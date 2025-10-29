@@ -2,7 +2,7 @@ package MattMC.screens;
 
 import MattMC.core.Game;
 import MattMC.core.Window;
-import MattMC.gfx.Texture;
+import MattMC.gfx.CubeMap;
 import MattMC.ui.UIButton;
 import org.lwjgl.BufferUtils;
 import org.lwjgl.stb.STBEasyFont;
@@ -15,17 +15,34 @@ import java.util.List;
 
 import static org.lwjgl.glfw.GLFW.*;
 import static org.lwjgl.opengl.GL11.*;
+import static org.lwjgl.opengl.GL13.*;
 import static org.lwjgl.system.MemoryStack.stackPush;
 
+/** Title screen with a time-based, fluid cubemap panorama and game logic at fixed 20 TPS. */
 public final class TitleScreen implements Screen {
+    // Core
     private final Game game;
     private final Window window;
+
+    // UI
     private final List<UIButton> buttons = new ArrayList<>();
+    private final ByteBuffer fontBuffer = BufferUtils.createByteBuffer(16 * 4096);
     private double mouseXWin, mouseYWin;
     private boolean mouseDown;
 
-    private final ByteBuffer fontBuffer = BufferUtils.createByteBuffer(16 * 4096);
-    private Texture bg;
+    // Panorama
+    private CubeMap sky;
+    private float yawDeg = 0f;   // rotated by real time (deg)
+    private float pitchDeg = 5f; // slight upward tilt
+    private float yawSpeedDegPerSec = 2.0f; // visual speed, time-based
+
+    // Fixed 20 TPS logic clock
+    private static final double TPS = 20.0;
+    private static final double TICK_LEN = 1.0 / TPS;
+    private double tickAcc = 0.0;
+
+    // Real-time frame clock for visuals & accumulator
+    private double lastFrameTimeSec = System.nanoTime() * 1e-9;
 
     // Layout
     private float titleScale = 3.0f;
@@ -39,7 +56,8 @@ public final class TitleScreen implements Screen {
         this.game = game;
         this.window = game.window();
 
-        bg = Texture.load("/assets/textures/gui/panorama1_0.png");
+        // Load six faces: panorama1_0.png ... panorama1_5.png
+        sky = MattMC.gfx.CubeMap.load("/assets/textures/gui/panorama1_", ".png");
 
         glfwSetCursorPosCallback(window.handle(), (h, x, y) -> { mouseXWin = x; mouseYWin = y; });
         glfwSetMouseButtonCallback(window.handle(), (h, button, action, mods) -> {
@@ -49,12 +67,7 @@ public final class TitleScreen implements Screen {
         recomputeLayout();
 
         glfwSetFramebufferSizeCallback(window.handle(), (win, newW, newH) -> {
-            glViewport(0, 0, Math.max(newW,1), Math.max(newH,1));
-            glMatrixMode(GL_PROJECTION);
-            glLoadIdentity();
-            glOrtho(0, newW, newH, 0, -1, 1);
-            glMatrixMode(GL_MODELVIEW);
-            glLoadIdentity();
+            glViewport(0, 0, Math.max(newW, 1), Math.max(newH, 1));
             recomputeLayout();
         });
     }
@@ -72,20 +85,32 @@ public final class TitleScreen implements Screen {
         int minButtonsTop = (int)(subtitleCY + subtitleH + 24);
 
         int totalButtonsH = 3 * buttonHeight + 2 * buttonGap;
-        int centeredTop = h/2 - totalButtonsH/2;
+        int centeredTop = h / 2 - totalButtonsH / 2;
 
         buttonsStartY = Math.max(minButtonsTop, centeredTop);
 
         int x = (w - buttonWidth) / 2;
         buttons.clear();
-        buttons.add(new UIButton("Singleplayer", x, buttonsStartY + 0*(buttonHeight+buttonGap), buttonWidth, buttonHeight));
-        buttons.add(new UIButton("Options",      x, buttonsStartY + 1*(buttonHeight+buttonGap), buttonWidth, buttonHeight));
-        buttons.add(new UIButton("Quit",         x, buttonsStartY + 2*(buttonHeight+buttonGap), buttonWidth, buttonHeight));
+        buttons.add(new UIButton("Singleplayer", x, buttonsStartY + 0 * (buttonHeight + buttonGap), buttonWidth, buttonHeight));
+        buttons.add(new UIButton("Options",      x, buttonsStartY + 1 * (buttonHeight + buttonGap), buttonWidth, buttonHeight));
+        buttons.add(new UIButton("Quit",         x, buttonsStartY + 2 * (buttonHeight + buttonGap), buttonWidth, buttonHeight));
     }
 
     @Override
     public void tick() {
-        // window -> framebuffer coords (HiDPI safe)
+        // Frame delta (seconds)
+        double now = System.nanoTime() * 1e-9;
+        double frameDt = now - lastFrameTimeSec;
+        lastFrameTimeSec = now;
+        if (frameDt < 0) frameDt = 0;
+        if (frameDt > 0.25) frameDt = 0.25; // clamp huge pauses to keep things sane
+
+        // Smooth, time-based panorama rotation (independent of tick/refresh)
+        yawDeg += yawSpeedDegPerSec * (float)frameDt;
+        if (yawDeg >= 360f) yawDeg -= 360f;
+        if (yawDeg < 0f)    yawDeg += 360f;
+
+        // Hover every frame for responsiveness (not tied to TPS)
         float mxFB, myFB;
         try (MemoryStack stack = stackPush()) {
             IntBuffer winW = stack.mallocInt(1), winH = stack.mallocInt(1);
@@ -94,17 +119,29 @@ public final class TitleScreen implements Screen {
             glfwGetFramebufferSize(window.handle(), fbW, fbH);
             float sx = fbW.get(0) / Math.max(1f, winW.get(0));
             float sy = fbH.get(0) / Math.max(1f, winH.get(0));
-            mxFB = (float) mouseXWin * sx;
-            myFB = (float) mouseYWin * sy;
+            mxFB = (float)mouseXWin * sx;
+            myFB = (float)mouseYWin * sy;
         }
+        for (var b : buttons) b.setHover(b.contains(mxFB, myFB));
 
-        for (var b : buttons) {
-            boolean hov = b.contains(mxFB, myFB);
-            b.setHover(hov);
-            if (hov && mouseDown) {
-                onClick(b.label);
-                mouseDown = false;
+        // Fixed 20 TPS for game logic
+        tickAcc += frameDt;
+        while (tickAcc >= TICK_LEN) {
+            doTick20(mxFB, myFB);
+            tickAcc -= TICK_LEN;
+        }
+    }
+
+    /** Logic that runs exactly at 20 TPS (clicks, timers, etc.). */
+    private void doTick20(float mxFB, float myFB) {
+        if (mouseDown) {
+            for (var b : buttons) {
+                if (b.contains(mxFB, myFB)) {
+                    onClick(b.label);
+                    break;
+                }
             }
+            mouseDown = false; // debounce
         }
     }
 
@@ -121,48 +158,97 @@ public final class TitleScreen implements Screen {
 
     @Override
     public void render(double alpha) {
-        glClearColor(0f, 0f, 0f, 1f);
-        glClear(GL_COLOR_BUFFER_BIT);
+        // 1) draw rotating cubemap panorama (perspective)
+        drawSkybox();
 
-        // Background image (cover & center)
-        drawBackgroundCover(bg, window.width(), window.height());
-
-        // Buttons first, text last (z-order)
+        // 2) switch to orthographic for UI and draw
+        setupOrtho();
         for (var b : buttons) drawButton(b);
-
         drawTitle("MattMC", titleCX, titleCY, titleScale, 0xFFFFFF);
         drawTitle("A blocky sandbox by Matt", subtitleCX, subtitleCY, subtitleScale, 0xB0C4DE);
     }
 
-    @Override
-    public void onClose() {
-        if (bg != null) { bg.close(); bg = null; }
-    }
+    private void drawSkybox() {
+        int w = window.width(), h = window.height();
+        float aspect = Math.max(1f, (float)w / Math.max(1, h));
 
-    // ------------------- Drawing helpers -------------------
+        // Clear and set perspective
+        glClearColor(0f, 0f, 0f, 1f);
+        glClear(GL_COLOR_BUFFER_BIT);
 
-    private void drawBackgroundCover(Texture tex, int screenW, int screenH) {
-        float imgW = tex.width, imgH = tex.height;
-        float scale = Math.max(screenW / imgW, screenH / imgH); // cover
-        float drawW = imgW * scale;
-        float drawH = imgH * scale;
-        float x = (screenW - drawW) / 2f;
-        float y = (screenH - drawH) / 2f;
+        glMatrixMode(GL_PROJECTION);
+        glLoadIdentity();
+        // Simple perspective via glFrustum
+        float fov = 70f, zn = 0.1f, zf = 10f;
+        float top = (float)(Math.tan(Math.toRadians(fov * 0.5)) * zn);
+        float bottom = -top;
+        float right = top * aspect;
+        float left = -right;
+        glFrustum(left, right, bottom, top, zn, zf);
 
-        glEnable(GL_TEXTURE_2D);
-        tex.bind();
+        glMatrixMode(GL_MODELVIEW);
+        glLoadIdentity();
+
+        // Camera at origin, rotate the skybox
+        glRotatef(pitchDeg, 1f, 0f, 0f);
+        glRotatef(yawDeg,   0f, 1f, 0f);
+
+        // Draw a cube of size 2 centered at origin with cubemap lookup
+        glDisable(GL_DEPTH_TEST);
+        glEnable(GL_TEXTURE_CUBE_MAP);
+        glBindTexture(GL_TEXTURE_CUBE_MAP, sky.id);
         glColor4f(1f, 1f, 1f, 1f);
+
         glBegin(GL_QUADS);
-        // v=1.0 at top, v=0.0 at bottom
-        glTexCoord2f(0f, 1f); glVertex2f(x,       y);
-        glTexCoord2f(1f, 1f); glVertex2f(x+drawW, y);
-        glTexCoord2f(1f, 0f); glVertex2f(x+drawW, y+drawH);
-        glTexCoord2f(0f, 0f); glVertex2f(x,       y+drawH);
+        // +X (right)
+        glTexCoord3f(+1, -1, -1); glVertex3f(+1, -1, -1);
+        glTexCoord3f(+1, -1, +1); glVertex3f(+1, -1, +1);
+        glTexCoord3f(+1, +1, +1); glVertex3f(+1, +1, +1);
+        glTexCoord3f(+1, +1, -1); glVertex3f(+1, +1, -1);
+
+        // -X (left)
+        glTexCoord3f(-1, -1, +1); glVertex3f(-1, -1, +1);
+        glTexCoord3f(-1, -1, -1); glVertex3f(-1, -1, -1);
+        glTexCoord3f(-1, +1, -1); glVertex3f(-1, +1, -1);
+        glTexCoord3f(-1, +1, +1); glVertex3f(-1, +1, +1);
+
+        // +Y (top)
+        glTexCoord3f(-1, +1, -1); glVertex3f(-1, +1, -1);
+        glTexCoord3f(+1, +1, -1); glVertex3f(+1, +1, -1);
+        glTexCoord3f(+1, +1, +1); glVertex3f(+1, +1, +1);
+        glTexCoord3f(-1, +1, +1); glVertex3f(-1, +1, +1);
+
+        // -Y (bottom)
+        glTexCoord3f(-1, -1, +1); glVertex3f(-1, -1, +1);
+        glTexCoord3f(+1, -1, +1); glVertex3f(+1, -1, +1);
+        glTexCoord3f(+1, -1, -1); glVertex3f(+1, -1, -1);
+        glTexCoord3f(-1, -1, -1); glVertex3f(-1, -1, -1);
+
+        // +Z (front)
+        glTexCoord3f(-1, -1, +1); glVertex3f(-1, -1, +1);
+        glTexCoord3f(-1, +1, +1); glVertex3f(-1, +1, +1);
+        glTexCoord3f(+1, +1, +1); glVertex3f(+1, +1, +1);
+        glTexCoord3f(+1, -1, +1); glVertex3f(+1, -1, +1);
+
+        // -Z (back)
+        glTexCoord3f(+1, -1, -1); glVertex3f(+1, -1, -1);
+        glTexCoord3f(+1, +1, -1); glVertex3f(+1, +1, -1);
+        glTexCoord3f(-1, +1, -1); glVertex3f(-1, +1, -1);
+        glTexCoord3f(-1, -1, -1); glVertex3f(-1, -1, -1);
         glEnd();
-        glBindTexture(GL_TEXTURE_2D, 0);
-        glDisable(GL_TEXTURE_2D);
+
+        glBindTexture(GL_TEXTURE_CUBE_MAP, 0);
+        glDisable(GL_TEXTURE_CUBE_MAP);
     }
 
+    private void setupOrtho() {
+        int w = window.width(), h = window.height();
+        glMatrixMode(GL_PROJECTION);
+        glLoadIdentity();
+        glOrtho(0, w, h, 0, -1, 1);
+        glMatrixMode(GL_MODELVIEW);
+        glLoadIdentity();
+    }
 
     private void drawButton(UIButton b) {
         int base = b.hover() ? 0x3A5FCD : 0x2E4A9B;
@@ -170,36 +256,36 @@ public final class TitleScreen implements Screen {
 
         // Shadow
         setColor(0x000000, 0.35f);
-        fillRect(b.x+2, b.y+3, b.w, b.h);
+        fillRect(b.x + 2, b.y + 3, b.w, b.h);
 
         // Body gradient
         glBegin(GL_QUADS);
         setColor(edge, 1f);
         glVertex2f(b.x, b.y);
-        glVertex2f(b.x+b.w, b.y);
+        glVertex2f(b.x + b.w, b.y);
         setColor(base, 1f);
-        glVertex2f(b.x+b.w, b.y+b.h);
-        glVertex2f(b.x, b.y+b.h);
+        glVertex2f(b.x + b.w, b.y + b.h);
+        glVertex2f(b.x, b.y + b.h);
         glEnd();
 
         // Border
         setColor(0x0B1220, 1f);
         glBegin(GL_LINE_LOOP);
         glVertex2f(b.x, b.y);
-        glVertex2f(b.x+b.w, b.y);
-        glVertex2f(b.x+b.w, b.y+b.h);
-        glVertex2f(b.x, b.y+b.h);
+        glVertex2f(b.x + b.w, b.y);
+        glVertex2f(b.x + b.w, b.y + b.h);
+        glVertex2f(b.x, b.y + b.h);
         glEnd();
 
-        drawTextCentered(b.label, b.x + b.w/2f, b.y + b.h/2f, 1.2f, 0xFFFFFF);
+        drawTextCentered(b.label, b.x + b.w / 2f, b.y + b.h / 2f, 1.2f, 0xFFFFFF);
     }
 
     private void fillRect(int x, int y, int w, int h) {
         glBegin(GL_QUADS);
         glVertex2f(x, y);
-        glVertex2f(x+w, y);
-        glVertex2f(x+w, y+h);
-        glVertex2f(x, y+h);
+        glVertex2f(x + w, y);
+        glVertex2f(x + w, y + h);
+        glVertex2f(x, y + h);
         glEnd();
     }
 
@@ -241,5 +327,10 @@ public final class TitleScreen implements Screen {
         glDisableClientState(GL_VERTEX_ARRAY);
 
         glPopMatrix();
+    }
+
+    @Override
+    public void onClose() {
+        if (sky != null) { sky.close(); sky = null; }
     }
 }
