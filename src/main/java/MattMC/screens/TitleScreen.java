@@ -2,6 +2,7 @@ package MattMC.screens;
 
 import MattMC.core.Game;
 import MattMC.core.Window;
+import MattMC.gfx.Texture;
 import MattMC.ui.UIButton;
 import org.lwjgl.BufferUtils;
 import org.lwjgl.stb.STBEasyFont;
@@ -24,14 +25,13 @@ public final class TitleScreen implements Screen {
     private boolean mouseDown;
 
     private final ByteBuffer fontBuffer = BufferUtils.createByteBuffer(16 * 4096);
+    private Texture bg; // background texture
 
-    // Layout params
+    // Layout
     private float titleScale = 3.0f;
     private float subtitleScale = 1.1f;
-    private float titleYFrac = 1f / 3f; // title at 1/3 window height
+    private float titleYFrac = 1f / 3f;
     private int buttonWidth = 280, buttonHeight = 42, buttonGap = 12;
-
-    // Cached layout
     private float titleCX, titleCY, subtitleCX, subtitleCY;
     private int buttonsStartY;
 
@@ -39,9 +39,10 @@ public final class TitleScreen implements Screen {
         this.game = game;
         this.window = game.window();
 
-        glfwSetCursorPosCallback(window.handle(), (h, x, y) -> {
-            mouseXWin = x; mouseYWin = y;
-        });
+        // Load background image from resources
+        bg = Texture.load("/assets/textures/gui/panorama1_0.png");
+
+        glfwSetCursorPosCallback(window.handle(), (h, x, y) -> { mouseXWin = x; mouseYWin = y; });
         glfwSetMouseButtonCallback(window.handle(), (h, button, action, mods) -> {
             if (button == GLFW_MOUSE_BUTTON_LEFT) mouseDown = (action == GLFW_PRESS);
         });
@@ -66,9 +67,8 @@ public final class TitleScreen implements Screen {
         titleCY = h * titleYFrac;
 
         subtitleCX = w / 2f;
-        subtitleCY = titleCY + 56f; // base offset under title
+        subtitleCY = titleCY + 56f;
 
-        // Ensure buttons start BELOW the subtitle with a margin
         int subtitleH = (int)(STBEasyFont.stb_easy_font_height("A") * subtitleScale);
         int minButtonsTop = (int)(subtitleCY + subtitleH + 24);
 
@@ -77,7 +77,6 @@ public final class TitleScreen implements Screen {
 
         buttonsStartY = Math.max(minButtonsTop, centeredTop);
 
-        // Build buttons
         int x = (w - buttonWidth) / 2;
         buttons.clear();
         buttons.add(new UIButton("Singleplayer", x, buttonsStartY + 0*(buttonHeight+buttonGap), buttonWidth, buttonHeight));
@@ -87,7 +86,7 @@ public final class TitleScreen implements Screen {
 
     @Override
     public void tick() {
-        // Convert window coords -> framebuffer coords for accurate hit-testing on HiDPI
+        // window -> framebuffer coords
         float mxFB, myFB;
         try (MemoryStack stack = stackPush()) {
             IntBuffer winW = stack.mallocInt(1), winH = stack.mallocInt(1);
@@ -123,32 +122,49 @@ public final class TitleScreen implements Screen {
 
     @Override
     public void render(double alpha) {
-        glClearColor(0.08f, 0.10f, 0.14f, 1f);
+        glClearColor(0f, 0f, 0f, 1f);
         glClear(GL_COLOR_BUFFER_BIT);
 
-        // Background
-        drawGradient(0, 0, window.width(), window.height()/2, 0x223355, 0x111a22);
-        drawGradient(0, window.height()/2, window.width(), window.height()/2, 0x0e1319, 0x101820);
+        // Draw the background image (cover & center)
+        drawBackgroundCover(bg, window.width(), window.height());
 
-        // Draw BUTTONS FIRST (so text renders on top and never appears hidden)
+        // Optional: darken slightly for legibility
+        glColor4f(0f, 0f, 0f, 0.20f);
+        fillRect(0, 0, window.width(), window.height());
+
+        // Buttons first, text last (z-order)
         for (var b : buttons) drawButton(b);
 
-        // Then draw title/subtitle ON TOP
         drawTitle("MattMC", titleCX, titleCY, titleScale, 0xFFFFFF);
         drawTitle("A blocky sandbox by Matt", subtitleCX, subtitleCY, subtitleScale, 0xB0C4DE);
     }
 
+    @Override
+    public void onClose() {
+        if (bg != null) { bg.close(); bg = null; }
+    }
+
     // ------------------- Drawing helpers -------------------
 
-    private void drawGradient(int x, int y, int w, int h, int cTop, int cBot) {
+    private void drawBackgroundCover(Texture tex, int screenW, int screenH) {
+        float imgW = tex.width, imgH = tex.height;
+        float scale = Math.max(screenW / imgW, screenH / imgH); // cover
+        float drawW = imgW * scale;
+        float drawH = imgH * scale;
+        float x = (screenW - drawW) / 2f;
+        float y = (screenH - drawH) / 2f;
+
+        glEnable(GL_TEXTURE_2D);
+        tex.bind();
+        glColor4f(1f, 1f, 1f, 1f);
         glBegin(GL_QUADS);
-        setColor(cTop, 1f);
-        glVertex2f(x, y);
-        glVertex2f(x+w, y);
-        setColor(cBot, 1f);
-        glVertex2f(x+w, y+h);
-        glVertex2f(x, y+h);
+        glTexCoord2f(0f, 0f); glVertex2f(x,       y);
+        glTexCoord2f(1f, 0f); glVertex2f(x+drawW, y);
+        glTexCoord2f(1f, 1f); glVertex2f(x+drawW, y+drawH);
+        glTexCoord2f(0f, 1f); glVertex2f(x,       y+drawH);
         glEnd();
+        glBindTexture(GL_TEXTURE_2D, 0);
+        glDisable(GL_TEXTURE_2D);
     }
 
     private void drawButton(UIButton b) {
@@ -178,11 +194,11 @@ public final class TitleScreen implements Screen {
         glVertex2f(b.x, b.y+b.h);
         glEnd();
 
-        // Centered label
         drawTextCentered(b.label, b.x + b.w/2f, b.y + b.h/2f, 1.2f, 0xFFFFFF);
     }
 
     private void fillRect(int x, int y, int w, int h) {
+        glDisable(GL_TEXTURE_2D);
         glBegin(GL_QUADS);
         glVertex2f(x, y);
         glVertex2f(x+w, y);
