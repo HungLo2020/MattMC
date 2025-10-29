@@ -25,7 +25,7 @@ public final class TitleScreen implements Screen {
     private boolean mouseDown;
 
     private final ByteBuffer fontBuffer = BufferUtils.createByteBuffer(16 * 4096);
-    private Texture bg; // background texture
+    private Texture bg;
 
     // Layout
     private float titleScale = 3.0f;
@@ -39,7 +39,6 @@ public final class TitleScreen implements Screen {
         this.game = game;
         this.window = game.window();
 
-        // Load background image from resources
         bg = Texture.load("/assets/textures/gui/panorama1_0.png");
 
         glfwSetCursorPosCallback(window.handle(), (h, x, y) -> { mouseXWin = x; mouseYWin = y; });
@@ -86,7 +85,7 @@ public final class TitleScreen implements Screen {
 
     @Override
     public void tick() {
-        // window -> framebuffer coords
+        // window -> framebuffer coords (HiDPI safe)
         float mxFB, myFB;
         try (MemoryStack stack = stackPush()) {
             IntBuffer winW = stack.mallocInt(1), winH = stack.mallocInt(1);
@@ -125,12 +124,8 @@ public final class TitleScreen implements Screen {
         glClearColor(0f, 0f, 0f, 1f);
         glClear(GL_COLOR_BUFFER_BIT);
 
-        // Draw the background image (cover & center)
+        // Background image (cover & center)
         drawBackgroundCover(bg, window.width(), window.height());
-
-        // Optional: darken slightly for legibility
-        glColor4f(0f, 0f, 0f, 0.20f);
-        fillRect(0, 0, window.width(), window.height());
 
         // Buttons first, text last (z-order)
         for (var b : buttons) drawButton(b);
@@ -158,14 +153,16 @@ public final class TitleScreen implements Screen {
         tex.bind();
         glColor4f(1f, 1f, 1f, 1f);
         glBegin(GL_QUADS);
-        glTexCoord2f(0f, 0f); glVertex2f(x,       y);
-        glTexCoord2f(1f, 0f); glVertex2f(x+drawW, y);
-        glTexCoord2f(1f, 1f); glVertex2f(x+drawW, y+drawH);
-        glTexCoord2f(0f, 1f); glVertex2f(x,       y+drawH);
+        // v=1.0 at top, v=0.0 at bottom
+        glTexCoord2f(0f, 1f); glVertex2f(x,       y);
+        glTexCoord2f(1f, 1f); glVertex2f(x+drawW, y);
+        glTexCoord2f(1f, 0f); glVertex2f(x+drawW, y+drawH);
+        glTexCoord2f(0f, 0f); glVertex2f(x,       y+drawH);
         glEnd();
         glBindTexture(GL_TEXTURE_2D, 0);
         glDisable(GL_TEXTURE_2D);
     }
+
 
     private void drawButton(UIButton b) {
         int base = b.hover() ? 0x3A5FCD : 0x2E4A9B;
@@ -198,7 +195,6 @@ public final class TitleScreen implements Screen {
     }
 
     private void fillRect(int x, int y, int w, int h) {
-        glDisable(GL_TEXTURE_2D);
         glBegin(GL_QUADS);
         glVertex2f(x, y);
         glVertex2f(x+w, y);

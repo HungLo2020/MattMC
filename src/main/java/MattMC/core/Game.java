@@ -7,10 +7,7 @@ public final class Game {
     private Screen current;
     private boolean running = true;
 
-    public Game(Window window) {
-        this.window = window;
-    }
-
+    public Game(Window window) { this.window = window; }
     public Window window() { return window; }
 
     public void setScreen(Screen next) {
@@ -22,7 +19,7 @@ public final class Game {
     public void quit() { running = false; }
 
     public void run() {
-        final double tick = 1.0 / 60.0; // 60 Hz UI
+        final double tick = 1.0 / 60.0;
         double prev = now(), acc = 0.0;
 
         while (running && !window.shouldClose()) {
