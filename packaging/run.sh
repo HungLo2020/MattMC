@@ -1,8 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Default to Java 21 if JAVA_HOME isn't set (edit the path if needed)
-export JAVA_HOME="${JAVA_HOME:-/usr/lib/jvm/java-21-openjdk-amd64}"
+# Resolve script location (handles symlinks, spaces, etc.)
+SCRIPT_DIR="$(cd -- "$(dirname -- "$0")" && pwd)"
+
+# Assume the script lives in .../MattMC/
+# So JRE is at: ./libraries/jre/
+export JAVA_HOME="${SCRIPT_DIR}/libraries/jre"
 
 # Use the Gradle-generated launcher which honors JAVA_HOME
-exec "$(dirname -- "$0")/bin/MattMC" "$@"
+exec "${SCRIPT_DIR}/bin/MattMC" "$@"
