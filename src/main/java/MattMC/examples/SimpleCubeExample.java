@@ -15,13 +15,12 @@ public final class SimpleCubeExample {
 
     /**
      * Draws a simple colored cube centered at the origin.
+     * Note: Caller should enable GL_DEPTH_TEST before calling and disable after.
      * 
      * @param size The size of the cube (edge length)
      */
     public static void drawCube(float size) {
         float h = size / 2f;  // Half-size for vertices relative to center
-        
-        glEnable(GL_DEPTH_TEST);
         
         // Front face (+Z) - Yellow
         glColor3f(1.0f, 1.0f, 0.0f);
@@ -80,10 +79,13 @@ public final class SimpleCubeExample {
     
     /**
      * Draws a cube with edge lines for better visibility.
+     * Manages depth testing internally.
      * 
      * @param size The size of the cube (edge length)
      */
     public static void drawCubeWithEdges(float size) {
+        glEnable(GL_DEPTH_TEST);
+        
         // Draw the colored faces
         drawCube(size);
         
@@ -124,7 +126,7 @@ public final class SimpleCubeExample {
      * @param fov Field of view in degrees
      */
     public static void setupPerspective(int width, int height, float fov) {
-        float aspect = (float) width / Math.max(1, height);
+        float aspect = Math.max(1f, (float) width / Math.max(1, height));
         float zNear = 0.1f;
         float zFar = 100.0f;
         
@@ -158,8 +160,13 @@ public final class SimpleCubeExample {
      *     glTranslatef(0f, 0f, -5f);  // Move back to see cube
      *     glRotatef(angle, 0f, 1f, 0f);  // Rotate for animation
      *     
-     *     // Draw cube
+     *     // Draw cube (manages depth testing internally)
      *     SimpleCubeExample.drawCubeWithEdges(2.0f);
+     *     
+     *     // Or manually manage depth testing:
+     *     // glEnable(GL_DEPTH_TEST);
+     *     // SimpleCubeExample.drawCube(2.0f);
+     *     // glDisable(GL_DEPTH_TEST);
      * }
      * }
      * </pre>

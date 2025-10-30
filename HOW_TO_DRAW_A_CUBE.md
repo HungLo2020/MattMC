@@ -37,7 +37,7 @@ The cube is rendered with a 3D perspective projection:
 
 ```java
 // Set up perspective projection
-float aspect = (float) width / height;
+float aspect = Math.max(1f, (float) width / Math.max(1, height));
 glMatrixMode(GL_PROJECTION);
 glLoadIdentity();
 float fov = 60f, zn = 0.1f, zf = 100f;
