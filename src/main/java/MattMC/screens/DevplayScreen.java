@@ -135,13 +135,17 @@ public final class DevplayScreen implements Screen {
     /**
      * Render all blocks in a chunk.
      * Uses face culling - only draws faces that are exposed to air.
+     * 
+     * Note: This iterates all 98,304 possible block positions but skips air blocks
+     * immediately with 'continue'. For larger worlds, consider using a sparse data
+     * structure or chunk sections like Minecraft does (16x16x16 sections).
      */
     private void renderChunk(Chunk chunk) {
         for (int x = 0; x < Chunk.WIDTH; x++) {
             for (int y = 0; y < Chunk.HEIGHT; y++) {
                 for (int z = 0; z < Chunk.DEPTH; z++) {
                     Block block = chunk.getBlock(x, y, z);
-                    if (block.isAir()) continue;
+                    if (block.isAir()) continue;  // Skip air blocks (most of the chunk)
                     
                     // Calculate world position
                     float wx = x;
@@ -278,9 +282,9 @@ public final class DevplayScreen implements Screen {
     }
     
     private int adjustColorBrightness(int rgb, float factor) {
-        int r = (int)(((rgb >> 16) & 0xFF) * factor);
-        int g = (int)(((rgb >> 8) & 0xFF) * factor);
-        int b = (int)((rgb & 0xFF) * factor);
+        int r = Math.min(255, (int)(((rgb >> 16) & 0xFF) * factor));
+        int g = Math.min(255, (int)(((rgb >> 8) & 0xFF) * factor));
+        int b = Math.min(255, (int)((rgb & 0xFF) * factor));
         return (r << 16) | (g << 8) | b;
     }
 

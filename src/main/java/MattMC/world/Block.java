@@ -5,6 +5,9 @@ package MattMC.world;
  * Similar to Minecraft's block system.
  */
 public final class Block {
+    // Reusable air block instance to avoid allocations
+    public static final Block AIR = new Block(BlockType.AIR);
+    
     private final BlockType type;
     
     public Block(BlockType type) {
