@@ -147,7 +147,7 @@ public final class TitleScreen implements Screen {
 
     private void onClick(String label) {
         switch (label) {
-            case "Singleplayer" -> System.out.println("→ TODO: world select / create world");
+            case "Singleplayer" -> game.setScreen(new SingleplayerScreen(game));
             case "Options"      -> System.out.println("→ TODO: options screen");
             case "Quit"         -> {
                 glfwSetWindowShouldClose(window.handle(), true);

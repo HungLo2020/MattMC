@@ -1,0 +1,224 @@
+package MattMC.screens;
+
+import MattMC.core.Game;
+import MattMC.core.Window;
+import MattMC.ui.UIButton;
+import org.lwjgl.BufferUtils;
+import org.lwjgl.stb.STBEasyFont;
+import org.lwjgl.system.MemoryStack;
+
+import java.nio.ByteBuffer;
+import java.nio.IntBuffer;
+import java.util.ArrayList;
+import java.util.List;
+
+import static org.lwjgl.glfw.GLFW.*;
+import static org.lwjgl.opengl.GL11.*;
+import static org.lwjgl.system.MemoryStack.stackPush;
+
+/* Simple singleplayer menu. Buttons do nothing except "Back". */
+public final class SingleplayerScreen implements Screen {
+    private final Game game;
+    private final Window window;
+    private final List<UIButton> buttons = new ArrayList<>();
+    private final ByteBuffer fontBuffer = BufferUtils.createByteBuffer(16 * 4096);
+    private double mouseXWin, mouseYWin;
+    private boolean mouseDown;
+
+    private float titleScale = 2.5f;
+    private float titleCX, titleCY;
+    private int buttonWidth = 300, buttonHeight = 44, buttonGap = 12;
+    private int buttonsStartY;
+
+    // Dev button (top-left)
+    private int devButtonWidth = 120;
+    private int devButtonHeight = 34;
+    private int devButtonMargin = 8;
+
+    public SingleplayerScreen(Game game) {
+        this.game = game;
+        this.window = game.window();
+
+        glfwSetCursorPosCallback(window.handle(), (h, x, y) -> { mouseXWin = x; mouseYWin = y; });
+        glfwSetMouseButtonCallback(window.handle(), (h, button, action, mods) -> {
+            if (button == GLFW_MOUSE_BUTTON_LEFT) mouseDown = (action == GLFW_PRESS);
+        });
+
+        recomputeLayout();
+
+        glfwSetFramebufferSizeCallback(window.handle(), (win, newW, newH) -> {
+            glViewport(0, 0, Math.max(newW, 1), Math.max(newH, 1));
+            recomputeLayout();
+        });
+    }
+
+    private void recomputeLayout() {
+        int w = window.width(), h = window.height();
+        titleCX = w / 2f;
+        titleCY = h * 0.18f;
+
+        int totalButtonsH = 3 * buttonHeight + 2 * buttonGap;
+        buttonsStartY = (int)(h / 2f - totalButtonsH / 2f);
+
+        int x = (w - buttonWidth) / 2;
+        buttons.clear();
+
+        // Top-left dev button
+        buttons.add(new UIButton("Devplay", devButtonMargin, devButtonMargin, devButtonWidth, devButtonHeight));
+
+        // Centered singleplayer buttons
+        buttons.add(new UIButton("Create World", x, buttonsStartY + 0 * (buttonHeight + buttonGap), buttonWidth, buttonHeight));
+        buttons.add(new UIButton("Load World",   x, buttonsStartY + 1 * (buttonHeight + buttonGap), buttonWidth, buttonHeight));
+        buttons.add(new UIButton("Back",         x, buttonsStartY + 2 * (buttonHeight + buttonGap), buttonWidth, buttonHeight));
+    }
+
+    @Override
+    public void tick() {
+        // Convert window coords -> framebuffer coords for accurate hit-testing on HiDPI
+        float mxFB, myFB;
+        try (MemoryStack stack = stackPush()) {
+            IntBuffer winW = stack.mallocInt(1), winH = stack.mallocInt(1);
+            IntBuffer fbW  = stack.mallocInt(1), fbH  = stack.mallocInt(1);
+            glfwGetWindowSize(window.handle(), winW, winH);
+            glfwGetFramebufferSize(window.handle(), fbW, fbH);
+            float sx = fbW.get(0) / Math.max(1f, winW.get(0));
+            float sy = fbH.get(0) / Math.max(1f, winH.get(0));
+            mxFB = (float) mouseXWin * sx;
+            myFB = (float) mouseYWin * sy;
+        }
+
+        for (var b : buttons) b.setHover(b.contains(mxFB, myFB));
+
+        if (mouseDown) {
+            for (var b : buttons) {
+                if (b.contains(mxFB, myFB)) {
+                    onClick(b.label);
+                    break;
+                }
+            }
+            mouseDown = false;
+        }
+    }
+
+    private void onClick(String label) {
+        if ("Back".equals(label)) {
+            game.setScreen(new TitleScreen(game));
+            return;
+        }
+        if ("Devplay".equals(label)) {
+            System.out.println("→ Devplay clicked");
+            return;
+        }
+        if ("Load World".equals(label)) {
+            System.out.println("→ Load World clicked");
+            return;
+        }
+        if ("Create World".equals(label)) {
+            System.out.println("→ Create World clicked");
+            return;
+        }
+        // other buttons intentionally do nothing for now
+    }
+
+    @Override
+    public void render(double alpha) {
+        // simple clear + ortho UI like TitleScreen
+        glClearColor(0.06f, 0.08f, 0.10f, 1f);
+        glClear(GL_COLOR_BUFFER_BIT);
+
+        setupOrtho();
+        for (var b : buttons) drawButton(b);
+        drawTitle("Singleplayer", titleCX, titleCY, titleScale, 0xFFFFFF);
+        drawTitle("Create or load worlds", titleCX, titleCY + 48f, 1.0f, 0xB0C4DE);
+    }
+
+    private void setupOrtho() {
+        int w = window.width(), h = window.height();
+        glMatrixMode(GL_PROJECTION);
+        glLoadIdentity();
+        glOrtho(0, w, h, 0, -1, 1);
+        glMatrixMode(GL_MODELVIEW);
+        glLoadIdentity();
+    }
+
+    private void drawButton(UIButton b) {
+        int base = b.hover() ? 0x3A5FCD : 0x2E4A9B;
+        int edge = b.hover() ? 0x6D89E3 : 0x20356B;
+
+        setColor(0x000000, 0.35f);
+        fillRect(b.x + 2, b.y + 3, b.w, b.h);
+
+        glBegin(GL_QUADS);
+        setColor(edge, 1f);
+        glVertex2f(b.x, b.y);
+        glVertex2f(b.x + b.w, b.y);
+        setColor(base, 1f);
+        glVertex2f(b.x + b.w, b.y + b.h);
+        glVertex2f(b.x, b.y + b.h);
+        glEnd();
+
+        setColor(0x0B1220, 1f);
+        glBegin(GL_LINE_LOOP);
+        glVertex2f(b.x, b.y);
+        glVertex2f(b.x + b.w, b.y);
+        glVertex2f(b.x + b.w, b.y + b.h);
+        glVertex2f(b.x, b.y + b.h);
+        glEnd();
+
+        drawTextCentered(b.label, b.x + b.w / 2f, b.y + b.h / 2f, 1.2f, 0xFFFFFF);
+    }
+
+    private void fillRect(int x, int y, int w, int h) {
+        glBegin(GL_QUADS);
+        glVertex2f(x, y);
+        glVertex2f(x + w, y);
+        glVertex2f(x + w, y + h);
+        glVertex2f(x, y + h);
+        glEnd();
+    }
+
+    private void setColor(int rgb, float a) {
+        float r = ((rgb >> 16) & 0xFF) / 255f;
+        float g = ((rgb >> 8) & 0xFF) / 255f;
+        float b = (rgb & 0xFF) / 255f;
+        glColor4f(r, g, b, a);
+    }
+
+    private void drawTitle(String text, float cx, float cy, float scale, int rgb) {
+        int tw = STBEasyFont.stb_easy_font_width(text);
+        int th = STBEasyFont.stb_easy_font_height(text);
+        float x = cx - (tw * scale) / 2f;
+        float y = cy - (th * scale) / 2f;
+        drawText(text, x, y, scale, rgb);
+    }
+
+    private void drawTextCentered(String text, float cx, float cy, float scale, int rgb) {
+        int tw = STBEasyFont.stb_easy_font_width(text);
+        int th = STBEasyFont.stb_easy_font_height(text);
+        float x = cx - (tw * scale) / 2f;
+        float y = cy - (th * scale) / 2f;
+        drawText(text, x, y, scale, rgb);
+    }
+
+    private void drawText(String text, float x, float y, float scale, int rgb) {
+        setColor(rgb, 1f);
+        fontBuffer.clear();
+        int quads = STBEasyFont.stb_easy_font_print(0, 0, text, null, fontBuffer);
+
+        glPushMatrix();
+        glTranslatef(x, y, 0f);
+        glScalef(scale, scale, 1f);
+
+        glEnableClientState(GL_VERTEX_ARRAY);
+        glVertexPointer(2, GL_FLOAT, 16, fontBuffer);
+        glDrawArrays(GL_QUADS, 0, quads * 4);
+        glDisableClientState(GL_VERTEX_ARRAY);
+
+        glPopMatrix();
+    }
+
+    @Override
+    public void onOpen() {}
+    @Override
+    public void onClose() {}
+}
