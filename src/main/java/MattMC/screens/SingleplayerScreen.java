@@ -107,6 +107,7 @@ public final class SingleplayerScreen implements Screen {
         }
         if ("Devplay".equals(label)) {
             System.out.println("→ Devplay clicked");
+            game.setScreen(new DevplayScreen(game));
             return;
         }
         if ("Load World".equals(label)) {
