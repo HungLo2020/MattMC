@@ -46,45 +46,53 @@ public class ChunkRenderer {
         BlockType type = block.type();
         int color = type.color();
         
+        // Track which faces are visible for outline rendering
+        boolean topVisible = shouldRenderFace(chunk, cx, cy + 1, cz);
+        boolean bottomVisible = shouldRenderFace(chunk, cx, cy - 1, cz);
+        boolean northVisible = shouldRenderFace(chunk, cx, cy, cz - 1);
+        boolean southVisible = shouldRenderFace(chunk, cx, cy, cz + 1);
+        boolean westVisible = shouldRenderFace(chunk, cx - 1, cy, cz);
+        boolean eastVisible = shouldRenderFace(chunk, cx + 1, cy, cz);
+        
         // Check each face and only render if adjacent block is air
         // Top face (+Y)
-        if (shouldRenderFace(chunk, cx, cy + 1, cz)) {
+        if (topVisible) {
             setColor(color, 1f);
             drawTopFace(x, y, z);
         }
         
         // Bottom face (-Y)
-        if (shouldRenderFace(chunk, cx, cy - 1, cz)) {
+        if (bottomVisible) {
             setColor(darkenColor(color), 1f);
             drawBottomFace(x, y, z);
         }
         
         // North face (-Z)
-        if (shouldRenderFace(chunk, cx, cy, cz - 1)) {
+        if (northVisible) {
             setColor(adjustColorBrightness(color, 0.8f), 1f);
             drawNorthFace(x, y, z);
         }
         
         // South face (+Z)
-        if (shouldRenderFace(chunk, cx, cy, cz + 1)) {
+        if (southVisible) {
             setColor(adjustColorBrightness(color, 0.8f), 1f);
             drawSouthFace(x, y, z);
         }
         
         // West face (-X)
-        if (shouldRenderFace(chunk, cx - 1, cy, cz)) {
+        if (westVisible) {
             setColor(adjustColorBrightness(color, 0.6f), 1f);
             drawWestFace(x, y, z);
         }
         
         // East face (+X)
-        if (shouldRenderFace(chunk, cx + 1, cy, cz)) {
+        if (eastVisible) {
             setColor(adjustColorBrightness(color, 0.6f), 1f);
             drawEastFace(x, y, z);
         }
         
-        // Draw black outline around the cube
-        drawBlockOutline(x, y, z);
+        // Draw black outline only for visible edges (edges on visible faces)
+        drawBlockOutline(x, y, z, topVisible, bottomVisible, northVisible, southVisible, westVisible, eastVisible);
     }
     
     /**
@@ -163,9 +171,13 @@ public class ChunkRenderer {
     
     /**
      * Draw a black outline around a cube to make blocks more distinguishable.
-     * Draws the 12 edges of the cube.
+     * Only draws edges that are on visible faces to improve performance.
+     * Each edge is shared by 2 faces - we draw it if at least one face is visible.
      */
-    private void drawBlockOutline(float x, float y, float z) {
+    private void drawBlockOutline(float x, float y, float z, 
+                                   boolean top, boolean bottom, 
+                                   boolean north, boolean south, 
+                                   boolean west, boolean east) {
         float x0 = x, x1 = x + 1;
         float y0 = y, y1 = y + 1;
         float z0 = z, z1 = z + 1;
@@ -174,23 +186,49 @@ public class ChunkRenderer {
         setColor(0x000000, 1f);
         
         glBegin(GL_LINES);
-        // Bottom 4 edges
-        glVertex3f(x0, y0, z0); glVertex3f(x1, y0, z0);
-        glVertex3f(x1, y0, z0); glVertex3f(x1, y0, z1);
-        glVertex3f(x1, y0, z1); glVertex3f(x0, y0, z1);
-        glVertex3f(x0, y0, z1); glVertex3f(x0, y0, z0);
         
-        // Top 4 edges
-        glVertex3f(x0, y1, z0); glVertex3f(x1, y1, z0);
-        glVertex3f(x1, y1, z0); glVertex3f(x1, y1, z1);
-        glVertex3f(x1, y1, z1); glVertex3f(x0, y1, z1);
-        glVertex3f(x0, y1, z1); glVertex3f(x0, y1, z0);
+        // Bottom 4 edges (shared by bottom face and side faces)
+        if (bottom || west || north) {
+            glVertex3f(x0, y0, z0); glVertex3f(x1, y0, z0);
+        }
+        if (bottom || east || north) {
+            glVertex3f(x1, y0, z0); glVertex3f(x1, y0, z1);
+        }
+        if (bottom || east || south) {
+            glVertex3f(x1, y0, z1); glVertex3f(x0, y0, z1);
+        }
+        if (bottom || west || south) {
+            glVertex3f(x0, y0, z1); glVertex3f(x0, y0, z0);
+        }
         
-        // 4 vertical edges
-        glVertex3f(x0, y0, z0); glVertex3f(x0, y1, z0);
-        glVertex3f(x1, y0, z0); glVertex3f(x1, y1, z0);
-        glVertex3f(x1, y0, z1); glVertex3f(x1, y1, z1);
-        glVertex3f(x0, y0, z1); glVertex3f(x0, y1, z1);
+        // Top 4 edges (shared by top face and side faces)
+        if (top || west || north) {
+            glVertex3f(x0, y1, z0); glVertex3f(x1, y1, z0);
+        }
+        if (top || east || north) {
+            glVertex3f(x1, y1, z0); glVertex3f(x1, y1, z1);
+        }
+        if (top || east || south) {
+            glVertex3f(x1, y1, z1); glVertex3f(x0, y1, z1);
+        }
+        if (top || west || south) {
+            glVertex3f(x0, y1, z1); glVertex3f(x0, y1, z0);
+        }
+        
+        // 4 vertical edges (each shared by 2 side faces)
+        if (west || north) {
+            glVertex3f(x0, y0, z0); glVertex3f(x0, y1, z0);
+        }
+        if (east || north) {
+            glVertex3f(x1, y0, z0); glVertex3f(x1, y1, z0);
+        }
+        if (east || south) {
+            glVertex3f(x1, y0, z1); glVertex3f(x1, y1, z1);
+        }
+        if (west || south) {
+            glVertex3f(x0, y0, z1); glVertex3f(x0, y1, z1);
+        }
+        
         glEnd();
     }
     
