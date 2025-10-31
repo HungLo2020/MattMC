@@ -313,6 +313,9 @@ public class ChunkRenderer {
     /**
      * Bind texture for the given block type.
      * If block has no texture, unbind texture.
+     * 
+     * Note: This is called during display list compilation, not every frame.
+     * TextureManager caches loaded textures, so repeated calls are cheap.
      */
     private void bindTextureForBlockType(BlockType blockType) {
         if (blockType.hasTexture()) {
