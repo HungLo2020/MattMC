@@ -129,9 +129,10 @@ public final class DevplayScreen implements Screen {
         glLoadIdentity();
 
         // Apply camera transformations (pitch, yaw, then position)
+        // Camera is at eye level (1.62 blocks above feet)
         glRotatef(player.getPitch(), 1f, 0f, 0f);
         glRotatef(player.getYaw(), 0f, 1f, 0f);
-        glTranslatef(-player.getX(), -player.getY(), -player.getZ());
+        glTranslatef(-player.getX(), -player.getEyeY(), -player.getZ());
 
         glEnable(GL_DEPTH_TEST);
         glEnable(GL_CULL_FACE);

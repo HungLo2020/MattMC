@@ -6,6 +6,9 @@ package MattMC.player;
  * Handles player position, orientation, and movement.
  */
 public class Player {
+    // Eye height offset from feet (Minecraft default is 1.62 blocks)
+    public static final float EYE_HEIGHT = 1.62f;
+    
     // Player position in world coordinates (feet position)
     private float x;
     private float y;
@@ -111,6 +114,13 @@ public class Player {
     public float getX() { return x; }
     public float getY() { return y; }
     public float getZ() { return z; }
+    
+    /**
+     * Get the Y coordinate of the player's eyes (camera position).
+     * In Minecraft, the camera is 1.62 blocks above the feet.
+     */
+    public float getEyeY() { return y + EYE_HEIGHT; }
+    
     public float getYaw() { return yaw; }
     public float getPitch() { return pitch; }
     public float getMoveSpeed() { return moveSpeed; }
