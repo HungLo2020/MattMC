@@ -29,6 +29,9 @@ public class ChunkRenderer {
     // This is similar to Minecraft's chunk rendering optimization
     private final Map<Chunk, Integer> displayListCache = new HashMap<>();
     
+    // Texture manager for loading and binding block textures
+    private final TextureManager textureManager = new TextureManager();
+    
     /**
      * Render a chunk using a cached display list.
      * If the chunk hasn't been compiled yet, compile it first.
@@ -290,7 +293,7 @@ public class ChunkRenderer {
             java.util.List<FaceData> typeFaces = entry.getValue();
             
             // Bind texture for this block type BEFORE glBegin
-            textureManager.bindTexture(blockType);
+            bindTextureForBlockType(blockType);
             
             // Render all faces of this type in one glBegin/glEnd block
             glBegin(GL_TRIANGLES);
@@ -305,6 +308,22 @@ public class ChunkRenderer {
     @FunctionalInterface
     private interface FaceRenderer {
         void render(float x, float y, float z);
+    }
+    
+    /**
+     * Bind texture for the given block type.
+     * If block has no texture, unbind texture.
+     */
+    private void bindTextureForBlockType(BlockType blockType) {
+        if (blockType.hasTexture()) {
+            int textureId = textureManager.loadTexture(blockType.getTexturePath());
+            if (textureId != 0) {
+                textureManager.bindTexture(textureId);
+                return;
+            }
+        }
+        // No texture available, unbind
+        textureManager.unbindTexture();
     }
     
     /**
@@ -323,50 +342,84 @@ public class ChunkRenderer {
         float x0 = x, x1 = x + 1;
         float y1 = y + 1;
         float z0 = z, z1 = z + 1;
-        // Counter-clockwise when viewed from above
-        glVertex3f(x0, y1, z0); glVertex3f(x0, y1, z1); glVertex3f(x1, y1, z1);
-        glVertex3f(x0, y1, z0); glVertex3f(x1, y1, z1); glVertex3f(x1, y1, z0);
+        // Counter-clockwise when viewed from above, with texture coordinates
+        glTexCoord2f(0, 0); glVertex3f(x0, y1, z0);
+        glTexCoord2f(0, 1); glVertex3f(x0, y1, z1);
+        glTexCoord2f(1, 1); glVertex3f(x1, y1, z1);
+        
+        glTexCoord2f(0, 0); glVertex3f(x0, y1, z0);
+        glTexCoord2f(1, 1); glVertex3f(x1, y1, z1);
+        glTexCoord2f(1, 0); glVertex3f(x1, y1, z0);
     }
     
     private void drawBottomFaceVertices(float x, float y, float z) {
         float x0 = x, x1 = x + 1;
         float y0 = y;
         float z0 = z, z1 = z + 1;
-        // Counter-clockwise when viewed from below
-        glVertex3f(x0, y0, z0); glVertex3f(x1, y0, z0); glVertex3f(x1, y0, z1);
-        glVertex3f(x0, y0, z0); glVertex3f(x1, y0, z1); glVertex3f(x0, y0, z1);
+        // Counter-clockwise when viewed from below, with texture coordinates
+        glTexCoord2f(0, 0); glVertex3f(x0, y0, z0);
+        glTexCoord2f(1, 0); glVertex3f(x1, y0, z0);
+        glTexCoord2f(1, 1); glVertex3f(x1, y0, z1);
+        
+        glTexCoord2f(0, 0); glVertex3f(x0, y0, z0);
+        glTexCoord2f(1, 1); glVertex3f(x1, y0, z1);
+        glTexCoord2f(0, 1); glVertex3f(x0, y0, z1);
     }
     
     private void drawNorthFaceVertices(float x, float y, float z) {
         float x0 = x, x1 = x + 1;
         float y0 = y, y1 = y + 1;
         float z0 = z;
-        glVertex3f(x1, y0, z0); glVertex3f(x0, y0, z0); glVertex3f(x0, y1, z0);
-        glVertex3f(x1, y0, z0); glVertex3f(x0, y1, z0); glVertex3f(x1, y1, z0);
+        // With texture coordinates
+        glTexCoord2f(1, 0); glVertex3f(x1, y0, z0);
+        glTexCoord2f(0, 0); glVertex3f(x0, y0, z0);
+        glTexCoord2f(0, 1); glVertex3f(x0, y1, z0);
+        
+        glTexCoord2f(1, 0); glVertex3f(x1, y0, z0);
+        glTexCoord2f(0, 1); glVertex3f(x0, y1, z0);
+        glTexCoord2f(1, 1); glVertex3f(x1, y1, z0);
     }
     
     private void drawSouthFaceVertices(float x, float y, float z) {
         float x0 = x, x1 = x + 1;
         float y0 = y, y1 = y + 1;
         float z1 = z + 1;
-        glVertex3f(x0, y0, z1); glVertex3f(x1, y0, z1); glVertex3f(x1, y1, z1);
-        glVertex3f(x0, y0, z1); glVertex3f(x1, y1, z1); glVertex3f(x0, y1, z1);
+        // With texture coordinates
+        glTexCoord2f(0, 0); glVertex3f(x0, y0, z1);
+        glTexCoord2f(1, 0); glVertex3f(x1, y0, z1);
+        glTexCoord2f(1, 1); glVertex3f(x1, y1, z1);
+        
+        glTexCoord2f(0, 0); glVertex3f(x0, y0, z1);
+        glTexCoord2f(1, 1); glVertex3f(x1, y1, z1);
+        glTexCoord2f(0, 1); glVertex3f(x0, y1, z1);
     }
     
     private void drawWestFaceVertices(float x, float y, float z) {
         float x0 = x;
         float y0 = y, y1 = y + 1;
         float z0 = z, z1 = z + 1;
-        glVertex3f(x0, y0, z0); glVertex3f(x0, y0, z1); glVertex3f(x0, y1, z1);
-        glVertex3f(x0, y0, z0); glVertex3f(x0, y1, z1); glVertex3f(x0, y1, z0);
+        // With texture coordinates
+        glTexCoord2f(0, 0); glVertex3f(x0, y0, z0);
+        glTexCoord2f(1, 0); glVertex3f(x0, y0, z1);
+        glTexCoord2f(1, 1); glVertex3f(x0, y1, z1);
+        
+        glTexCoord2f(0, 0); glVertex3f(x0, y0, z0);
+        glTexCoord2f(1, 1); glVertex3f(x0, y1, z1);
+        glTexCoord2f(0, 1); glVertex3f(x0, y1, z0);
     }
     
     private void drawEastFaceVertices(float x, float y, float z) {
         float x1 = x + 1;
         float y0 = y, y1 = y + 1;
         float z0 = z, z1 = z + 1;
-        glVertex3f(x1, y0, z1); glVertex3f(x1, y0, z0); glVertex3f(x1, y1, z0);
-        glVertex3f(x1, y0, z1); glVertex3f(x1, y1, z0); glVertex3f(x1, y1, z1);
+        // With texture coordinates
+        glTexCoord2f(1, 0); glVertex3f(x1, y0, z1);
+        glTexCoord2f(0, 0); glVertex3f(x1, y0, z0);
+        glTexCoord2f(0, 1); glVertex3f(x1, y1, z0);
+        
+        glTexCoord2f(1, 0); glVertex3f(x1, y0, z1);
+        glTexCoord2f(0, 1); glVertex3f(x1, y1, z0);
+        glTexCoord2f(1, 1); glVertex3f(x1, y1, z1);
     }
     
     /**
