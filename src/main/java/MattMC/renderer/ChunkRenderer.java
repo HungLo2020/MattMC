@@ -203,7 +203,9 @@ public class ChunkRenderer {
                                    java.util.List<FaceData> northFaces, java.util.List<FaceData> southFaces,
                                    java.util.List<FaceData> westFaces, java.util.List<FaceData> eastFaces,
                                    java.util.List<OutlineData> outlines) {
-        int color = block.color();
+        // Use white color (0xFFFFFF) by default - textures will show their natural colors
+        // Fallback magenta color will only be applied if texture is missing (handled in bindTextureForBlock)
+        int color = 0xFFFFFF;
         
         // Track which faces are visible for outline rendering
         boolean topVisible = shouldRenderFace(chunk, cx, cy + 1, cz);
@@ -290,13 +292,28 @@ public class ChunkRenderer {
             Block block = entry.getKey();
             java.util.List<FaceData> blockFaces = entry.getValue();
             
-            // Bind texture for this block BEFORE glBegin
-            bindTextureForBlock(block);
+            // Check if texture is available for this block
+            boolean hasTexture = block.hasTexture();
+            int textureId = 0;
+            if (hasTexture) {
+                textureId = textureManager.loadTexture(block.getTexturePath());
+                hasTexture = (textureId != 0);
+            }
+            
+            // If texture is available, bind it and use white color modulation
+            // If texture is not available, unbind texture and use magenta fallback color
+            if (hasTexture) {
+                textureManager.bindTexture(textureId);
+            } else {
+                textureManager.unbindTexture();
+            }
             
             // Render all faces of this type in one glBegin/glEnd block
             glBegin(GL_TRIANGLES);
             for (FaceData face : blockFaces) {
-                setColor(face.color, face.brightness);
+                // Use fallback magenta color if no texture, otherwise use the face color (white)
+                int renderColor = hasTexture ? face.color : block.getFallbackColor();
+                setColor(renderColor, face.brightness);
                 renderer.render(face.x, face.y, face.z);
             }
             glEnd();
@@ -306,25 +323,6 @@ public class ChunkRenderer {
     @FunctionalInterface
     private interface FaceRenderer {
         void render(float x, float y, float z);
-    }
-    
-    /**
-     * Bind texture for the given block.
-     * If block has no texture, unbind texture.
-     * 
-     * Note: This is called during display list compilation, not every frame.
-     * TextureManager caches loaded textures, so repeated calls are cheap.
-     */
-    private void bindTextureForBlock(Block block) {
-        if (block.hasTexture()) {
-            int textureId = textureManager.loadTexture(block.getTexturePath());
-            if (textureId != 0) {
-                textureManager.bindTexture(textureId);
-                return;
-            }
-        }
-        // No texture available, unbind
-        textureManager.unbindTexture();
     }
     
     /**
