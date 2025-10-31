@@ -29,7 +29,7 @@ public class ResourceManager {
             return MODEL_CACHE.get(name);
         }
         
-        String path = "/assets/mattmc/models/block/" + name + ".json";
+        String path = "/assets/models/block/" + name + ".json";
         try (InputStream is = ResourceManager.class.getResourceAsStream(path);
              Reader reader = new InputStreamReader(is)) {
             BlockModel model = GSON.fromJson(reader, BlockModel.class);
@@ -53,7 +53,7 @@ public class ResourceManager {
             return BLOCKSTATE_CACHE.get(name);
         }
         
-        String path = "/assets/mattmc/blockstates/" + name + ".json";
+        String path = "/assets/blockstates/" + name + ".json";
         try (InputStream is = ResourceManager.class.getResourceAsStream(path);
              Reader reader = new InputStreamReader(is)) {
             BlockState blockState = GSON.fromJson(reader, BlockState.class);
