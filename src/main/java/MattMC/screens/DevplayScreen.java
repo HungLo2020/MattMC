@@ -138,7 +138,10 @@ public final class DevplayScreen implements Screen {
         glEnable(GL_CULL_FACE);
         glCullFace(GL_BACK);
         
-        regionRenderer.renderRegion(region);
+        // Use optimized rendering with render distance and frustum culling
+        float[] viewMatrix = new float[16];
+        glGetFloatv(GL_MODELVIEW_MATRIX, viewMatrix);
+        regionRenderer.renderRegion(region, player, viewMatrix);
         
         glDisable(GL_CULL_FACE);
         glDisable(GL_DEPTH_TEST);
