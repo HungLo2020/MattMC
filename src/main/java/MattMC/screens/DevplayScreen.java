@@ -82,6 +82,19 @@ public final class DevplayScreen implements Screen {
             if (pitch > 89.0f) pitch = 89.0f;
             if (pitch < -89.0f) pitch = -89.0f;
         });
+        
+        // Mouse button callback for breaking/placing blocks
+        glfwSetMouseButtonCallback(window.handle(), (win, button, action, mods) -> {
+            if (action == GLFW_PRESS) {
+                if (button == GLFW_MOUSE_BUTTON_LEFT) {
+                    // Break block
+                    breakBlock();
+                } else if (button == GLFW_MOUSE_BUTTON_RIGHT) {
+                    // Place block
+                    placeBlock();
+                }
+            }
+        });
     }
 
     @Override
@@ -165,6 +178,9 @@ public final class DevplayScreen implements Screen {
         
         glDisable(GL_CULL_FACE);
         glDisable(GL_DEPTH_TEST);
+        
+        // Draw crosshair on top of everything
+        drawCrosshair(w, h);
     }
 
     /**
@@ -368,6 +384,143 @@ public final class DevplayScreen implements Screen {
         glColor4f(r, g, b, a);
     }
 
+    /**
+     * Draw crosshair in the center of the screen.
+     */
+    private void drawCrosshair(int screenWidth, int screenHeight) {
+        // Switch to 2D orthographic projection
+        glMatrixMode(GL_PROJECTION);
+        glPushMatrix();
+        glLoadIdentity();
+        glOrtho(0, screenWidth, screenHeight, 0, -1, 1);
+        
+        glMatrixMode(GL_MODELVIEW);
+        glPushMatrix();
+        glLoadIdentity();
+        
+        // Draw white crosshair
+        float centerX = screenWidth / 2f;
+        float centerY = screenHeight / 2f;
+        float size = 10f;
+        float thickness = 2f;
+        
+        glColor4f(1f, 1f, 1f, 1f);
+        glBegin(GL_QUADS);
+        // Horizontal line
+        glVertex2f(centerX - size, centerY - thickness/2);
+        glVertex2f(centerX + size, centerY - thickness/2);
+        glVertex2f(centerX + size, centerY + thickness/2);
+        glVertex2f(centerX - size, centerY + thickness/2);
+        // Vertical line
+        glVertex2f(centerX - thickness/2, centerY - size);
+        glVertex2f(centerX + thickness/2, centerY - size);
+        glVertex2f(centerX + thickness/2, centerY + size);
+        glVertex2f(centerX - thickness/2, centerY + size);
+        glEnd();
+        
+        // Restore matrices
+        glPopMatrix();
+        glMatrixMode(GL_PROJECTION);
+        glPopMatrix();
+        glMatrixMode(GL_MODELVIEW);
+    }
+    
+    /**
+     * Ray cast to find the block the player is looking at and break it.
+     */
+    private void breakBlock() {
+        BlockHitResult hit = raycastBlock(5.0f);
+        if (hit != null) {
+            chunk.setBlock(hit.x, hit.y, hit.z, Block.AIR);
+        }
+    }
+    
+    /**
+     * Ray cast to find where to place a block and place it.
+     */
+    private void placeBlock() {
+        BlockHitResult hit = raycastBlock(5.0f);
+        if (hit != null && hit.adjacentX >= 0 && hit.adjacentY >= 0 && hit.adjacentZ >= 0) {
+            // Place block at the adjacent position (the face we hit)
+            Block existing = chunk.getBlock(hit.adjacentX, hit.adjacentY, hit.adjacentZ);
+            if (existing.isAir()) {
+                chunk.setBlock(hit.adjacentX, hit.adjacentY, hit.adjacentZ, new Block(BlockType.STONE));
+            }
+        }
+    }
+    
+    /**
+     * Perform ray casting to find the block the player is looking at.
+     * Returns null if no block is found within maxDistance.
+     */
+    private BlockHitResult raycastBlock(float maxDistance) {
+        // Calculate ray direction from pitch and yaw
+        float yawRad = (float) Math.toRadians(yaw);
+        float pitchRad = (float) Math.toRadians(pitch);
+        
+        float dirX = (float) (Math.cos(pitchRad) * Math.sin(yawRad));
+        float dirY = (float) (-Math.sin(pitchRad));
+        float dirZ = (float) (-Math.cos(pitchRad) * Math.cos(yawRad));
+        
+        // DDA algorithm for voxel traversal
+        float rayX = playerX;
+        float rayY = playerY;
+        float rayZ = playerZ;
+        
+        float stepSize = 0.1f;
+        int steps = (int) (maxDistance / stepSize);
+        
+        int lastBlockX = -1, lastBlockY = -1, lastBlockZ = -1;
+        
+        for (int i = 0; i < steps; i++) {
+            rayX += dirX * stepSize;
+            rayY += dirY * stepSize;
+            rayZ += dirZ * stepSize;
+            
+            int blockX = (int) Math.floor(rayX);
+            int blockY = (int) Math.floor(rayY);
+            int blockZ = (int) Math.floor(rayZ);
+            
+            // Convert world Y to chunk Y
+            int chunkY = Chunk.worldYToChunkY(blockY);
+            
+            // Check if within chunk bounds
+            if (blockX >= 0 && blockX < Chunk.WIDTH && 
+                chunkY >= 0 && chunkY < Chunk.HEIGHT && 
+                blockZ >= 0 && blockZ < Chunk.DEPTH) {
+                
+                Block block = chunk.getBlock(blockX, chunkY, blockZ);
+                if (!block.isAir()) {
+                    // Found a solid block - return it and the last air position
+                    return new BlockHitResult(blockX, chunkY, blockZ, lastBlockX, lastBlockY, lastBlockZ);
+                }
+            }
+            
+            lastBlockX = blockX;
+            lastBlockY = chunkY;
+            lastBlockZ = blockZ;
+        }
+        
+        return null;
+    }
+    
+    /**
+     * Simple data class to hold ray cast hit result.
+     */
+    private static class BlockHitResult {
+        final int x, y, z;              // Block that was hit
+        final int adjacentX, adjacentY, adjacentZ;  // Adjacent air block (for placing)
+        
+        BlockHitResult(int x, int y, int z, int adjX, int adjY, int adjZ) {
+            this.x = x;
+            this.y = y;
+            this.z = z;
+            this.adjacentX = adjX;
+            this.adjacentY = adjY;
+            this.adjacentZ = adjZ;
+        }
+    }
+    
     private static double now() { return System.nanoTime() * 1e-9; }
 
     @Override public void onOpen() {}
