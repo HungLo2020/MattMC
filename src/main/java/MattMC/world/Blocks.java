@@ -38,6 +38,9 @@ import java.util.Set;
  */
 public class Blocks {
     
+    // Default namespace for vanilla blocks
+    private static final String DEFAULT_NAMESPACE = "mattmc";
+    
     // Registry maps block identifiers to BlockType instances
     private static final Map<String, BlockType> REGISTRY = new HashMap<>();
     
@@ -62,13 +65,26 @@ public class Blocks {
     /**
      * Register a block with a given name (without namespace).
      * Automatically adds "mattmc:" namespace prefix.
+     * This method is used during static initialization and assumes valid inputs.
      * 
      * @param name The block name (e.g., "dirt")
      * @param blockType The BlockType enum instance
      * @return The registered BlockType
      */
     private static BlockType register(String name, BlockType blockType) {
-        String identifier = "mattmc:" + name;
+        if (name == null) {
+            throw new NullPointerException("Block name cannot be null");
+        }
+        if (blockType == null) {
+            throw new NullPointerException("BlockType cannot be null");
+        }
+        String identifier = DEFAULT_NAMESPACE + ":" + name;
+        if (REGISTRY.containsKey(identifier)) {
+            throw new IllegalStateException("Block with identifier '" + identifier + "' is already registered!");
+        }
+        if (REVERSE_REGISTRY.containsKey(blockType)) {
+            throw new IllegalStateException("BlockType " + blockType + " is already registered!");
+        }
         REGISTRY.put(identifier, blockType);
         REVERSE_REGISTRY.put(blockType, identifier);
         return blockType;
