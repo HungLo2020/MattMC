@@ -203,6 +203,9 @@ public final class DevplayScreen implements Screen {
             setColor(adjustColorBrightness(color, 0.6f), 1f);
             drawEastFace(x, y, z);
         }
+        
+        // Draw black outline around the cube
+        drawBlockOutline(x, y, z);
     }
     
     /**
@@ -276,6 +279,39 @@ public final class DevplayScreen implements Screen {
         glBegin(GL_TRIANGLES);
         glVertex3f(x1, y0, z1); glVertex3f(x1, y0, z0); glVertex3f(x1, y1, z0);
         glVertex3f(x1, y0, z1); glVertex3f(x1, y1, z0); glVertex3f(x1, y1, z1);
+        glEnd();
+    }
+    
+    /**
+     * Draw a black outline around a cube to make blocks more distinguishable.
+     * Draws the 12 edges of the cube.
+     */
+    private void drawBlockOutline(float x, float y, float z) {
+        float x0 = x, x1 = x + 1;
+        float y0 = y, y1 = y + 1;
+        float z0 = z, z1 = z + 1;
+        
+        // Set black color for outline
+        setColor(0x000000, 1f);
+        
+        glBegin(GL_LINES);
+        // Bottom 4 edges
+        glVertex3f(x0, y0, z0); glVertex3f(x1, y0, z0);
+        glVertex3f(x1, y0, z0); glVertex3f(x1, y0, z1);
+        glVertex3f(x1, y0, z1); glVertex3f(x0, y0, z1);
+        glVertex3f(x0, y0, z1); glVertex3f(x0, y0, z0);
+        
+        // Top 4 edges
+        glVertex3f(x0, y1, z0); glVertex3f(x1, y1, z0);
+        glVertex3f(x1, y1, z0); glVertex3f(x1, y1, z1);
+        glVertex3f(x1, y1, z1); glVertex3f(x0, y1, z1);
+        glVertex3f(x0, y1, z1); glVertex3f(x0, y1, z0);
+        
+        // 4 vertical edges
+        glVertex3f(x0, y0, z0); glVertex3f(x0, y1, z0);
+        glVertex3f(x1, y0, z0); glVertex3f(x1, y1, z0);
+        glVertex3f(x1, y0, z1); glVertex3f(x1, y1, z1);
+        glVertex3f(x0, y0, z1); glVertex3f(x0, y1, z1);
         glEnd();
     }
     
