@@ -222,8 +222,9 @@ public final class DevplayScreen implements Screen {
         float y1 = y + 1;
         float z0 = z, z1 = z + 1;
         glBegin(GL_TRIANGLES);
-        glVertex3f(x0, y1, z0); glVertex3f(x1, y1, z0); glVertex3f(x1, y1, z1);
-        glVertex3f(x0, y1, z0); glVertex3f(x1, y1, z1); glVertex3f(x0, y1, z1);
+        // Counter-clockwise when viewed from above
+        glVertex3f(x0, y1, z0); glVertex3f(x0, y1, z1); glVertex3f(x1, y1, z1);
+        glVertex3f(x0, y1, z0); glVertex3f(x1, y1, z1); glVertex3f(x1, y1, z0);
         glEnd();
     }
     
@@ -232,8 +233,9 @@ public final class DevplayScreen implements Screen {
         float y0 = y;
         float z0 = z, z1 = z + 1;
         glBegin(GL_TRIANGLES);
-        glVertex3f(x0, y0, z0); glVertex3f(x1, y0, z1); glVertex3f(x1, y0, z0);
-        glVertex3f(x0, y0, z0); glVertex3f(x0, y0, z1); glVertex3f(x1, y0, z1);
+        // Counter-clockwise when viewed from below
+        glVertex3f(x0, y0, z0); glVertex3f(x1, y0, z0); glVertex3f(x1, y0, z1);
+        glVertex3f(x0, y0, z0); glVertex3f(x1, y0, z1); glVertex3f(x0, y0, z1);
         glEnd();
     }
     
