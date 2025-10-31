@@ -9,6 +9,30 @@ import java.util.Map;
  * 
  * Each block is registered with a unique identifier in the format "namespace:name" (e.g., "mattmc:dirt").
  * This allows for modding and resource pack support in the future.
+ * 
+ * <h2>Usage Examples:</h2>
+ * <pre>{@code
+ * // Access blocks via static fields (recommended for vanilla blocks)
+ * BlockType dirt = Blocks.DIRT;
+ * BlockType stone = Blocks.STONE;
+ * 
+ * // Look up blocks by identifier
+ * BlockType block = Blocks.getBlock("mattmc:dirt");
+ * 
+ * // Get the identifier for a block
+ * String id = Blocks.getIdentifier(BlockType.DIRT); // Returns "mattmc:dirt"
+ * 
+ * // Check if a block is registered
+ * boolean exists = Blocks.isRegistered("mattmc:diamond"); // Returns false
+ * 
+ * // List all registered blocks
+ * for (String identifier : Blocks.getRegisteredIdentifiers()) {
+ *     System.out.println(identifier);
+ * }
+ * }</pre>
+ * 
+ * <p>Note: Currently, blocks are based on the BlockType enum. Future versions may support
+ * dynamic block registration for modding support.</p>
  */
 public class Blocks {
     
