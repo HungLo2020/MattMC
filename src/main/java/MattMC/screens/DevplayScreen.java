@@ -67,7 +67,7 @@ public final class DevplayScreen implements Screen {
             }
             
             double xOffset = xpos - lastMouseX;
-            double yOffset = lastMouseY - ypos; // Reversed: y-coordinates range from bottom to top
+            double yOffset = ypos - lastMouseY; // Reversed: y-coordinates range from bottom to top
             lastMouseX = xpos;
             lastMouseY = ypos;
             
