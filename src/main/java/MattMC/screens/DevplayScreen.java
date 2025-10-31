@@ -8,7 +8,7 @@ import MattMC.player.PlayerController;
 import MattMC.player.PlayerPhysics;
 import MattMC.renderer.RegionRenderer;
 import MattMC.renderer.UIRenderer;
-import MattMC.world.BlockType;
+import MattMC.world.Blocks;
 import MattMC.world.Region;
 
 import static org.lwjgl.glfw.GLFW.*;
@@ -85,7 +85,7 @@ public final class DevplayScreen implements Screen {
                 if (button == GLFW_MOUSE_BUTTON_LEFT) {
                     blockInteraction.breakBlock();
                 } else if (button == GLFW_MOUSE_BUTTON_RIGHT) {
-                    blockInteraction.placeBlock(BlockType.STONE);
+                    blockInteraction.placeBlock(Blocks.STONE);
                 }
             }
         });

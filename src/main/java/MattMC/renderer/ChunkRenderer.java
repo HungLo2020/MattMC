@@ -1,7 +1,6 @@
 package MattMC.renderer;
 
 import MattMC.world.Block;
-import MattMC.world.BlockType;
 import MattMC.world.Chunk;
 
 import java.util.HashMap;
@@ -141,15 +140,15 @@ public class ChunkRenderer {
         float x, y, z;
         int color;
         float brightness;
-        BlockType blockType;
+        Block block;
         
-        FaceData(float x, float y, float z, int color, float brightness, BlockType blockType) {
+        FaceData(float x, float y, float z, int color, float brightness, Block block) {
             this.x = x;
             this.y = y;
             this.z = z;
             this.color = color;
             this.brightness = brightness;
-            this.blockType = blockType;
+            this.block = block;
         }
     }
     
@@ -204,8 +203,7 @@ public class ChunkRenderer {
                                    java.util.List<FaceData> northFaces, java.util.List<FaceData> southFaces,
                                    java.util.List<FaceData> westFaces, java.util.List<FaceData> eastFaces,
                                    java.util.List<OutlineData> outlines) {
-        BlockType type = block.type();
-        int color = type.color();
+        int color = block.color();
         
         // Track which faces are visible for outline rendering
         boolean topVisible = shouldRenderFace(chunk, cx, cy + 1, cz);
@@ -217,22 +215,22 @@ public class ChunkRenderer {
         
         // Collect visible faces for batched rendering
         if (topVisible) {
-            topFaces.add(new FaceData(x, y, z, color, 1f, type));
+            topFaces.add(new FaceData(x, y, z, color, 1f, block));
         }
         if (bottomVisible) {
-            bottomFaces.add(new FaceData(x, y, z, darkenColor(color), 1f, type));
+            bottomFaces.add(new FaceData(x, y, z, darkenColor(color), 1f, block));
         }
         if (northVisible) {
-            northFaces.add(new FaceData(x, y, z, adjustColorBrightness(color, 0.8f), 1f, type));
+            northFaces.add(new FaceData(x, y, z, adjustColorBrightness(color, 0.8f), 1f, block));
         }
         if (southVisible) {
-            southFaces.add(new FaceData(x, y, z, adjustColorBrightness(color, 0.8f), 1f, type));
+            southFaces.add(new FaceData(x, y, z, adjustColorBrightness(color, 0.8f), 1f, block));
         }
         if (westVisible) {
-            westFaces.add(new FaceData(x, y, z, adjustColorBrightness(color, 0.6f), 1f, type));
+            westFaces.add(new FaceData(x, y, z, adjustColorBrightness(color, 0.6f), 1f, block));
         }
         if (eastVisible) {
-            eastFaces.add(new FaceData(x, y, z, adjustColorBrightness(color, 0.6f), 1f, type));
+            eastFaces.add(new FaceData(x, y, z, adjustColorBrightness(color, 0.6f), 1f, block));
         }
         
         // Collect outline data
@@ -276,28 +274,28 @@ public class ChunkRenderer {
     }
     
     /**
-     * Render faces grouped by block type to minimize texture binding
+     * Render faces grouped by block to minimize texture binding
      */
     private void renderFacesByType(java.util.List<FaceData> faces, FaceRenderer renderer) {
         if (faces.isEmpty()) return;
         
-        // Group faces by block type
-        java.util.Map<BlockType, java.util.List<FaceData>> facesByType = new java.util.HashMap<>();
+        // Group faces by block
+        java.util.Map<Block, java.util.List<FaceData>> facesByBlock = new java.util.HashMap<>();
         for (FaceData face : faces) {
-            facesByType.computeIfAbsent(face.blockType, k -> new java.util.ArrayList<>()).add(face);
+            facesByBlock.computeIfAbsent(face.block, k -> new java.util.ArrayList<>()).add(face);
         }
         
-        // Render each block type group
-        for (java.util.Map.Entry<BlockType, java.util.List<FaceData>> entry : facesByType.entrySet()) {
-            BlockType blockType = entry.getKey();
-            java.util.List<FaceData> typeFaces = entry.getValue();
+        // Render each block group
+        for (java.util.Map.Entry<Block, java.util.List<FaceData>> entry : facesByBlock.entrySet()) {
+            Block block = entry.getKey();
+            java.util.List<FaceData> blockFaces = entry.getValue();
             
-            // Bind texture for this block type BEFORE glBegin
-            bindTextureForBlockType(blockType);
+            // Bind texture for this block BEFORE glBegin
+            bindTextureForBlock(block);
             
             // Render all faces of this type in one glBegin/glEnd block
             glBegin(GL_TRIANGLES);
-            for (FaceData face : typeFaces) {
+            for (FaceData face : blockFaces) {
                 setColor(face.color, face.brightness);
                 renderer.render(face.x, face.y, face.z);
             }
@@ -311,15 +309,15 @@ public class ChunkRenderer {
     }
     
     /**
-     * Bind texture for the given block type.
+     * Bind texture for the given block.
      * If block has no texture, unbind texture.
      * 
      * Note: This is called during display list compilation, not every frame.
      * TextureManager caches loaded textures, so repeated calls are cheap.
      */
-    private void bindTextureForBlockType(BlockType blockType) {
-        if (blockType.hasTexture()) {
-            int textureId = textureManager.loadTexture(blockType.getTexturePath());
+    private void bindTextureForBlock(Block block) {
+        if (block.hasTexture()) {
+            int textureId = textureManager.loadTexture(block.getTexturePath());
             if (textureId != 0) {
                 textureManager.bindTexture(textureId);
                 return;

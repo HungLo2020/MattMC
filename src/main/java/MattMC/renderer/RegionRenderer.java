@@ -2,7 +2,6 @@ package MattMC.renderer;
 
 import MattMC.player.Player;
 import MattMC.world.Block;
-import MattMC.world.BlockType;
 import MattMC.world.Chunk;
 import MattMC.world.Region;
 
