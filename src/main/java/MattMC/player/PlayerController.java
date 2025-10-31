@@ -27,7 +27,11 @@ public class PlayerController {
      * @param deltaTime Time since last frame in seconds
      */
     public void updateMovement(long window, float deltaTime) {
-        float moveSpeed = player.getMoveSpeed() * deltaTime;
+        PlayerPhysics physics = player.getPhysics();
+        boolean isFlying = physics != null && physics.isFlying();
+        
+        // Use flying speed when flying, walking speed otherwise
+        float moveSpeed = isFlying ? player.getFlySpeed() * deltaTime : player.getMoveSpeed() * deltaTime;
         
         // WASD movement
         if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) {
@@ -43,13 +47,25 @@ public class PlayerController {
             player.moveRight(moveSpeed);
         }
         
-        // Vertical movement
-        if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS) {
-            player.moveUp(moveSpeed);
+        // Vertical movement (flying only)
+        if (isFlying) {
+            if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS) {
+                player.moveUp(moveSpeed);
+            }
+            if (glfwGetKey(window, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS || 
+                glfwGetKey(window, GLFW_KEY_RIGHT_CONTROL) == GLFW_PRESS) {
+                player.moveUp(-moveSpeed);
+            }
         }
-        if (glfwGetKey(window, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS || 
-            glfwGetKey(window, GLFW_KEY_RIGHT_CONTROL) == GLFW_PRESS) {
-            player.moveUp(-moveSpeed);
+    }
+    
+    /**
+     * Handle space key press for jumping/flying toggle.
+     */
+    public void handleSpacePress() {
+        PlayerPhysics physics = player.getPhysics();
+        if (physics != null) {
+            physics.handleSpacePress();
         }
     }
     
