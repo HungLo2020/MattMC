@@ -29,6 +29,9 @@ public class ChunkRenderer {
     // This is similar to Minecraft's chunk rendering optimization
     private final Map<Chunk, Integer> displayListCache = new HashMap<>();
     
+    // Texture manager for loading and binding block textures
+    private final TextureManager textureManager = new TextureManager();
+    
     /**
      * Render a chunk using a cached display list.
      * If the chunk hasn't been compiled yet, compile it first.
@@ -138,13 +141,15 @@ public class ChunkRenderer {
         float x, y, z;
         int color;
         float brightness;
+        BlockType blockType;
         
-        FaceData(float x, float y, float z, int color, float brightness) {
+        FaceData(float x, float y, float z, int color, float brightness, BlockType blockType) {
             this.x = x;
             this.y = y;
             this.z = z;
             this.color = color;
             this.brightness = brightness;
+            this.blockType = blockType;
         }
     }
     
@@ -212,22 +217,22 @@ public class ChunkRenderer {
         
         // Collect visible faces for batched rendering
         if (topVisible) {
-            topFaces.add(new FaceData(x, y, z, color, 1f));
+            topFaces.add(new FaceData(x, y, z, color, 1f, type));
         }
         if (bottomVisible) {
-            bottomFaces.add(new FaceData(x, y, z, darkenColor(color), 1f));
+            bottomFaces.add(new FaceData(x, y, z, darkenColor(color), 1f, type));
         }
         if (northVisible) {
-            northFaces.add(new FaceData(x, y, z, adjustColorBrightness(color, 0.8f), 1f));
+            northFaces.add(new FaceData(x, y, z, adjustColorBrightness(color, 0.8f), 1f, type));
         }
         if (southVisible) {
-            southFaces.add(new FaceData(x, y, z, adjustColorBrightness(color, 0.8f), 1f));
+            southFaces.add(new FaceData(x, y, z, adjustColorBrightness(color, 0.8f), 1f, type));
         }
         if (westVisible) {
-            westFaces.add(new FaceData(x, y, z, adjustColorBrightness(color, 0.6f), 1f));
+            westFaces.add(new FaceData(x, y, z, adjustColorBrightness(color, 0.6f), 1f, type));
         }
         if (eastVisible) {
-            eastFaces.add(new FaceData(x, y, z, adjustColorBrightness(color, 0.6f), 1f));
+            eastFaces.add(new FaceData(x, y, z, adjustColorBrightness(color, 0.6f), 1f, type));
         }
         
         // Collect outline data
@@ -244,65 +249,19 @@ public class ChunkRenderer {
                                     java.util.List<FaceData> northFaces, java.util.List<FaceData> southFaces,
                                     java.util.List<FaceData> westFaces, java.util.List<FaceData> eastFaces,
                                     java.util.List<OutlineData> outlines) {
-        // Render all top faces in ONE glBegin/glEnd block
-        if (!topFaces.isEmpty()) {
-            glBegin(GL_TRIANGLES);
-            for (FaceData face : topFaces) {
-                setColor(face.color, face.brightness);
-                drawTopFaceVertices(face.x, face.y, face.z);
-            }
-            glEnd();
-        }
+        // Enable texturing
+        glEnable(GL_TEXTURE_2D);
         
-        // Render all bottom faces in ONE glBegin/glEnd block
-        if (!bottomFaces.isEmpty()) {
-            glBegin(GL_TRIANGLES);
-            for (FaceData face : bottomFaces) {
-                setColor(face.color, face.brightness);
-                drawBottomFaceVertices(face.x, face.y, face.z);
-            }
-            glEnd();
-        }
+        // Render faces grouped by block type (to minimize texture bindings)
+        renderFacesByType(topFaces, this::drawTopFaceVertices);
+        renderFacesByType(bottomFaces, this::drawBottomFaceVertices);
+        renderFacesByType(northFaces, this::drawNorthFaceVertices);
+        renderFacesByType(southFaces, this::drawSouthFaceVertices);
+        renderFacesByType(westFaces, this::drawWestFaceVertices);
+        renderFacesByType(eastFaces, this::drawEastFaceVertices);
         
-        // Render all north faces in ONE glBegin/glEnd block
-        if (!northFaces.isEmpty()) {
-            glBegin(GL_TRIANGLES);
-            for (FaceData face : northFaces) {
-                setColor(face.color, face.brightness);
-                drawNorthFaceVertices(face.x, face.y, face.z);
-            }
-            glEnd();
-        }
-        
-        // Render all south faces in ONE glBegin/glEnd block
-        if (!southFaces.isEmpty()) {
-            glBegin(GL_TRIANGLES);
-            for (FaceData face : southFaces) {
-                setColor(face.color, face.brightness);
-                drawSouthFaceVertices(face.x, face.y, face.z);
-            }
-            glEnd();
-        }
-        
-        // Render all west faces in ONE glBegin/glEnd block
-        if (!westFaces.isEmpty()) {
-            glBegin(GL_TRIANGLES);
-            for (FaceData face : westFaces) {
-                setColor(face.color, face.brightness);
-                drawWestFaceVertices(face.x, face.y, face.z);
-            }
-            glEnd();
-        }
-        
-        // Render all east faces in ONE glBegin/glEnd block
-        if (!eastFaces.isEmpty()) {
-            glBegin(GL_TRIANGLES);
-            for (FaceData face : eastFaces) {
-                setColor(face.color, face.brightness);
-                drawEastFaceVertices(face.x, face.y, face.z);
-            }
-            glEnd();
-        }
+        // Disable texturing for outlines
+        glDisable(GL_TEXTURE_2D);
         
         // Render all outlines in ONE glBegin/glEnd block
         if (!outlines.isEmpty()) {
@@ -314,6 +273,60 @@ public class ChunkRenderer {
             }
             glEnd();
         }
+    }
+    
+    /**
+     * Render faces grouped by block type to minimize texture binding
+     */
+    private void renderFacesByType(java.util.List<FaceData> faces, FaceRenderer renderer) {
+        if (faces.isEmpty()) return;
+        
+        // Group faces by block type
+        java.util.Map<BlockType, java.util.List<FaceData>> facesByType = new java.util.HashMap<>();
+        for (FaceData face : faces) {
+            facesByType.computeIfAbsent(face.blockType, k -> new java.util.ArrayList<>()).add(face);
+        }
+        
+        // Render each block type group
+        for (java.util.Map.Entry<BlockType, java.util.List<FaceData>> entry : facesByType.entrySet()) {
+            BlockType blockType = entry.getKey();
+            java.util.List<FaceData> typeFaces = entry.getValue();
+            
+            // Bind texture for this block type BEFORE glBegin
+            bindTextureForBlockType(blockType);
+            
+            // Render all faces of this type in one glBegin/glEnd block
+            glBegin(GL_TRIANGLES);
+            for (FaceData face : typeFaces) {
+                setColor(face.color, face.brightness);
+                renderer.render(face.x, face.y, face.z);
+            }
+            glEnd();
+        }
+    }
+    
+    @FunctionalInterface
+    private interface FaceRenderer {
+        void render(float x, float y, float z);
+    }
+    
+    /**
+     * Bind texture for the given block type.
+     * If block has no texture, unbind texture.
+     * 
+     * Note: This is called during display list compilation, not every frame.
+     * TextureManager caches loaded textures, so repeated calls are cheap.
+     */
+    private void bindTextureForBlockType(BlockType blockType) {
+        if (blockType.hasTexture()) {
+            int textureId = textureManager.loadTexture(blockType.getTexturePath());
+            if (textureId != 0) {
+                textureManager.bindTexture(textureId);
+                return;
+            }
+        }
+        // No texture available, unbind
+        textureManager.unbindTexture();
     }
     
     /**
@@ -332,50 +345,84 @@ public class ChunkRenderer {
         float x0 = x, x1 = x + 1;
         float y1 = y + 1;
         float z0 = z, z1 = z + 1;
-        // Counter-clockwise when viewed from above
-        glVertex3f(x0, y1, z0); glVertex3f(x0, y1, z1); glVertex3f(x1, y1, z1);
-        glVertex3f(x0, y1, z0); glVertex3f(x1, y1, z1); glVertex3f(x1, y1, z0);
+        // Counter-clockwise when viewed from above, with texture coordinates
+        glTexCoord2f(0, 0); glVertex3f(x0, y1, z0);
+        glTexCoord2f(0, 1); glVertex3f(x0, y1, z1);
+        glTexCoord2f(1, 1); glVertex3f(x1, y1, z1);
+        
+        glTexCoord2f(0, 0); glVertex3f(x0, y1, z0);
+        glTexCoord2f(1, 1); glVertex3f(x1, y1, z1);
+        glTexCoord2f(1, 0); glVertex3f(x1, y1, z0);
     }
     
     private void drawBottomFaceVertices(float x, float y, float z) {
         float x0 = x, x1 = x + 1;
         float y0 = y;
         float z0 = z, z1 = z + 1;
-        // Counter-clockwise when viewed from below
-        glVertex3f(x0, y0, z0); glVertex3f(x1, y0, z0); glVertex3f(x1, y0, z1);
-        glVertex3f(x0, y0, z0); glVertex3f(x1, y0, z1); glVertex3f(x0, y0, z1);
+        // Counter-clockwise when viewed from below, with texture coordinates
+        glTexCoord2f(0, 0); glVertex3f(x0, y0, z0);
+        glTexCoord2f(1, 0); glVertex3f(x1, y0, z0);
+        glTexCoord2f(1, 1); glVertex3f(x1, y0, z1);
+        
+        glTexCoord2f(0, 0); glVertex3f(x0, y0, z0);
+        glTexCoord2f(1, 1); glVertex3f(x1, y0, z1);
+        glTexCoord2f(0, 1); glVertex3f(x0, y0, z1);
     }
     
     private void drawNorthFaceVertices(float x, float y, float z) {
         float x0 = x, x1 = x + 1;
         float y0 = y, y1 = y + 1;
         float z0 = z;
-        glVertex3f(x1, y0, z0); glVertex3f(x0, y0, z0); glVertex3f(x0, y1, z0);
-        glVertex3f(x1, y0, z0); glVertex3f(x0, y1, z0); glVertex3f(x1, y1, z0);
+        // With texture coordinates
+        glTexCoord2f(1, 0); glVertex3f(x1, y0, z0);
+        glTexCoord2f(0, 0); glVertex3f(x0, y0, z0);
+        glTexCoord2f(0, 1); glVertex3f(x0, y1, z0);
+        
+        glTexCoord2f(1, 0); glVertex3f(x1, y0, z0);
+        glTexCoord2f(0, 1); glVertex3f(x0, y1, z0);
+        glTexCoord2f(1, 1); glVertex3f(x1, y1, z0);
     }
     
     private void drawSouthFaceVertices(float x, float y, float z) {
         float x0 = x, x1 = x + 1;
         float y0 = y, y1 = y + 1;
         float z1 = z + 1;
-        glVertex3f(x0, y0, z1); glVertex3f(x1, y0, z1); glVertex3f(x1, y1, z1);
-        glVertex3f(x0, y0, z1); glVertex3f(x1, y1, z1); glVertex3f(x0, y1, z1);
+        // With texture coordinates
+        glTexCoord2f(0, 0); glVertex3f(x0, y0, z1);
+        glTexCoord2f(1, 0); glVertex3f(x1, y0, z1);
+        glTexCoord2f(1, 1); glVertex3f(x1, y1, z1);
+        
+        glTexCoord2f(0, 0); glVertex3f(x0, y0, z1);
+        glTexCoord2f(1, 1); glVertex3f(x1, y1, z1);
+        glTexCoord2f(0, 1); glVertex3f(x0, y1, z1);
     }
     
     private void drawWestFaceVertices(float x, float y, float z) {
         float x0 = x;
         float y0 = y, y1 = y + 1;
         float z0 = z, z1 = z + 1;
-        glVertex3f(x0, y0, z0); glVertex3f(x0, y0, z1); glVertex3f(x0, y1, z1);
-        glVertex3f(x0, y0, z0); glVertex3f(x0, y1, z1); glVertex3f(x0, y1, z0);
+        // With texture coordinates
+        glTexCoord2f(0, 0); glVertex3f(x0, y0, z0);
+        glTexCoord2f(1, 0); glVertex3f(x0, y0, z1);
+        glTexCoord2f(1, 1); glVertex3f(x0, y1, z1);
+        
+        glTexCoord2f(0, 0); glVertex3f(x0, y0, z0);
+        glTexCoord2f(1, 1); glVertex3f(x0, y1, z1);
+        glTexCoord2f(0, 1); glVertex3f(x0, y1, z0);
     }
     
     private void drawEastFaceVertices(float x, float y, float z) {
         float x1 = x + 1;
         float y0 = y, y1 = y + 1;
         float z0 = z, z1 = z + 1;
-        glVertex3f(x1, y0, z1); glVertex3f(x1, y0, z0); glVertex3f(x1, y1, z0);
-        glVertex3f(x1, y0, z1); glVertex3f(x1, y1, z0); glVertex3f(x1, y1, z1);
+        // With texture coordinates
+        glTexCoord2f(1, 0); glVertex3f(x1, y0, z1);
+        glTexCoord2f(0, 0); glVertex3f(x1, y0, z0);
+        glTexCoord2f(0, 1); glVertex3f(x1, y1, z0);
+        
+        glTexCoord2f(1, 0); glVertex3f(x1, y0, z1);
+        glTexCoord2f(0, 1); glVertex3f(x1, y1, z0);
+        glTexCoord2f(1, 1); glVertex3f(x1, y1, z1);
     }
     
     /**
