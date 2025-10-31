@@ -140,14 +140,16 @@ public class ChunkRenderer {
         float x, y, z;
         int color;
         float brightness;
+        float colorBrightness; // Brightness adjustment for the base color (for fallback)
         Block block;
         
-        FaceData(float x, float y, float z, int color, float brightness, Block block) {
+        FaceData(float x, float y, float z, int color, float brightness, float colorBrightness, Block block) {
             this.x = x;
             this.y = y;
             this.z = z;
             this.color = color;
             this.brightness = brightness;
+            this.colorBrightness = colorBrightness;
             this.block = block;
         }
     }
@@ -216,23 +218,24 @@ public class ChunkRenderer {
         boolean eastVisible = shouldRenderFace(chunk, cx + 1, cy, cz);
         
         // Collect visible faces for batched rendering
+        // Store both the adjusted color and the brightness factor for fallback color
         if (topVisible) {
-            topFaces.add(new FaceData(x, y, z, color, 1f, block));
+            topFaces.add(new FaceData(x, y, z, color, 1f, 1f, block));
         }
         if (bottomVisible) {
-            bottomFaces.add(new FaceData(x, y, z, darkenColor(color), 1f, block));
+            bottomFaces.add(new FaceData(x, y, z, darkenColor(color), 1f, 0.5f, block));
         }
         if (northVisible) {
-            northFaces.add(new FaceData(x, y, z, adjustColorBrightness(color, 0.8f), 1f, block));
+            northFaces.add(new FaceData(x, y, z, adjustColorBrightness(color, 0.8f), 1f, 0.8f, block));
         }
         if (southVisible) {
-            southFaces.add(new FaceData(x, y, z, adjustColorBrightness(color, 0.8f), 1f, block));
+            southFaces.add(new FaceData(x, y, z, adjustColorBrightness(color, 0.8f), 1f, 0.8f, block));
         }
         if (westVisible) {
-            westFaces.add(new FaceData(x, y, z, adjustColorBrightness(color, 0.6f), 1f, block));
+            westFaces.add(new FaceData(x, y, z, adjustColorBrightness(color, 0.6f), 1f, 0.6f, block));
         }
         if (eastVisible) {
-            eastFaces.add(new FaceData(x, y, z, adjustColorBrightness(color, 0.6f), 1f, block));
+            eastFaces.add(new FaceData(x, y, z, adjustColorBrightness(color, 0.6f), 1f, 0.6f, block));
         }
         
         // Collect outline data
@@ -312,7 +315,8 @@ public class ChunkRenderer {
             glBegin(GL_TRIANGLES);
             for (FaceData face : blockFaces) {
                 // Use fallback magenta color if no texture, otherwise use the face color (white)
-                int renderColor = hasTexture ? face.color : block.getFallbackColor();
+                // Apply brightness adjustment to the fallback color to maintain directional shading
+                int renderColor = hasTexture ? face.color : adjustColorBrightness(block.getFallbackColor(), face.colorBrightness);
                 setColor(renderColor, face.brightness);
                 renderer.render(face.x, face.y, face.z);
             }
