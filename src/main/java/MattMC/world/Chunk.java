@@ -22,6 +22,9 @@ public final class Chunk {
     // We store the full array for simplicity, but Minecraft uses sections
     private final Block[][][] blocks;
     
+    // Dirty flag: marks if chunk needs to be re-rendered (for display list caching)
+    private boolean dirty = true;
+    
     public Chunk(int chunkX, int chunkZ) {
         this.chunkX = chunkX;
         this.chunkZ = chunkZ;
@@ -61,6 +64,21 @@ public final class Chunk {
             return;
         }
         blocks[x][y][z] = block;
+        this.dirty = true;  // Mark chunk as needing re-render
+    }
+    
+    /**
+     * Check if chunk has been modified and needs re-rendering.
+     */
+    public boolean isDirty() {
+        return dirty;
+    }
+    
+    /**
+     * Mark chunk as clean (already rendered).
+     */
+    public void setDirty(boolean dirty) {
+        this.dirty = dirty;
     }
     
     /**

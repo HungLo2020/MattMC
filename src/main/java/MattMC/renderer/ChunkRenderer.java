@@ -4,6 +4,9 @@ import MattMC.world.Block;
 import MattMC.world.BlockType;
 import MattMC.world.Chunk;
 
+import java.util.HashMap;
+import java.util.Map;
+
 import static org.lwjgl.opengl.GL11.*;
 
 /**
@@ -11,6 +14,7 @@ import static org.lwjgl.opengl.GL11.*;
  * Similar to Minecraft's ChunkRenderer/BlockRenderer classes.
  * 
  * Optimizations:
+ * - Display lists: Pre-compile chunk geometry into OpenGL display lists (massive performance boost)
  * - Chunk sections: Divide chunk into 16x16x16 sections, skip empty sections
  * - Face culling: Only render faces adjacent to air
  * - Outline culling: Only render edges on visible faces
@@ -21,13 +25,66 @@ public class ChunkRenderer {
     private static final int SECTION_SIZE = 16;
     private static final int SECTIONS_PER_CHUNK = Chunk.HEIGHT / SECTION_SIZE;  // 384 / 16 = 24 sections
     
+    // Display list cache: maps chunks to their compiled display lists
+    // This is similar to Minecraft's chunk rendering optimization
+    private final Map<Chunk, Integer> displayListCache = new HashMap<>();
+    
+    /**
+     * Render a chunk using a cached display list.
+     * If the chunk hasn't been compiled yet, compile it first.
+     * Display lists are 10-100x faster than immediate mode rendering.
+     */
+    public void renderChunk(Chunk chunk) {
+        // Check if chunk has been marked as dirty
+        if (chunk.isDirty()) {
+            // Recompile display list
+            invalidateChunk(chunk);
+            chunk.setDirty(false);
+        }
+        
+        // Get or create display list
+        Integer displayList = displayListCache.get(chunk);
+        if (displayList == null) {
+            displayList = compileChunkToDisplayList(chunk);
+            displayListCache.put(chunk, displayList);
+        }
+        
+        // Render the display list (single draw call for entire chunk!)
+        glCallList(displayList);
+    }
+    
+    /**
+     * Invalidate a chunk's display list, forcing it to be recompiled.
+     * Call this when blocks in the chunk are modified.
+     */
+    public void invalidateChunk(Chunk chunk) {
+        Integer displayList = displayListCache.remove(chunk);
+        if (displayList != null) {
+            glDeleteLists(displayList, 1);
+        }
+    }
+    
+    /**
+     * Compile all chunk geometry into a display list for fast rendering.
+     * This is called once per chunk (or when chunk is modified).
+     */
+    private int compileChunkToDisplayList(Chunk chunk) {
+        int displayList = glGenLists(1);
+        glNewList(displayList, GL_COMPILE);
+        
+        renderChunkImmediate(chunk);
+        
+        glEndList();
+        return displayList;
+    }
+    
     /**
      * Render all blocks in a chunk with face culling and section optimization.
      * 
      * Uses chunk sections (16x16x16) to skip large empty areas.
      * Each chunk has 24 vertical sections. Empty sections are skipped entirely.
      */
-    public void renderChunk(Chunk chunk) {
+    private void renderChunkImmediate(Chunk chunk) {
         // Iterate by sections (16 blocks tall each)
         for (int sectionIndex = 0; sectionIndex < SECTIONS_PER_CHUNK; sectionIndex++) {
             int sectionStartY = sectionIndex * SECTION_SIZE;
