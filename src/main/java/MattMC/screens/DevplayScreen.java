@@ -11,17 +11,25 @@ import static org.lwjgl.opengl.GL11.*;
 
 /* Devplay: renders a 16x16 chunk with flat terrain at y=64. ESC returns to Singleplayer. */
 public final class DevplayScreen implements Screen {
+    // Mouse sensitivity multiplier (1.0 = default, 0.5 = half speed, 2.0 = double speed)
+    private static final float MOUSE_SENSITIVITY = 1.0f;
+    
     private final Game game;
     private final Window window;
     
     private final Chunk chunk;
     
-    // Camera controls
-    private float cameraX = 8f;      // Center of chunk
-    private float cameraY = 80f;     // Above surface
-    private float cameraZ = 40f;     // Back from chunk
-    private float cameraYaw = 0f;    // Rotation around Y axis
-    private float cameraPitch = -20f; // Look down slightly
+    // Player/Camera position and orientation
+    private float playerX = 8f;      // Center of chunk
+    private float playerY = 80f;     // Above surface
+    private float playerZ = 40f;     // Back from chunk
+    private float yaw = 0f;          // Horizontal rotation (left/right)
+    private float pitch = 0f;        // Vertical rotation (up/down)
+    
+    // Mouse state
+    private double lastMouseX = 0;
+    private double lastMouseY = 0;
+    private boolean firstMouse = true;
     
     private double lastFrameTimeSec = now();
 
@@ -33,16 +41,46 @@ public final class DevplayScreen implements Screen {
         this.chunk = new Chunk(0, 0);
         this.chunk.generateFlatTerrain(64); // Surface at y=64
 
+        // Capture mouse for FPS-style controls
+        glfwSetInputMode(window.handle(), GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+        
         // Resize -> update viewport
         glfwSetFramebufferSizeCallback(window.handle(), (win, w, h) -> {
             glViewport(0, 0, Math.max(w, 1), Math.max(h, 1));
         });
 
-        // ESC to go back, WASD/Arrow keys for camera movement
+        // ESC to release mouse and go back
         glfwSetKeyCallback(window.handle(), (win, key, scancode, action, mods) -> {
             if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS) {
+                glfwSetInputMode(window.handle(), GLFW_CURSOR, GLFW_CURSOR_NORMAL);
                 game.setScreen(new SingleplayerScreen(game));
             }
+        });
+        
+        // Mouse callback for looking around
+        glfwSetCursorPosCallback(window.handle(), (win, xpos, ypos) -> {
+            if (firstMouse) {
+                lastMouseX = xpos;
+                lastMouseY = ypos;
+                firstMouse = false;
+                return;
+            }
+            
+            double xOffset = xpos - lastMouseX;
+            double yOffset = ypos - lastMouseY; // Reversed: y-coordinates range from bottom to top
+            lastMouseX = xpos;
+            lastMouseY = ypos;
+            
+            // Apply sensitivity
+            xOffset *= MOUSE_SENSITIVITY * 0.1;
+            yOffset *= MOUSE_SENSITIVITY * 0.1;
+            
+            yaw += (float) xOffset;
+            pitch += (float) yOffset;
+            
+            // Clamp pitch to prevent screen flip
+            if (pitch > 89.0f) pitch = 89.0f;
+            if (pitch < -89.0f) pitch = -89.0f;
         });
     }
 
@@ -55,43 +93,40 @@ public final class DevplayScreen implements Screen {
         if (dt > 0.5) dt = 0.5;
         
         float moveSpeed = 10f * (float)dt;
-        float rotSpeed = 60f * (float)dt;
         
-        // Camera controls
         long win = window.handle();
         
-        // WASD movement
+        // Calculate forward and right vectors based on yaw
+        float yawRad = (float) Math.toRadians(yaw);
+        float forwardX = (float) Math.sin(yawRad);
+        float forwardZ = -(float) Math.cos(yawRad);
+        float rightX = (float) Math.cos(yawRad);
+        float rightZ = (float) Math.sin(yawRad);
+        
+        // WASD movement (relative to view direction)
         if (glfwGetKey(win, GLFW_KEY_W) == GLFW_PRESS) {
-            cameraZ -= moveSpeed;
+            playerX += forwardX * moveSpeed;
+            playerZ += forwardZ * moveSpeed;
         }
         if (glfwGetKey(win, GLFW_KEY_S) == GLFW_PRESS) {
-            cameraZ += moveSpeed;
+            playerX -= forwardX * moveSpeed;
+            playerZ -= forwardZ * moveSpeed;
         }
         if (glfwGetKey(win, GLFW_KEY_A) == GLFW_PRESS) {
-            cameraX -= moveSpeed;
+            playerX -= rightX * moveSpeed;
+            playerZ -= rightZ * moveSpeed;
         }
         if (glfwGetKey(win, GLFW_KEY_D) == GLFW_PRESS) {
-            cameraX += moveSpeed;
-        }
-        if (glfwGetKey(win, GLFW_KEY_SPACE) == GLFW_PRESS) {
-            cameraY += moveSpeed;
-        }
-        if (glfwGetKey(win, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS) {
-            cameraY -= moveSpeed;
+            playerX += rightX * moveSpeed;
+            playerZ += rightZ * moveSpeed;
         }
         
-        // Arrow keys for camera rotation
-        if (glfwGetKey(win, GLFW_KEY_LEFT) == GLFW_PRESS) {
-            cameraYaw -= rotSpeed;
+        // Vertical movement
+        if (glfwGetKey(win, GLFW_KEY_SPACE) == GLFW_PRESS) {
+            playerY += moveSpeed;
         }
-        if (glfwGetKey(win, GLFW_KEY_RIGHT) == GLFW_PRESS) {
-            cameraYaw += rotSpeed;
-        }
-        if (glfwGetKey(win, GLFW_KEY_UP) == GLFW_PRESS) {
-            cameraPitch = Math.max(-89f, cameraPitch - rotSpeed);
-        }
-        if (glfwGetKey(win, GLFW_KEY_DOWN) == GLFW_PRESS) {
-            cameraPitch = Math.min(89f, cameraPitch + rotSpeed);
+        if (glfwGetKey(win, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS || glfwGetKey(win, GLFW_KEY_RIGHT_CONTROL) == GLFW_PRESS) {
+            playerY -= moveSpeed;
         }
     }
 
@@ -117,10 +152,10 @@ public final class DevplayScreen implements Screen {
         glMatrixMode(GL_MODELVIEW);
         glLoadIdentity();
 
-        // Apply camera transformations
-        glRotatef(cameraPitch, 1f, 0f, 0f);
-        glRotatef(cameraYaw, 0f, 1f, 0f);
-        glTranslatef(-cameraX, -cameraY, -cameraZ);
+        // Apply camera transformations (pitch, yaw, then position)
+        glRotatef(pitch, 1f, 0f, 0f);
+        glRotatef(yaw, 0f, 1f, 0f);
+        glTranslatef(-playerX, -playerY, -playerZ);
 
         glEnable(GL_DEPTH_TEST);
         glEnable(GL_CULL_FACE);
@@ -203,6 +238,9 @@ public final class DevplayScreen implements Screen {
             setColor(adjustColorBrightness(color, 0.6f), 1f);
             drawEastFace(x, y, z);
         }
+        
+        // Draw black outline around the cube
+        drawBlockOutline(x, y, z);
     }
     
     /**
@@ -276,6 +314,39 @@ public final class DevplayScreen implements Screen {
         glBegin(GL_TRIANGLES);
         glVertex3f(x1, y0, z1); glVertex3f(x1, y0, z0); glVertex3f(x1, y1, z0);
         glVertex3f(x1, y0, z1); glVertex3f(x1, y1, z0); glVertex3f(x1, y1, z1);
+        glEnd();
+    }
+    
+    /**
+     * Draw a black outline around a cube to make blocks more distinguishable.
+     * Draws the 12 edges of the cube.
+     */
+    private void drawBlockOutline(float x, float y, float z) {
+        float x0 = x, x1 = x + 1;
+        float y0 = y, y1 = y + 1;
+        float z0 = z, z1 = z + 1;
+        
+        // Set black color for outline
+        setColor(0x000000, 1f);
+        
+        glBegin(GL_LINES);
+        // Bottom 4 edges
+        glVertex3f(x0, y0, z0); glVertex3f(x1, y0, z0);
+        glVertex3f(x1, y0, z0); glVertex3f(x1, y0, z1);
+        glVertex3f(x1, y0, z1); glVertex3f(x0, y0, z1);
+        glVertex3f(x0, y0, z1); glVertex3f(x0, y0, z0);
+        
+        // Top 4 edges
+        glVertex3f(x0, y1, z0); glVertex3f(x1, y1, z0);
+        glVertex3f(x1, y1, z0); glVertex3f(x1, y1, z1);
+        glVertex3f(x1, y1, z1); glVertex3f(x0, y1, z1);
+        glVertex3f(x0, y1, z1); glVertex3f(x0, y1, z0);
+        
+        // 4 vertical edges
+        glVertex3f(x0, y0, z0); glVertex3f(x0, y1, z0);
+        glVertex3f(x1, y0, z0); glVertex3f(x1, y1, z0);
+        glVertex3f(x1, y0, z1); glVertex3f(x1, y1, z1);
+        glVertex3f(x0, y0, z1); glVertex3f(x0, y1, z1);
         glEnd();
     }
     
