@@ -56,7 +56,7 @@ public class Region {
      */
     public Block getBlock(int x, int y, int z) {
         if (x < 0 || x >= REGION_WIDTH_BLOCKS || z < 0 || z >= REGION_DEPTH_BLOCKS) {
-            return Block.AIR;
+            return Blocks.AIR;
         }
         
         int chunkX = x / Chunk.WIDTH;
@@ -65,7 +65,7 @@ public class Region {
         int blockZ = z % Chunk.DEPTH;
         
         Chunk chunk = getChunk(chunkX, chunkZ);
-        if (chunk == null) return Block.AIR;
+        if (chunk == null) return Blocks.AIR;
         
         return chunk.getBlock(blockX, y, blockZ);
     }

@@ -15,14 +15,14 @@ import java.util.Set;
  * <h2>Usage Examples:</h2>
  * <pre>{@code
  * // Access blocks via static fields (recommended for vanilla blocks)
- * BlockType dirt = Blocks.DIRT;
- * BlockType stone = Blocks.STONE;
+ * Block dirt = Blocks.DIRT;
+ * Block stone = Blocks.STONE;
  * 
  * // Look up blocks by identifier
- * BlockType block = Blocks.getBlock("mattmc:dirt");
+ * Block block = Blocks.getBlock("mattmc:dirt");
  * 
  * // Get the identifier for a block
- * String id = Blocks.getIdentifier(BlockType.DIRT); // Returns "mattmc:dirt"
+ * String id = Blocks.DIRT.getIdentifier(); // Returns "mattmc:dirt"
  * 
  * // Check if a block is registered
  * boolean exists = Blocks.isRegistered("mattmc:diamond"); // Returns false
@@ -32,62 +32,46 @@ import java.util.Set;
  *     System.out.println(identifier);
  * }
  * }</pre>
- * 
- * <p>Note: Currently, blocks are based on the BlockType enum. Future versions may support
- * dynamic block registration for modding support.</p>
  */
 public class Blocks {
     
     // Default namespace for vanilla blocks
     private static final String DEFAULT_NAMESPACE = "mattmc";
     
-    // Registry maps block identifiers to BlockType instances
-    private static final Map<String, BlockType> REGISTRY = new HashMap<>();
-    
-    // Reverse lookup: BlockType to identifier
-    private static final Map<BlockType, String> REVERSE_REGISTRY = new HashMap<>();
+    // Registry maps block identifiers to Block instances
+    private static final Map<String, Block> REGISTRY = new HashMap<>();
     
     // Static block instances - similar to Minecraft's public static final Block fields
-    public static final BlockType AIR;
-    public static final BlockType GRASS;
-    public static final BlockType DIRT;
-    public static final BlockType STONE;
-    
-    // Static initializer block - registers all vanilla blocks
-    static {
-        // Register blocks with their identifiers
-        AIR = register("air", BlockType.AIR);
-        GRASS = register("grass", BlockType.GRASS);
-        DIRT = register("dirt", BlockType.DIRT);
-        STONE = register("stone", BlockType.STONE);
-    }
+    // Each block is defined in one line with its properties
+    public static final Block AIR = register("air", new Block(0x000000, false, null));
+    public static final Block GRASS = register("grass", new Block(0x7CB342, true, null));
+    public static final Block DIRT = register("dirt", new Block(0x8B5A3C, true, "assets/textures/block/dirt.png"));
+    public static final Block STONE = register("stone", new Block(0x808080, true, "assets/textures/block/stone.png"));
     
     /**
      * Register a block with a given name (without namespace).
      * Automatically adds "mattmc:" namespace prefix.
-     * This method is used during static initialization and assumes valid inputs.
      * 
      * @param name The block name (e.g., "dirt")
-     * @param blockType The BlockType enum instance
-     * @return The registered BlockType
+     * @param block The Block instance with properties
+     * @return The registered Block with identifier set
      */
-    private static BlockType register(String name, BlockType blockType) {
+    private static Block register(String name, Block block) {
         if (name == null) {
             throw new NullPointerException("Block name cannot be null");
         }
-        if (blockType == null) {
-            throw new NullPointerException("BlockType cannot be null");
+        if (block == null) {
+            throw new NullPointerException("Block cannot be null");
         }
         String identifier = DEFAULT_NAMESPACE + ":" + name;
         if (REGISTRY.containsKey(identifier)) {
             throw new IllegalStateException("Block with identifier '" + identifier + "' is already registered!");
         }
-        if (REVERSE_REGISTRY.containsKey(blockType)) {
-            throw new IllegalStateException("BlockType " + blockType + " is already registered!");
-        }
-        REGISTRY.put(identifier, blockType);
-        REVERSE_REGISTRY.put(blockType, identifier);
-        return blockType;
+        
+        // Create a new block instance with the identifier set
+        Block registeredBlock = new Block(block.color(), block.isSolid(), block.getTexturePath(), identifier);
+        REGISTRY.put(identifier, registeredBlock);
+        return registeredBlock;
     }
     
     /**
@@ -95,56 +79,40 @@ public class Blocks {
      * Allows for future modding support where mods can use their own namespace.
      * 
      * @param identifier Full identifier (e.g., "mattmc:dirt" or "mymod:custom_block")
-     * @param blockType The BlockType enum instance
-     * @return The registered BlockType
-     * @throws IllegalArgumentException if identifier is already registered or if blockType is already mapped
-     * @throws NullPointerException if identifier or blockType is null
+     * @param block The Block instance with properties
+     * @return The registered Block with identifier set
+     * @throws IllegalArgumentException if identifier is already registered
+     * @throws NullPointerException if identifier or block is null
      */
-    public static BlockType registerBlock(String identifier, BlockType blockType) {
+    public static Block registerBlock(String identifier, Block block) {
         if (identifier == null) {
             throw new NullPointerException("Block identifier cannot be null");
         }
-        if (blockType == null) {
-            throw new NullPointerException("BlockType cannot be null");
+        if (block == null) {
+            throw new NullPointerException("Block cannot be null");
         }
         if (REGISTRY.containsKey(identifier)) {
             throw new IllegalArgumentException("Block with identifier '" + identifier + "' is already registered!");
         }
-        if (REVERSE_REGISTRY.containsKey(blockType)) {
-            throw new IllegalArgumentException("BlockType " + blockType + " is already registered with identifier '" 
-                + REVERSE_REGISTRY.get(blockType) + "'");
-        }
-        REGISTRY.put(identifier, blockType);
-        REVERSE_REGISTRY.put(blockType, identifier);
-        return blockType;
+        
+        // Create a new block instance with the identifier set
+        Block registeredBlock = new Block(block.color(), block.isSolid(), block.getTexturePath(), identifier);
+        REGISTRY.put(identifier, registeredBlock);
+        return registeredBlock;
     }
     
     /**
      * Get a block by its identifier.
      * 
      * @param identifier The block identifier (e.g., "mattmc:dirt")
-     * @return The BlockType, or null if not found
+     * @return The Block, or null if not found
      * @throws NullPointerException if identifier is null
      */
-    public static BlockType getBlock(String identifier) {
+    public static Block getBlock(String identifier) {
         if (identifier == null) {
             throw new NullPointerException("Block identifier cannot be null");
         }
         return REGISTRY.get(identifier);
-    }
-    
-    /**
-     * Get the identifier for a given BlockType.
-     * 
-     * @param blockType The BlockType
-     * @return The identifier string (e.g., "mattmc:dirt"), or null if not registered
-     * @throws NullPointerException if blockType is null
-     */
-    public static String getIdentifier(BlockType blockType) {
-        if (blockType == null) {
-            throw new NullPointerException("BlockType cannot be null");
-        }
-        return REVERSE_REGISTRY.get(blockType);
     }
     
     /**

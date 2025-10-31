@@ -1,7 +1,7 @@
 package MattMC.player;
 
 import MattMC.world.Block;
-import MattMC.world.BlockType;
+import MattMC.world.Blocks;
 import MattMC.world.Chunk;
 import MattMC.world.Region;
 
@@ -27,21 +27,21 @@ public class BlockInteraction {
     public void breakBlock() {
         BlockHitResult hit = raycastBlock();
         if (hit != null) {
-            region.setBlock(hit.x, hit.y, hit.z, Block.AIR);
+            region.setBlock(hit.x, hit.y, hit.z, Blocks.AIR);
         }
     }
     
     /**
      * Attempt to place a block on the face the player is looking at.
-     * @param blockType Type of block to place
+     * @param block The block to place
      */
-    public void placeBlock(BlockType blockType) {
+    public void placeBlock(Block block) {
         BlockHitResult hit = raycastBlock();
         if (hit != null && hit.adjacentX >= 0 && hit.adjacentY >= 0 && hit.adjacentZ >= 0) {
             // Place block at the adjacent position (the face we hit)
             Block existing = region.getBlock(hit.adjacentX, hit.adjacentY, hit.adjacentZ);
             if (existing.isAir()) {
-                region.setBlock(hit.adjacentX, hit.adjacentY, hit.adjacentZ, new Block(blockType));
+                region.setBlock(hit.adjacentX, hit.adjacentY, hit.adjacentZ, block);
             }
         }
     }

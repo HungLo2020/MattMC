@@ -34,7 +34,7 @@ public final class Chunk {
         for (int x = 0; x < WIDTH; x++) {
             for (int y = 0; y < HEIGHT; y++) {
                 for (int z = 0; z < DEPTH; z++) {
-                    blocks[x][y][z] = Block.AIR;
+                    blocks[x][y][z] = Blocks.AIR;
                 }
             }
         }
@@ -48,7 +48,7 @@ public final class Chunk {
      */
     public Block getBlock(int x, int y, int z) {
         if (x < 0 || x >= WIDTH || y < 0 || y >= HEIGHT || z < 0 || z >= DEPTH) {
-            return Block.AIR;
+            return Blocks.AIR;
         }
         return blocks[x][y][z];
     }
@@ -106,18 +106,18 @@ public final class Chunk {
             for (int z = 0; z < DEPTH; z++) {
                 // Fill from bottom to surface
                 for (int y = 0; y <= surfaceY && y < HEIGHT; y++) {
-                    BlockType type;
+                    Block block;
                     int worldY = chunkYToWorldY(y);
                     
                     if (worldY == surfaceWorldY) {
-                        type = BlockType.GRASS;
+                        block = Blocks.GRASS;
                     } else if (worldY >= surfaceWorldY - 3) {
-                        type = BlockType.DIRT;
+                        block = Blocks.DIRT;
                     } else {
-                        type = BlockType.STONE;
+                        block = Blocks.STONE;
                     }
                     
-                    blocks[x][y][z] = new Block(type);
+                    blocks[x][y][z] = block;
                 }
             }
         }
