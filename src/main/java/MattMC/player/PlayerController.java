@@ -67,7 +67,7 @@ public class PlayerController {
         }
         
         double xOffset = xpos - lastMouseX;
-        double yOffset = lastMouseY - ypos; // Reversed: y-coordinates range from bottom to top
+        double yOffset = ypos - lastMouseY; // Natural mouse movement: up = look up, down = look down
         lastMouseX = xpos;
         lastMouseY = ypos;
         
