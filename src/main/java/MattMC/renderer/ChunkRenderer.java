@@ -138,13 +138,15 @@ public class ChunkRenderer {
         float x, y, z;
         int color;
         float brightness;
+        BlockType blockType;
         
-        FaceData(float x, float y, float z, int color, float brightness) {
+        FaceData(float x, float y, float z, int color, float brightness, BlockType blockType) {
             this.x = x;
             this.y = y;
             this.z = z;
             this.color = color;
             this.brightness = brightness;
+            this.blockType = blockType;
         }
     }
     
@@ -212,22 +214,22 @@ public class ChunkRenderer {
         
         // Collect visible faces for batched rendering
         if (topVisible) {
-            topFaces.add(new FaceData(x, y, z, color, 1f));
+            topFaces.add(new FaceData(x, y, z, color, 1f, type));
         }
         if (bottomVisible) {
-            bottomFaces.add(new FaceData(x, y, z, darkenColor(color), 1f));
+            bottomFaces.add(new FaceData(x, y, z, darkenColor(color), 1f, type));
         }
         if (northVisible) {
-            northFaces.add(new FaceData(x, y, z, adjustColorBrightness(color, 0.8f), 1f));
+            northFaces.add(new FaceData(x, y, z, adjustColorBrightness(color, 0.8f), 1f, type));
         }
         if (southVisible) {
-            southFaces.add(new FaceData(x, y, z, adjustColorBrightness(color, 0.8f), 1f));
+            southFaces.add(new FaceData(x, y, z, adjustColorBrightness(color, 0.8f), 1f, type));
         }
         if (westVisible) {
-            westFaces.add(new FaceData(x, y, z, adjustColorBrightness(color, 0.6f), 1f));
+            westFaces.add(new FaceData(x, y, z, adjustColorBrightness(color, 0.6f), 1f, type));
         }
         if (eastVisible) {
-            eastFaces.add(new FaceData(x, y, z, adjustColorBrightness(color, 0.6f), 1f));
+            eastFaces.add(new FaceData(x, y, z, adjustColorBrightness(color, 0.6f), 1f, type));
         }
         
         // Collect outline data
@@ -244,65 +246,19 @@ public class ChunkRenderer {
                                     java.util.List<FaceData> northFaces, java.util.List<FaceData> southFaces,
                                     java.util.List<FaceData> westFaces, java.util.List<FaceData> eastFaces,
                                     java.util.List<OutlineData> outlines) {
-        // Render all top faces in ONE glBegin/glEnd block
-        if (!topFaces.isEmpty()) {
-            glBegin(GL_TRIANGLES);
-            for (FaceData face : topFaces) {
-                setColor(face.color, face.brightness);
-                drawTopFaceVertices(face.x, face.y, face.z);
-            }
-            glEnd();
-        }
+        // Enable texturing
+        glEnable(GL_TEXTURE_2D);
         
-        // Render all bottom faces in ONE glBegin/glEnd block
-        if (!bottomFaces.isEmpty()) {
-            glBegin(GL_TRIANGLES);
-            for (FaceData face : bottomFaces) {
-                setColor(face.color, face.brightness);
-                drawBottomFaceVertices(face.x, face.y, face.z);
-            }
-            glEnd();
-        }
+        // Render faces grouped by block type (to minimize texture bindings)
+        renderFacesByType(topFaces, this::drawTopFaceVertices);
+        renderFacesByType(bottomFaces, this::drawBottomFaceVertices);
+        renderFacesByType(northFaces, this::drawNorthFaceVertices);
+        renderFacesByType(southFaces, this::drawSouthFaceVertices);
+        renderFacesByType(westFaces, this::drawWestFaceVertices);
+        renderFacesByType(eastFaces, this::drawEastFaceVertices);
         
-        // Render all north faces in ONE glBegin/glEnd block
-        if (!northFaces.isEmpty()) {
-            glBegin(GL_TRIANGLES);
-            for (FaceData face : northFaces) {
-                setColor(face.color, face.brightness);
-                drawNorthFaceVertices(face.x, face.y, face.z);
-            }
-            glEnd();
-        }
-        
-        // Render all south faces in ONE glBegin/glEnd block
-        if (!southFaces.isEmpty()) {
-            glBegin(GL_TRIANGLES);
-            for (FaceData face : southFaces) {
-                setColor(face.color, face.brightness);
-                drawSouthFaceVertices(face.x, face.y, face.z);
-            }
-            glEnd();
-        }
-        
-        // Render all west faces in ONE glBegin/glEnd block
-        if (!westFaces.isEmpty()) {
-            glBegin(GL_TRIANGLES);
-            for (FaceData face : westFaces) {
-                setColor(face.color, face.brightness);
-                drawWestFaceVertices(face.x, face.y, face.z);
-            }
-            glEnd();
-        }
-        
-        // Render all east faces in ONE glBegin/glEnd block
-        if (!eastFaces.isEmpty()) {
-            glBegin(GL_TRIANGLES);
-            for (FaceData face : eastFaces) {
-                setColor(face.color, face.brightness);
-                drawEastFaceVertices(face.x, face.y, face.z);
-            }
-            glEnd();
-        }
+        // Disable texturing for outlines
+        glDisable(GL_TEXTURE_2D);
         
         // Render all outlines in ONE glBegin/glEnd block
         if (!outlines.isEmpty()) {
@@ -314,6 +270,41 @@ public class ChunkRenderer {
             }
             glEnd();
         }
+    }
+    
+    /**
+     * Render faces grouped by block type to minimize texture binding
+     */
+    private void renderFacesByType(java.util.List<FaceData> faces, FaceRenderer renderer) {
+        if (faces.isEmpty()) return;
+        
+        // Group faces by block type
+        java.util.Map<BlockType, java.util.List<FaceData>> facesByType = new java.util.HashMap<>();
+        for (FaceData face : faces) {
+            facesByType.computeIfAbsent(face.blockType, k -> new java.util.ArrayList<>()).add(face);
+        }
+        
+        // Render each block type group
+        for (java.util.Map.Entry<BlockType, java.util.List<FaceData>> entry : facesByType.entrySet()) {
+            BlockType blockType = entry.getKey();
+            java.util.List<FaceData> typeFaces = entry.getValue();
+            
+            // Bind texture for this block type BEFORE glBegin
+            textureManager.bindTexture(blockType);
+            
+            // Render all faces of this type in one glBegin/glEnd block
+            glBegin(GL_TRIANGLES);
+            for (FaceData face : typeFaces) {
+                setColor(face.color, face.brightness);
+                renderer.render(face.x, face.y, face.z);
+            }
+            glEnd();
+        }
+    }
+    
+    @FunctionalInterface
+    private interface FaceRenderer {
+        void render(float x, float y, float z);
     }
     
     /**
