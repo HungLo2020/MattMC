@@ -2,6 +2,7 @@ package MattMC.player;
 
 import MattMC.world.Block;
 import MattMC.world.Chunk;
+import MattMC.world.Region;
 
 /**
  * Handles player physics including gravity, collision detection, and flying.
@@ -19,7 +20,7 @@ public class PlayerPhysics {
     private static final float JUMP_VELOCITY = 8f; // Initial jump speed
     
     private final Player player;
-    private final Chunk chunk; // For now, single chunk. Later would be World.
+    private final Region region;
     
     // Physics state
     private float velocityY = 0f; // Vertical velocity
@@ -30,9 +31,9 @@ public class PlayerPhysics {
     private double lastSpacePress = 0;
     private static final double DOUBLE_TAP_THRESHOLD = 0.3; // seconds
     
-    public PlayerPhysics(Player player, Chunk chunk) {
+    public PlayerPhysics(Player player, Region region) {
         this.player = player;
-        this.chunk = chunk;
+        this.region = region;
     }
     
     /**
@@ -161,12 +162,12 @@ public class PlayerPhysics {
                     // Convert world Y to chunk Y
                     int chunkY = Chunk.worldYToChunkY(by);
                     
-                    // Check if block is within chunk bounds
-                    if (bx >= 0 && bx < Chunk.WIDTH && 
+                    // Check if block is within region bounds
+                    if (bx >= 0 && bx < Region.REGION_WIDTH_BLOCKS && 
                         chunkY >= 0 && chunkY < Chunk.HEIGHT && 
-                        bz >= 0 && bz < Chunk.DEPTH) {
+                        bz >= 0 && bz < Region.REGION_DEPTH_BLOCKS) {
                         
-                        Block block = chunk.getBlock(bx, chunkY, bz);
+                        Block block = region.getBlock(bx, chunkY, bz);
                         if (!block.isAir()) {
                             // Solid block found - collision!
                             return true;
@@ -206,7 +207,7 @@ public class PlayerPhysics {
     /**
      * Find the highest solid block at given X,Z position to spawn player on top.
      */
-    public static float findSpawnHeight(Chunk chunk, float x, float z) {
+    public static float findSpawnHeight(Region region, float x, float z) {
         int blockX = (int) Math.floor(x);
         int blockZ = (int) Math.floor(z);
         
@@ -214,11 +215,11 @@ public class PlayerPhysics {
         for (int worldY = Chunk.MAX_Y; worldY >= Chunk.MIN_Y; worldY--) {
             int chunkY = Chunk.worldYToChunkY(worldY);
             
-            if (blockX >= 0 && blockX < Chunk.WIDTH && 
+            if (blockX >= 0 && blockX < Region.REGION_WIDTH_BLOCKS && 
                 chunkY >= 0 && chunkY < Chunk.HEIGHT && 
-                blockZ >= 0 && blockZ < Chunk.DEPTH) {
+                blockZ >= 0 && blockZ < Region.REGION_DEPTH_BLOCKS) {
                 
-                Block block = chunk.getBlock(blockX, chunkY, blockZ);
+                Block block = region.getBlock(blockX, chunkY, blockZ);
                 if (!block.isAir()) {
                     // Found solid block - spawn on top
                     return worldY + 1.0f;

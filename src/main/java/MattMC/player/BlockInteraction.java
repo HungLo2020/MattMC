@@ -3,6 +3,7 @@ package MattMC.player;
 import MattMC.world.Block;
 import MattMC.world.BlockType;
 import MattMC.world.Chunk;
+import MattMC.world.Region;
 
 /**
  * Handles block breaking and placing mechanics.
@@ -10,14 +11,14 @@ import MattMC.world.Chunk;
  */
 public class BlockInteraction {
     private final Player player;
-    private final Chunk chunk; // For now, single chunk. Later would be a World reference.
+    private final Region region;
     
     // Maximum reach distance for block interaction
     private static final float MAX_REACH_DISTANCE = 5.0f;
     
-    public BlockInteraction(Player player, Chunk chunk) {
+    public BlockInteraction(Player player, Region region) {
         this.player = player;
-        this.chunk = chunk;
+        this.region = region;
     }
     
     /**
@@ -26,7 +27,7 @@ public class BlockInteraction {
     public void breakBlock() {
         BlockHitResult hit = raycastBlock();
         if (hit != null) {
-            chunk.setBlock(hit.x, hit.y, hit.z, Block.AIR);
+            region.setBlock(hit.x, hit.y, hit.z, Block.AIR);
         }
     }
     
@@ -38,9 +39,9 @@ public class BlockInteraction {
         BlockHitResult hit = raycastBlock();
         if (hit != null && hit.adjacentX >= 0 && hit.adjacentY >= 0 && hit.adjacentZ >= 0) {
             // Place block at the adjacent position (the face we hit)
-            Block existing = chunk.getBlock(hit.adjacentX, hit.adjacentY, hit.adjacentZ);
+            Block existing = region.getBlock(hit.adjacentX, hit.adjacentY, hit.adjacentZ);
             if (existing.isAir()) {
-                chunk.setBlock(hit.adjacentX, hit.adjacentY, hit.adjacentZ, new Block(blockType));
+                region.setBlock(hit.adjacentX, hit.adjacentY, hit.adjacentZ, new Block(blockType));
             }
         }
     }
@@ -78,12 +79,12 @@ public class BlockInteraction {
             // Convert world Y to chunk Y
             int chunkY = Chunk.worldYToChunkY(blockY);
             
-            // Check if within chunk bounds
-            if (blockX >= 0 && blockX < Chunk.WIDTH && 
+            // Check if within region bounds
+            if (blockX >= 0 && blockX < Region.REGION_WIDTH_BLOCKS && 
                 chunkY >= 0 && chunkY < Chunk.HEIGHT && 
-                blockZ >= 0 && blockZ < Chunk.DEPTH) {
+                blockZ >= 0 && blockZ < Region.REGION_DEPTH_BLOCKS) {
                 
-                Block block = chunk.getBlock(blockX, chunkY, blockZ);
+                Block block = region.getBlock(blockX, chunkY, blockZ);
                 if (!block.isAir()) {
                     // Found a solid block - return it and the last air position
                     return new BlockHitResult(blockX, chunkY, blockZ, lastBlockX, lastBlockY, lastBlockZ);
