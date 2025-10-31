@@ -6,7 +6,10 @@ package MattMC.player;
  * Handles player position, orientation, and movement.
  */
 public class Player {
-    // Player position in world coordinates
+    // Eye height offset from feet (Minecraft default is 1.62 blocks)
+    public static final float EYE_HEIGHT = 1.62f;
+    
+    // Player position in world coordinates (feet position)
     private float x;
     private float y;
     private float z;
@@ -16,7 +19,11 @@ public class Player {
     private float pitch; // Vertical rotation (up/down)
     
     // Movement speed
-    private float moveSpeed = 10f;
+    private float moveSpeed = 4.317f; // Minecraft walking speed (blocks/second)
+    private float flySpeed = 10.92f;   // Minecraft flying speed
+    
+    // Physics reference (set externally)
+    private PlayerPhysics physics;
     
     public Player(float x, float y, float z) {
         this.x = x;
@@ -28,27 +35,48 @@ public class Player {
     
     /**
      * Move the player forward/backward based on view direction.
+     * Uses physics for collision detection.
      */
     public void moveForward(float distance) {
         float yawRad = (float) Math.toRadians(yaw);
-        x += (float) Math.sin(yawRad) * distance;
-        z -= (float) Math.cos(yawRad) * distance;
+        float dx = (float) Math.sin(yawRad) * distance;
+        float dz = -(float) Math.cos(yawRad) * distance;
+        
+        if (physics != null) {
+            physics.tryMove(dx, 0, dz);
+        } else {
+            x += dx;
+            z += dz;
+        }
     }
     
     /**
      * Strafe the player left/right based on view direction.
+     * Uses physics for collision detection.
      */
     public void moveRight(float distance) {
         float yawRad = (float) Math.toRadians(yaw);
-        x += (float) Math.cos(yawRad) * distance;
-        z += (float) Math.sin(yawRad) * distance;
+        float dx = (float) Math.cos(yawRad) * distance;
+        float dz = (float) Math.sin(yawRad) * distance;
+        
+        if (physics != null) {
+            physics.tryMove(dx, 0, dz);
+        } else {
+            x += dx;
+            z += dz;
+        }
     }
     
     /**
-     * Move the player up/down (vertical movement).
+     * Move the player up/down (vertical movement for flying).
+     * Uses physics for collision detection.
      */
     public void moveUp(float distance) {
-        y += distance;
+        if (physics != null && physics.isFlying()) {
+            physics.tryMove(0, distance, 0);
+        } else if (physics == null) {
+            y += distance;
+        }
     }
     
     /**
@@ -86,9 +114,17 @@ public class Player {
     public float getX() { return x; }
     public float getY() { return y; }
     public float getZ() { return z; }
+    
+    /**
+     * Get the Y coordinate of the player's eyes (camera position).
+     * In Minecraft, the camera is 1.62 blocks above the feet.
+     */
+    public float getEyeY() { return y + EYE_HEIGHT; }
+    
     public float getYaw() { return yaw; }
     public float getPitch() { return pitch; }
     public float getMoveSpeed() { return moveSpeed; }
+    public float getFlySpeed() { return flySpeed; }
     
     public void setX(float x) { this.x = x; }
     public void setY(float y) { this.y = y; }
@@ -101,4 +137,6 @@ public class Player {
         if (this.pitch < -89.0f) this.pitch = -89.0f;
     }
     public void setMoveSpeed(float speed) { this.moveSpeed = speed; }
+    public void setPhysics(PlayerPhysics physics) { this.physics = physics; }
+    public PlayerPhysics getPhysics() { return physics; }
 }

@@ -5,6 +5,7 @@ import MattMC.core.Window;
 import MattMC.player.BlockInteraction;
 import MattMC.player.Player;
 import MattMC.player.PlayerController;
+import MattMC.player.PlayerPhysics;
 import MattMC.renderer.ChunkRenderer;
 import MattMC.renderer.UIRenderer;
 import MattMC.world.BlockType;
@@ -26,6 +27,7 @@ public final class DevplayScreen implements Screen {
     private final Chunk chunk;
     private final Player player;
     private final PlayerController playerController;
+    private final PlayerPhysics playerPhysics;
     private final BlockInteraction blockInteraction;
     private final ChunkRenderer chunkRenderer;
     private final UIRenderer uiRenderer;
@@ -40,7 +42,14 @@ public final class DevplayScreen implements Screen {
         this.chunk = new Chunk(0, 0);
         this.chunk.generateFlatTerrain(64); // Surface at y=64
         
-        this.player = new Player(8f, 80f, 40f); // Center of chunk, above surface
+        // Initialize player - spawn on top of terrain
+        float spawnX = 8f; // Center of chunk
+        float spawnZ = 8f; // Center of chunk
+        float spawnY = PlayerPhysics.findSpawnHeight(chunk, spawnX, spawnZ);
+        
+        this.player = new Player(spawnX, spawnY, spawnZ);
+        this.playerPhysics = new PlayerPhysics(player, chunk);
+        this.player.setPhysics(playerPhysics);
         this.playerController = new PlayerController(player);
         this.blockInteraction = new BlockInteraction(player, chunk);
         this.chunkRenderer = new ChunkRenderer();
@@ -54,11 +63,14 @@ public final class DevplayScreen implements Screen {
             glViewport(0, 0, Math.max(w, 1), Math.max(h, 1));
         });
 
-        // ESC to release mouse and go back
+        // ESC to release mouse and go back; Space for jumping/flying
         glfwSetKeyCallback(window.handle(), (win, key, scancode, action, mods) -> {
             if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS) {
                 glfwSetInputMode(window.handle(), GLFW_CURSOR, GLFW_CURSOR_NORMAL);
                 game.setScreen(new SingleplayerScreen(game));
+            }
+            if (key == GLFW_KEY_SPACE && action == GLFW_PRESS) {
+                playerController.handleSpacePress();
             }
         });
         
@@ -87,6 +99,9 @@ public final class DevplayScreen implements Screen {
         if (dt < 0) dt = 0;
         if (dt > 0.5) dt = 0.5;
         
+        // Update physics (gravity, collision)
+        playerPhysics.update((float)dt);
+        
         // Update player movement based on input
         playerController.updateMovement(window.handle(), (float)dt);
     }
@@ -114,9 +129,10 @@ public final class DevplayScreen implements Screen {
         glLoadIdentity();
 
         // Apply camera transformations (pitch, yaw, then position)
+        // Camera is at eye level (1.62 blocks above feet)
         glRotatef(player.getPitch(), 1f, 0f, 0f);
         glRotatef(player.getYaw(), 0f, 1f, 0f);
-        glTranslatef(-player.getX(), -player.getY(), -player.getZ());
+        glTranslatef(-player.getX(), -player.getEyeY(), -player.getZ());
 
         glEnable(GL_DEPTH_TEST);
         glEnable(GL_CULL_FACE);
