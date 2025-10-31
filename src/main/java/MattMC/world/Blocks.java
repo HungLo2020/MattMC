@@ -1,7 +1,9 @@
 package MattMC.world;
 
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Central registry for all blocks in the game.
@@ -79,10 +81,22 @@ public class Blocks {
      * @param identifier Full identifier (e.g., "mattmc:dirt" or "mymod:custom_block")
      * @param blockType The BlockType enum instance
      * @return The registered BlockType
+     * @throws IllegalArgumentException if identifier is already registered or if blockType is already mapped
+     * @throws NullPointerException if identifier or blockType is null
      */
     public static BlockType registerBlock(String identifier, BlockType blockType) {
+        if (identifier == null) {
+            throw new NullPointerException("Block identifier cannot be null");
+        }
+        if (blockType == null) {
+            throw new NullPointerException("BlockType cannot be null");
+        }
         if (REGISTRY.containsKey(identifier)) {
             throw new IllegalArgumentException("Block with identifier '" + identifier + "' is already registered!");
+        }
+        if (REVERSE_REGISTRY.containsKey(blockType)) {
+            throw new IllegalArgumentException("BlockType " + blockType + " is already registered with identifier '" 
+                + REVERSE_REGISTRY.get(blockType) + "'");
         }
         REGISTRY.put(identifier, blockType);
         REVERSE_REGISTRY.put(blockType, identifier);
@@ -94,8 +108,12 @@ public class Blocks {
      * 
      * @param identifier The block identifier (e.g., "mattmc:dirt")
      * @return The BlockType, or null if not found
+     * @throws NullPointerException if identifier is null
      */
     public static BlockType getBlock(String identifier) {
+        if (identifier == null) {
+            throw new NullPointerException("Block identifier cannot be null");
+        }
         return REGISTRY.get(identifier);
     }
     
@@ -104,8 +122,12 @@ public class Blocks {
      * 
      * @param blockType The BlockType
      * @return The identifier string (e.g., "mattmc:dirt"), or null if not registered
+     * @throws NullPointerException if blockType is null
      */
     public static String getIdentifier(BlockType blockType) {
+        if (blockType == null) {
+            throw new NullPointerException("BlockType cannot be null");
+        }
         return REVERSE_REGISTRY.get(blockType);
     }
     
@@ -114,8 +136,12 @@ public class Blocks {
      * 
      * @param identifier The block identifier
      * @return true if registered, false otherwise
+     * @throws NullPointerException if identifier is null
      */
     public static boolean isRegistered(String identifier) {
+        if (identifier == null) {
+            throw new NullPointerException("Block identifier cannot be null");
+        }
         return REGISTRY.containsKey(identifier);
     }
     
@@ -123,9 +149,9 @@ public class Blocks {
      * Get all registered block identifiers.
      * Useful for debugging and listing available blocks.
      * 
-     * @return An iterable of all registered identifiers
+     * @return An unmodifiable set of all registered identifiers
      */
-    public static Iterable<String> getRegisteredIdentifiers() {
-        return REGISTRY.keySet();
+    public static Set<String> getRegisteredIdentifiers() {
+        return Collections.unmodifiableSet(REGISTRY.keySet());
     }
 }
