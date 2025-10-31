@@ -55,9 +55,9 @@ public class BlockInteraction {
         float dirY = dir[1];
         float dirZ = dir[2];
         
-        // Start ray at player position
+        // Start ray at player's eyes (camera position), not feet
         float rayX = player.getX();
-        float rayY = player.getY();
+        float rayY = player.getEyeY();
         float rayZ = player.getZ();
         
         // DDA algorithm for voxel traversal
