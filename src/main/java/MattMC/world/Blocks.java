@@ -43,10 +43,11 @@ public class Blocks {
     
     // Static block instances - similar to Minecraft's public static final Block fields
     // Each block is defined in one line with its properties
-    public static final Block AIR = register("air", new Block(0x000000, false, null));
-    public static final Block GRASS = register("grass", new Block(0x7CB342, true, null));
-    public static final Block DIRT = register("dirt", new Block(0x8B5A3C, true, "assets/textures/block/dirt.png"));
-    public static final Block STONE = register("stone", new Block(0x808080, true, "assets/textures/block/stone.png"));
+    // Textures are loaded from blockstate and model JSON files
+    public static final Block AIR = register("air", new Block(0x000000, false));
+    public static final Block GRASS = register("grass", new Block(0x7CB342, true));
+    public static final Block DIRT = register("dirt", new Block(0x8B5A3C, true));
+    public static final Block STONE = register("stone", new Block(0x808080, true));
     
     /**
      * Register a block with a given name (without namespace).
@@ -69,7 +70,7 @@ public class Blocks {
         }
         
         // Create a new block instance with the identifier set
-        Block registeredBlock = new Block(block.color(), block.isSolid(), block.getTexturePath(), identifier);
+        Block registeredBlock = new Block(block.color(), block.isSolid(), identifier);
         REGISTRY.put(identifier, registeredBlock);
         return registeredBlock;
     }
@@ -96,7 +97,7 @@ public class Blocks {
         }
         
         // Create a new block instance with the identifier set
-        Block registeredBlock = new Block(block.color(), block.isSolid(), block.getTexturePath(), identifier);
+        Block registeredBlock = new Block(block.color(), block.isSolid(), identifier);
         REGISTRY.put(identifier, registeredBlock);
         return registeredBlock;
     }

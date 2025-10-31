@@ -32,6 +32,9 @@ dependencies {
     runtimeOnly("org.lwjgl:lwjgl-glfw:$lwjgl:natives-linux")
     runtimeOnly("org.lwjgl:lwjgl-opengl:$lwjgl:natives-linux")
     runtimeOnly("org.lwjgl:lwjgl-stb:$lwjgl:natives-linux")
+    
+    // JSON parsing for block models and blockstates
+    implementation("com.google.code.gson:gson:2.10.1")
 }
 
 /**
