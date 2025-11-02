@@ -101,6 +101,58 @@ public class UIRenderer {
     }
     
     /**
+     * Draw command overlay (chat input).
+     * Shows command input box at bottom of screen.
+     */
+    public void drawCommandOverlay(int screenWidth, int screenHeight, String commandText, String resultMessage) {
+        // Switch to 2D orthographic projection
+        glMatrixMode(GL_PROJECTION);
+        glPushMatrix();
+        glLoadIdentity();
+        glOrtho(0, screenWidth, screenHeight, 0, -1, 1);
+        
+        glMatrixMode(GL_MODELVIEW);
+        glPushMatrix();
+        glLoadIdentity();
+        
+        // Enable blending
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        
+        float scale = 1.5f;
+        float padding = 10f;
+        float boxHeight = STBEasyFont.stb_easy_font_height("A") * scale + padding * 2;
+        float boxY = screenHeight - boxHeight - padding;
+        
+        // Draw semi-transparent background box
+        glColor4f(0f, 0f, 0f, 0.5f);
+        glBegin(GL_QUADS);
+        glVertex2f(padding, boxY);
+        glVertex2f(screenWidth - padding, boxY);
+        glVertex2f(screenWidth - padding, boxY + boxHeight);
+        glVertex2f(padding, boxY + boxHeight);
+        glEnd();
+        
+        // Draw command text
+        String displayText = "/" + commandText;
+        drawText(displayText, padding * 2, boxY + padding, scale, 0xFFFFFF);
+        
+        // Draw result message above if present
+        if (resultMessage != null && !resultMessage.isEmpty()) {
+            float msgY = boxY - padding - STBEasyFont.stb_easy_font_height("A") * scale;
+            drawText(resultMessage, padding * 2, msgY, scale, 0xFFFF00);
+        }
+        
+        glDisable(GL_BLEND);
+        
+        // Restore matrices
+        glPopMatrix();
+        glMatrixMode(GL_PROJECTION);
+        glPopMatrix();
+        glMatrixMode(GL_MODELVIEW);
+    }
+    
+    /**
      * Draw text at specified position with scale and color.
      */
     private void drawText(String text, float x, float y, float scale, int rgb) {

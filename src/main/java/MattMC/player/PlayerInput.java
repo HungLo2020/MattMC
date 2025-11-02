@@ -26,7 +26,8 @@ public class PlayerInput {
     public static final String BREAK_BLOCK = "break_block";
     public static final String PLACE_BLOCK = "place_block";
     public static final String FLY_UP = "fly_up";
-    public static final String FLY_DOWN = "fly_down";
+    public static final String SNEAK = "sneak";  // Renamed from fly_down
+    public static final String CHAT = "chat";
     
     private PlayerInput() {
         // Initialize with default keybinds
@@ -56,7 +57,8 @@ public class PlayerInput {
         keybinds.put(BREAK_BLOCK, -(GLFW_MOUSE_BUTTON_LEFT + 1));
         keybinds.put(PLACE_BLOCK, -(GLFW_MOUSE_BUTTON_RIGHT + 1));
         keybinds.put(FLY_UP, GLFW_KEY_SPACE);
-        keybinds.put(FLY_DOWN, GLFW_KEY_LEFT_CONTROL);
+        keybinds.put(SNEAK, GLFW_KEY_LEFT_CONTROL);  // Renamed from FLY_DOWN
+        keybinds.put(CHAT, GLFW_KEY_SLASH);
     }
     
     /**

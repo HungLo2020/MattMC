@@ -54,7 +54,7 @@ public class PlayerController {
             if (input.isPressed(window, PlayerInput.FLY_UP)) {
                 player.moveUp(moveSpeed);
             }
-            if (input.isPressed(window, PlayerInput.FLY_DOWN)) {
+            if (input.isPressed(window, PlayerInput.SNEAK)) {  // Renamed from FLY_DOWN
                 player.moveUp(-moveSpeed);
             }
         }

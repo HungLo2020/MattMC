@@ -1,5 +1,6 @@
 package MattMC.screens;
 
+import MattMC.command.CommandHandler;
 import MattMC.core.Game;
 import MattMC.core.Window;
 import MattMC.player.BlockInteraction;
@@ -31,6 +32,7 @@ public final class DevplayScreen implements Screen {
     private final BlockInteraction blockInteraction;
     private final WorldRenderer worldRenderer;
     private final UIRenderer uiRenderer;
+    private final CommandHandler commandHandler;
     
     private double lastFrameTimeSec = now();
     private boolean showDebugInfo = false; // F3 debug menu toggle
@@ -39,6 +41,12 @@ public final class DevplayScreen implements Screen {
     private int fps = 0;
     private int frameCount = 0;
     private double lastFpsUpdateTime = now();
+    
+    // Command overlay state
+    private boolean commandOverlayActive = false;
+    private StringBuilder commandInput = new StringBuilder();
+    private String commandResult = "";
+    private double commandResultTime = 0;
 
     public DevplayScreen(Game game) {
         this.game = game;
@@ -64,6 +72,7 @@ public final class DevplayScreen implements Screen {
         this.blockInteraction = new BlockInteraction(player, world);
         this.worldRenderer = new WorldRenderer();
         this.uiRenderer = new UIRenderer();
+        this.commandHandler = new CommandHandler(player);
 
         // Capture mouse for FPS-style controls
         glfwSetInputMode(window.handle(), GLFW_CURSOR, GLFW_CURSOR_DISABLED);
@@ -73,17 +82,31 @@ public final class DevplayScreen implements Screen {
             glViewport(0, 0, Math.max(w, 1), Math.max(h, 1));
         });
 
-        // ESC to release mouse and go back; Space for jumping/flying; F3 for debug menu
+        // ESC to release mouse and go back; Space for jumping/flying; F3 for debug menu; / for chat/commands
         glfwSetKeyCallback(window.handle(), (win, key, scancode, action, mods) -> {
-            if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS) {
-                glfwSetInputMode(window.handle(), GLFW_CURSOR, GLFW_CURSOR_NORMAL);
-                game.setScreen(new SingleplayerScreen(game));
+            if (commandOverlayActive) {
+                handleCommandInput(key, action);
+            } else {
+                if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS) {
+                    glfwSetInputMode(window.handle(), GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+                    game.setScreen(new SingleplayerScreen(game));
+                }
+                if (key == GLFW_KEY_SPACE && action == GLFW_PRESS) {
+                    playerController.handleSpacePress();
+                }
+                if (key == GLFW_KEY_F3 && action == GLFW_PRESS) {
+                    showDebugInfo = !showDebugInfo;
+                }
+                if (key == GLFW_KEY_SLASH && action == GLFW_PRESS) {
+                    openCommandOverlay();
+                }
             }
-            if (key == GLFW_KEY_SPACE && action == GLFW_PRESS) {
-                playerController.handleSpacePress();
-            }
-            if (key == GLFW_KEY_F3 && action == GLFW_PRESS) {
-                showDebugInfo = !showDebugInfo;
+        });
+        
+        // Character callback for text input in command overlay
+        glfwSetCharCallback(window.handle(), (win, codepoint) -> {
+            if (commandOverlayActive) {
+                commandInput.append((char) codepoint);
             }
         });
         
@@ -126,8 +149,15 @@ public final class DevplayScreen implements Screen {
         // Update physics (gravity, collision)
         playerPhysics.update((float)dt);
         
-        // Update player movement based on input
-        playerController.updateMovement(window.handle(), (float)dt);
+        // Update player movement based on input (only if command overlay is not active)
+        if (!commandOverlayActive) {
+            playerController.updateMovement(window.handle(), (float)dt);
+        }
+        
+        // Clear command result after 5 seconds
+        if (commandResult != null && !commandResult.isEmpty() && now - commandResultTime > 5.0) {
+            commandResult = "";
+        }
     }
 
     @Override
@@ -174,6 +204,51 @@ public final class DevplayScreen implements Screen {
         // Draw debug info if enabled (F3)
         if (showDebugInfo) {
             uiRenderer.drawDebugInfo(w, h, fps, player.getX(), player.getY(), player.getZ());
+        }
+        
+        // Draw command overlay if active
+        if (commandOverlayActive) {
+            uiRenderer.drawCommandOverlay(w, h, commandInput.toString(), commandResult);
+        }
+    }
+    
+    /**
+     * Open command overlay for text input.
+     */
+    private void openCommandOverlay() {
+        commandOverlayActive = true;
+        commandInput.setLength(0);
+        commandResult = "";
+    }
+    
+    /**
+     * Close command overlay and restore normal input.
+     */
+    private void closeCommandOverlay() {
+        commandOverlayActive = false;
+        commandInput.setLength(0);
+    }
+    
+    /**
+     * Handle keyboard input when command overlay is active.
+     */
+    private void handleCommandInput(int key, int action) {
+        if (action == GLFW_PRESS || action == GLFW_REPEAT) {
+            if (key == GLFW_KEY_ENTER) {
+                // Execute command
+                String cmd = commandInput.toString().trim();
+                if (!cmd.isEmpty()) {
+                    commandResult = commandHandler.executeCommand(cmd);
+                    commandResultTime = now();
+                }
+                closeCommandOverlay();
+            } else if (key == GLFW_KEY_ESCAPE) {
+                // Cancel command input
+                closeCommandOverlay();
+            } else if (key == GLFW_KEY_BACKSPACE && commandInput.length() > 0) {
+                // Delete last character
+                commandInput.deleteCharAt(commandInput.length() - 1);
+            }
         }
     }
 

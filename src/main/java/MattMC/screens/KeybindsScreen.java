@@ -46,9 +46,10 @@ public final class KeybindsScreen implements Screen {
         {PlayerInput.JUMP, "Jump"},
         {PlayerInput.CROUCH, "Crouch"},
         {PlayerInput.FLY_UP, "Fly Up"},
-        {PlayerInput.FLY_DOWN, "Fly Down"},
+        {PlayerInput.SNEAK, "Sneak"},  // Renamed from FLY_DOWN
         {PlayerInput.BREAK_BLOCK, "Break Block"},
-        {PlayerInput.PLACE_BLOCK, "Place Block"}
+        {PlayerInput.PLACE_BLOCK, "Place Block"},
+        {PlayerInput.CHAT, "Chat"}  // New chat/command key
     };
 
     public KeybindsScreen(Game game) {

@@ -129,6 +129,11 @@ public class Player {
     public void setX(float x) { this.x = x; }
     public void setY(float y) { this.y = y; }
     public void setZ(float z) { this.z = z; }
+    public void setPosition(float x, float y, float z) {
+        this.x = x;
+        this.y = y;
+        this.z = z;
+    }
     public void setYaw(float yaw) { this.yaw = yaw; }
     public void setPitch(float pitch) { 
         this.pitch = pitch;
