@@ -345,7 +345,10 @@ public class ChunkRenderer {
         // Group faces by block to check for overlay texture
         java.util.Map<Block, java.util.List<FaceData>> facesByBlock = new java.util.HashMap<>();
         for (FaceData face : faces) {
-            facesByBlock.computeIfAbsent(face.block, k -> new java.util.ArrayList<>()).add(face);
+            // Only apply overlay to side faces (not top or bottom)
+            if ("side".equals(face.faceType)) {
+                facesByBlock.computeIfAbsent(face.block, k -> new java.util.ArrayList<>()).add(face);
+            }
         }
         
         for (java.util.Map.Entry<Block, java.util.List<FaceData>> entry : facesByBlock.entrySet()) {
@@ -423,56 +426,56 @@ public class ChunkRenderer {
         float x0 = x, x1 = x + 1;
         float y0 = y, y1 = y + 1;
         float z0 = z;
-        // With texture coordinates
-        glTexCoord2f(1, 0); glVertex3f(x1, y0, z0);
-        glTexCoord2f(0, 0); glVertex3f(x0, y0, z0);
-        glTexCoord2f(0, 1); glVertex3f(x0, y1, z0);
+        // With texture coordinates (V flipped to correct upside-down textures)
+        glTexCoord2f(1, 1); glVertex3f(x1, y0, z0);
+        glTexCoord2f(0, 1); glVertex3f(x0, y0, z0);
+        glTexCoord2f(0, 0); glVertex3f(x0, y1, z0);
         
-        glTexCoord2f(1, 0); glVertex3f(x1, y0, z0);
-        glTexCoord2f(0, 1); glVertex3f(x0, y1, z0);
-        glTexCoord2f(1, 1); glVertex3f(x1, y1, z0);
+        glTexCoord2f(1, 1); glVertex3f(x1, y0, z0);
+        glTexCoord2f(0, 0); glVertex3f(x0, y1, z0);
+        glTexCoord2f(1, 0); glVertex3f(x1, y1, z0);
     }
     
     private void drawSouthFaceVertices(float x, float y, float z) {
         float x0 = x, x1 = x + 1;
         float y0 = y, y1 = y + 1;
         float z1 = z + 1;
-        // With texture coordinates
-        glTexCoord2f(0, 0); glVertex3f(x0, y0, z1);
-        glTexCoord2f(1, 0); glVertex3f(x1, y0, z1);
-        glTexCoord2f(1, 1); glVertex3f(x1, y1, z1);
+        // With texture coordinates (V flipped to correct upside-down textures)
+        glTexCoord2f(0, 1); glVertex3f(x0, y0, z1);
+        glTexCoord2f(1, 1); glVertex3f(x1, y0, z1);
+        glTexCoord2f(1, 0); glVertex3f(x1, y1, z1);
         
-        glTexCoord2f(0, 0); glVertex3f(x0, y0, z1);
-        glTexCoord2f(1, 1); glVertex3f(x1, y1, z1);
-        glTexCoord2f(0, 1); glVertex3f(x0, y1, z1);
+        glTexCoord2f(0, 1); glVertex3f(x0, y0, z1);
+        glTexCoord2f(1, 0); glVertex3f(x1, y1, z1);
+        glTexCoord2f(0, 0); glVertex3f(x0, y1, z1);
     }
     
     private void drawWestFaceVertices(float x, float y, float z) {
         float x0 = x;
         float y0 = y, y1 = y + 1;
         float z0 = z, z1 = z + 1;
-        // With texture coordinates
-        glTexCoord2f(0, 0); glVertex3f(x0, y0, z0);
-        glTexCoord2f(1, 0); glVertex3f(x0, y0, z1);
-        glTexCoord2f(1, 1); glVertex3f(x0, y1, z1);
+        // With texture coordinates (V flipped to correct upside-down textures)
+        glTexCoord2f(0, 1); glVertex3f(x0, y0, z0);
+        glTexCoord2f(1, 1); glVertex3f(x0, y0, z1);
+        glTexCoord2f(1, 0); glVertex3f(x0, y1, z1);
         
-        glTexCoord2f(0, 0); glVertex3f(x0, y0, z0);
-        glTexCoord2f(1, 1); glVertex3f(x0, y1, z1);
-        glTexCoord2f(0, 1); glVertex3f(x0, y1, z0);
+        glTexCoord2f(0, 1); glVertex3f(x0, y0, z0);
+        glTexCoord2f(1, 0); glVertex3f(x0, y1, z1);
+        glTexCoord2f(0, 0); glVertex3f(x0, y1, z0);
     }
     
     private void drawEastFaceVertices(float x, float y, float z) {
         float x1 = x + 1;
         float y0 = y, y1 = y + 1;
         float z0 = z, z1 = z + 1;
-        // With texture coordinates
-        glTexCoord2f(1, 0); glVertex3f(x1, y0, z1);
-        glTexCoord2f(0, 0); glVertex3f(x1, y0, z0);
-        glTexCoord2f(0, 1); glVertex3f(x1, y1, z0);
+        // With texture coordinates (V flipped to correct upside-down textures)
+        glTexCoord2f(1, 1); glVertex3f(x1, y0, z1);
+        glTexCoord2f(0, 1); glVertex3f(x1, y0, z0);
+        glTexCoord2f(0, 0); glVertex3f(x1, y1, z0);
         
-        glTexCoord2f(1, 0); glVertex3f(x1, y0, z1);
-        glTexCoord2f(0, 1); glVertex3f(x1, y1, z0);
-        glTexCoord2f(1, 1); glVertex3f(x1, y1, z1);
+        glTexCoord2f(1, 1); glVertex3f(x1, y0, z1);
+        glTexCoord2f(0, 0); glVertex3f(x1, y1, z0);
+        glTexCoord2f(1, 0); glVertex3f(x1, y1, z1);
     }
     
     /**
