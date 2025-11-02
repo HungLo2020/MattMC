@@ -8,7 +8,7 @@ package MattMC.world;
  * - 32 chunks deep (Z) = 512 blocks
  * - Total: 1024 chunks per region
  */
-public class Region {
+public class Region implements WorldAccess {
     public static final int REGION_SIZE = 32; // 32x32 chunks
     public static final int REGION_WIDTH_BLOCKS = REGION_SIZE * Chunk.WIDTH; // 512 blocks
     public static final int REGION_DEPTH_BLOCKS = REGION_SIZE * Chunk.DEPTH; // 512 blocks
