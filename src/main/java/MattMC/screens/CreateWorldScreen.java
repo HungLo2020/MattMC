@@ -16,8 +16,8 @@ import static org.lwjgl.glfw.GLFW.*;
 import static org.lwjgl.opengl.GL11.*;
 import static org.lwjgl.system.MemoryStack.stackPush;
 
-/* Simple singleplayer menu. Buttons do nothing except "Back". */
-public final class SingleplayerScreen implements Screen {
+/* Create World screen - allows creating a new world. */
+public final class CreateWorldScreen implements Screen {
     private final Game game;
     private final Window window;
     private final List<UIButton> buttons = new ArrayList<>();
@@ -30,7 +30,7 @@ public final class SingleplayerScreen implements Screen {
     private int buttonWidth = 300, buttonHeight = 44, buttonGap = 12;
     private int buttonsStartY;
 
-    public SingleplayerScreen(Game game) {
+    public CreateWorldScreen(Game game) {
         this.game = game;
         this.window = game.window();
 
@@ -52,16 +52,15 @@ public final class SingleplayerScreen implements Screen {
         titleCX = w / 2f;
         titleCY = h * 0.18f;
 
-        int totalButtonsH = 3 * buttonHeight + 2 * buttonGap;
+        int totalButtonsH = 2 * buttonHeight + 1 * buttonGap;
         buttonsStartY = (int)(h / 2f - totalButtonsH / 2f);
 
         int x = (w - buttonWidth) / 2;
         buttons.clear();
 
-        // Centered singleplayer buttons
+        // Centered buttons
         buttons.add(new UIButton("Create World", x, buttonsStartY + 0 * (buttonHeight + buttonGap), buttonWidth, buttonHeight));
-        buttons.add(new UIButton("Load World",   x, buttonsStartY + 1 * (buttonHeight + buttonGap), buttonWidth, buttonHeight));
-        buttons.add(new UIButton("Back",         x, buttonsStartY + 2 * (buttonHeight + buttonGap), buttonWidth, buttonHeight));
+        buttons.add(new UIButton("Back",         x, buttonsStartY + 1 * (buttonHeight + buttonGap), buttonWidth, buttonHeight));
     }
 
     @Override
@@ -94,19 +93,14 @@ public final class SingleplayerScreen implements Screen {
 
     private void onClick(String label) {
         if ("Back".equals(label)) {
-            game.setScreen(new TitleScreen(game));
+            game.setScreen(new SingleplayerScreen(game));
             return;
         }
         if ("Create World".equals(label)) {
-            System.out.println("→ Create World clicked");
-            game.setScreen(new CreateWorldScreen(game));
+            System.out.println("→ Creating world and launching game");
+            game.setScreen(new DevplayScreen(game));
             return;
         }
-        if ("Load World".equals(label)) {
-            System.out.println("→ Load World clicked");
-            return;
-        }
-        // other buttons intentionally do nothing for now
     }
 
     @Override
@@ -117,8 +111,8 @@ public final class SingleplayerScreen implements Screen {
 
         setupOrtho();
         for (var b : buttons) drawButton(b);
-        drawTitle("Singleplayer", titleCX, titleCY, titleScale, 0xFFFFFF);
-        drawTitle("Create or load worlds", titleCX, titleCY + 48f, 1.0f, 0xB0C4DE);
+        drawTitle("Create New World", titleCX, titleCY, titleScale, 0xFFFFFF);
+        drawTitle("Click Create World to start playing", titleCX, titleCY + 48f, 1.0f, 0xB0C4DE);
     }
 
     private void setupOrtho() {
