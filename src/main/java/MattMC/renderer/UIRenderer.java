@@ -1,5 +1,7 @@
 package MattMC.renderer;
 
+import MattMC.world.Chunk;
+import MattMC.world.Region;
 import org.lwjgl.BufferUtils;
 import org.lwjgl.stb.STBEasyFont;
 
@@ -61,12 +63,12 @@ public class UIRenderer {
      */
     public void drawDebugInfo(int screenWidth, int screenHeight, float playerX, float playerY, float playerZ) {
         // Calculate chunk position from player position
-        int chunkX = Math.floorDiv((int)playerX, 16); // Chunk.WIDTH = 16
-        int chunkZ = Math.floorDiv((int)playerZ, 16); // Chunk.DEPTH = 16
+        int chunkX = Math.floorDiv((int)playerX, Chunk.WIDTH);
+        int chunkZ = Math.floorDiv((int)playerZ, Chunk.DEPTH);
         
         // Calculate region position from chunk position
-        int regionX = Math.floorDiv(chunkX, 32); // Region.REGION_SIZE = 32
-        int regionZ = Math.floorDiv(chunkZ, 32);
+        int regionX = Math.floorDiv(chunkX, Region.REGION_SIZE);
+        int regionZ = Math.floorDiv(chunkZ, Region.REGION_SIZE);
         
         // Switch to 2D orthographic projection
         glMatrixMode(GL_PROJECTION);
