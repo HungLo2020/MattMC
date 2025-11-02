@@ -254,8 +254,8 @@ public final class TitleScreen implements Screen {
     private void drawLogo() {
         if (logoTexture == null) return;
         
-        // Calculate logo dimensions - scale to fit nicely
-        float logoScale = 0.5f; // Adjust as needed
+        // Calculate logo dimensions - scale to be larger and more prominent
+        float logoScale = 1.5f; // Increased from 0.5f to make it bigger
         float logoWidth = logoTexture.width * logoScale;
         float logoHeight = logoTexture.height * logoScale;
         float logoX = titleCX - logoWidth / 2f;
@@ -269,11 +269,13 @@ public final class TitleScreen implements Screen {
         logoTexture.bind();
         glColor4f(1f, 1f, 1f, 1f);
         
+        // Flip texture coordinates vertically to fix upside-down issue
+        // (Texture loader flips vertically, so we need to flip back for proper display)
         glBegin(GL_QUADS);
-        glTexCoord2f(0, 0); glVertex2f(logoX, logoY);
-        glTexCoord2f(1, 0); glVertex2f(logoX + logoWidth, logoY);
-        glTexCoord2f(1, 1); glVertex2f(logoX + logoWidth, logoY + logoHeight);
-        glTexCoord2f(0, 1); glVertex2f(logoX, logoY + logoHeight);
+        glTexCoord2f(0, 1); glVertex2f(logoX, logoY);
+        glTexCoord2f(1, 1); glVertex2f(logoX + logoWidth, logoY);
+        glTexCoord2f(1, 0); glVertex2f(logoX + logoWidth, logoY + logoHeight);
+        glTexCoord2f(0, 0); glVertex2f(logoX, logoY + logoHeight);
         glEnd();
         
         glDisable(GL_BLEND);

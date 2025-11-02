@@ -1,15 +1,11 @@
 package MattMC.gfx;
 
-import org.lwjgl.opengl.GL30;
-
 import static org.lwjgl.opengl.GL11.*;
 import static org.lwjgl.opengl.GL13.*;
-import static org.lwjgl.opengl.GL30.*;
 
 /** Renders a panorama (cubemap skybox) with optional blur effect. */
 public final class PanoramaRenderer {
-    private static final float BLUR_PASSES = 3;            // Number of blur passes for better blur effect
-    private static final float BLUR_SAMPLE_OFFSET = 0.02f; // Offset for blur sampling
+    private static final float BLUR_OVERLAY_ALPHA = 0.25f; // Semi-transparent overlay for blur depth
     
     private final CubeMap sky;
     private float yawDeg = 0f;
@@ -69,7 +65,13 @@ public final class PanoramaRenderer {
         glEnable(GL_TEXTURE_CUBE_MAP);
         glBindTexture(GL_TEXTURE_CUBE_MAP, sky.id);
         
-        // No color tinting, just render normally
+        // Apply texture filtering for blur effect
+        if (blurred) {
+            // Use linear filtering with reduced quality for blur appearance
+            glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+            glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        }
+        
         glColor4f(1f, 1f, 1f, 1f);
 
         glBegin(GL_QUADS);
@@ -119,31 +121,89 @@ public final class PanoramaRenderer {
         }
     }
 
-    /** Applies a simple box blur by rendering multiple slightly offset copies with transparency. */
+    /** Applies a blur effect by rendering the panorama multiple times with slight offsets. */
     private void applySimpleBlur(int width, int height) {
-        // Switch to orthographic for blur overlay
+        // Re-render the panorama multiple times with slight transparency and offsets
+        // to create a blur-like effect
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        
+        // Render the cubemap again multiple times with slight rotations and low alpha
+        // to create blur streaks
+        glEnable(GL_TEXTURE_CUBE_MAP);
+        glBindTexture(GL_TEXTURE_CUBE_MAP, sky.id);
+        
+        float blurAlpha = 0.08f; // Low alpha for each blur pass
+        int numPasses = 8; // More passes for smoother blur
+        
+        for (int i = 0; i < numPasses; i++) {
+            glPushMatrix();
+            
+            // Slight rotation offset for each pass to create blur
+            float offsetDeg = (i - numPasses / 2f) * 0.5f;
+            glRotatef(offsetDeg, 0f, 1f, 0f);
+            
+            glColor4f(1f, 1f, 1f, blurAlpha);
+            
+            // Redraw the cubemap
+            glBegin(GL_QUADS);
+            // +X (right)
+            glTexCoord3f(+1, -1, -1); glVertex3f(+1, -1, -1);
+            glTexCoord3f(+1, -1, +1); glVertex3f(+1, -1, +1);
+            glTexCoord3f(+1, +1, +1); glVertex3f(+1, +1, +1);
+            glTexCoord3f(+1, +1, -1); glVertex3f(+1, +1, -1);
+            
+            // -X (left)
+            glTexCoord3f(-1, -1, +1); glVertex3f(-1, -1, +1);
+            glTexCoord3f(-1, -1, -1); glVertex3f(-1, -1, -1);
+            glTexCoord3f(-1, +1, -1); glVertex3f(-1, +1, -1);
+            glTexCoord3f(-1, +1, +1); glVertex3f(-1, +1, +1);
+            
+            // +Y (top)
+            glTexCoord3f(-1, +1, -1); glVertex3f(-1, +1, -1);
+            glTexCoord3f(+1, +1, -1); glVertex3f(+1, +1, -1);
+            glTexCoord3f(+1, +1, +1); glVertex3f(+1, +1, +1);
+            glTexCoord3f(-1, +1, +1); glVertex3f(-1, +1, +1);
+            
+            // -Y (bottom)
+            glTexCoord3f(-1, -1, +1); glVertex3f(-1, -1, +1);
+            glTexCoord3f(+1, -1, +1); glVertex3f(+1, -1, +1);
+            glTexCoord3f(+1, -1, -1); glVertex3f(+1, -1, -1);
+            glTexCoord3f(-1, -1, -1); glVertex3f(-1, -1, -1);
+            
+            // +Z (front)
+            glTexCoord3f(-1, -1, +1); glVertex3f(-1, -1, +1);
+            glTexCoord3f(-1, +1, +1); glVertex3f(-1, +1, +1);
+            glTexCoord3f(+1, +1, +1); glVertex3f(+1, +1, +1);
+            glTexCoord3f(+1, -1, +1); glVertex3f(+1, -1, +1);
+            
+            // -Z (back)
+            glTexCoord3f(+1, -1, -1); glVertex3f(+1, -1, -1);
+            glTexCoord3f(+1, +1, -1); glVertex3f(+1, +1, -1);
+            glTexCoord3f(-1, +1, -1); glVertex3f(-1, +1, -1);
+            glTexCoord3f(-1, -1, -1); glVertex3f(-1, -1, -1);
+            glEnd();
+            
+            glPopMatrix();
+        }
+        
+        glBindTexture(GL_TEXTURE_CUBE_MAP, 0);
+        glDisable(GL_TEXTURE_CUBE_MAP);
+        
+        // Add a subtle semi-transparent overlay to enhance the blur perception
         glMatrixMode(GL_PROJECTION);
         glLoadIdentity();
         glOrtho(0, width, height, 0, -1, 1);
         glMatrixMode(GL_MODELVIEW);
         glLoadIdentity();
-
-        // Enable blending for transparency
-        glEnable(GL_BLEND);
-        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
         
-        // Draw a translucent white overlay to create a "frosted glass" blur effect
-        glColor4f(1.0f, 1.0f, 1.0f, 0.15f);
-        
-        // Multiple passes with slight offsets to simulate blur
-        for (int i = 0; i < BLUR_PASSES; i++) {
-            glBegin(GL_QUADS);
-            glVertex2f(0, 0);
-            glVertex2f(width, 0);
-            glVertex2f(width, height);
-            glVertex2f(0, height);
-            glEnd();
-        }
+        glColor4f(0.0f, 0.0f, 0.0f, BLUR_OVERLAY_ALPHA);
+        glBegin(GL_QUADS);
+        glVertex2f(0, 0);
+        glVertex2f(width, 0);
+        glVertex2f(width, height);
+        glVertex2f(0, height);
+        glEnd();
         
         glDisable(GL_BLEND);
         glColor4f(1f, 1f, 1f, 1f); // Reset color
