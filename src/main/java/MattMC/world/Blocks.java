@@ -46,7 +46,7 @@ public class Blocks {
     // Textures are loaded from blockstate and model JSON files
     // If texture loading fails, a magenta fallback color is automatically used
     public static final Block AIR = register("air", new Block(false));
-    public static final Block GRASS = register("grass", new Block(true));
+    public static final Block GRASS_BLOCK = register("grass_block", new Block(true));
     public static final Block DIRT = register("dirt", new Block(true));
     public static final Block STONE = register("stone", new Block(true));
     

@@ -110,7 +110,7 @@ public final class Chunk {
                     int worldY = chunkYToWorldY(y);
                     
                     if (worldY == surfaceWorldY) {
-                        block = Blocks.GRASS;
+                        block = Blocks.GRASS_BLOCK;
                     } else if (worldY >= surfaceWorldY - 3) {
                         block = Blocks.DIRT;
                     } else {

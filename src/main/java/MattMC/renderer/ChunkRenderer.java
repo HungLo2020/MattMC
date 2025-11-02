@@ -142,8 +142,9 @@ public class ChunkRenderer {
         float brightness;
         float colorBrightness; // Brightness adjustment for the base color (for fallback)
         Block block;
+        String faceType; // "top", "bottom", "side", etc.
         
-        FaceData(float x, float y, float z, int color, float brightness, float colorBrightness, Block block) {
+        FaceData(float x, float y, float z, int color, float brightness, float colorBrightness, Block block, String faceType) {
             this.x = x;
             this.y = y;
             this.z = z;
@@ -151,6 +152,7 @@ public class ChunkRenderer {
             this.brightness = brightness;
             this.colorBrightness = colorBrightness;
             this.block = block;
+            this.faceType = faceType;
         }
     }
     
@@ -220,22 +222,22 @@ public class ChunkRenderer {
         // Collect visible faces for batched rendering
         // Store both the adjusted color and the brightness factor for fallback color
         if (topVisible) {
-            topFaces.add(new FaceData(x, y, z, color, 1f, 1f, block));
+            topFaces.add(new FaceData(x, y, z, color, 1f, 1f, block, "top"));
         }
         if (bottomVisible) {
-            bottomFaces.add(new FaceData(x, y, z, darkenColor(color), 1f, 0.5f, block));
+            bottomFaces.add(new FaceData(x, y, z, darkenColor(color), 1f, 0.5f, block, "bottom"));
         }
         if (northVisible) {
-            northFaces.add(new FaceData(x, y, z, adjustColorBrightness(color, 0.8f), 1f, 0.8f, block));
+            northFaces.add(new FaceData(x, y, z, adjustColorBrightness(color, 0.8f), 1f, 0.8f, block, "side"));
         }
         if (southVisible) {
-            southFaces.add(new FaceData(x, y, z, adjustColorBrightness(color, 0.8f), 1f, 0.8f, block));
+            southFaces.add(new FaceData(x, y, z, adjustColorBrightness(color, 0.8f), 1f, 0.8f, block, "side"));
         }
         if (westVisible) {
-            westFaces.add(new FaceData(x, y, z, adjustColorBrightness(color, 0.6f), 1f, 0.6f, block));
+            westFaces.add(new FaceData(x, y, z, adjustColorBrightness(color, 0.6f), 1f, 0.6f, block, "side"));
         }
         if (eastVisible) {
-            eastFaces.add(new FaceData(x, y, z, adjustColorBrightness(color, 0.6f), 1f, 0.6f, block));
+            eastFaces.add(new FaceData(x, y, z, adjustColorBrightness(color, 0.6f), 1f, 0.6f, block, "side"));
         }
         
         // Collect outline data
@@ -279,45 +281,93 @@ public class ChunkRenderer {
     }
     
     /**
-     * Render faces grouped by block to minimize texture binding
+     * Render faces grouped by block and texture to minimize texture binding
      */
     private void renderFacesByType(java.util.List<FaceData> faces, FaceRenderer renderer) {
         if (faces.isEmpty()) return;
         
-        // Group faces by block
+        // Group faces by block and texture
+        java.util.Map<String, java.util.List<FaceData>> facesByTexture = new java.util.HashMap<>();
+        for (FaceData face : faces) {
+            // Get texture path for this face
+            String texturePath = face.block.getTexturePath(face.faceType);
+            if (texturePath == null) {
+                texturePath = "fallback"; // Use special key for fallback
+            }
+            facesByTexture.computeIfAbsent(texturePath, k -> new java.util.ArrayList<>()).add(face);
+        }
+        
+        // Render each texture group
+        for (java.util.Map.Entry<String, java.util.List<FaceData>> entry : facesByTexture.entrySet()) {
+            String texturePath = entry.getKey();
+            java.util.List<FaceData> textureFaces = entry.getValue();
+            
+            // Check if this is a fallback render
+            boolean hasFallback = texturePath.equals("fallback");
+            boolean hasTexture = false;
+            
+            if (!hasFallback) {
+                int textureId = textureManager.loadTexture(texturePath);
+                hasTexture = (textureId != 0);
+                
+                if (hasTexture) {
+                    textureManager.bindTexture(textureId);
+                } else {
+                    textureManager.unbindTexture();
+                }
+            } else {
+                textureManager.unbindTexture();
+            }
+            
+            // Render all faces with this texture
+            glBegin(GL_TRIANGLES);
+            for (FaceData face : textureFaces) {
+                // Use fallback magenta color if no texture, otherwise use the face color (white)
+                int renderColor = (hasTexture && !hasFallback) ? face.color : adjustColorBrightness(face.block.getFallbackColor(), face.colorBrightness);
+                setColor(renderColor, face.brightness);
+                renderer.render(face.x, face.y, face.z);
+            }
+            glEnd();
+            
+            // Check if we need to render an overlay (for grass_block sides)
+            if (hasTexture && !hasFallback) {
+                renderOverlayForFaces(textureFaces, renderer);
+            }
+        }
+    }
+    
+    /**
+     * Render overlay textures for faces that have them (e.g., grass_block sides)
+     */
+    private void renderOverlayForFaces(java.util.List<FaceData> faces, FaceRenderer renderer) {
+        if (faces.isEmpty()) return;
+        
+        // Group faces by block to check for overlay texture
         java.util.Map<Block, java.util.List<FaceData>> facesByBlock = new java.util.HashMap<>();
         for (FaceData face : faces) {
             facesByBlock.computeIfAbsent(face.block, k -> new java.util.ArrayList<>()).add(face);
         }
         
-        // Render each block group
         for (java.util.Map.Entry<Block, java.util.List<FaceData>> entry : facesByBlock.entrySet()) {
             Block block = entry.getKey();
             java.util.List<FaceData> blockFaces = entry.getValue();
             
-            // Check if texture is available for this block
-            boolean hasTexture = block.hasTexture();
-            int textureId = 0;
-            if (hasTexture) {
-                textureId = textureManager.loadTexture(block.getTexturePath());
-                hasTexture = (textureId != 0);
+            // Check if block has overlay texture
+            String overlayPath = block.getTexturePath("overlay");
+            if (overlayPath == null) {
+                continue; // No overlay for this block
             }
             
-            // If texture is available, bind it and use white color modulation
-            // If texture is not available, unbind texture and use magenta fallback color
-            if (hasTexture) {
-                textureManager.bindTexture(textureId);
-            } else {
-                textureManager.unbindTexture();
+            int overlayTextureId = textureManager.loadTexture(overlayPath);
+            if (overlayTextureId == 0) {
+                continue; // Overlay texture not found
             }
             
-            // Render all faces of this type in one glBegin/glEnd block
+            // Render overlay
+            textureManager.bindTexture(overlayTextureId);
             glBegin(GL_TRIANGLES);
             for (FaceData face : blockFaces) {
-                // Use fallback magenta color if no texture, otherwise use the face color (white)
-                // Apply brightness adjustment to the fallback color to maintain directional shading
-                int renderColor = hasTexture ? face.color : adjustColorBrightness(block.getFallbackColor(), face.colorBrightness);
-                setColor(renderColor, face.brightness);
+                setColor(face.color, face.brightness);
                 renderer.render(face.x, face.y, face.z);
             }
             glEnd();

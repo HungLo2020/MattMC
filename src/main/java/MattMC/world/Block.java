@@ -2,11 +2,13 @@ package MattMC.world;
 
 import MattMC.resources.ResourceManager;
 
+import java.util.Map;
+
 /**
  * Represents a single block in the world.
  * Similar to Minecraft's Block class.
  * 
- * Each block has properties like solidity and texture path.
+ * Each block has properties like solidity and texture paths.
  * Blocks are registered in the Blocks class with unique identifiers.
  * Texture paths are loaded from blockstate and model JSON files.
  * If texture loading fails, a fallback magenta color (0xFF00FF) is used.
@@ -17,7 +19,7 @@ public final class Block {
     
     private final boolean solid;
     private final String identifier;
-    private String texturePath; // Lazily loaded from JSON
+    private Map<String, String> texturePaths; // Lazily loaded from JSON (top, bottom, side, overlay, etc.)
     
     /**
      * Create a new block with the given properties.
@@ -53,22 +55,68 @@ public final class Block {
     }
     
     /**
-     * Get the texture path for this block.
+     * Get the texture paths for this block.
      * Lazily loads from blockstate/model JSON files on first access.
+     * 
+     * @return A map of texture keys to paths (e.g., "top" -> "assets/textures/block/grass_block_top.png")
+     */
+    public Map<String, String> getTexturePaths() {
+        if (texturePaths == null && identifier != null) {
+            // Extract block name from identifier (e.g., "mattmc:dirt" -> "dirt")
+            String blockName = identifier.contains(":") ? identifier.substring(identifier.indexOf(':') + 1) : identifier;
+            texturePaths = ResourceManager.getBlockTexturePaths(blockName);
+        }
+        return texturePaths;
+    }
+    
+    /**
+     * Get the texture path for a specific face.
+     * Falls back to "all" texture if face-specific texture is not available.
+     * 
+     * @param face The face name (e.g., "top", "bottom", "side", "north", etc.)
+     * @return The texture path, or null if no texture is available
+     */
+    public String getTexturePath(String face) {
+        Map<String, String> paths = getTexturePaths();
+        if (paths == null || paths.isEmpty()) {
+            return null;
+        }
+        
+        // Try to get face-specific texture
+        String path = paths.get(face);
+        if (path != null) {
+            return path;
+        }
+        
+        // Fall back to "all" texture (for simple cube_all models)
+        return paths.get("all");
+    }
+    
+    /**
+     * Get the texture path for this block (backward compatibility).
+     * Returns the "all" texture, or the first available texture.
      * 
      * @return The texture path, or null if no texture is available
      */
     public String getTexturePath() {
-        if (texturePath == null && identifier != null) {
-            // Extract block name from identifier (e.g., "mattmc:dirt" -> "dirt")
-            String blockName = identifier.contains(":") ? identifier.substring(identifier.indexOf(':') + 1) : identifier;
-            texturePath = ResourceManager.getBlockTexturePath(blockName);
+        Map<String, String> paths = getTexturePaths();
+        if (paths == null || paths.isEmpty()) {
+            return null;
         }
-        return texturePath;
+        
+        // Try "all" first (for simple blocks)
+        String path = paths.get("all");
+        if (path != null) {
+            return path;
+        }
+        
+        // Return first available texture
+        return paths.values().iterator().next();
     }
     
     public boolean hasTexture() {
-        return getTexturePath() != null;
+        Map<String, String> paths = getTexturePaths();
+        return paths != null && !paths.isEmpty();
     }
     
     public String getIdentifier() {
