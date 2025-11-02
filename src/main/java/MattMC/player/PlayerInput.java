@@ -53,8 +53,8 @@ public class PlayerInput {
         keybinds.put(RIGHT, GLFW_KEY_D);
         keybinds.put(JUMP, GLFW_KEY_SPACE);
         keybinds.put(CROUCH, GLFW_KEY_LEFT_CONTROL);
-        keybinds.put(BREAK_BLOCK, GLFW_MOUSE_BUTTON_LEFT);
-        keybinds.put(PLACE_BLOCK, GLFW_MOUSE_BUTTON_RIGHT);
+        keybinds.put(BREAK_BLOCK, -(GLFW_MOUSE_BUTTON_LEFT + 1));
+        keybinds.put(PLACE_BLOCK, -(GLFW_MOUSE_BUTTON_RIGHT + 1));
         keybinds.put(FLY_UP, GLFW_KEY_SPACE);
         keybinds.put(FLY_DOWN, GLFW_KEY_LEFT_CONTROL);
     }
@@ -71,10 +71,19 @@ public class PlayerInput {
         
         // Mouse buttons use negative values to distinguish from keyboard keys
         if (keyCode < 0) {
-            return glfwGetMouseButton(window, -keyCode - 1) == GLFW_PRESS;
+            return glfwGetMouseButton(window, convertToGlfwMouseButton(keyCode)) == GLFW_PRESS;
         } else {
             return glfwGetKey(window, keyCode) == GLFW_PRESS;
         }
+    }
+    
+    /**
+     * Convert internal mouse button representation to GLFW mouse button constant.
+     * @param keyCode Negative value representing a mouse button
+     * @return GLFW mouse button constant
+     */
+    private static int convertToGlfwMouseButton(int keyCode) {
+        return -keyCode - 1;
     }
     
     /**
@@ -120,7 +129,7 @@ public class PlayerInput {
     public static String getKeyName(int keyCode) {
         // Mouse buttons (negative values)
         if (keyCode < 0) {
-            int button = -keyCode - 1;
+            int button = convertToGlfwMouseButton(keyCode);
             return switch (button) {
                 case GLFW_MOUSE_BUTTON_LEFT -> "Left Mouse";
                 case GLFW_MOUSE_BUTTON_RIGHT -> "Right Mouse";

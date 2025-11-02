@@ -313,8 +313,10 @@ public final class KeybindsScreen implements Screen {
     
     @Override
     public void onClose() {
-        // Clear callbacks
+        // Clear callbacks to prevent memory leaks
         glfwSetKeyCallback(window.handle(), null);
+        glfwSetMouseButtonCallback(window.handle(), null);
+        glfwSetCursorPosCallback(window.handle(), null);
     }
     
     /** Helper class to store keybind button data. */
