@@ -5,6 +5,9 @@ import static org.lwjgl.opengl.GL13.*;
 
 /** Renders a panorama (cubemap skybox) with optional blur effect. */
 public final class PanoramaRenderer {
+    private static final float BLUR_DIM_FACTOR = 0.5f;     // Dimming intensity for blur effect
+    private static final float BLUR_OVERLAY_ALPHA = 0.3f;  // Overlay opacity for blur effect
+    
     private final CubeMap sky;
     private float yawDeg = 0f;
     private float pitchDeg = 5f;
@@ -65,7 +68,7 @@ public final class PanoramaRenderer {
         
         // Apply blur effect by dimming the panorama
         if (blurred) {
-            glColor4f(0.5f, 0.5f, 0.5f, 1f); // Dim to 50% brightness for blur effect
+            glColor4f(BLUR_DIM_FACTOR, BLUR_DIM_FACTOR, BLUR_DIM_FACTOR, 1f);
         } else {
             glColor4f(1f, 1f, 1f, 1f);
         }
@@ -131,7 +134,7 @@ public final class PanoramaRenderer {
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
         
         // Draw a semi-transparent dark overlay
-        glColor4f(0.0f, 0.0f, 0.0f, 0.3f);
+        glColor4f(0.0f, 0.0f, 0.0f, BLUR_OVERLAY_ALPHA);
         glBegin(GL_QUADS);
         glVertex2f(0, 0);
         glVertex2f(width, 0);
