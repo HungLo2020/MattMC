@@ -69,8 +69,11 @@ public class KeybindManager {
         Path optionsPath = getOptionsPath();
         
         try {
-            // Ensure parent directory exists
-            Files.createDirectories(optionsPath.getParent());
+            // Ensure parent directory exists (if there is one)
+            Path parent = optionsPath.getParent();
+            if (parent != null) {
+                Files.createDirectories(parent);
+            }
             
             try (BufferedWriter writer = Files.newBufferedWriter(optionsPath)) {
                 writer.write("# MattMC Options File\n");
