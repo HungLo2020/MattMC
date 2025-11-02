@@ -51,17 +51,11 @@ public final class TextRenderer {
      * @param scale Text scale
      */
     public static void drawCenteredText(String text, float centerX, float y, float scale) {
-        try (MemoryStack stack = stackPush()) {
-            IntBuffer width = stack.mallocInt(1);
-            IntBuffer height = stack.mallocInt(1);
-            STBEasyFont.stb_easy_font_width(text);
-            
-            // Calculate text width
-            float textWidth = STBEasyFont.stb_easy_font_width(text) * scale;
-            float x = centerX - textWidth / 2;
-            
-            drawText(text, x, y, scale);
-        }
+        // Calculate text width
+        float textWidth = STBEasyFont.stb_easy_font_width(text) * scale;
+        float x = centerX - textWidth / 2;
+        
+        drawText(text, x, y, scale);
     }
     
     /**
