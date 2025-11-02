@@ -48,7 +48,8 @@ public final class KeybindsScreen implements Screen {
         {PlayerInput.FLY_UP, "Fly Up"},
         {PlayerInput.FLY_DOWN, "Fly Down"},
         {PlayerInput.BREAK_BLOCK, "Break Block"},
-        {PlayerInput.PLACE_BLOCK, "Place Block"}
+        {PlayerInput.PLACE_BLOCK, "Place Block"},
+        {PlayerInput.OPEN_COMMAND, "Open Command"}
     };
 
     public KeybindsScreen(Game game) {
