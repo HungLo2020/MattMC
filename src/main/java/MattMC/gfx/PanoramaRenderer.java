@@ -9,14 +9,21 @@ public final class PanoramaRenderer {
     private float yawDeg = 0f;
     private float pitchDeg = 5f;
     private final float yawSpeedDegPerSec = 2.0f;
+    private double lastFrameTimeSec = System.nanoTime() * 1e-9;
 
     public PanoramaRenderer(CubeMap sky) {
         this.sky = sky;
     }
 
-    /** Update the panorama rotation based on elapsed time. */
-    public void update(double deltaSeconds) {
-        yawDeg += yawSpeedDegPerSec * (float)deltaSeconds;
+    /** Update the panorama rotation based on elapsed time since last update. */
+    public void update() {
+        double now = System.nanoTime() * 1e-9;
+        double frameDt = now - lastFrameTimeSec;
+        lastFrameTimeSec = now;
+        if (frameDt < 0) frameDt = 0;
+        if (frameDt > 0.25) frameDt = 0.25; // clamp huge pauses
+        
+        yawDeg += yawSpeedDegPerSec * (float)frameDt;
         if (yawDeg >= 360f) yawDeg -= 360f;
         if (yawDeg < 0f) yawDeg += 360f;
     }
@@ -137,8 +144,6 @@ public final class PanoramaRenderer {
     }
 
     public void close() {
-        if (sky != null) {
-            sky.close();
-        }
+        sky.close();
     }
 }

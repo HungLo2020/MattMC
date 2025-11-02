@@ -29,7 +29,6 @@ public final class SingleplayerScreen implements Screen {
     
     // Panorama background
     private PanoramaRenderer panorama;
-    private double lastFrameTimeSec = System.nanoTime() * 1e-9;
 
     private float titleScale = 2.5f;
     private float titleCX, titleCY;
@@ -77,12 +76,7 @@ public final class SingleplayerScreen implements Screen {
     @Override
     public void tick() {
         // Update panorama animation
-        double now = System.nanoTime() * 1e-9;
-        double frameDt = now - lastFrameTimeSec;
-        lastFrameTimeSec = now;
-        if (frameDt < 0) frameDt = 0;
-        if (frameDt > 0.25) frameDt = 0.25;
-        panorama.update(frameDt);
+        panorama.update();
         
         // Convert window coords -> framebuffer coords for accurate hit-testing on HiDPI
         float mxFB, myFB;

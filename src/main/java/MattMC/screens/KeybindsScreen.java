@@ -32,7 +32,6 @@ public final class KeybindsScreen implements Screen {
     
     // Panorama background
     private PanoramaRenderer panorama;
-    private double lastFrameTimeSec = System.nanoTime() * 1e-9;
     
     private String waitingForKey = null; // Action name we're waiting to rebind
     private boolean ignoreNextRelease = false; // Flag to ignore the mouse release from the initial click
@@ -96,12 +95,7 @@ public final class KeybindsScreen implements Screen {
     @Override
     public void tick() {
         // Update panorama animation
-        double now = System.nanoTime() * 1e-9;
-        double frameDt = now - lastFrameTimeSec;
-        lastFrameTimeSec = now;
-        if (frameDt < 0) frameDt = 0;
-        if (frameDt > 0.25) frameDt = 0.25;
-        panorama.update(frameDt);
+        panorama.update();
         
         // Convert window coords -> framebuffer coords
         float mxFB, myFB;
