@@ -11,60 +11,14 @@ public final class PanoramaRenderer {
     private final float yawSpeedDegPerSec = 2.0f;
     private double lastFrameTimeSec = System.nanoTime() * 1e-9;
     
-    // Blur shader and framebuffers
-    private Shader blurShader;
-    private Framebuffer fbo1, fbo2;
+    // Blur effect and framebuffer for rendering to texture
+    private final BlurEffect blurEffect;
+    private Framebuffer renderTarget;
     private int lastWidth = -1, lastHeight = -1;
 
     public PanoramaRenderer(CubeMap sky) {
         this.sky = sky;
-        initBlurShader();
-    }
-    
-    private void initBlurShader() {
-        // Simple passthrough vertex shader
-        String vertexShader = """
-            #version 120
-            varying vec2 vTexCoord;
-            void main() {
-                gl_Position = gl_ModelViewProjectionMatrix * gl_Vertex;
-                vTexCoord = gl_MultiTexCoord0.xy;
-            }
-            """;
-        
-        // Gaussian blur fragment shader
-        String fragmentShader = """
-            #version 120
-            uniform sampler2D uTexture;
-            uniform vec2 uDirection;
-            uniform vec2 uResolution;
-            varying vec2 vTexCoord;
-            
-            void main() {
-                vec2 texelSize = 1.0 / uResolution;
-                vec4 color = vec4(0.0);
-                
-                // 9-tap Gaussian blur
-                float weights[5];
-                weights[0] = 0.227027;
-                weights[1] = 0.1945946;
-                weights[2] = 0.1216216;
-                weights[3] = 0.054054;
-                weights[4] = 0.016216;
-                
-                color += texture2D(uTexture, vTexCoord) * weights[0];
-                
-                for(int i = 1; i < 5; i++) {
-                    vec2 offset = uDirection * texelSize * float(i);
-                    color += texture2D(uTexture, vTexCoord + offset) * weights[i];
-                    color += texture2D(uTexture, vTexCoord - offset) * weights[i];
-                }
-                
-                gl_FragColor = color;
-            }
-            """;
-        
-        blurShader = new Shader(vertexShader, fragmentShader);
+        this.blurEffect = new BlurEffect();
     }
 
     /** Update the panorama rotation based on elapsed time since last update. */
@@ -87,28 +41,26 @@ public final class PanoramaRenderer {
      * @param blurred if true, applies a Gaussian blur shader effect
      */
     public void render(int width, int height, boolean blurred) {
-        // Recreate framebuffers if size changed
-        if (blurred && (lastWidth != width || lastHeight != height)) {
-            if (fbo1 != null) fbo1.close();
-            if (fbo2 != null) fbo2.close();
-            fbo1 = new Framebuffer(width, height);
-            fbo2 = new Framebuffer(width, height);
-            lastWidth = width;
-            lastHeight = height;
-        }
-        
         if (blurred) {
-            // Render panorama to framebuffer
-            fbo1.bind();
-            renderPanorama(width, height);
-            fbo1.unbind();
+            // Recreate render target if size changed
+            if (lastWidth != width || lastHeight != height) {
+                if (renderTarget != null) renderTarget.close();
+                renderTarget = new Framebuffer(width, height);
+                lastWidth = width;
+                lastHeight = height;
+            }
             
-            // Apply two-pass Gaussian blur
-            applyGaussianBlur(width, height);
+            // Render panorama to framebuffer
+            renderTarget.bind();
+            renderPanorama(width, height);
+            renderTarget.unbind();
+            
+            // Apply Gaussian blur and get result
+            Framebuffer blurResult = blurEffect.applyBlur(renderTarget.getTextureId(), width, height);
             
             // Render the blurred result to screen
             glViewport(0, 0, width, height);
-            renderQuadWithTexture(fbo2.getTextureId(), width, height);
+            renderQuadWithTexture(blurResult.getTextureId(), width, height);
         } else {
             // Render directly to screen without blur
             renderPanorama(width, height);
@@ -187,38 +139,6 @@ public final class PanoramaRenderer {
         glDisable(GL_TEXTURE_CUBE_MAP);
     }
     
-    private void applyGaussianBlur(int width, int height) {
-        blurShader.use();
-        blurShader.setUniform2f("uResolution", width, height);
-        blurShader.setUniform1i("uTexture", 0);
-        
-        // First pass: horizontal blur
-        fbo2.bind();
-        glClear(GL_COLOR_BUFFER_BIT);
-        blurShader.setUniform2f("uDirection", 1.0f, 0.0f);
-        fbo1.bindTexture();
-        renderQuadWithTexture(fbo1.getTextureId(), width, height);
-        fbo2.unbind();
-        
-        // Second pass: vertical blur
-        fbo1.bind();
-        glClear(GL_COLOR_BUFFER_BIT);
-        blurShader.setUniform2f("uDirection", 0.0f, 1.0f);
-        fbo2.bindTexture();
-        renderQuadWithTexture(fbo2.getTextureId(), width, height);
-        fbo1.unbind();
-        
-        // Third pass: horizontal blur again for stronger effect
-        fbo2.bind();
-        glClear(GL_COLOR_BUFFER_BIT);
-        blurShader.setUniform2f("uDirection", 1.0f, 0.0f);
-        fbo1.bindTexture();
-        renderQuadWithTexture(fbo1.getTextureId(), width, height);
-        fbo2.unbind();
-        
-        Shader.unbind();
-    }
-    
     private void renderQuadWithTexture(int textureId, int width, int height) {
         glMatrixMode(GL_PROJECTION);
         glLoadIdentity();
@@ -243,8 +163,7 @@ public final class PanoramaRenderer {
 
     public void close() {
         sky.close();
-        if (blurShader != null) blurShader.close();
-        if (fbo1 != null) fbo1.close();
-        if (fbo2 != null) fbo2.close();
+        if (blurEffect != null) blurEffect.close();
+        if (renderTarget != null) renderTarget.close();
     }
 }
