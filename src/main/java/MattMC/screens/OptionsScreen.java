@@ -33,18 +33,7 @@ public final class OptionsScreen implements Screen {
     public OptionsScreen(Game game) {
         this.game = game;
         this.window = game.window();
-
-        glfwSetCursorPosCallback(window.handle(), (h, x, y) -> { mouseXWin = x; mouseYWin = y; });
-        glfwSetMouseButtonCallback(window.handle(), (h, button, action, mods) -> {
-            if (button == GLFW_MOUSE_BUTTON_LEFT) mouseDown = (action == GLFW_PRESS);
-        });
-
         recomputeLayout();
-
-        glfwSetFramebufferSizeCallback(window.handle(), (win, newW, newH) -> {
-            glViewport(0, 0, Math.max(newW, 1), Math.max(newH, 1));
-            recomputeLayout();
-        });
     }
 
     private void recomputeLayout() {
@@ -200,7 +189,18 @@ public final class OptionsScreen implements Screen {
     }
 
     @Override
-    public void onOpen() {}
+    public void onOpen() {
+        // Set up callbacks when screen opens
+        glfwSetCursorPosCallback(window.handle(), (h, x, y) -> { mouseXWin = x; mouseYWin = y; });
+        glfwSetMouseButtonCallback(window.handle(), (h, button, action, mods) -> {
+            if (button == GLFW_MOUSE_BUTTON_LEFT) mouseDown = (action == GLFW_PRESS);
+        });
+        glfwSetFramebufferSizeCallback(window.handle(), (win, newW, newH) -> {
+            glViewport(0, 0, Math.max(newW, 1), Math.max(newH, 1));
+            recomputeLayout();
+        });
+    }
+    
     @Override
     public void onClose() {}
 }

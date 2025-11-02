@@ -29,6 +29,7 @@ public final class KeybindsScreen implements Screen {
     private boolean mouseDown;
     
     private String waitingForKey = null; // Action name we're waiting to rebind
+    private boolean ignoreNextRelease = false; // Flag to ignore the mouse release from the initial click
     
     private float titleScale = 2.0f;
     private float titleCX, titleCY;
@@ -53,50 +54,8 @@ public final class KeybindsScreen implements Screen {
     public KeybindsScreen(Game game) {
         this.game = game;
         this.window = game.window();
-
-        glfwSetCursorPosCallback(window.handle(), (h, x, y) -> { mouseXWin = x; mouseYWin = y; });
-        glfwSetMouseButtonCallback(window.handle(), (h, button, action, mods) -> {
-            if (button == GLFW_MOUSE_BUTTON_LEFT) {
-                if (action == GLFW_PRESS) {
-                    mouseDown = true;
-                } else if (action == GLFW_RELEASE && waitingForKey != null) {
-                    // Bind mouse button
-                    int mouseButton = -(button + 1); // Convert to negative value
-                    PlayerInput.getInstance().setKeybind(waitingForKey, mouseButton);
-                    KeybindManager.saveKeybinds();
-                    waitingForKey = null;
-                }
-            } else if (waitingForKey != null && action == GLFW_RELEASE) {
-                // Bind other mouse buttons
-                int mouseButton = -(button + 1);
-                PlayerInput.getInstance().setKeybind(waitingForKey, mouseButton);
-                KeybindManager.saveKeybinds();
-                waitingForKey = null;
-            }
-        });
-        
-        // Key callback for binding keys
-        glfwSetKeyCallback(window.handle(), (win, key, scancode, action, mods) -> {
-            if (action == GLFW_PRESS && waitingForKey != null) {
-                if (key == GLFW_KEY_ESCAPE) {
-                    // Cancel binding
-                    waitingForKey = null;
-                } else {
-                    // Bind key
-                    PlayerInput.getInstance().setKeybind(waitingForKey, key);
-                    KeybindManager.saveKeybinds();
-                    waitingForKey = null;
-                }
-            }
-        });
-
         backButton = new UIButton("Back", 0, 0, 200, 40);
         recomputeLayout();
-
-        glfwSetFramebufferSizeCallback(window.handle(), (win, newW, newH) -> {
-            glViewport(0, 0, Math.max(newW, 1), Math.max(newH, 1));
-            recomputeLayout();
-        });
     }
 
     private void recomputeLayout() {
@@ -148,12 +107,13 @@ public final class KeybindsScreen implements Screen {
             for (var kb : keybindButtons) {
                 if (kb.button.contains(mxFB, myFB)) {
                     waitingForKey = kb.action;
+                    ignoreNextRelease = true; // Ignore the release from this click
                     break;
                 }
             }
             
-            // Check back button
-            if (backButton.contains(mxFB, myFB)) {
+            // Check back button (only if not waiting for keybind)
+            if (waitingForKey == null && backButton.contains(mxFB, myFB)) {
                 game.setScreen(new OptionsScreen(game));
             }
             
@@ -309,15 +269,57 @@ public final class KeybindsScreen implements Screen {
     }
 
     @Override
-    public void onOpen() {}
+    public void onOpen() {
+        // Set up callbacks when screen opens
+        glfwSetCursorPosCallback(window.handle(), (h, x, y) -> { mouseXWin = x; mouseYWin = y; });
+        glfwSetMouseButtonCallback(window.handle(), (h, button, action, mods) -> {
+            if (button == GLFW_MOUSE_BUTTON_LEFT) {
+                if (action == GLFW_PRESS) {
+                    mouseDown = true;
+                } else if (action == GLFW_RELEASE && waitingForKey != null) {
+                    // Ignore the release from the initial click
+                    if (ignoreNextRelease) {
+                        ignoreNextRelease = false;
+                        return;
+                    }
+                    // Bind mouse button
+                    int mouseButton = -(button + 1); // Convert to negative value
+                    PlayerInput.getInstance().setKeybind(waitingForKey, mouseButton);
+                    KeybindManager.saveKeybinds();
+                    waitingForKey = null;
+                }
+            } else if (waitingForKey != null && action == GLFW_RELEASE) {
+                // Bind other mouse buttons (non-left clicks)
+                int mouseButton = -(button + 1);
+                PlayerInput.getInstance().setKeybind(waitingForKey, mouseButton);
+                KeybindManager.saveKeybinds();
+                waitingForKey = null;
+            }
+        });
+        
+        // Key callback for binding keys
+        glfwSetKeyCallback(window.handle(), (win, key, scancode, action, mods) -> {
+            if (action == GLFW_PRESS && waitingForKey != null) {
+                if (key == GLFW_KEY_ESCAPE) {
+                    // Cancel binding
+                    waitingForKey = null;
+                } else {
+                    // Bind key
+                    PlayerInput.getInstance().setKeybind(waitingForKey, key);
+                    KeybindManager.saveKeybinds();
+                    waitingForKey = null;
+                }
+            }
+        });
+
+        glfwSetFramebufferSizeCallback(window.handle(), (win, newW, newH) -> {
+            glViewport(0, 0, Math.max(newW, 1), Math.max(newH, 1));
+            recomputeLayout();
+        });
+    }
     
     @Override
-    public void onClose() {
-        // Clear callbacks to prevent memory leaks
-        glfwSetKeyCallback(window.handle(), null);
-        glfwSetMouseButtonCallback(window.handle(), null);
-        glfwSetCursorPosCallback(window.handle(), null);
-    }
+    public void onClose() {}
     
     /** Helper class to store keybind button data. */
     private static class KeybindButton {
