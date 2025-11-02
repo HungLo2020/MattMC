@@ -65,8 +65,11 @@ public class World implements WorldAccess {
     
     /**
      * Get a block at world coordinates.
+     * @param worldX World X coordinate (can be any value)
+     * @param chunkY Chunk-local Y coordinate (0-383, same as Region interface)
+     * @param worldZ World Z coordinate (can be any value)
      */
-    public Block getBlock(int worldX, int worldY, int worldZ) {
+    public Block getBlock(int worldX, int chunkY, int worldZ) {
         // Convert world coordinates to chunk coordinates
         int chunkX = Math.floorDiv(worldX, Chunk.WIDTH);
         int chunkZ = Math.floorDiv(worldZ, Chunk.DEPTH);
@@ -74,20 +77,22 @@ public class World implements WorldAccess {
         // Get local coordinates within the chunk
         int localX = Math.floorMod(worldX, Chunk.WIDTH);
         int localZ = Math.floorMod(worldZ, Chunk.DEPTH);
-        int localY = Chunk.worldYToChunkY(worldY);
         
         Chunk chunk = getChunkIfLoaded(chunkX, chunkZ);
         if (chunk == null) {
             return Blocks.AIR;
         }
         
-        return chunk.getBlock(localX, localY, localZ);
+        return chunk.getBlock(localX, chunkY, localZ);
     }
     
     /**
      * Set a block at world coordinates.
+     * @param worldX World X coordinate (can be any value)
+     * @param chunkY Chunk-local Y coordinate (0-383, same as Region interface)
+     * @param worldZ World Z coordinate (can be any value)
      */
-    public void setBlock(int worldX, int worldY, int worldZ, Block block) {
+    public void setBlock(int worldX, int chunkY, int worldZ, Block block) {
         // Convert world coordinates to chunk coordinates
         int chunkX = Math.floorDiv(worldX, Chunk.WIDTH);
         int chunkZ = Math.floorDiv(worldZ, Chunk.DEPTH);
@@ -95,10 +100,9 @@ public class World implements WorldAccess {
         // Get local coordinates within the chunk
         int localX = Math.floorMod(worldX, Chunk.WIDTH);
         int localZ = Math.floorMod(worldZ, Chunk.DEPTH);
-        int localY = Chunk.worldYToChunkY(worldY);
         
         Chunk chunk = getChunk(chunkX, chunkZ);
-        chunk.setBlock(localX, localY, localZ, block);
+        chunk.setBlock(localX, chunkY, localZ, block);
     }
     
     /**
