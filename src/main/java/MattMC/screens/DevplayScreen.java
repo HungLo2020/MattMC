@@ -36,6 +36,12 @@ public final class DevplayScreen implements Screen {
     
     // Debug menu toggle state
     private boolean debugMenuVisible = false;
+    
+    // Command overlay state
+    private boolean commandOverlayVisible = false;
+    private StringBuilder commandText = new StringBuilder("/");
+    private String commandErrorMessage = "";
+    private double commandErrorDisplayTime = 0;
 
     public DevplayScreen(Game game) {
         this.game = game;
@@ -70,17 +76,48 @@ public final class DevplayScreen implements Screen {
             glViewport(0, 0, Math.max(w, 1), Math.max(h, 1));
         });
 
-        // ESC to release mouse and go back; Space for jumping/flying; F3 to toggle debug menu
+        // Setup character callback for command input
+        glfwSetCharCallback(window.handle(), (win, codepoint) -> {
+            if (commandOverlayVisible && commandText.length() < 100) {
+                commandText.append((char) codepoint);
+            }
+        });
+        
+        // ESC to release mouse and go back; Space for jumping/flying; F3 to toggle debug menu; / to toggle command overlay
         glfwSetKeyCallback(window.handle(), (win, key, scancode, action, mods) -> {
-            if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS) {
-                glfwSetInputMode(window.handle(), GLFW_CURSOR, GLFW_CURSOR_NORMAL);
-                game.setScreen(new SingleplayerScreen(game));
-            }
-            if (key == GLFW_KEY_SPACE && action == GLFW_PRESS) {
-                playerController.handleSpacePress();
-            }
-            if (key == GLFW_KEY_F3 && action == GLFW_PRESS) {
-                debugMenuVisible = !debugMenuVisible;
+            if (commandOverlayVisible) {
+                // Command overlay is open - handle command input
+                if (action == GLFW_PRESS || action == GLFW_REPEAT) {
+                    if (key == GLFW_KEY_ESCAPE) {
+                        // Close command overlay
+                        closeCommandOverlay();
+                    } else if (key == GLFW_KEY_ENTER) {
+                        // Execute command and close
+                        executeCommand();
+                        closeCommandOverlay();
+                    } else if (key == GLFW_KEY_BACKSPACE) {
+                        // Delete last character (but keep the '/')
+                        if (commandText.length() > 1) {
+                            commandText.deleteCharAt(commandText.length() - 1);
+                        }
+                    }
+                }
+            } else {
+                // Normal game input
+                if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS) {
+                    glfwSetInputMode(window.handle(), GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+                    game.setScreen(new SingleplayerScreen(game));
+                }
+                if (key == GLFW_KEY_SPACE && action == GLFW_PRESS) {
+                    playerController.handleSpacePress();
+                }
+                if (key == GLFW_KEY_F3 && action == GLFW_PRESS) {
+                    debugMenuVisible = !debugMenuVisible;
+                }
+                if (key == GLFW_KEY_SLASH && action == GLFW_PRESS) {
+                    // Toggle command overlay
+                    openCommandOverlay();
+                }
             }
         });
         
@@ -101,6 +138,62 @@ public final class DevplayScreen implements Screen {
         });
     }
 
+    private void openCommandOverlay() {
+        commandOverlayVisible = true;
+        commandText = new StringBuilder("/");
+        commandErrorMessage = "";
+        commandErrorDisplayTime = 0;
+        // Keep cursor captured but allow typing
+    }
+    
+    private void closeCommandOverlay() {
+        commandOverlayVisible = false;
+        commandText = new StringBuilder("/");
+    }
+    
+    private void executeCommand() {
+        String cmd = commandText.toString().trim();
+        
+        // Parse and execute command
+        if (cmd.startsWith("/tp ")) {
+            executeTeleportCommand(cmd);
+        } else if (cmd.equals("/")) {
+            // Empty command, just close
+            return;
+        } else {
+            commandErrorMessage = "Unknown command: " + cmd;
+            commandErrorDisplayTime = 3.0; // Show error for 3 seconds
+        }
+    }
+    
+    private void executeTeleportCommand(String cmd) {
+        try {
+            // Parse: /tp x y z
+            String[] parts = cmd.substring(4).trim().split("\\s+");
+            
+            if (parts.length != 3) {
+                commandErrorMessage = "Usage: /tp x y z";
+                commandErrorDisplayTime = 3.0;
+                return;
+            }
+            
+            float x = Float.parseFloat(parts[0]);
+            float y = Float.parseFloat(parts[1]);
+            float z = Float.parseFloat(parts[2]);
+            
+            // Teleport the player
+            player.setX(x);
+            player.setY(y);
+            player.setZ(z);
+            
+            System.out.println("Teleported to: " + x + ", " + y + ", " + z);
+            
+        } catch (NumberFormatException e) {
+            commandErrorMessage = "Invalid coordinates. Usage: /tp x y z";
+            commandErrorDisplayTime = 3.0;
+        }
+    }
+
     @Override
     public void tick() {
         double now = now();
@@ -112,11 +205,20 @@ public final class DevplayScreen implements Screen {
         // Update chunks based on player position (load/unload)
         world.updateChunksAroundPlayer(player.getX(), player.getZ());
         
-        // Update physics (gravity, collision)
-        playerPhysics.update((float)dt);
+        // Update physics (gravity, collision) - only if command overlay is not visible
+        if (!commandOverlayVisible) {
+            playerPhysics.update((float)dt);
+        }
         
-        // Update player movement based on input
-        playerController.updateMovement(window.handle(), (float)dt);
+        // Update player movement based on input - only if command overlay is not visible
+        if (!commandOverlayVisible) {
+            playerController.updateMovement(window.handle(), (float)dt);
+        }
+        
+        // Decrease error display time
+        if (commandErrorDisplayTime > 0) {
+            commandErrorDisplayTime -= dt;
+        }
     }
 
     @Override
@@ -162,8 +264,15 @@ public final class DevplayScreen implements Screen {
             uiRenderer.drawDebugInfo(w, h, player.getX(), player.getY(), player.getZ());
         }
         
-        // Draw crosshair on top of everything
-        uiRenderer.drawCrosshair(w, h);
+        // Draw command overlay if visible
+        if (commandOverlayVisible) {
+            uiRenderer.drawCommandOverlay(w, h, commandText.toString(), commandErrorMessage, commandErrorDisplayTime > 0);
+        }
+        
+        // Draw crosshair on top of everything (but not when command overlay is open)
+        if (!commandOverlayVisible) {
+            uiRenderer.drawCrosshair(w, h);
+        }
     }
 
     private static double now() { return System.nanoTime() * 1e-9; }

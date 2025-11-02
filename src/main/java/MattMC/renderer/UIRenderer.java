@@ -123,6 +123,74 @@ public class UIRenderer {
     }
     
     /**
+     * Draw command overlay at bottom of screen (like Minecraft).
+     * Shows command input box with cursor.
+     */
+    public void drawCommandOverlay(int screenWidth, int screenHeight, String commandText, String errorMessage, boolean showError) {
+        // Switch to 2D orthographic projection
+        glMatrixMode(GL_PROJECTION);
+        glPushMatrix();
+        glLoadIdentity();
+        glOrtho(0, screenWidth, screenHeight, 0, -1, 1);
+        
+        glMatrixMode(GL_MODELVIEW);
+        glPushMatrix();
+        glLoadIdentity();
+        
+        // Enable blending for semi-transparent overlay
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        
+        // Draw command input box at bottom of screen
+        int boxHeight = 50;
+        int boxY = screenHeight - boxHeight - 20;
+        int boxX = 20;
+        int boxWidth = screenWidth - 40;
+        
+        // Draw semi-transparent background
+        setColor(0x000000, 0.7f);
+        fillRect(boxX, boxY, boxWidth, boxHeight);
+        
+        // Draw border
+        setColor(0xFFFFFF, 1.0f);
+        glBegin(GL_LINE_LOOP);
+        glVertex2f(boxX, boxY);
+        glVertex2f(boxX + boxWidth, boxY);
+        glVertex2f(boxX + boxWidth, boxY + boxHeight);
+        glVertex2f(boxX, boxY + boxHeight);
+        glEnd();
+        
+        // Draw command text with blinking cursor
+        String displayText = commandText + "_";
+        drawText(displayText, boxX + 10, boxY + 15, 1.5f, 0xFFFFFF);
+        
+        // Draw error message if present
+        if (showError && !errorMessage.isEmpty()) {
+            drawText(errorMessage, boxX + 10, boxY - 25, 1.0f, 0xFF0000);
+        }
+        
+        glDisable(GL_BLEND);
+        
+        // Restore matrices
+        glPopMatrix();
+        glMatrixMode(GL_PROJECTION);
+        glPopMatrix();
+        glMatrixMode(GL_MODELVIEW);
+    }
+    
+    /**
+     * Helper method to fill a rectangle.
+     */
+    private void fillRect(int x, int y, int w, int h) {
+        glBegin(GL_QUADS);
+        glVertex2f(x, y);
+        glVertex2f(x + w, y);
+        glVertex2f(x + w, y + h);
+        glVertex2f(x, y + h);
+        glEnd();
+    }
+    
+    /**
      * Helper method to set color from RGB integer.
      */
     private void setColor(int rgb, float a) {

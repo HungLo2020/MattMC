@@ -27,6 +27,7 @@ public class PlayerInput {
     public static final String PLACE_BLOCK = "place_block";
     public static final String FLY_UP = "fly_up";
     public static final String FLY_DOWN = "fly_down";
+    public static final String OPEN_COMMAND = "open_command";
     
     private PlayerInput() {
         // Initialize with default keybinds
@@ -57,6 +58,7 @@ public class PlayerInput {
         keybinds.put(PLACE_BLOCK, -(GLFW_MOUSE_BUTTON_RIGHT + 1));
         keybinds.put(FLY_UP, GLFW_KEY_SPACE);
         keybinds.put(FLY_DOWN, GLFW_KEY_LEFT_CONTROL);
+        keybinds.put(OPEN_COMMAND, GLFW_KEY_SLASH);
     }
     
     /**
