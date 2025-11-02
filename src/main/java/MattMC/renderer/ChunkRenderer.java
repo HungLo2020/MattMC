@@ -365,6 +365,22 @@ public class ChunkRenderer {
             }
         }
         
+        if (facesByBlock.isEmpty()) {
+            return; // No overlays to render
+        }
+        
+        // Enable alpha blending for overlay transparency
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        
+        // Disable depth writing so overlays don't block other geometry
+        // But keep depth testing enabled so they respect existing depth
+        glDepthMask(false);
+        
+        // Use polygon offset to prevent z-fighting with base texture
+        glEnable(GL_POLYGON_OFFSET_FILL);
+        glPolygonOffset(-1.0f, -1.0f);
+        
         // Render overlays for each block type
         for (java.util.Map.Entry<Block, java.util.List<FaceData>> blockEntry : facesByBlock.entrySet()) {
             Block block = blockEntry.getKey();
@@ -393,6 +409,11 @@ public class ChunkRenderer {
             }
             glEnd();
         }
+        
+        // Restore OpenGL state
+        glDisable(GL_POLYGON_OFFSET_FILL);
+        glDepthMask(true);
+        glDisable(GL_BLEND);
     }
     
     @FunctionalInterface
