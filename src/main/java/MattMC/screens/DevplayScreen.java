@@ -96,8 +96,8 @@ public final class DevplayScreen implements Screen {
                         executeCommand();
                         closeCommandOverlay();
                     } else if (key == GLFW_KEY_BACKSPACE) {
-                        // Delete last character (but keep the '/')
-                        if (commandText.length() > 1) {
+                        // Delete last character
+                        if (commandText.length() > 0) {
                             commandText.deleteCharAt(commandText.length() - 1);
                         }
                     }
@@ -140,7 +140,7 @@ public final class DevplayScreen implements Screen {
 
     private void openCommandOverlay() {
         commandOverlayVisible = true;
-        commandText = new StringBuilder("/");
+        commandText = new StringBuilder();
         commandErrorMessage = "";
         commandErrorDisplayTime = 0;
         // Keep cursor captured but allow typing
@@ -148,18 +148,27 @@ public final class DevplayScreen implements Screen {
     
     private void closeCommandOverlay() {
         commandOverlayVisible = false;
-        commandText = new StringBuilder("/");
+        commandText = new StringBuilder();
     }
     
     private void executeCommand() {
         String cmd = commandText.toString().trim();
         
+        // Empty command, just close
+        if (cmd.isEmpty() || cmd.equals("/")) {
+            return;
+        }
+        
+        // Ensure command starts with /
+        if (!cmd.startsWith("/")) {
+            commandErrorMessage = "Commands must start with /";
+            commandErrorDisplayTime = 3.0;
+            return;
+        }
+        
         // Parse and execute command
         if (cmd.startsWith("/tp ")) {
             executeTeleportCommand(cmd);
-        } else if (cmd.equals("/")) {
-            // Empty command, just close
-            return;
         } else {
             commandErrorMessage = "Unknown command: " + cmd;
             commandErrorDisplayTime = 3.0; // Show error for 3 seconds
