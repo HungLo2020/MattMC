@@ -44,6 +44,11 @@ public final class DevplayScreen implements Screen {
         // Initialize player - spawn at world origin
         float spawnX = 0f;
         float spawnZ = 0f;
+        
+        // Pre-load spawn chunks before finding spawn height
+        world.updateChunksAroundPlayer(spawnX, spawnZ);
+        
+        // Find proper spawn height on top of terrain
         float spawnY = PlayerPhysics.findSpawnHeight(world, spawnX, spawnZ);
         
         this.player = new Player(spawnX, spawnY, spawnZ);

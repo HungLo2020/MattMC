@@ -203,6 +203,7 @@ public class PlayerPhysics {
     
     /**
      * Find the highest solid block at given X,Z position to spawn player on top.
+     * Ensures spawn position has at least 2 blocks of air above for player headroom.
      */
     public static float findSpawnHeight(WorldAccess world, float x, float z) {
         int blockX = (int) Math.floor(x);
@@ -212,14 +213,29 @@ public class PlayerPhysics {
         for (int worldY = Chunk.MAX_Y; worldY >= Chunk.MIN_Y; worldY--) {
             int chunkY = Chunk.worldYToChunkY(worldY);
             
+            // Check if this is a solid block
             Block block = world.getBlock(blockX, chunkY, blockZ);
             if (!block.isAir()) {
-                // Found solid block - spawn on top
-                return worldY + 1.0f;
+                // Check if there's enough headroom (at least 2 blocks of air above)
+                int spawnWorldY = worldY + 1;
+                int spawnChunkY = Chunk.worldYToChunkY(spawnWorldY);
+                int headChunkY = Chunk.worldYToChunkY(spawnWorldY + 1);
+                
+                if (spawnChunkY >= 0 && spawnChunkY < Chunk.HEIGHT && 
+                    headChunkY >= 0 && headChunkY < Chunk.HEIGHT) {
+                    Block aboveBlock = world.getBlock(blockX, spawnChunkY, blockZ);
+                    Block headBlock = world.getBlock(blockX, headChunkY, blockZ);
+                    
+                    if (aboveBlock.isAir() && headBlock.isAir()) {
+                        // Found valid spawn location - on top of solid block with air above
+                        return spawnWorldY;
+                    }
+                }
             }
         }
         
-        // No solid block found - spawn at default height
+        // No solid block found or no valid spawn location - default to surface level
+        // This should rarely happen with proper terrain generation
         return 65f;
     }
     
