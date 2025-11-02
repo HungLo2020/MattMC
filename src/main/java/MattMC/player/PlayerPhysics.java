@@ -2,7 +2,7 @@ package MattMC.player;
 
 import MattMC.world.Block;
 import MattMC.world.Chunk;
-import MattMC.world.Region;
+import MattMC.world.WorldAccess;
 
 /**
  * Handles player physics including gravity, collision detection, and flying.
@@ -20,7 +20,7 @@ public class PlayerPhysics {
     private static final float JUMP_VELOCITY = 8f; // Initial jump speed
     
     private final Player player;
-    private final Region region;
+    private final WorldAccess world;
     
     // Physics state
     private float velocityY = 0f; // Vertical velocity
@@ -31,9 +31,9 @@ public class PlayerPhysics {
     private double lastSpacePress = 0;
     private static final double DOUBLE_TAP_THRESHOLD = 0.3; // seconds
     
-    public PlayerPhysics(Player player, Region region) {
+    public PlayerPhysics(Player player, WorldAccess world) {
         this.player = player;
-        this.region = region;
+        this.world = world;
     }
     
     /**
@@ -162,12 +162,9 @@ public class PlayerPhysics {
                     // Convert world Y to chunk Y
                     int chunkY = Chunk.worldYToChunkY(by);
                     
-                    // Check if block is within region bounds
-                    if (bx >= 0 && bx < Region.REGION_WIDTH_BLOCKS && 
-                        chunkY >= 0 && chunkY < Chunk.HEIGHT && 
-                        bz >= 0 && bz < Region.REGION_DEPTH_BLOCKS) {
-                        
-                        Block block = region.getBlock(bx, chunkY, bz);
+                    // Check if block coordinates are valid
+                    if (chunkY >= 0 && chunkY < Chunk.HEIGHT) {
+                        Block block = world.getBlock(bx, chunkY, bz);
                         if (!block.isAir()) {
                             // Solid block found - collision!
                             return true;
@@ -206,8 +203,9 @@ public class PlayerPhysics {
     
     /**
      * Find the highest solid block at given X,Z position to spawn player on top.
+     * Ensures spawn position has at least 2 blocks of air above for player headroom.
      */
-    public static float findSpawnHeight(Region region, float x, float z) {
+    public static float findSpawnHeight(WorldAccess world, float x, float z) {
         int blockX = (int) Math.floor(x);
         int blockZ = (int) Math.floor(z);
         
@@ -215,19 +213,29 @@ public class PlayerPhysics {
         for (int worldY = Chunk.MAX_Y; worldY >= Chunk.MIN_Y; worldY--) {
             int chunkY = Chunk.worldYToChunkY(worldY);
             
-            if (blockX >= 0 && blockX < Region.REGION_WIDTH_BLOCKS && 
-                chunkY >= 0 && chunkY < Chunk.HEIGHT && 
-                blockZ >= 0 && blockZ < Region.REGION_DEPTH_BLOCKS) {
+            // Check if this is a solid block
+            Block block = world.getBlock(blockX, chunkY, blockZ);
+            if (!block.isAir()) {
+                // Check if there's enough headroom (at least 2 blocks of air above)
+                int spawnWorldY = worldY + 1;
+                int spawnChunkY = Chunk.worldYToChunkY(spawnWorldY);
+                int headChunkY = Chunk.worldYToChunkY(spawnWorldY + 1);
                 
-                Block block = region.getBlock(blockX, chunkY, blockZ);
-                if (!block.isAir()) {
-                    // Found solid block - spawn on top
-                    return worldY + 1.0f;
+                if (spawnChunkY >= 0 && spawnChunkY < Chunk.HEIGHT && 
+                    headChunkY >= 0 && headChunkY < Chunk.HEIGHT) {
+                    Block aboveBlock = world.getBlock(blockX, spawnChunkY, blockZ);
+                    Block headBlock = world.getBlock(blockX, headChunkY, blockZ);
+                    
+                    if (aboveBlock.isAir() && headBlock.isAir()) {
+                        // Found valid spawn location - on top of solid block with air above
+                        return spawnWorldY;
+                    }
                 }
             }
         }
         
-        // No solid block found - spawn at default height
+        // No solid block found or no valid spawn location - default to surface level
+        // This should rarely happen with proper terrain generation
         return 65f;
     }
     

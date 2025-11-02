@@ -6,17 +6,17 @@ import MattMC.player.BlockInteraction;
 import MattMC.player.Player;
 import MattMC.player.PlayerController;
 import MattMC.player.PlayerPhysics;
-import MattMC.renderer.RegionRenderer;
+import MattMC.renderer.WorldRenderer;
 import MattMC.renderer.UIRenderer;
 import MattMC.world.Blocks;
-import MattMC.world.Region;
+import MattMC.world.World;
 
 import static org.lwjgl.glfw.GLFW.*;
 import static org.lwjgl.opengl.GL11.*;
 
 /**
- * Devplay screen - renders a 32x32 region (1024 chunks) with flat terrain at y=64.
- * Now refactored with separate Player, PlayerController, RegionRenderer, etc.
+ * Devplay screen - infinite world with dynamic chunk loading.
+ * Chunks load/unload based on player position.
  * ESC returns to Singleplayer.
  */
 public final class DevplayScreen implements Screen {
@@ -24,12 +24,12 @@ public final class DevplayScreen implements Screen {
     private final Window window;
     
     // Game components (following Minecraft's architecture)
-    private final Region region;
+    private final World world;
     private final Player player;
     private final PlayerController playerController;
     private final PlayerPhysics playerPhysics;
     private final BlockInteraction blockInteraction;
-    private final RegionRenderer regionRenderer;
+    private final WorldRenderer worldRenderer;
     private final UIRenderer uiRenderer;
     
     private double lastFrameTimeSec = now();
@@ -38,21 +38,25 @@ public final class DevplayScreen implements Screen {
         this.game = game;
         this.window = game.window();
         
-        // Initialize game components - create a region (32x32 chunks = 1024 chunks)
-        this.region = new Region(0, 0);
-        this.region.generateFlatTerrain(64); // Surface at y=64 across entire region
+        // Initialize infinite world
+        this.world = new World();
         
-        // Initialize player - spawn at center of region
-        float spawnX = Region.REGION_WIDTH_BLOCKS / 2f; // Center of region (256 blocks)
-        float spawnZ = Region.REGION_DEPTH_BLOCKS / 2f; // Center of region (256 blocks)
-        float spawnY = PlayerPhysics.findSpawnHeight(region, spawnX, spawnZ);
+        // Initialize player - spawn at world origin
+        float spawnX = 0f;
+        float spawnZ = 0f;
+        
+        // Pre-load spawn chunks before finding spawn height
+        world.updateChunksAroundPlayer(spawnX, spawnZ);
+        
+        // Find proper spawn height on top of terrain
+        float spawnY = PlayerPhysics.findSpawnHeight(world, spawnX, spawnZ);
         
         this.player = new Player(spawnX, spawnY, spawnZ);
-        this.playerPhysics = new PlayerPhysics(player, region);
+        this.playerPhysics = new PlayerPhysics(player, world);
         this.player.setPhysics(playerPhysics);
         this.playerController = new PlayerController(player);
-        this.blockInteraction = new BlockInteraction(player, region);
-        this.regionRenderer = new RegionRenderer();
+        this.blockInteraction = new BlockInteraction(player, world);
+        this.worldRenderer = new WorldRenderer();
         this.uiRenderer = new UIRenderer();
 
         // Capture mouse for FPS-style controls
@@ -99,6 +103,9 @@ public final class DevplayScreen implements Screen {
         if (dt < 0) dt = 0;
         if (dt > 0.5) dt = 0.5;
         
+        // Update chunks based on player position (load/unload)
+        world.updateChunksAroundPlayer(player.getX(), player.getZ());
+        
         // Update physics (gravity, collision)
         playerPhysics.update((float)dt);
         
@@ -138,10 +145,8 @@ public final class DevplayScreen implements Screen {
         glEnable(GL_CULL_FACE);
         glCullFace(GL_BACK);
         
-        // Use optimized rendering with render distance and frustum culling
-        float[] viewMatrix = new float[16];
-        glGetFloatv(GL_MODELVIEW_MATRIX, viewMatrix);
-        regionRenderer.renderRegion(region, player, viewMatrix);
+        // Render all loaded chunks in the infinite world
+        worldRenderer.render(world, player.getX(), player.getEyeY(), player.getZ());
         
         glDisable(GL_CULL_FACE);
         glDisable(GL_DEPTH_TEST);
