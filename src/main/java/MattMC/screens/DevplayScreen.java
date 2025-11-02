@@ -151,6 +151,9 @@ public final class DevplayScreen implements Screen {
         glDisable(GL_CULL_FACE);
         glDisable(GL_DEPTH_TEST);
         
+        // Draw debug information in top-left corner
+        uiRenderer.drawDebugInfo(w, h, player.getX(), player.getY(), player.getZ());
+        
         // Draw crosshair on top of everything
         uiRenderer.drawCrosshair(w, h);
     }
