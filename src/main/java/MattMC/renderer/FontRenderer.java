@@ -23,6 +23,7 @@ public class FontRenderer {
     private static final int BITMAP_W = 512;
     private static final int BITMAP_H = 512;
     private static final float FONT_HEIGHT = 24f;
+    private static final float BASELINE_OFFSET = 18f; // Offset to align text baseline properly
     
     private final STBTTBakedChar.Buffer cdata;
     private final int fontTexture;
@@ -102,7 +103,7 @@ public class FontRenderer {
         glColor4f(r, g, b, 1f);
         
         glPushMatrix();
-        glTranslatef(x, y, 0f);
+        glTranslatef(x, y + BASELINE_OFFSET * scale, 0f); // Add baseline offset to move text down
         glScalef(scale, scale, 1f);
         
         xBuffer.clear();
