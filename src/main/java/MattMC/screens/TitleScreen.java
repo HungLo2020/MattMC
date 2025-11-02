@@ -255,8 +255,15 @@ public final class TitleScreen implements Screen {
     private void drawLogo() {
         if (logoTexture == null) return;
         
-        // Calculate logo dimensions - scale to be larger and more prominent
-        float logoScale = 1.5f; // Increased from 0.5f to make it bigger
+        // Calculate logo dimensions - adaptive scaling based on window size
+        // Target width is roughly 40% of screen width for good visibility
+        int w = window.width();
+        float targetWidth = w * 0.4f;
+        float logoScale = targetWidth / logoTexture.width;
+        
+        // Clamp scale to reasonable bounds
+        logoScale = Math.max(0.3f, Math.min(logoScale, 2.0f));
+        
         float logoWidth = logoTexture.width * logoScale;
         float logoHeight = logoTexture.height * logoScale;
         float logoX = titleCX - logoWidth / 2f;
