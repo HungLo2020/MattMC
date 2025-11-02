@@ -33,6 +33,9 @@ public final class DevplayScreen implements Screen {
     private final UIRenderer uiRenderer;
     
     private double lastFrameTimeSec = now();
+    
+    // Debug menu toggle state
+    private boolean debugMenuVisible = false;
 
     public DevplayScreen(Game game) {
         this.game = game;
@@ -67,7 +70,7 @@ public final class DevplayScreen implements Screen {
             glViewport(0, 0, Math.max(w, 1), Math.max(h, 1));
         });
 
-        // ESC to release mouse and go back; Space for jumping/flying
+        // ESC to release mouse and go back; Space for jumping/flying; F3 to toggle debug menu
         glfwSetKeyCallback(window.handle(), (win, key, scancode, action, mods) -> {
             if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS) {
                 glfwSetInputMode(window.handle(), GLFW_CURSOR, GLFW_CURSOR_NORMAL);
@@ -75,6 +78,9 @@ public final class DevplayScreen implements Screen {
             }
             if (key == GLFW_KEY_SPACE && action == GLFW_PRESS) {
                 playerController.handleSpacePress();
+            }
+            if (key == GLFW_KEY_F3 && action == GLFW_PRESS) {
+                debugMenuVisible = !debugMenuVisible;
             }
         });
         
@@ -151,8 +157,10 @@ public final class DevplayScreen implements Screen {
         glDisable(GL_CULL_FACE);
         glDisable(GL_DEPTH_TEST);
         
-        // Draw debug information in top-left corner
-        uiRenderer.drawDebugInfo(w, h, player.getX(), player.getY(), player.getZ());
+        // Draw debug information in top-left corner (only if F3 is pressed)
+        if (debugMenuVisible) {
+            uiRenderer.drawDebugInfo(w, h, player.getX(), player.getY(), player.getZ());
+        }
         
         // Draw crosshair on top of everything
         uiRenderer.drawCrosshair(w, h);

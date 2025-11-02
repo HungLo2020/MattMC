@@ -83,8 +83,8 @@ public class UIRenderer {
         // Draw debug text in top-left corner
         float x = 10f;
         float y = 10f;
-        float lineHeight = 15f;
-        float scale = 1.0f;
+        float lineHeight = 20f;
+        float scale = 1.5f;
         
         // Format position values to 2 decimal places for readability
         String posText = String.format("Position: %.2f, %.2f, %.2f", playerX, playerY, playerZ);
