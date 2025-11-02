@@ -132,9 +132,8 @@ public class UIRenderer {
         glVertex2f(padding, boxY + boxHeight);
         glEnd();
         
-        // Draw command text
-        String displayText = "/" + commandText;
-        fontRenderer.drawText(displayText, padding * 2, boxY + padding, scale, 0xFFFFFF);
+        // Draw command text (without adding extra "/" prefix)
+        fontRenderer.drawText(commandText, padding * 2, boxY + padding, scale, 0xFFFFFF);
         
         // Draw result message above if present
         if (resultMessage != null && !resultMessage.isEmpty()) {

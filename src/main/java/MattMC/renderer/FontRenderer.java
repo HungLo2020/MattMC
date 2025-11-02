@@ -22,8 +22,8 @@ import static org.lwjgl.system.MemoryStack.stackPush;
 public class FontRenderer {
     private static final int BITMAP_W = 512;
     private static final int BITMAP_H = 512;
-    private static final float FONT_HEIGHT = 24f;
-    private static final float BASELINE_OFFSET = 18f; // Offset to align text baseline properly
+    private static final float FONT_HEIGHT = 18f; // Reduced from 24f for smaller, sharper text
+    private static final float BASELINE_OFFSET = 14f; // Adjusted offset for new font height
     
     private final STBTTBakedChar.Buffer cdata;
     private final int fontTexture;
