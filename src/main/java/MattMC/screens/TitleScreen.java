@@ -42,7 +42,7 @@ public final class TitleScreen implements Screen {
     // Layout
     private float titleScale = 3.0f;
     private float subtitleScale = 1.1f;
-    private float titleYFrac = 1f / 3f;
+    private float titleYFrac = 0.25f; // Raised from 1/3 to 1/4 of screen height
     private int buttonWidth = 280, buttonHeight = 42, buttonGap = 12;
     private float titleCX, titleCY, subtitleCX, subtitleCY;
     private int buttonsStartY;
