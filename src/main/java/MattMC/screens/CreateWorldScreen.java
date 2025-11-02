@@ -108,8 +108,9 @@ public final class CreateWorldScreen implements Screen {
 
     @Override
     public void render(double alpha) {
-        // Render panorama background with blur
-        game.panorama().render(window.width(), window.height(), true);
+        // Render panorama background with blur based on settings
+        boolean blurred = MattMC.util.OptionsManager.isMenuScreenBlurEnabled();
+        game.panorama().render(window.width(), window.height(), blurred);
 
         setupOrtho();
         for (var b : buttons) drawButton(b);

@@ -5,6 +5,7 @@ import MattMC.core.Window;
 import MattMC.screens.TitleScreen;
 import MattMC.util.AppPaths;
 import MattMC.util.KeybindManager;
+import MattMC.util.OptionsManager;
 
 import java.nio.file.Path;
 
@@ -27,6 +28,9 @@ public final class Main {
 
         // Load keybinds from Options.txt
         KeybindManager.loadKeybinds();
+        
+        // Load options (blur settings, etc.)
+        OptionsManager.loadOptions();
 
         // Boot the game
         try (var window = new Window(1280, 720, "MattMC")) {

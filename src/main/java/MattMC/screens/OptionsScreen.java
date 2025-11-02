@@ -41,7 +41,7 @@ public final class OptionsScreen implements Screen {
         titleCX = w / 2f;
         titleCY = h * 0.18f;
 
-        int totalButtonsH = 2 * buttonHeight + 1 * buttonGap;
+        int totalButtonsH = 4 * buttonHeight + 3 * buttonGap;
         buttonsStartY = (int)(h / 2f - totalButtonsH / 2f);
 
         int x = (w - buttonWidth) / 2;
@@ -49,7 +49,17 @@ public final class OptionsScreen implements Screen {
 
         // Centered buttons
         buttons.add(new UIButton("Keybinds", x, buttonsStartY + 0 * (buttonHeight + buttonGap), buttonWidth, buttonHeight));
-        buttons.add(new UIButton("Back",     x, buttonsStartY + 1 * (buttonHeight + buttonGap), buttonWidth, buttonHeight));
+        buttons.add(new UIButton(getMenuBlurButtonLabel(), x, buttonsStartY + 1 * (buttonHeight + buttonGap), buttonWidth, buttonHeight));
+        buttons.add(new UIButton(getTitleBlurButtonLabel(), x, buttonsStartY + 2 * (buttonHeight + buttonGap), buttonWidth, buttonHeight));
+        buttons.add(new UIButton("Back",     x, buttonsStartY + 3 * (buttonHeight + buttonGap), buttonWidth, buttonHeight));
+    }
+    
+    private String getMenuBlurButtonLabel() {
+        return "Menu Blur: " + (MattMC.util.OptionsManager.isMenuScreenBlurEnabled() ? "ON" : "OFF");
+    }
+    
+    private String getTitleBlurButtonLabel() {
+        return "Title Blur: " + (MattMC.util.OptionsManager.isTitleScreenBlurEnabled() ? "ON" : "OFF");
     }
 
     @Override
@@ -92,12 +102,23 @@ public final class OptionsScreen implements Screen {
             game.setScreen(new KeybindsScreen(game));
             return;
         }
+        if (label.startsWith("Menu Blur:")) {
+            MattMC.util.OptionsManager.toggleMenuScreenBlur();
+            recomputeLayout();
+            return;
+        }
+        if (label.startsWith("Title Blur:")) {
+            MattMC.util.OptionsManager.toggleTitleScreenBlur();
+            recomputeLayout();
+            return;
+        }
     }
 
     @Override
     public void render(double alpha) {
-        // Render panorama background with blur
-        game.panorama().render(window.width(), window.height(), true);
+        // Render panorama background with blur based on settings
+        boolean blurred = MattMC.util.OptionsManager.isMenuScreenBlurEnabled();
+        game.panorama().render(window.width(), window.height(), blurred);
 
         setupOrtho();
         for (var b : buttons) drawButton(b);

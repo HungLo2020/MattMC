@@ -1,6 +1,10 @@
 # MattMC Default Options File
 # This file contains default settings for the game
 
+# Blur settings
+blur_title_screen=false
+blur_menu_screens=true
+
 # Keybinds (format: action=key_name)
 # Keyboard keys: a-z, 0-9, space, left_shift, left_ctrl, left_alt, etc.
 # Mouse buttons: left_mouse, right_mouse, middle_mouse

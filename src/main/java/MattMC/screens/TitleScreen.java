@@ -42,7 +42,7 @@ public final class TitleScreen implements Screen {
     // Layout
     private float titleScale = 3.0f;
     private float subtitleScale = 1.1f;
-    private float titleYFrac = 0.25f; // Raised from 1/3 to 1/4 of screen height
+    private float titleYFrac = 0.18f; // Raised to 18% of screen height (closer to top)
     private int buttonWidth = 280, buttonHeight = 42, buttonGap = 12;
     private float titleCX, titleCY, subtitleCX, subtitleCY;
     private int buttonsStartY;
@@ -151,8 +151,9 @@ public final class TitleScreen implements Screen {
 
     @Override
     public void render(double alpha) {
-        // 1) draw rotating cubemap panorama (perspective) - no blur for title screen
-        game.panorama().render(window.width(), window.height(), false);
+        // 1) draw rotating cubemap panorama (perspective) - blur based on settings
+        boolean blurred = MattMC.util.OptionsManager.isTitleScreenBlurEnabled();
+        game.panorama().render(window.width(), window.height(), blurred);
 
         // 2) switch to orthographic for UI and draw
         setupOrtho();
