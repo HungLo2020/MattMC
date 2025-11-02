@@ -1,10 +1,5 @@
 package MattMC.renderer;
 
-import org.lwjgl.BufferUtils;
-import org.lwjgl.stb.STBEasyFont;
-
-import java.nio.ByteBuffer;
-
 import static org.lwjgl.opengl.GL11.*;
 
 /**
@@ -12,7 +7,11 @@ import static org.lwjgl.opengl.GL11.*;
  * Similar to Minecraft's GuiIngame class.
  */
 public class UIRenderer {
-    private final ByteBuffer fontBuffer = BufferUtils.createByteBuffer(16 * 4096);
+    private final FontRenderer fontRenderer;
+    
+    public UIRenderer() {
+        this.fontRenderer = new FontRenderer();
+    }
     
     /**
      * Draw crosshair in the center of the screen.
@@ -76,20 +75,20 @@ public class UIRenderer {
         
         float x = 5f;
         float y = 5f;
-        float scale = 1.5f;
-        float lineHeight = STBEasyFont.stb_easy_font_height("A") * scale + 2f;
+        float scale = 1.0f;
+        float lineHeight = fontRenderer.getTextHeight(scale) + 2f;
         
         // Draw game name
-        drawText("MattMC", x, y, scale, 0xFFFFFF);
+        fontRenderer.drawText("MattMC", x, y, scale, 0xFFFFFF);
         y += lineHeight;
         
         // Draw FPS
-        drawText("FPS: " + fps, x, y, scale, 0xFFFFFF);
+        fontRenderer.drawText("FPS: " + fps, x, y, scale, 0xFFFFFF);
         y += lineHeight;
         
         // Draw player coordinates
         String coords = String.format("X: %.2f Y: %.2f Z: %.2f", playerX, playerY, playerZ);
-        drawText(coords, x, y, scale, 0xFFFFFF);
+        fontRenderer.drawText(coords, x, y, scale, 0xFFFFFF);
         
         glDisable(GL_BLEND);
         
@@ -119,9 +118,9 @@ public class UIRenderer {
         glEnable(GL_BLEND);
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
         
-        float scale = 1.5f;
+        float scale = 1.0f;
         float padding = 10f;
-        float boxHeight = STBEasyFont.stb_easy_font_height("A") * scale + padding * 2;
+        float boxHeight = fontRenderer.getTextHeight(scale) + padding * 2;
         float boxY = screenHeight - boxHeight - padding;
         
         // Draw semi-transparent background box
@@ -135,12 +134,12 @@ public class UIRenderer {
         
         // Draw command text
         String displayText = "/" + commandText;
-        drawText(displayText, padding * 2, boxY + padding, scale, 0xFFFFFF);
+        fontRenderer.drawText(displayText, padding * 2, boxY + padding, scale, 0xFFFFFF);
         
         // Draw result message above if present
         if (resultMessage != null && !resultMessage.isEmpty()) {
-            float msgY = boxY - padding - STBEasyFont.stb_easy_font_height("A") * scale;
-            drawText(resultMessage, padding * 2, msgY, scale, 0xFFFF00);
+            float msgY = boxY - padding - fontRenderer.getTextHeight(scale);
+            fontRenderer.drawText(resultMessage, padding * 2, msgY, scale, 0xFFFF00);
         }
         
         glDisable(GL_BLEND);
@@ -153,26 +152,9 @@ public class UIRenderer {
     }
     
     /**
-     * Draw text at specified position with scale and color.
+     * Clean up resources.
      */
-    private void drawText(String text, float x, float y, float scale, int rgb) {
-        float r = ((rgb >> 16) & 0xFF) / 255f;
-        float g = ((rgb >> 8) & 0xFF) / 255f;
-        float b = (rgb & 0xFF) / 255f;
-        
-        glColor4f(r, g, b, 1f);
-        fontBuffer.clear();
-        int quads = STBEasyFont.stb_easy_font_print(0, 0, text, null, fontBuffer);
-
-        glPushMatrix();
-        glTranslatef(x, y, 0f);
-        glScalef(scale, scale, 1f);
-
-        glEnableClientState(GL_VERTEX_ARRAY);
-        glVertexPointer(2, GL_FLOAT, 16, fontBuffer);
-        glDrawArrays(GL_QUADS, 0, quads * 4);
-        glDisableClientState(GL_VERTEX_ARRAY);
-
-        glPopMatrix();
+    public void cleanup() {
+        fontRenderer.cleanup();
     }
 }

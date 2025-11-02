@@ -2,6 +2,7 @@ package MattMC.core;
 
 import MattMC.gfx.CubeMap;
 import MattMC.gfx.PanoramaRenderer;
+import MattMC.renderer.FontRenderer;
 import MattMC.screens.Screen;
 
 public final class Game {
@@ -9,15 +10,19 @@ public final class Game {
     private Screen current;
     private boolean running = true;
     private PanoramaRenderer sharedPanorama;
+    private FontRenderer sharedFontRenderer;
 
     public Game(Window window) { 
         this.window = window;
         // Load shared panorama once
         CubeMap sky = CubeMap.load("/assets/textures/gui/panorama1_", ".png");
         this.sharedPanorama = new PanoramaRenderer(sky);
+        // Load shared font renderer with Minecraft.ttf
+        this.sharedFontRenderer = new FontRenderer();
     }
     public Window window() { return window; }
     public PanoramaRenderer panorama() { return sharedPanorama; }
+    public FontRenderer fontRenderer() { return sharedFontRenderer; }
 
     public void setScreen(Screen next) {
         if (current != null) current.onClose();
