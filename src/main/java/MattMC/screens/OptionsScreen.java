@@ -176,12 +176,9 @@ public final class OptionsScreen implements Screen {
         fontBuffer.clear();
         int quads = STBEasyFont.stb_easy_font_print(0, 0, text, null, fontBuffer);
 
-        // Round coordinates to nearest pixel to avoid sub-pixel rendering
+        // Round coordinates to nearest pixel to avoid sub-pixel rendering blurriness
         float roundedX = Math.round(x);
         float roundedY = Math.round(y);
-
-        // Disable line smoothing to prevent blurry text
-        glDisable(GL_LINE_SMOOTH);
 
         glPushMatrix();
         glTranslatef(roundedX, roundedY, 0f);
