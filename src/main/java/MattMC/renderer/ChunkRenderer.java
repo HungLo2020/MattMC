@@ -1,6 +1,7 @@
 package MattMC.renderer;
 
 import MattMC.world.Block;
+import MattMC.world.Blocks;
 import MattMC.world.Chunk;
 
 import java.util.HashMap;
@@ -140,15 +141,21 @@ public class ChunkRenderer {
         float x, y, z;
         int color;
         float brightness;
+        float colorBrightness; // Brightness adjustment for the base color (for fallback)
         Block block;
+        String faceType; // "top", "bottom", "side", etc.
+        FaceRenderer renderer; // The renderer method to use for drawing this face
         
-        FaceData(float x, float y, float z, int color, float brightness, Block block) {
+        FaceData(float x, float y, float z, int color, float brightness, float colorBrightness, Block block, String faceType, FaceRenderer renderer) {
             this.x = x;
             this.y = y;
             this.z = z;
             this.color = color;
             this.brightness = brightness;
+            this.colorBrightness = colorBrightness;
             this.block = block;
+            this.faceType = faceType;
+            this.renderer = renderer;
         }
     }
     
@@ -203,7 +210,9 @@ public class ChunkRenderer {
                                    java.util.List<FaceData> northFaces, java.util.List<FaceData> southFaces,
                                    java.util.List<FaceData> westFaces, java.util.List<FaceData> eastFaces,
                                    java.util.List<OutlineData> outlines) {
-        int color = block.color();
+        // Use white color (0xFFFFFF) by default - textures will show their natural colors
+        // Fallback magenta color will only be applied if texture is missing (handled in bindTextureForBlock)
+        int color = 0xFFFFFF;
         
         // Track which faces are visible for outline rendering
         boolean topVisible = shouldRenderFace(chunk, cx, cy + 1, cz);
@@ -214,23 +223,24 @@ public class ChunkRenderer {
         boolean eastVisible = shouldRenderFace(chunk, cx + 1, cy, cz);
         
         // Collect visible faces for batched rendering
+        // Store both the adjusted color and the brightness factor for fallback color
         if (topVisible) {
-            topFaces.add(new FaceData(x, y, z, color, 1f, block));
+            topFaces.add(new FaceData(x, y, z, color, 1f, 1f, block, "top", this::drawTopFaceVertices));
         }
         if (bottomVisible) {
-            bottomFaces.add(new FaceData(x, y, z, darkenColor(color), 1f, block));
+            bottomFaces.add(new FaceData(x, y, z, darkenColor(color), 1f, 0.5f, block, "bottom", this::drawBottomFaceVertices));
         }
         if (northVisible) {
-            northFaces.add(new FaceData(x, y, z, adjustColorBrightness(color, 0.8f), 1f, block));
+            northFaces.add(new FaceData(x, y, z, adjustColorBrightness(color, 0.8f), 1f, 0.8f, block, "side", this::drawNorthFaceVertices));
         }
         if (southVisible) {
-            southFaces.add(new FaceData(x, y, z, adjustColorBrightness(color, 0.8f), 1f, block));
+            southFaces.add(new FaceData(x, y, z, adjustColorBrightness(color, 0.8f), 1f, 0.8f, block, "side", this::drawSouthFaceVertices));
         }
         if (westVisible) {
-            westFaces.add(new FaceData(x, y, z, adjustColorBrightness(color, 0.6f), 1f, block));
+            westFaces.add(new FaceData(x, y, z, adjustColorBrightness(color, 0.6f), 1f, 0.6f, block, "side", this::drawWestFaceVertices));
         }
         if (eastVisible) {
-            eastFaces.add(new FaceData(x, y, z, adjustColorBrightness(color, 0.6f), 1f, block));
+            eastFaces.add(new FaceData(x, y, z, adjustColorBrightness(color, 0.6f), 1f, 0.6f, block, "side", this::drawEastFaceVertices));
         }
         
         // Collect outline data
@@ -258,6 +268,15 @@ public class ChunkRenderer {
         renderFacesByType(westFaces, this::drawWestFaceVertices);
         renderFacesByType(eastFaces, this::drawEastFaceVertices);
         
+        // Render overlays AFTER all base textures (for grass_block sides)
+        // Collect all side faces for overlay rendering
+        java.util.List<FaceData> allSideFaces = new java.util.ArrayList<>();
+        allSideFaces.addAll(northFaces);
+        allSideFaces.addAll(southFaces);
+        allSideFaces.addAll(westFaces);
+        allSideFaces.addAll(eastFaces);
+        renderOverlaysForSideFaces(allSideFaces);
+        
         // Disable texturing for outlines
         glDisable(GL_TEXTURE_2D);
         
@@ -274,57 +293,145 @@ public class ChunkRenderer {
     }
     
     /**
-     * Render faces grouped by block to minimize texture binding
+     * Render faces grouped by block and texture to minimize texture binding
      */
     private void renderFacesByType(java.util.List<FaceData> faces, FaceRenderer renderer) {
         if (faces.isEmpty()) return;
         
-        // Group faces by block
-        java.util.Map<Block, java.util.List<FaceData>> facesByBlock = new java.util.HashMap<>();
+        // Group faces by block and texture
+        java.util.Map<String, java.util.List<FaceData>> facesByTexture = new java.util.HashMap<>();
         for (FaceData face : faces) {
-            facesByBlock.computeIfAbsent(face.block, k -> new java.util.ArrayList<>()).add(face);
+            // Get texture path for this face
+            String texturePath = face.block.getTexturePath(face.faceType);
+            if (texturePath == null) {
+                texturePath = "fallback"; // Use special key for fallback
+            }
+            facesByTexture.computeIfAbsent(texturePath, k -> new java.util.ArrayList<>()).add(face);
         }
         
-        // Render each block group
-        for (java.util.Map.Entry<Block, java.util.List<FaceData>> entry : facesByBlock.entrySet()) {
-            Block block = entry.getKey();
-            java.util.List<FaceData> blockFaces = entry.getValue();
+        // Render each texture group
+        for (java.util.Map.Entry<String, java.util.List<FaceData>> entry : facesByTexture.entrySet()) {
+            String texturePath = entry.getKey();
+            java.util.List<FaceData> textureFaces = entry.getValue();
             
-            // Bind texture for this block BEFORE glBegin
-            bindTextureForBlock(block);
+            // Check if this is a fallback render
+            boolean hasFallback = texturePath.equals("fallback");
+            boolean hasTexture = false;
             
-            // Render all faces of this type in one glBegin/glEnd block
+            if (!hasFallback) {
+                int textureId = textureManager.loadTexture(texturePath);
+                hasTexture = (textureId != 0);
+                
+                if (hasTexture) {
+                    textureManager.bindTexture(textureId);
+                } else {
+                    textureManager.unbindTexture();
+                }
+            } else {
+                textureManager.unbindTexture();
+            }
+            
+            // Render all faces with this texture
             glBegin(GL_TRIANGLES);
-            for (FaceData face : blockFaces) {
-                setColor(face.color, face.brightness);
+            for (FaceData face : textureFaces) {
+                // Use fallback magenta color if no texture, otherwise use the face color (white)
+                int renderColor = (hasTexture && !hasFallback) ? face.color : adjustColorBrightness(face.block.getFallbackColor(), face.colorBrightness);
+                
+                // Apply grass green tint for grass_block top face (vanilla Minecraft-like)
+                if (face.block == Blocks.GRASS_BLOCK && "top".equals(face.faceType)) {
+                    renderColor = applyTint(renderColor, 0x5BB53B, face.colorBrightness);
+                }
+                
+                setColor(renderColor, face.brightness);
                 renderer.render(face.x, face.y, face.z);
             }
             glEnd();
         }
     }
     
+    /**
+     * Render overlay textures for side faces that have them (e.g., grass_block sides).
+     * This is called AFTER all base textures are rendered to ensure overlays appear on top.
+     */
+    private void renderOverlaysForSideFaces(java.util.List<FaceData> sideFaces) {
+        if (sideFaces.isEmpty()) return;
+        
+        // Group side faces by block to check for overlay texture
+        java.util.Map<Block, java.util.List<FaceData>> facesByBlock = new java.util.HashMap<>();
+        
+        for (FaceData face : sideFaces) {
+            // Only process side faces
+            if ("side".equals(face.faceType)) {
+                Block block = face.block;
+                
+                // Check if block has overlay texture
+                String overlayPath = block.getTexturePath("overlay");
+                if (overlayPath != null) {
+                    facesByBlock.computeIfAbsent(block, k -> new java.util.ArrayList<>()).add(face);
+                }
+            }
+        }
+        
+        if (facesByBlock.isEmpty()) {
+            return; // No overlays to render
+        }
+        
+        // Enable alpha blending for overlay transparency
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        
+        // Disable depth writing so overlays don't block other geometry
+        // But keep depth testing enabled so they respect existing depth
+        glDepthMask(false);
+        
+        // Use polygon offset to prevent z-fighting with base texture
+        glEnable(GL_POLYGON_OFFSET_FILL);
+        glPolygonOffset(-1.0f, -1.0f);
+        
+        // Render overlays for each block type
+        for (java.util.Map.Entry<Block, java.util.List<FaceData>> blockEntry : facesByBlock.entrySet()) {
+            Block block = blockEntry.getKey();
+            java.util.List<FaceData> blockFaces = blockEntry.getValue();
+            
+            // Get overlay texture
+            String overlayPath = block.getTexturePath("overlay");
+            if (overlayPath == null) {
+                continue;
+            }
+            
+            int overlayTextureId = textureManager.loadTexture(overlayPath);
+            if (overlayTextureId == 0) {
+                continue; // Overlay texture not found
+            }
+            
+            // Bind overlay texture
+            textureManager.bindTexture(overlayTextureId);
+            
+            // Render all side faces with the overlay texture
+            glBegin(GL_TRIANGLES);
+            for (FaceData face : blockFaces) {
+                // Apply grass green tint for grass_block overlay (vanilla Minecraft-like)
+                int tintedColor = face.color;
+                if (block == Blocks.GRASS_BLOCK) {
+                    // Grass green tint: 0x5BB53B (RGB 91, 181, 59)
+                    tintedColor = applyTint(face.color, 0x5BB53B, face.colorBrightness);
+                }
+                setColor(tintedColor, face.brightness);
+                // Use the renderer that was stored in the FaceData
+                face.renderer.render(face.x, face.y, face.z);
+            }
+            glEnd();
+        }
+        
+        // Restore OpenGL state
+        glDisable(GL_POLYGON_OFFSET_FILL);
+        glDepthMask(true);
+        glDisable(GL_BLEND);
+    }
+    
     @FunctionalInterface
     private interface FaceRenderer {
         void render(float x, float y, float z);
-    }
-    
-    /**
-     * Bind texture for the given block.
-     * If block has no texture, unbind texture.
-     * 
-     * Note: This is called during display list compilation, not every frame.
-     * TextureManager caches loaded textures, so repeated calls are cheap.
-     */
-    private void bindTextureForBlock(Block block) {
-        if (block.hasTexture()) {
-            int textureId = textureManager.loadTexture(block.getTexturePath());
-            if (textureId != 0) {
-                textureManager.bindTexture(textureId);
-                return;
-            }
-        }
-        // No texture available, unbind
-        textureManager.unbindTexture();
     }
     
     /**
@@ -371,56 +478,56 @@ public class ChunkRenderer {
         float x0 = x, x1 = x + 1;
         float y0 = y, y1 = y + 1;
         float z0 = z;
-        // With texture coordinates
-        glTexCoord2f(1, 0); glVertex3f(x1, y0, z0);
-        glTexCoord2f(0, 0); glVertex3f(x0, y0, z0);
-        glTexCoord2f(0, 1); glVertex3f(x0, y1, z0);
+        // With texture coordinates (V flipped to correct upside-down textures)
+        glTexCoord2f(1, 1); glVertex3f(x1, y0, z0);
+        glTexCoord2f(0, 1); glVertex3f(x0, y0, z0);
+        glTexCoord2f(0, 0); glVertex3f(x0, y1, z0);
         
-        glTexCoord2f(1, 0); glVertex3f(x1, y0, z0);
-        glTexCoord2f(0, 1); glVertex3f(x0, y1, z0);
-        glTexCoord2f(1, 1); glVertex3f(x1, y1, z0);
+        glTexCoord2f(1, 1); glVertex3f(x1, y0, z0);
+        glTexCoord2f(0, 0); glVertex3f(x0, y1, z0);
+        glTexCoord2f(1, 0); glVertex3f(x1, y1, z0);
     }
     
     private void drawSouthFaceVertices(float x, float y, float z) {
         float x0 = x, x1 = x + 1;
         float y0 = y, y1 = y + 1;
         float z1 = z + 1;
-        // With texture coordinates
-        glTexCoord2f(0, 0); glVertex3f(x0, y0, z1);
-        glTexCoord2f(1, 0); glVertex3f(x1, y0, z1);
-        glTexCoord2f(1, 1); glVertex3f(x1, y1, z1);
+        // With texture coordinates (V flipped to correct upside-down textures)
+        glTexCoord2f(0, 1); glVertex3f(x0, y0, z1);
+        glTexCoord2f(1, 1); glVertex3f(x1, y0, z1);
+        glTexCoord2f(1, 0); glVertex3f(x1, y1, z1);
         
-        glTexCoord2f(0, 0); glVertex3f(x0, y0, z1);
-        glTexCoord2f(1, 1); glVertex3f(x1, y1, z1);
-        glTexCoord2f(0, 1); glVertex3f(x0, y1, z1);
+        glTexCoord2f(0, 1); glVertex3f(x0, y0, z1);
+        glTexCoord2f(1, 0); glVertex3f(x1, y1, z1);
+        glTexCoord2f(0, 0); glVertex3f(x0, y1, z1);
     }
     
     private void drawWestFaceVertices(float x, float y, float z) {
         float x0 = x;
         float y0 = y, y1 = y + 1;
         float z0 = z, z1 = z + 1;
-        // With texture coordinates
-        glTexCoord2f(0, 0); glVertex3f(x0, y0, z0);
-        glTexCoord2f(1, 0); glVertex3f(x0, y0, z1);
-        glTexCoord2f(1, 1); glVertex3f(x0, y1, z1);
+        // With texture coordinates (V flipped to correct upside-down textures)
+        glTexCoord2f(0, 1); glVertex3f(x0, y0, z0);
+        glTexCoord2f(1, 1); glVertex3f(x0, y0, z1);
+        glTexCoord2f(1, 0); glVertex3f(x0, y1, z1);
         
-        glTexCoord2f(0, 0); glVertex3f(x0, y0, z0);
-        glTexCoord2f(1, 1); glVertex3f(x0, y1, z1);
-        glTexCoord2f(0, 1); glVertex3f(x0, y1, z0);
+        glTexCoord2f(0, 1); glVertex3f(x0, y0, z0);
+        glTexCoord2f(1, 0); glVertex3f(x0, y1, z1);
+        glTexCoord2f(0, 0); glVertex3f(x0, y1, z0);
     }
     
     private void drawEastFaceVertices(float x, float y, float z) {
         float x1 = x + 1;
         float y0 = y, y1 = y + 1;
         float z0 = z, z1 = z + 1;
-        // With texture coordinates
-        glTexCoord2f(1, 0); glVertex3f(x1, y0, z1);
-        glTexCoord2f(0, 0); glVertex3f(x1, y0, z0);
-        glTexCoord2f(0, 1); glVertex3f(x1, y1, z0);
+        // With texture coordinates (V flipped to correct upside-down textures)
+        glTexCoord2f(1, 1); glVertex3f(x1, y0, z1);
+        glTexCoord2f(0, 1); glVertex3f(x1, y0, z0);
+        glTexCoord2f(0, 0); glVertex3f(x1, y1, z0);
         
-        glTexCoord2f(1, 0); glVertex3f(x1, y0, z1);
-        glTexCoord2f(0, 1); glVertex3f(x1, y1, z0);
-        glTexCoord2f(1, 1); glVertex3f(x1, y1, z1);
+        glTexCoord2f(1, 1); glVertex3f(x1, y0, z1);
+        glTexCoord2f(0, 0); glVertex3f(x1, y1, z0);
+        glTexCoord2f(1, 0); glVertex3f(x1, y1, z1);
     }
     
     /**
@@ -487,6 +594,33 @@ public class ChunkRenderer {
         int r = Math.min(255, (int)(((rgb >> 16) & 0xFF) * factor));
         int g = Math.min(255, (int)(((rgb >> 8) & 0xFF) * factor));
         int b = Math.min(255, (int)((rgb & 0xFF) * factor));
+        return (r << 16) | (g << 8) | b;
+    }
+    
+    /**
+     * Apply a color tint to a base color.
+     * Multiplies the base color by the tint color component-wise.
+     * 
+     * @param baseColor The base color (typically white 0xFFFFFF for textures)
+     * @param tintColor The tint color to apply (e.g., 0x5BB53B for grass green)
+     * @param brightnessFactor Additional brightness adjustment
+     * @return The tinted color
+     */
+    private int applyTint(int baseColor, int tintColor, float brightnessFactor) {
+        // Extract RGB components from base and tint
+        int baseR = (baseColor >> 16) & 0xFF;
+        int baseG = (baseColor >> 8) & 0xFF;
+        int baseB = baseColor & 0xFF;
+        
+        int tintR = (tintColor >> 16) & 0xFF;
+        int tintG = (tintColor >> 8) & 0xFF;
+        int tintB = tintColor & 0xFF;
+        
+        // Multiply components (treating them as 0-1 range)
+        int r = Math.min(255, (int)((baseR * tintR / 255.0f) * brightnessFactor));
+        int g = Math.min(255, (int)((baseG * tintG / 255.0f) * brightnessFactor));
+        int b = Math.min(255, (int)((baseB * tintB / 255.0f) * brightnessFactor));
+        
         return (r << 16) | (g << 8) | b;
     }
 

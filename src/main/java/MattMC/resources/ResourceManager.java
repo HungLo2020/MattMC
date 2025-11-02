@@ -67,12 +67,12 @@ public class ResourceManager {
     }
     
     /**
-     * Get the texture path for a block by loading its blockstate and model.
+     * Get all texture paths for a block by loading its blockstate and model.
      * 
      * @param blockName The block name (e.g., "dirt")
-     * @return The texture path (e.g., "assets/textures/block/dirt.png"), or null if not found
+     * @return A map of texture keys to paths (e.g., "top" -> "assets/textures/block/grass_block_top.png"), or null if not found
      */
-    public static String getBlockTexturePath(String blockName) {
+    public static Map<String, String> getBlockTexturePaths(String blockName) {
         // Load blockstate
         BlockState blockState = loadBlockState(blockName);
         if (blockState == null || blockState.getDefaultVariants() == null || blockState.getDefaultVariants().isEmpty()) {
@@ -95,19 +95,43 @@ public class ResourceManager {
             return null;
         }
         
+        // Convert all texture paths to file paths
+        Map<String, String> texturePaths = new HashMap<>();
+        for (Map.Entry<String, String> entry : model.getTextures().entrySet()) {
+            String key = entry.getKey();
+            String texturePath = entry.getValue();
+            // Convert resource path to file path (e.g., "block/dirt" -> "assets/textures/block/dirt.png")
+            texturePaths.put(key, "assets/textures/" + texturePath + ".png");
+        }
+        
+        return texturePaths;
+    }
+    
+    /**
+     * Get the texture path for a block by loading its blockstate and model.
+     * 
+     * @param blockName The block name (e.g., "dirt")
+     * @return The texture path (e.g., "assets/textures/block/dirt.png"), or null if not found
+     */
+    public static String getBlockTexturePath(String blockName) {
+        Map<String, String> paths = getBlockTexturePaths(blockName);
+        if (paths == null || paths.isEmpty()) {
+            return null;
+        }
+        
         // Get texture path (try "all" first, common for cube_all models)
-        String texturePath = model.getTexture("all");
+        String texturePath = paths.get("all");
         if (texturePath == null) {
             // Try other common keys
-            texturePath = model.getTexture("texture");
+            texturePath = paths.get("texture");
         }
         
-        if (texturePath != null) {
-            // Convert resource path to file path (e.g., "block/dirt" -> "assets/textures/block/dirt.png")
-            return "assets/textures/" + texturePath + ".png";
+        if (texturePath == null) {
+            // Return first available texture
+            texturePath = paths.values().iterator().next();
         }
         
-        return null;
+        return texturePath;
     }
     
     /**
