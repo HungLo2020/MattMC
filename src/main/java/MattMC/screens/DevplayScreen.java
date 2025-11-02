@@ -33,6 +33,12 @@ public final class DevplayScreen implements Screen {
     private final UIRenderer uiRenderer;
     
     private double lastFrameTimeSec = now();
+    private boolean showDebugInfo = false; // F3 debug menu toggle
+    
+    // FPS tracking
+    private int fps = 0;
+    private int frameCount = 0;
+    private double lastFpsUpdateTime = now();
 
     public DevplayScreen(Game game) {
         this.game = game;
@@ -67,7 +73,7 @@ public final class DevplayScreen implements Screen {
             glViewport(0, 0, Math.max(w, 1), Math.max(h, 1));
         });
 
-        // ESC to release mouse and go back; Space for jumping/flying
+        // ESC to release mouse and go back; Space for jumping/flying; F3 for debug menu
         glfwSetKeyCallback(window.handle(), (win, key, scancode, action, mods) -> {
             if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS) {
                 glfwSetInputMode(window.handle(), GLFW_CURSOR, GLFW_CURSOR_NORMAL);
@@ -75,6 +81,9 @@ public final class DevplayScreen implements Screen {
             }
             if (key == GLFW_KEY_SPACE && action == GLFW_PRESS) {
                 playerController.handleSpacePress();
+            }
+            if (key == GLFW_KEY_F3 && action == GLFW_PRESS) {
+                showDebugInfo = !showDebugInfo;
             }
         });
         
@@ -102,6 +111,14 @@ public final class DevplayScreen implements Screen {
         lastFrameTimeSec = now;
         if (dt < 0) dt = 0;
         if (dt > 0.5) dt = 0.5;
+        
+        // Update FPS counter
+        frameCount++;
+        if (now - lastFpsUpdateTime >= 1.0) {
+            fps = frameCount;
+            frameCount = 0;
+            lastFpsUpdateTime = now;
+        }
         
         // Update chunks based on player position (load/unload)
         world.updateChunksAroundPlayer(player.getX(), player.getZ());
@@ -153,6 +170,11 @@ public final class DevplayScreen implements Screen {
         
         // Draw crosshair on top of everything
         uiRenderer.drawCrosshair(w, h);
+        
+        // Draw debug info if enabled (F3)
+        if (showDebugInfo) {
+            uiRenderer.drawDebugInfo(w, h, fps, player.getX(), player.getY(), player.getZ());
+        }
     }
 
     private static double now() { return System.nanoTime() * 1e-9; }
