@@ -337,9 +337,9 @@ public class ChunkRenderer {
                 // Use fallback magenta color if no texture, otherwise use the face color (white)
                 int renderColor = (hasTexture && !hasFallback) ? face.color : adjustColorBrightness(face.block.getFallbackColor(), face.colorBrightness);
                 
-                // Apply dark purple tint for grass_block top face (hardcoded for testing)
+                // Apply grass green tint for grass_block top face (vanilla Minecraft-like)
                 if (face.block == Blocks.GRASS_BLOCK && "top".equals(face.faceType)) {
-                    renderColor = applyTint(renderColor, 0x800080, face.colorBrightness);
+                    renderColor = applyTint(renderColor, 0x5BB53B, face.colorBrightness);
                 }
                 
                 setColor(renderColor, face.brightness);
@@ -410,11 +410,11 @@ public class ChunkRenderer {
             // Render all side faces with the overlay texture
             glBegin(GL_TRIANGLES);
             for (FaceData face : blockFaces) {
-                // Apply dark purple tint for grass_block overlay (hardcoded for testing)
+                // Apply grass green tint for grass_block overlay (vanilla Minecraft-like)
                 int tintedColor = face.color;
                 if (block == Blocks.GRASS_BLOCK) {
-                    // Dark purple tint: 0x800080
-                    tintedColor = applyTint(face.color, 0x800080, face.colorBrightness);
+                    // Grass green tint: 0x5BB53B (RGB 91, 181, 59)
+                    tintedColor = applyTint(face.color, 0x5BB53B, face.colorBrightness);
                 }
                 setColor(tintedColor, face.brightness);
                 // Use the renderer that was stored in the FaceData
@@ -602,7 +602,7 @@ public class ChunkRenderer {
      * Multiplies the base color by the tint color component-wise.
      * 
      * @param baseColor The base color (typically white 0xFFFFFF for textures)
-     * @param tintColor The tint color to apply (e.g., 0x800080 for dark purple)
+     * @param tintColor The tint color to apply (e.g., 0x5BB53B for grass green)
      * @param brightnessFactor Additional brightness adjustment
      * @return The tinted color
      */
