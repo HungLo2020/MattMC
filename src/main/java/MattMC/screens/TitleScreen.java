@@ -3,6 +3,7 @@ package MattMC.screens;
 import MattMC.core.Game;
 import MattMC.core.Window;
 import MattMC.gfx.CubeMap;
+import MattMC.gfx.PanoramaRenderer;
 import MattMC.ui.UIButton;
 import org.lwjgl.BufferUtils;
 import org.lwjgl.stb.STBEasyFont;
@@ -31,10 +32,7 @@ public final class TitleScreen implements Screen {
     private boolean mouseDown;
 
     // Panorama
-    private CubeMap sky;
-    private float yawDeg = 0f;   // rotated by real time (deg)
-    private float pitchDeg = 5f; // slight upward tilt
-    private float yawSpeedDegPerSec = 2.0f; // visual speed, time-based
+    private PanoramaRenderer panorama;
 
     // Fixed 20 TPS logic clock
     private static final double TPS = 20.0;
@@ -57,7 +55,8 @@ public final class TitleScreen implements Screen {
         this.window = game.window();
 
         // Load six faces: panorama1_0.png ... panorama1_5.png
-        sky = MattMC.gfx.CubeMap.load("/assets/textures/gui/panorama1_", ".png");
+        CubeMap sky = MattMC.gfx.CubeMap.load("/assets/textures/gui/panorama1_", ".png");
+        panorama = new PanoramaRenderer(sky);
 
         glfwSetCursorPosCallback(window.handle(), (h, x, y) -> { mouseXWin = x; mouseYWin = y; });
         glfwSetMouseButtonCallback(window.handle(), (h, button, action, mods) -> {
@@ -106,9 +105,7 @@ public final class TitleScreen implements Screen {
         if (frameDt > 0.25) frameDt = 0.25; // clamp huge pauses to keep things sane
 
         // Smooth, time-based panorama rotation (independent of tick/refresh)
-        yawDeg += yawSpeedDegPerSec * (float)frameDt;
-        if (yawDeg >= 360f) yawDeg -= 360f;
-        if (yawDeg < 0f)    yawDeg += 360f;
+        panorama.update(frameDt);
 
         // Hover every frame for responsiveness (not tied to TPS)
         float mxFB, myFB;
@@ -158,8 +155,8 @@ public final class TitleScreen implements Screen {
 
     @Override
     public void render(double alpha) {
-        // 1) draw rotating cubemap panorama (perspective)
-        drawSkybox();
+        // 1) draw rotating cubemap panorama (perspective) - no blur for title screen
+        panorama.render(window.width(), window.height(), false);
 
         // 2) switch to orthographic for UI and draw
         setupOrtho();
@@ -168,78 +165,7 @@ public final class TitleScreen implements Screen {
         drawTitle("A blocky sandbox by Matt", subtitleCX, subtitleCY, subtitleScale, 0xB0C4DE);
     }
 
-    private void drawSkybox() {
-        int w = window.width(), h = window.height();
-        float aspect = Math.max(1f, (float)w / Math.max(1, h));
 
-        // Clear and set perspective
-        glClearColor(0f, 0f, 0f, 1f);
-        glClear(GL_COLOR_BUFFER_BIT);
-
-        glMatrixMode(GL_PROJECTION);
-        glLoadIdentity();
-        // Simple perspective via glFrustum
-        float fov = 70f, zn = 0.1f, zf = 10f;
-        float top = (float)(Math.tan(Math.toRadians(fov * 0.5)) * zn);
-        float bottom = -top;
-        float right = top * aspect;
-        float left = -right;
-        glFrustum(left, right, bottom, top, zn, zf);
-
-        glMatrixMode(GL_MODELVIEW);
-        glLoadIdentity();
-
-        // Camera at origin, rotate the skybox
-        glRotatef(pitchDeg, 1f, 0f, 0f);
-        glRotatef(yawDeg,   0f, 1f, 0f);
-
-        // Draw a cube of size 2 centered at origin with cubemap lookup
-        glDisable(GL_DEPTH_TEST);
-        glEnable(GL_TEXTURE_CUBE_MAP);
-        glBindTexture(GL_TEXTURE_CUBE_MAP, sky.id);
-        glColor4f(1f, 1f, 1f, 1f);
-
-        glBegin(GL_QUADS);
-        // +X (right)
-        glTexCoord3f(+1, -1, -1); glVertex3f(+1, -1, -1);
-        glTexCoord3f(+1, -1, +1); glVertex3f(+1, -1, +1);
-        glTexCoord3f(+1, +1, +1); glVertex3f(+1, +1, +1);
-        glTexCoord3f(+1, +1, -1); glVertex3f(+1, +1, -1);
-
-        // -X (left)
-        glTexCoord3f(-1, -1, +1); glVertex3f(-1, -1, +1);
-        glTexCoord3f(-1, -1, -1); glVertex3f(-1, -1, -1);
-        glTexCoord3f(-1, +1, -1); glVertex3f(-1, +1, -1);
-        glTexCoord3f(-1, +1, +1); glVertex3f(-1, +1, +1);
-
-        // +Y (top)
-        glTexCoord3f(-1, +1, -1); glVertex3f(-1, +1, -1);
-        glTexCoord3f(+1, +1, -1); glVertex3f(+1, +1, -1);
-        glTexCoord3f(+1, +1, +1); glVertex3f(+1, +1, +1);
-        glTexCoord3f(-1, +1, +1); glVertex3f(-1, +1, +1);
-
-        // -Y (bottom)
-        glTexCoord3f(-1, -1, +1); glVertex3f(-1, -1, +1);
-        glTexCoord3f(+1, -1, +1); glVertex3f(+1, -1, +1);
-        glTexCoord3f(+1, -1, -1); glVertex3f(+1, -1, -1);
-        glTexCoord3f(-1, -1, -1); glVertex3f(-1, -1, -1);
-
-        // +Z (front)
-        glTexCoord3f(-1, -1, +1); glVertex3f(-1, -1, +1);
-        glTexCoord3f(-1, +1, +1); glVertex3f(-1, +1, +1);
-        glTexCoord3f(+1, +1, +1); glVertex3f(+1, +1, +1);
-        glTexCoord3f(+1, -1, +1); glVertex3f(+1, -1, +1);
-
-        // -Z (back)
-        glTexCoord3f(+1, -1, -1); glVertex3f(+1, -1, -1);
-        glTexCoord3f(+1, +1, -1); glVertex3f(+1, +1, -1);
-        glTexCoord3f(-1, +1, -1); glVertex3f(-1, +1, -1);
-        glTexCoord3f(-1, -1, -1); glVertex3f(-1, -1, -1);
-        glEnd();
-
-        glBindTexture(GL_TEXTURE_CUBE_MAP, 0);
-        glDisable(GL_TEXTURE_CUBE_MAP);
-    }
 
     private void setupOrtho() {
         int w = window.width(), h = window.height();
@@ -331,6 +257,6 @@ public final class TitleScreen implements Screen {
 
     @Override
     public void onClose() {
-        if (sky != null) { sky.close(); sky = null; }
+        if (panorama != null) { panorama.close(); panorama = null; }
     }
 }
