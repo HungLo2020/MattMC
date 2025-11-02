@@ -1,6 +1,7 @@
 package MattMC.renderer;
 
 import MattMC.world.Block;
+import MattMC.world.Blocks;
 import MattMC.world.Chunk;
 
 import java.util.HashMap;
@@ -335,6 +336,12 @@ public class ChunkRenderer {
             for (FaceData face : textureFaces) {
                 // Use fallback magenta color if no texture, otherwise use the face color (white)
                 int renderColor = (hasTexture && !hasFallback) ? face.color : adjustColorBrightness(face.block.getFallbackColor(), face.colorBrightness);
+                
+                // Apply dark purple tint for grass_block top face (hardcoded for testing)
+                if (face.block == Blocks.GRASS_BLOCK && "top".equals(face.faceType)) {
+                    renderColor = applyTint(renderColor, 0x800080, face.colorBrightness);
+                }
+                
                 setColor(renderColor, face.brightness);
                 renderer.render(face.x, face.y, face.z);
             }
@@ -403,7 +410,13 @@ public class ChunkRenderer {
             // Render all side faces with the overlay texture
             glBegin(GL_TRIANGLES);
             for (FaceData face : blockFaces) {
-                setColor(face.color, face.brightness);
+                // Apply dark purple tint for grass_block overlay (hardcoded for testing)
+                int tintedColor = face.color;
+                if (block == Blocks.GRASS_BLOCK) {
+                    // Dark purple tint: 0x800080
+                    tintedColor = applyTint(face.color, 0x800080, face.colorBrightness);
+                }
+                setColor(tintedColor, face.brightness);
                 // Use the renderer that was stored in the FaceData
                 face.renderer.render(face.x, face.y, face.z);
             }
@@ -581,6 +594,33 @@ public class ChunkRenderer {
         int r = Math.min(255, (int)(((rgb >> 16) & 0xFF) * factor));
         int g = Math.min(255, (int)(((rgb >> 8) & 0xFF) * factor));
         int b = Math.min(255, (int)((rgb & 0xFF) * factor));
+        return (r << 16) | (g << 8) | b;
+    }
+    
+    /**
+     * Apply a color tint to a base color.
+     * Multiplies the base color by the tint color component-wise.
+     * 
+     * @param baseColor The base color (typically white 0xFFFFFF for textures)
+     * @param tintColor The tint color to apply (e.g., 0x800080 for dark purple)
+     * @param brightnessFactor Additional brightness adjustment
+     * @return The tinted color
+     */
+    private int applyTint(int baseColor, int tintColor, float brightnessFactor) {
+        // Extract RGB components from base and tint
+        int baseR = (baseColor >> 16) & 0xFF;
+        int baseG = (baseColor >> 8) & 0xFF;
+        int baseB = baseColor & 0xFF;
+        
+        int tintR = (tintColor >> 16) & 0xFF;
+        int tintG = (tintColor >> 8) & 0xFF;
+        int tintB = tintColor & 0xFF;
+        
+        // Multiply components (treating them as 0-1 range)
+        int r = Math.min(255, (int)((baseR * tintR / 255.0f) * brightnessFactor));
+        int g = Math.min(255, (int)((baseG * tintG / 255.0f) * brightnessFactor));
+        int b = Math.min(255, (int)((baseB * tintB / 255.0f) * brightnessFactor));
+        
         return (r << 16) | (g << 8) | b;
     }
 
