@@ -16,8 +16,8 @@ import static org.lwjgl.glfw.GLFW.*;
 import static org.lwjgl.opengl.GL11.*;
 import static org.lwjgl.system.MemoryStack.stackPush;
 
-/* Simple singleplayer menu with buttons to create/load worlds. */
-public final class SingleplayerScreen implements Screen {
+/** Options menu screen. */
+public final class OptionsScreen implements Screen {
     private final Game game;
     private final Window window;
     private final List<UIButton> buttons = new ArrayList<>();
@@ -30,21 +30,10 @@ public final class SingleplayerScreen implements Screen {
     private int buttonWidth = 300, buttonHeight = 44, buttonGap = 12;
     private int buttonsStartY;
 
-    public SingleplayerScreen(Game game) {
+    public OptionsScreen(Game game) {
         this.game = game;
         this.window = game.window();
-
-        glfwSetCursorPosCallback(window.handle(), (h, x, y) -> { mouseXWin = x; mouseYWin = y; });
-        glfwSetMouseButtonCallback(window.handle(), (h, button, action, mods) -> {
-            if (button == GLFW_MOUSE_BUTTON_LEFT) mouseDown = (action == GLFW_PRESS);
-        });
-
         recomputeLayout();
-
-        glfwSetFramebufferSizeCallback(window.handle(), (win, newW, newH) -> {
-            glViewport(0, 0, Math.max(newW, 1), Math.max(newH, 1));
-            recomputeLayout();
-        });
     }
 
     private void recomputeLayout() {
@@ -52,16 +41,15 @@ public final class SingleplayerScreen implements Screen {
         titleCX = w / 2f;
         titleCY = h * 0.18f;
 
-        int totalButtonsH = 3 * buttonHeight + 2 * buttonGap;
+        int totalButtonsH = 2 * buttonHeight + 1 * buttonGap;
         buttonsStartY = (int)(h / 2f - totalButtonsH / 2f);
 
         int x = (w - buttonWidth) / 2;
         buttons.clear();
 
-        // Centered singleplayer buttons
-        buttons.add(new UIButton("Create World", x, buttonsStartY + 0 * (buttonHeight + buttonGap), buttonWidth, buttonHeight));
-        buttons.add(new UIButton("Load World",   x, buttonsStartY + 1 * (buttonHeight + buttonGap), buttonWidth, buttonHeight));
-        buttons.add(new UIButton("Back",         x, buttonsStartY + 2 * (buttonHeight + buttonGap), buttonWidth, buttonHeight));
+        // Centered buttons
+        buttons.add(new UIButton("Keybinds", x, buttonsStartY + 0 * (buttonHeight + buttonGap), buttonWidth, buttonHeight));
+        buttons.add(new UIButton("Back",     x, buttonsStartY + 1 * (buttonHeight + buttonGap), buttonWidth, buttonHeight));
     }
 
     @Override
@@ -97,28 +85,22 @@ public final class SingleplayerScreen implements Screen {
             game.setScreen(new TitleScreen(game));
             return;
         }
-        if ("Create World".equals(label)) {
-            System.out.println("→ Create World clicked");
-            game.setScreen(new CreateWorldScreen(game));
+        if ("Keybinds".equals(label)) {
+            game.setScreen(new KeybindsScreen(game));
             return;
         }
-        if ("Load World".equals(label)) {
-            System.out.println("→ Load World clicked");
-            return;
-        }
-        // other buttons intentionally do nothing for now
     }
 
     @Override
     public void render(double alpha) {
-        // simple clear + ortho UI like TitleScreen
+        // simple clear + ortho UI
         glClearColor(0.06f, 0.08f, 0.10f, 1f);
         glClear(GL_COLOR_BUFFER_BIT);
 
         setupOrtho();
         for (var b : buttons) drawButton(b);
-        drawTitle("Singleplayer", titleCX, titleCY, titleScale, 0xFFFFFF);
-        drawTitle("Create or load worlds", titleCX, titleCY + 48f, 1.0f, 0xB0C4DE);
+        drawTitle("Options", titleCX, titleCY, titleScale, 0xFFFFFF);
+        drawTitle("Configure game settings", titleCX, titleCY + 48f, 1.0f, 0xB0C4DE);
     }
 
     private void setupOrtho() {
@@ -207,7 +189,18 @@ public final class SingleplayerScreen implements Screen {
     }
 
     @Override
-    public void onOpen() {}
+    public void onOpen() {
+        // Set up callbacks when screen opens
+        glfwSetCursorPosCallback(window.handle(), (h, x, y) -> { mouseXWin = x; mouseYWin = y; });
+        glfwSetMouseButtonCallback(window.handle(), (h, button, action, mods) -> {
+            if (button == GLFW_MOUSE_BUTTON_LEFT) mouseDown = (action == GLFW_PRESS);
+        });
+        glfwSetFramebufferSizeCallback(window.handle(), (win, newW, newH) -> {
+            glViewport(0, 0, Math.max(newW, 1), Math.max(newH, 1));
+            recomputeLayout();
+        });
+    }
+    
     @Override
     public void onClose() {}
 }

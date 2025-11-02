@@ -4,6 +4,7 @@ import MattMC.core.Game;
 import MattMC.core.Window;
 import MattMC.screens.TitleScreen;
 import MattMC.util.AppPaths;
+import MattMC.util.KeybindManager;
 
 import java.nio.file.Path;
 
@@ -23,6 +24,9 @@ public final class Main {
             System.exit(1);
             return;
         }
+
+        // Load keybinds from Options.txt
+        KeybindManager.loadKeybinds();
 
         // Boot the game
         try (var window = new Window(1280, 720, "MattMC")) {
