@@ -2,8 +2,7 @@ package MattMC.screens;
 
 import MattMC.core.Game;
 import MattMC.core.Window;
-import MattMC.gfx.CubeMap;
-import MattMC.gfx.PanoramaRenderer;
+import MattMC.gfx.Texture;
 import MattMC.ui.UIButton;
 import org.lwjgl.BufferUtils;
 import org.lwjgl.stb.STBEasyFont;
@@ -30,9 +29,7 @@ public final class TitleScreen implements Screen {
     private final ByteBuffer fontBuffer = BufferUtils.createByteBuffer(16 * 4096);
     private double mouseXWin, mouseYWin;
     private boolean mouseDown;
-
-    // Panorama
-    private PanoramaRenderer panorama;
+    private Texture logoTexture;
 
     // Fixed 20 TPS logic clock
     private static final double TPS = 20.0;
@@ -53,10 +50,9 @@ public final class TitleScreen implements Screen {
     public TitleScreen(Game game) {
         this.game = game;
         this.window = game.window();
-
-        // Load six faces: panorama1_0.png ... panorama1_5.png
-        CubeMap sky = MattMC.gfx.CubeMap.load("/assets/textures/gui/panorama1_", ".png");
-        panorama = new PanoramaRenderer(sky);
+        
+        // Load the MattMC logo texture
+        logoTexture = Texture.load("/assets/textures/gui/MattMC.png");
 
         glfwSetCursorPosCallback(window.handle(), (h, x, y) -> { mouseXWin = x; mouseYWin = y; });
         glfwSetMouseButtonCallback(window.handle(), (h, button, action, mods) -> {
@@ -105,7 +101,7 @@ public final class TitleScreen implements Screen {
         if (frameDt > 0.25) frameDt = 0.25; // clamp huge pauses to keep things sane
 
         // Smooth, time-based panorama rotation (independent of tick/refresh)
-        panorama.update();
+        game.panorama().update();
 
         // Hover every frame for responsiveness (not tied to TPS)
         float mxFB, myFB;
@@ -156,12 +152,12 @@ public final class TitleScreen implements Screen {
     @Override
     public void render(double alpha) {
         // 1) draw rotating cubemap panorama (perspective) - no blur for title screen
-        panorama.render(window.width(), window.height(), false);
+        game.panorama().render(window.width(), window.height(), false);
 
         // 2) switch to orthographic for UI and draw
         setupOrtho();
         for (var b : buttons) drawButton(b);
-        drawTitle("MattMC", titleCX, titleCY, titleScale, 0xFFFFFF);
+        drawLogo();
         drawTitle("A blocky sandbox by Matt", subtitleCX, subtitleCY, subtitleScale, 0xB0C4DE);
     }
 
@@ -255,8 +251,38 @@ public final class TitleScreen implements Screen {
         glPopMatrix();
     }
 
+    private void drawLogo() {
+        if (logoTexture == null) return;
+        
+        // Calculate logo dimensions - scale to fit nicely
+        float logoScale = 0.5f; // Adjust as needed
+        float logoWidth = logoTexture.width * logoScale;
+        float logoHeight = logoTexture.height * logoScale;
+        float logoX = titleCX - logoWidth / 2f;
+        float logoY = titleCY - logoHeight / 2f;
+        
+        // Enable texturing and blending for transparency
+        glEnable(GL_TEXTURE_2D);
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        
+        logoTexture.bind();
+        glColor4f(1f, 1f, 1f, 1f);
+        
+        glBegin(GL_QUADS);
+        glTexCoord2f(0, 0); glVertex2f(logoX, logoY);
+        glTexCoord2f(1, 0); glVertex2f(logoX + logoWidth, logoY);
+        glTexCoord2f(1, 1); glVertex2f(logoX + logoWidth, logoY + logoHeight);
+        glTexCoord2f(0, 1); glVertex2f(logoX, logoY + logoHeight);
+        glEnd();
+        
+        glDisable(GL_BLEND);
+        glDisable(GL_TEXTURE_2D);
+    }
+
     @Override
     public void onClose() {
-        if (panorama != null) { panorama.close(); panorama = null; }
+        // Panorama is now shared and managed by Game, don't close it
+        if (logoTexture != null) { logoTexture.close(); logoTexture = null; }
     }
 }

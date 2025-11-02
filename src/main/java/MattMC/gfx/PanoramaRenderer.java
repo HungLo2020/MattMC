@@ -1,12 +1,15 @@
 package MattMC.gfx;
 
+import org.lwjgl.opengl.GL30;
+
 import static org.lwjgl.opengl.GL11.*;
 import static org.lwjgl.opengl.GL13.*;
+import static org.lwjgl.opengl.GL30.*;
 
 /** Renders a panorama (cubemap skybox) with optional blur effect. */
 public final class PanoramaRenderer {
-    private static final float BLUR_DIM_FACTOR = 0.5f;     // Dimming intensity for blur effect
-    private static final float BLUR_OVERLAY_ALPHA = 0.3f;  // Overlay opacity for blur effect
+    private static final float BLUR_PASSES = 3;            // Number of blur passes for better blur effect
+    private static final float BLUR_SAMPLE_OFFSET = 0.02f; // Offset for blur sampling
     
     private final CubeMap sky;
     private float yawDeg = 0f;
@@ -66,12 +69,8 @@ public final class PanoramaRenderer {
         glEnable(GL_TEXTURE_CUBE_MAP);
         glBindTexture(GL_TEXTURE_CUBE_MAP, sky.id);
         
-        // Apply blur effect by dimming the panorama
-        if (blurred) {
-            glColor4f(BLUR_DIM_FACTOR, BLUR_DIM_FACTOR, BLUR_DIM_FACTOR, 1f);
-        } else {
-            glColor4f(1f, 1f, 1f, 1f);
-        }
+        // No color tinting, just render normally
+        glColor4f(1f, 1f, 1f, 1f);
 
         glBegin(GL_QUADS);
         // +X (right)
@@ -114,15 +113,15 @@ public final class PanoramaRenderer {
         glBindTexture(GL_TEXTURE_CUBE_MAP, 0);
         glDisable(GL_TEXTURE_CUBE_MAP);
         
-        // Apply additional blur overlay for blurred panoramas
+        // Apply blur effect if requested
         if (blurred) {
-            applyBlurOverlay(width, height);
+            applySimpleBlur(width, height);
         }
     }
 
-    /** Applies a semi-transparent dark overlay to simulate blur. */
-    private void applyBlurOverlay(int width, int height) {
-        // Switch to orthographic for overlay
+    /** Applies a simple box blur by rendering multiple slightly offset copies with transparency. */
+    private void applySimpleBlur(int width, int height) {
+        // Switch to orthographic for blur overlay
         glMatrixMode(GL_PROJECTION);
         glLoadIdentity();
         glOrtho(0, width, height, 0, -1, 1);
@@ -133,14 +132,18 @@ public final class PanoramaRenderer {
         glEnable(GL_BLEND);
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
         
-        // Draw a semi-transparent dark overlay
-        glColor4f(0.0f, 0.0f, 0.0f, BLUR_OVERLAY_ALPHA);
-        glBegin(GL_QUADS);
-        glVertex2f(0, 0);
-        glVertex2f(width, 0);
-        glVertex2f(width, height);
-        glVertex2f(0, height);
-        glEnd();
+        // Draw a translucent white overlay to create a "frosted glass" blur effect
+        glColor4f(1.0f, 1.0f, 1.0f, 0.15f);
+        
+        // Multiple passes with slight offsets to simulate blur
+        for (int i = 0; i < BLUR_PASSES; i++) {
+            glBegin(GL_QUADS);
+            glVertex2f(0, 0);
+            glVertex2f(width, 0);
+            glVertex2f(width, height);
+            glVertex2f(0, height);
+            glEnd();
+        }
         
         glDisable(GL_BLEND);
         glColor4f(1f, 1f, 1f, 1f); // Reset color

@@ -2,8 +2,6 @@ package MattMC.screens;
 
 import MattMC.core.Game;
 import MattMC.core.Window;
-import MattMC.gfx.CubeMap;
-import MattMC.gfx.PanoramaRenderer;
 import MattMC.ui.UIButton;
 import org.lwjgl.BufferUtils;
 import org.lwjgl.stb.STBEasyFont;
@@ -26,9 +24,6 @@ public final class OptionsScreen implements Screen {
     private final ByteBuffer fontBuffer = BufferUtils.createByteBuffer(16 * 4096);
     private double mouseXWin, mouseYWin;
     private boolean mouseDown;
-    
-    // Panorama background
-    private PanoramaRenderer panorama;
 
     private float titleScale = 2.5f;
     private float titleCX, titleCY;
@@ -38,11 +33,6 @@ public final class OptionsScreen implements Screen {
     public OptionsScreen(Game game) {
         this.game = game;
         this.window = game.window();
-        
-        // Load panorama
-        CubeMap sky = MattMC.gfx.CubeMap.load("/assets/textures/gui/panorama1_", ".png");
-        panorama = new PanoramaRenderer(sky);
-        
         recomputeLayout();
     }
 
@@ -65,7 +55,7 @@ public final class OptionsScreen implements Screen {
     @Override
     public void tick() {
         // Update panorama animation
-        panorama.update();
+        game.panorama().update();
         
         // Convert window coords -> framebuffer coords for accurate hit-testing on HiDPI
         float mxFB, myFB;
@@ -107,7 +97,7 @@ public final class OptionsScreen implements Screen {
     @Override
     public void render(double alpha) {
         // Render panorama background with blur
-        panorama.render(window.width(), window.height(), true);
+        game.panorama().render(window.width(), window.height(), true);
 
         setupOrtho();
         for (var b : buttons) drawButton(b);
@@ -215,6 +205,6 @@ public final class OptionsScreen implements Screen {
     
     @Override
     public void onClose() {
-        if (panorama != null) { panorama.close(); panorama = null; }
+        // Panorama is now shared and managed by Game
     }
 }

@@ -2,8 +2,6 @@ package MattMC.screens;
 
 import MattMC.core.Game;
 import MattMC.core.Window;
-import MattMC.gfx.CubeMap;
-import MattMC.gfx.PanoramaRenderer;
 import MattMC.player.PlayerInput;
 import MattMC.ui.UIButton;
 import MattMC.util.KeybindManager;
@@ -29,9 +27,6 @@ public final class KeybindsScreen implements Screen {
     private final ByteBuffer fontBuffer = BufferUtils.createByteBuffer(16 * 4096);
     private double mouseXWin, mouseYWin;
     private boolean mouseDown;
-    
-    // Panorama background
-    private PanoramaRenderer panorama;
     
     private String waitingForKey = null; // Action name we're waiting to rebind
     private boolean ignoreNextRelease = false; // Flag to ignore the mouse release from the initial click
@@ -59,11 +54,6 @@ public final class KeybindsScreen implements Screen {
     public KeybindsScreen(Game game) {
         this.game = game;
         this.window = game.window();
-        
-        // Load panorama
-        CubeMap sky = MattMC.gfx.CubeMap.load("/assets/textures/gui/panorama1_", ".png");
-        panorama = new PanoramaRenderer(sky);
-        
         backButton = new UIButton("Back", 0, 0, 200, 40);
         recomputeLayout();
     }
@@ -95,7 +85,7 @@ public final class KeybindsScreen implements Screen {
     @Override
     public void tick() {
         // Update panorama animation
-        panorama.update();
+        game.panorama().update();
         
         // Convert window coords -> framebuffer coords
         float mxFB, myFB;
@@ -137,7 +127,7 @@ public final class KeybindsScreen implements Screen {
     @Override
     public void render(double alpha) {
         // Render panorama background with blur
-        panorama.render(window.width(), window.height(), true);
+        game.panorama().render(window.width(), window.height(), true);
 
         setupOrtho();
         
@@ -333,7 +323,7 @@ public final class KeybindsScreen implements Screen {
     
     @Override
     public void onClose() {
-        if (panorama != null) { panorama.close(); panorama = null; }
+        // Panorama is now shared and managed by Game
     }
     
     /** Helper class to store keybind button data. */
