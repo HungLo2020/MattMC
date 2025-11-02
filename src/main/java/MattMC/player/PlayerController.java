@@ -11,6 +11,7 @@ public class PlayerController {
     public static final float MOUSE_SENSITIVITY = 1.0f;
     
     private final Player player;
+    private final PlayerInput input;
     
     // Mouse state for delta calculation
     private double lastMouseX = 0;
@@ -19,6 +20,7 @@ public class PlayerController {
     
     public PlayerController(Player player) {
         this.player = player;
+        this.input = PlayerInput.getInstance();
     }
     
     /**
@@ -33,27 +35,26 @@ public class PlayerController {
         // Use flying speed when flying, walking speed otherwise
         float moveSpeed = isFlying ? player.getFlySpeed() * deltaTime : player.getMoveSpeed() * deltaTime;
         
-        // WASD movement
-        if (glfwGetKey(window, GLFW_KEY_W) == GLFW_PRESS) {
+        // Movement using PlayerInput abstraction
+        if (input.isPressed(window, PlayerInput.FORWARD)) {
             player.moveForward(moveSpeed);
         }
-        if (glfwGetKey(window, GLFW_KEY_S) == GLFW_PRESS) {
+        if (input.isPressed(window, PlayerInput.BACKWARD)) {
             player.moveForward(-moveSpeed);
         }
-        if (glfwGetKey(window, GLFW_KEY_A) == GLFW_PRESS) {
+        if (input.isPressed(window, PlayerInput.LEFT)) {
             player.moveRight(-moveSpeed);
         }
-        if (glfwGetKey(window, GLFW_KEY_D) == GLFW_PRESS) {
+        if (input.isPressed(window, PlayerInput.RIGHT)) {
             player.moveRight(moveSpeed);
         }
         
         // Vertical movement (flying only)
         if (isFlying) {
-            if (glfwGetKey(window, GLFW_KEY_SPACE) == GLFW_PRESS) {
+            if (input.isPressed(window, PlayerInput.FLY_UP)) {
                 player.moveUp(moveSpeed);
             }
-            if (glfwGetKey(window, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS || 
-                glfwGetKey(window, GLFW_KEY_RIGHT_CONTROL) == GLFW_PRESS) {
+            if (input.isPressed(window, PlayerInput.FLY_DOWN)) {
                 player.moveUp(-moveSpeed);
             }
         }
