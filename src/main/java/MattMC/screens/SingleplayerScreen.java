@@ -16,7 +16,7 @@ import static org.lwjgl.glfw.GLFW.*;
 import static org.lwjgl.opengl.GL11.*;
 import static org.lwjgl.system.MemoryStack.stackPush;
 
-/* Simple singleplayer menu. Buttons do nothing except "Back". */
+/* Simple singleplayer menu with buttons to create/load worlds. */
 public final class SingleplayerScreen implements Screen {
     private final Game game;
     private final Window window;
