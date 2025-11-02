@@ -66,6 +66,9 @@ public final class SingleplayerScreen implements Screen {
 
     @Override
     public void tick() {
+        // Update panorama animation
+        game.panorama().update();
+        
         // Convert window coords -> framebuffer coords for accurate hit-testing on HiDPI
         float mxFB, myFB;
         try (MemoryStack stack = stackPush()) {
@@ -111,9 +114,9 @@ public final class SingleplayerScreen implements Screen {
 
     @Override
     public void render(double alpha) {
-        // simple clear + ortho UI like TitleScreen
-        glClearColor(0.06f, 0.08f, 0.10f, 1f);
-        glClear(GL_COLOR_BUFFER_BIT);
+        // Render panorama background with blur based on settings
+        boolean blurred = MattMC.util.OptionsManager.isMenuScreenBlurEnabled();
+        game.panorama().render(window.width(), window.height(), blurred);
 
         setupOrtho();
         for (var b : buttons) drawButton(b);
@@ -209,5 +212,7 @@ public final class SingleplayerScreen implements Screen {
     @Override
     public void onOpen() {}
     @Override
-    public void onClose() {}
+    public void onClose() {
+        // Panorama is now shared and managed by Game
+    }
 }

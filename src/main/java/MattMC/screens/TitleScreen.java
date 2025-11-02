@@ -2,7 +2,7 @@ package MattMC.screens;
 
 import MattMC.core.Game;
 import MattMC.core.Window;
-import MattMC.gfx.CubeMap;
+import MattMC.gfx.Texture;
 import MattMC.ui.UIButton;
 import org.lwjgl.BufferUtils;
 import org.lwjgl.stb.STBEasyFont;
@@ -29,12 +29,7 @@ public final class TitleScreen implements Screen {
     private final ByteBuffer fontBuffer = BufferUtils.createByteBuffer(16 * 4096);
     private double mouseXWin, mouseYWin;
     private boolean mouseDown;
-
-    // Panorama
-    private CubeMap sky;
-    private float yawDeg = 0f;   // rotated by real time (deg)
-    private float pitchDeg = 5f; // slight upward tilt
-    private float yawSpeedDegPerSec = 2.0f; // visual speed, time-based
+    private Texture logoTexture;
 
     // Fixed 20 TPS logic clock
     private static final double TPS = 20.0;
@@ -47,7 +42,7 @@ public final class TitleScreen implements Screen {
     // Layout
     private float titleScale = 3.0f;
     private float subtitleScale = 1.1f;
-    private float titleYFrac = 1f / 3f;
+    private float titleYFrac = 0.18f; // Raised to 18% of screen height (closer to top)
     private int buttonWidth = 280, buttonHeight = 42, buttonGap = 12;
     private float titleCX, titleCY, subtitleCX, subtitleCY;
     private int buttonsStartY;
@@ -55,9 +50,9 @@ public final class TitleScreen implements Screen {
     public TitleScreen(Game game) {
         this.game = game;
         this.window = game.window();
-
-        // Load six faces: panorama1_0.png ... panorama1_5.png
-        sky = MattMC.gfx.CubeMap.load("/assets/textures/gui/panorama1_", ".png");
+        
+        // Load the MattMC logo texture
+        logoTexture = Texture.load("/assets/textures/gui/MattMC.png");
 
         glfwSetCursorPosCallback(window.handle(), (h, x, y) -> { mouseXWin = x; mouseYWin = y; });
         glfwSetMouseButtonCallback(window.handle(), (h, button, action, mods) -> {
@@ -106,9 +101,7 @@ public final class TitleScreen implements Screen {
         if (frameDt > 0.25) frameDt = 0.25; // clamp huge pauses to keep things sane
 
         // Smooth, time-based panorama rotation (independent of tick/refresh)
-        yawDeg += yawSpeedDegPerSec * (float)frameDt;
-        if (yawDeg >= 360f) yawDeg -= 360f;
-        if (yawDeg < 0f)    yawDeg += 360f;
+        game.panorama().update();
 
         // Hover every frame for responsiveness (not tied to TPS)
         float mxFB, myFB;
@@ -158,88 +151,18 @@ public final class TitleScreen implements Screen {
 
     @Override
     public void render(double alpha) {
-        // 1) draw rotating cubemap panorama (perspective)
-        drawSkybox();
+        // 1) draw rotating cubemap panorama (perspective) - blur based on settings
+        boolean blurred = MattMC.util.OptionsManager.isTitleScreenBlurEnabled();
+        game.panorama().render(window.width(), window.height(), blurred);
 
         // 2) switch to orthographic for UI and draw
         setupOrtho();
         for (var b : buttons) drawButton(b);
-        drawTitle("MattMC", titleCX, titleCY, titleScale, 0xFFFFFF);
+        drawLogo();
         drawTitle("A blocky sandbox by Matt", subtitleCX, subtitleCY, subtitleScale, 0xB0C4DE);
     }
 
-    private void drawSkybox() {
-        int w = window.width(), h = window.height();
-        float aspect = Math.max(1f, (float)w / Math.max(1, h));
 
-        // Clear and set perspective
-        glClearColor(0f, 0f, 0f, 1f);
-        glClear(GL_COLOR_BUFFER_BIT);
-
-        glMatrixMode(GL_PROJECTION);
-        glLoadIdentity();
-        // Simple perspective via glFrustum
-        float fov = 70f, zn = 0.1f, zf = 10f;
-        float top = (float)(Math.tan(Math.toRadians(fov * 0.5)) * zn);
-        float bottom = -top;
-        float right = top * aspect;
-        float left = -right;
-        glFrustum(left, right, bottom, top, zn, zf);
-
-        glMatrixMode(GL_MODELVIEW);
-        glLoadIdentity();
-
-        // Camera at origin, rotate the skybox
-        glRotatef(pitchDeg, 1f, 0f, 0f);
-        glRotatef(yawDeg,   0f, 1f, 0f);
-
-        // Draw a cube of size 2 centered at origin with cubemap lookup
-        glDisable(GL_DEPTH_TEST);
-        glEnable(GL_TEXTURE_CUBE_MAP);
-        glBindTexture(GL_TEXTURE_CUBE_MAP, sky.id);
-        glColor4f(1f, 1f, 1f, 1f);
-
-        glBegin(GL_QUADS);
-        // +X (right)
-        glTexCoord3f(+1, -1, -1); glVertex3f(+1, -1, -1);
-        glTexCoord3f(+1, -1, +1); glVertex3f(+1, -1, +1);
-        glTexCoord3f(+1, +1, +1); glVertex3f(+1, +1, +1);
-        glTexCoord3f(+1, +1, -1); glVertex3f(+1, +1, -1);
-
-        // -X (left)
-        glTexCoord3f(-1, -1, +1); glVertex3f(-1, -1, +1);
-        glTexCoord3f(-1, -1, -1); glVertex3f(-1, -1, -1);
-        glTexCoord3f(-1, +1, -1); glVertex3f(-1, +1, -1);
-        glTexCoord3f(-1, +1, +1); glVertex3f(-1, +1, +1);
-
-        // +Y (top)
-        glTexCoord3f(-1, +1, -1); glVertex3f(-1, +1, -1);
-        glTexCoord3f(+1, +1, -1); glVertex3f(+1, +1, -1);
-        glTexCoord3f(+1, +1, +1); glVertex3f(+1, +1, +1);
-        glTexCoord3f(-1, +1, +1); glVertex3f(-1, +1, +1);
-
-        // -Y (bottom)
-        glTexCoord3f(-1, -1, +1); glVertex3f(-1, -1, +1);
-        glTexCoord3f(+1, -1, +1); glVertex3f(+1, -1, +1);
-        glTexCoord3f(+1, -1, -1); glVertex3f(+1, -1, -1);
-        glTexCoord3f(-1, -1, -1); glVertex3f(-1, -1, -1);
-
-        // +Z (front)
-        glTexCoord3f(-1, -1, +1); glVertex3f(-1, -1, +1);
-        glTexCoord3f(-1, +1, +1); glVertex3f(-1, +1, +1);
-        glTexCoord3f(+1, +1, +1); glVertex3f(+1, +1, +1);
-        glTexCoord3f(+1, -1, +1); glVertex3f(+1, -1, +1);
-
-        // -Z (back)
-        glTexCoord3f(+1, -1, -1); glVertex3f(+1, -1, -1);
-        glTexCoord3f(+1, +1, -1); glVertex3f(+1, +1, -1);
-        glTexCoord3f(-1, +1, -1); glVertex3f(-1, +1, -1);
-        glTexCoord3f(-1, -1, -1); glVertex3f(-1, -1, -1);
-        glEnd();
-
-        glBindTexture(GL_TEXTURE_CUBE_MAP, 0);
-        glDisable(GL_TEXTURE_CUBE_MAP);
-    }
 
     private void setupOrtho() {
         int w = window.width(), h = window.height();
@@ -329,8 +252,47 @@ public final class TitleScreen implements Screen {
         glPopMatrix();
     }
 
+    private void drawLogo() {
+        if (logoTexture == null) return;
+        
+        // Calculate logo dimensions - adaptive scaling based on window size
+        // Target width is roughly 60% of screen width for good visibility
+        int w = window.width();
+        float targetWidth = w * 0.6f;
+        float logoScale = targetWidth / logoTexture.width;
+        
+        // Clamp scale to reasonable bounds
+        logoScale = Math.max(0.3f, Math.min(logoScale, 2.0f));
+        
+        float logoWidth = logoTexture.width * logoScale;
+        float logoHeight = logoTexture.height * logoScale;
+        float logoX = titleCX - logoWidth / 2f;
+        float logoY = titleCY - logoHeight / 2f;
+        
+        // Enable texturing and blending for transparency
+        glEnable(GL_TEXTURE_2D);
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        
+        logoTexture.bind();
+        glColor4f(1f, 1f, 1f, 1f);
+        
+        // Flip texture coordinates vertically to fix upside-down issue
+        // (Texture loader flips vertically, so we need to flip back for proper display)
+        glBegin(GL_QUADS);
+        glTexCoord2f(0, 1); glVertex2f(logoX, logoY);
+        glTexCoord2f(1, 1); glVertex2f(logoX + logoWidth, logoY);
+        glTexCoord2f(1, 0); glVertex2f(logoX + logoWidth, logoY + logoHeight);
+        glTexCoord2f(0, 0); glVertex2f(logoX, logoY + logoHeight);
+        glEnd();
+        
+        glDisable(GL_BLEND);
+        glDisable(GL_TEXTURE_2D);
+    }
+
     @Override
     public void onClose() {
-        if (sky != null) { sky.close(); sky = null; }
+        // Panorama is now shared and managed by Game, don't close it
+        if (logoTexture != null) { logoTexture.close(); logoTexture = null; }
     }
 }
