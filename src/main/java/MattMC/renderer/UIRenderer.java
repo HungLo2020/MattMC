@@ -74,7 +74,7 @@ public class UIRenderer {
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
         
         float x = 5f;
-        float y = 5f;
+        float y = 10f; // Moved down slightly from 5f to 10f
         float scale = 1.0f;
         float lineHeight = fontRenderer.getTextHeight(scale) + 2f;
         

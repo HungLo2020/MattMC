@@ -91,9 +91,14 @@ public class FontRenderer {
         float g = ((rgb >> 8) & 0xFF) / 255f;
         float b = (rgb & 0xFF) / 255f;
         
+        // Enable alpha blending for proper text rendering
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        
         glEnable(GL_TEXTURE_2D);
         glBindTexture(GL_TEXTURE_2D, fontTexture);
         
+        // Use glColor with alpha to modulate the texture color
         glColor4f(r, g, b, 1f);
         
         glPushMatrix();
@@ -131,7 +136,9 @@ public class FontRenderer {
         }
         
         glPopMatrix();
+        
         glDisable(GL_TEXTURE_2D);
+        glDisable(GL_BLEND);
     }
     
     /**
