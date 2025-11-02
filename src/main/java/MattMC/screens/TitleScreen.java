@@ -256,9 +256,9 @@ public final class TitleScreen implements Screen {
         if (logoTexture == null) return;
         
         // Calculate logo dimensions - adaptive scaling based on window size
-        // Target width is roughly 40% of screen width for good visibility
+        // Target width is roughly 60% of screen width for good visibility
         int w = window.width();
-        float targetWidth = w * 0.4f;
+        float targetWidth = w * 0.6f;
         float logoScale = targetWidth / logoTexture.width;
         
         // Clamp scale to reasonable bounds
