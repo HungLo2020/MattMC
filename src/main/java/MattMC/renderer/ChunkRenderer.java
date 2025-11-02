@@ -143,8 +143,9 @@ public class ChunkRenderer {
         float colorBrightness; // Brightness adjustment for the base color (for fallback)
         Block block;
         String faceType; // "top", "bottom", "side", etc.
+        FaceRenderer renderer; // The renderer method to use for drawing this face
         
-        FaceData(float x, float y, float z, int color, float brightness, float colorBrightness, Block block, String faceType) {
+        FaceData(float x, float y, float z, int color, float brightness, float colorBrightness, Block block, String faceType, FaceRenderer renderer) {
             this.x = x;
             this.y = y;
             this.z = z;
@@ -153,6 +154,7 @@ public class ChunkRenderer {
             this.colorBrightness = colorBrightness;
             this.block = block;
             this.faceType = faceType;
+            this.renderer = renderer;
         }
     }
     
@@ -222,22 +224,22 @@ public class ChunkRenderer {
         // Collect visible faces for batched rendering
         // Store both the adjusted color and the brightness factor for fallback color
         if (topVisible) {
-            topFaces.add(new FaceData(x, y, z, color, 1f, 1f, block, "top"));
+            topFaces.add(new FaceData(x, y, z, color, 1f, 1f, block, "top", this::drawTopFaceVertices));
         }
         if (bottomVisible) {
-            bottomFaces.add(new FaceData(x, y, z, darkenColor(color), 1f, 0.5f, block, "bottom"));
+            bottomFaces.add(new FaceData(x, y, z, darkenColor(color), 1f, 0.5f, block, "bottom", this::drawBottomFaceVertices));
         }
         if (northVisible) {
-            northFaces.add(new FaceData(x, y, z, adjustColorBrightness(color, 0.8f), 1f, 0.8f, block, "side"));
+            northFaces.add(new FaceData(x, y, z, adjustColorBrightness(color, 0.8f), 1f, 0.8f, block, "side", this::drawNorthFaceVertices));
         }
         if (southVisible) {
-            southFaces.add(new FaceData(x, y, z, adjustColorBrightness(color, 0.8f), 1f, 0.8f, block, "side"));
+            southFaces.add(new FaceData(x, y, z, adjustColorBrightness(color, 0.8f), 1f, 0.8f, block, "side", this::drawSouthFaceVertices));
         }
         if (westVisible) {
-            westFaces.add(new FaceData(x, y, z, adjustColorBrightness(color, 0.6f), 1f, 0.6f, block, "side"));
+            westFaces.add(new FaceData(x, y, z, adjustColorBrightness(color, 0.6f), 1f, 0.6f, block, "side", this::drawWestFaceVertices));
         }
         if (eastVisible) {
-            eastFaces.add(new FaceData(x, y, z, adjustColorBrightness(color, 0.6f), 1f, 0.6f, block, "side"));
+            eastFaces.add(new FaceData(x, y, z, adjustColorBrightness(color, 0.6f), 1f, 0.6f, block, "side", this::drawEastFaceVertices));
         }
         
         // Collect outline data
@@ -264,6 +266,15 @@ public class ChunkRenderer {
         renderFacesByType(southFaces, this::drawSouthFaceVertices);
         renderFacesByType(westFaces, this::drawWestFaceVertices);
         renderFacesByType(eastFaces, this::drawEastFaceVertices);
+        
+        // Render overlays AFTER all base textures (for grass_block sides)
+        // Collect all side faces for overlay rendering
+        java.util.List<FaceData> allSideFaces = new java.util.ArrayList<>();
+        allSideFaces.addAll(northFaces);
+        allSideFaces.addAll(southFaces);
+        allSideFaces.addAll(westFaces);
+        allSideFaces.addAll(eastFaces);
+        renderOverlaysForSideFaces(allSideFaces);
         
         // Disable texturing for outlines
         glDisable(GL_TEXTURE_2D);
@@ -328,37 +339,41 @@ public class ChunkRenderer {
                 renderer.render(face.x, face.y, face.z);
             }
             glEnd();
-            
-            // Check if we need to render an overlay (for grass_block sides)
-            if (hasTexture && !hasFallback) {
-                renderOverlayForFaces(textureFaces, renderer);
-            }
         }
     }
     
     /**
-     * Render overlay textures for faces that have them (e.g., grass_block sides)
+     * Render overlay textures for side faces that have them (e.g., grass_block sides).
+     * This is called AFTER all base textures are rendered to ensure overlays appear on top.
      */
-    private void renderOverlayForFaces(java.util.List<FaceData> faces, FaceRenderer renderer) {
-        if (faces.isEmpty()) return;
+    private void renderOverlaysForSideFaces(java.util.List<FaceData> sideFaces) {
+        if (sideFaces.isEmpty()) return;
         
-        // Group faces by block to check for overlay texture
+        // Group side faces by block to check for overlay texture
         java.util.Map<Block, java.util.List<FaceData>> facesByBlock = new java.util.HashMap<>();
-        for (FaceData face : faces) {
-            // Only apply overlay to side faces (not top or bottom)
+        
+        for (FaceData face : sideFaces) {
+            // Only process side faces
             if ("side".equals(face.faceType)) {
-                facesByBlock.computeIfAbsent(face.block, k -> new java.util.ArrayList<>()).add(face);
+                Block block = face.block;
+                
+                // Check if block has overlay texture
+                String overlayPath = block.getTexturePath("overlay");
+                if (overlayPath != null) {
+                    facesByBlock.computeIfAbsent(block, k -> new java.util.ArrayList<>()).add(face);
+                }
             }
         }
         
-        for (java.util.Map.Entry<Block, java.util.List<FaceData>> entry : facesByBlock.entrySet()) {
-            Block block = entry.getKey();
-            java.util.List<FaceData> blockFaces = entry.getValue();
+        // Render overlays for each block type
+        for (java.util.Map.Entry<Block, java.util.List<FaceData>> blockEntry : facesByBlock.entrySet()) {
+            Block block = blockEntry.getKey();
+            java.util.List<FaceData> blockFaces = blockEntry.getValue();
             
-            // Check if block has overlay texture
+            // Get overlay texture
             String overlayPath = block.getTexturePath("overlay");
             if (overlayPath == null) {
-                continue; // No overlay for this block
+                continue;
             }
             
             int overlayTextureId = textureManager.loadTexture(overlayPath);
@@ -366,12 +381,15 @@ public class ChunkRenderer {
                 continue; // Overlay texture not found
             }
             
-            // Render overlay
+            // Bind overlay texture
             textureManager.bindTexture(overlayTextureId);
+            
+            // Render all side faces with the overlay texture
             glBegin(GL_TRIANGLES);
             for (FaceData face : blockFaces) {
                 setColor(face.color, face.brightness);
-                renderer.render(face.x, face.y, face.z);
+                // Use the renderer that was stored in the FaceData
+                face.renderer.render(face.x, face.y, face.z);
             }
             glEnd();
         }
