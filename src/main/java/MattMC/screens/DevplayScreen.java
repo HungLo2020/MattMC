@@ -214,12 +214,10 @@ public final class DevplayScreen implements Screen {
     
     /**
      * Open command overlay for text input.
-     * Initializes with "/" prefix for command entry.
      */
     private void openCommandOverlay() {
         commandOverlayActive = true;
         commandInput.setLength(0);
-        commandInput.append("/"); // Start with "/" prefix
         commandResult = "";
     }
     
