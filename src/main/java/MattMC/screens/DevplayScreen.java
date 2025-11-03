@@ -82,10 +82,10 @@ public final class DevplayScreen implements Screen {
         this.player = new Player(spawnX, spawnY, spawnZ);
         this.player.setYaw(playerYaw);
         this.player.setPitch(playerPitch);
-        this.playerPhysics = new PlayerPhysics(player, world);
+        this.playerPhysics = new PlayerPhysics(player, this.world);
         this.player.setPhysics(playerPhysics);
         this.playerController = new PlayerController(player);
-        this.blockInteraction = new BlockInteraction(player, world);
+        this.blockInteraction = new BlockInteraction(player, this.world);
         this.worldRenderer = new WorldRenderer();
         this.uiRenderer = new UIRenderer();
 
