@@ -29,15 +29,19 @@ public final class WorldSaveManager {
     public static List<String> listWorlds() {
         try {
             Path savesDir = getSavesDirectory();
+            System.out.println("[DEBUG] Listing worlds from: " + savesDir.toAbsolutePath());
             if (!Files.exists(savesDir)) {
+                System.out.println("[DEBUG] Saves directory does not exist yet");
                 return new ArrayList<>();
             }
             
-            return Files.list(savesDir)
-                    .filter(Files::isDirectory)
-                    .map(p -> p.getFileName().toString())
-                    .sorted()
-                    .collect(Collectors.toList());
+            try (var stream = Files.list(savesDir)) {
+                return stream
+                        .filter(Files::isDirectory)
+                        .map(p -> p.getFileName().toString())
+                        .sorted()
+                        .collect(Collectors.toList());
+            }
         } catch (IOException e) {
             System.err.println("Failed to list worlds: " + e.getMessage());
             return new ArrayList<>();
@@ -76,7 +80,9 @@ public final class WorldSaveManager {
      * Save a world to disk.
      */
     public static void saveWorld(World world, String worldName, float playerX, float playerY, float playerZ, float playerYaw, float playerPitch) throws IOException {
-        Path worldDir = getSavesDirectory().resolve(worldName);
+        Path savesDir = getSavesDirectory();
+        Path worldDir = savesDir.resolve(worldName);
+        System.out.println("[DEBUG] Saving world to: " + worldDir.toAbsolutePath());
         Files.createDirectories(worldDir);
         
         // Save world metadata
