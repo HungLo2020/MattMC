@@ -158,6 +158,9 @@ public final class DevplayScreen implements Screen {
         
         // Mouse button callback for breaking/placing blocks
         glfwSetMouseButtonCallback(window.handle(), (win, button, action, mods) -> {
+            // Don't interact with blocks if command overlay is open
+            if (commandOverlayVisible) return;
+            
             if (action == GLFW_PRESS) {
                 if (button == GLFW_MOUSE_BUTTON_LEFT) {
                     blockInteraction.breakBlock();
