@@ -48,7 +48,7 @@ public final class CreateWorldScreen implements Screen {
             if (worldNameField != null && worldNameField.isFocused()) {
                 char c = (char) codepoint;
                 // Only allow alphanumeric, space, and some punctuation
-                if (Character.isLetterOrDigit(c) || c == ' ' || c == '-' || c == '_' || c == '(' || c == ')') {
+                if (isValidWorldNameCharacter(c)) {
                     worldNameField.appendChar(c);
                 }
             }
@@ -162,6 +162,14 @@ public final class CreateWorldScreen implements Screen {
         
         System.out.println("→ Creating world: " + worldName);
         game.setScreen(new DevplayScreen(game, worldName));
+    }
+    
+    /**
+     * Check if a character is valid for world names.
+     * Allows alphanumeric, space, hyphen, underscore, and parentheses.
+     */
+    private static boolean isValidWorldNameCharacter(char c) {
+        return Character.isLetterOrDigit(c) || c == ' ' || c == '-' || c == '_' || c == '(' || c == ')';
     }
 
     @Override

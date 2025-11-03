@@ -46,7 +46,11 @@ public final class UITextField {
     }
     
     public void setText(String str) {
-        text = new StringBuilder(str.substring(0, Math.min(str.length(), maxLength)));
+        if (str == null) {
+            text = new StringBuilder();
+        } else {
+            text = new StringBuilder(str.substring(0, Math.min(str.length(), maxLength)));
+        }
     }
     
     public void appendChar(char c) {

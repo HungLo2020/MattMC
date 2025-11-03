@@ -156,15 +156,19 @@ public final class WorldSaveManager {
         // Load chunks
         Path chunksDir = worldDir.resolve("chunks");
         if (Files.exists(chunksDir)) {
-            Files.list(chunksDir)
-                    .filter(p -> p.getFileName().toString().endsWith(".dat"))
-                    .forEach(chunkFile -> {
-                        try {
-                            loadChunk(world, chunkFile);
-                        } catch (IOException e) {
-                            System.err.println("Failed to load chunk: " + chunkFile + " - " + e.getMessage());
-                        }
-                    });
+            try (var stream = Files.list(chunksDir)) {
+                var chunkFiles = stream
+                        .filter(p -> p.getFileName().toString().endsWith(".dat"))
+                        .collect(Collectors.toList());
+                
+                for (Path chunkFile : chunkFiles) {
+                    try {
+                        loadChunk(world, chunkFile);
+                    } catch (IOException e) {
+                        System.err.println("Failed to load chunk: " + chunkFile + " - " + e.getMessage());
+                    }
+                }
+            }
         }
         
         System.out.println("World loaded: " + worldName);
@@ -210,15 +214,31 @@ public final class WorldSaveManager {
     }
     
     private static void deleteDirectory(Path dir) throws IOException {
-        Files.walk(dir)
-                .sorted(Comparator.reverseOrder())
-                .forEach(path -> {
-                    try {
-                        Files.delete(path);
-                    } catch (IOException e) {
-                        System.err.println("Failed to delete: " + path);
-                    }
-                });
+        // Collect all paths first to properly close the stream
+        List<Path> pathsToDelete;
+        try (var stream = Files.walk(dir)) {
+            pathsToDelete = stream.sorted(Comparator.reverseOrder()).collect(Collectors.toList());
+        }
+        
+        // Delete all paths, collecting any errors
+        List<IOException> errors = new ArrayList<>();
+        for (Path path : pathsToDelete) {
+            try {
+                Files.delete(path);
+            } catch (IOException e) {
+                errors.add(e);
+                System.err.println("Failed to delete: " + path);
+            }
+        }
+        
+        // If any deletions failed, throw an exception
+        if (!errors.isEmpty()) {
+            IOException ex = new IOException("Failed to delete some files/directories");
+            for (IOException error : errors) {
+                ex.addSuppressed(error);
+            }
+            throw ex;
+        }
     }
     
     /**
