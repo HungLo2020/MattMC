@@ -1,0 +1,163 @@
+package MattMC.renderer;
+
+import MattMC.world.Block;
+import MattMC.world.Chunk;
+
+import java.util.ArrayList;
+import java.util.List;
+
+/**
+ * Collects visible block faces for batched rendering with face culling.
+ * Separates faces by direction for optimized rendering.
+ */
+public class BlockFaceCollector {
+    
+    // Face data storage
+    private final List<FaceData> topFaces = new ArrayList<>();
+    private final List<FaceData> bottomFaces = new ArrayList<>();
+    private final List<FaceData> northFaces = new ArrayList<>();
+    private final List<FaceData> southFaces = new ArrayList<>();
+    private final List<FaceData> westFaces = new ArrayList<>();
+    private final List<FaceData> eastFaces = new ArrayList<>();
+    private final List<OutlineData> outlines = new ArrayList<>();
+    
+    /**
+     * Clear all collected face data.
+     */
+    public void clear() {
+        topFaces.clear();
+        bottomFaces.clear();
+        northFaces.clear();
+        southFaces.clear();
+        westFaces.clear();
+        eastFaces.clear();
+        outlines.clear();
+    }
+    
+    /**
+     * Collect face data for a single block (for batched rendering).
+     * Only collects faces that are exposed to air (face culling).
+     */
+    public void collectBlockFaces(float x, float y, float z, Block block, Chunk chunk, 
+                                  int cx, int cy, int cz) {
+        // Use white color (0xFFFFFF) by default - textures will show their natural colors
+        // Fallback magenta color will only be applied if texture is missing (handled in bindTextureForBlock)
+        int color = 0xFFFFFF;
+        
+        // Track which faces are visible for outline rendering
+        boolean topVisible = shouldRenderFace(chunk, cx, cy + 1, cz);
+        boolean bottomVisible = shouldRenderFace(chunk, cx, cy - 1, cz);
+        boolean northVisible = shouldRenderFace(chunk, cx, cy, cz - 1);
+        boolean southVisible = shouldRenderFace(chunk, cx, cy, cz + 1);
+        boolean westVisible = shouldRenderFace(chunk, cx - 1, cy, cz);
+        boolean eastVisible = shouldRenderFace(chunk, cx + 1, cy, cz);
+        
+        // Collect visible faces for batched rendering
+        // Store both the adjusted color and the brightness factor for fallback color
+        if (topVisible) {
+            topFaces.add(new FaceData(x, y, z, color, 1f, 1f, block, "top", 
+                BlockFaceGeometry::drawTopFace));
+        }
+        if (bottomVisible) {
+            bottomFaces.add(new FaceData(x, y, z, ColorUtils.darkenColor(color), 1f, 0.5f, block, "bottom", 
+                BlockFaceGeometry::drawBottomFace));
+        }
+        if (northVisible) {
+            northFaces.add(new FaceData(x, y, z, ColorUtils.adjustColorBrightness(color, 0.8f), 1f, 0.8f, block, "side", 
+                BlockFaceGeometry::drawNorthFace));
+        }
+        if (southVisible) {
+            southFaces.add(new FaceData(x, y, z, ColorUtils.adjustColorBrightness(color, 0.8f), 1f, 0.8f, block, "side", 
+                BlockFaceGeometry::drawSouthFace));
+        }
+        if (westVisible) {
+            westFaces.add(new FaceData(x, y, z, ColorUtils.adjustColorBrightness(color, 0.6f), 1f, 0.6f, block, "side", 
+                BlockFaceGeometry::drawWestFace));
+        }
+        if (eastVisible) {
+            eastFaces.add(new FaceData(x, y, z, ColorUtils.adjustColorBrightness(color, 0.6f), 1f, 0.6f, block, "side", 
+                BlockFaceGeometry::drawEastFace));
+        }
+        
+        // Collect outline data
+        if (topVisible || bottomVisible || northVisible || southVisible || westVisible || eastVisible) {
+            outlines.add(new OutlineData(x, y, z, topVisible, bottomVisible, northVisible, 
+                southVisible, westVisible, eastVisible));
+        }
+    }
+    
+    /**
+     * Check if a face should be rendered (is the adjacent block air?).
+     */
+    private boolean shouldRenderFace(Chunk chunk, int x, int y, int z) {
+        // If out of bounds, consider it air (should render)
+        if (x < 0 || x >= Chunk.WIDTH || y < 0 || y >= Chunk.HEIGHT || z < 0 || z >= Chunk.DEPTH) {
+            return true;
+        }
+        return chunk.getBlock(x, y, z).isAir();
+    }
+    
+    // Getters for face lists
+    public List<FaceData> getTopFaces() { return topFaces; }
+    public List<FaceData> getBottomFaces() { return bottomFaces; }
+    public List<FaceData> getNorthFaces() { return northFaces; }
+    public List<FaceData> getSouthFaces() { return southFaces; }
+    public List<FaceData> getWestFaces() { return westFaces; }
+    public List<FaceData> getEastFaces() { return eastFaces; }
+    public List<OutlineData> getOutlines() { return outlines; }
+    
+    /**
+     * Functional interface for rendering a single face.
+     */
+    @FunctionalInterface
+    public interface FaceRenderer {
+        void render(float x, float y, float z);
+    }
+    
+    /**
+     * Data class to store face rendering information.
+     */
+    public static class FaceData {
+        public final float x, y, z;
+        public final int color;
+        public final float brightness;
+        public final float colorBrightness; // Brightness adjustment for the base color (for fallback)
+        public final Block block;
+        public final String faceType; // "top", "bottom", "side", etc.
+        public final FaceRenderer renderer; // The renderer method to use for drawing this face
+        
+        public FaceData(float x, float y, float z, int color, float brightness, float colorBrightness, 
+                       Block block, String faceType, FaceRenderer renderer) {
+            this.x = x;
+            this.y = y;
+            this.z = z;
+            this.color = color;
+            this.brightness = brightness;
+            this.colorBrightness = colorBrightness;
+            this.block = block;
+            this.faceType = faceType;
+            this.renderer = renderer;
+        }
+    }
+    
+    /**
+     * Data class to store outline rendering information.
+     */
+    public static class OutlineData {
+        public final float x, y, z;
+        public final boolean top, bottom, north, south, west, east;
+        
+        public OutlineData(float x, float y, float z, boolean top, boolean bottom, boolean north, 
+                          boolean south, boolean west, boolean east) {
+            this.x = x;
+            this.y = y;
+            this.z = z;
+            this.top = top;
+            this.bottom = bottom;
+            this.north = north;
+            this.south = south;
+            this.west = west;
+            this.east = east;
+        }
+    }
+}
