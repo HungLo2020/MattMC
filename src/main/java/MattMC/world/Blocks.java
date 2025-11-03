@@ -140,4 +140,19 @@ public class Blocks {
     public static Set<String> getRegisteredIdentifiers() {
         return Collections.unmodifiableSet(REGISTRY.keySet());
     }
+    
+    /**
+     * Get a block by its identifier, returning AIR if not found.
+     * This is useful for deserialization where we want to handle missing blocks gracefully.
+     * 
+     * @param identifier The block identifier (e.g., "mattmc:dirt")
+     * @return The Block, or AIR if not found
+     */
+    public static Block getBlockOrAir(String identifier) {
+        if (identifier == null) {
+            return AIR;
+        }
+        Block block = REGISTRY.get(identifier);
+        return block != null ? block : AIR;
+    }
 }
