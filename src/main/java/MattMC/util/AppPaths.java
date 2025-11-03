@@ -39,10 +39,26 @@ public final class AppPaths {
             // Running from packaged distribution - go up one level from lib/
             appRoot = jarDir.getParent();
             System.out.println("[DEBUG] Packaged mode: appRoot = " + appRoot);
+        } else if (jarDir.toString().contains("/build/classes/")) {
+            // Running from Gradle in dev mode - navigate up to project root
+            // Path is like: /path/to/project/build/classes/java/main
+            // We need to get to: /path/to/project/
+            Path current = jarDir;
+            while (current != null && !current.endsWith("build")) {
+                current = current.getParent();
+            }
+            if (current != null) {
+                appRoot = current.getParent(); // Go up from "build" to project root
+                System.out.println("[DEBUG] Gradle dev mode: appRoot = " + appRoot);
+            } else {
+                // Fallback if we can't find build directory
+                appRoot = jarDir;
+                System.out.println("[DEBUG] Dev mode fallback: appRoot = " + appRoot);
+            }
         } else {
             // Running from IDE or other setup - use jarDir itself
             appRoot = jarDir;
-            System.out.println("[DEBUG] Dev mode: appRoot = " + appRoot);
+            System.out.println("[DEBUG] IDE/other mode: appRoot = " + appRoot);
         }
         
         if (appRoot == null) {
