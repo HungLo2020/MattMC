@@ -89,6 +89,15 @@ public final class DevplayScreen implements Screen {
         this.worldRenderer = new WorldRenderer();
         this.uiRenderer = new UIRenderer();
 
+        // Register input callbacks
+        registerCallbacks();
+    }
+    
+    /**
+     * Register input callbacks for this screen.
+     * Called from constructor and when returning from pause menu.
+     */
+    private void registerCallbacks() {
         // Capture mouse for FPS-style controls
         glfwSetInputMode(window.handle(), GLFW_CURSOR, GLFW_CURSOR_DISABLED);
         
@@ -320,6 +329,10 @@ public final class DevplayScreen implements Screen {
         return worldName;
     }
 
-    @Override public void onOpen() {}
+    @Override 
+    public void onOpen() {
+        // Re-register callbacks when returning from pause menu
+        registerCallbacks();
+    }
     @Override public void onClose() {}
 }

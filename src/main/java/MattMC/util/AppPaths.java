@@ -26,13 +26,24 @@ public final class AppPaths {
         }
     }
 
-    /** Creates <parent-of-jar-dir>/<dirName> and returns it. Never null. */
+    /** Creates <app-root>/<dirName> and returns it. Never null. 
+     * App root is the parent of the lib directory (where bin/, lib/ are located). */
     public static Path ensureDataDirInJarParent(String dirName) throws IOException {
         Path jarDir = jarBaseDir();
-        Path parent = jarDir != null ? jarDir.getParent() : null;
-        if (parent == null) parent = jarDir; // last-resort fallback
+        
+        // Determine the app root directory
+        Path appRoot;
+        if (jarDir.endsWith("lib")) {
+            // Running from packaged distribution - go up one level from lib/
+            appRoot = jarDir.getParent();
+        } else {
+            // Running from IDE or other setup - use jarDir itself
+            appRoot = jarDir;
+        }
+        
+        if (appRoot == null) appRoot = jarDir; // last-resort fallback
 
-        Path dataDir = parent.resolve(dirName);
+        Path dataDir = appRoot.resolve(dirName);
         Files.createDirectories(dataDir);
 
         // Try to set sane POSIX perms on Unix; ignore if unsupported (e.g., Windows).
