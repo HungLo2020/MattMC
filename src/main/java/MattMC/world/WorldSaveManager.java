@@ -18,9 +18,14 @@ public final class WorldSaveManager {
     
     /**
      * Get the saves directory where all worlds are stored.
+     * Saves are stored in the MattMC data directory alongside options and other game data.
      */
     public static Path getSavesDirectory() throws IOException {
-        return AppPaths.ensureDataDirInJarParent("saves");
+        // Get the MattMC data directory first, then create saves inside it
+        Path mattmcDir = AppPaths.ensureDataDirInJarParent("MattMC");
+        Path savesDir = mattmcDir.resolve("saves");
+        Files.createDirectories(savesDir);
+        return savesDir;
     }
     
     /**
