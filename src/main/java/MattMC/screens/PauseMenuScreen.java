@@ -2,6 +2,8 @@ package MattMC.screens;
 
 import MattMC.core.Game;
 import MattMC.core.Window;
+import MattMC.gfx.BlurEffect;
+import MattMC.gfx.Framebuffer;
 import MattMC.ui.UIButton;
 import MattMC.ui.TextRenderer;
 import MattMC.world.World;
@@ -14,32 +16,44 @@ import java.util.List;
 
 import static org.lwjgl.glfw.GLFW.*;
 import static org.lwjgl.opengl.GL11.*;
+import static org.lwjgl.opengl.GL30.*;
 import static org.lwjgl.system.MemoryStack.stackPush;
 
-/* Simple singleplayer menu with buttons to create/load worlds. */
-public final class SingleplayerScreen implements Screen {
+/**
+ * Pause menu overlay shown when player presses ESC in-game.
+ * Similar to Minecraft's pause screen.
+ */
+public final class PauseMenuScreen implements Screen {
     private final Game game;
     private final Window window;
+    private final DevplayScreen gameScreen;
     private final List<UIButton> buttons = new ArrayList<>();
-    private final List<String> worldList = new ArrayList<>();
-    private final List<UIButton> worldButtons = new ArrayList<>();
     private double mouseXWin, mouseYWin;
     private boolean mouseDown;
-    private int selectedWorldIndex = -1;
-
+    
     private float titleScale = 2.5f;
     private float titleCX, titleCY;
     private int buttonWidth = 300, buttonHeight = 44, buttonGap = 12;
-    private int worldButtonHeight = 36;
     private int buttonsStartY;
+    
+    // Blur effect for background
+    private BlurEffect blurEffect;
 
-    public SingleplayerScreen(Game game) {
+    public PauseMenuScreen(Game game, DevplayScreen gameScreen) {
         this.game = game;
         this.window = game.window();
+        this.gameScreen = gameScreen;
 
         glfwSetCursorPosCallback(window.handle(), (h, x, y) -> { mouseXWin = x; mouseYWin = y; });
         glfwSetMouseButtonCallback(window.handle(), (h, button, action, mods) -> {
             if (button == GLFW_MOUSE_BUTTON_LEFT) mouseDown = (action == GLFW_PRESS);
+        });
+        
+        // Set up key callback for ESC to unpause
+        glfwSetKeyCallback(window.handle(), (win, key, scancode, action, mods) -> {
+            if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS) {
+                unpause();
+            }
         });
 
         recomputeLayout();
@@ -48,45 +62,35 @@ public final class SingleplayerScreen implements Screen {
             glViewport(0, 0, Math.max(newW, 1), Math.max(newH, 1));
             recomputeLayout();
         });
+        
+        // Release mouse cursor
+        glfwSetInputMode(window.handle(), GLFW_CURSOR, GLFW_CURSOR_NORMAL);
     }
 
     private void recomputeLayout() {
         int w = window.width(), h = window.height();
         titleCX = w / 2f;
-        titleCY = h * 0.12f;
+        titleCY = h * 0.30f;
 
-        // Load world list
-        worldList.clear();
-        worldList.addAll(WorldSaveManager.listWorlds());
-        
-        // World list area (top half)
-        int worldListY = (int)(h * 0.25f);
-        int worldListHeight = (int)(h * 0.4f);
-        int maxVisibleWorlds = Math.max(1, worldListHeight / (worldButtonHeight + 6));
-        
-        worldButtons.clear();
+        int totalButtonsH = 3 * buttonHeight + 2 * buttonGap;
+        buttonsStartY = (int)(h / 2f - totalButtonsH / 2f);
+
         int x = (w - buttonWidth) / 2;
-        for (int i = 0; i < Math.min(worldList.size(), maxVisibleWorlds); i++) {
-            String worldName = worldList.get(i);
-            int y = worldListY + i * (worldButtonHeight + 6);
-            worldButtons.add(new UIButton(worldName, x, y, buttonWidth, worldButtonHeight));
-        }
-        
-        // Bottom buttons
-        buttonsStartY = worldListY + worldListHeight + 20;
         buttons.clear();
 
-        // Centered singleplayer buttons
-        buttons.add(new UIButton("Play Selected", x, buttonsStartY + 0 * (buttonHeight + buttonGap), buttonWidth, buttonHeight));
-        buttons.add(new UIButton("Create New World", x, buttonsStartY + 1 * (buttonHeight + buttonGap), buttonWidth, buttonHeight));
-        buttons.add(new UIButton("Back",         x, buttonsStartY + 2 * (buttonHeight + buttonGap), buttonWidth, buttonHeight));
+        buttons.add(new UIButton("Back to Game",  x, buttonsStartY + 0 * (buttonHeight + buttonGap), buttonWidth, buttonHeight));
+        buttons.add(new UIButton("Save and Exit", x, buttonsStartY + 1 * (buttonHeight + buttonGap), buttonWidth, buttonHeight));
+        buttons.add(new UIButton("Options",       x, buttonsStartY + 2 * (buttonHeight + buttonGap), buttonWidth, buttonHeight));
+    }
+    
+    private void unpause() {
+        // Recapture mouse for FPS controls
+        glfwSetInputMode(window.handle(), GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+        game.setScreen(gameScreen);
     }
 
     @Override
     public void tick() {
-        // Update panorama animation
-        game.panorama().update();
-        
         // Convert window coords -> framebuffer coords for accurate hit-testing on HiDPI
         float mxFB, myFB;
         try (MemoryStack stack = stackPush()) {
@@ -101,19 +105,8 @@ public final class SingleplayerScreen implements Screen {
         }
 
         for (var b : buttons) b.setHover(b.contains(mxFB, myFB));
-        for (var b : worldButtons) b.setHover(b.contains(mxFB, myFB));
 
         if (mouseDown) {
-            // Check world button clicks
-            for (int i = 0; i < worldButtons.size(); i++) {
-                if (worldButtons.get(i).contains(mxFB, myFB)) {
-                    selectedWorldIndex = i;
-                    mouseDown = false;
-                    return;
-                }
-            }
-            
-            // Check main button clicks
             for (var b : buttons) {
                 if (b.contains(mxFB, myFB)) {
                     onClick(b.label);
@@ -125,64 +118,105 @@ public final class SingleplayerScreen implements Screen {
     }
 
     private void onClick(String label) {
-        if ("Back".equals(label)) {
-            game.setScreen(new TitleScreen(game));
+        if ("Back to Game".equals(label)) {
+            unpause();
             return;
         }
-        if ("Create New World".equals(label)) {
-            System.out.println("→ Create World clicked");
-            game.setScreen(new CreateWorldScreen(game));
+        if ("Save and Exit".equals(label)) {
+            saveAndExit();
             return;
         }
-        if ("Play Selected".equals(label)) {
-            if (selectedWorldIndex >= 0 && selectedWorldIndex < worldList.size()) {
-                loadWorld(worldList.get(selectedWorldIndex));
-            } else {
-                System.out.println("No world selected");
-            }
+        if ("Options".equals(label)) {
+            // TODO: Show options screen
+            System.out.println("Options not yet implemented in pause menu");
             return;
         }
     }
     
-    private void loadWorld(String worldName) {
+    private void saveAndExit() {
         try {
-            System.out.println("→ Loading world: " + worldName);
-            WorldSaveManager.WorldLoadResult result = WorldSaveManager.loadWorld(worldName);
+            // Save the world
+            gameScreen.saveWorld();
             
-            game.setScreen(new DevplayScreen(game, worldName, result.world,
-                result.metadata.playerX, result.metadata.playerY, result.metadata.playerZ,
-                result.metadata.playerYaw, result.metadata.playerPitch));
+            // Return to title screen
+            glfwSetInputMode(window.handle(), GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+            game.setScreen(new TitleScreen(game));
         } catch (Exception e) {
-            System.err.println("Failed to load world: " + e.getMessage());
+            System.err.println("Failed to save world: " + e.getMessage());
             e.printStackTrace();
+            // Still exit even if save failed
+            glfwSetInputMode(window.handle(), GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+            game.setScreen(new TitleScreen(game));
         }
     }
 
     @Override
     public void render(double alpha) {
-        // Render panorama background with blur based on settings
-        boolean blurred = MattMC.util.OptionsManager.isMenuScreenBlurEnabled();
-        game.panorama().render(window.width(), window.height(), blurred);
-
-        setupOrtho();
+        int w = window.width(), h = window.height();
         
-        // Draw world list
-        for (int i = 0; i < worldButtons.size(); i++) {
-            drawWorldButton(worldButtons.get(i), i == selectedWorldIndex);
+        // First render the game screen behind this overlay
+        gameScreen.render(alpha);
+        
+        // Apply blur if enabled
+        if (MattMC.util.OptionsManager.isMenuScreenBlurEnabled()) {
+            if (blurEffect == null) {
+                blurEffect = new BlurEffect();
+            }
+            
+            // Capture screen to texture
+            int captureTexture = glGenTextures();
+            glBindTexture(GL_TEXTURE_2D, captureTexture);
+            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, w, h, 0, GL_RGBA, GL_UNSIGNED_BYTE, 0);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+            glCopyTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, 0, 0, w, h);
+            
+            // Apply blur
+            Framebuffer blurredResult = blurEffect.applyBlur(captureTexture, w, h);
+            
+            // Render blurred result as background
+            glMatrixMode(GL_PROJECTION);
+            glLoadIdentity();
+            glOrtho(0, 1, 1, 0, -1, 1);
+            glMatrixMode(GL_MODELVIEW);
+            glLoadIdentity();
+            
+            glEnable(GL_TEXTURE_2D);
+            glBindTexture(GL_TEXTURE_2D, blurredResult.getTextureId());
+            glColor4f(1f, 1f, 1f, 1f);
+            
+            glBegin(GL_QUADS);
+            glTexCoord2f(0, 1); glVertex2f(0, 0);
+            glTexCoord2f(1, 1); glVertex2f(1, 0);
+            glTexCoord2f(1, 0); glVertex2f(1, 1);
+            glTexCoord2f(0, 0); glVertex2f(0, 1);
+            glEnd();
+            
+            glDisable(GL_TEXTURE_2D);
+            glDeleteTextures(captureTexture);
         }
         
-        // Draw main buttons
+        // Draw dark overlay
+        glMatrixMode(GL_PROJECTION);
+        glLoadIdentity();
+        glOrtho(0, w, h, 0, -1, 1);
+        glMatrixMode(GL_MODELVIEW);
+        glLoadIdentity();
+        
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        
+        setColor(0x000000, 0.5f);
+        glBegin(GL_QUADS);
+        glVertex2f(0, 0);
+        glVertex2f(w, 0);
+        glVertex2f(w, h);
+        glVertex2f(0, h);
+        glEnd();
+        
+        // Draw UI
         for (var b : buttons) drawButton(b);
-        
-        drawTitle("Singleplayer", titleCX, titleCY, titleScale, 0xFFFFFF);
-        
-        // Show message if no worlds
-        if (worldList.isEmpty()) {
-            drawTitle("No saved worlds", titleCX, titleCY + 48f, 1.2f, 0xB0C4DE);
-            drawTitle("Create a new world to get started", titleCX, titleCY + 72f, 1.0f, 0x808080);
-        } else {
-            drawTitle("Select a world", titleCX, titleCY + 48f, 1.0f, 0xB0C4DE);
-        }
+        drawTitle("Game Paused", titleCX, titleCY, titleScale, 0xFFFFFF);
     }
 
     private void setupOrtho() {
@@ -194,33 +228,6 @@ public final class SingleplayerScreen implements Screen {
         glLoadIdentity();
     }
 
-    private void drawWorldButton(UIButton b, boolean selected) {
-        int base = selected ? 0x4A7FED : (b.hover() ? 0x3A5FCD : 0x2E4A9B);
-        int edge = selected ? 0x7DA5F3 : (b.hover() ? 0x6D89E3 : 0x20356B);
-
-        setColor(0x000000, 0.35f);
-        fillRect(b.x + 2, b.y + 3, b.w, b.h);
-
-        glBegin(GL_QUADS);
-        setColor(edge, 1f);
-        glVertex2f(b.x, b.y);
-        glVertex2f(b.x + b.w, b.y);
-        setColor(base, 1f);
-        glVertex2f(b.x + b.w, b.y + b.h);
-        glVertex2f(b.x, b.y + b.h);
-        glEnd();
-
-        setColor(0x0B1220, 1f);
-        glBegin(GL_LINE_LOOP);
-        glVertex2f(b.x, b.y);
-        glVertex2f(b.x + b.w, b.y);
-        glVertex2f(b.x + b.w, b.y + b.h);
-        glVertex2f(b.x, b.y + b.h);
-        glEnd();
-
-        drawTextCentered(b.label, b.x + b.w / 2f, b.y + b.h / 2f, 1.0f, 0xFFFFFF);
-    }
-    
     private void drawButton(UIButton b) {
         int base = b.hover() ? 0x3A5FCD : 0x2E4A9B;
         int edge = b.hover() ? 0x6D89E3 : 0x20356B;
@@ -287,8 +294,12 @@ public final class SingleplayerScreen implements Screen {
 
     @Override
     public void onOpen() {}
+    
     @Override
     public void onClose() {
-        // Panorama is now shared and managed by Game
+        if (blurEffect != null) {
+            blurEffect.close();
+            blurEffect = null;
+        }
     }
 }

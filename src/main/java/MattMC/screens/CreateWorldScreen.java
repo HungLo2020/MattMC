@@ -3,8 +3,8 @@ package MattMC.screens;
 import MattMC.core.Game;
 import MattMC.core.Window;
 import MattMC.ui.UIButton;
+import MattMC.ui.UITextField;
 import MattMC.ui.TextRenderer;
-import MattMC.world.World;
 import MattMC.world.WorldSaveManager;
 import org.lwjgl.system.MemoryStack;
 
@@ -16,30 +16,52 @@ import static org.lwjgl.glfw.GLFW.*;
 import static org.lwjgl.opengl.GL11.*;
 import static org.lwjgl.system.MemoryStack.stackPush;
 
-/* Simple singleplayer menu with buttons to create/load worlds. */
-public final class SingleplayerScreen implements Screen {
+/* Create World screen - allows creating a new world. */
+public final class CreateWorldScreen implements Screen {
     private final Game game;
     private final Window window;
     private final List<UIButton> buttons = new ArrayList<>();
-    private final List<String> worldList = new ArrayList<>();
-    private final List<UIButton> worldButtons = new ArrayList<>();
+    private UITextField worldNameField;
     private double mouseXWin, mouseYWin;
     private boolean mouseDown;
-    private int selectedWorldIndex = -1;
 
     private float titleScale = 2.5f;
     private float titleCX, titleCY;
     private int buttonWidth = 300, buttonHeight = 44, buttonGap = 12;
-    private int worldButtonHeight = 36;
+    private int textFieldWidth = 300, textFieldHeight = 32;
     private int buttonsStartY;
 
-    public SingleplayerScreen(Game game) {
+    public CreateWorldScreen(Game game) {
         this.game = game;
         this.window = game.window();
 
         glfwSetCursorPosCallback(window.handle(), (h, x, y) -> { mouseXWin = x; mouseYWin = y; });
         glfwSetMouseButtonCallback(window.handle(), (h, button, action, mods) -> {
             if (button == GLFW_MOUSE_BUTTON_LEFT) mouseDown = (action == GLFW_PRESS);
+        });
+        
+        // Set up character callback for text field input
+        glfwSetCharCallback(window.handle(), (win, codepoint) -> {
+            if (worldNameField != null && worldNameField.isFocused()) {
+                char c = (char) codepoint;
+                // Only allow alphanumeric, space, and some punctuation
+                if (isValidWorldNameCharacter(c)) {
+                    worldNameField.appendChar(c);
+                }
+            }
+        });
+        
+        // Set up key callback for backspace and enter
+        glfwSetKeyCallback(window.handle(), (win, key, scancode, action, mods) -> {
+            if (worldNameField != null && worldNameField.isFocused()) {
+                if ((action == GLFW_PRESS || action == GLFW_REPEAT) && key == GLFW_KEY_BACKSPACE) {
+                    worldNameField.backspace();
+                }
+                if (action == GLFW_PRESS && key == GLFW_KEY_ENTER) {
+                    // Create world on Enter
+                    createWorld();
+                }
+            }
         });
 
         recomputeLayout();
@@ -53,33 +75,26 @@ public final class SingleplayerScreen implements Screen {
     private void recomputeLayout() {
         int w = window.width(), h = window.height();
         titleCX = w / 2f;
-        titleCY = h * 0.12f;
+        titleCY = h * 0.18f;
 
-        // Load world list
-        worldList.clear();
-        worldList.addAll(WorldSaveManager.listWorlds());
-        
-        // World list area (top half)
-        int worldListY = (int)(h * 0.25f);
-        int worldListHeight = (int)(h * 0.4f);
-        int maxVisibleWorlds = Math.max(1, worldListHeight / (worldButtonHeight + 6));
-        
-        worldButtons.clear();
+        // Layout: text field, then buttons below
+        int textFieldY = (int)(h * 0.35f);
+        int totalButtonsH = 2 * buttonHeight + 1 * buttonGap;
+        buttonsStartY = textFieldY + textFieldHeight + 30;
+
         int x = (w - buttonWidth) / 2;
-        for (int i = 0; i < Math.min(worldList.size(), maxVisibleWorlds); i++) {
-            String worldName = worldList.get(i);
-            int y = worldListY + i * (worldButtonHeight + 6);
-            worldButtons.add(new UIButton(worldName, x, y, buttonWidth, worldButtonHeight));
-        }
-        
-        // Bottom buttons
-        buttonsStartY = worldListY + worldListHeight + 20;
+        int tfx = (w - textFieldWidth) / 2;
         buttons.clear();
 
-        // Centered singleplayer buttons
-        buttons.add(new UIButton("Play Selected", x, buttonsStartY + 0 * (buttonHeight + buttonGap), buttonWidth, buttonHeight));
-        buttons.add(new UIButton("Create New World", x, buttonsStartY + 1 * (buttonHeight + buttonGap), buttonWidth, buttonHeight));
-        buttons.add(new UIButton("Back",         x, buttonsStartY + 2 * (buttonHeight + buttonGap), buttonWidth, buttonHeight));
+        // Create text field with unique world name
+        String defaultName = WorldSaveManager.generateUniqueWorldName("New World");
+        worldNameField = new UITextField(tfx, textFieldY, textFieldWidth, textFieldHeight, 50);
+        worldNameField.setText(defaultName);
+        worldNameField.setFocused(true); // Auto-focus
+
+        // Centered buttons
+        buttons.add(new UIButton("Create World", x, buttonsStartY + 0 * (buttonHeight + buttonGap), buttonWidth, buttonHeight));
+        buttons.add(new UIButton("Back",         x, buttonsStartY + 1 * (buttonHeight + buttonGap), buttonWidth, buttonHeight));
     }
 
     @Override
@@ -101,23 +116,21 @@ public final class SingleplayerScreen implements Screen {
         }
 
         for (var b : buttons) b.setHover(b.contains(mxFB, myFB));
-        for (var b : worldButtons) b.setHover(b.contains(mxFB, myFB));
+        if (worldNameField != null) worldNameField.setHover(worldNameField.contains(mxFB, myFB));
 
         if (mouseDown) {
-            // Check world button clicks
-            for (int i = 0; i < worldButtons.size(); i++) {
-                if (worldButtons.get(i).contains(mxFB, myFB)) {
-                    selectedWorldIndex = i;
-                    mouseDown = false;
-                    return;
-                }
-            }
-            
-            // Check main button clicks
-            for (var b : buttons) {
-                if (b.contains(mxFB, myFB)) {
-                    onClick(b.label);
-                    break;
+            // Check text field click
+            if (worldNameField != null && worldNameField.contains(mxFB, myFB)) {
+                worldNameField.setFocused(true);
+            } else {
+                if (worldNameField != null) worldNameField.setFocused(false);
+                
+                // Check button clicks
+                for (var b : buttons) {
+                    if (b.contains(mxFB, myFB)) {
+                        onClick(b.label);
+                        break;
+                    }
                 }
             }
             mouseDown = false;
@@ -126,36 +139,34 @@ public final class SingleplayerScreen implements Screen {
 
     private void onClick(String label) {
         if ("Back".equals(label)) {
-            game.setScreen(new TitleScreen(game));
+            game.setScreen(new SingleplayerScreen(game));
             return;
         }
-        if ("Create New World".equals(label)) {
-            System.out.println("→ Create World clicked");
-            game.setScreen(new CreateWorldScreen(game));
-            return;
-        }
-        if ("Play Selected".equals(label)) {
-            if (selectedWorldIndex >= 0 && selectedWorldIndex < worldList.size()) {
-                loadWorld(worldList.get(selectedWorldIndex));
-            } else {
-                System.out.println("No world selected");
-            }
+        if ("Create World".equals(label)) {
+            createWorld();
             return;
         }
     }
     
-    private void loadWorld(String worldName) {
-        try {
-            System.out.println("→ Loading world: " + worldName);
-            WorldSaveManager.WorldLoadResult result = WorldSaveManager.loadWorld(worldName);
-            
-            game.setScreen(new DevplayScreen(game, worldName, result.world,
-                result.metadata.playerX, result.metadata.playerY, result.metadata.playerZ,
-                result.metadata.playerYaw, result.metadata.playerPitch));
-        } catch (Exception e) {
-            System.err.println("Failed to load world: " + e.getMessage());
-            e.printStackTrace();
+    private void createWorld() {
+        String worldName = worldNameField.getText().trim();
+        if (worldName.isEmpty()) {
+            worldName = "New World";
         }
+        
+        // Ensure unique name
+        worldName = WorldSaveManager.generateUniqueWorldName(worldName);
+        
+        System.out.println("→ Creating world: " + worldName);
+        game.setScreen(new DevplayScreen(game, worldName));
+    }
+    
+    /**
+     * Check if a character is valid for world names.
+     * Allows alphanumeric, space, hyphen, underscore, and parentheses.
+     */
+    private static boolean isValidWorldNameCharacter(char c) {
+        return Character.isLetterOrDigit(c) || c == ' ' || c == '-' || c == '_' || c == '(' || c == ')';
     }
 
     @Override
@@ -166,23 +177,12 @@ public final class SingleplayerScreen implements Screen {
 
         setupOrtho();
         
-        // Draw world list
-        for (int i = 0; i < worldButtons.size(); i++) {
-            drawWorldButton(worldButtons.get(i), i == selectedWorldIndex);
-        }
+        // Draw text field
+        if (worldNameField != null) drawTextField(worldNameField);
         
-        // Draw main buttons
         for (var b : buttons) drawButton(b);
-        
-        drawTitle("Singleplayer", titleCX, titleCY, titleScale, 0xFFFFFF);
-        
-        // Show message if no worlds
-        if (worldList.isEmpty()) {
-            drawTitle("No saved worlds", titleCX, titleCY + 48f, 1.2f, 0xB0C4DE);
-            drawTitle("Create a new world to get started", titleCX, titleCY + 72f, 1.0f, 0x808080);
-        } else {
-            drawTitle("Select a world", titleCX, titleCY + 48f, 1.0f, 0xB0C4DE);
-        }
+        drawTitle("Create New World", titleCX, titleCY, titleScale, 0xFFFFFF);
+        drawTitle("World Name:", titleCX, worldNameField.y - 20f, 1.0f, 0xB0C4DE);
     }
 
     private void setupOrtho() {
@@ -194,31 +194,38 @@ public final class SingleplayerScreen implements Screen {
         glLoadIdentity();
     }
 
-    private void drawWorldButton(UIButton b, boolean selected) {
-        int base = selected ? 0x4A7FED : (b.hover() ? 0x3A5FCD : 0x2E4A9B);
-        int edge = selected ? 0x7DA5F3 : (b.hover() ? 0x6D89E3 : 0x20356B);
-
-        setColor(0x000000, 0.35f);
-        fillRect(b.x + 2, b.y + 3, b.w, b.h);
-
-        glBegin(GL_QUADS);
-        setColor(edge, 1f);
-        glVertex2f(b.x, b.y);
-        glVertex2f(b.x + b.w, b.y);
-        setColor(base, 1f);
-        glVertex2f(b.x + b.w, b.y + b.h);
-        glVertex2f(b.x, b.y + b.h);
-        glEnd();
-
-        setColor(0x0B1220, 1f);
+    private void drawTextField(UITextField tf) {
+        // Background
+        int bgColor = tf.isFocused() ? 0x000000 : 0x222222;
+        setColor(bgColor, 0.8f);
+        fillRect(tf.x, tf.y, tf.w, tf.h);
+        
+        // Border
+        int borderColor = tf.isFocused() ? 0xFFFFFF : 0x888888;
+        setColor(borderColor, 1f);
         glBegin(GL_LINE_LOOP);
-        glVertex2f(b.x, b.y);
-        glVertex2f(b.x + b.w, b.y);
-        glVertex2f(b.x + b.w, b.y + b.h);
-        glVertex2f(b.x, b.y + b.h);
+        glVertex2f(tf.x, tf.y);
+        glVertex2f(tf.x + tf.w, tf.y);
+        glVertex2f(tf.x + tf.w, tf.y + tf.h);
+        glVertex2f(tf.x, tf.y + tf.h);
         glEnd();
-
-        drawTextCentered(b.label, b.x + b.w / 2f, b.y + b.h / 2f, 1.0f, 0xFFFFFF);
+        
+        // Text
+        String text = tf.getText();
+        if (!text.isEmpty()) {
+            drawText(text, tf.x + 8f, tf.y + 10f, 1.0f, 0xFFFFFF);
+        }
+        
+        // Cursor
+        if (tf.isFocused() && (System.currentTimeMillis() / 500) % 2 == 0) {
+            float textWidth = TextRenderer.getTextWidth(text, 1.0f);
+            float cursorX = tf.x + 8f + textWidth;
+            setColor(0xFFFFFF, 1f);
+            glBegin(GL_LINES);
+            glVertex2f(cursorX, tf.y + 6f);
+            glVertex2f(cursorX, tf.y + tf.h - 6f);
+            glEnd();
+        }
     }
     
     private void drawButton(UIButton b) {

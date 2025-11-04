@@ -1,14 +1,23 @@
 package MattMC.core;
 
+import MattMC.gfx.CubeMap;
+import MattMC.gfx.PanoramaRenderer;
 import MattMC.screens.Screen;
 
 public final class Game {
     private final Window window;
     private Screen current;
     private boolean running = true;
+    private PanoramaRenderer sharedPanorama;
 
-    public Game(Window window) { this.window = window; }
+    public Game(Window window) { 
+        this.window = window;
+        // Load shared panorama once
+        CubeMap sky = CubeMap.load("/assets/textures/gui/panorama1_", ".png");
+        this.sharedPanorama = new PanoramaRenderer(sky);
+    }
     public Window window() { return window; }
+    public PanoramaRenderer panorama() { return sharedPanorama; }
 
     public void setScreen(Screen next) {
         if (current != null) current.onClose();

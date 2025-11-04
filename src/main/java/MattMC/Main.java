@@ -4,10 +4,14 @@ import MattMC.core.Game;
 import MattMC.core.Window;
 import MattMC.screens.TitleScreen;
 import MattMC.util.AppPaths;
+import MattMC.util.KeybindManager;
+import MattMC.util.OptionsManager;
 
 import java.nio.file.Path;
 
 public final class Main {
+    public static final String VERSION = "0.0.10";
+    
     public static void main(String[] args) {
         // Ensure data dir in parent of the JAR directory (or classes dir when in IDE)
         Path dataDir;
@@ -23,6 +27,12 @@ public final class Main {
             System.exit(1);
             return;
         }
+
+        // Load keybinds from Options.txt
+        KeybindManager.loadKeybinds();
+        
+        // Load options (blur settings, etc.)
+        OptionsManager.loadOptions();
 
         // Boot the game
         try (var window = new Window(1280, 720, "MattMC")) {
