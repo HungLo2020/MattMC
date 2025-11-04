@@ -8,7 +8,10 @@ import MattMC.player.PlayerController;
 import MattMC.player.PlayerPhysics;
 import MattMC.renderer.WorldRenderer;
 import MattMC.renderer.UIRenderer;
+import MattMC.renderer.BlockFaceGeometry;
+import MattMC.renderer.ColorUtils;
 import MattMC.world.Blocks;
+import MattMC.world.Chunk;
 import MattMC.world.World;
 import MattMC.world.WorldSaveManager;
 
@@ -313,6 +316,10 @@ public final class DevplayScreen implements Screen {
         worldRenderer.render(world, player.getX(), player.getEyeY(), player.getZ());
         
         glDisable(GL_CULL_FACE);
+        
+        // Render outline on the block the player is looking at
+        renderTargetedBlockOutline();
+        
         glDisable(GL_DEPTH_TEST);
         
         // Draw debug information in top-left corner (only if F3 is pressed)
@@ -331,6 +338,32 @@ public final class DevplayScreen implements Screen {
         }
     }
 
+    /**
+     * Render a black outline around the block the player is currently looking at.
+     */
+    private void renderTargetedBlockOutline() {
+        BlockInteraction.BlockHitResult hit = blockInteraction.getTargetedBlock();
+        if (hit != null) {
+            // Save texture state and disable texturing for outline
+            boolean textureEnabled = glIsEnabled(GL_TEXTURE_2D);
+            glDisable(GL_TEXTURE_2D);
+            
+            // Set up line rendering
+            glBegin(GL_LINES);
+            ColorUtils.setGLColor(0x000000, 1f);  // Black outline
+            
+            // Draw complete outline around the targeted block
+            BlockFaceGeometry.drawCompleteBlockOutline(hit.x, Chunk.chunkYToWorldY(hit.y), hit.z);
+            
+            glEnd();
+            
+            // Restore texture state
+            if (textureEnabled) {
+                glEnable(GL_TEXTURE_2D);
+            }
+        }
+    }
+    
     private static double now() { return System.nanoTime() * 1e-9; }
     
     /**

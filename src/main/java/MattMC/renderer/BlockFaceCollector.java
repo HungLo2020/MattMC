@@ -19,7 +19,6 @@ public class BlockFaceCollector {
     private final List<FaceData> southFaces = new ArrayList<>();
     private final List<FaceData> westFaces = new ArrayList<>();
     private final List<FaceData> eastFaces = new ArrayList<>();
-    private final List<OutlineData> outlines = new ArrayList<>();
     
     /**
      * Clear all collected face data.
@@ -31,7 +30,6 @@ public class BlockFaceCollector {
         southFaces.clear();
         westFaces.clear();
         eastFaces.clear();
-        outlines.clear();
     }
     
     /**
@@ -78,12 +76,6 @@ public class BlockFaceCollector {
             eastFaces.add(new FaceData(x, y, z, ColorUtils.adjustColorBrightness(color, 0.6f), 1f, 0.6f, block, "side", 
                 BlockFaceGeometry::drawEastFace));
         }
-        
-        // Collect outline data
-        if (topVisible || bottomVisible || northVisible || southVisible || westVisible || eastVisible) {
-            outlines.add(new OutlineData(x, y, z, topVisible, bottomVisible, northVisible, 
-                southVisible, westVisible, eastVisible));
-        }
     }
     
     /**
@@ -104,7 +96,6 @@ public class BlockFaceCollector {
     public List<FaceData> getSouthFaces() { return southFaces; }
     public List<FaceData> getWestFaces() { return westFaces; }
     public List<FaceData> getEastFaces() { return eastFaces; }
-    public List<OutlineData> getOutlines() { return outlines; }
     
     /**
      * Functional interface for rendering a single face.
@@ -137,27 +128,6 @@ public class BlockFaceCollector {
             this.block = block;
             this.faceType = faceType;
             this.renderer = renderer;
-        }
-    }
-    
-    /**
-     * Data class to store outline rendering information.
-     */
-    public static class OutlineData {
-        public final float x, y, z;
-        public final boolean top, bottom, north, south, west, east;
-        
-        public OutlineData(float x, float y, float z, boolean top, boolean bottom, boolean north, 
-                          boolean south, boolean west, boolean east) {
-            this.x = x;
-            this.y = y;
-            this.z = z;
-            this.top = top;
-            this.bottom = bottom;
-            this.north = north;
-            this.south = south;
-            this.west = west;
-            this.east = east;
         }
     }
 }
