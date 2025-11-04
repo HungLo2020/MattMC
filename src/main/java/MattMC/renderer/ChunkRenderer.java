@@ -19,7 +19,6 @@ import static org.lwjgl.opengl.GL11.*;
  * - Display lists: Pre-compile chunk geometry into OpenGL display lists (massive performance boost)
  * - Chunk sections: Divide chunk into 16x16x16 sections, skip empty sections
  * - Face culling: Only render faces adjacent to air
- * - Outline culling: Only render edges on visible faces
  */
 public class ChunkRenderer {
     
@@ -179,21 +178,6 @@ public class ChunkRenderer {
         allSideFaces.addAll(collector.getWestFaces());
         allSideFaces.addAll(collector.getEastFaces());
         renderOverlaysForSideFaces(allSideFaces);
-        
-        // Disable texturing for outlines
-        glDisable(GL_TEXTURE_2D);
-        
-        // Render all outlines in ONE glBegin/glEnd block
-        List<BlockFaceCollector.OutlineData> outlines = collector.getOutlines();
-        if (!outlines.isEmpty()) {
-            glBegin(GL_LINES);
-            ColorUtils.setGLColor(0x000000, 1f);  // Black outlines
-            for (BlockFaceCollector.OutlineData outline : outlines) {
-                BlockFaceGeometry.drawBlockOutline(outline.x, outline.y, outline.z, outline.top, outline.bottom,
-                        outline.north, outline.south, outline.west, outline.east);
-            }
-            glEnd();
-        }
     }
     
     /**

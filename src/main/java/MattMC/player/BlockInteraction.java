@@ -47,6 +47,14 @@ public class BlockInteraction {
     }
     
     /**
+     * Get the block the player is currently looking at.
+     * Returns null if no block is found within reach distance.
+     */
+    public BlockHitResult getTargetedBlock() {
+        return raycastBlock();
+    }
+    
+    /**
      * Perform ray casting to find the block the player is looking at.
      * Returns null if no block is found within maxDistance.
      */
@@ -102,11 +110,11 @@ public class BlockInteraction {
     /**
      * Simple data class to hold ray cast hit result.
      */
-    private static class BlockHitResult {
-        final int x, y, z;              // Block that was hit
-        final int adjacentX, adjacentY, adjacentZ;  // Adjacent air block (for placing)
+    public static class BlockHitResult {
+        public final int x, y, z;              // Block that was hit
+        public final int adjacentX, adjacentY, adjacentZ;  // Adjacent air block (for placing)
         
-        BlockHitResult(int x, int y, int z, int adjX, int adjY, int adjZ) {
+        public BlockHitResult(int x, int y, int z, int adjX, int adjY, int adjZ) {
             this.x = x;
             this.y = y;
             this.z = z;

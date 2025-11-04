@@ -113,6 +113,34 @@ public final class BlockFaceGeometry {
     }
     
     /**
+     * Draw a complete outline around a cube (all 12 edges).
+     * Used for highlighting the targeted block.
+     */
+    public static void drawCompleteBlockOutline(float x, float y, float z) {
+        float x0 = x, x1 = x + 1;
+        float y0 = y, y1 = y + 1;
+        float z0 = z, z1 = z + 1;
+        
+        // Bottom 4 edges
+        glVertex3f(x0, y0, z0); glVertex3f(x1, y0, z0);
+        glVertex3f(x1, y0, z0); glVertex3f(x1, y0, z1);
+        glVertex3f(x1, y0, z1); glVertex3f(x0, y0, z1);
+        glVertex3f(x0, y0, z1); glVertex3f(x0, y0, z0);
+        
+        // Top 4 edges
+        glVertex3f(x0, y1, z0); glVertex3f(x1, y1, z0);
+        glVertex3f(x1, y1, z0); glVertex3f(x1, y1, z1);
+        glVertex3f(x1, y1, z1); glVertex3f(x0, y1, z1);
+        glVertex3f(x0, y1, z1); glVertex3f(x0, y1, z0);
+        
+        // 4 vertical edges
+        glVertex3f(x0, y0, z0); glVertex3f(x0, y1, z0);
+        glVertex3f(x1, y0, z0); glVertex3f(x1, y1, z0);
+        glVertex3f(x1, y0, z1); glVertex3f(x1, y1, z1);
+        glVertex3f(x0, y0, z1); glVertex3f(x0, y1, z1);
+    }
+    
+    /**
      * Draw a black outline around a cube to make blocks more distinguishable.
      * Only draws edges that are on visible faces to improve performance.
      * Each edge is shared by 2 faces - we draw it if at least one face is visible.
