@@ -253,7 +253,7 @@ public final class DevplayScreen implements Screen {
         frameCount++;
         fpsUpdateTimer += dt;
         if (fpsUpdateTimer >= 0.5) { // Update FPS every 0.5 seconds
-            fps = frameCount / fpsUpdateTimer;
+            fps = frameCount / 0.5; // Use exact 0.5 for consistent calculation
             frameCount = 0;
             fpsUpdateTimer = 0.0;
         }
