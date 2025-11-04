@@ -1,8 +1,7 @@
 package MattMC.world;
 
 import MattMC.util.AppPaths;
-import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;
+import net.querz.nbt.tag.CompoundTag;
 
 import java.io.*;
 import java.nio.file.*;
@@ -10,11 +9,10 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 /**
- * Manages saving and loading worlds to/from disk.
- * Similar to Minecraft's world save system.
+ * Manages saving and loading worlds to/from disk using Minecraft-style format.
+ * Uses region files (.mca) in Anvil format and level.dat with NBT.
  */
 public final class WorldSaveManager {
-    private static final Gson GSON = new GsonBuilder().setPrettyPrinting().create();
     
     /**
      * Get the saves directory where all worlds are stored.
@@ -82,7 +80,7 @@ public final class WorldSaveManager {
     }
     
     /**
-     * Save a world to disk.
+     * Save a world to disk using Minecraft-style format.
      */
     public static void saveWorld(World world, String worldName, float playerX, float playerY, float playerZ, float playerYaw, float playerPitch) throws IOException {
         Path savesDir = getSavesDirectory();
@@ -90,62 +88,67 @@ public final class WorldSaveManager {
         System.out.println("[DEBUG] Saving world to: " + worldDir.toAbsolutePath());
         Files.createDirectories(worldDir);
         
-        // Save world metadata
-        WorldMetadata metadata = new WorldMetadata();
-        metadata.worldName = worldName;
-        metadata.lastPlayed = System.currentTimeMillis();
-        metadata.playerX = playerX;
-        metadata.playerY = playerY;
-        metadata.playerZ = playerZ;
-        metadata.playerYaw = playerYaw;
-        metadata.playerPitch = playerPitch;
+        // Save level.dat with NBT format
+        LevelData levelData = new LevelData();
+        levelData.setWorldName(worldName);
+        levelData.setLastPlayed(System.currentTimeMillis());
+        levelData.setPlayerX(playerX);
+        levelData.setPlayerY(playerY);
+        levelData.setPlayerZ(playerZ);
+        levelData.setPlayerYaw(playerYaw);
+        levelData.setPlayerPitch(playerPitch);
         
-        Path metadataFile = worldDir.resolve("level.json");
-        try (Writer writer = Files.newBufferedWriter(metadataFile)) {
-            GSON.toJson(metadata, writer);
+        // Set spawn at player's location
+        levelData.setSpawnX((int) playerX);
+        levelData.setSpawnY((int) playerY);
+        levelData.setSpawnZ((int) playerZ);
+        
+        Path levelDatFile = worldDir.resolve("level.dat");
+        levelData.save(levelDatFile);
+        
+        // Save backup
+        if (Files.exists(levelDatFile)) {
+            Path backupFile = worldDir.resolve("level.dat_old");
+            try {
+                Files.copy(levelDatFile, backupFile, StandardCopyOption.REPLACE_EXISTING);
+            } catch (IOException e) {
+                System.err.println("Failed to create level.dat backup: " + e.getMessage());
+            }
         }
         
-        // Save chunks
-        Path chunksDir = worldDir.resolve("chunks");
-        Files.createDirectories(chunksDir);
+        // Save chunks to region files
+        Path regionDir = worldDir.resolve("region");
+        Files.createDirectories(regionDir);
         
+        // Group chunks by region
+        Map<String, List<Chunk>> chunksByRegion = new HashMap<>();
         for (Chunk chunk : world.getLoadedChunks()) {
-            saveChunk(chunk, chunksDir);
+            int[] regionCoords = RegionFile.getRegionCoords(chunk.chunkX(), chunk.chunkZ());
+            String regionKey = regionCoords[0] + "," + regionCoords[1];
+            chunksByRegion.computeIfAbsent(regionKey, k -> new ArrayList<>()).add(chunk);
         }
         
-        System.out.println("World saved: " + worldName);
-    }
-    
-    /**
-     * Save a single chunk to disk.
-     */
-    private static void saveChunk(Chunk chunk, Path chunksDir) throws IOException {
-        String fileName = "chunk_" + chunk.chunkX() + "_" + chunk.chunkZ() + ".dat";
-        Path chunkFile = chunksDir.resolve(fileName);
-        
-        try (DataOutputStream out = new DataOutputStream(
-                new BufferedOutputStream(Files.newOutputStream(chunkFile)))) {
+        // Save each region
+        for (Map.Entry<String, List<Chunk>> entry : chunksByRegion.entrySet()) {
+            String[] coords = entry.getKey().split(",");
+            int regionX = Integer.parseInt(coords[0]);
+            int regionZ = Integer.parseInt(coords[1]);
             
-            // Write chunk coordinates
-            out.writeInt(chunk.chunkX());
-            out.writeInt(chunk.chunkZ());
+            Path regionFilePath = regionDir.resolve(String.format("r.%d.%d.mca", regionX, regionZ));
             
-            // Write block data
-            // For each position, write block identifier
-            for (int x = 0; x < Chunk.WIDTH; x++) {
-                for (int y = 0; y < Chunk.HEIGHT; y++) {
-                    for (int z = 0; z < Chunk.DEPTH; z++) {
-                        Block block = chunk.getBlock(x, y, z);
-                        String identifier = block.getIdentifier();
-                        out.writeUTF(identifier != null ? identifier : "mattmc:air");
-                    }
+            try (RegionFile regionFile = new RegionFile(regionFilePath, regionX, regionZ)) {
+                for (Chunk chunk : entry.getValue()) {
+                    CompoundTag chunkNBT = ChunkNBT.toNBT(chunk);
+                    regionFile.writeChunk(chunk.chunkX(), chunk.chunkZ(), chunkNBT);
                 }
             }
         }
+        
+        System.out.println("World saved: " + worldName + " (" + world.getLoadedChunkCount() + " chunks in region files)");
     }
     
     /**
-     * Load a world from disk.
+     * Load a world from disk using Minecraft-style format.
      * Returns the loaded World and metadata.
      */
     public static WorldLoadResult loadWorld(String worldName) throws IOException {
@@ -154,59 +157,101 @@ public final class WorldSaveManager {
             throw new IOException("World does not exist: " + worldName);
         }
         
-        // Load metadata
-        Path metadataFile = worldDir.resolve("level.json");
-        WorldMetadata metadata;
-        try (Reader reader = Files.newBufferedReader(metadataFile)) {
-            metadata = GSON.fromJson(reader, WorldMetadata.class);
+        // Load level.dat
+        Path levelDatFile = worldDir.resolve("level.dat");
+        LevelData levelData;
+        
+        // Try to load level.dat, fallback to level.dat_old if corrupted
+        try {
+            levelData = LevelData.load(levelDatFile);
+        } catch (IOException e) {
+            System.err.println("Failed to load level.dat, trying backup: " + e.getMessage());
+            Path backupFile = worldDir.resolve("level.dat_old");
+            if (Files.exists(backupFile)) {
+                levelData = LevelData.load(backupFile);
+            } else {
+                throw new IOException("Failed to load world data and no backup available", e);
+            }
         }
         
         // Create world
         World world = new World();
         
-        // Load chunks
-        Path chunksDir = worldDir.resolve("chunks");
-        if (Files.exists(chunksDir)) {
-            try (var stream = Files.list(chunksDir)) {
-                var chunkFiles = stream
-                        .filter(p -> p.getFileName().toString().endsWith(".dat"))
+        // Load chunks from region files
+        Path regionDir = worldDir.resolve("region");
+        if (Files.exists(regionDir)) {
+            try (var stream = Files.list(regionDir)) {
+                var regionFiles = stream
+                        .filter(p -> p.getFileName().toString().endsWith(".mca"))
                         .collect(Collectors.toList());
                 
-                for (Path chunkFile : chunkFiles) {
+                for (Path regionFilePath : regionFiles) {
                     try {
-                        loadChunk(world, chunkFile);
+                        loadRegion(world, regionFilePath);
                     } catch (IOException e) {
-                        System.err.println("Failed to load chunk: " + chunkFile + " - " + e.getMessage());
+                        System.err.println("Failed to load region: " + regionFilePath + " - " + e.getMessage());
                     }
                 }
             }
         }
         
-        System.out.println("World loaded: " + worldName);
+        System.out.println("World loaded: " + worldName + " (" + world.getLoadedChunkCount() + " chunks)");
+        
+        // Convert LevelData to WorldMetadata for compatibility
+        WorldMetadata metadata = new WorldMetadata();
+        metadata.worldName = levelData.getWorldName();
+        metadata.lastPlayed = levelData.getLastPlayed();
+        metadata.playerX = (float) levelData.getPlayerX();
+        metadata.playerY = (float) levelData.getPlayerY();
+        metadata.playerZ = (float) levelData.getPlayerZ();
+        metadata.playerYaw = levelData.getPlayerYaw();
+        metadata.playerPitch = levelData.getPlayerPitch();
+        
         return new WorldLoadResult(world, metadata);
     }
     
     /**
-     * Load a single chunk from disk.
+     * Load all chunks from a region file.
      */
-    private static void loadChunk(World world, Path chunkFile) throws IOException {
-        try (DataInputStream in = new DataInputStream(
-                new BufferedInputStream(Files.newInputStream(chunkFile)))) {
-            
-            // Read chunk coordinates
-            int chunkX = in.readInt();
-            int chunkZ = in.readInt();
-            
-            // Get or create chunk
-            Chunk chunk = world.getChunk(chunkX, chunkZ);
-            
-            // Read block data
-            for (int x = 0; x < Chunk.WIDTH; x++) {
-                for (int y = 0; y < Chunk.HEIGHT; y++) {
-                    for (int z = 0; z < Chunk.DEPTH; z++) {
-                        String identifier = in.readUTF();
-                        Block block = Blocks.getBlockOrAir(identifier);
-                        chunk.setBlock(x, y, z, block);
+    private static void loadRegion(World world, Path regionFilePath) throws IOException {
+        // Parse region coordinates from filename: r.x.z.mca
+        String fileName = regionFilePath.getFileName().toString();
+        String[] parts = fileName.replace("r.", "").replace(".mca", "").split("\\.");
+        if (parts.length != 2) {
+            System.err.println("Invalid region filename: " + fileName);
+            return;
+        }
+        
+        int regionX = Integer.parseInt(parts[0]);
+        int regionZ = Integer.parseInt(parts[1]);
+        
+        try (RegionFile regionFile = new RegionFile(regionFilePath, regionX, regionZ)) {
+            // Try to load all possible chunks in the region
+            for (int localX = 0; localX < RegionFile.REGION_SIZE; localX++) {
+                for (int localZ = 0; localZ < RegionFile.REGION_SIZE; localZ++) {
+                    int chunkX = regionX * RegionFile.REGION_SIZE + localX;
+                    int chunkZ = regionZ * RegionFile.REGION_SIZE + localZ;
+                    
+                    if (regionFile.hasChunk(chunkX, chunkZ)) {
+                        try {
+                            CompoundTag chunkNBT = regionFile.readChunk(chunkX, chunkZ);
+                            if (chunkNBT != null) {
+                                Chunk chunk = ChunkNBT.fromNBT(chunkNBT);
+                                // Manually add the loaded chunk to the world
+                                world.getChunk(chunk.chunkX(), chunk.chunkZ()); // Ensures it's in the map
+                                // Copy the loaded data
+                                Chunk worldChunk = world.getChunk(chunk.chunkX(), chunk.chunkZ());
+                                for (int x = 0; x < Chunk.WIDTH; x++) {
+                                    for (int y = 0; y < Chunk.HEIGHT; y++) {
+                                        for (int z = 0; z < Chunk.DEPTH; z++) {
+                                            worldChunk.setBlock(x, y, z, chunk.getBlock(x, y, z));
+                                        }
+                                    }
+                                }
+                            }
+                        } catch (Exception e) {
+                            System.err.println("Failed to load chunk (" + chunkX + ", " + chunkZ + "): " + e.getMessage());
+                        }
                     }
                 }
             }
