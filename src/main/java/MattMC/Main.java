@@ -10,6 +10,8 @@ import MattMC.util.OptionsManager;
 import java.nio.file.Path;
 
 public final class Main {
+    public static final String VERSION = "0.0.10";
+    
     public static void main(String[] args) {
         // Ensure data dir in parent of the JAR directory (or classes dir when in IDE)
         Path dataDir;

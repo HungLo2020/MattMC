@@ -38,6 +38,11 @@ public final class DevplayScreen implements Screen {
     
     private double lastFrameTimeSec = now();
     
+    // FPS tracking
+    private double fps = 0.0;
+    private double fpsUpdateTimer = 0.0;
+    private int frameCount = 0;
+    
     // Debug menu toggle state
     private boolean debugMenuVisible = false;
     
@@ -244,6 +249,15 @@ public final class DevplayScreen implements Screen {
         if (dt < 0) dt = 0;
         if (dt > 0.5) dt = 0.5;
         
+        // Update FPS calculation
+        frameCount++;
+        fpsUpdateTimer += dt;
+        if (fpsUpdateTimer >= 0.5) { // Update FPS every 0.5 seconds
+            fps = frameCount / fpsUpdateTimer;
+            frameCount = 0;
+            fpsUpdateTimer = 0.0;
+        }
+        
         // Update chunks based on player position (load/unload)
         world.updateChunksAroundPlayer(player.getX(), player.getZ());
         
@@ -303,7 +317,7 @@ public final class DevplayScreen implements Screen {
         
         // Draw debug information in top-left corner (only if F3 is pressed)
         if (debugMenuVisible) {
-            uiRenderer.drawDebugInfo(w, h, player.getX(), player.getY(), player.getZ());
+            uiRenderer.drawDebugInfo(w, h, player.getX(), player.getY(), player.getZ(), fps);
         }
         
         // Draw command overlay if visible
