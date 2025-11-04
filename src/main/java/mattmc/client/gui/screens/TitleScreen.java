@@ -1,0 +1,285 @@
+package mattmc.client.gui.screens;
+
+import mattmc.client.settings.OptionsManager;
+
+import mattmc.client.Minecraft;
+import mattmc.client.Window;
+import mattmc.client.renderer.texture.Texture;
+import mattmc.client.gui.components.Button;
+import mattmc.client.gui.components.TextRenderer;
+import org.lwjgl.system.MemoryStack;
+
+import java.nio.IntBuffer;
+import java.util.ArrayList;
+import java.util.List;
+
+import static org.lwjgl.glfw.GLFW.*;
+import static org.lwjgl.opengl.GL11.*;
+import static org.lwjgl.opengl.GL13.*;
+import static org.lwjgl.system.MemoryStack.stackPush;
+
+/** Title screen with a time-based, fluid cubemap panorama and game logic at fixed 20 TPS. */
+public final class TitleScreen implements Screen {
+    // Core
+    private final Minecraft game;
+    private final Window window;
+
+    // UI
+    private final List<Button> buttons = new ArrayList<>();
+    private double mouseXWin, mouseYWin;
+    private boolean mouseDown;
+    private Texture logoTexture;
+
+    // Fixed 20 TPS logic clock
+    private static final double TPS = 20.0;
+    private static final double TICK_LEN = 1.0 / TPS;
+    private double tickAcc = 0.0;
+
+    // Real-time frame clock for visuals & accumulator
+    private double lastFrameTimeSec = System.nanoTime() * 1e-9;
+
+    // Layout
+    private float titleScale = 3.0f;
+    private float subtitleScale = 1.1f;
+    private float titleYFrac = 0.18f; // Raised to 18% of screen height (closer to top)
+    private int buttonWidth = 280, buttonHeight = 42, buttonGap = 12;
+    private float titleCX, titleCY, subtitleCX, subtitleCY;
+    private int buttonsStartY;
+
+    public TitleScreen(Minecraft game) {
+        this.game = game;
+        this.window = game.window();
+        
+        // Load the MattMC logo texture
+        logoTexture = Texture.load("/assets/textures/gui/MattMC.png");
+
+        glfwSetCursorPosCallback(window.handle(), (h, x, y) -> { mouseXWin = x; mouseYWin = y; });
+        glfwSetMouseButtonCallback(window.handle(), (h, button, action, mods) -> {
+            if (button == GLFW_MOUSE_BUTTON_LEFT) mouseDown = (action == GLFW_PRESS);
+        });
+
+        recomputeLayout();
+
+        glfwSetFramebufferSizeCallback(window.handle(), (win, newW, newH) -> {
+            glViewport(0, 0, Math.max(newW, 1), Math.max(newH, 1));
+            recomputeLayout();
+        });
+    }
+
+    private void recomputeLayout() {
+        int w = window.width(), h = window.height();
+
+        titleCX = w / 2f;
+        titleCY = h * titleYFrac;
+
+        subtitleCX = w / 2f;
+        subtitleCY = titleCY + 56f;
+
+        int subtitleH = (int)(TextRenderer.getTextHeight("A", subtitleScale));
+        int minButtonsTop = (int)(subtitleCY + subtitleH + 24);
+
+        int totalButtonsH = 3 * buttonHeight + 2 * buttonGap;
+        int centeredTop = h / 2 - totalButtonsH / 2;
+
+        buttonsStartY = Math.max(minButtonsTop, centeredTop);
+
+        int x = (w - buttonWidth) / 2;
+        buttons.clear();
+        buttons.add(new Button("Singleplayer", x, buttonsStartY + 0 * (buttonHeight + buttonGap), buttonWidth, buttonHeight));
+        buttons.add(new Button("Options",      x, buttonsStartY + 1 * (buttonHeight + buttonGap), buttonWidth, buttonHeight));
+        buttons.add(new Button("Quit",         x, buttonsStartY + 2 * (buttonHeight + buttonGap), buttonWidth, buttonHeight));
+    }
+
+    @Override
+    public void tick() {
+        // Frame delta (seconds)
+        double now = System.nanoTime() * 1e-9;
+        double frameDt = now - lastFrameTimeSec;
+        lastFrameTimeSec = now;
+        if (frameDt < 0) frameDt = 0;
+        if (frameDt > 0.25) frameDt = 0.25; // clamp huge pauses to keep things sane
+
+        // Smooth, time-based panorama rotation (independent of tick/refresh)
+        game.panorama().update();
+
+        // Hover every frame for responsiveness (not tied to TPS)
+        float mxFB, myFB;
+        try (MemoryStack stack = stackPush()) {
+            IntBuffer winW = stack.mallocInt(1), winH = stack.mallocInt(1);
+            IntBuffer fbW  = stack.mallocInt(1),  fbH  = stack.mallocInt(1);
+            glfwGetWindowSize(window.handle(), winW, winH);
+            glfwGetFramebufferSize(window.handle(), fbW, fbH);
+            float sx = fbW.get(0) / Math.max(1f, winW.get(0));
+            float sy = fbH.get(0) / Math.max(1f, winH.get(0));
+            mxFB = (float)mouseXWin * sx;
+            myFB = (float)mouseYWin * sy;
+        }
+        for (var b : buttons) b.setHover(b.contains(mxFB, myFB));
+
+        // Fixed 20 TPS for game logic
+        tickAcc += frameDt;
+        while (tickAcc >= TICK_LEN) {
+            doTick20(mxFB, myFB);
+            tickAcc -= TICK_LEN;
+        }
+    }
+
+    /** Logic that runs exactly at 20 TPS (clicks, timers, etc.). */
+    private void doTick20(float mxFB, float myFB) {
+        if (mouseDown) {
+            for (var b : buttons) {
+                if (b.contains(mxFB, myFB)) {
+                    onClick(b.label);
+                    break;
+                }
+            }
+            mouseDown = false; // debounce
+        }
+    }
+
+    private void onClick(String label) {
+        switch (label) {
+            case "Singleplayer" -> game.setScreen(new SelectWorldScreen(game));
+            case "Options"      -> game.setScreen(new OptionsScreen(game));
+            case "Quit"         -> {
+                glfwSetWindowShouldClose(window.handle(), true);
+                game.quit();
+            }
+        }
+    }
+
+    @Override
+    public void render(double alpha) {
+        // 1) draw rotating cubemap panorama (perspective) - blur based on settings
+        boolean blurred = mattmc.client.settings.OptionsManager.isTitleScreenBlurEnabled();
+        game.panorama().render(window.width(), window.height(), blurred);
+
+        // 2) switch to orthographic for UI and draw
+        setupOrtho();
+        for (var b : buttons) drawButton(b);
+        drawLogo();
+        drawTitle("A blocky sandbox by Matt", subtitleCX, subtitleCY, subtitleScale, 0xB0C4DE);
+    }
+
+
+
+    private void setupOrtho() {
+        int w = window.width(), h = window.height();
+        glMatrixMode(GL_PROJECTION);
+        glLoadIdentity();
+        glOrtho(0, w, h, 0, -1, 1);
+        glMatrixMode(GL_MODELVIEW);
+        glLoadIdentity();
+    }
+
+    private void drawButton(Button b) {
+        int base = b.hover() ? 0x3A5FCD : 0x2E4A9B;
+        int edge = b.hover() ? 0x6D89E3 : 0x20356B;
+
+        // Shadow
+        setColor(0x000000, 0.35f);
+        fillRect(b.x + 2, b.y + 3, b.w, b.h);
+
+        // Body gradient
+        glBegin(GL_QUADS);
+        setColor(edge, 1f);
+        glVertex2f(b.x, b.y);
+        glVertex2f(b.x + b.w, b.y);
+        setColor(base, 1f);
+        glVertex2f(b.x + b.w, b.y + b.h);
+        glVertex2f(b.x, b.y + b.h);
+        glEnd();
+
+        // Border
+        setColor(0x0B1220, 1f);
+        glBegin(GL_LINE_LOOP);
+        glVertex2f(b.x, b.y);
+        glVertex2f(b.x + b.w, b.y);
+        glVertex2f(b.x + b.w, b.y + b.h);
+        glVertex2f(b.x, b.y + b.h);
+        glEnd();
+
+        drawTextCentered(b.label, b.x + b.w / 2f, b.y + b.h / 2f, 1.2f, 0xFFFFFF);
+    }
+
+    private void fillRect(int x, int y, int w, int h) {
+        glBegin(GL_QUADS);
+        glVertex2f(x, y);
+        glVertex2f(x + w, y);
+        glVertex2f(x + w, y + h);
+        glVertex2f(x, y + h);
+        glEnd();
+    }
+
+    private void setColor(int rgb, float a) {
+        float r = ((rgb >> 16) & 0xFF) / 255f;
+        float g = ((rgb >> 8) & 0xFF) / 255f;
+        float b = (rgb & 0xFF) / 255f;
+        glColor4f(r, g, b, a);
+    }
+
+    private void drawTitle(String text, float cx, float cy, float scale, int rgb) {
+        float tw = TextRenderer.getTextWidth(text, scale);
+        float th = TextRenderer.getTextHeight(text, scale);
+        float x = cx - tw / 2f;
+        float y = cy - th / 2f;
+        drawText(text, x, y, scale, rgb);
+    }
+
+    private void drawTextCentered(String text, float cx, float cy, float scale, int rgb) {
+        float tw = TextRenderer.getTextWidth(text, scale);
+        float th = TextRenderer.getTextHeight(text, scale);
+        float x = cx - tw / 2f;
+        float y = cy - th / 2f;
+        drawText(text, x, y, scale, rgb);
+    }
+
+    private void drawText(String text, float x, float y, float scale, int rgb) {
+        setColor(rgb, 1f);
+        TextRenderer.drawText(text, x, y, scale);
+    }
+
+    private void drawLogo() {
+        if (logoTexture == null) return;
+        
+        // Calculate logo dimensions - adaptive scaling based on window size
+        // Target width is roughly 60% of screen width for good visibility
+        int w = window.width();
+        float targetWidth = w * 0.6f;
+        float logoScale = targetWidth / logoTexture.width;
+        
+        // Clamp scale to reasonable bounds
+        logoScale = Math.max(0.3f, Math.min(logoScale, 2.0f));
+        
+        float logoWidth = logoTexture.width * logoScale;
+        float logoHeight = logoTexture.height * logoScale;
+        float logoX = titleCX - logoWidth / 2f;
+        float logoY = titleCY - logoHeight / 2f;
+        
+        // Enable texturing and blending for transparency
+        glEnable(GL_TEXTURE_2D);
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        
+        logoTexture.bind();
+        glColor4f(1f, 1f, 1f, 1f);
+        
+        // Flip texture coordinates vertically to fix upside-down issue
+        // (Texture loader flips vertically, so we need to flip back for proper display)
+        glBegin(GL_QUADS);
+        glTexCoord2f(0, 1); glVertex2f(logoX, logoY);
+        glTexCoord2f(1, 1); glVertex2f(logoX + logoWidth, logoY);
+        glTexCoord2f(1, 0); glVertex2f(logoX + logoWidth, logoY + logoHeight);
+        glTexCoord2f(0, 0); glVertex2f(logoX, logoY + logoHeight);
+        glEnd();
+        
+        glDisable(GL_BLEND);
+        glDisable(GL_TEXTURE_2D);
+    }
+
+    @Override
+    public void onClose() {
+        // Panorama is now shared and managed by Minecraft, don't close it
+        if (logoTexture != null) { logoTexture.close(); logoTexture = null; }
+    }
+}

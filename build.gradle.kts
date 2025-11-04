@@ -16,7 +16,7 @@ java {
 
 application {
     // Your main class
-    mainClass.set("MattMC.Main")
+    mainClass.set("mattmc.client.main.Main")
 }
 
 dependencies {
