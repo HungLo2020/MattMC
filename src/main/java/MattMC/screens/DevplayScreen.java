@@ -10,6 +10,7 @@ import MattMC.renderer.WorldRenderer;
 import MattMC.renderer.UIRenderer;
 import MattMC.world.Blocks;
 import MattMC.world.World;
+import MattMC.world.WorldSaveManager;
 
 import static org.lwjgl.glfw.GLFW.*;
 import static org.lwjgl.opengl.GL11.*;
@@ -17,7 +18,7 @@ import static org.lwjgl.opengl.GL11.*;
 /**
  * Devplay screen - infinite world with dynamic chunk loading.
  * Chunks load/unload based on player position.
- * ESC returns to Singleplayer.
+ * ESC opens pause menu.
  */
 public final class DevplayScreen implements Screen {
     private final Game game;
@@ -32,6 +33,9 @@ public final class DevplayScreen implements Screen {
     private final WorldRenderer worldRenderer;
     private final UIRenderer uiRenderer;
     
+    // World name for saving
+    private final String worldName;
+    
     private double lastFrameTimeSec = now();
     
     // Debug menu toggle state
@@ -43,31 +47,57 @@ public final class DevplayScreen implements Screen {
     private String commandErrorMessage = "";
     private double commandErrorDisplayTime = 0;
 
-    public DevplayScreen(Game game) {
+    public DevplayScreen(Game game, String worldName) {
+        this(game, worldName, null, 0f, 0f, 0f, 0f, 0f);
+    }
+    
+    public DevplayScreen(Game game, String worldName, World world, float playerX, float playerY, float playerZ, float playerYaw, float playerPitch) {
         this.game = game;
         this.window = game.window();
+        this.worldName = worldName;
         
-        // Initialize infinite world
-        this.world = new World();
+        // Initialize infinite world (use provided or create new)
+        this.world = world != null ? world : new World();
         
-        // Initialize player - spawn at world origin
-        float spawnX = 0f;
-        float spawnZ = 0f;
+        // Initialize player - use provided position or spawn at world origin
+        float spawnX = playerX;
+        float spawnY = playerY;
+        float spawnZ = playerZ;
         
-        // Pre-load spawn chunks before finding spawn height
-        world.updateChunksAroundPlayer(spawnX, spawnZ);
-        
-        // Find proper spawn height on top of terrain
-        float spawnY = PlayerPhysics.findSpawnHeight(world, spawnX, spawnZ);
+        if (world == null) {
+            // New world - find spawn position
+            spawnX = 0f;
+            spawnZ = 0f;
+            
+            // Pre-load spawn chunks before finding spawn height
+            this.world.updateChunksAroundPlayer(spawnX, spawnZ);
+            
+            // Find proper spawn height on top of terrain
+            spawnY = PlayerPhysics.findSpawnHeight(this.world, spawnX, spawnZ);
+        } else {
+            // Loaded world - pre-load chunks around player
+            this.world.updateChunksAroundPlayer(spawnX, spawnZ);
+        }
         
         this.player = new Player(spawnX, spawnY, spawnZ);
-        this.playerPhysics = new PlayerPhysics(player, world);
+        this.player.setYaw(playerYaw);
+        this.player.setPitch(playerPitch);
+        this.playerPhysics = new PlayerPhysics(player, this.world);
         this.player.setPhysics(playerPhysics);
         this.playerController = new PlayerController(player);
-        this.blockInteraction = new BlockInteraction(player, world);
+        this.blockInteraction = new BlockInteraction(player, this.world);
         this.worldRenderer = new WorldRenderer();
         this.uiRenderer = new UIRenderer();
 
+        // Register input callbacks
+        registerCallbacks();
+    }
+    
+    /**
+     * Register input callbacks for this screen.
+     * Called from constructor and when returning from pause menu.
+     */
+    private void registerCallbacks() {
         // Capture mouse for FPS-style controls
         glfwSetInputMode(window.handle(), GLFW_CURSOR, GLFW_CURSOR_DISABLED);
         
@@ -105,8 +135,8 @@ public final class DevplayScreen implements Screen {
             } else {
                 // Normal game input
                 if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS) {
-                    glfwSetInputMode(window.handle(), GLFW_CURSOR, GLFW_CURSOR_NORMAL);
-                    game.setScreen(new SingleplayerScreen(game));
+                    // Open pause menu
+                    game.setScreen(new PauseMenuScreen(game, this));
                 }
                 if (key == GLFW_KEY_SPACE && action == GLFW_PRESS) {
                     playerController.handleSpacePress();
@@ -128,6 +158,9 @@ public final class DevplayScreen implements Screen {
         
         // Mouse button callback for breaking/placing blocks
         glfwSetMouseButtonCallback(window.handle(), (win, button, action, mods) -> {
+            // Don't interact with blocks if command overlay is open
+            if (commandOverlayVisible) return;
+            
             if (action == GLFW_PRESS) {
                 if (button == GLFW_MOUSE_BUTTON_LEFT) {
                     blockInteraction.breakBlock();
@@ -285,7 +318,24 @@ public final class DevplayScreen implements Screen {
     }
 
     private static double now() { return System.nanoTime() * 1e-9; }
+    
+    /**
+     * Save the current world to disk.
+     */
+    public void saveWorld() throws java.io.IOException {
+        WorldSaveManager.saveWorld(world, worldName, 
+            player.getX(), player.getY(), player.getZ(),
+            player.getYaw(), player.getPitch());
+    }
+    
+    public String getWorldName() {
+        return worldName;
+    }
 
-    @Override public void onOpen() {}
+    @Override 
+    public void onOpen() {
+        // Re-register callbacks when returning from pause menu
+        registerCallbacks();
+    }
     @Override public void onClose() {}
 }

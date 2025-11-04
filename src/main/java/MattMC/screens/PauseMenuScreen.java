@@ -2,8 +2,10 @@ package MattMC.screens;
 
 import MattMC.core.Game;
 import MattMC.core.Window;
+import MattMC.gfx.BlurEffect;
+import MattMC.gfx.Framebuffer;
 import MattMC.ui.UIButton;
-import MattMC.ui.UITextField;
+import MattMC.world.World;
 import MattMC.world.WorldSaveManager;
 import org.lwjgl.BufferUtils;
 import org.lwjgl.stb.STBEasyFont;
@@ -16,54 +18,44 @@ import java.util.List;
 
 import static org.lwjgl.glfw.GLFW.*;
 import static org.lwjgl.opengl.GL11.*;
+import static org.lwjgl.opengl.GL30.*;
 import static org.lwjgl.system.MemoryStack.stackPush;
 
-/* Create World screen - allows creating a new world. */
-public final class CreateWorldScreen implements Screen {
+/**
+ * Pause menu overlay shown when player presses ESC in-game.
+ * Similar to Minecraft's pause screen.
+ */
+public final class PauseMenuScreen implements Screen {
     private final Game game;
     private final Window window;
+    private final DevplayScreen gameScreen;
     private final List<UIButton> buttons = new ArrayList<>();
-    private UITextField worldNameField;
     private final ByteBuffer fontBuffer = BufferUtils.createByteBuffer(16 * 4096);
     private double mouseXWin, mouseYWin;
     private boolean mouseDown;
-
+    
     private float titleScale = 2.5f;
     private float titleCX, titleCY;
     private int buttonWidth = 300, buttonHeight = 44, buttonGap = 12;
-    private int textFieldWidth = 300, textFieldHeight = 32;
     private int buttonsStartY;
+    
+    // Blur effect for background
+    private BlurEffect blurEffect;
 
-    public CreateWorldScreen(Game game) {
+    public PauseMenuScreen(Game game, DevplayScreen gameScreen) {
         this.game = game;
         this.window = game.window();
+        this.gameScreen = gameScreen;
 
         glfwSetCursorPosCallback(window.handle(), (h, x, y) -> { mouseXWin = x; mouseYWin = y; });
         glfwSetMouseButtonCallback(window.handle(), (h, button, action, mods) -> {
             if (button == GLFW_MOUSE_BUTTON_LEFT) mouseDown = (action == GLFW_PRESS);
         });
         
-        // Set up character callback for text field input
-        glfwSetCharCallback(window.handle(), (win, codepoint) -> {
-            if (worldNameField != null && worldNameField.isFocused()) {
-                char c = (char) codepoint;
-                // Only allow alphanumeric, space, and some punctuation
-                if (isValidWorldNameCharacter(c)) {
-                    worldNameField.appendChar(c);
-                }
-            }
-        });
-        
-        // Set up key callback for backspace and enter
+        // Set up key callback for ESC to unpause
         glfwSetKeyCallback(window.handle(), (win, key, scancode, action, mods) -> {
-            if (worldNameField != null && worldNameField.isFocused()) {
-                if ((action == GLFW_PRESS || action == GLFW_REPEAT) && key == GLFW_KEY_BACKSPACE) {
-                    worldNameField.backspace();
-                }
-                if (action == GLFW_PRESS && key == GLFW_KEY_ENTER) {
-                    // Create world on Enter
-                    createWorld();
-                }
+            if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS) {
+                unpause();
             }
         });
 
@@ -73,38 +65,35 @@ public final class CreateWorldScreen implements Screen {
             glViewport(0, 0, Math.max(newW, 1), Math.max(newH, 1));
             recomputeLayout();
         });
+        
+        // Release mouse cursor
+        glfwSetInputMode(window.handle(), GLFW_CURSOR, GLFW_CURSOR_NORMAL);
     }
 
     private void recomputeLayout() {
         int w = window.width(), h = window.height();
         titleCX = w / 2f;
-        titleCY = h * 0.18f;
+        titleCY = h * 0.30f;
 
-        // Layout: text field, then buttons below
-        int textFieldY = (int)(h * 0.35f);
-        int totalButtonsH = 2 * buttonHeight + 1 * buttonGap;
-        buttonsStartY = textFieldY + textFieldHeight + 30;
+        int totalButtonsH = 3 * buttonHeight + 2 * buttonGap;
+        buttonsStartY = (int)(h / 2f - totalButtonsH / 2f);
 
         int x = (w - buttonWidth) / 2;
-        int tfx = (w - textFieldWidth) / 2;
         buttons.clear();
 
-        // Create text field with unique world name
-        String defaultName = WorldSaveManager.generateUniqueWorldName("New World");
-        worldNameField = new UITextField(tfx, textFieldY, textFieldWidth, textFieldHeight, 50);
-        worldNameField.setText(defaultName);
-        worldNameField.setFocused(true); // Auto-focus
-
-        // Centered buttons
-        buttons.add(new UIButton("Create World", x, buttonsStartY + 0 * (buttonHeight + buttonGap), buttonWidth, buttonHeight));
-        buttons.add(new UIButton("Back",         x, buttonsStartY + 1 * (buttonHeight + buttonGap), buttonWidth, buttonHeight));
+        buttons.add(new UIButton("Back to Game",  x, buttonsStartY + 0 * (buttonHeight + buttonGap), buttonWidth, buttonHeight));
+        buttons.add(new UIButton("Save and Exit", x, buttonsStartY + 1 * (buttonHeight + buttonGap), buttonWidth, buttonHeight));
+        buttons.add(new UIButton("Options",       x, buttonsStartY + 2 * (buttonHeight + buttonGap), buttonWidth, buttonHeight));
+    }
+    
+    private void unpause() {
+        // Recapture mouse for FPS controls
+        glfwSetInputMode(window.handle(), GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+        game.setScreen(gameScreen);
     }
 
     @Override
     public void tick() {
-        // Update panorama animation
-        game.panorama().update();
-        
         // Convert window coords -> framebuffer coords for accurate hit-testing on HiDPI
         float mxFB, myFB;
         try (MemoryStack stack = stackPush()) {
@@ -119,21 +108,12 @@ public final class CreateWorldScreen implements Screen {
         }
 
         for (var b : buttons) b.setHover(b.contains(mxFB, myFB));
-        if (worldNameField != null) worldNameField.setHover(worldNameField.contains(mxFB, myFB));
 
         if (mouseDown) {
-            // Check text field click
-            if (worldNameField != null && worldNameField.contains(mxFB, myFB)) {
-                worldNameField.setFocused(true);
-            } else {
-                if (worldNameField != null) worldNameField.setFocused(false);
-                
-                // Check button clicks
-                for (var b : buttons) {
-                    if (b.contains(mxFB, myFB)) {
-                        onClick(b.label);
-                        break;
-                    }
+            for (var b : buttons) {
+                if (b.contains(mxFB, myFB)) {
+                    onClick(b.label);
+                    break;
                 }
             }
             mouseDown = false;
@@ -141,51 +121,105 @@ public final class CreateWorldScreen implements Screen {
     }
 
     private void onClick(String label) {
-        if ("Back".equals(label)) {
-            game.setScreen(new SingleplayerScreen(game));
+        if ("Back to Game".equals(label)) {
+            unpause();
             return;
         }
-        if ("Create World".equals(label)) {
-            createWorld();
+        if ("Save and Exit".equals(label)) {
+            saveAndExit();
+            return;
+        }
+        if ("Options".equals(label)) {
+            // TODO: Show options screen
+            System.out.println("Options not yet implemented in pause menu");
             return;
         }
     }
     
-    private void createWorld() {
-        String worldName = worldNameField.getText().trim();
-        if (worldName.isEmpty()) {
-            worldName = "New World";
+    private void saveAndExit() {
+        try {
+            // Save the world
+            gameScreen.saveWorld();
+            
+            // Return to title screen
+            glfwSetInputMode(window.handle(), GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+            game.setScreen(new TitleScreen(game));
+        } catch (Exception e) {
+            System.err.println("Failed to save world: " + e.getMessage());
+            e.printStackTrace();
+            // Still exit even if save failed
+            glfwSetInputMode(window.handle(), GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+            game.setScreen(new TitleScreen(game));
         }
-        
-        // Ensure unique name
-        worldName = WorldSaveManager.generateUniqueWorldName(worldName);
-        
-        System.out.println("→ Creating world: " + worldName);
-        game.setScreen(new DevplayScreen(game, worldName));
-    }
-    
-    /**
-     * Check if a character is valid for world names.
-     * Allows alphanumeric, space, hyphen, underscore, and parentheses.
-     */
-    private static boolean isValidWorldNameCharacter(char c) {
-        return Character.isLetterOrDigit(c) || c == ' ' || c == '-' || c == '_' || c == '(' || c == ')';
     }
 
     @Override
     public void render(double alpha) {
-        // Render panorama background with blur based on settings
-        boolean blurred = MattMC.util.OptionsManager.isMenuScreenBlurEnabled();
-        game.panorama().render(window.width(), window.height(), blurred);
-
-        setupOrtho();
+        int w = window.width(), h = window.height();
         
-        // Draw text field
-        if (worldNameField != null) drawTextField(worldNameField);
+        // First render the game screen behind this overlay
+        gameScreen.render(alpha);
         
+        // Apply blur if enabled
+        if (MattMC.util.OptionsManager.isMenuScreenBlurEnabled()) {
+            if (blurEffect == null) {
+                blurEffect = new BlurEffect();
+            }
+            
+            // Capture screen to texture
+            int captureTexture = glGenTextures();
+            glBindTexture(GL_TEXTURE_2D, captureTexture);
+            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, w, h, 0, GL_RGBA, GL_UNSIGNED_BYTE, 0);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+            glCopyTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, 0, 0, w, h);
+            
+            // Apply blur
+            Framebuffer blurredResult = blurEffect.applyBlur(captureTexture, w, h);
+            
+            // Render blurred result as background
+            glMatrixMode(GL_PROJECTION);
+            glLoadIdentity();
+            glOrtho(0, 1, 1, 0, -1, 1);
+            glMatrixMode(GL_MODELVIEW);
+            glLoadIdentity();
+            
+            glEnable(GL_TEXTURE_2D);
+            glBindTexture(GL_TEXTURE_2D, blurredResult.getTextureId());
+            glColor4f(1f, 1f, 1f, 1f);
+            
+            glBegin(GL_QUADS);
+            glTexCoord2f(0, 1); glVertex2f(0, 0);
+            glTexCoord2f(1, 1); glVertex2f(1, 0);
+            glTexCoord2f(1, 0); glVertex2f(1, 1);
+            glTexCoord2f(0, 0); glVertex2f(0, 1);
+            glEnd();
+            
+            glDisable(GL_TEXTURE_2D);
+            glDeleteTextures(captureTexture);
+        }
+        
+        // Draw dark overlay
+        glMatrixMode(GL_PROJECTION);
+        glLoadIdentity();
+        glOrtho(0, w, h, 0, -1, 1);
+        glMatrixMode(GL_MODELVIEW);
+        glLoadIdentity();
+        
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        
+        setColor(0x000000, 0.5f);
+        glBegin(GL_QUADS);
+        glVertex2f(0, 0);
+        glVertex2f(w, 0);
+        glVertex2f(w, h);
+        glVertex2f(0, h);
+        glEnd();
+        
+        // Draw UI
         for (var b : buttons) drawButton(b);
-        drawTitle("Create New World", titleCX, titleCY, titleScale, 0xFFFFFF);
-        drawTitle("World Name:", titleCX, worldNameField.y - 20f, 1.0f, 0xB0C4DE);
+        drawTitle("Game Paused", titleCX, titleCY, titleScale, 0xFFFFFF);
     }
 
     private void setupOrtho() {
@@ -197,40 +231,6 @@ public final class CreateWorldScreen implements Screen {
         glLoadIdentity();
     }
 
-    private void drawTextField(UITextField tf) {
-        // Background
-        int bgColor = tf.isFocused() ? 0x000000 : 0x222222;
-        setColor(bgColor, 0.8f);
-        fillRect(tf.x, tf.y, tf.w, tf.h);
-        
-        // Border
-        int borderColor = tf.isFocused() ? 0xFFFFFF : 0x888888;
-        setColor(borderColor, 1f);
-        glBegin(GL_LINE_LOOP);
-        glVertex2f(tf.x, tf.y);
-        glVertex2f(tf.x + tf.w, tf.y);
-        glVertex2f(tf.x + tf.w, tf.y + tf.h);
-        glVertex2f(tf.x, tf.y + tf.h);
-        glEnd();
-        
-        // Text
-        String text = tf.getText();
-        if (!text.isEmpty()) {
-            drawText(text, tf.x + 8f, tf.y + 10f, 1.0f, 0xFFFFFF);
-        }
-        
-        // Cursor
-        if (tf.isFocused() && (System.currentTimeMillis() / 500) % 2 == 0) {
-            int textWidth = STBEasyFont.stb_easy_font_width(text);
-            float cursorX = tf.x + 8f + textWidth;
-            setColor(0xFFFFFF, 1f);
-            glBegin(GL_LINES);
-            glVertex2f(cursorX, tf.y + 6f);
-            glVertex2f(cursorX, tf.y + tf.h - 6f);
-            glEnd();
-        }
-    }
-    
     private void drawButton(UIButton b) {
         int base = b.hover() ? 0x3A5FCD : 0x2E4A9B;
         int edge = b.hover() ? 0x6D89E3 : 0x20356B;
@@ -309,8 +309,12 @@ public final class CreateWorldScreen implements Screen {
 
     @Override
     public void onOpen() {}
+    
     @Override
     public void onClose() {
-        // Panorama is now shared and managed by Game
+        if (blurEffect != null) {
+            blurEffect.close();
+            blurEffect = null;
+        }
     }
 }

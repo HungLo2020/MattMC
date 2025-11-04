@@ -3,6 +3,8 @@ package MattMC.screens;
 import MattMC.core.Game;
 import MattMC.core.Window;
 import MattMC.ui.UIButton;
+import MattMC.world.World;
+import MattMC.world.WorldSaveManager;
 import org.lwjgl.BufferUtils;
 import org.lwjgl.stb.STBEasyFont;
 import org.lwjgl.system.MemoryStack;
@@ -21,13 +23,17 @@ public final class SingleplayerScreen implements Screen {
     private final Game game;
     private final Window window;
     private final List<UIButton> buttons = new ArrayList<>();
+    private final List<String> worldList = new ArrayList<>();
+    private final List<UIButton> worldButtons = new ArrayList<>();
     private final ByteBuffer fontBuffer = BufferUtils.createByteBuffer(16 * 4096);
     private double mouseXWin, mouseYWin;
     private boolean mouseDown;
+    private int selectedWorldIndex = -1;
 
     private float titleScale = 2.5f;
     private float titleCX, titleCY;
     private int buttonWidth = 300, buttonHeight = 44, buttonGap = 12;
+    private int worldButtonHeight = 36;
     private int buttonsStartY;
 
     public SingleplayerScreen(Game game) {
@@ -50,17 +56,32 @@ public final class SingleplayerScreen implements Screen {
     private void recomputeLayout() {
         int w = window.width(), h = window.height();
         titleCX = w / 2f;
-        titleCY = h * 0.18f;
+        titleCY = h * 0.12f;
 
-        int totalButtonsH = 3 * buttonHeight + 2 * buttonGap;
-        buttonsStartY = (int)(h / 2f - totalButtonsH / 2f);
-
+        // Load world list
+        worldList.clear();
+        worldList.addAll(WorldSaveManager.listWorlds());
+        
+        // World list area (top half)
+        int worldListY = (int)(h * 0.25f);
+        int worldListHeight = (int)(h * 0.4f);
+        int maxVisibleWorlds = Math.max(1, worldListHeight / (worldButtonHeight + 6));
+        
+        worldButtons.clear();
         int x = (w - buttonWidth) / 2;
+        for (int i = 0; i < Math.min(worldList.size(), maxVisibleWorlds); i++) {
+            String worldName = worldList.get(i);
+            int y = worldListY + i * (worldButtonHeight + 6);
+            worldButtons.add(new UIButton(worldName, x, y, buttonWidth, worldButtonHeight));
+        }
+        
+        // Bottom buttons
+        buttonsStartY = worldListY + worldListHeight + 20;
         buttons.clear();
 
         // Centered singleplayer buttons
-        buttons.add(new UIButton("Create World", x, buttonsStartY + 0 * (buttonHeight + buttonGap), buttonWidth, buttonHeight));
-        buttons.add(new UIButton("Load World",   x, buttonsStartY + 1 * (buttonHeight + buttonGap), buttonWidth, buttonHeight));
+        buttons.add(new UIButton("Play Selected", x, buttonsStartY + 0 * (buttonHeight + buttonGap), buttonWidth, buttonHeight));
+        buttons.add(new UIButton("Create New World", x, buttonsStartY + 1 * (buttonHeight + buttonGap), buttonWidth, buttonHeight));
         buttons.add(new UIButton("Back",         x, buttonsStartY + 2 * (buttonHeight + buttonGap), buttonWidth, buttonHeight));
     }
 
@@ -83,8 +104,19 @@ public final class SingleplayerScreen implements Screen {
         }
 
         for (var b : buttons) b.setHover(b.contains(mxFB, myFB));
+        for (var b : worldButtons) b.setHover(b.contains(mxFB, myFB));
 
         if (mouseDown) {
+            // Check world button clicks
+            for (int i = 0; i < worldButtons.size(); i++) {
+                if (worldButtons.get(i).contains(mxFB, myFB)) {
+                    selectedWorldIndex = i;
+                    mouseDown = false;
+                    return;
+                }
+            }
+            
+            // Check main button clicks
             for (var b : buttons) {
                 if (b.contains(mxFB, myFB)) {
                     onClick(b.label);
@@ -100,16 +132,33 @@ public final class SingleplayerScreen implements Screen {
             game.setScreen(new TitleScreen(game));
             return;
         }
-        if ("Create World".equals(label)) {
+        if ("Create New World".equals(label)) {
             System.out.println("→ Create World clicked");
             game.setScreen(new CreateWorldScreen(game));
             return;
         }
-        if ("Load World".equals(label)) {
-            System.out.println("→ Load World clicked");
+        if ("Play Selected".equals(label)) {
+            if (selectedWorldIndex >= 0 && selectedWorldIndex < worldList.size()) {
+                loadWorld(worldList.get(selectedWorldIndex));
+            } else {
+                System.out.println("No world selected");
+            }
             return;
         }
-        // other buttons intentionally do nothing for now
+    }
+    
+    private void loadWorld(String worldName) {
+        try {
+            System.out.println("→ Loading world: " + worldName);
+            WorldSaveManager.WorldLoadResult result = WorldSaveManager.loadWorld(worldName);
+            
+            game.setScreen(new DevplayScreen(game, worldName, result.world,
+                result.metadata.playerX, result.metadata.playerY, result.metadata.playerZ,
+                result.metadata.playerYaw, result.metadata.playerPitch));
+        } catch (Exception e) {
+            System.err.println("Failed to load world: " + e.getMessage());
+            e.printStackTrace();
+        }
     }
 
     @Override
@@ -119,9 +168,24 @@ public final class SingleplayerScreen implements Screen {
         game.panorama().render(window.width(), window.height(), blurred);
 
         setupOrtho();
+        
+        // Draw world list
+        for (int i = 0; i < worldButtons.size(); i++) {
+            drawWorldButton(worldButtons.get(i), i == selectedWorldIndex);
+        }
+        
+        // Draw main buttons
         for (var b : buttons) drawButton(b);
+        
         drawTitle("Singleplayer", titleCX, titleCY, titleScale, 0xFFFFFF);
-        drawTitle("Create or load worlds", titleCX, titleCY + 48f, 1.0f, 0xB0C4DE);
+        
+        // Show message if no worlds
+        if (worldList.isEmpty()) {
+            drawTitle("No saved worlds", titleCX, titleCY + 48f, 1.2f, 0xB0C4DE);
+            drawTitle("Create a new world to get started", titleCX, titleCY + 72f, 1.0f, 0x808080);
+        } else {
+            drawTitle("Select a world", titleCX, titleCY + 48f, 1.0f, 0xB0C4DE);
+        }
     }
 
     private void setupOrtho() {
@@ -133,6 +197,33 @@ public final class SingleplayerScreen implements Screen {
         glLoadIdentity();
     }
 
+    private void drawWorldButton(UIButton b, boolean selected) {
+        int base = selected ? 0x4A7FED : (b.hover() ? 0x3A5FCD : 0x2E4A9B);
+        int edge = selected ? 0x7DA5F3 : (b.hover() ? 0x6D89E3 : 0x20356B);
+
+        setColor(0x000000, 0.35f);
+        fillRect(b.x + 2, b.y + 3, b.w, b.h);
+
+        glBegin(GL_QUADS);
+        setColor(edge, 1f);
+        glVertex2f(b.x, b.y);
+        glVertex2f(b.x + b.w, b.y);
+        setColor(base, 1f);
+        glVertex2f(b.x + b.w, b.y + b.h);
+        glVertex2f(b.x, b.y + b.h);
+        glEnd();
+
+        setColor(0x0B1220, 1f);
+        glBegin(GL_LINE_LOOP);
+        glVertex2f(b.x, b.y);
+        glVertex2f(b.x + b.w, b.y);
+        glVertex2f(b.x + b.w, b.y + b.h);
+        glVertex2f(b.x, b.y + b.h);
+        glEnd();
+
+        drawTextCentered(b.label, b.x + b.w / 2f, b.y + b.h / 2f, 1.0f, 0xFFFFFF);
+    }
+    
     private void drawButton(UIButton b) {
         int base = b.hover() ? 0x3A5FCD : 0x2E4A9B;
         int edge = b.hover() ? 0x6D89E3 : 0x20356B;
