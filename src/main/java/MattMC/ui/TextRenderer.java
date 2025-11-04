@@ -15,11 +15,18 @@ public final class TextRenderer {
     
     /**
      * Initialize the text renderer with the Minecraft font.
-     * Should be called once at application startup.
+     * This is automatically called on first use, but can be called explicitly
+     * at application startup for better error handling.
      */
     public static void init() {
         if (font == null) {
-            font = TrueTypeFont.load(FONT_PATH);
+            try {
+                font = TrueTypeFont.load(FONT_PATH);
+            } catch (Exception e) {
+                System.err.println("Failed to load font: " + FONT_PATH);
+                e.printStackTrace();
+                throw new RuntimeException("Font initialization failed", e);
+            }
         }
     }
     

@@ -119,12 +119,13 @@ public final class TrueTypeFont implements AutoCloseable {
     
     /**
      * Update the font scale for rendering at a different size.
+     * Note: This doesn't rebake the font, just changes the reference size for scaling calculations.
+     * The actual scaling is done via glScale in TextRenderer.
      * @param pixelHeight Desired font height in pixels
      */
     public void updateScale(float pixelHeight) {
-        // Scale factor relative to baked size
-        // This is just used for scaling during rendering
-        this.fontSize = pixelHeight;
+        // This method is kept for API compatibility but doesn't need to do anything
+        // since scaling is handled by TextRenderer using glScale
     }
     
     /**
@@ -135,21 +136,14 @@ public final class TrueTypeFont implements AutoCloseable {
     public float getTextWidth(String text) {
         float width = 0;
         
-        try (MemoryStack stack = stackPush()) {
-            FloatBuffer xPos = stack.floats(0.0f);
-            FloatBuffer yPos = stack.floats(0.0f);
+        for (int i = 0; i < text.length(); i++) {
+            char c = text.charAt(i);
+            if (c < 32 || c >= 128) continue; // Skip non-ASCII
             
-            STBTTBakedChar.Buffer buf = charData;
-            
-            for (int i = 0; i < text.length(); i++) {
-                char c = text.charAt(i);
-                if (c < 32 || c >= 128) continue; // Skip non-ASCII
-                
-                int charIndex = c - 32;
-                if (charIndex >= 0 && charIndex < buf.capacity()) {
-                    STBTTBakedChar charInfo = buf.get(charIndex);
-                    width += charInfo.xadvance();
-                }
+            int charIndex = c - 32;
+            if (charIndex >= 0 && charIndex < charData.capacity()) {
+                STBTTBakedChar charInfo = charData.get(charIndex);
+                width += charInfo.xadvance();
             }
         }
         
