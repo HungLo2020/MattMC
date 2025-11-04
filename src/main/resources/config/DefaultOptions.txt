@@ -17,4 +17,4 @@ crouch=left_ctrl
 break_block=left_mouse
 place_block=right_mouse
 fly_up=space
-fly_down=left_ctrl
+open_command=/

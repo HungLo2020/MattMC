@@ -28,12 +28,10 @@ public class PlayerInput {
     public static final String BREAK_BLOCK = "break_block";
     public static final String PLACE_BLOCK = "place_block";
     public static final String FLY_UP = "fly_up";
-    public static final String FLY_DOWN = "fly_down";
     public static final String OPEN_COMMAND = "open_command";
     
     private PlayerInput() {
-        // Initialize with default keybinds
-        setDefaultKeybinds();
+        // Keybinds are loaded from config file by KeybindManager
     }
     
     /**
@@ -46,23 +44,7 @@ public class PlayerInput {
         return instance;
     }
     
-    /**
-     * Set default keybinds.
-     */
-    private void setDefaultKeybinds() {
-        keybinds.put(FORWARD, GLFW_KEY_W);
-        keybinds.put(BACKWARD, GLFW_KEY_S);
-        keybinds.put(LEFT, GLFW_KEY_A);
-        keybinds.put(RIGHT, GLFW_KEY_D);
-        keybinds.put(JUMP, GLFW_KEY_SPACE);
-        keybinds.put(CROUCH, GLFW_KEY_LEFT_CONTROL);
-        keybinds.put(BREAK_BLOCK, -(GLFW_MOUSE_BUTTON_LEFT + 1));
-        keybinds.put(PLACE_BLOCK, -(GLFW_MOUSE_BUTTON_RIGHT + 1));
-        keybinds.put(FLY_UP, GLFW_KEY_SPACE);
-        keybinds.put(FLY_DOWN, GLFW_KEY_LEFT_CONTROL);
-        keybinds.put(OPEN_COMMAND, GLFW_KEY_SLASH);
-    }
-    
+
     /**
      * Check if an action is currently pressed.
      * @param window GLFW window handle
