@@ -47,7 +47,7 @@ public final class TrueTypeFont implements AutoCloseable {
      * @return TrueTypeFont instance
      */
     public static TrueTypeFont load(String path) {
-        return load(path, 32.0f);
+        return load(path, 16.0f);
     }
     
     /**

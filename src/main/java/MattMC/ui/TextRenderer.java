@@ -52,10 +52,9 @@ public final class TextRenderer {
         if (font == null) init();
         
         glPushMatrix();
-        // Apply scaling - font is baked at 32px, scale relative to that
-        float renderScale = scale * 32.0f / font.getFontSize();
+        // Apply scaling - font is baked at 16px, scale directly
         glTranslatef(x, y, 0);
-        glScalef(renderScale, renderScale, 1f);
+        glScalef(scale, scale, 1f);
         font.drawText(text, 0, 0);
         glPopMatrix();
     }
@@ -86,9 +85,8 @@ public final class TextRenderer {
     public static float getTextWidth(String text, float scale) {
         if (font == null) init();
         
-        // Font is baked at 32px, scale relative to that
-        float renderScale = scale * 32.0f / font.getFontSize();
-        return font.getTextWidth(text) * renderScale;
+        // Font is baked at 16px, scale directly
+        return font.getTextWidth(text) * scale;
     }
     
     /**
@@ -100,8 +98,7 @@ public final class TextRenderer {
     public static float getTextHeight(String text, float scale) {
         if (font == null) init();
         
-        // Font is baked at 32px, scale relative to that
-        float renderScale = scale * 32.0f / font.getFontSize();
-        return font.getTextHeight() * renderScale;
+        // Font is baked at 16px, scale directly
+        return font.getTextHeight() * scale;
     }
 }
