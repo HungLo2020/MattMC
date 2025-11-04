@@ -65,7 +65,10 @@ public class BlockInteraction {
         float stepSize = 0.1f;
         int steps = (int) (MAX_REACH_DISTANCE / stepSize);
         
-        int lastBlockX = -1, lastBlockY = -1, lastBlockZ = -1;
+        // Initialize last block position to the starting position
+        int lastBlockX = (int) Math.floor(rayX);
+        int lastBlockY = Chunk.worldYToChunkY((int) Math.floor(rayY));
+        int lastBlockZ = (int) Math.floor(rayZ);
         
         for (int i = 0; i < steps; i++) {
             rayX += dirX * stepSize;
