@@ -1,11 +1,8 @@
 package MattMC.renderer;
 
+import MattMC.ui.TextRenderer;
 import MattMC.world.Chunk;
 import MattMC.world.Region;
-import org.lwjgl.BufferUtils;
-import org.lwjgl.stb.STBEasyFont;
-
-import java.nio.ByteBuffer;
 
 import static org.lwjgl.opengl.GL11.*;
 
@@ -14,7 +11,6 @@ import static org.lwjgl.opengl.GL11.*;
  * Similar to Minecraft's GuiIngame class.
  */
 public class UIRenderer {
-    private final ByteBuffer fontBuffer = BufferUtils.createByteBuffer(16 * 4096);
     
     /**
      * Draw crosshair in the center of the screen.
@@ -115,19 +111,7 @@ public class UIRenderer {
      */
     private void drawText(String text, float x, float y, float scale, int rgb) {
         setColor(rgb, 1f);
-        fontBuffer.clear();
-        int quads = STBEasyFont.stb_easy_font_print(0, 0, text, null, fontBuffer);
-        
-        glPushMatrix();
-        glTranslatef(x, y, 0f);
-        glScalef(scale, scale, 1f);
-        
-        glEnableClientState(GL_VERTEX_ARRAY);
-        glVertexPointer(2, GL_FLOAT, 16, fontBuffer);
-        glDrawArrays(GL_QUADS, 0, quads * 4);
-        glDisableClientState(GL_VERTEX_ARRAY);
-        
-        glPopMatrix();
+        TextRenderer.drawText(text, x, y, scale);
     }
     
     /**

@@ -3,11 +3,9 @@ package MattMC.screens;
 import MattMC.core.Game;
 import MattMC.core.Window;
 import MattMC.ui.UIButton;
-import org.lwjgl.BufferUtils;
-import org.lwjgl.stb.STBEasyFont;
+import MattMC.ui.TextRenderer;
 import org.lwjgl.system.MemoryStack;
 
-import java.nio.ByteBuffer;
 import java.nio.IntBuffer;
 import java.util.ArrayList;
 import java.util.List;
@@ -21,7 +19,6 @@ public final class OptionsScreen implements Screen {
     private final Game game;
     private final Window window;
     private final List<UIButton> buttons = new ArrayList<>();
-    private final ByteBuffer fontBuffer = BufferUtils.createByteBuffer(16 * 4096);
     private double mouseXWin, mouseYWin;
     private boolean mouseDown;
 
@@ -179,36 +176,24 @@ public final class OptionsScreen implements Screen {
     }
 
     private void drawTitle(String text, float cx, float cy, float scale, int rgb) {
-        int tw = STBEasyFont.stb_easy_font_width(text);
-        int th = STBEasyFont.stb_easy_font_height(text);
-        float x = cx - (tw * scale) / 2f;
-        float y = cy - (th * scale) / 2f;
+        float tw = TextRenderer.getTextWidth(text, scale);
+        float th = TextRenderer.getTextHeight(text, scale);
+        float x = cx - tw / 2f;
+        float y = cy - th / 2f;
         drawText(text, x, y, scale, rgb);
     }
 
     private void drawTextCentered(String text, float cx, float cy, float scale, int rgb) {
-        int tw = STBEasyFont.stb_easy_font_width(text);
-        int th = STBEasyFont.stb_easy_font_height(text);
-        float x = cx - (tw * scale) / 2f;
-        float y = cy - (th * scale) / 2f;
+        float tw = TextRenderer.getTextWidth(text, scale);
+        float th = TextRenderer.getTextHeight(text, scale);
+        float x = cx - tw / 2f;
+        float y = cy - th / 2f;
         drawText(text, x, y, scale, rgb);
     }
 
     private void drawText(String text, float x, float y, float scale, int rgb) {
         setColor(rgb, 1f);
-        fontBuffer.clear();
-        int quads = STBEasyFont.stb_easy_font_print(0, 0, text, null, fontBuffer);
-
-        glPushMatrix();
-        glTranslatef(x, y, 0f);
-        glScalef(scale, scale, 1f);
-
-        glEnableClientState(GL_VERTEX_ARRAY);
-        glVertexPointer(2, GL_FLOAT, 16, fontBuffer);
-        glDrawArrays(GL_QUADS, 0, quads * 4);
-        glDisableClientState(GL_VERTEX_ARRAY);
-
-        glPopMatrix();
+        TextRenderer.drawText(text, x, y, scale);
     }
 
     @Override
