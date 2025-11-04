@@ -1,38 +1,44 @@
 package MattMC.ui;
 
 import org.lwjgl.BufferUtils;
+import org.lwjgl.stb.STBTTAlignedQuad;
+import org.lwjgl.stb.STBTTBakedChar;
 import org.lwjgl.stb.STBTTFontinfo;
 import org.lwjgl.stb.STBTruetype;
 import org.lwjgl.system.MemoryStack;
 
 import java.io.InputStream;
 import java.nio.ByteBuffer;
+import java.nio.FloatBuffer;
 import java.nio.IntBuffer;
 
 import static org.lwjgl.opengl.GL11.*;
 import static org.lwjgl.system.MemoryStack.stackPush;
 
 /**
- * TrueType font renderer using STBTrueType.
- * Loads a TTF font and renders text as OpenGL textures.
+ * TrueType font renderer using STBTrueType with bitmap baking.
+ * Loads a TTF font and renders text using a pre-baked texture atlas.
  */
 public final class TrueTypeFont implements AutoCloseable {
     
     private final STBTTFontinfo fontInfo;
     private final ByteBuffer fontData;
     private final int textureId;
+    private final STBTTBakedChar.Buffer charData;
     private final int bitmapWidth = 512;
     private final int bitmapHeight = 512;
-    private float scale;
+    private float fontSize;
     private int ascent;
     private int descent;
     private int lineGap;
     
-    private TrueTypeFont(ByteBuffer fontData, STBTTFontinfo fontInfo, int textureId) {
+    private TrueTypeFont(ByteBuffer fontData, STBTTFontinfo fontInfo, int textureId, STBTTBakedChar.Buffer charData, float fontSize) {
         this.fontData = fontData;
         this.fontInfo = fontInfo;
         this.textureId = textureId;
-        updateScale(16.0f); // Default font size
+        this.charData = charData;
+        this.fontSize = fontSize;
+        updateMetrics();
     }
     
     /**
@@ -41,6 +47,16 @@ public final class TrueTypeFont implements AutoCloseable {
      * @return TrueTypeFont instance
      */
     public static TrueTypeFont load(String path) {
+        return load(path, 32.0f);
+    }
+    
+    /**
+     * Load a TrueType font from classpath with specified font size.
+     * @param path Classpath resource path to the TTF file
+     * @param fontSize Font size in pixels
+     * @return TrueTypeFont instance
+     */
+    public static TrueTypeFont load(String path, float fontSize) {
         ByteBuffer fontData = readResourceToBuffer(path);
         if (fontData == null) {
             throw new RuntimeException("Missing font resource on classpath: " + path);
@@ -51,15 +67,24 @@ public final class TrueTypeFont implements AutoCloseable {
             throw new RuntimeException("Failed to initialize font: " + path);
         }
         
-        // Create a texture for font bitmap cache
+        // Bake font bitmap for ASCII characters (32-126)
+        int bitmapWidth = 512;
+        int bitmapHeight = 512;
+        ByteBuffer bitmap = BufferUtils.createByteBuffer(bitmapWidth * bitmapHeight);
+        
+        STBTTBakedChar.Buffer charData = STBTTBakedChar.malloc(96); // 96 ASCII characters
+        STBTruetype.stbtt_BakeFontBitmap(fontData, fontSize, bitmap, bitmapWidth, bitmapHeight, 32, charData);
+        
+        // Create texture from bitmap
         int texId = glGenTextures();
         glBindTexture(GL_TEXTURE_2D, texId);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_ALPHA, bitmapWidth, bitmapHeight, 0, GL_ALPHA, GL_UNSIGNED_BYTE, bitmap);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
         glBindTexture(GL_TEXTURE_2D, 0);
         
-        System.out.println("Loaded TrueType font: " + path);
-        return new TrueTypeFont(fontData, fontInfo, texId);
+        System.out.println("Loaded TrueType font: " + path + " at " + fontSize + "px");
+        return new TrueTypeFont(fontData, fontInfo, texId, charData, fontSize);
     }
     
     private static ByteBuffer readResourceToBuffer(String path) {
@@ -75,11 +100,10 @@ public final class TrueTypeFont implements AutoCloseable {
     }
     
     /**
-     * Update the font scale for a specific pixel height.
-     * @param pixelHeight Desired font height in pixels
+     * Update font metrics.
      */
-    public void updateScale(float pixelHeight) {
-        this.scale = STBTruetype.stbtt_ScaleForPixelHeight(fontInfo, pixelHeight);
+    private void updateMetrics() {
+        float scale = STBTruetype.stbtt_ScaleForPixelHeight(fontInfo, fontSize);
         
         try (MemoryStack stack = stackPush()) {
             IntBuffer pAscent = stack.mallocInt(1);
@@ -87,14 +111,24 @@ public final class TrueTypeFont implements AutoCloseable {
             IntBuffer pLineGap = stack.mallocInt(1);
             
             STBTruetype.stbtt_GetFontVMetrics(fontInfo, pAscent, pDescent, pLineGap);
-            this.ascent = pAscent.get(0);
-            this.descent = pDescent.get(0);
-            this.lineGap = pLineGap.get(0);
+            this.ascent = (int)(pAscent.get(0) * scale);
+            this.descent = (int)(pDescent.get(0) * scale);
+            this.lineGap = (int)(pLineGap.get(0) * scale);
         }
     }
     
     /**
-     * Get the width of text at the current scale.
+     * Update the font scale for rendering at a different size.
+     * @param pixelHeight Desired font height in pixels
+     */
+    public void updateScale(float pixelHeight) {
+        // Scale factor relative to baked size
+        // This is just used for scaling during rendering
+        this.fontSize = pixelHeight;
+    }
+    
+    /**
+     * Get the width of text.
      * @param text Text to measure
      * @return Width in pixels
      */
@@ -102,21 +136,20 @@ public final class TrueTypeFont implements AutoCloseable {
         float width = 0;
         
         try (MemoryStack stack = stackPush()) {
-            IntBuffer pAdvancedWidth = stack.mallocInt(1);
-            IntBuffer pLeftSideBearing = stack.mallocInt(1);
+            FloatBuffer xPos = stack.floats(0.0f);
+            FloatBuffer yPos = stack.floats(0.0f);
             
-            int prevCodepoint = 0;
+            STBTTBakedChar.Buffer buf = charData;
+            
             for (int i = 0; i < text.length(); i++) {
-                int codepoint = text.charAt(i);
+                char c = text.charAt(i);
+                if (c < 32 || c >= 128) continue; // Skip non-ASCII
                 
-                STBTruetype.stbtt_GetCodepointHMetrics(fontInfo, codepoint, pAdvancedWidth, pLeftSideBearing);
-                width += pAdvancedWidth.get(0) * scale;
-                
-                if (prevCodepoint != 0) {
-                    width += STBTruetype.stbtt_GetCodepointKernAdvance(fontInfo, prevCodepoint, codepoint) * scale;
+                int charIndex = c - 32;
+                if (charIndex >= 0 && charIndex < buf.capacity()) {
+                    STBTTBakedChar charInfo = buf.get(charIndex);
+                    width += charInfo.xadvance();
                 }
-                
-                prevCodepoint = codepoint;
             }
         }
         
@@ -124,74 +157,53 @@ public final class TrueTypeFont implements AutoCloseable {
     }
     
     /**
-     * Get the height of text at the current scale.
+     * Get the height of text.
      * @return Height in pixels
      */
     public float getTextHeight() {
-        return (ascent - descent) * scale;
+        return ascent - descent;
     }
     
     /**
      * Render text at the specified position.
      * @param text Text to render
      * @param x X position (left)
-     * @param y Y position (baseline)
+     * @param y Y position (top)
      */
     public void drawText(String text, float x, float y) {
         glEnable(GL_TEXTURE_2D);
         glEnable(GL_BLEND);
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
         
-        float xpos = x;
+        glBindTexture(GL_TEXTURE_2D, textureId);
         
         try (MemoryStack stack = stackPush()) {
-            IntBuffer pAdvancedWidth = stack.mallocInt(1);
-            IntBuffer pLeftSideBearing = stack.mallocInt(1);
-            IntBuffer x0 = stack.mallocInt(1);
-            IntBuffer y0 = stack.mallocInt(1);
-            IntBuffer x1 = stack.mallocInt(1);
-            IntBuffer y1 = stack.mallocInt(1);
+            FloatBuffer xPos = stack.floats(x);
+            FloatBuffer yPos = stack.floats(y);
             
-            int prevCodepoint = 0;
+            STBTTAlignedQuad quad = STBTTAlignedQuad.malloc(stack);
             
+            glBegin(GL_QUADS);
             for (int i = 0; i < text.length(); i++) {
-                int codepoint = text.charAt(i);
+                char c = text.charAt(i);
+                if (c < 32 || c >= 128) continue; // Skip non-ASCII
                 
-                STBTruetype.stbtt_GetCodepointHMetrics(fontInfo, codepoint, pAdvancedWidth, pLeftSideBearing);
-                STBTruetype.stbtt_GetCodepointBitmapBox(fontInfo, codepoint, scale, scale, x0, y0, x1, y1);
+                int charIndex = c - 32;
+                STBTruetype.stbtt_GetBakedQuad(charData, bitmapWidth, bitmapHeight, charIndex, xPos, yPos, quad, true);
                 
-                int width = x1.get(0) - x0.get(0);
-                int height = y1.get(0) - y0.get(0);
+                glTexCoord2f(quad.s0(), quad.t0());
+                glVertex2f(quad.x0(), quad.y0());
                 
-                if (width > 0 && height > 0) {
-                    // Allocate bitmap for this character
-                    ByteBuffer bitmap = BufferUtils.createByteBuffer(width * height);
-                    STBTruetype.stbtt_MakeCodepointBitmap(fontInfo, bitmap, width, height, width, scale, scale, codepoint);
-                    
-                    // Upload to texture
-                    glBindTexture(GL_TEXTURE_2D, textureId);
-                    glTexImage2D(GL_TEXTURE_2D, 0, GL_ALPHA, width, height, 0, GL_ALPHA, GL_UNSIGNED_BYTE, bitmap);
-                    
-                    // Draw quad with texture
-                    float x2 = xpos + x0.get(0);
-                    float y2 = y + y0.get(0);
-                    
-                    glBegin(GL_QUADS);
-                    glTexCoord2f(0, 0); glVertex2f(x2, y2);
-                    glTexCoord2f(1, 0); glVertex2f(x2 + width, y2);
-                    glTexCoord2f(1, 1); glVertex2f(x2 + width, y2 + height);
-                    glTexCoord2f(0, 1); glVertex2f(x2, y2 + height);
-                    glEnd();
-                }
+                glTexCoord2f(quad.s1(), quad.t0());
+                glVertex2f(quad.x1(), quad.y0());
                 
-                xpos += pAdvancedWidth.get(0) * scale;
+                glTexCoord2f(quad.s1(), quad.t1());
+                glVertex2f(quad.x1(), quad.y1());
                 
-                if (prevCodepoint != 0) {
-                    xpos += STBTruetype.stbtt_GetCodepointKernAdvance(fontInfo, prevCodepoint, codepoint) * scale;
-                }
-                
-                prevCodepoint = codepoint;
+                glTexCoord2f(quad.s0(), quad.t1());
+                glVertex2f(quad.x0(), quad.y1());
             }
+            glEnd();
         }
         
         glDisable(GL_BLEND);
@@ -203,10 +215,17 @@ public final class TrueTypeFont implements AutoCloseable {
         return textureId;
     }
     
+    public float getFontSize() {
+        return fontSize;
+    }
+    
     @Override
     public void close() {
         if (textureId != 0) {
             glDeleteTextures(textureId);
+        }
+        if (charData != null) {
+            charData.free();
         }
     }
 }

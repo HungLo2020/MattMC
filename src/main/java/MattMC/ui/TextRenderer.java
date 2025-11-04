@@ -44,13 +44,12 @@ public final class TextRenderer {
     public static void drawText(String text, float x, float y, float scale) {
         if (font == null) init();
         
-        float fontSize = 16.0f * scale;
-        font.updateScale(fontSize);
-        
         glPushMatrix();
-        // Adjust Y position for baseline rendering
-        float baselineY = y + font.getTextHeight() * 0.8f;
-        font.drawText(text, x, baselineY);
+        // Apply scaling - font is baked at 32px, scale relative to that
+        float renderScale = scale * 32.0f / font.getFontSize();
+        glTranslatef(x, y, 0);
+        glScalef(renderScale, renderScale, 1f);
+        font.drawText(text, 0, 0);
         glPopMatrix();
     }
     
@@ -64,11 +63,8 @@ public final class TextRenderer {
     public static void drawCenteredText(String text, float centerX, float y, float scale) {
         if (font == null) init();
         
-        float fontSize = 16.0f * scale;
-        font.updateScale(fontSize);
-        
-        // Calculate text width
-        float textWidth = font.getTextWidth(text);
+        // Calculate text width at the desired scale
+        float textWidth = getTextWidth(text, scale);
         float x = centerX - textWidth / 2;
         
         drawText(text, x, y, scale);
@@ -83,10 +79,9 @@ public final class TextRenderer {
     public static float getTextWidth(String text, float scale) {
         if (font == null) init();
         
-        float fontSize = 16.0f * scale;
-        font.updateScale(fontSize);
-        
-        return font.getTextWidth(text);
+        // Font is baked at 32px, scale relative to that
+        float renderScale = scale * 32.0f / font.getFontSize();
+        return font.getTextWidth(text) * renderScale;
     }
     
     /**
@@ -98,9 +93,8 @@ public final class TextRenderer {
     public static float getTextHeight(String text, float scale) {
         if (font == null) init();
         
-        float fontSize = 16.0f * scale;
-        font.updateScale(fontSize);
-        
-        return font.getTextHeight();
+        // Font is baked at 32px, scale relative to that
+        float renderScale = scale * 32.0f / font.getFontSize();
+        return font.getTextHeight() * renderScale;
     }
 }
