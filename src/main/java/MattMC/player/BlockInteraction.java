@@ -37,7 +37,7 @@ public class BlockInteraction {
      */
     public void placeBlock(Block block) {
         BlockHitResult hit = raycastBlock();
-        if (hit != null && hit.adjacentX >= 0 && hit.adjacentY >= 0 && hit.adjacentZ >= 0) {
+        if (hit != null && hit.adjacentY >= 0 && hit.adjacentY < Chunk.HEIGHT) {
             // Place block at the adjacent position (the face we hit)
             Block existing = world.getBlock(hit.adjacentX, hit.adjacentY, hit.adjacentZ);
             if (existing.isAir()) {
