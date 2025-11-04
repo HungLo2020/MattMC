@@ -1,14 +1,12 @@
 package MattMC.world;
 
-import net.querz.nbt.io.*;
-import net.querz.nbt.tag.*;
+import MattMC.nbt.NBTUtil;
 
 import java.io.*;
 import java.nio.ByteBuffer;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.zip.DeflaterOutputStream;
-import java.util.zip.InflaterInputStream;
+import java.util.Map;
 
 /**
  * Represents a Minecraft-style region file (.mca) that stores 32x32 chunks.
@@ -111,7 +109,7 @@ public class RegionFile implements AutoCloseable {
     /**
      * Read chunk NBT data from the region file.
      */
-    public CompoundTag readChunk(int chunkX, int chunkZ) throws IOException {
+    public Map<String, Object> readChunk(int chunkX, int chunkZ) throws IOException {
         int index = getChunkIndex(chunkX, chunkZ);
         int location = locations[index];
         
@@ -144,16 +142,11 @@ public class RegionFile implements AutoCloseable {
             
             // Decompress and parse NBT
             InputStream input = new ByteArrayInputStream(compressedData);
-            if (compressionType == 2) { // Zlib (deflate)
-                input = new InflaterInputStream(input);
-            }
             
-            try (input) {
-                NamedTag namedTag = new NBTDeserializer(false).fromStream(input);
-                if (namedTag != null && namedTag.getTag() instanceof CompoundTag) {
-                    return (CompoundTag) namedTag.getTag();
-                }
-                return null;
+            if (compressionType == 2) { // Zlib (deflate)
+                return NBTUtil.readDeflated(input);
+            } else {
+                return null; // Unsupported compression
             }
         }
     }
@@ -161,14 +154,12 @@ public class RegionFile implements AutoCloseable {
     /**
      * Write chunk NBT data to the region file.
      */
-    public void writeChunk(int chunkX, int chunkZ, CompoundTag chunkData) throws IOException {
+    public void writeChunk(int chunkX, int chunkZ, Map<String, Object> chunkData) throws IOException {
         int index = getChunkIndex(chunkX, chunkZ);
         
         // Serialize and compress chunk data
         ByteArrayOutputStream byteOut = new ByteArrayOutputStream();
-        try (DeflaterOutputStream deflateOut = new DeflaterOutputStream(byteOut)) {
-            new NBTSerializer(false).toStream(new NamedTag(null, chunkData), deflateOut);
-        }
+        NBTUtil.writeDeflated(chunkData, byteOut);
         byte[] compressedData = byteOut.toByteArray();
         
         // Calculate sectors needed (1 byte for compression type + compressed data + 4 bytes for length)

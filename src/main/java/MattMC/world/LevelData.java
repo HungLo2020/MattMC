@@ -1,13 +1,11 @@
 package MattMC.world;
 
-import net.querz.nbt.io.*;
-import net.querz.nbt.tag.*;
+import MattMC.nbt.NBTUtil;
 
 import java.io.*;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.zip.GZIPInputStream;
-import java.util.zip.GZIPOutputStream;
+import java.util.*;
 
 /**
  * Represents the level.dat file structure for a Minecraft-style world.
@@ -47,100 +45,114 @@ public class LevelData {
     }
     
     /**
-     * Convert level data to NBT format.
+     * Convert level data to NBT format (Map-based).
      */
-    public CompoundTag toNBT() {
-        CompoundTag data = new CompoundTag();
+    public Map<String, Object> toNBT() {
+        Map<String, Object> data = new HashMap<>();
         
         // World metadata
-        data.putString("LevelName", worldName);
-        data.putLong("LastPlayed", lastPlayed);
-        data.putInt("SpawnX", spawnX);
-        data.putInt("SpawnY", spawnY);
-        data.putInt("SpawnZ", spawnZ);
-        data.putInt("GameType", gameMode);
-        data.putByte("hardcore", (byte) (hardcore ? 1 : 0));
-        data.putByte("Difficulty", (byte) difficulty);
+        data.put("LevelName", worldName);
+        data.put("LastPlayed", lastPlayed);
+        data.put("SpawnX", spawnX);
+        data.put("SpawnY", spawnY);
+        data.put("SpawnZ", spawnZ);
+        data.put("GameType", gameMode);
+        data.put("hardcore", (byte) (hardcore ? 1 : 0));
+        data.put("Difficulty", (byte) difficulty);
         
         // Version info
-        CompoundTag version = new CompoundTag();
-        version.putString("Name", "MattMC 1.0");
-        version.putInt("Id", 1);
+        Map<String, Object> version = new HashMap<>();
+        version.put("Name", "MattMC 1.0");
+        version.put("Id", 1);
         data.put("Version", version);
         
         // Player data
-        CompoundTag player = new CompoundTag();
+        Map<String, Object> player = new HashMap<>();
         
-        ListTag<DoubleTag> pos = new ListTag<>(DoubleTag.class);
-        pos.add(new DoubleTag(playerX));
-        pos.add(new DoubleTag(playerY));
-        pos.add(new DoubleTag(playerZ));
+        List<Double> pos = new ArrayList<>();
+        pos.add(playerX);
+        pos.add(playerY);
+        pos.add(playerZ);
         player.put("Pos", pos);
         
-        ListTag<FloatTag> rotation = new ListTag<>(FloatTag.class);
-        rotation.add(new FloatTag(playerYaw));
-        rotation.add(new FloatTag(playerPitch));
+        List<Float> rotation = new ArrayList<>();
+        rotation.add(playerYaw);
+        rotation.add(playerPitch);
         player.put("Rotation", rotation);
         
         data.put("Player", player);
         
-        CompoundTag root = new CompoundTag();
+        Map<String, Object> root = new HashMap<>();
         root.put("Data", data);
         
         return root;
     }
     
     /**
-     * Load level data from NBT format.
+     * Load level data from NBT format (Map-based).
      */
-    public static LevelData fromNBT(CompoundTag root) {
+    public static LevelData fromNBT(Map<String, Object> root) {
         LevelData levelData = new LevelData();
         
-        CompoundTag data = root.getCompoundTag("Data");
-        if (data == null) {
+        Object dataObj = root.get("Data");
+        if (!(dataObj instanceof Map)) {
             return levelData;
         }
         
+        @SuppressWarnings("unchecked")
+        Map<String, Object> data = (Map<String, Object>) dataObj;
+        
         // World metadata
-        if (data.containsKey("LevelName")) {
-            levelData.worldName = data.getString("LevelName");
+        if (data.get("LevelName") instanceof String) {
+            levelData.worldName = (String) data.get("LevelName");
         }
-        if (data.containsKey("LastPlayed")) {
-            levelData.lastPlayed = data.getLong("LastPlayed");
+        if (data.get("LastPlayed") instanceof Long) {
+            levelData.lastPlayed = (Long) data.get("LastPlayed");
         }
-        if (data.containsKey("SpawnX")) {
-            levelData.spawnX = data.getInt("SpawnX");
+        if (data.get("SpawnX") instanceof Integer) {
+            levelData.spawnX = (Integer) data.get("SpawnX");
         }
-        if (data.containsKey("SpawnY")) {
-            levelData.spawnY = data.getInt("SpawnY");
+        if (data.get("SpawnY") instanceof Integer) {
+            levelData.spawnY = (Integer) data.get("SpawnY");
         }
-        if (data.containsKey("SpawnZ")) {
-            levelData.spawnZ = data.getInt("SpawnZ");
+        if (data.get("SpawnZ") instanceof Integer) {
+            levelData.spawnZ = (Integer) data.get("SpawnZ");
         }
-        if (data.containsKey("GameType")) {
-            levelData.gameMode = data.getInt("GameType");
+        if (data.get("GameType") instanceof Integer) {
+            levelData.gameMode = (Integer) data.get("GameType");
         }
-        if (data.containsKey("hardcore")) {
-            levelData.hardcore = data.getByte("hardcore") != 0;
+        if (data.get("hardcore") instanceof Byte) {
+            levelData.hardcore = ((Byte) data.get("hardcore")) != 0;
         }
-        if (data.containsKey("Difficulty")) {
-            levelData.difficulty = data.getByte("Difficulty");
+        if (data.get("Difficulty") instanceof Byte) {
+            levelData.difficulty = (Byte) data.get("Difficulty");
         }
         
         // Player data
-        CompoundTag player = data.getCompoundTag("Player");
-        if (player != null) {
-            ListTag<?> pos = player.getListTag("Pos");
-            if (pos != null && pos.size() >= 3) {
-                levelData.playerX = pos.asDoubleTagList().get(0).asDouble();
-                levelData.playerY = pos.asDoubleTagList().get(1).asDouble();
-                levelData.playerZ = pos.asDoubleTagList().get(2).asDouble();
+        Object playerObj = data.get("Player");
+        if (playerObj instanceof Map) {
+            @SuppressWarnings("unchecked")
+            Map<String, Object> player = (Map<String, Object>) playerObj;
+            
+            Object posObj = player.get("Pos");
+            if (posObj instanceof List) {
+                @SuppressWarnings("unchecked")
+                List<Double> pos = (List<Double>) posObj;
+                if (pos.size() >= 3) {
+                    levelData.playerX = pos.get(0);
+                    levelData.playerY = pos.get(1);
+                    levelData.playerZ = pos.get(2);
+                }
             }
             
-            ListTag<?> rotation = player.getListTag("Rotation");
-            if (rotation != null && rotation.size() >= 2) {
-                levelData.playerYaw = rotation.asFloatTagList().get(0).asFloat();
-                levelData.playerPitch = rotation.asFloatTagList().get(1).asFloat();
+            Object rotationObj = player.get("Rotation");
+            if (rotationObj instanceof List) {
+                @SuppressWarnings("unchecked")
+                List<Float> rotation = (List<Float>) rotationObj;
+                if (rotation.size() >= 2) {
+                    levelData.playerYaw = rotation.get(0);
+                    levelData.playerPitch = rotation.get(1);
+                }
             }
         }
         
@@ -153,9 +165,8 @@ public class LevelData {
     public void save(Path filePath) throws IOException {
         Files.createDirectories(filePath.getParent());
         
-        try (OutputStream out = Files.newOutputStream(filePath);
-             GZIPOutputStream gzipOut = new GZIPOutputStream(out)) {
-            new NBTSerializer(true).toStream(new NamedTag(null, toNBT()), gzipOut);
+        try (OutputStream out = Files.newOutputStream(filePath)) {
+            NBTUtil.writeCompressed(toNBT(), out);
         }
     }
     
@@ -163,13 +174,9 @@ public class LevelData {
      * Load level data from a file.
      */
     public static LevelData load(Path filePath) throws IOException {
-        try (InputStream in = Files.newInputStream(filePath);
-             GZIPInputStream gzipIn = new GZIPInputStream(in)) {
-            NamedTag namedTag = new NBTDeserializer(true).fromStream(gzipIn);
-            if (namedTag != null && namedTag.getTag() instanceof CompoundTag) {
-                return fromNBT((CompoundTag) namedTag.getTag());
-            }
-            throw new IOException("Invalid level.dat format");
+        try (InputStream in = Files.newInputStream(filePath)) {
+            Map<String, Object> root = NBTUtil.readCompressed(in);
+            return fromNBT(root);
         }
     }
     

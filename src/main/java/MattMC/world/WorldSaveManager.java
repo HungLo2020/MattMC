@@ -1,7 +1,6 @@
 package MattMC.world;
 
 import MattMC.util.AppPaths;
-import net.querz.nbt.tag.CompoundTag;
 
 import java.io.*;
 import java.nio.file.*;
@@ -138,7 +137,7 @@ public final class WorldSaveManager {
             
             try (RegionFile regionFile = new RegionFile(regionFilePath, regionX, regionZ)) {
                 for (Chunk chunk : entry.getValue()) {
-                    CompoundTag chunkNBT = ChunkNBT.toNBT(chunk);
+                    Map<String, Object> chunkNBT = ChunkNBT.toNBT(chunk);
                     regionFile.writeChunk(chunk.chunkX(), chunk.chunkZ(), chunkNBT);
                 }
             }
@@ -234,7 +233,7 @@ public final class WorldSaveManager {
                     
                     if (regionFile.hasChunk(chunkX, chunkZ)) {
                         try {
-                            CompoundTag chunkNBT = regionFile.readChunk(chunkX, chunkZ);
+                            Map<String, Object> chunkNBT = regionFile.readChunk(chunkX, chunkZ);
                             if (chunkNBT != null) {
                                 Chunk chunk = ChunkNBT.fromNBT(chunkNBT);
                                 // Manually add the loaded chunk to the world
