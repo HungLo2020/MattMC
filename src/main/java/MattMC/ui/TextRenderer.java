@@ -1,45 +1,63 @@
 package MattMC.ui;
 
-import org.lwjgl.BufferUtils;
-import org.lwjgl.stb.STBEasyFont;
-import org.lwjgl.system.MemoryStack;
-
-import java.nio.ByteBuffer;
-import java.nio.IntBuffer;
-
 import static org.lwjgl.opengl.GL11.*;
-import static org.lwjgl.system.MemoryStack.stackPush;
 
 /**
- * Utility class for rendering text using STBEasyFont.
- * Provides centered, scaled text rendering capabilities.
+ * Utility class for rendering text using TrueType fonts.
+ * Provides centered, scaled text rendering capabilities with the Minecraft font.
  */
 public final class TextRenderer {
     
-    private static final ByteBuffer fontBuffer = BufferUtils.createByteBuffer(16 * 4096);
+    private static TrueTypeFont font;
+    private static final String FONT_PATH = "/assets/fonts/Minecraft.ttf";
     
     private TextRenderer() {} // Prevent instantiation
     
     /**
+     * Initialize the text renderer with the Minecraft font.
+     * This is automatically called on first use, but can be called explicitly
+     * at application startup for better error handling.
+     */
+    public static void init() {
+        if (font == null) {
+            try {
+                font = TrueTypeFont.load(FONT_PATH);
+            } catch (Exception e) {
+                System.err.println("Failed to load font: " + FONT_PATH);
+                e.printStackTrace();
+                throw new RuntimeException("Font initialization failed", e);
+            }
+        }
+    }
+    
+    /**
+     * Cleanup resources.
+     * Should be called at application shutdown.
+     */
+    public static void cleanup() {
+        if (font != null) {
+            font.close();
+            font = null;
+        }
+    }
+    
+    /**
      * Render text at a specific position with scale.
      * @param text Text to render
-     * @param x X position (bottom-left)
-     * @param y Y position (bottom-left)
+     * @param x X position (left)
+     * @param y Y position (top)
      * @param scale Text scale
      */
     public static void drawText(String text, float x, float y, float scale) {
+        if (font == null) init();
+        
         glPushMatrix();
+        // Apply scaling - font is baked at 16px, scale directly
         glTranslatef(x, y, 0);
         glScalef(scale, scale, 1f);
-        
-        fontBuffer.clear();
-        int quads = STBEasyFont.stb_easy_font_print(0, 0, text, null, fontBuffer);
-        
-        glEnableClientState(GL_VERTEX_ARRAY);
-        glVertexPointer(2, GL_FLOAT, 16, fontBuffer);
-        glDrawArrays(GL_QUADS, 0, quads * 4);
-        glDisableClientState(GL_VERTEX_ARRAY);
-        
+        // Offset y by ascent to make y coordinate represent top of text (like STBEasyFont)
+        // instead of baseline
+        font.drawText(text, 0, font.getAscent());
         glPopMatrix();
     }
     
@@ -51,8 +69,10 @@ public final class TextRenderer {
      * @param scale Text scale
      */
     public static void drawCenteredText(String text, float centerX, float y, float scale) {
-        // Calculate text width
-        float textWidth = STBEasyFont.stb_easy_font_width(text) * scale;
+        if (font == null) init();
+        
+        // Calculate text width at the desired scale
+        float textWidth = getTextWidth(text, scale);
         float x = centerX - textWidth / 2;
         
         drawText(text, x, y, scale);
@@ -65,7 +85,10 @@ public final class TextRenderer {
      * @return Width in pixels
      */
     public static float getTextWidth(String text, float scale) {
-        return STBEasyFont.stb_easy_font_width(text) * scale;
+        if (font == null) init();
+        
+        // Font is baked at 16px, scale directly
+        return font.getTextWidth(text) * scale;
     }
     
     /**
@@ -75,6 +98,9 @@ public final class TextRenderer {
      * @return Height in pixels
      */
     public static float getTextHeight(String text, float scale) {
-        return STBEasyFont.stb_easy_font_height(text) * scale;
+        if (font == null) init();
+        
+        // Font is baked at 16px, scale directly
+        return font.getTextHeight() * scale;
     }
 }
