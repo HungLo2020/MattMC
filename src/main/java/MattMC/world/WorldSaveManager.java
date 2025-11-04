@@ -103,9 +103,8 @@ public final class WorldSaveManager {
         levelData.setSpawnZ((int) playerZ);
         
         Path levelDatFile = worldDir.resolve("level.dat");
-        levelData.save(levelDatFile);
         
-        // Save backup
+        // Save backup before writing new level.dat
         if (Files.exists(levelDatFile)) {
             Path backupFile = worldDir.resolve("level.dat_old");
             try {
@@ -114,6 +113,9 @@ public final class WorldSaveManager {
                 System.err.println("Failed to create level.dat backup: " + e.getMessage());
             }
         }
+        
+        // Save new level.dat
+        levelData.save(levelDatFile);
         
         // Save chunks to region files
         Path regionDir = worldDir.resolve("region");
