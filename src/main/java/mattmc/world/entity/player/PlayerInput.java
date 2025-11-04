@@ -31,7 +31,7 @@ public class PlayerInput {
     public static final String OPEN_COMMAND = "open_command";
     
     private PlayerInput() {
-        // Keybinds are loaded from config file by KeybindManager
+        // Keybinds are initialized by KeybindManager from DefaultOptions.txt config file
     }
     
     /**
