@@ -115,6 +115,7 @@ public final class BlockFaceGeometry {
     /**
      * Draw a complete outline around a cube (all 12 edges).
      * Used for highlighting the targeted block.
+     * Must be called within a GL_LINES block (between glBegin(GL_LINES) and glEnd()).
      */
     public static void drawCompleteBlockOutline(float x, float y, float z) {
         float x0 = x, x1 = x + 1;

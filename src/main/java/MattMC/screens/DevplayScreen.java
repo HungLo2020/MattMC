@@ -344,7 +344,8 @@ public final class DevplayScreen implements Screen {
     private void renderTargetedBlockOutline() {
         BlockInteraction.BlockHitResult hit = blockInteraction.getTargetedBlock();
         if (hit != null) {
-            // Disable texturing for outline
+            // Save texture state and disable texturing for outline
+            boolean textureEnabled = glIsEnabled(GL_TEXTURE_2D);
             glDisable(GL_TEXTURE_2D);
             
             // Set up line rendering
@@ -355,6 +356,11 @@ public final class DevplayScreen implements Screen {
             BlockFaceGeometry.drawCompleteBlockOutline(hit.x, Chunk.chunkYToWorldY(hit.y), hit.z);
             
             glEnd();
+            
+            // Restore texture state
+            if (textureEnabled) {
+                glEnable(GL_TEXTURE_2D);
+            }
         }
     }
     
