@@ -55,7 +55,9 @@ public final class TextRenderer {
         // Apply scaling - font is baked at 16px, scale directly
         glTranslatef(x, y, 0);
         glScalef(scale, scale, 1f);
-        font.drawText(text, 0, 0);
+        // Offset y by ascent to make y coordinate represent top of text (like STBEasyFont)
+        // instead of baseline
+        font.drawText(text, 0, font.getAscent());
         glPopMatrix();
     }
     

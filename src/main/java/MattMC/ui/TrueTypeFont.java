@@ -213,6 +213,10 @@ public final class TrueTypeFont implements AutoCloseable {
         return fontSize;
     }
     
+    public int getAscent() {
+        return ascent;
+    }
+    
     @Override
     public void close() {
         if (textureId != 0) {
