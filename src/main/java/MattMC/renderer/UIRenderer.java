@@ -59,9 +59,9 @@ public class UIRenderer {
     
     /**
      * Draw debug information in the top-left corner.
-     * Shows player position, chunk position, and region position.
+     * Shows version, FPS, player position, chunk position, and region position.
      */
-    public void drawDebugInfo(int screenWidth, int screenHeight, float playerX, float playerY, float playerZ) {
+    public void drawDebugInfo(int screenWidth, int screenHeight, float playerX, float playerY, float playerZ, double fps) {
         // Calculate chunk position from player position
         int chunkX = Math.floorDiv((int)playerX, Chunk.WIDTH);
         int chunkZ = Math.floorDiv((int)playerZ, Chunk.DEPTH);
@@ -86,14 +86,22 @@ public class UIRenderer {
         float lineHeight = 20f;
         float scale = 1.5f;
         
+        // Header line with version
+        String headerText = "MattMC: " + MattMC.Main.VERSION + ": Debug Screen";
+        drawText(headerText, x, y, scale, 0xFFFFFF);
+        
+        // FPS display
+        String fpsText = String.format("FPS: %.0f", fps);
+        drawText(fpsText, x, y + lineHeight, scale, 0xFFFFFF);
+        
         // Format position values to 2 decimal places for readability
         String posText = String.format("Position: %.2f, %.2f, %.2f", playerX, playerY, playerZ);
         String chunkText = String.format("Chunk: %d, %d", chunkX, chunkZ);
         String regionText = String.format("Region: %d, %d", regionX, regionZ);
         
-        drawText(posText, x, y, scale, 0xFFFFFF);
-        drawText(chunkText, x, y + lineHeight, scale, 0xFFFFFF);
-        drawText(regionText, x, y + lineHeight * 2, scale, 0xFFFFFF);
+        drawText(posText, x, y + lineHeight * 2, scale, 0xFFFFFF);
+        drawText(chunkText, x, y + lineHeight * 3, scale, 0xFFFFFF);
+        drawText(regionText, x, y + lineHeight * 4, scale, 0xFFFFFF);
         
         // Restore matrices
         glPopMatrix();

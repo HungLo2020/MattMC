@@ -37,7 +37,7 @@ public class BlockInteraction {
      */
     public void placeBlock(Block block) {
         BlockHitResult hit = raycastBlock();
-        if (hit != null && hit.adjacentX >= 0 && hit.adjacentY >= 0 && hit.adjacentZ >= 0) {
+        if (hit != null && hit.adjacentY >= 0 && hit.adjacentY < Chunk.HEIGHT) {
             // Place block at the adjacent position (the face we hit)
             Block existing = world.getBlock(hit.adjacentX, hit.adjacentY, hit.adjacentZ);
             if (existing.isAir()) {
@@ -65,7 +65,10 @@ public class BlockInteraction {
         float stepSize = 0.1f;
         int steps = (int) (MAX_REACH_DISTANCE / stepSize);
         
-        int lastBlockX = -1, lastBlockY = -1, lastBlockZ = -1;
+        // Initialize last block position to the starting position
+        int lastBlockX = (int) Math.floor(rayX);
+        int lastBlockY = Chunk.worldYToChunkY((int) Math.floor(rayY));
+        int lastBlockZ = (int) Math.floor(rayZ);
         
         for (int i = 0; i < steps; i++) {
             rayX += dirX * stepSize;
