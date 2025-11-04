@@ -40,15 +40,16 @@ public final class AppPaths {
             appRoot = jarDir.getParent();
             System.out.println("[DEBUG] Packaged mode: appRoot = " + appRoot);
         } else if (jarDir.toString().contains("/build/classes/")) {
-            // Running from Gradle in dev mode - navigate up to project root
+            // Running from Gradle :run task in dev mode
             // Path is like: /path/to/project/build/classes/java/main
-            // We need to get to: /path/to/project/
+            // Navigate to /path/to/project/build/install/MattMC/
             Path current = jarDir;
             while (current != null && !current.endsWith("build")) {
                 current = current.getParent();
             }
             if (current != null) {
-                appRoot = current.getParent(); // Go up from "build" to project root
+                // Use build/install/MattMC as the app root for dev builds
+                appRoot = current.resolve("install").resolve("MattMC");
                 System.out.println("[DEBUG] Gradle dev mode: appRoot = " + appRoot);
             } else {
                 // Fallback if we can't find build directory
@@ -56,9 +57,24 @@ public final class AppPaths {
                 System.out.println("[DEBUG] Dev mode fallback: appRoot = " + appRoot);
             }
         } else {
-            // Running from IDE or other setup - use jarDir itself
-            appRoot = jarDir;
-            System.out.println("[DEBUG] IDE/other mode: appRoot = " + appRoot);
+            // Running from IDE or other setup
+            // Navigate up to find project root (where build/ directory would be)
+            // and use build/install/MattMC as the app root
+            Path current = jarDir;
+            appRoot = null;
+            while (current != null && current.getParent() != null) {
+                Path buildDir = current.resolve("build");
+                if (Files.exists(buildDir) && Files.isDirectory(buildDir)) {
+                    appRoot = buildDir.resolve("install").resolve("MattMC");
+                    System.out.println("[DEBUG] IDE mode: found build dir, appRoot = " + appRoot);
+                    break;
+                }
+                current = current.getParent();
+            }
+            if (appRoot == null) {
+                appRoot = jarDir;
+                System.out.println("[DEBUG] IDE fallback: appRoot = " + appRoot);
+            }
         }
         
         if (appRoot == null) {
