@@ -397,5 +397,12 @@ public final class DevplayScreen implements Screen {
         // Re-register callbacks when returning from pause menu
         registerCallbacks();
     }
-    @Override public void onClose() {}
+    
+    @Override 
+    public void onClose() {
+        // Shutdown async chunk loader
+        if (world != null) {
+            world.shutdown();
+        }
+    }
 }

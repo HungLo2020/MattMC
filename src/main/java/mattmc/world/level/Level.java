@@ -8,20 +8,27 @@ import mattmc.world.level.block.Blocks;
 import mattmc.world.level.chunk.LevelChunk;
 import mattmc.world.level.chunk.ChunkNBT;
 import mattmc.world.level.chunk.RegionFile;
+import mattmc.world.level.chunk.AsyncChunkLoader;
 
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Iterator;
+import java.util.List;
 
 /**
  * Manages an infinite world with dynamic chunk loading/unloading.
  * Similar to Minecraft's world management system.
+ * 
+ * Now uses asynchronous chunk loading to prevent lag spikes.
  */
 public class Level implements LevelAccessor {
     // Store chunks by their position (chunkX, chunkZ)
     private final Map<Long, LevelChunk> loadedChunks = new HashMap<>();
+    
+    // Async chunk loader for background loading/generation
+    private final AsyncChunkLoader asyncLoader;
     
     // Render distance in chunks
     private int renderDistance = 8;
@@ -34,6 +41,7 @@ public class Level implements LevelAccessor {
     private Path worldDirectory = null;
     
     public Level() {
+        this.asyncLoader = new AsyncChunkLoader();
     }
     
     /**
@@ -42,6 +50,7 @@ public class Level implements LevelAccessor {
      */
     public void setWorldDirectory(Path worldDirectory) {
         this.worldDirectory = worldDirectory;
+        this.asyncLoader.setWorldDirectory(worldDirectory);
     }
     
     /**
@@ -215,28 +224,35 @@ public class Level implements LevelAccessor {
     /**
      * Update the world based on player position.
      * Loads chunks near the player and unloads distant chunks.
+     * 
+     * Now uses asynchronous loading to prevent lag spikes.
      */
     public void updateChunksAroundPlayer(float playerX, float playerZ) {
+        // Process pending async tasks
+        asyncLoader.processPendingTasks();
+        
+        // Collect completed chunks from background threads
+        List<LevelChunk> completedChunks = asyncLoader.collectCompletedChunks();
+        for (LevelChunk chunk : completedChunks) {
+            long key = chunkKey(chunk.chunkX(), chunk.chunkZ());
+            loadedChunks.put(key, chunk);
+        }
+        
         // Convert player position to chunk coordinates
         int playerChunkX = Math.floorDiv((int)playerX, LevelChunk.WIDTH);
         int playerChunkZ = Math.floorDiv((int)playerZ, LevelChunk.DEPTH);
         
-        // Only update if player moved to a different chunk
-        if (playerChunkX == lastPlayerChunkX && playerChunkZ == lastPlayerChunkZ) {
-            return;
-        }
-        
-        lastPlayerChunkX = playerChunkX;
-        lastPlayerChunkZ = playerChunkZ;
-        
-        // Load chunks around player
+        // Request chunks around player (async)
         for (int dx = -renderDistance; dx <= renderDistance; dx++) {
             for (int dz = -renderDistance; dz <= renderDistance; dz++) {
                 int chunkX = playerChunkX + dx;
                 int chunkZ = playerChunkZ + dz;
                 
-                // Ensure chunk is loaded
-                getChunk(chunkX, chunkZ);
+                long key = chunkKey(chunkX, chunkZ);
+                if (!loadedChunks.containsKey(key)) {
+                    // Request async loading
+                    asyncLoader.requestChunk(chunkX, chunkZ, playerX, playerZ);
+                }
             }
         }
         
@@ -256,6 +272,9 @@ public class Level implements LevelAccessor {
                 iterator.remove();
             }
         }
+        
+        lastPlayerChunkX = playerChunkX;
+        lastPlayerChunkZ = playerChunkZ;
     }
     
     /**
@@ -284,5 +303,20 @@ public class Level implements LevelAccessor {
      */
     public int getRenderDistance() {
         return renderDistance;
+    }
+    
+    /**
+     * Get the async chunk loader for accessing loading stats.
+     */
+    public AsyncChunkLoader getAsyncLoader() {
+        return asyncLoader;
+    }
+    
+    /**
+     * Shutdown the async loader and wait for tasks to complete.
+     * Call this when closing the world.
+     */
+    public void shutdown() {
+        asyncLoader.shutdown();
     }
 }
