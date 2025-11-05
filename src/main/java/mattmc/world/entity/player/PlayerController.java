@@ -56,7 +56,7 @@ public class PlayerController {
             if (input.isPressed(window, PlayerInput.FLY_UP)) {
                 player.moveUp(moveSpeed);
             }
-            if (input.isPressed(window, PlayerInput.FLY_DOWN)) {
+            if (input.isPressed(window, PlayerInput.CROUCH)) {
                 player.moveUp(-moveSpeed);
             }
         }
