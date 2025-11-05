@@ -88,7 +88,8 @@ public class MeshBuilder {
         );
         
         // Apply grass green tint for grass_block top face (vanilla Minecraft-like)
-        if (face.block == Blocks.GRASS_BLOCK && "top".equals(face.faceType)) {
+        // Note: faceType is never null in practice (always set to string literal)
+        if (face.block == Blocks.GRASS_BLOCK && face.faceType != null && "top".equals(face.faceType)) {
             renderColor = ColorUtils.applyTint(renderColor, 0x5BB53B, face.colorBrightness);
         }
         

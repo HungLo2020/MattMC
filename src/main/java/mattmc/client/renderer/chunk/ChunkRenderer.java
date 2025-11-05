@@ -79,7 +79,7 @@ public class ChunkRenderer {
         ChunkVAO vao = vaoCache.get(chunk);
         if (vao == null) {
             // VAO not ready yet - it will be uploaded later from async mesh building
-            // For now, skip rendering this chunk
+            // Chunks will appear once mesh buffer is uploaded from worker thread
             return;
         }
         
