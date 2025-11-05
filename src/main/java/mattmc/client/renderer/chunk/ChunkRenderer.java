@@ -455,4 +455,19 @@ public class ChunkRenderer {
         glDepthMask(true);
         glDisable(GL_BLEND);
     }
+    
+    /**
+     * Set whether to use VBO/VAO rendering (true) or display lists (false).
+     * Default is true (VBO rendering).
+     */
+    public void setUseVBORendering(boolean useVBO) {
+        this.useVBORendering = useVBO;
+    }
+    
+    /**
+     * Get whether VBO/VAO rendering is enabled.
+     */
+    public boolean isUsingVBORendering() {
+        return useVBORendering;
+    }
 }
