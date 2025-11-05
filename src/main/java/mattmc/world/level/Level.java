@@ -6,7 +6,11 @@ import mattmc.world.level.chunk.Region;
 import mattmc.world.level.block.Block;
 import mattmc.world.level.block.Blocks;
 import mattmc.world.level.chunk.LevelChunk;
+import mattmc.world.level.chunk.ChunkNBT;
+import mattmc.world.level.chunk.RegionFile;
 
+import java.io.IOException;
+import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Iterator;
@@ -26,7 +30,25 @@ public class Level implements LevelAccessor {
     private int lastPlayerChunkX = Integer.MAX_VALUE;
     private int lastPlayerChunkZ = Integer.MAX_VALUE;
     
+    // World save directory (null if world is not being saved)
+    private Path worldDirectory = null;
+    
     public Level() {
+    }
+    
+    /**
+     * Set the world directory for saving chunks.
+     * This should be set when a world is loaded or created.
+     */
+    public void setWorldDirectory(Path worldDirectory) {
+        this.worldDirectory = worldDirectory;
+    }
+    
+    /**
+     * Get the world directory.
+     */
+    public Path getWorldDirectory() {
+        return worldDirectory;
     }
     
     /**
@@ -113,6 +135,34 @@ public class Level implements LevelAccessor {
     }
     
     /**
+     * Save a single chunk to disk if the world directory is set.
+     * This is called when chunks are unloaded to preserve modifications.
+     */
+    private void saveChunk(LevelChunk chunk) {
+        if (worldDirectory == null) {
+            return; // No save directory set, skip saving
+        }
+        
+        try {
+            Path regionDir = worldDirectory.resolve("region");
+            java.nio.file.Files.createDirectories(regionDir);
+            
+            int[] regionCoords = RegionFile.getRegionCoords(chunk.chunkX(), chunk.chunkZ());
+            int regionX = regionCoords[0];
+            int regionZ = regionCoords[1];
+            
+            Path regionFilePath = regionDir.resolve(String.format("r.%d.%d.mca", regionX, regionZ));
+            
+            try (RegionFile regionFile = new RegionFile(regionFilePath, regionX, regionZ)) {
+                Map<String, Object> chunkNBT = ChunkNBT.toNBT(chunk);
+                regionFile.writeChunk(chunk.chunkX(), chunk.chunkZ(), chunkNBT);
+            }
+        } catch (IOException e) {
+            System.err.println("Failed to save chunk (" + chunk.chunkX() + ", " + chunk.chunkZ() + "): " + e.getMessage());
+        }
+    }
+    
+    /**
      * Update the world based on player position.
      * Loads chunks near the player and unloads distant chunks.
      */
@@ -151,6 +201,11 @@ public class Level implements LevelAccessor {
             int dz = Math.abs(chunk.chunkZ() - playerChunkZ);
             
             if (dx > unloadDistance || dz > unloadDistance) {
+                // Save the chunk if it has been modified before unloading
+                if (chunk.isDirty()) {
+                    saveChunk(chunk);
+                    chunk.setDirty(false);
+                }
                 iterator.remove();
             }
         }

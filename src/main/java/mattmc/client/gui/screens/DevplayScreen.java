@@ -67,6 +67,16 @@ public final class DevplayScreen implements Screen {
         // Initialize infinite world (use provided or create new)
         this.world = world != null ? world : new Level();
         
+        // Set world directory for new worlds so chunks can be saved during unload
+        if (world == null) {
+            try {
+                java.nio.file.Path worldDir = mattmc.world.level.storage.LevelStorageSource.getSavesDirectory().resolve(worldName);
+                this.world.setWorldDirectory(worldDir);
+            } catch (java.io.IOException e) {
+                System.err.println("Failed to set world directory: " + e.getMessage());
+            }
+        }
+        
         // Initialize player - use provided position or spawn at world origin
         float spawnX = playerX;
         float spawnY = playerY;
