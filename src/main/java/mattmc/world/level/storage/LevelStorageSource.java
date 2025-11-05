@@ -93,6 +93,9 @@ public final class LevelStorageSource {
         System.out.println("[DEBUG] Saving world to: " + worldDir.toAbsolutePath());
         Files.createDirectories(worldDir);
         
+        // Set world directory so chunks can be saved during unload
+        world.setWorldDirectory(worldDir);
+        
         // Save level.dat with NBT format
         LevelData levelData = new LevelData();
         levelData.setWorldName(worldName);
@@ -183,6 +186,9 @@ public final class LevelStorageSource {
         
         // Create world
         Level world = new Level();
+        
+        // Set world directory for saving chunks during unload
+        world.setWorldDirectory(worldDir);
         
         // Load chunks from region files
         Path regionDir = worldDir.resolve("region");

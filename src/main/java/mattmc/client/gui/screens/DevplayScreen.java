@@ -15,6 +15,9 @@ import mattmc.world.level.chunk.LevelChunk;
 import mattmc.world.level.Level;
 import mattmc.world.level.storage.LevelStorageSource;
 
+import java.io.IOException;
+import java.nio.file.Path;
+
 import static org.lwjgl.glfw.GLFW.*;
 import static org.lwjgl.opengl.GL11.*;
 
@@ -66,6 +69,16 @@ public final class DevplayScreen implements Screen {
         
         // Initialize infinite world (use provided or create new)
         this.world = world != null ? world : new Level();
+        
+        // Set world directory for new worlds so chunks can be saved during unload
+        if (world == null) {
+            try {
+                Path worldDir = LevelStorageSource.getSavesDirectory().resolve(worldName);
+                this.world.setWorldDirectory(worldDir);
+            } catch (IOException e) {
+                System.err.println("Failed to set world directory: " + e.getMessage());
+            }
+        }
         
         // Initialize player - use provided position or spawn at world origin
         float spawnX = playerX;
