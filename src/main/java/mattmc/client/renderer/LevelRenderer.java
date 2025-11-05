@@ -1,15 +1,11 @@
 package mattmc.client.renderer;
 
-import mattmc.client.renderer.chunk.RegionRenderer;
 import mattmc.client.renderer.texture.TextureAtlas;
 
 import mattmc.world.level.chunk.LevelChunk;
 import mattmc.world.level.Level;
-import mattmc.world.level.chunk.LevelChunk;
 import mattmc.client.renderer.chunk.ChunkRenderer;
-import mattmc.client.renderer.chunk.ChunkMeshData;
 import mattmc.client.renderer.chunk.ChunkMeshBuffer;
-import mattmc.world.level.Level;
 
 import java.util.List;
 
@@ -57,13 +53,7 @@ public class LevelRenderer {
      * Also processes pending mesh uploads from background threads.
      */
     public void render(Level world, float playerX, float playerY, float playerZ) {
-        // Process completed mesh data from async loader (old display list path)
-        List<ChunkMeshData> completedMeshes = world.getAsyncLoader().collectCompletedMeshes();
-        for (ChunkMeshData meshData : completedMeshes) {
-            chunkRenderer.uploadMeshData(meshData);
-        }
-        
-        // Process completed mesh buffers from async loader (new VBO/VAO path)
+        // Process completed mesh buffers from async loader
         List<ChunkMeshBuffer> completedMeshBuffers = world.getAsyncLoader().collectCompletedMeshBuffers();
         for (ChunkMeshBuffer meshBuffer : completedMeshBuffers) {
             chunkRenderer.uploadMeshBuffer(meshBuffer);
