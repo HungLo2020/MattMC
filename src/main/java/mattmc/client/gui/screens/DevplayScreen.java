@@ -15,6 +15,9 @@ import mattmc.world.level.chunk.LevelChunk;
 import mattmc.world.level.Level;
 import mattmc.world.level.storage.LevelStorageSource;
 
+import java.io.IOException;
+import java.nio.file.Path;
+
 import static org.lwjgl.glfw.GLFW.*;
 import static org.lwjgl.opengl.GL11.*;
 
@@ -70,9 +73,9 @@ public final class DevplayScreen implements Screen {
         // Set world directory for new worlds so chunks can be saved during unload
         if (world == null) {
             try {
-                java.nio.file.Path worldDir = mattmc.world.level.storage.LevelStorageSource.getSavesDirectory().resolve(worldName);
+                Path worldDir = LevelStorageSource.getSavesDirectory().resolve(worldName);
                 this.world.setWorldDirectory(worldDir);
-            } catch (java.io.IOException e) {
+            } catch (IOException e) {
                 System.err.println("Failed to set world directory: " + e.getMessage());
             }
         }
