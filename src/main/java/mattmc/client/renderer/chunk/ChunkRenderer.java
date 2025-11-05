@@ -8,6 +8,7 @@ import mattmc.world.level.block.Block;
 import mattmc.world.level.block.Block;
 import mattmc.world.level.block.Blocks;
 import mattmc.world.level.chunk.LevelChunk;
+import mattmc.world.level.chunk.ChunkUtils;
 import mattmc.client.renderer.block.BlockFaceCollector;
 import mattmc.client.renderer.block.BlockFaceGeometry;
 import mattmc.client.renderer.texture.TextureManager;
@@ -40,6 +41,9 @@ public class ChunkRenderer {
     // This is similar to Minecraft's chunk rendering optimization
     private final Map<LevelChunk, Integer> displayListCache = new HashMap<>();
     
+    // Cache for chunk key to chunk mapping (for mesh data uploads)
+    private final Map<Long, LevelChunk> chunkByKey = new HashMap<>();
+    
     // Texture manager for loading and binding block textures
     private final TextureManager textureManager = new TextureManager();
     
@@ -63,8 +67,36 @@ public class ChunkRenderer {
             displayListCache.put(chunk, displayList);
         }
         
+        // Track chunk by key for mesh data uploads
+        long key = chunkKey(chunk.chunkX(), chunk.chunkZ());
+        chunkByKey.put(key, chunk);
+        
         // Render the display list (single draw call for entire chunk!)
         glCallList(displayList);
+    }
+    
+    /**
+     * Upload mesh data to GPU and create display list.
+     * This is called on the render thread with pre-built mesh data from a worker thread.
+     * Returns true if upload was successful.
+     */
+    public boolean uploadMeshData(ChunkMeshData meshData) {
+        long key = chunkKey(meshData.getChunkX(), meshData.getChunkZ());
+        LevelChunk chunk = chunkByKey.get(key);
+        
+        if (chunk == null) {
+            // Chunk not loaded yet or was unloaded
+            return false;
+        }
+        
+        // Remove old display list if it exists
+        invalidateChunk(chunk);
+        
+        // Create new display list from mesh data
+        int displayList = compileChunkToDisplayListFromMesh(meshData.getFaceCollector());
+        displayListCache.put(chunk, displayList);
+        
+        return true;
     }
     
     /**
@@ -90,6 +122,37 @@ public class ChunkRenderer {
         
         glEndList();
         return displayList;
+    }
+    
+    /**
+     * Compile pre-built mesh data into a display list.
+     * The mesh data was prepared on a background thread.
+     */
+    private int compileChunkToDisplayListFromMesh(BlockFaceCollector collector) {
+        int displayList = glGenLists(1);
+        glNewList(displayList, GL_COMPILE);
+        
+        // Render using pre-collected faces
+        renderBatchedFaces(collector);
+        
+        glEndList();
+        return displayList;
+    }
+    
+    /**
+     * Helper to create chunk key from coordinates.
+     */
+    private static long chunkKey(int chunkX, int chunkZ) {
+        return ChunkUtils.chunkKey(chunkX, chunkZ);
+    }
+    
+    /**
+     * Remove a chunk from the tracking cache.
+     * Call this when a chunk is unloaded.
+     */
+    public void removeChunkFromCache(LevelChunk chunk) {
+        long key = chunkKey(chunk.chunkX(), chunk.chunkZ());
+        chunkByKey.remove(key);
     }
     
     /**
@@ -146,22 +209,7 @@ public class ChunkRenderer {
      * This allows us to skip entire 16x16x16 sections very quickly.
      */
     private boolean isSectionEmpty(LevelChunk chunk, int startY, int endY) {
-        // Sample a few blocks to quickly determine if section is likely empty
-        // Full check would scan all 4,096 blocks, but sampling is faster
-        // Check corners and center
-        int midY = (startY + endY) / 2;
-        
-        if (!chunk.getBlock(0, startY, 0).isAir()) return false;
-        if (!chunk.getBlock(15, startY, 15).isAir()) return false;
-        if (!chunk.getBlock(0, midY, 0).isAir()) return false;
-        if (!chunk.getBlock(15, midY, 15).isAir()) return false;
-        if (!chunk.getBlock(0, endY - 1, 0).isAir()) return false;
-        if (!chunk.getBlock(15, endY - 1, 15).isAir()) return false;
-        if (!chunk.getBlock(8, midY, 8).isAir()) return false;
-        
-        // If all samples are air, likely the whole section is empty
-        // For flat terrain at y=64, sections above y=80 will be skipped
-        return true;
+        return ChunkUtils.isSectionEmpty(chunk, startY, endY);
     }
     
     /**

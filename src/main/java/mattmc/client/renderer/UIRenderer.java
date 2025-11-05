@@ -60,7 +60,8 @@ public class UIRenderer {
      * Draw debug information in the top-left corner.
      * Shows version, FPS, player position, chunk position, and region position.
      */
-    public void drawDebugInfo(int screenWidth, int screenHeight, float playerX, float playerY, float playerZ, double fps) {
+    public void drawDebugInfo(int screenWidth, int screenHeight, float playerX, float playerY, float playerZ, double fps, 
+                               int loadedChunks, int pendingChunks, int activeWorkers) {
         // Calculate chunk position from player position
         int chunkX = Math.floorDiv((int)playerX, LevelChunk.WIDTH);
         int chunkZ = Math.floorDiv((int)playerZ, LevelChunk.DEPTH);
@@ -101,6 +102,13 @@ public class UIRenderer {
         drawText(posText, x, y + lineHeight * 2, scale, 0xFFFFFF);
         drawText(chunkText, x, y + lineHeight * 3, scale, 0xFFFFFF);
         drawText(regionText, x, y + lineHeight * 4, scale, 0xFFFFFF);
+        
+        // Chunk loading stats
+        String loadedText = String.format("Loaded Chunks: %d", loadedChunks);
+        String pendingText = String.format("Pending: %d | Workers: %d", pendingChunks, activeWorkers);
+        
+        drawText(loadedText, x, y + lineHeight * 5, scale, 0xFFFFFF);
+        drawText(pendingText, x, y + lineHeight * 6, scale, 0xFFFFFF);
         
         // Restore matrices
         glPopMatrix();

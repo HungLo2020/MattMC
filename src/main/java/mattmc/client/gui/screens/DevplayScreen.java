@@ -108,6 +108,7 @@ public final class DevplayScreen implements Screen {
         this.playerController = new PlayerController(player);
         this.blockInteraction = new BlockInteraction(player, this.world);
         this.worldRenderer = new LevelRenderer();
+        this.worldRenderer.initWithLevel(this.world);
         this.uiRenderer = new UIRenderer();
 
         // Register input callbacks
@@ -274,8 +275,8 @@ public final class DevplayScreen implements Screen {
             fpsUpdateTimer = 0.0;
         }
         
-        // Update chunks based on player position (load/unload)
-        world.updateChunksAroundPlayer(player.getX(), player.getZ());
+        // Update chunks based on player position (load/unload) with frustum prioritization
+        world.updateChunksAroundPlayer(player.getX(), player.getZ(), player.getYaw());
         
         // Update physics (gravity, collision) - only if command overlay is not visible
         if (!commandOverlayVisible) {
@@ -337,7 +338,11 @@ public final class DevplayScreen implements Screen {
         
         // Draw debug information in top-left corner (only if F3 is pressed)
         if (debugMenuVisible) {
-            uiRenderer.drawDebugInfo(w, h, player.getX(), player.getY(), player.getZ(), fps);
+            int loadedChunks = world.getLoadedChunkCount();
+            int pendingChunks = world.getAsyncLoader().getPendingTaskCount();
+            int activeWorkers = world.getAsyncLoader().getActiveTaskCount();
+            uiRenderer.drawDebugInfo(w, h, player.getX(), player.getY(), player.getZ(), fps,
+                                     loadedChunks, pendingChunks, activeWorkers);
         }
         
         // Draw command overlay if visible
@@ -397,5 +402,12 @@ public final class DevplayScreen implements Screen {
         // Re-register callbacks when returning from pause menu
         registerCallbacks();
     }
-    @Override public void onClose() {}
+    
+    @Override 
+    public void onClose() {
+        // Shutdown async chunk loader
+        if (world != null) {
+            world.shutdown();
+        }
+    }
 }
