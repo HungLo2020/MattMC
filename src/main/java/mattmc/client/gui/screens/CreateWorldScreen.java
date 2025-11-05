@@ -90,13 +90,13 @@ public final class CreateWorldScreen implements Screen {
         buttons.clear();
 
         // Create text field with unique world name
-        String defaultName = LevelStorageSource.generateUniqueWorldName("New Level");
+        String defaultName = LevelStorageSource.generateUniqueWorldName("New World");
         worldNameField = new EditBox(tfx, textFieldY, textFieldWidth, textFieldHeight, 50);
         worldNameField.setText(defaultName);
         worldNameField.setFocused(true); // Auto-focus
 
         // Centered buttons
-        buttons.add(new Button("Create Level", x, buttonsStartY + 0 * (buttonHeight + buttonGap), buttonWidth, buttonHeight));
+        buttons.add(new Button("Create World", x, buttonsStartY + 0 * (buttonHeight + buttonGap), buttonWidth, buttonHeight));
         buttons.add(new Button("Back",         x, buttonsStartY + 1 * (buttonHeight + buttonGap), buttonWidth, buttonHeight));
     }
 
@@ -145,7 +145,7 @@ public final class CreateWorldScreen implements Screen {
             game.setScreen(new SelectWorldScreen(game));
             return;
         }
-        if ("Create Level".equals(label)) {
+        if ("Create World".equals(label)) {
             createWorld();
             return;
         }
@@ -154,7 +154,7 @@ public final class CreateWorldScreen implements Screen {
     private void createWorld() {
         String worldName = worldNameField.getText().trim();
         if (worldName.isEmpty()) {
-            worldName = "New Level";
+            worldName = "New World";
         }
         
         // Ensure unique name
@@ -184,8 +184,8 @@ public final class CreateWorldScreen implements Screen {
         if (worldNameField != null) drawTextField(worldNameField);
         
         for (var b : buttons) drawButton(b);
-        drawTitle("Create New Level", titleCX, titleCY, titleScale, 0xFFFFFF);
-        drawTitle("Level Name:", titleCX, worldNameField.y - 20f, 1.0f, 0xB0C4DE);
+        drawTitle("Create New World", titleCX, titleCY, titleScale, 0xFFFFFF);
+        drawTitle("World Name:", titleCX, worldNameField.y - 20f, 1.0f, 0xB0C4DE);
     }
 
     private void setupOrtho() {

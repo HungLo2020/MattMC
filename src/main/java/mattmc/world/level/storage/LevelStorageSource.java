@@ -70,7 +70,7 @@ public final class LevelStorageSource {
     
     /**
      * Generate a unique world name based on a base name.
-     * If "New Level" exists, returns "New Level (2)", etc.
+     * If "New World" exists, returns "New World (2)", etc.
      */
     public static String generateUniqueWorldName(String baseName) {
         if (!worldExists(baseName)) {
