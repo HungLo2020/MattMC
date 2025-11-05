@@ -50,8 +50,10 @@ public class ChunkRenderer {
     // Texture manager for loading and binding block textures
     private final TextureManager textureManager = new TextureManager();
     
-    // Flag to enable VBO/VAO rendering (set to true to use new system)
-    private boolean useVBORendering = true;
+    // Flag to enable VBO/VAO rendering
+    // Default: false (use display lists which support textures)
+    // Set to true to use VBO rendering (faster but no texture support yet)
+    private boolean useVBORendering = false;
     
     /**
      * Render a chunk using either VBO/VAO or display list.

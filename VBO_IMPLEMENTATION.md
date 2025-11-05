@@ -43,10 +43,11 @@ Vertex format (9 floats per vertex, interleaved):
 ### Enable/Disable VBO Rendering
 
 ```java
-// Enable VBO rendering (default)
+// Display list rendering is used by default (supports textures)
+// Enable VBO rendering for better performance (no texture support yet)
 chunkRenderer.setUseVBORendering(true);
 
-// Disable VBO rendering (fallback to display lists)
+// Disable VBO rendering (use display lists with texture support)
 chunkRenderer.setUseVBORendering(false);
 ```
 
@@ -60,16 +61,20 @@ AsyncChunkLoader.MAX_MESH_UPLOADS_PER_FRAME = 2;
 
 ## Current Limitations
 
-### No Texture Support (Yet)
+### No Texture Support in VBO Mode
+
+**Display lists (default mode) fully support textures.**
 
 VBO rendering currently uses fallback colors only:
 - Each block renders with its fallback color
 - Textures are disabled during VBO rendering
-- Display list path still supports textures
+- Display list path (default) supports textures normally
 
 **Why?** The original code groups faces by texture and renders each group separately. VBO rendering builds a single mesh for the entire chunk, so we can't switch textures mid-render.
 
 **Solution:** Implement a texture atlas (future enhancement)
+
+**Current Status:** Display lists are used by default to maintain texture support.
 
 ### Fixed-Function Pipeline
 
@@ -113,9 +118,9 @@ src/main/java/mattmc/world/level/chunk/
 
 Both rendering paths are maintained for smooth migration:
 
-1. **Current State**: VBO enabled by default, display lists available as fallback
-2. **Testing Phase**: Users can toggle between paths to compare
-3. **Future**: Once VBO is fully validated, display list code can be removed
+1. **Current State**: Display lists used by default (full texture support), VBO available as optional optimization
+2. **Testing Phase**: Users can opt-in to VBO rendering to test performance (no textures)
+3. **Future**: Once texture atlas is implemented, VBO can become the default
 
 ## Future Enhancements
 
