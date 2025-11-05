@@ -53,6 +53,11 @@ public class LevelRenderer {
      * Also processes pending mesh uploads from background threads.
      */
     public void render(Level world, float playerX, float playerY, float playerZ) {
+        // First, register all loaded chunks with the renderer so uploads can find them
+        for (LevelChunk chunk : world.getLoadedChunks()) {
+            chunkRenderer.registerChunk(chunk);
+        }
+        
         // Process completed mesh buffers from async loader
         List<ChunkMeshBuffer> completedMeshBuffers = world.getAsyncLoader().collectCompletedMeshBuffers();
         for (ChunkMeshBuffer meshBuffer : completedMeshBuffers) {

@@ -25,6 +25,15 @@ public class ChunkRenderer {
     private TextureAtlas textureAtlas = null;
     
     /**
+     * Register a chunk for tracking (so mesh buffers can be uploaded to it).
+     * Call this before uploading mesh buffers.
+     */
+    public void registerChunk(LevelChunk chunk) {
+        long key = chunkKey(chunk.chunkX(), chunk.chunkZ());
+        chunkByKey.put(key, chunk);
+    }
+    
+    /**
      * Render a chunk using VBO/VAO.
      */
     public void renderChunk(LevelChunk chunk) {
@@ -40,10 +49,6 @@ public class ChunkRenderer {
             // VAO not ready yet - it will be uploaded later from async mesh building
             return;
         }
-        
-        // Track chunk by key for mesh data uploads
-        long key = chunkKey(chunk.chunkX(), chunk.chunkZ());
-        chunkByKey.put(key, chunk);
         
         // Enable texturing and bind texture atlas
         glEnable(GL_TEXTURE_2D);
