@@ -1,0 +1,124 @@
+# MattMC
+
+MattMC is a performance-focused Minecraft clone built from the ground up with an emphasis on modularity, efficiency, and a personal vision of what Minecraft could be. This project represents my take on how Minecraft's development would unfold if I were in charge—prioritizing clean architecture, optimal performance, and thoughtful design decisions.
+
+## Vision
+
+This project reimagines Minecraft with a focus on:
+
+- **Performance First**: Every system is designed with efficiency in mind, from chunk rendering to world storage
+- **Modularity**: Clean separation of concerns with a well-organized codebase that follows modern software engineering practices
+- **Technical Excellence**: Leveraging advanced techniques like OpenGL display lists, face culling, and optimized data structures
+- **Transparency**: Comprehensive documentation of technical decisions and architectural choices
+
+## Key Features
+
+### Performance Optimizations
+- **Advanced Chunk Rendering**: Uses OpenGL display lists for 10-100x performance improvement
+- **Intelligent Face Culling**: Only renders block faces adjacent to air, dramatically reducing polygon count
+- **Chunk Sections**: Divides chunks into 16×16×16 sections, skipping empty sections entirely
+- **Efficient World Storage**: Minecraft-inspired Anvil format with region files and NBT compression
+
+### Minecraft-Compatible Architecture
+- **Chunk System**: 16×384×16 chunks following Minecraft 1.18+ specifications
+- **Y-Coordinate Range**: -64 to 319 (384 blocks total)
+- **World Save Format**: Region-based storage with NBT data structures
+- **Block Models**: JSON-based block models and blockstates system
+
+### Game Features
+- World creation and management
+- Player movement and controls
+- Customizable keybindings and settings
+- Development/testing screen for experimentation
+- Save/load functionality with automatic backups
+
+## Technical Stack
+
+- **Language**: Java 21
+- **Graphics**: LWJGL 3.3.4 (OpenGL)
+- **Build System**: Gradle with Kotlin DSL
+- **Libraries**:
+  - LWJGL (OpenGL, GLFW, STB)
+  - Gson for JSON parsing
+
+## Project Structure
+
+```
+mattmc/
+├── client/              # Client-side code
+│   ├── main/           # Entry point
+│   ├── gui/            # User interface
+│   │   ├── screens/    # Game screens (title, pause, options, etc.)
+│   │   └── components/ # UI components (buttons, text boxes, etc.)
+│   ├── resources/      # Resource management (models, textures)
+│   ├── settings/       # Game settings and keybindings
+│   ├── renderer/       # Rendering systems
+│   └── level/          # World/level management
+│       ├── chunk/      # Chunk system
+│       ├── block/      # Block types and properties
+│       └── storage/    # World save/load (Anvil format, NBT)
+└── server/             # Server-side code (future)
+```
+
+## Building and Running
+
+### Prerequisites
+- Java 21 or higher
+- Gradle (included via wrapper)
+
+### Build
+```bash
+./gradlew build
+```
+
+### Run Development Version
+```bash
+./RunDev.sh
+```
+
+### Create Distribution
+```bash
+./gradlew portableZip
+```
+
+The distributable zip will be created in `build/releases/`.
+
+## Documentation
+
+For in-depth technical information, see:
+
+- [**Chunk System**](CHUNK_SYSTEM.md) - Details on the chunk-based voxel rendering system
+- [**Efficiency Analysis**](EFFICIENCY_ANALYSIS.md) - Performance optimizations and analysis
+- [**World Save Format**](WORLD_SAVE_FORMAT.md) - World storage format and NBT structures
+- [**Refactoring Summary**](REFACTORING_SUMMARY.md) - Architectural decisions and code organization
+
+## Development Philosophy
+
+MattMC follows a philosophy of:
+
+1. **Performance over convenience**: Making the hard optimization choices that lead to smooth gameplay
+2. **Clean code**: Following Java conventions and Minecraft's proven architectural patterns
+3. **Documentation**: Comprehensive technical documentation for all major systems
+4. **Modularity**: Clear separation between client, server, and shared code
+5. **Maintainability**: Code that's easy to understand, modify, and extend
+
+## Current Status
+
+MattMC is in active development. Current features include:
+
+- ✅ Core rendering engine with optimized chunk rendering
+- ✅ Player controls and camera system
+- ✅ World generation and storage
+- ✅ GUI system with multiple screens
+- ✅ Settings and keybinding management
+- ✅ Save/load functionality
+- 🚧 Block interactions (in progress)
+- 🚧 Multiplayer support (planned)
+
+## License
+
+This is a personal project created for educational purposes and to explore game engine development.
+
+## Acknowledgments
+
+MattMC draws inspiration from Minecraft Java Edition's architecture while implementing a personal vision for performance and design. Special thanks to the Minecraft community and modding scene for demonstrating what's possible with thoughtful optimization and clean code.
