@@ -151,7 +151,6 @@ public class MeshBuilder {
         currentVertex += 4;
     }
     
-
     /**
      * Add south face vertices and indices.
      */

@@ -119,4 +119,3 @@ public class ChunkVAO {
         return indexCount == 0;
     }
 }
-
