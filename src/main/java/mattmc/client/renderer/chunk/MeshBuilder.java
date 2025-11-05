@@ -77,10 +77,17 @@ public class MeshBuilder {
     
     /**
      * Extract RGBA color from face data.
+     * Since VBO rendering doesn't support per-face texture switching,
+     * we use the block's fallback color for all faces.
      */
     private float[] extractColor(BlockFaceCollector.FaceData face) {
-        // Apply grass green tint for grass_block
-        int renderColor = face.color;
+        // Use fallback color since we don't have texture support in VBO rendering yet
+        int renderColor = ColorUtils.adjustColorBrightness(
+            face.block.getFallbackColor(), 
+            face.colorBrightness
+        );
+        
+        // Apply grass green tint for grass_block top face (vanilla Minecraft-like)
         if (face.block == Blocks.GRASS_BLOCK && "top".equals(face.faceType)) {
             renderColor = ColorUtils.applyTint(renderColor, 0x5BB53B, face.colorBrightness);
         }

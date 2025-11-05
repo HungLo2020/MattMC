@@ -51,21 +51,29 @@ public class ChunkVAO {
      * Render this chunk using VBO/EBO with fixed-function pipeline.
      * Sets up vertex arrays and issues a single draw call.
      * Must be called on the OpenGL thread.
+     * 
+     * Note: Currently renders without textures (vertex colors only).
+     * Future enhancement: implement texture atlas for multi-texture support in single VBO.
      */
     public void render() {
         int stride = ChunkMeshBuffer.VERTEX_SIZE_BYTES;
+        
+        // Disable texturing for VBO rendering (for now)
+        // TODO: Implement texture atlas to support textures in VBO rendering
+        boolean wasTextureEnabled = glIsEnabled(GL_TEXTURE_2D);
+        if (wasTextureEnabled) {
+            glDisable(GL_TEXTURE_2D);
+        }
         
         // Bind VBO
         glBindBuffer(GL_ARRAY_BUFFER, vboId);
         
         // Enable client state arrays (fixed-function pipeline)
         glEnableClientState(GL_VERTEX_ARRAY);
-        glEnableClientState(GL_TEXTURE_COORD_ARRAY);
         glEnableClientState(GL_COLOR_ARRAY);
         
         // Set vertex attribute pointers
         glVertexPointer(3, GL_FLOAT, stride, ChunkMeshBuffer.POSITION_OFFSET * Float.BYTES);
-        glTexCoordPointer(2, GL_FLOAT, stride, ChunkMeshBuffer.TEXCOORD_OFFSET * Float.BYTES);
         glColorPointer(4, GL_FLOAT, stride, ChunkMeshBuffer.COLOR_OFFSET * Float.BYTES);
         
         // Bind EBO and draw
@@ -74,12 +82,16 @@ public class ChunkVAO {
         
         // Disable client state arrays
         glDisableClientState(GL_VERTEX_ARRAY);
-        glDisableClientState(GL_TEXTURE_COORD_ARRAY);
         glDisableClientState(GL_COLOR_ARRAY);
         
         // Unbind buffers
         glBindBuffer(GL_ARRAY_BUFFER, 0);
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+        
+        // Restore texture state
+        if (wasTextureEnabled) {
+            glEnable(GL_TEXTURE_2D);
+        }
     }
     
     /**
