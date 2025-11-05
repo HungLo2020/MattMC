@@ -145,6 +145,8 @@ public class AsyncChunkLoader {
                     LevelChunk chunk = future.get();
                     completed.add(chunk);
                     
+                    System.out.println("Chunk loaded/generated: (" + chunk.chunkX() + ", " + chunk.chunkZ() + "), starting mesh building...");
+                    
                     // Start mesh building for this chunk (both old and new formats)
                     Future<ChunkMeshData> meshFuture = executor.submit(() -> buildChunkMesh(chunk));
                     meshFutures.put(key, meshFuture);
@@ -152,6 +154,7 @@ public class AsyncChunkLoader {
                     // Also build VBO mesh buffer
                     Future<ChunkMeshBuffer> meshBufferFuture = executor.submit(() -> buildChunkMeshBuffer(chunk));
                     meshBufferFutures.put(key, meshBufferFuture);
+                    System.out.println("Submitted mesh buffer build task for chunk (" + chunk.chunkX() + ", " + chunk.chunkZ() + ")");
                     
                 } catch (InterruptedException | ExecutionException e) {
                     System.err.println("Failed to load chunk: " + e.getMessage());
@@ -342,6 +345,7 @@ public class AsyncChunkLoader {
         // First, check for newly completed mesh buffers
         Iterator<Map.Entry<Long, Future<ChunkMeshBuffer>>> iterator = meshBufferFutures.entrySet().iterator();
         
+        int completed = 0;
         while (iterator.hasNext()) {
             Map.Entry<Long, Future<ChunkMeshBuffer>> entry = iterator.next();
             Future<ChunkMeshBuffer> future = entry.getValue();
@@ -350,11 +354,18 @@ public class AsyncChunkLoader {
                 try {
                     ChunkMeshBuffer meshBuffer = future.get();
                     completedMeshBuffers.offer(meshBuffer);
+                    completed++;
+                    System.out.println("Mesh buffer completed for chunk, queued for upload. Queue size: " + completedMeshBuffers.size());
                 } catch (InterruptedException | ExecutionException e) {
                     System.err.println("Failed to build mesh buffer: " + e.getMessage());
+                    e.printStackTrace();
                 }
                 iterator.remove();
             }
+        }
+        
+        if (completed > 0) {
+            System.out.println("Collected " + completed + " completed mesh buffers this frame");
         }
         
         // Return up to budget limit for this frame
