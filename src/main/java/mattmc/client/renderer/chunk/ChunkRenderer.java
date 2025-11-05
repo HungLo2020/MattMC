@@ -41,18 +41,62 @@ public class ChunkRenderer {
     // This is similar to Minecraft's chunk rendering optimization
     private final Map<LevelChunk, Integer> displayListCache = new HashMap<>();
     
+    // VAO cache: maps chunks to their VAOs (new VBO/VAO rendering)
+    private final Map<LevelChunk, ChunkVAO> vaoCache = new HashMap<>();
+    
     // Cache for chunk key to chunk mapping (for mesh data uploads)
     private final Map<Long, LevelChunk> chunkByKey = new HashMap<>();
     
     // Texture manager for loading and binding block textures
     private final TextureManager textureManager = new TextureManager();
     
+    // Flag to enable VBO/VAO rendering (set to true to use new system)
+    private boolean useVBORendering = true;
+    
     /**
-     * Render a chunk using a cached display list.
+     * Render a chunk using either VBO/VAO or display list.
+     * If the chunk hasn't been compiled yet, compile it first.
+     */
+    public void renderChunk(LevelChunk chunk) {
+        if (useVBORendering) {
+            renderChunkVAO(chunk);
+        } else {
+            renderChunkDisplayList(chunk);
+        }
+    }
+    
+    /**
+     * Render a chunk using VAO/VBO (new method).
+     */
+    private void renderChunkVAO(LevelChunk chunk) {
+        // Check if chunk has been marked as dirty
+        if (chunk.isDirty()) {
+            invalidateChunk(chunk);
+            chunk.setDirty(false);
+        }
+        
+        // Get or create VAO
+        ChunkVAO vao = vaoCache.get(chunk);
+        if (vao == null) {
+            // VAO not ready yet - it will be uploaded later from async mesh building
+            // For now, skip rendering this chunk
+            return;
+        }
+        
+        // Track chunk by key for mesh data uploads
+        long key = chunkKey(chunk.chunkX(), chunk.chunkZ());
+        chunkByKey.put(key, chunk);
+        
+        // Render using VAO (single draw call!)
+        vao.render();
+    }
+    
+    /**
+     * Render a chunk using a cached display list (old method).
      * If the chunk hasn't been compiled yet, compile it first.
      * Display lists are 10-100x faster than immediate mode rendering.
      */
-    public void renderChunk(LevelChunk chunk) {
+    private void renderChunkDisplayList(LevelChunk chunk) {
         // Check if chunk has been marked as dirty
         if (chunk.isDirty()) {
             // Recompile display list
@@ -100,13 +144,49 @@ public class ChunkRenderer {
     }
     
     /**
-     * Invalidate a chunk's display list, forcing it to be recompiled.
+     * Upload mesh buffer to GPU and create VAO (new VBO/VAO method).
+     * This is called on the render thread with pre-built mesh buffer from a worker thread.
+     * Returns true if upload was successful.
+     */
+    public boolean uploadMeshBuffer(ChunkMeshBuffer meshBuffer) {
+        long key = chunkKey(meshBuffer.getChunkX(), meshBuffer.getChunkZ());
+        LevelChunk chunk = chunkByKey.get(key);
+        
+        if (chunk == null) {
+            // Chunk not loaded yet or was unloaded
+            return false;
+        }
+        
+        // Remove old VAO if it exists
+        ChunkVAO oldVAO = vaoCache.remove(chunk);
+        if (oldVAO != null) {
+            oldVAO.delete();
+        }
+        
+        // Create new VAO from mesh buffer
+        if (!meshBuffer.isEmpty()) {
+            ChunkVAO vao = new ChunkVAO(meshBuffer);
+            vaoCache.put(chunk, vao);
+        }
+        
+        return true;
+    }
+    
+    /**
+     * Invalidate a chunk's rendering resources, forcing it to be rebuilt.
      * Call this when blocks in the chunk are modified.
      */
     public void invalidateChunk(LevelChunk chunk) {
+        // Delete display list if it exists
         Integer displayList = displayListCache.remove(chunk);
         if (displayList != null) {
             glDeleteLists(displayList, 1);
+        }
+        
+        // Delete VAO if it exists
+        ChunkVAO vao = vaoCache.remove(chunk);
+        if (vao != null) {
+            vao.delete();
         }
     }
     

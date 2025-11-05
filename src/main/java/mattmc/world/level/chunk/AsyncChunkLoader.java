@@ -1,6 +1,8 @@
 package mattmc.world.level.chunk;
 
 import mattmc.client.renderer.chunk.ChunkMeshData;
+import mattmc.client.renderer.chunk.ChunkMeshBuffer;
+import mattmc.client.renderer.chunk.MeshBuilder;
 import mattmc.client.renderer.block.BlockFaceCollector;
 import mattmc.world.level.block.Block;
 
@@ -25,6 +27,8 @@ public class AsyncChunkLoader {
     private final Map<Long, Future<LevelChunk>> chunkFutures;
     private final Map<Long, Future<ChunkMeshData>> meshFutures;
     private final Queue<ChunkMeshData> completedMeshes;
+    private final Map<Long, Future<ChunkMeshBuffer>> meshBufferFutures;
+    private final Queue<ChunkMeshBuffer> completedMeshBuffers;
     
     // Budget: maximum operations per frame
     private static final int MAX_CHUNK_LOADS_PER_FRAME = 4;
@@ -39,6 +43,8 @@ public class AsyncChunkLoader {
         this.chunkFutures = new ConcurrentHashMap<>();
         this.meshFutures = new ConcurrentHashMap<>();
         this.completedMeshes = new ConcurrentLinkedQueue<>();
+        this.meshBufferFutures = new ConcurrentHashMap<>();
+        this.completedMeshBuffers = new ConcurrentLinkedQueue<>();
     }
     
     public void setWorldDirectory(Path worldDirectory) {
@@ -133,9 +139,13 @@ public class AsyncChunkLoader {
                     LevelChunk chunk = future.get();
                     completed.add(chunk);
                     
-                    // Start mesh building for this chunk
+                    // Start mesh building for this chunk (both old and new formats)
                     Future<ChunkMeshData> meshFuture = executor.submit(() -> buildChunkMesh(chunk));
                     meshFutures.put(key, meshFuture);
+                    
+                    // Also build VBO mesh buffer
+                    Future<ChunkMeshBuffer> meshBufferFuture = executor.submit(() -> buildChunkMeshBuffer(chunk));
+                    meshBufferFutures.put(key, meshBufferFuture);
                     
                 } catch (InterruptedException | ExecutionException e) {
                     System.err.println("Failed to load chunk: " + e.getMessage());
@@ -256,6 +266,25 @@ public class AsyncChunkLoader {
      * Runs on background thread.
      */
     private ChunkMeshData buildChunkMesh(LevelChunk chunk) {
+        BlockFaceCollector collector = collectChunkFaces(chunk);
+        return new ChunkMeshData(chunk.chunkX(), chunk.chunkZ(), collector);
+    }
+    
+    /**
+     * Build mesh buffer for a chunk (VBO/VAO format).
+     * Runs on background thread.
+     */
+    private ChunkMeshBuffer buildChunkMeshBuffer(LevelChunk chunk) {
+        BlockFaceCollector collector = collectChunkFaces(chunk);
+        MeshBuilder meshBuilder = new MeshBuilder();
+        return meshBuilder.build(chunk.chunkX(), chunk.chunkZ(), collector);
+    }
+    
+    /**
+     * Collect visible faces from a chunk.
+     * Runs on background thread.
+     */
+    private BlockFaceCollector collectChunkFaces(LevelChunk chunk) {
         BlockFaceCollector collector = new BlockFaceCollector();
         
         // Iterate through all blocks and collect visible faces
@@ -284,7 +313,7 @@ public class AsyncChunkLoader {
             }
         }
         
-        return new ChunkMeshData(chunk.chunkX(), chunk.chunkZ(), collector);
+        return collector;
     }
     
     public void shutdown() {
@@ -297,5 +326,40 @@ public class AsyncChunkLoader {
     
     public int getActiveTaskCount() {
         return executor.getActiveTasks();
+    }
+    
+    /**
+     * Collect completed mesh buffers ready for GPU upload (VBO/VAO format).
+     * Limited by budget to spread GPU uploads across frames.
+     */
+    public List<ChunkMeshBuffer> collectCompletedMeshBuffers() {
+        // First, check for newly completed mesh buffers
+        Iterator<Map.Entry<Long, Future<ChunkMeshBuffer>>> iterator = meshBufferFutures.entrySet().iterator();
+        
+        while (iterator.hasNext()) {
+            Map.Entry<Long, Future<ChunkMeshBuffer>> entry = iterator.next();
+            Future<ChunkMeshBuffer> future = entry.getValue();
+            
+            if (future.isDone()) {
+                try {
+                    ChunkMeshBuffer meshBuffer = future.get();
+                    completedMeshBuffers.offer(meshBuffer);
+                } catch (InterruptedException | ExecutionException e) {
+                    System.err.println("Failed to build mesh buffer: " + e.getMessage());
+                }
+                iterator.remove();
+            }
+        }
+        
+        // Return up to budget limit for this frame
+        List<ChunkMeshBuffer> result = new ArrayList<>();
+        for (int i = 0; i < MAX_MESH_UPLOADS_PER_FRAME && !completedMeshBuffers.isEmpty(); i++) {
+            ChunkMeshBuffer meshBuffer = completedMeshBuffers.poll();
+            if (meshBuffer != null) {
+                result.add(meshBuffer);
+            }
+        }
+        
+        return result;
     }
 }
