@@ -80,7 +80,7 @@ public final class SelectWorldScreen implements Screen {
 
         // Centered singleplayer buttons
         buttons.add(new Button("Play Selected", x, buttonsStartY + 0 * (buttonHeight + buttonGap), buttonWidth, buttonHeight));
-        buttons.add(new Button("Create New Level", x, buttonsStartY + 1 * (buttonHeight + buttonGap), buttonWidth, buttonHeight));
+        buttons.add(new Button("Create New World", x, buttonsStartY + 1 * (buttonHeight + buttonGap), buttonWidth, buttonHeight));
         buttons.add(new Button("Back",         x, buttonsStartY + 2 * (buttonHeight + buttonGap), buttonWidth, buttonHeight));
     }
 
@@ -131,8 +131,8 @@ public final class SelectWorldScreen implements Screen {
             game.setScreen(new TitleScreen(game));
             return;
         }
-        if ("Create New Level".equals(label)) {
-            System.out.println("→ Create Level clicked");
+        if ("Create New World".equals(label)) {
+            System.out.println("→ Create World clicked");
             game.setScreen(new CreateWorldScreen(game));
             return;
         }
