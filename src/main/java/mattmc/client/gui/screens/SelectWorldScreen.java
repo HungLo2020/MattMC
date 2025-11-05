@@ -165,7 +165,6 @@ public final class SelectWorldScreen implements Screen {
             if (selectedWorldIndex >= 0 && selectedWorldIndex < worldList.size()) {
                 // Second click: actually delete the world
                 deleteWorld(worldList.get(selectedWorldIndex));
-                deleteConfirmMode = false;
             }
             return;
         }
@@ -190,8 +189,9 @@ public final class SelectWorldScreen implements Screen {
             System.out.println("→ Deleting world: " + worldName);
             LevelStorageSource.deleteWorld(worldName);
             
-            // Reset selection and refresh the world list
+            // Reset selection, confirmation mode, and refresh the world list
             selectedWorldIndex = -1;
+            deleteConfirmMode = false;
             recomputeLayout();
         } catch (Exception e) {
             System.err.println("Failed to delete world: " + e.getMessage());
