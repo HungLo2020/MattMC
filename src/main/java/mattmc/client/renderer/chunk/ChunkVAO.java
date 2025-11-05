@@ -7,7 +7,6 @@ import java.nio.IntBuffer;
 
 import static org.lwjgl.opengl.GL11.*;
 import static org.lwjgl.opengl.GL15.*;
-import static org.lwjgl.opengl.GL20.*;
 import static org.lwjgl.opengl.GL30.*;
 
 /**
@@ -52,23 +51,18 @@ public class ChunkVAO {
         IntBuffer indexBuffer = meshBuffer.createIndexBuffer();
         glBufferData(GL_ELEMENT_ARRAY_BUFFER, indexBuffer, GL_STATIC_DRAW);
         
-        // Configure vertex attributes
+        // Configure vertex arrays using fixed-function pipeline (compatibility mode)
         int stride = ChunkMeshBuffer.VERTEX_SIZE_BYTES;
         
-        // Attribute 0: Position (x, y, z)
-        glEnableVertexAttribArray(0);
-        glVertexAttribPointer(0, 3, GL_FLOAT, false, stride, 
-                             ChunkMeshBuffer.POSITION_OFFSET * Float.BYTES);
+        // Enable client state for fixed-function pipeline
+        glEnableClientState(GL_VERTEX_ARRAY);
+        glEnableClientState(GL_TEXTURE_COORD_ARRAY);
+        glEnableClientState(GL_COLOR_ARRAY);
         
-        // Attribute 1: Texture coordinates (u, v)
-        glEnableVertexAttribArray(1);
-        glVertexAttribPointer(1, 2, GL_FLOAT, false, stride, 
-                             ChunkMeshBuffer.TEXCOORD_OFFSET * Float.BYTES);
-        
-        // Attribute 2: Color (r, g, b, a)
-        glEnableVertexAttribArray(2);
-        glVertexAttribPointer(2, 4, GL_FLOAT, false, stride, 
-                             ChunkMeshBuffer.COLOR_OFFSET * Float.BYTES);
+        // Set vertex pointers (fixed-function pipeline)
+        glVertexPointer(3, GL_FLOAT, stride, ChunkMeshBuffer.POSITION_OFFSET * Float.BYTES);
+        glTexCoordPointer(2, GL_FLOAT, stride, ChunkMeshBuffer.TEXCOORD_OFFSET * Float.BYTES);
+        glColorPointer(4, GL_FLOAT, stride, ChunkMeshBuffer.COLOR_OFFSET * Float.BYTES);
         
         // Unbind VAO (good practice)
         glBindVertexArray(0);
