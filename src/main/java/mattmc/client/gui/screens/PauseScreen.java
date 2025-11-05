@@ -80,7 +80,7 @@ public final class PauseScreen implements Screen {
         int x = (w - buttonWidth) / 2;
         buttons.clear();
 
-        buttons.add(new Button("Back to Minecraft",  x, buttonsStartY + 0 * (buttonHeight + buttonGap), buttonWidth, buttonHeight));
+        buttons.add(new Button("Resume",  x, buttonsStartY + 0 * (buttonHeight + buttonGap), buttonWidth, buttonHeight));
         buttons.add(new Button("Save and Exit", x, buttonsStartY + 1 * (buttonHeight + buttonGap), buttonWidth, buttonHeight));
         buttons.add(new Button("Options",       x, buttonsStartY + 2 * (buttonHeight + buttonGap), buttonWidth, buttonHeight));
     }
@@ -120,7 +120,7 @@ public final class PauseScreen implements Screen {
     }
 
     private void onClick(String label) {
-        if ("Back to Minecraft".equals(label)) {
+        if ("Resume".equals(label)) {
             unpause();
             return;
         }
@@ -218,7 +218,7 @@ public final class PauseScreen implements Screen {
         
         // Draw UI
         for (var b : buttons) drawButton(b);
-        drawTitle("Minecraft Paused", titleCX, titleCY, titleScale, 0xFFFFFF);
+        drawTitle("Game Paused", titleCX, titleCY, titleScale, 0xFFFFFF);
     }
 
     private void setupOrtho() {
