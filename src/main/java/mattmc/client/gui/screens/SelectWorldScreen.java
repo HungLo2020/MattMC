@@ -81,7 +81,8 @@ public final class SelectWorldScreen implements Screen {
         // Centered singleplayer buttons
         buttons.add(new Button("Play Selected", x, buttonsStartY + 0 * (buttonHeight + buttonGap), buttonWidth, buttonHeight));
         buttons.add(new Button("Create New World", x, buttonsStartY + 1 * (buttonHeight + buttonGap), buttonWidth, buttonHeight));
-        buttons.add(new Button("Back",         x, buttonsStartY + 2 * (buttonHeight + buttonGap), buttonWidth, buttonHeight));
+        buttons.add(new Button("Delete World", x, buttonsStartY + 2 * (buttonHeight + buttonGap), buttonWidth, buttonHeight));
+        buttons.add(new Button("Back",         x, buttonsStartY + 3 * (buttonHeight + buttonGap), buttonWidth, buttonHeight));
     }
 
     @Override
@@ -144,6 +145,14 @@ public final class SelectWorldScreen implements Screen {
             }
             return;
         }
+        if ("Delete World".equals(label)) {
+            if (selectedWorldIndex >= 0 && selectedWorldIndex < worldList.size()) {
+                deleteWorld(worldList.get(selectedWorldIndex));
+            } else {
+                System.out.println("No world selected");
+            }
+            return;
+        }
     }
     
     private void loadWorld(String worldName) {
@@ -156,6 +165,20 @@ public final class SelectWorldScreen implements Screen {
                 result.metadata.playerYaw, result.metadata.playerPitch));
         } catch (Exception e) {
             System.err.println("Failed to load world: " + e.getMessage());
+            e.printStackTrace();
+        }
+    }
+    
+    private void deleteWorld(String worldName) {
+        try {
+            System.out.println("→ Deleting world: " + worldName);
+            LevelStorageSource.deleteWorld(worldName);
+            
+            // Reset selection and refresh the world list
+            selectedWorldIndex = -1;
+            recomputeLayout();
+        } catch (Exception e) {
+            System.err.println("Failed to delete world: " + e.getMessage());
             e.printStackTrace();
         }
     }
