@@ -56,9 +56,10 @@ public class ChunkVAO {
         
         // Set vertex pointers (fixed-function pipeline)
         // Note: glEnableClientState is NOT part of VAO state, so we enable it in render()
-        glVertexPointer(3, GL_FLOAT, stride, ChunkMeshBuffer.POSITION_OFFSET * Float.BYTES);
-        glTexCoordPointer(2, GL_FLOAT, stride, ChunkMeshBuffer.TEXCOORD_OFFSET * Float.BYTES);
-        glColorPointer(4, GL_FLOAT, stride, ChunkMeshBuffer.COLOR_OFFSET * Float.BYTES);
+        // When VBO is bound, these offsets must be passed as long (byte offsets into VBO)
+        glVertexPointer(3, GL_FLOAT, stride, (long)(ChunkMeshBuffer.POSITION_OFFSET * Float.BYTES));
+        glTexCoordPointer(2, GL_FLOAT, stride, (long)(ChunkMeshBuffer.TEXCOORD_OFFSET * Float.BYTES));
+        glColorPointer(4, GL_FLOAT, stride, (long)(ChunkMeshBuffer.COLOR_OFFSET * Float.BYTES));
         
         // Unbind VAO (good practice)
         glBindVertexArray(0);
