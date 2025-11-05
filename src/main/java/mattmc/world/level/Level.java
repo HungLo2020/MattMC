@@ -228,6 +228,17 @@ public class Level implements LevelAccessor {
      * Now uses asynchronous loading to prevent lag spikes.
      */
     public void updateChunksAroundPlayer(float playerX, float playerZ) {
+        updateChunksAroundPlayer(playerX, playerZ, 0f);
+    }
+    
+    /**
+     * Update the world based on player position and view direction.
+     * Loads chunks near the player and unloads distant chunks.
+     * Prioritizes chunks in the player's view frustum.
+     * 
+     * @param playerYaw Player's yaw angle in degrees for frustum-based prioritization
+     */
+    public void updateChunksAroundPlayer(float playerX, float playerZ, float playerYaw) {
         // Process pending async tasks
         asyncLoader.processPendingTasks();
         
@@ -250,8 +261,8 @@ public class Level implements LevelAccessor {
                 
                 long key = chunkKey(chunkX, chunkZ);
                 if (!loadedChunks.containsKey(key)) {
-                    // Request async loading
-                    asyncLoader.requestChunk(chunkX, chunkZ, playerX, playerZ);
+                    // Request async loading with frustum prioritization
+                    asyncLoader.requestChunk(chunkX, chunkZ, playerX, playerZ, playerYaw);
                 }
             }
         }

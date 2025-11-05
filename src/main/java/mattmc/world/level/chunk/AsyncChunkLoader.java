@@ -48,8 +48,10 @@ public class AsyncChunkLoader {
     /**
      * Request a chunk to be loaded/generated.
      * Returns immediately, chunk will be loaded in the background.
+     * 
+     * @param playerYaw Player's yaw angle in degrees for frustum prioritization
      */
-    public void requestChunk(int chunkX, int chunkZ, double playerX, double playerZ) {
+    public void requestChunk(int chunkX, int chunkZ, double playerX, double playerZ, float playerYaw) {
         long key = chunkKey(chunkX, chunkZ);
         
         // Skip if already loading or loaded
@@ -65,10 +67,31 @@ public class AsyncChunkLoader {
         double dz = (chunkZ * LevelChunk.DEPTH + 8) - playerZ;
         double distanceSquared = dx * dx + dz * dz;
         
+        // Boost priority for chunks in view frustum
+        // Calculate angle to chunk center from player
+        double angleToChunk = Math.toDegrees(Math.atan2(dx, dz));
+        double angleDiff = Math.abs(normalizeAngle(angleToChunk - playerYaw));
+        
+        // Chunks within 90 degrees of view direction get priority boost
+        if (angleDiff < 90) {
+            // Reduce effective distance for chunks in view (higher priority)
+            double frustumBoost = 1.0 - (angleDiff / 180.0); // 0.5 to 1.0
+            distanceSquared *= (1.0 - frustumBoost * 0.5); // Up to 50% distance reduction
+        }
+        
         // Add to priority queue
         ChunkLoadTask task = new ChunkLoadTask(chunkX, chunkZ, distanceSquared, 
                                                ChunkLoadTask.TaskType.GENERATION);
         pendingTasks.offer(task);
+    }
+    
+    /**
+     * Normalize angle to -180 to 180 range.
+     */
+    private double normalizeAngle(double angle) {
+        while (angle > 180) angle -= 360;
+        while (angle < -180) angle += 360;
+        return angle;
     }
     
     /**
