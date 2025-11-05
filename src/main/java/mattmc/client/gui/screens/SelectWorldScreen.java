@@ -28,6 +28,7 @@ public final class SelectWorldScreen implements Screen {
     private double mouseXWin, mouseYWin;
     private boolean mouseDown;
     private int selectedWorldIndex = -1;
+    private boolean deleteConfirmMode = false;
 
     private float titleScale = 2.5f;
     private float titleCX, titleCY;
@@ -81,7 +82,9 @@ public final class SelectWorldScreen implements Screen {
         // Centered singleplayer buttons
         buttons.add(new Button("Play Selected", x, buttonsStartY + 0 * (buttonHeight + buttonGap), buttonWidth, buttonHeight));
         buttons.add(new Button("Create New World", x, buttonsStartY + 1 * (buttonHeight + buttonGap), buttonWidth, buttonHeight));
-        buttons.add(new Button("Back",         x, buttonsStartY + 2 * (buttonHeight + buttonGap), buttonWidth, buttonHeight));
+        String deleteLabel = deleteConfirmMode ? "Confirm Delete?" : "Delete World";
+        buttons.add(new Button(deleteLabel, x, buttonsStartY + 2 * (buttonHeight + buttonGap), buttonWidth, buttonHeight));
+        buttons.add(new Button("Back",         x, buttonsStartY + 3 * (buttonHeight + buttonGap), buttonWidth, buttonHeight));
     }
 
     @Override
@@ -109,6 +112,9 @@ public final class SelectWorldScreen implements Screen {
             // Check world button clicks
             for (int i = 0; i < worldButtons.size(); i++) {
                 if (worldButtons.get(i).contains(mxFB, myFB)) {
+                    if (selectedWorldIndex != i) {
+                        deleteConfirmMode = false;  // Reset confirmation when selecting a different world
+                    }
                     selectedWorldIndex = i;
                     mouseDown = false;
                     return;
@@ -137,10 +143,28 @@ public final class SelectWorldScreen implements Screen {
             return;
         }
         if ("Play Selected".equals(label)) {
+            deleteConfirmMode = false;  // Reset confirmation mode
             if (selectedWorldIndex >= 0 && selectedWorldIndex < worldList.size()) {
                 loadWorld(worldList.get(selectedWorldIndex));
             } else {
                 System.out.println("No world selected");
+            }
+            return;
+        }
+        if ("Delete World".equals(label)) {
+            if (selectedWorldIndex >= 0 && selectedWorldIndex < worldList.size()) {
+                // First click: enter confirmation mode
+                deleteConfirmMode = true;
+                recomputeLayout();
+            } else {
+                System.out.println("No world selected");
+            }
+            return;
+        }
+        if ("Confirm Delete?".equals(label)) {
+            if (selectedWorldIndex >= 0 && selectedWorldIndex < worldList.size()) {
+                // Second click: actually delete the world
+                deleteWorld(worldList.get(selectedWorldIndex));
             }
             return;
         }
@@ -156,6 +180,21 @@ public final class SelectWorldScreen implements Screen {
                 result.metadata.playerYaw, result.metadata.playerPitch));
         } catch (Exception e) {
             System.err.println("Failed to load world: " + e.getMessage());
+            e.printStackTrace();
+        }
+    }
+    
+    private void deleteWorld(String worldName) {
+        try {
+            System.out.println("→ Deleting world: " + worldName);
+            LevelStorageSource.deleteWorld(worldName);
+            
+            // Reset selection, confirmation mode, and refresh the world list
+            selectedWorldIndex = -1;
+            deleteConfirmMode = false;
+            recomputeLayout();
+        } catch (Exception e) {
+            System.err.println("Failed to delete world: " + e.getMessage());
             e.printStackTrace();
         }
     }
