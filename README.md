@@ -44,20 +44,26 @@ This project reimagines Minecraft with a focus on:
 ## Project Structure
 
 ```
-mattmc/
+src/main/java/mattmc/
 ├── client/              # Client-side code
-│   ├── main/           # Entry point
+│   ├── main/           # Entry point (Main.java)
 │   ├── gui/            # User interface
 │   │   ├── screens/    # Game screens (title, pause, options, etc.)
 │   │   └── components/ # UI components (buttons, text boxes, etc.)
 │   ├── resources/      # Resource management (models, textures)
 │   ├── settings/       # Game settings and keybindings
-│   ├── renderer/       # Rendering systems
-│   └── level/          # World/level management
+│   └── renderer/       # Rendering systems
+│       ├── chunk/      # Chunk rendering
+│       ├── block/      # Block rendering
+│       └── texture/    # Texture management
+├── world/              # World and level management
+│   ├── entity/         # Entities (player, mobs, etc.)
+│   └── level/          # Level/world systems
 │       ├── chunk/      # Chunk system
 │       ├── block/      # Block types and properties
 │       └── storage/    # World save/load (Anvil format, NBT)
-└── server/             # Server-side code (future)
+├── nbt/                # NBT (Named Binary Tag) data structures
+└── util/               # Utility classes
 ```
 
 ## Building and Running
