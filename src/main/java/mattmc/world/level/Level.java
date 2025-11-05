@@ -60,14 +60,22 @@ public class Level implements LevelAccessor {
     
     /**
      * Get a chunk at the specified chunk coordinates.
-     * If the chunk doesn't exist, it will be generated.
+     * If the chunk doesn't exist in memory, tries to load it from disk.
+     * If it doesn't exist on disk, it will be generated.
      */
     public LevelChunk getChunk(int chunkX, int chunkZ) {
         long key = chunkKey(chunkX, chunkZ);
         LevelChunk chunk = loadedChunks.get(key);
         
         if (chunk == null) {
-            chunk = generateChunk(chunkX, chunkZ);
+            // Try to load from disk first if world directory is set
+            chunk = loadChunkFromDisk(chunkX, chunkZ);
+            
+            // If not found on disk, generate a new chunk
+            if (chunk == null) {
+                chunk = generateChunk(chunkX, chunkZ);
+            }
+            
             loadedChunks.put(key, chunk);
         }
         
@@ -79,6 +87,48 @@ public class Level implements LevelAccessor {
      */
     public LevelChunk getChunkIfLoaded(int chunkX, int chunkZ) {
         return loadedChunks.get(chunkKey(chunkX, chunkZ));
+    }
+    
+    /**
+     * Try to load a chunk from disk.
+     * Returns null if the chunk doesn't exist on disk or if world directory is not set.
+     */
+    private LevelChunk loadChunkFromDisk(int chunkX, int chunkZ) {
+        if (worldDirectory == null) {
+            return null; // No save directory set
+        }
+        
+        try {
+            Path regionDir = worldDirectory.resolve("region");
+            if (!java.nio.file.Files.exists(regionDir)) {
+                return null; // No region directory yet
+            }
+            
+            int[] regionCoords = RegionFile.getRegionCoords(chunkX, chunkZ);
+            int regionX = regionCoords[0];
+            int regionZ = regionCoords[1];
+            
+            Path regionFilePath = regionDir.resolve(String.format("r.%d.%d.mca", regionX, regionZ));
+            
+            if (!java.nio.file.Files.exists(regionFilePath)) {
+                return null; // Region file doesn't exist
+            }
+            
+            try (RegionFile regionFile = new RegionFile(regionFilePath, regionX, regionZ)) {
+                if (!regionFile.hasChunk(chunkX, chunkZ)) {
+                    return null; // Chunk not in region file
+                }
+                
+                Map<String, Object> chunkNBT = regionFile.readChunk(chunkX, chunkZ);
+                if (chunkNBT != null) {
+                    return ChunkNBT.fromNBT(chunkNBT);
+                }
+            }
+        } catch (IOException e) {
+            System.err.println("Failed to load chunk (" + chunkX + ", " + chunkZ + ") from disk: " + e.getMessage());
+        }
+        
+        return null;
     }
     
     /**
