@@ -3,6 +3,7 @@ package mattmc.client.renderer.chunk;
 import mattmc.client.Minecraft;
 import mattmc.client.renderer.ColorUtils;
 import mattmc.client.renderer.texture.Texture;
+import mattmc.client.renderer.texture.TextureAtlas;
 
 import mattmc.world.level.block.Block;
 import mattmc.world.level.block.Block;
@@ -50,9 +51,11 @@ public class ChunkRenderer {
     // Texture manager for loading and binding block textures
     private final TextureManager textureManager = new TextureManager();
     
+    // Texture atlas for VBO rendering (null = not initialized)
+    private TextureAtlas textureAtlas = null;
+    
     // Flag to enable VBO/VAO rendering
-    // Default: false (use display lists which support textures)
-    // Set to true to use VBO rendering (faster but no texture support yet)
+    // Default: true when texture atlas is available
     private boolean useVBORendering = false;
     
     /**
@@ -89,8 +92,17 @@ public class ChunkRenderer {
         long key = chunkKey(chunk.chunkX(), chunk.chunkZ());
         chunkByKey.put(key, chunk);
         
+        // Enable texturing and bind texture atlas
+        glEnable(GL_TEXTURE_2D);
+        if (textureAtlas != null) {
+            textureAtlas.bind();
+        }
+        
         // Render using VAO (single draw call!)
         vao.render();
+        
+        // Unbind texture
+        glBindTexture(GL_TEXTURE_2D, 0);
     }
     
     /**
@@ -471,5 +483,24 @@ public class ChunkRenderer {
      */
     public boolean isUsingVBORendering() {
         return useVBORendering;
+    }
+    
+    /**
+     * Set the texture atlas and automatically enable VBO rendering.
+     * Call this after building the texture atlas at game startup.
+     */
+    public void setTextureAtlas(TextureAtlas atlas) {
+        this.textureAtlas = atlas;
+        if (atlas != null) {
+            this.useVBORendering = true;
+            System.out.println("Texture atlas set, VBO rendering enabled");
+        }
+    }
+    
+    /**
+     * Get the texture atlas used for VBO rendering.
+     */
+    public TextureAtlas getTextureAtlas() {
+        return textureAtlas;
     }
 }

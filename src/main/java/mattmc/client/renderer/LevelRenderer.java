@@ -1,6 +1,7 @@
 package mattmc.client.renderer;
 
 import mattmc.client.renderer.chunk.RegionRenderer;
+import mattmc.client.renderer.texture.TextureAtlas;
 
 import mattmc.world.level.chunk.LevelChunk;
 import mattmc.world.level.Level;
@@ -18,11 +19,12 @@ import static org.lwjgl.opengl.GL11.*;
  * Renders all loaded chunks in an infinite world.
  * Similar to RegionRenderer but works with the Level system.
  * 
- * Now handles async mesh uploads from background threads.
+ * Now handles async mesh uploads from background threads and texture atlas.
  */
 public class LevelRenderer {
     private final ChunkRenderer chunkRenderer;
     private Level currentLevel;
+    private boolean textureAtlasInitialized = false;
     
     public LevelRenderer() {
         this.chunkRenderer = new ChunkRenderer();
@@ -30,7 +32,7 @@ public class LevelRenderer {
     
     /**
      * Initialize the renderer with a level.
-     * This sets up the chunk unload listener.
+     * This sets up the chunk unload listener and builds the texture atlas.
      */
     public void initWithLevel(Level level) {
         if (currentLevel != null) {
@@ -38,6 +40,16 @@ public class LevelRenderer {
         }
         this.currentLevel = level;
         level.setChunkUnloadListener(chunk -> chunkRenderer.removeChunkFromCache(chunk));
+        
+        // Build texture atlas once on first initialization
+        if (!textureAtlasInitialized) {
+            System.out.println("Initializing texture atlas for VBO rendering...");
+            TextureAtlas atlas = new TextureAtlas();
+            chunkRenderer.setTextureAtlas(atlas);
+            level.getAsyncLoader().setTextureAtlas(atlas);
+            textureAtlasInitialized = true;
+            System.out.println("Texture atlas initialized with " + atlas.getTextureCount() + " textures");
+        }
     }
     
     /**

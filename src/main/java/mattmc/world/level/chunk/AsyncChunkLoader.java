@@ -3,6 +3,7 @@ package mattmc.world.level.chunk;
 import mattmc.client.renderer.chunk.ChunkMeshData;
 import mattmc.client.renderer.chunk.ChunkMeshBuffer;
 import mattmc.client.renderer.chunk.MeshBuilder;
+import mattmc.client.renderer.texture.TextureAtlas;
 import mattmc.client.renderer.block.BlockFaceCollector;
 import mattmc.world.level.block.Block;
 
@@ -35,6 +36,7 @@ public class AsyncChunkLoader {
     private static final int MAX_MESH_UPLOADS_PER_FRAME = 2;
     
     private Path worldDirectory;
+    private TextureAtlas textureAtlas;
     
     public AsyncChunkLoader() {
         this.executor = new ChunkTaskExecutor();
@@ -49,6 +51,10 @@ public class AsyncChunkLoader {
     
     public void setWorldDirectory(Path worldDirectory) {
         this.worldDirectory = worldDirectory;
+    }
+    
+    public void setTextureAtlas(TextureAtlas atlas) {
+        this.textureAtlas = atlas;
     }
     
     /**
@@ -276,7 +282,7 @@ public class AsyncChunkLoader {
      */
     private ChunkMeshBuffer buildChunkMeshBuffer(LevelChunk chunk) {
         BlockFaceCollector collector = collectChunkFaces(chunk);
-        MeshBuilder meshBuilder = new MeshBuilder();
+        MeshBuilder meshBuilder = new MeshBuilder(textureAtlas);
         return meshBuilder.build(chunk.chunkX(), chunk.chunkZ(), collector);
     }
     
