@@ -8,6 +8,7 @@ import mattmc.world.level.block.Block;
 import mattmc.world.level.block.Block;
 import mattmc.world.level.block.Blocks;
 import mattmc.world.level.chunk.LevelChunk;
+import mattmc.world.level.chunk.ChunkUtils;
 import mattmc.client.renderer.block.BlockFaceCollector;
 import mattmc.client.renderer.block.BlockFaceGeometry;
 import mattmc.client.renderer.texture.TextureManager;
@@ -142,7 +143,16 @@ public class ChunkRenderer {
      * Helper to create chunk key from coordinates.
      */
     private static long chunkKey(int chunkX, int chunkZ) {
-        return ((long)chunkX << 32) | (chunkZ & 0xFFFFFFFFL);
+        return ChunkUtils.chunkKey(chunkX, chunkZ);
+    }
+    
+    /**
+     * Remove a chunk from the tracking cache.
+     * Call this when a chunk is unloaded.
+     */
+    public void removeChunkFromCache(LevelChunk chunk) {
+        long key = chunkKey(chunk.chunkX(), chunk.chunkZ());
+        chunkByKey.remove(key);
     }
     
     /**
@@ -199,22 +209,7 @@ public class ChunkRenderer {
      * This allows us to skip entire 16x16x16 sections very quickly.
      */
     private boolean isSectionEmpty(LevelChunk chunk, int startY, int endY) {
-        // Sample a few blocks to quickly determine if section is likely empty
-        // Full check would scan all 4,096 blocks, but sampling is faster
-        // Check corners and center
-        int midY = (startY + endY) / 2;
-        
-        if (!chunk.getBlock(0, startY, 0).isAir()) return false;
-        if (!chunk.getBlock(15, startY, 15).isAir()) return false;
-        if (!chunk.getBlock(0, midY, 0).isAir()) return false;
-        if (!chunk.getBlock(15, midY, 15).isAir()) return false;
-        if (!chunk.getBlock(0, endY - 1, 0).isAir()) return false;
-        if (!chunk.getBlock(15, endY - 1, 15).isAir()) return false;
-        if (!chunk.getBlock(8, midY, 8).isAir()) return false;
-        
-        // If all samples are air, likely the whole section is empty
-        // For flat terrain at y=64, sections above y=80 will be skipped
-        return true;
+        return ChunkUtils.isSectionEmpty(chunk, startY, endY);
     }
     
     /**

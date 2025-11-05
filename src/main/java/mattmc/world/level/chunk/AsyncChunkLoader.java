@@ -52,11 +52,11 @@ public class AsyncChunkLoader {
      * @param playerYaw Player's yaw angle in degrees for frustum prioritization
      */
     public void requestChunk(int chunkX, int chunkZ, double playerX, double playerZ, float playerYaw) {
-        long key = chunkKey(chunkX, chunkZ);
+        long key = ChunkUtils.chunkKey(chunkX, chunkZ);
         
-        // Skip if already loading or loaded
+        // Skip if already loading, meshing, or in progress
         synchronized (tasksInProgress) {
-            if (tasksInProgress.contains(key) || chunkFutures.containsKey(key)) {
+            if (tasksInProgress.contains(key) || chunkFutures.containsKey(key) || meshFutures.containsKey(key)) {
                 return;
             }
             tasksInProgress.add(key);
@@ -105,7 +105,7 @@ public class AsyncChunkLoader {
             ChunkLoadTask task = pendingTasks.poll();
             if (task == null) break;
             
-            long key = chunkKey(task.getChunkX(), task.getChunkZ());
+            long key = ChunkUtils.chunkKey(task.getChunkX(), task.getChunkZ());
             
             // Submit chunk loading task
             Future<LevelChunk> future = executor.submit(() -> loadOrGenerateChunk(task.getChunkX(), task.getChunkZ()));
@@ -128,12 +128,12 @@ public class AsyncChunkLoader {
             Future<LevelChunk> future = entry.getValue();
             
             if (future.isDone()) {
+                long key = entry.getKey();
                 try {
                     LevelChunk chunk = future.get();
                     completed.add(chunk);
                     
                     // Start mesh building for this chunk
-                    long key = entry.getKey();
                     Future<ChunkMeshData> meshFuture = executor.submit(() -> buildChunkMesh(chunk));
                     meshFutures.put(key, meshFuture);
                     
@@ -142,7 +142,6 @@ public class AsyncChunkLoader {
                 }
                 
                 iterator.remove();
-                long key = entry.getKey();
                 synchronized (tasksInProgress) {
                     tasksInProgress.remove(key);
                 }
@@ -265,7 +264,7 @@ public class AsyncChunkLoader {
             int sectionEndY = Math.min(sectionStartY + 16, LevelChunk.HEIGHT);
             
             // Quick check: is this section empty?
-            if (isSectionEmpty(chunk, sectionStartY, sectionEndY)) {
+            if (ChunkUtils.isSectionEmpty(chunk, sectionStartY, sectionEndY)) {
                 continue;
             }
             
@@ -286,27 +285,6 @@ public class AsyncChunkLoader {
         }
         
         return new ChunkMeshData(chunk.chunkX(), chunk.chunkZ(), collector);
-    }
-    
-    /**
-     * Check if a section is empty.
-     */
-    private boolean isSectionEmpty(LevelChunk chunk, int startY, int endY) {
-        int midY = (startY + endY) / 2;
-        
-        if (!chunk.getBlock(0, startY, 0).isAir()) return false;
-        if (!chunk.getBlock(15, startY, 15).isAir()) return false;
-        if (!chunk.getBlock(0, midY, 0).isAir()) return false;
-        if (!chunk.getBlock(15, midY, 15).isAir()) return false;
-        if (!chunk.getBlock(0, endY - 1, 0).isAir()) return false;
-        if (!chunk.getBlock(15, endY - 1, 15).isAir()) return false;
-        if (!chunk.getBlock(8, midY, 8).isAir()) return false;
-        
-        return true;
-    }
-    
-    private static long chunkKey(int chunkX, int chunkZ) {
-        return ((long)chunkX << 32) | (chunkZ & 0xFFFFFFFFL);
     }
     
     public void shutdown() {

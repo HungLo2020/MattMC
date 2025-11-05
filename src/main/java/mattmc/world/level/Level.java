@@ -9,6 +9,7 @@ import mattmc.world.level.chunk.LevelChunk;
 import mattmc.world.level.chunk.ChunkNBT;
 import mattmc.world.level.chunk.RegionFile;
 import mattmc.world.level.chunk.AsyncChunkLoader;
+import mattmc.world.level.chunk.ChunkUtils;
 
 import java.io.IOException;
 import java.nio.file.Path;
@@ -30,8 +31,18 @@ public class Level implements LevelAccessor {
     // Async chunk loader for background loading/generation
     private final AsyncChunkLoader asyncLoader;
     
+    // Listener for chunk unload events (used by renderer to clean up caches)
+    private ChunkUnloadListener unloadListener;
+    
     // Render distance in chunks
     private int renderDistance = 8;
+    
+    /**
+     * Listener interface for chunk unload events.
+     */
+    public interface ChunkUnloadListener {
+        void onChunkUnload(LevelChunk chunk);
+    }
     
     // Last player chunk position for tracking when to load/unload
     private int lastPlayerChunkX = Integer.MAX_VALUE;
@@ -64,7 +75,7 @@ public class Level implements LevelAccessor {
      * Convert chunk coordinates to a unique long key for the map.
      */
     private static long chunkKey(int chunkX, int chunkZ) {
-        return ((long)chunkX << 32) | (chunkZ & 0xFFFFFFFFL);
+        return ChunkUtils.chunkKey(chunkX, chunkZ);
     }
     
     /**
@@ -280,6 +291,12 @@ public class Level implements LevelAccessor {
             if (dx > unloadDistance || dz > unloadDistance) {
                 // Always save chunks before unloading to preserve any modifications
                 saveChunk(chunk);
+                
+                // Notify listener before removing
+                if (unloadListener != null) {
+                    unloadListener.onChunkUnload(chunk);
+                }
+                
                 iterator.remove();
             }
         }
@@ -321,6 +338,14 @@ public class Level implements LevelAccessor {
      */
     public AsyncChunkLoader getAsyncLoader() {
         return asyncLoader;
+    }
+    
+    /**
+     * Set a listener for chunk unload events.
+     * Used by the renderer to clean up caches.
+     */
+    public void setChunkUnloadListener(ChunkUnloadListener listener) {
+        this.unloadListener = listener;
     }
     
     /**

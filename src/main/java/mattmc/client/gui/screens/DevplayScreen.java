@@ -108,6 +108,7 @@ public final class DevplayScreen implements Screen {
         this.playerController = new PlayerController(player);
         this.blockInteraction = new BlockInteraction(player, this.world);
         this.worldRenderer = new LevelRenderer();
+        this.worldRenderer.initWithLevel(this.world);
         this.uiRenderer = new UIRenderer();
 
         // Register input callbacks

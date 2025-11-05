@@ -21,9 +21,22 @@ import static org.lwjgl.opengl.GL11.*;
  */
 public class LevelRenderer {
     private final ChunkRenderer chunkRenderer;
+    private Level currentLevel;
     
     public LevelRenderer() {
         this.chunkRenderer = new ChunkRenderer();
+    }
+    
+    /**
+     * Initialize the renderer with a level.
+     * This sets up the chunk unload listener.
+     */
+    public void initWithLevel(Level level) {
+        if (currentLevel != null) {
+            currentLevel.setChunkUnloadListener(null);
+        }
+        this.currentLevel = level;
+        level.setChunkUnloadListener(chunk -> chunkRenderer.removeChunkFromCache(chunk));
     }
     
     /**
