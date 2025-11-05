@@ -14,7 +14,7 @@ This project reimagines Minecraft with a focus on:
 ## Key Features
 
 ### Performance Optimizations
-- **Advanced Chunk Rendering**: Uses OpenGL display lists for 10-100x performance improvement
+- **Advanced Chunk Rendering**: Uses OpenGL display lists to cache compiled geometry for significant performance improvements over immediate mode rendering
 - **Intelligent Face Culling**: Only renders block faces adjacent to air, dramatically reducing polygon count
 - **Chunk Sections**: Divides chunks into 16×16×16 sections, skipping empty sections entirely
 - **Efficient World Storage**: Minecraft-inspired Anvil format with region files and NBT compression
@@ -78,8 +78,15 @@ src/main/java/mattmc/
 ```
 
 ### Run Development Version
+
+**Linux/Mac:**
 ```bash
 ./RunDev.sh
+```
+
+**Windows/Alternative:**
+```bash
+./gradlew run
 ```
 
 ### Create Distribution
