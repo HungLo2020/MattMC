@@ -16,9 +16,11 @@ public final class Window implements AutoCloseable {
         glfwDefaultWindowHints();
         glfwWindowHint(GLFW_VISIBLE, GLFW_TRUE);
 
-        // Force 2.1 compatibility so fixed-function works everywhere.
-        glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 2);
-        glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 1);
+        // OpenGL 3.2 compatibility profile - supports both modern features (VAOs, texture arrays)
+        // and legacy fixed-function pipeline for gradual migration
+        glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
+        glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 2);
+        glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_COMPAT_PROFILE);
 
         handle = glfwCreateWindow(w, h, title, 0, 0);
         if (handle == 0) throw new IllegalStateException("Window creation failed");

@@ -77,11 +77,11 @@ public class MeshBuilder {
     
     /**
      * Extract RGBA color from face data.
-     * Since VBO rendering doesn't support per-face texture switching,
-     * we use the block's fallback color for all faces.
+     * Uses fallback colors until texture atlas is implemented.
+     * With OpenGL 3.2+ VAOs, texture atlas support is now possible.
      */
     private float[] extractColor(BlockFaceCollector.FaceData face) {
-        // Use fallback color since we don't have texture support in VBO rendering yet
+        // Use fallback color until texture atlas is implemented
         int renderColor = ColorUtils.adjustColorBrightness(
             face.block.getFallbackColor(), 
             face.colorBrightness

@@ -34,9 +34,9 @@ Vertex format (9 floats per vertex, interleaved):
 
 ### GPU-Side (Render Thread)
 
-1. **ChunkVAO** manages VBO and EBO (Element Buffer Object)
+1. **ChunkVAO** manages VAO, VBO, and EBO using OpenGL 3.2+
 2. Single `glDrawElements` call renders entire chunk
-3. Fixed-function pipeline compatibility mode
+3. Proper VAO state management enables texture atlas support
 
 ## Usage
 
@@ -61,29 +61,31 @@ AsyncChunkLoader.MAX_MESH_UPLOADS_PER_FRAME = 2;
 
 ## Current Limitations
 
-### No Texture Support in VBO Mode
+### Texture Atlas Not Yet Implemented
 
-**Display lists (default mode) fully support textures.**
+**OpenGL 3.2+ VAO infrastructure is now in place for texture support!**
 
 VBO rendering currently uses fallback colors only:
 - Each block renders with its fallback color
-- Textures are disabled during VBO rendering
 - Display list path (default) supports textures normally
 
-**Why?** The original code groups faces by texture and renders each group separately. VBO rendering builds a single mesh for the entire chunk, so we can't switch textures mid-render.
+**Why?** The original code groups faces by texture and renders each group separately. VBO rendering builds a single mesh for the entire chunk, so we need a texture atlas to pack multiple textures.
 
-**Solution:** Implement a texture atlas (future enhancement)
+**Status:** 
+- ✅ OpenGL upgraded to 3.2 compatibility profile
+- ✅ Proper VAO implementation with vertex attributes
+- 🔄 Texture atlas needed to enable textures in VBO mode
+- Modern Minecraft-style rendering is now possible!
 
-**Current Status:** Display lists are used by default to maintain texture support.
+**Current Default:** Display lists maintain full texture support while texture atlas is developed.
 
-### Fixed-Function Pipeline
+### OpenGL Version
 
-Currently uses OpenGL fixed-function pipeline for compatibility:
-- `glEnableClientState(GL_VERTEX_ARRAY)`
-- `glEnableClientState(GL_COLOR_ARRAY)`
-- `glVertexPointer`, `glColorPointer`
-
-**Future:** Migrate to core OpenGL with shaders
+Now requires OpenGL 3.2 or higher:
+- Uses compatibility profile (supports both modern VAOs and legacy fixed-function)
+- Proper VAO state management (glGenVertexArrays, glBindVertexArray)
+- Vertex attribute arrays (glVertexAttribPointer)
+- Ready for texture arrays and modern rendering techniques
 
 ## Performance Benefits
 
