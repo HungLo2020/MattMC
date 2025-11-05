@@ -251,11 +251,8 @@ public class Level implements LevelAccessor {
             int dz = Math.abs(chunk.chunkZ() - playerChunkZ);
             
             if (dx > unloadDistance || dz > unloadDistance) {
-                // Save the chunk if it has been modified before unloading
-                if (chunk.isDirty()) {
-                    saveChunk(chunk);
-                    chunk.setDirty(false);
-                }
+                // Always save chunks before unloading to preserve any modifications
+                saveChunk(chunk);
                 iterator.remove();
             }
         }
