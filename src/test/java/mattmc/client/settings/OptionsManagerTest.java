@@ -77,4 +77,20 @@ public class OptionsManagerTest {
         OptionsManager.setResolution(1920, 1080);
         assertEquals("1920x1080", OptionsManager.getResolutionString(), "Resolution string should be formatted correctly");
     }
+    
+    @Test
+    public void testResolutionValidation() {
+        // Store current resolution
+        int currentWidth = OptionsManager.getResolutionWidth();
+        int currentHeight = OptionsManager.getResolutionHeight();
+        
+        // Try to set invalid resolution (should be rejected)
+        OptionsManager.setResolution(-1, 720);
+        assertEquals(currentWidth, OptionsManager.getResolutionWidth(), "Width should not change with invalid input");
+        assertEquals(currentHeight, OptionsManager.getResolutionHeight(), "Height should not change with invalid input");
+        
+        OptionsManager.setResolution(1280, 0);
+        assertEquals(currentWidth, OptionsManager.getResolutionWidth(), "Width should not change with invalid input");
+        assertEquals(currentHeight, OptionsManager.getResolutionHeight(), "Height should not change with invalid input");
+    }
 }

@@ -234,6 +234,10 @@ public class OptionsManager {
     }
     
     public static void setResolution(int width, int height) {
+        if (width <= 0 || height <= 0) {
+            System.err.println("Invalid resolution: " + width + "x" + height + ". Width and height must be positive.");
+            return;
+        }
         resolutionWidth = width;
         resolutionHeight = height;
         saveOptions();

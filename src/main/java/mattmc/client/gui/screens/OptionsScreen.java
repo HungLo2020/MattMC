@@ -127,7 +127,8 @@ public final class OptionsScreen implements Screen {
             }
             
             // Move to next resolution (wrap around)
-            int nextIndex = (currentIndex + 1) % supportedResolutions.length;
+            // If current resolution is not found, start from the first supported resolution
+            int nextIndex = (currentIndex == -1) ? 0 : (currentIndex + 1) % supportedResolutions.length;
             String nextRes = supportedResolutions[nextIndex];
             String[] parts = nextRes.split("x");
             int newWidth = Integer.parseInt(parts[0]);
