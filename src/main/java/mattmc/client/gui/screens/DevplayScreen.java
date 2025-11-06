@@ -418,6 +418,9 @@ public final class DevplayScreen implements Screen {
         // Re-register callbacks when returning from pause menu
         registerCallbacks();
         
+        // Reset frame time to prevent huge delta time on first tick after pause
+        lastFrameTimeSec = now();
+        
         // Sync previous position to current position when resuming
         // This prevents visual "teleport" due to interpolation after pause
         player.updatePreviousPosition();
