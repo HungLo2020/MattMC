@@ -8,23 +8,41 @@ import mattmc.world.level.block.Blocks;
 import mattmc.world.level.chunk.LevelChunk;
 import mattmc.world.level.chunk.ChunkNBT;
 import mattmc.world.level.chunk.RegionFile;
+import mattmc.world.level.chunk.AsyncChunkLoader;
+import mattmc.world.level.chunk.ChunkUtils;
 
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Iterator;
+import java.util.List;
 
 /**
  * Manages an infinite world with dynamic chunk loading/unloading.
  * Similar to Minecraft's world management system.
+ * 
+ * Now uses asynchronous chunk loading to prevent lag spikes.
  */
 public class Level implements LevelAccessor {
     // Store chunks by their position (chunkX, chunkZ)
     private final Map<Long, LevelChunk> loadedChunks = new HashMap<>();
     
+    // Async chunk loader for background loading/generation
+    private final AsyncChunkLoader asyncLoader;
+    
+    // Listener for chunk unload events (used by renderer to clean up caches)
+    private ChunkUnloadListener unloadListener;
+    
     // Render distance in chunks
     private int renderDistance = 8;
+    
+    /**
+     * Listener interface for chunk unload events.
+     */
+    public interface ChunkUnloadListener {
+        void onChunkUnload(LevelChunk chunk);
+    }
     
     // Last player chunk position for tracking when to load/unload
     private int lastPlayerChunkX = Integer.MAX_VALUE;
@@ -34,6 +52,7 @@ public class Level implements LevelAccessor {
     private Path worldDirectory = null;
     
     public Level() {
+        this.asyncLoader = new AsyncChunkLoader();
     }
     
     /**
@@ -42,6 +61,7 @@ public class Level implements LevelAccessor {
      */
     public void setWorldDirectory(Path worldDirectory) {
         this.worldDirectory = worldDirectory;
+        this.asyncLoader.setWorldDirectory(worldDirectory);
     }
     
     /**
@@ -55,7 +75,7 @@ public class Level implements LevelAccessor {
      * Convert chunk coordinates to a unique long key for the map.
      */
     private static long chunkKey(int chunkX, int chunkZ) {
-        return ((long)chunkX << 32) | (chunkZ & 0xFFFFFFFFL);
+        return ChunkUtils.chunkKey(chunkX, chunkZ);
     }
     
     /**
@@ -215,28 +235,46 @@ public class Level implements LevelAccessor {
     /**
      * Update the world based on player position.
      * Loads chunks near the player and unloads distant chunks.
+     * 
+     * Now uses asynchronous loading to prevent lag spikes.
      */
     public void updateChunksAroundPlayer(float playerX, float playerZ) {
+        updateChunksAroundPlayer(playerX, playerZ, 0f);
+    }
+    
+    /**
+     * Update the world based on player position and view direction.
+     * Loads chunks near the player and unloads distant chunks.
+     * Prioritizes chunks in the player's view frustum.
+     * 
+     * @param playerYaw Player's yaw angle in degrees for frustum-based prioritization
+     */
+    public void updateChunksAroundPlayer(float playerX, float playerZ, float playerYaw) {
+        // Process pending async tasks
+        asyncLoader.processPendingTasks();
+        
+        // Collect completed chunks from background threads
+        List<LevelChunk> completedChunks = asyncLoader.collectCompletedChunks();
+        for (LevelChunk chunk : completedChunks) {
+            long key = chunkKey(chunk.chunkX(), chunk.chunkZ());
+            loadedChunks.put(key, chunk);
+        }
+        
         // Convert player position to chunk coordinates
         int playerChunkX = Math.floorDiv((int)playerX, LevelChunk.WIDTH);
         int playerChunkZ = Math.floorDiv((int)playerZ, LevelChunk.DEPTH);
         
-        // Only update if player moved to a different chunk
-        if (playerChunkX == lastPlayerChunkX && playerChunkZ == lastPlayerChunkZ) {
-            return;
-        }
-        
-        lastPlayerChunkX = playerChunkX;
-        lastPlayerChunkZ = playerChunkZ;
-        
-        // Load chunks around player
+        // Request chunks around player (async)
         for (int dx = -renderDistance; dx <= renderDistance; dx++) {
             for (int dz = -renderDistance; dz <= renderDistance; dz++) {
                 int chunkX = playerChunkX + dx;
                 int chunkZ = playerChunkZ + dz;
                 
-                // Ensure chunk is loaded
-                getChunk(chunkX, chunkZ);
+                long key = chunkKey(chunkX, chunkZ);
+                if (!loadedChunks.containsKey(key)) {
+                    // Request async loading with frustum prioritization
+                    asyncLoader.requestChunk(chunkX, chunkZ, playerX, playerZ, playerYaw);
+                }
             }
         }
         
@@ -253,9 +291,18 @@ public class Level implements LevelAccessor {
             if (dx > unloadDistance || dz > unloadDistance) {
                 // Always save chunks before unloading to preserve any modifications
                 saveChunk(chunk);
+                
+                // Notify listener before removing
+                if (unloadListener != null) {
+                    unloadListener.onChunkUnload(chunk);
+                }
+                
                 iterator.remove();
             }
         }
+        
+        lastPlayerChunkX = playerChunkX;
+        lastPlayerChunkZ = playerChunkZ;
     }
     
     /**
@@ -284,5 +331,28 @@ public class Level implements LevelAccessor {
      */
     public int getRenderDistance() {
         return renderDistance;
+    }
+    
+    /**
+     * Get the async chunk loader for accessing loading stats.
+     */
+    public AsyncChunkLoader getAsyncLoader() {
+        return asyncLoader;
+    }
+    
+    /**
+     * Set a listener for chunk unload events.
+     * Used by the renderer to clean up caches.
+     */
+    public void setChunkUnloadListener(ChunkUnloadListener listener) {
+        this.unloadListener = listener;
+    }
+    
+    /**
+     * Shutdown the async loader and wait for tasks to complete.
+     * Call this when closing the world.
+     */
+    public void shutdown() {
+        asyncLoader.shutdown();
     }
 }

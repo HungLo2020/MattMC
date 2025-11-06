@@ -1,0 +1,368 @@
+package mattmc.client.renderer.chunk;
+
+import mattmc.client.renderer.ColorUtils;
+import mattmc.client.renderer.block.BlockFaceCollector;
+import mattmc.client.renderer.texture.TextureAtlas;
+import mattmc.world.level.block.Blocks;
+
+import java.util.ArrayList;
+import java.util.List;
+
+/**
+ * Builds vertex and index arrays from collected block faces.
+ * Converts BlockFaceCollector data into a format suitable for VBO/VAO rendering.
+ * Supports texture atlas UV mapping for multi-texture VBO rendering.
+ */
+public class MeshBuilder {
+    
+    // Vertex format: x, y, z, u, v, r, g, b, a (9 floats per vertex)
+    private final List<Float> vertices = new ArrayList<>();
+    private final List<Integer> indices = new ArrayList<>();
+    private int currentVertex = 0;
+    private final TextureAtlas textureAtlas;
+    
+    /**
+     * Create a mesh builder with optional texture atlas support.
+     * 
+     * @param textureAtlas Texture atlas for UV mapping, or null to use fallback colors
+     */
+    public MeshBuilder(TextureAtlas textureAtlas) {
+        this.textureAtlas = textureAtlas;
+    }
+    
+    /**
+     * Build a ChunkMeshBuffer from collected face data.
+     */
+    public ChunkMeshBuffer build(int chunkX, int chunkZ, BlockFaceCollector collector) {
+        vertices.clear();
+        indices.clear();
+        currentVertex = 0;
+        
+        // Process all face types - each list knows its orientation
+        addFacesOfType(collector.getTopFaces(), FaceType.TOP);
+        addFacesOfType(collector.getBottomFaces(), FaceType.BOTTOM);
+        addFacesOfType(collector.getNorthFaces(), FaceType.NORTH);
+        addFacesOfType(collector.getSouthFaces(), FaceType.SOUTH);
+        addFacesOfType(collector.getWestFaces(), FaceType.WEST);
+        addFacesOfType(collector.getEastFaces(), FaceType.EAST);
+        
+        // Convert lists to arrays
+        float[] vertexArray = new float[vertices.size()];
+        for (int i = 0; i < vertices.size(); i++) {
+            vertexArray[i] = vertices.get(i);
+        }
+        
+        int[] indexArray = new int[indices.size()];
+        for (int i = 0; i < indices.size(); i++) {
+            indexArray[i] = indices.get(i);
+        }
+        
+        return new ChunkMeshBuffer(chunkX, chunkZ, vertexArray, indexArray);
+    }
+    
+    /**
+     * Face orientation enum.
+     */
+    private enum FaceType {
+        TOP, BOTTOM, NORTH, SOUTH, WEST, EAST
+    }
+    
+    /**
+     * Add faces of a specific type to the mesh.
+     */
+    private void addFacesOfType(List<BlockFaceCollector.FaceData> faces, FaceType type) {
+        for (BlockFaceCollector.FaceData face : faces) {
+            // Extract color components and UV mapping
+            float[] color = extractColor(face);
+            TextureAtlas.UVMapping uvMapping = getUVMapping(face);
+            
+            // Add the face with correct orientation
+            switch (type) {
+                case TOP -> addTopFace(face.x, face.y, face.z, color, uvMapping);
+                case BOTTOM -> addBottomFace(face.x, face.y, face.z, color, uvMapping);
+                case NORTH -> addNorthFace(face.x, face.y, face.z, color, uvMapping);
+                case SOUTH -> addSouthFace(face.x, face.y, face.z, color, uvMapping);
+                case WEST -> addWestFace(face.x, face.y, face.z, color, uvMapping);
+                case EAST -> addEastFace(face.x, face.y, face.z, color, uvMapping);
+            }
+        }
+    }
+    
+    /**
+     * Get UV mapping from texture atlas for a face.
+     * Returns null if no atlas or texture not found.
+     */
+    private TextureAtlas.UVMapping getUVMapping(BlockFaceCollector.FaceData face) {
+        if (textureAtlas == null) {
+            return null;
+        }
+        
+        String texturePath = face.block.getTexturePath(face.faceType);
+        if (texturePath == null) {
+            return null;
+        }
+        
+        return textureAtlas.getUVMapping(texturePath);
+    }
+    
+    /**
+     * Extract RGBA color from face data.
+     * Uses white color with brightness when texture atlas is available,
+     * otherwise uses fallback colors.
+     */
+    private float[] extractColor(BlockFaceCollector.FaceData face) {
+        int renderColor;
+        
+        if (textureAtlas != null && face.block.hasTexture()) {
+            // Use white color for texture modulation
+            renderColor = 0xFFFFFF;
+            
+            // Apply grass green tint for grass_block top face (vanilla Minecraft-like)
+            if (face.block == Blocks.GRASS_BLOCK && face.faceType != null && "top".equals(face.faceType)) {
+                renderColor = 0x5BB53B; // Grass green
+            }
+        } else {
+            // Use fallback color when no texture atlas
+            renderColor = ColorUtils.adjustColorBrightness(
+                face.block.getFallbackColor(), 
+                face.colorBrightness
+            );
+            
+            // Apply grass green tint for grass_block top face
+            if (face.block == Blocks.GRASS_BLOCK && face.faceType != null && "top".equals(face.faceType)) {
+                renderColor = ColorUtils.applyTint(renderColor, 0x5BB53B, face.colorBrightness);
+            }
+        }
+        
+        // Apply brightness
+        float brightness = face.brightness;
+        
+        int r = (renderColor >> 16) & 0xFF;
+        int g = (renderColor >> 8) & 0xFF;
+        int b = renderColor & 0xFF;
+        
+        return new float[] {
+            (r / 255.0f) * brightness,
+            (g / 255.0f) * brightness,
+            (b / 255.0f) * brightness,
+            1.0f // alpha
+        };
+    }
+    
+    /**
+     * Add top face vertices and indices.
+     */
+    private void addTopFace(float x, float y, float z, float[] color, TextureAtlas.UVMapping uvMapping) {
+        float x0 = x, x1 = x + 1;
+        float y1 = y + 1;
+        float z0 = z, z1 = z + 1;
+        
+        // Get UV coordinates (0-1 if no atlas)
+        float u0 = 0, v0 = 0, u1 = 1, v1 = 1;
+        if (uvMapping != null) {
+            u0 = uvMapping.u0;
+            v0 = uvMapping.v0;
+            u1 = uvMapping.u1;
+            v1 = uvMapping.v1;
+        }
+        
+        int baseVertex = currentVertex;
+        
+        // 4 vertices for the quad with atlas UVs
+        addVertex(x0, y1, z0, u0, v0, color); // 0
+        addVertex(x0, y1, z1, u0, v1, color); // 1
+        addVertex(x1, y1, z1, u1, v1, color); // 2
+        addVertex(x1, y1, z0, u1, v0, color); // 3
+        
+        // 2 triangles (6 indices)
+        addQuadIndices(baseVertex);
+        
+        currentVertex += 4;
+    }
+    
+    /**
+     * Add bottom face vertices and indices.
+     */
+    private void addBottomFace(float x, float y, float z, float[] color, TextureAtlas.UVMapping uvMapping) {
+        float x0 = x, x1 = x + 1;
+        float y0 = y;
+        float z0 = z, z1 = z + 1;
+        
+        // Get UV coordinates
+        float u0 = 0, v0 = 0, u1 = 1, v1 = 1;
+        if (uvMapping != null) {
+            u0 = uvMapping.u0;
+            v0 = uvMapping.v0;
+            u1 = uvMapping.u1;
+            v1 = uvMapping.v1;
+        }
+        
+        int baseVertex = currentVertex;
+        
+        // 4 vertices for the quad with atlas UVs
+        addVertex(x0, y0, z0, u0, v0, color); // 0
+        addVertex(x1, y0, z0, u1, v0, color); // 1
+        addVertex(x1, y0, z1, u1, v1, color); // 2
+        addVertex(x0, y0, z1, u0, v1, color); // 3
+        
+        // 2 triangles (6 indices)
+        addQuadIndices(baseVertex);
+        
+        currentVertex += 4;
+    }
+    
+    /**
+     * Add south face vertices and indices.
+     */
+    private void addSouthFace(float x, float y, float z, float[] color, TextureAtlas.UVMapping uvMapping) {
+        float x0 = x, x1 = x + 1;
+        float y0 = y, y1 = y + 1;
+        float z1 = z + 1;
+        
+        // Get UV coordinates
+        float u0 = 0, v0 = 0, u1 = 1, v1 = 1;
+        if (uvMapping != null) {
+            u0 = uvMapping.u0;
+            v0 = uvMapping.v0;
+            u1 = uvMapping.u1;
+            v1 = uvMapping.v1;
+        }
+        
+        int baseVertex = currentVertex;
+        
+        // 4 vertices for the quad with atlas UVs
+        addVertex(x0, y0, z1, u0, v1, color); // 0
+        addVertex(x1, y0, z1, u1, v1, color); // 1
+        addVertex(x1, y1, z1, u1, v0, color); // 2
+        addVertex(x0, y1, z1, u0, v0, color); // 3
+        
+        // 2 triangles (6 indices)
+        addQuadIndices(baseVertex);
+        
+        currentVertex += 4;
+    }
+    
+    /**
+     * Add west face vertices and indices.
+     */
+    private void addWestFace(float x, float y, float z, float[] color, TextureAtlas.UVMapping uvMapping) {
+        float x0 = x;
+        float y0 = y, y1 = y + 1;
+        float z0 = z, z1 = z + 1;
+        
+        // Get UV coordinates
+        float u0 = 0, v0 = 0, u1 = 1, v1 = 1;
+        if (uvMapping != null) {
+            u0 = uvMapping.u0;
+            v0 = uvMapping.v0;
+            u1 = uvMapping.u1;
+            v1 = uvMapping.v1;
+        }
+        
+        int baseVertex = currentVertex;
+        
+        // 4 vertices for the quad with atlas UVs
+        addVertex(x0, y0, z0, u0, v1, color); // 0
+        addVertex(x0, y0, z1, u1, v1, color); // 1
+        addVertex(x0, y1, z1, u1, v0, color); // 2
+        addVertex(x0, y1, z0, u0, v0, color); // 3
+        
+        // 2 triangles (6 indices)
+        addQuadIndices(baseVertex);
+        
+        currentVertex += 4;
+    }
+    
+    /**
+     * Add east face vertices and indices.
+     */
+    private void addEastFace(float x, float y, float z, float[] color, TextureAtlas.UVMapping uvMapping) {
+        float x1 = x + 1;
+        float y0 = y, y1 = y + 1;
+        float z0 = z, z1 = z + 1;
+        
+        // Get UV coordinates
+        float u0 = 0, v0 = 0, u1 = 1, v1 = 1;
+        if (uvMapping != null) {
+            u0 = uvMapping.u0;
+            v0 = uvMapping.v0;
+            u1 = uvMapping.u1;
+            v1 = uvMapping.v1;
+        }
+        
+        int baseVertex = currentVertex;
+        
+        // 4 vertices for the quad with atlas UVs
+        addVertex(x1, y0, z1, u1, v1, color); // 0
+        addVertex(x1, y0, z0, u0, v1, color); // 1
+        addVertex(x1, y1, z0, u0, v0, color); // 2
+        addVertex(x1, y1, z1, u1, v0, color); // 3
+        
+        // 2 triangles (6 indices)
+        addQuadIndices(baseVertex);
+        
+        currentVertex += 4;
+    }
+    
+    /**
+     * Add north face vertices and indices.
+     */
+    private void addNorthFace(float x, float y, float z, float[] color, TextureAtlas.UVMapping uvMapping) {
+        float x0 = x, x1 = x + 1;
+        float y0 = y, y1 = y + 1;
+        float z0 = z;
+        
+        // Get UV coordinates
+        float u0 = 0, v0 = 0, u1 = 1, v1 = 1;
+        if (uvMapping != null) {
+            u0 = uvMapping.u0;
+            v0 = uvMapping.v0;
+            u1 = uvMapping.u1;
+            v1 = uvMapping.v1;
+        }
+        
+        int baseVertex = currentVertex;
+        
+        // 4 vertices for the quad with atlas UVs
+        addVertex(x1, y0, z0, u1, v1, color); // 0
+        addVertex(x0, y0, z0, u0, v1, color); // 1
+        addVertex(x0, y1, z0, u0, v0, color); // 2
+        addVertex(x1, y1, z0, u1, v0, color); // 3
+        
+        // 2 triangles (6 indices)
+        addQuadIndices(baseVertex);
+        
+        currentVertex += 4;
+    }
+    
+    /**
+     * Add a single vertex to the vertex list.
+     */
+    private void addVertex(float x, float y, float z, float u, float v, float[] color) {
+        vertices.add(x);
+        vertices.add(y);
+        vertices.add(z);
+        vertices.add(u);
+        vertices.add(v);
+        vertices.add(color[0]); // r
+        vertices.add(color[1]); // g
+        vertices.add(color[2]); // b
+        vertices.add(color[3]); // a
+    }
+    
+    /**
+     * Add indices for a quad (2 triangles).
+     * Assumes vertices are in order: 0, 1, 2, 3 (counter-clockwise).
+     */
+    private void addQuadIndices(int baseVertex) {
+        // Triangle 1: 0, 1, 2
+        indices.add(baseVertex + 0);
+        indices.add(baseVertex + 1);
+        indices.add(baseVertex + 2);
+        
+        // Triangle 2: 0, 2, 3
+        indices.add(baseVertex + 0);
+        indices.add(baseVertex + 2);
+        indices.add(baseVertex + 3);
+    }
+}
