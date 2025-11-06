@@ -118,7 +118,7 @@ public class OptionsManager {
                 }
             }
             
-            logger.info("Loaded options: title blur={}{}{}", titleScreenBlurEnabled, ", menu blur=", menuScreenBlurEnabled);
+            logger.info("Loaded options: title blur={}, menu blur={}", titleScreenBlurEnabled, menuScreenBlurEnabled);
         } catch (IOException e) {
             logger.error("Error loading options: {}", e.getMessage());
         }
@@ -284,7 +284,7 @@ public class OptionsManager {
     
     public static void setResolution(int width, int height) {
         if (width <= 0 || height <= 0) {
-            logger.error("Invalid resolution: {}{}{}{}", width, "x", height, ". Width and height must be positive.");
+            logger.error("Invalid resolution: {}x{}. Width and height must be positive.", width, height);
             return;
         }
         resolutionWidth = width;

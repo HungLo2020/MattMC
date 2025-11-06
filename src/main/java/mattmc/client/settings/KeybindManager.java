@@ -58,7 +58,7 @@ public class KeybindManager {
                         try {
                             keyCode = Integer.parseInt(keyName);
                         } catch (NumberFormatException e) {
-                            logger.error("Invalid key name for action {}{}{}", action, ": ", keyName);
+                            logger.error("Invalid key name for action {}: {}", action, keyName);
                             continue;
                         }
                     }
@@ -70,7 +70,7 @@ public class KeybindManager {
             // Apply loaded keybinds to PlayerInput
             if (!keybinds.isEmpty()) {
                 PlayerInput.getInstance().setAllKeybinds(keybinds);
-                logger.info("Loaded {}{}", keybinds.size(), " keybinds from Options.txt");
+                logger.info("Loaded {} keybinds from Options.txt", keybinds.size());
             }
         } catch (IOException e) {
             logger.error("Error loading keybinds: {}", e.getMessage());
@@ -136,7 +136,7 @@ public class KeybindManager {
                     writer.write(entry.getKey() + "=" + keyName + "\n");
                 }
                 
-                logger.info("Saved {}{}", keybinds.size(), " keybinds to Options.txt");
+                logger.info("Saved {} keybinds to Options.txt", keybinds.size());
             }
         } catch (IOException e) {
             logger.error("Error saving keybinds: {}", e.getMessage());

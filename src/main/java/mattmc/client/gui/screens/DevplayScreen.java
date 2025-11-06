@@ -276,7 +276,7 @@ public final class DevplayScreen implements Screen {
             player.setY(y);
             player.setZ(z);
             
-            logger.info("Teleported to: {}{}{}{}{}", x, ", ", y, ", ", z);
+            logger.info("Teleported to: {}, {}, {}", x, y, z);
             
         } catch (NumberFormatException e) {
             commandErrorMessage = "Invalid coordinates. Usage: /tp x y z";

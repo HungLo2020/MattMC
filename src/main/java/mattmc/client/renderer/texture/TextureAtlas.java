@@ -68,7 +68,7 @@ public class TextureAtlas {
         // Remove null paths
         uniqueTexturePaths.remove(null);
         
-        logger.info("Found {}{}", uniqueTexturePaths.size(), " unique textures");
+        logger.info("Found {} unique textures", uniqueTexturePaths.size());
         
         // Calculate atlas dimensions (power of 2, square layout)
         int textureCount = uniqueTexturePaths.size();
@@ -76,7 +76,7 @@ public class TextureAtlas {
         atlasWidth = texturesPerRow * textureSize;
         atlasHeight = texturesPerRow * textureSize;
         
-        logger.info("Atlas size: {}{}{}{}{}{}", atlasWidth, "x", atlasHeight, " (", texturesPerRow, " textures per row)");
+        logger.info("Atlas size: {}x{} ({} textures per row)", atlasWidth, atlasHeight, texturesPerRow);
         
         // Create atlas image
         BufferedImage atlasImage = new BufferedImage(atlasWidth, atlasHeight, BufferedImage.TYPE_INT_ARGB);
@@ -106,12 +106,12 @@ public class TextureAtlas {
                     
                     uvMappings.put(texturePath, new UVMapping(u0, v0, u1, v1));
                     
-                    logger.info("  Packed: {}{}{}{}{}{}{}{}{}{}{}{}{}", texturePath, " at (", x, ",", y, ") UV: ", u0, ",", v0, " -> ", u1, ",", v1);
+                    logger.info("  Packed: {} at ({},{}) UV: {},{} -> {},{}", texturePath, x, y, u0, v0, u1, v1);
                 } else {
                     logger.error("  Failed to load: {}", texturePath);
                 }
             } catch (Exception e) {
-                logger.error("  Error loading {}{}{}", texturePath, ": ", e.getMessage());
+                logger.error("  Error loading {}: {}", texturePath, e.getMessage());
             }
             
             // Move to next position
