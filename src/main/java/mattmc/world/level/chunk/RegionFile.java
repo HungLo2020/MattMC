@@ -29,6 +29,8 @@ public class RegionFile implements AutoCloseable {
     private final int[] timestamps = new int[REGION_SIZE * REGION_SIZE];
     
     // Keep file handle open for reuse (Minecraft Java Edition approach)
+    // This file handle is accessed via synchronized methods for thread safety.
+    // Set to null when close() is called to release resources.
     private RandomAccessFile file;
     private boolean headerDirty = false;
     
@@ -234,10 +236,16 @@ public class RegionFile implements AutoCloseable {
             
             if (offset < 2 || sectorCount == 0) continue;
             
-            // Expand array if needed
+            // Expand array if needed, but cap at reasonable maximum to prevent excessive memory use
             int maxSector = offset + sectorCount;
             if (maxSector > usedSectors.length) {
-                boolean[] newArray = new boolean[Math.max(maxSector, usedSectors.length * 2)];
+                // Cap at 64MB worth of sectors (16384 sectors * 4KB = 64MB max region file)
+                // This prevents unbounded growth from corrupted location data
+                if (maxSector > 16384) {
+                    System.err.println("Warning: Chunk location references sector beyond reasonable limit, appending instead");
+                    continue;
+                }
+                boolean[] newArray = new boolean[Math.min(16384, Math.max(maxSector, usedSectors.length * 2))];
                 System.arraycopy(usedSectors, 0, newArray, 0, usedSectors.length);
                 usedSectors = newArray;
             }

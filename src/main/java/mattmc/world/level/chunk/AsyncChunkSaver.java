@@ -3,6 +3,7 @@ package mattmc.world.level.chunk;
 import java.io.IOException;
 import java.util.Map;
 import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * Asynchronous chunk saver to prevent lag spikes when saving chunks.
@@ -14,6 +15,7 @@ public class AsyncChunkSaver {
     private final BlockingQueue<ChunkSaveTask> saveQueue;
     private final RegionFileCache regionCache;
     private volatile boolean shutdown = false;
+    private final AtomicInteger activeTasks = new AtomicInteger(0);
     
     private static class ChunkSaveTask {
         final int chunkX;
@@ -61,7 +63,12 @@ public class AsyncChunkSaver {
             try {
                 ChunkSaveTask task = saveQueue.poll(100, TimeUnit.MILLISECONDS);
                 if (task != null) {
-                    saveChunkToRegion(task);
+                    activeTasks.incrementAndGet();
+                    try {
+                        saveChunkToRegion(task);
+                    } finally {
+                        activeTasks.decrementAndGet();
+                    }
                 }
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
@@ -86,10 +93,13 @@ public class AsyncChunkSaver {
      * Flush all pending saves and wait for completion.
      */
     public void flush() {
-        // Wait for queue to drain
-        while (!saveQueue.isEmpty()) {
+        // Wait for queue to drain and active tasks to complete
+        // Use exponential backoff to reduce CPU usage while waiting
+        long sleepTime = 1;
+        while (!saveQueue.isEmpty() || activeTasks.get() > 0) {
             try {
-                Thread.sleep(10);
+                Thread.sleep(sleepTime);
+                sleepTime = Math.min(sleepTime * 2, 100); // Cap at 100ms
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
                 break;
