@@ -8,11 +8,15 @@ import java.util.HashMap;
 import java.util.Map;
 
 import static org.lwjgl.glfw.GLFW.*;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Manages loading and saving keybinds from the Options.txt file.
  */
 public class KeybindManager {
+    private static final Logger logger = LoggerFactory.getLogger(KeybindManager.class);
+
     private static final String OPTIONS_FILE = "Options.txt";
     private static final String DEFAULT_OPTIONS_RESOURCE = "/config/DefaultOptions.txt";
     
@@ -24,7 +28,7 @@ public class KeybindManager {
         Path optionsPath = getOptionsPath();
         
         if (!Files.exists(optionsPath)) {
-            System.out.println("Options.txt not found, copying from defaults...");
+            logger.info("Options.txt not found, copying from defaults...");
             copyDefaultOptions(optionsPath);
         }
         
@@ -54,7 +58,7 @@ public class KeybindManager {
                         try {
                             keyCode = Integer.parseInt(keyName);
                         } catch (NumberFormatException e) {
-                            System.err.println("Invalid key name for action " + action + ": " + keyName);
+                            logger.error("Invalid key name for action {}{}{}", action, ": ", keyName);
                             continue;
                         }
                     }
@@ -66,10 +70,10 @@ public class KeybindManager {
             // Apply loaded keybinds to PlayerInput
             if (!keybinds.isEmpty()) {
                 PlayerInput.getInstance().setAllKeybinds(keybinds);
-                System.out.println("Loaded " + keybinds.size() + " keybinds from Options.txt");
+                logger.info("Loaded {}{}", keybinds.size(), " keybinds from Options.txt");
             }
         } catch (IOException e) {
-            System.err.println("Error loading keybinds: " + e.getMessage());
+            logger.error("Error loading keybinds: {}", e.getMessage());
             e.printStackTrace();
         }
     }
@@ -88,15 +92,15 @@ public class KeybindManager {
             // Copy from resources
             try (InputStream input = KeybindManager.class.getResourceAsStream(DEFAULT_OPTIONS_RESOURCE)) {
                 if (input == null) {
-                    System.err.println("DefaultOptions.txt not found in resources, creating with hardcoded defaults...");
+                    logger.error("DefaultOptions.txt not found in resources, creating with hardcoded defaults...");
                     saveKeybinds();
                     return;
                 }
                 Files.copy(input, targetPath, StandardCopyOption.REPLACE_EXISTING);
-                System.out.println("Copied DefaultOptions.txt to " + targetPath);
+                logger.info("Copied DefaultOptions.txt to {}", targetPath);
             }
         } catch (IOException e) {
-            System.err.println("Error copying default options: " + e.getMessage());
+            logger.error("Error copying default options: {}", e.getMessage());
             e.printStackTrace();
             // Fall back to saving current keybinds
             saveKeybinds();
@@ -132,10 +136,10 @@ public class KeybindManager {
                     writer.write(entry.getKey() + "=" + keyName + "\n");
                 }
                 
-                System.out.println("Saved " + keybinds.size() + " keybinds to Options.txt");
+                logger.info("Saved {}{}", keybinds.size(), " keybinds to Options.txt");
             }
         } catch (IOException e) {
-            System.err.println("Error saving keybinds: " + e.getMessage());
+            logger.error("Error saving keybinds: {}", e.getMessage());
             e.printStackTrace();
         }
     }
@@ -145,7 +149,7 @@ public class KeybindManager {
      * This allows keybinds to be changed mid-game without restarting.
      */
     public static void reloadKeybinds() {
-        System.out.println("Reloading keybinds...");
+        logger.info("Reloading keybinds...");
         loadKeybinds();
     }
     

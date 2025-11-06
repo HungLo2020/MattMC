@@ -9,9 +9,13 @@ import java.nio.ByteBuffer;
 import static org.lwjgl.opengl.GL11.*;
 import static org.lwjgl.opengl.GL12.*;
 import static org.lwjgl.opengl.GL13.*;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /** Minimal cubemap loader for six square PNGs from the classpath. */
 public final class CubeMap implements AutoCloseable {
+    private static final Logger logger = LoggerFactory.getLogger(CubeMap.class);
+
     public final int id;
     public final int size;
 
@@ -84,7 +88,7 @@ public final class CubeMap implements AutoCloseable {
         glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
 
         glBindTexture(GL_TEXTURE_CUBE_MAP, 0);
-        System.out.println("Loaded cubemap " + basePathNoIndex + "[0..5]" + ext + " size=" + size + " id=" + tex);
+        logger.info("Loaded cubemap {}{}{}{}{}{}{}", basePathNoIndex, "[0..5]", ext, " size=", size, " id=", tex);
         return new CubeMap(tex, size);
     }
 

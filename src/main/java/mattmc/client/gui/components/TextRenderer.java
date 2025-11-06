@@ -3,12 +3,16 @@ package mattmc.client.gui.components;
 import mattmc.client.Minecraft;
 
 import static org.lwjgl.opengl.GL11.*;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Utility class for rendering text using TrueType fonts.
  * Provides centered, scaled text rendering capabilities with the Minecraft font.
  */
 public final class TextRenderer {
+    private static final Logger logger = LoggerFactory.getLogger(TextRenderer.class);
+
     
     private static TrueTypeFont font;
     private static final String FONT_PATH = "/assets/fonts/Minecraft.ttf";
@@ -25,7 +29,7 @@ public final class TextRenderer {
             try {
                 font = TrueTypeFont.load(FONT_PATH);
             } catch (Exception e) {
-                System.err.println("Failed to load font: " + FONT_PATH);
+                logger.error("Failed to load font: {}", FONT_PATH);
                 e.printStackTrace();
                 throw new RuntimeException("Font initialization failed", e);
             }

@@ -13,12 +13,16 @@ import java.util.HashMap;
 import java.util.Map;
 
 import static org.lwjgl.opengl.GL11.*;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Manages texture loading and binding for block textures.
  * Similar to Minecraft's texture management system.
  */
 public class TextureManager {
+    private static final Logger logger = LoggerFactory.getLogger(TextureManager.class);
+
     private final Map<String, Integer> textureCache = new HashMap<>();
     
     /**
@@ -32,7 +36,7 @@ public class TextureManager {
         
         try (InputStream is = getClass().getClassLoader().getResourceAsStream(path)) {
             if (is == null) {
-                System.err.println("Texture not found: " + path + " (expected in resources folder)");
+                logger.error("Texture not found: {}{}", path, " (expected in resources folder)");
                 return 0;
             }
             
@@ -70,11 +74,11 @@ public class TextureManager {
             glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, buffer);
             
             textureCache.put(path, textureID);
-            System.out.println("Loaded texture: " + path + " (ID: " + textureID + ")");
+            logger.info("Loaded texture: {}{}{}{}", path, " (ID: ", textureID, ")");
             
             return textureID;
         } catch (IOException e) {
-            System.err.println("Failed to load texture: " + path);
+            logger.error("Failed to load texture: {}", path);
             e.printStackTrace();
             return 0;
         }

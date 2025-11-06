@@ -21,6 +21,8 @@ import java.nio.file.Path;
 
 import static org.lwjgl.glfw.GLFW.*;
 import static org.lwjgl.opengl.GL11.*;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Devplay screen - infinite world with dynamic chunk loading.
@@ -28,6 +30,8 @@ import static org.lwjgl.opengl.GL11.*;
  * ESC opens pause menu.
  */
 public final class DevplayScreen implements Screen {
+    private static final Logger logger = LoggerFactory.getLogger(DevplayScreen.class);
+
     private final Minecraft game;
     private final Window window;
     
@@ -86,19 +90,19 @@ public final class DevplayScreen implements Screen {
         // Apply render distance from settings
         int renderDistance = OptionsManager.getRenderDistance();
         this.world.setRenderDistance(renderDistance);
-        System.out.println("Set render distance to: " + renderDistance + " chunks");
+        logger.info("Set render distance to: {}{}", renderDistance, " chunks");
         
         // Set world directory for new worlds so chunks can be saved during unload
         if (world == null) {
             // Use the provided seed for new worlds
             this.world.setSeed(seed);
-            System.out.println("Created new world with seed: " + seed);
+            logger.info("Created new world with seed: {}", seed);
             
             try {
                 Path worldDir = LevelStorageSource.getSavesDirectory().resolve(worldName);
                 this.world.setWorldDirectory(worldDir);
             } catch (IOException e) {
-                System.err.println("Failed to set world directory: " + e.getMessage());
+                logger.error("Failed to set world directory: {}", e.getMessage());
             }
         }
         
@@ -272,7 +276,7 @@ public final class DevplayScreen implements Screen {
             player.setY(y);
             player.setZ(z);
             
-            System.out.println("Teleported to: " + x + ", " + y + ", " + z);
+            logger.info("Teleported to: {}{}{}{}{}", x, ", ", y, ", ", z);
             
         } catch (NumberFormatException e) {
             commandErrorMessage = "Invalid coordinates. Usage: /tp x y z";

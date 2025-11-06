@@ -10,6 +10,8 @@ import mattmc.client.renderer.chunk.ChunkMeshBuffer;
 import java.util.List;
 
 import static org.lwjgl.opengl.GL11.*;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Renders all loaded chunks in an infinite world.
@@ -19,6 +21,8 @@ import static org.lwjgl.opengl.GL11.*;
  * Implements frustum culling to skip rendering chunks outside the camera view.
  */
 public class LevelRenderer {
+    private static final Logger logger = LoggerFactory.getLogger(LevelRenderer.class);
+
     private final ChunkRenderer chunkRenderer;
     private final Frustum frustum;
     private Level currentLevel;
@@ -47,12 +51,12 @@ public class LevelRenderer {
         
         // Build texture atlas once on first initialization
         if (!textureAtlasInitialized) {
-            System.out.println("Initializing texture atlas for VBO rendering...");
+            logger.info("Initializing texture atlas for VBO rendering...");
             TextureAtlas atlas = new TextureAtlas();
             chunkRenderer.setTextureAtlas(atlas);
             level.getAsyncLoader().setTextureAtlas(atlas);
             textureAtlasInitialized = true;
-            System.out.println("Texture atlas initialized with " + atlas.getTextureCount() + " textures");
+            logger.info("Texture atlas initialized with {}{}", atlas.getTextureCount(), " textures");
         }
     }
     
