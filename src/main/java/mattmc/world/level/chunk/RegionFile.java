@@ -28,16 +28,25 @@ public class RegionFile implements AutoCloseable {
     // Timestamp table: last modified timestamp for each chunk
     private final int[] timestamps = new int[REGION_SIZE * REGION_SIZE];
     
+    // Keep file handle open for reuse (Minecraft Java Edition approach)
+    // This file handle is accessed via synchronized methods for thread safety.
+    // Set to null when close() is called to release resources.
+    private RandomAccessFile file;
+    private boolean headerDirty = false;
+    
     public RegionFile(Path filePath, int regionX, int regionZ) throws IOException {
         this.filePath = filePath;
         this.regionX = regionX;
         this.regionZ = regionZ;
         
-        if (Files.exists(filePath)) {
+        // Create parent directory if needed
+        Files.createDirectories(filePath.getParent());
+        
+        // Open file for reading and writing
+        this.file = new RandomAccessFile(filePath.toFile(), "rw");
+        
+        if (file.length() >= HEADER_SIZE) {
             loadHeader();
-        } else {
-            // New file, initialize empty
-            Files.createDirectories(filePath.getParent());
         }
     }
     
@@ -64,54 +73,56 @@ public class RegionFile implements AutoCloseable {
      * Load the header (location and timestamp tables) from the region file.
      */
     private void loadHeader() throws IOException {
-        try (RandomAccessFile raf = new RandomAccessFile(filePath.toFile(), "r")) {
-            if (raf.length() < HEADER_SIZE) {
-                return; // Incomplete/corrupted header
-            }
-            
-            // Read location table
-            byte[] locationData = new byte[SECTOR_SIZE];
-            raf.readFully(locationData);
-            ByteBuffer locationBuffer = ByteBuffer.wrap(locationData);
-            for (int i = 0; i < REGION_SIZE * REGION_SIZE; i++) {
-                locations[i] = locationBuffer.getInt();
-            }
-            
-            // Read timestamp table
-            byte[] timestampData = new byte[SECTOR_SIZE];
-            raf.readFully(timestampData);
-            ByteBuffer timestampBuffer = ByteBuffer.wrap(timestampData);
-            for (int i = 0; i < REGION_SIZE * REGION_SIZE; i++) {
-                timestamps[i] = timestampBuffer.getInt();
-            }
+        if (file.length() < HEADER_SIZE) {
+            return; // Incomplete/corrupted header
+        }
+        
+        file.seek(0);
+        
+        // Read location table
+        byte[] locationData = new byte[SECTOR_SIZE];
+        file.readFully(locationData);
+        ByteBuffer locationBuffer = ByteBuffer.wrap(locationData);
+        for (int i = 0; i < REGION_SIZE * REGION_SIZE; i++) {
+            locations[i] = locationBuffer.getInt();
+        }
+        
+        // Read timestamp table
+        byte[] timestampData = new byte[SECTOR_SIZE];
+        file.readFully(timestampData);
+        ByteBuffer timestampBuffer = ByteBuffer.wrap(timestampData);
+        for (int i = 0; i < REGION_SIZE * REGION_SIZE; i++) {
+            timestamps[i] = timestampBuffer.getInt();
         }
     }
     
     /**
      * Save the header (location and timestamp tables) to the region file.
      */
-    private void saveHeader(RandomAccessFile raf) throws IOException {
-        raf.seek(0);
+    private void saveHeader() throws IOException {
+        file.seek(0);
         
         // Write location table
         ByteBuffer locationBuffer = ByteBuffer.allocate(SECTOR_SIZE);
         for (int location : locations) {
             locationBuffer.putInt(location);
         }
-        raf.write(locationBuffer.array());
+        file.write(locationBuffer.array());
         
         // Write timestamp table
         ByteBuffer timestampBuffer = ByteBuffer.allocate(SECTOR_SIZE);
         for (int timestamp : timestamps) {
             timestampBuffer.putInt(timestamp);
         }
-        raf.write(timestampBuffer.array());
+        file.write(timestampBuffer.array());
+        
+        headerDirty = false;
     }
     
     /**
      * Read chunk NBT data from the region file.
      */
-    public Map<String, Object> readChunk(int chunkX, int chunkZ) throws IOException {
+    public synchronized Map<String, Object> readChunk(int chunkX, int chunkZ) throws IOException {
         int index = getChunkIndex(chunkX, chunkZ);
         int location = locations[index];
         
@@ -126,37 +137,35 @@ public class RegionFile implements AutoCloseable {
             return null; // Invalid location
         }
         
-        try (RandomAccessFile raf = new RandomAccessFile(filePath.toFile(), "r")) {
-            raf.seek(offset * SECTOR_SIZE);
-            
-            // Read chunk length (4 bytes)
-            int length = raf.readInt();
-            if (length <= 0 || length > sectorCount * SECTOR_SIZE) {
-                return null; // Invalid length
-            }
-            
-            // Read compression type (1 byte)
-            byte compressionType = raf.readByte();
-            
-            // Read compressed data
-            byte[] compressedData = new byte[length - 1];
-            raf.readFully(compressedData);
-            
-            // Decompress and parse NBT
-            InputStream input = new ByteArrayInputStream(compressedData);
-            
-            if (compressionType == 2) { // Zlib (deflate)
-                return NBTUtil.readDeflated(input);
-            } else {
-                return null; // Unsupported compression
-            }
+        file.seek(offset * SECTOR_SIZE);
+        
+        // Read chunk length (4 bytes)
+        int length = file.readInt();
+        if (length <= 0 || length > sectorCount * SECTOR_SIZE) {
+            return null; // Invalid length
+        }
+        
+        // Read compression type (1 byte)
+        byte compressionType = file.readByte();
+        
+        // Read compressed data
+        byte[] compressedData = new byte[length - 1];
+        file.readFully(compressedData);
+        
+        // Decompress and parse NBT
+        InputStream input = new ByteArrayInputStream(compressedData);
+        
+        if (compressionType == 2) { // Zlib (deflate)
+            return NBTUtil.readDeflated(input);
+        } else {
+            return null; // Unsupported compression
         }
     }
     
     /**
      * Write chunk NBT data to the region file.
      */
-    public void writeChunk(int chunkX, int chunkZ, Map<String, Object> chunkData) throws IOException {
+    public synchronized void writeChunk(int chunkX, int chunkZ, Map<String, Object> chunkData) throws IOException {
         int index = getChunkIndex(chunkX, chunkZ);
         
         // Serialize and compress chunk data
@@ -168,42 +177,115 @@ public class RegionFile implements AutoCloseable {
         int dataLength = compressedData.length + 1; // +1 for compression type byte
         int sectorsNeeded = (dataLength + 4 + SECTOR_SIZE - 1) / SECTOR_SIZE; // +4 for length int
         
-        try (RandomAccessFile raf = new RandomAccessFile(filePath.toFile(), "rw")) {
-            // Find free space or reuse existing space
-            int offset = findFreeSpace(raf, sectorsNeeded);
-            
-            // Write chunk data
-            raf.seek(offset * SECTOR_SIZE);
-            raf.writeInt(dataLength);
-            raf.writeByte(2); // Compression type: 2 = zlib (deflate)
-            raf.write(compressedData);
-            
-            // Pad to sector boundary
-            int written = 4 + 1 + compressedData.length;
-            int padding = (sectorsNeeded * SECTOR_SIZE) - written;
-            if (padding > 0) {
-                raf.write(new byte[padding]);
-            }
-            
-            // Update location table
-            locations[index] = (offset << 8) | (sectorsNeeded & 0xFF);
-            timestamps[index] = (int) (System.currentTimeMillis() / 1000L);
-            
-            // Save header
-            saveHeader(raf);
+        // Get current allocation for this chunk
+        int oldLocation = locations[index];
+        int oldOffset = (oldLocation >> 8) & 0xFFFFFF;
+        int oldSectorCount = oldLocation & 0xFF;
+        
+        // Check if we can reuse the existing space
+        int offset;
+        if (oldSectorCount >= sectorsNeeded && oldOffset >= 2) {
+            // Reuse existing space (Minecraft Java optimization)
+            offset = oldOffset;
+        } else {
+            // Need to find new space
+            offset = findFreeSpace(sectorsNeeded, index);
         }
+        
+        // Write chunk data
+        file.seek(offset * SECTOR_SIZE);
+        file.writeInt(dataLength);
+        file.writeByte(2); // Compression type: 2 = zlib (deflate)
+        file.write(compressedData);
+        
+        // Pad to sector boundary
+        int written = 4 + 1 + compressedData.length;
+        int padding = (sectorsNeeded * SECTOR_SIZE) - written;
+        if (padding > 0) {
+            file.write(new byte[padding]);
+        }
+        
+        // Update location table
+        locations[index] = (offset << 8) | (sectorsNeeded & 0xFF);
+        timestamps[index] = (int) (System.currentTimeMillis() / 1000L);
+        headerDirty = true;
     }
     
     /**
      * Find free space in the region file for the given number of sectors.
      * Returns the sector offset where data can be written.
+     * Improved to reuse freed space (Minecraft Java optimization).
      */
-    private int findFreeSpace(RandomAccessFile raf, int sectorsNeeded) throws IOException {
-        // Simple allocation: append at the end
-        // A more sophisticated implementation would reuse freed space
-        long fileLength = raf.length();
-        int nextSector = Math.max(2, (int) ((fileLength + SECTOR_SIZE - 1) / SECTOR_SIZE));
-        return nextSector;
+    private int findFreeSpace(int sectorsNeeded, int excludeIndex) throws IOException {
+        // Build a map of used sectors
+        boolean[] usedSectors = new boolean[1024]; // Max reasonable size, will expand if needed
+        
+        // Mark header as used
+        usedSectors[0] = true;
+        usedSectors[1] = true;
+        
+        // Mark all allocated chunks as used
+        for (int i = 0; i < REGION_SIZE * REGION_SIZE; i++) {
+            if (i == excludeIndex) continue; // Skip the chunk we're updating
+            
+            int location = locations[i];
+            if (location == 0) continue;
+            
+            int offset = (location >> 8) & 0xFFFFFF;
+            int sectorCount = location & 0xFF;
+            
+            if (offset < 2 || sectorCount == 0) continue;
+            
+            // Expand array if needed, but cap at reasonable maximum to prevent excessive memory use
+            int maxSector = offset + sectorCount;
+            if (maxSector > usedSectors.length) {
+                // Cap at 64MB worth of sectors (16384 sectors * 4KB = 64MB max region file)
+                // This prevents unbounded growth from corrupted location data
+                if (maxSector > 16384) {
+                    System.err.println("Warning: Chunk location references sector beyond reasonable limit, appending instead");
+                    continue;
+                }
+                boolean[] newArray = new boolean[Math.min(16384, Math.max(maxSector, usedSectors.length * 2))];
+                System.arraycopy(usedSectors, 0, newArray, 0, usedSectors.length);
+                usedSectors = newArray;
+            }
+            
+            // Mark sectors as used
+            for (int j = 0; j < sectorCount; j++) {
+                usedSectors[offset + j] = true;
+            }
+        }
+        
+        // Find first contiguous free space
+        for (int i = 2; i < usedSectors.length - sectorsNeeded + 1; i++) {
+            boolean foundSpace = true;
+            for (int j = 0; j < sectorsNeeded; j++) {
+                if (usedSectors[i + j]) {
+                    foundSpace = false;
+                    i += j; // Skip ahead
+                    break;
+                }
+            }
+            if (foundSpace) {
+                return i;
+            }
+        }
+        
+        // No free space found, append at end
+        long fileLength = file.length();
+        return Math.max(2, (int) ((fileLength + SECTOR_SIZE - 1) / SECTOR_SIZE));
+    }
+    
+    /**
+     * Flush any pending writes to disk.
+     */
+    public synchronized void flush() throws IOException {
+        if (headerDirty) {
+            saveHeader();
+        }
+        if (file != null) {
+            file.getFD().sync();
+        }
     }
     
     /**
@@ -227,7 +309,14 @@ public class RegionFile implements AutoCloseable {
     }
     
     @Override
-    public void close() {
-        // No persistent handles to close in this implementation
+    public synchronized void close() throws IOException {
+        if (file != null) {
+            // Flush header if dirty before closing
+            if (headerDirty) {
+                saveHeader();
+            }
+            file.close();
+            file = null;
+        }
     }
 }
