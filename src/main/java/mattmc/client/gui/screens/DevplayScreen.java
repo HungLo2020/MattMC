@@ -44,10 +44,11 @@ public final class DevplayScreen implements Screen {
     
     private double lastFrameTimeSec = now();
     
-    // FPS tracking
+    // FPS tracking - moved to render() for accurate measurement
     private double fps = 0.0;
     private double fpsUpdateTimer = 0.0;
     private int frameCount = 0;
+    private double lastFpsUpdateTime = now();
     
     // Debug menu toggle state
     private boolean debugMenuVisible = false;
@@ -57,6 +58,9 @@ public final class DevplayScreen implements Screen {
     private StringBuilder commandText = new StringBuilder("/");
     private String commandErrorMessage = "";
     private double commandErrorDisplayTime = 0;
+    
+    // Flag to track if world should be shut down on close
+    private boolean shouldShutdownWorld = false;
 
     public DevplayScreen(Minecraft game, String worldName) {
         this(game, worldName, null, 0f, 0f, 0f, 0f, 0f);
@@ -260,20 +264,16 @@ public final class DevplayScreen implements Screen {
 
     @Override
     public void tick() {
+        // Save previous position for interpolation before updating
+        player.updatePreviousPosition();
+        
         double now = now();
         double dt = now - lastFrameTimeSec;
         lastFrameTimeSec = now;
         if (dt < 0) dt = 0;
         if (dt > 0.5) dt = 0.5;
         
-        // Update FPS calculation
-        frameCount++;
-        fpsUpdateTimer += dt;
-        if (fpsUpdateTimer >= 0.5) { // Update FPS every 0.5 seconds
-            fps = frameCount / 0.5; // Use exact 0.5 for consistent calculation
-            frameCount = 0;
-            fpsUpdateTimer = 0.0;
-        }
+        // FPS tracking moved to render() for accurate measurement
         
         // Update chunks based on player position (load/unload) with frustum prioritization
         world.updateChunksAroundPlayer(player.getX(), player.getZ(), player.getYaw());
@@ -296,6 +296,19 @@ public final class DevplayScreen implements Screen {
 
     @Override
     public void render(double alpha) {
+        // Track FPS in render() method for accurate measurement
+        frameCount++;
+        double now = now();
+        double timeSinceLastUpdate = now - lastFpsUpdateTime;
+        if (timeSinceLastUpdate >= 0.5) { // Update FPS every 0.5 seconds
+            fps = frameCount / timeSinceLastUpdate;
+            frameCount = 0;
+            lastFpsUpdateTime = now;
+        }
+        
+        // Convert alpha to float for interpolation
+        float alphaF = (float) alpha;
+        
         int w = window.width(), h = window.height();
 
         // Clear color + depth (sky blue)
@@ -317,17 +330,19 @@ public final class DevplayScreen implements Screen {
         glLoadIdentity();
 
         // Apply camera transformations (pitch, yaw, then position)
+        // Use interpolated values for smooth rendering between ticks
         // Camera is at eye level (1.62 blocks above feet)
-        glRotatef(player.getPitch(), 1f, 0f, 0f);
-        glRotatef(player.getYaw(), 0f, 1f, 0f);
-        glTranslatef(-player.getX(), -player.getEyeY(), -player.getZ());
+        glRotatef(player.getPitch(alphaF), 1f, 0f, 0f);
+        glRotatef(player.getYaw(alphaF), 0f, 1f, 0f);
+        glTranslatef(-player.getX(alphaF), -player.getEyeY(alphaF), -player.getZ(alphaF));
 
         glEnable(GL_DEPTH_TEST);
         glEnable(GL_CULL_FACE);
         glCullFace(GL_BACK);
         
         // Render all loaded chunks in the infinite world
-        worldRenderer.render(world, player.getX(), player.getEyeY(), player.getZ());
+        // Use interpolated position for smooth rendering
+        worldRenderer.render(world, player.getX(alphaF), player.getEyeY(alphaF), player.getZ(alphaF));
         
         glDisable(GL_CULL_FACE);
         
@@ -341,7 +356,8 @@ public final class DevplayScreen implements Screen {
             int loadedChunks = world.getLoadedChunkCount();
             int pendingChunks = world.getAsyncLoader().getPendingTaskCount();
             int activeWorkers = world.getAsyncLoader().getActiveTaskCount();
-            uiRenderer.drawDebugInfo(w, h, player.getX(), player.getY(), player.getZ(), fps,
+            // Use interpolated position for smooth debug display
+            uiRenderer.drawDebugInfo(w, h, player.getX(alphaF), player.getY(alphaF), player.getZ(alphaF), fps,
                                      loadedChunks, pendingChunks, activeWorkers);
         }
         
@@ -401,13 +417,29 @@ public final class DevplayScreen implements Screen {
     public void onOpen() {
         // Re-register callbacks when returning from pause menu
         registerCallbacks();
+        
+        // Reset frame time to prevent huge delta time on first tick after pause
+        lastFrameTimeSec = now();
+        
+        // Sync previous position to current position when resuming
+        // This prevents visual "teleport" due to interpolation after pause
+        player.updatePreviousPosition();
     }
     
     @Override 
     public void onClose() {
-        // Shutdown async chunk loader
-        if (world != null) {
+        // Only shutdown async chunk loader if we're truly exiting (not just pausing)
+        if (shouldShutdownWorld && world != null) {
             world.shutdown();
         }
+    }
+    
+    /**
+     * Save the world and mark it for shutdown.
+     * Called when exiting to title screen.
+     */
+    public void saveAndShutdown() throws java.io.IOException {
+        shouldShutdownWorld = true;
+        saveWorld();
     }
 }
