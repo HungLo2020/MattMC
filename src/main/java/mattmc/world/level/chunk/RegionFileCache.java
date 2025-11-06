@@ -1,5 +1,8 @@
 package mattmc.world.level.chunk;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.io.IOException;
 import java.nio.file.Path;
 import java.util.LinkedHashMap;
@@ -11,6 +14,7 @@ import java.util.Map;
  * Uses LRU eviction to limit memory usage.
  */
 public class RegionFileCache implements AutoCloseable {
+    private static final Logger logger = LoggerFactory.getLogger(RegionFileCache.class);
     private static final int MAX_CACHE_SIZE = 256; // Maximum number of region files to keep open
     
     private final Path regionDirectory;
@@ -26,7 +30,7 @@ public class RegionFileCache implements AutoCloseable {
                     try {
                         eldest.getValue().close();
                     } catch (IOException e) {
-                        System.err.println("Error closing region file: " + e.getMessage());
+                        logger.error("Error closing region file: {}", e.getMessage(), e);
                     }
                     return true;
                 }

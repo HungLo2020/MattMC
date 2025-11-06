@@ -3,6 +3,8 @@ package mattmc.world.level.chunk;
 import mattmc.client.Minecraft;
 
 import mattmc.nbt.NBTUtil;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.*;
 import java.nio.ByteBuffer;
@@ -15,6 +17,8 @@ import java.util.Map;
  * Based on the Anvil format used in modern Minecraft Java Edition.
  */
 public class RegionFile implements AutoCloseable {
+    private static final Logger logger = LoggerFactory.getLogger(RegionFile.class);
+    
     public static final int REGION_SIZE = 32; // 32x32 chunks per region
     private static final int SECTOR_SIZE = 4096; // 4KB sectors
     private static final int HEADER_SIZE = 2 * SECTOR_SIZE; // 8KB header (locations + timestamps)
@@ -242,7 +246,7 @@ public class RegionFile implements AutoCloseable {
                 // Cap at 64MB worth of sectors (16384 sectors * 4KB = 64MB max region file)
                 // This prevents unbounded growth from corrupted location data
                 if (maxSector > 16384) {
-                    System.err.println("Warning: Chunk location references sector beyond reasonable limit, appending instead");
+                    logger.warn("Chunk location references sector beyond reasonable limit ({}), appending instead", maxSector);
                     continue;
                 }
                 boolean[] newArray = new boolean[Math.min(16384, Math.max(maxSector, usedSectors.length * 2))];
