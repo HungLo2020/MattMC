@@ -38,6 +38,7 @@ public class AsyncChunkLoader {
     private static final int MAX_MESH_UPLOADS_PER_FRAME = 2;
     
     private Path worldDirectory;
+    private RegionFileCache regionCache;
     private TextureAtlas textureAtlas;
     private WorldGenerator worldGenerator;
     
@@ -54,6 +55,10 @@ public class AsyncChunkLoader {
     
     public void setWorldDirectory(Path worldDirectory) {
         this.worldDirectory = worldDirectory;
+    }
+    
+    public void setRegionCache(RegionFileCache regionCache) {
+        this.regionCache = regionCache;
     }
     
     public void setTextureAtlas(TextureAtlas atlas) {
@@ -234,6 +239,27 @@ public class AsyncChunkLoader {
      * Runs on background thread.
      */
     private LevelChunk loadChunkFromDisk(int chunkX, int chunkZ) {
+        // Use region cache if available, otherwise fall back to direct file access
+        if (regionCache != null) {
+            try {
+                RegionFile regionFile = regionCache.getRegionFile(chunkX, chunkZ);
+                if (regionFile.hasChunk(chunkX, chunkZ)) {
+                    Map<String, Object> chunkNBT = regionFile.readChunk(chunkX, chunkZ);
+                    if (chunkNBT != null) {
+                        return ChunkNBT.fromNBT(chunkNBT);
+                    }
+                }
+            } catch (IOException e) {
+                System.err.println("Failed to load chunk (" + chunkX + ", " + chunkZ + ") from cache: " + e.getMessage());
+            }
+            return null;
+        }
+        
+        // Fallback to direct file access (legacy)
+        if (worldDirectory == null) {
+            return null;
+        }
+        
         try {
             Path regionDir = worldDirectory.resolve("region");
             if (!java.nio.file.Files.exists(regionDir)) {
