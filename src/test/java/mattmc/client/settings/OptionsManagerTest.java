@@ -125,4 +125,80 @@ public class OptionsManagerTest {
         OptionsManager.toggleFullscreen();
         assertEquals(initialState, OptionsManager.isFullscreenEnabled(), "Fullscreen should toggle back");
     }
+    
+    @Test
+    public void testRenderDistanceDefaultValue() {
+        // Default render distance should be 16
+        int renderDistance = OptionsManager.getRenderDistance();
+        assertTrue(renderDistance >= 2 && renderDistance <= 64, "Render distance should be within valid range");
+    }
+    
+    @Test
+    public void testRenderDistanceSetAndGet() {
+        // Test setting valid render distances
+        OptionsManager.setRenderDistance(8);
+        assertEquals(8, OptionsManager.getRenderDistance(), "Render distance should be set to 8");
+        
+        OptionsManager.setRenderDistance(32);
+        assertEquals(32, OptionsManager.getRenderDistance(), "Render distance should be set to 32");
+        
+        OptionsManager.setRenderDistance(16);
+        assertEquals(16, OptionsManager.getRenderDistance(), "Render distance should be set to 16");
+    }
+    
+    @Test
+    public void testRenderDistanceClamping() {
+        // Test that values below minimum are clamped to 2
+        OptionsManager.setRenderDistance(1);
+        assertEquals(2, OptionsManager.getRenderDistance(), "Render distance below 2 should be clamped to 2");
+        
+        OptionsManager.setRenderDistance(-5);
+        assertEquals(2, OptionsManager.getRenderDistance(), "Negative render distance should be clamped to 2");
+        
+        // Test that values above maximum are clamped to 64
+        OptionsManager.setRenderDistance(100);
+        assertEquals(64, OptionsManager.getRenderDistance(), "Render distance above 64 should be clamped to 64");
+        
+        OptionsManager.setRenderDistance(128);
+        assertEquals(64, OptionsManager.getRenderDistance(), "Render distance of 128 should be clamped to 64");
+    }
+    
+    @Test
+    public void testRenderDistanceBoundaryValues() {
+        // Test minimum boundary
+        OptionsManager.setRenderDistance(2);
+        assertEquals(2, OptionsManager.getRenderDistance(), "Render distance should accept minimum value of 2");
+        
+        // Test maximum boundary
+        OptionsManager.setRenderDistance(64);
+        assertEquals(64, OptionsManager.getRenderDistance(), "Render distance should accept maximum value of 64");
+    }
+    
+    @Test
+    public void testRenderDistanceAllowedValues() {
+        // Test all allowed values from OptionsManager constant
+        int[] allowedValues = OptionsManager.ALLOWED_RENDER_DISTANCES;
+        
+        for (int value : allowedValues) {
+            OptionsManager.setRenderDistance(value);
+            assertEquals(value, OptionsManager.getRenderDistance(), 
+                "Render distance should accept allowed value of " + value);
+        }
+    }
+    
+    @Test
+    public void testRenderDistanceIntermediateValues() {
+        // Test that intermediate values (not in allowed list) are accepted but clamped
+        // This ensures the system handles manually set values gracefully
+        OptionsManager.setRenderDistance(15);
+        assertEquals(15, OptionsManager.getRenderDistance(), 
+            "Render distance should accept intermediate value of 15");
+        
+        OptionsManager.setRenderDistance(20);
+        assertEquals(20, OptionsManager.getRenderDistance(), 
+            "Render distance should accept intermediate value of 20");
+        
+        // Reset to a standard value
+        OptionsManager.setRenderDistance(16);
+    }
 }
