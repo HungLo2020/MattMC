@@ -59,7 +59,7 @@ public class LevelRenderer {
             
             // Check if chunk is dirty and needs mesh rebuild
             if (chunk.isDirty()) {
-                chunkRenderer.invalidateChunk(chunk);
+                // Don't invalidate the old VAO yet - keep it visible until new one is ready
                 chunk.setDirty(false);
                 world.getAsyncLoader().requestChunkMeshRebuild(chunk);
             }
