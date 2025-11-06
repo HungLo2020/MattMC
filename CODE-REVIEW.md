@@ -238,26 +238,6 @@ handling with specific error messages.
 
 ## Error Handling
 
-### 13. Silent Exception Swallowing in NBTUtil
-
-**File:** `src/main/java/mattmc/nbt/NBTUtil.java`
-
-**Lines:** Throughout
-
-**Issue:** The NBT utility methods throw generic `IOException` without providing context about what operation failed or what data was being processed. When called from higher-level code, it's difficult to debug issues.
-
-**Risk:** Difficult to diagnose data corruption or save/load failures.
-
-**Copilot Prompt:**
-```
-In NBTUtil.java, improve exception handling by adding contextual error messages. When IOExceptions are thrown, 
-include information about what was being serialized/deserialized, the tag type, and position in the stream. 
-Consider creating custom exception types like NBTSerializationException and NBTDeserializationException that 
-wrap IOExceptions with additional context.
-```
-
----
-
 ### 14. Poor Error Recovery in AsyncChunkLoader
 
 **File:** `src/main/java/mattmc/world/level/chunk/AsyncChunkLoader.java`
