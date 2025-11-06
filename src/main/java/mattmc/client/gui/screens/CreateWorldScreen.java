@@ -25,6 +25,7 @@ public final class CreateWorldScreen implements Screen {
     private final Window window;
     private final List<Button> buttons = new ArrayList<>();
     private EditBox worldNameField;
+    private EditBox seedField;
     private double mouseXWin, mouseYWin;
     private boolean mouseDown;
 
@@ -45,20 +46,26 @@ public final class CreateWorldScreen implements Screen {
         
         // Set up character callback for text field input
         glfwSetCharCallback(window.handle(), (win, codepoint) -> {
-            if (worldNameField != null && worldNameField.isFocused()) {
+            EditBox focusedField = getFocusedField();
+            if (focusedField != null) {
                 char c = (char) codepoint;
-                // Only allow alphanumeric, space, and some punctuation
-                if (isValidWorldNameCharacter(c)) {
-                    worldNameField.appendChar(c);
+                // For world name, only allow alphanumeric, space, and some punctuation
+                if (focusedField == worldNameField && isValidWorldNameCharacter(c)) {
+                    focusedField.appendChar(c);
+                }
+                // For seed, allow any printable character
+                else if (focusedField == seedField && isPrintableCharacter(c)) {
+                    focusedField.appendChar(c);
                 }
             }
         });
         
         // Set up key callback for backspace and enter
         glfwSetKeyCallback(window.handle(), (win, key, scancode, action, mods) -> {
-            if (worldNameField != null && worldNameField.isFocused()) {
+            EditBox focusedField = getFocusedField();
+            if (focusedField != null) {
                 if ((action == GLFW_PRESS || action == GLFW_REPEAT) && key == GLFW_KEY_BACKSPACE) {
-                    worldNameField.backspace();
+                    focusedField.backspace();
                 }
                 if (action == GLFW_PRESS && key == GLFW_KEY_ENTER) {
                     // Create world on Enter
@@ -80,10 +87,11 @@ public final class CreateWorldScreen implements Screen {
         titleCX = w / 2f;
         titleCY = h * 0.18f;
 
-        // Layout: text field, then buttons below
-        int textFieldY = (int)(h * 0.35f);
+        // Layout: world name field, seed field, then buttons below
+        int firstTextFieldY = (int)(h * 0.30f);
+        int fieldGap = 15;
         int totalButtonsH = 2 * buttonHeight + 1 * buttonGap;
-        buttonsStartY = textFieldY + textFieldHeight + 30;
+        buttonsStartY = firstTextFieldY + 2 * textFieldHeight + fieldGap + 50;
 
         int x = (w - buttonWidth) / 2;
         int tfx = (w - textFieldWidth) / 2;
@@ -91,9 +99,15 @@ public final class CreateWorldScreen implements Screen {
 
         // Create text field with unique world name
         String defaultName = LevelStorageSource.generateUniqueWorldName("New World");
-        worldNameField = new EditBox(tfx, textFieldY, textFieldWidth, textFieldHeight, 50);
+        worldNameField = new EditBox(tfx, firstTextFieldY, textFieldWidth, textFieldHeight, 50);
         worldNameField.setText(defaultName);
-        worldNameField.setFocused(true); // Auto-focus
+        worldNameField.setFocused(false); // Start unfocused
+        
+        // Create seed field with random seed
+        long randomSeed = new java.util.Random().nextLong();
+        seedField = new EditBox(tfx, firstTextFieldY + textFieldHeight + fieldGap, textFieldWidth, textFieldHeight, 100);
+        seedField.setText(String.valueOf(randomSeed));
+        seedField.setFocused(false);
 
         // Centered buttons
         buttons.add(new Button("Create World", x, buttonsStartY + 0 * (buttonHeight + buttonGap), buttonWidth, buttonHeight));
@@ -119,13 +133,19 @@ public final class CreateWorldScreen implements Screen {
 
         for (var b : buttons) b.setHover(b.contains(mxFB, myFB));
         if (worldNameField != null) worldNameField.setHover(worldNameField.contains(mxFB, myFB));
+        if (seedField != null) seedField.setHover(seedField.contains(mxFB, myFB));
 
         if (mouseDown) {
-            // Check text field click
+            // Check text field clicks
             if (worldNameField != null && worldNameField.contains(mxFB, myFB)) {
                 worldNameField.setFocused(true);
+                if (seedField != null) seedField.setFocused(false);
+            } else if (seedField != null && seedField.contains(mxFB, myFB)) {
+                seedField.setFocused(true);
+                if (worldNameField != null) worldNameField.setFocused(false);
             } else {
                 if (worldNameField != null) worldNameField.setFocused(false);
+                if (seedField != null) seedField.setFocused(false);
                 
                 // Check button clicks
                 for (var b : buttons) {
@@ -159,8 +179,45 @@ public final class CreateWorldScreen implements Screen {
         // Ensure unique name
         worldName = LevelStorageSource.generateUniqueWorldName(worldName);
         
-        System.out.println("→ Creating world: " + worldName);
-        game.setScreen(new DevplayScreen(game, worldName));
+        // Parse seed from seed field
+        String seedText = seedField.getText().trim();
+        long seed = parseSeed(seedText);
+        
+        System.out.println("→ Creating world: " + worldName + " with seed: " + seed);
+        game.setScreen(new DevplayScreen(game, worldName, seed));
+    }
+    
+    /**
+     * Parse a seed from text input.
+     * If the text is a valid long number, use it directly.
+     * Otherwise, use the hash code of the string.
+     * This matches Minecraft's behavior.
+     */
+    private long parseSeed(String seedText) {
+        if (seedText.isEmpty()) {
+            return new java.util.Random().nextLong();
+        }
+        
+        try {
+            // Try to parse as a long number
+            return Long.parseLong(seedText);
+        } catch (NumberFormatException e) {
+            // Use hash code of the string (like Minecraft does)
+            return seedText.hashCode();
+        }
+    }
+    
+    /**
+     * Get the currently focused field, if any.
+     */
+    private EditBox getFocusedField() {
+        if (worldNameField != null && worldNameField.isFocused()) {
+            return worldNameField;
+        }
+        if (seedField != null && seedField.isFocused()) {
+            return seedField;
+        }
+        return null;
     }
     
     /**
@@ -169,6 +226,14 @@ public final class CreateWorldScreen implements Screen {
      */
     private static boolean isValidWorldNameCharacter(char c) {
         return Character.isLetterOrDigit(c) || c == ' ' || c == '-' || c == '_' || c == '(' || c == ')';
+    }
+    
+    /**
+     * Check if a character is printable (for seed input).
+     * Allows most printable ASCII characters.
+     */
+    private static boolean isPrintableCharacter(char c) {
+        return c >= 32 && c <= 126; // Printable ASCII range
     }
 
     @Override
@@ -179,12 +244,14 @@ public final class CreateWorldScreen implements Screen {
 
         setupOrtho();
         
-        // Draw text field
+        // Draw text fields
         if (worldNameField != null) drawTextField(worldNameField);
+        if (seedField != null) drawTextField(seedField);
         
         for (var b : buttons) drawButton(b);
         drawTitle("Create New World", titleCX, titleCY, titleScale, 0xFFFFFF);
         drawTitle("World Name:", titleCX, worldNameField.y - 20f, 1.0f, 0xB0C4DE);
+        drawTitle("Seed:", titleCX, seedField.y - 20f, 1.0f, 0xB0C4DE);
     }
 
     private void setupOrtho() {

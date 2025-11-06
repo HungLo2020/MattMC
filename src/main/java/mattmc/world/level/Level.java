@@ -10,6 +10,7 @@ import mattmc.world.level.chunk.ChunkNBT;
 import mattmc.world.level.chunk.RegionFile;
 import mattmc.world.level.chunk.AsyncChunkLoader;
 import mattmc.world.level.chunk.ChunkUtils;
+import mattmc.world.level.levelgen.WorldGenerator;
 
 import java.io.IOException;
 import java.nio.file.Path;
@@ -30,6 +31,9 @@ public class Level implements LevelAccessor {
     
     // Async chunk loader for background loading/generation
     private final AsyncChunkLoader asyncLoader;
+    
+    // World generator for noise-based terrain
+    private WorldGenerator worldGenerator;
     
     // Listener for chunk unload events (used by renderer to clean up caches)
     private ChunkUnloadListener unloadListener;
@@ -53,6 +57,24 @@ public class Level implements LevelAccessor {
     
     public Level() {
         this.asyncLoader = new AsyncChunkLoader();
+        // Initialize with a default seed (will be updated when world is loaded/created)
+        this.worldGenerator = new WorldGenerator(0L);
+    }
+    
+    /**
+     * Set the world seed for terrain generation.
+     * This should be called when creating or loading a world.
+     */
+    public void setSeed(long seed) {
+        this.worldGenerator = new WorldGenerator(seed);
+        this.asyncLoader.setWorldGenerator(worldGenerator);
+    }
+    
+    /**
+     * Get the current world seed.
+     */
+    public long getSeed() {
+        return worldGenerator.getSeed();
     }
     
     /**
@@ -153,12 +175,11 @@ public class Level implements LevelAccessor {
     
     /**
      * Generate a new chunk at the specified position.
-     * Currently generates flat terrain at y=64.
+     * Uses noise-based terrain generation.
      */
     private LevelChunk generateChunk(int chunkX, int chunkZ) {
         LevelChunk chunk = new LevelChunk(chunkX, chunkZ);
-        // Generate flat terrain at y=64
-        chunk.generateFlatTerrain(64);
+        worldGenerator.generateChunkTerrain(chunk);
         return chunk;
     }
     

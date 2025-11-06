@@ -100,6 +100,7 @@ public final class LevelStorageSource {
         LevelData levelData = new LevelData();
         levelData.setWorldName(worldName);
         levelData.setLastPlayed(System.currentTimeMillis());
+        levelData.setSeed(world.getSeed());
         levelData.setPlayerX(playerX);
         levelData.setPlayerY(playerY);
         levelData.setPlayerZ(playerZ);
@@ -186,6 +187,9 @@ public final class LevelStorageSource {
         
         // Create world
         Level world = new Level();
+        
+        // Set world seed from level data
+        world.setSeed(levelData.getSeed());
         
         // Set world directory for saving chunks during unload
         world.setWorldDirectory(worldDir);
