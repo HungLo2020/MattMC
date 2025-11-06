@@ -13,6 +13,9 @@ public class OptionsManager {
     private static final String DEFAULT_OPTIONS_RESOURCE = "/config/DefaultOptions.txt";
     private static final int MIN_FPS_CAP = 30;
     private static final int MAX_FPS_CAP = 999;
+    private static final int MIN_RENDER_DISTANCE = 2;
+    private static final int MAX_RENDER_DISTANCE = 64;
+    private static final int DEFAULT_RENDER_DISTANCE = 16;
     
     // Blur settings
     private static boolean titleScreenBlurEnabled = false;  // Default: disabled for title screen
@@ -28,11 +31,21 @@ public class OptionsManager {
     // Fullscreen setting
     private static boolean fullscreenEnabled = false;  // Default: windowed mode
     
+    // Render distance setting
+    private static int renderDistance = DEFAULT_RENDER_DISTANCE;  // Default: 16 chunks
+    
     /**
      * Validate and clamp FPS cap value to valid range.
      */
     private static int validateFpsCap(int fps) {
         return Math.max(MIN_FPS_CAP, Math.min(MAX_FPS_CAP, fps));
+    }
+    
+    /**
+     * Validate and clamp render distance value to valid range.
+     */
+    private static int validateRenderDistance(int distance) {
+        return Math.max(MIN_RENDER_DISTANCE, Math.min(MAX_RENDER_DISTANCE, distance));
     }
     
     /**
@@ -87,6 +100,13 @@ public class OptionsManager {
                         }
                     } else if (key.equals("fullscreen")) {
                         fullscreenEnabled = Boolean.parseBoolean(value);
+                    } else if (key.equals("render_distance")) {
+                        try {
+                            int distance = Integer.parseInt(value);
+                            renderDistance = validateRenderDistance(distance);
+                        } catch (NumberFormatException e) {
+                            System.err.println("Invalid render distance value: " + value);
+                        }
                     }
                 }
             }
@@ -135,6 +155,9 @@ public class OptionsManager {
             // Update fullscreen setting
             options.put("fullscreen", String.valueOf(fullscreenEnabled));
             
+            // Update render distance setting
+            options.put("render_distance", String.valueOf(renderDistance));
+            
             // Write back to file
             Path parent = optionsPath.getParent();
             if (parent != null) {
@@ -166,6 +189,12 @@ public class OptionsManager {
                 // Write fullscreen setting
                 writer.write("# Fullscreen mode\n");
                 writer.write("fullscreen=" + fullscreenEnabled + "\n");
+                writer.write("\n");
+                
+                // Write render distance setting
+                writer.write("# Render distance in chunks (2-64)\n");
+                writer.write("# Available values: 2, 4, 8, 16, 32, 64\n");
+                writer.write("render_distance=" + renderDistance + "\n");
                 writer.write("\n");
                 
                 // Write keybinds section header
@@ -275,6 +304,16 @@ public class OptionsManager {
     
     public static void toggleFullscreen() {
         fullscreenEnabled = !fullscreenEnabled;
+        saveOptions();
+    }
+    
+    // Render distance getters and setters
+    public static int getRenderDistance() {
+        return renderDistance;
+    }
+    
+    public static void setRenderDistance(int distance) {
+        renderDistance = validateRenderDistance(distance);
         saveOptions();
     }
 }

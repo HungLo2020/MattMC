@@ -15,6 +15,10 @@ resolution=1920x1080
 # Fullscreen mode
 fullscreen=true
 
+# Render distance in chunks (2-64)
+# Available values: 2, 4, 8, 16, 32, 64
+render_distance=16
+
 # Keybinds (format: action=key_name)
 # Keyboard keys: a-z, 0-9, space, left_shift, left_ctrl, left_alt, etc.
 # Mouse buttons: left_mouse, right_mouse, middle_mouse

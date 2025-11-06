@@ -40,7 +40,7 @@ public final class OptionsScreen implements Screen {
         titleCX = w / 2f;
         titleCY = h * 0.18f;
 
-        int totalButtonsH = 7 * buttonHeight + 6 * buttonGap;
+        int totalButtonsH = 8 * buttonHeight + 7 * buttonGap;
         buttonsStartY = (int)(h / 2f - totalButtonsH / 2f);
 
         int x = (w - buttonWidth) / 2;
@@ -53,7 +53,8 @@ public final class OptionsScreen implements Screen {
         buttons.add(new Button(getMenuBlurButtonLabel(), x, buttonsStartY + 3 * (buttonHeight + buttonGap), buttonWidth, buttonHeight));
         buttons.add(new Button(getTitleBlurButtonLabel(), x, buttonsStartY + 4 * (buttonHeight + buttonGap), buttonWidth, buttonHeight));
         buttons.add(new Button(getFpsCapButtonLabel(), x, buttonsStartY + 5 * (buttonHeight + buttonGap), buttonWidth, buttonHeight));
-        buttons.add(new Button("Back",     x, buttonsStartY + 6 * (buttonHeight + buttonGap), buttonWidth, buttonHeight));
+        buttons.add(new Button(getRenderDistanceButtonLabel(), x, buttonsStartY + 6 * (buttonHeight + buttonGap), buttonWidth, buttonHeight));
+        buttons.add(new Button("Back",     x, buttonsStartY + 7 * (buttonHeight + buttonGap), buttonWidth, buttonHeight));
     }
     
     private String getMenuBlurButtonLabel() {
@@ -76,6 +77,11 @@ public final class OptionsScreen implements Screen {
     private String getFpsCapButtonLabel() {
         int fpsCap = mattmc.client.settings.OptionsManager.getFpsCap();
         return "FPS Cap: " + fpsCap + " (-/+)";
+    }
+    
+    private String getRenderDistanceButtonLabel() {
+        int renderDistance = mattmc.client.settings.OptionsManager.getRenderDistance();
+        return "Render Distance: " + renderDistance + " chunks";
     }
 
     @Override
@@ -183,6 +189,29 @@ public final class OptionsScreen implements Screen {
             mattmc.client.settings.OptionsManager.setFpsCap(commonValues[nextIndex]);
             game.window().applyFpsCapSetting();
             game.updateFpsCap();
+            recomputeLayout();
+            return;
+        }
+        if (label.startsWith("Render Distance:")) {
+            // Cycle through allowed render distance values: 2, 4, 8, 16, 32, 64
+            int current = mattmc.client.settings.OptionsManager.getRenderDistance();
+            int[] allowedValues = {2, 4, 8, 16, 32, 64};
+            int nextIndex = 0;
+            
+            // Find the next value in the cycle
+            for (int i = 0; i < allowedValues.length; i++) {
+                if (allowedValues[i] > current) {
+                    nextIndex = i;
+                    break;
+                }
+            }
+            
+            // If we're at or past the last value, wrap to the first
+            if (current >= allowedValues[allowedValues.length - 1]) {
+                nextIndex = 0;
+            }
+            
+            mattmc.client.settings.OptionsManager.setRenderDistance(allowedValues[nextIndex]);
             recomputeLayout();
             return;
         }
