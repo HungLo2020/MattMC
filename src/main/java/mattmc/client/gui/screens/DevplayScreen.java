@@ -63,10 +63,18 @@ public final class DevplayScreen implements Screen {
     private boolean shouldShutdownWorld = false;
 
     public DevplayScreen(Minecraft game, String worldName) {
-        this(game, worldName, null, 0f, 0f, 0f, 0f, 0f);
+        this(game, worldName, new java.util.Random().nextLong());
+    }
+    
+    public DevplayScreen(Minecraft game, String worldName, long seed) {
+        this(game, worldName, null, seed, 0f, 0f, 0f, 0f, 0f);
     }
     
     public DevplayScreen(Minecraft game, String worldName, Level world, float playerX, float playerY, float playerZ, float playerYaw, float playerPitch) {
+        this(game, worldName, world, new java.util.Random().nextLong(), playerX, playerY, playerZ, playerYaw, playerPitch);
+    }
+    
+    public DevplayScreen(Minecraft game, String worldName, Level world, long seed, float playerX, float playerY, float playerZ, float playerYaw, float playerPitch) {
         this.game = game;
         this.window = game.window();
         this.worldName = worldName;
@@ -76,8 +84,7 @@ public final class DevplayScreen implements Screen {
         
         // Set world directory for new worlds so chunks can be saved during unload
         if (world == null) {
-            // Generate a random seed for new worlds
-            long seed = new java.util.Random().nextLong();
+            // Use the provided seed for new worlds
             this.world.setSeed(seed);
             System.out.println("Created new world with seed: " + seed);
             
