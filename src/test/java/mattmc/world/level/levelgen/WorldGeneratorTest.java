@@ -115,8 +115,8 @@ public class WorldGeneratorTest {
         
         // With noise-based generation, we should have both ocean and land
         // Note: This might rarely fail due to random chance, but it's very unlikely
-        assertTrue(hasOcean || hasLand,
-            "World should have either ocean or land areas");
+        assertTrue(hasOcean && hasLand,
+            "World should have both ocean and land areas. Ocean: " + hasOcean + ", Land: " + hasLand);
     }
     
     @Test

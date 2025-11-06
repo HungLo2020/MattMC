@@ -179,47 +179,7 @@ public class Level implements LevelAccessor {
      */
     private LevelChunk generateChunk(int chunkX, int chunkZ) {
         LevelChunk chunk = new LevelChunk(chunkX, chunkZ);
-        
-        // Generate terrain using noise-based world generator
-        for (int localX = 0; localX < LevelChunk.WIDTH; localX++) {
-            for (int localZ = 0; localZ < LevelChunk.DEPTH; localZ++) {
-                int worldX = chunkX * LevelChunk.WIDTH + localX;
-                int worldZ = chunkZ * LevelChunk.DEPTH + localZ;
-                
-                int terrainHeight = worldGenerator.getTerrainHeight(worldX, worldZ);
-                
-                // Fill terrain from bottom to surface
-                for (int worldY = LevelChunk.MIN_Y; worldY <= terrainHeight && worldY <= LevelChunk.MAX_Y; worldY++) {
-                    int chunkY = LevelChunk.worldYToChunkY(worldY);
-                    
-                    Block block;
-                    if (worldY == terrainHeight) {
-                        // Surface block - grass above sea level, sand/dirt below
-                        if (terrainHeight >= 63) {
-                            block = Blocks.GRASS_BLOCK;
-                        } else {
-                            block = Blocks.DIRT;
-                        }
-                    } else if (worldY >= terrainHeight - 3) {
-                        block = Blocks.DIRT;
-                    } else {
-                        block = Blocks.STONE;
-                    }
-                    
-                    chunk.setBlock(localX, chunkY, localZ, block);
-                }
-                
-                // Add water for ocean areas
-                if (terrainHeight < 63) {
-                    for (int worldY = terrainHeight + 1; worldY <= 63; worldY++) {
-                        int chunkY = LevelChunk.worldYToChunkY(worldY);
-                        // For now, use stone to represent water (no water block implemented yet)
-                        // chunk.setBlock(localX, chunkY, localZ, Blocks.WATER);
-                    }
-                }
-            }
-        }
-        
+        worldGenerator.generateChunkTerrain(chunk);
         return chunk;
     }
     

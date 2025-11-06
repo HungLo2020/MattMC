@@ -97,4 +97,55 @@ public class WorldGenerator {
     public NoiseParameters getNoiseParameters() {
         return noiseParams;
     }
+    
+    /**
+     * Generate terrain for a chunk.
+     * Fills the chunk with blocks based on noise-generated terrain heights.
+     * 
+     * @param chunk The chunk to fill with terrain
+     */
+    public void generateChunkTerrain(mattmc.world.level.chunk.LevelChunk chunk) {
+        int chunkX = chunk.chunkX();
+        int chunkZ = chunk.chunkZ();
+        
+        // Generate terrain using noise-based world generator
+        for (int localX = 0; localX < mattmc.world.level.chunk.LevelChunk.WIDTH; localX++) {
+            for (int localZ = 0; localZ < mattmc.world.level.chunk.LevelChunk.DEPTH; localZ++) {
+                int worldX = chunkX * mattmc.world.level.chunk.LevelChunk.WIDTH + localX;
+                int worldZ = chunkZ * mattmc.world.level.chunk.LevelChunk.DEPTH + localZ;
+                
+                int terrainHeight = getTerrainHeight(worldX, worldZ);
+                
+                // Fill terrain from bottom to surface
+                for (int worldY = mattmc.world.level.chunk.LevelChunk.MIN_Y; worldY <= terrainHeight && worldY <= mattmc.world.level.chunk.LevelChunk.MAX_Y; worldY++) {
+                    int chunkY = mattmc.world.level.chunk.LevelChunk.worldYToChunkY(worldY);
+                    
+                    mattmc.world.level.block.Block block;
+                    if (worldY == terrainHeight) {
+                        // Surface block - grass above sea level, sand/dirt below
+                        if (terrainHeight >= SEA_LEVEL) {
+                            block = mattmc.world.level.block.Blocks.GRASS_BLOCK;
+                        } else {
+                            block = mattmc.world.level.block.Blocks.DIRT;
+                        }
+                    } else if (worldY >= terrainHeight - 3) {
+                        block = mattmc.world.level.block.Blocks.DIRT;
+                    } else {
+                        block = mattmc.world.level.block.Blocks.STONE;
+                    }
+                    
+                    chunk.setBlock(localX, chunkY, localZ, block);
+                }
+                
+                // Add water for ocean areas
+                if (terrainHeight < SEA_LEVEL) {
+                    for (int worldY = terrainHeight + 1; worldY <= SEA_LEVEL; worldY++) {
+                        int chunkY = mattmc.world.level.chunk.LevelChunk.worldYToChunkY(worldY);
+                        // For now, use stone to represent water (no water block implemented yet)
+                        // chunk.setBlock(localX, chunkY, localZ, Blocks.WATER);
+                    }
+                }
+            }
+        }
+    }
 }
