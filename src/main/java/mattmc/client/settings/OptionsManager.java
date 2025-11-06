@@ -17,6 +17,9 @@ public class OptionsManager {
     private static final int MAX_RENDER_DISTANCE = 64;
     private static final int DEFAULT_RENDER_DISTANCE = 16;
     
+    // Allowed render distance values (powers of 2 from 2 to 64)
+    public static final int[] ALLOWED_RENDER_DISTANCES = {2, 4, 8, 16, 32, 64};
+    
     // Blur settings
     private static boolean titleScreenBlurEnabled = false;  // Default: disabled for title screen
     private static boolean menuScreenBlurEnabled = true;    // Default: enabled for other screens

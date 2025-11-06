@@ -193,21 +193,30 @@ public final class OptionsScreen implements Screen {
             return;
         }
         if (label.startsWith("Render Distance:")) {
-            // Cycle through allowed render distance values: 2, 4, 8, 16, 32, 64
+            // Cycle through allowed render distance values
             int current = mattmc.client.settings.OptionsManager.getRenderDistance();
-            int[] allowedValues = {2, 4, 8, 16, 32, 64};
-            int nextIndex = 0;
+            int[] allowedValues = mattmc.client.settings.OptionsManager.ALLOWED_RENDER_DISTANCES;
             
-            // Find the next value in the cycle
+            // Find the current or next higher allowed value
+            int nextIndex = 0;
+            boolean foundCurrent = false;
+            
             for (int i = 0; i < allowedValues.length; i++) {
-                if (allowedValues[i] > current) {
+                if (allowedValues[i] == current) {
+                    // Found exact match, use next value
+                    nextIndex = (i + 1) % allowedValues.length;
+                    foundCurrent = true;
+                    break;
+                } else if (allowedValues[i] > current) {
+                    // Current value is between allowed values, jump to next higher
                     nextIndex = i;
+                    foundCurrent = true;
                     break;
                 }
             }
             
-            // If we're at or past the last value, wrap to the first
-            if (current >= allowedValues[allowedValues.length - 1]) {
+            // If current is higher than all allowed values, wrap to first
+            if (!foundCurrent) {
                 nextIndex = 0;
             }
             

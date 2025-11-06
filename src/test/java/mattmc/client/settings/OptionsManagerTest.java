@@ -176,13 +176,29 @@ public class OptionsManagerTest {
     
     @Test
     public void testRenderDistanceAllowedValues() {
-        // Test all allowed values: 2, 4, 8, 16, 32, 64
-        int[] allowedValues = {2, 4, 8, 16, 32, 64};
+        // Test all allowed values from OptionsManager constant
+        int[] allowedValues = OptionsManager.ALLOWED_RENDER_DISTANCES;
         
         for (int value : allowedValues) {
             OptionsManager.setRenderDistance(value);
             assertEquals(value, OptionsManager.getRenderDistance(), 
                 "Render distance should accept allowed value of " + value);
         }
+    }
+    
+    @Test
+    public void testRenderDistanceIntermediateValues() {
+        // Test that intermediate values (not in allowed list) are accepted but clamped
+        // This ensures the system handles manually set values gracefully
+        OptionsManager.setRenderDistance(15);
+        assertEquals(15, OptionsManager.getRenderDistance(), 
+            "Render distance should accept intermediate value of 15");
+        
+        OptionsManager.setRenderDistance(20);
+        assertEquals(20, OptionsManager.getRenderDistance(), 
+            "Render distance should accept intermediate value of 20");
+        
+        // Reset to a standard value
+        OptionsManager.setRenderDistance(16);
     }
 }
