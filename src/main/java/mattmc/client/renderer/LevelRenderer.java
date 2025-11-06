@@ -50,12 +50,19 @@ public class LevelRenderer {
     
     /**
      * Render all loaded chunks in the world.
-     * Also processes pending mesh uploads from background threads.
+     * Also processes pending mesh uploads from background threads and handles dirty chunks.
      */
     public void render(Level world, float playerX, float playerY, float playerZ) {
         // First, register all loaded chunks with the renderer so uploads can find them
         for (LevelChunk chunk : world.getLoadedChunks()) {
             chunkRenderer.registerChunk(chunk);
+            
+            // Check if chunk is dirty and needs mesh rebuild
+            if (chunk.isDirty()) {
+                chunkRenderer.invalidateChunk(chunk);
+                chunk.setDirty(false);
+                world.getAsyncLoader().requestChunkMeshRebuild(chunk);
+            }
         }
         
         // Process completed mesh buffers from async loader

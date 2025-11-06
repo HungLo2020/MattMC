@@ -325,6 +325,30 @@ public class AsyncChunkLoader {
         return collector;
     }
     
+    /**
+     * Request a mesh rebuild for a dirty chunk.
+     * Call this when blocks in the chunk are modified.
+     */
+    public void requestChunkMeshRebuild(LevelChunk chunk) {
+        if (textureAtlas == null) {
+            System.err.println("Cannot rebuild mesh: texture atlas not set");
+            return;
+        }
+        
+        long key = ChunkUtils.chunkKey(chunk.chunkX(), chunk.chunkZ());
+        
+        // Cancel any existing mesh build task for this chunk
+        Future<ChunkMeshBuffer> existingFuture = meshBufferFutures.remove(key);
+        if (existingFuture != null && !existingFuture.isDone()) {
+            existingFuture.cancel(false);
+        }
+        
+        // Submit new mesh build task
+        Future<ChunkMeshBuffer> meshBufferFuture = executor.submit(() -> buildChunkMeshBuffer(chunk));
+        meshBufferFutures.put(key, meshBufferFuture);
+        System.out.println("Requested mesh rebuild for chunk (" + chunk.chunkX() + ", " + chunk.chunkZ() + ")");
+    }
+    
     public void shutdown() {
         executor.shutdown();
     }
