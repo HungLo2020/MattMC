@@ -40,7 +40,7 @@ public final class OptionsScreen implements Screen {
         titleCX = w / 2f;
         titleCY = h * 0.18f;
 
-        int totalButtonsH = 4 * buttonHeight + 3 * buttonGap;
+        int totalButtonsH = 8 * buttonHeight + 7 * buttonGap;
         buttonsStartY = (int)(h / 2f - totalButtonsH / 2f);
 
         int x = (w - buttonWidth) / 2;
@@ -48,23 +48,45 @@ public final class OptionsScreen implements Screen {
 
         // Centered buttons
         buttons.add(new Button("Keybinds", x, buttonsStartY + 0 * (buttonHeight + buttonGap), buttonWidth, buttonHeight));
-        buttons.add(new Button(getMenuBlurButtonLabel(), x, buttonsStartY + 1 * (buttonHeight + buttonGap), buttonWidth, buttonHeight));
-        buttons.add(new Button(getTitleBlurButtonLabel(), x, buttonsStartY + 2 * (buttonHeight + buttonGap), buttonWidth, buttonHeight));
-        buttons.add(new Button("Back",     x, buttonsStartY + 3 * (buttonHeight + buttonGap), buttonWidth, buttonHeight));
+        buttons.add(new Button(getResolutionButtonLabel(), x, buttonsStartY + 1 * (buttonHeight + buttonGap), buttonWidth, buttonHeight));
+        buttons.add(new Button(getFullscreenButtonLabel(), x, buttonsStartY + 2 * (buttonHeight + buttonGap), buttonWidth, buttonHeight));
+        buttons.add(new Button(getMenuBlurButtonLabel(), x, buttonsStartY + 3 * (buttonHeight + buttonGap), buttonWidth, buttonHeight));
+        buttons.add(new Button(getTitleBlurButtonLabel(), x, buttonsStartY + 4 * (buttonHeight + buttonGap), buttonWidth, buttonHeight));
+        buttons.add(new Button(getFpsCapButtonLabel(), x, buttonsStartY + 5 * (buttonHeight + buttonGap), buttonWidth, buttonHeight));
+        buttons.add(new Button(getRenderDistanceButtonLabel(), x, buttonsStartY + 6 * (buttonHeight + buttonGap), buttonWidth, buttonHeight));
+        buttons.add(new Button("Back",     x, buttonsStartY + 7 * (buttonHeight + buttonGap), buttonWidth, buttonHeight));
     }
     
     private String getMenuBlurButtonLabel() {
         return "Menu Blur: " + (mattmc.client.settings.OptionsManager.isMenuScreenBlurEnabled() ? "ON" : "OFF");
     }
     
+    private String getResolutionButtonLabel() {
+        String currentRes = mattmc.client.settings.OptionsManager.getResolutionString();
+        return "Resolution: " + currentRes;
+    }
+    
+    private String getFullscreenButtonLabel() {
+        return "Fullscreen: " + (mattmc.client.settings.OptionsManager.isFullscreenEnabled() ? "ON" : "OFF");
+    }
+    
     private String getTitleBlurButtonLabel() {
         return "Title Blur: " + (mattmc.client.settings.OptionsManager.isTitleScreenBlurEnabled() ? "ON" : "OFF");
+    }
+    
+    private String getFpsCapButtonLabel() {
+        int fpsCap = mattmc.client.settings.OptionsManager.getFpsCap();
+        return "FPS Cap: " + fpsCap + " (-/+)";
+    }
+    
+    private String getRenderDistanceButtonLabel() {
+        int renderDistance = mattmc.client.settings.OptionsManager.getRenderDistance();
+        return "Render Distance: " + renderDistance + " chunks";
     }
 
     @Override
     public void tick() {
-        // Update panorama animation
-        game.panorama().update();
+        // Panorama rotation is now updated during rendering to prevent jitter
         
         // Convert window coords -> framebuffer coords for accurate hit-testing on HiDPI
         float mxFB, myFB;
@@ -101,6 +123,40 @@ public final class OptionsScreen implements Screen {
             game.setScreen(new ControlsScreen(game));
             return;
         }
+        if (label.startsWith("Resolution:")) {
+            // Cycle through supported resolutions
+            String current = mattmc.client.settings.OptionsManager.getResolutionString();
+            String[] supportedResolutions = {"1280x720", "1600x900", "1920x1080"};
+            int currentIndex = -1;
+            
+            // Find current resolution index
+            for (int i = 0; i < supportedResolutions.length; i++) {
+                if (supportedResolutions[i].equals(current)) {
+                    currentIndex = i;
+                    break;
+                }
+            }
+            
+            // Move to next resolution (wrap around)
+            // If current resolution is not found, start from the first supported resolution
+            int nextIndex = (currentIndex == -1) ? 0 : (currentIndex + 1) % supportedResolutions.length;
+            String nextRes = supportedResolutions[nextIndex];
+            String[] parts = nextRes.split("x");
+            int newWidth = Integer.parseInt(parts[0]);
+            int newHeight = Integer.parseInt(parts[1]);
+            
+            // Update settings and apply new resolution
+            mattmc.client.settings.OptionsManager.setResolution(newWidth, newHeight);
+            window.setSize(newWidth, newHeight);
+            recomputeLayout();
+            return;
+        }
+        if (label.startsWith("Fullscreen:")) {
+            mattmc.client.settings.OptionsManager.toggleFullscreen();
+            window.setFullscreen(mattmc.client.settings.OptionsManager.isFullscreenEnabled());
+            recomputeLayout();
+            return;
+        }
         if (label.startsWith("Menu Blur:")) {
             mattmc.client.settings.OptionsManager.toggleMenuScreenBlur();
             recomputeLayout();
@@ -108,6 +164,63 @@ public final class OptionsScreen implements Screen {
         }
         if (label.startsWith("Title Blur:")) {
             mattmc.client.settings.OptionsManager.toggleTitleScreenBlur();
+            recomputeLayout();
+            return;
+        }
+        if (label.startsWith("FPS Cap:")) {
+            // Cycle through common FPS values
+            int current = mattmc.client.settings.OptionsManager.getFpsCap();
+            int[] commonValues = {30, 60, 75, 120, 144, 165, 240, 360, 999};
+            int nextIndex = 0;
+            
+            // Find the next value in the cycle
+            for (int i = 0; i < commonValues.length; i++) {
+                if (commonValues[i] > current) {
+                    nextIndex = i;
+                    break;
+                }
+            }
+            
+            // If we're at or past the last value, wrap to the first
+            if (current >= commonValues[commonValues.length - 1]) {
+                nextIndex = 0;
+            }
+            
+            mattmc.client.settings.OptionsManager.setFpsCap(commonValues[nextIndex]);
+            game.window().applyFpsCapSetting();
+            game.updateFpsCap();
+            recomputeLayout();
+            return;
+        }
+        if (label.startsWith("Render Distance:")) {
+            // Cycle through allowed render distance values
+            int current = mattmc.client.settings.OptionsManager.getRenderDistance();
+            int[] allowedValues = mattmc.client.settings.OptionsManager.ALLOWED_RENDER_DISTANCES;
+            
+            // Find the current or next higher allowed value
+            int nextIndex = 0;
+            boolean foundCurrent = false;
+            
+            for (int i = 0; i < allowedValues.length; i++) {
+                if (allowedValues[i] == current) {
+                    // Found exact match, use next value
+                    nextIndex = (i + 1) % allowedValues.length;
+                    foundCurrent = true;
+                    break;
+                } else if (allowedValues[i] > current) {
+                    // Current value is between allowed values, jump to next higher
+                    nextIndex = i;
+                    foundCurrent = true;
+                    break;
+                }
+            }
+            
+            // If current is higher than all allowed values, wrap to first
+            if (!foundCurrent) {
+                nextIndex = 0;
+            }
+            
+            mattmc.client.settings.OptionsManager.setRenderDistance(allowedValues[nextIndex]);
             recomputeLayout();
             return;
         }

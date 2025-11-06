@@ -42,7 +42,7 @@ public class Blocks {
     
     // Registry maps block identifiers to Block instances
     private static final Map<String, Block> REGISTRY = new HashMap<>();
-    
+
     // Static block instances - similar to Minecraft's public static final Block fields
     // Each block is defined in one line with its properties
     // Textures are loaded from blockstate and model JSON files

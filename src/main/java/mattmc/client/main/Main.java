@@ -34,8 +34,10 @@ public final class Main {
         // Load options (blur settings, etc.)
         OptionsManager.loadOptions();
 
-        // Boot the game
-        try (var window = new Window(1280, 720, "MattMC")) {
+        // Boot the game with configured resolution
+        int width = OptionsManager.getResolutionWidth();
+        int height = OptionsManager.getResolutionHeight();
+        try (var window = new Window(width, height, "MattMC")) {
             var game = new Minecraft(window);
             // If your Minecraft wants to know the dataDir, you can add a setter/ctor and pass it in.
             game.setScreen(new TitleScreen(game));

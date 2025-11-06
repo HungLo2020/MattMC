@@ -11,10 +11,45 @@ import java.util.Map;
 public class OptionsManager {
     private static final String OPTIONS_FILE = "Options.txt";
     private static final String DEFAULT_OPTIONS_RESOURCE = "/config/DefaultOptions.txt";
+    private static final int MIN_FPS_CAP = 30;
+    private static final int MAX_FPS_CAP = 999;
+    private static final int MIN_RENDER_DISTANCE = 2;
+    private static final int MAX_RENDER_DISTANCE = 64;
+    private static final int DEFAULT_RENDER_DISTANCE = 16;
+    
+    // Allowed render distance values (powers of 2 from 2 to 64)
+    public static final int[] ALLOWED_RENDER_DISTANCES = {2, 4, 8, 16, 32, 64};
     
     // Blur settings
     private static boolean titleScreenBlurEnabled = false;  // Default: disabled for title screen
     private static boolean menuScreenBlurEnabled = true;    // Default: enabled for other screens
+    
+    // FPS cap setting
+    private static int fpsCapValue = 60;  // Default: 60 FPS
+    
+    // Resolution settings
+    private static int resolutionWidth = 1280;  // Default: 1280x720
+    private static int resolutionHeight = 720;
+    
+    // Fullscreen setting
+    private static boolean fullscreenEnabled = false;  // Default: windowed mode
+    
+    // Render distance setting
+    private static int renderDistance = DEFAULT_RENDER_DISTANCE;  // Default: 16 chunks
+    
+    /**
+     * Validate and clamp FPS cap value to valid range.
+     */
+    private static int validateFpsCap(int fps) {
+        return Math.max(MIN_FPS_CAP, Math.min(MAX_FPS_CAP, fps));
+    }
+    
+    /**
+     * Validate and clamp render distance value to valid range.
+     */
+    private static int validateRenderDistance(int distance) {
+        return Math.max(MIN_RENDER_DISTANCE, Math.min(MAX_RENDER_DISTANCE, distance));
+    }
     
     /**
      * Load options from the Options.txt file.
@@ -49,6 +84,32 @@ public class OptionsManager {
                         titleScreenBlurEnabled = Boolean.parseBoolean(value);
                     } else if (key.equals("blur_menu_screens")) {
                         menuScreenBlurEnabled = Boolean.parseBoolean(value);
+                    } else if (key.equals("fps_cap")) {
+                        try {
+                            int fps = Integer.parseInt(value);
+                            fpsCapValue = validateFpsCap(fps);
+                        } catch (NumberFormatException e) {
+                            System.err.println("Invalid FPS cap value: " + value);
+                        }
+                    } else if (key.equals("resolution")) {
+                        try {
+                            String[] resParts = value.split("x");
+                            if (resParts.length == 2) {
+                                resolutionWidth = Integer.parseInt(resParts[0].trim());
+                                resolutionHeight = Integer.parseInt(resParts[1].trim());
+                            }
+                        } catch (NumberFormatException e) {
+                            System.err.println("Invalid resolution value: " + value);
+                        }
+                    } else if (key.equals("fullscreen")) {
+                        fullscreenEnabled = Boolean.parseBoolean(value);
+                    } else if (key.equals("render_distance")) {
+                        try {
+                            int distance = Integer.parseInt(value);
+                            renderDistance = validateRenderDistance(distance);
+                        } catch (NumberFormatException e) {
+                            System.err.println("Invalid render distance value: " + value);
+                        }
                     }
                 }
             }
@@ -88,6 +149,18 @@ public class OptionsManager {
             options.put("blur_title_screen", String.valueOf(titleScreenBlurEnabled));
             options.put("blur_menu_screens", String.valueOf(menuScreenBlurEnabled));
             
+            // Update FPS cap setting
+            options.put("fps_cap", String.valueOf(fpsCapValue));
+            
+            // Update resolution setting
+            options.put("resolution", resolutionWidth + "x" + resolutionHeight);
+            
+            // Update fullscreen setting
+            options.put("fullscreen", String.valueOf(fullscreenEnabled));
+            
+            // Update render distance setting
+            options.put("render_distance", String.valueOf(renderDistance));
+            
             // Write back to file
             Path parent = optionsPath.getParent();
             if (parent != null) {
@@ -103,6 +176,28 @@ public class OptionsManager {
                 writer.write("# Blur settings\n");
                 writer.write("blur_title_screen=" + titleScreenBlurEnabled + "\n");
                 writer.write("blur_menu_screens=" + menuScreenBlurEnabled + "\n");
+                writer.write("\n");
+                
+                // Write FPS cap setting
+                writer.write("# FPS cap (30-999)\n");
+                writer.write("fps_cap=" + fpsCapValue + "\n");
+                writer.write("\n");
+                
+                // Write resolution setting
+                writer.write("# Resolution (format: widthxheight)\n");
+                writer.write("# Supported resolutions: 1280x720, 1600x900, 1920x1080\n");
+                writer.write("resolution=" + resolutionWidth + "x" + resolutionHeight + "\n");
+                writer.write("\n");
+                
+                // Write fullscreen setting
+                writer.write("# Fullscreen mode\n");
+                writer.write("fullscreen=" + fullscreenEnabled + "\n");
+                writer.write("\n");
+                
+                // Write render distance setting
+                writer.write("# Render distance in chunks (2-64)\n");
+                writer.write("# Available values: 2, 4, 8, 16, 32, 64\n");
+                writer.write("render_distance=" + renderDistance + "\n");
                 writer.write("\n");
                 
                 // Write keybinds section header
@@ -161,6 +256,67 @@ public class OptionsManager {
     
     public static void toggleMenuScreenBlur() {
         menuScreenBlurEnabled = !menuScreenBlurEnabled;
+        saveOptions();
+    }
+    
+    // FPS cap getters and setters
+    public static int getFpsCap() {
+        return fpsCapValue;
+    }
+    
+    public static void setFpsCap(int fps) {
+        fpsCapValue = validateFpsCap(fps);
+        saveOptions();
+    }
+    
+    // Resolution getters and setters
+    public static int getResolutionWidth() {
+        return resolutionWidth;
+    }
+    
+    public static int getResolutionHeight() {
+        return resolutionHeight;
+    }
+    
+    public static void setResolution(int width, int height) {
+        if (width <= 0 || height <= 0) {
+            System.err.println("Invalid resolution: " + width + "x" + height + ". Width and height must be positive.");
+            return;
+        }
+        resolutionWidth = width;
+        resolutionHeight = height;
+        saveOptions();
+    }
+    
+    /**
+     * Get the resolution as a formatted string (e.g., "1280x720")
+     */
+    public static String getResolutionString() {
+        return resolutionWidth + "x" + resolutionHeight;
+    }
+    
+    // Fullscreen getters and setters
+    public static boolean isFullscreenEnabled() {
+        return fullscreenEnabled;
+    }
+    
+    public static void setFullscreenEnabled(boolean enabled) {
+        fullscreenEnabled = enabled;
+        saveOptions();
+    }
+    
+    public static void toggleFullscreen() {
+        fullscreenEnabled = !fullscreenEnabled;
+        saveOptions();
+    }
+    
+    // Render distance getters and setters
+    public static int getRenderDistance() {
+        return renderDistance;
+    }
+    
+    public static void setRenderDistance(int distance) {
+        renderDistance = validateRenderDistance(distance);
         saveOptions();
     }
 }

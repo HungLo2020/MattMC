@@ -1,23 +1,37 @@
 package mattmc.client;
 
+import mattmc.client.settings.OptionsManager;
 import mattmc.client.renderer.CubeMap;
 import mattmc.client.renderer.PanoramaRenderer;
 import mattmc.client.gui.screens.Screen;
 
 public final class Minecraft {
+    private static final double MIN_SLEEP_TIME = 0.002;  // 2ms - minimum time worth sleeping
+    private static final double SLEEP_BUFFER = 0.001;    // 1ms - buffer to avoid oversleeping
+    
     private final Window window;
     private Screen current;
     private boolean running = true;
     private PanoramaRenderer sharedPanorama;
+    private int cachedFpsCap;
 
     public Minecraft(Window window) { 
         this.window = window;
         // Load shared panorama once
         CubeMap sky = CubeMap.load("/assets/textures/gui/panorama1_", ".png");
         this.sharedPanorama = new PanoramaRenderer(sky);
+        // Cache the FPS cap
+        this.cachedFpsCap = OptionsManager.getFpsCap();
     }
     public Window window() { return window; }
     public PanoramaRenderer panorama() { return sharedPanorama; }
+    
+    /**
+     * Update the cached FPS cap. Call this when the FPS setting changes.
+     */
+    public void updateFpsCap() {
+        this.cachedFpsCap = OptionsManager.getFpsCap();
+    }
 
     public void setScreen(Screen next) {
         if (current != null) current.onClose();
@@ -28,20 +42,54 @@ public final class Minecraft {
     public void quit() { running = false; }
 
     public void run() {
-        final double tick = 1.0 / 60.0;
-        double prev = now(), acc = 0.0;
+        final double TICK_RATE = 20.0;  // 20 ticks per second (Minecraft standard)
+        final double tickTime = 1.0 / TICK_RATE;
+        double lastTime = now();
+        double tickAccumulator = 0.0;
+        double lastRenderTime = lastTime;
 
         while (running && !window.shouldClose()) {
-            double curr = now();
-            double dt   = curr - prev; prev = curr;
-            acc += dt;
+            double currentTime = now();
+            double deltaTime = currentTime - lastTime;
+            lastTime = currentTime;
+            
+            // Clamp delta time to prevent spiral of death
+            if (deltaTime > 0.25) deltaTime = 0.25;
+            
+            tickAccumulator += deltaTime;
 
-            while (acc >= tick) {
+            // Fixed tick rate: run game logic at exactly 20 TPS
+            while (tickAccumulator >= tickTime) {
                 if (current != null) current.tick();
-                acc -= tick;
+                tickAccumulator -= tickTime;
             }
-            if (current != null) current.render(acc / tick);
-            window.swap();
+            
+            // Variable render rate: render as fast as possible up to FPS cap
+            double targetFrameTime = 1.0 / cachedFpsCap;
+            double timeSinceLastRender = currentTime - lastRenderTime;
+            
+            // Only render if enough time has passed for target FPS
+            if (timeSinceLastRender >= targetFrameTime) {
+                // Alpha represents how far between ticks we are (for interpolation)
+                double alpha = tickAccumulator / tickTime;
+                if (current != null) current.render(alpha);
+                window.swap();
+                lastRenderTime = currentTime;
+            } else {
+                // Calculate precise sleep time to avoid busy-waiting
+                double remainingTime = targetFrameTime - timeSinceLastRender;
+                if (remainingTime > MIN_SLEEP_TIME) {
+                    try {
+                        // Sleep for most of the remaining time, leaving a buffer
+                        long sleepMs = (long)((remainingTime - SLEEP_BUFFER) * 1000);
+                        if (sleepMs > 0) {
+                            Thread.sleep(sleepMs);
+                        }
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                    }
+                }
+            }
         }
     }
 

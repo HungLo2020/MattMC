@@ -9,7 +9,7 @@ public final class PanoramaRenderer {
     private float yawDeg = 0f;
     private float pitchDeg = 5f;
     private final float yawSpeedDegPerSec = 2.0f;
-    private double lastFrameTimeSec = System.nanoTime() * 1e-9;
+    private double lastRenderTimeSec = System.nanoTime() * 1e-9;
     
     // Blur effect and framebuffer for rendering to texture
     private final BlurEffect blurEffect;
@@ -21,26 +21,25 @@ public final class PanoramaRenderer {
         this.blurEffect = new BlurEffect();
     }
 
-    /** Update the panorama rotation based on elapsed time since last update. */
-    public void update() {
-        double now = System.nanoTime() * 1e-9;
-        double frameDt = now - lastFrameTimeSec;
-        lastFrameTimeSec = now;
-        if (frameDt < 0) frameDt = 0;
-        if (frameDt > 0.25) frameDt = 0.25; // clamp huge pauses
-        
-        yawDeg += yawSpeedDegPerSec * (float)frameDt;
-        if (yawDeg >= 360f) yawDeg -= 360f;
-        if (yawDeg < 0f) yawDeg += 360f;
-    }
-
     /**
-     * Render the panorama skybox.
+     * Render the panorama skybox. Rotation is updated each time this is called,
+     * synchronized with actual rendered frames to prevent jitter.
      * @param width viewport width
      * @param height viewport height
      * @param blurred if true, applies a Gaussian blur shader effect
      */
     public void render(int width, int height, boolean blurred) {
+        // Update rotation based on time since last render
+        // This ensures smooth rotation synchronized with actual displayed frames
+        double now = System.nanoTime() * 1e-9;
+        double renderDt = now - lastRenderTimeSec;
+        lastRenderTimeSec = now;
+        if (renderDt < 0) renderDt = 0;
+        if (renderDt > 0.25) renderDt = 0.25; // clamp huge pauses
+        
+        yawDeg += yawSpeedDegPerSec * (float)renderDt;
+        if (yawDeg >= 360f) yawDeg -= 360f;
+        if (yawDeg < 0f) yawDeg += 360f;
         if (blurred) {
             // Recreate render target if size changed
             if (lastWidth != width || lastHeight != height) {
