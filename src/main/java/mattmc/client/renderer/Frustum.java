@@ -47,65 +47,69 @@ public class Frustum {
     }
     
     /**
-     * Multiply two 4x4 matrices (result = a * b).
+     * Multiply two 4x4 matrices in column-major order (result = a * b).
+     * OpenGL matrices are stored in column-major order.
      */
     private void multiplyMatrices(FloatBuffer result, FloatBuffer a, FloatBuffer b) {
-        for (int i = 0; i < 4; i++) {
-            for (int j = 0; j < 4; j++) {
+        for (int row = 0; row < 4; row++) {
+            for (int col = 0; col < 4; col++) {
                 float sum = 0;
                 for (int k = 0; k < 4; k++) {
-                    sum += a.get(i * 4 + k) * b.get(k * 4 + j);
+                    // Column-major: matrix[col * 4 + row]
+                    sum += a.get(k * 4 + row) * b.get(col * 4 + k);
                 }
-                result.put(i * 4 + j, sum);
+                result.put(col * 4 + row, sum);
             }
         }
     }
     
     /**
      * Extract frustum planes from the clip matrix.
+     * The clip matrix is in column-major order (OpenGL format).
+     * Plane equation: Ax + By + Cz + D = 0
      */
     private void extractPlanes(FloatBuffer clip) {
-        // Right plane
-        planes[RIGHT][0] = clip.get(3) - clip.get(0);
-        planes[RIGHT][1] = clip.get(7) - clip.get(4);
-        planes[RIGHT][2] = clip.get(11) - clip.get(8);
-        planes[RIGHT][3] = clip.get(15) - clip.get(12);
-        normalizePlane(RIGHT);
-        
-        // Left plane
+        // Left plane: 4th column + 1st column
         planes[LEFT][0] = clip.get(3) + clip.get(0);
         planes[LEFT][1] = clip.get(7) + clip.get(4);
         planes[LEFT][2] = clip.get(11) + clip.get(8);
         planes[LEFT][3] = clip.get(15) + clip.get(12);
         normalizePlane(LEFT);
         
-        // Bottom plane
+        // Right plane: 4th column - 1st column
+        planes[RIGHT][0] = clip.get(3) - clip.get(0);
+        planes[RIGHT][1] = clip.get(7) - clip.get(4);
+        planes[RIGHT][2] = clip.get(11) - clip.get(8);
+        planes[RIGHT][3] = clip.get(15) - clip.get(12);
+        normalizePlane(RIGHT);
+        
+        // Bottom plane: 4th column + 2nd column
         planes[BOTTOM][0] = clip.get(3) + clip.get(1);
         planes[BOTTOM][1] = clip.get(7) + clip.get(5);
         planes[BOTTOM][2] = clip.get(11) + clip.get(9);
         planes[BOTTOM][3] = clip.get(15) + clip.get(13);
         normalizePlane(BOTTOM);
         
-        // Top plane
+        // Top plane: 4th column - 2nd column
         planes[TOP][0] = clip.get(3) - clip.get(1);
         planes[TOP][1] = clip.get(7) - clip.get(5);
         planes[TOP][2] = clip.get(11) - clip.get(9);
         planes[TOP][3] = clip.get(15) - clip.get(13);
         normalizePlane(TOP);
         
-        // Far plane
-        planes[FAR][0] = clip.get(3) - clip.get(2);
-        planes[FAR][1] = clip.get(7) - clip.get(6);
-        planes[FAR][2] = clip.get(11) - clip.get(10);
-        planes[FAR][3] = clip.get(15) - clip.get(14);
-        normalizePlane(FAR);
-        
-        // Near plane
+        // Near plane: 4th column + 3rd column
         planes[NEAR][0] = clip.get(3) + clip.get(2);
         planes[NEAR][1] = clip.get(7) + clip.get(6);
         planes[NEAR][2] = clip.get(11) + clip.get(10);
         planes[NEAR][3] = clip.get(15) + clip.get(14);
         normalizePlane(NEAR);
+        
+        // Far plane: 4th column - 3rd column
+        planes[FAR][0] = clip.get(3) - clip.get(2);
+        planes[FAR][1] = clip.get(7) - clip.get(6);
+        planes[FAR][2] = clip.get(11) - clip.get(10);
+        planes[FAR][3] = clip.get(15) - clip.get(14);
+        normalizePlane(FAR);
     }
     
     /**
@@ -128,7 +132,6 @@ public class Frustum {
     
     /**
      * Test if an axis-aligned bounding box is inside or intersecting the frustum.
-     * Uses conservative culling - expands the test slightly to avoid false culling.
      * 
      * @param minX Minimum X coordinate of the box
      * @param minY Minimum Y coordinate of the box
@@ -139,32 +142,15 @@ public class Frustum {
      * @return true if the box is visible (inside or intersecting frustum), false if completely outside
      */
     public boolean isBoxVisible(float minX, float minY, float minZ, float maxX, float maxY, float maxZ) {
-        // Add small margin to prevent false culling at frustum edges
-        float margin = 2.0f;
-        minX -= margin;
-        minY -= margin;
-        minZ -= margin;
-        maxX += margin;
-        maxY += margin;
-        maxZ += margin;
-        
-        // Test all six planes
+        // Test each plane
         for (int i = 0; i < 6; i++) {
-            // Check all 8 corners of the box - if all are outside one plane, box is culled
-            int outCount = 0;
+            // Find the p-vertex (most positive vertex along the plane normal)
+            float px = planes[i][0] > 0 ? maxX : minX;
+            float py = planes[i][1] > 0 ? maxY : minY;
+            float pz = planes[i][2] > 0 ? maxZ : minZ;
             
-            // Test all 8 corners
-            if (planes[i][0] * minX + planes[i][1] * minY + planes[i][2] * minZ + planes[i][3] < 0) outCount++;
-            if (planes[i][0] * maxX + planes[i][1] * minY + planes[i][2] * minZ + planes[i][3] < 0) outCount++;
-            if (planes[i][0] * minX + planes[i][1] * maxY + planes[i][2] * minZ + planes[i][3] < 0) outCount++;
-            if (planes[i][0] * maxX + planes[i][1] * maxY + planes[i][2] * minZ + planes[i][3] < 0) outCount++;
-            if (planes[i][0] * minX + planes[i][1] * minY + planes[i][2] * maxZ + planes[i][3] < 0) outCount++;
-            if (planes[i][0] * maxX + planes[i][1] * minY + planes[i][2] * maxZ + planes[i][3] < 0) outCount++;
-            if (planes[i][0] * minX + planes[i][1] * maxY + planes[i][2] * maxZ + planes[i][3] < 0) outCount++;
-            if (planes[i][0] * maxX + planes[i][1] * maxY + planes[i][2] * maxZ + planes[i][3] < 0) outCount++;
-            
-            // If all 8 corners are outside this plane, the box is completely outside
-            if (outCount == 8) {
+            // If the p-vertex is outside (behind) this plane, the box is completely outside
+            if (planes[i][0] * px + planes[i][1] * py + planes[i][2] * pz + planes[i][3] < 0) {
                 return false;
             }
         }
