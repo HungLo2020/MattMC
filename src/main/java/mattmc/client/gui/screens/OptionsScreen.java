@@ -40,7 +40,7 @@ public final class OptionsScreen implements Screen {
         titleCX = w / 2f;
         titleCY = h * 0.18f;
 
-        int totalButtonsH = 4 * buttonHeight + 3 * buttonGap;
+        int totalButtonsH = 5 * buttonHeight + 4 * buttonGap;
         buttonsStartY = (int)(h / 2f - totalButtonsH / 2f);
 
         int x = (w - buttonWidth) / 2;
@@ -50,7 +50,8 @@ public final class OptionsScreen implements Screen {
         buttons.add(new Button("Keybinds", x, buttonsStartY + 0 * (buttonHeight + buttonGap), buttonWidth, buttonHeight));
         buttons.add(new Button(getMenuBlurButtonLabel(), x, buttonsStartY + 1 * (buttonHeight + buttonGap), buttonWidth, buttonHeight));
         buttons.add(new Button(getTitleBlurButtonLabel(), x, buttonsStartY + 2 * (buttonHeight + buttonGap), buttonWidth, buttonHeight));
-        buttons.add(new Button("Back",     x, buttonsStartY + 3 * (buttonHeight + buttonGap), buttonWidth, buttonHeight));
+        buttons.add(new Button(getFpsCapButtonLabel(), x, buttonsStartY + 3 * (buttonHeight + buttonGap), buttonWidth, buttonHeight));
+        buttons.add(new Button("Back",     x, buttonsStartY + 4 * (buttonHeight + buttonGap), buttonWidth, buttonHeight));
     }
     
     private String getMenuBlurButtonLabel() {
@@ -59,6 +60,11 @@ public final class OptionsScreen implements Screen {
     
     private String getTitleBlurButtonLabel() {
         return "Title Blur: " + (mattmc.client.settings.OptionsManager.isTitleScreenBlurEnabled() ? "ON" : "OFF");
+    }
+    
+    private String getFpsCapButtonLabel() {
+        int fpsCap = mattmc.client.settings.OptionsManager.getFpsCap();
+        return "FPS Cap: " + fpsCap + " (-/+)";
     }
 
     @Override
@@ -108,6 +114,22 @@ public final class OptionsScreen implements Screen {
         }
         if (label.startsWith("Title Blur:")) {
             mattmc.client.settings.OptionsManager.toggleTitleScreenBlur();
+            recomputeLayout();
+            return;
+        }
+        if (label.startsWith("FPS Cap:")) {
+            // Cycle through common FPS values
+            int current = mattmc.client.settings.OptionsManager.getFpsCap();
+            int[] commonValues = {30, 60, 75, 120, 144, 165, 240, 360, 999};
+            int nextIndex = 0;
+            for (int i = 0; i < commonValues.length; i++) {
+                if (commonValues[i] > current) {
+                    nextIndex = i;
+                    break;
+                }
+            }
+            mattmc.client.settings.OptionsManager.setFpsCap(commonValues[nextIndex]);
+            game.window().applyFpsCapSetting();
             recomputeLayout();
             return;
         }

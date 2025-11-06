@@ -16,6 +16,9 @@ public class OptionsManager {
     private static boolean titleScreenBlurEnabled = false;  // Default: disabled for title screen
     private static boolean menuScreenBlurEnabled = true;    // Default: enabled for other screens
     
+    // FPS cap setting
+    private static int fpsCapValue = 60;  // Default: 60 FPS
+    
     /**
      * Load options from the Options.txt file.
      */
@@ -49,6 +52,14 @@ public class OptionsManager {
                         titleScreenBlurEnabled = Boolean.parseBoolean(value);
                     } else if (key.equals("blur_menu_screens")) {
                         menuScreenBlurEnabled = Boolean.parseBoolean(value);
+                    } else if (key.equals("fps_cap")) {
+                        try {
+                            int fps = Integer.parseInt(value);
+                            // Clamp to valid range: 30-999
+                            fpsCapValue = Math.max(30, Math.min(999, fps));
+                        } catch (NumberFormatException e) {
+                            System.err.println("Invalid FPS cap value: " + value);
+                        }
                     }
                 }
             }
@@ -88,6 +99,9 @@ public class OptionsManager {
             options.put("blur_title_screen", String.valueOf(titleScreenBlurEnabled));
             options.put("blur_menu_screens", String.valueOf(menuScreenBlurEnabled));
             
+            // Update FPS cap setting
+            options.put("fps_cap", String.valueOf(fpsCapValue));
+            
             // Write back to file
             Path parent = optionsPath.getParent();
             if (parent != null) {
@@ -103,6 +117,11 @@ public class OptionsManager {
                 writer.write("# Blur settings\n");
                 writer.write("blur_title_screen=" + titleScreenBlurEnabled + "\n");
                 writer.write("blur_menu_screens=" + menuScreenBlurEnabled + "\n");
+                writer.write("\n");
+                
+                // Write FPS cap setting
+                writer.write("# FPS cap (30-999)\n");
+                writer.write("fps_cap=" + fpsCapValue + "\n");
                 writer.write("\n");
                 
                 // Write keybinds section header
@@ -161,6 +180,17 @@ public class OptionsManager {
     
     public static void toggleMenuScreenBlur() {
         menuScreenBlurEnabled = !menuScreenBlurEnabled;
+        saveOptions();
+    }
+    
+    // FPS cap getters and setters
+    public static int getFpsCap() {
+        return fpsCapValue;
+    }
+    
+    public static void setFpsCap(int fps) {
+        // Clamp to valid range: 30-999
+        fpsCapValue = Math.max(30, Math.min(999, fps));
         saveOptions();
     }
 }

@@ -1,5 +1,6 @@
 package mattmc.client;
 
+import mattmc.client.settings.OptionsManager;
 import org.lwjgl.opengl.GL;
 import static org.lwjgl.glfw.GLFW.*;
 import static org.lwjgl.opengl.GL11.*;
@@ -27,7 +28,9 @@ public final class Window implements AutoCloseable {
 
         glfwMakeContextCurrent(handle);
         GL.createCapabilities();
-        glfwSwapInterval(1); // vsync
+        
+        // Configure swap interval based on FPS cap setting
+        applyFpsCapSetting();
 
         glDisable(GL_DEPTH_TEST);
         glEnable(GL_BLEND);
@@ -61,6 +64,18 @@ public final class Window implements AutoCloseable {
     }
 
     public void swap() { glfwSwapBuffers(handle); }
+    
+    /**
+     * Apply the FPS cap setting from OptionsManager.
+     * Call this when the FPS cap setting changes.
+     */
+    public void applyFpsCapSetting() {
+        int fpsCap = OptionsManager.getFpsCap();
+        
+        // For very high FPS caps (>=240), disable VSync to avoid monitor refresh rate limitation
+        // For lower FPS caps, also disable VSync as we'll handle timing manually in the game loop
+        glfwSwapInterval(0); // Disable VSync for manual FPS control
+    }
 
     @Override public void close() {
         glfwDestroyWindow(handle);

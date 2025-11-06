@@ -1,5 +1,6 @@
 package mattmc.client;
 
+import mattmc.client.settings.OptionsManager;
 import mattmc.client.renderer.CubeMap;
 import mattmc.client.renderer.PanoramaRenderer;
 import mattmc.client.gui.screens.Screen;
@@ -30,6 +31,7 @@ public final class Minecraft {
     public void run() {
         final double tick = 1.0 / 60.0;
         double prev = now(), acc = 0.0;
+        double lastFrameTime = prev;
 
         while (running && !window.shouldClose()) {
             double curr = now();
@@ -40,8 +42,25 @@ public final class Minecraft {
                 if (current != null) current.tick();
                 acc -= tick;
             }
-            if (current != null) current.render(acc / tick);
-            window.swap();
+            
+            // Apply FPS cap
+            int fpsCap = OptionsManager.getFpsCap();
+            double targetFrameTime = 1.0 / fpsCap;
+            double timeSinceLastFrame = curr - lastFrameTime;
+            
+            // Only render if enough time has passed for target FPS
+            if (timeSinceLastFrame >= targetFrameTime) {
+                if (current != null) current.render(acc / tick);
+                window.swap();
+                lastFrameTime = curr;
+            } else {
+                // Sleep briefly to avoid busy-waiting and reduce CPU usage
+                try {
+                    Thread.sleep(1);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                }
+            }
         }
     }
 
