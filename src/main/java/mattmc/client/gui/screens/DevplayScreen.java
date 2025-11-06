@@ -374,9 +374,11 @@ public final class DevplayScreen implements Screen {
             int loadedChunks = world.getLoadedChunkCount();
             int pendingChunks = world.getAsyncLoader().getPendingTaskCount();
             int activeWorkers = world.getAsyncLoader().getActiveTaskCount();
+            int renderedChunks = worldRenderer.getRenderedChunkCount();
+            int culledChunks = worldRenderer.getCulledChunkCount();
             // Use interpolated position for smooth debug display
             uiRenderer.drawDebugInfo(w, h, player.getX(alphaF), player.getY(alphaF), player.getZ(alphaF), fps,
-                                     loadedChunks, pendingChunks, activeWorkers);
+                                     loadedChunks, pendingChunks, activeWorkers, renderedChunks, culledChunks);
         }
         
         // Draw command overlay if visible

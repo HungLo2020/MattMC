@@ -16,14 +16,22 @@ import static org.lwjgl.opengl.GL11.*;
  * Similar to RegionRenderer but works with the Level system.
  * 
  * Now handles async mesh uploads from background threads and texture atlas.
+ * Implements frustum culling to skip rendering chunks outside the camera view.
  */
 public class LevelRenderer {
     private final ChunkRenderer chunkRenderer;
+    private final Frustum frustum;
     private Level currentLevel;
     private boolean textureAtlasInitialized = false;
     
+    // Statistics for debugging
+    private int totalChunks = 0;
+    private int renderedChunks = 0;
+    private int culledChunks = 0;
+    
     public LevelRenderer() {
         this.chunkRenderer = new ChunkRenderer();
+        this.frustum = new Frustum();
     }
     
     /**
@@ -51,8 +59,17 @@ public class LevelRenderer {
     /**
      * Render all loaded chunks in the world.
      * Also processes pending mesh uploads from background threads and handles dirty chunks.
+     * Uses frustum culling to skip chunks outside the camera view.
      */
     public void render(Level world, float playerX, float playerY, float playerZ) {
+        // Update frustum from current GL matrices (must be called after camera setup)
+        frustum.update();
+        
+        // Reset statistics
+        totalChunks = 0;
+        renderedChunks = 0;
+        culledChunks = 0;
+        
         // First, register all loaded chunks with the renderer so uploads can find them
         for (LevelChunk chunk : world.getLoadedChunks()) {
             chunkRenderer.registerChunk(chunk);
@@ -73,8 +90,20 @@ public class LevelRenderer {
         
         glPushMatrix();
         
-        // Render each loaded chunk
+        // Render each loaded chunk with frustum culling
         for (LevelChunk chunk : world.getLoadedChunks()) {
+            totalChunks++;
+            
+            // Frustum culling: skip chunks outside the camera view
+            if (!frustum.isChunkVisible(chunk.chunkX(), chunk.chunkZ(), 
+                                       LevelChunk.WIDTH, LevelChunk.DEPTH, 
+                                       LevelChunk.MIN_Y, LevelChunk.MAX_Y)) {
+                culledChunks++;
+                continue;
+            }
+            
+            renderedChunks++;
+            
             // Calculate chunk world position
             int chunkWorldX = chunk.chunkX() * LevelChunk.WIDTH;
             int chunkWorldZ = chunk.chunkZ() * LevelChunk.DEPTH;
@@ -86,5 +115,26 @@ public class LevelRenderer {
         }
         
         glPopMatrix();
+    }
+    
+    /**
+     * Get the number of chunks that were rendered in the last frame.
+     */
+    public int getRenderedChunkCount() {
+        return renderedChunks;
+    }
+    
+    /**
+     * Get the number of chunks that were culled (not rendered) in the last frame.
+     */
+    public int getCulledChunkCount() {
+        return culledChunks;
+    }
+    
+    /**
+     * Get the total number of loaded chunks in the last frame.
+     */
+    public int getTotalChunkCount() {
+        return totalChunks;
     }
 }
