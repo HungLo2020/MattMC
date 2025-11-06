@@ -128,6 +128,7 @@ public class Frustum {
     
     /**
      * Test if an axis-aligned bounding box is inside or intersecting the frustum.
+     * Uses conservative culling - expands the test slightly to avoid false culling.
      * 
      * @param minX Minimum X coordinate of the box
      * @param minY Minimum Y coordinate of the box
@@ -138,15 +139,32 @@ public class Frustum {
      * @return true if the box is visible (inside or intersecting frustum), false if completely outside
      */
     public boolean isBoxVisible(float minX, float minY, float minZ, float maxX, float maxY, float maxZ) {
+        // Add small margin to prevent false culling at frustum edges
+        float margin = 2.0f;
+        minX -= margin;
+        minY -= margin;
+        minZ -= margin;
+        maxX += margin;
+        maxY += margin;
+        maxZ += margin;
+        
         // Test all six planes
         for (int i = 0; i < 6; i++) {
-            // Get the "positive vertex" (vertex furthest along plane normal)
-            float px = planes[i][0] > 0 ? maxX : minX;
-            float py = planes[i][1] > 0 ? maxY : minY;
-            float pz = planes[i][2] > 0 ? maxZ : minZ;
+            // Check all 8 corners of the box - if all are outside one plane, box is culled
+            int outCount = 0;
             
-            // If positive vertex is outside, the entire box is outside
-            if (planes[i][0] * px + planes[i][1] * py + planes[i][2] * pz + planes[i][3] < 0) {
+            // Test all 8 corners
+            if (planes[i][0] * minX + planes[i][1] * minY + planes[i][2] * minZ + planes[i][3] < 0) outCount++;
+            if (planes[i][0] * maxX + planes[i][1] * minY + planes[i][2] * minZ + planes[i][3] < 0) outCount++;
+            if (planes[i][0] * minX + planes[i][1] * maxY + planes[i][2] * minZ + planes[i][3] < 0) outCount++;
+            if (planes[i][0] * maxX + planes[i][1] * maxY + planes[i][2] * minZ + planes[i][3] < 0) outCount++;
+            if (planes[i][0] * minX + planes[i][1] * minY + planes[i][2] * maxZ + planes[i][3] < 0) outCount++;
+            if (planes[i][0] * maxX + planes[i][1] * minY + planes[i][2] * maxZ + planes[i][3] < 0) outCount++;
+            if (planes[i][0] * minX + planes[i][1] * maxY + planes[i][2] * maxZ + planes[i][3] < 0) outCount++;
+            if (planes[i][0] * maxX + planes[i][1] * maxY + planes[i][2] * maxZ + planes[i][3] < 0) outCount++;
+            
+            // If all 8 corners are outside this plane, the box is completely outside
+            if (outCount == 8) {
                 return false;
             }
         }
