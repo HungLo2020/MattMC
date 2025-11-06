@@ -12,6 +12,9 @@ fps_cap=60
 # Supported resolutions: 1280x720, 1600x900, 1920x1080
 resolution=1280x720
 
+# Fullscreen mode
+fullscreen=false
+
 # Keybinds (format: action=key_name)
 # Keyboard keys: a-z, 0-9, space, left_shift, left_ctrl, left_alt, etc.
 # Mouse buttons: left_mouse, right_mouse, middle_mouse

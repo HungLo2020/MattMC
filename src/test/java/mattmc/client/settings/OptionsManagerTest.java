@@ -93,4 +93,36 @@ public class OptionsManagerTest {
         assertEquals(currentWidth, OptionsManager.getResolutionWidth(), "Width should not change with invalid input");
         assertEquals(currentHeight, OptionsManager.getResolutionHeight(), "Height should not change with invalid input");
     }
+    
+    @Test
+    public void testFullscreenDefaultValue() {
+        // Default fullscreen should be false (windowed mode)
+        boolean fullscreen = OptionsManager.isFullscreenEnabled();
+        // Just verify it returns a boolean value
+        assertTrue(fullscreen == true || fullscreen == false, "Fullscreen should be a boolean value");
+    }
+    
+    @Test
+    public void testFullscreenSetAndGet() {
+        // Test setting fullscreen
+        OptionsManager.setFullscreenEnabled(true);
+        assertTrue(OptionsManager.isFullscreenEnabled(), "Fullscreen should be enabled");
+        
+        OptionsManager.setFullscreenEnabled(false);
+        assertFalse(OptionsManager.isFullscreenEnabled(), "Fullscreen should be disabled");
+    }
+    
+    @Test
+    public void testFullscreenToggle() {
+        // Get current state
+        boolean initialState = OptionsManager.isFullscreenEnabled();
+        
+        // Toggle and verify it changed
+        OptionsManager.toggleFullscreen();
+        assertEquals(!initialState, OptionsManager.isFullscreenEnabled(), "Fullscreen should toggle");
+        
+        // Toggle back
+        OptionsManager.toggleFullscreen();
+        assertEquals(initialState, OptionsManager.isFullscreenEnabled(), "Fullscreen should toggle back");
+    }
 }

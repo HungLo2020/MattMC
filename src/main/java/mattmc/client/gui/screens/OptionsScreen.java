@@ -40,7 +40,7 @@ public final class OptionsScreen implements Screen {
         titleCX = w / 2f;
         titleCY = h * 0.18f;
 
-        int totalButtonsH = 6 * buttonHeight + 5 * buttonGap;
+        int totalButtonsH = 7 * buttonHeight + 6 * buttonGap;
         buttonsStartY = (int)(h / 2f - totalButtonsH / 2f);
 
         int x = (w - buttonWidth) / 2;
@@ -49,10 +49,11 @@ public final class OptionsScreen implements Screen {
         // Centered buttons
         buttons.add(new Button("Keybinds", x, buttonsStartY + 0 * (buttonHeight + buttonGap), buttonWidth, buttonHeight));
         buttons.add(new Button(getResolutionButtonLabel(), x, buttonsStartY + 1 * (buttonHeight + buttonGap), buttonWidth, buttonHeight));
-        buttons.add(new Button(getMenuBlurButtonLabel(), x, buttonsStartY + 2 * (buttonHeight + buttonGap), buttonWidth, buttonHeight));
-        buttons.add(new Button(getTitleBlurButtonLabel(), x, buttonsStartY + 3 * (buttonHeight + buttonGap), buttonWidth, buttonHeight));
-        buttons.add(new Button(getFpsCapButtonLabel(), x, buttonsStartY + 4 * (buttonHeight + buttonGap), buttonWidth, buttonHeight));
-        buttons.add(new Button("Back",     x, buttonsStartY + 5 * (buttonHeight + buttonGap), buttonWidth, buttonHeight));
+        buttons.add(new Button(getFullscreenButtonLabel(), x, buttonsStartY + 2 * (buttonHeight + buttonGap), buttonWidth, buttonHeight));
+        buttons.add(new Button(getMenuBlurButtonLabel(), x, buttonsStartY + 3 * (buttonHeight + buttonGap), buttonWidth, buttonHeight));
+        buttons.add(new Button(getTitleBlurButtonLabel(), x, buttonsStartY + 4 * (buttonHeight + buttonGap), buttonWidth, buttonHeight));
+        buttons.add(new Button(getFpsCapButtonLabel(), x, buttonsStartY + 5 * (buttonHeight + buttonGap), buttonWidth, buttonHeight));
+        buttons.add(new Button("Back",     x, buttonsStartY + 6 * (buttonHeight + buttonGap), buttonWidth, buttonHeight));
     }
     
     private String getMenuBlurButtonLabel() {
@@ -62,6 +63,10 @@ public final class OptionsScreen implements Screen {
     private String getResolutionButtonLabel() {
         String currentRes = mattmc.client.settings.OptionsManager.getResolutionString();
         return "Resolution: " + currentRes;
+    }
+    
+    private String getFullscreenButtonLabel() {
+        return "Fullscreen: " + (mattmc.client.settings.OptionsManager.isFullscreenEnabled() ? "ON" : "OFF");
     }
     
     private String getTitleBlurButtonLabel() {
@@ -137,6 +142,12 @@ public final class OptionsScreen implements Screen {
             // Update settings and apply new resolution
             mattmc.client.settings.OptionsManager.setResolution(newWidth, newHeight);
             window.setSize(newWidth, newHeight);
+            recomputeLayout();
+            return;
+        }
+        if (label.startsWith("Fullscreen:")) {
+            mattmc.client.settings.OptionsManager.toggleFullscreen();
+            window.setFullscreen(mattmc.client.settings.OptionsManager.isFullscreenEnabled());
             recomputeLayout();
             return;
         }
