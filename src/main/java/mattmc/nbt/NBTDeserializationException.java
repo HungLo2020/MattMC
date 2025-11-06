@@ -61,6 +61,7 @@ public class NBTDeserializationException extends IOException {
         return switch (type) {
             case 0 -> "TAG_END";
             case 1 -> "TAG_BYTE";
+            case 2 -> "TAG_SHORT";
             case 3 -> "TAG_INT";
             case 4 -> "TAG_LONG";
             case 5 -> "TAG_FLOAT";
@@ -69,6 +70,7 @@ public class NBTDeserializationException extends IOException {
             case 8 -> "TAG_STRING";
             case 9 -> "TAG_LIST";
             case 10 -> "TAG_COMPOUND";
+            case 11 -> "TAG_INT_ARRAY";
             case 12 -> "TAG_LONG_ARRAY";
             default -> "UNKNOWN";
         };

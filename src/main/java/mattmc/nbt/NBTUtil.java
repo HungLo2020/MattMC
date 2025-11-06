@@ -15,6 +15,7 @@ public class NBTUtil {
     // Tag types
     private static final byte TAG_END = 0;
     private static final byte TAG_BYTE = 1;
+    private static final byte TAG_SHORT = 2;
     private static final byte TAG_INT = 3;
     private static final byte TAG_LONG = 4;
     private static final byte TAG_FLOAT = 5;
@@ -23,7 +24,13 @@ public class NBTUtil {
     private static final byte TAG_STRING = 8;
     private static final byte TAG_LIST = 9;
     private static final byte TAG_COMPOUND = 10;
+    private static final byte TAG_INT_ARRAY = 11;
     private static final byte TAG_LONG_ARRAY = 12;
+    
+    // Maximum sizes for deserialization to prevent DoS attacks
+    private static final int MAX_BYTE_ARRAY_SIZE = 16777216;  // 16MB
+    private static final int MAX_LONG_ARRAY_SIZE = 2097152;   // 2M longs (16MB)
+    private static final int MAX_LIST_SIZE = 1048576;         // 1M elements
     
     /**
      * Write a compound tag to a stream (compressed with gzip).
@@ -244,6 +251,7 @@ public class NBTUtil {
         return switch (type) {
             case TAG_END -> "END";
             case TAG_BYTE -> "BYTE";
+            case TAG_SHORT -> "SHORT";
             case TAG_INT -> "INT";
             case TAG_LONG -> "LONG";
             case TAG_FLOAT -> "FLOAT";
@@ -252,6 +260,7 @@ public class NBTUtil {
             case TAG_STRING -> "STRING";
             case TAG_LIST -> "LIST";
             case TAG_COMPOUND -> "COMPOUND";
+            case TAG_INT_ARRAY -> "INT_ARRAY";
             case TAG_LONG_ARRAY -> "LONG_ARRAY";
             default -> "UNKNOWN";
         };
@@ -307,7 +316,7 @@ public class NBTUtil {
                 case TAG_STRING -> dis.readUTF();
                 case TAG_BYTE_ARRAY -> {
                     int length = dis.readInt();
-                    if (length < 0 || length > 16777216) { // 16MB max for safety
+                    if (length < 0 || length > MAX_BYTE_ARRAY_SIZE) {
                         throw new NBTDeserializationException("Invalid byte array length: " + length, tagName, type, position);
                     }
                     byte[] array = new byte[length];
@@ -316,7 +325,7 @@ public class NBTUtil {
                 }
                 case TAG_LONG_ARRAY -> {
                     int length = dis.readInt();
-                    if (length < 0 || length > 2097152) { // 2M longs max (16MB) for safety
+                    if (length < 0 || length > MAX_LONG_ARRAY_SIZE) {
                         throw new NBTDeserializationException("Invalid long array length: " + length, tagName, type, position);
                     }
                     long[] array = new long[length];
@@ -341,7 +350,7 @@ public class NBTUtil {
             byte listType = dis.readByte();
             int length = dis.readInt();
             
-            if (length < 0 || length > 1048576) { // 1M elements max for safety
+            if (length < 0 || length > MAX_LIST_SIZE) {
                 throw new NBTDeserializationException("Invalid list length: " + length, tagName, TAG_LIST, position);
             }
             
