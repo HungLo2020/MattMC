@@ -7,6 +7,8 @@ import mattmc.world.level.chunk.LevelChunk;
 import mattmc.world.level.chunk.RegionFile;
 
 import mattmc.util.AppPaths;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.*;
 import java.nio.file.*;
@@ -18,6 +20,7 @@ import java.util.stream.Collectors;
  * Uses region files (.mca) in Anvil format and level.dat with NBT.
  */
 public final class LevelStorageSource {
+    private static final Logger logger = LoggerFactory.getLogger(LevelStorageSource.class);
     
     /**
      * Get the saves directory where all worlds are stored.
@@ -37,9 +40,9 @@ public final class LevelStorageSource {
     public static List<String> listWorlds() {
         try {
             Path savesDir = getSavesDirectory();
-            System.out.println("[DEBUG] Listing worlds from: " + savesDir.toAbsolutePath());
+            logger.debug("Listing worlds from: {}", savesDir.toAbsolutePath());
             if (!Files.exists(savesDir)) {
-                System.out.println("[DEBUG] Saves directory does not exist yet");
+                logger.debug("Saves directory does not exist yet");
                 return new ArrayList<>();
             }
             
@@ -51,7 +54,7 @@ public final class LevelStorageSource {
                         .collect(Collectors.toList());
             }
         } catch (IOException e) {
-            System.err.println("Failed to list worlds: " + e.getMessage());
+            logger.error("Failed to list worlds: {}", e.getMessage(), e);
             return new ArrayList<>();
         }
     }
@@ -90,7 +93,7 @@ public final class LevelStorageSource {
     public static void saveWorld(Level world, String worldName, float playerX, float playerY, float playerZ, float playerYaw, float playerPitch) throws IOException {
         Path savesDir = getSavesDirectory();
         Path worldDir = savesDir.resolve(worldName);
-        System.out.println("[DEBUG] Saving world to: " + worldDir.toAbsolutePath());
+        logger.debug("Saving world to: {}", worldDir.toAbsolutePath());
         Files.createDirectories(worldDir);
         
         // Set world directory so chunks can be saved during unload
@@ -120,7 +123,7 @@ public final class LevelStorageSource {
             try {
                 Files.copy(levelDatFile, backupFile, StandardCopyOption.REPLACE_EXISTING);
             } catch (IOException e) {
-                System.err.println("Failed to create level.dat backup: " + e.getMessage());
+                logger.error("Failed to create level.dat backup: {}", e.getMessage(), e);
             }
         }
         
@@ -155,7 +158,7 @@ public final class LevelStorageSource {
             }
         }
         
-        System.out.println("Level saved: " + worldName + " (" + world.getLoadedChunkCount() + " chunks in region files)");
+        logger.info("Level saved: {} ({} chunks in region files)", worldName, world.getLoadedChunkCount());
     }
     
     /**
@@ -176,7 +179,7 @@ public final class LevelStorageSource {
         try {
             levelData = LevelData.load(levelDatFile);
         } catch (IOException e) {
-            System.err.println("Failed to load level.dat, trying backup: " + e.getMessage());
+            logger.warn("Failed to load level.dat, trying backup: {}", e.getMessage());
             Path backupFile = worldDir.resolve("level.dat_old");
             if (Files.exists(backupFile)) {
                 levelData = LevelData.load(backupFile);
@@ -206,13 +209,13 @@ public final class LevelStorageSource {
                     try {
                         loadRegion(world, regionFilePath);
                     } catch (IOException e) {
-                        System.err.println("Failed to load region: " + regionFilePath + " - " + e.getMessage());
+                        logger.error("Failed to load region: {} - {}", regionFilePath, e.getMessage(), e);
                     }
                 }
             }
         }
         
-        System.out.println("Level loaded: " + worldName + " (" + world.getLoadedChunkCount() + " chunks)");
+        logger.info("Level loaded: {} ({} chunks)", worldName, world.getLoadedChunkCount());
         
         // Convert LevelData to WorldMetadata for compatibility
         WorldMetadata metadata = new WorldMetadata();
@@ -235,7 +238,7 @@ public final class LevelStorageSource {
         String fileName = regionFilePath.getFileName().toString();
         String[] parts = fileName.replace("r.", "").replace(".mca", "").split("\\.");
         if (parts.length != 2) {
-            System.err.println("Invalid region filename: " + fileName);
+            logger.error("Invalid region filename: {}", fileName);
             return;
         }
         
@@ -267,7 +270,7 @@ public final class LevelStorageSource {
                                 }
                             }
                         } catch (Exception e) {
-                            System.err.println("Failed to load chunk (" + chunkX + ", " + chunkZ + "): " + e.getMessage());
+                            logger.error("Failed to load chunk ({}, {}): {}", chunkX, chunkZ, e.getMessage(), e);
                         }
                     }
                 }
@@ -282,7 +285,7 @@ public final class LevelStorageSource {
         Path worldDir = getSavesDirectory().resolve(worldName);
         if (Files.exists(worldDir)) {
             deleteDirectory(worldDir);
-            System.out.println("Level deleted: " + worldName);
+            logger.info("Level deleted: {}", worldName);
         }
     }
     
@@ -300,7 +303,7 @@ public final class LevelStorageSource {
                 Files.delete(path);
             } catch (IOException e) {
                 errors.add(e);
-                System.err.println("Failed to delete: " + path);
+                logger.error("Failed to delete: {}", path, e);
             }
         }
         

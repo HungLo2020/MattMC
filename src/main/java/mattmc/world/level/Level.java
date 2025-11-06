@@ -13,6 +13,8 @@ import mattmc.world.level.chunk.AsyncChunkLoader;
 import mattmc.world.level.chunk.AsyncChunkSaver;
 import mattmc.world.level.chunk.ChunkUtils;
 import mattmc.world.level.levelgen.WorldGenerator;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.nio.file.Path;
@@ -29,6 +31,8 @@ import java.util.List;
  * Uses region file caching for better I/O performance.
  */
 public class Level implements LevelAccessor {
+    private static final Logger logger = LoggerFactory.getLogger(Level.class);
+    
     // Store chunks by their position (chunkX, chunkZ)
     private final Map<Long, LevelChunk> loadedChunks = new HashMap<>();
     
@@ -116,7 +120,7 @@ public class Level implements LevelAccessor {
                 // Pass region cache to async loader for efficient loading
                 asyncLoader.setRegionCache(regionCache);
             } catch (IOException e) {
-                System.err.println("Failed to initialize region cache: " + e.getMessage());
+                logger.error("Failed to initialize region cache: {}", e.getMessage(), e);
             }
         }
     }
@@ -202,7 +206,7 @@ public class Level implements LevelAccessor {
                 }
             }
         } catch (IOException e) {
-            System.err.println("Failed to load chunk (" + chunkX + ", " + chunkZ + ") from disk: " + e.getMessage());
+            logger.error("Failed to load chunk ({}, {}) from disk: {}", chunkX, chunkZ, e.getMessage(), e);
         }
         
         return null;
@@ -406,7 +410,7 @@ public class Level implements LevelAccessor {
             try {
                 regionCache.close();
             } catch (IOException e) {
-                System.err.println("Error closing region cache: " + e.getMessage());
+                logger.error("Error closing region cache: {}", e.getMessage(), e);
             }
         }
         

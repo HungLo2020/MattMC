@@ -1,5 +1,8 @@
 package mattmc.world.level.chunk;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.io.IOException;
 import java.util.Map;
 import java.util.concurrent.*;
@@ -11,6 +14,8 @@ import java.util.concurrent.atomic.AtomicInteger;
  * and processing them on a background thread.
  */
 public class AsyncChunkSaver {
+    private static final Logger logger = LoggerFactory.getLogger(AsyncChunkSaver.class);
+    
     private final ExecutorService executor;
     private final BlockingQueue<ChunkSaveTask> saveQueue;
     private final RegionFileCache regionCache;
@@ -85,7 +90,7 @@ public class AsyncChunkSaver {
             RegionFile regionFile = regionCache.getRegionFile(task.chunkX, task.chunkZ);
             regionFile.writeChunk(task.chunkX, task.chunkZ, task.chunkData);
         } catch (IOException e) {
-            System.err.println("Failed to save chunk (" + task.chunkX + ", " + task.chunkZ + "): " + e.getMessage());
+            logger.error("Failed to save chunk ({}, {}): {}", task.chunkX, task.chunkZ, e.getMessage(), e);
         }
     }
     
@@ -110,7 +115,7 @@ public class AsyncChunkSaver {
         try {
             regionCache.flush();
         } catch (IOException e) {
-            System.err.println("Error flushing region cache: " + e.getMessage());
+            logger.error("Error flushing region cache: {}", e.getMessage(), e);
         }
     }
     

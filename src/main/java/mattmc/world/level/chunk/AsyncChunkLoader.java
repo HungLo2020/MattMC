@@ -8,6 +8,8 @@ import mattmc.client.renderer.block.BlockFaceCollector;
 import mattmc.world.level.block.Block;
 import mattmc.world.level.block.Blocks;
 import mattmc.world.level.levelgen.WorldGenerator;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.nio.file.Path;
@@ -24,6 +26,8 @@ import java.util.concurrent.*;
  * - Queue results for GPU upload on the render thread
  */
 public class AsyncChunkLoader {
+    private static final Logger logger = LoggerFactory.getLogger(AsyncChunkLoader.class);
+    
     private final ChunkTaskExecutor executor;
     private final PriorityBlockingQueue<ChunkLoadTask> pendingTasks;
     private final Set<Long> tasksInProgress;
@@ -157,7 +161,7 @@ public class AsyncChunkLoader {
                     LevelChunk chunk = future.get();
                     completed.add(chunk);
                     
-                    System.out.println("Chunk loaded/generated: (" + chunk.chunkX() + ", " + chunk.chunkZ() + "), starting mesh building...");
+                    logger.debug("Chunk loaded/generated: ({}, {}), starting mesh building...", chunk.chunkX(), chunk.chunkZ());
                     
                     // Start mesh building for this chunk (both old and new formats)
                     Future<ChunkMeshData> meshFuture = executor.submit(() -> buildChunkMesh(chunk));
@@ -166,10 +170,10 @@ public class AsyncChunkLoader {
                     // Also build VBO mesh buffer
                     Future<ChunkMeshBuffer> meshBufferFuture = executor.submit(() -> buildChunkMeshBuffer(chunk));
                     meshBufferFutures.put(key, meshBufferFuture);
-                    System.out.println("Submitted mesh buffer build task for chunk (" + chunk.chunkX() + ", " + chunk.chunkZ() + ")");
+                    logger.debug("Submitted mesh buffer build task for chunk ({}, {})", chunk.chunkX(), chunk.chunkZ());
                     
                 } catch (InterruptedException | ExecutionException e) {
-                    System.err.println("Failed to load chunk: " + e.getMessage());
+                    logger.error("Failed to load chunk: {}", e.getMessage(), e);
                 }
                 
                 iterator.remove();
@@ -199,7 +203,7 @@ public class AsyncChunkLoader {
                     ChunkMeshData meshData = future.get();
                     completedMeshes.offer(meshData);
                 } catch (InterruptedException | ExecutionException e) {
-                    System.err.println("Failed to build mesh: " + e.getMessage());
+                    logger.error("Failed to build mesh: {}", e.getMessage(), e);
                 }
                 iterator.remove();
             }
@@ -250,7 +254,7 @@ public class AsyncChunkLoader {
                     }
                 }
             } catch (IOException e) {
-                System.err.println("Failed to load chunk (" + chunkX + ", " + chunkZ + ") from cache: " + e.getMessage());
+                logger.error("Failed to load chunk ({}, {}) from cache: {}", chunkX, chunkZ, e.getMessage(), e);
             }
             return null;
         }
@@ -287,7 +291,7 @@ public class AsyncChunkLoader {
                 }
             }
         } catch (IOException e) {
-            System.err.println("Failed to load chunk (" + chunkX + ", " + chunkZ + ") from disk: " + e.getMessage());
+            logger.error("Failed to load chunk ({}, {}) from disk: {}", chunkX, chunkZ, e.getMessage(), e);
         }
         
         return null;
@@ -325,6 +329,13 @@ public class AsyncChunkLoader {
      * Runs on background thread.
      */
     private ChunkMeshBuffer buildChunkMeshBuffer(LevelChunk chunk) {
+        // Null safety check for textureAtlas
+        if (textureAtlas == null) {
+            logger.warn("Cannot build mesh buffer: texture atlas not initialized for chunk ({}, {})", chunk.chunkX(), chunk.chunkZ());
+            // Return an empty mesh buffer to gracefully handle the case
+            return new ChunkMeshBuffer(chunk.chunkX(), chunk.chunkZ(), new float[0], new int[0]);
+        }
+        
         BlockFaceCollector collector = collectChunkFaces(chunk);
         MeshBuilder meshBuilder = new MeshBuilder(textureAtlas);
         return meshBuilder.build(chunk.chunkX(), chunk.chunkZ(), collector);
@@ -372,7 +383,7 @@ public class AsyncChunkLoader {
      */
     public void requestChunkMeshRebuild(LevelChunk chunk) {
         if (textureAtlas == null) {
-            System.err.println("Cannot rebuild mesh: texture atlas not set");
+            logger.warn("Cannot rebuild mesh: texture atlas not set for chunk ({}, {})", chunk.chunkX(), chunk.chunkZ());
             return;
         }
         
@@ -387,7 +398,7 @@ public class AsyncChunkLoader {
         // Submit new mesh build task
         Future<ChunkMeshBuffer> meshBufferFuture = executor.submit(() -> buildChunkMeshBuffer(chunk));
         meshBufferFutures.put(key, meshBufferFuture);
-        System.out.println("Requested mesh rebuild for chunk (" + chunk.chunkX() + ", " + chunk.chunkZ() + ")");
+        logger.debug("Requested mesh rebuild for chunk ({}, {})", chunk.chunkX(), chunk.chunkZ());
     }
     
     public void shutdown() {
@@ -420,17 +431,16 @@ public class AsyncChunkLoader {
                     ChunkMeshBuffer meshBuffer = future.get();
                     completedMeshBuffers.offer(meshBuffer);
                     completed++;
-                    System.out.println("Mesh buffer completed for chunk, queued for upload. Queue size: " + completedMeshBuffers.size());
+                    logger.debug("Mesh buffer completed for chunk, queued for upload. Queue size: {}", completedMeshBuffers.size());
                 } catch (InterruptedException | ExecutionException e) {
-                    System.err.println("Failed to build mesh buffer: " + e.getMessage());
-                    e.printStackTrace();
+                    logger.error("Failed to build mesh buffer: {}", e.getMessage(), e);
                 }
                 iterator.remove();
             }
         }
         
         if (completed > 0) {
-            System.out.println("Collected " + completed + " completed mesh buffers this frame");
+            logger.debug("Collected {} completed mesh buffers this frame", completed);
         }
         
         // Return up to budget limit for this frame

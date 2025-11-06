@@ -20,12 +20,16 @@ import static org.lwjgl.glfw.GLFW.*;
 import static org.lwjgl.opengl.GL11.*;
 import static org.lwjgl.opengl.GL30.*;
 import static org.lwjgl.system.MemoryStack.stackPush;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Pause menu overlay shown when player presses ESC in-game.
  * Similar to Minecraft's pause screen.
  */
 public final class PauseScreen implements Screen {
+    private static final Logger logger = LoggerFactory.getLogger(PauseScreen.class);
+
     private final Minecraft game;
     private final Window window;
     private final DevplayScreen gameScreen;
@@ -130,7 +134,7 @@ public final class PauseScreen implements Screen {
         }
         if ("Options".equals(label)) {
             // TODO: Show options screen
-            System.out.println("Options not yet implemented in pause menu");
+            logger.info("Options not yet implemented in pause menu");
             return;
         }
     }
@@ -144,7 +148,7 @@ public final class PauseScreen implements Screen {
             glfwSetInputMode(window.handle(), GLFW_CURSOR, GLFW_CURSOR_NORMAL);
             game.setScreen(new TitleScreen(game));
         } catch (Exception e) {
-            System.err.println("Failed to save world: " + e.getMessage());
+            logger.error("Failed to save world: {}", e.getMessage());
             e.printStackTrace();
             // Still exit even if save failed
             glfwSetInputMode(window.handle(), GLFW_CURSOR, GLFW_CURSOR_NORMAL);

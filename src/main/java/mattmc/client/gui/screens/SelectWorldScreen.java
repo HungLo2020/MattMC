@@ -17,9 +17,13 @@ import java.util.List;
 import static org.lwjgl.glfw.GLFW.*;
 import static org.lwjgl.opengl.GL11.*;
 import static org.lwjgl.system.MemoryStack.stackPush;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /* Simple singleplayer menu with buttons to create/load worlds. */
 public final class SelectWorldScreen implements Screen {
+    private static final Logger logger = LoggerFactory.getLogger(SelectWorldScreen.class);
+
     private final Minecraft game;
     private final Window window;
     private final List<Button> buttons = new ArrayList<>();
@@ -137,7 +141,7 @@ public final class SelectWorldScreen implements Screen {
             return;
         }
         if ("Create New World".equals(label)) {
-            System.out.println("→ Create World clicked");
+            logger.info("→ Create World clicked");
             game.setScreen(new CreateWorldScreen(game));
             return;
         }
@@ -146,7 +150,7 @@ public final class SelectWorldScreen implements Screen {
             if (selectedWorldIndex >= 0 && selectedWorldIndex < worldList.size()) {
                 loadWorld(worldList.get(selectedWorldIndex));
             } else {
-                System.out.println("No world selected");
+                logger.info("No world selected");
             }
             return;
         }
@@ -156,7 +160,7 @@ public final class SelectWorldScreen implements Screen {
                 deleteConfirmMode = true;
                 recomputeLayout();
             } else {
-                System.out.println("No world selected");
+                logger.info("No world selected");
             }
             return;
         }
@@ -171,21 +175,21 @@ public final class SelectWorldScreen implements Screen {
     
     private void loadWorld(String worldName) {
         try {
-            System.out.println("→ Loading world: " + worldName);
+            logger.info("→ Loading world: {}", worldName);
             LevelStorageSource.WorldLoadResult result = LevelStorageSource.loadWorld(worldName);
             
             game.setScreen(new DevplayScreen(game, worldName, result.world,
                 result.metadata.playerX, result.metadata.playerY, result.metadata.playerZ,
                 result.metadata.playerYaw, result.metadata.playerPitch));
         } catch (Exception e) {
-            System.err.println("Failed to load world: " + e.getMessage());
+            logger.error("Failed to load world: {}", e.getMessage());
             e.printStackTrace();
         }
     }
     
     private void deleteWorld(String worldName) {
         try {
-            System.out.println("→ Deleting world: " + worldName);
+            logger.info("→ Deleting world: {}", worldName);
             LevelStorageSource.deleteWorld(worldName);
             
             // Reset selection, confirmation mode, and refresh the world list
@@ -193,7 +197,7 @@ public final class SelectWorldScreen implements Screen {
             deleteConfirmMode = false;
             recomputeLayout();
         } catch (Exception e) {
-            System.err.println("Failed to delete world: " + e.getMessage());
+            logger.error("Failed to delete world: {}", e.getMessage());
             e.printStackTrace();
         }
     }

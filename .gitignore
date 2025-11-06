@@ -47,3 +47,6 @@ bin/
 
 # Runtime generated files
 Options.txt
+
+# Log files
+logs/

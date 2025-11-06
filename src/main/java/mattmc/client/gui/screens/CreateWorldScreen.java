@@ -18,9 +18,13 @@ import java.util.List;
 import static org.lwjgl.glfw.GLFW.*;
 import static org.lwjgl.opengl.GL11.*;
 import static org.lwjgl.system.MemoryStack.stackPush;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /* Create Level screen - allows creating a new world. */
 public final class CreateWorldScreen implements Screen {
+    private static final Logger logger = LoggerFactory.getLogger(CreateWorldScreen.class);
+
     private final Minecraft game;
     private final Window window;
     private final List<Button> buttons = new ArrayList<>();
@@ -183,7 +187,7 @@ public final class CreateWorldScreen implements Screen {
         String seedText = seedField.getText().trim();
         long seed = parseSeed(seedText);
         
-        System.out.println("→ Creating world: " + worldName + " with seed: " + seed);
+        logger.info("→ Creating world: {} with seed: {}", worldName, seed);
         game.setScreen(new DevplayScreen(game, worldName, seed));
     }
     
