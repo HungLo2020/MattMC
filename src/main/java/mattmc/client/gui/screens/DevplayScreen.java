@@ -261,6 +261,9 @@ public final class DevplayScreen implements Screen {
 
     @Override
     public void tick() {
+        // Save previous position for interpolation before updating
+        player.updatePreviousPosition();
+        
         double now = now();
         double dt = now - lastFrameTimeSec;
         lastFrameTimeSec = now;
@@ -300,6 +303,9 @@ public final class DevplayScreen implements Screen {
             lastFpsUpdateTime = now;
         }
         
+        // Convert alpha to float for interpolation
+        float alphaF = (float) alpha;
+        
         int w = window.width(), h = window.height();
 
         // Clear color + depth (sky blue)
@@ -321,17 +327,19 @@ public final class DevplayScreen implements Screen {
         glLoadIdentity();
 
         // Apply camera transformations (pitch, yaw, then position)
+        // Use interpolated values for smooth rendering between ticks
         // Camera is at eye level (1.62 blocks above feet)
-        glRotatef(player.getPitch(), 1f, 0f, 0f);
-        glRotatef(player.getYaw(), 0f, 1f, 0f);
-        glTranslatef(-player.getX(), -player.getEyeY(), -player.getZ());
+        glRotatef(player.getPitch(alphaF), 1f, 0f, 0f);
+        glRotatef(player.getYaw(alphaF), 0f, 1f, 0f);
+        glTranslatef(-player.getX(alphaF), -player.getEyeY(alphaF), -player.getZ(alphaF));
 
         glEnable(GL_DEPTH_TEST);
         glEnable(GL_CULL_FACE);
         glCullFace(GL_BACK);
         
         // Render all loaded chunks in the infinite world
-        worldRenderer.render(world, player.getX(), player.getEyeY(), player.getZ());
+        // Use interpolated position for smooth rendering
+        worldRenderer.render(world, player.getX(alphaF), player.getEyeY(alphaF), player.getZ(alphaF));
         
         glDisable(GL_CULL_FACE);
         
@@ -345,7 +353,8 @@ public final class DevplayScreen implements Screen {
             int loadedChunks = world.getLoadedChunkCount();
             int pendingChunks = world.getAsyncLoader().getPendingTaskCount();
             int activeWorkers = world.getAsyncLoader().getActiveTaskCount();
-            uiRenderer.drawDebugInfo(w, h, player.getX(), player.getY(), player.getZ(), fps,
+            // Use interpolated position for smooth debug display
+            uiRenderer.drawDebugInfo(w, h, player.getX(alphaF), player.getY(alphaF), player.getZ(alphaF), fps,
                                      loadedChunks, pendingChunks, activeWorkers);
         }
         

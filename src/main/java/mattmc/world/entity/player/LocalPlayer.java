@@ -16,9 +16,18 @@ public class LocalPlayer {
     private float y;
     private float z;
     
+    // Previous position for interpolation
+    private float prevX;
+    private float prevY;
+    private float prevZ;
+    
     // Camera orientation
     private float yaw;   // Horizontal rotation (left/right)
     private float pitch; // Vertical rotation (up/down)
+    
+    // Previous orientation for interpolation
+    private float prevYaw;
+    private float prevPitch;
     
     // Movement speed
     private float moveSpeed = 4.317f; // Minecraft walking speed (blocks/second)
@@ -31,8 +40,25 @@ public class LocalPlayer {
         this.x = x;
         this.y = y;
         this.z = z;
+        this.prevX = x;
+        this.prevY = y;
+        this.prevZ = z;
         this.yaw = 0f;
         this.pitch = 0f;
+        this.prevYaw = 0f;
+        this.prevPitch = 0f;
+    }
+    
+    /**
+     * Call this at the start of each tick to save current position for interpolation.
+     * This allows smooth rendering between ticks.
+     */
+    public void updatePreviousPosition() {
+        prevX = x;
+        prevY = y;
+        prevZ = z;
+        prevYaw = yaw;
+        prevPitch = pitch;
     }
     
     /**
@@ -118,13 +144,65 @@ public class LocalPlayer {
     public float getZ() { return z; }
     
     /**
+     * Get interpolated X position for smooth rendering.
+     * @param alpha interpolation factor between ticks (0.0 to 1.0)
+     */
+    public float getX(float alpha) {
+        return prevX + (x - prevX) * alpha;
+    }
+    
+    /**
+     * Get interpolated Y position for smooth rendering.
+     * @param alpha interpolation factor between ticks (0.0 to 1.0)
+     */
+    public float getY(float alpha) {
+        return prevY + (y - prevY) * alpha;
+    }
+    
+    /**
+     * Get interpolated Z position for smooth rendering.
+     * @param alpha interpolation factor between ticks (0.0 to 1.0)
+     */
+    public float getZ(float alpha) {
+        return prevZ + (z - prevZ) * alpha;
+    }
+    
+    /**
      * Get the Y coordinate of the player's eyes (camera position).
      * In Minecraft, the camera is 1.62 blocks above the feet.
      */
     public float getEyeY() { return y + EYE_HEIGHT; }
     
+    /**
+     * Get interpolated eye Y position for smooth rendering.
+     * @param alpha interpolation factor between ticks (0.0 to 1.0)
+     */
+    public float getEyeY(float alpha) {
+        return getY(alpha) + EYE_HEIGHT;
+    }
+    
     public float getYaw() { return yaw; }
     public float getPitch() { return pitch; }
+    
+    /**
+     * Get interpolated yaw for smooth rendering.
+     * @param alpha interpolation factor between ticks (0.0 to 1.0)
+     */
+    public float getYaw(float alpha) {
+        // Handle wrapping around 360 degrees
+        float delta = yaw - prevYaw;
+        if (delta > 180f) delta -= 360f;
+        if (delta < -180f) delta += 360f;
+        return prevYaw + delta * alpha;
+    }
+    
+    /**
+     * Get interpolated pitch for smooth rendering.
+     * @param alpha interpolation factor between ticks (0.0 to 1.0)
+     */
+    public float getPitch(float alpha) {
+        return prevPitch + (pitch - prevPitch) * alpha;
+    }
     public float getMoveSpeed() { return moveSpeed; }
     public float getFlySpeed() { return flySpeed; }
     
