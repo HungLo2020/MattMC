@@ -10,15 +10,25 @@ public final class Minecraft {
     private Screen current;
     private boolean running = true;
     private PanoramaRenderer sharedPanorama;
+    private int cachedFpsCap;
 
     public Minecraft(Window window) { 
         this.window = window;
         // Load shared panorama once
         CubeMap sky = CubeMap.load("/assets/textures/gui/panorama1_", ".png");
         this.sharedPanorama = new PanoramaRenderer(sky);
+        // Cache the FPS cap
+        this.cachedFpsCap = OptionsManager.getFpsCap();
     }
     public Window window() { return window; }
     public PanoramaRenderer panorama() { return sharedPanorama; }
+    
+    /**
+     * Update the cached FPS cap. Call this when the FPS setting changes.
+     */
+    public void updateFpsCap() {
+        this.cachedFpsCap = OptionsManager.getFpsCap();
+    }
 
     public void setScreen(Screen next) {
         if (current != null) current.onClose();
@@ -43,9 +53,8 @@ public final class Minecraft {
                 acc -= tick;
             }
             
-            // Apply FPS cap
-            int fpsCap = OptionsManager.getFpsCap();
-            double targetFrameTime = 1.0 / fpsCap;
+            // Apply FPS cap using cached value
+            double targetFrameTime = 1.0 / cachedFpsCap;
             double timeSinceLastFrame = curr - lastFrameTime;
             
             // Only render if enough time has passed for target FPS
@@ -54,11 +63,18 @@ public final class Minecraft {
                 window.swap();
                 lastFrameTime = curr;
             } else {
-                // Sleep briefly to avoid busy-waiting and reduce CPU usage
-                try {
-                    Thread.sleep(1);
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
+                // Calculate precise sleep time to avoid busy-waiting
+                double remainingTime = targetFrameTime - timeSinceLastFrame;
+                if (remainingTime > 0.002) { // Only sleep if more than 2ms remaining
+                    try {
+                        // Sleep for most of the remaining time, leaving a small buffer
+                        long sleepMs = (long)((remainingTime - 0.001) * 1000);
+                        if (sleepMs > 0) {
+                            Thread.sleep(sleepMs);
+                        }
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                    }
                 }
             }
         }

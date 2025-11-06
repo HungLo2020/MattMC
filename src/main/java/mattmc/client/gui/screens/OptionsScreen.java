@@ -122,14 +122,23 @@ public final class OptionsScreen implements Screen {
             int current = mattmc.client.settings.OptionsManager.getFpsCap();
             int[] commonValues = {30, 60, 75, 120, 144, 165, 240, 360, 999};
             int nextIndex = 0;
+            
+            // Find the next value in the cycle
             for (int i = 0; i < commonValues.length; i++) {
                 if (commonValues[i] > current) {
                     nextIndex = i;
                     break;
                 }
             }
+            
+            // If we're at or past the last value, wrap to the first
+            if (current >= commonValues[commonValues.length - 1]) {
+                nextIndex = 0;
+            }
+            
             mattmc.client.settings.OptionsManager.setFpsCap(commonValues[nextIndex]);
             game.window().applyFpsCapSetting();
+            game.updateFpsCap();
             recomputeLayout();
             return;
         }
