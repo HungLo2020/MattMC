@@ -417,6 +417,10 @@ public final class DevplayScreen implements Screen {
     public void onOpen() {
         // Re-register callbacks when returning from pause menu
         registerCallbacks();
+        
+        // Sync previous position to current position when resuming
+        // This prevents visual "teleport" due to interpolation after pause
+        player.updatePreviousPosition();
     }
     
     @Override 
