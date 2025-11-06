@@ -71,20 +71,24 @@ public class ChunkRenderer {
             return false;
         }
         
-        // Remove old VAO if it exists
-        ChunkVAO oldVAO = vaoCache.remove(chunk);
-        if (oldVAO != null) {
-            oldVAO.delete();
-        }
-        
-        // Create new VAO from mesh buffer
+        // Create new VAO from mesh buffer first
+        ChunkVAO newVAO = null;
         if (!meshBuffer.isEmpty()) {
-            ChunkVAO vao = new ChunkVAO(meshBuffer);
-            vaoCache.put(chunk, vao);
+            newVAO = new ChunkVAO(meshBuffer);
             System.out.println("Uploaded VAO for chunk (" + meshBuffer.getChunkX() + ", " + meshBuffer.getChunkZ() + 
                              ") with " + meshBuffer.getIndexCount() + " indices");
         } else {
             System.out.println("Skipped empty mesh for chunk (" + meshBuffer.getChunkX() + ", " + meshBuffer.getChunkZ() + ")");
+        }
+        
+        // ONLY NOW replace and delete old VAO (after new one is ready)
+        // This prevents flickering - old VAO stays visible until replaced
+        ChunkVAO oldVAO = vaoCache.remove(chunk);
+        if (newVAO != null) {
+            vaoCache.put(chunk, newVAO);
+        }
+        if (oldVAO != null) {
+            oldVAO.delete();
         }
         
         return true;
