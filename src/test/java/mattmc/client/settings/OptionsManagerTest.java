@@ -46,4 +46,35 @@ public class OptionsManagerTest {
         OptionsManager.setFpsCap(999);
         assertEquals(999, OptionsManager.getFpsCap(), "FPS cap should accept maximum value of 999");
     }
+    
+    @Test
+    public void testResolutionDefaultValue() {
+        // Default resolution should be 1280x720
+        int width = OptionsManager.getResolutionWidth();
+        int height = OptionsManager.getResolutionHeight();
+        assertTrue(width > 0 && height > 0, "Resolution should have positive dimensions");
+    }
+    
+    @Test
+    public void testResolutionSetAndGet() {
+        // Test setting a resolution
+        OptionsManager.setResolution(1920, 1080);
+        assertEquals(1920, OptionsManager.getResolutionWidth(), "Width should be set to 1920");
+        assertEquals(1080, OptionsManager.getResolutionHeight(), "Height should be set to 1080");
+        
+        // Test another resolution
+        OptionsManager.setResolution(1600, 900);
+        assertEquals(1600, OptionsManager.getResolutionWidth(), "Width should be set to 1600");
+        assertEquals(900, OptionsManager.getResolutionHeight(), "Height should be set to 900");
+    }
+    
+    @Test
+    public void testResolutionString() {
+        // Test resolution string formatting
+        OptionsManager.setResolution(1280, 720);
+        assertEquals("1280x720", OptionsManager.getResolutionString(), "Resolution string should be formatted correctly");
+        
+        OptionsManager.setResolution(1920, 1080);
+        assertEquals("1920x1080", OptionsManager.getResolutionString(), "Resolution string should be formatted correctly");
+    }
 }

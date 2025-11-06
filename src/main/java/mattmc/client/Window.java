@@ -66,6 +66,16 @@ public final class Window implements AutoCloseable {
     public void swap() { glfwSwapBuffers(handle); }
     
     /**
+     * Change the window size to a new resolution.
+     * This will trigger the framebuffer size callback and recompute layouts.
+     */
+    public void setSize(int newWidth, int newHeight) {
+        glfwSetWindowSize(handle, newWidth, newHeight);
+        this.width = newWidth;
+        this.height = newHeight;
+    }
+    
+    /**
      * Apply the FPS cap setting from OptionsManager.
      * VSync is disabled to allow manual FPS control.
      */
