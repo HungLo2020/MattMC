@@ -187,7 +187,7 @@ public final class CreateWorldScreen implements Screen {
         String seedText = seedField.getText().trim();
         long seed = parseSeed(seedText);
         
-        logger.info("→ Creating world: {}{}{}", worldName, " with seed: ", seed);
+        logger.info("→ Creating world: {} with seed: {}", worldName, seed);
         game.setScreen(new DevplayScreen(game, worldName, seed));
     }
     

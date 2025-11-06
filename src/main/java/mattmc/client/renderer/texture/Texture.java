@@ -43,7 +43,7 @@ public final class Texture implements AutoCloseable {
         STBImage.stbi_image_free(pixels);
         glBindTexture(GL_TEXTURE_2D, 0);
 
-        logger.info("Loaded texture {}{}{}{}{}{}{}", classpath, " ", x[0], "x", y[0], " id=", tex);
+        logger.info("Loaded texture {} {}x{} id={}", classpath, x[0], y[0], tex);
         return new Texture(tex, x[0], y[0]);
     }
 

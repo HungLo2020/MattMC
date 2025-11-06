@@ -56,7 +56,7 @@ public class LevelRenderer {
             chunkRenderer.setTextureAtlas(atlas);
             level.getAsyncLoader().setTextureAtlas(atlas);
             textureAtlasInitialized = true;
-            logger.info("Texture atlas initialized with {}{}", atlas.getTextureCount(), " textures");
+            logger.info("Texture atlas initialized with {} textures", atlas.getTextureCount());
         }
     }
     

@@ -74,12 +74,11 @@ public class TextureManager {
             glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, buffer);
             
             textureCache.put(path, textureID);
-            logger.info("Loaded texture: {}{}{}{}", path, " (ID: ", textureID, ")");
+            logger.info("Loaded texture: {} (ID: {})", path, textureID);
             
             return textureID;
         } catch (IOException e) {
-            logger.error("Failed to load texture: {}", path);
-            e.printStackTrace();
+            logger.error("Failed to load texture: {}", path, e);
             return 0;
         }
     }

@@ -88,7 +88,7 @@ public final class CubeMap implements AutoCloseable {
         glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE);
 
         glBindTexture(GL_TEXTURE_CUBE_MAP, 0);
-        logger.info("Loaded cubemap {}{}{}{}{}{}{}", basePathNoIndex, "[0..5]", ext, " size=", size, " id=", tex);
+        logger.info("Loaded cubemap {}[0..5]{} size={} id={}", basePathNoIndex, ext, size, tex);
         return new CubeMap(tex, size);
     }
 

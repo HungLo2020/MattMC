@@ -220,8 +220,7 @@ public class OptionsManager {
                 logger.info("Saved options to Options.txt");
             }
         } catch (IOException e) {
-            logger.error("Error saving options: {}", e.getMessage());
-            e.printStackTrace();
+            logger.error("Error saving options: {}", e.getMessage(), e);
         }
     }
     
