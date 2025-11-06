@@ -6,6 +6,8 @@ import mattmc.client.renderer.chunk.MeshBuilder;
 import mattmc.client.renderer.texture.TextureAtlas;
 import mattmc.client.renderer.block.BlockFaceCollector;
 import mattmc.world.level.block.Block;
+import mattmc.world.level.block.Blocks;
+import mattmc.world.level.levelgen.WorldGenerator;
 
 import java.io.IOException;
 import java.nio.file.Path;
@@ -37,6 +39,7 @@ public class AsyncChunkLoader {
     
     private Path worldDirectory;
     private TextureAtlas textureAtlas;
+    private WorldGenerator worldGenerator;
     
     public AsyncChunkLoader() {
         this.executor = new ChunkTaskExecutor();
@@ -55,6 +58,10 @@ public class AsyncChunkLoader {
     
     public void setTextureAtlas(TextureAtlas atlas) {
         this.textureAtlas = atlas;
+    }
+    
+    public void setWorldGenerator(WorldGenerator generator) {
+        this.worldGenerator = generator;
     }
     
     /**
@@ -266,7 +273,15 @@ public class AsyncChunkLoader {
      */
     private LevelChunk generateChunk(int chunkX, int chunkZ) {
         LevelChunk chunk = new LevelChunk(chunkX, chunkZ);
-        chunk.generateFlatTerrain(64);
+        
+        // If no world generator is set, generate flat terrain as fallback
+        if (worldGenerator == null) {
+            chunk.generateFlatTerrain(64);
+            return chunk;
+        }
+        
+        // Use WorldGenerator to fill terrain
+        worldGenerator.generateChunkTerrain(chunk);
         return chunk;
     }
     
