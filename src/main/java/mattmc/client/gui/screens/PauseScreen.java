@@ -137,8 +137,8 @@ public final class PauseScreen implements Screen {
     
     private void saveAndExit() {
         try {
-            // Save the world
-            gameScreen.saveWorld();
+            // Save the world and mark it for shutdown
+            gameScreen.saveAndShutdown();
             
             // Return to title screen
             glfwSetInputMode(window.handle(), GLFW_CURSOR, GLFW_CURSOR_NORMAL);

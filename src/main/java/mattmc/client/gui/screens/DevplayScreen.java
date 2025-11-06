@@ -58,6 +58,9 @@ public final class DevplayScreen implements Screen {
     private StringBuilder commandText = new StringBuilder("/");
     private String commandErrorMessage = "";
     private double commandErrorDisplayTime = 0;
+    
+    // Flag to track if world should be shut down on close
+    private boolean shouldShutdownWorld = false;
 
     public DevplayScreen(Minecraft game, String worldName) {
         this(game, worldName, null, 0f, 0f, 0f, 0f, 0f);
@@ -418,9 +421,18 @@ public final class DevplayScreen implements Screen {
     
     @Override 
     public void onClose() {
-        // Shutdown async chunk loader
-        if (world != null) {
+        // Only shutdown async chunk loader if we're truly exiting (not just pausing)
+        if (shouldShutdownWorld && world != null) {
             world.shutdown();
         }
+    }
+    
+    /**
+     * Save the world and mark it for shutdown.
+     * Called when exiting to title screen.
+     */
+    public void saveAndShutdown() throws java.io.IOException {
+        shouldShutdownWorld = true;
+        saveWorld();
     }
 }
