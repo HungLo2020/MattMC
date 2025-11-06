@@ -6,6 +6,9 @@ import mattmc.client.renderer.PanoramaRenderer;
 import mattmc.client.gui.screens.Screen;
 
 public final class Minecraft {
+    private static final double MIN_SLEEP_TIME = 0.002;  // 2ms - minimum time worth sleeping
+    private static final double SLEEP_BUFFER = 0.001;    // 1ms - buffer to avoid oversleeping
+    
     private final Window window;
     private Screen current;
     private boolean running = true;
@@ -65,10 +68,10 @@ public final class Minecraft {
             } else {
                 // Calculate precise sleep time to avoid busy-waiting
                 double remainingTime = targetFrameTime - timeSinceLastFrame;
-                if (remainingTime > 0.002) { // Only sleep if more than 2ms remaining
+                if (remainingTime > MIN_SLEEP_TIME) {
                     try {
-                        // Sleep for most of the remaining time, leaving a small buffer
-                        long sleepMs = (long)((remainingTime - 0.001) * 1000);
+                        // Sleep for most of the remaining time, leaving a buffer
+                        long sleepMs = (long)((remainingTime - SLEEP_BUFFER) * 1000);
                         if (sleepMs > 0) {
                             Thread.sleep(sleepMs);
                         }

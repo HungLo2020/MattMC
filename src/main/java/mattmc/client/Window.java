@@ -67,14 +67,11 @@ public final class Window implements AutoCloseable {
     
     /**
      * Apply the FPS cap setting from OptionsManager.
-     * Call this when the FPS cap setting changes.
+     * VSync is disabled to allow manual FPS control.
      */
     public void applyFpsCapSetting() {
-        int fpsCap = OptionsManager.getFpsCap();
-        
-        // For very high FPS caps (>=240), disable VSync to avoid monitor refresh rate limitation
-        // For lower FPS caps, also disable VSync as we'll handle timing manually in the game loop
-        glfwSwapInterval(0); // Disable VSync for manual FPS control
+        // Disable VSync for manual FPS control
+        glfwSwapInterval(0);
     }
 
     @Override public void close() {

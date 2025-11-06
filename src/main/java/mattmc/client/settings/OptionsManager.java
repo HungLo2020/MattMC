@@ -11,6 +11,8 @@ import java.util.Map;
 public class OptionsManager {
     private static final String OPTIONS_FILE = "Options.txt";
     private static final String DEFAULT_OPTIONS_RESOURCE = "/config/DefaultOptions.txt";
+    private static final int MIN_FPS_CAP = 30;
+    private static final int MAX_FPS_CAP = 999;
     
     // Blur settings
     private static boolean titleScreenBlurEnabled = false;  // Default: disabled for title screen
@@ -18,6 +20,13 @@ public class OptionsManager {
     
     // FPS cap setting
     private static int fpsCapValue = 60;  // Default: 60 FPS
+    
+    /**
+     * Validate and clamp FPS cap value to valid range.
+     */
+    private static int validateFpsCap(int fps) {
+        return Math.max(MIN_FPS_CAP, Math.min(MAX_FPS_CAP, fps));
+    }
     
     /**
      * Load options from the Options.txt file.
@@ -55,8 +64,7 @@ public class OptionsManager {
                     } else if (key.equals("fps_cap")) {
                         try {
                             int fps = Integer.parseInt(value);
-                            // Clamp to valid range: 30-999
-                            fpsCapValue = Math.max(30, Math.min(999, fps));
+                            fpsCapValue = validateFpsCap(fps);
                         } catch (NumberFormatException e) {
                             System.err.println("Invalid FPS cap value: " + value);
                         }
@@ -189,8 +197,7 @@ public class OptionsManager {
     }
     
     public static void setFpsCap(int fps) {
-        // Clamp to valid range: 30-999
-        fpsCapValue = Math.max(30, Math.min(999, fps));
+        fpsCapValue = validateFpsCap(fps);
         saveOptions();
     }
 }
