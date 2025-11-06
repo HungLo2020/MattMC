@@ -58,10 +58,10 @@ public class UIRenderer {
     
     /**
      * Draw debug information in the top-left corner.
-     * Shows version, FPS, player position, chunk position, and region position.
+     * Shows version, FPS, player position, chunk position, region position, and culling stats.
      */
     public void drawDebugInfo(int screenWidth, int screenHeight, float playerX, float playerY, float playerZ, double fps, 
-                               int loadedChunks, int pendingChunks, int activeWorkers) {
+                               int loadedChunks, int pendingChunks, int activeWorkers, int renderedChunks, int culledChunks) {
         // Calculate chunk position from player position
         int chunkX = Math.floorDiv((int)playerX, LevelChunk.WIDTH);
         int chunkZ = Math.floorDiv((int)playerZ, LevelChunk.DEPTH);
@@ -109,6 +109,10 @@ public class UIRenderer {
         
         drawText(loadedText, x, y + lineHeight * 5, scale, 0xFFFFFF);
         drawText(pendingText, x, y + lineHeight * 6, scale, 0xFFFFFF);
+        
+        // Frustum culling stats
+        String renderText = String.format("Rendered: %d | Culled: %d", renderedChunks, culledChunks);
+        drawText(renderText, x, y + lineHeight * 7, scale, 0xFFFFFF);
         
         // Restore matrices
         glPopMatrix();

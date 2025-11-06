@@ -2,6 +2,7 @@ package mattmc.client.gui.screens;
 
 import mattmc.client.Minecraft;
 import mattmc.client.Window;
+import mattmc.client.settings.OptionsManager;
 import mattmc.world.entity.player.BlockInteraction;
 import mattmc.world.entity.player.LocalPlayer;
 import mattmc.world.entity.player.PlayerController;
@@ -81,6 +82,11 @@ public final class DevplayScreen implements Screen {
         
         // Initialize infinite world (use provided or create new)
         this.world = world != null ? world : new Level();
+        
+        // Apply render distance from settings
+        int renderDistance = OptionsManager.getRenderDistance();
+        this.world.setRenderDistance(renderDistance);
+        System.out.println("Set render distance to: " + renderDistance + " chunks");
         
         // Set world directory for new worlds so chunks can be saved during unload
         if (world == null) {
@@ -368,9 +374,11 @@ public final class DevplayScreen implements Screen {
             int loadedChunks = world.getLoadedChunkCount();
             int pendingChunks = world.getAsyncLoader().getPendingTaskCount();
             int activeWorkers = world.getAsyncLoader().getActiveTaskCount();
+            int renderedChunks = worldRenderer.getRenderedChunkCount();
+            int culledChunks = worldRenderer.getCulledChunkCount();
             // Use interpolated position for smooth debug display
             uiRenderer.drawDebugInfo(w, h, player.getX(alphaF), player.getY(alphaF), player.getZ(alphaF), fps,
-                                     loadedChunks, pendingChunks, activeWorkers);
+                                     loadedChunks, pendingChunks, activeWorkers, renderedChunks, culledChunks);
         }
         
         // Draw command overlay if visible
