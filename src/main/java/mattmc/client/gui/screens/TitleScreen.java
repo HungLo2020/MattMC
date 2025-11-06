@@ -99,8 +99,7 @@ public final class TitleScreen implements Screen {
         if (frameDt < 0) frameDt = 0;
         if (frameDt > 0.25) frameDt = 0.25; // clamp huge pauses to keep things sane
 
-        // Smooth, time-based panorama rotation (independent of tick/refresh)
-        game.panorama().update();
+        // Panorama rotation is now updated during rendering to prevent jitter
 
         // Hover every frame for responsiveness (not tied to TPS)
         float mxFB, myFB;

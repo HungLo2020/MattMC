@@ -89,8 +89,7 @@ public final class SelectWorldScreen implements Screen {
 
     @Override
     public void tick() {
-        // Update panorama animation
-        game.panorama().update();
+        // Panorama rotation is now updated during rendering to prevent jitter
         
         // Convert window coords -> framebuffer coords for accurate hit-testing on HiDPI
         float mxFB, myFB;
