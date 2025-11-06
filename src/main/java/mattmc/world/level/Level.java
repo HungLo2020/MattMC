@@ -59,6 +59,7 @@ public class Level implements LevelAccessor {
         this.asyncLoader = new AsyncChunkLoader();
         // Initialize with a default seed (will be updated when world is loaded/created)
         this.worldGenerator = new WorldGenerator(0L);
+        this.asyncLoader.setWorldGenerator(worldGenerator);
     }
     
     /**
