@@ -37,12 +37,6 @@ public class ChunkRenderer {
      * Render a chunk using VBO/VAO.
      */
     public void renderChunk(LevelChunk chunk) {
-        // Check if chunk has been marked as dirty
-        if (chunk.isDirty()) {
-            invalidateChunk(chunk);
-            chunk.setDirty(false);
-        }
-        
         // Get VAO
         ChunkVAO vao = vaoCache.get(chunk);
         if (vao == null) {
