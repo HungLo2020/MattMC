@@ -42,32 +42,42 @@ public final class Minecraft {
     public void quit() { running = false; }
 
     public void run() {
-        final double tick = 1.0 / 60.0;
-        double prev = now(), acc = 0.0;
-        double lastFrameTime = prev;
+        final double TICK_RATE = 20.0;  // 20 ticks per second (Minecraft standard)
+        final double tickTime = 1.0 / TICK_RATE;
+        double lastTime = now();
+        double tickAccumulator = 0.0;
+        double lastRenderTime = lastTime;
 
         while (running && !window.shouldClose()) {
-            double curr = now();
-            double dt   = curr - prev; prev = curr;
-            acc += dt;
+            double currentTime = now();
+            double deltaTime = currentTime - lastTime;
+            lastTime = currentTime;
+            
+            // Clamp delta time to prevent spiral of death
+            if (deltaTime > 0.25) deltaTime = 0.25;
+            
+            tickAccumulator += deltaTime;
 
-            while (acc >= tick) {
+            // Fixed tick rate: run game logic at exactly 20 TPS
+            while (tickAccumulator >= tickTime) {
                 if (current != null) current.tick();
-                acc -= tick;
+                tickAccumulator -= tickTime;
             }
             
-            // Apply FPS cap using cached value
+            // Variable render rate: render as fast as possible up to FPS cap
             double targetFrameTime = 1.0 / cachedFpsCap;
-            double timeSinceLastFrame = curr - lastFrameTime;
+            double timeSinceLastRender = currentTime - lastRenderTime;
             
             // Only render if enough time has passed for target FPS
-            if (timeSinceLastFrame >= targetFrameTime) {
-                if (current != null) current.render(acc / tick);
+            if (timeSinceLastRender >= targetFrameTime) {
+                // Alpha represents how far between ticks we are (for interpolation)
+                double alpha = tickAccumulator / tickTime;
+                if (current != null) current.render(alpha);
                 window.swap();
-                lastFrameTime = curr;
+                lastRenderTime = currentTime;
             } else {
                 // Calculate precise sleep time to avoid busy-waiting
-                double remainingTime = targetFrameTime - timeSinceLastFrame;
+                double remainingTime = targetFrameTime - timeSinceLastRender;
                 if (remainingTime > MIN_SLEEP_TIME) {
                     try {
                         // Sleep for most of the remaining time, leaving a buffer

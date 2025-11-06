@@ -44,10 +44,11 @@ public final class DevplayScreen implements Screen {
     
     private double lastFrameTimeSec = now();
     
-    // FPS tracking
+    // FPS tracking - moved to render() for accurate measurement
     private double fps = 0.0;
     private double fpsUpdateTimer = 0.0;
     private int frameCount = 0;
+    private double lastFpsUpdateTime = now();
     
     // Debug menu toggle state
     private boolean debugMenuVisible = false;
@@ -266,14 +267,7 @@ public final class DevplayScreen implements Screen {
         if (dt < 0) dt = 0;
         if (dt > 0.5) dt = 0.5;
         
-        // Update FPS calculation
-        frameCount++;
-        fpsUpdateTimer += dt;
-        if (fpsUpdateTimer >= 0.5) { // Update FPS every 0.5 seconds
-            fps = frameCount / 0.5; // Use exact 0.5 for consistent calculation
-            frameCount = 0;
-            fpsUpdateTimer = 0.0;
-        }
+        // FPS tracking moved to render() for accurate measurement
         
         // Update chunks based on player position (load/unload) with frustum prioritization
         world.updateChunksAroundPlayer(player.getX(), player.getZ(), player.getYaw());
@@ -296,6 +290,16 @@ public final class DevplayScreen implements Screen {
 
     @Override
     public void render(double alpha) {
+        // Track FPS in render() method for accurate measurement
+        frameCount++;
+        double now = now();
+        double timeSinceLastUpdate = now - lastFpsUpdateTime;
+        if (timeSinceLastUpdate >= 0.5) { // Update FPS every 0.5 seconds
+            fps = frameCount / timeSinceLastUpdate;
+            frameCount = 0;
+            lastFpsUpdateTime = now;
+        }
+        
         int w = window.width(), h = window.height();
 
         // Clear color + depth (sky blue)
