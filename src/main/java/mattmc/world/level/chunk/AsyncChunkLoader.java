@@ -6,6 +6,8 @@ import mattmc.client.renderer.chunk.MeshBuilder;
 import mattmc.client.renderer.texture.TextureAtlas;
 import mattmc.client.renderer.block.BlockFaceCollector;
 import mattmc.world.level.block.Block;
+import mattmc.world.level.block.Blocks;
+import mattmc.world.level.levelgen.WorldGenerator;
 
 import java.io.IOException;
 import java.nio.file.Path;
@@ -37,6 +39,7 @@ public class AsyncChunkLoader {
     
     private Path worldDirectory;
     private TextureAtlas textureAtlas;
+    private WorldGenerator worldGenerator;
     
     public AsyncChunkLoader() {
         this.executor = new ChunkTaskExecutor();
@@ -55,6 +58,10 @@ public class AsyncChunkLoader {
     
     public void setTextureAtlas(TextureAtlas atlas) {
         this.textureAtlas = atlas;
+    }
+    
+    public void setWorldGenerator(WorldGenerator generator) {
+        this.worldGenerator = generator;
     }
     
     /**
@@ -266,7 +273,53 @@ public class AsyncChunkLoader {
      */
     private LevelChunk generateChunk(int chunkX, int chunkZ) {
         LevelChunk chunk = new LevelChunk(chunkX, chunkZ);
-        chunk.generateFlatTerrain(64);
+        
+        // If no world generator is set, generate flat terrain as fallback
+        if (worldGenerator == null) {
+            chunk.generateFlatTerrain(64);
+            return chunk;
+        }
+        
+        // Generate terrain using noise-based world generator
+        for (int localX = 0; localX < LevelChunk.WIDTH; localX++) {
+            for (int localZ = 0; localZ < LevelChunk.DEPTH; localZ++) {
+                int worldX = chunkX * LevelChunk.WIDTH + localX;
+                int worldZ = chunkZ * LevelChunk.DEPTH + localZ;
+                
+                int terrainHeight = worldGenerator.getTerrainHeight(worldX, worldZ);
+                
+                // Fill terrain from bottom to surface
+                for (int worldY = LevelChunk.MIN_Y; worldY <= terrainHeight && worldY <= LevelChunk.MAX_Y; worldY++) {
+                    int chunkY = LevelChunk.worldYToChunkY(worldY);
+                    
+                    Block block;
+                    if (worldY == terrainHeight) {
+                        // Surface block - grass above sea level, sand/dirt below
+                        if (terrainHeight >= 63) {
+                            block = Blocks.GRASS_BLOCK;
+                        } else {
+                            block = Blocks.DIRT;
+                        }
+                    } else if (worldY >= terrainHeight - 3) {
+                        block = Blocks.DIRT;
+                    } else {
+                        block = Blocks.STONE;
+                    }
+                    
+                    chunk.setBlock(localX, chunkY, localZ, block);
+                }
+                
+                // Add water for ocean areas
+                if (terrainHeight < 63) {
+                    for (int worldY = terrainHeight + 1; worldY <= 63; worldY++) {
+                        int chunkY = LevelChunk.worldYToChunkY(worldY);
+                        // For now, use stone to represent water (no water block implemented yet)
+                        // chunk.setBlock(localX, chunkY, localZ, Blocks.WATER);
+                    }
+                }
+            }
+        }
+        
         return chunk;
     }
     

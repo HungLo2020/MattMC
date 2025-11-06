@@ -18,6 +18,7 @@ import java.util.*;
 public class LevelData {
     private String worldName;
     private long lastPlayed;
+    private long seed;
     private int spawnX;
     private int spawnY;
     private int spawnZ;
@@ -35,6 +36,7 @@ public class LevelData {
     public LevelData() {
         this.worldName = "Level";
         this.lastPlayed = System.currentTimeMillis();
+        this.seed = new java.util.Random().nextLong();
         this.spawnX = 0;
         this.spawnY = 64;
         this.spawnZ = 0;
@@ -57,6 +59,7 @@ public class LevelData {
         // Level metadata
         data.put("LevelName", worldName);
         data.put("LastPlayed", lastPlayed);
+        data.put("RandomSeed", seed);
         data.put("SpawnX", spawnX);
         data.put("SpawnY", spawnY);
         data.put("SpawnZ", spawnZ);
@@ -112,6 +115,9 @@ public class LevelData {
         }
         if (data.get("LastPlayed") instanceof Long) {
             levelData.lastPlayed = (Long) data.get("LastPlayed");
+        }
+        if (data.get("RandomSeed") instanceof Long) {
+            levelData.seed = (Long) data.get("RandomSeed");
         }
         if (data.get("SpawnX") instanceof Integer) {
             levelData.spawnX = (Integer) data.get("SpawnX");
@@ -223,4 +229,7 @@ public class LevelData {
     
     public float getPlayerPitch() { return playerPitch; }
     public void setPlayerPitch(float playerPitch) { this.playerPitch = playerPitch; }
+    
+    public long getSeed() { return seed; }
+    public void setSeed(long seed) { this.seed = seed; }
 }

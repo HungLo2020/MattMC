@@ -76,6 +76,11 @@ public final class DevplayScreen implements Screen {
         
         // Set world directory for new worlds so chunks can be saved during unload
         if (world == null) {
+            // Generate a random seed for new worlds
+            long seed = new java.util.Random().nextLong();
+            this.world.setSeed(seed);
+            System.out.println("Created new world with seed: " + seed);
+            
             try {
                 Path worldDir = LevelStorageSource.getSavesDirectory().resolve(worldName);
                 this.world.setWorldDirectory(worldDir);
