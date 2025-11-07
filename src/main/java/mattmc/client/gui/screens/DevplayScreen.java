@@ -393,10 +393,13 @@ public final class DevplayScreen implements Screen {
         int blocksSet = 0;
         
         // Fill the region with the specified block
+        // Note: Level.setBlock expects chunk-local Y coordinates (0-383)
         for (int x = minX; x <= maxX; x++) {
-            for (int y = minY; y <= maxY; y++) {
+            for (int worldY = minY; worldY <= maxY; worldY++) {
+                // Convert world Y to chunk Y for setBlock call
+                int chunkY = LevelChunk.worldYToChunkY(worldY);
                 for (int z = minZ; z <= maxZ; z++) {
-                    world.setBlock(x, y, z, block);
+                    world.setBlock(x, chunkY, z, block);
                     blocksSet++;
                 }
             }

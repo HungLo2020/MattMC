@@ -15,6 +15,10 @@ import static org.lwjgl.opengl.GL11.*;
  */
 public class UIRenderer {
     
+    // Constants for command feedback positioning and sizing
+    private static final int FEEDBACK_Y_OFFSET = 120; // Distance from bottom of screen
+    private static final int CHAR_WIDTH_ESTIMATE = 8; // Approximate character width in pixels
+    
     /**
      * Draw crosshair in the center of the screen.
      */
@@ -219,13 +223,13 @@ public class UIRenderer {
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
         
         // Position message above the hotbar/command area (centered horizontally)
-        int messageY = screenHeight - 120; // Above where command overlay would be
+        int messageY = screenHeight - FEEDBACK_Y_OFFSET;
         
         // Draw semi-transparent background behind text
         int padding = 8;
         float textScale = 1.2f;
-        // Estimate text width (rough approximation)
-        int textWidth = (int)(message.length() * 8 * textScale);
+        // Estimate text width (rough approximation using character width estimate)
+        int textWidth = (int)(message.length() * CHAR_WIDTH_ESTIMATE * textScale);
         int bgX = (screenWidth - textWidth) / 2 - padding;
         int bgY = messageY - padding;
         int bgWidth = textWidth + padding * 2;
