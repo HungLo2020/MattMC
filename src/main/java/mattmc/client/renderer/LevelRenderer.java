@@ -88,7 +88,7 @@ public class LevelRenderer {
             totalChunks++;
             
             // Frustum culling: skip chunks outside the camera view early
-            // This is done before hasChunkMesh to avoid unnecessary lookups for culled chunks
+            // This is done before registration and dirty checks to avoid unnecessary operations for culled chunks
             if (!frustum.isChunkVisible(chunk.chunkX(), chunk.chunkZ(), 
                                        LevelChunk.WIDTH, LevelChunk.DEPTH, 
                                        LevelChunk.MIN_Y, LevelChunk.MAX_Y)) {
@@ -107,6 +107,7 @@ public class LevelRenderer {
             }
             
             // Skip chunks without mesh data to avoid wasted GL calls
+            // These are counted as culled since they can't be rendered
             if (!chunkRenderer.hasChunkMesh(chunk)) {
                 culledChunks++;
                 continue;

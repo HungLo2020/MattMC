@@ -80,9 +80,9 @@ public class FrustumTest {
         assertEquals(-64, LevelChunk.MIN_Y, "MIN_Y should be -64");
         assertEquals(319, LevelChunk.MAX_Y, "MAX_Y should be 319");
         
-        // The total height should be 384 (from -64 to 319 inclusive)
+        // The total height should match the HEIGHT constant
         int expectedHeight = LevelChunk.MAX_Y - LevelChunk.MIN_Y + 1;
-        assertEquals(384, expectedHeight, "Chunk height should be 384 blocks");
+        assertEquals(LevelChunk.HEIGHT, expectedHeight, "Chunk height calculation should match HEIGHT constant");
     }
     
     @Test
