@@ -65,8 +65,10 @@ public final class DevplayScreen implements Screen {
     // Command overlay state
     private boolean commandOverlayVisible = false;
     private StringBuilder commandText = new StringBuilder("/");
-    private String commandErrorMessage = "";
-    private double commandErrorDisplayTime = 0;
+    
+    // Command feedback message (shown above hotbar area, independent of command overlay)
+    private String commandFeedbackMessage = "";
+    private double commandFeedbackDisplayTime = 0;
     
     // Region selection state for /pos1, /pos2, and /set commands
     private int[] regionPos1 = null; // [x, y, z]
@@ -230,8 +232,6 @@ public final class DevplayScreen implements Screen {
     private void openCommandOverlay() {
         commandOverlayVisible = true;
         commandText = new StringBuilder();
-        commandErrorMessage = "";
-        commandErrorDisplayTime = 0;
         // Keep cursor captured but allow typing
     }
     
@@ -250,8 +250,8 @@ public final class DevplayScreen implements Screen {
         
         // Ensure command starts with /
         if (!cmd.startsWith("/")) {
-            commandErrorMessage = "Commands must start with /";
-            commandErrorDisplayTime = 3.0;
+            commandFeedbackMessage = "Commands must start with /";
+            commandFeedbackDisplayTime = 3.0;
             return;
         }
         
@@ -265,8 +265,8 @@ public final class DevplayScreen implements Screen {
         } else if (cmd.startsWith("/set ")) {
             executeSetCommand(cmd);
         } else {
-            commandErrorMessage = "Unknown command: " + cmd;
-            commandErrorDisplayTime = 3.0; // Show error for 3 seconds
+            commandFeedbackMessage = "Unknown command: " + cmd;
+            commandFeedbackDisplayTime = 3.0; // Show error for 3 seconds
         }
     }
     
@@ -276,8 +276,8 @@ public final class DevplayScreen implements Screen {
             String[] parts = cmd.substring(4).trim().split("\\s+");
             
             if (parts.length != 3) {
-                commandErrorMessage = "Usage: /tp x y z";
-                commandErrorDisplayTime = 3.0;
+                commandFeedbackMessage = "Usage: /tp x y z";
+                commandFeedbackDisplayTime = 3.0;
                 return;
             }
             
@@ -293,8 +293,8 @@ public final class DevplayScreen implements Screen {
             logger.info("Teleported to: {}, {}, {}", x, y, z);
             
         } catch (NumberFormatException e) {
-            commandErrorMessage = "Invalid coordinates. Usage: /tp x y z";
-            commandErrorDisplayTime = 3.0;
+            commandFeedbackMessage = "Invalid coordinates. Usage: /tp x y z";
+            commandFeedbackDisplayTime = 3.0;
         }
     }
     
@@ -311,8 +311,8 @@ public final class DevplayScreen implements Screen {
         logger.info("Position 1 set to: {}, {}, {}", x, y, z);
         
         // Show confirmation message to user
-        commandErrorMessage = "Position 1 set to: " + x + ", " + y + ", " + z;
-        commandErrorDisplayTime = 3.0;
+        commandFeedbackMessage = "Position 1 set to: " + x + ", " + y + ", " + z;
+        commandFeedbackDisplayTime = 3.0;
     }
     
     /**
@@ -328,8 +328,8 @@ public final class DevplayScreen implements Screen {
         logger.info("Position 2 set to: {}, {}, {}", x, y, z);
         
         // Show confirmation message to user
-        commandErrorMessage = "Position 2 set to: " + x + ", " + y + ", " + z;
-        commandErrorDisplayTime = 3.0;
+        commandFeedbackMessage = "Position 2 set to: " + x + ", " + y + ", " + z;
+        commandFeedbackDisplayTime = 3.0;
     }
     
     /**
@@ -339,8 +339,8 @@ public final class DevplayScreen implements Screen {
     private void executeSetCommand(String cmd) {
         // Check if both positions are set
         if (regionPos1 == null || regionPos2 == null) {
-            commandErrorMessage = "Please set both positions first with /pos1 and /pos2";
-            commandErrorDisplayTime = 3.0;
+            commandFeedbackMessage = "Please set both positions first with /pos1 and /pos2";
+            commandFeedbackDisplayTime = 3.0;
             return;
         }
         
@@ -348,8 +348,8 @@ public final class DevplayScreen implements Screen {
         String blockName = cmd.substring(5).trim(); // Remove "/set "
         
         if (blockName.isEmpty()) {
-            commandErrorMessage = "Usage: /set <block>";
-            commandErrorDisplayTime = 3.0;
+            commandFeedbackMessage = "Usage: /set <block>";
+            commandFeedbackDisplayTime = 3.0;
             return;
         }
         
@@ -364,8 +364,8 @@ public final class DevplayScreen implements Screen {
         }
         
         if (block == null) {
-            commandErrorMessage = "Unknown block: " + blockName;
-            commandErrorDisplayTime = 3.0;
+            commandFeedbackMessage = "Unknown block: " + blockName;
+            commandFeedbackDisplayTime = 3.0;
             return;
         }
         
@@ -384,8 +384,8 @@ public final class DevplayScreen implements Screen {
         long totalBlocks = sizeX * sizeY * sizeZ;
         
         if (totalBlocks > MAX_REGION_SIZE) {
-            commandErrorMessage = "Region too large (" + totalBlocks + " blocks). Maximum is " + MAX_REGION_SIZE;
-            commandErrorDisplayTime = 3.0;
+            commandFeedbackMessage = "Region too large (" + totalBlocks + " blocks). Maximum is " + MAX_REGION_SIZE;
+            commandFeedbackDisplayTime = 3.0;
             return;
         }
         
@@ -406,8 +406,8 @@ public final class DevplayScreen implements Screen {
                     minX, minY, minZ, maxX, maxY, maxZ, block.getIdentifier(), blocksSet);
         
         // Show confirmation message to user
-        commandErrorMessage = "Filled " + blocksSet + " blocks with " + blockName;
-        commandErrorDisplayTime = 3.0;
+        commandFeedbackMessage = "Filled " + blocksSet + " blocks with " + blockName;
+        commandFeedbackDisplayTime = 3.0;
     }
 
     @Override
@@ -437,8 +437,8 @@ public final class DevplayScreen implements Screen {
         }
         
         // Decrease error display time
-        if (commandErrorDisplayTime > 0) {
-            commandErrorDisplayTime -= dt;
+        if (commandFeedbackDisplayTime > 0) {
+            commandFeedbackDisplayTime -= dt;
         }
     }
 
@@ -514,7 +514,12 @@ public final class DevplayScreen implements Screen {
         
         // Draw command overlay if visible
         if (commandOverlayVisible) {
-            uiRenderer.drawCommandOverlay(w, h, commandText.toString(), commandErrorMessage, commandErrorDisplayTime > 0);
+            uiRenderer.drawCommandOverlay(w, h, commandText.toString());
+        }
+        
+        // Draw command feedback message (independent of command overlay)
+        if (commandFeedbackDisplayTime > 0) {
+            uiRenderer.drawCommandFeedback(w, h, commandFeedbackMessage);
         }
         
         // Draw crosshair on top of everything (but not when command overlay is open)

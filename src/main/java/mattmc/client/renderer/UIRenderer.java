@@ -143,7 +143,7 @@ public class UIRenderer {
      * Draw command overlay at bottom of screen (like Minecraft).
      * Shows command input box with cursor.
      */
-    public void drawCommandOverlay(int screenWidth, int screenHeight, String commandText, String errorMessage, boolean showError) {
+    public void drawCommandOverlay(int screenWidth, int screenHeight, String commandText) {
         // Switch to 2D orthographic projection
         glMatrixMode(GL_PROJECTION);
         glPushMatrix();
@@ -181,10 +181,63 @@ public class UIRenderer {
         String displayText = commandText + "_";
         drawText(displayText, boxX + 10, boxY + 15, 1.5f, 0xFFFFFF);
         
-        // Draw error message if present
-        if (showError && !errorMessage.isEmpty()) {
-            drawText(errorMessage, boxX + 10, boxY - 25, 1.0f, 0xFF0000);
+        glDisable(GL_BLEND);
+        
+        // Restore matrices
+        glPopMatrix();
+        glMatrixMode(GL_PROJECTION);
+        glPopMatrix();
+        glMatrixMode(GL_MODELVIEW);
+    }
+    
+    /**
+     * Draw command feedback message above the hotbar area.
+     * This message appears independently of the command input overlay and fades after a few seconds.
+     * Similar to Minecraft's action bar messages.
+     * 
+     * @param screenWidth Screen width
+     * @param screenHeight Screen height
+     * @param message The feedback message to display
+     */
+    public void drawCommandFeedback(int screenWidth, int screenHeight, String message) {
+        if (message == null || message.isEmpty()) {
+            return;
         }
+        
+        // Switch to 2D orthographic projection
+        glMatrixMode(GL_PROJECTION);
+        glPushMatrix();
+        glLoadIdentity();
+        glOrtho(0, screenWidth, screenHeight, 0, -1, 1);
+        
+        glMatrixMode(GL_MODELVIEW);
+        glPushMatrix();
+        glLoadIdentity();
+        
+        // Enable blending for semi-transparent text background
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        
+        // Position message above the hotbar/command area (centered horizontally)
+        int messageY = screenHeight - 120; // Above where command overlay would be
+        
+        // Draw semi-transparent background behind text
+        int padding = 8;
+        float textScale = 1.2f;
+        // Estimate text width (rough approximation)
+        int textWidth = (int)(message.length() * 8 * textScale);
+        int bgX = (screenWidth - textWidth) / 2 - padding;
+        int bgY = messageY - padding;
+        int bgWidth = textWidth + padding * 2;
+        int bgHeight = (int)(16 * textScale) + padding * 2;
+        
+        // Draw background
+        setColor(0x000000, 0.6f);
+        fillRect(bgX, bgY, bgWidth, bgHeight);
+        
+        // Draw text centered
+        int textX = (screenWidth - textWidth) / 2;
+        drawText(message, textX, messageY, textScale, 0xFFFFFF);
         
         glDisable(GL_BLEND);
         
