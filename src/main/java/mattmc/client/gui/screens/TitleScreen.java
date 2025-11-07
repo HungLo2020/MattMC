@@ -274,12 +274,12 @@ public final class TitleScreen implements Screen {
         float splashX = logoRight - 80f; // Further to the left
         float splashY = logoBottom - 10f; // Slightly higher
         
-        // Calculate animated scale using sine wave with 0.5 second intervals
-        // Period = 0.5 seconds, so frequency = 1/0.5 = 2 Hz
+        // Calculate animated scale using sine wave with 1 second intervals
+        // Period = 1 second, so frequency = 1/1 = 1 Hz
         // Scale oscillates between 1.2 and 1.4 (slightly larger to slightly smaller)
         float baseScale = 1.3f;
         float scaleAmplitude = 0.1f; // Oscillates ±0.1 around base
-        float animatedScale = baseScale + scaleAmplitude * (float)Math.sin(splashAnimationTime * 2.0 * Math.PI * 2.0);
+        float animatedScale = baseScale + scaleAmplitude * (float)Math.sin(splashAnimationTime * 2.0 * Math.PI * 1.0);
         
         // Save current matrix state
         glPushMatrix();
@@ -287,8 +287,8 @@ public final class TitleScreen implements Screen {
         // Move to the splash text position
         glTranslatef(splashX, splashY, 0);
         
-        // Rotate -45 degrees (top of text faces top-left corner)
-        glRotatef(-45f, 0, 0, 1);
+        // Rotate -30 degrees (top of text faces top-left corner)
+        glRotatef(-30f, 0, 0, 1);
         
         // Draw text at origin (0, 0) since we've already translated
         // Draw in yellow color (0xFFFF00)
