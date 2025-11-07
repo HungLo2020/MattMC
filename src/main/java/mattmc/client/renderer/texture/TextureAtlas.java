@@ -182,8 +182,22 @@ public class TextureAtlas {
         // Upload texture data
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, buffer);
         
-        // Apply filtering settings (using NEAREST for block textures)
-        TextureManager.applyTextureFiltering(true);
+        // Texture atlases should NOT use mipmaps to avoid color bleeding between packed textures
+        // Always use NEAREST filtering for block textures to maintain the pixelated look
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+        
+        // Apply anisotropic filtering if enabled (helps with distant terrain without mipmaps)
+        int anisotropicLevel = OptionsManager.getAnisotropicFiltering();
+        if (anisotropicLevel > 0) {
+            try {
+                float maxAniso = glGetFloat(GL_MAX_TEXTURE_MAX_ANISOTROPY_EXT);
+                float aniso = Math.min(anisotropicLevel, maxAniso);
+                glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAX_ANISOTROPY_EXT, aniso);
+            } catch (IllegalStateException | IllegalArgumentException e) {
+                logger.debug("Anisotropic filtering not supported: {}", e.getMessage());
+            }
+        }
         
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
