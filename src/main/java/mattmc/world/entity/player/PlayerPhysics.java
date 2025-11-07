@@ -17,10 +17,12 @@ public class PlayerPhysics {
     public static final float PLAYER_HEIGHT = 1.8f;
     public static final float PLAYER_DEPTH = 0.6f;
     
-    // Physics constants
-    private static final float GRAVITY = 20f; // Blocks per second squared
-    private static final float TERMINAL_VELOCITY = 50f; // Max fall speed
-    private static final float JUMP_VELOCITY = 8f; // Initial jump speed
+    // Physics constants (Minecraft Java Edition values)
+    // Minecraft runs at 20 TPS, so: 0.08 blocks/tick² * 20 ticks/s * 20 ticks/s = 32 blocks/s²
+    private static final float GRAVITY = 32f; // Blocks per second squared
+    private static final float TERMINAL_VELOCITY = 78.4f; // Max fall speed (blocks/second)
+    // Jump velocity: 0.42 blocks/tick * 20 ticks/s = 8.4 blocks/s
+    private static final float JUMP_VELOCITY = 8.4f; // Initial jump speed (blocks/second)
     
     private final LocalPlayer player;
     private final CollisionDetector collisionDetector;

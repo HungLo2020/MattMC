@@ -31,7 +31,10 @@ public class LocalPlayer {
     
     // Movement speed
     private float moveSpeed = 4.317f; // Minecraft walking speed (blocks/second)
+    private float sprintSpeed = 5.612f; // Minecraft sprinting speed (1.3x walking)
+    private float sneakSpeed = 1.295f; // Minecraft sneaking speed (0.3x walking)
     private float flySpeed = 10.92f;   // Minecraft flying speed
+    private float flySprintSpeed = 21.84f; // Minecraft flying sprint speed (2x flying)
     
     // Physics reference (set externally)
     private PlayerPhysics physics;
@@ -204,7 +207,10 @@ public class LocalPlayer {
         return prevPitch + (pitch - prevPitch) * alpha;
     }
     public float getMoveSpeed() { return moveSpeed; }
+    public float getSprintSpeed() { return sprintSpeed; }
+    public float getSneakSpeed() { return sneakSpeed; }
     public float getFlySpeed() { return flySpeed; }
+    public float getFlySprintSpeed() { return flySprintSpeed; }
     
     public void setX(float x) { this.x = x; }
     public void setY(float y) { this.y = y; }

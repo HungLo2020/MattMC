@@ -24,6 +24,7 @@ public class PlayerInput {
     public static final String LEFT = "left";
     public static final String RIGHT = "right";
     public static final String JUMP = "jump";
+    public static final String SPRINT = "sprint";
     public static final String CROUCH = "crouch";
     public static final String BREAK_BLOCK = "break_block";
     public static final String PLACE_BLOCK = "place_block";
