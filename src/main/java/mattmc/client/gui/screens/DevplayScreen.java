@@ -7,6 +7,7 @@ import mattmc.world.entity.player.BlockInteraction;
 import mattmc.world.entity.player.LocalPlayer;
 import mattmc.world.entity.player.PlayerController;
 import mattmc.world.entity.player.PlayerPhysics;
+import mattmc.world.entity.player.PlayerInput;
 import mattmc.client.renderer.LevelRenderer;
 import mattmc.client.renderer.UIRenderer;
 import mattmc.client.renderer.block.BlockFaceGeometry;
@@ -206,7 +207,9 @@ public final class DevplayScreen implements Screen {
                     // Toggle command overlay
                     openCommandOverlay();
                 }
-                if (key == GLFW_KEY_E && action == GLFW_PRESS) {
+                // Check for inventory key (respects user configuration)
+                Integer inventoryKey = PlayerInput.getInstance().getKeybind(PlayerInput.INVENTORY);
+                if (inventoryKey != null && key == inventoryKey && action == GLFW_PRESS) {
                     // Open inventory screen
                     game.setScreen(new InventoryScreen(game, this));
                 }

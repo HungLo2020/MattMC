@@ -3,6 +3,7 @@ package mattmc.client.gui.screens;
 import mattmc.client.Minecraft;
 import mattmc.client.Window;
 import mattmc.client.renderer.texture.Texture;
+import mattmc.world.entity.player.PlayerInput;
 
 import static org.lwjgl.glfw.GLFW.*;
 import static org.lwjgl.opengl.GL11.*;
@@ -28,12 +29,18 @@ public final class InventoryScreen implements Screen {
         // Release mouse cursor
         glfwSetInputMode(window.handle(), GLFW_CURSOR, GLFW_CURSOR_NORMAL);
 
-        // Set up key callback for E (or inventory key) to close
+        // Set up key callback for inventory key (respects user configuration) or ESC to close
         glfwSetKeyCallback(window.handle(), (win, key, scancode, action, mods) -> {
-            if (key == GLFW_KEY_E && action == GLFW_PRESS) {
-                closeInventory();
-            } else if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS) {
-                closeInventory();
+            if (action == GLFW_PRESS) {
+                if (key == GLFW_KEY_ESCAPE) {
+                    closeInventory();
+                } else {
+                    // Check if this is the inventory key
+                    Integer inventoryKey = PlayerInput.getInstance().getKeybind(PlayerInput.INVENTORY);
+                    if (inventoryKey != null && key == inventoryKey) {
+                        closeInventory();
+                    }
+                }
             }
         });
 
