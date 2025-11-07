@@ -95,14 +95,16 @@ public class UIRenderer {
         String fpsText = String.format("FPS: %.0f", fps);
         drawText(fpsText, x, y + lineHeight, scale, 0xFFFFFF);
         
-        // Calculate cardinal direction from yaw
-        String direction = getCardinalDirection(yaw);
+        // Normalize yaw to 0-360 range for display
+        float normalizedYaw = ((yaw % 360) + 360) % 360;
+        
+        // Calculate cardinal direction from normalized yaw
+        String direction = getCardinalDirection(normalizedYaw);
         
         // Format position values to 2 decimal places for readability
-        // Include facing direction and yaw on same line as requested
-        String posText = String.format("Position: %.2f, %.2f, %.2f (Facing: %s, Yaw: %.2f)", 
-                                        playerX, playerY, playerZ, direction, yaw);
-        String rotationText = String.format("Pitch: %.2f, Roll: %.2f", pitch, roll);
+        String posText = String.format("Position: %.2f, %.2f, %.2f (Facing: %s)", 
+                                        playerX, playerY, playerZ, direction);
+        String rotationText = String.format("Yaw: %.2f, Pitch: %.2f, Roll: %.2f", normalizedYaw, pitch, roll);
         String chunkText = String.format("LevelChunk: %d, %d", chunkX, chunkZ);
         String regionText = String.format("Region: %d, %d", regionX, regionZ);
         
