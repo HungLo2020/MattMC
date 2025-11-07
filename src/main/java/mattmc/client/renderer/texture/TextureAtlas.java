@@ -92,9 +92,9 @@ public class TextureAtlas {
         BufferedImage atlasImage = new BufferedImage(atlasWidth, atlasHeight, BufferedImage.TYPE_INT_ARGB);
         Graphics2D g = atlasImage.createGraphics();
         
-        // Fill with transparent black (will appear as background in empty areas)
-        // Using transparent instead of magenta to avoid color bleeding with mipmaps
-        g.setColor(new Color(0, 0, 0, 0));
+        // Fill with neutral gray (RGB: 128,128,128) to minimize color bleeding artifacts
+        // Gray is less noticeable than black or magenta when mipmaps/anisotropic filtering sample it
+        g.setColor(new Color(128, 128, 128, 255));
         g.fillRect(0, 0, atlasWidth, atlasHeight);
         
         // Pack textures into atlas
