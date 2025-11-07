@@ -38,3 +38,4 @@ break_block=left_mouse
 place_block=right_mouse
 fly_up=space
 open_command=/
+inventory=e

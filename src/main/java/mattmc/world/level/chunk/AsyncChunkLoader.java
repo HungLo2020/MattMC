@@ -45,6 +45,7 @@ public class AsyncChunkLoader {
     private RegionFileCache regionCache;
     private TextureAtlas textureAtlas;
     private WorldGenerator worldGenerator;
+    private BlockFaceCollector.ChunkNeighborAccessor neighborAccessor;
     
     public AsyncChunkLoader() {
         this.executor = new ChunkTaskExecutor();
@@ -71,6 +72,13 @@ public class AsyncChunkLoader {
     
     public void setWorldGenerator(WorldGenerator generator) {
         this.worldGenerator = generator;
+    }
+    
+    /**
+     * Set the chunk neighbor accessor for cross-chunk face culling.
+     */
+    public void setNeighborAccessor(BlockFaceCollector.ChunkNeighborAccessor accessor) {
+        this.neighborAccessor = accessor;
     }
     
     /**
@@ -347,6 +355,9 @@ public class AsyncChunkLoader {
      */
     private BlockFaceCollector collectChunkFaces(LevelChunk chunk) {
         BlockFaceCollector collector = new BlockFaceCollector();
+        
+        // Set the neighbor accessor for cross-chunk face culling
+        collector.setNeighborAccessor(neighborAccessor);
         
         // Iterate through all blocks and collect visible faces
         for (int sectionIndex = 0; sectionIndex < 24; sectionIndex++) {

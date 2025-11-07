@@ -14,6 +14,21 @@ import java.util.List;
  */
 public class BlockFaceCollector {
     
+    /**
+     * Interface for querying blocks across chunk boundaries.
+     */
+    public interface ChunkNeighborAccessor {
+        /**
+         * Get a block at chunk-local coordinates, checking neighboring chunks if necessary.
+         * @param chunk The current chunk
+         * @param x Chunk-local X coordinate (can be outside 0-15 range)
+         * @param y Chunk-local Y coordinate (0-383)
+         * @param z Chunk-local Z coordinate (can be outside 0-15 range)
+         * @return The block at the specified position
+         */
+        Block getBlockAcrossChunks(LevelChunk chunk, int x, int y, int z);
+    }
+    
     // Face data storage
     private final List<FaceData> topFaces = new ArrayList<>();
     private final List<FaceData> bottomFaces = new ArrayList<>();
@@ -21,6 +36,16 @@ public class BlockFaceCollector {
     private final List<FaceData> southFaces = new ArrayList<>();
     private final List<FaceData> westFaces = new ArrayList<>();
     private final List<FaceData> eastFaces = new ArrayList<>();
+    
+    // Neighbor accessor for cross-chunk queries
+    private ChunkNeighborAccessor neighborAccessor;
+    
+    /**
+     * Set the chunk neighbor accessor for cross-chunk face culling.
+     */
+    public void setNeighborAccessor(ChunkNeighborAccessor accessor) {
+        this.neighborAccessor = accessor;
+    }
     
     /**
      * Clear all collected face data.
@@ -84,11 +109,24 @@ public class BlockFaceCollector {
      * Check if a face should be rendered (is the adjacent block air?).
      */
     private boolean shouldRenderFace(LevelChunk chunk, int x, int y, int z) {
-        // If out of bounds, consider it air (should render)
-        if (x < 0 || x >= LevelChunk.WIDTH || y < 0 || y >= LevelChunk.HEIGHT || z < 0 || z >= LevelChunk.DEPTH) {
-            return true;
+        // Check Y bounds first (no neighboring chunks in Y direction)
+        if (y < 0 || y >= LevelChunk.HEIGHT) {
+            return true; // Out of world bounds, render the face
         }
-        return chunk.getBlock(x, y, z).isAir();
+        
+        // If within chunk bounds, use direct chunk access
+        if (x >= 0 && x < LevelChunk.WIDTH && z >= 0 && z < LevelChunk.DEPTH) {
+            return chunk.getBlock(x, y, z).isAir();
+        }
+        
+        // Out of chunk bounds in X or Z - need to check neighboring chunk
+        if (neighborAccessor != null) {
+            Block adjacentBlock = neighborAccessor.getBlockAcrossChunks(chunk, x, y, z);
+            return adjacentBlock.isAir();
+        }
+        
+        // No neighbor accessor available - fall back to old behavior
+        return true;
     }
     
     // Getters for face lists

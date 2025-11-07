@@ -4,6 +4,7 @@ import mattmc.client.Minecraft;
 import mattmc.client.gui.screens.Screen;
 
 import mattmc.client.gui.components.TextRenderer;
+import mattmc.client.renderer.texture.Texture;
 import mattmc.world.level.chunk.LevelChunk;
 import mattmc.world.level.chunk.Region;
 
@@ -14,6 +15,13 @@ import static org.lwjgl.opengl.GL11.*;
  * Similar to Minecraft's GuiIngame class.
  */
 public class UIRenderer {
+    
+    // Constants for command feedback positioning and sizing
+    private static final int FEEDBACK_Y_OFFSET = 120; // Distance from bottom of screen
+    private static final int CHAR_WIDTH_ESTIMATE = 8; // Approximate character width in pixels
+    
+    // Hotbar texture
+    private Texture hotbarTexture;
     
     /**
      * Draw crosshair in the center of the screen.
@@ -132,6 +140,61 @@ public class UIRenderer {
     }
     
     /**
+     * Draw hotbar at the bottom center of the screen.
+     */
+    public void drawHotbar(int screenWidth, int screenHeight) {
+        // Load hotbar texture if not already loaded
+        if (hotbarTexture == null) {
+            hotbarTexture = Texture.load("/assets/textures/gui/sprites/hud/hotbar.png");
+        }
+        
+        // Switch to 2D orthographic projection
+        glMatrixMode(GL_PROJECTION);
+        glPushMatrix();
+        glLoadIdentity();
+        glOrtho(0, screenWidth, screenHeight, 0, -1, 1);
+        
+        glMatrixMode(GL_MODELVIEW);
+        glPushMatrix();
+        glLoadIdentity();
+        
+        // Enable blending for texture rendering
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        
+        // Draw hotbar texture centered at bottom of screen
+        if (hotbarTexture != null) {
+            glEnable(GL_TEXTURE_2D);
+            hotbarTexture.bind();
+            glColor4f(1f, 1f, 1f, 1f);
+            
+            // Scale hotbar to 3x size for better visibility (like Minecraft GUI scale)
+            float scale = 3.0f;
+            float texWidth = hotbarTexture.width * scale;
+            float texHeight = hotbarTexture.height * scale;
+            float x = (screenWidth - texWidth) / 2f;
+            float y = screenHeight - texHeight - 10; // 10 pixels from bottom
+            
+            glBegin(GL_QUADS);
+            glTexCoord2f(0, 1); glVertex2f(x, y);
+            glTexCoord2f(1, 1); glVertex2f(x + texWidth, y);
+            glTexCoord2f(1, 0); glVertex2f(x + texWidth, y + texHeight);
+            glTexCoord2f(0, 0); glVertex2f(x, y + texHeight);
+            glEnd();
+            
+            glDisable(GL_TEXTURE_2D);
+        }
+        
+        glDisable(GL_BLEND);
+        
+        // Restore matrices
+        glPopMatrix();
+        glMatrixMode(GL_PROJECTION);
+        glPopMatrix();
+        glMatrixMode(GL_MODELVIEW);
+    }
+    
+    /**
      * Helper method to draw text at the specified position.
      */
     private void drawText(String text, float x, float y, float scale, int rgb) {
@@ -143,7 +206,7 @@ public class UIRenderer {
      * Draw command overlay at bottom of screen (like Minecraft).
      * Shows command input box with cursor.
      */
-    public void drawCommandOverlay(int screenWidth, int screenHeight, String commandText, String errorMessage, boolean showError) {
+    public void drawCommandOverlay(int screenWidth, int screenHeight, String commandText) {
         // Switch to 2D orthographic projection
         glMatrixMode(GL_PROJECTION);
         glPushMatrix();
@@ -181,10 +244,63 @@ public class UIRenderer {
         String displayText = commandText + "_";
         drawText(displayText, boxX + 10, boxY + 15, 1.5f, 0xFFFFFF);
         
-        // Draw error message if present
-        if (showError && !errorMessage.isEmpty()) {
-            drawText(errorMessage, boxX + 10, boxY - 25, 1.0f, 0xFF0000);
+        glDisable(GL_BLEND);
+        
+        // Restore matrices
+        glPopMatrix();
+        glMatrixMode(GL_PROJECTION);
+        glPopMatrix();
+        glMatrixMode(GL_MODELVIEW);
+    }
+    
+    /**
+     * Draw command feedback message above the hotbar area.
+     * This message appears independently of the command input overlay and fades after a few seconds.
+     * Similar to Minecraft's action bar messages.
+     * 
+     * @param screenWidth Screen width
+     * @param screenHeight Screen height
+     * @param message The feedback message to display
+     */
+    public void drawCommandFeedback(int screenWidth, int screenHeight, String message) {
+        if (message == null || message.isEmpty()) {
+            return;
         }
+        
+        // Switch to 2D orthographic projection
+        glMatrixMode(GL_PROJECTION);
+        glPushMatrix();
+        glLoadIdentity();
+        glOrtho(0, screenWidth, screenHeight, 0, -1, 1);
+        
+        glMatrixMode(GL_MODELVIEW);
+        glPushMatrix();
+        glLoadIdentity();
+        
+        // Enable blending for semi-transparent text background
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        
+        // Position message above the hotbar/command area (centered horizontally)
+        int messageY = screenHeight - FEEDBACK_Y_OFFSET;
+        
+        // Draw semi-transparent background behind text
+        int padding = 8;
+        float textScale = 1.2f;
+        // Estimate text width (rough approximation using character width estimate)
+        int textWidth = (int)(message.length() * CHAR_WIDTH_ESTIMATE * textScale);
+        int bgX = (screenWidth - textWidth) / 2 - padding;
+        int bgY = messageY - padding;
+        int bgWidth = textWidth + padding * 2;
+        int bgHeight = (int)(16 * textScale) + padding * 2;
+        
+        // Draw background
+        setColor(0x000000, 0.6f);
+        fillRect(bgX, bgY, bgWidth, bgHeight);
+        
+        // Draw text centered
+        int textX = (screenWidth - textWidth) / 2;
+        drawText(message, textX, messageY, textScale, 0xFFFFFF);
         
         glDisable(GL_BLEND);
         

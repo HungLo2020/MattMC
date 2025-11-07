@@ -27,6 +27,9 @@ public class KeybindManager {
     public static void loadKeybinds() {
         Path optionsPath = getOptionsPath();
         
+        // Set default keybinds first (fallback for missing entries)
+        setDefaultKeybinds();
+        
         if (!Files.exists(optionsPath)) {
             logger.info("Options.txt not found, copying from defaults...");
             copyDefaultOptions(optionsPath);
@@ -67,15 +70,36 @@ public class KeybindManager {
                 }
             }
             
-            // Apply loaded keybinds to PlayerInput
+            // Apply loaded keybinds to PlayerInput (this will override defaults)
             if (!keybinds.isEmpty()) {
-                PlayerInput.getInstance().setAllKeybinds(keybinds);
+                for (Map.Entry<String, Integer> entry : keybinds.entrySet()) {
+                    PlayerInput.getInstance().setKeybind(entry.getKey(), entry.getValue());
+                }
                 logger.info("Loaded {} keybinds from Options.txt", keybinds.size());
             }
         } catch (IOException e) {
             logger.error("Error loading keybinds: {}", e.getMessage());
             e.printStackTrace();
         }
+    }
+    
+    /**
+     * Set default keybinds as fallback for any missing entries in Options.txt.
+     */
+    private static void setDefaultKeybinds() {
+        PlayerInput input = PlayerInput.getInstance();
+        input.setKeybind(PlayerInput.FORWARD, GLFW_KEY_W);
+        input.setKeybind(PlayerInput.BACKWARD, GLFW_KEY_S);
+        input.setKeybind(PlayerInput.LEFT, GLFW_KEY_A);
+        input.setKeybind(PlayerInput.RIGHT, GLFW_KEY_D);
+        input.setKeybind(PlayerInput.JUMP, GLFW_KEY_SPACE);
+        input.setKeybind(PlayerInput.CROUCH, GLFW_KEY_LEFT_CONTROL);
+        input.setKeybind(PlayerInput.BREAK_BLOCK, -(GLFW_MOUSE_BUTTON_LEFT + 1));
+        input.setKeybind(PlayerInput.PLACE_BLOCK, -(GLFW_MOUSE_BUTTON_RIGHT + 1));
+        input.setKeybind(PlayerInput.FLY_UP, GLFW_KEY_SPACE);
+        input.setKeybind(PlayerInput.OPEN_COMMAND, GLFW_KEY_SLASH);
+        input.setKeybind(PlayerInput.INVENTORY, GLFW_KEY_E);
+        logger.debug("Set default keybinds");
     }
     
     /**
