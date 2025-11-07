@@ -135,24 +135,39 @@ public class BlockFaceCollectorTest {
             }
             
             // Determine which chunk to query based on coordinates
-            LevelChunk targetChunk = null;
+            int targetChunkX = centerChunk.chunkX();
+            int targetChunkZ = centerChunk.chunkZ();
             int targetX = x;
             int targetZ = z;
             
+            // Adjust for X boundary crossing
             if (x < 0) {
-                targetChunk = westChunk;
+                targetChunkX--;
                 targetX = LevelChunk.WIDTH + x;
             } else if (x >= LevelChunk.WIDTH) {
-                targetChunk = eastChunk;
+                targetChunkX++;
                 targetX = x - LevelChunk.WIDTH;
             }
             
+            // Adjust for Z boundary crossing
             if (z < 0) {
-                targetChunk = northChunk;
+                targetChunkZ--;
                 targetZ = LevelChunk.DEPTH + z;
             } else if (z >= LevelChunk.DEPTH) {
-                targetChunk = southChunk;
+                targetChunkZ++;
                 targetZ = z - LevelChunk.DEPTH;
+            }
+            
+            // Get the appropriate neighbor chunk
+            LevelChunk targetChunk = null;
+            if (targetChunkX == centerChunk.chunkX() - 1 && targetChunkZ == centerChunk.chunkZ()) {
+                targetChunk = westChunk;
+            } else if (targetChunkX == centerChunk.chunkX() + 1 && targetChunkZ == centerChunk.chunkZ()) {
+                targetChunk = eastChunk;
+            } else if (targetChunkX == centerChunk.chunkX() && targetChunkZ == centerChunk.chunkZ() - 1) {
+                targetChunk = northChunk;
+            } else if (targetChunkX == centerChunk.chunkX() && targetChunkZ == centerChunk.chunkZ() + 1) {
+                targetChunk = southChunk;
             }
             
             if (targetChunk != null) {
