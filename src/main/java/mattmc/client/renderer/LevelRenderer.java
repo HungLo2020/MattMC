@@ -74,19 +74,8 @@ public class LevelRenderer {
         renderedChunks = 0;
         culledChunks = 0;
         
-        // First, register all loaded chunks with the renderer so uploads can find them
-        for (LevelChunk chunk : world.getLoadedChunks()) {
-            chunkRenderer.registerChunk(chunk);
-            
-            // Check if chunk is dirty and needs mesh rebuild
-            if (chunk.isDirty()) {
-                // Don't invalidate the old VAO yet - keep it visible until new one is ready
-                chunk.setDirty(false);
-                world.getAsyncLoader().requestChunkMeshRebuild(chunk);
-            }
-        }
-        
-        // Process completed mesh buffers from async loader
+        // Process completed mesh buffers from async loader first
+        // This makes newly loaded chunk meshes available for rendering
         List<ChunkMeshBuffer> completedMeshBuffers = world.getAsyncLoader().collectCompletedMeshBuffers();
         for (ChunkMeshBuffer meshBuffer : completedMeshBuffers) {
             chunkRenderer.uploadMeshBuffer(meshBuffer);
@@ -98,7 +87,8 @@ public class LevelRenderer {
         for (LevelChunk chunk : world.getLoadedChunks()) {
             totalChunks++;
             
-            // Frustum culling: skip chunks outside the camera view
+            // Frustum culling: skip chunks outside the camera view early
+            // This is done before registration and dirty checks to avoid unnecessary operations for culled chunks
             if (!frustum.isChunkVisible(chunk.chunkX(), chunk.chunkZ(), 
                                        LevelChunk.WIDTH, LevelChunk.DEPTH, 
                                        LevelChunk.MIN_Y, LevelChunk.MAX_Y)) {
@@ -106,15 +96,37 @@ public class LevelRenderer {
                 continue;
             }
             
-            renderedChunks++;
+            // Register chunk for mesh uploads (idempotent operation)
+            chunkRenderer.registerChunk(chunk);
+            
+            // Check if chunk is dirty and needs mesh rebuild
+            if (chunk.isDirty()) {
+                // Don't invalidate the old VAO yet - keep it visible until new one is ready
+                chunk.setDirty(false);
+                world.getAsyncLoader().requestChunkMeshRebuild(chunk);
+            }
+            
+            // Skip chunks without mesh data to avoid wasted GL calls
+            // These are counted as culled since they can't be rendered
+            if (!chunkRenderer.hasChunkMesh(chunk)) {
+                culledChunks++;
+                continue;
+            }
             
             // Calculate chunk world position
             int chunkWorldX = chunk.chunkX() * LevelChunk.WIDTH;
             int chunkWorldZ = chunk.chunkZ() * LevelChunk.DEPTH;
             
+            // Only do GL matrix operations if we're actually going to render
             glPushMatrix();
             glTranslatef(chunkWorldX, 0, chunkWorldZ);
-            chunkRenderer.renderChunk(chunk);
+            if (chunkRenderer.renderChunk(chunk)) {
+                renderedChunks++;
+            } else {
+                // Chunk lost its VAO between the hasChunkMesh check and now
+                // This is rare but can happen with concurrent modifications
+                culledChunks++;
+            }
             glPopMatrix();
         }
         
