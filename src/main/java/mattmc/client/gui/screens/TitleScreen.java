@@ -274,12 +274,12 @@ public final class TitleScreen implements Screen {
         float splashX = logoRight - 80f; // Further to the left
         float splashY = logoBottom - 10f; // Slightly higher
         
-        // Calculate animated scale using sine wave with 1 second intervals
-        // Period = 1 second, so frequency = 1/1 = 1 Hz
-        // Scale oscillates between 1.2 and 1.4 (slightly larger to slightly smaller)
-        float baseScale = 1.3f;
-        float scaleAmplitude = 0.1f; // Oscillates ±0.1 around base
-        float animatedScale = baseScale + scaleAmplitude * (float)Math.sin(splashAnimationTime * 2.0 * Math.PI * 1.0);
+        // Calculate animated scale using sine wave with 2 second intervals
+        // Period = 2 seconds, so frequency = 1/2 = 0.5 Hz
+        // Scale oscillates between 1.2 and 1.3 (slightly larger to slightly smaller)
+        float baseScale = 1.25f;
+        float scaleAmplitude = 0.05f; // Oscillates ±0.05 around base (1.25 ± 0.05 = 1.2 to 1.3)
+        float animatedScale = baseScale + scaleAmplitude * (float)Math.sin(splashAnimationTime * 2.0 * Math.PI * 0.5);
         
         // Save current matrix state
         glPushMatrix();
