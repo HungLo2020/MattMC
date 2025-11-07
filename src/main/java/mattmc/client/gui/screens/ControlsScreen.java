@@ -51,6 +51,7 @@ public final class ControlsScreen implements Screen {
         {PlayerInput.LEFT, "Strafe Left"},
         {PlayerInput.RIGHT, "Strafe Right"},
         {PlayerInput.JUMP, "Jump"},
+        {PlayerInput.SPRINT, "Sprint"},
         {PlayerInput.CROUCH, "Crouch / Fly Down"},
         {PlayerInput.FLY_UP, "Fly Up"},
         {PlayerInput.BREAK_BLOCK, "Break Block"},
