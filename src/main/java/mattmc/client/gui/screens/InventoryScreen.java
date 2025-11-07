@@ -7,6 +7,7 @@ import mattmc.client.renderer.BlurRenderer;
 import mattmc.client.renderer.texture.Texture;
 import mattmc.world.entity.player.PlayerInput;
 
+import static mattmc.client.settings.OptionsManager.isMenuScreenBlurEnabled;
 import static org.lwjgl.glfw.GLFW.*;
 import static org.lwjgl.opengl.GL11.*;
 import static org.lwjgl.opengl.GL30.*;
@@ -84,7 +85,7 @@ public final class InventoryScreen implements Screen {
         gameScreen.render(alpha);
         
         // Apply blur if enabled
-        if (mattmc.client.settings.OptionsManager.isMenuScreenBlurEnabled()) {
+        if (isMenuScreenBlurEnabled()) {
             if (blurEffect == null) {
                 blurEffect = new BlurEffect();
             }

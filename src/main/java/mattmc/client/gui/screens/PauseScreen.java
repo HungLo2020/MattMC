@@ -1,7 +1,5 @@
 package mattmc.client.gui.screens;
 
-import mattmc.client.settings.OptionsManager;
-
 import mattmc.client.Minecraft;
 import mattmc.client.Window;
 import mattmc.client.renderer.BlurEffect;
@@ -16,6 +14,7 @@ import java.nio.IntBuffer;
 import java.util.ArrayList;
 import java.util.List;
 
+import static mattmc.client.settings.OptionsManager.isMenuScreenBlurEnabled;
 import static org.lwjgl.glfw.GLFW.*;
 import static org.lwjgl.opengl.GL11.*;
 import static org.lwjgl.opengl.GL30.*;
@@ -167,7 +166,7 @@ public final class PauseScreen implements Screen {
         gameScreen.render(alpha);
         
         // Apply blur if enabled
-        if (mattmc.client.settings.OptionsManager.isMenuScreenBlurEnabled()) {
+        if (isMenuScreenBlurEnabled()) {
             if (blurEffect == null) {
                 blurEffect = new BlurEffect();
             }
