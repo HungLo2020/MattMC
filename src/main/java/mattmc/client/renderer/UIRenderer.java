@@ -99,25 +99,28 @@ public class UIRenderer {
         String direction = getCardinalDirection(yaw);
         
         // Format position values to 2 decimal places for readability
-        String posText = String.format("Position: %.2f, %.2f, %.2f (Facing: %s) (Yaw: %.2f, Pitch: %.2f, Roll: %.2f)", 
-                                        playerX, playerY, playerZ, direction, yaw, pitch, roll);
+        // Include facing direction and yaw on same line as requested
+        String posText = String.format("Position: %.2f, %.2f, %.2f (Facing: %s, Yaw: %.2f)", 
+                                        playerX, playerY, playerZ, direction, yaw);
+        String rotationText = String.format("Pitch: %.2f, Roll: %.2f", pitch, roll);
         String chunkText = String.format("LevelChunk: %d, %d", chunkX, chunkZ);
         String regionText = String.format("Region: %d, %d", regionX, regionZ);
         
         drawText(posText, x, y + lineHeight * 2, scale, 0xFFFFFF);
-        drawText(chunkText, x, y + lineHeight * 3, scale, 0xFFFFFF);
-        drawText(regionText, x, y + lineHeight * 4, scale, 0xFFFFFF);
+        drawText(rotationText, x, y + lineHeight * 3, scale, 0xFFFFFF);
+        drawText(chunkText, x, y + lineHeight * 4, scale, 0xFFFFFF);
+        drawText(regionText, x, y + lineHeight * 5, scale, 0xFFFFFF);
         
         // Chunk loading stats
         String loadedText = String.format("Loaded Chunks: %d", loadedChunks);
         String pendingText = String.format("Pending: %d | Workers: %d", pendingChunks, activeWorkers);
         
-        drawText(loadedText, x, y + lineHeight * 5, scale, 0xFFFFFF);
-        drawText(pendingText, x, y + lineHeight * 6, scale, 0xFFFFFF);
+        drawText(loadedText, x, y + lineHeight * 6, scale, 0xFFFFFF);
+        drawText(pendingText, x, y + lineHeight * 7, scale, 0xFFFFFF);
         
         // Frustum culling stats
         String renderText = String.format("Rendered: %d | Culled: %d", renderedChunks, culledChunks);
-        drawText(renderText, x, y + lineHeight * 7, scale, 0xFFFFFF);
+        drawText(renderText, x, y + lineHeight * 8, scale, 0xFFFFFF);
         
         // Restore matrices
         glPopMatrix();
