@@ -8,6 +8,7 @@ import mattmc.client.renderer.texture.Texture;
 import mattmc.client.gui.components.Button;
 import mattmc.client.gui.components.ButtonRenderer;
 import mattmc.client.gui.components.TextRenderer;
+import mattmc.client.gui.SplashTextLoader;
 import org.lwjgl.system.MemoryStack;
 
 import java.nio.IntBuffer;
@@ -30,6 +31,7 @@ public final class TitleScreen implements Screen {
     private double mouseXWin, mouseYWin;
     private boolean mouseDown;
     private Texture logoTexture;
+    private String splashText;
 
     // Fixed 20 TPS logic clock
     private static final double TPS = 20.0;
@@ -53,6 +55,9 @@ public final class TitleScreen implements Screen {
         
         // Load the MattMC logo texture
         logoTexture = Texture.load("/assets/textures/gui/MattMC.png");
+        
+        // Load random splash text
+        splashText = SplashTextLoader.getRandomSplashText();
 
         glfwSetCursorPosCallback(window.handle(), (h, x, y) -> { mouseXWin = x; mouseYWin = y; });
         glfwSetMouseButtonCallback(window.handle(), (h, button, action, mods) -> {
@@ -162,6 +167,7 @@ public final class TitleScreen implements Screen {
         }
         drawLogo();
         drawTitle("A blocky sandbox by Matt", subtitleCX, subtitleCY, subtitleScale, 0xB0C4DE);
+        drawSplashText();
     }
 
 
@@ -241,6 +247,30 @@ public final class TitleScreen implements Screen {
         
         glDisable(GL_BLEND);
         glDisable(GL_TEXTURE_2D);
+    }
+
+    private void drawSplashText() {
+        if (splashText == null || splashText.isEmpty()) return;
+        
+        // Position splash text slightly below and to the right of the logo
+        // Calculate logo bottom-right position
+        int w = window.width();
+        float targetWidth = w * 0.6f;
+        float logoScale = targetWidth / logoTexture.width;
+        logoScale = Math.max(0.3f, Math.min(logoScale, 2.0f));
+        
+        float logoWidth = logoTexture.width * logoScale;
+        float logoHeight = logoTexture.height * logoScale;
+        float logoRight = titleCX + logoWidth / 2f;
+        float logoBottom = titleCY + logoHeight / 2f;
+        
+        // Position splash text with offset from logo
+        float splashScale = 1.0f;
+        float splashX = logoRight + 10f; // 10 pixels to the right
+        float splashY = logoBottom + 5f; // 5 pixels below
+        
+        // Draw in yellow color (0xFFFF00)
+        drawText(splashText, splashX, splashY, splashScale, 0xFFFF00);
     }
 
     @Override

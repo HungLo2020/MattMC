@@ -141,6 +141,18 @@ public class PlayerPhysics {
     }
     
     /**
+     * Handle continuous jump when space is held.
+     * This allows jumping immediately when hitting the ground if space is still held.
+     */
+    public void handleSpaceHeld() {
+        // Only jump if on ground, not flying, and not in the double-tap window
+        if (!flying && onGround) {
+            velocityY = JUMP_VELOCITY;
+            onGround = false;
+        }
+    }
+    
+    /**
      * Find the highest solid block at given X,Z position to spawn player on top.
      * Ensures spawn position has at least 2 blocks of air above for player headroom.
      */
