@@ -19,6 +19,7 @@ public class UIRenderer {
     // Constants for command feedback positioning and sizing
     private static final int FEEDBACK_Y_OFFSET = 120; // Distance from bottom of screen
     private static final int CHAR_WIDTH_ESTIMATE = 8; // Approximate character width in pixels
+    private static final float HOTBAR_SCALE = 3.0f; // Scale factor for hotbar rendering
     
     // Hotbar texture
     private Texture hotbarTexture;
@@ -172,7 +173,6 @@ public class UIRenderer {
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
         
         // Draw hotbar texture centered at bottom of screen
-        float scale = 3.0f;
         float hotbarX = 0f;
         float hotbarY = 0f;
         
@@ -182,8 +182,8 @@ public class UIRenderer {
             glColor4f(1f, 1f, 1f, 1f);
             
             // Scale hotbar to 3x size for better visibility (like Minecraft GUI scale)
-            float texWidth = hotbarTexture.width * scale;
-            float texHeight = hotbarTexture.height * scale;
+            float texWidth = hotbarTexture.width * HOTBAR_SCALE;
+            float texHeight = hotbarTexture.height * HOTBAR_SCALE;
             hotbarX = (screenWidth - texWidth) / 2f;
             hotbarY = screenHeight - texHeight - 10; // 10 pixels from bottom
             
@@ -202,13 +202,13 @@ public class UIRenderer {
             
             // Calculate position for selection overlay
             // The hotbar has 9 slots, each slot is (hotbar width / 9) wide
-            float slotWidth = (hotbarTexture.width * scale) / 9f;
+            float slotWidth = (hotbarTexture.width * HOTBAR_SCALE) / 9f;
             float selectionX = hotbarX + (selectedHotbarSlot * slotWidth);
             float selectionY = hotbarY;
             
             // The selection texture should match the slot size
-            float selectionWidth = hotbarSelectionTexture.width * scale;
-            float selectionHeight = hotbarSelectionTexture.height * scale;
+            float selectionWidth = hotbarSelectionTexture.width * HOTBAR_SCALE;
+            float selectionHeight = hotbarSelectionTexture.height * HOTBAR_SCALE;
             
             glBegin(GL_QUADS);
             glTexCoord2f(0, 1); glVertex2f(selectionX, selectionY);

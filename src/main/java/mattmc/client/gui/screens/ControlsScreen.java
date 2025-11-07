@@ -42,6 +42,7 @@ public final class ControlsScreen implements Screen {
     private int scrollOffset = 0;
     private int maxScrollOffset = 0;
     private static final int SCROLL_BUFFER = 50; // Buffer room above/below keybinds
+    private static final int SCROLL_SPEED = 20; // Pixels to scroll per mouse wheel notch
     
     // Keybind actions with display names
     private static final String[][] KEYBIND_ACTIONS = {
@@ -291,7 +292,7 @@ public final class ControlsScreen implements Screen {
         glfwSetScrollCallback(window.handle(), (win, xOffset, yOffset) -> {
             // Scroll down = positive yOffset, scroll up = negative yOffset
             // We want scrolling down to increase scrollOffset (move content up)
-            int scrollAmount = (int)(-yOffset * 20); // Multiply by speed factor
+            int scrollAmount = (int)(-yOffset * SCROLL_SPEED);
             scrollOffset = Math.max(0, Math.min(maxScrollOffset, scrollOffset + scrollAmount));
         });
     }

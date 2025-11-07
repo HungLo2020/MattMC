@@ -217,27 +217,18 @@ public final class DevplayScreen implements Screen {
                 // Check for hotbar selection keys (1-9)
                 if (action == GLFW_PRESS) {
                     PlayerInput input = PlayerInput.getInstance();
-                    for (int i = 1; i <= 9; i++) {
-                        String hotbarAction = switch(i) {
-                            case 1 -> PlayerInput.HOTBAR_1;
-                            case 2 -> PlayerInput.HOTBAR_2;
-                            case 3 -> PlayerInput.HOTBAR_3;
-                            case 4 -> PlayerInput.HOTBAR_4;
-                            case 5 -> PlayerInput.HOTBAR_5;
-                            case 6 -> PlayerInput.HOTBAR_6;
-                            case 7 -> PlayerInput.HOTBAR_7;
-                            case 8 -> PlayerInput.HOTBAR_8;
-                            case 9 -> PlayerInput.HOTBAR_9;
-                            default -> null;
-                        };
-                        
-                        if (hotbarAction != null) {
-                            Integer hotbarKey = input.getKeybind(hotbarAction);
-                            if (hotbarKey != null && key == hotbarKey) {
-                                // Select hotbar slot (0-indexed, so slot 1 is index 0)
-                                uiRenderer.setSelectedHotbarSlot(i - 1);
-                                break;
-                            }
+                    String[] hotbarActions = {
+                        PlayerInput.HOTBAR_1, PlayerInput.HOTBAR_2, PlayerInput.HOTBAR_3,
+                        PlayerInput.HOTBAR_4, PlayerInput.HOTBAR_5, PlayerInput.HOTBAR_6,
+                        PlayerInput.HOTBAR_7, PlayerInput.HOTBAR_8, PlayerInput.HOTBAR_9
+                    };
+                    
+                    for (int i = 0; i < hotbarActions.length; i++) {
+                        Integer hotbarKey = input.getKeybind(hotbarActions[i]);
+                        if (hotbarKey != null && key == hotbarKey) {
+                            // Select hotbar slot (0-indexed)
+                            uiRenderer.setSelectedHotbarSlot(i);
+                            break;
                         }
                     }
                 }
