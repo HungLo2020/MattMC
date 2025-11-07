@@ -40,6 +40,9 @@ public final class TitleScreen implements Screen {
 
     // Real-time frame clock for visuals & accumulator
     private double lastFrameTimeSec = System.nanoTime() * 1e-9;
+    
+    // Splash text animation
+    private double splashAnimationTime = 0.0;
 
     // Layout
     private float titleScale = 3.0f;
@@ -104,6 +107,9 @@ public final class TitleScreen implements Screen {
         lastFrameTimeSec = now;
         if (frameDt < 0) frameDt = 0;
         if (frameDt > 0.25) frameDt = 0.25; // clamp huge pauses to keep things sane
+
+        // Update splash text animation time
+        splashAnimationTime += frameDt;
 
         // Panorama rotation is now updated during rendering to prevent jitter
 
@@ -252,7 +258,7 @@ public final class TitleScreen implements Screen {
     private void drawSplashText() {
         if (splashText == null || splashText.isEmpty()) return;
         
-        // Position splash text slightly below and to the right of the logo
+        // Position splash text further to the left from the logo
         // Calculate logo bottom-right position
         int w = window.width();
         float targetWidth = w * 0.6f;
@@ -264,13 +270,33 @@ public final class TitleScreen implements Screen {
         float logoRight = titleCX + logoWidth / 2f;
         float logoBottom = titleCY + logoHeight / 2f;
         
-        // Position splash text with offset from logo
-        float splashScale = 1.3f; // Slightly larger text
-        float splashX = logoRight - 15f; // Slightly to the left
+        // Position splash text with offset from logo - moved further left
+        float splashX = logoRight - 80f; // Further to the left
         float splashY = logoBottom - 10f; // Slightly higher
         
+        // Calculate animated scale using sine wave with 0.5 second intervals
+        // Period = 0.5 seconds, so frequency = 1/0.5 = 2 Hz
+        // Scale oscillates between 1.2 and 1.4 (slightly larger to slightly smaller)
+        float baseScale = 1.3f;
+        float scaleAmplitude = 0.1f; // Oscillates ±0.1 around base
+        float animatedScale = baseScale + scaleAmplitude * (float)Math.sin(splashAnimationTime * 2.0 * Math.PI * 2.0);
+        
+        // Save current matrix state
+        glPushMatrix();
+        
+        // Move to the splash text position
+        glTranslatef(splashX, splashY, 0);
+        
+        // Rotate -45 degrees (top of text faces top-left corner)
+        glRotatef(-45f, 0, 0, 1);
+        
+        // Draw text at origin (0, 0) since we've already translated
         // Draw in yellow color (0xFFFF00)
-        drawText(splashText, splashX, splashY, splashScale, 0xFFFF00);
+        setColor(0xFFFF00, 1f);
+        TextRenderer.drawText(splashText, 0, 0, animatedScale);
+        
+        // Restore matrix state
+        glPopMatrix();
     }
 
     @Override
