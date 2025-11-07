@@ -38,14 +38,28 @@ public class ChunkRenderer {
     }
     
     /**
-     * Render a chunk using VBO/VAO.
+     * Check if a chunk has mesh data ready for rendering.
+     * This should be called before doing any GL state changes to avoid wasted operations.
+     * 
+     * @param chunk The chunk to check
+     * @return true if the chunk has a VAO and can be rendered
      */
-    public void renderChunk(LevelChunk chunk) {
+    public boolean hasChunkMesh(LevelChunk chunk) {
+        return vaoCache.get(chunk) != null;
+    }
+    
+    /**
+     * Render a chunk using VBO/VAO.
+     * Returns true if rendering actually happened.
+     * 
+     * @return true if the chunk was rendered, false if no VAO available
+     */
+    public boolean renderChunk(LevelChunk chunk) {
         // Get VAO
         ChunkVAO vao = vaoCache.get(chunk);
         if (vao == null) {
             // VAO not ready yet - it will be uploaded later from async mesh building
-            return;
+            return false;
         }
         
         // Enable texturing and bind texture atlas
@@ -59,6 +73,8 @@ public class ChunkRenderer {
         
         // Unbind texture
         glBindTexture(GL_TEXTURE_2D, 0);
+        
+        return true;
     }
     
     /**

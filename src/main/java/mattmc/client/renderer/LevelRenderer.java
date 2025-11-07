@@ -98,6 +98,12 @@ public class LevelRenderer {
         for (LevelChunk chunk : world.getLoadedChunks()) {
             totalChunks++;
             
+            // Skip chunks without mesh data early to avoid wasted GL calls
+            if (!chunkRenderer.hasChunkMesh(chunk)) {
+                culledChunks++;
+                continue;
+            }
+            
             // Frustum culling: skip chunks outside the camera view
             if (!frustum.isChunkVisible(chunk.chunkX(), chunk.chunkZ(), 
                                        LevelChunk.WIDTH, LevelChunk.DEPTH, 
@@ -106,15 +112,20 @@ public class LevelRenderer {
                 continue;
             }
             
-            renderedChunks++;
-            
             // Calculate chunk world position
             int chunkWorldX = chunk.chunkX() * LevelChunk.WIDTH;
             int chunkWorldZ = chunk.chunkZ() * LevelChunk.DEPTH;
             
+            // Only do GL matrix operations if we're actually going to render
             glPushMatrix();
             glTranslatef(chunkWorldX, 0, chunkWorldZ);
-            chunkRenderer.renderChunk(chunk);
+            if (chunkRenderer.renderChunk(chunk)) {
+                renderedChunks++;
+            } else {
+                // Chunk lost its VAO between the hasChunkMesh check and now
+                // This is rare but can happen with concurrent modifications
+                culledChunks++;
+            }
             glPopMatrix();
         }
         
