@@ -460,6 +460,11 @@ public final class DevplayScreen implements Screen {
         // Update player movement based on input - only if command overlay is not visible
         if (!commandOverlayVisible) {
             playerController.updateMovement(window.handle(), FIXED_DT);
+            
+            // Handle continuous jump when space is held
+            if (PlayerInput.getInstance().isPressed(window.handle(), PlayerInput.JUMP)) {
+                playerController.handleSpaceHeld();
+            }
         }
         
         // Decrease error display time (use wall clock time for UI)

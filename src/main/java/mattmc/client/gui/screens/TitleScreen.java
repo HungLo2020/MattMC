@@ -8,6 +8,7 @@ import mattmc.client.renderer.texture.Texture;
 import mattmc.client.gui.components.Button;
 import mattmc.client.gui.components.ButtonRenderer;
 import mattmc.client.gui.components.TextRenderer;
+import mattmc.client.gui.SplashTextLoader;
 import org.lwjgl.system.MemoryStack;
 
 import java.nio.IntBuffer;
@@ -30,6 +31,7 @@ public final class TitleScreen implements Screen {
     private double mouseXWin, mouseYWin;
     private boolean mouseDown;
     private Texture logoTexture;
+    private String splashText;
 
     // Fixed 20 TPS logic clock
     private static final double TPS = 20.0;
@@ -38,6 +40,9 @@ public final class TitleScreen implements Screen {
 
     // Real-time frame clock for visuals & accumulator
     private double lastFrameTimeSec = System.nanoTime() * 1e-9;
+    
+    // Splash text animation
+    private double splashAnimationTime = 0.0;
 
     // Layout
     private float titleScale = 3.0f;
@@ -53,6 +58,9 @@ public final class TitleScreen implements Screen {
         
         // Load the MattMC logo texture
         logoTexture = Texture.load("/assets/textures/gui/MattMC.png");
+        
+        // Load random splash text
+        splashText = SplashTextLoader.getRandomSplashText();
 
         glfwSetCursorPosCallback(window.handle(), (h, x, y) -> { mouseXWin = x; mouseYWin = y; });
         glfwSetMouseButtonCallback(window.handle(), (h, button, action, mods) -> {
@@ -99,6 +107,9 @@ public final class TitleScreen implements Screen {
         lastFrameTimeSec = now;
         if (frameDt < 0) frameDt = 0;
         if (frameDt > 0.25) frameDt = 0.25; // clamp huge pauses to keep things sane
+
+        // Update splash text animation time
+        splashAnimationTime += frameDt;
 
         // Panorama rotation is now updated during rendering to prevent jitter
 
@@ -162,6 +173,7 @@ public final class TitleScreen implements Screen {
         }
         drawLogo();
         drawTitle("A blocky sandbox by Matt", subtitleCX, subtitleCY, subtitleScale, 0xB0C4DE);
+        drawSplashText();
     }
 
 
@@ -241,6 +253,50 @@ public final class TitleScreen implements Screen {
         
         glDisable(GL_BLEND);
         glDisable(GL_TEXTURE_2D);
+    }
+
+    private void drawSplashText() {
+        if (splashText == null || splashText.isEmpty()) return;
+        
+        // Position splash text further to the left from the logo
+        // Calculate logo bottom-right position
+        int w = window.width();
+        float targetWidth = w * 0.6f;
+        float logoScale = targetWidth / logoTexture.width;
+        logoScale = Math.max(0.3f, Math.min(logoScale, 2.0f));
+        
+        float logoWidth = logoTexture.width * logoScale;
+        float logoHeight = logoTexture.height * logoScale;
+        float logoRight = titleCX + logoWidth / 2f;
+        float logoBottom = titleCY + logoHeight / 2f;
+        
+        // Position splash text with offset from logo - moved further left
+        float splashX = logoRight - 80f; // Further to the left
+        float splashY = logoBottom - 10f; // Slightly higher
+        
+        // Calculate animated scale using sine wave with 2 second intervals
+        // Period = 2 seconds, so frequency = 1/2 = 0.5 Hz
+        // Scale oscillates between 1.2 and 1.3 (slightly larger to slightly smaller)
+        float baseScale = 1.25f;
+        float scaleAmplitude = 0.05f; // Oscillates ±0.05 around base (1.25 ± 0.05 = 1.2 to 1.3)
+        float animatedScale = baseScale + scaleAmplitude * (float)Math.sin(splashAnimationTime * 2.0 * Math.PI * 0.5);
+        
+        // Save current matrix state
+        glPushMatrix();
+        
+        // Move to the splash text position
+        glTranslatef(splashX, splashY, 0);
+        
+        // Rotate -30 degrees (top of text faces top-left corner)
+        glRotatef(-30f, 0, 0, 1);
+        
+        // Draw text at origin (0, 0) since we've already translated
+        // Draw in yellow color (0xFFFF00)
+        setColor(0xFFFF00, 1f);
+        TextRenderer.drawText(splashText, 0, 0, animatedScale);
+        
+        // Restore matrix state
+        glPopMatrix();
     }
 
     @Override

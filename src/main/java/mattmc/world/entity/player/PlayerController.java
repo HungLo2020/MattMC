@@ -90,6 +90,16 @@ public class PlayerController {
     }
     
     /**
+     * Handle continuous jump when space is held.
+     */
+    public void handleSpaceHeld() {
+        PlayerPhysics physics = player.getPhysics();
+        if (physics != null) {
+            physics.handleSpaceHeld();
+        }
+    }
+    
+    /**
      * Handle mouse movement for camera rotation.
      * @param xpos Current mouse X position
      * @param ypos Current mouse Y position
