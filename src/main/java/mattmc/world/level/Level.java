@@ -173,10 +173,11 @@ public class Level implements LevelAccessor {
     /**
      * Try to load a chunk from disk.
      * Returns null if the chunk doesn't exist on disk or if world directory is not set.
+     * Uses region cache for better performance (Minecraft Java Edition approach).
      */
     private LevelChunk loadChunkFromDisk(int chunkX, int chunkZ) {
-        if (worldDirectory == null) {
-            return null; // No save directory set
+        if (worldDirectory == null || regionCache == null) {
+            return null; // No save directory or cache set
         }
         
         try {
@@ -195,15 +196,15 @@ public class Level implements LevelAccessor {
                 return null; // Region file doesn't exist
             }
             
-            try (RegionFile regionFile = new RegionFile(regionFilePath, regionX, regionZ)) {
-                if (!regionFile.hasChunk(chunkX, chunkZ)) {
-                    return null; // Chunk not in region file
-                }
-                
-                Map<String, Object> chunkNBT = regionFile.readChunk(chunkX, chunkZ);
-                if (chunkNBT != null) {
-                    return ChunkNBT.fromNBT(chunkNBT);
-                }
+            // Use cached region file instead of creating a new one
+            RegionFile regionFile = regionCache.getRegionFile(chunkX, chunkZ);
+            if (!regionFile.hasChunk(chunkX, chunkZ)) {
+                return null; // Chunk not in region file
+            }
+            
+            Map<String, Object> chunkNBT = regionFile.readChunk(chunkX, chunkZ);
+            if (chunkNBT != null) {
+                return ChunkNBT.fromNBT(chunkNBT);
             }
         } catch (IOException e) {
             logger.error("Failed to load chunk ({}, {}) from disk: {}", chunkX, chunkZ, e.getMessage(), e);
