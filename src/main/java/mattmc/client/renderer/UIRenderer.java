@@ -60,7 +60,8 @@ public class UIRenderer {
      * Draw debug information in the top-left corner.
      * Shows version, FPS, player position, chunk position, region position, and culling stats.
      */
-    public void drawDebugInfo(int screenWidth, int screenHeight, float playerX, float playerY, float playerZ, double fps, 
+    public void drawDebugInfo(int screenWidth, int screenHeight, float playerX, float playerY, float playerZ, 
+                               float yaw, float pitch, float roll, double fps, 
                                int loadedChunks, int pendingChunks, int activeWorkers, int renderedChunks, int culledChunks) {
         // Calculate chunk position from player position
         int chunkX = Math.floorDiv((int)playerX, LevelChunk.WIDTH);
@@ -94,8 +95,12 @@ public class UIRenderer {
         String fpsText = String.format("FPS: %.0f", fps);
         drawText(fpsText, x, y + lineHeight, scale, 0xFFFFFF);
         
+        // Calculate cardinal direction from yaw
+        String direction = getCardinalDirection(yaw);
+        
         // Format position values to 2 decimal places for readability
-        String posText = String.format("Position: %.2f, %.2f, %.2f", playerX, playerY, playerZ);
+        String posText = String.format("Position: %.2f, %.2f, %.2f (Facing: %s) (Yaw: %.2f, Pitch: %.2f, Roll: %.2f)", 
+                                        playerX, playerY, playerZ, direction, yaw, pitch, roll);
         String chunkText = String.format("LevelChunk: %d, %d", chunkX, chunkZ);
         String regionText = String.format("Region: %d, %d", regionX, regionZ);
         
@@ -205,5 +210,36 @@ public class UIRenderer {
         float g = ((rgb >> 8) & 0xFF) / 255f;
         float b = (rgb & 0xFF) / 255f;
         glColor4f(r, g, b, a);
+    }
+    
+    /**
+     * Get cardinal direction from yaw angle.
+     * Minecraft's yaw: 0 = South, 90 = West, 180 = North, 270 = East
+     * @param yaw The yaw angle in degrees
+     * @return Cardinal direction (N, S, E, W, NE, NW, SE, SW)
+     */
+    private String getCardinalDirection(float yaw) {
+        // Normalize yaw to 0-360 range
+        float normalizedYaw = ((yaw % 360) + 360) % 360;
+        
+        // Determine direction based on yaw ranges
+        // In Minecraft: South = 0, West = 90, North = 180, East = 270
+        if (normalizedYaw >= 337.5 || normalizedYaw < 22.5) {
+            return "South";
+        } else if (normalizedYaw >= 22.5 && normalizedYaw < 67.5) {
+            return "South-West";
+        } else if (normalizedYaw >= 67.5 && normalizedYaw < 112.5) {
+            return "West";
+        } else if (normalizedYaw >= 112.5 && normalizedYaw < 157.5) {
+            return "North-West";
+        } else if (normalizedYaw >= 157.5 && normalizedYaw < 202.5) {
+            return "North";
+        } else if (normalizedYaw >= 202.5 && normalizedYaw < 247.5) {
+            return "North-East";
+        } else if (normalizedYaw >= 247.5 && normalizedYaw < 292.5) {
+            return "East";
+        } else {
+            return "South-East";
+        }
     }
 }

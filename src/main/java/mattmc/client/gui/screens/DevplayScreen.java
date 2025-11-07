@@ -381,7 +381,8 @@ public final class DevplayScreen implements Screen {
             int renderedChunks = worldRenderer.getRenderedChunkCount();
             int culledChunks = worldRenderer.getCulledChunkCount();
             // Use interpolated position for smooth debug display
-            uiRenderer.drawDebugInfo(w, h, player.getX(alphaF), player.getY(alphaF), player.getZ(alphaF), fps,
+            uiRenderer.drawDebugInfo(w, h, player.getX(alphaF), player.getY(alphaF), player.getZ(alphaF), 
+                                     player.getYaw(alphaF), player.getPitch(alphaF), 0f, fps,
                                      loadedChunks, pendingChunks, activeWorkers, renderedChunks, culledChunks);
         }
         
