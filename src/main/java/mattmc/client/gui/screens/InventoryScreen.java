@@ -29,6 +29,12 @@ public final class InventoryScreen implements Screen {
         // Release mouse cursor
         glfwSetInputMode(window.handle(), GLFW_CURSOR, GLFW_CURSOR_NORMAL);
 
+        // Disable mouse movement callback to prevent camera rotation
+        glfwSetCursorPosCallback(window.handle(), null);
+        
+        // Disable mouse button callback to prevent block interaction
+        glfwSetMouseButtonCallback(window.handle(), null);
+
         // Set up key callback for inventory key (respects user configuration) or ESC to close
         glfwSetKeyCallback(window.handle(), (win, key, scancode, action, mods) -> {
             if (action == GLFW_PRESS) {
@@ -57,8 +63,8 @@ public final class InventoryScreen implements Screen {
 
     @Override
     public void tick() {
-        // Game continues to tick in background
-        gameScreen.tick();
+        // Don't update the game while inventory is open - player should not move
+        // and game is effectively paused (similar to pause menu behavior)
     }
 
     @Override
