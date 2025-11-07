@@ -444,11 +444,8 @@ public final class DevplayScreen implements Screen {
         // Save previous position for interpolation before updating
         player.updatePreviousPosition();
         
-        double now = now();
-        double dt = now - lastFrameTimeSec;
-        lastFrameTimeSec = now;
-        if (dt < 0) dt = 0;
-        if (dt > 0.5) dt = 0.5;
+        // Fixed timestep: since tick() is called at exactly 20 TPS, use fixed dt
+        final float FIXED_DT = 0.05f; // 1/20 second per tick
         
         // FPS tracking moved to render() for accurate measurement
         
@@ -457,16 +454,19 @@ public final class DevplayScreen implements Screen {
         
         // Update physics (gravity, collision) - only if command overlay is not visible
         if (!commandOverlayVisible) {
-            playerPhysics.update((float)dt);
+            playerPhysics.update(FIXED_DT);
         }
         
         // Update player movement based on input - only if command overlay is not visible
         if (!commandOverlayVisible) {
-            playerController.updateMovement(window.handle(), (float)dt);
+            playerController.updateMovement(window.handle(), FIXED_DT);
         }
         
-        // Decrease error display time
+        // Decrease error display time (use wall clock time for UI)
         if (commandFeedbackDisplayTime > 0) {
+            double now = now();
+            double dt = now - lastFrameTimeSec;
+            lastFrameTimeSec = now;
             commandFeedbackDisplayTime -= dt;
         }
     }

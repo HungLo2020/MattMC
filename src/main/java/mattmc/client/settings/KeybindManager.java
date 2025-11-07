@@ -93,6 +93,7 @@ public class KeybindManager {
         input.setKeybind(PlayerInput.LEFT, GLFW_KEY_A);
         input.setKeybind(PlayerInput.RIGHT, GLFW_KEY_D);
         input.setKeybind(PlayerInput.JUMP, GLFW_KEY_SPACE);
+        input.setKeybind(PlayerInput.SPRINT, GLFW_KEY_LEFT_SHIFT);
         input.setKeybind(PlayerInput.CROUCH, GLFW_KEY_LEFT_CONTROL);
         input.setKeybind(PlayerInput.BREAK_BLOCK, -(GLFW_MOUSE_BUTTON_LEFT + 1));
         input.setKeybind(PlayerInput.PLACE_BLOCK, -(GLFW_MOUSE_BUTTON_RIGHT + 1));
