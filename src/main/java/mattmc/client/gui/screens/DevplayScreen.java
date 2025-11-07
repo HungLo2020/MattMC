@@ -11,6 +11,7 @@ import mattmc.client.renderer.LevelRenderer;
 import mattmc.client.renderer.UIRenderer;
 import mattmc.client.renderer.block.BlockFaceGeometry;
 import mattmc.client.renderer.ColorUtils;
+import mattmc.world.level.block.Block;
 import mattmc.world.level.block.Blocks;
 import mattmc.world.level.chunk.LevelChunk;
 import mattmc.world.level.Level;
@@ -31,6 +32,9 @@ import org.slf4j.LoggerFactory;
  */
 public final class DevplayScreen implements Screen {
     private static final Logger logger = LoggerFactory.getLogger(DevplayScreen.class);
+    
+    // Maximum region size for /set command to prevent UI freezing (100,000 blocks)
+    private static final long MAX_REGION_SIZE = 100_000;
 
     private final Minecraft game;
     private final Window window;
@@ -61,8 +65,14 @@ public final class DevplayScreen implements Screen {
     // Command overlay state
     private boolean commandOverlayVisible = false;
     private StringBuilder commandText = new StringBuilder("/");
-    private String commandErrorMessage = "";
-    private double commandErrorDisplayTime = 0;
+    
+    // Command feedback message (shown above hotbar area, independent of command overlay)
+    private String commandFeedbackMessage = "";
+    private double commandFeedbackDisplayTime = 0;
+    
+    // Region selection state for /pos1, /pos2, and /set commands
+    private int[] regionPos1 = null; // [x, y, z]
+    private int[] regionPos2 = null; // [x, y, z]
     
     // Flag to track if world should be shut down on close
     private boolean shouldShutdownWorld = false;
@@ -222,8 +232,6 @@ public final class DevplayScreen implements Screen {
     private void openCommandOverlay() {
         commandOverlayVisible = true;
         commandText = new StringBuilder();
-        commandErrorMessage = "";
-        commandErrorDisplayTime = 0;
         // Keep cursor captured but allow typing
     }
     
@@ -242,17 +250,23 @@ public final class DevplayScreen implements Screen {
         
         // Ensure command starts with /
         if (!cmd.startsWith("/")) {
-            commandErrorMessage = "Commands must start with /";
-            commandErrorDisplayTime = 3.0;
+            commandFeedbackMessage = "Commands must start with /";
+            commandFeedbackDisplayTime = 3.0;
             return;
         }
         
         // Parse and execute command
         if (cmd.startsWith("/tp ")) {
             executeTeleportCommand(cmd);
+        } else if (cmd.equals("/pos1")) {
+            executePos1Command();
+        } else if (cmd.equals("/pos2")) {
+            executePos2Command();
+        } else if (cmd.startsWith("/set ")) {
+            executeSetCommand(cmd);
         } else {
-            commandErrorMessage = "Unknown command: " + cmd;
-            commandErrorDisplayTime = 3.0; // Show error for 3 seconds
+            commandFeedbackMessage = "Unknown command: " + cmd;
+            commandFeedbackDisplayTime = 3.0; // Show error for 3 seconds
         }
     }
     
@@ -262,8 +276,8 @@ public final class DevplayScreen implements Screen {
             String[] parts = cmd.substring(4).trim().split("\\s+");
             
             if (parts.length != 3) {
-                commandErrorMessage = "Usage: /tp x y z";
-                commandErrorDisplayTime = 3.0;
+                commandFeedbackMessage = "Usage: /tp x y z";
+                commandFeedbackDisplayTime = 3.0;
                 return;
             }
             
@@ -279,9 +293,124 @@ public final class DevplayScreen implements Screen {
             logger.info("Teleported to: {}, {}, {}", x, y, z);
             
         } catch (NumberFormatException e) {
-            commandErrorMessage = "Invalid coordinates. Usage: /tp x y z";
-            commandErrorDisplayTime = 3.0;
+            commandFeedbackMessage = "Invalid coordinates. Usage: /tp x y z";
+            commandFeedbackDisplayTime = 3.0;
         }
+    }
+    
+    /**
+     * Execute /pos1 command - sets the first position of the region to the player's current position.
+     */
+    private void executePos1Command() {
+        // Get player's current block position (floor of the feet position)
+        int x = (int) Math.floor(player.getX());
+        int y = (int) Math.floor(player.getY());
+        int z = (int) Math.floor(player.getZ());
+        
+        regionPos1 = new int[]{x, y, z};
+        logger.info("Position 1 set to: {}, {}, {}", x, y, z);
+        
+        // Show confirmation message to user
+        commandFeedbackMessage = "Position 1 set to: " + x + ", " + y + ", " + z;
+        commandFeedbackDisplayTime = 3.0;
+    }
+    
+    /**
+     * Execute /pos2 command - sets the second position of the region to the player's current position.
+     */
+    private void executePos2Command() {
+        // Get player's current block position (floor of the feet position)
+        int x = (int) Math.floor(player.getX());
+        int y = (int) Math.floor(player.getY());
+        int z = (int) Math.floor(player.getZ());
+        
+        regionPos2 = new int[]{x, y, z};
+        logger.info("Position 2 set to: {}, {}, {}", x, y, z);
+        
+        // Show confirmation message to user
+        commandFeedbackMessage = "Position 2 set to: " + x + ", " + y + ", " + z;
+        commandFeedbackDisplayTime = 3.0;
+    }
+    
+    /**
+     * Execute /set command - fills the region defined by pos1 and pos2 with the specified block.
+     * @param cmd The full command string (e.g., "/set stone" or "/set mattmc:stone")
+     */
+    private void executeSetCommand(String cmd) {
+        // Check if both positions are set
+        if (regionPos1 == null || regionPos2 == null) {
+            commandFeedbackMessage = "Please set both positions first with /pos1 and /pos2";
+            commandFeedbackDisplayTime = 3.0;
+            return;
+        }
+        
+        // Parse the block name from the command
+        String blockName = cmd.substring(5).trim(); // Remove "/set "
+        
+        if (blockName.isEmpty()) {
+            commandFeedbackMessage = "Usage: /set <block>";
+            commandFeedbackDisplayTime = 3.0;
+            return;
+        }
+        
+        // Look up the block - try with namespace first, then without
+        Block block = null;
+        if (blockName.contains(":")) {
+            // Already has namespace (e.g., "mattmc:stone")
+            block = Blocks.getBlock(blockName);
+        } else {
+            // Try adding default namespace (e.g., "stone" -> "mattmc:stone")
+            block = Blocks.getBlock("mattmc:" + blockName);
+        }
+        
+        if (block == null) {
+            commandFeedbackMessage = "Unknown block: " + blockName;
+            commandFeedbackDisplayTime = 3.0;
+            return;
+        }
+        
+        // Calculate the bounds of the region
+        int minX = Math.min(regionPos1[0], regionPos2[0]);
+        int maxX = Math.max(regionPos1[0], regionPos2[0]);
+        int minY = Math.min(regionPos1[1], regionPos2[1]);
+        int maxY = Math.max(regionPos1[1], regionPos2[1]);
+        int minZ = Math.min(regionPos1[2], regionPos2[2]);
+        int maxZ = Math.max(regionPos1[2], regionPos2[2]);
+        
+        // Calculate region size and check for maximum limit to prevent UI freezing
+        long sizeX = (long)(maxX - minX + 1);
+        long sizeY = (long)(maxY - minY + 1);
+        long sizeZ = (long)(maxZ - minZ + 1);
+        long totalBlocks = sizeX * sizeY * sizeZ;
+        
+        if (totalBlocks > MAX_REGION_SIZE) {
+            commandFeedbackMessage = "Region too large (" + totalBlocks + " blocks). Maximum is " + MAX_REGION_SIZE;
+            commandFeedbackDisplayTime = 3.0;
+            return;
+        }
+        
+        // Calculate the number of blocks to set
+        int blocksSet = 0;
+        
+        // Fill the region with the specified block
+        // Note: Level.setBlock expects chunk-local Y coordinates (0-383)
+        for (int x = minX; x <= maxX; x++) {
+            for (int worldY = minY; worldY <= maxY; worldY++) {
+                // Convert world Y to chunk Y for setBlock call
+                int chunkY = LevelChunk.worldYToChunkY(worldY);
+                for (int z = minZ; z <= maxZ; z++) {
+                    world.setBlock(x, chunkY, z, block);
+                    blocksSet++;
+                }
+            }
+        }
+        
+        logger.info("Filled region ({}, {}, {}) to ({}, {}, {}) with {} - {} blocks set",
+                    minX, minY, minZ, maxX, maxY, maxZ, block.getIdentifier(), blocksSet);
+        
+        // Show confirmation message to user
+        commandFeedbackMessage = "Filled " + blocksSet + " blocks with " + blockName;
+        commandFeedbackDisplayTime = 3.0;
     }
 
     @Override
@@ -311,8 +440,8 @@ public final class DevplayScreen implements Screen {
         }
         
         // Decrease error display time
-        if (commandErrorDisplayTime > 0) {
-            commandErrorDisplayTime -= dt;
+        if (commandFeedbackDisplayTime > 0) {
+            commandFeedbackDisplayTime -= dt;
         }
     }
 
@@ -388,7 +517,12 @@ public final class DevplayScreen implements Screen {
         
         // Draw command overlay if visible
         if (commandOverlayVisible) {
-            uiRenderer.drawCommandOverlay(w, h, commandText.toString(), commandErrorMessage, commandErrorDisplayTime > 0);
+            uiRenderer.drawCommandOverlay(w, h, commandText.toString());
+        }
+        
+        // Draw command feedback message (independent of command overlay)
+        if (commandFeedbackDisplayTime > 0) {
+            uiRenderer.drawCommandFeedback(w, h, commandFeedbackMessage);
         }
         
         // Draw crosshair on top of everything (but not when command overlay is open)
