@@ -4,6 +4,7 @@ import mattmc.client.Minecraft;
 import mattmc.client.gui.screens.Screen;
 
 import mattmc.client.gui.components.TextRenderer;
+import mattmc.client.renderer.texture.Texture;
 import mattmc.world.level.chunk.LevelChunk;
 import mattmc.world.level.chunk.Region;
 
@@ -18,6 +19,9 @@ public class UIRenderer {
     // Constants for command feedback positioning and sizing
     private static final int FEEDBACK_Y_OFFSET = 120; // Distance from bottom of screen
     private static final int CHAR_WIDTH_ESTIMATE = 8; // Approximate character width in pixels
+    
+    // Hotbar texture
+    private Texture hotbarTexture;
     
     /**
      * Draw crosshair in the center of the screen.
@@ -127,6 +131,61 @@ public class UIRenderer {
         // Frustum culling stats
         String renderText = String.format("Rendered: %d | Culled: %d", renderedChunks, culledChunks);
         drawText(renderText, x, y + lineHeight * 8, scale, 0xFFFFFF);
+        
+        // Restore matrices
+        glPopMatrix();
+        glMatrixMode(GL_PROJECTION);
+        glPopMatrix();
+        glMatrixMode(GL_MODELVIEW);
+    }
+    
+    /**
+     * Draw hotbar at the bottom center of the screen.
+     */
+    public void drawHotbar(int screenWidth, int screenHeight) {
+        // Load hotbar texture if not already loaded
+        if (hotbarTexture == null) {
+            hotbarTexture = Texture.load("/assets/textures/gui/sprites/hud/hotbar.png");
+        }
+        
+        // Switch to 2D orthographic projection
+        glMatrixMode(GL_PROJECTION);
+        glPushMatrix();
+        glLoadIdentity();
+        glOrtho(0, screenWidth, screenHeight, 0, -1, 1);
+        
+        glMatrixMode(GL_MODELVIEW);
+        glPushMatrix();
+        glLoadIdentity();
+        
+        // Enable blending for texture rendering
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        
+        // Draw hotbar texture centered at bottom of screen
+        if (hotbarTexture != null) {
+            glEnable(GL_TEXTURE_2D);
+            hotbarTexture.bind();
+            glColor4f(1f, 1f, 1f, 1f);
+            
+            // Scale hotbar to 3x size for better visibility (like Minecraft GUI scale)
+            float scale = 3.0f;
+            float texWidth = hotbarTexture.width * scale;
+            float texHeight = hotbarTexture.height * scale;
+            float x = (screenWidth - texWidth) / 2f;
+            float y = screenHeight - texHeight - 10; // 10 pixels from bottom
+            
+            glBegin(GL_QUADS);
+            glTexCoord2f(0, 1); glVertex2f(x, y);
+            glTexCoord2f(1, 1); glVertex2f(x + texWidth, y);
+            glTexCoord2f(1, 0); glVertex2f(x + texWidth, y + texHeight);
+            glTexCoord2f(0, 0); glVertex2f(x, y + texHeight);
+            glEnd();
+            
+            glDisable(GL_TEXTURE_2D);
+        }
+        
+        glDisable(GL_BLEND);
         
         // Restore matrices
         glPopMatrix();

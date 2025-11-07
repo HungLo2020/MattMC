@@ -29,6 +29,7 @@ public class PlayerInput {
     public static final String PLACE_BLOCK = "place_block";
     public static final String FLY_UP = "fly_up";
     public static final String OPEN_COMMAND = "open_command";
+    public static final String INVENTORY = "inventory";
     
     private PlayerInput() {
         // Keybinds are initialized by KeybindManager from DefaultOptions.txt config file

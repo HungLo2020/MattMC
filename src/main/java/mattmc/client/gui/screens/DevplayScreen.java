@@ -7,6 +7,7 @@ import mattmc.world.entity.player.BlockInteraction;
 import mattmc.world.entity.player.LocalPlayer;
 import mattmc.world.entity.player.PlayerController;
 import mattmc.world.entity.player.PlayerPhysics;
+import mattmc.world.entity.player.PlayerInput;
 import mattmc.client.renderer.LevelRenderer;
 import mattmc.client.renderer.UIRenderer;
 import mattmc.client.renderer.block.BlockFaceGeometry;
@@ -205,6 +206,12 @@ public final class DevplayScreen implements Screen {
                 if (key == GLFW_KEY_SLASH && action == GLFW_PRESS) {
                     // Toggle command overlay
                     openCommandOverlay();
+                }
+                // Check for inventory key (respects user configuration)
+                Integer inventoryKey = PlayerInput.getInstance().getKeybind(PlayerInput.INVENTORY);
+                if (inventoryKey != null && key == inventoryKey && action == GLFW_PRESS) {
+                    // Open inventory screen
+                    game.setScreen(new InventoryScreen(game, this));
                 }
             }
         });
@@ -524,6 +531,9 @@ public final class DevplayScreen implements Screen {
         if (commandFeedbackDisplayTime > 0) {
             uiRenderer.drawCommandFeedback(w, h, commandFeedbackMessage);
         }
+        
+        // Draw hotbar at bottom center (always visible)
+        uiRenderer.drawHotbar(w, h);
         
         // Draw crosshair on top of everything (but not when command overlay is open)
         if (!commandOverlayVisible) {
