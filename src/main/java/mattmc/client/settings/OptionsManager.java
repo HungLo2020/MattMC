@@ -81,11 +81,21 @@ public class OptionsManager {
      */
     private static int validateAnisotropicLevel(int level) {
         if (level <= 0) return 0;
+        
         // Find closest valid level
+        int closestLevel = ALLOWED_ANISOTROPIC_LEVELS[1]; // Start with 2
+        int minDifference = Math.abs(level - closestLevel);
+        
         for (int validLevel : ALLOWED_ANISOTROPIC_LEVELS) {
-            if (level <= validLevel) return validLevel;
+            if (validLevel == 0) continue; // Skip 0, already handled above
+            int difference = Math.abs(level - validLevel);
+            if (difference < minDifference) {
+                minDifference = difference;
+                closestLevel = validLevel;
+            }
         }
-        return 16; // Default to max if higher than all values
+        
+        return closestLevel;
     }
     
     /**

@@ -292,11 +292,15 @@ public class OptionsManagerTest {
     public void testAnisotropicFilteringIntermediateValues() {
         // Test that intermediate values snap to nearest valid value
         OptionsManager.setAnisotropicFiltering(3);
+        assertEquals(2, OptionsManager.getAnisotropicFiltering(), 
+            "Anisotropic filtering of 3 should snap to 2 (nearest)");
+        
+        OptionsManager.setAnisotropicFiltering(6);
         assertEquals(4, OptionsManager.getAnisotropicFiltering(), 
-            "Anisotropic filtering of 3 should snap to 4");
+            "Anisotropic filtering of 6 should snap to 4 (nearest)");
         
         OptionsManager.setAnisotropicFiltering(10);
-        assertEquals(16, OptionsManager.getAnisotropicFiltering(), 
-            "Anisotropic filtering of 10 should snap to 16");
+        assertEquals(8, OptionsManager.getAnisotropicFiltering(), 
+            "Anisotropic filtering of 10 should snap to 8 (nearest)");
     }
 }

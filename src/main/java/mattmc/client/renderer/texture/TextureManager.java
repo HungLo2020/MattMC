@@ -31,6 +31,48 @@ public class TextureManager {
     private final Map<String, Integer> textureCache = new HashMap<>();
     
     /**
+     * Apply texture filtering settings (mipmaps and anisotropic filtering) to the currently bound texture.
+     * This should be called after glTexImage2D and before unbinding the texture.
+     * 
+     * @param useMipmaps Whether to use mipmap filtering (for block textures use GL_NEAREST, for UI use GL_LINEAR)
+     */
+    public static void applyTextureFiltering(boolean useMipmaps) {
+        int mipmapLevel = OptionsManager.getMipmapLevel();
+        
+        if (mipmapLevel > 0 && useMipmaps) {
+            // Generate mipmaps
+            glGenerateMipmap(GL_TEXTURE_2D);
+            // Use mipmap filtering (NEAREST for block textures to maintain pixelated look)
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST_MIPMAP_LINEAR);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+            // Set max mipmap level
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, mipmapLevel);
+        } else if (useMipmaps) {
+            // No mipmaps for block textures
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+        } else {
+            // Linear filtering for UI textures
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        }
+        
+        // Apply anisotropic filtering settings
+        int anisotropicLevel = OptionsManager.getAnisotropicFiltering();
+        if (anisotropicLevel > 0) {
+            try {
+                // Get max anisotropic level supported by GPU
+                float maxAniso = glGetFloat(GL_MAX_TEXTURE_MAX_ANISOTROPY_EXT);
+                float aniso = Math.min(anisotropicLevel, maxAniso);
+                glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAX_ANISOTROPY_EXT, aniso);
+            } catch (IllegalStateException | IllegalArgumentException e) {
+                // Anisotropic filtering extension not supported, silently ignore
+                logger.debug("Anisotropic filtering not supported: {}", e.getMessage());
+            }
+        }
+    }
+    
+    /**
      * Load a texture from resources and return its OpenGL texture ID.
      * Textures are cached to avoid reloading.
      */
@@ -72,36 +114,8 @@ public class TextureManager {
             // Upload texture data
             glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, buffer);
             
-            // Apply mipmap settings
-            int mipmapLevel = OptionsManager.getMipmapLevel();
-            if (mipmapLevel > 0) {
-                // Generate mipmaps
-                glGenerateMipmap(GL_TEXTURE_2D);
-                // Use mipmap filtering
-                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST_MIPMAP_LINEAR);
-                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-                // Set max mipmap level
-                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, mipmapLevel);
-            } else {
-                // No mipmaps
-                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-            }
-            
-            // Apply anisotropic filtering settings
-            int anisotropicLevel = OptionsManager.getAnisotropicFiltering();
-            if (anisotropicLevel > 0) {
-                // Check if anisotropic filtering is supported
-                try {
-                    // Get max anisotropic level supported by GPU
-                    float maxAniso = glGetFloat(GL_MAX_TEXTURE_MAX_ANISOTROPY_EXT);
-                    float aniso = Math.min(anisotropicLevel, maxAniso);
-                    glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAX_ANISOTROPY_EXT, aniso);
-                } catch (Exception e) {
-                    // Anisotropic filtering not supported, silently ignore
-                    logger.debug("Anisotropic filtering not supported");
-                }
-            }
+            // Apply filtering settings (using NEAREST for block textures)
+            applyTextureFiltering(true);
             
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
