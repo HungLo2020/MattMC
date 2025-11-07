@@ -168,8 +168,8 @@ public class UIRenderer {
             hotbarTexture.bind();
             glColor4f(1f, 1f, 1f, 1f);
             
-            // Scale hotbar to 2x size for better visibility (like Minecraft GUI scale)
-            float scale = 2.0f;
+            // Scale hotbar to 3x size for better visibility (like Minecraft GUI scale)
+            float scale = 3.0f;
             float texWidth = hotbarTexture.width * scale;
             float texHeight = hotbarTexture.height * scale;
             float x = (screenWidth - texWidth) / 2f;

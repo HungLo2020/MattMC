@@ -93,12 +93,16 @@ public final class InventoryScreen implements Screen {
             inventoryTexture.bind();
             glColor4f(1f, 1f, 1f, 1f);
             
-            // Scale inventory to 2x size for better visibility (like Minecraft GUI scale)
-            float scale = 2.0f;
+            // Scale inventory to 3x size for better visibility (like Minecraft GUI scale)
+            float scale = 3.0f;
+            // The inventory texture is 256x256 but the actual content is ~176x166 centered
+            // We need to offset by the empty space around the content
+            float contentOffsetX = 40f; // Offset from left edge of texture to content
+            float contentOffsetY = 45f; // Offset from top edge of texture to content
             float texWidth = inventoryTexture.width * scale;
             float texHeight = inventoryTexture.height * scale;
-            float x = (w - texWidth) / 2f;
-            float y = (h - texHeight) / 2f;
+            float x = (w - texWidth) / 2f + (contentOffsetX * scale);
+            float y = (h - texHeight) / 2f + (contentOffsetY * scale);
             
             glBegin(GL_QUADS);
             glTexCoord2f(0, 1); glVertex2f(x, y);
