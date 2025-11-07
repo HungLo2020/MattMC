@@ -5,7 +5,7 @@ import mattmc.client.settings.OptionsManager;
 import mattmc.client.Minecraft;
 import mattmc.client.Window;
 import mattmc.client.renderer.BlurEffect;
-import mattmc.client.renderer.Framebuffer;
+import mattmc.client.renderer.BlurRenderer;
 import mattmc.client.gui.components.Button;
 import mattmc.client.gui.components.TextRenderer;
 import mattmc.world.level.Level;
@@ -171,38 +171,7 @@ public final class PauseScreen implements Screen {
             if (blurEffect == null) {
                 blurEffect = new BlurEffect();
             }
-            
-            // Capture screen to texture
-            int captureTexture = glGenTextures();
-            glBindTexture(GL_TEXTURE_2D, captureTexture);
-            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, w, h, 0, GL_RGBA, GL_UNSIGNED_BYTE, 0);
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-            glCopyTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, 0, 0, w, h);
-            
-            // Apply blur
-            Framebuffer blurredResult = blurEffect.applyBlur(captureTexture, w, h);
-            
-            // Render blurred result as background
-            glMatrixMode(GL_PROJECTION);
-            glLoadIdentity();
-            glOrtho(0, 1, 1, 0, -1, 1);
-            glMatrixMode(GL_MODELVIEW);
-            glLoadIdentity();
-            
-            glEnable(GL_TEXTURE_2D);
-            glBindTexture(GL_TEXTURE_2D, blurredResult.getTextureId());
-            glColor4f(1f, 1f, 1f, 1f);
-            
-            glBegin(GL_QUADS);
-            glTexCoord2f(0, 1); glVertex2f(0, 0);
-            glTexCoord2f(1, 1); glVertex2f(1, 0);
-            glTexCoord2f(1, 0); glVertex2f(1, 1);
-            glTexCoord2f(0, 0); glVertex2f(0, 1);
-            glEnd();
-            
-            glDisable(GL_TEXTURE_2D);
-            glDeleteTextures(captureTexture);
+            BlurRenderer.renderBlurredBackground(blurEffect, w, h);
         }
         
         // Draw dark overlay
