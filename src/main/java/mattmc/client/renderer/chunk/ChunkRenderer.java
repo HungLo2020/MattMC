@@ -31,10 +31,12 @@ public class ChunkRenderer {
     /**
      * Register a chunk for tracking (so mesh buffers can be uploaded to it).
      * Call this before uploading mesh buffers.
+     * This method is idempotent - calling it multiple times has no effect.
      */
     public void registerChunk(LevelChunk chunk) {
         long key = chunkKey(chunk.chunkX(), chunk.chunkZ());
-        chunkByKey.put(key, chunk);
+        // Only add if not already present to avoid unnecessary HashMap operations
+        chunkByKey.putIfAbsent(key, chunk);
     }
     
     /**
