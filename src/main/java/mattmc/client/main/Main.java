@@ -8,8 +8,12 @@ import mattmc.client.settings.KeybindManager;
 import mattmc.client.settings.OptionsManager;
 
 import java.nio.file.Path;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public final class Main {
+    private static final Logger logger = LoggerFactory.getLogger(Main.class);
+
     public static final String VERSION = "0.0.10";
     
     public static void main(String[] args) {
@@ -19,10 +23,10 @@ public final class Main {
             dataDir = AppPaths.ensureDataDirInJarParent("MattMC");
             // expose it for other systems that may want to read it
             System.setProperty("mattmc.dataDir", dataDir.toString());
-            System.out.println("MattMC data dir: " + dataDir);
+            logger.info("MattMC data dir: {}", dataDir);
         } catch (Exception e) {
             // Hard fail if we can't make the data directory
-            System.err.println("Failed to create data directory: " + e);
+            logger.error("Failed to create data directory: {}", e);
             e.printStackTrace();
             System.exit(1);
             return;

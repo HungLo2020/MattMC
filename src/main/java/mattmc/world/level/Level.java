@@ -8,9 +8,13 @@ import mattmc.world.level.block.Blocks;
 import mattmc.world.level.chunk.LevelChunk;
 import mattmc.world.level.chunk.ChunkNBT;
 import mattmc.world.level.chunk.RegionFile;
+import mattmc.world.level.chunk.RegionFileCache;
 import mattmc.world.level.chunk.AsyncChunkLoader;
+import mattmc.world.level.chunk.AsyncChunkSaver;
 import mattmc.world.level.chunk.ChunkUtils;
 import mattmc.world.level.levelgen.WorldGenerator;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.nio.file.Path;
@@ -23,14 +27,23 @@ import java.util.List;
  * Manages an infinite world with dynamic chunk loading/unloading.
  * Similar to Minecraft's world management system.
  * 
- * Now uses asynchronous chunk loading to prevent lag spikes.
+ * Now uses asynchronous chunk loading and saving to prevent lag spikes.
+ * Uses region file caching for better I/O performance.
  */
 public class Level implements LevelAccessor {
+    private static final Logger logger = LoggerFactory.getLogger(Level.class);
+    
     // Store chunks by their position (chunkX, chunkZ)
     private final Map<Long, LevelChunk> loadedChunks = new HashMap<>();
     
     // Async chunk loader for background loading/generation
     private final AsyncChunkLoader asyncLoader;
+    
+    // Region file cache for efficient chunk I/O
+    private RegionFileCache regionCache;
+    
+    // Async chunk saver for background saving
+    private AsyncChunkSaver asyncSaver;
     
     // World generator for noise-based terrain
     private WorldGenerator worldGenerator;
@@ -59,6 +72,7 @@ public class Level implements LevelAccessor {
         this.asyncLoader = new AsyncChunkLoader();
         // Initialize with a default seed (will be updated when world is loaded/created)
         this.worldGenerator = new WorldGenerator(0L);
+        this.asyncLoader.setWorldGenerator(worldGenerator);
     }
     
     /**
@@ -84,6 +98,31 @@ public class Level implements LevelAccessor {
     public void setWorldDirectory(Path worldDirectory) {
         this.worldDirectory = worldDirectory;
         this.asyncLoader.setWorldDirectory(worldDirectory);
+        
+        // Initialize region cache and async saver
+        if (worldDirectory != null) {
+            try {
+                Path regionDir = worldDirectory.resolve("region");
+                java.nio.file.Files.createDirectories(regionDir);
+                
+                // Close old cache/saver if they exist
+                if (regionCache != null) {
+                    regionCache.close();
+                }
+                if (asyncSaver != null) {
+                    asyncSaver.shutdown();
+                }
+                
+                // Create new cache and saver
+                regionCache = new RegionFileCache(regionDir);
+                asyncSaver = new AsyncChunkSaver(regionCache);
+                
+                // Pass region cache to async loader for efficient loading
+                asyncLoader.setRegionCache(regionCache);
+            } catch (IOException e) {
+                logger.error("Failed to initialize region cache: {}", e.getMessage(), e);
+            }
+        }
     }
     
     /**
@@ -167,7 +206,7 @@ public class Level implements LevelAccessor {
                 }
             }
         } catch (IOException e) {
-            System.err.println("Failed to load chunk (" + chunkX + ", " + chunkZ + ") from disk: " + e.getMessage());
+            logger.error("Failed to load chunk ({}, {}) from disk: {}", chunkX, chunkZ, e.getMessage(), e);
         }
         
         return null;
@@ -228,29 +267,16 @@ public class Level implements LevelAccessor {
     /**
      * Save a single chunk to disk if the world directory is set.
      * This is called when chunks are unloaded to preserve modifications.
+     * Now uses async saving to prevent lag spikes.
      */
     private void saveChunk(LevelChunk chunk) {
-        if (worldDirectory == null) {
+        if (worldDirectory == null || asyncSaver == null) {
             return; // No save directory set, skip saving
         }
         
-        try {
-            Path regionDir = worldDirectory.resolve("region");
-            java.nio.file.Files.createDirectories(regionDir);
-            
-            int[] regionCoords = RegionFile.getRegionCoords(chunk.chunkX(), chunk.chunkZ());
-            int regionX = regionCoords[0];
-            int regionZ = regionCoords[1];
-            
-            Path regionFilePath = regionDir.resolve(String.format("r.%d.%d.mca", regionX, regionZ));
-            
-            try (RegionFile regionFile = new RegionFile(regionFilePath, regionX, regionZ)) {
-                Map<String, Object> chunkNBT = ChunkNBT.toNBT(chunk);
-                regionFile.writeChunk(chunk.chunkX(), chunk.chunkZ(), chunkNBT);
-            }
-        } catch (IOException e) {
-            System.err.println("Failed to save chunk (" + chunk.chunkX() + ", " + chunk.chunkZ() + "): " + e.getMessage());
-        }
+        // Convert chunk to NBT and queue for async saving
+        Map<String, Object> chunkNBT = ChunkNBT.toNBT(chunk);
+        asyncSaver.saveChunkAsync(chunk.chunkX(), chunk.chunkZ(), chunkNBT);
     }
     
     /**
@@ -374,6 +400,20 @@ public class Level implements LevelAccessor {
      * Call this when closing the world.
      */
     public void shutdown() {
+        // Flush any pending chunk saves
+        if (asyncSaver != null) {
+            asyncSaver.shutdown();
+        }
+        
+        // Close region cache
+        if (regionCache != null) {
+            try {
+                regionCache.close();
+            } catch (IOException e) {
+                logger.error("Error closing region cache: {}", e.getMessage(), e);
+            }
+        }
+        
         asyncLoader.shutdown();
     }
 }

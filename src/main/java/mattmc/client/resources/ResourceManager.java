@@ -8,6 +8,8 @@ import mattmc.client.resources.model.BlockStateVariant;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -20,6 +22,7 @@ import java.util.Map;
  * Similar to Minecraft's ResourceManager.
  */
 public class ResourceManager {
+    private static final Logger logger = LoggerFactory.getLogger(ResourceManager.class);
     private static final Gson GSON = new GsonBuilder().create();
     private static final Map<String, BlockModel> MODEL_CACHE = new HashMap<>();
     private static final Map<String, BlockState> BLOCKSTATE_CACHE = new HashMap<>();
@@ -42,8 +45,7 @@ public class ResourceManager {
             MODEL_CACHE.put(name, model);
             return model;
         } catch (Exception e) {
-            System.err.println("Failed to load block model: " + path);
-            e.printStackTrace();
+            logger.error("Failed to load block model: {}", path, e);
             return null;
         }
     }
@@ -66,8 +68,7 @@ public class ResourceManager {
             BLOCKSTATE_CACHE.put(name, blockState);
             return blockState;
         } catch (Exception e) {
-            System.err.println("Failed to load blockstate: " + path);
-            e.printStackTrace();
+            logger.error("Failed to load blockstate: {}", path, e);
             return null;
         }
     }

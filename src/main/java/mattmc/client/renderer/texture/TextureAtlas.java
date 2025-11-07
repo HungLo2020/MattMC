@@ -13,6 +13,8 @@ import java.util.*;
 import java.util.List;
 
 import static org.lwjgl.opengl.GL11.*;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Runtime texture atlas builder for block textures.
@@ -22,6 +24,8 @@ import static org.lwjgl.opengl.GL11.*;
  * Similar to modern Minecraft's texture atlas system.
  */
 public class TextureAtlas {
+    private static final Logger logger = LoggerFactory.getLogger(TextureAtlas.class);
+
     private final int atlasTextureId;
     private final int atlasWidth;
     private final int atlasHeight;
@@ -47,7 +51,7 @@ public class TextureAtlas {
      * Call this once during game initialization.
      */
     public TextureAtlas() {
-        System.out.println("Building texture atlas...");
+        logger.info("Building texture atlas...");
         
         // Collect all unique texture paths from registered blocks
         Set<String> uniqueTexturePaths = new HashSet<>();
@@ -64,7 +68,7 @@ public class TextureAtlas {
         // Remove null paths
         uniqueTexturePaths.remove(null);
         
-        System.out.println("Found " + uniqueTexturePaths.size() + " unique textures");
+        logger.info("Found {} unique textures", uniqueTexturePaths.size());
         
         // Calculate atlas dimensions (power of 2, square layout)
         int textureCount = uniqueTexturePaths.size();
@@ -72,7 +76,7 @@ public class TextureAtlas {
         atlasWidth = texturesPerRow * textureSize;
         atlasHeight = texturesPerRow * textureSize;
         
-        System.out.println("Atlas size: " + atlasWidth + "x" + atlasHeight + " (" + texturesPerRow + " textures per row)");
+        logger.info("Atlas size: {}x{} ({} textures per row)", atlasWidth, atlasHeight, texturesPerRow);
         
         // Create atlas image
         BufferedImage atlasImage = new BufferedImage(atlasWidth, atlasHeight, BufferedImage.TYPE_INT_ARGB);
@@ -102,12 +106,12 @@ public class TextureAtlas {
                     
                     uvMappings.put(texturePath, new UVMapping(u0, v0, u1, v1));
                     
-                    System.out.println("  Packed: " + texturePath + " at (" + x + "," + y + ") UV: " + u0 + "," + v0 + " -> " + u1 + "," + v1);
+                    logger.info("  Packed: {} at ({},{}) UV: {},{} -> {},{}", texturePath, x, y, u0, v0, u1, v1);
                 } else {
-                    System.err.println("  Failed to load: " + texturePath);
+                    logger.error("  Failed to load: {}", texturePath);
                 }
             } catch (Exception e) {
-                System.err.println("  Error loading " + texturePath + ": " + e.getMessage());
+                logger.error("  Error loading {}: {}", texturePath, e.getMessage());
             }
             
             // Move to next position
@@ -123,7 +127,7 @@ public class TextureAtlas {
         // Upload atlas to GPU
         atlasTextureId = createGLTexture(atlasImage);
         
-        System.out.println("Texture atlas built successfully! ID: " + atlasTextureId);
+        logger.info("Texture atlas built successfully! ID: {}", atlasTextureId);
     }
     
     /**
@@ -132,12 +136,12 @@ public class TextureAtlas {
     private BufferedImage loadTexture(String path) {
         try (InputStream is = getClass().getClassLoader().getResourceAsStream(path)) {
             if (is == null) {
-                System.err.println("Texture not found: " + path);
+                logger.error("Texture not found: {}", path);
                 return null;
             }
             return ImageIO.read(is);
         } catch (Exception e) {
-            System.err.println("Failed to load texture: " + path);
+            logger.error("Failed to load texture: {}", path);
             e.printStackTrace();
             return null;
         }
