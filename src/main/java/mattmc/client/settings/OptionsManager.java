@@ -4,11 +4,15 @@ import java.io.*;
 import java.nio.file.*;
 import java.util.HashMap;
 import java.util.Map;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Manages game options/settings (excluding keybinds).
  */
 public class OptionsManager {
+    private static final Logger logger = LoggerFactory.getLogger(OptionsManager.class);
+
     private static final String OPTIONS_FILE = "Options.txt";
     private static final String DEFAULT_OPTIONS_RESOURCE = "/config/DefaultOptions.txt";
     private static final int MIN_FPS_CAP = 30;
@@ -58,7 +62,7 @@ public class OptionsManager {
         Path optionsPath = getOptionsPath();
         
         if (!Files.exists(optionsPath)) {
-            System.out.println("Options.txt not found for loading settings");
+            logger.info("Options.txt not found for loading settings");
             return;
         }
         
@@ -89,7 +93,7 @@ public class OptionsManager {
                             int fps = Integer.parseInt(value);
                             fpsCapValue = validateFpsCap(fps);
                         } catch (NumberFormatException e) {
-                            System.err.println("Invalid FPS cap value: " + value);
+                            logger.error("Invalid FPS cap value: {}", value);
                         }
                     } else if (key.equals("resolution")) {
                         try {
@@ -99,7 +103,7 @@ public class OptionsManager {
                                 resolutionHeight = Integer.parseInt(resParts[1].trim());
                             }
                         } catch (NumberFormatException e) {
-                            System.err.println("Invalid resolution value: " + value);
+                            logger.error("Invalid resolution value: {}", value);
                         }
                     } else if (key.equals("fullscreen")) {
                         fullscreenEnabled = Boolean.parseBoolean(value);
@@ -108,15 +112,15 @@ public class OptionsManager {
                             int distance = Integer.parseInt(value);
                             renderDistance = validateRenderDistance(distance);
                         } catch (NumberFormatException e) {
-                            System.err.println("Invalid render distance value: " + value);
+                            logger.error("Invalid render distance value: {}", value);
                         }
                     }
                 }
             }
             
-            System.out.println("Loaded options: title blur=" + titleScreenBlurEnabled + ", menu blur=" + menuScreenBlurEnabled);
+            logger.info("Loaded options: title blur={}, menu blur={}", titleScreenBlurEnabled, menuScreenBlurEnabled);
         } catch (IOException e) {
-            System.err.println("Error loading options: " + e.getMessage());
+            logger.error("Error loading options: {}", e.getMessage());
         }
     }
     
@@ -213,11 +217,10 @@ public class OptionsManager {
                     }
                 }
                 
-                System.out.println("Saved options to Options.txt");
+                logger.info("Saved options to Options.txt");
             }
         } catch (IOException e) {
-            System.err.println("Error saving options: " + e.getMessage());
-            e.printStackTrace();
+            logger.error("Error saving options: {}", e.getMessage(), e);
         }
     }
     
@@ -280,7 +283,7 @@ public class OptionsManager {
     
     public static void setResolution(int width, int height) {
         if (width <= 0 || height <= 0) {
-            System.err.println("Invalid resolution: " + width + "x" + height + ". Width and height must be positive.");
+            logger.error("Invalid resolution: {}x{}. Width and height must be positive.", width, height);
             return;
         }
         resolutionWidth = width;

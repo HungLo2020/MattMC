@@ -36,6 +36,10 @@ dependencies {
     // JSON parsing for block models and blockstates
     implementation("com.google.code.gson:gson:2.10.1")
     
+    // Logging framework
+    implementation("org.slf4j:slf4j-api:2.0.9")
+    implementation("ch.qos.logback:logback-classic:1.4.11")
+    
     // Testing dependencies
     testImplementation("org.junit.jupiter:junit-jupiter-api:5.10.0")
     testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine:5.10.0")

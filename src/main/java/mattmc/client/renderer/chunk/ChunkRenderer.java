@@ -8,12 +8,16 @@ import java.util.HashMap;
 import java.util.Map;
 
 import static org.lwjgl.opengl.GL11.*;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Handles rendering of chunks using VBO/VAO with texture atlas.
  * Modern rendering approach similar to Minecraft Java Edition.
  */
 public class ChunkRenderer {
+    private static final Logger logger = LoggerFactory.getLogger(ChunkRenderer.class);
+
     
     // VAO cache: maps chunks to their VAOs
     private final Map<LevelChunk, ChunkVAO> vaoCache = new HashMap<>();
@@ -75,10 +79,9 @@ public class ChunkRenderer {
         ChunkVAO newVAO = null;
         if (!meshBuffer.isEmpty()) {
             newVAO = new ChunkVAO(meshBuffer);
-            System.out.println("Uploaded VAO for chunk (" + meshBuffer.getChunkX() + ", " + meshBuffer.getChunkZ() + 
-                             ") with " + meshBuffer.getIndexCount() + " indices");
+            logger.info("Uploaded VAO for chunk ({},{}) with {} indices", meshBuffer.getChunkX(), meshBuffer.getChunkZ(), meshBuffer.getIndexCount());
         } else {
-            System.out.println("Skipped empty mesh for chunk (" + meshBuffer.getChunkX() + ", " + meshBuffer.getChunkZ() + ")");
+            logger.info("Skipped empty mesh for chunk ({},{})", meshBuffer.getChunkX(), meshBuffer.getChunkZ());
         }
         
         // ONLY NOW replace and delete old VAO (after new one is ready)
@@ -128,7 +131,7 @@ public class ChunkRenderer {
      */
     public void setTextureAtlas(TextureAtlas atlas) {
         this.textureAtlas = atlas;
-        System.out.println("Texture atlas set for chunk renderer");
+        logger.info("Texture atlas set for chunk renderer");
     }
     
     /**

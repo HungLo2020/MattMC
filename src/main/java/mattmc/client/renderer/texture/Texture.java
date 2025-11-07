@@ -8,9 +8,13 @@ import java.nio.ByteBuffer;
 
 import static org.lwjgl.opengl.GL11.*;
 import static org.lwjgl.opengl.GL12.*;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /** Minimal PNG loader (RGBA) from classpath. */
 public final class Texture implements AutoCloseable {
+    private static final Logger logger = LoggerFactory.getLogger(Texture.class);
+
     public final int id;
     public final int width;
     public final int height;
@@ -39,7 +43,7 @@ public final class Texture implements AutoCloseable {
         STBImage.stbi_image_free(pixels);
         glBindTexture(GL_TEXTURE_2D, 0);
 
-        System.out.println("Loaded texture " + classpath + " " + x[0] + "x" + y[0] + " id=" + tex);
+        logger.info("Loaded texture {} {}x{} id={}", classpath, x[0], y[0], tex);
         return new Texture(tex, x[0], y[0]);
     }
 

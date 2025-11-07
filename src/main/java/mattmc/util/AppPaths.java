@@ -1,5 +1,8 @@
 package mattmc.util;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.io.IOException;
 import java.net.URI;
 import java.nio.file.*;
@@ -8,6 +11,8 @@ import java.util.EnumSet;
 import java.util.Set;
 
 public final class AppPaths {
+    private static final Logger logger = LoggerFactory.getLogger(AppPaths.class);
+    
     private AppPaths() {}
 
     /** Returns the directory that contains the running JAR, or the classes dir when run from IDE. */
@@ -30,15 +35,15 @@ public final class AppPaths {
      * App root is the parent of the lib directory (where bin/, lib/ are located). */
     public static Path ensureDataDirInJarParent(String dirName) throws IOException {
         Path jarDir = jarBaseDir();
-        System.out.println("[DEBUG] AppPaths.jarBaseDir() = " + jarDir);
-        System.out.println("[DEBUG] jarDir.endsWith(\"lib\") = " + jarDir.endsWith("lib"));
+        logger.debug("AppPaths.jarBaseDir() = {}", jarDir);
+        logger.debug("jarDir.endsWith(\"lib\") = {}", jarDir.endsWith("lib"));
         
         // Determine the app root directory
         Path appRoot;
         if (jarDir.endsWith("lib")) {
             // Running from packaged distribution - go up one level from lib/
             appRoot = jarDir.getParent();
-            System.out.println("[DEBUG] Packaged mode: appRoot = " + appRoot);
+            logger.debug("Packaged mode: appRoot = {}", appRoot);
         } else if (jarDir.toString().contains("/build/classes/")) {
             // Running from Gradle :run task in dev mode
             // Path is like: /path/to/project/build/classes/java/main
@@ -50,11 +55,11 @@ public final class AppPaths {
             if (current != null) {
                 // Use build/install/MattMC as the app root for dev builds
                 appRoot = current.resolve("install").resolve("MattMC");
-                System.out.println("[DEBUG] Gradle dev mode: appRoot = " + appRoot);
+                logger.debug("Gradle dev mode: appRoot = {}", appRoot);
             } else {
                 // Fallback if we can't find build directory
                 appRoot = jarDir;
-                System.out.println("[DEBUG] Dev mode fallback: appRoot = " + appRoot);
+                logger.debug("Dev mode fallback: appRoot = {}", appRoot);
             }
         } else {
             // Running from IDE or other setup
@@ -66,24 +71,24 @@ public final class AppPaths {
                 Path buildDir = current.resolve("build");
                 if (Files.exists(buildDir) && Files.isDirectory(buildDir)) {
                     appRoot = buildDir.resolve("install").resolve("MattMC");
-                    System.out.println("[DEBUG] IDE mode: found build dir, appRoot = " + appRoot);
+                    logger.debug("IDE mode: found build dir, appRoot = {}", appRoot);
                     break;
                 }
                 current = current.getParent();
             }
             if (appRoot == null) {
                 appRoot = jarDir;
-                System.out.println("[DEBUG] IDE fallback: appRoot = " + appRoot);
+                logger.debug("IDE fallback: appRoot = {}", appRoot);
             }
         }
         
         if (appRoot == null) {
             appRoot = jarDir; // last-resort fallback
-            System.out.println("[DEBUG] appRoot was null, using jarDir = " + appRoot);
+            logger.debug("appRoot was null, using jarDir = {}", appRoot);
         }
 
         Path dataDir = appRoot.resolve(dirName);
-        System.out.println("[DEBUG] Final dataDir = " + dataDir);
+        logger.debug("Final dataDir = {}", dataDir);
         Files.createDirectories(dataDir);
 
         // Try to set sane POSIX perms on Unix; ignore if unsupported (e.g., Windows).

@@ -4,8 +4,12 @@ import mattmc.client.settings.OptionsManager;
 import org.lwjgl.opengl.GL;
 import static org.lwjgl.glfw.GLFW.*;
 import static org.lwjgl.opengl.GL11.*;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 public final class Window implements AutoCloseable {
+    private static final Logger logger = LoggerFactory.getLogger(Window.class);
+
     private final long handle;
     private int width, height;
     private int windowedWidth, windowedHeight;  // Store windowed mode dimensions
@@ -99,7 +103,7 @@ public final class Window implements AutoCloseable {
     public void setFullscreen(boolean fullscreen) {
         long monitor = glfwGetPrimaryMonitor();
         if (monitor == 0) {
-            System.err.println("Failed to get primary monitor");
+            logger.error("Failed to get primary monitor");
             return;
         }
         
@@ -117,7 +121,7 @@ public final class Window implements AutoCloseable {
             // Get the video mode of the primary monitor
             org.lwjgl.glfw.GLFWVidMode mode = glfwGetVideoMode(monitor);
             if (mode == null) {
-                System.err.println("Failed to get video mode");
+                logger.error("Failed to get video mode");
                 return;
             }
             

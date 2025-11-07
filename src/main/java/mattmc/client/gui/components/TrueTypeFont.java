@@ -14,12 +14,16 @@ import java.nio.IntBuffer;
 
 import static org.lwjgl.opengl.GL11.*;
 import static org.lwjgl.system.MemoryStack.stackPush;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * TrueType font renderer using STBTrueType with bitmap baking.
  * Loads a TTF font and renders text using a pre-baked texture atlas.
  */
 public final class TrueTypeFont implements AutoCloseable {
+    private static final Logger logger = LoggerFactory.getLogger(TrueTypeFont.class);
+
     
     private final STBTTFontinfo fontInfo;
     private final ByteBuffer fontData;
@@ -83,7 +87,7 @@ public final class TrueTypeFont implements AutoCloseable {
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
         glBindTexture(GL_TEXTURE_2D, 0);
         
-        System.out.println("Loaded TrueType font: " + path + " at " + fontSize + "px");
+        logger.info("Loaded TrueType font: {} at {}px", path, fontSize);
         return new TrueTypeFont(fontData, fontInfo, texId, charData, fontSize);
     }
     
