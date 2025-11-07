@@ -98,8 +98,9 @@ public class FrustumTest {
         });
         
         // Test with negative coordinates
+        // Chunk at (-7, -7) would have world coords from (-112, -112) to (-96, -96)
         assertDoesNotThrow(() -> {
-            frustum.isBoxVisible(-100, -64, -100, -84, 319, -84);
+            frustum.isBoxVisible(-112, -64, -112, -96, 319, -96);
         });
         
         // Test with large coordinates
