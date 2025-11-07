@@ -2,11 +2,14 @@ package mattmc.client.gui.screens;
 
 import mattmc.client.Minecraft;
 import mattmc.client.Window;
+import mattmc.client.renderer.BlurEffect;
+import mattmc.client.renderer.Framebuffer;
 import mattmc.client.renderer.texture.Texture;
 import mattmc.world.entity.player.PlayerInput;
 
 import static org.lwjgl.glfw.GLFW.*;
 import static org.lwjgl.opengl.GL11.*;
+import static org.lwjgl.opengl.GL30.*;
 
 /**
  * Inventory screen overlay - displays the inventory.png centered on screen.
@@ -17,11 +20,17 @@ public final class InventoryScreen implements Screen {
     private final Window window;
     private final DevplayScreen gameScreen;
     private Texture inventoryTexture;
+    
+    // Blur effect for background
+    private BlurEffect blurEffect;
 
     public InventoryScreen(Minecraft game, DevplayScreen gameScreen) {
         this.game = game;
         this.window = game.window();
         this.gameScreen = gameScreen;
+        
+        // Sync player position to prevent flickering during interpolation
+        gameScreen.syncPlayerPosition();
 
         // Load inventory texture
         inventoryTexture = Texture.load("/assets/textures/gui/container/inventory.png");
@@ -73,6 +82,45 @@ public final class InventoryScreen implements Screen {
         
         // First render the game screen behind this overlay
         gameScreen.render(alpha);
+        
+        // Apply blur if enabled
+        if (mattmc.client.settings.OptionsManager.isMenuScreenBlurEnabled()) {
+            if (blurEffect == null) {
+                blurEffect = new BlurEffect();
+            }
+            
+            // Capture screen to texture
+            int captureTexture = glGenTextures();
+            glBindTexture(GL_TEXTURE_2D, captureTexture);
+            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, w, h, 0, GL_RGBA, GL_UNSIGNED_BYTE, 0);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+            glCopyTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, 0, 0, w, h);
+            
+            // Apply blur
+            Framebuffer blurredResult = blurEffect.applyBlur(captureTexture, w, h);
+            
+            // Render blurred result as background
+            glMatrixMode(GL_PROJECTION);
+            glLoadIdentity();
+            glOrtho(0, 1, 1, 0, -1, 1);
+            glMatrixMode(GL_MODELVIEW);
+            glLoadIdentity();
+            
+            glEnable(GL_TEXTURE_2D);
+            glBindTexture(GL_TEXTURE_2D, blurredResult.getTextureId());
+            glColor4f(1f, 1f, 1f, 1f);
+            
+            glBegin(GL_QUADS);
+            glTexCoord2f(0, 1); glVertex2f(0, 0);
+            glTexCoord2f(1, 1); glVertex2f(1, 0);
+            glTexCoord2f(1, 0); glVertex2f(1, 1);
+            glTexCoord2f(0, 0); glVertex2f(0, 1);
+            glEnd();
+            
+            glDisable(GL_TEXTURE_2D);
+            glDeleteTextures(captureTexture);
+        }
         
         // Draw dark overlay
         glMatrixMode(GL_PROJECTION);
@@ -138,6 +186,10 @@ public final class InventoryScreen implements Screen {
         if (inventoryTexture != null) {
             inventoryTexture.close();
             inventoryTexture = null;
+        }
+        if (blurEffect != null) {
+            blurEffect.close();
+            blurEffect = null;
         }
     }
 }

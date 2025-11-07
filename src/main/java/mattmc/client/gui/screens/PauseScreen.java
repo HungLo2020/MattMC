@@ -49,6 +49,9 @@ public final class PauseScreen implements Screen {
         this.game = game;
         this.window = game.window();
         this.gameScreen = gameScreen;
+        
+        // Sync player position to prevent flickering during interpolation
+        gameScreen.syncPlayerPosition();
 
         glfwSetCursorPosCallback(window.handle(), (h, x, y) -> { mouseXWin = x; mouseYWin = y; });
         glfwSetMouseButtonCallback(window.handle(), (h, button, action, mods) -> {

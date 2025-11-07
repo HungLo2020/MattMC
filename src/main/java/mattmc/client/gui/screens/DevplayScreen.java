@@ -581,6 +581,14 @@ public final class DevplayScreen implements Screen {
     public String getWorldName() {
         return worldName;
     }
+    
+    /**
+     * Sync player previous position to current position.
+     * Called by overlay screens (pause, inventory) to prevent flickering during interpolation.
+     */
+    public void syncPlayerPosition() {
+        player.updatePreviousPosition();
+    }
 
     @Override 
     public void onOpen() {
