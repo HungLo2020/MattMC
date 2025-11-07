@@ -16,9 +16,9 @@ public final class ButtonRenderer {
     private static final String TEXTURE_PATH = "/assets/textures/gui/sprites/buttonswide.png";
     
     /**
-     * Loads the button texture if not already loaded.
+     * Loads the button texture if not already loaded (thread-safe).
      */
-    public static void ensureTextureLoaded() {
+    public static synchronized void ensureTextureLoaded() {
         if (buttonTexture == null) {
             buttonTexture = Texture.load(TEXTURE_PATH);
         }
@@ -81,9 +81,9 @@ public final class ButtonRenderer {
     }
     
     /**
-     * Cleans up resources when done.
+     * Cleans up resources when done (thread-safe).
      */
-    public static void cleanup() {
+    public static synchronized void cleanup() {
         if (buttonTexture != null) {
             buttonTexture.close();
             buttonTexture = null;

@@ -141,19 +141,22 @@ public final class ControlsScreen implements Screen {
             boolean waiting = kb.action.equals(waitingForKey);
             Button b = kb.button;
             ButtonRenderer.drawButton(b, waiting);
-            
-            // Draw action name on left, key name on right
-            Integer keyCode = PlayerInput.getInstance().getKeybind(kb.action);
-            String keyName = waiting ? "Press a key..." : 
-                            (keyCode != null ? PlayerInput.getKeyName(keyCode) : "Unbound");
-            
-            drawText(kb.display, b.x + 10, b.y + b.h / 2f - 6f, 1.0f, 0xFFFFFF);
-            drawTextRight(keyName, b.x + b.w - 10, b.y + b.h / 2f - 6f, 1.0f, 0xFFFFFF);
+            drawKeybindButtonText(kb, waiting, b);
         }
         
         // Draw back button
         ButtonRenderer.drawButton(backButton);
         drawTextCentered(backButton.label, backButton.x + backButton.w / 2f, backButton.y + backButton.h / 2f, 1.2f, 0xFFFFFF);
+    }
+
+    private void drawKeybindButtonText(KeybindButton kb, boolean waiting, Button b) {
+        // Draw action name on left, key name on right
+        Integer keyCode = PlayerInput.getInstance().getKeybind(kb.action);
+        String keyName = waiting ? "Press a key..." : 
+                        (keyCode != null ? PlayerInput.getKeyName(keyCode) : "Unbound");
+        
+        drawText(kb.display, b.x + 10, b.y + b.h / 2f - 6f, 1.0f, 0xFFFFFF);
+        drawTextRight(keyName, b.x + b.w - 10, b.y + b.h / 2f - 6f, 1.0f, 0xFFFFFF);
     }
 
     private void setupOrtho() {
