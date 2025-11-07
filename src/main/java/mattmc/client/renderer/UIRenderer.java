@@ -220,13 +220,10 @@ public class UIRenderer {
     /**
      * Get cardinal direction from yaw angle.
      * Minecraft's yaw: 0 = South, 90 = West, 180 = North, 270 = East
-     * @param yaw The yaw angle in degrees
+     * @param normalizedYaw The yaw angle in degrees (should be normalized to 0-360 range)
      * @return Cardinal direction (N, S, E, W, NE, NW, SE, SW)
      */
-    private String getCardinalDirection(float yaw) {
-        // Normalize yaw to 0-360 range
-        float normalizedYaw = ((yaw % 360) + 360) % 360;
-        
+    private String getCardinalDirection(float normalizedYaw) {
         // Determine direction based on yaw ranges
         // In Minecraft: South = 0, West = 90, North = 180, East = 270
         if (normalizedYaw >= 337.5 || normalizedYaw < 22.5) {
