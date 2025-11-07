@@ -1,6 +1,7 @@
 package mattmc.world.level;
 
 import mattmc.client.Minecraft;
+import mattmc.client.renderer.block.BlockFaceCollector;
 import mattmc.world.level.chunk.Region;
 
 import mattmc.world.level.block.Block;
@@ -68,11 +69,65 @@ public class Level implements LevelAccessor {
     // World save directory (null if world is not being saved)
     private Path worldDirectory = null;
     
+    // Chunk neighbor accessor for cross-chunk face culling
+    private final BlockFaceCollector.ChunkNeighborAccessor neighborAccessor = this::getBlockAcrossChunks;
+    
     public Level() {
         this.asyncLoader = new AsyncChunkLoader();
         // Initialize with a default seed (will be updated when world is loaded/created)
         this.worldGenerator = new WorldGenerator(0L);
         this.asyncLoader.setWorldGenerator(worldGenerator);
+        // Set the neighbor accessor for cross-chunk face culling
+        this.asyncLoader.setNeighborAccessor(neighborAccessor);
+    }
+    
+    /**
+     * Get a block at chunk-local coordinates, checking neighboring chunks if necessary.
+     * Used for cross-chunk face culling.
+     */
+    private Block getBlockAcrossChunks(LevelChunk chunk, int localX, int localY, int localZ) {
+        // Check Y bounds first
+        if (localY < 0 || localY >= LevelChunk.HEIGHT) {
+            return Blocks.AIR;
+        }
+        
+        // If within chunk bounds, use direct chunk access
+        if (localX >= 0 && localX < LevelChunk.WIDTH && localZ >= 0 && localZ < LevelChunk.DEPTH) {
+            return chunk.getBlock(localX, localY, localZ);
+        }
+        
+        // Calculate which neighboring chunk to query
+        int targetChunkX = chunk.chunkX();
+        int targetChunkZ = chunk.chunkZ();
+        int targetLocalX = localX;
+        int targetLocalZ = localZ;
+        
+        // Adjust for X boundary crossing
+        if (localX < 0) {
+            targetChunkX--;
+            targetLocalX = LevelChunk.WIDTH + localX; // localX is negative, so this adds
+        } else if (localX >= LevelChunk.WIDTH) {
+            targetChunkX++;
+            targetLocalX = localX - LevelChunk.WIDTH;
+        }
+        
+        // Adjust for Z boundary crossing
+        if (localZ < 0) {
+            targetChunkZ--;
+            targetLocalZ = LevelChunk.DEPTH + localZ; // localZ is negative, so this adds
+        } else if (localZ >= LevelChunk.DEPTH) {
+            targetChunkZ++;
+            targetLocalZ = localZ - LevelChunk.DEPTH;
+        }
+        
+        // Get the neighboring chunk if it's loaded
+        LevelChunk neighborChunk = getChunkIfLoaded(targetChunkX, targetChunkZ);
+        if (neighborChunk == null) {
+            // Neighboring chunk not loaded - assume air for now
+            return Blocks.AIR;
+        }
+        
+        return neighborChunk.getBlock(targetLocalX, localY, targetLocalZ);
     }
     
     /**
