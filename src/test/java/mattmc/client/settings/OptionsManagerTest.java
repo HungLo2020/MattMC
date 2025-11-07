@@ -201,4 +201,102 @@ public class OptionsManagerTest {
         // Reset to a standard value
         OptionsManager.setRenderDistance(16);
     }
+    
+    @Test
+    public void testMipmapLevelDefaultValue() {
+        // Default mipmap level should be 4
+        int mipmapLevel = OptionsManager.getMipmapLevel();
+        assertTrue(mipmapLevel >= 0 && mipmapLevel <= 4, "Mipmap level should be within valid range");
+    }
+    
+    @Test
+    public void testMipmapLevelSetAndGet() {
+        // Test setting valid mipmap levels
+        OptionsManager.setMipmapLevel(0);
+        assertEquals(0, OptionsManager.getMipmapLevel(), "Mipmap level should be set to 0 (off)");
+        
+        OptionsManager.setMipmapLevel(2);
+        assertEquals(2, OptionsManager.getMipmapLevel(), "Mipmap level should be set to 2");
+        
+        OptionsManager.setMipmapLevel(4);
+        assertEquals(4, OptionsManager.getMipmapLevel(), "Mipmap level should be set to 4");
+    }
+    
+    @Test
+    public void testMipmapLevelClamping() {
+        // Test that values below minimum are clamped to 0
+        OptionsManager.setMipmapLevel(-1);
+        assertEquals(0, OptionsManager.getMipmapLevel(), "Negative mipmap level should be clamped to 0");
+        
+        // Test that values above maximum are clamped to 4
+        OptionsManager.setMipmapLevel(10);
+        assertEquals(4, OptionsManager.getMipmapLevel(), "Mipmap level above 4 should be clamped to 4");
+    }
+    
+    @Test
+    public void testMipmapLevelAllowedValues() {
+        // Test all allowed values from OptionsManager constant
+        int[] allowedValues = OptionsManager.ALLOWED_MIPMAP_LEVELS;
+        
+        for (int value : allowedValues) {
+            OptionsManager.setMipmapLevel(value);
+            assertEquals(value, OptionsManager.getMipmapLevel(), 
+                "Mipmap level should accept allowed value of " + value);
+        }
+    }
+    
+    @Test
+    public void testAnisotropicFilteringDefaultValue() {
+        // Default anisotropic filtering should be 16
+        int anisotropicLevel = OptionsManager.getAnisotropicFiltering();
+        assertTrue(anisotropicLevel >= 0, "Anisotropic filtering level should be non-negative");
+    }
+    
+    @Test
+    public void testAnisotropicFilteringSetAndGet() {
+        // Test setting valid anisotropic filtering levels
+        OptionsManager.setAnisotropicFiltering(0);
+        assertEquals(0, OptionsManager.getAnisotropicFiltering(), "Anisotropic filtering should be set to 0 (off)");
+        
+        OptionsManager.setAnisotropicFiltering(4);
+        assertEquals(4, OptionsManager.getAnisotropicFiltering(), "Anisotropic filtering should be set to 4");
+        
+        OptionsManager.setAnisotropicFiltering(16);
+        assertEquals(16, OptionsManager.getAnisotropicFiltering(), "Anisotropic filtering should be set to 16");
+    }
+    
+    @Test
+    public void testAnisotropicFilteringClamping() {
+        // Test that negative values are clamped to 0
+        OptionsManager.setAnisotropicFiltering(-1);
+        assertEquals(0, OptionsManager.getAnisotropicFiltering(), "Negative anisotropic filtering should be clamped to 0");
+        
+        // Test that values above maximum snap to closest valid value
+        OptionsManager.setAnisotropicFiltering(20);
+        assertEquals(16, OptionsManager.getAnisotropicFiltering(), "Anisotropic filtering of 20 should be clamped to 16");
+    }
+    
+    @Test
+    public void testAnisotropicFilteringAllowedValues() {
+        // Test all allowed values from OptionsManager constant
+        int[] allowedValues = OptionsManager.ALLOWED_ANISOTROPIC_LEVELS;
+        
+        for (int value : allowedValues) {
+            OptionsManager.setAnisotropicFiltering(value);
+            assertEquals(value, OptionsManager.getAnisotropicFiltering(), 
+                "Anisotropic filtering should accept allowed value of " + value);
+        }
+    }
+    
+    @Test
+    public void testAnisotropicFilteringIntermediateValues() {
+        // Test that intermediate values snap to nearest valid value
+        OptionsManager.setAnisotropicFiltering(3);
+        assertEquals(4, OptionsManager.getAnisotropicFiltering(), 
+            "Anisotropic filtering of 3 should snap to 4");
+        
+        OptionsManager.setAnisotropicFiltering(10);
+        assertEquals(16, OptionsManager.getAnisotropicFiltering(), 
+            "Anisotropic filtering of 10 should snap to 16");
+    }
 }

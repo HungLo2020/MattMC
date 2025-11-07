@@ -1,5 +1,6 @@
 package mattmc.client.renderer.texture;
 
+import mattmc.client.settings.OptionsManager;
 import mattmc.world.level.block.Block;
 import mattmc.world.level.block.Blocks;
 import org.lwjgl.BufferUtils;
@@ -13,6 +14,10 @@ import java.util.*;
 import java.util.List;
 
 import static org.lwjgl.opengl.GL11.*;
+import static org.lwjgl.opengl.GL12.*;
+import static org.lwjgl.opengl.GL13.*;
+import static org.lwjgl.opengl.GL30.*;
+import static org.lwjgl.opengl.EXTTextureFilterAnisotropic.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -174,14 +179,41 @@ public class TextureAtlas {
         int textureID = glGenTextures();
         glBindTexture(GL_TEXTURE_2D, textureID);
         
-        // Set texture parameters
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-        
         // Upload texture data
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, buffer);
+        
+        // Apply mipmap settings
+        int mipmapLevel = OptionsManager.getMipmapLevel();
+        if (mipmapLevel > 0) {
+            // Generate mipmaps
+            glGenerateMipmap(GL_TEXTURE_2D);
+            // Use mipmap filtering
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST_MIPMAP_LINEAR);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+            // Set max mipmap level
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, mipmapLevel);
+        } else {
+            // No mipmaps
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+        }
+        
+        // Apply anisotropic filtering settings
+        int anisotropicLevel = OptionsManager.getAnisotropicFiltering();
+        if (anisotropicLevel > 0) {
+            try {
+                // Get max anisotropic level supported by GPU
+                float maxAniso = glGetFloat(GL_MAX_TEXTURE_MAX_ANISOTROPY_EXT);
+                float aniso = Math.min(anisotropicLevel, maxAniso);
+                glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAX_ANISOTROPY_EXT, aniso);
+            } catch (Exception e) {
+                // Anisotropic filtering not supported, silently ignore
+                logger.debug("Anisotropic filtering not supported");
+            }
+        }
+        
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
         
         glBindTexture(GL_TEXTURE_2D, 0);
         

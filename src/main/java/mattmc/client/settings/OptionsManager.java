@@ -41,6 +41,18 @@ public class OptionsManager {
     // Render distance setting
     private static int renderDistance = DEFAULT_RENDER_DISTANCE;  // Default: 16 chunks
     
+    // Mipmap setting (0 = off, 1-4 = mipmap levels)
+    private static int mipmapLevel = 4;  // Default: 4
+    
+    // Anisotropic filtering setting (0 = off, 2/4/8/16 = filtering level)
+    private static int anisotropicFiltering = 16;  // Default: 16
+    
+    // Allowed mipmap levels
+    public static final int[] ALLOWED_MIPMAP_LEVELS = {0, 1, 2, 3, 4};
+    
+    // Allowed anisotropic filtering levels
+    public static final int[] ALLOWED_ANISOTROPIC_LEVELS = {0, 2, 4, 8, 16};
+    
     /**
      * Validate and clamp FPS cap value to valid range.
      */
@@ -53,6 +65,27 @@ public class OptionsManager {
      */
     private static int validateRenderDistance(int distance) {
         return Math.max(MIN_RENDER_DISTANCE, Math.min(MAX_RENDER_DISTANCE, distance));
+    }
+    
+    /**
+     * Validate mipmap level (0=off, 1-4).
+     */
+    private static int validateMipmapLevel(int level) {
+        if (level < 0) return 0;
+        if (level > 4) return 4;
+        return level;
+    }
+    
+    /**
+     * Validate anisotropic filtering level (0=off, or one of 2,4,8,16).
+     */
+    private static int validateAnisotropicLevel(int level) {
+        if (level <= 0) return 0;
+        // Find closest valid level
+        for (int validLevel : ALLOWED_ANISOTROPIC_LEVELS) {
+            if (level <= validLevel) return validLevel;
+        }
+        return 16; // Default to max if higher than all values
     }
     
     /**
@@ -114,6 +147,20 @@ public class OptionsManager {
                         } catch (NumberFormatException e) {
                             logger.error("Invalid render distance value: {}", value);
                         }
+                    } else if (key.equals("mipmaps")) {
+                        try {
+                            int level = Integer.parseInt(value);
+                            mipmapLevel = validateMipmapLevel(level);
+                        } catch (NumberFormatException e) {
+                            logger.error("Invalid mipmap level value: {}", value);
+                        }
+                    } else if (key.equals("anisotropic_filtering")) {
+                        try {
+                            int level = Integer.parseInt(value);
+                            anisotropicFiltering = validateAnisotropicLevel(level);
+                        } catch (NumberFormatException e) {
+                            logger.error("Invalid anisotropic filtering value: {}", value);
+                        }
                     }
                 }
             }
@@ -165,6 +212,12 @@ public class OptionsManager {
             // Update render distance setting
             options.put("render_distance", String.valueOf(renderDistance));
             
+            // Update mipmap setting
+            options.put("mipmaps", String.valueOf(mipmapLevel));
+            
+            // Update anisotropic filtering setting
+            options.put("anisotropic_filtering", String.valueOf(anisotropicFiltering));
+            
             // Write back to file
             Path parent = optionsPath.getParent();
             if (parent != null) {
@@ -202,6 +255,16 @@ public class OptionsManager {
                 writer.write("# Render distance in chunks (2-64)\n");
                 writer.write("# Available values: 2, 4, 8, 16, 32, 64\n");
                 writer.write("render_distance=" + renderDistance + "\n");
+                writer.write("\n");
+                
+                // Write mipmap setting
+                writer.write("# Mipmaps (off, 1, 2, 3, 4)\n");
+                writer.write("mipmaps=" + mipmapLevel + "\n");
+                writer.write("\n");
+                
+                // Write anisotropic filtering setting
+                writer.write("# Anisotropic filtering (off, 2, 4, 8, 16)\n");
+                writer.write("anisotropic_filtering=" + anisotropicFiltering + "\n");
                 writer.write("\n");
                 
                 // Write keybinds section header
@@ -320,6 +383,26 @@ public class OptionsManager {
     
     public static void setRenderDistance(int distance) {
         renderDistance = validateRenderDistance(distance);
+        saveOptions();
+    }
+    
+    // Mipmap level getters and setters
+    public static int getMipmapLevel() {
+        return mipmapLevel;
+    }
+    
+    public static void setMipmapLevel(int level) {
+        mipmapLevel = validateMipmapLevel(level);
+        saveOptions();
+    }
+    
+    // Anisotropic filtering getters and setters
+    public static int getAnisotropicFiltering() {
+        return anisotropicFiltering;
+    }
+    
+    public static void setAnisotropicFiltering(int level) {
+        anisotropicFiltering = validateAnisotropicLevel(level);
         saveOptions();
     }
 }
