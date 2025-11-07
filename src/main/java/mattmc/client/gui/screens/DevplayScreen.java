@@ -32,6 +32,9 @@ import org.slf4j.LoggerFactory;
  */
 public final class DevplayScreen implements Screen {
     private static final Logger logger = LoggerFactory.getLogger(DevplayScreen.class);
+    
+    // Maximum region size for /set command to prevent UI freezing (100,000 blocks)
+    private static final long MAX_REGION_SIZE = 100_000;
 
     private final Minecraft game;
     private final Window window;
@@ -380,8 +383,6 @@ public final class DevplayScreen implements Screen {
         long sizeZ = (long)(maxZ - minZ + 1);
         long totalBlocks = sizeX * sizeY * sizeZ;
         
-        // Maximum safe region size (100,000 blocks)
-        final long MAX_REGION_SIZE = 100_000;
         if (totalBlocks > MAX_REGION_SIZE) {
             commandErrorMessage = "Region too large (" + totalBlocks + " blocks). Maximum is " + MAX_REGION_SIZE;
             commandErrorDisplayTime = 3.0;

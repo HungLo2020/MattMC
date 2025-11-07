@@ -219,6 +219,7 @@ public class RegionCommandTest {
     @Test
     public void testMaximumRegionSizeLimit() {
         // Test that we can detect regions that exceed the maximum size
+        // This value should match DevplayScreen.MAX_REGION_SIZE
         final long MAX_REGION_SIZE = 100_000;
         
         // Test a region that would be exactly at the limit
