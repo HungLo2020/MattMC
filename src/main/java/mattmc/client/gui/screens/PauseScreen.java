@@ -5,6 +5,7 @@ import mattmc.client.Window;
 import mattmc.client.renderer.BlurEffect;
 import mattmc.client.renderer.BlurRenderer;
 import mattmc.client.gui.components.Button;
+import mattmc.client.gui.components.ButtonRenderer;
 import mattmc.client.gui.components.TextRenderer;
 import mattmc.world.level.Level;
 import mattmc.world.level.storage.LevelStorageSource;
@@ -192,7 +193,10 @@ public final class PauseScreen implements Screen {
         glEnd();
         
         // Draw UI
-        for (var b : buttons) drawButton(b);
+        for (var b : buttons) {
+            ButtonRenderer.drawButton(b);
+            drawTextCentered(b.label, b.x + b.w / 2f, b.y + b.h / 2f, 1.2f, 0xFFFFFF);
+        }
         drawTitle("Game Paused", titleCX, titleCY, titleScale, 0xFFFFFF);
     }
 
@@ -205,41 +209,7 @@ public final class PauseScreen implements Screen {
         glLoadIdentity();
     }
 
-    private void drawButton(Button b) {
-        int base = b.hover() ? 0x3A5FCD : 0x2E4A9B;
-        int edge = b.hover() ? 0x6D89E3 : 0x20356B;
 
-        setColor(0x000000, 0.35f);
-        fillRect(b.x + 2, b.y + 3, b.w, b.h);
-
-        glBegin(GL_QUADS);
-        setColor(edge, 1f);
-        glVertex2f(b.x, b.y);
-        glVertex2f(b.x + b.w, b.y);
-        setColor(base, 1f);
-        glVertex2f(b.x + b.w, b.y + b.h);
-        glVertex2f(b.x, b.y + b.h);
-        glEnd();
-
-        setColor(0x0B1220, 1f);
-        glBegin(GL_LINE_LOOP);
-        glVertex2f(b.x, b.y);
-        glVertex2f(b.x + b.w, b.y);
-        glVertex2f(b.x + b.w, b.y + b.h);
-        glVertex2f(b.x, b.y + b.h);
-        glEnd();
-
-        drawTextCentered(b.label, b.x + b.w / 2f, b.y + b.h / 2f, 1.2f, 0xFFFFFF);
-    }
-
-    private void fillRect(int x, int y, int w, int h) {
-        glBegin(GL_QUADS);
-        glVertex2f(x, y);
-        glVertex2f(x + w, y);
-        glVertex2f(x + w, y + h);
-        glVertex2f(x, y + h);
-        glEnd();
-    }
 
     private void setColor(int rgb, float a) {
         float r = ((rgb >> 16) & 0xFF) / 255f;

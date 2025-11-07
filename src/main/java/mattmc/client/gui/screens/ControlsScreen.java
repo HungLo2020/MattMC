@@ -7,6 +7,7 @@ import mattmc.client.Minecraft;
 import mattmc.client.Window;
 import mattmc.world.entity.player.PlayerInput;
 import mattmc.client.gui.components.Button;
+import mattmc.client.gui.components.ButtonRenderer;
 import mattmc.client.gui.components.TextRenderer;
 import mattmc.client.settings.KeybindManager;
 import org.lwjgl.system.MemoryStack;
@@ -138,11 +139,21 @@ public final class ControlsScreen implements Screen {
         // Draw keybind buttons
         for (var kb : keybindButtons) {
             boolean waiting = kb.action.equals(waitingForKey);
-            drawKeybindButton(kb, waiting);
+            Button b = kb.button;
+            ButtonRenderer.drawButton(b, waiting);
+            
+            // Draw action name on left, key name on right
+            Integer keyCode = PlayerInput.getInstance().getKeybind(kb.action);
+            String keyName = waiting ? "Press a key..." : 
+                            (keyCode != null ? PlayerInput.getKeyName(keyCode) : "Unbound");
+            
+            drawText(kb.display, b.x + 10, b.y + b.h / 2f - 6f, 1.0f, 0xFFFFFF);
+            drawTextRight(keyName, b.x + b.w - 10, b.y + b.h / 2f - 6f, 1.0f, 0xFFFFFF);
         }
         
         // Draw back button
-        drawButton(backButton);
+        ButtonRenderer.drawButton(backButton);
+        drawTextCentered(backButton.label, backButton.x + backButton.w / 2f, backButton.y + backButton.h / 2f, 1.2f, 0xFFFFFF);
     }
 
     private void setupOrtho() {
@@ -154,76 +165,7 @@ public final class ControlsScreen implements Screen {
         glLoadIdentity();
     }
 
-    private void drawKeybindButton(KeybindButton kb, boolean waiting) {
-        Button b = kb.button;
-        
-        int base = waiting ? 0xFF6B35 : (b.hover() ? 0x3A5FCD : 0x2E4A9B);
-        int edge = waiting ? 0xFF8C5A : (b.hover() ? 0x6D89E3 : 0x20356B);
 
-        setColor(0x000000, 0.35f);
-        fillRect(b.x + 2, b.y + 3, b.w, b.h);
-
-        glBegin(GL_QUADS);
-        setColor(edge, 1f);
-        glVertex2f(b.x, b.y);
-        glVertex2f(b.x + b.w, b.y);
-        setColor(base, 1f);
-        glVertex2f(b.x + b.w, b.y + b.h);
-        glVertex2f(b.x, b.y + b.h);
-        glEnd();
-
-        setColor(0x0B1220, 1f);
-        glBegin(GL_LINE_LOOP);
-        glVertex2f(b.x, b.y);
-        glVertex2f(b.x + b.w, b.y);
-        glVertex2f(b.x + b.w, b.y + b.h);
-        glVertex2f(b.x, b.y + b.h);
-        glEnd();
-
-        // Draw action name on left, key name on right
-        Integer keyCode = PlayerInput.getInstance().getKeybind(kb.action);
-        String keyName = waiting ? "Press a key..." : 
-                        (keyCode != null ? PlayerInput.getKeyName(keyCode) : "Unbound");
-        
-        drawText(kb.display, b.x + 10, b.y + b.h / 2f - 6f, 1.0f, 0xFFFFFF);
-        drawTextRight(keyName, b.x + b.w - 10, b.y + b.h / 2f - 6f, 1.0f, 0xFFFFFF);
-    }
-
-    private void drawButton(Button b) {
-        int base = b.hover() ? 0x3A5FCD : 0x2E4A9B;
-        int edge = b.hover() ? 0x6D89E3 : 0x20356B;
-
-        setColor(0x000000, 0.35f);
-        fillRect(b.x + 2, b.y + 3, b.w, b.h);
-
-        glBegin(GL_QUADS);
-        setColor(edge, 1f);
-        glVertex2f(b.x, b.y);
-        glVertex2f(b.x + b.w, b.y);
-        setColor(base, 1f);
-        glVertex2f(b.x + b.w, b.y + b.h);
-        glVertex2f(b.x, b.y + b.h);
-        glEnd();
-
-        setColor(0x0B1220, 1f);
-        glBegin(GL_LINE_LOOP);
-        glVertex2f(b.x, b.y);
-        glVertex2f(b.x + b.w, b.y);
-        glVertex2f(b.x + b.w, b.y + b.h);
-        glVertex2f(b.x, b.y + b.h);
-        glEnd();
-
-        drawTextCentered(b.label, b.x + b.w / 2f, b.y + b.h / 2f, 1.2f, 0xFFFFFF);
-    }
-
-    private void fillRect(int x, int y, int w, int h) {
-        glBegin(GL_QUADS);
-        glVertex2f(x, y);
-        glVertex2f(x + w, y);
-        glVertex2f(x + w, y + h);
-        glVertex2f(x, y + h);
-        glEnd();
-    }
 
     private void setColor(int rgb, float a) {
         float r = ((rgb >> 16) & 0xFF) / 255f;
