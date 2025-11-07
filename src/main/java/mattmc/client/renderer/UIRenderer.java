@@ -201,9 +201,8 @@ public class UIRenderer {
             glColor4f(1f, 1f, 1f, 1f);
             
             // Calculate position for selection overlay
-            // The hotbar has 9 slots, each slot is (hotbar width / 9) wide
-            // Hotbar: 182 pixels wide (9 slots = 20.22 pixels per slot)
-            // Selection: 24 pixels wide (3.78 pixels larger than a slot)
+            // The hotbar has 9 slots, so each slot width = (hotbar texture width / 9)
+            // The selection overlay is larger than a slot, so center it on the slot
             float slotWidth = (hotbarTexture.width * HOTBAR_SCALE) / 9f;
             float selectionWidth = hotbarSelectionTexture.width * HOTBAR_SCALE;
             float selectionHeight = hotbarSelectionTexture.height * HOTBAR_SCALE;

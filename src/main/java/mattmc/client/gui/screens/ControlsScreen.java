@@ -290,8 +290,8 @@ public final class ControlsScreen implements Screen {
         
         // Scroll callback for mouse wheel scrolling
         glfwSetScrollCallback(window.handle(), (win, xOffset, yOffset) -> {
-            // Scroll down = positive yOffset, scroll up = negative yOffset
-            // We want scrolling down to increase scrollOffset (move content up)
+            // yOffset: positive when scrolling up, negative when scrolling down
+            // Negate yOffset so scrolling down increases scrollOffset (moves content up)
             int scrollAmount = (int)(-yOffset * SCROLL_SPEED);
             scrollOffset = Math.max(0, Math.min(maxScrollOffset, scrollOffset + scrollAmount));
         });
