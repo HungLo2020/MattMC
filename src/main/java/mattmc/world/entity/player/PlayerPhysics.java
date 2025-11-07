@@ -21,10 +21,9 @@ public class PlayerPhysics {
     // Minecraft runs at 20 TPS (0.05s per tick)
     private static final float GRAVITY = 32f; // Blocks per second squared (MC: 0.08/tick² × 400)
     private static final float TERMINAL_VELOCITY = 78.4f; // Max fall speed (blocks/second)
-    // Jump velocity: 8.0 blocks/s achieves ~1.20 block height with fixed dt=0.05s
-    // This allows jumping over 1-block tall obstacles
-    // (Minecraft uses 8.4 blocks/s with air resistance for 1.252 blocks)
-    private static final float JUMP_VELOCITY = 8.0f; // Initial jump speed (blocks/second)
+    // Jump velocity: 8.17 blocks/s achieves exactly 1.25 block height with fixed dt=0.05s
+    // Matches Minecraft Java Edition jump height (MC uses 8.4 blocks/s with air resistance)
+    private static final float JUMP_VELOCITY = 8.17f; // Initial jump speed (blocks/second)
     
     private final LocalPlayer player;
     private final CollisionDetector collisionDetector;
@@ -48,15 +47,7 @@ public class PlayerPhysics {
      */
     public void update(float deltaTime) {
         if (!flying) {
-            // Apply gravity
-            velocityY -= GRAVITY * deltaTime;
-            
-            // Terminal velocity
-            if (velocityY < -TERMINAL_VELOCITY) {
-                velocityY = -TERMINAL_VELOCITY;
-            }
-            
-            // Apply vertical movement
+            // Apply vertical movement FIRST using current velocity (Minecraft physics order)
             float newY = player.getY() + velocityY * deltaTime;
             
             // Check collision and adjust
@@ -77,6 +68,14 @@ public class PlayerPhysics {
             }
             
             player.setY(newY);
+            
+            // Apply gravity AFTER movement (correct Minecraft order)
+            velocityY -= GRAVITY * deltaTime;
+            
+            // Terminal velocity
+            if (velocityY < -TERMINAL_VELOCITY) {
+                velocityY = -TERMINAL_VELOCITY;
+            }
         } else {
             // Flying mode - no gravity
             velocityY = 0;
