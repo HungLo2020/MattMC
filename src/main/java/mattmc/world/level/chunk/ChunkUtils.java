@@ -19,25 +19,25 @@ public final class ChunkUtils {
     
     /**
      * Check if a chunk section is empty (all air blocks).
-     * Samples key positions to quickly determine if the section is empty.
+     * Performs a thorough check of all blocks in the section.
      * 
      * @param chunk The chunk to check
      * @param startY Start Y coordinate (chunk-local)
      * @param endY End Y coordinate (chunk-local, exclusive)
-     * @return true if section appears empty
+     * @return true if section is completely empty
      */
     public static boolean isSectionEmpty(LevelChunk chunk, int startY, int endY) {
-        int midY = (startY + endY) / 2;
-        
-        // Sample corners and center
-        if (!chunk.getBlock(0, startY, 0).isAir()) return false;
-        if (!chunk.getBlock(15, startY, 15).isAir()) return false;
-        if (!chunk.getBlock(0, midY, 0).isAir()) return false;
-        if (!chunk.getBlock(15, midY, 15).isAir()) return false;
-        if (!chunk.getBlock(0, endY - 1, 0).isAir()) return false;
-        if (!chunk.getBlock(15, endY - 1, 15).isAir()) return false;
-        if (!chunk.getBlock(8, midY, 8).isAir()) return false;
-        
-        return true;
+        // Check all blocks in the section to ensure accuracy
+        // This is more thorough than sampling and prevents invisible block bugs
+        for (int x = 0; x < LevelChunk.WIDTH; x++) {
+            for (int y = startY; y < endY; y++) {
+                for (int z = 0; z < LevelChunk.DEPTH; z++) {
+                    if (!chunk.getBlock(x, y, z).isAir()) {
+                        return false; // Found a non-air block, section is not empty
+                    }
+                }
+            }
+        }
+        return true; // All blocks are air, section is empty
     }
 }
