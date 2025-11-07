@@ -11,6 +11,7 @@ import mattmc.client.renderer.LevelRenderer;
 import mattmc.client.renderer.UIRenderer;
 import mattmc.client.renderer.block.BlockFaceGeometry;
 import mattmc.client.renderer.ColorUtils;
+import mattmc.world.level.block.Block;
 import mattmc.world.level.block.Blocks;
 import mattmc.world.level.chunk.LevelChunk;
 import mattmc.world.level.Level;
@@ -63,6 +64,10 @@ public final class DevplayScreen implements Screen {
     private StringBuilder commandText = new StringBuilder("/");
     private String commandErrorMessage = "";
     private double commandErrorDisplayTime = 0;
+    
+    // Region selection state for /pos1, /pos2, and /set commands
+    private int[] regionPos1 = null; // [x, y, z]
+    private int[] regionPos2 = null; // [x, y, z]
     
     // Flag to track if world should be shut down on close
     private boolean shouldShutdownWorld = false;
@@ -250,6 +255,12 @@ public final class DevplayScreen implements Screen {
         // Parse and execute command
         if (cmd.startsWith("/tp ")) {
             executeTeleportCommand(cmd);
+        } else if (cmd.equals("/pos1")) {
+            executePos1Command();
+        } else if (cmd.equals("/pos2")) {
+            executePos2Command();
+        } else if (cmd.startsWith("/set ")) {
+            executeSetCommand(cmd);
         } else {
             commandErrorMessage = "Unknown command: " + cmd;
             commandErrorDisplayTime = 3.0; // Show error for 3 seconds
@@ -282,6 +293,106 @@ public final class DevplayScreen implements Screen {
             commandErrorMessage = "Invalid coordinates. Usage: /tp x y z";
             commandErrorDisplayTime = 3.0;
         }
+    }
+    
+    /**
+     * Execute /pos1 command - sets the first position of the region to the player's current position.
+     */
+    private void executePos1Command() {
+        // Get player's current block position (floor of the feet position)
+        int x = (int) Math.floor(player.getX());
+        int y = (int) Math.floor(player.getY());
+        int z = (int) Math.floor(player.getZ());
+        
+        regionPos1 = new int[]{x, y, z};
+        logger.info("Position 1 set to: {}, {}, {}", x, y, z);
+        
+        // Show confirmation message to user
+        commandErrorMessage = "Position 1 set to: " + x + ", " + y + ", " + z;
+        commandErrorDisplayTime = 3.0;
+    }
+    
+    /**
+     * Execute /pos2 command - sets the second position of the region to the player's current position.
+     */
+    private void executePos2Command() {
+        // Get player's current block position (floor of the feet position)
+        int x = (int) Math.floor(player.getX());
+        int y = (int) Math.floor(player.getY());
+        int z = (int) Math.floor(player.getZ());
+        
+        regionPos2 = new int[]{x, y, z};
+        logger.info("Position 2 set to: {}, {}, {}", x, y, z);
+        
+        // Show confirmation message to user
+        commandErrorMessage = "Position 2 set to: " + x + ", " + y + ", " + z;
+        commandErrorDisplayTime = 3.0;
+    }
+    
+    /**
+     * Execute /set command - fills the region defined by pos1 and pos2 with the specified block.
+     * @param cmd The full command string (e.g., "/set stone" or "/set mattmc:stone")
+     */
+    private void executeSetCommand(String cmd) {
+        // Check if both positions are set
+        if (regionPos1 == null || regionPos2 == null) {
+            commandErrorMessage = "Please set both positions first with /pos1 and /pos2";
+            commandErrorDisplayTime = 3.0;
+            return;
+        }
+        
+        // Parse the block name from the command
+        String blockName = cmd.substring(5).trim(); // Remove "/set "
+        
+        if (blockName.isEmpty()) {
+            commandErrorMessage = "Usage: /set <block>";
+            commandErrorDisplayTime = 3.0;
+            return;
+        }
+        
+        // Look up the block - try with namespace first, then without
+        Block block = null;
+        if (blockName.contains(":")) {
+            // Already has namespace (e.g., "mattmc:stone")
+            block = Blocks.getBlock(blockName);
+        } else {
+            // Try adding default namespace (e.g., "stone" -> "mattmc:stone")
+            block = Blocks.getBlock("mattmc:" + blockName);
+        }
+        
+        if (block == null) {
+            commandErrorMessage = "Unknown block: " + blockName;
+            commandErrorDisplayTime = 3.0;
+            return;
+        }
+        
+        // Calculate the bounds of the region
+        int minX = Math.min(regionPos1[0], regionPos2[0]);
+        int maxX = Math.max(regionPos1[0], regionPos2[0]);
+        int minY = Math.min(regionPos1[1], regionPos2[1]);
+        int maxY = Math.max(regionPos1[1], regionPos2[1]);
+        int minZ = Math.min(regionPos1[2], regionPos2[2]);
+        int maxZ = Math.max(regionPos1[2], regionPos2[2]);
+        
+        // Calculate the number of blocks to set
+        int blocksSet = 0;
+        
+        // Fill the region with the specified block
+        for (int x = minX; x <= maxX; x++) {
+            for (int y = minY; y <= maxY; y++) {
+                for (int z = minZ; z <= maxZ; z++) {
+                    world.setBlock(x, y, z, block);
+                    blocksSet++;
+                }
+            }
+        }
+        
+        logger.info("Filled region ({}, {}, {}) to ({}, {}, {}) with {} - {} blocks set",
+                    minX, minY, minZ, maxX, maxY, maxZ, block.getIdentifier(), blocksSet);
+        
+        // Show confirmation message to user
+        commandErrorMessage = "Filled " + blocksSet + " blocks with " + blockName;
+        commandErrorDisplayTime = 3.0;
     }
 
     @Override
