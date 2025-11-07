@@ -2,11 +2,15 @@ package mattmc.client.gui.screens;
 
 import mattmc.client.Minecraft;
 import mattmc.client.Window;
+import mattmc.client.renderer.BlurEffect;
+import mattmc.client.renderer.BlurRenderer;
 import mattmc.client.renderer.texture.Texture;
 import mattmc.world.entity.player.PlayerInput;
 
+import static mattmc.client.settings.OptionsManager.isMenuScreenBlurEnabled;
 import static org.lwjgl.glfw.GLFW.*;
 import static org.lwjgl.opengl.GL11.*;
+import static org.lwjgl.opengl.GL30.*;
 
 /**
  * Inventory screen overlay - displays the inventory.png centered on screen.
@@ -17,11 +21,17 @@ public final class InventoryScreen implements Screen {
     private final Window window;
     private final DevplayScreen gameScreen;
     private Texture inventoryTexture;
+    
+    // Blur effect for background
+    private BlurEffect blurEffect;
 
     public InventoryScreen(Minecraft game, DevplayScreen gameScreen) {
         this.game = game;
         this.window = game.window();
         this.gameScreen = gameScreen;
+        
+        // Sync player position to prevent flickering during interpolation
+        gameScreen.syncPlayerPosition();
 
         // Load inventory texture
         inventoryTexture = Texture.load("/assets/textures/gui/container/inventory.png");
@@ -73,6 +83,14 @@ public final class InventoryScreen implements Screen {
         
         // First render the game screen behind this overlay
         gameScreen.render(alpha);
+        
+        // Apply blur if enabled
+        if (isMenuScreenBlurEnabled()) {
+            if (blurEffect == null) {
+                blurEffect = new BlurEffect();
+            }
+            BlurRenderer.renderBlurredBackground(blurEffect, w, h);
+        }
         
         // Draw dark overlay
         glMatrixMode(GL_PROJECTION);
@@ -138,6 +156,10 @@ public final class InventoryScreen implements Screen {
         if (inventoryTexture != null) {
             inventoryTexture.close();
             inventoryTexture = null;
+        }
+        if (blurEffect != null) {
+            blurEffect.close();
+            blurEffect = null;
         }
     }
 }

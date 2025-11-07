@@ -581,6 +581,14 @@ public final class DevplayScreen implements Screen {
     public String getWorldName() {
         return worldName;
     }
+    
+    /**
+     * Sync player previous position to current position.
+     * Called by overlay screens (pause, inventory) to prevent flickering during interpolation.
+     */
+    public void syncPlayerPosition() {
+        player.updatePreviousPosition();
+    }
 
     @Override 
     public void onOpen() {
@@ -593,6 +601,9 @@ public final class DevplayScreen implements Screen {
         // Sync previous position to current position when resuming
         // This prevents visual "teleport" due to interpolation after pause
         player.updatePreviousPosition();
+        
+        // Reset mouse state to prevent camera jump on first movement
+        playerController.resetMouseState();
     }
     
     @Override 
