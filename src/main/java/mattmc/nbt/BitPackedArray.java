@@ -133,7 +133,10 @@ public class BitPackedArray {
      * Minecraft uses a minimum of 4 bits per entry for performance reasons.
      */
     public static int calculateBitsPerEntry(int paletteSize) {
-        if (paletteSize <= 1) {
+        if (paletteSize <= 0) {
+            return 0; // Invalid or empty palette
+        }
+        if (paletteSize == 1) {
             return 0; // Single block type - no data needed
         }
         

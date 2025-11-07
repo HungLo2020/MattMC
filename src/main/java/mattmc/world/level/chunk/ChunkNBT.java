@@ -190,8 +190,19 @@ public class ChunkNBT {
         
         long[] blockStatesData = (long[]) blockStatesObj;
         
-        // Calculate bits per entry from data size
+        // Calculate expected bits per entry and validate data size
         int bitsPerEntry = BitPackedArray.calculateBitsPerEntry(paletteArray.length);
+        
+        // Validate that we have enough data for 4096 blocks
+        if (bitsPerEntry > 0) {
+            int entriesPerLong = 64 / bitsPerEntry;
+            int expectedLongs = (4096 + entriesPerLong - 1) / entriesPerLong;
+            
+            if (blockStatesData.length < expectedLongs) {
+                // Data is corrupted or incomplete, skip this section
+                return;
+            }
+        }
         
         // Create bit-packed array for reading
         BitPackedArray blockStates = new BitPackedArray(bitsPerEntry, 16 * 16 * 16, blockStatesData);

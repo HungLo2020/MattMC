@@ -65,9 +65,10 @@ public class BitPackedArrayTest {
     
     @Test
     public void testCalculateBitsPerEntry() {
+        assertEquals(0, BitPackedArray.calculateBitsPerEntry(0)); // Empty palette
         assertEquals(0, BitPackedArray.calculateBitsPerEntry(1)); // Single block
-        assertEquals(4, BitPackedArray.calculateBitsPerEntry(2)); // Min 4 bits
-        assertEquals(4, BitPackedArray.calculateBitsPerEntry(4)); // 4 values -> 2 bits, but min is 4
+        assertEquals(4, BitPackedArray.calculateBitsPerEntry(2)); // 2 values -> 1 bit, enforced min is 4
+        assertEquals(4, BitPackedArray.calculateBitsPerEntry(4)); // 4 values -> 2 bits, enforced min is 4
         assertEquals(4, BitPackedArray.calculateBitsPerEntry(16)); // 16 values -> 4 bits
         assertEquals(5, BitPackedArray.calculateBitsPerEntry(17)); // 17 values -> 5 bits
         assertEquals(8, BitPackedArray.calculateBitsPerEntry(256)); // 256 values -> 8 bits
