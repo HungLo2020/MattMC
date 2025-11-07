@@ -265,9 +265,9 @@ public final class TitleScreen implements Screen {
         float logoBottom = titleCY + logoHeight / 2f;
         
         // Position splash text with offset from logo
-        float splashScale = 1.0f;
-        float splashX = logoRight + 10f; // 10 pixels to the right
-        float splashY = logoBottom + 5f; // 5 pixels below
+        float splashScale = 1.3f; // Slightly larger text
+        float splashX = logoRight - 15f; // Slightly to the left
+        float splashY = logoBottom - 10f; // Slightly higher
         
         // Draw in yellow color (0xFFFF00)
         drawText(splashText, splashX, splashY, splashScale, 0xFFFF00);
