@@ -16,8 +16,8 @@ import static org.lwjgl.glfw.GLFW.*;
 import static org.lwjgl.opengl.GL11.*;
 import static org.lwjgl.system.MemoryStack.stackPush;
 
-/** Options menu screen. */
-public final class OptionsScreen implements Screen {
+/** Skins options submenu screen. */
+public final class SkinsScreen implements Screen {
     private final Minecraft game;
     private final Window window;
     private final List<Button> buttons = new ArrayList<>();
@@ -29,7 +29,7 @@ public final class OptionsScreen implements Screen {
     private int buttonWidth = 300, buttonHeight = 44, buttonGap = 12;
     private int buttonsStartY;
 
-    public OptionsScreen(Minecraft game) {
+    public SkinsScreen(Minecraft game) {
         this.game = game;
         this.window = game.window();
         recomputeLayout();
@@ -40,25 +40,18 @@ public final class OptionsScreen implements Screen {
         titleCX = w / 2f;
         titleCY = h * 0.18f;
 
-        int totalButtonsH = 6 * buttonHeight + 5 * buttonGap;
+        int totalButtonsH = 1 * buttonHeight;
         buttonsStartY = (int)(h / 2f - totalButtonsH / 2f);
 
         int x = (w - buttonWidth) / 2;
         buttons.clear();
 
-        // Submenu buttons
-        buttons.add(new Button("Keybinds", x, buttonsStartY + 0 * (buttonHeight + buttonGap), buttonWidth, buttonHeight));
-        buttons.add(new Button("Graphics", x, buttonsStartY + 1 * (buttonHeight + buttonGap), buttonWidth, buttonHeight));
-        buttons.add(new Button("Game",     x, buttonsStartY + 2 * (buttonHeight + buttonGap), buttonWidth, buttonHeight));
-        buttons.add(new Button("Skins",    x, buttonsStartY + 3 * (buttonHeight + buttonGap), buttonWidth, buttonHeight));
-        buttons.add(new Button("Sounds",   x, buttonsStartY + 4 * (buttonHeight + buttonGap), buttonWidth, buttonHeight));
-        buttons.add(new Button("Back",     x, buttonsStartY + 5 * (buttonHeight + buttonGap), buttonWidth, buttonHeight));
+        // Just a back button for now
+        buttons.add(new Button("Back", x, buttonsStartY, buttonWidth, buttonHeight));
     }
 
     @Override
     public void tick() {
-        // Panorama rotation is now updated during rendering to prevent jitter
-        
         // Convert window coords -> framebuffer coords for accurate hit-testing on HiDPI
         float mxFB, myFB;
         try (MemoryStack stack = stackPush()) {
@@ -87,27 +80,7 @@ public final class OptionsScreen implements Screen {
 
     private void onClick(String label) {
         if ("Back".equals(label)) {
-            game.setScreen(new TitleScreen(game));
-            return;
-        }
-        if ("Keybinds".equals(label)) {
-            game.setScreen(new ControlsScreen(game));
-            return;
-        }
-        if ("Graphics".equals(label)) {
-            game.setScreen(new GraphicsScreen(game));
-            return;
-        }
-        if ("Game".equals(label)) {
-            game.setScreen(new GameScreen(game));
-            return;
-        }
-        if ("Skins".equals(label)) {
-            game.setScreen(new SkinsScreen(game));
-            return;
-        }
-        if ("Sounds".equals(label)) {
-            game.setScreen(new SoundsScreen(game));
+            game.setScreen(new OptionsScreen(game));
             return;
         }
     }
@@ -120,8 +93,8 @@ public final class OptionsScreen implements Screen {
 
         setupOrtho();
         for (var b : buttons) drawButton(b);
-        drawTitle("Options", titleCX, titleCY, titleScale, 0xFFFFFF);
-        drawTitle("Configure game settings", titleCX, titleCY + 48f, 1.0f, 0xB0C4DE);
+        drawTitle("Skins", titleCX, titleCY, titleScale, 0xFFFFFF);
+        drawTitle("Skin customization (coming soon)", titleCX, titleCY + 48f, 1.0f, 0xB0C4DE);
     }
 
     private void setupOrtho() {
