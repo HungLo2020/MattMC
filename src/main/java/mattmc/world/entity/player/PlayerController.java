@@ -37,6 +37,7 @@ public class PlayerController {
         boolean isCrouching = input.isPressed(window, PlayerInput.CROUCH);
         
         // Determine movement speed based on state
+        // Note: Crouching takes priority over sprinting if both are pressed
         float moveSpeed;
         if (isFlying) {
             // Flying mode
@@ -44,6 +45,7 @@ public class PlayerController {
         } else {
             // Walking/running mode
             if (isCrouching) {
+                // Sneaking takes priority over sprinting
                 moveSpeed = player.getSneakSpeed() * deltaTime;
             } else if (isSprinting) {
                 moveSpeed = player.getSprintSpeed() * deltaTime;
