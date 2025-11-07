@@ -1,6 +1,7 @@
 package mattmc.world.level.chunk;
 
 import mattmc.client.Minecraft;
+import mattmc.nbt.BitPackedArray;
 import mattmc.world.level.block.Block;
 import mattmc.world.level.block.Blocks;
 
@@ -46,6 +47,7 @@ public class ChunkNBT {
     /**
      * Create NBT for a single 16x16x16 section of the chunk.
      * Returns null if the section is empty (all air).
+     * Uses bit-packed arrays like Minecraft Java Edition for optimal storage.
      */
     private static Map<String, Object> createSection(LevelChunk chunk, int sectionY) {
         // Check if section is empty
@@ -71,14 +73,11 @@ public class ChunkNBT {
         // Section Y coordinate (world Y / 16)
         section.put("Y", (byte) (sectionY + LevelChunk.MIN_Y / 16));
         
-        // Block states - simple palette approach
-        // For now, store block identifiers directly
-        List<Map<String, Object>> palette = new ArrayList<>();
-        long[] blockStates = new long[16 * 16 * 16]; // Simple 1:1 mapping for now
-        
+        // Build palette - map unique blocks to palette indices
+        List<String> paletteList = new ArrayList<>();
         Map<String, Integer> paletteMap = new HashMap<>();
-        int paletteIndex = 0;
         
+        // First pass: collect unique blocks
         for (int x = 0; x < 16; x++) {
             for (int y = 0; y < 16; y++) {
                 for (int z = 0; z < 16; z++) {
@@ -86,25 +85,45 @@ public class ChunkNBT {
                     String identifier = block.getIdentifier();
                     if (identifier == null) identifier = "mattmc:air";
                     
-                    // Add to palette if not present
                     if (!paletteMap.containsKey(identifier)) {
-                        Map<String, Object> paletteEntry = new HashMap<>();
-                        paletteEntry.put("Name", identifier);
-                        palette.add(paletteEntry);
-                        paletteMap.put(identifier, paletteIndex++);
+                        paletteMap.put(identifier, paletteList.size());
+                        paletteList.add(identifier);
                     }
-                    
-                    // Store block state index
-                    int index = x + z * 16 + y * 16 * 16;
-                    blockStates[index] = paletteMap.get(identifier);
                 }
             }
         }
         
-        section.put("Palette", palette);
+        // Calculate bits per entry (Minecraft-style)
+        int bitsPerEntry = BitPackedArray.calculateBitsPerEntry(paletteList.size());
         
-        // Block states as long array
-        section.put("BlockStates", blockStates);
+        // Create bit-packed array for block states
+        BitPackedArray blockStates = new BitPackedArray(bitsPerEntry, 16 * 16 * 16);
+        
+        // Second pass: fill block states
+        for (int x = 0; x < 16; x++) {
+            for (int y = 0; y < 16; y++) {
+                for (int z = 0; z < 16; z++) {
+                    Block block = chunk.getBlock(x, baseY + y, z);
+                    String identifier = block.getIdentifier();
+                    if (identifier == null) identifier = "mattmc:air";
+                    
+                    int index = x + z * 16 + y * 16 * 16;
+                    int paletteIndex = paletteMap.get(identifier);
+                    blockStates.set(index, paletteIndex);
+                }
+            }
+        }
+        
+        // Build palette for NBT
+        List<Map<String, Object>> palette = new ArrayList<>();
+        for (String identifier : paletteList) {
+            Map<String, Object> paletteEntry = new HashMap<>();
+            paletteEntry.put("Name", identifier);
+            palette.add(paletteEntry);
+        }
+        
+        section.put("Palette", palette);
+        section.put("BlockStates", blockStates.getData());
         
         return section;
     }
@@ -135,6 +154,7 @@ public class ChunkNBT {
     
     /**
      * Load a single section into the chunk.
+     * Handles bit-packed block states like Minecraft Java Edition.
      */
     private static void loadSection(LevelChunk chunk, Map<String, Object> section) {
         // Get section Y
@@ -168,20 +188,25 @@ public class ChunkNBT {
             return;
         }
         
-        long[] blockStates = (long[]) blockStatesObj;
+        long[] blockStatesData = (long[]) blockStatesObj;
+        
+        // Calculate bits per entry from data size
+        int bitsPerEntry = BitPackedArray.calculateBitsPerEntry(paletteArray.length);
+        
+        // Create bit-packed array for reading
+        BitPackedArray blockStates = new BitPackedArray(bitsPerEntry, 16 * 16 * 16, blockStatesData);
         
         // Load blocks
         for (int x = 0; x < 16; x++) {
             for (int y = 0; y < 16; y++) {
                 for (int z = 0; z < 16; z++) {
                     int index = x + z * 16 + y * 16 * 16;
-                    if (index < blockStates.length) {
-                        int paletteIndex = (int) blockStates[index];
-                        if (paletteIndex >= 0 && paletteIndex < paletteArray.length) {
-                            String identifier = paletteArray[paletteIndex];
-                            Block block = Blocks.getBlockOrAir(identifier);
-                            chunk.setBlock(x, baseY + y, z, block);
-                        }
+                    int paletteIndex = blockStates.get(index);
+                    
+                    if (paletteIndex >= 0 && paletteIndex < paletteArray.length) {
+                        String identifier = paletteArray[paletteIndex];
+                        Block block = Blocks.getBlockOrAir(identifier);
+                        chunk.setBlock(x, baseY + y, z, block);
                     }
                 }
             }
