@@ -75,20 +75,26 @@ public class TextureAtlas {
         
         logger.info("Found {} unique textures", uniqueTexturePaths.size());
         
-        // Calculate atlas dimensions (power of 2, square layout)
+        // Calculate atlas dimensions (must be power of 2 for mipmaps)
         int textureCount = uniqueTexturePaths.size();
         int texturesPerRow = (int) Math.ceil(Math.sqrt(textureCount));
-        atlasWidth = texturesPerRow * textureSize;
-        atlasHeight = texturesPerRow * textureSize;
         
-        logger.info("Atlas size: {}x{} ({} textures per row)", atlasWidth, atlasHeight, texturesPerRow);
+        // Round up to next power of 2
+        int powerOf2Width = nextPowerOf2(texturesPerRow * textureSize);
+        int powerOf2Height = powerOf2Width; // Keep it square
+        
+        atlasWidth = powerOf2Width;
+        atlasHeight = powerOf2Height;
+        
+        logger.info("Atlas size: {}x{} ({} textures, {} per row)", atlasWidth, atlasHeight, textureCount, texturesPerRow);
         
         // Create atlas image
         BufferedImage atlasImage = new BufferedImage(atlasWidth, atlasHeight, BufferedImage.TYPE_INT_ARGB);
         Graphics2D g = atlasImage.createGraphics();
         
-        // Fill with magenta (missing texture color)
-        g.setColor(new Color(255, 0, 255));
+        // Fill with transparent black (will appear as background in empty areas)
+        // Using transparent instead of magenta to avoid color bleeding with mipmaps
+        g.setColor(new Color(0, 0, 0, 0));
         g.fillRect(0, 0, atlasWidth, atlasHeight);
         
         // Pack textures into atlas
@@ -153,6 +159,17 @@ public class TextureAtlas {
     }
     
     /**
+     * Calculate the next power of 2 greater than or equal to the given value.
+     */
+    private int nextPowerOf2(int value) {
+        int power = 1;
+        while (power < value) {
+            power *= 2;
+        }
+        return power;
+    }
+    
+    /**
      * Create an OpenGL texture from a BufferedImage.
      */
     private int createGLTexture(BufferedImage image) {
@@ -182,22 +199,8 @@ public class TextureAtlas {
         // Upload texture data
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, buffer);
         
-        // Texture atlases should NOT use mipmaps to avoid color bleeding between packed textures
-        // Always use NEAREST filtering for block textures to maintain the pixelated look
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-        
-        // Apply anisotropic filtering if enabled (helps with distant terrain without mipmaps)
-        int anisotropicLevel = OptionsManager.getAnisotropicFiltering();
-        if (anisotropicLevel > 0) {
-            try {
-                float maxAniso = glGetFloat(GL_MAX_TEXTURE_MAX_ANISOTROPY_EXT);
-                float aniso = Math.min(anisotropicLevel, maxAniso);
-                glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAX_ANISOTROPY_EXT, aniso);
-            } catch (IllegalStateException | IllegalArgumentException e) {
-                logger.debug("Anisotropic filtering not supported: {}", e.getMessage());
-            }
-        }
+        // Apply texture filtering including mipmaps (atlas is now power-of-2 and uses transparent fill)
+        TextureManager.applyTextureFiltering(true);
         
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
