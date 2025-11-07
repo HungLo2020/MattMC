@@ -191,4 +191,58 @@ public class RegionCommandTest {
         // Should set 10 * 6 * 10 = 600 blocks
         assertEquals(600, blocksSet, "Should set 600 blocks in a 10x6x10 region");
     }
+    
+    @Test
+    public void testRegionSizeCalculation() {
+        // Test the region size calculation logic used for safety limit
+        int[] pos1 = {0, 64, 0};
+        int[] pos2 = {9, 69, 9};
+        
+        int minX = Math.min(pos1[0], pos2[0]);
+        int maxX = Math.max(pos1[0], pos2[0]);
+        int minY = Math.min(pos1[1], pos2[1]);
+        int maxY = Math.max(pos1[1], pos2[1]);
+        int minZ = Math.min(pos1[2], pos2[2]);
+        int maxZ = Math.max(pos1[2], pos2[2]);
+        
+        long sizeX = (long)(maxX - minX + 1);
+        long sizeY = (long)(maxY - minY + 1);
+        long sizeZ = (long)(maxZ - minZ + 1);
+        long totalBlocks = sizeX * sizeY * sizeZ;
+        
+        assertEquals(10, sizeX);
+        assertEquals(6, sizeY);
+        assertEquals(10, sizeZ);
+        assertEquals(600, totalBlocks);
+    }
+    
+    @Test
+    public void testMaximumRegionSizeLimit() {
+        // Test that we can detect regions that exceed the maximum size
+        final long MAX_REGION_SIZE = 100_000;
+        
+        // Test a region that would be exactly at the limit
+        int[] pos1 = {0, 0, 0};
+        int[] pos2 = {99, 9, 99}; // 100 * 10 * 100 = 100,000 blocks
+        
+        long sizeX = Math.abs(pos2[0] - pos1[0]) + 1;
+        long sizeY = Math.abs(pos2[1] - pos1[1]) + 1;
+        long sizeZ = Math.abs(pos2[2] - pos1[2]) + 1;
+        long totalBlocks = sizeX * sizeY * sizeZ;
+        
+        assertEquals(100_000, totalBlocks);
+        assertFalse(totalBlocks > MAX_REGION_SIZE, "Region at limit should be allowed");
+        
+        // Test a region that exceeds the limit
+        int[] pos3 = {0, 0, 0};
+        int[] pos4 = {99, 10, 99}; // 100 * 11 * 100 = 110,000 blocks
+        
+        sizeX = Math.abs(pos4[0] - pos3[0]) + 1;
+        sizeY = Math.abs(pos4[1] - pos3[1]) + 1;
+        sizeZ = Math.abs(pos4[2] - pos3[2]) + 1;
+        totalBlocks = sizeX * sizeY * sizeZ;
+        
+        assertEquals(110_000, totalBlocks);
+        assertTrue(totalBlocks > MAX_REGION_SIZE, "Region exceeding limit should be detected");
+    }
 }

@@ -374,6 +374,20 @@ public final class DevplayScreen implements Screen {
         int minZ = Math.min(regionPos1[2], regionPos2[2]);
         int maxZ = Math.max(regionPos1[2], regionPos2[2]);
         
+        // Calculate region size and check for maximum limit to prevent UI freezing
+        long sizeX = (long)(maxX - minX + 1);
+        long sizeY = (long)(maxY - minY + 1);
+        long sizeZ = (long)(maxZ - minZ + 1);
+        long totalBlocks = sizeX * sizeY * sizeZ;
+        
+        // Maximum safe region size (100,000 blocks)
+        final long MAX_REGION_SIZE = 100_000;
+        if (totalBlocks > MAX_REGION_SIZE) {
+            commandErrorMessage = "Region too large (" + totalBlocks + " blocks). Maximum is " + MAX_REGION_SIZE;
+            commandErrorDisplayTime = 3.0;
+            return;
+        }
+        
         // Calculate the number of blocks to set
         int blocksSet = 0;
         
