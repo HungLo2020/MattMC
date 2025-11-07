@@ -40,7 +40,7 @@ public final class OptionsScreen implements Screen {
         titleCX = w / 2f;
         titleCY = h * 0.18f;
 
-        int totalButtonsH = 8 * buttonHeight + 7 * buttonGap;
+        int totalButtonsH = 10 * buttonHeight + 9 * buttonGap;
         buttonsStartY = (int)(h / 2f - totalButtonsH / 2f);
 
         int x = (w - buttonWidth) / 2;
@@ -54,7 +54,9 @@ public final class OptionsScreen implements Screen {
         buttons.add(new Button(getTitleBlurButtonLabel(), x, buttonsStartY + 4 * (buttonHeight + buttonGap), buttonWidth, buttonHeight));
         buttons.add(new Button(getFpsCapButtonLabel(), x, buttonsStartY + 5 * (buttonHeight + buttonGap), buttonWidth, buttonHeight));
         buttons.add(new Button(getRenderDistanceButtonLabel(), x, buttonsStartY + 6 * (buttonHeight + buttonGap), buttonWidth, buttonHeight));
-        buttons.add(new Button("Back",     x, buttonsStartY + 7 * (buttonHeight + buttonGap), buttonWidth, buttonHeight));
+        buttons.add(new Button(getMipmapButtonLabel(), x, buttonsStartY + 7 * (buttonHeight + buttonGap), buttonWidth, buttonHeight));
+        buttons.add(new Button(getAnisotropicButtonLabel(), x, buttonsStartY + 8 * (buttonHeight + buttonGap), buttonWidth, buttonHeight));
+        buttons.add(new Button("Back",     x, buttonsStartY + 9 * (buttonHeight + buttonGap), buttonWidth, buttonHeight));
     }
     
     private String getMenuBlurButtonLabel() {
@@ -82,6 +84,22 @@ public final class OptionsScreen implements Screen {
     private String getRenderDistanceButtonLabel() {
         int renderDistance = mattmc.client.settings.OptionsManager.getRenderDistance();
         return "Render Distance: " + renderDistance + " chunks";
+    }
+    
+    private String getMipmapButtonLabel() {
+        int level = mattmc.client.settings.OptionsManager.getMipmapLevel();
+        if (level == 0) {
+            return "Mipmaps: OFF";
+        }
+        return "Mipmaps: " + level;
+    }
+    
+    private String getAnisotropicButtonLabel() {
+        int level = mattmc.client.settings.OptionsManager.getAnisotropicFiltering();
+        if (level == 0) {
+            return "Anisotropic Filtering: OFF";
+        }
+        return "Anisotropic Filtering: " + level + "x";
     }
 
     @Override
@@ -221,6 +239,42 @@ public final class OptionsScreen implements Screen {
             }
             
             mattmc.client.settings.OptionsManager.setRenderDistance(allowedValues[nextIndex]);
+            recomputeLayout();
+            return;
+        }
+        if (label.startsWith("Mipmaps:")) {
+            // Cycle through mipmap levels: off, 1, 2, 3, 4
+            int current = mattmc.client.settings.OptionsManager.getMipmapLevel();
+            int[] allowedValues = mattmc.client.settings.OptionsManager.ALLOWED_MIPMAP_LEVELS;
+            
+            // Find next value in the cycle
+            int nextIndex = 0;
+            for (int i = 0; i < allowedValues.length; i++) {
+                if (allowedValues[i] == current) {
+                    nextIndex = (i + 1) % allowedValues.length;
+                    break;
+                }
+            }
+            
+            mattmc.client.settings.OptionsManager.setMipmapLevel(allowedValues[nextIndex]);
+            recomputeLayout();
+            return;
+        }
+        if (label.startsWith("Anisotropic Filtering:")) {
+            // Cycle through anisotropic filtering levels: off, 2x, 4x, 8x, 16x
+            int current = mattmc.client.settings.OptionsManager.getAnisotropicFiltering();
+            int[] allowedValues = mattmc.client.settings.OptionsManager.ALLOWED_ANISOTROPIC_LEVELS;
+            
+            // Find next value in the cycle
+            int nextIndex = 0;
+            for (int i = 0; i < allowedValues.length; i++) {
+                if (allowedValues[i] == current) {
+                    nextIndex = (i + 1) % allowedValues.length;
+                    break;
+                }
+            }
+            
+            mattmc.client.settings.OptionsManager.setAnisotropicFiltering(allowedValues[nextIndex]);
             recomputeLayout();
             return;
         }

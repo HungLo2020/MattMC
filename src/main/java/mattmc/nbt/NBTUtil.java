@@ -34,9 +34,11 @@ public class NBTUtil {
     
     /**
      * Write a compound tag to a stream (compressed with gzip).
+     * Uses BufferedOutputStream for better performance (Minecraft Java Edition approach).
      */
     public static void writeCompressed(Map<String, Object> compound, OutputStream out) throws IOException {
-        try (GZIPOutputStream gzip = new GZIPOutputStream(out);
+        try (BufferedOutputStream buffered = new BufferedOutputStream(out, 8192);
+             GZIPOutputStream gzip = new GZIPOutputStream(buffered);
              DataOutputStream dos = new DataOutputStream(gzip)) {
             writeCompoundTag(dos, "", compound);
         } catch (NBTSerializationException e) {
@@ -48,9 +50,11 @@ public class NBTUtil {
     
     /**
      * Read a compound tag from a stream (compressed with gzip).
+     * Uses BufferedInputStream for better performance (Minecraft Java Edition approach).
      */
     public static Map<String, Object> readCompressed(InputStream in) throws IOException {
-        try (GZIPInputStream gzip = new GZIPInputStream(in);
+        try (BufferedInputStream buffered = new BufferedInputStream(in, 8192);
+             GZIPInputStream gzip = new GZIPInputStream(buffered);
              DataInputStream dis = new DataInputStream(gzip)) {
             byte type = dis.readByte();
             if (type != TAG_COMPOUND) {
@@ -67,9 +71,12 @@ public class NBTUtil {
     
     /**
      * Write a compound tag to a stream (deflate compression).
+     * Uses BufferedOutputStream for better performance (Minecraft Java Edition approach).
+     * Uses compression level 1 for faster compression with acceptable compression ratio.
      */
     public static void writeDeflated(Map<String, Object> compound, OutputStream out) throws IOException {
-        try (DeflaterOutputStream deflate = new DeflaterOutputStream(out);
+        try (BufferedOutputStream buffered = new BufferedOutputStream(out, 8192);
+             DeflaterOutputStream deflate = new DeflaterOutputStream(buffered, new Deflater(1));
              DataOutputStream dos = new DataOutputStream(deflate)) {
             writeCompoundTag(dos, "", compound);
         } catch (NBTSerializationException e) {
@@ -81,9 +88,11 @@ public class NBTUtil {
     
     /**
      * Read a compound tag from a stream (deflate compression).
+     * Uses BufferedInputStream for better performance (Minecraft Java Edition approach).
      */
     public static Map<String, Object> readDeflated(InputStream in) throws IOException {
-        try (InflaterInputStream inflate = new InflaterInputStream(in);
+        try (BufferedInputStream buffered = new BufferedInputStream(in, 8192);
+             InflaterInputStream inflate = new InflaterInputStream(buffered);
              DataInputStream dis = new DataInputStream(inflate)) {
             byte type = dis.readByte();
             if (type != TAG_COMPOUND) {

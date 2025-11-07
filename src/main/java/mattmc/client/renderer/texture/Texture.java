@@ -1,5 +1,6 @@
 package mattmc.client.renderer.texture;
 
+import mattmc.client.settings.OptionsManager;
 import org.lwjgl.BufferUtils;
 import org.lwjgl.stb.STBImage;
 
@@ -8,6 +9,9 @@ import java.nio.ByteBuffer;
 
 import static org.lwjgl.opengl.GL11.*;
 import static org.lwjgl.opengl.GL12.*;
+import static org.lwjgl.opengl.GL13.*;
+import static org.lwjgl.opengl.GL30.*;
+import static org.lwjgl.opengl.EXTTextureFilterAnisotropic.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -34,13 +38,16 @@ public final class Texture implements AutoCloseable {
 
         int tex = glGenTextures();
         glBindTexture(GL_TEXTURE_2D, tex);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-
+        
+        // Upload texture data
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, x[0], y[0], 0, GL_RGBA, GL_UNSIGNED_BYTE, pixels);
         STBImage.stbi_image_free(pixels);
+        
+        // Apply filtering settings (using LINEAR for UI textures)
+        TextureManager.applyTextureFiltering(false);
+        
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
         glBindTexture(GL_TEXTURE_2D, 0);
 
         logger.info("Loaded texture {} {}x{} id={}", classpath, x[0], y[0], tex);

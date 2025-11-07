@@ -173,10 +173,11 @@ public class Level implements LevelAccessor {
     /**
      * Try to load a chunk from disk.
      * Returns null if the chunk doesn't exist on disk or if world directory is not set.
+     * Uses region cache for better performance (Minecraft Java Edition approach).
      */
     private LevelChunk loadChunkFromDisk(int chunkX, int chunkZ) {
-        if (worldDirectory == null) {
-            return null; // No save directory set
+        if (worldDirectory == null || regionCache == null) {
+            return null; // No save directory or cache set
         }
         
         try {
@@ -195,15 +196,15 @@ public class Level implements LevelAccessor {
                 return null; // Region file doesn't exist
             }
             
-            try (RegionFile regionFile = new RegionFile(regionFilePath, regionX, regionZ)) {
-                if (!regionFile.hasChunk(chunkX, chunkZ)) {
-                    return null; // Chunk not in region file
-                }
-                
-                Map<String, Object> chunkNBT = regionFile.readChunk(chunkX, chunkZ);
-                if (chunkNBT != null) {
-                    return ChunkNBT.fromNBT(chunkNBT);
-                }
+            // Use cached region file instead of creating a new one
+            RegionFile regionFile = regionCache.getRegionFile(chunkX, chunkZ);
+            if (!regionFile.hasChunk(chunkX, chunkZ)) {
+                return null; // Chunk not in region file
+            }
+            
+            Map<String, Object> chunkNBT = regionFile.readChunk(chunkX, chunkZ);
+            if (chunkNBT != null) {
+                return ChunkNBT.fromNBT(chunkNBT);
             }
         } catch (IOException e) {
             logger.error("Failed to load chunk ({}, {}) from disk: {}", chunkX, chunkZ, e.getMessage(), e);
@@ -262,6 +263,36 @@ public class Level implements LevelAccessor {
         
         LevelChunk chunk = getChunk(chunkX, chunkZ);
         chunk.setBlock(localX, chunkY, localZ, block);
+        
+        // Mark adjacent chunks as dirty if the block is at a chunk boundary
+        // This is needed because adjacent chunks may have faces that need to be culled/unculled
+        if (localX == 0) {
+            // Block is at the western edge, mark western neighbor as dirty
+            LevelChunk westChunk = getChunkIfLoaded(chunkX - 1, chunkZ);
+            if (westChunk != null) {
+                westChunk.setDirty(true);
+            }
+        } else if (localX == LevelChunk.WIDTH - 1) {
+            // Block is at the eastern edge, mark eastern neighbor as dirty
+            LevelChunk eastChunk = getChunkIfLoaded(chunkX + 1, chunkZ);
+            if (eastChunk != null) {
+                eastChunk.setDirty(true);
+            }
+        }
+        
+        if (localZ == 0) {
+            // Block is at the northern edge, mark northern neighbor as dirty
+            LevelChunk northChunk = getChunkIfLoaded(chunkX, chunkZ - 1);
+            if (northChunk != null) {
+                northChunk.setDirty(true);
+            }
+        } else if (localZ == LevelChunk.DEPTH - 1) {
+            // Block is at the southern edge, mark southern neighbor as dirty
+            LevelChunk southChunk = getChunkIfLoaded(chunkX, chunkZ + 1);
+            if (southChunk != null) {
+                southChunk.setDirty(true);
+            }
+        }
     }
     
     /**
