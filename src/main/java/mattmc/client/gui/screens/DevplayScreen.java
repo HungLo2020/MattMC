@@ -206,6 +206,10 @@ public final class DevplayScreen implements Screen {
                     // Toggle command overlay
                     openCommandOverlay();
                 }
+                if (key == GLFW_KEY_E && action == GLFW_PRESS) {
+                    // Open inventory screen
+                    game.setScreen(new InventoryScreen(game, this));
+                }
             }
         });
         
@@ -524,6 +528,9 @@ public final class DevplayScreen implements Screen {
         if (commandFeedbackDisplayTime > 0) {
             uiRenderer.drawCommandFeedback(w, h, commandFeedbackMessage);
         }
+        
+        // Draw hotbar at bottom center (always visible)
+        uiRenderer.drawHotbar(w, h);
         
         // Draw crosshair on top of everything (but not when command overlay is open)
         if (!commandOverlayVisible) {
