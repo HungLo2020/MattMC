@@ -99,6 +99,15 @@ public class KeybindManager {
         input.setKeybind(PlayerInput.FLY_UP, GLFW_KEY_SPACE);
         input.setKeybind(PlayerInput.OPEN_COMMAND, GLFW_KEY_SLASH);
         input.setKeybind(PlayerInput.INVENTORY, GLFW_KEY_E);
+        input.setKeybind(PlayerInput.HOTBAR_1, GLFW_KEY_1);
+        input.setKeybind(PlayerInput.HOTBAR_2, GLFW_KEY_2);
+        input.setKeybind(PlayerInput.HOTBAR_3, GLFW_KEY_3);
+        input.setKeybind(PlayerInput.HOTBAR_4, GLFW_KEY_4);
+        input.setKeybind(PlayerInput.HOTBAR_5, GLFW_KEY_5);
+        input.setKeybind(PlayerInput.HOTBAR_6, GLFW_KEY_6);
+        input.setKeybind(PlayerInput.HOTBAR_7, GLFW_KEY_7);
+        input.setKeybind(PlayerInput.HOTBAR_8, GLFW_KEY_8);
+        input.setKeybind(PlayerInput.HOTBAR_9, GLFW_KEY_9);
         logger.debug("Set default keybinds");
     }
     

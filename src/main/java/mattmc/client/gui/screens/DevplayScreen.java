@@ -213,6 +213,25 @@ public final class DevplayScreen implements Screen {
                     // Open inventory screen
                     game.setScreen(new InventoryScreen(game, this));
                 }
+                
+                // Check for hotbar selection keys (1-9)
+                if (action == GLFW_PRESS) {
+                    PlayerInput input = PlayerInput.getInstance();
+                    String[] hotbarActions = {
+                        PlayerInput.HOTBAR_1, PlayerInput.HOTBAR_2, PlayerInput.HOTBAR_3,
+                        PlayerInput.HOTBAR_4, PlayerInput.HOTBAR_5, PlayerInput.HOTBAR_6,
+                        PlayerInput.HOTBAR_7, PlayerInput.HOTBAR_8, PlayerInput.HOTBAR_9
+                    };
+                    
+                    for (int i = 0; i < hotbarActions.length; i++) {
+                        Integer hotbarKey = input.getKeybind(hotbarActions[i]);
+                        if (hotbarKey != null && key == hotbarKey) {
+                            // Select hotbar slot (0-indexed)
+                            uiRenderer.setSelectedHotbarSlot(i);
+                            break;
+                        }
+                    }
+                }
             }
         });
         
