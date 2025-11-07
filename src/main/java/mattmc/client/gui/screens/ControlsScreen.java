@@ -38,6 +38,11 @@ public final class ControlsScreen implements Screen {
     private int keybindsStartY;
     private int backButtonY;
     
+    // Scrolling support
+    private int scrollOffset = 0;
+    private int maxScrollOffset = 0;
+    private static final int SCROLL_BUFFER = 50; // Buffer room above/below keybinds
+    
     // Keybind actions with display names
     private static final String[][] KEYBIND_ACTIONS = {
         {PlayerInput.FORWARD, "Move Forward"},
@@ -49,7 +54,16 @@ public final class ControlsScreen implements Screen {
         {PlayerInput.FLY_UP, "Fly Up"},
         {PlayerInput.BREAK_BLOCK, "Break Block"},
         {PlayerInput.PLACE_BLOCK, "Place Block"},
-        {PlayerInput.OPEN_COMMAND, "Open Command"}
+        {PlayerInput.OPEN_COMMAND, "Open Command"},
+        {PlayerInput.HOTBAR_1, "Hotbar Slot 1"},
+        {PlayerInput.HOTBAR_2, "Hotbar Slot 2"},
+        {PlayerInput.HOTBAR_3, "Hotbar Slot 3"},
+        {PlayerInput.HOTBAR_4, "Hotbar Slot 4"},
+        {PlayerInput.HOTBAR_5, "Hotbar Slot 5"},
+        {PlayerInput.HOTBAR_6, "Hotbar Slot 6"},
+        {PlayerInput.HOTBAR_7, "Hotbar Slot 7"},
+        {PlayerInput.HOTBAR_8, "Hotbar Slot 8"},
+        {PlayerInput.HOTBAR_9, "Hotbar Slot 9"}
     };
 
     public ControlsScreen(Minecraft game) {
@@ -81,6 +95,10 @@ public final class ControlsScreen implements Screen {
         backButtonY = h - 80;
         backButton.x = (w - backButton.w) / 2;
         backButton.y = backButtonY;
+        
+        // Calculate maximum scroll offset (total content height - available height + buffer)
+        int availableHeight = backButtonY - keybindsStartY - SCROLL_BUFFER;
+        maxScrollOffset = Math.max(0, totalKeybindsH - availableHeight + SCROLL_BUFFER);
     }
 
     @Override
@@ -101,14 +119,19 @@ public final class ControlsScreen implements Screen {
         }
 
         for (var kb : keybindButtons) {
-            kb.button.setHover(kb.button.contains(mxFB, myFB));
+            // Apply scroll offset to button position for hover detection
+            int adjustedY = kb.button.y - scrollOffset;
+            kb.button.setHover(mxFB >= kb.button.x && mxFB < kb.button.x + kb.button.w &&
+                              myFB >= adjustedY && myFB < adjustedY + kb.button.h);
         }
         backButton.setHover(backButton.contains(mxFB, myFB));
 
         if (mouseDown) {
-            // Check keybind buttons
+            // Check keybind buttons with scroll offset
             for (var kb : keybindButtons) {
-                if (kb.button.contains(mxFB, myFB)) {
+                int adjustedY = kb.button.y - scrollOffset;
+                if (mxFB >= kb.button.x && mxFB < kb.button.x + kb.button.w &&
+                    myFB >= adjustedY && myFB < adjustedY + kb.button.h) {
                     waitingForKey = kb.action;
                     ignoreNextRelease = true; // Ignore the release from this click
                     break;
@@ -136,12 +159,23 @@ public final class ControlsScreen implements Screen {
         drawTitle("Keybinds", titleCX, titleCY, titleScale, 0xFFFFFF);
         drawTitle("Click a button to change its keybind", titleCX, titleCY + 40f, 0.9f, 0xB0C4DE);
         
-        // Draw keybind buttons
+        // Draw keybind buttons with scroll offset
         for (var kb : keybindButtons) {
             boolean waiting = kb.action.equals(waitingForKey);
             Button b = kb.button;
-            ButtonRenderer.drawButton(b, waiting);
-            drawKeybindButtonText(kb, waiting, b);
+            
+            // Apply scroll offset to button rendering
+            int adjustedY = b.y - scrollOffset;
+            
+            // Only render buttons that are visible on screen
+            if (adjustedY + b.h >= keybindsStartY - SCROLL_BUFFER && adjustedY <= backButtonY) {
+                // Temporarily adjust button Y for rendering
+                int originalY = b.y;
+                b.y = adjustedY;
+                ButtonRenderer.drawButton(b, waiting);
+                drawKeybindButtonText(kb, waiting, b);
+                b.y = originalY;
+            }
         }
         
         // Draw back button
@@ -251,6 +285,14 @@ public final class ControlsScreen implements Screen {
         glfwSetFramebufferSizeCallback(window.handle(), (win, newW, newH) -> {
             glViewport(0, 0, Math.max(newW, 1), Math.max(newH, 1));
             recomputeLayout();
+        });
+        
+        // Scroll callback for mouse wheel scrolling
+        glfwSetScrollCallback(window.handle(), (win, xOffset, yOffset) -> {
+            // Scroll down = positive yOffset, scroll up = negative yOffset
+            // We want scrolling down to increase scrollOffset (move content up)
+            int scrollAmount = (int)(-yOffset * 20); // Multiply by speed factor
+            scrollOffset = Math.max(0, Math.min(maxScrollOffset, scrollOffset + scrollAmount));
         });
     }
     
