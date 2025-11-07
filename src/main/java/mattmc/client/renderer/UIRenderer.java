@@ -168,9 +168,10 @@ public class UIRenderer {
             hotbarTexture.bind();
             glColor4f(1f, 1f, 1f, 1f);
             
-            // Position hotbar at bottom center
-            float texWidth = hotbarTexture.width;
-            float texHeight = hotbarTexture.height;
+            // Scale hotbar to 2x size for better visibility (like Minecraft GUI scale)
+            float scale = 2.0f;
+            float texWidth = hotbarTexture.width * scale;
+            float texHeight = hotbarTexture.height * scale;
             float x = (screenWidth - texWidth) / 2f;
             float y = screenHeight - texHeight - 10; // 10 pixels from bottom
             

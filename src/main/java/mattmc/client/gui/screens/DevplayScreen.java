@@ -209,7 +209,9 @@ public final class DevplayScreen implements Screen {
                 }
                 // Check for inventory key (respects user configuration)
                 Integer inventoryKey = PlayerInput.getInstance().getKeybind(PlayerInput.INVENTORY);
+                logger.debug("Inventory key: {}, pressed key: {}, action: {}", inventoryKey, key, action);
                 if (inventoryKey != null && key == inventoryKey && action == GLFW_PRESS) {
+                    logger.info("Opening inventory screen");
                     // Open inventory screen
                     game.setScreen(new InventoryScreen(game, this));
                 }

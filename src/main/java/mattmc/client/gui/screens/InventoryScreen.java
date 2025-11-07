@@ -93,9 +93,10 @@ public final class InventoryScreen implements Screen {
             inventoryTexture.bind();
             glColor4f(1f, 1f, 1f, 1f);
             
-            // Center the inventory image
-            float texWidth = inventoryTexture.width;
-            float texHeight = inventoryTexture.height;
+            // Scale inventory to 2x size for better visibility (like Minecraft GUI scale)
+            float scale = 2.0f;
+            float texWidth = inventoryTexture.width * scale;
+            float texHeight = inventoryTexture.height * scale;
             float x = (w - texWidth) / 2f;
             float y = (h - texHeight) / 2f;
             
