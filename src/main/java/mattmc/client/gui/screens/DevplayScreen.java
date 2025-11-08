@@ -110,7 +110,7 @@ public final class DevplayScreen implements Screen {
         // Apply render distance from settings
         int renderDistance = OptionsManager.getRenderDistance();
         this.world.setRenderDistance(renderDistance);
-        logger.info("Set render distance to: {}{}", renderDistance, " chunks");
+        // logger.info("Set render distance to: {}{}", renderDistance, " chunks");
         
         // Set world directory for new worlds so chunks can be saved during unload
         if (world == null) {

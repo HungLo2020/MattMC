@@ -75,7 +75,7 @@ public class KeybindManager {
                 for (Map.Entry<String, Integer> entry : keybinds.entrySet()) {
                     PlayerInput.getInstance().setKeybind(entry.getKey(), entry.getValue());
                 }
-                logger.info("Loaded {} keybinds from Options.txt", keybinds.size());
+                // logger.info("Loaded {} keybinds from Options.txt", keybinds.size());
             }
         } catch (IOException e) {
             logger.error("Error loading keybinds: {}", e.getMessage());
