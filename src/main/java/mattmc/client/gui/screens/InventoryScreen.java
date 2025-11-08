@@ -35,15 +35,21 @@ public final class InventoryScreen implements Screen {
     private double mouseXWin, mouseYWin;
     private final List<InventorySlot> slots = new ArrayList<>();
     
+    // Held item state (for drag-and-drop)
+    private mattmc.world.item.ItemStack heldItem = null;
+    private int heldItemSourceSlot = -1;
+    
     // Helper class to represent an inventory slot
     private static class InventorySlot {
         final float x, y, width, height; // Relative to 176x166 GUI coordinate system
+        final int inventoryIndex; // Index in player inventory (0-35, or -1 for non-inventory slots)
         
-        InventorySlot(float x, float y, float width, float height) {
+        InventorySlot(float x, float y, float width, float height, int inventoryIndex) {
             this.x = x;
             this.y = y;
             this.width = width;
             this.height = height;
+            this.inventoryIndex = inventoryIndex;
         }
         
         boolean contains(float px, float py) {
@@ -74,8 +80,16 @@ public final class InventoryScreen implements Screen {
             mouseYWin = y; 
         });
 
-        // Disable mouse button callback to prevent block interaction
-        glfwSetMouseButtonCallback(window.handle(), null);
+        // Handle mouse button clicks for inventory interaction
+        glfwSetMouseButtonCallback(window.handle(), (h, button, action, mods) -> {
+            if (action == GLFW_PRESS) {
+                if (button == GLFW_MOUSE_BUTTON_LEFT) {
+                    handleLeftClick(mods);
+                } else if (button == GLFW_MOUSE_BUTTON_RIGHT) {
+                    handleRightClick(mods);
+                }
+            }
+        });
 
         // Set up key callback for inventory key (respects user configuration) or ESC to close
         glfwSetKeyCallback(window.handle(), (win, key, scancode, action, mods) -> {
@@ -98,9 +112,267 @@ public final class InventoryScreen implements Screen {
     }
 
     private void closeInventory() {
+        // Return held item to inventory if any
+        if (heldItem != null && heldItemSourceSlot >= 0) {
+            mattmc.world.entity.player.LocalPlayer player = gameScreen.getPlayer();
+            if (player != null && player.getInventory() != null) {
+                player.getInventory().setStack(heldItemSourceSlot, heldItem);
+            }
+            heldItem = null;
+            heldItemSourceSlot = -1;
+        }
+        
         // Recapture mouse for FPS controls
         glfwSetInputMode(window.handle(), GLFW_CURSOR, GLFW_CURSOR_DISABLED);
         game.setScreen(gameScreen);
+    }
+    
+    /**
+     * Handle left-click for inventory item interaction.
+     */
+    private void handleLeftClick(int mods) {
+        mattmc.world.entity.player.LocalPlayer player = gameScreen.getPlayer();
+        if (player == null || player.getInventory() == null) {
+            return;
+        }
+        
+        mattmc.world.item.Inventory inventory = player.getInventory();
+        
+        // Get GUI coordinates
+        float scale = 3.0f;
+        int w = window.width(), h = window.height();
+        float contentOffsetX = 40f;
+        float contentOffsetY = 45f;
+        float texWidth = inventoryTexture.width * scale;
+        float texHeight = inventoryTexture.height * scale;
+        float guiX = (w - texWidth) / 2f + (contentOffsetX * scale);
+        float guiY = (h - texHeight) / 2f + (contentOffsetY * scale);
+        
+        // Convert window mouse coordinates to framebuffer coordinates
+        float mouseFBX, mouseFBY;
+        try (MemoryStack stack = stackPush()) {
+            IntBuffer winW = stack.mallocInt(1), winH = stack.mallocInt(1);
+            IntBuffer fbW  = stack.mallocInt(1), fbH  = stack.mallocInt(1);
+            glfwGetWindowSize(window.handle(), winW, winH);
+            glfwGetFramebufferSize(window.handle(), fbW, fbH);
+            float sx = fbW.get(0) / Math.max(1f, winW.get(0));
+            float sy = fbH.get(0) / Math.max(1f, winH.get(0));
+            mouseFBX = (float) mouseXWin * sx;
+            mouseFBY = (float) mouseYWin * sy;
+        }
+        
+        // Convert mouse position to GUI-relative coordinates
+        float mouseGuiX = (mouseFBX - guiX) / scale;
+        float mouseGuiY = (mouseFBY - guiY) / scale;
+        
+        // Find clicked slot
+        for (InventorySlot slot : slots) {
+            if (slot.contains(mouseGuiX, mouseGuiY)) {
+                // Only handle inventory slots (not armor/crafting slots)
+                if (slot.inventoryIndex >= 0) {
+                    boolean isShiftClick = (mods & GLFW_MOD_SHIFT) != 0;
+                    
+                    if (isShiftClick) {
+                        handleShiftClick(inventory, slot.inventoryIndex);
+                    } else {
+                        handleNormalClick(inventory, slot.inventoryIndex);
+                    }
+                }
+                break;
+            }
+        }
+    }
+    
+    /**
+     * Handle right-click for inventory item interaction.
+     * Right-click on stack with empty cursor: pick up half
+     * Right-click on empty slot with cursor: deposit one item
+     */
+    private void handleRightClick(int mods) {
+        mattmc.world.entity.player.LocalPlayer player = gameScreen.getPlayer();
+        if (player == null || player.getInventory() == null) {
+            return;
+        }
+        
+        mattmc.world.item.Inventory inventory = player.getInventory();
+        
+        // Get GUI coordinates
+        float scale = 3.0f;
+        int w = window.width(), h = window.height();
+        float contentOffsetX = 40f;
+        float contentOffsetY = 45f;
+        float texWidth = inventoryTexture.width * scale;
+        float texHeight = inventoryTexture.height * scale;
+        float guiX = (w - texWidth) / 2f + (contentOffsetX * scale);
+        float guiY = (h - texHeight) / 2f + (contentOffsetY * scale);
+        
+        // Convert window mouse coordinates to framebuffer coordinates
+        float mouseFBX, mouseFBY;
+        try (MemoryStack stack = stackPush()) {
+            IntBuffer winW = stack.mallocInt(1), winH = stack.mallocInt(1);
+            IntBuffer fbW  = stack.mallocInt(1), fbH  = stack.mallocInt(1);
+            glfwGetWindowSize(window.handle(), winW, winH);
+            glfwGetFramebufferSize(window.handle(), fbW, fbH);
+            float sx = fbW.get(0) / Math.max(1f, winW.get(0));
+            float sy = fbH.get(0) / Math.max(1f, winH.get(0));
+            mouseFBX = (float) mouseXWin * sx;
+            mouseFBY = (float) mouseYWin * sy;
+        }
+        
+        // Convert mouse position to GUI-relative coordinates
+        float mouseGuiX = (mouseFBX - guiX) / scale;
+        float mouseGuiY = (mouseFBY - guiY) / scale;
+        
+        // Find clicked slot
+        for (InventorySlot slot : slots) {
+            if (slot.contains(mouseGuiX, mouseGuiY)) {
+                // Only handle inventory slots (not armor/crafting slots)
+                if (slot.inventoryIndex >= 0) {
+                    handleRightClickSlot(inventory, slot.inventoryIndex);
+                }
+                break;
+            }
+        }
+    }
+    
+    /**
+     * Handle normal (non-shift) click on an inventory slot.
+     */
+    private void handleNormalClick(mattmc.world.item.Inventory inventory, int slotIndex) {
+        mattmc.world.item.ItemStack slotItem = inventory.getStack(slotIndex);
+        
+        if (heldItem == null) {
+            // Pick up item from slot
+            if (slotItem != null) {
+                heldItem = slotItem;
+                heldItemSourceSlot = slotIndex;
+                inventory.setStack(slotIndex, null);
+            }
+        } else {
+            // Placing held item in slot
+            if (slotItem == null) {
+                // Empty slot - place held item
+                inventory.setStack(slotIndex, heldItem);
+                heldItem = null;
+                heldItemSourceSlot = -1;
+            } else if (slotItem.getItem() == heldItem.getItem()) {
+                // Same item type - try to merge
+                int spaceLeft = slotItem.getItem().getMaxStackSize() - slotItem.getCount();
+                if (spaceLeft > 0) {
+                    int toAdd = Math.min(spaceLeft, heldItem.getCount());
+                    slotItem.grow(toAdd);
+                    
+                    int remainingHeld = heldItem.getCount() - toAdd;
+                    if (remainingHeld > 0) {
+                        heldItem.setCount(remainingHeld);
+                    } else {
+                        heldItem = null;
+                        heldItemSourceSlot = -1;
+                    }
+                } else {
+                    // Stack is full - swap items
+                    mattmc.world.item.ItemStack temp = slotItem;
+                    inventory.setStack(slotIndex, heldItem);
+                    heldItem = temp;
+                }
+            } else {
+                // Different item type - swap
+                mattmc.world.item.ItemStack temp = slotItem;
+                inventory.setStack(slotIndex, heldItem);
+                heldItem = temp;
+            }
+        }
+    }
+    
+    /**
+     * Handle right-click on an inventory slot.
+     * If cursor is empty and slot has items: pick up half (rounded up)
+     * If cursor has items and slot is empty: place one item
+     */
+    private void handleRightClickSlot(mattmc.world.item.Inventory inventory, int slotIndex) {
+        mattmc.world.item.ItemStack slotItem = inventory.getStack(slotIndex);
+        
+        if (heldItem == null) {
+            // Empty cursor - pick up half of the stack
+            if (slotItem != null) {
+                int totalCount = slotItem.getCount();
+                int pickupCount = (totalCount + 1) / 2; // Round up
+                int remainingCount = totalCount - pickupCount;
+                
+                // Create held item with pickup count
+                heldItem = new mattmc.world.item.ItemStack(slotItem.getItem(), pickupCount);
+                heldItemSourceSlot = slotIndex;
+                
+                // Update slot with remaining count, or clear if none left
+                if (remainingCount > 0) {
+                    slotItem.setCount(remainingCount);
+                } else {
+                    inventory.setStack(slotIndex, null);
+                }
+            }
+        } else {
+            // Cursor has items - place one item
+            if (slotItem == null) {
+                // Empty slot - place one item
+                mattmc.world.item.ItemStack newStack = new mattmc.world.item.ItemStack(heldItem.getItem(), 1);
+                inventory.setStack(slotIndex, newStack);
+                
+                // Reduce held item count
+                int newHeldCount = heldItem.getCount() - 1;
+                if (newHeldCount > 0) {
+                    heldItem.setCount(newHeldCount);
+                } else {
+                    heldItem = null;
+                    heldItemSourceSlot = -1;
+                }
+            } else if (slotItem.getItem() == heldItem.getItem() && !slotItem.isFull()) {
+                // Same item type and not full - add one item
+                slotItem.grow(1);
+                
+                // Reduce held item count
+                int newHeldCount = heldItem.getCount() - 1;
+                if (newHeldCount > 0) {
+                    heldItem.setCount(newHeldCount);
+                } else {
+                    heldItem = null;
+                    heldItemSourceSlot = -1;
+                }
+            }
+        }
+    }
+    
+    /**
+     * Handle shift-click on an inventory slot.
+     * Moves item from hotbar to inventory or vice versa.
+     */
+    private void handleShiftClick(mattmc.world.item.Inventory inventory, int slotIndex) {
+        mattmc.world.item.ItemStack slotItem = inventory.getStack(slotIndex);
+        
+        if (slotItem == null) {
+            return; // Nothing to move
+        }
+        
+        if (mattmc.world.item.Inventory.isHotbarSlot(slotIndex)) {
+            // Move from hotbar to main inventory
+            // Find first empty slot in main inventory (slots 9-35, left-to-right, top-down)
+            for (int i = 9; i < 36; i++) {
+                if (inventory.getStack(i) == null) {
+                    inventory.setStack(i, slotItem);
+                    inventory.setStack(slotIndex, null);
+                    break;
+                }
+            }
+        } else if (mattmc.world.item.Inventory.isMainInventorySlot(slotIndex)) {
+            // Move from main inventory to hotbar
+            // Find first empty slot in hotbar (slots 0-8, left-to-right)
+            for (int i = 0; i < 9; i++) {
+                if (inventory.getStack(i) == null) {
+                    inventory.setStack(i, slotItem);
+                    inventory.setStack(slotIndex, null);
+                    break;
+                }
+            }
+        }
     }
     
     /**
@@ -113,39 +385,40 @@ public final class InventoryScreen implements Screen {
         // Slot dimensions (standard Minecraft slot size)
         float slotSize = 16f;
         
-        // Armor slots (4 slots, vertical on left side)
+        // Armor slots (4 slots, vertical on left side) - Not linked to inventory yet
         float armorX = 8f;
         float armorY = 8f;
         for (int i = 0; i < 4; i++) {
-            slots.add(new InventorySlot(armorX, armorY + i * 18f, slotSize, slotSize));
+            slots.add(new InventorySlot(armorX, armorY + i * 18f, slotSize, slotSize, -1));
         }
         
-        // Crafting grid (2x2 slots)
+        // Crafting grid (2x2 slots) - Not linked to inventory yet
         float craftX = 98f;
         float craftY = 18f;
         for (int row = 0; row < 2; row++) {
             for (int col = 0; col < 2; col++) {
-                slots.add(new InventorySlot(craftX + col * 18f, craftY + row * 18f, slotSize, slotSize));
+                slots.add(new InventorySlot(craftX + col * 18f, craftY + row * 18f, slotSize, slotSize, -1));
             }
         }
         
-        // Crafting output slot
-        slots.add(new InventorySlot(154f, 28f, slotSize, slotSize));
+        // Crafting output slot - Not linked to inventory yet
+        slots.add(new InventorySlot(154f, 28f, slotSize, slotSize, -1));
         
-        // Main inventory (3 rows x 9 columns)
+        // Main inventory (3 rows x 9 columns) - slots 9-35
         float invX = 8f;
         float invY = 84f;
         for (int row = 0; row < 3; row++) {
             for (int col = 0; col < 9; col++) {
-                slots.add(new InventorySlot(invX + col * 18f, invY + row * 18f, slotSize, slotSize));
+                int inventoryIndex = 9 + (row * 9 + col);
+                slots.add(new InventorySlot(invX + col * 18f, invY + row * 18f, slotSize, slotSize, inventoryIndex));
             }
         }
         
-        // Hotbar (1 row x 9 columns)
+        // Hotbar (1 row x 9 columns) - slots 0-8
         float hotbarX = 8f;
         float hotbarY = 142f;
         for (int col = 0; col < 9; col++) {
-            slots.add(new InventorySlot(hotbarX + col * 18f, hotbarY, slotSize, slotSize));
+            slots.add(new InventorySlot(hotbarX + col * 18f, hotbarY, slotSize, slotSize, col));
         }
     }
 
@@ -220,6 +493,11 @@ public final class InventoryScreen implements Screen {
             
             // Draw items in inventory slots
             drawInventoryItems(x, y, scale);
+            
+            // Draw held item under mouse cursor
+            if (heldItem != null) {
+                drawHeldItem();
+            }
         }
         
         glDisable(GL_BLEND);
@@ -296,6 +574,11 @@ public final class InventoryScreen implements Screen {
                 
                 // Render the item
                 mattmc.client.renderer.ItemRenderer.renderItem(stack, slotCenterX, slotCenterY, itemSize);
+                
+                // Render item count if more than 1
+                if (stack.getCount() > 1) {
+                    drawItemCount(stack.getCount(), slotCenterX, slotCenterY, scale, itemSize);
+                }
             }
         }
         
@@ -312,11 +595,83 @@ public final class InventoryScreen implements Screen {
                 
                 // Calculate screen position for this slot
                 float slotCenterX = guiX + (invX + col * 18f + 8f) * scale;
-                float slotCenterY = guiY + (invY + row * 18f + 12f) * scale;
+                float slotCenterY = guiY + (invY + row * 18f + 14f) * scale;
                 
                 // Render the item
                 mattmc.client.renderer.ItemRenderer.renderItem(stack, slotCenterX, slotCenterY, itemSize);
+                
+                // Render item count if more than 1
+                if (stack.getCount() > 1) {
+                    drawItemCount(stack.getCount(), slotCenterX, slotCenterY, scale, itemSize);
+                }
             }
+        }
+    }
+    
+    /**
+     * Draw item count text in the bottom-right corner of an item slot.
+     */
+    private void drawItemCount(int count, float itemCenterX, float itemCenterY, float guiScale, float itemSize) {
+        String countText = String.valueOf(count);
+        
+        // Slots are 16x16 in GUI coordinates, scaled by guiScale
+        // The item is centered in the slot
+        // We want the text at the bottom-right of the slot
+        float slotSize = 16f * guiScale;
+        float halfSlot = slotSize / 2f;
+        
+        // Position text in bottom-right corner of the slot
+        float textScale = 1.0f;
+        // Offset from item center to bottom-right of slot
+        // X: Move right to edge, then back a bit for padding
+        float textX = itemCenterX + halfSlot - 12f;
+        // Y: Move down to bottom edge, then up a bit for padding
+        // Since text origin is at top-left of text, we need to position it higher
+        float textY = itemCenterY + halfSlot - 30f; // Moved up from -10f to -18f
+        
+        // Draw text with shadow for better visibility
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        
+        // Draw shadow (offset slightly)
+        glColor4f(0.25f, 0.25f, 0.25f, 1.0f);
+        mattmc.client.gui.components.TextRenderer.drawText(countText, textX + 1, textY + 1, textScale);
+        
+        // Draw main text
+        glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
+        mattmc.client.gui.components.TextRenderer.drawText(countText, textX, textY, textScale);
+        
+        glDisable(GL_BLEND);
+    }
+    
+    /**
+     * Draw the item being held by the mouse cursor.
+     */
+    private void drawHeldItem() {
+        if (heldItem == null) {
+            return;
+        }
+        
+        // Convert window mouse coordinates to framebuffer coordinates
+        float mouseFBX, mouseFBY;
+        try (MemoryStack stack = stackPush()) {
+            IntBuffer winW = stack.mallocInt(1), winH = stack.mallocInt(1);
+            IntBuffer fbW  = stack.mallocInt(1), fbH  = stack.mallocInt(1);
+            glfwGetWindowSize(window.handle(), winW, winH);
+            glfwGetFramebufferSize(window.handle(), fbW, fbH);
+            float sx = fbW.get(0) / Math.max(1f, winW.get(0));
+            float sy = fbH.get(0) / Math.max(1f, winH.get(0));
+            mouseFBX = (float) mouseXWin * sx;
+            mouseFBY = (float) mouseYWin * sy;
+        }
+        
+        // Render the held item centered on the mouse cursor
+        float itemSize = 19.2f;
+        mattmc.client.renderer.ItemRenderer.renderItem(heldItem, mouseFBX, mouseFBY, itemSize);
+        
+        // Render item count if more than 1
+        if (heldItem.getCount() > 1) {
+            drawItemCount(heldItem.getCount(), mouseFBX, mouseFBY, 1.0f, itemSize);
         }
     }
 
