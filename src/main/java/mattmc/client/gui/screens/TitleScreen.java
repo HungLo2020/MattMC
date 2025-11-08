@@ -290,10 +290,14 @@ public final class TitleScreen implements Screen {
         // Rotate -30 degrees (top of text faces top-left corner)
         glRotatef(-30f, 0, 0, 1);
         
-        // Draw text at origin (0, 0) since we've already translated
+        // Center the text on the anchor point by offsetting by half the text width
+        float textWidth = TextRenderer.getTextWidth(splashText, animatedScale);
+        float offsetX = -textWidth / 2f;
+        
+        // Draw text centered on the anchor point
         // Draw in yellow color (0xFFFF00)
         setColor(0xFFFF00, 1f);
-        TextRenderer.drawText(splashText, 0, 0, animatedScale);
+        TextRenderer.drawText(splashText, offsetX, 0, animatedScale);
         
         // Restore matrix state
         glPopMatrix();
