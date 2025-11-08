@@ -23,6 +23,12 @@ import static org.lwjgl.system.MemoryStack.stackPush;
  * Does not pause the game. Press E (or configured inventory key) to close.
  */
 public final class InventoryScreen implements Screen {
+    // GUI rendering constants
+    private static final float GUI_SCALE = 3.0f;
+    private static final float CONTENT_OFFSET_X = 40f;
+    private static final float CONTENT_OFFSET_Y = 45f;
+    private static final float SLOT_SIZE = 16f;
+    
     private final Minecraft game;
     private final Window window;
     private final DevplayScreen gameScreen;
@@ -113,11 +119,48 @@ public final class InventoryScreen implements Screen {
 
     private void closeInventory() {
         // Return held item to inventory if any
-        if (heldItem != null && heldItemSourceSlot >= 0) {
+        if (heldItem != null) {
             mattmc.world.entity.player.LocalPlayer player = gameScreen.getPlayer();
             if (player != null && player.getInventory() != null) {
-                player.getInventory().setStack(heldItemSourceSlot, heldItem);
+                mattmc.world.item.Inventory inventory = player.getInventory();
+                
+                // Try to return item to source slot first (if valid and compatible)
+                if (heldItemSourceSlot >= 0 && heldItemSourceSlot < inventory.getSize()) {
+                    mattmc.world.item.ItemStack slotItem = inventory.getStack(heldItemSourceSlot);
+                    if (slotItem == null) {
+                        // Source slot is empty - return item there
+                        inventory.setStack(heldItemSourceSlot, heldItem);
+                        heldItem = null;
+                    } else if (slotItem.canMergeWith(heldItem)) {
+                        // Source slot has compatible item - try to merge
+                        int spaceLeft = slotItem.getItem().getMaxStackSize() - slotItem.getCount();
+                        int toAdd = Math.min(spaceLeft, heldItem.getCount());
+                        if (toAdd > 0) {
+                            slotItem.grow(toAdd);
+                            int remaining = heldItem.getCount() - toAdd;
+                            if (remaining > 0) {
+                                heldItem.setCount(remaining);
+                            } else {
+                                heldItem = null;
+                            }
+                        }
+                    }
+                }
+                
+                // If item still held, try to add to any compatible slot or first empty slot
+                if (heldItem != null) {
+                    boolean added = inventory.addItem(heldItem);
+                    if (added) {
+                        heldItem = null;
+                    }
+                    // Note: If inventory is full and item can't be added, it will be lost.
+                    // In a production system, you might want to drop it to the world instead.
+                    // For now, we accept this limitation as inventory space management is
+                    // the player's responsibility.
+                }
             }
+            
+            // Clear held item state
             heldItem = null;
             heldItemSourceSlot = -1;
         }
@@ -128,25 +171,16 @@ public final class InventoryScreen implements Screen {
     }
     
     /**
-     * Handle left-click for inventory item interaction.
+     * Find the inventory slot under the current mouse position.
+     * @return The slot's inventory index, or -1 if no valid slot was clicked
      */
-    private void handleLeftClick(int mods) {
-        mattmc.world.entity.player.LocalPlayer player = gameScreen.getPlayer();
-        if (player == null || player.getInventory() == null) {
-            return;
-        }
-        
-        mattmc.world.item.Inventory inventory = player.getInventory();
-        
+    private int findClickedSlot() {
         // Get GUI coordinates
-        float scale = 3.0f;
         int w = window.width(), h = window.height();
-        float contentOffsetX = 40f;
-        float contentOffsetY = 45f;
-        float texWidth = inventoryTexture.width * scale;
-        float texHeight = inventoryTexture.height * scale;
-        float guiX = (w - texWidth) / 2f + (contentOffsetX * scale);
-        float guiY = (h - texHeight) / 2f + (contentOffsetY * scale);
+        float texWidth = inventoryTexture.width * GUI_SCALE;
+        float texHeight = inventoryTexture.height * GUI_SCALE;
+        float guiX = (w - texWidth) / 2f + (CONTENT_OFFSET_X * GUI_SCALE);
+        float guiY = (h - texHeight) / 2f + (CONTENT_OFFSET_Y * GUI_SCALE);
         
         // Convert window mouse coordinates to framebuffer coordinates
         float mouseFBX, mouseFBY;
@@ -162,23 +196,41 @@ public final class InventoryScreen implements Screen {
         }
         
         // Convert mouse position to GUI-relative coordinates
-        float mouseGuiX = (mouseFBX - guiX) / scale;
-        float mouseGuiY = (mouseFBY - guiY) / scale;
+        float mouseGuiX = (mouseFBX - guiX) / GUI_SCALE;
+        float mouseGuiY = (mouseFBY - guiY) / GUI_SCALE;
         
         // Find clicked slot
         for (InventorySlot slot : slots) {
             if (slot.contains(mouseGuiX, mouseGuiY)) {
-                // Only handle inventory slots (not armor/crafting slots)
+                // Only return inventory slots (not armor/crafting slots)
                 if (slot.inventoryIndex >= 0) {
-                    boolean isShiftClick = (mods & GLFW_MOD_SHIFT) != 0;
-                    
-                    if (isShiftClick) {
-                        handleShiftClick(inventory, slot.inventoryIndex);
-                    } else {
-                        handleNormalClick(inventory, slot.inventoryIndex);
-                    }
+                    return slot.inventoryIndex;
                 }
-                break;
+            }
+        }
+        
+        return -1; // No valid slot clicked
+    }
+    
+    /**
+     * Handle left-click for inventory item interaction.
+     */
+    private void handleLeftClick(int mods) {
+        mattmc.world.entity.player.LocalPlayer player = gameScreen.getPlayer();
+        if (player == null || player.getInventory() == null) {
+            return;
+        }
+        
+        mattmc.world.item.Inventory inventory = player.getInventory();
+        int slotIndex = findClickedSlot();
+        
+        if (slotIndex >= 0) {
+            boolean isShiftClick = (mods & GLFW_MOD_SHIFT) != 0;
+            
+            if (isShiftClick) {
+                handleShiftClick(inventory, slotIndex);
+            } else {
+                handleNormalClick(inventory, slotIndex);
             }
         }
     }
@@ -195,43 +247,10 @@ public final class InventoryScreen implements Screen {
         }
         
         mattmc.world.item.Inventory inventory = player.getInventory();
+        int slotIndex = findClickedSlot();
         
-        // Get GUI coordinates
-        float scale = 3.0f;
-        int w = window.width(), h = window.height();
-        float contentOffsetX = 40f;
-        float contentOffsetY = 45f;
-        float texWidth = inventoryTexture.width * scale;
-        float texHeight = inventoryTexture.height * scale;
-        float guiX = (w - texWidth) / 2f + (contentOffsetX * scale);
-        float guiY = (h - texHeight) / 2f + (contentOffsetY * scale);
-        
-        // Convert window mouse coordinates to framebuffer coordinates
-        float mouseFBX, mouseFBY;
-        try (MemoryStack stack = stackPush()) {
-            IntBuffer winW = stack.mallocInt(1), winH = stack.mallocInt(1);
-            IntBuffer fbW  = stack.mallocInt(1), fbH  = stack.mallocInt(1);
-            glfwGetWindowSize(window.handle(), winW, winH);
-            glfwGetFramebufferSize(window.handle(), fbW, fbH);
-            float sx = fbW.get(0) / Math.max(1f, winW.get(0));
-            float sy = fbH.get(0) / Math.max(1f, winH.get(0));
-            mouseFBX = (float) mouseXWin * sx;
-            mouseFBY = (float) mouseYWin * sy;
-        }
-        
-        // Convert mouse position to GUI-relative coordinates
-        float mouseGuiX = (mouseFBX - guiX) / scale;
-        float mouseGuiY = (mouseFBY - guiY) / scale;
-        
-        // Find clicked slot
-        for (InventorySlot slot : slots) {
-            if (slot.contains(mouseGuiX, mouseGuiY)) {
-                // Only handle inventory slots (not armor/crafting slots)
-                if (slot.inventoryIndex >= 0) {
-                    handleRightClickSlot(inventory, slot.inventoryIndex);
-                }
-                break;
-            }
+        if (slotIndex >= 0) {
+            handleRightClickSlot(inventory, slotIndex);
         }
     }
     
@@ -382,14 +401,11 @@ public final class InventoryScreen implements Screen {
     private void initializeSlots() {
         slots.clear();
         
-        // Slot dimensions (standard Minecraft slot size)
-        float slotSize = 16f;
-        
         // Armor slots (4 slots, vertical on left side) - Not linked to inventory yet
         float armorX = 8f;
         float armorY = 8f;
         for (int i = 0; i < 4; i++) {
-            slots.add(new InventorySlot(armorX, armorY + i * 18f, slotSize, slotSize, -1));
+            slots.add(new InventorySlot(armorX, armorY + i * 18f, SLOT_SIZE, SLOT_SIZE, -1));
         }
         
         // Crafting grid (2x2 slots) - Not linked to inventory yet
@@ -397,12 +413,12 @@ public final class InventoryScreen implements Screen {
         float craftY = 18f;
         for (int row = 0; row < 2; row++) {
             for (int col = 0; col < 2; col++) {
-                slots.add(new InventorySlot(craftX + col * 18f, craftY + row * 18f, slotSize, slotSize, -1));
+                slots.add(new InventorySlot(craftX + col * 18f, craftY + row * 18f, SLOT_SIZE, SLOT_SIZE, -1));
             }
         }
         
         // Crafting output slot - Not linked to inventory yet
-        slots.add(new InventorySlot(154f, 28f, slotSize, slotSize, -1));
+        slots.add(new InventorySlot(154f, 28f, SLOT_SIZE, SLOT_SIZE, -1));
         
         // Main inventory (3 rows x 9 columns) - slots 9-35
         float invX = 8f;
@@ -410,7 +426,7 @@ public final class InventoryScreen implements Screen {
         for (int row = 0; row < 3; row++) {
             for (int col = 0; col < 9; col++) {
                 int inventoryIndex = 9 + (row * 9 + col);
-                slots.add(new InventorySlot(invX + col * 18f, invY + row * 18f, slotSize, slotSize, inventoryIndex));
+                slots.add(new InventorySlot(invX + col * 18f, invY + row * 18f, SLOT_SIZE, SLOT_SIZE, inventoryIndex));
             }
         }
         
@@ -418,7 +434,7 @@ public final class InventoryScreen implements Screen {
         float hotbarX = 8f;
         float hotbarY = 142f;
         for (int col = 0; col < 9; col++) {
-            slots.add(new InventorySlot(hotbarX + col * 18f, hotbarY, slotSize, slotSize, col));
+            slots.add(new InventorySlot(hotbarX + col * 18f, hotbarY, SLOT_SIZE, SLOT_SIZE, col));
         }
     }
 
@@ -469,15 +485,12 @@ public final class InventoryScreen implements Screen {
             glColor4f(1f, 1f, 1f, 1f);
             
             // Scale inventory to 3x size for better visibility (like Minecraft GUI scale)
-            float scale = 3.0f;
             // The inventory texture is 256x256 but the actual content is ~176x166 centered
             // We need to offset by the empty space around the content
-            float contentOffsetX = 40f; // Offset from left edge of texture to content
-            float contentOffsetY = 45f; // Offset from top edge of texture to content
-            float texWidth = inventoryTexture.width * scale;
-            float texHeight = inventoryTexture.height * scale;
-            float x = (w - texWidth) / 2f + (contentOffsetX * scale);
-            float y = (h - texHeight) / 2f + (contentOffsetY * scale);
+            float texWidth = inventoryTexture.width * GUI_SCALE;
+            float texHeight = inventoryTexture.height * GUI_SCALE;
+            float x = (w - texWidth) / 2f + (CONTENT_OFFSET_X * GUI_SCALE);
+            float y = (h - texHeight) / 2f + (CONTENT_OFFSET_Y * GUI_SCALE);
             
             glBegin(GL_QUADS);
             glTexCoord2f(0, 1); glVertex2f(x, y);
@@ -489,10 +502,10 @@ public final class InventoryScreen implements Screen {
             glDisable(GL_TEXTURE_2D);
             
             // Draw slot highlight if mouse is over a slot
-            drawSlotHighlight(x, y, scale);
+            drawSlotHighlight(x, y, GUI_SCALE);
             
             // Draw items in inventory slots
-            drawInventoryItems(x, y, scale);
+            drawInventoryItems(x, y, GUI_SCALE);
             
             // Draw held item under mouse cursor
             if (heldItem != null) {
