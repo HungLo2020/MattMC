@@ -37,6 +37,87 @@ public class InventoryItemMovementTest {
     }
     
     @Test
+    public void testRightClickPickUpHalf() {
+        Inventory inventory = new Inventory();
+        
+        // Place 10 items in slot 0
+        ItemStack stone = new ItemStack(Items.STONE, 10);
+        inventory.setStack(0, stone);
+        
+        // Simulate right-click pick up (pick up half, rounded up)
+        int totalCount = stone.getCount();
+        int pickupCount = (totalCount + 1) / 2; // Should be 5
+        int remainingCount = totalCount - pickupCount; // Should be 5
+        
+        assertEquals(5, pickupCount);
+        assertEquals(5, remainingCount);
+        
+        // Update inventory
+        ItemStack pickedUp = new ItemStack(stone.getItem(), pickupCount);
+        stone.setCount(remainingCount);
+        
+        // Verify
+        assertEquals(5, pickedUp.getCount());
+        assertEquals(5, inventory.getStack(0).getCount());
+    }
+    
+    @Test
+    public void testRightClickPickUpHalfOddNumber() {
+        Inventory inventory = new Inventory();
+        
+        // Place 9 items in slot 0 (odd number)
+        ItemStack stone = new ItemStack(Items.STONE, 9);
+        inventory.setStack(0, stone);
+        
+        // Simulate right-click pick up (pick up half, rounded up)
+        int totalCount = stone.getCount();
+        int pickupCount = (totalCount + 1) / 2; // Should be 5 (rounded up)
+        int remainingCount = totalCount - pickupCount; // Should be 4
+        
+        assertEquals(5, pickupCount);
+        assertEquals(4, remainingCount);
+    }
+    
+    @Test
+    public void testRightClickPlaceOne() {
+        Inventory inventory = new Inventory();
+        
+        // Simulate holding 10 items
+        ItemStack held = new ItemStack(Items.DIAMOND, 10);
+        
+        // Right-click on empty slot (place one)
+        ItemStack placedStack = new ItemStack(held.getItem(), 1);
+        inventory.setStack(0, placedStack);
+        
+        // Reduce held count
+        held.setCount(held.getCount() - 1);
+        
+        // Verify
+        assertEquals(1, inventory.getStack(0).getCount());
+        assertEquals(9, held.getCount());
+    }
+    
+    @Test
+    public void testRightClickPlaceOneOnSameType() {
+        Inventory inventory = new Inventory();
+        
+        // Place 5 items in slot 0
+        ItemStack slotStack = new ItemStack(Items.STONE, 5);
+        inventory.setStack(0, slotStack);
+        
+        // Simulate holding 10 of the same item
+        ItemStack held = new ItemStack(Items.STONE, 10);
+        
+        // Right-click on slot with same item type (add one)
+        slotStack.grow(1);
+        held.setCount(held.getCount() - 1);
+        
+        // Verify
+        assertEquals(6, inventory.getStack(0).getCount());
+        assertEquals(9, held.getCount());
+    }
+    
+    @Test
     public void testShiftClickHotbarToInventory() {
         Inventory inventory = new Inventory();
         
