@@ -449,7 +449,7 @@ public final class InventoryScreen implements Screen {
                 
                 // Calculate screen position for this slot
                 float slotCenterX = guiX + (invX + col * 18f + 8f) * scale;
-                float slotCenterY = guiY + (invY + row * 18f + 12f) * scale;
+                float slotCenterY = guiY + (invY + row * 18f + 14f) * scale;
                 
                 // Render the item
                 mattmc.client.renderer.ItemRenderer.renderItem(stack, slotCenterX, slotCenterY, itemSize);
