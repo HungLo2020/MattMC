@@ -240,6 +240,11 @@ public final class TitleScreen implements Screen {
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
         
         logoTexture.bind();
+        
+        // Ensure pixel-perfect rendering with no filtering (for crystal clear pixel art)
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+        
         glColor4f(1f, 1f, 1f, 1f);
         
         // Flip texture coordinates vertically to fix upside-down issue
