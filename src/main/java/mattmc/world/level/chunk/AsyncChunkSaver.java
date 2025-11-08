@@ -16,6 +16,9 @@ import java.util.concurrent.atomic.AtomicInteger;
 public class AsyncChunkSaver {
     private static final Logger logger = LoggerFactory.getLogger(AsyncChunkSaver.class);
     
+    // Reasonable capacity limit to prevent unbounded memory growth
+    private static final int SAVE_QUEUE_CAPACITY = 1000;
+    
     private final ExecutorService executor;
     private final BlockingQueue<ChunkSaveTask> saveQueue;
     private final RegionFileCache regionCache;
@@ -36,7 +39,7 @@ public class AsyncChunkSaver {
     
     public AsyncChunkSaver(RegionFileCache regionCache) {
         this.regionCache = regionCache;
-        this.saveQueue = new LinkedBlockingQueue<>();
+        this.saveQueue = new LinkedBlockingQueue<>(SAVE_QUEUE_CAPACITY);
         this.executor = Executors.newSingleThreadExecutor(r -> {
             Thread t = new Thread(r, "Chunk-Saver");
             t.setDaemon(true);
@@ -50,6 +53,7 @@ public class AsyncChunkSaver {
     /**
      * Queue a chunk for asynchronous saving.
      * Returns immediately without blocking.
+     * If the queue is full, logs a warning and blocks until space is available.
      */
     public void saveChunkAsync(int chunkX, int chunkZ, Map<String, Object> chunkData) {
         if (shutdown) {
@@ -57,7 +61,19 @@ public class AsyncChunkSaver {
         }
         
         ChunkSaveTask task = new ChunkSaveTask(chunkX, chunkZ, chunkData);
-        saveQueue.offer(task);
+        
+        // Try to add without blocking first
+        if (!saveQueue.offer(task)) {
+            // Queue is full, log warning and wait
+            logger.warn("Save queue full ({}), waiting for space to save chunk ({}, {})", 
+                       SAVE_QUEUE_CAPACITY, chunkX, chunkZ);
+            try {
+                saveQueue.put(task); // This will block until space is available
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                logger.error("Interrupted while waiting to queue chunk save", e);
+            }
+        }
     }
     
     /**

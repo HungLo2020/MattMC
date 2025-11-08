@@ -158,4 +158,19 @@ public class ChunkRenderer {
     public TextureAtlas getTextureAtlas() {
         return textureAtlas;
     }
+    
+    /**
+     * Cleanup all OpenGL resources (VAOs).
+     * Call this when the renderer is no longer needed.
+     */
+    public void cleanup() {
+        logger.info("Cleaning up ChunkRenderer - deleting {} VAOs", vaoCache.size());
+        for (ChunkVAO vao : vaoCache.values()) {
+            if (vao != null) {
+                vao.delete();
+            }
+        }
+        vaoCache.clear();
+        chunkByKey.clear();
+    }
 }

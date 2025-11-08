@@ -33,12 +33,10 @@ public final class LevelChunk {
         this.chunkZ = chunkZ;
         this.blocks = new Block[WIDTH][HEIGHT][DEPTH];
         
-        // Initialize all blocks to air by default
+        // Initialize all blocks to air using Arrays.fill for better performance
         for (int x = 0; x < WIDTH; x++) {
             for (int y = 0; y < HEIGHT; y++) {
-                for (int z = 0; z < DEPTH; z++) {
-                    blocks[x][y][z] = Blocks.AIR;
-                }
+                java.util.Arrays.fill(blocks[x][y], Blocks.AIR);
             }
         }
     }
