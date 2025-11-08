@@ -135,4 +135,16 @@ public class Item {
     public String getIdentifier() {
         return identifier;
     }
+    
+    /**
+     * Called when the player uses (right-clicks with) this item.
+     * This method should be overridden by subclasses to implement custom behavior.
+     * 
+     * @param blockInteraction The block interaction handler for the player
+     * @return true if the item was used successfully, false otherwise
+     */
+    public boolean onUse(mattmc.world.entity.player.BlockInteraction blockInteraction) {
+        // Base implementation does nothing
+        return false;
+    }
 }
