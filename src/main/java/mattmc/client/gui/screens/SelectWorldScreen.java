@@ -181,7 +181,7 @@ public final class SelectWorldScreen implements Screen {
             
             game.setScreen(new DevplayScreen(game, worldName, result.world,
                 result.metadata.playerX, result.metadata.playerY, result.metadata.playerZ,
-                result.metadata.playerYaw, result.metadata.playerPitch));
+                result.metadata.playerYaw, result.metadata.playerPitch, result.metadata.playerInventory));
         } catch (Exception e) {
             logger.error("Failed to load world: {}", e.getMessage());
             e.printStackTrace();

@@ -1,6 +1,7 @@
 package mattmc.world.level.storage;
 
 import mattmc.client.Minecraft;
+import mattmc.world.item.Inventory;
 import mattmc.world.level.Level;
 import mattmc.world.level.chunk.ChunkNBT;
 import mattmc.world.level.chunk.LevelChunk;
@@ -90,7 +91,7 @@ public final class LevelStorageSource {
     /**
      * Save a world to disk using Minecraft-style format.
      */
-    public static void saveWorld(Level world, String worldName, float playerX, float playerY, float playerZ, float playerYaw, float playerPitch) throws IOException {
+    public static void saveWorld(Level world, String worldName, float playerX, float playerY, float playerZ, float playerYaw, float playerPitch, Inventory playerInventory) throws IOException {
         Path savesDir = getSavesDirectory();
         Path worldDir = savesDir.resolve(worldName);
         logger.debug("Saving world to: {}", worldDir.toAbsolutePath());
@@ -129,6 +130,21 @@ public final class LevelStorageSource {
         
         // Save new level.dat
         levelData.save(levelDatFile);
+        
+        // Save player data to playerdata folder
+        if (playerInventory != null) {
+            Path playerdataDir = worldDir.resolve("playerdata");
+            Files.createDirectories(playerdataDir);
+            Path playerDatFile = playerdataDir.resolve("player.dat");
+            
+            try {
+                PlayerData.save(playerDatFile, playerInventory);
+                logger.debug("Player inventory saved to: {}", playerDatFile.toAbsolutePath());
+            } catch (IOException e) {
+                logger.error("Failed to save player data: {}", e.getMessage(), e);
+                throw e;
+            }
+        }
         
         // Save chunks to region files
         Path regionDir = worldDir.resolve("region");
@@ -217,6 +233,22 @@ public final class LevelStorageSource {
         
         logger.info("Level loaded: {} ({} chunks)", worldName, world.getLoadedChunkCount());
         
+        // Load player data from playerdata folder
+        Path playerdataDir = worldDir.resolve("playerdata");
+        Path playerDatFile = playerdataDir.resolve("player.dat");
+        Inventory playerInventory = new Inventory();
+        
+        if (Files.exists(playerDatFile)) {
+            try {
+                PlayerData.load(playerDatFile, playerInventory);
+                logger.debug("Player inventory loaded from: {}", playerDatFile.toAbsolutePath());
+            } catch (IOException e) {
+                logger.warn("Failed to load player data, using empty inventory: {}", e.getMessage());
+            }
+        } else {
+            logger.debug("No player data found, using empty inventory");
+        }
+        
         // Convert LevelData to WorldMetadata for compatibility
         WorldMetadata metadata = new WorldMetadata();
         metadata.worldName = levelData.getWorldName();
@@ -226,6 +258,7 @@ public final class LevelStorageSource {
         metadata.playerZ = (float) levelData.getPlayerZ();
         metadata.playerYaw = levelData.getPlayerYaw();
         metadata.playerPitch = levelData.getPlayerPitch();
+        metadata.playerInventory = playerInventory;
         
         return new WorldLoadResult(world, metadata);
     }
@@ -328,6 +361,7 @@ public final class LevelStorageSource {
         public float playerZ;
         public float playerYaw;
         public float playerPitch;
+        public Inventory playerInventory; // Player inventory loaded from player.dat
     }
     
     /**
