@@ -35,15 +35,21 @@ public final class InventoryScreen implements Screen {
     private double mouseXWin, mouseYWin;
     private final List<InventorySlot> slots = new ArrayList<>();
     
+    // Held item state (for drag-and-drop)
+    private mattmc.world.item.ItemStack heldItem = null;
+    private int heldItemSourceSlot = -1;
+    
     // Helper class to represent an inventory slot
     private static class InventorySlot {
         final float x, y, width, height; // Relative to 176x166 GUI coordinate system
+        final int inventoryIndex; // Index in player inventory (0-35, or -1 for non-inventory slots)
         
-        InventorySlot(float x, float y, float width, float height) {
+        InventorySlot(float x, float y, float width, float height, int inventoryIndex) {
             this.x = x;
             this.y = y;
             this.width = width;
             this.height = height;
+            this.inventoryIndex = inventoryIndex;
         }
         
         boolean contains(float px, float py) {
@@ -74,8 +80,12 @@ public final class InventoryScreen implements Screen {
             mouseYWin = y; 
         });
 
-        // Disable mouse button callback to prevent block interaction
-        glfwSetMouseButtonCallback(window.handle(), null);
+        // Handle mouse button clicks for inventory interaction
+        glfwSetMouseButtonCallback(window.handle(), (h, button, action, mods) -> {
+            if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS) {
+                handleMouseClick(mods);
+            }
+        });
 
         // Set up key callback for inventory key (respects user configuration) or ESC to close
         glfwSetKeyCallback(window.handle(), (win, key, scancode, action, mods) -> {
@@ -98,9 +108,130 @@ public final class InventoryScreen implements Screen {
     }
 
     private void closeInventory() {
+        // Return held item to inventory if any
+        if (heldItem != null && heldItemSourceSlot >= 0) {
+            mattmc.world.entity.player.LocalPlayer player = gameScreen.getPlayer();
+            if (player != null && player.getInventory() != null) {
+                player.getInventory().setStack(heldItemSourceSlot, heldItem);
+            }
+            heldItem = null;
+            heldItemSourceSlot = -1;
+        }
+        
         // Recapture mouse for FPS controls
         glfwSetInputMode(window.handle(), GLFW_CURSOR, GLFW_CURSOR_DISABLED);
         game.setScreen(gameScreen);
+    }
+    
+    /**
+     * Handle mouse click for inventory item interaction.
+     */
+    private void handleMouseClick(int mods) {
+        mattmc.world.entity.player.LocalPlayer player = gameScreen.getPlayer();
+        if (player == null || player.getInventory() == null) {
+            return;
+        }
+        
+        mattmc.world.item.Inventory inventory = player.getInventory();
+        
+        // Get GUI coordinates
+        float scale = 3.0f;
+        int w = window.width(), h = window.height();
+        float contentOffsetX = 40f;
+        float contentOffsetY = 45f;
+        float texWidth = inventoryTexture.width * scale;
+        float texHeight = inventoryTexture.height * scale;
+        float guiX = (w - texWidth) / 2f + (contentOffsetX * scale);
+        float guiY = (h - texHeight) / 2f + (contentOffsetY * scale);
+        
+        // Convert window mouse coordinates to framebuffer coordinates
+        float mouseFBX, mouseFBY;
+        try (MemoryStack stack = stackPush()) {
+            IntBuffer winW = stack.mallocInt(1), winH = stack.mallocInt(1);
+            IntBuffer fbW  = stack.mallocInt(1), fbH  = stack.mallocInt(1);
+            glfwGetWindowSize(window.handle(), winW, winH);
+            glfwGetFramebufferSize(window.handle(), fbW, fbH);
+            float sx = fbW.get(0) / Math.max(1f, winW.get(0));
+            float sy = fbH.get(0) / Math.max(1f, winH.get(0));
+            mouseFBX = (float) mouseXWin * sx;
+            mouseFBY = (float) mouseYWin * sy;
+        }
+        
+        // Convert mouse position to GUI-relative coordinates
+        float mouseGuiX = (mouseFBX - guiX) / scale;
+        float mouseGuiY = (mouseFBY - guiY) / scale;
+        
+        // Find clicked slot
+        for (InventorySlot slot : slots) {
+            if (slot.contains(mouseGuiX, mouseGuiY)) {
+                // Only handle inventory slots (not armor/crafting slots)
+                if (slot.inventoryIndex >= 0) {
+                    boolean isShiftClick = (mods & GLFW_MOD_SHIFT) != 0;
+                    
+                    if (isShiftClick) {
+                        handleShiftClick(inventory, slot.inventoryIndex);
+                    } else {
+                        handleNormalClick(inventory, slot.inventoryIndex);
+                    }
+                }
+                break;
+            }
+        }
+    }
+    
+    /**
+     * Handle normal (non-shift) click on an inventory slot.
+     */
+    private void handleNormalClick(mattmc.world.item.Inventory inventory, int slotIndex) {
+        mattmc.world.item.ItemStack slotItem = inventory.getStack(slotIndex);
+        
+        if (heldItem == null) {
+            // Pick up item from slot
+            if (slotItem != null) {
+                heldItem = slotItem;
+                heldItemSourceSlot = slotIndex;
+                inventory.setStack(slotIndex, null);
+            }
+        } else {
+            // Place held item in slot
+            inventory.setStack(slotIndex, heldItem);
+            heldItem = null;
+            heldItemSourceSlot = -1;
+        }
+    }
+    
+    /**
+     * Handle shift-click on an inventory slot.
+     * Moves item from hotbar to inventory or vice versa.
+     */
+    private void handleShiftClick(mattmc.world.item.Inventory inventory, int slotIndex) {
+        mattmc.world.item.ItemStack slotItem = inventory.getStack(slotIndex);
+        
+        if (slotItem == null) {
+            return; // Nothing to move
+        }
+        
+        if (mattmc.world.item.Inventory.isHotbarSlot(slotIndex)) {
+            // Move from hotbar to main inventory
+            // Find first empty slot in main inventory (slots 9-35, left-to-right, top-down)
+            for (int i = 9; i < 36; i++) {
+                if (inventory.getStack(i) == null) {
+                    inventory.setStack(i, slotItem);
+                    inventory.setStack(slotIndex, null);
+                    break;
+                }
+            }
+        } else if (mattmc.world.item.Inventory.isMainInventorySlot(slotIndex)) {
+            // Move from main inventory to hotbar
+            // Find first empty slot in hotbar (slots 0-8, left-to-right)
+            for (int i = 0; i < 9; i++) {
+                if (inventory.getStack(i) == null) {
+                    inventory.setStack(i, slotItem);
+                    inventory.setStack(slotIndex, null);
+                    break;
+                }
+            }
+        }
     }
     
     /**
@@ -113,39 +244,40 @@ public final class InventoryScreen implements Screen {
         // Slot dimensions (standard Minecraft slot size)
         float slotSize = 16f;
         
-        // Armor slots (4 slots, vertical on left side)
+        // Armor slots (4 slots, vertical on left side) - Not linked to inventory yet
         float armorX = 8f;
         float armorY = 8f;
         for (int i = 0; i < 4; i++) {
-            slots.add(new InventorySlot(armorX, armorY + i * 18f, slotSize, slotSize));
+            slots.add(new InventorySlot(armorX, armorY + i * 18f, slotSize, slotSize, -1));
         }
         
-        // Crafting grid (2x2 slots)
+        // Crafting grid (2x2 slots) - Not linked to inventory yet
         float craftX = 98f;
         float craftY = 18f;
         for (int row = 0; row < 2; row++) {
             for (int col = 0; col < 2; col++) {
-                slots.add(new InventorySlot(craftX + col * 18f, craftY + row * 18f, slotSize, slotSize));
+                slots.add(new InventorySlot(craftX + col * 18f, craftY + row * 18f, slotSize, slotSize, -1));
             }
         }
         
-        // Crafting output slot
-        slots.add(new InventorySlot(154f, 28f, slotSize, slotSize));
+        // Crafting output slot - Not linked to inventory yet
+        slots.add(new InventorySlot(154f, 28f, slotSize, slotSize, -1));
         
-        // Main inventory (3 rows x 9 columns)
+        // Main inventory (3 rows x 9 columns) - slots 9-35
         float invX = 8f;
         float invY = 84f;
         for (int row = 0; row < 3; row++) {
             for (int col = 0; col < 9; col++) {
-                slots.add(new InventorySlot(invX + col * 18f, invY + row * 18f, slotSize, slotSize));
+                int inventoryIndex = 9 + (row * 9 + col);
+                slots.add(new InventorySlot(invX + col * 18f, invY + row * 18f, slotSize, slotSize, inventoryIndex));
             }
         }
         
-        // Hotbar (1 row x 9 columns)
+        // Hotbar (1 row x 9 columns) - slots 0-8
         float hotbarX = 8f;
         float hotbarY = 142f;
         for (int col = 0; col < 9; col++) {
-            slots.add(new InventorySlot(hotbarX + col * 18f, hotbarY, slotSize, slotSize));
+            slots.add(new InventorySlot(hotbarX + col * 18f, hotbarY, slotSize, slotSize, col));
         }
     }
 
@@ -220,6 +352,11 @@ public final class InventoryScreen implements Screen {
             
             // Draw items in inventory slots
             drawInventoryItems(x, y, scale);
+            
+            // Draw held item under mouse cursor
+            if (heldItem != null) {
+                drawHeldItem();
+            }
         }
         
         glDisable(GL_BLEND);
@@ -318,6 +455,32 @@ public final class InventoryScreen implements Screen {
                 mattmc.client.renderer.ItemRenderer.renderItem(stack, slotCenterX, slotCenterY, itemSize);
             }
         }
+    }
+    
+    /**
+     * Draw the item being held by the mouse cursor.
+     */
+    private void drawHeldItem() {
+        if (heldItem == null) {
+            return;
+        }
+        
+        // Convert window mouse coordinates to framebuffer coordinates
+        float mouseFBX, mouseFBY;
+        try (MemoryStack stack = stackPush()) {
+            IntBuffer winW = stack.mallocInt(1), winH = stack.mallocInt(1);
+            IntBuffer fbW  = stack.mallocInt(1), fbH  = stack.mallocInt(1);
+            glfwGetWindowSize(window.handle(), winW, winH);
+            glfwGetFramebufferSize(window.handle(), fbW, fbH);
+            float sx = fbW.get(0) / Math.max(1f, winW.get(0));
+            float sy = fbH.get(0) / Math.max(1f, winH.get(0));
+            mouseFBX = (float) mouseXWin * sx;
+            mouseFBY = (float) mouseYWin * sy;
+        }
+        
+        // Render the held item centered on the mouse cursor
+        float itemSize = 19.2f;
+        mattmc.client.renderer.ItemRenderer.renderItem(heldItem, mouseFBX, mouseFBY, itemSize);
     }
 
     private void setColor(int rgb, float a) {
