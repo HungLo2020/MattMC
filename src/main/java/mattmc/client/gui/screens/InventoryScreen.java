@@ -281,8 +281,8 @@ public final class InventoryScreen implements Screen {
         
         mattmc.world.item.Inventory inventory = player.getInventory();
         
-        // Standard Minecraft slot size in GUI
-        float itemSize = 16f;
+        // Standard Minecraft slot size in GUI, increased by 20% for better visibility
+        float itemSize = 19.2f;
         
         // Draw items in hotbar (slots 0-8, at the bottom of the inventory GUI)
         float hotbarX = 8f;
@@ -292,7 +292,7 @@ public final class InventoryScreen implements Screen {
             if (stack != null && stack.getItem() != null) {
                 // Calculate screen position for this slot
                 float slotCenterX = guiX + (hotbarX + i * 18f + 8f) * scale;
-                float slotCenterY = guiY + (hotbarY + 8f) * scale;
+                float slotCenterY = guiY + (hotbarY + 14f) * scale;
                 
                 // Render the item
                 mattmc.client.renderer.ItemRenderer.renderItem(stack, slotCenterX, slotCenterY, itemSize);
@@ -312,7 +312,7 @@ public final class InventoryScreen implements Screen {
                 
                 // Calculate screen position for this slot
                 float slotCenterX = guiX + (invX + col * 18f + 8f) * scale;
-                float slotCenterY = guiY + (invY + row * 18f + 8f) * scale;
+                float slotCenterY = guiY + (invY + row * 18f + 12f) * scale;
                 
                 // Render the item
                 mattmc.client.renderer.ItemRenderer.renderItem(stack, slotCenterX, slotCenterY, itemSize);
