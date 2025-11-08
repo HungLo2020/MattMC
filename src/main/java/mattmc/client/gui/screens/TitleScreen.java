@@ -261,6 +261,7 @@ public final class TitleScreen implements Screen {
         // Position splash text further to the left from the logo
         // Calculate logo bottom-right position
         int w = window.width();
+        int h = window.height();
         float targetWidth = w * 0.6f;
         float logoScale = targetWidth / logoTexture.width;
         logoScale = Math.max(0.3f, Math.min(logoScale, 2.0f));
@@ -270,9 +271,9 @@ public final class TitleScreen implements Screen {
         float logoRight = titleCX + logoWidth / 2f;
         float logoBottom = titleCY + logoHeight / 2f;
         
-        // Position splash text with offset from logo - moved further left
-        float splashX = logoRight - 80f; // Further to the left
-        float splashY = logoBottom - 10f; // Slightly higher
+        // Position splash text with offset from logo - moved left by 1/10 screen width and up by 1/10 screen height
+        float splashX = logoRight - 80f - (w * 0.1f); // Left by 1/10 screen width
+        float splashY = logoBottom - 10f - (h * 0.1f); // Up by 1/10 screen height
         
         // Calculate animated scale using sine wave with 2 second intervals
         // Period = 2 seconds, so frequency = 1/2 = 0.5 Hz
