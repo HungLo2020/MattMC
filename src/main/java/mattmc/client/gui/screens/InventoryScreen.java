@@ -249,10 +249,38 @@ public final class InventoryScreen implements Screen {
                 inventory.setStack(slotIndex, null);
             }
         } else {
-            // Place held item in slot
-            inventory.setStack(slotIndex, heldItem);
-            heldItem = null;
-            heldItemSourceSlot = -1;
+            // Placing held item in slot
+            if (slotItem == null) {
+                // Empty slot - place held item
+                inventory.setStack(slotIndex, heldItem);
+                heldItem = null;
+                heldItemSourceSlot = -1;
+            } else if (slotItem.getItem() == heldItem.getItem()) {
+                // Same item type - try to merge
+                int spaceLeft = slotItem.getItem().getMaxStackSize() - slotItem.getCount();
+                if (spaceLeft > 0) {
+                    int toAdd = Math.min(spaceLeft, heldItem.getCount());
+                    slotItem.grow(toAdd);
+                    
+                    int remainingHeld = heldItem.getCount() - toAdd;
+                    if (remainingHeld > 0) {
+                        heldItem.setCount(remainingHeld);
+                    } else {
+                        heldItem = null;
+                        heldItemSourceSlot = -1;
+                    }
+                } else {
+                    // Stack is full - swap items
+                    mattmc.world.item.ItemStack temp = slotItem;
+                    inventory.setStack(slotIndex, heldItem);
+                    heldItem = temp;
+                }
+            } else {
+                // Different item type - swap
+                mattmc.world.item.ItemStack temp = slotItem;
+                inventory.setStack(slotIndex, heldItem);
+                heldItem = temp;
+            }
         }
     }
     
@@ -586,11 +614,17 @@ public final class InventoryScreen implements Screen {
     private void drawItemCount(int count, float itemCenterX, float itemCenterY, float guiScale, float itemSize) {
         String countText = String.valueOf(count);
         
-        // Position text in bottom-right corner of the item
-        // Item size is the visual size, we need to offset from center
+        // Slots are 16x16 in GUI coordinates, scaled by guiScale
+        // The item is centered in the slot
+        // We want the text at the bottom-right of the slot
+        float slotSize = 16f * guiScale;
+        float halfSlot = slotSize / 2f;
+        
+        // Position text in bottom-right corner of the slot
         float textScale = 1.0f;
-        float textX = itemCenterX + (itemSize * guiScale * 0.35f);
-        float textY = itemCenterY + (itemSize * guiScale * 0.35f);
+        // Offset from item center to bottom-right of slot, minus a small padding
+        float textX = itemCenterX + halfSlot - 12f; // 12 pixels from right edge
+        float textY = itemCenterY + halfSlot - 10f; // 10 pixels from bottom edge
         
         // Draw text with shadow for better visibility
         glEnable(GL_BLEND);

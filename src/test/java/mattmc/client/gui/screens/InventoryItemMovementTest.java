@@ -118,6 +118,73 @@ public class InventoryItemMovementTest {
     }
     
     @Test
+    public void testItemMerging() {
+        Inventory inventory = new Inventory();
+        
+        // Place 10 items in slot 0
+        ItemStack slotStack = new ItemStack(Items.STONE, 10);
+        inventory.setStack(0, slotStack);
+        
+        // Simulate holding 5 of the same item
+        ItemStack held = new ItemStack(Items.STONE, 5);
+        
+        // Merge items (add all 5 to the slot)
+        int spaceLeft = slotStack.getItem().getMaxStackSize() - slotStack.getCount();
+        int toAdd = Math.min(spaceLeft, held.getCount());
+        slotStack.grow(toAdd);
+        int remainingHeld = held.getCount() - toAdd;
+        
+        // Verify - all 5 should be added
+        assertEquals(15, inventory.getStack(0).getCount());
+        assertEquals(0, remainingHeld);
+    }
+    
+    @Test
+    public void testItemMergingPartial() {
+        Inventory inventory = new Inventory();
+        
+        // Place 60 items in slot 0 (max is 64 for most items)
+        ItemStack slotStack = new ItemStack(Items.STONE, 60);
+        inventory.setStack(0, slotStack);
+        
+        // Simulate holding 10 of the same item
+        ItemStack held = new ItemStack(Items.STONE, 10);
+        
+        // Merge items (can only add 4 due to max stack size)
+        int spaceLeft = slotStack.getItem().getMaxStackSize() - slotStack.getCount();
+        int toAdd = Math.min(spaceLeft, held.getCount());
+        slotStack.grow(toAdd);
+        int remainingHeld = held.getCount() - toAdd;
+        
+        // Verify - only 4 should be added (60 + 4 = 64 max)
+        assertEquals(64, inventory.getStack(0).getCount());
+        assertEquals(6, remainingHeld); // 10 - 4 = 6 remaining
+    }
+    
+    @Test
+    public void testItemSwapDifferentTypes() {
+        Inventory inventory = new Inventory();
+        
+        // Place stone in slot 0
+        ItemStack slotStack = new ItemStack(Items.STONE, 10);
+        inventory.setStack(0, slotStack);
+        
+        // Simulate holding diamond
+        ItemStack held = new ItemStack(Items.DIAMOND, 5);
+        
+        // Swap items (different types)
+        ItemStack temp = slotStack;
+        inventory.setStack(0, held);
+        held = temp;
+        
+        // Verify swap
+        assertEquals(Items.DIAMOND, inventory.getStack(0).getItem());
+        assertEquals(5, inventory.getStack(0).getCount());
+        assertEquals(Items.STONE, held.getItem());
+        assertEquals(10, held.getCount());
+    }
+    
+    @Test
     public void testShiftClickHotbarToInventory() {
         Inventory inventory = new Inventory();
         
