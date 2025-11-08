@@ -67,7 +67,7 @@ public class TextureManager {
                 glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAX_ANISOTROPY_EXT, aniso);
             } catch (IllegalStateException | IllegalArgumentException e) {
                 // Anisotropic filtering extension not supported, silently ignore
-                logger.debug("Anisotropic filtering not supported: {}", e.getMessage());
+                // logger.debug("Anisotropic filtering not supported: {}", e.getMessage());
             }
         }
     }
@@ -121,7 +121,7 @@ public class TextureManager {
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
             
             textureCache.put(path, textureID);
-            logger.info("Loaded texture: {} (ID: {})", path, textureID);
+            // logger.info("Loaded texture: {} (ID: {})", path, textureID);
             
             return textureID;
         } catch (IOException e) {

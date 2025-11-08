@@ -41,9 +41,9 @@ public final class LevelStorageSource {
     public static List<String> listWorlds() {
         try {
             Path savesDir = getSavesDirectory();
-            logger.debug("Listing worlds from: {}", savesDir.toAbsolutePath());
+            // logger.debug("Listing worlds from: {}", savesDir.toAbsolutePath());
             if (!Files.exists(savesDir)) {
-                logger.debug("Saves directory does not exist yet");
+                // logger.debug("Saves directory does not exist yet");
                 return new ArrayList<>();
             }
             
@@ -94,7 +94,7 @@ public final class LevelStorageSource {
     public static void saveWorld(Level world, String worldName, float playerX, float playerY, float playerZ, float playerYaw, float playerPitch, Inventory playerInventory) throws IOException {
         Path savesDir = getSavesDirectory();
         Path worldDir = savesDir.resolve(worldName);
-        logger.debug("Saving world to: {}", worldDir.toAbsolutePath());
+        // logger.debug("Saving world to: {}", worldDir.toAbsolutePath());
         Files.createDirectories(worldDir);
         
         // Set world directory so chunks can be saved during unload
@@ -139,7 +139,7 @@ public final class LevelStorageSource {
             
             try {
                 PlayerData.save(playerDatFile, playerInventory);
-                logger.debug("Player inventory saved to: {}", playerDatFile.toAbsolutePath());
+                // logger.debug("Player inventory saved to: {}", playerDatFile.toAbsolutePath());
             } catch (IOException e) {
                 logger.error("Failed to save player data: {}", e.getMessage(), e);
                 throw e;
@@ -174,7 +174,7 @@ public final class LevelStorageSource {
             }
         }
         
-        logger.info("Level saved: {} ({} chunks in region files)", worldName, world.getLoadedChunkCount());
+        // logger.info("Level saved: {} ({} chunks in region files)", worldName, world.getLoadedChunkCount());
     }
     
     /**
@@ -231,7 +231,7 @@ public final class LevelStorageSource {
             }
         }
         
-        logger.info("Level loaded: {} ({} chunks)", worldName, world.getLoadedChunkCount());
+        // logger.info("Level loaded: {} ({} chunks)", worldName, world.getLoadedChunkCount());
         
         // Load player data from playerdata folder
         Path playerdataDir = worldDir.resolve("playerdata");
@@ -241,12 +241,12 @@ public final class LevelStorageSource {
         if (Files.exists(playerDatFile)) {
             try {
                 PlayerData.load(playerDatFile, playerInventory);
-                logger.debug("Player inventory loaded from: {}", playerDatFile.toAbsolutePath());
+                // logger.debug("Player inventory loaded from: {}", playerDatFile.toAbsolutePath());
             } catch (IOException e) {
                 logger.warn("Failed to load player data, using empty inventory: {}", e.getMessage());
             }
         } else {
-            logger.debug("No player data found, using empty inventory");
+            // logger.debug("No player data found, using empty inventory");
         }
         
         // Convert LevelData to WorldMetadata for compatibility
@@ -318,7 +318,7 @@ public final class LevelStorageSource {
         Path worldDir = getSavesDirectory().resolve(worldName);
         if (Files.exists(worldDir)) {
             deleteDirectory(worldDir);
-            logger.info("Level deleted: {}", worldName);
+            // logger.info("Level deleted: {}", worldName);
         }
     }
     
