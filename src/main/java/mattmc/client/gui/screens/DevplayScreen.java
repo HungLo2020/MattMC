@@ -13,6 +13,7 @@ import mattmc.client.renderer.UIRenderer;
 import mattmc.client.renderer.block.BlockFaceGeometry;
 import mattmc.client.renderer.ColorUtils;
 import mattmc.world.item.Inventory;
+import mattmc.world.item.ItemStack;
 import mattmc.world.level.block.Block;
 import mattmc.world.level.block.Blocks;
 import mattmc.world.level.chunk.LevelChunk;
@@ -269,7 +270,14 @@ public final class DevplayScreen implements Screen {
                 if (button == GLFW_MOUSE_BUTTON_LEFT) {
                     blockInteraction.breakBlock();
                 } else if (button == GLFW_MOUSE_BUTTON_RIGHT) {
-                    blockInteraction.placeBlock(Blocks.STONE);
+                    // Get the item in the selected hotbar slot
+                    ItemStack selectedStack = player.getInventory().getSelectedStack();
+                    if (selectedStack != null) {
+                        // Try to use the item
+                        selectedStack.getItem().onUse(blockInteraction);
+                        // TODO: In the future, consume the item if it was used successfully
+                    }
+                    // If no item in selected slot, do nothing (can no longer place stone)
                 } else if (button == GLFW_MOUSE_BUTTON_MIDDLE) {
                     // Pick block - raycast and add to inventory
                     boolean success = blockInteraction.pickBlock();

@@ -52,4 +52,22 @@ public class BlockItem extends Item {
     public Block getBlock() {
         return block;
     }
+    
+    /**
+     * Called when the player uses (right-clicks with) this block item.
+     * Places the associated block where the player is looking.
+     * 
+     * @param blockInteraction The block interaction handler for the player
+     * @return true if the block was placed successfully, false otherwise
+     */
+    @Override
+    public boolean onUse(mattmc.world.entity.player.BlockInteraction blockInteraction) {
+        // Use the BlockInteraction to place the block where the player is looking
+        blockInteraction.placeBlock(this.block);
+        // Always return true to indicate we attempted to use the item
+        // (even if placement failed due to no valid target)
+        // TODO: In the future, we should only return true if placement succeeded
+        // and should consume the item from the stack
+        return true;
+    }
 }
