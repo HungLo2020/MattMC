@@ -281,8 +281,8 @@ public final class InventoryScreen implements Screen {
         
         mattmc.world.item.Inventory inventory = player.getInventory();
         
-        // Standard Minecraft slot size in GUI
-        float itemSize = 16f;
+        // Standard Minecraft slot size in GUI, increased by 20% for better visibility
+        float itemSize = 19.2f;
         
         // Draw items in hotbar (slots 0-8, at the bottom of the inventory GUI)
         float hotbarX = 8f;
