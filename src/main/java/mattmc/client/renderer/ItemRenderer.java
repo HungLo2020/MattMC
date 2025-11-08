@@ -89,46 +89,44 @@ public class ItemRenderer {
         glEnable(GL_TEXTURE_2D);
         
         // Define the isometric cube dimensions
-        // Standard isometric: 30° angle, 2:1 pixel ratio
-        // Scale increased to ~1.3x (roughly twice the previous 0.65)
-        float scale = size * 1.3f;
+        // Increased scale significantly for better visibility
+        float scale = size * 2.0f;  // Doubled from original 1.0, 4x from 0.5
         
         // Isometric projection parameters
-        // Each face is 8 pixels wide/tall in isometric space
         float isoWidth = scale * 0.5f;   // Width of one face edge in isometric projection
         float isoHeight = scale * 0.5f;  // Height of one face edge in isometric projection
         
         // Draw the three visible faces in back-to-front order
-        // Faces are flipped horizontally to show front faces instead of back faces
+        // These are the FRONT-facing sides (toward the camera)
         
-        // 1. Right face (darker - 60%) - now on the left side visually
-        if (sideTexture != null) {
-            Texture tex = loadTexture(sideTexture);
-            if (tex != null) {
-                tex.bind();
-                glColor4f(0.6f, 0.6f, 0.6f, 1.0f);
-                glBegin(GL_QUADS);
-                // Right face vertices (flipped horizontally)
-                glTexCoord2f(0, 0); glVertex2f(x + isoWidth, y + isoHeight * 0.5f);      // Bottom right
-                glTexCoord2f(1, 0); glVertex2f(x, y);                                     // Bottom center  
-                glTexCoord2f(1, 1); glVertex2f(x, y - isoHeight);                         // Top center
-                glTexCoord2f(0, 1); glVertex2f(x + isoWidth, y - isoHeight * 0.5f);      // Top right
-                glEnd();
-            }
-        }
-        
-        // 2. Left face (medium brightness - 80%) - now on the right side visually
+        // 1. Left face (medium brightness - 80%)
         if (sideTexture != null) {
             Texture tex = loadTexture(sideTexture);
             if (tex != null) {
                 tex.bind();
                 glColor4f(0.8f, 0.8f, 0.8f, 1.0f);
                 glBegin(GL_QUADS);
-                // Left face vertices (flipped horizontally)
-                glTexCoord2f(0, 0); glVertex2f(x, y);                                     // Bottom center
-                glTexCoord2f(1, 0); glVertex2f(x - isoWidth, y + isoHeight * 0.5f);      // Bottom left
-                glTexCoord2f(1, 1); glVertex2f(x - isoWidth, y - isoHeight * 0.5f);      // Top left
-                glTexCoord2f(0, 1); glVertex2f(x, y - isoHeight);                         // Top center
+                // Left face vertices - slopes downward away from viewer
+                glTexCoord2f(0, 0); glVertex2f(x, y);                                     // Near bottom
+                glTexCoord2f(1, 0); glVertex2f(x - isoWidth, y - isoHeight * 0.5f);      // Far bottom
+                glTexCoord2f(1, 1); glVertex2f(x - isoWidth, y - isoHeight * 1.5f);      // Far top
+                glTexCoord2f(0, 1); glVertex2f(x, y - isoHeight);                         // Near top
+                glEnd();
+            }
+        }
+        
+        // 2. Right face (darker - 60%)
+        if (sideTexture != null) {
+            Texture tex = loadTexture(sideTexture);
+            if (tex != null) {
+                tex.bind();
+                glColor4f(0.6f, 0.6f, 0.6f, 1.0f);
+                glBegin(GL_QUADS);
+                // Right face vertices - slopes downward away from viewer
+                glTexCoord2f(0, 0); glVertex2f(x + isoWidth, y - isoHeight * 0.5f);      // Far bottom
+                glTexCoord2f(1, 0); glVertex2f(x, y);                                     // Near bottom
+                glTexCoord2f(1, 1); glVertex2f(x, y - isoHeight);                         // Near top
+                glTexCoord2f(0, 1); glVertex2f(x + isoWidth, y - isoHeight * 1.5f);      // Far top
                 glEnd();
             }
         }
@@ -140,11 +138,11 @@ public class ItemRenderer {
                 tex.bind();
                 glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
                 glBegin(GL_QUADS);
-                // Top face vertices in counter-clockwise order forming a diamond
-                glTexCoord2f(0, 0); glVertex2f(x + isoWidth, y - isoHeight * 0.5f);      // Right
-                glTexCoord2f(1, 0); glVertex2f(x, y - isoHeight);                         // Top
-                glTexCoord2f(1, 1); glVertex2f(x - isoWidth, y - isoHeight * 0.5f);      // Left
-                glTexCoord2f(0, 1); glVertex2f(x, y);                                     // Bottom
+                // Top face as diamond - connects the tops of the two side faces
+                glTexCoord2f(0, 0); glVertex2f(x, y - isoHeight);                         // Near (bottom of diamond)
+                glTexCoord2f(1, 0); glVertex2f(x - isoWidth, y - isoHeight * 1.5f);      // Left (left of diamond)
+                glTexCoord2f(1, 1); glVertex2f(x, y - isoHeight * 2.0f);                  // Far (top of diamond)
+                glTexCoord2f(0, 1); glVertex2f(x + isoWidth, y - isoHeight * 1.5f);      // Right (right of diamond)
                 glEnd();
             }
         }
