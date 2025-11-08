@@ -240,7 +240,8 @@ public class UIRenderer {
                     // Calculate position for this slot
                     float slotWidth = (hotbarTexture.width * HOTBAR_SCALE) / 9f;
                     float itemX = hotbarX + (i * slotWidth) + (slotWidth / 2f); // Center item in slot
-                    float itemY = hotbarY + (hotbarTexture.height * HOTBAR_SCALE / 2f); // Center vertically
+                    // Lower the item position to better align with hotbar slots
+                    float itemY = hotbarY + (hotbarTexture.height * HOTBAR_SCALE / 2f) + 6f; // Center vertically + offset down
                     
                     // Render the item using ItemRenderer
                     float itemSize = 16f; // Standard Minecraft item size in GUI
