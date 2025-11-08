@@ -172,7 +172,7 @@ public final class TitleScreen implements Screen {
             drawTextCentered(b.label, b.x + b.w / 2f, b.y + b.h / 2f, 1.2f, 0xFFFFFF);
         }
         drawLogo();
-        drawTitle("A blocky sandbox by Matt", subtitleCX, subtitleCY, subtitleScale, 0xB0C4DE);
+        drawTitle(" ", subtitleCX, subtitleCY, subtitleScale, 0xB0C4DE);
         drawSplashText();
     }
 
@@ -272,15 +272,15 @@ public final class TitleScreen implements Screen {
         float logoBottom = titleCY + logoHeight / 2f;
         
         // Position splash text with offset from logo - moved left by 1/10 screen width and up by 1/10 screen height
-        float splashX = logoRight - 80f - (w * 0.1f); // Left by 1/10 screen width
+        float splashX = logoRight - 80f - (w * 0.05f); // Left by 1/10 screen width
         float splashY = logoBottom - 10f - (h * 0.1f); // Up by 1/10 screen height
         
         // Calculate animated scale using sine wave with 2 second intervals
         // Period = 2 seconds, so frequency = 1/2 = 0.5 Hz
         // Scale oscillates between 1.2 and 1.3 (slightly larger to slightly smaller)
-        float baseScale = 1.25f;
-        float scaleAmplitude = 0.05f; // Oscillates ±0.05 around base (1.25 ± 0.05 = 1.2 to 1.3)
-        float animatedScale = baseScale + scaleAmplitude * (float)Math.sin(splashAnimationTime * 2.0 * Math.PI * 0.5);
+        float baseScale = 1.65f;
+        float scaleAmplitude = 0.075f; // Oscillates ±0.05 around base (1.25 ± 0.05 = 1.2 to 1.3)
+        float animatedScale = baseScale + scaleAmplitude * (float)Math.sin(splashAnimationTime * 1.5 * Math.PI * 0.5);
         
         // Save current matrix state
         glPushMatrix();
@@ -289,7 +289,7 @@ public final class TitleScreen implements Screen {
         glTranslatef(splashX, splashY, 0);
         
         // Rotate -30 degrees (top of text faces top-left corner)
-        glRotatef(-30f, 0, 0, 1);
+        glRotatef(-20f, 0, 0, 1);
         
         // Center the text on the anchor point by offsetting by half the text width
         float textWidth = TextRenderer.getTextWidth(splashText, animatedScale);
