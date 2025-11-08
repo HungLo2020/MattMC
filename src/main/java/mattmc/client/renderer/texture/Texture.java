@@ -51,7 +51,7 @@ public final class Texture implements AutoCloseable {
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
         glBindTexture(GL_TEXTURE_2D, 0);
 
-        logger.info("Loaded texture {} {}x{} id={}", classpath, x[0], y[0], tex);
+        // logger.info("Loaded texture {} {}x{} id={}", classpath, x[0], y[0], tex);
         return new Texture(tex, x[0], y[0]);
     }
 

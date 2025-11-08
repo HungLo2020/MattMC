@@ -32,8 +32,21 @@ public final class AppPaths {
     }
 
     /** Creates <app-root>/<dirName> and returns it. Never null. 
-     * App root is the parent of the lib directory (where bin/, lib/ are located). */
+     * App root is the parent of the lib directory (where bin/, lib/ are located). 
+     * 
+     * @param dirName Name of the directory to create (validated to prevent path traversal)
+     * @throws IOException if directory creation fails
+     * @throws IllegalArgumentException if dirName contains invalid characters
+     */
     public static Path ensureDataDirInJarParent(String dirName) throws IOException {
+        // Validate dirName to prevent path traversal
+        if (dirName == null || dirName.isEmpty()) {
+            throw new IllegalArgumentException("Directory name cannot be null or empty");
+        }
+        if (dirName.contains("..") || dirName.contains("/") || dirName.contains("\\")) {
+            throw new IllegalArgumentException("Directory name contains invalid characters: " + dirName);
+        }
+        
         Path jarDir = jarBaseDir();
         logger.debug("AppPaths.jarBaseDir() = {}", jarDir);
         logger.debug("jarDir.endsWith(\"lib\") = {}", jarDir.endsWith("lib"));
@@ -89,6 +102,12 @@ public final class AppPaths {
 
         Path dataDir = appRoot.resolve(dirName);
         logger.debug("Final dataDir = {}", dataDir);
+        
+        // Verify the resolved path is within appRoot (extra safety check)
+        if (!dataDir.normalize().startsWith(appRoot.normalize())) {
+            throw new IllegalArgumentException("Resolved path is outside app root: " + dataDir);
+        }
+        
         Files.createDirectories(dataDir);
 
         // Try to set sane POSIX perms on Unix; ignore if unsupported (e.g., Windows).

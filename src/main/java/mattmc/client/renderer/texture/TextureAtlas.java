@@ -27,8 +27,9 @@ import org.slf4j.LoggerFactory;
  * enabling VBO rendering with multiple textures.
  * 
  * Similar to modern Minecraft's texture atlas system.
+ * Implements AutoCloseable to ensure OpenGL resources are properly released.
  */
-public class TextureAtlas {
+public class TextureAtlas implements AutoCloseable {
     private static final Logger logger = LoggerFactory.getLogger(TextureAtlas.class);
 
     private final int atlasTextureId;
@@ -56,11 +57,16 @@ public class TextureAtlas {
      * Call this once during game initialization.
      */
     public TextureAtlas() {
-        logger.info("Building texture atlas...");
+        // logger.info("Building texture atlas...");
         
         // Collect all unique texture paths from registered blocks
         Set<String> uniqueTexturePaths = new HashSet<>();
         for (String identifier : Blocks.getRegisteredIdentifiers()) {
+            // Skip AIR block - it doesn't have a texture
+            if (identifier.equals("mattmc:air")) {
+                continue;
+            }
+            
             Block block = Blocks.getBlock(identifier);
             if (block != null) {
                 Map<String, String> texturePaths = block.getTexturePaths();
@@ -73,7 +79,7 @@ public class TextureAtlas {
         // Remove null paths
         uniqueTexturePaths.remove(null);
         
-        logger.info("Found {} unique textures", uniqueTexturePaths.size());
+        // logger.info("Found {} unique textures", uniqueTexturePaths.size());
         
         // Calculate atlas dimensions (must be power of 2 for mipmaps)
         int textureCount = uniqueTexturePaths.size();
@@ -86,7 +92,7 @@ public class TextureAtlas {
         atlasWidth = powerOf2Width;
         atlasHeight = powerOf2Height;
         
-        logger.info("Atlas size: {}x{} ({} textures, {} per row)", atlasWidth, atlasHeight, textureCount, texturesPerRow);
+        // logger.info("Atlas size: {}x{} ({} textures, {} per row)", atlasWidth, atlasHeight, textureCount, texturesPerRow);
         
         // Create atlas image
         BufferedImage atlasImage = new BufferedImage(atlasWidth, atlasHeight, BufferedImage.TYPE_INT_ARGB);
@@ -117,7 +123,7 @@ public class TextureAtlas {
                     
                     uvMappings.put(texturePath, new UVMapping(u0, v0, u1, v1));
                     
-                    logger.info("  Packed: {} at ({},{}) UV: {},{} -> {},{}", texturePath, x, y, u0, v0, u1, v1);
+                    // logger.info("  Packed: {} at ({},{}) UV: {},{} -> {},{}", texturePath, x, y, u0, v0, u1, v1);
                 } else {
                     logger.error("  Failed to load: {}", texturePath);
                 }
@@ -138,7 +144,7 @@ public class TextureAtlas {
         // Upload atlas to GPU
         atlasTextureId = createGLTexture(atlasImage);
         
-        logger.info("Texture atlas built successfully! ID: {}", atlasTextureId);
+        // logger.info("Texture atlas built successfully! ID: {}", atlasTextureId);
     }
     
     /**
@@ -234,7 +240,18 @@ public class TextureAtlas {
     
     /**
      * Clean up GPU resources.
+     * Implements AutoCloseable.close() for proper resource management.
      */
+    @Override
+    public void close() {
+        cleanup();
+    }
+    
+    /**
+     * Clean up GPU resources.
+     * @deprecated Use close() instead for AutoCloseable pattern
+     */
+    @Deprecated
     public void cleanup() {
         glDeleteTextures(atlasTextureId);
     }

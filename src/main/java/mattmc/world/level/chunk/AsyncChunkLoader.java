@@ -169,7 +169,7 @@ public class AsyncChunkLoader {
                     LevelChunk chunk = future.get();
                     completed.add(chunk);
                     
-                    logger.debug("Chunk loaded/generated: ({}, {}), starting mesh building...", chunk.chunkX(), chunk.chunkZ());
+                    // logger.debug("Chunk loaded/generated: ({}, {}), starting mesh building...", chunk.chunkX(), chunk.chunkZ());
                     
                     // Start mesh building for this chunk (both old and new formats)
                     Future<ChunkMeshData> meshFuture = executor.submit(() -> buildChunkMesh(chunk));
@@ -178,7 +178,7 @@ public class AsyncChunkLoader {
                     // Also build VBO mesh buffer
                     Future<ChunkMeshBuffer> meshBufferFuture = executor.submit(() -> buildChunkMeshBuffer(chunk));
                     meshBufferFutures.put(key, meshBufferFuture);
-                    logger.debug("Submitted mesh buffer build task for chunk ({}, {})", chunk.chunkX(), chunk.chunkZ());
+                    // logger.debug("Submitted mesh buffer build task for chunk ({}, {})", chunk.chunkX(), chunk.chunkZ());
                     
                 } catch (InterruptedException | ExecutionException e) {
                     logger.error("Failed to load chunk: {}", e.getMessage(), e);
@@ -409,7 +409,7 @@ public class AsyncChunkLoader {
         // Submit new mesh build task
         Future<ChunkMeshBuffer> meshBufferFuture = executor.submit(() -> buildChunkMeshBuffer(chunk));
         meshBufferFutures.put(key, meshBufferFuture);
-        logger.debug("Requested mesh rebuild for chunk ({}, {})", chunk.chunkX(), chunk.chunkZ());
+        // logger.debug("Requested mesh rebuild for chunk ({}, {})", chunk.chunkX(), chunk.chunkZ());
     }
     
     public void shutdown() {
@@ -442,7 +442,7 @@ public class AsyncChunkLoader {
                     ChunkMeshBuffer meshBuffer = future.get();
                     completedMeshBuffers.offer(meshBuffer);
                     completed++;
-                    logger.debug("Mesh buffer completed for chunk, queued for upload. Queue size: {}", completedMeshBuffers.size());
+                    // logger.debug("Mesh buffer completed for chunk, queued for upload. Queue size: {}", completedMeshBuffers.size());
                 } catch (InterruptedException | ExecutionException e) {
                     logger.error("Failed to build mesh buffer: {}", e.getMessage(), e);
                 }
@@ -451,7 +451,7 @@ public class AsyncChunkLoader {
         }
         
         if (completed > 0) {
-            logger.debug("Collected {} completed mesh buffers this frame", completed);
+            // logger.debug("Collected {} completed mesh buffers this frame", completed);
         }
         
         // Return up to budget limit for this frame

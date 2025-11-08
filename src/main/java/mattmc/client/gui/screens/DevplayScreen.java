@@ -12,6 +12,8 @@ import mattmc.client.renderer.LevelRenderer;
 import mattmc.client.renderer.UIRenderer;
 import mattmc.client.renderer.block.BlockFaceGeometry;
 import mattmc.client.renderer.ColorUtils;
+import mattmc.world.item.Inventory;
+import mattmc.world.item.ItemStack;
 import mattmc.world.level.block.Block;
 import mattmc.world.level.block.Blocks;
 import mattmc.world.level.chunk.LevelChunk;
@@ -87,10 +89,18 @@ public final class DevplayScreen implements Screen {
     }
     
     public DevplayScreen(Minecraft game, String worldName, Level world, float playerX, float playerY, float playerZ, float playerYaw, float playerPitch) {
-        this(game, worldName, world, new java.util.Random().nextLong(), playerX, playerY, playerZ, playerYaw, playerPitch);
+        this(game, worldName, world, new java.util.Random().nextLong(), playerX, playerY, playerZ, playerYaw, playerPitch, null);
+    }
+    
+    public DevplayScreen(Minecraft game, String worldName, Level world, float playerX, float playerY, float playerZ, float playerYaw, float playerPitch, Inventory playerInventory) {
+        this(game, worldName, world, new java.util.Random().nextLong(), playerX, playerY, playerZ, playerYaw, playerPitch, playerInventory);
     }
     
     public DevplayScreen(Minecraft game, String worldName, Level world, long seed, float playerX, float playerY, float playerZ, float playerYaw, float playerPitch) {
+        this(game, worldName, world, seed, playerX, playerY, playerZ, playerYaw, playerPitch, null);
+    }
+    
+    public DevplayScreen(Minecraft game, String worldName, Level world, long seed, float playerX, float playerY, float playerZ, float playerYaw, float playerPitch, Inventory playerInventory) {
         this.game = game;
         this.window = game.window();
         this.worldName = worldName;
@@ -101,7 +111,7 @@ public final class DevplayScreen implements Screen {
         // Apply render distance from settings
         int renderDistance = OptionsManager.getRenderDistance();
         this.world.setRenderDistance(renderDistance);
-        logger.info("Set render distance to: {}{}", renderDistance, " chunks");
+        // logger.info("Set render distance to: {}{}", renderDistance, " chunks");
         
         // Set world directory for new worlds so chunks can be saved during unload
         if (world == null) {
@@ -140,6 +150,16 @@ public final class DevplayScreen implements Screen {
         this.player = new LocalPlayer(spawnX, spawnY, spawnZ);
         this.player.setYaw(playerYaw);
         this.player.setPitch(playerPitch);
+        
+        // Load player inventory if provided
+        if (playerInventory != null) {
+            Inventory inventory = this.player.getInventory();
+            for (int i = 0; i < inventory.getSize(); i++) {
+                inventory.setStack(i, playerInventory.getStack(i));
+            }
+            inventory.setSelectedSlot(playerInventory.getSelectedSlot());
+        }
+        
         this.playerPhysics = new PlayerPhysics(player, this.world);
         this.player.setPhysics(playerPhysics);
         this.playerController = new PlayerController(player);
@@ -226,8 +246,9 @@ public final class DevplayScreen implements Screen {
                     for (int i = 0; i < hotbarActions.length; i++) {
                         Integer hotbarKey = input.getKeybind(hotbarActions[i]);
                         if (hotbarKey != null && key == hotbarKey) {
-                            // Select hotbar slot (0-indexed)
+                            // Select hotbar slot (0-indexed) - sync both UIRenderer and player inventory
                             uiRenderer.setSelectedHotbarSlot(i);
+                            player.getInventory().setSelectedSlot(i);
                             break;
                         }
                     }
@@ -249,7 +270,22 @@ public final class DevplayScreen implements Screen {
                 if (button == GLFW_MOUSE_BUTTON_LEFT) {
                     blockInteraction.breakBlock();
                 } else if (button == GLFW_MOUSE_BUTTON_RIGHT) {
-                    blockInteraction.placeBlock(Blocks.STONE);
+                    // Get the item in the selected hotbar slot
+                    ItemStack selectedStack = player.getInventory().getSelectedStack();
+                    if (selectedStack != null) {
+                        // Try to use the item
+                        selectedStack.getItem().onUse(blockInteraction);
+                        // TODO: In the future, consume the item if it was used successfully
+                    }
+                    // If no item in selected slot, do nothing (can no longer place stone)
+                } else if (button == GLFW_MOUSE_BUTTON_MIDDLE) {
+                    // Pick block - raycast and add to inventory
+                    boolean success = blockInteraction.pickBlock();
+                    if (success) {
+                        System.out.println("DEBUG: Successfully picked block and added to inventory");
+                    } else {
+                        System.out.println("DEBUG: Failed to pick block");
+                    }
                 }
             }
         });
@@ -557,7 +593,7 @@ public final class DevplayScreen implements Screen {
         }
         
         // Draw hotbar at bottom center (always visible)
-        uiRenderer.drawHotbar(w, h);
+        uiRenderer.drawHotbar(w, h, player);
         
         // Draw crosshair on top of everything (but not when command overlay is open)
         if (!commandOverlayVisible) {
@@ -599,11 +635,19 @@ public final class DevplayScreen implements Screen {
     public void saveWorld() throws java.io.IOException {
         LevelStorageSource.saveWorld(world, worldName, 
             player.getX(), player.getY(), player.getZ(),
-            player.getYaw(), player.getPitch());
+            player.getYaw(), player.getPitch(), player.getInventory());
     }
     
     public String getWorldName() {
         return worldName;
+    }
+    
+    /**
+     * Get the local player.
+     * @return The player instance
+     */
+    public LocalPlayer getPlayer() {
+        return player;
     }
     
     /**

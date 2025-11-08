@@ -97,9 +97,9 @@ public class ChunkRenderer {
         ChunkVAO newVAO = null;
         if (!meshBuffer.isEmpty()) {
             newVAO = new ChunkVAO(meshBuffer);
-            logger.info("Uploaded VAO for chunk ({},{}) with {} indices", meshBuffer.getChunkX(), meshBuffer.getChunkZ(), meshBuffer.getIndexCount());
+            // logger.info("Uploaded VAO for chunk ({},{}) with {} indices", meshBuffer.getChunkX(), meshBuffer.getChunkZ(), meshBuffer.getIndexCount());
         } else {
-            logger.info("Skipped empty mesh for chunk ({},{})", meshBuffer.getChunkX(), meshBuffer.getChunkZ());
+            // logger.info("Skipped empty mesh for chunk ({},{})", meshBuffer.getChunkX(), meshBuffer.getChunkZ());
         }
         
         // ONLY NOW replace and delete old VAO (after new one is ready)
@@ -149,7 +149,7 @@ public class ChunkRenderer {
      */
     public void setTextureAtlas(TextureAtlas atlas) {
         this.textureAtlas = atlas;
-        logger.info("Texture atlas set for chunk renderer");
+        // logger.info("Texture atlas set for chunk renderer");
     }
     
     /**
@@ -157,5 +157,20 @@ public class ChunkRenderer {
      */
     public TextureAtlas getTextureAtlas() {
         return textureAtlas;
+    }
+    
+    /**
+     * Cleanup all OpenGL resources (VAOs).
+     * Call this when the renderer is no longer needed.
+     */
+    public void cleanup() {
+        logger.info("Cleaning up ChunkRenderer - deleting {} VAOs", vaoCache.size());
+        for (ChunkVAO vao : vaoCache.values()) {
+            if (vao != null) {
+                vao.delete();
+            }
+        }
+        vaoCache.clear();
+        chunkByKey.clear();
     }
 }

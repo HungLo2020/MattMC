@@ -40,6 +40,7 @@ public class PlayerInput {
     public static final String HOTBAR_7 = "hotbar_7";
     public static final String HOTBAR_8 = "hotbar_8";
     public static final String HOTBAR_9 = "hotbar_9";
+    public static final String DELETE_ITEM = "delete_item";
     
     private PlayerInput() {
         // Keybinds are initialized by KeybindManager from DefaultOptions.txt config file

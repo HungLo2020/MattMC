@@ -142,6 +142,98 @@ public class ResourceManager {
     }
     
     /**
+     * Load an item model from assets/models/item/{name}.json
+     * 
+     * @param name The item model name (e.g., "diamond")
+     * @return The loaded BlockModel, or null if not found
+     */
+    public static BlockModel loadItemModel(String name) {
+        String cacheKey = "item:" + name;
+        if (MODEL_CACHE.containsKey(cacheKey)) {
+            return MODEL_CACHE.get(cacheKey);
+        }
+        
+        String path = "/assets/models/item/" + name + ".json";
+        try (InputStream is = ResourceManager.class.getResourceAsStream(path);
+             Reader reader = new InputStreamReader(is)) {
+            BlockModel model = GSON.fromJson(reader, BlockModel.class);
+            MODEL_CACHE.put(cacheKey, model);
+            return model;
+        } catch (Exception e) {
+            logger.error("Failed to load item model: {}", path, e);
+            return null;
+        }
+    }
+    
+    /**
+     * Resolve an item model by following parent references.
+     * If the item model has a parent, load and merge with parent model.
+     * 
+     * @param itemName The item name (e.g., "grass_block")
+     * @return The resolved BlockModel with all textures, or null if not found
+     */
+    public static BlockModel resolveItemModel(String itemName) {
+        BlockModel itemModel = loadItemModel(itemName);
+        if (itemModel == null) {
+            return null;
+        }
+        
+        // If the item model has a parent, resolve it
+        if (itemModel.getParent() != null) {
+            String parentPath = itemModel.getParent();
+            
+            // Check if parent is a block model (e.g., "block/grass_block")
+            if (parentPath.startsWith("block/")) {
+                String blockName = parentPath.substring(6); // Remove "block/" prefix
+                BlockModel blockModel = loadBlockModel(blockName);
+                
+                // If block model has textures, use them
+                if (blockModel != null && blockModel.getTextures() != null) {
+                    // Merge textures (item model textures override block model textures)
+                    Map<String, String> mergedTextures = new HashMap<>(blockModel.getTextures());
+                    if (itemModel.getTextures() != null) {
+                        mergedTextures.putAll(itemModel.getTextures());
+                    }
+                    
+                    // Create a new model with merged data
+                    BlockModel resolved = new BlockModel();
+                    resolved.setParent(blockModel.getParent());
+                    resolved.setTextures(mergedTextures);
+                    // Preserve tints from item model
+                    resolved.setTints(itemModel.getTints());
+                    return resolved;
+                }
+            }
+        }
+        
+        return itemModel;
+    }
+    
+    /**
+     * Get all texture paths for an item by loading its item model.
+     * 
+     * @param itemName The item name (e.g., "grass_block")
+     * @return A map of texture keys to paths, or null if not found
+     */
+    public static Map<String, String> getItemTexturePaths(String itemName) {
+        BlockModel model = resolveItemModel(itemName);
+        if (model == null || model.getTextures() == null) {
+            return null;
+        }
+        
+        // Convert all texture paths to file paths
+        Map<String, String> texturePaths = new HashMap<>();
+        for (Map.Entry<String, String> entry : model.getTextures().entrySet()) {
+            String key = entry.getKey();
+            String texturePath = entry.getValue();
+            // Convert resource path to file path (e.g., "block/dirt" -> "assets/textures/block/dirt.png")
+            texturePaths.put(key, "assets/textures/" + texturePath + ".png");
+        }
+        
+        return texturePaths;
+    }
+    
+    /**
      * Clear all cached models and blockstates.
      */
     public static void clearCache() {

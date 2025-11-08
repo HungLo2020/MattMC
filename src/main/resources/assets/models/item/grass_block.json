@@ -1,0 +1,10 @@
+{
+  "parent": "block/grass_block",
+  "tints": [
+    {
+      "type": "grass",
+      "downfall": 1.0,
+      "temperature": 0.5
+    }
+  ]
+}

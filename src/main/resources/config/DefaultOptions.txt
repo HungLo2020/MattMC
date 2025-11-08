@@ -49,3 +49,4 @@ hotbar_6=6
 hotbar_7=7
 hotbar_8=8
 hotbar_9=9
+delete_item=delete
