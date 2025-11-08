@@ -109,6 +109,11 @@ public final class InventoryScreen implements Screen {
                     if (inventoryKey != null && key == inventoryKey) {
                         closeInventory();
                     }
+                    // Check if this is the delete item key
+                    Integer deleteKey = PlayerInput.getInstance().getKeybind(PlayerInput.DELETE_ITEM);
+                    if (deleteKey != null && key == deleteKey) {
+                        handleDeleteItem();
+                    }
                 }
             }
         });
@@ -363,6 +368,37 @@ public final class InventoryScreen implements Screen {
                     heldItem = null;
                     heldItemSourceSlot = -1;
                 }
+            }
+        }
+    }
+    
+    /**
+     * Handle delete key press to delete the item stack under the cursor.
+     * If holding an item with the cursor, delete that item.
+     * Otherwise, delete the item in the slot under the cursor.
+     */
+    private void handleDeleteItem() {
+        mattmc.world.entity.player.LocalPlayer player = gameScreen.getPlayer();
+        if (player == null || player.getInventory() == null) {
+            return;
+        }
+        
+        // If holding an item, delete it
+        if (heldItem != null) {
+            heldItem = null;
+            heldItemSourceSlot = -1;
+            return;
+        }
+        
+        // Otherwise, delete the item in the slot under the cursor
+        mattmc.world.item.Inventory inventory = player.getInventory();
+        int slotIndex = findClickedSlot();
+        
+        if (slotIndex >= 0) {
+            mattmc.world.item.ItemStack slotItem = inventory.getStack(slotIndex);
+            if (slotItem != null) {
+                // Delete the item by setting the slot to null
+                inventory.setStack(slotIndex, null);
             }
         }
     }

@@ -117,6 +117,7 @@ public class KeybindManager {
         input.setKeybind(PlayerInput.HOTBAR_7, GLFW_KEY_7);
         input.setKeybind(PlayerInput.HOTBAR_8, GLFW_KEY_8);
         input.setKeybind(PlayerInput.HOTBAR_9, GLFW_KEY_9);
+        input.setKeybind(PlayerInput.DELETE_ITEM, GLFW_KEY_DELETE);
         logger.debug("Set default keybinds");
     }
     
