@@ -51,12 +51,12 @@ public class LevelRenderer {
         
         // Build texture atlas once on first initialization
         if (!textureAtlasInitialized) {
-            logger.info("Initializing texture atlas for VBO rendering...");
+            // logger.info("Initializing texture atlas for VBO rendering...");
             TextureAtlas atlas = new TextureAtlas();
             chunkRenderer.setTextureAtlas(atlas);
             level.getAsyncLoader().setTextureAtlas(atlas);
             textureAtlasInitialized = true;
-            logger.info("Texture atlas initialized with {} textures", atlas.getTextureCount());
+            // logger.info("Texture atlas initialized with {} textures", atlas.getTextureCount());
         }
     }
     

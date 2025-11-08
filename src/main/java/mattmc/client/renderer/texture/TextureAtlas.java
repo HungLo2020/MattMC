@@ -56,7 +56,7 @@ public class TextureAtlas {
      * Call this once during game initialization.
      */
     public TextureAtlas() {
-        logger.info("Building texture atlas...");
+        // logger.info("Building texture atlas...");
         
         // Collect all unique texture paths from registered blocks
         Set<String> uniqueTexturePaths = new HashSet<>();
@@ -73,7 +73,7 @@ public class TextureAtlas {
         // Remove null paths
         uniqueTexturePaths.remove(null);
         
-        logger.info("Found {} unique textures", uniqueTexturePaths.size());
+        // logger.info("Found {} unique textures", uniqueTexturePaths.size());
         
         // Calculate atlas dimensions (must be power of 2 for mipmaps)
         int textureCount = uniqueTexturePaths.size();
@@ -86,7 +86,7 @@ public class TextureAtlas {
         atlasWidth = powerOf2Width;
         atlasHeight = powerOf2Height;
         
-        logger.info("Atlas size: {}x{} ({} textures, {} per row)", atlasWidth, atlasHeight, textureCount, texturesPerRow);
+        // logger.info("Atlas size: {}x{} ({} textures, {} per row)", atlasWidth, atlasHeight, textureCount, texturesPerRow);
         
         // Create atlas image
         BufferedImage atlasImage = new BufferedImage(atlasWidth, atlasHeight, BufferedImage.TYPE_INT_ARGB);
@@ -117,7 +117,7 @@ public class TextureAtlas {
                     
                     uvMappings.put(texturePath, new UVMapping(u0, v0, u1, v1));
                     
-                    logger.info("  Packed: {} at ({},{}) UV: {},{} -> {},{}", texturePath, x, y, u0, v0, u1, v1);
+                    // logger.info("  Packed: {} at ({},{}) UV: {},{} -> {},{}", texturePath, x, y, u0, v0, u1, v1);
                 } else {
                     logger.error("  Failed to load: {}", texturePath);
                 }
@@ -138,7 +138,7 @@ public class TextureAtlas {
         // Upload atlas to GPU
         atlasTextureId = createGLTexture(atlasImage);
         
-        logger.info("Texture atlas built successfully! ID: {}", atlasTextureId);
+        // logger.info("Texture atlas built successfully! ID: {}", atlasTextureId);
     }
     
     /**
