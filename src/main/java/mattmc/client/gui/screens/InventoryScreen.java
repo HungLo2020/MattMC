@@ -622,9 +622,12 @@ public final class InventoryScreen implements Screen {
         
         // Position text in bottom-right corner of the slot
         float textScale = 1.0f;
-        // Offset from item center to bottom-right of slot, minus a small padding
-        float textX = itemCenterX + halfSlot - 12f; // 12 pixels from right edge
-        float textY = itemCenterY + halfSlot - 10f; // 10 pixels from bottom edge
+        // Offset from item center to bottom-right of slot
+        // X: Move right to edge, then back a bit for padding
+        float textX = itemCenterX + halfSlot - 12f;
+        // Y: Move down to bottom edge, then up a bit for padding
+        // Since text origin is at top-left of text, we need to position it higher
+        float textY = itemCenterY + halfSlot - 18f; // Moved up from -10f to -18f
         
         // Draw text with shadow for better visibility
         glEnable(GL_BLEND);
