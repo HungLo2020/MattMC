@@ -24,12 +24,22 @@ public class PlayerInput {
     public static final String LEFT = "left";
     public static final String RIGHT = "right";
     public static final String JUMP = "jump";
+    public static final String SPRINT = "sprint";
     public static final String CROUCH = "crouch";
     public static final String BREAK_BLOCK = "break_block";
     public static final String PLACE_BLOCK = "place_block";
     public static final String FLY_UP = "fly_up";
     public static final String OPEN_COMMAND = "open_command";
     public static final String INVENTORY = "inventory";
+    public static final String HOTBAR_1 = "hotbar_1";
+    public static final String HOTBAR_2 = "hotbar_2";
+    public static final String HOTBAR_3 = "hotbar_3";
+    public static final String HOTBAR_4 = "hotbar_4";
+    public static final String HOTBAR_5 = "hotbar_5";
+    public static final String HOTBAR_6 = "hotbar_6";
+    public static final String HOTBAR_7 = "hotbar_7";
+    public static final String HOTBAR_8 = "hotbar_8";
+    public static final String HOTBAR_9 = "hotbar_9";
     
     private PlayerInput() {
         // Keybinds are initialized by KeybindManager from DefaultOptions.txt config file

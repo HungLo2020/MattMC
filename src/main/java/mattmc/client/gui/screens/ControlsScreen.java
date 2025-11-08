@@ -7,6 +7,7 @@ import mattmc.client.Minecraft;
 import mattmc.client.Window;
 import mattmc.world.entity.player.PlayerInput;
 import mattmc.client.gui.components.Button;
+import mattmc.client.gui.components.ButtonRenderer;
 import mattmc.client.gui.components.TextRenderer;
 import mattmc.client.settings.KeybindManager;
 import org.lwjgl.system.MemoryStack;
@@ -37,6 +38,12 @@ public final class ControlsScreen implements Screen {
     private int keybindsStartY;
     private int backButtonY;
     
+    // Scrolling support
+    private int scrollOffset = 0;
+    private int maxScrollOffset = 0;
+    private static final int SCROLL_BUFFER = 50; // Buffer room above/below keybinds
+    private static final int SCROLL_SPEED = 20; // Pixels to scroll per mouse wheel notch
+    
     // Keybind actions with display names
     private static final String[][] KEYBIND_ACTIONS = {
         {PlayerInput.FORWARD, "Move Forward"},
@@ -44,11 +51,21 @@ public final class ControlsScreen implements Screen {
         {PlayerInput.LEFT, "Strafe Left"},
         {PlayerInput.RIGHT, "Strafe Right"},
         {PlayerInput.JUMP, "Jump"},
+        {PlayerInput.SPRINT, "Sprint"},
         {PlayerInput.CROUCH, "Crouch / Fly Down"},
         {PlayerInput.FLY_UP, "Fly Up"},
         {PlayerInput.BREAK_BLOCK, "Break Block"},
         {PlayerInput.PLACE_BLOCK, "Place Block"},
-        {PlayerInput.OPEN_COMMAND, "Open Command"}
+        {PlayerInput.OPEN_COMMAND, "Open Command"},
+        {PlayerInput.HOTBAR_1, "Hotbar Slot 1"},
+        {PlayerInput.HOTBAR_2, "Hotbar Slot 2"},
+        {PlayerInput.HOTBAR_3, "Hotbar Slot 3"},
+        {PlayerInput.HOTBAR_4, "Hotbar Slot 4"},
+        {PlayerInput.HOTBAR_5, "Hotbar Slot 5"},
+        {PlayerInput.HOTBAR_6, "Hotbar Slot 6"},
+        {PlayerInput.HOTBAR_7, "Hotbar Slot 7"},
+        {PlayerInput.HOTBAR_8, "Hotbar Slot 8"},
+        {PlayerInput.HOTBAR_9, "Hotbar Slot 9"}
     };
 
     public ControlsScreen(Minecraft game) {
@@ -80,6 +97,10 @@ public final class ControlsScreen implements Screen {
         backButtonY = h - 80;
         backButton.x = (w - backButton.w) / 2;
         backButton.y = backButtonY;
+        
+        // Calculate maximum scroll offset (total content height - available height + buffer)
+        int availableHeight = backButtonY - keybindsStartY - SCROLL_BUFFER;
+        maxScrollOffset = Math.max(0, totalKeybindsH - availableHeight + SCROLL_BUFFER);
     }
 
     @Override
@@ -100,14 +121,19 @@ public final class ControlsScreen implements Screen {
         }
 
         for (var kb : keybindButtons) {
-            kb.button.setHover(kb.button.contains(mxFB, myFB));
+            // Apply scroll offset to button position for hover detection
+            int adjustedY = kb.button.y - scrollOffset;
+            kb.button.setHover(mxFB >= kb.button.x && mxFB < kb.button.x + kb.button.w &&
+                              myFB >= adjustedY && myFB < adjustedY + kb.button.h);
         }
         backButton.setHover(backButton.contains(mxFB, myFB));
 
         if (mouseDown) {
-            // Check keybind buttons
+            // Check keybind buttons with scroll offset
             for (var kb : keybindButtons) {
-                if (kb.button.contains(mxFB, myFB)) {
+                int adjustedY = kb.button.y - scrollOffset;
+                if (mxFB >= kb.button.x && mxFB < kb.button.x + kb.button.w &&
+                    myFB >= adjustedY && myFB < adjustedY + kb.button.h) {
                     waitingForKey = kb.action;
                     ignoreNextRelease = true; // Ignore the release from this click
                     break;
@@ -135,14 +161,38 @@ public final class ControlsScreen implements Screen {
         drawTitle("Keybinds", titleCX, titleCY, titleScale, 0xFFFFFF);
         drawTitle("Click a button to change its keybind", titleCX, titleCY + 40f, 0.9f, 0xB0C4DE);
         
-        // Draw keybind buttons
+        // Draw keybind buttons with scroll offset
         for (var kb : keybindButtons) {
             boolean waiting = kb.action.equals(waitingForKey);
-            drawKeybindButton(kb, waiting);
+            Button b = kb.button;
+            
+            // Apply scroll offset to button rendering
+            int adjustedY = b.y - scrollOffset;
+            
+            // Only render buttons that are visible on screen
+            if (adjustedY + b.h >= keybindsStartY - SCROLL_BUFFER && adjustedY <= backButtonY) {
+                // Temporarily adjust button Y for rendering
+                int originalY = b.y;
+                b.y = adjustedY;
+                ButtonRenderer.drawButton(b, waiting);
+                drawKeybindButtonText(kb, waiting, b);
+                b.y = originalY;
+            }
         }
         
         // Draw back button
-        drawButton(backButton);
+        ButtonRenderer.drawButton(backButton);
+        drawTextCentered(backButton.label, backButton.x + backButton.w / 2f, backButton.y + backButton.h / 2f, 1.2f, 0xFFFFFF);
+    }
+
+    private void drawKeybindButtonText(KeybindButton kb, boolean waiting, Button b) {
+        // Draw action name on left, key name on right
+        Integer keyCode = PlayerInput.getInstance().getKeybind(kb.action);
+        String keyName = waiting ? "Press a key..." : 
+                        (keyCode != null ? PlayerInput.getKeyName(keyCode) : "Unbound");
+        
+        drawText(kb.display, b.x + 10, b.y + b.h / 2f - 6f, 1.0f, 0xFFFFFF);
+        drawTextRight(keyName, b.x + b.w - 10, b.y + b.h / 2f - 6f, 1.0f, 0xFFFFFF);
     }
 
     private void setupOrtho() {
@@ -154,76 +204,7 @@ public final class ControlsScreen implements Screen {
         glLoadIdentity();
     }
 
-    private void drawKeybindButton(KeybindButton kb, boolean waiting) {
-        Button b = kb.button;
-        
-        int base = waiting ? 0xFF6B35 : (b.hover() ? 0x3A5FCD : 0x2E4A9B);
-        int edge = waiting ? 0xFF8C5A : (b.hover() ? 0x6D89E3 : 0x20356B);
 
-        setColor(0x000000, 0.35f);
-        fillRect(b.x + 2, b.y + 3, b.w, b.h);
-
-        glBegin(GL_QUADS);
-        setColor(edge, 1f);
-        glVertex2f(b.x, b.y);
-        glVertex2f(b.x + b.w, b.y);
-        setColor(base, 1f);
-        glVertex2f(b.x + b.w, b.y + b.h);
-        glVertex2f(b.x, b.y + b.h);
-        glEnd();
-
-        setColor(0x0B1220, 1f);
-        glBegin(GL_LINE_LOOP);
-        glVertex2f(b.x, b.y);
-        glVertex2f(b.x + b.w, b.y);
-        glVertex2f(b.x + b.w, b.y + b.h);
-        glVertex2f(b.x, b.y + b.h);
-        glEnd();
-
-        // Draw action name on left, key name on right
-        Integer keyCode = PlayerInput.getInstance().getKeybind(kb.action);
-        String keyName = waiting ? "Press a key..." : 
-                        (keyCode != null ? PlayerInput.getKeyName(keyCode) : "Unbound");
-        
-        drawText(kb.display, b.x + 10, b.y + b.h / 2f - 6f, 1.0f, 0xFFFFFF);
-        drawTextRight(keyName, b.x + b.w - 10, b.y + b.h / 2f - 6f, 1.0f, 0xFFFFFF);
-    }
-
-    private void drawButton(Button b) {
-        int base = b.hover() ? 0x3A5FCD : 0x2E4A9B;
-        int edge = b.hover() ? 0x6D89E3 : 0x20356B;
-
-        setColor(0x000000, 0.35f);
-        fillRect(b.x + 2, b.y + 3, b.w, b.h);
-
-        glBegin(GL_QUADS);
-        setColor(edge, 1f);
-        glVertex2f(b.x, b.y);
-        glVertex2f(b.x + b.w, b.y);
-        setColor(base, 1f);
-        glVertex2f(b.x + b.w, b.y + b.h);
-        glVertex2f(b.x, b.y + b.h);
-        glEnd();
-
-        setColor(0x0B1220, 1f);
-        glBegin(GL_LINE_LOOP);
-        glVertex2f(b.x, b.y);
-        glVertex2f(b.x + b.w, b.y);
-        glVertex2f(b.x + b.w, b.y + b.h);
-        glVertex2f(b.x, b.y + b.h);
-        glEnd();
-
-        drawTextCentered(b.label, b.x + b.w / 2f, b.y + b.h / 2f, 1.2f, 0xFFFFFF);
-    }
-
-    private void fillRect(int x, int y, int w, int h) {
-        glBegin(GL_QUADS);
-        glVertex2f(x, y);
-        glVertex2f(x + w, y);
-        glVertex2f(x + w, y + h);
-        glVertex2f(x, y + h);
-        glEnd();
-    }
 
     private void setColor(int rgb, float a) {
         float r = ((rgb >> 16) & 0xFF) / 255f;
@@ -306,6 +287,14 @@ public final class ControlsScreen implements Screen {
         glfwSetFramebufferSizeCallback(window.handle(), (win, newW, newH) -> {
             glViewport(0, 0, Math.max(newW, 1), Math.max(newH, 1));
             recomputeLayout();
+        });
+        
+        // Scroll callback for mouse wheel scrolling
+        glfwSetScrollCallback(window.handle(), (win, xOffset, yOffset) -> {
+            // yOffset: positive when scrolling up, negative when scrolling down
+            // Negate yOffset so scrolling down increases scrollOffset (moves content up)
+            int scrollAmount = (int)(-yOffset * SCROLL_SPEED);
+            scrollOffset = Math.max(0, Math.min(maxScrollOffset, scrollOffset + scrollAmount));
         });
     }
     

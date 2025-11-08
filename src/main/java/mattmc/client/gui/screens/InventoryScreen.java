@@ -6,11 +6,17 @@ import mattmc.client.renderer.BlurEffect;
 import mattmc.client.renderer.BlurRenderer;
 import mattmc.client.renderer.texture.Texture;
 import mattmc.world.entity.player.PlayerInput;
+import org.lwjgl.system.MemoryStack;
+
+import java.nio.IntBuffer;
+import java.util.ArrayList;
+import java.util.List;
 
 import static mattmc.client.settings.OptionsManager.isMenuScreenBlurEnabled;
 import static org.lwjgl.glfw.GLFW.*;
 import static org.lwjgl.opengl.GL11.*;
 import static org.lwjgl.opengl.GL30.*;
+import static org.lwjgl.system.MemoryStack.stackPush;
 
 /**
  * Inventory screen overlay - displays the inventory.png centered on screen.
@@ -24,6 +30,26 @@ public final class InventoryScreen implements Screen {
     
     // Blur effect for background
     private BlurEffect blurEffect;
+    
+    // Mouse tracking for slot highlighting
+    private double mouseXWin, mouseYWin;
+    private final List<InventorySlot> slots = new ArrayList<>();
+    
+    // Helper class to represent an inventory slot
+    private static class InventorySlot {
+        final float x, y, width, height; // Relative to 176x166 GUI coordinate system
+        
+        InventorySlot(float x, float y, float width, float height) {
+            this.x = x;
+            this.y = y;
+            this.width = width;
+            this.height = height;
+        }
+        
+        boolean contains(float px, float py) {
+            return px >= x && px < x + width && py >= y && py < y + height;
+        }
+    }
 
     public InventoryScreen(Minecraft game, DevplayScreen gameScreen) {
         this.game = game;
@@ -33,15 +59,21 @@ public final class InventoryScreen implements Screen {
         // Sync player position to prevent flickering during interpolation
         gameScreen.syncPlayerPosition();
 
+        // Initialize inventory slots
+        initializeSlots();
+
         // Load inventory texture
         inventoryTexture = Texture.load("/assets/textures/gui/container/inventory.png");
 
         // Release mouse cursor
         glfwSetInputMode(window.handle(), GLFW_CURSOR, GLFW_CURSOR_NORMAL);
 
-        // Disable mouse movement callback to prevent camera rotation
-        glfwSetCursorPosCallback(window.handle(), null);
-        
+        // Track mouse position for slot highlighting
+        glfwSetCursorPosCallback(window.handle(), (h, x, y) -> { 
+            mouseXWin = x; 
+            mouseYWin = y; 
+        });
+
         // Disable mouse button callback to prevent block interaction
         glfwSetMouseButtonCallback(window.handle(), null);
 
@@ -69,6 +101,52 @@ public final class InventoryScreen implements Screen {
         // Recapture mouse for FPS controls
         glfwSetInputMode(window.handle(), GLFW_CURSOR, GLFW_CURSOR_DISABLED);
         game.setScreen(gameScreen);
+    }
+    
+    /**
+     * Initialize all inventory slot positions based on standard Minecraft inventory layout.
+     * Coordinates are relative to the 176x166 GUI coordinate system.
+     */
+    private void initializeSlots() {
+        slots.clear();
+        
+        // Slot dimensions (standard Minecraft slot size)
+        float slotSize = 16f;
+        
+        // Armor slots (4 slots, vertical on left side)
+        float armorX = 8f;
+        float armorY = 8f;
+        for (int i = 0; i < 4; i++) {
+            slots.add(new InventorySlot(armorX, armorY + i * 18f, slotSize, slotSize));
+        }
+        
+        // Crafting grid (2x2 slots)
+        float craftX = 98f;
+        float craftY = 18f;
+        for (int row = 0; row < 2; row++) {
+            for (int col = 0; col < 2; col++) {
+                slots.add(new InventorySlot(craftX + col * 18f, craftY + row * 18f, slotSize, slotSize));
+            }
+        }
+        
+        // Crafting output slot
+        slots.add(new InventorySlot(154f, 28f, slotSize, slotSize));
+        
+        // Main inventory (3 rows x 9 columns)
+        float invX = 8f;
+        float invY = 84f;
+        for (int row = 0; row < 3; row++) {
+            for (int col = 0; col < 9; col++) {
+                slots.add(new InventorySlot(invX + col * 18f, invY + row * 18f, slotSize, slotSize));
+            }
+        }
+        
+        // Hotbar (1 row x 9 columns)
+        float hotbarX = 8f;
+        float hotbarY = 142f;
+        for (int col = 0; col < 9; col++) {
+            slots.add(new InventorySlot(hotbarX + col * 18f, hotbarY, slotSize, slotSize));
+        }
     }
 
     @Override
@@ -136,9 +214,56 @@ public final class InventoryScreen implements Screen {
             glEnd();
             
             glDisable(GL_TEXTURE_2D);
+            
+            // Draw slot highlight if mouse is over a slot
+            drawSlotHighlight(x, y, scale);
         }
         
         glDisable(GL_BLEND);
+    }
+    
+    /**
+     * Draws a transparent white highlight over the hovered inventory slot.
+     */
+    private void drawSlotHighlight(float guiX, float guiY, float scale) {
+        // Convert window mouse coordinates to framebuffer coordinates
+        float mouseFBX, mouseFBY;
+        try (MemoryStack stack = stackPush()) {
+            IntBuffer winW = stack.mallocInt(1), winH = stack.mallocInt(1);
+            IntBuffer fbW  = stack.mallocInt(1), fbH  = stack.mallocInt(1);
+            glfwGetWindowSize(window.handle(), winW, winH);
+            glfwGetFramebufferSize(window.handle(), fbW, fbH);
+            float sx = fbW.get(0) / Math.max(1f, winW.get(0));
+            float sy = fbH.get(0) / Math.max(1f, winH.get(0));
+            mouseFBX = (float) mouseXWin * sx;
+            mouseFBY = (float) mouseYWin * sy;
+        }
+        
+        // Convert mouse position to GUI-relative coordinates
+        float mouseGuiX = (mouseFBX - guiX) / scale;
+        float mouseGuiY = (mouseFBY - guiY) / scale;
+        
+        // Check which slot the mouse is over
+        for (InventorySlot slot : slots) {
+            if (slot.contains(mouseGuiX, mouseGuiY)) {
+                // Draw transparent white highlight over this slot
+                float slotScreenX = guiX + slot.x * scale;
+                float slotScreenY = guiY + slot.y * scale;
+                float slotScreenW = slot.width * scale;
+                float slotScreenH = slot.height * scale;
+                
+                // Use a fairly transparent white color for the highlight
+                glColor4f(1f, 1f, 1f, 0.3f);
+                glBegin(GL_QUADS);
+                glVertex2f(slotScreenX, slotScreenY);
+                glVertex2f(slotScreenX + slotScreenW, slotScreenY);
+                glVertex2f(slotScreenX + slotScreenW, slotScreenY + slotScreenH);
+                glVertex2f(slotScreenX, slotScreenY + slotScreenH);
+                glEnd();
+                
+                break; // Only highlight one slot at a time
+            }
+        }
     }
 
     private void setColor(int rgb, float a) {

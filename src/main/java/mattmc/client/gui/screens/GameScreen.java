@@ -17,8 +17,8 @@ import static org.lwjgl.glfw.GLFW.*;
 import static org.lwjgl.opengl.GL11.*;
 import static org.lwjgl.system.MemoryStack.stackPush;
 
-/** Options menu screen. */
-public final class OptionsScreen implements Screen {
+/** Game options submenu screen. */
+public final class GameScreen implements Screen {
     private final Minecraft game;
     private final Window window;
     private final List<Button> buttons = new ArrayList<>();
@@ -30,7 +30,7 @@ public final class OptionsScreen implements Screen {
     private int buttonWidth = 300, buttonHeight = 44, buttonGap = 12;
     private int buttonsStartY;
 
-    public OptionsScreen(Minecraft game) {
+    public GameScreen(Minecraft game) {
         this.game = game;
         this.window = game.window();
         recomputeLayout();
@@ -41,25 +41,30 @@ public final class OptionsScreen implements Screen {
         titleCX = w / 2f;
         titleCY = h * 0.18f;
 
-        int totalButtonsH = 6 * buttonHeight + 5 * buttonGap;
+        int totalButtonsH = 3 * buttonHeight + 2 * buttonGap;
         buttonsStartY = (int)(h / 2f - totalButtonsH / 2f);
 
         int x = (w - buttonWidth) / 2;
         buttons.clear();
 
-        // Submenu buttons
-        buttons.add(new Button("Keybinds", x, buttonsStartY + 0 * (buttonHeight + buttonGap), buttonWidth, buttonHeight));
-        buttons.add(new Button("Graphics", x, buttonsStartY + 1 * (buttonHeight + buttonGap), buttonWidth, buttonHeight));
-        buttons.add(new Button("Game",     x, buttonsStartY + 2 * (buttonHeight + buttonGap), buttonWidth, buttonHeight));
-        buttons.add(new Button("Skins",    x, buttonsStartY + 3 * (buttonHeight + buttonGap), buttonWidth, buttonHeight));
-        buttons.add(new Button("Sounds",   x, buttonsStartY + 4 * (buttonHeight + buttonGap), buttonWidth, buttonHeight));
-        buttons.add(new Button("Back",     x, buttonsStartY + 5 * (buttonHeight + buttonGap), buttonWidth, buttonHeight));
+        // Game-related buttons
+        buttons.add(new Button(getFpsCapButtonLabel(), x, buttonsStartY + 0 * (buttonHeight + buttonGap), buttonWidth, buttonHeight));
+        buttons.add(new Button(getRenderDistanceButtonLabel(), x, buttonsStartY + 1 * (buttonHeight + buttonGap), buttonWidth, buttonHeight));
+        buttons.add(new Button("Back",     x, buttonsStartY + 2 * (buttonHeight + buttonGap), buttonWidth, buttonHeight));
+    }
+    
+    private String getFpsCapButtonLabel() {
+        int fpsCap = mattmc.client.settings.OptionsManager.getFpsCap();
+        return "FPS Cap: " + fpsCap + " (-/+)";
+    }
+    
+    private String getRenderDistanceButtonLabel() {
+        int renderDistance = mattmc.client.settings.OptionsManager.getRenderDistance();
+        return "Render Distance: " + renderDistance + " chunks";
     }
 
     @Override
     public void tick() {
-        // Panorama rotation is now updated during rendering to prevent jitter
-        
         // Convert window coords -> framebuffer coords for accurate hit-testing on HiDPI
         float mxFB, myFB;
         try (MemoryStack stack = stackPush()) {
@@ -88,27 +93,64 @@ public final class OptionsScreen implements Screen {
 
     private void onClick(String label) {
         if ("Back".equals(label)) {
-            game.setScreen(new TitleScreen(game));
+            game.setScreen(new OptionsScreen(game));
             return;
         }
-        if ("Keybinds".equals(label)) {
-            game.setScreen(new ControlsScreen(game));
+        if (label.startsWith("FPS Cap:")) {
+            // Cycle through common FPS values
+            int current = mattmc.client.settings.OptionsManager.getFpsCap();
+            int[] commonValues = {30, 60, 75, 120, 144, 165, 240, 360, 999};
+            int nextIndex = 0;
+            
+            // Find the next value in the cycle
+            for (int i = 0; i < commonValues.length; i++) {
+                if (commonValues[i] > current) {
+                    nextIndex = i;
+                    break;
+                }
+            }
+            
+            // If we're at or past the last value, wrap to the first
+            if (current >= commonValues[commonValues.length - 1]) {
+                nextIndex = 0;
+            }
+            
+            mattmc.client.settings.OptionsManager.setFpsCap(commonValues[nextIndex]);
+            game.window().applyFpsCapSetting();
+            game.updateFpsCap();
+            recomputeLayout();
             return;
         }
-        if ("Graphics".equals(label)) {
-            game.setScreen(new GraphicsScreen(game));
-            return;
-        }
-        if ("Game".equals(label)) {
-            game.setScreen(new GameScreen(game));
-            return;
-        }
-        if ("Skins".equals(label)) {
-            game.setScreen(new SkinsScreen(game));
-            return;
-        }
-        if ("Sounds".equals(label)) {
-            game.setScreen(new SoundsScreen(game));
+        if (label.startsWith("Render Distance:")) {
+            // Cycle through allowed render distance values
+            int current = mattmc.client.settings.OptionsManager.getRenderDistance();
+            int[] allowedValues = mattmc.client.settings.OptionsManager.ALLOWED_RENDER_DISTANCES;
+            
+            // Find the current or next higher allowed value
+            int nextIndex = 0;
+            boolean foundCurrent = false;
+            
+            for (int i = 0; i < allowedValues.length; i++) {
+                if (allowedValues[i] == current) {
+                    // Found exact match, use next value
+                    nextIndex = (i + 1) % allowedValues.length;
+                    foundCurrent = true;
+                    break;
+                } else if (allowedValues[i] > current) {
+                    // Current value is between allowed values, jump to next higher
+                    nextIndex = i;
+                    foundCurrent = true;
+                    break;
+                }
+            }
+            
+            // If current is higher than all allowed values, wrap to first
+            if (!foundCurrent) {
+                nextIndex = 0;
+            }
+            
+            mattmc.client.settings.OptionsManager.setRenderDistance(allowedValues[nextIndex]);
+            recomputeLayout();
             return;
         }
     }
@@ -124,7 +166,7 @@ public final class OptionsScreen implements Screen {
             ButtonRenderer.drawButton(b);
             drawTextCentered(b.label, b.x + b.w / 2f, b.y + b.h / 2f, 1.2f, 0xFFFFFF);
         }
-        drawTitle("Options", titleCX, titleCY, titleScale, 0xFFFFFF);
+        drawTitle("Game", titleCX, titleCY, titleScale, 0xFFFFFF);
         drawTitle("Configure game settings", titleCX, titleCY + 48f, 1.0f, 0xB0C4DE);
     }
 

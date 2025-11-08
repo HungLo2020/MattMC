@@ -33,9 +33,26 @@ public class PlayerController {
     public void updateMovement(long window, float deltaTime) {
         PlayerPhysics physics = player.getPhysics();
         boolean isFlying = physics != null && physics.isFlying();
+        boolean isSprinting = input.isPressed(window, PlayerInput.SPRINT);
+        boolean isCrouching = input.isPressed(window, PlayerInput.CROUCH);
         
-        // Use flying speed when flying, walking speed otherwise
-        float moveSpeed = isFlying ? player.getFlySpeed() * deltaTime : player.getMoveSpeed() * deltaTime;
+        // Determine movement speed based on state
+        // Note: Crouching takes priority over sprinting if both are pressed
+        float moveSpeed;
+        if (isFlying) {
+            // Flying mode
+            moveSpeed = isSprinting ? player.getFlySprintSpeed() * deltaTime : player.getFlySpeed() * deltaTime;
+        } else {
+            // Walking/running mode
+            if (isCrouching) {
+                // Sneaking takes priority over sprinting
+                moveSpeed = player.getSneakSpeed() * deltaTime;
+            } else if (isSprinting) {
+                moveSpeed = player.getSprintSpeed() * deltaTime;
+            } else {
+                moveSpeed = player.getMoveSpeed() * deltaTime;
+            }
+        }
         
         // Movement using PlayerInput abstraction
         if (input.isPressed(window, PlayerInput.FORWARD)) {
@@ -69,6 +86,16 @@ public class PlayerController {
         PlayerPhysics physics = player.getPhysics();
         if (physics != null) {
             physics.handleSpacePress();
+        }
+    }
+    
+    /**
+     * Handle continuous jump when space is held.
+     */
+    public void handleSpaceHeld() {
+        PlayerPhysics physics = player.getPhysics();
+        if (physics != null) {
+            physics.handleSpaceHeld();
         }
     }
     

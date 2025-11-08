@@ -19,9 +19,14 @@ public class UIRenderer {
     // Constants for command feedback positioning and sizing
     private static final int FEEDBACK_Y_OFFSET = 120; // Distance from bottom of screen
     private static final int CHAR_WIDTH_ESTIMATE = 8; // Approximate character width in pixels
+    private static final float HOTBAR_SCALE = 3.0f; // Scale factor for hotbar rendering
     
     // Hotbar texture
     private Texture hotbarTexture;
+    private Texture hotbarSelectionTexture;
+    
+    // Selected hotbar slot (0-8 for slots 1-9)
+    private int selectedHotbarSlot = 0;
     
     /**
      * Draw crosshair in the center of the screen.
@@ -148,6 +153,11 @@ public class UIRenderer {
             hotbarTexture = Texture.load("/assets/textures/gui/sprites/hud/hotbar.png");
         }
         
+        // Load hotbar selection texture if not already loaded
+        if (hotbarSelectionTexture == null) {
+            hotbarSelectionTexture = Texture.load("/assets/textures/gui/sprites/hud/hotbar_selection.png");
+        }
+        
         // Switch to 2D orthographic projection
         glMatrixMode(GL_PROJECTION);
         glPushMatrix();
@@ -163,23 +173,50 @@ public class UIRenderer {
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
         
         // Draw hotbar texture centered at bottom of screen
+        float hotbarX = 0f;
+        float hotbarY = 0f;
+        
         if (hotbarTexture != null) {
             glEnable(GL_TEXTURE_2D);
             hotbarTexture.bind();
             glColor4f(1f, 1f, 1f, 1f);
             
             // Scale hotbar to 3x size for better visibility (like Minecraft GUI scale)
-            float scale = 3.0f;
-            float texWidth = hotbarTexture.width * scale;
-            float texHeight = hotbarTexture.height * scale;
-            float x = (screenWidth - texWidth) / 2f;
-            float y = screenHeight - texHeight - 10; // 10 pixels from bottom
+            float texWidth = hotbarTexture.width * HOTBAR_SCALE;
+            float texHeight = hotbarTexture.height * HOTBAR_SCALE;
+            hotbarX = (screenWidth - texWidth) / 2f;
+            hotbarY = screenHeight - texHeight - 10; // 10 pixels from bottom
             
             glBegin(GL_QUADS);
-            glTexCoord2f(0, 1); glVertex2f(x, y);
-            glTexCoord2f(1, 1); glVertex2f(x + texWidth, y);
-            glTexCoord2f(1, 0); glVertex2f(x + texWidth, y + texHeight);
-            glTexCoord2f(0, 0); glVertex2f(x, y + texHeight);
+            glTexCoord2f(0, 1); glVertex2f(hotbarX, hotbarY);
+            glTexCoord2f(1, 1); glVertex2f(hotbarX + texWidth, hotbarY);
+            glTexCoord2f(1, 0); glVertex2f(hotbarX + texWidth, hotbarY + texHeight);
+            glTexCoord2f(0, 0); glVertex2f(hotbarX, hotbarY + texHeight);
+            glEnd();
+        }
+        
+        // Draw selection overlay on the selected hotbar slot
+        if (hotbarSelectionTexture != null && hotbarTexture != null) {
+            hotbarSelectionTexture.bind();
+            glColor4f(1f, 1f, 1f, 1f);
+            
+            // Calculate position for selection overlay
+            // The hotbar has 9 slots, so each slot width = (hotbar texture width / 9)
+            // The selection overlay is larger than a slot, so center it on the slot
+            float slotWidth = (hotbarTexture.width * HOTBAR_SCALE) / 9f;
+            float selectionWidth = hotbarSelectionTexture.width * HOTBAR_SCALE;
+            float selectionHeight = hotbarSelectionTexture.height * HOTBAR_SCALE;
+            
+            // Center the selection overlay on the slot by offsetting by half the difference
+            float centerOffset = (selectionWidth - slotWidth) / 2f;
+            float selectionX = hotbarX + (selectedHotbarSlot * slotWidth) - centerOffset;
+            float selectionY = hotbarY;
+            
+            glBegin(GL_QUADS);
+            glTexCoord2f(0, 1); glVertex2f(selectionX, selectionY);
+            glTexCoord2f(1, 1); glVertex2f(selectionX + selectionWidth, selectionY);
+            glTexCoord2f(1, 0); glVertex2f(selectionX + selectionWidth, selectionY + selectionHeight);
+            glTexCoord2f(0, 0); glVertex2f(selectionX, selectionY + selectionHeight);
             glEnd();
             
             glDisable(GL_TEXTURE_2D);
@@ -358,6 +395,22 @@ public class UIRenderer {
             return "East";
         } else {
             return "South-East";
+        }
+    }
+    
+    /**
+     * Get the selected hotbar slot (0-8 for slots 1-9).
+     */
+    public int getSelectedHotbarSlot() {
+        return selectedHotbarSlot;
+    }
+    
+    /**
+     * Set the selected hotbar slot (0-8 for slots 1-9).
+     */
+    public void setSelectedHotbarSlot(int slot) {
+        if (slot >= 0 && slot <= 8) {
+            selectedHotbarSlot = slot;
         }
     }
 }

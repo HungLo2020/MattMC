@@ -6,6 +6,7 @@ import mattmc.world.level.Level;
 import mattmc.client.Minecraft;
 import mattmc.client.Window;
 import mattmc.client.gui.components.Button;
+import mattmc.client.gui.components.ButtonRenderer;
 import mattmc.client.gui.components.EditBox;
 import mattmc.client.gui.components.TextRenderer;
 import mattmc.world.level.storage.LevelStorageSource;
@@ -252,7 +253,10 @@ public final class CreateWorldScreen implements Screen {
         if (worldNameField != null) drawTextField(worldNameField);
         if (seedField != null) drawTextField(seedField);
         
-        for (var b : buttons) drawButton(b);
+        for (var b : buttons) {
+            ButtonRenderer.drawButton(b);
+            drawTextCentered(b.label, b.x + b.w / 2f, b.y + b.h / 2f, 1.2f, 0xFFFFFF);
+        }
         drawTitle("Create New World", titleCX, titleCY, titleScale, 0xFFFFFF);
         drawTitle("World Name:", titleCX, worldNameField.y - 20f, 1.0f, 0xB0C4DE);
         drawTitle("Seed:", titleCX, seedField.y - 20f, 1.0f, 0xB0C4DE);
@@ -301,32 +305,7 @@ public final class CreateWorldScreen implements Screen {
         }
     }
     
-    private void drawButton(Button b) {
-        int base = b.hover() ? 0x3A5FCD : 0x2E4A9B;
-        int edge = b.hover() ? 0x6D89E3 : 0x20356B;
 
-        setColor(0x000000, 0.35f);
-        fillRect(b.x + 2, b.y + 3, b.w, b.h);
-
-        glBegin(GL_QUADS);
-        setColor(edge, 1f);
-        glVertex2f(b.x, b.y);
-        glVertex2f(b.x + b.w, b.y);
-        setColor(base, 1f);
-        glVertex2f(b.x + b.w, b.y + b.h);
-        glVertex2f(b.x, b.y + b.h);
-        glEnd();
-
-        setColor(0x0B1220, 1f);
-        glBegin(GL_LINE_LOOP);
-        glVertex2f(b.x, b.y);
-        glVertex2f(b.x + b.w, b.y);
-        glVertex2f(b.x + b.w, b.y + b.h);
-        glVertex2f(b.x, b.y + b.h);
-        glEnd();
-
-        drawTextCentered(b.label, b.x + b.w / 2f, b.y + b.h / 2f, 1.2f, 0xFFFFFF);
-    }
 
     private void fillRect(int x, int y, int w, int h) {
         glBegin(GL_QUADS);

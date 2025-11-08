@@ -6,7 +6,9 @@ import mattmc.client.Minecraft;
 import mattmc.client.Window;
 import mattmc.client.renderer.texture.Texture;
 import mattmc.client.gui.components.Button;
+import mattmc.client.gui.components.ButtonRenderer;
 import mattmc.client.gui.components.TextRenderer;
+import mattmc.client.gui.SplashTextLoader;
 import org.lwjgl.system.MemoryStack;
 
 import java.nio.IntBuffer;
@@ -29,6 +31,7 @@ public final class TitleScreen implements Screen {
     private double mouseXWin, mouseYWin;
     private boolean mouseDown;
     private Texture logoTexture;
+    private String splashText;
 
     // Fixed 20 TPS logic clock
     private static final double TPS = 20.0;
@@ -37,6 +40,9 @@ public final class TitleScreen implements Screen {
 
     // Real-time frame clock for visuals & accumulator
     private double lastFrameTimeSec = System.nanoTime() * 1e-9;
+    
+    // Splash text animation
+    private double splashAnimationTime = 0.0;
 
     // Layout
     private float titleScale = 3.0f;
@@ -52,6 +58,9 @@ public final class TitleScreen implements Screen {
         
         // Load the MattMC logo texture
         logoTexture = Texture.load("/assets/textures/gui/MattMC.png");
+        
+        // Load random splash text
+        splashText = SplashTextLoader.getRandomSplashText();
 
         glfwSetCursorPosCallback(window.handle(), (h, x, y) -> { mouseXWin = x; mouseYWin = y; });
         glfwSetMouseButtonCallback(window.handle(), (h, button, action, mods) -> {
@@ -98,6 +107,9 @@ public final class TitleScreen implements Screen {
         lastFrameTimeSec = now;
         if (frameDt < 0) frameDt = 0;
         if (frameDt > 0.25) frameDt = 0.25; // clamp huge pauses to keep things sane
+
+        // Update splash text animation time
+        splashAnimationTime += frameDt;
 
         // Panorama rotation is now updated during rendering to prevent jitter
 
@@ -155,9 +167,13 @@ public final class TitleScreen implements Screen {
 
         // 2) switch to orthographic for UI and draw
         setupOrtho();
-        for (var b : buttons) drawButton(b);
+        for (var b : buttons) {
+            ButtonRenderer.drawButton(b);
+            drawTextCentered(b.label, b.x + b.w / 2f, b.y + b.h / 2f, 1.2f, 0xFFFFFF);
+        }
         drawLogo();
-        drawTitle("A blocky sandbox by Matt", subtitleCX, subtitleCY, subtitleScale, 0xB0C4DE);
+        drawTitle(" ", subtitleCX, subtitleCY, subtitleScale, 0xB0C4DE);
+        drawSplashText();
     }
 
 
@@ -171,44 +187,7 @@ public final class TitleScreen implements Screen {
         glLoadIdentity();
     }
 
-    private void drawButton(Button b) {
-        int base = b.hover() ? 0x3A5FCD : 0x2E4A9B;
-        int edge = b.hover() ? 0x6D89E3 : 0x20356B;
 
-        // Shadow
-        setColor(0x000000, 0.35f);
-        fillRect(b.x + 2, b.y + 3, b.w, b.h);
-
-        // Body gradient
-        glBegin(GL_QUADS);
-        setColor(edge, 1f);
-        glVertex2f(b.x, b.y);
-        glVertex2f(b.x + b.w, b.y);
-        setColor(base, 1f);
-        glVertex2f(b.x + b.w, b.y + b.h);
-        glVertex2f(b.x, b.y + b.h);
-        glEnd();
-
-        // Border
-        setColor(0x0B1220, 1f);
-        glBegin(GL_LINE_LOOP);
-        glVertex2f(b.x, b.y);
-        glVertex2f(b.x + b.w, b.y);
-        glVertex2f(b.x + b.w, b.y + b.h);
-        glVertex2f(b.x, b.y + b.h);
-        glEnd();
-
-        drawTextCentered(b.label, b.x + b.w / 2f, b.y + b.h / 2f, 1.2f, 0xFFFFFF);
-    }
-
-    private void fillRect(int x, int y, int w, int h) {
-        glBegin(GL_QUADS);
-        glVertex2f(x, y);
-        glVertex2f(x + w, y);
-        glVertex2f(x + w, y + h);
-        glVertex2f(x, y + h);
-        glEnd();
-    }
 
     private void setColor(int rgb, float a) {
         float r = ((rgb >> 16) & 0xFF) / 255f;
@@ -274,6 +253,55 @@ public final class TitleScreen implements Screen {
         
         glDisable(GL_BLEND);
         glDisable(GL_TEXTURE_2D);
+    }
+
+    private void drawSplashText() {
+        if (splashText == null || splashText.isEmpty()) return;
+        
+        // Position splash text further to the left from the logo
+        // Calculate logo bottom-right position
+        int w = window.width();
+        int h = window.height();
+        float targetWidth = w * 0.6f;
+        float logoScale = targetWidth / logoTexture.width;
+        logoScale = Math.max(0.3f, Math.min(logoScale, 2.0f));
+        
+        float logoWidth = logoTexture.width * logoScale;
+        float logoHeight = logoTexture.height * logoScale;
+        float logoRight = titleCX + logoWidth / 2f;
+        float logoBottom = titleCY + logoHeight / 2f;
+        
+        // Position splash text with offset from logo - moved left by 1/10 screen width and up by 1/10 screen height
+        float splashX = logoRight - 80f - (w * 0.05f); // Left by 1/10 screen width
+        float splashY = logoBottom - 10f - (h * 0.1f); // Up by 1/10 screen height
+        
+        // Calculate animated scale using sine wave with 2 second intervals
+        // Period = 2 seconds, so frequency = 1/2 = 0.5 Hz
+        // Scale oscillates between 1.2 and 1.3 (slightly larger to slightly smaller)
+        float baseScale = 1.65f;
+        float scaleAmplitude = 0.075f; // Oscillates ±0.05 around base (1.25 ± 0.05 = 1.2 to 1.3)
+        float animatedScale = baseScale + scaleAmplitude * (float)Math.sin(splashAnimationTime * 1.5 * Math.PI * 0.5);
+        
+        // Save current matrix state
+        glPushMatrix();
+        
+        // Move to the splash text position
+        glTranslatef(splashX, splashY, 0);
+        
+        // Rotate -30 degrees (top of text faces top-left corner)
+        glRotatef(-20f, 0, 0, 1);
+        
+        // Center the text on the anchor point by offsetting by half the text width
+        float textWidth = TextRenderer.getTextWidth(splashText, animatedScale);
+        float offsetX = -textWidth / 2f;
+        
+        // Draw text centered on the anchor point
+        // Draw in yellow color (0xFFFF00)
+        setColor(0xFFFF00, 1f);
+        TextRenderer.drawText(splashText, offsetX, 0, animatedScale);
+        
+        // Restore matrix state
+        glPopMatrix();
     }
 
     @Override
