@@ -88,7 +88,7 @@ public final class TrueTypeFont implements AutoCloseable {
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
         glBindTexture(GL_TEXTURE_2D, 0);
         
-        logger.info("Loaded TrueType font: {} at {}px", path, fontSize);
+        // logger.info("Loaded TrueType font: {} at {}px", path, fontSize);
         return new TrueTypeFont(fontData, fontInfo, texId, charData, fontSize);
     }
     

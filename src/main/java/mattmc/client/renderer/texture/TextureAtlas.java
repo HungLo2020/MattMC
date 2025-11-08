@@ -61,6 +61,11 @@ public class TextureAtlas {
         // Collect all unique texture paths from registered blocks
         Set<String> uniqueTexturePaths = new HashSet<>();
         for (String identifier : Blocks.getRegisteredIdentifiers()) {
+            // Skip AIR block - it doesn't have a texture
+            if (identifier.equals("mattmc:air")) {
+                continue;
+            }
+            
             Block block = Blocks.getBlock(identifier);
             if (block != null) {
                 Map<String, String> texturePaths = block.getTexturePaths();

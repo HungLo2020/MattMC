@@ -53,6 +53,14 @@ public class KeybindManager {
                     String action = parts[0].trim();
                     String keyName = parts[1].trim();
                     
+                    // Skip non-keybind settings (these are handled by OptionsManager)
+                    if (action.equals("blur_title_screen") || action.equals("blur_menu_screens") ||
+                        action.equals("fps_cap") || action.equals("resolution") ||
+                        action.equals("fullscreen") || action.equals("render_distance") ||
+                        action.equals("mipmaps") || action.equals("anisotropic_filtering")) {
+                        continue;
+                    }
+                    
                     // Try to parse as human-readable key name first
                     Integer keyCode = KeyNameParser.parseKeyName(keyName);
                     
@@ -75,7 +83,7 @@ public class KeybindManager {
                 for (Map.Entry<String, Integer> entry : keybinds.entrySet()) {
                     PlayerInput.getInstance().setKeybind(entry.getKey(), entry.getValue());
                 }
-                logger.info("Loaded {} keybinds from Options.txt", keybinds.size());
+                // logger.info("Loaded {} keybinds from Options.txt", keybinds.size());
             }
         } catch (IOException e) {
             logger.error("Error loading keybinds: {}", e.getMessage());

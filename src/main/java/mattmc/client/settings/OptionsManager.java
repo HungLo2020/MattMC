@@ -175,7 +175,7 @@ public class OptionsManager {
                 }
             }
             
-            logger.info("Loaded options: title blur={}, menu blur={}", titleScreenBlurEnabled, menuScreenBlurEnabled);
+            // logger.info("Loaded options: title blur={}, menu blur={}", titleScreenBlurEnabled, menuScreenBlurEnabled);
         } catch (IOException e) {
             logger.error("Error loading options: {}", e.getMessage());
         }
