@@ -240,12 +240,15 @@ public class UIRenderer {
                     // Calculate position for this slot
                     float slotWidth = (hotbarTexture.width * HOTBAR_SCALE) / 9f;
                     float itemX = hotbarX + (i * slotWidth) + (slotWidth / 2f); // Center item in slot horizontally
-                    // Calculate vertical center of hotbar: hotbarY is top edge, add half height for center
-                    float hotbarCenterY = hotbarY + (hotbarTexture.height * HOTBAR_SCALE / 2f);
-                    float itemY = hotbarCenterY; // Use exact vertical center of hotbar
                     
-                    // Render the item using ItemRenderer (increased size by 20%: 16 * 1.2 = 19.2)
-                    float itemSize = 19.2f;
+                    // Calculate vertical center of the actual slot (not just hotbar texture)
+                    // Hotbar slots have padding/border, so the slot center is slightly below the texture center
+                    float hotbarCenterY = hotbarY + (hotbarTexture.height * HOTBAR_SCALE / 2f);
+                    float slotCenterOffset = 4f; // Additional offset to center in the actual slot area
+                    float itemY = hotbarCenterY + slotCenterOffset;
+                    
+                    // Render the item using ItemRenderer (increased size: 16 * 1.2 * 1.1 = 21.12)
+                    float itemSize = 21.12f;
                     ItemRenderer.renderItem(stack, itemX, itemY, itemSize);
                     
                     // Draw item count in bottom-right of slot if > 1
