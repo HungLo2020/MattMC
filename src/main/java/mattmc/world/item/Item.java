@@ -13,7 +13,7 @@ import java.util.Map;
  * Texture paths are loaded from item model JSON files.
  * If texture loading fails, a fallback magenta color (0xFF00FF) is used.
  */
-public final class Item {
+public class Item {
     // Fallback color used when texture is missing or fails to load
     private static final int FALLBACK_COLOR = 0xFF00FF; // Magenta
     

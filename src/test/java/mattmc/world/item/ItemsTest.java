@@ -1,5 +1,6 @@
 package mattmc.world.item;
 
+import mattmc.world.level.block.Blocks;
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -17,6 +18,11 @@ public class ItemsTest {
         assertNotNull(Items.COAL, "COAL should be registered");
         assertNotNull(Items.IRON_INGOT, "IRON_INGOT should be registered");
         assertNotNull(Items.GOLD_INGOT, "GOLD_INGOT should be registered");
+        
+        // Test block items
+        assertNotNull(Items.STONE, "STONE should be registered");
+        assertNotNull(Items.DIRT, "DIRT should be registered");
+        assertNotNull(Items.GRASS_BLOCK, "GRASS_BLOCK should be registered");
         
         // Test tools
         assertNotNull(Items.WOODEN_PICKAXE, "WOODEN_PICKAXE should be registered");
@@ -151,5 +157,29 @@ public class ItemsTest {
         assertTrue(Items.DIAMOND.isStackable(), "DIAMOND should be stackable");
         assertFalse(Items.WOODEN_PICKAXE.isStackable(), "WOODEN_PICKAXE should not be stackable");
         assertFalse(Items.DIAMOND_AXE.isStackable(), "DIAMOND_AXE should not be stackable");
+    }
+    
+    @Test
+    public void testBlockItemsAreRegistered() {
+        // Test that block items are BlockItem instances
+        assertTrue(Items.STONE instanceof BlockItem, "STONE should be a BlockItem");
+        assertTrue(Items.DIRT instanceof BlockItem, "DIRT should be a BlockItem");
+        assertTrue(Items.GRASS_BLOCK instanceof BlockItem, "GRASS_BLOCK should be a BlockItem");
+        
+        // Test that block items have the correct blocks
+        assertSame(Blocks.STONE, ((BlockItem) Items.STONE).getBlock(), "STONE item should have STONE block");
+        assertSame(Blocks.DIRT, ((BlockItem) Items.DIRT).getBlock(), "DIRT item should have DIRT block");
+        assertSame(Blocks.GRASS_BLOCK, ((BlockItem) Items.GRASS_BLOCK).getBlock(), "GRASS_BLOCK item should have GRASS_BLOCK block");
+    }
+    
+    @Test
+    public void testBlockItemsAreStackable() {
+        assertTrue(Items.STONE.isStackable(), "STONE should be stackable");
+        assertTrue(Items.DIRT.isStackable(), "DIRT should be stackable");
+        assertTrue(Items.GRASS_BLOCK.isStackable(), "GRASS_BLOCK should be stackable");
+        
+        assertEquals(64, Items.STONE.getMaxStackSize(), "STONE should stack to 64");
+        assertEquals(64, Items.DIRT.getMaxStackSize(), "DIRT should stack to 64");
+        assertEquals(64, Items.GRASS_BLOCK.getMaxStackSize(), "GRASS_BLOCK should stack to 64");
     }
 }

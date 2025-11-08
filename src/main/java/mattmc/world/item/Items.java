@@ -1,5 +1,8 @@
 package mattmc.world.item;
 
+import mattmc.world.level.block.Block;
+import mattmc.world.level.block.Blocks;
+
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
@@ -46,6 +49,11 @@ public class Items {
     // Textures are loaded from item model JSON files
     // If texture loading fails, a magenta fallback color is automatically used
     
+    // Block items (placeable blocks, stackable to 64)
+    public static final BlockItem STONE = register("stone", new BlockItem(Blocks.STONE));
+    public static final BlockItem DIRT = register("dirt", new BlockItem(Blocks.DIRT));
+    public static final BlockItem GRASS_BLOCK = register("grass_block", new BlockItem(Blocks.GRASS_BLOCK));
+    
     // Basic materials (stackable, 64 max)
     public static final Item STICK = register("stick", new Item(64));
     public static final Item COAL = register("coal", new Item(64));
@@ -77,7 +85,7 @@ public class Items {
      * @param item The Item instance with properties
      * @return The registered Item with identifier set
      */
-    private static Item register(String name, Item item) {
+    private static <T extends Item> T register(String name, T item) {
         if (name == null) {
             throw new NullPointerException("Item name cannot be null");
         }
@@ -90,7 +98,13 @@ public class Items {
         }
         
         // Create a new item instance with the identifier set
-        Item registeredItem = new Item(item.getMaxStackSize(), identifier);
+        T registeredItem;
+        if (item instanceof BlockItem) {
+            BlockItem blockItem = (BlockItem) item;
+            registeredItem = (T) new BlockItem(blockItem.getBlock(), item.getMaxStackSize(), identifier);
+        } else {
+            registeredItem = (T) new Item(item.getMaxStackSize(), identifier);
+        }
         REGISTRY.put(identifier, registeredItem);
         return registeredItem;
     }
@@ -105,7 +119,7 @@ public class Items {
      * @throws IllegalArgumentException if identifier is already registered
      * @throws NullPointerException if identifier or item is null
      */
-    public static Item registerItem(String identifier, Item item) {
+    public static <T extends Item> T registerItem(String identifier, T item) {
         if (identifier == null) {
             throw new NullPointerException("Item identifier cannot be null");
         }
@@ -117,7 +131,13 @@ public class Items {
         }
         
         // Create a new item instance with the identifier set
-        Item registeredItem = new Item(item.getMaxStackSize(), identifier);
+        T registeredItem;
+        if (item instanceof BlockItem) {
+            BlockItem blockItem = (BlockItem) item;
+            registeredItem = (T) new BlockItem(blockItem.getBlock(), item.getMaxStackSize(), identifier);
+        } else {
+            registeredItem = (T) new Item(item.getMaxStackSize(), identifier);
+        }
         REGISTRY.put(identifier, registeredItem);
         return registeredItem;
     }
