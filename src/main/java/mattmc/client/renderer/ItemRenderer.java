@@ -107,11 +107,11 @@ public class ItemRenderer {
                 tex.bind();
                 glColor4f(0.6f, 0.6f, 0.6f, 1.0f);
                 glBegin(GL_QUADS);
-                // Right face as parallelogram
-                glTexCoord2f(0, 0); glVertex2f(x, y - yOffset);                          // Top center
-                glTexCoord2f(1, 0); glVertex2f(x + xOffset, y);                          // Top right
-                glTexCoord2f(1, 1); glVertex2f(x + xOffset, y + faceHeight);            // Bottom right
-                glTexCoord2f(0, 1); glVertex2f(x, y + faceHeight - yOffset);            // Bottom center
+                // Right face as parallelogram - texture coords flipped vertically
+                glTexCoord2f(0, 1); glVertex2f(x, y - yOffset);                          // Top center
+                glTexCoord2f(1, 1); glVertex2f(x + xOffset, y);                          // Top right
+                glTexCoord2f(1, 0); glVertex2f(x + xOffset, y + faceHeight);            // Bottom right
+                glTexCoord2f(0, 0); glVertex2f(x, y + faceHeight - yOffset);            // Bottom center
                 glEnd();
             }
         }
@@ -123,11 +123,11 @@ public class ItemRenderer {
                 tex.bind();
                 glColor4f(0.8f, 0.8f, 0.8f, 1.0f);
                 glBegin(GL_QUADS);
-                // Left face as parallelogram
-                glTexCoord2f(0, 0); glVertex2f(x - xOffset, y);                          // Top left
-                glTexCoord2f(1, 0); glVertex2f(x, y - yOffset);                          // Top center
-                glTexCoord2f(1, 1); glVertex2f(x, y + faceHeight - yOffset);            // Bottom center
-                glTexCoord2f(0, 1); glVertex2f(x - xOffset, y + faceHeight);            // Bottom left
+                // Left face as parallelogram - texture coords flipped vertically
+                glTexCoord2f(0, 1); glVertex2f(x - xOffset, y);                          // Top left
+                glTexCoord2f(1, 1); glVertex2f(x, y - yOffset);                          // Top center
+                glTexCoord2f(1, 0); glVertex2f(x, y + faceHeight - yOffset);            // Bottom center
+                glTexCoord2f(0, 0); glVertex2f(x - xOffset, y + faceHeight);            // Bottom left
                 glEnd();
             }
         }
@@ -139,11 +139,11 @@ public class ItemRenderer {
                 tex.bind();
                 glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
                 glBegin(GL_QUADS);
-                // Top face as diamond/rhombus
-                glTexCoord2f(0, 0); glVertex2f(x, y - yOffset - faceHeight);            // Top
-                glTexCoord2f(1, 0); glVertex2f(x + xOffset, y - faceHeight);            // Right
-                glTexCoord2f(1, 1); glVertex2f(x, y - yOffset);                          // Bottom
-                glTexCoord2f(0, 1); glVertex2f(x - xOffset, y - faceHeight);            // Left
+                // Top face as diamond/rhombus - texture coords flipped vertically
+                glTexCoord2f(0, 1); glVertex2f(x, y - yOffset - faceHeight);            // Top
+                glTexCoord2f(1, 1); glVertex2f(x + xOffset, y - faceHeight);            // Right
+                glTexCoord2f(1, 0); glVertex2f(x, y - yOffset);                          // Bottom
+                glTexCoord2f(0, 0); glVertex2f(x - xOffset, y - faceHeight);            // Left
                 glEnd();
             }
         }
