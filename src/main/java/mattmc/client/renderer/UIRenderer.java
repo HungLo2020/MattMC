@@ -242,9 +242,9 @@ public class UIRenderer {
                     float itemX = hotbarX + (i * slotWidth) + (slotWidth / 2f); // Center item in slot horizontally
                     
                     // Calculate vertical center of the actual slot (not just hotbar texture)
-                    // Hotbar slots have padding/border, so the slot center is slightly below the texture center
+                    // Hotbar slots have padding/border, so the slot center is below the texture center
                     float hotbarCenterY = hotbarY + (hotbarTexture.height * HOTBAR_SCALE / 2f);
-                    float slotCenterOffset = 4f; // Additional offset to center in the actual slot area
+                    float slotCenterOffset = 12f; // Offset to center in the actual slot area
                     float itemY = hotbarCenterY + slotCenterOffset;
                     
                     // Render the item using ItemRenderer (increased size: 16 * 1.2 * 1.1 = 21.12)
