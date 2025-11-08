@@ -146,8 +146,12 @@ public class UIRenderer {
     
     /**
      * Draw hotbar at the bottom center of the screen.
+     * 
+     * @param screenWidth Screen width
+     * @param screenHeight Screen height
+     * @param player The player whose inventory to display
      */
-    public void drawHotbar(int screenWidth, int screenHeight) {
+    public void drawHotbar(int screenWidth, int screenHeight, mattmc.world.entity.player.LocalPlayer player) {
         // Load hotbar texture if not already loaded
         if (hotbarTexture == null) {
             hotbarTexture = Texture.load("/assets/textures/gui/sprites/hud/hotbar.png");
@@ -220,6 +224,45 @@ public class UIRenderer {
             glEnd();
             
             glDisable(GL_TEXTURE_2D);
+        }
+        
+        // Draw items in hotbar slots
+        if (player != null && player.getInventory() != null) {
+            mattmc.world.item.Inventory inventory = player.getInventory();
+            
+            // Synchronize selected slot between UIRenderer and player inventory
+            selectedHotbarSlot = inventory.getSelectedSlot();
+            
+            // Draw each item in the hotbar (slots 0-8)
+            for (int i = 0; i < 9; i++) {
+                mattmc.world.item.ItemStack stack = inventory.getStack(i);
+                if (stack != null && stack.getItem() != null) {
+                    // Calculate position for this slot
+                    float slotWidth = (hotbarTexture.width * HOTBAR_SCALE) / 9f;
+                    float itemX = hotbarX + (i * slotWidth) + (slotWidth / 2f) - 8; // Center item in slot
+                    float itemY = hotbarY + (hotbarTexture.height * HOTBAR_SCALE / 2f) - 8; // Center vertically
+                    
+                    // Draw item count in bottom-right of slot if > 1
+                    if (stack.getCount() > 1) {
+                        String countText = String.valueOf(stack.getCount());
+                        float countX = hotbarX + ((i + 1) * slotWidth) - 20; // Bottom-right corner
+                        float countY = hotbarY + (hotbarTexture.height * HOTBAR_SCALE) - 15;
+                        drawText(countText, countX, countY, 1.0f, 0xFFFFFF);
+                    }
+                    
+                    // Draw item identifier for debugging (temporary - will be replaced with item textures later)
+                    String itemId = stack.getItem().getIdentifier();
+                    if (itemId != null) {
+                        // Extract just the item name from "namespace:name"
+                        String itemName = itemId.contains(":") ? itemId.substring(itemId.indexOf(':') + 1) : itemId;
+                        // Abbreviate long names
+                        if (itemName.length() > 4) {
+                            itemName = itemName.substring(0, 4);
+                        }
+                        drawText(itemName, itemX, itemY, 0.8f, 0xFFFFFF);
+                    }
+                }
+            }
         }
         
         glDisable(GL_BLEND);

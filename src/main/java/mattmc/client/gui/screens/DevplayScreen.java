@@ -226,8 +226,9 @@ public final class DevplayScreen implements Screen {
                     for (int i = 0; i < hotbarActions.length; i++) {
                         Integer hotbarKey = input.getKeybind(hotbarActions[i]);
                         if (hotbarKey != null && key == hotbarKey) {
-                            // Select hotbar slot (0-indexed)
+                            // Select hotbar slot (0-indexed) - sync both UIRenderer and player inventory
                             uiRenderer.setSelectedHotbarSlot(i);
+                            player.getInventory().setSelectedSlot(i);
                             break;
                         }
                     }
@@ -250,6 +251,14 @@ public final class DevplayScreen implements Screen {
                     blockInteraction.breakBlock();
                 } else if (button == GLFW_MOUSE_BUTTON_RIGHT) {
                     blockInteraction.placeBlock(Blocks.STONE);
+                } else if (button == GLFW_MOUSE_BUTTON_MIDDLE) {
+                    // Pick block - raycast and add to inventory
+                    boolean success = blockInteraction.pickBlock();
+                    if (success) {
+                        System.out.println("DEBUG: Successfully picked block and added to inventory");
+                    } else {
+                        System.out.println("DEBUG: Failed to pick block");
+                    }
                 }
             }
         });
@@ -557,7 +566,7 @@ public final class DevplayScreen implements Screen {
         }
         
         // Draw hotbar at bottom center (always visible)
-        uiRenderer.drawHotbar(w, h);
+        uiRenderer.drawHotbar(w, h, player);
         
         // Draw crosshair on top of everything (but not when command overlay is open)
         if (!commandOverlayVisible) {

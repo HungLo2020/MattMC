@@ -2,6 +2,7 @@ package mattmc.world.entity.player;
 
 
 import mattmc.client.Minecraft;
+import mattmc.world.item.Inventory;
 /**
  * Represents the player in the game world.
  * Similar to Minecraft's EntityPlayer class.
@@ -39,6 +40,9 @@ public class LocalPlayer {
     // Physics reference (set externally)
     private PlayerPhysics physics;
     
+    // Player inventory
+    private final Inventory inventory;
+    
     public LocalPlayer(float x, float y, float z) {
         this.x = x;
         this.y = y;
@@ -50,6 +54,7 @@ public class LocalPlayer {
         this.pitch = 0f;
         this.prevYaw = 0f;
         this.prevPitch = 0f;
+        this.inventory = new Inventory();
     }
     
     /**
@@ -225,4 +230,11 @@ public class LocalPlayer {
     public void setMoveSpeed(float speed) { this.moveSpeed = speed; }
     public void setPhysics(PlayerPhysics physics) { this.physics = physics; }
     public PlayerPhysics getPhysics() { return physics; }
+    
+    /**
+     * Get the player's inventory.
+     * 
+     * @return The inventory
+     */
+    public Inventory getInventory() { return inventory; }
 }
