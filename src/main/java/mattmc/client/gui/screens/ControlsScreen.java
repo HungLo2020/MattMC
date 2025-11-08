@@ -57,6 +57,7 @@ public final class ControlsScreen implements Screen {
         {PlayerInput.BREAK_BLOCK, "Break Block"},
         {PlayerInput.PLACE_BLOCK, "Place Block"},
         {PlayerInput.OPEN_COMMAND, "Open Command"},
+        {PlayerInput.DELETE_ITEM, "Delete Item"},
         {PlayerInput.HOTBAR_1, "Hotbar Slot 1"},
         {PlayerInput.HOTBAR_2, "Hotbar Slot 2"},
         {PlayerInput.HOTBAR_3, "Hotbar Slot 3"},

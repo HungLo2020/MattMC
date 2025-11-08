@@ -28,6 +28,7 @@ public final class KeyNameParser {
         if (keyName.equals("enter")) return GLFW_KEY_ENTER;
         if (keyName.equals("tab")) return GLFW_KEY_TAB;
         if (keyName.equals("backspace")) return GLFW_KEY_BACKSPACE;
+        if (keyName.equals("delete")) return GLFW_KEY_DELETE;
         if (keyName.equals("escape")) return GLFW_KEY_ESCAPE;
         if (keyName.equals("left_shift")) return GLFW_KEY_LEFT_SHIFT;
         if (keyName.equals("right_shift")) return GLFW_KEY_RIGHT_SHIFT;
@@ -85,6 +86,7 @@ public final class KeyNameParser {
         if (keyCode == GLFW_KEY_ENTER) return "enter";
         if (keyCode == GLFW_KEY_TAB) return "tab";
         if (keyCode == GLFW_KEY_BACKSPACE) return "backspace";
+        if (keyCode == GLFW_KEY_DELETE) return "delete";
         if (keyCode == GLFW_KEY_ESCAPE) return "escape";
         if (keyCode == GLFW_KEY_LEFT_SHIFT) return "left_shift";
         if (keyCode == GLFW_KEY_RIGHT_SHIFT) return "right_shift";
