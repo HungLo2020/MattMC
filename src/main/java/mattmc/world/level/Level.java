@@ -176,6 +176,10 @@ public class Level implements LevelAccessor {
                 asyncLoader.setRegionCache(regionCache);
             } catch (IOException e) {
                 logger.error("Failed to initialize region cache: {}", e.getMessage(), e);
+                // Reset to null to maintain consistency - saves won't work
+                this.worldDirectory = null;
+                this.asyncLoader.setWorldDirectory(null);
+                throw new RuntimeException("Failed to initialize world save directory", e);
             }
         }
     }
@@ -486,9 +490,35 @@ public class Level implements LevelAccessor {
      * Call this when closing the world.
      */
     public void shutdown() {
+        logger.info("Shutting down level...");
+        
+        // Save all loaded chunks before shutting down the async saver
+        // Collect exceptions but continue trying to save all chunks
+        int savedCount = 0;
+        int failedCount = 0;
+        for (LevelChunk chunk : loadedChunks.values()) {
+            try {
+                if (worldDirectory != null && asyncSaver != null) {
+                    Map<String, Object> chunkNBT = ChunkNBT.toNBT(chunk);
+                    asyncSaver.saveChunkAsync(chunk.chunkX(), chunk.chunkZ(), chunkNBT);
+                    savedCount++;
+                }
+            } catch (Exception e) {
+                logger.error("Error saving chunk ({}, {}) during shutdown: {}", 
+                           chunk.chunkX(), chunk.chunkZ(), e.getMessage(), e);
+                failedCount++;
+            }
+        }
+        
+        logger.info("Queued {} chunks for saving ({} failed)", savedCount, failedCount);
+        
         // Flush any pending chunk saves
         if (asyncSaver != null) {
-            asyncSaver.shutdown();
+            try {
+                asyncSaver.shutdown();
+            } catch (Exception e) {
+                logger.error("Error shutting down async saver: {}", e.getMessage(), e);
+            }
         }
         
         // Close region cache
@@ -500,6 +530,13 @@ public class Level implements LevelAccessor {
             }
         }
         
-        asyncLoader.shutdown();
+        // Shutdown async loader
+        try {
+            asyncLoader.shutdown();
+        } catch (Exception e) {
+            logger.error("Error shutting down async loader: {}", e.getMessage(), e);
+        }
+        
+        logger.info("Level shutdown complete");
     }
 }

@@ -27,8 +27,9 @@ import org.slf4j.LoggerFactory;
  * enabling VBO rendering with multiple textures.
  * 
  * Similar to modern Minecraft's texture atlas system.
+ * Implements AutoCloseable to ensure OpenGL resources are properly released.
  */
-public class TextureAtlas {
+public class TextureAtlas implements AutoCloseable {
     private static final Logger logger = LoggerFactory.getLogger(TextureAtlas.class);
 
     private final int atlasTextureId;
@@ -239,7 +240,18 @@ public class TextureAtlas {
     
     /**
      * Clean up GPU resources.
+     * Implements AutoCloseable.close() for proper resource management.
      */
+    @Override
+    public void close() {
+        cleanup();
+    }
+    
+    /**
+     * Clean up GPU resources.
+     * @deprecated Use close() instead for AutoCloseable pattern
+     */
+    @Deprecated
     public void cleanup() {
         glDeleteTextures(atlasTextureId);
     }

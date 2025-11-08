@@ -27,9 +27,7 @@ public final class Main {
         } catch (Exception e) {
             // Hard fail if we can't make the data directory
             logger.error("Failed to create data directory: {}", e);
-            e.printStackTrace();
-            System.exit(1);
-            return;
+            throw new RuntimeException("Failed to create data directory", e);
         }
 
         // Load keybinds from Options.txt

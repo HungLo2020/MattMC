@@ -37,6 +37,7 @@ public class RegionFile implements AutoCloseable {
     // Set to null when close() is called to release resources.
     private RandomAccessFile file;
     private boolean headerDirty = false;
+    private boolean closed = false;
     
     public RegionFile(Path filePath, int regionX, int regionZ) throws IOException {
         this.filePath = filePath;
@@ -127,6 +128,9 @@ public class RegionFile implements AutoCloseable {
      * Read chunk NBT data from the region file.
      */
     public synchronized Map<String, Object> readChunk(int chunkX, int chunkZ) throws IOException {
+        if (closed) {
+            throw new IllegalStateException("Cannot read from closed RegionFile");
+        }
         int index = getChunkIndex(chunkX, chunkZ);
         int location = locations[index];
         
@@ -170,6 +174,9 @@ public class RegionFile implements AutoCloseable {
      * Write chunk NBT data to the region file.
      */
     public synchronized void writeChunk(int chunkX, int chunkZ, Map<String, Object> chunkData) throws IOException {
+        if (closed) {
+            throw new IllegalStateException("Cannot write to closed RegionFile");
+        }
         int index = getChunkIndex(chunkX, chunkZ);
         
         // Serialize and compress chunk data
@@ -284,6 +291,9 @@ public class RegionFile implements AutoCloseable {
      * Flush any pending writes to disk.
      */
     public synchronized void flush() throws IOException {
+        if (closed) {
+            return; // Already closed, nothing to flush
+        }
         if (headerDirty) {
             saveHeader();
         }
@@ -314,6 +324,10 @@ public class RegionFile implements AutoCloseable {
     
     @Override
     public synchronized void close() throws IOException {
+        if (closed) {
+            return; // Already closed
+        }
+        closed = true;
         if (file != null) {
             // Flush header if dirty before closing
             if (headerDirty) {
