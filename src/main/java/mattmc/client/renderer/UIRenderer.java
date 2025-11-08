@@ -214,7 +214,7 @@ public class UIRenderer {
             // Center the selection overlay on the slot by offsetting by half the difference
             float centerOffset = (selectionWidth - slotWidth) / 2f;
             float selectionX = hotbarX + (selectedHotbarSlot * slotWidth) - centerOffset;
-            float selectionY = hotbarY - 1; // Move up by 1 pixel
+            float selectionY = hotbarY - (1 * HOTBAR_SCALE); // Move up by 1 PNG pixel (3 screen pixels due to 3x scale)
             
             glBegin(GL_QUADS);
             glTexCoord2f(0, 1); glVertex2f(selectionX, selectionY);
