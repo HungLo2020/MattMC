@@ -616,6 +616,14 @@ public final class DevplayScreen implements Screen {
     }
     
     /**
+     * Get the local player.
+     * @return The player instance
+     */
+    public LocalPlayer getPlayer() {
+        return player;
+    }
+    
+    /**
      * Sync player previous position to current position.
      * Called by overlay screens (pause, inventory) to prevent flickering during interpolation.
      */
