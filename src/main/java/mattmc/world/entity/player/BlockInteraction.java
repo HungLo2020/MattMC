@@ -2,6 +2,9 @@ package mattmc.world.entity.player;
 
 import mattmc.client.Minecraft;
 
+import mattmc.world.item.BlockItem;
+import mattmc.world.item.ItemStack;
+import mattmc.world.item.Items;
 import mattmc.world.level.block.Block;
 import mattmc.world.level.block.Blocks;
 import mattmc.world.level.chunk.LevelChunk;
@@ -54,6 +57,49 @@ public class BlockInteraction {
      */
     public BlockHitResult getTargetedBlock() {
         return raycastBlock();
+    }
+    
+    /**
+     * Pick the block the player is looking at and add it to their inventory.
+     * Similar to Minecraft's middle-click pick block functionality.
+     * Adds the block to the first empty slot, starting with the hotbar.
+     * 
+     * @return true if a block was picked successfully
+     */
+    public boolean pickBlock() {
+        BlockHitResult hit = raycastBlock();
+        if (hit == null) {
+            return false;
+        }
+        
+        Block block = world.getBlock(hit.x, hit.y, hit.z);
+        if (block == null || block.isAir()) {
+            return false;
+        }
+        
+        // Find the corresponding BlockItem for this block
+        String blockId = block.getIdentifier();
+        if (blockId == null) {
+            return false;
+        }
+        
+        // Try to get the item with the same identifier
+        BlockItem blockItem = null;
+        if (blockId.equals("mattmc:stone")) {
+            blockItem = Items.STONE;
+        } else if (blockId.equals("mattmc:dirt")) {
+            blockItem = Items.DIRT;
+        } else if (blockId.equals("mattmc:grass_block")) {
+            blockItem = Items.GRASS_BLOCK;
+        }
+        
+        if (blockItem == null) {
+            return false; // No corresponding item for this block
+        }
+        
+        // Add the item to the player's inventory
+        ItemStack stack = new ItemStack(blockItem, 1);
+        return player.getInventory().addItem(stack);
     }
     
     /**

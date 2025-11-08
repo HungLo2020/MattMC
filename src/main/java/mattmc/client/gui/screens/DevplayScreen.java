@@ -250,6 +250,9 @@ public final class DevplayScreen implements Screen {
                     blockInteraction.breakBlock();
                 } else if (button == GLFW_MOUSE_BUTTON_RIGHT) {
                     blockInteraction.placeBlock(Blocks.STONE);
+                } else if (button == GLFW_MOUSE_BUTTON_MIDDLE) {
+                    // Pick block - raycast and add to inventory
+                    blockInteraction.pickBlock();
                 }
             }
         });
