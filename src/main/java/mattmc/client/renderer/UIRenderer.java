@@ -214,7 +214,7 @@ public class UIRenderer {
             // Center the selection overlay on the slot by offsetting by half the difference
             float centerOffset = (selectionWidth - slotWidth) / 2f;
             float selectionX = hotbarX + (selectedHotbarSlot * slotWidth) - centerOffset;
-            float selectionY = hotbarY;
+            float selectionY = hotbarY - 1; // Move up by 1 pixel
             
             glBegin(GL_QUADS);
             glTexCoord2f(0, 1); glVertex2f(selectionX, selectionY);
@@ -239,8 +239,12 @@ public class UIRenderer {
                 if (stack != null && stack.getItem() != null) {
                     // Calculate position for this slot
                     float slotWidth = (hotbarTexture.width * HOTBAR_SCALE) / 9f;
-                    float itemX = hotbarX + (i * slotWidth) + (slotWidth / 2f) - 8; // Center item in slot
-                    float itemY = hotbarY + (hotbarTexture.height * HOTBAR_SCALE / 2f) - 8; // Center vertically
+                    float itemX = hotbarX + (i * slotWidth) + (slotWidth / 2f); // Center item in slot
+                    float itemY = hotbarY + (hotbarTexture.height * HOTBAR_SCALE / 2f); // Center vertically
+                    
+                    // Render the item using ItemRenderer
+                    float itemSize = 16f; // Standard Minecraft item size in GUI
+                    ItemRenderer.renderItem(stack, itemX, itemY, itemSize);
                     
                     // Draw item count in bottom-right of slot if > 1
                     if (stack.getCount() > 1) {
@@ -248,18 +252,6 @@ public class UIRenderer {
                         float countX = hotbarX + ((i + 1) * slotWidth) - 20; // Bottom-right corner
                         float countY = hotbarY + (hotbarTexture.height * HOTBAR_SCALE) - 15;
                         drawText(countText, countX, countY, 1.0f, 0xFFFFFF);
-                    }
-                    
-                    // Draw item identifier for debugging (temporary - will be replaced with item textures later)
-                    String itemId = stack.getItem().getIdentifier();
-                    if (itemId != null) {
-                        // Extract just the item name from "namespace:name"
-                        String itemName = itemId.contains(":") ? itemId.substring(itemId.indexOf(':') + 1) : itemId;
-                        // Abbreviate long names
-                        if (itemName.length() > 4) {
-                            itemName = itemName.substring(0, 4);
-                        }
-                        drawText(itemName, itemX, itemY, 0.8f, 0xFFFFFF);
                     }
                 }
             }

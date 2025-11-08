@@ -217,6 +217,9 @@ public final class InventoryScreen implements Screen {
             
             // Draw slot highlight if mouse is over a slot
             drawSlotHighlight(x, y, scale);
+            
+            // Draw items in inventory slots
+            drawInventoryItems(x, y, scale);
         }
         
         glDisable(GL_BLEND);
@@ -262,6 +265,57 @@ public final class InventoryScreen implements Screen {
                 glEnd();
                 
                 break; // Only highlight one slot at a time
+            }
+        }
+    }
+    
+    /**
+     * Draws items in all inventory slots.
+     * This includes the hotbar (slots 0-8) and main inventory (slots 9-35).
+     */
+    private void drawInventoryItems(float guiX, float guiY, float scale) {
+        mattmc.world.entity.player.LocalPlayer player = gameScreen.getPlayer();
+        if (player == null || player.getInventory() == null) {
+            return;
+        }
+        
+        mattmc.world.item.Inventory inventory = player.getInventory();
+        
+        // Standard Minecraft slot size in GUI
+        float itemSize = 16f;
+        
+        // Draw items in hotbar (slots 0-8, at the bottom of the inventory GUI)
+        float hotbarX = 8f;
+        float hotbarY = 142f;
+        for (int i = 0; i < 9; i++) {
+            mattmc.world.item.ItemStack stack = inventory.getStack(i);
+            if (stack != null && stack.getItem() != null) {
+                // Calculate screen position for this slot
+                float slotCenterX = guiX + (hotbarX + i * 18f + 8f) * scale;
+                float slotCenterY = guiY + (hotbarY + 8f) * scale;
+                
+                // Render the item
+                mattmc.client.renderer.ItemRenderer.renderItem(stack, slotCenterX, slotCenterY, itemSize);
+            }
+        }
+        
+        // Draw items in main inventory (slots 9-35, 3 rows x 9 columns above hotbar)
+        float invX = 8f;
+        float invY = 84f;
+        for (int slot = 9; slot < 36; slot++) {
+            mattmc.world.item.ItemStack stack = inventory.getStack(slot);
+            if (stack != null && stack.getItem() != null) {
+                // Calculate row and column in main inventory
+                int invIndex = slot - 9; // 0-26
+                int row = invIndex / 9;
+                int col = invIndex % 9;
+                
+                // Calculate screen position for this slot
+                float slotCenterX = guiX + (invX + col * 18f + 8f) * scale;
+                float slotCenterY = guiY + (invY + row * 18f + 8f) * scale;
+                
+                // Render the item
+                mattmc.client.renderer.ItemRenderer.renderItem(stack, slotCenterX, slotCenterY, itemSize);
             }
         }
     }
