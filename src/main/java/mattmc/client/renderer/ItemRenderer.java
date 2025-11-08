@@ -26,7 +26,7 @@ public class ItemRenderer {
     
     /**
      * Render an item at the specified screen position.
-     * This renders items as 2D sprites within the existing 2D projection.
+     * Renders block items as orthographic 3D cubes (isometric view).
      * 
      * @param stack The item stack to render
      * @param x Screen X position (center of item)
@@ -54,14 +54,126 @@ public class ItemRenderer {
             return;
         }
         
-        // For now, render all items as 2D flat textures
-        // Use the "all" texture for cube_all blocks, or "top" texture for multi-textured blocks
-        String texturePath = getMainTexture(texturePaths);
-        if (texturePath != null) {
-            renderTextureAsFlat(texturePath, x, y, size);
+        // Check if this is a block item (has block textures)
+        boolean isBlockItem = texturePaths.containsKey("all") || texturePaths.containsKey("top") || 
+                              texturePaths.containsKey("side") || texturePaths.containsKey("bottom");
+        
+        if (isBlockItem) {
+            // Render as isometric 3D cube
+            renderIsometricCube(texturePaths, x, y, size);
         } else {
-            renderFallbackItem(x, y, size);
+            // Render as flat 2D icon (for non-block items)
+            String texturePath = texturePaths.get("layer0");
+            if (texturePath == null) {
+                texturePath = texturePaths.values().iterator().next();
+            }
+            if (texturePath != null) {
+                renderTextureAsFlat(texturePath, x, y, size);
+            } else {
+                renderFallbackItem(x, y, size);
+            }
         }
+    }
+    
+    /**
+     * Render an isometric cube showing three faces (top, front-right, and right).
+     * This creates an orthographic 3D view of a block item.
+     */
+    private static void renderIsometricCube(Map<String, String> texturePaths, float x, float y, float size) {
+        // Get textures for each face
+        String topTexture = getTextureForFace(texturePaths, "top");
+        String sideTexture = getTextureForFace(texturePaths, "side");
+        
+        // Save GL state
+        boolean textureWasEnabled = glIsEnabled(GL_TEXTURE_2D);
+        glEnable(GL_TEXTURE_2D);
+        
+        // Define the isometric cube dimensions
+        // Using a 2:1 pixel ratio for isometric projection (standard in Minecraft)
+        float cubeSize = size * 0.85f; // Slightly smaller to fit nicely in the slot
+        float faceWidth = cubeSize * 0.5f;  // Half width for each face
+        float faceHeight = cubeSize * 0.5f; // Half height for each face
+        
+        // Isometric angle offsets (26.565 degrees for true isometric, but we'll use simpler values)
+        float xOffset = faceWidth * 0.866f;  // cos(30°) ≈ 0.866
+        float yOffset = faceHeight * 0.5f;   // sin(30°) = 0.5
+        
+        // Draw the three visible faces in back-to-front order for proper layering
+        
+        // 1. Right face (darkest - 60% brightness)
+        if (sideTexture != null) {
+            Texture tex = loadTexture(sideTexture);
+            if (tex != null) {
+                tex.bind();
+                glColor4f(0.6f, 0.6f, 0.6f, 1.0f);
+                glBegin(GL_QUADS);
+                // Right face as parallelogram
+                glTexCoord2f(0, 0); glVertex2f(x, y - yOffset);                          // Top center
+                glTexCoord2f(1, 0); glVertex2f(x + xOffset, y);                          // Top right
+                glTexCoord2f(1, 1); glVertex2f(x + xOffset, y + faceHeight);            // Bottom right
+                glTexCoord2f(0, 1); glVertex2f(x, y + faceHeight - yOffset);            // Bottom center
+                glEnd();
+            }
+        }
+        
+        // 2. Front-left face (medium - 80% brightness)
+        if (sideTexture != null) {
+            Texture tex = loadTexture(sideTexture);
+            if (tex != null) {
+                tex.bind();
+                glColor4f(0.8f, 0.8f, 0.8f, 1.0f);
+                glBegin(GL_QUADS);
+                // Left face as parallelogram
+                glTexCoord2f(0, 0); glVertex2f(x - xOffset, y);                          // Top left
+                glTexCoord2f(1, 0); glVertex2f(x, y - yOffset);                          // Top center
+                glTexCoord2f(1, 1); glVertex2f(x, y + faceHeight - yOffset);            // Bottom center
+                glTexCoord2f(0, 1); glVertex2f(x - xOffset, y + faceHeight);            // Bottom left
+                glEnd();
+            }
+        }
+        
+        // 3. Top face (brightest - 100% brightness)
+        if (topTexture != null) {
+            Texture tex = loadTexture(topTexture);
+            if (tex != null) {
+                tex.bind();
+                glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
+                glBegin(GL_QUADS);
+                // Top face as diamond/rhombus
+                glTexCoord2f(0, 0); glVertex2f(x, y - yOffset - faceHeight);            // Top
+                glTexCoord2f(1, 0); glVertex2f(x + xOffset, y - faceHeight);            // Right
+                glTexCoord2f(1, 1); glVertex2f(x, y - yOffset);                          // Bottom
+                glTexCoord2f(0, 1); glVertex2f(x - xOffset, y - faceHeight);            // Left
+                glEnd();
+            }
+        }
+        
+        // Restore GL state
+        if (!textureWasEnabled) {
+            glDisable(GL_TEXTURE_2D);
+        }
+        glColor4f(1f, 1f, 1f, 1f); // Reset color
+    }
+    
+    /**
+     * Get the texture for a specific face of a block.
+     * Falls back to "all" texture if specific face not found.
+     */
+    private static String getTextureForFace(Map<String, String> texturePaths, String faceKey) {
+        // Try specific face first
+        String texture = texturePaths.get(faceKey);
+        if (texture != null) {
+            return texture;
+        }
+        
+        // Fall back to "all" texture (for cube_all blocks)
+        texture = texturePaths.get("all");
+        if (texture != null) {
+            return texture;
+        }
+        
+        // Fall back to any available texture
+        return texturePaths.values().isEmpty() ? null : texturePaths.values().iterator().next();
     }
     
     /**
