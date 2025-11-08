@@ -199,6 +199,8 @@ public class ResourceManager {
                     BlockModel resolved = new BlockModel();
                     resolved.setParent(blockModel.getParent());
                     resolved.setTextures(mergedTextures);
+                    // Preserve tints from item model
+                    resolved.setTints(itemModel.getTints());
                     return resolved;
                 }
             }

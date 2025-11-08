@@ -59,8 +59,10 @@ public class ItemRenderer {
                               texturePaths.containsKey("side") || texturePaths.containsKey("bottom");
         
         if (isBlockItem) {
+            // Get the item model to check for tints
+            mattmc.client.resources.model.BlockModel itemModel = ResourceManager.resolveItemModel(itemName);
             // Render as isometric 3D cube
-            renderIsometricCube(texturePaths, x, y, size);
+            renderIsometricCube(texturePaths, itemModel, x, y, size);
         } else {
             // Render as flat 2D icon (for non-block items)
             String texturePath = texturePaths.get("layer0");
@@ -79,10 +81,17 @@ public class ItemRenderer {
      * Render an isometric cube showing three faces (top, left, and right).
      * This creates an orthographic 3D view of a block item matching Minecraft's style.
      */
-    private static void renderIsometricCube(Map<String, String> texturePaths, float x, float y, float size) {
+    private static void renderIsometricCube(Map<String, String> texturePaths, mattmc.client.resources.model.BlockModel itemModel, float x, float y, float size) {
         // Get textures for each face
         String topTexture = getTextureForFace(texturePaths, "top");
         String sideTexture = getTextureForFace(texturePaths, "side");
+        
+        // Check if there are tints and get the tint color for the top face
+        int topTintColor = 0xFFFFFF; // Default: no tint (white)
+        if (itemModel != null && itemModel.getTints() != null && !itemModel.getTints().isEmpty()) {
+            // Get the first tint (grass blocks typically have one tint)
+            topTintColor = itemModel.getTints().get(0).getTintColor();
+        }
         
         // Save GL state
         boolean textureWasEnabled = glIsEnabled(GL_TEXTURE_2D);
@@ -131,12 +140,16 @@ public class ItemRenderer {
             }
         }
         
-        // 3. Top face (brightest - 100%)
+        // 3. Top face (brightest - 100% with tint applied)
         if (topTexture != null) {
             Texture tex = loadTexture(topTexture);
             if (tex != null) {
                 tex.bind();
-                glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
+                // Apply tint color to the top face
+                float r = ((topTintColor >> 16) & 0xFF) / 255.0f;
+                float g = ((topTintColor >> 8) & 0xFF) / 255.0f;
+                float b = (topTintColor & 0xFF) / 255.0f;
+                glColor4f(r, g, b, 1.0f);
                 glBegin(GL_QUADS);
                 // Top face as diamond - connects the tops of the two side faces
                 glTexCoord2f(0, 0); glVertex2f(x, y - isoHeight);                         // Near (bottom of diamond)
