@@ -6,6 +6,7 @@ import mattmc.client.renderer.BlurEffect;
 import mattmc.client.renderer.BlurRenderer;
 import mattmc.client.renderer.texture.Texture;
 import mattmc.world.entity.player.PlayerInput;
+import mattmc.world.item.ItemStack;
 import org.lwjgl.system.MemoryStack;
 
 import java.nio.IntBuffer;
@@ -293,12 +294,14 @@ public final class InventoryScreen implements Screen {
                     mattmc.world.item.ItemStack temp = slotItem;
                     inventory.setStack(slotIndex, heldItem);
                     heldItem = temp;
+                    heldItemSourceSlot = -1; // Source slot no longer valid after swap
                 }
             } else {
                 // Different item type - swap
                 mattmc.world.item.ItemStack temp = slotItem;
                 inventory.setStack(slotIndex, heldItem);
                 heldItem = temp;
+                heldItemSourceSlot = -1; // Source slot no longer valid after swap
             }
         }
     }
@@ -362,7 +365,7 @@ public final class InventoryScreen implements Screen {
     
     /**
      * Handle shift-click on an inventory slot.
-     * Moves item from hotbar to inventory or vice versa.
+     * Moves item from hotbar to inventory or vice versa, with stack merging support.
      */
     private void handleShiftClick(mattmc.world.item.Inventory inventory, int slotIndex) {
         mattmc.world.item.ItemStack slotItem = inventory.getStack(slotIndex);
@@ -371,27 +374,70 @@ public final class InventoryScreen implements Screen {
             return; // Nothing to move
         }
         
+        // Create a copy to track remaining items to move
+        ItemStack itemsToMove = slotItem.copy();
+        
         if (mattmc.world.item.Inventory.isHotbarSlot(slotIndex)) {
-            // Move from hotbar to main inventory
-            // Find first empty slot in main inventory (slots 9-35, left-to-right, top-down)
-            for (int i = 9; i < 36; i++) {
-                if (inventory.getStack(i) == null) {
-                    inventory.setStack(i, slotItem);
-                    inventory.setStack(slotIndex, null);
-                    break;
-                }
-            }
+            // Move from hotbar to main inventory (slots 9-35)
+            itemsToMove = moveItemsToRange(inventory, itemsToMove, 9, 36);
         } else if (mattmc.world.item.Inventory.isMainInventorySlot(slotIndex)) {
-            // Move from main inventory to hotbar
-            // Find first empty slot in hotbar (slots 0-8, left-to-right)
-            for (int i = 0; i < 9; i++) {
-                if (inventory.getStack(i) == null) {
-                    inventory.setStack(i, slotItem);
-                    inventory.setStack(slotIndex, null);
-                    break;
+            // Move from main inventory to hotbar (slots 0-8)
+            itemsToMove = moveItemsToRange(inventory, itemsToMove, 0, 9);
+        }
+        
+        // Update source slot
+        if (itemsToMove == null || itemsToMove.getCount() == 0) {
+            // All items moved
+            inventory.setStack(slotIndex, null);
+        } else {
+            // Some items couldn't be moved
+            inventory.setStack(slotIndex, itemsToMove);
+        }
+    }
+    
+    /**
+     * Helper method to move items to a range of slots with merging support.
+     * First tries to merge with existing stacks, then places in empty slots.
+     * 
+     * @param inventory The inventory
+     * @param itemsToMove The items to move
+     * @param startSlot Start of the slot range (inclusive)
+     * @param endSlot End of the slot range (exclusive)
+     * @return Remaining items that couldn't be moved, or null if all moved
+     */
+    private ItemStack moveItemsToRange(mattmc.world.item.Inventory inventory, ItemStack itemsToMove, int startSlot, int endSlot) {
+        if (itemsToMove == null || itemsToMove.getCount() == 0) {
+            return null;
+        }
+        
+        // First pass: try to merge with existing stacks of the same type
+        for (int i = startSlot; i < endSlot; i++) {
+            ItemStack targetStack = inventory.getStack(i);
+            if (targetStack != null && targetStack.canMergeWith(itemsToMove)) {
+                int spaceLeft = targetStack.getItem().getMaxStackSize() - targetStack.getCount();
+                if (spaceLeft > 0) {
+                    int toAdd = Math.min(spaceLeft, itemsToMove.getCount());
+                    targetStack.grow(toAdd);
+                    int remaining = itemsToMove.getCount() - toAdd;
+                    
+                    if (remaining <= 0) {
+                        return null; // All items merged
+                    }
+                    itemsToMove.setCount(remaining);
                 }
             }
         }
+        
+        // Second pass: place remaining items in empty slots
+        for (int i = startSlot; i < endSlot; i++) {
+            if (inventory.getStack(i) == null) {
+                inventory.setStack(i, itemsToMove.copy());
+                return null; // All items placed
+            }
+        }
+        
+        // If we get here, there wasn't enough space for all items
+        return itemsToMove;
     }
     
     /**
@@ -700,6 +746,12 @@ public final class InventoryScreen implements Screen {
     
     @Override
     public void onClose() {
+        // Clear GLFW callbacks to prevent memory leaks
+        glfwSetCursorPosCallback(window.handle(), null);
+        glfwSetMouseButtonCallback(window.handle(), null);
+        glfwSetKeyCallback(window.handle(), null);
+        glfwSetFramebufferSizeCallback(window.handle(), null);
+        
         if (inventoryTexture != null) {
             inventoryTexture.close();
             inventoryTexture = null;
