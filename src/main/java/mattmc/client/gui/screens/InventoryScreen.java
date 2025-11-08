@@ -176,6 +176,10 @@ public final class InventoryScreen implements Screen {
      * @return The slot's inventory index, or -1 if no valid slot was clicked
      */
     private int findClickedSlot() {
+        if (inventoryTexture == null) {
+            return -1; // Can't determine slot position without texture dimensions
+        }
+        
         // Get GUI coordinates
         int w = window.width(), h = window.height();
         float texWidth = inventoryTexture.width * GUI_SCALE;
