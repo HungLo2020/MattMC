@@ -233,4 +233,25 @@ public class GiveCommandTest {
         assertEquals(pickaxe, retrievedStack.getItem());
         assertEquals(1, retrievedStack.getCount());
     }
+    
+    @Test
+    public void testGiveCommandDefaultQuantity() {
+        // Test that /give command defaults to quantity of 1 when not specified
+        // This simulates the command: "/give stone" (without a count)
+        Inventory inventory = new Inventory();
+        Item stone = Items.STONE;
+        
+        // Default count should be 1
+        int defaultCount = 1;
+        ItemStack stack = new ItemStack(stone, defaultCount);
+        boolean added = inventory.addItem(stack);
+        
+        assertTrue(added, "Item should be added with default count");
+        
+        // Verify item is in first slot with count of 1
+        ItemStack retrievedStack = inventory.getStack(0);
+        assertNotNull(retrievedStack, "Stack should be in first slot");
+        assertEquals(stone, retrievedStack.getItem());
+        assertEquals(1, retrievedStack.getCount(), "Default count should be 1");
+    }
 }

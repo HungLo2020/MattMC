@@ -481,32 +481,35 @@ public final class DevplayScreen implements Screen {
     
     /**
      * Execute /give command - gives the player items and adds them to their inventory.
-     * @param cmd The full command string (e.g., "/give stone 64" or "/give mattmc:dirt 32")
+     * @param cmd The full command string (e.g., "/give stone 64" or "/give mattmc:dirt 32" or "/give stone")
      */
     private void executeGiveCommand(String cmd) {
-        // Parse the command: /give <item> <count>
+        // Parse the command: /give <item> [count]
         String[] parts = cmd.substring(6).trim().split("\\s+");
         
-        if (parts.length < 2) {
-            commandFeedbackMessage = "Usage: /give <item> <count>";
+        if (parts.length < 1 || parts[0].isEmpty()) {
+            commandFeedbackMessage = "Usage: /give <item> [count]";
             commandFeedbackDisplayTime = 3.0;
             return;
         }
         
         String itemName = parts[0];
-        int count;
+        int count = 1; // Default to 1 if not specified
         
-        try {
-            count = Integer.parseInt(parts[1]);
-            if (count <= 0) {
-                commandFeedbackMessage = "Count must be positive";
+        // Parse count if provided
+        if (parts.length >= 2) {
+            try {
+                count = Integer.parseInt(parts[1]);
+                if (count <= 0) {
+                    commandFeedbackMessage = "Count must be positive";
+                    commandFeedbackDisplayTime = 3.0;
+                    return;
+                }
+            } catch (NumberFormatException e) {
+                commandFeedbackMessage = "Invalid count: " + parts[1];
                 commandFeedbackDisplayTime = 3.0;
                 return;
             }
-        } catch (NumberFormatException e) {
-            commandFeedbackMessage = "Invalid count: " + parts[1];
-            commandFeedbackDisplayTime = 3.0;
-            return;
         }
         
         // Look up the item - try with namespace first, then without
