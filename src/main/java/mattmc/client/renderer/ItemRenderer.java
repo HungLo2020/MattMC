@@ -251,7 +251,9 @@ public class ItemRenderer {
             }
         }
         
-        // === TOP STEP (back half only, half width) ===
+        // === TOP STEP (back half only, half width, half height) ===
+        // The top step sits on the back half of the bottom slab
+        // In isometric view, "back" means toward the top-left (negative X, negative Y screen coords)
         
         // Top step - Left face (medium brightness - 80%)
         if (sideTexture != null) {
@@ -260,11 +262,11 @@ public class ItemRenderer {
                 tex.bind();
                 glColor4f(0.8f, 0.8f, 0.8f, 1.0f);
                 glBegin(GL_QUADS);
-                // Left face of top step - starts at middle, goes to back
-                glTexCoord2f(0.5f, 0);    glVertex2f(x - isoWidth * 0.5f, y - isoHeight);     // Middle bottom
-                glTexCoord2f(1, 0);       glVertex2f(x - isoWidth, y - isoHeight * 1.25f);    // Far bottom
-                glTexCoord2f(1, 0.5f);    glVertex2f(x - isoWidth, y - isoHeight * 1.75f);    // Far top
-                glTexCoord2f(0.5f, 0.5f); glVertex2f(x - isoWidth * 0.5f, y - isoHeight * 1.5f); // Middle top
+                // Left face of top step - half depth (back half only)
+                glTexCoord2f(0.5f, 0.5f); glVertex2f(x - isoWidth * 0.5f, y - isoHeight * 0.75f);  // Near bottom
+                glTexCoord2f(1, 0.5f);    glVertex2f(x - isoWidth, y - isoHeight * 1.25f);        // Far bottom  
+                glTexCoord2f(1, 1);       glVertex2f(x - isoWidth, y - isoHeight * 1.75f);        // Far top
+                glTexCoord2f(0.5f, 1);    glVertex2f(x - isoWidth * 0.5f, y - isoHeight * 1.25f); // Near top
                 glEnd();
             }
         }
@@ -276,11 +278,11 @@ public class ItemRenderer {
                 tex.bind();
                 glColor4f(0.6f, 0.6f, 0.6f, 1.0f);
                 glBegin(GL_QUADS);
-                // Right face of top step - starts at middle, goes to back
-                glTexCoord2f(0, 0);       glVertex2f(x + isoWidth * 0.5f, y - isoHeight);     // Middle bottom
-                glTexCoord2f(0.5f, 0);    glVertex2f(x - isoWidth * 0.5f, y - isoHeight);     // Middle bottom (shared with left)
-                glTexCoord2f(0.5f, 0.5f); glVertex2f(x - isoWidth * 0.5f, y - isoHeight * 1.5f); // Middle top
-                glTexCoord2f(0, 0.5f);    glVertex2f(x + isoWidth * 0.5f, y - isoHeight * 1.5f); // Middle top (right side)
+                // Right face of top step - half depth (back half only)
+                glTexCoord2f(0, 0.5f);    glVertex2f(x + isoWidth * 0.5f, y - isoHeight * 0.75f);  // Near bottom (right side)
+                glTexCoord2f(0.5f, 0.5f); glVertex2f(x - isoWidth * 0.5f, y - isoHeight * 0.75f);  // Near bottom (middle)
+                glTexCoord2f(0.5f, 1);    glVertex2f(x - isoWidth * 0.5f, y - isoHeight * 1.25f); // Near top (middle)
+                glTexCoord2f(0, 1);       glVertex2f(x + isoWidth * 0.5f, y - isoHeight * 1.25f); // Near top (right side)
                 glEnd();
             }
         }
@@ -292,11 +294,11 @@ public class ItemRenderer {
                 tex.bind();
                 glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
                 glBegin(GL_QUADS);
-                // Top face of top step - back half diamond
-                glTexCoord2f(0.5f, 0);    glVertex2f(x - isoWidth * 0.5f, y - isoHeight * 1.5f); // Middle near
-                glTexCoord2f(0.5f, 0.5f); glVertex2f(x - isoWidth, y - isoHeight * 1.75f);       // Far left
-                glTexCoord2f(1, 0.5f);    glVertex2f(x, y - isoHeight * 2.0f);                   // Far back
-                glTexCoord2f(1, 0);       glVertex2f(x + isoWidth * 0.5f, y - isoHeight * 1.5f); // Middle right
+                // Top face of top step - back half diamond only
+                glTexCoord2f(0.5f, 0);    glVertex2f(x - isoWidth * 0.5f, y - isoHeight * 1.25f); // Middle near
+                glTexCoord2f(0.5f, 0.5f); glVertex2f(x - isoWidth, y - isoHeight * 1.75f);        // Far left
+                glTexCoord2f(1, 0.5f);    glVertex2f(x, y - isoHeight * 2.25f);                   // Far back (top point)
+                glTexCoord2f(1, 0);       glVertex2f(x + isoWidth * 0.5f, y - isoHeight * 1.25f); // Middle right
                 glEnd();
             }
         }
