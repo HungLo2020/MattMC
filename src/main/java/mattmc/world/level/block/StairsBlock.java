@@ -19,11 +19,11 @@ import mattmc.world.phys.shapes.VoxelShape;
  */
 public class StairsBlock extends Block {
     
-    // Collision shapes for bottom stairs (north-facing)
-    // Bottom half: two boxes - one for the lower step and one for the upper step
+    // Collision shape for bottom stairs (north-facing) - full block with south-east quarter removed
+    // This is more accurate to Minecraft - a single shape with a corner cut out
     private static final VoxelShape BOTTOM_SHAPE = VoxelShape.or(
-        VoxelShape.box(0.0, 0.0, 0.0, 1.0, 0.5, 1.0),  // Bottom slab (full width/depth, half height)
-        VoxelShape.box(0.0, 0.5, 0.0, 1.0, 1.0, 0.5)    // Top step (north half only)
+        VoxelShape.box(0.0, 0.0, 0.0, 1.0, 0.5, 1.0),      // Bottom slab (full width/depth, half height)
+        VoxelShape.box(0.0, 0.5, 0.0, 1.0, 1.0, 0.5)       // Top step (north half only, upper half)
     );
     
     /**
@@ -43,7 +43,7 @@ public class StairsBlock extends Block {
     
     /**
      * Get the collision shape for stairs.
-     * Returns a shape with two boxes: bottom slab + top north step.
+     * Returns a shape representing a full block with the south-east quarter removed.
      */
     @Override
     public VoxelShape getCollisionShape() {
@@ -51,11 +51,10 @@ public class StairsBlock extends Block {
     }
     
     /**
-     * Stairs use custom collision but render as cubes for now.
-     * TODO: Implement proper VBO-based stairs rendering.
+     * Stairs use custom rendering with VBO-generated geometry.
      */
     @Override
     public boolean hasCustomRendering() {
-        return false;  // Disabled custom rendering - causes texture atlas display bug
+        return true;
     }
 }
