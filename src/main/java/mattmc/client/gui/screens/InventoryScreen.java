@@ -1063,8 +1063,8 @@ public final class InventoryScreen implements Screen {
                     if (itemIndex >= 0 && itemIndex < allItems.size()) {
                         // Draw 16x16 white semi-transparent highlight centered in slot
                         float highlightSize = 16f * GUI_SCALE;
-                        float highlightX = slotX + (slotSpacing - highlightSize) / 2f;
-                        float highlightY = slotY + (slotSpacing - highlightSize) / 2f;
+                        float highlightX = slotX + (slotSpacing - highlightSize) / 2f - 1f;  // Move 1 pixel left
+                        float highlightY = slotY + (slotSpacing - highlightSize) / 2f - 1f;  // Move 1 pixel up
                         
                         glEnable(GL_BLEND);
                         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
@@ -1108,7 +1108,7 @@ public final class InventoryScreen implements Screen {
                     float slotX = guiX + startX + col * slotSpacing;
                     float slotY = guiY + startY + row * slotSpacing;
                     float itemX = slotX + (slotSpacing / 2f) - 4f;  // Move 4 pixels left
-                    float itemY = slotY + (slotSpacing / 2f) + 10f;  // Move 10 pixels down
+                    float itemY = slotY + (slotSpacing / 2f) + 11f;  // Move 11 pixels down
                     
                     mattmc.client.renderer.ItemRenderer.renderItem(stack, itemX, itemY, itemSize);
                 }
