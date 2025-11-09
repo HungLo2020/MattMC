@@ -88,7 +88,6 @@ public class ItemRenderer {
                                           String itemName, float x, float y, float size) {
         // Save current GL state
         glPushMatrix();
-        glPushAttrib(GL_ALL_ATTRIB_BITS);
         
         // Move to the item's screen position
         glTranslatef(x, y, 0);
@@ -106,10 +105,19 @@ public class ItemRenderer {
         // Center the block (move it so center is at origin)
         glTranslatef(-0.5f, -0.5f, -0.5f);
         
+        // Save specific GL states we're going to change
+        boolean wasTextureEnabled = glIsEnabled(GL_TEXTURE_2D);
+        boolean wasDepthTestEnabled = glIsEnabled(GL_DEPTH_TEST);
+        boolean wasBlendEnabled = glIsEnabled(GL_BLEND);
+        
         // Enable texturing and depth test for 3D rendering
         glEnable(GL_TEXTURE_2D);
         glEnable(GL_DEPTH_TEST);
         glDepthFunc(GL_LEQUAL);
+        glClear(GL_DEPTH_BUFFER_BIT); // Clear depth buffer for this item
+        
+        // Disable blending to ensure solid rendering
+        glDisable(GL_BLEND);
         
         // Ensure polygons are filled (not wireframe)
         glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
@@ -127,7 +135,10 @@ public class ItemRenderer {
         }
         
         // Restore GL state
-        glPopAttrib();
+        if (!wasDepthTestEnabled) glDisable(GL_DEPTH_TEST);
+        if (!wasTextureEnabled) glDisable(GL_TEXTURE_2D);
+        if (wasBlendEnabled) glEnable(GL_BLEND);
+        
         glPopMatrix();
     }
     
