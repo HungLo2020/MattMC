@@ -1030,9 +1030,9 @@ public final class InventoryScreen implements Screen {
                 ItemStack stack = new ItemStack(item, 1);
                 
                 // Calculate screen position for this slot
-                // Items need to be positioned much lower - add ~36 pixels to align with slot centers
+                // Items need to be positioned much lower - add 54 pixels (3 slots worth) to align with slot centers
                 float slotCenterX = guiX + (slot.x + 8f) * scale;
-                float slotCenterY = guiY + (slot.y + 9f + 36f) * scale;  // 9f centers in 18px slot, +36f moves down ~2 slots
+                float slotCenterY = guiY + (slot.y + 9f + 54f) * scale;  // 9f centers in 18px slot, +54f moves down 3 slots
                 
                 // Render the item
                 mattmc.client.renderer.ItemRenderer.renderItem(stack, slotCenterX, slotCenterY, itemSize);
