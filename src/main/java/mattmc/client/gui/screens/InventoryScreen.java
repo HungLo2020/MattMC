@@ -7,6 +7,9 @@ import mattmc.client.renderer.BlurRenderer;
 import mattmc.client.renderer.texture.Texture;
 import mattmc.world.entity.player.PlayerInput;
 import mattmc.world.item.ItemStack;
+import mattmc.world.item.CreativeModeTab;
+import mattmc.world.item.CreativeModeTabs;
+import mattmc.world.item.Item;
 import org.lwjgl.system.MemoryStack;
 
 import java.nio.IntBuffer;
@@ -21,6 +24,7 @@ import static org.lwjgl.system.MemoryStack.stackPush;
 
 /**
  * Inventory screen overlay - displays the inventory.png centered on screen.
+ * Also displays the creative inventory on the right side for item selection.
  * Does not pause the game. Press E (or configured inventory key) to close.
  */
 public final class InventoryScreen implements Screen {
@@ -30,10 +34,16 @@ public final class InventoryScreen implements Screen {
     private static final float CONTENT_OFFSET_Y = 45f;
     private static final float SLOT_SIZE = 16f;
     
+    // Creative inventory constants
+    private static final int CREATIVE_ROWS = 5;
+    private static final int CREATIVE_COLS = 9;
+    private static final int CREATIVE_VISIBLE_SLOTS = CREATIVE_ROWS * CREATIVE_COLS;
+    
     private final Minecraft game;
     private final Window window;
     private final DevplayScreen gameScreen;
     private Texture inventoryTexture;
+    private Texture creativeInventoryTexture;
     
     // Blur effect for background
     private BlurEffect blurEffect;
@@ -41,22 +51,34 @@ public final class InventoryScreen implements Screen {
     // Mouse tracking for slot highlighting
     private double mouseXWin, mouseYWin;
     private final List<InventorySlot> slots = new ArrayList<>();
+    private final List<InventorySlot> creativeSlots = new ArrayList<>();
     
     // Held item state (for drag-and-drop)
     private mattmc.world.item.ItemStack heldItem = null;
     private int heldItemSourceSlot = -1;
+    private boolean heldItemFromCreative = false;
+    
+    // Creative mode state
+    private int selectedTabIndex = 0;
+    private int creativeScrollOffset = 0;
     
     // Helper class to represent an inventory slot
     private static class InventorySlot {
-        final float x, y, width, height; // Relative to 176x166 GUI coordinate system
+        final float x, y, width, height; // Relative to GUI coordinate system
         final int inventoryIndex; // Index in player inventory (0-35, or -1 for non-inventory slots)
+        final boolean isCreative; // Whether this is a creative inventory slot
         
         InventorySlot(float x, float y, float width, float height, int inventoryIndex) {
+            this(x, y, width, height, inventoryIndex, false);
+        }
+        
+        InventorySlot(float x, float y, float width, float height, int inventoryIndex, boolean isCreative) {
             this.x = x;
             this.y = y;
             this.width = width;
             this.height = height;
             this.inventoryIndex = inventoryIndex;
+            this.isCreative = isCreative;
         }
         
         boolean contains(float px, float py) {
@@ -74,9 +96,11 @@ public final class InventoryScreen implements Screen {
 
         // Initialize inventory slots
         initializeSlots();
+        initializeCreativeSlots();
 
-        // Load inventory texture
+        // Load inventory textures
         inventoryTexture = Texture.load("/assets/textures/gui/container/inventory.png");
+        creativeInventoryTexture = Texture.load("/assets/textures/gui/container/creativeinv.png");
 
         // Release mouse cursor
         glfwSetInputMode(window.handle(), GLFW_CURSOR, GLFW_CURSOR_NORMAL);
@@ -114,8 +138,21 @@ public final class InventoryScreen implements Screen {
                     if (deleteKey != null && key == deleteKey) {
                         handleDeleteItem();
                     }
+                    // Tab navigation with number keys
+                    if (key >= GLFW_KEY_1 && key <= GLFW_KEY_9) {
+                        int tabIndex = key - GLFW_KEY_1;
+                        if (tabIndex < CreativeModeTabs.getTabCount()) {
+                            selectedTabIndex = tabIndex;
+                            creativeScrollOffset = 0;
+                        }
+                    }
                 }
             }
+        });
+        
+        // Handle scroll wheel for creative inventory scrolling
+        glfwSetScrollCallback(window.handle(), (win, xoffset, yoffset) -> {
+            handleScroll(yoffset);
         });
 
         glfwSetFramebufferSizeCallback(window.handle(), (win, newW, newH) -> {
@@ -232,6 +269,15 @@ public final class InventoryScreen implements Screen {
         }
         
         mattmc.world.item.Inventory inventory = player.getInventory();
+        
+        // Check if clicked on creative slot first
+        int creativeSlotIndex = findClickedCreativeSlot();
+        if (creativeSlotIndex >= 0) {
+            handleCreativeSlotClick(creativeSlotIndex);
+            return;
+        }
+        
+        // Check regular inventory slot
         int slotIndex = findClickedSlot();
         
         if (slotIndex >= 0) {
@@ -243,6 +289,80 @@ public final class InventoryScreen implements Screen {
                 handleNormalClick(inventory, slotIndex);
             }
         }
+    }
+    
+    /**
+     * Handle click on a creative inventory slot.
+     */
+    private void handleCreativeSlotClick(int slotIndex) {
+        CreativeModeTab currentTab = getCurrentTab();
+        if (currentTab == null) return;
+        
+        // Calculate actual item index considering scroll offset
+        int itemIndex = (creativeScrollOffset * CREATIVE_COLS) + slotIndex;
+        List<Item> items = currentTab.getItems();
+        
+        if (itemIndex >= 0 && itemIndex < items.size()) {
+            Item item = items.get(itemIndex);
+            
+            // Creative mode: always create a new stack when clicking
+            if (heldItem != null && heldItem.getItem() == item) {
+                // Already holding this item, increase count up to max stack size
+                int newCount = Math.min(heldItem.getCount() + item.getMaxStackSize(), item.getMaxStackSize());
+                heldItem.setCount(newCount);
+            } else {
+                // Pick up a new stack of this item
+                heldItem = new ItemStack(item, item.getMaxStackSize());
+                heldItemFromCreative = true;
+                heldItemSourceSlot = -1;
+            }
+        }
+    }
+    
+    /**
+     * Find the creative inventory slot under the current mouse position.
+     * @return The slot index (0-44), or -1 if no valid slot was clicked
+     */
+    private int findClickedCreativeSlot() {
+        if (creativeInventoryTexture == null) {
+            return -1;
+        }
+        
+        // Get creative GUI coordinates (positioned to the right middle of screen)
+        int w = window.width(), h = window.height();
+        float texWidth = creativeInventoryTexture.width * GUI_SCALE;
+        float texHeight = creativeInventoryTexture.height * GUI_SCALE;
+        
+        // Position on right middle of screen
+        float guiX = w - texWidth - 50f;  // 50 pixels from right edge
+        float guiY = (h - texHeight) / 2f;
+        
+        // Convert window mouse coordinates to framebuffer coordinates
+        float mouseFBX, mouseFBY;
+        try (MemoryStack stack = stackPush()) {
+            IntBuffer winW = stack.mallocInt(1), winH = stack.mallocInt(1);
+            IntBuffer fbW  = stack.mallocInt(1), fbH  = stack.mallocInt(1);
+            glfwGetWindowSize(window.handle(), winW, winH);
+            glfwGetFramebufferSize(window.handle(), fbW, fbH);
+            float sx = fbW.get(0) / Math.max(1f, winW.get(0));
+            float sy = fbH.get(0) / Math.max(1f, winH.get(0));
+            mouseFBX = (float) mouseXWin * sx;
+            mouseFBY = (float) mouseYWin * sy;
+        }
+        
+        // Convert mouse position to GUI-relative coordinates
+        float mouseGuiX = (mouseFBX - guiX) / GUI_SCALE;
+        float mouseGuiY = (mouseFBY - guiY) / GUI_SCALE;
+        
+        // Find clicked slot
+        for (int i = 0; i < creativeSlots.size(); i++) {
+            InventorySlot slot = creativeSlots.get(i);
+            if (slot.contains(mouseGuiX, mouseGuiY)) {
+                return i;
+            }
+        }
+        
+        return -1;
     }
     
     /**
@@ -523,6 +643,59 @@ public final class InventoryScreen implements Screen {
             slots.add(new InventorySlot(hotbarX + col * 18f, hotbarY, SLOT_SIZE, SLOT_SIZE, col));
         }
     }
+    
+    /**
+     * Initialize creative inventory slot positions.
+     * These are positioned to the right of the main inventory.
+     * Coordinates are relative to the creative inventory texture (256x256).
+     */
+    private void initializeCreativeSlots() {
+        creativeSlots.clear();
+        
+        // Creative inventory slots (5 rows x 9 columns)
+        // Starting position in the texture (based on analysis)
+        float startX = 8f;
+        float startY = 18f;
+        
+        for (int row = 0; row < CREATIVE_ROWS; row++) {
+            for (int col = 0; col < CREATIVE_COLS; col++) {
+                int slotIndex = row * CREATIVE_COLS + col;
+                creativeSlots.add(new InventorySlot(
+                    startX + col * 18f, 
+                    startY + row * 18f, 
+                    SLOT_SIZE, 
+                    SLOT_SIZE, 
+                    slotIndex,
+                    true
+                ));
+            }
+        }
+    }
+    
+    /**
+     * Handle scroll wheel for creative inventory navigation.
+     */
+    private void handleScroll(double yoffset) {
+        CreativeModeTab currentTab = getCurrentTab();
+        if (currentTab == null) return;
+        
+        int totalItems = currentTab.size();
+        int maxScroll = Math.max(0, (totalItems - CREATIVE_VISIBLE_SLOTS + CREATIVE_COLS - 1) / CREATIVE_COLS);
+        
+        creativeScrollOffset -= (int) yoffset;
+        creativeScrollOffset = Math.max(0, Math.min(creativeScrollOffset, maxScroll));
+    }
+    
+    /**
+     * Get the currently selected creative mode tab.
+     */
+    private CreativeModeTab getCurrentTab() {
+        List<CreativeModeTab> tabs = CreativeModeTabs.getTabs();
+        if (selectedTabIndex >= 0 && selectedTabIndex < tabs.size()) {
+            return tabs.get(selectedTabIndex);
+        }
+        return null;
+    }
 
     @Override
     public void tick() {
@@ -592,11 +765,41 @@ public final class InventoryScreen implements Screen {
             
             // Draw items in inventory slots
             drawInventoryItems(x, y, GUI_SCALE);
+        }
+        
+        // Draw creative inventory on the right middle
+        if (creativeInventoryTexture != null) {
+            glEnable(GL_TEXTURE_2D);
+            creativeInventoryTexture.bind();
+            glColor4f(1f, 1f, 1f, 1f);
             
-            // Draw held item under mouse cursor
-            if (heldItem != null) {
-                drawHeldItem();
-            }
+            float creativeTexWidth = creativeInventoryTexture.width * GUI_SCALE;
+            float creativeTexHeight = creativeInventoryTexture.height * GUI_SCALE;
+            float creativeX = w - creativeTexWidth - 50f;  // 50 pixels from right edge
+            float creativeY = (h - creativeTexHeight) / 2f;
+            
+            glBegin(GL_QUADS);
+            glTexCoord2f(0, 1); glVertex2f(creativeX, creativeY);
+            glTexCoord2f(1, 1); glVertex2f(creativeX + creativeTexWidth, creativeY);
+            glTexCoord2f(1, 0); glVertex2f(creativeX + creativeTexWidth, creativeY + creativeTexHeight);
+            glTexCoord2f(0, 0); glVertex2f(creativeX, creativeY + creativeTexHeight);
+            glEnd();
+            
+            glDisable(GL_TEXTURE_2D);
+            
+            // Draw creative slot highlight
+            drawCreativeSlotHighlight(creativeX, creativeY, GUI_SCALE);
+            
+            // Draw items in creative inventory slots
+            drawCreativeInventoryItems(creativeX, creativeY, GUI_SCALE);
+            
+            // Draw tab information
+            drawTabInfo(creativeX, creativeY, GUI_SCALE);
+        }
+        
+        // Draw held item under mouse cursor (always on top)
+        if (heldItem != null) {
+            drawHeldItem();
         }
         
         glDisable(GL_BLEND);
@@ -773,6 +976,113 @@ public final class InventoryScreen implements Screen {
             drawItemCount(heldItem.getCount(), mouseFBX, mouseFBY, 1.0f, itemSize);
         }
     }
+    
+    /**
+     * Draw slot highlight for creative inventory.
+     */
+    private void drawCreativeSlotHighlight(float guiX, float guiY, float scale) {
+        float mouseFBX, mouseFBY;
+        try (MemoryStack stack = stackPush()) {
+            IntBuffer winW = stack.mallocInt(1), winH = stack.mallocInt(1);
+            IntBuffer fbW  = stack.mallocInt(1), fbH  = stack.mallocInt(1);
+            glfwGetWindowSize(window.handle(), winW, winH);
+            glfwGetFramebufferSize(window.handle(), fbW, fbH);
+            float sx = fbW.get(0) / Math.max(1f, winW.get(0));
+            float sy = fbH.get(0) / Math.max(1f, winH.get(0));
+            mouseFBX = (float) mouseXWin * sx;
+            mouseFBY = (float) mouseYWin * sy;
+        }
+        
+        float mouseGuiX = (mouseFBX - guiX) / scale;
+        float mouseGuiY = (mouseFBY - guiY) / scale;
+        
+        for (InventorySlot slot : creativeSlots) {
+            if (slot.contains(mouseGuiX, mouseGuiY)) {
+                float slotScreenX = guiX + slot.x * scale;
+                float slotScreenY = guiY + slot.y * scale;
+                float slotScreenW = slot.width * scale;
+                float slotScreenH = slot.height * scale;
+                
+                glColor4f(1f, 1f, 1f, 0.3f);
+                glBegin(GL_QUADS);
+                glVertex2f(slotScreenX, slotScreenY);
+                glVertex2f(slotScreenX + slotScreenW, slotScreenY);
+                glVertex2f(slotScreenX + slotScreenW, slotScreenY + slotScreenH);
+                glVertex2f(slotScreenX, slotScreenY + slotScreenH);
+                glEnd();
+                
+                break;
+            }
+        }
+    }
+    
+    /**
+     * Draw items in creative inventory slots.
+     */
+    private void drawCreativeInventoryItems(float guiX, float guiY, float scale) {
+        CreativeModeTab currentTab = getCurrentTab();
+        if (currentTab == null) return;
+        
+        List<Item> items = currentTab.getItems();
+        float itemSize = 19.2f;
+        
+        for (int i = 0; i < creativeSlots.size(); i++) {
+            InventorySlot slot = creativeSlots.get(i);
+            
+            // Calculate item index considering scroll offset
+            int itemIndex = (creativeScrollOffset * CREATIVE_COLS) + i;
+            
+            if (itemIndex >= 0 && itemIndex < items.size()) {
+                Item item = items.get(itemIndex);
+                ItemStack stack = new ItemStack(item, 1);
+                
+                // Calculate screen position for this slot
+                float slotCenterX = guiX + (slot.x + 8f) * scale;
+                float slotCenterY = guiY + (slot.y + 14f) * scale;
+                
+                // Render the item
+                mattmc.client.renderer.ItemRenderer.renderItem(stack, slotCenterX, slotCenterY, itemSize);
+            }
+        }
+    }
+    
+    /**
+     * Draw tab information at the top of creative inventory.
+     */
+    private void drawTabInfo(float guiX, float guiY, float scale) {
+        CreativeModeTab currentTab = getCurrentTab();
+        if (currentTab == null) return;
+        
+        // Draw tab name above the creative inventory
+        String tabName = currentTab.getDisplayName();
+        float textX = guiX + 10f;
+        float textY = guiY - 30f;
+        float textScale = 1.2f;
+        
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        
+        // Draw shadow
+        glColor4f(0.25f, 0.25f, 0.25f, 1.0f);
+        mattmc.client.gui.components.TextRenderer.drawText(tabName, textX + 1, textY + 1, textScale);
+        
+        // Draw main text
+        glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
+        mattmc.client.gui.components.TextRenderer.drawText(tabName, textX, textY, textScale);
+        
+        // Draw tab navigation hint below the inventory
+        String hint = "Press 1-" + Math.min(9, CreativeModeTabs.getTabCount()) + " to switch tabs | Scroll to navigate";
+        float hintY = guiY + creativeInventoryTexture.height * scale + 10f;
+        textScale = 0.8f;
+        
+        glColor4f(0.25f, 0.25f, 0.25f, 1.0f);
+        mattmc.client.gui.components.TextRenderer.drawText(hint, textX + 1, hintY + 1, textScale);
+        
+        glColor4f(0.7f, 0.7f, 0.7f, 1.0f);
+        mattmc.client.gui.components.TextRenderer.drawText(hint, textX, hintY, textScale);
+        
+        glDisable(GL_BLEND);
+    }
 
     private void setColor(int rgb, float a) {
         float r = ((rgb >> 16) & 0xFF) / 255f;
@@ -791,10 +1101,15 @@ public final class InventoryScreen implements Screen {
         glfwSetMouseButtonCallback(window.handle(), null);
         glfwSetKeyCallback(window.handle(), null);
         glfwSetFramebufferSizeCallback(window.handle(), null);
+        glfwSetScrollCallback(window.handle(), null);
         
         if (inventoryTexture != null) {
             inventoryTexture.close();
             inventoryTexture = null;
+        }
+        if (creativeInventoryTexture != null) {
+            creativeInventoryTexture.close();
+            creativeInventoryTexture = null;
         }
         if (blurEffect != null) {
             blurEffect.close();
