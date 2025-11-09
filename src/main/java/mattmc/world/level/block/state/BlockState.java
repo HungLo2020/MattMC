@@ -65,4 +65,63 @@ public class BlockState {
         copy.properties.putAll(this.properties);
         return copy;
     }
+    
+    /**
+     * Convert this blockstate to an NBT-compatible map.
+     */
+    public Map<String, Object> toNBT() {
+        Map<String, Object> nbt = new HashMap<>();
+        for (Map.Entry<String, Object> entry : properties.entrySet()) {
+            Object value = entry.getValue();
+            // Convert enum values to strings
+            if (value instanceof Enum) {
+                nbt.put(entry.getKey(), ((Enum<?>) value).name());
+            } else {
+                nbt.put(entry.getKey(), value);
+            }
+        }
+        return nbt;
+    }
+    
+    /**
+     * Load a blockstate from an NBT-compatible map.
+     */
+    public static BlockState fromNBT(Map<String, Object> nbt) {
+        BlockState state = new BlockState();
+        for (Map.Entry<String, Object> entry : nbt.entrySet()) {
+            String key = entry.getKey();
+            Object value = entry.getValue();
+            
+            // Convert string values back to enums
+            if (value instanceof String) {
+                String str = (String) value;
+                // Try to parse as Direction
+                try {
+                    Direction dir = Direction.valueOf(str);
+                    state.setValue(key, dir);
+                    continue;
+                } catch (IllegalArgumentException ignored) {}
+                
+                // Try to parse as Half
+                try {
+                    Half half = Half.valueOf(str);
+                    state.setValue(key, half);
+                    continue;
+                } catch (IllegalArgumentException ignored) {}
+                
+                // Fall back to string
+                state.setValue(key, value);
+            } else {
+                state.setValue(key, value);
+            }
+        }
+        return state;
+    }
+    
+    /**
+     * Check if this blockstate is empty (has no properties).
+     */
+    public boolean isEmpty() {
+        return properties.isEmpty();
+    }
 }

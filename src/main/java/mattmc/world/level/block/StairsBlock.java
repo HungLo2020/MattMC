@@ -85,15 +85,20 @@ public class StairsBlock extends Block {
         // Determine half based on which face was clicked and player's Y position
         Half half;
         if (hitFace == 0) {
-            // Clicked bottom face - always place as top half
+            // Clicked bottom face - always place as top half (upside down)
             half = Half.TOP;
         } else if (hitFace == 1) {
-            // Clicked top face - always place as bottom half
+            // Clicked top face - always place as bottom half (right-side up)
             half = Half.BOTTOM;
         } else {
-            // Clicked side face - determine based on where on the block was clicked
-            float relativeY = playerY - blockY;
-            half = relativeY > 0.5 ? Half.TOP : Half.BOTTOM;
+            // Clicked side face - determine based on where the player is looking (Y position)
+            // Use the player's eye height for more accurate placement
+            float eyeY = playerY + 1.62f; // Player eye height is at feet + 1.62 blocks
+            float blockCenterY = blockY + 0.5f;
+            
+            // If looking at top half of block, place as top half (upside down)
+            // If looking at bottom half, place as bottom half (right-side up)
+            half = eyeY > blockCenterY ? Half.TOP : Half.BOTTOM;
         }
         
         state.setValue("facing", facing);
