@@ -555,44 +555,14 @@ public final class InventoryScreen implements Screen {
     
     /**
      * Initialize the list of all items for the creative inventory.
+     * Uses the creative tabs system to automatically populate items.
      */
     private void initializeCreativeItems() {
         allItems.clear();
-        // Add all items in order
-        allItems.add(Items.STONE);
-        allItems.add(Items.DIRT);
-        allItems.add(Items.GRASS_BLOCK);
-        allItems.add(Items.COBBLESTONE);
-        allItems.add(Items.MOSSY_COBBLESTONE);
-        allItems.add(Items.OAK_PLANKS);
-        allItems.add(Items.SPRUCE_PLANKS);
-        allItems.add(Items.BIRCH_PLANKS);
-        allItems.add(Items.SILVER_BIRCH_PLANKS);
-        allItems.add(Items.JUNGLE_PLANKS);
-        allItems.add(Items.ACACIA_PLANKS);
-        allItems.add(Items.DARK_OAK_PLANKS);
-        allItems.add(Items.MANGROVE_PLANKS);
-        allItems.add(Items.CHERRY_PLANKS);
-        allItems.add(Items.BAMBOO_PLANKS);
-        allItems.add(Items.CRIMSON_PLANKS);
-        allItems.add(Items.WARPED_PLANKS);
-        allItems.add(Items.WOODEN_PICKAXE);
-        allItems.add(Items.STONE_PICKAXE);
-        allItems.add(Items.IRON_PICKAXE);
-        allItems.add(Items.DIAMOND_PICKAXE);
-        allItems.add(Items.WOODEN_AXE);
-        allItems.add(Items.STONE_AXE);
-        allItems.add(Items.IRON_AXE);
-        allItems.add(Items.DIAMOND_AXE);
-        allItems.add(Items.WOODEN_SHOVEL);
-        allItems.add(Items.STONE_SHOVEL);
-        allItems.add(Items.IRON_SHOVEL);
-        allItems.add(Items.DIAMOND_SHOVEL);
-        allItems.add(Items.STICK);
-        allItems.add(Items.COAL);
-        allItems.add(Items.IRON_INGOT);
-        allItems.add(Items.GOLD_INGOT);
-        allItems.add(Items.DIAMOND);
+        // Ensure creative mode tabs are initialized
+        mattmc.world.item.CreativeModeTabs.init();
+        // Get all unique items from creative tabs
+        allItems.addAll(mattmc.world.item.CreativeTabs.getAllUniqueItems());
     }
     
     /**
@@ -660,7 +630,7 @@ public final class InventoryScreen implements Screen {
     
     /**
      * Handle clicking on a creative inventory item.
-     * Deposits a single item into the first available slot (hotbar first, then main inventory).
+     * Attempts to merge with existing stacks first, then deposits into first available slot.
      */
     private void handleCreativeItemClick(mattmc.world.item.Inventory inventory, int itemIndex) {
         if (itemIndex < 0 || itemIndex >= allItems.size()) {
@@ -670,6 +640,28 @@ public final class InventoryScreen implements Screen {
         Item item = allItems.get(itemIndex);
         ItemStack stackToAdd = new ItemStack(item, 1);
         
+        // First, try to merge with existing stacks (hotbar first, then main inventory)
+        // Try hotbar (slots 0-8)
+        for (int i = 0; i < 9; i++) {
+            ItemStack existing = inventory.getStack(i);
+            if (existing != null && existing.getItem() == item && 
+                existing.getCount() < item.getMaxStackSize()) {
+                existing.grow(1);
+                return;
+            }
+        }
+        
+        // Try main inventory (slots 9-35)
+        for (int i = 9; i < 36; i++) {
+            ItemStack existing = inventory.getStack(i);
+            if (existing != null && existing.getItem() == item && 
+                existing.getCount() < item.getMaxStackSize()) {
+                existing.grow(1);
+                return;
+            }
+        }
+        
+        // If no existing stacks to merge with, find first empty slot
         // Try hotbar first (slots 0-8)
         for (int i = 0; i < 9; i++) {
             ItemStack existing = inventory.getStack(i);
@@ -688,15 +680,8 @@ public final class InventoryScreen implements Screen {
             }
         }
         
-        // If no empty slots, try to stack with existing items
-        for (int i = 0; i < 36; i++) {
-            ItemStack existing = inventory.getStack(i);
-            if (existing != null && existing.getItem() == item && 
-                existing.getCount() < item.getMaxStackSize()) {
-                existing.setCount(existing.getCount() + 1);
-                return;
-            }
-        }
+        // If we get here, inventory is completely full and all stacks are at max capacity
+        // Item cannot be added
     }
 
     @Override

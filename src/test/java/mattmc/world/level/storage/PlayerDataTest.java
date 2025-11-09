@@ -22,9 +22,9 @@ public class PlayerDataTest {
     public void testInventoryToNBTAndBack() {
         // Create inventory with some items
         Inventory inventory = new Inventory();
-        inventory.setStack(0, new ItemStack(Items.DIAMOND, 10));
+        inventory.setStack(0, new ItemStack(Items.STONE, 10));
         inventory.setStack(1, new ItemStack(Items.STONE, 64));
-        inventory.setStack(9, new ItemStack(Items.IRON_PICKAXE, 1));
+        inventory.setStack(9, new ItemStack(Items.BIRCH_PLANKS, 1));
         inventory.setSelectedSlot(2);
         
         // Convert to NBT
@@ -36,7 +36,7 @@ public class PlayerDataTest {
         
         // Verify items
         assertNotNull(loaded.getStack(0));
-        assertEquals(Items.DIAMOND, loaded.getStack(0).getItem());
+        assertEquals(Items.STONE, loaded.getStack(0).getItem());
         assertEquals(10, loaded.getStack(0).getCount());
         
         assertNotNull(loaded.getStack(1));
@@ -44,7 +44,7 @@ public class PlayerDataTest {
         assertEquals(64, loaded.getStack(1).getCount());
         
         assertNotNull(loaded.getStack(9));
-        assertEquals(Items.IRON_PICKAXE, loaded.getStack(9).getItem());
+        assertEquals(Items.BIRCH_PLANKS, loaded.getStack(9).getItem());
         assertEquals(1, loaded.getStack(9).getCount());
         
         // Verify selected slot
@@ -76,8 +76,8 @@ public class PlayerDataTest {
         
         // Create inventory with items
         Inventory inventory = new Inventory();
-        inventory.setStack(0, new ItemStack(Items.DIAMOND, 5));
-        inventory.setStack(8, new ItemStack(Items.GOLD_INGOT, 32));
+        inventory.setStack(0, new ItemStack(Items.STONE, 5));
+        inventory.setStack(8, new ItemStack(Items.DARK_OAK_PLANKS, 32));
         inventory.setSelectedSlot(3);
         
         // Save to file
@@ -91,11 +91,11 @@ public class PlayerDataTest {
         
         // Verify items
         assertNotNull(loaded.getStack(0));
-        assertEquals(Items.DIAMOND, loaded.getStack(0).getItem());
+        assertEquals(Items.STONE, loaded.getStack(0).getItem());
         assertEquals(5, loaded.getStack(0).getCount());
         
         assertNotNull(loaded.getStack(8));
-        assertEquals(Items.GOLD_INGOT, loaded.getStack(8).getItem());
+        assertEquals(Items.DARK_OAK_PLANKS, loaded.getStack(8).getItem());
         assertEquals(32, loaded.getStack(8).getCount());
         
         assertEquals(3, loaded.getSelectedSlot());
@@ -135,7 +135,7 @@ public class PlayerDataTest {
         assertFalse(Files.exists(playerdataDir));
         
         Inventory inventory = new Inventory();
-        inventory.setStack(0, new ItemStack(Items.DIAMOND, 1));
+        inventory.setStack(0, new ItemStack(Items.STONE, 1));
         
         // Save should create the directory
         PlayerData.save(playerDatFile, inventory);
