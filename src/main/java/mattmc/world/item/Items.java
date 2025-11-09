@@ -55,6 +55,18 @@ public class Items {
     public static final BlockItem GRASS_BLOCK = register("grass_block", new BlockItem(Blocks.GRASS_BLOCK));
     public static final BlockItem COBBLESTONE = register("cobblestone", new BlockItem(Blocks.COBBLESTONE));
     public static final BlockItem MOSSY_COBBLESTONE = register("mossy_cobblestone", new BlockItem(Blocks.MOSSY_COBBLESTONE));
+    public static final BlockItem SILVER_BIRCH_PLANKS = register("silver_birch_planks", new BlockItem(Blocks.SILVER_BIRCH_PLANKS));
+    public static final BlockItem OAK_PLANKS = register("oak_planks", new BlockItem(Blocks.OAK_PLANKS));
+    public static final BlockItem SPRUCE_PLANKS = register("spruce_planks", new BlockItem(Blocks.SPRUCE_PLANKS));
+    public static final BlockItem BIRCH_PLANKS = register("birch_planks", new BlockItem(Blocks.BIRCH_PLANKS));
+    public static final BlockItem JUNGLE_PLANKS = register("jungle_planks", new BlockItem(Blocks.JUNGLE_PLANKS));
+    public static final BlockItem ACACIA_PLANKS = register("acacia_planks", new BlockItem(Blocks.ACACIA_PLANKS));
+    public static final BlockItem DARK_OAK_PLANKS = register("dark_oak_planks", new BlockItem(Blocks.DARK_OAK_PLANKS));
+    public static final BlockItem MANGROVE_PLANKS = register("mangrove_planks", new BlockItem(Blocks.MANGROVE_PLANKS));
+    public static final BlockItem CHERRY_PLANKS = register("cherry_planks", new BlockItem(Blocks.CHERRY_PLANKS));
+    public static final BlockItem BAMBOO_PLANKS = register("bamboo_planks", new BlockItem(Blocks.BAMBOO_PLANKS));
+    public static final BlockItem WARPED_PLANKS = register("warped_planks", new BlockItem(Blocks.WARPED_PLANKS));
+    public static final BlockItem CRIMSON_PLANKS = register("crimson_planks", new BlockItem(Blocks.CRIMSON_PLANKS));
     
     // Basic materials (stackable, 64 max)
     public static final Item STICK = register("stick", new Item(64));
