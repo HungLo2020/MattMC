@@ -111,6 +111,9 @@ public class ItemRenderer {
         glEnable(GL_DEPTH_TEST);
         glDepthFunc(GL_LEQUAL);
         
+        // Ensure polygons are filled (not wireframe)
+        glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+        
         // Check if this is a stairs block
         boolean isStairs = itemModel != null && itemModel.getParent() != null && 
                           itemModel.getParent().contains("stairs");
