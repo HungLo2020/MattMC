@@ -31,12 +31,6 @@ This project reimagines Minecraft with a focus on:
 - Customizable keybindings and settings
 - Development/testing screen for experimentation
 - Save/load functionality with automatic backups
-- **Creative Mode Inventory**: 
-  - Item categorization into tabs (Building Blocks, Decorations, Redstone, Tools, Materials)
-  - Scrollable inventory with 45 visible slots (5 rows × 9 columns)
-  - Infinite item pickup for creative building
-  - Tab navigation with number keys (1-9)
-  - Intuitive scroll wheel navigation
 
 ## Technical Stack
 
@@ -131,7 +125,6 @@ MattMC is in active development. Current features include:
 - ✅ GUI system with multiple screens
 - ✅ Settings and keybinding management
 - ✅ Save/load functionality
-- ✅ Creative mode inventory with categorized tabs
 - 🚧 Block interactions (in progress)
 - 🚧 Multiplayer support (planned)
 
