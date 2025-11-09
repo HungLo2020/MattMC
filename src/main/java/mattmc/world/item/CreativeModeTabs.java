@@ -134,4 +134,33 @@ public class CreativeModeTabs {
     public static int getTabCount() {
         return TABS.size();
     }
+    
+    /**
+     * Get all items from all tabs in order.
+     * Items are returned in tab order (all items from first tab, then second tab, etc.).
+     * 
+     * @return List of all items across all tabs
+     */
+    public static List<Item> getAllItems() {
+        List<Item> allItems = new ArrayList<>();
+        for (CreativeModeTab tab : TABS) {
+            allItems.addAll(tab.getItems());
+        }
+        return allItems;
+    }
+    
+    /**
+     * Get the tab that contains a specific item.
+     * 
+     * @param item The item to find
+     * @return The tab containing the item, or null if not found
+     */
+    public static CreativeModeTab getTabForItem(Item item) {
+        for (CreativeModeTab tab : TABS) {
+            if (tab.getItems().contains(item)) {
+                return tab;
+            }
+        }
+        return null;
+    }
 }

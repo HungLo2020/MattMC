@@ -39,6 +39,12 @@ public final class InventoryScreen implements Screen {
     private static final int CREATIVE_COLS = 9;
     private static final int CREATIVE_VISIBLE_SLOTS = CREATIVE_ROWS * CREATIVE_COLS;
     
+    // Creative inventory texture content dimensions (actual content, not canvas)
+    private static final float CREATIVE_CONTENT_WIDTH = 176f;
+    private static final float CREATIVE_CONTENT_HEIGHT = 222f;
+    private static final float CREATIVE_CANVAS_WIDTH = 256f;
+    private static final float CREATIVE_CANVAS_HEIGHT = 256f;
+    
     private final Minecraft game;
     private final Window window;
     private final DevplayScreen gameScreen;
@@ -58,9 +64,8 @@ public final class InventoryScreen implements Screen {
     private int heldItemSourceSlot = -1;
     private boolean heldItemFromCreative = false;
     
-    // Creative mode state
-    private int selectedTabIndex = 0;
-    private int creativeScrollOffset = 0;
+    // Creative mode state - row-based scrolling
+    private int creativeScrollRow = 0;  // Which row is at the top
     
     // Helper class to represent an inventory slot
     private static class InventorySlot {
@@ -137,14 +142,6 @@ public final class InventoryScreen implements Screen {
                     Integer deleteKey = PlayerInput.getInstance().getKeybind(PlayerInput.DELETE_ITEM);
                     if (deleteKey != null && key == deleteKey) {
                         handleDeleteItem();
-                    }
-                    // Tab navigation with number keys
-                    if (key >= GLFW_KEY_1 && key <= GLFW_KEY_9) {
-                        int tabIndex = key - GLFW_KEY_1;
-                        if (tabIndex < CreativeModeTabs.getTabCount()) {
-                            selectedTabIndex = tabIndex;
-                            creativeScrollOffset = 0;
-                        }
                     }
                 }
             }
@@ -295,15 +292,13 @@ public final class InventoryScreen implements Screen {
      * Handle click on a creative inventory slot.
      */
     private void handleCreativeSlotClick(int slotIndex) {
-        CreativeModeTab currentTab = getCurrentTab();
-        if (currentTab == null) return;
+        List<Item> allItems = CreativeModeTabs.getAllItems();
         
-        // Calculate actual item index considering scroll offset
-        int itemIndex = (creativeScrollOffset * CREATIVE_COLS) + slotIndex;
-        List<Item> items = currentTab.getItems();
+        // Calculate actual item index considering scroll row
+        int itemIndex = (creativeScrollRow * CREATIVE_COLS) + slotIndex;
         
-        if (itemIndex >= 0 && itemIndex < items.size()) {
-            Item item = items.get(itemIndex);
+        if (itemIndex >= 0 && itemIndex < allItems.size()) {
+            Item item = allItems.get(itemIndex);
             
             // Creative mode: always create a new stack when clicking
             if (heldItem != null && heldItem.getItem() == item) {
@@ -675,28 +670,22 @@ public final class InventoryScreen implements Screen {
     /**
      * Handle scroll wheel for creative inventory navigation.
      */
+    /**
+     * Handle scroll wheel for creative inventory navigation.
+     * Scrolls entire rows up or down.
+     */
     private void handleScroll(double yoffset) {
-        CreativeModeTab currentTab = getCurrentTab();
-        if (currentTab == null) return;
+        List<Item> allItems = CreativeModeTabs.getAllItems();
         
-        int totalItems = currentTab.size();
-        int maxScroll = Math.max(0, (totalItems - CREATIVE_VISIBLE_SLOTS + CREATIVE_COLS - 1) / CREATIVE_COLS);
+        // Calculate total number of rows needed for all items
+        int totalRows = (allItems.size() + CREATIVE_COLS - 1) / CREATIVE_COLS;
+        int maxScrollRow = Math.max(0, totalRows - CREATIVE_ROWS);
         
-        creativeScrollOffset -= (int) yoffset;
-        creativeScrollOffset = Math.max(0, Math.min(creativeScrollOffset, maxScroll));
+        // Scroll by one row per wheel tick
+        creativeScrollRow -= (int) yoffset;
+        creativeScrollRow = Math.max(0, Math.min(creativeScrollRow, maxScrollRow));
     }
     
-    /**
-     * Get the currently selected creative mode tab.
-     */
-    private CreativeModeTab getCurrentTab() {
-        List<CreativeModeTab> tabs = CreativeModeTabs.getTabs();
-        if (selectedTabIndex >= 0 && selectedTabIndex < tabs.size()) {
-            return tabs.get(selectedTabIndex);
-        }
-        return null;
-    }
-
     @Override
     public void tick() {
         // Don't update the game while inventory is open - player should not move
@@ -773,15 +762,20 @@ public final class InventoryScreen implements Screen {
             creativeInventoryTexture.bind();
             glColor4f(1f, 1f, 1f, 1f);
             
-            float creativeTexWidth = creativeInventoryTexture.width * GUI_SCALE;
-            float creativeTexHeight = creativeInventoryTexture.height * GUI_SCALE;
-            float creativeX = w - creativeTexWidth - 50f;  // 50 pixels from right edge
+            // Use only the content area dimensions, not the full canvas
+            float creativeTexWidth = CREATIVE_CONTENT_WIDTH * GUI_SCALE;
+            float creativeTexHeight = CREATIVE_CONTENT_HEIGHT * GUI_SCALE;
+            float creativeX = w - creativeTexWidth - 20f;  // 20 pixels from right edge (moved closer)
             float creativeY = (h - creativeTexHeight) / 2f;
             
+            // Calculate texture coordinates to show only the content area (0,0) to (176,222) of the 256x256 canvas
+            float texU = CREATIVE_CONTENT_WIDTH / CREATIVE_CANVAS_WIDTH;  // 176/256
+            float texV = CREATIVE_CONTENT_HEIGHT / CREATIVE_CANVAS_HEIGHT; // 222/256
+            
             glBegin(GL_QUADS);
-            glTexCoord2f(0, 1); glVertex2f(creativeX, creativeY);
-            glTexCoord2f(1, 1); glVertex2f(creativeX + creativeTexWidth, creativeY);
-            glTexCoord2f(1, 0); glVertex2f(creativeX + creativeTexWidth, creativeY + creativeTexHeight);
+            glTexCoord2f(0, texV); glVertex2f(creativeX, creativeY);
+            glTexCoord2f(texU, texV); glVertex2f(creativeX + creativeTexWidth, creativeY);
+            glTexCoord2f(texU, 0); glVertex2f(creativeX + creativeTexWidth, creativeY + creativeTexHeight);
             glTexCoord2f(0, 0); glVertex2f(creativeX, creativeY + creativeTexHeight);
             glEnd();
             
@@ -1020,20 +1014,17 @@ public final class InventoryScreen implements Screen {
      * Draw items in creative inventory slots.
      */
     private void drawCreativeInventoryItems(float guiX, float guiY, float scale) {
-        CreativeModeTab currentTab = getCurrentTab();
-        if (currentTab == null) return;
-        
-        List<Item> items = currentTab.getItems();
+        List<Item> allItems = CreativeModeTabs.getAllItems();
         float itemSize = 19.2f;
         
         for (int i = 0; i < creativeSlots.size(); i++) {
             InventorySlot slot = creativeSlots.get(i);
             
-            // Calculate item index considering scroll offset
-            int itemIndex = (creativeScrollOffset * CREATIVE_COLS) + i;
+            // Calculate item index considering scroll row
+            int itemIndex = (creativeScrollRow * CREATIVE_COLS) + i;
             
-            if (itemIndex >= 0 && itemIndex < items.size()) {
-                Item item = items.get(itemIndex);
+            if (itemIndex >= 0 && itemIndex < allItems.size()) {
+                Item item = allItems.get(itemIndex);
                 ItemStack stack = new ItemStack(item, 1);
                 
                 // Calculate screen position for this slot
@@ -1048,32 +1039,48 @@ public final class InventoryScreen implements Screen {
     
     /**
      * Draw tab information at the top of creative inventory.
+     * Shows the tab name of the top-left-most visible item.
      */
     private void drawTabInfo(float guiX, float guiY, float scale) {
-        CreativeModeTab currentTab = getCurrentTab();
-        if (currentTab == null) return;
+        List<Item> allItems = CreativeModeTabs.getAllItems();
         
-        // Draw tab name above the creative inventory
-        String tabName = currentTab.getDisplayName();
+        // Get the first visible item (top-left)
+        int firstItemIndex = creativeScrollRow * CREATIVE_COLS;
+        
+        if (firstItemIndex >= 0 && firstItemIndex < allItems.size()) {
+            Item firstItem = allItems.get(firstItemIndex);
+            CreativeModeTab tab = CreativeModeTabs.getTabForItem(firstItem);
+            
+            if (tab != null) {
+                // Draw tab name above the creative inventory
+                String tabName = tab.getDisplayName();
+                float textX = guiX + 10f;
+                float textY = guiY - 30f;
+                float textScale = 1.2f;
+                
+                glEnable(GL_BLEND);
+                glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+                
+                // Draw shadow
+                glColor4f(0.25f, 0.25f, 0.25f, 1.0f);
+                mattmc.client.gui.components.TextRenderer.drawText(tabName, textX + 1, textY + 1, textScale);
+                
+                // Draw main text
+                glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
+                mattmc.client.gui.components.TextRenderer.drawText(tabName, textX, textY, textScale);
+                
+                glDisable(GL_BLEND);
+            }
+        }
+        
+        // Draw scroll hint below the inventory
+        String hint = "Scroll to navigate items";
+        float hintY = guiY + CREATIVE_CONTENT_HEIGHT * scale + 10f;
         float textX = guiX + 10f;
-        float textY = guiY - 30f;
-        float textScale = 1.2f;
+        float textScale = 0.8f;
         
         glEnable(GL_BLEND);
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-        
-        // Draw shadow
-        glColor4f(0.25f, 0.25f, 0.25f, 1.0f);
-        mattmc.client.gui.components.TextRenderer.drawText(tabName, textX + 1, textY + 1, textScale);
-        
-        // Draw main text
-        glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
-        mattmc.client.gui.components.TextRenderer.drawText(tabName, textX, textY, textScale);
-        
-        // Draw tab navigation hint below the inventory
-        String hint = "Press 1-" + Math.min(9, CreativeModeTabs.getTabCount()) + " to switch tabs | Scroll to navigate";
-        float hintY = guiY + creativeInventoryTexture.height * scale + 10f;
-        textScale = 0.8f;
         
         glColor4f(0.25f, 0.25f, 0.25f, 1.0f);
         mattmc.client.gui.components.TextRenderer.drawText(hint, textX + 1, hintY + 1, textScale);
