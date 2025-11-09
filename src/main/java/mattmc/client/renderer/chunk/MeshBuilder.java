@@ -423,7 +423,10 @@ public class MeshBuilder {
             v1 = uvMapping.v1;
         }
         
-        // Top face of slab
+        // Calculate mid-point for half-height textures
+        float v05 = (v0 + v1) / 2.0f;
+        
+        // Top face of slab (full texture)
         int base = currentVertex;
         addVertex(x0, y1, z0, u0, v0, colorTop);
         addVertex(x0, y1, z1, u0, v1, colorTop);
@@ -432,7 +435,7 @@ public class MeshBuilder {
         addQuadIndices(base);
         currentVertex += 4;
         
-        // Bottom face
+        // Bottom face (full texture)
         base = currentVertex;
         addVertex(x0, y0, z0, u0, v0, colorBottom);
         addVertex(x1, y0, z0, u1, v0, colorBottom);
@@ -441,39 +444,39 @@ public class MeshBuilder {
         addQuadIndices(base);
         currentVertex += 4;
         
-        // North face
+        // North face (only use bottom half of texture since slab is half height)
         base = currentVertex;
         addVertex(x1, y0, z0, u1, v1, colorNorth);
         addVertex(x0, y0, z0, u0, v1, colorNorth);
-        addVertex(x0, y1, z0, u0, v0, colorNorth);
-        addVertex(x1, y1, z0, u1, v0, colorNorth);
+        addVertex(x0, y1, z0, u0, v05, colorNorth);
+        addVertex(x1, y1, z0, u1, v05, colorNorth);
         addQuadIndices(base);
         currentVertex += 4;
         
-        // South face
+        // South face (only use bottom half of texture)
         base = currentVertex;
         addVertex(x0, y0, z1, u0, v1, colorSouth);
         addVertex(x1, y0, z1, u1, v1, colorSouth);
-        addVertex(x1, y1, z1, u1, v0, colorSouth);
-        addVertex(x0, y1, z1, u0, v0, colorSouth);
+        addVertex(x1, y1, z1, u1, v05, colorSouth);
+        addVertex(x0, y1, z1, u0, v05, colorSouth);
         addQuadIndices(base);
         currentVertex += 4;
         
-        // West face
+        // West face (only use bottom half of texture)
         base = currentVertex;
         addVertex(x0, y0, z0, u0, v1, colorWest);
         addVertex(x0, y0, z1, u1, v1, colorWest);
-        addVertex(x0, y1, z1, u1, v0, colorWest);
-        addVertex(x0, y1, z0, u0, v0, colorWest);
+        addVertex(x0, y1, z1, u1, v05, colorWest);
+        addVertex(x0, y1, z0, u0, v05, colorWest);
         addQuadIndices(base);
         currentVertex += 4;
         
-        // East face
+        // East face (only use bottom half of texture)
         base = currentVertex;
         addVertex(x1, y0, z1, u1, v1, colorEast);
         addVertex(x1, y0, z0, u0, v1, colorEast);
-        addVertex(x1, y1, z0, u0, v0, colorEast);
-        addVertex(x1, y1, z1, u1, v0, colorEast);
+        addVertex(x1, y1, z0, u0, v05, colorEast);
+        addVertex(x1, y1, z1, u1, v05, colorEast);
         addQuadIndices(base);
         currentVertex += 4;
     }
@@ -499,7 +502,7 @@ public class MeshBuilder {
             v1 = uvMapping.v1;
         }
         
-        // Top face of step (north half only)
+        // Top face of step (north half only - use half depth of texture)
         int base = currentVertex;
         addVertex(x0, y1, z0, u0, v0, colorTop);
         addVertex(x0, y1, z05, u0, v05, colorTop);
@@ -508,37 +511,37 @@ public class MeshBuilder {
         addQuadIndices(base);
         currentVertex += 4;
         
-        // North face of step
+        // North face of step (full height - use top half of texture since this is upper step)
         base = currentVertex;
-        addVertex(x1, y0, z0, u1, v1, colorNorth);
-        addVertex(x0, y0, z0, u0, v1, colorNorth);
+        addVertex(x1, y0, z0, u1, v05, colorNorth);
+        addVertex(x0, y0, z0, u0, v05, colorNorth);
         addVertex(x0, y1, z0, u0, v0, colorNorth);
         addVertex(x1, y1, z0, u1, v0, colorNorth);
         addQuadIndices(base);
         currentVertex += 4;
         
-        // South face of step (inner vertical face)
+        // South face of step (inner vertical face - use top half of texture)
         base = currentVertex;
-        addVertex(x0, y0, z05, u0, v1, colorSouth);
-        addVertex(x1, y0, z05, u1, v1, colorSouth);
+        addVertex(x0, y0, z05, u0, v05, colorSouth);
+        addVertex(x1, y0, z05, u1, v05, colorSouth);
         addVertex(x1, y1, z05, u1, v0, colorSouth);
         addVertex(x0, y1, z05, u0, v0, colorSouth);
         addQuadIndices(base);
         currentVertex += 4;
         
-        // West face of step
+        // West face of step (half depth, use top half of texture vertically)
         base = currentVertex;
-        addVertex(x0, y0, z0, u0, v1, colorWest);
-        addVertex(x0, y0, z05, u05, v1, colorWest);
+        addVertex(x0, y0, z0, u0, v05, colorWest);
+        addVertex(x0, y0, z05, u05, v05, colorWest);
         addVertex(x0, y1, z05, u05, v0, colorWest);
         addVertex(x0, y1, z0, u0, v0, colorWest);
         addQuadIndices(base);
         currentVertex += 4;
         
-        // East face of step
+        // East face of step (half depth, use top half of texture vertically)
         base = currentVertex;
-        addVertex(x1, y0, z05, u05, v1, colorEast);
-        addVertex(x1, y0, z0, u0, v1, colorEast);
+        addVertex(x1, y0, z05, u05, v05, colorEast);
+        addVertex(x1, y0, z0, u0, v05, colorEast);
         addVertex(x1, y1, z0, u0, v0, colorEast);
         addVertex(x1, y1, z05, u05, v0, colorEast);
         addQuadIndices(base);

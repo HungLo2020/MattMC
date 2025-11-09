@@ -151,5 +151,24 @@ public class Block {
     public boolean hasCustomRendering() {
         return false;
     }
+    
+    /**
+     * Get the blockstate for placement.
+     * Override in subclasses that need placement logic (e.g., stairs).
+     * 
+     * @param playerX Player X position
+     * @param playerY Player Y position
+     * @param playerZ Player Z position
+     * @param blockX Block X position being placed
+     * @param blockY Block Y position being placed
+     * @param blockZ Block Z position being placed
+     * @param hitFace The face that was clicked (0=bottom, 1=top, 2=north, 3=south, 4=west, 5=east)
+     * @return BlockState for this placement, or null if no state needed
+     */
+    public mattmc.world.level.block.state.BlockState getPlacementState(
+            float playerX, float playerY, float playerZ,
+            int blockX, int blockY, int blockZ, int hitFace) {
+        return null;  // Most blocks don't need placement state
+    }
 }
 
