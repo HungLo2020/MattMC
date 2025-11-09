@@ -65,15 +65,8 @@ public class BlockFaceCollector {
      */
     public void collectBlockFaces(float x, float y, float z, Block block, LevelChunk chunk, 
                                   int cx, int cy, int cz) {
-        // Check if this block uses custom rendering
-        if (block.hasCustomRendering()) {
-            // For custom blocks like stairs, add a single "full block" renderer
-            // The renderer will handle all faces
-            int color = 0xFFFFFF;
-            topFaces.add(new FaceData(x, y, z, color, 1f, 1f, block, "all", 
-                BlockFaceGeometry::drawStairsNorthBottom));
-            return;
-        }
+        // TODO: Implement proper custom rendering for stairs via VBO vertex generation
+        // For now, render stairs as regular cubes (collision boxes are still correct)
         
         // Use white color (0xFFFFFF) by default - textures will show their natural colors
         // Fallback magenta color will only be applied if texture is missing (handled in bindTextureForBlock)

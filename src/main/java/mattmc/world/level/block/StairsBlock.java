@@ -51,10 +51,11 @@ public class StairsBlock extends Block {
     }
     
     /**
-     * Stairs use custom rendering, not simple cube geometry.
+     * Stairs use custom collision but render as cubes for now.
+     * TODO: Implement proper VBO-based stairs rendering.
      */
     @Override
     public boolean hasCustomRendering() {
-        return true;
+        return false;  // Disabled custom rendering - causes texture atlas display bug
     }
 }
