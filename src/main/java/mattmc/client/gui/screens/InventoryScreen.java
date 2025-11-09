@@ -630,7 +630,7 @@ public final class InventoryScreen implements Screen {
     
     /**
      * Handle clicking on a creative inventory item.
-     * Deposits a single item into the first available slot (hotbar first, then main inventory).
+     * Attempts to merge with existing stacks first, then deposits into first available slot.
      */
     private void handleCreativeItemClick(mattmc.world.item.Inventory inventory, int itemIndex) {
         if (itemIndex < 0 || itemIndex >= allItems.size()) {
@@ -640,6 +640,28 @@ public final class InventoryScreen implements Screen {
         Item item = allItems.get(itemIndex);
         ItemStack stackToAdd = new ItemStack(item, 1);
         
+        // First, try to merge with existing stacks (hotbar first, then main inventory)
+        // Try hotbar (slots 0-8)
+        for (int i = 0; i < 9; i++) {
+            ItemStack existing = inventory.getStack(i);
+            if (existing != null && existing.getItem() == item && 
+                existing.getCount() < item.getMaxStackSize()) {
+                existing.grow(1);
+                return;
+            }
+        }
+        
+        // Try main inventory (slots 9-35)
+        for (int i = 9; i < 36; i++) {
+            ItemStack existing = inventory.getStack(i);
+            if (existing != null && existing.getItem() == item && 
+                existing.getCount() < item.getMaxStackSize()) {
+                existing.grow(1);
+                return;
+            }
+        }
+        
+        // If no existing stacks to merge with, find first empty slot
         // Try hotbar first (slots 0-8)
         for (int i = 0; i < 9; i++) {
             ItemStack existing = inventory.getStack(i);
@@ -658,15 +680,8 @@ public final class InventoryScreen implements Screen {
             }
         }
         
-        // If no empty slots, try to stack with existing items
-        for (int i = 0; i < 36; i++) {
-            ItemStack existing = inventory.getStack(i);
-            if (existing != null && existing.getItem() == item && 
-                existing.getCount() < item.getMaxStackSize()) {
-                existing.setCount(existing.getCount() + 1);
-                return;
-            }
-        }
+        // If we get here, inventory is completely full and all stacks are at max capacity
+        // Item cannot be added
     }
 
     @Override
