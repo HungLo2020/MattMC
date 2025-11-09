@@ -35,7 +35,7 @@ public final class InventoryScreen implements Screen {
     
     // Creative inventory constants
     private static final int CREATIVE_COLS = 9;
-    private static final int CREATIVE_ROWS = 18;
+    private static final int CREATIVE_ROWS = 15;
     
     private final Minecraft game;
     private final Window window;
@@ -601,7 +601,7 @@ public final class InventoryScreen implements Screen {
         // Calculate creative inventory position
         int w = window.width(), h = window.height();
         float contentWidth = 176f * GUI_SCALE;
-        float contentHeight = 350f * GUI_SCALE;
+        float contentHeight = 296f * GUI_SCALE;
         float guiX = w - contentWidth - 20f;
         float guiY = (h - contentHeight) / 2f;
         
@@ -976,23 +976,23 @@ public final class InventoryScreen implements Screen {
      * Render the creative inventory on the right side of the screen.
      */
     private void renderCreativeInventory(int screenWidth, int screenHeight) {
-        // Texture content area is 176x350 pixels in a 256x384 canvas
+        // Texture content area is 176x296 pixels in a 256x384 canvas
         float contentWidth = 176f * GUI_SCALE;
-        float contentHeight = 350f * GUI_SCALE;
+        float contentHeight = 296f * GUI_SCALE;
         
         // Position on right side of screen
         float x = screenWidth - contentWidth - 20f;
         float y = (screenHeight - contentHeight) / 2f;
         
-        // Render the texture using only the content area (0,0) to (176,350)
+        // Render the texture using only the content area (0,0) to (176,296)
         glEnable(GL_TEXTURE_2D);
         creativeInventoryTexture.bind();
         glColor4f(1f, 1f, 1f, 1f);
         
         // Texture coordinates: (0,1) is top-left, (1,0) is bottom-right in OpenGL
-        // We want to show content from (0,0) to (176,350) of the 256x384 texture
+        // We want to show content from (0,0) to (176,296) of the 256x384 texture
         float texU = 176f / 256f;  // 0.6875
-        float texV_bottom = 1.0f - (350f / 384f);  // 0.0885...
+        float texV_bottom = 1.0f - (296f / 384f);  // 0.229166...
         
         glBegin(GL_QUADS);
         glTexCoord2f(0, 1); glVertex2f(x, y);  // top-left
