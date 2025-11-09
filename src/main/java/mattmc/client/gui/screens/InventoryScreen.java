@@ -642,15 +642,15 @@ public final class InventoryScreen implements Screen {
     /**
      * Initialize creative inventory slot positions.
      * These are positioned to the right of the main inventory.
-     * Coordinates are relative to the creative inventory texture (256x256).
+     * Coordinates are relative to the creative inventory texture (176x222 content).
      */
     private void initializeCreativeSlots() {
         creativeSlots.clear();
         
         // Creative inventory slots (5 rows x 9 columns)
-        // Starting position in the texture (based on analysis)
-        float startX = 8f;
-        float startY = 18f;
+        // The texture has 18x18 pixel slots starting at (0,0)
+        float startX = 8f;  // 8 pixels from left edge
+        float startY = 0f;  // Starting at top of texture content
         
         for (int row = 0; row < CREATIVE_ROWS; row++) {
             for (int col = 0; col < CREATIVE_COLS; col++) {
@@ -768,15 +768,17 @@ public final class InventoryScreen implements Screen {
             float creativeX = w - creativeTexWidth - 20f;  // 20 pixels from right edge (moved closer)
             float creativeY = (h - creativeTexHeight) / 2f;
             
-            // Calculate texture coordinates to show only the content area (0,0) to (176,222) of the 256x256 canvas
-            float texU = CREATIVE_CONTENT_WIDTH / CREATIVE_CANVAS_WIDTH;  // 176/256
-            float texV = CREATIVE_CONTENT_HEIGHT / CREATIVE_CANVAS_HEIGHT; // 222/256
+            // Calculate texture coordinates to show only the content area
+            // Content is at (0,0) to (176,222) in a 256x256 canvas
+            // In OpenGL texture coords: (0,1) is top-left, (1,0) is bottom-right
+            float texU = CREATIVE_CONTENT_WIDTH / CREATIVE_CANVAS_WIDTH;  // 176/256 = 0.6875
+            float texV_bottom = 1.0f - (CREATIVE_CONTENT_HEIGHT / CREATIVE_CANVAS_HEIGHT); // 1 - 222/256 = 0.1328
             
             glBegin(GL_QUADS);
-            glTexCoord2f(0, texV); glVertex2f(creativeX, creativeY);
-            glTexCoord2f(texU, texV); glVertex2f(creativeX + creativeTexWidth, creativeY);
-            glTexCoord2f(texU, 0); glVertex2f(creativeX + creativeTexWidth, creativeY + creativeTexHeight);
-            glTexCoord2f(0, 0); glVertex2f(creativeX, creativeY + creativeTexHeight);
+            glTexCoord2f(0, 1); glVertex2f(creativeX, creativeY);  // top-left
+            glTexCoord2f(texU, 1); glVertex2f(creativeX + creativeTexWidth, creativeY);  // top-right
+            glTexCoord2f(texU, texV_bottom); glVertex2f(creativeX + creativeTexWidth, creativeY + creativeTexHeight);  // bottom-right
+            glTexCoord2f(0, texV_bottom); glVertex2f(creativeX, creativeY + creativeTexHeight);  // bottom-left
             glEnd();
             
             glDisable(GL_TEXTURE_2D);
