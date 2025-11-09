@@ -253,8 +253,16 @@ public final class InventoryScreen implements Screen {
         }
         
         mattmc.world.item.Inventory inventory = player.getInventory();
-        int slotIndex = findClickedSlot();
         
+        // Check if clicking on creative inventory first
+        int creativeItemIndex = findClickedCreativeItem();
+        if (creativeItemIndex >= 0 && creativeItemIndex < allItems.size()) {
+            handleCreativeItemClick(inventory, creativeItemIndex);
+            return;
+        }
+        
+        // Otherwise handle normal inventory click
+        int slotIndex = findClickedSlot();
         if (slotIndex >= 0) {
             boolean isShiftClick = (mods & GLFW_MOD_SHIFT) != 0;
             
@@ -596,6 +604,99 @@ public final class InventoryScreen implements Screen {
         
         creativeScrollRow -= (int) yoffset;
         creativeScrollRow = Math.max(0, Math.min(creativeScrollRow, maxScrollRow));
+    }
+    
+    /**
+     * Find which creative inventory item (if any) was clicked.
+     * @return Item index in allItems list, or -1 if no item was clicked
+     */
+    private int findClickedCreativeItem() {
+        if (creativeInventoryTexture == null) {
+            return -1;
+        }
+        
+        // Get mouse position in framebuffer coordinates
+        float mouseFBX, mouseFBY;
+        try (MemoryStack stack = stackPush()) {
+            IntBuffer winW = stack.mallocInt(1), winH = stack.mallocInt(1);
+            IntBuffer fbW  = stack.mallocInt(1), fbH  = stack.mallocInt(1);
+            glfwGetWindowSize(window.handle(), winW, winH);
+            glfwGetFramebufferSize(window.handle(), fbW, fbH);
+            float sx = fbW.get(0) / Math.max(1f, winW.get(0));
+            float sy = fbH.get(0) / Math.max(1f, winH.get(0));
+            mouseFBX = (float) mouseXWin * sx;
+            mouseFBY = (float) mouseYWin * sy;
+        }
+        
+        // Calculate creative inventory position
+        int w = window.width(), h = window.height();
+        float contentWidth = 176f * GUI_SCALE;
+        float contentHeight = 222f * GUI_SCALE;
+        float guiX = w - contentWidth - 20f;
+        float guiY = (h - contentHeight) / 2f;
+        
+        // Slot grid parameters
+        float startX = guiX + 8f * GUI_SCALE;
+        float startY = guiY + 18f * GUI_SCALE;
+        float slotSpacing = 18f * GUI_SCALE;
+        
+        // Check which slot was clicked
+        for (int row = 0; row < CREATIVE_ROWS; row++) {
+            for (int col = 0; col < CREATIVE_COLS; col++) {
+                float slotX = startX + col * slotSpacing;
+                float slotY = startY + row * slotSpacing;
+                
+                // Check if mouse is within this slot
+                if (mouseFBX >= slotX && mouseFBX < slotX + slotSpacing &&
+                    mouseFBY >= slotY && mouseFBY < slotY + slotSpacing) {
+                    int itemIndex = (creativeScrollRow + row) * CREATIVE_COLS + col;
+                    return itemIndex;
+                }
+            }
+        }
+        
+        return -1;
+    }
+    
+    /**
+     * Handle clicking on a creative inventory item.
+     * Deposits a single item into the first available slot (hotbar first, then main inventory).
+     */
+    private void handleCreativeItemClick(mattmc.world.item.Inventory inventory, int itemIndex) {
+        if (itemIndex < 0 || itemIndex >= allItems.size()) {
+            return;
+        }
+        
+        Item item = allItems.get(itemIndex);
+        ItemStack stackToAdd = new ItemStack(item, 1);
+        
+        // Try hotbar first (slots 0-8)
+        for (int i = 0; i < 9; i++) {
+            ItemStack existing = inventory.getStack(i);
+            if (existing == null) {
+                inventory.setStack(i, stackToAdd);
+                return;
+            }
+        }
+        
+        // Then try main inventory (slots 9-35)
+        for (int i = 9; i < 36; i++) {
+            ItemStack existing = inventory.getStack(i);
+            if (existing == null) {
+                inventory.setStack(i, stackToAdd);
+                return;
+            }
+        }
+        
+        // If no empty slots, try to stack with existing items
+        for (int i = 0; i < 36; i++) {
+            ItemStack existing = inventory.getStack(i);
+            if (existing != null && existing.getItem() == item && 
+                existing.getCount() < item.getMaxStackSize()) {
+                existing.setCount(existing.getCount() + 1);
+                return;
+            }
+        }
     }
 
     @Override
@@ -943,8 +1044,8 @@ public final class InventoryScreen implements Screen {
                     // Calculate position - center item in the 18x18 slot
                     float slotX = guiX + startX + col * slotSpacing;
                     float slotY = guiY + startY + row * slotSpacing;
-                    float itemX = slotX + (slotSpacing / 2f);
-                    float itemY = slotY + (slotSpacing / 2f);
+                    float itemX = slotX + (slotSpacing / 2f) - 2f;  // Move 2 pixels left
+                    float itemY = slotY + (slotSpacing / 2f) + 8f;  // Move 8 pixels down
                     
                     mattmc.client.renderer.ItemRenderer.renderItem(stack, itemX, itemY, itemSize);
                 }
