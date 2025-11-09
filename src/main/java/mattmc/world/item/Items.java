@@ -69,27 +69,27 @@ public class Items {
     public static final BlockItem CRIMSON_PLANKS = register("crimson_planks", new BlockItem(Blocks.CRIMSON_PLANKS));
     
     // Basic materials (stackable, 64 max)
-    public static final Item STICK = register("stick", new Item(64));
-    public static final Item COAL = register("coal", new Item(64));
-    public static final Item IRON_INGOT = register("iron_ingot", new Item(64));
-    public static final Item GOLD_INGOT = register("gold_ingot", new Item(64));
-    public static final Item DIAMOND = register("diamond", new Item(64));
+    //public static final Item STICK = register("stick", new Item(64));
+    //public static final Item COAL = register("coal", new Item(64));
+    //public static final Item IRON_INGOT = register("iron_ingot", new Item(64));
+    //public static final Item GOLD_INGOT = register("gold_ingot", new Item(64));
+    //public static final Item DIAMOND = register("diamond", new Item(64));
     
     // Tools (non-stackable, 1 max - similar to Minecraft tools)
-    public static final Item WOODEN_PICKAXE = register("wooden_pickaxe", new Item(1));
-    public static final Item STONE_PICKAXE = register("stone_pickaxe", new Item(1));
-    public static final Item IRON_PICKAXE = register("iron_pickaxe", new Item(1));
-    public static final Item DIAMOND_PICKAXE = register("diamond_pickaxe", new Item(1));
+    //public static final Item WOODEN_PICKAXE = register("wooden_pickaxe", new Item(1));
+    //public static final Item STONE_PICKAXE = register("stone_pickaxe", new Item(1));
+    //public static final Item IRON_PICKAXE = register("iron_pickaxe", new Item(1));
+    //public static final Item DIAMOND_PICKAXE = register("diamond_pickaxe", new Item(1));
     
-    public static final Item WOODEN_AXE = register("wooden_axe", new Item(1));
-    public static final Item STONE_AXE = register("stone_axe", new Item(1));
-    public static final Item IRON_AXE = register("iron_axe", new Item(1));
-    public static final Item DIAMOND_AXE = register("diamond_axe", new Item(1));
+    //public static final Item WOODEN_AXE = register("wooden_axe", new Item(1));
+    //public static final Item STONE_AXE = register("stone_axe", new Item(1));
+    //public static final Item IRON_AXE = register("iron_axe", new Item(1));
+    //public static final Item DIAMOND_AXE = register("diamond_axe", new Item(1));
     
-    public static final Item WOODEN_SHOVEL = register("wooden_shovel", new Item(1));
-    public static final Item STONE_SHOVEL = register("stone_shovel", new Item(1));
-    public static final Item IRON_SHOVEL = register("iron_shovel", new Item(1));
-    public static final Item DIAMOND_SHOVEL = register("diamond_shovel", new Item(1));
+    //public static final Item WOODEN_SHOVEL = register("wooden_shovel", new Item(1));
+    //public static final Item STONE_SHOVEL = register("stone_shovel", new Item(1));
+    //public static final Item IRON_SHOVEL = register("iron_shovel", new Item(1));
+    //public static final Item DIAMOND_SHOVEL = register("diamond_shovel", new Item(1));
     
     /**
      * Register an item with a given name (without namespace).
