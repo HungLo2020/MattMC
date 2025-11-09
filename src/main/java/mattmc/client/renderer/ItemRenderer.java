@@ -179,14 +179,17 @@ public class ItemRenderer {
     
     /**
      * Render an isometric stairs showing the same geometry as in-game.
-     * Stairs consist of a bottom slab (half-height) and a top step (half-width).
-     * This matches the actual in-game stairs geometry rendered in isometric view.
+     * Stairs consist of a bottom slab (full width/depth, half height: 0-0.5)
+     * and a top step (back half depth only, half height: 0.5-1.0).
+     * 
+     * This uses the same isometric projection as the cube rendering:
+     * - For a cube: Near bottom is at (x, y), far is diagonal toward top-left
+     * - Each unit in 3D space translates to specific screen coordinates
      */
     private static void renderIsometricStairs(Map<String, String> texturePaths, mattmc.client.resources.model.BlockModel itemModel, float x, float y, float size) {
         // Get textures for each face
         String topTexture = getTextureForFace(texturePaths, "top");
         String sideTexture = getTextureForFace(texturePaths, "side");
-        String bottomTexture = getTextureForFace(texturePaths, "bottom");
         
         // Save GL state
         boolean textureWasEnabled = glIsEnabled(GL_TEXTURE_2D);
@@ -194,111 +197,111 @@ public class ItemRenderer {
         
         // Define the isometric dimensions (matching the cube rendering)
         float scale = size * 2.0f;
-        float isoWidth = scale * 0.5f;
-        float isoHeight = scale * 0.5f;
+        float isoWidth = scale * 0.5f;   // How far left/right a block edge extends
+        float isoHeight = scale * 0.5f;  // How far up/down a block edge extends
         
-        // Stairs are rendered as:
-        // 1. A bottom slab (full width, half height)
-        // 2. A top step on the back half (half width, half height)
+        // For stairs facing NORTH (step on north/back half):
+        // Bottom slab: Full width and depth, from y=0 to y=0.5 (half height)
+        // Top step: North (back) half only, from y=0.5 to y=1.0 (half height)
         
-        // === BOTTOM SLAB (full width, half height) ===
+        // === BOTTOM SLAB (y: 0 to 0.5, full width/depth) ===
         
-        // Bottom slab - Left face (medium brightness - 80%)
+        // Bottom slab - Left face (full depth, half height)
         if (sideTexture != null) {
             Texture tex = loadTexture(sideTexture);
             if (tex != null) {
                 tex.bind();
                 glColor4f(0.8f, 0.8f, 0.8f, 1.0f);
                 glBegin(GL_QUADS);
-                // Left face of bottom slab - half height
-                glTexCoord2f(0, 0.5f); glVertex2f(x, y);                                     // Near bottom
-                glTexCoord2f(1, 0.5f); glVertex2f(x - isoWidth, y - isoHeight * 0.5f);      // Far bottom
-                glTexCoord2f(1, 1);    glVertex2f(x - isoWidth, y - isoHeight);             // Far top
-                glTexCoord2f(0, 1);    glVertex2f(x, y - isoHeight * 0.5f);                 // Near top
+                // Texture coords: bottom half of texture (0.5 to 1.0 in V)
+                glTexCoord2f(0, 0.5f); glVertex2f(x, y);                                 // Near bottom (y=0)
+                glTexCoord2f(1, 0.5f); glVertex2f(x - isoWidth, y - isoHeight * 0.5f);  // Far bottom (y=0)
+                glTexCoord2f(1, 1);    glVertex2f(x - isoWidth, y - isoHeight);         // Far top (y=0.5)
+                glTexCoord2f(0, 1);    glVertex2f(x, y - isoHeight * 0.5f);             // Near top (y=0.5)
                 glEnd();
             }
         }
         
-        // Bottom slab - Right face (darker - 60%)
+        // Bottom slab - Right face (full depth, half height)
         if (sideTexture != null) {
             Texture tex = loadTexture(sideTexture);
             if (tex != null) {
                 tex.bind();
                 glColor4f(0.6f, 0.6f, 0.6f, 1.0f);
                 glBegin(GL_QUADS);
-                // Right face of bottom slab - half height
-                glTexCoord2f(0, 0.5f); glVertex2f(x + isoWidth, y - isoHeight * 0.5f);      // Far bottom
-                glTexCoord2f(1, 0.5f); glVertex2f(x, y);                                     // Near bottom
-                glTexCoord2f(1, 1);    glVertex2f(x, y - isoHeight * 0.5f);                 // Near top
-                glTexCoord2f(0, 1);    glVertex2f(x + isoWidth, y - isoHeight);             // Far top
+                glTexCoord2f(0, 0.5f); glVertex2f(x + isoWidth, y - isoHeight * 0.5f);  // Far bottom (y=0)
+                glTexCoord2f(1, 0.5f); glVertex2f(x, y);                                 // Near bottom (y=0)
+                glTexCoord2f(1, 1);    glVertex2f(x, y - isoHeight * 0.5f);             // Near top (y=0.5)
+                glTexCoord2f(0, 1);    glVertex2f(x + isoWidth, y - isoHeight);         // Far top (y=0.5)
                 glEnd();
             }
         }
         
-        // Bottom slab - Top face (brightest - 100%)
+        // Bottom slab - Top face (full diamond at y=0.5)
         if (topTexture != null) {
             Texture tex = loadTexture(topTexture);
             if (tex != null) {
                 tex.bind();
                 glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
                 glBegin(GL_QUADS);
-                // Top face of bottom slab - full diamond
-                glTexCoord2f(0, 0);    glVertex2f(x, y - isoHeight * 0.5f);                 // Near
-                glTexCoord2f(0.5f, 0); glVertex2f(x - isoWidth, y - isoHeight);             // Left
-                glTexCoord2f(0.5f, 0.5f); glVertex2f(x, y - isoHeight * 1.5f);              // Far
-                glTexCoord2f(0, 0.5f); glVertex2f(x + isoWidth, y - isoHeight);             // Right
+                glTexCoord2f(0, 0);       glVertex2f(x, y - isoHeight * 0.5f);        // Near edge
+                glTexCoord2f(0.5f, 0);    glVertex2f(x - isoWidth, y - isoHeight);    // Left edge
+                glTexCoord2f(0.5f, 0.5f); glVertex2f(x, y - isoHeight * 1.5f);        // Far edge
+                glTexCoord2f(0, 0.5f);    glVertex2f(x + isoWidth, y - isoHeight);    // Right edge
                 glEnd();
             }
         }
         
-        // === TOP STEP (back half only, half width, half height) ===
-        // The top step sits on the back half of the bottom slab
-        // In isometric view, "back" means toward the top-left (negative X, negative Y screen coords)
+        // === TOP STEP (y: 0.5 to 1.0, back/north half only) ===
+        // The step occupies the back (north) half in depth
+        // In isometric view, this means it extends from the middle toward the far (top) point
         
-        // Top step - Left face (medium brightness - 80%)
+        // Top step - Left face (half depth, half height)
         if (sideTexture != null) {
             Texture tex = loadTexture(sideTexture);
             if (tex != null) {
                 tex.bind();
                 glColor4f(0.8f, 0.8f, 0.8f, 1.0f);
                 glBegin(GL_QUADS);
-                // Left face of top step - half depth (back half only)
-                glTexCoord2f(0.5f, 0.5f); glVertex2f(x - isoWidth * 0.5f, y - isoHeight * 0.75f);  // Near bottom
-                glTexCoord2f(1, 0.5f);    glVertex2f(x - isoWidth, y - isoHeight * 1.25f);        // Far bottom  
-                glTexCoord2f(1, 1);       glVertex2f(x - isoWidth, y - isoHeight * 1.75f);        // Far top
-                glTexCoord2f(0.5f, 1);    glVertex2f(x - isoWidth * 0.5f, y - isoHeight * 1.25f); // Near top
+                // The left edge of the step: from center line to far-left
+                // Texture coords: Use back half of texture horizontally (0.5 to 1.0 in U), top half vertically (0 to 0.5 in V)
+                glTexCoord2f(0.5f, 0.5f); glVertex2f(x - isoWidth * 0.5f, y - isoHeight);      // Middle-bottom (y=0.5, z=0.5)
+                glTexCoord2f(1, 0.5f);    glVertex2f(x - isoWidth, y - isoHeight * 1.25f);    // Far-bottom (y=0.5, z=0)
+                glTexCoord2f(1, 1);       glVertex2f(x - isoWidth, y - isoHeight * 1.75f);    // Far-top (y=1.0, z=0)
+                glTexCoord2f(0.5f, 1);    glVertex2f(x - isoWidth * 0.5f, y - isoHeight * 1.5f); // Middle-top (y=1.0, z=0.5)
                 glEnd();
             }
         }
         
-        // Top step - Right face (darker - 60%)
+        // Top step - Right face (half depth, half height)
         if (sideTexture != null) {
             Texture tex = loadTexture(sideTexture);
             if (tex != null) {
                 tex.bind();
                 glColor4f(0.6f, 0.6f, 0.6f, 1.0f);
                 glBegin(GL_QUADS);
-                // Right face of top step - half depth (back half only)
-                glTexCoord2f(0, 0.5f);    glVertex2f(x + isoWidth * 0.5f, y - isoHeight * 0.75f);  // Near bottom (right side)
-                glTexCoord2f(0.5f, 0.5f); glVertex2f(x - isoWidth * 0.5f, y - isoHeight * 0.75f);  // Near bottom (middle)
-                glTexCoord2f(0.5f, 1);    glVertex2f(x - isoWidth * 0.5f, y - isoHeight * 1.25f); // Near top (middle)
-                glTexCoord2f(0, 1);       glVertex2f(x + isoWidth * 0.5f, y - isoHeight * 1.25f); // Near top (right side)
+                // The right edge of the step: from center line to far-right  
+                // Texture coords: Use back half horizontally (0 to 0.5 in U), top half vertically (0 to 0.5 in V)
+                glTexCoord2f(0, 0.5f);    glVertex2f(x + isoWidth * 0.5f, y - isoHeight);      // Middle-bottom (y=0.5, z=0.5)
+                glTexCoord2f(0.5f, 0.5f); glVertex2f(x - isoWidth * 0.5f, y - isoHeight);      // Center-bottom (shared)
+                glTexCoord2f(0.5f, 1);    glVertex2f(x - isoWidth * 0.5f, y - isoHeight * 1.5f); // Center-top (shared)
+                glTexCoord2f(0, 1);       glVertex2f(x + isoWidth * 0.5f, y - isoHeight * 1.5f); // Middle-top (y=1.0, z=0.5)
                 glEnd();
             }
         }
         
-        // Top step - Top face (brightest - 100%)
+        // Top step - Top face (back half diamond at y=1.0)
         if (topTexture != null) {
             Texture tex = loadTexture(topTexture);
             if (tex != null) {
                 tex.bind();
                 glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
                 glBegin(GL_QUADS);
-                // Top face of top step - back half diamond only
-                glTexCoord2f(0.5f, 0);    glVertex2f(x - isoWidth * 0.5f, y - isoHeight * 1.25f); // Middle near
-                glTexCoord2f(0.5f, 0.5f); glVertex2f(x - isoWidth, y - isoHeight * 1.75f);        // Far left
-                glTexCoord2f(1, 0.5f);    glVertex2f(x, y - isoHeight * 2.25f);                   // Far back (top point)
-                glTexCoord2f(1, 0);       glVertex2f(x + isoWidth * 0.5f, y - isoHeight * 1.25f); // Middle right
+                // Top of the step - uses back half of texture (0.5 to 1.0 in both U and V)
+                glTexCoord2f(0.5f, 0);    glVertex2f(x - isoWidth * 0.5f, y - isoHeight * 1.5f); // Middle edge (z=0.5)
+                glTexCoord2f(0.5f, 0.5f); glVertex2f(x - isoWidth, y - isoHeight * 1.75f);       // Far-left (z=0, x=0)
+                glTexCoord2f(1, 0.5f);    glVertex2f(x, y - isoHeight * 2.0f);                   // Far-back point (z=0, x=1)
+                glTexCoord2f(1, 0);       glVertex2f(x + isoWidth * 0.5f, y - isoHeight * 1.5f); // Middle-right (z=0.5, x=1)
                 glEnd();
             }
         }
