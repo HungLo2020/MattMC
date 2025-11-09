@@ -13,6 +13,8 @@ import mattmc.client.renderer.UIRenderer;
 import mattmc.client.renderer.block.BlockFaceGeometry;
 import mattmc.client.renderer.ColorUtils;
 import mattmc.world.item.Inventory;
+import mattmc.world.item.Item;
+import mattmc.world.item.Items;
 import mattmc.world.item.ItemStack;
 import mattmc.world.level.block.Block;
 import mattmc.world.level.block.Blocks;
@@ -326,6 +328,8 @@ public final class DevplayScreen implements Screen {
             executePos2Command();
         } else if (cmd.startsWith("/set ")) {
             executeSetCommand(cmd);
+        } else if (cmd.startsWith("/give ")) {
+            executeGiveCommand(cmd);
         } else {
             commandFeedbackMessage = "Unknown command: " + cmd;
             commandFeedbackDisplayTime = 3.0; // Show error for 3 seconds
@@ -472,6 +476,84 @@ public final class DevplayScreen implements Screen {
         
         // Show confirmation message to user
         commandFeedbackMessage = "Filled " + blocksSet + " blocks with " + blockName;
+        commandFeedbackDisplayTime = 3.0;
+    }
+    
+    /**
+     * Execute /give command - gives the player items and adds them to their inventory.
+     * @param cmd The full command string (e.g., "/give stone 64" or "/give mattmc:dirt 32")
+     */
+    private void executeGiveCommand(String cmd) {
+        // Parse the command: /give <item> <count>
+        String[] parts = cmd.substring(6).trim().split("\\s+");
+        
+        if (parts.length < 2) {
+            commandFeedbackMessage = "Usage: /give <item> <count>";
+            commandFeedbackDisplayTime = 3.0;
+            return;
+        }
+        
+        String itemName = parts[0];
+        int count;
+        
+        try {
+            count = Integer.parseInt(parts[1]);
+            if (count <= 0) {
+                commandFeedbackMessage = "Count must be positive";
+                commandFeedbackDisplayTime = 3.0;
+                return;
+            }
+        } catch (NumberFormatException e) {
+            commandFeedbackMessage = "Invalid count: " + parts[1];
+            commandFeedbackDisplayTime = 3.0;
+            return;
+        }
+        
+        // Look up the item - try with namespace first, then without
+        Item item = null;
+        if (itemName.contains(":")) {
+            // Already has namespace (e.g., "mattmc:stone")
+            item = Items.getItem(itemName);
+        } else {
+            // Try adding default namespace (e.g., "stone" -> "mattmc:stone")
+            item = Items.getItem("mattmc:" + itemName);
+        }
+        
+        if (item == null) {
+            commandFeedbackMessage = "Unknown item: " + itemName;
+            commandFeedbackDisplayTime = 3.0;
+            return;
+        }
+        
+        // Add items to inventory, respecting max stack size
+        Inventory inventory = player.getInventory();
+        int itemsGiven = 0;
+        int remainingCount = count;
+        
+        while (remainingCount > 0) {
+            int stackSize = Math.min(remainingCount, item.getMaxStackSize());
+            ItemStack stack = new ItemStack(item, stackSize);
+            
+            if (inventory.addItem(stack)) {
+                itemsGiven += stackSize;
+                remainingCount -= stackSize;
+            } else {
+                // Inventory is full
+                break;
+            }
+        }
+        
+        if (itemsGiven > 0) {
+            if (itemsGiven < count) {
+                commandFeedbackMessage = "Gave " + itemsGiven + " " + itemName + " (inventory full)";
+            } else {
+                commandFeedbackMessage = "Gave " + itemsGiven + " " + itemName;
+            }
+            logger.info("Gave player {} x{}", itemName, itemsGiven);
+        } else {
+            commandFeedbackMessage = "Inventory is full";
+        }
+        
         commandFeedbackDisplayTime = 3.0;
     }
 
