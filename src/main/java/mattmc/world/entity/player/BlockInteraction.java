@@ -3,6 +3,7 @@ package mattmc.world.entity.player;
 import mattmc.client.Minecraft;
 
 import mattmc.world.item.BlockItem;
+import mattmc.world.item.Item;
 import mattmc.world.item.ItemStack;
 import mattmc.world.item.Items;
 import mattmc.world.level.block.Block;
@@ -77,28 +78,25 @@ public class BlockInteraction {
             return false;
         }
         
-        // Find the corresponding BlockItem for this block
+        // Find the corresponding BlockItem for this block using the Items registry
         String blockId = block.getIdentifier();
         if (blockId == null) {
             return false;
         }
         
-        // Try to get the item with the same identifier
-        BlockItem blockItem = null;
-        if (blockId.equals("mattmc:stone")) {
-            blockItem = Items.STONE;
-        } else if (blockId.equals("mattmc:dirt")) {
-            blockItem = Items.DIRT;
-        } else if (blockId.equals("mattmc:grass_block")) {
-            blockItem = Items.GRASS_BLOCK;
-        }
-        
-        if (blockItem == null) {
+        // Look up the item dynamically from the registry using the block's identifier
+        Item item = Items.getItem(blockId);
+        if (item == null) {
             return false; // No corresponding item for this block
         }
         
+        // Verify it's a BlockItem (items that can be placed as blocks)
+        if (!(item instanceof BlockItem)) {
+            return false;
+        }
+        
         // Add the item to the player's inventory
-        ItemStack stack = new ItemStack(blockItem, 1);
+        ItemStack stack = new ItemStack(item, 1);
         return player.getInventory().addItem(stack);
     }
     
