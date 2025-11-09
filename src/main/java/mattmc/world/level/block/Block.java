@@ -4,6 +4,7 @@ import mattmc.client.Minecraft;
 import mattmc.client.renderer.texture.Texture;
 
 import mattmc.client.resources.ResourceManager;
+import mattmc.world.phys.shapes.VoxelShape;
 
 import java.util.Map;
 
@@ -16,7 +17,7 @@ import java.util.Map;
  * Texture paths are loaded from blockstate and model JSON files.
  * If texture loading fails, a fallback magenta color (0xFF00FF) is used.
  */
-public final class Block {
+public class Block {
     // Fallback color used when texture is missing or fails to load
     private static final int FALLBACK_COLOR = 0xFF00FF; // Magenta
     
@@ -128,6 +129,46 @@ public final class Block {
     
     public boolean isAir() {
         return this == Blocks.AIR;
+    }
+    
+    /**
+     * Get the collision shape for this block.
+     * Override this method in subclasses to provide custom collision shapes.
+     * 
+     * @return The collision shape for this block
+     */
+    public VoxelShape getCollisionShape() {
+        // Default: full block collision
+        return isSolid() ? VoxelShape.block() : VoxelShape.empty();
+    }
+    
+    /**
+     * Check if this block uses custom rendering (not a simple cube).
+     * Override this method in subclasses that need custom geometry.
+     * 
+     * @return true if this block uses custom rendering
+     */
+    public boolean hasCustomRendering() {
+        return false;
+    }
+    
+    /**
+     * Get the blockstate for placement.
+     * Override in subclasses that need placement logic (e.g., stairs).
+     * 
+     * @param playerX Player X position
+     * @param playerY Player Y position
+     * @param playerZ Player Z position
+     * @param blockX Block X position being placed
+     * @param blockY Block Y position being placed
+     * @param blockZ Block Z position being placed
+     * @param hitFace The face that was clicked (0=bottom, 1=top, 2=north, 3=south, 4=west, 5=east)
+     * @return BlockState for this placement, or null if no state needed
+     */
+    public mattmc.world.level.block.state.BlockState getPlacementState(
+            float playerX, float playerY, float playerZ,
+            int blockX, int blockY, int blockZ, int hitFace) {
+        return null;  // Most blocks don't need placement state
     }
 }
 

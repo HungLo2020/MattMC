@@ -196,4 +196,118 @@ public final class BlockFaceGeometry {
             glVertex3f(x0, y0, z1); glVertex3f(x0, y1, z1);
         }
     }
+    
+    /**
+     * Draw a north-facing bottom stairs block.
+     * This draws the geometry for stairs with the step facing north.
+     * The stairs consist of a bottom slab (full block, half height) 
+     * and a top step (north half only, full height).
+     */
+    public static void drawStairsNorthBottom(float x, float y, float z) {
+        float x0 = x, x1 = x + 1;
+        float y0 = y, y05 = y + 0.5f, y1 = y + 1;
+        float z0 = z, z05 = z + 0.5f, z1 = z + 1;
+        
+        // Bottom slab (0, 0, 0) to (1, 0.5, 1)
+        // Top face of bottom slab
+        glTexCoord2f(0, 0); glVertex3f(x0, y05, z0);
+        glTexCoord2f(0, 1); glVertex3f(x0, y05, z1);
+        glTexCoord2f(1, 1); glVertex3f(x1, y05, z1);
+        
+        glTexCoord2f(0, 0); glVertex3f(x0, y05, z0);
+        glTexCoord2f(1, 1); glVertex3f(x1, y05, z1);
+        glTexCoord2f(1, 0); glVertex3f(x1, y05, z0);
+        
+        // Bottom face of slab
+        glTexCoord2f(0, 0); glVertex3f(x0, y0, z0);
+        glTexCoord2f(1, 0); glVertex3f(x1, y0, z0);
+        glTexCoord2f(1, 1); glVertex3f(x1, y0, z1);
+        
+        glTexCoord2f(0, 0); glVertex3f(x0, y0, z0);
+        glTexCoord2f(1, 1); glVertex3f(x1, y0, z1);
+        glTexCoord2f(0, 1); glVertex3f(x0, y0, z1);
+        
+        // North face of slab
+        glTexCoord2f(1, 1); glVertex3f(x1, y0, z0);
+        glTexCoord2f(0, 1); glVertex3f(x0, y0, z0);
+        glTexCoord2f(0, 0.5f); glVertex3f(x0, y05, z0);
+        
+        glTexCoord2f(1, 1); glVertex3f(x1, y0, z0);
+        glTexCoord2f(0, 0.5f); glVertex3f(x0, y05, z0);
+        glTexCoord2f(1, 0.5f); glVertex3f(x1, y05, z0);
+        
+        // South face of slab
+        glTexCoord2f(0, 1); glVertex3f(x0, y0, z1);
+        glTexCoord2f(1, 1); glVertex3f(x1, y0, z1);
+        glTexCoord2f(1, 0.5f); glVertex3f(x1, y05, z1);
+        
+        glTexCoord2f(0, 1); glVertex3f(x0, y0, z1);
+        glTexCoord2f(1, 0.5f); glVertex3f(x1, y05, z1);
+        glTexCoord2f(0, 0.5f); glVertex3f(x0, y05, z1);
+        
+        // West face of slab
+        glTexCoord2f(0, 1); glVertex3f(x0, y0, z0);
+        glTexCoord2f(1, 1); glVertex3f(x0, y0, z1);
+        glTexCoord2f(1, 0.5f); glVertex3f(x0, y05, z1);
+        
+        glTexCoord2f(0, 1); glVertex3f(x0, y0, z0);
+        glTexCoord2f(1, 0.5f); glVertex3f(x0, y05, z1);
+        glTexCoord2f(0, 0.5f); glVertex3f(x0, y05, z0);
+        
+        // East face of slab
+        glTexCoord2f(1, 1); glVertex3f(x1, y0, z1);
+        glTexCoord2f(0, 1); glVertex3f(x1, y0, z0);
+        glTexCoord2f(0, 0.5f); glVertex3f(x1, y05, z0);
+        
+        glTexCoord2f(1, 1); glVertex3f(x1, y0, z1);
+        glTexCoord2f(0, 0.5f); glVertex3f(x1, y05, z0);
+        glTexCoord2f(1, 0.5f); glVertex3f(x1, y05, z1);
+        
+        // Top step (0, 0.5, 0) to (1, 1, 0.5) - north half only
+        // Top face of step
+        glTexCoord2f(0, 0); glVertex3f(x0, y1, z0);
+        glTexCoord2f(0, 0.5f); glVertex3f(x0, y1, z05);
+        glTexCoord2f(1, 0.5f); glVertex3f(x1, y1, z05);
+        
+        glTexCoord2f(0, 0); glVertex3f(x0, y1, z0);
+        glTexCoord2f(1, 0.5f); glVertex3f(x1, y1, z05);
+        glTexCoord2f(1, 0); glVertex3f(x1, y1, z0);
+        
+        // North face of step (full)
+        glTexCoord2f(1, 0.5f); glVertex3f(x1, y05, z0);
+        glTexCoord2f(0, 0.5f); glVertex3f(x0, y05, z0);
+        glTexCoord2f(0, 0); glVertex3f(x0, y1, z0);
+        
+        glTexCoord2f(1, 0.5f); glVertex3f(x1, y05, z0);
+        glTexCoord2f(0, 0); glVertex3f(x0, y1, z0);
+        glTexCoord2f(1, 0); glVertex3f(x1, y1, z0);
+        
+        // South face of step (inner step face)
+        glTexCoord2f(0, 0.5f); glVertex3f(x0, y05, z05);
+        glTexCoord2f(1, 0.5f); glVertex3f(x1, y05, z05);
+        glTexCoord2f(1, 0); glVertex3f(x1, y1, z05);
+        
+        glTexCoord2f(0, 0.5f); glVertex3f(x0, y05, z05);
+        glTexCoord2f(1, 0); glVertex3f(x1, y1, z05);
+        glTexCoord2f(0, 0); glVertex3f(x0, y1, z05);
+        
+        // West face of step
+        glTexCoord2f(0, 0.5f); glVertex3f(x0, y05, z0);
+        glTexCoord2f(0.5f, 0.5f); glVertex3f(x0, y05, z05);
+        glTexCoord2f(0.5f, 0); glVertex3f(x0, y1, z05);
+        
+        glTexCoord2f(0, 0.5f); glVertex3f(x0, y05, z0);
+        glTexCoord2f(0.5f, 0); glVertex3f(x0, y1, z05);
+        glTexCoord2f(0, 0); glVertex3f(x0, y1, z0);
+        
+        // East face of step
+        glTexCoord2f(0.5f, 0.5f); glVertex3f(x1, y05, z05);
+        glTexCoord2f(0, 0.5f); glVertex3f(x1, y05, z0);
+        glTexCoord2f(0, 0); glVertex3f(x1, y1, z0);
+        
+        glTexCoord2f(0.5f, 0.5f); glVertex3f(x1, y05, z05);
+        glTexCoord2f(0, 0); glVertex3f(x1, y1, z0);
+        glTexCoord2f(0.5f, 0); glVertex3f(x1, y1, z05);
+    }
 }
+

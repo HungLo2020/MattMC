@@ -2,6 +2,10 @@ package mattmc.world.level.chunk;
 
 import mattmc.world.level.block.Block;
 import mattmc.world.level.block.Blocks;
+import mattmc.world.level.block.state.BlockState;
+
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * Represents a 16x16x384 chunk of blocks.
@@ -25,6 +29,9 @@ public final class LevelChunk {
     // We store the full array for simplicity, but Minecraft uses sections
     private final Block[][][] blocks;
     
+    // Block states for blocks that need them (sparse storage)
+    private final Map<Long, BlockState> blockStates;
+    
     // Dirty flag: marks if chunk needs to be re-rendered (for display list caching)
     private boolean dirty = true;
     
@@ -32,6 +39,7 @@ public final class LevelChunk {
         this.chunkX = chunkX;
         this.chunkZ = chunkZ;
         this.blocks = new Block[WIDTH][HEIGHT][DEPTH];
+        this.blockStates = new HashMap<>();
         
         // Initialize all blocks to air using Arrays.fill for better performance
         for (int x = 0; x < WIDTH; x++) {
@@ -39,6 +47,13 @@ public final class LevelChunk {
                 java.util.Arrays.fill(blocks[x][y], Blocks.AIR);
             }
         }
+    }
+    
+    /**
+     * Get position key for blockstate map.
+     */
+    private long getPositionKey(int x, int y, int z) {
+        return ((long)x << 32) | ((long)y << 16) | (long)z;
     }
     
     /**
@@ -55,16 +70,48 @@ public final class LevelChunk {
     }
     
     /**
+     * Get a blockstate at chunk-local coordinates.
+     * Returns null if no blockstate exists.
+     */
+    public BlockState getBlockState(int x, int y, int z) {
+        if (x < 0 || x >= WIDTH || y < 0 || y >= HEIGHT || z < 0 || z >= DEPTH) {
+            return null;
+        }
+        return blockStates.get(getPositionKey(x, y, z));
+    }
+    
+    /**
      * Set a block at chunk-local coordinates.
      * @param x 0-15
      * @param y 0-383 (world Y = y + MIN_Y)
      * @param z 0-15
      */
     public void setBlock(int x, int y, int z, Block block) {
+        setBlock(x, y, z, block, null);
+    }
+    
+    /**
+     * Set a block with blockstate at chunk-local coordinates.
+     * @param x 0-15
+     * @param y 0-383 (world Y = y + MIN_Y)
+     * @param z 0-15
+     * @param block The block to place
+     * @param state The blockstate (can be null for stateless blocks)
+     */
+    public void setBlock(int x, int y, int z, Block block, BlockState state) {
         if (x < 0 || x >= WIDTH || y < 0 || y >= HEIGHT || z < 0 || z >= DEPTH) {
             return;
         }
         blocks[x][y][z] = block;
+        
+        // Store or remove blockstate
+        long key = getPositionKey(x, y, z);
+        if (state != null) {
+            blockStates.put(key, state);
+        } else {
+            blockStates.remove(key);
+        }
+        
         this.dirty = true;  // Mark chunk as needing re-render
     }
     

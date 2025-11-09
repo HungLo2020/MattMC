@@ -67,6 +67,7 @@ public class Items {
     public static final BlockItem BAMBOO_PLANKS = register("bamboo_planks", new BlockItem(Blocks.BAMBOO_PLANKS));
     public static final BlockItem WARPED_PLANKS = register("warped_planks", new BlockItem(Blocks.WARPED_PLANKS));
     public static final BlockItem CRIMSON_PLANKS = register("crimson_planks", new BlockItem(Blocks.CRIMSON_PLANKS));
+    public static final BlockItem BIRCH_STAIRS = register("birch_stairs", new BlockItem(Blocks.BIRCH_STAIRS));
     
     // Basic materials (stackable, 64 max)
     //public static final Item STICK = register("stick", new Item(64));

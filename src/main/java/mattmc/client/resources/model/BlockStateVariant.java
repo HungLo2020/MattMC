@@ -4,13 +4,14 @@ package mattmc.client.resources.model;
  * Represents a single variant in a blockstate JSON file.
  * 
  * Example:
- * { "model": "block/dirt", "x": 90, "y": 180, "weight": 400 }
+ * { "model": "block/dirt", "x": 90, "y": 180, "weight": 400, "uvlock": true }
  */
 public class BlockStateVariant {
     private String model;
     private Integer x;
     private Integer y;
     private Integer weight;
+    private Boolean uvlock;
     
     public String getModel() {
         return model;
@@ -42,5 +43,13 @@ public class BlockStateVariant {
     
     public void setWeight(Integer weight) {
         this.weight = weight;
+    }
+    
+    public Boolean getUvlock() {
+        return uvlock;
+    }
+    
+    public void setUvlock(Boolean uvlock) {
+        this.uvlock = uvlock;
     }
 }

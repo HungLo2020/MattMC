@@ -72,6 +72,13 @@ public class MeshBuilder {
      */
     private void addFacesOfType(List<BlockFaceCollector.FaceData> faces, FaceType type) {
         for (BlockFaceCollector.FaceData face : faces) {
+            // Check if this is a stairs block (special marker)
+            if ("stairs".equals(face.faceType)) {
+                // Add stairs geometry instead of regular face, passing blockstate
+                addStairsGeometry(face.x, face.y, face.z, face.block, face.blockState);
+                continue;
+            }
+            
             // Extract color components and UV mapping
             float[] color = extractColor(face);
             TextureAtlas.UVMapping uvMapping = getUVMapping(face);
@@ -364,5 +371,380 @@ public class MeshBuilder {
         indices.add(baseVertex + 0);
         indices.add(baseVertex + 2);
         indices.add(baseVertex + 3);
+    }
+    
+    /**
+     * Add stairs geometry based on blockstate (facing and half).
+     * Stairs consist of a bottom slab and a top step, rotated based on facing direction.
+     */
+    private void addStairsGeometry(float x, float y, float z, mattmc.world.level.block.Block block, 
+                                    mattmc.world.level.block.state.BlockState state) {
+        // Get texture path and UV mapping for stairs
+        String texturePath = block.getTexturePath("side");
+        if (texturePath == null) {
+            texturePath = block.getTexturePath();
+        }
+        TextureAtlas.UVMapping uvMapping = null;
+        if (textureAtlas != null && texturePath != null) {
+            uvMapping = textureAtlas.getUVMapping(texturePath);
+        }
+        
+        // White color with appropriate brightness for each face
+        float[] colorTop = {1.0f, 1.0f, 1.0f, 1.0f};
+        float[] colorBottom = {0.5f, 0.5f, 0.5f, 1.0f};
+        float[] colorNorth = {0.8f, 0.8f, 0.8f, 1.0f};
+        float[] colorSouth = {0.8f, 0.8f, 0.8f, 1.0f};
+        float[] colorWest = {0.6f, 0.6f, 0.6f, 1.0f};
+        float[] colorEast = {0.6f, 0.6f, 0.6f, 1.0f};
+        
+        // Get facing and half from blockstate (default to NORTH and BOTTOM if no state)
+        mattmc.world.level.block.state.properties.Direction facing = 
+            state != null ? state.getDirection("facing") : mattmc.world.level.block.state.properties.Direction.NORTH;
+        mattmc.world.level.block.state.properties.Half half = 
+            state != null ? state.getHalf("half") : mattmc.world.level.block.state.properties.Half.BOTTOM;
+        
+        // Render based on half (top or bottom)
+        if (half == mattmc.world.level.block.state.properties.Half.BOTTOM) {
+            // Bottom stairs: slab on bottom, step on top
+            addStairsBottomSlabFace(x, y, z, 0.5f, facing, colorTop, colorBottom, colorNorth, colorSouth, colorWest, colorEast, uvMapping);
+            addStairsTopStepFace(x, y + 0.5f, z, facing, colorTop, colorNorth, colorSouth, colorWest, colorEast, uvMapping);
+        } else {
+            // Top stairs: slab on top, step on bottom  
+            addStairsBottomSlabFace(x, y + 0.5f, z, 0.5f, facing, colorTop, colorBottom, colorNorth, colorSouth, colorWest, colorEast, uvMapping);
+            addStairsTopStepFace(x, y, z, facing, colorTop, colorNorth, colorSouth, colorWest, colorEast, uvMapping);
+        }
+    }
+    
+    /**
+     * Add bottom slab faces for stairs.
+     * The facing parameter determines which direction the step faces.
+     */
+    private void addStairsBottomSlabFace(float x, float y, float z, float height,
+                                          mattmc.world.level.block.state.properties.Direction facing,
+                                          float[] colorTop, float[] colorBottom, 
+                                          float[] colorNorth, float[] colorSouth,
+                                          float[] colorWest, float[] colorEast,
+                                          TextureAtlas.UVMapping uvMapping) {
+        float x0 = x, x1 = x + 1;
+        float y0 = y, y1 = y + height;
+        float z0 = z, z1 = z + 1;
+        
+        float u0 = 0, v0 = 0, u1 = 1, v1 = 1;
+        if (uvMapping != null) {
+            u0 = uvMapping.u0;
+            v0 = uvMapping.v0;
+            u1 = uvMapping.u1;
+            v1 = uvMapping.v1;
+        }
+        
+        // Calculate mid-point for half-height textures
+        float v05 = (v0 + v1) / 2.0f;
+        
+        // Top face of slab (full texture)
+        int base = currentVertex;
+        addVertex(x0, y1, z0, u0, v0, colorTop);
+        addVertex(x0, y1, z1, u0, v1, colorTop);
+        addVertex(x1, y1, z1, u1, v1, colorTop);
+        addVertex(x1, y1, z0, u1, v0, colorTop);
+        addQuadIndices(base);
+        currentVertex += 4;
+        
+        // Bottom face (full texture)
+        base = currentVertex;
+        addVertex(x0, y0, z0, u0, v0, colorBottom);
+        addVertex(x1, y0, z0, u1, v0, colorBottom);
+        addVertex(x1, y0, z1, u1, v1, colorBottom);
+        addVertex(x0, y0, z1, u0, v1, colorBottom);
+        addQuadIndices(base);
+        currentVertex += 4;
+        
+        // Side faces - all full width/depth, half height
+        // North face
+        base = currentVertex;
+        addVertex(x1, y0, z0, u1, v1, colorNorth);
+        addVertex(x0, y0, z0, u0, v1, colorNorth);
+        addVertex(x0, y1, z0, u0, v05, colorNorth);
+        addVertex(x1, y1, z0, u1, v05, colorNorth);
+        addQuadIndices(base);
+        currentVertex += 4;
+        
+        // South face
+        base = currentVertex;
+        addVertex(x0, y0, z1, u0, v1, colorSouth);
+        addVertex(x1, y0, z1, u1, v1, colorSouth);
+        addVertex(x1, y1, z1, u1, v05, colorSouth);
+        addVertex(x0, y1, z1, u0, v05, colorSouth);
+        addQuadIndices(base);
+        currentVertex += 4;
+        
+        // West face
+        base = currentVertex;
+        addVertex(x0, y0, z0, u0, v1, colorWest);
+        addVertex(x0, y0, z1, u1, v1, colorWest);
+        addVertex(x0, y1, z1, u1, v05, colorWest);
+        addVertex(x0, y1, z0, u0, v05, colorWest);
+        addQuadIndices(base);
+        currentVertex += 4;
+        
+        // East face
+        base = currentVertex;
+        addVertex(x1, y0, z1, u1, v1, colorEast);
+        addVertex(x1, y0, z0, u0, v1, colorEast);
+        addVertex(x1, y1, z0, u0, v05, colorEast);
+        addVertex(x1, y1, z1, u1, v05, colorEast);
+        addQuadIndices(base);
+        currentVertex += 4;
+    }
+    
+    /**
+     * Add top step faces for stairs (based on facing direction).
+     */
+    private void addStairsTopStepFace(float x, float y, float z,
+                                       mattmc.world.level.block.state.properties.Direction facing,
+                                       float[] colorTop, float[] colorNorth, float[] colorSouth,
+                                       float[] colorWest, float[] colorEast,
+                                       TextureAtlas.UVMapping uvMapping) {
+        float x0 = x, x05 = x + 0.5f, x1 = x + 1;
+        float y0 = y, y1 = y + 0.5f;
+        float z0 = z, z05 = z + 0.5f, z1 = z + 1;
+        
+        float u0 = 0, v0 = 0, u05 = 0.5f, u1 = 1, v05 = 0.5f, v1 = 1;
+        if (uvMapping != null) {
+            u0 = uvMapping.u0;
+            v0 = uvMapping.v0;
+            u05 = (uvMapping.u0 + uvMapping.u1) / 2;
+            u1 = uvMapping.u1;
+            v05 = (uvMapping.v0 + uvMapping.v1) / 2;
+            v1 = uvMapping.v1;
+        }
+        
+        // Render step based on facing direction
+        // NORTH: step in north half (z0 to z05)
+        // SOUTH: step in south half (z05 to z1)
+        // WEST: step in west half (x0 to x05)
+        // EAST: step in east half (x05 to x1)
+        
+        switch (facing) {
+            case NORTH -> addStairsStepNorth(x0, x1, y0, y1, z0, z05, u0, u05, u1, v0, v05, v1, 
+                                              colorTop, colorNorth, colorSouth, colorWest, colorEast);
+            case SOUTH -> addStairsStepSouth(x0, x1, y0, y1, z05, z1, u0, u05, u1, v0, v05, v1,
+                                              colorTop, colorNorth, colorSouth, colorWest, colorEast);
+            case WEST -> addStairsStepWest(x0, x05, y0, y1, z0, z1, u0, u05, u1, v0, v05, v1,
+                                            colorTop, colorNorth, colorSouth, colorWest, colorEast);
+            case EAST -> addStairsStepEast(x05, x1, y0, y1, z0, z1, u0, u05, u1, v0, v05, v1,
+                                            colorTop, colorNorth, colorSouth, colorWest, colorEast);
+        }
+    }
+    
+    /**
+     * Add step geometry for north-facing stairs (step in north half).
+     */
+    private void addStairsStepNorth(float x0, float x1, float y0, float y1, float z0, float z05,
+                                     float u0, float u05, float u1, float v0, float v05, float v1,
+                                     float[] colorTop, float[] colorNorth, float[] colorSouth,
+                                     float[] colorWest, float[] colorEast) {
+        // Top face (north half)
+        int base = currentVertex;
+        addVertex(x0, y1, z0, u0, v0, colorTop);
+        addVertex(x0, y1, z05, u0, v05, colorTop);
+        addVertex(x1, y1, z05, u1, v05, colorTop);
+        addVertex(x1, y1, z0, u1, v0, colorTop);
+        addQuadIndices(base);
+        currentVertex += 4;
+        
+        // North face (front of step)
+        base = currentVertex;
+        addVertex(x1, y0, z0, u1, v05, colorNorth);
+        addVertex(x0, y0, z0, u0, v05, colorNorth);
+        addVertex(x0, y1, z0, u0, v0, colorNorth);
+        addVertex(x1, y1, z0, u1, v0, colorNorth);
+        addQuadIndices(base);
+        currentVertex += 4;
+        
+        // South face (inner vertical)
+        base = currentVertex;
+        addVertex(x0, y0, z05, u0, v05, colorSouth);
+        addVertex(x1, y0, z05, u1, v05, colorSouth);
+        addVertex(x1, y1, z05, u1, v0, colorSouth);
+        addVertex(x0, y1, z05, u0, v0, colorSouth);
+        addQuadIndices(base);
+        currentVertex += 4;
+        
+        // West face (left side, half depth)
+        base = currentVertex;
+        addVertex(x0, y0, z0, u0, v05, colorWest);
+        addVertex(x0, y0, z05, u05, v05, colorWest);
+        addVertex(x0, y1, z05, u05, v0, colorWest);
+        addVertex(x0, y1, z0, u0, v0, colorWest);
+        addQuadIndices(base);
+        currentVertex += 4;
+        
+        // East face (right side, half depth)
+        base = currentVertex;
+        addVertex(x1, y0, z05, u05, v05, colorEast);
+        addVertex(x1, y0, z0, u0, v05, colorEast);
+        addVertex(x1, y1, z0, u0, v0, colorEast);
+        addVertex(x1, y1, z05, u05, v0, colorEast);
+        addQuadIndices(base);
+        currentVertex += 4;
+    }
+    
+    /**
+     * Add step geometry for south-facing stairs (step in south half).
+     */
+    private void addStairsStepSouth(float x0, float x1, float y0, float y1, float z05, float z1,
+                                     float u0, float u05, float u1, float v0, float v05, float v1,
+                                     float[] colorTop, float[] colorNorth, float[] colorSouth,
+                                     float[] colorWest, float[] colorEast) {
+        // Top face (south half)
+        int base = currentVertex;
+        addVertex(x0, y1, z05, u0, v05, colorTop);
+        addVertex(x0, y1, z1, u0, v1, colorTop);
+        addVertex(x1, y1, z1, u1, v1, colorTop);
+        addVertex(x1, y1, z05, u1, v05, colorTop);
+        addQuadIndices(base);
+        currentVertex += 4;
+        
+        // North face (inner vertical)
+        base = currentVertex;
+        addVertex(x1, y0, z05, u1, v05, colorNorth);
+        addVertex(x0, y0, z05, u0, v05, colorNorth);
+        addVertex(x0, y1, z05, u0, v0, colorNorth);
+        addVertex(x1, y1, z05, u1, v0, colorNorth);
+        addQuadIndices(base);
+        currentVertex += 4;
+        
+        // South face (front of step)
+        base = currentVertex;
+        addVertex(x0, y0, z1, u0, v05, colorSouth);
+        addVertex(x1, y0, z1, u1, v05, colorSouth);
+        addVertex(x1, y1, z1, u1, v0, colorSouth);
+        addVertex(x0, y1, z1, u0, v0, colorSouth);
+        addQuadIndices(base);
+        currentVertex += 4;
+        
+        // West face (left side, half depth)
+        base = currentVertex;
+        addVertex(x0, y0, z05, u05, v05, colorWest);
+        addVertex(x0, y0, z1, u1, v05, colorWest);
+        addVertex(x0, y1, z1, u1, v0, colorWest);
+        addVertex(x0, y1, z05, u05, v0, colorWest);
+        addQuadIndices(base);
+        currentVertex += 4;
+        
+        // East face (right side, half depth)
+        base = currentVertex;
+        addVertex(x1, y0, z1, u1, v05, colorEast);
+        addVertex(x1, y0, z05, u05, v05, colorEast);
+        addVertex(x1, y1, z05, u05, v0, colorEast);
+        addVertex(x1, y1, z1, u1, v0, colorEast);
+        addQuadIndices(base);
+        currentVertex += 4;
+    }
+    
+    /**
+     * Add step geometry for west-facing stairs (step in west half).
+     */
+    private void addStairsStepWest(float x0, float x05, float y0, float y1, float z0, float z1,
+                                    float u0, float u05, float u1, float v0, float v05, float v1,
+                                    float[] colorTop, float[] colorNorth, float[] colorSouth,
+                                    float[] colorWest, float[] colorEast) {
+        // Top face (west half)
+        int base = currentVertex;
+        addVertex(x0, y1, z0, u0, v0, colorTop);
+        addVertex(x0, y1, z1, u0, v1, colorTop);
+        addVertex(x05, y1, z1, u05, v1, colorTop);
+        addVertex(x05, y1, z0, u05, v0, colorTop);
+        addQuadIndices(base);
+        currentVertex += 4;
+        
+        // North face (left side, half width)
+        base = currentVertex;
+        addVertex(x05, y0, z0, u05, v05, colorNorth);
+        addVertex(x0, y0, z0, u0, v05, colorNorth);
+        addVertex(x0, y1, z0, u0, v0, colorNorth);
+        addVertex(x05, y1, z0, u05, v0, colorNorth);
+        addQuadIndices(base);
+        currentVertex += 4;
+        
+        // South face (right side, half width)
+        base = currentVertex;
+        addVertex(x0, y0, z1, u0, v05, colorSouth);
+        addVertex(x05, y0, z1, u05, v05, colorSouth);
+        addVertex(x05, y1, z1, u05, v0, colorSouth);
+        addVertex(x0, y1, z1, u0, v0, colorSouth);
+        addQuadIndices(base);
+        currentVertex += 4;
+        
+        // West face (front of step)
+        base = currentVertex;
+        addVertex(x0, y0, z0, u0, v05, colorWest);
+        addVertex(x0, y0, z1, u1, v05, colorWest);
+        addVertex(x0, y1, z1, u1, v0, colorWest);
+        addVertex(x0, y1, z0, u0, v0, colorWest);
+        addQuadIndices(base);
+        currentVertex += 4;
+        
+        // East face (inner vertical)
+        base = currentVertex;
+        addVertex(x05, y0, z1, u1, v05, colorEast);
+        addVertex(x05, y0, z0, u0, v05, colorEast);
+        addVertex(x05, y1, z0, u0, v0, colorEast);
+        addVertex(x05, y1, z1, u1, v0, colorEast);
+        addQuadIndices(base);
+        currentVertex += 4;
+    }
+    
+    /**
+     * Add step geometry for east-facing stairs (step in east half).
+     */
+    private void addStairsStepEast(float x05, float x1, float y0, float y1, float z0, float z1,
+                                    float u0, float u05, float u1, float v0, float v05, float v1,
+                                    float[] colorTop, float[] colorNorth, float[] colorSouth,
+                                    float[] colorWest, float[] colorEast) {
+        // Top face (east half)
+        int base = currentVertex;
+        addVertex(x05, y1, z0, u05, v0, colorTop);
+        addVertex(x05, y1, z1, u05, v1, colorTop);
+        addVertex(x1, y1, z1, u1, v1, colorTop);
+        addVertex(x1, y1, z0, u1, v0, colorTop);
+        addQuadIndices(base);
+        currentVertex += 4;
+        
+        // North face (right side, half width)
+        base = currentVertex;
+        addVertex(x1, y0, z0, u1, v05, colorNorth);
+        addVertex(x05, y0, z0, u05, v05, colorNorth);
+        addVertex(x05, y1, z0, u05, v0, colorNorth);
+        addVertex(x1, y1, z0, u1, v0, colorNorth);
+        addQuadIndices(base);
+        currentVertex += 4;
+        
+        // South face (left side, half width)
+        base = currentVertex;
+        addVertex(x05, y0, z1, u05, v05, colorSouth);
+        addVertex(x1, y0, z1, u1, v05, colorSouth);
+        addVertex(x1, y1, z1, u1, v0, colorSouth);
+        addVertex(x05, y1, z1, u05, v0, colorSouth);
+        addQuadIndices(base);
+        currentVertex += 4;
+        
+        // West face (inner vertical)
+        base = currentVertex;
+        addVertex(x05, y0, z0, u0, v05, colorWest);
+        addVertex(x05, y0, z1, u1, v05, colorWest);
+        addVertex(x05, y1, z1, u1, v0, colorWest);
+        addVertex(x05, y1, z0, u0, v0, colorWest);
+        addQuadIndices(base);
+        currentVertex += 4;
+        
+        // East face (front of step)
+        base = currentVertex;
+        addVertex(x1, y0, z1, u1, v05, colorEast);
+        addVertex(x1, y0, z0, u0, v05, colorEast);
+        addVertex(x1, y1, z0, u0, v0, colorEast);
+        addVertex(x1, y1, z1, u1, v0, colorEast);
+        addQuadIndices(base);
+        currentVertex += 4;
     }
 }

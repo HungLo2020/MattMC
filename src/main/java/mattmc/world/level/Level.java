@@ -306,12 +306,41 @@ public class Level implements LevelAccessor {
     }
     
     /**
+     * Get a blockstate at world coordinates.
+     */
+    @Override
+    public mattmc.world.level.block.state.BlockState getBlockState(int worldX, int chunkY, int worldZ) {
+        // Convert world coordinates to chunk coordinates
+        int chunkX = Math.floorDiv(worldX, LevelChunk.WIDTH);
+        int chunkZ = Math.floorDiv(worldZ, LevelChunk.DEPTH);
+        
+        // Get local coordinates within the chunk
+        int localX = Math.floorMod(worldX, LevelChunk.WIDTH);
+        int localZ = Math.floorMod(worldZ, LevelChunk.DEPTH);
+        
+        LevelChunk chunk = getChunkIfLoaded(chunkX, chunkZ);
+        if (chunk == null) {
+            return null;
+        }
+        
+        return chunk.getBlockState(localX, chunkY, localZ);
+    }
+    
+    /**
      * Set a block at world coordinates.
      * @param worldX Level X coordinate (can be any value)
      * @param chunkY LevelChunk-local Y coordinate (0-383, same as Region interface)
      * @param worldZ Level Z coordinate (can be any value)
      */
     public void setBlock(int worldX, int chunkY, int worldZ, Block block) {
+        setBlock(worldX, chunkY, worldZ, block, null);
+    }
+    
+    /**
+     * Set a block with blockstate at world coordinates.
+     */
+    @Override
+    public void setBlock(int worldX, int chunkY, int worldZ, Block block, mattmc.world.level.block.state.BlockState state) {
         // Convert world coordinates to chunk coordinates
         int chunkX = Math.floorDiv(worldX, LevelChunk.WIDTH);
         int chunkZ = Math.floorDiv(worldZ, LevelChunk.DEPTH);
@@ -321,7 +350,7 @@ public class Level implements LevelAccessor {
         int localZ = Math.floorMod(worldZ, LevelChunk.DEPTH);
         
         LevelChunk chunk = getChunk(chunkX, chunkZ);
-        chunk.setBlock(localX, chunkY, localZ, block);
+        chunk.setBlock(localX, chunkY, localZ, block, state);
         
         // Mark adjacent chunks as dirty if the block is at a chunk boundary
         // This is needed because adjacent chunks may have faces that need to be culled/unculled
