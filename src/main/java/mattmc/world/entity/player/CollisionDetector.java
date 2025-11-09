@@ -3,6 +3,10 @@ package mattmc.world.entity.player;
 import mattmc.world.level.block.Block;
 import mattmc.world.level.chunk.LevelChunk;
 import mattmc.world.level.LevelAccessor;
+import mattmc.world.phys.AABB;
+import mattmc.world.phys.shapes.VoxelShape;
+
+import java.util.List;
 
 /**
  * Handles collision detection for the player against the world blocks.
@@ -33,6 +37,9 @@ public class CollisionDetector {
         float minZ = z - PlayerPhysics.PLAYER_DEPTH / 2;
         float maxZ = z + PlayerPhysics.PLAYER_DEPTH / 2;
         
+        // Create player AABB
+        AABB playerBox = new AABB(minX, minY, minZ, maxX, maxY, maxZ);
+        
         // Check all potential collision blocks
         int startX = (int) Math.floor(minX);
         int endX = (int) Math.floor(maxX);
@@ -51,8 +58,17 @@ public class CollisionDetector {
                     if (chunkY >= 0 && chunkY < LevelChunk.HEIGHT) {
                         Block block = world.getBlock(bx, chunkY, bz);
                         if (!block.isAir()) {
-                            // Solid block found - collision!
-                            return true;
+                            // Get block's collision shape
+                            VoxelShape shape = block.getCollisionShape();
+                            if (!shape.isEmpty()) {
+                                // Get AABBs for this block and check collision
+                                List<AABB> blockBoxes = shape.toAabbs(bx, by, bz);
+                                for (AABB blockBox : blockBoxes) {
+                                    if (playerBox.intersects(blockBox)) {
+                                        return true;
+                                    }
+                                }
+                            }
                         }
                     }
                 }

@@ -4,6 +4,7 @@ import mattmc.client.Minecraft;
 import mattmc.client.renderer.texture.Texture;
 
 import mattmc.client.resources.ResourceManager;
+import mattmc.world.phys.shapes.VoxelShape;
 
 import java.util.Map;
 
@@ -128,6 +129,27 @@ public class Block {
     
     public boolean isAir() {
         return this == Blocks.AIR;
+    }
+    
+    /**
+     * Get the collision shape for this block.
+     * Override this method in subclasses to provide custom collision shapes.
+     * 
+     * @return The collision shape for this block
+     */
+    public VoxelShape getCollisionShape() {
+        // Default: full block collision
+        return isSolid() ? VoxelShape.block() : VoxelShape.empty();
+    }
+    
+    /**
+     * Check if this block uses custom rendering (not a simple cube).
+     * Override this method in subclasses that need custom geometry.
+     * 
+     * @return true if this block uses custom rendering
+     */
+    public boolean hasCustomRendering() {
+        return false;
     }
 }
 
