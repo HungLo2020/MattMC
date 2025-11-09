@@ -1018,8 +1018,71 @@ public final class InventoryScreen implements Screen {
         
         glDisable(GL_TEXTURE_2D);
         
+        // Draw hover highlight
+        drawCreativeHoverHighlight(x, y);
+        
         // Draw items in creative slots
         drawCreativeItems(x, y);
+    }
+    
+    /**
+     * Draw hover highlight for creative inventory slots.
+     */
+    private void drawCreativeHoverHighlight(float guiX, float guiY) {
+        // Get mouse position in framebuffer coordinates
+        float mouseFBX, mouseFBY;
+        try (MemoryStack stack = stackPush()) {
+            IntBuffer winW = stack.mallocInt(1), winH = stack.mallocInt(1);
+            IntBuffer fbW  = stack.mallocInt(1), fbH  = stack.mallocInt(1);
+            glfwGetWindowSize(window.handle(), winW, winH);
+            glfwGetFramebufferSize(window.handle(), fbW, fbH);
+            float sx = fbW.get(0) / Math.max(1f, winW.get(0));
+            float sy = fbH.get(0) / Math.max(1f, winH.get(0));
+            mouseFBX = (float) mouseXWin * sx;
+            mouseFBY = (float) mouseYWin * sy;
+        }
+        
+        // Slot grid parameters
+        float startX = guiX + 8f * GUI_SCALE;
+        float startY = guiY + 18f * GUI_SCALE;
+        float slotSpacing = 18f * GUI_SCALE;
+        
+        // Check which slot is being hovered
+        for (int row = 0; row < CREATIVE_ROWS; row++) {
+            for (int col = 0; col < CREATIVE_COLS; col++) {
+                float slotX = startX + col * slotSpacing;
+                float slotY = startY + row * slotSpacing;
+                
+                // Check if mouse is within this slot
+                if (mouseFBX >= slotX && mouseFBX < slotX + slotSpacing &&
+                    mouseFBY >= slotY && mouseFBY < slotY + slotSpacing) {
+                    
+                    int itemIndex = (creativeScrollRow + row) * CREATIVE_COLS + col;
+                    
+                    // Only highlight if there's an item in this slot
+                    if (itemIndex >= 0 && itemIndex < allItems.size()) {
+                        // Draw 16x16 white semi-transparent highlight centered in slot
+                        float highlightSize = 16f * GUI_SCALE;
+                        float highlightX = slotX + (slotSpacing - highlightSize) / 2f;
+                        float highlightY = slotY + (slotSpacing - highlightSize) / 2f;
+                        
+                        glEnable(GL_BLEND);
+                        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+                        glColor4f(1f, 1f, 1f, 0.3f);  // White with 30% opacity
+                        
+                        glBegin(GL_QUADS);
+                        glVertex2f(highlightX, highlightY);
+                        glVertex2f(highlightX + highlightSize, highlightY);
+                        glVertex2f(highlightX + highlightSize, highlightY + highlightSize);
+                        glVertex2f(highlightX, highlightY + highlightSize);
+                        glEnd();
+                        
+                        glDisable(GL_BLEND);
+                        return;  // Only one highlight at a time
+                    }
+                }
+            }
+        }
     }
     
     /**
@@ -1044,8 +1107,8 @@ public final class InventoryScreen implements Screen {
                     // Calculate position - center item in the 18x18 slot
                     float slotX = guiX + startX + col * slotSpacing;
                     float slotY = guiY + startY + row * slotSpacing;
-                    float itemX = slotX + (slotSpacing / 2f) - 2f;  // Move 2 pixels left
-                    float itemY = slotY + (slotSpacing / 2f) + 8f;  // Move 8 pixels down
+                    float itemX = slotX + (slotSpacing / 2f) - 4f;  // Move 4 pixels left
+                    float itemY = slotY + (slotSpacing / 2f) + 10f;  // Move 10 pixels down
                     
                     mattmc.client.renderer.ItemRenderer.renderItem(stack, itemX, itemY, itemSize);
                 }
