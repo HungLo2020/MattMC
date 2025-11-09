@@ -567,13 +567,20 @@ public final class InventoryScreen implements Screen {
     
     /**
      * Handle scroll wheel for creative inventory.
+     * Scrolling down (negative yoffset) increases scroll row to show next items.
+     * Scrolling up (positive yoffset) decreases scroll row to show previous items.
      */
     private void handleCreativeScroll(double yoffset) {
         int totalRows = (allItems.size() + CREATIVE_COLS - 1) / CREATIVE_COLS;
         int maxScrollRow = Math.max(0, totalRows - CREATIVE_ROWS);
         
-        creativeScrollRow -= (int) yoffset;
-        creativeScrollRow = Math.max(0, Math.min(creativeScrollRow, maxScrollRow));
+        // Only allow scrolling if there are more items than can fit in the display
+        if (maxScrollRow > 0) {
+            // Scroll down (negative yoffset) = increase row to show later items
+            // Scroll up (positive yoffset) = decrease row to show earlier items
+            creativeScrollRow += (int) -yoffset;
+            creativeScrollRow = Math.max(0, Math.min(creativeScrollRow, maxScrollRow));
+        }
     }
     
     /**
