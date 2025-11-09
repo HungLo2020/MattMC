@@ -1,6 +1,3 @@
 {
-  "model": {
-    "type": "minecraft:model",
-    "model": "minecraft:block/birch_stairs"
-  }
+  "parent": "block/birch_stairs"
 }

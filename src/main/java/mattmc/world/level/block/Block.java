@@ -16,7 +16,7 @@ import java.util.Map;
  * Texture paths are loaded from blockstate and model JSON files.
  * If texture loading fails, a fallback magenta color (0xFF00FF) is used.
  */
-public final class Block {
+public class Block {
     // Fallback color used when texture is missing or fails to load
     private static final int FALLBACK_COLOR = 0xFF00FF; // Magenta
     
