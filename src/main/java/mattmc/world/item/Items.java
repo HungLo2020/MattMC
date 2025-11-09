@@ -69,27 +69,27 @@ public class Items {
     public static final BlockItem CRIMSON_PLANKS = register("crimson_planks", new BlockItem(Blocks.CRIMSON_PLANKS));
     
     // Basic materials (stackable, 64 max)
-    public static final Item STICK = register("stick", new Item(64));
-    public static final Item COAL = register("coal", new Item(64));
-    public static final Item IRON_INGOT = register("iron_ingot", new Item(64));
-    public static final Item GOLD_INGOT = register("gold_ingot", new Item(64));
-    public static final Item DIAMOND = register("diamond", new Item(64));
+    //public static final Item STICK = register("stick", new Item(64));
+    //public static final Item COAL = register("coal", new Item(64));
+    //public static final Item IRON_INGOT = register("iron_ingot", new Item(64));
+    //public static final Item GOLD_INGOT = register("gold_ingot", new Item(64));
+    //public static final Item DIAMOND = register("diamond", new Item(64));
     
     // Tools (non-stackable, 1 max - similar to Minecraft tools)
-    public static final Item WOODEN_PICKAXE = register("wooden_pickaxe", new Item(1));
-    public static final Item STONE_PICKAXE = register("stone_pickaxe", new Item(1));
-    public static final Item IRON_PICKAXE = register("iron_pickaxe", new Item(1));
-    public static final Item DIAMOND_PICKAXE = register("diamond_pickaxe", new Item(1));
+    //public static final Item WOODEN_PICKAXE = register("wooden_pickaxe", new Item(1));
+    //public static final Item STONE_PICKAXE = register("stone_pickaxe", new Item(1));
+    //public static final Item IRON_PICKAXE = register("iron_pickaxe", new Item(1));
+    //public static final Item DIAMOND_PICKAXE = register("diamond_pickaxe", new Item(1));
     
-    public static final Item WOODEN_AXE = register("wooden_axe", new Item(1));
-    public static final Item STONE_AXE = register("stone_axe", new Item(1));
-    public static final Item IRON_AXE = register("iron_axe", new Item(1));
-    public static final Item DIAMOND_AXE = register("diamond_axe", new Item(1));
+    //public static final Item WOODEN_AXE = register("wooden_axe", new Item(1));
+    //public static final Item STONE_AXE = register("stone_axe", new Item(1));
+    //public static final Item IRON_AXE = register("iron_axe", new Item(1));
+    //public static final Item DIAMOND_AXE = register("diamond_axe", new Item(1));
     
-    public static final Item WOODEN_SHOVEL = register("wooden_shovel", new Item(1));
-    public static final Item STONE_SHOVEL = register("stone_shovel", new Item(1));
-    public static final Item IRON_SHOVEL = register("iron_shovel", new Item(1));
-    public static final Item DIAMOND_SHOVEL = register("diamond_shovel", new Item(1));
+    //public static final Item WOODEN_SHOVEL = register("wooden_shovel", new Item(1));
+    //public static final Item STONE_SHOVEL = register("stone_shovel", new Item(1));
+    //public static final Item IRON_SHOVEL = register("iron_shovel", new Item(1));
+    //public static final Item DIAMOND_SHOVEL = register("diamond_shovel", new Item(1));
     
     /**
      * Initialize creative tabs and assign items to them.
@@ -116,25 +116,25 @@ public class Items {
         CreativeTabs.BUILDING_BLOCKS.addItem(WARPED_PLANKS);
         
         // Tools tab
-        CreativeTabs.TOOLS.addItem(WOODEN_PICKAXE);
-        CreativeTabs.TOOLS.addItem(STONE_PICKAXE);
-        CreativeTabs.TOOLS.addItem(IRON_PICKAXE);
-        CreativeTabs.TOOLS.addItem(DIAMOND_PICKAXE);
-        CreativeTabs.TOOLS.addItem(WOODEN_AXE);
-        CreativeTabs.TOOLS.addItem(STONE_AXE);
-        CreativeTabs.TOOLS.addItem(IRON_AXE);
-        CreativeTabs.TOOLS.addItem(DIAMOND_AXE);
-        CreativeTabs.TOOLS.addItem(WOODEN_SHOVEL);
-        CreativeTabs.TOOLS.addItem(STONE_SHOVEL);
-        CreativeTabs.TOOLS.addItem(IRON_SHOVEL);
-        CreativeTabs.TOOLS.addItem(DIAMOND_SHOVEL);
+        //CreativeTabs.TOOLS.addItem(WOODEN_PICKAXE);
+        //CreativeTabs.TOOLS.addItem(STONE_PICKAXE);
+        //CreativeTabs.TOOLS.addItem(IRON_PICKAXE);
+        //CreativeTabs.TOOLS.addItem(DIAMOND_PICKAXE);
+        //CreativeTabs.TOOLS.addItem(WOODEN_AXE);
+        //CreativeTabs.TOOLS.addItem(STONE_AXE);
+        //CreativeTabs.TOOLS.addItem(IRON_AXE);
+        //CreativeTabs.TOOLS.addItem(DIAMOND_AXE);
+        //CreativeTabs.TOOLS.addItem(WOODEN_SHOVEL);
+        //CreativeTabs.TOOLS.addItem(STONE_SHOVEL);
+        //CreativeTabs.TOOLS.addItem(IRON_SHOVEL);
+        //CreativeTabs.TOOLS.addItem(DIAMOND_SHOVEL);
         
         // Ingredients tab
-        CreativeTabs.INGREDIENTS.addItem(STICK);
-        CreativeTabs.INGREDIENTS.addItem(COAL);
-        CreativeTabs.INGREDIENTS.addItem(IRON_INGOT);
-        CreativeTabs.INGREDIENTS.addItem(GOLD_INGOT);
-        CreativeTabs.INGREDIENTS.addItem(DIAMOND);
+        //CreativeTabs.INGREDIENTS.addItem(STICK);
+        //CreativeTabs.INGREDIENTS.addItem(COAL);
+        //CreativeTabs.INGREDIENTS.addItem(IRON_INGOT);
+        //CreativeTabs.INGREDIENTS.addItem(GOLD_INGOT);
+        //CreativeTabs.INGREDIENTS.addItem(DIAMOND);
     }
     
     /**

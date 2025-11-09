@@ -6,6 +6,7 @@ import java.util.Date
 
 plugins {
     application
+    idea
 }
 
 repositories { mavenCentral() }
