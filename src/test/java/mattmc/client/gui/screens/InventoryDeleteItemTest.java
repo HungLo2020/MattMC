@@ -16,12 +16,12 @@ public class InventoryDeleteItemTest {
         Inventory inventory = new Inventory();
         
         // Place an item in slot 0
-        ItemStack diamond = new ItemStack(Items.DIAMOND, 5);
+        ItemStack diamond = new ItemStack(Items.STONE, 5);
         inventory.setStack(0, diamond);
         
         // Verify item is there
         assertNotNull(inventory.getStack(0));
-        assertEquals(Items.DIAMOND, inventory.getStack(0).getItem());
+        assertEquals(Items.STONE, inventory.getStack(0).getItem());
         assertEquals(5, inventory.getStack(0).getCount());
         
         // Simulate delete (set to null)
@@ -72,7 +72,7 @@ public class InventoryDeleteItemTest {
         Inventory inventory = new Inventory();
         
         // Place a partial stack in slot 10
-        ItemStack iron = new ItemStack(Items.IRON_INGOT, 15);
+        ItemStack iron = new ItemStack(Items.ACACIA_PLANKS, 15);
         inventory.setStack(10, iron);
         
         // Verify partial stack is there
@@ -91,9 +91,9 @@ public class InventoryDeleteItemTest {
         Inventory inventory = new Inventory();
         
         // Place items in multiple hotbar slots
-        inventory.setStack(0, new ItemStack(Items.DIAMOND, 5));
-        inventory.setStack(1, new ItemStack(Items.GOLD_INGOT, 10));
-        inventory.setStack(2, new ItemStack(Items.IRON_INGOT, 20));
+        inventory.setStack(0, new ItemStack(Items.STONE, 5));
+        inventory.setStack(1, new ItemStack(Items.DARK_OAK_PLANKS, 10));
+        inventory.setStack(2, new ItemStack(Items.ACACIA_PLANKS, 20));
         
         // Delete item from slot 1
         inventory.setStack(1, null);
@@ -109,9 +109,9 @@ public class InventoryDeleteItemTest {
         Inventory inventory = new Inventory();
         
         // Place items in multiple main inventory slots
-        inventory.setStack(9, new ItemStack(Items.DIAMOND, 5));
-        inventory.setStack(15, new ItemStack(Items.GOLD_INGOT, 10));
-        inventory.setStack(20, new ItemStack(Items.IRON_INGOT, 20));
+        inventory.setStack(9, new ItemStack(Items.STONE, 5));
+        inventory.setStack(15, new ItemStack(Items.DARK_OAK_PLANKS, 10));
+        inventory.setStack(20, new ItemStack(Items.ACACIA_PLANKS, 20));
         
         // Delete item from slot 15
         inventory.setStack(15, null);

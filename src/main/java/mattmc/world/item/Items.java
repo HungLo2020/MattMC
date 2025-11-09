@@ -92,52 +92,6 @@ public class Items {
     //public static final Item DIAMOND_SHOVEL = register("diamond_shovel", new Item(1));
     
     /**
-     * Initialize creative tabs and assign items to them.
-     * This method should be called after all items are registered.
-     */
-    static {
-        // Building Blocks tab
-        CreativeTabs.BUILDING_BLOCKS.addItem(STONE);
-        CreativeTabs.BUILDING_BLOCKS.addItem(GRASS_BLOCK);
-        CreativeTabs.BUILDING_BLOCKS.addItem(DIRT);
-        CreativeTabs.BUILDING_BLOCKS.addItem(COBBLESTONE);
-        CreativeTabs.BUILDING_BLOCKS.addItem(MOSSY_COBBLESTONE);
-        CreativeTabs.BUILDING_BLOCKS.addItem(OAK_PLANKS);
-        CreativeTabs.BUILDING_BLOCKS.addItem(SPRUCE_PLANKS);
-        CreativeTabs.BUILDING_BLOCKS.addItem(BIRCH_PLANKS);
-        CreativeTabs.BUILDING_BLOCKS.addItem(SILVER_BIRCH_PLANKS);
-        CreativeTabs.BUILDING_BLOCKS.addItem(JUNGLE_PLANKS);
-        CreativeTabs.BUILDING_BLOCKS.addItem(ACACIA_PLANKS);
-        CreativeTabs.BUILDING_BLOCKS.addItem(DARK_OAK_PLANKS);
-        CreativeTabs.BUILDING_BLOCKS.addItem(MANGROVE_PLANKS);
-        CreativeTabs.BUILDING_BLOCKS.addItem(CHERRY_PLANKS);
-        CreativeTabs.BUILDING_BLOCKS.addItem(BAMBOO_PLANKS);
-        CreativeTabs.BUILDING_BLOCKS.addItem(CRIMSON_PLANKS);
-        CreativeTabs.BUILDING_BLOCKS.addItem(WARPED_PLANKS);
-        
-        // Tools tab
-        //CreativeTabs.TOOLS.addItem(WOODEN_PICKAXE);
-        //CreativeTabs.TOOLS.addItem(STONE_PICKAXE);
-        //CreativeTabs.TOOLS.addItem(IRON_PICKAXE);
-        //CreativeTabs.TOOLS.addItem(DIAMOND_PICKAXE);
-        //CreativeTabs.TOOLS.addItem(WOODEN_AXE);
-        //CreativeTabs.TOOLS.addItem(STONE_AXE);
-        //CreativeTabs.TOOLS.addItem(IRON_AXE);
-        //CreativeTabs.TOOLS.addItem(DIAMOND_AXE);
-        //CreativeTabs.TOOLS.addItem(WOODEN_SHOVEL);
-        //CreativeTabs.TOOLS.addItem(STONE_SHOVEL);
-        //CreativeTabs.TOOLS.addItem(IRON_SHOVEL);
-        //CreativeTabs.TOOLS.addItem(DIAMOND_SHOVEL);
-        
-        // Ingredients tab
-        //CreativeTabs.INGREDIENTS.addItem(STICK);
-        //CreativeTabs.INGREDIENTS.addItem(COAL);
-        //CreativeTabs.INGREDIENTS.addItem(IRON_INGOT);
-        //CreativeTabs.INGREDIENTS.addItem(GOLD_INGOT);
-        //CreativeTabs.INGREDIENTS.addItem(DIAMOND);
-    }
-    
-    /**
      * Register an item with a given name (without namespace).
      * Automatically adds "mattmc:" namespace prefix.
      * 

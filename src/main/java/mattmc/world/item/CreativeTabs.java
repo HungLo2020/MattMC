@@ -80,6 +80,13 @@ public class CreativeTabs {
      */
     public static final CreativeTab MISCELLANEOUS = register("miscellaneous", null, "Miscellaneous");
     
+    // Static initializer to ensure CreativeModeTabs is initialized
+    static {
+        // This will trigger the static initializer in CreativeModeTabs
+        // which populates all the tabs with items
+        CreativeModeTabs.init();
+    }
+    
     /**
      * Register a creative tab.
      * 

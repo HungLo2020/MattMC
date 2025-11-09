@@ -20,9 +20,9 @@ public class GiveCommandTest {
         assertNotNull(dirt, "Item 'mattmc:dirt' should exist");
         assertEquals("mattmc:dirt", dirt.getIdentifier());
         
-        Item diamond = Items.getItem("mattmc:diamond");
-        assertNotNull(diamond, "Item 'mattmc:diamond' should exist");
-        assertEquals("mattmc:diamond", diamond.getIdentifier());
+        Item cobblestone = Items.getItem("mattmc:cobblestone");
+        assertNotNull(cobblestone, "Item 'mattmc:cobblestone' should exist");
+        assertEquals("mattmc:cobblestone", cobblestone.getIdentifier());
     }
     
     @Test
@@ -215,23 +215,23 @@ public class GiveCommandTest {
     }
     
     @Test
-    public void testNonStackableItem() {
-        // Test giving a non-stackable item (like a pickaxe)
+    public void testStackableBlockItem() {
+        // Test giving a stackable block item (like planks)
         Inventory inventory = new Inventory();
-        Item pickaxe = Items.DIAMOND_PICKAXE;
+        Item planks = Items.SPRUCE_PLANKS;
         
-        assertEquals(1, pickaxe.getMaxStackSize(), "Pickaxe should have max stack size of 1");
+        assertEquals(64, planks.getMaxStackSize(), "Planks should have max stack size of 64");
         
-        // Add pickaxe
-        ItemStack stack = new ItemStack(pickaxe, 1);
+        // Add planks
+        ItemStack stack = new ItemStack(planks, 16);
         boolean added = inventory.addItem(stack);
-        assertTrue(added, "Pickaxe should be added");
+        assertTrue(added, "Planks should be added");
         
-        // Verify pickaxe is in first slot
+        // Verify planks are in first slot
         ItemStack retrievedStack = inventory.getStack(0);
         assertNotNull(retrievedStack);
-        assertEquals(pickaxe, retrievedStack.getItem());
-        assertEquals(1, retrievedStack.getCount());
+        assertEquals(planks, retrievedStack.getItem());
+        assertEquals(16, retrievedStack.getCount());
     }
     
     @Test

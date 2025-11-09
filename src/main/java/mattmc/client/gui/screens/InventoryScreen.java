@@ -559,6 +559,8 @@ public final class InventoryScreen implements Screen {
      */
     private void initializeCreativeItems() {
         allItems.clear();
+        // Ensure creative mode tabs are initialized
+        mattmc.world.item.CreativeModeTabs.init();
         // Get all unique items from creative tabs
         allItems.addAll(mattmc.world.item.CreativeTabs.getAllUniqueItems());
     }

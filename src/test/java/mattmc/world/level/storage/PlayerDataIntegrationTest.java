@@ -27,8 +27,8 @@ public class PlayerDataIntegrationTest {
         
         // Create and save inventory
         Inventory inventory = new Inventory();
-        inventory.setStack(0, new ItemStack(Items.DIAMOND, 15));
-        inventory.setStack(1, new ItemStack(Items.IRON_PICKAXE, 1));
+        inventory.setStack(0, new ItemStack(Items.STONE, 15));
+        inventory.setStack(1, new ItemStack(Items.BIRCH_PLANKS, 1));
         inventory.setStack(9, new ItemStack(Items.STONE, 64));
         inventory.setSelectedSlot(1);
         
@@ -44,11 +44,11 @@ public class PlayerDataIntegrationTest {
         PlayerData.load(playerDatFile, loaded);
         
         assertNotNull(loaded.getStack(0));
-        assertEquals(Items.DIAMOND, loaded.getStack(0).getItem());
+        assertEquals(Items.STONE, loaded.getStack(0).getItem());
         assertEquals(15, loaded.getStack(0).getCount());
         
         assertNotNull(loaded.getStack(1));
-        assertEquals(Items.IRON_PICKAXE, loaded.getStack(1).getItem());
+        assertEquals(Items.BIRCH_PLANKS, loaded.getStack(1).getItem());
         assertEquals(1, loaded.getStack(1).getCount());
         
         assertNotNull(loaded.getStack(9));
@@ -69,7 +69,7 @@ public class PlayerDataIntegrationTest {
         
         // Save should create directory
         Inventory inventory = new Inventory();
-        inventory.setStack(0, new ItemStack(Items.DIAMOND, 1));
+        inventory.setStack(0, new ItemStack(Items.STONE, 1));
         
         PlayerData.save(playerDatFile, inventory);
         
@@ -85,13 +85,13 @@ public class PlayerDataIntegrationTest {
         
         // First save
         Inventory inv1 = new Inventory();
-        inv1.setStack(0, new ItemStack(Items.DIAMOND, 5));
+        inv1.setStack(0, new ItemStack(Items.STONE, 5));
         PlayerData.save(playerDatFile, inv1);
         
         // Load and modify
         Inventory inv2 = new Inventory();
         PlayerData.load(playerDatFile, inv2);
-        inv2.setStack(1, new ItemStack(Items.GOLD_INGOT, 10));
+        inv2.setStack(1, new ItemStack(Items.DARK_OAK_PLANKS, 10));
         
         // Save again
         PlayerData.save(playerDatFile, inv2);
@@ -101,11 +101,11 @@ public class PlayerDataIntegrationTest {
         PlayerData.load(playerDatFile, inv3);
         
         assertNotNull(inv3.getStack(0));
-        assertEquals(Items.DIAMOND, inv3.getStack(0).getItem());
+        assertEquals(Items.STONE, inv3.getStack(0).getItem());
         assertEquals(5, inv3.getStack(0).getCount());
         
         assertNotNull(inv3.getStack(1));
-        assertEquals(Items.GOLD_INGOT, inv3.getStack(1).getItem());
+        assertEquals(Items.DARK_OAK_PLANKS, inv3.getStack(1).getItem());
         assertEquals(10, inv3.getStack(1).getCount());
     }
     

@@ -10,21 +10,21 @@ public class ItemStackTest {
     
     @Test
     public void testCreateItemStackWithDefaultCount() {
-        ItemStack stack = new ItemStack(Items.DIAMOND);
-        assertEquals(Items.DIAMOND, stack.getItem());
+        ItemStack stack = new ItemStack(Items.STONE);
+        assertEquals(Items.STONE, stack.getItem());
         assertEquals(1, stack.getCount());
     }
     
     @Test
     public void testCreateItemStackWithCustomCount() {
-        ItemStack stack = new ItemStack(Items.DIAMOND, 32);
-        assertEquals(Items.DIAMOND, stack.getItem());
+        ItemStack stack = new ItemStack(Items.STONE, 32);
+        assertEquals(Items.STONE, stack.getItem());
         assertEquals(32, stack.getCount());
     }
     
     @Test
     public void testCreateItemStackWithMaxCount() {
-        ItemStack stack = new ItemStack(Items.DIAMOND, 64);
+        ItemStack stack = new ItemStack(Items.STONE, 64);
         assertEquals(64, stack.getCount());
     }
     
@@ -38,34 +38,34 @@ public class ItemStackTest {
     @Test
     public void testCreateItemStackWithZeroCountThrows() {
         assertThrows(IllegalArgumentException.class, () -> {
-            new ItemStack(Items.DIAMOND, 0);
+            new ItemStack(Items.STONE, 0);
         });
     }
     
     @Test
     public void testCreateItemStackWithNegativeCountThrows() {
         assertThrows(IllegalArgumentException.class, () -> {
-            new ItemStack(Items.DIAMOND, -1);
+            new ItemStack(Items.STONE, -1);
         });
     }
     
     @Test
     public void testCreateItemStackExceedingMaxStackSizeThrows() {
         assertThrows(IllegalArgumentException.class, () -> {
-            new ItemStack(Items.DIAMOND, 65);
+            new ItemStack(Items.STONE, 65);
         });
     }
     
     @Test
     public void testSetCount() {
-        ItemStack stack = new ItemStack(Items.DIAMOND, 10);
+        ItemStack stack = new ItemStack(Items.STONE, 10);
         stack.setCount(20);
         assertEquals(20, stack.getCount());
     }
     
     @Test
     public void testSetCountToZeroThrows() {
-        ItemStack stack = new ItemStack(Items.DIAMOND, 10);
+        ItemStack stack = new ItemStack(Items.STONE, 10);
         assertThrows(IllegalArgumentException.class, () -> {
             stack.setCount(0);
         });
@@ -73,7 +73,7 @@ public class ItemStackTest {
     
     @Test
     public void testSetCountExceedingMaxThrows() {
-        ItemStack stack = new ItemStack(Items.DIAMOND, 10);
+        ItemStack stack = new ItemStack(Items.STONE, 10);
         assertThrows(IllegalArgumentException.class, () -> {
             stack.setCount(65);
         });
@@ -81,7 +81,7 @@ public class ItemStackTest {
     
     @Test
     public void testGrow() {
-        ItemStack stack = new ItemStack(Items.DIAMOND, 10);
+        ItemStack stack = new ItemStack(Items.STONE, 10);
         int added = stack.grow(20);
         assertEquals(20, added);
         assertEquals(30, stack.getCount());
@@ -89,7 +89,7 @@ public class ItemStackTest {
     
     @Test
     public void testGrowHitsMaxStackSize() {
-        ItemStack stack = new ItemStack(Items.DIAMOND, 60);
+        ItemStack stack = new ItemStack(Items.STONE, 60);
         int added = stack.grow(10);
         assertEquals(4, added); // Can only add 4 to reach 64
         assertEquals(64, stack.getCount());
@@ -97,14 +97,14 @@ public class ItemStackTest {
     
     @Test
     public void testShrink() {
-        ItemStack stack = new ItemStack(Items.DIAMOND, 10);
+        ItemStack stack = new ItemStack(Items.STONE, 10);
         stack.shrink(5);
         assertEquals(5, stack.getCount());
     }
     
     @Test
     public void testShrinkToZeroThrows() {
-        ItemStack stack = new ItemStack(Items.DIAMOND, 5);
+        ItemStack stack = new ItemStack(Items.STONE, 5);
         assertThrows(IllegalArgumentException.class, () -> {
             stack.shrink(5);
         });
@@ -112,7 +112,7 @@ public class ItemStackTest {
     
     @Test
     public void testShrinkBelowZeroThrows() {
-        ItemStack stack = new ItemStack(Items.DIAMOND, 5);
+        ItemStack stack = new ItemStack(Items.STONE, 5);
         assertThrows(IllegalArgumentException.class, () -> {
             stack.shrink(10);
         });
@@ -120,25 +120,25 @@ public class ItemStackTest {
     
     @Test
     public void testIsEmpty() {
-        ItemStack stack = new ItemStack(Items.DIAMOND, 1);
+        ItemStack stack = new ItemStack(Items.STONE, 1);
         assertFalse(stack.isEmpty());
     }
     
     @Test
     public void testIsFull() {
-        ItemStack notFull = new ItemStack(Items.DIAMOND, 32);
+        ItemStack notFull = new ItemStack(Items.STONE, 32);
         assertFalse(notFull.isFull());
         
-        ItemStack full = new ItemStack(Items.DIAMOND, 64);
+        ItemStack full = new ItemStack(Items.STONE, 64);
         assertTrue(full.isFull());
     }
     
     @Test
     public void testCanMergeWith() {
-        ItemStack stack1 = new ItemStack(Items.DIAMOND, 32);
-        ItemStack stack2 = new ItemStack(Items.DIAMOND, 10);
-        ItemStack stack3 = new ItemStack(Items.COAL, 10);
-        ItemStack full = new ItemStack(Items.DIAMOND, 64);
+        ItemStack stack1 = new ItemStack(Items.STONE, 32);
+        ItemStack stack2 = new ItemStack(Items.STONE, 10);
+        ItemStack stack3 = new ItemStack(Items.COBBLESTONE, 10);
+        ItemStack full = new ItemStack(Items.STONE, 64);
         
         assertTrue(stack1.canMergeWith(stack2), "Same item, not full should merge");
         assertFalse(stack1.canMergeWith(stack3), "Different items should not merge");
@@ -148,7 +148,7 @@ public class ItemStackTest {
     
     @Test
     public void testCopy() {
-        ItemStack original = new ItemStack(Items.DIAMOND, 32);
+        ItemStack original = new ItemStack(Items.STONE, 32);
         ItemStack copy = original.copy();
         
         assertNotSame(original, copy);
@@ -163,7 +163,7 @@ public class ItemStackTest {
     
     @Test
     public void testCopyWithCount() {
-        ItemStack original = new ItemStack(Items.DIAMOND, 32);
+        ItemStack original = new ItemStack(Items.STONE, 32);
         ItemStack copy = original.copyWithCount(16);
         
         assertNotSame(original, copy);
@@ -174,9 +174,9 @@ public class ItemStackTest {
     
     @Test
     public void testToString() {
-        ItemStack stack = new ItemStack(Items.DIAMOND, 32);
+        ItemStack stack = new ItemStack(Items.STONE, 32);
         String str = stack.toString();
         assertTrue(str.contains("32"));
-        assertTrue(str.contains("mattmc:diamond"));
+        assertTrue(str.contains("mattmc:stone"));
     }
 }
