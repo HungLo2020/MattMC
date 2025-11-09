@@ -117,7 +117,7 @@ public class BlockFaceCollector {
     }
     
     /**
-     * Check if a face should be rendered (is the adjacent block air or non-opaque?).
+     * Check if a face should be rendered (is the adjacent block air or transparent?).
      */
     private boolean shouldRenderFace(LevelChunk chunk, int x, int y, int z) {
         // Check Y bounds first (no neighboring chunks in Y direction)
@@ -128,13 +128,13 @@ public class BlockFaceCollector {
         // If within chunk bounds, use direct chunk access
         if (x >= 0 && x < LevelChunk.WIDTH && z >= 0 && z < LevelChunk.DEPTH) {
             Block adjacent = chunk.getBlock(x, y, z);
-            return adjacent.isAir() || !adjacent.isOpaque();  // Render if air or non-opaque
+            return adjacent.isAir() || !adjacent.isSolid();  // Render if air or transparent (non-solid)
         }
         
         // Out of chunk bounds in X or Z - need to check neighboring chunk
         if (neighborAccessor != null) {
             Block adjacentBlock = neighborAccessor.getBlockAcrossChunks(chunk, x, y, z);
-            return adjacentBlock.isAir() || !adjacentBlock.isOpaque();  // Render if air or non-opaque
+            return adjacentBlock.isAir() || !adjacentBlock.isSolid();  // Render if air or transparent
         }
         
         // No neighbor accessor available - fall back to old behavior

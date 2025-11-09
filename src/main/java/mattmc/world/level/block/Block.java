@@ -132,16 +132,6 @@ public class Block {
     }
     
     /**
-     * Check if this block is opaque (fully covers all faces for culling).
-     * Override this in subclasses for non-opaque blocks like stairs, slabs, etc.
-     * 
-     * @return true if this block is fully opaque
-     */
-    public boolean isOpaque() {
-        return isSolid();  // By default, solid blocks are opaque
-    }
-    
-    /**
      * Get the collision shape for this block.
      * Override this method in subclasses to provide custom collision shapes.
      * 

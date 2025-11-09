@@ -27,17 +27,18 @@ public class StairsBlock extends Block {
     
     /**
      * Create a new stairs block.
-     * Stairs blocks are always solid (have collision).
+     * Stairs blocks are transparent (non-solid) so adjacent blocks render correctly,
+     * but still have custom collision shapes.
      */
     public StairsBlock() {
-        super(true);
+        super(false);  // Stairs are transparent/non-solid for rendering
     }
     
     /**
      * Internal constructor used during registration to set the identifier.
      */
     StairsBlock(String identifier) {
-        super(true, identifier);
+        super(false, identifier);  // Stairs are transparent/non-solid for rendering
     }
     
     /**
@@ -48,15 +49,6 @@ public class StairsBlock extends Block {
     @Override
     public VoxelShape getCollisionShape() {
         return BOTTOM_SHAPE;
-    }
-    
-    /**
-     * Stairs are not opaque - they don't fully cover adjacent faces.
-     * This prevents adjacent blocks from having their faces culled.
-     */
-    @Override
-    public boolean isOpaque() {
-        return false;
     }
     
     /**
