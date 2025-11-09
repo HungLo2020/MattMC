@@ -53,6 +53,8 @@ public class Items {
     public static final BlockItem STONE = register("stone", new BlockItem(Blocks.STONE));
     public static final BlockItem DIRT = register("dirt", new BlockItem(Blocks.DIRT));
     public static final BlockItem GRASS_BLOCK = register("grass_block", new BlockItem(Blocks.GRASS_BLOCK));
+    public static final BlockItem COBBLESTONE = register("cobblestone", new BlockItem(Blocks.COBBLESTONE));
+    public static final BlockItem MOSSY_COBBLESTONE = register("mossy_cobblestone", new BlockItem(Blocks.MOSSY_COBBLESTONE));
     
     // Basic materials (stackable, 64 max)
     public static final Item STICK = register("stick", new Item(64));
