@@ -282,12 +282,7 @@ public final class DevplayScreen implements Screen {
                     // If no item in selected slot, do nothing (can no longer place stone)
                 } else if (button == GLFW_MOUSE_BUTTON_MIDDLE) {
                     // Pick block - raycast and add to inventory
-                    boolean success = blockInteraction.pickBlock();
-                    if (success) {
-                        System.out.println("DEBUG: Successfully picked block and added to inventory");
-                    } else {
-                        System.out.println("DEBUG: Failed to pick block");
-                    }
+                    blockInteraction.pickBlock();
                 }
             }
         });
