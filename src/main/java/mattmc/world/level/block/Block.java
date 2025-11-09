@@ -163,11 +163,15 @@ public class Block {
      * @param blockY Block Y position being placed
      * @param blockZ Block Z position being placed
      * @param hitFace The face that was clicked (0=bottom, 1=top, 2=north, 3=south, 4=west, 5=east)
+     * @param hitX The exact X position where the ray hit the block face
+     * @param hitY The exact Y position where the ray hit the block face
+     * @param hitZ The exact Z position where the ray hit the block face
      * @return BlockState for this placement, or null if no state needed
      */
     public mattmc.world.level.block.state.BlockState getPlacementState(
             float playerX, float playerY, float playerZ,
-            int blockX, int blockY, int blockZ, int hitFace) {
+            int blockX, int blockY, int blockZ, int hitFace,
+            float hitX, float hitY, float hitZ) {
         return null;  // Most blocks don't need placement state
     }
 }

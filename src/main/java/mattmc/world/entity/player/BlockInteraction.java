@@ -51,7 +51,8 @@ public class BlockInteraction {
                 mattmc.world.level.block.state.BlockState state = block.getPlacementState(
                     player.getX(), player.getY(), player.getZ(),
                     hit.adjacentX, hit.adjacentY, hit.adjacentZ,
-                    hit.hitFace
+                    hit.hitFace,
+                    hit.hitX, hit.hitY, hit.hitZ
                 );
                 
                 // Place block with state
@@ -149,7 +150,9 @@ public class BlockInteraction {
                 Block block = world.getBlock(blockX, chunkY, blockZ);
                 if (!block.isAir()) {
                     // Found a solid block - return it and the last air position
-                    return new BlockHitResult(blockX, chunkY, blockZ, lastBlockX, lastBlockY, lastBlockZ);
+                    // Pass the exact ray hit position (rayX, rayY, rayZ)
+                    int hitFace = BlockHitResult.determineHitFace(blockX, chunkY, blockZ, lastBlockX, lastBlockY, lastBlockZ);
+                    return new BlockHitResult(blockX, chunkY, blockZ, lastBlockX, lastBlockY, lastBlockZ, hitFace, rayX, rayY, rayZ);
                 }
             }
             
@@ -168,8 +171,9 @@ public class BlockInteraction {
         public final int x, y, z;              // Block that was hit
         public final int adjacentX, adjacentY, adjacentZ;  // Adjacent air block (for placing)
         public final int hitFace;              // Face that was hit (0=bottom, 1=top, 2=north, 3=south, 4=west, 5=east)
+        public final float hitX, hitY, hitZ;   // Exact position where the ray hit the block
         
-        public BlockHitResult(int x, int y, int z, int adjX, int adjY, int adjZ, int hitFace) {
+        public BlockHitResult(int x, int y, int z, int adjX, int adjY, int adjZ, int hitFace, float hitX, float hitY, float hitZ) {
             this.x = x;
             this.y = y;
             this.z = z;
@@ -177,14 +181,17 @@ public class BlockInteraction {
             this.adjacentY = adjY;
             this.adjacentZ = adjZ;
             this.hitFace = hitFace;
+            this.hitX = hitX;
+            this.hitY = hitY;
+            this.hitZ = hitZ;
         }
         
         // Legacy constructor for compatibility
         public BlockHitResult(int x, int y, int z, int adjX, int adjY, int adjZ) {
-            this(x, y, z, adjX, adjY, adjZ, determineHitFace(x, y, z, adjX, adjY, adjZ));
+            this(x, y, z, adjX, adjY, adjZ, determineHitFace(x, y, z, adjX, adjY, adjZ), adjX + 0.5f, adjY + 0.5f, adjZ + 0.5f);
         }
         
-        private static int determineHitFace(int x, int y, int z, int adjX, int adjY, int adjZ) {
+        public static int determineHitFace(int x, int y, int z, int adjX, int adjY, int adjZ) {
             // Determine which face based on difference
             if (adjY < y) return 0; // bottom
             if (adjY > y) return 1; // top
