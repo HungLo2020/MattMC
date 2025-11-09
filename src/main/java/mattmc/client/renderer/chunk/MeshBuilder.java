@@ -74,8 +74,8 @@ public class MeshBuilder {
         for (BlockFaceCollector.FaceData face : faces) {
             // Check if this is a stairs block (special marker)
             if ("stairs".equals(face.faceType)) {
-                // Add stairs geometry instead of regular face
-                addStairsGeometry(face.x, face.y, face.z, face.block);
+                // Add stairs geometry instead of regular face, passing blockstate
+                addStairsGeometry(face.x, face.y, face.z, face.block, face.blockState);
                 continue;
             }
             
@@ -374,10 +374,11 @@ public class MeshBuilder {
     }
     
     /**
-     * Add stairs geometry (north-facing bottom stairs).
-     * Stairs consist of a bottom slab and a top step.
+     * Add stairs geometry based on blockstate (facing and half).
+     * Stairs consist of a bottom slab and a top step, rotated based on facing direction.
      */
-    private void addStairsGeometry(float x, float y, float z, mattmc.world.level.block.Block block) {
+    private void addStairsGeometry(float x, float y, float z, mattmc.world.level.block.Block block, 
+                                    mattmc.world.level.block.state.BlockState state) {
         // Get texture path and UV mapping for stairs
         String texturePath = block.getTexturePath("side");
         if (texturePath == null) {
@@ -396,17 +397,30 @@ public class MeshBuilder {
         float[] colorWest = {0.6f, 0.6f, 0.6f, 1.0f};
         float[] colorEast = {0.6f, 0.6f, 0.6f, 1.0f};
         
-        // Bottom slab: (0, 0, 0) to (1, 0.5, 1)
-        addStairsBottomSlabFace(x, y, z, 0.5f, colorTop, colorBottom, colorNorth, colorSouth, colorWest, colorEast, uvMapping);
+        // Get facing and half from blockstate (default to NORTH and BOTTOM if no state)
+        mattmc.world.level.block.state.properties.Direction facing = 
+            state != null ? state.getDirection("facing") : mattmc.world.level.block.state.properties.Direction.NORTH;
+        mattmc.world.level.block.state.properties.Half half = 
+            state != null ? state.getHalf("half") : mattmc.world.level.block.state.properties.Half.BOTTOM;
         
-        // Top step: (0, 0.5, 0) to (1, 1, 0.5) - north half only
-        addStairsTopStepFace(x, y + 0.5f, z, colorTop, colorNorth, colorSouth, colorWest, colorEast, uvMapping);
+        // Render based on half (top or bottom)
+        if (half == mattmc.world.level.block.state.properties.Half.BOTTOM) {
+            // Bottom stairs: slab on bottom, step on top
+            addStairsBottomSlabFace(x, y, z, 0.5f, facing, colorTop, colorBottom, colorNorth, colorSouth, colorWest, colorEast, uvMapping);
+            addStairsTopStepFace(x, y + 0.5f, z, facing, colorTop, colorNorth, colorSouth, colorWest, colorEast, uvMapping);
+        } else {
+            // Top stairs: slab on top, step on bottom  
+            addStairsBottomSlabFace(x, y + 0.5f, z, 0.5f, facing, colorTop, colorBottom, colorNorth, colorSouth, colorWest, colorEast, uvMapping);
+            addStairsTopStepFace(x, y, z, facing, colorTop, colorNorth, colorSouth, colorWest, colorEast, uvMapping);
+        }
     }
     
     /**
      * Add bottom slab faces for stairs.
+     * The facing parameter determines which direction the step faces.
      */
-    private void addStairsBottomSlabFace(float x, float y, float z, float height, 
+    private void addStairsBottomSlabFace(float x, float y, float z, float height,
+                                          mattmc.world.level.block.state.properties.Direction facing,
                                           float[] colorTop, float[] colorBottom, 
                                           float[] colorNorth, float[] colorSouth,
                                           float[] colorWest, float[] colorEast,
@@ -482,9 +496,10 @@ public class MeshBuilder {
     }
     
     /**
-     * Add top step faces for stairs (north half only).
+     * Add top step faces for stairs (based on facing direction).
      */
     private void addStairsTopStepFace(float x, float y, float z,
+                                       mattmc.world.level.block.state.properties.Direction facing,
                                        float[] colorTop, float[] colorNorth, float[] colorSouth,
                                        float[] colorWest, float[] colorEast,
                                        TextureAtlas.UVMapping uvMapping) {

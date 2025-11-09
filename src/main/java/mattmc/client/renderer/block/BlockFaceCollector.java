@@ -68,9 +68,11 @@ public class BlockFaceCollector {
         // Check if this block uses custom rendering (e.g., stairs)
         if (block.hasCustomRendering()) {
             // For stairs blocks, add a special marker that MeshBuilder will handle
+            // Get the blockstate for this position
+            mattmc.world.level.block.state.BlockState state = chunk.getBlockState(cx, cy, cz);
             int color = 0xFFFFFF;
-            // Add to topFaces with a special marker
-            topFaces.add(new FaceData(x, y, z, color, 1f, 1f, block, "stairs", null));
+            // Add to topFaces with a special marker, storing blockstate in the FaceData
+            topFaces.add(new FaceData(x, y, z, color, 1f, 1f, block, "stairs", null, state));
             return;
         }
         
@@ -115,7 +117,7 @@ public class BlockFaceCollector {
     }
     
     /**
-     * Check if a face should be rendered (is the adjacent block air?).
+     * Check if a face should be rendered (is the adjacent block air or non-opaque?).
      */
     private boolean shouldRenderFace(LevelChunk chunk, int x, int y, int z) {
         // Check Y bounds first (no neighboring chunks in Y direction)
@@ -125,13 +127,14 @@ public class BlockFaceCollector {
         
         // If within chunk bounds, use direct chunk access
         if (x >= 0 && x < LevelChunk.WIDTH && z >= 0 && z < LevelChunk.DEPTH) {
-            return chunk.getBlock(x, y, z).isAir();
+            Block adjacent = chunk.getBlock(x, y, z);
+            return adjacent.isAir() || !adjacent.isOpaque();  // Render if air or non-opaque
         }
         
         // Out of chunk bounds in X or Z - need to check neighboring chunk
         if (neighborAccessor != null) {
             Block adjacentBlock = neighborAccessor.getBlockAcrossChunks(chunk, x, y, z);
-            return adjacentBlock.isAir();
+            return adjacentBlock.isAir() || !adjacentBlock.isOpaque();  // Render if air or non-opaque
         }
         
         // No neighbor accessor available - fall back to old behavior
@@ -165,9 +168,15 @@ public class BlockFaceCollector {
         public final Block block;
         public final String faceType; // "top", "bottom", "side", etc.
         public final FaceRenderer renderer; // The renderer method to use for drawing this face
+        public final mattmc.world.level.block.state.BlockState blockState; // Block state for custom rendering
         
         public FaceData(float x, float y, float z, int color, float brightness, float colorBrightness, 
                        Block block, String faceType, FaceRenderer renderer) {
+            this(x, y, z, color, brightness, colorBrightness, block, faceType, renderer, null);
+        }
+        
+        public FaceData(float x, float y, float z, int color, float brightness, float colorBrightness, 
+                       Block block, String faceType, FaceRenderer renderer, mattmc.world.level.block.state.BlockState blockState) {
             this.x = x;
             this.y = y;
             this.z = z;
@@ -177,6 +186,7 @@ public class BlockFaceCollector {
             this.block = block;
             this.faceType = faceType;
             this.renderer = renderer;
+            this.blockState = blockState;
         }
     }
 }

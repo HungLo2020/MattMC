@@ -51,6 +51,15 @@ public class StairsBlock extends Block {
     }
     
     /**
+     * Stairs are not opaque - they don't fully cover adjacent faces.
+     * This prevents adjacent blocks from having their faces culled.
+     */
+    @Override
+    public boolean isOpaque() {
+        return false;
+    }
+    
+    /**
      * Stairs use custom rendering with VBO-generated geometry.
      */
     @Override

@@ -47,7 +47,15 @@ public class BlockInteraction {
             // Place block at the adjacent position (the face we hit)
             Block existing = world.getBlock(hit.adjacentX, hit.adjacentY, hit.adjacentZ);
             if (existing.isAir()) {
-                world.setBlock(hit.adjacentX, hit.adjacentY, hit.adjacentZ, block);
+                // Get placement state from block based on player position and hit face
+                mattmc.world.level.block.state.BlockState state = block.getPlacementState(
+                    player.getX(), player.getY(), player.getZ(),
+                    hit.adjacentX, hit.adjacentY, hit.adjacentZ,
+                    hit.hitFace
+                );
+                
+                // Place block with state
+                world.setBlock(hit.adjacentX, hit.adjacentY, hit.adjacentZ, block, state);
             }
         }
     }
@@ -159,14 +167,32 @@ public class BlockInteraction {
     public static class BlockHitResult {
         public final int x, y, z;              // Block that was hit
         public final int adjacentX, adjacentY, adjacentZ;  // Adjacent air block (for placing)
+        public final int hitFace;              // Face that was hit (0=bottom, 1=top, 2=north, 3=south, 4=west, 5=east)
         
-        public BlockHitResult(int x, int y, int z, int adjX, int adjY, int adjZ) {
+        public BlockHitResult(int x, int y, int z, int adjX, int adjY, int adjZ, int hitFace) {
             this.x = x;
             this.y = y;
             this.z = z;
             this.adjacentX = adjX;
             this.adjacentY = adjY;
             this.adjacentZ = adjZ;
+            this.hitFace = hitFace;
+        }
+        
+        // Legacy constructor for compatibility
+        public BlockHitResult(int x, int y, int z, int adjX, int adjY, int adjZ) {
+            this(x, y, z, adjX, adjY, adjZ, determineHitFace(x, y, z, adjX, adjY, adjZ));
+        }
+        
+        private static int determineHitFace(int x, int y, int z, int adjX, int adjY, int adjZ) {
+            // Determine which face based on difference
+            if (adjY < y) return 0; // bottom
+            if (adjY > y) return 1; // top
+            if (adjZ < z) return 2; // north
+            if (adjZ > z) return 3; // south
+            if (adjX < x) return 4; // west
+            if (adjX > x) return 5; // east
+            return 1; // default to top
         }
     }
 }
