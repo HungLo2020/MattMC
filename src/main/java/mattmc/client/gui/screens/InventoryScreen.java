@@ -555,44 +555,12 @@ public final class InventoryScreen implements Screen {
     
     /**
      * Initialize the list of all items for the creative inventory.
+     * Uses the creative tabs system to automatically populate items.
      */
     private void initializeCreativeItems() {
         allItems.clear();
-        // Add all items in order
-        allItems.add(Items.STONE);
-        allItems.add(Items.DIRT);
-        allItems.add(Items.GRASS_BLOCK);
-        allItems.add(Items.COBBLESTONE);
-        allItems.add(Items.MOSSY_COBBLESTONE);
-        allItems.add(Items.OAK_PLANKS);
-        allItems.add(Items.SPRUCE_PLANKS);
-        allItems.add(Items.BIRCH_PLANKS);
-        allItems.add(Items.SILVER_BIRCH_PLANKS);
-        allItems.add(Items.JUNGLE_PLANKS);
-        allItems.add(Items.ACACIA_PLANKS);
-        allItems.add(Items.DARK_OAK_PLANKS);
-        allItems.add(Items.MANGROVE_PLANKS);
-        allItems.add(Items.CHERRY_PLANKS);
-        allItems.add(Items.BAMBOO_PLANKS);
-        allItems.add(Items.CRIMSON_PLANKS);
-        allItems.add(Items.WARPED_PLANKS);
-        allItems.add(Items.WOODEN_PICKAXE);
-        allItems.add(Items.STONE_PICKAXE);
-        allItems.add(Items.IRON_PICKAXE);
-        allItems.add(Items.DIAMOND_PICKAXE);
-        allItems.add(Items.WOODEN_AXE);
-        allItems.add(Items.STONE_AXE);
-        allItems.add(Items.IRON_AXE);
-        allItems.add(Items.DIAMOND_AXE);
-        allItems.add(Items.WOODEN_SHOVEL);
-        allItems.add(Items.STONE_SHOVEL);
-        allItems.add(Items.IRON_SHOVEL);
-        allItems.add(Items.DIAMOND_SHOVEL);
-        allItems.add(Items.STICK);
-        allItems.add(Items.COAL);
-        allItems.add(Items.IRON_INGOT);
-        allItems.add(Items.GOLD_INGOT);
-        allItems.add(Items.DIAMOND);
+        // Get all unique items from creative tabs
+        allItems.addAll(mattmc.world.item.CreativeTabs.getAllUniqueItems());
     }
     
     /**
