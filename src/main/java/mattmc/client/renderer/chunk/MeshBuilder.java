@@ -5,19 +5,22 @@ import mattmc.client.renderer.block.BlockFaceCollector;
 import mattmc.client.renderer.texture.TextureAtlas;
 import mattmc.world.level.block.Blocks;
 
-import java.util.ArrayList;
 import java.util.List;
 
 /**
  * Builds vertex and index arrays from collected block faces.
  * Converts BlockFaceCollector data into a format suitable for VBO/VAO rendering.
  * Supports texture atlas UV mapping for multi-texture VBO rendering.
+ * 
+ * ISSUE-002 fix: Uses primitive FloatList and IntList instead of ArrayList<Float/Integer>
+ * to eliminate boxing overhead and reduce GC pressure.
  */
 public class MeshBuilder {
     
     // Vertex format: x, y, z, u, v, r, g, b, a (9 floats per vertex)
-    private final List<Float> vertices = new ArrayList<>();
-    private final List<Integer> indices = new ArrayList<>();
+    // Using primitive arrays to avoid boxing/unboxing overhead
+    private final FloatList vertices = new FloatList();
+    private final IntList indices = new IntList();
     private int currentVertex = 0;
     private final TextureAtlas textureAtlas;
     
@@ -46,16 +49,9 @@ public class MeshBuilder {
         addFacesOfType(collector.getWestFaces(), FaceType.WEST);
         addFacesOfType(collector.getEastFaces(), FaceType.EAST);
         
-        // Convert lists to arrays
-        float[] vertexArray = new float[vertices.size()];
-        for (int i = 0; i < vertices.size(); i++) {
-            vertexArray[i] = vertices.get(i);
-        }
-        
-        int[] indexArray = new int[indices.size()];
-        for (int i = 0; i < indices.size(); i++) {
-            indexArray[i] = indices.get(i);
-        }
+        // Use efficient toArray() which just copies the used portion
+        float[] vertexArray = vertices.toArray();
+        int[] indexArray = indices.toArray();
         
         return new ChunkMeshBuffer(chunkX, chunkZ, vertexArray, indexArray);
     }
