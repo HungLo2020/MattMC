@@ -92,7 +92,7 @@ public class TooltipRenderer {
     
     /**
      * Draw a rounded rectangle (filled).
-     * Uses a simple approach with just straight lines and small corner rounding.
+     * Draws the main body plus four rounded corners.
      */
     private void drawRoundedRect(float x, float y, float width, float height, float radius, 
                                  float r, float g, float b, float a) {
@@ -101,30 +101,120 @@ public class TooltipRenderer {
         // Clamp radius to not exceed half the smaller dimension
         radius = Math.min(radius, Math.min(width, height) / 2f);
         
-        // Draw main rectangle (just a simple filled quad)
+        int segments = 16; // More segments for smoother corners
+        
+        // Draw the center rectangle (without corners)
         glBegin(GL_QUADS);
-        glVertex2f(x, y);
-        glVertex2f(x + width, y);
-        glVertex2f(x + width, y + height);
-        glVertex2f(x, y + height);
+        glVertex2f(x + radius, y);
+        glVertex2f(x + width - radius, y);
+        glVertex2f(x + width - radius, y + height);
+        glVertex2f(x + radius, y + height);
+        glEnd();
+        
+        // Draw left and right rectangles
+        glBegin(GL_QUADS);
+        glVertex2f(x, y + radius);
+        glVertex2f(x + radius, y + radius);
+        glVertex2f(x + radius, y + height - radius);
+        glVertex2f(x, y + height - radius);
+        
+        glVertex2f(x + width - radius, y + radius);
+        glVertex2f(x + width, y + radius);
+        glVertex2f(x + width, y + height - radius);
+        glVertex2f(x + width - radius, y + height - radius);
+        glEnd();
+        
+        // Draw four rounded corners
+        // Top-left corner
+        glBegin(GL_TRIANGLE_FAN);
+        glVertex2f(x + radius, y + radius);
+        for (int i = segments; i >= 0; i--) {
+            float angle = (float) Math.PI * 0.5f + ((float) Math.PI * 0.5f * i / segments);
+            glVertex2f(x + radius + radius * (float) Math.cos(angle), 
+                      y + radius + radius * (float) Math.sin(angle));
+        }
+        glEnd();
+        
+        // Top-right corner
+        glBegin(GL_TRIANGLE_FAN);
+        glVertex2f(x + width - radius, y + radius);
+        for (int i = segments; i >= 0; i--) {
+            float angle = (float) Math.PI * 1.0f + ((float) Math.PI * 0.5f * i / segments);
+            glVertex2f(x + width - radius + radius * (float) Math.cos(angle), 
+                      y + radius + radius * (float) Math.sin(angle));
+        }
+        glEnd();
+        
+        // Bottom-right corner
+        glBegin(GL_TRIANGLE_FAN);
+        glVertex2f(x + width - radius, y + height - radius);
+        for (int i = segments; i >= 0; i--) {
+            float angle = (float) Math.PI * 1.5f + ((float) Math.PI * 0.5f * i / segments);
+            glVertex2f(x + width - radius + radius * (float) Math.cos(angle), 
+                      y + height - radius + radius * (float) Math.sin(angle));
+        }
+        glEnd();
+        
+        // Bottom-left corner
+        glBegin(GL_TRIANGLE_FAN);
+        glVertex2f(x + radius, y + height - radius);
+        for (int i = segments; i >= 0; i--) {
+            float angle = (float) Math.PI * 0.0f + ((float) Math.PI * 0.5f * i / segments);
+            glVertex2f(x + radius + radius * (float) Math.cos(angle), 
+                      y + height - radius + radius * (float) Math.sin(angle));
+        }
         glEnd();
     }
     
     /**
      * Draw a rounded rectangle border (outline).
-     * Uses a simple approach with just straight lines.
+     * Draws lines connecting the four rounded corners.
      */
     private void drawRoundedRectBorder(float x, float y, float width, float height, float radius, 
                                        float borderWidth, float r, float g, float b, float a) {
         glColor4f(r, g, b, a);
         glLineWidth(borderWidth);
         
-        // Draw border as a simple rectangle outline
-        glBegin(GL_LINE_LOOP);
-        glVertex2f(x, y);
-        glVertex2f(x + width, y);
-        glVertex2f(x + width, y + height);
-        glVertex2f(x, y + height);
+        // Clamp radius to not exceed half the smaller dimension
+        radius = Math.min(radius, Math.min(width, height) / 2f);
+        
+        int segments = 16; // More segments for smoother corners
+        
+        glBegin(GL_LINE_STRIP);
+        
+        // Top-left corner (starting from left side going to top)
+        for (int i = 0; i <= segments; i++) {
+            float angle = (float) Math.PI * 1.0f + ((float) Math.PI * 0.5f * i / segments);
+            glVertex2f(x + radius + radius * (float) Math.cos(angle), 
+                      y + radius + radius * (float) Math.sin(angle));
+        }
+        
+        // Top-right corner (from top going to right)
+        for (int i = 0; i <= segments; i++) {
+            float angle = (float) Math.PI * 1.5f + ((float) Math.PI * 0.5f * i / segments);
+            glVertex2f(x + width - radius + radius * (float) Math.cos(angle), 
+                      y + radius + radius * (float) Math.sin(angle));
+        }
+        
+        // Bottom-right corner (from right going to bottom)
+        for (int i = 0; i <= segments; i++) {
+            float angle = (float) Math.PI * 0.0f + ((float) Math.PI * 0.5f * i / segments);
+            glVertex2f(x + width - radius + radius * (float) Math.cos(angle), 
+                      y + height - radius + radius * (float) Math.sin(angle));
+        }
+        
+        // Bottom-left corner (from bottom going to left)
+        for (int i = 0; i <= segments; i++) {
+            float angle = (float) Math.PI * 0.5f + ((float) Math.PI * 0.5f * i / segments);
+            glVertex2f(x + radius + radius * (float) Math.cos(angle), 
+                      y + height - radius + radius * (float) Math.sin(angle));
+        }
+        
+        // Close the loop back to start
+        float angle = (float) Math.PI * 1.0f;
+        glVertex2f(x + radius + radius * (float) Math.cos(angle), 
+                  y + radius + radius * (float) Math.sin(angle));
+        
         glEnd();
         
         glLineWidth(1f); // Reset line width
