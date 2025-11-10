@@ -2,6 +2,7 @@ package mattmc.client.renderer;
 
 import static org.lwjgl.opengl.GL11.*;
 import static org.lwjgl.opengl.GL13.*;
+import static org.lwjgl.opengl.GL30.*;
 
 /**
  * Handles blur effect specifically for tooltips.
@@ -101,24 +102,17 @@ public class TooltipBlurEffect {
         ensureFramebuffers(w, h);
         
         // Step 1: Capture the screen region into a texture
-        captureBuffer.bind();
-        glClear(GL_COLOR_BUFFER_BIT);
+        // We need to read from the default framebuffer (0) which has the rendered scene
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
         
-        // Copy the screen region to the framebuffer
-        glBindTexture(GL_TEXTURE_2D, 0);
-        glCopyTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, (int)x, screenHeight - (int)y - h, w, h, 0);
         int capturedTexture = glGenTextures();
         glBindTexture(GL_TEXTURE_2D, capturedTexture);
+        // OpenGL's coordinate system has (0,0) at bottom-left, so we need to flip Y
         glCopyTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, (int)x, screenHeight - (int)y - h, w, h, 0);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-        
-        captureBuffer.unbind();
-        
-        // Restore viewport
-        glViewport(0, 0, screenWidth, screenHeight);
         
         // Step 2: Apply horizontal blur
         blurBuffer1.bind();
@@ -151,6 +145,7 @@ public class TooltipBlurEffect {
         Shader.unbind();
         
         // Step 4: Render the blurred result back to the screen region
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
         glEnable(GL_BLEND);
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
         glEnable(GL_TEXTURE_2D);
