@@ -250,13 +250,14 @@ public final class BlockGeometryCapture {
         float z0 = z, z05 = z + 0.5f, z1 = z + 1;
         
         // Bottom slab (0, 0, 0) to (1, 0.5, 1)
-        // Top face of bottom slab
+        // Top face of bottom slab - only the north half (z=0 to z=0.5)
+        // The south half is covered by the top step
         capture.texCoord(0, 0); capture.addVertex(x0, y05, z0);
-        capture.texCoord(0, 1); capture.addVertex(x0, y05, z1);
-        capture.texCoord(1, 1); capture.addVertex(x1, y05, z1);
+        capture.texCoord(0, 0.5f); capture.addVertex(x0, y05, z05);
+        capture.texCoord(1, 0.5f); capture.addVertex(x1, y05, z05);
         
         capture.texCoord(0, 0); capture.addVertex(x0, y05, z0);
-        capture.texCoord(1, 1); capture.addVertex(x1, y05, z1);
+        capture.texCoord(1, 0.5f); capture.addVertex(x1, y05, z05);
         capture.texCoord(1, 0); capture.addVertex(x1, y05, z0);
         
         // North face of slab
