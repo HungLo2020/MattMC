@@ -179,8 +179,8 @@ public class ItemRenderer {
     
     /**
      * Render isometric stairs by converting the in-game 3D geometry to 2D isometric projection.
-     * Uses north-facing stairs geometry: bottom slab (full block, half height) + 
-     * top step (full width, north/back half depth, half height).
+     * Uses south-facing stairs geometry for proper isometric view: bottom slab (full block, half height) + 
+     * top step (full width, south/front half depth, half height).
      */
     private static void renderIsometricStairs(Map<String, String> texturePaths, mattmc.client.resources.model.BlockModel itemModel, float x, float y, float size) {
         String topTexture = getTextureForFace(texturePaths, "top");
@@ -199,9 +199,11 @@ public class ItemRenderer {
         // sx = x + (wx - wz) * isoWidth
         // sy = y - wy * isoHeight - (wx + wz) * isoHeight * 0.5
         
+        // Render in back-to-front order for proper 2D depth
+        
         // === BOTTOM SLAB: x[0,1], y[0,0.5], z[0,1] ===
         
-        // Left face (west, x=0, visible from isometric view)
+        // Left face (west, x=0) - back face
         if (sideTexture != null) {
             Texture tex = loadTexture(sideTexture);
             if (tex != null) {
@@ -217,7 +219,7 @@ public class ItemRenderer {
             }
         }
         
-        // Right face (south, z=1, visible from isometric view)
+        // Right face (south, z=1) - back face  
         if (sideTexture != null) {
             Texture tex = loadTexture(sideTexture);
             if (tex != null) {
@@ -233,7 +235,7 @@ public class ItemRenderer {
             }
         }
         
-        // Top face
+        // Top face - front face (drawn last for slab)
         if (topTexture != null) {
             Texture tex = loadTexture(topTexture);
             if (tex != null) {
@@ -249,25 +251,41 @@ public class ItemRenderer {
             }
         }
         
-        // === TOP STEP: x[0,1], y[0.5,1.0], z[0,0.5] (north/back half) ===
+        // === TOP STEP: x[0,1], y[0.5,1.0], z[0.5,1] (south/front half) ===
         
-        // Left face (west side of step, x=0)
+        // Left face (west side of step, x=0) - back face
         if (sideTexture != null) {
             Texture tex = loadTexture(sideTexture);
             if (tex != null) {
                 tex.bind();
                 glColor4f(0.8f, 0.8f, 0.8f, 1.0f);
                 glBegin(GL_QUADS);
-                // (0,0.5,0), (0,0.5,0.5), (0,1.0,0.5), (0,1.0,0)
-                glTexCoord2f(0.5f, 0.5f); glVertex2f(x + (0-0)*isoWidth, y - 0.5f*isoHeight - (0+0)*isoHeight*0.5f);
-                glTexCoord2f(1, 0.5f);    glVertex2f(x + (0-0.5f)*isoWidth, y - 0.5f*isoHeight - (0+0.5f)*isoHeight*0.5f);
-                glTexCoord2f(1, 1);       glVertex2f(x + (0-0.5f)*isoWidth, y - 1.0f*isoHeight - (0+0.5f)*isoHeight*0.5f);
-                glTexCoord2f(0.5f, 1);    glVertex2f(x + (0-0)*isoWidth, y - 1.0f*isoHeight - (0+0)*isoHeight*0.5f);
+                // (0,0.5,0.5), (0,0.5,1), (0,1.0,1), (0,1.0,0.5)
+                glTexCoord2f(0.5f, 0.5f); glVertex2f(x + (0-0.5f)*isoWidth, y - 0.5f*isoHeight - (0+0.5f)*isoHeight*0.5f);
+                glTexCoord2f(1, 0.5f);    glVertex2f(x + (0-1)*isoWidth, y - 0.5f*isoHeight - (0+1)*isoHeight*0.5f);
+                glTexCoord2f(1, 1);       glVertex2f(x + (0-1)*isoWidth, y - 1.0f*isoHeight - (0+1)*isoHeight*0.5f);
+                glTexCoord2f(0.5f, 1);    glVertex2f(x + (0-0.5f)*isoWidth, y - 1.0f*isoHeight - (0+0.5f)*isoHeight*0.5f);
                 glEnd();
             }
         }
         
-        // Right face (south side of step, z=0.5, inner vertical face)
+        // Right face (south side of step, z=1) - back face
+        if (sideTexture != null) {
+            Texture tex = loadTexture(sideTexture);
+            if (tex != null) {
+                tex.bind();
+                glColor4f(0.6f, 0.6f, 0.6f, 1.0f);
+                glBegin(GL_QUADS);
+                // (0,0.5,1), (1,0.5,1), (1,1.0,1), (0,1.0,1)
+                glTexCoord2f(0, 0.5f); glVertex2f(x + (0-1)*isoWidth, y - 0.5f*isoHeight - (0+1)*isoHeight*0.5f);
+                glTexCoord2f(1, 0.5f); glVertex2f(x + (1-1)*isoWidth, y - 0.5f*isoHeight - (1+1)*isoHeight*0.5f);
+                glTexCoord2f(1, 1);    glVertex2f(x + (1-1)*isoWidth, y - 1.0f*isoHeight - (1+1)*isoHeight*0.5f);
+                glTexCoord2f(0, 1);    glVertex2f(x + (0-1)*isoWidth, y - 1.0f*isoHeight - (0+1)*isoHeight*0.5f);
+                glEnd();
+            }
+        }
+        
+        // Inner vertical face (z=0.5, front of step) - middle face
         if (sideTexture != null) {
             Texture tex = loadTexture(sideTexture);
             if (tex != null) {
@@ -283,18 +301,18 @@ public class ItemRenderer {
             }
         }
         
-        // Top face of step
+        // Top face of step - front face (drawn last)
         if (topTexture != null) {
             Texture tex = loadTexture(topTexture);
             if (tex != null) {
                 tex.bind();
                 glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
                 glBegin(GL_QUADS);
-                // (0,1.0,0), (0,1.0,0.5), (1,1.0,0.5), (1,1.0,0)
-                glTexCoord2f(0.5f, 0);    glVertex2f(x + (0-0)*isoWidth, y - 1.0f*isoHeight - (0+0)*isoHeight*0.5f);
-                glTexCoord2f(0.5f, 0.5f); glVertex2f(x + (0-0.5f)*isoWidth, y - 1.0f*isoHeight - (0+0.5f)*isoHeight*0.5f);
-                glTexCoord2f(1, 0.5f);    glVertex2f(x + (1-0.5f)*isoWidth, y - 1.0f*isoHeight - (1+0.5f)*isoHeight*0.5f);
-                glTexCoord2f(1, 0);       glVertex2f(x + (1-0)*isoWidth, y - 1.0f*isoHeight - (1+0)*isoHeight*0.5f);
+                // (0,1.0,0.5), (0,1.0,1), (1,1.0,1), (1,1.0,0.5)
+                glTexCoord2f(0.5f, 0);    glVertex2f(x + (0-0.5f)*isoWidth, y - 1.0f*isoHeight - (0+0.5f)*isoHeight*0.5f);
+                glTexCoord2f(0.5f, 0.5f); glVertex2f(x + (0-1)*isoWidth, y - 1.0f*isoHeight - (0+1)*isoHeight*0.5f);
+                glTexCoord2f(1, 0.5f);    glVertex2f(x + (1-1)*isoWidth, y - 1.0f*isoHeight - (1+1)*isoHeight*0.5f);
+                glTexCoord2f(1, 0);       glVertex2f(x + (1-0.5f)*isoWidth, y - 1.0f*isoHeight - (1+0.5f)*isoHeight*0.5f);
                 glEnd();
             }
         }
