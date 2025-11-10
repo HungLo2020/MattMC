@@ -23,14 +23,17 @@ public class TooltipRenderer {
     
     // Colors
     private static final float BG_GRAY = 0.3f;
-    private static final float BG_ALPHA = 0.75f;
+    private static final float BG_ALPHA = 0.08f;  // Very subtle gray tint to show blur through
     private static final float BORDER_R = 0.3f;
     private static final float BORDER_G = 0.5f;
     private static final float BORDER_B = 1.0f;
     private static final float BORDER_ALPHA = 1.0f;
     private static final float BORDER_WIDTH = 6f;  // Increased 3x (2 * 3 = 6)
     
+    private final TooltipBlurEffect blurEffect;
+    
     public TooltipRenderer() {
+        this.blurEffect = new TooltipBlurEffect();
     }
     
     /**
@@ -77,9 +80,11 @@ public class TooltipRenderer {
         tooltipX = Math.max(0, Math.min(tooltipX, screenWidth - boxWidth));
         tooltipY = Math.max(0, Math.min(tooltipY, screenHeight - boxHeight));
         
-        // Draw semi-transparent gray background with rounded corners
-        drawRoundedRect(tooltipX, tooltipY, boxWidth, boxHeight, TOOLTIP_CORNER_RADIUS, 
-                       BG_GRAY, BG_GRAY, BG_GRAY, BG_ALPHA);
+        // Apply blur to the tooltip region BEFORE drawing the tooltip
+        blurEffect.applyRegionalBlur(tooltipX, tooltipY, boxWidth, boxHeight, screenWidth, screenHeight);
+        
+        // NOTE: Gray tint disabled - blur effect provides background separation
+        // If needed in future, ensure very low alpha (< 0.05) to avoid obscuring blur
         
         // Draw blue border with rounded corners
         drawRoundedRectBorder(tooltipX, tooltipY, boxWidth, boxHeight, TOOLTIP_CORNER_RADIUS, 
@@ -203,6 +208,8 @@ public class TooltipRenderer {
      * Clean up resources.
      */
     public void close() {
-        // No resources to clean up
+        if (blurEffect != null) {
+            blurEffect.close();
+        }
     }
 }
