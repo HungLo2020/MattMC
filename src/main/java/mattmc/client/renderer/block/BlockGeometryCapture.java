@@ -462,14 +462,35 @@ public final class BlockGeometryCapture {
         float z0 = z, z05 = z + 0.5f, z1 = z + 1;
         
         // Bottom slab (0, 0, 0) to (1, 0.5, 1) - full block, half height
-        // Top face of bottom slab
-        capture.texCoord(0, 0); capture.addVertex(x0, y05, z0);
-        capture.texCoord(0, 1); capture.addVertex(x0, y05, z1);
+        // Top face of bottom slab - EXCEPT where top step is (northwest quarter)
+        // We need to render the L-shaped top face excluding (0,0) to (0.5,0.5)
+        
+        // Southeast corner (0.5, 0.5) to (1, 1)
+        capture.texCoord(0.5f, 0.5f); capture.addVertex(x05, y05, z05);
+        capture.texCoord(0.5f, 1); capture.addVertex(x05, y05, z1);
         capture.texCoord(1, 1); capture.addVertex(x1, y05, z1);
         
-        capture.texCoord(0, 0); capture.addVertex(x0, y05, z0);
+        capture.texCoord(0.5f, 0.5f); capture.addVertex(x05, y05, z05);
         capture.texCoord(1, 1); capture.addVertex(x1, y05, z1);
+        capture.texCoord(1, 0.5f); capture.addVertex(x1, y05, z05);
+        
+        // Northeast strip (0.5, 0) to (1, 0.5)
+        capture.texCoord(0.5f, 0); capture.addVertex(x05, y05, z0);
+        capture.texCoord(0.5f, 0.5f); capture.addVertex(x05, y05, z05);
+        capture.texCoord(1, 0.5f); capture.addVertex(x1, y05, z05);
+        
+        capture.texCoord(0.5f, 0); capture.addVertex(x05, y05, z0);
+        capture.texCoord(1, 0.5f); capture.addVertex(x1, y05, z05);
         capture.texCoord(1, 0); capture.addVertex(x1, y05, z0);
+        
+        // Southwest strip (0, 0.5) to (0.5, 1)
+        capture.texCoord(0, 0.5f); capture.addVertex(x0, y05, z05);
+        capture.texCoord(0, 1); capture.addVertex(x0, y05, z1);
+        capture.texCoord(0.5f, 1); capture.addVertex(x05, y05, z1);
+        
+        capture.texCoord(0, 0.5f); capture.addVertex(x0, y05, z05);
+        capture.texCoord(0.5f, 1); capture.addVertex(x05, y05, z1);
+        capture.texCoord(0.5f, 0.5f); capture.addVertex(x05, y05, z05);
         
         // North face of slab (z=0)
         capture.texCoord(1, 1); capture.addVertex(x1, y0, z0);
