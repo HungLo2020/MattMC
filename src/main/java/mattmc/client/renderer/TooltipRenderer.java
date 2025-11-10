@@ -15,11 +15,11 @@ import static org.lwjgl.system.MemoryStack.stackPush;
  * and the item name.
  */
 public class TooltipRenderer {
-    private static final float TOOLTIP_PADDING = 6f;
-    private static final float TOOLTIP_CORNER_RADIUS = 4f;
-    private static final float TOOLTIP_OFFSET_X = 12f;
-    private static final float TOOLTIP_OFFSET_Y = -12f;
-    private static final float TEXT_SCALE = 1.2f;
+    private static final float TOOLTIP_PADDING = 9f;  // Increased by 50% (6 * 1.5 = 9)
+    private static final float TOOLTIP_CORNER_RADIUS = 6f;  // Increased by 50% (4 * 1.5 = 6)
+    private static final float TOOLTIP_OFFSET_X = 18f;  // Increased by 50% (12 * 1.5 = 18)
+    private static final float TOOLTIP_OFFSET_Y = -18f;  // Increased by 50% (12 * 1.5 = 18)
+    private static final float TEXT_SCALE = 1.8f;  // Increased by 50% (1.2 * 1.5 = 1.8)
     
     // Colors
     private static final float BG_GRAY = 0.3f;
@@ -102,47 +102,69 @@ public class TooltipRenderer {
         
         int segments = 8; // Number of segments per corner
         
-        glBegin(GL_TRIANGLE_FAN);
+        // Draw the main rectangle body (without corners)
+        glBegin(GL_QUADS);
         
-        // Center point
-        glVertex2f(x + width / 2f, y + height / 2f);
+        // Center rectangle
+        glVertex2f(x + radius, y);
+        glVertex2f(x + width - radius, y);
+        glVertex2f(x + width - radius, y + height);
+        glVertex2f(x + radius, y + height);
+        
+        // Left rectangle
+        glVertex2f(x, y + radius);
+        glVertex2f(x + radius, y + radius);
+        glVertex2f(x + radius, y + height - radius);
+        glVertex2f(x, y + height - radius);
+        
+        // Right rectangle
+        glVertex2f(x + width - radius, y + radius);
+        glVertex2f(x + width, y + radius);
+        glVertex2f(x + width, y + height - radius);
+        glVertex2f(x + width - radius, y + height - radius);
+        
+        glEnd();
+        
+        // Draw the four rounded corners using triangle fans
         
         // Top-left corner
+        glBegin(GL_TRIANGLE_FAN);
+        glVertex2f(x + radius, y + radius); // Center of arc
         for (int i = 0; i <= segments; i++) {
             float angle = (float) Math.PI + i * (float) Math.PI / 2f / segments;
-            float cx = x + radius;
-            float cy = y + radius;
-            glVertex2f(cx + radius * (float) Math.cos(angle), cy + radius * (float) Math.sin(angle));
+            glVertex2f(x + radius + radius * (float) Math.cos(angle), 
+                      y + radius + radius * (float) Math.sin(angle));
         }
-        
-        // Bottom-left corner
-        for (int i = 0; i <= segments; i++) {
-            float angle = (float) Math.PI * 1.5f + i * (float) Math.PI / 2f / segments;
-            float cx = x + radius;
-            float cy = y + height - radius;
-            glVertex2f(cx + radius * (float) Math.cos(angle), cy + radius * (float) Math.sin(angle));
-        }
-        
-        // Bottom-right corner
-        for (int i = 0; i <= segments; i++) {
-            float angle = i * (float) Math.PI / 2f / segments;
-            float cx = x + width - radius;
-            float cy = y + height - radius;
-            glVertex2f(cx + radius * (float) Math.cos(angle), cy + radius * (float) Math.sin(angle));
-        }
+        glEnd();
         
         // Top-right corner
+        glBegin(GL_TRIANGLE_FAN);
+        glVertex2f(x + width - radius, y + radius); // Center of arc
+        for (int i = 0; i <= segments; i++) {
+            float angle = (float) Math.PI * 1.5f + i * (float) Math.PI / 2f / segments;
+            glVertex2f(x + width - radius + radius * (float) Math.cos(angle), 
+                      y + radius + radius * (float) Math.sin(angle));
+        }
+        glEnd();
+        
+        // Bottom-right corner
+        glBegin(GL_TRIANGLE_FAN);
+        glVertex2f(x + width - radius, y + height - radius); // Center of arc
+        for (int i = 0; i <= segments; i++) {
+            float angle = i * (float) Math.PI / 2f / segments;
+            glVertex2f(x + width - radius + radius * (float) Math.cos(angle), 
+                      y + height - radius + radius * (float) Math.sin(angle));
+        }
+        glEnd();
+        
+        // Bottom-left corner
+        glBegin(GL_TRIANGLE_FAN);
+        glVertex2f(x + radius, y + height - radius); // Center of arc
         for (int i = 0; i <= segments; i++) {
             float angle = (float) Math.PI / 2f + i * (float) Math.PI / 2f / segments;
-            float cx = x + width - radius;
-            float cy = y + radius;
-            glVertex2f(cx + radius * (float) Math.cos(angle), cy + radius * (float) Math.sin(angle));
+            glVertex2f(x + radius + radius * (float) Math.cos(angle), 
+                      y + height - radius + radius * (float) Math.sin(angle));
         }
-        
-        // Close the loop
-        float angle = (float) Math.PI;
-        glVertex2f(x + radius + radius * (float) Math.cos(angle), y + radius + radius * (float) Math.sin(angle));
-        
         glEnd();
     }
     
@@ -161,41 +183,40 @@ public class TooltipRenderer {
         
         glBegin(GL_LINE_STRIP);
         
-        // Top-left corner
-        for (int i = 0; i <= segments; i++) {
+        // Start from top-left corner and go clockwise
+        
+        // Top-left corner arc
+        for (int i = segments; i >= 0; i--) {
             float angle = (float) Math.PI + i * (float) Math.PI / 2f / segments;
-            float cx = x + radius;
-            float cy = y + radius;
-            glVertex2f(cx + radius * (float) Math.cos(angle), cy + radius * (float) Math.sin(angle));
+            glVertex2f(x + radius + radius * (float) Math.cos(angle), 
+                      y + radius + radius * (float) Math.sin(angle));
         }
         
-        // Bottom-left corner
-        for (int i = 0; i <= segments; i++) {
+        // Bottom-left corner arc
+        for (int i = segments; i >= 0; i--) {
             float angle = (float) Math.PI * 1.5f + i * (float) Math.PI / 2f / segments;
-            float cx = x + radius;
-            float cy = y + height - radius;
-            glVertex2f(cx + radius * (float) Math.cos(angle), cy + radius * (float) Math.sin(angle));
+            glVertex2f(x + radius + radius * (float) Math.cos(angle), 
+                      y + height - radius + radius * (float) Math.sin(angle));
         }
         
-        // Bottom-right corner
-        for (int i = 0; i <= segments; i++) {
+        // Bottom-right corner arc
+        for (int i = segments; i >= 0; i--) {
             float angle = i * (float) Math.PI / 2f / segments;
-            float cx = x + width - radius;
-            float cy = y + height - radius;
-            glVertex2f(cx + radius * (float) Math.cos(angle), cy + radius * (float) Math.sin(angle));
+            glVertex2f(x + width - radius + radius * (float) Math.cos(angle), 
+                      y + height - radius + radius * (float) Math.sin(angle));
         }
         
-        // Top-right corner
-        for (int i = 0; i <= segments; i++) {
+        // Top-right corner arc
+        for (int i = segments; i >= 0; i--) {
             float angle = (float) Math.PI / 2f + i * (float) Math.PI / 2f / segments;
-            float cx = x + width - radius;
-            float cy = y + radius;
-            glVertex2f(cx + radius * (float) Math.cos(angle), cy + radius * (float) Math.sin(angle));
+            glVertex2f(x + width - radius + radius * (float) Math.cos(angle), 
+                      y + radius + radius * (float) Math.sin(angle));
         }
         
-        // Close the loop
+        // Close the loop back to start
         float angle = (float) Math.PI;
-        glVertex2f(x + radius + radius * (float) Math.cos(angle), y + radius + radius * (float) Math.sin(angle));
+        glVertex2f(x + radius + radius * (float) Math.cos(angle), 
+                  y + radius + radius * (float) Math.sin(angle));
         
         glEnd();
         
