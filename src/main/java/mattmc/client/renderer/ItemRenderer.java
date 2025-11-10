@@ -182,155 +182,155 @@ public class ItemRenderer {
      * Uses south-facing stairs geometry for proper isometric view: bottom slab (full block, half height) + 
      * top step (full width, south/front half depth, half height).
      */
+    /**
+     * Render stairs as an isometric 3D block with proper stepped geometry.
+     * Closely follows Minecraft's approach: uses the exact same 3D geometry as the in-game
+     * stairs (from BlockFaceGeometry.drawStairsNorthBottom) and projects it to 2D isometric view.
+     *
+     * The stairs consist of two parts:
+     * - Bottom slab: (0,0,0) to (1,0.5,1) - full block width, half height
+     * - Top step: (0,0.5,0) to (1,1,0.5) - full width, north half depth, top half height
+     */
     private static void renderIsometricStairs(Map<String, String> texturePaths, mattmc.client.resources.model.BlockModel itemModel, float x, float y, float size) {
+        // Get textures for each face
         String topTexture = getTextureForFace(texturePaths, "top");
         String sideTexture = getTextureForFace(texturePaths, "side");
         
         boolean textureWasEnabled = glIsEnabled(GL_TEXTURE_2D);
-        glEnable(GL_TEXTURE_2D);
+        if (!textureWasEnabled) {
+            glEnable(GL_TEXTURE_2D);
+        }
         
-        // Use same scaling as cubes
-        float scale = size * 2.0f;
-        float isoWidth = scale * 0.5f;
-        float isoHeight = scale * 0.5f;
+        // Isometric projection parameters (same as cube)
+        // For 3D point (wx, wy, wz), the 2D screen coordinates are:
+        // screen_x = x + (wx - wz) * isoWidth
+        // screen_y = y - wy * isoHeight - (wx + wz) * isoHeight * 0.5
+        float isoWidth = size * 2.0f;
+        float isoHeight = size * 1.0f;
         
-        // Render in back-to-front order for proper 2D depth (painter's algorithm - no depth buffer)
+        // === BOTTOM SLAB: (0,0,0) to (1,0.5,1) ===
         
-        // === BOTTOM SLAB: x[0,1], y[0,0.5], z[0,1] ===
-        
-        // Left face (west, x=0) - full depth of slab
-        // This face should be visible on the left side in isometric view
+        // West face of bottom slab (x=0, z=0→1, y=0→0.5)
         if (sideTexture != null) {
             Texture tex = loadTexture(sideTexture);
             if (tex != null) {
                 tex.bind();
                 glColor4f(0.8f, 0.8f, 0.8f, 1.0f);
                 glBegin(GL_QUADS);
-                // For a face at x=0 going from z=0 to z=1, y=0 to y=0.5
-                // Use the cube's left face pattern: near-bottom, far-bottom, far-top, near-top
-                glTexCoord2f(0, 0.5f); glVertex2f(x, y);                                    // (0,0,0) near-bottom
-                glTexCoord2f(1, 0.5f); glVertex2f(x - isoWidth, y - isoHeight * 0.5f);     // (0,0,1) far-bottom
-                glTexCoord2f(1, 1);    glVertex2f(x - isoWidth, y - isoHeight);            // (0,0.5,1) far-top
-                glTexCoord2f(0, 1);    glVertex2f(x, y - isoHeight * 0.5f);                // (0,0.5,0) near-top
+                // Vertices from BlockFaceGeometry pattern: (x0,y0,z0), (x0,y0,z1), (x0,y0.5,z1), (x0,y0.5,z0)
+                glTexCoord2f(0, 1);    glVertex2f(project2Dx(0, 0, 0, x, isoWidth),    project2Dy(0, 0, 0, y, isoHeight));      // (0,0,0)
+                glTexCoord2f(1, 1);    glVertex2f(project2Dx(0, 0, 1, x, isoWidth),    project2Dy(0, 0, 1, y, isoHeight));      // (0,0,1)
+                glTexCoord2f(1, 0.5f); glVertex2f(project2Dx(0, 0.5f, 1, x, isoWidth), project2Dy(0, 0.5f, 1, y, isoHeight));   // (0,0.5,1)
+                glTexCoord2f(0, 0.5f); glVertex2f(project2Dx(0, 0.5f, 0, x, isoWidth), project2Dy(0, 0.5f, 0, y, isoHeight));   // (0,0.5,0)
                 glEnd();
             }
         }
         
-        // Right face (south, z=1) - full width of slab
+        // South face of bottom slab (z=1, x=0→1, y=0→0.5)
         if (sideTexture != null) {
             Texture tex = loadTexture(sideTexture);
             if (tex != null) {
                 tex.bind();
                 glColor4f(0.6f, 0.6f, 0.6f, 1.0f);
                 glBegin(GL_QUADS);
-                // For a face at z=1 going from x=0 to x=1, y=0 to y=0.5
-                // Use the cube's right face pattern: far-bottom, near-bottom, near-top, far-top
-                glTexCoord2f(0, 0.5f); glVertex2f(x + isoWidth, y - isoHeight * 0.5f);     // (1,0,1) far-bottom
-                glTexCoord2f(1, 0.5f); glVertex2f(x, y);                                    // (0,0,1) near-bottom
-                glTexCoord2f(1, 1);    glVertex2f(x, y - isoHeight * 0.5f);                // (0,0.5,1) near-top
-                glTexCoord2f(0, 1);    glVertex2f(x + isoWidth, y - isoHeight);            // (1,0.5,1) far-top
+                // Vertices from BlockFaceGeometry pattern: (x0,y0,z1), (x1,y0,z1), (x1,y0.5,z1), (x0,y0.5,z1)
+                glTexCoord2f(0, 1);    glVertex2f(project2Dx(0, 0, 1, x, isoWidth),    project2Dy(0, 0, 1, y, isoHeight));      // (0,0,1)
+                glTexCoord2f(1, 1);    glVertex2f(project2Dx(1, 0, 1, x, isoWidth),    project2Dy(1, 0, 1, y, isoHeight));      // (1,0,1)
+                glTexCoord2f(1, 0.5f); glVertex2f(project2Dx(1, 0.5f, 1, x, isoWidth), project2Dy(1, 0.5f, 1, y, isoHeight));   // (1,0.5,1)
+                glTexCoord2f(0, 0.5f); glVertex2f(project2Dx(0, 0.5f, 1, x, isoWidth), project2Dy(0, 0.5f, 1, y, isoHeight));   // (0,0.5,1)
                 glEnd();
             }
         }
         
-        // Top face of slab (full diamond at y=0.5)
+        // Top face of bottom slab (y=0.5, x=0→1, z=0→1)
         if (topTexture != null) {
             Texture tex = loadTexture(topTexture);
             if (tex != null) {
                 tex.bind();
                 glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
                 glBegin(GL_QUADS);
-                // Diamond: near, left, far, right (same pattern as cube top)
-                glTexCoord2f(0, 0);       glVertex2f(x, y - isoHeight * 0.5f);              // (0,0.5,0) near
-                glTexCoord2f(0.5f, 0);    glVertex2f(x - isoWidth, y - isoHeight);          // (0,0.5,1) left
-                glTexCoord2f(0.5f, 0.5f); glVertex2f(x, y - isoHeight * 1.5f);              // (1,0.5,1) far
-                glTexCoord2f(0, 0.5f);    glVertex2f(x + isoWidth, y - isoHeight);          // (1,0.5,0) right
+                // Vertices from BlockFaceGeometry pattern (for top face)
+                glTexCoord2f(0, 0); glVertex2f(project2Dx(0, 0.5f, 0, x, isoWidth), project2Dy(0, 0.5f, 0, y, isoHeight));   // (0,0.5,0)
+                glTexCoord2f(0, 1); glVertex2f(project2Dx(0, 0.5f, 1, x, isoWidth), project2Dy(0, 0.5f, 1, y, isoHeight));   // (0,0.5,1)
+                glTexCoord2f(1, 1); glVertex2f(project2Dx(1, 0.5f, 1, x, isoWidth), project2Dy(1, 0.5f, 1, y, isoHeight));   // (1,0.5,1)
+                glTexCoord2f(1, 0); glVertex2f(project2Dx(1, 0.5f, 0, x, isoWidth), project2Dy(1, 0.5f, 0, y, isoHeight));   // (1,0.5,0)
                 glEnd();
             }
         }
         
-        // === TOP STEP: x[0,1], y[0.5,1.0], z[0.5,1] (south/front half) ===
+        // === TOP STEP: (0,0.5,0) to (1,1,0.5) - north half only ===
         
-        // West face of step (x=0, from z=0.5 to z=1, y=0.5 to y=1.0)
-        // This should show the left side of the top step
+        // West face of top step (x=0, z=0→0.5, y=0.5→1)
         if (sideTexture != null) {
             Texture tex = loadTexture(sideTexture);
             if (tex != null) {
                 tex.bind();
                 glColor4f(0.8f, 0.8f, 0.8f, 1.0f);
                 glBegin(GL_QUADS);
-                // Use cube's left face pattern adapted for the step
-                // Near is z=0.5, far is z=1.0
-                glTexCoord2f(0.5f, 0.5f); glVertex2f(x - isoWidth * 0.5f, y - isoHeight * 0.75f);  // (0,0.5,0.5) near-bottom
-                glTexCoord2f(1, 0.5f);    glVertex2f(x - isoWidth, y - isoHeight);                  // (0,0.5,1) far-bottom
-                glTexCoord2f(1, 1);       glVertex2f(x - isoWidth, y - isoHeight * 1.5f);           // (0,1.0,1) far-top
-                glTexCoord2f(0.5f, 1);    glVertex2f(x - isoWidth * 0.5f, y - isoHeight * 1.25f);   // (0,1.0,0.5) near-top
+                glTexCoord2f(0, 0.5f);   glVertex2f(project2Dx(0, 0.5f, 0, x, isoWidth),   project2Dy(0, 0.5f, 0, y, isoHeight));    // (0,0.5,0)
+                glTexCoord2f(0.5f, 0.5f); glVertex2f(project2Dx(0, 0.5f, 0.5f, x, isoWidth), project2Dy(0, 0.5f, 0.5f, y, isoHeight));  // (0,0.5,0.5)
+                glTexCoord2f(0.5f, 0);    glVertex2f(project2Dx(0, 1, 0.5f, x, isoWidth),    project2Dy(0, 1, 0.5f, y, isoHeight));     // (0,1,0.5)
+                glTexCoord2f(0, 0);       glVertex2f(project2Dx(0, 1, 0, x, isoWidth),       project2Dy(0, 1, 0, y, isoHeight));        // (0,1,0)
                 glEnd();
             }
         }
         
-        // East face of step (x=1, from z=0.5 to z=1, y=0.5 to y=1.0)
-        // This should show the right side of the top step
+        // North face of top step (z=0, x=0→1, y=0.5→1)
+        if (sideTexture != null) {
+            Texture tex = loadTexture(sideTexture);
+            if (tex != null) {
+                tex.bind();
+                glColor4f(0.6f, 0.6f, 0.6f, 1.0f);
+                glBegin(GL_QUADS);
+                glTexCoord2f(1, 0.5f); glVertex2f(project2Dx(1, 0.5f, 0, x, isoWidth), project2Dy(1, 0.5f, 0, y, isoHeight));   // (1,0.5,0)
+                glTexCoord2f(0, 0.5f); glVertex2f(project2Dx(0, 0.5f, 0, x, isoWidth), project2Dy(0, 0.5f, 0, y, isoHeight));   // (0,0.5,0)
+                glTexCoord2f(0, 0);    glVertex2f(project2Dx(0, 1, 0, x, isoWidth),    project2Dy(0, 1, 0, y, isoHeight));      // (0,1,0)
+                glTexCoord2f(1, 0);    glVertex2f(project2Dx(1, 1, 0, x, isoWidth),    project2Dy(1, 1, 0, y, isoHeight));      // (1,1,0)
+                glEnd();
+            }
+        }
+        
+        // South face of top step (z=0.5, x=0→1, y=0.5→1) - the inner vertical step face
+        if (sideTexture != null) {
+            Texture tex = loadTexture(sideTexture);
+            if (tex != null) {
+                tex.bind();
+                glColor4f(0.6f, 0.6f, 0.6f, 1.0f);
+                glBegin(GL_QUADS);
+                glTexCoord2f(0, 0.5f); glVertex2f(project2Dx(0, 0.5f, 0.5f, x, isoWidth), project2Dy(0, 0.5f, 0.5f, y, isoHeight));   // (0,0.5,0.5)
+                glTexCoord2f(1, 0.5f); glVertex2f(project2Dx(1, 0.5f, 0.5f, x, isoWidth), project2Dy(1, 0.5f, 0.5f, y, isoHeight));   // (1,0.5,0.5)
+                glTexCoord2f(1, 0);    glVertex2f(project2Dx(1, 1, 0.5f, x, isoWidth),    project2Dy(1, 1, 0.5f, y, isoHeight));      // (1,1,0.5)
+                glTexCoord2f(0, 0);    glVertex2f(project2Dx(0, 1, 0.5f, x, isoWidth),    project2Dy(0, 1, 0.5f, y, isoHeight));      // (0,1,0.5)
+                glEnd();
+            }
+        }
+        
+        // East face of top step (x=1, z=0→0.5, y=0.5→1)
         if (sideTexture != null) {
             Texture tex = loadTexture(sideTexture);
             if (tex != null) {
                 tex.bind();
                 glColor4f(0.8f, 0.8f, 0.8f, 1.0f);
                 glBegin(GL_QUADS);
-                // For east face, reverse the winding compared to west
-                // Near is z=1.0, far is z=0.5 (because we're looking from the other side)
-                glTexCoord2f(0, 0.5f);    glVertex2f(x + isoWidth, y - isoHeight);                  // (1,0.5,1) near-bottom
-                glTexCoord2f(0.5f, 0.5f); glVertex2f(x + isoWidth * 0.5f, y - isoHeight * 0.75f);   // (1,0.5,0.5) far-bottom
-                glTexCoord2f(0.5f, 1);    glVertex2f(x + isoWidth * 0.5f, y - isoHeight * 1.25f);   // (1,1.0,0.5) far-top
-                glTexCoord2f(0, 1);       glVertex2f(x + isoWidth, y - isoHeight * 1.5f);           // (1,1.0,1) near-top
+                glTexCoord2f(0.5f, 0.5f); glVertex2f(project2Dx(1, 0.5f, 0.5f, x, isoWidth), project2Dy(1, 0.5f, 0.5f, y, isoHeight));  // (1,0.5,0.5)
+                glTexCoord2f(0, 0.5f);    glVertex2f(project2Dx(1, 0.5f, 0, x, isoWidth),    project2Dy(1, 0.5f, 0, y, isoHeight));     // (1,0.5,0)
+                glTexCoord2f(0, 0);       glVertex2f(project2Dx(1, 1, 0, x, isoWidth),       project2Dy(1, 1, 0, y, isoHeight));        // (1,1,0)
+                glTexCoord2f(0.5f, 0);    glVertex2f(project2Dx(1, 1, 0.5f, x, isoWidth),    project2Dy(1, 1, 0.5f, y, isoHeight));     // (1,1,0.5)
                 glEnd();
             }
         }
         
-        // South face of step (z=1, full width, y=0.5 to y=1.0)
-        if (sideTexture != null) {
-            Texture tex = loadTexture(sideTexture);
-            if (tex != null) {
-                tex.bind();
-                glColor4f(0.6f, 0.6f, 0.6f, 1.0f);
-                glBegin(GL_QUADS);
-                // Right face pattern for south-facing surface
-                glTexCoord2f(0, 0.5f); glVertex2f(x + isoWidth, y - isoHeight);            // (1,0.5,1) far-bottom
-                glTexCoord2f(1, 0.5f); glVertex2f(x, y - isoHeight * 0.5f);                // (0,0.5,1) near-bottom
-                glTexCoord2f(1, 1);    glVertex2f(x, y - isoHeight);                       // (0,1.0,1) near-top
-                glTexCoord2f(0, 1);    glVertex2f(x + isoWidth, y - isoHeight * 1.5f);     // (1,1.0,1) far-top
-                glEnd();
-            }
-        }
-        
-        // Inner vertical face (z=0.5, full width, y=0.5 to y=1.0) - north face of step
-        if (sideTexture != null) {
-            Texture tex = loadTexture(sideTexture);
-            if (tex != null) {
-                tex.bind();
-                glColor4f(0.6f, 0.6f, 0.6f, 1.0f);
-                glBegin(GL_QUADS);
-                // Right face pattern for the inner vertical step
-                glTexCoord2f(0, 0.5f); glVertex2f(x + isoWidth * 0.5f, y - isoHeight * 0.75f);   // (1,0.5,0.5) far-bottom
-                glTexCoord2f(1, 0.5f); glVertex2f(x - isoWidth * 0.5f, y - isoHeight * 0.75f);   // (0,0.5,0.5) near-bottom
-                glTexCoord2f(1, 1);    glVertex2f(x - isoWidth * 0.5f, y - isoHeight * 1.25f);   // (0,1.0,0.5) near-top
-                glTexCoord2f(0, 1);    glVertex2f(x + isoWidth * 0.5f, y - isoHeight * 1.25f);   // (1,1.0,0.5) far-top
-                glEnd();
-            }
-        }
-        
-        // Top face of step (south half diamond at y=1.0)
+        // Top face of top step (y=1, x=0→1, z=0→0.5)
         if (topTexture != null) {
             Texture tex = loadTexture(topTexture);
             if (tex != null) {
                 tex.bind();
                 glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
                 glBegin(GL_QUADS);
-                // Half diamond: near(z=0.5), left(z=1), far(z=1), right(z=0.5)
-                glTexCoord2f(0.5f, 0);    glVertex2f(x - isoWidth * 0.5f, y - isoHeight * 1.25f);   // (0,1.0,0.5) near-left
-                glTexCoord2f(0.5f, 0.5f); glVertex2f(x - isoWidth, y - isoHeight * 1.5f);            // (0,1.0,1) left
-                glTexCoord2f(1, 0.5f);    glVertex2f(x, y - isoHeight * 1.5f);                       // (1,1.0,1) far
-                glTexCoord2f(1, 0);       glVertex2f(x + isoWidth * 0.5f, y - isoHeight * 1.25f);    // (1,1.0,0.5) near-right
+                glTexCoord2f(0, 0);    glVertex2f(project2Dx(0, 1, 0, x, isoWidth),    project2Dy(0, 1, 0, y, isoHeight));      // (0,1,0)
+                glTexCoord2f(0, 0.5f); glVertex2f(project2Dx(0, 1, 0.5f, x, isoWidth), project2Dy(0, 1, 0.5f, y, isoHeight));   // (0,1,0.5)
+                glTexCoord2f(1, 0.5f); glVertex2f(project2Dx(1, 1, 0.5f, x, isoWidth), project2Dy(1, 1, 0.5f, y, isoHeight));   // (1,1,0.5)
+                glTexCoord2f(1, 0);    glVertex2f(project2Dx(1, 1, 0, x, isoWidth),    project2Dy(1, 1, 0, y, isoHeight));      // (1,1,0)
                 glEnd();
             }
         }
@@ -339,6 +339,22 @@ public class ItemRenderer {
             glDisable(GL_TEXTURE_2D);
         }
         glColor4f(1f, 1f, 1f, 1f);
+    }
+    
+    /**
+     * Project a 3D world coordinate to 2D isometric X coordinate.
+     * Formula: screen_x = centerX + (wx - wz) * isoWidth
+     */
+    private static float project2Dx(float wx, float wy, float wz, float centerX, float isoWidth) {
+        return centerX + (wx - wz) * isoWidth;
+    }
+    
+    /**
+     * Project a 3D world coordinate to 2D isometric Y coordinate.
+     * Formula: screen_y = centerY - wy * isoHeight - (wx + wz) * isoHeight * 0.5
+     */
+    private static float project2Dy(float wx, float wy, float wz, float centerY, float isoHeight) {
+        return centerY - wy * isoHeight - (wx + wz) * isoHeight * 0.5f;
     }
     
     /**
