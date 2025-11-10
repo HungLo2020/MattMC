@@ -177,7 +177,7 @@ public class ItemRenderer {
     
     /**
      * Render stairs as an isometric 3D block with proper stepped geometry.
-     * Stairs rise toward the west (back-left) as they recede from the camera.
+     * Stairs rise toward the northwest (back/top) in isometric view.
      */
     private static void renderIsometricStairs(Map<String, String> texturePaths, mattmc.client.resources.model.BlockModel itemModel, float x, float y, float size) {
         // Get textures for each face
@@ -194,33 +194,37 @@ public class ItemRenderer {
         float isoWidth = scale * 0.5f;
         float isoHeight = scale * 0.5f;
         
-        // Capture west-facing stairs geometry (step rises toward x=0, back-left in isometric)
+        // Capture northwest corner stairs geometry (step at x=0, z=0 corner - back/top in isometric)
         VertexCapture capture = new VertexCapture();
-        BlockGeometryCapture.captureStairsWestBottom(capture, 0, 0, 0);
+        BlockGeometryCapture.captureStairsNorthwestCorner(capture, 0, 0, 0);
         List<VertexCapture.Face> allFaces = capture.getFaces();
         
-        // Separate faces by type for proper rendering order and texture assignment
+        // Separate faces by type and visibility
         List<VertexCapture.Face> topFacesList = new ArrayList<>();
-        List<VertexCapture.Face> sideFacesList = new ArrayList<>();
+        List<VertexCapture.Face> visibleSideFaces = new ArrayList<>();
         
         for (VertexCapture.Face face : allFaces) {
             if (isTopFace(face)) {
                 topFacesList.add(face);
             } else {
-                sideFacesList.add(face);
+                // Only render visible side faces (West and North faces)
+                // Filter out East and South faces which are hidden in isometric view
+                if (isVisibleSideFace(face)) {
+                    visibleSideFaces.add(face);
+                }
             }
         }
         
-        // Render side faces first with appropriate shading
+        // Render visible side faces first with appropriate shading
         if (sideTexture != null) {
             Texture tex = loadTexture(sideTexture);
             if (tex != null) {
                 tex.bind();
                 
-                for (VertexCapture.Face face : sideFacesList) {
+                for (VertexCapture.Face face : visibleSideFaces) {
                     // Determine brightness based on face orientation
                     // West-facing faces (x=0) get 0.8 brightness
-                    // Other faces get 0.6 brightness
+                    // North-facing faces (z=0) get 0.6 brightness
                     boolean isWestFacing = isWestFacing(face);
                     float brightness = isWestFacing ? 0.8f : 0.6f;
                     glColor4f(brightness, brightness, brightness, 1.0f);
@@ -259,6 +263,46 @@ public class ItemRenderer {
         
         // All Y values are the same and greater than 0
         return Math.abs(y1 - y2) < 0.01f && Math.abs(y2 - y3) < 0.01f && y1 > 0.01f;
+    }
+    
+    /**
+     * Check if a side face is visible in isometric view.
+     * Only West (x=0) and North (z=0) faces are visible, plus the inner step faces.
+     */
+    private static boolean isVisibleSideFace(VertexCapture.Face face) {
+        // Check if it's a West face (x=0)
+        if (face.v1.x < 0.01f && face.v2.x < 0.01f && face.v3.x < 0.01f) {
+            return true;
+        }
+        
+        // Check if it's a North face (z=0)
+        if (face.v1.z < 0.01f && face.v2.z < 0.01f && face.v3.z < 0.01f) {
+            return true;
+        }
+        
+        // Check if it's an inner step face at x=0.5
+        float avgX = (face.v1.x + face.v2.x + face.v3.x) / 3.0f;
+        if (Math.abs(avgX - 0.5f) < 0.01f) {
+            // Verify it's vertical (Y values differ)
+            float yMin = Math.min(face.v1.y, Math.min(face.v2.y, face.v3.y));
+            float yMax = Math.max(face.v1.y, Math.max(face.v2.y, face.v3.y));
+            if (yMax - yMin > 0.4f) { // Significant Y difference = vertical face
+                return true;
+            }
+        }
+        
+        // Check if it's an inner step face at z=0.5
+        float avgZ = (face.v1.z + face.v2.z + face.v3.z) / 3.0f;
+        if (Math.abs(avgZ - 0.5f) < 0.01f) {
+            // Verify it's vertical (Y values differ)
+            float yMin = Math.min(face.v1.y, Math.min(face.v2.y, face.v3.y));
+            float yMax = Math.max(face.v1.y, Math.max(face.v2.y, face.v3.y));
+            if (yMax - yMin > 0.4f) { // Significant Y difference = vertical face
+                return true;
+            }
+        }
+        
+        return false;
     }
     
     /**
