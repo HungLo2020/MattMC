@@ -4,6 +4,7 @@ import mattmc.client.Minecraft;
 import mattmc.client.Window;
 import mattmc.client.renderer.BlurEffect;
 import mattmc.client.renderer.BlurRenderer;
+import mattmc.client.renderer.TooltipRenderer;
 import mattmc.client.renderer.texture.Texture;
 import mattmc.world.entity.player.PlayerInput;
 import mattmc.world.item.Item;
@@ -45,6 +46,9 @@ public final class InventoryScreen implements Screen {
     
     // Blur effect for background
     private BlurEffect blurEffect;
+    
+    // Tooltip renderer for item hover
+    private TooltipRenderer tooltipRenderer;
     
     // Mouse tracking for slot highlighting
     private double mouseXWin, mouseYWin;
@@ -93,6 +97,9 @@ public final class InventoryScreen implements Screen {
         // Load textures
         inventoryTexture = Texture.load("/assets/textures/gui/container/inventory.png");
         creativeInventoryTexture = Texture.load("/assets/textures/gui/container/creativeinv.png");
+        
+        // Initialize tooltip renderer
+        tooltipRenderer = new TooltipRenderer();
 
         // Release mouse cursor
         glfwSetInputMode(window.handle(), GLFW_CURSOR, GLFW_CURSOR_NORMAL);
@@ -584,6 +591,37 @@ public final class InventoryScreen implements Screen {
     }
     
     /**
+     * Get the item currently being hovered over.
+     * Checks both inventory slots and creative inventory slots.
+     * @return The hovered item, or null if no item is being hovered
+     */
+    private Item getHoveredItem() {
+        mattmc.world.entity.player.LocalPlayer player = gameScreen.getPlayer();
+        if (player == null || player.getInventory() == null) {
+            return null;
+        }
+        
+        mattmc.world.item.Inventory inventory = player.getInventory();
+        
+        // Check creative inventory first
+        int creativeItemIndex = findClickedCreativeItem();
+        if (creativeItemIndex >= 0 && creativeItemIndex < allItems.size()) {
+            return allItems.get(creativeItemIndex);
+        }
+        
+        // Check regular inventory slots
+        int slotIndex = findClickedSlot();
+        if (slotIndex >= 0) {
+            ItemStack stack = inventory.getStack(slotIndex);
+            if (stack != null) {
+                return stack.getItem();
+            }
+        }
+        
+        return null;
+    }
+    
+    /**
      * Find which creative inventory item (if any) was clicked.
      * @return Item index in allItems list, or -1 if no item was clicked
      */
@@ -769,6 +807,20 @@ public final class InventoryScreen implements Screen {
         // Draw held item under mouse cursor
         if (heldItem != null) {
             drawHeldItem();
+        }
+        
+        // Draw tooltip for hovered item (but not when holding an item)
+        if (heldItem == null) {
+            Item hoveredItem = getHoveredItem();
+            if (hoveredItem != null && hoveredItem.getIdentifier() != null) {
+                // Get display name from identifier (e.g., "mattmc:diamond" -> "Diamond")
+                String identifier = hoveredItem.getIdentifier();
+                String itemName = identifier.contains(":") ? identifier.substring(identifier.indexOf(':') + 1) : identifier;
+                // Capitalize first letter and replace underscores with spaces
+                itemName = itemName.substring(0, 1).toUpperCase() + itemName.substring(1).replace('_', ' ');
+                
+                tooltipRenderer.renderTooltip(itemName, mouseXWin, mouseYWin, window.handle());
+            }
         }
         
         glDisable(GL_BLEND);
@@ -976,6 +1028,10 @@ public final class InventoryScreen implements Screen {
         if (blurEffect != null) {
             blurEffect.close();
             blurEffect = null;
+        }
+        if (tooltipRenderer != null) {
+            tooltipRenderer.close();
+            tooltipRenderer = null;
         }
     }
     
