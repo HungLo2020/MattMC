@@ -311,19 +311,20 @@ public class ItemRenderer {
         // Project and render vertex 1
         float x1 = project2Dx(face.v1.x, face.v1.y, face.v1.z, centerX, isoWidth);
         float y1 = project2Dy(face.v1.x, face.v1.y, face.v1.z, centerY, isoHeight);
-        glTexCoord2f(face.v1.u, face.v1.v);
+        // Flip V coordinate for 2D rendering (v=0 is top in 2D textures, but bottom in 3D geometry)
+        glTexCoord2f(face.v1.u, 1.0f - face.v1.v);
         glVertex2f(x1, y1);
         
         // Project and render vertex 2
         float x2 = project2Dx(face.v2.x, face.v2.y, face.v2.z, centerX, isoWidth);
         float y2 = project2Dy(face.v2.x, face.v2.y, face.v2.z, centerY, isoHeight);
-        glTexCoord2f(face.v2.u, face.v2.v);
+        glTexCoord2f(face.v2.u, 1.0f - face.v2.v);
         glVertex2f(x2, y2);
         
         // Project and render vertex 3
         float x3 = project2Dx(face.v3.x, face.v3.y, face.v3.z, centerX, isoWidth);
         float y3 = project2Dy(face.v3.x, face.v3.y, face.v3.z, centerY, isoHeight);
-        glTexCoord2f(face.v3.u, face.v3.v);
+        glTexCoord2f(face.v3.u, 1.0f - face.v3.v);
         glVertex2f(x3, y3);
         
         glEnd();
