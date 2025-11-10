@@ -454,43 +454,23 @@ public final class BlockGeometryCapture {
      * 
      * Geometry:
      * - Bottom slab: (0,0,0) to (1,0.5,1) - full block, half height
-     * - Top step: (0,0.5,0) to (0.5,1,0.5) - northwest quarter only, top half height
+     * - Top step: (0,0.5,0) to (1,1,0.5) - north half, full width, top half height
      */
     public static void captureStairsNorthwestCorner(VertexCapture capture, float x, float y, float z) {
-        float x0 = x, x05 = x + 0.5f, x1 = x + 1;
+        float x0 = x, x1 = x + 1;
         float y0 = y, y05 = y + 0.5f, y1 = y + 1;
         float z0 = z, z05 = z + 0.5f, z1 = z + 1;
         
         // Bottom slab (0, 0, 0) to (1, 0.5, 1) - full block, half height
-        // Top face of bottom slab - EXCEPT where top step is (northwest quarter)
-        // We need to render the L-shaped top face excluding (0,0) to (0.5,0.5)
-        
-        // Southeast corner (0.5, 0.5) to (1, 1)
-        capture.texCoord(0.5f, 0.5f); capture.addVertex(x05, y05, z05);
-        capture.texCoord(0.5f, 1); capture.addVertex(x05, y05, z1);
-        capture.texCoord(1, 1); capture.addVertex(x1, y05, z1);
-        
-        capture.texCoord(0.5f, 0.5f); capture.addVertex(x05, y05, z05);
-        capture.texCoord(1, 1); capture.addVertex(x1, y05, z1);
-        capture.texCoord(1, 0.5f); capture.addVertex(x1, y05, z05);
-        
-        // Northeast strip (0.5, 0) to (1, 0.5)
-        capture.texCoord(0.5f, 0); capture.addVertex(x05, y05, z0);
-        capture.texCoord(0.5f, 0.5f); capture.addVertex(x05, y05, z05);
-        capture.texCoord(1, 0.5f); capture.addVertex(x1, y05, z05);
-        
-        capture.texCoord(0.5f, 0); capture.addVertex(x05, y05, z0);
-        capture.texCoord(1, 0.5f); capture.addVertex(x1, y05, z05);
-        capture.texCoord(1, 0); capture.addVertex(x1, y05, z0);
-        
-        // Southwest strip (0, 0.5) to (0.5, 1)
+        // Top face of bottom slab - only the SOUTH half where there's no top step
+        // South half: (0, 0.5) to (1, 1) at y=0.5
         capture.texCoord(0, 0.5f); capture.addVertex(x0, y05, z05);
         capture.texCoord(0, 1); capture.addVertex(x0, y05, z1);
-        capture.texCoord(0.5f, 1); capture.addVertex(x05, y05, z1);
+        capture.texCoord(1, 1); capture.addVertex(x1, y05, z1);
         
         capture.texCoord(0, 0.5f); capture.addVertex(x0, y05, z05);
-        capture.texCoord(0.5f, 1); capture.addVertex(x05, y05, z1);
-        capture.texCoord(0.5f, 0.5f); capture.addVertex(x05, y05, z05);
+        capture.texCoord(1, 1); capture.addVertex(x1, y05, z1);
+        capture.texCoord(1, 0.5f); capture.addVertex(x1, y05, z05);
         
         // North face of slab (z=0)
         capture.texCoord(1, 1); capture.addVertex(x1, y0, z0);
@@ -528,15 +508,15 @@ public final class BlockGeometryCapture {
         capture.texCoord(0, 0.5f); capture.addVertex(x1, y05, z0);
         capture.texCoord(1, 0.5f); capture.addVertex(x1, y05, z1);
         
-        // Top step (0, 0.5, 0) to (0.5, 1, 0.5) - northwest quarter only
+        // Top step (0, 0.5, 0) to (1, 1, 0.5) - north half, full width
         // Top face of step
         capture.texCoord(0, 0); capture.addVertex(x0, y1, z0);
         capture.texCoord(0, 0.5f); capture.addVertex(x0, y1, z05);
-        capture.texCoord(0.5f, 0.5f); capture.addVertex(x05, y1, z05);
+        capture.texCoord(1, 0.5f); capture.addVertex(x1, y1, z05);
         
         capture.texCoord(0, 0); capture.addVertex(x0, y1, z0);
-        capture.texCoord(0.5f, 0.5f); capture.addVertex(x05, y1, z05);
-        capture.texCoord(0.5f, 0); capture.addVertex(x05, y1, z0);
+        capture.texCoord(1, 0.5f); capture.addVertex(x1, y1, z05);
+        capture.texCoord(1, 0); capture.addVertex(x1, y1, z0);
         
         // West face of step (x=0, z from 0 to 0.5)
         capture.texCoord(0, 0.5f); capture.addVertex(x0, y05, z0);
@@ -547,31 +527,31 @@ public final class BlockGeometryCapture {
         capture.texCoord(0.5f, 0); capture.addVertex(x0, y1, z05);
         capture.texCoord(0, 0); capture.addVertex(x0, y1, z0);
         
-        // North face of step (z=0, x from 0 to 0.5)
-        capture.texCoord(0.5f, 0.5f); capture.addVertex(x05, y05, z0);
+        // East face of step (x=1, z from 0 to 0.5)
+        capture.texCoord(0.5f, 0.5f); capture.addVertex(x1, y05, z05);
+        capture.texCoord(0, 0.5f); capture.addVertex(x1, y05, z0);
+        capture.texCoord(0, 0); capture.addVertex(x1, y1, z0);
+        
+        capture.texCoord(0.5f, 0.5f); capture.addVertex(x1, y05, z05);
+        capture.texCoord(0, 0); capture.addVertex(x1, y1, z0);
+        capture.texCoord(0.5f, 0); capture.addVertex(x1, y1, z05);
+        
+        // North face of step (z=0, x from 0 to 1) - FULL WIDTH
+        capture.texCoord(1, 0.5f); capture.addVertex(x1, y05, z0);
         capture.texCoord(0, 0.5f); capture.addVertex(x0, y05, z0);
         capture.texCoord(0, 0); capture.addVertex(x0, y1, z0);
         
-        capture.texCoord(0.5f, 0.5f); capture.addVertex(x05, y05, z0);
+        capture.texCoord(1, 0.5f); capture.addVertex(x1, y05, z0);
         capture.texCoord(0, 0); capture.addVertex(x0, y1, z0);
-        capture.texCoord(0.5f, 0); capture.addVertex(x05, y1, z0);
+        capture.texCoord(1, 0); capture.addVertex(x1, y1, z0);
         
-        // East face of step (x=0.5, z from 0 to 0.5) - inner step face
-        capture.texCoord(0.5f, 0.5f); capture.addVertex(x05, y05, z05);
-        capture.texCoord(0, 0.5f); capture.addVertex(x05, y05, z0);
-        capture.texCoord(0, 0); capture.addVertex(x05, y1, z0);
-        
-        capture.texCoord(0.5f, 0.5f); capture.addVertex(x05, y05, z05);
-        capture.texCoord(0, 0); capture.addVertex(x05, y1, z0);
-        capture.texCoord(0.5f, 0); capture.addVertex(x05, y1, z05);
-        
-        // South face of step (z=0.5, x from 0 to 0.5) - inner step face
+        // South face of step (z=0.5, x from 0 to 1) - inner step face, FULL WIDTH
         capture.texCoord(0, 0.5f); capture.addVertex(x0, y05, z05);
-        capture.texCoord(0.5f, 0.5f); capture.addVertex(x05, y05, z05);
-        capture.texCoord(0.5f, 0); capture.addVertex(x05, y1, z05);
+        capture.texCoord(1, 0.5f); capture.addVertex(x1, y05, z05);
+        capture.texCoord(1, 0); capture.addVertex(x1, y1, z05);
         
         capture.texCoord(0, 0.5f); capture.addVertex(x0, y05, z05);
-        capture.texCoord(0.5f, 0); capture.addVertex(x05, y1, z05);
+        capture.texCoord(1, 0); capture.addVertex(x1, y1, z05);
         capture.texCoord(0, 0); capture.addVertex(x0, y1, z05);
     }
 }

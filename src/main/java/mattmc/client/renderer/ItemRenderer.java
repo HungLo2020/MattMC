@@ -267,7 +267,7 @@ public class ItemRenderer {
     
     /**
      * Check if a side face is visible in isometric view.
-     * Only West (x=0) and North (z=0) faces are visible, plus the inner step faces.
+     * Only West (x=0) and North (z=0) faces are visible, plus the inner step face at z=0.5.
      */
     private static boolean isVisibleSideFace(VertexCapture.Face face) {
         // Check if it's a West face (x=0)
@@ -280,21 +280,10 @@ public class ItemRenderer {
             return true;
         }
         
-        // Check if it's an inner step face at x=0.5
-        float avgX = (face.v1.x + face.v2.x + face.v3.x) / 3.0f;
-        if (Math.abs(avgX - 0.5f) < 0.01f) {
-            // Verify it's vertical (Y values differ)
-            float yMin = Math.min(face.v1.y, Math.min(face.v2.y, face.v3.y));
-            float yMax = Math.max(face.v1.y, Math.max(face.v2.y, face.v3.y));
-            if (yMax - yMin > 0.4f) { // Significant Y difference = vertical face
-                return true;
-            }
-        }
-        
-        // Check if it's an inner step face at z=0.5
+        // Check if it's an inner step face at z=0.5 (full width, vertical)
         float avgZ = (face.v1.z + face.v2.z + face.v3.z) / 3.0f;
         if (Math.abs(avgZ - 0.5f) < 0.01f) {
-            // Verify it's vertical (Y values differ)
+            // Verify it's vertical (Y values differ significantly)
             float yMin = Math.min(face.v1.y, Math.min(face.v2.y, face.v3.y));
             float yMax = Math.max(face.v1.y, Math.max(face.v2.y, face.v3.y));
             if (yMax - yMin > 0.4f) { // Significant Y difference = vertical face
