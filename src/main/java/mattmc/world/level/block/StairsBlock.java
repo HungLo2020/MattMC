@@ -65,7 +65,8 @@ public class StairsBlock extends Block {
     @Override
     public mattmc.world.level.block.state.BlockState getPlacementState(
             float playerX, float playerY, float playerZ,
-            int blockX, int blockY, int blockZ, int hitFace) {
+            int blockX, int blockY, int blockZ, int hitFace,
+            float hitX, float hitY, float hitZ) {
         
         mattmc.world.level.block.state.BlockState state = new mattmc.world.level.block.state.BlockState();
         
@@ -82,7 +83,7 @@ public class StairsBlock extends Block {
             facing = dz > 0 ? Direction.NORTH : Direction.SOUTH;
         }
         
-        // Determine half based on which face was clicked and player's Y position
+        // Determine half based on which face was clicked and where on the face was hit
         Half half;
         if (hitFace == 0) {
             // Clicked bottom face - always place as top half (upside down)
@@ -91,14 +92,15 @@ public class StairsBlock extends Block {
             // Clicked top face - always place as bottom half (right-side up)
             half = Half.BOTTOM;
         } else {
-            // Clicked side face - determine based on where the player is looking (Y position)
-            // Use the player's eye height for more accurate placement
-            float eyeY = playerY + 1.62f; // Player eye height is at feet + 1.62 blocks
-            float blockCenterY = blockY + 0.5f;
+            // Clicked side face - determine based on where we hit the face (Y position)
+            // hitY is the exact world Y where the ray hit the block face
+            // Get the Y position relative to the block that was hit (the adjacent block where we're placing)
+            // We need to check where in the vertical space the hit occurred
+            float relativeY = hitY - (float)Math.floor(hitY);
             
-            // If looking at top half of block, place as top half (upside down)
-            // If looking at bottom half, place as bottom half (right-side up)
-            half = eyeY > blockCenterY ? Half.TOP : Half.BOTTOM;
+            // If we hit the top half of the face (relativeY > 0.5), place as top half (upside down)
+            // If we hit the bottom half of the face (relativeY <= 0.5), place as bottom half (right-side up)
+            half = relativeY > 0.5f ? Half.TOP : Half.BOTTOM;
         }
         
         state.setValue("facing", facing);

@@ -3,6 +3,7 @@ package mattmc.world.level.storage;
 import mattmc.client.Minecraft;
 import mattmc.world.item.Inventory;
 import mattmc.world.level.Level;
+import mattmc.world.level.block.Block;
 import mattmc.world.level.chunk.ChunkNBT;
 import mattmc.world.level.chunk.LevelChunk;
 import mattmc.world.level.chunk.RegionFile;
@@ -297,7 +298,9 @@ public final class LevelStorageSource {
                                 for (int x = 0; x < LevelChunk.WIDTH; x++) {
                                     for (int y = 0; y < LevelChunk.HEIGHT; y++) {
                                         for (int z = 0; z < LevelChunk.DEPTH; z++) {
-                                            worldChunk.setBlock(x, y, z, chunk.getBlock(x, y, z));
+                                            Block block = chunk.getBlock(x, y, z);
+                                            mattmc.world.level.block.state.BlockState state = chunk.getBlockState(x, y, z);
+                                            worldChunk.setBlock(x, y, z, block, state);
                                         }
                                     }
                                 }
