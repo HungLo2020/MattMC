@@ -13,9 +13,33 @@ import java.util.concurrent.atomic.AtomicInteger;
  * - Chunk disk I/O
  * 
  * OpenGL operations remain on the render thread.
+ * 
+ * ISSUE-010 fix: Improved thread count calculation for better performance across
+ * different hardware configurations.
  */
 public class ChunkTaskExecutor {
-    private static final int THREAD_COUNT = Math.max(2, Runtime.getRuntime().availableProcessors() - 1);
+    private static final int THREAD_COUNT = calculateOptimalThreadCount();
+    
+    /**
+     * Calculate optimal thread count based on available processors.
+     * Chunk loading is I/O bound, so we don't need one thread per core.
+     * Uses adaptive formula for different hardware configurations.
+     */
+    private static int calculateOptimalThreadCount() {
+        int cores = Runtime.getRuntime().availableProcessors();
+        
+        // Use 50-75% of available cores, capped at 8 threads
+        // Chunk loading is I/O bound, so we don't need excessive threads
+        if (cores <= 2) {
+            return 2; // Minimum for responsiveness on low-end systems
+        } else if (cores <= 4) {
+            return cores - 1; // 3 threads on quad core
+        } else if (cores <= 8) {
+            return cores / 2 + 1; // 4-5 threads on 6-8 cores
+        } else {
+            return 8; // Cap at 8 threads for chunk work to avoid contention
+        }
+    }
     
     private final ExecutorService executor;
     private final AtomicInteger activeTasks = new AtomicInteger(0);

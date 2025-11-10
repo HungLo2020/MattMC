@@ -30,7 +30,8 @@ public class AsyncChunkLoader {
     
     private final ChunkTaskExecutor executor;
     private final PriorityBlockingQueue<ChunkLoadTask> pendingTasks;
-    private final Set<Long> tasksInProgress;
+    // ISSUE-014 fix: Use ConcurrentHashMap.KeySetView instead of synchronized Set
+    private final ConcurrentHashMap.KeySetView<Long, Boolean> tasksInProgress;
     private final Map<Long, Future<LevelChunk>> chunkFutures;
     private final Map<Long, Future<ChunkMeshData>> meshFutures;
     private final Queue<ChunkMeshData> completedMeshes;
@@ -50,7 +51,8 @@ public class AsyncChunkLoader {
     public AsyncChunkLoader() {
         this.executor = new ChunkTaskExecutor();
         this.pendingTasks = new PriorityBlockingQueue<>();
-        this.tasksInProgress = Collections.synchronizedSet(new HashSet<>());
+        // ISSUE-014 fix: Use lock-free concurrent set
+        this.tasksInProgress = ConcurrentHashMap.newKeySet();
         this.chunkFutures = new ConcurrentHashMap<>();
         this.meshFutures = new ConcurrentHashMap<>();
         this.completedMeshes = new ConcurrentLinkedQueue<>();
@@ -90,12 +92,17 @@ public class AsyncChunkLoader {
     public void requestChunk(int chunkX, int chunkZ, double playerX, double playerZ, float playerYaw) {
         long key = ChunkUtils.chunkKey(chunkX, chunkZ);
         
+        // ISSUE-014 fix: Use lock-free atomic operations instead of synchronized block
         // Skip if already loading, meshing, or in progress
-        synchronized (tasksInProgress) {
-            if (tasksInProgress.contains(key) || chunkFutures.containsKey(key) || meshFutures.containsKey(key)) {
-                return;
-            }
-            tasksInProgress.add(key);
+        // Use add() which returns false if already present (atomic operation)
+        if (!tasksInProgress.add(key)) {
+            return; // Already in progress
+        }
+        
+        // Double-check if futures exist (rare race condition)
+        if (chunkFutures.containsKey(key) || meshFutures.containsKey(key)) {
+            tasksInProgress.remove(key); // Remove from set since we're not actually processing
+            return;
         }
         
         // Calculate priority (distance from player)
@@ -185,9 +192,8 @@ public class AsyncChunkLoader {
                 }
                 
                 iterator.remove();
-                synchronized (tasksInProgress) {
-                    tasksInProgress.remove(key);
-                }
+                // ISSUE-014 fix: Use lock-free remove operation
+                tasksInProgress.remove(key);
             }
         }
         

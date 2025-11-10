@@ -84,10 +84,24 @@ public class Level implements LevelAccessor {
     /**
      * Get a block at chunk-local coordinates, checking neighboring chunks if necessary.
      * Used for cross-chunk face culling.
+     * ISSUE-004 fix: Added defensive null checks and bounds validation.
      */
     private Block getBlockAcrossChunks(LevelChunk chunk, int localX, int localY, int localZ) {
+        // Validate chunk reference (ISSUE-004 fix)
+        if (chunk == null) {
+            return Blocks.AIR;
+        }
+        
         // Check Y bounds first
         if (localY < 0 || localY >= LevelChunk.HEIGHT) {
+            return Blocks.AIR;
+        }
+        
+        // Add sanity check for coordinates - they shouldn't be more than 2 chunks away
+        // This prevents integer overflow issues and catches potential bugs
+        if (Math.abs(localX) > LevelChunk.WIDTH * 2 || Math.abs(localZ) > LevelChunk.DEPTH * 2) {
+            logger.warn("Suspicious coordinates in getBlockAcrossChunks: chunk({}, {}), local({}, {}, {})", 
+                       chunk.chunkX(), chunk.chunkZ(), localX, localY, localZ);
             return Blocks.AIR;
         }
         
