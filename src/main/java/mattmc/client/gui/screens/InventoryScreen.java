@@ -819,7 +819,7 @@ public final class InventoryScreen implements Screen {
                 // Capitalize first letter and replace underscores with spaces
                 itemName = itemName.substring(0, 1).toUpperCase() + itemName.substring(1).replace('_', ' ');
                 
-                tooltipRenderer.renderTooltip(itemName, mouseXWin, mouseYWin, window.handle());
+                tooltipRenderer.renderTooltip(itemName, mouseXWin, mouseYWin, window.handle(), w, h);
             }
         }
         

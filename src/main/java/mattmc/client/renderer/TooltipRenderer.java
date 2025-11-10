@@ -39,19 +39,21 @@ public class TooltipRenderer {
     
     /**
      * Render a tooltip at the specified mouse position.
+     * Assumes the projection matrix is already set to screen coordinates.
      * @param text The text to display
      * @param mouseX Mouse X position in window coordinates
      * @param mouseY Mouse Y position in window coordinates
      * @param windowHandle GLFW window handle
+     * @param screenWidth Screen width in pixels
+     * @param screenHeight Screen height in pixels
      */
-    public void renderTooltip(String text, double mouseX, double mouseY, long windowHandle) {
+    public void renderTooltip(String text, double mouseX, double mouseY, long windowHandle, int screenWidth, int screenHeight) {
         if (text == null || text.isEmpty()) {
             return;
         }
         
         // Convert window coordinates to framebuffer coordinates
         float mouseFBX, mouseFBY;
-        int fbWidth, fbHeight;
         try (MemoryStack stack = stackPush()) {
             IntBuffer winW = stack.mallocInt(1), winH = stack.mallocInt(1);
             IntBuffer fbW  = stack.mallocInt(1), fbH  = stack.mallocInt(1);
@@ -61,8 +63,6 @@ public class TooltipRenderer {
             float sy = fbH.get(0) / Math.max(1f, winH.get(0));
             mouseFBX = (float) mouseX * sx;
             mouseFBY = (float) mouseY * sy;
-            fbWidth = fbW.get(0);
-            fbHeight = fbH.get(0);
         }
         
         // Calculate text dimensions
@@ -78,18 +78,18 @@ public class TooltipRenderer {
         float tooltipY = mouseFBY + TOOLTIP_OFFSET_Y - boxHeight;
         
         // Clamp to screen bounds
-        tooltipX = Math.max(0, Math.min(tooltipX, fbWidth - boxWidth));
-        tooltipY = Math.max(0, Math.min(tooltipY, fbHeight - boxHeight));
+        tooltipX = Math.max(0, Math.min(tooltipX, screenWidth - boxWidth));
+        tooltipY = Math.max(0, Math.min(tooltipY, screenHeight - boxHeight));
         
         // Capture the area behind the tooltip for blur
         int captureX = (int) tooltipX;
-        int captureY = (int) (fbHeight - tooltipY - boxHeight); // OpenGL Y is bottom-up
+        int captureY = (int) (screenHeight - tooltipY - boxHeight); // OpenGL Y is bottom-up
         int captureWidth = (int) Math.ceil(boxWidth);
         int captureHeight = (int) Math.ceil(boxHeight);
         
         // Ensure capture dimensions are valid
-        captureWidth = Math.max(1, Math.min(captureWidth, fbWidth - captureX));
-        captureHeight = Math.max(1, Math.min(captureHeight, fbHeight - captureY));
+        captureWidth = Math.max(1, Math.min(captureWidth, screenWidth - captureX));
+        captureHeight = Math.max(1, Math.min(captureHeight, screenHeight - captureY));
         
         // Capture screen region to texture
         int captureTexture = glGenTextures();
@@ -103,19 +103,7 @@ public class TooltipRenderer {
             // Apply blur to captured region
             Framebuffer blurredFB = blurEffect.applyBlur(captureTexture, captureWidth, captureHeight);
             
-            // Set up 2D projection for rendering
-            glMatrixMode(GL_PROJECTION);
-            glPushMatrix();
-            glLoadIdentity();
-            glOrtho(0, fbWidth, fbHeight, 0, -1, 1);
-            glMatrixMode(GL_MODELVIEW);
-            glPushMatrix();
-            glLoadIdentity();
-            
-            glEnable(GL_BLEND);
-            glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-            
-            // Render blurred background
+            // Render blurred background (projection is already set up correctly)
             glEnable(GL_TEXTURE_2D);
             glBindTexture(GL_TEXTURE_2D, blurredFB.getTextureId());
             glColor4f(1f, 1f, 1f, 1f);
@@ -140,14 +128,6 @@ public class TooltipRenderer {
             // Draw text
             glColor4f(1f, 1f, 1f, 1f);
             TextRenderer.drawText(text, tooltipX + TOOLTIP_PADDING, tooltipY + TOOLTIP_PADDING, TEXT_SCALE);
-            
-            glDisable(GL_BLEND);
-            
-            // Restore matrices
-            glMatrixMode(GL_PROJECTION);
-            glPopMatrix();
-            glMatrixMode(GL_MODELVIEW);
-            glPopMatrix();
             
         } finally {
             // Clean up capture texture

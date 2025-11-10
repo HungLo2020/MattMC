@@ -117,10 +117,13 @@ public class TooltipBlurEffect {
      * Render a full-screen quad for post-processing.
      */
     private void renderQuad(int width, int height) {
+        // Save current matrices
         glMatrixMode(GL_PROJECTION);
+        glPushMatrix();
         glLoadIdentity();
         glOrtho(0, width, height, 0, -1, 1);
         glMatrixMode(GL_MODELVIEW);
+        glPushMatrix();
         glLoadIdentity();
         
         glEnable(GL_TEXTURE_2D);
@@ -134,6 +137,12 @@ public class TooltipBlurEffect {
         glEnd();
         
         glDisable(GL_TEXTURE_2D);
+        
+        // Restore matrices
+        glMatrixMode(GL_PROJECTION);
+        glPopMatrix();
+        glMatrixMode(GL_MODELVIEW);
+        glPopMatrix();
     }
     
     /**
