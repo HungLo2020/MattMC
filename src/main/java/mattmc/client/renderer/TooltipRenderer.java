@@ -15,11 +15,11 @@ import static org.lwjgl.system.MemoryStack.stackPush;
  * and the item name.
  */
 public class TooltipRenderer {
-    private static final float TOOLTIP_PADDING = 9f;  // Increased by 50% (6 * 1.5 = 9)
-    private static final float TOOLTIP_CORNER_RADIUS = 6f;  // Increased by 50% (4 * 1.5 = 6)
-    private static final float TOOLTIP_OFFSET_X = 18f;  // Increased by 50% (12 * 1.5 = 18)
-    private static final float TOOLTIP_OFFSET_Y = -18f;  // Increased by 50% (12 * 1.5 = 18)
-    private static final float TEXT_SCALE = 1.8f;  // Increased by 50% (1.2 * 1.5 = 1.8)
+    private static final float TOOLTIP_PADDING = 13.5f;  // Increased by another 50% (9 * 1.5 = 13.5)
+    private static final float TOOLTIP_CORNER_RADIUS = 9f;  // Increased by 50% (6 * 1.5 = 9)
+    private static final float TOOLTIP_OFFSET_X = 18f;  // Kept same
+    private static final float TOOLTIP_OFFSET_Y = -18f;  // Kept same
+    private static final float TEXT_SCALE = 1.8f;  // Kept same as requested
     
     // Colors
     private static final float BG_GRAY = 0.3f;
@@ -28,7 +28,7 @@ public class TooltipRenderer {
     private static final float BORDER_G = 0.5f;
     private static final float BORDER_B = 1.0f;
     private static final float BORDER_ALPHA = 1.0f;
-    private static final float BORDER_WIDTH = 2f;
+    private static final float BORDER_WIDTH = 6f;  // Increased 3x (2 * 3 = 6)
     
     public TooltipRenderer() {
     }
