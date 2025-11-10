@@ -83,9 +83,8 @@ public class TooltipRenderer {
         // Apply blur to the tooltip region BEFORE drawing the tooltip
         blurEffect.applyRegionalBlur(tooltipX, tooltipY, boxWidth, boxHeight, screenWidth, screenHeight);
         
-        // Draw very subtle gray tint with rounded corners
-        drawRoundedRect(tooltipX, tooltipY, boxWidth, boxHeight, TOOLTIP_CORNER_RADIUS, 
-                       BG_GRAY, BG_GRAY, BG_GRAY, BG_ALPHA);
+        // NOTE: Gray tint disabled - blur effect provides background separation
+        // If needed in future, ensure very low alpha (< 0.05) to avoid obscuring blur
         
         // Draw blue border with rounded corners
         drawRoundedRectBorder(tooltipX, tooltipY, boxWidth, boxHeight, TOOLTIP_CORNER_RADIUS, 

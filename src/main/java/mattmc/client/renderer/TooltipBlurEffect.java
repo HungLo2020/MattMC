@@ -175,7 +175,8 @@ public class TooltipBlurEffect {
         glPopMatrix();
         
         glDisable(GL_TEXTURE_2D);
-        glDisable(GL_BLEND);
+        // Keep blending enabled for subsequent rendering
+        // glDisable(GL_BLEND);  // Removed - let caller manage blend state
         
         // Clean up temporary texture
         glDeleteTextures(capturedTexture);
