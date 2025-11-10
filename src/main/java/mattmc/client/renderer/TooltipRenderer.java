@@ -30,7 +30,10 @@ public class TooltipRenderer {
     private static final float BORDER_ALPHA = 1.0f;
     private static final float BORDER_WIDTH = 6f;  // Increased 3x (2 * 3 = 6)
     
+    private final TooltipBlurEffect blurEffect;
+    
     public TooltipRenderer() {
+        this.blurEffect = new TooltipBlurEffect();
     }
     
     /**
@@ -76,6 +79,9 @@ public class TooltipRenderer {
         // Clamp to screen bounds
         tooltipX = Math.max(0, Math.min(tooltipX, screenWidth - boxWidth));
         tooltipY = Math.max(0, Math.min(tooltipY, screenHeight - boxHeight));
+        
+        // Apply blur to the tooltip region BEFORE drawing the tooltip
+        blurEffect.applyRegionalBlur(tooltipX, tooltipY, boxWidth, boxHeight, screenWidth, screenHeight);
         
         // Draw semi-transparent gray background with rounded corners
         drawRoundedRect(tooltipX, tooltipY, boxWidth, boxHeight, TOOLTIP_CORNER_RADIUS, 
@@ -203,6 +209,8 @@ public class TooltipRenderer {
      * Clean up resources.
      */
     public void close() {
-        // No resources to clean up
+        if (blurEffect != null) {
+            blurEffect.close();
+        }
     }
 }
