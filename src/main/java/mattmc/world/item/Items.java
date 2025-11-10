@@ -100,6 +100,7 @@ public class Items {
      * @param item The Item instance with properties
      * @return The registered Item with identifier set
      */
+    @SuppressWarnings("unchecked") // Safe cast: we check instanceof before casting
     private static <T extends Item> T register(String name, T item) {
         if (name == null) {
             throw new NullPointerException("Item name cannot be null");
@@ -134,6 +135,7 @@ public class Items {
      * @throws IllegalArgumentException if identifier is already registered
      * @throws NullPointerException if identifier or item is null
      */
+    @SuppressWarnings("unchecked") // Safe cast: we check instanceof before casting
     public static <T extends Item> T registerItem(String identifier, T item) {
         if (identifier == null) {
             throw new NullPointerException("Item identifier cannot be null");

@@ -18,12 +18,16 @@ import org.slf4j.LoggerFactory;
 public class ChunkRenderer {
     private static final Logger logger = LoggerFactory.getLogger(ChunkRenderer.class);
 
+    // Calculate expected chunk count based on maximum render distance
+    // For render distance of 32, we have (32*2+1)^2 = 4225 chunks
+    // Using this as initial capacity prevents HashMap resize operations
+    private static final int EXPECTED_CHUNK_COUNT = (32 * 2 + 1) * (32 * 2 + 1);
     
-    // VAO cache: maps chunks to their VAOs
-    private final Map<LevelChunk, ChunkVAO> vaoCache = new HashMap<>();
+    // VAO cache: maps chunks to their VAOs (ISSUE-003 fix: added initial capacity)
+    private final Map<LevelChunk, ChunkVAO> vaoCache = new HashMap<>(EXPECTED_CHUNK_COUNT);
     
-    // Cache for chunk key to chunk mapping (for mesh data uploads)
-    private final Map<Long, LevelChunk> chunkByKey = new HashMap<>();
+    // Cache for chunk key to chunk mapping (ISSUE-003 fix: added initial capacity)
+    private final Map<Long, LevelChunk> chunkByKey = new HashMap<>(EXPECTED_CHUNK_COUNT);
     
     // Texture atlas for VBO rendering
     private TextureAtlas textureAtlas = null;

@@ -24,11 +24,28 @@ import org.slf4j.LoggerFactory;
 /**
  * Manages texture loading and binding for block textures.
  * Similar to Minecraft's texture management system.
+ * 
+ * ISSUE-005 fix: Implements LRU eviction to prevent unbounded memory growth.
+ * ISSUE-013 fix: Supports runtime texture filtering changes via reapplyFilteringSettings().
  */
 public class TextureManager {
     private static final Logger logger = LoggerFactory.getLogger(TextureManager.class);
 
-    private final Map<String, Integer> textureCache = new HashMap<>();
+    // ISSUE-005 fix: LRU cache with maximum size limit
+    private static final int MAX_TEXTURE_CACHE_SIZE = 256;
+    
+    private final Map<String, Integer> textureCache = new java.util.LinkedHashMap<String, Integer>(16, 0.75f, true) {
+        @Override
+        protected boolean removeEldestEntry(Map.Entry<String, Integer> eldest) {
+            if (size() > MAX_TEXTURE_CACHE_SIZE) {
+                // Clean up OpenGL texture before eviction
+                glDeleteTextures(eldest.getValue());
+                logger.debug("Evicted texture from cache: {} (cache size: {})", eldest.getKey(), size());
+                return true;
+            }
+            return false;
+        }
+    };
     
     /**
      * Apply texture filtering settings (mipmaps and anisotropic filtering) to the currently bound texture.
@@ -142,6 +159,24 @@ public class TextureManager {
      */
     public void unbindTexture() {
         glBindTexture(GL_TEXTURE_2D, 0);
+    }
+    
+    /**
+     * Reapply texture filtering settings to all cached textures.
+     * ISSUE-013 fix: Call this when mipmap or anisotropic filtering settings change.
+     * Allows users to change graphics settings without restarting.
+     */
+    public void reapplyFilteringSettings() {
+        int currentBinding = glGetInteger(GL_TEXTURE_BINDING_2D);
+        
+        for (int textureID : textureCache.values()) {
+            glBindTexture(GL_TEXTURE_2D, textureID);
+            applyTextureFiltering(true); // Reapply with current settings
+        }
+        
+        // Restore previous binding
+        glBindTexture(GL_TEXTURE_2D, currentBinding);
+        logger.info("Reapplied texture filtering to {} textures", textureCache.size());
     }
     
     /**

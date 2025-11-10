@@ -59,8 +59,22 @@ distributions {
         contents {
             from("packaging") {
                 into("")                 // place next to bin/ and lib/
-                // Keep exec bit on Unix zips (0755). If Gradle warns, you can omit and chmod after unzip.
-                fileMode = 0b111_101_101
+                // ISSUE-020 fix: Use new filePermissions API instead of deprecated fileMode
+                filePermissions {
+                    user {
+                        read = true
+                        write = true
+                        execute = true
+                    }
+                    group {
+                        read = true
+                        execute = true
+                    }
+                    other {
+                        read = true
+                        execute = true
+                    }
+                }
             }
         }
     }

@@ -84,10 +84,24 @@ public class Level implements LevelAccessor {
     /**
      * Get a block at chunk-local coordinates, checking neighboring chunks if necessary.
      * Used for cross-chunk face culling.
+     * ISSUE-004 fix: Added defensive null checks and bounds validation.
      */
     private Block getBlockAcrossChunks(LevelChunk chunk, int localX, int localY, int localZ) {
+        // Validate chunk reference (ISSUE-004 fix)
+        if (chunk == null) {
+            return Blocks.AIR;
+        }
+        
         // Check Y bounds first
         if (localY < 0 || localY >= LevelChunk.HEIGHT) {
+            return Blocks.AIR;
+        }
+        
+        // Add sanity check for coordinates - they shouldn't be more than 2 chunks away
+        // This prevents integer overflow issues and catches potential bugs
+        if (Math.abs(localX) > LevelChunk.WIDTH * 2 || Math.abs(localZ) > LevelChunk.DEPTH * 2) {
+            logger.warn("Suspicious coordinates in getBlockAcrossChunks: chunk({}, {}), local({}, {}, {})", 
+                       chunk.chunkX(), chunk.chunkZ(), localX, localY, localZ);
             return Blocks.AIR;
         }
         
@@ -202,8 +216,20 @@ public class Level implements LevelAccessor {
      * Get a chunk at the specified chunk coordinates.
      * If the chunk doesn't exist in memory, tries to load it from disk.
      * If it doesn't exist on disk, it will be generated.
+     * 
+     * ISSUE-012 fix: Added coordinate validation to prevent overflow at extreme coordinates.
      */
     public LevelChunk getChunk(int chunkX, int chunkZ) {
+        // Validate chunk coordinates are within reasonable bounds
+        // This prevents integer overflow and chunk key collisions at extreme coordinates
+        final int MAX_CHUNK_COORD = 1_000_000;
+        if (Math.abs(chunkX) > MAX_CHUNK_COORD || Math.abs(chunkZ) > MAX_CHUNK_COORD) {
+            logger.error("Chunk coordinates out of bounds: ({}, {}). Max allowed: ±{}", 
+                        chunkX, chunkZ, MAX_CHUNK_COORD);
+            // Return an empty air chunk to prevent crashes
+            return new LevelChunk(0, 0); // Fallback to origin
+        }
+        
         long key = chunkKey(chunkX, chunkZ);
         LevelChunk chunk = loadedChunks.get(key);
         
