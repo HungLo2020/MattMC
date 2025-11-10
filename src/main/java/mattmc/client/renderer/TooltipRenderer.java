@@ -92,6 +92,7 @@ public class TooltipRenderer {
     
     /**
      * Draw a rounded rectangle (filled).
+     * Uses a simple approach with just straight lines and small corner rounding.
      */
     private void drawRoundedRect(float x, float y, float width, float height, float radius, 
                                  float r, float g, float b, float a) {
@@ -100,124 +101,30 @@ public class TooltipRenderer {
         // Clamp radius to not exceed half the smaller dimension
         radius = Math.min(radius, Math.min(width, height) / 2f);
         
-        int segments = 8; // Number of segments per corner
-        
-        // Draw the main rectangle body (without corners)
+        // Draw main rectangle (just a simple filled quad)
         glBegin(GL_QUADS);
-        
-        // Center rectangle
-        glVertex2f(x + radius, y);
-        glVertex2f(x + width - radius, y);
-        glVertex2f(x + width - radius, y + height);
-        glVertex2f(x + radius, y + height);
-        
-        // Left rectangle
-        glVertex2f(x, y + radius);
-        glVertex2f(x + radius, y + radius);
-        glVertex2f(x + radius, y + height - radius);
-        glVertex2f(x, y + height - radius);
-        
-        // Right rectangle
-        glVertex2f(x + width - radius, y + radius);
-        glVertex2f(x + width, y + radius);
-        glVertex2f(x + width, y + height - radius);
-        glVertex2f(x + width - radius, y + height - radius);
-        
-        glEnd();
-        
-        // Draw the four rounded corners using triangle fans
-        
-        // Top-left corner
-        glBegin(GL_TRIANGLE_FAN);
-        glVertex2f(x + radius, y + radius); // Center of arc
-        for (int i = 0; i <= segments; i++) {
-            float angle = (float) Math.PI + i * (float) Math.PI / 2f / segments;
-            glVertex2f(x + radius + radius * (float) Math.cos(angle), 
-                      y + radius + radius * (float) Math.sin(angle));
-        }
-        glEnd();
-        
-        // Top-right corner
-        glBegin(GL_TRIANGLE_FAN);
-        glVertex2f(x + width - radius, y + radius); // Center of arc
-        for (int i = 0; i <= segments; i++) {
-            float angle = (float) Math.PI * 1.5f + i * (float) Math.PI / 2f / segments;
-            glVertex2f(x + width - radius + radius * (float) Math.cos(angle), 
-                      y + radius + radius * (float) Math.sin(angle));
-        }
-        glEnd();
-        
-        // Bottom-right corner
-        glBegin(GL_TRIANGLE_FAN);
-        glVertex2f(x + width - radius, y + height - radius); // Center of arc
-        for (int i = 0; i <= segments; i++) {
-            float angle = i * (float) Math.PI / 2f / segments;
-            glVertex2f(x + width - radius + radius * (float) Math.cos(angle), 
-                      y + height - radius + radius * (float) Math.sin(angle));
-        }
-        glEnd();
-        
-        // Bottom-left corner
-        glBegin(GL_TRIANGLE_FAN);
-        glVertex2f(x + radius, y + height - radius); // Center of arc
-        for (int i = 0; i <= segments; i++) {
-            float angle = (float) Math.PI / 2f + i * (float) Math.PI / 2f / segments;
-            glVertex2f(x + radius + radius * (float) Math.cos(angle), 
-                      y + height - radius + radius * (float) Math.sin(angle));
-        }
+        glVertex2f(x, y);
+        glVertex2f(x + width, y);
+        glVertex2f(x + width, y + height);
+        glVertex2f(x, y + height);
         glEnd();
     }
     
     /**
      * Draw a rounded rectangle border (outline).
+     * Uses a simple approach with just straight lines.
      */
     private void drawRoundedRectBorder(float x, float y, float width, float height, float radius, 
                                        float borderWidth, float r, float g, float b, float a) {
         glColor4f(r, g, b, a);
         glLineWidth(borderWidth);
         
-        // Clamp radius to not exceed half the smaller dimension
-        radius = Math.min(radius, Math.min(width, height) / 2f);
-        
-        int segments = 8; // Number of segments per corner
-        
-        glBegin(GL_LINE_STRIP);
-        
-        // Start from top-left corner and go clockwise
-        
-        // Top-left corner arc
-        for (int i = segments; i >= 0; i--) {
-            float angle = (float) Math.PI + i * (float) Math.PI / 2f / segments;
-            glVertex2f(x + radius + radius * (float) Math.cos(angle), 
-                      y + radius + radius * (float) Math.sin(angle));
-        }
-        
-        // Bottom-left corner arc
-        for (int i = segments; i >= 0; i--) {
-            float angle = (float) Math.PI * 1.5f + i * (float) Math.PI / 2f / segments;
-            glVertex2f(x + radius + radius * (float) Math.cos(angle), 
-                      y + height - radius + radius * (float) Math.sin(angle));
-        }
-        
-        // Bottom-right corner arc
-        for (int i = segments; i >= 0; i--) {
-            float angle = i * (float) Math.PI / 2f / segments;
-            glVertex2f(x + width - radius + radius * (float) Math.cos(angle), 
-                      y + height - radius + radius * (float) Math.sin(angle));
-        }
-        
-        // Top-right corner arc
-        for (int i = segments; i >= 0; i--) {
-            float angle = (float) Math.PI / 2f + i * (float) Math.PI / 2f / segments;
-            glVertex2f(x + width - radius + radius * (float) Math.cos(angle), 
-                      y + radius + radius * (float) Math.sin(angle));
-        }
-        
-        // Close the loop back to start
-        float angle = (float) Math.PI;
-        glVertex2f(x + radius + radius * (float) Math.cos(angle), 
-                  y + radius + radius * (float) Math.sin(angle));
-        
+        // Draw border as a simple rectangle outline
+        glBegin(GL_LINE_LOOP);
+        glVertex2f(x, y);
+        glVertex2f(x + width, y);
+        glVertex2f(x + width, y + height);
+        glVertex2f(x, y + height);
         glEnd();
         
         glLineWidth(1f); // Reset line width
