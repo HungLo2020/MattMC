@@ -43,15 +43,16 @@ public class TooltipBlurEffect {
                 vec2 texelSize = 1.0 / uResolution;
                 vec4 color = vec4(0.0);
                 
-                // 5-tap Gaussian blur for lighter effect
-                float weights[3];
-                weights[0] = 0.383;
-                weights[1] = 0.242;
-                weights[2] = 0.061;
+                // 7-tap Gaussian blur for stronger effect
+                float weights[4];
+                weights[0] = 0.324;
+                weights[1] = 0.232;
+                weights[2] = 0.0855;
+                weights[3] = 0.0205;
                 
                 color += texture2D(uTexture, vTexCoord) * weights[0];
                 
-                for(int i = 1; i < 3; i++) {
+                for(int i = 1; i < 4; i++) {
                     vec2 offset = uDirection * texelSize * float(i);
                     color += texture2D(uTexture, vTexCoord + offset) * weights[i];
                     color += texture2D(uTexture, vTexCoord - offset) * weights[i];

@@ -23,7 +23,7 @@ public class TooltipRenderer {
     
     // Colors
     private static final float BG_GRAY = 0.3f;
-    private static final float BG_ALPHA = 0.25f;  // Reduced from 0.75f to let blur show through
+    private static final float BG_ALPHA = 0.08f;  // Very subtle gray tint to show blur through
     private static final float BORDER_R = 0.3f;
     private static final float BORDER_G = 0.5f;
     private static final float BORDER_B = 1.0f;
@@ -83,9 +83,9 @@ public class TooltipRenderer {
         // Apply blur to the tooltip region BEFORE drawing the tooltip
         blurEffect.applyRegionalBlur(tooltipX, tooltipY, boxWidth, boxHeight, screenWidth, screenHeight);
         
-        // TEMPORARILY DISABLED: Draw semi-transparent gray background with rounded corners
-        // drawRoundedRect(tooltipX, tooltipY, boxWidth, boxHeight, TOOLTIP_CORNER_RADIUS, 
-        //                BG_GRAY, BG_GRAY, BG_GRAY, BG_ALPHA);
+        // Draw very subtle gray tint with rounded corners
+        drawRoundedRect(tooltipX, tooltipY, boxWidth, boxHeight, TOOLTIP_CORNER_RADIUS, 
+                       BG_GRAY, BG_GRAY, BG_GRAY, BG_ALPHA);
         
         // Draw blue border with rounded corners
         drawRoundedRectBorder(tooltipX, tooltipY, boxWidth, boxHeight, TOOLTIP_CORNER_RADIUS, 
