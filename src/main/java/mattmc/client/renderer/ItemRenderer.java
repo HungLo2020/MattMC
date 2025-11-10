@@ -91,7 +91,7 @@ public class ItemRenderer {
     }
     
     /**
-     * Render an isometric cube showing three faces (top, left, and right).
+     * Render an isometric cube showing three faces (south, east, and top).
      * Uses the actual in-game 3D block geometry projected to 2D isometric view.
      */
     private static void renderIsometricCube(Map<String, String> texturePaths, mattmc.client.resources.model.BlockModel itemModel, float x, float y, float size) {
@@ -119,9 +119,9 @@ public class ItemRenderer {
         VertexCapture capture = new VertexCapture();
         
         // Capture the three visible faces in an isometric view
-        // In isometric view from the typical angle, we see: west (left), east (right), and top
-        BlockGeometryCapture.captureWestFace(capture, 0, 0, 0);
-        List<VertexCapture.Face> westFaces = List.copyOf(capture.getFaces());
+        // In isometric view, we see: south (left side), east (right side), and top
+        BlockGeometryCapture.captureSouthFace(capture, 0, 0, 0);
+        List<VertexCapture.Face> southFaces = List.copyOf(capture.getFaces());
         
         capture.clear();
         BlockGeometryCapture.captureEastFace(capture, 0, 0, 0);
@@ -133,13 +133,13 @@ public class ItemRenderer {
         
         // Render the faces in back-to-front order for proper visibility
         
-        // 1. West face (left side, medium brightness - 80%)
+        // 1. South face (left side, medium brightness - 80%)
         if (sideTexture != null) {
             Texture tex = loadTexture(sideTexture);
             if (tex != null) {
                 tex.bind();
                 glColor4f(0.8f, 0.8f, 0.8f, 1.0f);
-                renderFacesIsometric(westFaces, x, y, isoWidth, isoHeight);
+                renderFacesIsometric(southFaces, x, y, isoWidth, isoHeight);
             }
         }
         
@@ -215,11 +215,11 @@ public class ItemRenderer {
                     boolean isTopFace = isTopFace(face);
                     
                     if (!isTopFace) {
-                        // Determine if it's a west-facing or east-facing side
-                        boolean isWestFacing = isWestFacing(face);
+                        // Determine if it's a south-facing or east-facing side
+                        boolean isSouthFacing = isSouthFacing(face);
                         
-                        // Apply appropriate shading: west faces are lighter (0.8), others darker (0.6)
-                        float brightness = isWestFacing ? 0.8f : 0.6f;
+                        // Apply appropriate shading: south faces are lighter (0.8), others darker (0.6)
+                        float brightness = isSouthFacing ? 0.8f : 0.6f;
                         glColor4f(brightness, brightness, brightness, 1.0f);
                         
                         renderFaceIsometric(face, x, y, isoWidth, isoHeight);
@@ -262,11 +262,35 @@ public class ItemRenderer {
     }
     
     /**
-     * Check if a face is west-facing (vertical face on the X=0 side).
+     * Check if a face is south-facing (vertical face on the Z=1 side).
      */
-    private static boolean isWestFacing(VertexCapture.Face face) {
-        // West faces have all vertices at X=0
-        return face.v1.x < 0.01f && face.v2.x < 0.01f && face.v3.x < 0.01f;
+    private static boolean isSouthFacing(VertexCapture.Face face) {
+        // South faces have all vertices at Z=1 or Z=0.5 (for the inner step face)
+        float z1 = face.v1.z;
+        float z2 = face.v2.z;
+        float z3 = face.v3.z;
+        
+        // Check if all Z values are the same and close to 1.0 or 0.5
+        if (Math.abs(z1 - z2) < 0.01f && Math.abs(z2 - z3) < 0.01f) {
+            return z1 > 0.4f;  // Z >= 0.5 (south or inner step face)
+        }
+        return false;
+    }
+    
+    /**
+     * Project a 3D world coordinate to 2D isometric X coordinate.
+     * Formula: screen_x = centerX + (wx - wz) * isoWidth
+     */
+    private static float project2Dx(float wx, float wy, float wz, float centerX, float isoWidth) {
+        return centerX + (wx - wz) * isoWidth;
+    }
+    
+    /**
+     * Project a 3D world coordinate to 2D isometric Y coordinate.
+     * Formula: screen_y = centerY - wy * isoHeight - (wx + wz) * isoHeight * 0.5
+     */
+    private static float project2Dy(float wx, float wy, float wz, float centerY, float isoHeight) {
+        return centerY - wy * isoHeight - (wx + wz) * isoHeight * 0.5f;
     }
     
     /**
@@ -303,22 +327,6 @@ public class ItemRenderer {
         glVertex2f(x3, y3);
         
         glEnd();
-    }
-    
-    /**
-     * Project a 3D world coordinate to 2D isometric X coordinate.
-     * Formula: screen_x = centerX + (wx - wz) * isoWidth
-     */
-    private static float project2Dx(float wx, float wy, float wz, float centerX, float isoWidth) {
-        return centerX + (wx - wz) * isoWidth;
-    }
-    
-    /**
-     * Project a 3D world coordinate to 2D isometric Y coordinate.
-     * Formula: screen_y = centerY - wy * isoHeight - (wx + wz) * isoHeight * 0.5
-     */
-    private static float project2Dy(float wx, float wy, float wz, float centerY, float isoHeight) {
-        return centerY - wy * isoHeight - (wx + wz) * isoHeight * 0.5f;
     }
     
     /**
