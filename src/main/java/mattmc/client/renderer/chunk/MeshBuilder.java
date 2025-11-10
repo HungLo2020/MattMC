@@ -35,19 +35,57 @@ public class MeshBuilder {
     
     /**
      * Build a ChunkMeshBuffer from collected face data.
+     * ISSUE-015 fix: Optimized list iteration to reduce method call overhead.
      */
     public ChunkMeshBuffer build(int chunkX, int chunkZ, BlockFaceCollector collector) {
         vertices.clear();
         indices.clear();
         currentVertex = 0;
         
-        // Process all face types - each list knows its orientation
-        addFacesOfType(collector.getTopFaces(), FaceType.TOP);
-        addFacesOfType(collector.getBottomFaces(), FaceType.BOTTOM);
-        addFacesOfType(collector.getNorthFaces(), FaceType.NORTH);
-        addFacesOfType(collector.getSouthFaces(), FaceType.SOUTH);
-        addFacesOfType(collector.getWestFaces(), FaceType.WEST);
-        addFacesOfType(collector.getEastFaces(), FaceType.EAST);
+        // ISSUE-015 fix: Process all face types in a flattened structure
+        // to reduce method call overhead and iterator allocations
+        List<BlockFaceCollector.FaceData>[] allFaces = new List[] {
+            collector.getTopFaces(),
+            collector.getBottomFaces(),
+            collector.getNorthFaces(),
+            collector.getSouthFaces(),
+            collector.getWestFaces(),
+            collector.getEastFaces()
+        };
+        
+        FaceType[] faceTypes = FaceType.values();
+        
+        // Use indexed loops to avoid iterator object allocations
+        for (int i = 0; i < allFaces.length; i++) {
+            List<BlockFaceCollector.FaceData> faces = allFaces[i];
+            FaceType type = faceTypes[i];
+            
+            // Indexed loop instead of enhanced for to avoid iterator
+            for (int j = 0; j < faces.size(); j++) {
+                BlockFaceCollector.FaceData face = faces.get(j);
+                
+                // Check if this is a stairs block (special marker)
+                if ("stairs".equals(face.faceType)) {
+                    // Add stairs geometry instead of regular face, passing blockstate
+                    addStairsGeometry(face.x, face.y, face.z, face.block, face.blockState);
+                    continue;
+                }
+                
+                // Extract color components and UV mapping
+                float[] color = extractColor(face);
+                TextureAtlas.UVMapping uvMapping = getUVMapping(face);
+                
+                // Add the face with correct orientation
+                switch (type) {
+                    case TOP -> addTopFace(face.x, face.y, face.z, color, uvMapping);
+                    case BOTTOM -> addBottomFace(face.x, face.y, face.z, color, uvMapping);
+                    case NORTH -> addNorthFace(face.x, face.y, face.z, color, uvMapping);
+                    case SOUTH -> addSouthFace(face.x, face.y, face.z, color, uvMapping);
+                    case WEST -> addWestFace(face.x, face.y, face.z, color, uvMapping);
+                    case EAST -> addEastFace(face.x, face.y, face.z, color, uvMapping);
+                }
+            }
+        }
         
         // Use efficient toArray() which just copies the used portion
         float[] vertexArray = vertices.toArray();
@@ -61,34 +99,6 @@ public class MeshBuilder {
      */
     private enum FaceType {
         TOP, BOTTOM, NORTH, SOUTH, WEST, EAST
-    }
-    
-    /**
-     * Add faces of a specific type to the mesh.
-     */
-    private void addFacesOfType(List<BlockFaceCollector.FaceData> faces, FaceType type) {
-        for (BlockFaceCollector.FaceData face : faces) {
-            // Check if this is a stairs block (special marker)
-            if ("stairs".equals(face.faceType)) {
-                // Add stairs geometry instead of regular face, passing blockstate
-                addStairsGeometry(face.x, face.y, face.z, face.block, face.blockState);
-                continue;
-            }
-            
-            // Extract color components and UV mapping
-            float[] color = extractColor(face);
-            TextureAtlas.UVMapping uvMapping = getUVMapping(face);
-            
-            // Add the face with correct orientation
-            switch (type) {
-                case TOP -> addTopFace(face.x, face.y, face.z, color, uvMapping);
-                case BOTTOM -> addBottomFace(face.x, face.y, face.z, color, uvMapping);
-                case NORTH -> addNorthFace(face.x, face.y, face.z, color, uvMapping);
-                case SOUTH -> addSouthFace(face.x, face.y, face.z, color, uvMapping);
-                case WEST -> addWestFace(face.x, face.y, face.z, color, uvMapping);
-                case EAST -> addEastFace(face.x, face.y, face.z, color, uvMapping);
-            }
-        }
     }
     
     /**
