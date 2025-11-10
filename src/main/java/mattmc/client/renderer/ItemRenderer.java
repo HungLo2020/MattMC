@@ -89,6 +89,17 @@ public class ItemRenderer {
         // Save current GL state
         glPushMatrix();
         
+        // Save specific GL states we're going to change
+        boolean wasTextureEnabled = glIsEnabled(GL_TEXTURE_2D);
+        boolean wasDepthTestEnabled = glIsEnabled(GL_DEPTH_TEST);
+        boolean wasBlendEnabled = glIsEnabled(GL_BLEND);
+        boolean wasLightingEnabled = glIsEnabled(GL_LIGHTING);
+        
+        // Disable lighting to use our explicit colors
+        if (wasLightingEnabled) {
+            glDisable(GL_LIGHTING);
+        }
+        
         // Move to the item's screen position
         glTranslatef(x, y, 0);
         
@@ -105,16 +116,10 @@ public class ItemRenderer {
         // Center the block (move it so center is at origin)
         glTranslatef(-0.5f, -0.5f, -0.5f);
         
-        // Save specific GL states we're going to change
-        boolean wasTextureEnabled = glIsEnabled(GL_TEXTURE_2D);
-        boolean wasDepthTestEnabled = glIsEnabled(GL_DEPTH_TEST);
-        boolean wasBlendEnabled = glIsEnabled(GL_BLEND);
-        
         // Enable texturing and depth test for 3D rendering
         glEnable(GL_TEXTURE_2D);
         glEnable(GL_DEPTH_TEST);
         glDepthFunc(GL_LEQUAL);
-        glClear(GL_DEPTH_BUFFER_BIT); // Clear depth buffer for this item
         
         // Disable blending to ensure solid rendering
         glDisable(GL_BLEND);
@@ -138,6 +143,7 @@ public class ItemRenderer {
         if (!wasDepthTestEnabled) glDisable(GL_DEPTH_TEST);
         if (!wasTextureEnabled) glDisable(GL_TEXTURE_2D);
         if (wasBlendEnabled) glEnable(GL_BLEND);
+        if (wasLightingEnabled) glEnable(GL_LIGHTING);
         
         glPopMatrix();
     }
