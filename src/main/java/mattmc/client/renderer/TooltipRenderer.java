@@ -7,13 +7,12 @@ import java.nio.IntBuffer;
 
 import static org.lwjgl.glfw.GLFW.*;
 import static org.lwjgl.opengl.GL11.*;
-import static org.lwjgl.opengl.GL30.*;
 import static org.lwjgl.system.MemoryStack.stackPush;
 
 /**
  * Renders tooltips for inventory items.
  * Displays a small semi-transparent gray box with rounded edges, blue outline,
- * and blurred background showing the item name.
+ * and the item name.
  */
 public class TooltipRenderer {
     private static final float TOOLTIP_PADDING = 6f;
@@ -24,17 +23,14 @@ public class TooltipRenderer {
     
     // Colors
     private static final float BG_GRAY = 0.3f;
-    private static final float BG_ALPHA = 0.7f;
+    private static final float BG_ALPHA = 0.75f;
     private static final float BORDER_R = 0.3f;
     private static final float BORDER_G = 0.5f;
     private static final float BORDER_B = 1.0f;
     private static final float BORDER_ALPHA = 1.0f;
     private static final float BORDER_WIDTH = 2f;
     
-    private TooltipBlurEffect blurEffect;
-    
     public TooltipRenderer() {
-        this.blurEffect = new TooltipBlurEffect();
     }
     
     /**
@@ -81,58 +77,17 @@ public class TooltipRenderer {
         tooltipX = Math.max(0, Math.min(tooltipX, screenWidth - boxWidth));
         tooltipY = Math.max(0, Math.min(tooltipY, screenHeight - boxHeight));
         
-        // Capture the area behind the tooltip for blur
-        int captureX = (int) tooltipX;
-        int captureY = (int) (screenHeight - tooltipY - boxHeight); // OpenGL Y is bottom-up
-        int captureWidth = (int) Math.ceil(boxWidth);
-        int captureHeight = (int) Math.ceil(boxHeight);
+        // Draw semi-transparent gray background with rounded corners
+        drawRoundedRect(tooltipX, tooltipY, boxWidth, boxHeight, TOOLTIP_CORNER_RADIUS, 
+                       BG_GRAY, BG_GRAY, BG_GRAY, BG_ALPHA);
         
-        // Ensure capture dimensions are valid
-        captureWidth = Math.max(1, Math.min(captureWidth, screenWidth - captureX));
-        captureHeight = Math.max(1, Math.min(captureHeight, screenHeight - captureY));
+        // Draw blue border with rounded corners
+        drawRoundedRectBorder(tooltipX, tooltipY, boxWidth, boxHeight, TOOLTIP_CORNER_RADIUS, 
+                             BORDER_WIDTH, BORDER_R, BORDER_G, BORDER_B, BORDER_ALPHA);
         
-        // Capture screen region to texture
-        int captureTexture = glGenTextures();
-        try {
-            glBindTexture(GL_TEXTURE_2D, captureTexture);
-            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, captureWidth, captureHeight, 0, GL_RGBA, GL_UNSIGNED_BYTE, 0);
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-            glCopyTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, captureX, captureY, captureWidth, captureHeight);
-            
-            // Apply blur to captured region
-            Framebuffer blurredFB = blurEffect.applyBlur(captureTexture, captureWidth, captureHeight);
-            
-            // Render blurred background (projection is already set up correctly)
-            glEnable(GL_TEXTURE_2D);
-            glBindTexture(GL_TEXTURE_2D, blurredFB.getTextureId());
-            glColor4f(1f, 1f, 1f, 1f);
-            
-            glBegin(GL_QUADS);
-            glTexCoord2f(0, 1); glVertex2f(tooltipX, tooltipY);
-            glTexCoord2f(1, 1); glVertex2f(tooltipX + boxWidth, tooltipY);
-            glTexCoord2f(1, 0); glVertex2f(tooltipX + boxWidth, tooltipY + boxHeight);
-            glTexCoord2f(0, 0); glVertex2f(tooltipX, tooltipY + boxHeight);
-            glEnd();
-            
-            glDisable(GL_TEXTURE_2D);
-            
-            // Draw semi-transparent gray background with rounded corners
-            drawRoundedRect(tooltipX, tooltipY, boxWidth, boxHeight, TOOLTIP_CORNER_RADIUS, 
-                           BG_GRAY, BG_GRAY, BG_GRAY, BG_ALPHA);
-            
-            // Draw blue border with rounded corners
-            drawRoundedRectBorder(tooltipX, tooltipY, boxWidth, boxHeight, TOOLTIP_CORNER_RADIUS, 
-                                 BORDER_WIDTH, BORDER_R, BORDER_G, BORDER_B, BORDER_ALPHA);
-            
-            // Draw text
-            glColor4f(1f, 1f, 1f, 1f);
-            TextRenderer.drawText(text, tooltipX + TOOLTIP_PADDING, tooltipY + TOOLTIP_PADDING, TEXT_SCALE);
-            
-        } finally {
-            // Clean up capture texture
-            glDeleteTextures(captureTexture);
-        }
+        // Draw text
+        glColor4f(1f, 1f, 1f, 1f);
+        TextRenderer.drawText(text, tooltipX + TOOLTIP_PADDING, tooltipY + TOOLTIP_PADDING, TEXT_SCALE);
     }
     
     /**
@@ -251,9 +206,6 @@ public class TooltipRenderer {
      * Clean up resources.
      */
     public void close() {
-        if (blurEffect != null) {
-            blurEffect.close();
-            blurEffect = null;
-        }
+        // No resources to clean up
     }
 }
