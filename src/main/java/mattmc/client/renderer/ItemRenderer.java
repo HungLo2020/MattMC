@@ -26,7 +26,7 @@ public class ItemRenderer {
     
     /**
      * Render an item at the specified screen position.
-     * Renders block items using 3D geometry with isometric projection.
+     * Renders block items as orthographic 3D cubes (isometric view).
      * 
      * @param stack The item stack to render
      * @param x Screen X position (center of item)
@@ -62,8 +62,17 @@ public class ItemRenderer {
             // Get the item model to check for tints and special rendering
             mattmc.client.resources.model.BlockModel itemModel = ResourceManager.resolveItemModel(itemName);
             
-            // Render as 3D block with isometric projection
-            render3DBlockItem(texturePaths, itemModel, itemName, x, y, size);
+            // Check if this is a stairs block
+            boolean isStairs = itemModel != null && itemModel.getParent() != null && 
+                              itemModel.getParent().contains("stairs");
+            
+            if (isStairs) {
+                // Render as isometric stairs
+                renderIsometricStairs(texturePaths, itemModel, x, y, size);
+            } else {
+                // Render as isometric 3D cube
+                renderIsometricCube(texturePaths, itemModel, x, y, size);
+            }
         } else {
             // Render as flat 2D icon (for non-block items)
             String texturePath = texturePaths.get("layer0");
@@ -79,315 +88,218 @@ public class ItemRenderer {
     }
     
     /**
-     * Render a 3D block item using isometric projection.
-     * This renders the actual block geometry (cubes, stairs, etc.) in 3D space
-     * and projects it isometrically, eliminating the need for special-case rendering.
+     * Render an isometric cube showing three faces (top, left, and right).
+     * This creates an orthographic 3D view of a block item matching Minecraft's style.
      */
-    private static void render3DBlockItem(Map<String, String> texturePaths, 
-                                          mattmc.client.resources.model.BlockModel itemModel,
-                                          String itemName, float x, float y, float size) {
-        // Save current GL state
-        glPushMatrix();
-        
-        // Save specific GL states we're going to change
-        boolean wasTextureEnabled = glIsEnabled(GL_TEXTURE_2D);
-        boolean wasDepthTestEnabled = glIsEnabled(GL_DEPTH_TEST);
-        boolean wasBlendEnabled = glIsEnabled(GL_BLEND);
-        boolean wasLightingEnabled = glIsEnabled(GL_LIGHTING);
-        
-        // Disable lighting to use our explicit colors
-        if (wasLightingEnabled) {
-            glDisable(GL_LIGHTING);
-        }
-        
-        // Move to the item's screen position
-        glTranslatef(x, y, 0);
-        
-        // Set up isometric projection
-        // Scale to the desired size
-        float scale = size * 16.0f; // Scale factor to make block visible
-        glScalef(scale, -scale, scale); // Negative Y to flip to screen coordinates
-        
-        // Apply isometric rotation (rotate to show 3 faces)
-        // Standard isometric view: rotate 45° around Y, then ~35.264° around X
-        glRotatef(45, 0, 1, 0);     // Rotate around Y axis
-        glRotatef(-30, 1, 0, 0);    // Rotate around X axis (closer to true isometric would be atan(1/sqrt(2)) ≈ 35.264°)
-        
-        // Center the block (move it so center is at origin)
-        glTranslatef(-0.5f, -0.5f, -0.5f);
-        
-        // Enable texturing and depth test for 3D rendering
-        glEnable(GL_TEXTURE_2D);
-        glEnable(GL_DEPTH_TEST);
-        glDepthFunc(GL_LEQUAL);
-        
-        // Disable blending to ensure solid rendering
-        glDisable(GL_BLEND);
-        
-        // Ensure polygons are filled (not wireframe)
-        glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-        
-        // Check if this is a stairs block
-        boolean isStairs = itemModel != null && itemModel.getParent() != null && 
-                          itemModel.getParent().contains("stairs");
-        
-        if (isStairs) {
-            // Render stairs geometry
-            renderStairsGeometry(texturePaths, itemModel);
-        } else {
-            // Render cube geometry
-            renderCubeGeometry(texturePaths, itemModel);
-        }
-        
-        // Restore GL state
-        if (!wasDepthTestEnabled) glDisable(GL_DEPTH_TEST);
-        if (!wasTextureEnabled) glDisable(GL_TEXTURE_2D);
-        if (wasBlendEnabled) glEnable(GL_BLEND);
-        if (wasLightingEnabled) glEnable(GL_LIGHTING);
-        
-        glPopMatrix();
-    }
-    
-    /**
-     * Render a cube block in 3D space (0,0,0 to 1,1,1).
-     */
-    private static void renderCubeGeometry(Map<String, String> texturePaths, 
-                                           mattmc.client.resources.model.BlockModel itemModel) {
+    private static void renderIsometricCube(Map<String, String> texturePaths, mattmc.client.resources.model.BlockModel itemModel, float x, float y, float size) {
+        // Get textures for each face
         String topTexture = getTextureForFace(texturePaths, "top");
         String sideTexture = getTextureForFace(texturePaths, "side");
-        String bottomTexture = getTextureForFace(texturePaths, "bottom");
         
-        // Get tint color if any
-        int topTintColor = 0xFFFFFF;
+        // Check if there are tints and get the tint color for the top face
+        int topTintColor = 0xFFFFFF; // Default: no tint (white)
         if (itemModel != null && itemModel.getTints() != null && !itemModel.getTints().isEmpty()) {
+            // Get the first tint (grass blocks typically have one tint)
             topTintColor = itemModel.getTints().get(0).getTintColor();
         }
         
-        // Draw all 6 faces of the cube
-        // Top face (y=1)
-        if (topTexture != null) {
-            Texture tex = loadTexture(topTexture);
-            if (tex != null) {
-                tex.bind();
-                float r = ((topTintColor >> 16) & 0xFF) / 255.0f;
-                float g = ((topTintColor >> 8) & 0xFF) / 255.0f;
-                float b = (topTintColor & 0xFF) / 255.0f;
-                glColor3f(r, g, b);
-                glBegin(GL_QUADS);
-                glTexCoord2f(0, 0); glVertex3f(0, 1, 0);
-                glTexCoord2f(0, 1); glVertex3f(0, 1, 1);
-                glTexCoord2f(1, 1); glVertex3f(1, 1, 1);
-                glTexCoord2f(1, 0); glVertex3f(1, 1, 0);
-                glEnd();
-            }
-        }
+        // Save GL state
+        boolean textureWasEnabled = glIsEnabled(GL_TEXTURE_2D);
+        glEnable(GL_TEXTURE_2D);
         
-        // Bottom face (y=0)
-        if (bottomTexture != null) {
-            Texture tex = loadTexture(bottomTexture);
-            if (tex != null) {
-                tex.bind();
-                glColor3f(0.5f, 0.5f, 0.5f); // Darken bottom
-                glBegin(GL_QUADS);
-                glTexCoord2f(0, 0); glVertex3f(0, 0, 1);
-                glTexCoord2f(0, 1); glVertex3f(0, 0, 0);
-                glTexCoord2f(1, 1); glVertex3f(1, 0, 0);
-                glTexCoord2f(1, 0); glVertex3f(1, 0, 1);
-                glEnd();
-            }
-        }
+        // Define the isometric cube dimensions
+        // Increased scale significantly for better visibility
+        float scale = size * 2.0f;  // Doubled from original 1.0, 4x from 0.5
         
-        // Side faces (darker than top)
+        // Isometric projection parameters
+        float isoWidth = scale * 0.5f;   // Width of one face edge in isometric projection
+        float isoHeight = scale * 0.5f;  // Height of one face edge in isometric projection
+        
+        // Draw the three visible faces in back-to-front order
+        // These are the FRONT-facing sides (toward the camera)
+        
+        // 1. Left face (medium brightness - 80%)
         if (sideTexture != null) {
             Texture tex = loadTexture(sideTexture);
             if (tex != null) {
                 tex.bind();
-                
-                // North face (z=0)
-                glColor3f(0.8f, 0.8f, 0.8f);
+                glColor4f(0.8f, 0.8f, 0.8f, 1.0f);
                 glBegin(GL_QUADS);
-                glTexCoord2f(1, 0); glVertex3f(1, 0, 0);
-                glTexCoord2f(0, 0); glVertex3f(0, 0, 0);
-                glTexCoord2f(0, 1); glVertex3f(0, 1, 0);
-                glTexCoord2f(1, 1); glVertex3f(1, 1, 0);
-                glEnd();
-                
-                // South face (z=1)
-                glColor3f(0.8f, 0.8f, 0.8f);
-                glBegin(GL_QUADS);
-                glTexCoord2f(0, 0); glVertex3f(0, 0, 1);
-                glTexCoord2f(1, 0); glVertex3f(1, 0, 1);
-                glTexCoord2f(1, 1); glVertex3f(1, 1, 1);
-                glTexCoord2f(0, 1); glVertex3f(0, 1, 1);
-                glEnd();
-                
-                // West face (x=0)
-                glColor3f(0.6f, 0.6f, 0.6f);
-                glBegin(GL_QUADS);
-                glTexCoord2f(0, 0); glVertex3f(0, 0, 0);
-                glTexCoord2f(1, 0); glVertex3f(0, 0, 1);
-                glTexCoord2f(1, 1); glVertex3f(0, 1, 1);
-                glTexCoord2f(0, 1); glVertex3f(0, 1, 0);
-                glEnd();
-                
-                // East face (x=1)
-                glColor3f(0.6f, 0.6f, 0.6f);
-                glBegin(GL_QUADS);
-                glTexCoord2f(1, 0); glVertex3f(1, 0, 1);
-                glTexCoord2f(0, 0); glVertex3f(1, 0, 0);
-                glTexCoord2f(0, 1); glVertex3f(1, 1, 0);
-                glTexCoord2f(1, 1); glVertex3f(1, 1, 1);
+                // Left face vertices - slopes downward away from viewer
+                glTexCoord2f(0, 0); glVertex2f(x, y);                                     // Near bottom
+                glTexCoord2f(1, 0); glVertex2f(x - isoWidth, y - isoHeight * 0.5f);      // Far bottom
+                glTexCoord2f(1, 1); glVertex2f(x - isoWidth, y - isoHeight * 1.5f);      // Far top
+                glTexCoord2f(0, 1); glVertex2f(x, y - isoHeight);                         // Near top
                 glEnd();
             }
         }
         
-        glColor3f(1, 1, 1); // Reset color
+        // 2. Right face (darker - 60%)
+        if (sideTexture != null) {
+            Texture tex = loadTexture(sideTexture);
+            if (tex != null) {
+                tex.bind();
+                glColor4f(0.6f, 0.6f, 0.6f, 1.0f);
+                glBegin(GL_QUADS);
+                // Right face vertices - slopes downward away from viewer
+                glTexCoord2f(0, 0); glVertex2f(x + isoWidth, y - isoHeight * 0.5f);      // Far bottom
+                glTexCoord2f(1, 0); glVertex2f(x, y);                                     // Near bottom
+                glTexCoord2f(1, 1); glVertex2f(x, y - isoHeight);                         // Near top
+                glTexCoord2f(0, 1); glVertex2f(x + isoWidth, y - isoHeight * 1.5f);      // Far top
+                glEnd();
+            }
+        }
+        
+        // 3. Top face (brightest - 100% with tint applied)
+        if (topTexture != null) {
+            Texture tex = loadTexture(topTexture);
+            if (tex != null) {
+                tex.bind();
+                // Apply tint color to the top face
+                float r = ((topTintColor >> 16) & 0xFF) / 255.0f;
+                float g = ((topTintColor >> 8) & 0xFF) / 255.0f;
+                float b = (topTintColor & 0xFF) / 255.0f;
+                glColor4f(r, g, b, 1.0f);
+                glBegin(GL_QUADS);
+                // Top face as diamond - connects the tops of the two side faces
+                glTexCoord2f(0, 0); glVertex2f(x, y - isoHeight);                         // Near (bottom of diamond)
+                glTexCoord2f(1, 0); glVertex2f(x - isoWidth, y - isoHeight * 1.5f);      // Left (left of diamond)
+                glTexCoord2f(1, 1); glVertex2f(x, y - isoHeight * 2.0f);                  // Far (top of diamond)
+                glTexCoord2f(0, 1); glVertex2f(x + isoWidth, y - isoHeight * 1.5f);      // Right (right of diamond)
+                glEnd();
+            }
+        }
+        
+        // Restore GL state
+        if (!textureWasEnabled) {
+            glDisable(GL_TEXTURE_2D);
+        }
+        glColor4f(1f, 1f, 1f, 1f); // Reset color
     }
     
     /**
-     * Render stairs geometry in 3D space.
-     * Stairs consist of a bottom slab (full width, half height) 
-     * and a top step (back half, half height).
+     * Render an isometric stairs using the same 2D projection as cubes.
+     * Stairs = bottom slab (full width, half height) + top step (back half, half height).
      */
-    private static void renderStairsGeometry(Map<String, String> texturePaths,
-                                             mattmc.client.resources.model.BlockModel itemModel) {
+    private static void renderIsometricStairs(Map<String, String> texturePaths, mattmc.client.resources.model.BlockModel itemModel, float x, float y, float size) {
+        // Get textures for each face
         String topTexture = getTextureForFace(texturePaths, "top");
         String sideTexture = getTextureForFace(texturePaths, "side");
-        String bottomTexture = getTextureForFace(texturePaths, "bottom");
         
-        if (sideTexture == null || topTexture == null) {
-            return;
+        // Save GL state
+        boolean textureWasEnabled = glIsEnabled(GL_TEXTURE_2D);
+        glEnable(GL_TEXTURE_2D);
+        
+        // Use the SAME scaling as the cube for consistency
+        float scale = size * 2.0f;
+        float isoWidth = scale * 0.5f;
+        float isoHeight = scale * 0.5f;
+        
+        // === BOTTOM SLAB (full width/depth, half height) ===
+        // Same as cube but only half the height
+        
+        // Left face of slab
+        if (sideTexture != null) {
+            Texture tex = loadTexture(sideTexture);
+            if (tex != null) {
+                tex.bind();
+                glColor4f(0.8f, 0.8f, 0.8f, 1.0f);
+                glBegin(GL_QUADS);
+                glTexCoord2f(0, 0.5f); glVertex2f(x, y);                                 
+                glTexCoord2f(1, 0.5f); glVertex2f(x - isoWidth, y - isoHeight * 0.5f);  
+                glTexCoord2f(1, 1);    glVertex2f(x - isoWidth, y - isoHeight);         
+                glTexCoord2f(0, 1);    glVertex2f(x, y - isoHeight * 0.5f);             
+                glEnd();
+            }
         }
         
-        Texture sideTex = loadTexture(sideTexture);
-        Texture topTex = loadTexture(topTexture);
-        Texture bottomTex = bottomTexture != null ? loadTexture(bottomTexture) : sideTex;
-        
-        if (sideTex == null || topTex == null) {
-            return;
+        // Right face of slab
+        if (sideTexture != null) {
+            Texture tex = loadTexture(sideTexture);
+            if (tex != null) {
+                tex.bind();
+                glColor4f(0.6f, 0.6f, 0.6f, 1.0f);
+                glBegin(GL_QUADS);
+                glTexCoord2f(0, 0.5f); glVertex2f(x + isoWidth, y - isoHeight * 0.5f);  
+                glTexCoord2f(1, 0.5f); glVertex2f(x, y);                                 
+                glTexCoord2f(1, 1);    glVertex2f(x, y - isoHeight * 0.5f);             
+                glTexCoord2f(0, 1);    glVertex2f(x + isoWidth, y - isoHeight);         
+                glEnd();
+            }
         }
         
-        // Bottom slab: from y=0 to y=0.5, full width and depth (x: 0-1, z: 0-1)
-        
-        // Bottom slab - Top face (y=0.5)
-        topTex.bind();
-        glColor3f(1, 1, 1);
-        glBegin(GL_QUADS);
-        glTexCoord2f(0, 0); glVertex3f(0, 0.5f, 0);
-        glTexCoord2f(0, 1); glVertex3f(0, 0.5f, 1);
-        glTexCoord2f(1, 1); glVertex3f(1, 0.5f, 1);
-        glTexCoord2f(1, 0); glVertex3f(1, 0.5f, 0);
-        glEnd();
-        
-        // Bottom slab - Bottom face (y=0)
-        if (bottomTex != null) {
-            bottomTex.bind();
-            glColor3f(0.5f, 0.5f, 0.5f);
-            glBegin(GL_QUADS);
-            glTexCoord2f(0, 1); glVertex3f(0, 0, 1);
-            glTexCoord2f(0, 0); glVertex3f(0, 0, 0);
-            glTexCoord2f(1, 0); glVertex3f(1, 0, 0);
-            glTexCoord2f(1, 1); glVertex3f(1, 0, 1);
-            glEnd();
+        // Top face of slab (full diamond)
+        if (topTexture != null) {
+            Texture tex = loadTexture(topTexture);
+            if (tex != null) {
+                tex.bind();
+                glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
+                glBegin(GL_QUADS);
+                glTexCoord2f(0, 0);       glVertex2f(x, y - isoHeight * 0.5f);        
+                glTexCoord2f(0.5f, 0);    glVertex2f(x - isoWidth, y - isoHeight);    
+                glTexCoord2f(0.5f, 0.5f); glVertex2f(x, y - isoHeight * 1.5f);        
+                glTexCoord2f(0, 0.5f);    glVertex2f(x + isoWidth, y - isoHeight);    
+                glEnd();
+            }
         }
         
-        // Bottom slab - Side faces (half height, use bottom half of texture)
-        sideTex.bind();
+        // === TOP STEP (back half only, half height, sits on slab) ===
+        // Smaller cube on the back half - uses back portion of the diamond
         
-        // North face (z=0)
-        glColor3f(0.8f, 0.8f, 0.8f);
-        glBegin(GL_QUADS);
-        glTexCoord2f(1, 0.5f); glVertex3f(1, 0, 0);
-        glTexCoord2f(0, 0.5f); glVertex3f(0, 0, 0);
-        glTexCoord2f(0, 1);    glVertex3f(0, 0.5f, 0);
-        glTexCoord2f(1, 1);    glVertex3f(1, 0.5f, 0);
-        glEnd();
+        // Left face of step (back half only)
+        if (sideTexture != null) {
+            Texture tex = loadTexture(sideTexture);
+            if (tex != null) {
+                tex.bind();
+                glColor4f(0.8f, 0.8f, 0.8f, 1.0f);
+                glBegin(GL_QUADS);
+                // From middle to far-left, starting at slab top
+                glTexCoord2f(0.5f, 0.5f); glVertex2f(x - isoWidth * 0.5f, y - isoHeight);      
+                glTexCoord2f(1, 0.5f);    glVertex2f(x - isoWidth, y - isoHeight * 1.25f);    
+                glTexCoord2f(1, 1);       glVertex2f(x - isoWidth, y - isoHeight * 1.75f);    
+                glTexCoord2f(0.5f, 1);    glVertex2f(x - isoWidth * 0.5f, y - isoHeight * 1.5f); 
+                glEnd();
+            }
+        }
         
-        // South face (z=1)
-        glColor3f(0.8f, 0.8f, 0.8f);
-        glBegin(GL_QUADS);
-        glTexCoord2f(0, 0.5f); glVertex3f(0, 0, 1);
-        glTexCoord2f(1, 0.5f); glVertex3f(1, 0, 1);
-        glTexCoord2f(1, 1);    glVertex3f(1, 0.5f, 1);
-        glTexCoord2f(0, 1);    glVertex3f(0, 0.5f, 1);
-        glEnd();
+        // Right face of step (back half only)
+        if (sideTexture != null) {
+            Texture tex = loadTexture(sideTexture);
+            if (tex != null) {
+                tex.bind();
+                glColor4f(0.6f, 0.6f, 0.6f, 1.0f);
+                glBegin(GL_QUADS);
+                // From far-right to middle, starting at slab top
+                glTexCoord2f(0, 0.5f);    glVertex2f(x + isoWidth * 0.5f, y - isoHeight);      
+                glTexCoord2f(0.5f, 0.5f); glVertex2f(x - isoWidth * 0.5f, y - isoHeight);      
+                glTexCoord2f(0.5f, 1);    glVertex2f(x - isoWidth * 0.5f, y - isoHeight * 1.5f); 
+                glTexCoord2f(0, 1);       glVertex2f(x + isoWidth * 0.5f, y - isoHeight * 1.5f); 
+                glEnd();
+            }
+        }
         
-        // West face (x=0)
-        glColor3f(0.6f, 0.6f, 0.6f);
-        glBegin(GL_QUADS);
-        glTexCoord2f(0, 0.5f); glVertex3f(0, 0, 0);
-        glTexCoord2f(1, 0.5f); glVertex3f(0, 0, 1);
-        glTexCoord2f(1, 1);    glVertex3f(0, 0.5f, 1);
-        glTexCoord2f(0, 1);    glVertex3f(0, 0.5f, 0);
-        glEnd();
+        // Top face of step (back half diamond)
+        if (topTexture != null) {
+            Texture tex = loadTexture(topTexture);
+            if (tex != null) {
+                tex.bind();
+                glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
+                glBegin(GL_QUADS);
+                // Back half of the diamond at the top
+                glTexCoord2f(0.5f, 0);    glVertex2f(x - isoWidth * 0.5f, y - isoHeight * 1.5f); 
+                glTexCoord2f(0.5f, 0.5f); glVertex2f(x - isoWidth, y - isoHeight * 1.75f);       
+                glTexCoord2f(1, 0.5f);    glVertex2f(x, y - isoHeight * 2.0f);                   
+                glTexCoord2f(1, 0);       glVertex2f(x + isoWidth * 0.5f, y - isoHeight * 1.5f); 
+                glEnd();
+            }
+        }
         
-        // East face (x=1)
-        glColor3f(0.6f, 0.6f, 0.6f);
-        glBegin(GL_QUADS);
-        glTexCoord2f(1, 0.5f); glVertex3f(1, 0, 1);
-        glTexCoord2f(0, 0.5f); glVertex3f(1, 0, 0);
-        glTexCoord2f(0, 1);    glVertex3f(1, 0.5f, 0);
-        glTexCoord2f(1, 1);    glVertex3f(1, 0.5f, 1);
-        glEnd();
-        
-        // Top step: from y=0.5 to y=1.0, back half only (x: 0-1, z: 0-0.5)
-        
-        // Top step - Top face (y=1.0)
-        topTex.bind();
-        glColor3f(1, 1, 1);
-        glBegin(GL_QUADS);
-        glTexCoord2f(0.5f, 0);   glVertex3f(0, 1, 0);
-        glTexCoord2f(0.5f, 0.5f); glVertex3f(0, 1, 0.5f);
-        glTexCoord2f(1, 0.5f);   glVertex3f(1, 1, 0.5f);
-        glTexCoord2f(1, 0);      glVertex3f(1, 1, 0);
-        glEnd();
-        
-        // Top step - Side faces
-        sideTex.bind();
-        
-        // North face (z=0) - full height for this part
-        glColor3f(0.8f, 0.8f, 0.8f);
-        glBegin(GL_QUADS);
-        glTexCoord2f(1, 0.5f); glVertex3f(1, 0.5f, 0);
-        glTexCoord2f(0, 0.5f); glVertex3f(0, 0.5f, 0);
-        glTexCoord2f(0, 1);    glVertex3f(0, 1, 0);
-        glTexCoord2f(1, 1);    glVertex3f(1, 1, 0);
-        glEnd();
-        
-        // Front face (z=0.5) - vertical face at front of step
-        glColor3f(0.8f, 0.8f, 0.8f);
-        glBegin(GL_QUADS);
-        glTexCoord2f(0, 0.5f); glVertex3f(0, 0.5f, 0.5f);
-        glTexCoord2f(1, 0.5f); glVertex3f(1, 0.5f, 0.5f);
-        glTexCoord2f(1, 1);    glVertex3f(1, 1, 0.5f);
-        glTexCoord2f(0, 1);    glVertex3f(0, 1, 0.5f);
-        glEnd();
-        
-        // West face (x=0) - back half only
-        glColor3f(0.6f, 0.6f, 0.6f);
-        glBegin(GL_QUADS);
-        glTexCoord2f(0.5f, 0.5f); glVertex3f(0, 0.5f, 0);
-        glTexCoord2f(1, 0.5f);    glVertex3f(0, 0.5f, 0.5f);
-        glTexCoord2f(1, 1);       glVertex3f(0, 1, 0.5f);
-        glTexCoord2f(0.5f, 1);    glVertex3f(0, 1, 0);
-        glEnd();
-        
-        // East face (x=1) - back half only
-        glColor3f(0.6f, 0.6f, 0.6f);
-        glBegin(GL_QUADS);
-        glTexCoord2f(1, 0.5f);    glVertex3f(1, 0.5f, 0.5f);
-        glTexCoord2f(0.5f, 0.5f); glVertex3f(1, 0.5f, 0);
-        glTexCoord2f(0.5f, 1);    glVertex3f(1, 1, 0);
-        glTexCoord2f(1, 1);       glVertex3f(1, 1, 0.5f);
-        glEnd();
-        
-        glColor3f(1, 1, 1); // Reset color
+        // Restore GL state
+        if (!textureWasEnabled) {
+            glDisable(GL_TEXTURE_2D);
+        }
+        glColor4f(1f, 1f, 1f, 1f);
     }
-    
-    /**
-     * Render an isometric cube showing three faces (top, left, and right).
-     * This creates an orthographic 3D view of a block item matching Minecraft's style.
-     */
     
     /**
      * Get the texture for a specific face of a block.
