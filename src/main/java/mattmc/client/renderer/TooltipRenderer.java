@@ -23,7 +23,7 @@ public class TooltipRenderer {
     
     // Colors
     private static final float BG_GRAY = 0.3f;
-    private static final float BG_ALPHA = 0.75f;
+    private static final float BG_ALPHA = 0.25f;  // Reduced from 0.75f to let blur show through
     private static final float BORDER_R = 0.3f;
     private static final float BORDER_G = 0.5f;
     private static final float BORDER_B = 1.0f;

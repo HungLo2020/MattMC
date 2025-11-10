@@ -43,17 +43,15 @@ public class TooltipBlurEffect {
                 vec2 texelSize = 1.0 / uResolution;
                 vec4 color = vec4(0.0);
                 
-                // 9-tap Gaussian blur for better quality
-                float weights[5];
-                weights[0] = 0.227027;
-                weights[1] = 0.1945946;
-                weights[2] = 0.1216216;
-                weights[3] = 0.054054;
-                weights[4] = 0.016216;
+                // 5-tap Gaussian blur for lighter effect
+                float weights[3];
+                weights[0] = 0.383;
+                weights[1] = 0.242;
+                weights[2] = 0.061;
                 
                 color += texture2D(uTexture, vTexCoord) * weights[0];
                 
-                for(int i = 1; i < 5; i++) {
+                for(int i = 1; i < 3; i++) {
                     vec2 offset = uDirection * texelSize * float(i);
                     color += texture2D(uTexture, vTexCoord + offset) * weights[i];
                     color += texture2D(uTexture, vTexCoord - offset) * weights[i];
@@ -163,10 +161,10 @@ public class TooltipBlurEffect {
         
         glColor4f(1f, 1f, 1f, 1f);
         glBegin(GL_QUADS);
-        glTexCoord2f(0, 0); glVertex2f(x, y);
-        glTexCoord2f(1, 0); glVertex2f(x + width, y);
-        glTexCoord2f(1, 1); glVertex2f(x + width, y + height);
-        glTexCoord2f(0, 1); glVertex2f(x, y + height);
+        glTexCoord2f(0, 1); glVertex2f(x, y);
+        glTexCoord2f(1, 1); glVertex2f(x + width, y);
+        glTexCoord2f(1, 0); glVertex2f(x + width, y + height);
+        glTexCoord2f(0, 0); glVertex2f(x, y + height);
         glEnd();
         
         // Restore matrices
