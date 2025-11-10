@@ -177,7 +177,7 @@ public class ItemRenderer {
     
     /**
      * Render stairs as an isometric 3D block with proper stepped geometry.
-     * Stairs rise toward the back (north) as they recede from the camera, matching Minecraft's style.
+     * Stairs rise toward the west (back-left) as they recede from the camera.
      */
     private static void renderIsometricStairs(Map<String, String> texturePaths, mattmc.client.resources.model.BlockModel itemModel, float x, float y, float size) {
         // Get textures for each face
@@ -194,9 +194,9 @@ public class ItemRenderer {
         float isoWidth = scale * 0.5f;
         float isoHeight = scale * 0.5f;
         
-        // Capture north-facing stairs geometry (step rises toward z=0, which is away from camera)
+        // Capture west-facing stairs geometry (step rises toward x=0, back-left in isometric)
         VertexCapture capture = new VertexCapture();
-        BlockGeometryCapture.captureStairsNorthBottom(capture, 0, 0, 0);
+        BlockGeometryCapture.captureStairsWestBottom(capture, 0, 0, 0);
         List<VertexCapture.Face> allFaces = capture.getFaces();
         
         // Separate faces by type for proper rendering order and texture assignment
