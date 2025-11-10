@@ -7,6 +7,7 @@ import mattmc.world.item.ItemStack;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -91,7 +92,7 @@ public class ItemRenderer {
     }
     
     /**
-     * Render an isometric cube showing three faces (south, east, and top).
+     * Render an isometric cube showing three faces (west, north, and top).
      * Uses the actual in-game 3D block geometry projected to 2D isometric view.
      */
     private static void renderIsometricCube(Map<String, String> texturePaths, mattmc.client.resources.model.BlockModel itemModel, float x, float y, float size) {
@@ -119,13 +120,13 @@ public class ItemRenderer {
         VertexCapture capture = new VertexCapture();
         
         // Capture the three visible faces in an isometric view
-        // In isometric view, we see: south (left side), east (right side), and top
-        BlockGeometryCapture.captureSouthFace(capture, 0, 0, 0);
-        List<VertexCapture.Face> southFaces = List.copyOf(capture.getFaces());
+        // The view is from SW looking NE, so we see: west (left), north (right), and top
+        BlockGeometryCapture.captureWestFace(capture, 0, 0, 0);
+        List<VertexCapture.Face> westFaces = List.copyOf(capture.getFaces());
         
         capture.clear();
-        BlockGeometryCapture.captureEastFace(capture, 0, 0, 0);
-        List<VertexCapture.Face> eastFaces = List.copyOf(capture.getFaces());
+        BlockGeometryCapture.captureNorthFace(capture, 0, 0, 0);
+        List<VertexCapture.Face> northFaces = List.copyOf(capture.getFaces());
         
         capture.clear();
         BlockGeometryCapture.captureTopFace(capture, 0, 0, 0);
@@ -133,23 +134,23 @@ public class ItemRenderer {
         
         // Render the faces in back-to-front order for proper visibility
         
-        // 1. South face (left side, medium brightness - 80%)
+        // 1. West face (left side, medium brightness - 80%)
         if (sideTexture != null) {
             Texture tex = loadTexture(sideTexture);
             if (tex != null) {
                 tex.bind();
                 glColor4f(0.8f, 0.8f, 0.8f, 1.0f);
-                renderFacesIsometric(southFaces, x, y, isoWidth, isoHeight);
+                renderFacesIsometric(westFaces, x, y, isoWidth, isoHeight);
             }
         }
         
-        // 2. East face (right side, darker - 60%)
+        // 2. North face (right side, darker - 60%)
         if (sideTexture != null) {
             Texture tex = loadTexture(sideTexture);
             if (tex != null) {
                 tex.bind();
                 glColor4f(0.6f, 0.6f, 0.6f, 1.0f);
-                renderFacesIsometric(eastFaces, x, y, isoWidth, isoHeight);
+                renderFacesIsometric(northFaces, x, y, isoWidth, isoHeight);
             }
         }
         
@@ -176,8 +177,7 @@ public class ItemRenderer {
     
     /**
      * Render stairs as an isometric 3D block with proper stepped geometry.
-     * Uses the exact same 3D geometry as the in-game stairs (from BlockFaceGeometry.drawStairsNorthBottom)
-     * and projects it to 2D isometric view.
+     * Uses the exact same 3D geometry as the in-game stairs projected to 2D isometric view.
      */
     private static void renderIsometricStairs(Map<String, String> texturePaths, mattmc.client.resources.model.BlockModel itemModel, float x, float y, float size) {
         // Get textures for each face
@@ -199,46 +199,46 @@ public class ItemRenderer {
         BlockGeometryCapture.captureStairsNorthBottom(capture, 0, 0, 0);
         List<VertexCapture.Face> allFaces = capture.getFaces();
         
-        // Render all faces with appropriate textures and shading
-        // We'll render in two passes: sides first, then tops, for proper depth ordering
+        // Separate faces by type for proper rendering order and texture assignment
+        List<VertexCapture.Face> topFacesList = new ArrayList<>();
+        List<VertexCapture.Face> sideFacesList = new ArrayList<>();
         
-        // Pass 1: Side faces (darker shading)
+        for (VertexCapture.Face face : allFaces) {
+            if (isTopFace(face)) {
+                topFacesList.add(face);
+            } else {
+                sideFacesList.add(face);
+            }
+        }
+        
+        // Render side faces first with appropriate shading
         if (sideTexture != null) {
             Texture tex = loadTexture(sideTexture);
             if (tex != null) {
                 tex.bind();
                 
-                // Render each face with appropriate shading based on face orientation
-                for (VertexCapture.Face face : allFaces) {
-                    // Determine face type based on vertex positions
-                    // Top faces have all vertices at same Y value that's not 0
-                    boolean isTopFace = isTopFace(face);
+                for (VertexCapture.Face face : sideFacesList) {
+                    // Determine brightness based on face orientation
+                    // West-facing faces (x=0) get 0.8 brightness
+                    // Other faces get 0.6 brightness
+                    boolean isWestFacing = isWestFacing(face);
+                    float brightness = isWestFacing ? 0.8f : 0.6f;
+                    glColor4f(brightness, brightness, brightness, 1.0f);
                     
-                    if (!isTopFace) {
-                        // Determine if it's a south-facing or east-facing side
-                        boolean isSouthFacing = isSouthFacing(face);
-                        
-                        // Apply appropriate shading: south faces are lighter (0.8), others darker (0.6)
-                        float brightness = isSouthFacing ? 0.8f : 0.6f;
-                        glColor4f(brightness, brightness, brightness, 1.0f);
-                        
-                        renderFaceIsometric(face, x, y, isoWidth, isoHeight);
-                    }
+                    renderFaceIsometric(face, x, y, isoWidth, isoHeight);
                 }
             }
         }
         
-        // Pass 2: Top faces (brightest)
+        // Render top faces last with full brightness
         if (topTexture != null) {
             Texture tex = loadTexture(topTexture);
             if (tex != null) {
                 tex.bind();
                 glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
                 
-                for (VertexCapture.Face face : allFaces) {
-                    if (isTopFace(face)) {
-                        renderFaceIsometric(face, x, y, isoWidth, isoHeight);
-                    }
+                for (VertexCapture.Face face : topFacesList) {
+                    renderFaceIsometric(face, x, y, isoWidth, isoHeight);
                 }
             }
         }
@@ -262,19 +262,11 @@ public class ItemRenderer {
     }
     
     /**
-     * Check if a face is south-facing (vertical face on the Z=1 side).
+     * Check if a face is west-facing (vertical face on the X=0 side).
      */
-    private static boolean isSouthFacing(VertexCapture.Face face) {
-        // South faces have all vertices at Z=1 or Z=0.5 (for the inner step face)
-        float z1 = face.v1.z;
-        float z2 = face.v2.z;
-        float z3 = face.v3.z;
-        
-        // Check if all Z values are the same and close to 1.0 or 0.5
-        if (Math.abs(z1 - z2) < 0.01f && Math.abs(z2 - z3) < 0.01f) {
-            return z1 > 0.4f;  // Z >= 0.5 (south or inner step face)
-        }
-        return false;
+    private static boolean isWestFacing(VertexCapture.Face face) {
+        // West faces have all vertices at X=0
+        return face.v1.x < 0.01f && face.v2.x < 0.01f && face.v3.x < 0.01f;
     }
     
     /**
@@ -311,20 +303,19 @@ public class ItemRenderer {
         // Project and render vertex 1
         float x1 = project2Dx(face.v1.x, face.v1.y, face.v1.z, centerX, isoWidth);
         float y1 = project2Dy(face.v1.x, face.v1.y, face.v1.z, centerY, isoHeight);
-        // Flip V coordinate for 2D rendering (v=0 is top in 2D textures, but bottom in 3D geometry)
-        glTexCoord2f(face.v1.u, 1.0f - face.v1.v);
+        glTexCoord2f(face.v1.u, face.v1.v);
         glVertex2f(x1, y1);
         
         // Project and render vertex 2
         float x2 = project2Dx(face.v2.x, face.v2.y, face.v2.z, centerX, isoWidth);
         float y2 = project2Dy(face.v2.x, face.v2.y, face.v2.z, centerY, isoHeight);
-        glTexCoord2f(face.v2.u, 1.0f - face.v2.v);
+        glTexCoord2f(face.v2.u, face.v2.v);
         glVertex2f(x2, y2);
         
         // Project and render vertex 3
         float x3 = project2Dx(face.v3.x, face.v3.y, face.v3.z, centerX, isoWidth);
         float y3 = project2Dy(face.v3.x, face.v3.y, face.v3.z, centerY, isoHeight);
-        glTexCoord2f(face.v3.u, 1.0f - face.v3.v);
+        glTexCoord2f(face.v3.u, face.v3.v);
         glVertex2f(x3, y3);
         
         glEnd();
