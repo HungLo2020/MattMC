@@ -3,6 +3,7 @@ package mattmc.world.entity.player;
 import mattmc.client.Minecraft;
 
 import mattmc.world.item.BlockItem;
+import mattmc.world.item.Item;
 import mattmc.world.item.ItemStack;
 import mattmc.world.item.Items;
 import mattmc.world.level.block.Block;
@@ -46,7 +47,16 @@ public class BlockInteraction {
             // Place block at the adjacent position (the face we hit)
             Block existing = world.getBlock(hit.adjacentX, hit.adjacentY, hit.adjacentZ);
             if (existing.isAir()) {
-                world.setBlock(hit.adjacentX, hit.adjacentY, hit.adjacentZ, block);
+                // Get placement state from block based on player position and hit face
+                mattmc.world.level.block.state.BlockState state = block.getPlacementState(
+                    player.getX(), player.getY(), player.getZ(),
+                    hit.adjacentX, hit.adjacentY, hit.adjacentZ,
+                    hit.hitFace,
+                    hit.hitX, hit.hitY, hit.hitZ
+                );
+                
+                // Place block with state
+                world.setBlock(hit.adjacentX, hit.adjacentY, hit.adjacentZ, block, state);
             }
         }
     }
@@ -77,28 +87,25 @@ public class BlockInteraction {
             return false;
         }
         
-        // Find the corresponding BlockItem for this block
+        // Find the corresponding BlockItem for this block using the Items registry
         String blockId = block.getIdentifier();
         if (blockId == null) {
             return false;
         }
         
-        // Try to get the item with the same identifier
-        BlockItem blockItem = null;
-        if (blockId.equals("mattmc:stone")) {
-            blockItem = Items.STONE;
-        } else if (blockId.equals("mattmc:dirt")) {
-            blockItem = Items.DIRT;
-        } else if (blockId.equals("mattmc:grass_block")) {
-            blockItem = Items.GRASS_BLOCK;
-        }
-        
-        if (blockItem == null) {
+        // Look up the item dynamically from the registry using the block's identifier
+        Item item = Items.getItem(blockId);
+        if (item == null) {
             return false; // No corresponding item for this block
         }
         
+        // Verify it's a BlockItem (items that can be placed as blocks)
+        if (!(item instanceof BlockItem)) {
+            return false;
+        }
+        
         // Add the item to the player's inventory
-        ItemStack stack = new ItemStack(blockItem, 1);
+        ItemStack stack = new ItemStack(item, 1);
         return player.getInventory().addItem(stack);
     }
     
@@ -143,7 +150,9 @@ public class BlockInteraction {
                 Block block = world.getBlock(blockX, chunkY, blockZ);
                 if (!block.isAir()) {
                     // Found a solid block - return it and the last air position
-                    return new BlockHitResult(blockX, chunkY, blockZ, lastBlockX, lastBlockY, lastBlockZ);
+                    // Pass the exact ray hit position (rayX, rayY, rayZ)
+                    int hitFace = BlockHitResult.determineHitFace(blockX, chunkY, blockZ, lastBlockX, lastBlockY, lastBlockZ);
+                    return new BlockHitResult(blockX, chunkY, blockZ, lastBlockX, lastBlockY, lastBlockZ, hitFace, rayX, rayY, rayZ);
                 }
             }
             
@@ -161,14 +170,36 @@ public class BlockInteraction {
     public static class BlockHitResult {
         public final int x, y, z;              // Block that was hit
         public final int adjacentX, adjacentY, adjacentZ;  // Adjacent air block (for placing)
+        public final int hitFace;              // Face that was hit (0=bottom, 1=top, 2=north, 3=south, 4=west, 5=east)
+        public final float hitX, hitY, hitZ;   // Exact position where the ray hit the block
         
-        public BlockHitResult(int x, int y, int z, int adjX, int adjY, int adjZ) {
+        public BlockHitResult(int x, int y, int z, int adjX, int adjY, int adjZ, int hitFace, float hitX, float hitY, float hitZ) {
             this.x = x;
             this.y = y;
             this.z = z;
             this.adjacentX = adjX;
             this.adjacentY = adjY;
             this.adjacentZ = adjZ;
+            this.hitFace = hitFace;
+            this.hitX = hitX;
+            this.hitY = hitY;
+            this.hitZ = hitZ;
+        }
+        
+        // Legacy constructor for compatibility
+        public BlockHitResult(int x, int y, int z, int adjX, int adjY, int adjZ) {
+            this(x, y, z, adjX, adjY, adjZ, determineHitFace(x, y, z, adjX, adjY, adjZ), adjX + 0.5f, adjY + 0.5f, adjZ + 0.5f);
+        }
+        
+        public static int determineHitFace(int x, int y, int z, int adjX, int adjY, int adjZ) {
+            // Determine which face based on difference
+            if (adjY < y) return 0; // bottom
+            if (adjY > y) return 1; // top
+            if (adjZ < z) return 2; // north
+            if (adjZ > z) return 3; // south
+            if (adjX < x) return 4; // west
+            if (adjX > x) return 5; // east
+            return 1; // default to top
         }
     }
 }

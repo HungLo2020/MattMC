@@ -6,8 +6,10 @@ import mattmc.client.renderer.PanoramaRenderer;
 import mattmc.client.gui.screens.Screen;
 
 public final class Minecraft {
-    private static final double MIN_SLEEP_TIME = 0.002;  // 2ms - minimum time worth sleeping
-    private static final double SLEEP_BUFFER = 0.001;    // 1ms - buffer to avoid oversleeping
+    // ISSUE-017 fix: Tiered sleep strategy for better power efficiency and frame timing
+    private static final double LONG_SLEEP_THRESHOLD = 0.010;  // 10ms - use long sleep
+    private static final double SHORT_SLEEP_THRESHOLD = 0.001; // 1ms - use short sleep
+    private static final double SLEEP_BUFFER = 0.002;          // 2ms - buffer to avoid oversleeping
     
     private final Window window;
     private Screen current;
@@ -76,18 +78,27 @@ public final class Minecraft {
                 window.swap();
                 lastRenderTime = currentTime;
             } else {
-                // Calculate precise sleep time to avoid busy-waiting
+                // ISSUE-017 fix: Tiered sleep strategy for better CPU efficiency
                 double remainingTime = targetFrameTime - timeSinceLastRender;
-                if (remainingTime > MIN_SLEEP_TIME) {
+                
+                if (remainingTime > LONG_SLEEP_THRESHOLD) {
+                    // Long wait (>10ms): sleep for most of the time
                     try {
-                        // Sleep for most of the remaining time, leaving a buffer
                         long sleepMs = (long)((remainingTime - SLEEP_BUFFER) * 1000);
-                        if (sleepMs > 0) {
-                            Thread.sleep(sleepMs);
-                        }
+                        Thread.sleep(sleepMs);
                     } catch (InterruptedException e) {
                         Thread.currentThread().interrupt();
                     }
+                } else if (remainingTime > SHORT_SLEEP_THRESHOLD) {
+                    // Medium wait (1-10ms): short sleep
+                    try {
+                        Thread.sleep(1);
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                    }
+                } else if (remainingTime > 0) {
+                    // Very short wait (<1ms): just yield to avoid busy-wait
+                    Thread.yield();
                 }
             }
         }

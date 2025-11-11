@@ -16,13 +16,13 @@ public class InventoryItemMovementTest {
         Inventory inventory = new Inventory();
         
         // Place an item in slot 0
-        ItemStack diamond = new ItemStack(Items.DIAMOND, 5);
+        ItemStack diamond = new ItemStack(Items.STONE, 5);
         inventory.setStack(0, diamond);
         
         // Simulate picking up the item
         ItemStack pickedUp = inventory.getStack(0);
         assertNotNull(pickedUp);
-        assertEquals(Items.DIAMOND, pickedUp.getItem());
+        assertEquals(Items.STONE, pickedUp.getItem());
         assertEquals(5, pickedUp.getCount());
         
         // Remove from original slot
@@ -32,7 +32,7 @@ public class InventoryItemMovementTest {
         // Place in new slot
         inventory.setStack(5, pickedUp);
         assertNotNull(inventory.getStack(5));
-        assertEquals(Items.DIAMOND, inventory.getStack(5).getItem());
+        assertEquals(Items.STONE, inventory.getStack(5).getItem());
         assertEquals(5, inventory.getStack(5).getCount());
     }
     
@@ -83,7 +83,7 @@ public class InventoryItemMovementTest {
         Inventory inventory = new Inventory();
         
         // Simulate holding 10 items
-        ItemStack held = new ItemStack(Items.DIAMOND, 10);
+        ItemStack held = new ItemStack(Items.STONE, 10);
         
         // Right-click on empty slot (place one)
         ItemStack placedStack = new ItemStack(held.getItem(), 1);
@@ -170,7 +170,7 @@ public class InventoryItemMovementTest {
         inventory.setStack(0, slotStack);
         
         // Simulate holding diamond
-        ItemStack held = new ItemStack(Items.DIAMOND, 5);
+        ItemStack held = new ItemStack(Items.STONE, 5);
         
         // Swap items (different types)
         ItemStack temp = slotStack;
@@ -178,7 +178,7 @@ public class InventoryItemMovementTest {
         held = temp;
         
         // Verify swap
-        assertEquals(Items.DIAMOND, inventory.getStack(0).getItem());
+        assertEquals(Items.STONE, inventory.getStack(0).getItem());
         assertEquals(5, inventory.getStack(0).getCount());
         assertEquals(Items.STONE, held.getItem());
         assertEquals(10, held.getCount());
@@ -218,7 +218,7 @@ public class InventoryItemMovementTest {
         Inventory inventory = new Inventory();
         
         // Place an item in main inventory slot 9
-        ItemStack iron = new ItemStack(Items.IRON_INGOT, 20);
+        ItemStack iron = new ItemStack(Items.ACACIA_PLANKS, 20);
         inventory.setStack(9, iron);
         
         // Find first empty slot in hotbar (0-8)
@@ -239,7 +239,7 @@ public class InventoryItemMovementTest {
         // Verify
         assertNull(inventory.getStack(9));
         assertNotNull(inventory.getStack(0));
-        assertEquals(Items.IRON_INGOT, inventory.getStack(0).getItem());
+        assertEquals(Items.ACACIA_PLANKS, inventory.getStack(0).getItem());
     }
     
     @Test
@@ -252,7 +252,7 @@ public class InventoryItemMovementTest {
         }
         
         // Place an item in main inventory
-        ItemStack gold = new ItemStack(Items.GOLD_INGOT, 5);
+        ItemStack gold = new ItemStack(Items.DARK_OAK_PLANKS, 5);
         inventory.setStack(9, gold);
         
         // Try to shift-click (should not move since hotbar is full)
@@ -268,7 +268,7 @@ public class InventoryItemMovementTest {
         
         // Item should remain in slot 9
         assertNotNull(inventory.getStack(9));
-        assertEquals(Items.GOLD_INGOT, inventory.getStack(9).getItem());
+        assertEquals(Items.DARK_OAK_PLANKS, inventory.getStack(9).getItem());
     }
     
     @Test

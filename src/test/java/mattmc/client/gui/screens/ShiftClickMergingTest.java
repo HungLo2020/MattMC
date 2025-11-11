@@ -114,10 +114,10 @@ public class ShiftClickMergingTest {
         Inventory inventory = new Inventory();
         
         // Place 25 diamonds in main inventory slot 10
-        inventory.setStack(10, new ItemStack(Items.DIAMOND, 25));
+        inventory.setStack(10, new ItemStack(Items.STONE, 25));
         
         // Place 15 diamonds in hotbar slot 3
-        inventory.setStack(3, new ItemStack(Items.DIAMOND, 15));
+        inventory.setStack(3, new ItemStack(Items.STONE, 15));
         
         // Simulate shift-click from main inventory slot 10
         ItemStack itemsToMove = inventory.getStack(10).copy();

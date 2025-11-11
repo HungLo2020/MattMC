@@ -29,8 +29,21 @@ public class BlockState {
     
     /**
      * Get variants for the default state (empty string key).
+     * If no default state exists, returns the first available variant.
      */
     public List<BlockStateVariant> getDefaultVariants() {
-        return variants != null ? variants.get("") : null;
+        if (variants == null || variants.isEmpty()) {
+            return null;
+        }
+        
+        // Try to get default state (empty string key)
+        List<BlockStateVariant> defaultVariants = variants.get("");
+        if (defaultVariants != null) {
+            return defaultVariants;
+        }
+        
+        // If no default state, return first available variant
+        // This is useful for blocks like stairs that only have property-based variants
+        return variants.values().iterator().next();
     }
 }

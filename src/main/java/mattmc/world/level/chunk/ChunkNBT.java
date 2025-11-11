@@ -125,6 +125,24 @@ public class ChunkNBT {
         section.put("Palette", palette);
         section.put("BlockStates", blockStates.getData());
         
+        // Save blockstate properties for blocks that have them
+        Map<String, Map<String, Object>> blockStateProperties = new HashMap<>();
+        for (int x = 0; x < 16; x++) {
+            for (int y = 0; y < 16; y++) {
+                for (int z = 0; z < 16; z++) {
+                    mattmc.world.level.block.state.BlockState state = chunk.getBlockState(x, baseY + y, z);
+                    if (state != null && !state.isEmpty()) {
+                        String key = x + "," + y + "," + z;
+                        blockStateProperties.put(key, state.toNBT());
+                    }
+                }
+            }
+        }
+        
+        if (!blockStateProperties.isEmpty()) {
+            section.put("BlockStateProperties", blockStateProperties);
+        }
+        
         return section;
     }
     
@@ -218,6 +236,34 @@ public class ChunkNBT {
                         String identifier = paletteArray[paletteIndex];
                         Block block = Blocks.getBlockOrAir(identifier);
                         chunk.setBlock(x, baseY + y, z, block);
+                    }
+                }
+            }
+        }
+        
+        // Load blockstate properties
+        Object blockStatePropertiesObj = section.get("BlockStateProperties");
+        if (blockStatePropertiesObj instanceof Map) {
+            @SuppressWarnings("unchecked")
+            Map<String, Map<String, Object>> blockStateProperties = 
+                (Map<String, Map<String, Object>>) blockStatePropertiesObj;
+            
+            for (Map.Entry<String, Map<String, Object>> entry : blockStateProperties.entrySet()) {
+                String[] coords = entry.getKey().split(",");
+                if (coords.length == 3) {
+                    try {
+                        int x = Integer.parseInt(coords[0]);
+                        int y = Integer.parseInt(coords[1]);
+                        int z = Integer.parseInt(coords[2]);
+                        
+                        mattmc.world.level.block.state.BlockState state = 
+                            mattmc.world.level.block.state.BlockState.fromNBT(entry.getValue());
+                        
+                        // Get the current block and re-set with the state
+                        Block block = chunk.getBlock(x, baseY + y, z);
+                        chunk.setBlock(x, baseY + y, z, block, state);
+                    } catch (NumberFormatException ignored) {
+                        // Skip malformed coordinates
                     }
                 }
             }

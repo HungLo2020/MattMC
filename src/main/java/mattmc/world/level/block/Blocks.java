@@ -51,6 +51,21 @@ public class Blocks {
     public static final Block GRASS_BLOCK = register("grass_block", new Block(true));
     public static final Block DIRT = register("dirt", new Block(true));
     public static final Block STONE = register("stone", new Block(true));
+    public static final Block COBBLESTONE = register("cobblestone", new Block(true));
+    public static final Block MOSSY_COBBLESTONE = register("mossy_cobblestone", new Block(true));
+    public static final Block SILVER_BIRCH_PLANKS = register("silver_birch_planks", new Block(true));
+    public static final Block OAK_PLANKS = register("oak_planks", new Block(true));
+    public static final Block SPRUCE_PLANKS = register("spruce_planks", new Block(true));
+    public static final Block BIRCH_PLANKS = register("birch_planks", new Block(true));
+    public static final Block JUNGLE_PLANKS = register("jungle_planks", new Block(true));
+    public static final Block ACACIA_PLANKS = register("acacia_planks", new Block(true));
+    public static final Block DARK_OAK_PLANKS = register("dark_oak_planks", new Block(true));
+    public static final Block MANGROVE_PLANKS = register("mangrove_planks", new Block(true));
+    public static final Block CHERRY_PLANKS = register("cherry_planks", new Block(true));
+    public static final Block BAMBOO_PLANKS = register("bamboo_planks", new Block(true));
+    public static final Block CRIMSON_PLANKS = register("crimson_planks", new Block(true));
+    public static final Block WARPED_PLANKS = register("warped_planks", new Block(true));
+    public static final Block BIRCH_STAIRS = register("birch_stairs", new StairsBlock());
     
     /**
      * Register a block with a given name (without namespace).
@@ -73,7 +88,12 @@ public class Blocks {
         }
         
         // Create a new block instance with the identifier set
-        Block registeredBlock = new Block(block.isSolid(), identifier);
+        Block registeredBlock;
+        if (block instanceof StairsBlock) {
+            registeredBlock = new StairsBlock(identifier);
+        } else {
+            registeredBlock = new Block(block.isSolid(), identifier);
+        }
         REGISTRY.put(identifier, registeredBlock);
         return registeredBlock;
     }
@@ -100,7 +120,12 @@ public class Blocks {
         }
         
         // Create a new block instance with the identifier set
-        Block registeredBlock = new Block(block.isSolid(), identifier);
+        Block registeredBlock;
+        if (block instanceof StairsBlock) {
+            registeredBlock = new StairsBlock(identifier);
+        } else {
+            registeredBlock = new Block(block.isSolid(), identifier);
+        }
         REGISTRY.put(identifier, registeredBlock);
         return registeredBlock;
     }

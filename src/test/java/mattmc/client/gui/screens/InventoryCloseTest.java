@@ -16,7 +16,7 @@ public class InventoryCloseTest {
         Inventory inventory = new Inventory();
         
         // Simulate picking up an item from slot 5
-        ItemStack diamond = new ItemStack(Items.DIAMOND, 10);
+        ItemStack diamond = new ItemStack(Items.STONE, 10);
         inventory.setStack(5, diamond);
         
         // Simulate picking up the item (source slot is 5)
@@ -39,7 +39,7 @@ public class InventoryCloseTest {
         // Verify item returned to source slot
         assertNull(heldItem);
         assertNotNull(inventory.getStack(5));
-        assertEquals(Items.DIAMOND, inventory.getStack(5).getItem());
+        assertEquals(Items.STONE, inventory.getStack(5).getItem());
         assertEquals(10, inventory.getStack(5).getCount());
     }
     
@@ -183,7 +183,7 @@ public class InventoryCloseTest {
         }
         
         // Simulate holding an item
-        ItemStack heldItem = new ItemStack(Items.DIAMOND, 5);
+        ItemStack heldItem = new ItemStack(Items.STONE, 5);
         int heldItemSourceSlot = -1; // Source slot invalid
         
         // Try to add to inventory (should fail - inventory is full)

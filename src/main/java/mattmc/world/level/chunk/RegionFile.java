@@ -11,13 +11,20 @@ import java.nio.ByteBuffer;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Map;
+import java.util.concurrent.locks.ReadWriteLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 /**
  * Represents a Minecraft-style region file (.mca) that stores 32x32 chunks.
  * Based on the Anvil format used in modern Minecraft Java Edition.
+ * 
+ * Thread-safe: Uses ReentrantReadWriteLock to allow concurrent reads while ensuring exclusive writes.
  */
 public class RegionFile implements AutoCloseable {
     private static final Logger logger = LoggerFactory.getLogger(RegionFile.class);
+    
+    // Lock for thread-safe file access (ISSUE-001 fix)
+    private final ReadWriteLock lock = new ReentrantReadWriteLock();
     
     public static final int REGION_SIZE = 32; // 32x32 chunks per region
     private static final int SECTOR_SIZE = 4096; // 4KB sectors
@@ -76,35 +83,43 @@ public class RegionFile implements AutoCloseable {
     
     /**
      * Load the header (location and timestamp tables) from the region file.
+     * Thread-safe: Acquires write lock during initialization.
      */
     private void loadHeader() throws IOException {
-        if (file.length() < HEADER_SIZE) {
-            return; // Incomplete/corrupted header
-        }
-        
-        file.seek(0);
-        
-        // Read location table
-        byte[] locationData = new byte[SECTOR_SIZE];
-        file.readFully(locationData);
-        ByteBuffer locationBuffer = ByteBuffer.wrap(locationData);
-        for (int i = 0; i < REGION_SIZE * REGION_SIZE; i++) {
-            locations[i] = locationBuffer.getInt();
-        }
-        
-        // Read timestamp table
-        byte[] timestampData = new byte[SECTOR_SIZE];
-        file.readFully(timestampData);
-        ByteBuffer timestampBuffer = ByteBuffer.wrap(timestampData);
-        for (int i = 0; i < REGION_SIZE * REGION_SIZE; i++) {
-            timestamps[i] = timestampBuffer.getInt();
+        lock.writeLock().lock();
+        try {
+            if (file.length() < HEADER_SIZE) {
+                return; // Incomplete/corrupted header
+            }
+            
+            file.seek(0);
+            
+            // Read location table
+            byte[] locationData = new byte[SECTOR_SIZE];
+            file.readFully(locationData);
+            ByteBuffer locationBuffer = ByteBuffer.wrap(locationData);
+            for (int i = 0; i < REGION_SIZE * REGION_SIZE; i++) {
+                locations[i] = locationBuffer.getInt();
+            }
+            
+            // Read timestamp table
+            byte[] timestampData = new byte[SECTOR_SIZE];
+            file.readFully(timestampData);
+            ByteBuffer timestampBuffer = ByteBuffer.wrap(timestampData);
+            for (int i = 0; i < REGION_SIZE * REGION_SIZE; i++) {
+                timestamps[i] = timestampBuffer.getInt();
+            }
+        } finally {
+            lock.writeLock().unlock();
         }
     }
     
     /**
      * Save the header (location and timestamp tables) to the region file.
+     * Thread-safe: Must be called with write lock held.
      */
     private void saveHeader() throws IOException {
+        // Caller must hold write lock
         file.seek(0);
         
         // Write location table
@@ -126,100 +141,112 @@ public class RegionFile implements AutoCloseable {
     
     /**
      * Read chunk NBT data from the region file.
+     * Thread-safe: Uses read lock for concurrent reading.
      */
-    public synchronized Map<String, Object> readChunk(int chunkX, int chunkZ) throws IOException {
-        if (closed) {
-            throw new IllegalStateException("Cannot read from closed RegionFile");
-        }
-        int index = getChunkIndex(chunkX, chunkZ);
-        int location = locations[index];
-        
-        if (location == 0) {
-            return null; // LevelChunk not present
-        }
-        
-        int offset = (location >> 8) & 0xFFFFFF; // 3 bytes: sector offset
-        int sectorCount = location & 0xFF; // 1 byte: sector count
-        
-        if (offset < 2 || sectorCount == 0) {
-            return null; // Invalid location
-        }
-        
-        file.seek(offset * SECTOR_SIZE);
-        
-        // Read chunk length (4 bytes)
-        int length = file.readInt();
-        if (length <= 0 || length > sectorCount * SECTOR_SIZE) {
-            return null; // Invalid length
-        }
-        
-        // Read compression type (1 byte)
-        byte compressionType = file.readByte();
-        
-        // Read compressed data
-        byte[] compressedData = new byte[length - 1];
-        file.readFully(compressedData);
-        
-        // Decompress and parse NBT
-        InputStream input = new ByteArrayInputStream(compressedData);
-        
-        if (compressionType == 2) { // Zlib (deflate)
-            return NBTUtil.readDeflated(input);
-        } else {
-            return null; // Unsupported compression
+    public Map<String, Object> readChunk(int chunkX, int chunkZ) throws IOException {
+        lock.readLock().lock();
+        try {
+            if (closed) {
+                throw new IllegalStateException("Cannot read from closed RegionFile");
+            }
+            int index = getChunkIndex(chunkX, chunkZ);
+            int location = locations[index];
+            
+            if (location == 0) {
+                return null; // LevelChunk not present
+            }
+            
+            int offset = (location >> 8) & 0xFFFFFF; // 3 bytes: sector offset
+            int sectorCount = location & 0xFF; // 1 byte: sector count
+            
+            if (offset < 2 || sectorCount == 0) {
+                return null; // Invalid location
+            }
+            
+            file.seek(offset * SECTOR_SIZE);
+            
+            // Read chunk length (4 bytes)
+            int length = file.readInt();
+            if (length <= 0 || length > sectorCount * SECTOR_SIZE) {
+                return null; // Invalid length
+            }
+            
+            // Read compression type (1 byte)
+            byte compressionType = file.readByte();
+            
+            // Read compressed data
+            byte[] compressedData = new byte[length - 1];
+            file.readFully(compressedData);
+            
+            // Decompress and parse NBT
+            InputStream input = new ByteArrayInputStream(compressedData);
+            
+            if (compressionType == 2) { // Zlib (deflate)
+                return NBTUtil.readDeflated(input);
+            } else {
+                return null; // Unsupported compression
+            }
+        } finally {
+            lock.readLock().unlock();
         }
     }
     
     /**
      * Write chunk NBT data to the region file.
+     * Thread-safe: Uses write lock for exclusive writing.
      */
-    public synchronized void writeChunk(int chunkX, int chunkZ, Map<String, Object> chunkData) throws IOException {
-        if (closed) {
-            throw new IllegalStateException("Cannot write to closed RegionFile");
+    public void writeChunk(int chunkX, int chunkZ, Map<String, Object> chunkData) throws IOException {
+        lock.writeLock().lock();
+        try {
+            if (closed) {
+                throw new IllegalStateException("Cannot write to closed RegionFile");
+            }
+            int index = getChunkIndex(chunkX, chunkZ);
+            
+            // Serialize and compress chunk data
+            ByteArrayOutputStream byteOut = new ByteArrayOutputStream();
+            NBTUtil.writeDeflated(chunkData, byteOut);
+            byte[] compressedData = byteOut.toByteArray();
+            
+            // Calculate sectors needed (1 byte for compression type + compressed data + 4 bytes for length)
+            int dataLength = compressedData.length + 1; // +1 for compression type byte
+            int sectorsNeeded = (dataLength + 4 + SECTOR_SIZE - 1) / SECTOR_SIZE; // +4 for length int
+            
+            // Get current allocation for this chunk
+            int oldLocation = locations[index];
+            int oldOffset = (oldLocation >> 8) & 0xFFFFFF;
+            int oldSectorCount = oldLocation & 0xFF;
+            
+            // Check if we can reuse the existing space
+            int offset;
+            if (oldSectorCount >= sectorsNeeded && oldOffset >= 2) {
+                // Reuse existing space (Minecraft Java optimization)
+                offset = oldOffset;
+            } else {
+                // Need to find new space
+                offset = findFreeSpace(sectorsNeeded, index);
+            }
+            
+            // Write chunk data
+            file.seek(offset * SECTOR_SIZE);
+            file.writeInt(dataLength);
+            file.writeByte(2); // Compression type: 2 = zlib (deflate)
+            file.write(compressedData);
+            
+            // Pad to sector boundary
+            int written = 4 + 1 + compressedData.length;
+            int padding = (sectorsNeeded * SECTOR_SIZE) - written;
+            if (padding > 0) {
+                file.write(new byte[padding]);
+            }
+            
+            // Update location table
+            locations[index] = (offset << 8) | (sectorsNeeded & 0xFF);
+            timestamps[index] = (int) (System.currentTimeMillis() / 1000L);
+            headerDirty = true;
+        } finally {
+            lock.writeLock().unlock();
         }
-        int index = getChunkIndex(chunkX, chunkZ);
-        
-        // Serialize and compress chunk data
-        ByteArrayOutputStream byteOut = new ByteArrayOutputStream();
-        NBTUtil.writeDeflated(chunkData, byteOut);
-        byte[] compressedData = byteOut.toByteArray();
-        
-        // Calculate sectors needed (1 byte for compression type + compressed data + 4 bytes for length)
-        int dataLength = compressedData.length + 1; // +1 for compression type byte
-        int sectorsNeeded = (dataLength + 4 + SECTOR_SIZE - 1) / SECTOR_SIZE; // +4 for length int
-        
-        // Get current allocation for this chunk
-        int oldLocation = locations[index];
-        int oldOffset = (oldLocation >> 8) & 0xFFFFFF;
-        int oldSectorCount = oldLocation & 0xFF;
-        
-        // Check if we can reuse the existing space
-        int offset;
-        if (oldSectorCount >= sectorsNeeded && oldOffset >= 2) {
-            // Reuse existing space (Minecraft Java optimization)
-            offset = oldOffset;
-        } else {
-            // Need to find new space
-            offset = findFreeSpace(sectorsNeeded, index);
-        }
-        
-        // Write chunk data
-        file.seek(offset * SECTOR_SIZE);
-        file.writeInt(dataLength);
-        file.writeByte(2); // Compression type: 2 = zlib (deflate)
-        file.write(compressedData);
-        
-        // Pad to sector boundary
-        int written = 4 + 1 + compressedData.length;
-        int padding = (sectorsNeeded * SECTOR_SIZE) - written;
-        if (padding > 0) {
-            file.write(new byte[padding]);
-        }
-        
-        // Update location table
-        locations[index] = (offset << 8) | (sectorsNeeded & 0xFF);
-        timestamps[index] = (int) (System.currentTimeMillis() / 1000L);
-        headerDirty = true;
     }
     
     /**
@@ -289,25 +316,37 @@ public class RegionFile implements AutoCloseable {
     
     /**
      * Flush any pending writes to disk.
+     * Thread-safe: Uses write lock.
      */
-    public synchronized void flush() throws IOException {
-        if (closed) {
-            return; // Already closed, nothing to flush
-        }
-        if (headerDirty) {
-            saveHeader();
-        }
-        if (file != null) {
-            file.getFD().sync();
+    public void flush() throws IOException {
+        lock.writeLock().lock();
+        try {
+            if (closed) {
+                return; // Already closed, nothing to flush
+            }
+            if (headerDirty) {
+                saveHeader();
+            }
+            if (file != null) {
+                file.getFD().sync();
+            }
+        } finally {
+            lock.writeLock().unlock();
         }
     }
     
     /**
      * Check if a chunk exists in this region.
+     * Thread-safe: Uses read lock.
      */
     public boolean hasChunk(int chunkX, int chunkZ) {
-        int index = getChunkIndex(chunkX, chunkZ);
-        return locations[index] != 0;
+        lock.readLock().lock();
+        try {
+            int index = getChunkIndex(chunkX, chunkZ);
+            return locations[index] != 0;
+        } finally {
+            lock.readLock().unlock();
+        }
     }
     
     public int getRegionX() {
@@ -323,18 +362,23 @@ public class RegionFile implements AutoCloseable {
     }
     
     @Override
-    public synchronized void close() throws IOException {
-        if (closed) {
-            return; // Already closed
-        }
-        closed = true;
-        if (file != null) {
-            // Flush header if dirty before closing
-            if (headerDirty) {
-                saveHeader();
+    public void close() throws IOException {
+        lock.writeLock().lock();
+        try {
+            if (closed) {
+                return; // Already closed
             }
-            file.close();
-            file = null;
+            closed = true;
+            if (file != null) {
+                // Flush header if dirty before closing
+                if (headerDirty) {
+                    saveHeader();
+                }
+                file.close();
+                file = null;
+            }
+        } finally {
+            lock.writeLock().unlock();
         }
     }
 }

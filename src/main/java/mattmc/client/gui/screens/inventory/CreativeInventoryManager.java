@@ -1,0 +1,183 @@
+package mattmc.client.gui.screens.inventory;
+
+import mattmc.client.Window;
+import mattmc.world.item.Inventory;
+import mattmc.world.item.Item;
+import mattmc.world.item.ItemStack;
+import org.lwjgl.system.MemoryStack;
+
+import java.nio.IntBuffer;
+import java.util.ArrayList;
+import java.util.List;
+
+import static org.lwjgl.glfw.GLFW.glfwGetFramebufferSize;
+import static org.lwjgl.glfw.GLFW.glfwGetWindowSize;
+import static org.lwjgl.system.MemoryStack.stackPush;
+
+/**
+ * Manages creative mode item selection and scrolling.
+ */
+public class CreativeInventoryManager {
+    private static final int CREATIVE_COLS = 9;
+    private static final int CREATIVE_ROWS = 15;
+    private static final float GUI_SCALE = 3.0f;
+    
+    private final List<Item> allItems = new ArrayList<>();
+    private int scrollRow = 0;
+    
+    public CreativeInventoryManager() {
+        initializeItems();
+    }
+    
+    /**
+     * Initialize the list of all items for the creative inventory.
+     * Uses the creative tabs system to automatically populate items.
+     */
+    private void initializeItems() {
+        allItems.clear();
+        // Ensure creative mode tabs are initialized
+        mattmc.world.item.CreativeModeTabs.init();
+        // Get all unique items from creative tabs
+        allItems.addAll(mattmc.world.item.CreativeTabs.getAllUniqueItems());
+    }
+    
+    /**
+     * Handle scroll wheel for creative inventory.
+     * Scrolling down (negative yoffset) increases scroll row to show next items.
+     * Scrolling up (positive yoffset) decreases scroll row to show previous items.
+     */
+    public void handleScroll(double yoffset) {
+        int totalRows = (allItems.size() + CREATIVE_COLS - 1) / CREATIVE_COLS;
+        int maxScrollRow = Math.max(0, totalRows - CREATIVE_ROWS);
+        
+        // Only allow scrolling if there are more items than can fit in the display
+        if (maxScrollRow > 0) {
+            // Scroll down (negative yoffset) = increase row to show later items
+            // Scroll up (positive yoffset) = decrease row to show earlier items
+            scrollRow += (int) -yoffset;
+            scrollRow = Math.max(0, Math.min(scrollRow, maxScrollRow));
+        }
+    }
+    
+    /**
+     * Find which creative inventory item (if any) was clicked.
+     * @param mouseXWin Mouse X in window coordinates
+     * @param mouseYWin Mouse Y in window coordinates
+     * @param window Window reference for coordinate conversion
+     * @return Item index in allItems list, or -1 if no item was clicked
+     */
+    public int findClickedCreativeItem(double mouseXWin, double mouseYWin, Window window) {
+        // Get mouse position in framebuffer coordinates
+        float mouseFBX, mouseFBY;
+        try (MemoryStack stack = stackPush()) {
+            IntBuffer winW = stack.mallocInt(1), winH = stack.mallocInt(1);
+            IntBuffer fbW  = stack.mallocInt(1), fbH  = stack.mallocInt(1);
+            glfwGetWindowSize(window.handle(), winW, winH);
+            glfwGetFramebufferSize(window.handle(), fbW, fbH);
+            float sx = fbW.get(0) / Math.max(1f, winW.get(0));
+            float sy = fbH.get(0) / Math.max(1f, winH.get(0));
+            mouseFBX = (float) mouseXWin * sx;
+            mouseFBY = (float) mouseYWin * sy;
+        }
+        
+        // Calculate creative inventory position
+        int w = window.width(), h = window.height();
+        float contentWidth = 176f * GUI_SCALE;
+        float contentHeight = 296f * GUI_SCALE;
+        float guiX = w - contentWidth - 20f;
+        float guiY = (h - contentHeight) / 2f;
+        
+        // Slot grid parameters
+        float startX = guiX + 8f * GUI_SCALE;
+        float startY = guiY + 18f * GUI_SCALE;
+        float slotSpacing = 18f * GUI_SCALE;
+        
+        // Check which slot was clicked
+        for (int row = 0; row < CREATIVE_ROWS; row++) {
+            for (int col = 0; col < CREATIVE_COLS; col++) {
+                float slotX = startX + col * slotSpacing;
+                float slotY = startY + row * slotSpacing;
+                
+                // Check if mouse is within this slot
+                if (mouseFBX >= slotX && mouseFBX < slotX + slotSpacing &&
+                    mouseFBY >= slotY && mouseFBY < slotY + slotSpacing) {
+                    int itemIndex = (scrollRow + row) * CREATIVE_COLS + col;
+                    return itemIndex;
+                }
+            }
+        }
+        
+        return -1;
+    }
+    
+    /**
+     * Handle clicking on a creative inventory item.
+     * Attempts to merge with existing stacks first, then deposits into first available slot.
+     */
+    public void handleCreativeItemClick(Inventory inventory, int itemIndex) {
+        if (itemIndex < 0 || itemIndex >= allItems.size()) {
+            return;
+        }
+        
+        Item item = allItems.get(itemIndex);
+        ItemStack stackToAdd = new ItemStack(item, 1);
+        
+        // First, try to merge with existing stacks (hotbar first, then main inventory)
+        // Try hotbar (slots 0-8)
+        for (int i = 0; i < 9; i++) {
+            ItemStack existing = inventory.getStack(i);
+            if (existing != null && existing.getItem() == item && 
+                existing.getCount() < item.getMaxStackSize()) {
+                existing.grow(1);
+                return;
+            }
+        }
+        
+        // Try main inventory (slots 9-35)
+        for (int i = 9; i < 36; i++) {
+            ItemStack existing = inventory.getStack(i);
+            if (existing != null && existing.getItem() == item && 
+                existing.getCount() < item.getMaxStackSize()) {
+                existing.grow(1);
+                return;
+            }
+        }
+        
+        // If no existing stacks to merge with, find first empty slot
+        // Try hotbar first (slots 0-8)
+        for (int i = 0; i < 9; i++) {
+            ItemStack existing = inventory.getStack(i);
+            if (existing == null) {
+                inventory.setStack(i, stackToAdd);
+                return;
+            }
+        }
+        
+        // Then try main inventory (slots 9-35)
+        for (int i = 9; i < 36; i++) {
+            ItemStack existing = inventory.getStack(i);
+            if (existing == null) {
+                inventory.setStack(i, stackToAdd);
+                return;
+            }
+        }
+        
+        // If we get here, inventory is completely full and all stacks are at max capacity
+        // Item cannot be added
+    }
+    
+    public List<Item> getAllItems() {
+        return allItems;
+    }
+    
+    public int getScrollRow() {
+        return scrollRow;
+    }
+    
+    public Item getItemAt(int index) {
+        if (index >= 0 && index < allItems.size()) {
+            return allItems.get(index);
+        }
+        return null;
+    }
+}

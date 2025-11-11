@@ -13,55 +13,55 @@ public class ItemsTest {
     @Test
     public void testVanillaItemsAreRegistered() {
         // Test that vanilla items are properly registered
-        assertNotNull(Items.STICK, "STICK should be registered");
-        assertNotNull(Items.DIAMOND, "DIAMOND should be registered");
-        assertNotNull(Items.COAL, "COAL should be registered");
-        assertNotNull(Items.IRON_INGOT, "IRON_INGOT should be registered");
-        assertNotNull(Items.GOLD_INGOT, "GOLD_INGOT should be registered");
+        assertNotNull(Items.DIRT, "DIRT should be registered");
+        assertNotNull(Items.STONE, "STONE should be registered");
+        assertNotNull(Items.COBBLESTONE, "COBBLESTONE should be registered");
+        assertNotNull(Items.ACACIA_PLANKS, "ACACIA_PLANKS should be registered");
+        assertNotNull(Items.DARK_OAK_PLANKS, "DARK_OAK_PLANKS should be registered");
         
         // Test block items
         assertNotNull(Items.STONE, "STONE should be registered");
         assertNotNull(Items.DIRT, "DIRT should be registered");
         assertNotNull(Items.GRASS_BLOCK, "GRASS_BLOCK should be registered");
         
-        // Test tools
-        assertNotNull(Items.WOODEN_PICKAXE, "WOODEN_PICKAXE should be registered");
-        assertNotNull(Items.DIAMOND_PICKAXE, "DIAMOND_PICKAXE should be registered");
-        assertNotNull(Items.IRON_AXE, "IRON_AXE should be registered");
-        assertNotNull(Items.STONE_SHOVEL, "STONE_SHOVEL should be registered");
+        // Test planks
+        assertNotNull(Items.OAK_PLANKS, "OAK_PLANKS should be registered");
+        assertNotNull(Items.SPRUCE_PLANKS, "SPRUCE_PLANKS should be registered");
+        assertNotNull(Items.BAMBOO_PLANKS, "BAMBOO_PLANKS should be registered");
+        assertNotNull(Items.MOSSY_COBBLESTONE, "MOSSY_COBBLESTONE should be registered");
     }
     
     @Test
     public void testItemIdentifiers() {
-        assertEquals("mattmc:stick", Items.STICK.getIdentifier(), "STICK identifier should be 'mattmc:stick'");
-        assertEquals("mattmc:diamond", Items.DIAMOND.getIdentifier(), "DIAMOND identifier should be 'mattmc:diamond'");
-        assertEquals("mattmc:wooden_pickaxe", Items.WOODEN_PICKAXE.getIdentifier(), 
-            "WOODEN_PICKAXE identifier should be 'mattmc:wooden_pickaxe'");
+        assertEquals("mattmc:dirt", Items.DIRT.getIdentifier(), "DIRT identifier should be 'mattmc:dirt'");
+        assertEquals("mattmc:stone", Items.STONE.getIdentifier(), "STONE identifier should be 'mattmc:stone'");
+        assertEquals("mattmc:oak_planks", Items.OAK_PLANKS.getIdentifier(), 
+            "OAK_PLANKS identifier should be 'mattmc:oak_planks'");
     }
     
     @Test
     public void testItemStackSizes() {
         // Materials should stack to 64
-        assertEquals(64, Items.STICK.getMaxStackSize(), "STICK should stack to 64");
-        assertEquals(64, Items.DIAMOND.getMaxStackSize(), "DIAMOND should stack to 64");
-        assertEquals(64, Items.COAL.getMaxStackSize(), "COAL should stack to 64");
+        assertEquals(64, Items.DIRT.getMaxStackSize(), "DIRT should stack to 64");
+        assertEquals(64, Items.STONE.getMaxStackSize(), "STONE should stack to 64");
+        assertEquals(64, Items.COBBLESTONE.getMaxStackSize(), "COBBLESTONE should stack to 64");
         
-        // Tools should not stack (max 1)
-        assertEquals(1, Items.WOODEN_PICKAXE.getMaxStackSize(), "WOODEN_PICKAXE should have max stack size of 1");
-        assertEquals(1, Items.DIAMOND_PICKAXE.getMaxStackSize(), "DIAMOND_PICKAXE should have max stack size of 1");
-        assertEquals(1, Items.IRON_AXE.getMaxStackSize(), "IRON_AXE should have max stack size of 1");
-        assertEquals(1, Items.STONE_SHOVEL.getMaxStackSize(), "STONE_SHOVEL should have max stack size of 1");
+        // All block items stack to 64
+        assertEquals(64, Items.OAK_PLANKS.getMaxStackSize(), "OAK_PLANKS should have max stack size of 64");
+        assertEquals(64, Items.SPRUCE_PLANKS.getMaxStackSize(), "SPRUCE_PLANKS should have max stack size of 64");
+        assertEquals(64, Items.BAMBOO_PLANKS.getMaxStackSize(), "BAMBOO_PLANKS should have max stack size of 64");
+        assertEquals(64, Items.MOSSY_COBBLESTONE.getMaxStackSize(), "MOSSY_COBBLESTONE should have max stack size of 64");
     }
     
     @Test
     public void testGetItemByIdentifier() {
-        Item stick = Items.getItem("mattmc:stick");
-        assertNotNull(stick, "getItem should return STICK for 'mattmc:stick'");
-        assertSame(Items.STICK, stick, "getItem should return the same instance as Items.STICK");
+        Item dirt = Items.getItem("mattmc:dirt");
+        assertNotNull(dirt, "getItem should return DIRT for 'mattmc:dirt'");
+        assertSame(Items.DIRT, dirt, "getItem should return the same instance as Items.DIRT");
         
-        Item diamond = Items.getItem("mattmc:diamond");
-        assertNotNull(diamond, "getItem should return DIAMOND for 'mattmc:diamond'");
-        assertSame(Items.DIAMOND, diamond, "getItem should return the same instance as Items.DIAMOND");
+        Item stone = Items.getItem("mattmc:stone");
+        assertNotNull(stone, "getItem should return STONE for 'mattmc:stone'");
+        assertSame(Items.STONE, stone, "getItem should return the same instance as Items.STONE");
     }
     
     @Test
@@ -72,8 +72,8 @@ public class ItemsTest {
     
     @Test
     public void testIsRegistered() {
-        assertTrue(Items.isRegistered("mattmc:stick"), "STICK should be registered");
-        assertTrue(Items.isRegistered("mattmc:diamond"), "DIAMOND should be registered");
+        assertTrue(Items.isRegistered("mattmc:dirt"), "DIRT should be registered");
+        assertTrue(Items.isRegistered("mattmc:stone"), "STONE should be registered");
         assertFalse(Items.isRegistered("mattmc:nonexistent"), "Non-existent item should not be registered");
     }
     
@@ -100,7 +100,7 @@ public class ItemsTest {
     public void testRegisterDuplicateItemThrowsException() {
         // Try to register an item with an identifier that's already registered
         assertThrows(IllegalArgumentException.class, () -> {
-            Items.registerItem("mattmc:stick", new Item(64));
+            Items.registerItem("mattmc:dirt", new Item(64));
         }, "Registering duplicate item should throw IllegalArgumentException");
     }
     
@@ -140,10 +140,10 @@ public class ItemsTest {
         assertFalse(identifiers.isEmpty(), "Registered identifiers set should not be empty");
         
         // Check that vanilla items are in the set
-        assertTrue(identifiers.contains("mattmc:stick"), "Identifiers should contain 'mattmc:stick'");
-        assertTrue(identifiers.contains("mattmc:diamond"), "Identifiers should contain 'mattmc:diamond'");
-        assertTrue(identifiers.contains("mattmc:wooden_pickaxe"), 
-            "Identifiers should contain 'mattmc:wooden_pickaxe'");
+        assertTrue(identifiers.contains("mattmc:dirt"), "Identifiers should contain 'mattmc:dirt'");
+        assertTrue(identifiers.contains("mattmc:stone"), "Identifiers should contain 'mattmc:stone'");
+        assertTrue(identifiers.contains("mattmc:oak_planks"), 
+            "Identifiers should contain 'mattmc:oak_planks'");
         
         // Verify the set is unmodifiable
         assertThrows(UnsupportedOperationException.class, () -> {
@@ -153,10 +153,10 @@ public class ItemsTest {
     
     @Test
     public void testItemsAreStackable() {
-        assertTrue(Items.STICK.isStackable(), "STICK should be stackable");
-        assertTrue(Items.DIAMOND.isStackable(), "DIAMOND should be stackable");
-        assertFalse(Items.WOODEN_PICKAXE.isStackable(), "WOODEN_PICKAXE should not be stackable");
-        assertFalse(Items.DIAMOND_AXE.isStackable(), "DIAMOND_AXE should not be stackable");
+        assertTrue(Items.DIRT.isStackable(), "DIRT should be stackable");
+        assertTrue(Items.STONE.isStackable(), "STONE should be stackable");
+        assertTrue(Items.OAK_PLANKS.isStackable(), "OAK_PLANKS should be stackable");
+        assertTrue(Items.CHERRY_PLANKS.isStackable(), "CHERRY_PLANKS should be stackable");
     }
     
     @Test

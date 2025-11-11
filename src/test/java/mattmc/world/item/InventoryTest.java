@@ -30,7 +30,7 @@ public class InventoryTest {
     
     @Test
     public void testGetAndSetStack() {
-        ItemStack stack = new ItemStack(Items.DIAMOND, 10);
+        ItemStack stack = new ItemStack(Items.STONE, 10);
         inventory.setStack(5, stack);
         assertEquals(stack, inventory.getStack(5));
     }
@@ -44,7 +44,7 @@ public class InventoryTest {
     
     @Test
     public void testSetStackOutOfBounds() {
-        ItemStack stack = new ItemStack(Items.DIAMOND, 10);
+        ItemStack stack = new ItemStack(Items.STONE, 10);
         // Should not throw, just silently fail
         inventory.setStack(-1, stack);
         inventory.setStack(36, stack);
@@ -75,36 +75,36 @@ public class InventoryTest {
     public void testGetSelectedStack() {
         assertNull(inventory.getSelectedStack());
         
-        ItemStack stack = new ItemStack(Items.DIAMOND, 10);
+        ItemStack stack = new ItemStack(Items.STONE, 10);
         inventory.setStack(0, stack);
         assertEquals(stack, inventory.getSelectedStack());
         
         inventory.setSelectedSlot(3);
         assertNull(inventory.getSelectedStack());
         
-        ItemStack stack2 = new ItemStack(Items.COAL, 5);
+        ItemStack stack2 = new ItemStack(Items.COBBLESTONE, 5);
         inventory.setStack(3, stack2);
         assertEquals(stack2, inventory.getSelectedStack());
     }
     
     @Test
     public void testAddItemToEmptyInventory() {
-        ItemStack stack = new ItemStack(Items.DIAMOND, 10);
+        ItemStack stack = new ItemStack(Items.STONE, 10);
         assertTrue(inventory.addItem(stack));
         
         // Should be in slot 0 (first slot)
         ItemStack inSlot = inventory.getStack(0);
         assertNotNull(inSlot);
-        assertEquals(Items.DIAMOND, inSlot.getItem());
+        assertEquals(Items.STONE, inSlot.getItem());
         assertEquals(10, inSlot.getCount());
     }
     
     @Test
     public void testAddItemMergesWithExisting() {
-        ItemStack stack1 = new ItemStack(Items.DIAMOND, 30);
+        ItemStack stack1 = new ItemStack(Items.STONE, 30);
         inventory.setStack(0, stack1);
         
-        ItemStack stack2 = new ItemStack(Items.DIAMOND, 20);
+        ItemStack stack2 = new ItemStack(Items.STONE, 20);
         assertTrue(inventory.addItem(stack2));
         
         // Should merge into slot 0
@@ -113,10 +113,10 @@ public class InventoryTest {
     
     @Test
     public void testAddItemMergesPartially() {
-        ItemStack stack1 = new ItemStack(Items.DIAMOND, 60);
+        ItemStack stack1 = new ItemStack(Items.STONE, 60);
         inventory.setStack(0, stack1);
         
-        ItemStack stack2 = new ItemStack(Items.DIAMOND, 10);
+        ItemStack stack2 = new ItemStack(Items.STONE, 10);
         assertTrue(inventory.addItem(stack2));
         
         // Should merge 4 into slot 0 (to reach 64), rest into new slot
@@ -128,10 +128,10 @@ public class InventoryTest {
     public void testAddItemToFullInventory() {
         // Fill inventory
         for (int i = 0; i < 36; i++) {
-            inventory.setStack(i, new ItemStack(Items.COAL, 64));
+            inventory.setStack(i, new ItemStack(Items.COBBLESTONE, 64));
         }
         
-        ItemStack stack = new ItemStack(Items.DIAMOND, 10);
+        ItemStack stack = new ItemStack(Items.STONE, 10);
         assertFalse(inventory.addItem(stack));
     }
     
@@ -144,17 +144,17 @@ public class InventoryTest {
     public void testFindFirstEmptySlot() {
         assertEquals(0, inventory.findFirstEmptySlot());
         
-        inventory.setStack(0, new ItemStack(Items.DIAMOND, 1));
+        inventory.setStack(0, new ItemStack(Items.STONE, 1));
         assertEquals(1, inventory.findFirstEmptySlot());
         
-        inventory.setStack(1, new ItemStack(Items.COAL, 1));
+        inventory.setStack(1, new ItemStack(Items.COBBLESTONE, 1));
         assertEquals(2, inventory.findFirstEmptySlot());
     }
     
     @Test
     public void testFindFirstEmptySlotWhenFull() {
         for (int i = 0; i < 36; i++) {
-            inventory.setStack(i, new ItemStack(Items.DIAMOND, 1));
+            inventory.setStack(i, new ItemStack(Items.STONE, 1));
         }
         assertEquals(-1, inventory.findFirstEmptySlot());
     }
@@ -164,7 +164,7 @@ public class InventoryTest {
         assertFalse(inventory.isFull());
         
         for (int i = 0; i < 36; i++) {
-            inventory.setStack(i, new ItemStack(Items.DIAMOND, 1));
+            inventory.setStack(i, new ItemStack(Items.STONE, 1));
         }
         assertTrue(inventory.isFull());
     }
@@ -172,9 +172,9 @@ public class InventoryTest {
     @Test
     public void testClear() {
         // Add some items
-        inventory.setStack(0, new ItemStack(Items.DIAMOND, 10));
-        inventory.setStack(5, new ItemStack(Items.COAL, 20));
-        inventory.setStack(35, new ItemStack(Items.STICK, 30));
+        inventory.setStack(0, new ItemStack(Items.STONE, 10));
+        inventory.setStack(5, new ItemStack(Items.COBBLESTONE, 20));
+        inventory.setStack(35, new ItemStack(Items.DIRT, 30));
         
         inventory.clear();
         
