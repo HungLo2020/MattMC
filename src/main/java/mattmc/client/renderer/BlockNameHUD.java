@@ -52,30 +52,20 @@ public class BlockNameHUD extends AbstractBlurBox {
         int[] viewport = new int[4];
         glGetIntegerv(GL_VIEWPORT, viewport);
         
-        // Save comprehensive GL state before rendering (but NOT matrices - those are already set up correctly)
-        glPushAttrib(GL_ALL_ATTRIB_BITS);
+        // Apply blur to the background region
+        // Note: applyRegionalBlur may modify viewport and other state
+        applyRegionalBlur(HUD_X, HUD_Y, hudWidth, hudHeight, screenWidth, screenHeight);
         
-        try {
-            // Apply blur to the background region
-            applyRegionalBlur(HUD_X, HUD_Y, hudWidth, hudHeight, screenWidth, screenHeight);
-            
-            // Ensure viewport is correctly restored after blur
-            glViewport(viewport[0], viewport[1], viewport[2], viewport[3]);
-            
-            // 2D projection is already set up by DevplayScreen - no need to set it again
-            // Just render the text
-            glEnable(GL_BLEND);
-            glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-            glColor4f(1f, 1f, 1f, 1f);
-            
-            TextRenderer.drawText(blockName, HUD_X + PADDING, HUD_Y + PADDING, TEXT_SCALE);
-        } finally {
-            // Restore all GL state
-            glPopAttrib();
-            
-            // Restore viewport one more time to be absolutely sure
-            glViewport(viewport[0], viewport[1], viewport[2], viewport[3]);
-        }
+        // Restore viewport after blur (blur operations may have changed it)
+        glViewport(viewport[0], viewport[1], viewport[2], viewport[3]);
+        
+        // 2D projection is already set up by DevplayScreen - no need to set it again
+        // Just render the text with blend enabled
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        glColor4f(1f, 1f, 1f, 1f);
+        
+        TextRenderer.drawText(blockName, HUD_X + PADDING, HUD_Y + PADDING, TEXT_SCALE);
     }
     
     /**

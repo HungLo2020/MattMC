@@ -159,15 +159,8 @@ public class AbstractBlurBox {
         
         blurBuffer2.bindTexture();
         
-        // Set up orthographic projection for screen coordinates
-        glMatrixMode(GL_PROJECTION);
-        glPushMatrix();
-        glLoadIdentity();
-        glOrtho(0, screenWidth, screenHeight, 0, -1, 1);
-        glMatrixMode(GL_MODELVIEW);
-        glPushMatrix();
-        glLoadIdentity();
-        
+        // Use the existing 2D projection set up by DevplayScreen
+        // No need to push/pop or set up our own projection
         glColor4f(1f, 1f, 1f, 1f);
         glBegin(GL_QUADS);
         glTexCoord2f(0, 1); glVertex2f(x, y);
@@ -175,12 +168,6 @@ public class AbstractBlurBox {
         glTexCoord2f(1, 0); glVertex2f(x + width, y + height);
         glTexCoord2f(0, 0); glVertex2f(x, y + height);
         glEnd();
-        
-        // Restore matrices
-        glMatrixMode(GL_PROJECTION);
-        glPopMatrix();
-        glMatrixMode(GL_MODELVIEW);
-        glPopMatrix();
         
         // Unbind texture before disabling GL_TEXTURE_2D
         glBindTexture(GL_TEXTURE_2D, 0);

@@ -307,10 +307,9 @@ public final class DevplayScreen implements Screen {
         uiRenderer.drawHotbar(w, h, player);
         
         // Draw block name HUD in top-left corner (only when not in debug mode or command overlay, and when HUD overlays are enabled)
-        // TEMPORARILY DISABLED FOR DEBUGGING
-        // if (renderHudOverlays && !uiState.isDebugMenuVisible() && !uiState.isCommandOverlayVisible()) {
-        //     blockNameHUD.render(player, world, w, h);
-        // }
+        if (renderHudOverlays && !uiState.isDebugMenuVisible() && !uiState.isCommandOverlayVisible()) {
+            blockNameHUD.render(player, world, w, h);
+        }
         
         // Draw crosshair on top of everything (but not when command overlay is open)
         if (!uiState.isCommandOverlayVisible()) {
