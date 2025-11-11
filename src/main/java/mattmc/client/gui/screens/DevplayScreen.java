@@ -61,6 +61,10 @@ public final class DevplayScreen implements Screen {
     
     // Flag to track if world should be shut down on close
     private boolean shouldShutdownWorld = false;
+    
+    // Flag to control whether HUD overlays should be rendered
+    // Set to false when this screen is being rendered as background for overlay screens
+    private boolean renderHudOverlays = true;
 
     public DevplayScreen(Minecraft game, String worldName) {
         this(game, worldName, new java.util.Random().nextLong());
@@ -276,8 +280,8 @@ public final class DevplayScreen implements Screen {
         // Draw hotbar at bottom center (always visible)
         uiRenderer.drawHotbar(w, h, player);
         
-        // Draw block name HUD in top-left corner (only when not in debug mode or command overlay)
-        if (!uiState.isDebugMenuVisible() && !uiState.isCommandOverlayVisible()) {
+        // Draw block name HUD in top-left corner (only when not in debug mode or command overlay, and when HUD overlays are enabled)
+        if (renderHudOverlays && !uiState.isDebugMenuVisible() && !uiState.isCommandOverlayVisible()) {
             blockNameHUD.render(player, world, w, h);
         }
         
@@ -343,6 +347,14 @@ public final class DevplayScreen implements Screen {
     public void syncPlayerPosition() {
         player.updatePreviousPosition();
     }
+    
+    /**
+     * Set whether HUD overlays (like BlockNameHUD) should be rendered.
+     * Should be set to false when this screen is being rendered as background for overlay screens.
+     */
+    public void setRenderHudOverlays(boolean render) {
+        this.renderHudOverlays = render;
+    }
 
     @Override 
     public void onOpen() {
@@ -351,6 +363,9 @@ public final class DevplayScreen implements Screen {
         
         // Reset frame time to prevent huge delta time on first tick after pause
         lastFrameTimeSec = now();
+        
+        // Re-enable HUD overlays when returning to game
+        renderHudOverlays = true;
         
         // Sync previous position to current position when resuming
         // This prevents visual "teleport" due to interpolation after pause

@@ -163,8 +163,14 @@ public final class PauseScreen implements Screen {
     public void render(double alpha) {
         int w = window.width(), h = window.height();
         
+        // Disable HUD overlays (like BlockNameHUD) when rendering game screen as background
+        gameScreen.setRenderHudOverlays(false);
+        
         // First render the game screen behind this overlay
         gameScreen.render(alpha);
+        
+        // Re-enable HUD overlays for when we return to game
+        gameScreen.setRenderHudOverlays(true);
         
         // Apply blur if enabled
         if (isMenuScreenBlurEnabled()) {
