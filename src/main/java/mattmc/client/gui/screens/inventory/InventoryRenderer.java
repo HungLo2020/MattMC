@@ -53,13 +53,12 @@ public class InventoryRenderer {
             BlurRenderer.renderBlurredBackground(blurEffect, screenWidth, screenHeight);
         }
         
-        // Save current matrices before modifying
+        // Set up projection for inventory rendering
+        // This projection will be used by all subsequent inventory rendering methods
         glMatrixMode(GL_PROJECTION);
-        glPushMatrix();
         glLoadIdentity();
         glOrtho(0, screenWidth, screenHeight, 0, -1, 1);
         glMatrixMode(GL_MODELVIEW);
-        glPushMatrix();
         glLoadIdentity();
         
         glEnable(GL_BLEND);
@@ -73,12 +72,6 @@ public class InventoryRenderer {
         glVertex2f(screenWidth, screenHeight);
         glVertex2f(0, screenHeight);
         glEnd();
-        
-        // Restore matrices
-        glMatrixMode(GL_MODELVIEW);
-        glPopMatrix();
-        glMatrixMode(GL_PROJECTION);
-        glPopMatrix();
     }
     
     public void renderInventoryBackground() {
