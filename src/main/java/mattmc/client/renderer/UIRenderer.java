@@ -28,6 +28,9 @@ public class UIRenderer {
     // Selected hotbar slot (0-8 for slots 1-9)
     private int selectedHotbarSlot = 0;
     
+    // Block name display with blur effect
+    private BlockNameDisplay blockNameDisplay;
+    
     /**
      * Draw crosshair in the center of the screen.
      */
@@ -452,5 +455,22 @@ public class UIRenderer {
         if (slot >= 0 && slot <= 8) {
             selectedHotbarSlot = slot;
         }
+    }
+    
+    /**
+     * Draw the name of the block the player is looking at in the top-left corner.
+     * Uses a blurred background effect.
+     * 
+     * @param screenWidth Screen width
+     * @param screenHeight Screen height
+     * @param targetedBlock The block the player is looking at (can be null)
+     */
+    public void drawBlockNameDisplay(int screenWidth, int screenHeight, mattmc.world.level.block.Block targetedBlock) {
+        // Lazy initialization of block name display
+        if (blockNameDisplay == null) {
+            blockNameDisplay = new BlockNameDisplay();
+        }
+        
+        blockNameDisplay.render(screenWidth, screenHeight, targetedBlock);
     }
 }

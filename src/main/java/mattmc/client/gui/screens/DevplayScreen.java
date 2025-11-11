@@ -258,6 +258,13 @@ public final class DevplayScreen implements Screen {
             uiRenderer.drawDebugInfo(w, h, player.getX(alphaF), player.getY(alphaF), player.getZ(alphaF), 
                                      player.getYaw(alphaF), player.getPitch(alphaF), 0f, uiState.getFPS(),
                                      loadedChunks, pendingChunks, activeWorkers, renderedChunks, culledChunks);
+        } else {
+            // Draw block name display in top-left corner (only if debug menu is not visible)
+            BlockInteraction.BlockHitResult hit = blockInteraction.getTargetedBlock();
+            if (hit != null) {
+                mattmc.world.level.block.Block targetedBlock = world.getBlock(hit.x, hit.y, hit.z);
+                uiRenderer.drawBlockNameDisplay(w, h, targetedBlock);
+            }
         }
         
         // Draw command overlay if visible
