@@ -216,12 +216,13 @@ public final class DevplayScreen implements Screen {
         
         // Ensure viewport is set correctly (in case it was modified by other screens)
         // Query actual framebuffer size for high-DPI displays
+        int fbWidth, fbHeight;
         try (org.lwjgl.system.MemoryStack stack = org.lwjgl.system.MemoryStack.stackPush()) {
             java.nio.IntBuffer pWidth = stack.mallocInt(1);
             java.nio.IntBuffer pHeight = stack.mallocInt(1);
             org.lwjgl.glfw.GLFW.glfwGetFramebufferSize(window.handle(), pWidth, pHeight);
-            int fbWidth = pWidth.get(0);
-            int fbHeight = pHeight.get(0);
+            fbWidth = pWidth.get(0);
+            fbHeight = pHeight.get(0);
             glViewport(0, 0, fbWidth > 0 ? fbWidth : w, fbHeight > 0 ? fbHeight : h);
         }
 
@@ -229,8 +230,8 @@ public final class DevplayScreen implements Screen {
         glClearColor(0.53f, 0.81f, 0.92f, 1f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-        // Perspective projection
-        float aspect = Math.max(1f, (float) w / Math.max(1, h));
+        // Perspective projection - use framebuffer dimensions for aspect ratio
+        float aspect = Math.max(1f, (float) fbWidth / Math.max(1, fbHeight));
         glMatrixMode(GL_PROJECTION);
         glLoadIdentity();
         float fov = 70f, zn = 0.1f, zf = 500f;
