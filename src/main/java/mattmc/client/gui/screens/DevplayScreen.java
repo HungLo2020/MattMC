@@ -377,11 +377,6 @@ public final class DevplayScreen implements Screen {
     
     @Override 
     public void onClose() {
-        // Clean up BlockNameHUD resources
-        if (blockNameHUD != null) {
-            blockNameHUD.close();
-        }
-        
         // Only shutdown async chunk loader if we're truly exiting (not just pausing)
         if (shouldShutdownWorld && world != null) {
             world.shutdown();

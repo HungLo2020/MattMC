@@ -10,10 +10,10 @@ import static org.lwjgl.opengl.GL11.*;
 
 /**
  * HUD element that displays the name of the block the player is looking at.
- * Renders in the top-left corner of the screen with a blurred background.
+ * Renders in the top-left corner of the screen with a semi-transparent background.
  * Uses raycasting up to 10 blocks to detect the targeted block.
  */
-public class BlockNameHUD extends AbstractBlurBox {
+public class BlockNameHUD {
     private static final float HUD_X = 10f;
     private static final float HUD_Y = 10f;
     private static final float PADDING = 10f;
@@ -48,39 +48,41 @@ public class BlockNameHUD extends AbstractBlurBox {
         float hudWidth = textWidth + PADDING * 2;
         float hudHeight = textHeight + PADDING * 2;
         
-        // Save comprehensive GL state before rendering
-        glPushAttrib(GL_ALL_ATTRIB_BITS);
+        // Set up 2D orthographic projection
+        glMatrixMode(GL_PROJECTION);
+        glPushMatrix();
+        glLoadIdentity();
+        glOrtho(0, screenWidth, screenHeight, 0, -1, 1);
         
-        try {
-            // Apply blur to the background region
-            applyRegionalBlur(HUD_X, HUD_Y, hudWidth, hudHeight, screenWidth, screenHeight);
-            
-            // Set up 2D orthographic projection for text rendering
-            glMatrixMode(GL_PROJECTION);
-            glPushMatrix();
-            glLoadIdentity();
-            glOrtho(0, screenWidth, screenHeight, 0, -1, 1);
-            
-            glMatrixMode(GL_MODELVIEW);
-            glPushMatrix();
-            glLoadIdentity();
-            
-            // Render text on top of blur
-            glEnable(GL_BLEND);
-            glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-            glColor4f(1f, 1f, 1f, 1f);
-            
-            TextRenderer.drawText(blockName, HUD_X + PADDING, HUD_Y + PADDING, TEXT_SCALE);
-            
-            // Restore matrices
-            glPopMatrix();
-            glMatrixMode(GL_PROJECTION);
-            glPopMatrix();
-            glMatrixMode(GL_MODELVIEW);
-        } finally {
-            // Restore all GL state
-            glPopAttrib();
-        }
+        glMatrixMode(GL_MODELVIEW);
+        glPushMatrix();
+        glLoadIdentity();
+        
+        // Enable blending for transparency
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        
+        // Draw semi-transparent dark background
+        glColor4f(0f, 0f, 0f, 0.7f);
+        glBegin(GL_QUADS);
+        glVertex2f(HUD_X, HUD_Y);
+        glVertex2f(HUD_X + hudWidth, HUD_Y);
+        glVertex2f(HUD_X + hudWidth, HUD_Y + hudHeight);
+        glVertex2f(HUD_X, HUD_Y + hudHeight);
+        glEnd();
+        
+        // Render text on top of background
+        glColor4f(1f, 1f, 1f, 1f);
+        TextRenderer.drawText(blockName, HUD_X + PADDING, HUD_Y + PADDING, TEXT_SCALE);
+        
+        // Restore matrices
+        glPopMatrix();
+        glMatrixMode(GL_PROJECTION);
+        glPopMatrix();
+        glMatrixMode(GL_MODELVIEW);
+        
+        // Disable blending
+        glDisable(GL_BLEND);
     }
     
     /**
