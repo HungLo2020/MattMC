@@ -285,7 +285,11 @@ public class OptionsManager {
                 // Write all other options (keybinds)
                 for (Map.Entry<String, String> entry : options.entrySet()) {
                     String key = entry.getKey();
-                    if (!key.equals("blur_title_screen") && !key.equals("blur_menu_screens")) {
+                    // Skip settings that were already written above
+                    if (!key.equals("blur_title_screen") && !key.equals("blur_menu_screens") &&
+                        !key.equals("fps_cap") && !key.equals("resolution") &&
+                        !key.equals("fullscreen") && !key.equals("render_distance") &&
+                        !key.equals("mipmaps") && !key.equals("anisotropic_filtering")) {
                         writer.write(key + "=" + entry.getValue() + "\n");
                     }
                 }

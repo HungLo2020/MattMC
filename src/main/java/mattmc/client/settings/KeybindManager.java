@@ -86,8 +86,7 @@ public class KeybindManager {
                 // logger.info("Loaded {} keybinds from Options.txt", keybinds.size());
             }
         } catch (IOException e) {
-            logger.error("Error loading keybinds: {}", e.getMessage());
-            e.printStackTrace();
+            logger.error("Error loading keybinds: {}", e.getMessage(), e);
         }
     }
     
@@ -143,8 +142,7 @@ public class KeybindManager {
                 logger.info("Copied DefaultOptions.txt to {}", targetPath);
             }
         } catch (IOException e) {
-            logger.error("Error copying default options: {}", e.getMessage());
-            e.printStackTrace();
+            logger.error("Error copying default options: {}", e.getMessage(), e);
             // Fall back to saving current keybinds
             saveKeybinds();
         }
@@ -182,8 +180,7 @@ public class KeybindManager {
                 logger.info("Saved {} keybinds to Options.txt", keybinds.size());
             }
         } catch (IOException e) {
-            logger.error("Error saving keybinds: {}", e.getMessage());
-            e.printStackTrace();
+            logger.error("Error saving keybinds: {}", e.getMessage(), e);
         }
     }
     

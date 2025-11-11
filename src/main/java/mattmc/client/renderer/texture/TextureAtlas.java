@@ -158,8 +158,7 @@ public class TextureAtlas implements AutoCloseable {
             }
             return ImageIO.read(is);
         } catch (Exception e) {
-            logger.error("Failed to load texture: {}", path);
-            e.printStackTrace();
+            logger.error("Failed to load texture: {}", path, e);
             return null;
         }
     }
