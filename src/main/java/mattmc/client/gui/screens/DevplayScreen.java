@@ -274,9 +274,11 @@ public final class DevplayScreen implements Screen {
         
         // Set up 2D orthographic projection for all UI rendering
         // This creates a clean separation between 3D world rendering and 2D UI rendering
+        // IMPORTANT: Use framebuffer dimensions (not window dimensions) to match viewport
+        // This ensures consistency when AbstractBlurBox restores the projection
         glMatrixMode(GL_PROJECTION);
         glLoadIdentity();
-        glOrtho(0, w, h, 0, -1, 1);
+        glOrtho(0, fbWidth, fbHeight, 0, -1, 1);
         glMatrixMode(GL_MODELVIEW);
         glLoadIdentity();
         
@@ -304,16 +306,17 @@ public final class DevplayScreen implements Screen {
         }
         
         // Draw hotbar at bottom center (always visible)
-        uiRenderer.drawHotbar(w, h, player);
+        // Use framebuffer dimensions to match the 2D projection
+        uiRenderer.drawHotbar(fbWidth, fbHeight, player);
         
         // Draw block name HUD in top-left corner (only when not in debug mode or command overlay, and when HUD overlays are enabled)
         if (renderHudOverlays && !uiState.isDebugMenuVisible() && !uiState.isCommandOverlayVisible()) {
-            blockNameHUD.render(player, world, w, h);
+            blockNameHUD.render(player, world, fbWidth, fbHeight);
         }
         
         // Draw crosshair on top of everything (but not when command overlay is open)
         if (!uiState.isCommandOverlayVisible()) {
-            uiRenderer.drawCrosshair(w, h);
+            uiRenderer.drawCrosshair(fbWidth, fbHeight);
         }
     }
 
