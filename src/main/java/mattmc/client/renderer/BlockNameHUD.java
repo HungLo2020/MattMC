@@ -48,6 +48,9 @@ public class BlockNameHUD extends AbstractBlurBox {
         float hudWidth = textWidth + PADDING * 2;
         float hudHeight = textHeight + PADDING * 2;
         
+        // Save GL state before rendering
+        boolean blendWasEnabled = glGetBoolean(GL_BLEND);
+        
         // Apply blur to the background region
         applyRegionalBlur(HUD_X, HUD_Y, hudWidth, hudHeight, screenWidth, screenHeight);
         
@@ -73,6 +76,11 @@ public class BlockNameHUD extends AbstractBlurBox {
         glMatrixMode(GL_PROJECTION);
         glPopMatrix();
         glMatrixMode(GL_MODELVIEW);
+        
+        // Restore GL state
+        if (!blendWasEnabled) {
+            glDisable(GL_BLEND);
+        }
     }
     
     /**
