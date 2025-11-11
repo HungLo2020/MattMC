@@ -31,13 +31,14 @@ public class TooltipBlurEffect {
             }
             """;
         
-        // Gaussian blur fragment shader
+        // Gaussian blur fragment shader with gray tint
         String fragmentShader = """
             #version 120
             uniform sampler2D uTexture;
             uniform vec2 uDirection;
             uniform vec2 uResolution;
             varying vec2 vTexCoord;
+            uniform float uRadius;
             
             void main() {
                 vec2 texelSize = 1.0 / uResolution;
@@ -53,12 +54,16 @@ public class TooltipBlurEffect {
                 color += texture2D(uTexture, vTexCoord) * weights[0];
                 
                 for(int i = 1; i < 4; i++) {
-                    vec2 offset = uDirection * texelSize * float(i);
+                    vec2 offset = uDirection * texelSize * uRadius * float(i);
                     color += texture2D(uTexture, vTexCoord + offset) * weights[i];
                     color += texture2D(uTexture, vTexCoord - offset) * weights[i];
                 }
                 
-                gl_FragColor = color;
+                // Apply dark tint by darkening the blurred result
+                // Multiply by 0.4 to darken, then add a small dark gray overlay
+                vec3 darkened = color.rgb * 0.6;
+                vec3 darkOverlay = vec3(0.08, 0.08, 0.08);
+                gl_FragColor = vec4(darkened + darkOverlay, color.a);
             }
             """;
         
@@ -121,6 +126,7 @@ public class TooltipBlurEffect {
         blurShader.setUniform2f("uResolution", w, h);
         blurShader.setUniform1i("uTexture", 0);
         blurShader.setUniform2f("uDirection", 1.0f, 0.0f);
+        blurShader.setUniform1f("uRadius", 2.0f);
         
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D, capturedTexture);
