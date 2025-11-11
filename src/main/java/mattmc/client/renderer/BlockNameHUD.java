@@ -52,21 +52,8 @@ public class BlockNameHUD extends AbstractBlurBox {
         int[] viewport = new int[4];
         glGetIntegerv(GL_VIEWPORT, viewport);
         
-        // Save current matrix mode
-        int[] matrixMode = new int[1];
-        glGetIntegerv(GL_MATRIX_MODE, matrixMode);
-        
-        // Save current depth test state (depth test should be disabled for 2D rendering)
-        boolean depthTestWasEnabled = glIsEnabled(GL_DEPTH_TEST);
-        
-        // Save comprehensive GL state before rendering
+        // Save comprehensive GL state before rendering (but NOT matrices - those are already set up correctly)
         glPushAttrib(GL_ALL_ATTRIB_BITS);
-        
-        // Save projection and modelview matrices
-        glMatrixMode(GL_PROJECTION);
-        glPushMatrix();
-        glMatrixMode(GL_MODELVIEW);
-        glPushMatrix();
         
         try {
             // Apply blur to the background region
@@ -75,43 +62,19 @@ public class BlockNameHUD extends AbstractBlurBox {
             // Ensure viewport is correctly restored after blur
             glViewport(viewport[0], viewport[1], viewport[2], viewport[3]);
             
-            // Set up 2D orthographic projection for text rendering
-            glMatrixMode(GL_PROJECTION);
-            glLoadIdentity();
-            glOrtho(0, screenWidth, screenHeight, 0, -1, 1);
-            
-            glMatrixMode(GL_MODELVIEW);
-            glLoadIdentity();
-            
-            // Render text on top of blur
+            // 2D projection is already set up by DevplayScreen - no need to set it again
+            // Just render the text
             glEnable(GL_BLEND);
             glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
             glColor4f(1f, 1f, 1f, 1f);
             
             TextRenderer.drawText(blockName, HUD_X + PADDING, HUD_Y + PADDING, TEXT_SCALE);
         } finally {
-            // Restore matrices in reverse order
-            glMatrixMode(GL_MODELVIEW);
-            glPopMatrix();
-            glMatrixMode(GL_PROJECTION);
-            glPopMatrix();
-            
             // Restore all GL state
             glPopAttrib();
             
             // Restore viewport one more time to be absolutely sure
             glViewport(viewport[0], viewport[1], viewport[2], viewport[3]);
-            
-            // Restore matrix mode
-            glMatrixMode(matrixMode[0]);
-            
-            // Ensure depth test state matches what it was before we started
-            // (it should be disabled for 2D UI rendering)
-            if (depthTestWasEnabled) {
-                glEnable(GL_DEPTH_TEST);
-            } else {
-                glDisable(GL_DEPTH_TEST);
-            }
         }
     }
     

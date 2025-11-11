@@ -272,6 +272,14 @@ public final class DevplayScreen implements Screen {
         
         glDisable(GL_DEPTH_TEST);
         
+        // Set up 2D orthographic projection for all UI rendering
+        // This creates a clean separation between 3D world rendering and 2D UI rendering
+        glMatrixMode(GL_PROJECTION);
+        glLoadIdentity();
+        glOrtho(0, w, h, 0, -1, 1);
+        glMatrixMode(GL_MODELVIEW);
+        glLoadIdentity();
+        
         // Draw debug information in top-left corner (only if F3 is pressed)
         if (uiState.isDebugMenuVisible()) {
             int loadedChunks = world.getLoadedChunkCount();

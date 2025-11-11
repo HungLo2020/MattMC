@@ -162,15 +162,8 @@ public class UIRenderer {
             hotbarSelectionTexture = Texture.load("/assets/textures/gui/sprites/hud/hotbar_selection.png");
         }
         
-        // Switch to 2D orthographic projection
-        glMatrixMode(GL_PROJECTION);
-        glPushMatrix();
-        glLoadIdentity();
-        glOrtho(0, screenWidth, screenHeight, 0, -1, 1);
-        
-        glMatrixMode(GL_MODELVIEW);
-        glPushMatrix();
-        glLoadIdentity();
+        // 2D orthographic projection is already set up by DevplayScreen
+        // No need to push/pop matrices
         
         // Enable blending for texture rendering
         glEnable(GL_BLEND);
@@ -263,12 +256,6 @@ public class UIRenderer {
         }
         
         glDisable(GL_BLEND);
-        
-        // Restore matrices
-        glPopMatrix();
-        glMatrixMode(GL_PROJECTION);
-        glPopMatrix();
-        glMatrixMode(GL_MODELVIEW);
     }
     
     /**
