@@ -58,9 +58,9 @@ public class TooltipBlurEffect {
                     color += texture2D(uTexture, vTexCoord - offset) * weights[i];
                 }
                 
-                // Add a slight gray tint to further abstract the background
-                vec4 grayTint = vec4(0.5, 0.5, 0.5, 0.3);
-                gl_FragColor = mix(color, grayTint, 0.25);
+                // Add a dark gray tint to further abstract the background
+                vec4 grayTint = vec4(0.15, 0.15, 0.15, 0.5);
+                gl_FragColor = mix(color, grayTint, 0.4);
             }
             """;
         
