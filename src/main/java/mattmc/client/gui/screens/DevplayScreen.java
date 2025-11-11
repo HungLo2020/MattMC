@@ -10,6 +10,7 @@ import mattmc.world.entity.player.PlayerPhysics;
 import mattmc.world.entity.player.PlayerInput;
 import mattmc.client.renderer.LevelRenderer;
 import mattmc.client.renderer.UIRenderer;
+import mattmc.client.renderer.BlockNameHUD;
 import mattmc.client.renderer.block.BlockFaceGeometry;
 import mattmc.client.renderer.ColorUtils;
 import mattmc.world.item.Inventory;
@@ -46,6 +47,7 @@ public final class DevplayScreen implements Screen {
     private final BlockInteraction blockInteraction;
     private final LevelRenderer worldRenderer;
     private final UIRenderer uiRenderer;
+    private final BlockNameHUD blockNameHUD;
     
     // Level name for saving
     private final String worldName;
@@ -147,6 +149,7 @@ public final class DevplayScreen implements Screen {
         this.worldRenderer = new LevelRenderer();
         this.worldRenderer.initWithLevel(this.world);
         this.uiRenderer = new UIRenderer();
+        this.blockNameHUD = new BlockNameHUD();
 
         // Initialize UI state, command system, and input handler
         this.uiState = new DevplayUIState(now());
@@ -273,6 +276,11 @@ public final class DevplayScreen implements Screen {
         // Draw hotbar at bottom center (always visible)
         uiRenderer.drawHotbar(w, h, player);
         
+        // Draw block name HUD in top-left corner (only when not in debug mode or command overlay)
+        if (!uiState.isDebugMenuVisible() && !uiState.isCommandOverlayVisible()) {
+            blockNameHUD.render(player, world, w, h);
+        }
+        
         // Draw crosshair on top of everything (but not when command overlay is open)
         if (!uiState.isCommandOverlayVisible()) {
             uiRenderer.drawCrosshair(w, h);
@@ -354,6 +362,11 @@ public final class DevplayScreen implements Screen {
     
     @Override 
     public void onClose() {
+        // Clean up BlockNameHUD resources
+        if (blockNameHUD != null) {
+            blockNameHUD.close();
+        }
+        
         // Only shutdown async chunk loader if we're truly exiting (not just pausing)
         if (shouldShutdownWorld && world != null) {
             world.shutdown();
