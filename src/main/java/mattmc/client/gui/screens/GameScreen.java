@@ -41,7 +41,7 @@ public final class GameScreen implements Screen {
         titleCX = w / 2f;
         titleCY = h * 0.18f;
 
-        int totalButtonsH = 3 * buttonHeight + 2 * buttonGap;
+        int totalButtonsH = 4 * buttonHeight + 3 * buttonGap;
         buttonsStartY = (int)(h / 2f - totalButtonsH / 2f);
 
         int x = (w - buttonWidth) / 2;
@@ -50,7 +50,8 @@ public final class GameScreen implements Screen {
         // Game-related buttons
         buttons.add(new Button(getFpsCapButtonLabel(), x, buttonsStartY + 0 * (buttonHeight + buttonGap), buttonWidth, buttonHeight));
         buttons.add(new Button(getRenderDistanceButtonLabel(), x, buttonsStartY + 1 * (buttonHeight + buttonGap), buttonWidth, buttonHeight));
-        buttons.add(new Button("Back",     x, buttonsStartY + 2 * (buttonHeight + buttonGap), buttonWidth, buttonHeight));
+        buttons.add(new Button(getHudBlockInfoButtonLabel(), x, buttonsStartY + 2 * (buttonHeight + buttonGap), buttonWidth, buttonHeight));
+        buttons.add(new Button("Back",     x, buttonsStartY + 3 * (buttonHeight + buttonGap), buttonWidth, buttonHeight));
     }
     
     private String getFpsCapButtonLabel() {
@@ -61,6 +62,11 @@ public final class GameScreen implements Screen {
     private String getRenderDistanceButtonLabel() {
         int renderDistance = mattmc.client.settings.OptionsManager.getRenderDistance();
         return "Render Distance: " + renderDistance + " chunks";
+    }
+    
+    private String getHudBlockInfoButtonLabel() {
+        boolean enabled = mattmc.client.settings.OptionsManager.isHudBlockInfoEnabled();
+        return "HUD Block Info: " + (enabled ? "ON" : "OFF");
     }
 
     @Override
@@ -150,6 +156,11 @@ public final class GameScreen implements Screen {
             }
             
             mattmc.client.settings.OptionsManager.setRenderDistance(allowedValues[nextIndex]);
+            recomputeLayout();
+            return;
+        }
+        if (label.startsWith("HUD Block Info:")) {
+            mattmc.client.settings.OptionsManager.toggleHudBlockInfo();
             recomputeLayout();
             return;
         }

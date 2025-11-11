@@ -47,6 +47,9 @@ public class OptionsManager {
     // Anisotropic filtering setting (0 = off, 2/4/8/16 = filtering level)
     private static int anisotropicFiltering = 16;  // Default: 16
     
+    // HUD Block Info setting
+    private static boolean hudBlockInfoEnabled = true;  // Default: enabled
+    
     // Allowed mipmap levels
     public static final int[] ALLOWED_MIPMAP_LEVELS = {0, 1, 2, 3, 4};
     
@@ -171,6 +174,8 @@ public class OptionsManager {
                         } catch (NumberFormatException e) {
                             logger.error("Invalid anisotropic filtering value: {}", value);
                         }
+                    } else if (key.equals("hud_block_info")) {
+                        hudBlockInfoEnabled = Boolean.parseBoolean(value);
                     }
                 }
             }
@@ -228,6 +233,9 @@ public class OptionsManager {
             // Update anisotropic filtering setting
             options.put("anisotropic_filtering", String.valueOf(anisotropicFiltering));
             
+            // Update HUD Block Info setting
+            options.put("hud_block_info", String.valueOf(hudBlockInfoEnabled));
+            
             // Write back to file
             Path parent = optionsPath.getParent();
             if (parent != null) {
@@ -275,6 +283,11 @@ public class OptionsManager {
                 // Write anisotropic filtering setting
                 writer.write("# Anisotropic filtering (off, 2, 4, 8, 16)\n");
                 writer.write("anisotropic_filtering=" + anisotropicFiltering + "\n");
+                writer.write("\n");
+                
+                // Write HUD Block Info setting
+                writer.write("# HUD Block Info (show block name when looking at blocks)\n");
+                writer.write("hud_block_info=" + hudBlockInfoEnabled + "\n");
                 writer.write("\n");
                 
                 // Write keybinds section header
@@ -413,6 +426,21 @@ public class OptionsManager {
     
     public static void setAnisotropicFiltering(int level) {
         anisotropicFiltering = validateAnisotropicLevel(level);
+        saveOptions();
+    }
+    
+    // HUD Block Info getters and setters
+    public static boolean isHudBlockInfoEnabled() {
+        return hudBlockInfoEnabled;
+    }
+    
+    public static void setHudBlockInfoEnabled(boolean enabled) {
+        hudBlockInfoEnabled = enabled;
+        saveOptions();
+    }
+    
+    public static void toggleHudBlockInfo() {
+        hudBlockInfoEnabled = !hudBlockInfoEnabled;
         saveOptions();
     }
 }

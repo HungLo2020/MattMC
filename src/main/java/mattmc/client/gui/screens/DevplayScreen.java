@@ -10,6 +10,7 @@ import mattmc.world.entity.player.PlayerPhysics;
 import mattmc.world.entity.player.PlayerInput;
 import mattmc.client.renderer.LevelRenderer;
 import mattmc.client.renderer.UIRenderer;
+import mattmc.client.renderer.BlockInfoHudRenderer;
 import mattmc.client.renderer.block.BlockFaceGeometry;
 import mattmc.client.renderer.ColorUtils;
 import mattmc.world.item.Inventory;
@@ -46,6 +47,7 @@ public final class DevplayScreen implements Screen {
     private final BlockInteraction blockInteraction;
     private final LevelRenderer worldRenderer;
     private final UIRenderer uiRenderer;
+    private final BlockInfoHudRenderer blockInfoHudRenderer;
     
     // Level name for saving
     private final String worldName;
@@ -147,6 +149,7 @@ public final class DevplayScreen implements Screen {
         this.worldRenderer = new LevelRenderer();
         this.worldRenderer.initWithLevel(this.world);
         this.uiRenderer = new UIRenderer();
+        this.blockInfoHudRenderer = new BlockInfoHudRenderer();
 
         // Initialize UI state, command system, and input handler
         this.uiState = new DevplayUIState(now());
@@ -273,6 +276,14 @@ public final class DevplayScreen implements Screen {
         // Draw hotbar at bottom center (always visible)
         uiRenderer.drawHotbar(w, h, player);
         
+        // Draw block info HUD at top center (only if enabled and not in command overlay)
+        if (mattmc.client.settings.OptionsManager.isHudBlockInfoEnabled() && !uiState.isCommandOverlayVisible()) {
+            String blockName = getTargetedBlockName();
+            if (blockName != null) {
+                blockInfoHudRenderer.renderBlockInfo(blockName, w, h);
+            }
+        }
+        
         // Draw crosshair on top of everything (but not when command overlay is open)
         if (!uiState.isCommandOverlayVisible()) {
             uiRenderer.drawCrosshair(w, h);
@@ -303,6 +314,80 @@ public final class DevplayScreen implements Screen {
                 glEnable(GL_TEXTURE_2D);
             }
         }
+    }
+    
+    /**
+     * Get the name of the block the player is looking at (up to 10 blocks distance).
+     * Returns null if no block is found within 10 blocks.
+     */
+    private String getTargetedBlockName() {
+        float[] dir = player.getForwardVector();
+        float dirX = dir[0];
+        float dirY = dir[1];
+        float dirZ = dir[2];
+        
+        // Start ray at player's eyes (camera position), not feet
+        float rayX = player.getX();
+        float rayY = player.getEyeY();
+        float rayZ = player.getZ();
+        
+        // DDA algorithm for voxel traversal
+        float maxDistance = 10.0f; // 10 blocks maximum
+        float stepSize = 0.1f;
+        int steps = (int) (maxDistance / stepSize);
+        
+        for (int i = 0; i < steps; i++) {
+            rayX += dirX * stepSize;
+            rayY += dirY * stepSize;
+            rayZ += dirZ * stepSize;
+            
+            int blockX = (int) Math.floor(rayX);
+            int blockY = (int) Math.floor(rayY);
+            int blockZ = (int) Math.floor(rayZ);
+            
+            // Convert world Y to chunk Y
+            int chunkY = LevelChunk.worldYToChunkY(blockY);
+            
+            // Check if Y is valid
+            if (chunkY >= 0 && chunkY < LevelChunk.HEIGHT) {
+                mattmc.world.level.block.Block block = world.getBlock(blockX, chunkY, blockZ);
+                if (!block.isAir()) {
+                    // Found a solid block - get its name
+                    String identifier = block.getIdentifier();
+                    if (identifier != null) {
+                        // Format the identifier nicely (e.g., "minecraft:stone" -> "Stone")
+                        String[] parts = identifier.split(":");
+                        String blockName = parts.length > 1 ? parts[1] : parts[0];
+                        // Capitalize first letter of each word
+                        return formatBlockName(blockName);
+                    }
+                    return "Unknown Block";
+                }
+            }
+        }
+        
+        return null;
+    }
+    
+    /**
+     * Format block name from identifier (e.g., "oak_log" -> "Oak Log")
+     */
+    private String formatBlockName(String identifier) {
+        String[] words = identifier.split("_");
+        StringBuilder formatted = new StringBuilder();
+        for (String word : words) {
+            if (formatted.length() > 0) {
+                formatted.append(" ");
+            }
+            // Capitalize first letter
+            if (word.length() > 0) {
+                formatted.append(Character.toUpperCase(word.charAt(0)));
+                if (word.length() > 1) {
+                    formatted.append(word.substring(1));
+                }
+            }
+        }
+        return formatted.toString();
     }
     
     private static double now() { return System.nanoTime() * 1e-9; }
@@ -352,8 +437,13 @@ public final class DevplayScreen implements Screen {
         playerController.resetMouseState();
     }
     
-    @Override 
+    @Override
     public void onClose() {
+        // Clean up block info HUD renderer
+        if (blockInfoHudRenderer != null) {
+            blockInfoHudRenderer.close();
+        }
+        
         // Only shutdown async chunk loader if we're truly exiting (not just pausing)
         if (shouldShutdownWorld && world != null) {
             world.shutdown();
