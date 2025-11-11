@@ -150,6 +150,8 @@ public class BlurEffect {
         glTexCoord2f(0, 0); glVertex2f(0, height);
         glEnd();
         
+        // Unbind texture before disabling GL_TEXTURE_2D
+        glBindTexture(GL_TEXTURE_2D, 0);
         glDisable(GL_TEXTURE_2D);
     }
     

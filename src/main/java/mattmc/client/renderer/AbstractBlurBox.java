@@ -182,6 +182,8 @@ public class AbstractBlurBox {
         glMatrixMode(GL_MODELVIEW);
         glPopMatrix();
         
+        // Unbind texture before disabling GL_TEXTURE_2D
+        glBindTexture(GL_TEXTURE_2D, 0);
         glDisable(GL_TEXTURE_2D);
         // Keep blending enabled for subsequent rendering
         // glDisable(GL_BLEND);  // Removed - let caller manage blend state
@@ -212,6 +214,8 @@ public class AbstractBlurBox {
         glTexCoord2f(0, 0); glVertex2f(0, height);
         glEnd();
         
+        // Unbind texture before disabling GL_TEXTURE_2D
+        glBindTexture(GL_TEXTURE_2D, 0);
         glDisable(GL_TEXTURE_2D);
         
         glMatrixMode(GL_PROJECTION);
