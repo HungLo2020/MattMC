@@ -31,7 +31,7 @@ public class TooltipBlurEffect {
             }
             """;
         
-        // Gaussian blur fragment shader
+        // Gaussian blur fragment shader with gray tint
         String fragmentShader = """
             #version 120
             uniform sampler2D uTexture;
@@ -58,7 +58,9 @@ public class TooltipBlurEffect {
                     color += texture2D(uTexture, vTexCoord - offset) * weights[i];
                 }
                 
-                gl_FragColor = color;
+                // Add a slight gray tint to further abstract the background
+                vec4 grayTint = vec4(0.5, 0.5, 0.5, 0.3);
+                gl_FragColor = mix(color, grayTint, 0.25);
             }
             """;
         
