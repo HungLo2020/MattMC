@@ -56,6 +56,9 @@ public class BlockNameHUD extends AbstractBlurBox {
         int[] matrixMode = new int[1];
         glGetIntegerv(GL_MATRIX_MODE, matrixMode);
         
+        // Save current depth test state (depth test should be disabled for 2D rendering)
+        boolean depthTestWasEnabled = glIsEnabled(GL_DEPTH_TEST);
+        
         // Save comprehensive GL state before rendering
         glPushAttrib(GL_ALL_ATTRIB_BITS);
         
@@ -101,6 +104,14 @@ public class BlockNameHUD extends AbstractBlurBox {
             
             // Restore matrix mode
             glMatrixMode(matrixMode[0]);
+            
+            // Ensure depth test state matches what it was before we started
+            // (it should be disabled for 2D UI rendering)
+            if (depthTestWasEnabled) {
+                glEnable(GL_DEPTH_TEST);
+            } else {
+                glDisable(GL_DEPTH_TEST);
+            }
         }
     }
     
