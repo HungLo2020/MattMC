@@ -13,11 +13,6 @@ import mattmc.client.renderer.UIRenderer;
 import mattmc.client.renderer.block.BlockFaceGeometry;
 import mattmc.client.renderer.ColorUtils;
 import mattmc.world.item.Inventory;
-import mattmc.world.item.Item;
-import mattmc.world.item.Items;
-import mattmc.world.item.ItemStack;
-import mattmc.world.level.block.Block;
-import mattmc.world.level.block.Blocks;
 import mattmc.world.level.chunk.LevelChunk;
 import mattmc.world.level.Level;
 import mattmc.world.level.storage.LevelStorageSource;
@@ -25,7 +20,6 @@ import mattmc.world.level.storage.LevelStorageSource;
 import java.io.IOException;
 import java.nio.file.Path;
 
-import static org.lwjgl.glfw.GLFW.*;
 import static org.lwjgl.opengl.GL11.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -34,12 +28,12 @@ import org.slf4j.LoggerFactory;
  * Devplay screen - infinite world with dynamic chunk loading.
  * Chunks load/unload based on player position.
  * ESC opens pause menu.
+ * 
+ * Refactored to delegate command handling to CommandSystem,
+ * input handling to DevplayInputHandler, and UI state to DevplayUIState.
  */
 public final class DevplayScreen implements Screen {
     private static final Logger logger = LoggerFactory.getLogger(DevplayScreen.class);
-    
-    // Maximum region size for /set command to prevent UI freezing (100,000 blocks)
-    private static final long MAX_REGION_SIZE = 100_000;
 
     private final Minecraft game;
     private final Window window;
@@ -58,26 +52,10 @@ public final class DevplayScreen implements Screen {
     
     private double lastFrameTimeSec = now();
     
-    // FPS tracking - moved to render() for accurate measurement
-    private double fps = 0.0;
-    private double fpsUpdateTimer = 0.0;
-    private int frameCount = 0;
-    private double lastFpsUpdateTime = now();
-    
-    // Debug menu toggle state
-    private boolean debugMenuVisible = false;
-    
-    // Command overlay state
-    private boolean commandOverlayVisible = false;
-    private StringBuilder commandText = new StringBuilder("/");
-    
-    // Command feedback message (shown above hotbar area, independent of command overlay)
-    private String commandFeedbackMessage = "";
-    private double commandFeedbackDisplayTime = 0;
-    
-    // Region selection state for /pos1, /pos2, and /set commands
-    private int[] regionPos1 = null; // [x, y, z]
-    private int[] regionPos2 = null; // [x, y, z]
+    // Extracted components
+    private final DevplayUIState uiState;
+    private final CommandSystem commandSystem;
+    private final DevplayInputHandler inputHandler;
     
     // Flag to track if world should be shut down on close
     private boolean shouldShutdownWorld = false;
@@ -170,389 +148,18 @@ public final class DevplayScreen implements Screen {
         this.worldRenderer.initWithLevel(this.world);
         this.uiRenderer = new UIRenderer();
 
+        // Initialize UI state, command system, and input handler
+        this.uiState = new DevplayUIState(now());
+        this.commandSystem = new CommandSystem(player, this.world);
+        this.inputHandler = new DevplayInputHandler(
+            game, window, player, this.world, blockInteraction, uiState, commandSystem,
+            playerController, uiRenderer,
+            () -> game.setScreen(new PauseScreen(game, this)),
+            () -> game.setScreen(new InventoryScreen(game, this))
+        );
+
         // Register input callbacks
-        registerCallbacks();
-    }
-    
-    /**
-     * Register input callbacks for this screen.
-     * Called from constructor and when returning from pause menu.
-     */
-    private void registerCallbacks() {
-        // Capture mouse for FPS-style controls
-        glfwSetInputMode(window.handle(), GLFW_CURSOR, GLFW_CURSOR_DISABLED);
-        
-        // Resize -> update viewport
-        glfwSetFramebufferSizeCallback(window.handle(), (win, w, h) -> {
-            glViewport(0, 0, Math.max(w, 1), Math.max(h, 1));
-        });
-
-        // Setup character callback for command input
-        glfwSetCharCallback(window.handle(), (win, codepoint) -> {
-            if (commandOverlayVisible && commandText.length() < 100) {
-                commandText.append((char) codepoint);
-            }
-        });
-        
-        // ESC to release mouse and go back; Space for jumping/flying; F3 to toggle debug menu; / to toggle command overlay
-        glfwSetKeyCallback(window.handle(), (win, key, scancode, action, mods) -> {
-            if (commandOverlayVisible) {
-                // Command overlay is open - handle command input
-                if (action == GLFW_PRESS || action == GLFW_REPEAT) {
-                    if (key == GLFW_KEY_ESCAPE) {
-                        // Close command overlay
-                        closeCommandOverlay();
-                    } else if (key == GLFW_KEY_ENTER) {
-                        // Execute command and close
-                        executeCommand();
-                        closeCommandOverlay();
-                    } else if (key == GLFW_KEY_BACKSPACE) {
-                        // Delete last character
-                        if (commandText.length() > 0) {
-                            commandText.deleteCharAt(commandText.length() - 1);
-                        }
-                    }
-                }
-            } else {
-                // Normal game input
-                if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS) {
-                    // Open pause menu
-                    game.setScreen(new PauseScreen(game, this));
-                }
-                if (key == GLFW_KEY_SPACE && action == GLFW_PRESS) {
-                    playerController.handleSpacePress();
-                }
-                if (key == GLFW_KEY_F3 && action == GLFW_PRESS) {
-                    debugMenuVisible = !debugMenuVisible;
-                }
-                if (key == GLFW_KEY_SLASH && action == GLFW_PRESS) {
-                    // Toggle command overlay
-                    openCommandOverlay();
-                }
-                // Check for inventory key (respects user configuration)
-                Integer inventoryKey = PlayerInput.getInstance().getKeybind(PlayerInput.INVENTORY);
-                if (inventoryKey != null && key == inventoryKey && action == GLFW_PRESS) {
-                    // Open inventory screen
-                    game.setScreen(new InventoryScreen(game, this));
-                }
-                
-                // Check for hotbar selection keys (1-9)
-                if (action == GLFW_PRESS) {
-                    PlayerInput input = PlayerInput.getInstance();
-                    String[] hotbarActions = {
-                        PlayerInput.HOTBAR_1, PlayerInput.HOTBAR_2, PlayerInput.HOTBAR_3,
-                        PlayerInput.HOTBAR_4, PlayerInput.HOTBAR_5, PlayerInput.HOTBAR_6,
-                        PlayerInput.HOTBAR_7, PlayerInput.HOTBAR_8, PlayerInput.HOTBAR_9
-                    };
-                    
-                    for (int i = 0; i < hotbarActions.length; i++) {
-                        Integer hotbarKey = input.getKeybind(hotbarActions[i]);
-                        if (hotbarKey != null && key == hotbarKey) {
-                            // Select hotbar slot (0-indexed) - sync both UIRenderer and player inventory
-                            uiRenderer.setSelectedHotbarSlot(i);
-                            player.getInventory().setSelectedSlot(i);
-                            break;
-                        }
-                    }
-                }
-            }
-        });
-        
-        // Mouse callback for looking around
-        glfwSetCursorPosCallback(window.handle(), (win, xpos, ypos) -> {
-            playerController.handleMouseMovement(xpos, ypos);
-        });
-        
-        // Mouse button callback for breaking/placing blocks
-        glfwSetMouseButtonCallback(window.handle(), (win, button, action, mods) -> {
-            // Don't interact with blocks if command overlay is open
-            if (commandOverlayVisible) return;
-            
-            if (action == GLFW_PRESS) {
-                if (button == GLFW_MOUSE_BUTTON_LEFT) {
-                    blockInteraction.breakBlock();
-                } else if (button == GLFW_MOUSE_BUTTON_RIGHT) {
-                    // Get the item in the selected hotbar slot
-                    ItemStack selectedStack = player.getInventory().getSelectedStack();
-                    if (selectedStack != null) {
-                        // Try to use the item
-                        selectedStack.getItem().onUse(blockInteraction);
-                        // TODO: In the future, consume the item if it was used successfully
-                    }
-                    // If no item in selected slot, do nothing (can no longer place stone)
-                } else if (button == GLFW_MOUSE_BUTTON_MIDDLE) {
-                    // Pick block - raycast and add to inventory
-                    blockInteraction.pickBlock();
-                }
-            }
-        });
-    }
-
-    private void openCommandOverlay() {
-        commandOverlayVisible = true;
-        commandText = new StringBuilder();
-        // Keep cursor captured but allow typing
-    }
-    
-    private void closeCommandOverlay() {
-        commandOverlayVisible = false;
-        commandText = new StringBuilder();
-    }
-    
-    private void executeCommand() {
-        String cmd = commandText.toString().trim();
-        
-        // Empty command, just close
-        if (cmd.isEmpty() || cmd.equals("/")) {
-            return;
-        }
-        
-        // Ensure command starts with /
-        if (!cmd.startsWith("/")) {
-            commandFeedbackMessage = "Commands must start with /";
-            commandFeedbackDisplayTime = 3.0;
-            return;
-        }
-        
-        // Parse and execute command
-        if (cmd.startsWith("/tp ")) {
-            executeTeleportCommand(cmd);
-        } else if (cmd.equals("/pos1")) {
-            executePos1Command();
-        } else if (cmd.equals("/pos2")) {
-            executePos2Command();
-        } else if (cmd.startsWith("/set ")) {
-            executeSetCommand(cmd);
-        } else if (cmd.startsWith("/give ")) {
-            executeGiveCommand(cmd);
-        } else {
-            commandFeedbackMessage = "Unknown command: " + cmd;
-            commandFeedbackDisplayTime = 3.0; // Show error for 3 seconds
-        }
-    }
-    
-    private void executeTeleportCommand(String cmd) {
-        try {
-            // Parse: /tp x y z
-            String[] parts = cmd.substring(4).trim().split("\\s+");
-            
-            if (parts.length != 3) {
-                commandFeedbackMessage = "Usage: /tp x y z";
-                commandFeedbackDisplayTime = 3.0;
-                return;
-            }
-            
-            float x = Float.parseFloat(parts[0]);
-            float y = Float.parseFloat(parts[1]);
-            float z = Float.parseFloat(parts[2]);
-            
-            // Teleport the player
-            player.setX(x);
-            player.setY(y);
-            player.setZ(z);
-            
-            logger.info("Teleported to: {}, {}, {}", x, y, z);
-            
-        } catch (NumberFormatException e) {
-            commandFeedbackMessage = "Invalid coordinates. Usage: /tp x y z";
-            commandFeedbackDisplayTime = 3.0;
-        }
-    }
-    
-    /**
-     * Execute /pos1 command - sets the first position of the region to the player's current position.
-     */
-    private void executePos1Command() {
-        // Get player's current block position (floor of the feet position)
-        int x = (int) Math.floor(player.getX());
-        int y = (int) Math.floor(player.getY());
-        int z = (int) Math.floor(player.getZ());
-        
-        regionPos1 = new int[]{x, y, z};
-        logger.info("Position 1 set to: {}, {}, {}", x, y, z);
-        
-        // Show confirmation message to user
-        commandFeedbackMessage = "Position 1 set to: " + x + ", " + y + ", " + z;
-        commandFeedbackDisplayTime = 3.0;
-    }
-    
-    /**
-     * Execute /pos2 command - sets the second position of the region to the player's current position.
-     */
-    private void executePos2Command() {
-        // Get player's current block position (floor of the feet position)
-        int x = (int) Math.floor(player.getX());
-        int y = (int) Math.floor(player.getY());
-        int z = (int) Math.floor(player.getZ());
-        
-        regionPos2 = new int[]{x, y, z};
-        logger.info("Position 2 set to: {}, {}, {}", x, y, z);
-        
-        // Show confirmation message to user
-        commandFeedbackMessage = "Position 2 set to: " + x + ", " + y + ", " + z;
-        commandFeedbackDisplayTime = 3.0;
-    }
-    
-    /**
-     * Execute /set command - fills the region defined by pos1 and pos2 with the specified block.
-     * @param cmd The full command string (e.g., "/set stone" or "/set mattmc:stone")
-     */
-    private void executeSetCommand(String cmd) {
-        // Check if both positions are set
-        if (regionPos1 == null || regionPos2 == null) {
-            commandFeedbackMessage = "Please set both positions first with /pos1 and /pos2";
-            commandFeedbackDisplayTime = 3.0;
-            return;
-        }
-        
-        // Parse the block name from the command
-        String blockName = cmd.substring(5).trim(); // Remove "/set "
-        
-        if (blockName.isEmpty()) {
-            commandFeedbackMessage = "Usage: /set <block>";
-            commandFeedbackDisplayTime = 3.0;
-            return;
-        }
-        
-        // Look up the block - try with namespace first, then without
-        Block block = null;
-        if (blockName.contains(":")) {
-            // Already has namespace (e.g., "mattmc:stone")
-            block = Blocks.getBlock(blockName);
-        } else {
-            // Try adding default namespace (e.g., "stone" -> "mattmc:stone")
-            block = Blocks.getBlock("mattmc:" + blockName);
-        }
-        
-        if (block == null) {
-            commandFeedbackMessage = "Unknown block: " + blockName;
-            commandFeedbackDisplayTime = 3.0;
-            return;
-        }
-        
-        // Calculate the bounds of the region
-        int minX = Math.min(regionPos1[0], regionPos2[0]);
-        int maxX = Math.max(regionPos1[0], regionPos2[0]);
-        int minY = Math.min(regionPos1[1], regionPos2[1]);
-        int maxY = Math.max(regionPos1[1], regionPos2[1]);
-        int minZ = Math.min(regionPos1[2], regionPos2[2]);
-        int maxZ = Math.max(regionPos1[2], regionPos2[2]);
-        
-        // Calculate region size and check for maximum limit to prevent UI freezing
-        long sizeX = (long)(maxX - minX + 1);
-        long sizeY = (long)(maxY - minY + 1);
-        long sizeZ = (long)(maxZ - minZ + 1);
-        long totalBlocks = sizeX * sizeY * sizeZ;
-        
-        if (totalBlocks > MAX_REGION_SIZE) {
-            commandFeedbackMessage = "Region too large (" + totalBlocks + " blocks). Maximum is " + MAX_REGION_SIZE;
-            commandFeedbackDisplayTime = 3.0;
-            return;
-        }
-        
-        // Calculate the number of blocks to set
-        int blocksSet = 0;
-        
-        // Fill the region with the specified block
-        // Note: Level.setBlock expects chunk-local Y coordinates (0-383)
-        for (int x = minX; x <= maxX; x++) {
-            for (int worldY = minY; worldY <= maxY; worldY++) {
-                // Convert world Y to chunk Y for setBlock call
-                int chunkY = LevelChunk.worldYToChunkY(worldY);
-                for (int z = minZ; z <= maxZ; z++) {
-                    world.setBlock(x, chunkY, z, block);
-                    blocksSet++;
-                }
-            }
-        }
-        
-        logger.info("Filled region ({}, {}, {}) to ({}, {}, {}) with {} - {} blocks set",
-                    minX, minY, minZ, maxX, maxY, maxZ, block.getIdentifier(), blocksSet);
-        
-        // Show confirmation message to user
-        commandFeedbackMessage = "Filled " + blocksSet + " blocks with " + blockName;
-        commandFeedbackDisplayTime = 3.0;
-    }
-    
-    /**
-     * Execute /give command - gives the player items and adds them to their inventory.
-     * @param cmd The full command string (e.g., "/give stone 64" or "/give mattmc:dirt 32" or "/give stone")
-     */
-    private void executeGiveCommand(String cmd) {
-        // Parse the command: /give <item> [count]
-        String[] parts = cmd.substring(6).trim().split("\\s+");
-        
-        if (parts.length < 1 || parts[0].isEmpty()) {
-            commandFeedbackMessage = "Usage: /give <item> [count]";
-            commandFeedbackDisplayTime = 3.0;
-            return;
-        }
-        
-        String itemName = parts[0];
-        int count = 1; // Default to 1 if not specified
-        
-        // Parse count if provided
-        if (parts.length >= 2) {
-            try {
-                count = Integer.parseInt(parts[1]);
-                if (count <= 0) {
-                    commandFeedbackMessage = "Count must be positive";
-                    commandFeedbackDisplayTime = 3.0;
-                    return;
-                }
-            } catch (NumberFormatException e) {
-                commandFeedbackMessage = "Invalid count: " + parts[1];
-                commandFeedbackDisplayTime = 3.0;
-                return;
-            }
-        }
-        
-        // Look up the item - try with namespace first, then without
-        Item item = null;
-        if (itemName.contains(":")) {
-            // Already has namespace (e.g., "mattmc:stone")
-            item = Items.getItem(itemName);
-        } else {
-            // Try adding default namespace (e.g., "stone" -> "mattmc:stone")
-            item = Items.getItem("mattmc:" + itemName);
-        }
-        
-        if (item == null) {
-            commandFeedbackMessage = "Unknown item: " + itemName;
-            commandFeedbackDisplayTime = 3.0;
-            return;
-        }
-        
-        // Add items to inventory, respecting max stack size
-        Inventory inventory = player.getInventory();
-        int itemsGiven = 0;
-        int remainingCount = count;
-        
-        while (remainingCount > 0) {
-            int stackSize = Math.min(remainingCount, item.getMaxStackSize());
-            ItemStack stack = new ItemStack(item, stackSize);
-            
-            if (inventory.addItem(stack)) {
-                itemsGiven += stackSize;
-                remainingCount -= stackSize;
-            } else {
-                // Inventory is full
-                break;
-            }
-        }
-        
-        if (itemsGiven > 0) {
-            if (itemsGiven < count) {
-                commandFeedbackMessage = "Gave " + itemsGiven + " " + itemName + " (inventory full)";
-            } else {
-                commandFeedbackMessage = "Gave " + itemsGiven + " " + itemName;
-            }
-            logger.info("Gave player {} x{}", itemName, itemsGiven);
-        } else {
-            commandFeedbackMessage = "Inventory is full";
-        }
-        
-        commandFeedbackDisplayTime = 3.0;
+        inputHandler.registerCallbacks();
     }
 
     @Override
@@ -563,18 +170,16 @@ public final class DevplayScreen implements Screen {
         // Fixed timestep: since tick() is called at exactly 20 TPS, use fixed dt
         final float FIXED_DT = 0.05f; // 1/20 second per tick
         
-        // FPS tracking moved to render() for accurate measurement
-        
         // Update chunks based on player position (load/unload) with frustum prioritization
         world.updateChunksAroundPlayer(player.getX(), player.getZ(), player.getYaw());
         
         // Update physics (gravity, collision) - only if command overlay is not visible
-        if (!commandOverlayVisible) {
+        if (!uiState.isCommandOverlayVisible()) {
             playerPhysics.update(FIXED_DT);
         }
         
         // Update player movement based on input - only if command overlay is not visible
-        if (!commandOverlayVisible) {
+        if (!uiState.isCommandOverlayVisible()) {
             playerController.updateMovement(window.handle(), FIXED_DT);
             
             // Handle continuous jump when space is held
@@ -583,26 +188,19 @@ public final class DevplayScreen implements Screen {
             }
         }
         
-        // Decrease error display time (use wall clock time for UI)
-        if (commandFeedbackDisplayTime > 0) {
+        // Decrease feedback display time
+        if (uiState.hasCommandFeedback()) {
             double now = now();
             double dt = now - lastFrameTimeSec;
             lastFrameTimeSec = now;
-            commandFeedbackDisplayTime -= dt;
+            uiState.updateFeedbackTimer(dt);
         }
     }
 
     @Override
     public void render(double alpha) {
         // Track FPS in render() method for accurate measurement
-        frameCount++;
-        double now = now();
-        double timeSinceLastUpdate = now - lastFpsUpdateTime;
-        if (timeSinceLastUpdate >= 0.5) { // Update FPS every 0.5 seconds
-            fps = frameCount / timeSinceLastUpdate;
-            frameCount = 0;
-            lastFpsUpdateTime = now;
-        }
+        uiState.updateFPS(now());
         
         // Convert alpha to float for interpolation
         float alphaF = (float) alpha;
@@ -650,7 +248,7 @@ public final class DevplayScreen implements Screen {
         glDisable(GL_DEPTH_TEST);
         
         // Draw debug information in top-left corner (only if F3 is pressed)
-        if (debugMenuVisible) {
+        if (uiState.isDebugMenuVisible()) {
             int loadedChunks = world.getLoadedChunkCount();
             int pendingChunks = world.getAsyncLoader().getPendingTaskCount();
             int activeWorkers = world.getAsyncLoader().getActiveTaskCount();
@@ -658,25 +256,25 @@ public final class DevplayScreen implements Screen {
             int culledChunks = worldRenderer.getCulledChunkCount();
             // Use interpolated position for smooth debug display
             uiRenderer.drawDebugInfo(w, h, player.getX(alphaF), player.getY(alphaF), player.getZ(alphaF), 
-                                     player.getYaw(alphaF), player.getPitch(alphaF), 0f, fps,
+                                     player.getYaw(alphaF), player.getPitch(alphaF), 0f, uiState.getFPS(),
                                      loadedChunks, pendingChunks, activeWorkers, renderedChunks, culledChunks);
         }
         
         // Draw command overlay if visible
-        if (commandOverlayVisible) {
-            uiRenderer.drawCommandOverlay(w, h, commandText.toString());
+        if (uiState.isCommandOverlayVisible()) {
+            uiRenderer.drawCommandOverlay(w, h, uiState.getCommandText());
         }
         
         // Draw command feedback message (independent of command overlay)
-        if (commandFeedbackDisplayTime > 0) {
-            uiRenderer.drawCommandFeedback(w, h, commandFeedbackMessage);
+        if (uiState.hasCommandFeedback()) {
+            uiRenderer.drawCommandFeedback(w, h, uiState.getCommandFeedbackMessage());
         }
         
         // Draw hotbar at bottom center (always visible)
         uiRenderer.drawHotbar(w, h, player);
         
         // Draw crosshair on top of everything (but not when command overlay is open)
-        if (!commandOverlayVisible) {
+        if (!uiState.isCommandOverlayVisible()) {
             uiRenderer.drawCrosshair(w, h);
         }
     }
@@ -741,7 +339,7 @@ public final class DevplayScreen implements Screen {
     @Override 
     public void onOpen() {
         // Re-register callbacks when returning from pause menu
-        registerCallbacks();
+        inputHandler.registerCallbacks();
         
         // Reset frame time to prevent huge delta time on first tick after pause
         lastFrameTimeSec = now();
