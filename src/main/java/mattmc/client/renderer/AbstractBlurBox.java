@@ -151,6 +151,14 @@ public class AbstractBlurBox {
         
         Shader.unbind();
         
+        // Restore 2D projection that DevplayScreen set up
+        // (renderQuad may have left matrices in different state)
+        glMatrixMode(GL_PROJECTION);
+        glLoadIdentity();
+        glOrtho(0, screenWidth, screenHeight, 0, -1, 1);
+        glMatrixMode(GL_MODELVIEW);
+        glLoadIdentity();
+        
         // Step 4: Render the blurred result back to the screen region
         glBindFramebuffer(GL_FRAMEBUFFER, 0);
         glEnable(GL_BLEND);
@@ -181,14 +189,18 @@ public class AbstractBlurBox {
     
     /**
      * Render a quad for post-processing.
+     * Sets up a temporary projection for framebuffer rendering, then restores original state.
      */
     protected void renderQuad(int width, int height) {
+        // Save current matrix mode
+        int[] matrixMode = new int[1];
+        glGetIntegerv(GL_MATRIX_MODE, matrixMode);
+        
+        // Set up orthographic projection for this framebuffer
         glMatrixMode(GL_PROJECTION);
-        glPushMatrix();
         glLoadIdentity();
         glOrtho(0, width, height, 0, -1, 1);
         glMatrixMode(GL_MODELVIEW);
-        glPushMatrix();
         glLoadIdentity();
         
         glEnable(GL_TEXTURE_2D);
@@ -205,10 +217,8 @@ public class AbstractBlurBox {
         glBindTexture(GL_TEXTURE_2D, 0);
         glDisable(GL_TEXTURE_2D);
         
-        glMatrixMode(GL_PROJECTION);
-        glPopMatrix();
-        glMatrixMode(GL_MODELVIEW);
-        glPopMatrix();
+        // Restore original matrix mode
+        glMatrixMode(matrixMode[0]);
     }
     
     /**
