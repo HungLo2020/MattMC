@@ -20,6 +20,10 @@ public final class BlurRenderer {
      * @param height Screen height
      */
     public static void renderBlurredBackground(BlurEffect blurEffect, int width, int height) {
+        // Save current GL state
+        int[] viewport = new int[4];
+        glGetIntegerv(GL_VIEWPORT, viewport);
+        
         int captureTexture = glGenTextures();
         try {
             // Capture screen to texture
@@ -51,6 +55,9 @@ public final class BlurRenderer {
             glEnd();
             
             glDisable(GL_TEXTURE_2D);
+            
+            // Restore viewport
+            glViewport(viewport[0], viewport[1], viewport[2], viewport[3]);
         } finally {
             // Ensure texture is cleaned up even if an exception occurs
             glDeleteTextures(captureTexture);

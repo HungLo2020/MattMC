@@ -54,11 +54,13 @@ public final class PanoramaRenderer {
             renderPanorama(width, height);
             renderTarget.unbind();
             
+            // Restore viewport after framebuffer operations
+            glViewport(0, 0, width, height);
+            
             // Apply Gaussian blur and get result
             Framebuffer blurResult = blurEffect.applyBlur(renderTarget.getTextureId(), width, height);
             
             // Render the blurred result to screen
-            glViewport(0, 0, width, height);
             renderQuadWithTexture(blurResult.getTextureId(), width, height);
         } else {
             // Render directly to screen without blur

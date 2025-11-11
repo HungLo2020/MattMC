@@ -89,6 +89,10 @@ public class BlurEffect {
     public Framebuffer applyBlur(int sourceTextureId, int width, int height) {
         ensureFramebuffers(width, height);
         
+        // Save current viewport
+        int[] viewport = new int[4];
+        glGetIntegerv(GL_VIEWPORT, viewport);
+        
         blurShader.use();
         blurShader.setUniform2f("uResolution", width, height);
         blurShader.setUniform1i("uTexture", 0);
@@ -119,6 +123,9 @@ public class BlurEffect {
         fbo1.unbind();
         
         Shader.unbind();
+        
+        // Restore viewport
+        glViewport(viewport[0], viewport[1], viewport[2], viewport[3]);
         
         return fbo1; // Return final result
     }
