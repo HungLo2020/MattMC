@@ -213,6 +213,9 @@ public final class DevplayScreen implements Screen {
         float alphaF = (float) alpha;
         
         int w = window.width(), h = window.height();
+        
+        // Ensure viewport is set correctly (in case it was modified by other screens)
+        glViewport(0, 0, w, h);
 
         // Clear color + depth (sky blue)
         glClearColor(0.53f, 0.81f, 0.92f, 1f);
