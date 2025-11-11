@@ -48,38 +48,38 @@ public class BlockNameHUD extends AbstractBlurBox {
         float hudWidth = textWidth + PADDING * 2;
         float hudHeight = textHeight + PADDING * 2;
         
-        // Save GL state before rendering
-        boolean blendWasEnabled = glGetBoolean(GL_BLEND);
+        // Save comprehensive GL state before rendering
+        glPushAttrib(GL_ALL_ATTRIB_BITS);
         
-        // Apply blur to the background region
-        applyRegionalBlur(HUD_X, HUD_Y, hudWidth, hudHeight, screenWidth, screenHeight);
-        
-        // Set up 2D orthographic projection for text rendering
-        glMatrixMode(GL_PROJECTION);
-        glPushMatrix();
-        glLoadIdentity();
-        glOrtho(0, screenWidth, screenHeight, 0, -1, 1);
-        
-        glMatrixMode(GL_MODELVIEW);
-        glPushMatrix();
-        glLoadIdentity();
-        
-        // Render text on top of blur
-        glEnable(GL_BLEND);
-        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-        glColor4f(1f, 1f, 1f, 1f);
-        
-        TextRenderer.drawText(blockName, HUD_X + PADDING, HUD_Y + PADDING, TEXT_SCALE);
-        
-        // Restore matrices
-        glPopMatrix();
-        glMatrixMode(GL_PROJECTION);
-        glPopMatrix();
-        glMatrixMode(GL_MODELVIEW);
-        
-        // Restore GL state
-        if (!blendWasEnabled) {
-            glDisable(GL_BLEND);
+        try {
+            // Apply blur to the background region
+            applyRegionalBlur(HUD_X, HUD_Y, hudWidth, hudHeight, screenWidth, screenHeight);
+            
+            // Set up 2D orthographic projection for text rendering
+            glMatrixMode(GL_PROJECTION);
+            glPushMatrix();
+            glLoadIdentity();
+            glOrtho(0, screenWidth, screenHeight, 0, -1, 1);
+            
+            glMatrixMode(GL_MODELVIEW);
+            glPushMatrix();
+            glLoadIdentity();
+            
+            // Render text on top of blur
+            glEnable(GL_BLEND);
+            glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+            glColor4f(1f, 1f, 1f, 1f);
+            
+            TextRenderer.drawText(blockName, HUD_X + PADDING, HUD_Y + PADDING, TEXT_SCALE);
+            
+            // Restore matrices
+            glPopMatrix();
+            glMatrixMode(GL_PROJECTION);
+            glPopMatrix();
+            glMatrixMode(GL_MODELVIEW);
+        } finally {
+            // Restore all GL state
+            glPopAttrib();
         }
     }
     
