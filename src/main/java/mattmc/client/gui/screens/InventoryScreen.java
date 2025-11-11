@@ -272,7 +272,8 @@ public final class InventoryScreen implements Screen {
             renderer.renderTooltip(hoveredItem, mouseXWin, mouseYWin);
         }
         
-        glDisable(GL_BLEND);
+        // Note: GL_BLEND state is managed by individual rendering methods
+        // Do not unconditionally disable it here as it may be needed by game rendering
     }
 
     @Override

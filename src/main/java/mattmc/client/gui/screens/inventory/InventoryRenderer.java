@@ -53,11 +53,13 @@ public class InventoryRenderer {
             BlurRenderer.renderBlurredBackground(blurEffect, screenWidth, screenHeight);
         }
         
-        // Draw dark overlay
+        // Save current matrices before modifying
         glMatrixMode(GL_PROJECTION);
+        glPushMatrix();
         glLoadIdentity();
         glOrtho(0, screenWidth, screenHeight, 0, -1, 1);
         glMatrixMode(GL_MODELVIEW);
+        glPushMatrix();
         glLoadIdentity();
         
         glEnable(GL_BLEND);
@@ -71,6 +73,12 @@ public class InventoryRenderer {
         glVertex2f(screenWidth, screenHeight);
         glVertex2f(0, screenHeight);
         glEnd();
+        
+        // Restore matrices
+        glMatrixMode(GL_MODELVIEW);
+        glPopMatrix();
+        glMatrixMode(GL_PROJECTION);
+        glPopMatrix();
     }
     
     public void renderInventoryBackground() {
@@ -94,6 +102,8 @@ public class InventoryRenderer {
         glTexCoord2f(0, 0); glVertex2f(x, y + texHeight);
         glEnd();
         
+        // Unbind texture before disabling GL_TEXTURE_2D
+        glBindTexture(GL_TEXTURE_2D, 0);
         glDisable(GL_TEXTURE_2D);
     }
     
@@ -267,6 +277,8 @@ public class InventoryRenderer {
         glTexCoord2f(0, texV_bottom); glVertex2f(x, y + contentHeight);
         glEnd();
         
+        // Unbind texture before disabling GL_TEXTURE_2D
+        glBindTexture(GL_TEXTURE_2D, 0);
         glDisable(GL_TEXTURE_2D);
         
         renderCreativeItems(allItems, scrollRow, x, y);
