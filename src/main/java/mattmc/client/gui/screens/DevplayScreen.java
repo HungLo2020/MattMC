@@ -223,7 +223,12 @@ public final class DevplayScreen implements Screen {
             org.lwjgl.glfw.GLFW.glfwGetFramebufferSize(window.handle(), pWidth, pHeight);
             fbWidth = pWidth.get(0);
             fbHeight = pHeight.get(0);
-            glViewport(0, 0, fbWidth > 0 ? fbWidth : w, fbHeight > 0 ? fbHeight : h);
+            
+            // Fallback to window dimensions if framebuffer query fails
+            if (fbWidth <= 0) fbWidth = w;
+            if (fbHeight <= 0) fbHeight = h;
+            
+            glViewport(0, 0, fbWidth, fbHeight);
         }
 
         // Clear color + depth (sky blue)
@@ -231,7 +236,8 @@ public final class DevplayScreen implements Screen {
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         // Perspective projection - use framebuffer dimensions for aspect ratio
-        float aspect = Math.max(1f, (float) fbWidth / Math.max(1, fbHeight));
+        // Ensure we don't divide by zero
+        float aspect = fbHeight > 0 ? (float) fbWidth / (float) fbHeight : 1.0f;
         glMatrixMode(GL_PROJECTION);
         glLoadIdentity();
         float fov = 70f, zn = 0.1f, zf = 500f;
