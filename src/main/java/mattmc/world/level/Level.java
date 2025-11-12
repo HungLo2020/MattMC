@@ -442,10 +442,21 @@ public class Level implements LevelAccessor {
         
         // Track which chunks were modified for re-rendering
         java.util.Set<LevelChunk> dirtyChunks = new java.util.HashSet<>();
+        java.util.Set<Long> visited = new java.util.HashSet<>();
         
-        // Use a simple flood-fill approach to propagate light
-        // This is a simplified version - a full implementation would use a queue
-        propagateLightRecursive(sourceX, sourceY, sourceZ, sourceLightLevel, new java.util.HashSet<>(), dirtyChunks);
+        // Mark the source position as visited so we don't revisit it
+        long sourceKey = ((long)sourceX << 32) | ((long)sourceY << 16) | (long)sourceZ;
+        visited.add(sourceKey);
+        
+        // Start propagation from all 6 neighbors with light level - 1
+        // The source block itself already has its light set by setBlock in LevelChunk
+        int neighborLight = sourceLightLevel - 1;
+        propagateLightRecursive(sourceX + 1, sourceY, sourceZ, neighborLight, visited, dirtyChunks);
+        propagateLightRecursive(sourceX - 1, sourceY, sourceZ, neighborLight, visited, dirtyChunks);
+        propagateLightRecursive(sourceX, sourceY + 1, sourceZ, neighborLight, visited, dirtyChunks);
+        propagateLightRecursive(sourceX, sourceY - 1, sourceZ, neighborLight, visited, dirtyChunks);
+        propagateLightRecursive(sourceX, sourceY, sourceZ + 1, neighborLight, visited, dirtyChunks);
+        propagateLightRecursive(sourceX, sourceY, sourceZ - 1, neighborLight, visited, dirtyChunks);
         
         // Mark all affected chunks as dirty for re-rendering
         for (LevelChunk chunk : dirtyChunks) {
