@@ -40,7 +40,7 @@ void main() {
     else if (ao >= 2.0) aoFactor = 0.6;
     else if (ao >= 1.0) aoFactor = 0.8;
     
-    // Calculate ambient lighting
+    // Calculate ambient lighting from both sources
     vec3 skyAmbient = uAmbientSky * skyLightNorm;
     vec3 blockAmbient = uAmbientBlock * blockLightNorm;
     
@@ -48,16 +48,24 @@ void main() {
     float NdotL = max(dot(normalize(vNormal), normalize(uSunDir)), 0.0);
     vec3 sunDiffuse = uSunColor * NdotL * skyLightNorm;
     
-    // Combine sky-based lighting (affected by AO)
-    vec3 skyLighting = (skyAmbient + sunDiffuse) * aoFactor;
+    // Combine sky lighting (ambient + sun)
+    vec3 skyLighting = skyAmbient + sunDiffuse;
     
-    // Block light is less affected by AO (torches should shine even in corners)
-    // Apply a softer AO factor to block light (minimum 0.7 instead of 0.45)
-    float blockAOFactor = mix(1.0, aoFactor, 0.5); // 50% AO influence on block light
+    // Apply ambient occlusion to sky lighting
+    skyLighting *= aoFactor;
+    
+    // Block light is less affected by AO and adds on top of sky lighting
+    // Apply reduced AO to block light (50% influence)
+    float blockAOFactor = mix(1.0, aoFactor, 0.5);
     vec3 blockLighting = blockAmbient * blockAOFactor;
     
-    // Combine all lighting (max of sky and block to avoid over-darkening)
+    // Combine lighting: use max for base, then add block light contribution
+    // This makes torches visible even in bright areas
     vec3 lighting = max(skyLighting, blockLighting);
+    
+    // Add extra block light contribution to make torches more visible
+    // Increased to 0.8 (80%) to make torches clearly visible even when using placeholder models
+    lighting += blockLighting * 0.8;
     
     // Apply lighting to albedo
     vec3 litColor = albedo * lighting;
