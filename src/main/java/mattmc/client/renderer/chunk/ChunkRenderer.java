@@ -11,6 +11,7 @@ import java.util.Map;
 
 import static org.lwjgl.opengl.GL11.*;
 import static org.lwjgl.opengl.GL13.*;
+import static org.lwjgl.opengl.GL30.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -152,7 +153,7 @@ public class ChunkRenderer {
         // Unbind shadow map if it was bound
         if (shadowRenderer != null) {
             glActiveTexture(GL_TEXTURE1);
-            glBindTexture(GL_TEXTURE_2D, 0);
+            glBindTexture(GL_TEXTURE_2D_ARRAY, 0); // Fixed: unbind texture array, not 2D
             glActiveTexture(GL_TEXTURE0);
         }
         

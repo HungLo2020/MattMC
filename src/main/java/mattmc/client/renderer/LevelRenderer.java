@@ -34,7 +34,7 @@ public class LevelRenderer {
     
     // Shadow rendering
     private ShadowRenderer shadowRenderer;
-    private boolean shadowsEnabled = true;
+    private boolean shadowsEnabled = false; // TEMPORARILY DISABLED - needs debugging
     
     // Statistics for debugging
     private int totalChunks = 0;
@@ -45,8 +45,10 @@ public class LevelRenderer {
         this.chunkRenderer = new ChunkRenderer();
         this.frustum = new Frustum();
         
-        // Initialize shadow renderer with medium quality (1536x1536, 3 cascades)
-        this.shadowRenderer = new ShadowRenderer(1536, 3);
+        // Shadow renderer - temporarily disabled for debugging
+        // TODO: Re-enable once texture array issues are resolved
+        // this.shadowRenderer = new ShadowRenderer(1536, 3);
+        this.shadowRenderer = null;
     }
     
     /**
