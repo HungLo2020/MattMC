@@ -78,6 +78,9 @@ public class Level implements LevelAccessor {
     // Light propagator for incremental BFS light updates
     private mattmc.world.level.lighting.LightPropagator lightPropagator;
     
+    // Relight scheduler for distance-based prioritization
+    private mattmc.world.level.lighting.RelightScheduler relightScheduler;
+    
     public Level() {
         this.asyncLoader = new AsyncChunkLoader();
         // Initialize with a default seed (will be updated when world is loaded/created)
@@ -85,8 +88,9 @@ public class Level implements LevelAccessor {
         this.asyncLoader.setWorldGenerator(worldGenerator);
         // Set the neighbor accessor for cross-chunk face culling
         this.asyncLoader.setNeighborAccessor(neighborAccessor);
-        // Initialize light propagator
+        // Initialize light propagator and scheduler
         this.lightPropagator = new mattmc.world.level.lighting.LightPropagator(this);
+        this.relightScheduler = new mattmc.world.level.lighting.RelightScheduler(this);
     }
     
     /**
@@ -616,6 +620,21 @@ public class Level implements LevelAccessor {
     /**
      * Process light updates with a time budget.
      * Should be called each frame to incrementally update lighting.
+     * Uses the RelightScheduler for distance-based prioritization.
+     * 
+     * @param msBudget Time budget in milliseconds (typically 2-5ms per frame)
+     * @param cameraX Camera X position for prioritization
+     * @param cameraY Camera Y position for prioritization
+     * @param cameraZ Camera Z position for prioritization
+     */
+    public void updateLighting(double msBudget, float cameraX, float cameraY, float cameraZ) {
+        relightScheduler.updateCameraPosition(cameraX, cameraY, cameraZ);
+        relightScheduler.processLighting(msBudget);
+    }
+    
+    /**
+     * Process light updates with a time budget (legacy method without camera position).
+     * Should be called each frame to incrementally update lighting.
      * 
      * @param msBudget Time budget in milliseconds (typically 2-5ms per frame)
      */
@@ -630,6 +649,15 @@ public class Level implements LevelAccessor {
      */
     public mattmc.world.level.lighting.LightPropagator getLightPropagator() {
         return lightPropagator;
+    }
+    
+    /**
+     * Get the relight scheduler for this level.
+     * 
+     * @return The relight scheduler
+     */
+    public mattmc.world.level.lighting.RelightScheduler getRelightScheduler() {
+        return relightScheduler;
     }
     
     /**
