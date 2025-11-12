@@ -1,6 +1,7 @@
 package mattmc.client.renderer;
 
 import mattmc.client.renderer.texture.TextureAtlas;
+import mattmc.client.renderer.shadow.ShadowRenderer;
 
 import mattmc.world.level.chunk.LevelChunk;
 import mattmc.world.level.Level;
@@ -8,6 +9,8 @@ import mattmc.client.renderer.chunk.ChunkRenderer;
 import mattmc.client.renderer.chunk.ChunkMeshBuffer;
 
 import java.util.List;
+import java.nio.FloatBuffer;
+import org.lwjgl.BufferUtils;
 
 import static org.lwjgl.opengl.GL11.*;
 import org.slf4j.Logger;
@@ -19,6 +22,7 @@ import org.slf4j.LoggerFactory;
  * 
  * Now handles async mesh uploads from background threads and texture atlas.
  * Implements frustum culling to skip rendering chunks outside the camera view.
+ * Supports cascaded shadow maps for realistic sun shadows.
  */
 public class LevelRenderer {
     private static final Logger logger = LoggerFactory.getLogger(LevelRenderer.class);
@@ -28,6 +32,10 @@ public class LevelRenderer {
     private Level currentLevel;
     private boolean textureAtlasInitialized = false;
     
+    // Shadow rendering
+    private ShadowRenderer shadowRenderer;
+    private boolean shadowsEnabled = true;
+    
     // Statistics for debugging
     private int totalChunks = 0;
     private int renderedChunks = 0;
@@ -36,6 +44,9 @@ public class LevelRenderer {
     public LevelRenderer() {
         this.chunkRenderer = new ChunkRenderer();
         this.frustum = new Frustum();
+        
+        // Initialize shadow renderer with medium quality (1536x1536, 3 cascades)
+        this.shadowRenderer = new ShadowRenderer(1536, 3);
     }
     
     /**
@@ -64,8 +75,18 @@ public class LevelRenderer {
      * Render all loaded chunks in the world.
      * Also processes pending mesh uploads from background threads and handles dirty chunks.
      * Uses frustum culling to skip chunks outside the camera view.
+     * 
+     * @param world The world to render
+     * @param playerX Player X position
+     * @param playerY Player Y position  
+     * @param playerZ Player Z position
+     * @param cameraFov Camera field of view in degrees
+     * @param cameraAspect Camera aspect ratio
+     * @param cameraNear Camera near plane distance
+     * @param cameraFar Camera far plane distance
      */
-    public void render(Level world, float playerX, float playerY, float playerZ) {
+    public void render(Level world, float playerX, float playerY, float playerZ, 
+                      float cameraFov, float cameraAspect, float cameraNear, float cameraFar) {
         // Update frustum from current GL matrices (must be called after camera setup)
         frustum.update();
         
@@ -77,6 +98,11 @@ public class LevelRenderer {
         // Get sky brightness and sun direction from day cycle
         float skyBrightness = world.getDayCycle().getSkyBrightness();
         float[] sunDirection = world.getDayCycle().getSunDirection();
+        
+        // Render shadow maps if shadows are enabled
+        if (shadowsEnabled) {
+            renderShadowMaps(world, sunDirection, cameraFov, cameraAspect, cameraNear, cameraFar);
+        }
         
         // Process completed mesh buffers from async loader first
         // This makes newly loaded chunk meshes available for rendering
@@ -124,7 +150,8 @@ public class LevelRenderer {
             // Only do GL matrix operations if we're actually going to render
             glPushMatrix();
             glTranslatef(chunkWorldX, 0, chunkWorldZ);
-            if (chunkRenderer.renderChunk(chunk, playerX, playerY, playerZ, skyBrightness, sunDirection)) {
+            if (chunkRenderer.renderChunk(chunk, playerX, playerY, playerZ, skyBrightness, sunDirection, 
+                                         shadowsEnabled ? shadowRenderer : null)) {
                 renderedChunks++;
             } else {
                 // Chunk lost its VAO between the hasChunkMesh check and now
@@ -135,6 +162,39 @@ public class LevelRenderer {
         }
         
         glPopMatrix();
+    }
+    
+    /**
+     * Backwards compatible render method.
+     * Uses default camera parameters.
+     */
+    public void render(Level world, float playerX, float playerY, float playerZ) {
+        render(world, playerX, playerY, playerZ, 70f, 1.0f, 0.1f, 500f);
+    }
+    
+    /**
+     * Render shadow maps for all cascades.
+     */
+    private void renderShadowMaps(Level world, float[] sunDirection, 
+                                   float cameraFov, float cameraAspect, 
+                                   float cameraNear, float cameraFar) {
+        // Get current view and projection matrices
+        FloatBuffer viewMatrix = BufferUtils.createFloatBuffer(16);
+        FloatBuffer projMatrix = BufferUtils.createFloatBuffer(16);
+        
+        glGetFloatv(GL_MODELVIEW_MATRIX, viewMatrix);
+        glGetFloatv(GL_PROJECTION_MATRIX, projMatrix);
+        
+        float[] viewArray = new float[16];
+        float[] projArray = new float[16];
+        viewMatrix.get(viewArray);
+        projMatrix.get(projArray);
+        
+        // Update shadow renderer camera parameters
+        shadowRenderer.setCameraParameters(cameraNear, cameraFar, cameraFov, cameraAspect);
+        
+        // Render shadow maps
+        shadowRenderer.renderShadowMaps(world, chunkRenderer, viewArray, projArray, sunDirection);
     }
     
     /**

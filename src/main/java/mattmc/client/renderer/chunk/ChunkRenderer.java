@@ -2,6 +2,7 @@ package mattmc.client.renderer.chunk;
 
 import mattmc.client.renderer.VoxelLitShader;
 import mattmc.client.renderer.texture.TextureAtlas;
+import mattmc.client.renderer.shadow.ShadowRenderer;
 import mattmc.world.level.chunk.LevelChunk;
 import mattmc.world.level.chunk.ChunkUtils;
 
@@ -9,6 +10,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 import static org.lwjgl.opengl.GL11.*;
+import static org.lwjgl.opengl.GL13.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -68,10 +70,11 @@ public class ChunkRenderer {
      * @param cameraZ Camera Z position for fog
      * @param skyBrightness Sky brightness multiplier (0.0-1.0) from day cycle
      * @param sunDirection Sun direction vector [x, y, z] from day cycle
+     * @param shadowRenderer Optional shadow renderer for shadow mapping (null to disable shadows)
      * @return true if the chunk was rendered, false if no VAO available
      */
     public boolean renderChunk(LevelChunk chunk, float cameraX, float cameraY, float cameraZ, 
-                              float skyBrightness, float[] sunDirection) {
+                              float skyBrightness, float[] sunDirection, ShadowRenderer shadowRenderer) {
         // Get VAO
         ChunkVAO vao = vaoCache.get(chunk);
         if (vao == null) {
@@ -109,6 +112,30 @@ public class ChunkRenderer {
         // Gamma correction
         shader.setGamma(2.2f);
         
+        // Shadow settings
+        if (shadowRenderer != null) {
+            shader.setShadowsEnabled(true);
+            shader.setShadowMapSampler(1); // Texture unit 1 for shadow map
+            
+            // Bind shadow map texture
+            shadowRenderer.getCascadedShadowMap().getShadowFBO().bindTexture(1);
+            
+            // Set cascade uniforms
+            shader.setNumCascades(shadowRenderer.getCascadedShadowMap().getNumCascades());
+            
+            // Set cascade split distances
+            float[] splits = new float[4];
+            for (int i = 0; i < shadowRenderer.getCascadedShadowMap().getNumCascades() && i < 4; i++) {
+                splits[i] = shadowRenderer.getCascadedShadowMap().getCascades()[i].getFarSplit();
+            }
+            shader.setCascadeSplits(splits);
+            
+            // Set light view-projection matrices
+            shader.setLightViewProjMatrices(shadowRenderer.getCascadedShadowMap().getCascades());
+        } else {
+            shader.setShadowsEnabled(false);
+        }
+        
         // Enable texturing and bind texture atlas
         glEnable(GL_TEXTURE_2D);
         if (textureAtlas != null) {
@@ -122,6 +149,13 @@ public class ChunkRenderer {
         VoxelLitShader.unbind();
         glBindTexture(GL_TEXTURE_2D, 0);
         
+        // Unbind shadow map if it was bound
+        if (shadowRenderer != null) {
+            glActiveTexture(GL_TEXTURE1);
+            glBindTexture(GL_TEXTURE_2D, 0);
+            glActiveTexture(GL_TEXTURE0);
+        }
+        
         return true;
     }
     
@@ -133,7 +167,15 @@ public class ChunkRenderer {
      * @return true if the chunk was rendered, false if no VAO available
      */
     public boolean renderChunk(LevelChunk chunk) {
-        return renderChunk(chunk, 0, 0, 0, 1.0f, new float[]{0.3f, -0.8f, 0.5f});
+        return renderChunk(chunk, 0, 0, 0, 1.0f, new float[]{0.3f, -0.8f, 0.5f}, null);
+    }
+    
+    /**
+     * Render a chunk with specified lighting (backward compatibility).
+     */
+    public boolean renderChunk(LevelChunk chunk, float cameraX, float cameraY, float cameraZ, 
+                              float skyBrightness, float[] sunDirection) {
+        return renderChunk(chunk, cameraX, cameraY, cameraZ, skyBrightness, sunDirection, null);
     }
     
     /**
@@ -199,6 +241,27 @@ public class ChunkRenderer {
         long key = chunkKey(chunk.chunkX(), chunk.chunkZ());
         chunkByKey.remove(key);
         invalidateChunk(chunk);
+    }
+    
+    /**
+     * Render a chunk's depth only (for shadow mapping).
+     * This renders the VAO geometry but only writes to depth buffer.
+     * 
+     * @param chunk The chunk to render depth for
+     * @return true if the chunk was rendered, false if no VAO available
+     */
+    public boolean renderChunkDepth(LevelChunk chunk) {
+        // Get VAO
+        ChunkVAO vao = vaoCache.get(chunk);
+        if (vao == null) {
+            return false;
+        }
+        
+        // Simply render the VAO - the caller should have already set up
+        // the appropriate shader and GL state for depth-only rendering
+        vao.render();
+        
+        return true;
     }
     
     /**

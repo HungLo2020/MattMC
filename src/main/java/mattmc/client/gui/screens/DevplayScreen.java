@@ -248,7 +248,9 @@ public final class DevplayScreen implements Screen {
         
         // Render all loaded chunks in the infinite world
         // Use interpolated position for smooth rendering
-        worldRenderer.render(world, player.getX(alphaF), player.getEyeY(alphaF), player.getZ(alphaF));
+        // Pass camera parameters for shadow mapping
+        worldRenderer.render(world, player.getX(alphaF), player.getEyeY(alphaF), player.getZ(alphaF), 
+                           fov, aspect, zn, zf);
         
         glDisable(GL_CULL_FACE);
         
