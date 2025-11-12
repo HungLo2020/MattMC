@@ -91,11 +91,11 @@ public class ChunkRenderer {
         
         // Sun settings - pointing down and slightly to the side (typical morning/afternoon sun)
         shader.setSunDirection(0.3f, -0.8f, 0.5f);
-        shader.setSunColor(1.0f, 0.95f, 0.85f); // Slightly warm sun color (linear space)
+        shader.setSunColor(0.8f, 0.75f, 0.65f); // Reduced sun color (linear space)
         
-        // Ambient settings
-        shader.setAmbientSky(0.4f, 0.5f, 0.6f); // Cool blue sky ambient (linear space)
-        shader.setAmbientBlock(1.0f, 0.7f, 0.4f); // Warm torch/block light (linear space)
+        // Ambient settings - reduced to prevent over-brightening
+        shader.setAmbientSky(0.3f, 0.35f, 0.4f); // Subtle cool blue sky ambient (linear space)
+        shader.setAmbientBlock(0.8f, 0.55f, 0.3f); // Warm torch/block light (linear space)
         
         // Fog settings
         shader.setFogColor(0.5f, 0.7f, 1.0f); // Sky blue fog (linear space)
