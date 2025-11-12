@@ -72,7 +72,7 @@ public class BlockFaceCollector {
             mattmc.world.level.block.state.BlockState state = chunk.getBlockState(cx, cy, cz);
             int color = 0xFFFFFF;
             // Add to topFaces with a special marker, storing blockstate in the FaceData
-            topFaces.add(new FaceData(x, y, z, color, 1f, 1f, block, "stairs", null, state));
+            topFaces.add(new FaceData(x, y, z, color, 1f, 1f, block, "stairs", null, state, cx, cy, cz));
             return;
         }
         
@@ -90,29 +90,30 @@ public class BlockFaceCollector {
         
         // Collect visible faces for batched rendering
         // Store both the adjusted color and the brightness factor for fallback color
+        // Also store chunk-local coordinates for lighting lookup
         if (topVisible) {
             topFaces.add(new FaceData(x, y, z, color, 1f, 1f, block, "top", 
-                BlockFaceGeometry::drawTopFace));
+                BlockFaceGeometry::drawTopFace, null, cx, cy, cz));
         }
         if (bottomVisible) {
             bottomFaces.add(new FaceData(x, y, z, ColorUtils.darkenColor(color), 1f, 0.5f, block, "bottom", 
-                BlockFaceGeometry::drawBottomFace));
+                BlockFaceGeometry::drawBottomFace, null, cx, cy, cz));
         }
         if (northVisible) {
             northFaces.add(new FaceData(x, y, z, ColorUtils.adjustColorBrightness(color, 0.8f), 1f, 0.8f, block, "side", 
-                BlockFaceGeometry::drawNorthFace));
+                BlockFaceGeometry::drawNorthFace, null, cx, cy, cz));
         }
         if (southVisible) {
             southFaces.add(new FaceData(x, y, z, ColorUtils.adjustColorBrightness(color, 0.8f), 1f, 0.8f, block, "side", 
-                BlockFaceGeometry::drawSouthFace));
+                BlockFaceGeometry::drawSouthFace, null, cx, cy, cz));
         }
         if (westVisible) {
             westFaces.add(new FaceData(x, y, z, ColorUtils.adjustColorBrightness(color, 0.6f), 1f, 0.6f, block, "side", 
-                BlockFaceGeometry::drawWestFace));
+                BlockFaceGeometry::drawWestFace, null, cx, cy, cz));
         }
         if (eastVisible) {
             eastFaces.add(new FaceData(x, y, z, ColorUtils.adjustColorBrightness(color, 0.6f), 1f, 0.6f, block, "side", 
-                BlockFaceGeometry::drawEastFace));
+                BlockFaceGeometry::drawEastFace, null, cx, cy, cz));
         }
     }
     
@@ -169,14 +170,21 @@ public class BlockFaceCollector {
         public final String faceType; // "top", "bottom", "side", etc.
         public final FaceRenderer renderer; // The renderer method to use for drawing this face
         public final mattmc.world.level.block.state.BlockState blockState; // Block state for custom rendering
+        public final int chunkX, chunkY, chunkZ; // Chunk-local coordinates for lighting lookup
         
         public FaceData(float x, float y, float z, int color, float brightness, float colorBrightness, 
                        Block block, String faceType, FaceRenderer renderer) {
-            this(x, y, z, color, brightness, colorBrightness, block, faceType, renderer, null);
+            this(x, y, z, color, brightness, colorBrightness, block, faceType, renderer, null, 0, 0, 0);
         }
         
         public FaceData(float x, float y, float z, int color, float brightness, float colorBrightness, 
                        Block block, String faceType, FaceRenderer renderer, mattmc.world.level.block.state.BlockState blockState) {
+            this(x, y, z, color, brightness, colorBrightness, block, faceType, renderer, blockState, 0, 0, 0);
+        }
+        
+        public FaceData(float x, float y, float z, int color, float brightness, float colorBrightness, 
+                       Block block, String faceType, FaceRenderer renderer, mattmc.world.level.block.state.BlockState blockState,
+                       int chunkX, int chunkY, int chunkZ) {
             this.x = x;
             this.y = y;
             this.z = z;
@@ -187,6 +195,9 @@ public class BlockFaceCollector {
             this.faceType = faceType;
             this.renderer = renderer;
             this.blockState = blockState;
+            this.chunkX = chunkX;
+            this.chunkY = chunkY;
+            this.chunkZ = chunkZ;
         }
     }
 }

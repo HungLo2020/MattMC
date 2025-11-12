@@ -67,6 +67,18 @@ public class Blocks {
     public static final Block WARPED_PLANKS = register("warped_planks", new Block(true));
     public static final Block BIRCH_STAIRS = register("birch_stairs", new StairsBlock());
     
+    // Light-emitting blocks
+    public static final Block TORCH = register("torch", new Block(false, 14));
+    public static final Block GLOWSTONE = register("glowstone", new Block(true, 15));
+    public static final Block SEA_LANTERN = register("sea_lantern", new Block(true, 15));
+    public static final Block LANTERN = register("lantern", new Block(true, 15));
+    public static final Block JACK_O_LANTERN = register("jack_o_lantern", new Block(true, 15));
+    public static final Block REDSTONE_LAMP_ON = register("redstone_lamp_on", new Block(true, 15));
+    public static final Block LAVA = register("lava", new Block(false, 15));
+    public static final Block FIRE = register("fire", new Block(false, 15));
+    public static final Block END_ROD = register("end_rod", new Block(true, 14));
+    public static final Block REDSTONE_TORCH = register("redstone_torch", new Block(false, 7));
+    
     /**
      * Register a block with a given name (without namespace).
      * Automatically adds "mattmc:" namespace prefix.
@@ -92,7 +104,7 @@ public class Blocks {
         if (block instanceof StairsBlock) {
             registeredBlock = new StairsBlock(identifier);
         } else {
-            registeredBlock = new Block(block.isSolid(), identifier);
+            registeredBlock = new Block(block.isSolid(), identifier, block.getLightEmission());
         }
         REGISTRY.put(identifier, registeredBlock);
         return registeredBlock;
@@ -124,7 +136,7 @@ public class Blocks {
         if (block instanceof StairsBlock) {
             registeredBlock = new StairsBlock(identifier);
         } else {
-            registeredBlock = new Block(block.isSolid(), identifier);
+            registeredBlock = new Block(block.isSolid(), identifier, block.getLightEmission());
         }
         REGISTRY.put(identifier, registeredBlock);
         return registeredBlock;
