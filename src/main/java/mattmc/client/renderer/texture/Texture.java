@@ -38,7 +38,6 @@ public final class Texture implements AutoCloseable {
 
         int tex = glGenTextures();
         glBindTexture(GL_TEXTURE_2D, tex);
-        
         // Upload texture data
         glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, x[0], y[0], 0, GL_RGBA, GL_UNSIGNED_BYTE, pixels);
         STBImage.stbi_image_free(pixels);
