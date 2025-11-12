@@ -1,12 +1,9 @@
 package mattmc.client.renderer.shadow;
 
+import mattmc.util.Matrix4f;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.nio.FloatBuffer;
-import org.lwjgl.BufferUtils;
-
-import static org.lwjgl.opengl.GL11.*;
 
 /**
  * Manages cascaded shadow maps (CSM) for directional sun lighting.
@@ -95,8 +92,13 @@ public class CascadedShadowMap implements AutoCloseable {
         computeCascadeSplits();
         
         // Get camera inverse view-projection matrix
-        float[] cameraInvVP = new float[16];
-        invertMatrix(multiplyMatrices(cameraProjMatrix, cameraViewMatrix), cameraInvVP);
+        float[] cameraVP = Matrix4f.multiply(cameraProjMatrix, cameraViewMatrix);
+        float[] cameraInvVP = Matrix4f.invert(cameraVP);
+        
+        if (cameraInvVP == null) {
+            logger.warn("Failed to invert camera view-projection matrix, skipping cascade update");
+            return;
+        }
         
         for (int i = 0; i < numCascades; i++) {
             ShadowCascade cascade = cascades[i];
@@ -285,41 +287,6 @@ public class CascadedShadowMap implements AutoCloseable {
         result[1] = (matrix[1] * x + matrix[5] * y + matrix[9] * z + matrix[13]) / w;
         result[2] = (matrix[2] * x + matrix[6] * y + matrix[10] * z + matrix[14]) / w;
         return result;
-    }
-    
-    /**
-     * Multiply two 4x4 matrices (column-major).
-     */
-    private float[] multiplyMatrices(float[] a, float[] b) {
-        float[] result = new float[16];
-        for (int i = 0; i < 4; i++) {
-            for (int j = 0; j < 4; j++) {
-                result[i * 4 + j] = 0;
-                for (int k = 0; k < 4; k++) {
-                    result[i * 4 + j] += a[i * 4 + k] * b[k * 4 + j];
-                }
-            }
-        }
-        return result;
-    }
-    
-    /**
-     * Invert a 4x4 matrix (simplified for view-projection matrices).
-     */
-    private void invertMatrix(float[] m, float[] result) {
-        // This is a simplified inversion using cofactor expansion
-        // For production, consider using a more robust library like JOML
-        FloatBuffer mBuffer = BufferUtils.createFloatBuffer(16).put(m).flip();
-        FloatBuffer invBuffer = BufferUtils.createFloatBuffer(16);
-        
-        // Use OpenGL to invert (fallback method)
-        // In production, use proper matrix library
-        glPushMatrix();
-        glLoadMatrixf(mBuffer);
-        glGetFloatv(GL_MODELVIEW_MATRIX, invBuffer);
-        glPopMatrix();
-        
-        invBuffer.get(result);
     }
     
     public ShadowFramebuffer getShadowFBO() {
