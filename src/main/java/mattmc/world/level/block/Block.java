@@ -23,6 +23,7 @@ public class Block {
     
     private final boolean solid;
     private final String identifier;
+    private final int lightLevel; // Light emission level (0-15, like Minecraft)
     private Map<String, String> texturePaths; // Lazily loaded from JSON (top, bottom, side, overlay, etc.)
     
     /**
@@ -32,7 +33,19 @@ public class Block {
      * @param solid Whether the block is solid (has collision)
      */
     public Block(boolean solid) {
+        this(solid, 0);
+    }
+    
+    /**
+     * Create a new block with the given properties and light level.
+     * Texture path will be loaded from blockstate/model JSON files.
+     * 
+     * @param solid Whether the block is solid (has collision)
+     * @param lightLevel Light emission level (0-15)
+     */
+    public Block(boolean solid, int lightLevel) {
         this.solid = solid;
+        this.lightLevel = Math.max(0, Math.min(15, lightLevel)); // Clamp to 0-15
         this.identifier = null; // Will be set during registration
     }
     
@@ -40,7 +53,15 @@ public class Block {
      * Internal constructor used during registration to set the identifier.
      */
     Block(boolean solid, String identifier) {
+        this(solid, 0, identifier);
+    }
+    
+    /**
+     * Internal constructor used during registration to set the identifier and light level.
+     */
+    Block(boolean solid, int lightLevel, String identifier) {
         this.solid = solid;
+        this.lightLevel = Math.max(0, Math.min(15, lightLevel)); // Clamp to 0-15
         this.identifier = identifier;
     }
     
@@ -56,6 +77,17 @@ public class Block {
     
     public boolean isSolid() {
         return solid;
+    }
+    
+    /**
+     * Get the light emission level of this block (0-15).
+     * 0 means no light emission, 15 is maximum brightness.
+     * For reference: torches emit 14, glowstone emits 15, lava emits 15.
+     * 
+     * @return Light level (0-15)
+     */
+    public int getLightLevel() {
+        return lightLevel;
     }
     
     /**

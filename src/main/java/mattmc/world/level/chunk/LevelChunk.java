@@ -32,6 +32,12 @@ public final class LevelChunk {
     // Block states for blocks that need them (sparse storage)
     private final Map<Long, BlockState> blockStates;
     
+    // Light level storage (0-15 for each block position)
+    // blockLight stores light emitted by blocks (torches, glowstone, etc.)
+    // skyLight stores light from the sky (affected by day/night cycle)
+    private final byte[][][] blockLight;  // [x][y][z] each value 0-15
+    private final byte[][][] skyLight;    // [x][y][z] each value 0-15
+    
     // Dirty flag: marks if chunk needs to be re-rendered (for display list caching)
     private boolean dirty = true;
     
@@ -40,11 +46,18 @@ public final class LevelChunk {
         this.chunkZ = chunkZ;
         this.blocks = new Block[WIDTH][HEIGHT][DEPTH];
         this.blockStates = new HashMap<>();
+        this.blockLight = new byte[WIDTH][HEIGHT][DEPTH];
+        this.skyLight = new byte[WIDTH][HEIGHT][DEPTH];
         
         // Initialize all blocks to air using Arrays.fill for better performance
         for (int x = 0; x < WIDTH; x++) {
             for (int y = 0; y < HEIGHT; y++) {
                 java.util.Arrays.fill(blocks[x][y], Blocks.AIR);
+                // Initialize sky light to full brightness (15) at the top
+                // This will be properly calculated by lighting engine later
+                java.util.Arrays.fill(skyLight[x][y], (byte) 0);
+                // Block light starts at 0 (no light emission)
+                java.util.Arrays.fill(blockLight[x][y], (byte) 0);
             }
         }
     }
@@ -112,6 +125,14 @@ public final class LevelChunk {
             blockStates.remove(key);
         }
         
+        // Update block light based on the block's light emission
+        // This is a simple implementation - a full lighting engine would propagate light to neighbors
+        if (block != null) {
+            setBlockLight(x, y, z, block.getLightLevel());
+        } else {
+            setBlockLight(x, y, z, 0);
+        }
+        
         this.dirty = true;  // Mark chunk as needing re-render
     }
     
@@ -127,6 +148,83 @@ public final class LevelChunk {
      */
     public void setDirty(boolean dirty) {
         this.dirty = dirty;
+    }
+    
+    /**
+     * Get the block light level at chunk-local coordinates (0-15).
+     * Block light is light emitted by blocks like torches.
+     * 
+     * @param x 0-15
+     * @param y 0-383 (world Y = y + MIN_Y)
+     * @param z 0-15
+     * @return Block light level (0-15), or 0 if out of bounds
+     */
+    public int getBlockLight(int x, int y, int z) {
+        if (x < 0 || x >= WIDTH || y < 0 || y >= HEIGHT || z < 0 || z >= DEPTH) {
+            return 0;
+        }
+        return blockLight[x][y][z] & 0x0F; // Mask to ensure 0-15 range
+    }
+    
+    /**
+     * Set the block light level at chunk-local coordinates (0-15).
+     * 
+     * @param x 0-15
+     * @param y 0-383 (world Y = y + MIN_Y)
+     * @param z 0-15
+     * @param level Light level (0-15, will be clamped)
+     */
+    public void setBlockLight(int x, int y, int z, int level) {
+        if (x < 0 || x >= WIDTH || y < 0 || y >= HEIGHT || z < 0 || z >= DEPTH) {
+            return;
+        }
+        blockLight[x][y][z] = (byte) Math.max(0, Math.min(15, level));
+        this.dirty = true;
+    }
+    
+    /**
+     * Get the sky light level at chunk-local coordinates (0-15).
+     * Sky light is light from the sky, affected by day/night cycle.
+     * 
+     * @param x 0-15
+     * @param y 0-383 (world Y = y + MIN_Y)
+     * @param z 0-15
+     * @return Sky light level (0-15), or 0 if out of bounds
+     */
+    public int getSkyLight(int x, int y, int z) {
+        if (x < 0 || x >= WIDTH || y < 0 || y >= HEIGHT || z < 0 || z >= DEPTH) {
+            return 0;
+        }
+        return skyLight[x][y][z] & 0x0F; // Mask to ensure 0-15 range
+    }
+    
+    /**
+     * Set the sky light level at chunk-local coordinates (0-15).
+     * 
+     * @param x 0-15
+     * @param y 0-383 (world Y = y + MIN_Y)
+     * @param z 0-15
+     * @param level Light level (0-15, will be clamped)
+     */
+    public void setSkyLight(int x, int y, int z, int level) {
+        if (x < 0 || x >= WIDTH || y < 0 || y >= HEIGHT || z < 0 || z >= DEPTH) {
+            return;
+        }
+        skyLight[x][y][z] = (byte) Math.max(0, Math.min(15, level));
+        this.dirty = true;
+    }
+    
+    /**
+     * Get the combined light level at chunk-local coordinates (0-15).
+     * Returns the maximum of block light and sky light.
+     * 
+     * @param x 0-15
+     * @param y 0-383 (world Y = y + MIN_Y)
+     * @param z 0-15
+     * @return Combined light level (0-15)
+     */
+    public int getLightLevel(int x, int y, int z) {
+        return Math.max(getBlockLight(x, y, z), getSkyLight(x, y, z));
     }
     
     /**

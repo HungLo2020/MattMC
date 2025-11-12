@@ -43,6 +43,9 @@ public class CreativeModeTabs {
         CreativeTabs.BUILDING_BLOCKS.addItem(Items.WARPED_PLANKS);
         CreativeTabs.BUILDING_BLOCKS.addItem(Items.BIRCH_STAIRS);
         
+        // Decoration Blocks tab
+        CreativeTabs.DECORATION_BLOCKS.addItem(Items.TORCH);
+        
         // Tools tab
         //CreativeTabs.TOOLS.addItem(Items.WOODEN_PICKAXE);
         //CreativeTabs.TOOLS.addItem(Items.STONE_PICKAXE);
