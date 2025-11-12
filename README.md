@@ -28,6 +28,11 @@ This project reimagines Minecraft with a focus on:
   - 1 byte per block: high nibble = skyLight (0-15), low nibble = blockLight (0-15)
   - Stored per 16×16×16 section for efficiency
   - Column heightmaps track topmost non-air blocks for optimization
+- **Smooth Lighting**: Mesh-time per-vertex light sampling with ambient occlusion
+  - Samples 8 nearby voxels per vertex for smooth gradients
+  - 3-block corner rule for ambient occlusion darkening
+  - Runtime toggle via `smooth_lighting` setting
+  - See [SMOOTH_LIGHTING.md](docs/SMOOTH_LIGHTING.md) for details
 
 ### Game Features
 - World creation and management
@@ -105,6 +110,7 @@ The distributable zip will be created in `build/releases/`.
 For in-depth technical information, see:
 
 - [**Chunk System**](CHUNK_SYSTEM.md) - Details on the chunk-based voxel rendering system
+- [**Smooth Lighting**](docs/SMOOTH_LIGHTING.md) - Per-vertex light sampling and ambient occlusion
 - [**Efficiency Analysis**](EFFICIENCY_ANALYSIS.md) - Performance optimizations and analysis
 - [**World Save Format**](WORLD_SAVE_FORMAT.md) - World storage format and NBT structures
 - [**Refactoring Summary**](REFACTORING_SUMMARY.md) - Architectural decisions and code organization
@@ -127,6 +133,7 @@ MattMC is in active development. Current features include:
 - ✅ Player controls and camera system
 - ✅ World generation and storage
 - ✅ Per-voxel light storage (skyLight and blockLight)
+- ✅ Smooth lighting with per-vertex sampling and ambient occlusion
 - ✅ Column heightmap tracking
 - ✅ GUI system with multiple screens
 - ✅ Settings and keybinding management
