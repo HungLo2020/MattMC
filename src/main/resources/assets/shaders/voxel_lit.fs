@@ -64,8 +64,8 @@ void main() {
     vec3 lighting = max(skyLighting, blockLighting);
     
     // Add extra block light contribution to make torches more visible
-    // This additive component ensures torches glow even when sky is bright
-    lighting += blockLighting * 0.3;
+    // Increased to 0.8 (80%) to make torches clearly visible even when using placeholder models
+    lighting += blockLighting * 0.8;
     
     // Apply lighting to albedo
     vec3 litColor = albedo * lighting;
