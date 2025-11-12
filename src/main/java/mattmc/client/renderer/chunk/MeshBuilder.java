@@ -80,14 +80,23 @@ public class MeshBuilder {
                 float[] color = extractColor(face, chunk);
                 TextureAtlas.UVMapping uvMapping = getUVMapping(face);
                 
+                // Calculate smooth lighting and AO for this face
+                float[][] vertexLighting = null;
+                if (chunk != null) {
+                    // Face direction: 0=bottom, 1=top, 2=north, 3=south, 4=west, 5=east
+                    int faceDir = type.ordinal();
+                    vertexLighting = mattmc.world.level.chunk.SmoothLighting.calculateFaceLighting(
+                        chunk, face.chunkX, face.chunkY, face.chunkZ, faceDir);
+                }
+                
                 // Add the face with correct orientation
                 switch (type) {
-                    case TOP -> addTopFace(face.x, face.y, face.z, color, uvMapping);
-                    case BOTTOM -> addBottomFace(face.x, face.y, face.z, color, uvMapping);
-                    case NORTH -> addNorthFace(face.x, face.y, face.z, color, uvMapping);
-                    case SOUTH -> addSouthFace(face.x, face.y, face.z, color, uvMapping);
-                    case WEST -> addWestFace(face.x, face.y, face.z, color, uvMapping);
-                    case EAST -> addEastFace(face.x, face.y, face.z, color, uvMapping);
+                    case TOP -> addTopFace(face.x, face.y, face.z, color, uvMapping, vertexLighting);
+                    case BOTTOM -> addBottomFace(face.x, face.y, face.z, color, uvMapping, vertexLighting);
+                    case NORTH -> addNorthFace(face.x, face.y, face.z, color, uvMapping, vertexLighting);
+                    case SOUTH -> addSouthFace(face.x, face.y, face.z, color, uvMapping, vertexLighting);
+                    case WEST -> addWestFace(face.x, face.y, face.z, color, uvMapping, vertexLighting);
+                    case EAST -> addEastFace(face.x, face.y, face.z, color, uvMapping, vertexLighting);
                 }
             }
         }
@@ -186,9 +195,33 @@ public class MeshBuilder {
     }
     
     /**
-     * Add top face vertices and indices.
+     * Apply per-vertex smooth lighting and AO to a base color.
+     * @param baseColor The base color [r, g, b, a]
+     * @param vertexData [lightLevel, aoMultiplier] where lightLevel is 0-15 and aoMultiplier is 0.0-1.0
+     * @return Modified color with smooth lighting applied
      */
-    private void addTopFace(float x, float y, float z, float[] color, TextureAtlas.UVMapping uvMapping) {
+    private float[] applyVertexLighting(float[] baseColor, float[] vertexData) {
+        float lightLevel = vertexData[0];
+        float aoMultiplier = vertexData[1];
+        
+        // Convert light level to brightness (0-15 to 0.05-1.0)
+        float lightBrightness = Math.max(0.05f, lightLevel / 15.0f);
+        
+        // Combine light brightness with AO
+        float totalMultiplier = lightBrightness * aoMultiplier;
+        
+        return new float[] {
+            baseColor[0] * totalMultiplier,
+            baseColor[1] * totalMultiplier,
+            baseColor[2] * totalMultiplier,
+            baseColor[3]  // Keep alpha unchanged
+        };
+    }
+    
+    /**
+     * Add top face vertices and indices with smooth lighting and AO.
+     */
+    private void addTopFace(float x, float y, float z, float[] color, TextureAtlas.UVMapping uvMapping, float[][] vertexLighting) {
         float x0 = x, x1 = x + 1;
         float y1 = y + 1;
         float z0 = z, z1 = z + 1;
@@ -204,11 +237,18 @@ public class MeshBuilder {
         
         int baseVertex = currentVertex;
         
-        // 4 vertices for the quad with atlas UVs
-        addVertex(x0, y1, z0, u0, v0, color); // 0
-        addVertex(x0, y1, z1, u0, v1, color); // 1
-        addVertex(x1, y1, z1, u1, v1, color); // 2
-        addVertex(x1, y1, z0, u1, v0, color); // 3
+        // 4 vertices for the quad with atlas UVs and per-vertex lighting
+        if (vertexLighting != null) {
+            addVertex(x0, y1, z0, u0, v0, applyVertexLighting(color, vertexLighting[0])); // 0
+            addVertex(x0, y1, z1, u0, v1, applyVertexLighting(color, vertexLighting[3])); // 1
+            addVertex(x1, y1, z1, u1, v1, applyVertexLighting(color, vertexLighting[2])); // 2
+            addVertex(x1, y1, z0, u1, v0, applyVertexLighting(color, vertexLighting[1])); // 3
+        } else {
+            addVertex(x0, y1, z0, u0, v0, color); // 0
+            addVertex(x0, y1, z1, u0, v1, color); // 1
+            addVertex(x1, y1, z1, u1, v1, color); // 2
+            addVertex(x1, y1, z0, u1, v0, color); // 3
+        }
         
         // 2 triangles (6 indices)
         addQuadIndices(baseVertex);
@@ -219,7 +259,10 @@ public class MeshBuilder {
     /**
      * Add bottom face vertices and indices.
      */
-    private void addBottomFace(float x, float y, float z, float[] color, TextureAtlas.UVMapping uvMapping) {
+    /**
+     * Add bottom face vertices and indices with smooth lighting and AO.
+     */
+    private void addBottomFace(float x, float y, float z, float[] color, TextureAtlas.UVMapping uvMapping, float[][] vertexLighting) {
         float x0 = x, x1 = x + 1;
         float y0 = y;
         float z0 = z, z1 = z + 1;
@@ -235,11 +278,18 @@ public class MeshBuilder {
         
         int baseVertex = currentVertex;
         
-        // 4 vertices for the quad with atlas UVs
-        addVertex(x0, y0, z0, u0, v0, color); // 0
-        addVertex(x1, y0, z0, u1, v0, color); // 1
-        addVertex(x1, y0, z1, u1, v1, color); // 2
-        addVertex(x0, y0, z1, u0, v1, color); // 3
+        // 4 vertices for the quad with atlas UVs and per-vertex lighting
+        if (vertexLighting != null) {
+            addVertex(x0, y0, z0, u0, v0, applyVertexLighting(color, vertexLighting[0])); // 0
+            addVertex(x1, y0, z0, u1, v0, applyVertexLighting(color, vertexLighting[1])); // 1
+            addVertex(x1, y0, z1, u1, v1, applyVertexLighting(color, vertexLighting[2])); // 2
+            addVertex(x0, y0, z1, u0, v1, applyVertexLighting(color, vertexLighting[3])); // 3
+        } else {
+            addVertex(x0, y0, z0, u0, v0, color); // 0
+            addVertex(x1, y0, z0, u1, v0, color); // 1
+            addVertex(x1, y0, z1, u1, v1, color); // 2
+            addVertex(x0, y0, z1, u0, v1, color); // 3
+        }
         
         // 2 triangles (6 indices)
         addQuadIndices(baseVertex);
@@ -248,9 +298,9 @@ public class MeshBuilder {
     }
     
     /**
-     * Add south face vertices and indices.
+     * Add south face vertices and indices with smooth lighting and AO.
      */
-    private void addSouthFace(float x, float y, float z, float[] color, TextureAtlas.UVMapping uvMapping) {
+    private void addSouthFace(float x, float y, float z, float[] color, TextureAtlas.UVMapping uvMapping, float[][] vertexLighting) {
         float x0 = x, x1 = x + 1;
         float y0 = y, y1 = y + 1;
         float z1 = z + 1;
@@ -266,11 +316,18 @@ public class MeshBuilder {
         
         int baseVertex = currentVertex;
         
-        // 4 vertices for the quad with atlas UVs
-        addVertex(x0, y0, z1, u0, v1, color); // 0
-        addVertex(x1, y0, z1, u1, v1, color); // 1
-        addVertex(x1, y1, z1, u1, v0, color); // 2
-        addVertex(x0, y1, z1, u0, v0, color); // 3
+        // 4 vertices for the quad with atlas UVs and per-vertex lighting
+        if (vertexLighting != null) {
+            addVertex(x0, y0, z1, u0, v1, applyVertexLighting(color, vertexLighting[0])); // 0
+            addVertex(x1, y0, z1, u1, v1, applyVertexLighting(color, vertexLighting[1])); // 1
+            addVertex(x1, y1, z1, u1, v0, applyVertexLighting(color, vertexLighting[2])); // 2
+            addVertex(x0, y1, z1, u0, v0, applyVertexLighting(color, vertexLighting[3])); // 3
+        } else {
+            addVertex(x0, y0, z1, u0, v1, color); // 0
+            addVertex(x1, y0, z1, u1, v1, color); // 1
+            addVertex(x1, y1, z1, u1, v0, color); // 2
+            addVertex(x0, y1, z1, u0, v0, color); // 3
+        }
         
         // 2 triangles (6 indices)
         addQuadIndices(baseVertex);
@@ -279,9 +336,9 @@ public class MeshBuilder {
     }
     
     /**
-     * Add west face vertices and indices.
+     * Add west face vertices and indices with smooth lighting and AO.
      */
-    private void addWestFace(float x, float y, float z, float[] color, TextureAtlas.UVMapping uvMapping) {
+    private void addWestFace(float x, float y, float z, float[] color, TextureAtlas.UVMapping uvMapping, float[][] vertexLighting) {
         float x0 = x;
         float y0 = y, y1 = y + 1;
         float z0 = z, z1 = z + 1;
@@ -297,11 +354,18 @@ public class MeshBuilder {
         
         int baseVertex = currentVertex;
         
-        // 4 vertices for the quad with atlas UVs
-        addVertex(x0, y0, z0, u0, v1, color); // 0
-        addVertex(x0, y0, z1, u1, v1, color); // 1
-        addVertex(x0, y1, z1, u1, v0, color); // 2
-        addVertex(x0, y1, z0, u0, v0, color); // 3
+        // 4 vertices for the quad with atlas UVs and per-vertex lighting
+        if (vertexLighting != null) {
+            addVertex(x0, y0, z0, u0, v1, applyVertexLighting(color, vertexLighting[0])); // 0
+            addVertex(x0, y0, z1, u1, v1, applyVertexLighting(color, vertexLighting[1])); // 1
+            addVertex(x0, y1, z1, u1, v0, applyVertexLighting(color, vertexLighting[2])); // 2
+            addVertex(x0, y1, z0, u0, v0, applyVertexLighting(color, vertexLighting[3])); // 3
+        } else {
+            addVertex(x0, y0, z0, u0, v1, color); // 0
+            addVertex(x0, y0, z1, u1, v1, color); // 1
+            addVertex(x0, y1, z1, u1, v0, color); // 2
+            addVertex(x0, y1, z0, u0, v0, color); // 3
+        }
         
         // 2 triangles (6 indices)
         addQuadIndices(baseVertex);
@@ -310,9 +374,9 @@ public class MeshBuilder {
     }
     
     /**
-     * Add east face vertices and indices.
+     * Add east face vertices and indices with smooth lighting and AO.
      */
-    private void addEastFace(float x, float y, float z, float[] color, TextureAtlas.UVMapping uvMapping) {
+    private void addEastFace(float x, float y, float z, float[] color, TextureAtlas.UVMapping uvMapping, float[][] vertexLighting) {
         float x1 = x + 1;
         float y0 = y, y1 = y + 1;
         float z0 = z, z1 = z + 1;
@@ -328,11 +392,18 @@ public class MeshBuilder {
         
         int baseVertex = currentVertex;
         
-        // 4 vertices for the quad with atlas UVs
-        addVertex(x1, y0, z1, u1, v1, color); // 0
-        addVertex(x1, y0, z0, u0, v1, color); // 1
-        addVertex(x1, y1, z0, u0, v0, color); // 2
-        addVertex(x1, y1, z1, u1, v0, color); // 3
+        // 4 vertices for the quad with atlas UVs and per-vertex lighting
+        if (vertexLighting != null) {
+            addVertex(x1, y0, z1, u1, v1, applyVertexLighting(color, vertexLighting[1])); // 0
+            addVertex(x1, y0, z0, u0, v1, applyVertexLighting(color, vertexLighting[0])); // 1
+            addVertex(x1, y1, z0, u0, v0, applyVertexLighting(color, vertexLighting[3])); // 2
+            addVertex(x1, y1, z1, u1, v0, applyVertexLighting(color, vertexLighting[2])); // 3
+        } else {
+            addVertex(x1, y0, z1, u1, v1, color); // 0
+            addVertex(x1, y0, z0, u0, v1, color); // 1
+            addVertex(x1, y1, z0, u0, v0, color); // 2
+            addVertex(x1, y1, z1, u1, v0, color); // 3
+        }
         
         // 2 triangles (6 indices)
         addQuadIndices(baseVertex);
@@ -341,9 +412,9 @@ public class MeshBuilder {
     }
     
     /**
-     * Add north face vertices and indices.
+     * Add north face vertices and indices with smooth lighting and AO.
      */
-    private void addNorthFace(float x, float y, float z, float[] color, TextureAtlas.UVMapping uvMapping) {
+    private void addNorthFace(float x, float y, float z, float[] color, TextureAtlas.UVMapping uvMapping, float[][] vertexLighting) {
         float x0 = x, x1 = x + 1;
         float y0 = y, y1 = y + 1;
         float z0 = z;
@@ -359,11 +430,18 @@ public class MeshBuilder {
         
         int baseVertex = currentVertex;
         
-        // 4 vertices for the quad with atlas UVs
-        addVertex(x1, y0, z0, u1, v1, color); // 0
-        addVertex(x0, y0, z0, u0, v1, color); // 1
-        addVertex(x0, y1, z0, u0, v0, color); // 2
-        addVertex(x1, y1, z0, u1, v0, color); // 3
+        // 4 vertices for the quad with atlas UVs and per-vertex lighting
+        if (vertexLighting != null) {
+            addVertex(x1, y0, z0, u1, v1, applyVertexLighting(color, vertexLighting[1])); // 0
+            addVertex(x0, y0, z0, u0, v1, applyVertexLighting(color, vertexLighting[0])); // 1
+            addVertex(x0, y1, z0, u0, v0, applyVertexLighting(color, vertexLighting[3])); // 2
+            addVertex(x1, y1, z0, u1, v0, applyVertexLighting(color, vertexLighting[2])); // 3
+        } else {
+            addVertex(x1, y0, z0, u1, v1, color); // 0
+            addVertex(x0, y0, z0, u0, v1, color); // 1
+            addVertex(x0, y1, z0, u0, v0, color); // 2
+            addVertex(x1, y1, z0, u1, v0, color); // 3
+        }
         
         // 2 triangles (6 indices)
         addQuadIndices(baseVertex);
