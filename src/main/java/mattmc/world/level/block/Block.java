@@ -23,6 +23,7 @@ public class Block {
     
     private final boolean solid;
     private final String identifier;
+    private final int lightEmission; // Light level emitted by this block (0-15)
     private Map<String, String> texturePaths; // Lazily loaded from JSON (top, bottom, side, overlay, etc.)
     
     /**
@@ -32,15 +33,27 @@ public class Block {
      * @param solid Whether the block is solid (has collision)
      */
     public Block(boolean solid) {
+        this(solid, 0);
+    }
+    
+    /**
+     * Create a new block with light emission.
+     * 
+     * @param solid Whether the block is solid (has collision)
+     * @param lightEmission Light level emitted by this block (0-15)
+     */
+    public Block(boolean solid, int lightEmission) {
         this.solid = solid;
+        this.lightEmission = Math.max(0, Math.min(15, lightEmission));
         this.identifier = null; // Will be set during registration
     }
     
     /**
      * Internal constructor used during registration to set the identifier.
      */
-    Block(boolean solid, String identifier) {
+    Block(boolean solid, int lightEmission, String identifier) {
         this.solid = solid;
+        this.lightEmission = Math.max(0, Math.min(15, lightEmission));
         this.identifier = identifier;
     }
     
@@ -140,6 +153,15 @@ public class Block {
     public boolean isOpaque() {
         // Air is not opaque; solid blocks are opaque
         return solid;
+    }
+    
+    /**
+     * Get the light level emitted by this block.
+     * 
+     * @return Light emission level (0-15), where 0 means no light emission
+     */
+    public int getLightEmission() {
+        return lightEmission;
     }
     
     /**
