@@ -76,4 +76,12 @@ public class VoxelLitShader extends Shader {
     public void setTextureSampler(int unit) {
         setUniform1i("uTexture", unit);
     }
+    
+    /**
+     * Set the sky brightness multiplier (0.0 to 1.0).
+     * This dims ambient sky lighting during night time.
+     */
+    public void setSkyBrightness(float brightness) {
+        setUniform1f("uSkyBrightness", brightness);
+    }
 }

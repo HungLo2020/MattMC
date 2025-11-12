@@ -66,9 +66,12 @@ public class ChunkRenderer {
      * @param cameraX Camera X position for fog
      * @param cameraY Camera Y position for fog
      * @param cameraZ Camera Z position for fog
+     * @param skyBrightness Sky brightness multiplier (0.0-1.0) from day cycle
+     * @param sunDirection Sun direction vector [x, y, z] from day cycle
      * @return true if the chunk was rendered, false if no VAO available
      */
-    public boolean renderChunk(LevelChunk chunk, float cameraX, float cameraY, float cameraZ) {
+    public boolean renderChunk(LevelChunk chunk, float cameraX, float cameraY, float cameraZ, 
+                              float skyBrightness, float[] sunDirection) {
         // Get VAO
         ChunkVAO vao = vaoCache.get(chunk);
         if (vao == null) {
@@ -89,13 +92,16 @@ public class ChunkRenderer {
         shader.setCameraPosition(cameraX, cameraY, cameraZ);
         shader.setTextureSampler(0); // Texture unit 0
         
-        // Sun settings - pointing down and slightly to the side (typical morning/afternoon sun)
-        shader.setSunDirection(0.3f, -0.8f, 0.5f);
+        // Sun settings from day cycle
+        shader.setSunDirection(sunDirection[0], sunDirection[1], sunDirection[2]);
         shader.setSunColor(0.6f, 0.6f, 0.55f); // Neutral sun color
         
         // Ambient settings - moderate values for natural look
         shader.setAmbientSky(0.4f, 0.45f, 0.5f); // Cool blue sky ambient
         shader.setAmbientBlock(0.9f, 0.7f, 0.4f); // Warm torch/block light
+        
+        // Sky brightness (dims lighting at night)
+        shader.setSkyBrightness(skyBrightness);
         
         // Fog settings
         shader.setFogColor(0.5f, 0.7f, 1.0f); // Sky blue fog (linear space)
@@ -121,13 +127,13 @@ public class ChunkRenderer {
     
     /**
      * Render a chunk using VBO/VAO with lit shader (backward compatibility).
-     * Uses default camera position at origin.
+     * Uses default camera position at origin and full brightness.
      * 
      * @param chunk The chunk to render
      * @return true if the chunk was rendered, false if no VAO available
      */
     public boolean renderChunk(LevelChunk chunk) {
-        return renderChunk(chunk, 0, 0, 0);
+        return renderChunk(chunk, 0, 0, 0, 1.0f, new float[]{0.3f, -0.8f, 0.5f});
     }
     
     /**
