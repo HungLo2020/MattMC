@@ -24,6 +24,10 @@ This project reimagines Minecraft with a focus on:
 - **Y-Coordinate Range**: -64 to 319 (384 blocks total)
 - **World Save Format**: Region-based storage with NBT data structures
 - **Block Models**: JSON-based block models and blockstates system
+- **Light Storage**: Per-voxel light data with 16 levels each for sky and block light
+  - 1 byte per block: high nibble = skyLight (0-15), low nibble = blockLight (0-15)
+  - Stored per 16×16×16 section for efficiency
+  - Column heightmaps track topmost non-air blocks for optimization
 
 ### Game Features
 - World creation and management
@@ -122,6 +126,8 @@ MattMC is in active development. Current features include:
 - ✅ Core rendering engine with optimized chunk rendering
 - ✅ Player controls and camera system
 - ✅ World generation and storage
+- ✅ Per-voxel light storage (skyLight and blockLight)
+- ✅ Column heightmap tracking
 - ✅ GUI system with multiple screens
 - ✅ Settings and keybinding management
 - ✅ Save/load functionality
