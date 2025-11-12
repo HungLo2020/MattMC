@@ -132,6 +132,17 @@ public class Block {
     }
     
     /**
+     * Check if this block is opaque and stops skylight propagation.
+     * Opaque blocks prevent skylight from passing through them.
+     * 
+     * @return true if the block is opaque (blocks skylight)
+     */
+    public boolean isOpaque() {
+        // Air is not opaque; solid blocks are opaque
+        return solid;
+    }
+    
+    /**
      * Get the collision shape for this block.
      * Override this method in subclasses to provide custom collision shapes.
      * 
