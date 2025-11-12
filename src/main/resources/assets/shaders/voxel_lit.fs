@@ -16,6 +16,7 @@ uniform vec3 uAmbientSky;    // Sky ambient color
 uniform vec3 uAmbientBlock;  // Block light ambient color
 uniform float uGamma;        // Gamma value (typically 2.2)
 uniform vec3 uFogColor;      // Fog color
+uniform float uSkyBrightness; // Sky brightness multiplier (0.0-1.0) for day/night cycle
 
 void main() {
     // Sample texture
@@ -41,12 +42,13 @@ void main() {
     else if (ao >= 1.0) aoFactor = 0.8;
     
     // Calculate ambient lighting from both sources
-    vec3 skyAmbient = uAmbientSky * skyLightNorm;
+    // Apply sky brightness multiplier to dim ambient sky light at night
+    vec3 skyAmbient = uAmbientSky * skyLightNorm * uSkyBrightness;
     vec3 blockAmbient = uAmbientBlock * blockLightNorm;
     
     // Calculate Lambert diffuse from sun (N·L)
     float NdotL = max(dot(normalize(vNormal), normalize(uSunDir)), 0.0);
-    vec3 sunDiffuse = uSunColor * NdotL * skyLightNorm;
+    vec3 sunDiffuse = uSunColor * NdotL * skyLightNorm * uSkyBrightness;
     
     // Combine sky lighting (ambient + sun)
     vec3 skyLighting = skyAmbient + sunDiffuse;
