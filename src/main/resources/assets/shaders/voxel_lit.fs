@@ -12,7 +12,7 @@ varying float vViewDepth;
 
 // Uniforms
 uniform sampler2D uTexture;
-uniform sampler2DArrayShadow uShadowMap;  // Shadow map texture array
+uniform sampler2DArray uShadowMap;  // Shadow map texture array (depth)
 uniform vec3 uSunDir;        // Normalized sun direction vector
 uniform vec3 uSunColor;      // Sun color
 uniform vec3 uAmbientSky;    // Sky ambient color
@@ -23,7 +23,7 @@ uniform float uSkyBrightness; // Sky brightness multiplier (0.0-1.0) for day/nig
 
 // Shadow cascade uniforms
 uniform mat4 uLightViewProj[4];  // Light view-projection matrices for each cascade
-uniform vec4 uCascadeSplits;     // Cascade split distances (near/far pairs)
+uniform vec4 uCascadeSplits;     // Cascade split distances (far splits)
 uniform int uNumCascades;        // Number of active cascades
 uniform bool uShadowsEnabled;    // Whether shadows are enabled
 
@@ -33,14 +33,18 @@ uniform bool uShadowsEnabled;    // Whether shadows are enabled
  */
 float sampleShadowMapPCF(vec3 shadowCoord, int cascadeIndex) {
     float shadow = 0.0;
-    vec2 texelSize = vec2(1.0 / 1024.0); // Adjust based on shadow map resolution
+    vec2 texelSize = vec2(1.0 / 1536.0); // Texel size for shadow map
+    float currentDepth = shadowCoord.z;
     
     // 3x3 PCF kernel
     for (int x = -1; x <= 1; x++) {
         for (int y = -1; y <= 1; y++) {
             vec2 offset = vec2(x, y) * texelSize;
-            vec4 shadowSample = vec4(shadowCoord.xy + offset, float(cascadeIndex), shadowCoord.z);
-            shadow += shadow2DArray(uShadowMap, shadowSample).r;
+            vec3 sampleCoord = vec3(shadowCoord.xy + offset, float(cascadeIndex));
+            float sampledDepth = texture2DArray(uShadowMap, sampleCoord).r;
+            
+            // Compare depths - if current is deeper, we're in shadow
+            shadow += (currentDepth - 0.005 < sampledDepth) ? 1.0 : 0.0;
         }
     }
     
@@ -87,30 +91,8 @@ float calculateShadow() {
         return 1.0; // Outside shadow map, assume lit
     }
     
-    // Apply depth bias to reduce shadow acne
-    float bias = 0.005;
-    shadowCoord.z -= bias;
-    
     // Sample shadow map with PCF
     float shadowFactor = sampleShadowMapPCF(shadowCoord, cascadeIndex);
-    
-    // Blend with next cascade near split boundaries to reduce popping
-    float blendRange = 5.0; // Distance over which to blend cascades
-    if (cascadeIndex < uNumCascades - 1) {
-        float nextSplit = uCascadeSplits[cascadeIndex];
-        float blendFactor = clamp((nextSplit - vViewDepth) / blendRange, 0.0, 1.0);
-        
-        if (blendFactor < 1.0) {
-            // Sample next cascade
-            vec4 nextLightClipPos = uLightViewProj[cascadeIndex + 1] * vec4(vWorldPos, 1.0);
-            vec3 nextShadowCoord = nextLightClipPos.xyz / nextLightClipPos.w;
-            nextShadowCoord = nextShadowCoord * 0.5 + 0.5;
-            nextShadowCoord.z -= bias;
-            
-            float nextShadowFactor = sampleShadowMapPCF(nextShadowCoord, cascadeIndex + 1);
-            shadowFactor = mix(nextShadowFactor, shadowFactor, blendFactor);
-        }
-    }
     
     return shadowFactor;
 }
