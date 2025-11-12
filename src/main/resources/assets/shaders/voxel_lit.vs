@@ -27,7 +27,7 @@ void main() {
     
     // Calculate fog factor (exponential squared fog)
     float distance = length(worldPos.xyz - uCameraPos);
-    const float fogDensity = 0.015; // Adjust for desired fog thickness
+    const float fogDensity = 0.0035; // Reduced density for more distant fog
     float fogAmount = 1.0 - exp(-pow(distance * fogDensity, 2.0));
     vFogFactor = clamp(fogAmount, 0.0, 1.0);
 }
