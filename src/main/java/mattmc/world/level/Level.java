@@ -379,6 +379,12 @@ public class Level implements LevelAccessor {
         int localZ = Math.floorMod(worldZ, LevelChunk.DEPTH);
         
         LevelChunk chunk = getChunk(chunkX, chunkZ);
+        
+        // Check if we're removing a light-emitting block
+        Block oldBlock = chunk.getBlock(localX, chunkY, localZ);
+        boolean removingLight = oldBlock != null && oldBlock.getLightLevel() > 0 && 
+                                (block == null || block.getLightLevel() == 0);
+        
         chunk.setBlock(localX, chunkY, localZ, block, state);
         
         // Mark adjacent chunks as dirty if the block is at a chunk boundary
@@ -411,7 +417,13 @@ public class Level implements LevelAccessor {
             }
         }
         
-        // Propagate block light if the block emits light
+        // Handle light removal and propagation
+        if (removingLight) {
+            // Remove light from the old light source
+            removeLightSource(worldX, chunkY, worldZ, oldBlock.getLightLevel());
+        }
+        
+        // Propagate block light if the new block emits light
         if (block.getLightLevel() > 0) {
             propagateBlockLight(worldX, chunkY, worldZ);
         }
@@ -531,6 +543,123 @@ public class Level implements LevelAccessor {
             propagateLightRecursive(worldX, chunkY - 1, worldZ, nextLight, visited, dirtyChunks);
             propagateLightRecursive(worldX, chunkY, worldZ + 1, nextLight, visited, dirtyChunks);
             propagateLightRecursive(worldX, chunkY, worldZ - 1, nextLight, visited, dirtyChunks);
+        }
+    }
+    
+    /**
+     * Remove light from a light source that was just broken.
+     * Uses a flood-fill to find all blocks lit by this source and clears them,
+     * then re-propagates light from neighboring sources.
+     * 
+     * @param sourceX World X coordinate of the removed light source
+     * @param sourceY Chunk Y coordinate of the removed light source
+     * @param sourceZ World Z coordinate of the removed light source
+     * @param oldLightLevel The light level of the removed source
+     */
+    private void removeLightSource(int sourceX, int sourceY, int sourceZ, int oldLightLevel) {
+        // Track positions to clear and chunks that need updating
+        java.util.Queue<LightNode> toRemove = new java.util.LinkedList<>();
+        java.util.Set<Long> visited = new java.util.HashSet<>();
+        java.util.Set<LevelChunk> dirtyChunks = new java.util.HashSet<>();
+        java.util.List<LightNode> borderNodes = new java.util.ArrayList<>();
+        
+        // Start from the source position
+        toRemove.add(new LightNode(sourceX, sourceY, sourceZ, oldLightLevel));
+        
+        // BFS to find all blocks that need light removed
+        while (!toRemove.isEmpty()) {
+            LightNode node = toRemove.poll();
+            
+            long posKey = ((long)node.x & 0xFFFFFFFFL) << 32 | 
+                         ((long)node.y & 0xFFFFL) << 16 | 
+                         ((long)node.z & 0xFFFFL);
+            if (visited.contains(posKey)) {
+                continue;
+            }
+            visited.add(posKey);
+            
+            // Get chunk and local coordinates
+            int chunkX = Math.floorDiv(node.x, LevelChunk.WIDTH);
+            int chunkZ = Math.floorDiv(node.z, LevelChunk.DEPTH);
+            int localX = Math.floorMod(node.x, LevelChunk.WIDTH);
+            int localZ = Math.floorMod(node.z, LevelChunk.DEPTH);
+            
+            LevelChunk chunk = getChunkIfLoaded(chunkX, chunkZ);
+            if (chunk == null || node.y < 0 || node.y >= LevelChunk.HEIGHT) {
+                continue;
+            }
+            
+            int currentLight = chunk.getBlockLight(localX, node.y, localZ);
+            
+            // If this block's light is from the removed source, clear it
+            if (currentLight > 0 && currentLight < node.lightLevel) {
+                chunk.setBlockLight(localX, node.y, localZ, 0);
+                dirtyChunks.add(chunk);
+                
+                // Check neighbors
+                addNeighborsForRemoval(node.x, node.y, node.z, currentLight, toRemove);
+            } else if (currentLight >= node.lightLevel) {
+                // This block has light from another source, mark it for re-propagation
+                borderNodes.add(new LightNode(node.x, node.y, node.z, currentLight));
+            }
+        }
+        
+        // Re-propagate light from border nodes (blocks with other light sources)
+        for (LightNode borderNode : borderNodes) {
+            int chunkX = Math.floorDiv(borderNode.x, LevelChunk.WIDTH);
+            int chunkZ = Math.floorDiv(borderNode.z, LevelChunk.DEPTH);
+            int localX = Math.floorMod(borderNode.x, LevelChunk.WIDTH);
+            int localZ = Math.floorMod(borderNode.z, LevelChunk.DEPTH);
+            
+            LevelChunk chunk = getChunkIfLoaded(chunkX, chunkZ);
+            if (chunk == null) continue;
+            
+            Block block = chunk.getBlock(localX, borderNode.y, localZ);
+            if (block != null && block.getLightLevel() > 0) {
+                // This is a light-emitting block, re-propagate from it
+                propagateBlockLight(borderNode.x, borderNode.y, borderNode.z);
+            } else {
+                // Re-propagate from this position
+                int lightLevel = chunk.getBlockLight(localX, borderNode.y, localZ);
+                if (lightLevel > 0) {
+                    java.util.Set<Long> repropVisited = new java.util.HashSet<>();
+                    propagateLightRecursive(borderNode.x, borderNode.y, borderNode.z, 
+                                          lightLevel, repropVisited, dirtyChunks);
+                }
+            }
+        }
+        
+        // Mark all affected chunks as dirty
+        for (LevelChunk chunk : dirtyChunks) {
+            chunk.setDirty(true);
+        }
+    }
+    
+    /**
+     * Add neighbors of a position to the removal queue.
+     */
+    private void addNeighborsForRemoval(int x, int y, int z, int lightLevel, 
+                                        java.util.Queue<LightNode> queue) {
+        queue.add(new LightNode(x + 1, y, z, lightLevel));
+        queue.add(new LightNode(x - 1, y, z, lightLevel));
+        queue.add(new LightNode(x, y + 1, z, lightLevel));
+        queue.add(new LightNode(x, y - 1, z, lightLevel));
+        queue.add(new LightNode(x, y, z + 1, lightLevel));
+        queue.add(new LightNode(x, y, z - 1, lightLevel));
+    }
+    
+    /**
+     * Helper class for light removal algorithm.
+     */
+    private static class LightNode {
+        final int x, y, z;
+        final int lightLevel;
+        
+        LightNode(int x, int y, int z, int lightLevel) {
+            this.x = x;
+            this.y = y;
+            this.z = z;
+            this.lightLevel = lightLevel;
         }
     }
     

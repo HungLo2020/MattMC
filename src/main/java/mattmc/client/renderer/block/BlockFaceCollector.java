@@ -129,16 +129,19 @@ public class BlockFaceCollector {
     
     /**
      * Convert a light level (0-15) to a brightness multiplier (0.0-1.0).
-     * Uses Minecraft's lighting formula with a minimum brightness to prevent complete darkness.
+     * Uses a custom formula to ensure visibility even at low light levels.
      * 
      * @param lightLevel Light level from 0 (dark) to 15 (bright)
-     * @return Brightness multiplier from ~0.05 (minimum) to 1.0 (maximum)
+     * @return Brightness multiplier from ~0.25 (minimum) to 1.0 (maximum)
      */
     private float calculateBrightnessFromLightLevel(int lightLevel) {
-        // Minecraft's formula: brightness = 0.05 + (lightLevel / 15.0) * 0.95
-        // This ensures blocks are never completely black (minimum 5% brightness)
+        // Adjusted formula: brightness = 0.25 + (lightLevel / 15.0) * 0.75
+        // This ensures blocks are never too dark (minimum 25% brightness)
         // and full light (15) gives 100% brightness
-        return 0.05f + (lightLevel / 15.0f) * 0.95f;
+        // Light level 0: 0.25 (25%)
+        // Light level 7: 0.60 (60%)
+        // Light level 15: 1.00 (100%)
+        return 0.25f + (lightLevel / 15.0f) * 0.75f;
     }
     
     /**
