@@ -410,6 +410,111 @@ public class Level implements LevelAccessor {
                 southChunk.setDirty(true);
             }
         }
+        
+        // Propagate block light if the block emits light
+        if (block.getLightLevel() > 0) {
+            propagateBlockLight(worldX, chunkY, worldZ);
+        }
+    }
+    
+    /**
+     * Propagate block light from a light source using flood-fill algorithm.
+     * Light decreases by 1 for each block distance from the source.
+     * 
+     * @param sourceX World X coordinate of the light source
+     * @param sourceY Chunk Y coordinate of the light source
+     * @param sourceZ World Z coordinate of the light source
+     */
+    private void propagateBlockLight(int sourceX, int sourceY, int sourceZ) {
+        // Get the chunk containing the source
+        int chunkX = Math.floorDiv(sourceX, LevelChunk.WIDTH);
+        int chunkZ = Math.floorDiv(sourceZ, LevelChunk.DEPTH);
+        int localX = Math.floorMod(sourceX, LevelChunk.WIDTH);
+        int localZ = Math.floorMod(sourceZ, LevelChunk.DEPTH);
+        
+        LevelChunk sourceChunk = getChunkIfLoaded(chunkX, chunkZ);
+        if (sourceChunk == null) {
+            return;
+        }
+        
+        Block sourceBlock = sourceChunk.getBlock(localX, sourceY, localZ);
+        int sourceLightLevel = sourceBlock.getLightLevel();
+        
+        // Track which chunks were modified for re-rendering
+        java.util.Set<LevelChunk> dirtyChunks = new java.util.HashSet<>();
+        
+        // Use a simple flood-fill approach to propagate light
+        // This is a simplified version - a full implementation would use a queue
+        propagateLightRecursive(sourceX, sourceY, sourceZ, sourceLightLevel, new java.util.HashSet<>(), dirtyChunks);
+        
+        // Mark all affected chunks as dirty for re-rendering
+        for (LevelChunk chunk : dirtyChunks) {
+            chunk.setDirty(true);
+        }
+    }
+    
+    /**
+     * Recursively propagate light to neighboring blocks.
+     * 
+     * @param worldX World X coordinate
+     * @param chunkY Chunk Y coordinate  
+     * @param worldZ World Z coordinate
+     * @param lightLevel Current light level to propagate
+     * @param visited Set of visited positions to prevent infinite recursion
+     * @param dirtyChunks Set to track which chunks need re-rendering
+     */
+    private void propagateLightRecursive(int worldX, int chunkY, int worldZ, int lightLevel, 
+                                        java.util.Set<Long> visited, java.util.Set<LevelChunk> dirtyChunks) {
+        if (lightLevel <= 0) {
+            return; // No more light to propagate
+        }
+        
+        // Create position key for visited tracking
+        long posKey = ((long)worldX << 32) | ((long)chunkY << 16) | (long)worldZ;
+        if (visited.contains(posKey)) {
+            return; // Already visited this position
+        }
+        visited.add(posKey);
+        
+        // Get chunk and local coordinates
+        int chunkX = Math.floorDiv(worldX, LevelChunk.WIDTH);
+        int chunkZ = Math.floorDiv(worldZ, LevelChunk.DEPTH);
+        int localX = Math.floorMod(worldX, LevelChunk.WIDTH);
+        int localZ = Math.floorMod(worldZ, LevelChunk.DEPTH);
+        
+        LevelChunk chunk = getChunkIfLoaded(chunkX, chunkZ);
+        if (chunk == null) {
+            return;
+        }
+        
+        // Check if this position is within valid Y bounds
+        if (chunkY < 0 || chunkY >= LevelChunk.HEIGHT) {
+            return;
+        }
+        
+        // Get current block light at this position
+        int currentLight = chunk.getBlockLight(localX, chunkY, localZ);
+        
+        // Only update if new light level is brighter
+        if (lightLevel > currentLight) {
+            chunk.setBlockLight(localX, chunkY, localZ, lightLevel);
+            dirtyChunks.add(chunk); // Mark chunk for re-rendering
+            
+            // Check if block is solid (blocks light)
+            Block block = chunk.getBlock(localX, chunkY, localZ);
+            if (block.isSolid()) {
+                return; // Solid blocks stop light propagation
+            }
+            
+            // Propagate to all 6 neighbors with reduced light level
+            int nextLight = lightLevel - 1;
+            propagateLightRecursive(worldX + 1, chunkY, worldZ, nextLight, visited, dirtyChunks);
+            propagateLightRecursive(worldX - 1, chunkY, worldZ, nextLight, visited, dirtyChunks);
+            propagateLightRecursive(worldX, chunkY + 1, worldZ, nextLight, visited, dirtyChunks);
+            propagateLightRecursive(worldX, chunkY - 1, worldZ, nextLight, visited, dirtyChunks);
+            propagateLightRecursive(worldX, chunkY, worldZ + 1, nextLight, visited, dirtyChunks);
+            propagateLightRecursive(worldX, chunkY, worldZ - 1, nextLight, visited, dirtyChunks);
+        }
     }
     
     /**
