@@ -243,19 +243,39 @@ public class VertexLightSampler {
     
     /**
      * Get the 8 sample offsets for light interpolation around a vertex.
+     * 
+     * For proper smooth lighting, we need to sample all 8 blocks that touch
+     * the vertex. The vertex is at the corner of the current block, so we need
+     * to sample in all 8 octants around that corner point.
      */
     private int[][] getSampleOffsets(Normal normal, int cornerIndex) {
-        // For simplicity, we sample the block itself and its immediate neighbors
-        // A more accurate implementation would sample all 8 voxels around the vertex
-        
-        // For now, return a simplified set of 4 samples (the face's block and 3 neighbors)
+        // Get the corner position relative to the block
         int[] corner = getCornerOffset(normal, cornerIndex);
         
+        // Determine which blocks touch this vertex
+        // A vertex at position (cx, cy, cz) is touched by blocks in a 2x2x2 cube
+        // The cube ranges from (cx-1 to cx) in X, (cy-1 to cy) in Y, (cz-1 to cz) in Z
+        // But we need to shift based on which corner we're at
+        
+        // For each axis, if corner offset is 0, we sample current and -1
+        // If corner offset is 1, we sample current and +1
+        int x0 = corner[0] == 0 ? -1 : 0;
+        int x1 = corner[0] == 0 ? 0 : 1;
+        int y0 = corner[1] == 0 ? -1 : 0;
+        int y1 = corner[1] == 0 ? 0 : 1;
+        int z0 = corner[2] == 0 ? -1 : 0;
+        int z1 = corner[2] == 0 ? 0 : 1;
+        
+        // Return all 8 combinations
         return new int[][]{
-            {0, 0, 0},           // The block itself
-            {corner[0], 0, 0},    // X neighbor
-            {0, corner[1], 0},    // Y neighbor
-            {0, 0, corner[2]},    // Z neighbor
+            {x0, y0, z0},
+            {x0, y0, z1},
+            {x0, y1, z0},
+            {x0, y1, z1},
+            {x1, y0, z0},
+            {x1, y0, z1},
+            {x1, y1, z0},
+            {x1, y1, z1}
         };
     }
     
