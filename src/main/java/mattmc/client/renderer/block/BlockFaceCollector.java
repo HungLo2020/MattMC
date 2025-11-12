@@ -71,14 +71,24 @@ public class BlockFaceCollector {
             // Get the blockstate for this position
             mattmc.world.level.block.state.BlockState state = chunk.getBlockState(cx, cy, cz);
             int color = 0xFFFFFF;
+            
+            // Calculate brightness from light level (0-15) to (0.0-1.0)
+            // Minecraft uses a minimum brightness to ensure blocks aren't completely black
+            int lightLevel = chunk.getLightLevel(cx, cy, cz);
+            float lightBrightness = calculateBrightnessFromLightLevel(lightLevel);
+            
             // Add to topFaces with a special marker, storing blockstate in the FaceData
-            topFaces.add(new FaceData(x, y, z, color, 1f, 1f, block, "stairs", null, state));
+            topFaces.add(new FaceData(x, y, z, color, lightBrightness, lightBrightness, block, "stairs", null, state));
             return;
         }
         
         // Use white color (0xFFFFFF) by default - textures will show their natural colors
         // Fallback magenta color will only be applied if texture is missing (handled in bindTextureForBlock)
         int color = 0xFFFFFF;
+        
+        // Get the light level for this block position (0-15)
+        int lightLevel = chunk.getLightLevel(cx, cy, cz);
+        float lightBrightness = calculateBrightnessFromLightLevel(lightLevel);
         
         // Track which faces are visible for outline rendering
         boolean topVisible = shouldRenderFace(chunk, cx, cy + 1, cz);
@@ -89,31 +99,46 @@ public class BlockFaceCollector {
         boolean eastVisible = shouldRenderFace(chunk, cx + 1, cy, cz);
         
         // Collect visible faces for batched rendering
+        // Combine directional brightness (for shading) with light level brightness
         // Store both the adjusted color and the brightness factor for fallback color
         if (topVisible) {
-            topFaces.add(new FaceData(x, y, z, color, 1f, 1f, block, "top", 
+            topFaces.add(new FaceData(x, y, z, color, lightBrightness * 1.0f, lightBrightness * 1.0f, block, "top", 
                 BlockFaceGeometry::drawTopFace));
         }
         if (bottomVisible) {
-            bottomFaces.add(new FaceData(x, y, z, ColorUtils.darkenColor(color), 1f, 0.5f, block, "bottom", 
+            bottomFaces.add(new FaceData(x, y, z, ColorUtils.darkenColor(color), lightBrightness * 0.5f, lightBrightness * 0.5f, block, "bottom", 
                 BlockFaceGeometry::drawBottomFace));
         }
         if (northVisible) {
-            northFaces.add(new FaceData(x, y, z, ColorUtils.adjustColorBrightness(color, 0.8f), 1f, 0.8f, block, "side", 
+            northFaces.add(new FaceData(x, y, z, ColorUtils.adjustColorBrightness(color, 0.8f), lightBrightness * 0.8f, lightBrightness * 0.8f, block, "side", 
                 BlockFaceGeometry::drawNorthFace));
         }
         if (southVisible) {
-            southFaces.add(new FaceData(x, y, z, ColorUtils.adjustColorBrightness(color, 0.8f), 1f, 0.8f, block, "side", 
+            southFaces.add(new FaceData(x, y, z, ColorUtils.adjustColorBrightness(color, 0.8f), lightBrightness * 0.8f, lightBrightness * 0.8f, block, "side", 
                 BlockFaceGeometry::drawSouthFace));
         }
         if (westVisible) {
-            westFaces.add(new FaceData(x, y, z, ColorUtils.adjustColorBrightness(color, 0.6f), 1f, 0.6f, block, "side", 
+            westFaces.add(new FaceData(x, y, z, ColorUtils.adjustColorBrightness(color, 0.6f), lightBrightness * 0.6f, lightBrightness * 0.6f, block, "side", 
                 BlockFaceGeometry::drawWestFace));
         }
         if (eastVisible) {
-            eastFaces.add(new FaceData(x, y, z, ColorUtils.adjustColorBrightness(color, 0.6f), 1f, 0.6f, block, "side", 
+            eastFaces.add(new FaceData(x, y, z, ColorUtils.adjustColorBrightness(color, 0.6f), lightBrightness * 0.6f, lightBrightness * 0.6f, block, "side", 
                 BlockFaceGeometry::drawEastFace));
         }
+    }
+    
+    /**
+     * Convert a light level (0-15) to a brightness multiplier (0.0-1.0).
+     * Uses Minecraft's lighting formula with a minimum brightness to prevent complete darkness.
+     * 
+     * @param lightLevel Light level from 0 (dark) to 15 (bright)
+     * @return Brightness multiplier from ~0.05 (minimum) to 1.0 (maximum)
+     */
+    private float calculateBrightnessFromLightLevel(int lightLevel) {
+        // Minecraft's formula: brightness = 0.05 + (lightLevel / 15.0) * 0.95
+        // This ensures blocks are never completely black (minimum 5% brightness)
+        // and full light (15) gives 100% brightness
+        return 0.05f + (lightLevel / 15.0f) * 0.95f;
     }
     
     /**

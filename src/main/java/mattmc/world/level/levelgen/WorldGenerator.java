@@ -147,5 +147,35 @@ public class WorldGenerator {
                 }
             }
         }
+        
+        // Initialize sky light after terrain generation
+        initializeSkyLight(chunk);
+    }
+    
+    /**
+     * Initialize sky light for a chunk after terrain generation.
+     * Sky light propagates downward from the top of the world until it hits a solid block.
+     */
+    private void initializeSkyLight(mattmc.world.level.chunk.LevelChunk chunk) {
+        // For each column in the chunk
+        for (int localX = 0; localX < mattmc.world.level.chunk.LevelChunk.WIDTH; localX++) {
+            for (int localZ = 0; localZ < mattmc.world.level.chunk.LevelChunk.DEPTH; localZ++) {
+                // Start from the top with full sky light (15)
+                int currentSkyLight = 15;
+                
+                // Propagate downward
+                for (int chunkY = mattmc.world.level.chunk.LevelChunk.HEIGHT - 1; chunkY >= 0; chunkY--) {
+                    mattmc.world.level.block.Block block = chunk.getBlock(localX, chunkY, localZ);
+                    
+                    // Set the sky light at this position
+                    chunk.setSkyLight(localX, chunkY, localZ, currentSkyLight);
+                    
+                    // If we hit a solid block, sky light stops (goes to 0)
+                    if (block.isSolid()) {
+                        currentSkyLight = 0;
+                    }
+                }
+            }
+        }
     }
 }
