@@ -11,18 +11,20 @@ import java.util.List;
  * Builds vertex and index arrays from collected block faces.
  * Converts BlockFaceCollector data into a format suitable for VBO/VAO rendering.
  * Supports texture atlas UV mapping for multi-texture VBO rendering.
+ * Supports smooth lighting with per-vertex light sampling and ambient occlusion.
  * 
  * ISSUE-002 fix: Uses primitive FloatList and IntList instead of ArrayList<Float/Integer>
  * to eliminate boxing overhead and reduce GC pressure.
  */
 public class MeshBuilder {
     
-    // Vertex format: x, y, z, u, v, r, g, b, a (9 floats per vertex)
+    // Vertex format: x, y, z, u, v, r, g, b, a, skyLight, blockLight, ao (12 floats per vertex)
     // Using primitive arrays to avoid boxing/unboxing overhead
     private final FloatList vertices = new FloatList();
     private final IntList indices = new IntList();
     private int currentVertex = 0;
     private final TextureAtlas textureAtlas;
+    private VertexLightSampler lightSampler = null;
     
     /**
      * Create a mesh builder with optional texture atlas support.
@@ -31,6 +33,14 @@ public class MeshBuilder {
      */
     public MeshBuilder(TextureAtlas textureAtlas) {
         this.textureAtlas = textureAtlas;
+    }
+    
+    /**
+     * Set the light sampler for smooth lighting.
+     * If null, flat lighting will be used.
+     */
+    public void setLightSampler(VertexLightSampler sampler) {
+        this.lightSampler = sampler;
     }
     
     /**
@@ -349,9 +359,17 @@ public class MeshBuilder {
     }
     
     /**
-     * Add a single vertex to the vertex list.
+     * Add a single vertex to the vertex list with default light values.
      */
     private void addVertex(float x, float y, float z, float u, float v, float[] color) {
+        addVertex(x, y, z, u, v, color, 15.0f, 0.0f, 0.0f);
+    }
+    
+    /**
+     * Add a single vertex to the vertex list with light data.
+     */
+    private void addVertex(float x, float y, float z, float u, float v, float[] color,
+                          float skyLight, float blockLight, float ao) {
         vertices.add(x);
         vertices.add(y);
         vertices.add(z);
@@ -361,6 +379,9 @@ public class MeshBuilder {
         vertices.add(color[1]); // g
         vertices.add(color[2]); // b
         vertices.add(color[3]); // a
+        vertices.add(skyLight);  // 0-15
+        vertices.add(blockLight); // 0-15
+        vertices.add(ao);        // 0-3
     }
     
     /**

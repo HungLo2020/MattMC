@@ -50,6 +50,9 @@ public class OptionsManager {
     // Anisotropic filtering setting (0 = off, 2/4/8/16 = filtering level)
     private static int anisotropicFiltering = 16;  // Default: 16
     
+    // Smooth lighting setting (true = smooth, false = flat)
+    private static boolean smoothLightingEnabled = true;  // Default: enabled
+    
     // Allowed mipmap levels
     public static final int[] ALLOWED_MIPMAP_LEVELS = {0, 1, 2, 3, 4};
     
@@ -176,6 +179,8 @@ public class OptionsManager {
                         } catch (NumberFormatException e) {
                             logger.error("Invalid anisotropic filtering value: {}", value);
                         }
+                    } else if (key.equals("smooth_lighting")) {
+                        smoothLightingEnabled = Boolean.parseBoolean(value);
                     }
                 }
             }
@@ -236,6 +241,9 @@ public class OptionsManager {
             // Update anisotropic filtering setting
             options.put("anisotropic_filtering", String.valueOf(anisotropicFiltering));
             
+            // Update smooth lighting setting
+            options.put("smooth_lighting", String.valueOf(smoothLightingEnabled));
+            
             // Write back to file
             Path parent = optionsPath.getParent();
             if (parent != null) {
@@ -288,6 +296,11 @@ public class OptionsManager {
                 // Write anisotropic filtering setting
                 writer.write("# Anisotropic filtering (off, 2, 4, 8, 16)\n");
                 writer.write("anisotropic_filtering=" + anisotropicFiltering + "\n");
+                writer.write("\n");
+                
+                // Write smooth lighting setting
+                writer.write("# Smooth lighting (true = smooth, false = flat)\n");
+                writer.write("smooth_lighting=" + smoothLightingEnabled + "\n");
                 writer.write("\n");
                 
                 // Write keybinds section header
@@ -441,6 +454,21 @@ public class OptionsManager {
     
     public static void toggleShowBlockName() {
         showBlockNameEnabled = !showBlockNameEnabled;
+        saveOptions();
+    }
+    
+    // Smooth lighting getters and setters
+    public static boolean isSmoothLightingEnabled() {
+        return smoothLightingEnabled;
+    }
+    
+    public static void setSmoothLightingEnabled(boolean enabled) {
+        smoothLightingEnabled = enabled;
+        saveOptions();
+    }
+    
+    public static void toggleSmoothLighting() {
+        smoothLightingEnabled = !smoothLightingEnabled;
         saveOptions();
     }
 }
