@@ -11,18 +11,20 @@ import java.util.List;
  * Builds vertex and index arrays from collected block faces.
  * Converts BlockFaceCollector data into a format suitable for VBO/VAO rendering.
  * Supports texture atlas UV mapping for multi-texture VBO rendering.
+ * Supports smooth lighting with per-vertex light sampling and ambient occlusion.
  * 
  * ISSUE-002 fix: Uses primitive FloatList and IntList instead of ArrayList<Float/Integer>
  * to eliminate boxing overhead and reduce GC pressure.
  */
 public class MeshBuilder {
     
-    // Vertex format: x, y, z, u, v, r, g, b, a (9 floats per vertex)
+    // Vertex format: x, y, z, u, v, r, g, b, a, skyLight, blockLight, ao (12 floats per vertex)
     // Using primitive arrays to avoid boxing/unboxing overhead
     private final FloatList vertices = new FloatList();
     private final IntList indices = new IntList();
     private int currentVertex = 0;
     private final TextureAtlas textureAtlas;
+    private VertexLightSampler lightSampler = null;
     
     /**
      * Create a mesh builder with optional texture atlas support.
@@ -31,6 +33,14 @@ public class MeshBuilder {
      */
     public MeshBuilder(TextureAtlas textureAtlas) {
         this.textureAtlas = textureAtlas;
+    }
+    
+    /**
+     * Set the light sampler for smooth lighting.
+     * If null, flat lighting will be used.
+     */
+    public void setLightSampler(VertexLightSampler sampler) {
+        this.lightSampler = sampler;
     }
     
     /**
@@ -75,14 +85,14 @@ public class MeshBuilder {
                 float[] color = extractColor(face);
                 TextureAtlas.UVMapping uvMapping = getUVMapping(face);
                 
-                // Add the face with correct orientation
+                // Add the face with correct orientation, passing face data for light sampling
                 switch (type) {
-                    case TOP -> addTopFace(face.x, face.y, face.z, color, uvMapping);
-                    case BOTTOM -> addBottomFace(face.x, face.y, face.z, color, uvMapping);
-                    case NORTH -> addNorthFace(face.x, face.y, face.z, color, uvMapping);
-                    case SOUTH -> addSouthFace(face.x, face.y, face.z, color, uvMapping);
-                    case WEST -> addWestFace(face.x, face.y, face.z, color, uvMapping);
-                    case EAST -> addEastFace(face.x, face.y, face.z, color, uvMapping);
+                    case TOP -> addTopFace(face, color, uvMapping);
+                    case BOTTOM -> addBottomFace(face, color, uvMapping);
+                    case NORTH -> addNorthFace(face, color, uvMapping);
+                    case SOUTH -> addSouthFace(face, color, uvMapping);
+                    case WEST -> addWestFace(face, color, uvMapping);
+                    case EAST -> addEastFace(face, color, uvMapping);
                 }
             }
         }
@@ -163,9 +173,26 @@ public class MeshBuilder {
     }
     
     /**
+     * Sample light for a vertex, or return defaults if no light sampler.
+     * Returns [skyLight, blockLight, ao] as floats.
+     */
+    private float[] sampleVertexLight(BlockFaceCollector.FaceData face, 
+                                      mattmc.client.renderer.chunk.VertexLightSampler.Normal normal,
+                                      int cornerIndex) {
+        if (lightSampler != null && face.chunk != null) {
+            mattmc.client.renderer.chunk.VertexLightSampler.VertexLight light = 
+                lightSampler.sampleVertex(face.chunk, face.cx, face.cy, face.cz, normal, cornerIndex);
+            return new float[] {light.skyLight, light.blockLight, light.ao};
+        }
+        // Default: full sky light, no block light, no AO
+        return new float[] {15.0f, 0.0f, 0.0f};
+    }
+    
+    /**
      * Add top face vertices and indices.
      */
-    private void addTopFace(float x, float y, float z, float[] color, TextureAtlas.UVMapping uvMapping) {
+    private void addTopFace(BlockFaceCollector.FaceData face, float[] color, TextureAtlas.UVMapping uvMapping) {
+        float x = face.x, y = face.y, z = face.z;
         float x0 = x, x1 = x + 1;
         float y1 = y + 1;
         float z0 = z, z1 = z + 1;
@@ -181,11 +208,17 @@ public class MeshBuilder {
         
         int baseVertex = currentVertex;
         
-        // 4 vertices for the quad with atlas UVs
-        addVertex(x0, y1, z0, u0, v0, color); // 0
-        addVertex(x0, y1, z1, u0, v1, color); // 1
-        addVertex(x1, y1, z1, u1, v1, color); // 2
-        addVertex(x1, y1, z0, u1, v0, color); // 3
+        // Sample light for each vertex (4 corners of top face)
+        float[] light0 = sampleVertexLight(face, mattmc.client.renderer.chunk.VertexLightSampler.Normal.UP, 0);
+        float[] light1 = sampleVertexLight(face, mattmc.client.renderer.chunk.VertexLightSampler.Normal.UP, 1);
+        float[] light2 = sampleVertexLight(face, mattmc.client.renderer.chunk.VertexLightSampler.Normal.UP, 2);
+        float[] light3 = sampleVertexLight(face, mattmc.client.renderer.chunk.VertexLightSampler.Normal.UP, 3);
+        
+        // 4 vertices for the quad with atlas UVs and light data
+        addVertex(x0, y1, z0, u0, v0, color, light0[0], light0[1], light0[2]); // 0
+        addVertex(x0, y1, z1, u0, v1, color, light1[0], light1[1], light1[2]); // 1
+        addVertex(x1, y1, z1, u1, v1, color, light2[0], light2[1], light2[2]); // 2
+        addVertex(x1, y1, z0, u1, v0, color, light3[0], light3[1], light3[2]); // 3
         
         // 2 triangles (6 indices)
         addQuadIndices(baseVertex);
@@ -196,7 +229,8 @@ public class MeshBuilder {
     /**
      * Add bottom face vertices and indices.
      */
-    private void addBottomFace(float x, float y, float z, float[] color, TextureAtlas.UVMapping uvMapping) {
+    private void addBottomFace(BlockFaceCollector.FaceData face, float[] color, TextureAtlas.UVMapping uvMapping) {
+        float x = face.x, y = face.y, z = face.z;
         float x0 = x, x1 = x + 1;
         float y0 = y;
         float z0 = z, z1 = z + 1;
@@ -212,11 +246,17 @@ public class MeshBuilder {
         
         int baseVertex = currentVertex;
         
-        // 4 vertices for the quad with atlas UVs
-        addVertex(x0, y0, z0, u0, v0, color); // 0
-        addVertex(x1, y0, z0, u1, v0, color); // 1
-        addVertex(x1, y0, z1, u1, v1, color); // 2
-        addVertex(x0, y0, z1, u0, v1, color); // 3
+        // Sample light for each vertex
+        float[] light0 = sampleVertexLight(face, mattmc.client.renderer.chunk.VertexLightSampler.Normal.DOWN, 0);
+        float[] light1 = sampleVertexLight(face, mattmc.client.renderer.chunk.VertexLightSampler.Normal.DOWN, 1);
+        float[] light2 = sampleVertexLight(face, mattmc.client.renderer.chunk.VertexLightSampler.Normal.DOWN, 2);
+        float[] light3 = sampleVertexLight(face, mattmc.client.renderer.chunk.VertexLightSampler.Normal.DOWN, 3);
+        
+        // 4 vertices for the quad with atlas UVs and light data
+        addVertex(x0, y0, z0, u0, v0, color, light0[0], light0[1], light0[2]); // 0
+        addVertex(x1, y0, z0, u1, v0, color, light1[0], light1[1], light1[2]); // 1
+        addVertex(x1, y0, z1, u1, v1, color, light2[0], light2[1], light2[2]); // 2
+        addVertex(x0, y0, z1, u0, v1, color, light3[0], light3[1], light3[2]); // 3
         
         // 2 triangles (6 indices)
         addQuadIndices(baseVertex);
@@ -227,7 +267,8 @@ public class MeshBuilder {
     /**
      * Add south face vertices and indices.
      */
-    private void addSouthFace(float x, float y, float z, float[] color, TextureAtlas.UVMapping uvMapping) {
+    private void addSouthFace(BlockFaceCollector.FaceData face, float[] color, TextureAtlas.UVMapping uvMapping) {
+        float x = face.x, y = face.y, z = face.z;
         float x0 = x, x1 = x + 1;
         float y0 = y, y1 = y + 1;
         float z1 = z + 1;
@@ -243,11 +284,17 @@ public class MeshBuilder {
         
         int baseVertex = currentVertex;
         
-        // 4 vertices for the quad with atlas UVs
-        addVertex(x0, y0, z1, u0, v1, color); // 0
-        addVertex(x1, y0, z1, u1, v1, color); // 1
-        addVertex(x1, y1, z1, u1, v0, color); // 2
-        addVertex(x0, y1, z1, u0, v0, color); // 3
+        // Sample light for each vertex
+        float[] light0 = sampleVertexLight(face, mattmc.client.renderer.chunk.VertexLightSampler.Normal.SOUTH, 0);
+        float[] light1 = sampleVertexLight(face, mattmc.client.renderer.chunk.VertexLightSampler.Normal.SOUTH, 1);
+        float[] light2 = sampleVertexLight(face, mattmc.client.renderer.chunk.VertexLightSampler.Normal.SOUTH, 2);
+        float[] light3 = sampleVertexLight(face, mattmc.client.renderer.chunk.VertexLightSampler.Normal.SOUTH, 3);
+        
+        // 4 vertices for the quad with atlas UVs and light data
+        addVertex(x0, y0, z1, u0, v1, color, light0[0], light0[1], light0[2]); // 0
+        addVertex(x1, y0, z1, u1, v1, color, light1[0], light1[1], light1[2]); // 1
+        addVertex(x1, y1, z1, u1, v0, color, light2[0], light2[1], light2[2]); // 2
+        addVertex(x0, y1, z1, u0, v0, color, light3[0], light3[1], light3[2]); // 3
         
         // 2 triangles (6 indices)
         addQuadIndices(baseVertex);
@@ -258,7 +305,8 @@ public class MeshBuilder {
     /**
      * Add west face vertices and indices.
      */
-    private void addWestFace(float x, float y, float z, float[] color, TextureAtlas.UVMapping uvMapping) {
+    private void addWestFace(BlockFaceCollector.FaceData face, float[] color, TextureAtlas.UVMapping uvMapping) {
+        float x = face.x, y = face.y, z = face.z;
         float x0 = x;
         float y0 = y, y1 = y + 1;
         float z0 = z, z1 = z + 1;
@@ -274,11 +322,17 @@ public class MeshBuilder {
         
         int baseVertex = currentVertex;
         
-        // 4 vertices for the quad with atlas UVs
-        addVertex(x0, y0, z0, u0, v1, color); // 0
-        addVertex(x0, y0, z1, u1, v1, color); // 1
-        addVertex(x0, y1, z1, u1, v0, color); // 2
-        addVertex(x0, y1, z0, u0, v0, color); // 3
+        // Sample light for each vertex
+        float[] light0 = sampleVertexLight(face, mattmc.client.renderer.chunk.VertexLightSampler.Normal.WEST, 0);
+        float[] light1 = sampleVertexLight(face, mattmc.client.renderer.chunk.VertexLightSampler.Normal.WEST, 1);
+        float[] light2 = sampleVertexLight(face, mattmc.client.renderer.chunk.VertexLightSampler.Normal.WEST, 2);
+        float[] light3 = sampleVertexLight(face, mattmc.client.renderer.chunk.VertexLightSampler.Normal.WEST, 3);
+        
+        // 4 vertices for the quad with atlas UVs and light data
+        addVertex(x0, y0, z0, u0, v1, color, light0[0], light0[1], light0[2]); // 0
+        addVertex(x0, y0, z1, u1, v1, color, light1[0], light1[1], light1[2]); // 1
+        addVertex(x0, y1, z1, u1, v0, color, light2[0], light2[1], light2[2]); // 2
+        addVertex(x0, y1, z0, u0, v0, color, light3[0], light3[1], light3[2]); // 3
         
         // 2 triangles (6 indices)
         addQuadIndices(baseVertex);
@@ -289,7 +343,8 @@ public class MeshBuilder {
     /**
      * Add east face vertices and indices.
      */
-    private void addEastFace(float x, float y, float z, float[] color, TextureAtlas.UVMapping uvMapping) {
+    private void addEastFace(BlockFaceCollector.FaceData face, float[] color, TextureAtlas.UVMapping uvMapping) {
+        float x = face.x, y = face.y, z = face.z;
         float x1 = x + 1;
         float y0 = y, y1 = y + 1;
         float z0 = z, z1 = z + 1;
@@ -305,11 +360,17 @@ public class MeshBuilder {
         
         int baseVertex = currentVertex;
         
-        // 4 vertices for the quad with atlas UVs
-        addVertex(x1, y0, z1, u1, v1, color); // 0
-        addVertex(x1, y0, z0, u0, v1, color); // 1
-        addVertex(x1, y1, z0, u0, v0, color); // 2
-        addVertex(x1, y1, z1, u1, v0, color); // 3
+        // Sample light for each vertex
+        float[] light0 = sampleVertexLight(face, mattmc.client.renderer.chunk.VertexLightSampler.Normal.EAST, 0);
+        float[] light1 = sampleVertexLight(face, mattmc.client.renderer.chunk.VertexLightSampler.Normal.EAST, 1);
+        float[] light2 = sampleVertexLight(face, mattmc.client.renderer.chunk.VertexLightSampler.Normal.EAST, 2);
+        float[] light3 = sampleVertexLight(face, mattmc.client.renderer.chunk.VertexLightSampler.Normal.EAST, 3);
+        
+        // 4 vertices for the quad with atlas UVs and light data
+        addVertex(x1, y0, z1, u1, v1, color, light0[0], light0[1], light0[2]); // 0
+        addVertex(x1, y0, z0, u0, v1, color, light1[0], light1[1], light1[2]); // 1
+        addVertex(x1, y1, z0, u0, v0, color, light2[0], light2[1], light2[2]); // 2
+        addVertex(x1, y1, z1, u1, v0, color, light3[0], light3[1], light3[2]); // 3
         
         // 2 triangles (6 indices)
         addQuadIndices(baseVertex);
@@ -320,7 +381,8 @@ public class MeshBuilder {
     /**
      * Add north face vertices and indices.
      */
-    private void addNorthFace(float x, float y, float z, float[] color, TextureAtlas.UVMapping uvMapping) {
+    private void addNorthFace(BlockFaceCollector.FaceData face, float[] color, TextureAtlas.UVMapping uvMapping) {
+        float x = face.x, y = face.y, z = face.z;
         float x0 = x, x1 = x + 1;
         float y0 = y, y1 = y + 1;
         float z0 = z;
@@ -336,11 +398,17 @@ public class MeshBuilder {
         
         int baseVertex = currentVertex;
         
-        // 4 vertices for the quad with atlas UVs
-        addVertex(x1, y0, z0, u1, v1, color); // 0
-        addVertex(x0, y0, z0, u0, v1, color); // 1
-        addVertex(x0, y1, z0, u0, v0, color); // 2
-        addVertex(x1, y1, z0, u1, v0, color); // 3
+        // Sample light for each vertex
+        float[] light0 = sampleVertexLight(face, mattmc.client.renderer.chunk.VertexLightSampler.Normal.NORTH, 0);
+        float[] light1 = sampleVertexLight(face, mattmc.client.renderer.chunk.VertexLightSampler.Normal.NORTH, 1);
+        float[] light2 = sampleVertexLight(face, mattmc.client.renderer.chunk.VertexLightSampler.Normal.NORTH, 2);
+        float[] light3 = sampleVertexLight(face, mattmc.client.renderer.chunk.VertexLightSampler.Normal.NORTH, 3);
+        
+        // 4 vertices for the quad with atlas UVs and light data
+        addVertex(x1, y0, z0, u1, v1, color, light0[0], light0[1], light0[2]); // 0
+        addVertex(x0, y0, z0, u0, v1, color, light1[0], light1[1], light1[2]); // 1
+        addVertex(x0, y1, z0, u0, v0, color, light2[0], light2[1], light2[2]); // 2
+        addVertex(x1, y1, z0, u1, v0, color, light3[0], light3[1], light3[2]); // 3
         
         // 2 triangles (6 indices)
         addQuadIndices(baseVertex);
@@ -349,18 +417,49 @@ public class MeshBuilder {
     }
     
     /**
-     * Add a single vertex to the vertex list.
+     * Add a single vertex to the vertex list with default light values.
      */
     private void addVertex(float x, float y, float z, float u, float v, float[] color) {
+        addVertex(x, y, z, u, v, color, 15.0f, 0.0f, 0.0f);
+    }
+    
+    /**
+     * Add a single vertex to the vertex list with light data.
+     * Applies light modulation to the vertex color.
+     */
+    private void addVertex(float x, float y, float z, float u, float v, float[] color,
+                          float skyLight, float blockLight, float ao) {
+        // Calculate light factor (0-1 range)
+        // Combine sky and block light, taking the maximum
+        float maxLight = Math.max(skyLight, blockLight) / 15.0f;
+        
+        // Apply AO factor (1.0, 0.8, 0.6, 0.45)
+        float aoFactor = 1.0f;
+        if (ao >= 3) aoFactor = 0.45f;
+        else if (ao >= 2) aoFactor = 0.6f;
+        else if (ao >= 1) aoFactor = 0.8f;
+        
+        // Combine light and AO
+        float lightFactor = maxLight * aoFactor;
+        
+        // Apply light factor to color
+        float r = color[0] * lightFactor;
+        float g = color[1] * lightFactor;
+        float b = color[2] * lightFactor;
+        
+        // Add vertex data
         vertices.add(x);
         vertices.add(y);
         vertices.add(z);
         vertices.add(u);
         vertices.add(v);
-        vertices.add(color[0]); // r
-        vertices.add(color[1]); // g
-        vertices.add(color[2]); // b
+        vertices.add(r);
+        vertices.add(g);
+        vertices.add(b);
         vertices.add(color[3]); // a
+        vertices.add(skyLight);  // 0-15 (stored for future use)
+        vertices.add(blockLight); // 0-15 (stored for future use)
+        vertices.add(ao);        // 0-3 (stored for future use)
     }
     
     /**

@@ -8,10 +8,11 @@ import org.lwjgl.BufferUtils;
  * CPU-side container for chunk mesh vertex and index data.
  * Can be prepared on a background thread and then uploaded to GPU on the render thread.
  * 
- * Vertex format (interleaved, 9 floats per vertex):
+ * Vertex format (interleaved, 12 floats per vertex):
  * - Position (x, y, z): 3 floats
  * - Texture coords (u, v): 2 floats  
  * - Color (r, g, b, a): 4 floats
+ * - Light data (skyLight, blockLight, ao): 3 floats (values 0-15, 0-15, 0-3)
  */
 public class ChunkMeshBuffer {
     private final int chunkX;
@@ -22,10 +23,11 @@ public class ChunkMeshBuffer {
     private final int indexCount;
     
     // Vertex attribute layout
-    public static final int FLOATS_PER_VERTEX = 9;
+    public static final int FLOATS_PER_VERTEX = 12;
     public static final int POSITION_OFFSET = 0;
     public static final int TEXCOORD_OFFSET = 3;
     public static final int COLOR_OFFSET = 5;
+    public static final int LIGHT_OFFSET = 9;  // skyLight, blockLight, ao
     public static final int VERTEX_SIZE_BYTES = FLOATS_PER_VERTEX * Float.BYTES;
     
     /**
@@ -33,7 +35,7 @@ public class ChunkMeshBuffer {
      * 
      * @param chunkX Chunk X coordinate
      * @param chunkZ Chunk Z coordinate
-     * @param vertices Vertex data (interleaved: x,y,z, u,v, r,g,b,a)
+     * @param vertices Vertex data (interleaved: x,y,z, u,v, r,g,b,a, skyLight,blockLight,ao)
      * @param indices Index data (triangle indices)
      */
     public ChunkMeshBuffer(int chunkX, int chunkZ, float[] vertices, int[] indices) {
