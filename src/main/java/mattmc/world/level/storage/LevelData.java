@@ -25,6 +25,7 @@ public class LevelData {
     private int gameMode;
     private boolean hardcore;
     private int difficulty;
+    private long worldTime;
     
     // LocalPlayer data
     private double playerX;
@@ -43,6 +44,7 @@ public class LevelData {
         this.gameMode = 0; // Survival
         this.hardcore = false;
         this.difficulty = 2; // Normal
+        this.worldTime = 0L; // Start at sunrise
         this.playerX = 0.0;
         this.playerY = 65.0;
         this.playerZ = 0.0;
@@ -66,6 +68,7 @@ public class LevelData {
         data.put("GameType", gameMode);
         data.put("hardcore", (byte) (hardcore ? 1 : 0));
         data.put("Difficulty", (byte) difficulty);
+        data.put("Time", worldTime);
         
         // Version info
         Map<String, Object> version = new HashMap<>();
@@ -136,6 +139,9 @@ public class LevelData {
         }
         if (data.get("Difficulty") instanceof Byte) {
             levelData.difficulty = (Byte) data.get("Difficulty");
+        }
+        if (data.get("Time") instanceof Long) {
+            levelData.worldTime = (Long) data.get("Time");
         }
         
         // LocalPlayer data
@@ -232,4 +238,7 @@ public class LevelData {
     
     public long getSeed() { return seed; }
     public void setSeed(long seed) { this.seed = seed; }
+    
+    public long getWorldTime() { return worldTime; }
+    public void setWorldTime(long worldTime) { this.worldTime = worldTime; }
 }

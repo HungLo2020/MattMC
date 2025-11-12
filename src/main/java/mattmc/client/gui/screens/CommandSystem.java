@@ -61,6 +61,8 @@ public class CommandSystem {
             return executeSetCommand(cmd);
         } else if (cmd.startsWith("/give ")) {
             return executeGiveCommand(cmd);
+        } else if (cmd.startsWith("/time ")) {
+            return executeTimeCommand(cmd);
         } else {
             return "Unknown command: " + cmd;
         }
@@ -261,6 +263,67 @@ public class CommandSystem {
             }
         } else {
             return "Inventory is full";
+        }
+    }
+    
+    /**
+     * Execute /time command - sets or queries the world time.
+     * Usage: /time set <time> or /time query
+     * Shortcuts: /time set day (1000), /time set noon (6000), /time set night (13000), /time set midnight (18000)
+     */
+    private String executeTimeCommand(String cmd) {
+        try {
+            String[] parts = cmd.substring(6).trim().split("\\s+");
+            
+            if (parts.length == 0 || parts[0].isEmpty()) {
+                return "Usage: /time set <time|day|noon|night|midnight> or /time query";
+            }
+            
+            String subCommand = parts[0];
+            
+            if (subCommand.equals("query")) {
+                long timeOfDay = world.getDayCycle().getTimeOfDay();
+                long worldTime = world.getDayCycle().getWorldTime();
+                return "Time of day: " + timeOfDay + " (World time: " + worldTime + ")";
+            } else if (subCommand.equals("set")) {
+                if (parts.length < 2) {
+                    return "Usage: /time set <time|day|noon|night|midnight>";
+                }
+                
+                String timeArg = parts[1];
+                long newTime;
+                
+                // Parse named times
+                switch (timeArg.toLowerCase()) {
+                    case "day":
+                        newTime = 1000L; // Shortly after sunrise
+                        break;
+                    case "noon":
+                        newTime = 6000L; // Midday
+                        break;
+                    case "night":
+                        newTime = 13000L; // Shortly after sunset
+                        break;
+                    case "midnight":
+                        newTime = 18000L; // Middle of the night
+                        break;
+                    default:
+                        // Try to parse as a number
+                        try {
+                            newTime = Long.parseLong(timeArg);
+                        } catch (NumberFormatException e) {
+                            return "Invalid time value. Use a number or: day, noon, night, midnight";
+                        }
+                }
+                
+                world.getDayCycle().setWorldTime(newTime);
+                logger.info("Set world time to: {}", newTime);
+                return "Time set to " + newTime;
+            } else {
+                return "Unknown time subcommand. Usage: /time set <time> or /time query";
+            }
+        } catch (Exception e) {
+            return "Error executing time command: " + e.getMessage();
         }
     }
 }
