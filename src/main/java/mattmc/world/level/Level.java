@@ -75,6 +75,9 @@ public class Level implements LevelAccessor {
     // Day/night cycle
     private final DayCycle dayCycle = new DayCycle();
     
+    // Light propagator for incremental BFS light updates
+    private mattmc.world.level.lighting.LightPropagator lightPropagator;
+    
     public Level() {
         this.asyncLoader = new AsyncChunkLoader();
         // Initialize with a default seed (will be updated when world is loaded/created)
@@ -82,6 +85,8 @@ public class Level implements LevelAccessor {
         this.asyncLoader.setWorldGenerator(worldGenerator);
         // Set the neighbor accessor for cross-chunk face culling
         this.asyncLoader.setNeighborAccessor(neighborAccessor);
+        // Initialize light propagator
+        this.lightPropagator = new mattmc.world.level.lighting.LightPropagator(this);
     }
     
     /**
@@ -379,7 +384,11 @@ public class Level implements LevelAccessor {
         int localZ = Math.floorMod(worldZ, LevelChunk.DEPTH);
         
         LevelChunk chunk = getChunk(chunkX, chunkZ);
+        Block oldBlock = chunk.getBlock(localX, chunkY, localZ);
         chunk.setBlock(localX, chunkY, localZ, block, state);
+        
+        // Handle light updates
+        handleLightUpdate(worldX, chunkY, worldZ, oldBlock, block);
         
         // Mark adjacent chunks as dirty if the block is at a chunk boundary
         // This is needed because adjacent chunks may have faces that need to be culled/unculled
@@ -410,6 +419,60 @@ public class Level implements LevelAccessor {
                 southChunk.setDirty(true);
             }
         }
+    }
+    
+    /**
+     * Handle light updates when a block is placed or removed.
+     */
+    private void handleLightUpdate(int worldX, int chunkY, int worldZ, Block oldBlock, Block newBlock) {
+        // Handle block light changes
+        int oldEmission = oldBlock.getLightEmission();
+        int newEmission = newBlock.getLightEmission();
+        
+        if (oldEmission > 0) {
+            // Old block emitted light, remove it
+            lightPropagator.enqueueRemoveBlock(worldX, chunkY, worldZ);
+        }
+        
+        if (newEmission > 0) {
+            // New block emits light, add it
+            lightPropagator.enqueueAddBlock(worldX, chunkY, worldZ, newEmission);
+        }
+        
+        // Handle skylight changes
+        boolean oldOpaque = oldBlock.isOpaque();
+        boolean newOpaque = newBlock.isOpaque();
+        
+        if (!oldOpaque && newOpaque) {
+            // Block became opaque, remove skylight
+            lightPropagator.enqueueRemoveSkylight(worldX, chunkY, worldZ);
+        } else if (oldOpaque && !newOpaque) {
+            // Block became transparent, check if skylight should propagate
+            // Check if there's skylight above this position
+            if (chunkY < LevelChunk.HEIGHT - 1) {
+                int aboveLight = getSkyLightAt(worldX, chunkY + 1, worldZ);
+                if (aboveLight > 0) {
+                    lightPropagator.enqueueSkylightFromSurface(worldX, chunkY, worldZ);
+                }
+            } else {
+                // At top of world, propagate full skylight
+                lightPropagator.enqueueSkylightFromSurface(worldX, chunkY, worldZ);
+            }
+        }
+    }
+    
+    /**
+     * Get skylight at world coordinates.
+     */
+    private int getSkyLightAt(int worldX, int chunkY, int worldZ) {
+        int chunkX = Math.floorDiv(worldX, LevelChunk.WIDTH);
+        int chunkZ = Math.floorDiv(worldZ, LevelChunk.DEPTH);
+        LevelChunk chunk = getChunkIfLoaded(chunkX, chunkZ);
+        if (chunk == null) return 0;
+        
+        int localX = Math.floorMod(worldX, LevelChunk.WIDTH);
+        int localZ = Math.floorMod(worldZ, LevelChunk.DEPTH);
+        return chunk.getSkyLight(localX, chunkY, localZ);
     }
     
     /**
@@ -548,6 +611,25 @@ public class Level implements LevelAccessor {
      */
     public void tickDayCycle() {
         dayCycle.tick();
+    }
+    
+    /**
+     * Process light updates with a time budget.
+     * Should be called each frame to incrementally update lighting.
+     * 
+     * @param msBudget Time budget in milliseconds (typically 2-5ms per frame)
+     */
+    public void updateLighting(double msBudget) {
+        lightPropagator.updateBudget(msBudget);
+    }
+    
+    /**
+     * Get the light propagator for this level.
+     * 
+     * @return The light propagator
+     */
+    public mattmc.world.level.lighting.LightPropagator getLightPropagator() {
+        return lightPropagator;
     }
     
     /**
