@@ -74,8 +74,9 @@ public class LevelRenderer {
         renderedChunks = 0;
         culledChunks = 0;
         
-        // Get sky brightness from day cycle
+        // Get sky brightness and sun direction from day cycle
         float skyBrightness = world.getDayCycle().getSkyBrightness();
+        float[] sunDirection = world.getDayCycle().getSunDirection();
         
         // Process completed mesh buffers from async loader first
         // This makes newly loaded chunk meshes available for rendering
@@ -123,7 +124,7 @@ public class LevelRenderer {
             // Only do GL matrix operations if we're actually going to render
             glPushMatrix();
             glTranslatef(chunkWorldX, 0, chunkWorldZ);
-            if (chunkRenderer.renderChunk(chunk, playerX, playerY, playerZ, skyBrightness)) {
+            if (chunkRenderer.renderChunk(chunk, playerX, playerY, playerZ, skyBrightness, sunDirection)) {
                 renderedChunks++;
             } else {
                 // Chunk lost its VAO between the hasChunkMesh check and now
