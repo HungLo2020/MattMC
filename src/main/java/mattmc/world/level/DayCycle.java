@@ -78,14 +78,22 @@ public class DayCycle {
     
     /**
      * Get the sun angle in radians for positioning the directional light.
-     * Returns the angle of the sun in the sky (0 = horizon at sunrise, PI = horizon at sunset).
+     * Returns the angle of the sun in the sky for a half-circle arc.
+     * 0 = horizon at sunrise, PI/2 = overhead at noon, PI = horizon at sunset.
      */
     public float getSunAngle() {
-        float celestialAngle = getCelestialAngle();
-        // Offset so that 0.0 (sunrise) starts at horizon
-        // Add 0.25 so that time 0 corresponds to the sun being at the eastern horizon
-        float adjusted = (celestialAngle + 0.25f) % 1.0f;
-        return (float) (adjusted * Math.PI * 2.0);
+        long timeOfDay = getTimeOfDay();
+        
+        // Sun is visible from time 0 to 12000 (half day)
+        // Map this to 0 to PI radians for a half-circle arc
+        if (timeOfDay <= SUNSET) {
+            // During daytime: map 0-12000 to 0-PI
+            return (float) (timeOfDay / (double) SUNSET * Math.PI);
+        } else {
+            // During nighttime: sun is below horizon, moon would be visible
+            // For now, just continue the arc (sun goes around the world)
+            return (float) ((timeOfDay - SUNSET) / (double) SUNSET * Math.PI) + (float) Math.PI;
+        }
     }
     
     /**
@@ -95,27 +103,27 @@ public class DayCycle {
     public float[] getSkyColor() {
         long timeOfDay = getTimeOfDay();
         
-        // Day sky (light blue)
-        if (timeOfDay >= 0 && timeOfDay < SUNSET) {
+        // Day sky (light blue) - from sunrise through most of day
+        if (timeOfDay >= 0 && timeOfDay < 11000) {
             return new float[] {0.53f, 0.81f, 0.92f};
         }
-        // Sunset (orange/red gradient)
-        else if (timeOfDay >= SUNSET && timeOfDay < 13000) {
-            float t = (timeOfDay - SUNSET) / 1000f; // 0.0 to 1.0
+        // Sunset transition (orange/red gradient) - 11000 to 13000
+        else if (timeOfDay >= 11000 && timeOfDay < 13000) {
+            float t = (timeOfDay - 11000) / 2000f; // 0.0 to 1.0
             // Interpolate from day blue to sunset orange
             float r = 0.53f + (0.85f - 0.53f) * t;
             float g = 0.81f + (0.45f - 0.81f) * t;
             float b = 0.92f + (0.25f - 0.92f) * t;
             return new float[] {r, g, b};
         }
-        // Night (dark blue)
+        // Night (dark blue) - 13000 to 23000
         else if (timeOfDay >= 13000 && timeOfDay < SUNRISE) {
             return new float[] {0.05f, 0.05f, 0.15f};
         }
-        // Sunrise (orange/red gradient back to day)
+        // Sunrise (orange/red gradient back to day) - 23000 to 24000
         else {
             float t = (timeOfDay - SUNRISE) / 1000f; // 0.0 to 1.0
-            // Interpolate from night dark to day blue
+            // Interpolate from sunset orange to day blue
             float r = 0.85f + (0.53f - 0.85f) * t;
             float g = 0.45f + (0.81f - 0.45f) * t;
             float b = 0.25f + (0.92f - 0.25f) * t;
@@ -131,13 +139,15 @@ public class DayCycle {
     public float[] getSunDirection() {
         float angle = getSunAngle();
         
-        // Sun moves in the X-Z plane, with Y component for height
-        // At sunrise (angle=0): sun is at eastern horizon
-        // At noon (angle=PI/2): sun is directly overhead
-        // At sunset (angle=PI): sun is at western horizon
+        // Sun moves in an arc across the sky
+        // At sunrise (angle=0): sun is at eastern horizon (y=0)
+        // At noon (angle=PI/2): sun is directly overhead (y=1)  
+        // At sunset (angle=PI): sun is at western horizon (y=0)
         
-        float x = (float) Math.sin(angle);
-        float y = (float) Math.cos(angle);
+        // sin(angle) gives horizontal position (east to west)
+        // sin(angle) for angle in [0, PI] gives values [0, 1, 0] which is what we want for height
+        float x = (float) Math.cos(angle); // East-west position
+        float y = (float) Math.sin(angle); // Height (0 at horizon, 1 at zenith)
         float z = 0.0f;
         
         // Normalize (should already be normalized, but just to be safe)
@@ -152,22 +162,22 @@ public class DayCycle {
     public float getSkyBrightness() {
         long timeOfDay = getTimeOfDay();
         
-        // Full brightness during day
-        if (timeOfDay >= 0 && timeOfDay < SUNSET) {
+        // Full brightness during day (0 to 11000)
+        if (timeOfDay >= 0 && timeOfDay < 11000) {
             return 1.0f;
         }
-        // Fade to dim during sunset
-        else if (timeOfDay >= SUNSET && timeOfDay < 13000) {
-            float t = (timeOfDay - SUNSET) / 1000f;
+        // Fade to dim during sunset (11000 to 13000)
+        else if (timeOfDay >= 11000 && timeOfDay < 13000) {
+            float t = (timeOfDay - 11000) / 2000f; // 0.0 to 1.0
             return 1.0f - (0.7f * t); // Dim to 30% brightness
         }
-        // Dim during night (moon provides some light)
+        // Dim during night (moon provides some light) (13000 to 23000)
         else if (timeOfDay >= 13000 && timeOfDay < SUNRISE) {
             return 0.3f;
         }
-        // Fade back to full during sunrise
+        // Fade back to full during sunrise (23000 to 24000)
         else {
-            float t = (timeOfDay - SUNRISE) / 1000f;
+            float t = (timeOfDay - SUNRISE) / 1000f; // 0.0 to 1.0
             return 0.3f + (0.7f * t);
         }
     }
