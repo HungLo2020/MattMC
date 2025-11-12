@@ -1,5 +1,6 @@
 package mattmc.client.renderer.chunk;
 
+import mattmc.client.renderer.VoxelLitShader;
 import mattmc.client.renderer.texture.TextureAtlas;
 import mattmc.world.level.chunk.LevelChunk;
 import mattmc.world.level.chunk.ChunkUtils;
@@ -12,7 +13,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Handles rendering of chunks using VBO/VAO with texture atlas.
+ * Handles rendering of chunks using VBO/VAO with texture atlas and lit shader.
  * Modern rendering approach similar to Minecraft Java Edition.
  */
 public class ChunkRenderer {
@@ -31,6 +32,9 @@ public class ChunkRenderer {
     
     // Texture atlas for VBO rendering
     private TextureAtlas textureAtlas = null;
+    
+    // Voxel lit shader for proper lighting
+    private VoxelLitShader shader = null;
     
     /**
      * Register a chunk for tracking (so mesh buffers can be uploaded to it).
@@ -55,18 +59,49 @@ public class ChunkRenderer {
     }
     
     /**
-     * Render a chunk using VBO/VAO.
+     * Render a chunk using VBO/VAO with lit shader.
      * Returns true if rendering actually happened.
      * 
+     * @param chunk The chunk to render
+     * @param cameraX Camera X position for fog
+     * @param cameraY Camera Y position for fog
+     * @param cameraZ Camera Z position for fog
      * @return true if the chunk was rendered, false if no VAO available
      */
-    public boolean renderChunk(LevelChunk chunk) {
+    public boolean renderChunk(LevelChunk chunk, float cameraX, float cameraY, float cameraZ) {
         // Get VAO
         ChunkVAO vao = vaoCache.get(chunk);
         if (vao == null) {
             // VAO not ready yet - it will be uploaded later from async mesh building
             return false;
         }
+        
+        // Initialize shader if not already done
+        if (shader == null) {
+            shader = new VoxelLitShader();
+            logger.info("Initialized VoxelLitShader for chunk rendering");
+        }
+        
+        // Use the lit shader
+        shader.use();
+        
+        // Set shader uniforms
+        shader.setCameraPosition(cameraX, cameraY, cameraZ);
+        shader.setTextureSampler(0); // Texture unit 0
+        
+        // Sun settings - pointing down and slightly to the side (typical morning/afternoon sun)
+        shader.setSunDirection(0.3f, -0.8f, 0.5f);
+        shader.setSunColor(1.0f, 0.95f, 0.85f); // Slightly warm sun color (linear space)
+        
+        // Ambient settings
+        shader.setAmbientSky(0.4f, 0.5f, 0.6f); // Cool blue sky ambient (linear space)
+        shader.setAmbientBlock(1.0f, 0.7f, 0.4f); // Warm torch/block light (linear space)
+        
+        // Fog settings
+        shader.setFogColor(0.5f, 0.7f, 1.0f); // Sky blue fog (linear space)
+        
+        // Gamma correction
+        shader.setGamma(2.2f);
         
         // Enable texturing and bind texture atlas
         glEnable(GL_TEXTURE_2D);
@@ -77,10 +112,22 @@ public class ChunkRenderer {
         // Render using VAO (single draw call!)
         vao.render();
         
-        // Unbind texture
+        // Unbind shader and texture
+        VoxelLitShader.unbind();
         glBindTexture(GL_TEXTURE_2D, 0);
         
         return true;
+    }
+    
+    /**
+     * Render a chunk using VBO/VAO with lit shader (backward compatibility).
+     * Uses default camera position at origin.
+     * 
+     * @param chunk The chunk to render
+     * @return true if the chunk was rendered, false if no VAO available
+     */
+    public boolean renderChunk(LevelChunk chunk) {
+        return renderChunk(chunk, 0, 0, 0);
     }
     
     /**

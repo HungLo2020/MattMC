@@ -4,7 +4,7 @@ import static org.lwjgl.opengl.GL11.*;
 import static org.lwjgl.opengl.GL20.*;
 
 /** Simple shader program wrapper for GLSL shaders. */
-public final class Shader implements AutoCloseable {
+public class Shader implements AutoCloseable {
     private final int programId;
     
     public Shader(String vertexSource, String fragmentSource) {
@@ -60,6 +60,20 @@ public final class Shader implements AutoCloseable {
         int location = glGetUniformLocation(programId, name);
         if (location != -1) {
             glUniform1i(location, value);
+        }
+    }
+    
+    public void setUniform3f(String name, float v1, float v2, float v3) {
+        int location = glGetUniformLocation(programId, name);
+        if (location != -1) {
+            glUniform3f(location, v1, v2, v3);
+        }
+    }
+    
+    public void setUniform4f(String name, float v1, float v2, float v3, float v4) {
+        int location = glGetUniformLocation(programId, name);
+        if (location != -1) {
+            glUniform4f(location, v1, v2, v3, v4);
         }
     }
     

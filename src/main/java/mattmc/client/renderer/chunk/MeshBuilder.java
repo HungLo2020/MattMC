@@ -18,7 +18,7 @@ import java.util.List;
  */
 public class MeshBuilder {
     
-    // Vertex format: x, y, z, u, v, r, g, b, a, skyLight, blockLight, ao (12 floats per vertex)
+    // Vertex format: x, y, z, u, v, r, g, b, a, nx, ny, nz, skyLight, blockLight, ao (15 floats per vertex)
     // Using primitive arrays to avoid boxing/unboxing overhead
     private final FloatList vertices = new FloatList();
     private final IntList indices = new IntList();
@@ -214,11 +214,11 @@ public class MeshBuilder {
         float[] light2 = sampleVertexLight(face, mattmc.client.renderer.chunk.VertexLightSampler.Normal.UP, 2);
         float[] light3 = sampleVertexLight(face, mattmc.client.renderer.chunk.VertexLightSampler.Normal.UP, 3);
         
-        // 4 vertices for the quad with atlas UVs and light data
-        addVertex(x0, y1, z0, u0, v0, color, light0[0], light0[1], light0[2]); // 0
-        addVertex(x0, y1, z1, u0, v1, color, light1[0], light1[1], light1[2]); // 1
-        addVertex(x1, y1, z1, u1, v1, color, light2[0], light2[1], light2[2]); // 2
-        addVertex(x1, y1, z0, u1, v0, color, light3[0], light3[1], light3[2]); // 3
+        // 4 vertices for the quad with atlas UVs, normal (0,1,0) for top face, and light data
+        addVertex(x0, y1, z0, u0, v0, color, 0, 1, 0, light0[0], light0[1], light0[2]); // 0
+        addVertex(x0, y1, z1, u0, v1, color, 0, 1, 0, light1[0], light1[1], light1[2]); // 1
+        addVertex(x1, y1, z1, u1, v1, color, 0, 1, 0, light2[0], light2[1], light2[2]); // 2
+        addVertex(x1, y1, z0, u1, v0, color, 0, 1, 0, light3[0], light3[1], light3[2]); // 3
         
         // 2 triangles (6 indices)
         addQuadIndices(baseVertex);
@@ -252,11 +252,11 @@ public class MeshBuilder {
         float[] light2 = sampleVertexLight(face, mattmc.client.renderer.chunk.VertexLightSampler.Normal.DOWN, 2);
         float[] light3 = sampleVertexLight(face, mattmc.client.renderer.chunk.VertexLightSampler.Normal.DOWN, 3);
         
-        // 4 vertices for the quad with atlas UVs and light data
-        addVertex(x0, y0, z0, u0, v0, color, light0[0], light0[1], light0[2]); // 0
-        addVertex(x1, y0, z0, u1, v0, color, light1[0], light1[1], light1[2]); // 1
-        addVertex(x1, y0, z1, u1, v1, color, light2[0], light2[1], light2[2]); // 2
-        addVertex(x0, y0, z1, u0, v1, color, light3[0], light3[1], light3[2]); // 3
+        // 4 vertices for the quad with atlas UVs, normal (0,-1,0) for bottom face, and light data
+        addVertex(x0, y0, z0, u0, v0, color, 0, -1, 0, light0[0], light0[1], light0[2]); // 0
+        addVertex(x1, y0, z0, u1, v0, color, 0, -1, 0, light1[0], light1[1], light1[2]); // 1
+        addVertex(x1, y0, z1, u1, v1, color, 0, -1, 0, light2[0], light2[1], light2[2]); // 2
+        addVertex(x0, y0, z1, u0, v1, color, 0, -1, 0, light3[0], light3[1], light3[2]); // 3
         
         // 2 triangles (6 indices)
         addQuadIndices(baseVertex);
@@ -290,11 +290,11 @@ public class MeshBuilder {
         float[] light2 = sampleVertexLight(face, mattmc.client.renderer.chunk.VertexLightSampler.Normal.SOUTH, 2);
         float[] light3 = sampleVertexLight(face, mattmc.client.renderer.chunk.VertexLightSampler.Normal.SOUTH, 3);
         
-        // 4 vertices for the quad with atlas UVs and light data
-        addVertex(x0, y0, z1, u0, v1, color, light0[0], light0[1], light0[2]); // 0
-        addVertex(x1, y0, z1, u1, v1, color, light1[0], light1[1], light1[2]); // 1
-        addVertex(x1, y1, z1, u1, v0, color, light2[0], light2[1], light2[2]); // 2
-        addVertex(x0, y1, z1, u0, v0, color, light3[0], light3[1], light3[2]); // 3
+        // 4 vertices for the quad with atlas UVs, normal (0,0,1) for south face, and light data
+        addVertex(x0, y0, z1, u0, v1, color, 0, 0, 1, light0[0], light0[1], light0[2]); // 0
+        addVertex(x1, y0, z1, u1, v1, color, 0, 0, 1, light1[0], light1[1], light1[2]); // 1
+        addVertex(x1, y1, z1, u1, v0, color, 0, 0, 1, light2[0], light2[1], light2[2]); // 2
+        addVertex(x0, y1, z1, u0, v0, color, 0, 0, 1, light3[0], light3[1], light3[2]); // 3
         
         // 2 triangles (6 indices)
         addQuadIndices(baseVertex);
@@ -328,11 +328,11 @@ public class MeshBuilder {
         float[] light2 = sampleVertexLight(face, mattmc.client.renderer.chunk.VertexLightSampler.Normal.WEST, 2);
         float[] light3 = sampleVertexLight(face, mattmc.client.renderer.chunk.VertexLightSampler.Normal.WEST, 3);
         
-        // 4 vertices for the quad with atlas UVs and light data
-        addVertex(x0, y0, z0, u0, v1, color, light0[0], light0[1], light0[2]); // 0
-        addVertex(x0, y0, z1, u1, v1, color, light1[0], light1[1], light1[2]); // 1
-        addVertex(x0, y1, z1, u1, v0, color, light2[0], light2[1], light2[2]); // 2
-        addVertex(x0, y1, z0, u0, v0, color, light3[0], light3[1], light3[2]); // 3
+        // 4 vertices for the quad with atlas UVs, normal (-1,0,0) for west face, and light data
+        addVertex(x0, y0, z0, u0, v1, color, -1, 0, 0, light0[0], light0[1], light0[2]); // 0
+        addVertex(x0, y0, z1, u1, v1, color, -1, 0, 0, light1[0], light1[1], light1[2]); // 1
+        addVertex(x0, y1, z1, u1, v0, color, -1, 0, 0, light2[0], light2[1], light2[2]); // 2
+        addVertex(x0, y1, z0, u0, v0, color, -1, 0, 0, light3[0], light3[1], light3[2]); // 3
         
         // 2 triangles (6 indices)
         addQuadIndices(baseVertex);
@@ -366,11 +366,11 @@ public class MeshBuilder {
         float[] light2 = sampleVertexLight(face, mattmc.client.renderer.chunk.VertexLightSampler.Normal.EAST, 2);
         float[] light3 = sampleVertexLight(face, mattmc.client.renderer.chunk.VertexLightSampler.Normal.EAST, 3);
         
-        // 4 vertices for the quad with atlas UVs and light data
-        addVertex(x1, y0, z1, u1, v1, color, light0[0], light0[1], light0[2]); // 0
-        addVertex(x1, y0, z0, u0, v1, color, light1[0], light1[1], light1[2]); // 1
-        addVertex(x1, y1, z0, u0, v0, color, light2[0], light2[1], light2[2]); // 2
-        addVertex(x1, y1, z1, u1, v0, color, light3[0], light3[1], light3[2]); // 3
+        // 4 vertices for the quad with atlas UVs, normal (1,0,0) for east face, and light data
+        addVertex(x1, y0, z1, u1, v1, color, 1, 0, 0, light0[0], light0[1], light0[2]); // 0
+        addVertex(x1, y0, z0, u0, v1, color, 1, 0, 0, light1[0], light1[1], light1[2]); // 1
+        addVertex(x1, y1, z0, u0, v0, color, 1, 0, 0, light2[0], light2[1], light2[2]); // 2
+        addVertex(x1, y1, z1, u1, v0, color, 1, 0, 0, light3[0], light3[1], light3[2]); // 3
         
         // 2 triangles (6 indices)
         addQuadIndices(baseVertex);
@@ -404,11 +404,11 @@ public class MeshBuilder {
         float[] light2 = sampleVertexLight(face, mattmc.client.renderer.chunk.VertexLightSampler.Normal.NORTH, 2);
         float[] light3 = sampleVertexLight(face, mattmc.client.renderer.chunk.VertexLightSampler.Normal.NORTH, 3);
         
-        // 4 vertices for the quad with atlas UVs and light data
-        addVertex(x1, y0, z0, u1, v1, color, light0[0], light0[1], light0[2]); // 0
-        addVertex(x0, y0, z0, u0, v1, color, light1[0], light1[1], light1[2]); // 1
-        addVertex(x0, y1, z0, u0, v0, color, light2[0], light2[1], light2[2]); // 2
-        addVertex(x1, y1, z0, u1, v0, color, light3[0], light3[1], light3[2]); // 3
+        // 4 vertices for the quad with atlas UVs, normal (0,0,-1) for north face, and light data
+        addVertex(x1, y0, z0, u1, v1, color, 0, 0, -1, light0[0], light0[1], light0[2]); // 0
+        addVertex(x0, y0, z0, u0, v1, color, 0, 0, -1, light1[0], light1[1], light1[2]); // 1
+        addVertex(x0, y1, z0, u0, v0, color, 0, 0, -1, light2[0], light2[1], light2[2]); // 2
+        addVertex(x1, y1, z0, u1, v0, color, 0, 0, -1, light3[0], light3[1], light3[2]); // 3
         
         // 2 triangles (6 indices)
         addQuadIndices(baseVertex);
@@ -419,47 +419,33 @@ public class MeshBuilder {
     /**
      * Add a single vertex to the vertex list with default light values.
      */
-    private void addVertex(float x, float y, float z, float u, float v, float[] color) {
-        addVertex(x, y, z, u, v, color, 15.0f, 0.0f, 0.0f);
+    private void addVertex(float x, float y, float z, float u, float v, float[] color, float nx, float ny, float nz) {
+        addVertex(x, y, z, u, v, color, nx, ny, nz, 15.0f, 0.0f, 0.0f);
     }
     
     /**
-     * Add a single vertex to the vertex list with light data.
-     * Applies light modulation to the vertex color.
+     * Add a single vertex to the vertex list with light data and normal.
+     * Does NOT apply lighting to the color - that's handled by the shader.
+     * The color represents the albedo (base color) only.
      */
     private void addVertex(float x, float y, float z, float u, float v, float[] color,
-                          float skyLight, float blockLight, float ao) {
-        // Calculate light factor (0-1 range)
-        // Combine sky and block light, taking the maximum
-        float maxLight = Math.max(skyLight, blockLight) / 15.0f;
-        
-        // Apply AO factor (1.0, 0.8, 0.6, 0.45)
-        float aoFactor = 1.0f;
-        if (ao >= 3) aoFactor = 0.45f;
-        else if (ao >= 2) aoFactor = 0.6f;
-        else if (ao >= 1) aoFactor = 0.8f;
-        
-        // Combine light and AO
-        float lightFactor = maxLight * aoFactor;
-        
-        // Apply light factor to color
-        float r = color[0] * lightFactor;
-        float g = color[1] * lightFactor;
-        float b = color[2] * lightFactor;
-        
-        // Add vertex data
+                          float nx, float ny, float nz, float skyLight, float blockLight, float ao) {
+        // Add vertex data (position, uv, color, normal, light)
         vertices.add(x);
         vertices.add(y);
         vertices.add(z);
         vertices.add(u);
         vertices.add(v);
-        vertices.add(r);
-        vertices.add(g);
-        vertices.add(b);
+        vertices.add(color[0]); // r (albedo, no lighting applied)
+        vertices.add(color[1]); // g
+        vertices.add(color[2]); // b
         vertices.add(color[3]); // a
-        vertices.add(skyLight);  // 0-15 (stored for future use)
-        vertices.add(blockLight); // 0-15 (stored for future use)
-        vertices.add(ao);        // 0-3 (stored for future use)
+        vertices.add(nx);  // normal x
+        vertices.add(ny);  // normal y
+        vertices.add(nz);  // normal z
+        vertices.add(skyLight);  // 0-15
+        vertices.add(blockLight); // 0-15
+        vertices.add(ao);        // 0-3
     }
     
     /**
@@ -547,56 +533,56 @@ public class MeshBuilder {
         
         // Top face of slab (full texture)
         int base = currentVertex;
-        addVertex(x0, y1, z0, u0, v0, colorTop);
-        addVertex(x0, y1, z1, u0, v1, colorTop);
-        addVertex(x1, y1, z1, u1, v1, colorTop);
-        addVertex(x1, y1, z0, u1, v0, colorTop);
+        addVertex(x0, y1, z0, u0, v0, colorTop, 0, 1, 0);
+        addVertex(x0, y1, z1, u0, v1, colorTop, 0, 1, 0);
+        addVertex(x1, y1, z1, u1, v1, colorTop, 0, 1, 0);
+        addVertex(x1, y1, z0, u1, v0, colorTop, 0, 1, 0);
         addQuadIndices(base);
         currentVertex += 4;
         
         // Bottom face (full texture)
         base = currentVertex;
-        addVertex(x0, y0, z0, u0, v0, colorBottom);
-        addVertex(x1, y0, z0, u1, v0, colorBottom);
-        addVertex(x1, y0, z1, u1, v1, colorBottom);
-        addVertex(x0, y0, z1, u0, v1, colorBottom);
+        addVertex(x0, y0, z0, u0, v0, colorBottom, 0, -1, 0);
+        addVertex(x1, y0, z0, u1, v0, colorBottom, 0, -1, 0);
+        addVertex(x1, y0, z1, u1, v1, colorBottom, 0, -1, 0);
+        addVertex(x0, y0, z1, u0, v1, colorBottom, 0, -1, 0);
         addQuadIndices(base);
         currentVertex += 4;
         
         // Side faces - all full width/depth, half height
         // North face
         base = currentVertex;
-        addVertex(x1, y0, z0, u1, v1, colorNorth);
-        addVertex(x0, y0, z0, u0, v1, colorNorth);
-        addVertex(x0, y1, z0, u0, v05, colorNorth);
-        addVertex(x1, y1, z0, u1, v05, colorNorth);
+        addVertex(x1, y0, z0, u1, v1, colorNorth, 0, 0, -1);
+        addVertex(x0, y0, z0, u0, v1, colorNorth, 0, 0, -1);
+        addVertex(x0, y1, z0, u0, v05, colorNorth, 0, 0, -1);
+        addVertex(x1, y1, z0, u1, v05, colorNorth, 0, 0, -1);
         addQuadIndices(base);
         currentVertex += 4;
         
         // South face
         base = currentVertex;
-        addVertex(x0, y0, z1, u0, v1, colorSouth);
-        addVertex(x1, y0, z1, u1, v1, colorSouth);
-        addVertex(x1, y1, z1, u1, v05, colorSouth);
-        addVertex(x0, y1, z1, u0, v05, colorSouth);
+        addVertex(x0, y0, z1, u0, v1, colorSouth, 0, 0, 1);
+        addVertex(x1, y0, z1, u1, v1, colorSouth, 0, 0, 1);
+        addVertex(x1, y1, z1, u1, v05, colorSouth, 0, 0, 1);
+        addVertex(x0, y1, z1, u0, v05, colorSouth, 0, 0, 1);
         addQuadIndices(base);
         currentVertex += 4;
         
         // West face
         base = currentVertex;
-        addVertex(x0, y0, z0, u0, v1, colorWest);
-        addVertex(x0, y0, z1, u1, v1, colorWest);
-        addVertex(x0, y1, z1, u1, v05, colorWest);
-        addVertex(x0, y1, z0, u0, v05, colorWest);
+        addVertex(x0, y0, z0, u0, v1, colorWest, -1, 0, 0);
+        addVertex(x0, y0, z1, u1, v1, colorWest, -1, 0, 0);
+        addVertex(x0, y1, z1, u1, v05, colorWest, -1, 0, 0);
+        addVertex(x0, y1, z0, u0, v05, colorWest, -1, 0, 0);
         addQuadIndices(base);
         currentVertex += 4;
         
         // East face
         base = currentVertex;
-        addVertex(x1, y0, z1, u1, v1, colorEast);
-        addVertex(x1, y0, z0, u0, v1, colorEast);
-        addVertex(x1, y1, z0, u0, v05, colorEast);
-        addVertex(x1, y1, z1, u1, v05, colorEast);
+        addVertex(x1, y0, z1, u1, v1, colorEast, 1, 0, 0);
+        addVertex(x1, y0, z0, u0, v1, colorEast, 1, 0, 0);
+        addVertex(x1, y1, z0, u0, v05, colorEast, 1, 0, 0);
+        addVertex(x1, y1, z1, u1, v05, colorEast, 1, 0, 0);
         addQuadIndices(base);
         currentVertex += 4;
     }
@@ -650,55 +636,55 @@ public class MeshBuilder {
                                      float[] colorWest, float[] colorEast) {
         // Top face (north half)
         int base = currentVertex;
-        addVertex(x0, y1, z0, u0, v0, colorTop);
-        addVertex(x0, y1, z05, u0, v05, colorTop);
-        addVertex(x1, y1, z05, u1, v05, colorTop);
-        addVertex(x1, y1, z0, u1, v0, colorTop);
+        addVertex(x0, y1, z0, u0, v0, colorTop, 0, 1, 0);
+        addVertex(x0, y1, z05, u0, v05, colorTop, 0, 1, 0);
+        addVertex(x1, y1, z05, u1, v05, colorTop, 0, 1, 0);
+        addVertex(x1, y1, z0, u1, v0, colorTop, 0, 1, 0);
         addQuadIndices(base);
         currentVertex += 4;
         
         // Bottom face (north half)
         base = currentVertex;
-        addVertex(x0, y0, z0, u0, v0, colorBottom);
-        addVertex(x1, y0, z0, u1, v0, colorBottom);
-        addVertex(x1, y0, z05, u1, v05, colorBottom);
-        addVertex(x0, y0, z05, u0, v05, colorBottom);
+        addVertex(x0, y0, z0, u0, v0, colorBottom, 0, -1, 0);
+        addVertex(x1, y0, z0, u1, v0, colorBottom, 0, -1, 0);
+        addVertex(x1, y0, z05, u1, v05, colorBottom, 0, -1, 0);
+        addVertex(x0, y0, z05, u0, v05, colorBottom, 0, -1, 0);
         addQuadIndices(base);
         currentVertex += 4;
         
         // North face (front of step)
         base = currentVertex;
-        addVertex(x1, y0, z0, u1, v05, colorNorth);
-        addVertex(x0, y0, z0, u0, v05, colorNorth);
-        addVertex(x0, y1, z0, u0, v0, colorNorth);
-        addVertex(x1, y1, z0, u1, v0, colorNorth);
+        addVertex(x1, y0, z0, u1, v05, colorNorth, 0, -1, 0);
+        addVertex(x0, y0, z0, u0, v05, colorNorth, 0, -1, 0);
+        addVertex(x0, y1, z0, u0, v0, colorNorth, 0, 1, 0);
+        addVertex(x1, y1, z0, u1, v0, colorNorth, 0, 1, 0);
         addQuadIndices(base);
         currentVertex += 4;
         
         // South face (inner vertical)
         base = currentVertex;
-        addVertex(x0, y0, z05, u0, v05, colorSouth);
-        addVertex(x1, y0, z05, u1, v05, colorSouth);
-        addVertex(x1, y1, z05, u1, v0, colorSouth);
-        addVertex(x0, y1, z05, u0, v0, colorSouth);
+        addVertex(x0, y0, z05, u0, v05, colorSouth, 0, -1, 0);
+        addVertex(x1, y0, z05, u1, v05, colorSouth, 0, -1, 0);
+        addVertex(x1, y1, z05, u1, v0, colorSouth, 0, 1, 0);
+        addVertex(x0, y1, z05, u0, v0, colorSouth, 0, 1, 0);
         addQuadIndices(base);
         currentVertex += 4;
         
         // West face (left side, half depth)
         base = currentVertex;
-        addVertex(x0, y0, z0, u0, v05, colorWest);
-        addVertex(x0, y0, z05, u05, v05, colorWest);
-        addVertex(x0, y1, z05, u05, v0, colorWest);
-        addVertex(x0, y1, z0, u0, v0, colorWest);
+        addVertex(x0, y0, z0, u0, v05, colorWest, 0, -1, 0);
+        addVertex(x0, y0, z05, u05, v05, colorWest, 0, -1, 0);
+        addVertex(x0, y1, z05, u05, v0, colorWest, 0, 1, 0);
+        addVertex(x0, y1, z0, u0, v0, colorWest, 0, 1, 0);
         addQuadIndices(base);
         currentVertex += 4;
         
         // East face (right side, half depth)
         base = currentVertex;
-        addVertex(x1, y0, z05, u05, v05, colorEast);
-        addVertex(x1, y0, z0, u0, v05, colorEast);
-        addVertex(x1, y1, z0, u0, v0, colorEast);
-        addVertex(x1, y1, z05, u05, v0, colorEast);
+        addVertex(x1, y0, z05, u05, v05, colorEast, 0, -1, 0);
+        addVertex(x1, y0, z0, u0, v05, colorEast, 0, -1, 0);
+        addVertex(x1, y1, z0, u0, v0, colorEast, 0, 1, 0);
+        addVertex(x1, y1, z05, u05, v0, colorEast, 0, 1, 0);
         addQuadIndices(base);
         currentVertex += 4;
     }
@@ -712,55 +698,55 @@ public class MeshBuilder {
                                      float[] colorWest, float[] colorEast) {
         // Top face (south half)
         int base = currentVertex;
-        addVertex(x0, y1, z05, u0, v05, colorTop);
-        addVertex(x0, y1, z1, u0, v1, colorTop);
-        addVertex(x1, y1, z1, u1, v1, colorTop);
-        addVertex(x1, y1, z05, u1, v05, colorTop);
+        addVertex(x0, y1, z05, u0, v05, colorTop, 0, 1, 0);
+        addVertex(x0, y1, z1, u0, v1, colorTop, 0, 1, 0);
+        addVertex(x1, y1, z1, u1, v1, colorTop, 0, 1, 0);
+        addVertex(x1, y1, z05, u1, v05, colorTop, 0, 1, 0);
         addQuadIndices(base);
         currentVertex += 4;
         
         // Bottom face (south half)
         base = currentVertex;
-        addVertex(x0, y0, z05, u0, v05, colorBottom);
-        addVertex(x1, y0, z05, u1, v05, colorBottom);
-        addVertex(x1, y0, z1, u1, v1, colorBottom);
-        addVertex(x0, y0, z1, u0, v1, colorBottom);
+        addVertex(x0, y0, z05, u0, v05, colorBottom, 0, -1, 0);
+        addVertex(x1, y0, z05, u1, v05, colorBottom, 0, -1, 0);
+        addVertex(x1, y0, z1, u1, v1, colorBottom, 0, -1, 0);
+        addVertex(x0, y0, z1, u0, v1, colorBottom, 0, -1, 0);
         addQuadIndices(base);
         currentVertex += 4;
         
         // North face (inner vertical)
         base = currentVertex;
-        addVertex(x1, y0, z05, u1, v05, colorNorth);
-        addVertex(x0, y0, z05, u0, v05, colorNorth);
-        addVertex(x0, y1, z05, u0, v0, colorNorth);
-        addVertex(x1, y1, z05, u1, v0, colorNorth);
+        addVertex(x1, y0, z05, u1, v05, colorNorth, 0, -1, 0);
+        addVertex(x0, y0, z05, u0, v05, colorNorth, 0, -1, 0);
+        addVertex(x0, y1, z05, u0, v0, colorNorth, 0, 1, 0);
+        addVertex(x1, y1, z05, u1, v0, colorNorth, 0, 1, 0);
         addQuadIndices(base);
         currentVertex += 4;
         
         // South face (front of step)
         base = currentVertex;
-        addVertex(x0, y0, z1, u0, v05, colorSouth);
-        addVertex(x1, y0, z1, u1, v05, colorSouth);
-        addVertex(x1, y1, z1, u1, v0, colorSouth);
-        addVertex(x0, y1, z1, u0, v0, colorSouth);
+        addVertex(x0, y0, z1, u0, v05, colorSouth, 0, -1, 0);
+        addVertex(x1, y0, z1, u1, v05, colorSouth, 0, -1, 0);
+        addVertex(x1, y1, z1, u1, v0, colorSouth, 0, 1, 0);
+        addVertex(x0, y1, z1, u0, v0, colorSouth, 0, 1, 0);
         addQuadIndices(base);
         currentVertex += 4;
         
         // West face (left side, half depth)
         base = currentVertex;
-        addVertex(x0, y0, z05, u05, v05, colorWest);
-        addVertex(x0, y0, z1, u1, v05, colorWest);
-        addVertex(x0, y1, z1, u1, v0, colorWest);
-        addVertex(x0, y1, z05, u05, v0, colorWest);
+        addVertex(x0, y0, z05, u05, v05, colorWest, 0, -1, 0);
+        addVertex(x0, y0, z1, u1, v05, colorWest, 0, -1, 0);
+        addVertex(x0, y1, z1, u1, v0, colorWest, 0, 1, 0);
+        addVertex(x0, y1, z05, u05, v0, colorWest, 0, 1, 0);
         addQuadIndices(base);
         currentVertex += 4;
         
         // East face (right side, half depth)
         base = currentVertex;
-        addVertex(x1, y0, z1, u1, v05, colorEast);
-        addVertex(x1, y0, z05, u05, v05, colorEast);
-        addVertex(x1, y1, z05, u05, v0, colorEast);
-        addVertex(x1, y1, z1, u1, v0, colorEast);
+        addVertex(x1, y0, z1, u1, v05, colorEast, 0, -1, 0);
+        addVertex(x1, y0, z05, u05, v05, colorEast, 0, -1, 0);
+        addVertex(x1, y1, z05, u05, v0, colorEast, 0, 1, 0);
+        addVertex(x1, y1, z1, u1, v0, colorEast, 0, 1, 0);
         addQuadIndices(base);
         currentVertex += 4;
     }
@@ -774,55 +760,55 @@ public class MeshBuilder {
                                     float[] colorWest, float[] colorEast) {
         // Top face (west half)
         int base = currentVertex;
-        addVertex(x0, y1, z0, u0, v0, colorTop);
-        addVertex(x0, y1, z1, u0, v1, colorTop);
-        addVertex(x05, y1, z1, u05, v1, colorTop);
-        addVertex(x05, y1, z0, u05, v0, colorTop);
+        addVertex(x0, y1, z0, u0, v0, colorTop, 0, 1, 0);
+        addVertex(x0, y1, z1, u0, v1, colorTop, 0, 1, 0);
+        addVertex(x05, y1, z1, u05, v1, colorTop, 0, 1, 0);
+        addVertex(x05, y1, z0, u05, v0, colorTop, 0, 1, 0);
         addQuadIndices(base);
         currentVertex += 4;
         
         // Bottom face (west half)
         base = currentVertex;
-        addVertex(x0, y0, z0, u0, v0, colorBottom);
-        addVertex(x05, y0, z0, u05, v0, colorBottom);
-        addVertex(x05, y0, z1, u05, v1, colorBottom);
-        addVertex(x0, y0, z1, u0, v1, colorBottom);
+        addVertex(x0, y0, z0, u0, v0, colorBottom, 0, -1, 0);
+        addVertex(x05, y0, z0, u05, v0, colorBottom, 0, -1, 0);
+        addVertex(x05, y0, z1, u05, v1, colorBottom, 0, -1, 0);
+        addVertex(x0, y0, z1, u0, v1, colorBottom, 0, -1, 0);
         addQuadIndices(base);
         currentVertex += 4;
         
         // North face (left side, half width)
         base = currentVertex;
-        addVertex(x05, y0, z0, u05, v05, colorNorth);
-        addVertex(x0, y0, z0, u0, v05, colorNorth);
-        addVertex(x0, y1, z0, u0, v0, colorNorth);
-        addVertex(x05, y1, z0, u05, v0, colorNorth);
+        addVertex(x05, y0, z0, u05, v05, colorNorth, 0, -1, 0);
+        addVertex(x0, y0, z0, u0, v05, colorNorth, 0, -1, 0);
+        addVertex(x0, y1, z0, u0, v0, colorNorth, 0, 1, 0);
+        addVertex(x05, y1, z0, u05, v0, colorNorth, 0, 1, 0);
         addQuadIndices(base);
         currentVertex += 4;
         
         // South face (right side, half width)
         base = currentVertex;
-        addVertex(x0, y0, z1, u0, v05, colorSouth);
-        addVertex(x05, y0, z1, u05, v05, colorSouth);
-        addVertex(x05, y1, z1, u05, v0, colorSouth);
-        addVertex(x0, y1, z1, u0, v0, colorSouth);
+        addVertex(x0, y0, z1, u0, v05, colorSouth, 0, -1, 0);
+        addVertex(x05, y0, z1, u05, v05, colorSouth, 0, -1, 0);
+        addVertex(x05, y1, z1, u05, v0, colorSouth, 0, 1, 0);
+        addVertex(x0, y1, z1, u0, v0, colorSouth, 0, 1, 0);
         addQuadIndices(base);
         currentVertex += 4;
         
         // West face (front of step)
         base = currentVertex;
-        addVertex(x0, y0, z0, u0, v05, colorWest);
-        addVertex(x0, y0, z1, u1, v05, colorWest);
-        addVertex(x0, y1, z1, u1, v0, colorWest);
-        addVertex(x0, y1, z0, u0, v0, colorWest);
+        addVertex(x0, y0, z0, u0, v05, colorWest, 0, -1, 0);
+        addVertex(x0, y0, z1, u1, v05, colorWest, 0, -1, 0);
+        addVertex(x0, y1, z1, u1, v0, colorWest, 0, 1, 0);
+        addVertex(x0, y1, z0, u0, v0, colorWest, 0, 1, 0);
         addQuadIndices(base);
         currentVertex += 4;
         
         // East face (inner vertical)
         base = currentVertex;
-        addVertex(x05, y0, z1, u1, v05, colorEast);
-        addVertex(x05, y0, z0, u0, v05, colorEast);
-        addVertex(x05, y1, z0, u0, v0, colorEast);
-        addVertex(x05, y1, z1, u1, v0, colorEast);
+        addVertex(x05, y0, z1, u1, v05, colorEast, 0, -1, 0);
+        addVertex(x05, y0, z0, u0, v05, colorEast, 0, -1, 0);
+        addVertex(x05, y1, z0, u0, v0, colorEast, 0, 1, 0);
+        addVertex(x05, y1, z1, u1, v0, colorEast, 0, 1, 0);
         addQuadIndices(base);
         currentVertex += 4;
     }
@@ -836,55 +822,55 @@ public class MeshBuilder {
                                     float[] colorWest, float[] colorEast) {
         // Top face (east half)
         int base = currentVertex;
-        addVertex(x05, y1, z0, u05, v0, colorTop);
-        addVertex(x05, y1, z1, u05, v1, colorTop);
-        addVertex(x1, y1, z1, u1, v1, colorTop);
-        addVertex(x1, y1, z0, u1, v0, colorTop);
+        addVertex(x05, y1, z0, u05, v0, colorTop, 0, 1, 0);
+        addVertex(x05, y1, z1, u05, v1, colorTop, 0, 1, 0);
+        addVertex(x1, y1, z1, u1, v1, colorTop, 0, 1, 0);
+        addVertex(x1, y1, z0, u1, v0, colorTop, 0, 1, 0);
         addQuadIndices(base);
         currentVertex += 4;
         
         // Bottom face (east half)
         base = currentVertex;
-        addVertex(x05, y0, z0, u05, v0, colorBottom);
-        addVertex(x1, y0, z0, u1, v0, colorBottom);
-        addVertex(x1, y0, z1, u1, v1, colorBottom);
-        addVertex(x05, y0, z1, u05, v1, colorBottom);
+        addVertex(x05, y0, z0, u05, v0, colorBottom, 0, -1, 0);
+        addVertex(x1, y0, z0, u1, v0, colorBottom, 0, -1, 0);
+        addVertex(x1, y0, z1, u1, v1, colorBottom, 0, -1, 0);
+        addVertex(x05, y0, z1, u05, v1, colorBottom, 0, -1, 0);
         addQuadIndices(base);
         currentVertex += 4;
         
         // North face (right side, half width)
         base = currentVertex;
-        addVertex(x1, y0, z0, u1, v05, colorNorth);
-        addVertex(x05, y0, z0, u05, v05, colorNorth);
-        addVertex(x05, y1, z0, u05, v0, colorNorth);
-        addVertex(x1, y1, z0, u1, v0, colorNorth);
+        addVertex(x1, y0, z0, u1, v05, colorNorth, 0, -1, 0);
+        addVertex(x05, y0, z0, u05, v05, colorNorth, 0, -1, 0);
+        addVertex(x05, y1, z0, u05, v0, colorNorth, 0, 1, 0);
+        addVertex(x1, y1, z0, u1, v0, colorNorth, 0, 1, 0);
         addQuadIndices(base);
         currentVertex += 4;
         
         // South face (left side, half width)
         base = currentVertex;
-        addVertex(x05, y0, z1, u05, v05, colorSouth);
-        addVertex(x1, y0, z1, u1, v05, colorSouth);
-        addVertex(x1, y1, z1, u1, v0, colorSouth);
-        addVertex(x05, y1, z1, u05, v0, colorSouth);
+        addVertex(x05, y0, z1, u05, v05, colorSouth, 0, -1, 0);
+        addVertex(x1, y0, z1, u1, v05, colorSouth, 0, -1, 0);
+        addVertex(x1, y1, z1, u1, v0, colorSouth, 0, 1, 0);
+        addVertex(x05, y1, z1, u05, v0, colorSouth, 0, 1, 0);
         addQuadIndices(base);
         currentVertex += 4;
         
         // West face (inner vertical)
         base = currentVertex;
-        addVertex(x05, y0, z0, u0, v05, colorWest);
-        addVertex(x05, y0, z1, u1, v05, colorWest);
-        addVertex(x05, y1, z1, u1, v0, colorWest);
-        addVertex(x05, y1, z0, u0, v0, colorWest);
+        addVertex(x05, y0, z0, u0, v05, colorWest, 0, -1, 0);
+        addVertex(x05, y0, z1, u1, v05, colorWest, 0, -1, 0);
+        addVertex(x05, y1, z1, u1, v0, colorWest, 0, 1, 0);
+        addVertex(x05, y1, z0, u0, v0, colorWest, 0, 1, 0);
         addQuadIndices(base);
         currentVertex += 4;
         
         // East face (front of step)
         base = currentVertex;
-        addVertex(x1, y0, z1, u1, v05, colorEast);
-        addVertex(x1, y0, z0, u0, v05, colorEast);
-        addVertex(x1, y1, z0, u0, v0, colorEast);
-        addVertex(x1, y1, z1, u1, v0, colorEast);
+        addVertex(x1, y0, z1, u1, v05, colorEast, 0, -1, 0);
+        addVertex(x1, y0, z0, u0, v05, colorEast, 0, -1, 0);
+        addVertex(x1, y1, z0, u0, v0, colorEast, 0, 1, 0);
+        addVertex(x1, y1, z1, u1, v0, colorEast, 0, 1, 0);
         addQuadIndices(base);
         currentVertex += 4;
     }
