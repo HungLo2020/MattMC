@@ -394,4 +394,17 @@ public class LightPropagator {
                skyAddHead != skyAddTail ||
                skyRemoveHead != skyRemoveTail;
     }
+    
+    /**
+     * Get the total number of pending light updates across all queues.
+     * 
+     * @return Total number of pending updates
+     */
+    public int getPendingUpdateCount() {
+        int blockAddCount = (blockAddTail - blockAddHead + BUFFER_SIZE) % BUFFER_SIZE;
+        int blockRemoveCount = (blockRemoveTail - blockRemoveHead + BUFFER_SIZE) % BUFFER_SIZE;
+        int skyAddCount = (skyAddTail - skyAddHead + BUFFER_SIZE) % BUFFER_SIZE;
+        int skyRemoveCount = (skyRemoveTail - skyRemoveHead + BUFFER_SIZE) % BUFFER_SIZE;
+        return blockAddCount + blockRemoveCount + skyAddCount + skyRemoveCount;
+    }
 }

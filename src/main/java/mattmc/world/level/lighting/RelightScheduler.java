@@ -68,17 +68,26 @@ public class RelightScheduler {
         // Reset frame metrics
         nodesProcessedLastFrame = 0;
         
+        // Get initial backlog size before processing
+        int initialBacklog = propagator.getPendingUpdateCount();
+        
         // For now, we simply delegate to the propagator's updateBudget method
         // The propagator already processes updates incrementally with a time budget
         // Future enhancement: implement distance-based prioritization by reordering queues
         propagator.updateBudget(msBudget);
+        
+        // Get final backlog size after processing
+        int finalBacklog = propagator.getPendingUpdateCount();
+        
+        // Calculate nodes processed this frame
+        nodesProcessedLastFrame = Math.max(0, initialBacklog - finalBacklog);
         
         // Calculate time spent
         long endTime = System.nanoTime();
         timeSpentLastFrame = (endTime - startTime) / 1_000_000.0; // convert to ms
         
         // Update backlog size
-        backlogSize = propagator.hasPendingUpdates() ? 1 : 0; // Simplified for now
+        backlogSize = finalBacklog;
         
         // Track totals
         totalTimeSpent += timeSpentLastFrame;
