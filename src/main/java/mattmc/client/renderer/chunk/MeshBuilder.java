@@ -425,21 +425,41 @@ public class MeshBuilder {
     
     /**
      * Add a single vertex to the vertex list with light data.
+     * Applies light modulation to the vertex color.
      */
     private void addVertex(float x, float y, float z, float u, float v, float[] color,
                           float skyLight, float blockLight, float ao) {
+        // Calculate light factor (0-1 range)
+        // Combine sky and block light, taking the maximum
+        float maxLight = Math.max(skyLight, blockLight) / 15.0f;
+        
+        // Apply AO factor (1.0, 0.8, 0.6, 0.45)
+        float aoFactor = 1.0f;
+        if (ao >= 3) aoFactor = 0.45f;
+        else if (ao >= 2) aoFactor = 0.6f;
+        else if (ao >= 1) aoFactor = 0.8f;
+        
+        // Combine light and AO
+        float lightFactor = maxLight * aoFactor;
+        
+        // Apply light factor to color
+        float r = color[0] * lightFactor;
+        float g = color[1] * lightFactor;
+        float b = color[2] * lightFactor;
+        
+        // Add vertex data
         vertices.add(x);
         vertices.add(y);
         vertices.add(z);
         vertices.add(u);
         vertices.add(v);
-        vertices.add(color[0]); // r
-        vertices.add(color[1]); // g
-        vertices.add(color[2]); // b
+        vertices.add(r);
+        vertices.add(g);
+        vertices.add(b);
         vertices.add(color[3]); // a
-        vertices.add(skyLight);  // 0-15
-        vertices.add(blockLight); // 0-15
-        vertices.add(ao);        // 0-3
+        vertices.add(skyLight);  // 0-15 (stored for future use)
+        vertices.add(blockLight); // 0-15 (stored for future use)
+        vertices.add(ao);        // 0-3 (stored for future use)
     }
     
     /**
