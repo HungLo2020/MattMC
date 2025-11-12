@@ -28,6 +28,9 @@ public class OptionsManager {
     private static boolean titleScreenBlurEnabled = false;  // Default: disabled for title screen
     private static boolean menuScreenBlurEnabled = true;    // Default: enabled for other screens
     
+    // Block name display setting
+    private static boolean showBlockNameEnabled = true;  // Default: enabled
+    
     // FPS cap setting
     private static int fpsCapValue = 60;  // Default: 60 FPS
     
@@ -131,6 +134,8 @@ public class OptionsManager {
                         titleScreenBlurEnabled = Boolean.parseBoolean(value);
                     } else if (key.equals("blur_menu_screens")) {
                         menuScreenBlurEnabled = Boolean.parseBoolean(value);
+                    } else if (key.equals("show_block_name")) {
+                        showBlockNameEnabled = Boolean.parseBoolean(value);
                     } else if (key.equals("fps_cap")) {
                         try {
                             int fps = Integer.parseInt(value);
@@ -210,6 +215,9 @@ public class OptionsManager {
             options.put("blur_title_screen", String.valueOf(titleScreenBlurEnabled));
             options.put("blur_menu_screens", String.valueOf(menuScreenBlurEnabled));
             
+            // Update block name display setting
+            options.put("show_block_name", String.valueOf(showBlockNameEnabled));
+            
             // Update FPS cap setting
             options.put("fps_cap", String.valueOf(fpsCapValue));
             
@@ -243,6 +251,11 @@ public class OptionsManager {
                 writer.write("# Blur settings\n");
                 writer.write("blur_title_screen=" + titleScreenBlurEnabled + "\n");
                 writer.write("blur_menu_screens=" + menuScreenBlurEnabled + "\n");
+                writer.write("\n");
+                
+                // Write block name display setting
+                writer.write("# Block name display\n");
+                writer.write("show_block_name=" + showBlockNameEnabled + "\n");
                 writer.write("\n");
                 
                 // Write FPS cap setting
@@ -413,6 +426,21 @@ public class OptionsManager {
     
     public static void setAnisotropicFiltering(int level) {
         anisotropicFiltering = validateAnisotropicLevel(level);
+        saveOptions();
+    }
+    
+    // Block name display getters and setters
+    public static boolean isShowBlockNameEnabled() {
+        return showBlockNameEnabled;
+    }
+    
+    public static void setShowBlockNameEnabled(boolean enabled) {
+        showBlockNameEnabled = enabled;
+        saveOptions();
+    }
+    
+    public static void toggleShowBlockName() {
+        showBlockNameEnabled = !showBlockNameEnabled;
         saveOptions();
     }
 }
