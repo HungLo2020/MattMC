@@ -7,6 +7,7 @@ varying vec3 vLightData;
 varying vec3 vNormal;
 varying vec3 vWorldPos;
 varying float vFogFactor;
+varying float vViewDepth;
 
 // Uniforms
 uniform vec3 uCameraPos;
@@ -30,4 +31,7 @@ void main() {
     const float fogDensity = 0.0035; // Reduced density for more distant fog
     float fogAmount = 1.0 - exp(-pow(distance * fogDensity, 2.0));
     vFogFactor = clamp(fogAmount, 0.0, 1.0);
+    
+    // Calculate view space depth for cascade selection
+    vViewDepth = distance;
 }

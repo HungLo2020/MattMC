@@ -3,6 +3,9 @@ package mattmc.client.renderer;
 import static org.lwjgl.opengl.GL11.*;
 import static org.lwjgl.opengl.GL20.*;
 
+import java.nio.FloatBuffer;
+import org.lwjgl.BufferUtils;
+
 /** Simple shader program wrapper for GLSL shaders. */
 public class Shader implements AutoCloseable {
     private final int programId;
@@ -75,6 +78,19 @@ public class Shader implements AutoCloseable {
         if (location != -1) {
             glUniform4f(location, v1, v2, v3, v4);
         }
+    }
+    
+    public void setUniformMatrix4fv(String name, boolean transpose, FloatBuffer matrix) {
+        int location = glGetUniformLocation(programId, name);
+        if (location != -1) {
+            glUniformMatrix4fv(location, transpose, matrix);
+        }
+    }
+    
+    public void setUniformMatrix4fv(String name, boolean transpose, float[] matrix) {
+        FloatBuffer buffer = BufferUtils.createFloatBuffer(16);
+        buffer.put(matrix).flip();
+        setUniformMatrix4fv(name, transpose, buffer);
     }
     
     public static void unbind() {
