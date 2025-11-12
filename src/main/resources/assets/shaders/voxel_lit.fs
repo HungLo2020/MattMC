@@ -45,18 +45,19 @@ void main() {
     else if (ao >= 2.0) aoFactor = 0.6;
     else if (ao >= 1.0) aoFactor = 0.8;
     
-    // Calculate ambient lighting (scaled down to prevent over-brightening)
+    // Calculate ambient lighting (very conservative to prevent washout)
     vec3 skyAmbient = uAmbientSky * skyLightNorm;
     vec3 blockAmbient = uAmbientBlock * blockLightNorm;
     vec3 ambient = max(skyAmbient, blockAmbient); // Take maximum of the two
     
     // Calculate Lambert diffuse from sun (N·L)
     float NdotL = max(dot(normalize(vNormal), normalize(uSunDir)), 0.0);
-    vec3 sunDiffuse = uSunColor * NdotL * skyLightNorm * 0.5; // Scale down sun contribution
+    vec3 sunDiffuse = uSunColor * NdotL * skyLightNorm * 0.3; // Further reduced sun contribution
     
     // Combine all lighting (do this in linear space)
-    // Total should not exceed 1.0 to prevent over-saturation
-    vec3 lighting = ambient + sunDiffuse;
+    // Use a minimum ambient to prevent completely black areas
+    vec3 minAmbient = vec3(0.03); // Very dark but not completely black
+    vec3 lighting = max(ambient + sunDiffuse, minAmbient);
     
     // Apply ambient occlusion
     lighting *= aoFactor;
