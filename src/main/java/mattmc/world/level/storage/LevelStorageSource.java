@@ -106,6 +106,7 @@ public final class LevelStorageSource {
         levelData.setWorldName(worldName);
         levelData.setLastPlayed(System.currentTimeMillis());
         levelData.setSeed(world.getSeed());
+        levelData.setWorldTime(world.getDayCycle().getWorldTime());
         levelData.setPlayerX(playerX);
         levelData.setPlayerY(playerY);
         levelData.setPlayerZ(playerZ);
@@ -210,6 +211,9 @@ public final class LevelStorageSource {
         
         // Set world seed from level data
         world.setSeed(levelData.getSeed());
+        
+        // Set world time from level data
+        world.getDayCycle().setWorldTime(levelData.getWorldTime());
         
         // Set world directory for saving chunks during unload
         world.setWorldDirectory(worldDir);

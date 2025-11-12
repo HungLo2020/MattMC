@@ -72,6 +72,9 @@ public class Level implements LevelAccessor {
     // Chunk neighbor accessor for cross-chunk face culling
     private final BlockFaceCollector.ChunkNeighborAccessor neighborAccessor = this::getBlockAcrossChunks;
     
+    // Day/night cycle
+    private final DayCycle dayCycle = new DayCycle();
+    
     public Level() {
         this.asyncLoader = new AsyncChunkLoader();
         // Initialize with a default seed (will be updated when world is loaded/created)
@@ -530,6 +533,21 @@ public class Level implements LevelAccessor {
      */
     public AsyncChunkLoader getAsyncLoader() {
         return asyncLoader;
+    }
+    
+    /**
+     * Get the day/night cycle manager.
+     */
+    public DayCycle getDayCycle() {
+        return dayCycle;
+    }
+    
+    /**
+     * Tick the world's day/night cycle.
+     * Should be called once per game tick (20 TPS).
+     */
+    public void tickDayCycle() {
+        dayCycle.tick();
     }
     
     /**
