@@ -58,6 +58,13 @@ void main() {
     // Apply lighting to albedo
     vec3 litColor = albedo * lighting;
     
+    // Add tiny emissive boost for emissive blocks (helps with bloom later)
+    // Only add emissive when blockLight is very high (indicating light source)
+    // This makes torches and other light-emitting blocks glow slightly
+    float emissiveStrength = smoothstep(12.0, 15.0, blockLight);
+    vec3 emissive = albedo * emissiveStrength * 0.15;
+    litColor += emissive;
+    
     // Apply fog
     vec3 finalColor = mix(litColor, uFogColor, vFogFactor);
     
