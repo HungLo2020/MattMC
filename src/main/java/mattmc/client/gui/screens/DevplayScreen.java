@@ -170,6 +170,9 @@ public final class DevplayScreen implements Screen {
         // Fixed timestep: since tick() is called at exactly 20 TPS, use fixed dt
         final float FIXED_DT = 0.05f; // 1/20 second per tick
         
+        // Tick the day/night cycle
+        world.tickDayCycle();
+        
         // Update chunks based on player position (load/unload) with frustum prioritization
         world.updateChunksAroundPlayer(player.getX(), player.getZ(), player.getYaw());
         
@@ -207,8 +210,9 @@ public final class DevplayScreen implements Screen {
         
         int w = window.width(), h = window.height();
 
-        // Clear color + depth (sky blue)
-        glClearColor(0.53f, 0.81f, 0.92f, 1f);
+        // Get sky color from day/night cycle
+        float[] skyColor = world.getDayCycle().getSkyColor();
+        glClearColor(skyColor[0], skyColor[1], skyColor[2], 1f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         // Perspective projection
@@ -232,6 +236,9 @@ public final class DevplayScreen implements Screen {
         glRotatef(player.getYaw(alphaF), 0f, 1f, 0f);
         glTranslatef(-player.getX(alphaF), -player.getEyeY(alphaF), -player.getZ(alphaF));
 
+        // Set up directional light based on sun position
+        setupDirectionalLight();
+
         glEnable(GL_DEPTH_TEST);
         glEnable(GL_CULL_FACE);
         glCullFace(GL_BACK);
@@ -244,6 +251,10 @@ public final class DevplayScreen implements Screen {
         
         // Render outline on the block the player is looking at
         renderTargetedBlockOutline();
+        
+        // Disable lighting for UI rendering
+        glDisable(GL_LIGHTING);
+        glDisable(GL_LIGHT0);
         
         glDisable(GL_DEPTH_TEST);
         
@@ -258,6 +269,15 @@ public final class DevplayScreen implements Screen {
             uiRenderer.drawDebugInfo(w, h, player.getX(alphaF), player.getY(alphaF), player.getZ(alphaF), 
                                      player.getYaw(alphaF), player.getPitch(alphaF), 0f, uiState.getFPS(),
                                      loadedChunks, pendingChunks, activeWorkers, renderedChunks, culledChunks);
+        } else {
+            // Draw block name display in top-left corner (only if debug menu is not visible and option is enabled)
+            if (mattmc.client.settings.OptionsManager.isShowBlockNameEnabled()) {
+                BlockInteraction.BlockHitResult hit = blockInteraction.getTargetedBlock();
+                if (hit != null) {
+                    mattmc.world.level.block.Block targetedBlock = world.getBlock(hit.x, hit.y, hit.z);
+                    uiRenderer.drawBlockNameDisplay(w, h, targetedBlock);
+                }
+            }
         }
         
         // Draw command overlay if visible
@@ -277,6 +297,40 @@ public final class DevplayScreen implements Screen {
         if (!uiState.isCommandOverlayVisible()) {
             uiRenderer.drawCrosshair(w, h);
         }
+    }
+
+    /**
+     * Set up OpenGL directional light based on the sun position.
+     * The sun acts as a directional light source that rotates through the day/night cycle.
+     */
+    private void setupDirectionalLight() {
+        // Get sun direction from day cycle
+        float[] sunDir = world.getDayCycle().getSunDirection();
+        float brightness = world.getDayCycle().getSkyBrightness();
+        
+        // Enable lighting
+        glEnable(GL_LIGHTING);
+        glEnable(GL_LIGHT0);
+        glEnable(GL_COLOR_MATERIAL);
+        glColorMaterial(GL_FRONT_AND_BACK, GL_AMBIENT_AND_DIFFUSE);
+        
+        // Set up directional light (GL_LIGHT0)
+        // Position with w=0 makes it directional (parallel rays)
+        float[] lightPos = {sunDir[0], sunDir[1], sunDir[2], 0.0f};
+        glLightfv(GL_LIGHT0, GL_POSITION, lightPos);
+        
+        // Set light colors based on brightness
+        float[] ambient = {0.4f * brightness, 0.4f * brightness, 0.4f * brightness, 1.0f};
+        float[] diffuse = {brightness, brightness, brightness, 1.0f};
+        float[] specular = {0.0f, 0.0f, 0.0f, 1.0f};  // No specular for Minecraft-like look
+        
+        glLightfv(GL_LIGHT0, GL_AMBIENT, ambient);
+        glLightfv(GL_LIGHT0, GL_DIFFUSE, diffuse);
+        glLightfv(GL_LIGHT0, GL_SPECULAR, specular);
+        
+        // Set global ambient light (very dim)
+        float[] globalAmbient = {0.2f, 0.2f, 0.2f, 1.0f};
+        glLightModelfv(GL_LIGHT_MODEL_AMBIENT, globalAmbient);
     }
 
     /**

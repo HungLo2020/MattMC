@@ -5,6 +5,9 @@
 blur_title_screen=false
 blur_menu_screens=true
 
+# Block name display
+show_block_name=true
+
 # FPS cap (30-999)
 fps_cap=60
 

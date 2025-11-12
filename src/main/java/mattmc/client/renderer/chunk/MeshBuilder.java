@@ -413,11 +413,11 @@ public class MeshBuilder {
         if (half == mattmc.world.level.block.state.properties.Half.BOTTOM) {
             // Bottom stairs: slab on bottom, step on top
             addStairsBottomSlabFace(x, y, z, 0.5f, facing, colorTop, colorBottom, colorNorth, colorSouth, colorWest, colorEast, uvMapping);
-            addStairsTopStepFace(x, y + 0.5f, z, facing, colorTop, colorNorth, colorSouth, colorWest, colorEast, uvMapping);
+            addStairsTopStepFace(x, y + 0.5f, z, facing, colorTop, colorBottom, colorNorth, colorSouth, colorWest, colorEast, uvMapping);
         } else {
             // Top stairs: slab on top, step on bottom  
             addStairsBottomSlabFace(x, y + 0.5f, z, 0.5f, facing, colorTop, colorBottom, colorNorth, colorSouth, colorWest, colorEast, uvMapping);
-            addStairsTopStepFace(x, y, z, facing, colorTop, colorNorth, colorSouth, colorWest, colorEast, uvMapping);
+            addStairsTopStepFace(x, y, z, facing, colorTop, colorBottom, colorNorth, colorSouth, colorWest, colorEast, uvMapping);
         }
     }
     
@@ -507,7 +507,7 @@ public class MeshBuilder {
      */
     private void addStairsTopStepFace(float x, float y, float z,
                                        mattmc.world.level.block.state.properties.Direction facing,
-                                       float[] colorTop, float[] colorNorth, float[] colorSouth,
+                                       float[] colorTop, float[] colorBottom, float[] colorNorth, float[] colorSouth,
                                        float[] colorWest, float[] colorEast,
                                        TextureAtlas.UVMapping uvMapping) {
         float x0 = x, x05 = x + 0.5f, x1 = x + 1;
@@ -532,13 +532,13 @@ public class MeshBuilder {
         
         switch (facing) {
             case NORTH -> addStairsStepNorth(x0, x1, y0, y1, z0, z05, u0, u05, u1, v0, v05, v1, 
-                                              colorTop, colorNorth, colorSouth, colorWest, colorEast);
+                                              colorTop, colorBottom, colorNorth, colorSouth, colorWest, colorEast);
             case SOUTH -> addStairsStepSouth(x0, x1, y0, y1, z05, z1, u0, u05, u1, v0, v05, v1,
-                                              colorTop, colorNorth, colorSouth, colorWest, colorEast);
+                                              colorTop, colorBottom, colorNorth, colorSouth, colorWest, colorEast);
             case WEST -> addStairsStepWest(x0, x05, y0, y1, z0, z1, u0, u05, u1, v0, v05, v1,
-                                            colorTop, colorNorth, colorSouth, colorWest, colorEast);
+                                            colorTop, colorBottom, colorNorth, colorSouth, colorWest, colorEast);
             case EAST -> addStairsStepEast(x05, x1, y0, y1, z0, z1, u0, u05, u1, v0, v05, v1,
-                                            colorTop, colorNorth, colorSouth, colorWest, colorEast);
+                                            colorTop, colorBottom, colorNorth, colorSouth, colorWest, colorEast);
         }
     }
     
@@ -547,7 +547,7 @@ public class MeshBuilder {
      */
     private void addStairsStepNorth(float x0, float x1, float y0, float y1, float z0, float z05,
                                      float u0, float u05, float u1, float v0, float v05, float v1,
-                                     float[] colorTop, float[] colorNorth, float[] colorSouth,
+                                     float[] colorTop, float[] colorBottom, float[] colorNorth, float[] colorSouth,
                                      float[] colorWest, float[] colorEast) {
         // Top face (north half)
         int base = currentVertex;
@@ -555,6 +555,15 @@ public class MeshBuilder {
         addVertex(x0, y1, z05, u0, v05, colorTop);
         addVertex(x1, y1, z05, u1, v05, colorTop);
         addVertex(x1, y1, z0, u1, v0, colorTop);
+        addQuadIndices(base);
+        currentVertex += 4;
+        
+        // Bottom face (north half)
+        base = currentVertex;
+        addVertex(x0, y0, z0, u0, v0, colorBottom);
+        addVertex(x1, y0, z0, u1, v0, colorBottom);
+        addVertex(x1, y0, z05, u1, v05, colorBottom);
+        addVertex(x0, y0, z05, u0, v05, colorBottom);
         addQuadIndices(base);
         currentVertex += 4;
         
@@ -600,7 +609,7 @@ public class MeshBuilder {
      */
     private void addStairsStepSouth(float x0, float x1, float y0, float y1, float z05, float z1,
                                      float u0, float u05, float u1, float v0, float v05, float v1,
-                                     float[] colorTop, float[] colorNorth, float[] colorSouth,
+                                     float[] colorTop, float[] colorBottom, float[] colorNorth, float[] colorSouth,
                                      float[] colorWest, float[] colorEast) {
         // Top face (south half)
         int base = currentVertex;
@@ -608,6 +617,15 @@ public class MeshBuilder {
         addVertex(x0, y1, z1, u0, v1, colorTop);
         addVertex(x1, y1, z1, u1, v1, colorTop);
         addVertex(x1, y1, z05, u1, v05, colorTop);
+        addQuadIndices(base);
+        currentVertex += 4;
+        
+        // Bottom face (south half)
+        base = currentVertex;
+        addVertex(x0, y0, z05, u0, v05, colorBottom);
+        addVertex(x1, y0, z05, u1, v05, colorBottom);
+        addVertex(x1, y0, z1, u1, v1, colorBottom);
+        addVertex(x0, y0, z1, u0, v1, colorBottom);
         addQuadIndices(base);
         currentVertex += 4;
         
@@ -653,7 +671,7 @@ public class MeshBuilder {
      */
     private void addStairsStepWest(float x0, float x05, float y0, float y1, float z0, float z1,
                                     float u0, float u05, float u1, float v0, float v05, float v1,
-                                    float[] colorTop, float[] colorNorth, float[] colorSouth,
+                                    float[] colorTop, float[] colorBottom, float[] colorNorth, float[] colorSouth,
                                     float[] colorWest, float[] colorEast) {
         // Top face (west half)
         int base = currentVertex;
@@ -661,6 +679,15 @@ public class MeshBuilder {
         addVertex(x0, y1, z1, u0, v1, colorTop);
         addVertex(x05, y1, z1, u05, v1, colorTop);
         addVertex(x05, y1, z0, u05, v0, colorTop);
+        addQuadIndices(base);
+        currentVertex += 4;
+        
+        // Bottom face (west half)
+        base = currentVertex;
+        addVertex(x0, y0, z0, u0, v0, colorBottom);
+        addVertex(x05, y0, z0, u05, v0, colorBottom);
+        addVertex(x05, y0, z1, u05, v1, colorBottom);
+        addVertex(x0, y0, z1, u0, v1, colorBottom);
         addQuadIndices(base);
         currentVertex += 4;
         
@@ -706,7 +733,7 @@ public class MeshBuilder {
      */
     private void addStairsStepEast(float x05, float x1, float y0, float y1, float z0, float z1,
                                     float u0, float u05, float u1, float v0, float v05, float v1,
-                                    float[] colorTop, float[] colorNorth, float[] colorSouth,
+                                    float[] colorTop, float[] colorBottom, float[] colorNorth, float[] colorSouth,
                                     float[] colorWest, float[] colorEast) {
         // Top face (east half)
         int base = currentVertex;
@@ -714,6 +741,15 @@ public class MeshBuilder {
         addVertex(x05, y1, z1, u05, v1, colorTop);
         addVertex(x1, y1, z1, u1, v1, colorTop);
         addVertex(x1, y1, z0, u1, v0, colorTop);
+        addQuadIndices(base);
+        currentVertex += 4;
+        
+        // Bottom face (east half)
+        base = currentVertex;
+        addVertex(x05, y0, z0, u05, v0, colorBottom);
+        addVertex(x1, y0, z0, u1, v0, colorBottom);
+        addVertex(x1, y0, z1, u1, v1, colorBottom);
+        addVertex(x05, y0, z1, u05, v1, colorBottom);
         addQuadIndices(base);
         currentVertex += 4;
         
