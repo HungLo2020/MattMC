@@ -71,7 +71,7 @@ public class DevplayInputHandler {
             }
         });
         
-        // ESC to release mouse and go back; Space for jumping/flying; F3 to toggle debug menu; / to toggle command overlay
+        // ESC to release mouse and go back; Space for jumping/flying; F3 to toggle debug menu; F4 to toggle lighting debug; / to toggle command overlay
         glfwSetKeyCallback(window.handle(), (win, key, scancode, action, mods) -> {
             if (uiState.isCommandOverlayVisible()) {
                 handleCommandOverlayInput(key, action);
@@ -122,6 +122,9 @@ public class DevplayInputHandler {
             } else if (key == GLFW_KEY_F3) {
                 // Toggle debug menu
                 uiState.toggleDebugMenu();
+            } else if (key == GLFW_KEY_F4) {
+                // Toggle lighting debug overlay
+                uiState.toggleLightingDebug();
             } else if (key == GLFW_KEY_SLASH) {
                 // Open command overlay
                 uiState.openCommandOverlay();
