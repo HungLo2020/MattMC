@@ -43,17 +43,21 @@ void main() {
     // Calculate ambient lighting
     vec3 skyAmbient = uAmbientSky * skyLightNorm;
     vec3 blockAmbient = uAmbientBlock * blockLightNorm;
-    vec3 ambient = max(skyAmbient, blockAmbient);
     
     // Calculate Lambert diffuse from sun (N·L)
     float NdotL = max(dot(normalize(vNormal), normalize(uSunDir)), 0.0);
     vec3 sunDiffuse = uSunColor * NdotL * skyLightNorm;
     
-    // Combine all lighting
-    vec3 lighting = ambient + sunDiffuse;
+    // Combine sky-based lighting (affected by AO)
+    vec3 skyLighting = (skyAmbient + sunDiffuse) * aoFactor;
     
-    // Apply ambient occlusion
-    lighting *= aoFactor;
+    // Block light is less affected by AO (torches should shine even in corners)
+    // Apply a softer AO factor to block light (minimum 0.7 instead of 0.45)
+    float blockAOFactor = mix(1.0, aoFactor, 0.5); // 50% AO influence on block light
+    vec3 blockLighting = blockAmbient * blockAOFactor;
+    
+    // Combine all lighting (max of sky and block to avoid over-darkening)
+    vec3 lighting = max(skyLighting, blockLighting);
     
     // Apply lighting to albedo
     vec3 litColor = albedo * lighting;
