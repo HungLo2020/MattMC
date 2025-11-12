@@ -116,6 +116,20 @@ public class LightPropagator {
      * @param worldZ World Z coordinate
      */
     public void enqueueSkylightFromSurface(int worldX, int chunkY, int worldZ) {
+        enqueueSkylight(worldX, chunkY, worldZ, 15);
+    }
+    
+    /**
+     * Enqueue skylight with a specific level (for propagation).
+     * 
+     * @param worldX World X coordinate
+     * @param chunkY Chunk-local Y coordinate (0-383)
+     * @param worldZ World Z coordinate
+     * @param level Light level to set (0-15)
+     */
+    private void enqueueSkylight(int worldX, int chunkY, int worldZ, int level) {
+        if (level <= 0 || level > 15) return;
+        
         int nextTail = (skyAddTail + 1) % BUFFER_SIZE;
         if (nextTail == skyAddHead) {
             // Buffer full, skip this update
@@ -126,7 +140,7 @@ public class LightPropagator {
         node.x = worldX;
         node.y = chunkY;
         node.z = worldZ;
-        node.level = 15;  // Full skylight
+        node.level = level;
         skyAddTail = nextTail;
     }
     
@@ -213,6 +227,8 @@ public class LightPropagator {
             int neighborLight = getBlockLight(nx, ny, nz);
             if (newLevel > 0 && newLevel > neighborLight) {
                 enqueueAddBlock(nx, ny, nz, newLevel);
+                // Mark neighbor chunk dirty when light crosses chunk boundary
+                markChunkDirty(nx, ny, nz);
             }
         }
     }
@@ -244,9 +260,12 @@ public class LightPropagator {
                 if (neighborLight < node.level) {
                     // This neighbor was lit by the removed light
                     enqueueRemoveBlock(nx, ny, nz);
+                    // Mark neighbor chunk dirty when light removal crosses chunk boundary
+                    markChunkDirty(nx, ny, nz);
                 } else if (block.getLightEmission() > 0) {
                     // This neighbor is a light source, re-propagate
                     enqueueAddBlock(nx, ny, nz, block.getLightEmission());
+                    markChunkDirty(nx, ny, nz);
                 }
             }
         }
@@ -286,7 +305,9 @@ public class LightPropagator {
             }
             
             if (newLevel > 0 && newLevel > getSkyLight(nx, ny, nz)) {
-                enqueueSkylightFromSurface(nx, ny, nz);
+                enqueueSkylight(nx, ny, nz, newLevel);
+                // Mark neighbor chunk dirty when light crosses chunk boundary
+                markChunkDirty(nx, ny, nz);
             }
         }
     }
@@ -315,9 +336,12 @@ public class LightPropagator {
                 if (neighborLight < node.level || (dir[1] == -1 && neighborLight == node.level)) {
                     // This neighbor was lit by the removed light
                     enqueueRemoveSkylight(nx, ny, nz);
+                    // Mark neighbor chunk dirty when light removal crosses chunk boundary
+                    markChunkDirty(nx, ny, nz);
                 } else {
                     // Re-propagate from this neighbor
-                    enqueueSkylightFromSurface(nx, ny, nz);
+                    enqueueSkylight(nx, ny, nz, neighborLight);
+                    markChunkDirty(nx, ny, nz);
                 }
             }
         }
