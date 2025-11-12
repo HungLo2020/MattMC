@@ -167,6 +167,10 @@ public class ChunkNBT {
             }
         }
         
+        // Recalculate lighting after loading blocks
+        // TODO: In the future, save/load light data to avoid recalculation
+        LightEngine.updateLighting(chunk);
+        
         return chunk;
     }
     

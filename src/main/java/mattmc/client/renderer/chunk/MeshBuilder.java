@@ -36,8 +36,13 @@ public class MeshBuilder {
     /**
      * Build a ChunkMeshBuffer from collected face data.
      * ISSUE-015 fix: Optimized list iteration to reduce method call overhead.
+     * 
+     * @param chunkX Chunk X coordinate
+     * @param chunkZ Chunk Z coordinate
+     * @param collector Face data collector
+     * @param chunk The chunk being meshed (for lighting lookups)
      */
-    public ChunkMeshBuffer build(int chunkX, int chunkZ, BlockFaceCollector collector) {
+    public ChunkMeshBuffer build(int chunkX, int chunkZ, BlockFaceCollector collector, mattmc.world.level.chunk.LevelChunk chunk) {
         vertices.clear();
         indices.clear();
         currentVertex = 0;
@@ -72,7 +77,7 @@ public class MeshBuilder {
                 }
                 
                 // Extract color components and UV mapping
-                float[] color = extractColor(face);
+                float[] color = extractColor(face, chunk);
                 TextureAtlas.UVMapping uvMapping = getUVMapping(face);
                 
                 // Add the face with correct orientation
@@ -119,11 +124,18 @@ public class MeshBuilder {
     }
     
     /**
-     * Extract RGBA color from face data.
+     * Extract RGBA color from face data with Minecraft-style lighting.
      * Uses white color with brightness when texture atlas is available,
      * otherwise uses fallback colors.
+     * 
+     * Combines:
+     * - Directional brightness (existing face-based shading)
+     * - Block/sky light levels (0-15)
+     * 
+     * @param face The face data
+     * @param chunk The chunk for light lookups (can be null for fallback)
      */
-    private float[] extractColor(BlockFaceCollector.FaceData face) {
+    private float[] extractColor(BlockFaceCollector.FaceData face, mattmc.world.level.chunk.LevelChunk chunk) {
         int renderColor;
         
         if (textureAtlas != null && face.block.hasTexture()) {
@@ -147,17 +159,28 @@ public class MeshBuilder {
             }
         }
         
-        // Apply brightness
-        float brightness = face.brightness;
+        // Get light level from chunk (0-15)
+        float lightLevel = 15.0f; // Default to full brightness if no chunk
+        if (chunk != null) {
+            int lightValue = chunk.getLightLevel(face.chunkX, face.chunkY, face.chunkZ);
+            lightLevel = (float) lightValue;
+        }
+        
+        // Convert light level to brightness multiplier (Minecraft formula)
+        // Light 0 = 0.05 (minimum brightness), Light 15 = 1.0 (full brightness)
+        float lightBrightness = Math.max(0.05f, lightLevel / 15.0f);
+        
+        // Combine directional brightness with lighting
+        float combinedBrightness = face.brightness * lightBrightness;
         
         int r = (renderColor >> 16) & 0xFF;
         int g = (renderColor >> 8) & 0xFF;
         int b = renderColor & 0xFF;
         
         return new float[] {
-            (r / 255.0f) * brightness,
-            (g / 255.0f) * brightness,
-            (b / 255.0f) * brightness,
+            (r / 255.0f) * combinedBrightness,
+            (g / 255.0f) * combinedBrightness,
+            (b / 255.0f) * combinedBrightness,
             1.0f // alpha
         };
     }

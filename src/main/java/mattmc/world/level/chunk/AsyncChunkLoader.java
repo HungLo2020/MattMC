@@ -321,11 +321,14 @@ public class AsyncChunkLoader {
         // If no world generator is set, generate flat terrain as fallback
         if (worldGenerator == null) {
             chunk.generateFlatTerrain(64);
-            return chunk;
+        } else {
+            // Use WorldGenerator to fill terrain
+            worldGenerator.generateChunkTerrain(chunk);
         }
         
-        // Use WorldGenerator to fill terrain
-        worldGenerator.generateChunkTerrain(chunk);
+        // Calculate lighting after terrain generation
+        LightEngine.updateLighting(chunk);
+        
         return chunk;
     }
     
@@ -352,7 +355,7 @@ public class AsyncChunkLoader {
         
         BlockFaceCollector collector = collectChunkFaces(chunk);
         MeshBuilder meshBuilder = new MeshBuilder(textureAtlas);
-        return meshBuilder.build(chunk.chunkX(), chunk.chunkZ(), collector);
+        return meshBuilder.build(chunk.chunkX(), chunk.chunkZ(), collector, chunk);
     }
     
     /**
