@@ -11,23 +11,18 @@ varying float vFogFactor;
 // Uniforms
 uniform sampler2D uTexture;
 uniform vec3 uSunDir;        // Normalized sun direction vector
-uniform vec3 uSunColor;      // Sun color (linear space)
-uniform vec3 uAmbientSky;    // Sky ambient color (linear space)
-uniform vec3 uAmbientBlock;  // Block light ambient color (linear space)
+uniform vec3 uSunColor;      // Sun color
+uniform vec3 uAmbientSky;    // Sky ambient color
+uniform vec3 uAmbientBlock;  // Block light ambient color
 uniform float uGamma;        // Gamma value (typically 2.2)
-uniform vec3 uFogColor;      // Fog color (linear space)
-
-// Convert sRGB to linear space
-vec3 srgbToLinear(vec3 srgb) {
-    return pow(srgb, vec3(2.2));
-}
+uniform vec3 uFogColor;      // Fog color
 
 void main() {
-    // Sample texture (in sRGB space)
+    // Sample texture
     vec4 texColor = texture2D(uTexture, vTexCoord);
     
-    // Convert texture and vertex colors from sRGB to linear space
-    vec3 albedo = srgbToLinear(vColor.rgb) * srgbToLinear(texColor.rgb);
+    // Get albedo (no color space conversion needed)
+    vec3 albedo = vColor.rgb * texColor.rgb;
     
     // Extract light data
     float skyLight = vLightData.x;
@@ -45,32 +40,27 @@ void main() {
     else if (ao >= 2.0) aoFactor = 0.6;
     else if (ao >= 1.0) aoFactor = 0.8;
     
-    // Calculate ambient lighting (very conservative to prevent washout)
+    // Calculate ambient lighting
     vec3 skyAmbient = uAmbientSky * skyLightNorm;
     vec3 blockAmbient = uAmbientBlock * blockLightNorm;
-    vec3 ambient = max(skyAmbient, blockAmbient); // Take maximum of the two
+    vec3 ambient = max(skyAmbient, blockAmbient);
     
     // Calculate Lambert diffuse from sun (N·L)
     float NdotL = max(dot(normalize(vNormal), normalize(uSunDir)), 0.0);
-    vec3 sunDiffuse = uSunColor * NdotL * skyLightNorm * 0.3; // Further reduced sun contribution
+    vec3 sunDiffuse = uSunColor * NdotL * skyLightNorm;
     
-    // Combine all lighting (do this in linear space)
-    // Use a minimum ambient to prevent completely black areas
-    vec3 minAmbient = vec3(0.03); // Very dark but not completely black
-    vec3 lighting = max(ambient + sunDiffuse, minAmbient);
+    // Combine all lighting
+    vec3 lighting = ambient + sunDiffuse;
     
     // Apply ambient occlusion
     lighting *= aoFactor;
     
-    // Apply lighting to albedo (still in linear space)
+    // Apply lighting to albedo
     vec3 litColor = albedo * lighting;
     
-    // Apply fog (in linear space)
+    // Apply fog
     vec3 finalColor = mix(litColor, uFogColor, vFogFactor);
     
-    // Apply gamma correction at the end (linear -> sRGB)
-    finalColor = pow(finalColor, vec3(1.0 / uGamma));
-    
-    // Output final color
+    // Output final color (no gamma correction)
     gl_FragColor = vec4(finalColor, vColor.a * texColor.a);
 }

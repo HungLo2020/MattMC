@@ -91,11 +91,11 @@ public class ChunkRenderer {
         
         // Sun settings - pointing down and slightly to the side (typical morning/afternoon sun)
         shader.setSunDirection(0.3f, -0.8f, 0.5f);
-        shader.setSunColor(0.5f, 0.47f, 0.42f); // Subdued sun color (linear space)
+        shader.setSunColor(0.6f, 0.6f, 0.55f); // Neutral sun color
         
-        // Ambient settings - very low to match Minecraft darkness
-        shader.setAmbientSky(0.15f, 0.18f, 0.22f); // Minimal cool blue sky ambient (linear space)
-        shader.setAmbientBlock(0.65f, 0.45f, 0.25f); // Warm torch/block light (linear space)
+        // Ambient settings - moderate values for natural look
+        shader.setAmbientSky(0.4f, 0.45f, 0.5f); // Cool blue sky ambient
+        shader.setAmbientBlock(0.9f, 0.7f, 0.4f); // Warm torch/block light
         
         // Fog settings
         shader.setFogColor(0.5f, 0.7f, 1.0f); // Sky blue fog (linear space)
