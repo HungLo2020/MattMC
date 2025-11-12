@@ -445,7 +445,10 @@ public class Level implements LevelAccessor {
         java.util.Set<Long> visited = new java.util.HashSet<>();
         
         // Mark the source position as visited so we don't revisit it
-        long sourceKey = ((long)sourceX << 32) | ((long)sourceY << 16) | (long)sourceZ;
+        // Ensure proper masking to handle negative coordinates
+        long sourceKey = ((long)sourceX & 0xFFFFFFFFL) << 32 | 
+                         ((long)sourceY & 0xFFFFL) << 16 | 
+                         ((long)sourceZ & 0xFFFFL);
         visited.add(sourceKey);
         
         // Start propagation from all 6 neighbors with light level - 1
@@ -481,7 +484,10 @@ public class Level implements LevelAccessor {
         }
         
         // Create position key for visited tracking
-        long posKey = ((long)worldX << 32) | ((long)chunkY << 16) | (long)worldZ;
+        // Ensure proper masking to handle negative coordinates
+        long posKey = ((long)worldX & 0xFFFFFFFFL) << 32 | 
+                      ((long)chunkY & 0xFFFFL) << 16 | 
+                      ((long)worldZ & 0xFFFFL);
         if (visited.contains(posKey)) {
             return; // Already visited this position
         }
