@@ -3,19 +3,14 @@
 // Inputs from vertex shader
 varying vec2 vTexCoord;
 varying vec4 vColor;
-varying vec3 vLightData;  // (skyLight 0-15, blockLight 0-15, ao 0-3)
 varying vec3 vNormal;
 varying vec3 vWorldPos;
 varying float vFogFactor;
-varying vec4 vShadowCoord0; // Near cascade
-varying vec4 vShadowCoord1; // Mid cascade
-varying vec4 vShadowCoord2; // Far cascade
+varying vec4 vShadowCoord;
 
 // Uniforms
 uniform sampler2D uTexture;
-uniform sampler2D uShadowMap0; // Near cascade shadow map
-uniform sampler2D uShadowMap1; // Mid cascade shadow map
-uniform sampler2D uShadowMap2; // Far cascade shadow map
+uniform sampler2D uShadowMap;
 uniform vec3 uSunDir;        // Normalized sun direction vector
 uniform vec3 uSunColor;      // Sun color
 uniform vec3 uAmbientSky;    // Sky ambient color
@@ -24,17 +19,18 @@ uniform float uGamma;        // Gamma value (typically 2.2)
 uniform vec3 uFogColor;      // Fog color
 uniform float uSkyBrightness; // Sky brightness multiplier (0.0-1.0) for day/night cycle
 uniform int uShadowsEnabled;  // Whether shadows are enabled
-uniform vec3 uCameraPos;     // Camera position for cascade selection
-uniform float uCascadeSplit0; // Near cascade distance (16 blocks)
-uniform float uCascadeSplit1; // Mid cascade distance (48 blocks)
 
 /**
- * Sample a shadow map and perform depth comparison.
+ * Sample the shadow map to determine if this fragment is in shadow.
  * Returns 1.0 for lit, 0.0 for shadowed.
  */
-float sampleShadowMap(sampler2D shadowMap, vec4 shadowCoord, vec2 texelSize) {
+float calculateShadow() {
+    if (uShadowsEnabled == 0) {
+        return 1.0; // No shadows
+    }
+    
     // Perspective divide
-    vec3 projCoords = shadowCoord.xyz / shadowCoord.w;
+    vec3 projCoords = vShadowCoord.xyz / vShadowCoord.w;
     
     // Transform from [-1,1] to [0,1] range
     projCoords = projCoords * 0.5 + 0.5;
@@ -51,45 +47,9 @@ float sampleShadowMap(sampler2D shadowMap, vec4 shadowCoord, vec2 texelSize) {
     // Adaptive bias to prevent shadow acne
     float bias = max(0.005 * (1.0 - dot(vNormal, uSunDir)), 0.001);
     
-    // PCF (Percentage Closer Filtering) with 3x3 samples
-    float shadow = 0.0;
-    for (int x = -1; x <= 1; x++) {
-        for (int y = -1; y <= 1; y++) {
-            vec2 offset = vec2(x, y) * texelSize;
-            float pcfDepth = texture2D(shadowMap, projCoords.xy + offset).r;
-            shadow += currentDepth - bias > pcfDepth ? 0.0 : 1.0;
-        }
-    }
-    return shadow / 9.0;
-}
-
-/**
- * Calculate shadow factor using Cascaded Shadow Maps (CSM).
- * Returns 1.0 for fully lit, 0.0 for fully shadowed.
- */
-float calculateShadow() {
-    if (uShadowsEnabled == 0) {
-        return 1.0; // No shadows
-    }
-    
-    // Calculate distance from camera to fragment
-    float distanceFromCamera = length(vWorldPos - uCameraPos);
-    
-    // Shadow map texel size (assuming 2048x2048 shadow maps)
-    vec2 texelSize = vec2(1.0 / 2048.0);
-    
-    // Select cascade based on distance from camera
-    float shadow;
-    if (distanceFromCamera < uCascadeSplit0) {
-        // Near cascade (0-16 blocks): highest quality, tight frustum
-        shadow = sampleShadowMap(uShadowMap0, vShadowCoord0, texelSize);
-    } else if (distanceFromCamera < uCascadeSplit1) {
-        // Mid cascade (16-48 blocks): medium quality
-        shadow = sampleShadowMap(uShadowMap1, vShadowCoord1, texelSize);
-    } else {
-        // Far cascade (48-128 blocks): lowest quality, wide coverage
-        shadow = sampleShadowMap(uShadowMap2, vShadowCoord2, texelSize);
-    }
+    // Simple shadow test
+    float closestDepth = texture2D(uShadowMap, projCoords.xy).r;
+    float shadow = currentDepth - bias > closestDepth ? 0.0 : 1.0;
     
     return shadow;
 }
@@ -101,56 +61,33 @@ void main() {
     // Get albedo (no color space conversion needed)
     vec3 albedo = vColor.rgb * texColor.rgb;
     
-    // Extract light data
-    float skyLight = vLightData.x;
-    float blockLight = vLightData.y;
-    float ao = vLightData.z;
-    
-    // Convert light values from 0-15 range to 0-1 range
-    float skyLightNorm = skyLight / 15.0;
-    float blockLightNorm = blockLight / 15.0;
-    
-    // Apply ambient occlusion factor
-    // AO values: 0 = no occlusion, 1 = slight, 2 = medium, 3 = heavy
-    float aoFactor = 1.0;
-    if (ao >= 3.0) aoFactor = 0.45;
-    else if (ao >= 2.0) aoFactor = 0.6;
-    else if (ao >= 1.0) aoFactor = 0.8;
-    
-    // Calculate ambient lighting from both sources
-    // Apply sky brightness multiplier to dim ambient sky light at night
-    vec3 skyAmbient = uAmbientSky * skyLightNorm * uSkyBrightness;
-    vec3 blockAmbient = uAmbientBlock * blockLightNorm;
-    
     // Calculate Lambert diffuse from sun (N·L)
     float NdotL = max(dot(normalize(vNormal), normalize(uSunDir)), 0.0);
     
-    // Calculate shadow factor (only if there's skylight)
-    float shadowFactor = 1.0;
-    if (skyLightNorm > 0.0) {
-        shadowFactor = calculateShadow();
-    }
+    // Calculate shadow factor
+    float shadowFactor = calculateShadow();
+    
+    // Apply shadow to both sun diffuse and ambient sky lighting for more visible shadows
+    // Shadow factor ranges from 0.0 (full shadow) to 1.0 (fully lit)
+    // We use 0.3 as minimum shadow brightness to prevent completely black shadows
+    float shadowDarkness = mix(0.3, 1.0, shadowFactor);
     
     // Apply shadow to sun diffuse lighting
-    vec3 sunDiffuse = uSunColor * NdotL * skyLightNorm * uSkyBrightness * shadowFactor;
+    vec3 sunDiffuse = uSunColor * NdotL * uSkyBrightness * shadowFactor;
     
-    // Combine sky lighting (ambient + shadowed sun)
+    // Apply shadow to ambient sky lighting for more pronounced shadow effect
+    vec3 skyAmbient = uAmbientSky * uSkyBrightness * shadowDarkness;
+    
+    // Combine sky lighting (shadowed ambient + shadowed sun)
     vec3 skyLighting = skyAmbient + sunDiffuse;
     
-    // Apply ambient occlusion to sky lighting
-    skyLighting *= aoFactor;
-    
-    // Block light is less affected by AO and adds on top of sky lighting
-    // Apply reduced AO to block light (50% influence)
-    float blockAOFactor = mix(1.0, aoFactor, 0.5);
-    vec3 blockLighting = blockAmbient * blockAOFactor;
+    // Block light adds on top of sky lighting (not affected by shadows)
+    vec3 blockLighting = uAmbientBlock;
     
     // Combine lighting: use max for base, then add block light contribution
-    // This makes torches visible even in bright areas
     vec3 lighting = max(skyLighting, blockLighting);
     
     // Add extra block light contribution to make torches more visible
-    // Increased to 0.8 (80%) to make torches clearly visible even when using placeholder models
     lighting += blockLighting * 0.8;
     
     // Apply lighting to albedo

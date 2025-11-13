@@ -78,31 +78,7 @@ public class ChunkNBT {
         }
         
         if (isEmpty) {
-            // Even if section has no blocks, we might still want to save light data
-            // Check if we have non-default light values
-            LightStorage lightSection = chunk.getLightSection(sectionY);
-            if (lightSection != null) {
-                boolean hasNonDefaultLight = false;
-                byte[] lightData = lightSection.getData();
-                for (byte b : lightData) {
-                    // Check if any light value is not the default (sky=15, block=0, i.e., 0xF0)
-                    if (b != (byte) 0xF0) {
-                        hasNonDefaultLight = true;
-                        break;
-                    }
-                }
-                
-                if (!hasNonDefaultLight) {
-                    return null; // Skip sections with no blocks and default light
-                }
-                
-                // Create a minimal section just for light data
-                Map<String, Object> section = new HashMap<>(2);
-                section.put("Y", (byte) (sectionY + LevelChunk.MIN_Y / 16));
-                section.put("LightData", lightSection.getData());
-                return section;
-            }
-            return null; // Skip empty sections with no light data
+            return null; // Skip empty sections completely
         }
         
         // Section with palette and block states (estimated 4-5 fields)
@@ -183,12 +159,6 @@ public class ChunkNBT {
             section.put("BlockStateProperties", blockStateProperties);
         }
         
-        // Save light data for this section (versioned extension)
-        LightStorage lightSection = chunk.getLightSection(sectionY);
-        if (lightSection != null) {
-            section.put("LightData", lightSection.getData());
-        }
-        
         return section;
     }
     
@@ -248,21 +218,10 @@ public class ChunkNBT {
         byte sectionY = section.get("Y") instanceof Byte ? (Byte) section.get("Y") : 0;
         int baseY = (sectionY - LevelChunk.MIN_Y / 16) * 16;
         
-        // Load light data for this section (versioned extension - optional for backward compatibility)
-        // This should be loaded first, as sections might only contain light data
-        Object lightDataObj = section.get("LightData");
-        if (lightDataObj instanceof byte[]) {
-            byte[] lightData = (byte[]) lightDataObj;
-            if (lightData.length == 4096) {
-                int sectionIndex = (sectionY - LevelChunk.MIN_Y / 16);
-                chunk.setLightSection(sectionIndex, new LightStorage(lightData));
-            }
-        }
-        
-        // Get palette (might not exist for light-only sections)
+        // Get palette
         Object paletteObj = section.get("Palette");
         if (!(paletteObj instanceof List)) {
-            return; // Light-only section, no blocks to load
+            return; // No blocks to load
         }
         
         @SuppressWarnings("unchecked")

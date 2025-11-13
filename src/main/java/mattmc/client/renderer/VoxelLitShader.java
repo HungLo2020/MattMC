@@ -3,10 +3,8 @@ package mattmc.client.renderer;
 /**
  * Shader program for rendering lit voxel chunks.
  * Implements:
- * - Smooth lighting with sky and block light
- * - Ambient occlusion
  * - Directional sun lighting (Lambert N·L)
- * - Shadow mapping for sunlight shadows
+ * - Basic shadow mapping based on sun position
  * - Distance fog (exponential squared)
  * - Gamma correction
  */
@@ -87,35 +85,23 @@ public class VoxelLitShader extends Shader {
     }
     
     /**
-     * Set the shadow map texture sampler units for all cascades.
-     */
-    public void setShadowMapSamplers(int unit0, int unit1, int unit2) {
-        setUniform1i("uShadowMap0", unit0);
-        setUniform1i("uShadowMap1", unit1);
-        setUniform1i("uShadowMap2", unit2);
-    }
-    
-    /**
-     * Set the shadow matrices for all cascades.
-     */
-    public void setShadowMatrices(float[] matrix0, float[] matrix1, float[] matrix2) {
-        setUniformMatrix4f("uShadowMatrix0", matrix0);
-        setUniformMatrix4f("uShadowMatrix1", matrix1);
-        setUniformMatrix4f("uShadowMatrix2", matrix2);
-    }
-    
-    /**
-     * Set the cascade split distances for selecting the appropriate cascade.
-     */
-    public void setCascadeSplits(float split0, float split1) {
-        setUniform1f("uCascadeSplit0", split0);
-        setUniform1f("uCascadeSplit1", split1);
-    }
-    
-    /**
-     * Enable or disable shadow mapping.
+     * Enable or disable shadows.
      */
     public void setShadowsEnabled(boolean enabled) {
         setUniform1i("uShadowsEnabled", enabled ? 1 : 0);
+    }
+    
+    /**
+     * Set the shadow matrix for transforming world coords to shadow map space.
+     */
+    public void setShadowMatrix(float[] matrix) {
+        setUniformMatrix4f("uShadowMatrix", matrix);
+    }
+    
+    /**
+     * Set the shadow map sampler unit.
+     */
+    public void setShadowMapSampler(int unit) {
+        setUniform1i("uShadowMap", unit);
     }
 }

@@ -20,14 +20,14 @@ import org.slf4j.LoggerFactory;
  * 
  * Now handles async mesh uploads from background threads and texture atlas.
  * Implements frustum culling to skip rendering chunks outside the camera view.
- * Supports shadow mapping for directional sunlight.
+ * Implements basic shadow mapping based on sun position.
  */
 public class LevelRenderer {
     private static final Logger logger = LoggerFactory.getLogger(LevelRenderer.class);
 
     private final ChunkRenderer chunkRenderer;
     private final Frustum frustum;
-    private final CascadedShadowRenderer shadowRenderer;
+    private final SimpleShadowRenderer shadowRenderer;
     private Level currentLevel;
     private boolean textureAtlasInitialized = false;
     
@@ -39,7 +39,7 @@ public class LevelRenderer {
     public LevelRenderer() {
         this.chunkRenderer = new ChunkRenderer();
         this.frustum = new Frustum();
-        this.shadowRenderer = new CascadedShadowRenderer();
+        this.shadowRenderer = new SimpleShadowRenderer();
     }
     
     /**
@@ -68,6 +68,7 @@ public class LevelRenderer {
      * Render all loaded chunks in the world.
      * Also processes pending mesh uploads from background threads and handles dirty chunks.
      * Uses frustum culling to skip chunks outside the camera view.
+     * Implements basic shadow mapping when sun is above horizon.
      */
     public void render(Level world, float playerX, float playerY, float playerZ) {
         // Update frustum from current GL matrices (must be called after camera setup)
@@ -82,20 +83,10 @@ public class LevelRenderer {
         float skyBrightness = world.getDayCycle().getSkyBrightness();
         float[] sunDirection = world.getDayCycle().getSunDirection();
         
-        // Get shadows enabled setting from options
-        boolean shadowsEnabled = OptionsManager.areShadowsEnabled();
-        
-        // Render shadow cascades during daytime (when sun is up)
-        if (shadowsEnabled && skyBrightness > 0.3f) {
-            // Get current view and projection matrices for cascade calculation
-            float[] viewMatrix = new float[16];
-            float[] projectionMatrix = new float[16];
-            glGetFloatv(GL_MODELVIEW_MATRIX, viewMatrix);
-            glGetFloatv(GL_PROJECTION_MATRIX, projectionMatrix);
-            
-            shadowRenderer.renderShadowCascades(world, chunkRenderer, sunDirection, 
-                                               playerX, playerY, playerZ,
-                                               viewMatrix, projectionMatrix);
+        // Render shadow map if sun is above horizon
+        boolean shadowsEnabled = sunDirection[1] > 0 && OptionsManager.areShadowsEnabled();
+        if (shadowsEnabled) {
+            shadowRenderer.renderShadowMap(world, chunkRenderer, sunDirection, playerX, playerY, playerZ);
         }
         
         // Process completed mesh buffers from async loader first
@@ -145,11 +136,12 @@ public class LevelRenderer {
             glPushMatrix();
             glTranslatef(chunkWorldX, 0, chunkWorldZ);
             
-            // Render chunk with CSM shadows if enabled
+            // Render chunk with shadows if enabled
             boolean rendered;
-            if (shadowsEnabled && skyBrightness > 0.3f) {
+            if (shadowsEnabled) {
                 rendered = chunkRenderer.renderChunk(chunk, playerX, playerY, playerZ, 
-                                                    skyBrightness, sunDirection, shadowRenderer);
+                                                    skyBrightness, sunDirection, true,
+                                                    shadowRenderer.getShadowMatrix(), shadowRenderer);
             } else {
                 rendered = chunkRenderer.renderChunk(chunk, playerX, playerY, playerZ, 
                                                     skyBrightness, sunDirection);

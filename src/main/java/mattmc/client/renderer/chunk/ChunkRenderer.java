@@ -60,7 +60,7 @@ public class ChunkRenderer {
     }
     
     /**
-     * Render a chunk using VBO/VAO with lit shader (without shadows).
+     * Render a chunk using VBO/VAO with lit shader.
      * Returns true if rendering actually happened.
      * 
      * @param chunk The chunk to render
@@ -73,11 +73,11 @@ public class ChunkRenderer {
      */
     public boolean renderChunk(LevelChunk chunk, float cameraX, float cameraY, float cameraZ, 
                               float skyBrightness, float[] sunDirection) {
-        return renderChunk(chunk, cameraX, cameraY, cameraZ, skyBrightness, sunDirection, null, null);
+        return renderChunk(chunk, cameraX, cameraY, cameraZ, skyBrightness, sunDirection, false, null, null);
     }
     
     /**
-     * Render a chunk using VBO/VAO with lit shader and cascaded shadow mapping.
+     * Render a chunk using VBO/VAO with lit shader and optional shadows.
      * Returns true if rendering actually happened.
      * 
      * @param chunk The chunk to render
@@ -86,22 +86,14 @@ public class ChunkRenderer {
      * @param cameraZ Camera Z position for fog
      * @param skyBrightness Sky brightness multiplier (0.0-1.0) from day cycle
      * @param sunDirection Sun direction vector [x, y, z] from day cycle
-     * @param csmRenderer Cascaded shadow renderer for CSM (null to disable shadows)
+     * @param shadowsEnabled Whether shadows are enabled
+     * @param shadowMatrix Shadow transformation matrix (can be null if shadows disabled)
+     * @param shadowRenderer Shadow renderer for binding shadow map (can be null if shadows disabled)
      * @return true if the chunk was rendered, false if no VAO available
      */
     public boolean renderChunk(LevelChunk chunk, float cameraX, float cameraY, float cameraZ, 
-                              float skyBrightness, float[] sunDirection,
-                              mattmc.client.renderer.CascadedShadowRenderer csmRenderer) {
-        return renderChunk(chunk, cameraX, cameraY, cameraZ, skyBrightness, sunDirection, null, csmRenderer);
-    }
-    
-    /**
-     * Internal render method that supports both old and new shadow renderers.
-     */
-    private boolean renderChunk(LevelChunk chunk, float cameraX, float cameraY, float cameraZ, 
-                               float skyBrightness, float[] sunDirection,
-                               mattmc.client.renderer.ShadowRenderer oldShadowRenderer,
-                               mattmc.client.renderer.CascadedShadowRenderer csmRenderer) {
+                              float skyBrightness, float[] sunDirection, boolean shadowsEnabled,
+                              float[] shadowMatrix, mattmc.client.renderer.SimpleShadowRenderer shadowRenderer) {
         // Get VAO
         ChunkVAO vao = vaoCache.get(chunk);
         if (vao == null) {
@@ -140,28 +132,11 @@ public class ChunkRenderer {
         shader.setGamma(2.2f);
         
         // Shadow settings
-        if (csmRenderer != null) {
-            // Use cascaded shadow maps
+        if (shadowsEnabled && shadowRenderer != null && shadowMatrix != null) {
             shader.setShadowsEnabled(true);
-            
-            // Set cascade split distances
-            float[] cascadeSplits = csmRenderer.getCascadeSplits();
-            shader.setCascadeSplits(cascadeSplits[0], cascadeSplits[1]);
-            
-            // Set shadow matrices for all cascades
-            float[][] matrices = csmRenderer.getAllCascadeShadowMatrices();
-            shader.setShadowMatrices(matrices[0], matrices[1], matrices[2]);
-            
-            // Bind shadow maps to texture units 1, 2, 3
-            csmRenderer.bindCascadeShadowMap(0, org.lwjgl.opengl.GL13.GL_TEXTURE1);
-            csmRenderer.bindCascadeShadowMap(1, org.lwjgl.opengl.GL13.GL_TEXTURE2);
-            csmRenderer.bindCascadeShadowMap(2, org.lwjgl.opengl.GL13.GL_TEXTURE3);
-            
-            // Set shadow map samplers
-            shader.setShadowMapSamplers(1, 2, 3);
-        } else if (oldShadowRenderer != null) {
-            // Legacy single shadow map support (kept for backward compatibility)
-            shader.setShadowsEnabled(false); // Disable for now since we're moving to CSM
+            shader.setShadowMatrix(shadowMatrix);
+            shader.setShadowMapSampler(1); // Texture unit 1 for shadow map
+            shadowRenderer.bindShadowMap(GL_TEXTURE1);
         } else {
             shader.setShadowsEnabled(false);
         }
@@ -195,19 +170,17 @@ public class ChunkRenderer {
     }
     
     /**
-     * Render a chunk in depth-only mode for shadow mapping.
-     * Uses only the VAO geometry without any shader setup.
-     * The shadow depth shader should already be active when this is called.
+     * Render chunk geometry only (no shader setup) for shadow passes.
      * 
      * @param chunk The chunk to render
      */
-    public void renderChunkDepthOnly(LevelChunk chunk) {
+    public void renderChunkGeometryOnly(LevelChunk chunk) {
         ChunkVAO vao = vaoCache.get(chunk);
         if (vao != null) {
             vao.render();
         }
     }
-    
+
     /**
      * Upload mesh buffer to GPU and create VAO.
      * This is called on the render thread with pre-built mesh buffer from a worker thread.

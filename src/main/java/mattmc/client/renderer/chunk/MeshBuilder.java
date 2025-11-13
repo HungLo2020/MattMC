@@ -11,20 +11,18 @@ import java.util.List;
  * Builds vertex and index arrays from collected block faces.
  * Converts BlockFaceCollector data into a format suitable for VBO/VAO rendering.
  * Supports texture atlas UV mapping for multi-texture VBO rendering.
- * Supports smooth lighting with per-vertex light sampling and ambient occlusion.
  * 
  * ISSUE-002 fix: Uses primitive FloatList and IntList instead of ArrayList<Float/Integer>
  * to eliminate boxing overhead and reduce GC pressure.
  */
 public class MeshBuilder {
     
-    // Vertex format: x, y, z, u, v, r, g, b, a, nx, ny, nz, skyLight, blockLight, ao (15 floats per vertex)
+    // Vertex format: x, y, z, u, v, r, g, b, a, nx, ny, nz, unused1, unused2, unused3 (15 floats per vertex)
     // Using primitive arrays to avoid boxing/unboxing overhead
     private final FloatList vertices = new FloatList();
     private final IntList indices = new IntList();
     private int currentVertex = 0;
     private final TextureAtlas textureAtlas;
-    private VertexLightSampler lightSampler = null;
     
     /**
      * Create a mesh builder with optional texture atlas support.
@@ -33,14 +31,6 @@ public class MeshBuilder {
      */
     public MeshBuilder(TextureAtlas textureAtlas) {
         this.textureAtlas = textureAtlas;
-    }
-    
-    /**
-     * Set the light sampler for smooth lighting.
-     * If null, flat lighting will be used.
-     */
-    public void setLightSampler(VertexLightSampler sampler) {
-        this.lightSampler = sampler;
     }
     
     /**
@@ -173,19 +163,14 @@ public class MeshBuilder {
     }
     
     /**
-     * Sample light for a vertex, or return defaults if no light sampler.
-     * Returns [skyLight, blockLight, ao] as floats.
+     * Sample light for a vertex - always returns default values now.
+     * Returns [unused1, unused2, unused3] as floats.
      */
     private float[] sampleVertexLight(BlockFaceCollector.FaceData face, 
-                                      mattmc.client.renderer.chunk.VertexLightSampler.Normal normal,
+                                      int normalIndex,
                                       int cornerIndex) {
-        if (lightSampler != null && face.chunk != null) {
-            mattmc.client.renderer.chunk.VertexLightSampler.VertexLight light = 
-                lightSampler.sampleVertex(face.chunk, face.cx, face.cy, face.cz, normal, cornerIndex);
-            return new float[] {light.skyLight, light.blockLight, light.ao};
-        }
-        // Default: full sky light, no block light, no AO
-        return new float[] {15.0f, 0.0f, 0.0f};
+        // Default: unused values
+        return new float[] {0.0f, 0.0f, 0.0f};
     }
     
     /**
@@ -209,10 +194,10 @@ public class MeshBuilder {
         int baseVertex = currentVertex;
         
         // Sample light for each vertex (4 corners of top face)
-        float[] light0 = sampleVertexLight(face, mattmc.client.renderer.chunk.VertexLightSampler.Normal.UP, 0);
-        float[] light1 = sampleVertexLight(face, mattmc.client.renderer.chunk.VertexLightSampler.Normal.UP, 1);
-        float[] light2 = sampleVertexLight(face, mattmc.client.renderer.chunk.VertexLightSampler.Normal.UP, 2);
-        float[] light3 = sampleVertexLight(face, mattmc.client.renderer.chunk.VertexLightSampler.Normal.UP, 3);
+        float[] light0 = sampleVertexLight(face, 0, 0);
+        float[] light1 = sampleVertexLight(face, 0, 1);
+        float[] light2 = sampleVertexLight(face, 0, 2);
+        float[] light3 = sampleVertexLight(face, 0, 3);
         
         // 4 vertices for the quad with atlas UVs, normal (0,1,0) for top face, and light data
         addVertex(x0, y1, z0, u0, v0, color, 0, 1, 0, light0[0], light0[1], light0[2]); // 0
@@ -247,10 +232,10 @@ public class MeshBuilder {
         int baseVertex = currentVertex;
         
         // Sample light for each vertex
-        float[] light0 = sampleVertexLight(face, mattmc.client.renderer.chunk.VertexLightSampler.Normal.DOWN, 0);
-        float[] light1 = sampleVertexLight(face, mattmc.client.renderer.chunk.VertexLightSampler.Normal.DOWN, 1);
-        float[] light2 = sampleVertexLight(face, mattmc.client.renderer.chunk.VertexLightSampler.Normal.DOWN, 2);
-        float[] light3 = sampleVertexLight(face, mattmc.client.renderer.chunk.VertexLightSampler.Normal.DOWN, 3);
+        float[] light0 = sampleVertexLight(face, 1, 0);
+        float[] light1 = sampleVertexLight(face, 1, 1);
+        float[] light2 = sampleVertexLight(face, 1, 2);
+        float[] light3 = sampleVertexLight(face, 1, 3);
         
         // 4 vertices for the quad with atlas UVs, normal (0,-1,0) for bottom face, and light data
         addVertex(x0, y0, z0, u0, v0, color, 0, -1, 0, light0[0], light0[1], light0[2]); // 0
@@ -285,10 +270,10 @@ public class MeshBuilder {
         int baseVertex = currentVertex;
         
         // Sample light for each vertex
-        float[] light0 = sampleVertexLight(face, mattmc.client.renderer.chunk.VertexLightSampler.Normal.SOUTH, 0);
-        float[] light1 = sampleVertexLight(face, mattmc.client.renderer.chunk.VertexLightSampler.Normal.SOUTH, 1);
-        float[] light2 = sampleVertexLight(face, mattmc.client.renderer.chunk.VertexLightSampler.Normal.SOUTH, 2);
-        float[] light3 = sampleVertexLight(face, mattmc.client.renderer.chunk.VertexLightSampler.Normal.SOUTH, 3);
+        float[] light0 = sampleVertexLight(face, 3, 0);
+        float[] light1 = sampleVertexLight(face, 3, 1);
+        float[] light2 = sampleVertexLight(face, 3, 2);
+        float[] light3 = sampleVertexLight(face, 3, 3);
         
         // 4 vertices for the quad with atlas UVs, normal (0,0,1) for south face, and light data
         addVertex(x0, y0, z1, u0, v1, color, 0, 0, 1, light0[0], light0[1], light0[2]); // 0
@@ -323,10 +308,10 @@ public class MeshBuilder {
         int baseVertex = currentVertex;
         
         // Sample light for each vertex
-        float[] light0 = sampleVertexLight(face, mattmc.client.renderer.chunk.VertexLightSampler.Normal.WEST, 0);
-        float[] light1 = sampleVertexLight(face, mattmc.client.renderer.chunk.VertexLightSampler.Normal.WEST, 1);
-        float[] light2 = sampleVertexLight(face, mattmc.client.renderer.chunk.VertexLightSampler.Normal.WEST, 2);
-        float[] light3 = sampleVertexLight(face, mattmc.client.renderer.chunk.VertexLightSampler.Normal.WEST, 3);
+        float[] light0 = sampleVertexLight(face, 4, 0);
+        float[] light1 = sampleVertexLight(face, 4, 1);
+        float[] light2 = sampleVertexLight(face, 4, 2);
+        float[] light3 = sampleVertexLight(face, 4, 3);
         
         // 4 vertices for the quad with atlas UVs, normal (-1,0,0) for west face, and light data
         addVertex(x0, y0, z0, u0, v1, color, -1, 0, 0, light0[0], light0[1], light0[2]); // 0
@@ -361,10 +346,10 @@ public class MeshBuilder {
         int baseVertex = currentVertex;
         
         // Sample light for each vertex
-        float[] light0 = sampleVertexLight(face, mattmc.client.renderer.chunk.VertexLightSampler.Normal.EAST, 0);
-        float[] light1 = sampleVertexLight(face, mattmc.client.renderer.chunk.VertexLightSampler.Normal.EAST, 1);
-        float[] light2 = sampleVertexLight(face, mattmc.client.renderer.chunk.VertexLightSampler.Normal.EAST, 2);
-        float[] light3 = sampleVertexLight(face, mattmc.client.renderer.chunk.VertexLightSampler.Normal.EAST, 3);
+        float[] light0 = sampleVertexLight(face, 5, 0);
+        float[] light1 = sampleVertexLight(face, 5, 1);
+        float[] light2 = sampleVertexLight(face, 5, 2);
+        float[] light3 = sampleVertexLight(face, 5, 3);
         
         // 4 vertices for the quad with atlas UVs, normal (1,0,0) for east face, and light data
         addVertex(x1, y0, z1, u1, v1, color, 1, 0, 0, light0[0], light0[1], light0[2]); // 0
@@ -399,10 +384,10 @@ public class MeshBuilder {
         int baseVertex = currentVertex;
         
         // Sample light for each vertex
-        float[] light0 = sampleVertexLight(face, mattmc.client.renderer.chunk.VertexLightSampler.Normal.NORTH, 0);
-        float[] light1 = sampleVertexLight(face, mattmc.client.renderer.chunk.VertexLightSampler.Normal.NORTH, 1);
-        float[] light2 = sampleVertexLight(face, mattmc.client.renderer.chunk.VertexLightSampler.Normal.NORTH, 2);
-        float[] light3 = sampleVertexLight(face, mattmc.client.renderer.chunk.VertexLightSampler.Normal.NORTH, 3);
+        float[] light0 = sampleVertexLight(face, 2, 0);
+        float[] light1 = sampleVertexLight(face, 2, 1);
+        float[] light2 = sampleVertexLight(face, 2, 2);
+        float[] light3 = sampleVertexLight(face, 2, 3);
         
         // 4 vertices for the quad with atlas UVs, normal (0,0,-1) for north face, and light data
         addVertex(x1, y0, z0, u1, v1, color, 0, 0, -1, light0[0], light0[1], light0[2]); // 0
@@ -417,20 +402,21 @@ public class MeshBuilder {
     }
     
     /**
-     * Add a single vertex to the vertex list with default light values.
+     * Add a single vertex to the vertex list with default unused values.
      */
     private void addVertex(float x, float y, float z, float u, float v, float[] color, float nx, float ny, float nz) {
-        addVertex(x, y, z, u, v, color, nx, ny, nz, 15.0f, 0.0f, 0.0f);
+        addVertex(x, y, z, u, v, color, nx, ny, nz, 0.0f, 0.0f, 0.0f);
     }
     
     /**
-     * Add a single vertex to the vertex list with light data and normal.
+     * Add a single vertex to the vertex list with normal.
      * Does NOT apply lighting to the color - that's handled by the shader.
      * The color represents the albedo (base color) only.
+     * The last three parameters are currently unused but kept for compatibility.
      */
     private void addVertex(float x, float y, float z, float u, float v, float[] color,
-                          float nx, float ny, float nz, float skyLight, float blockLight, float ao) {
-        // Add vertex data (position, uv, color, normal, light)
+                          float nx, float ny, float nz, float unused1, float unused2, float unused3) {
+        // Add vertex data (position, uv, color, normal, unused)
         vertices.add(x);
         vertices.add(y);
         vertices.add(z);
@@ -443,9 +429,9 @@ public class MeshBuilder {
         vertices.add(nx);  // normal x
         vertices.add(ny);  // normal y
         vertices.add(nz);  // normal z
-        vertices.add(skyLight);  // 0-15
-        vertices.add(blockLight); // 0-15
-        vertices.add(ao);        // 0-3
+        vertices.add(unused1);  // unused
+        vertices.add(unused2);  // unused
+        vertices.add(unused3);  // unused
     }
     
     /**

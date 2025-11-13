@@ -32,9 +32,6 @@ public final class LevelChunk {
     // Block states for blocks that need them (sparse storage)
     private final Map<Long, BlockState> blockStates;
     
-    // Light storage for each 16×16×16 section (HEIGHT / 16 sections)
-    private final LightStorage[] lightSections;
-    
     // Heightmap tracking topmost non-air block per column
     private final ColumnHeightmap heightmap;
     
@@ -46,13 +43,6 @@ public final class LevelChunk {
         this.chunkZ = chunkZ;
         this.blocks = new Block[WIDTH][HEIGHT][DEPTH];
         this.blockStates = new HashMap<>();
-        
-        // Initialize light storage for each section
-        int numSections = HEIGHT / 16;
-        this.lightSections = new LightStorage[numSections];
-        for (int i = 0; i < numSections; i++) {
-            this.lightSections[i] = new LightStorage();
-        }
         
         // Initialize heightmap
         this.heightmap = new ColumnHeightmap();
@@ -192,92 +182,11 @@ public final class LevelChunk {
      * @param x 0-15
      * @param y 0-383 (world Y = y + MIN_Y)
      * @param z 0-15
-     * @return Sky light level (0-15)
-     */
-    public int getSkyLight(int x, int y, int z) {
-        if (x < 0 || x >= WIDTH || y < 0 || y >= HEIGHT || z < 0 || z >= DEPTH) {
-            return 0;
-        }
-        int sectionIndex = y / 16;
-        int sectionY = y % 16;
-        return lightSections[sectionIndex].getSky(x, sectionY, z);
-    }
-    
-    /**
-     * Get block light level at chunk-local coordinates.
-     * @param x 0-15
-     * @param y 0-383 (world Y = y + MIN_Y)
-     * @param z 0-15
-     * @return Block light level (0-15)
-     */
-    public int getBlockLight(int x, int y, int z) {
-        if (x < 0 || x >= WIDTH || y < 0 || y >= HEIGHT || z < 0 || z >= DEPTH) {
-            return 0;
-        }
-        int sectionIndex = y / 16;
-        int sectionY = y % 16;
-        return lightSections[sectionIndex].getBlock(x, sectionY, z);
-    }
-    
-    /**
-     * Set sky light level at chunk-local coordinates.
-     * @param x 0-15
-     * @param y 0-383 (world Y = y + MIN_Y)
-     * @param z 0-15
-     * @param level Sky light level (0-15)
-     */
-    public void setSkyLight(int x, int y, int z, int level) {
-        if (x < 0 || x >= WIDTH || y < 0 || y >= HEIGHT || z < 0 || z >= DEPTH) {
-            return;
-        }
-        int sectionIndex = y / 16;
-        int sectionY = y % 16;
-        lightSections[sectionIndex].setSky(x, sectionY, z, level);
-    }
-    
-    /**
-     * Set block light level at chunk-local coordinates.
-     * @param x 0-15
-     * @param y 0-383 (world Y = y + MIN_Y)
-     * @param z 0-15
-     * @param level Block light level (0-15)
-     */
-    public void setBlockLight(int x, int y, int z, int level) {
-        if (x < 0 || x >= WIDTH || y < 0 || y >= HEIGHT || z < 0 || z >= DEPTH) {
-            return;
-        }
-        int sectionIndex = y / 16;
-        int sectionY = y % 16;
-        lightSections[sectionIndex].setBlock(x, sectionY, z, level);
-    }
-    
     /**
      * Get the heightmap for this chunk.
      */
     public ColumnHeightmap getHeightmap() {
         return heightmap;
-    }
-    
-    /**
-     * Get the light storage for a specific section.
-     * @param sectionIndex Section index (0 to HEIGHT/16 - 1)
-     */
-    public LightStorage getLightSection(int sectionIndex) {
-        if (sectionIndex < 0 || sectionIndex >= lightSections.length) {
-            return null;
-        }
-        return lightSections[sectionIndex];
-    }
-    
-    /**
-     * Set the light storage for a specific section.
-     * @param sectionIndex Section index (0 to HEIGHT/16 - 1)
-     * @param lightStorage The light storage to set
-     */
-    public void setLightSection(int sectionIndex, LightStorage lightStorage) {
-        if (sectionIndex >= 0 && sectionIndex < lightSections.length) {
-            lightSections[sectionIndex] = lightStorage;
-        }
     }
     
     public int chunkX() { return chunkX; }

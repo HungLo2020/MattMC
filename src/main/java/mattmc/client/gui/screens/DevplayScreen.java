@@ -205,9 +205,6 @@ public final class DevplayScreen implements Screen {
         // Track FPS in render() method for accurate measurement
         uiState.updateFPS(now());
         
-        // Process lighting updates with 2ms budget, prioritizing near camera
-        world.updateLighting(2.0, player.getX(), player.getEyeY(), player.getZ());
-        
         // Convert alpha to float for interpolation
         float alphaF = (float) alpha;
         
@@ -291,15 +288,6 @@ public final class DevplayScreen implements Screen {
         // Draw command feedback message (independent of command overlay)
         if (uiState.hasCommandFeedback()) {
             uiRenderer.drawCommandFeedback(w, h, uiState.getCommandFeedbackMessage());
-        }
-        
-        // Draw lighting debug overlay if enabled
-        if (uiState.isLightingDebugVisible()) {
-            mattmc.world.level.lighting.RelightScheduler scheduler = world.getRelightScheduler();
-            uiRenderer.drawLightingDebug(w, h, 
-                scheduler.getBacklogSize(),
-                scheduler.getNodesProcessedLastFrame(),
-                scheduler.getTimeSpentLastFrame());
         }
         
         // Draw hotbar at bottom center (always visible)

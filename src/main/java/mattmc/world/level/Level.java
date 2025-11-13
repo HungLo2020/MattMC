@@ -15,7 +15,6 @@ import mattmc.world.level.chunk.AsyncChunkLoader;
 import mattmc.world.level.chunk.AsyncChunkSaver;
 import mattmc.world.level.chunk.ChunkUtils;
 import mattmc.world.level.levelgen.WorldGenerator;
-import mattmc.world.level.lighting.LightAccessor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -69,24 +68,12 @@ public class Level implements LevelAccessor {
     // World save directory (null if world is not being saved)
     private Path worldDirectory = null;
     
-    // Light accessor for cross-chunk light sampling
-    private final LightAccessor lightAccessor;
-    
     // Day/night cycle
     private final DayCycle dayCycle = new DayCycle();
-    
-    // Light propagator for incremental BFS light updates
-    private mattmc.world.level.lighting.LightPropagator lightPropagator;
-    
-    // Relight scheduler for distance-based prioritization
-    private mattmc.world.level.lighting.RelightScheduler relightScheduler;
     
     public Level() {
         // Initialize block access with chunk manager
         this.blockAccess = new WorldBlockAccess(chunkManager);
-        
-        // Initialize light accessor with chunk manager
-        this.lightAccessor = new LightAccessor(chunkManager);
         
         this.asyncLoader = new AsyncChunkLoader();
         // Initialize with a default seed (will be updated when world is loaded/created)
@@ -96,23 +83,6 @@ public class Level implements LevelAccessor {
         // Set the neighbor accessor for cross-chunk face culling
         BlockFaceCollector.ChunkNeighborAccessor neighborAccessor = blockAccess::getBlockAcrossChunks;
         this.asyncLoader.setNeighborAccessor(neighborAccessor);
-        
-        // Set the light accessor for cross-chunk light sampling
-        AsyncChunkLoader.LightAccessor asyncLightAccessor = new AsyncChunkLoader.LightAccessor() {
-            @Override
-            public int getSkyLight(LevelChunk chunk, int x, int y, int z) {
-                return lightAccessor.getSkyLightAcrossChunks(chunk, x, y, z);
-            }
-            
-            @Override
-            public int getBlockLight(LevelChunk chunk, int x, int y, int z) {
-                return lightAccessor.getBlockLightAcrossChunks(chunk, x, y, z);
-            }
-        };
-        this.asyncLoader.setLightAccessor(asyncLightAccessor);
-        // Initialize light propagator and scheduler
-        this.lightPropagator = new mattmc.world.level.lighting.LightPropagator(this);
-        this.relightScheduler = new mattmc.world.level.lighting.RelightScheduler(this);
     }
     
     /**
@@ -268,8 +238,6 @@ public class Level implements LevelAccessor {
     private LevelChunk generateChunk(int chunkX, int chunkZ) {
         LevelChunk chunk = new LevelChunk(chunkX, chunkZ);
         worldGenerator.generateChunkTerrain(chunk);
-        // Initialize skylight based on terrain
-        mattmc.world.level.levelgen.SkylightInitializer.initializeChunk(chunk);
         return chunk;
     }
     
@@ -306,108 +274,10 @@ public class Level implements LevelAccessor {
      */
     @Override
     public void setBlock(int worldX, int chunkY, int worldZ, Block block, mattmc.world.level.block.state.BlockState state) {
-        Block oldBlock = blockAccess.setBlock(worldX, chunkY, worldZ, block, state, this::getChunk);
-        
-        // Handle light updates
-        handleLightUpdate(worldX, chunkY, worldZ, oldBlock, block);
+        blockAccess.setBlock(worldX, chunkY, worldZ, block, state, this::getChunk);
         
         // Mark adjacent chunks as dirty if the block is at a chunk boundary
         blockAccess.markAdjacentChunksDirtyIfOnBoundary(worldX, worldZ);
-    }
-    
-    /**
-     * Handle light updates when a block is placed or removed.
-     */
-    private void handleLightUpdate(int worldX, int chunkY, int worldZ, Block oldBlock, Block newBlock) {
-        // Handle block light changes
-        int oldEmission = oldBlock.getLightEmission();
-        int newEmission = newBlock.getLightEmission();
-        
-        if (oldEmission > 0) {
-            // Old block emitted light, remove it
-            lightPropagator.enqueueRemoveBlock(worldX, chunkY, worldZ);
-        }
-        
-        if (newEmission > 0) {
-            // New block emits light, add it
-            lightPropagator.enqueueAddBlock(worldX, chunkY, worldZ, newEmission);
-        }
-        
-        // Handle skylight changes
-        boolean oldOpaque = oldBlock.isOpaque();
-        boolean newOpaque = newBlock.isOpaque();
-        
-        if (!oldOpaque && newOpaque) {
-            // Block became opaque, remove skylight
-            lightPropagator.enqueueRemoveSkylight(worldX, chunkY, worldZ);
-        } else if (oldOpaque && !newOpaque) {
-            // Block became transparent - need to restore skylight to this column
-            // 
-            // The key insight: skylight propagates downward at full strength (level 15)
-            // until it hits an opaque block. When we remove an opaque block, we need
-            // to check if there's a clear path to the sky above and propagate skylight
-            // down through the entire column below.
-            
-            // First, check if there's skylight above or if we have a clear path to sky
-            boolean hasSkylightAbove = false;
-            int skylightLevel = 0;
-            
-            // Scan upward to find if we have a clear path to sky
-            if (chunkY >= LevelChunk.HEIGHT - 1) {
-                // At or above world height - full skylight
-                hasSkylightAbove = true;
-                skylightLevel = 15;
-            } else {
-                // Check the block directly above
-                int aboveLight = getSkyLightAt(worldX, chunkY + 1, worldZ);
-                if (aboveLight > 0) {
-                    hasSkylightAbove = true;
-                    skylightLevel = aboveLight;
-                }
-            }
-            
-            // If we have skylight from above, propagate it down through the column
-            if (hasSkylightAbove && skylightLevel == 15) {
-                // Full skylight from above - propagate down through entire column
-                // Start from this position and go downward
-                int currentY = chunkY;
-                while (currentY >= 0) {
-                    Block blockAtY = getBlock(worldX, currentY, worldZ);
-                    if (blockAtY.isOpaque()) {
-                        // Hit an opaque block, stop propagating downward
-                        break;
-                    }
-                    
-                    // This position should have full skylight
-                    lightPropagator.enqueueSkylight(worldX, currentY, worldZ, 15);
-                    currentY--;
-                }
-            } else if (hasSkylightAbove && skylightLevel > 0) {
-                // Reduced skylight from above (shouldn't normally happen in vertical column)
-                lightPropagator.enqueueSkylight(worldX, chunkY, worldZ, skylightLevel);
-            } else {
-                // No skylight from above, check horizontal neighbors
-                int eastLight = getSkyLightAt(worldX + 1, chunkY, worldZ);
-                int westLight = getSkyLightAt(worldX - 1, chunkY, worldZ);
-                int northLight = getSkyLightAt(worldX, chunkY, worldZ - 1);
-                int southLight = getSkyLightAt(worldX, chunkY, worldZ + 1);
-                
-                int maxHorizontalLight = Math.max(Math.max(eastLight, westLight), 
-                                                   Math.max(northLight, southLight));
-                
-                if (maxHorizontalLight > 1) {
-                    // Skylight from the side - attenuate by 1
-                    lightPropagator.enqueueSkylight(worldX, chunkY, worldZ, maxHorizontalLight - 1);
-                }
-            }
-        }
-    }
-    
-    /**
-     * Get skylight at world coordinates.
-     */
-    private int getSkyLightAt(int worldX, int chunkY, int worldZ) {
-        return lightAccessor.getSkyLight(worldX, chunkY, worldZ);
     }
     
     /**
@@ -533,44 +403,6 @@ public class Level implements LevelAccessor {
      * Should be called each frame to incrementally update lighting.
      * Uses the RelightScheduler for distance-based prioritization.
      * 
-     * @param msBudget Time budget in milliseconds (typically 2-5ms per frame)
-     * @param cameraX Camera X position for prioritization
-     * @param cameraY Camera Y position for prioritization
-     * @param cameraZ Camera Z position for prioritization
-     */
-    public void updateLighting(double msBudget, float cameraX, float cameraY, float cameraZ) {
-        relightScheduler.updateCameraPosition(cameraX, cameraY, cameraZ);
-        relightScheduler.processLighting(msBudget);
-    }
-    
-    /**
-     * Process light updates with a time budget (legacy method without camera position).
-     * Should be called each frame to incrementally update lighting.
-     * 
-     * @param msBudget Time budget in milliseconds (typically 2-5ms per frame)
-     */
-    public void updateLighting(double msBudget) {
-        lightPropagator.updateBudget(msBudget);
-    }
-    
-    /**
-     * Get the light propagator for this level.
-     * 
-     * @return The light propagator
-     */
-    public mattmc.world.level.lighting.LightPropagator getLightPropagator() {
-        return lightPropagator;
-    }
-    
-    /**
-     * Get the relight scheduler for this level.
-     * 
-     * @return The relight scheduler
-     */
-    public mattmc.world.level.lighting.RelightScheduler getRelightScheduler() {
-        return relightScheduler;
-    }
-    
     /**
      * Set a listener for chunk unload events.
      * Used by the renderer to clean up caches.
