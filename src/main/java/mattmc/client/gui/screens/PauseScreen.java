@@ -81,7 +81,7 @@ public final class PauseScreen implements Screen {
         titleCX = w / 2f;
         titleCY = h * 0.30f;
 
-        int totalButtonsH = 3 * buttonHeight + 2 * buttonGap;
+        int totalButtonsH = 2 * buttonHeight + 1 * buttonGap;
         buttonsStartY = (int)(h / 2f - totalButtonsH / 2f);
 
         int x = (w - buttonWidth) / 2;
@@ -89,7 +89,6 @@ public final class PauseScreen implements Screen {
 
         buttons.add(new Button("Resume",  x, buttonsStartY + 0 * (buttonHeight + buttonGap), buttonWidth, buttonHeight));
         buttons.add(new Button("Save and Exit", x, buttonsStartY + 1 * (buttonHeight + buttonGap), buttonWidth, buttonHeight));
-        buttons.add(new Button("Options",       x, buttonsStartY + 2 * (buttonHeight + buttonGap), buttonWidth, buttonHeight));
     }
     
     private void unpause() {
@@ -135,11 +134,6 @@ public final class PauseScreen implements Screen {
             saveAndExit();
             return;
         }
-        if ("Options".equals(label)) {
-            // TODO: Show options screen
-            logger.info("Options not yet implemented in pause menu");
-            return;
-        }
     }
     
     private void saveAndExit() {
@@ -151,8 +145,7 @@ public final class PauseScreen implements Screen {
             glfwSetInputMode(window.handle(), GLFW_CURSOR, GLFW_CURSOR_NORMAL);
             game.setScreen(new TitleScreen(game));
         } catch (Exception e) {
-            logger.error("Failed to save world: {}", e.getMessage());
-            e.printStackTrace();
+            logger.error("Failed to save world", e);
             // Still exit even if save failed
             glfwSetInputMode(window.handle(), GLFW_CURSOR, GLFW_CURSOR_NORMAL);
             game.setScreen(new TitleScreen(game));

@@ -7,11 +7,15 @@ varying vec3 vLightData;
 varying vec3 vNormal;
 varying vec3 vWorldPos;
 varying float vFogFactor;
-varying vec4 vShadowCoord;
+varying vec4 vShadowCoord0; // Near cascade
+varying vec4 vShadowCoord1; // Mid cascade
+varying vec4 vShadowCoord2; // Far cascade
 
 // Uniforms
 uniform vec3 uCameraPos;
-uniform mat4 uShadowMatrix;
+uniform mat4 uShadowMatrix0; // Near cascade matrix
+uniform mat4 uShadowMatrix1; // Mid cascade matrix
+uniform mat4 uShadowMatrix2; // Far cascade matrix
 uniform int uShadowsEnabled;
 
 void main() {
@@ -38,9 +42,10 @@ void main() {
     float fogAmount = 1.0 - exp(-pow(distance * fogDensity, 2.0));
     vFogFactor = clamp(fogAmount, 0.0, 1.0);
     
-    // Calculate shadow coordinates if shadows are enabled
-    // Use world position for shadow coordinate calculation
+    // Calculate shadow coordinates for all cascades if shadows are enabled
     if (uShadowsEnabled == 1) {
-        vShadowCoord = uShadowMatrix * worldPos;
+        vShadowCoord0 = uShadowMatrix0 * worldPos;
+        vShadowCoord1 = uShadowMatrix1 * worldPos;
+        vShadowCoord2 = uShadowMatrix2 * worldPos;
     }
 }

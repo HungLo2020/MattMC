@@ -33,12 +33,14 @@ This project reimagines Minecraft with a focus on:
   - 3-block corner rule for ambient occlusion darkening
   - Runtime toggle via `smooth_lighting` setting
   - See [SMOOTH_LIGHTING.md](docs/SMOOTH_LIGHTING.md) for details
-- **Shadow Mapping**: Real-time shadows cast by directional sunlight (experimental)
-  - 2048×2048 depth map for shadow rendering
+- **Cascaded Shadow Maps (CSM)**: Real-time shadows from directional sunlight
+  - 3 cascades (near, mid, far) for optimal quality distribution
+  - 2048×2048 depth map per cascade
   - PCF filtering for soft shadow edges
   - Integrated with day/night cycle (only renders during daytime)
   - Runtime toggle via `shadows` setting (disabled by default)
-  - See [SHADOW_MAPPING.md](docs/SHADOW_MAPPING.md) for details
+  - Similar to Minecraft Complementary shaders approach
+  - See [CASCADED_SHADOW_MAPS.md](docs/CASCADED_SHADOW_MAPS.md) for details
 
 ### Game Features
 - World creation and management
@@ -117,7 +119,7 @@ For in-depth technical information, see:
 
 - [**Chunk System**](CHUNK_SYSTEM.md) - Details on the chunk-based voxel rendering system
 - [**Smooth Lighting**](docs/SMOOTH_LIGHTING.md) - Per-vertex light sampling and ambient occlusion
-- [**Shadow Mapping**](docs/SHADOW_MAPPING.md) - Real-time shadows from directional sunlight
+- [**Cascaded Shadow Maps**](docs/CASCADED_SHADOW_MAPS.md) - CSM implementation similar to Complementary shaders
 - [**Day/Night Cycle**](docs/DAY_NIGHT_CYCLE.md) - Sun movement and sky brightness calculations
 - [**Efficiency Analysis**](EFFICIENCY_ANALYSIS.md) - Performance optimizations and analysis
 - [**World Save Format**](WORLD_SAVE_FORMAT.md) - World storage format and NBT structures
@@ -142,7 +144,7 @@ MattMC is in active development. Current features include:
 - ✅ World generation and storage
 - ✅ Per-voxel light storage (skyLight and blockLight)
 - ✅ Smooth lighting with per-vertex sampling and ambient occlusion
-- ✅ Shadow mapping with real-time shadows from sunlight
+- ✅ Cascaded Shadow Maps (CSM) with 3-cascade system for realistic shadows
 - ✅ Day/night cycle with dynamic lighting
 - ✅ Column heightmap tracking
 - ✅ GUI system with multiple screens

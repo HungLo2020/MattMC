@@ -27,7 +27,8 @@ public class VoxelShape {
      * Create a voxel shape from a single box.
      */
     public static VoxelShape box(double minX, double minY, double minZ, double maxX, double maxY, double maxZ) {
-        List<AABB> boxes = new ArrayList<>();
+        // Pre-allocate with exact size (1 box)
+        List<AABB> boxes = new ArrayList<>(1);
         boxes.add(new AABB(minX, minY, minZ, maxX, maxY, maxZ));
         return new VoxelShape(boxes);
     }
@@ -43,7 +44,9 @@ public class VoxelShape {
      * Combine two voxel shapes into one.
      */
     public static VoxelShape or(VoxelShape shape1, VoxelShape shape2) {
-        List<AABB> combined = new ArrayList<>(shape1.boxes);
+        // Pre-allocate with exact combined size
+        List<AABB> combined = new ArrayList<>(shape1.boxes.size() + shape2.boxes.size());
+        combined.addAll(shape1.boxes);
         combined.addAll(shape2.boxes);
         return new VoxelShape(combined);
     }
@@ -52,7 +55,8 @@ public class VoxelShape {
      * Get all AABBs in this shape, offset by block position.
      */
     public List<AABB> toAabbs(int blockX, int blockY, int blockZ) {
-        List<AABB> result = new ArrayList<>();
+        // Pre-allocate with exact size (number of boxes)
+        List<AABB> result = new ArrayList<>(boxes.size());
         for (AABB box : boxes) {
             result.add(box.move(blockX, blockY, blockZ));
         }

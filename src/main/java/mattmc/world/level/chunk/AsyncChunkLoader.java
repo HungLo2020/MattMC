@@ -240,7 +240,8 @@ public class AsyncChunkLoader {
         }
         
         // Return up to budget limit for this frame
-        List<ChunkMeshData> result = new ArrayList<>();
+        // Pre-allocate with maximum possible size to avoid resizing
+        List<ChunkMeshData> result = new ArrayList<>(MAX_MESH_UPLOADS_PER_FRAME);
         for (int i = 0; i < MAX_MESH_UPLOADS_PER_FRAME && !completedMeshes.isEmpty(); i++) {
             ChunkMeshData meshData = completedMeshes.poll();
             if (meshData != null) {
@@ -485,7 +486,8 @@ public class AsyncChunkLoader {
         }
         
         // Return up to budget limit for this frame
-        List<ChunkMeshBuffer> result = new ArrayList<>();
+        // Pre-allocate with maximum possible size to avoid resizing
+        List<ChunkMeshBuffer> result = new ArrayList<>(MAX_MESH_UPLOADS_PER_FRAME);
         for (int i = 0; i < MAX_MESH_UPLOADS_PER_FRAME && !completedMeshBuffers.isEmpty(); i++) {
             ChunkMeshBuffer meshBuffer = completedMeshBuffers.poll();
             if (meshBuffer != null) {

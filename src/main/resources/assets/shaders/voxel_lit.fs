@@ -7,11 +7,15 @@ varying vec3 vLightData;  // (skyLight 0-15, blockLight 0-15, ao 0-3)
 varying vec3 vNormal;
 varying vec3 vWorldPos;
 varying float vFogFactor;
-varying vec4 vShadowCoord;
+varying vec4 vShadowCoord0; // Near cascade
+varying vec4 vShadowCoord1; // Mid cascade
+varying vec4 vShadowCoord2; // Far cascade
 
 // Uniforms
 uniform sampler2D uTexture;
-uniform sampler2D uShadowMap;
+uniform sampler2D uShadowMap0; // Near cascade shadow map
+uniform sampler2D uShadowMap1; // Mid cascade shadow map
+uniform sampler2D uShadowMap2; // Far cascade shadow map
 uniform vec3 uSunDir;        // Normalized sun direction vector
 uniform vec3 uSunColor;      // Sun color
 uniform vec3 uAmbientSky;    // Sky ambient color
@@ -20,18 +24,17 @@ uniform float uGamma;        // Gamma value (typically 2.2)
 uniform vec3 uFogColor;      // Fog color
 uniform float uSkyBrightness; // Sky brightness multiplier (0.0-1.0) for day/night cycle
 uniform int uShadowsEnabled;  // Whether shadows are enabled
+uniform vec3 uCameraPos;     // Camera position for cascade selection
+uniform float uCascadeSplit0; // Near cascade distance (16 blocks)
+uniform float uCascadeSplit1; // Mid cascade distance (48 blocks)
 
 /**
- * Calculate shadow factor using PCF (Percentage Closer Filtering).
- * Returns 1.0 for fully lit, 0.0 for fully shadowed.
+ * Sample a shadow map and perform depth comparison.
+ * Returns 1.0 for lit, 0.0 for shadowed.
  */
-float calculateShadow() {
-    if (uShadowsEnabled == 0) {
-        return 1.0; // No shadows
-    }
-    
-    // Perspective divide to get NDC coordinates
-    vec3 projCoords = vShadowCoord.xyz / vShadowCoord.w;
+float sampleShadowMap(sampler2D shadowMap, vec4 shadowCoord, vec2 texelSize) {
+    // Perspective divide
+    vec3 projCoords = shadowCoord.xyz / shadowCoord.w;
     
     // Transform from [-1,1] to [0,1] range
     projCoords = projCoords * 0.5 + 0.5;
@@ -43,24 +46,50 @@ float calculateShadow() {
         return 1.0;
     }
     
-    // Get depth from shadow map
-    float closestDepth = texture2D(uShadowMap, projCoords.xy).r;
     float currentDepth = projCoords.z;
     
-    // Bias to prevent shadow acne
+    // Adaptive bias to prevent shadow acne
     float bias = max(0.005 * (1.0 - dot(vNormal, uSunDir)), 0.001);
     
-    // Simple PCF (2x2 samples)
+    // PCF (Percentage Closer Filtering) with 3x3 samples
     float shadow = 0.0;
-    vec2 texelSize = vec2(1.0 / 2048.0); // Assuming 2048x2048 shadow map
     for (int x = -1; x <= 1; x++) {
         for (int y = -1; y <= 1; y++) {
             vec2 offset = vec2(x, y) * texelSize;
-            float pcfDepth = texture2D(uShadowMap, projCoords.xy + offset).r;
+            float pcfDepth = texture2D(shadowMap, projCoords.xy + offset).r;
             shadow += currentDepth - bias > pcfDepth ? 0.0 : 1.0;
         }
     }
-    shadow /= 9.0; // Average of 9 samples
+    return shadow / 9.0;
+}
+
+/**
+ * Calculate shadow factor using Cascaded Shadow Maps (CSM).
+ * Returns 1.0 for fully lit, 0.0 for fully shadowed.
+ */
+float calculateShadow() {
+    if (uShadowsEnabled == 0) {
+        return 1.0; // No shadows
+    }
+    
+    // Calculate distance from camera to fragment
+    float distanceFromCamera = length(vWorldPos - uCameraPos);
+    
+    // Shadow map texel size (assuming 2048x2048 shadow maps)
+    vec2 texelSize = vec2(1.0 / 2048.0);
+    
+    // Select cascade based on distance from camera
+    float shadow;
+    if (distanceFromCamera < uCascadeSplit0) {
+        // Near cascade (0-16 blocks): highest quality, tight frustum
+        shadow = sampleShadowMap(uShadowMap0, vShadowCoord0, texelSize);
+    } else if (distanceFromCamera < uCascadeSplit1) {
+        // Mid cascade (16-48 blocks): medium quality
+        shadow = sampleShadowMap(uShadowMap1, vShadowCoord1, texelSize);
+    } else {
+        // Far cascade (48-128 blocks): lowest quality, wide coverage
+        shadow = sampleShadowMap(uShadowMap2, vShadowCoord2, texelSize);
+    }
     
     return shadow;
 }
