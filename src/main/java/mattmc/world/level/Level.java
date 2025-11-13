@@ -14,6 +14,7 @@ import mattmc.world.level.chunk.RegionFileCache;
 import mattmc.world.level.chunk.AsyncChunkLoader;
 import mattmc.world.level.chunk.AsyncChunkSaver;
 import mattmc.world.level.chunk.ChunkUtils;
+import mattmc.world.level.chunk.LightEngine;
 import mattmc.world.level.levelgen.WorldGenerator;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -274,10 +275,47 @@ public class Level implements LevelAccessor {
      */
     @Override
     public void setBlock(int worldX, int chunkY, int worldZ, Block block, mattmc.world.level.block.state.BlockState state) {
-        blockAccess.setBlock(worldX, chunkY, worldZ, block, state, this::getChunk);
+        Block oldBlock = blockAccess.setBlock(worldX, chunkY, worldZ, block, state, this::getChunk);
+        
+        // Update lighting at this position if block changed
+        if (oldBlock != block) {
+            updateLightAtPosition(worldX, chunkY, worldZ);
+        }
         
         // Mark adjacent chunks as dirty if the block is at a chunk boundary
         blockAccess.markAdjacentChunksDirtyIfOnBoundary(worldX, worldZ);
+    }
+    
+    /**
+     * Update light at a specific position after a block change.
+     */
+    private void updateLightAtPosition(int worldX, int chunkY, int worldZ) {
+        // Convert to chunk coordinates
+        int chunkX = Math.floorDiv(worldX, LevelChunk.WIDTH);
+        int chunkZ = Math.floorDiv(worldZ, LevelChunk.DEPTH);
+        int localX = Math.floorMod(worldX, LevelChunk.WIDTH);
+        int localZ = Math.floorMod(worldZ, LevelChunk.DEPTH);
+        
+        LevelChunk chunk = getChunkIfLoaded(chunkX, chunkZ);
+        if (chunk == null) {
+            return;
+        }
+        
+        // Create ChunkAccess for light engine
+        LightEngine.ChunkAccess chunkAccess = new LightEngine.ChunkAccess() {
+            @Override
+            public LevelChunk getChunk(int cx, int cz) {
+                return getChunkIfLoaded(cx, cz);
+            }
+            
+            @Override
+            public Block getBlock(int wx, int cy, int wz) {
+                return Level.this.getBlock(wx, cy, wz);
+            }
+        };
+        
+        // Update light at this position
+        LightEngine.updateLightAt(chunk, chunkAccess, localX, chunkY, localZ);
     }
     
     /**

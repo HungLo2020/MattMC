@@ -163,14 +163,28 @@ public class MeshBuilder {
     }
     
     /**
-     * Sample light for a vertex - removed, now returns empty values.
-     * Returns [unused1, unused2, unused3] as floats.
+     * Sample light for a vertex.
+     * Returns [skyLight, blockLight, ao] as floats (0-15, 0-15, 0-3).
+     * 
+     * For smooth lighting, this would sample nearby blocks and average.
+     * For now, we just sample the current block's light level.
      */
     private float[] sampleVertexLight(BlockFaceCollector.FaceData face, 
                                       int normalIndex,
                                       int cornerIndex) {
-        // No light sampling in simplified version
-        return new float[] {0.0f, 0.0f, 0.0f};
+        // If no chunk reference, return no light
+        if (face.chunk == null) {
+            return new float[] {15.0f, 0.0f, 0.0f}; // Default to full skylight
+        }
+        
+        // Get light at the face position
+        int skyLight = face.chunk.getSkyLight(face.cx, face.cy, face.cz);
+        int blockLight = face.chunk.getBlockLight(face.cx, face.cy, face.cz);
+        
+        // No ambient occlusion for now
+        float ao = 0.0f;
+        
+        return new float[] {(float)skyLight, (float)blockLight, ao};
     }
     
     /**

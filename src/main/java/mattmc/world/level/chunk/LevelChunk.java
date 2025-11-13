@@ -35,6 +35,13 @@ public final class LevelChunk {
     // Heightmap tracking topmost non-air block per column
     private final ColumnHeightmap heightmap;
     
+    // Light storage: one byte per block
+    // High nibble (4 bits) = skyLight (0-15)
+    // Low nibble (4 bits) = blockLight (0-15)
+    // Stored as [x][y][z] matching the blocks array
+    // Light arrays are lazily initialized to save memory for chunks with no lighting
+    private byte[][][] lightData;
+    
     // Dirty flag: marks if chunk needs to be re-rendered (for display list caching)
     private boolean dirty = true;
     
@@ -182,6 +189,100 @@ public final class LevelChunk {
      * @param x 0-15
      * @param y 0-383 (world Y = y + MIN_Y)
      * @param z 0-15
+     * @return Light level 0-15
+     */
+    public int getSkyLight(int x, int y, int z) {
+        if (x < 0 || x >= WIDTH || y < 0 || y >= HEIGHT || z < 0 || z >= DEPTH) {
+            return 0;
+        }
+        if (lightData == null) {
+            return 0;
+        }
+        // High nibble contains skylight
+        return (lightData[x][y][z] >> 4) & 0x0F;
+    }
+    
+    /**
+     * Get block light level at chunk-local coordinates.
+     * @param x 0-15
+     * @param y 0-383 (world Y = y + MIN_Y)
+     * @param z 0-15
+     * @return Light level 0-15
+     */
+    public int getBlockLight(int x, int y, int z) {
+        if (x < 0 || x >= WIDTH || y < 0 || y >= HEIGHT || z < 0 || z >= DEPTH) {
+            return 0;
+        }
+        if (lightData == null) {
+            return 0;
+        }
+        // Low nibble contains block light
+        return lightData[x][y][z] & 0x0F;
+    }
+    
+    /**
+     * Set sky light level at chunk-local coordinates.
+     * @param x 0-15
+     * @param y 0-383 (world Y = y + MIN_Y)
+     * @param z 0-15
+     * @param level Light level 0-15
+     */
+    public void setSkyLight(int x, int y, int z, int level) {
+        if (x < 0 || x >= WIDTH || y < 0 || y >= HEIGHT || z < 0 || z >= DEPTH) {
+            return;
+        }
+        ensureLightArraysExist();
+        
+        // Clamp to valid range
+        level = Math.max(0, Math.min(15, level));
+        
+        // Clear old skylight and set new (high nibble)
+        lightData[x][y][z] = (byte)((lightData[x][y][z] & 0x0F) | (level << 4));
+    }
+    
+    /**
+     * Set block light level at chunk-local coordinates.
+     * @param x 0-15
+     * @param y 0-383 (world Y = y + MIN_Y)
+     * @param z 0-15
+     * @param level Light level 0-15
+     */
+    public void setBlockLight(int x, int y, int z, int level) {
+        if (x < 0 || x >= WIDTH || y < 0 || y >= HEIGHT || z < 0 || z >= DEPTH) {
+            return;
+        }
+        ensureLightArraysExist();
+        
+        // Clamp to valid range
+        level = Math.max(0, Math.min(15, level));
+        
+        // Clear old block light and set new (low nibble)
+        lightData[x][y][z] = (byte)((lightData[x][y][z] & 0xF0) | level);
+    }
+    
+    /**
+     * Ensure light arrays are initialized.
+     * Lazily creates the arrays on first use to save memory.
+     */
+    public void ensureLightArraysExist() {
+        if (lightData == null) {
+            lightData = new byte[WIDTH][HEIGHT][DEPTH];
+        }
+    }
+    
+    /**
+     * Clear all light data in this chunk.
+     */
+    public void clearAllLight() {
+        if (lightData != null) {
+            for (int x = 0; x < WIDTH; x++) {
+                for (int y = 0; y < HEIGHT; y++) {
+                    java.util.Arrays.fill(lightData[x][y], (byte)0);
+                }
+            }
+        }
+    }
+    
     /**
      * Get the heightmap for this chunk.
      */

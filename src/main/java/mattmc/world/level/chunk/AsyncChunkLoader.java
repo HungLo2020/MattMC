@@ -338,11 +338,41 @@ public class AsyncChunkLoader {
         // If no world generator is set, generate flat terrain as fallback
         if (worldGenerator == null) {
             chunk.generateFlatTerrain(64);
-            return chunk;
+        } else {
+            // Use WorldGenerator to fill terrain
+            worldGenerator.generateChunkTerrain(chunk);
         }
         
-        // Use WorldGenerator to fill terrain
-        worldGenerator.generateChunkTerrain(chunk);
+        // Initialize lighting for the chunk
+        // We need a ChunkAccess implementation for cross-chunk light propagation
+        LightEngine.ChunkAccess chunkAccess = new LightEngine.ChunkAccess() {
+            @Override
+            public LevelChunk getChunk(int cx, int cz) {
+                // For now, we can't access neighboring chunks during async generation
+                // This is a limitation - neighboring chunks might not be loaded yet
+                // Light will be recalculated when neighbors are loaded
+                if (cx == chunkX && cz == chunkZ) {
+                    return chunk;
+                }
+                return null;
+            }
+            
+            @Override
+            public Block getBlock(int worldX, int chunkY, int worldZ) {
+                // Convert to local coordinates
+                int cx = Math.floorDiv(worldX, LevelChunk.WIDTH);
+                int cz = Math.floorDiv(worldZ, LevelChunk.DEPTH);
+                if (cx == chunkX && cz == chunkZ) {
+                    int lx = Math.floorMod(worldX, LevelChunk.WIDTH);
+                    int lz = Math.floorMod(worldZ, LevelChunk.DEPTH);
+                    return chunk.getBlock(lx, chunkY, lz);
+                }
+                return Blocks.AIR;
+            }
+        };
+        
+        LightEngine.initializeChunkLighting(chunk, chunkAccess);
+        
         return chunk;
     }
     
