@@ -14,8 +14,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Handles rendering of chunks using VBO/VAO with texture atlas.
- * Simplified rendering with basic texturing and no lighting effects.
+ * Handles rendering of chunks using VBO/VAO with texture atlas and basic lighting.
+ * Implements simple Lambert diffuse lighting from the sun.
  */
 public class ChunkRenderer {
     private static final Logger logger = LoggerFactory.getLogger(ChunkRenderer.class);
@@ -34,7 +34,7 @@ public class ChunkRenderer {
     // Texture atlas for VBO rendering
     private TextureAtlas textureAtlas = null;
     
-    // Basic shader for rendering
+    // Shader for rendering with basic lighting
     private VoxelLitShader shader = null;
     
     /**
@@ -60,13 +60,15 @@ public class ChunkRenderer {
     }
     
     /**
-     * Render a chunk using VBO/VAO with basic shader (no lighting).
+     * Render a chunk using VBO/VAO with basic directional lighting.
      * Returns true if rendering actually happened.
      * 
      * @param chunk The chunk to render
+     * @param skyBrightness Sky brightness multiplier (0.0-1.0) from day cycle
+     * @param sunDirection Sun direction vector [x, y, z] from day cycle
      * @return true if the chunk was rendered, false if no VAO available
      */
-    public boolean renderChunk(LevelChunk chunk) {
+    public boolean renderChunk(LevelChunk chunk, float skyBrightness, float[] sunDirection) {
         // Get VAO
         ChunkVAO vao = vaoCache.get(chunk);
         if (vao == null) {
@@ -77,7 +79,7 @@ public class ChunkRenderer {
         // Initialize shader if not already done
         if (shader == null) {
             shader = new VoxelLitShader();
-            logger.info("Initialized VoxelLitShader for chunk rendering");
+            logger.info("Initialized VoxelLitShader for chunk rendering with Lambert lighting");
         }
         
         // Use the shader
@@ -85,6 +87,8 @@ public class ChunkRenderer {
         
         // Set shader uniforms
         shader.setTextureSampler(0); // Texture unit 0
+        shader.setSunDirection(sunDirection[0], sunDirection[1], sunDirection[2]);
+        shader.setSkyBrightness(skyBrightness);
         
         // Enable texturing and bind texture atlas to unit 0
         glEnable(GL_TEXTURE_2D);
@@ -101,6 +105,19 @@ public class ChunkRenderer {
         glBindTexture(GL_TEXTURE_2D, 0);
         
         return true;
+    }
+    
+    /**
+     * Render a chunk with default lighting parameters (for legacy compatibility).
+     * Uses default sun direction and full brightness.
+     * 
+     * @param chunk The chunk to render
+     * @return true if the chunk was rendered, false if no VAO available
+     */
+    public boolean renderChunk(LevelChunk chunk) {
+        // Default: sun at noon position, full brightness
+        float[] defaultSunDirection = {0.3f, -0.8f, 0.5f};
+        return renderChunk(chunk, 1.0f, defaultSunDirection);
     }
 
     /**
