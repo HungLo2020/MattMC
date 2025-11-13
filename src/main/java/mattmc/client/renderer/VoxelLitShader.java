@@ -4,6 +4,7 @@ package mattmc.client.renderer;
  * Shader program for rendering lit voxel chunks.
  * Implements:
  * - Directional sun lighting (Lambert N·L)
+ * - Basic shadow mapping based on sun position
  * - Distance fog (exponential squared)
  * - Gamma correction
  */
@@ -81,5 +82,26 @@ public class VoxelLitShader extends Shader {
      */
     public void setSkyBrightness(float brightness) {
         setUniform1f("uSkyBrightness", brightness);
+    }
+    
+    /**
+     * Enable or disable shadows.
+     */
+    public void setShadowsEnabled(boolean enabled) {
+        setUniform1i("uShadowsEnabled", enabled ? 1 : 0);
+    }
+    
+    /**
+     * Set the shadow matrix for transforming world coords to shadow map space.
+     */
+    public void setShadowMatrix(float[] matrix) {
+        setUniformMatrix4f("uShadowMatrix", matrix);
+    }
+    
+    /**
+     * Set the shadow map sampler unit.
+     */
+    public void setShadowMapSampler(int unit) {
+        setUniform1i("uShadowMap", unit);
     }
 }

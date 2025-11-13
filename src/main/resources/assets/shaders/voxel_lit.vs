@@ -6,9 +6,12 @@ varying vec4 vColor;
 varying vec3 vNormal;
 varying vec3 vWorldPos;
 varying float vFogFactor;
+varying vec4 vShadowCoord;
 
 // Uniforms
 uniform vec3 uCameraPos;
+uniform mat4 uShadowMatrix;
+uniform int uShadowsEnabled;
 
 void main() {
     // Get vertex in world space (gl_Vertex is already in world space due to chunk translation)
@@ -32,4 +35,9 @@ void main() {
     const float fogDensity = 0.0035; // Reduced density for more distant fog
     float fogAmount = 1.0 - exp(-pow(distance * fogDensity, 2.0));
     vFogFactor = clamp(fogAmount, 0.0, 1.0);
+    
+    // Calculate shadow coordinates if shadows are enabled
+    if (uShadowsEnabled == 1) {
+        vShadowCoord = uShadowMatrix * worldPos;
+    }
 }

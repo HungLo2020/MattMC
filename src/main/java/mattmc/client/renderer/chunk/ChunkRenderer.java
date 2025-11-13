@@ -73,6 +73,27 @@ public class ChunkRenderer {
      */
     public boolean renderChunk(LevelChunk chunk, float cameraX, float cameraY, float cameraZ, 
                               float skyBrightness, float[] sunDirection) {
+        return renderChunk(chunk, cameraX, cameraY, cameraZ, skyBrightness, sunDirection, false, null, null);
+    }
+    
+    /**
+     * Render a chunk using VBO/VAO with lit shader and optional shadows.
+     * Returns true if rendering actually happened.
+     * 
+     * @param chunk The chunk to render
+     * @param cameraX Camera X position for fog
+     * @param cameraY Camera Y position for fog
+     * @param cameraZ Camera Z position for fog
+     * @param skyBrightness Sky brightness multiplier (0.0-1.0) from day cycle
+     * @param sunDirection Sun direction vector [x, y, z] from day cycle
+     * @param shadowsEnabled Whether shadows are enabled
+     * @param shadowMatrix Shadow transformation matrix (can be null if shadows disabled)
+     * @param shadowRenderer Shadow renderer for binding shadow map (can be null if shadows disabled)
+     * @return true if the chunk was rendered, false if no VAO available
+     */
+    public boolean renderChunk(LevelChunk chunk, float cameraX, float cameraY, float cameraZ, 
+                              float skyBrightness, float[] sunDirection, boolean shadowsEnabled,
+                              float[] shadowMatrix, mattmc.client.renderer.SimpleShadowRenderer shadowRenderer) {
         // Get VAO
         ChunkVAO vao = vaoCache.get(chunk);
         if (vao == null) {
@@ -110,6 +131,16 @@ public class ChunkRenderer {
         // Gamma correction
         shader.setGamma(2.2f);
         
+        // Shadow settings
+        if (shadowsEnabled && shadowRenderer != null && shadowMatrix != null) {
+            shader.setShadowsEnabled(true);
+            shader.setShadowMatrix(shadowMatrix);
+            shader.setShadowMapSampler(1); // Texture unit 1 for shadow map
+            shadowRenderer.bindShadowMap(GL_TEXTURE1);
+        } else {
+            shader.setShadowsEnabled(false);
+        }
+        
         // Enable texturing and bind texture atlas to unit 0
         glEnable(GL_TEXTURE_2D);
         glActiveTexture(GL_TEXTURE0); // Ensure we're on texture unit 0
@@ -138,6 +169,17 @@ public class ChunkRenderer {
         return renderChunk(chunk, 0, 0, 0, 1.0f, new float[]{0.3f, -0.8f, 0.5f});
     }
     
+    /**
+     * Render chunk geometry only (no shader setup) for shadow passes.
+     * 
+     * @param chunk The chunk to render
+     */
+    public void renderChunkGeometryOnly(LevelChunk chunk) {
+        ChunkVAO vao = vaoCache.get(chunk);
+        if (vao != null) {
+            vao.render();
+        }
+    }
 
     /**
      * Upload mesh buffer to GPU and create VAO.
