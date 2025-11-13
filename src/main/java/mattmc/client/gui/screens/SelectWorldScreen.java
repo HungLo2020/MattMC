@@ -183,8 +183,7 @@ public final class SelectWorldScreen implements Screen {
                 result.metadata.playerX, result.metadata.playerY, result.metadata.playerZ,
                 result.metadata.playerYaw, result.metadata.playerPitch, result.metadata.playerInventory));
         } catch (Exception e) {
-            logger.error("Failed to load world: {}", e.getMessage());
-            e.printStackTrace();
+            logger.error("Failed to load world: {}", worldName, e);
         }
     }
     
@@ -198,8 +197,7 @@ public final class SelectWorldScreen implements Screen {
             deleteConfirmMode = false;
             recomputeLayout();
         } catch (Exception e) {
-            logger.error("Failed to delete world: {}", e.getMessage());
-            e.printStackTrace();
+            logger.error("Failed to delete world: {}", worldName, e);
         }
     }
 

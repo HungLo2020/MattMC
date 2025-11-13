@@ -151,8 +151,7 @@ public final class PauseScreen implements Screen {
             glfwSetInputMode(window.handle(), GLFW_CURSOR, GLFW_CURSOR_NORMAL);
             game.setScreen(new TitleScreen(game));
         } catch (Exception e) {
-            logger.error("Failed to save world: {}", e.getMessage());
-            e.printStackTrace();
+            logger.error("Failed to save world", e);
             // Still exit even if save failed
             glfwSetInputMode(window.handle(), GLFW_CURSOR, GLFW_CURSOR_NORMAL);
             game.setScreen(new TitleScreen(game));
