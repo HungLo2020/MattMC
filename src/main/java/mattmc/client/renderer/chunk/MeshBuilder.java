@@ -163,13 +163,13 @@ public class MeshBuilder {
     }
     
     /**
-     * Sample light for a vertex - always returns default values now.
+     * Sample light for a vertex - removed, now returns empty values.
      * Returns [unused1, unused2, unused3] as floats.
      */
     private float[] sampleVertexLight(BlockFaceCollector.FaceData face, 
                                       int normalIndex,
                                       int cornerIndex) {
-        // Default: unused values
+        // No light sampling in simplified version
         return new float[] {0.0f, 0.0f, 0.0f};
     }
     
