@@ -15,9 +15,12 @@ uniform mat4 uShadowMatrix;
 uniform int uShadowsEnabled;
 
 void main() {
-    // Transform vertex position
-    vec4 worldPos = gl_ModelViewMatrix * gl_Vertex;
-    gl_Position = gl_ProjectionMatrix * worldPos;
+    // Get vertex in world space (gl_Vertex is already in world space due to chunk translation)
+    vec4 worldPos = gl_Vertex;
+    
+    // Transform to camera space for rendering
+    vec4 viewPos = gl_ModelViewMatrix * worldPos;
+    gl_Position = gl_ProjectionMatrix * viewPos;
     
     // Pass through data to fragment shader
     vTexCoord = gl_MultiTexCoord0.xy;
@@ -29,12 +32,13 @@ void main() {
     vNormal = normalize(gl_NormalMatrix * gl_Normal);
     
     // Calculate fog factor (exponential squared fog)
-    float distance = length(worldPos.xyz - uCameraPos);
+    float distance = length(viewPos.xyz - uCameraPos);
     const float fogDensity = 0.0035; // Reduced density for more distant fog
     float fogAmount = 1.0 - exp(-pow(distance * fogDensity, 2.0));
     vFogFactor = clamp(fogAmount, 0.0, 1.0);
     
     // Calculate shadow coordinates if shadows are enabled
+    // Use world position for shadow coordinate calculation
     if (uShadowsEnabled == 1) {
         vShadowCoord = uShadowMatrix * worldPos;
     }

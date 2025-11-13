@@ -96,8 +96,11 @@ void main() {
     // Calculate Lambert diffuse from sun (N·L)
     float NdotL = max(dot(normalize(vNormal), normalize(uSunDir)), 0.0);
     
-    // Calculate shadow factor
-    float shadowFactor = calculateShadow();
+    // Calculate shadow factor (only if there's skylight)
+    float shadowFactor = 1.0;
+    if (skyLightNorm > 0.0) {
+        shadowFactor = calculateShadow();
+    }
     
     // Apply shadow to sun diffuse lighting
     vec3 sunDiffuse = uSunColor * NdotL * skyLightNorm * uSkyBrightness * shadowFactor;
