@@ -67,13 +67,21 @@ void main() {
     // Calculate shadow factor
     float shadowFactor = calculateShadow();
     
+    // Apply shadow to both sun diffuse and ambient sky lighting for more visible shadows
+    // Shadow factor ranges from 0.0 (full shadow) to 1.0 (fully lit)
+    // We use 0.3 as minimum shadow brightness to prevent completely black shadows
+    float shadowDarkness = mix(0.3, 1.0, shadowFactor);
+    
     // Apply shadow to sun diffuse lighting
     vec3 sunDiffuse = uSunColor * NdotL * uSkyBrightness * shadowFactor;
     
-    // Combine sky lighting (ambient + shadowed sun)
-    vec3 skyLighting = uAmbientSky * uSkyBrightness + sunDiffuse;
+    // Apply shadow to ambient sky lighting for more pronounced shadow effect
+    vec3 skyAmbient = uAmbientSky * uSkyBrightness * shadowDarkness;
     
-    // Block light adds on top of sky lighting
+    // Combine sky lighting (shadowed ambient + shadowed sun)
+    vec3 skyLighting = skyAmbient + sunDiffuse;
+    
+    // Block light adds on top of sky lighting (not affected by shadows)
     vec3 blockLighting = uAmbientBlock;
     
     // Combine lighting: use max for base, then add block light contribution

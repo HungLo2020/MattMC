@@ -4,6 +4,8 @@ import mattmc.client.renderer.chunk.ChunkRenderer;
 import mattmc.world.level.Level;
 import mattmc.world.level.chunk.LevelChunk;
 import org.lwjgl.BufferUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.nio.FloatBuffer;
 
@@ -14,11 +16,13 @@ import static org.lwjgl.opengl.GL11.*;
  * Renders opaque blocks from the sun's perspective to create a shadow map.
  */
 public class SimpleShadowRenderer {
+    private static final Logger logger = LoggerFactory.getLogger(SimpleShadowRenderer.class);
     private static final int SHADOW_MAP_SIZE = 1024;
     private static final float SHADOW_DISTANCE = 64.0f; // How far shadows extend
     
     private final SimpleShadowMap shadowMap;
     private final float[] shadowMatrix = new float[16];
+    private boolean firstRender = true;
     
     public SimpleShadowRenderer() {
         this.shadowMap = new SimpleShadowMap(SHADOW_MAP_SIZE, SHADOW_MAP_SIZE);
@@ -32,6 +36,12 @@ public class SimpleShadowRenderer {
         // Only render shadows when sun is above horizon
         if (sunDirection[1] <= 0) {
             return; // Sun is below horizon, no shadows
+        }
+        
+        if (firstRender) {
+            logger.info("Shadow rendering started - sun direction: [{}, {}, {}]", 
+                sunDirection[0], sunDirection[1], sunDirection[2]);
+            firstRender = false;
         }
         
         // Save viewport
