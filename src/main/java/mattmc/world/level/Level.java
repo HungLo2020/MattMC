@@ -36,6 +36,9 @@ public class Level implements LevelAccessor {
     // Chunk manager for handling loaded chunks lifecycle
     private final ChunkManager chunkManager = new ChunkManager();
     
+    // World block access for unified block operations across chunks
+    private final WorldBlockAccess blockAccess;
+    
     // Async chunk loader for background loading/generation
     private final AsyncChunkLoader asyncLoader;
     
@@ -65,22 +68,6 @@ public class Level implements LevelAccessor {
     // World save directory (null if world is not being saved)
     private Path worldDirectory = null;
     
-    // Chunk neighbor accessor for cross-chunk face culling
-    private final BlockFaceCollector.ChunkNeighborAccessor neighborAccessor = this::getBlockAcrossChunks;
-    
-    // Light accessor for cross-chunk light sampling
-    private final AsyncChunkLoader.LightAccessor lightAccessor = new AsyncChunkLoader.LightAccessor() {
-        @Override
-        public int getSkyLight(LevelChunk chunk, int x, int y, int z) {
-            return getSkyLightAcrossChunks(chunk, x, y, z);
-        }
-        
-        @Override
-        public int getBlockLight(LevelChunk chunk, int x, int y, int z) {
-            return getBlockLightAcrossChunks(chunk, x, y, z);
-        }
-    };
-    
     // Day/night cycle
     private final DayCycle dayCycle = new DayCycle();
     
@@ -91,80 +78,34 @@ public class Level implements LevelAccessor {
     private mattmc.world.level.lighting.RelightScheduler relightScheduler;
     
     public Level() {
+        // Initialize block access with chunk manager
+        this.blockAccess = new WorldBlockAccess(chunkManager);
+        
         this.asyncLoader = new AsyncChunkLoader();
         // Initialize with a default seed (will be updated when world is loaded/created)
         this.worldGenerator = new WorldGenerator(0L);
         this.asyncLoader.setWorldGenerator(worldGenerator);
+        
         // Set the neighbor accessor for cross-chunk face culling
+        BlockFaceCollector.ChunkNeighborAccessor neighborAccessor = blockAccess::getBlockAcrossChunks;
         this.asyncLoader.setNeighborAccessor(neighborAccessor);
+        
         // Set the light accessor for cross-chunk light sampling
+        AsyncChunkLoader.LightAccessor lightAccessor = new AsyncChunkLoader.LightAccessor() {
+            @Override
+            public int getSkyLight(LevelChunk chunk, int x, int y, int z) {
+                return getSkyLightAcrossChunks(chunk, x, y, z);
+            }
+            
+            @Override
+            public int getBlockLight(LevelChunk chunk, int x, int y, int z) {
+                return getBlockLightAcrossChunks(chunk, x, y, z);
+            }
+        };
         this.asyncLoader.setLightAccessor(lightAccessor);
         // Initialize light propagator and scheduler
         this.lightPropagator = new mattmc.world.level.lighting.LightPropagator(this);
         this.relightScheduler = new mattmc.world.level.lighting.RelightScheduler(this);
-    }
-    
-    /**
-     * Get a block at chunk-local coordinates, checking neighboring chunks if necessary.
-     * Used for cross-chunk face culling.
-     * ISSUE-004 fix: Added defensive null checks and bounds validation.
-     */
-    private Block getBlockAcrossChunks(LevelChunk chunk, int localX, int localY, int localZ) {
-        // Validate chunk reference (ISSUE-004 fix)
-        if (chunk == null) {
-            return Blocks.AIR;
-        }
-        
-        // Check Y bounds first
-        if (localY < 0 || localY >= LevelChunk.HEIGHT) {
-            return Blocks.AIR;
-        }
-        
-        // Add sanity check for coordinates - they shouldn't be more than 2 chunks away
-        // This prevents integer overflow issues and catches potential bugs
-        if (Math.abs(localX) > LevelChunk.WIDTH * 2 || Math.abs(localZ) > LevelChunk.DEPTH * 2) {
-            logger.warn("Suspicious coordinates in getBlockAcrossChunks: chunk({}, {}), local({}, {}, {})", 
-                       chunk.chunkX(), chunk.chunkZ(), localX, localY, localZ);
-            return Blocks.AIR;
-        }
-        
-        // If within chunk bounds, use direct chunk access
-        if (localX >= 0 && localX < LevelChunk.WIDTH && localZ >= 0 && localZ < LevelChunk.DEPTH) {
-            return chunk.getBlock(localX, localY, localZ);
-        }
-        
-        // Calculate which neighboring chunk to query
-        int targetChunkX = chunk.chunkX();
-        int targetChunkZ = chunk.chunkZ();
-        int targetLocalX = localX;
-        int targetLocalZ = localZ;
-        
-        // Adjust for X boundary crossing
-        if (localX < 0) {
-            targetChunkX--;
-            targetLocalX = LevelChunk.WIDTH + localX; // localX is negative, so this adds
-        } else if (localX >= LevelChunk.WIDTH) {
-            targetChunkX++;
-            targetLocalX = localX - LevelChunk.WIDTH;
-        }
-        
-        // Adjust for Z boundary crossing
-        if (localZ < 0) {
-            targetChunkZ--;
-            targetLocalZ = LevelChunk.DEPTH + localZ; // localZ is negative, so this adds
-        } else if (localZ >= LevelChunk.DEPTH) {
-            targetChunkZ++;
-            targetLocalZ = localZ - LevelChunk.DEPTH;
-        }
-        
-        // Get the neighboring chunk if it's loaded
-        LevelChunk neighborChunk = getChunkIfLoaded(targetChunkX, targetChunkZ);
-        if (neighborChunk == null) {
-            // Neighboring chunk not loaded - assume air for now
-            return Blocks.AIR;
-        }
-        
-        return neighborChunk.getBlock(targetLocalX, localY, targetLocalZ);
     }
     
     /**
@@ -458,20 +399,7 @@ public class Level implements LevelAccessor {
      * @param worldZ Level Z coordinate (can be any value)
      */
     public Block getBlock(int worldX, int chunkY, int worldZ) {
-        // Convert world coordinates to chunk coordinates
-        int chunkX = Math.floorDiv(worldX, LevelChunk.WIDTH);
-        int chunkZ = Math.floorDiv(worldZ, LevelChunk.DEPTH);
-        
-        // Get local coordinates within the chunk
-        int localX = Math.floorMod(worldX, LevelChunk.WIDTH);
-        int localZ = Math.floorMod(worldZ, LevelChunk.DEPTH);
-        
-        LevelChunk chunk = getChunkIfLoaded(chunkX, chunkZ);
-        if (chunk == null) {
-            return Blocks.AIR;
-        }
-        
-        return chunk.getBlock(localX, chunkY, localZ);
+        return blockAccess.getBlock(worldX, chunkY, worldZ);
     }
     
     /**
@@ -479,20 +407,7 @@ public class Level implements LevelAccessor {
      */
     @Override
     public mattmc.world.level.block.state.BlockState getBlockState(int worldX, int chunkY, int worldZ) {
-        // Convert world coordinates to chunk coordinates
-        int chunkX = Math.floorDiv(worldX, LevelChunk.WIDTH);
-        int chunkZ = Math.floorDiv(worldZ, LevelChunk.DEPTH);
-        
-        // Get local coordinates within the chunk
-        int localX = Math.floorMod(worldX, LevelChunk.WIDTH);
-        int localZ = Math.floorMod(worldZ, LevelChunk.DEPTH);
-        
-        LevelChunk chunk = getChunkIfLoaded(chunkX, chunkZ);
-        if (chunk == null) {
-            return null;
-        }
-        
-        return chunk.getBlockState(localX, chunkY, localZ);
+        return blockAccess.getBlockState(worldX, chunkY, worldZ);
     }
     
     /**
@@ -510,50 +425,13 @@ public class Level implements LevelAccessor {
      */
     @Override
     public void setBlock(int worldX, int chunkY, int worldZ, Block block, mattmc.world.level.block.state.BlockState state) {
-        // Convert world coordinates to chunk coordinates
-        int chunkX = Math.floorDiv(worldX, LevelChunk.WIDTH);
-        int chunkZ = Math.floorDiv(worldZ, LevelChunk.DEPTH);
-        
-        // Get local coordinates within the chunk
-        int localX = Math.floorMod(worldX, LevelChunk.WIDTH);
-        int localZ = Math.floorMod(worldZ, LevelChunk.DEPTH);
-        
-        LevelChunk chunk = getChunk(chunkX, chunkZ);
-        Block oldBlock = chunk.getBlock(localX, chunkY, localZ);
-        chunk.setBlock(localX, chunkY, localZ, block, state);
+        Block oldBlock = blockAccess.setBlock(worldX, chunkY, worldZ, block, state, this::getChunk);
         
         // Handle light updates
         handleLightUpdate(worldX, chunkY, worldZ, oldBlock, block);
         
         // Mark adjacent chunks as dirty if the block is at a chunk boundary
-        // This is needed because adjacent chunks may have faces that need to be culled/unculled
-        if (localX == 0) {
-            // Block is at the western edge, mark western neighbor as dirty
-            LevelChunk westChunk = getChunkIfLoaded(chunkX - 1, chunkZ);
-            if (westChunk != null) {
-                westChunk.setDirty(true);
-            }
-        } else if (localX == LevelChunk.WIDTH - 1) {
-            // Block is at the eastern edge, mark eastern neighbor as dirty
-            LevelChunk eastChunk = getChunkIfLoaded(chunkX + 1, chunkZ);
-            if (eastChunk != null) {
-                eastChunk.setDirty(true);
-            }
-        }
-        
-        if (localZ == 0) {
-            // Block is at the northern edge, mark northern neighbor as dirty
-            LevelChunk northChunk = getChunkIfLoaded(chunkX, chunkZ - 1);
-            if (northChunk != null) {
-                northChunk.setDirty(true);
-            }
-        } else if (localZ == LevelChunk.DEPTH - 1) {
-            // Block is at the southern edge, mark southern neighbor as dirty
-            LevelChunk southChunk = getChunkIfLoaded(chunkX, chunkZ + 1);
-            if (southChunk != null) {
-                southChunk.setDirty(true);
-            }
-        }
+        blockAccess.markAdjacentChunksDirtyIfOnBoundary(worldX, worldZ);
     }
     
     /**
