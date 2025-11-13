@@ -28,6 +28,7 @@ public class LevelRenderer {
     private final Frustum frustum;
     private Level currentLevel;
     private boolean textureAtlasInitialized = false;
+    private boolean firstRenderLogged = false;
     
     // Statistics for debugging
     private int totalChunks = 0;
@@ -137,9 +138,10 @@ public class LevelRenderer {
         
         glPopMatrix();
         
-        // Log rendering stats on first render
-        if (renderedChunks > 0) {
+        // Log rendering stats on first render only
+        if (!firstRenderLogged && renderedChunks > 0) {
             logger.info("Rendering {} chunks with basic shader", renderedChunks);
+            firstRenderLogged = true;
         }
     }
     
