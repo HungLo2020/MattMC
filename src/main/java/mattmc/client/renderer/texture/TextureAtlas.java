@@ -158,8 +158,7 @@ public class TextureAtlas implements AutoCloseable {
             }
             return ImageIO.read(is);
         } catch (Exception e) {
-            logger.error("Failed to load texture: {}", path);
-            e.printStackTrace();
+            logger.error("Failed to load texture: {}", path, e);
             return null;
         }
     }
@@ -244,15 +243,6 @@ public class TextureAtlas implements AutoCloseable {
      */
     @Override
     public void close() {
-        cleanup();
-    }
-    
-    /**
-     * Clean up GPU resources.
-     * @deprecated Use close() instead for AutoCloseable pattern
-     */
-    @Deprecated
-    public void cleanup() {
         glDeleteTextures(atlasTextureId);
     }
     
