@@ -166,7 +166,8 @@ Shadow mapping can be toggled via the options system:
 **Options File** (`Options.txt`):
 ```
 # Shadow mapping (true = enabled, false = disabled)
-shadows=true
+# NOTE: This is an experimental feature, disabled by default
+shadows=false
 ```
 
 ### Performance Considerations

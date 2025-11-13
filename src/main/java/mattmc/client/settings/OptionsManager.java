@@ -54,7 +54,7 @@ public class OptionsManager {
     private static boolean smoothLightingEnabled = true;  // Default: enabled
     
     // Shadow mapping setting (true = enabled, false = disabled)
-    private static boolean shadowsEnabled = true;  // Default: enabled
+    private static boolean shadowsEnabled = false;  // Default: disabled (experimental feature)
     
     // Allowed mipmap levels
     public static final int[] ALLOWED_MIPMAP_LEVELS = {0, 1, 2, 3, 4};

@@ -74,10 +74,10 @@ public class ShadowMapFramebuffer {
     /**
      * Bind this framebuffer for rendering.
      * All subsequent rendering will go to the shadow map.
+     * Note: You should set the viewport separately after binding.
      */
     public void bind() {
         glBindFramebuffer(GL_FRAMEBUFFER, framebufferId);
-        glViewport(0, 0, width, height);
     }
     
     /**

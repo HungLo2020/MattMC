@@ -33,11 +33,11 @@ This project reimagines Minecraft with a focus on:
   - 3-block corner rule for ambient occlusion darkening
   - Runtime toggle via `smooth_lighting` setting
   - See [SMOOTH_LIGHTING.md](docs/SMOOTH_LIGHTING.md) for details
-- **Shadow Mapping**: Real-time shadows cast by directional sunlight
+- **Shadow Mapping**: Real-time shadows cast by directional sunlight (experimental)
   - 2048×2048 depth map for shadow rendering
   - PCF filtering for soft shadow edges
   - Integrated with day/night cycle (only renders during daytime)
-  - Runtime toggle via `shadows` setting
+  - Runtime toggle via `shadows` setting (disabled by default)
   - See [SHADOW_MAPPING.md](docs/SHADOW_MAPPING.md) for details
 
 ### Game Features

@@ -51,15 +51,22 @@ public class ShadowRenderer {
                                 float[] sunDirection, float playerX, float playerY, float playerZ) {
         // Bind shadow map framebuffer
         shadowMapFbo.bind();
-        shadowMapFbo.clear();
         
-        // Save current viewport and matrices
+        // Save current viewport before changing it
         int[] viewport = new int[4];
         glGetIntegerv(GL_VIEWPORT, viewport);
         
-        glPushMatrix();
+        // Set viewport to shadow map size
+        glViewport(0, 0, SHADOW_MAP_SIZE, SHADOW_MAP_SIZE);
         
-        // Set up orthographic projection for shadow map
+        // Clear shadow map
+        shadowMapFbo.clear();
+        
+        // Save current matrix mode
+        int[] matrixMode = new int[1];
+        glGetIntegerv(GL_MATRIX_MODE, matrixMode);
+        
+        // Save projection matrix
         glMatrixMode(GL_PROJECTION);
         glPushMatrix();
         glLoadIdentity();
@@ -74,8 +81,9 @@ public class ShadowRenderer {
         projBuffer.get(shadowProjectionMatrix);
         projBuffer.rewind();
         
-        // Set up view matrix looking from sun position toward scene
+        // Save and set up view matrix looking from sun position toward scene
         glMatrixMode(GL_MODELVIEW);
+        glPushMatrix();
         glLoadIdentity();
         
         // Calculate sun position (far from player in opposite sun direction)
@@ -118,17 +126,20 @@ public class ShadowRenderer {
         
         ShadowDepthShader.unbind();
         
-        // Restore matrices
-        glMatrixMode(GL_PROJECTION);
-        glPopMatrix();
+        // Restore matrices in reverse order
         glMatrixMode(GL_MODELVIEW);
         glPopMatrix();
+        glMatrixMode(GL_PROJECTION);
+        glPopMatrix();
         
-        // Restore viewport
-        glViewport(viewport[0], viewport[1], viewport[2], viewport[3]);
+        // Restore original matrix mode
+        glMatrixMode(matrixMode[0]);
         
         // Unbind shadow map framebuffer
         shadowMapFbo.unbind();
+        
+        // Restore viewport after unbinding framebuffer
+        glViewport(viewport[0], viewport[1], viewport[2], viewport[3]);
     }
     
     /**
