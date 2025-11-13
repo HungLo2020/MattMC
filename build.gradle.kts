@@ -116,3 +116,7 @@ tasks.register<Zip>("portableZip") {
         into(appName) // keep MattMC/ folder at the root of the zip
     }
 }
+tasks.register<JavaExec>("runDebugTest") {
+    mainClass.set("mattmc.world.level.lighting.DebugSkylightTest")
+    classpath = sourceSets["test"].runtimeClasspath
+}

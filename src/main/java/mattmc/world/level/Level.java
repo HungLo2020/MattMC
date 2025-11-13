@@ -458,6 +458,8 @@ public class Level implements LevelAccessor {
     private LevelChunk generateChunk(int chunkX, int chunkZ) {
         LevelChunk chunk = new LevelChunk(chunkX, chunkZ);
         worldGenerator.generateChunkTerrain(chunk);
+        // Initialize skylight based on terrain
+        mattmc.world.level.levelgen.SkylightInitializer.initializeChunk(chunk);
         return chunk;
     }
     
@@ -592,16 +594,64 @@ public class Level implements LevelAccessor {
             // Block became opaque, remove skylight
             lightPropagator.enqueueRemoveSkylight(worldX, chunkY, worldZ);
         } else if (oldOpaque && !newOpaque) {
-            // Block became transparent, check if skylight should propagate
-            // Check if there's skylight above this position
-            if (chunkY < LevelChunk.HEIGHT - 1) {
+            // Block became transparent - need to restore skylight to this column
+            // 
+            // The key insight: skylight propagates downward at full strength (level 15)
+            // until it hits an opaque block. When we remove an opaque block, we need
+            // to check if there's a clear path to the sky above and propagate skylight
+            // down through the entire column below.
+            
+            // First, check if there's skylight above or if we have a clear path to sky
+            boolean hasSkylightAbove = false;
+            int skylightLevel = 0;
+            
+            // Scan upward to find if we have a clear path to sky
+            if (chunkY >= LevelChunk.HEIGHT - 1) {
+                // At or above world height - full skylight
+                hasSkylightAbove = true;
+                skylightLevel = 15;
+            } else {
+                // Check the block directly above
                 int aboveLight = getSkyLightAt(worldX, chunkY + 1, worldZ);
                 if (aboveLight > 0) {
-                    lightPropagator.enqueueSkylightFromSurface(worldX, chunkY, worldZ);
+                    hasSkylightAbove = true;
+                    skylightLevel = aboveLight;
                 }
+            }
+            
+            // If we have skylight from above, propagate it down through the column
+            if (hasSkylightAbove && skylightLevel == 15) {
+                // Full skylight from above - propagate down through entire column
+                // Start from this position and go downward
+                int currentY = chunkY;
+                while (currentY >= 0) {
+                    Block blockAtY = getBlock(worldX, currentY, worldZ);
+                    if (blockAtY.isOpaque()) {
+                        // Hit an opaque block, stop propagating downward
+                        break;
+                    }
+                    
+                    // This position should have full skylight
+                    lightPropagator.enqueueSkylight(worldX, currentY, worldZ, 15);
+                    currentY--;
+                }
+            } else if (hasSkylightAbove && skylightLevel > 0) {
+                // Reduced skylight from above (shouldn't normally happen in vertical column)
+                lightPropagator.enqueueSkylight(worldX, chunkY, worldZ, skylightLevel);
             } else {
-                // At top of world, propagate full skylight
-                lightPropagator.enqueueSkylightFromSurface(worldX, chunkY, worldZ);
+                // No skylight from above, check horizontal neighbors
+                int eastLight = getSkyLightAt(worldX + 1, chunkY, worldZ);
+                int westLight = getSkyLightAt(worldX - 1, chunkY, worldZ);
+                int northLight = getSkyLightAt(worldX, chunkY, worldZ - 1);
+                int southLight = getSkyLightAt(worldX, chunkY, worldZ + 1);
+                
+                int maxHorizontalLight = Math.max(Math.max(eastLight, westLight), 
+                                                   Math.max(northLight, southLight));
+                
+                if (maxHorizontalLight > 1) {
+                    // Skylight from the side - attenuate by 1
+                    lightPropagator.enqueueSkylight(worldX, chunkY, worldZ, maxHorizontalLight - 1);
+                }
             }
         }
     }

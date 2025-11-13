@@ -127,7 +127,7 @@ public class LightPropagator {
      * @param worldZ World Z coordinate
      * @param level Light level to set (0-15)
      */
-    private void enqueueSkylight(int worldX, int chunkY, int worldZ, int level) {
+    public void enqueueSkylight(int worldX, int chunkY, int worldZ, int level) {
         if (level <= 0 || level > 15) return;
         
         int nextTail = (skyAddTail + 1) % BUFFER_SIZE;
