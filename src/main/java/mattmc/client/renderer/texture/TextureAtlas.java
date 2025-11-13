@@ -243,15 +243,6 @@ public class TextureAtlas implements AutoCloseable {
      */
     @Override
     public void close() {
-        cleanup();
-    }
-    
-    /**
-     * Clean up GPU resources.
-     * @deprecated Use close() instead for AutoCloseable pattern
-     */
-    @Deprecated
-    public void cleanup() {
         glDeleteTextures(atlasTextureId);
     }
     
