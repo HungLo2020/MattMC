@@ -1,6 +1,7 @@
 package mattmc.client.renderer;
 
 import mattmc.client.renderer.texture.TextureAtlas;
+import mattmc.client.settings.OptionsManager;
 
 import mattmc.world.level.chunk.LevelChunk;
 import mattmc.world.level.Level;
@@ -29,7 +30,6 @@ public class LevelRenderer {
     private final ShadowRenderer shadowRenderer;
     private Level currentLevel;
     private boolean textureAtlasInitialized = false;
-    private boolean shadowsEnabled = true;
     
     // Statistics for debugging
     private int totalChunks = 0;
@@ -81,6 +81,9 @@ public class LevelRenderer {
         // Get sky brightness and sun direction from day cycle
         float skyBrightness = world.getDayCycle().getSkyBrightness();
         float[] sunDirection = world.getDayCycle().getSunDirection();
+        
+        // Get shadows enabled setting from options
+        boolean shadowsEnabled = OptionsManager.areShadowsEnabled();
         
         // Render shadow map during daytime (when sun is up)
         if (shadowsEnabled && skyBrightness > 0.3f) {
@@ -165,19 +168,5 @@ public class LevelRenderer {
      */
     public int getTotalChunkCount() {
         return totalChunks;
-    }
-    
-    /**
-     * Enable or disable shadows.
-     */
-    public void setShadowsEnabled(boolean enabled) {
-        this.shadowsEnabled = enabled;
-    }
-    
-    /**
-     * Check if shadows are enabled.
-     */
-    public boolean areShadowsEnabled() {
-        return shadowsEnabled;
     }
 }

@@ -33,6 +33,12 @@ This project reimagines Minecraft with a focus on:
   - 3-block corner rule for ambient occlusion darkening
   - Runtime toggle via `smooth_lighting` setting
   - See [SMOOTH_LIGHTING.md](docs/SMOOTH_LIGHTING.md) for details
+- **Shadow Mapping**: Real-time shadows cast by directional sunlight
+  - 2048×2048 depth map for shadow rendering
+  - PCF filtering for soft shadow edges
+  - Integrated with day/night cycle (only renders during daytime)
+  - Runtime toggle via `shadows` setting
+  - See [SHADOW_MAPPING.md](docs/SHADOW_MAPPING.md) for details
 
 ### Game Features
 - World creation and management
@@ -111,6 +117,8 @@ For in-depth technical information, see:
 
 - [**Chunk System**](CHUNK_SYSTEM.md) - Details on the chunk-based voxel rendering system
 - [**Smooth Lighting**](docs/SMOOTH_LIGHTING.md) - Per-vertex light sampling and ambient occlusion
+- [**Shadow Mapping**](docs/SHADOW_MAPPING.md) - Real-time shadows from directional sunlight
+- [**Day/Night Cycle**](docs/DAY_NIGHT_CYCLE.md) - Sun movement and sky brightness calculations
 - [**Efficiency Analysis**](EFFICIENCY_ANALYSIS.md) - Performance optimizations and analysis
 - [**World Save Format**](WORLD_SAVE_FORMAT.md) - World storage format and NBT structures
 - [**Refactoring Summary**](REFACTORING_SUMMARY.md) - Architectural decisions and code organization
@@ -134,6 +142,8 @@ MattMC is in active development. Current features include:
 - ✅ World generation and storage
 - ✅ Per-voxel light storage (skyLight and blockLight)
 - ✅ Smooth lighting with per-vertex sampling and ambient occlusion
+- ✅ Shadow mapping with real-time shadows from sunlight
+- ✅ Day/night cycle with dynamic lighting
 - ✅ Column heightmap tracking
 - ✅ GUI system with multiple screens
 - ✅ Settings and keybinding management
