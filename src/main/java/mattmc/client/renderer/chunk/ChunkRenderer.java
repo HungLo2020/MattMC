@@ -9,6 +9,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 import static org.lwjgl.opengl.GL11.*;
+import static org.lwjgl.opengl.GL13.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -165,8 +166,9 @@ public class ChunkRenderer {
             shader.setShadowsEnabled(false);
         }
         
-        // Enable texturing and bind texture atlas
+        // Enable texturing and bind texture atlas to unit 0
         glEnable(GL_TEXTURE_2D);
+        glActiveTexture(GL_TEXTURE0); // Ensure we're on texture unit 0
         if (textureAtlas != null) {
             textureAtlas.bind();
         }
