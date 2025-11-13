@@ -1,4 +1,0 @@
-tasks.register<JavaExec>("runDebugTest") {
-    mainClass.set("mattmc.world.level.lighting.DebugSkylightTest")
-    classpath = sourceSets["test"].runtimeClasspath
-}
