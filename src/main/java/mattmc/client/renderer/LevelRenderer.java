@@ -19,7 +19,7 @@ import org.slf4j.LoggerFactory;
  * 
  * Now handles async mesh uploads from background threads and texture atlas.
  * Implements frustum culling to skip rendering chunks outside the camera view.
- * Simplified version with no lighting or shadow effects.
+ * Implements basic Lambert directional lighting from the sun.
  */
 public class LevelRenderer {
     private static final Logger logger = LoggerFactory.getLogger(LevelRenderer.class);
@@ -64,8 +64,8 @@ public class LevelRenderer {
     
     /**
      * Render all loaded chunks in the world.
-     * Also processes pending mesh uploads from background threads and handles dirty chunks.
-     * Uses frustum culling to skip chunks outside the camera view.
+     * Uses frustum culling to skip rendering chunks outside the camera view.
+     * Implements basic Lambert directional lighting.
      */
     public void render(Level world, float playerX, float playerY, float playerZ) {
         // Update frustum from current GL matrices (must be called after camera setup)
@@ -75,6 +75,16 @@ public class LevelRenderer {
         totalChunks = 0;
         renderedChunks = 0;
         culledChunks = 0;
+        
+        // Get sky brightness and sun direction from day cycle
+        float skyBrightness = world.getDayCycle().getSkyBrightness();
+        float[] sunDirection = world.getDayCycle().getSunDirection();
+        
+        // Log sun direction and brightness on first render
+        if (!firstRenderLogged) {
+            logger.info("Sun direction: [{}, {}, {}], brightness: {}", 
+                sunDirection[0], sunDirection[1], sunDirection[2], skyBrightness);
+        }
         
         // Process completed mesh buffers from async loader first
         // This makes newly loaded chunk meshes available for rendering
@@ -123,8 +133,8 @@ public class LevelRenderer {
             glPushMatrix();
             glTranslatef(chunkWorldX, 0, chunkWorldZ);
             
-            // Render chunk with basic shader (no lighting/shadows)
-            boolean rendered = chunkRenderer.renderChunk(chunk);
+            // Render chunk with Lambert lighting
+            boolean rendered = chunkRenderer.renderChunk(chunk, skyBrightness, sunDirection);
             
             if (rendered) {
                 renderedChunks++;
@@ -140,7 +150,7 @@ public class LevelRenderer {
         
         // Log rendering stats on first render only
         if (!firstRenderLogged && renderedChunks > 0) {
-            logger.info("Rendering {} chunks with basic shader", renderedChunks);
+            logger.info("Rendering {} chunks with Lambert directional lighting", renderedChunks);
             firstRenderLogged = true;
         }
     }
