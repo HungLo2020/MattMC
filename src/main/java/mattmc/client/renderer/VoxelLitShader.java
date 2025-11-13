@@ -87,18 +87,29 @@ public class VoxelLitShader extends Shader {
     }
     
     /**
-     * Set the shadow map texture sampler unit (typically 1).
+     * Set the shadow map texture sampler units for all cascades.
      */
-    public void setShadowMapSampler(int unit) {
-        setUniform1i("uShadowMap", unit);
+    public void setShadowMapSamplers(int unit0, int unit1, int unit2) {
+        setUniform1i("uShadowMap0", unit0);
+        setUniform1i("uShadowMap1", unit1);
+        setUniform1i("uShadowMap2", unit2);
     }
     
     /**
-     * Set the shadow matrix for transforming world coordinates to shadow space.
-     * This matrix should be: shadowProjection * shadowView * inverse(modelView)
+     * Set the shadow matrices for all cascades.
      */
-    public void setShadowMatrix(float[] matrix) {
-        setUniformMatrix4f("uShadowMatrix", matrix);
+    public void setShadowMatrices(float[] matrix0, float[] matrix1, float[] matrix2) {
+        setUniformMatrix4f("uShadowMatrix0", matrix0);
+        setUniformMatrix4f("uShadowMatrix1", matrix1);
+        setUniformMatrix4f("uShadowMatrix2", matrix2);
+    }
+    
+    /**
+     * Set the cascade split distances for selecting the appropriate cascade.
+     */
+    public void setCascadeSplits(float split0, float split1) {
+        setUniform1f("uCascadeSplit0", split0);
+        setUniform1f("uCascadeSplit1", split1);
     }
     
     /**
