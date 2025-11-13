@@ -81,7 +81,7 @@ public class LightEngine {
     
     /**
      * Initialize skylight for columns exposed to sky.
-     * Sets skylight to max (15) for topmost air blocks.
+     * Sets skylight to max (15) for topmost air blocks and lets BFS propagate down.
      */
     private static void initializeSkylight(LevelChunk chunk, Queue<LightNode> queue) {
         for (int x = 0; x < LevelChunk.WIDTH; x++) {
@@ -96,21 +96,16 @@ public class LightEngine {
                     }
                 }
                 
-                // Skylight propagates down through air blocks from top
-                // Start from above the topmost solid block (or from the top if no solid blocks)
+                // Only add the topmost exposed air block to the queue
+                // The BFS propagation will handle spreading the light downward
                 int startY = topSolidY >= 0 ? topSolidY + 1 : LevelChunk.HEIGHT - 1;
                 
-                // All air blocks from startY down to the first opaque block get skylight
-                for (int y = startY; y >= 0; y--) {
-                    Block block = chunk.getBlock(x, y, z);
-                    
+                // If there's an air block at startY, set it to max skylight
+                if (startY >= 0 && startY < LevelChunk.HEIGHT) {
+                    Block block = chunk.getBlock(x, startY, z);
                     if (block.isAir()) {
-                        // Set skylight to max and add to propagation queue
-                        chunk.setSkyLight(x, y, z, MAX_LIGHT_LEVEL);
-                        queue.add(new LightNode(x, y, z, MAX_LIGHT_LEVEL, true));
-                    } else if (block.isOpaque()) {
-                        // Opaque block stops skylight propagation down this column
-                        break;
+                        chunk.setSkyLight(x, startY, z, MAX_LIGHT_LEVEL);
+                        queue.add(new LightNode(x, startY, z, MAX_LIGHT_LEVEL, true));
                     }
                 }
             }
@@ -140,6 +135,7 @@ public class LightEngine {
     /**
      * Propagate light using BFS algorithm.
      * Light attenuates by 1 per block distance.
+     * Special case: skylight going straight down through air doesn't attenuate.
      */
     private static void propagateLight(LevelChunk chunk, ChunkAccess chunkAccess, Queue<LightNode> queue) {
         // 6 neighbor offsets (up, down, north, south, west, east)
@@ -155,23 +151,39 @@ public class LightEngine {
         while (!queue.isEmpty()) {
             LightNode node = queue.poll();
             
-            // Calculate attenuated light level for neighbors
-            int neighborLight = node.lightLevel - 1;
-            if (neighborLight <= 0) {
-                continue; // Light too weak to propagate
-            }
-            
             // Check all 6 neighbors
-            for (int[] offset : neighbors) {
+            for (int i = 0; i < neighbors.length; i++) {
+                int[] offset = neighbors[i];
                 int nx = node.x + offset[0];
                 int ny = node.y + offset[1];
                 int nz = node.z + offset[2];
                 
+                // Check Y bounds first (quick rejection)
+                if (ny < 0 || ny >= LevelChunk.HEIGHT) {
+                    continue;
+                }
+                
+                // Calculate attenuated light level for this neighbor
+                // Special case: skylight going straight down doesn't attenuate
+                boolean isDownward = (i == 1); // down direction
+                int neighborLight;
+                if (node.isSkyLight && isDownward && node.lightLevel == MAX_LIGHT_LEVEL) {
+                    // Skylight at max level going down stays at max
+                    neighborLight = MAX_LIGHT_LEVEL;
+                } else {
+                    // Normal attenuation
+                    neighborLight = node.lightLevel - 1;
+                }
+                
+                if (neighborLight <= 0) {
+                    continue; // Light too weak to propagate
+                }
+                
                 // Get neighbor block (may be in different chunk)
                 Block neighborBlock = getBlockAt(chunk, chunkAccess, nx, ny, nz);
                 
-                // Skip if neighbor is opaque (doesn't let light through)
-                if (neighborBlock.isOpaque()) {
+                // Skip if neighbor block is invalid (chunk not loaded) or opaque
+                if (neighborBlock == null || neighborBlock.isOpaque()) {
                     continue;
                 }
                 
@@ -180,8 +192,11 @@ public class LightEngine {
                 
                 // Update if new light is brighter
                 if (neighborLight > currentLight) {
-                    setLightAt(chunk, chunkAccess, nx, ny, nz, neighborLight, node.isSkyLight);
-                    queue.add(new LightNode(nx, ny, nz, neighborLight, node.isSkyLight));
+                    // Try to set the light - if it fails (neighbor chunk doesn't exist), don't queue
+                    boolean success = setLightAt(chunk, chunkAccess, nx, ny, nz, neighborLight, node.isSkyLight);
+                    if (success) {
+                        queue.add(new LightNode(nx, ny, nz, neighborLight, node.isSkyLight));
+                    }
                 }
             }
         }
@@ -292,13 +307,14 @@ public class LightEngine {
     
     /**
      * Set light level at position (handles cross-chunk access).
+     * @return true if light was set successfully, false if chunk doesn't exist
      */
-    private static void setLightAt(LevelChunk baseChunk, ChunkAccess chunkAccess, 
+    private static boolean setLightAt(LevelChunk baseChunk, ChunkAccess chunkAccess, 
                                    int localX, int localY, int localZ, 
                                    int lightLevel, boolean isSkyLight) {
         // Check Y bounds
         if (localY < 0 || localY >= LevelChunk.HEIGHT) {
-            return;
+            return false;
         }
         
         // If within base chunk, use direct access
@@ -309,7 +325,7 @@ public class LightEngine {
             } else {
                 baseChunk.setBlockLight(localX, localY, localZ, lightLevel);
             }
-            return;
+            return true;
         }
         
         // Calculate chunk coordinates for neighbor
@@ -322,7 +338,7 @@ public class LightEngine {
         );
         
         if (neighborChunk == null) {
-            return;
+            return false;  // Neighbor chunk doesn't exist
         }
         
         // Convert to neighbor's local coordinates
@@ -334,5 +350,6 @@ public class LightEngine {
         } else {
             neighborChunk.setBlockLight(neighborLocalX, localY, neighborLocalZ, lightLevel);
         }
+        return true;
     }
 }

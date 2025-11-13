@@ -57,7 +57,7 @@ public class LightEngineTest {
     }
     
     /**
-     * Test that opaque blocks stop skylight propagation.
+     * Test that opaque blocks stop skylight propagation vertically.
      */
     @Test
     public void testOpaqueBocksStopSkylight() {
@@ -98,9 +98,11 @@ public class LightEngineTest {
         int atStone = chunk.getSkyLight(8, 100, 8);
         assertEquals(0, atStone, "Opaque block should have no skylight");
         
-        // Below the stone should have no skylight
+        // Below the stone, light will leak in from adjacent columns since only one block is stone
+        // This is expected Minecraft behavior - a single block doesn't create complete darkness below it
         int belowStone = chunk.getSkyLight(8, 99, 8);
-        assertEquals(0, belowStone, "Below opaque block should have no skylight");
+        assertTrue(belowStone > 0, "Light should leak in from adjacent columns");
+        assertTrue(belowStone < 15, "But it should be attenuated");
     }
     
     /**
@@ -218,9 +220,13 @@ public class LightEngineTest {
         // Place a torch at (8, 64, 8)
         chunk.setBlock(8, 64, 8, Blocks.TORCH);
         
-        // Place a stone wall at x=9
-        for (int y = 60; y < 70; y++) {
-            chunk.setBlock(9, y, 8, Blocks.STONE);
+        // Place a complete stone wall at x=9 (surrounding the torch's light radius)
+        // Torch emits light 14, so it can reach 14 blocks away
+        // Wall needs to be tall and wide enough to block all paths
+        for (int y = 50; y <= 78; y++) {  // More than 14 blocks vertically
+            for (int z = 0; z < 16; z++) {   // Full width
+                chunk.setBlock(9, y, z, Blocks.STONE);
+            }
         }
         
         LightEngine.ChunkAccess chunkAccess = new LightEngine.ChunkAccess() {
@@ -244,11 +250,13 @@ public class LightEngineTest {
         // Torch should have light
         assertEquals(14, chunk.getBlockLight(8, 64, 8), "Torch should emit light");
         
-        // Stone wall should have no light
+        // Stone wall should have no light (it's opaque)
         assertEquals(0, chunk.getBlockLight(9, 64, 8), "Opaque block should have no light");
         
-        // Behind the wall should have no light
-        assertEquals(0, chunk.getBlockLight(10, 64, 8), "Behind wall should have no light");
+        // Behind the wall should have no light from torch
+        // Torch at x=8 emits level 14, reaches x=9 wall (blocked), so x=10 should be dark
+        int behindWall = chunk.getBlockLight(10, 64, 8);
+        assertEquals(0, behindWall, "Behind wall should have no light from torch");
         
         // West of torch should still have light
         assertEquals(13, chunk.getBlockLight(7, 64, 8), "West of torch should have light");
