@@ -28,8 +28,9 @@ void main() {
     vLightData = gl_MultiTexCoord1.xyz;  // Light data from secondary tex coord
     vWorldPos = worldPos.xyz;
     
-    // Calculate normal from the vertex normal attribute
-    vNormal = normalize(gl_NormalMatrix * gl_Normal);
+    // Pass normal in world space (don't transform by ModelView matrix)
+    // This ensures lighting is camera-independent
+    vNormal = normalize(gl_Normal);
     
     // Calculate fog factor (exponential squared fog)
     float distance = length(viewPos.xyz - uCameraPos);

@@ -47,6 +47,15 @@ public class AsyncChunkLoader {
     private TextureAtlas textureAtlas;
     private WorldGenerator worldGenerator;
     private BlockFaceCollector.ChunkNeighborAccessor neighborAccessor;
+    private LightAccessor lightAccessor;
+    
+    /**
+     * Interface for accessing light values across chunk boundaries.
+     */
+    public interface LightAccessor {
+        int getSkyLight(LevelChunk chunk, int x, int y, int z);
+        int getBlockLight(LevelChunk chunk, int x, int y, int z);
+    }
     
     public AsyncChunkLoader() {
         this.executor = new ChunkTaskExecutor();
@@ -81,6 +90,13 @@ public class AsyncChunkLoader {
      */
     public void setNeighborAccessor(BlockFaceCollector.ChunkNeighborAccessor accessor) {
         this.neighborAccessor = accessor;
+    }
+    
+    /**
+     * Set the light accessor for cross-chunk light sampling.
+     */
+    public void setLightAccessor(LightAccessor accessor) {
+        this.lightAccessor = accessor;
     }
     
     /**
@@ -494,25 +510,33 @@ public class AsyncChunkLoader {
         
         @Override
         public int getSkyLight(LevelChunk chunk, int x, int y, int z) {
-            // If within chunk bounds, get light directly
+            // Use light accessor if available for proper cross-chunk light access
+            if (lightAccessor != null) {
+                return lightAccessor.getSkyLight(chunk, x, y, z);
+            }
+            
+            // Fallback: If within chunk bounds, get light directly
             if (x >= 0 && x < LevelChunk.WIDTH && y >= 0 && y < LevelChunk.HEIGHT && z >= 0 && z < LevelChunk.DEPTH) {
                 return chunk.getSkyLight(x, y, z);
             }
             
-            // Out of bounds - would need to access neighbor chunk
-            // For now, return default value (15 for sky)
-            return 15;
+            // Out of bounds - return underground default (0) to prevent bright underground areas
+            return 0;
         }
         
         @Override
         public int getBlockLight(LevelChunk chunk, int x, int y, int z) {
-            // If within chunk bounds, get light directly
+            // Use light accessor if available for proper cross-chunk light access
+            if (lightAccessor != null) {
+                return lightAccessor.getBlockLight(chunk, x, y, z);
+            }
+            
+            // Fallback: If within chunk bounds, get light directly
             if (x >= 0 && x < LevelChunk.WIDTH && y >= 0 && y < LevelChunk.HEIGHT && z >= 0 && z < LevelChunk.DEPTH) {
                 return chunk.getBlockLight(x, y, z);
             }
             
-            // Out of bounds - would need to access neighbor chunk
-            // For now, return default value (0 for block light)
+            // Out of bounds - return 0 (no light)
             return 0;
         }
     }
