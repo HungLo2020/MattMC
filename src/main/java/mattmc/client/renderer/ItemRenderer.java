@@ -200,8 +200,10 @@ public class ItemRenderer {
         List<VertexCapture.Face> allFaces = capture.getFaces();
         
         // Separate faces by type and visibility
-        List<VertexCapture.Face> topFacesList = new ArrayList<>();
-        List<VertexCapture.Face> visibleSideFaces = new ArrayList<>();
+        // Pre-allocate with estimated capacity to reduce resizing
+        int estimatedCapacity = allFaces.size() / 2;
+        List<VertexCapture.Face> topFacesList = new ArrayList<>(estimatedCapacity);
+        List<VertexCapture.Face> visibleSideFaces = new ArrayList<>(estimatedCapacity);
         
         for (VertexCapture.Face face : allFaces) {
             if (isTopFace(face)) {

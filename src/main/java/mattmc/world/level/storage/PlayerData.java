@@ -28,7 +28,8 @@ public class PlayerData {
     public static Map<String, Object> inventoryToNBT(Inventory inventory) {
         Map<String, Object> data = new HashMap<>();
         
-        List<Map<String, Object>> items = new ArrayList<>();
+        // Pre-allocate with exact capacity (inventory size) for worst-case scenario
+        List<Map<String, Object>> items = new ArrayList<>(inventory.getSize());
         
         for (int i = 0; i < inventory.getSize(); i++) {
             ItemStack stack = inventory.getStack(i);

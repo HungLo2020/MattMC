@@ -30,7 +30,8 @@ public class ChunkNBT {
         root.put("Status", "full");
         
         // Sections - divide the chunk into 16-block-tall sections
-        List<Map<String, Object>> sections = new ArrayList<>();
+        // Pre-allocate with exact size (HEIGHT / 16)
+        List<Map<String, Object>> sections = new ArrayList<>(LevelChunk.HEIGHT / 16);
         
         for (int sectionY = 0; sectionY < LevelChunk.HEIGHT / 16; sectionY++) {
             Map<String, Object> section = createSection(chunk, sectionY);
@@ -43,7 +44,8 @@ public class ChunkNBT {
         
         // Save heightmap data (versioned extension)
         int[][] heightmapData = chunk.getHeightmap().getData();
-        List<Integer> heightmapList = new ArrayList<>();
+        // Pre-allocate with exact size (16 * 16 = 256)
+        List<Integer> heightmapList = new ArrayList<>(256);
         for (int x = 0; x < 16; x++) {
             for (int z = 0; z < 16; z++) {
                 heightmapList.add(heightmapData[x][z]);

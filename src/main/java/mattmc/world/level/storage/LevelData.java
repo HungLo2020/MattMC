@@ -79,13 +79,13 @@ public class LevelData {
         // LocalPlayer data
         Map<String, Object> player = new HashMap<>();
         
-        List<Double> pos = new ArrayList<>();
+        List<Double> pos = new ArrayList<>(3);
         pos.add(playerX);
         pos.add(playerY);
         pos.add(playerZ);
         player.put("Pos", pos);
         
-        List<Float> rotation = new ArrayList<>();
+        List<Float> rotation = new ArrayList<>(2);
         rotation.add(playerYaw);
         rotation.add(playerPitch);
         player.put("Rotation", rotation);
