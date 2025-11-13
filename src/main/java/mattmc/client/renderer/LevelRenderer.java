@@ -34,7 +34,7 @@ public class LevelRenderer {
     
     // Shadow rendering
     private ShadowRenderer shadowRenderer;
-    private boolean shadowsEnabled = false; // TEMPORARILY DISABLED - needs debugging
+    private boolean shadowsEnabled = true;
     
     // Statistics for debugging
     private int totalChunks = 0;
@@ -45,10 +45,15 @@ public class LevelRenderer {
         this.chunkRenderer = new ChunkRenderer();
         this.frustum = new Frustum();
         
-        // Shadow renderer - temporarily disabled for debugging
-        // TODO: Re-enable once texture array issues are resolved
-        // this.shadowRenderer = new ShadowRenderer(1536, 3);
-        this.shadowRenderer = null;
+        // Initialize shadow renderer - OpenGL 3.2+ supports texture arrays
+        try {
+            this.shadowRenderer = new ShadowRenderer(1536, 3);
+            logger.info("Shadow renderer initialized successfully");
+        } catch (Exception e) {
+            logger.error("Failed to initialize shadow renderer: {}", e.getMessage());
+            this.shadowRenderer = null;
+            this.shadowsEnabled = false;
+        }
     }
     
     /**

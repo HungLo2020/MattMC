@@ -60,14 +60,13 @@ public class SkylightInitializer {
         for (int y = LevelChunk.HEIGHT - 1; y >= 0; y--) {
             Block block = chunk.getBlock(x, y, z);
             
-            if (!hitOpaque) {
+            // Check if this block is opaque
+            if (block.isOpaque()) {
+                hitOpaque = true;
+                chunk.setSkyLight(x, y, z, 0); // Opaque blocks have no skylight
+            } else if (!hitOpaque) {
                 // Still in open sky - set full brightness
                 chunk.setSkyLight(x, y, z, 15);
-                
-                // Check if we hit an opaque block
-                if (block.isOpaque()) {
-                    hitOpaque = true;
-                }
             } else {
                 // Below opaque blocks - no skylight
                 chunk.setSkyLight(x, y, z, 0);
