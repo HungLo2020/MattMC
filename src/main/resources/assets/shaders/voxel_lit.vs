@@ -39,5 +39,7 @@ void main() {
     // Calculate shadow coordinates if shadows are enabled
     if (uShadowsEnabled == 1) {
         vShadowCoord = uShadowMatrix * worldPos;
+    } else {
+        vShadowCoord = vec4(0.0, 0.0, 0.0, 1.0);
     }
 }

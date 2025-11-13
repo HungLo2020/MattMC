@@ -42,6 +42,9 @@ public class SimpleShadowMap {
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
         
+        // Note: Shadow comparison mode not used - we do manual depth comparison in shader
+        // This gives us more control over the shadow calculation
+        
         // Attach depth texture to framebuffer
         glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, depthTextureId, 0);
         

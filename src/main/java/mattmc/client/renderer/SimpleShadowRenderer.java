@@ -96,12 +96,17 @@ public class SimpleShadowRenderer {
         // Calculate shadow matrix
         calculateShadowMatrix(projectionMatrix, viewMatrix);
         
+        // Enable depth testing for shadow map rendering
+        glEnable(GL_DEPTH_TEST);
+        glDepthFunc(GL_LESS);
+        
         // Render opaque blocks only (no color output, depth only)
         glColorMask(false, false, false, false);
         glEnable(GL_CULL_FACE);
         glCullFace(GL_FRONT); // Front face culling reduces shadow acne
         
         // Render chunks
+        int chunksRendered = 0;
         for (LevelChunk chunk : world.getLoadedChunks()) {
             if (!chunkRenderer.hasChunkMesh(chunk)) {
                 continue;
@@ -114,6 +119,11 @@ public class SimpleShadowRenderer {
             glTranslatef(chunkWorldX, 0, chunkWorldZ);
             chunkRenderer.renderChunkGeometryOnly(chunk);
             glPopMatrix();
+            chunksRendered++;
+        }
+        
+        if (firstRender && chunksRendered > 0) {
+            logger.info("Shadow map rendered {} chunks", chunksRendered);
         }
         
         // Restore state
