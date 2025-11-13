@@ -17,7 +17,8 @@ public class ChunkNBT {
      * Convert a chunk to NBT format (Map-based).
      */
     public static Map<String, Object> toNBT(LevelChunk chunk) {
-        Map<String, Object> root = new HashMap<>();
+        // Pre-allocate root map with expected fields
+        Map<String, Object> root = new HashMap<>(6);
         
         // LevelChunk position
         root.put("xPos", chunk.chunkX());
@@ -96,7 +97,7 @@ public class ChunkNBT {
                 }
                 
                 // Create a minimal section just for light data
-                Map<String, Object> section = new HashMap<>();
+                Map<String, Object> section = new HashMap<>(2);
                 section.put("Y", (byte) (sectionY + LevelChunk.MIN_Y / 16));
                 section.put("LightData", lightSection.getData());
                 return section;
@@ -104,7 +105,8 @@ public class ChunkNBT {
             return null; // Skip empty sections with no light data
         }
         
-        Map<String, Object> section = new HashMap<>();
+        // Section with palette and block states (estimated 4-5 fields)
+        Map<String, Object> section = new HashMap<>(5);
         
         // Section Y coordinate (world Y / 16)
         section.put("Y", (byte) (sectionY + LevelChunk.MIN_Y / 16));
@@ -151,9 +153,11 @@ public class ChunkNBT {
         }
         
         // Build palette for NBT
-        List<Map<String, Object>> palette = new ArrayList<>();
+        // Pre-allocate with exact size (number of unique blocks in palette)
+        List<Map<String, Object>> palette = new ArrayList<>(paletteList.size());
         for (String identifier : paletteList) {
-            Map<String, Object> paletteEntry = new HashMap<>();
+            // Pre-allocate HashMap with single entry
+            Map<String, Object> paletteEntry = new HashMap<>(1);
             paletteEntry.put("Name", identifier);
             palette.add(paletteEntry);
         }

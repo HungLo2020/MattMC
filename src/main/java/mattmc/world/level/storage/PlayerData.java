@@ -26,7 +26,8 @@ public class PlayerData {
      * Convert inventory to NBT format (Map-based).
      */
     public static Map<String, Object> inventoryToNBT(Inventory inventory) {
-        Map<String, Object> data = new HashMap<>();
+        // Pre-allocate with exact size (Inventory and SelectedItemSlot)
+        Map<String, Object> data = new HashMap<>(2);
         
         // Pre-allocate with exact capacity (inventory size) for worst-case scenario
         List<Map<String, Object>> items = new ArrayList<>(inventory.getSize());
@@ -34,7 +35,8 @@ public class PlayerData {
         for (int i = 0; i < inventory.getSize(); i++) {
             ItemStack stack = inventory.getStack(i);
             if (stack != null) {
-                Map<String, Object> itemData = new HashMap<>();
+                // Pre-allocate with 3 fields: Slot, id, Count
+                Map<String, Object> itemData = new HashMap<>(3);
                 
                 // Store slot index
                 itemData.put("Slot", (byte) i);

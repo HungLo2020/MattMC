@@ -56,7 +56,8 @@ public class LevelData {
      * Convert level data to NBT format (Map-based).
      */
     public Map<String, Object> toNBT() {
-        Map<String, Object> data = new HashMap<>();
+        // Pre-allocate with estimated size for all level metadata fields
+        Map<String, Object> data = new HashMap<>(11);
         
         // Level metadata
         data.put("LevelName", worldName);
@@ -71,13 +72,13 @@ public class LevelData {
         data.put("Time", worldTime);
         
         // Version info
-        Map<String, Object> version = new HashMap<>();
+        Map<String, Object> version = new HashMap<>(2);
         version.put("Name", "MattMC 1.0");
         version.put("Id", 1);
         data.put("Version", version);
         
         // LocalPlayer data
-        Map<String, Object> player = new HashMap<>();
+        Map<String, Object> player = new HashMap<>(2);
         
         List<Double> pos = new ArrayList<>(3);
         pos.add(playerX);
@@ -92,7 +93,8 @@ public class LevelData {
         
         data.put("LocalPlayer", player);
         
-        Map<String, Object> root = new HashMap<>();
+        // Root wrapper with single entry
+        Map<String, Object> root = new HashMap<>(1);
         root.put("Data", data);
         
         return root;
