@@ -24,6 +24,21 @@ This project reimagines Minecraft with a focus on:
 - **Y-Coordinate Range**: -64 to 319 (384 blocks total)
 - **World Save Format**: Region-based storage with NBT data structures
 - **Block Models**: JSON-based block models and blockstates system
+- **Light Storage**: Per-voxel light data with 16 levels each for sky and block light
+  - 1 byte per block: high nibble = skyLight (0-15), low nibble = blockLight (0-15)
+  - Stored per 16×16×16 section for efficiency
+  - Column heightmaps track topmost non-air blocks for optimization
+- **Smooth Lighting**: Mesh-time per-vertex light sampling with ambient occlusion
+  - Samples 8 nearby voxels per vertex for smooth gradients
+  - 3-block corner rule for ambient occlusion darkening
+  - Runtime toggle via `smooth_lighting` setting
+  - See [SMOOTH_LIGHTING.md](docs/SMOOTH_LIGHTING.md) for details
+- **Shadow Mapping**: Real-time shadows cast by directional sunlight (experimental)
+  - 2048×2048 depth map for shadow rendering
+  - PCF filtering for soft shadow edges
+  - Integrated with day/night cycle (only renders during daytime)
+  - Runtime toggle via `shadows` setting (disabled by default)
+  - See [SHADOW_MAPPING.md](docs/SHADOW_MAPPING.md) for details
 
 ### Game Features
 - World creation and management
@@ -101,6 +116,9 @@ The distributable zip will be created in `build/releases/`.
 For in-depth technical information, see:
 
 - [**Chunk System**](CHUNK_SYSTEM.md) - Details on the chunk-based voxel rendering system
+- [**Smooth Lighting**](docs/SMOOTH_LIGHTING.md) - Per-vertex light sampling and ambient occlusion
+- [**Shadow Mapping**](docs/SHADOW_MAPPING.md) - Real-time shadows from directional sunlight
+- [**Day/Night Cycle**](docs/DAY_NIGHT_CYCLE.md) - Sun movement and sky brightness calculations
 - [**Efficiency Analysis**](EFFICIENCY_ANALYSIS.md) - Performance optimizations and analysis
 - [**World Save Format**](WORLD_SAVE_FORMAT.md) - World storage format and NBT structures
 - [**Refactoring Summary**](REFACTORING_SUMMARY.md) - Architectural decisions and code organization
@@ -122,6 +140,11 @@ MattMC is in active development. Current features include:
 - ✅ Core rendering engine with optimized chunk rendering
 - ✅ Player controls and camera system
 - ✅ World generation and storage
+- ✅ Per-voxel light storage (skyLight and blockLight)
+- ✅ Smooth lighting with per-vertex sampling and ambient occlusion
+- ✅ Shadow mapping with real-time shadows from sunlight
+- ✅ Day/night cycle with dynamic lighting
+- ✅ Column heightmap tracking
 - ✅ GUI system with multiple screens
 - ✅ Settings and keybinding management
 - ✅ Save/load functionality

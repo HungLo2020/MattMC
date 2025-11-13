@@ -352,6 +352,14 @@ public class AsyncChunkLoader {
         
         BlockFaceCollector collector = collectChunkFaces(chunk);
         MeshBuilder meshBuilder = new MeshBuilder(textureAtlas);
+        
+        // Enable smooth lighting if the setting is on
+        if (mattmc.client.settings.OptionsManager.isSmoothLightingEnabled()) {
+            mattmc.client.renderer.chunk.VertexLightSampler lightSampler = 
+                new mattmc.client.renderer.chunk.VertexLightSampler(new ChunkBlockAccessor());
+            meshBuilder.setLightSampler(lightSampler);
+        }
+        
         return meshBuilder.build(chunk.chunkX(), chunk.chunkZ(), collector);
     }
     
@@ -470,5 +478,42 @@ public class AsyncChunkLoader {
         }
         
         return result;
+    }
+    
+    /**
+     * Implementation of VertexLightSampler.BlockAccessor for cross-chunk light access.
+     */
+    private class ChunkBlockAccessor implements mattmc.client.renderer.chunk.VertexLightSampler.BlockAccessor {
+        @Override
+        public Block getBlockAcrossChunks(LevelChunk chunk, int x, int y, int z) {
+            if (neighborAccessor != null) {
+                return neighborAccessor.getBlockAcrossChunks(chunk, x, y, z);
+            }
+            return Blocks.AIR;
+        }
+        
+        @Override
+        public int getSkyLight(LevelChunk chunk, int x, int y, int z) {
+            // If within chunk bounds, get light directly
+            if (x >= 0 && x < LevelChunk.WIDTH && y >= 0 && y < LevelChunk.HEIGHT && z >= 0 && z < LevelChunk.DEPTH) {
+                return chunk.getSkyLight(x, y, z);
+            }
+            
+            // Out of bounds - would need to access neighbor chunk
+            // For now, return default value (15 for sky)
+            return 15;
+        }
+        
+        @Override
+        public int getBlockLight(LevelChunk chunk, int x, int y, int z) {
+            // If within chunk bounds, get light directly
+            if (x >= 0 && x < LevelChunk.WIDTH && y >= 0 && y < LevelChunk.HEIGHT && z >= 0 && z < LevelChunk.DEPTH) {
+                return chunk.getBlockLight(x, y, z);
+            }
+            
+            // Out of bounds - would need to access neighbor chunk
+            // For now, return default value (0 for block light)
+            return 0;
+        }
     }
 }

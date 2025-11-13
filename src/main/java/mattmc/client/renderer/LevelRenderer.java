@@ -1,6 +1,7 @@
 package mattmc.client.renderer;
 
 import mattmc.client.renderer.texture.TextureAtlas;
+import mattmc.client.settings.OptionsManager;
 
 import mattmc.world.level.chunk.LevelChunk;
 import mattmc.world.level.Level;
@@ -19,12 +20,14 @@ import org.slf4j.LoggerFactory;
  * 
  * Now handles async mesh uploads from background threads and texture atlas.
  * Implements frustum culling to skip rendering chunks outside the camera view.
+ * Supports shadow mapping for directional sunlight.
  */
 public class LevelRenderer {
     private static final Logger logger = LoggerFactory.getLogger(LevelRenderer.class);
 
     private final ChunkRenderer chunkRenderer;
     private final Frustum frustum;
+    private final ShadowRenderer shadowRenderer;
     private Level currentLevel;
     private boolean textureAtlasInitialized = false;
     
@@ -36,6 +39,7 @@ public class LevelRenderer {
     public LevelRenderer() {
         this.chunkRenderer = new ChunkRenderer();
         this.frustum = new Frustum();
+        this.shadowRenderer = new ShadowRenderer();
     }
     
     /**
@@ -73,6 +77,18 @@ public class LevelRenderer {
         totalChunks = 0;
         renderedChunks = 0;
         culledChunks = 0;
+        
+        // Get sky brightness and sun direction from day cycle
+        float skyBrightness = world.getDayCycle().getSkyBrightness();
+        float[] sunDirection = world.getDayCycle().getSunDirection();
+        
+        // Get shadows enabled setting from options
+        boolean shadowsEnabled = OptionsManager.areShadowsEnabled();
+        
+        // Render shadow map during daytime (when sun is up)
+        if (shadowsEnabled && skyBrightness > 0.3f) {
+            shadowRenderer.renderShadowMap(world, chunkRenderer, sunDirection, playerX, playerY, playerZ);
+        }
         
         // Process completed mesh buffers from async loader first
         // This makes newly loaded chunk meshes available for rendering
@@ -120,7 +136,7 @@ public class LevelRenderer {
             // Only do GL matrix operations if we're actually going to render
             glPushMatrix();
             glTranslatef(chunkWorldX, 0, chunkWorldZ);
-            if (chunkRenderer.renderChunk(chunk)) {
+            if (chunkRenderer.renderChunk(chunk, playerX, playerY, playerZ, skyBrightness, sunDirection)) {
                 renderedChunks++;
             } else {
                 // Chunk lost its VAO between the hasChunkMesh check and now

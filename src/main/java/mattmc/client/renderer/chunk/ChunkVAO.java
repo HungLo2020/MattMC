@@ -60,6 +60,13 @@ public class ChunkVAO {
         glVertexPointer(3, GL_FLOAT, stride, (long)(ChunkMeshBuffer.POSITION_OFFSET * Float.BYTES));
         glTexCoordPointer(2, GL_FLOAT, stride, (long)(ChunkMeshBuffer.TEXCOORD_OFFSET * Float.BYTES));
         glColorPointer(4, GL_FLOAT, stride, (long)(ChunkMeshBuffer.COLOR_OFFSET * Float.BYTES));
+        glNormalPointer(GL_FLOAT, stride, (long)(ChunkMeshBuffer.NORMAL_OFFSET * Float.BYTES));
+        
+        // Use secondary texture coordinate for light data (skyLight, blockLight, ao)
+        // This allows the shader to access it via gl_MultiTexCoord1
+        glClientActiveTexture(GL_TEXTURE1);
+        glTexCoordPointer(3, GL_FLOAT, stride, (long)(ChunkMeshBuffer.LIGHT_OFFSET * Float.BYTES));
+        glClientActiveTexture(GL_TEXTURE0); // Reset to texture unit 0
         
         // Unbind VAO (good practice)
         glBindVertexArray(0);
@@ -83,14 +90,25 @@ public class ChunkVAO {
         glEnableClientState(GL_VERTEX_ARRAY);
         glEnableClientState(GL_TEXTURE_COORD_ARRAY);
         glEnableClientState(GL_COLOR_ARRAY);
+        glEnableClientState(GL_NORMAL_ARRAY);
+        
+        // Enable secondary texture coord array for light data
+        glClientActiveTexture(GL_TEXTURE1);
+        glEnableClientState(GL_TEXTURE_COORD_ARRAY);
+        glClientActiveTexture(GL_TEXTURE0);
         
         // Draw
         glDrawElements(GL_TRIANGLES, indexCount, GL_UNSIGNED_INT, 0);
         
         // Disable client state
+        glClientActiveTexture(GL_TEXTURE1);
+        glDisableClientState(GL_TEXTURE_COORD_ARRAY);
+        glClientActiveTexture(GL_TEXTURE0);
+        
         glDisableClientState(GL_VERTEX_ARRAY);
         glDisableClientState(GL_TEXTURE_COORD_ARRAY);
         glDisableClientState(GL_COLOR_ARRAY);
+        glDisableClientState(GL_NORMAL_ARRAY);
         
         // Unbind VAO
         glBindVertexArray(0);

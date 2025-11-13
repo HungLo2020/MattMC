@@ -1,5 +1,6 @@
 package mattmc.client.renderer.chunk;
 
+import mattmc.client.renderer.VoxelLitShader;
 import mattmc.client.renderer.texture.TextureAtlas;
 import mattmc.world.level.chunk.LevelChunk;
 import mattmc.world.level.chunk.ChunkUtils;
@@ -12,7 +13,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Handles rendering of chunks using VBO/VAO with texture atlas.
+ * Handles rendering of chunks using VBO/VAO with texture atlas and lit shader.
  * Modern rendering approach similar to Minecraft Java Edition.
  */
 public class ChunkRenderer {
@@ -31,6 +32,9 @@ public class ChunkRenderer {
     
     // Texture atlas for VBO rendering
     private TextureAtlas textureAtlas = null;
+    
+    // Voxel lit shader for proper lighting
+    private VoxelLitShader shader = null;
     
     /**
      * Register a chunk for tracking (so mesh buffers can be uploaded to it).
@@ -55,17 +59,68 @@ public class ChunkRenderer {
     }
     
     /**
-     * Render a chunk using VBO/VAO.
+     * Render a chunk using VBO/VAO with lit shader.
      * Returns true if rendering actually happened.
      * 
+     * @param chunk The chunk to render
+     * @param cameraX Camera X position for fog
+     * @param cameraY Camera Y position for fog
+     * @param cameraZ Camera Z position for fog
+     * @param skyBrightness Sky brightness multiplier (0.0-1.0) from day cycle
+     * @param sunDirection Sun direction vector [x, y, z] from day cycle
+     * @param shadowRenderer Shadow renderer for shadow mapping (null to disable shadows)
      * @return true if the chunk was rendered, false if no VAO available
      */
-    public boolean renderChunk(LevelChunk chunk) {
+    public boolean renderChunk(LevelChunk chunk, float cameraX, float cameraY, float cameraZ, 
+                              float skyBrightness, float[] sunDirection, 
+                              mattmc.client.renderer.ShadowRenderer shadowRenderer) {
         // Get VAO
         ChunkVAO vao = vaoCache.get(chunk);
         if (vao == null) {
             // VAO not ready yet - it will be uploaded later from async mesh building
             return false;
+        }
+        
+        // Initialize shader if not already done
+        if (shader == null) {
+            shader = new VoxelLitShader();
+            logger.info("Initialized VoxelLitShader for chunk rendering");
+        }
+        
+        // Use the lit shader
+        shader.use();
+        
+        // Set shader uniforms
+        shader.setCameraPosition(cameraX, cameraY, cameraZ);
+        shader.setTextureSampler(0); // Texture unit 0
+        
+        // Sun settings from day cycle
+        shader.setSunDirection(sunDirection[0], sunDirection[1], sunDirection[2]);
+        shader.setSunColor(0.6f, 0.6f, 0.55f); // Neutral sun color
+        
+        // Ambient settings - moderate values for natural look
+        shader.setAmbientSky(0.4f, 0.45f, 0.5f); // Cool blue sky ambient
+        shader.setAmbientBlock(0.9f, 0.7f, 0.4f); // Warm torch/block light
+        
+        // Sky brightness (dims lighting at night)
+        shader.setSkyBrightness(skyBrightness);
+        
+        // Fog settings
+        shader.setFogColor(0.5f, 0.7f, 1.0f); // Sky blue fog (linear space)
+        
+        // Gamma correction
+        shader.setGamma(2.2f);
+        
+        // Shadow settings
+        if (shadowRenderer != null) {
+            shader.setShadowsEnabled(true);
+            shader.setShadowMapSampler(1); // Texture unit 1
+            shader.setShadowMatrix(shadowRenderer.getShadowMatrix());
+            
+            // Bind shadow map to texture unit 1
+            shadowRenderer.bindShadowMap(org.lwjgl.opengl.GL13.GL_TEXTURE1);
+        } else {
+            shader.setShadowsEnabled(false);
         }
         
         // Enable texturing and bind texture atlas
@@ -77,10 +132,53 @@ public class ChunkRenderer {
         // Render using VAO (single draw call!)
         vao.render();
         
-        // Unbind texture
+        // Unbind shader and texture
+        VoxelLitShader.unbind();
         glBindTexture(GL_TEXTURE_2D, 0);
         
         return true;
+    }
+    
+    /**
+     * Render a chunk using VBO/VAO with lit shader (without shadows).
+     * Returns true if rendering actually happened.
+     * 
+     * @param chunk The chunk to render
+     * @param cameraX Camera X position for fog
+     * @param cameraY Camera Y position for fog
+     * @param cameraZ Camera Z position for fog
+     * @param skyBrightness Sky brightness multiplier (0.0-1.0) from day cycle
+     * @param sunDirection Sun direction vector [x, y, z] from day cycle
+     * @return true if the chunk was rendered, false if no VAO available
+     */
+    public boolean renderChunk(LevelChunk chunk, float cameraX, float cameraY, float cameraZ, 
+                              float skyBrightness, float[] sunDirection) {
+        return renderChunk(chunk, cameraX, cameraY, cameraZ, skyBrightness, sunDirection, null);
+    }
+    
+    /**
+     * Render a chunk using VBO/VAO with lit shader (backward compatibility).
+     * Uses default camera position at origin and full brightness.
+     * 
+     * @param chunk The chunk to render
+     * @return true if the chunk was rendered, false if no VAO available
+     */
+    public boolean renderChunk(LevelChunk chunk) {
+        return renderChunk(chunk, 0, 0, 0, 1.0f, new float[]{0.3f, -0.8f, 0.5f});
+    }
+    
+    /**
+     * Render a chunk in depth-only mode for shadow mapping.
+     * Uses only the VAO geometry without any shader setup.
+     * The shadow depth shader should already be active when this is called.
+     * 
+     * @param chunk The chunk to render
+     */
+    public void renderChunkDepthOnly(LevelChunk chunk) {
+        ChunkVAO vao = vaoCache.get(chunk);
+        if (vao != null) {
+            vao.render();
+        }
     }
     
     /**

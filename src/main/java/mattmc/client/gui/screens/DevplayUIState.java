@@ -8,6 +8,9 @@ public class DevplayUIState {
     // Debug menu toggle state
     private boolean debugMenuVisible = false;
     
+    // Lighting debug overlay toggle state
+    private boolean lightingDebugVisible = false;
+    
     // Command overlay state
     private boolean commandOverlayVisible = false;
     private StringBuilder commandText = new StringBuilder("/");
@@ -31,6 +34,14 @@ public class DevplayUIState {
     
     public void toggleDebugMenu() {
         debugMenuVisible = !debugMenuVisible;
+    }
+    
+    public boolean isLightingDebugVisible() {
+        return lightingDebugVisible;
+    }
+    
+    public void toggleLightingDebug() {
+        lightingDebugVisible = !lightingDebugVisible;
     }
     
     public boolean isCommandOverlayVisible() {

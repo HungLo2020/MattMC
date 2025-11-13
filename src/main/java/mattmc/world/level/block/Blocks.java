@@ -66,6 +66,7 @@ public class Blocks {
     public static final Block CRIMSON_PLANKS = register("crimson_planks", new Block(true));
     public static final Block WARPED_PLANKS = register("warped_planks", new Block(true));
     public static final Block BIRCH_STAIRS = register("birch_stairs", new StairsBlock());
+    public static final Block TORCH = register("torch", new Block(false, 14)); // Emits light level 14
     
     /**
      * Register a block with a given name (without namespace).
@@ -92,7 +93,7 @@ public class Blocks {
         if (block instanceof StairsBlock) {
             registeredBlock = new StairsBlock(identifier);
         } else {
-            registeredBlock = new Block(block.isSolid(), identifier);
+            registeredBlock = new Block(block.isSolid(), block.getLightEmission(), identifier);
         }
         REGISTRY.put(identifier, registeredBlock);
         return registeredBlock;
@@ -124,7 +125,7 @@ public class Blocks {
         if (block instanceof StairsBlock) {
             registeredBlock = new StairsBlock(identifier);
         } else {
-            registeredBlock = new Block(block.isSolid(), identifier);
+            registeredBlock = new Block(block.isSolid(), block.getLightEmission(), identifier);
         }
         REGISTRY.put(identifier, registeredBlock);
         return registeredBlock;
