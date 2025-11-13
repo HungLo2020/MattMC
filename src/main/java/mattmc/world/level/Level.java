@@ -6,6 +6,7 @@ import mattmc.world.level.chunk.Region;
 
 import mattmc.world.level.block.Block;
 import mattmc.world.level.block.Blocks;
+import mattmc.world.level.chunk.ChunkManager;
 import mattmc.world.level.chunk.LevelChunk;
 import mattmc.world.level.chunk.ChunkNBT;
 import mattmc.world.level.chunk.RegionFile;
@@ -19,10 +20,8 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.nio.file.Path;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Manages an infinite world with dynamic chunk loading/unloading.
@@ -34,8 +33,8 @@ import java.util.List;
 public class Level implements LevelAccessor {
     private static final Logger logger = LoggerFactory.getLogger(Level.class);
     
-    // Store chunks by their position (chunkX, chunkZ)
-    private final Map<Long, LevelChunk> loadedChunks = new HashMap<>();
+    // Chunk manager for handling loaded chunks lifecycle
+    private final ChunkManager chunkManager = new ChunkManager();
     
     // Async chunk loader for background loading/generation
     private final AsyncChunkLoader asyncLoader;
@@ -48,9 +47,6 @@ public class Level implements LevelAccessor {
     
     // World generator for noise-based terrain
     private WorldGenerator worldGenerator;
-    
-    // Listener for chunk unload events (used by renderer to clean up caches)
-    private ChunkUnloadListener unloadListener;
     
     // Render distance in chunks
     private int renderDistance = 8;
@@ -359,13 +355,6 @@ public class Level implements LevelAccessor {
     }
     
     /**
-     * Convert chunk coordinates to a unique long key for the map.
-     */
-    private static long chunkKey(int chunkX, int chunkZ) {
-        return ChunkUtils.chunkKey(chunkX, chunkZ);
-    }
-    
-    /**
      * Get a chunk at the specified chunk coordinates.
      * If the chunk doesn't exist in memory, tries to load it from disk.
      * If it doesn't exist on disk, it will be generated.
@@ -383,8 +372,7 @@ public class Level implements LevelAccessor {
             return new LevelChunk(0, 0); // Fallback to origin
         }
         
-        long key = chunkKey(chunkX, chunkZ);
-        LevelChunk chunk = loadedChunks.get(key);
+        LevelChunk chunk = chunkManager.getChunk(chunkX, chunkZ);
         
         if (chunk == null) {
             // Try to load from disk first if world directory is set
@@ -395,7 +383,7 @@ public class Level implements LevelAccessor {
                 chunk = generateChunk(chunkX, chunkZ);
             }
             
-            loadedChunks.put(key, chunk);
+            chunkManager.addChunk(chunk);
         }
         
         return chunk;
@@ -405,7 +393,7 @@ public class Level implements LevelAccessor {
      * Get a chunk if it's loaded, or null if not.
      */
     public LevelChunk getChunkIfLoaded(int chunkX, int chunkZ) {
-        return loadedChunks.get(chunkKey(chunkX, chunkZ));
+        return chunkManager.getChunk(chunkX, chunkZ);
     }
     
     /**
@@ -709,8 +697,7 @@ public class Level implements LevelAccessor {
         // Collect completed chunks from background threads
         List<LevelChunk> completedChunks = asyncLoader.collectCompletedChunks();
         for (LevelChunk chunk : completedChunks) {
-            long key = chunkKey(chunk.chunkX(), chunk.chunkZ());
-            loadedChunks.put(key, chunk);
+            chunkManager.addChunk(chunk);
         }
         
         // Convert player position to chunk coordinates
@@ -723,8 +710,7 @@ public class Level implements LevelAccessor {
                 int chunkX = playerChunkX + dx;
                 int chunkZ = playerChunkZ + dz;
                 
-                long key = chunkKey(chunkX, chunkZ);
-                if (!loadedChunks.containsKey(key)) {
+                if (!chunkManager.isChunkLoaded(chunkX, chunkZ)) {
                     // Request async loading with frustum prioritization
                     asyncLoader.requestChunk(chunkX, chunkZ, playerX, playerZ, playerYaw);
                 }
@@ -733,26 +719,8 @@ public class Level implements LevelAccessor {
         
         // Unload chunks that are too far away
         int unloadDistance = renderDistance + 2;
-        Iterator<Map.Entry<Long, LevelChunk>> iterator = loadedChunks.entrySet().iterator();
-        while (iterator.hasNext()) {
-            Map.Entry<Long, LevelChunk> entry = iterator.next();
-            LevelChunk chunk = entry.getValue();
-            
-            int dx = Math.abs(chunk.chunkX() - playerChunkX);
-            int dz = Math.abs(chunk.chunkZ() - playerChunkZ);
-            
-            if (dx > unloadDistance || dz > unloadDistance) {
-                // Always save chunks before unloading to preserve any modifications
-                saveChunk(chunk);
-                
-                // Notify listener before removing
-                if (unloadListener != null) {
-                    unloadListener.onChunkUnload(chunk);
-                }
-                
-                iterator.remove();
-            }
-        }
+        chunkManager.unloadChunksOutsideRadius(playerChunkX, playerChunkZ, unloadDistance, 
+                                               this::saveChunk);
         
         lastPlayerChunkX = playerChunkX;
         lastPlayerChunkZ = playerChunkZ;
@@ -762,14 +730,14 @@ public class Level implements LevelAccessor {
      * Get all currently loaded chunks.
      */
     public Iterable<LevelChunk> getLoadedChunks() {
-        return loadedChunks.values();
+        return chunkManager.getLoadedChunks();
     }
     
     /**
      * Get the number of loaded chunks.
      */
     public int getLoadedChunkCount() {
-        return loadedChunks.size();
+        return chunkManager.getLoadedChunkCount();
     }
     
     /**
@@ -856,7 +824,7 @@ public class Level implements LevelAccessor {
      * Used by the renderer to clean up caches.
      */
     public void setChunkUnloadListener(ChunkUnloadListener listener) {
-        this.unloadListener = listener;
+        chunkManager.setUnloadListener(listener);
     }
     
     /**
@@ -870,7 +838,7 @@ public class Level implements LevelAccessor {
         // Collect exceptions but continue trying to save all chunks
         int savedCount = 0;
         int failedCount = 0;
-        for (LevelChunk chunk : loadedChunks.values()) {
+        for (LevelChunk chunk : chunkManager.getLoadedChunks()) {
             try {
                 if (worldDirectory != null && asyncSaver != null) {
                     Map<String, Object> chunkNBT = ChunkNBT.toNBT(chunk);
