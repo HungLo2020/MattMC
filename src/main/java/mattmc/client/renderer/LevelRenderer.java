@@ -1,7 +1,6 @@
 package mattmc.client.renderer;
 
 import mattmc.client.renderer.texture.TextureAtlas;
-import mattmc.client.settings.OptionsManager;
 
 import mattmc.world.level.chunk.LevelChunk;
 import mattmc.world.level.Level;
@@ -20,14 +19,13 @@ import org.slf4j.LoggerFactory;
  * 
  * Now handles async mesh uploads from background threads and texture atlas.
  * Implements frustum culling to skip rendering chunks outside the camera view.
- * Implements basic shadow mapping based on sun position.
+ * Simplified version with no lighting or shadow effects.
  */
 public class LevelRenderer {
     private static final Logger logger = LoggerFactory.getLogger(LevelRenderer.class);
 
     private final ChunkRenderer chunkRenderer;
     private final Frustum frustum;
-    private final SimpleShadowRenderer shadowRenderer;
     private Level currentLevel;
     private boolean textureAtlasInitialized = false;
     
@@ -39,7 +37,6 @@ public class LevelRenderer {
     public LevelRenderer() {
         this.chunkRenderer = new ChunkRenderer();
         this.frustum = new Frustum();
-        this.shadowRenderer = new SimpleShadowRenderer();
     }
     
     /**
@@ -68,7 +65,6 @@ public class LevelRenderer {
      * Render all loaded chunks in the world.
      * Also processes pending mesh uploads from background threads and handles dirty chunks.
      * Uses frustum culling to skip chunks outside the camera view.
-     * Implements basic shadow mapping when sun is above horizon.
      */
     public void render(Level world, float playerX, float playerY, float playerZ) {
         // Update frustum from current GL matrices (must be called after camera setup)
@@ -78,16 +74,6 @@ public class LevelRenderer {
         totalChunks = 0;
         renderedChunks = 0;
         culledChunks = 0;
-        
-        // Get sky brightness and sun direction from day cycle
-        float skyBrightness = world.getDayCycle().getSkyBrightness();
-        float[] sunDirection = world.getDayCycle().getSunDirection();
-        
-        // Render shadow map if sun is above horizon
-        boolean shadowsEnabled = sunDirection[1] > 0 && OptionsManager.areShadowsEnabled();
-        if (shadowsEnabled) {
-            shadowRenderer.renderShadowMap(world, chunkRenderer, sunDirection, playerX, playerY, playerZ);
-        }
         
         // Process completed mesh buffers from async loader first
         // This makes newly loaded chunk meshes available for rendering
@@ -136,16 +122,8 @@ public class LevelRenderer {
             glPushMatrix();
             glTranslatef(chunkWorldX, 0, chunkWorldZ);
             
-            // Render chunk with shadows if enabled
-            boolean rendered;
-            if (shadowsEnabled) {
-                rendered = chunkRenderer.renderChunk(chunk, playerX, playerY, playerZ, 
-                                                    skyBrightness, sunDirection, true,
-                                                    shadowRenderer.getShadowMatrix(), shadowRenderer);
-            } else {
-                rendered = chunkRenderer.renderChunk(chunk, playerX, playerY, playerZ, 
-                                                    skyBrightness, sunDirection);
-            }
+            // Render chunk with basic shader (no lighting/shadows)
+            boolean rendered = chunkRenderer.renderChunk(chunk);
             
             if (rendered) {
                 renderedChunks++;
@@ -158,6 +136,11 @@ public class LevelRenderer {
         }
         
         glPopMatrix();
+        
+        // Log rendering stats on first render
+        if (renderedChunks > 0) {
+            logger.info("Rendering {} chunks with basic shader", renderedChunks);
+        }
     }
     
     /**
