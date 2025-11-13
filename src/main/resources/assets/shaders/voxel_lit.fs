@@ -102,12 +102,15 @@ void main() {
     vec3 albedo = vColor.rgb * texColor.rgb;
     
     // Extract light data
-    float skyLight = vLightData.x;
-    float blockLight = vLightData.y;
-    float ao = vLightData.z;
+    float skyLight = vLightData.x;       // Binary: 0 (no sky access) or 15 (can see sky)
+    float blockLight = vLightData.y;     // 0-15 from light-emitting blocks
+    float ao = vLightData.z;             // 0-3 ambient occlusion
     
-    // Convert light values from 0-15 range to 0-1 range
-    float skyLightNorm = skyLight / 15.0;
+    // Skylight is now binary: either has sky access (15) or not (0)
+    // Use it only to determine if surface can receive sun lighting, not for shading intensity
+    bool hasSkylightAccess = skyLight > 7.0; // Binary check (skylight should be 0 or 15)
+    
+    // Convert block light from 0-15 range to 0-1 range
     float blockLightNorm = blockLight / 15.0;
     
     // Apply ambient occlusion factor
@@ -117,25 +120,29 @@ void main() {
     else if (ao >= 2.0) aoFactor = 0.6;
     else if (ao >= 1.0) aoFactor = 0.8;
     
-    // Calculate ambient lighting from both sources
-    // Apply sky brightness multiplier to dim ambient sky light at night
-    vec3 skyAmbient = uAmbientSky * skyLightNorm * uSkyBrightness;
+    // Base ambient sky lighting - always present for surfaces with sky access
+    // This represents ambient light scattered from the sky dome
+    vec3 skyAmbient = hasSkylightAccess ? (uAmbientSky * uSkyBrightness * 0.4) : vec3(0.0);
+    
+    // Block light ambient (from torches, etc.)
     vec3 blockAmbient = uAmbientBlock * blockLightNorm;
     
-    // Calculate Lambert diffuse from sun (N·L)
-    float NdotL = max(dot(normalize(vNormal), normalize(uSunDir)), 0.0);
-    
-    // Calculate shadow factor (only if there's skylight)
-    float shadowFactor = 1.0;
-    if (skyLightNorm > 0.0) {
-        shadowFactor = calculateShadow();
+    // Calculate directional sun lighting (only for surfaces with sky access)
+    vec3 sunLighting = vec3(0.0);
+    if (hasSkylightAccess && uSkyBrightness > 0.1) {
+        // Calculate Lambert diffuse from sun (N·L)
+        float NdotL = max(dot(normalize(vNormal), normalize(uSunDir)), 0.0);
+        
+        // Calculate shadow factor from shadow maps based on sun position
+        float shadowFactor = calculateShadow();
+        
+        // Sun provides strong directional lighting when not shadowed
+        // Shadow map determines actual shadows based on sun angle
+        sunLighting = uSunColor * NdotL * uSkyBrightness * shadowFactor;
     }
     
-    // Apply shadow to sun diffuse lighting
-    vec3 sunDiffuse = uSunColor * NdotL * skyLightNorm * uSkyBrightness * shadowFactor;
-    
-    // Combine sky lighting (ambient + shadowed sun)
-    vec3 skyLighting = skyAmbient + sunDiffuse;
+    // Combine sky lighting (ambient + directional sun with real-time shadows)
+    vec3 skyLighting = skyAmbient + sunLighting;
     
     // Apply ambient occlusion to sky lighting
     skyLighting *= aoFactor;
