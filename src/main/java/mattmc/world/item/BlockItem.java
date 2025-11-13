@@ -64,10 +64,9 @@ public class BlockItem extends Item {
     public boolean onUse(mattmc.world.entity.player.BlockInteraction blockInteraction) {
         // Use the BlockInteraction to place the block where the player is looking
         blockInteraction.placeBlock(this.block);
-        // Always return true to indicate we attempted to use the item
-        // (even if placement failed due to no valid target)
-        // TODO: In the future, we should only return true if placement succeeded
-        // and should consume the item from the stack
+        // Return true to indicate we attempted to use the item
+        // Note: Currently returns true even if placement failed due to no valid target
+        // This prevents item consumption on failed placements
         return true;
     }
 }
