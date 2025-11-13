@@ -20,14 +20,12 @@ import org.slf4j.LoggerFactory;
  * 
  * Now handles async mesh uploads from background threads and texture atlas.
  * Implements frustum culling to skip rendering chunks outside the camera view.
- * Supports shadow mapping for directional sunlight.
  */
 public class LevelRenderer {
     private static final Logger logger = LoggerFactory.getLogger(LevelRenderer.class);
 
     private final ChunkRenderer chunkRenderer;
     private final Frustum frustum;
-    private final CascadedShadowRenderer shadowRenderer;
     private Level currentLevel;
     private boolean textureAtlasInitialized = false;
     
@@ -39,7 +37,6 @@ public class LevelRenderer {
     public LevelRenderer() {
         this.chunkRenderer = new ChunkRenderer();
         this.frustum = new Frustum();
-        this.shadowRenderer = new CascadedShadowRenderer();
     }
     
     /**
@@ -81,22 +78,6 @@ public class LevelRenderer {
         // Get sky brightness and sun direction from day cycle
         float skyBrightness = world.getDayCycle().getSkyBrightness();
         float[] sunDirection = world.getDayCycle().getSunDirection();
-        
-        // Get shadows enabled setting from options
-        boolean shadowsEnabled = OptionsManager.areShadowsEnabled();
-        
-        // Render shadow cascades during daytime (when sun is up)
-        if (shadowsEnabled && skyBrightness > 0.3f) {
-            // Get current view and projection matrices for cascade calculation
-            float[] viewMatrix = new float[16];
-            float[] projectionMatrix = new float[16];
-            glGetFloatv(GL_MODELVIEW_MATRIX, viewMatrix);
-            glGetFloatv(GL_PROJECTION_MATRIX, projectionMatrix);
-            
-            shadowRenderer.renderShadowCascades(world, chunkRenderer, sunDirection, 
-                                               playerX, playerY, playerZ,
-                                               viewMatrix, projectionMatrix);
-        }
         
         // Process completed mesh buffers from async loader first
         // This makes newly loaded chunk meshes available for rendering
@@ -145,15 +126,9 @@ public class LevelRenderer {
             glPushMatrix();
             glTranslatef(chunkWorldX, 0, chunkWorldZ);
             
-            // Render chunk with CSM shadows if enabled
-            boolean rendered;
-            if (shadowsEnabled && skyBrightness > 0.3f) {
-                rendered = chunkRenderer.renderChunk(chunk, playerX, playerY, playerZ, 
-                                                    skyBrightness, sunDirection, shadowRenderer);
-            } else {
-                rendered = chunkRenderer.renderChunk(chunk, playerX, playerY, playerZ, 
-                                                    skyBrightness, sunDirection);
-            }
+            // Render chunk
+            boolean rendered = chunkRenderer.renderChunk(chunk, playerX, playerY, playerZ, 
+                                                        skyBrightness, sunDirection);
             
             if (rendered) {
                 renderedChunks++;
