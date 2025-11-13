@@ -68,10 +68,12 @@ public class ChunkRenderer {
      * @param cameraZ Camera Z position for fog
      * @param skyBrightness Sky brightness multiplier (0.0-1.0) from day cycle
      * @param sunDirection Sun direction vector [x, y, z] from day cycle
+     * @param shadowRenderer Shadow renderer for shadow mapping (null to disable shadows)
      * @return true if the chunk was rendered, false if no VAO available
      */
     public boolean renderChunk(LevelChunk chunk, float cameraX, float cameraY, float cameraZ, 
-                              float skyBrightness, float[] sunDirection) {
+                              float skyBrightness, float[] sunDirection, 
+                              mattmc.client.renderer.ShadowRenderer shadowRenderer) {
         // Get VAO
         ChunkVAO vao = vaoCache.get(chunk);
         if (vao == null) {
@@ -109,6 +111,18 @@ public class ChunkRenderer {
         // Gamma correction
         shader.setGamma(2.2f);
         
+        // Shadow settings
+        if (shadowRenderer != null) {
+            shader.setShadowsEnabled(true);
+            shader.setShadowMapSampler(1); // Texture unit 1
+            shader.setShadowMatrix(shadowRenderer.getShadowMatrix());
+            
+            // Bind shadow map to texture unit 1
+            shadowRenderer.bindShadowMap(org.lwjgl.opengl.GL13.GL_TEXTURE1);
+        } else {
+            shader.setShadowsEnabled(false);
+        }
+        
         // Enable texturing and bind texture atlas
         glEnable(GL_TEXTURE_2D);
         if (textureAtlas != null) {
@@ -126,6 +140,23 @@ public class ChunkRenderer {
     }
     
     /**
+     * Render a chunk using VBO/VAO with lit shader (without shadows).
+     * Returns true if rendering actually happened.
+     * 
+     * @param chunk The chunk to render
+     * @param cameraX Camera X position for fog
+     * @param cameraY Camera Y position for fog
+     * @param cameraZ Camera Z position for fog
+     * @param skyBrightness Sky brightness multiplier (0.0-1.0) from day cycle
+     * @param sunDirection Sun direction vector [x, y, z] from day cycle
+     * @return true if the chunk was rendered, false if no VAO available
+     */
+    public boolean renderChunk(LevelChunk chunk, float cameraX, float cameraY, float cameraZ, 
+                              float skyBrightness, float[] sunDirection) {
+        return renderChunk(chunk, cameraX, cameraY, cameraZ, skyBrightness, sunDirection, null);
+    }
+    
+    /**
      * Render a chunk using VBO/VAO with lit shader (backward compatibility).
      * Uses default camera position at origin and full brightness.
      * 
@@ -134,6 +165,20 @@ public class ChunkRenderer {
      */
     public boolean renderChunk(LevelChunk chunk) {
         return renderChunk(chunk, 0, 0, 0, 1.0f, new float[]{0.3f, -0.8f, 0.5f});
+    }
+    
+    /**
+     * Render a chunk in depth-only mode for shadow mapping.
+     * Uses only the VAO geometry without any shader setup.
+     * The shadow depth shader should already be active when this is called.
+     * 
+     * @param chunk The chunk to render
+     */
+    public void renderChunkDepthOnly(LevelChunk chunk) {
+        ChunkVAO vao = vaoCache.get(chunk);
+        if (vao != null) {
+            vao.render();
+        }
     }
     
     /**

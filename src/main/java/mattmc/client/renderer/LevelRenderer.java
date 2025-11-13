@@ -19,14 +19,17 @@ import org.slf4j.LoggerFactory;
  * 
  * Now handles async mesh uploads from background threads and texture atlas.
  * Implements frustum culling to skip rendering chunks outside the camera view.
+ * Supports shadow mapping for directional sunlight.
  */
 public class LevelRenderer {
     private static final Logger logger = LoggerFactory.getLogger(LevelRenderer.class);
 
     private final ChunkRenderer chunkRenderer;
     private final Frustum frustum;
+    private final ShadowRenderer shadowRenderer;
     private Level currentLevel;
     private boolean textureAtlasInitialized = false;
+    private boolean shadowsEnabled = true;
     
     // Statistics for debugging
     private int totalChunks = 0;
@@ -36,6 +39,7 @@ public class LevelRenderer {
     public LevelRenderer() {
         this.chunkRenderer = new ChunkRenderer();
         this.frustum = new Frustum();
+        this.shadowRenderer = new ShadowRenderer();
     }
     
     /**
@@ -77,6 +81,11 @@ public class LevelRenderer {
         // Get sky brightness and sun direction from day cycle
         float skyBrightness = world.getDayCycle().getSkyBrightness();
         float[] sunDirection = world.getDayCycle().getSunDirection();
+        
+        // Render shadow map during daytime (when sun is up)
+        if (shadowsEnabled && skyBrightness > 0.3f) {
+            shadowRenderer.renderShadowMap(world, chunkRenderer, sunDirection, playerX, playerY, playerZ);
+        }
         
         // Process completed mesh buffers from async loader first
         // This makes newly loaded chunk meshes available for rendering
@@ -156,5 +165,19 @@ public class LevelRenderer {
      */
     public int getTotalChunkCount() {
         return totalChunks;
+    }
+    
+    /**
+     * Enable or disable shadows.
+     */
+    public void setShadowsEnabled(boolean enabled) {
+        this.shadowsEnabled = enabled;
+    }
+    
+    /**
+     * Check if shadows are enabled.
+     */
+    public boolean areShadowsEnabled() {
+        return shadowsEnabled;
     }
 }

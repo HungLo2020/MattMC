@@ -77,6 +77,13 @@ public class Shader implements AutoCloseable {
         }
     }
     
+    public void setUniformMatrix4f(String name, float[] matrix) {
+        int location = glGetUniformLocation(programId, name);
+        if (location != -1 && matrix.length == 16) {
+            glUniformMatrix4fv(location, false, matrix);
+        }
+    }
+    
     public static void unbind() {
         glUseProgram(0);
     }

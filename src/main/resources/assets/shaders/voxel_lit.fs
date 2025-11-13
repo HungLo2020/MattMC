@@ -7,9 +7,11 @@ varying vec3 vLightData;  // (skyLight 0-15, blockLight 0-15, ao 0-3)
 varying vec3 vNormal;
 varying vec3 vWorldPos;
 varying float vFogFactor;
+varying vec4 vShadowCoord;
 
 // Uniforms
 uniform sampler2D uTexture;
+uniform sampler2D uShadowMap;
 uniform vec3 uSunDir;        // Normalized sun direction vector
 uniform vec3 uSunColor;      // Sun color
 uniform vec3 uAmbientSky;    // Sky ambient color
@@ -17,6 +19,51 @@ uniform vec3 uAmbientBlock;  // Block light ambient color
 uniform float uGamma;        // Gamma value (typically 2.2)
 uniform vec3 uFogColor;      // Fog color
 uniform float uSkyBrightness; // Sky brightness multiplier (0.0-1.0) for day/night cycle
+uniform int uShadowsEnabled;  // Whether shadows are enabled
+
+/**
+ * Calculate shadow factor using PCF (Percentage Closer Filtering).
+ * Returns 1.0 for fully lit, 0.0 for fully shadowed.
+ */
+float calculateShadow() {
+    if (uShadowsEnabled == 0) {
+        return 1.0; // No shadows
+    }
+    
+    // Perspective divide to get NDC coordinates
+    vec3 projCoords = vShadowCoord.xyz / vShadowCoord.w;
+    
+    // Transform from [-1,1] to [0,1] range
+    projCoords = projCoords * 0.5 + 0.5;
+    
+    // If outside shadow map bounds, assume lit
+    if (projCoords.x < 0.0 || projCoords.x > 1.0 || 
+        projCoords.y < 0.0 || projCoords.y > 1.0 ||
+        projCoords.z > 1.0) {
+        return 1.0;
+    }
+    
+    // Get depth from shadow map
+    float closestDepth = texture2D(uShadowMap, projCoords.xy).r;
+    float currentDepth = projCoords.z;
+    
+    // Bias to prevent shadow acne
+    float bias = max(0.005 * (1.0 - dot(vNormal, uSunDir)), 0.001);
+    
+    // Simple PCF (2x2 samples)
+    float shadow = 0.0;
+    vec2 texelSize = vec2(1.0 / 2048.0); // Assuming 2048x2048 shadow map
+    for (int x = -1; x <= 1; x++) {
+        for (int y = -1; y <= 1; y++) {
+            vec2 offset = vec2(x, y) * texelSize;
+            float pcfDepth = texture2D(uShadowMap, projCoords.xy + offset).r;
+            shadow += currentDepth - bias > pcfDepth ? 0.0 : 1.0;
+        }
+    }
+    shadow /= 9.0; // Average of 9 samples
+    
+    return shadow;
+}
 
 void main() {
     // Sample texture
@@ -48,9 +95,14 @@ void main() {
     
     // Calculate Lambert diffuse from sun (N·L)
     float NdotL = max(dot(normalize(vNormal), normalize(uSunDir)), 0.0);
-    vec3 sunDiffuse = uSunColor * NdotL * skyLightNorm * uSkyBrightness;
     
-    // Combine sky lighting (ambient + sun)
+    // Calculate shadow factor
+    float shadowFactor = calculateShadow();
+    
+    // Apply shadow to sun diffuse lighting
+    vec3 sunDiffuse = uSunColor * NdotL * skyLightNorm * uSkyBrightness * shadowFactor;
+    
+    // Combine sky lighting (ambient + shadowed sun)
     vec3 skyLighting = skyAmbient + sunDiffuse;
     
     // Apply ambient occlusion to sky lighting

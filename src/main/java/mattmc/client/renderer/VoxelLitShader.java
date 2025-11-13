@@ -6,6 +6,7 @@ package mattmc.client.renderer;
  * - Smooth lighting with sky and block light
  * - Ambient occlusion
  * - Directional sun lighting (Lambert N·L)
+ * - Shadow mapping for sunlight shadows
  * - Distance fog (exponential squared)
  * - Gamma correction
  */
@@ -83,5 +84,27 @@ public class VoxelLitShader extends Shader {
      */
     public void setSkyBrightness(float brightness) {
         setUniform1f("uSkyBrightness", brightness);
+    }
+    
+    /**
+     * Set the shadow map texture sampler unit (typically 1).
+     */
+    public void setShadowMapSampler(int unit) {
+        setUniform1i("uShadowMap", unit);
+    }
+    
+    /**
+     * Set the shadow matrix for transforming world coordinates to shadow space.
+     * This matrix should be: shadowProjection * shadowView * inverse(modelView)
+     */
+    public void setShadowMatrix(float[] matrix) {
+        setUniformMatrix4f("uShadowMatrix", matrix);
+    }
+    
+    /**
+     * Enable or disable shadow mapping.
+     */
+    public void setShadowsEnabled(boolean enabled) {
+        setUniform1i("uShadowsEnabled", enabled ? 1 : 0);
     }
 }
