@@ -12,8 +12,10 @@ import mattmc.world.level.chunk.LevelChunk;
  * to avoid stalling the game. Handles cross-chunk propagation by accessing neighboring chunks.
  * 
  * Algorithm:
- * - Block light: Attenuates by 1 per step, stops at opacity >= 1
- * - Skylight: Downward casts keep 15 until blocked, lateral spread attenuates
+ * - Block light: Attenuates by 1 per step in all directions, stops at opacity >= 1
+ * - Skylight: Binary system (0 or 15) that only propagates vertically downward.
+ *   Represents "can see sky" rather than light falloff. Shadows are rendered in
+ *   real-time by the CascadedShadowRenderer based on sun angle, not baked into voxel data.
  */
 public class LightPropagator {
     
@@ -273,6 +275,8 @@ public class LightPropagator {
     
     /**
      * Process a single skylight addition from the queue.
+     * Skylight only propagates downward at full strength (15).
+     * No lateral propagation - shadows are handled by the real-time shadow rendering system.
      */
     private void processSkyLightAddition() {
         LightNode node = skyLightAddQueue[skyAddHead];
@@ -284,36 +288,27 @@ public class LightPropagator {
         setSkyLight(node.x, node.y, node.z, node.level);
         markChunkDirty(node.x, node.y, node.z);
         
-        // Propagate to neighbors
-        for (int[] dir : DIRECTIONS) {
-            int nx = node.x + dir[0];
-            int ny = node.y + dir[1];
-            int nz = node.z + dir[2];
-            
-            if (ny < 0 || ny >= LevelChunk.HEIGHT) continue;
-            
+        // Only propagate downward - skylight represents "can see sky" (binary: 0 or 15)
+        // Shadows are rendered in real-time based on sun angle, not baked into voxel data
+        int nx = node.x;
+        int ny = node.y - 1; // Only check below
+        int nz = node.z;
+        
+        if (ny >= 0 && ny < LevelChunk.HEIGHT) {
             Block block = getBlock(nx, ny, nz);
-            if (block.isOpaque()) continue;
-            
-            int newLevel;
-            if (dir[1] == -1) {
-                // Downward propagation keeps full brightness
-                newLevel = node.level;
-            } else {
-                // Lateral propagation attenuates
-                newLevel = node.level - 1;
-            }
-            
-            if (newLevel > 0 && newLevel > getSkyLight(nx, ny, nz)) {
-                enqueueSkylight(nx, ny, nz, newLevel);
-                // Mark neighbor chunk dirty when light crosses chunk boundary
-                markChunkDirty(nx, ny, nz);
+            if (!block.isOpaque()) {
+                // Only propagate full skylight (15) downward
+                if (node.level == 15 && getSkyLight(nx, ny, nz) < 15) {
+                    enqueueSkylight(nx, ny, nz, 15);
+                    markChunkDirty(nx, ny, nz);
+                }
             }
         }
     }
     
     /**
      * Process a single skylight removal from the queue.
+     * Only propagates removal downward since skylight only propagates downward.
      */
     private void processSkyLightRemoval() {
         LightNode node = skyLightRemoveQueue[skyRemoveHead];
@@ -322,27 +317,42 @@ public class LightPropagator {
         setSkyLight(node.x, node.y, node.z, 0);
         markChunkDirty(node.x, node.y, node.z);
         
-        // Propagate removal to neighbors
-        for (int[] dir : DIRECTIONS) {
-            int nx = node.x + dir[0];
-            int ny = node.y + dir[1];
-            int nz = node.z + dir[2];
-            
-            if (ny < 0 || ny >= LevelChunk.HEIGHT) continue;
-            
+        // Only propagate removal downward (skylight only travels down)
+        int nx = node.x;
+        int ny = node.y - 1;
+        int nz = node.z;
+        
+        if (ny >= 0 && ny < LevelChunk.HEIGHT) {
             int neighborLight = getSkyLight(nx, ny, nz);
             
             if (neighborLight > 0) {
-                if (neighborLight < node.level || (dir[1] == -1 && neighborLight == node.level)) {
-                    // This neighbor was lit by the removed light
-                    enqueueRemoveSkylight(nx, ny, nz);
-                    // Mark neighbor chunk dirty when light removal crosses chunk boundary
-                    markChunkDirty(nx, ny, nz);
-                } else {
-                    // Re-propagate from this neighbor
-                    enqueueSkylight(nx, ny, nz, neighborLight);
-                    markChunkDirty(nx, ny, nz);
+                // The block below was lit by this skylight, remove it
+                enqueueRemoveSkylight(nx, ny, nz);
+                markChunkDirty(nx, ny, nz);
+            }
+        }
+        
+        // Check if skylight should be restored from above
+        // This happens when a block is removed and there's now a clear path to sky
+        int aboveY = node.y + 1;
+        if (aboveY < LevelChunk.HEIGHT) {
+            int aboveLight = getSkyLight(node.x, aboveY, node.z);
+            Block aboveBlock = getBlock(node.x, aboveY, node.z);
+            
+            // If the block above has skylight and is not opaque, re-propagate it down
+            if (aboveLight == 15 && !aboveBlock.isOpaque()) {
+                Block currentBlock = getBlock(node.x, node.y, node.z);
+                if (!currentBlock.isOpaque()) {
+                    enqueueSkylight(node.x, node.y, node.z, 15);
+                    markChunkDirty(node.x, node.y, node.z);
                 }
+            }
+        } else if (aboveY >= LevelChunk.HEIGHT) {
+            // At or above world height - this should have full skylight if not opaque
+            Block currentBlock = getBlock(node.x, node.y, node.z);
+            if (!currentBlock.isOpaque()) {
+                enqueueSkylight(node.x, node.y, node.z, 15);
+                markChunkDirty(node.x, node.y, node.z);
             }
         }
     }

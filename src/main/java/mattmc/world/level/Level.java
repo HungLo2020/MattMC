@@ -343,31 +343,26 @@ public class Level implements LevelAccessor {
         } else if (oldOpaque && !newOpaque) {
             // Block became transparent - need to restore skylight to this column
             // 
-            // The key insight: skylight propagates downward at full strength (level 15)
-            // until it hits an opaque block. When we remove an opaque block, we need
-            // to check if there's a clear path to the sky above and propagate skylight
-            // down through the entire column below.
+            // With the new binary skylight system (0 or 15 only), we just need to
+            // check if there's a clear path to sky above. If so, propagate full
+            // skylight (15) down through the column. No lateral propagation.
             
-            // First, check if there's skylight above or if we have a clear path to sky
+            // Check if there's skylight above or if we're at world top
             boolean hasSkylightAbove = false;
-            int skylightLevel = 0;
             
-            // Scan upward to find if we have a clear path to sky
             if (chunkY >= LevelChunk.HEIGHT - 1) {
                 // At or above world height - full skylight
                 hasSkylightAbove = true;
-                skylightLevel = 15;
             } else {
                 // Check the block directly above
                 int aboveLight = getSkyLightAt(worldX, chunkY + 1, worldZ);
-                if (aboveLight > 0) {
+                if (aboveLight == 15) {
                     hasSkylightAbove = true;
-                    skylightLevel = aboveLight;
                 }
             }
             
-            // If we have skylight from above, propagate it down through the column
-            if (hasSkylightAbove && skylightLevel == 15) {
+            // If we have full skylight from above, propagate it down through the column
+            if (hasSkylightAbove) {
                 // Full skylight from above - propagate down through entire column
                 // Start from this position and go downward
                 int currentY = chunkY;
@@ -378,28 +373,13 @@ public class Level implements LevelAccessor {
                         break;
                     }
                     
-                    // This position should have full skylight
+                    // This position should have full skylight (binary: 15)
                     lightPropagator.enqueueSkylight(worldX, currentY, worldZ, 15);
                     currentY--;
                 }
-            } else if (hasSkylightAbove && skylightLevel > 0) {
-                // Reduced skylight from above (shouldn't normally happen in vertical column)
-                lightPropagator.enqueueSkylight(worldX, chunkY, worldZ, skylightLevel);
-            } else {
-                // No skylight from above, check horizontal neighbors
-                int eastLight = getSkyLightAt(worldX + 1, chunkY, worldZ);
-                int westLight = getSkyLightAt(worldX - 1, chunkY, worldZ);
-                int northLight = getSkyLightAt(worldX, chunkY, worldZ - 1);
-                int southLight = getSkyLightAt(worldX, chunkY, worldZ + 1);
-                
-                int maxHorizontalLight = Math.max(Math.max(eastLight, westLight), 
-                                                   Math.max(northLight, southLight));
-                
-                if (maxHorizontalLight > 1) {
-                    // Skylight from the side - attenuate by 1
-                    lightPropagator.enqueueSkylight(worldX, chunkY, worldZ, maxHorizontalLight - 1);
-                }
             }
+            // No else case - if no skylight from above, block stays dark (0)
+            // Shadows are rendered in real-time based on sun angle
         }
     }
     
