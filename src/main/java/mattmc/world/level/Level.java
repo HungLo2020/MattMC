@@ -593,15 +593,55 @@ public class Level implements LevelAccessor {
             lightPropagator.enqueueRemoveSkylight(worldX, chunkY, worldZ);
         } else if (oldOpaque && !newOpaque) {
             // Block became transparent, check if skylight should propagate
-            // Check if there's skylight above this position
+            // We need to check all neighbors for skylight, not just above
+            int maxNeighborLight = 0;
+            
+            // Check above
             if (chunkY < LevelChunk.HEIGHT - 1) {
                 int aboveLight = getSkyLightAt(worldX, chunkY + 1, worldZ);
-                if (aboveLight > 0) {
-                    lightPropagator.enqueueSkylightFromSurface(worldX, chunkY, worldZ);
-                }
+                maxNeighborLight = Math.max(maxNeighborLight, aboveLight);
             } else {
-                // At top of world, propagate full skylight
-                lightPropagator.enqueueSkylightFromSurface(worldX, chunkY, worldZ);
+                // At top of world, should get full skylight
+                maxNeighborLight = 15;
+            }
+            
+            // Check all horizontal neighbors for skylight
+            int eastLight = getSkyLightAt(worldX + 1, chunkY, worldZ);
+            int westLight = getSkyLightAt(worldX - 1, chunkY, worldZ);
+            int northLight = getSkyLightAt(worldX, chunkY, worldZ - 1);
+            int southLight = getSkyLightAt(worldX, chunkY, worldZ + 1);
+            
+            maxNeighborLight = Math.max(maxNeighborLight, eastLight);
+            maxNeighborLight = Math.max(maxNeighborLight, westLight);
+            maxNeighborLight = Math.max(maxNeighborLight, northLight);
+            maxNeighborLight = Math.max(maxNeighborLight, southLight);
+            
+            // Also check below (skylight propagates downward at full strength)
+            if (chunkY > 0) {
+                int belowLight = getSkyLightAt(worldX, chunkY - 1, worldZ);
+                maxNeighborLight = Math.max(maxNeighborLight, belowLight);
+            }
+            
+            // If any neighbor has skylight, propagate it to this position
+            if (maxNeighborLight > 0) {
+                // Determine the appropriate light level for this position
+                // If light comes from above or below, it maintains full strength
+                // If it comes from the side, it attenuates by 1
+                int targetLight = maxNeighborLight;
+                
+                int aboveLight = (chunkY < LevelChunk.HEIGHT - 1) ? getSkyLightAt(worldX, chunkY + 1, worldZ) : 15;
+                int belowLight = (chunkY > 0) ? getSkyLightAt(worldX, chunkY - 1, worldZ) : 0;
+                
+                // If the max light is from above or below, maintain it; otherwise attenuate
+                if (aboveLight != maxNeighborLight && belowLight != maxNeighborLight) {
+                    // Light is coming from the side, so it should attenuate
+                    targetLight = Math.max(0, maxNeighborLight - 1);
+                }
+                
+                // Enqueue skylight propagation with the calculated light level
+                if (targetLight > 0) {
+                    lightPropagator.enqueueSkylight(worldX, chunkY, worldZ, targetLight);
+                }
             }
         }
     }
