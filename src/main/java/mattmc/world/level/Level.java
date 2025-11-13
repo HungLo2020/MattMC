@@ -223,8 +223,12 @@ public class Level implements LevelAccessor {
         // Get the neighboring chunk if it's loaded
         LevelChunk neighborChunk = getChunkIfLoaded(targetChunkX, targetChunkZ);
         if (neighborChunk == null) {
-            // Neighboring chunk not loaded - return underground default (0)
-            return 0;
+            // Neighboring chunk not loaded - use the edge value from the current chunk
+            // This prevents shadow grid patterns at chunk boundaries
+            // Clamp coordinates to the current chunk's edge
+            int edgeX = Math.max(0, Math.min(LevelChunk.WIDTH - 1, localX));
+            int edgeZ = Math.max(0, Math.min(LevelChunk.DEPTH - 1, localZ));
+            return chunk.getSkyLight(edgeX, localY, edgeZ);
         }
         
         return neighborChunk.getSkyLight(targetLocalX, localY, targetLocalZ);
@@ -282,8 +286,12 @@ public class Level implements LevelAccessor {
         // Get the neighboring chunk if it's loaded
         LevelChunk neighborChunk = getChunkIfLoaded(targetChunkX, targetChunkZ);
         if (neighborChunk == null) {
-            // Neighboring chunk not loaded - return 0
-            return 0;
+            // Neighboring chunk not loaded - use the edge value from the current chunk
+            // This prevents shadow grid patterns at chunk boundaries
+            // Clamp coordinates to the current chunk's edge
+            int edgeX = Math.max(0, Math.min(LevelChunk.WIDTH - 1, localX));
+            int edgeZ = Math.max(0, Math.min(LevelChunk.DEPTH - 1, localZ));
+            return chunk.getBlockLight(edgeX, localY, edgeZ);
         }
         
         return neighborChunk.getBlockLight(targetLocalX, localY, targetLocalZ);
