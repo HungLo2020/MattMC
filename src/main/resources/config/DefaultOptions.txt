@@ -9,7 +9,7 @@ blur_menu_screens=true
 show_block_name=true
 
 # FPS cap (30-999)
-fps_cap=60
+fps_cap=244
 
 # Resolution (format: widthxheight)
 # Supported resolutions: 1280x720, 1600x900, 1920x1080
