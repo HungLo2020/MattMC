@@ -119,6 +119,11 @@ public final class LevelChunk {
         if (x < 0 || x >= WIDTH || y < 0 || y >= HEIGHT || z < 0 || z >= DEPTH) {
             return;
         }
+        
+        // Get the old block for light updates
+        Block oldBlock = blocks[x][y][z];
+        
+        // Update the block
         blocks[x][y][z] = block;
         
         // Store or remove blockstate
@@ -127,6 +132,13 @@ public final class LevelChunk {
             blockStates.put(key, state);
         } else {
             blockStates.remove(key);
+        }
+        
+        // Update block light if emission or opacity changed
+        if (oldBlock.getLightEmission() != block.getLightEmission() || 
+            oldBlock.getOpacity() != block.getOpacity()) {
+            mattmc.world.level.lighting.LightPropagator propagator = new mattmc.world.level.lighting.LightPropagator();
+            propagator.updateBlockLight(this, x, y, z, block, oldBlock);
         }
         
         this.dirty = true;  // Mark chunk as needing re-render
