@@ -111,7 +111,7 @@ public class BlockFaceCollector {
                 BlockFaceGeometry::drawWestFace, null, chunk, cx, cy, cz));
         }
         if (eastVisible) {
-            eastFaces.add(new FaceData(x, y, z, ColorUtils.adjustColorBrightness(color, 0.8f), 1f, 0.8f, block, "side", 
+            eastFaces.add(new FaceData(x, y, z, ColorUtils.adjustColorBrightness(color, 0.6f), 1f, 0.6f, block, "side", 
                 BlockFaceGeometry::drawEastFace, null, chunk, cx, cy, cz));
         }
     }

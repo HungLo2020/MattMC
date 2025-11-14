@@ -158,14 +158,10 @@ public class MeshBuilder {
      */
     private float[] extractColor(BlockFaceCollector.FaceData face) {
         int renderColor;
-        float directionalShading = 1.0f;  // Default: no shading
         
         if (textureAtlas != null && face.block.hasTexture()) {
             // Use white color for texture modulation
             renderColor = 0xFFFFFF;
-            
-            // Apply directional shading (Minecraft's standard face brightness)
-            directionalShading = face.colorBrightness;
             
             // Apply grass green tint for grass_block top face (vanilla Minecraft-like)
             if (face.block == Blocks.GRASS_BLOCK && face.faceType != null && "top".equals(face.faceType)) {
@@ -185,7 +181,7 @@ public class MeshBuilder {
         }
         
         // Apply brightness
-        float brightness = face.brightness * directionalShading;
+        float brightness = face.brightness;
         
         int r = (renderColor >> 16) & 0xFF;
         int g = (renderColor >> 8) & 0xFF;
@@ -287,10 +283,10 @@ public class MeshBuilder {
         // North face (normal = 0,0,-1)
         else if (normalIndex == 2) {
             switch (cornerIndex) {
-                case 0: return new int[] {0,0,0, 1,0,0, 0,-1,0, 1,-1,0};   // x1, y0
-                case 1: return new int[] {0,0,0, -1,0,0, 0,-1,0, -1,-1,0}; // x0, y0
-                case 2: return new int[] {0,0,0, -1,0,0, 0,1,0, -1,1,0};   // x0, y1
-                case 3: return new int[] {0,0,0, 1,0,0, 0,1,0, 1,1,0};     // x1, y1
+                case 0: return new int[] {0,0,-1, 1,0,-1, 0,-1,-1, 1,-1,-1};   // x1, y0
+                case 1: return new int[] {0,0,-1, -1,0,-1, 0,-1,-1, -1,-1,-1}; // x0, y0
+                case 2: return new int[] {0,0,-1, -1,0,-1, 0,1,-1, -1,1,-1};   // x0, y1
+                case 3: return new int[] {0,0,-1, 1,0,-1, 0,1,-1, 1,1,-1};     // x1, y1
             }
         }
         // South face (normal = 0,0,1)
@@ -305,10 +301,10 @@ public class MeshBuilder {
         // West face (normal = -1,0,0)
         else if (normalIndex == 4) {
             switch (cornerIndex) {
-                case 0: return new int[] {0,0,0, 0,0,-1, 0,-1,0, 0,-1,-1}; // z0, y0
-                case 1: return new int[] {0,0,0, 0,0,1, 0,-1,0, 0,-1,1};   // z1, y0
-                case 2: return new int[] {0,0,0, 0,0,1, 0,1,0, 0,1,1};     // z1, y1
-                case 3: return new int[] {0,0,0, 0,0,-1, 0,1,0, 0,1,-1};   // z0, y1
+                case 0: return new int[] {-1,0,0, -1,0,-1, -1,-1,0, -1,-1,-1}; // z0, y0
+                case 1: return new int[] {-1,0,0, -1,0,1, -1,-1,0, -1,-1,1};   // z1, y0
+                case 2: return new int[] {-1,0,0, -1,0,1, -1,1,0, -1,1,1};     // z1, y1
+                case 3: return new int[] {-1,0,0, -1,0,-1, -1,1,0, -1,1,-1};   // z0, y1
             }
         }
         // East face (normal = 1,0,0)
