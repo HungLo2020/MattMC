@@ -163,14 +163,161 @@ public class MeshBuilder {
     }
     
     /**
-     * Sample light for a vertex - always returns default values now.
-     * Returns [unused1, unused2, unused3] as floats.
+     * Sample light for a vertex using 8-sample smooth lighting.
+     * 
+     * For each vertex, we sample light from the 3 adjacent faces + 1 diagonal corner.
+     * This creates smooth lighting gradients across block edges without banding.
+     * 
+     * @param face The face data containing chunk reference and position
+     * @param normalIndex Which face (0=top, 1=bottom, 2=north, 3=south, 4=west, 5=east)
+     * @param cornerIndex Which corner of the face (0-3)
+     * @return [skyLight, blockLight, ao] as floats (0-15 for light, 0-3 for ao)
      */
     private float[] sampleVertexLight(BlockFaceCollector.FaceData face, 
                                       int normalIndex,
                                       int cornerIndex) {
-        // Default: unused values
-        return new float[] {0.0f, 0.0f, 0.0f};
+        // If no chunk reference, return default lighting
+        if (face.chunk == null) {
+            return new float[] {15.0f, 0.0f, 0.0f}; // Full skylight, no blocklight, no AO
+        }
+        
+        // Get chunk-local coordinates of the block
+        int cx = face.cx;
+        int cy = face.cy;
+        int cz = face.cz;
+        
+        // Sample light from 4 positions around the vertex (3 sides + 1 diagonal)
+        // The positions depend on which face and which corner we're sampling
+        int[] offsets = getVertexSampleOffsets(normalIndex, cornerIndex);
+        
+        float skyLightSum = 0;
+        float blockLightSum = 0;
+        int samples = 0;
+        
+        // Sample 4 positions (3 adjacent + 1 diagonal)
+        for (int i = 0; i < 4; i++) {
+            int dx = offsets[i * 3];
+            int dy = offsets[i * 3 + 1];
+            int dz = offsets[i * 3 + 2];
+            
+            int sx = cx + dx;
+            int sy = cy + dy;
+            int sz = cz + dz;
+            
+            // Sample light at this position
+            int skyLight = getSkyLightSafe(face.chunk, sx, sy, sz);
+            int blockLight = getBlockLightSafe(face.chunk, sx, sy, sz);
+            
+            skyLightSum += skyLight;
+            blockLightSum += blockLight;
+            samples++;
+        }
+        
+        // Average the samples
+        float avgSkyLight = skyLightSum / samples;
+        float avgBlockLight = blockLightSum / samples;
+        float ao = 0.0f; // No AO yet
+        
+        return new float[] {avgSkyLight, avgBlockLight, ao};
+    }
+    
+    /**
+     * Get offsets for the 4 sample positions for a vertex (3 sides + 1 diagonal).
+     * Returns array of 12 ints: [dx0,dy0,dz0, dx1,dy1,dz1, dx2,dy2,dz2, dx3,dy3,dz3]
+     */
+    private int[] getVertexSampleOffsets(int normalIndex, int cornerIndex) {
+        // For each face and corner, define the 4 sampling positions
+        // Format: [dx,dy,dz, dx,dy,dz, dx,dy,dz, dx,dy,dz]
+        
+        // Top face (normal = 0,1,0)
+        if (normalIndex == 0) {
+            switch (cornerIndex) {
+                case 0: return new int[] {0,1,0, -1,1,0, 0,1,-1, -1,1,-1}; // x0, z0
+                case 1: return new int[] {0,1,0, -1,1,0, 0,1,1, -1,1,1};   // x0, z1
+                case 2: return new int[] {0,1,0, 1,1,0, 0,1,1, 1,1,1};     // x1, z1
+                case 3: return new int[] {0,1,0, 1,1,0, 0,1,-1, 1,1,-1};   // x1, z0
+            }
+        }
+        // Bottom face (normal = 0,-1,0)
+        else if (normalIndex == 1) {
+            switch (cornerIndex) {
+                case 0: return new int[] {0,0,0, -1,0,0, 0,0,-1, -1,0,-1}; // x0, z0
+                case 1: return new int[] {0,0,0, 1,0,0, 0,0,-1, 1,0,-1};   // x1, z0
+                case 2: return new int[] {0,0,0, 1,0,0, 0,0,1, 1,0,1};     // x1, z1
+                case 3: return new int[] {0,0,0, -1,0,0, 0,0,1, -1,0,1};   // x0, z1
+            }
+        }
+        // North face (normal = 0,0,-1)
+        else if (normalIndex == 2) {
+            switch (cornerIndex) {
+                case 0: return new int[] {0,0,0, 1,0,0, 0,-1,0, 1,-1,0};   // x1, y0
+                case 1: return new int[] {0,0,0, -1,0,0, 0,-1,0, -1,-1,0}; // x0, y0
+                case 2: return new int[] {0,0,0, -1,0,0, 0,1,0, -1,1,0};   // x0, y1
+                case 3: return new int[] {0,0,0, 1,0,0, 0,1,0, 1,1,0};     // x1, y1
+            }
+        }
+        // South face (normal = 0,0,1)
+        else if (normalIndex == 3) {
+            switch (cornerIndex) {
+                case 0: return new int[] {0,0,1, -1,0,1, 0,-1,1, -1,-1,1}; // x0, y0
+                case 1: return new int[] {0,0,1, 1,0,1, 0,-1,1, 1,-1,1};   // x1, y0
+                case 2: return new int[] {0,0,1, 1,0,1, 0,1,1, 1,1,1};     // x1, y1
+                case 3: return new int[] {0,0,1, -1,0,1, 0,1,1, -1,1,1};   // x0, y1
+            }
+        }
+        // West face (normal = -1,0,0)
+        else if (normalIndex == 4) {
+            switch (cornerIndex) {
+                case 0: return new int[] {0,0,0, 0,0,-1, 0,-1,0, 0,-1,-1}; // z0, y0
+                case 1: return new int[] {0,0,0, 0,0,1, 0,-1,0, 0,-1,1};   // z1, y0
+                case 2: return new int[] {0,0,0, 0,0,1, 0,1,0, 0,1,1};     // z1, y1
+                case 3: return new int[] {0,0,0, 0,0,-1, 0,1,0, 0,1,-1};   // z0, y1
+            }
+        }
+        // East face (normal = 1,0,0)
+        else if (normalIndex == 5) {
+            switch (cornerIndex) {
+                case 0: return new int[] {1,0,0, 1,0,1, 1,-1,0, 1,-1,1};   // z1, y0
+                case 1: return new int[] {1,0,0, 1,0,-1, 1,-1,0, 1,-1,-1}; // z0, y0
+                case 2: return new int[] {1,0,0, 1,0,-1, 1,1,0, 1,1,-1};   // z0, y1
+                case 3: return new int[] {1,0,0, 1,0,1, 1,1,0, 1,1,1};     // z1, y1
+            }
+        }
+        
+        // Default: sample center position 4 times
+        return new int[] {0,0,0, 0,0,0, 0,0,0, 0,0,0};
+    }
+    
+    /**
+     * Get skylight value safely, returning 15 if out of bounds.
+     */
+    private int getSkyLightSafe(mattmc.world.level.chunk.LevelChunk chunk, int x, int y, int z) {
+        // Check bounds
+        if (y < 0 || y >= mattmc.world.level.chunk.LevelChunk.HEIGHT) {
+            return 15; // Out of bounds: full skylight
+        }
+        if (x < 0 || x >= mattmc.world.level.chunk.LevelChunk.WIDTH ||
+            z < 0 || z >= mattmc.world.level.chunk.LevelChunk.DEPTH) {
+            return 15; // Out of chunk bounds: full skylight (TODO: sample neighbor chunks)
+        }
+        
+        return chunk.getSkyLight(x, y, z);
+    }
+    
+    /**
+     * Get blocklight value safely, returning 0 if out of bounds.
+     */
+    private int getBlockLightSafe(mattmc.world.level.chunk.LevelChunk chunk, int x, int y, int z) {
+        // Check bounds
+        if (y < 0 || y >= mattmc.world.level.chunk.LevelChunk.HEIGHT) {
+            return 0; // Out of bounds: no blocklight
+        }
+        if (x < 0 || x >= mattmc.world.level.chunk.LevelChunk.WIDTH ||
+            z < 0 || z >= mattmc.world.level.chunk.LevelChunk.DEPTH) {
+            return 0; // Out of chunk bounds: no blocklight (TODO: sample neighbor chunks)
+        }
+        
+        return chunk.getBlockLight(x, y, z);
     }
     
     /**

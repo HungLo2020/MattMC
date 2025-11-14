@@ -165,6 +165,16 @@ public class Block {
     }
     
     /**
+     * Get the opacity of this block (how much it blocks light).
+     * 
+     * @return Opacity level (0-15), where 0 means fully transparent and 15 means fully opaque
+     */
+    public int getOpacity() {
+        // By default, solid blocks are fully opaque (15), air and non-solid blocks are transparent (0)
+        return solid ? 15 : 0;
+    }
+    
+    /**
      * Get the collision shape for this block.
      * Override this method in subclasses to provide custom collision shapes.
      * 
