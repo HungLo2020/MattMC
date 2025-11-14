@@ -717,15 +717,17 @@ public class MeshBuilder {
         }
         
         // Convert from pixels to block coordinates (0-1)
-        float x0 = x + from[0] / 16.0f;
-        float y0 = y + from[1] / 16.0f;
-        float z0 = z + from[2] / 16.0f;
-        float x1 = x + to[0] / 16.0f;
-        float y1 = y + to[1] / 16.0f;
-        float z1 = z + to[2] / 16.0f;
+        float x0 = from[0] / 16.0f;
+        float y0 = from[1] / 16.0f;
+        float z0 = from[2] / 16.0f;
+        float x1 = to[0] / 16.0f;
+        float y1 = to[1] / 16.0f;
+        float z1 = to[2] / 16.0f;
         
-        // Apply rotation from variant (TODO: implement rotation)
-        // For now, rotation is handled by having different model variants
+        // Apply rotation from variant
+        // Rotations are in degrees: x rotates around X axis, y rotates around Y axis
+        int rotX = variant.getX() != null ? variant.getX() : 0;
+        int rotY = variant.getY() != null ? variant.getY() : 0;
         
         // Render each face of the element
         java.util.Map<String, mattmc.client.resources.model.ModelElement.ElementFace> faces = element.getFaces();
@@ -774,8 +776,9 @@ public class MeshBuilder {
                 v1 = uvMapping.v1;
             }
             
-            // Render the face based on direction
-            renderElementFace(direction, x0, y0, z0, x1, y1, z1, u0, v0, u1, v1);
+            // Render the face based on direction, with rotation applied
+            renderElementFace(direction, x, y, z, x0, y0, z0, x1, y1, z1, 
+                            u0, v0, u1, v1, rotX, rotY);
         }
     }
     
@@ -803,12 +806,73 @@ public class MeshBuilder {
     }
     
     /**
-     * Render a face of a model element.
+     * Render a face of a model element with rotation applied.
+     * 
+     * @param direction Face direction (up, down, north, south, east, west)
+     * @param worldX World X position of the block
+     * @param worldY World Y position of the block
+     * @param worldZ World Z position of the block
+     * @param x0 Local X minimum (0-1)
+     * @param y0 Local Y minimum (0-1)
+     * @param z0 Local Z minimum (0-1)
+     * @param x1 Local X maximum (0-1)
+     * @param y1 Local Y maximum (0-1)
+     * @param z1 Local Z maximum (0-1)
+     * @param u0 UV u minimum
+     * @param v0 UV v minimum
+     * @param u1 UV u maximum
+     * @param v1 UV v maximum
+     * @param rotX Rotation around X axis in degrees (0, 90, 180, 270)
+     * @param rotY Rotation around Y axis in degrees (0, 90, 180, 270)
      */
-    private void renderElementFace(String direction, 
+    private void renderElementFace(String direction,
+                                    float worldX, float worldY, float worldZ,
                                     float x0, float y0, float z0,
                                     float x1, float y1, float z1,
-                                    float u0, float v0, float u1, float v1) {
+                                    float u0, float v0, float u1, float v1,
+                                    int rotX, int rotY) {
+        
+        // Apply Y rotation (around vertical axis) to the coordinates and direction
+        if (rotY != 0) {
+            // Rotate the element bounds around Y axis
+            float[] rotated = rotateY(x0, z0, rotY);
+            float rx0 = rotated[0], rz0 = rotated[1];
+            rotated = rotateY(x1, z1, rotY);
+            float rx1 = rotated[0], rz1 = rotated[1];
+            
+            // Ensure min/max are correct after rotation
+            x0 = Math.min(rx0, rx1);
+            x1 = Math.max(rx0, rx1);
+            z0 = Math.min(rz0, rz1);
+            z1 = Math.max(rz0, rz1);
+            
+            // Rotate the face direction
+            direction = rotateFaceDirection(direction, rotY, rotX);
+        }
+        
+        // Apply X rotation (flip upside down for top/bottom stairs)
+        if (rotX == 180) {
+            // Flip Y coordinates
+            float temp = y0;
+            y0 = 1.0f - y1;
+            y1 = 1.0f - temp;
+            
+            // Flip face direction for vertical faces
+            if (direction.equals("up")) {
+                direction = "down";
+            } else if (direction.equals("down")) {
+                direction = "up";
+            }
+        }
+        
+        // Add world offset
+        x0 += worldX;
+        x1 += worldX;
+        y0 += worldY;
+        y1 += worldY;
+        z0 += worldZ;
+        z1 += worldZ;
+        
         // Color and brightness based on direction
         float[] color;
         switch (direction) {
@@ -868,6 +932,83 @@ public class MeshBuilder {
         
         addQuadIndices(base);
         currentVertex += 4;
+    }
+    
+    /**
+     * Rotate coordinates around Y axis (vertical).
+     * Returns [newX, newZ].
+     */
+    private float[] rotateY(float x, float z, int degrees) {
+        // Center at 0.5, 0.5
+        x -= 0.5f;
+        z -= 0.5f;
+        
+        float newX, newZ;
+        switch (degrees) {
+            case 90 -> {
+                // 90 degrees clockwise: (x,z) -> (z, -x)
+                newX = z;
+                newZ = -x;
+            }
+            case 180 -> {
+                // 180 degrees: (x,z) -> (-x, -z)
+                newX = -x;
+                newZ = -z;
+            }
+            case 270 -> {
+                // 270 degrees clockwise: (x,z) -> (-z, x)
+                newX = -z;
+                newZ = x;
+            }
+            default -> {
+                newX = x;
+                newZ = z;
+            }
+        }
+        
+        // Offset back
+        newX += 0.5f;
+        newZ += 0.5f;
+        
+        return new float[]{newX, newZ};
+    }
+    
+    /**
+     * Rotate a face direction based on Y and X rotations.
+     */
+    private String rotateFaceDirection(String direction, int rotY, int rotX) {
+        // Apply Y rotation (horizontal)
+        if (rotY != 0) {
+            direction = switch (direction) {
+                case "north" -> {
+                    if (rotY == 90) yield "east";
+                    if (rotY == 180) yield "south";
+                    if (rotY == 270) yield "west";
+                    yield direction;
+                }
+                case "east" -> {
+                    if (rotY == 90) yield "south";
+                    if (rotY == 180) yield "west";
+                    if (rotY == 270) yield "north";
+                    yield direction;
+                }
+                case "south" -> {
+                    if (rotY == 90) yield "west";
+                    if (rotY == 180) yield "north";
+                    if (rotY == 270) yield "east";
+                    yield direction;
+                }
+                case "west" -> {
+                    if (rotY == 90) yield "north";
+                    if (rotY == 180) yield "east";
+                    if (rotY == 270) yield "south";
+                    yield direction;
+                }
+                default -> direction;
+            };
+        }
+        
+        return direction;
     }
     
 }
