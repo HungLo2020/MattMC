@@ -71,8 +71,8 @@ public class LightPropagator {
 		addQueue.offer(new LightNode(chunk, x, y, z, emission));
 		
 		// BFS propagation
-		while (!addQueue.isEmpty()) {
-			LightNode node = addQueue.poll();
+		LightNode node;
+		while ((node = addQueue.poll()) != null) {
 			int currentLight = node.lightLevel;
 			
 			if (currentLight <= 1) {
@@ -151,32 +151,32 @@ public class LightPropagator {
 		
 		Queue<LightNode> boundaryQueue = new ArrayDeque<>();
 		
-		while (!removeQueue.isEmpty()) {
-			LightNode node = removeQueue.poll();
+		LightNode node2;
+		while ((node2 = removeQueue.poll()) != null) {
 			
 			// Check all 6 neighbors
-			checkNeighborForRemoval(node.chunk, node.x - 1, node.y, node.z, node.lightLevel, boundaryQueue);
-			checkNeighborForRemoval(node.chunk, node.x + 1, node.y, node.z, node.lightLevel, boundaryQueue);
-			checkNeighborForRemoval(node.chunk, node.x, node.y - 1, node.z, node.lightLevel, boundaryQueue);
-			checkNeighborForRemoval(node.chunk, node.x, node.y + 1, node.z, node.lightLevel, boundaryQueue);
-			checkNeighborForRemoval(node.chunk, node.x, node.y, node.z - 1, node.lightLevel, boundaryQueue);
-			checkNeighborForRemoval(node.chunk, node.x, node.y, node.z + 1, node.lightLevel, boundaryQueue);
+			checkNeighborForRemoval(node2.chunk, node2.x - 1, node2.y, node2.z, node2.lightLevel, boundaryQueue);
+			checkNeighborForRemoval(node2.chunk, node2.x + 1, node2.y, node2.z, node2.lightLevel, boundaryQueue);
+			checkNeighborForRemoval(node2.chunk, node2.x, node2.y - 1, node2.z, node2.lightLevel, boundaryQueue);
+			checkNeighborForRemoval(node2.chunk, node2.x, node2.y + 1, node2.z, node2.lightLevel, boundaryQueue);
+			checkNeighborForRemoval(node2.chunk, node2.x, node2.y, node2.z - 1, node2.lightLevel, boundaryQueue);
+			checkNeighborForRemoval(node2.chunk, node2.x, node2.y, node2.z + 1, node2.lightLevel, boundaryQueue);
 		}
 		
 		// Re-propagate light from boundary nodes
 		addQueue.clear();
-		while (!boundaryQueue.isEmpty()) {
-			LightNode node = boundaryQueue.poll();
-			int light = node.chunk.getBlockLight(node.x, node.y, node.z);
+		LightNode node3;
+		while ((node3 = boundaryQueue.poll()) != null) {
+			int light = node3.chunk.getBlockLight(node3.x, node3.y, node3.z);
 			if (light > 0) {
-				addQueue.offer(node);
+				addQueue.offer(node3);
 			}
 		}
 		
 		// BFS re-propagation from boundary
-		while (!addQueue.isEmpty()) {
-			LightNode node = addQueue.poll();
-			int currentLight = node.chunk.getBlockLight(node.x, node.y, node.z);
+		LightNode node4;
+		while ((node4 = addQueue.poll()) != null) {
+			int currentLight = node4.chunk.getBlockLight(node4.x, node4.y, node4.z);
 			
 			if (currentLight <= 1) {
 				continue;
@@ -184,12 +184,12 @@ public class LightPropagator {
 			
 			int newLight = currentLight - 1;
 			
-			repropagateToNeighbor(node.chunk, node.x - 1, node.y, node.z, newLight);
-			repropagateToNeighbor(node.chunk, node.x + 1, node.y, node.z, newLight);
-			repropagateToNeighbor(node.chunk, node.x, node.y - 1, node.z, newLight);
-			repropagateToNeighbor(node.chunk, node.x, node.y + 1, node.z, newLight);
-			repropagateToNeighbor(node.chunk, node.x, node.y, node.z - 1, newLight);
-			repropagateToNeighbor(node.chunk, node.x, node.y, node.z + 1, newLight);
+			repropagateToNeighbor(node4.chunk, node4.x - 1, node4.y, node4.z, newLight);
+			repropagateToNeighbor(node4.chunk, node4.x + 1, node4.y, node4.z, newLight);
+			repropagateToNeighbor(node4.chunk, node4.x, node4.y - 1, node4.z, newLight);
+			repropagateToNeighbor(node4.chunk, node4.x, node4.y + 1, node4.z, newLight);
+			repropagateToNeighbor(node4.chunk, node4.x, node4.y, node4.z - 1, newLight);
+			repropagateToNeighbor(node4.chunk, node4.x, node4.y, node4.z + 1, newLight);
 		}
 	}
 	

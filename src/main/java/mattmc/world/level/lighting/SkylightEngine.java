@@ -113,8 +113,8 @@ public class SkylightEngine {
 		}
 		
 		// BFS propagation
-		while (!addQueue.isEmpty()) {
-			SkyNode node = addQueue.poll();
+		SkyNode node;
+		while ((node = addQueue.poll()) != null) {
 			
 			if (node.lightLevel <= 0) {
 				continue;
@@ -242,8 +242,8 @@ public class SkylightEngine {
 			}
 			
 			// Second pass: BFS propagation to neighbors
-			while (!addQueue.isEmpty()) {
-				SkyNode node = addQueue.poll();
+			SkyNode node;
+			while ((node = addQueue.poll()) != null) {
 				int nextLight = node.lightLevel - 1;
 				if (nextLight > 0) {
 					propagateSkyToNeighbor(chunk, node.x - 1, node.y, node.z, nextLight);
@@ -280,16 +280,16 @@ public class SkylightEngine {
 			addQueue.clear();
 			addQueue.offer(new SkyNode(x, y, z, newLight));
 			
-			while (!addQueue.isEmpty()) {
-				SkyNode node = addQueue.poll();
-				int nextLight = node.lightLevel - 1;
+			SkyNode node2;
+			while ((node2 = addQueue.poll()) != null) {
+				int nextLight = node2.lightLevel - 1;
 				if (nextLight > 0) {
-					propagateSkyToNeighbor(chunk, node.x - 1, node.y, node.z, nextLight);
-					propagateSkyToNeighbor(chunk, node.x + 1, node.y, node.z, nextLight);
-					propagateSkyToNeighbor(chunk, node.x, node.y - 1, node.z, nextLight);
-					propagateSkyToNeighbor(chunk, node.x, node.y + 1, node.z, nextLight);
-					propagateSkyToNeighbor(chunk, node.x, node.y, node.z - 1, nextLight);
-					propagateSkyToNeighbor(chunk, node.x, node.y, node.z + 1, nextLight);
+					propagateSkyToNeighbor(chunk, node2.x - 1, node2.y, node2.z, nextLight);
+					propagateSkyToNeighbor(chunk, node2.x + 1, node2.y, node2.z, nextLight);
+					propagateSkyToNeighbor(chunk, node2.x, node2.y - 1, node2.z, nextLight);
+					propagateSkyToNeighbor(chunk, node2.x, node2.y + 1, node2.z, nextLight);
+					propagateSkyToNeighbor(chunk, node2.x, node2.y, node2.z - 1, nextLight);
+					propagateSkyToNeighbor(chunk, node2.x, node2.y, node2.z + 1, nextLight);
 				}
 			}
 		}
@@ -312,8 +312,8 @@ public class SkylightEngine {
 		
 		Queue<SkyNode> boundaryQueue = new ArrayDeque<>();
 		
-		while (!removeQueue.isEmpty()) {
-			SkyNode node = removeQueue.poll();
+		SkyNode node;
+		while ((node = removeQueue.poll()) != null) {
 			
 			checkNeighborForRemoval(chunk, node.x - 1, node.y, node.z, node.lightLevel, boundaryQueue);
 			checkNeighborForRemoval(chunk, node.x + 1, node.y, node.z, node.lightLevel, boundaryQueue);
@@ -327,18 +327,18 @@ public class SkylightEngine {
 		addQueue.clear();
 		addQueue.addAll(boundaryQueue);
 		
-		while (!addQueue.isEmpty()) {
-			SkyNode node = addQueue.poll();
-			int currentLight = chunk.getSkyLight(node.x, node.y, node.z);
+		SkyNode node3;
+		while ((node3 = addQueue.poll()) != null) {
+			int currentLight = chunk.getSkyLight(node3.x, node3.y, node3.z);
 			int nextLight = currentLight - 1;
 			
 			if (nextLight > 0) {
-				propagateSkyToNeighbor(chunk, node.x - 1, node.y, node.z, nextLight);
-				propagateSkyToNeighbor(chunk, node.x + 1, node.y, node.z, nextLight);
-				propagateSkyToNeighbor(chunk, node.x, node.y - 1, node.z, nextLight);
-				propagateSkyToNeighbor(chunk, node.x, node.y + 1, node.z, nextLight);
-				propagateSkyToNeighbor(chunk, node.x, node.y, node.z - 1, nextLight);
-				propagateSkyToNeighbor(chunk, node.x, node.y, node.z + 1, nextLight);
+				propagateSkyToNeighbor(chunk, node3.x - 1, node3.y, node3.z, nextLight);
+				propagateSkyToNeighbor(chunk, node3.x + 1, node3.y, node3.z, nextLight);
+				propagateSkyToNeighbor(chunk, node3.x, node3.y - 1, node3.z, nextLight);
+				propagateSkyToNeighbor(chunk, node3.x, node3.y + 1, node3.z, nextLight);
+				propagateSkyToNeighbor(chunk, node3.x, node3.y, node3.z - 1, nextLight);
+				propagateSkyToNeighbor(chunk, node3.x, node3.y, node3.z + 1, nextLight);
 			}
 		}
 	}
