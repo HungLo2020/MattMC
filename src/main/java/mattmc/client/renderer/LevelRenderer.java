@@ -19,6 +19,7 @@ import org.slf4j.LoggerFactory;
  * 
  * Now handles async mesh uploads from background threads and texture atlas.
  * Implements frustum culling to skip rendering chunks outside the camera view.
+ * Simplified version with no lighting or shadow effects.
  */
 public class LevelRenderer {
     private static final Logger logger = LoggerFactory.getLogger(LevelRenderer.class);
@@ -27,6 +28,7 @@ public class LevelRenderer {
     private final Frustum frustum;
     private Level currentLevel;
     private boolean textureAtlasInitialized = false;
+    private boolean firstRenderLogged = false;
     
     // Statistics for debugging
     private int totalChunks = 0;
@@ -120,7 +122,11 @@ public class LevelRenderer {
             // Only do GL matrix operations if we're actually going to render
             glPushMatrix();
             glTranslatef(chunkWorldX, 0, chunkWorldZ);
-            if (chunkRenderer.renderChunk(chunk)) {
+            
+            // Render chunk with basic shader (no lighting/shadows)
+            boolean rendered = chunkRenderer.renderChunk(chunk);
+            
+            if (rendered) {
                 renderedChunks++;
             } else {
                 // Chunk lost its VAO between the hasChunkMesh check and now
@@ -131,6 +137,12 @@ public class LevelRenderer {
         }
         
         glPopMatrix();
+        
+        // Log rendering stats on first render only
+        if (!firstRenderLogged && renderedChunks > 0) {
+            logger.info("Rendering {} chunks with basic shader", renderedChunks);
+            firstRenderLogged = true;
+        }
     }
     
     /**

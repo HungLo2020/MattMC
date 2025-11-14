@@ -88,9 +88,9 @@ public class Item {
         if (texturePaths == null && identifier != null) {
             // Extract item name from identifier (e.g., "mattmc:diamond" -> "diamond")
             String itemName = identifier.contains(":") ? identifier.substring(identifier.indexOf(':') + 1) : identifier;
-            // Note: ResourceManager.getItemTexturePaths() would need to be implemented
-            // For now, we'll set it to null and rely on future implementation
-            texturePaths = null; // TODO: Implement ResourceManager.getItemTexturePaths(itemName)
+            // Note: Item texture paths are currently not loaded from ResourceManager
+            // They should be set explicitly when registering items
+            texturePaths = null;
         }
         return texturePaths;
     }

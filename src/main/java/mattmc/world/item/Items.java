@@ -68,7 +68,8 @@ public class Items {
     public static final BlockItem WARPED_PLANKS = register("warped_planks", new BlockItem(Blocks.WARPED_PLANKS));
     public static final BlockItem CRIMSON_PLANKS = register("crimson_planks", new BlockItem(Blocks.CRIMSON_PLANKS));
     public static final BlockItem BIRCH_STAIRS = register("birch_stairs", new BlockItem(Blocks.BIRCH_STAIRS));
-    
+    public static final BlockItem TORCH = register("torch", new BlockItem(Blocks.TORCH));
+
     // Basic materials (stackable, 64 max)
     //public static final Item STICK = register("stick", new Item(64));
     //public static final Item COAL = register("coal", new Item(64));

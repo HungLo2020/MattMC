@@ -8,6 +8,7 @@ import mattmc.client.renderer.block.BlockFaceCollector;
 import mattmc.world.level.block.Block;
 import mattmc.world.level.block.Blocks;
 import mattmc.world.level.levelgen.WorldGenerator;
+import mattmc.world.level.lighting.WorldLightManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -47,6 +48,15 @@ public class AsyncChunkLoader {
     private TextureAtlas textureAtlas;
     private WorldGenerator worldGenerator;
     private BlockFaceCollector.ChunkNeighborAccessor neighborAccessor;
+    private LightAccessor lightAccessor;
+    
+    /**
+     * Interface for accessing light values across chunk boundaries.
+     */
+    public interface LightAccessor {
+        int getSkyLight(LevelChunk chunk, int x, int y, int z);
+        int getBlockLight(LevelChunk chunk, int x, int y, int z);
+    }
     
     public AsyncChunkLoader() {
         this.executor = new ChunkTaskExecutor();
@@ -81,6 +91,13 @@ public class AsyncChunkLoader {
      */
     public void setNeighborAccessor(BlockFaceCollector.ChunkNeighborAccessor accessor) {
         this.neighborAccessor = accessor;
+    }
+    
+    /**
+     * Set the light accessor for cross-chunk light sampling.
+     */
+    public void setLightAccessor(LightAccessor accessor) {
+        this.lightAccessor = accessor;
     }
     
     /**
@@ -224,7 +241,8 @@ public class AsyncChunkLoader {
         }
         
         // Return up to budget limit for this frame
-        List<ChunkMeshData> result = new ArrayList<>();
+        // Pre-allocate with maximum possible size to avoid resizing
+        List<ChunkMeshData> result = new ArrayList<>(MAX_MESH_UPLOADS_PER_FRAME);
         for (int i = 0; i < MAX_MESH_UPLOADS_PER_FRAME && !completedMeshes.isEmpty(); i++) {
             ChunkMeshData meshData = completedMeshes.poll();
             if (meshData != null) {
@@ -264,7 +282,10 @@ public class AsyncChunkLoader {
                 if (regionFile.hasChunk(chunkX, chunkZ)) {
                     Map<String, Object> chunkNBT = regionFile.readChunk(chunkX, chunkZ);
                     if (chunkNBT != null) {
-                        return ChunkNBT.fromNBT(chunkNBT);
+                        LevelChunk chunk = ChunkNBT.fromNBT(chunkNBT);
+                        // Initialize skylight for loaded chunks with BFS propagation
+                        WorldLightManager.getInstance().initializeChunkSkylight(chunk);
+                        return chunk;
                     }
                 }
             } catch (IOException e) {
@@ -301,7 +322,10 @@ public class AsyncChunkLoader {
                 
                 Map<String, Object> chunkNBT = regionFile.readChunk(chunkX, chunkZ);
                 if (chunkNBT != null) {
-                    return ChunkNBT.fromNBT(chunkNBT);
+                    LevelChunk chunk = ChunkNBT.fromNBT(chunkNBT);
+                    // Initialize skylight for loaded chunks with BFS propagation
+                    WorldLightManager.getInstance().initializeChunkSkylight(chunk);
+                    return chunk;
                 }
             }
         } catch (IOException e) {
@@ -352,6 +376,7 @@ public class AsyncChunkLoader {
         
         BlockFaceCollector collector = collectChunkFaces(chunk);
         MeshBuilder meshBuilder = new MeshBuilder(textureAtlas);
+        
         return meshBuilder.build(chunk.chunkX(), chunk.chunkZ(), collector);
     }
     
@@ -461,7 +486,8 @@ public class AsyncChunkLoader {
         }
         
         // Return up to budget limit for this frame
-        List<ChunkMeshBuffer> result = new ArrayList<>();
+        // Pre-allocate with maximum possible size to avoid resizing
+        List<ChunkMeshBuffer> result = new ArrayList<>(MAX_MESH_UPLOADS_PER_FRAME);
         for (int i = 0; i < MAX_MESH_UPLOADS_PER_FRAME && !completedMeshBuffers.isEmpty(); i++) {
             ChunkMeshBuffer meshBuffer = completedMeshBuffers.poll();
             if (meshBuffer != null) {

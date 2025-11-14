@@ -1,5 +1,6 @@
 package mattmc.client.renderer.chunk;
 
+import mattmc.client.renderer.VoxelLitShader;
 import mattmc.client.renderer.texture.TextureAtlas;
 import mattmc.world.level.chunk.LevelChunk;
 import mattmc.world.level.chunk.ChunkUtils;
@@ -8,12 +9,13 @@ import java.util.HashMap;
 import java.util.Map;
 
 import static org.lwjgl.opengl.GL11.*;
+import static org.lwjgl.opengl.GL13.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Handles rendering of chunks using VBO/VAO with texture atlas.
- * Modern rendering approach similar to Minecraft Java Edition.
+ * Handles rendering of chunks using VBO/VAO with texture atlas and per-vertex lighting.
+ * Supports gamma-corrected lighting with configurable gamma curve.
  */
 public class ChunkRenderer {
     private static final Logger logger = LoggerFactory.getLogger(ChunkRenderer.class);
@@ -31,6 +33,9 @@ public class ChunkRenderer {
     
     // Texture atlas for VBO rendering
     private TextureAtlas textureAtlas = null;
+    
+    // Basic shader for rendering
+    private VoxelLitShader shader = null;
     
     /**
      * Register a chunk for tracking (so mesh buffers can be uploaded to it).
@@ -54,35 +59,51 @@ public class ChunkRenderer {
         return vaoCache.get(chunk) != null;
     }
     
-    /**
-     * Render a chunk using VBO/VAO.
-     * Returns true if rendering actually happened.
-     * 
-     * @return true if the chunk was rendered, false if no VAO available
-     */
-    public boolean renderChunk(LevelChunk chunk) {
-        // Get VAO
-        ChunkVAO vao = vaoCache.get(chunk);
-        if (vao == null) {
-            // VAO not ready yet - it will be uploaded later from async mesh building
-            return false;
-        }
-        
-        // Enable texturing and bind texture atlas
-        glEnable(GL_TEXTURE_2D);
-        if (textureAtlas != null) {
-            textureAtlas.bind();
-        }
-        
-        // Render using VAO (single draw call!)
-        vao.render();
-        
-        // Unbind texture
-        glBindTexture(GL_TEXTURE_2D, 0);
-        
-        return true;
-    }
-    
+	/**
+	 * Render a chunk using VBO/VAO with lighting shader.
+	 * Returns true if rendering actually happened.
+	 * 
+	 * @param chunk The chunk to render
+	 * @return true if the chunk was rendered, false if no VAO available
+	 */
+	public boolean renderChunk(LevelChunk chunk) {
+		// Get VAO
+		ChunkVAO vao = vaoCache.get(chunk);
+		if (vao == null) {
+			// VAO not ready yet - it will be uploaded later from async mesh building
+			return false;
+		}
+		
+		// Initialize shader if not already done
+		if (shader == null) {
+			shader = new VoxelLitShader();
+			logger.info("Initialized VoxelLitShader for chunk rendering");
+		}
+		
+		// Use the shader
+		shader.use();
+		
+		// Set shader uniforms
+		shader.setTextureSampler(0); // Texture unit 0
+		shader.applyDefaultLighting(); // Apply default gamma and emissive boost
+		
+		// Enable texturing and bind texture atlas to unit 0
+		glEnable(GL_TEXTURE_2D);
+		glActiveTexture(GL_TEXTURE0);
+		if (textureAtlas != null) {
+			textureAtlas.bind();
+		}
+		
+		// Render using VAO (single draw call!)
+		vao.render();
+		
+		// Unbind shader and texture
+		VoxelLitShader.unbind();
+		glBindTexture(GL_TEXTURE_2D, 0);
+		
+		return true;
+	}
+
     /**
      * Upload mesh buffer to GPU and create VAO.
      * This is called on the render thread with pre-built mesh buffer from a worker thread.
@@ -156,25 +177,33 @@ public class ChunkRenderer {
         // logger.info("Texture atlas set for chunk renderer");
     }
     
-    /**
-     * Get the texture atlas.
-     */
-    public TextureAtlas getTextureAtlas() {
-        return textureAtlas;
-    }
-    
-    /**
-     * Cleanup all OpenGL resources (VAOs).
-     * Call this when the renderer is no longer needed.
-     */
-    public void cleanup() {
-        logger.info("Cleaning up ChunkRenderer - deleting {} VAOs", vaoCache.size());
-        for (ChunkVAO vao : vaoCache.values()) {
-            if (vao != null) {
-                vao.delete();
-            }
-        }
-        vaoCache.clear();
-        chunkByKey.clear();
-    }
+	/**
+	 * Get the texture atlas.
+	 */
+	public TextureAtlas getTextureAtlas() {
+		return textureAtlas;
+	}
+	
+	/**
+	 * Get the shader instance for configuration.
+	 * Returns null if shader hasn't been initialized yet.
+	 */
+	public VoxelLitShader getShader() {
+		return shader;
+	}
+	
+	/**
+	 * Cleanup all OpenGL resources (VAOs).
+	 * Call this when the renderer is no longer needed.
+	 */
+	public void cleanup() {
+		logger.info("Cleaning up ChunkRenderer - deleting {} VAOs", vaoCache.size());
+		for (ChunkVAO vao : vaoCache.values()) {
+			if (vao != null) {
+				vao.delete();
+			}
+		}
+		vaoCache.clear();
+		chunkByKey.clear();
+	}
 }
