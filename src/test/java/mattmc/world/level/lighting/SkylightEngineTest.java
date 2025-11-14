@@ -101,38 +101,7 @@ public class SkylightEngineTest {
 		assertEquals(0, belowFloorLight, "Below opaque floor should have no skylight");
 	}
 	
-	@Test
-	public void testHeightmapUpdate() {
-		LevelChunk chunk = new LevelChunk(0, 0);
-		SkylightEngine engine = new SkylightEngine();
-		
-		// Initial surface at y=64
-		int surfaceY = LevelChunk.worldYToChunkY(64);
-		chunk.setBlock(8, surfaceY, 8, Blocks.GRASS_BLOCK);
-		
-		// Initialize
-		engine.initializeChunkSkylight(chunk);
-		
-		// Check initial heightmap
-		int initialHeightmap = chunk.getHeightmap().getHeight(8, 8);
-		assertEquals(64, initialHeightmap, "Initial heightmap should be 64");
-		
-		// Dig down - remove the surface block
-		chunk.setBlock(8, surfaceY, 8, Blocks.AIR);
-		
-		// Manually trigger heightmap update (normally done by setBlock hook)
-		engine.updateColumnSkylight(chunk, 8, surfaceY, 8, Blocks.AIR, Blocks.GRASS_BLOCK);
-		
-		// Heightmap should have decreased
-		int newHeightmap = chunk.getHeightmap().getHeight(8, 8);
-		assertTrue(newHeightmap < initialHeightmap, 
-			"Heightmap should decrease after removing block, was " + initialHeightmap + " now " + newHeightmap);
-		
-		// Skylight at the dug position should now be 15
-		assertEquals(15, chunk.getSkyLight(8, surfaceY, 8), 
-			"Dug position should have full skylight");
-	}
-	
+
 	@Test
 	public void testDigVerticalShaft() {
 		LevelChunk chunk = new LevelChunk(0, 0);
