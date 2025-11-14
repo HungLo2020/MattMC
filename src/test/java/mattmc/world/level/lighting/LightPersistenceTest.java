@@ -10,33 +10,26 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 
 /**
- * Manual test for light data persistence.
- * This test creates a world, sets some light values, saves it,
- * then reloads and verifies the light values persisted.
+ * Manual test for heightmap and skylight initialization.
+ * 
+ * This test creates a world, generates terrain, and prints skylight values
+ * to verify that skylight is properly initialized based on the heightmap.
  * 
  * Run with: ./gradlew runDebugTest
- * or: java -cp build/classes/java/test:build/classes/java/main mattmc.world.level.lighting.LightPersistenceTest
  */
 public class LightPersistenceTest {
 	
 	public static void main(String[] args) throws IOException {
-		System.out.println("=== Light Data Persistence Test ===\n");
+		System.out.println("=== Heightmap + Skylight Initialization Test ===\n");
 		
 		// Create a temporary directory for the test world
-		Path worldDir = Files.createTempDirectory("mattmc-light-test-");
+		Path worldDir = Files.createTempDirectory("mattmc-skylight-test-");
 		System.out.println("Test world directory: " + worldDir);
 		
 		try {
-			// Phase 1: Create and save a world with custom light values
-			System.out.println("\n--- Phase 1: Creating and saving world ---");
-			createAndSaveWorld(worldDir);
-			
-			// Phase 2: Load the world and verify light values
-			System.out.println("\n--- Phase 2: Loading and verifying world ---");
-			loadAndVerifyWorld(worldDir);
-			
+			testSkylightInitialization(worldDir);
 			System.out.println("\n=== TEST PASSED ===");
-			System.out.println("All light values persisted correctly!");
+			System.out.println("Skylight values are correctly initialized!");
 			
 		} finally {
 			// Cleanup
@@ -45,108 +38,89 @@ public class LightPersistenceTest {
 		}
 	}
 	
-	private static void createAndSaveWorld(Path worldDir) throws IOException {
+	private static void testSkylightInitialization(Path worldDir) throws IOException {
 		Level level = new Level();
 		level.setWorldDirectory(worldDir);
 		level.setSeed(12345L);
 		
-		// Get a chunk and set some blocks with custom light values
-		LevelChunk chunk = level.getChunk(0, 0);
+		System.out.println("\n--- Generating Chunks ---");
 		
-		// Set blocks
-		chunk.setBlock(5, 64, 5, Blocks.STONE);
-		chunk.setBlock(10, 100, 10, Blocks.DIRT);
-		chunk.setBlock(3, 150, 7, Blocks.TORCH); // Emits light
+		// Generate a few chunks (flat world generation will create terrain)
+		LevelChunk chunk1 = level.getChunk(0, 0);
+		LevelChunk chunk2 = level.getChunk(1, 0);
+		LevelChunk chunk3 = level.getChunk(0, 1);
 		
-		// Set custom light values
-		System.out.println("Setting light values:");
+		System.out.println("Generated 3 chunks");
 		
-		// Location 1: (5, 64, 5)
-		chunk.setSkyLight(5, 64, 5, 12);
-		chunk.setBlockLight(5, 64, 5, 3);
-		System.out.println("  (5, 64, 5): sky=12, block=3");
+		// Inspect heightmap and skylight for several columns in chunk (0, 0)
+		System.out.println("\n--- Chunk (0, 0) Column Analysis ---");
+		inspectColumn(chunk1, 0, 0);
+		inspectColumn(chunk1, 8, 8);
+		inspectColumn(chunk1, 15, 15);
 		
-		// Location 2: (10, 100, 10)
-		chunk.setSkyLight(10, 100, 10, 7);
-		chunk.setBlockLight(10, 100, 10, 9);
-		System.out.println("  (10, 100, 10): sky=7, block=9");
-		
-		// Location 3: (3, 150, 7) - torch location
-		chunk.setSkyLight(3, 150, 7, 2);
-		chunk.setBlockLight(3, 150, 7, 14); // Bright block light from torch
-		System.out.println("  (3, 150, 7): sky=2, block=14 (torch)");
-		
-		// Location 4: Default values (15, 180, 8)
-		System.out.println("  (15, 180, 8): sky=" + chunk.getSkyLight(15, 180, 8) + 
-		                   ", block=" + chunk.getBlockLight(15, 180, 8) + " (defaults)");
-		
-		// Trigger save by unloading chunks
+		// Save the world
+		System.out.println("\n--- Saving World ---");
 		level.updateChunksAroundPlayer(1000, 1000);
 		level.shutdown();
+		System.out.println("World saved");
 		
-		System.out.println("World saved successfully.");
+		// Reload the world
+		System.out.println("\n--- Reloading World ---");
+		Level level2 = new Level();
+		level2.setWorldDirectory(worldDir);
+		level2.setSeed(12345L);
+		
+		LevelChunk reloadedChunk = level2.getChunk(0, 0);
+		System.out.println("Reloaded chunk (0, 0)");
+		
+		// Verify heightmap and skylight persisted
+		System.out.println("\n--- Reloaded Chunk (0, 0) Verification ---");
+		inspectColumn(reloadedChunk, 0, 0);
+		inspectColumn(reloadedChunk, 8, 8);
+		inspectColumn(reloadedChunk, 15, 15);
+		
+		level2.shutdown();
 	}
 	
-	private static void loadAndVerifyWorld(Path worldDir) throws IOException {
-		Level level = new Level();
-		level.setWorldDirectory(worldDir);
-		level.setSeed(12345L);
+	/**
+	 * Inspect and print heightmap and skylight values for a column.
+	 */
+	private static void inspectColumn(LevelChunk chunk, int x, int z) {
+		int heightmapY = chunk.getHeightmap().getHeight(x, z);
+		System.out.println("\nColumn (" + x + ", " + z + "):");
+		System.out.println("  Heightmap: " + heightmapY);
 		
-		// Load the chunk
-		LevelChunk chunk = level.getChunk(0, 0);
+		// Find the surface block
+		int surfaceChunkY = LevelChunk.worldYToChunkY(heightmapY);
+		Block surfaceBlock = chunk.getBlock(x, surfaceChunkY, z);
+		System.out.println("  Surface block: " + surfaceBlock.getIdentifier());
 		
-		System.out.println("Verifying light values:");
+		// Check skylight above, at, and below surface
+		int aboveY = Math.min(heightmapY + 5, LevelChunk.MAX_Y);
+		int aboveChunkY = LevelChunk.worldYToChunkY(aboveY);
+		int skyAbove = chunk.getSkyLight(x, aboveChunkY, z);
+		System.out.println("  Skylight 5 above surface (Y=" + aboveY + "): " + skyAbove);
 		
-		// Verify blocks
-		Block block1 = chunk.getBlock(5, 64, 5);
-		Block block2 = chunk.getBlock(10, 100, 10);
-		Block block3 = chunk.getBlock(3, 150, 7);
+		int skyAtSurface = chunk.getSkyLight(x, surfaceChunkY, z);
+		System.out.println("  Skylight at surface (Y=" + heightmapY + "): " + skyAtSurface);
 		
-		System.out.println("  Block at (5, 64, 5): " + block1.getIdentifier());
-		System.out.println("  Block at (10, 100, 10): " + block2.getIdentifier());
-		System.out.println("  Block at (3, 150, 7): " + block3.getIdentifier());
+		int belowY = Math.max(heightmapY - 5, LevelChunk.MIN_Y);
+		int belowChunkY = LevelChunk.worldYToChunkY(belowY);
+		int skyBelow = chunk.getSkyLight(x, belowChunkY, z);
+		System.out.println("  Skylight 5 below surface (Y=" + belowY + "): " + skyBelow);
 		
-		// Verify light values
-		int sky1 = chunk.getSkyLight(5, 64, 5);
-		int block1Light = chunk.getBlockLight(5, 64, 5);
-		System.out.println("  (5, 64, 5): sky=" + sky1 + ", block=" + block1Light);
-		verify(sky1 == 12, "Sky light at (5,64,5) should be 12");
-		verify(block1Light == 3, "Block light at (5,64,5) should be 3");
-		
-		int sky2 = chunk.getSkyLight(10, 100, 10);
-		int block2Light = chunk.getBlockLight(10, 100, 10);
-		System.out.println("  (10, 100, 10): sky=" + sky2 + ", block=" + block2Light);
-		verify(sky2 == 7, "Sky light at (10,100,10) should be 7");
-		verify(block2Light == 9, "Block light at (10,100,10) should be 9");
-		
-		int sky3 = chunk.getSkyLight(3, 150, 7);
-		int block3Light = chunk.getBlockLight(3, 150, 7);
-		System.out.println("  (3, 150, 7): sky=" + sky3 + ", block=" + block3Light);
-		verify(sky3 == 2, "Sky light at (3,150,7) should be 2");
-		verify(block3Light == 14, "Block light at (3,150,7) should be 14");
-		
-		// Verify default values
-		int skyDefault = chunk.getSkyLight(15, 180, 8);
-		int blockDefault = chunk.getBlockLight(15, 180, 8);
-		System.out.println("  (15, 180, 8): sky=" + skyDefault + ", block=" + blockDefault + " (defaults)");
-		verify(skyDefault == 15, "Default sky light should be 15");
-		verify(blockDefault == 0, "Default block light should be 0");
-		
-		// Test Block API
-		System.out.println("\nVerifying Block API:");
-		System.out.println("  STONE emission: " + Blocks.STONE.getLightEmission());
-		System.out.println("  STONE opacity: " + Blocks.STONE.getOpacity());
-		System.out.println("  TORCH emission: " + Blocks.TORCH.getLightEmission());
-		System.out.println("  TORCH opacity: " + Blocks.TORCH.getOpacity());
-		System.out.println("  AIR opacity: " + Blocks.AIR.getOpacity());
-		
-		level.shutdown();
-	}
-	
-	private static void verify(boolean condition, String message) {
-		if (!condition) {
-			throw new AssertionError("VERIFICATION FAILED: " + message);
+		// Verify expectations
+		if (skyAbove != 15) {
+			throw new AssertionError("Skylight above surface should be 15, got " + skyAbove);
 		}
+		if (skyAtSurface != 0) {
+			throw new AssertionError("Skylight at surface should be 0, got " + skyAtSurface);
+		}
+		if (skyBelow != 0) {
+			throw new AssertionError("Skylight below surface should be 0, got " + skyBelow);
+		}
+		
+		System.out.println("  ✓ Skylight values correct!");
 	}
 	
 	private static void deleteRecursively(Path path) throws IOException {

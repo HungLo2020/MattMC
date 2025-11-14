@@ -8,6 +8,7 @@ import mattmc.client.renderer.block.BlockFaceCollector;
 import mattmc.world.level.block.Block;
 import mattmc.world.level.block.Blocks;
 import mattmc.world.level.levelgen.WorldGenerator;
+import mattmc.world.level.lighting.SkylightInitializer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -281,7 +282,10 @@ public class AsyncChunkLoader {
                 if (regionFile.hasChunk(chunkX, chunkZ)) {
                     Map<String, Object> chunkNBT = regionFile.readChunk(chunkX, chunkZ);
                     if (chunkNBT != null) {
-                        return ChunkNBT.fromNBT(chunkNBT);
+                        LevelChunk chunk = ChunkNBT.fromNBT(chunkNBT);
+                        // Initialize skylight for loaded chunks (in case it wasn't saved or needs refresh)
+                        SkylightInitializer.initializeChunkSkylight(chunk);
+                        return chunk;
                     }
                 }
             } catch (IOException e) {
@@ -318,7 +322,10 @@ public class AsyncChunkLoader {
                 
                 Map<String, Object> chunkNBT = regionFile.readChunk(chunkX, chunkZ);
                 if (chunkNBT != null) {
-                    return ChunkNBT.fromNBT(chunkNBT);
+                    LevelChunk chunk = ChunkNBT.fromNBT(chunkNBT);
+                    // Initialize skylight for loaded chunks (in case it wasn't saved or needs refresh)
+                    SkylightInitializer.initializeChunkSkylight(chunk);
+                    return chunk;
                 }
             }
         } catch (IOException e) {
