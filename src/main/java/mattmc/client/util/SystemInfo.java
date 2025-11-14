@@ -110,9 +110,13 @@ public class SystemInfo {
      */
     public static String getGPUName() {
         try {
+            // Check if we're in a headless environment
+            if (java.awt.GraphicsEnvironment.isHeadless()) {
+                return "Unknown (Headless)";
+            }
             String renderer = GL11.glGetString(GL11.GL_RENDERER);
             return renderer != null ? renderer : "Unknown";
-        } catch (Exception e) {
+        } catch (Exception | Error e) {
             return "Unknown";
         }
     }
