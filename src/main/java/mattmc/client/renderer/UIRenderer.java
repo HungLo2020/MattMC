@@ -624,9 +624,8 @@ public class UIRenderer {
      * Helper method to draw text right-aligned at the specified position.
      */
     private void drawTextRightAligned(String text, float x, float y, float scale, int rgb) {
-        // Estimate text width (rough approximation)
-        float charWidth = 8f * scale; // Approximate character width
-        float textWidth = text.length() * charWidth;
+        // Get accurate text width
+        float textWidth = TextRenderer.getTextWidth(text, scale);
         
         // Draw text at position adjusted for right alignment
         setColor(rgb, 1f);
