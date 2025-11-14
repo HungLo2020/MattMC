@@ -36,7 +36,8 @@ void main() {
 	float finalBrightness = max(skyBrightness, blockBrightness);
 	
 	// Ensure minimum brightness (never completely dark)
-	finalBrightness = max(finalBrightness, 0.05);
+	// Increased from 0.05 to 0.20 to make shadows less intense
+	finalBrightness = max(finalBrightness, 0.20);
 	
 	// Apply optional emissive boost
 	// (could be controlled per-texture in future)
