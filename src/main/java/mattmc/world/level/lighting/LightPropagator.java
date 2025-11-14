@@ -113,8 +113,8 @@ public class LightPropagator {
 		// Within same chunk - propagate directly
 		// Check if block is opaque (blocks light)
 		Block block = chunk.getBlock(x, y, z);
-		if (block.getOpacity() >= 15) {
-			return; // Fully opaque block stops light
+		if (block == null || block.getOpacity() >= 15) {
+			return; // Fully opaque block stops light or null
 		}
 		
 		// Get current light at neighbor
@@ -248,8 +248,8 @@ public class LightPropagator {
 		
 		// Check if block is opaque
 		Block block = chunk.getBlock(x, y, z);
-		if (block.getOpacity() >= 15) {
-			return;
+		if (block == null || block.getOpacity() >= 15) {
+			return; // Opaque block or null
 		}
 		
 		int currentLight = chunk.getBlockLight(x, y, z);

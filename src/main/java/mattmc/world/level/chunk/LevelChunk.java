@@ -83,7 +83,8 @@ public final class LevelChunk {
         if (x < 0 || x >= WIDTH || y < 0 || y >= HEIGHT || z < 0 || z >= DEPTH) {
             return Blocks.AIR;
         }
-        return blocks[x][y][z];
+        Block block = blocks[x][y][z];
+        return block != null ? block : Blocks.AIR;
     }
     
     /**

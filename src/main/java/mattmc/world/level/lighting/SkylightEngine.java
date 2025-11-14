@@ -97,7 +97,7 @@ public class SkylightEngine {
 				// Check if there's a cavity below the heightmap
 				if (belowHeightmapChunkY >= 0 && belowHeightmapChunkY < LevelChunk.HEIGHT) {
 					Block block = chunk.getBlock(x, belowHeightmapChunkY, z);
-					if (block.getOpacity() < 15) {
+					if (block != null && block.getOpacity() < 15) {
 						// Non-opaque block below heightmap - skylight can enter
 						int aboveY = LevelChunk.worldYToChunkY(heightmapY + 1);
 						if (aboveY >= 0 && aboveY < LevelChunk.HEIGHT) {
@@ -122,8 +122,8 @@ public class SkylightEngine {
 			
 			// Check if this position can receive light
 			Block block = chunk.getBlock(node.x, node.y, node.z);
-			if (block.getOpacity() >= 15) {
-				continue; // Opaque block
+			if (block == null || block.getOpacity() >= 15) {
+				continue; // Opaque block or null
 			}
 			
 			int currentLight = chunk.getSkyLight(node.x, node.y, node.z);
@@ -159,8 +159,8 @@ public class SkylightEngine {
 		
 		// Check if block is opaque
 		Block block = chunk.getBlock(x, y, z);
-		if (block.getOpacity() >= 15) {
-			return; // Opaque block stops light
+		if (block == null || block.getOpacity() >= 15) {
+			return; // Opaque block stops light or null block
 		}
 		
 		int currentLight = chunk.getSkyLight(x, y, z);
@@ -199,7 +199,11 @@ public class SkylightEngine {
 		// If heightmap changed, update skylight for the entire column
 		if (oldHeightmapY != newHeightmapY) {
 			updateColumnSkylightAfterHeightmapChange(chunk, x, z, oldHeightmapY, newHeightmapY);
-		} else if (newOpacity < 15 && oldOpacity >= 15) {
+			return; // Heightmap change handles all skylight updates for this column
+		}
+		
+		// Heightmap didn't change, but opacity changed at this specific position
+		if (newOpacity < 15 && oldOpacity >= 15) {
 			// Block became transparent - add skylight
 			addSkylightAt(chunk, x, y, z);
 		} else if (newOpacity >= 15 && oldOpacity < 15) {
@@ -224,13 +228,30 @@ public class SkylightEngine {
 			}
 		} else {
 			// Heightmap decreased (block removed) - add skylight
+			addQueue.clear();
+			
+			// First pass: set skylight to 15 for all positions that gained sky access
 			for (int y = 0; y < LevelChunk.HEIGHT; y++) {
 				int worldY = LevelChunk.chunkYToWorldY(y);
 				if (worldY > newHeightmapY && worldY <= oldHeightmapY) {
-					// This area gained sky access
+					// This area gained sky access - set to full skylight
 					chunk.setSkyLight(x, y, z, 15);
-					// Propagate to neighbors
-					addSkylightAt(chunk, x, y, z);
+					// Add to queue for propagation
+					addQueue.offer(new SkyNode(x, y, z, 15));
+				}
+			}
+			
+			// Second pass: BFS propagation to neighbors
+			while (!addQueue.isEmpty()) {
+				SkyNode node = addQueue.poll();
+				int nextLight = node.lightLevel - 1;
+				if (nextLight > 0) {
+					propagateSkyToNeighbor(chunk, node.x - 1, node.y, node.z, nextLight);
+					propagateSkyToNeighbor(chunk, node.x + 1, node.y, node.z, nextLight);
+					propagateSkyToNeighbor(chunk, node.x, node.y - 1, node.z, nextLight);
+					propagateSkyToNeighbor(chunk, node.x, node.y + 1, node.z, nextLight);
+					propagateSkyToNeighbor(chunk, node.x, node.y, node.z - 1, nextLight);
+					propagateSkyToNeighbor(chunk, node.x, node.y, node.z + 1, nextLight);
 				}
 			}
 		}
@@ -364,7 +385,7 @@ public class SkylightEngine {
 	private int findTopmostOpaqueBlock(LevelChunk chunk, int x, int z) {
 		for (int y = LevelChunk.HEIGHT - 1; y >= 0; y--) {
 			Block block = chunk.getBlock(x, y, z);
-			if (block.getOpacity() >= 15) {
+			if (block != null && block.getOpacity() >= 15) {
 				return LevelChunk.chunkYToWorldY(y);
 			}
 		}
