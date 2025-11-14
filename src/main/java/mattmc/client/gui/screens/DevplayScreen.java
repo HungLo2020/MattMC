@@ -269,6 +269,9 @@ public final class DevplayScreen implements Screen {
             uiRenderer.drawDebugInfo(w, h, player.getX(alphaF), player.getY(alphaF), player.getZ(alphaF), 
                                      player.getYaw(alphaF), player.getPitch(alphaF), 0f, uiState.getFPS(),
                                      loadedChunks, pendingChunks, activeWorkers, renderedChunks, culledChunks);
+            
+            // Draw system information on the right side
+            uiRenderer.drawSystemInfo(w, h, window.handle());
         } else {
             // Draw block name display in top-left corner (only if debug menu is not visible and option is enabled)
             if (mattmc.client.settings.OptionsManager.isShowBlockNameEnabled()) {
