@@ -17,12 +17,38 @@ import java.util.List;
  */
 public class MeshBuilder {
     
+    /**
+     * Interface for sampling light values across chunk boundaries.
+     */
+    public interface ChunkLightAccessor {
+        /**
+         * Get skylight level at chunk-local coordinates, checking neighboring chunks if necessary.
+         * @param chunk The current chunk
+         * @param x Chunk-local X coordinate (can be outside 0-15 range)
+         * @param y Chunk-local Y coordinate (0-383)
+         * @param z Chunk-local Z coordinate (can be outside 0-15 range)
+         * @return Skylight level (0-15)
+         */
+        int getSkyLightAcrossChunks(mattmc.world.level.chunk.LevelChunk chunk, int x, int y, int z);
+        
+        /**
+         * Get blocklight level at chunk-local coordinates, checking neighboring chunks if necessary.
+         * @param chunk The current chunk
+         * @param x Chunk-local X coordinate (can be outside 0-15 range)
+         * @param y Chunk-local Y coordinate (0-383)
+         * @param z Chunk-local Z coordinate (can be outside 0-15 range)
+         * @return Blocklight level (0-15)
+         */
+        int getBlockLightAcrossChunks(mattmc.world.level.chunk.LevelChunk chunk, int x, int y, int z);
+    }
+    
     // Vertex format: x, y, z, u, v, r, g, b, a, nx, ny, nz, unused1, unused2, unused3 (15 floats per vertex)
     // Using primitive arrays to avoid boxing/unboxing overhead
     private final FloatList vertices = new FloatList();
     private final IntList indices = new IntList();
     private int currentVertex = 0;
     private final TextureAtlas textureAtlas;
+    private ChunkLightAccessor lightAccessor;
     
     /**
      * Create a mesh builder with optional texture atlas support.
@@ -31,6 +57,13 @@ public class MeshBuilder {
      */
     public MeshBuilder(TextureAtlas textureAtlas) {
         this.textureAtlas = textureAtlas;
+    }
+    
+    /**
+     * Set the light accessor for cross-chunk light sampling.
+     */
+    public void setLightAccessor(ChunkLightAccessor accessor) {
+        this.lightAccessor = accessor;
     }
     
     /**
@@ -296,9 +329,18 @@ public class MeshBuilder {
         if (y < 0 || y >= mattmc.world.level.chunk.LevelChunk.HEIGHT) {
             return 15; // Out of bounds: full skylight
         }
+        
+        // If we have a light accessor and coordinates are out of chunk bounds, use cross-chunk sampling
+        if (lightAccessor != null && 
+            (x < 0 || x >= mattmc.world.level.chunk.LevelChunk.WIDTH ||
+             z < 0 || z >= mattmc.world.level.chunk.LevelChunk.DEPTH)) {
+            return lightAccessor.getSkyLightAcrossChunks(chunk, x, y, z);
+        }
+        
+        // Within chunk bounds - use direct access
         if (x < 0 || x >= mattmc.world.level.chunk.LevelChunk.WIDTH ||
             z < 0 || z >= mattmc.world.level.chunk.LevelChunk.DEPTH) {
-            return 15; // Out of chunk bounds: full skylight (TODO: sample neighbor chunks)
+            return 15; // Out of chunk bounds without accessor: full skylight
         }
         
         return chunk.getSkyLight(x, y, z);
@@ -312,9 +354,18 @@ public class MeshBuilder {
         if (y < 0 || y >= mattmc.world.level.chunk.LevelChunk.HEIGHT) {
             return 0; // Out of bounds: no blocklight
         }
+        
+        // If we have a light accessor and coordinates are out of chunk bounds, use cross-chunk sampling
+        if (lightAccessor != null && 
+            (x < 0 || x >= mattmc.world.level.chunk.LevelChunk.WIDTH ||
+             z < 0 || z >= mattmc.world.level.chunk.LevelChunk.DEPTH)) {
+            return lightAccessor.getBlockLightAcrossChunks(chunk, x, y, z);
+        }
+        
+        // Within chunk bounds - use direct access
         if (x < 0 || x >= mattmc.world.level.chunk.LevelChunk.WIDTH ||
             z < 0 || z >= mattmc.world.level.chunk.LevelChunk.DEPTH) {
-            return 0; // Out of chunk bounds: no blocklight (TODO: sample neighbor chunks)
+            return 0; // Out of chunk bounds without accessor: no blocklight
         }
         
         return chunk.getBlockLight(x, y, z);

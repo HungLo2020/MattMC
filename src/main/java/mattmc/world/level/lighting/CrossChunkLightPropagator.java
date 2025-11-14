@@ -65,9 +65,9 @@ public class CrossChunkLightPropagator {
 	 * Propagate blockLight across chunk boundaries.
 	 * 
 	 * @param sourceChunk The chunk where light originates
-	 * @param x Chunk-local X (0-15)
+	 * @param x Chunk-local X (can be outside 0-15 if crossing boundary)
 	 * @param y Chunk-local Y (0-383)
-	 * @param z Chunk-local Z (0-15)
+	 * @param z Chunk-local Z (can be outside 0-15 if crossing boundary)
 	 * @param lightLevel Light level to propagate
 	 */
 	public void propagateBlockLightCross(LevelChunk sourceChunk, int x, int y, int z, int lightLevel) {
@@ -76,6 +76,66 @@ public class CrossChunkLightPropagator {
 		}
 		
 		int newLight = lightLevel - 1; // Attenuation
+		
+		// IMPORTANT: Before propagating FROM this position, we need to verify
+		// that this position can actually hold light (i.e., it's not opaque).
+		// We need to check the block at the target position across chunk boundaries.
+		
+		// Calculate which chunk and local coordinates we're checking
+		int targetChunkX = sourceChunk.chunkX();
+		int targetChunkZ = sourceChunk.chunkZ();
+		int targetLocalX = x;
+		int targetLocalZ = z;
+		
+		// Handle X boundary crossing
+		if (x < 0) {
+			targetChunkX--;
+			targetLocalX = LevelChunk.WIDTH - 1;
+		} else if (x >= LevelChunk.WIDTH) {
+			targetChunkX++;
+			targetLocalX = 0;
+		}
+		
+		// Handle Z boundary crossing
+		if (z < 0) {
+			targetChunkZ--;
+			targetLocalZ = LevelChunk.DEPTH - 1;
+		} else if (z >= LevelChunk.DEPTH) {
+			targetChunkZ++;
+			targetLocalZ = 0;
+		}
+		
+		// Handle Y bounds
+		if (y < 0 || y >= LevelChunk.HEIGHT) {
+			return; // Out of world bounds
+		}
+		
+		// Get the target chunk to check the block
+		boolean crossingChunk = (targetChunkX != sourceChunk.chunkX() || 
+		                         targetChunkZ != sourceChunk.chunkZ());
+		
+		LevelChunk targetChunk;
+		if (crossingChunk) {
+			if (neighborAccessor == null) {
+				return; // No accessor available
+			}
+			targetChunk = neighborAccessor.getChunkIfLoaded(targetChunkX, targetChunkZ);
+			if (targetChunk == null) {
+				// Chunk not loaded - defer the check and potential propagation
+				// We'll check opacity when the chunk loads
+				deferUpdate(targetChunkX, targetChunkZ, targetLocalX, y, targetLocalZ, 
+				           newLight, false);
+				return;
+			}
+		} else {
+			targetChunk = sourceChunk;
+		}
+		
+		// Check if the block at this position is opaque
+		Block block = targetChunk.getBlock(targetLocalX, y, targetLocalZ);
+		if (block.getOpacity() >= 15) {
+			return; // Fully opaque block - don't propagate FROM this position
+		}
 		
 		// Check all 6 neighbors - propagate to neighbor chunks if needed
 		tryPropagateToNeighbor(sourceChunk, x - 1, y, z, newLight, false);
@@ -90,9 +150,9 @@ public class CrossChunkLightPropagator {
 	 * Propagate skyLight across chunk boundaries.
 	 * 
 	 * @param sourceChunk The chunk where light originates
-	 * @param x Chunk-local X (0-15)
+	 * @param x Chunk-local X (can be outside 0-15 if crossing boundary)
 	 * @param y Chunk-local Y (0-383)
-	 * @param z Chunk-local Z (0-15)
+	 * @param z Chunk-local Z (can be outside 0-15 if crossing boundary)
 	 * @param lightLevel Light level to propagate
 	 */
 	public void propagateSkylightCross(LevelChunk sourceChunk, int x, int y, int z, int lightLevel) {
@@ -101,6 +161,65 @@ public class CrossChunkLightPropagator {
 		}
 		
 		int newLight = lightLevel - 1; // Attenuation
+		
+		// IMPORTANT: Before propagating FROM this position, we need to verify
+		// that this position can actually hold light (i.e., it's not opaque).
+		// We need to check the block at the target position across chunk boundaries.
+		
+		// Calculate which chunk and local coordinates we're checking
+		int targetChunkX = sourceChunk.chunkX();
+		int targetChunkZ = sourceChunk.chunkZ();
+		int targetLocalX = x;
+		int targetLocalZ = z;
+		
+		// Handle X boundary crossing
+		if (x < 0) {
+			targetChunkX--;
+			targetLocalX = LevelChunk.WIDTH - 1;
+		} else if (x >= LevelChunk.WIDTH) {
+			targetChunkX++;
+			targetLocalX = 0;
+		}
+		
+		// Handle Z boundary crossing
+		if (z < 0) {
+			targetChunkZ--;
+			targetLocalZ = LevelChunk.DEPTH - 1;
+		} else if (z >= LevelChunk.DEPTH) {
+			targetChunkZ++;
+			targetLocalZ = 0;
+		}
+		
+		// Handle Y bounds
+		if (y < 0 || y >= LevelChunk.HEIGHT) {
+			return; // Out of world bounds
+		}
+		
+		// Get the target chunk to check the block
+		boolean crossingChunk = (targetChunkX != sourceChunk.chunkX() || 
+		                         targetChunkZ != sourceChunk.chunkZ());
+		
+		LevelChunk targetChunk;
+		if (crossingChunk) {
+			if (neighborAccessor == null) {
+				return; // No accessor available
+			}
+			targetChunk = neighborAccessor.getChunkIfLoaded(targetChunkX, targetChunkZ);
+			if (targetChunk == null) {
+				// Chunk not loaded - defer the check and potential propagation
+				deferUpdate(targetChunkX, targetChunkZ, targetLocalX, y, targetLocalZ, 
+				           newLight, true);
+				return;
+			}
+		} else {
+			targetChunk = sourceChunk;
+		}
+		
+		// Check if the block at this position is opaque
+		Block block = targetChunk.getBlock(targetLocalX, y, targetLocalZ);
+		if (block.getOpacity() >= 15) {
+			return; // Fully opaque block - don't propagate FROM this position
+		}
 		
 		// Check all 6 neighbors - propagate to neighbor chunks if needed
 		tryPropagateToNeighbor(sourceChunk, x - 1, y, z, newLight, true);
