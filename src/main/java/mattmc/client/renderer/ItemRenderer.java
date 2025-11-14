@@ -134,22 +134,22 @@ public class ItemRenderer {
         
         // Render the faces in back-to-front order for proper visibility
         
-        // 1. West face (left side, darker - 60%)
-        if (sideTexture != null) {
-            Texture tex = loadTexture(sideTexture);
-            if (tex != null) {
-                tex.bind();
-                glColor4f(0.6f, 0.6f, 0.6f, 1.0f);
-                renderFacesIsometric(westFaces, x, y, isoWidth, isoHeight);
-            }
-        }
-        
-        // 2. North face (right side, medium brightness - 80%)
+        // 1. West face (left side, medium brightness - 80%)
         if (sideTexture != null) {
             Texture tex = loadTexture(sideTexture);
             if (tex != null) {
                 tex.bind();
                 glColor4f(0.8f, 0.8f, 0.8f, 1.0f);
+                renderFacesIsometric(westFaces, x, y, isoWidth, isoHeight);
+            }
+        }
+        
+        // 2. North face (right side, darker - 60%)
+        if (sideTexture != null) {
+            Texture tex = loadTexture(sideTexture);
+            if (tex != null) {
+                tex.bind();
+                glColor4f(0.6f, 0.6f, 0.6f, 1.0f);
                 renderFacesIsometric(northFaces, x, y, isoWidth, isoHeight);
             }
         }
@@ -225,10 +225,10 @@ public class ItemRenderer {
                 
                 for (VertexCapture.Face face : visibleSideFaces) {
                     // Determine brightness based on face orientation
-                    // West-facing faces (x=0) get 0.6 brightness
-                    // North-facing faces (z=0) get 0.8 brightness
+                    // West-facing faces (x=0) get 0.8 brightness
+                    // North-facing faces (z=0) get 0.6 brightness
                     boolean isWestFacing = isWestFacing(face);
-                    float brightness = isWestFacing ? 0.6f : 0.8f;
+                    float brightness = isWestFacing ? 0.8f : 0.6f;
                     glColor4f(brightness, brightness, brightness, 1.0f);
                     
                     renderFaceIsometric(face, x, y, isoWidth, isoHeight);

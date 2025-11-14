@@ -158,10 +158,14 @@ public class MeshBuilder {
      */
     private float[] extractColor(BlockFaceCollector.FaceData face) {
         int renderColor;
+        float directionalShading = 1.0f;  // Default: no shading
         
         if (textureAtlas != null && face.block.hasTexture()) {
             // Use white color for texture modulation
             renderColor = 0xFFFFFF;
+            
+            // Apply directional shading (Minecraft's standard face brightness)
+            directionalShading = face.colorBrightness;
             
             // Apply grass green tint for grass_block top face (vanilla Minecraft-like)
             if (face.block == Blocks.GRASS_BLOCK && face.faceType != null && "top".equals(face.faceType)) {
@@ -181,7 +185,7 @@ public class MeshBuilder {
         }
         
         // Apply brightness
-        float brightness = face.brightness;
+        float brightness = face.brightness * directionalShading;
         
         int r = (renderColor >> 16) & 0xFF;
         int g = (renderColor >> 8) & 0xFF;
