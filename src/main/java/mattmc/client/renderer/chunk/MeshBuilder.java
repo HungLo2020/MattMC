@@ -649,48 +649,230 @@ public class MeshBuilder {
     }
     
     /**
-     * Add stairs geometry based on blockstate (facing and half).
-     * Stairs consist of a bottom slab and a top step, rotated based on facing direction.
+     * Add stairs geometry based on blockstate (facing, half, and shape).
+     * Uses JSON model elements instead of hardcoded geometry.
      */
     private void addStairsGeometry(float x, float y, float z, mattmc.world.level.block.Block block, 
-                                    mattmc.world.level.block.state.BlockState state) {
-        // Get texture path and UV mapping for stairs
-        String texturePath = block.getTexturePath("side");
-        if (texturePath == null) {
-            texturePath = block.getTexturePath();
+                                    mattmc.world.level.block.state.BlockState blockState) {
+        // Get the block name from identifier
+        String blockName = block.getIdentifier();
+        if (blockName == null) {
+            return;
         }
-        TextureAtlas.UVMapping uvMapping = null;
-        if (textureAtlas != null && texturePath != null) {
-            uvMapping = textureAtlas.getUVMapping(texturePath);
+        blockName = blockName.contains(":") ? blockName.substring(blockName.indexOf(':') + 1) : blockName;
+        
+        // Load blockstate definition
+        mattmc.client.resources.model.BlockState blockStateDef = 
+            mattmc.client.resources.ResourceManager.loadBlockState(blockName);
+        if (blockStateDef == null) {
+            return;
         }
         
-        // White color with appropriate brightness for each face
-        float[] colorTop = {1.0f, 1.0f, 1.0f, 1.0f};
-        float[] colorBottom = {0.5f, 0.5f, 0.5f, 1.0f};
-        float[] colorNorth = {0.8f, 0.8f, 0.8f, 1.0f};
-        float[] colorSouth = {0.8f, 0.8f, 0.8f, 1.0f};
-        float[] colorWest = {0.6f, 0.6f, 0.6f, 1.0f};
-        float[] colorEast = {0.6f, 0.6f, 0.6f, 1.0f};
+        // Get variant for this blockstate
+        java.util.List<mattmc.client.resources.model.BlockStateVariant> variants = 
+            blockStateDef.getVariant(blockState);
+        if (variants == null || variants.isEmpty()) {
+            return;
+        }
         
-        // Get facing and half from blockstate (default to NORTH and BOTTOM if no state)
-        mattmc.world.level.block.state.properties.Direction facing = 
-            state != null ? state.getDirection("facing") : mattmc.world.level.block.state.properties.Direction.NORTH;
-        mattmc.world.level.block.state.properties.Half half = 
-            state != null ? state.getHalf("half") : mattmc.world.level.block.state.properties.Half.BOTTOM;
+        // Use first variant
+        mattmc.client.resources.model.BlockStateVariant variant = variants.get(0);
+        if (variant.getModel() == null) {
+            return;
+        }
         
-        // Render based on half (top or bottom)
-        if (half == mattmc.world.level.block.state.properties.Half.BOTTOM) {
-            // Bottom stairs: slab on bottom, step on top
-            addStairsBottomSlabFace(x, y, z, 0.5f, facing, colorTop, colorBottom, colorNorth, colorSouth, colorWest, colorEast, uvMapping);
-            addStairsTopStepFace(x, y + 0.5f, z, facing, colorTop, colorBottom, colorNorth, colorSouth, colorWest, colorEast, uvMapping);
-        } else {
-            // Top stairs: slab on top, step on bottom  
-            addStairsBottomSlabFace(x, y + 0.5f, z, 0.5f, facing, colorTop, colorBottom, colorNorth, colorSouth, colorWest, colorEast, uvMapping);
-            addStairsTopStepFace(x, y, z, facing, colorTop, colorBottom, colorNorth, colorSouth, colorWest, colorEast, uvMapping);
+        // Resolve model with elements
+        mattmc.client.resources.model.BlockModel model = 
+            mattmc.client.resources.ResourceManager.resolveBlockModel(variant.getModel());
+        if (model == null || !model.hasElements()) {
+            return;
+        }
+        
+        // Get textures
+        java.util.Map<String, String> textures = model.getTextures();
+        if (textures == null) {
+            return;
+        }
+        
+        // Render each element
+        for (mattmc.client.resources.model.ModelElement element : model.getElements()) {
+            renderModelElement(element, textures, x, y, z, variant);
         }
     }
     
     /**
+     * Render a single model element from a block model.
+     */
+    private void renderModelElement(
+            mattmc.client.resources.model.ModelElement element,
+            java.util.Map<String, String> textures,
+            float x, float y, float z,
+            mattmc.client.resources.model.BlockStateVariant variant) {
+        
+        // Get element bounds (in pixels 0-16)
+        float[] from = element.getFrom();
+        float[] to = element.getTo();
+        if (from == null || to == null || from.length < 3 || to.length < 3) {
+            return;
+        }
+        
+        // Convert from pixels to block coordinates (0-1)
+        float x0 = x + from[0] / 16.0f;
+        float y0 = y + from[1] / 16.0f;
+        float z0 = z + from[2] / 16.0f;
+        float x1 = x + to[0] / 16.0f;
+        float y1 = y + to[1] / 16.0f;
+        float z1 = z + to[2] / 16.0f;
+        
+        // Apply rotation from variant (TODO: implement rotation)
+        // For now, rotation is handled by having different model variants
+        
+        // Render each face of the element
+        java.util.Map<String, mattmc.client.resources.model.ModelElement.ElementFace> faces = element.getFaces();
+        if (faces == null) {
+            return;
+        }
+        
+        // Process each face
+        for (java.util.Map.Entry<String, mattmc.client.resources.model.ModelElement.ElementFace> entry : faces.entrySet()) {
+            String direction = entry.getKey();
+            mattmc.client.resources.model.ModelElement.ElementFace face = entry.getValue();
+            
+            // Resolve texture reference
+            String textureRef = face.getTexture();
+            String texturePath = resolveTexture(textureRef, textures);
+            if (texturePath == null) {
+                continue;
+            }
+            
+            // Get UV mapping from texture atlas
+            TextureAtlas.UVMapping uvMapping = null;
+            if (textureAtlas != null) {
+                // Convert texture path to full path
+                String fullPath = "assets/textures/" + texturePath + ".png";
+                uvMapping = textureAtlas.getUVMapping(fullPath);
+            }
+            
+            // Get UV coordinates from face (or use defaults)
+            float[] uv = face.getUv();
+            float u0, v0, u1, v1;
+            if (uv != null && uv.length >= 4) {
+                // Convert from pixels to normalized (assuming 16x16 texture)
+                u0 = uv[0] / 16.0f;
+                v0 = uv[1] / 16.0f;
+                u1 = uv[2] / 16.0f;
+                v1 = uv[3] / 16.0f;
+            } else {
+                u0 = 0; v0 = 0; u1 = 1; v1 = 1;
+            }
+            
+            // If we have atlas mapping, override the UVs
+            if (uvMapping != null) {
+                u0 = uvMapping.u0;
+                v0 = uvMapping.v0;
+                u1 = uvMapping.u1;
+                v1 = uvMapping.v1;
+            }
+            
+            // Render the face based on direction
+            renderElementFace(direction, x0, y0, z0, x1, y1, z1, u0, v0, u1, v1);
+        }
+    }
+    
+    /**
+     * Resolve a texture reference (e.g., "#side" -> "block/birch_planks").
+     */
+    private String resolveTexture(String textureRef, java.util.Map<String, String> textures) {
+        if (textureRef == null || textures == null) {
+            return null;
+        }
+        
+        // If reference starts with #, look it up in textures map
+        if (textureRef.startsWith("#")) {
+            String key = textureRef.substring(1);
+            String resolved = textures.get(key);
+            // May need to resolve recursively
+            while (resolved != null && resolved.startsWith("#")) {
+                key = resolved.substring(1);
+                resolved = textures.get(key);
+            }
+            return resolved;
+        }
+        
+        return textureRef;
+    }
+    
+    /**
+     * Render a face of a model element.
+     */
+    private void renderElementFace(String direction, 
+                                    float x0, float y0, float z0,
+                                    float x1, float y1, float z1,
+                                    float u0, float v0, float u1, float v1) {
+        // Color and brightness based on direction
+        float[] color;
+        switch (direction) {
+            case "up" -> color = new float[]{1.0f, 1.0f, 1.0f, 1.0f};
+            case "down" -> color = new float[]{0.5f, 0.5f, 0.5f, 1.0f};
+            case "north", "south" -> color = new float[]{0.8f, 0.8f, 0.8f, 1.0f};
+            case "west", "east" -> color = new float[]{0.6f, 0.6f, 0.6f, 1.0f};
+            default -> color = new float[]{1.0f, 1.0f, 1.0f, 1.0f};
+        }
+        
+        int base = currentVertex;
+        
+        switch (direction) {
+            case "up" -> {
+                // Top face
+                addVertex(x0, y1, z0, u0, v0, color, 0, 1, 0);
+                addVertex(x0, y1, z1, u0, v1, color, 0, 1, 0);
+                addVertex(x1, y1, z1, u1, v1, color, 0, 1, 0);
+                addVertex(x1, y1, z0, u1, v0, color, 0, 1, 0);
+            }
+            case "down" -> {
+                // Bottom face
+                addVertex(x0, y0, z0, u0, v0, color, 0, -1, 0);
+                addVertex(x1, y0, z0, u1, v0, color, 0, -1, 0);
+                addVertex(x1, y0, z1, u1, v1, color, 0, -1, 0);
+                addVertex(x0, y0, z1, u0, v1, color, 0, -1, 0);
+            }
+            case "north" -> {
+                // North face (z0)
+                addVertex(x1, y0, z0, u1, v1, color, 0, 0, -1);
+                addVertex(x0, y0, z0, u0, v1, color, 0, 0, -1);
+                addVertex(x0, y1, z0, u0, v0, color, 0, 0, -1);
+                addVertex(x1, y1, z0, u1, v0, color, 0, 0, -1);
+            }
+            case "south" -> {
+                // South face (z1)
+                addVertex(x0, y0, z1, u0, v1, color, 0, 0, 1);
+                addVertex(x1, y0, z1, u1, v1, color, 0, 0, 1);
+                addVertex(x1, y1, z1, u1, v0, color, 0, 0, 1);
+                addVertex(x0, y1, z1, u0, v0, color, 0, 0, 1);
+            }
+            case "west" -> {
+                // West face (x0)
+                addVertex(x0, y0, z0, u0, v1, color, -1, 0, 0);
+                addVertex(x0, y0, z1, u1, v1, color, -1, 0, 0);
+                addVertex(x0, y1, z1, u1, v0, color, -1, 0, 0);
+                addVertex(x0, y1, z0, u0, v0, color, -1, 0, 0);
+            }
+            case "east" -> {
+                // East face (x1)
+                addVertex(x1, y0, z1, u0, v1, color, 1, 0, 0);
+                addVertex(x1, y0, z0, u1, v1, color, 1, 0, 0);
+                addVertex(x1, y1, z0, u1, v0, color, 1, 0, 0);
+                addVertex(x1, y1, z1, u0, v0, color, 1, 0, 0);
+            }
+        }
+        
+        addQuadIndices(base);
+        currentVertex += 4;
+    }
+    
+    /**
+     * Old hardcoded stairs methods - kept for reference, will be removed later.
+     * 
      * Add bottom slab faces for stairs.
      * The facing parameter determines which direction the step faces.
      */

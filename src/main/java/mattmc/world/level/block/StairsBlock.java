@@ -52,7 +52,8 @@ public class StairsBlock extends Block {
     }
     
     /**
-     * Stairs use custom rendering with VBO-generated geometry.
+     * Stairs use model-based custom rendering.
+     * The geometry comes from JSON model elements instead of hardcoded methods.
      */
     @Override
     public boolean hasCustomRendering() {
