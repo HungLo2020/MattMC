@@ -109,6 +109,14 @@ public class BlockState {
                     continue;
                 } catch (IllegalArgumentException ignored) {}
                 
+                // Try to parse as StairsShape
+                try {
+                    mattmc.world.level.block.state.properties.StairsShape shape = 
+                        mattmc.world.level.block.state.properties.StairsShape.valueOf(str);
+                    state.setValue(key, shape);
+                    continue;
+                } catch (IllegalArgumentException ignored) {}
+                
                 // Fall back to string
                 state.setValue(key, value);
             } else {
