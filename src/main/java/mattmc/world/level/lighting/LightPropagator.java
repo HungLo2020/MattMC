@@ -73,6 +73,9 @@ public class LightPropagator {
 		// BFS propagation
 		while (!addQueue.isEmpty()) {
 			LightNode node = addQueue.poll();
+			if (node == null) {
+				continue; // Safety check for concurrent access
+			}
 			int currentLight = node.lightLevel;
 			
 			if (currentLight <= 1) {
@@ -153,6 +156,9 @@ public class LightPropagator {
 		
 		while (!removeQueue.isEmpty()) {
 			LightNode node = removeQueue.poll();
+			if (node == null) {
+				continue; // Safety check for concurrent access
+			}
 			
 			// Check all 6 neighbors
 			checkNeighborForRemoval(node.chunk, node.x - 1, node.y, node.z, node.lightLevel, boundaryQueue);
@@ -167,6 +173,9 @@ public class LightPropagator {
 		addQueue.clear();
 		while (!boundaryQueue.isEmpty()) {
 			LightNode node = boundaryQueue.poll();
+			if (node == null) {
+				continue; // Safety check for concurrent access
+			}
 			int light = node.chunk.getBlockLight(node.x, node.y, node.z);
 			if (light > 0) {
 				addQueue.offer(node);
@@ -176,6 +185,9 @@ public class LightPropagator {
 		// BFS re-propagation from boundary
 		while (!addQueue.isEmpty()) {
 			LightNode node = addQueue.poll();
+			if (node == null) {
+				continue; // Safety check for concurrent access
+			}
 			int currentLight = node.chunk.getBlockLight(node.x, node.y, node.z);
 			
 			if (currentLight <= 1) {

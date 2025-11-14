@@ -115,6 +115,9 @@ public class SkylightEngine {
 		// BFS propagation
 		while (!addQueue.isEmpty()) {
 			SkyNode node = addQueue.poll();
+			if (node == null) {
+				continue; // Safety check for concurrent access
+			}
 			
 			if (node.lightLevel <= 0) {
 				continue;
@@ -244,6 +247,9 @@ public class SkylightEngine {
 			// Second pass: BFS propagation to neighbors
 			while (!addQueue.isEmpty()) {
 				SkyNode node = addQueue.poll();
+				if (node == null) {
+					continue; // Safety check for concurrent access
+				}
 				int nextLight = node.lightLevel - 1;
 				if (nextLight > 0) {
 					propagateSkyToNeighbor(chunk, node.x - 1, node.y, node.z, nextLight);
@@ -282,6 +288,9 @@ public class SkylightEngine {
 			
 			while (!addQueue.isEmpty()) {
 				SkyNode node = addQueue.poll();
+				if (node == null) {
+					continue; // Safety check for concurrent access
+				}
 				int nextLight = node.lightLevel - 1;
 				if (nextLight > 0) {
 					propagateSkyToNeighbor(chunk, node.x - 1, node.y, node.z, nextLight);
@@ -314,6 +323,9 @@ public class SkylightEngine {
 		
 		while (!removeQueue.isEmpty()) {
 			SkyNode node = removeQueue.poll();
+			if (node == null) {
+				continue; // Safety check for concurrent access
+			}
 			
 			checkNeighborForRemoval(chunk, node.x - 1, node.y, node.z, node.lightLevel, boundaryQueue);
 			checkNeighborForRemoval(chunk, node.x + 1, node.y, node.z, node.lightLevel, boundaryQueue);
@@ -329,6 +341,9 @@ public class SkylightEngine {
 		
 		while (!addQueue.isEmpty()) {
 			SkyNode node = addQueue.poll();
+			if (node == null) {
+				continue; // Safety check for concurrent access
+			}
 			int currentLight = chunk.getSkyLight(node.x, node.y, node.z);
 			int nextLight = currentLight - 1;
 			
