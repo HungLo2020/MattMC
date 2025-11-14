@@ -87,6 +87,20 @@ public class Level implements LevelAccessor {
         // Set the neighbor accessor for cross-chunk face culling
         BlockFaceCollector.ChunkNeighborAccessor neighborAccessor = blockAccess::getBlockAcrossChunks;
         this.asyncLoader.setNeighborAccessor(neighborAccessor);
+        
+        // Set the light accessor for cross-chunk light sampling
+        AsyncChunkLoader.LightAccessor lightAccessor = new AsyncChunkLoader.LightAccessor() {
+            @Override
+            public int getSkyLight(LevelChunk chunk, int x, int y, int z) {
+                return blockAccess.getSkyLightAcrossChunks(chunk, x, y, z);
+            }
+            
+            @Override
+            public int getBlockLight(LevelChunk chunk, int x, int y, int z) {
+                return blockAccess.getBlockLightAcrossChunks(chunk, x, y, z);
+            }
+        };
+        this.asyncLoader.setLightAccessor(lightAccessor);
     }
     
     /**
