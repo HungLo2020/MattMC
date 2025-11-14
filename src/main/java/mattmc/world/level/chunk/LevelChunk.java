@@ -43,6 +43,9 @@ public final class LevelChunk {
     // Dirty flag: marks if chunk needs to be re-rendered (for display list caching)
     private boolean dirty = true;
     
+    // Suppress light updates flag: set true during bulk operations like terrain generation
+    private boolean suppressLightUpdates = false;
+    
     public LevelChunk(int chunkX, int chunkZ) {
         this.chunkX = chunkX;
         this.chunkZ = chunkZ;
@@ -136,8 +139,9 @@ public final class LevelChunk {
         }
         
         // Update block light if emission or opacity changed
-        if (oldBlock.getLightEmission() != block.getLightEmission() || 
-            oldBlock.getOpacity() != block.getOpacity()) {
+        if (!suppressLightUpdates && 
+            (oldBlock.getLightEmission() != block.getLightEmission() || 
+             oldBlock.getOpacity() != block.getOpacity())) {
             mattmc.world.level.lighting.WorldLightManager.getInstance()
                 .updateBlockLight(this, x, y, z, block, oldBlock);
             
@@ -161,6 +165,14 @@ public final class LevelChunk {
      */
     public void setDirty(boolean dirty) {
         this.dirty = dirty;
+    }
+    
+    /**
+     * Set whether to suppress light updates during bulk operations.
+     * Should be true during terrain generation and world loading.
+     */
+    public void setSuppressLightUpdates(boolean suppress) {
+        this.suppressLightUpdates = suppress;
     }
     
     /**

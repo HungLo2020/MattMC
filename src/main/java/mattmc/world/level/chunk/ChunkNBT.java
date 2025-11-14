@@ -197,6 +197,9 @@ public class ChunkNBT {
         
         LevelChunk chunk = new LevelChunk(chunkX, chunkZ);
         
+        // Suppress light updates during chunk loading for performance
+        chunk.setSuppressLightUpdates(true);
+        
         // Load sections
         Object sectionsObj = nbt.get("sections");
         if (sectionsObj instanceof List) {
@@ -230,6 +233,9 @@ public class ChunkNBT {
                 }
             }
         }
+        
+        // Re-enable light updates after loading complete
+        chunk.setSuppressLightUpdates(false);
         
         return chunk;
     }

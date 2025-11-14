@@ -111,6 +111,9 @@ public class WorldGenerator {
         int chunkX = chunk.chunkX();
         int chunkZ = chunk.chunkZ();
         
+        // Suppress light updates during terrain generation for performance
+        chunk.setSuppressLightUpdates(true);
+        
         // Generate terrain using noise-based world generator
         for (int localX = 0; localX < mattmc.world.level.chunk.LevelChunk.WIDTH; localX++) {
             for (int localZ = 0; localZ < mattmc.world.level.chunk.LevelChunk.DEPTH; localZ++) {
@@ -150,6 +153,9 @@ public class WorldGenerator {
                 }
             }
         }
+        
+        // Re-enable light updates after terrain generation
+        chunk.setSuppressLightUpdates(false);
         
         // After terrain generation, initialize skylight with BFS propagation
         WorldLightManager.getInstance().initializeChunkSkylight(chunk);
