@@ -117,6 +117,6 @@ tasks.register<Zip>("portableZip") {
     }
 }
 tasks.register<JavaExec>("runDebugTest") {
-	mainClass.set("mattmc.world.level.lighting.CrossChunkLightManualTest")
+	mainClass.set("mattmc.world.level.lighting.VertexLightSamplingTest")
 	classpath = sourceSets["test"].runtimeClasspath
 }
