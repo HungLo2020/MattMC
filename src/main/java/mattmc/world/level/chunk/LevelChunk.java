@@ -235,6 +235,8 @@ public final class LevelChunk {
         int sectionIndex = y / SECTION_HEIGHT;
         int sectionY = y % SECTION_HEIGHT;
         lightSections[sectionIndex].setSkyLight(x, sectionY, z, level);
+        // Mark chunk dirty to trigger mesh rebuild with new lighting
+        setDirty(true);
     }
     
     /**
@@ -267,6 +269,8 @@ public final class LevelChunk {
         int sectionIndex = y / SECTION_HEIGHT;
         int sectionY = y % SECTION_HEIGHT;
         lightSections[sectionIndex].setBlockLight(x, sectionY, z, level);
+        // Mark chunk dirty to trigger mesh rebuild with new lighting
+        setDirty(true);
     }
     
     /**
