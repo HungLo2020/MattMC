@@ -1,6 +1,6 @@
 package mattmc.world.level.levelgen;
 
-import mattmc.world.level.lighting.SkylightInitializer;
+import mattmc.world.level.lighting.SkylightEngine;
 
 /**
  * World generator using Minecraft-style noise-based terrain generation.
@@ -151,7 +151,8 @@ public class WorldGenerator {
             }
         }
         
-        // After terrain generation, initialize skylight based on heightmap
-        SkylightInitializer.initializeChunkSkylight(chunk);
+        // After terrain generation, initialize skylight with BFS propagation
+        SkylightEngine engine = new SkylightEngine();
+        engine.initializeChunkSkylight(chunk);
     }
 }

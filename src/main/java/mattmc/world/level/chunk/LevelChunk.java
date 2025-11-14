@@ -139,6 +139,10 @@ public final class LevelChunk {
             oldBlock.getOpacity() != block.getOpacity()) {
             mattmc.world.level.lighting.LightPropagator propagator = new mattmc.world.level.lighting.LightPropagator();
             propagator.updateBlockLight(this, x, y, z, block, oldBlock);
+            
+            // Update skylight if opacity changed (column update)
+            mattmc.world.level.lighting.SkylightEngine skylightEngine = new mattmc.world.level.lighting.SkylightEngine();
+            skylightEngine.updateColumnSkylight(this, x, y, z, block, oldBlock);
         }
         
         this.dirty = true;  // Mark chunk as needing re-render
