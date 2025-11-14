@@ -1,5 +1,7 @@
 package mattmc.world.level.levelgen;
 
+import mattmc.world.level.lighting.WorldLightManager;
+
 /**
  * World generator using Minecraft-style noise-based terrain generation.
  * 
@@ -101,6 +103,7 @@ public class WorldGenerator {
     /**
      * Generate terrain for a chunk.
      * Fills the chunk with blocks based on noise-generated terrain heights.
+     * After terrain generation, initializes skylight based on heightmap.
      * 
      * @param chunk The chunk to fill with terrain
      */
@@ -147,5 +150,8 @@ public class WorldGenerator {
                 }
             }
         }
+        
+        // After terrain generation, initialize skylight with BFS propagation
+        WorldLightManager.getInstance().initializeChunkSkylight(chunk);
     }
 }

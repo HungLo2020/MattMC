@@ -75,6 +75,10 @@ public class Level implements LevelAccessor {
         // Initialize block access with chunk manager
         this.blockAccess = new WorldBlockAccess(chunkManager);
         
+        // Initialize world light manager with neighbor accessor
+        mattmc.world.level.lighting.WorldLightManager.getInstance()
+            .setNeighborAccessor(this::getChunkIfLoaded);
+        
         this.asyncLoader = new AsyncChunkLoader();
         // Initialize with a default seed (will be updated when world is loaded/created)
         this.worldGenerator = new WorldGenerator(0L);
@@ -176,6 +180,10 @@ public class Level implements LevelAccessor {
             }
             
             chunkManager.addChunk(chunk);
+            
+            // Process any deferred light updates for this chunk
+            mattmc.world.level.lighting.WorldLightManager.getInstance()
+                .processDeferredUpdates(chunk);
         }
         
         return chunk;
