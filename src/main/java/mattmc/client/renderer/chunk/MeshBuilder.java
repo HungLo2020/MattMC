@@ -166,20 +166,48 @@ public class MeshBuilder {
      * Sample light for a vertex.
      * Returns [skyLight, blockLight, ao] as floats (0-15, 0-15, 0-3).
      * 
-     * For smooth lighting, this would sample nearby blocks and average.
-     * For now, we just sample the current block's light level.
+     * Samples light from the neighboring AIR block that the face is exposed to,
+     * not from the solid block itself. This is critical for proper lighting.
+     * normalIndex: 0=TOP, 1=BOTTOM, 2=NORTH, 3=SOUTH, 4=WEST, 5=EAST
      */
     private float[] sampleVertexLight(BlockFaceCollector.FaceData face, 
                                       int normalIndex,
                                       int cornerIndex) {
-        // If no chunk reference, return no light
+        // If no chunk reference, return default lighting
         if (face.chunk == null) {
             return new float[] {15.0f, 0.0f, 0.0f}; // Default to full skylight
         }
         
-        // Get light at the face position
-        int skyLight = face.chunk.getSkyLight(face.cx, face.cy, face.cz);
-        int blockLight = face.chunk.getBlockLight(face.cx, face.cy, face.cz);
+        // Calculate the position of the neighboring block that the face is exposed to
+        // Face normals: TOP(0,1,0), BOTTOM(0,-1,0), NORTH(0,0,-1), SOUTH(0,0,1), WEST(-1,0,0), EAST(1,0,0)
+        int lightX = face.cx;
+        int lightY = face.cy;
+        int lightZ = face.cz;
+        
+        switch (normalIndex) {
+            case 0: // TOP - sample from block above
+                lightY++;
+                break;
+            case 1: // BOTTOM - sample from block below
+                lightY--;
+                break;
+            case 2: // NORTH - sample from block to north (z-)
+                lightZ--;
+                break;
+            case 3: // SOUTH - sample from block to south (z+)
+                lightZ++;
+                break;
+            case 4: // WEST - sample from block to west (x-)
+                lightX--;
+                break;
+            case 5: // EAST - sample from block to east (x+)
+                lightX++;
+                break;
+        }
+        
+        // Get light from the neighboring air block
+        int skyLight = face.chunk.getSkyLight(lightX, lightY, lightZ);
+        int blockLight = face.chunk.getBlockLight(lightX, lightY, lightZ);
         
         // No ambient occlusion for now
         float ao = 0.0f;
