@@ -186,6 +186,12 @@ public class MeshBuilder {
         int cy = face.cy;
         int cz = face.cz;
         
+        // Get AO sample offsets (2 sides + 1 corner per vertex)
+        int[] aoOffsets = getAOSampleOffsets(normalIndex, cornerIndex);
+        
+        // Calculate AO using Minecraft-style two-sides + corner rule
+        float ao = calculateVertexAO(face.chunk, cx, cy, cz, aoOffsets);
+        
         // Sample light from 4 positions around the vertex (3 sides + 1 diagonal)
         // The positions depend on which face and which corner we're sampling
         int[] offsets = getVertexSampleOffsets(normalIndex, cornerIndex);
@@ -216,9 +222,137 @@ public class MeshBuilder {
         // Average the samples
         float avgSkyLight = skyLightSum / samples;
         float avgBlockLight = blockLightSum / samples;
-        float ao = 0.0f; // No AO yet
         
         return new float[] {avgSkyLight, avgBlockLight, ao};
+    }
+    
+    /**
+     * Calculate vertex AO using Minecraft-style two-sides + corner rule.
+     * 
+     * Rules:
+     * - If both side neighbors are solid → strongest AO (3)
+     * - If one side + corner are solid → medium AO (2)
+     * - If only corner is solid → weak AO (1)
+     * - Otherwise → no AO (0)
+     * 
+     * @param chunk The chunk to sample from
+     * @param cx Chunk-local x coordinate of the block
+     * @param cy Chunk-local y coordinate of the block
+     * @param cz Chunk-local z coordinate of the block
+     * @param offsets [side1_dx, side1_dy, side1_dz, side2_dx, side2_dy, side2_dz, corner_dx, corner_dy, corner_dz]
+     * @return AO value (0=no AO, 1=weak, 2=medium, 3=strong)
+     */
+    private float calculateVertexAO(mattmc.world.level.chunk.LevelChunk chunk, 
+                                    int cx, int cy, int cz, 
+                                    int[] offsets) {
+        // Check the 3 positions: side1, side2, corner
+        boolean side1 = isBlockOpaque(chunk, cx + offsets[0], cy + offsets[1], cz + offsets[2]);
+        boolean side2 = isBlockOpaque(chunk, cx + offsets[3], cy + offsets[4], cz + offsets[5]);
+        boolean corner = isBlockOpaque(chunk, cx + offsets[6], cy + offsets[7], cz + offsets[8]);
+        
+        // Apply Minecraft AO rules
+        if (side1 && side2) {
+            // Both sides solid → strongest AO
+            return 3.0f;
+        } else if ((side1 && corner) || (side2 && corner)) {
+            // One side + corner solid → medium AO
+            return 2.0f;
+        } else if (corner || side1 || side2) {
+            // Only one neighbor solid → weak AO
+            return 1.0f;
+        } else {
+            // No neighbors solid → no AO
+            return 0.0f;
+        }
+    }
+    
+    /**
+     * Check if a block is opaque at the given position.
+     * A block is considered opaque if it has opacity >= 15.
+     * 
+     * @return true if block is opaque (blocks light completely)
+     */
+    private boolean isBlockOpaque(mattmc.world.level.chunk.LevelChunk chunk, int x, int y, int z) {
+        // Bounds check
+        if (y < 0 || y >= 384) {
+            return false;
+        }
+        
+        mattmc.world.level.block.Block block = chunk.getBlock(x, y, z);
+        if (block == null) {
+            return false;
+        }
+        
+        return block.getOpacity() >= 15;
+    }
+    
+    /**
+     * Get the 3 sample positions for AO calculation (2 sides + 1 corner).
+     * Returns array of 9 ints: [side1_dx, side1_dy, side1_dz, side2_dx, side2_dy, side2_dz, corner_dx, corner_dy, corner_dz]
+     * 
+     * The samples are relative to the face, positioned around the vertex.
+     */
+    private int[] getAOSampleOffsets(int normalIndex, int cornerIndex) {
+        // For each face and corner, define the 2 side neighbors + 1 corner diagonal
+        // Format: [side1_dx,dy,dz, side2_dx,dy,dz, corner_dx,dy,dz]
+        
+        // Top face (normal = 0,1,0)
+        if (normalIndex == 0) {
+            switch (cornerIndex) {
+                case 0: return new int[] {-1,1,0, 0,1,-1, -1,1,-1}; // x0, z0: (-X, -Z, corner)
+                case 1: return new int[] {-1,1,0, 0,1,1, -1,1,1};   // x0, z1: (-X, +Z, corner)
+                case 2: return new int[] {1,1,0, 0,1,1, 1,1,1};     // x1, z1: (+X, +Z, corner)
+                case 3: return new int[] {1,1,0, 0,1,-1, 1,1,-1};   // x1, z0: (+X, -Z, corner)
+            }
+        }
+        // Bottom face (normal = 0,-1,0)
+        else if (normalIndex == 1) {
+            switch (cornerIndex) {
+                case 0: return new int[] {-1,0,0, 0,0,-1, -1,0,-1};
+                case 1: return new int[] {1,0,0, 0,0,-1, 1,0,-1};
+                case 2: return new int[] {1,0,0, 0,0,1, 1,0,1};
+                case 3: return new int[] {-1,0,0, 0,0,1, -1,0,1};
+            }
+        }
+        // North face (normal = 0,0,-1)
+        else if (normalIndex == 2) {
+            switch (cornerIndex) {
+                case 0: return new int[] {-1,0,0, 0,1,0, -1,1,0};
+                case 1: return new int[] {1,0,0, 0,1,0, 1,1,0};
+                case 2: return new int[] {1,0,0, 0,-1,0, 1,-1,0};
+                case 3: return new int[] {-1,0,0, 0,-1,0, -1,-1,0};
+            }
+        }
+        // South face (normal = 0,0,1)
+        else if (normalIndex == 3) {
+            switch (cornerIndex) {
+                case 0: return new int[] {1,0,0, 0,1,0, 1,1,0};
+                case 1: return new int[] {-1,0,0, 0,1,0, -1,1,0};
+                case 2: return new int[] {-1,0,0, 0,-1,0, -1,-1,0};
+                case 3: return new int[] {1,0,0, 0,-1,0, 1,-1,0};
+            }
+        }
+        // West face (normal = -1,0,0)
+        else if (normalIndex == 4) {
+            switch (cornerIndex) {
+                case 0: return new int[] {0,0,-1, 0,1,0, 0,1,-1};
+                case 1: return new int[] {0,0,1, 0,1,0, 0,1,1};
+                case 2: return new int[] {0,0,1, 0,-1,0, 0,-1,1};
+                case 3: return new int[] {0,0,-1, 0,-1,0, 0,-1,-1};
+            }
+        }
+        // East face (normal = 1,0,0)
+        else if (normalIndex == 5) {
+            switch (cornerIndex) {
+                case 0: return new int[] {0,0,1, 0,1,0, 0,1,1};
+                case 1: return new int[] {0,0,-1, 0,1,0, 0,1,-1};
+                case 2: return new int[] {0,0,-1, 0,-1,0, 0,-1,-1};
+                case 3: return new int[] {0,0,1, 0,-1,0, 0,-1,1};
+            }
+        }
+        
+        // Default (should never reach here)
+        return new int[] {0,0,0, 0,0,0, 0,0,0};
     }
     
     /**

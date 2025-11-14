@@ -1,17 +1,19 @@
 package mattmc.client.renderer;
 
 /**
- * Shader program for rendering voxel chunks with per-vertex lighting.
- * Supports gamma-corrected lighting with configurable gamma curve and emissive boost.
+ * Shader program for rendering voxel chunks with per-vertex lighting and ambient occlusion.
+ * Supports gamma-corrected lighting with configurable gamma curve, emissive boost, and AO strength.
  */
 public class VoxelLitShader extends Shader {
 	
 	// Default lighting parameters
 	private static final float DEFAULT_LIGHT_GAMMA = 1.4f;
 	private static final float DEFAULT_EMISSIVE_BOOST = 1.0f;
+	private static final float DEFAULT_AO_STRENGTH = 0.8f;
 	
 	private float lightGamma = DEFAULT_LIGHT_GAMMA;
 	private float emissiveBoost = DEFAULT_EMISSIVE_BOOST;
+	private float aoStrength = DEFAULT_AO_STRENGTH;
 	
 	/**
 	 * Create and compile the voxel lit shader program.
@@ -52,6 +54,16 @@ public class VoxelLitShader extends Shader {
 	}
 	
 	/**
+	 * Set the ambient occlusion strength.
+	 * 
+	 * @param strength AO strength (0.0=off, 1.0=full, default 0.8)
+	 */
+	public void setAOStrength(float strength) {
+		this.aoStrength = strength;
+		setUniform1f("uAOStrength", strength);
+	}
+	
+	/**
 	 * Get the current gamma exponent.
 	 */
 	public float getLightGamma() {
@@ -66,11 +78,19 @@ public class VoxelLitShader extends Shader {
 	}
 	
 	/**
+	 * Get the current AO strength.
+	 */
+	public float getAOStrength() {
+		return aoStrength;
+	}
+	
+	/**
 	 * Apply default lighting parameters.
 	 * Should be called after use() to ensure uniforms are set.
 	 */
 	public void applyDefaultLighting() {
 		setLightGamma(DEFAULT_LIGHT_GAMMA);
 		setEmissiveBoost(DEFAULT_EMISSIVE_BOOST);
+		setAOStrength(DEFAULT_AO_STRENGTH);
 	}
 }
