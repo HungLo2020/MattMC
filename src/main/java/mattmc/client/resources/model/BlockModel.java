@@ -21,6 +21,7 @@ public class BlockModel {
     private String parent;
     private Map<String, String> textures;
     private List<TintInfo> tints;
+    private List<ModelElement> elements;
     
     public String getParent() {
         return parent;
@@ -51,5 +52,20 @@ public class BlockModel {
     
     public void setTints(List<TintInfo> tints) {
         this.tints = tints;
+    }
+    
+    public List<ModelElement> getElements() {
+        return elements;
+    }
+    
+    public void setElements(List<ModelElement> elements) {
+        this.elements = elements;
+    }
+    
+    /**
+     * Check if this model has elements defined.
+     */
+    public boolean hasElements() {
+        return elements != null && !elements.isEmpty();
     }
 }

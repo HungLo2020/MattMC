@@ -46,4 +46,34 @@ public class BlockState {
         // This is useful for blocks like stairs that only have property-based variants
         return variants.values().iterator().next();
     }
+    
+    /**
+     * Get variant for a specific state key.
+     * The key is formatted like "facing=north,half=bottom,shape=straight".
+     * 
+     * @param stateKey The state key
+     * @return The list of variants for this state, or null if not found
+     */
+    public List<BlockStateVariant> getVariant(String stateKey) {
+        if (variants == null) {
+            return null;
+        }
+        return variants.get(stateKey);
+    }
+    
+    /**
+     * Get variant for a blockstate by building the key from properties.
+     * 
+     * @param blockState The blockstate with properties
+     * @return The list of variants for this state, or null if not found
+     */
+    public List<BlockStateVariant> getVariant(mattmc.world.level.block.state.BlockState blockState) {
+        if (blockState == null || variants == null) {
+            return getDefaultVariants();
+        }
+        
+        // Build the state key from properties (e.g., "facing=north,half=bottom")
+        String stateKey = blockState.toString();
+        return getVariant(stateKey);
+    }
 }

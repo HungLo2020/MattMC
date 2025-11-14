@@ -28,7 +28,8 @@ public class ResourceManager {
     private static final Map<String, BlockState> BLOCKSTATE_CACHE = new HashMap<>();
     
     /**
-     * Load a block model from assets/mattmc/models/block/{name}.json
+     * Load a block model from assets/models/block/{name}.json
+     * Also tries minecraft/models/block/{name}.json for vanilla models.
      * 
      * @param name The model name (e.g., "dirt")
      * @return The loaded BlockModel, or null if not found
@@ -38,6 +39,7 @@ public class ResourceManager {
             return MODEL_CACHE.get(name);
         }
         
+        // Try loading from assets first
         String path = "/assets/models/block/" + name + ".json";
         try (InputStream is = ResourceManager.class.getResourceAsStream(path);
              Reader reader = new InputStreamReader(is)) {
@@ -45,8 +47,17 @@ public class ResourceManager {
             MODEL_CACHE.put(name, model);
             return model;
         } catch (Exception e) {
-            logger.error("Failed to load block model: {}", path, e);
-            return null;
+            // Try minecraft namespace
+            String minecraftPath = "/minecraft/models/block/" + name + ".json";
+            try (InputStream is = ResourceManager.class.getResourceAsStream(minecraftPath);
+                 Reader reader = new InputStreamReader(is)) {
+                BlockModel model = GSON.fromJson(reader, BlockModel.class);
+                MODEL_CACHE.put(name, model);
+                return model;
+            } catch (Exception e2) {
+                logger.error("Failed to load block model: {} and {}", path, minecraftPath);
+                return null;
+            }
         }
     }
     
@@ -239,5 +250,82 @@ public class ResourceManager {
     public static void clearCache() {
         MODEL_CACHE.clear();
         BLOCKSTATE_CACHE.clear();
+    }
+    
+    /**
+     * Resolve a block model by following parent references and merging elements.
+     * This handles models that use "parent" to inherit geometry and textures.
+     * 
+     * @param modelPath The model path (e.g., "block/stairs" or "minecraft:block/stairs")
+     * @return The resolved BlockModel with merged elements and textures, or null if not found
+     */
+    public static BlockModel resolveBlockModel(String modelPath) {
+        // Extract model name from path
+        String modelName;
+        if (modelPath.contains(":")) {
+            // Handle "minecraft:block/stairs" format
+            modelName = modelPath.substring(modelPath.indexOf(':') + 1);
+            if (modelName.startsWith("block/")) {
+                modelName = modelName.substring(6);
+            }
+        } else if (modelPath.startsWith("block/")) {
+            // Handle "block/stairs" format
+            modelName = modelPath.substring(6);
+        } else {
+            modelName = modelPath;
+        }
+        
+        BlockModel model = loadBlockModel(modelName);
+        if (model == null) {
+            return null;
+        }
+        
+        // If model has a parent, resolve it and merge
+        if (model.getParent() != null) {
+            BlockModel parent = resolveBlockModel(model.getParent());
+            if (parent != null) {
+                // Merge parent and child
+                return mergeModels(parent, model);
+            }
+        }
+        
+        return model;
+    }
+    
+    /**
+     * Merge a parent model with a child model.
+     * Child properties override parent properties.
+     */
+    private static BlockModel mergeModels(BlockModel parent, BlockModel child) {
+        BlockModel merged = new BlockModel();
+        
+        // Merge textures (child overrides parent)
+        Map<String, String> mergedTextures = new HashMap<>();
+        if (parent.getTextures() != null) {
+            mergedTextures.putAll(parent.getTextures());
+        }
+        if (child.getTextures() != null) {
+            mergedTextures.putAll(child.getTextures());
+        }
+        merged.setTextures(mergedTextures);
+        
+        // Use child elements if present, otherwise use parent elements
+        if (child.hasElements()) {
+            merged.setElements(child.getElements());
+        } else if (parent.hasElements()) {
+            merged.setElements(parent.getElements());
+        }
+        
+        // Use child tints if present, otherwise use parent tints
+        if (child.getTints() != null) {
+            merged.setTints(child.getTints());
+        } else if (parent.getTints() != null) {
+            merged.setTints(parent.getTints());
+        }
+        
+        // Preserve parent reference from child
+        merged.setParent(child.getParent());
+        
+        return merged;
     }
 }

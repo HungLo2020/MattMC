@@ -124,4 +124,36 @@ public class BlockState {
     public boolean isEmpty() {
         return properties.isEmpty();
     }
+    
+    /**
+     * Convert this blockstate to a string key for blockstate variant lookup.
+     * Format: "facing=north,half=bottom,shape=straight" (sorted alphabetically).
+     * 
+     * @return The state key string
+     */
+    @Override
+    public String toString() {
+        if (properties.isEmpty()) {
+            return "";
+        }
+        
+        // Sort properties alphabetically for consistent keys
+        StringBuilder sb = new StringBuilder();
+        properties.entrySet().stream()
+            .sorted(Map.Entry.comparingByKey())
+            .forEach(entry -> {
+                if (sb.length() > 0) {
+                    sb.append(',');
+                }
+                sb.append(entry.getKey()).append('=');
+                Object value = entry.getValue();
+                // Convert enum values to lowercase names
+                if (value instanceof Enum) {
+                    sb.append(((Enum<?>) value).name().toLowerCase());
+                } else {
+                    sb.append(value.toString().toLowerCase());
+                }
+            });
+        return sb.toString();
+    }
 }
