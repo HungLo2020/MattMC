@@ -1,10 +1,10 @@
 {
-  "parent": "block/block",
+  "parent": "mattmc:block/block",
   "textures": {
-    "particle": "block/dirt",
-    "bottom": "block/dirt",
-    "top": "block/grass_block_top",
-    "side": "block/grass_block_side",
-    "overlay": "block/grass_block_side_overlay"
+    "particle": "mattmc:block/dirt",
+    "bottom": "mattmc:block/dirt",
+    "top": "mattmc:block/grass_block_top",
+    "side": "mattmc:block/grass_block_side",
+    "overlay": "mattmc:block/grass_block_side_overlay"
   }
 }

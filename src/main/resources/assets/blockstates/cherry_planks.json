@@ -1,7 +1,7 @@
 {
   "variants": {
-    "": [
-      { "model": "block/cherry_planks" }
-    ]
+    "": {
+      "model": "mattmc:block/cherry_planks"
+    }
   }
 }

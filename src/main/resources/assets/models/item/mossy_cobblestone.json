@@ -1,6 +1,3 @@
 {
-  "model": {
-    "type": "mattmc:model",
-    "model": "mattmc:block/mossy_cobblestone"
-  }
+  "parent": "mattmc:block/mossy_cobblestone"
 }

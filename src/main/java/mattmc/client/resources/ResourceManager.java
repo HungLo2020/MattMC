@@ -6,7 +6,6 @@ import mattmc.client.resources.model.BlockModel;
 import mattmc.client.resources.model.BlockState;
 import mattmc.client.resources.model.BlockStateVariant;
 import mattmc.client.resources.model.ModelElement;
-import mattmc.client.resources.model.ItemModelWrapper;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
@@ -311,7 +310,7 @@ public class ResourceManager {
     
     /**
      * Load an item model from assets/models/item/{name}.json
-     * This handles both standard Minecraft format and custom wrapper format.
+     * Uses standard Minecraft format with "parent" property.
      * 
      * @param name The item model name (e.g., "diamond")
      * @return The loaded BlockModel (raw), or null if not found
@@ -320,25 +319,7 @@ public class ResourceManager {
         String path = "/assets/models/item/" + name + ".json";
         try (InputStream is = ResourceManager.class.getResourceAsStream(path);
              Reader reader = new InputStreamReader(is)) {
-            
-            // First, try to parse as ItemModelWrapper (custom format)
-            try {
-                ItemModelWrapper wrapper = GSON.fromJson(new InputStreamReader(
-                    ResourceManager.class.getResourceAsStream(path)), ItemModelWrapper.class);
-                
-                if (wrapper != null && wrapper.getModel() != null && wrapper.getModel().getModel() != null) {
-                    // This is the custom format - create a BlockModel with the referenced model as parent
-                    BlockModel model = new BlockModel();
-                    model.setParent(wrapper.getModel().getModel());
-                    return model;
-                }
-            } catch (Exception e) {
-                // Not the custom format, try standard format
-            }
-            
-            // Try standard Minecraft format
-            BlockModel model = GSON.fromJson(new InputStreamReader(
-                ResourceManager.class.getResourceAsStream(path)), BlockModel.class);
+            BlockModel model = GSON.fromJson(reader, BlockModel.class);
             return model;
         } catch (Exception e) {
             logger.debug("Failed to load item model: {}", path);

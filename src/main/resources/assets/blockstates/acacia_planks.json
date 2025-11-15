@@ -1,7 +1,7 @@
 {
   "variants": {
-    "": [
-      { "model": "block/acacia_planks" }
-    ]
+    "": {
+      "model": "mattmc:block/acacia_planks"
+    }
   }
 }

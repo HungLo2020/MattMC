@@ -6,7 +6,7 @@ This implementation follows Minecraft's JSON model system architecture for loadi
 
 1. **Blockstate JSON files** - Define which model to use for each block state
 2. **Block model JSON files** - Define geometry (elements), textures, and display transforms
-3. **Item model JSON files** - Reference block models or define custom item models
+3. **Item model JSON files** - Reference block models using standard Minecraft format
 4. **Parent model inheritance** - Models can extend parent models
 5. **Texture variable resolution** - Texture references like `#side` are resolved to actual paths
 
@@ -26,17 +26,6 @@ This implementation follows Minecraft's JSON model system architecture for loadi
 - Represents a blockstate JSON file
 - Supports both single variant and array variant formats
 - Handles variant selection based on block properties
-
-**ItemModelWrapper** (`mattmc.client.resources.model.ItemModelWrapper`)
-- Handles the custom item model format:
-  ```json
-  {
-    "model": {
-      "type": "mattmc:model",
-      "model": "mattmc:block/cobblestone"
-    }
-  }
-  ```
 
 ### 2. Resource Loading (ResourceManager)
 
@@ -158,7 +147,8 @@ Map<String, String> textures = ResourceManager.getBlockTexturePaths("cobblestone
 
 ```java
 BlockModel itemModel = ResourceManager.loadItemModel("cobblestone");
-// Resolves the custom wrapper format and loads the referenced block model
+// Loads item model using standard Minecraft format with "parent" property
+// Resolves parent chain and loads the referenced block model
 ```
 
 ### Loading Blockstate
@@ -167,6 +157,31 @@ BlockModel itemModel = ResourceManager.loadItemModel("cobblestone");
 BlockState blockState = ResourceManager.loadBlockState("birch_stairs");
 List<BlockStateVariant> variants = blockState.getVariantsForState("facing=north,half=bottom,shape=straight");
 // Returns the variant(s) for that specific state
+```
+
+## Item Model Format
+
+Item models use standard Minecraft format:
+
+```json
+{
+  "parent": "mattmc:block/cobblestone"
+}
+```
+
+For items with tints (like grass):
+
+```json
+{
+  "parent": "mattmc:block/grass_block",
+  "tints": [
+    {
+      "type": "grass",
+      "downfall": 1.0,
+      "temperature": 0.5
+    }
+  ]
+}
 ```
 
 ## Texture Variable Resolution
