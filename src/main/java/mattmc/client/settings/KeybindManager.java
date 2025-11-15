@@ -38,12 +38,29 @@ public class KeybindManager {
         try (BufferedReader reader = Files.newBufferedReader(optionsPath)) {
             Map<String, Integer> keybinds = new HashMap<>();
             String line;
+            boolean inKeybindSection = false;
             
             while ((line = reader.readLine()) != null) {
                 line = line.trim();
                 
-                // Skip comments and empty lines
-                if (line.isEmpty() || line.startsWith("#")) {
+                // Skip empty lines
+                if (line.isEmpty()) {
+                    continue;
+                }
+                
+                // Check if we've reached the keybind section
+                if (line.startsWith("# Keybinds")) {
+                    inKeybindSection = true;
+                    continue;
+                }
+                
+                // Skip all lines until we reach the keybind section
+                if (!inKeybindSection) {
+                    continue;
+                }
+                
+                // Skip comments within the keybind section
+                if (line.startsWith("#")) {
                     continue;
                 }
                 
@@ -52,14 +69,6 @@ public class KeybindManager {
                 if (parts.length == 2) {
                     String action = parts[0].trim();
                     String keyName = parts[1].trim();
-                    
-                    // Skip non-keybind settings (these are handled by OptionsManager)
-                    if (action.equals("blur_title_screen") || action.equals("blur_menu_screens") ||
-                        action.equals("fps_cap") || action.equals("resolution") ||
-                        action.equals("fullscreen") || action.equals("render_distance") ||
-                        action.equals("mipmaps") || action.equals("anisotropic_filtering")) {
-                        continue;
-                    }
                     
                     // Try to parse as human-readable key name first
                     Integer keyCode = KeyNameParser.parseKeyName(keyName);
