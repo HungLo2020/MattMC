@@ -46,8 +46,12 @@ void main() {
 	// Sky light is white, so we scale it uniformly
 	vec3 skyColor = vec3(skyBrightness);
 	
-	// Take the maximum of sky and block light for each channel
-	vec3 finalLightColor = max(skyColor, blockLightColor);
+	// Additive blending of sky and block light for smooth color mixing
+	// This creates natural color transitions when different light sources overlap
+	vec3 finalLightColor = skyColor + blockLightColor;
+	
+	// Clamp to prevent over-brightening
+	finalLightColor = min(finalLightColor, vec3(1.0));
 	
 	// Ensure minimum brightness (never completely dark)
 	// Increased from 0.05 to 0.20 to make shadows less intense
