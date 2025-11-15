@@ -3,7 +3,8 @@
 // Inputs from vertex shader
 varying vec2 vTexCoord;
 varying vec4 vColor;
-varying vec3 vLightData; // (skyLight, blockLight, ao)
+varying vec4 vLightData; // (skyLight, blockLightR, blockLightG, blockLightB)
+varying float vAO; // Ambient occlusion
 
 // Uniforms
 uniform sampler2D uTexture;
@@ -19,30 +20,42 @@ float lightToBrightness(float lightValue, float gamma) {
 	return pow(normalized, gamma);
 }
 
+// Map RGB light values to color with gamma curve
+vec3 lightToColor(vec3 lightRGB, float gamma) {
+	// Normalize to 0.0-1.0
+	vec3 normalized = clamp(lightRGB / 15.0, 0.0, 1.0);
+	
+	// Apply gamma curve
+	return pow(normalized, vec3(gamma));
+}
+
 void main() {
 	// Sample texture
 	vec4 texColor = texture2D(uTexture, vTexCoord);
 	
 	// Extract light components (0-15 range)
 	float skyLight = vLightData.x;
-	float blockLight = vLightData.y;
-	float ao = vLightData.z; // Not used yet, reserved for ambient occlusion
+	vec3 blockLightRGB = vLightData.yzw; // R, G, B
+	float ao = vAO; // Not used yet, reserved for ambient occlusion
 	
-	// Convert to brightness with gamma curve
+	// Convert to brightness/color with gamma curve
 	float skyBrightness = lightToBrightness(skyLight, uLightGamma);
-	float blockBrightness = lightToBrightness(blockLight, uLightGamma);
+	vec3 blockLightColor = lightToColor(blockLightRGB, uLightGamma);
 	
-	// Combine sky and block light (take maximum)
-	float finalBrightness = max(skyBrightness, blockBrightness);
+	// Combine sky light (white) with colored block light
+	// Sky light is white, so we scale it uniformly
+	vec3 skyColor = vec3(skyBrightness);
+	
+	// Take the maximum of sky and block light for each channel
+	vec3 finalLightColor = max(skyColor, blockLightColor);
 	
 	// Ensure minimum brightness (never completely dark)
 	// Increased from 0.05 to 0.20 to make shadows less intense
-	finalBrightness = max(finalBrightness, 0.20);
+	finalLightColor = max(finalLightColor, vec3(0.20));
 	
 	// Apply optional emissive boost
-	// (could be controlled per-texture in future)
-	finalBrightness *= uEmissiveBoost;
+	finalLightColor *= uEmissiveBoost;
 	
 	// Apply lighting to final color
-	gl_FragColor = vColor * texColor * vec4(vec3(finalBrightness), 1.0);
+	gl_FragColor = vColor * texColor * vec4(finalLightColor, 1.0);
 }

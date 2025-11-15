@@ -147,6 +147,24 @@ public class CrossChunkLightPropagator {
 	}
 	
 	/**
+	 * Propagate blockLight RGB across chunk boundaries.
+	 * 
+	 * @param sourceChunk The chunk where light originates
+	 * @param x Chunk-local X (can be outside 0-15 if crossing boundary)
+	 * @param y Chunk-local Y (0-383)
+	 * @param z Chunk-local Z (can be outside 0-15 if crossing boundary)
+	 * @param r Red light level to propagate (0-15)
+	 * @param g Green light level to propagate (0-15)
+	 * @param b Blue light level to propagate (0-15)
+	 */
+	public void propagateBlockLightRGBCross(LevelChunk sourceChunk, int x, int y, int z, int r, int g, int b) {
+		// For now, use the max of RGB as the legacy light level
+		// TODO: Implement proper RGB cross-chunk propagation
+		int lightLevel = Math.max(r, Math.max(g, b));
+		propagateBlockLightCross(sourceChunk, x, y, z, lightLevel);
+	}
+	
+	/**
 	 * Propagate skyLight across chunk boundaries.
 	 * 
 	 * @param sourceChunk The chunk where light originates

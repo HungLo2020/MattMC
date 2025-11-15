@@ -23,7 +23,10 @@ public class Block {
     
     private final boolean solid;
     private final String identifier;
-    private final int lightEmission; // Light level emitted by this block (0-15)
+    private final int lightEmission; // Legacy light level emitted by this block (0-15)
+    private final int lightEmissionR; // Red channel light emission (0-15)
+    private final int lightEmissionG; // Green channel light emission (0-15)
+    private final int lightEmissionB; // Blue channel light emission (0-15)
     private Map<String, String> texturePaths; // Lazily loaded from JSON (top, bottom, side, overlay, etc.)
     
     /**
@@ -33,27 +36,61 @@ public class Block {
      * @param solid Whether the block is solid (has collision)
      */
     public Block(boolean solid) {
-        this(solid, 0);
+        this(solid, 0, 0, 0, 0);
     }
     
     /**
-     * Create a new block with light emission.
+     * Create a new block with white light emission (legacy).
+     * Sets all RGB channels to the same value for white light.
      * 
      * @param solid Whether the block is solid (has collision)
      * @param lightEmission Light level emitted by this block (0-15)
      */
     public Block(boolean solid, int lightEmission) {
+        this(solid, lightEmission, lightEmission, lightEmission, lightEmission);
+    }
+    
+    /**
+     * Create a new block with RGB light emission.
+     * 
+     * @param solid Whether the block is solid (has collision)
+     * @param lightEmissionR Red channel light emission (0-15)
+     * @param lightEmissionG Green channel light emission (0-15)
+     * @param lightEmissionB Blue channel light emission (0-15)
+     */
+    public Block(boolean solid, int lightEmissionR, int lightEmissionG, int lightEmissionB) {
+        this(solid, Math.max(lightEmissionR, Math.max(lightEmissionG, lightEmissionB)), 
+             lightEmissionR, lightEmissionG, lightEmissionB);
+    }
+    
+    /**
+     * Create a new block with explicit emission level and RGB light values.
+     * This is the most flexible constructor for colored lights.
+     * 
+     * @param solid Whether the block is solid (has collision)
+     * @param lightEmission Overall light emission level (0-15), used for intensity
+     * @param lightEmissionR Red channel light emission (0-15)
+     * @param lightEmissionG Green channel light emission (0-15)
+     * @param lightEmissionB Blue channel light emission (0-15)
+     */
+    public Block(boolean solid, int lightEmission, int lightEmissionR, int lightEmissionG, int lightEmissionB) {
         this.solid = solid;
         this.lightEmission = Math.max(0, Math.min(15, lightEmission));
+        this.lightEmissionR = Math.max(0, Math.min(15, lightEmissionR));
+        this.lightEmissionG = Math.max(0, Math.min(15, lightEmissionG));
+        this.lightEmissionB = Math.max(0, Math.min(15, lightEmissionB));
         this.identifier = null; // Will be set during registration
     }
     
     /**
      * Internal constructor used during registration to set the identifier.
      */
-    Block(boolean solid, int lightEmission, String identifier) {
+    Block(boolean solid, int lightEmission, int lightEmissionR, int lightEmissionG, int lightEmissionB, String identifier) {
         this.solid = solid;
         this.lightEmission = Math.max(0, Math.min(15, lightEmission));
+        this.lightEmissionR = Math.max(0, Math.min(15, lightEmissionR));
+        this.lightEmissionG = Math.max(0, Math.min(15, lightEmissionG));
+        this.lightEmissionB = Math.max(0, Math.min(15, lightEmissionB));
         this.identifier = identifier;
     }
     
@@ -156,12 +193,41 @@ public class Block {
     }
     
     /**
-     * Get the light level emitted by this block.
+     * Get the light level emitted by this block (legacy, returns max of RGB).
      * 
      * @return Light emission level (0-15), where 0 means no light emission
+     * @deprecated Use getLightEmissionR/G/B for RGB values
      */
+    @Deprecated
     public int getLightEmission() {
         return lightEmission;
+    }
+    
+    /**
+     * Get the RED channel light level emitted by this block.
+     * 
+     * @return Red light emission level (0-15)
+     */
+    public int getLightEmissionR() {
+        return lightEmissionR;
+    }
+    
+    /**
+     * Get the GREEN channel light level emitted by this block.
+     * 
+     * @return Green light emission level (0-15)
+     */
+    public int getLightEmissionG() {
+        return lightEmissionG;
+    }
+    
+    /**
+     * Get the BLUE channel light emission level emitted by this block.
+     * 
+     * @return Blue light emission level (0-15)
+     */
+    public int getLightEmissionB() {
+        return lightEmissionB;
     }
     
     /**
