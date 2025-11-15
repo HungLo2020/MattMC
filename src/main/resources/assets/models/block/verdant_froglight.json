@@ -1,0 +1,7 @@
+{
+  "parent": "mattmc:block/cube_column",
+  "textures": {
+    "end": "mattmc:block/verdant_froglight_top",
+    "side": "mattmc:block/verdant_froglight_side"
+  }
+}

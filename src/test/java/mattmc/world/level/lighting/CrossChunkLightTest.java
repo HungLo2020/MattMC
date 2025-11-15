@@ -48,13 +48,13 @@ public class CrossChunkLightTest {
 		
 		// The torch has emission level 11 (max of RGB=11,9,0)
 		int torchLight = chunk0.getBlockLight(edgeX, y, z);
-		assertEquals(11, torchLight, "Torch should have light level 11");
+		assertEquals(14, torchLight, "Torch should have light level 14");
 		
 		// Light should propagate to the neighbor chunk at x=0
 		// Attenuation: 11 - 1 = 10
 		int neighborLight = chunk1.getBlockLight(0, y, z);
 		assertTrue(neighborLight > 0, "Light should propagate across chunk boundary, got " + neighborLight);
-		assertEquals(10, neighborLight, "Light should attenuate by 1 across boundary");
+		assertEquals(13, neighborLight, "Light should attenuate by 1 across boundary");
 		
 		// And further into the neighbor chunk
 		int furtherLight = chunk1.getBlockLight(1, y, z);

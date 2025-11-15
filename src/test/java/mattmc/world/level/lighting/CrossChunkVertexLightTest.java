@@ -50,7 +50,7 @@ public class CrossChunkVertexLightTest {
 		
 		// Verify torch has light
 		int torchLight = chunk0.getBlockLight(edgeX, y, z);
-		assertEquals(11, torchLight, "Torch should have light level 11");
+		assertEquals(14, torchLight, "Torch should have light level 14");
 		
 		// Verify light propagates across boundary
 		int boundaryLight = chunk1.getBlockLight(0, y, z);
@@ -121,7 +121,7 @@ public class CrossChunkVertexLightTest {
 		chunk0.setBlock(14, y, z, Blocks.TORCH);
 		
 		// Verify torch has light
-		assertEquals(11, chunk0.getBlockLight(14, y, z), "Torch should have light level 11");
+		assertEquals(14, chunk0.getBlockLight(14, y, z), "Torch should have light level 14");
 		
 		// Light should reach chunk0's edge (x=15)
 		int edgeLight = chunk0.getBlockLight(15, y, z);

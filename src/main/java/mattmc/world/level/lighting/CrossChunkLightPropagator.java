@@ -53,12 +53,20 @@ public class CrossChunkLightPropagator {
 	
 	// Neighbor accessor
 	private NeighborChunkAccessor neighborAccessor;
+	private LightPropagator lightPropagator;  // Reference back to propagator for continuing BFS
 	
 	/**
 	 * Set the neighbor chunk accessor.
 	 */
 	public void setNeighborAccessor(NeighborChunkAccessor accessor) {
 		this.neighborAccessor = accessor;
+	}
+	
+	/**
+	 * Set the light propagator for continuing BFS across chunks.
+	 */
+	public void setLightPropagator(LightPropagator propagator) {
+		this.lightPropagator = propagator;
 	}
 	
 	/**
@@ -158,10 +166,109 @@ public class CrossChunkLightPropagator {
 	 * @param b Blue light level to propagate (0-15)
 	 */
 	public void propagateBlockLightRGBCross(LevelChunk sourceChunk, int x, int y, int z, int r, int g, int b) {
-		// For now, use the max of RGB as the legacy light level
-		// TODO: Implement proper RGB cross-chunk propagation
-		int lightLevel = Math.max(r, Math.max(g, b));
-		propagateBlockLightCross(sourceChunk, x, y, z, lightLevel);
+		// Check if light is strong enough to propagate
+		if (r <= 0 && g <= 0 && b <= 0) {
+			return; // No light to propagate
+		}
+		
+		// Calculate which chunk and local coordinates we're targeting
+		int targetChunkX = sourceChunk.chunkX();
+		int targetChunkZ = sourceChunk.chunkZ();
+		int targetLocalX = x;
+		int targetLocalZ = z;
+		
+		// Handle X boundary crossing
+		if (x < 0) {
+			targetChunkX--;
+			targetLocalX = LevelChunk.WIDTH + x; // x is negative
+		} else if (x >= LevelChunk.WIDTH) {
+			targetChunkX++;
+			targetLocalX = x - LevelChunk.WIDTH;
+		}
+		
+		// Handle Z boundary crossing
+		if (z < 0) {
+			targetChunkZ--;
+			targetLocalZ = LevelChunk.DEPTH + z; // z is negative
+		} else if (z >= LevelChunk.DEPTH) {
+			targetChunkZ++;
+			targetLocalZ = z - LevelChunk.DEPTH;
+		}
+		
+		// Handle Y bounds
+		if (y < 0 || y >= LevelChunk.HEIGHT) {
+			return; // Out of world bounds
+		}
+		
+		// Get the target chunk
+		boolean crossingChunk = (targetChunkX != sourceChunk.chunkX() || 
+		                         targetChunkZ != sourceChunk.chunkZ());
+		
+		if (!crossingChunk) {
+			// Not actually crossing a chunk boundary - this shouldn't happen
+			// but handle it gracefully
+			return;
+		}
+		
+		if (neighborAccessor == null) {
+			return; // No accessor available
+		}
+		
+		LevelChunk targetChunk = neighborAccessor.getChunkIfLoaded(targetChunkX, targetChunkZ);
+		if (targetChunk == null) {
+			// Chunk not loaded - defer the update
+			// TODO: Store RGB values in deferred updates (for now, just skip)
+			return;
+		}
+		
+		// Check if the block at this position is opaque
+		Block block = targetChunk.getBlock(targetLocalX, y, targetLocalZ);
+		if (block.getOpacity() >= 15) {
+			return; // Fully opaque block - don't set light here
+		}
+		
+		// Get current light at target position
+		int currentR = targetChunk.getBlockLightR(targetLocalX, y, targetLocalZ);
+		int currentG = targetChunk.getBlockLightG(targetLocalX, y, targetLocalZ);
+		int currentB = targetChunk.getBlockLightB(targetLocalX, y, targetLocalZ);
+		
+		// Only update if new light is brighter in at least one channel
+		if (r > currentR || g > currentG || b > currentB) {
+			// Take maximum of each channel
+			int finalR = Math.max(r, currentR);
+			int finalG = Math.max(g, currentG);
+			int finalB = Math.max(b, currentB);
+			
+			// Set the light in the target chunk
+			targetChunk.setBlockLightRGB(targetLocalX, y, targetLocalZ, finalR, finalG, finalB);
+			
+			// Continue propagation from this position using the light propagator
+			// This is critical for cross-chunk light to continue spreading!
+			if (lightPropagator != null) {
+				// Note: We pass the attenuated values (finalR-1, etc.) as the propagator
+				// expects the light value TO BE PROPAGATED, not the current value
+				int propR = Math.max(0, finalR - 1);
+				int propG = Math.max(0, finalG - 1);
+				int propB = Math.max(0, finalB - 1);
+				
+				if (propR > 0 || propG > 0 || propB > 0) {
+					// Propagate to neighbors of this position in the target chunk
+					// We need to propagate within the target chunk, not add to source chunk queue
+					// Actually, we should call propagateRGBToNeighbor for each neighbor
+					// But that would require exposing it or having a helper method
+					// For now, use a simpler approach: recursively call cross-chunk propagator
+					// for all 6 neighbors of the position we just set
+					
+					// Propagate in all 6 directions from the position in target chunk
+					propagateBlockLightRGBCross(targetChunk, targetLocalX - 1, y, targetLocalZ, propR + 1, propG + 1, propB + 1);
+					propagateBlockLightRGBCross(targetChunk, targetLocalX + 1, y, targetLocalZ, propR + 1, propG + 1, propB + 1);
+					propagateBlockLightRGBCross(targetChunk, targetLocalX, y - 1, targetLocalZ, propR + 1, propG + 1, propB + 1);
+					propagateBlockLightRGBCross(targetChunk, targetLocalX, y + 1, targetLocalZ, propR + 1, propG + 1, propB + 1);
+					propagateBlockLightRGBCross(targetChunk, targetLocalX, y, targetLocalZ - 1, propR + 1, propG + 1, propB + 1);
+					propagateBlockLightRGBCross(targetChunk, targetLocalX, y, targetLocalZ + 1, propR + 1, propG + 1, propB + 1);
+				}
+			}
+		}
 	}
 	
 	/**

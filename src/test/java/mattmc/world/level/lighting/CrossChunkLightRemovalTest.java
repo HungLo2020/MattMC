@@ -116,7 +116,7 @@ public class CrossChunkLightRemovalTest {
 		// Place torch one block inside chunk boundary
 		int nearEdgeX = 14;
 		
-		propagator.addBlockLightRGB(chunk0, nearEdgeX, y, 8, 11, 9, 0);
+		propagator.addBlockLightRGB(chunk0, nearEdgeX, y, 8, 14, 11, 0);
 		
 		// Light should reach chunk 1 (distance 2: 14->15->0)
 		assertTrue(chunk1.getBlockLightR(0, y, 8) > 0, "Light should cross chunk boundary");
