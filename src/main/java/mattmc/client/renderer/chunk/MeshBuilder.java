@@ -99,8 +99,8 @@ public class MeshBuilder {
                 
                 // Check if this is a stairs block (special marker)
                 if ("stairs".equals(face.faceType)) {
-                    // Add stairs geometry instead of regular face, passing blockstate
-                    addStairsGeometry(face.x, face.y, face.z, face.block, face.blockState);
+                    // Add stairs geometry instead of regular face, passing blockstate and face for lighting
+                    addStairsGeometry(face);
                     continue;
                 }
                 
@@ -652,8 +652,13 @@ public class MeshBuilder {
      * Add stairs geometry based on blockstate (facing and half).
      * Stairs consist of a bottom slab and a top step, rotated based on facing direction.
      */
-    private void addStairsGeometry(float x, float y, float z, mattmc.world.level.block.Block block, 
-                                    mattmc.world.level.block.state.BlockState state) {
+    private void addStairsGeometry(BlockFaceCollector.FaceData face) {
+        float x = face.x;
+        float y = face.y;
+        float z = face.z;
+        mattmc.world.level.block.Block block = face.block;
+        mattmc.world.level.block.state.BlockState state = face.blockState;
+        
         // Get texture path and UV mapping for stairs
         String texturePath = block.getTexturePath("side");
         if (texturePath == null) {
@@ -681,12 +686,12 @@ public class MeshBuilder {
         // Render based on half (top or bottom)
         if (half == mattmc.world.level.block.state.properties.Half.BOTTOM) {
             // Bottom stairs: slab on bottom, step on top
-            addStairsBottomSlabFace(x, y, z, 0.5f, facing, colorTop, colorBottom, colorNorth, colorSouth, colorWest, colorEast, uvMapping);
-            addStairsTopStepFace(x, y + 0.5f, z, facing, colorTop, colorBottom, colorNorth, colorSouth, colorWest, colorEast, uvMapping);
+            addStairsBottomSlabFace(face, x, y, z, 0.5f, facing, colorTop, colorBottom, colorNorth, colorSouth, colorWest, colorEast, uvMapping);
+            addStairsTopStepFace(face, x, y + 0.5f, z, facing, colorTop, colorBottom, colorNorth, colorSouth, colorWest, colorEast, uvMapping);
         } else {
             // Top stairs: slab on top, step on bottom  
-            addStairsBottomSlabFace(x, y + 0.5f, z, 0.5f, facing, colorTop, colorBottom, colorNorth, colorSouth, colorWest, colorEast, uvMapping);
-            addStairsTopStepFace(x, y, z, facing, colorTop, colorBottom, colorNorth, colorSouth, colorWest, colorEast, uvMapping);
+            addStairsBottomSlabFace(face, x, y + 0.5f, z, 0.5f, facing, colorTop, colorBottom, colorNorth, colorSouth, colorWest, colorEast, uvMapping);
+            addStairsTopStepFace(face, x, y, z, facing, colorTop, colorBottom, colorNorth, colorSouth, colorWest, colorEast, uvMapping);
         }
     }
     
@@ -694,7 +699,7 @@ public class MeshBuilder {
      * Add bottom slab faces for stairs.
      * The facing parameter determines which direction the step faces.
      */
-    private void addStairsBottomSlabFace(float x, float y, float z, float height,
+    private void addStairsBottomSlabFace(BlockFaceCollector.FaceData face, float x, float y, float z, float height,
                                           mattmc.world.level.block.state.properties.Direction facing,
                                           float[] colorTop, float[] colorBottom, 
                                           float[] colorNorth, float[] colorSouth,
@@ -716,57 +721,89 @@ public class MeshBuilder {
         float v05 = (v0 + v1) / 2.0f;
         
         // Top face of slab (full texture)
+        // Sample light for top face vertices
+        float[] light0 = sampleVertexLight(face, 0, 0);
+        float[] light1 = sampleVertexLight(face, 0, 1);
+        float[] light2 = sampleVertexLight(face, 0, 2);
+        float[] light3 = sampleVertexLight(face, 0, 3);
+        
         int base = currentVertex;
-        addVertex(x0, y1, z0, u0, v0, colorTop, 0, 1, 0);
-        addVertex(x0, y1, z1, u0, v1, colorTop, 0, 1, 0);
-        addVertex(x1, y1, z1, u1, v1, colorTop, 0, 1, 0);
-        addVertex(x1, y1, z0, u1, v0, colorTop, 0, 1, 0);
+        addVertex(x0, y1, z0, u0, v0, colorTop, 0, 1, 0, light0[0], light0[1], light0[2]);
+        addVertex(x0, y1, z1, u0, v1, colorTop, 0, 1, 0, light1[0], light1[1], light1[2]);
+        addVertex(x1, y1, z1, u1, v1, colorTop, 0, 1, 0, light2[0], light2[1], light2[2]);
+        addVertex(x1, y1, z0, u1, v0, colorTop, 0, 1, 0, light3[0], light3[1], light3[2]);
         addQuadIndices(base);
         currentVertex += 4;
         
         // Bottom face (full texture)
+        // Sample light for bottom face vertices
+        light0 = sampleVertexLight(face, 1, 0);
+        light1 = sampleVertexLight(face, 1, 1);
+        light2 = sampleVertexLight(face, 1, 2);
+        light3 = sampleVertexLight(face, 1, 3);
+        
         base = currentVertex;
-        addVertex(x0, y0, z0, u0, v0, colorBottom, 0, -1, 0);
-        addVertex(x1, y0, z0, u1, v0, colorBottom, 0, -1, 0);
-        addVertex(x1, y0, z1, u1, v1, colorBottom, 0, -1, 0);
-        addVertex(x0, y0, z1, u0, v1, colorBottom, 0, -1, 0);
+        addVertex(x0, y0, z0, u0, v0, colorBottom, 0, -1, 0, light0[0], light0[1], light0[2]);
+        addVertex(x1, y0, z0, u1, v0, colorBottom, 0, -1, 0, light1[0], light1[1], light1[2]);
+        addVertex(x1, y0, z1, u1, v1, colorBottom, 0, -1, 0, light2[0], light2[1], light2[2]);
+        addVertex(x0, y0, z1, u0, v1, colorBottom, 0, -1, 0, light3[0], light3[1], light3[2]);
         addQuadIndices(base);
         currentVertex += 4;
         
         // Side faces - all full width/depth, half height
         // North face
+        light0 = sampleVertexLight(face, 2, 0);
+        light1 = sampleVertexLight(face, 2, 1);
+        light2 = sampleVertexLight(face, 2, 2);
+        light3 = sampleVertexLight(face, 2, 3);
+        
         base = currentVertex;
-        addVertex(x1, y0, z0, u1, v1, colorNorth, 0, 0, -1);
-        addVertex(x0, y0, z0, u0, v1, colorNorth, 0, 0, -1);
-        addVertex(x0, y1, z0, u0, v05, colorNorth, 0, 0, -1);
-        addVertex(x1, y1, z0, u1, v05, colorNorth, 0, 0, -1);
+        addVertex(x1, y0, z0, u1, v1, colorNorth, 0, 0, -1, light0[0], light0[1], light0[2]);
+        addVertex(x0, y0, z0, u0, v1, colorNorth, 0, 0, -1, light1[0], light1[1], light1[2]);
+        addVertex(x0, y1, z0, u0, v05, colorNorth, 0, 0, -1, light2[0], light2[1], light2[2]);
+        addVertex(x1, y1, z0, u1, v05, colorNorth, 0, 0, -1, light3[0], light3[1], light3[2]);
         addQuadIndices(base);
         currentVertex += 4;
         
         // South face
+        light0 = sampleVertexLight(face, 3, 0);
+        light1 = sampleVertexLight(face, 3, 1);
+        light2 = sampleVertexLight(face, 3, 2);
+        light3 = sampleVertexLight(face, 3, 3);
+        
         base = currentVertex;
-        addVertex(x0, y0, z1, u0, v1, colorSouth, 0, 0, 1);
-        addVertex(x1, y0, z1, u1, v1, colorSouth, 0, 0, 1);
-        addVertex(x1, y1, z1, u1, v05, colorSouth, 0, 0, 1);
-        addVertex(x0, y1, z1, u0, v05, colorSouth, 0, 0, 1);
+        addVertex(x0, y0, z1, u0, v1, colorSouth, 0, 0, 1, light0[0], light0[1], light0[2]);
+        addVertex(x1, y0, z1, u1, v1, colorSouth, 0, 0, 1, light1[0], light1[1], light1[2]);
+        addVertex(x1, y1, z1, u1, v05, colorSouth, 0, 0, 1, light2[0], light2[1], light2[2]);
+        addVertex(x0, y1, z1, u0, v05, colorSouth, 0, 0, 1, light3[0], light3[1], light3[2]);
         addQuadIndices(base);
         currentVertex += 4;
         
         // West face
+        light0 = sampleVertexLight(face, 4, 0);
+        light1 = sampleVertexLight(face, 4, 1);
+        light2 = sampleVertexLight(face, 4, 2);
+        light3 = sampleVertexLight(face, 4, 3);
+        
         base = currentVertex;
-        addVertex(x0, y0, z0, u0, v1, colorWest, -1, 0, 0);
-        addVertex(x0, y0, z1, u1, v1, colorWest, -1, 0, 0);
-        addVertex(x0, y1, z1, u1, v05, colorWest, -1, 0, 0);
-        addVertex(x0, y1, z0, u0, v05, colorWest, -1, 0, 0);
+        addVertex(x0, y0, z0, u0, v1, colorWest, -1, 0, 0, light0[0], light0[1], light0[2]);
+        addVertex(x0, y0, z1, u1, v1, colorWest, -1, 0, 0, light1[0], light1[1], light1[2]);
+        addVertex(x0, y1, z1, u1, v05, colorWest, -1, 0, 0, light2[0], light2[1], light2[2]);
+        addVertex(x0, y1, z0, u0, v05, colorWest, -1, 0, 0, light3[0], light3[1], light3[2]);
         addQuadIndices(base);
         currentVertex += 4;
         
         // East face
+        light0 = sampleVertexLight(face, 5, 0);
+        light1 = sampleVertexLight(face, 5, 1);
+        light2 = sampleVertexLight(face, 5, 2);
+        light3 = sampleVertexLight(face, 5, 3);
+        
         base = currentVertex;
-        addVertex(x1, y0, z1, u1, v1, colorEast, 1, 0, 0);
-        addVertex(x1, y0, z0, u0, v1, colorEast, 1, 0, 0);
-        addVertex(x1, y1, z0, u0, v05, colorEast, 1, 0, 0);
-        addVertex(x1, y1, z1, u1, v05, colorEast, 1, 0, 0);
+        addVertex(x1, y0, z1, u1, v1, colorEast, 1, 0, 0, light0[0], light0[1], light0[2]);
+        addVertex(x1, y0, z0, u0, v1, colorEast, 1, 0, 0, light1[0], light1[1], light1[2]);
+        addVertex(x1, y1, z0, u0, v05, colorEast, 1, 0, 0, light2[0], light2[1], light2[2]);
+        addVertex(x1, y1, z1, u1, v05, colorEast, 1, 0, 0, light3[0], light3[1], light3[2]);
         addQuadIndices(base);
         currentVertex += 4;
     }
@@ -774,7 +811,7 @@ public class MeshBuilder {
     /**
      * Add top step faces for stairs (based on facing direction).
      */
-    private void addStairsTopStepFace(float x, float y, float z,
+    private void addStairsTopStepFace(BlockFaceCollector.FaceData face, float x, float y, float z,
                                        mattmc.world.level.block.state.properties.Direction facing,
                                        float[] colorTop, float[] colorBottom, float[] colorNorth, float[] colorSouth,
                                        float[] colorWest, float[] colorEast,
@@ -800,13 +837,13 @@ public class MeshBuilder {
         // EAST: step in east half (x05 to x1)
         
         switch (facing) {
-            case NORTH -> addStairsStepNorth(x0, x1, y0, y1, z0, z05, u0, u05, u1, v0, v05, v1, 
+            case NORTH -> addStairsStepNorth(face, x0, x1, y0, y1, z0, z05, u0, u05, u1, v0, v05, v1, 
                                               colorTop, colorBottom, colorNorth, colorSouth, colorWest, colorEast);
-            case SOUTH -> addStairsStepSouth(x0, x1, y0, y1, z05, z1, u0, u05, u1, v0, v05, v1,
+            case SOUTH -> addStairsStepSouth(face, x0, x1, y0, y1, z05, z1, u0, u05, u1, v0, v05, v1,
                                               colorTop, colorBottom, colorNorth, colorSouth, colorWest, colorEast);
-            case WEST -> addStairsStepWest(x0, x05, y0, y1, z0, z1, u0, u05, u1, v0, v05, v1,
+            case WEST -> addStairsStepWest(face, x0, x05, y0, y1, z0, z1, u0, u05, u1, v0, v05, v1,
                                             colorTop, colorBottom, colorNorth, colorSouth, colorWest, colorEast);
-            case EAST -> addStairsStepEast(x05, x1, y0, y1, z0, z1, u0, u05, u1, v0, v05, v1,
+            case EAST -> addStairsStepEast(face, x05, x1, y0, y1, z0, z1, u0, u05, u1, v0, v05, v1,
                                             colorTop, colorBottom, colorNorth, colorSouth, colorWest, colorEast);
         }
     }
@@ -814,61 +851,91 @@ public class MeshBuilder {
     /**
      * Add step geometry for north-facing stairs (step in north half).
      */
-    private void addStairsStepNorth(float x0, float x1, float y0, float y1, float z0, float z05,
+    private void addStairsStepNorth(BlockFaceCollector.FaceData face, float x0, float x1, float y0, float y1, float z0, float z05,
                                      float u0, float u05, float u1, float v0, float v05, float v1,
                                      float[] colorTop, float[] colorBottom, float[] colorNorth, float[] colorSouth,
                                      float[] colorWest, float[] colorEast) {
         // Top face (north half)
+        float[] light0 = sampleVertexLight(face, 0, 0);
+        float[] light1 = sampleVertexLight(face, 0, 1);
+        float[] light2 = sampleVertexLight(face, 0, 2);
+        float[] light3 = sampleVertexLight(face, 0, 3);
+        
         int base = currentVertex;
-        addVertex(x0, y1, z0, u0, v0, colorTop, 0, 1, 0);
-        addVertex(x0, y1, z05, u0, v05, colorTop, 0, 1, 0);
-        addVertex(x1, y1, z05, u1, v05, colorTop, 0, 1, 0);
-        addVertex(x1, y1, z0, u1, v0, colorTop, 0, 1, 0);
+        addVertex(x0, y1, z0, u0, v0, colorTop, 0, 1, 0, light0[0], light0[1], light0[2]);
+        addVertex(x0, y1, z05, u0, v05, colorTop, 0, 1, 0, light1[0], light1[1], light1[2]);
+        addVertex(x1, y1, z05, u1, v05, colorTop, 0, 1, 0, light2[0], light2[1], light2[2]);
+        addVertex(x1, y1, z0, u1, v0, colorTop, 0, 1, 0, light3[0], light3[1], light3[2]);
         addQuadIndices(base);
         currentVertex += 4;
         
         // Bottom face (north half)
+        light0 = sampleVertexLight(face, 1, 0);
+        light1 = sampleVertexLight(face, 1, 1);
+        light2 = sampleVertexLight(face, 1, 2);
+        light3 = sampleVertexLight(face, 1, 3);
+        
         base = currentVertex;
-        addVertex(x0, y0, z0, u0, v0, colorBottom, 0, -1, 0);
-        addVertex(x1, y0, z0, u1, v0, colorBottom, 0, -1, 0);
-        addVertex(x1, y0, z05, u1, v05, colorBottom, 0, -1, 0);
-        addVertex(x0, y0, z05, u0, v05, colorBottom, 0, -1, 0);
+        addVertex(x0, y0, z0, u0, v0, colorBottom, 0, -1, 0, light0[0], light0[1], light0[2]);
+        addVertex(x1, y0, z0, u1, v0, colorBottom, 0, -1, 0, light1[0], light1[1], light1[2]);
+        addVertex(x1, y0, z05, u1, v05, colorBottom, 0, -1, 0, light2[0], light2[1], light2[2]);
+        addVertex(x0, y0, z05, u0, v05, colorBottom, 0, -1, 0, light3[0], light3[1], light3[2]);
         addQuadIndices(base);
         currentVertex += 4;
         
         // North face (front of step)
+        light0 = sampleVertexLight(face, 2, 0);
+        light1 = sampleVertexLight(face, 2, 1);
+        light2 = sampleVertexLight(face, 2, 2);
+        light3 = sampleVertexLight(face, 2, 3);
+        
         base = currentVertex;
-        addVertex(x1, y0, z0, u1, v05, colorNorth, 0, -1, 0);
-        addVertex(x0, y0, z0, u0, v05, colorNorth, 0, -1, 0);
-        addVertex(x0, y1, z0, u0, v0, colorNorth, 0, 1, 0);
-        addVertex(x1, y1, z0, u1, v0, colorNorth, 0, 1, 0);
+        addVertex(x1, y0, z0, u1, v05, colorNorth, 0, -1, 0, light0[0], light0[1], light0[2]);
+        addVertex(x0, y0, z0, u0, v05, colorNorth, 0, -1, 0, light1[0], light1[1], light1[2]);
+        addVertex(x0, y1, z0, u0, v0, colorNorth, 0, 1, 0, light2[0], light2[1], light2[2]);
+        addVertex(x1, y1, z0, u1, v0, colorNorth, 0, 1, 0, light3[0], light3[1], light3[2]);
         addQuadIndices(base);
         currentVertex += 4;
         
         // South face (inner vertical)
+        light0 = sampleVertexLight(face, 3, 0);
+        light1 = sampleVertexLight(face, 3, 1);
+        light2 = sampleVertexLight(face, 3, 2);
+        light3 = sampleVertexLight(face, 3, 3);
+        
         base = currentVertex;
-        addVertex(x0, y0, z05, u0, v05, colorSouth, 0, -1, 0);
-        addVertex(x1, y0, z05, u1, v05, colorSouth, 0, -1, 0);
-        addVertex(x1, y1, z05, u1, v0, colorSouth, 0, 1, 0);
-        addVertex(x0, y1, z05, u0, v0, colorSouth, 0, 1, 0);
+        addVertex(x0, y0, z05, u0, v05, colorSouth, 0, -1, 0, light0[0], light0[1], light0[2]);
+        addVertex(x1, y0, z05, u1, v05, colorSouth, 0, -1, 0, light1[0], light1[1], light1[2]);
+        addVertex(x1, y1, z05, u1, v0, colorSouth, 0, 1, 0, light2[0], light2[1], light2[2]);
+        addVertex(x0, y1, z05, u0, v0, colorSouth, 0, 1, 0, light3[0], light3[1], light3[2]);
         addQuadIndices(base);
         currentVertex += 4;
         
         // West face (left side, half depth)
+        light0 = sampleVertexLight(face, 4, 0);
+        light1 = sampleVertexLight(face, 4, 1);
+        light2 = sampleVertexLight(face, 4, 2);
+        light3 = sampleVertexLight(face, 4, 3);
+        
         base = currentVertex;
-        addVertex(x0, y0, z0, u0, v05, colorWest, 0, -1, 0);
-        addVertex(x0, y0, z05, u05, v05, colorWest, 0, -1, 0);
-        addVertex(x0, y1, z05, u05, v0, colorWest, 0, 1, 0);
-        addVertex(x0, y1, z0, u0, v0, colorWest, 0, 1, 0);
+        addVertex(x0, y0, z0, u0, v05, colorWest, 0, -1, 0, light0[0], light0[1], light0[2]);
+        addVertex(x0, y0, z05, u05, v05, colorWest, 0, -1, 0, light1[0], light1[1], light1[2]);
+        addVertex(x0, y1, z05, u05, v0, colorWest, 0, 1, 0, light2[0], light2[1], light2[2]);
+        addVertex(x0, y1, z0, u0, v0, colorWest, 0, 1, 0, light3[0], light3[1], light3[2]);
         addQuadIndices(base);
         currentVertex += 4;
         
         // East face (right side, half depth)
+        light0 = sampleVertexLight(face, 5, 0);
+        light1 = sampleVertexLight(face, 5, 1);
+        light2 = sampleVertexLight(face, 5, 2);
+        light3 = sampleVertexLight(face, 5, 3);
+        
         base = currentVertex;
-        addVertex(x1, y0, z05, u05, v05, colorEast, 0, -1, 0);
-        addVertex(x1, y0, z0, u0, v05, colorEast, 0, -1, 0);
-        addVertex(x1, y1, z0, u0, v0, colorEast, 0, 1, 0);
-        addVertex(x1, y1, z05, u05, v0, colorEast, 0, 1, 0);
+        addVertex(x1, y0, z05, u05, v05, colorEast, 0, -1, 0, light0[0], light0[1], light0[2]);
+        addVertex(x1, y0, z0, u0, v05, colorEast, 0, -1, 0, light1[0], light1[1], light1[2]);
+        addVertex(x1, y1, z0, u0, v0, colorEast, 0, 1, 0, light2[0], light2[1], light2[2]);
+        addVertex(x1, y1, z05, u05, v0, colorEast, 0, 1, 0, light3[0], light3[1], light3[2]);
         addQuadIndices(base);
         currentVertex += 4;
     }
@@ -876,61 +943,91 @@ public class MeshBuilder {
     /**
      * Add step geometry for south-facing stairs (step in south half).
      */
-    private void addStairsStepSouth(float x0, float x1, float y0, float y1, float z05, float z1,
+    private void addStairsStepSouth(BlockFaceCollector.FaceData face, float x0, float x1, float y0, float y1, float z05, float z1,
                                      float u0, float u05, float u1, float v0, float v05, float v1,
                                      float[] colorTop, float[] colorBottom, float[] colorNorth, float[] colorSouth,
                                      float[] colorWest, float[] colorEast) {
         // Top face (south half)
+        float[] light0 = sampleVertexLight(face, 0, 0);
+        float[] light1 = sampleVertexLight(face, 0, 1);
+        float[] light2 = sampleVertexLight(face, 0, 2);
+        float[] light3 = sampleVertexLight(face, 0, 3);
+        
         int base = currentVertex;
-        addVertex(x0, y1, z05, u0, v05, colorTop, 0, 1, 0);
-        addVertex(x0, y1, z1, u0, v1, colorTop, 0, 1, 0);
-        addVertex(x1, y1, z1, u1, v1, colorTop, 0, 1, 0);
-        addVertex(x1, y1, z05, u1, v05, colorTop, 0, 1, 0);
+        addVertex(x0, y1, z05, u0, v05, colorTop, 0, 1, 0, light0[0], light0[1], light0[2]);
+        addVertex(x0, y1, z1, u0, v1, colorTop, 0, 1, 0, light1[0], light1[1], light1[2]);
+        addVertex(x1, y1, z1, u1, v1, colorTop, 0, 1, 0, light2[0], light2[1], light2[2]);
+        addVertex(x1, y1, z05, u1, v05, colorTop, 0, 1, 0, light3[0], light3[1], light3[2]);
         addQuadIndices(base);
         currentVertex += 4;
         
         // Bottom face (south half)
+        light0 = sampleVertexLight(face, 1, 0);
+        light1 = sampleVertexLight(face, 1, 1);
+        light2 = sampleVertexLight(face, 1, 2);
+        light3 = sampleVertexLight(face, 1, 3);
+        
         base = currentVertex;
-        addVertex(x0, y0, z05, u0, v05, colorBottom, 0, -1, 0);
-        addVertex(x1, y0, z05, u1, v05, colorBottom, 0, -1, 0);
-        addVertex(x1, y0, z1, u1, v1, colorBottom, 0, -1, 0);
-        addVertex(x0, y0, z1, u0, v1, colorBottom, 0, -1, 0);
+        addVertex(x0, y0, z05, u0, v05, colorBottom, 0, -1, 0, light0[0], light0[1], light0[2]);
+        addVertex(x1, y0, z05, u1, v05, colorBottom, 0, -1, 0, light1[0], light1[1], light1[2]);
+        addVertex(x1, y0, z1, u1, v1, colorBottom, 0, -1, 0, light2[0], light2[1], light2[2]);
+        addVertex(x0, y0, z1, u0, v1, colorBottom, 0, -1, 0, light3[0], light3[1], light3[2]);
         addQuadIndices(base);
         currentVertex += 4;
         
         // North face (inner vertical)
+        light0 = sampleVertexLight(face, 2, 0);
+        light1 = sampleVertexLight(face, 2, 1);
+        light2 = sampleVertexLight(face, 2, 2);
+        light3 = sampleVertexLight(face, 2, 3);
+        
         base = currentVertex;
-        addVertex(x1, y0, z05, u1, v05, colorNorth, 0, -1, 0);
-        addVertex(x0, y0, z05, u0, v05, colorNorth, 0, -1, 0);
-        addVertex(x0, y1, z05, u0, v0, colorNorth, 0, 1, 0);
-        addVertex(x1, y1, z05, u1, v0, colorNorth, 0, 1, 0);
+        addVertex(x1, y0, z05, u1, v05, colorNorth, 0, -1, 0, light0[0], light0[1], light0[2]);
+        addVertex(x0, y0, z05, u0, v05, colorNorth, 0, -1, 0, light1[0], light1[1], light1[2]);
+        addVertex(x0, y1, z05, u0, v0, colorNorth, 0, 1, 0, light2[0], light2[1], light2[2]);
+        addVertex(x1, y1, z05, u1, v0, colorNorth, 0, 1, 0, light3[0], light3[1], light3[2]);
         addQuadIndices(base);
         currentVertex += 4;
         
         // South face (front of step)
+        light0 = sampleVertexLight(face, 3, 0);
+        light1 = sampleVertexLight(face, 3, 1);
+        light2 = sampleVertexLight(face, 3, 2);
+        light3 = sampleVertexLight(face, 3, 3);
+        
         base = currentVertex;
-        addVertex(x0, y0, z1, u0, v05, colorSouth, 0, -1, 0);
-        addVertex(x1, y0, z1, u1, v05, colorSouth, 0, -1, 0);
-        addVertex(x1, y1, z1, u1, v0, colorSouth, 0, 1, 0);
-        addVertex(x0, y1, z1, u0, v0, colorSouth, 0, 1, 0);
+        addVertex(x0, y0, z1, u0, v05, colorSouth, 0, -1, 0, light0[0], light0[1], light0[2]);
+        addVertex(x1, y0, z1, u1, v05, colorSouth, 0, -1, 0, light1[0], light1[1], light1[2]);
+        addVertex(x1, y1, z1, u1, v0, colorSouth, 0, 1, 0, light2[0], light2[1], light2[2]);
+        addVertex(x0, y1, z1, u0, v0, colorSouth, 0, 1, 0, light3[0], light3[1], light3[2]);
         addQuadIndices(base);
         currentVertex += 4;
         
         // West face (left side, half depth)
+        light0 = sampleVertexLight(face, 4, 0);
+        light1 = sampleVertexLight(face, 4, 1);
+        light2 = sampleVertexLight(face, 4, 2);
+        light3 = sampleVertexLight(face, 4, 3);
+        
         base = currentVertex;
-        addVertex(x0, y0, z05, u05, v05, colorWest, 0, -1, 0);
-        addVertex(x0, y0, z1, u1, v05, colorWest, 0, -1, 0);
-        addVertex(x0, y1, z1, u1, v0, colorWest, 0, 1, 0);
-        addVertex(x0, y1, z05, u05, v0, colorWest, 0, 1, 0);
+        addVertex(x0, y0, z05, u05, v05, colorWest, 0, -1, 0, light0[0], light0[1], light0[2]);
+        addVertex(x0, y0, z1, u1, v05, colorWest, 0, -1, 0, light1[0], light1[1], light1[2]);
+        addVertex(x0, y1, z1, u1, v0, colorWest, 0, 1, 0, light2[0], light2[1], light2[2]);
+        addVertex(x0, y1, z05, u05, v0, colorWest, 0, 1, 0, light3[0], light3[1], light3[2]);
         addQuadIndices(base);
         currentVertex += 4;
         
         // East face (right side, half depth)
+        light0 = sampleVertexLight(face, 5, 0);
+        light1 = sampleVertexLight(face, 5, 1);
+        light2 = sampleVertexLight(face, 5, 2);
+        light3 = sampleVertexLight(face, 5, 3);
+        
         base = currentVertex;
-        addVertex(x1, y0, z1, u1, v05, colorEast, 0, -1, 0);
-        addVertex(x1, y0, z05, u05, v05, colorEast, 0, -1, 0);
-        addVertex(x1, y1, z05, u05, v0, colorEast, 0, 1, 0);
-        addVertex(x1, y1, z1, u1, v0, colorEast, 0, 1, 0);
+        addVertex(x1, y0, z1, u1, v05, colorEast, 0, -1, 0, light0[0], light0[1], light0[2]);
+        addVertex(x1, y0, z05, u05, v05, colorEast, 0, -1, 0, light1[0], light1[1], light1[2]);
+        addVertex(x1, y1, z05, u05, v0, colorEast, 0, 1, 0, light2[0], light2[1], light2[2]);
+        addVertex(x1, y1, z1, u1, v0, colorEast, 0, 1, 0, light3[0], light3[1], light3[2]);
         addQuadIndices(base);
         currentVertex += 4;
     }
@@ -938,61 +1035,91 @@ public class MeshBuilder {
     /**
      * Add step geometry for west-facing stairs (step in west half).
      */
-    private void addStairsStepWest(float x0, float x05, float y0, float y1, float z0, float z1,
+    private void addStairsStepWest(BlockFaceCollector.FaceData face, float x0, float x05, float y0, float y1, float z0, float z1,
                                     float u0, float u05, float u1, float v0, float v05, float v1,
                                     float[] colorTop, float[] colorBottom, float[] colorNorth, float[] colorSouth,
                                     float[] colorWest, float[] colorEast) {
         // Top face (west half)
+        float[] light0 = sampleVertexLight(face, 0, 0);
+        float[] light1 = sampleVertexLight(face, 0, 1);
+        float[] light2 = sampleVertexLight(face, 0, 2);
+        float[] light3 = sampleVertexLight(face, 0, 3);
+        
         int base = currentVertex;
-        addVertex(x0, y1, z0, u0, v0, colorTop, 0, 1, 0);
-        addVertex(x0, y1, z1, u0, v1, colorTop, 0, 1, 0);
-        addVertex(x05, y1, z1, u05, v1, colorTop, 0, 1, 0);
-        addVertex(x05, y1, z0, u05, v0, colorTop, 0, 1, 0);
+        addVertex(x0, y1, z0, u0, v0, colorTop, 0, 1, 0, light0[0], light0[1], light0[2]);
+        addVertex(x0, y1, z1, u0, v1, colorTop, 0, 1, 0, light1[0], light1[1], light1[2]);
+        addVertex(x05, y1, z1, u05, v1, colorTop, 0, 1, 0, light2[0], light2[1], light2[2]);
+        addVertex(x05, y1, z0, u05, v0, colorTop, 0, 1, 0, light3[0], light3[1], light3[2]);
         addQuadIndices(base);
         currentVertex += 4;
         
         // Bottom face (west half)
+        light0 = sampleVertexLight(face, 1, 0);
+        light1 = sampleVertexLight(face, 1, 1);
+        light2 = sampleVertexLight(face, 1, 2);
+        light3 = sampleVertexLight(face, 1, 3);
+        
         base = currentVertex;
-        addVertex(x0, y0, z0, u0, v0, colorBottom, 0, -1, 0);
-        addVertex(x05, y0, z0, u05, v0, colorBottom, 0, -1, 0);
-        addVertex(x05, y0, z1, u05, v1, colorBottom, 0, -1, 0);
-        addVertex(x0, y0, z1, u0, v1, colorBottom, 0, -1, 0);
+        addVertex(x0, y0, z0, u0, v0, colorBottom, 0, -1, 0, light0[0], light0[1], light0[2]);
+        addVertex(x05, y0, z0, u05, v0, colorBottom, 0, -1, 0, light1[0], light1[1], light1[2]);
+        addVertex(x05, y0, z1, u05, v1, colorBottom, 0, -1, 0, light2[0], light2[1], light2[2]);
+        addVertex(x0, y0, z1, u0, v1, colorBottom, 0, -1, 0, light3[0], light3[1], light3[2]);
         addQuadIndices(base);
         currentVertex += 4;
         
         // North face (left side, half width)
+        light0 = sampleVertexLight(face, 2, 0);
+        light1 = sampleVertexLight(face, 2, 1);
+        light2 = sampleVertexLight(face, 2, 2);
+        light3 = sampleVertexLight(face, 2, 3);
+        
         base = currentVertex;
-        addVertex(x05, y0, z0, u05, v05, colorNorth, 0, -1, 0);
-        addVertex(x0, y0, z0, u0, v05, colorNorth, 0, -1, 0);
-        addVertex(x0, y1, z0, u0, v0, colorNorth, 0, 1, 0);
-        addVertex(x05, y1, z0, u05, v0, colorNorth, 0, 1, 0);
+        addVertex(x05, y0, z0, u05, v05, colorNorth, 0, -1, 0, light0[0], light0[1], light0[2]);
+        addVertex(x0, y0, z0, u0, v05, colorNorth, 0, -1, 0, light1[0], light1[1], light1[2]);
+        addVertex(x0, y1, z0, u0, v0, colorNorth, 0, 1, 0, light2[0], light2[1], light2[2]);
+        addVertex(x05, y1, z0, u05, v0, colorNorth, 0, 1, 0, light3[0], light3[1], light3[2]);
         addQuadIndices(base);
         currentVertex += 4;
         
         // South face (right side, half width)
+        light0 = sampleVertexLight(face, 3, 0);
+        light1 = sampleVertexLight(face, 3, 1);
+        light2 = sampleVertexLight(face, 3, 2);
+        light3 = sampleVertexLight(face, 3, 3);
+        
         base = currentVertex;
-        addVertex(x0, y0, z1, u0, v05, colorSouth, 0, -1, 0);
-        addVertex(x05, y0, z1, u05, v05, colorSouth, 0, -1, 0);
-        addVertex(x05, y1, z1, u05, v0, colorSouth, 0, 1, 0);
-        addVertex(x0, y1, z1, u0, v0, colorSouth, 0, 1, 0);
+        addVertex(x0, y0, z1, u0, v05, colorSouth, 0, -1, 0, light0[0], light0[1], light0[2]);
+        addVertex(x05, y0, z1, u05, v05, colorSouth, 0, -1, 0, light1[0], light1[1], light1[2]);
+        addVertex(x05, y1, z1, u05, v0, colorSouth, 0, 1, 0, light2[0], light2[1], light2[2]);
+        addVertex(x0, y1, z1, u0, v0, colorSouth, 0, 1, 0, light3[0], light3[1], light3[2]);
         addQuadIndices(base);
         currentVertex += 4;
         
         // West face (front of step)
+        light0 = sampleVertexLight(face, 4, 0);
+        light1 = sampleVertexLight(face, 4, 1);
+        light2 = sampleVertexLight(face, 4, 2);
+        light3 = sampleVertexLight(face, 4, 3);
+        
         base = currentVertex;
-        addVertex(x0, y0, z0, u0, v05, colorWest, 0, -1, 0);
-        addVertex(x0, y0, z1, u1, v05, colorWest, 0, -1, 0);
-        addVertex(x0, y1, z1, u1, v0, colorWest, 0, 1, 0);
-        addVertex(x0, y1, z0, u0, v0, colorWest, 0, 1, 0);
+        addVertex(x0, y0, z0, u0, v05, colorWest, 0, -1, 0, light0[0], light0[1], light0[2]);
+        addVertex(x0, y0, z1, u1, v05, colorWest, 0, -1, 0, light1[0], light1[1], light1[2]);
+        addVertex(x0, y1, z1, u1, v0, colorWest, 0, 1, 0, light2[0], light2[1], light2[2]);
+        addVertex(x0, y1, z0, u0, v0, colorWest, 0, 1, 0, light3[0], light3[1], light3[2]);
         addQuadIndices(base);
         currentVertex += 4;
         
         // East face (inner vertical)
+        light0 = sampleVertexLight(face, 5, 0);
+        light1 = sampleVertexLight(face, 5, 1);
+        light2 = sampleVertexLight(face, 5, 2);
+        light3 = sampleVertexLight(face, 5, 3);
+        
         base = currentVertex;
-        addVertex(x05, y0, z1, u1, v05, colorEast, 0, -1, 0);
-        addVertex(x05, y0, z0, u0, v05, colorEast, 0, -1, 0);
-        addVertex(x05, y1, z0, u0, v0, colorEast, 0, 1, 0);
-        addVertex(x05, y1, z1, u1, v0, colorEast, 0, 1, 0);
+        addVertex(x05, y0, z1, u1, v05, colorEast, 0, -1, 0, light0[0], light0[1], light0[2]);
+        addVertex(x05, y0, z0, u0, v05, colorEast, 0, -1, 0, light1[0], light1[1], light1[2]);
+        addVertex(x05, y1, z0, u0, v0, colorEast, 0, 1, 0, light2[0], light2[1], light2[2]);
+        addVertex(x05, y1, z1, u1, v0, colorEast, 0, 1, 0, light3[0], light3[1], light3[2]);
         addQuadIndices(base);
         currentVertex += 4;
     }
@@ -1000,61 +1127,91 @@ public class MeshBuilder {
     /**
      * Add step geometry for east-facing stairs (step in east half).
      */
-    private void addStairsStepEast(float x05, float x1, float y0, float y1, float z0, float z1,
+    private void addStairsStepEast(BlockFaceCollector.FaceData face, float x05, float x1, float y0, float y1, float z0, float z1,
                                     float u0, float u05, float u1, float v0, float v05, float v1,
                                     float[] colorTop, float[] colorBottom, float[] colorNorth, float[] colorSouth,
                                     float[] colorWest, float[] colorEast) {
         // Top face (east half)
+        float[] light0 = sampleVertexLight(face, 0, 0);
+        float[] light1 = sampleVertexLight(face, 0, 1);
+        float[] light2 = sampleVertexLight(face, 0, 2);
+        float[] light3 = sampleVertexLight(face, 0, 3);
+        
         int base = currentVertex;
-        addVertex(x05, y1, z0, u05, v0, colorTop, 0, 1, 0);
-        addVertex(x05, y1, z1, u05, v1, colorTop, 0, 1, 0);
-        addVertex(x1, y1, z1, u1, v1, colorTop, 0, 1, 0);
-        addVertex(x1, y1, z0, u1, v0, colorTop, 0, 1, 0);
+        addVertex(x05, y1, z0, u05, v0, colorTop, 0, 1, 0, light0[0], light0[1], light0[2]);
+        addVertex(x05, y1, z1, u05, v1, colorTop, 0, 1, 0, light1[0], light1[1], light1[2]);
+        addVertex(x1, y1, z1, u1, v1, colorTop, 0, 1, 0, light2[0], light2[1], light2[2]);
+        addVertex(x1, y1, z0, u1, v0, colorTop, 0, 1, 0, light3[0], light3[1], light3[2]);
         addQuadIndices(base);
         currentVertex += 4;
         
         // Bottom face (east half)
+        light0 = sampleVertexLight(face, 1, 0);
+        light1 = sampleVertexLight(face, 1, 1);
+        light2 = sampleVertexLight(face, 1, 2);
+        light3 = sampleVertexLight(face, 1, 3);
+        
         base = currentVertex;
-        addVertex(x05, y0, z0, u05, v0, colorBottom, 0, -1, 0);
-        addVertex(x1, y0, z0, u1, v0, colorBottom, 0, -1, 0);
-        addVertex(x1, y0, z1, u1, v1, colorBottom, 0, -1, 0);
-        addVertex(x05, y0, z1, u05, v1, colorBottom, 0, -1, 0);
+        addVertex(x05, y0, z0, u05, v0, colorBottom, 0, -1, 0, light0[0], light0[1], light0[2]);
+        addVertex(x1, y0, z0, u1, v0, colorBottom, 0, -1, 0, light1[0], light1[1], light1[2]);
+        addVertex(x1, y0, z1, u1, v1, colorBottom, 0, -1, 0, light2[0], light2[1], light2[2]);
+        addVertex(x05, y0, z1, u05, v1, colorBottom, 0, -1, 0, light3[0], light3[1], light3[2]);
         addQuadIndices(base);
         currentVertex += 4;
         
         // North face (right side, half width)
+        light0 = sampleVertexLight(face, 2, 0);
+        light1 = sampleVertexLight(face, 2, 1);
+        light2 = sampleVertexLight(face, 2, 2);
+        light3 = sampleVertexLight(face, 2, 3);
+        
         base = currentVertex;
-        addVertex(x1, y0, z0, u1, v05, colorNorth, 0, -1, 0);
-        addVertex(x05, y0, z0, u05, v05, colorNorth, 0, -1, 0);
-        addVertex(x05, y1, z0, u05, v0, colorNorth, 0, 1, 0);
-        addVertex(x1, y1, z0, u1, v0, colorNorth, 0, 1, 0);
+        addVertex(x1, y0, z0, u1, v05, colorNorth, 0, -1, 0, light0[0], light0[1], light0[2]);
+        addVertex(x05, y0, z0, u05, v05, colorNorth, 0, -1, 0, light1[0], light1[1], light1[2]);
+        addVertex(x05, y1, z0, u05, v0, colorNorth, 0, 1, 0, light2[0], light2[1], light2[2]);
+        addVertex(x1, y1, z0, u1, v0, colorNorth, 0, 1, 0, light3[0], light3[1], light3[2]);
         addQuadIndices(base);
         currentVertex += 4;
         
         // South face (left side, half width)
+        light0 = sampleVertexLight(face, 3, 0);
+        light1 = sampleVertexLight(face, 3, 1);
+        light2 = sampleVertexLight(face, 3, 2);
+        light3 = sampleVertexLight(face, 3, 3);
+        
         base = currentVertex;
-        addVertex(x05, y0, z1, u05, v05, colorSouth, 0, -1, 0);
-        addVertex(x1, y0, z1, u1, v05, colorSouth, 0, -1, 0);
-        addVertex(x1, y1, z1, u1, v0, colorSouth, 0, 1, 0);
-        addVertex(x05, y1, z1, u05, v0, colorSouth, 0, 1, 0);
+        addVertex(x05, y0, z1, u05, v05, colorSouth, 0, -1, 0, light0[0], light0[1], light0[2]);
+        addVertex(x1, y0, z1, u1, v05, colorSouth, 0, -1, 0, light1[0], light1[1], light1[2]);
+        addVertex(x1, y1, z1, u1, v0, colorSouth, 0, 1, 0, light2[0], light2[1], light2[2]);
+        addVertex(x05, y1, z1, u05, v0, colorSouth, 0, 1, 0, light3[0], light3[1], light3[2]);
         addQuadIndices(base);
         currentVertex += 4;
         
         // West face (inner vertical)
+        light0 = sampleVertexLight(face, 4, 0);
+        light1 = sampleVertexLight(face, 4, 1);
+        light2 = sampleVertexLight(face, 4, 2);
+        light3 = sampleVertexLight(face, 4, 3);
+        
         base = currentVertex;
-        addVertex(x05, y0, z0, u0, v05, colorWest, 0, -1, 0);
-        addVertex(x05, y0, z1, u1, v05, colorWest, 0, -1, 0);
-        addVertex(x05, y1, z1, u1, v0, colorWest, 0, 1, 0);
-        addVertex(x05, y1, z0, u0, v0, colorWest, 0, 1, 0);
+        addVertex(x05, y0, z0, u0, v05, colorWest, 0, -1, 0, light0[0], light0[1], light0[2]);
+        addVertex(x05, y0, z1, u1, v05, colorWest, 0, -1, 0, light1[0], light1[1], light1[2]);
+        addVertex(x05, y1, z1, u1, v0, colorWest, 0, 1, 0, light2[0], light2[1], light2[2]);
+        addVertex(x05, y1, z0, u0, v0, colorWest, 0, 1, 0, light3[0], light3[1], light3[2]);
         addQuadIndices(base);
         currentVertex += 4;
         
         // East face (front of step)
+        light0 = sampleVertexLight(face, 5, 0);
+        light1 = sampleVertexLight(face, 5, 1);
+        light2 = sampleVertexLight(face, 5, 2);
+        light3 = sampleVertexLight(face, 5, 3);
+        
         base = currentVertex;
-        addVertex(x1, y0, z1, u1, v05, colorEast, 0, -1, 0);
-        addVertex(x1, y0, z0, u0, v05, colorEast, 0, -1, 0);
-        addVertex(x1, y1, z0, u0, v0, colorEast, 0, 1, 0);
-        addVertex(x1, y1, z1, u1, v0, colorEast, 0, 1, 0);
+        addVertex(x1, y0, z1, u1, v05, colorEast, 0, -1, 0, light0[0], light0[1], light0[2]);
+        addVertex(x1, y0, z0, u0, v05, colorEast, 0, -1, 0, light1[0], light1[1], light1[2]);
+        addVertex(x1, y1, z0, u0, v0, colorEast, 0, 1, 0, light2[0], light2[1], light2[2]);
+        addVertex(x1, y1, z1, u1, v0, colorEast, 0, 1, 0, light3[0], light3[1], light3[2]);
         addQuadIndices(base);
         currentVertex += 4;
     }
