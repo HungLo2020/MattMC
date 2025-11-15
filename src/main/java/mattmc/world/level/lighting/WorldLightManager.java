@@ -90,4 +90,18 @@ public class WorldLightManager {
 	public int getTotalDeferredUpdateCount() {
 		return crossChunkPropagator.getTotalDeferredUpdateCount();
 	}
+	
+	/**
+	 * Add block light at a position with RGB values.
+	 */
+	public void addBlockLightRGB(LevelChunk chunk, int x, int y, int z, int r, int g, int b) {
+		blockLightPropagator.addBlockLightRGB(chunk, x, y, z, r, g, b);
+	}
+	
+	/**
+	 * Remove block light at a position.
+	 */
+	public void removeBlockLight(LevelChunk chunk, int x, int y, int z) {
+		blockLightPropagator.removeBlockLight(chunk, x, y, z);
+	}
 }

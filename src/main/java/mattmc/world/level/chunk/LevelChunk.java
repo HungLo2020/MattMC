@@ -424,6 +424,59 @@ public final class LevelChunk {
         return heightmap;
     }
     
+    /**
+     * Recalculate block light for all emissive blocks in this chunk.
+     * This is used after loading a chunk to ensure light values match current registry values.
+     * If a block's light emission was changed in the registry, this will update the lighting.
+     */
+    public void recalculateBlockLight() {
+        mattmc.world.level.lighting.WorldLightManager lightManager = 
+            mattmc.world.level.lighting.WorldLightManager.getInstance();
+        
+        // Iterate through all blocks and update lighting for emissive blocks
+        for (int x = 0; x < WIDTH; x++) {
+            for (int y = 0; y < HEIGHT; y++) {
+                for (int z = 0; z < DEPTH; z++) {
+                    Block block = blocks[x][y][z];
+                    
+                    // Skip air blocks
+                    if (block.isAir()) {
+                        continue;
+                    }
+                    
+                    // Get current emission values from registry
+                    int emissionR = block.getLightEmissionR();
+                    int emissionG = block.getLightEmissionG();
+                    int emissionB = block.getLightEmissionB();
+                    
+                    // Get currently stored light at this position
+                    int storedR = getBlockLightR(x, y, z);
+                    int storedG = getBlockLightG(x, y, z);
+                    int storedB = getBlockLightB(x, y, z);
+                    
+                    // Check if there's a mismatch between registry and stored values
+                    // We only care about emissive blocks or positions with light
+                    boolean hasEmission = (emissionR > 0 || emissionG > 0 || emissionB > 0);
+                    boolean hasStoredLight = (storedR > 0 || storedG > 0 || storedB > 0);
+                    boolean mismatch = hasEmission && (emissionR != storedR || emissionG != storedG || emissionB != storedB);
+                    
+                    if (mismatch || (hasStoredLight && !hasEmission)) {
+                        // Need to update: either emission changed or block shouldn't have light
+                        // First remove any existing light
+                        if (hasStoredLight) {
+                            lightManager.removeBlockLight(this, x, y, z);
+                        }
+                        
+                        // Then add new light if block is emissive
+                        if (hasEmission) {
+                            lightManager.addBlockLightRGB(this, x, y, z, emissionR, emissionG, emissionB);
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
     public int chunkX() { return chunkX; }
     public int chunkZ() { return chunkZ; }
 }
