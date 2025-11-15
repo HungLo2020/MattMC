@@ -449,28 +449,27 @@ public final class LevelChunk {
                     int emissionG = block.getLightEmissionG();
                     int emissionB = block.getLightEmissionB();
                     
+                    // Only process blocks that should emit light according to the registry
+                    boolean hasEmission = (emissionR > 0 || emissionG > 0 || emissionB > 0);
+                    if (!hasEmission) {
+                        continue; // Skip non-emissive blocks
+                    }
+                    
                     // Get currently stored light at this position
                     int storedR = getBlockLightR(x, y, z);
                     int storedG = getBlockLightG(x, y, z);
                     int storedB = getBlockLightB(x, y, z);
                     
                     // Check if there's a mismatch between registry and stored values
-                    // We only care about emissive blocks or positions with light
-                    boolean hasEmission = (emissionR > 0 || emissionG > 0 || emissionB > 0);
-                    boolean hasStoredLight = (storedR > 0 || storedG > 0 || storedB > 0);
-                    boolean mismatch = hasEmission && (emissionR != storedR || emissionG != storedG || emissionB != storedB);
+                    boolean mismatch = (emissionR != storedR || emissionG != storedG || emissionB != storedB);
                     
-                    if (mismatch || (hasStoredLight && !hasEmission)) {
-                        // Need to update: either emission changed or block shouldn't have light
-                        // First remove any existing light
-                        if (hasStoredLight) {
-                            lightManager.removeBlockLight(this, x, y, z);
-                        }
+                    if (mismatch) {
+                        // Emission values changed - update lighting
+                        // First remove the old light
+                        lightManager.removeBlockLight(this, x, y, z);
                         
-                        // Then add new light if block is emissive
-                        if (hasEmission) {
-                            lightManager.addBlockLightRGB(this, x, y, z, emissionR, emissionG, emissionB);
-                        }
+                        // Then add new light based on current registry values
+                        lightManager.addBlockLightRGB(this, x, y, z, emissionR, emissionG, emissionB);
                     }
                 }
             }

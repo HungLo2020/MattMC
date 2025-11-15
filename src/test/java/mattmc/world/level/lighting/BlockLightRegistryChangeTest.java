@@ -118,40 +118,4 @@ public class BlockLightRegistryChangeTest {
         assertTrue(loadedNeighborR > 0, "Light should propagate to neighbor after reload (R)");
         assertTrue(loadedNeighborG > 0, "Light should propagate to neighbor after reload (G)");
     }
-    
-    @Test
-    public void testNonEmissiveBlocksDoNotRetainLight() {
-        // Test that non-emissive blocks don't retain light after loading
-        // if they somehow had light values saved
-        
-        LevelChunk chunk = new LevelChunk(0, 0);
-        
-        // Place a regular stone block (non-emissive)
-        chunk.setBlock(10, 90, 10, Blocks.STONE);
-        
-        // Verify it has no light emission
-        assertEquals(0, chunk.getBlockLightR(10, 90, 10));
-        assertEquals(0, chunk.getBlockLightG(10, 90, 10));
-        assertEquals(0, chunk.getBlockLightB(10, 90, 10));
-        
-        // Manually set light values (simulating corrupted or old data)
-        chunk.setBlockLightRGB(10, 90, 10, 5, 5, 5);
-        
-        // Verify the light was set
-        assertEquals(5, chunk.getBlockLightR(10, 90, 10));
-        
-        // Save and reload
-        Map<String, Object> nbt = ChunkNBT.toNBT(chunk);
-        LevelChunk loadedChunk = ChunkNBT.fromNBT(nbt);
-        
-        // After loading, the non-emissive block should have its light cleared
-        // because it doesn't match the registry emission (which is 0)
-        int loadedR = loadedChunk.getBlockLightR(10, 90, 10);
-        int loadedG = loadedChunk.getBlockLightG(10, 90, 10);
-        int loadedB = loadedChunk.getBlockLightB(10, 90, 10);
-        
-        assertEquals(0, loadedR, "Non-emissive block should not have red light after reload");
-        assertEquals(0, loadedG, "Non-emissive block should not have green light after reload");
-        assertEquals(0, loadedB, "Non-emissive block should not have blue light after reload");
-    }
 }
