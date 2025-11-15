@@ -93,7 +93,9 @@ public class Blocks {
         if (block instanceof StairsBlock) {
             registeredBlock = new StairsBlock(identifier);
         } else {
-            registeredBlock = new Block(block.isSolid(), block.getLightEmission(), identifier);
+            registeredBlock = new Block(block.isSolid(), 
+                block.getLightEmissionR(), block.getLightEmissionG(), block.getLightEmissionB(), 
+                identifier);
         }
         REGISTRY.put(identifier, registeredBlock);
         return registeredBlock;
@@ -125,7 +127,9 @@ public class Blocks {
         if (block instanceof StairsBlock) {
             registeredBlock = new StairsBlock(identifier);
         } else {
-            registeredBlock = new Block(block.isSolid(), block.getLightEmission(), identifier);
+            registeredBlock = new Block(block.isSolid(), 
+                block.getLightEmissionR(), block.getLightEmissionG(), block.getLightEmissionB(), 
+                identifier);
         }
         REGISTRY.put(identifier, registeredBlock);
         return registeredBlock;
