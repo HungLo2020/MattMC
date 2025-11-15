@@ -36,7 +36,7 @@ public class Block {
      * @param solid Whether the block is solid (has collision)
      */
     public Block(boolean solid) {
-        this(solid, 0, 0, 0);
+        this(solid, 0, 0, 0, 0);
     }
     
     /**
@@ -47,7 +47,7 @@ public class Block {
      * @param lightEmission Light level emitted by this block (0-15)
      */
     public Block(boolean solid, int lightEmission) {
-        this(solid, lightEmission, lightEmission, lightEmission);
+        this(solid, lightEmission, lightEmission, lightEmission, lightEmission);
     }
     
     /**
@@ -59,25 +59,38 @@ public class Block {
      * @param lightEmissionB Blue channel light emission (0-15)
      */
     public Block(boolean solid, int lightEmissionR, int lightEmissionG, int lightEmissionB) {
+        this(solid, Math.max(lightEmissionR, Math.max(lightEmissionG, lightEmissionB)), 
+             lightEmissionR, lightEmissionG, lightEmissionB);
+    }
+    
+    /**
+     * Create a new block with explicit emission level and RGB light values.
+     * This is the most flexible constructor for colored lights.
+     * 
+     * @param solid Whether the block is solid (has collision)
+     * @param lightEmission Overall light emission level (0-15), used for intensity
+     * @param lightEmissionR Red channel light emission (0-15)
+     * @param lightEmissionG Green channel light emission (0-15)
+     * @param lightEmissionB Blue channel light emission (0-15)
+     */
+    public Block(boolean solid, int lightEmission, int lightEmissionR, int lightEmissionG, int lightEmissionB) {
         this.solid = solid;
+        this.lightEmission = Math.max(0, Math.min(15, lightEmission));
         this.lightEmissionR = Math.max(0, Math.min(15, lightEmissionR));
         this.lightEmissionG = Math.max(0, Math.min(15, lightEmissionG));
         this.lightEmissionB = Math.max(0, Math.min(15, lightEmissionB));
-        // Legacy field for backward compatibility (max of RGB)
-        this.lightEmission = Math.max(lightEmissionR, Math.max(lightEmissionG, lightEmissionB));
         this.identifier = null; // Will be set during registration
     }
     
     /**
      * Internal constructor used during registration to set the identifier.
      */
-    Block(boolean solid, int lightEmissionR, int lightEmissionG, int lightEmissionB, String identifier) {
+    Block(boolean solid, int lightEmission, int lightEmissionR, int lightEmissionG, int lightEmissionB, String identifier) {
         this.solid = solid;
+        this.lightEmission = Math.max(0, Math.min(15, lightEmission));
         this.lightEmissionR = Math.max(0, Math.min(15, lightEmissionR));
         this.lightEmissionG = Math.max(0, Math.min(15, lightEmissionG));
         this.lightEmissionB = Math.max(0, Math.min(15, lightEmissionB));
-        // Legacy field for backward compatibility (max of RGB)
-        this.lightEmission = Math.max(lightEmissionR, Math.max(lightEmissionG, lightEmissionB));
         this.identifier = identifier;
     }
     

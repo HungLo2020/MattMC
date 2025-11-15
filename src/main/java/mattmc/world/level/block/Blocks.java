@@ -61,15 +61,13 @@ public class Blocks {
     public static final Block ACACIA_PLANKS = register("acacia_planks", new Block(true));
     public static final Block DARK_OAK_PLANKS = register("dark_oak_planks", new Block(true));
     public static final Block MANGROVE_PLANKS = register("mangrove_planks", new Block(true));
-    public static final Block CHERRY_PLANKS = register("cherry_planks", new Block(true));
-    public static final Block BAMBOO_PLANKS = register("bamboo_planks", new Block(true));
-    public static final Block CRIMSON_PLANKS = register("crimson_planks", new Block(true));
-    public static final Block WARPED_PLANKS = register("warped_planks", new Block(true));
+    public static final Block CHERRY_PLANKS = register("cherry_planks", new Block(true, 0, 0, 0, 0));
+    public static final Block BAMBOO_PLANKS = register("bamboo_planks", new Block(true, 0, 0, 0, 0));
+    public static final Block CRIMSON_PLANKS = register("crimson_planks", new Block(true, 0, 0, 0, 0));
+    public static final Block WARPED_PLANKS = register("warped_planks", new Block(true, 0, 0, 0, 0));
     public static final Block BIRCH_STAIRS = register("birch_stairs", new StairsBlock());
-    public static final Block TORCH = register("torch", new Block(false, 14)); // Emits white light level 14
-    public static final Block RED_TORCH = register("red_torch", new Block(false, 14, 2, 2)); // Emits red light
-    public static final Block GREEN_TORCH = register("green_torch", new Block(false, 2, 14, 2)); // Emits green light
-    public static final Block BLUE_TORCH = register("blue_torch", new Block(false, 2, 2, 14)); // Emits blue light
+    // Torch emits orange light: emission=14, R=14 (full red), G=7 (half green), B=0 (no blue)
+    public static final Block TORCH = register("torch", new Block(false, 14, 14, 7, 0));
     
     /**
      * Register a block with a given name (without namespace).
@@ -97,6 +95,7 @@ public class Blocks {
             registeredBlock = new StairsBlock(identifier);
         } else {
             registeredBlock = new Block(block.isSolid(), 
+                block.getLightEmission(),
                 block.getLightEmissionR(), block.getLightEmissionG(), block.getLightEmissionB(), 
                 identifier);
         }
@@ -131,6 +130,7 @@ public class Blocks {
             registeredBlock = new StairsBlock(identifier);
         } else {
             registeredBlock = new Block(block.isSolid(), 
+                block.getLightEmission(),
                 block.getLightEmissionR(), block.getLightEmissionG(), block.getLightEmissionB(), 
                 identifier);
         }
