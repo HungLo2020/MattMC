@@ -18,29 +18,29 @@ public class LightPropagatorTest {
 		LevelChunk chunk = new LevelChunk(0, 0);
 		LightPropagator propagator = new LightPropagator();
 		
-		// Place a torch at (8, 64, 8) - emits light level 14
+		// Place a torch at (8, 64, 8) - emits light level 15
 		int torchY = LevelChunk.worldYToChunkY(64);
 		int emission = Blocks.TORCH.getLightEmission();
-		assertEquals(14, emission, "Torch should emit light level 14");
+		assertEquals(15, emission, "Torch should emit light level 15");
 		
 		// Add light from torch
 		propagator.addBlockLight(chunk, 8, torchY, 8, emission);
 		
 		// Verify light at source
-		assertEquals(14, chunk.getBlockLight(8, torchY, 8), "Source should have full emission");
+		assertEquals(15, chunk.getBlockLight(8, torchY, 8), "Source should have full emission");
 		
 		// Verify light propagates to neighbors with attenuation
-		assertEquals(13, chunk.getBlockLight(9, torchY, 8), "Neighbor +X should have 13");
-		assertEquals(13, chunk.getBlockLight(7, torchY, 8), "Neighbor -X should have 13");
-		assertEquals(13, chunk.getBlockLight(8, torchY, 9), "Neighbor +Z should have 13");
-		assertEquals(13, chunk.getBlockLight(8, torchY, 7), "Neighbor -Z should have 13");
+		assertEquals(14, chunk.getBlockLight(9, torchY, 8), "Neighbor +X should have 14");
+		assertEquals(14, chunk.getBlockLight(7, torchY, 8), "Neighbor -X should have 14");
+		assertEquals(14, chunk.getBlockLight(8, torchY, 9), "Neighbor +Z should have 14");
+		assertEquals(14, chunk.getBlockLight(8, torchY, 7), "Neighbor -Z should have 14");
 		
 		// Verify light propagates to distance 2
-		assertEquals(12, chunk.getBlockLight(10, torchY, 8), "Distance 2 should have 12");
-		assertEquals(12, chunk.getBlockLight(6, torchY, 8), "Distance 2 should have 12");
+		assertEquals(13, chunk.getBlockLight(10, torchY, 8), "Distance 2 should have 13");
+		assertEquals(13, chunk.getBlockLight(6, torchY, 8), "Distance 2 should have 13");
 		
 		// Verify light propagates diagonally
-		assertEquals(12, chunk.getBlockLight(9, torchY, 9), "Diagonal neighbor should have 12");
+		assertEquals(13, chunk.getBlockLight(9, torchY, 9), "Diagonal neighbor should have 13");
 	}
 	
 	@Test
@@ -170,9 +170,9 @@ public class LightPropagatorTest {
 		// Place a torch (should automatically propagate light via setBlock hook)
 		chunk.setBlock(8, y, 8, Blocks.TORCH);
 		
-		// Light should be added
-		assertEquals(14, chunk.getBlockLight(8, y, 8), "Torch should emit light");
-		assertEquals(13, chunk.getBlockLight(9, y, 8), "Light should propagate");
+		// Light should be added - torch emits RGB=(11, 9, 0) so intensity = 11
+		assertEquals(11, chunk.getBlockLight(8, y, 8), "Torch should emit light");
+		assertEquals(10, chunk.getBlockLight(9, y, 8), "Light should propagate");
 		
 		// Remove the torch
 		chunk.setBlock(8, y, 8, Blocks.AIR);

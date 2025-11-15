@@ -183,17 +183,22 @@ public class LightPropagator {
 	 * @param z Chunk-local Z coordinate (0-15)
 	 */
 	public void removeBlockLight(LevelChunk chunk, int x, int y, int z) {
-		int removedLight = chunk.getBlockLight(x, y, z);
-		if (removedLight <= 0) {
+		// Read actual RGB values from the chunk
+		int removedR = chunk.getBlockLightR(x, y, z);
+		int removedG = chunk.getBlockLightG(x, y, z);
+		int removedB = chunk.getBlockLightB(x, y, z);
+		
+		// Check if there's any light to remove
+		if (removedR <= 0 && removedG <= 0 && removedB <= 0) {
 			return; // No light to remove
 		}
 		
 		// Clear light at source
-		chunk.setBlockLight(x, y, z, 0);
+		chunk.setBlockLightRGB(x, y, z, 0, 0, 0);
 		
 		// BFS to remove light and collect boundary nodes for re-propagation
 		removeQueue.clear();
-		removeQueue.offer(new LightNode(chunk, x, y, z, removedLight));
+		removeQueue.offer(new LightNode(chunk, x, y, z, removedR, removedG, removedB));
 		
 		Queue<LightNode> boundaryQueue = new ArrayDeque<>();
 		
@@ -215,29 +220,42 @@ public class LightPropagator {
 		addQueue.clear();
 		LightNode node3;
 		while ((node3 = boundaryQueue.poll()) != null) {
-			int light = node3.chunk.getBlockLight(node3.x, node3.y, node3.z);
-			if (light > 0) {
-				addQueue.offer(node3);
+			// Get current RGB values (should match what's in the node since we just read them)
+			int r = node3.chunk.getBlockLightR(node3.x, node3.y, node3.z);
+			int g = node3.chunk.getBlockLightG(node3.x, node3.y, node3.z);
+			int b = node3.chunk.getBlockLightB(node3.x, node3.y, node3.z);
+			
+			// Only re-propagate if there's still light here
+			if (r > 0 || g > 0 || b > 0) {
+				addQueue.offer(new LightNode(node3.chunk, node3.x, node3.y, node3.z, r, g, b));
 			}
 		}
 		
 		// BFS re-propagation from boundary
 		LightNode node4;
 		while ((node4 = addQueue.poll()) != null) {
-			int currentLight = node4.chunk.getBlockLight(node4.x, node4.y, node4.z);
+			// Get current RGB values from the node
+			int currentR = node4.r;
+			int currentG = node4.g;
+			int currentB = node4.b;
 			
-			if (currentLight <= 1) {
+			// Only propagate if at least one channel is strong enough
+			if (currentR <= 1 && currentG <= 1 && currentB <= 1) {
 				continue;
 			}
 			
-			int newLight = currentLight - 1;
+			// Attenuation (reduce each channel by 1, min 0)
+			int newR = Math.max(0, currentR - 1);
+			int newG = Math.max(0, currentG - 1);
+			int newB = Math.max(0, currentB - 1);
 			
-			repropagateToNeighbor(node4.chunk, node4.x - 1, node4.y, node4.z, newLight);
-			repropagateToNeighbor(node4.chunk, node4.x + 1, node4.y, node4.z, newLight);
-			repropagateToNeighbor(node4.chunk, node4.x, node4.y - 1, node4.z, newLight);
-			repropagateToNeighbor(node4.chunk, node4.x, node4.y + 1, node4.z, newLight);
-			repropagateToNeighbor(node4.chunk, node4.x, node4.y, node4.z - 1, newLight);
-			repropagateToNeighbor(node4.chunk, node4.x, node4.y, node4.z + 1, newLight);
+			// Use the RGB propagation method
+			propagateRGBToNeighbor(node4.chunk, node4.x - 1, node4.y, node4.z, newR, newG, newB);
+			propagateRGBToNeighbor(node4.chunk, node4.x + 1, node4.y, node4.z, newR, newG, newB);
+			propagateRGBToNeighbor(node4.chunk, node4.x, node4.y - 1, node4.z, newR, newG, newB);
+			propagateRGBToNeighbor(node4.chunk, node4.x, node4.y + 1, node4.z, newR, newG, newB);
+			propagateRGBToNeighbor(node4.chunk, node4.x, node4.y, node4.z - 1, newR, newG, newB);
+			propagateRGBToNeighbor(node4.chunk, node4.x, node4.y, node4.z + 1, newR, newG, newB);
 		}
 	}
 	
@@ -254,7 +272,13 @@ public class LightPropagator {
 			return;
 		}
 		
-		int neighborLight = chunk.getBlockLight(x, y, z);
+		// Read actual RGB values from neighbor
+		int neighborR = chunk.getBlockLightR(x, y, z);
+		int neighborG = chunk.getBlockLightG(x, y, z);
+		int neighborB = chunk.getBlockLightB(x, y, z);
+		
+		// Calculate max for comparison
+		int neighborLight = Math.max(neighborR, Math.max(neighborG, neighborB));
 		
 		if (neighborLight == 0) {
 			return; // Already dark
@@ -263,14 +287,14 @@ public class LightPropagator {
 		// Check if this light came from the removed source
 		if (neighborLight < sourceLight) {
 			// This light was from the removed source - remove it
-			chunk.setBlockLight(x, y, z, 0);
-			removeQueue.offer(new LightNode(chunk, x, y, z, neighborLight));
+			chunk.setBlockLightRGB(x, y, z, 0, 0, 0);
+			removeQueue.offer(new LightNode(chunk, x, y, z, neighborR, neighborG, neighborB));
 		} else {
 			// This light is from another source - add to boundary for re-propagation
 			Block block = chunk.getBlock(x, y, z);
 			// Check if it's an emissive block (light source)
 			if (block.getLightEmission() > 0 || neighborLight >= sourceLight) {
-				boundaryQueue.offer(new LightNode(chunk, x, y, z, neighborLight));
+				boundaryQueue.offer(new LightNode(chunk, x, y, z, neighborR, neighborG, neighborB));
 			}
 		}
 	}
