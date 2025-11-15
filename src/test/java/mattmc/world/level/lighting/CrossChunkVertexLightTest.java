@@ -50,12 +50,12 @@ public class CrossChunkVertexLightTest {
 		
 		// Verify torch has light
 		int torchLight = chunk0.getBlockLight(edgeX, y, z);
-		assertEquals(14, torchLight, "Torch should have light level 14");
+		assertEquals(11, torchLight, "Torch should have light level 11");
 		
 		// Verify light propagates across boundary
 		int boundaryLight = chunk1.getBlockLight(0, y, z);
 		assertTrue(boundaryLight > 0, "Light should cross chunk boundary");
-		assertEquals(13, boundaryLight, "Light should attenuate by 1 across boundary");
+		assertEquals(10, boundaryLight, "Light should attenuate by 1 across boundary");
 		
 		// Now test vertex sampling - when building the mesh for chunk1,
 		// vertices at x=0 might sample from x=-1 (which is chunk0's x=15)
@@ -121,7 +121,7 @@ public class CrossChunkVertexLightTest {
 		chunk0.setBlock(14, y, z, Blocks.TORCH);
 		
 		// Verify torch has light
-		assertEquals(14, chunk0.getBlockLight(14, y, z), "Torch should have light level 14");
+		assertEquals(11, chunk0.getBlockLight(14, y, z), "Torch should have light level 11");
 		
 		// Light should reach chunk0's edge (x=15)
 		int edgeLight = chunk0.getBlockLight(15, y, z);

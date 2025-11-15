@@ -396,6 +396,17 @@ public class CrossChunkLightPropagator {
 	}
 	
 	/**
+	 * Get a neighbor chunk if it's loaded, null otherwise.
+	 * This is a helper method for light removal that needs to access neighbor chunks.
+	 */
+	public LevelChunk getNeighborChunk(int chunkX, int chunkZ) {
+		if (neighborAccessor == null) {
+			return null;
+		}
+		return neighborAccessor.getChunkIfLoaded(chunkX, chunkZ);
+	}
+	
+	/**
 	 * Generate a unique key for chunk coordinates.
 	 */
 	private long chunkKey(int chunkX, int chunkZ) {
