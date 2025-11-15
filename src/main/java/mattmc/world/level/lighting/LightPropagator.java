@@ -406,6 +406,116 @@ public class LightPropagator {
 				// TODO: This should trigger re-propagation from neighbors
 				// For now, we just clear the light at this position
 			}
+		} else if (oldBlock.getOpacity() >= 15 && newBlock.getOpacity() < 15) {
+			// Old block was opaque, new block is transparent
+			// Light from neighbors should propagate into this newly opened space
+			propagateLightFromNeighbors(chunk, x, y, z);
+		}
+	}
+	
+	/**
+	 * Propagate light from neighboring blocks into the specified position.
+	 * This is used when a transparent block replaces an opaque block.
+	 */
+	private void propagateLightFromNeighbors(LevelChunk chunk, int x, int y, int z) {
+		// Clear the add queue before starting
+		addQueue.clear();
+		
+		// Check all 6 neighbors and propagate their light
+		propagateLightFromNeighbor(chunk, x - 1, y, z, x, y, z);
+		propagateLightFromNeighbor(chunk, x + 1, y, z, x, y, z);
+		propagateLightFromNeighbor(chunk, x, y - 1, z, x, y, z);
+		propagateLightFromNeighbor(chunk, x, y + 1, z, x, y, z);
+		propagateLightFromNeighbor(chunk, x, y, z - 1, x, y, z);
+		propagateLightFromNeighbor(chunk, x, y, z + 1, x, y, z);
+		
+		// Process the queue to continue propagation
+		processAddQueue();
+	}
+	
+	/**
+	 * Propagate light from a neighbor position to the target position.
+	 * @param chunk The chunk
+	 * @param fromX Source X coordinate
+	 * @param fromY Source Y coordinate
+	 * @param fromZ Source Z coordinate
+	 * @param toX Target X coordinate
+	 * @param toY Target Y coordinate
+	 * @param toZ Target Z coordinate
+	 */
+	private void propagateLightFromNeighbor(LevelChunk chunk, int fromX, int fromY, int fromZ, 
+	                                        int toX, int toY, int toZ) {
+		// Check if source is out of bounds
+		if (fromX < 0 || fromX >= LevelChunk.WIDTH || 
+		    fromY < 0 || fromY >= LevelChunk.HEIGHT || 
+		    fromZ < 0 || fromZ >= LevelChunk.DEPTH) {
+			// TODO: Handle cross-chunk propagation
+			return;
+		}
+		
+		// Get light at source
+		int sourceR = chunk.getBlockLightR(fromX, fromY, fromZ);
+		int sourceG = chunk.getBlockLightG(fromX, fromY, fromZ);
+		int sourceB = chunk.getBlockLightB(fromX, fromY, fromZ);
+		
+		// If source has no light, nothing to propagate
+		if (sourceR <= 0 && sourceG <= 0 && sourceB <= 0) {
+			return;
+		}
+		
+		// Attenuate light (reduce by 1 per block)
+		int newR = Math.max(0, sourceR - 1);
+		int newG = Math.max(0, sourceG - 1);
+		int newB = Math.max(0, sourceB - 1);
+		
+		// Get current light at target
+		int currentR = chunk.getBlockLightR(toX, toY, toZ);
+		int currentG = chunk.getBlockLightG(toX, toY, toZ);
+		int currentB = chunk.getBlockLightB(toX, toY, toZ);
+		
+		// Only propagate if new light is brighter in at least one channel
+		if (newR > currentR || newG > currentG || newB > currentB) {
+			// Take maximum of each channel
+			int finalR = Math.max(newR, currentR);
+			int finalG = Math.max(newG, currentG);
+			int finalB = Math.max(newB, currentB);
+			
+			// Set the new light value
+			chunk.setBlockLightRGB(toX, toY, toZ, finalR, finalG, finalB);
+			
+			// Use the existing propagation queue to continue spreading this light
+			addQueue.offer(new LightNode(chunk, toX, toY, toZ, finalR, finalG, finalB));
+		}
+	}
+	
+	/**
+	 * Process the add queue to continue light propagation.
+	 * This should be called after propagateLightFromNeighbors to complete the propagation.
+	 */
+	private void processAddQueue() {
+		LightNode node;
+		while ((node = addQueue.poll()) != null) {
+			int currentR = node.r;
+			int currentG = node.g;
+			int currentB = node.b;
+			
+			// Only propagate if at least one channel is strong enough
+			if (currentR <= 1 && currentG <= 1 && currentB <= 1) {
+				continue; // Light too weak to propagate
+			}
+			
+			// Attenuation (reduce each channel by 1, min 0)
+			int newR = Math.max(0, currentR - 1);
+			int newG = Math.max(0, currentG - 1);
+			int newB = Math.max(0, currentB - 1);
+			
+			// Propagate to all 6 neighbors
+			propagateRGBToNeighbor(node.chunk, node.x - 1, node.y, node.z, newR, newG, newB);
+			propagateRGBToNeighbor(node.chunk, node.x + 1, node.y, node.z, newR, newG, newB);
+			propagateRGBToNeighbor(node.chunk, node.x, node.y - 1, node.z, newR, newG, newB);
+			propagateRGBToNeighbor(node.chunk, node.x, node.y + 1, node.z, newR, newG, newB);
+			propagateRGBToNeighbor(node.chunk, node.x, node.y, node.z - 1, newR, newG, newB);
+			propagateRGBToNeighbor(node.chunk, node.x, node.y, node.z + 1, newR, newG, newB);
 		}
 	}
 }

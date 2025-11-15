@@ -70,6 +70,7 @@ public class Blocks {
     public static final Block PEARLESCENT_FROGLIGHT = register("pearlescent_froglight", new Block(false, 14, 14, 9, 12));
     public static final Block VERDANT_FROGLIGHT = register("verdant_froglight", new Block(false, 14, 11, 13, 11));
     public static final Block OCHRE_FROGLIGHT = register("ochre_froglight", new Block(false, 14, 14, 12, 7));
+    public static final Block SEA_LANTERN = register("sea_lantern", new Block(false, 14, 10, 14, 14));
     
     /**
      * Register a block with a given name (without namespace).

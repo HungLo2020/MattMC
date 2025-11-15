@@ -46,6 +46,7 @@ public class CreativeModeTabs {
         CreativeTabs.BUILDING_BLOCKS.addItem(Items.PEARLESCENT_FROGLIGHT);
         CreativeTabs.BUILDING_BLOCKS.addItem(Items.OCHRE_FROGLIGHT);
         CreativeTabs.BUILDING_BLOCKS.addItem(Items.VERDANT_FROGLIGHT);
+        CreativeTabs.BUILDING_BLOCKS.addItem(Items.SEA_LANTERN);
         
         // Tools tab
         //CreativeTabs.TOOLS.addItem(Items.WOODEN_PICKAXE);
