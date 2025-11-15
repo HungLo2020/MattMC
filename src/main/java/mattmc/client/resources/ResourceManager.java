@@ -121,6 +121,11 @@ public class ResourceManager {
     private static BlockModel mergeModels(BlockModel parent, BlockModel child) {
         BlockModel merged = new BlockModel();
         
+        // Preserve the child's original parent for special rendering detection
+        if (child.getParent() != null) {
+            merged.setOriginalParent(child.getParent());
+        }
+        
         // Merge textures (child textures override parent)
         Map<String, String> mergedTextures = new HashMap<>();
         if (parent.getTextures() != null) {

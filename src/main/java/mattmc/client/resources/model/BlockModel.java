@@ -26,12 +26,23 @@ public class BlockModel {
     private Map<String, ModelDisplay.Transform> display;
     private Boolean ambientocclusion;
     
+    // Track the original parent before merging for special rendering detection (e.g., stairs)
+    private transient String originalParent;
+    
     public String getParent() {
         return parent;
     }
     
     public void setParent(String parent) {
         this.parent = parent;
+    }
+    
+    public String getOriginalParent() {
+        return originalParent;
+    }
+    
+    public void setOriginalParent(String originalParent) {
+        this.originalParent = originalParent;
     }
     
     public Map<String, String> getTextures() {
