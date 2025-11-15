@@ -1,7 +1,7 @@
 {
   "variants": {
-    "": [
-      { "model": "block/warped_planks" }
-    ]
+    "": {
+      "model": "mattmc:block/warped_planks"
+    }
   }
 }

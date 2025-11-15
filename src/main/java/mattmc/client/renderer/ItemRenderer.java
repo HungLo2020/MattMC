@@ -66,9 +66,9 @@ public class ItemRenderer {
             // Get the item model to check for tints and special rendering
             mattmc.client.resources.model.BlockModel itemModel = ResourceManager.resolveItemModel(itemName);
             
-            // Check if this is a stairs block
-            boolean isStairs = itemModel != null && itemModel.getParent() != null && 
-                              itemModel.getParent().contains("stairs");
+            // Check if this is a stairs block by looking at the original parent before merging
+            String originalParent = itemModel != null ? itemModel.getOriginalParent() : null;
+            boolean isStairs = originalParent != null && originalParent.contains("stairs");
             
             if (isStairs) {
                 // Render as isometric stairs

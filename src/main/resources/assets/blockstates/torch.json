@@ -1,7 +1,7 @@
 {
   "variants": {
-    "": [
-      { "model": "block/mossy_cobblestone" }
-    ]
+    "": {
+      "model": "mattmc:block/mossy_cobblestone"
+    }
   }
 }

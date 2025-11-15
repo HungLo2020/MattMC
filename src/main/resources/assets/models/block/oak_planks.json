@@ -1,6 +1,6 @@
 {
-  "parent": "block/cube_all",
+  "parent": "mattmc:block/cube_all",
   "textures": {
-    "all": "block/oak_planks"
+    "all": "mattmc:block/oak_planks"
   }
 }

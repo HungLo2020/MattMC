@@ -1,7 +1,7 @@
 {
   "variants": {
-    "": [
-      { "model": "block/cobblestone" }
-    ]
+    "": {
+      "model": "mattmc:block/cobblestone"
+    }
   }
 }

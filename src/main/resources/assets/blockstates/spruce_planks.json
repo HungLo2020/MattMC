@@ -1,7 +1,7 @@
 {
   "variants": {
-    "": [
-      { "model": "block/spruce_planks" }
-    ]
+    "": {
+      "model": "mattmc:block/spruce_planks"
+    }
   }
 }

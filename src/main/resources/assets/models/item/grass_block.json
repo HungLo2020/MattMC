@@ -1,6 +1,6 @@
 {
-  "parent": "block/grass_block",
-  "tints": [
+  "parent": "mattmc:block/grass_block",
+    "tints": [
     {
       "type": "grass",
       "downfall": 1.0,
