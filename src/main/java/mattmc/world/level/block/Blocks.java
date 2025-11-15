@@ -66,8 +66,7 @@ public class Blocks {
     public static final Block CRIMSON_PLANKS = register("crimson_planks", new Block(true, 0, 0, 0, 0));
     public static final Block WARPED_PLANKS = register("warped_planks", new Block(true, 0, 0, 0, 0));
     public static final Block BIRCH_STAIRS = register("birch_stairs", new StairsBlock());
-    // Torch emits orange light: emission=14, R=14 (full red), G=7 (half green), B=0 (no blue)
-    public static final Block TORCH = register("torch", new Block(false, 14, 14, 7, 0));
+    public static final Block TORCH = register("torch", new Block(false, 15, 11, 9, 0));
     
     /**
      * Register a block with a given name (without namespace).
