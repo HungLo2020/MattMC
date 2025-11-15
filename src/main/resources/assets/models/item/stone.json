@@ -1,3 +1,6 @@
 {
-  "parent": "block/stone"
+  "model": {
+    "type": "mattmc:model",
+    "model": "mattmc:block/stone"
+  }
 }

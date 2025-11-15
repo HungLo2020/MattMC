@@ -1,3 +1,6 @@
 {
-  "parent": "block/mangrove_planks"
+  "model": {
+    "type": "mattmc:model",
+    "model": "mattmc:block/mangrove_planks"
+  }
 }

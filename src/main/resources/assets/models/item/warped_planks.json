@@ -1,3 +1,6 @@
 {
-  "parent": "block/warped_planks"
+  "model": {
+    "type": "mattmc:model",
+    "model": "mattmc:block/warped_planks"
+  }
 }

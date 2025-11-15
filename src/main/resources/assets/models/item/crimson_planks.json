@@ -1,3 +1,6 @@
 {
-  "parent": "block/crimson_planks"
+  "model": {
+    "type": "mattmc:model",
+    "model": "mattmc:block/crimson_planks"
+  }
 }

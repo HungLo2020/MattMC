@@ -1,3 +1,6 @@
 {
-  "parent": "block/silver_birch_planks"
+  "model": {
+    "type": "mattmc:model",
+    "model": "mattmc:block/silver_birch_planks"
+  }
 }

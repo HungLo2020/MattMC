@@ -1,3 +1,6 @@
 {
-  "parent": "block/jungle_planks"
+  "model": {
+    "type": "mattmc:model",
+    "model": "mattmc:block/jungle_planks"
+  }
 }

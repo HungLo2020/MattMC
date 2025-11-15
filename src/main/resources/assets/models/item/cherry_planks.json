@@ -1,3 +1,6 @@
 {
-  "parent": "block/cherry_planks"
+  "model": {
+    "type": "mattmc:model",
+    "model": "mattmc:block/cherry_planks"
+  }
 }

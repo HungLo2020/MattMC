@@ -1,3 +1,6 @@
 {
-  "parent": "block/dirt"
+  "model": {
+    "type": "mattmc:model",
+    "model": "mattmc:block/dirt"
+  }
 }

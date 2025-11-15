@@ -1,3 +1,6 @@
 {
-  "parent": "block/dark_oak_planks"
+  "model": {
+    "type": "mattmc:model",
+    "model": "mattmc:block/dark_oak_planks"
+  }
 }
