@@ -261,21 +261,56 @@ public class LightPropagator {
 	
 	/**
 	 * Check a neighbor for removal during light removal BFS.
-	 * Now supports cross-chunk boundaries (chunk-local only for now).
+	 * Now properly supports cross-chunk boundaries.
 	 */
 	private void checkNeighborForRemoval(LevelChunk chunk, int x, int y, int z, 
 	                                      int sourceLight, Queue<LightNode> boundaryQueue) {
-		// For now, skip cross-chunk removal (complex edge case)
-		// Check bounds
-		if (x < 0 || x >= LevelChunk.WIDTH || y < 0 || y >= LevelChunk.HEIGHT || 
-		    z < 0 || z >= LevelChunk.DEPTH) {
+		LevelChunk targetChunk = chunk;
+		int targetX = x;
+		int targetZ = z;
+		
+		// Handle cross-chunk boundaries
+		if (x < 0 || x >= LevelChunk.WIDTH || z < 0 || z >= LevelChunk.DEPTH) {
+			if (crossChunkPropagator == null) {
+				return; // No cross-chunk support
+			}
+			
+			// Calculate target chunk coordinates
+			int chunkX = chunk.chunkX();
+			int chunkZ = chunk.chunkZ();
+			
+			if (x < 0) {
+				chunkX--;
+				targetX = x + LevelChunk.WIDTH;
+			} else if (x >= LevelChunk.WIDTH) {
+				chunkX++;
+				targetX = x - LevelChunk.WIDTH;
+			}
+			
+			if (z < 0) {
+				chunkZ--;
+				targetZ = z + LevelChunk.DEPTH;
+			} else if (z >= LevelChunk.DEPTH) {
+				chunkZ++;
+				targetZ = z - LevelChunk.DEPTH;
+			}
+			
+			// Try to get the neighbor chunk
+			targetChunk = crossChunkPropagator.getNeighborChunk(chunkX, chunkZ);
+			if (targetChunk == null) {
+				return; // Neighbor chunk not loaded, can't remove light there
+			}
+		}
+		
+		// Check Y bounds (no cross-chunk for vertical)
+		if (y < 0 || y >= LevelChunk.HEIGHT) {
 			return;
 		}
 		
 		// Read actual RGB values from neighbor
-		int neighborR = chunk.getBlockLightR(x, y, z);
-		int neighborG = chunk.getBlockLightG(x, y, z);
-		int neighborB = chunk.getBlockLightB(x, y, z);
+		int neighborR = targetChunk.getBlockLightR(targetX, y, targetZ);
+		int neighborG = targetChunk.getBlockLightG(targetX, y, targetZ);
+		int neighborB = targetChunk.getBlockLightB(targetX, y, targetZ);
 		
 		// Calculate max for comparison
 		int neighborLight = Math.max(neighborR, Math.max(neighborG, neighborB));
@@ -287,14 +322,14 @@ public class LightPropagator {
 		// Check if this light came from the removed source
 		if (neighborLight < sourceLight) {
 			// This light was from the removed source - remove it
-			chunk.setBlockLightRGB(x, y, z, 0, 0, 0);
-			removeQueue.offer(new LightNode(chunk, x, y, z, neighborR, neighborG, neighborB));
+			targetChunk.setBlockLightRGB(targetX, y, targetZ, 0, 0, 0);
+			removeQueue.offer(new LightNode(targetChunk, targetX, y, targetZ, neighborR, neighborG, neighborB));
 		} else {
 			// This light is from another source - add to boundary for re-propagation
-			Block block = chunk.getBlock(x, y, z);
+			Block block = targetChunk.getBlock(targetX, y, targetZ);
 			// Check if it's an emissive block (light source)
 			if (block.getLightEmission() > 0 || neighborLight >= sourceLight) {
-				boundaryQueue.offer(new LightNode(chunk, x, y, z, neighborR, neighborG, neighborB));
+				boundaryQueue.offer(new LightNode(targetChunk, targetX, y, targetZ, neighborR, neighborG, neighborB));
 			}
 		}
 	}
