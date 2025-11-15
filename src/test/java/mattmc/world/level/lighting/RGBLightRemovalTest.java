@@ -20,15 +20,15 @@ public class RGBLightRemovalTest {
 		
 		int y = LevelChunk.worldYToChunkY(64);
 		
-		// Add RGB light (like a torch with R=11, G=9, B=0)
-		int r = 11, g = 9, b = 0;
+		// Add RGB light (like a torch with R=14, G=11, B=0)
+		int r = 14, g = 11, b = 0;
 		propagator.addBlockLightRGB(chunk, 8, y, 8, r, g, b);
 		
 		// Verify light is present
-		assertEquals(11, chunk.getBlockLightR(8, y, 8), "Source should have R=11");
-		assertEquals(9, chunk.getBlockLightG(8, y, 8), "Source should have G=9");
+		assertEquals(14, chunk.getBlockLightR(8, y, 8), "Source should have R=14");
+		assertEquals(11, chunk.getBlockLightG(8, y, 8), "Source should have G=11");
 		assertEquals(0, chunk.getBlockLightB(8, y, 8), "Source should have B=0");
-		assertEquals(11, chunk.getBlockLight(8, y, 8), "Intensity should be max(R,G,B)=11");
+		assertEquals(14, chunk.getBlockLight(8, y, 8), "Intensity should be max(R,G,B)=14");
 		
 		// Check propagated light
 		assertTrue(chunk.getBlockLightR(9, y, 8) > 0, "Light should propagate in R channel");
@@ -56,7 +56,7 @@ public class RGBLightRemovalTest {
 		LevelChunk chunk = new LevelChunk(0, 0);
 		int y = LevelChunk.worldYToChunkY(64);
 		
-		// Place a torch (RGB=11,9,0)
+		// Place a torch (RGB=14,11,0)
 		chunk.setBlock(8, y, 8, Blocks.TORCH);
 		
 		// Verify torch light is present
@@ -94,19 +94,19 @@ public class RGBLightRemovalTest {
 		LevelChunk chunk = new LevelChunk(0, 0);
 		int y = LevelChunk.worldYToChunkY(64);
 		
-		// Place two torches far enough apart (13 blocks ensures no overlap)
-		chunk.setBlock(2, y, 8, Blocks.TORCH);
+		// Place two torches far enough apart (15 blocks ensures no overlap with range 14 torches)
+		chunk.setBlock(0, y, 8, Blocks.TORCH);
 		chunk.setBlock(15, y, 8, Blocks.TORCH);
 		
 		// Both should have light
-		assertTrue(chunk.getBlockLightR(2, y, 8) > 0, "First torch has light");
+		assertTrue(chunk.getBlockLightR(0, y, 8) > 0, "First torch has light");
 		assertTrue(chunk.getBlockLightR(15, y, 8) > 0, "Second torch has light");
 		
 		// Remove first torch
-		chunk.setBlock(2, y, 8, Blocks.AIR);
+		chunk.setBlock(0, y, 8, Blocks.AIR);
 		
 		// First torch area should be dark (no light from second torch reaches here)
-		assertEquals(0, chunk.getBlockLightR(2, y, 8), "First torch removed");
+		assertEquals(0, chunk.getBlockLightR(0, y, 8), "First torch removed");
 		
 		// Second torch should still have light
 		assertTrue(chunk.getBlockLightR(15, y, 8) > 0, "Second torch still has light");
@@ -115,7 +115,7 @@ public class RGBLightRemovalTest {
 		chunk.setBlock(15, y, 8, Blocks.AIR);
 		
 		// Both should be dark
-		assertEquals(0, chunk.getBlockLightR(2, y, 8), "First position dark");
+		assertEquals(0, chunk.getBlockLightR(0, y, 8), "First position dark");
 		assertEquals(0, chunk.getBlockLightR(15, y, 8), "Second position dark");
 	}
 	

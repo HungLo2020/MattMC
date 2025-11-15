@@ -33,7 +33,7 @@ public class BlockLightRegistryChangeTest {
         LevelChunk chunk = new LevelChunk(0, 0);
         
         // Place a torch at position (8, 100, 8)
-        // The torch in the registry has emission values: R=11, G=9, B=0
+        // The torch in the registry has emission values: R=14, G=11, B=0
         chunk.setBlock(8, 100, 8, Blocks.TORCH);
         
         // Verify the torch emits the correct light initially
@@ -41,8 +41,8 @@ public class BlockLightRegistryChangeTest {
         int initialG = chunk.getBlockLightG(8, 100, 8);
         int initialB = chunk.getBlockLightB(8, 100, 8);
         
-        assertEquals(11, initialR, "Initial red emission should be 11");
-        assertEquals(9, initialG, "Initial green emission should be 9");
+        assertEquals(14, initialR, "Initial red emission should be 14");
+        assertEquals(11, initialG, "Initial green emission should be 11");
         assertEquals(0, initialB, "Initial blue emission should be 0");
         
         // Serialize the chunk to NBT (simulating save)
@@ -63,8 +63,8 @@ public class BlockLightRegistryChangeTest {
         int loadedB = loadedChunk.getBlockLightB(8, 100, 8);
         
         // The torch should still have the correct light values from the registry
-        assertEquals(11, loadedR, "Loaded red emission should match registry");
-        assertEquals(9, loadedG, "Loaded green emission should match registry");
+        assertEquals(14, loadedR, "Loaded red emission should match registry");
+        assertEquals(11, loadedG, "Loaded green emission should match registry");
         assertEquals(0, loadedB, "Loaded blue emission should match registry");
     }
     
@@ -85,8 +85,8 @@ public class BlockLightRegistryChangeTest {
         int initialG = chunk.getBlockLightG(5, 80, 5);
         int initialB = chunk.getBlockLightB(5, 80, 5);
         
-        assertEquals(11, initialR);
-        assertEquals(9, initialG);
+        assertEquals(14, initialR);
+        assertEquals(11, initialG);
         assertEquals(0, initialB);
         
         // Verify light propagates to neighbors (one block away should be emission - 1)
@@ -107,8 +107,8 @@ public class BlockLightRegistryChangeTest {
         int loadedG = loadedChunk.getBlockLightG(5, 80, 5);
         int loadedB = loadedChunk.getBlockLightB(5, 80, 5);
         
-        assertEquals(11, loadedR);
-        assertEquals(9, loadedG);
+        assertEquals(14, loadedR);
+        assertEquals(11, loadedG);
         assertEquals(0, loadedB);
         
         // Neighbors should also have correct propagated light
