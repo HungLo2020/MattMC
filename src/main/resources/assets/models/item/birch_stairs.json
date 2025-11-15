@@ -1,3 +1,6 @@
 {
-  "parent": "block/birch_stairs"
+  "model": {
+    "type": "mattmc:model",
+    "model": "mattmc:block/birch_stairs"
+  }
 }
