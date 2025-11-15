@@ -43,6 +43,9 @@ public class CreativeModeTabs {
         CreativeTabs.BUILDING_BLOCKS.addItem(Items.WARPED_PLANKS);
         CreativeTabs.BUILDING_BLOCKS.addItem(Items.BIRCH_STAIRS);
         CreativeTabs.BUILDING_BLOCKS.addItem(Items.TORCH);
+        CreativeTabs.BUILDING_BLOCKS.addItem(Items.PEARLESCENT_FROGLIGHT);
+        CreativeTabs.BUILDING_BLOCKS.addItem(Items.OCHRE_FROGLIGHT);
+        CreativeTabs.BUILDING_BLOCKS.addItem(Items.VERDANT_FROGLIGHT);
         
         // Tools tab
         //CreativeTabs.TOOLS.addItem(Items.WOODEN_PICKAXE);

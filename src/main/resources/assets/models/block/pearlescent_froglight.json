@@ -1,0 +1,7 @@
+{
+  "parent": "mattmc:block/cube_column",
+  "textures": {
+    "end": "mattmc:block/pearlescent_froglight_top",
+    "side": "mattmc:block/pearlescent_froglight_side"
+  }
+}
