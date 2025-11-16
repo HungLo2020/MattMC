@@ -149,11 +149,20 @@ public class SkylightEngine {
 	
 	/**
 	 * Propagate skylight to a neighbor position.
+	 * Now delegates cross-chunk propagation to CrossChunkLightPropagator.
 	 */
 	private void propagateSkyToNeighbor(LevelChunk chunk, int x, int y, int z, int newLight) {
-		// Check bounds
-		if (x < 0 || x >= LevelChunk.WIDTH || y < 0 || y >= LevelChunk.HEIGHT || 
-		    z < 0 || z >= LevelChunk.DEPTH) {
+		// Handle cross-chunk boundaries by delegating
+		if (x < 0 || x >= LevelChunk.WIDTH || z < 0 || z >= LevelChunk.DEPTH) {
+			CrossChunkLightPropagator propagator = WorldLightManager.getInstance().getCrossChunkPropagator();
+			if (propagator != null) {
+				propagator.propagateSkylightCross(chunk, x, y, z, newLight);
+			}
+			return;
+		}
+		
+		// Check Y bounds
+		if (y < 0 || y >= LevelChunk.HEIGHT) {
 			return;
 		}
 		
