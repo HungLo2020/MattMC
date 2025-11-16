@@ -54,8 +54,8 @@ void main() {
 	finalLightColor = min(finalLightColor, vec3(1.0));
 	
 	// Ensure minimum brightness (never completely dark)
-	// Increased from 0.05 to 0.20 to make shadows less intense
-	finalLightColor = max(finalLightColor, vec3(0.20));
+	// Increased from 0.05 to 0.20, then to 0.25 to reduce interior corner darkness
+	finalLightColor = max(finalLightColor, vec3(0.25));
 	
 	// Apply optional emissive boost
 	finalLightColor *= uEmissiveBoost;

@@ -321,15 +321,35 @@ public class LightPropagator {
 		
 		// Check if this light came from the removed source
 		if (neighborLight < sourceLight) {
-			// This light was from the removed source - remove it
+			// This light was definitely from the removed source - remove it
 			targetChunk.setBlockLightRGB(targetX, y, targetZ, 0, 0, 0);
 			removeQueue.offer(new LightNode(targetChunk, targetX, y, targetZ, neighborR, neighborG, neighborB));
 		} else {
-			// This light is from another source - add to boundary for re-propagation
+			// This light might be from another source
+			// Check if the block itself is emissive (it's an actual light source)
 			Block block = targetChunk.getBlock(targetX, y, targetZ);
-			// Check if it's an emissive block (light source)
-			if (block.getLightEmission() > 0 || neighborLight >= sourceLight) {
+			int blockEmissionR = block.getLightEmissionR();
+			int blockEmissionG = block.getLightEmissionG();
+			int blockEmissionB = block.getLightEmissionB();
+			
+			// If this block is a light source, definitely keep it for re-propagation
+			if (blockEmissionR > 0 || blockEmissionG > 0 || blockEmissionB > 0) {
 				boundaryQueue.offer(new LightNode(targetChunk, targetX, y, targetZ, neighborR, neighborG, neighborB));
+			} else {
+				// Not a light source, but has light >= sourceLight
+				// This could be from another nearby source, or it could be stale
+				// The safest approach is to remove it and let re-propagation restore it if needed
+				// However, we only remove if equal - if higher, it's definitely from another source
+				if (neighborLight == sourceLight) {
+					// Equal light level - could be from this source or another
+					// Remove it and let re-propagation decide
+					targetChunk.setBlockLightRGB(targetX, y, targetZ, 0, 0, 0);
+					removeQueue.offer(new LightNode(targetChunk, targetX, y, targetZ, neighborR, neighborG, neighborB));
+				} else {
+					// neighborLight > sourceLight - definitely from a stronger source
+					// Keep for re-propagation
+					boundaryQueue.offer(new LightNode(targetChunk, targetX, y, targetZ, neighborR, neighborG, neighborB));
+				}
 			}
 		}
 	}
