@@ -274,13 +274,14 @@ public class MeshBuilder {
         // This helps in caves where 3 faces meet and all sampled positions may be in shadow
         // The boost is applied to the combined light, not individual channels
         float combinedLight = avgSkyLight + avgBlockLightR + avgBlockLightG + avgBlockLightB;
-        if (combinedLight < 3.0f) {
+        if (combinedLight < 6.0f) {
             // Very dark corner - boost all channels proportionally
-            float boostFactor = 3.0f / Math.max(combinedLight, 0.1f);
-            avgSkyLight = Math.min(avgSkyLight * boostFactor, avgSkyLight + 2.0f);
-            avgBlockLightR = Math.min(avgBlockLightR * boostFactor, avgBlockLightR + 2.0f);
-            avgBlockLightG = Math.min(avgBlockLightG * boostFactor, avgBlockLightG + 2.0f);
-            avgBlockLightB = Math.min(avgBlockLightB * boostFactor, avgBlockLightB + 2.0f);
+            // Increased threshold from 3.0 to 6.0 and boost from +2.0 to +4.0 for better visibility
+            float boostFactor = 6.0f / Math.max(combinedLight, 0.1f);
+            avgSkyLight = Math.min(avgSkyLight * boostFactor, avgSkyLight + 4.0f);
+            avgBlockLightR = Math.min(avgBlockLightR * boostFactor, avgBlockLightR + 4.0f);
+            avgBlockLightG = Math.min(avgBlockLightG * boostFactor, avgBlockLightG + 4.0f);
+            avgBlockLightB = Math.min(avgBlockLightB * boostFactor, avgBlockLightB + 4.0f);
         }
         
         float ao = 0.0f; // No AO yet
