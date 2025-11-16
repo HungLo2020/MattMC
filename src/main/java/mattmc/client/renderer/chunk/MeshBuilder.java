@@ -237,13 +237,13 @@ public class MeshBuilder {
         // The positions depend on which face and which corner we're sampling
         int[] offsets = getVertexSampleOffsets(normalIndex, cornerIndex);
         
-        // Use MAXIMUM instead of AVERAGE to fix dark corners
-        // In interior corners, some samples are inside solid blocks (0 light)
-        // Using max ensures the vertex shows the brightest light reaching it
-        float maxSkyLight = 0;
+        // Use AVERAGE for skylight (correct for natural light propagation)
+        // Use MAXIMUM for block light (fixes dark corners from torches)
+        float skyLightSum = 0;
         float maxBlockLightR = 0;
         float maxBlockLightG = 0;
         float maxBlockLightB = 0;
+        int samples = 0;
         
         // Sample 4 positions (3 adjacent + 1 diagonal)
         for (int i = 0; i < 4; i++) {
@@ -259,16 +259,21 @@ public class MeshBuilder {
             int skyLight = getSkyLightSafe(face.chunk, sx, sy, sz);
             int[] blockLightRGB = getBlockLightRGBSafe(face.chunk, sx, sy, sz);
             
-            // Take the maximum of each channel
-            maxSkyLight = Math.max(maxSkyLight, skyLight);
+            // Average skylight (natural light propagation)
+            skyLightSum += skyLight;
+            samples++;
+            
+            // Take maximum of block light (fixes dark corners from point lights)
             maxBlockLightR = Math.max(maxBlockLightR, blockLightRGB[0]);
             maxBlockLightG = Math.max(maxBlockLightG, blockLightRGB[1]);
             maxBlockLightB = Math.max(maxBlockLightB, blockLightRGB[2]);
         }
         
+        // Average skylight, maximum block light
+        float avgSkyLight = skyLightSum / samples;
         float ao = 0.0f; // No AO yet
         
-        return new float[] {maxSkyLight, maxBlockLightR, maxBlockLightG, maxBlockLightB, ao};
+        return new float[] {avgSkyLight, maxBlockLightR, maxBlockLightG, maxBlockLightB, ao};
     }
     
     /**
