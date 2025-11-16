@@ -69,6 +69,49 @@ public class RotatedPillarBlock extends Block {
     }
     
     /**
+     * Get the texture path for a specific face.
+     * Rotated pillar blocks use "end" texture for top/bottom and "side" texture for horizontal faces.
+     * 
+     * @param face The face name (e.g., "top", "bottom", "side", "north", etc.)
+     * @return The texture path, or null if no texture is available
+     */
+    @Override
+    public String getTexturePath(String face) {
+        java.util.Map<String, String> paths = getTexturePaths();
+        if (paths == null || paths.isEmpty()) {
+            return null;
+        }
+        
+        // Map face names to texture variable names for pillar blocks
+        // Pillar blocks use "end" for top/bottom and "side" for horizontal faces
+        String textureKey;
+        switch (face) {
+            case "top":
+            case "bottom":
+                textureKey = "end";  // Top and bottom use "end" texture
+                break;
+            case "north":
+            case "south":
+            case "east":
+            case "west":
+            case "side":
+                textureKey = "side";  // All horizontal faces use "side" texture
+                break;
+            default:
+                textureKey = face;  // Use face name as-is for other cases
+                break;
+        }
+        
+        String path = paths.get(textureKey);
+        if (path != null) {
+            return path;
+        }
+        
+        // Fall back to "all" texture (for simple cube_all models)
+        return paths.get("all");
+    }
+    
+    /**
      * Get the blockstate for pillar placement based on clicked face.
      * The axis is determined by the face that was clicked.
      */
