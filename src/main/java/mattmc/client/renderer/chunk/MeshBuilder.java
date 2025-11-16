@@ -210,10 +210,13 @@ public class MeshBuilder {
     }
     
     /**
-     * Sample light for a vertex using 8-sample smooth lighting.
+     * Sample light for a vertex using smart smooth lighting.
      * 
      * For each vertex, we sample light from the 3 adjacent faces + 1 diagonal corner.
      * This creates smooth lighting gradients across block edges without banding.
+     * 
+     * Only non-zero light samples are averaged to prevent interior corners from being too dark.
+     * This fixes the issue where solid blocks (with 0 light) would darken adjacent corners.
      * 
      * @param face The face data containing chunk reference and position
      * @param normalIndex Which face (0=top, 1=bottom, 2=north, 3=south, 4=west, 5=east)
@@ -241,7 +244,8 @@ public class MeshBuilder {
         float blockLightRSum = 0;
         float blockLightGSum = 0;
         float blockLightBSum = 0;
-        int samples = 0;
+        int skyLightSamples = 0;
+        int blockLightSamples = 0;
         
         // Sample 4 positions (3 adjacent + 1 diagonal)
         for (int i = 0; i < 4; i++) {
@@ -257,18 +261,29 @@ public class MeshBuilder {
             int skyLight = getSkyLightSafe(face.chunk, sx, sy, sz);
             int[] blockLightRGB = getBlockLightRGBSafe(face.chunk, sx, sy, sz);
             
-            skyLightSum += skyLight;
-            blockLightRSum += blockLightRGB[0];
-            blockLightGSum += blockLightRGB[1];
-            blockLightBSum += blockLightRGB[2];
-            samples++;
+            // Only include non-zero skylight samples in the average
+            // This prevents solid blocks (with 0 skylight) from darkening interior corners
+            if (skyLight > 0) {
+                skyLightSum += skyLight;
+                skyLightSamples++;
+            }
+            
+            // Only include non-zero blocklight samples in the average
+            // Check if any RGB component is non-zero
+            if (blockLightRGB[0] > 0 || blockLightRGB[1] > 0 || blockLightRGB[2] > 0) {
+                blockLightRSum += blockLightRGB[0];
+                blockLightGSum += blockLightRGB[1];
+                blockLightBSum += blockLightRGB[2];
+                blockLightSamples++;
+            }
         }
         
-        // Average the samples
-        float avgSkyLight = skyLightSum / samples;
-        float avgBlockLightR = blockLightRSum / samples;
-        float avgBlockLightG = blockLightGSum / samples;
-        float avgBlockLightB = blockLightBSum / samples;
+        // Average only the non-zero samples to prevent interior corners from being too dark
+        // If all samples are zero, use zero (fully dark, but shader has minimum brightness)
+        float avgSkyLight = skyLightSamples > 0 ? skyLightSum / skyLightSamples : 0.0f;
+        float avgBlockLightR = blockLightSamples > 0 ? blockLightRSum / blockLightSamples : 0.0f;
+        float avgBlockLightG = blockLightSamples > 0 ? blockLightGSum / blockLightSamples : 0.0f;
+        float avgBlockLightB = blockLightSamples > 0 ? blockLightBSum / blockLightSamples : 0.0f;
         float ao = 0.0f; // No AO yet
         
         return new float[] {avgSkyLight, avgBlockLightR, avgBlockLightG, avgBlockLightB, ao};
