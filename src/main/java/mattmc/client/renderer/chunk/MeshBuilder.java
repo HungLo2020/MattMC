@@ -237,11 +237,13 @@ public class MeshBuilder {
         // The positions depend on which face and which corner we're sampling
         int[] offsets = getVertexSampleOffsets(normalIndex, cornerIndex);
         
-        float skyLightSum = 0;
-        float blockLightRSum = 0;
-        float blockLightGSum = 0;
-        float blockLightBSum = 0;
-        int samples = 0;
+        // Use MAXIMUM instead of AVERAGE to fix dark corners
+        // In interior corners, some samples are inside solid blocks (0 light)
+        // Using max ensures the vertex shows the brightest light reaching it
+        float maxSkyLight = 0;
+        float maxBlockLightR = 0;
+        float maxBlockLightG = 0;
+        float maxBlockLightB = 0;
         
         // Sample 4 positions (3 adjacent + 1 diagonal)
         for (int i = 0; i < 4; i++) {
@@ -257,36 +259,16 @@ public class MeshBuilder {
             int skyLight = getSkyLightSafe(face.chunk, sx, sy, sz);
             int[] blockLightRGB = getBlockLightRGBSafe(face.chunk, sx, sy, sz);
             
-            skyLightSum += skyLight;
-            blockLightRSum += blockLightRGB[0];
-            blockLightGSum += blockLightRGB[1];
-            blockLightBSum += blockLightRGB[2];
-            samples++;
-        }
-        
-        // Average the samples
-        float avgSkyLight = skyLightSum / samples;
-        float avgBlockLightR = blockLightRSum / samples;
-        float avgBlockLightG = blockLightGSum / samples;
-        float avgBlockLightB = blockLightBSum / samples;
-        
-        // Apply a minimum light boost to prevent interior corners from being too dark
-        // This helps in caves where 3 faces meet and all sampled positions may be in shadow
-        // The boost is applied to the combined light, not individual channels
-        float combinedLight = avgSkyLight + avgBlockLightR + avgBlockLightG + avgBlockLightB;
-        if (combinedLight < 6.0f) {
-            // Very dark corner - boost all channels proportionally
-            // Increased threshold from 3.0 to 6.0 and boost from +2.0 to +4.0 for better visibility
-            float boostFactor = 6.0f / Math.max(combinedLight, 0.1f);
-            avgSkyLight = Math.min(avgSkyLight * boostFactor, avgSkyLight + 4.0f);
-            avgBlockLightR = Math.min(avgBlockLightR * boostFactor, avgBlockLightR + 4.0f);
-            avgBlockLightG = Math.min(avgBlockLightG * boostFactor, avgBlockLightG + 4.0f);
-            avgBlockLightB = Math.min(avgBlockLightB * boostFactor, avgBlockLightB + 4.0f);
+            // Take the maximum of each channel
+            maxSkyLight = Math.max(maxSkyLight, skyLight);
+            maxBlockLightR = Math.max(maxBlockLightR, blockLightRGB[0]);
+            maxBlockLightG = Math.max(maxBlockLightG, blockLightRGB[1]);
+            maxBlockLightB = Math.max(maxBlockLightB, blockLightRGB[2]);
         }
         
         float ao = 0.0f; // No AO yet
         
-        return new float[] {avgSkyLight, avgBlockLightR, avgBlockLightG, avgBlockLightB, ao};
+        return new float[] {maxSkyLight, maxBlockLightR, maxBlockLightG, maxBlockLightB, ao};
     }
     
     /**
