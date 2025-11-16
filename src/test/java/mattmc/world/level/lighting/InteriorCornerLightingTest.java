@@ -10,11 +10,12 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
- * Test to verify that interior corners between blocks are not too dark.
+ * Test to verify that interior corners between blocks are not too dark
+ * and that ceiling (bottom face) lighting works correctly.
  * 
- * This tests the fix for the issue where interior corners in caves would be
- * very dark even when nearby torches or other light sources existed, because
- * the vertex light sampling was averaging zeros from solid blocks.
+ * This tests the fixes for:
+ * 1. Interior corners in caves being very dark even with nearby light sources
+ * 2. Ceiling blocks being perfectly dark when they should receive light from below
  */
 public class InteriorCornerLightingTest {
 	
@@ -193,6 +194,84 @@ public class InteriorCornerLightingTest {
 			
 		} catch (Exception e) {
 			throw new RuntimeException("Failed to test vertex light sampling", e);
+		}
+	}
+	
+	@Test
+	public void testCeilingBottomFaceLighting() {
+		// This test verifies that ceiling (bottom face) blocks receive light from the air below
+		// Previously, bottom faces sampled at Y=0 (inside the block) instead of Y=-1 (below)
+		
+		Level level = new Level();
+		LevelChunk chunk = level.getChunk(0, 0);
+		
+		int y = LevelChunk.worldYToChunkY(65);
+		
+		// Create a horizontal shaft scenario:
+		// Air at Y=64 with skylight
+		// Block at Y=65 (ceiling of the shaft)
+		
+		// Set skylight in the air below the ceiling block
+		chunk.setSkyLight(8, y - 1, 8, 15); // Air directly below - full skylight
+		chunk.setSkyLight(7, y - 1, 8, 15); // Air to the west below
+		chunk.setSkyLight(8, y - 1, 7, 15); // Air to the north below
+		chunk.setSkyLight(7, y - 1, 7, 15); // Air to the northwest below
+		
+		// Place a ceiling block at Y=65
+		chunk.setBlock(8, y, 8, Blocks.STONE);
+		
+		// Create a face for the bottom (ceiling) of this block
+		BlockFaceCollector.FaceData ceilingFace = new BlockFaceCollector.FaceData(
+			8, 65, 8, 0xFFFFFF, 1.0f, 0.5f, Blocks.STONE, "bottom", null, null, chunk, 8, y, 8
+		);
+		
+		MeshBuilder meshBuilder = new MeshBuilder(null);
+		meshBuilder.setLightAccessor(new MeshBuilder.ChunkLightAccessor() {
+			@Override
+			public int getSkyLightAcrossChunks(LevelChunk chunk, int x, int y, int z) {
+				if (x >= 0 && x < LevelChunk.WIDTH && z >= 0 && z < LevelChunk.DEPTH && 
+				    y >= 0 && y < LevelChunk.HEIGHT) {
+					return chunk.getSkyLight(x, y, z);
+				}
+				return 15;
+			}
+			
+			@Override
+			public int getBlockLightAcrossChunks(LevelChunk chunk, int x, int y, int z) {
+				if (x >= 0 && x < LevelChunk.WIDTH && z >= 0 && z < LevelChunk.DEPTH && 
+				    y >= 0 && y < LevelChunk.HEIGHT) {
+					return chunk.getBlockLight(x, y, z);
+				}
+				return 0;
+			}
+		});
+		
+		try {
+			java.lang.reflect.Method sampleMethod = MeshBuilder.class.getDeclaredMethod(
+				"sampleVertexLight", 
+				BlockFaceCollector.FaceData.class, 
+				int.class, 
+				int.class
+			);
+			sampleMethod.setAccessible(true);
+			
+			// Sample the bottom face (normalIndex=1 for bottom, cornerIndex=0 for first corner)
+			float[] lightData = (float[]) sampleMethod.invoke(meshBuilder, ceilingFace, 1, 0);
+			float skyLight = lightData[0];
+			
+			// With the fix, the ceiling should have skylight because it samples from Y-1 (the air below)
+			// All 4 samples should be from air with skylight=15
+			// Expected: 15.0
+			
+			assertTrue(skyLight >= 10.0f, 
+				"Ceiling should receive skylight from air below, expected >= 10, got " + skyLight);
+			
+			System.out.println("Ceiling Bottom Face Lighting Test:");
+			System.out.println("  Ceiling SkyLight: " + skyLight);
+			System.out.println("  ✓ Ceiling receives light from air space below");
+			
+		} catch (Exception e) {
+			throw new RuntimeException("Failed to test ceiling lighting", e);
 		}
 	}
 }

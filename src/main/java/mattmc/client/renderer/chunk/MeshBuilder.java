@@ -309,10 +309,10 @@ public class MeshBuilder {
         // Bottom face (normal = 0,-1,0)
         else if (normalIndex == 1) {
             switch (cornerIndex) {
-                case 0: return new int[] {0,0,0, -1,0,0, 0,0,-1, -1,0,-1}; // x0, z0
-                case 1: return new int[] {0,0,0, 1,0,0, 0,0,-1, 1,0,-1};   // x1, z0
-                case 2: return new int[] {0,0,0, 1,0,0, 0,0,1, 1,0,1};     // x1, z1
-                case 3: return new int[] {0,0,0, -1,0,0, 0,0,1, -1,0,1};   // x0, z1
+                case 0: return new int[] {0,-1,0, -1,-1,0, 0,-1,-1, -1,-1,-1}; // x0, z0
+                case 1: return new int[] {0,-1,0, 1,-1,0, 0,-1,-1, 1,-1,-1};   // x1, z0
+                case 2: return new int[] {0,-1,0, 1,-1,0, 0,-1,1, 1,-1,1};     // x1, z1
+                case 3: return new int[] {0,-1,0, -1,-1,0, 0,-1,1, -1,-1,1};   // x0, z1
             }
         }
         // North face (normal = 0,0,-1)
