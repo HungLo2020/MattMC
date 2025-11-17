@@ -63,6 +63,7 @@ public class RGBLightRemovalTest {
 		int rAtSource = chunk.getBlockLightR(8, y, 8);
 		int gAtSource = chunk.getBlockLightG(8, y, 8);
 		int bAtSource = chunk.getBlockLightB(8, y, 8);
+		int iAtSource = chunk.getBlockLightI(8, y, 8);
 		
 		assertTrue(rAtSource > 0, "Torch should emit red light");
 		assertTrue(gAtSource > 0, "Torch should emit green light");
@@ -71,11 +72,17 @@ public class RGBLightRemovalTest {
 		// Verify light propagates
 		int rNeighbor = chunk.getBlockLightR(9, y, 8);
 		int gNeighbor = chunk.getBlockLightG(9, y, 8);
+		int bNeighbor = chunk.getBlockLightB(9, y, 8);
+		int iNeighbor = chunk.getBlockLightI(9, y, 8);
 		
 		assertTrue(rNeighbor > 0, "Red light should propagate");
 		assertTrue(gNeighbor > 0, "Green light should propagate");
-		assertTrue(rNeighbor < rAtSource, "Light should attenuate");
-		assertTrue(gNeighbor < gAtSource, "Light should attenuate");
+		// COLOR should remain constant during propagation
+		assertEquals(rAtSource, rNeighbor, "Red color should stay constant");
+		assertEquals(gAtSource, gNeighbor, "Green color should stay constant");
+		assertEquals(bAtSource, bNeighbor, "Blue color should stay constant");
+		// Only INTENSITY should attenuate
+		assertTrue(iNeighbor < iAtSource, "Intensity should attenuate");
 		
 		// Remove the torch
 		chunk.setBlock(8, y, 8, Blocks.AIR);

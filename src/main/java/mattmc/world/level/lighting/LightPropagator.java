@@ -18,14 +18,15 @@ import java.util.Queue;
 public class LightPropagator {
 	
 	/**
-	 * Represents a light node in the BFS queue for RGB propagation.
+	 * Represents a light node in the BFS queue for RGBI propagation.
 	 */
 	private static class LightNode {
 		final LevelChunk chunk; // Added to support cross-chunk propagation
 		final int x, y, z;
-		final int r, g, b;  // RGB light levels (0-15)
+		final int r, g, b;  // RGB color values (0-15) - constant during propagation
+		final int i;        // Intensity (0-15) - decrements during propagation
 		
-		LightNode(LevelChunk chunk, int x, int y, int z, int r, int g, int b) {
+		LightNode(LevelChunk chunk, int x, int y, int z, int r, int g, int b, int i) {
 			this.chunk = chunk;
 			this.x = x;
 			this.y = y;
@@ -33,11 +34,12 @@ public class LightPropagator {
 			this.r = r;
 			this.g = g;
 			this.b = b;
+			this.i = i;
 		}
 		
-		// Legacy constructor for backward compatibility (converts single value to white RGB)
+		// Legacy constructor for backward compatibility (converts single value to white RGBI)
 		LightNode(LevelChunk chunk, int x, int y, int z, int lightLevel) {
-			this(chunk, x, y, z, lightLevel, lightLevel, lightLevel);
+			this(chunk, x, y, z, lightLevel, lightLevel, lightLevel, lightLevel);
 		}
 	}
 	
@@ -58,6 +60,7 @@ public class LightPropagator {
 	/**
 	 * Add blockLight RGB from an emissive block at the given position.
 	 * This propagates light outward using BFS with attenuation.
+	 * Color (RGB) remains constant; only intensity decrements with distance.
 	 * 
 	 * @param chunk The chunk containing the block
 	 * @param x Chunk-local X coordinate (0-15)
@@ -72,12 +75,15 @@ public class LightPropagator {
 			return; // No light to add
 		}
 		
+		// Calculate intensity as max of RGB channels
+		int intensity = Math.max(r, Math.max(g, b));
+		
 		// Set the light at the source position
-		chunk.setBlockLightRGB(x, y, z, r, g, b);
+		chunk.setBlockLightRGBI(x, y, z, r, g, b, intensity);
 		
 		// Enqueue the source for propagation
 		addQueue.clear();
-		addQueue.offer(new LightNode(chunk, x, y, z, r, g, b));
+		addQueue.offer(new LightNode(chunk, x, y, z, r, g, b, intensity));
 		
 		// BFS propagation
 		LightNode node;
@@ -85,24 +91,23 @@ public class LightPropagator {
 			int currentR = node.r;
 			int currentG = node.g;
 			int currentB = node.b;
+			int currentI = node.i;
 			
-			// Only propagate if at least one channel is strong enough
-			if (currentR <= 1 && currentG <= 1 && currentB <= 1) {
+			// Only propagate if intensity is strong enough
+			if (currentI <= 1) {
 				continue; // Light too weak to propagate
 			}
 			
-			// Attenuation (reduce each channel by 1, min 0)
-			int newR = Math.max(0, currentR - 1);
-			int newG = Math.max(0, currentG - 1);
-			int newB = Math.max(0, currentB - 1);
+			// Attenuation (reduce intensity by 1, keep color constant)
+			int newI = currentI - 1;
 			
-			// Propagate to all 6 neighbors
-			propagateRGBToNeighbor(node.chunk, node.x - 1, node.y, node.z, newR, newG, newB);
-			propagateRGBToNeighbor(node.chunk, node.x + 1, node.y, node.z, newR, newG, newB);
-			propagateRGBToNeighbor(node.chunk, node.x, node.y - 1, node.z, newR, newG, newB);
-			propagateRGBToNeighbor(node.chunk, node.x, node.y + 1, node.z, newR, newG, newB);
-			propagateRGBToNeighbor(node.chunk, node.x, node.y, node.z - 1, newR, newG, newB);
-			propagateRGBToNeighbor(node.chunk, node.x, node.y, node.z + 1, newR, newG, newB);
+			// Propagate to all 6 neighbors with same color but reduced intensity
+			propagateRGBIToNeighbor(node.chunk, node.x - 1, node.y, node.z, currentR, currentG, currentB, newI);
+			propagateRGBIToNeighbor(node.chunk, node.x + 1, node.y, node.z, currentR, currentG, currentB, newI);
+			propagateRGBIToNeighbor(node.chunk, node.x, node.y - 1, node.z, currentR, currentG, currentB, newI);
+			propagateRGBIToNeighbor(node.chunk, node.x, node.y + 1, node.z, currentR, currentG, currentB, newI);
+			propagateRGBIToNeighbor(node.chunk, node.x, node.y, node.z - 1, currentR, currentG, currentB, newI);
+			propagateRGBIToNeighbor(node.chunk, node.x, node.y, node.z + 1, currentR, currentG, currentB, newI);
 		}
 	}
 	
@@ -122,15 +127,16 @@ public class LightPropagator {
 	}
 	
 	/**
-	 * Propagate RGB light to a neighbor position.
+	 * Propagate RGBI light to a neighbor position.
 	 * Now supports cross-chunk propagation.
+	 * Color (RGB) remains constant; only intensity decrements.
 	 */
-	private void propagateRGBToNeighbor(LevelChunk chunk, int x, int y, int z, int newR, int newG, int newB) {
+	private void propagateRGBIToNeighbor(LevelChunk chunk, int x, int y, int z, int r, int g, int b, int newI) {
 		// Check if crossing chunk boundaries
 		if (x < 0 || x >= LevelChunk.WIDTH || z < 0 || z >= LevelChunk.DEPTH) {
 			// Crossing chunk boundary - use cross-chunk propagator if available
 			if (crossChunkPropagator != null) {
-				crossChunkPropagator.propagateBlockLightRGBCross(chunk, x, y, z, newR + 1, newG + 1, newB + 1);
+				crossChunkPropagator.propagateBlockLightRGBICross(chunk, x, y, z, r, g, b, newI);
 			}
 			return;
 		}
@@ -151,26 +157,32 @@ public class LightPropagator {
 		int currentR = chunk.getBlockLightR(x, y, z);
 		int currentG = chunk.getBlockLightG(x, y, z);
 		int currentB = chunk.getBlockLightB(x, y, z);
+		int currentI = chunk.getBlockLightI(x, y, z);
 		
-		// Only update if new light is brighter in at least one channel
-		if (newR > currentR || newG > currentG || newB > currentB) {
-			// Take maximum of each channel
-			int finalR = Math.max(newR, currentR);
-			int finalG = Math.max(newG, currentG);
-			int finalB = Math.max(newB, currentB);
-			chunk.setBlockLightRGB(x, y, z, finalR, finalG, finalB);
-			addQueue.offer(new LightNode(chunk, x, y, z, finalR, finalG, finalB));
+		// Only update if new intensity is brighter
+		if (newI > currentI) {
+			// Use the new color and intensity
+			chunk.setBlockLightRGBI(x, y, z, r, g, b, newI);
+			addQueue.offer(new LightNode(chunk, x, y, z, r, g, b, newI));
+		} else if (newI == currentI) {
+			// Same intensity - mix colors by averaging
+			int mixedR = (r + currentR) / 2;
+			int mixedG = (g + currentG) / 2;
+			int mixedB = (b + currentB) / 2;
+			chunk.setBlockLightRGBI(x, y, z, mixedR, mixedG, mixedB, newI);
+			// Don't re-enqueue if intensity hasn't increased
 		}
+		// If newI < currentI, don't update (existing light is brighter)
 	}
 	
 	/**
 	 * Propagate light to a neighbor position (legacy method).
 	 * Now supports cross-chunk propagation.
-	 * @deprecated Use propagateRGBToNeighbor for RGB values
+	 * @deprecated Use propagateRGBIToNeighbor for RGBI values
 	 */
 	@Deprecated
 	private void propagateToNeighbor(LevelChunk chunk, int x, int y, int z, int newLight) {
-		propagateRGBToNeighbor(chunk, x, y, z, newLight, newLight, newLight);
+		propagateRGBIToNeighbor(chunk, x, y, z, newLight, newLight, newLight, newLight);
 	}
 	
 	/**
@@ -183,88 +195,89 @@ public class LightPropagator {
 	 * @param z Chunk-local Z coordinate (0-15)
 	 */
 	public void removeBlockLight(LevelChunk chunk, int x, int y, int z) {
-		// Read actual RGB values from the chunk
+		// Read actual RGBI values from the chunk
 		int removedR = chunk.getBlockLightR(x, y, z);
 		int removedG = chunk.getBlockLightG(x, y, z);
 		int removedB = chunk.getBlockLightB(x, y, z);
+		int removedI = chunk.getBlockLightI(x, y, z);
 		
 		// Check if there's any light to remove
-		if (removedR <= 0 && removedG <= 0 && removedB <= 0) {
+		if (removedI <= 0) {
 			return; // No light to remove
 		}
 		
 		// Clear light at source
-		chunk.setBlockLightRGB(x, y, z, 0, 0, 0);
+		chunk.setBlockLightRGBI(x, y, z, 0, 0, 0, 0);
 		
 		// BFS to remove light and collect boundary nodes for re-propagation
 		removeQueue.clear();
-		removeQueue.offer(new LightNode(chunk, x, y, z, removedR, removedG, removedB));
+		removeQueue.offer(new LightNode(chunk, x, y, z, removedR, removedG, removedB, removedI));
 		
 		Queue<LightNode> boundaryQueue = new ArrayDeque<>();
 		
 		LightNode node2;
 		while ((node2 = removeQueue.poll()) != null) {
-			// Use max of RGB as the light level for removal
-			int sourceLight = Math.max(node2.r, Math.max(node2.g, node2.b));
+			// Use intensity for removal comparison
+			int sourceIntensity = node2.i;
 			
 			// Check all 6 neighbors
-			checkNeighborForRemoval(node2.chunk, node2.x - 1, node2.y, node2.z, sourceLight, boundaryQueue);
-			checkNeighborForRemoval(node2.chunk, node2.x + 1, node2.y, node2.z, sourceLight, boundaryQueue);
-			checkNeighborForRemoval(node2.chunk, node2.x, node2.y - 1, node2.z, sourceLight, boundaryQueue);
-			checkNeighborForRemoval(node2.chunk, node2.x, node2.y + 1, node2.z, sourceLight, boundaryQueue);
-			checkNeighborForRemoval(node2.chunk, node2.x, node2.y, node2.z - 1, sourceLight, boundaryQueue);
-			checkNeighborForRemoval(node2.chunk, node2.x, node2.y, node2.z + 1, sourceLight, boundaryQueue);
+			checkNeighborForRemoval(node2.chunk, node2.x - 1, node2.y, node2.z, sourceIntensity, boundaryQueue);
+			checkNeighborForRemoval(node2.chunk, node2.x + 1, node2.y, node2.z, sourceIntensity, boundaryQueue);
+			checkNeighborForRemoval(node2.chunk, node2.x, node2.y - 1, node2.z, sourceIntensity, boundaryQueue);
+			checkNeighborForRemoval(node2.chunk, node2.x, node2.y + 1, node2.z, sourceIntensity, boundaryQueue);
+			checkNeighborForRemoval(node2.chunk, node2.x, node2.y, node2.z - 1, sourceIntensity, boundaryQueue);
+			checkNeighborForRemoval(node2.chunk, node2.x, node2.y, node2.z + 1, sourceIntensity, boundaryQueue);
 		}
 		
 		// Re-propagate light from boundary nodes
 		addQueue.clear();
 		LightNode node3;
 		while ((node3 = boundaryQueue.poll()) != null) {
-			// Get current RGB values (should match what's in the node since we just read them)
+			// Get current RGBI values (should match what's in the node since we just read them)
 			int r = node3.chunk.getBlockLightR(node3.x, node3.y, node3.z);
 			int g = node3.chunk.getBlockLightG(node3.x, node3.y, node3.z);
 			int b = node3.chunk.getBlockLightB(node3.x, node3.y, node3.z);
+			int i = node3.chunk.getBlockLightI(node3.x, node3.y, node3.z);
 			
 			// Only re-propagate if there's still light here
-			if (r > 0 || g > 0 || b > 0) {
-				addQueue.offer(new LightNode(node3.chunk, node3.x, node3.y, node3.z, r, g, b));
+			if (i > 0) {
+				addQueue.offer(new LightNode(node3.chunk, node3.x, node3.y, node3.z, r, g, b, i));
 			}
 		}
 		
 		// BFS re-propagation from boundary
 		LightNode node4;
 		while ((node4 = addQueue.poll()) != null) {
-			// Get current RGB values from the node
+			// Get current RGBI values from the node
 			int currentR = node4.r;
 			int currentG = node4.g;
 			int currentB = node4.b;
+			int currentI = node4.i;
 			
-			// Only propagate if at least one channel is strong enough
-			if (currentR <= 1 && currentG <= 1 && currentB <= 1) {
+			// Only propagate if intensity is strong enough
+			if (currentI <= 1) {
 				continue;
 			}
 			
-			// Attenuation (reduce each channel by 1, min 0)
-			int newR = Math.max(0, currentR - 1);
-			int newG = Math.max(0, currentG - 1);
-			int newB = Math.max(0, currentB - 1);
+			// Attenuation (reduce intensity by 1, keep color constant)
+			int newI = currentI - 1;
 			
-			// Use the RGB propagation method
-			propagateRGBToNeighbor(node4.chunk, node4.x - 1, node4.y, node4.z, newR, newG, newB);
-			propagateRGBToNeighbor(node4.chunk, node4.x + 1, node4.y, node4.z, newR, newG, newB);
-			propagateRGBToNeighbor(node4.chunk, node4.x, node4.y - 1, node4.z, newR, newG, newB);
-			propagateRGBToNeighbor(node4.chunk, node4.x, node4.y + 1, node4.z, newR, newG, newB);
-			propagateRGBToNeighbor(node4.chunk, node4.x, node4.y, node4.z - 1, newR, newG, newB);
-			propagateRGBToNeighbor(node4.chunk, node4.x, node4.y, node4.z + 1, newR, newG, newB);
+			// Use the RGBI propagation method
+			propagateRGBIToNeighbor(node4.chunk, node4.x - 1, node4.y, node4.z, currentR, currentG, currentB, newI);
+			propagateRGBIToNeighbor(node4.chunk, node4.x + 1, node4.y, node4.z, currentR, currentG, currentB, newI);
+			propagateRGBIToNeighbor(node4.chunk, node4.x, node4.y - 1, node4.z, currentR, currentG, currentB, newI);
+			propagateRGBIToNeighbor(node4.chunk, node4.x, node4.y + 1, node4.z, currentR, currentG, currentB, newI);
+			propagateRGBIToNeighbor(node4.chunk, node4.x, node4.y, node4.z - 1, currentR, currentG, currentB, newI);
+			propagateRGBIToNeighbor(node4.chunk, node4.x, node4.y, node4.z + 1, currentR, currentG, currentB, newI);
 		}
 	}
 	
 	/**
 	 * Check a neighbor for removal during light removal BFS.
-	 * Now properly supports cross-chunk boundaries.
+	 * Now properly supports cross-chunk boundaries and RGBI.
 	 */
 	private void checkNeighborForRemoval(LevelChunk chunk, int x, int y, int z, 
-	                                      int sourceLight, Queue<LightNode> boundaryQueue) {
+	                                      int sourceIntensity, Queue<LightNode> boundaryQueue) {
 		LevelChunk targetChunk = chunk;
 		int targetX = x;
 		int targetZ = z;
@@ -307,23 +320,21 @@ public class LightPropagator {
 			return;
 		}
 		
-		// Read actual RGB values from neighbor
+		// Read actual RGBI values from neighbor
 		int neighborR = targetChunk.getBlockLightR(targetX, y, targetZ);
 		int neighborG = targetChunk.getBlockLightG(targetX, y, targetZ);
 		int neighborB = targetChunk.getBlockLightB(targetX, y, targetZ);
+		int neighborI = targetChunk.getBlockLightI(targetX, y, targetZ);
 		
-		// Calculate max for comparison
-		int neighborLight = Math.max(neighborR, Math.max(neighborG, neighborB));
-		
-		if (neighborLight == 0) {
+		if (neighborI == 0) {
 			return; // Already dark
 		}
 		
-		// Check if this light came from the removed source
-		if (neighborLight < sourceLight) {
+		// Check if this light came from the removed source (compare intensity)
+		if (neighborI < sourceIntensity) {
 			// This light was definitely from the removed source - remove it
-			targetChunk.setBlockLightRGB(targetX, y, targetZ, 0, 0, 0);
-			removeQueue.offer(new LightNode(targetChunk, targetX, y, targetZ, neighborR, neighborG, neighborB));
+			targetChunk.setBlockLightRGBI(targetX, y, targetZ, 0, 0, 0, 0);
+			removeQueue.offer(new LightNode(targetChunk, targetX, y, targetZ, neighborR, neighborG, neighborB, neighborI));
 		} else {
 			// This light might be from another source
 			// Check if the block itself is emissive (it's an actual light source)
@@ -331,24 +342,25 @@ public class LightPropagator {
 			int blockEmissionR = block.getLightEmissionR();
 			int blockEmissionG = block.getLightEmissionG();
 			int blockEmissionB = block.getLightEmissionB();
+			int blockEmissionI = Math.max(blockEmissionR, Math.max(blockEmissionG, blockEmissionB));
 			
 			// If this block is a light source, definitely keep it for re-propagation
-			if (blockEmissionR > 0 || blockEmissionG > 0 || blockEmissionB > 0) {
-				boundaryQueue.offer(new LightNode(targetChunk, targetX, y, targetZ, neighborR, neighborG, neighborB));
+			if (blockEmissionI > 0) {
+				boundaryQueue.offer(new LightNode(targetChunk, targetX, y, targetZ, neighborR, neighborG, neighborB, neighborI));
 			} else {
-				// Not a light source, but has light >= sourceLight
+				// Not a light source, but has light >= sourceIntensity
 				// This could be from another nearby source, or it could be stale
 				// The safest approach is to remove it and let re-propagation restore it if needed
 				// However, we only remove if equal - if higher, it's definitely from another source
-				if (neighborLight == sourceLight) {
-					// Equal light level - could be from this source or another
+				if (neighborI == sourceIntensity) {
+					// Equal intensity - could be from this source or another
 					// Remove it and let re-propagation decide
-					targetChunk.setBlockLightRGB(targetX, y, targetZ, 0, 0, 0);
-					removeQueue.offer(new LightNode(targetChunk, targetX, y, targetZ, neighborR, neighborG, neighborB));
+					targetChunk.setBlockLightRGBI(targetX, y, targetZ, 0, 0, 0, 0);
+					removeQueue.offer(new LightNode(targetChunk, targetX, y, targetZ, neighborR, neighborG, neighborB, neighborI));
 				} else {
-					// neighborLight > sourceLight - definitely from a stronger source
+					// neighborI > sourceIntensity - definitely from a stronger source
 					// Keep for re-propagation
-					boundaryQueue.offer(new LightNode(targetChunk, targetX, y, targetZ, neighborR, neighborG, neighborB));
+					boundaryQueue.offer(new LightNode(targetChunk, targetX, y, targetZ, neighborR, neighborG, neighborB, neighborI));
 				}
 			}
 		}
@@ -455,6 +467,7 @@ public class LightPropagator {
 	
 	/**
 	 * Propagate light from a neighbor position to the target position.
+	 * Uses RGBI format: color stays constant, intensity decrements.
 	 * @param chunk The chunk
 	 * @param fromX Source X coordinate
 	 * @param fromY Source Y coordinate
@@ -477,34 +490,26 @@ public class LightPropagator {
 		int sourceR = chunk.getBlockLightR(fromX, fromY, fromZ);
 		int sourceG = chunk.getBlockLightG(fromX, fromY, fromZ);
 		int sourceB = chunk.getBlockLightB(fromX, fromY, fromZ);
+		int sourceI = chunk.getBlockLightI(fromX, fromY, fromZ);
 		
 		// If source has no light, nothing to propagate
-		if (sourceR <= 0 && sourceG <= 0 && sourceB <= 0) {
+		if (sourceI <= 0) {
 			return;
 		}
 		
-		// Attenuate light (reduce by 1 per block)
-		int newR = Math.max(0, sourceR - 1);
-		int newG = Math.max(0, sourceG - 1);
-		int newB = Math.max(0, sourceB - 1);
+		// Attenuate intensity (reduce by 1 per block), keep color constant
+		int newI = sourceI - 1;
 		
 		// Get current light at target
-		int currentR = chunk.getBlockLightR(toX, toY, toZ);
-		int currentG = chunk.getBlockLightG(toX, toY, toZ);
-		int currentB = chunk.getBlockLightB(toX, toY, toZ);
+		int currentI = chunk.getBlockLightI(toX, toY, toZ);
 		
-		// Only propagate if new light is brighter in at least one channel
-		if (newR > currentR || newG > currentG || newB > currentB) {
-			// Take maximum of each channel
-			int finalR = Math.max(newR, currentR);
-			int finalG = Math.max(newG, currentG);
-			int finalB = Math.max(newB, currentB);
-			
-			// Set the new light value
-			chunk.setBlockLightRGB(toX, toY, toZ, finalR, finalG, finalB);
+		// Only propagate if new intensity is brighter
+		if (newI > currentI) {
+			// Set the new light value with same color but reduced intensity
+			chunk.setBlockLightRGBI(toX, toY, toZ, sourceR, sourceG, sourceB, newI);
 			
 			// Use the existing propagation queue to continue spreading this light
-			addQueue.offer(new LightNode(chunk, toX, toY, toZ, finalR, finalG, finalB));
+			addQueue.offer(new LightNode(chunk, toX, toY, toZ, sourceR, sourceG, sourceB, newI));
 		}
 	}
 	
@@ -518,24 +523,23 @@ public class LightPropagator {
 			int currentR = node.r;
 			int currentG = node.g;
 			int currentB = node.b;
+			int currentI = node.i;
 			
-			// Only propagate if at least one channel is strong enough
-			if (currentR <= 1 && currentG <= 1 && currentB <= 1) {
+			// Only propagate if intensity is strong enough
+			if (currentI <= 1) {
 				continue; // Light too weak to propagate
 			}
 			
-			// Attenuation (reduce each channel by 1, min 0)
-			int newR = Math.max(0, currentR - 1);
-			int newG = Math.max(0, currentG - 1);
-			int newB = Math.max(0, currentB - 1);
+			// Attenuation (reduce intensity by 1, keep color constant)
+			int newI = currentI - 1;
 			
 			// Propagate to all 6 neighbors
-			propagateRGBToNeighbor(node.chunk, node.x - 1, node.y, node.z, newR, newG, newB);
-			propagateRGBToNeighbor(node.chunk, node.x + 1, node.y, node.z, newR, newG, newB);
-			propagateRGBToNeighbor(node.chunk, node.x, node.y - 1, node.z, newR, newG, newB);
-			propagateRGBToNeighbor(node.chunk, node.x, node.y + 1, node.z, newR, newG, newB);
-			propagateRGBToNeighbor(node.chunk, node.x, node.y, node.z - 1, newR, newG, newB);
-			propagateRGBToNeighbor(node.chunk, node.x, node.y, node.z + 1, newR, newG, newB);
+			propagateRGBIToNeighbor(node.chunk, node.x - 1, node.y, node.z, currentR, currentG, currentB, newI);
+			propagateRGBIToNeighbor(node.chunk, node.x + 1, node.y, node.z, currentR, currentG, currentB, newI);
+			propagateRGBIToNeighbor(node.chunk, node.x, node.y - 1, node.z, currentR, currentG, currentB, newI);
+			propagateRGBIToNeighbor(node.chunk, node.x, node.y + 1, node.z, currentR, currentG, currentB, newI);
+			propagateRGBIToNeighbor(node.chunk, node.x, node.y, node.z - 1, currentR, currentG, currentB, newI);
+			propagateRGBIToNeighbor(node.chunk, node.x, node.y, node.z + 1, currentR, currentG, currentB, newI);
 		}
 	}
 }
