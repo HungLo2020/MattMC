@@ -3,6 +3,7 @@ package mattmc.world.level.chunk;
 import mattmc.client.renderer.chunk.ChunkMeshData;
 import mattmc.client.renderer.chunk.ChunkMeshBuffer;
 import mattmc.client.renderer.chunk.MeshBuilder;
+import mattmc.client.renderer.chunk.VertexLightSampler;
 import mattmc.client.renderer.texture.TextureAtlas;
 import mattmc.client.renderer.block.BlockFaceCollector;
 import mattmc.world.level.block.Block;
@@ -408,7 +409,7 @@ public class AsyncChunkLoader {
         
         // Set light accessor for cross-chunk light sampling if available
         if (lightAccessor != null) {
-            meshBuilder.setLightAccessor(new MeshBuilder.ChunkLightAccessor() {
+            meshBuilder.setLightAccessor(new VertexLightSampler.ChunkLightAccessor() {
                 @Override
                 public int getSkyLightAcrossChunks(LevelChunk chunk, int x, int y, int z) {
                     return lightAccessor.getSkyLight(chunk, x, y, z);

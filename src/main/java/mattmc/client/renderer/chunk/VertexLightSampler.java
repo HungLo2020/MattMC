@@ -253,7 +253,7 @@ public class VertexLightSampler {
             return 0; // Out of chunk bounds without accessor: no blocklight
         }
         
-        return chunk.getBlockLight(x, y, z);
+        return chunk.getBlockLightI(x, y, z);
     }
     
     /**

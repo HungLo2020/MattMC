@@ -313,7 +313,7 @@ public class WorldBlockAccess {
         
         // If within chunk bounds, use direct chunk access
         if (localX >= 0 && localX < LevelChunk.WIDTH && localZ >= 0 && localZ < LevelChunk.DEPTH) {
-            return chunk.getBlockLight(localX, localY, localZ);
+            return chunk.getBlockLightI(localX, localY, localZ);
         }
         
         // Calculate which neighboring chunk to query
@@ -347,7 +347,7 @@ public class WorldBlockAccess {
             return 0;
         }
         
-        return neighborChunk.getBlockLight(targetLocalX, localY, targetLocalZ);
+        return neighborChunk.getBlockLightI(targetLocalX, localY, targetLocalZ);
     }
     
     /**

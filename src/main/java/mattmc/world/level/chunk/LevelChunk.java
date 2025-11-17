@@ -143,7 +143,9 @@ public final class LevelChunk {
         
         // Update block light if emission or opacity changed
         if (!suppressLightUpdates && worldLightManager != null &&
-            (oldBlock.getLightEmission() != block.getLightEmission() || 
+            (oldBlock.getLightEmissionR() != block.getLightEmissionR() ||
+             oldBlock.getLightEmissionG() != block.getLightEmissionG() ||
+             oldBlock.getLightEmissionB() != block.getLightEmissionB() ||
              oldBlock.getOpacity() != block.getOpacity())) {
             worldLightManager.updateBlockLight(this, x, y, z, block, oldBlock);
             

@@ -50,7 +50,7 @@ public class MeshBuilder {
     /**
      * Set the light accessor for cross-chunk light sampling.
      */
-    public void setLightAccessor(ChunkLightAccessor accessor) {
+    public void setLightAccessor(VertexLightSampler.ChunkLightAccessor accessor) {
         this.lightSampler.setLightAccessor(accessor);
     }
     
