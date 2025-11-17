@@ -25,6 +25,11 @@ public class CrossChunkLightPropagator {
 		public final int lightLevel;
 		public final boolean isSkylight; // true = skylight, false = blocklight
 		
+		// RGBI values for colored block light (only used when isSkylight = false)
+		public final int r, g, b, i;
+		public final boolean isRGBI; // true = use RGBI values, false = use legacy lightLevel
+		
+		// Legacy constructor for non-RGBI updates (skylight or legacy blocklight)
 		public CrossChunkUpdate(int chunkX, int chunkZ, int localX, int localY, int localZ, 
 		                        int lightLevel, boolean isSkylight) {
 			this.chunkX = chunkX;
@@ -34,6 +39,28 @@ public class CrossChunkLightPropagator {
 			this.localZ = localZ;
 			this.lightLevel = lightLevel;
 			this.isSkylight = isSkylight;
+			this.r = 0;
+			this.g = 0;
+			this.b = 0;
+			this.i = 0;
+			this.isRGBI = false;
+		}
+		
+		// RGBI constructor for colored block light
+		public CrossChunkUpdate(int chunkX, int chunkZ, int localX, int localY, int localZ, 
+		                        int r, int g, int b, int i) {
+			this.chunkX = chunkX;
+			this.chunkZ = chunkZ;
+			this.localX = localX;
+			this.localY = localY;
+			this.localZ = localZ;
+			this.lightLevel = 0; // Not used for RGBI
+			this.isSkylight = false; // RGBI is only for block light
+			this.r = r;
+			this.g = g;
+			this.b = b;
+			this.i = i;
+			this.isRGBI = true;
 		}
 	}
 	
@@ -215,8 +242,8 @@ public class CrossChunkLightPropagator {
 			
 			targetChunk = neighborAccessor.getChunkIfLoaded(targetChunkX, targetChunkZ);
 			if (targetChunk == null) {
-				// Chunk not loaded - defer the update
-				// TODO: Store RGBI values in deferred updates (for now, just skip)
+				// Chunk not loaded - defer the RGBI update
+				deferRGBIUpdate(targetChunkX, targetChunkZ, targetLocalX, y, targetLocalZ, r, g, b, intensity);
 				return;
 			}
 		} else {
@@ -429,6 +456,30 @@ public class CrossChunkLightPropagator {
 	}
 	
 	/**
+	 * Propagate RGBI block light within a single chunk.
+	 * Color (RGB) remains constant; only intensity decrements with distance.
+	 */
+	private void propagateWithinChunkRGBI(LevelChunk chunk, int x, int y, int z, 
+	                                      int r, int g, int b, int intensity) {
+		// Check if block is opaque (blocks light)
+		Block block = chunk.getBlock(x, y, z);
+		if (block.getOpacity() >= 15) {
+			return; // Fully opaque block stops light
+		}
+		
+		// Get current light intensity at position
+		int currentI = chunk.getBlockLightI(x, y, z);
+		
+		// Only update if new intensity is brighter
+		if (intensity > currentI) {
+			chunk.setBlockLightRGBI(x, y, z, r, g, b, intensity);
+			
+			// Continue propagation from this position with the same color but reduced intensity
+			propagateBlockLightRGBICross(chunk, x, y, z, r, g, b, intensity);
+		}
+	}
+	
+	/**
 	 * Defer an update for a chunk that isn't loaded yet.
 	 */
 	private void deferUpdate(int chunkX, int chunkZ, int localX, int localY, int localZ, 
@@ -436,6 +487,17 @@ public class CrossChunkLightPropagator {
 		long chunkKey = chunkKey(chunkX, chunkZ);
 		CrossChunkUpdate update = new CrossChunkUpdate(chunkX, chunkZ, localX, localY, localZ, 
 		                                               lightLevel, isSkylight);
+		
+		deferredUpdates.computeIfAbsent(chunkKey, k -> new ArrayList<>()).add(update);
+	}
+	
+	/**
+	 * Defer an RGBI update for a chunk that isn't loaded yet.
+	 */
+	private void deferRGBIUpdate(int chunkX, int chunkZ, int localX, int localY, int localZ, 
+	                             int r, int g, int b, int i) {
+		long chunkKey = chunkKey(chunkX, chunkZ);
+		CrossChunkUpdate update = new CrossChunkUpdate(chunkX, chunkZ, localX, localY, localZ, r, g, b, i);
 		
 		deferredUpdates.computeIfAbsent(chunkKey, k -> new ArrayList<>()).add(update);
 	}
@@ -456,8 +518,15 @@ public class CrossChunkLightPropagator {
 		
 		// Apply all deferred updates
 		for (CrossChunkUpdate update : updates) {
-			propagateWithinChunk(chunk, update.localX, update.localY, update.localZ, 
-			                    update.lightLevel, update.isSkylight);
+			if (update.isRGBI) {
+				// RGBI update - propagate with color
+				propagateWithinChunkRGBI(chunk, update.localX, update.localY, update.localZ, 
+				                        update.r, update.g, update.b, update.i);
+			} else {
+				// Legacy update (skylight or non-RGBI blocklight)
+				propagateWithinChunk(chunk, update.localX, update.localY, update.localZ, 
+				                    update.lightLevel, update.isSkylight);
+			}
 		}
 	}
 	
