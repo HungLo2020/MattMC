@@ -130,6 +130,12 @@ public abstract class AbstractMenuScreen implements Screen {
         drawText(text, x, y, scale, rgb);
     }
     
+    protected void drawTextRight(String text, float rx, float y, float scale, int rgb) {
+        float tw = TextRenderer.getTextWidth(text, scale);
+        float x = rx - tw;
+        drawText(text, x, y, scale, rgb);
+    }
+    
     protected void drawText(String text, float x, float y, float scale, int rgb) {
         setColor(rgb, 1f);
         TextRenderer.drawText(text, x, y, scale);

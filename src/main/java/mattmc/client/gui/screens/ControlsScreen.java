@@ -4,37 +4,25 @@ import mattmc.client.settings.OptionsManager;
 import mattmc.world.level.block.Block;
 
 import mattmc.client.Minecraft;
-import mattmc.client.Window;
 import mattmc.world.entity.player.PlayerInput;
 import mattmc.client.gui.components.Button;
 import mattmc.client.gui.components.ButtonRenderer;
-import mattmc.client.gui.components.TextRenderer;
 import mattmc.client.settings.KeybindManager;
-import org.lwjgl.system.MemoryStack;
 
-import java.nio.IntBuffer;
 import java.util.ArrayList;
 import java.util.List;
 
 import static org.lwjgl.glfw.GLFW.*;
 import static org.lwjgl.opengl.GL11.*;
-import static org.lwjgl.system.MemoryStack.stackPush;
 
 /** Keybinds configuration screen. */
-public final class ControlsScreen implements Screen {
-    private final Minecraft game;
-    private final Window window;
+public final class ControlsScreen extends AbstractMenuScreen {
     private final List<KeybindButton> keybindButtons = new ArrayList<>();
     private final Button backButton;
-    private double mouseXWin, mouseYWin;
-    private boolean mouseDown;
     
     private String waitingForKey = null; // Action name we're waiting to rebind
     private boolean ignoreNextRelease = false; // Flag to ignore the mouse release from the initial click
     
-    private float titleScale = 2.0f;
-    private float titleCX, titleCY;
-    private int buttonWidth = 400, buttonHeight = 36, buttonGap = 8;
     private int keybindsStartY;
     private int backButtonY;
     
@@ -44,6 +32,18 @@ public final class ControlsScreen implements Screen {
     private static final int SCROLL_BUFFER = 50; // Buffer room above/below keybinds
     private static final int SCROLL_SPEED = 20; // Pixels to scroll per mouse wheel notch
     
+    public ControlsScreen(Minecraft game) {
+        super(game);
+        // Customize layout properties for this screen
+        titleScale = 2.0f;
+        buttonWidth = 400;
+        buttonHeight = 36;
+        buttonGap = 8;
+        
+        backButton = new Button("Back", 0, 0, 200, 40);
+        recomputeLayout();
+    }
+
     // Keybind actions with display names
     private static final String[][] KEYBIND_ACTIONS = {
         {PlayerInput.FORWARD, "Move Forward"},
@@ -69,14 +69,8 @@ public final class ControlsScreen implements Screen {
         {PlayerInput.HOTBAR_9, "Hotbar Slot 9"}
     };
 
-    public ControlsScreen(Minecraft game) {
-        this.game = game;
-        this.window = game.window();
-        backButton = new Button("Back", 0, 0, 200, 40);
-        recomputeLayout();
-    }
-
-    private void recomputeLayout() {
+    @Override
+    protected void recomputeLayout() {
         int w = window.width(), h = window.height();
         titleCX = w / 2f;
         titleCY = h * 0.12f;
@@ -105,20 +99,27 @@ public final class ControlsScreen implements Screen {
     }
 
     @Override
+    protected void onClick(String label) {
+        // Not used - custom click handling in tick()
+    }
+
+    @Override
     public void tick() {
-        // Panorama rotation is now updated during rendering to prevent jitter
-        
+        // Custom tick for ControlsScreen with scroll handling
         // Convert window coords -> framebuffer coords
         float mxFB, myFB;
-        try (MemoryStack stack = stackPush()) {
-            IntBuffer winW = stack.mallocInt(1), winH = stack.mallocInt(1);
-            IntBuffer fbW  = stack.mallocInt(1), fbH  = stack.mallocInt(1);
+        org.lwjgl.system.MemoryStack stack = org.lwjgl.system.MemoryStack.stackPush();
+        try {
+            java.nio.IntBuffer winW = stack.mallocInt(1), winH = stack.mallocInt(1);
+            java.nio.IntBuffer fbW  = stack.mallocInt(1),  fbH  = stack.mallocInt(1);
             glfwGetWindowSize(window.handle(), winW, winH);
             glfwGetFramebufferSize(window.handle(), fbW, fbH);
             float sx = fbW.get(0) / Math.max(1f, winW.get(0));
             float sy = fbH.get(0) / Math.max(1f, winH.get(0));
             mxFB = (float) mouseXWin * sx;
             myFB = (float) mouseYWin * sy;
+        } finally {
+            stack.close();
         }
 
         for (var kb : keybindButtons) {
@@ -196,51 +197,6 @@ public final class ControlsScreen implements Screen {
         drawTextRight(keyName, b.x + b.w - 10, b.y + b.h / 2f - 6f, 1.0f, 0xFFFFFF);
     }
 
-    private void setupOrtho() {
-        int w = window.width(), h = window.height();
-        glMatrixMode(GL_PROJECTION);
-        glLoadIdentity();
-        glOrtho(0, w, h, 0, -1, 1);
-        glMatrixMode(GL_MODELVIEW);
-        glLoadIdentity();
-    }
-
-
-
-    private void setColor(int rgb, float a) {
-        float r = ((rgb >> 16) & 0xFF) / 255f;
-        float g = ((rgb >> 8) & 0xFF) / 255f;
-        float b = (rgb & 0xFF) / 255f;
-        glColor4f(r, g, b, a);
-    }
-
-    private void drawTitle(String text, float cx, float cy, float scale, int rgb) {
-        float tw = TextRenderer.getTextWidth(text, scale);
-        float th = TextRenderer.getTextHeight(text, scale);
-        float x = cx - tw / 2f;
-        float y = cy - th / 2f;
-        drawText(text, x, y, scale, rgb);
-    }
-
-    private void drawTextCentered(String text, float cx, float cy, float scale, int rgb) {
-        float tw = TextRenderer.getTextWidth(text, scale);
-        float th = TextRenderer.getTextHeight(text, scale);
-        float x = cx - tw / 2f;
-        float y = cy - th / 2f;
-        drawText(text, x, y, scale, rgb);
-    }
-    
-    private void drawTextRight(String text, float rx, float y, float scale, int rgb) {
-        float tw = TextRenderer.getTextWidth(text, scale);
-        float x = rx - tw;
-        drawText(text, x, y, scale, rgb);
-    }
-
-    private void drawText(String text, float x, float y, float scale, int rgb) {
-        setColor(rgb, 1f);
-        TextRenderer.drawText(text, x, y, scale);
-    }
-
     @Override
     public void onOpen() {
         // Set up callbacks when screen opens
@@ -297,11 +253,6 @@ public final class ControlsScreen implements Screen {
             int scrollAmount = (int)(-yOffset * SCROLL_SPEED);
             scrollOffset = Math.max(0, Math.min(maxScrollOffset, scrollOffset + scrollAmount));
         });
-    }
-    
-    @Override
-    public void onClose() {
-        // Panorama is now shared and managed by Minecraft
     }
     
     /** Helper class to store keybind button data. */
