@@ -1,7 +1,7 @@
 package mattmc.world.level.lighting;
 
 import mattmc.client.renderer.block.BlockFaceCollector;
-import mattmc.client.renderer.chunk.MeshBuilder;
+import mattmc.client.renderer.chunk.VertexLightSampler;
 import mattmc.world.level.Level;
 import mattmc.world.level.block.Blocks;
 import mattmc.world.level.chunk.LevelChunk;
@@ -55,11 +55,11 @@ public class InteriorCornerLightingTest {
 			8, y, 8 // chunk-local coordinates
 		);
 		
-		// Create a MeshBuilder to test vertex light sampling
-		MeshBuilder meshBuilder = new MeshBuilder(null);
+		// Create a VertexLightSampler to test vertex light sampling
+		VertexLightSampler lightSampler = new VertexLightSampler();
 		
 		// Set up a simple light accessor that just uses the chunk
-		meshBuilder.setLightAccessor(new MeshBuilder.ChunkLightAccessor() {
+		lightSampler.setLightAccessor(new VertexLightSampler.ChunkLightAccessor() {
 			@Override
 			public int getSkyLightAcrossChunks(LevelChunk chunk, int x, int y, int z) {
 				if (x >= 0 && x < LevelChunk.WIDTH && z >= 0 && z < LevelChunk.DEPTH) {
@@ -77,19 +77,11 @@ public class InteriorCornerLightingTest {
 			}
 		});
 		
-		// Sample light at the corner vertex using reflection to access the private method
+		// Sample light at the corner vertex using the public API
 		// We're testing that the corner is not too dark
 		try {
-			java.lang.reflect.Method sampleMethod = MeshBuilder.class.getDeclaredMethod(
-				"sampleVertexLight", 
-				BlockFaceCollector.FaceData.class, 
-				int.class, 
-				int.class
-			);
-			sampleMethod.setAccessible(true);
-			
 			// Sample the corner vertex (normalIndex=0 for top face, cornerIndex=0 for first corner)
-			float[] lightData = (float[]) sampleMethod.invoke(meshBuilder, cornerFace, 0, 0);
+			float[] lightData = lightSampler.sampleVertexLight(cornerFace, 0, 0);
 			
 			// lightData = [skyLight, blockLightR, blockLightG, blockLightB, ao]
 			float skyLight = lightData[0];
@@ -147,8 +139,8 @@ public class InteriorCornerLightingTest {
 			8, 64, 8, 0xFFFFFF, 1.0f, 1.0f, Blocks.STONE, "top", null, null, chunk, 8, y, 8
 		);
 		
-		MeshBuilder meshBuilder = new MeshBuilder(null);
-		meshBuilder.setLightAccessor(new MeshBuilder.ChunkLightAccessor() {
+		VertexLightSampler lightSampler = new VertexLightSampler();
+		lightSampler.setLightAccessor(new VertexLightSampler.ChunkLightAccessor() {
 			@Override
 			public int getSkyLightAcrossChunks(LevelChunk chunk, int x, int y, int z) {
 				if (x >= 0 && x < LevelChunk.WIDTH && z >= 0 && z < LevelChunk.DEPTH) {
@@ -167,16 +159,8 @@ public class InteriorCornerLightingTest {
 		});
 		
 		try {
-			java.lang.reflect.Method sampleMethod = MeshBuilder.class.getDeclaredMethod(
-				"sampleVertexLight", 
-				BlockFaceCollector.FaceData.class, 
-				int.class, 
-				int.class
-			);
-			sampleMethod.setAccessible(true);
-			
 			// Sample corner 0 of the top face
-			float[] lightData = (float[]) sampleMethod.invoke(meshBuilder, testFace, 0, 0);
+			float[] lightData = lightSampler.sampleVertexLight(testFace, 0, 0);
 			float skyLight = lightData[0];
 			
 			// With the fix, skylight should be averaged from non-zero samples only
@@ -225,8 +209,8 @@ public class InteriorCornerLightingTest {
 			8, 65, 8, 0xFFFFFF, 1.0f, 0.5f, Blocks.STONE, "bottom", null, null, chunk, 8, y, 8
 		);
 		
-		MeshBuilder meshBuilder = new MeshBuilder(null);
-		meshBuilder.setLightAccessor(new MeshBuilder.ChunkLightAccessor() {
+		VertexLightSampler lightSampler = new VertexLightSampler();
+		lightSampler.setLightAccessor(new VertexLightSampler.ChunkLightAccessor() {
 			@Override
 			public int getSkyLightAcrossChunks(LevelChunk chunk, int x, int y, int z) {
 				if (x >= 0 && x < LevelChunk.WIDTH && z >= 0 && z < LevelChunk.DEPTH && 
@@ -247,16 +231,8 @@ public class InteriorCornerLightingTest {
 		});
 		
 		try {
-			java.lang.reflect.Method sampleMethod = MeshBuilder.class.getDeclaredMethod(
-				"sampleVertexLight", 
-				BlockFaceCollector.FaceData.class, 
-				int.class, 
-				int.class
-			);
-			sampleMethod.setAccessible(true);
-			
 			// Sample the bottom face (normalIndex=1 for bottom, cornerIndex=0 for first corner)
-			float[] lightData = (float[]) sampleMethod.invoke(meshBuilder, ceilingFace, 1, 0);
+			float[] lightData = lightSampler.sampleVertexLight(ceilingFace, 1, 0);
 			float skyLight = lightData[0];
 			
 			// With the fix, the ceiling should have skylight because it samples from Y-1 (the air below)
