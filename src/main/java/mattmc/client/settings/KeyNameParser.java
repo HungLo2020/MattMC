@@ -63,6 +63,24 @@ public final class KeyNameParser {
             return GLFW_KEY_A + (keyName.charAt(0) - 'a');
         }
         
+        // Punctuation and special characters (single character)
+        if (keyName.length() == 1) {
+            char c = keyName.charAt(0);
+            switch (c) {
+                case '/': return GLFW_KEY_SLASH;
+                case '\\': return GLFW_KEY_BACKSLASH;
+                case ',': return GLFW_KEY_COMMA;
+                case '.': return GLFW_KEY_PERIOD;
+                case ';': return GLFW_KEY_SEMICOLON;
+                case '\'': return GLFW_KEY_APOSTROPHE;
+                case '[': return GLFW_KEY_LEFT_BRACKET;
+                case ']': return GLFW_KEY_RIGHT_BRACKET;
+                case '-': return GLFW_KEY_MINUS;
+                case '=': return GLFW_KEY_EQUAL;
+                case '`': return GLFW_KEY_GRAVE_ACCENT;
+            }
+        }
+        
         return null;
     }
     
@@ -117,6 +135,19 @@ public final class KeyNameParser {
         if (keyCode >= GLFW_KEY_A && keyCode <= GLFW_KEY_Z) {
             return String.valueOf((char)('a' + (keyCode - GLFW_KEY_A)));
         }
+        
+        // Punctuation and special characters
+        if (keyCode == GLFW_KEY_SLASH) return "/";
+        if (keyCode == GLFW_KEY_BACKSLASH) return "\\";
+        if (keyCode == GLFW_KEY_COMMA) return ",";
+        if (keyCode == GLFW_KEY_PERIOD) return ".";
+        if (keyCode == GLFW_KEY_SEMICOLON) return ";";
+        if (keyCode == GLFW_KEY_APOSTROPHE) return "'";
+        if (keyCode == GLFW_KEY_LEFT_BRACKET) return "[";
+        if (keyCode == GLFW_KEY_RIGHT_BRACKET) return "]";
+        if (keyCode == GLFW_KEY_MINUS) return "-";
+        if (keyCode == GLFW_KEY_EQUAL) return "=";
+        if (keyCode == GLFW_KEY_GRAVE_ACCENT) return "`";
         
         // Fall back to numeric representation
         return String.valueOf(keyCode);

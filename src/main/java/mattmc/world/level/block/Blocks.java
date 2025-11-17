@@ -61,12 +61,16 @@ public class Blocks {
     public static final Block ACACIA_PLANKS = register("acacia_planks", new Block(true));
     public static final Block DARK_OAK_PLANKS = register("dark_oak_planks", new Block(true));
     public static final Block MANGROVE_PLANKS = register("mangrove_planks", new Block(true));
-    public static final Block CHERRY_PLANKS = register("cherry_planks", new Block(true));
-    public static final Block BAMBOO_PLANKS = register("bamboo_planks", new Block(true));
-    public static final Block CRIMSON_PLANKS = register("crimson_planks", new Block(true));
-    public static final Block WARPED_PLANKS = register("warped_planks", new Block(true));
+    public static final Block CHERRY_PLANKS = register("cherry_planks", new Block(true, 0, 0, 0, 0));
+    public static final Block BAMBOO_PLANKS = register("bamboo_planks", new Block(true, 0, 0, 0, 0));
+    public static final Block CRIMSON_PLANKS = register("crimson_planks", new Block(true, 0, 0, 0, 0));
+    public static final Block WARPED_PLANKS = register("warped_planks", new Block(true, 0, 0, 0, 0));
     public static final Block BIRCH_STAIRS = register("birch_stairs", new StairsBlock());
-    public static final Block TORCH = register("torch", new Block(false, 14)); // Emits light level 14
+    public static final Block TORCH = register("torch", new Block(false, 14, 14, 11, 0));
+    public static final Block PEARLESCENT_FROGLIGHT = register("pearlescent_froglight", new RotatedPillarBlock(false, 14, 14, 9, 12));
+    public static final Block VERDANT_FROGLIGHT = register("verdant_froglight", new RotatedPillarBlock(false, 14, 11, 13, 11));
+    public static final Block OCHRE_FROGLIGHT = register("ochre_froglight", new RotatedPillarBlock(false, 14, 14, 12, 7));
+    public static final Block SEA_LANTERN = register("sea_lantern", new Block(false, 14, 10, 14, 14));
     
     /**
      * Register a block with a given name (without namespace).
@@ -92,8 +96,16 @@ public class Blocks {
         Block registeredBlock;
         if (block instanceof StairsBlock) {
             registeredBlock = new StairsBlock(identifier);
+        } else if (block instanceof RotatedPillarBlock) {
+            registeredBlock = new RotatedPillarBlock(block.isSolid(), 
+                block.getLightEmission(),
+                block.getLightEmissionR(), block.getLightEmissionG(), block.getLightEmissionB(), 
+                identifier);
         } else {
-            registeredBlock = new Block(block.isSolid(), block.getLightEmission(), identifier);
+            registeredBlock = new Block(block.isSolid(), 
+                block.getLightEmission(),
+                block.getLightEmissionR(), block.getLightEmissionG(), block.getLightEmissionB(), 
+                identifier);
         }
         REGISTRY.put(identifier, registeredBlock);
         return registeredBlock;
@@ -124,8 +136,16 @@ public class Blocks {
         Block registeredBlock;
         if (block instanceof StairsBlock) {
             registeredBlock = new StairsBlock(identifier);
+        } else if (block instanceof RotatedPillarBlock) {
+            registeredBlock = new RotatedPillarBlock(block.isSolid(), 
+                block.getLightEmission(),
+                block.getLightEmissionR(), block.getLightEmissionG(), block.getLightEmissionB(), 
+                identifier);
         } else {
-            registeredBlock = new Block(block.isSolid(), block.getLightEmission(), identifier);
+            registeredBlock = new Block(block.isSolid(), 
+                block.getLightEmission(),
+                block.getLightEmissionR(), block.getLightEmissionG(), block.getLightEmissionB(), 
+                identifier);
         }
         REGISTRY.put(identifier, registeredBlock);
         return registeredBlock;

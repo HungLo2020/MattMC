@@ -91,6 +91,13 @@ public class DevplayInputHandler {
                 handleMouseInput(button, action);
             }
         });
+        
+        // Setup scroll callback for hotbar scrolling
+        glfwSetScrollCallback(window.handle(), (win, xOffset, yOffset) -> {
+            if (!uiState.isCommandOverlayVisible()) {
+                handleScroll(yOffset);
+            }
+        });
     }
     
     private void handleCommandOverlayInput(int key, int action) {
@@ -173,5 +180,31 @@ public class DevplayInputHandler {
                 blockInteraction.pickBlock();
             }
         }
+    }
+    
+    /**
+     * Handle mouse scroll for hotbar slot selection.
+     * Scroll up selects previous slot, scroll down selects next slot.
+     * 
+     * @param yOffset Scroll offset (positive = scroll up, negative = scroll down)
+     */
+    private void handleScroll(double yOffset) {
+        int currentSlot = player.getInventory().getSelectedSlot();
+        int newSlot;
+        
+        if (yOffset > 0) {
+            // Scroll up = select previous slot (with wrapping)
+            newSlot = (currentSlot - 1 + 9) % 9;
+        } else if (yOffset < 0) {
+            // Scroll down = select next slot (with wrapping)
+            newSlot = (currentSlot + 1) % 9;
+        } else {
+            // No scroll
+            return;
+        }
+        
+        // Sync both UIRenderer and player inventory
+        uiRenderer.setSelectedHotbarSlot(newSlot);
+        player.getInventory().setSelectedSlot(newSlot);
     }
 }

@@ -321,10 +321,16 @@ public class OptionsManager {
                 writer.write("# Keyboard keys: a-z, 0-9, space, left_shift, left_ctrl, left_alt, etc.\n");
                 writer.write("# Mouse buttons: left_mouse, right_mouse, middle_mouse\n");
                 
-                // Write all other options (keybinds)
+                // Write keybinds only (exclude all options that are handled above)
                 for (Map.Entry<String, String> entry : options.entrySet()) {
                     String key = entry.getKey();
-                    if (!key.equals("blur_title_screen") && !key.equals("blur_menu_screens")) {
+                    // Skip all known option keys - only write keybinds
+                    if (!key.equals("blur_title_screen") && !key.equals("blur_menu_screens") &&
+                        !key.equals("show_block_name") && !key.equals("fps_cap") &&
+                        !key.equals("resolution") && !key.equals("fullscreen") &&
+                        !key.equals("render_distance") && !key.equals("mipmaps") &&
+                        !key.equals("anisotropic_filtering") && !key.equals("smooth_lighting") &&
+                        !key.equals("shadows")) {
                         writer.write(key + "=" + entry.getValue() + "\n");
                     }
                 }

@@ -1,7 +1,7 @@
 {
   "variants": {
-    "": [
-      { "model": "block/jungle_planks" }
-    ]
+    "": {
+      "model": "mattmc:block/jungle_planks"
+    }
   }
 }

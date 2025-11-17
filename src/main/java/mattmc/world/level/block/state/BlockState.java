@@ -1,5 +1,6 @@
 package mattmc.world.level.block.state;
 
+import mattmc.world.level.block.state.properties.Axis;
 import mattmc.world.level.block.state.properties.Direction;
 import mattmc.world.level.block.state.properties.Half;
 
@@ -10,7 +11,7 @@ import java.util.Map;
  * Represents the state of a block with its properties.
  * Similar to Minecraft's BlockState class.
  * 
- * BlockStates store property values for blocks like stairs (facing, half, shape).
+ * BlockStates store property values for blocks like stairs (facing, half, shape) and pillars (axis).
  */
 public class BlockState {
     private final Map<String, Object> properties;
@@ -48,6 +49,14 @@ public class BlockState {
     public Half getHalf(String property) {
         Object value = properties.get(property);
         return value instanceof Half ? (Half) value : Half.BOTTOM;
+    }
+    
+    /**
+     * Get an Axis property.
+     */
+    public Axis getAxis(String property) {
+        Object value = properties.get(property);
+        return value instanceof Axis ? (Axis) value : Axis.Y;
     }
     
     /**
@@ -106,6 +115,13 @@ public class BlockState {
                 try {
                     Half half = Half.valueOf(str);
                     state.setValue(key, half);
+                    continue;
+                } catch (IllegalArgumentException ignored) {}
+                
+                // Try to parse as Axis
+                try {
+                    Axis axis = Axis.valueOf(str);
+                    state.setValue(key, axis);
                     continue;
                 } catch (IllegalArgumentException ignored) {}
                 

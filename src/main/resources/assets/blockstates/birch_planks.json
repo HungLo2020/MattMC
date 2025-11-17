@@ -1,7 +1,7 @@
 {
   "variants": {
-    "": [
-      { "model": "block/birch_planks" }
-    ]
+    "": {
+      "model": "mattmc:block/birch_planks"
+    }
   }
 }

@@ -377,6 +377,21 @@ public class AsyncChunkLoader {
         BlockFaceCollector collector = collectChunkFaces(chunk);
         MeshBuilder meshBuilder = new MeshBuilder(textureAtlas);
         
+        // Set light accessor for cross-chunk light sampling if available
+        if (lightAccessor != null) {
+            meshBuilder.setLightAccessor(new MeshBuilder.ChunkLightAccessor() {
+                @Override
+                public int getSkyLightAcrossChunks(LevelChunk chunk, int x, int y, int z) {
+                    return lightAccessor.getSkyLight(chunk, x, y, z);
+                }
+                
+                @Override
+                public int getBlockLightAcrossChunks(LevelChunk chunk, int x, int y, int z) {
+                    return lightAccessor.getBlockLight(chunk, x, y, z);
+                }
+            });
+        }
+        
         return meshBuilder.build(chunk.chunkX(), chunk.chunkZ(), collector);
     }
     

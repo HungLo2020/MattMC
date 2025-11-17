@@ -1,35 +1,38 @@
 package mattmc.world.level.chunk;
 
 /**
- * Stores light data for a 16x16x16 chunk section using nibble arrays.
- * Each light value is stored in 4 bits (0-15).
+ * Stores light data for a 16x16x16 chunk section using packed arrays.
+ * Light values use different bit depths for efficiency:
+ * - skyLight: 4 bits per value (0-15)
+ * - blockLight RGB: 5 bits per channel (0-31), packed into 2 bytes per position (15 bits total)
  * 
- * This class handles two types of lighting:
- * - skyLight: Light from the sky (0-15, where 15 is full daylight)
- * - blockLight: Light emitted by blocks (0-15, where 15 is brightest)
- * 
- * Storage format: 4096 values (16x16x16) packed into 2048 bytes per light type.
+ * Storage format: 
+ * - skyLight: 4096 values packed into 2048 bytes (nibble array)
+ * - blockLight: 4096 RGB values packed into 8192 bytes (2 bytes per position for RGB)
  */
 public class LightStorage {
 	private static final int SECTION_SIZE = 16;
 	private static final int TOTAL_BLOCKS = SECTION_SIZE * SECTION_SIZE * SECTION_SIZE; // 4096
-	private static final int ARRAY_SIZE = TOTAL_BLOCKS / 2; // 2048 bytes (2 values per byte)
+	private static final int SKYLIGHT_ARRAY_SIZE = TOTAL_BLOCKS / 2; // 2048 bytes (2 values per byte)
+	private static final int BLOCKLIGHT_ARRAY_SIZE = TOTAL_BLOCKS * 2; // 8192 bytes (2 bytes per RGB value)
 	
-	// Nibble arrays: 4 bits per value, packed into bytes
+	// Nibble array for skylight: 4 bits per value, packed into bytes
 	private final byte[] skyLight;
+	// Packed RGB array for block light: 5 bits per channel (R=5, G=5, B=5 = 15 bits), stored in 2 bytes
+	// Format per 2 bytes: RRRRRGGG GGBBBBB (5R, 5G, 5B)
 	private final byte[] blockLight;
 	
 	/**
 	 * Create a new light storage with default values.
 	 * SkyLight defaults to 15 (full brightness).
-	 * BlockLight defaults to 0 (no light).
+	 * BlockLight RGBI defaults to 0 (no light).
 	 */
 	public LightStorage() {
-		this.skyLight = new byte[ARRAY_SIZE];
-		this.blockLight = new byte[ARRAY_SIZE];
+		this.skyLight = new byte[SKYLIGHT_ARRAY_SIZE];
+		this.blockLight = new byte[BLOCKLIGHT_ARRAY_SIZE];
 		
 		// Initialize skylight to 15 (full brightness)
-		for (int i = 0; i < ARRAY_SIZE; i++) {
+		for (int i = 0; i < SKYLIGHT_ARRAY_SIZE; i++) {
 			skyLight[i] = (byte) 0xFF; // 0xFF = 15 in both nibbles
 		}
 		// blockLight is already initialized to 0
@@ -37,19 +40,56 @@ public class LightStorage {
 	
 	/**
 	 * Create light storage from existing data.
+	 * Automatically detects legacy (2048 bytes) or RGBI (8192 bytes) block light format.
 	 * @param skyLight Sky light nibble array (2048 bytes)
-	 * @param blockLight Block light nibble array (2048 bytes)
+	 * @param blockLight Block light array (2048 bytes for legacy, 8192 bytes for RGBI)
 	 */
 	public LightStorage(byte[] skyLight, byte[] blockLight) {
-		if (skyLight == null || skyLight.length != ARRAY_SIZE) {
-			throw new IllegalArgumentException("SkyLight array must be " + ARRAY_SIZE + " bytes");
+		if (skyLight == null || skyLight.length != SKYLIGHT_ARRAY_SIZE) {
+			throw new IllegalArgumentException("SkyLight array must be " + SKYLIGHT_ARRAY_SIZE + " bytes");
 		}
-		if (blockLight == null || blockLight.length != ARRAY_SIZE) {
-			throw new IllegalArgumentException("BlockLight array must be " + ARRAY_SIZE + " bytes");
+		if (blockLight == null) {
+			throw new IllegalArgumentException("BlockLight array cannot be null");
 		}
 		
 		this.skyLight = skyLight.clone();
-		this.blockLight = blockLight.clone();
+		
+		// Detect format by array size
+		if (blockLight.length == SKYLIGHT_ARRAY_SIZE) {
+			// Legacy format: convert single-channel to white RGBI
+			this.blockLight = new byte[BLOCKLIGHT_ARRAY_SIZE];
+			
+			// Convert legacy nibble format to RGBI format
+			for (int i = 0; i < TOTAL_BLOCKS; i++) {
+				int nibbleIndex = i / 2;
+				boolean isLower = (i & 1) == 0;
+				int legacyLight;
+				if (isLower) {
+					legacyLight = blockLight[nibbleIndex] & 0x0F;
+				} else {
+					legacyLight = (blockLight[nibbleIndex] >> 4) & 0x0F;
+				}
+				// Set white RGBI (R=G=B=legacyLight, I=legacyLight)
+				setBlockLightRGBIAtIndex(i, legacyLight, legacyLight, legacyLight, legacyLight);
+			}
+		} else if (blockLight.length == BLOCKLIGHT_ARRAY_SIZE) {
+			// RGBI format: use directly
+			this.blockLight = blockLight.clone();
+		} else {
+			throw new IllegalArgumentException("BlockLight array must be " + SKYLIGHT_ARRAY_SIZE + 
+				" bytes (legacy) or " + BLOCKLIGHT_ARRAY_SIZE + " bytes (RGBI), got: " + blockLight.length);
+		}
+	}
+	
+	/**
+	 * Helper method to set RGBI at a specific block index (0-4095).
+	 */
+	private void setBlockLightRGBIAtIndex(int blockIndex, int r, int g, int b, int i) {
+		// Pack RGBI into 2 bytes: RRRRGGGG BBBBIIII
+		int packed = ((r & 0x0F) << 12) | ((g & 0x0F) << 8) | ((b & 0x0F) << 4) | (i & 0x0F);
+		int byteIndex = blockIndex * 2;
+		blockLight[byteIndex] = (byte) (packed >> 8);
+		blockLight[byteIndex + 1] = (byte) (packed & 0xFF);
 	}
 	
 	/**
@@ -124,45 +164,140 @@ public class LightStorage {
 	}
 	
 	/**
-	 * Get block light level at position.
+	 * Get the block index for 3D coordinates.
 	 * @param x 0-15
 	 * @param y 0-15
 	 * @param z 0-15
-	 * @return Block light level (0-15)
+	 * @return block index (0-4095)
 	 */
-	public int getBlockLight(int x, int y, int z) {
-		int index = getIndex(x, y, z);
-		byte value = blockLight[index];
-		
-		if (isLowerNibble(x, y, z)) {
-			return value & 0x0F; // Lower 4 bits
-		} else {
-			return (value >> 4) & 0x0F; // Upper 4 bits
+	private int getBlockIndex(int x, int y, int z) {
+		if (x < 0 || x >= SECTION_SIZE || y < 0 || y >= SECTION_SIZE || z < 0 || z >= SECTION_SIZE) {
+			throw new IllegalArgumentException("Coordinates out of bounds: " + x + ", " + y + ", " + z);
 		}
+		return (y * SECTION_SIZE * SECTION_SIZE) + (z * SECTION_SIZE) + x;
 	}
 	
 	/**
-	 * Set block light level at position.
+	 * Get block light RED level at position (0-15).
+	 * @param x 0-15
+	 * @param y 0-15
+	 * @param z 0-15
+	 * @return Block light red level (0-15)
+	 */
+	public int getBlockLightR(int x, int y, int z) {
+		int blockIndex = getBlockIndex(x, y, z);
+		int byteIndex = blockIndex * 2;
+		int packed = ((blockLight[byteIndex] & 0xFF) << 8) | (blockLight[byteIndex + 1] & 0xFF);
+		return (packed >> 12) & 0x0F; // Extract 4 bits for R
+	}
+	
+	/**
+	 * Get block light GREEN level at position (0-15).
+	 * @param x 0-15
+	 * @param y 0-15
+	 * @param z 0-15
+	 * @return Block light green level (0-15)
+	 */
+	public int getBlockLightG(int x, int y, int z) {
+		int blockIndex = getBlockIndex(x, y, z);
+		int byteIndex = blockIndex * 2;
+		int packed = ((blockLight[byteIndex] & 0xFF) << 8) | (blockLight[byteIndex + 1] & 0xFF);
+		return (packed >> 8) & 0x0F; // Extract 4 bits for G
+	}
+	
+	/**
+	 * Get block light BLUE level at position (0-15).
+	 * @param x 0-15
+	 * @param y 0-15
+	 * @param z 0-15
+	 * @return Block light blue level (0-15)
+	 */
+	public int getBlockLightB(int x, int y, int z) {
+		int blockIndex = getBlockIndex(x, y, z);
+		int byteIndex = blockIndex * 2;
+		int packed = ((blockLight[byteIndex] & 0xFF) << 8) | (blockLight[byteIndex + 1] & 0xFF);
+		return (packed >> 4) & 0x0F; // Extract 4 bits for B
+	}
+	
+	/**
+	 * Get block light INTENSITY level at position (0-15).
+	 * @param x 0-15
+	 * @param y 0-15
+	 * @param z 0-15
+	 * @return Block light intensity level (0-15)
+	 */
+	public int getBlockLightI(int x, int y, int z) {
+		int blockIndex = getBlockIndex(x, y, z);
+		int byteIndex = blockIndex * 2;
+		int packed = ((blockLight[byteIndex] & 0xFF) << 8) | (blockLight[byteIndex + 1] & 0xFF);
+		return packed & 0x0F; // Extract 4 bits for I
+	}
+	
+	/**
+	 * Get block light level at position (legacy method, returns intensity).
+	 * @param x 0-15
+	 * @param y 0-15
+	 * @param z 0-15
+	 * @return Block light level (0-15), the intensity channel
+	 * @deprecated Use getBlockLightR/G/B/I for RGBI values
+	 */
+	@Deprecated
+	public int getBlockLight(int x, int y, int z) {
+		return getBlockLightI(x, y, z);
+	}
+	
+	/**
+	 * Set block light RGBI levels at position.
+	 * @param x 0-15
+	 * @param y 0-15
+	 * @param z 0-15
+	 * @param r Red level (0-15)
+	 * @param g Green level (0-15)
+	 * @param b Blue level (0-15)
+	 * @param i Intensity level (0-15)
+	 */
+	public void setBlockLightRGBI(int x, int y, int z, int r, int g, int b, int i) {
+		if (r < 0 || r > 15 || g < 0 || g > 15 || b < 0 || b > 15 || i < 0 || i > 15) {
+			throw new IllegalArgumentException("RGBI light levels must be 0-15, got: " + r + ", " + g + ", " + b + ", " + i);
+		}
+		
+		int blockIndex = getBlockIndex(x, y, z);
+		int byteIndex = blockIndex * 2;
+		
+		// Pack RGBI into 2 bytes: RRRRGGGG BBBBIIII
+		int packed = ((r & 0x0F) << 12) | ((g & 0x0F) << 8) | ((b & 0x0F) << 4) | (i & 0x0F);
+		blockLight[byteIndex] = (byte) (packed >> 8);
+		blockLight[byteIndex + 1] = (byte) (packed & 0xFF);
+	}
+	
+	/**
+	 * Set block light RGB levels at position (intensity = max of RGB).
+	 * @param x 0-15
+	 * @param y 0-15
+	 * @param z 0-15
+	 * @param r Red level (0-15)
+	 * @param g Green level (0-15)
+	 * @param b Blue level (0-15)
+	 */
+	public void setBlockLightRGB(int x, int y, int z, int r, int g, int b) {
+		int intensity = Math.max(r, Math.max(g, b));
+		setBlockLightRGBI(x, y, z, r, g, b, intensity);
+	}
+	
+	/**
+	 * Set block light level at position (legacy method, sets all RGBI to same value).
 	 * @param x 0-15
 	 * @param y 0-15
 	 * @param z 0-15
 	 * @param level Light level (0-15)
+	 * @deprecated Use setBlockLightRGBI for RGBI values
 	 */
+	@Deprecated
 	public void setBlockLight(int x, int y, int z, int level) {
 		if (level < 0 || level > 15) {
 			throw new IllegalArgumentException("Light level must be 0-15, got: " + level);
 		}
-		
-		int index = getIndex(x, y, z);
-		byte currentByte = blockLight[index];
-		
-		if (isLowerNibble(x, y, z)) {
-			// Set lower nibble, preserve upper nibble
-			blockLight[index] = (byte) ((currentByte & 0xF0) | level);
-		} else {
-			// Set upper nibble, preserve lower nibble
-			blockLight[index] = (byte) ((currentByte & 0x0F) | (level << 4));
-		}
+		setBlockLightRGBI(x, y, z, level, level, level, level);
 	}
 	
 	/**
@@ -174,10 +309,11 @@ public class LightStorage {
 	}
 	
 	/**
-	 * Get the raw block light array for serialization.
-	 * @return Clone of block light array (2048 bytes)
+	 * Get the raw block light RGBI array for serialization.
+	 * @return Clone of block light RGBI array (8192 bytes)
 	 */
 	public byte[] getBlockLightArray() {
 		return blockLight.clone();
 	}
 }
+

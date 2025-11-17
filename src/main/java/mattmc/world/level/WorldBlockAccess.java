@@ -217,6 +217,140 @@ public class WorldBlockAccess {
     }
     
     /**
+     * Get skylight level at a position across chunk boundaries.
+     * Similar to getBlockAcrossChunks but for skylight values.
+     * 
+     * @param chunk The current chunk
+     * @param localX Chunk-local X coordinate (can be outside 0-15 range)
+     * @param localY Chunk-local Y coordinate (0-383)
+     * @param localZ Chunk-local Z coordinate (can be outside 0-15 range)
+     * @return Skylight level (0-15), or 15 if chunk not loaded or out of bounds
+     */
+    public int getSkyLightAcrossChunks(LevelChunk chunk, int localX, int localY, int localZ) {
+        // Validate chunk reference
+        if (chunk == null) {
+            return 15; // Default to full skylight
+        }
+        
+        // Check Y bounds first
+        if (localY < 0 || localY >= LevelChunk.HEIGHT) {
+            return 15; // Out of world bounds: full skylight
+        }
+        
+        // Sanity check for coordinates
+        if (Math.abs(localX) > LevelChunk.WIDTH * 2 || Math.abs(localZ) > LevelChunk.DEPTH * 2) {
+            logger.warn("Suspicious coordinates in getSkyLightAcrossChunks: chunk({}, {}), local({}, {}, {})", 
+                       chunk.chunkX(), chunk.chunkZ(), localX, localY, localZ);
+            return 15; // Default to full skylight
+        }
+        
+        // If within chunk bounds, use direct chunk access
+        if (localX >= 0 && localX < LevelChunk.WIDTH && localZ >= 0 && localZ < LevelChunk.DEPTH) {
+            return chunk.getSkyLight(localX, localY, localZ);
+        }
+        
+        // Calculate which neighboring chunk to query
+        int targetChunkX = chunk.chunkX();
+        int targetChunkZ = chunk.chunkZ();
+        int targetLocalX = localX;
+        int targetLocalZ = localZ;
+        
+        // Adjust for X boundary crossing
+        if (localX < 0) {
+            targetChunkX--;
+            targetLocalX = LevelChunk.WIDTH + localX;
+        } else if (localX >= LevelChunk.WIDTH) {
+            targetChunkX++;
+            targetLocalX = localX - LevelChunk.WIDTH;
+        }
+        
+        // Adjust for Z boundary crossing
+        if (localZ < 0) {
+            targetChunkZ--;
+            targetLocalZ = LevelChunk.DEPTH + localZ;
+        } else if (localZ >= LevelChunk.DEPTH) {
+            targetChunkZ++;
+            targetLocalZ = localZ - LevelChunk.DEPTH;
+        }
+        
+        // Get the neighboring chunk if it's loaded
+        LevelChunk neighborChunk = chunkManager.getChunk(targetChunkX, targetChunkZ);
+        if (neighborChunk == null) {
+            // Neighboring chunk not loaded - assume full skylight
+            return 15;
+        }
+        
+        return neighborChunk.getSkyLight(targetLocalX, localY, targetLocalZ);
+    }
+    
+    /**
+     * Get blocklight level at a position across chunk boundaries.
+     * Similar to getBlockAcrossChunks but for blocklight values.
+     * 
+     * @param chunk The current chunk
+     * @param localX Chunk-local X coordinate (can be outside 0-15 range)
+     * @param localY Chunk-local Y coordinate (0-383)
+     * @param localZ Chunk-local Z coordinate (can be outside 0-15 range)
+     * @return Blocklight level (0-15), or 0 if chunk not loaded or out of bounds
+     */
+    public int getBlockLightAcrossChunks(LevelChunk chunk, int localX, int localY, int localZ) {
+        // Validate chunk reference
+        if (chunk == null) {
+            return 0; // Default to no blocklight
+        }
+        
+        // Check Y bounds first
+        if (localY < 0 || localY >= LevelChunk.HEIGHT) {
+            return 0; // Out of world bounds: no blocklight
+        }
+        
+        // Sanity check for coordinates
+        if (Math.abs(localX) > LevelChunk.WIDTH * 2 || Math.abs(localZ) > LevelChunk.DEPTH * 2) {
+            logger.warn("Suspicious coordinates in getBlockLightAcrossChunks: chunk({}, {}), local({}, {}, {})", 
+                       chunk.chunkX(), chunk.chunkZ(), localX, localY, localZ);
+            return 0; // Default to no blocklight
+        }
+        
+        // If within chunk bounds, use direct chunk access
+        if (localX >= 0 && localX < LevelChunk.WIDTH && localZ >= 0 && localZ < LevelChunk.DEPTH) {
+            return chunk.getBlockLight(localX, localY, localZ);
+        }
+        
+        // Calculate which neighboring chunk to query
+        int targetChunkX = chunk.chunkX();
+        int targetChunkZ = chunk.chunkZ();
+        int targetLocalX = localX;
+        int targetLocalZ = localZ;
+        
+        // Adjust for X boundary crossing
+        if (localX < 0) {
+            targetChunkX--;
+            targetLocalX = LevelChunk.WIDTH + localX;
+        } else if (localX >= LevelChunk.WIDTH) {
+            targetChunkX++;
+            targetLocalX = localX - LevelChunk.WIDTH;
+        }
+        
+        // Adjust for Z boundary crossing
+        if (localZ < 0) {
+            targetChunkZ--;
+            targetLocalZ = LevelChunk.DEPTH + localZ;
+        } else if (localZ >= LevelChunk.DEPTH) {
+            targetChunkZ++;
+            targetLocalZ = localZ - LevelChunk.DEPTH;
+        }
+        
+        // Get the neighboring chunk if it's loaded
+        LevelChunk neighborChunk = chunkManager.getChunk(targetChunkX, targetChunkZ);
+        if (neighborChunk == null) {
+            // Neighboring chunk not loaded - assume no blocklight
+            return 0;
+        }
+        
+        return neighborChunk.getBlockLight(targetLocalX, localY, targetLocalZ);
+    }
+    
+    /**
      * Callback interface for getting or creating chunks.
      */
     public interface ChunkGetter {

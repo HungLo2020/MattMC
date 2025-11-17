@@ -72,7 +72,9 @@ public class SkylightEngine {
 			int worldY = LevelChunk.chunkYToWorldY(y);
 			
 			if (heightmapY == LevelChunk.MIN_Y || worldY > heightmapY) {
-				// Above the heightmap - full skylight
+				// Above the heightmap OR no opaque blocks - full skylight from direct sky access
+				// Note: For open columns (no opaque blocks), propagateSkylightBelowHeightmap
+				// will re-process with attenuation where needed
 				chunk.setSkyLight(x, y, z, 15);
 			} else {
 				// At or below the heightmap - no skylight (will be propagated if cavity exists)
@@ -83,56 +85,45 @@ public class SkylightEngine {
 	
 	/**
 	 * Propagate skylight below the heightmap into cavities.
-	 * This uses BFS to spread skylight downward and sideways.
+	 * This uses BFS to spread skylight downward and sideways with attenuation.
+	 * 
+	 * For columns that have opaque blocks (heightmap > MIN_Y), this propagates
+	 * light horizontally into any air cavities below the heightmap.
+	 * 
+	 * For open columns (heightmap = MIN_Y), the flat light=15 from initializeColumnSkylight
+	 * is kept - representing direct unobstructed skylight.
+	 * 
+	 * Light does NOT pass through opaque blocks.
 	 */
 	private void propagateSkylightBelowHeightmap(LevelChunk chunk) {
 		addQueue.clear();
 		
-		// Seed the queue with all positions just below the heightmap that have skylight above them
+		// Seed from blocks that have light and are adjacent to blocks that need light
+		// This handles horizontal propagation into cavities
 		for (int x = 0; x < LevelChunk.WIDTH; x++) {
 			for (int z = 0; z < LevelChunk.DEPTH; z++) {
 				int heightmapY = chunk.getHeightmap().getHeight(x, z);
-				int belowHeightmapChunkY = LevelChunk.worldYToChunkY(heightmapY - 1);
 				
-				// Check if there's a cavity below the heightmap
-				if (belowHeightmapChunkY >= 0 && belowHeightmapChunkY < LevelChunk.HEIGHT) {
-					Block block = chunk.getBlock(x, belowHeightmapChunkY, z);
-					if (block != null && block.getOpacity() < 15) {
-						// Non-opaque block below heightmap - skylight can enter
-						int aboveY = LevelChunk.worldYToChunkY(heightmapY + 1);
-						if (aboveY >= 0 && aboveY < LevelChunk.HEIGHT) {
-							int skyLightAbove = chunk.getSkyLight(x, aboveY, z);
-							if (skyLightAbove > 0) {
-								// Propagate skylight down into the cavity
-								addQueue.offer(new SkyNode(x, belowHeightmapChunkY, z, skyLightAbove));
-							}
+				// For open columns (heightmap = MIN_Y), add all lit blocks to seed
+				// horizontal propagation to neighboring columns/cavities
+				if (heightmapY == LevelChunk.MIN_Y) {
+					for (int y = 0; y < LevelChunk.HEIGHT; y++) {
+						int light = chunk.getSkyLight(x, y, z);
+						if (light > 0) {
+							addQueue.offer(new SkyNode(x, y, z, light));
 						}
 					}
 				}
 			}
 		}
 		
-		// BFS propagation
+		// BFS propagation to neighbors (horizontal and vertical) with attenuation
 		SkyNode node;
 		while ((node = addQueue.poll()) != null) {
 			
 			if (node.lightLevel <= 0) {
 				continue;
 			}
-			
-			// Check if this position can receive light
-			Block block = chunk.getBlock(node.x, node.y, node.z);
-			if (block == null || block.getOpacity() >= 15) {
-				continue; // Opaque block or null
-			}
-			
-			int currentLight = chunk.getSkyLight(node.x, node.y, node.z);
-			if (node.lightLevel <= currentLight) {
-				continue; // Already has equal or better light
-			}
-			
-			// Update skylight
-			chunk.setSkyLight(node.x, node.y, node.z, node.lightLevel);
 			
 			// Propagate to neighbors with attenuation
 			int newLight = node.lightLevel - 1;
@@ -165,6 +156,7 @@ public class SkylightEngine {
 		
 		int currentLight = chunk.getSkyLight(x, y, z);
 		if (newLight > currentLight) {
+			chunk.setSkyLight(x, y, z, newLight);  // Set the light value before adding to queue
 			addQueue.offer(new SkyNode(x, y, z, newLight));
 		}
 	}

@@ -18,7 +18,7 @@ public class LightPropagatorTest {
 		LevelChunk chunk = new LevelChunk(0, 0);
 		LightPropagator propagator = new LightPropagator();
 		
-		// Place a torch at (8, 64, 8) - emits light level 14
+		// Place a torch at (8, 64, 8) - emits light level 14 (vanilla torch level)
 		int torchY = LevelChunk.worldYToChunkY(64);
 		int emission = Blocks.TORCH.getLightEmission();
 		assertEquals(14, emission, "Torch should emit light level 14");
@@ -170,7 +170,7 @@ public class LightPropagatorTest {
 		// Place a torch (should automatically propagate light via setBlock hook)
 		chunk.setBlock(8, y, 8, Blocks.TORCH);
 		
-		// Light should be added
+		// Light should be added - torch emits RGB=(14, 11, 0) so intensity = 14
 		assertEquals(14, chunk.getBlockLight(8, y, 8), "Torch should emit light");
 		assertEquals(13, chunk.getBlockLight(9, y, 8), "Light should propagate");
 		

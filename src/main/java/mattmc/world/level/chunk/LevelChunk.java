@@ -252,12 +252,78 @@ public final class LevelChunk {
     }
     
     /**
-     * Get block light level at chunk-local coordinates.
+     * Get block light RED level at chunk-local coordinates.
+     * @param x 0-15
+     * @param y 0-383 (world Y = y + MIN_Y)
+     * @param z 0-15
+     * @return Block light red level (0-15)
+     */
+    public int getBlockLightR(int x, int y, int z) {
+        if (x < 0 || x >= WIDTH || y < 0 || y >= HEIGHT || z < 0 || z >= DEPTH) {
+            return 0;
+        }
+        int sectionIndex = y / SECTION_HEIGHT;
+        int sectionY = y % SECTION_HEIGHT;
+        return lightSections[sectionIndex].getBlockLightR(x, sectionY, z);
+    }
+    
+    /**
+     * Get block light GREEN level at chunk-local coordinates.
+     * @param x 0-15
+     * @param y 0-383 (world Y = y + MIN_Y)
+     * @param z 0-15
+     * @return Block light green level (0-15)
+     */
+    public int getBlockLightG(int x, int y, int z) {
+        if (x < 0 || x >= WIDTH || y < 0 || y >= HEIGHT || z < 0 || z >= DEPTH) {
+            return 0;
+        }
+        int sectionIndex = y / SECTION_HEIGHT;
+        int sectionY = y % SECTION_HEIGHT;
+        return lightSections[sectionIndex].getBlockLightG(x, sectionY, z);
+    }
+    
+    /**
+     * Get block light BLUE level at chunk-local coordinates.
+     * @param x 0-15
+     * @param y 0-383 (world Y = y + MIN_Y)
+     * @param z 0-15
+     * @return Block light blue level (0-15)
+     */
+    public int getBlockLightB(int x, int y, int z) {
+        if (x < 0 || x >= WIDTH || y < 0 || y >= HEIGHT || z < 0 || z >= DEPTH) {
+            return 0;
+        }
+        int sectionIndex = y / SECTION_HEIGHT;
+        int sectionY = y % SECTION_HEIGHT;
+        return lightSections[sectionIndex].getBlockLightB(x, sectionY, z);
+    }
+    
+    /**
+     * Get block light INTENSITY level at chunk-local coordinates.
+     * @param x 0-15
+     * @param y 0-383 (world Y = y + MIN_Y)
+     * @param z 0-15
+     * @return Block light intensity level (0-15)
+     */
+    public int getBlockLightI(int x, int y, int z) {
+        if (x < 0 || x >= WIDTH || y < 0 || y >= HEIGHT || z < 0 || z >= DEPTH) {
+            return 0;
+        }
+        int sectionIndex = y / SECTION_HEIGHT;
+        int sectionY = y % SECTION_HEIGHT;
+        return lightSections[sectionIndex].getBlockLightI(x, sectionY, z);
+    }
+    
+    /**
+     * Get block light level at chunk-local coordinates (legacy, returns intensity).
      * @param x 0-15
      * @param y 0-383 (world Y = y + MIN_Y)
      * @param z 0-15
      * @return Block light level (0-15)
+     * @deprecated Use getBlockLightR/G/B/I for RGBI values
      */
+    @Deprecated
     public int getBlockLight(int x, int y, int z) {
         if (x < 0 || x >= WIDTH || y < 0 || y >= HEIGHT || z < 0 || z >= DEPTH) {
             return 0;
@@ -268,12 +334,55 @@ public final class LevelChunk {
     }
     
     /**
-     * Set block light level at chunk-local coordinates.
+     * Set block light RGBI levels at chunk-local coordinates.
+     * @param x 0-15
+     * @param y 0-383 (world Y = y + MIN_Y)
+     * @param z 0-15
+     * @param r Red level (0-15)
+     * @param g Green level (0-15)
+     * @param b Blue level (0-15)
+     * @param i Intensity level (0-15)
+     */
+    public void setBlockLightRGBI(int x, int y, int z, int r, int g, int b, int i) {
+        if (x < 0 || x >= WIDTH || y < 0 || y >= HEIGHT || z < 0 || z >= DEPTH) {
+            return;
+        }
+        int sectionIndex = y / SECTION_HEIGHT;
+        int sectionY = y % SECTION_HEIGHT;
+        lightSections[sectionIndex].setBlockLightRGBI(x, sectionY, z, r, g, b, i);
+        // Mark chunk dirty to trigger mesh rebuild with new lighting
+        setDirty(true);
+    }
+    
+    /**
+     * Set block light RGB levels at chunk-local coordinates (intensity = max of RGB).
+     * @param x 0-15
+     * @param y 0-383 (world Y = y + MIN_Y)
+     * @param z 0-15
+     * @param r Red level (0-15)
+     * @param g Green level (0-15)
+     * @param b Blue level (0-15)
+     */
+    public void setBlockLightRGB(int x, int y, int z, int r, int g, int b) {
+        if (x < 0 || x >= WIDTH || y < 0 || y >= HEIGHT || z < 0 || z >= DEPTH) {
+            return;
+        }
+        int sectionIndex = y / SECTION_HEIGHT;
+        int sectionY = y % SECTION_HEIGHT;
+        lightSections[sectionIndex].setBlockLightRGB(x, sectionY, z, r, g, b);
+        // Mark chunk dirty to trigger mesh rebuild with new lighting
+        setDirty(true);
+    }
+    
+    /**
+     * Set block light level at chunk-local coordinates (legacy, sets all RGBI to same value).
      * @param x 0-15
      * @param y 0-383 (world Y = y + MIN_Y)
      * @param z 0-15
      * @param level Light level (0-15)
+     * @deprecated Use setBlockLightRGBI for RGBI values
      */
+    @Deprecated
     public void setBlockLight(int x, int y, int z, int level) {
         if (x < 0 || x >= WIDTH || y < 0 || y >= HEIGHT || z < 0 || z >= DEPTH) {
             return;
@@ -313,6 +422,58 @@ public final class LevelChunk {
      */
     public ColumnHeightmap getHeightmap() {
         return heightmap;
+    }
+    
+    /**
+     * Recalculate block light for all emissive blocks in this chunk.
+     * This is used after loading a chunk to ensure light values match current registry values.
+     * If a block's light emission was changed in the registry, this will update the lighting.
+     */
+    public void recalculateBlockLight() {
+        mattmc.world.level.lighting.WorldLightManager lightManager = 
+            mattmc.world.level.lighting.WorldLightManager.getInstance();
+        
+        // Iterate through all blocks and update lighting for emissive blocks
+        for (int x = 0; x < WIDTH; x++) {
+            for (int y = 0; y < HEIGHT; y++) {
+                for (int z = 0; z < DEPTH; z++) {
+                    Block block = blocks[x][y][z];
+                    
+                    // Skip air blocks
+                    if (block.isAir()) {
+                        continue;
+                    }
+                    
+                    // Get current emission values from registry
+                    int emissionR = block.getLightEmissionR();
+                    int emissionG = block.getLightEmissionG();
+                    int emissionB = block.getLightEmissionB();
+                    
+                    // Only process blocks that should emit light according to the registry
+                    boolean hasEmission = (emissionR > 0 || emissionG > 0 || emissionB > 0);
+                    if (!hasEmission) {
+                        continue; // Skip non-emissive blocks
+                    }
+                    
+                    // Get currently stored light at this position
+                    int storedR = getBlockLightR(x, y, z);
+                    int storedG = getBlockLightG(x, y, z);
+                    int storedB = getBlockLightB(x, y, z);
+                    
+                    // Check if there's a mismatch between registry and stored values
+                    boolean mismatch = (emissionR != storedR || emissionG != storedG || emissionB != storedB);
+                    
+                    if (mismatch) {
+                        // Emission values changed - update lighting
+                        // First remove the old light
+                        lightManager.removeBlockLight(this, x, y, z);
+                        
+                        // Then add new light based on current registry values
+                        lightManager.addBlockLightRGB(this, x, y, z, emissionR, emissionG, emissionB);
+                    }
+                }
+            }
+        }
     }
     
     public int chunkX() { return chunkX; }

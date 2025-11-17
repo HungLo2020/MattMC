@@ -1,7 +1,7 @@
 {
   "variants": {
-    "": [
-      { "model": "block/dark_oak_planks" }
-    ]
+    "": {
+      "model": "mattmc:block/dark_oak_planks"
+    }
   }
 }

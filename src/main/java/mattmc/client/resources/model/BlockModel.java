@@ -14,13 +14,20 @@ import java.util.Map;
  *   "parent": "block/cube_all",
  *   "textures": {
  *     "all": "block/dirt"
- *   }
+ *   },
+ *   "elements": [...]
  * }
  */
 public class BlockModel {
     private String parent;
     private Map<String, String> textures;
     private List<TintInfo> tints;
+    private List<ModelElement> elements;
+    private Map<String, ModelDisplay.Transform> display;
+    private Boolean ambientocclusion;
+    
+    // Track the original parent before merging for special rendering detection (e.g., stairs)
+    private transient String originalParent;
     
     public String getParent() {
         return parent;
@@ -28,6 +35,14 @@ public class BlockModel {
     
     public void setParent(String parent) {
         this.parent = parent;
+    }
+    
+    public String getOriginalParent() {
+        return originalParent;
+    }
+    
+    public void setOriginalParent(String originalParent) {
+        this.originalParent = originalParent;
     }
     
     public Map<String, String> getTextures() {
@@ -51,5 +66,29 @@ public class BlockModel {
     
     public void setTints(List<TintInfo> tints) {
         this.tints = tints;
+    }
+    
+    public List<ModelElement> getElements() {
+        return elements;
+    }
+    
+    public void setElements(List<ModelElement> elements) {
+        this.elements = elements;
+    }
+    
+    public Map<String, ModelDisplay.Transform> getDisplay() {
+        return display;
+    }
+    
+    public void setDisplay(Map<String, ModelDisplay.Transform> display) {
+        this.display = display;
+    }
+    
+    public Boolean getAmbientocclusion() {
+        return ambientocclusion;
+    }
+    
+    public void setAmbientocclusion(Boolean ambientocclusion) {
+        this.ambientocclusion = ambientocclusion;
     }
 }

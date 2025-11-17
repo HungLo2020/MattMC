@@ -62,10 +62,13 @@ public class ChunkVAO {
         glColorPointer(4, GL_FLOAT, stride, (long)(ChunkMeshBuffer.COLOR_OFFSET * Float.BYTES));
         glNormalPointer(GL_FLOAT, stride, (long)(ChunkMeshBuffer.NORMAL_OFFSET * Float.BYTES));
         
-        // Use secondary texture coordinate for light data (skyLight, blockLight, ao)
+        // Use secondary texture coordinate for light data (skyLight, blockLightR, blockLightG, blockLightB, ao)
         // This allows the shader to access it via gl_MultiTexCoord1
+        // Note: We're using a 5-component vector, but OpenGL tex coords support up to 4, so we'll use GL_TEXTURE1 and GL_TEXTURE2
         glClientActiveTexture(GL_TEXTURE1);
-        glTexCoordPointer(3, GL_FLOAT, stride, (long)(ChunkMeshBuffer.LIGHT_OFFSET * Float.BYTES));
+        glTexCoordPointer(4, GL_FLOAT, stride, (long)(ChunkMeshBuffer.LIGHT_OFFSET * Float.BYTES)); // skyLight, blockLightR, blockLightG, blockLightB
+        glClientActiveTexture(GL_TEXTURE2);
+        glTexCoordPointer(1, GL_FLOAT, stride, (long)((ChunkMeshBuffer.LIGHT_OFFSET + 4) * Float.BYTES)); // ao
         glClientActiveTexture(GL_TEXTURE0); // Reset to texture unit 0
         
         // Unbind VAO (good practice)
@@ -92,8 +95,10 @@ public class ChunkVAO {
         glEnableClientState(GL_COLOR_ARRAY);
         glEnableClientState(GL_NORMAL_ARRAY);
         
-        // Enable secondary texture coord array for light data
+        // Enable secondary texture coord arrays for light data
         glClientActiveTexture(GL_TEXTURE1);
+        glEnableClientState(GL_TEXTURE_COORD_ARRAY);
+        glClientActiveTexture(GL_TEXTURE2);
         glEnableClientState(GL_TEXTURE_COORD_ARRAY);
         glClientActiveTexture(GL_TEXTURE0);
         
@@ -101,6 +106,8 @@ public class ChunkVAO {
         glDrawElements(GL_TRIANGLES, indexCount, GL_UNSIGNED_INT, 0);
         
         // Disable client state
+        glClientActiveTexture(GL_TEXTURE2);
+        glDisableClientState(GL_TEXTURE_COORD_ARRAY);
         glClientActiveTexture(GL_TEXTURE1);
         glDisableClientState(GL_TEXTURE_COORD_ARRAY);
         glClientActiveTexture(GL_TEXTURE0);

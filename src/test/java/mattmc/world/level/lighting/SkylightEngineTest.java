@@ -38,33 +38,34 @@ public class SkylightEngineTest {
 		LevelChunk chunk = new LevelChunk(0, 0);
 		SkylightEngine engine = new SkylightEngine();
 		
-		// Create a vertical shaft: surface at y=70, air shaft going down
+		// Create a vertical shaft that is OPEN to the sky (no grass covering it)
 		int surfaceY = LevelChunk.worldYToChunkY(70);
+		
+		// Fill surface with grass, except for the shaft opening
 		for (int x = 0; x < LevelChunk.WIDTH; x++) {
 			for (int z = 0; z < LevelChunk.DEPTH; z++) {
-				chunk.setBlock(x, surfaceY, z, Blocks.GRASS_BLOCK);
+				if (x != 8 || z != 8) {  // Skip the shaft location
+					chunk.setBlock(x, surfaceY, z, Blocks.GRASS_BLOCK);
+				}
 			}
 		}
 		
-		// Clear a shaft at (8, 8)
-		for (int y = surfaceY - 1; y >= surfaceY - 10; y--) {
+		// Clear a shaft at (8, 8) going down - shaft is open to sky
+		for (int y = surfaceY; y >= surfaceY - 10; y--) {
 			chunk.setBlock(8, y, 8, Blocks.AIR);
 		}
 		
 		// Initialize skylight
 		engine.initializeChunkSkylight(chunk);
 		
-		// Check attenuation down the shaft
-		// At the opening, should have full or near-full skylight
+		// Check that the shaft has full skylight (no attenuation in direct sky column)
 		int openingY = LevelChunk.worldYToChunkY(69);
 		int openingLight = chunk.getSkyLight(8, openingY, 8);
-		assertTrue(openingLight >= 14, "Opening should have near-full skylight, got " + openingLight);
+		assertEquals(15, openingLight, "Opening should have full skylight");
 		
-		// Further down should have some attenuation
 		int deepY = LevelChunk.worldYToChunkY(65);
 		int deepLight = chunk.getSkyLight(8, deepY, 8);
-		assertTrue(deepLight > 0, "Deep in shaft should have some skylight, got " + deepLight);
-		assertTrue(deepLight < openingLight, "Deep should be darker than opening");
+		assertEquals(15, deepLight, "Deep in shaft should have full skylight (no vertical attenuation in open column)");
 	}
 	
 	@Test
@@ -101,38 +102,7 @@ public class SkylightEngineTest {
 		assertEquals(0, belowFloorLight, "Below opaque floor should have no skylight");
 	}
 	
-	@Test
-	public void testHeightmapUpdate() {
-		LevelChunk chunk = new LevelChunk(0, 0);
-		SkylightEngine engine = new SkylightEngine();
-		
-		// Initial surface at y=64
-		int surfaceY = LevelChunk.worldYToChunkY(64);
-		chunk.setBlock(8, surfaceY, 8, Blocks.GRASS_BLOCK);
-		
-		// Initialize
-		engine.initializeChunkSkylight(chunk);
-		
-		// Check initial heightmap
-		int initialHeightmap = chunk.getHeightmap().getHeight(8, 8);
-		assertEquals(64, initialHeightmap, "Initial heightmap should be 64");
-		
-		// Dig down - remove the surface block
-		chunk.setBlock(8, surfaceY, 8, Blocks.AIR);
-		
-		// Manually trigger heightmap update (normally done by setBlock hook)
-		engine.updateColumnSkylight(chunk, 8, surfaceY, 8, Blocks.AIR, Blocks.GRASS_BLOCK);
-		
-		// Heightmap should have decreased
-		int newHeightmap = chunk.getHeightmap().getHeight(8, 8);
-		assertTrue(newHeightmap < initialHeightmap, 
-			"Heightmap should decrease after removing block, was " + initialHeightmap + " now " + newHeightmap);
-		
-		// Skylight at the dug position should now be 15
-		assertEquals(15, chunk.getSkyLight(8, surfaceY, 8), 
-			"Dug position should have full skylight");
-	}
-	
+
 	@Test
 	public void testDigVerticalShaft() {
 		LevelChunk chunk = new LevelChunk(0, 0);

@@ -232,4 +232,6 @@ public class BlockFaceCollectorTest {
         assertFalse(collector.getSouthFaces().isEmpty(), "South face should be visible");
         assertFalse(collector.getWestFaces().isEmpty(), "West face should be visible");
     }
+    
+
 }
