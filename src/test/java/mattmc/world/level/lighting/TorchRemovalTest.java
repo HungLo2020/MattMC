@@ -12,14 +12,17 @@ import static org.junit.jupiter.api.Assertions.*;
  */
 public class TorchRemovalTest {
     
+    private WorldLightManager worldLightManager;
+    
     @BeforeEach
     public void setup() {
-        WorldLightManager.resetInstance();
+        worldLightManager = new WorldLightManager();
     }
     
     @Test
     public void testSimpleTorchRemoval() {
         LevelChunk chunk = new LevelChunk(0, 0);
+        chunk.setWorldLightManager(worldLightManager);
         
         // Place a torch
         chunk.setBlock(8, 100, 8, Blocks.TORCH);

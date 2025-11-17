@@ -24,9 +24,6 @@ public class CrossChunkVertexLightTest {
 	
 	@BeforeEach
 	public void setup() throws IOException {
-		// Reset the WorldLightManager singleton for each test
-		WorldLightManager.resetInstance();
-		
 		// Create a temp world
 		tempDir = Files.createTempDirectory("mattmc-vertex-light-test-");
 		level = new Level();
@@ -73,8 +70,8 @@ public class CrossChunkVertexLightTest {
 		LevelChunk chunk1 = level.getChunk(1, 0);
 		
 		// Initialize skylight for both chunks
-		WorldLightManager.getInstance().initializeChunkSkylight(chunk0);
-		WorldLightManager.getInstance().initializeChunkSkylight(chunk1);
+		level.getWorldLightManager().initializeChunkSkylight(chunk0);
+		level.getWorldLightManager().initializeChunkSkylight(chunk1);
 		
 		int y = LevelChunk.worldYToChunkY(100); // Well above ground
 		int z = 8;

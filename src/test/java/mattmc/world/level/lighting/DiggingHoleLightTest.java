@@ -16,6 +16,8 @@ public class DiggingHoleLightTest {
 	@Test
 	public void testDigHoleAndCoverItUp() {
 		LevelChunk chunk = new LevelChunk(0, 0);
+		WorldLightManager worldLightManager = new WorldLightManager();
+		chunk.setWorldLightManager(worldLightManager);
 		int surfaceY = LevelChunk.worldYToChunkY(64);
 		
 		System.out.println("surfaceY (chunk-local): " + surfaceY);
@@ -62,6 +64,8 @@ public class DiggingHoleLightTest {
 	@Test
 	public void testTorchInHoleThenCover() {
 		LevelChunk chunk = new LevelChunk(0, 0);
+		WorldLightManager worldLightManager = new WorldLightManager();
+		chunk.setWorldLightManager(worldLightManager);
 		int surfaceY = LevelChunk.worldYToChunkY(64);
 		
 		// Create underground (filled with stone below surface)

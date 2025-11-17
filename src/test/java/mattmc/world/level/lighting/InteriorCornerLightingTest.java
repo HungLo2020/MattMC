@@ -38,7 +38,7 @@ public class InteriorCornerLightingTest {
 		chunk.setBlock(8, y, 10, Blocks.TORCH);
 		
 		// Trigger light propagation
-		WorldLightManager.getInstance().updateBlockLight(chunk, 8, y, 10, Blocks.TORCH, Blocks.AIR);
+		level.getWorldLightManager().updateBlockLight(chunk, 8, y, 10, Blocks.TORCH, Blocks.AIR);
 		
 		// Now create a FaceData for the top face of block at (8, 64, 8)
 		// which is at the interior corner

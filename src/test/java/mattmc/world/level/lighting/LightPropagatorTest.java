@@ -160,6 +160,8 @@ public class LightPropagatorTest {
 	@Test
 	public void testUpdateBlockLight() {
 		LevelChunk chunk = new LevelChunk(0, 0);
+		WorldLightManager worldLightManager = new WorldLightManager();
+		chunk.setWorldLightManager(worldLightManager);
 		
 		int y = LevelChunk.worldYToChunkY(64);
 		

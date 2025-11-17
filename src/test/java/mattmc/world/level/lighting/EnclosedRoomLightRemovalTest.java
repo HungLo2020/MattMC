@@ -14,14 +14,17 @@ import static org.junit.jupiter.api.Assertions.*;
  */
 public class EnclosedRoomLightRemovalTest {
     
+    private WorldLightManager worldLightManager;
+    
     @BeforeEach
     public void setup() {
-        WorldLightManager.resetInstance();
+        worldLightManager = new WorldLightManager();
     }
     
     @Test
     public void testLightRemovalInEnclosedRoom() {
         LevelChunk chunk = new LevelChunk(0, 0);
+        chunk.setWorldLightManager(worldLightManager);
         
         // Create an enclosed room (5x5x5) with walls
         // Floor at Y=64, ceiling at Y=68, walls around

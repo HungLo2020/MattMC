@@ -22,9 +22,6 @@ public class CrossChunkLightTest {
 	
 	@BeforeEach
 	public void setup() throws IOException {
-		// Reset the WorldLightManager singleton for each test
-		WorldLightManager.resetInstance();
-		
 		// Create a temp world
 		tempDir = Files.createTempDirectory("mattmc-crosschunk-test-");
 		level = new Level();
@@ -75,7 +72,7 @@ public class CrossChunkLightTest {
 		chunk0.setBlock(edgeX, y, z, Blocks.TORCH);
 		
 		// Check that there are deferred updates
-		CrossChunkLightPropagator propagator = WorldLightManager.getInstance().getCrossChunkPropagator();
+		CrossChunkLightPropagator propagator = level.getWorldLightManager().getCrossChunkPropagator();
 		int deferredCount = propagator.getDeferredUpdateCount(1, 0);
 		assertTrue(deferredCount > 0, "Should have deferred updates for unloaded chunk");
 		

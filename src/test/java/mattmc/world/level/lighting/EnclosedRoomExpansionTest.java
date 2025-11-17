@@ -18,6 +18,8 @@ public class EnclosedRoomExpansionTest {
 	@Test
 	public void testExpandingEnclosedRoomWithTorch() {
 		LevelChunk chunk = new LevelChunk(0, 0);
+		WorldLightManager worldLightManager = new WorldLightManager();
+		chunk.setWorldLightManager(worldLightManager);
 		int y = LevelChunk.worldYToChunkY(64);
 		
 		// Suppress light updates during terrain setup to avoid skylight infinite loop
@@ -78,6 +80,8 @@ public class EnclosedRoomExpansionTest {
 	@Test
 	public void testExpandingRoomMultipleDirections() {
 		LevelChunk chunk = new LevelChunk(0, 0);
+		WorldLightManager worldLightManager = new WorldLightManager();
+		chunk.setWorldLightManager(worldLightManager);
 		int y = LevelChunk.worldYToChunkY(64);
 		
 		// Suppress light updates during terrain setup
