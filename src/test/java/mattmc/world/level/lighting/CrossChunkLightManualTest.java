@@ -37,9 +37,6 @@ public class CrossChunkLightManualTest {
 	}
 	
 	private static void testCrossChunkLightPropagation(Path worldDir) throws IOException {
-		// Reset WorldLightManager for clean test
-		WorldLightManager.resetInstance();
-		
 		Level level = new Level();
 		level.setWorldDirectory(worldDir);
 		level.setSeed(12345L);

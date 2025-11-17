@@ -39,6 +39,9 @@ public class Level implements LevelAccessor {
     // World block access for unified block operations across chunks
     private final WorldBlockAccess blockAccess;
     
+    // World light manager for coordinating light propagation
+    private final mattmc.world.level.lighting.WorldLightManager worldLightManager;
+    
     // Async chunk loader for background loading/generation
     private final AsyncChunkLoader asyncLoader;
     
@@ -72,17 +75,21 @@ public class Level implements LevelAccessor {
     private final DayCycle dayCycle = new DayCycle();
     
     public Level() {
+        // Initialize world light manager first
+        this.worldLightManager = new mattmc.world.level.lighting.WorldLightManager();
+        
         // Initialize block access with chunk manager
         this.blockAccess = new WorldBlockAccess(chunkManager);
         
-        // Initialize world light manager with neighbor accessor
-        mattmc.world.level.lighting.WorldLightManager.getInstance()
-            .setNeighborAccessor(this::getChunkIfLoaded);
+        // Set neighbor accessor for cross-chunk light propagation
+        this.worldLightManager.setNeighborAccessor(this::getChunkIfLoaded);
         
         this.asyncLoader = new AsyncChunkLoader();
         // Initialize with a default seed (will be updated when world is loaded/created)
         this.worldGenerator = new WorldGenerator(0L);
         this.asyncLoader.setWorldGenerator(worldGenerator);
+        // Pass world light manager to async loader
+        this.asyncLoader.setWorldLightManager(worldLightManager);
         
         // Set the neighbor accessor for cross-chunk face culling
         BlockFaceCollector.ChunkNeighborAccessor neighborAccessor = blockAccess::getBlockAcrossChunks;
@@ -213,11 +220,13 @@ public class Level implements LevelAccessor {
                 chunk = generateChunk(chunkX, chunkZ);
             }
             
+            // Set the world light manager for automatic light updates
+            chunk.setWorldLightManager(worldLightManager);
+            
             chunkManager.addChunk(chunk);
             
             // Process any deferred light updates for this chunk
-            mattmc.world.level.lighting.WorldLightManager.getInstance()
-                .processDeferredUpdates(chunk);
+            worldLightManager.processDeferredUpdates(chunk);
         }
         
         return chunk;
@@ -279,7 +288,7 @@ public class Level implements LevelAccessor {
      */
     private LevelChunk generateChunk(int chunkX, int chunkZ) {
         LevelChunk chunk = new LevelChunk(chunkX, chunkZ);
-        worldGenerator.generateChunkTerrain(chunk);
+        worldGenerator.generateChunkTerrain(chunk, worldLightManager);
         return chunk;
     }
     
@@ -430,6 +439,13 @@ public class Level implements LevelAccessor {
      */
     public DayCycle getDayCycle() {
         return dayCycle;
+    }
+    
+    /**
+     * Get the world light manager.
+     */
+    public mattmc.world.level.lighting.WorldLightManager getWorldLightManager() {
+        return worldLightManager;
     }
     
     /**

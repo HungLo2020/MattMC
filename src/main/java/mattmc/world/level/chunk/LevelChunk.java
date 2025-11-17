@@ -46,6 +46,9 @@ public final class LevelChunk {
     // Suppress light updates flag: set true during bulk operations like terrain generation
     private boolean suppressLightUpdates = false;
     
+    // World light manager reference (optional, for automatic light updates)
+    private mattmc.world.level.lighting.WorldLightManager worldLightManager = null;
+    
     public LevelChunk(int chunkX, int chunkZ) {
         this.chunkX = chunkX;
         this.chunkZ = chunkZ;
@@ -139,15 +142,13 @@ public final class LevelChunk {
         }
         
         // Update block light if emission or opacity changed
-        if (!suppressLightUpdates && 
+        if (!suppressLightUpdates && worldLightManager != null &&
             (oldBlock.getLightEmission() != block.getLightEmission() || 
              oldBlock.getOpacity() != block.getOpacity())) {
-            mattmc.world.level.lighting.WorldLightManager.getInstance()
-                .updateBlockLight(this, x, y, z, block, oldBlock);
+            worldLightManager.updateBlockLight(this, x, y, z, block, oldBlock);
             
             // Update skylight if opacity changed (column update)
-            mattmc.world.level.lighting.WorldLightManager.getInstance()
-                .updateColumnSkylight(this, x, y, z, block, oldBlock);
+            worldLightManager.updateColumnSkylight(this, x, y, z, block, oldBlock);
         }
         
         this.dirty = true;  // Mark chunk as needing re-render
@@ -173,6 +174,14 @@ public final class LevelChunk {
      */
     public void setSuppressLightUpdates(boolean suppress) {
         this.suppressLightUpdates = suppress;
+    }
+    
+    /**
+     * Set the world light manager for automatic light updates.
+     * If not set, light updates will be skipped (useful for chunks that are being generated).
+     */
+    public void setWorldLightManager(mattmc.world.level.lighting.WorldLightManager worldLightManager) {
+        this.worldLightManager = worldLightManager;
     }
     
     /**
@@ -428,10 +437,13 @@ public final class LevelChunk {
      * Recalculate block light for all emissive blocks in this chunk.
      * This is used after loading a chunk to ensure light values match current registry values.
      * If a block's light emission was changed in the registry, this will update the lighting.
+     * Requires worldLightManager to be set.
      */
     public void recalculateBlockLight() {
-        mattmc.world.level.lighting.WorldLightManager lightManager = 
-            mattmc.world.level.lighting.WorldLightManager.getInstance();
+        // Can only recalculate light if we have a world light manager
+        if (worldLightManager == null) {
+            return;
+        }
         
         // Iterate through all blocks and update lighting for emissive blocks
         for (int x = 0; x < WIDTH; x++) {
@@ -466,10 +478,10 @@ public final class LevelChunk {
                     if (mismatch) {
                         // Emission values changed - update lighting
                         // First remove the old light
-                        lightManager.removeBlockLight(this, x, y, z);
+                        worldLightManager.removeBlockLight(this, x, y, z);
                         
                         // Then add new light based on current registry values
-                        lightManager.addBlockLightRGB(this, x, y, z, emissionR, emissionG, emissionB);
+                        worldLightManager.addBlockLightRGB(this, x, y, z, emissionR, emissionG, emissionB);
                     }
                 }
             }

@@ -54,6 +54,8 @@ public class RGBLightRemovalTest {
 	@Test
 	public void testTorchPlaceAndRemove() {
 		LevelChunk chunk = new LevelChunk(0, 0);
+		WorldLightManager worldLightManager = new WorldLightManager();
+		chunk.setWorldLightManager(worldLightManager);
 		int y = LevelChunk.worldYToChunkY(64);
 		
 		// Place a torch (RGB=14,11,0)
@@ -99,6 +101,8 @@ public class RGBLightRemovalTest {
 	@Test
 	public void testMultipleTorchRemoval() {
 		LevelChunk chunk = new LevelChunk(0, 0);
+		WorldLightManager worldLightManager = new WorldLightManager();
+		chunk.setWorldLightManager(worldLightManager);
 		int y = LevelChunk.worldYToChunkY(64);
 		
 		// Place two torches far enough apart (15 blocks ensures no overlap with range 14 torches)
@@ -129,6 +133,8 @@ public class RGBLightRemovalTest {
 	@Test
 	public void testRepeatedPlaceAndRemove() {
 		LevelChunk chunk = new LevelChunk(0, 0);
+		WorldLightManager worldLightManager = new WorldLightManager();
+		chunk.setWorldLightManager(worldLightManager);
 		int y = LevelChunk.worldYToChunkY(64);
 		
 		// Test the same position multiple times to catch any state issues

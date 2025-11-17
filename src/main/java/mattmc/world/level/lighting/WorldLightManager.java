@@ -4,21 +4,19 @@ import mattmc.world.level.block.Block;
 import mattmc.world.level.chunk.LevelChunk;
 
 /**
- * Global light manager that coordinates light propagation across the entire world.
+ * World light manager that coordinates light propagation across the entire world.
  * Provides a centralized point for accessing cross-chunk light propagation.
  * 
- * This is a singleton pattern to avoid passing the cross-chunk propagator
- * through every method call.
+ * Each Level instance owns its own WorldLightManager for proper encapsulation
+ * and improved testability.
  */
 public class WorldLightManager {
-	
-	private static WorldLightManager instance = new WorldLightManager();
 	
 	private CrossChunkLightPropagator crossChunkPropagator;
 	private LightPropagator blockLightPropagator;
 	private SkylightEngine skylightEngine;
 	
-	private WorldLightManager() {
+	public WorldLightManager() {
 		this.crossChunkPropagator = new CrossChunkLightPropagator();
 		this.blockLightPropagator = new LightPropagator();
 		this.skylightEngine = new SkylightEngine();
@@ -27,20 +25,6 @@ public class WorldLightManager {
 		this.blockLightPropagator.setCrossChunkPropagator(crossChunkPropagator);
 		this.crossChunkPropagator.setLightPropagator(blockLightPropagator);
 		// SkylightEngine will also need cross-chunk support (to be added)
-	}
-	
-	/**
-	 * Get the singleton instance.
-	 */
-	public static WorldLightManager getInstance() {
-		return instance;
-	}
-	
-	/**
-	 * Reset the singleton (for testing).
-	 */
-	public static void resetInstance() {
-		instance = new WorldLightManager();
 	}
 	
 	/**

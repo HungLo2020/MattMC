@@ -24,7 +24,7 @@ public class VertexLightSamplingTest {
 		chunk.generateFlatTerrain(65);
 		
 		// Initialize skylight for the chunk
-		WorldLightManager.getInstance().initializeChunkSkylight(chunk);
+		level.getWorldLightManager().initializeChunkSkylight(chunk);
 		
 		System.out.println("--- Test 1: Skylight Sampling ---");
 		System.out.println("Created flat terrain at Y=65");
@@ -54,7 +54,7 @@ public class VertexLightSamplingTest {
 		chunk.setBlock(8, torchY, 8, Blocks.TORCH);
 		
 		// Manually trigger blockLight propagation
-		WorldLightManager.getInstance().updateBlockLight(chunk, 8, torchY, 8, Blocks.TORCH, Blocks.AIR);
+		level.getWorldLightManager().updateBlockLight(chunk, 8, torchY, 8, Blocks.TORCH, Blocks.AIR);
 		
 		System.out.println("Torch light emission: " + Blocks.TORCH.getLightEmission());
 		System.out.println("\nBlockLight values around torch:");

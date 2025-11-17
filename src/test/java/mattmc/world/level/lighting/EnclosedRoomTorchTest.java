@@ -19,6 +19,8 @@ public class EnclosedRoomTorchTest {
 	@Test
 	public void testTorchInEnclosedRoom() {
 		LevelChunk chunk = new LevelChunk(0, 0);
+		WorldLightManager worldLightManager = new WorldLightManager();
+		chunk.setWorldLightManager(worldLightManager);
 		int y = LevelChunk.worldYToChunkY(64);
 		
 		// Build a completely enclosed room (5x5x5)
@@ -63,6 +65,8 @@ public class EnclosedRoomTorchTest {
 	@Test
 	public void testMultipleIterationsInEnclosedRoom() {
 		LevelChunk chunk = new LevelChunk(0, 0);
+		WorldLightManager worldLightManager = new WorldLightManager();
+		chunk.setWorldLightManager(worldLightManager);
 		int y = LevelChunk.worldYToChunkY(64);
 		
 		// Build enclosed room

@@ -47,6 +47,7 @@ public class AsyncChunkLoader {
     private RegionFileCache regionCache;
     private TextureAtlas textureAtlas;
     private WorldGenerator worldGenerator;
+    private WorldLightManager worldLightManager;
     private BlockFaceCollector.ChunkNeighborAccessor neighborAccessor;
     private LightAccessor lightAccessor;
     
@@ -101,6 +102,13 @@ public class AsyncChunkLoader {
     
     public void setWorldGenerator(WorldGenerator generator) {
         this.worldGenerator = generator;
+    }
+    
+    /**
+     * Set the world light manager for light initialization.
+     */
+    public void setWorldLightManager(WorldLightManager worldLightManager) {
+        this.worldLightManager = worldLightManager;
     }
     
     /**
@@ -301,7 +309,9 @@ public class AsyncChunkLoader {
                     if (chunkNBT != null) {
                         LevelChunk chunk = ChunkNBT.fromNBT(chunkNBT);
                         // Initialize skylight for loaded chunks with BFS propagation
-                        WorldLightManager.getInstance().initializeChunkSkylight(chunk);
+                        if (worldLightManager != null) {
+                            worldLightManager.initializeChunkSkylight(chunk);
+                        }
                         return chunk;
                     }
                 }
@@ -341,7 +351,9 @@ public class AsyncChunkLoader {
                 if (chunkNBT != null) {
                     LevelChunk chunk = ChunkNBT.fromNBT(chunkNBT);
                     // Initialize skylight for loaded chunks with BFS propagation
-                    WorldLightManager.getInstance().initializeChunkSkylight(chunk);
+                    if (worldLightManager != null) {
+                        worldLightManager.initializeChunkSkylight(chunk);
+                    }
                     return chunk;
                 }
             }
@@ -366,7 +378,7 @@ public class AsyncChunkLoader {
         }
         
         // Use WorldGenerator to fill terrain
-        worldGenerator.generateChunkTerrain(chunk);
+        worldGenerator.generateChunkTerrain(chunk, worldLightManager);
         return chunk;
     }
     
