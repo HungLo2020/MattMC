@@ -7,64 +7,39 @@ This document provides a comprehensive analysis of the failing tests in the Matt
 
 ## Summary
 
-**Total Failing Tests: 1**
+**Total Failing Tests: 0**
 
-1. **CrossChunkLightTest**: 1 failure - Deferred updates for unloaded chunks not implemented
+All tests are now passing! 🎉
 
-**Status Update**: As of the latest test run (383 tests completed, 1 failed), the following tests that were previously failing are now passing:
+**Status Update**: As of the latest test run (384 tests completed, 0 failed), all cross-chunk light propagation tests are passing:
 - ✅ CrossChunkLightRemovalTest.testTorchJustInsideChunkBoundary
 - ✅ CrossChunkLightTest.testBlockLightCrossesChunkBoundary
 - ✅ CrossChunkLightTest.testLightCrossesMultipleChunkBoundaries
 - ✅ CrossChunkLightTest.testNoSeamsAtChunkBoundary
+- ✅ CrossChunkLightTest.testDeferredUpdateWhenChunkNotLoaded ← **FIXED!**
 - ✅ CrossChunkVertexLightTest.testBlockLightCrossesChunkBoundaryForVertices
 - ✅ CrossChunkVertexLightTest.testVertexLightSamplingConsistency
 
 ---
 
-## CrossChunkLightTest (1 failure)
+## Recent Fixes
 
-### Test Purpose
-Tests that light from blocks (especially torches) properly propagates across chunk boundaries in both directions, with correct attenuation and deferred update handling.
+### CrossChunkLightTest.testDeferredUpdateWhenChunkNotLoaded ✅ FIXED
 
-### Failing Test
-
-#### testDeferredUpdateWhenChunkNotLoaded()
-**Line 80**: `assertTrue(deferredCount > 0, "Should have deferred updates for unloaded chunk")`
-
-**Failure**: `expected: <true> but was: <false>`
-
-**What it tests**:
+**What was tested**:
 - Places torch at chunk edge BEFORE the neighboring chunk is loaded
 - Expects the lighting system to queue "deferred updates" for the unloaded chunk
 - When the chunk loads, deferred updates should be processed automatically
 
-**Why it's failing**:
-The test expects `deferredCount > 0` but gets 0. This means the lighting system is NOT tracking deferred updates for unloaded chunks.
+**What was wrong**:
+The `CrossChunkLightPropagator.propagateBlockLightRGBICross()` method had a TODO comment at line 217-220 that said "Store RGBI values in deferred updates (for now, just skip)". When a chunk was not loaded, it would simply return without deferring the update.
 
-**Root Cause**:
-The `CrossChunkLightPropagator.getDeferredUpdateCount()` method is returning 0. Either:
-1. The system is not creating deferred updates when propagating to unloaded chunks, OR
-2. The deferred update tracking mechanism is not implemented
+**How it was fixed**:
+1. Extended `CrossChunkUpdate` class to support RGBI values (r, g, b, i) in addition to legacy single light level
+2. Added `deferRGBIUpdate()` method to properly defer RGBI light updates
+3. Updated `propagateBlockLightRGBICross()` to call `deferRGBIUpdate()` when target chunk is not loaded
+4. Added `propagateWithinChunkRGBI()` method to handle RGBI deferred updates when chunks load
+5. Updated `processDeferredUpdates()` to dispatch to the appropriate propagation method based on update type
 
-This is a critical feature for open-world games - when you place a torch near a chunk boundary, the light should automatically propagate when that chunk loads later.
+This ensures that when a light source (like a torch) is placed near a chunk boundary, the light properly propagates to that chunk when it eventually loads, preventing lighting "pop in" that players would otherwise see.
 
-**Is this a real bug or false positive?**: **REAL BUG** - Deferred updates are a required feature for proper lighting in chunk-based worlds. Without this, players would see lighting "pop in" when chunks load.
-
----
-
-## Recommended Actions
-
-### Critical Fixes (Real Bugs)
-1. **Implement deferred updates** - Track and apply light updates for unloaded chunks
-   - Ensure `getDeferredUpdateCount()` properly tracks pending updates
-   - Process deferred updates when chunks load
-
----
-
-## Test Status Summary
-
-| Test Class | Test Method | Status | Type |
-|------------|------------|--------|------|
-| CrossChunkLightTest | testDeferredUpdateWhenChunkNotLoaded | ❌ | Real Bug |
-
-**Real Bugs**: 1 out of 1 failing test
