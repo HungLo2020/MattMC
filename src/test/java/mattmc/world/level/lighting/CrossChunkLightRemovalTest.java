@@ -55,7 +55,7 @@ public class CrossChunkLightRemovalTest {
 		}
 		
 		System.out.println("Skylight at chunk0[15]: " + chunk0.getSkyLight(15, y, 8));
-		System.out.println("Blocklight before torch at chunk0[15]: " + chunk0.getBlockLight(15, y, 8));
+		System.out.println("Blocklight before torch at chunk0[15]: " + chunk0.getBlockLightI(15, y, 8));
 		
 		// Place a torch at the edge of chunk 0 (will propagate into chunk 1)
 		int edgeX = 15; // Last block in chunk 0

@@ -71,7 +71,7 @@ public class InteriorCornerLightingTest {
 			@Override
 			public int getBlockLightAcrossChunks(LevelChunk chunk, int x, int y, int z) {
 				if (x >= 0 && x < LevelChunk.WIDTH && z >= 0 && z < LevelChunk.DEPTH) {
-					return chunk.getBlockLight(x, y, z);
+					return chunk.getBlockLightI(x, y, z);
 				}
 				return 0; // Default no blocklight
 			}
@@ -152,7 +152,7 @@ public class InteriorCornerLightingTest {
 			@Override
 			public int getBlockLightAcrossChunks(LevelChunk chunk, int x, int y, int z) {
 				if (x >= 0 && x < LevelChunk.WIDTH && z >= 0 && z < LevelChunk.DEPTH) {
-					return chunk.getBlockLight(x, y, z);
+					return chunk.getBlockLightI(x, y, z);
 				}
 				return 0;
 			}
@@ -224,7 +224,7 @@ public class InteriorCornerLightingTest {
 			public int getBlockLightAcrossChunks(LevelChunk chunk, int x, int y, int z) {
 				if (x >= 0 && x < LevelChunk.WIDTH && z >= 0 && z < LevelChunk.DEPTH && 
 				    y >= 0 && y < LevelChunk.HEIGHT) {
-					return chunk.getBlockLight(x, y, z);
+					return chunk.getBlockLightI(x, y, z);
 				}
 				return 0;
 			}

@@ -67,7 +67,7 @@ public class CrossChunkLightManualTest {
 		
 		// In chunk 0 approaching boundary
 		for (int x = torchX; x <= 15; x++) {
-			int light = chunk0.getBlockLight(x, y, z);
+			int light = chunk0.getBlockLightI(x, y, z);
 			int distance = x - torchX;
 			System.out.println(String.format("  Torch + %d blocks  (0, 0)   %2d      %2d", 
 			                                distance, x, light));
@@ -76,15 +76,15 @@ public class CrossChunkLightManualTest {
 		// Across boundary in chunk 1
 		System.out.println("  --- CHUNK BOUNDARY ---");
 		for (int x = 0; x <= 5; x++) {
-			int light = chunk1.getBlockLight(x, y, z);
+			int light = chunk1.getBlockLightI(x, y, z);
 			int distance = (15 - torchX) + 1 + x;
 			System.out.println(String.format("  Torch + %d blocks  (1, 0)   %2d      %2d", 
 			                                distance, x, light));
 		}
 		
 		// Verify no seam
-		int lightBeforeBoundary = chunk0.getBlockLight(15, y, z);
-		int lightAfterBoundary = chunk1.getBlockLight(0, y, z);
+		int lightBeforeBoundary = chunk0.getBlockLightI(15, y, z);
+		int lightAfterBoundary = chunk1.getBlockLightI(0, y, z);
 		
 		System.out.println("\nVerification:");
 		System.out.println(String.format("  Light at chunk0[15]: %d", lightBeforeBoundary));
@@ -111,7 +111,7 @@ public class CrossChunkLightManualTest {
 		chunk1.setBlock(edgeX, y, z, Blocks.TORCH);
 		
 		// Check light in chunk 2
-		int chunk2Light = chunk2.getBlockLight(0, y, z);
+		int chunk2Light = chunk2.getBlockLightI(0, y, z);
 		System.out.println(String.format("Light at chunk (2, 0) position [0]: %d", chunk2Light));
 		verify(chunk2Light > 0, "Deferred light update should be processed when chunk loads");
 		
@@ -133,7 +133,7 @@ public class CrossChunkLightManualTest {
 			int chunkX = worldX / 16;
 			int localX = worldX % 16;
 			LevelChunk chunk = level.getChunk(chunkX, 0);
-			int light = chunk.getBlockLight(localX, y, z);
+			int light = chunk.getBlockLightI(localX, y, z);
 			String boundary = (worldX == 64) ? " <-- BOUNDARY" : "";
 			System.out.println(String.format("  %7d  (%d, 0)  %7d  %5d%s", 
 			                                worldX, chunkX, localX, light, boundary));

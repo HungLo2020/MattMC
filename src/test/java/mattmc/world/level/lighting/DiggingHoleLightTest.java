@@ -85,28 +85,28 @@ public class DiggingHoleLightTest {
 		// Place a torch in the cave
 		chunk.setBlock(7, surfaceY - 3, 7, Blocks.TORCH);
 		
-		System.out.println("Torch placed, blocklight: " + chunk.getBlockLight(7, surfaceY - 3, 7));
+		System.out.println("Torch placed, blocklight: " + chunk.getBlockLightI(7, surfaceY - 3, 7));
 		
 		// Cave should be lit by torch
-		int lightFromTorch = chunk.getBlockLight(7, surfaceY - 3, 7);
+		int lightFromTorch = chunk.getBlockLightI(7, surfaceY - 3, 7);
 		assertTrue(lightFromTorch > 0, "Torch should light the cave, got: " + lightFromTorch);
 		
 		// Also should have propagated light nearby
-		int lightNearby = chunk.getBlockLight(7, surfaceY - 2, 7);
+		int lightNearby = chunk.getBlockLightI(7, surfaceY - 2, 7);
 		System.out.println("Light nearby: " + lightNearby);
 		assertTrue(lightNearby > 0, "Light should propagate from torch, got: " + lightNearby);
 		
 		// Remove the torch - this is where the bug happens
 		chunk.setBlock(7, surfaceY - 3, 7, Blocks.AIR);
 		
-		System.out.println("After removing torch, blocklight at source: " + chunk.getBlockLight(7, surfaceY - 3, 7));
-		System.out.println("After removing torch, blocklight nearby: " + chunk.getBlockLight(7, surfaceY - 2, 7));
+		System.out.println("After removing torch, blocklight at source: " + chunk.getBlockLightI(7, surfaceY - 3, 7));
+		System.out.println("After removing torch, blocklight nearby: " + chunk.getBlockLightI(7, surfaceY - 2, 7));
 		
 		// Light should be completely gone
-		assertEquals(0, chunk.getBlockLight(7, surfaceY - 3, 7), "Torch light should be removed");
-		assertEquals(0, chunk.getBlockLight(7, surfaceY - 2, 7), "Propagated light should be removed");
-		assertEquals(0, chunk.getBlockLight(7, surfaceY - 4, 7), "Propagated light should be removed");
-		assertEquals(0, chunk.getBlockLight(6, surfaceY - 3, 7), "Propagated light should be removed");
-		assertEquals(0, chunk.getBlockLight(8, surfaceY - 3, 7), "Propagated light should be removed");
+		assertEquals(0, chunk.getBlockLightI(7, surfaceY - 3, 7), "Torch light should be removed");
+		assertEquals(0, chunk.getBlockLightI(7, surfaceY - 2, 7), "Propagated light should be removed");
+		assertEquals(0, chunk.getBlockLightI(7, surfaceY - 4, 7), "Propagated light should be removed");
+		assertEquals(0, chunk.getBlockLightI(6, surfaceY - 3, 7), "Propagated light should be removed");
+		assertEquals(0, chunk.getBlockLightI(8, surfaceY - 3, 7), "Propagated light should be removed");
 	}
 }
