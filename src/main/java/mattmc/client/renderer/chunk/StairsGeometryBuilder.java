@@ -278,10 +278,10 @@ public class StairsGeometryBuilder {
         light3 = lightSampler.sampleVertexLight(face, 2, 3);
         
         base = currentVertex;
-        addVertex(vertices, x1, y0, z0, u1, v05, colors.north, 0, -1, 0, light0[0], light0[1], light0[2], light0[3], light0[4]);
-        addVertex(vertices, x0, y0, z0, u0, v05, colors.north, 0, -1, 0, light1[0], light1[1], light1[2], light1[3], light1[4]);
-        addVertex(vertices, x0, y1, z0, u0, v0, colors.north, 0, 1, 0, light2[0], light2[1], light2[2], light2[3], light2[4]);
-        addVertex(vertices, x1, y1, z0, u1, v0, colors.north, 0, 1, 0, light3[0], light3[1], light3[2], light3[3], light3[4]);
+        addVertex(vertices, x1, y0, z0, u1, v05, colors.north, 0, 0, -1, light0[0], light0[1], light0[2], light0[3], light0[4]);
+        addVertex(vertices, x0, y0, z0, u0, v05, colors.north, 0, 0, -1, light1[0], light1[1], light1[2], light1[3], light1[4]);
+        addVertex(vertices, x0, y1, z0, u0, v0, colors.north, 0, 0, -1, light2[0], light2[1], light2[2], light2[3], light2[4]);
+        addVertex(vertices, x1, y1, z0, u1, v0, colors.north, 0, 0, -1, light3[0], light3[1], light3[2], light3[3], light3[4]);
         addQuadIndices(indices, base);
         currentVertex += 4;
         
@@ -292,10 +292,10 @@ public class StairsGeometryBuilder {
         light3 = lightSampler.sampleVertexLight(face, 3, 3);
         
         base = currentVertex;
-        addVertex(vertices, x0, y0, z05, u0, v05, colors.south, 0, -1, 0, light0[0], light0[1], light0[2], light0[3], light0[4]);
-        addVertex(vertices, x1, y0, z05, u1, v05, colors.south, 0, -1, 0, light1[0], light1[1], light1[2], light1[3], light1[4]);
-        addVertex(vertices, x1, y1, z05, u1, v0, colors.south, 0, 1, 0, light2[0], light2[1], light2[2], light2[3], light2[4]);
-        addVertex(vertices, x0, y1, z05, u0, v0, colors.south, 0, 1, 0, light3[0], light3[1], light3[2], light3[3], light3[4]);
+        addVertex(vertices, x0, y0, z05, u0, v05, colors.south, 0, 0, 1, light0[0], light0[1], light0[2], light0[3], light0[4]);
+        addVertex(vertices, x1, y0, z05, u1, v05, colors.south, 0, 0, 1, light1[0], light1[1], light1[2], light1[3], light1[4]);
+        addVertex(vertices, x1, y1, z05, u1, v0, colors.south, 0, 0, 1, light2[0], light2[1], light2[2], light2[3], light2[4]);
+        addVertex(vertices, x0, y1, z05, u0, v0, colors.south, 0, 0, 1, light3[0], light3[1], light3[2], light3[3], light3[4]);
         addQuadIndices(indices, base);
         currentVertex += 4;
         
@@ -306,10 +306,10 @@ public class StairsGeometryBuilder {
         light3 = lightSampler.sampleVertexLight(face, 4, 3);
         
         base = currentVertex;
-        addVertex(vertices, x0, y0, z0, u0, v05, colors.west, 0, -1, 0, light0[0], light0[1], light0[2], light0[3], light0[4]);
-        addVertex(vertices, x0, y0, z05, u05, v05, colors.west, 0, -1, 0, light1[0], light1[1], light1[2], light1[3], light1[4]);
-        addVertex(vertices, x0, y1, z05, u05, v0, colors.west, 0, 1, 0, light2[0], light2[1], light2[2], light2[3], light2[4]);
-        addVertex(vertices, x0, y1, z0, u0, v0, colors.west, 0, 1, 0, light3[0], light3[1], light3[2], light3[3], light3[4]);
+        addVertex(vertices, x0, y0, z0, u0, v05, colors.west, -1, 0, 0, light0[0], light0[1], light0[2], light0[3], light0[4]);
+        addVertex(vertices, x0, y0, z05, u05, v05, colors.west, -1, 0, 0, light1[0], light1[1], light1[2], light1[3], light1[4]);
+        addVertex(vertices, x0, y1, z05, u05, v0, colors.west, -1, 0, 0, light2[0], light2[1], light2[2], light2[3], light2[4]);
+        addVertex(vertices, x0, y1, z0, u0, v0, colors.west, -1, 0, 0, light3[0], light3[1], light3[2], light3[3], light3[4]);
         addQuadIndices(indices, base);
         currentVertex += 4;
         
@@ -320,10 +320,10 @@ public class StairsGeometryBuilder {
         light3 = lightSampler.sampleVertexLight(face, 5, 3);
         
         base = currentVertex;
-        addVertex(vertices, x1, y0, z05, u05, v05, colors.east, 0, -1, 0, light0[0], light0[1], light0[2], light0[3], light0[4]);
-        addVertex(vertices, x1, y0, z0, u0, v05, colors.east, 0, -1, 0, light1[0], light1[1], light1[2], light1[3], light1[4]);
-        addVertex(vertices, x1, y1, z0, u0, v0, colors.east, 0, 1, 0, light2[0], light2[1], light2[2], light2[3], light2[4]);
-        addVertex(vertices, x1, y1, z05, u05, v0, colors.east, 0, 1, 0, light3[0], light3[1], light3[2], light3[3], light3[4]);
+        addVertex(vertices, x1, y0, z05, u05, v05, colors.east, 1, 0, 0, light0[0], light0[1], light0[2], light0[3], light0[4]);
+        addVertex(vertices, x1, y0, z0, u0, v05, colors.east, 1, 0, 0, light1[0], light1[1], light1[2], light1[3], light1[4]);
+        addVertex(vertices, x1, y1, z0, u0, v0, colors.east, 1, 0, 0, light2[0], light2[1], light2[2], light2[3], light2[4]);
+        addVertex(vertices, x1, y1, z05, u05, v0, colors.east, 1, 0, 0, light3[0], light3[1], light3[2], light3[3], light3[4]);
         addQuadIndices(indices, base);
         currentVertex += 4;
         
@@ -374,10 +374,10 @@ public class StairsGeometryBuilder {
         light3 = lightSampler.sampleVertexLight(face, 2, 3);
         
         base = currentVertex;
-        addVertex(vertices, x1, y0, z05, u1, v05, colors.north, 0, -1, 0, light0[0], light0[1], light0[2], light0[3], light0[4]);
-        addVertex(vertices, x0, y0, z05, u0, v05, colors.north, 0, -1, 0, light1[0], light1[1], light1[2], light1[3], light1[4]);
-        addVertex(vertices, x0, y1, z05, u0, v0, colors.north, 0, 1, 0, light2[0], light2[1], light2[2], light2[3], light2[4]);
-        addVertex(vertices, x1, y1, z05, u1, v0, colors.north, 0, 1, 0, light3[0], light3[1], light3[2], light3[3], light3[4]);
+        addVertex(vertices, x1, y0, z05, u1, v05, colors.north, 0, 0, -1, light0[0], light0[1], light0[2], light0[3], light0[4]);
+        addVertex(vertices, x0, y0, z05, u0, v05, colors.north, 0, 0, -1, light1[0], light1[1], light1[2], light1[3], light1[4]);
+        addVertex(vertices, x0, y1, z05, u0, v0, colors.north, 0, 0, -1, light2[0], light2[1], light2[2], light2[3], light2[4]);
+        addVertex(vertices, x1, y1, z05, u1, v0, colors.north, 0, 0, -1, light3[0], light3[1], light3[2], light3[3], light3[4]);
         addQuadIndices(indices, base);
         currentVertex += 4;
         
@@ -388,10 +388,10 @@ public class StairsGeometryBuilder {
         light3 = lightSampler.sampleVertexLight(face, 3, 3);
         
         base = currentVertex;
-        addVertex(vertices, x0, y0, z1, u0, v05, colors.south, 0, -1, 0, light0[0], light0[1], light0[2], light0[3], light0[4]);
-        addVertex(vertices, x1, y0, z1, u1, v05, colors.south, 0, -1, 0, light1[0], light1[1], light1[2], light1[3], light1[4]);
-        addVertex(vertices, x1, y1, z1, u1, v0, colors.south, 0, 1, 0, light2[0], light2[1], light2[2], light2[3], light2[4]);
-        addVertex(vertices, x0, y1, z1, u0, v0, colors.south, 0, 1, 0, light3[0], light3[1], light3[2], light3[3], light3[4]);
+        addVertex(vertices, x0, y0, z1, u0, v05, colors.south, 0, 0, 1, light0[0], light0[1], light0[2], light0[3], light0[4]);
+        addVertex(vertices, x1, y0, z1, u1, v05, colors.south, 0, 0, 1, light1[0], light1[1], light1[2], light1[3], light1[4]);
+        addVertex(vertices, x1, y1, z1, u1, v0, colors.south, 0, 0, 1, light2[0], light2[1], light2[2], light2[3], light2[4]);
+        addVertex(vertices, x0, y1, z1, u0, v0, colors.south, 0, 0, 1, light3[0], light3[1], light3[2], light3[3], light3[4]);
         addQuadIndices(indices, base);
         currentVertex += 4;
         
@@ -402,10 +402,10 @@ public class StairsGeometryBuilder {
         light3 = lightSampler.sampleVertexLight(face, 4, 3);
         
         base = currentVertex;
-        addVertex(vertices, x0, y0, z05, u05, v05, colors.west, 0, -1, 0, light0[0], light0[1], light0[2], light0[3], light0[4]);
-        addVertex(vertices, x0, y0, z1, u1, v05, colors.west, 0, -1, 0, light1[0], light1[1], light1[2], light1[3], light1[4]);
-        addVertex(vertices, x0, y1, z1, u1, v0, colors.west, 0, 1, 0, light2[0], light2[1], light2[2], light2[3], light2[4]);
-        addVertex(vertices, x0, y1, z05, u05, v0, colors.west, 0, 1, 0, light3[0], light3[1], light3[2], light3[3], light3[4]);
+        addVertex(vertices, x0, y0, z05, u05, v05, colors.west, -1, 0, 0, light0[0], light0[1], light0[2], light0[3], light0[4]);
+        addVertex(vertices, x0, y0, z1, u1, v05, colors.west, -1, 0, 0, light1[0], light1[1], light1[2], light1[3], light1[4]);
+        addVertex(vertices, x0, y1, z1, u1, v0, colors.west, -1, 0, 0, light2[0], light2[1], light2[2], light2[3], light2[4]);
+        addVertex(vertices, x0, y1, z05, u05, v0, colors.west, -1, 0, 0, light3[0], light3[1], light3[2], light3[3], light3[4]);
         addQuadIndices(indices, base);
         currentVertex += 4;
         
@@ -416,10 +416,10 @@ public class StairsGeometryBuilder {
         light3 = lightSampler.sampleVertexLight(face, 5, 3);
         
         base = currentVertex;
-        addVertex(vertices, x1, y0, z1, u1, v05, colors.east, 0, -1, 0, light0[0], light0[1], light0[2], light0[3], light0[4]);
-        addVertex(vertices, x1, y0, z05, u05, v05, colors.east, 0, -1, 0, light1[0], light1[1], light1[2], light1[3], light1[4]);
-        addVertex(vertices, x1, y1, z05, u05, v0, colors.east, 0, 1, 0, light2[0], light2[1], light2[2], light2[3], light2[4]);
-        addVertex(vertices, x1, y1, z1, u1, v0, colors.east, 0, 1, 0, light3[0], light3[1], light3[2], light3[3], light3[4]);
+        addVertex(vertices, x1, y0, z1, u1, v05, colors.east, 1, 0, 0, light0[0], light0[1], light0[2], light0[3], light0[4]);
+        addVertex(vertices, x1, y0, z05, u05, v05, colors.east, 1, 0, 0, light1[0], light1[1], light1[2], light1[3], light1[4]);
+        addVertex(vertices, x1, y1, z05, u05, v0, colors.east, 1, 0, 0, light2[0], light2[1], light2[2], light2[3], light2[4]);
+        addVertex(vertices, x1, y1, z1, u1, v0, colors.east, 1, 0, 0, light3[0], light3[1], light3[2], light3[3], light3[4]);
         addQuadIndices(indices, base);
         currentVertex += 4;
         
@@ -470,10 +470,10 @@ public class StairsGeometryBuilder {
         light3 = lightSampler.sampleVertexLight(face, 2, 3);
         
         base = currentVertex;
-        addVertex(vertices, x05, y0, z0, u05, v05, colors.north, 0, -1, 0, light0[0], light0[1], light0[2], light0[3], light0[4]);
-        addVertex(vertices, x0, y0, z0, u0, v05, colors.north, 0, -1, 0, light1[0], light1[1], light1[2], light1[3], light1[4]);
-        addVertex(vertices, x0, y1, z0, u0, v0, colors.north, 0, 1, 0, light2[0], light2[1], light2[2], light2[3], light2[4]);
-        addVertex(vertices, x05, y1, z0, u05, v0, colors.north, 0, 1, 0, light3[0], light3[1], light3[2], light3[3], light3[4]);
+        addVertex(vertices, x05, y0, z0, u05, v05, colors.north, 0, 0, -1, light0[0], light0[1], light0[2], light0[3], light0[4]);
+        addVertex(vertices, x0, y0, z0, u0, v05, colors.north, 0, 0, -1, light1[0], light1[1], light1[2], light1[3], light1[4]);
+        addVertex(vertices, x0, y1, z0, u0, v0, colors.north, 0, 0, -1, light2[0], light2[1], light2[2], light2[3], light2[4]);
+        addVertex(vertices, x05, y1, z0, u05, v0, colors.north, 0, 0, -1, light3[0], light3[1], light3[2], light3[3], light3[4]);
         addQuadIndices(indices, base);
         currentVertex += 4;
         
@@ -484,10 +484,10 @@ public class StairsGeometryBuilder {
         light3 = lightSampler.sampleVertexLight(face, 3, 3);
         
         base = currentVertex;
-        addVertex(vertices, x0, y0, z1, u0, v05, colors.south, 0, -1, 0, light0[0], light0[1], light0[2], light0[3], light0[4]);
-        addVertex(vertices, x05, y0, z1, u05, v05, colors.south, 0, -1, 0, light1[0], light1[1], light1[2], light1[3], light1[4]);
-        addVertex(vertices, x05, y1, z1, u05, v0, colors.south, 0, 1, 0, light2[0], light2[1], light2[2], light2[3], light2[4]);
-        addVertex(vertices, x0, y1, z1, u0, v0, colors.south, 0, 1, 0, light3[0], light3[1], light3[2], light3[3], light3[4]);
+        addVertex(vertices, x0, y0, z1, u0, v05, colors.south, 0, 0, 1, light0[0], light0[1], light0[2], light0[3], light0[4]);
+        addVertex(vertices, x05, y0, z1, u05, v05, colors.south, 0, 0, 1, light1[0], light1[1], light1[2], light1[3], light1[4]);
+        addVertex(vertices, x05, y1, z1, u05, v0, colors.south, 0, 0, 1, light2[0], light2[1], light2[2], light2[3], light2[4]);
+        addVertex(vertices, x0, y1, z1, u0, v0, colors.south, 0, 0, 1, light3[0], light3[1], light3[2], light3[3], light3[4]);
         addQuadIndices(indices, base);
         currentVertex += 4;
         
@@ -498,10 +498,10 @@ public class StairsGeometryBuilder {
         light3 = lightSampler.sampleVertexLight(face, 4, 3);
         
         base = currentVertex;
-        addVertex(vertices, x0, y0, z0, u0, v05, colors.west, 0, -1, 0, light0[0], light0[1], light0[2], light0[3], light0[4]);
-        addVertex(vertices, x0, y0, z1, u1, v05, colors.west, 0, -1, 0, light1[0], light1[1], light1[2], light1[3], light1[4]);
-        addVertex(vertices, x0, y1, z1, u1, v0, colors.west, 0, 1, 0, light2[0], light2[1], light2[2], light2[3], light2[4]);
-        addVertex(vertices, x0, y1, z0, u0, v0, colors.west, 0, 1, 0, light3[0], light3[1], light3[2], light3[3], light3[4]);
+        addVertex(vertices, x0, y0, z0, u0, v05, colors.west, -1, 0, 0, light0[0], light0[1], light0[2], light0[3], light0[4]);
+        addVertex(vertices, x0, y0, z1, u1, v05, colors.west, -1, 0, 0, light1[0], light1[1], light1[2], light1[3], light1[4]);
+        addVertex(vertices, x0, y1, z1, u1, v0, colors.west, -1, 0, 0, light2[0], light2[1], light2[2], light2[3], light2[4]);
+        addVertex(vertices, x0, y1, z0, u0, v0, colors.west, -1, 0, 0, light3[0], light3[1], light3[2], light3[3], light3[4]);
         addQuadIndices(indices, base);
         currentVertex += 4;
         
@@ -512,10 +512,10 @@ public class StairsGeometryBuilder {
         light3 = lightSampler.sampleVertexLight(face, 5, 3);
         
         base = currentVertex;
-        addVertex(vertices, x05, y0, z1, u1, v05, colors.east, 0, -1, 0, light0[0], light0[1], light0[2], light0[3], light0[4]);
-        addVertex(vertices, x05, y0, z0, u0, v05, colors.east, 0, -1, 0, light1[0], light1[1], light1[2], light1[3], light1[4]);
-        addVertex(vertices, x05, y1, z0, u0, v0, colors.east, 0, 1, 0, light2[0], light2[1], light2[2], light2[3], light2[4]);
-        addVertex(vertices, x05, y1, z1, u1, v0, colors.east, 0, 1, 0, light3[0], light3[1], light3[2], light3[3], light3[4]);
+        addVertex(vertices, x05, y0, z1, u1, v05, colors.east, 1, 0, 0, light0[0], light0[1], light0[2], light0[3], light0[4]);
+        addVertex(vertices, x05, y0, z0, u0, v05, colors.east, 1, 0, 0, light1[0], light1[1], light1[2], light1[3], light1[4]);
+        addVertex(vertices, x05, y1, z0, u0, v0, colors.east, 1, 0, 0, light2[0], light2[1], light2[2], light2[3], light2[4]);
+        addVertex(vertices, x05, y1, z1, u1, v0, colors.east, 1, 0, 0, light3[0], light3[1], light3[2], light3[3], light3[4]);
         addQuadIndices(indices, base);
         currentVertex += 4;
         
@@ -566,10 +566,10 @@ public class StairsGeometryBuilder {
         light3 = lightSampler.sampleVertexLight(face, 2, 3);
         
         base = currentVertex;
-        addVertex(vertices, x1, y0, z0, u1, v05, colors.north, 0, -1, 0, light0[0], light0[1], light0[2], light0[3], light0[4]);
-        addVertex(vertices, x05, y0, z0, u05, v05, colors.north, 0, -1, 0, light1[0], light1[1], light1[2], light1[3], light1[4]);
-        addVertex(vertices, x05, y1, z0, u05, v0, colors.north, 0, 1, 0, light2[0], light2[1], light2[2], light2[3], light2[4]);
-        addVertex(vertices, x1, y1, z0, u1, v0, colors.north, 0, 1, 0, light3[0], light3[1], light3[2], light3[3], light3[4]);
+        addVertex(vertices, x1, y0, z0, u1, v05, colors.north, 0, 0, -1, light0[0], light0[1], light0[2], light0[3], light0[4]);
+        addVertex(vertices, x05, y0, z0, u05, v05, colors.north, 0, 0, -1, light1[0], light1[1], light1[2], light1[3], light1[4]);
+        addVertex(vertices, x05, y1, z0, u05, v0, colors.north, 0, 0, -1, light2[0], light2[1], light2[2], light2[3], light2[4]);
+        addVertex(vertices, x1, y1, z0, u1, v0, colors.north, 0, 0, -1, light3[0], light3[1], light3[2], light3[3], light3[4]);
         addQuadIndices(indices, base);
         currentVertex += 4;
         
@@ -580,10 +580,10 @@ public class StairsGeometryBuilder {
         light3 = lightSampler.sampleVertexLight(face, 3, 3);
         
         base = currentVertex;
-        addVertex(vertices, x05, y0, z1, u05, v05, colors.south, 0, -1, 0, light0[0], light0[1], light0[2], light0[3], light0[4]);
-        addVertex(vertices, x1, y0, z1, u1, v05, colors.south, 0, -1, 0, light1[0], light1[1], light1[2], light1[3], light1[4]);
-        addVertex(vertices, x1, y1, z1, u1, v0, colors.south, 0, 1, 0, light2[0], light2[1], light2[2], light2[3], light2[4]);
-        addVertex(vertices, x05, y1, z1, u05, v0, colors.south, 0, 1, 0, light3[0], light3[1], light3[2], light3[3], light3[4]);
+        addVertex(vertices, x05, y0, z1, u05, v05, colors.south, 0, 0, 1, light0[0], light0[1], light0[2], light0[3], light0[4]);
+        addVertex(vertices, x1, y0, z1, u1, v05, colors.south, 0, 0, 1, light1[0], light1[1], light1[2], light1[3], light1[4]);
+        addVertex(vertices, x1, y1, z1, u1, v0, colors.south, 0, 0, 1, light2[0], light2[1], light2[2], light2[3], light2[4]);
+        addVertex(vertices, x05, y1, z1, u05, v0, colors.south, 0, 0, 1, light3[0], light3[1], light3[2], light3[3], light3[4]);
         addQuadIndices(indices, base);
         currentVertex += 4;
         
@@ -594,10 +594,10 @@ public class StairsGeometryBuilder {
         light3 = lightSampler.sampleVertexLight(face, 4, 3);
         
         base = currentVertex;
-        addVertex(vertices, x05, y0, z0, u0, v05, colors.west, 0, -1, 0, light0[0], light0[1], light0[2], light0[3], light0[4]);
-        addVertex(vertices, x05, y0, z1, u1, v05, colors.west, 0, -1, 0, light1[0], light1[1], light1[2], light1[3], light1[4]);
-        addVertex(vertices, x05, y1, z1, u1, v0, colors.west, 0, 1, 0, light2[0], light2[1], light2[2], light2[3], light2[4]);
-        addVertex(vertices, x05, y1, z0, u0, v0, colors.west, 0, 1, 0, light3[0], light3[1], light3[2], light3[3], light3[4]);
+        addVertex(vertices, x05, y0, z0, u0, v05, colors.west, -1, 0, 0, light0[0], light0[1], light0[2], light0[3], light0[4]);
+        addVertex(vertices, x05, y0, z1, u1, v05, colors.west, -1, 0, 0, light1[0], light1[1], light1[2], light1[3], light1[4]);
+        addVertex(vertices, x05, y1, z1, u1, v0, colors.west, -1, 0, 0, light2[0], light2[1], light2[2], light2[3], light2[4]);
+        addVertex(vertices, x05, y1, z0, u0, v0, colors.west, -1, 0, 0, light3[0], light3[1], light3[2], light3[3], light3[4]);
         addQuadIndices(indices, base);
         currentVertex += 4;
         
@@ -608,10 +608,10 @@ public class StairsGeometryBuilder {
         light3 = lightSampler.sampleVertexLight(face, 5, 3);
         
         base = currentVertex;
-        addVertex(vertices, x1, y0, z1, u1, v05, colors.east, 0, -1, 0, light0[0], light0[1], light0[2], light0[3], light0[4]);
-        addVertex(vertices, x1, y0, z0, u0, v05, colors.east, 0, -1, 0, light1[0], light1[1], light1[2], light1[3], light1[4]);
-        addVertex(vertices, x1, y1, z0, u0, v0, colors.east, 0, 1, 0, light2[0], light2[1], light2[2], light2[3], light2[4]);
-        addVertex(vertices, x1, y1, z1, u1, v0, colors.east, 0, 1, 0, light3[0], light3[1], light3[2], light3[3], light3[4]);
+        addVertex(vertices, x1, y0, z1, u1, v05, colors.east, 1, 0, 0, light0[0], light0[1], light0[2], light0[3], light0[4]);
+        addVertex(vertices, x1, y0, z0, u0, v05, colors.east, 1, 0, 0, light1[0], light1[1], light1[2], light1[3], light1[4]);
+        addVertex(vertices, x1, y1, z0, u0, v0, colors.east, 1, 0, 0, light2[0], light2[1], light2[2], light2[3], light2[4]);
+        addVertex(vertices, x1, y1, z1, u1, v0, colors.east, 1, 0, 0, light3[0], light3[1], light3[2], light3[3], light3[4]);
         addQuadIndices(indices, base);
         currentVertex += 4;
         
