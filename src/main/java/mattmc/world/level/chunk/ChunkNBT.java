@@ -342,8 +342,8 @@ public class ChunkNBT {
             byte[] skyLight = (byte[]) skyLightObj;
             byte[] blockLight = (byte[]) blockLightObj;
             
-            // Validate array sizes
-            if (skyLight.length == 2048 && blockLight.length == 2048) {
+            // Validate array sizes (support both legacy 2048 and RGBI 8192 formats)
+            if (skyLight.length == 2048 && (blockLight.length == 2048 || blockLight.length == 8192)) {
                 LightStorage lightStorage = new LightStorage(skyLight, blockLight);
                 // sectionY is world section index, need to convert to chunk section index
                 int chunkSectionIndex = baseY / 16;
