@@ -99,6 +99,26 @@ public class Level implements LevelAccessor {
             public int getBlockLight(LevelChunk chunk, int x, int y, int z) {
                 return blockAccess.getBlockLightAcrossChunks(chunk, x, y, z);
             }
+            
+            @Override
+            public int getBlockLightR(LevelChunk chunk, int x, int y, int z) {
+                return blockAccess.getBlockLightRAcrossChunks(chunk, x, y, z);
+            }
+            
+            @Override
+            public int getBlockLightG(LevelChunk chunk, int x, int y, int z) {
+                return blockAccess.getBlockLightGAcrossChunks(chunk, x, y, z);
+            }
+            
+            @Override
+            public int getBlockLightB(LevelChunk chunk, int x, int y, int z) {
+                return blockAccess.getBlockLightBAcrossChunks(chunk, x, y, z);
+            }
+            
+            @Override
+            public int getBlockLightI(LevelChunk chunk, int x, int y, int z) {
+                return blockAccess.getBlockLightIAcrossChunks(chunk, x, y, z);
+            }
         };
         this.asyncLoader.setLightAccessor(lightAccessor);
     }
