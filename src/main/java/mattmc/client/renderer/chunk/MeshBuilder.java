@@ -19,14 +19,6 @@ import java.util.List;
  */
 public class MeshBuilder {
     
-    /**
-     * Type alias for backward compatibility.
-     * @deprecated Use VertexLightSampler.ChunkLightAccessor instead
-     */
-    @Deprecated
-    public interface ChunkLightAccessor extends VertexLightSampler.ChunkLightAccessor {
-    }
-    
     // Vertex format: x, y, z, u, v, r, g, b, a, nx, ny, nz, skyLight, blockLightR, blockLightG, blockLightB, ao (17 floats per vertex)
     // Using primitive arrays to avoid boxing/unboxing overhead
     private final FloatList vertices = new FloatList();

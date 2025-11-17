@@ -327,24 +327,6 @@ public final class LevelChunk {
     }
     
     /**
-     * Get block light level at chunk-local coordinates (legacy, returns intensity).
-     * @param x 0-15
-     * @param y 0-383 (world Y = y + MIN_Y)
-     * @param z 0-15
-     * @return Block light level (0-15)
-     * @deprecated Use getBlockLightR/G/B/I for RGBI values
-     */
-    @Deprecated
-    public int getBlockLight(int x, int y, int z) {
-        if (x < 0 || x >= WIDTH || y < 0 || y >= HEIGHT || z < 0 || z >= DEPTH) {
-            return 0;
-        }
-        int sectionIndex = y / SECTION_HEIGHT;
-        int sectionY = y % SECTION_HEIGHT;
-        return lightSections[sectionIndex].getBlockLight(x, sectionY, z);
-    }
-    
-    /**
      * Set block light RGBI levels at chunk-local coordinates.
      * @param x 0-15
      * @param y 0-383 (world Y = y + MIN_Y)
@@ -381,26 +363,6 @@ public final class LevelChunk {
         int sectionIndex = y / SECTION_HEIGHT;
         int sectionY = y % SECTION_HEIGHT;
         lightSections[sectionIndex].setBlockLightRGB(x, sectionY, z, r, g, b);
-        // Mark chunk dirty to trigger mesh rebuild with new lighting
-        setDirty(true);
-    }
-    
-    /**
-     * Set block light level at chunk-local coordinates (legacy, sets all RGBI to same value).
-     * @param x 0-15
-     * @param y 0-383 (world Y = y + MIN_Y)
-     * @param z 0-15
-     * @param level Light level (0-15)
-     * @deprecated Use setBlockLightRGBI for RGBI values
-     */
-    @Deprecated
-    public void setBlockLight(int x, int y, int z, int level) {
-        if (x < 0 || x >= WIDTH || y < 0 || y >= HEIGHT || z < 0 || z >= DEPTH) {
-            return;
-        }
-        int sectionIndex = y / SECTION_HEIGHT;
-        int sectionY = y % SECTION_HEIGHT;
-        lightSections[sectionIndex].setBlockLight(x, sectionY, z, level);
         // Mark chunk dirty to trigger mesh rebuild with new lighting
         setDirty(true);
     }
