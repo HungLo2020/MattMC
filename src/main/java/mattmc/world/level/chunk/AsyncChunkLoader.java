@@ -56,6 +56,23 @@ public class AsyncChunkLoader {
     public interface LightAccessor {
         int getSkyLight(LevelChunk chunk, int x, int y, int z);
         int getBlockLight(LevelChunk chunk, int x, int y, int z);
+        
+        // RGBI light methods for proper color and attenuation
+        default int getBlockLightR(LevelChunk chunk, int x, int y, int z) {
+            return getBlockLight(chunk, x, y, z); // Fallback to intensity for white light
+        }
+        
+        default int getBlockLightG(LevelChunk chunk, int x, int y, int z) {
+            return getBlockLight(chunk, x, y, z); // Fallback to intensity for white light
+        }
+        
+        default int getBlockLightB(LevelChunk chunk, int x, int y, int z) {
+            return getBlockLight(chunk, x, y, z); // Fallback to intensity for white light
+        }
+        
+        default int getBlockLightI(LevelChunk chunk, int x, int y, int z) {
+            return getBlockLight(chunk, x, y, z); // Fallback to intensity
+        }
     }
     
     public AsyncChunkLoader() {
@@ -388,6 +405,36 @@ public class AsyncChunkLoader {
                 @Override
                 public int getBlockLightAcrossChunks(LevelChunk chunk, int x, int y, int z) {
                     return lightAccessor.getBlockLight(chunk, x, y, z);
+                }
+                
+                @Override
+                public int[] getBlockLightRGBAcrossChunks(LevelChunk chunk, int x, int y, int z) {
+                    // Get RGBI values from the light accessor
+                    int r = lightAccessor.getBlockLightR(chunk, x, y, z);
+                    int g = lightAccessor.getBlockLightG(chunk, x, y, z);
+                    int b = lightAccessor.getBlockLightB(chunk, x, y, z);
+                    int intensity = lightAccessor.getBlockLightI(chunk, x, y, z);
+                    
+                    // If no light, return early
+                    if (intensity == 0) {
+                        return new int[] {0, 0, 0};
+                    }
+                    
+                    // Scale RGB by intensity ratio to properly attenuate light
+                    int maxRGB = Math.max(r, Math.max(g, b));
+                    
+                    // If maxRGB is 0 but intensity is not, use intensity as white light
+                    if (maxRGB == 0) {
+                        return new int[] {intensity, intensity, intensity};
+                    }
+                    
+                    // Scale RGB by the intensity ratio
+                    float scale = (float) intensity / maxRGB;
+                    int scaledR = Math.round(r * scale);
+                    int scaledG = Math.round(g * scale);
+                    int scaledB = Math.round(b * scale);
+                    
+                    return new int[] {scaledR, scaledG, scaledB};
                 }
             });
         }
