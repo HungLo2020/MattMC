@@ -62,7 +62,7 @@ byte[] skyLight = storage.getSkyLightArray();
 byte[] blockLight = storage.getBlockLightArray();
 
 assertEquals(2048, skyLight.length);
-assertEquals(2048, blockLight.length);
+assertEquals(8192, blockLight.length);
 
 LightStorage restored = new LightStorage(skyLight, blockLight);
 
