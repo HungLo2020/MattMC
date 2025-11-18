@@ -431,11 +431,15 @@ public class ItemRenderer {
         // Scale flat items to match the visual size of isometric block items
         // Isometric blocks have a diamond width of 2*size, so we scale flat items by 2x
         float halfSize = size;
+        
+        // Shift items upward to center them properly in inventory slots
+        float yOffset = size * 0.5f;
+        
         glBegin(GL_QUADS);
-        glTexCoord2f(0, 1); glVertex2f(x - halfSize, y - halfSize);
-        glTexCoord2f(1, 1); glVertex2f(x + halfSize, y - halfSize);
-        glTexCoord2f(1, 0); glVertex2f(x + halfSize, y + halfSize);
-        glTexCoord2f(0, 0); glVertex2f(x - halfSize, y + halfSize);
+        glTexCoord2f(0, 1); glVertex2f(x - halfSize, y - halfSize - yOffset);
+        glTexCoord2f(1, 1); glVertex2f(x + halfSize, y - halfSize - yOffset);
+        glTexCoord2f(1, 0); glVertex2f(x + halfSize, y + halfSize - yOffset);
+        glTexCoord2f(0, 0); glVertex2f(x - halfSize, y + halfSize - yOffset);
         glEnd();
         
         // Restore GL state
@@ -452,11 +456,15 @@ public class ItemRenderer {
         
         // Match the scale of flat items (which matches isometric block items)
         float halfSize = size;
+        
+        // Shift items upward to center them properly in inventory slots
+        float yOffset = size * 0.5f;
+        
         glBegin(GL_QUADS);
-        glVertex2f(x - halfSize, y - halfSize);
-        glVertex2f(x + halfSize, y - halfSize);
-        glVertex2f(x + halfSize, y + halfSize);
-        glVertex2f(x - halfSize, y + halfSize);
+        glVertex2f(x - halfSize, y - halfSize - yOffset);
+        glVertex2f(x + halfSize, y - halfSize - yOffset);
+        glVertex2f(x + halfSize, y + halfSize - yOffset);
+        glVertex2f(x - halfSize, y + halfSize - yOffset);
         glEnd();
     }
     
