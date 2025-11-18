@@ -24,9 +24,6 @@ public class CrossChunkVertexLightTest {
 	
 	@BeforeEach
 	public void setup() throws IOException {
-		// Reset the WorldLightManager singleton for each test
-		WorldLightManager.resetInstance();
-		
 		// Create a temp world
 		tempDir = Files.createTempDirectory("mattmc-vertex-light-test-");
 		level = new Level();
@@ -49,12 +46,12 @@ public class CrossChunkVertexLightTest {
 		chunk0.setBlock(edgeX, y, z, Blocks.TORCH);
 		
 		// Verify torch has light (intensity = max(R=14, G=11, B=0) = 14)
-		int torchLight = chunk0.getBlockLight(edgeX, y, z);
+		int torchLight = chunk0.getBlockLightI(edgeX, y, z);
 		assertEquals(14, torchLight, "Torch should have light level 14");
 		
 		// Verify light propagates across boundary with attenuation of 1
 		// Distance 1: intensity = 14 - 1 = 13
-		int boundaryLight = chunk1.getBlockLight(0, y, z);
+		int boundaryLight = chunk1.getBlockLightI(0, y, z);
 		assertTrue(boundaryLight > 0, "Light should cross chunk boundary");
 		assertEquals(13, boundaryLight, "Light should attenuate by 1 across boundary");
 		
@@ -73,8 +70,8 @@ public class CrossChunkVertexLightTest {
 		LevelChunk chunk1 = level.getChunk(1, 0);
 		
 		// Initialize skylight for both chunks
-		WorldLightManager.getInstance().initializeChunkSkylight(chunk0);
-		WorldLightManager.getInstance().initializeChunkSkylight(chunk1);
+		level.getWorldLightManager().initializeChunkSkylight(chunk0);
+		level.getWorldLightManager().initializeChunkSkylight(chunk1);
 		
 		int y = LevelChunk.worldYToChunkY(100); // Well above ground
 		int z = 8;
@@ -122,16 +119,16 @@ public class CrossChunkVertexLightTest {
 		chunk0.setBlock(14, y, z, Blocks.TORCH);
 		
 		// Verify torch has light
-		assertEquals(14, chunk0.getBlockLight(14, y, z), "Torch should have light level 14");
+		assertEquals(14, chunk0.getBlockLightI(14, y, z), "Torch should have light level 14");
 		
 		// Light should reach chunk0's edge (x=15)
-		int edgeLight = chunk0.getBlockLight(15, y, z);
+		int edgeLight = chunk0.getBlockLightI(15, y, z);
 		System.out.println("Light at edge (15, y, " + z + "): " + edgeLight);
 		assertTrue(edgeLight > 0, "Light should reach chunk edge");
 		
 		// Check light in and beyond the wall
-		int lightInWall = chunk1.getBlockLight(0, y, z);
-		int lightBeyondWall = chunk1.getBlockLight(1, y, z);
+		int lightInWall = chunk1.getBlockLightI(0, y, z);
+		int lightBeyondWall = chunk1.getBlockLightI(1, y, z);
 		System.out.println("Light in wall (chunk1 x=0, y, " + z + "): " + lightInWall);
 		System.out.println("Light beyond wall (chunk1 x=1, y, " + z + "): " + lightBeyondWall);
 		
@@ -154,11 +151,11 @@ public class CrossChunkVertexLightTest {
 		
 		// The blocklight at chunk0's x=15 should match what we get when sampling
 		// from chunk1's perspective at x=-1
-		int lightFromChunk0 = chunk0.getBlockLight(15, y, z);
+		int lightFromChunk0 = chunk0.getBlockLightI(15, y, z);
 		
 		// We can't directly test the vertex sampling without accessing internals,
 		// but we can verify that the light values are consistent across the boundary
-		int lightFromChunk1 = chunk1.getBlockLight(0, y, z);
+		int lightFromChunk1 = chunk1.getBlockLightI(0, y, z);
 		
 		// These should differ by exactly 1 (attenuation)
 		assertEquals(lightFromChunk0 - 1, lightFromChunk1,

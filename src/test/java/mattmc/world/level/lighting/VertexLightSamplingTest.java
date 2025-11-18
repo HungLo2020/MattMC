@@ -24,7 +24,7 @@ public class VertexLightSamplingTest {
 		chunk.generateFlatTerrain(65);
 		
 		// Initialize skylight for the chunk
-		WorldLightManager.getInstance().initializeChunkSkylight(chunk);
+		level.getWorldLightManager().initializeChunkSkylight(chunk);
 		
 		System.out.println("--- Test 1: Skylight Sampling ---");
 		System.out.println("Created flat terrain at Y=65");
@@ -54,9 +54,9 @@ public class VertexLightSamplingTest {
 		chunk.setBlock(8, torchY, 8, Blocks.TORCH);
 		
 		// Manually trigger blockLight propagation
-		WorldLightManager.getInstance().updateBlockLight(chunk, 8, torchY, 8, Blocks.TORCH, Blocks.AIR);
+		level.getWorldLightManager().updateBlockLight(chunk, 8, torchY, 8, Blocks.TORCH, Blocks.AIR);
 		
-		System.out.println("Torch light emission: " + Blocks.TORCH.getLightEmission());
+		System.out.println("Torch light emission: " + Math.max(Blocks.TORCH.getLightEmissionR(), Math.max(Blocks.TORCH.getLightEmissionG(), Blocks.TORCH.getLightEmissionB())));
 		System.out.println("\nBlockLight values around torch:");
 		System.out.println("  Position             BlockLight");
 		System.out.println("  -------------------  ----------");
@@ -65,7 +65,7 @@ public class VertexLightSamplingTest {
 		for (int dx = -3; dx <= 3; dx++) {
 			int x = 8 + dx;
 			if (x >= 0 && x < LevelChunk.WIDTH) {
-				int blockLight = chunk.getBlockLight(x, torchY, 8);
+				int blockLight = chunk.getBlockLightI(x, torchY, 8);
 				String desc = dx == 0 ? "Torch source" : (Math.abs(dx) + " blocks away");
 				System.out.println("  (" + x + "," + (torchY + LevelChunk.MIN_Y) + "," + cz + ") " + desc + ":  " + blockLight);
 			}

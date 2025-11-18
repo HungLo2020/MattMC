@@ -22,15 +22,18 @@ import static org.junit.jupiter.api.Assertions.*;
  */
 public class BlockLightRegistryChangeTest {
     
+    private WorldLightManager worldLightManager;
+    
     @BeforeEach
     public void setup() {
-        WorldLightManager.resetInstance();
+        worldLightManager = new WorldLightManager();
     }
     
     @Test
     public void testBlockLightRecalculationAfterRegistryChange() {
         // Create a chunk with a torch (which has RGB emission values)
         LevelChunk chunk = new LevelChunk(0, 0);
+        chunk.setWorldLightManager(worldLightManager);
         
         // Place a torch at position (8, 100, 8)
         // The torch in the registry has emission values: R=14, G=11, B=0
@@ -76,6 +79,7 @@ public class BlockLightRegistryChangeTest {
         // 3. Load the chunk and verify recalculation happens
         
         LevelChunk chunk = new LevelChunk(0, 0);
+        chunk.setWorldLightManager(worldLightManager);
         
         // Place a torch
         chunk.setBlock(5, 80, 5, Blocks.TORCH);

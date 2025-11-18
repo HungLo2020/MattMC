@@ -22,9 +22,6 @@ public class CrossChunkLightTest {
 	
 	@BeforeEach
 	public void setup() throws IOException {
-		// Reset the WorldLightManager singleton for each test
-		WorldLightManager.resetInstance();
-		
 		// Create a temp world
 		tempDir = Files.createTempDirectory("mattmc-crosschunk-test-");
 		level = new Level();
@@ -47,17 +44,17 @@ public class CrossChunkLightTest {
 		chunk0.setBlock(edgeX, y, z, Blocks.TORCH);
 		
 		// The torch has emission level 11 (max of RGB=11,9,0)
-		int torchLight = chunk0.getBlockLight(edgeX, y, z);
+		int torchLight = chunk0.getBlockLightI(edgeX, y, z);
 		assertEquals(14, torchLight, "Torch should have light level 14");
 		
 		// Light should propagate to the neighbor chunk at x=0
 		// Attenuation: 11 - 1 = 10
-		int neighborLight = chunk1.getBlockLight(0, y, z);
+		int neighborLight = chunk1.getBlockLightI(0, y, z);
 		assertTrue(neighborLight > 0, "Light should propagate across chunk boundary, got " + neighborLight);
 		assertEquals(13, neighborLight, "Light should attenuate by 1 across boundary");
 		
 		// And further into the neighbor chunk
-		int furtherLight = chunk1.getBlockLight(1, y, z);
+		int furtherLight = chunk1.getBlockLightI(1, y, z);
 		assertTrue(furtherLight > 0, "Light should propagate further into neighbor chunk");
 		assertTrue(furtherLight < neighborLight, "Light should continue to attenuate");
 	}
@@ -75,7 +72,7 @@ public class CrossChunkLightTest {
 		chunk0.setBlock(edgeX, y, z, Blocks.TORCH);
 		
 		// Check that there are deferred updates
-		CrossChunkLightPropagator propagator = WorldLightManager.getInstance().getCrossChunkPropagator();
+		CrossChunkLightPropagator propagator = level.getWorldLightManager().getCrossChunkPropagator();
 		int deferredCount = propagator.getDeferredUpdateCount(1, 0);
 		assertTrue(deferredCount > 0, "Should have deferred updates for unloaded chunk");
 		
@@ -84,7 +81,7 @@ public class CrossChunkLightTest {
 		
 		// Light should now be in chunk 1
 		// Torch has intensity 14, at distance 1 it should be 13
-		int neighborLight = chunk1.getBlockLight(0, y, z);
+		int neighborLight = chunk1.getBlockLightI(0, y, z);
 		assertTrue(neighborLight > 0, "Deferred light should be applied when chunk loads");
 		assertEquals(13, neighborLight, "Deferred light should have correct attenuation");
 	}
@@ -105,13 +102,13 @@ public class CrossChunkLightTest {
 		
 		// Should see light in all three chunks
 		// Torch has intensity 14 (max of R=14, G=11, B=0)
-		assertTrue(chunk0.getBlockLight(torchX, y, z) == 14, "Source chunk should have full torch light");
-		assertTrue(chunk0.getBlockLight(15, y, z) > 0, "Light should reach chunk 0 edge");
-		assertTrue(chunk1.getBlockLight(0, y, z) > 0, "Light should cross into chunk 1");
+		assertTrue(chunk0.getBlockLightI(torchX, y, z) == 14, "Source chunk should have full torch light");
+		assertTrue(chunk0.getBlockLightI(15, y, z) > 0, "Light should reach chunk 0 edge");
+		assertTrue(chunk1.getBlockLightI(0, y, z) > 0, "Light should cross into chunk 1");
 		
 		// Depending on distance, might reach chunk 2
-		int lightAtChunk1Edge = chunk1.getBlockLight(15, y, z);
-		int lightInChunk2 = chunk2.getBlockLight(0, y, z);
+		int lightAtChunk1Edge = chunk1.getBlockLightI(15, y, z);
+		int lightInChunk2 = chunk2.getBlockLightI(0, y, z);
 		
 		// From torch at x=8 in chunk0 to x=0 in chunk2 is:
 		// 7 blocks to chunk edge (8,9,10,11,12,13,14) 
@@ -120,7 +117,7 @@ public class CrossChunkLightTest {
 		// Light intensity: 14 - 24 = -10, so won't reach
 		
 		// But should reach the start of chunk1 (7 blocks away, intensity = 14-7 = 7)
-		assertTrue(chunk1.getBlockLight(0, y, z) > 0, "Should reach start of chunk1");
+		assertTrue(chunk1.getBlockLightI(0, y, z) > 0, "Should reach start of chunk1");
 	}
 	
 	
@@ -136,8 +133,8 @@ public class CrossChunkLightTest {
 		chunk0.setBlock(15, y, z, Blocks.TORCH);
 		
 		// Check light continuity - no sudden jumps
-		int lightAtBoundary = chunk0.getBlockLight(15, y, z);
-		int lightAcrossBoundary = chunk1.getBlockLight(0, y, z);
+		int lightAtBoundary = chunk0.getBlockLightI(15, y, z);
+		int lightAcrossBoundary = chunk1.getBlockLightI(0, y, z);
 		
 		// Should differ by exactly 1 (attenuation)
 		assertEquals(lightAtBoundary - 1, lightAcrossBoundary, 

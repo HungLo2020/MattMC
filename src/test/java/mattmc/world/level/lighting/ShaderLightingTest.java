@@ -30,10 +30,10 @@ public class ShaderLightingTest {
 		chunk.setBlock(torchX, torchY, torchZ, Blocks.TORCH);
 		
 		// Manually set light values (normally done by propagation)
-		chunk.setBlockLight(torchX, torchY, torchZ, 14); // Source
-		chunk.setBlockLight(torchX + 1, torchY, torchZ, 13); // Adjacent
-		chunk.setBlockLight(torchX + 2, torchY, torchZ, 12); // 2 blocks away
-		chunk.setBlockLight(torchX + 3, torchY, torchZ, 11); // 3 blocks away
+		chunk.setBlockLightRGBI(torchX, torchY, torchZ, 14, 14, 14, 14); // Source
+		chunk.setBlockLightRGBI(torchX + 1, torchY, torchZ, 13, 13, 13, 13); // Adjacent
+		chunk.setBlockLightRGBI(torchX + 2, torchY, torchZ, 12, 12, 12, 12); // 2 blocks away
+		chunk.setBlockLightRGBI(torchX + 3, torchY, torchZ, 11, 11, 11, 11); // 3 blocks away
 		
 		// Set sky light
 		chunk.setSkyLight(torchX, torchY, torchZ, 0); // In cave
@@ -41,14 +41,14 @@ public class ShaderLightingTest {
 		
 		System.out.println("Test Setup:");
 		System.out.println("  Torch placed at (" + torchX + ", " + torchY + ", " + torchZ + ")");
-		System.out.println("  Emission level: " + Blocks.TORCH.getLightEmission());
+		System.out.println("  Emission level: " + Math.max(Blocks.TORCH.getLightEmissionR(), Math.max(Blocks.TORCH.getLightEmissionG(), Blocks.TORCH.getLightEmissionB())));
 		System.out.println();
 		
 		// Display light values
 		System.out.println("BlockLight values (should show torch falloff):");
 		for (int dx = 0; dx <= 3; dx++) {
 			int x = torchX + dx;
-			int light = chunk.getBlockLight(x, torchY, torchZ);
+			int light = chunk.getBlockLightI(x, torchY, torchZ);
 			float normalized = light / 15.0f;
 			float gamma14 = (float) Math.pow(normalized, 1.4);
 			float gamma20 = (float) Math.pow(normalized, 2.0);

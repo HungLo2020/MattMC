@@ -436,14 +436,14 @@ public class CrossChunkLightPropagator {
 		}
 		
 		// Get current light at position
-		int currentLight = isSkylight ? chunk.getSkyLight(x, y, z) : chunk.getBlockLight(x, y, z);
+		int currentLight = isSkylight ? chunk.getSkyLight(x, y, z) : chunk.getBlockLightI(x, y, z);
 		
 		// Only update if new light is brighter
 		if (newLight > currentLight) {
 			if (isSkylight) {
 				chunk.setSkyLight(x, y, z, newLight);
 			} else {
-				chunk.setBlockLight(x, y, z, newLight);
+				chunk.setBlockLightRGBI(x, y, z, newLight, newLight, newLight, newLight);
 			}
 			
 			// Continue propagation from this position

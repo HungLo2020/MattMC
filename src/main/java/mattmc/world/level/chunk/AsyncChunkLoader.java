@@ -3,6 +3,7 @@ package mattmc.world.level.chunk;
 import mattmc.client.renderer.chunk.ChunkMeshData;
 import mattmc.client.renderer.chunk.ChunkMeshBuffer;
 import mattmc.client.renderer.chunk.MeshBuilder;
+import mattmc.client.renderer.chunk.VertexLightSampler;
 import mattmc.client.renderer.texture.TextureAtlas;
 import mattmc.client.renderer.block.BlockFaceCollector;
 import mattmc.world.level.block.Block;
@@ -47,6 +48,7 @@ public class AsyncChunkLoader {
     private RegionFileCache regionCache;
     private TextureAtlas textureAtlas;
     private WorldGenerator worldGenerator;
+    private WorldLightManager worldLightManager;
     private BlockFaceCollector.ChunkNeighborAccessor neighborAccessor;
     private LightAccessor lightAccessor;
     
@@ -101,6 +103,13 @@ public class AsyncChunkLoader {
     
     public void setWorldGenerator(WorldGenerator generator) {
         this.worldGenerator = generator;
+    }
+    
+    /**
+     * Set the world light manager for light initialization.
+     */
+    public void setWorldLightManager(WorldLightManager worldLightManager) {
+        this.worldLightManager = worldLightManager;
     }
     
     /**
@@ -300,8 +309,12 @@ public class AsyncChunkLoader {
                     Map<String, Object> chunkNBT = regionFile.readChunk(chunkX, chunkZ);
                     if (chunkNBT != null) {
                         LevelChunk chunk = ChunkNBT.fromNBT(chunkNBT);
+                        // Set the world light manager for automatic light updates
+                        chunk.setWorldLightManager(worldLightManager);
                         // Initialize skylight for loaded chunks with BFS propagation
-                        WorldLightManager.getInstance().initializeChunkSkylight(chunk);
+                        if (worldLightManager != null) {
+                            worldLightManager.initializeChunkSkylight(chunk);
+                        }
                         return chunk;
                     }
                 }
@@ -340,8 +353,12 @@ public class AsyncChunkLoader {
                 Map<String, Object> chunkNBT = regionFile.readChunk(chunkX, chunkZ);
                 if (chunkNBT != null) {
                     LevelChunk chunk = ChunkNBT.fromNBT(chunkNBT);
+                    // Set the world light manager for automatic light updates
+                    chunk.setWorldLightManager(worldLightManager);
                     // Initialize skylight for loaded chunks with BFS propagation
-                    WorldLightManager.getInstance().initializeChunkSkylight(chunk);
+                    if (worldLightManager != null) {
+                        worldLightManager.initializeChunkSkylight(chunk);
+                    }
                     return chunk;
                 }
             }
@@ -359,6 +376,9 @@ public class AsyncChunkLoader {
     private LevelChunk generateChunk(int chunkX, int chunkZ) {
         LevelChunk chunk = new LevelChunk(chunkX, chunkZ);
         
+        // Set the world light manager for automatic light updates
+        chunk.setWorldLightManager(worldLightManager);
+        
         // If no world generator is set, generate flat terrain as fallback
         if (worldGenerator == null) {
             chunk.generateFlatTerrain(64);
@@ -366,7 +386,7 @@ public class AsyncChunkLoader {
         }
         
         // Use WorldGenerator to fill terrain
-        worldGenerator.generateChunkTerrain(chunk);
+        worldGenerator.generateChunkTerrain(chunk, worldLightManager);
         return chunk;
     }
     
@@ -396,7 +416,7 @@ public class AsyncChunkLoader {
         
         // Set light accessor for cross-chunk light sampling if available
         if (lightAccessor != null) {
-            meshBuilder.setLightAccessor(new MeshBuilder.ChunkLightAccessor() {
+            meshBuilder.setLightAccessor(new VertexLightSampler.ChunkLightAccessor() {
                 @Override
                 public int getSkyLightAcrossChunks(LevelChunk chunk, int x, int y, int z) {
                     return lightAccessor.getSkyLight(chunk, x, y, z);

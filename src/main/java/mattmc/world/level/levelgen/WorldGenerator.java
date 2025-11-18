@@ -106,8 +106,9 @@ public class WorldGenerator {
      * After terrain generation, initializes skylight based on heightmap.
      * 
      * @param chunk The chunk to fill with terrain
+     * @param worldLightManager The world light manager for initializing skylight (can be null)
      */
-    public void generateChunkTerrain(mattmc.world.level.chunk.LevelChunk chunk) {
+    public void generateChunkTerrain(mattmc.world.level.chunk.LevelChunk chunk, mattmc.world.level.lighting.WorldLightManager worldLightManager) {
         int chunkX = chunk.chunkX();
         int chunkZ = chunk.chunkZ();
         
@@ -158,6 +159,8 @@ public class WorldGenerator {
         chunk.setSuppressLightUpdates(false);
         
         // After terrain generation, initialize skylight with BFS propagation
-        WorldLightManager.getInstance().initializeChunkSkylight(chunk);
+        if (worldLightManager != null) {
+            worldLightManager.initializeChunkSkylight(chunk);
+        }
     }
 }

@@ -54,7 +54,7 @@ public class BlockLightPropagationTest {
 		chunk.setBlock(8, torchY, 8, Blocks.TORCH);
 		
 		// Verify torch emission
-		int emission = Blocks.TORCH.getLightEmission();
+		int emission = Math.max(Blocks.TORCH.getLightEmissionR(), Math.max(Blocks.TORCH.getLightEmissionG(), Blocks.TORCH.getLightEmissionB()));
 		System.out.println("Torch light emission: " + emission);
 		
 		// Check blockLight propagation
@@ -69,9 +69,9 @@ public class BlockLightPropagationTest {
 		printBlockLightAt(chunk, 9, torchY, 9, "Diagonal");
 		
 		// Verify expected values
-		int sourceLight = chunk.getBlockLight(8, torchY, 8);
-		int neighborLight = chunk.getBlockLight(9, torchY, 8);
-		int distance2Light = chunk.getBlockLight(10, torchY, 8);
+		int sourceLight = chunk.getBlockLightI(8, torchY, 8);
+		int neighborLight = chunk.getBlockLightI(9, torchY, 8);
+		int distance2Light = chunk.getBlockLightI(10, torchY, 8);
 		
 		System.out.println("\nVerification:");
 		System.out.println("  Source light: " + sourceLight + " (expected: " + emission + ")");
@@ -95,8 +95,8 @@ public class BlockLightPropagationTest {
 		printBlockLightAt(chunk, 9, torchY, 8, "Former neighbor");
 		printBlockLightAt(chunk, 10, torchY, 8, "Former distance 2");
 		
-		int removedSourceLight = chunk.getBlockLight(8, torchY, 8);
-		int removedNeighborLight = chunk.getBlockLight(9, torchY, 8);
+		int removedSourceLight = chunk.getBlockLightI(8, torchY, 8);
+		int removedNeighborLight = chunk.getBlockLightI(9, torchY, 8);
 		
 		System.out.println("\nVerification:");
 		System.out.println("  Former source light: " + removedSourceLight + " (expected: 0)");
@@ -117,7 +117,7 @@ public class BlockLightPropagationTest {
 		printBlockLightAt(chunk, 11, torchY, 8, "Torch 2 at (11,64,8)");
 		printBlockLightAt(chunk, 8, torchY, 8, "Middle (8,64,8)");
 		
-		int midLight = chunk.getBlockLight(8, torchY, 8);
+		int midLight = chunk.getBlockLightI(8, torchY, 8);
 		System.out.println("\nMiddle position light: " + midLight);
 		System.out.println("  (Should be lit from both sources)");
 		verify(midLight > 0, "Middle should have light from both sources");
@@ -131,7 +131,7 @@ public class BlockLightPropagationTest {
 		printBlockLightAt(chunk, 11, torchY, 8, "Torch 2 (still there)");
 		printBlockLightAt(chunk, 8, torchY, 8, "Middle");
 		
-		int midLightAfter = chunk.getBlockLight(8, torchY, 8);
+		int midLightAfter = chunk.getBlockLightI(8, torchY, 8);
 		System.out.println("\nMiddle position light after: " + midLightAfter);
 		System.out.println("  (Should still have light from torch 2)");
 		verify(midLightAfter > 0, "Middle should still have light from remaining torch");
@@ -151,14 +151,14 @@ public class BlockLightPropagationTest {
 		printBlockLightAt(reloadedChunk, 11, torchY, 8, "Torch 2 (should persist)");
 		printBlockLightAt(reloadedChunk, 8, torchY, 8, "Middle (should persist)");
 		
-		int persistedLight = reloadedChunk.getBlockLight(11, torchY, 8);
+		int persistedLight = reloadedChunk.getBlockLightI(11, torchY, 8);
 		verify(persistedLight == emission, "BlockLight should persist after save/load");
 		
 		level2.shutdown();
 	}
 	
 	private static void printBlockLightAt(LevelChunk chunk, int x, int y, int z, String label) {
-		int light = chunk.getBlockLight(x, y, z);
+		int light = chunk.getBlockLightI(x, y, z);
 		System.out.println("  " + label + ": " + light);
 	}
 	

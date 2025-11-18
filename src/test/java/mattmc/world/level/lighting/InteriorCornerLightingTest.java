@@ -38,7 +38,7 @@ public class InteriorCornerLightingTest {
 		chunk.setBlock(8, y, 10, Blocks.TORCH);
 		
 		// Trigger light propagation
-		WorldLightManager.getInstance().updateBlockLight(chunk, 8, y, 10, Blocks.TORCH, Blocks.AIR);
+		level.getWorldLightManager().updateBlockLight(chunk, 8, y, 10, Blocks.TORCH, Blocks.AIR);
 		
 		// Now create a FaceData for the top face of block at (8, 64, 8)
 		// which is at the interior corner
@@ -71,7 +71,7 @@ public class InteriorCornerLightingTest {
 			@Override
 			public int getBlockLightAcrossChunks(LevelChunk chunk, int x, int y, int z) {
 				if (x >= 0 && x < LevelChunk.WIDTH && z >= 0 && z < LevelChunk.DEPTH) {
-					return chunk.getBlockLight(x, y, z);
+					return chunk.getBlockLightI(x, y, z);
 				}
 				return 0; // Default no blocklight
 			}
@@ -152,7 +152,7 @@ public class InteriorCornerLightingTest {
 			@Override
 			public int getBlockLightAcrossChunks(LevelChunk chunk, int x, int y, int z) {
 				if (x >= 0 && x < LevelChunk.WIDTH && z >= 0 && z < LevelChunk.DEPTH) {
-					return chunk.getBlockLight(x, y, z);
+					return chunk.getBlockLightI(x, y, z);
 				}
 				return 0;
 			}
@@ -224,7 +224,7 @@ public class InteriorCornerLightingTest {
 			public int getBlockLightAcrossChunks(LevelChunk chunk, int x, int y, int z) {
 				if (x >= 0 && x < LevelChunk.WIDTH && z >= 0 && z < LevelChunk.DEPTH && 
 				    y >= 0 && y < LevelChunk.HEIGHT) {
-					return chunk.getBlockLight(x, y, z);
+					return chunk.getBlockLightI(x, y, z);
 				}
 				return 0;
 			}
