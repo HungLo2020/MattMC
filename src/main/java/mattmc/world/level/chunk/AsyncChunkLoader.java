@@ -309,6 +309,8 @@ public class AsyncChunkLoader {
                     Map<String, Object> chunkNBT = regionFile.readChunk(chunkX, chunkZ);
                     if (chunkNBT != null) {
                         LevelChunk chunk = ChunkNBT.fromNBT(chunkNBT);
+                        // Set the world light manager for automatic light updates
+                        chunk.setWorldLightManager(worldLightManager);
                         // Initialize skylight for loaded chunks with BFS propagation
                         if (worldLightManager != null) {
                             worldLightManager.initializeChunkSkylight(chunk);
@@ -351,6 +353,8 @@ public class AsyncChunkLoader {
                 Map<String, Object> chunkNBT = regionFile.readChunk(chunkX, chunkZ);
                 if (chunkNBT != null) {
                     LevelChunk chunk = ChunkNBT.fromNBT(chunkNBT);
+                    // Set the world light manager for automatic light updates
+                    chunk.setWorldLightManager(worldLightManager);
                     // Initialize skylight for loaded chunks with BFS propagation
                     if (worldLightManager != null) {
                         worldLightManager.initializeChunkSkylight(chunk);
@@ -371,6 +375,9 @@ public class AsyncChunkLoader {
      */
     private LevelChunk generateChunk(int chunkX, int chunkZ) {
         LevelChunk chunk = new LevelChunk(chunkX, chunkZ);
+        
+        // Set the world light manager for automatic light updates
+        chunk.setWorldLightManager(worldLightManager);
         
         // If no world generator is set, generate flat terrain as fallback
         if (worldGenerator == null) {

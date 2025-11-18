@@ -206,7 +206,9 @@ public class Level implements LevelAccessor {
             logger.error("Chunk coordinates out of bounds: ({}, {}). Max allowed: ±{}", 
                         chunkX, chunkZ, MAX_CHUNK_COORD);
             // Return an empty air chunk to prevent crashes
-            return new LevelChunk(0, 0); // Fallback to origin
+            LevelChunk fallbackChunk = new LevelChunk(0, 0);
+            fallbackChunk.setWorldLightManager(worldLightManager);
+            return fallbackChunk;
         }
         
         LevelChunk chunk = chunkManager.getChunk(chunkX, chunkZ);
