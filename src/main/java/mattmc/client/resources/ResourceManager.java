@@ -64,12 +64,18 @@ public class ResourceManager {
         
         String resourcePath = "/assets/models/block/" + path + ".json";
         
-        try (InputStream is = ResourceManager.class.getResourceAsStream(resourcePath);
-             Reader reader = new InputStreamReader(is)) {
-            BlockModel model = GSON.fromJson(reader, BlockModel.class);
-            return model;
-        } catch (IOException | JsonParseException e) {
-            logger.debug("Failed to load block model: {}", resourcePath);
+        try {
+            InputStream is = ResourceManager.class.getResourceAsStream(resourcePath);
+            if (is == null) {
+                logger.error("Block model not found: {}", resourcePath);
+                return null;
+            }
+            try (Reader reader = new InputStreamReader(is)) {
+                BlockModel model = GSON.fromJson(reader, BlockModel.class);
+                return model;
+            }
+        } catch (Exception e) {
+            logger.error("Failed to load block model: {}", resourcePath, e);
             return null;
         }
     }
@@ -230,12 +236,18 @@ public class ResourceManager {
         }
         
         String path = "/assets/blockstates/" + name + ".json";
-        try (InputStream is = ResourceManager.class.getResourceAsStream(path);
-             Reader reader = new InputStreamReader(is)) {
-            BlockState blockState = GSON.fromJson(reader, BlockState.class);
-            BLOCKSTATE_CACHE.put(name, blockState);
-            return blockState;
-        } catch (IOException | JsonParseException e) {
+        try {
+            InputStream is = ResourceManager.class.getResourceAsStream(path);
+            if (is == null) {
+                logger.error("Blockstate not found: {}", path);
+                return null;
+            }
+            try (Reader reader = new InputStreamReader(is)) {
+                BlockState blockState = GSON.fromJson(reader, BlockState.class);
+                BLOCKSTATE_CACHE.put(name, blockState);
+                return blockState;
+            }
+        } catch (Exception e) {
             logger.error("Failed to load blockstate: {}", path, e);
             return null;
         }
@@ -324,12 +336,18 @@ public class ResourceManager {
      */
     private static BlockModel loadItemModelRaw(String name) {
         String path = "/assets/models/item/" + name + ".json";
-        try (InputStream is = ResourceManager.class.getResourceAsStream(path);
-             Reader reader = new InputStreamReader(is)) {
-            BlockModel model = GSON.fromJson(reader, BlockModel.class);
-            return model;
-        } catch (IOException | JsonParseException e) {
-            logger.debug("Failed to load item model: {}", path);
+        try {
+            InputStream is = ResourceManager.class.getResourceAsStream(path);
+            if (is == null) {
+                logger.error("Item model not found: {}", path);
+                return null;
+            }
+            try (Reader reader = new InputStreamReader(is)) {
+                BlockModel model = GSON.fromJson(reader, BlockModel.class);
+                return model;
+            }
+        } catch (Exception e) {
+            logger.error("Failed to load item model: {}", path, e);
             return null;
         }
     }

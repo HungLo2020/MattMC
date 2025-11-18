@@ -146,4 +146,25 @@ class ModelLoadingTest {
         assertNotNull(model.getElements(), "Should have elements");
         assertEquals(2, model.getElements().size(), "Outer stairs should have 2 elements");
     }
+    
+    @Test
+    void testMissingItemModelHandling() {
+        // Test that loading a non-existent item model returns null instead of throwing NPE
+        BlockModel model = ResourceManager.loadItemModel("nonexistent_item_model_12345");
+        assertNull(model, "Non-existent item model should return null");
+    }
+    
+    @Test
+    void testMissingBlockModelHandling() {
+        // Test that loading a non-existent block model returns null instead of throwing NPE
+        BlockModel model = ResourceManager.loadBlockModel("nonexistent_block_model_12345");
+        assertNull(model, "Non-existent block model should return null");
+    }
+    
+    @Test
+    void testMissingBlockStateHandling() {
+        // Test that loading a non-existent blockstate returns null instead of throwing NPE
+        BlockState blockState = ResourceManager.loadBlockState("nonexistent_blockstate_12345");
+        assertNull(blockState, "Non-existent blockstate should return null");
+    }
 }
