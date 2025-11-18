@@ -322,7 +322,7 @@ public class CommandSystem {
             } else {
                 return "Unknown time subcommand. Usage: /time set <time> or /time query";
             }
-        } catch (Exception e) {
+        } catch (NumberFormatException e) {
             return "Error executing time command: " + e.getMessage();
         }
     }

@@ -1,1021 +1,725 @@
-# MattMC - Code Analysis & Refactoring Plan
+# MattMC - Code Quality & Improvement Plan
 
-**Analysis Date:** 2025-11-17  
-**Codebase Size:** 143 production Java files, ~25,537 lines of code  
-**Test Coverage:** 68 test files, ~9,782 lines of test code, 383 test methods  
-**Build Status:** ✅ Compiles successfully, all tests passing (384 tests, 0 failures)
+**Analysis Date:** 2025-11-18  
+**Codebase Size:** 214 Java source files, ~25,881 lines of production code  
+**Test Status:** ✅ All 384 tests passing (0 failures)  
+**Build Status:** ✅ Compiles successfully
 
 ---
 
 ## Executive Summary
 
-MattMC is a well-engineered, performance-focused Minecraft clone with clean architecture and solid software engineering practices. The codebase demonstrates maturity with proper logging, async I/O, comprehensive testing, and good separation of concerns. Recent improvements include fixing all lighting system tests and implementing AbstractMenuScreen base class for UI code reuse.
+MattMC is a well-engineered, performance-focused Minecraft clone with solid architecture and good software engineering practices. The code demonstrates strong understanding of performance optimization, proper async I/O, and clean separation of concerns. Recent improvements include comprehensive lighting system fixes and extraction of helper classes from large monolithic files.
 
-**Overall Code Quality:** 8.0/10
-- ✅ Strong points: Clean architecture, excellent test coverage, good performance optimizations, proper resource management
-- ⚠️ Areas for improvement: Some large classes, remaining singleton pattern usage, potential for more code reuse
+**Overall Code Quality:** 8/10
+- ✅ **Strengths**: Clean architecture, excellent test coverage (384 tests), good performance optimizations, proper resource management
+- ⚠️ **Areas for improvement**: Some very large classes (669 lines!), static mutable state in settings, limited use of modern Java features, broad exception catching
 
 ---
 
 ## Table of Contents
 
-1. [Architecture & Design](#1-architecture--design)
-2. [Code Organization & Clarity](#2-code-organization--clarity)
-3. [Performance Optimization Opportunities](#3-performance-optimization-opportunities)
-4. [Error Handling & Robustness](#4-error-handling--robustness)
-5. [Testing & Quality Assurance](#5-testing--quality-assurance)
-6. [Security Considerations](#6-security-considerations)
-7. [Code Quality Issues](#7-code-quality-issues)
-8. [Documentation & Maintainability](#8-documentation--maintainability)
-9. [Build System & Dependencies](#9-build-system--dependencies)
-10. [Recommended Refactoring Priorities](#10-recommended-refactoring-priorities)
+1. [Performance Optimization Opportunities](#1-performance-optimization-opportunities)
+2. [Code Quality & Maintainability Issues](#2-code-quality--maintainability-issues)
+3. [Potential Bugs & Robustness Issues](#3-potential-bugs--robustness-issues)
+4. [Architecture & Design Improvements](#4-architecture--design-improvements)
+5. [Build System & Dependencies](#5-build-system--dependencies)
+6. [Priority Recommendations](#6-priority-recommendations)
 
 ---
 
-## 1. Architecture & Design
+## 1. Performance Optimization Opportunities
 
-### 1.1 Large Classes (God Classes)
+### 1.1 Collection Optimizations
+**Status:** ✅ Partially Optimized  
+**Severity:** LOW  
+**Impact:** Memory and GC pressure
+
+**Current State:**
+- `FloatList` and `IntList` primitive collections already implemented ✅
+- Used in `MeshBuilder` to avoid boxing overhead ✅
+- Reduced GC pressure in hot rendering paths ✅
+
+**Remaining Opportunities:**
+```bash
+# Analysis shows 86 instances of collection creation
+# Check if any are in hot paths with boxed primitives
+```
+
+**Recommendation:**
+1. Profile application to identify hot paths with collection allocations
+2. Consider using fastutil or Eclipse Collections for additional primitive support
+3. **Priority:** LOW - already well optimized
+
+### 1.2 String Operations Performance
+**Severity:** LOW-MEDIUM  
+**Impact:** Performance in resource loading and logging
+
+**Issues Found:**
+- ~30 string split/substring/replace operations
+- String concatenation with `+` operator in various places
+- Resource path building using string concatenation
+
+**Examples:**
+```java
+// ResourceManager.java line 63
+String resourcePath = "/assets/models/block/" + path + ".json";
+```
+
+**Recommendation:**
+1. For hot paths: Use `StringBuilder` or pre-computed paths
+2. For logging: Use parameterized logging (e.g., `logger.debug("Path: {}", path)`)
+3. For resource paths: Consider `Path.of()` or caching
+4. **Priority:** LOW - Modern JVMs optimize simple concatenation well
+
+### 1.3 Async Task Management
+**Status:** Good, but can be improved  
 **Severity:** MEDIUM  
-**Impact:** Maintainability, testability
+**Impact:** Chunk loading responsiveness
 
-**Identified Large Files:**
-1. **MeshBuilder.java (982 lines)** - Down from 1,295 lines ✅ Improved
-   - Already extracted: `VertexLightSampler`, `UVMapper`
-   - Responsibilities: Face processing, vertex generation, geometry building
-   - **Status:** Significantly improved, but still large
-   - **Recommendation:** Continue monitoring size as features are added
+**Current Implementation:**
+```java
+// AsyncChunkLoader.java lines 44-45
+private static final int MAX_CHUNK_LOADS_PER_FRAME = 4;    // Why 4?
+private static final int MAX_MESH_UPLOADS_PER_FRAME = 2;   // Why 2?
+```
 
-2. **CrossChunkLightPropagator.java (572 lines)**
-   - Responsibilities: Cross-chunk light propagation, deferred updates, RGBI light handling
-   - **Recommendation:** Consider extracting deferred update management into separate class
+**Opportunities:**
+1. **Distance-based chunk priority**: Load chunks closer to player first
+2. **Task cancellation**: Cancel far-away chunk tasks when player moves
+3. **Dynamic budgets**: Adjust frame budgets based on current FPS
+4. **Telemetry**: Add metrics for thread pool utilization
 
-3. **BlockGeometryCapture.java (558 lines)**
-   - Complex geometry calculations mixed with model parsing
-   - **Recommendation:** Separate model data classes from geometry calculation logic
+**Recommendation:**
+```java
+// Add priority queue based on distance
+PriorityQueue<ChunkLoadTask> prioritized by distance to player
 
-4. **LightPropagator.java (545 lines)**
-   - BFS propagation, removal queues, within-chunk light updates
-   - **Recommendation:** Extract light removal logic into separate class
+// Add task cancellation for out-of-range chunks
+void cancelFarChunkTasks(int playerChunkX, int playerChunkZ, int maxDistance)
 
-5. **AsyncChunkLoader.java (515 lines)**
-   - Manages multiple concurrent task queues and futures
-   - **Recommendation:** Extract task priority management into separate class
+// Make budgets configurable based on performance
+int getMaxChunkLoadsPerFrame() {
+    return currentFPS > 60 ? 8 : 4;
+}
+```
+**Priority:** MEDIUM - Would improve perceived loading performance
 
-6. **OptionsManager.java (508 lines)**
-   - All game settings as static fields, loading/saving logic
-   - **Recommendation:** See section 1.2 on singleton/static state
+### 1.4 Math Operations
+**Count:** ~223 Math.* calls  
+**Severity:** LOW  
+**Impact:** Performance in hot paths
 
-7. **ItemRenderer.java (497 lines)**
+**Assessment:**
+- Modern JVMs optimize Math operations well
+- JIT compiles frequently used Math functions
+- No evidence of Math operations in tight loops causing issues
+
+**Recommendation:**
+1. Profile to identify if Math operations are bottlenecks
+2. Only optimize if profiling shows issues
+3. Consider lookup tables for trig functions if needed in tight loops
+4. **Priority:** VERY LOW - Not a problem unless proven otherwise
+
+### 1.5 Null Checks
+**Count:** 377 null comparisons  
+**Severity:** LOW  
+**Impact:** Code readability and minor performance
+
+**Issues:**
+- 377 explicit null checks throughout codebase
+- No null annotations (`@Nullable`, `@NotNull`) used
+- Defensive programming, but verbose
+
+**Recommendation:**
+1. Add JSR-305 or Java's built-in null annotations
+2. Use `Optional<T>` for optional return values where appropriate
+3. Enable null checking in IDE (reduces need for explicit checks)
+4. **Priority:** MEDIUM - Would prevent NPEs and improve code clarity
+
+---
+
+## 2. Code Quality & Maintainability Issues
+
+### 2.1 Very Large Classes
+**Severity:** HIGH  
+**Impact:** Maintainability, testability, code clarity
+
+**Largest Files:**
+1. **StairsGeometryBuilder.java (669 lines)** ⚠️ NEW LARGEST FILE
+   - Complex geometry generation for stairs blocks
+   - Handles rotation, facing, half (top/bottom)
+   - Many repetitive face generation methods
+   - **Recommendation:** Extract face generation to helper methods or separate class
+
+2. **AsyncChunkLoader.java (582 lines)**
+   - Manages chunk loading, generation, meshing
+   - Multiple concurrent task queues
+   - **Recommendation:** Extract task priority management and mesh handling
+
+3. **CrossChunkLightPropagator.java (572 lines)**
+   - Cross-chunk light propagation
+   - Deferred update management
+   - RGBI light handling
+   - **Recommendation:** Extract deferred update management
+
+4. **WorldBlockAccess.java (571 lines)**
+   - Unified block access across chunks
+   - Coordinate conversion
+   - **Recommendation:** Extract coordinate conversion utilities
+
+5. **BlockGeometryCapture.java (558 lines)**
+   - Geometry calculations mixed with model parsing
+   - **Recommendation:** Separate model data from geometry calculation
+
+6. **Level.java (528 lines)**
+   - World management, chunk loading, day cycle
+   - **Recommendation:** Extract day cycle management
+
+7. **LightPropagator.java (526 lines)**
+   - BFS propagation, removal queues
+   - **Recommendation:** Extract light removal logic
+
+8. **OptionsManager.java (508 lines)**
+   - All game settings as static fields
+   - See Section 2.2 on static mutable state
+
+9. **ItemRenderer.java (497 lines)**
    - Handles both 2D icons and 3D isometric rendering
    - **Recommendation:** Split into `Icon2DRenderer` and `IsometricBlockRenderer`
 
-8. **Level.java (490 lines)**
-   - World management, chunk loading, day cycle, block access
-   - **Recommendation:** Extract day cycle management to separate class
+10. **LevelChunk.java (457 lines)**
+    - Core chunk data structure
+    - **Status:** Acceptable size for such a central class
 
-9. **LevelChunk.java (481 lines)**
-   - Chunk data storage, light storage, block access, heightmap
-   - **Status:** Acceptable size for core data structure
+**Priority:** HIGH for StairsGeometryBuilder (669 lines is excessive)
 
-10. **DevplayScreen.java (428 lines)**
-    - Development testing screen with many features
-    - **Recommendation:** Split input handling (already has `DevplayInputHandler`) and UI state management (already has `DevplayUIState`)
+### 2.2 Static Mutable State (Anti-Pattern)
+**Severity:** HIGH  
+**Impact:** Thread safety, testability, architecture
 
-### 1.2 Static Mutable State
-**Severity:** MEDIUM  
-**Impact:** Thread safety, testability
-
-**Locations:**
-- `OptionsManager.java` - All settings as static mutable fields
-- `KeybindManager.java` - Keybind maps as static
-- `Blocks.java` - Registry as static mutable map (acceptable for this use case)
-- `Items.java` - Registry as static mutable map (acceptable for this use case)
-
-**Issues:**
-- Static mutable state is not inherently thread-safe
-- Makes testing difficult (shared state between tests)
-- Violates dependency injection principles for OptionsManager and KeybindManager
-
-**Recommendation:**
-1. For `OptionsManager` and `KeybindManager`: Convert to instance-based managers
-2. Use dependency injection to pass instances
-3. For registries (`Blocks`, `Items`): Current pattern is acceptable as they're initialized once at startup
-
-### 1.3 Screen Class Refactoring Progress
-**Status:** ✅ Partially Complete
-
-**Completed:**
-- Created `AbstractMenuScreen` base class
-- Refactored 6 screens to use base class: `OptionsScreen`, `GraphicsScreen`, `GameScreen`, `ControlsScreen`, `SkinsScreen`, `SoundsScreen`
-- Reduced code duplication significantly
-
-**Remaining Work:**
-- 7 screens still not using base class:
-  - `CreateWorldScreen` (353 lines) - Complex with text fields
-  - `TitleScreen` (312 lines) - Special case with splash text
-  - `InventoryScreen` (287 lines) - Complex with inventory rendering
-  - `SelectWorldScreen` (281 lines) - Complex with world list
-  - `PauseScreen` (245 lines) - Could benefit from base class
-  - `DevplayScreen` (428 lines) - Development/testing screen
-  - `GameScreen` (141 lines) - Already extends AbstractMenuScreen ✅
-
-**Recommendation:**
-1. Evaluate if `PauseScreen` can extend `AbstractMenuScreen`
-2. Keep specialized screens (`CreateWorldScreen`, `SelectWorldScreen`, `InventoryScreen`) as-is
-3. `TitleScreen` and `DevplayScreen` can remain standalone due to unique requirements
-
-### 1.4 Package Organization
-**Status:** Good overall structure
-
-**Current Structure:**
-```
-mattmc/
-├── client/           # Client-side code
-│   ├── main/        # Entry point
-│   ├── gui/         # User interface
-│   │   ├── screens/      # Screen implementations
-│   │   └── components/   # UI components
-│   ├── renderer/    # Rendering systems
-│   │   ├── chunk/        # Chunk rendering
-│   │   ├── block/        # Block rendering
-│   │   └── texture/      # Texture management
-│   ├── resources/   # Resource loading
-│   ├── settings/    # Settings management
-│   └── util/        # Client utilities
-├── world/           # Game logic
-│   ├── entity/      # Entities
-│   ├── item/        # Items
-│   ├── level/       # World/level management
-│   │   ├── block/        # Block types
-│   │   ├── chunk/        # Chunk system
-│   │   ├── lighting/     # Lighting engine
-│   │   ├── levelgen/     # World generation
-│   │   └── storage/      # World save/load
-│   └── phys/        # Physics/collision
-├── nbt/             # NBT serialization
-└── util/            # Utilities
+**Critical Issue: OptionsManager**
+```java
+// OptionsManager.java - ALL settings are static mutable fields
+private static boolean titleScreenBlurEnabled = false;
+private static boolean menuScreenBlurEnabled = true;
+private static boolean showBlockNameEnabled = true;
+private static int fpsCapValue = 60;
+private static int resolutionWidth = 1280;
+private static int resolutionHeight = 720;
+// ... and many more
 ```
 
-**Assessment:** Structure is clear and well-organized. No changes needed.
+**Problems:**
+1. ❌ Not thread-safe (concurrent access possible)
+2. ❌ Difficult to test (shared state between tests)
+3. ❌ Violates dependency injection principles
+4. ❌ Can't have multiple independent configurations
+5. ❌ Tightly couples entire codebase to one global state
 
----
+**Also Affected:**
+- `KeybindManager` - Similar static mutable pattern
 
-## 2. Code Organization & Clarity
+**Not a Problem:**
+- `Blocks` registry - Initialized once at startup (acceptable)
+- `Items` registry - Initialized once at startup (acceptable)
 
-## 2. Code Organization & Clarity
+**Recommendation:**
+```java
+// Convert to instance-based
+public class OptionsManager {
+    private boolean titleScreenBlurEnabled = false;
+    private boolean menuScreenBlurEnabled = true;
+    // ... other fields as instance variables
+    
+    // Use dependency injection
+    public OptionsManager() { }
+    
+    // Singleton pattern if truly needed globally
+    private static final OptionsManager INSTANCE = new OptionsManager();
+    public static OptionsManager getInstance() { return INSTANCE; }
+}
+```
+**Priority:** HIGH - Fundamental architectural issue
 
-### 2.1 TODO Comments
-**Count:** 3 (down from 4+ in previous analysis) ✅ Improved
+### 2.3 TODO Comments
+**Count:** 3 remaining  
+**Severity:** LOW  
+**Impact:** Incomplete functionality
 
 **Remaining TODOs:**
-1. `LightPropagator.java` line ~215: "TODO: This should trigger re-propagation from neighbors"
-2. `LightPropagator.java` line ~282: "TODO: Handle cross-chunk propagation"
-3. `StairsBlock.java`: "TODO: Rotate based on blockstate facing/half"
+1. **LightPropagator.java:419**
+   ```java
+   // TODO: This should trigger re-propagation from neighbors
+   ```
+   
+2. **LightPropagator.java:466**
+   ```java
+   // TODO: Handle cross-chunk propagation
+   ```
+   Note: May already be handled by CrossChunkLightPropagator
+
+3. **StairsBlock.java:47**
+   ```java
+   // TODO: Rotate based on blockstate facing/half
+   ```
 
 **Recommendation:**
-1. Create GitHub issues for each TODO with context
+1. Create GitHub issues for each TODO
 2. Link TODO comments to issue numbers
 3. Prioritize and schedule implementation
-4. Note: The cross-chunk propagation TODOs may already be addressed by `CrossChunkLightPropagator`
+4. **Priority:** LOW - Track but not urgent
 
-### 2.2 Deprecated Code
-**Status:** ✅ Complete
+### 2.4 Limited Modern Java Features
+**Java Version:** 21 ✅  
+**Severity:** LOW-MEDIUM  
+**Impact:** Code clarity and conciseness
 
-All deprecated code has been removed from the codebase:
-- ✅ Removed `MeshBuilder.ChunkLightAccessor` - migrated to `VertexLightSampler.ChunkLightAccessor`
-- ✅ Removed `LightPropagator.addBlockLight()` - migrated to `addBlockLightRGB()`
-- ✅ Removed `LightPropagator.propagateToNeighbor()` - migrated to `propagateRGBIToNeighbor()`
-- ✅ Removed `Block.getLightEmission()` - migrated to RGB emission methods
-- ✅ Removed `LightStorage.getBlockLight()` - migrated to `getBlockLightI()`
-- ✅ Removed `LightStorage.setBlockLight()` - migrated to `setBlockLightRGBI()`
-- ✅ Removed `LevelChunk.getBlockLight()` - migrated to `getBlockLightI()`
-- ✅ Removed `LevelChunk.setBlockLight()` - migrated to `setBlockLightRGBI()`
+**Opportunities:**
+- **Records:** 0 uses - Could simplify data classes
+- **Pattern matching:** Limited use despite Java 21
+- **Text blocks:** Not used for multi-line strings
+- **Sealed classes:** Could improve block/item hierarchies
 
-All usages in production and test code have been updated. All 384 tests passing.
+**Examples of where records would help:**
+```java
+// Current: Data clumps passed as separate parameters
+void setBlockLight(int r, int g, int b, int i)
 
-**Completed:** 2025-11-17
+// With records:
+public record RGBILight(int r, int g, int b, int i) {
+    public static final RGBILight BLACK = new RGBILight(0, 0, 0, 0);
+    public static final RGBILight WHITE = new RGBILight(15, 15, 15, 15);
+}
 
-### 2.3 Magic Numbers
-**Severity:** LOW-MEDIUM
+void setBlockLight(RGBILight light)
 
-**Examples Found:**
+// Chunk coordinates
+public record ChunkPos(int x, int z) {
+    public long toLong() {
+        return ((long)x << 32) | (z & 0xFFFFFFFFL);
+    }
+}
+```
+
+**Recommendation:**
+1. Introduce records for immutable data classes
+2. Use pattern matching for instanceof where appropriate
+3. Consider text blocks for JSON/multi-line strings
+4. **Priority:** LOW - Nice to have, not critical
+
+### 2.5 Magic Numbers
+**Severity:** LOW  
+**Impact:** Code readability
+
+**Examples:**
 ```java
 // AsyncChunkLoader.java
 private static final int MAX_CHUNK_LOADS_PER_FRAME = 4;    // Why 4?
 private static final int MAX_MESH_UPLOADS_PER_FRAME = 2;   // Why 2?
 
-// NBTUtil.java (GOOD - has constants with explanatory comments)
-private static final int MAX_BYTE_ARRAY_SIZE = 16777216;  // 16MB
+// Good example - NBTUtil.java
+private static final int MAX_BYTE_ARRAY_SIZE = 16777216;  // 16MB - clear!
 private static final int MAX_LONG_ARRAY_SIZE = 2097152;   // 2M longs
-private static final int MAX_LIST_SIZE = 1048576;         // 1M elements
 ```
 
 **Recommendation:**
-1. Add comments explaining rationale for magic numbers
+1. Add explanatory comments for all magic numbers
 2. Group related constants together
-3. Example pattern from NBTUtil is good - follow it
-4. Consider making some values configurable where appropriate
-
-### 2.4 Code Duplication
-**Status:** ✅ Significantly Improved
-
-**Completed Refactorings:**
-- Screen classes: `AbstractMenuScreen` base class created
-- Light sampling: Extracted to `VertexLightSampler` class
-- UV mapping: Extracted to `UVMapper` class
-
-**Remaining Areas:**
-- Some button creation patterns still duplicated in non-AbstractMenuScreen screens
-- Error handling patterns in resource loading
-- NBT serialization patterns (acceptable due to type safety)
-
-**Recommendation:**
-1. Continue monitoring for duplication as new features are added
-2. Extract common patterns when duplication reaches 3+ occurrences
-3. Use composition over inheritance where appropriate
-
-### 2.5 String Concatenation
-**Count:** ~113 instances with `+` operator
-
-**Locations:**
-- Logging statements
-- UI text generation
-- Resource path building
-
-**Recommendation:**
-1. For logging: Use parameterized messages: `logger.info("Value: {}", value)`
-2. For multi-step building: Use `StringBuilder`
-3. For resource paths: Consider using `Path.of()` or utility methods
-4. **Priority:** Low - modern JVMs optimize simple string concatenation
+3. Follow NBTUtil pattern
+4. **Priority:** LOW - Doesn't affect functionality
 
 ---
 
-## 3. Performance Optimization Opportunities
+## 3. Potential Bugs & Robustness Issues
 
-## 3. Performance Optimization Opportunities
+### 3.1 Resource Cleanup Patterns
+**Severity:** MEDIUM  
+**Impact:** Resource leaks
 
-### 3.1 Collection Usage
-**Status:** ✅ Good - Already Optimized
-
-**Current State:**
-- `FloatList` and `IntList` primitive collections used in `MeshBuilder` ✅
-- Eliminated boxing/unboxing overhead
-- Reduced GC pressure
-
-**Remaining Opportunities:**
-- Some places still use `ArrayList<Integer>`, `ArrayList<Float>`
-- Consider using Eclipse Collections or fastutil for additional primitive support
-
-**Recommendation:**
-1. Continue using primitive collections in hot paths
-2. Profile before making changes - current approach is working well
-3. **Priority:** Low - already well optimized
-
-### 3.2 Concurrent Data Structures
-**Status:** ✅ Good
-
-**AsyncChunkLoader** uses:
-- `ConcurrentHashMap.KeySetView` for lock-free set operations (ISSUE-014 fix) ✅
-- `ConcurrentLinkedQueue` for completed mesh queues
-- `ConcurrentHashMap` for futures tracking
-
-**Recommendation:**
-1. Current approach is sound
-2. Monitor for contention issues under load
-3. Consider distance-based priority queue for chunk loading
-
-### 3.3 Math Operations
-**Count:** ~211 `Math.` calls
-
-**Recommendation:**
-1. Profile to identify hot spots before optimizing
-2. Consider lookup tables for expensive operations (sin, cos, sqrt) if needed
-3. Use fast approximations only where precision loss is acceptable
-4. **Priority:** Low - modern JVMs optimize Math operations well
-
-### 3.4 Lambda Expressions
-**Count:** ~237 lambda expressions
-
-**Assessment:** Modern Java handles lambdas efficiently. No action needed.
-
-### 3.5 Enhanced For Loops
-**Count:** ~116 enhanced for loops
-
-**Status:** `MeshBuilder` already uses indexed loops to avoid iterator allocations (ISSUE-015 fix) ✅
-
-**Recommendation:**
-1. Use enhanced for loops in non-hot paths for readability
-2. Use indexed loops in performance-critical sections
-3. Current balance is appropriate
-
-### 3.6 Async Task Management
-**AsyncChunkLoader:** ✅ Well Designed
-
-**Current Features:**
-- Adaptive thread pool configuration
-- Task budgeting (MAX_CHUNK_LOADS_PER_FRAME, MAX_MESH_UPLOADS_PER_FRAME)
-- Proper future management
-
-**Opportunities:**
-1. Implement distance-based priority for chunk loading
-2. Cancel far-away chunk tasks when player moves quickly
-3. Add telemetry for thread pool utilization
-
-**Recommendation:**
-1. Add priority queue for chunk tasks based on player distance
-2. Implement task cancellation for out-of-range chunks
-3. **Priority:** Medium
-
----
-
-## 4. Error Handling & Robustness
-
-## 4. Error Handling & Robustness
-
-### 4.1 Broad Exception Catching
-**Count:** ~23 instances of `catch (Exception e)`
-
-**Pattern found:**
-```java
-} catch (Exception e) {
-    logger.debug("Failed to load block model: {}", resourcePath);
-    return null;
-}
-```
-
-**Locations:**
-- `ResourceManager` - Multiple model/blockstate loading methods
-- NBT deserialization methods
-- File I/O operations
+**Analysis:**
+- 15+ instances of `.close()` found in manual cleanup
+- 9 classes implement `AutoCloseable` ✅
+- 154 try blocks found, not all using try-with-resources
 
 **Issues:**
-- Catches unexpected exceptions (programming errors)
-- Makes debugging harder
-- May hide bugs
-
-**Recommendation:**
-1. Catch specific exceptions (`IOException`, `JsonParseException`, `NBTDeserializationException`)
-2. Let programming errors (NPE, IllegalArgumentException) propagate
-3. Add proper error context
-4. Example:
 ```java
-} catch (IOException | JsonParseException e) {
-    logger.warn("Failed to load block model {}: {}", resourcePath, e.getMessage());
-    return null;
-}
+// PauseScreen.java line 241 - Manual cleanup
+blurEffect.close();
+
+// Better: Use try-with-resources
+try (BlurEffect blurEffect = new BlurEffect()) {
+    // use blurEffect
+} // Automatically closed
 ```
-
-### 4.2 Null Safety
-**Status:** No null annotations found (`@Nullable`, `@NotNull`)
-
-**Recommendation:**
-1. Add JSR-305 annotations or Java's built-in annotations
-2. Enable null checking in IDE/build configuration
-3. Use `Optional<T>` for optional return values where appropriate
-4. **Priority:** Medium - would prevent many potential NPEs
-
-### 4.3 Resource Cleanup
-**Status:** ✅ Good
-
-**AutoCloseable implementations found:** 9 classes
-- `Window`, `TrueTypeFont`, `Texture`, `CubeMap`, `Framebuffer`
-- `RegionFile`, `RegionFileCache`
-
-**Good Practices:**
-- Many resources implement `AutoCloseable`
-- Try-with-resources used in several places
-
-**Areas for improvement:**
-- Ensure consistent use of try-with-resources
-- Review manual cleanup code for correctness
 
 **Recommendation:**
 1. Audit all resource cleanup code
 2. Consistently use try-with-resources pattern
-3. **Priority:** Low - already well handled
+3. Ensure all closeables are properly closed
+4. **Priority:** MEDIUM - Prevents resource leaks
 
-### 4.4 Input Validation
-**Status:** Inconsistent
+### 3.2 Cross-Chunk Lighting TODOs
+**Severity:** MEDIUM  
+**Impact:** Potential lighting bugs
+
+**Issue:**
+Two TODOs in LightPropagator suggest incomplete cross-chunk handling:
+```java
+// Line 419
+// TODO: This should trigger re-propagation from neighbors
+
+// Line 466
+// TODO: Handle cross-chunk propagation
+```
+
+**Analysis:**
+- `CrossChunkLightPropagator` exists and appears to handle cross-chunk cases
+- May indicate that these TODOs are already addressed
+- Need to verify if local propagator properly delegates to cross-chunk propagator
+
+**Recommendation:**
+1. Verify if TODOs are still valid or already implemented
+2. If implemented, remove TODOs and add documentation
+3. If not implemented, create issues and prioritize
+4. **Priority:** MEDIUM - Lighting is visible to players
+
+### 3.3 Thread Safety
+**Severity:** MEDIUM  
+**Impact:** Potential concurrency bugs
+
+**Concurrent Code Found:**
+- AsyncChunkLoader uses ConcurrentHashMap correctly ✅
+- ConcurrentHashMap.KeySetView used (ISSUE-014 fix) ✅
+- Proper future management ✅
+
+**Thread Safety Issues:**
+- OptionsManager static fields (no synchronization)
+- KeybindManager static fields (no synchronization)
+
+**Concurrent Constructs:**
+- 6 uses of volatile/Atomic* classes (appropriate)
+- 4 uses of synchronized blocks (ButtonRenderer, PanoramaRenderer, RegionFile, AsyncChunkLoader)
+
+**Recommendation:**
+1. Fix OptionsManager/KeybindManager (convert to instance-based)
+2. Document thread safety guarantees
+3. Consider adding `@ThreadSafe` annotations
+4. **Priority:** MEDIUM - Concurrent bugs are hard to debug
+
+### 3.4 System.out Usage
+**Severity:** VERY LOW  
+**Impact:** None (only in comments)
+
+**Finding:**
+```bash
+# Only 2 matches, both in Javadoc comments
+Blocks.java: *     System.out.println(identifier);
+Items.java: *     System.out.println(identifier);
+```
+
+✅ No actual System.out.println in production code
+✅ Proper use of SLF4J logging (135 logger statements)
+
+**Status:** ✅ Good - No action needed
+
+### 3.5 Input Validation
+**Severity:** MEDIUM  
+**Impact:** Potential crashes or unexpected behavior
 
 **Good Examples:**
 - `AppPaths.ensureDataDirInJarParent()` has excellent path validation ✅
-- `Block` constructor validates parameters
-- `OptionsManager` has validation methods for settings
+- Block constructor validates parameters ✅
 
 **Missing Validation:**
 - Some methods lack parameter validation
 - Not all public APIs validate inputs
 
 **Recommendation:**
-1. Validate method parameters consistently, especially in public APIs
-2. Fail fast with `IllegalArgumentException` for invalid inputs
+1. Validate method parameters consistently
+2. Fail fast with `IllegalArgumentException`
 3. Document preconditions in Javadoc
-4. **Priority:** Medium
-
-### 4.5 Error Reporting
-**Status:** Good - Using SLF4J
-
-**Logging Statistics:**
-- ~135 logger statements (error, warn, info, debug)
-- No `System.out.println` in production code ✅
-- No `printStackTrace()` calls ✅
-
-**Recommendation:**
-1. Continue using SLF4J for all logging
-2. Use appropriate log levels (error for failures, warn for recoverable issues, info for significant events)
-3. Current approach is sound
+4. **Priority:** MEDIUM - Prevents crashes
 
 ---
 
-## 5. Testing & Quality Assurance
+## 4. Architecture & Design Improvements
 
-### 5.1 Test Coverage
-**Status:** ✅ Excellent
-
-**Statistics:**
-- 68 test files
-- ~9,782 lines of test code
-- 383 test methods
-- **0 failures** (all 384 tests passing) ✅
-
-**Well-Covered Areas:**
-- NBT serialization - Comprehensive tests
-- Lighting system - Extensive tests (all now passing) ✅
-- Settings management - Good coverage
-- GUI components - Inventory tests
-- Chunk storage - Good coverage
-- World generation - Basic tests
-
-**Missing/Limited Coverage:**
-- Rendering code (acceptable - difficult to test)
-- Advanced world generation scenarios
-- Resource loading edge cases
-- Async chunk loading stress tests
-
-**Recommendation:**
-1. Maintain current excellent test coverage
-2. Add more edge case tests for world generation
-3. Add stress tests for async operations
-4. **Priority:** Low - coverage is already excellent
-
-### 5.2 Test Quality
-**Status:** ✅ Very Good
-
-**Strengths:**
-- Clear test naming
-- Good assertions
-- Proper setup/teardown
-- Tests are well-organized mirroring production code
-- Performance benchmarks included (`PerformanceBenchmark.java`)
-
-**Recommendation:**
-1. Continue current testing practices
-2. Consider adding property-based testing for complex algorithms
-3. Add integration tests for full game flow
-
-### 5.3 Test Organization
-**Structure:** test/java/mattmc/... mirrors src/main/java/mattmc/... ✅
-
-**Test Packages:**
-- client/gui/screens
-- client/renderer
-- client/resources
-- client/settings
-- nbt
-- performance
-- world/level/chunk
-- world/level/levelgen
-- world/level/lighting
-- world/level/storage
-
-**Recommendation:**
-- Current organization is excellent
-- No changes needed
-
----
-
-## 6. Security Considerations
-
-## 6. Security Considerations
-
-### 6.1 Path Traversal Prevention
+### 4.1 Package Organization
 **Status:** ✅ Good
 
-**AppPaths.ensureDataDirInJarParent()** has excellent validation:
-```java
-if (dirName.contains("..") || dirName.contains("/") || dirName.contains("\\")) {
-    throw new IllegalArgumentException("Directory name contains invalid characters");
-}
+```
+mattmc/
+├── client/              # Client-side code
+│   ├── gui/            # User interface
+│   ├── renderer/       # Rendering systems
+│   ├── resources/      # Resource loading
+│   └── settings/       # Settings management
+├── world/              # Game logic
+│   ├── entity/         # Entities
+│   ├── item/           # Items
+│   ├── level/          # World/level management
+│   │   ├── block/      # Block types
+│   │   ├── chunk/      # Chunk system
+│   │   ├── lighting/   # Lighting engine
+│   │   ├── levelgen/   # World generation
+│   │   └── storage/    # World save/load
+│   └── phys/           # Physics/collision
+├── nbt/                # NBT serialization
+└── util/               # Utilities
 ```
 
-**Recommendation:**
-1. Apply similar validation to all file/path operations
-2. Review world save/load for path traversal risks
-3. Current implementation is secure for intended use
+✅ Clear separation of concerns  
+✅ No changes needed
 
-### 6.2 NBT Deserialization Safety
-**Status:** ✅ Excellent
-
-**Size limits in NBTUtil:**
-```java
-private static final int MAX_BYTE_ARRAY_SIZE = 16777216;  // 16MB
-private static final int MAX_LONG_ARRAY_SIZE = 2097152;   // 2M longs
-private static final int MAX_LIST_SIZE = 1048576;         // 1M elements
-```
-
-**Custom exceptions:**
-- `NBTSerializationException`
-- `NBTDeserializationException`
-
-**Recommendations:**
-1. Add depth limits to prevent stack overflow from nested compounds
-2. Consider adding timeout for deserialization
-3. Current approach is sound - just add depth limiting
-
-### 6.3 Resource Loading
-**Status:** ✅ Safe
-
-**Current:** Loads from classpath only (embedded resources)
-
-**Future Considerations:**
-- If adding mod support: Validate mod resources carefully
-- If adding resource packs: Validate paths and content
-- If adding user textures: Validate image files
-
-### 6.4 Thread Safety
-**Status:** Good
-
-**Concurrent code:**
-- `AsyncChunkLoader` uses concurrent collections properly
-- Lock-free sets via `ConcurrentHashMap.KeySetView` ✅
-- Proper future management
-
-**Static mutable state:**
-- `OptionsManager`, `KeybindManager` have potential thread safety issues
-- Registries (`Blocks`, `Items`) are initialized once - acceptable
-
-**Recommendation:**
-1. Document thread safety guarantees
-2. Fix `OptionsManager` and `KeybindManager` (see section 1.3)
-3. **Priority:** Medium
-
----
-
-## 7. Code Quality Issues
-
-### 7.1 Instanceof Usage
-**Count:** ~78 instances
-
-**Assessment:** Acceptable - mostly for type-specific behavior
+### 4.2 Instanceof Usage
+**Count:** 78 instances  
+**Severity:** LOW  
+**Assessment:** Acceptable for polymorphic behavior
 
 **Examples:**
-- Block subclass checks (`StairsBlock`, `RotatedPillarBlock`)
+- Block subclass checks (StairsBlock, RotatedPillarBlock)
 - Model element type checking
 - Screen type checking
 
 **Recommendation:**
 - Current usage is appropriate
-- Consider visitor pattern if instanceof chains grow long
-- **Priority:** Low - not a problem currently
+- Consider visitor pattern only if instanceof chains grow
+- **Priority:** LOW - Not a problem
 
-### 7.2 Data Clumps
-**Identified:**
+### 4.3 Screen Class Hierarchy
+**Status:** ✅ Partially Improved
 
-**Chunk coordinates (chunkX, chunkZ) passed together:**
-- Could use a `ChunkPos` value object
+**Completed:**
+- AbstractMenuScreen base class created ✅
+- 6 screens refactored to use it ✅
 
-**Light values (r, g, b) passed as separate parameters:**
-- Already improved with RGBI handling in `CrossChunkLightPropagator`
-- Could benefit from `RGBLight` value object
-
-**Recommendation:**
-```java
-public record ChunkPos(int x, int z) {
-    public long toLong() {
-        return ((long)x << 32) | (z & 0xFFFFFFFFL);
-    }
-    
-    public static ChunkPos fromLong(long key) {
-        return new ChunkPos((int)(key >> 32), (int)key);
-    }
-}
-
-public record RGBLight(int r, int g, int b) {
-    public static RGBLight WHITE = new RGBLight(15, 15, 15);
-    public static RGBLight BLACK = new RGBLight(0, 0, 0);
-}
-```
-**Priority:** Low - code works well as-is, but would improve clarity
-
-### 7.3 Modern Java Features
-**Java 21 is being used** ✅
-
-**Opportunities:**
-- **Records:** Not used yet - could benefit data classes
-- **Pattern matching:** Could simplify instanceof chains
-- **Text blocks:** Could improve multi-line strings
-- **Sealed classes:** Could improve block/item hierarchies
+**Remaining:**
+- TitleScreen (312 lines) - Special case with splash text
+- CreateWorldScreen (353 lines) - Complex with text fields
+- SelectWorldScreen (281 lines) - Complex with world list
+- InventoryScreen (287 lines) - Complex with inventory
+- DevplayScreen (428 lines) - Development/testing
+- PauseScreen - Could potentially use base class
 
 **Recommendation:**
-1. Consider using records for immutable data classes (e.g., `ChunkPos`, `RGBLight`)
-2. Use pattern matching for instanceof where appropriate
-3. **Priority:** Low - nice to have, not critical
-
-### 7.4 Enum Usage
-**Count:** ~9 enum definitions
-
-**Status:** Appropriate use of enums for type-safe constants
-
-**Examples:**
-- `FaceType` for block faces
-- Various game state enums
-
-**Recommendation:** Current usage is good
+- Keep specialized screens as-is
+- Consider refactoring PauseScreen
+- **Priority:** LOW - Already significantly improved
 
 ---
 
-## 8. Documentation & Maintainability
+## 5. Build System & Dependencies
 
-## 8. Documentation & Maintainability
+### 5.1 Multi-Platform Natives MISSING
+**Severity:** HIGH  
+**Impact:** Windows and macOS users cannot run the application
 
-### 8.1 Javadoc Coverage
-**Status:** Good
-
-**Well-documented:**
-- `ResourceManager` - Excellent class-level docs with usage examples ✅
-- `Blocks` - Great usage examples and API documentation ✅
-- `NBTUtil` - Good method documentation
-- Most public APIs have Javadoc
-- Package-level concerns well explained
-
-**Missing documentation:**
-- Some private/package-private methods
-- Some complex algorithms lack detailed explanation
-
-**Recommendation:**
-1. Maintain current Javadoc quality
-2. Document complex algorithms with examples
-3. Add `@param` and `@return` tags consistently where missing
-4. **Priority:** Low - documentation is already good
-
-### 8.2 README and Technical Documentation
-**Status:** ✅ Excellent
-
-**Comprehensive documentation:**
-- `README.md` - Excellent project overview, architecture, features
-- `CHUNK_SYSTEM.md` - Technical chunk system documentation
-- `SMOOTH_LIGHTING.md` - Lighting implementation details
-- `CASCADED_SHADOW_MAPS.md` - Shadow mapping documentation
-- `DAY_NIGHT_CYCLE.md` - Day/night system documentation
-- `EFFICIENCY_ANALYSIS.md` - Performance analysis
-- `WORLD_SAVE_FORMAT.md` - Storage format specification
-- `REFACTORING_SUMMARY.md` - Architectural decisions
-- `JSON_MODEL_SYSTEM.md` - Model system documentation
-- `ROADMAP.md` - Project roadmap
-- `FAILED-TESTS.md` - Test failure analysis (now showing 0 failures ✅)
-
-**Recommendation:**
-1. Keep documentation up-to-date with code changes
-2. Consider adding architecture diagrams
-3. Current documentation is exemplary
-
-### 8.3 Code Comments
-**Status:** Good
-
-**Strengths:**
-- Comments explain "why" not just "what"
-- Good context provided for non-obvious decisions
-- Performance optimizations are documented
-
-**Issues:**
-- Minimal commented-out code (good) ✅
-- Comments generally up-to-date
-
-**Recommendation:**
-1. Continue current commenting practices
-2. Use comments to explain non-obvious decisions
-3. Keep comments synchronized with code changes
-
-### 8.4 Naming Conventions
-**Status:** ✅ Excellent
-
-**Consistent naming:**
-- Classes: PascalCase ✅
-- Methods: camelCase ✅
-- Constants: UPPER_SNAKE_CASE ✅
-- Packages: lowercase ✅
-- Clear, descriptive names throughout
-
-**Recommendation:** Continue current naming practices
-
----
-
-## 9. Build System & Dependencies
-
-### 9.1 Gradle Configuration
-**Status:** Good with minor issues
-
-**Strengths:**
-- Uses Kotlin DSL (modern, type-safe) ✅
-- Clear dependency management
-- Custom tasks for distribution
-- Java 21 toolchain configured ✅
-
-**Issues Identified:**
-1. **Platform Natives:** Only Linux natives included
-   ```kotlin
-   runtimeOnly("org.lwjgl:lwjgl:$lwjgl:natives-linux")
-   ```
-   - Windows and macOS users cannot run the application
-
-2. **Gradle Deprecations:** Build shows deprecation warnings
-
-**Recommendation:**
-1. Add multi-platform natives detection:
+**Current Issue:**
 ```kotlin
-val lwjglNatives = when (osName) {
-    "Linux" -> "natives-linux"
-    "Mac OS X", "Darwin" -> "natives-macos"
-    "Windows" -> "natives-windows"
-    else -> "natives-linux" // default
+// build.gradle.kts lines 32-35 - LINUX ONLY!
+runtimeOnly("org.lwjgl:lwjgl:$lwjgl:natives-linux")
+runtimeOnly("org.lwjgl:lwjgl-glfw:$lwjgl:natives-linux")
+runtimeOnly("org.lwjgl:lwjgl-opengl:$lwjgl:natives-linux")
+runtimeOnly("org.lwjgl:lwjgl-stb:$lwjgl:natives-linux")
+```
+
+**Recommendation:**
+```kotlin
+val lwjglNatives = when {
+    osName.contains("linux") -> "natives-linux"
+    osName.contains("mac") || osName.contains("darwin") -> "natives-macos"
+    osName.contains("win") -> "natives-windows"
+    else -> "natives-linux"
 }
 
 runtimeOnly("org.lwjgl:lwjgl:$lwjgl:$lwjglNatives")
 runtimeOnly("org.lwjgl:lwjgl-glfw:$lwjgl:$lwjglNatives")
-// ... etc
+runtimeOnly("org.lwjgl:lwjgl-opengl:$lwjgl:$lwjglNatives")
+runtimeOnly("org.lwjgl:lwjgl-stb:$lwjgl:$lwjglNatives")
+```
+**Priority:** HIGH - Critical for cross-platform support
+
+### 5.2 Gradle Deprecation Warnings
+**Severity:** MEDIUM  
+**Impact:** Future Gradle compatibility
+
+**Warning:**
+```
+Deprecated Gradle features were used in this build, 
+making it incompatible with Gradle 9.0.
 ```
 
-2. Address Gradle deprecation warnings
-3. **Priority:** Medium - affects cross-platform support
+**Recommendation:**
+1. Run `./gradlew build --warning-mode all` to see specific warnings
+2. Update deprecated APIs to new equivalents
+3. **Priority:** MEDIUM - Will break in Gradle 9.0
 
-### 9.2 Dependencies
+### 5.3 Dependencies
 **Status:** ✅ Excellent
 
-**Current dependencies:**
-- LWJGL 3.3.4 (OpenGL, GLFW, STB) ✅
+**Current Dependencies:**
+- LWJGL 3.3.4 ✅
 - Gson 2.10.1 ✅
 - SLF4J 2.0.9 ✅
 - Logback 1.4.11 ✅
 - JUnit 5.10.0 ✅
 
-**All dependencies are up-to-date and appropriate!**
+All dependencies are up-to-date and appropriate!
 
 **Optional Additions:**
-1. **Static Analysis:**
-   - SpotBugs for bug detection
-   - Error Prone for compile-time checks
-   
-2. **Coverage:**
-   - JaCoCo for test coverage reporting
+1. **Static Analysis:** SpotBugs, Error Prone
+2. **Coverage:** JaCoCo
+3. **Primitive Collections:** fastutil or Eclipse Collections
 
-3. **Primitive Collections:**
-   - fastutil or Eclipse Collections for better primitive support
+**Priority:** LOW - Current dependencies are excellent
 
-**Recommendation:**
-1. Current dependencies are excellent
-2. Consider adding static analysis tools
-3. **Priority:** Low - current setup works well
+### 5.4 Shell Scripts Portability
+**Severity:** LOW  
+**Impact:** Development convenience
 
-### 9.3 Shell Scripts
-**Status:** Good with portability issues
-
-**Scripts found:**
-- `Backup.sh` - Backup automation
-- `ClearOldBranches.sh` - Branch cleanup
-- `Export.sh` - Export builds
-- `RunDev.sh` - Run development version
-- `RunExport.sh` - Run exported build
+**Scripts:**
+- Backup.sh - Has hardcoded path `/home/matt/OneDrive/...`
+- ClearOldBranches.sh
+- Export.sh
+- RunDev.sh
+- RunExport.sh
 
 **Issues:**
-1. **Backup.sh** has hardcoded user path:
-   ```bash
-   ONEDRIVE_DIR="/home/matt/OneDrive/Apps/Programming/MattMC"
-   ```
-2. Scripts are Unix-only (no Windows `.bat` equivalents)
+- Unix-only (no Windows .bat equivalents)
+- Hardcoded user paths in Backup.sh
 
 **Recommendation:**
-1. Make `Backup.sh` configurable via environment variables or config file
-2. Add Windows batch file equivalents (or use Gradle tasks)
-3. Add error handling in scripts
-4. **Priority:** Low - development convenience, not critical
+1. Make paths configurable via env variables
+2. Add Windows equivalents or use Gradle tasks
+3. **Priority:** LOW - Development convenience only
 
 ---
 
-## 10. Recommended Refactoring Priorities
+## 6. Priority Recommendations
 
-### ✅ Completed Refactorings
+### Priority 1: Critical (Do First) 🔴
 
-1. **✅ Remove WorldLightManager singleton** (formerly Section 1.2)
-   - Replaced with dependency injection
-   - Level class now owns WorldLightManager instance
-   - Pass instance through constructors and setter methods
-   - Improves testability and reduces coupling
-   - **Completed:** 2025-11-17
+1. **Add Multi-Platform LWJGL Natives** (Section 5.1)
+   - Impact: HIGH - Enables Windows/macOS support
+   - Effort: 1 day
+   - Blocks: Cross-platform distribution
 
-### Priority 1: High-Value Refactorings
-**Impact:** HIGH | **Effort:** LOW-MEDIUM
+2. **Fix OptionsManager Static State** (Section 2.2)
+   - Impact: HIGH - Architectural issue, thread safety
+   - Effort: 2-3 days
+   - Fixes: Testability, thread safety, coupling
 
-1. **Convert OptionsManager to instance-based** (Section 1.2)
-   - Remove static mutable state
-   - Use dependency injection
-   - Improves thread safety and testability
-   - **Estimated Effort:** 2-3 days
+### Priority 2: Important (Do Soon) 🟡
 
-2. **Add multi-platform native dependencies** (Section 9.1)
-   - Detect OS and include appropriate LWJGL natives
-   - Enables Windows and macOS support
-   - **Estimated Effort:** 1 day
+3. **Refactor StairsGeometryBuilder** (Section 2.1)
+   - Impact: MEDIUM - 669 lines is excessive
+   - Effort: 2-3 days
+   - Improves: Maintainability, readability
 
-### Priority 2: Code Organization Improvements
-**Impact:** MEDIUM | **Effort:** MEDIUM
+4. **Add Null Safety Annotations** (Section 1.5)
+   - Impact: MEDIUM - Prevents NPEs
+   - Effort: 3-4 days
+   - Improves: Code safety, IDE support
 
-1. **Extract remaining large classes** (Section 1.1)
-   - Split `ItemRenderer` into `Icon2DRenderer` and `IsometricBlockRenderer`
-   - Extract task priority management from `AsyncChunkLoader`
-   - Extract deferred update management from `CrossChunkLightPropagator`
-   - **Estimated Effort:** 3-5 days
+5. **Verify/Fix Cross-Chunk Lighting TODOs** (Section 3.2)
+   - Impact: MEDIUM - Visible to players
+   - Effort: 1-2 days
+   - Fixes: Potential lighting bugs
 
-2. **Evaluate remaining screens for AbstractMenuScreen** (Section 1.3)
-   - Consider refactoring `PauseScreen` to use base class
-   - **Estimated Effort:** 1-2 days
+### Priority 3: Nice to Have (When Time Permits) 🟢
 
-3. **Add null safety annotations** (Section 4.2)
-   - Add `@Nullable` and `@NotNull` to public APIs
-   - Enable IDE/build null checking
-   - **Estimated Effort:** 3-4 days
+6. **Implement Distance-Based Chunk Priority** (Section 1.3)
+   - Impact: MEDIUM - Loading responsiveness
+   - Effort: 3-4 days
+   - Improves: Perceived performance
 
-### Priority 3: Performance Optimizations (Profile First!)
-**Impact:** LOW-MEDIUM | **Effort:** MEDIUM
+7. **Extract Large Classes** (Section 2.1)
+   - Impact: MEDIUM - Several 500+ line files
+   - Effort: 1-2 weeks
+   - Improves: Maintainability
 
-1. **Implement distance-based chunk loading priority** (Section 3.6)
-   - Priority queue for chunk tasks
-   - Cancel out-of-range tasks
-   - Add telemetry for monitoring
-   - **Estimated Effort:** 3-4 days
+8. **Use Modern Java Features** (Section 2.4)
+   - Impact: LOW-MEDIUM - Code clarity
+   - Effort: 2-3 days
+   - Improves: Readability, conciseness
 
-2. **Use modern Java features** (Section 7.3)
-   - Introduce records for data classes (`ChunkPos`, `RGBLight`)
-   - Use pattern matching where appropriate
-   - **Estimated Effort:** 2-3 days
+9. **Fix Gradle Deprecations** (Section 5.2)
+    - Impact: MEDIUM - Future compatibility
+    - Effort: 1 day
+    - Fixes: Gradle 9.0 compatibility
 
-### Priority 4: Robustness Improvements
-**Impact:** MEDIUM | **Effort:** LOW-MEDIUM
+### Priority 4: Low Priority (Track Only) ⚪
 
-1. **Improve exception handling** (Section 4.1)
-   - Replace broad `catch (Exception)` with specific exceptions
-   - Add better error context
-   - **Estimated Effort:** 2-3 days
+10. **Add Magic Number Comments** (Section 2.5)
+    - Impact: LOW - Documentation
+    - Effort: 1 day
 
-2. **Add NBT depth limiting** (Section 6.2)
-   - Prevent stack overflow from deeply nested compounds
-   - **Estimated Effort:** 1 day
+11. **Consistent Try-With-Resources** (Section 3.1)
+    - Impact: LOW-MEDIUM - Resource cleanup
+    - Effort: 2 days
 
-3. **Address remaining TODOs** (Section 2.1)
-   - Create GitHub issues for each TODO
-   - Prioritize and schedule implementation
-   - **Estimated Effort:** Variable
+12. **Add Static Analysis Tools** (Section 5.3)
+    - Impact: LOW - Code quality
+    - Effort: 1-2 days
 
-### Priority 5: Documentation & Tooling
-**Impact:** LOW-MEDIUM | **Effort:** LOW
+---
 
-1. **Add static analysis tools** (Section 9.2)
-   - Configure SpotBugs
-   - Add Error Prone
-   - **Estimated Effort:** 1-2 days
+## Performance Metrics Summary
 
-2. **Add architecture diagrams** (Section 8.2)
-   - Create visual documentation
-   - Show component relationships
-   - **Estimated Effort:** 1-2 days
-
-3. **Make shell scripts configurable** (Section 9.3)
-   - Remove hardcoded paths
-   - Add Windows equivalents
-   - **Estimated Effort:** 1 day
-
-### Priority 6: Nice-to-Have Improvements
-**Impact:** LOW | **Effort:** LOW
-
-1. **Add magic number comments** (Section 2.3)
-   - Document rationale for constants
-   - **Estimated Effort:** 1 day
-
-2. **Create value objects for data clumps** (Section 7.2)
-   - Introduce `ChunkPos` and `RGBLight` records
-   - **Estimated Effort:** 2-3 days
+| Metric | Value | Status |
+|--------|-------|--------|
+| Production Files | 214 | - |
+| Production LOC | ~25,881 | - |
+| Test Files | 68 | ✅ |
+| Test Methods | 384 | ✅ |
+| **Failing Tests** | **0** | **✅** |
+| Largest File | StairsGeometryBuilder (669) | ⚠️ |
+| Files > 500 lines | 10 | ⚠️ |
+| TODO Comments | 3 | ✅ |
+| Deprecated Items | 0 | ✅ |
+| Broad catch(Exception) | 0 | ✅ |
+| Null Annotations | 0 | ❌ |
+| Logger Statements | ~135 | ✅ |
+| System.out (actual) | 0 | ✅ |
 
 ---
 
 ## Conclusion
 
-MattMC is a **well-engineered, high-quality project** with excellent architecture and comprehensive testing. Recent improvements have significantly enhanced code quality:
+MattMC is a **high-quality, well-architected project** with excellent test coverage and thoughtful performance optimizations. The code demonstrates strong software engineering principles.
 
-### Recent Achievements ✅
-1. **All tests passing** - Fixed all 11 lighting system test failures
-2. **AbstractMenuScreen** - Reduced UI code duplication
-3. **Extracted helper classes** - `VertexLightSampler`, `UVMapper` from `MeshBuilder`
-4. **ISSUE fixes** - Addressed multiple performance and concurrency issues
-5. **Comprehensive documentation** - Excellent technical documentation
+### Strengths ✅
+1. **Excellent test coverage** - 384 tests, 0 failures
+2. **Performance-conscious** - Custom primitive collections, async I/O
+3. **Clean architecture** - Well-organized packages
+4. **Proper logging** - SLF4J throughout, no System.out
+5. **Good documentation** - Comprehensive technical docs
+6. **Modern Java** - Using Java 21
 
-### Current State
-**Code Quality: 8.0/10** (up from 7.5/10)
-
-**Strengths:**
-- ✅ Clean, well-organized architecture
-- ✅ Excellent test coverage (383 tests, 0 failures)
-- ✅ Performance-conscious design
-- ✅ Proper resource management
-- ✅ Comprehensive documentation
-- ✅ Modern Java practices (Java 21)
-- ✅ Good logging and error handling
-- ✅ Async I/O properly implemented
-
-**Areas for Improvement:**
-- ⚠️ Singleton pattern in `WorldLightManager`
-- ⚠️ Static mutable state in `OptionsManager`, `KeybindManager`
-- ⚠️ Some large classes could be split further
-- ⚠️ Missing multi-platform native dependencies
-- ⚠️ Null safety annotations not used
+### Critical Issues ❌
+1. **Multi-platform natives missing** - Linux-only builds
+2. **Static mutable state** - OptionsManager anti-pattern
+3. **Very large classes** - StairsGeometryBuilder at 669 lines
 
 ### Recommended Approach
 
-**Phase 1: Quick Wins (1-2 weeks)**
-1. Add multi-platform natives support
-2. Remove `WorldLightManager` singleton
-3. Add null safety annotations to critical APIs
+**Phase 1: Critical Fixes (1-2 weeks)**
+- Add multi-platform natives
+- Fix OptionsManager static state
+- Refactor largest class (StairsGeometryBuilder)
 
-**Phase 2: Code Organization (2-3 weeks)**
-1. Convert `OptionsManager` to instance-based
-2. Extract remaining large classes
-3. Improve exception handling
+**Phase 2: Quality Improvements (2-3 weeks)**
+- Add null annotations
+- Verify lighting TODOs
 
 **Phase 3: Continuous Improvement (Ongoing)**
-1. Profile and optimize hot paths
-2. Add static analysis tools
-3. Enhance documentation with diagrams
-4. Address TODOs as they become priorities
+- Extract large classes as needed
+- Add modern Java features gradually
+- Profile and optimize hot paths
 
-### Final Assessment
-
-This is a **mature, production-quality codebase** with excellent engineering practices. The refactorings suggested are primarily about maintainability and future-proofing rather than fixing critical issues. The code demonstrates:
-
-- Clear understanding of software architecture
-- Performance optimization awareness
-- Comprehensive testing discipline
-- Excellent documentation practices
-- Thoughtful design decisions
-
-**Estimated Total Effort for All Recommendations:** 4-6 weeks of focused work
-
-However, the codebase is already in excellent shape and can continue to be developed effectively as-is. Refactorings should be prioritized based on actual development needs rather than pursuing perfection.
+**Final Assessment:** 8/10 - Production-quality codebase with minor improvements needed. The project can continue development effectively as-is, but addressing Priority 1-2 items would significantly improve maintainability and cross-platform support.
 
 ---
 
-## Appendix: Metrics Summary
-
-| Metric | Value | Change |
-|--------|-------|--------|
-| Production Files | 143 | +10 (modularization) |
-| Production LOC | ~25,537 | -188 (refactoring) |
-| Test Files | 68 | = |
-| Test LOC | ~9,782 | -14 |
-| Test Methods | 383 | = |
-| **Failing Tests** | **0** | **-11** ✅ |
-| Largest File | MeshBuilder (982) | -313 (extraction) |
-| Files > 500 lines | 9 | -1 |
-| Files > 300 lines | 23 | Similar |
-| TODO Comments | 3 | -1 |
-| Deprecated Items | 8 | New tracking |
-| Logger Statements | ~135 | Good coverage |
-| Test Coverage | Excellent | ✅ |
-
-## Appendix B: File Size Distribution
-
-| Size Range | Count | Notable Files |
-|------------|-------|---------------|
-| 900+ lines | 1 | MeshBuilder |
-| 500-899 lines | 8 | CrossChunkLight, BlockGeometry, LightPropagator, etc. |
-| 300-499 lines | 14 | Level, LevelChunk, ItemRenderer, etc. |
-| < 300 lines | 120 | Majority (84%) |
-
-**Analysis:** File size distribution is healthy. Large files have clear reasons for their size (core functionality), and most of the codebase consists of focused, maintainable classes.
-
-## Appendix C: Test Coverage by Module
-
-| Module | Tests | Coverage | Status |
-|--------|-------|----------|---------|
-| NBT Serialization | Extensive | ✅ Excellent | All passing |
-| Lighting System | Extensive | ✅ Excellent | **All passing** ✅ |
-| Chunk Storage | Good | ✅ Good | All passing |
-| Settings Management | Good | ✅ Good | All passing |
-| GUI/Inventory | Basic | ✅ Adequate | All passing |
-| World Generation | Basic | ✅ Adequate | All passing |
-| Rendering | Limited | ⚠️ Expected | Difficult to test |
-| Resources | Limited | ⚠️ Low | Could improve |
-
-**Overall Test Status:** 384 tests, **0 failures**, **100% pass rate** ✅
-
----
-
-**End of Analysis Report**  
-**Next Update:** Recommended after significant architectural changes or every 3-6 months
+**Next Review:** Recommended after major architectural changes or every 3-6 months
