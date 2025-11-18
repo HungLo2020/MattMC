@@ -432,10 +432,10 @@ public class ItemRenderer {
         // Isometric blocks have a diamond width of 2*size, so we scale flat items by 2x
         float halfSize = size;
         glBegin(GL_QUADS);
-        glTexCoord2f(0, 0); glVertex2f(x - halfSize, y - halfSize);
-        glTexCoord2f(1, 0); glVertex2f(x + halfSize, y - halfSize);
-        glTexCoord2f(1, 1); glVertex2f(x + halfSize, y + halfSize);
-        glTexCoord2f(0, 1); glVertex2f(x - halfSize, y + halfSize);
+        glTexCoord2f(0, 1); glVertex2f(x - halfSize, y - halfSize);
+        glTexCoord2f(1, 1); glVertex2f(x + halfSize, y - halfSize);
+        glTexCoord2f(1, 0); glVertex2f(x + halfSize, y + halfSize);
+        glTexCoord2f(0, 0); glVertex2f(x - halfSize, y + halfSize);
         glEnd();
         
         // Restore GL state

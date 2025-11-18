@@ -1,3 +1,6 @@
 {
-  "parent": "mattmc:block/torch"
+  "parent": "item/generated",
+  "textures": {
+    "layer0": "mattmc:block/torch"
+  }
 }
