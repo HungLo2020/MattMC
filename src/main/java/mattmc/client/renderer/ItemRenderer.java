@@ -116,6 +116,11 @@ public class ItemRenderer {
         float isoWidth = scale * 0.5f;
         float isoHeight = scale * 0.5f;
         
+        // Adjust Y position to restore block positioning to match original placement
+        // Before fixing items, InventoryRenderer used +14f offset; now it uses +8f (6 GUI units = 18 pixels higher)
+        // Shift blocks down by 18 pixels to restore original positioning while keeping items correctly centered
+        float adjustedY = y + 18f;
+        
         // Capture the 3D geometry for a standard cube
         VertexCapture capture = new VertexCapture();
         
@@ -140,7 +145,7 @@ public class ItemRenderer {
             if (tex != null) {
                 tex.bind();
                 glColor4f(0.8f, 0.8f, 0.8f, 1.0f);
-                renderFacesIsometric(westFaces, x, y, isoWidth, isoHeight);
+                renderFacesIsometric(westFaces, x, adjustedY, isoWidth, isoHeight);
             }
         }
         
@@ -150,7 +155,7 @@ public class ItemRenderer {
             if (tex != null) {
                 tex.bind();
                 glColor4f(0.6f, 0.6f, 0.6f, 1.0f);
-                renderFacesIsometric(northFaces, x, y, isoWidth, isoHeight);
+                renderFacesIsometric(northFaces, x, adjustedY, isoWidth, isoHeight);
             }
         }
         
@@ -164,7 +169,7 @@ public class ItemRenderer {
                 float g = ((topTintColor >> 8) & 0xFF) / 255.0f;
                 float b = (topTintColor & 0xFF) / 255.0f;
                 glColor4f(r, g, b, 1.0f);
-                renderFacesIsometric(topFaces, x, y, isoWidth, isoHeight);
+                renderFacesIsometric(topFaces, x, adjustedY, isoWidth, isoHeight);
             }
         }
         
@@ -193,6 +198,9 @@ public class ItemRenderer {
         float scale = size * 2.0f;
         float isoWidth = scale * 0.5f;
         float isoHeight = scale * 0.5f;
+        
+        // Adjust Y position to restore stairs positioning to match original placement
+        float adjustedY = y + 18f;
         
         // Capture south-facing stairs geometry (step rises toward z=1 - back in isometric)
         VertexCapture capture = new VertexCapture();
@@ -231,7 +239,7 @@ public class ItemRenderer {
                     float brightness = isWestFacing ? 0.8f : 0.6f;
                     glColor4f(brightness, brightness, brightness, 1.0f);
                     
-                    renderFaceIsometric(face, x, y, isoWidth, isoHeight);
+                    renderFaceIsometric(face, x, adjustedY, isoWidth, isoHeight);
                 }
             }
         }
@@ -244,7 +252,7 @@ public class ItemRenderer {
                 glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
                 
                 for (VertexCapture.Face face : topFacesList) {
-                    renderFaceIsometric(face, x, y, isoWidth, isoHeight);
+                    renderFaceIsometric(face, x, adjustedY, isoWidth, isoHeight);
                 }
             }
         }
@@ -428,12 +436,15 @@ public class ItemRenderer {
         texture.bind();
         glColor4f(1f, 1f, 1f, 1f);
         
-        float halfSize = size / 2f;
+        // Scale flat items to match the visual size of isometric block items
+        // Isometric blocks have a diamond width of 2*size, so we scale flat items by 2x
+        float halfSize = size;
+        
         glBegin(GL_QUADS);
-        glTexCoord2f(0, 0); glVertex2f(x - halfSize, y - halfSize);
-        glTexCoord2f(1, 0); glVertex2f(x + halfSize, y - halfSize);
-        glTexCoord2f(1, 1); glVertex2f(x + halfSize, y + halfSize);
-        glTexCoord2f(0, 1); glVertex2f(x - halfSize, y + halfSize);
+        glTexCoord2f(0, 1); glVertex2f(x - halfSize, y - halfSize);
+        glTexCoord2f(1, 1); glVertex2f(x + halfSize, y - halfSize);
+        glTexCoord2f(1, 0); glVertex2f(x + halfSize, y + halfSize);
+        glTexCoord2f(0, 0); glVertex2f(x - halfSize, y + halfSize);
         glEnd();
         
         // Restore GL state
@@ -448,7 +459,9 @@ public class ItemRenderer {
     private static void renderFallbackItem(float x, float y, float size) {
         glColor4f(1f, 0f, 1f, 1f); // Magenta
         
-        float halfSize = size / 2f;
+        // Match the scale of flat items (which matches isometric block items)
+        float halfSize = size;
+        
         glBegin(GL_QUADS);
         glVertex2f(x - halfSize, y - halfSize);
         glVertex2f(x + halfSize, y - halfSize);
