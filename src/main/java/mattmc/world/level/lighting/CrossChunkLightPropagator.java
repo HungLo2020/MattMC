@@ -257,24 +257,28 @@ public class CrossChunkLightPropagator {
 			return; // Fully opaque block - don't set light here
 		}
 		
+		// Apply opacity-based attenuation (same as in LightPropagator)
+		int blockOpacity = block.getOpacity();
+		int decrement = Math.max(1, blockOpacity);
+		int attenuatedI = Math.max(0, intensity - decrement);
+		
 		// Get current light at target position
 		int currentI = targetChunk.getBlockLightI(targetLocalX, y, targetLocalZ);
 		
 		// Only update if new intensity is brighter
-		if (intensity > currentI) {
-			// Set the light in the target chunk with same color but current intensity
-			targetChunk.setBlockLightRGBI(targetLocalX, y, targetLocalZ, r, g, b, intensity);
+		if (attenuatedI > currentI) {
+			// Set the light in the target chunk with same color but attenuated intensity
+			targetChunk.setBlockLightRGBI(targetLocalX, y, targetLocalZ, r, g, b, attenuatedI);
 			
-			// Continue propagation from this position with reduced intensity
-			int nextI = intensity - 1;
-			if (nextI > 0) {
+			// Continue propagation from this position if intensity is still strong enough
+			if (attenuatedI > 0) {
 				// Propagate in all 6 directions from the position in target chunk
-				propagateBlockLightRGBICross(targetChunk, targetLocalX - 1, y, targetLocalZ, r, g, b, nextI);
-				propagateBlockLightRGBICross(targetChunk, targetLocalX + 1, y, targetLocalZ, r, g, b, nextI);
-				propagateBlockLightRGBICross(targetChunk, targetLocalX, y - 1, targetLocalZ, r, g, b, nextI);
-				propagateBlockLightRGBICross(targetChunk, targetLocalX, y + 1, targetLocalZ, r, g, b, nextI);
-				propagateBlockLightRGBICross(targetChunk, targetLocalX, y, targetLocalZ - 1, r, g, b, nextI);
-				propagateBlockLightRGBICross(targetChunk, targetLocalX, y, targetLocalZ + 1, r, g, b, nextI);
+				propagateBlockLightRGBICross(targetChunk, targetLocalX - 1, y, targetLocalZ, r, g, b, attenuatedI);
+				propagateBlockLightRGBICross(targetChunk, targetLocalX + 1, y, targetLocalZ, r, g, b, attenuatedI);
+				propagateBlockLightRGBICross(targetChunk, targetLocalX, y - 1, targetLocalZ, r, g, b, attenuatedI);
+				propagateBlockLightRGBICross(targetChunk, targetLocalX, y + 1, targetLocalZ, r, g, b, attenuatedI);
+				propagateBlockLightRGBICross(targetChunk, targetLocalX, y, targetLocalZ - 1, r, g, b, attenuatedI);
+				propagateBlockLightRGBICross(targetChunk, targetLocalX, y, targetLocalZ + 1, r, g, b, attenuatedI);
 			}
 		}
 	}
@@ -467,15 +471,22 @@ public class CrossChunkLightPropagator {
 			return; // Fully opaque block stops light
 		}
 		
+		// Apply opacity-based attenuation (same as in propagateBlockLightRGBICross)
+		int blockOpacity = block.getOpacity();
+		int decrement = Math.max(1, blockOpacity);
+		int attenuatedI = Math.max(0, intensity - decrement);
+		
 		// Get current light intensity at position
 		int currentI = chunk.getBlockLightI(x, y, z);
 		
 		// Only update if new intensity is brighter
-		if (intensity > currentI) {
-			chunk.setBlockLightRGBI(x, y, z, r, g, b, intensity);
+		if (attenuatedI > currentI) {
+			chunk.setBlockLightRGBI(x, y, z, r, g, b, attenuatedI);
 			
-			// Continue propagation from this position with the same color but reduced intensity
-			propagateBlockLightRGBICross(chunk, x, y, z, r, g, b, intensity);
+			// Continue propagation from this position with the same color but attenuated intensity
+			if (attenuatedI > 0) {
+				propagateBlockLightRGBICross(chunk, x, y, z, r, g, b, attenuatedI);
+			}
 		}
 	}
 	

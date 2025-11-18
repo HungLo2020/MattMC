@@ -425,8 +425,8 @@ public class LightPropagator {
 			int currentB = chunk.getBlockLightB(x, y, z);
 			if (currentR > 0 || currentG > 0 || currentB > 0) {
 				chunk.setBlockLightRGB(x, y, z, 0, 0, 0);
-				// TODO: This should trigger re-propagation from neighbors
-				// For now, we just clear the light at this position
+				// Re-propagate light from neighbors to fill in any gaps
+				propagateLightFromNeighbors(chunk, x, y, z);
 			}
 		} else if (oldBlock.getOpacity() >= FULL_OPACITY && newBlock.getOpacity() < FULL_OPACITY) {
 			// Old block was opaque, new block is transparent
@@ -474,6 +474,12 @@ public class LightPropagator {
 		    fromZ < 0 || fromZ >= LevelChunk.DEPTH) {
 			// TODO: Handle cross-chunk propagation
 			return;
+		}
+		
+		// Check if target block is opaque - don't propagate into opaque blocks
+		Block targetBlock = chunk.getBlock(toX, toY, toZ);
+		if (targetBlock != null && targetBlock.getOpacity() >= FULL_OPACITY) {
+			return; // Can't propagate into opaque blocks
 		}
 		
 		// Get light at source
