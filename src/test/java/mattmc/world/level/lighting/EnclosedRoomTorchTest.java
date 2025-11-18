@@ -19,6 +19,8 @@ public class EnclosedRoomTorchTest {
 	@Test
 	public void testTorchInEnclosedRoom() {
 		LevelChunk chunk = new LevelChunk(0, 0);
+		WorldLightManager worldLightManager = new WorldLightManager();
+		chunk.setWorldLightManager(worldLightManager);
 		int y = LevelChunk.worldYToChunkY(64);
 		
 		// Build a completely enclosed room (5x5x5)
@@ -35,34 +37,36 @@ public class EnclosedRoomTorchTest {
 		}
 		
 		// Inside the room (7,y+2,7) should be dark initially
-		assertEquals(0, chunk.getBlockLight(7, y + 2, 7), "Room should start dark");
+		assertEquals(0, chunk.getBlockLightI(7, y + 2, 7), "Room should start dark");
 		
 		// Place a torch inside the room at (7, y+1, 7)
 		chunk.setBlock(7, y + 1, 7, Blocks.TORCH);
 		
 		// The room should now be lit
-		int lightAtTorch = chunk.getBlockLight(7, y + 1, 7);
+		int lightAtTorch = chunk.getBlockLightI(7, y + 1, 7);
 		assertTrue(lightAtTorch > 0, "Torch should emit light");
 		
 		// Light should propagate inside the room
-		int lightNearby = chunk.getBlockLight(7, y + 2, 7);
+		int lightNearby = chunk.getBlockLightI(7, y + 2, 7);
 		assertTrue(lightNearby > 0, "Light should fill the room");
 		
 		// Break the torch
 		chunk.setBlock(7, y + 1, 7, Blocks.AIR);
 		
 		// The room should go dark again
-		assertEquals(0, chunk.getBlockLight(7, y + 1, 7), "Light should be removed at torch position");
-		assertEquals(0, chunk.getBlockLight(7, y + 2, 7), "Light should be removed throughout room");
-		assertEquals(0, chunk.getBlockLight(6, y + 1, 7), "Light should be removed in all directions");
-		assertEquals(0, chunk.getBlockLight(8, y + 1, 7), "Light should be removed in all directions");
-		assertEquals(0, chunk.getBlockLight(7, y + 1, 6), "Light should be removed in all directions");
-		assertEquals(0, chunk.getBlockLight(7, y + 1, 8), "Light should be removed in all directions");
+		assertEquals(0, chunk.getBlockLightI(7, y + 1, 7), "Light should be removed at torch position");
+		assertEquals(0, chunk.getBlockLightI(7, y + 2, 7), "Light should be removed throughout room");
+		assertEquals(0, chunk.getBlockLightI(6, y + 1, 7), "Light should be removed in all directions");
+		assertEquals(0, chunk.getBlockLightI(8, y + 1, 7), "Light should be removed in all directions");
+		assertEquals(0, chunk.getBlockLightI(7, y + 1, 6), "Light should be removed in all directions");
+		assertEquals(0, chunk.getBlockLightI(7, y + 1, 8), "Light should be removed in all directions");
 	}
 	
 	@Test
 	public void testMultipleIterationsInEnclosedRoom() {
 		LevelChunk chunk = new LevelChunk(0, 0);
+		WorldLightManager worldLightManager = new WorldLightManager();
+		chunk.setWorldLightManager(worldLightManager);
 		int y = LevelChunk.worldYToChunkY(64);
 		
 		// Build enclosed room
@@ -83,22 +87,22 @@ public class EnclosedRoomTorchTest {
 			chunk.setBlock(7, y + 1, 7, Blocks.TORCH);
 			
 			// Verify light exists
-			assertTrue(chunk.getBlockLight(7, y + 1, 7) > 0, 
+			assertTrue(chunk.getBlockLightI(7, y + 1, 7) > 0, 
 				"Iteration " + iteration + ": Light should exist after placing torch");
-			assertTrue(chunk.getBlockLight(7, y + 2, 7) > 0, 
+			assertTrue(chunk.getBlockLightI(7, y + 2, 7) > 0, 
 				"Iteration " + iteration + ": Light should propagate");
 			
 			// Break torch
 			chunk.setBlock(7, y + 1, 7, Blocks.AIR);
 			
 			// Verify light is completely removed
-			assertEquals(0, chunk.getBlockLight(7, y + 1, 7), 
+			assertEquals(0, chunk.getBlockLightI(7, y + 1, 7), 
 				"Iteration " + iteration + ": Light should be removed at torch");
-			assertEquals(0, chunk.getBlockLight(7, y + 2, 7), 
+			assertEquals(0, chunk.getBlockLightI(7, y + 2, 7), 
 				"Iteration " + iteration + ": Light should be removed everywhere");
-			assertEquals(0, chunk.getBlockLight(6, y + 1, 7), 
+			assertEquals(0, chunk.getBlockLightI(6, y + 1, 7), 
 				"Iteration " + iteration + ": No light should remain");
-			assertEquals(0, chunk.getBlockLight(8, y + 1, 7), 
+			assertEquals(0, chunk.getBlockLightI(8, y + 1, 7), 
 				"Iteration " + iteration + ": No light should remain");
 		}
 	}

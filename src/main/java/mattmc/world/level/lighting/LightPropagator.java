@@ -115,16 +115,6 @@ public class LightPropagator {
 	 * Add blockLight from an emissive block (legacy method, converts to white RGB).
 	 * 
 	 * @param chunk The chunk containing the block
-	 * @param x Chunk-local X coordinate (0-15)
-	 * @param y Chunk-local Y coordinate (0-383)
-	 * @param z Chunk-local Z coordinate (0-15)
-	 * @param emission Light emission level of the block (0-15)
-	 * @deprecated Use addBlockLightRGB for RGB values
-	 */
-	@Deprecated
-	public void addBlockLight(LevelChunk chunk, int x, int y, int z, int emission) {
-		addBlockLightRGB(chunk, x, y, z, emission, emission, emission);
-	}
 	
 	/**
 	 * Propagate RGBI light to a neighbor position.
@@ -175,15 +165,6 @@ public class LightPropagator {
 		// If newI < currentI, don't update (existing light is brighter)
 	}
 	
-	/**
-	 * Propagate light to a neighbor position (legacy method).
-	 * Now supports cross-chunk propagation.
-	 * @deprecated Use propagateRGBIToNeighbor for RGBI values
-	 */
-	@Deprecated
-	private void propagateToNeighbor(LevelChunk chunk, int x, int y, int z, int newLight) {
-		propagateRGBIToNeighbor(chunk, x, y, z, newLight, newLight, newLight, newLight);
-	}
 	
 	/**
 	 * Remove blockLight from a position (when an emissive block is removed).
@@ -391,11 +372,11 @@ public class LightPropagator {
 			return; // Opaque block or null
 		}
 		
-		int currentLight = chunk.getBlockLight(x, y, z);
+		int currentLight = chunk.getBlockLightI(x, y, z);
 		
 		// Only update if new light is brighter
 		if (newLight > currentLight) {
-			chunk.setBlockLight(x, y, z, newLight);
+			chunk.setBlockLightRGBI(x, y, z, newLight, newLight, newLight, newLight);
 			addQueue.offer(new LightNode(chunk, x, y, z, newLight));
 		}
 	}

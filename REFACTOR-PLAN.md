@@ -81,37 +81,7 @@ MattMC is a well-engineered, performance-focused Minecraft clone with clean arch
     - Development testing screen with many features
     - **Recommendation:** Split input handling (already has `DevplayInputHandler`) and UI state management (already has `DevplayUIState`)
 
-### 1.2 Singleton Pattern Usage
-**Severity:** MEDIUM  
-**Impact:** Testing difficulty, tight coupling
-
-**Location:** `WorldLightManager.java`
-
-```java
-private static WorldLightManager instance = new WorldLightManager();
-
-public static WorldLightManager getInstance() {
-    return instance;
-}
-
-public static void resetInstance() {
-    instance = new WorldLightManager();
-}
-```
-
-**Issues:**
-- Singleton pattern makes unit testing difficult
-- Global mutable state
-- The `resetInstance()` method indicates testing challenges
-- Tight coupling throughout codebase
-
-**Recommendation:**
-1. Remove singleton pattern
-2. Use dependency injection instead
-3. Pass `WorldLightManager` instance through constructors
-4. Update `Level.java` to own the light manager instance
-
-### 1.3 Static Mutable State
+### 1.2 Static Mutable State
 **Severity:** MEDIUM  
 **Impact:** Thread safety, testability
 
@@ -131,7 +101,7 @@ public static void resetInstance() {
 2. Use dependency injection to pass instances
 3. For registries (`Blocks`, `Items`): Current pattern is acceptable as they're initialized once at startup
 
-### 1.4 Screen Class Refactoring Progress
+### 1.3 Screen Class Refactoring Progress
 **Status:** ✅ Partially Complete
 
 **Completed:**
@@ -154,7 +124,7 @@ public static void resetInstance() {
 2. Keep specialized screens (`CreateWorldScreen`, `SelectWorldScreen`, `InventoryScreen`) as-is
 3. `TitleScreen` and `DevplayScreen` can remain standalone due to unique requirements
 
-### 1.5 Package Organization
+### 1.4 Package Organization
 **Status:** Good overall structure
 
 **Current Structure:**
@@ -209,20 +179,21 @@ mattmc/
 4. Note: The cross-chunk propagation TODOs may already be addressed by `CrossChunkLightPropagator`
 
 ### 2.2 Deprecated Code
-**Count:** 8 instances found
+**Status:** ✅ Complete
 
-**Locations:**
-- `MeshBuilder.java` - Deprecated interface for backward compatibility
-- `LightPropagator.java` - Legacy methods
-- `Block.java` - Old API methods
-- `LightStorage.java` - Deprecated storage methods
-- `LevelChunk.java` - Legacy chunk methods
+All deprecated code has been removed from the codebase:
+- ✅ Removed `MeshBuilder.ChunkLightAccessor` - migrated to `VertexLightSampler.ChunkLightAccessor`
+- ✅ Removed `LightPropagator.addBlockLight()` - migrated to `addBlockLightRGB()`
+- ✅ Removed `LightPropagator.propagateToNeighbor()` - migrated to `propagateRGBIToNeighbor()`
+- ✅ Removed `Block.getLightEmission()` - migrated to RGB emission methods
+- ✅ Removed `LightStorage.getBlockLight()` - migrated to `getBlockLightI()`
+- ✅ Removed `LightStorage.setBlockLight()` - migrated to `setBlockLightRGBI()`
+- ✅ Removed `LevelChunk.getBlockLight()` - migrated to `getBlockLightI()`
+- ✅ Removed `LevelChunk.setBlockLight()` - migrated to `setBlockLightRGBI()`
 
-**Recommendation:**
-1. Review each deprecated item for removal eligibility
-2. Update callers to use new APIs
-3. Remove deprecated code in next major version
-4. Document migration path in deprecation annotations
+All usages in production and test code have been updated. All 384 tests passing.
+
+**Completed:** 2025-11-17
 
 ### 2.3 Magic Numbers
 **Severity:** LOW-MEDIUM
@@ -832,24 +803,25 @@ runtimeOnly("org.lwjgl:lwjgl-glfw:$lwjgl:$lwjglNatives")
 
 ## 10. Recommended Refactoring Priorities
 
-## 10. Recommended Refactoring Priorities
+### ✅ Completed Refactorings
+
+1. **✅ Remove WorldLightManager singleton** (formerly Section 1.2)
+   - Replaced with dependency injection
+   - Level class now owns WorldLightManager instance
+   - Pass instance through constructors and setter methods
+   - Improves testability and reduces coupling
+   - **Completed:** 2025-11-17
 
 ### Priority 1: High-Value Refactorings
 **Impact:** HIGH | **Effort:** LOW-MEDIUM
 
-1. **Remove WorldLightManager singleton** (Section 1.2)
-   - Replace with dependency injection
-   - Pass instance through constructors
-   - Improves testability and reduces coupling
-   - **Estimated Effort:** 1-2 days
-
-2. **Convert OptionsManager to instance-based** (Section 1.3)
+1. **Convert OptionsManager to instance-based** (Section 1.2)
    - Remove static mutable state
    - Use dependency injection
    - Improves thread safety and testability
    - **Estimated Effort:** 2-3 days
 
-3. **Add multi-platform native dependencies** (Section 9.1)
+2. **Add multi-platform native dependencies** (Section 9.1)
    - Detect OS and include appropriate LWJGL natives
    - Enables Windows and macOS support
    - **Estimated Effort:** 1 day
@@ -863,7 +835,7 @@ runtimeOnly("org.lwjgl:lwjgl-glfw:$lwjgl:$lwjglNatives")
    - Extract deferred update management from `CrossChunkLightPropagator`
    - **Estimated Effort:** 3-5 days
 
-2. **Evaluate remaining screens for AbstractMenuScreen** (Section 1.4)
+2. **Evaluate remaining screens for AbstractMenuScreen** (Section 1.3)
    - Consider refactoring `PauseScreen` to use base class
    - **Estimated Effort:** 1-2 days
 

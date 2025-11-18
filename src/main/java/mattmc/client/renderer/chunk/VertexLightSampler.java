@@ -253,12 +253,13 @@ public class VertexLightSampler {
             return 0; // Out of chunk bounds without accessor: no blocklight
         }
         
-        return chunk.getBlockLight(x, y, z);
+        return chunk.getBlockLightI(x, y, z);
     }
     
     /**
      * Get blocklight RGB values safely, returning [0,0,0] if out of bounds.
-     * @return Array of [R, G, B] values (0-15 each)
+     * Scales RGB values by intensity to properly attenuate light with distance.
+     * @return Array of [R, G, B] values (0-15 each), scaled by intensity
      */
     private int[] getBlockLightRGBSafe(LevelChunk chunk, int x, int y, int z) {
         // Check bounds
@@ -279,10 +280,33 @@ public class VertexLightSampler {
             return new int[] {0, 0, 0}; // Out of chunk bounds without accessor: no blocklight
         }
         
-        return new int[] {
-            chunk.getBlockLightR(x, y, z),
-            chunk.getBlockLightG(x, y, z),
-            chunk.getBlockLightB(x, y, z)
-        };
+        // Get RGB and intensity values
+        int r = chunk.getBlockLightR(x, y, z);
+        int g = chunk.getBlockLightG(x, y, z);
+        int b = chunk.getBlockLightB(x, y, z);
+        int intensity = chunk.getBlockLightI(x, y, z);
+        
+        // If no light, return early
+        if (intensity == 0) {
+            return new int[] {0, 0, 0};
+        }
+        
+        // Scale RGB by intensity ratio to properly attenuate light
+        // RGB values stay constant during propagation, but intensity decrements
+        // We need to scale RGB to match the current intensity
+        int maxRGB = Math.max(r, Math.max(g, b));
+        
+        // If maxRGB is 0 but intensity is not, something is wrong - return intensity as white light
+        if (maxRGB == 0) {
+            return new int[] {intensity, intensity, intensity};
+        }
+        
+        // Scale RGB by the intensity ratio
+        float scale = (float) intensity / maxRGB;
+        int scaledR = Math.round(r * scale);
+        int scaledG = Math.round(g * scale);
+        int scaledB = Math.round(b * scale);
+        
+        return new int[] {scaledR, scaledG, scaledB};
     }
 }

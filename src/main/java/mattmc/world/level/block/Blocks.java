@@ -97,13 +97,15 @@ public class Blocks {
         if (block instanceof StairsBlock) {
             registeredBlock = new StairsBlock(identifier);
         } else if (block instanceof RotatedPillarBlock) {
+            int lightEmission = Math.max(block.getLightEmissionR(), Math.max(block.getLightEmissionG(), block.getLightEmissionB()));
             registeredBlock = new RotatedPillarBlock(block.isSolid(), 
-                block.getLightEmission(),
+                lightEmission,
                 block.getLightEmissionR(), block.getLightEmissionG(), block.getLightEmissionB(), 
                 identifier);
         } else {
+            int lightEmission = Math.max(block.getLightEmissionR(), Math.max(block.getLightEmissionG(), block.getLightEmissionB()));
             registeredBlock = new Block(block.isSolid(), 
-                block.getLightEmission(),
+                lightEmission,
                 block.getLightEmissionR(), block.getLightEmissionG(), block.getLightEmissionB(), 
                 identifier);
         }
@@ -137,13 +139,15 @@ public class Blocks {
         if (block instanceof StairsBlock) {
             registeredBlock = new StairsBlock(identifier);
         } else if (block instanceof RotatedPillarBlock) {
+            int lightEmission = Math.max(block.getLightEmissionR(), Math.max(block.getLightEmissionG(), block.getLightEmissionB()));
             registeredBlock = new RotatedPillarBlock(block.isSolid(), 
-                block.getLightEmission(),
+                lightEmission,
                 block.getLightEmissionR(), block.getLightEmissionG(), block.getLightEmissionB(), 
                 identifier);
         } else {
+            int lightEmission = Math.max(block.getLightEmissionR(), Math.max(block.getLightEmissionG(), block.getLightEmissionB()));
             registeredBlock = new Block(block.isSolid(), 
-                block.getLightEmission(),
+                lightEmission,
                 block.getLightEmissionR(), block.getLightEmissionG(), block.getLightEmissionB(), 
                 identifier);
         }

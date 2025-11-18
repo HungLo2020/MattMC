@@ -24,13 +24,13 @@ public class ChunkLightSerializationTest {
 		
 		// Set some light values
 		chunk.setSkyLight(0, 64, 0, 10);
-		chunk.setBlockLight(0, 64, 0, 5);
+		chunk.setBlockLightRGBI(0, 64, 0, 5, 5, 5, 5);
 		chunk.setSkyLight(5, 100, 5, 8);
-		chunk.setBlockLight(5, 100, 5, 12);
+		chunk.setBlockLightRGBI(5, 100, 5, 12, 12, 12, 12);
 		
 		// Set light in a different section
 		chunk.setSkyLight(8, 200, 8, 6);
-		chunk.setBlockLight(8, 200, 8, 3);
+		chunk.setBlockLightRGBI(8, 200, 8, 3, 3, 3, 3);
 		
 		// Serialize to NBT
 		Map<String, Object> nbt = ChunkNBT.toNBT(chunk);
@@ -44,11 +44,11 @@ public class ChunkLightSerializationTest {
 		
 		// Verify light values are preserved
 		assertEquals(10, loaded.getSkyLight(0, 64, 0), "Sky light at (0,64,0)");
-		assertEquals(5, loaded.getBlockLight(0, 64, 0), "Block light at (0,64,0)");
+		assertEquals(5, loaded.getBlockLightI(0, 64, 0), "Block light at (0,64,0)");
 		assertEquals(8, loaded.getSkyLight(5, 100, 5), "Sky light at (5,100,5)");
-		assertEquals(12, loaded.getBlockLight(5, 100, 5), "Block light at (5,100,5)");
+		assertEquals(12, loaded.getBlockLightI(5, 100, 5), "Block light at (5,100,5)");
 		assertEquals(6, loaded.getSkyLight(8, 200, 8), "Sky light at (8,200,8)");
-		assertEquals(3, loaded.getBlockLight(8, 200, 8), "Block light at (8,200,8)");
+		assertEquals(3, loaded.getBlockLightI(8, 200, 8), "Block light at (8,200,8)");
 	}
 	
 	@Test
@@ -65,7 +65,7 @@ public class ChunkLightSerializationTest {
 		
 		// Verify default light values are preserved
 		assertEquals(15, loaded.getSkyLight(1, 64, 1), "Default sky light should be 15");
-		assertEquals(0, loaded.getBlockLight(1, 64, 1), "Default block light should be 0");
+		assertEquals(0, loaded.getBlockLightI(1, 64, 1), "Default block light should be 0");
 	}
 	
 	@Test
@@ -75,7 +75,7 @@ public class ChunkLightSerializationTest {
 		// Set a block and modify its light
 		chunk.setBlock(8, 64, 8, Blocks.STONE);
 		chunk.setSkyLight(8, 64, 8, 3);
-		chunk.setBlockLight(8, 64, 8, 14);
+		chunk.setBlockLightRGBI(8, 64, 8, 14, 14, 14, 14);
 		
 		// Serialize and deserialize
 		Map<String, Object> nbt = ChunkNBT.toNBT(chunk);
@@ -84,7 +84,7 @@ public class ChunkLightSerializationTest {
 		// Verify
 		assertEquals(Blocks.STONE, loaded.getBlock(8, 64, 8));
 		assertEquals(3, loaded.getSkyLight(8, 64, 8));
-		assertEquals(14, loaded.getBlockLight(8, 64, 8));
+		assertEquals(14, loaded.getBlockLightI(8, 64, 8));
 	}
 	
 	@Test
@@ -93,7 +93,7 @@ public class ChunkLightSerializationTest {
 		LevelChunk chunk = new LevelChunk(42, -17);
 		chunk.setBlock(0, 64, 0, Blocks.STONE);
 		chunk.setSkyLight(3, 100, 7, 11);
-		chunk.setBlockLight(3, 100, 7, 4);
+		chunk.setBlockLightRGBI(3, 100, 7, 4, 4, 4, 4);
 		
 		// Serialize and deserialize
 		Map<String, Object> nbt = ChunkNBT.toNBT(chunk);
@@ -105,6 +105,6 @@ public class ChunkLightSerializationTest {
 		
 		// Verify light data
 		assertEquals(11, loaded.getSkyLight(3, 100, 7));
-		assertEquals(4, loaded.getBlockLight(3, 100, 7));
+		assertEquals(4, loaded.getBlockLightI(3, 100, 7));
 	}
 }

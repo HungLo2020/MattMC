@@ -28,7 +28,7 @@ public class RGBLightRemovalTest {
 		assertEquals(14, chunk.getBlockLightR(8, y, 8), "Source should have R=14");
 		assertEquals(11, chunk.getBlockLightG(8, y, 8), "Source should have G=11");
 		assertEquals(0, chunk.getBlockLightB(8, y, 8), "Source should have B=0");
-		assertEquals(14, chunk.getBlockLight(8, y, 8), "Intensity should be max(R,G,B)=14");
+		assertEquals(14, chunk.getBlockLightI(8, y, 8), "Intensity should be max(R,G,B)=14");
 		
 		// Check propagated light
 		assertTrue(chunk.getBlockLightR(9, y, 8) > 0, "Light should propagate in R channel");
@@ -42,18 +42,20 @@ public class RGBLightRemovalTest {
 		assertEquals(0, chunk.getBlockLightR(8, y, 8), "R should be removed");
 		assertEquals(0, chunk.getBlockLightG(8, y, 8), "G should be removed");
 		assertEquals(0, chunk.getBlockLightB(8, y, 8), "B should be removed");
-		assertEquals(0, chunk.getBlockLight(8, y, 8), "Intensity should be 0");
+		assertEquals(0, chunk.getBlockLightI(8, y, 8), "Intensity should be 0");
 		
 		// Propagated light should also be removed
 		assertEquals(0, chunk.getBlockLightR(9, y, 8), "Propagated R should be removed");
 		assertEquals(0, chunk.getBlockLightG(9, y, 8), "Propagated G should be removed");
 		assertEquals(0, chunk.getBlockLightB(9, y, 8), "Propagated B should be removed");
-		assertEquals(0, chunk.getBlockLight(9, y, 8), "Propagated intensity should be 0");
+		assertEquals(0, chunk.getBlockLightI(9, y, 8), "Propagated intensity should be 0");
 	}
 	
 	@Test
 	public void testTorchPlaceAndRemove() {
 		LevelChunk chunk = new LevelChunk(0, 0);
+		WorldLightManager worldLightManager = new WorldLightManager();
+		chunk.setWorldLightManager(worldLightManager);
 		int y = LevelChunk.worldYToChunkY(64);
 		
 		// Place a torch (RGB=14,11,0)
@@ -99,6 +101,8 @@ public class RGBLightRemovalTest {
 	@Test
 	public void testMultipleTorchRemoval() {
 		LevelChunk chunk = new LevelChunk(0, 0);
+		WorldLightManager worldLightManager = new WorldLightManager();
+		chunk.setWorldLightManager(worldLightManager);
 		int y = LevelChunk.worldYToChunkY(64);
 		
 		// Place two torches far enough apart (15 blocks ensures no overlap with range 14 torches)
@@ -129,6 +133,8 @@ public class RGBLightRemovalTest {
 	@Test
 	public void testRepeatedPlaceAndRemove() {
 		LevelChunk chunk = new LevelChunk(0, 0);
+		WorldLightManager worldLightManager = new WorldLightManager();
+		chunk.setWorldLightManager(worldLightManager);
 		int y = LevelChunk.worldYToChunkY(64);
 		
 		// Test the same position multiple times to catch any state issues
