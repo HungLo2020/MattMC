@@ -179,20 +179,21 @@ mattmc/
 4. Note: The cross-chunk propagation TODOs may already be addressed by `CrossChunkLightPropagator`
 
 ### 2.2 Deprecated Code
-**Count:** 8 instances found
+**Status:** ✅ Complete
 
-**Locations:**
-- `MeshBuilder.java` - Deprecated interface for backward compatibility
-- `LightPropagator.java` - Legacy methods
-- `Block.java` - Old API methods
-- `LightStorage.java` - Deprecated storage methods
-- `LevelChunk.java` - Legacy chunk methods
+All deprecated code has been removed from the codebase:
+- ✅ Removed `MeshBuilder.ChunkLightAccessor` - migrated to `VertexLightSampler.ChunkLightAccessor`
+- ✅ Removed `LightPropagator.addBlockLight()` - migrated to `addBlockLightRGB()`
+- ✅ Removed `LightPropagator.propagateToNeighbor()` - migrated to `propagateRGBIToNeighbor()`
+- ✅ Removed `Block.getLightEmission()` - migrated to RGB emission methods
+- ✅ Removed `LightStorage.getBlockLight()` - migrated to `getBlockLightI()`
+- ✅ Removed `LightStorage.setBlockLight()` - migrated to `setBlockLightRGBI()`
+- ✅ Removed `LevelChunk.getBlockLight()` - migrated to `getBlockLightI()`
+- ✅ Removed `LevelChunk.setBlockLight()` - migrated to `setBlockLightRGBI()`
 
-**Recommendation:**
-1. Review each deprecated item for removal eligibility
-2. Update callers to use new APIs
-3. Remove deprecated code in next major version
-4. Document migration path in deprecation annotations
+All usages in production and test code have been updated. All 384 tests passing.
+
+**Completed:** 2025-11-17
 
 ### 2.3 Magic Numbers
 **Severity:** LOW-MEDIUM

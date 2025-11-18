@@ -192,16 +192,6 @@ public class Block {
         return solid;
     }
     
-    /**
-     * Get the light level emitted by this block (legacy, returns max of RGB).
-     * 
-     * @return Light emission level (0-15), where 0 means no light emission
-     * @deprecated Use getLightEmissionR/G/B for RGB values
-     */
-    @Deprecated
-    public int getLightEmission() {
-        return lightEmission;
-    }
     
     /**
      * Get the RED channel light level emitted by this block.

@@ -234,19 +234,6 @@ public class LightStorage {
 	}
 	
 	/**
-	 * Get block light level at position (legacy method, returns intensity).
-	 * @param x 0-15
-	 * @param y 0-15
-	 * @param z 0-15
-	 * @return Block light level (0-15), the intensity channel
-	 * @deprecated Use getBlockLightR/G/B/I for RGBI values
-	 */
-	@Deprecated
-	public int getBlockLight(int x, int y, int z) {
-		return getBlockLightI(x, y, z);
-	}
-	
-	/**
 	 * Set block light RGBI levels at position.
 	 * @param x 0-15
 	 * @param y 0-15
@@ -285,20 +272,6 @@ public class LightStorage {
 	}
 	
 	/**
-	 * Set block light level at position (legacy method, sets all RGBI to same value).
-	 * @param x 0-15
-	 * @param y 0-15
-	 * @param z 0-15
-	 * @param level Light level (0-15)
-	 * @deprecated Use setBlockLightRGBI for RGBI values
-	 */
-	@Deprecated
-	public void setBlockLight(int x, int y, int z, int level) {
-		if (level < 0 || level > 15) {
-			throw new IllegalArgumentException("Light level must be 0-15, got: " + level);
-		}
-		setBlockLightRGBI(x, y, z, level, level, level, level);
-	}
 	
 	/**
 	 * Get the raw sky light array for serialization.

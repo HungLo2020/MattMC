@@ -19,8 +19,8 @@ assertEquals(15, storage.getSkyLight(0, 0, 0));
 assertEquals(15, storage.getSkyLight(15, 15, 15));
 
 // Block light should default to 0 (no light)
-assertEquals(0, storage.getBlockLight(0, 0, 0));
-assertEquals(0, storage.getBlockLight(15, 15, 15));
+assertEquals(0, storage.getBlockLightI(0, 0, 0));
+assertEquals(0, storage.getBlockLightI(15, 15, 15));
 }
 
 @Test
@@ -41,14 +41,14 @@ assertEquals(15, storage.getSkyLight(15, 15, 15));
 public void testSetAndGetBlockLight() {
 LightStorage storage = new LightStorage();
 
-storage.setBlockLight(0, 0, 0, 0);
-assertEquals(0, storage.getBlockLight(0, 0, 0));
+storage.setBlockLightRGBI(0, 0, 0, 0, 0, 0, 0);
+assertEquals(0, storage.getBlockLightI(0, 0, 0));
 
-storage.setBlockLight(1, 2, 3, 7);
-assertEquals(7, storage.getBlockLight(1, 2, 3));
+storage.setBlockLightRGBI(1, 2, 3, 7, 7, 7, 7);
+assertEquals(7, storage.getBlockLightI(1, 2, 3));
 
-storage.setBlockLight(15, 15, 15, 15);
-assertEquals(15, storage.getBlockLight(15, 15, 15));
+storage.setBlockLightRGBI(15, 15, 15, 15, 15, 15, 15);
+assertEquals(15, storage.getBlockLightI(15, 15, 15));
 }
 
 @Test
@@ -56,7 +56,7 @@ public void testArraySerialization() {
 LightStorage storage = new LightStorage();
 
 storage.setSkyLight(5, 5, 5, 10);
-storage.setBlockLight(5, 5, 5, 8);
+storage.setBlockLightRGBI(5, 5, 5, 8, 8, 8, 8);
 
 byte[] skyLight = storage.getSkyLightArray();
 byte[] blockLight = storage.getBlockLightArray();
@@ -67,6 +67,6 @@ assertEquals(8192, blockLight.length);
 LightStorage restored = new LightStorage(skyLight, blockLight);
 
 assertEquals(10, restored.getSkyLight(5, 5, 5));
-assertEquals(8, restored.getBlockLight(5, 5, 5));
+assertEquals(8, restored.getBlockLightI(5, 5, 5));
 }
 }

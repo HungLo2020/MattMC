@@ -85,7 +85,7 @@ public class ChunkNBT {
             for (int x = 0; x < 16 && !hasNonDefaultLight; x++) {
                 for (int y = 0; y < 16 && !hasNonDefaultLight; y++) {
                     for (int z = 0; z < 16 && !hasNonDefaultLight; z++) {
-                        if (lightStorage.getSkyLight(x, y, z) != 15 || lightStorage.getBlockLight(x, y, z) != 0) {
+                        if (lightStorage.getSkyLight(x, y, z) != 15 || lightStorage.getBlockLightI(x, y, z) != 0) {
                             hasNonDefaultLight = true;
                         }
                     }

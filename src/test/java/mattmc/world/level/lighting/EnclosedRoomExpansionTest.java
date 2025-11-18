@@ -53,12 +53,12 @@ public class EnclosedRoomExpansionTest {
 		chunk.setBlock(6, y, 6, Blocks.TORCH);
 		
 		System.out.println("Placed torch at center (6, 64, 6)");
-		System.out.println("Light at torch: " + chunk.getBlockLight(6, y, 6));
-		System.out.println("Light at (5, 64, 6): " + chunk.getBlockLight(5, y, 6));
-		System.out.println("Light at (7, 64, 6): " + chunk.getBlockLight(7, y, 6));
+		System.out.println("Light at torch: " + chunk.getBlockLightI(6, y, 6));
+		System.out.println("Light at (5, 64, 6): " + chunk.getBlockLightI(5, y, 6));
+		System.out.println("Light at (7, 64, 6): " + chunk.getBlockLightI(7, y, 6));
 		
 		// Verify light propagated throughout the room
-		int lightAtCorner = chunk.getBlockLight(5, y, 5);
+		int lightAtCorner = chunk.getBlockLightI(5, y, 5);
 		System.out.println("Light at corner (5, 64, 5): " + lightAtCorner);
 		assertTrue(lightAtCorner > 0, "Initial room should be lit by torch");
 		
@@ -67,12 +67,12 @@ public class EnclosedRoomExpansionTest {
 		System.out.println("\n--- Expanding room by breaking wall at (8, 64, 6) ---");
 		chunk.setBlock(8, y, 6, Blocks.AIR);
 		
-		System.out.println("Light at torch (6, 64, 6): " + chunk.getBlockLight(6, y, 6));
-		System.out.println("Light at (7, 64, 6): " + chunk.getBlockLight(7, y, 6));
-		System.out.println("Light at newly opened (8, 64, 6): " + chunk.getBlockLight(8, y, 6));
+		System.out.println("Light at torch (6, 64, 6): " + chunk.getBlockLightI(6, y, 6));
+		System.out.println("Light at (7, 64, 6): " + chunk.getBlockLightI(7, y, 6));
+		System.out.println("Light at newly opened (8, 64, 6): " + chunk.getBlockLightI(8, y, 6));
 		
 		// THIS IS THE BUG: Light should propagate into the newly opened space
-		int lightInNewSpace = chunk.getBlockLight(8, y, 6);
+		int lightInNewSpace = chunk.getBlockLightI(8, y, 6);
 		assertTrue(lightInNewSpace > 0, 
 			"Light should propagate into newly opened space at (8, 64, 6), but got: " + lightInNewSpace);
 	}
@@ -109,22 +109,22 @@ public class EnclosedRoomExpansionTest {
 		
 		// Expand in +X direction
 		chunk.setBlock(8, y, 6, Blocks.AIR);
-		int lightXPlus = chunk.getBlockLight(8, y, 6);
+		int lightXPlus = chunk.getBlockLightI(8, y, 6);
 		assertTrue(lightXPlus > 0, "Light should propagate in +X direction, got: " + lightXPlus);
 		
 		// Expand in -X direction
 		chunk.setBlock(4, y, 6, Blocks.AIR);
-		int lightXMinus = chunk.getBlockLight(4, y, 6);
+		int lightXMinus = chunk.getBlockLightI(4, y, 6);
 		assertTrue(lightXMinus > 0, "Light should propagate in -X direction, got: " + lightXMinus);
 		
 		// Expand in +Z direction
 		chunk.setBlock(6, y, 8, Blocks.AIR);
-		int lightZPlus = chunk.getBlockLight(6, y, 8);
+		int lightZPlus = chunk.getBlockLightI(6, y, 8);
 		assertTrue(lightZPlus > 0, "Light should propagate in +Z direction, got: " + lightZPlus);
 		
 		// Expand in -Z direction
 		chunk.setBlock(6, y, 4, Blocks.AIR);
-		int lightZMinus = chunk.getBlockLight(6, y, 4);
+		int lightZMinus = chunk.getBlockLightI(6, y, 4);
 		assertTrue(lightZMinus > 0, "Light should propagate in -Z direction, got: " + lightZMinus);
 	}
 }
