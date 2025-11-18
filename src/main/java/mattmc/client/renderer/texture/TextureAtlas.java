@@ -8,6 +8,7 @@ import org.lwjgl.BufferUtils;
 import javax.imageio.ImageIO;
 import java.awt.*;
 import java.awt.image.BufferedImage;
+import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
 import java.util.*;
@@ -127,7 +128,7 @@ public class TextureAtlas implements AutoCloseable {
                 } else {
                     logger.error("  Failed to load: {}", texturePath);
                 }
-            } catch (Exception e) {
+            } catch (RuntimeException e) {
                 logger.error("  Error loading {}: {}", texturePath, e.getMessage());
             }
             
@@ -157,7 +158,7 @@ public class TextureAtlas implements AutoCloseable {
                 return null;
             }
             return ImageIO.read(is);
-        } catch (Exception e) {
+        } catch (IOException e) {
             logger.error("Failed to load texture: {}", path, e);
             return null;
         }

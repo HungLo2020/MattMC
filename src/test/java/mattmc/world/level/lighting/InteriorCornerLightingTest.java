@@ -108,7 +108,7 @@ public class InteriorCornerLightingTest {
 			System.out.println("  Total BlockLight: " + totalBlockLight);
 			System.out.println("  ✓ Corner is properly lit (not too dark)");
 			
-		} catch (Exception e) {
+		} catch (RuntimeException e) {
 			throw new RuntimeException("Failed to test vertex light sampling", e);
 		}
 	}
@@ -176,7 +176,7 @@ public class InteriorCornerLightingTest {
 			System.out.println("  SkyLight: " + skyLight);
 			System.out.println("  ✓ Only non-zero samples are averaged");
 			
-		} catch (Exception e) {
+		} catch (RuntimeException e) {
 			throw new RuntimeException("Failed to test vertex light sampling", e);
 		}
 	}
@@ -246,7 +246,7 @@ public class InteriorCornerLightingTest {
 			System.out.println("  Ceiling SkyLight: " + skyLight);
 			System.out.println("  ✓ Ceiling receives light from air space below");
 			
-		} catch (Exception e) {
+		} catch (RuntimeException e) {
 			throw new RuntimeException("Failed to test ceiling lighting", e);
 		}
 	}

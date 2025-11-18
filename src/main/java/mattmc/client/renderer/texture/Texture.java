@@ -4,6 +4,7 @@ import mattmc.client.settings.OptionsManager;
 import org.lwjgl.BufferUtils;
 import org.lwjgl.stb.STBImage;
 
+import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
 
@@ -61,7 +62,7 @@ public final class Texture implements AutoCloseable {
             ByteBuffer buf = BufferUtils.createByteBuffer(tmp.length);
             buf.put(tmp).flip();
             return buf;
-        } catch (Exception e) {
+        } catch (IOException e) {
             throw new RuntimeException("Failed to read resource: " + path, e);
         }
     }

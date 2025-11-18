@@ -242,44 +242,7 @@ public class OptionsManager {
 ```
 **Priority:** HIGH - Fundamental architectural issue
 
-### 2.3 Broad Exception Catching
-**Severity:** MEDIUM-HIGH  
-**Impact:** Debugging difficulty, may hide bugs
-
-**Count:** 23 instances of `catch (Exception e)`
-
-**Examples:**
-```java
-// ResourceManager.java line 69
-} catch (Exception e) {
-    logger.debug("Failed to load block model: {}", resourcePath);
-    return null;
-}
-
-// TrueTypeFont.java line 102
-} catch (Exception e) {
-    logger.error("Failed to load font", e);
-}
-```
-
-**Problems:**
-- Catches unexpected exceptions (programming errors)
-- Makes debugging harder
-- May hide actual bugs (NPE, IllegalArgumentException)
-- Too generic error handling
-
-**Recommendation:**
-```java
-// Be specific about what exceptions you expect
-} catch (IOException | JsonParseException e) {
-    logger.warn("Failed to load block model {}: {}", resourcePath, e.getMessage());
-    return null;
-}
-// Let programming errors propagate
-```
-**Priority:** MEDIUM - Should be fixed systematically
-
-### 2.4 TODO Comments
+### 2.3 TODO Comments
 **Count:** 3 remaining  
 **Severity:** LOW  
 **Impact:** Incomplete functionality
@@ -307,7 +270,7 @@ public class OptionsManager {
 3. Prioritize and schedule implementation
 4. **Priority:** LOW - Track but not urgent
 
-### 2.5 Limited Modern Java Features
+### 2.4 Limited Modern Java Features
 **Java Version:** 21 ✅  
 **Severity:** LOW-MEDIUM  
 **Impact:** Code clarity and conciseness
@@ -345,7 +308,7 @@ public record ChunkPos(int x, int z) {
 3. Consider text blocks for JSON/multi-line strings
 4. **Priority:** LOW - Nice to have, not critical
 
-### 2.6 Magic Numbers
+### 2.5 Magic Numbers
 **Severity:** LOW  
 **Impact:** Code readability
 
@@ -654,54 +617,49 @@ All dependencies are up-to-date and appropriate!
    - Effort: 2-3 days
    - Improves: Maintainability, readability
 
-4. **Fix Broad Exception Catching** (Section 2.3)
-   - Impact: MEDIUM - Debugging and robustness
-   - Effort: 2-3 days
-   - Improves: Error handling, debugging
-
-5. **Add Null Safety Annotations** (Section 1.5)
+4. **Add Null Safety Annotations** (Section 1.5)
    - Impact: MEDIUM - Prevents NPEs
    - Effort: 3-4 days
    - Improves: Code safety, IDE support
 
-6. **Verify/Fix Cross-Chunk Lighting TODOs** (Section 3.2)
+5. **Verify/Fix Cross-Chunk Lighting TODOs** (Section 3.2)
    - Impact: MEDIUM - Visible to players
    - Effort: 1-2 days
    - Fixes: Potential lighting bugs
 
 ### Priority 3: Nice to Have (When Time Permits) 🟢
 
-7. **Implement Distance-Based Chunk Priority** (Section 1.3)
+6. **Implement Distance-Based Chunk Priority** (Section 1.3)
    - Impact: MEDIUM - Loading responsiveness
    - Effort: 3-4 days
    - Improves: Perceived performance
 
-8. **Extract Large Classes** (Section 2.1)
+7. **Extract Large Classes** (Section 2.1)
    - Impact: MEDIUM - Several 500+ line files
    - Effort: 1-2 weeks
    - Improves: Maintainability
 
-9. **Use Modern Java Features** (Section 2.5)
+8. **Use Modern Java Features** (Section 2.4)
    - Impact: LOW-MEDIUM - Code clarity
    - Effort: 2-3 days
    - Improves: Readability, conciseness
 
-10. **Fix Gradle Deprecations** (Section 5.2)
+9. **Fix Gradle Deprecations** (Section 5.2)
     - Impact: MEDIUM - Future compatibility
     - Effort: 1 day
     - Fixes: Gradle 9.0 compatibility
 
 ### Priority 4: Low Priority (Track Only) ⚪
 
-11. **Add Magic Number Comments** (Section 2.6)
+10. **Add Magic Number Comments** (Section 2.5)
     - Impact: LOW - Documentation
     - Effort: 1 day
 
-12. **Consistent Try-With-Resources** (Section 3.1)
+11. **Consistent Try-With-Resources** (Section 3.1)
     - Impact: LOW-MEDIUM - Resource cleanup
     - Effort: 2 days
 
-13. **Add Static Analysis Tools** (Section 5.3)
+12. **Add Static Analysis Tools** (Section 5.3)
     - Impact: LOW - Code quality
     - Effort: 1-2 days
 
@@ -720,7 +678,7 @@ All dependencies are up-to-date and appropriate!
 | Files > 500 lines | 10 | ⚠️ |
 | TODO Comments | 3 | ✅ |
 | Deprecated Items | 0 | ✅ |
-| Broad catch(Exception) | 23 | ⚠️ |
+| Broad catch(Exception) | 0 | ✅ |
 | Null Annotations | 0 | ❌ |
 | Logger Statements | ~135 | ✅ |
 | System.out (actual) | 0 | ✅ |
@@ -752,7 +710,6 @@ MattMC is a **high-quality, well-architected project** with excellent test cover
 - Refactor largest class (StairsGeometryBuilder)
 
 **Phase 2: Quality Improvements (2-3 weeks)**
-- Fix broad exception catching
 - Add null annotations
 - Verify lighting TODOs
 

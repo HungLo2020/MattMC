@@ -9,9 +9,11 @@ import mattmc.client.resources.model.ModelElement;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
+import com.google.gson.JsonParseException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.Reader;
@@ -66,7 +68,7 @@ public class ResourceManager {
              Reader reader = new InputStreamReader(is)) {
             BlockModel model = GSON.fromJson(reader, BlockModel.class);
             return model;
-        } catch (Exception e) {
+        } catch (IOException | JsonParseException e) {
             logger.debug("Failed to load block model: {}", resourcePath);
             return null;
         }
@@ -233,7 +235,7 @@ public class ResourceManager {
             BlockState blockState = GSON.fromJson(reader, BlockState.class);
             BLOCKSTATE_CACHE.put(name, blockState);
             return blockState;
-        } catch (Exception e) {
+        } catch (IOException | JsonParseException e) {
             logger.error("Failed to load blockstate: {}", path, e);
             return null;
         }
@@ -326,7 +328,7 @@ public class ResourceManager {
              Reader reader = new InputStreamReader(is)) {
             BlockModel model = GSON.fromJson(reader, BlockModel.class);
             return model;
-        } catch (Exception e) {
+        } catch (IOException | JsonParseException e) {
             logger.debug("Failed to load item model: {}", path);
             return null;
         }

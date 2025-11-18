@@ -309,7 +309,7 @@ public final class LevelStorageSource {
                                     }
                                 }
                             }
-                        } catch (Exception e) {
+                        } catch (IOException | RuntimeException e) {
                             logger.error("Failed to load chunk ({}, {}): {}", chunkX, chunkZ, e.getMessage(), e);
                         }
                     }
