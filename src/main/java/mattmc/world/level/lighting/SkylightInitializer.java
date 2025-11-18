@@ -3,6 +3,8 @@ package mattmc.world.level.lighting;
 import mattmc.world.level.block.Block;
 import mattmc.world.level.chunk.LevelChunk;
 
+import static mattmc.world.level.lighting.LightingConstants.FULL_OPACITY;
+
 /**
  * Static skylight initializer for chunks.
  * 
@@ -41,20 +43,19 @@ public class SkylightInitializer {
 	 * @param z Column Z coordinate (0-15)
 	 */
 	private static void initializeColumnSkylight(LevelChunk chunk, int x, int z) {
-		// Find the topmost opaque block in this column
+		// Find the topmost fully opaque block in this column
 		int heightmapY = findTopmostOpaqueBlock(chunk, x, z);
 		
 		// Update the heightmap
 		chunk.getHeightmap().setHeight(x, z, heightmapY);
 		
 		// Set skylight values based on heightmap
+		// For simplicity and consistency with BFS propagation, treat air columns uniformly
 		for (int y = 0; y < LevelChunk.HEIGHT; y++) {
 			int worldY = LevelChunk.chunkYToWorldY(y);
 			
-			// If heightmap is MIN_Y, there are no opaque blocks, so all blocks get full skylight
-			// Otherwise, blocks above the heightmap get full skylight, blocks at/below get none
 			if (heightmapY == LevelChunk.MIN_Y || worldY > heightmapY) {
-				// Above the heightmap (or no opaque blocks) - full skylight
+				// Above the heightmap (or no fully opaque blocks) - full skylight
 				chunk.setSkyLight(x, y, z, 15);
 			} else {
 				// At or below the heightmap - no skylight
@@ -66,28 +67,32 @@ public class SkylightInitializer {
 	/**
 	 * Find the topmost opaque block in a column.
 	 * 
-	 * Scans from top to bottom looking for the first opaque block
-	 * (opacity > 0). Returns the world Y coordinate of that block,
-	 * or MIN_Y if no opaque blocks are found.
+	 * Scans from top to bottom looking for the first fully opaque block
+	 * (opacity >= FULL_OPACITY). Returns the world Y coordinate of that block,
+	 * or MIN_Y if no fully opaque blocks are found.
+	 * 
+	 * Semi-transparent blocks (opacity 1-14) are NOT treated as blockers
+	 * for the heightmap, allowing skylight to propagate through them with
+	 * appropriate attenuation.
 	 * 
 	 * @param chunk The chunk
 	 * @param x Column X coordinate (0-15)
 	 * @param z Column Z coordinate (0-15)
-	 * @return World Y coordinate of topmost opaque block
+	 * @return World Y coordinate of topmost fully opaque block
 	 */
 	private static int findTopmostOpaqueBlock(LevelChunk chunk, int x, int z) {
 		// Scan from top to bottom
 		for (int y = LevelChunk.HEIGHT - 1; y >= 0; y--) {
 			Block block = chunk.getBlock(x, y, z);
 			
-			// Check if this block is opaque (blocks light)
-			if (block.getOpacity() > 0) {
-				// Found the topmost opaque block - return its world Y
+			// Check if this block is fully opaque (hard blocker)
+			if (block.getOpacity() >= FULL_OPACITY) {
+				// Found the topmost fully opaque block - return its world Y
 				return LevelChunk.chunkYToWorldY(y);
 			}
 		}
 		
-		// No opaque blocks found in this column - return minimum Y
+		// No fully opaque blocks found in this column - return minimum Y
 		return LevelChunk.MIN_Y;
 	}
 	

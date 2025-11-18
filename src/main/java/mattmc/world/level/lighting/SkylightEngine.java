@@ -6,6 +6,8 @@ import mattmc.world.level.chunk.LevelChunk;
 import java.util.ArrayDeque;
 import java.util.Queue;
 
+import static mattmc.world.level.lighting.LightingConstants.FULL_OPACITY;
+
 /**
  * Handles skylight propagation using BFS queues.
  * 
@@ -61,20 +63,19 @@ public class SkylightEngine {
 	 * Initialize skylight for a single column (vertical fill above heightmap).
 	 */
 	private void initializeColumnSkylight(LevelChunk chunk, int x, int z) {
-		// Find the topmost opaque block
+		// Find the topmost fully opaque block
 		int heightmapY = findTopmostOpaqueBlock(chunk, x, z);
 		
 		// Update the heightmap
 		chunk.getHeightmap().setHeight(x, z, heightmapY);
 		
 		// Set skylight values based on heightmap
+		// For simplicity and consistency with BFS propagation, treat air columns uniformly
 		for (int y = 0; y < LevelChunk.HEIGHT; y++) {
 			int worldY = LevelChunk.chunkYToWorldY(y);
 			
 			if (heightmapY == LevelChunk.MIN_Y || worldY > heightmapY) {
-				// Above the heightmap OR no opaque blocks - full skylight from direct sky access
-				// Note: For open columns (no opaque blocks), propagateSkylightBelowHeightmap
-				// will re-process with attenuation where needed
+				// Above the heightmap OR no fully opaque blocks - full skylight from direct sky access
 				chunk.setSkyLight(x, y, z, 15);
 			} else {
 				// At or below the heightmap - no skylight (will be propagated if cavity exists)
@@ -117,7 +118,7 @@ public class SkylightEngine {
 			}
 		}
 		
-		// BFS propagation to neighbors (horizontal and vertical) with attenuation
+		// BFS propagation to neighbors (horizontal and vertical) with opacity-based attenuation
 		SkyNode node;
 		while ((node = addQueue.poll()) != null) {
 			
@@ -125,34 +126,48 @@ public class SkylightEngine {
 				continue;
 			}
 			
-			// Propagate to neighbors with attenuation
-			int newLight = node.lightLevel - 1;
-			if (newLight > 0) {
-				propagateSkyToNeighbor(chunk, node.x - 1, node.y, node.z, newLight);
-				propagateSkyToNeighbor(chunk, node.x + 1, node.y, node.z, newLight);
-				propagateSkyToNeighbor(chunk, node.x, node.y - 1, node.z, newLight);
-				propagateSkyToNeighbor(chunk, node.x, node.y + 1, node.z, newLight);
-				propagateSkyToNeighbor(chunk, node.x, node.y, node.z - 1, newLight);
-				propagateSkyToNeighbor(chunk, node.x, node.y, node.z + 1, newLight);
-			}
+			// Propagate to neighbors with source light level
+			// Attenuation will be calculated based on target block opacity
+			propagateSkyToNeighbor(chunk, node.x - 1, node.y, node.z, node.lightLevel);
+			propagateSkyToNeighbor(chunk, node.x + 1, node.y, node.z, node.lightLevel);
+			propagateSkyToNeighbor(chunk, node.x, node.y - 1, node.z, node.lightLevel);
+			propagateSkyToNeighbor(chunk, node.x, node.y + 1, node.z, node.lightLevel);
+			propagateSkyToNeighbor(chunk, node.x, node.y, node.z - 1, node.lightLevel);
+			propagateSkyToNeighbor(chunk, node.x, node.y, node.z + 1, node.lightLevel);
 		}
 	}
 	
 	/**
-	 * Propagate skylight to a neighbor position.
+	 * Propagate skylight to a neighbor position with opacity-based attenuation.
+	 * 
+	 * Attenuation rule:
+	 * - If block opacity >= FULL_OPACITY (15): hard blocker, no propagation
+	 * - Otherwise: decrement = Math.max(1, blockOpacity)
+	 *   This ensures light always decreases by at least 1 per step,
+	 *   but semi-transparent blocks cause additional attenuation.
 	 */
-	private void propagateSkyToNeighbor(LevelChunk chunk, int x, int y, int z, int newLight) {
+	private void propagateSkyToNeighbor(LevelChunk chunk, int x, int y, int z, int sourceLight) {
 		// Check bounds
 		if (x < 0 || x >= LevelChunk.WIDTH || y < 0 || y >= LevelChunk.HEIGHT || 
 		    z < 0 || z >= LevelChunk.DEPTH) {
 			return;
 		}
 		
-		// Check if block is opaque
+		// Check if block is fully opaque
 		Block block = chunk.getBlock(x, y, z);
-		if (block == null || block.getOpacity() >= 15) {
-			return; // Opaque block stops light or null block
+		if (block == null) {
+			return; // Null block
 		}
+		
+		int blockOpacity = block.getOpacity();
+		if (blockOpacity >= FULL_OPACITY) {
+			return; // Fully opaque block stops light
+		}
+		
+		// Apply opacity-based attenuation
+		// Decrement is at least 1 (for air/transparent) or more for semi-transparent blocks
+		int decrement = Math.max(1, blockOpacity);
+		int newLight = Math.max(0, sourceLight - decrement);
 		
 		int currentLight = chunk.getSkyLight(x, y, z);
 		if (newLight > currentLight) {
@@ -195,10 +210,10 @@ public class SkylightEngine {
 		}
 		
 		// Heightmap didn't change, but opacity changed at this specific position
-		if (newOpacity < 15 && oldOpacity >= 15) {
+		if (newOpacity < FULL_OPACITY && oldOpacity >= FULL_OPACITY) {
 			// Block became transparent - add skylight
 			addSkylightAt(chunk, x, y, z);
-		} else if (newOpacity >= 15 && oldOpacity < 15) {
+		} else if (newOpacity >= FULL_OPACITY && oldOpacity < FULL_OPACITY) {
 			// Block became opaque - remove skylight
 			removeSkylightAt(chunk, x, y, z);
 		}
@@ -236,14 +251,13 @@ public class SkylightEngine {
 			// Second pass: BFS propagation to neighbors
 			SkyNode node;
 			while ((node = addQueue.poll()) != null) {
-				int nextLight = node.lightLevel - 1;
-				if (nextLight > 0) {
-					propagateSkyToNeighbor(chunk, node.x - 1, node.y, node.z, nextLight);
-					propagateSkyToNeighbor(chunk, node.x + 1, node.y, node.z, nextLight);
-					propagateSkyToNeighbor(chunk, node.x, node.y - 1, node.z, nextLight);
-					propagateSkyToNeighbor(chunk, node.x, node.y + 1, node.z, nextLight);
-					propagateSkyToNeighbor(chunk, node.x, node.y, node.z - 1, nextLight);
-					propagateSkyToNeighbor(chunk, node.x, node.y, node.z + 1, nextLight);
+				if (node.lightLevel > 0) {
+					propagateSkyToNeighbor(chunk, node.x - 1, node.y, node.z, node.lightLevel);
+					propagateSkyToNeighbor(chunk, node.x + 1, node.y, node.z, node.lightLevel);
+					propagateSkyToNeighbor(chunk, node.x, node.y - 1, node.z, node.lightLevel);
+					propagateSkyToNeighbor(chunk, node.x, node.y + 1, node.z, node.lightLevel);
+					propagateSkyToNeighbor(chunk, node.x, node.y, node.z - 1, node.lightLevel);
+					propagateSkyToNeighbor(chunk, node.x, node.y, node.z + 1, node.lightLevel);
 				}
 			}
 		}
@@ -274,14 +288,13 @@ public class SkylightEngine {
 			
 			SkyNode node2;
 			while ((node2 = addQueue.poll()) != null) {
-				int nextLight = node2.lightLevel - 1;
-				if (nextLight > 0) {
-					propagateSkyToNeighbor(chunk, node2.x - 1, node2.y, node2.z, nextLight);
-					propagateSkyToNeighbor(chunk, node2.x + 1, node2.y, node2.z, nextLight);
-					propagateSkyToNeighbor(chunk, node2.x, node2.y - 1, node2.z, nextLight);
-					propagateSkyToNeighbor(chunk, node2.x, node2.y + 1, node2.z, nextLight);
-					propagateSkyToNeighbor(chunk, node2.x, node2.y, node2.z - 1, nextLight);
-					propagateSkyToNeighbor(chunk, node2.x, node2.y, node2.z + 1, nextLight);
+				if (node2.lightLevel > 0) {
+					propagateSkyToNeighbor(chunk, node2.x - 1, node2.y, node2.z, node2.lightLevel);
+					propagateSkyToNeighbor(chunk, node2.x + 1, node2.y, node2.z, node2.lightLevel);
+					propagateSkyToNeighbor(chunk, node2.x, node2.y - 1, node2.z, node2.lightLevel);
+					propagateSkyToNeighbor(chunk, node2.x, node2.y + 1, node2.z, node2.lightLevel);
+					propagateSkyToNeighbor(chunk, node2.x, node2.y, node2.z - 1, node2.lightLevel);
+					propagateSkyToNeighbor(chunk, node2.x, node2.y, node2.z + 1, node2.lightLevel);
 				}
 			}
 		}
@@ -322,15 +335,14 @@ public class SkylightEngine {
 		SkyNode node3;
 		while ((node3 = addQueue.poll()) != null) {
 			int currentLight = chunk.getSkyLight(node3.x, node3.y, node3.z);
-			int nextLight = currentLight - 1;
 			
-			if (nextLight > 0) {
-				propagateSkyToNeighbor(chunk, node3.x - 1, node3.y, node3.z, nextLight);
-				propagateSkyToNeighbor(chunk, node3.x + 1, node3.y, node3.z, nextLight);
-				propagateSkyToNeighbor(chunk, node3.x, node3.y - 1, node3.z, nextLight);
-				propagateSkyToNeighbor(chunk, node3.x, node3.y + 1, node3.z, nextLight);
-				propagateSkyToNeighbor(chunk, node3.x, node3.y, node3.z - 1, nextLight);
-				propagateSkyToNeighbor(chunk, node3.x, node3.y, node3.z + 1, nextLight);
+			if (currentLight > 0) {
+				propagateSkyToNeighbor(chunk, node3.x - 1, node3.y, node3.z, currentLight);
+				propagateSkyToNeighbor(chunk, node3.x + 1, node3.y, node3.z, currentLight);
+				propagateSkyToNeighbor(chunk, node3.x, node3.y - 1, node3.z, currentLight);
+				propagateSkyToNeighbor(chunk, node3.x, node3.y + 1, node3.z, currentLight);
+				propagateSkyToNeighbor(chunk, node3.x, node3.y, node3.z - 1, currentLight);
+				propagateSkyToNeighbor(chunk, node3.x, node3.y, node3.z + 1, currentLight);
 			}
 		}
 	}
@@ -377,7 +389,7 @@ public class SkylightEngine {
 	private int findTopmostOpaqueBlock(LevelChunk chunk, int x, int z) {
 		for (int y = LevelChunk.HEIGHT - 1; y >= 0; y--) {
 			Block block = chunk.getBlock(x, y, z);
-			if (block != null && block.getOpacity() >= 15) {
+			if (block != null && block.getOpacity() >= FULL_OPACITY) {
 				return LevelChunk.chunkYToWorldY(y);
 			}
 		}

@@ -6,6 +6,8 @@ import mattmc.world.level.chunk.LevelChunk;
 import java.util.ArrayDeque;
 import java.util.Queue;
 
+import static mattmc.world.level.lighting.LightingConstants.FULL_OPACITY;
+
 /**
  * Handles blockLight propagation using BFS queues.
  * 
@@ -94,32 +96,32 @@ public class LightPropagator {
 			int currentI = node.i;
 			
 			// Only propagate if intensity is strong enough
-			if (currentI <= 1) {
+			if (currentI <= 0) {
 				continue; // Light too weak to propagate
 			}
 			
-			// Attenuation (reduce intensity by 1, keep color constant)
-			int newI = currentI - 1;
-			
-			// Propagate to all 6 neighbors with same color but reduced intensity
-			propagateRGBIToNeighbor(node.chunk, node.x - 1, node.y, node.z, currentR, currentG, currentB, newI);
-			propagateRGBIToNeighbor(node.chunk, node.x + 1, node.y, node.z, currentR, currentG, currentB, newI);
-			propagateRGBIToNeighbor(node.chunk, node.x, node.y - 1, node.z, currentR, currentG, currentB, newI);
-			propagateRGBIToNeighbor(node.chunk, node.x, node.y + 1, node.z, currentR, currentG, currentB, newI);
-			propagateRGBIToNeighbor(node.chunk, node.x, node.y, node.z - 1, currentR, currentG, currentB, newI);
-			propagateRGBIToNeighbor(node.chunk, node.x, node.y, node.z + 1, currentR, currentG, currentB, newI);
+			// Propagate to all 6 neighbors with same color
+			// Attenuation will be calculated in propagateRGBIToNeighbor based on target block opacity
+			propagateRGBIToNeighbor(node.chunk, node.x - 1, node.y, node.z, currentR, currentG, currentB, currentI);
+			propagateRGBIToNeighbor(node.chunk, node.x + 1, node.y, node.z, currentR, currentG, currentB, currentI);
+			propagateRGBIToNeighbor(node.chunk, node.x, node.y - 1, node.z, currentR, currentG, currentB, currentI);
+			propagateRGBIToNeighbor(node.chunk, node.x, node.y + 1, node.z, currentR, currentG, currentB, currentI);
+			propagateRGBIToNeighbor(node.chunk, node.x, node.y, node.z - 1, currentR, currentG, currentB, currentI);
+			propagateRGBIToNeighbor(node.chunk, node.x, node.y, node.z + 1, currentR, currentG, currentB, currentI);
 		}
 	}
 	
-	/**
-	 * Add blockLight from an emissive block (legacy method, converts to white RGB).
-	 * 
-	 * @param chunk The chunk containing the block
 	
 	/**
 	 * Propagate RGBI light to a neighbor position.
-	 * Now supports cross-chunk propagation.
-	 * Color (RGB) remains constant; only intensity decrements.
+	 * Now supports cross-chunk propagation and opacity-based attenuation.
+	 * Color (RGB) remains constant; intensity decrements based on block opacity.
+	 * 
+	 * Attenuation rule:
+	 * - If block opacity >= FULL_OPACITY (15): hard blocker, no propagation
+	 * - Otherwise: decrement = Math.max(1, blockOpacity)
+	 *   This ensures light always decreases by at least 1 per step,
+	 *   but semi-transparent blocks cause additional attenuation.
 	 */
 	private void propagateRGBIToNeighbor(LevelChunk chunk, int x, int y, int z, int r, int g, int b, int newI) {
 		// Check if crossing chunk boundaries
@@ -137,11 +139,21 @@ public class LightPropagator {
 		}
 		
 		// Within same chunk - propagate directly
-		// Check if block is opaque (blocks light)
+		// Check if block is fully opaque (hard blocker)
 		Block block = chunk.getBlock(x, y, z);
-		if (block == null || block.getOpacity() >= 15) {
-			return; // Fully opaque block stops light or null
+		if (block == null) {
+			return; // Null block
 		}
+		
+		int blockOpacity = block.getOpacity();
+		if (blockOpacity >= FULL_OPACITY) {
+			return; // Fully opaque block stops light
+		}
+		
+		// Apply opacity-based attenuation
+		// Decrement is at least 1 (for air/transparent) or more for semi-transparent blocks
+		int decrement = Math.max(1, blockOpacity);
+		int attenuatedI = Math.max(0, newI - decrement);
 		
 		// Get current light at neighbor
 		int currentR = chunk.getBlockLightR(x, y, z);
@@ -150,19 +162,19 @@ public class LightPropagator {
 		int currentI = chunk.getBlockLightI(x, y, z);
 		
 		// Only update if new intensity is brighter
-		if (newI > currentI) {
-			// Use the new color and intensity
-			chunk.setBlockLightRGBI(x, y, z, r, g, b, newI);
-			addQueue.offer(new LightNode(chunk, x, y, z, r, g, b, newI));
-		} else if (newI == currentI) {
+		if (attenuatedI > currentI) {
+			// Use the new color and attenuated intensity
+			chunk.setBlockLightRGBI(x, y, z, r, g, b, attenuatedI);
+			addQueue.offer(new LightNode(chunk, x, y, z, r, g, b, attenuatedI));
+		} else if (attenuatedI == currentI && attenuatedI > 0) {
 			// Same intensity - mix colors by averaging
 			int mixedR = (r + currentR) / 2;
 			int mixedG = (g + currentG) / 2;
 			int mixedB = (b + currentB) / 2;
-			chunk.setBlockLightRGBI(x, y, z, mixedR, mixedG, mixedB, newI);
+			chunk.setBlockLightRGBI(x, y, z, mixedR, mixedG, mixedB, attenuatedI);
 			// Don't re-enqueue if intensity hasn't increased
 		}
-		// If newI < currentI, don't update (existing light is brighter)
+		// If attenuatedI < currentI, don't update (existing light is brighter)
 	}
 	
 	
@@ -236,20 +248,17 @@ public class LightPropagator {
 			int currentI = node4.i;
 			
 			// Only propagate if intensity is strong enough
-			if (currentI <= 1) {
+			if (currentI <= 0) {
 				continue;
 			}
 			
-			// Attenuation (reduce intensity by 1, keep color constant)
-			int newI = currentI - 1;
-			
-			// Use the RGBI propagation method
-			propagateRGBIToNeighbor(node4.chunk, node4.x - 1, node4.y, node4.z, currentR, currentG, currentB, newI);
-			propagateRGBIToNeighbor(node4.chunk, node4.x + 1, node4.y, node4.z, currentR, currentG, currentB, newI);
-			propagateRGBIToNeighbor(node4.chunk, node4.x, node4.y - 1, node4.z, currentR, currentG, currentB, newI);
-			propagateRGBIToNeighbor(node4.chunk, node4.x, node4.y + 1, node4.z, currentR, currentG, currentB, newI);
-			propagateRGBIToNeighbor(node4.chunk, node4.x, node4.y, node4.z - 1, currentR, currentG, currentB, newI);
-			propagateRGBIToNeighbor(node4.chunk, node4.x, node4.y, node4.z + 1, currentR, currentG, currentB, newI);
+			// Use the RGBI propagation method with source light level
+			propagateRGBIToNeighbor(node4.chunk, node4.x - 1, node4.y, node4.z, currentR, currentG, currentB, currentI);
+			propagateRGBIToNeighbor(node4.chunk, node4.x + 1, node4.y, node4.z, currentR, currentG, currentB, currentI);
+			propagateRGBIToNeighbor(node4.chunk, node4.x, node4.y - 1, node4.z, currentR, currentG, currentB, currentI);
+			propagateRGBIToNeighbor(node4.chunk, node4.x, node4.y + 1, node4.z, currentR, currentG, currentB, currentI);
+			propagateRGBIToNeighbor(node4.chunk, node4.x, node4.y, node4.z - 1, currentR, currentG, currentB, currentI);
+			propagateRGBIToNeighbor(node4.chunk, node4.x, node4.y, node4.z + 1, currentR, currentG, currentB, currentI);
 		}
 	}
 	
@@ -368,7 +377,7 @@ public class LightPropagator {
 		
 		// Check if block is opaque
 		Block block = chunk.getBlock(x, y, z);
-		if (block == null || block.getOpacity() >= 15) {
+		if (block == null || block.getOpacity() >= FULL_OPACITY) {
 			return; // Opaque block or null
 		}
 		
@@ -408,7 +417,7 @@ public class LightPropagator {
 		// If new block is emissive, add its light
 		if (newEmissionR > 0 || newEmissionG > 0 || newEmissionB > 0) {
 			addBlockLightRGB(chunk, x, y, z, newEmissionR, newEmissionG, newEmissionB);
-		} else if (newBlock.getOpacity() >= 15) {
+		} else if (newBlock.getOpacity() >= FULL_OPACITY) {
 			// New block is opaque and non-emissive - it blocks light
 			// Remove any light that was at this position
 			int currentR = chunk.getBlockLightR(x, y, z);
@@ -419,7 +428,7 @@ public class LightPropagator {
 				// TODO: This should trigger re-propagation from neighbors
 				// For now, we just clear the light at this position
 			}
-		} else if (oldBlock.getOpacity() >= 15 && newBlock.getOpacity() < 15) {
+		} else if (oldBlock.getOpacity() >= FULL_OPACITY && newBlock.getOpacity() < FULL_OPACITY) {
 			// Old block was opaque, new block is transparent
 			// Light from neighbors should propagate into this newly opened space
 			propagateLightFromNeighbors(chunk, x, y, z);
@@ -507,20 +516,17 @@ public class LightPropagator {
 			int currentI = node.i;
 			
 			// Only propagate if intensity is strong enough
-			if (currentI <= 1) {
+			if (currentI <= 0) {
 				continue; // Light too weak to propagate
 			}
 			
-			// Attenuation (reduce intensity by 1, keep color constant)
-			int newI = currentI - 1;
-			
-			// Propagate to all 6 neighbors
-			propagateRGBIToNeighbor(node.chunk, node.x - 1, node.y, node.z, currentR, currentG, currentB, newI);
-			propagateRGBIToNeighbor(node.chunk, node.x + 1, node.y, node.z, currentR, currentG, currentB, newI);
-			propagateRGBIToNeighbor(node.chunk, node.x, node.y - 1, node.z, currentR, currentG, currentB, newI);
-			propagateRGBIToNeighbor(node.chunk, node.x, node.y + 1, node.z, currentR, currentG, currentB, newI);
-			propagateRGBIToNeighbor(node.chunk, node.x, node.y, node.z - 1, currentR, currentG, currentB, newI);
-			propagateRGBIToNeighbor(node.chunk, node.x, node.y, node.z + 1, currentR, currentG, currentB, newI);
+			// Propagate to all 6 neighbors with source light level
+			propagateRGBIToNeighbor(node.chunk, node.x - 1, node.y, node.z, currentR, currentG, currentB, currentI);
+			propagateRGBIToNeighbor(node.chunk, node.x + 1, node.y, node.z, currentR, currentG, currentB, currentI);
+			propagateRGBIToNeighbor(node.chunk, node.x, node.y - 1, node.z, currentR, currentG, currentB, currentI);
+			propagateRGBIToNeighbor(node.chunk, node.x, node.y + 1, node.z, currentR, currentG, currentB, currentI);
+			propagateRGBIToNeighbor(node.chunk, node.x, node.y, node.z - 1, currentR, currentG, currentB, currentI);
+			propagateRGBIToNeighbor(node.chunk, node.x, node.y, node.z + 1, currentR, currentG, currentB, currentI);
 		}
 	}
 }
