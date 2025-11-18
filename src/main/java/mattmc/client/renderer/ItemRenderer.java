@@ -116,10 +116,10 @@ public class ItemRenderer {
         float isoWidth = scale * 0.5f;
         float isoHeight = scale * 0.5f;
         
-        // Adjust Y position to center isometric cube visually at the same point as flat items
-        // The isometric cube extends from centerY (bottom) to centerY - size (top)
-        // Visual center is at centerY - size/2, so shift down by size/2 to center at y
-        float adjustedY = y + isoHeight * 0.5f;
+        // Adjust Y position to restore block positioning to match original placement
+        // Before fixing items, InventoryRenderer used +14f offset; now it uses +8f (6 GUI units = 18 pixels higher)
+        // Shift blocks down by 18 pixels to restore original positioning while keeping items correctly centered
+        float adjustedY = y + 18f;
         
         // Capture the 3D geometry for a standard cube
         VertexCapture capture = new VertexCapture();
@@ -199,8 +199,8 @@ public class ItemRenderer {
         float isoWidth = scale * 0.5f;
         float isoHeight = scale * 0.5f;
         
-        // Adjust Y position to center isometric stairs visually at the same point as flat items
-        float adjustedY = y + isoHeight * 0.5f;
+        // Adjust Y position to restore stairs positioning to match original placement
+        float adjustedY = y + 18f;
         
         // Capture south-facing stairs geometry (step rises toward z=1 - back in isometric)
         VertexCapture capture = new VertexCapture();
