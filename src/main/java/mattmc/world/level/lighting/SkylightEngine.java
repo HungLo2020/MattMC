@@ -60,24 +60,40 @@ public class SkylightEngine {
 	}
 	
 	/**
-	 * Initialize skylight for a single column (vertical fill above heightmap).
+	 * Initialize skylight for a single column (vertical fill above heightmap with attenuation).
 	 */
 	private void initializeColumnSkylight(LevelChunk chunk, int x, int z) {
-		// Find the topmost opaque block
+		// Find the topmost fully opaque block
 		int heightmapY = findTopmostOpaqueBlock(chunk, x, z);
 		
 		// Update the heightmap
 		chunk.getHeightmap().setHeight(x, z, heightmapY);
 		
-		// Set skylight values based on heightmap
-		for (int y = 0; y < LevelChunk.HEIGHT; y++) {
+		// Set skylight values with vertical attenuation for semi-transparent blocks
+		// Air blocks (opacity 0) maintain full skylight in a vertical column
+		// Semi-transparent blocks (opacity 1-14) attenuate light
+		
+		int currentLight = 15; // Start with full sky light at top
+		
+		for (int y = LevelChunk.HEIGHT - 1; y >= 0; y--) {
 			int worldY = LevelChunk.chunkYToWorldY(y);
 			
 			if (heightmapY == LevelChunk.MIN_Y || worldY > heightmapY) {
-				// Above the heightmap OR no opaque blocks - full skylight from direct sky access
-				// Note: For open columns (no opaque blocks), propagateSkylightBelowHeightmap
-				// will re-process with attenuation where needed
-				chunk.setSkyLight(x, y, z, 15);
+				// Above the heightmap OR no fully opaque blocks
+				
+				// Set light at this position
+				chunk.setSkyLight(x, y, z, currentLight);
+				
+				// Calculate light for next block down based on THIS block's opacity
+				Block block = chunk.getBlock(x, y, z);
+				int blockOpacity = (block != null) ? block.getOpacity() : 0;
+				
+				if (blockOpacity > 0) {
+					// Semi-transparent block - apply attenuation
+					int decrement = Math.max(1, blockOpacity);
+					currentLight = Math.max(0, currentLight - decrement);
+				}
+				// For air (opacity 0), maintain current light level (no attenuation in vertical column)
 			} else {
 				// At or below the heightmap - no skylight (will be propagated if cavity exists)
 				chunk.setSkyLight(x, y, z, 0);
