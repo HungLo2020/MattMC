@@ -111,8 +111,8 @@ public class PlayerData {
                         ItemStack stack = new ItemStack(item, count);
                         inventory.setStack(slot, stack);
                     }
-                } catch (Exception e) {
-                    // Skip invalid items
+                } catch (ClassCastException | IllegalArgumentException e) {
+                    // Skip invalid items - can happen if item IDs changed or data is corrupted
                 }
             }
         }

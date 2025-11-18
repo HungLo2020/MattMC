@@ -11,6 +11,7 @@ import mattmc.world.level.Level;
 import mattmc.world.level.storage.LevelStorageSource;
 import org.lwjgl.system.MemoryStack;
 
+import java.io.IOException;
 import java.nio.IntBuffer;
 import java.util.ArrayList;
 import java.util.List;
@@ -144,7 +145,7 @@ public final class PauseScreen implements Screen {
             // Return to title screen
             glfwSetInputMode(window.handle(), GLFW_CURSOR, GLFW_CURSOR_NORMAL);
             game.setScreen(new TitleScreen(game));
-        } catch (Exception e) {
+        } catch (IOException e) {
             logger.error("Failed to save world", e);
             // Still exit even if save failed
             glfwSetInputMode(window.handle(), GLFW_CURSOR, GLFW_CURSOR_NORMAL);

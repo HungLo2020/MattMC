@@ -28,7 +28,7 @@ public final class TextRenderer {
         if (font == null) {
             try {
                 font = TrueTypeFont.load(FONT_PATH);
-            } catch (Exception e) {
+            } catch (RuntimeException e) {
                 logger.error("Failed to load font: {}", FONT_PATH, e);
                 throw new RuntimeException("Font initialization failed", e);
             }

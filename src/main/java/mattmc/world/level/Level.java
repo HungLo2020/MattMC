@@ -489,7 +489,7 @@ public class Level implements LevelAccessor {
                     asyncSaver.saveChunkAsync(chunk.chunkX(), chunk.chunkZ(), chunkNBT);
                     savedCount++;
                 }
-            } catch (Exception e) {
+            } catch (RuntimeException e) {
                 logger.error("Error saving chunk ({}, {}) during shutdown: {}", 
                            chunk.chunkX(), chunk.chunkZ(), e.getMessage(), e);
                 failedCount++;
@@ -502,7 +502,7 @@ public class Level implements LevelAccessor {
         if (asyncSaver != null) {
             try {
                 asyncSaver.shutdown();
-            } catch (Exception e) {
+            } catch (RuntimeException e) {
                 logger.error("Error shutting down async saver: {}", e.getMessage(), e);
             }
         }
@@ -519,7 +519,7 @@ public class Level implements LevelAccessor {
         // Shutdown async loader
         try {
             asyncLoader.shutdown();
-        } catch (Exception e) {
+        } catch (RuntimeException e) {
             logger.error("Error shutting down async loader: {}", e.getMessage(), e);
         }
         
