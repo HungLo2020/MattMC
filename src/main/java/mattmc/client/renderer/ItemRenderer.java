@@ -478,7 +478,7 @@ public class ItemRenderer {
             TEXTURE_CACHE.put(path, texture);
             return texture;
         } catch (Exception e) {
-            logger.warn("Failed to load texture: {}", path, e);
+            logger.error("Failed to load texture: {}", path, e);
             return null;
         }
     }
