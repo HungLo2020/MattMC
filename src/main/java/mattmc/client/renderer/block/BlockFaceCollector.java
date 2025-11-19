@@ -65,28 +65,9 @@ public class BlockFaceCollector {
      */
     public void collectBlockFaces(float x, float y, float z, Block block, LevelChunk chunk, 
                                   int cx, int cy, int cz) {
-        // Check if this block uses custom rendering (e.g., stairs, torch)
-        if (block.hasCustomRendering()) {
-            // Determine the type of custom rendering based on block class
-            // Get the blockstate for this position
-            mattmc.world.level.block.state.BlockState state = chunk.getBlockState(cx, cy, cz);
-            int color = 0xFFFFFF;
-            
-            // Determine marker type based on block instance
-            String markerType;
-            if (block instanceof mattmc.world.level.block.TorchBlock) {
-                markerType = "torch";
-            } else if (block instanceof mattmc.world.level.block.StairsBlock) {
-                markerType = "stairs";
-            } else {
-                // Default to stairs for unknown custom rendering blocks
-                markerType = "stairs";
-            }
-            
-            // Add to topFaces with a special marker, storing blockstate in the FaceData
-            topFaces.add(new FaceData(x, y, z, color, 1f, 1f, block, markerType, null, state, chunk, cx, cy, cz));
-            return;
-        }
+        // All blocks are now rendered using model-agnostic face collection
+        // Custom rendering markers (stairs, torch) have been removed
+        // Geometry is generated from JSON models instead
         
         // Use white color (0xFFFFFF) by default - textures will show their natural colors
         // Fallback magenta color will only be applied if texture is missing (handled in bindTextureForBlock)
