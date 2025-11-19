@@ -93,15 +93,10 @@ public class ItemRenderer {
         glEnable(GL_TEXTURE_2D);
         glEnable(GL_DEPTH_TEST);
         
-        // Set up orthographic projection for 2D rendering with depth
-        glMatrixMode(GL_PROJECTION);
-        glPushMatrix();
-        glLoadIdentity();
-        glOrtho(0, 800, 600, 0, -1000, 1000);  // Use typical screen dimensions
-        
+        // Work within the existing coordinate system set up by UIRenderHelper
+        // Don't replace the projection matrix, just use modelview transforms
         glMatrixMode(GL_MODELVIEW);
         glPushMatrix();
-        glLoadIdentity();
         
         // Translate to item position
         glTranslatef(x, y, 0);
@@ -128,10 +123,7 @@ public class ItemRenderer {
             }
         }
         
-        // Restore matrices
-        glMatrixMode(GL_MODELVIEW);
-        glPopMatrix();
-        glMatrixMode(GL_PROJECTION);
+        // Restore matrix
         glPopMatrix();
         
         // Restore GL state
