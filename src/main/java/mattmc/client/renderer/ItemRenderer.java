@@ -93,20 +93,28 @@ public class ItemRenderer {
         // Save GL state
         boolean textureWasEnabled = glIsEnabled(GL_TEXTURE_2D);
         boolean depthTestWasEnabled = glIsEnabled(GL_DEPTH_TEST);
+        boolean blendWasEnabled = glIsEnabled(GL_BLEND);
         
         glEnable(GL_TEXTURE_2D);
         glEnable(GL_DEPTH_TEST);
         glDepthFunc(GL_LEQUAL);
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
         
-        // Clear depth buffer for this item
-        glClear(GL_DEPTH_BUFFER_BIT);
+        // Set up a local orthographic projection with proper depth range
+        glMatrixMode(GL_PROJECTION);
+        glPushMatrix();
+        glLoadIdentity();
+        // Create an orthographic projection centered at item position with depth
+        float left = x - size * 2;
+        float right = x + size * 2;
+        float bottom = y + size * 2;
+        float top = y - size * 2;
+        glOrtho(left, right, bottom, top, -100, 100);  // Depth range for 3D
         
-        // Work within the existing coordinate system
         glMatrixMode(GL_MODELVIEW);
         glPushMatrix();
-        
-        // Translate to item position
-        glTranslatef(x, y, 0);
+        glLoadIdentity();
         
         // Apply isometric-style rotation to show 3 faces (like Minecraft GUI display)
         // These rotations show top, north, and east faces
@@ -128,14 +136,21 @@ public class ItemRenderer {
         } else {
             // No quads - render fallback
             glPopMatrix();
+            glMatrixMode(GL_PROJECTION);
+            glPopMatrix();
+            glMatrixMode(GL_MODELVIEW);
             if (!depthTestWasEnabled) glDisable(GL_DEPTH_TEST);
             if (!textureWasEnabled) glDisable(GL_TEXTURE_2D);
+            if (!blendWasEnabled) glDisable(GL_BLEND);
             renderFallbackItem(x, y, size);
             return;
         }
         
-        // Restore matrix
+        // Restore matrices
         glPopMatrix();
+        glMatrixMode(GL_PROJECTION);
+        glPopMatrix();
+        glMatrixMode(GL_MODELVIEW);
         
         // Restore GL state
         if (!depthTestWasEnabled) {
@@ -143,6 +158,9 @@ public class ItemRenderer {
         }
         if (!textureWasEnabled) {
             glDisable(GL_TEXTURE_2D);
+        }
+        if (!blendWasEnabled) {
+            glDisable(GL_BLEND);
         }
         glColor4f(1f, 1f, 1f, 1f); // Reset color
     }
