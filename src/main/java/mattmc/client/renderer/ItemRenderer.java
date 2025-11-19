@@ -92,29 +92,20 @@ public class ItemRenderer {
     private static void renderBakedModel(BakedModel bakedModel, BlockModel itemModel, float x, float y, float size) {
         // Save GL state
         boolean textureWasEnabled = glIsEnabled(GL_TEXTURE_2D);
-        boolean depthTestWasEnabled = glIsEnabled(GL_DEPTH_TEST);
         boolean blendWasEnabled = glIsEnabled(GL_BLEND);
         
         glEnable(GL_TEXTURE_2D);
-        glEnable(GL_DEPTH_TEST);
-        glDepthFunc(GL_LEQUAL);
+        // Disable depth test - render in painter's algorithm order instead
+        glDisable(GL_DEPTH_TEST);
         glEnable(GL_BLEND);
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
         
-        // Set up a local orthographic projection with proper depth range
-        glMatrixMode(GL_PROJECTION);
-        glPushMatrix();
-        glLoadIdentity();
-        // Create an orthographic projection centered at item position with depth
-        float left = x - size * 2;
-        float right = x + size * 2;
-        float bottom = y + size * 2;
-        float top = y - size * 2;
-        glOrtho(left, right, bottom, top, -100, 100);  // Depth range for 3D
-        
+        // Work within existing projection, just use modelview transforms
         glMatrixMode(GL_MODELVIEW);
         glPushMatrix();
-        glLoadIdentity();
+        
+        // Translate to item position
+        glTranslatef(x, y, 0);
         
         // Apply isometric-style rotation to show 3 faces (like Minecraft GUI display)
         // These rotations show top, north, and east faces
@@ -127,35 +118,37 @@ public class ItemRenderer {
         // Center the model (models are in 0-1 range)
         glTranslatef(-0.5f, -0.5f, -0.5f);
         
-        // Render all quads from the baked model
+        // Render all quads from the baked model in back-to-front order
         List<BakedQuad> quads = bakedModel.getQuads();
         if (quads != null && !quads.isEmpty()) {
+            // Render in specific order: bottom, back faces first, then front faces
             for (BakedQuad quad : quads) {
-                renderQuad3D(quad, itemModel);
+                if (quad.getFace() == BakedQuad.Direction.DOWN || 
+                    quad.getFace() == BakedQuad.Direction.WEST ||
+                    quad.getFace() == BakedQuad.Direction.SOUTH) {
+                    renderQuad3D(quad, itemModel);
+                }
+            }
+            for (BakedQuad quad : quads) {
+                if (quad.getFace() == BakedQuad.Direction.UP || 
+                    quad.getFace() == BakedQuad.Direction.EAST ||
+                    quad.getFace() == BakedQuad.Direction.NORTH) {
+                    renderQuad3D(quad, itemModel);
+                }
             }
         } else {
             // No quads - render fallback
             glPopMatrix();
-            glMatrixMode(GL_PROJECTION);
-            glPopMatrix();
-            glMatrixMode(GL_MODELVIEW);
-            if (!depthTestWasEnabled) glDisable(GL_DEPTH_TEST);
             if (!textureWasEnabled) glDisable(GL_TEXTURE_2D);
             if (!blendWasEnabled) glDisable(GL_BLEND);
             renderFallbackItem(x, y, size);
             return;
         }
         
-        // Restore matrices
+        // Restore matrix
         glPopMatrix();
-        glMatrixMode(GL_PROJECTION);
-        glPopMatrix();
-        glMatrixMode(GL_MODELVIEW);
         
         // Restore GL state
-        if (!depthTestWasEnabled) {
-            glDisable(GL_DEPTH_TEST);
-        }
         if (!textureWasEnabled) {
             glDisable(GL_TEXTURE_2D);
         }
