@@ -68,7 +68,7 @@ public class Items {
     public static final BlockItem WARPED_PLANKS = register("warped_planks", new BlockItem(Blocks.WARPED_PLANKS));
     public static final BlockItem CRIMSON_PLANKS = register("crimson_planks", new BlockItem(Blocks.CRIMSON_PLANKS));
     public static final BlockItem BIRCH_STAIRS = register("birch_stairs", new BlockItem(Blocks.BIRCH_STAIRS));
-    public static final BlockItem TORCH = register("torch", new BlockItem(Blocks.TORCH));
+    public static final Item TORCH = register("torch", new StandingAndWallBlockItem(Blocks.TORCH, Blocks.WALL_TORCH));
     public static final BlockItem PEARLESCENT_FROGLIGHT = register("pearlescent_froglight", new BlockItem(Blocks.PEARLESCENT_FROGLIGHT));
     public static final BlockItem OCHRE_FROGLIGHT = register("ochre_froglight", new BlockItem(Blocks.OCHRE_FROGLIGHT));
     public static final BlockItem VERDANT_FROGLIGHT = register("verdant_froglight", new BlockItem(Blocks.VERDANT_FROGLIGHT));
@@ -120,7 +120,14 @@ public class Items {
         
         // Create a new item instance with the identifier set
         T registeredItem;
-        if (item instanceof BlockItem) {
+        if (item instanceof StandingAndWallBlockItem) {
+            StandingAndWallBlockItem standingAndWallItem = (StandingAndWallBlockItem) item;
+            registeredItem = (T) new StandingAndWallBlockItem(
+                standingAndWallItem.getStandingBlock(), 
+                standingAndWallItem.getWallBlock(), 
+                item.getMaxStackSize(), 
+                identifier);
+        } else if (item instanceof BlockItem) {
             BlockItem blockItem = (BlockItem) item;
             registeredItem = (T) new BlockItem(blockItem.getBlock(), item.getMaxStackSize(), identifier);
         } else {
@@ -154,7 +161,14 @@ public class Items {
         
         // Create a new item instance with the identifier set
         T registeredItem;
-        if (item instanceof BlockItem) {
+        if (item instanceof StandingAndWallBlockItem) {
+            StandingAndWallBlockItem standingAndWallItem = (StandingAndWallBlockItem) item;
+            registeredItem = (T) new StandingAndWallBlockItem(
+                standingAndWallItem.getStandingBlock(), 
+                standingAndWallItem.getWallBlock(), 
+                item.getMaxStackSize(), 
+                identifier);
+        } else if (item instanceof BlockItem) {
             BlockItem blockItem = (BlockItem) item;
             registeredItem = (T) new BlockItem(blockItem.getBlock(), item.getMaxStackSize(), identifier);
         } else {
