@@ -16,6 +16,9 @@ import java.util.List;
  * to eliminate boxing overhead and reduce GC pressure.
  * 
  * Refactored to use extracted classes for light sampling and UV mapping.
+ * 
+ * Updated to use model-agnostic rendering based on JSON models, matching Minecraft's approach.
+ * Removed custom geometry builders (StairsGeometryBuilder, TorchGeometryBuilder).
  */
 public class MeshBuilder {
     
@@ -26,8 +29,6 @@ public class MeshBuilder {
     private int currentVertex = 0;
     private final VertexLightSampler lightSampler;
     private final UVMapper uvMapper;
-    private final StairsGeometryBuilder stairsBuilder;
-    private final TorchGeometryBuilder torchBuilder;
     
     /**
      * Create a mesh builder with optional texture atlas support.
@@ -37,8 +38,6 @@ public class MeshBuilder {
     public MeshBuilder(TextureAtlas textureAtlas) {
         this.lightSampler = new VertexLightSampler();
         this.uvMapper = new UVMapper(textureAtlas);
-        this.stairsBuilder = new StairsGeometryBuilder(lightSampler, uvMapper);
-        this.torchBuilder = new TorchGeometryBuilder(lightSampler, uvMapper);
     }
     
     /**
@@ -79,20 +78,8 @@ public class MeshBuilder {
             for (int j = 0; j < faces.size(); j++) {
                 BlockFaceCollector.FaceData face = faces.get(j);
                 
-                // Check if this is a stairs block (special marker)
-                if ("stairs".equals(face.faceType)) {
-                    // Add stairs geometry instead of regular face, passing blockstate and face for lighting
-                    currentVertex = stairsBuilder.addStairsGeometry(face, vertices, indices, currentVertex);
-                    continue;
-                }
-                
-                // Check if this is a torch block (special marker)
-                if ("torch".equals(face.faceType)) {
-                    // Add torch geometry from JSON model
-                    currentVertex = torchBuilder.addTorchGeometry(face, vertices, indices, currentVertex);
-                    continue;
-                }
-                
+                // All blocks are now rendered using model-agnostic face rendering
+                // Custom geometry builders have been removed - all geometry comes from JSON models
                 // Extract color components and UV mapping
                 float[] color = uvMapper.extractColor(face);
                 TextureAtlas.UVMapping uvMapping = uvMapper.getUVMapping(face);
