@@ -100,10 +100,16 @@ public class ItemRenderer {
             if (texturePath == null) {
                 texturePath = texturePaths.values().iterator().next();
             }
+            
+            // Flat items need different offset than block items:
+            // - In inventory screen: no additional offset needed (already centered in slots)
+            // - In hotbar: need to move UP by 18f to align with slots (opposite of block items)
+            float adjustedY = applyInventoryOffset ? y : y - 18f;
+            
             if (texturePath != null) {
-                renderTextureAsFlat(texturePath, x, y, size);
+                renderTextureAsFlat(texturePath, x, adjustedY, size);
             } else {
-                renderFallbackItem(x, y, size);
+                renderFallbackItem(x, adjustedY, size);
             }
         }
     }
