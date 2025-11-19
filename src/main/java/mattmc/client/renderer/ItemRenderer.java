@@ -110,49 +110,21 @@ public class ItemRenderer {
             rotY = guiTransform.getRotation().get(1);
         }
         
-        // Determine face rendering order based on Y rotation
-        // For rotations closer to 45° (looking SW to NE): WEST, SOUTH are back
-        // For rotations closer to 315° (looking SE to NW): NORTH, WEST are back
-        boolean isRotation45 = Math.abs(rotY - 45.0f) < Math.abs(rotY - 315.0f);
-        
         // Render all quads from the baked model in back-to-front order
         List<BakedQuad> quads = bakedModel.getQuads();
         if (quads != null && !quads.isEmpty()) {
-            // Render back faces first
+            // Render in specific order: bottom, back faces first, then front faces
             for (BakedQuad quad : quads) {
-                BakedQuad.Direction face = quad.getFace();
-                boolean isBackFace;
-                if (isRotation45) {
-                    // 45° rotation: WEST, SOUTH, DOWN are back
-                    isBackFace = face == BakedQuad.Direction.DOWN || 
-                                face == BakedQuad.Direction.SOUTH ||
-                                face == BakedQuad.Direction.WEST;
-                } else {
-                    // 315° rotation: NORTH, WEST, DOWN are back
-                    isBackFace = face == BakedQuad.Direction.DOWN || 
-                                face == BakedQuad.Direction.NORTH ||
-                                face == BakedQuad.Direction.WEST;
-                }
-                if (isBackFace) {
+                if (quad.getFace() == BakedQuad.Direction.DOWN || 
+                    quad.getFace() == BakedQuad.Direction.WEST ||
+                    quad.getFace() == BakedQuad.Direction.SOUTH) {
                     renderQuad2D(quad, itemModel, x, y, size, rotX, rotY);
                 }
             }
-            // Render front faces second
             for (BakedQuad quad : quads) {
-                BakedQuad.Direction face = quad.getFace();
-                boolean isFrontFace;
-                if (isRotation45) {
-                    // 45° rotation: EAST, NORTH, UP are front
-                    isFrontFace = face == BakedQuad.Direction.UP || 
-                                 face == BakedQuad.Direction.NORTH ||
-                                 face == BakedQuad.Direction.EAST;
-                } else {
-                    // 315° rotation: EAST, SOUTH, UP are front
-                    isFrontFace = face == BakedQuad.Direction.UP || 
-                                 face == BakedQuad.Direction.SOUTH ||
-                                 face == BakedQuad.Direction.EAST;
-                }
-                if (isFrontFace) {
+                if (quad.getFace() == BakedQuad.Direction.UP || 
+                    quad.getFace() == BakedQuad.Direction.EAST ||
+                    quad.getFace() == BakedQuad.Direction.NORTH) {
                     renderQuad2D(quad, itemModel, x, y, size, rotX, rotY);
                 }
             }
