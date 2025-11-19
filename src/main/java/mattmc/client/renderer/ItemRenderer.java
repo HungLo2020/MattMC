@@ -85,59 +85,62 @@ public class ItemRenderer {
     }
     
     /**
-     * Render a baked model as a simple 2D sprite.
-     * Uses the first quad's texture and renders as a flat 2D quad.
-     * This is a simplified approach that works reliably in the 2D UI context.
+     * Render a baked model with isometric/orthographic 3D projection.
+     * Renders all quads from the model to show a 3D representation,
+     * matching Minecraft's item rendering approach.
      */
     private static void renderBakedModel(BakedModel bakedModel, BlockModel itemModel, float x, float y, float size) {
         // Save GL state
         boolean textureWasEnabled = glIsEnabled(GL_TEXTURE_2D);
+        boolean depthTestWasEnabled = glIsEnabled(GL_DEPTH_TEST);
         
         glEnable(GL_TEXTURE_2D);
+        glEnable(GL_DEPTH_TEST);
+        glDepthFunc(GL_LEQUAL);
         
-        // Get the first quad to extract texture
+        // Clear depth buffer for this item
+        glClear(GL_DEPTH_BUFFER_BIT);
+        
+        // Work within the existing coordinate system
+        glMatrixMode(GL_MODELVIEW);
+        glPushMatrix();
+        
+        // Translate to item position
+        glTranslatef(x, y, 0);
+        
+        // Apply isometric-style rotation to show 3 faces (like Minecraft GUI display)
+        // These rotations show top, north, and east faces
+        glRotatef(30, 1, 0, 0);   // Tilt down to see top
+        glRotatef(45, 0, 1, 0);   // Rotate to see corner
+        
+        // Scale to fit the item size
+        glScalef(size, -size, size);  // Negative Y to flip correctly
+        
+        // Center the model (models are in 0-1 range)
+        glTranslatef(-0.5f, -0.5f, -0.5f);
+        
+        // Render all quads from the baked model
         List<BakedQuad> quads = bakedModel.getQuads();
-        if (quads == null || quads.isEmpty()) {
+        if (quads != null && !quads.isEmpty()) {
+            for (BakedQuad quad : quads) {
+                renderQuad3D(quad, itemModel);
+            }
+        } else {
+            // No quads - render fallback
+            glPopMatrix();
+            if (!depthTestWasEnabled) glDisable(GL_DEPTH_TEST);
+            if (!textureWasEnabled) glDisable(GL_TEXTURE_2D);
             renderFallbackItem(x, y, size);
             return;
         }
         
-        // Use the first quad's texture (usually top or north face)
-        BakedQuad firstQuad = quads.get(0);
-        String texturePath = firstQuad.getTexturePath();
-        Texture texture = loadTexture(texturePath);
-        
-        if (texture == null) {
-            renderFallbackItem(x, y, size);
-            return;
-        }
-        
-        texture.bind();
-        
-        // Apply tint if needed
-        float r = 1.0f, g = 1.0f, b = 1.0f, a = 1.0f;
-        int tintIndex = firstQuad.getTintIndex();
-        if (tintIndex >= 0 && itemModel != null && itemModel.getTints() != null && 
-            tintIndex < itemModel.getTints().size()) {
-            int tintColor = itemModel.getTints().get(tintIndex).getTintColor();
-            r = ((tintColor >> 16) & 0xFF) / 255.0f;
-            g = ((tintColor >> 8) & 0xFF) / 255.0f;
-            b = (tintColor & 0xFF) / 255.0f;
-        }
-        
-        glColor4f(r, g, b, a);
-        
-        // Render as a simple 2D quad
-        float halfSize = size;
-        
-        glBegin(GL_QUADS);
-        glTexCoord2f(0, 1); glVertex2f(x - halfSize, y - halfSize);
-        glTexCoord2f(1, 1); glVertex2f(x + halfSize, y - halfSize);
-        glTexCoord2f(1, 0); glVertex2f(x + halfSize, y + halfSize);
-        glTexCoord2f(0, 0); glVertex2f(x - halfSize, y + halfSize);
-        glEnd();
+        // Restore matrix
+        glPopMatrix();
         
         // Restore GL state
+        if (!depthTestWasEnabled) {
+            glDisable(GL_DEPTH_TEST);
+        }
         if (!textureWasEnabled) {
             glDisable(GL_TEXTURE_2D);
         }
@@ -182,12 +185,9 @@ public class ItemRenderer {
     }
     
     /**
-     * Render a single quad from a baked model.
+     * Render a single quad in 3D space from a baked model.
      */
-    private static void renderQuad(BakedQuad quad, BlockModel itemModel) {
-        // Ensure we're in fill mode for every quad
-        glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-        
+    private static void renderQuad3D(BakedQuad quad, BlockModel itemModel) {
         // Load and bind texture
         String texturePath = quad.getTexturePath();
         Texture texture = loadTexture(texturePath);
