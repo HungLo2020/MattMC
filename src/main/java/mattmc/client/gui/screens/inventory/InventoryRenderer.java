@@ -163,7 +163,7 @@ public class InventoryRenderer {
             ItemStack stack = inventory.getStack(i);
             if (stack != null && stack.getItem() != null) {
                 float slotCenterX = guiX + (hotbarX + i * 18f + 8f) * GUI_SCALE;
-                float slotCenterY = guiY + (hotbarY + 8f) * GUI_SCALE;
+                float slotCenterY = guiY + (hotbarY + 8f) * GUI_SCALE + 18f;
                 
                 mattmc.client.renderer.ItemRenderer.renderItem(stack, slotCenterX, slotCenterY, itemSize);
                 
@@ -184,7 +184,7 @@ public class InventoryRenderer {
                 int col = invIndex % 9;
                 
                 float slotCenterX = guiX + (invX + col * 18f + 8f) * GUI_SCALE;
-                float slotCenterY = guiY + (invY + row * 18f + 8f) * GUI_SCALE;
+                float slotCenterY = guiY + (invY + row * 18f + 8f) * GUI_SCALE + 18f;
                 
                 mattmc.client.renderer.ItemRenderer.renderItem(stack, slotCenterX, slotCenterY, itemSize);
                 
@@ -351,7 +351,7 @@ public class InventoryRenderer {
                     // Slots are 16f GUI units = 48 screen pixels, center is at 24 pixels from top-left
                     float slotSizeScreen = 16f * GUI_SCALE;
                     float itemX = slotX + (slotSizeScreen / 2f);
-                    float itemY = slotY + (slotSizeScreen / 2f);
+                    float itemY = slotY + (slotSizeScreen / 2f) + 18f;
                     
                     mattmc.client.renderer.ItemRenderer.renderItem(stack, itemX, itemY, itemSize);
                 }

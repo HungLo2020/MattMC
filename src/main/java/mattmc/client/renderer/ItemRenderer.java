@@ -116,11 +116,6 @@ public class ItemRenderer {
         float isoWidth = scale * 0.5f;
         float isoHeight = scale * 0.5f;
         
-        // Adjust Y position to restore block positioning to match original placement
-        // Before fixing items, InventoryRenderer used +14f offset; now it uses +8f (6 GUI units = 18 pixels higher)
-        // Shift blocks down by 18 pixels to restore original positioning while keeping items correctly centered
-        float adjustedY = y + 18f;
-        
         // Capture the 3D geometry for a standard cube
         VertexCapture capture = new VertexCapture();
         
@@ -145,7 +140,7 @@ public class ItemRenderer {
             if (tex != null) {
                 tex.bind();
                 glColor4f(0.8f, 0.8f, 0.8f, 1.0f);
-                renderFacesIsometric(westFaces, x, adjustedY, isoWidth, isoHeight);
+                renderFacesIsometric(westFaces, x, y, isoWidth, isoHeight);
             }
         }
         
@@ -155,7 +150,7 @@ public class ItemRenderer {
             if (tex != null) {
                 tex.bind();
                 glColor4f(0.6f, 0.6f, 0.6f, 1.0f);
-                renderFacesIsometric(northFaces, x, adjustedY, isoWidth, isoHeight);
+                renderFacesIsometric(northFaces, x, y, isoWidth, isoHeight);
             }
         }
         
@@ -169,7 +164,7 @@ public class ItemRenderer {
                 float g = ((topTintColor >> 8) & 0xFF) / 255.0f;
                 float b = (topTintColor & 0xFF) / 255.0f;
                 glColor4f(r, g, b, 1.0f);
-                renderFacesIsometric(topFaces, x, adjustedY, isoWidth, isoHeight);
+                renderFacesIsometric(topFaces, x, y, isoWidth, isoHeight);
             }
         }
         
@@ -198,9 +193,6 @@ public class ItemRenderer {
         float scale = size * 2.0f;
         float isoWidth = scale * 0.5f;
         float isoHeight = scale * 0.5f;
-        
-        // Adjust Y position to restore stairs positioning to match original placement
-        float adjustedY = y + 18f;
         
         // Capture south-facing stairs geometry (step rises toward z=1 - back in isometric)
         VertexCapture capture = new VertexCapture();
@@ -239,7 +231,7 @@ public class ItemRenderer {
                     float brightness = isWestFacing ? 0.8f : 0.6f;
                     glColor4f(brightness, brightness, brightness, 1.0f);
                     
-                    renderFaceIsometric(face, x, adjustedY, isoWidth, isoHeight);
+                    renderFaceIsometric(face, x, y, isoWidth, isoHeight);
                 }
             }
         }
@@ -252,7 +244,7 @@ public class ItemRenderer {
                 glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
                 
                 for (VertexCapture.Face face : topFacesList) {
-                    renderFaceIsometric(face, x, adjustedY, isoWidth, isoHeight);
+                    renderFaceIsometric(face, x, y, isoWidth, isoHeight);
                 }
             }
         }
