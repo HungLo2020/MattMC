@@ -78,14 +78,20 @@ public class ModelBakery {
         List<BakedQuad> quads = new ArrayList<>();
         
         // Process each model element (cuboid)
-        if (model.getElements() != null) {
+        if (model.getElements() != null && !model.getElements().isEmpty()) {
             for (ModelElement element : model.getElements()) {
                 quads.addAll(bakeElement(element, model));
             }
+        } else if (model.getTextures() != null && model.getTextures().containsKey("layer0")) {
+            // This is a generated 2D item (like torch) - create a flat quad from layer0 texture
+            quads.add(generateFlatQuad(model));
         }
         
         // Get particle texture (for break particles)
         String particleTexture = model.getTexture("particle");
+        if (particleTexture == null && model.getTextures() != null) {
+            particleTexture = model.getTexture("layer0");
+        }
         
         // Check ambient occlusion setting (default true)
         boolean hasAmbientOcclusion = model.getAmbientocclusion() == null || model.getAmbientocclusion();
@@ -296,6 +302,39 @@ public class ModelBakery {
         vertices[offset + 9] = g;
         vertices[offset + 10] = b;
         vertices[offset + 11] = a;
+    }
+    
+    /**
+     * Generate a flat quad for 2D items (like generated items from layer0 texture).
+     * Creates a single facing-camera quad from 0,0 to 1,1 in model space.
+     */
+    private static BakedQuad generateFlatQuad(BlockModel model) {
+        // Get the layer0 texture
+        String texturePath = model.getTexture("layer0");
+        if (texturePath == null) {
+            texturePath = "missing";
+        }
+        
+        // Resolve texture path
+        texturePath = resolveTexturePath(texturePath, model);
+        
+        // Create a flat quad facing the camera (Z+ direction)
+        float[] vertices = new float[48];  // 4 vertices * 12 floats
+        
+        // Normal pointing toward camera (0, 0, 1)
+        float nx = 0, ny = 0, nz = 1;
+        float r = 1, g = 1, b = 1, a = 1;
+        
+        // Vertex 0: bottom-left (0, 0, 0)
+        addVertex(vertices, 0, 0, 0, 0, 0, 1, nx, ny, nz, r, g, b, a);
+        // Vertex 1: bottom-right (1, 0, 0)
+        addVertex(vertices, 12, 1, 0, 0, 1, 1, nx, ny, nz, r, g, b, a);
+        // Vertex 2: top-right (1, 1, 0)
+        addVertex(vertices, 24, 1, 1, 0, 1, 0, nx, ny, nz, r, g, b, a);
+        // Vertex 3: top-left (0, 1, 0)
+        addVertex(vertices, 36, 0, 1, 0, 0, 0, nx, ny, nz, r, g, b, a);
+        
+        return new BakedQuad(vertices, -1, BakedQuad.Direction.SOUTH, texturePath);
     }
     
     /**

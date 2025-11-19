@@ -93,6 +93,12 @@ public class ItemRenderer {
         glEnable(GL_TEXTURE_2D);
         glEnable(GL_DEPTH_TEST);
         
+        // Ensure polygon mode is set to fill (not wireframe)
+        glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+        
+        // Disable face culling so all faces are visible
+        glDisable(GL_CULL_FACE);
+        
         // Work within the existing coordinate system set up by UIRenderHelper
         // Don't replace the projection matrix, just use modelview transforms
         glMatrixMode(GL_MODELVIEW);
