@@ -85,78 +85,62 @@ public class ItemRenderer {
     }
     
     /**
-     * Render a baked model with 3D perspective rendering, matching Minecraft's approach.
+     * Render a baked model as a simple 2D sprite.
+     * Uses the first quad's texture and renders as a flat 2D quad.
+     * This is a simplified approach that works reliably in the 2D UI context.
      */
     private static void renderBakedModel(BakedModel bakedModel, BlockModel itemModel, float x, float y, float size) {
         // Save GL state
         boolean textureWasEnabled = glIsEnabled(GL_TEXTURE_2D);
-        boolean depthTestWasEnabled = glIsEnabled(GL_DEPTH_TEST);
-        boolean cullFaceWasEnabled = glIsEnabled(GL_CULL_FACE);
         
         glEnable(GL_TEXTURE_2D);
-        glEnable(GL_DEPTH_TEST);
         
-        // Disable any edge/line rendering modes
-        glDisable(GL_LINE_SMOOTH);
-        glDisable(GL_LINE_STIPPLE);
-        glEdgeFlag(true);
-        
-        // Ensure polygon mode is set to fill (not wireframe)
-        // Save current polygon mode and set to fill
-        int[] polygonMode = new int[1];
-        glGetIntegerv(GL_POLYGON_MODE, polygonMode);
-        glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-        
-        // Disable face culling so all faces are visible
-        glDisable(GL_CULL_FACE);
-        
-        // Work within the existing coordinate system set up by UIRenderHelper
-        // Don't replace the projection matrix, just use modelview transforms
-        glMatrixMode(GL_MODELVIEW);
-        glPushMatrix();
-        
-        // Translate to item position
-        glTranslatef(x, y, 0);
-        
-        // Get display transform for GUI mode (matching Minecraft)
-        ModelDisplay.Transform guiTransform = bakedModel.getTransform("gui");
-        if (guiTransform != null) {
-            applyDisplayTransform(guiTransform, size);
-        } else {
-            // Default transform matching Minecraft's default item display
-            glRotatef(30, 1, 0, 0);   // Rotate around X axis
-            glRotatef(225, 0, 1, 0);  // Rotate around Y axis
-            glScalef(size, size, size);
-        }
-        
-        // Center the model (Minecraft models are in 0-1 range)
-        glTranslatef(-0.5f, -0.5f, -0.5f);
-        
-        // Render all quads from the baked model
+        // Get the first quad to extract texture
         List<BakedQuad> quads = bakedModel.getQuads();
-        if (quads != null) {
-            for (BakedQuad quad : quads) {
-                renderQuad(quad, itemModel);
-            }
+        if (quads == null || quads.isEmpty()) {
+            renderFallbackItem(x, y, size);
+            return;
         }
         
-        // Restore matrix
-        glPopMatrix();
+        // Use the first quad's texture (usually top or north face)
+        BakedQuad firstQuad = quads.get(0);
+        String texturePath = firstQuad.getTexturePath();
+        Texture texture = loadTexture(texturePath);
+        
+        if (texture == null) {
+            renderFallbackItem(x, y, size);
+            return;
+        }
+        
+        texture.bind();
+        
+        // Apply tint if needed
+        float r = 1.0f, g = 1.0f, b = 1.0f, a = 1.0f;
+        int tintIndex = firstQuad.getTintIndex();
+        if (tintIndex >= 0 && itemModel != null && itemModel.getTints() != null && 
+            tintIndex < itemModel.getTints().size()) {
+            int tintColor = itemModel.getTints().get(tintIndex).getTintColor();
+            r = ((tintColor >> 16) & 0xFF) / 255.0f;
+            g = ((tintColor >> 8) & 0xFF) / 255.0f;
+            b = (tintColor & 0xFF) / 255.0f;
+        }
+        
+        glColor4f(r, g, b, a);
+        
+        // Render as a simple 2D quad
+        float halfSize = size;
+        
+        glBegin(GL_QUADS);
+        glTexCoord2f(0, 1); glVertex2f(x - halfSize, y - halfSize);
+        glTexCoord2f(1, 1); glVertex2f(x + halfSize, y - halfSize);
+        glTexCoord2f(1, 0); glVertex2f(x + halfSize, y + halfSize);
+        glTexCoord2f(0, 0); glVertex2f(x - halfSize, y + halfSize);
+        glEnd();
         
         // Restore GL state
-        if (!depthTestWasEnabled) {
-            glDisable(GL_DEPTH_TEST);
-        }
         if (!textureWasEnabled) {
             glDisable(GL_TEXTURE_2D);
         }
-        if (cullFaceWasEnabled) {
-            glEnable(GL_CULL_FACE);
-        }
-        
-        // Restore polygon mode
-        glPolygonMode(GL_FRONT_AND_BACK, polygonMode[0]);
-        
         glColor4f(1f, 1f, 1f, 1f); // Reset color
     }
     
