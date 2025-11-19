@@ -222,51 +222,64 @@ public class ItemRenderer {
             b = (tintColor & 0xFF) / 255.0f;
         }
         
-        // Render the quad (4 vertices, vertex format: x, y, z, u, v, nx, ny, nz, r, g, b, a)
-        glBegin(GL_QUADS);
-        for (int i = 0; i < 4; i++) {
+        // Render the quad as two triangles (vertex format: x, y, z, u, v, nx, ny, nz, r, g, b, a)
+        // Using GL_TRIANGLES is more universally supported than GL_QUADS
+        
+        // Get normal for shading
+        float nx = vertices[5];
+        float ny = vertices[6];
+        float nz = vertices[7];
+        
+        // Apply shading based on normal direction (matching Minecraft's directional shading)
+        float shade = 1.0f;
+        if (Math.abs(ny - 1.0f) < 0.01f) {
+            shade = 1.0f;  // Top face
+        } else if (Math.abs(ny + 1.0f) < 0.01f) {
+            shade = 0.5f;  // Bottom face
+        } else if (Math.abs(nz) > 0.5f) {
+            shade = 0.8f;  // North/South face
+        } else if (Math.abs(nx) > 0.5f) {
+            shade = 0.6f;  // East/West face
+        }
+        
+        glBegin(GL_TRIANGLES);
+        
+        // First triangle: vertices 0, 1, 2
+        for (int i : new int[]{0, 1, 2}) {
             int offset = i * 12;
-            
-            // Position
             float x = vertices[offset + 0];
             float y = vertices[offset + 1];
             float z = vertices[offset + 2];
-            
-            // Texture coordinates
             float u = vertices[offset + 3];
             float v = vertices[offset + 4];
-            
-            // Normal (for lighting, not used in fixed function but kept for consistency)
-            float nx = vertices[offset + 5];
-            float ny = vertices[offset + 6];
-            float nz = vertices[offset + 7];
-            
-            // Color (from vertex, multiplied by tint)
             float vr = vertices[offset + 8] * r;
             float vg = vertices[offset + 9] * g;
             float vb = vertices[offset + 10] * b;
             float va = vertices[offset + 11];
             
-            // Apply shading based on normal direction (matching Minecraft's directional shading)
-            float shade = 1.0f;
-            if (Math.abs(ny - 1.0f) < 0.01f) {
-                // Top face
-                shade = 1.0f;
-            } else if (Math.abs(ny + 1.0f) < 0.01f) {
-                // Bottom face
-                shade = 0.5f;
-            } else if (Math.abs(nz) > 0.5f) {
-                // North/South face
-                shade = 0.8f;
-            } else if (Math.abs(nx) > 0.5f) {
-                // East/West face
-                shade = 0.6f;
-            }
+            glColor4f(vr * shade, vg * shade, vb * shade, va);
+            glTexCoord2f(u, v);
+            glVertex3f(x, y, z);
+        }
+        
+        // Second triangle: vertices 0, 2, 3
+        for (int i : new int[]{0, 2, 3}) {
+            int offset = i * 12;
+            float x = vertices[offset + 0];
+            float y = vertices[offset + 1];
+            float z = vertices[offset + 2];
+            float u = vertices[offset + 3];
+            float v = vertices[offset + 4];
+            float vr = vertices[offset + 8] * r;
+            float vg = vertices[offset + 9] * g;
+            float vb = vertices[offset + 10] * b;
+            float va = vertices[offset + 11];
             
             glColor4f(vr * shade, vg * shade, vb * shade, va);
             glTexCoord2f(u, v);
             glVertex3f(x, y, z);
         }
+        
         glEnd();
     }
     
