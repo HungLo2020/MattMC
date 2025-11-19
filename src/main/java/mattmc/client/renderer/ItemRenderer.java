@@ -88,6 +88,8 @@ public class ItemRenderer {
      * Render a baked model with isometric/orthographic 3D projection.
      * Renders all quads from the model to show a 3D representation,
      * matching Minecraft's item rendering approach.
+     * 
+     * Uses manual 3D-to-2D projection like other UI renderers in this codebase (HotbarRenderer, etc.)
      */
     private static void renderBakedModel(BakedModel bakedModel, BlockModel itemModel, float x, float y, float size) {
         // Save GL state
@@ -95,32 +97,8 @@ public class ItemRenderer {
         boolean blendWasEnabled = glIsEnabled(GL_BLEND);
         
         glEnable(GL_TEXTURE_2D);
-        // Disable depth test - render in painter's algorithm order instead
-        glDisable(GL_DEPTH_TEST);
         glEnable(GL_BLEND);
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-        
-        // CRITICAL: Explicitly set polygon mode to fill
-        // Some graphics drivers or states might have it set to GL_LINE
-        glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
-        
-        // Work within existing projection, just use modelview transforms
-        glMatrixMode(GL_MODELVIEW);
-        glPushMatrix();
-        
-        // Translate to center position
-        glTranslatef(x, y, 0);
-        
-        // Apply isometric-style rotation to show 3 faces (like Minecraft GUI display)
-        // These rotations show top, north, and east faces
-        glRotatef(30, 1, 0, 0);   // Tilt down to see top
-        glRotatef(45, 0, 1, 0);   // Rotate to see corner
-        
-        // Scale to fit the item size
-        glScalef(size, -size, size);  // Negative Y to flip correctly
-        
-        // Center the model (models are in 0-1 range)
-        glTranslatef(-0.5f, -0.5f, -0.5f);
         
         // Render all quads from the baked model in back-to-front order
         List<BakedQuad> quads = bakedModel.getQuads();
@@ -130,27 +108,23 @@ public class ItemRenderer {
                 if (quad.getFace() == BakedQuad.Direction.DOWN || 
                     quad.getFace() == BakedQuad.Direction.WEST ||
                     quad.getFace() == BakedQuad.Direction.SOUTH) {
-                    renderQuad3D(quad, itemModel);
+                    renderQuad2D(quad, itemModel, x, y, size);
                 }
             }
             for (BakedQuad quad : quads) {
                 if (quad.getFace() == BakedQuad.Direction.UP || 
                     quad.getFace() == BakedQuad.Direction.EAST ||
                     quad.getFace() == BakedQuad.Direction.NORTH) {
-                    renderQuad3D(quad, itemModel);
+                    renderQuad2D(quad, itemModel, x, y, size);
                 }
             }
         } else {
             // No quads - render fallback
-            glPopMatrix();
             if (!textureWasEnabled) glDisable(GL_TEXTURE_2D);
             if (!blendWasEnabled) glDisable(GL_BLEND);
             renderFallbackItem(x, y, size);
             return;
         }
-        
-        // Restore matrix
-        glPopMatrix();
         
         // Restore GL state
         if (!textureWasEnabled) {
@@ -200,10 +174,11 @@ public class ItemRenderer {
     }
     
     /**
-     * Render a single quad from a baked model in 3D.
-     * Uses glVertex3f to let OpenGL handle the transformation through the modelview matrix.
+     * Render a single quad from a baked model in 2D.
+     * Manually projects 3D vertices to 2D, then uses GL_QUADS with glVertex2f.
+     * This matches how other UI elements render (HotbarRenderer, UIRenderHelper, etc.)
      */
-    private static void renderQuad3D(BakedQuad quad, BlockModel itemModel) {
+    private static void renderQuad2D(BakedQuad quad, BlockModel itemModel, float centerX, float centerY, float size) {
         // Load and bind texture
         String texturePath = quad.getTexturePath();
         Texture texture = loadTexture(texturePath);
@@ -244,14 +219,44 @@ public class ItemRenderer {
             shade = 0.6f;  // East/West face
         }
         
-        glBegin(GL_TRIANGLES);
-        
-        // First triangle: vertices 0, 1, 2
-        for (int i : new int[]{0, 1, 2}) {
+        // Manually project 3D vertices to 2D screen space
+        // This is the key - we do the 3D math ourselves, then use glVertex2f like all other UI
+        float[][] projected = new float[4][2];
+        for (int i = 0; i < 4; i++) {
             int offset = i * 12;
             float x = vertices[offset + 0];
             float y = vertices[offset + 1];
             float z = vertices[offset + 2];
+            
+            // Center the model (models are in 0-1 range)
+            x -= 0.5f;
+            y -= 0.5f;
+            z -= 0.5f;
+            
+            // Apply isometric rotation (30° X-axis, 45° Y-axis)
+            float rad30 = (float) Math.toRadians(30);
+            float rad45 = (float) Math.toRadians(45);
+            
+            // Rotate around Y-axis by 45°
+            float cos45 = (float) Math.cos(rad45);
+            float sin45 = (float) Math.sin(rad45);
+            float x1 = x * cos45 - z * sin45;
+            float z1 = x * sin45 + z * cos45;
+            
+            // Rotate around X-axis by 30°
+            float cos30 = (float) Math.cos(rad30);
+            float sin30 = (float) Math.sin(rad30);
+            float y1 = y * cos30 - z1 * sin30;
+            
+            // Scale and project to screen
+            projected[i][0] = centerX + x1 * size;
+            projected[i][1] = centerY - y1 * size;  // Flip Y for screen coordinates
+        }
+        
+        // Render as a quad using glVertex2f - EXACTLY like HotbarRenderer and other UI
+        glBegin(GL_QUADS);
+        for (int i = 0; i < 4; i++) {
+            int offset = i * 12;
             float u = vertices[offset + 3];
             float v = vertices[offset + 4];
             float vr = vertices[offset + 8] * r;
@@ -261,27 +266,8 @@ public class ItemRenderer {
             
             glColor4f(vr * shade, vg * shade, vb * shade, va);
             glTexCoord2f(u, v);
-            glVertex3f(x, y, z);
+            glVertex2f(projected[i][0], projected[i][1]);
         }
-        
-        // Second triangle: vertices 0, 2, 3
-        for (int i : new int[]{0, 2, 3}) {
-            int offset = i * 12;
-            float x = vertices[offset + 0];
-            float y = vertices[offset + 1];
-            float z = vertices[offset + 2];
-            float u = vertices[offset + 3];
-            float v = vertices[offset + 4];
-            float vr = vertices[offset + 8] * r;
-            float vg = vertices[offset + 9] * g;
-            float vb = vertices[offset + 10] * b;
-            float va = vertices[offset + 11];
-            
-            glColor4f(vr * shade, vg * shade, vb * shade, va);
-            glTexCoord2f(u, v);
-            glVertex3f(x, y, z);
-        }
-        
         glEnd();
     }
     
