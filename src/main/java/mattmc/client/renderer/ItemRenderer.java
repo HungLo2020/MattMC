@@ -100,6 +100,10 @@ public class ItemRenderer {
         glEnable(GL_BLEND);
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
         
+        // CRITICAL: Explicitly set polygon mode to fill
+        // Some graphics drivers or states might have it set to GL_LINE
+        glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+        
         // Work within existing projection, just use modelview transforms
         glMatrixMode(GL_MODELVIEW);
         glPushMatrix();
