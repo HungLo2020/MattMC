@@ -1,5 +1,5 @@
 {
-  "parent": "mattmc:block/cube_bottom_top",
+  "parent": "mattmc:block/block",
   "textures": {
     "particle": "mattmc:block/dirt",
     "bottom": "mattmc:block/dirt",

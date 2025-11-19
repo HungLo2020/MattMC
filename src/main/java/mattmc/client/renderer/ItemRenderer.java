@@ -100,14 +100,11 @@ public class ItemRenderer {
         glEnable(GL_BLEND);
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
         
-        // Get display transform for GUI mode from the baked model
+        // Check if model has custom display transform for GUI
         ModelDisplay.Transform guiTransform = bakedModel.getTransform("gui");
-        float rotX = 30.0f;  // Default X rotation
-        float rotY = 45.0f;  // Default Y rotation
-        
+        Float customRotY = null;
         if (guiTransform != null && guiTransform.getRotation() != null && guiTransform.getRotation().size() >= 2) {
-            rotX = guiTransform.getRotation().get(0);
-            rotY = guiTransform.getRotation().get(1);
+            customRotY = guiTransform.getRotation().get(1);
         }
         
         // Render all quads from the baked model in back-to-front order
@@ -118,14 +115,14 @@ public class ItemRenderer {
                 if (quad.getFace() == BakedQuad.Direction.DOWN || 
                     quad.getFace() == BakedQuad.Direction.WEST ||
                     quad.getFace() == BakedQuad.Direction.SOUTH) {
-                    renderQuad2D(quad, itemModel, x, y, size, rotX, rotY);
+                    renderQuad2D(quad, itemModel, x, y, size, customRotY);
                 }
             }
             for (BakedQuad quad : quads) {
                 if (quad.getFace() == BakedQuad.Direction.UP || 
                     quad.getFace() == BakedQuad.Direction.EAST ||
                     quad.getFace() == BakedQuad.Direction.NORTH) {
-                    renderQuad2D(quad, itemModel, x, y, size, rotX, rotY);
+                    renderQuad2D(quad, itemModel, x, y, size, customRotY);
                 }
             }
         } else {
@@ -188,7 +185,7 @@ public class ItemRenderer {
      * Manually projects 3D vertices to 2D, then uses GL_QUADS with glVertex2f.
      * This matches how other UI elements render (HotbarRenderer, UIRenderHelper, etc.)
      */
-    private static void renderQuad2D(BakedQuad quad, BlockModel itemModel, float centerX, float centerY, float size, float rotX, float rotY) {
+    private static void renderQuad2D(BakedQuad quad, BlockModel itemModel, float centerX, float centerY, float size, Float customRotY) {
         // Load and bind texture
         String texturePath = quad.getTexturePath();
         Texture texture = loadTexture(texturePath);
@@ -243,9 +240,9 @@ public class ItemRenderer {
             y -= 0.5f;
             z -= 0.5f;
             
-            // Apply isometric rotation using values from display transform
-            float radX = (float) Math.toRadians(rotX);
-            float radY = (float) Math.toRadians(rotY);
+            // Apply isometric rotation (30° X-axis, 45° Y-axis default)
+            float rad30 = (float) Math.toRadians(30);
+            float radY = (customRotY != null) ? (float) Math.toRadians(customRotY) : (float) Math.toRadians(45);
             
             // Rotate around Y-axis
             float cosY = (float) Math.cos(radY);
@@ -253,10 +250,10 @@ public class ItemRenderer {
             float x1 = x * cosY - z * sinY;
             float z1 = x * sinY + z * cosY;
             
-            // Rotate around X-axis
-            float cosX = (float) Math.cos(radX);
-            float sinX = (float) Math.sin(radX);
-            float y1 = y * cosX - z1 * sinX;
+            // Rotate around X-axis by 30°
+            float cos30 = (float) Math.cos(rad30);
+            float sin30 = (float) Math.sin(rad30);
+            float y1 = y * cos30 - z1 * sin30;
             
             // Scale and project to screen
             projected[i][0] = centerX + x1 * size;
