@@ -101,20 +101,23 @@ public class ItemRenderer {
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
         
         // Render all quads from the baked model in back-to-front order
+        // Painter's algorithm for isometric view: back faces first, front faces last
+        // From isometric view (Y=-45°, X=30°), we see: right (EAST), front (NORTH), top (UP)
         List<BakedQuad> quads = bakedModel.getQuads();
         if (quads != null && !quads.isEmpty()) {
-            // Render in specific order: bottom, back faces first, then front faces
+            // Render back faces first (occluded by front faces)
             for (BakedQuad quad : quads) {
-                if (quad.getFace() == BakedQuad.Direction.DOWN || 
-                    quad.getFace() == BakedQuad.Direction.WEST ||
-                    quad.getFace() == BakedQuad.Direction.SOUTH) {
+                if (quad.getFace() == BakedQuad.Direction.SOUTH ||  // Back face
+                    quad.getFace() == BakedQuad.Direction.WEST ||   // Back-left face
+                    quad.getFace() == BakedQuad.Direction.DOWN) {   // Bottom face
                     renderQuad2D(quad, itemModel, x, y, size);
                 }
             }
+            // Render front faces last (visible, occlude back faces)
             for (BakedQuad quad : quads) {
-                if (quad.getFace() == BakedQuad.Direction.UP || 
-                    quad.getFace() == BakedQuad.Direction.EAST ||
-                    quad.getFace() == BakedQuad.Direction.NORTH) {
+                if (quad.getFace() == BakedQuad.Direction.NORTH ||  // Front face
+                    quad.getFace() == BakedQuad.Direction.EAST ||   // Front-right face
+                    quad.getFace() == BakedQuad.Direction.UP) {     // Top face
                     renderQuad2D(quad, itemModel, x, y, size);
                 }
             }
@@ -233,11 +236,12 @@ public class ItemRenderer {
             y -= 0.5f;
             z -= 0.5f;
             
-            // Apply isometric rotation (30° X-axis, 45° Y-axis)
+            // Apply isometric rotation (30° X-axis, -45° Y-axis)
+            // Note: Y-axis rotation is -45° (negative) for correct orientation
             float rad30 = (float) Math.toRadians(30);
-            float rad45 = (float) Math.toRadians(45);
+            float rad45 = (float) Math.toRadians(-45);  // Negative for correct orientation
             
-            // Rotate around Y-axis by 45°
+            // Rotate around Y-axis by -45°
             float cos45 = (float) Math.cos(rad45);
             float sin45 = (float) Math.sin(rad45);
             float x1 = x * cos45 - z * sin45;
@@ -249,8 +253,10 @@ public class ItemRenderer {
             float y1 = y * cos30 - z1 * sin30;
             
             // Scale and project to screen
-            projected[i][0] = centerX + x1 * size;
-            projected[i][1] = centerY - y1 * size;  // Flip Y for screen coordinates
+            // x,y are top-left of the item area, not center
+            // Scale by size to fit in the item slot
+            projected[i][0] = centerX + (x1 * size);
+            projected[i][1] = centerY + (y1 * size);  // No flip needed - y increases downward in screen coords
         }
         
         // Render as a quad using glVertex2f - EXACTLY like HotbarRenderer and other UI

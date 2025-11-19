@@ -85,6 +85,13 @@ public class ModelBakery {
         } else if (model.getTextures() != null && model.getTextures().containsKey("layer0")) {
             // This is a generated 2D item (like torch) - create a flat quad from layer0 texture
             quads.add(generateFlatQuad(model));
+        } else if (model.getTextures() != null && 
+                  (model.getTextures().containsKey("top") || 
+                   model.getTextures().containsKey("bottom") ||
+                   model.getTextures().containsKey("side") ||
+                   model.getTextures().containsKey("all"))) {
+            // Model has textures but no elements - generate cube elements (like grass_block)
+            quads.addAll(generateCubeQuads(model));
         }
         
         // Get particle texture (for break particles)
@@ -335,6 +342,89 @@ public class ModelBakery {
         addVertex(vertices, 36, 0, 1, 0, 0, 0, nx, ny, nz, r, g, b, a);
         
         return new BakedQuad(vertices, -1, BakedQuad.Direction.SOUTH, texturePath);
+    }
+    
+    /**
+     * Generate cube quads for models that have textures but no elements.
+     * Used for blocks like grass_block that define textures (top, side, bottom) without elements.
+     */
+    private static List<BakedQuad> generateCubeQuads(BlockModel model) {
+        List<BakedQuad> quads = new ArrayList<>();
+        
+        // Full cube from 0,0,0 to 1,1,1
+        float x0 = 0, y0 = 0, z0 = 0;
+        float x1 = 1, y1 = 1, z1 = 1;
+        
+        // Get textures for each face (with fallbacks)
+        String downTexture = getTextureForFace(model, "bottom", "down", "all");
+        String upTexture = getTextureForFace(model, "top", "up", "all");
+        String northTexture = getTextureForFace(model, "side", "north", "all");
+        String southTexture = getTextureForFace(model, "side", "south", "all");
+        String westTexture = getTextureForFace(model, "side", "west", "all");
+        String eastTexture = getTextureForFace(model, "side", "east", "all");
+        
+        // Build quads for each face
+        if (downTexture != null) {
+            quads.add(buildCubeFace(BakedQuad.Direction.DOWN, x0, y0, z0, x1, y1, z1, downTexture, model));
+        }
+        if (upTexture != null) {
+            quads.add(buildCubeFace(BakedQuad.Direction.UP, x0, y0, z0, x1, y1, z1, upTexture, model));
+        }
+        if (northTexture != null) {
+            quads.add(buildCubeFace(BakedQuad.Direction.NORTH, x0, y0, z0, x1, y1, z1, northTexture, model));
+        }
+        if (southTexture != null) {
+            quads.add(buildCubeFace(BakedQuad.Direction.SOUTH, x0, y0, z0, x1, y1, z1, southTexture, model));
+        }
+        if (westTexture != null) {
+            quads.add(buildCubeFace(BakedQuad.Direction.WEST, x0, y0, z0, x1, y1, z1, westTexture, model));
+        }
+        if (eastTexture != null) {
+            quads.add(buildCubeFace(BakedQuad.Direction.EAST, x0, y0, z0, x1, y1, z1, eastTexture, model));
+        }
+        
+        return quads;
+    }
+    
+    /**
+     * Get texture for a specific face with fallback options.
+     */
+    private static String getTextureForFace(BlockModel model, String... keys) {
+        if (model.getTextures() == null) {
+            return null;
+        }
+        
+        for (String key : keys) {
+            String texture = model.getTextures().get(key);
+            if (texture != null) {
+                return texture;
+            }
+        }
+        return null;
+    }
+    
+    /**
+     * Build a single face of a cube.
+     */
+    private static BakedQuad buildCubeFace(BakedQuad.Direction direction, 
+                                           float x0, float y0, float z0, float x1, float y1, float z1,
+                                           String texturePath, BlockModel model) {
+        // Resolve texture path
+        texturePath = resolveTexturePath(texturePath, model);
+        
+        // Full UV (0,0 to 1,1)
+        float u0 = 0, v0 = 0, u1 = 1, v1 = 1;
+        
+        // Build vertices for this face
+        float[] vertices = buildQuadVertices(direction, x0, y0, z0, x1, y1, z1, u0, v0, u1, v1);
+        
+        // Determine tint index (grass_block top and side faces are tinted)
+        int tintIndex = -1;
+        if (texturePath.contains("grass_block_top") || texturePath.contains("grass_block_side_overlay")) {
+            tintIndex = 0;  // First tint index (grass color)
+        }
+        
+        return new BakedQuad(vertices, tintIndex, direction, texturePath);
     }
     
     /**
