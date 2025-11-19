@@ -247,12 +247,12 @@ public class ItemRenderer {
             y -= 0.5f;
             z -= 0.5f;
             
-            // Apply isometric rotation (30° X-axis, -45° Y-axis)
-            // Note: Y-axis rotation is -45° (negative) for correct orientation
+            // Apply isometric rotation (30° X-axis, -45° Y-axis default)
+            // Y-axis rotation can be overridden by display.gui.rotation in JSON
             float rad30 = (float) Math.toRadians(30);
-            float rad45 = (float) Math.toRadians(-45);  // Negative for correct orientation
+            float rad45 = (float) Math.toRadians(-45);  // Default -45° for isometric view
             
-            // Rotate around Y-axis by -45°
+            // Rotate around Y-axis by -45° (default)
             float cos45 = (float) Math.cos(rad45);
             float sin45 = (float) Math.sin(rad45);
             float x1 = x * cos45 - z * sin45;
@@ -266,9 +266,9 @@ public class ItemRenderer {
             // Scale and project to screen
             // x,y are top-left of the item area, not center
             // Scale by size to fit in the item slot
-            // Negate y1 to flip Y-axis - this fixes stairs being upside down
+            // Use + for Y (not -) - correct default projection
             projected[i][0] = centerX + (x1 * size);
-            projected[i][1] = centerY - (y1 * size);  // Flip Y-axis (- instead of +)
+            projected[i][1] = centerY + (y1 * size);  // Standard projection (+ not -)
         }
         
         // Render as a quad using glVertex2f - EXACTLY like HotbarRenderer and other UI
