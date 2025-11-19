@@ -103,32 +103,36 @@ public class ItemRenderer {
         // Get display transform for GUI mode from the baked model
         ModelDisplay.Transform guiTransform = bakedModel.getTransform("gui");
         float rotX = 30.0f;  // Default X rotation
-        float rotY = 45.0f;  // Default Y rotation (Minecraft default for blocks)
+        float rotY = 45.0f;  // Default Y rotation
         
         if (guiTransform != null && guiTransform.getRotation() != null && guiTransform.getRotation().size() >= 2) {
             rotX = guiTransform.getRotation().get(0);
             rotY = guiTransform.getRotation().get(1);
         }
         
+        // Determine face rendering order based on Y rotation
+        // For rotations closer to 45° (looking SW to NE): WEST, SOUTH are back
+        // For rotations closer to 135° (looking SE to NW): EAST, SOUTH are back
+        boolean isRotation45 = Math.abs(rotY - 45.0f) < Math.abs(rotY - 135.0f);
+        
         // Render all quads from the baked model in back-to-front order
         List<BakedQuad> quads = bakedModel.getQuads();
         if (quads != null && !quads.isEmpty()) {
-            // Render in back-to-front order based on standard isometric view (45° Y rotation)
-            // Back faces: DOWN, SOUTH, WEST
-            // Front faces: UP, NORTH, EAST
+            // Render back faces first
             for (BakedQuad quad : quads) {
                 BakedQuad.Direction face = quad.getFace();
-                if (face == BakedQuad.Direction.DOWN || 
-                    face == BakedQuad.Direction.SOUTH ||
-                    face == BakedQuad.Direction.WEST) {
+                boolean isBackFace = face == BakedQuad.Direction.DOWN || face == BakedQuad.Direction.SOUTH ||
+                                    (isRotation45 ? face == BakedQuad.Direction.WEST : face == BakedQuad.Direction.EAST);
+                if (isBackFace) {
                     renderQuad2D(quad, itemModel, x, y, size, rotX, rotY);
                 }
             }
+            // Render front faces second
             for (BakedQuad quad : quads) {
                 BakedQuad.Direction face = quad.getFace();
-                if (face == BakedQuad.Direction.UP || 
-                    face == BakedQuad.Direction.NORTH ||
-                    face == BakedQuad.Direction.EAST) {
+                boolean isFrontFace = face == BakedQuad.Direction.UP || face == BakedQuad.Direction.NORTH ||
+                                     (isRotation45 ? face == BakedQuad.Direction.EAST : face == BakedQuad.Direction.WEST);
+                if (isFrontFace) {
                     renderQuad2D(quad, itemModel, x, y, size, rotX, rotY);
                 }
             }
@@ -247,7 +251,7 @@ public class ItemRenderer {
             y -= 0.5f;
             z -= 0.5f;
             
-            // Apply isometric rotation using rotations from display transform
+            // Apply isometric rotation using values from display transform
             float radX = (float) Math.toRadians(rotX);
             float radY = (float) Math.toRadians(rotY);
             
