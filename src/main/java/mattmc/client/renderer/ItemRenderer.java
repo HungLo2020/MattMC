@@ -114,34 +114,70 @@ public class ItemRenderer {
         
         // Render all quads from the baked model in back-to-front order
         // Painter's algorithm for isometric view: back faces first, front faces last
-        // From isometric view (Y=-45°, X=30°), we see: right (EAST), front (NORTH), top (UP)
-        // The UP face (top) must be rendered LAST as it's the topmost visible face
+        // Face ordering depends on Y rotation angle:
+        // - For -45°: we see EAST (right), NORTH (front), UP (top)
+        // - For 135°: we see WEST (left), SOUTH (back), UP (top) 
         List<BakedQuad> quads = bakedModel.getQuads();
         if (quads != null && !quads.isEmpty()) {
-            // Render back/bottom faces first (most occluded)
-            for (BakedQuad quad : quads) {
-                if (quad.getFace() == BakedQuad.Direction.DOWN) {   // Bottom face - render first
-                    renderQuad2D(quad, itemModel, x, y, size, xRotation, yRotation);
+            // Determine face ordering based on Y rotation
+            // Y rotation around 135° means we're viewing from opposite angle
+            boolean flippedView = (yRotation > 45 && yRotation < 225);
+            
+            if (flippedView) {
+                // For 135° rotation (stairs): render EAST/NORTH first, WEST/SOUTH later
+                // Render bottom first
+                for (BakedQuad quad : quads) {
+                    if (quad.getFace() == BakedQuad.Direction.DOWN) {
+                        renderQuad2D(quad, itemModel, x, y, size, xRotation, yRotation);
+                    }
                 }
-            }
-            // Render back side faces
-            for (BakedQuad quad : quads) {
-                if (quad.getFace() == BakedQuad.Direction.SOUTH ||  // Back face
-                    quad.getFace() == BakedQuad.Direction.WEST) {   // Back-left face
-                    renderQuad2D(quad, itemModel, x, y, size, xRotation, yRotation);
+                // Render front faces (from this view angle)
+                for (BakedQuad quad : quads) {
+                    if (quad.getFace() == BakedQuad.Direction.EAST ||
+                        quad.getFace() == BakedQuad.Direction.NORTH) {
+                        renderQuad2D(quad, itemModel, x, y, size, xRotation, yRotation);
+                    }
                 }
-            }
-            // Render front side faces
-            for (BakedQuad quad : quads) {
-                if (quad.getFace() == BakedQuad.Direction.NORTH ||  // Front face
-                    quad.getFace() == BakedQuad.Direction.EAST) {   // Front-right face
-                    renderQuad2D(quad, itemModel, x, y, size, xRotation, yRotation);
+                // Render back faces (from this view angle)
+                for (BakedQuad quad : quads) {
+                    if (quad.getFace() == BakedQuad.Direction.WEST ||
+                        quad.getFace() == BakedQuad.Direction.SOUTH) {
+                        renderQuad2D(quad, itemModel, x, y, size, xRotation, yRotation);
+                    }
                 }
-            }
-            // Render top face LAST (most visible, should occlude everything else)
-            for (BakedQuad quad : quads) {
-                if (quad.getFace() == BakedQuad.Direction.UP) {     // Top face - render last!
-                    renderQuad2D(quad, itemModel, x, y, size, xRotation, yRotation);
+                // Render top last
+                for (BakedQuad quad : quads) {
+                    if (quad.getFace() == BakedQuad.Direction.UP) {
+                        renderQuad2D(quad, itemModel, x, y, size, xRotation, yRotation);
+                    }
+                }
+            } else {
+                // For -45° rotation (most blocks): render SOUTH/WEST first, NORTH/EAST later
+                // Render bottom first
+                for (BakedQuad quad : quads) {
+                    if (quad.getFace() == BakedQuad.Direction.DOWN) {
+                        renderQuad2D(quad, itemModel, x, y, size, xRotation, yRotation);
+                    }
+                }
+                // Render back faces
+                for (BakedQuad quad : quads) {
+                    if (quad.getFace() == BakedQuad.Direction.SOUTH ||
+                        quad.getFace() == BakedQuad.Direction.WEST) {
+                        renderQuad2D(quad, itemModel, x, y, size, xRotation, yRotation);
+                    }
+                }
+                // Render front faces
+                for (BakedQuad quad : quads) {
+                    if (quad.getFace() == BakedQuad.Direction.NORTH ||
+                        quad.getFace() == BakedQuad.Direction.EAST) {
+                        renderQuad2D(quad, itemModel, x, y, size, xRotation, yRotation);
+                    }
+                }
+                // Render top last
+                for (BakedQuad quad : quads) {
+                    if (quad.getFace() == BakedQuad.Direction.UP) {
+                        renderQuad2D(quad, itemModel, x, y, size, xRotation, yRotation);
+                    }
                 }
             }
         } else {
@@ -278,9 +314,10 @@ public class ItemRenderer {
             // Scale and project to screen
             // x,y are top-left of the item area, not center
             // Scale by size to fit in the item slot
-            // Use + for Y (not -) - correct default projection
+            // Y-axis flip depends on rotation: 135° needs flip, -45° doesn't
+            float yFlip = (yRotation > 45 && yRotation < 225) ? -1f : 1f;
             projected[i][0] = centerX + (x1 * size);
-            projected[i][1] = centerY + (y1 * size);  // Standard projection (+ not -)
+            projected[i][1] = centerY + (y1 * size * yFlip);  // Flip Y for 135° rotation
         }
         
         // Render as a quad using glVertex2f - EXACTLY like HotbarRenderer and other UI
