@@ -100,22 +100,39 @@ public class ItemRenderer {
         glEnable(GL_BLEND);
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
         
+        // Get display transform for GUI mode from the baked model
+        ModelDisplay.Transform guiTransform = bakedModel.getTransform("gui");
+        float rotX = 30.0f;  // Default X rotation
+        float rotY = 225.0f; // Default Y rotation (45° from the other direction)
+        
+        if (guiTransform != null && guiTransform.getRotation() != null && guiTransform.getRotation().size() >= 2) {
+            rotX = guiTransform.getRotation().get(0);
+            rotY = guiTransform.getRotation().get(1);
+        }
+        
         // Render all quads from the baked model in back-to-front order
         List<BakedQuad> quads = bakedModel.getQuads();
         if (quads != null && !quads.isEmpty()) {
+            // Determine face rendering order based on Y rotation
+            // For 225° (SW to NE): WEST and SOUTH are back faces
+            // For 135° (SE to NW): EAST and SOUTH are back faces
+            boolean facingWest = (rotY >= 180.0f && rotY < 270.0f);  // 225° range
+            
             // Render in specific order: bottom, back faces first, then front faces
             for (BakedQuad quad : quads) {
-                if (quad.getFace() == BakedQuad.Direction.DOWN || 
-                    quad.getFace() == BakedQuad.Direction.WEST ||
-                    quad.getFace() == BakedQuad.Direction.SOUTH) {
-                    renderQuad2D(quad, itemModel, x, y, size);
+                BakedQuad.Direction face = quad.getFace();
+                boolean isBackFace = face == BakedQuad.Direction.DOWN || face == BakedQuad.Direction.SOUTH ||
+                                    (facingWest ? face == BakedQuad.Direction.WEST : face == BakedQuad.Direction.EAST);
+                if (isBackFace) {
+                    renderQuad2D(quad, itemModel, x, y, size, rotX, rotY);
                 }
             }
             for (BakedQuad quad : quads) {
-                if (quad.getFace() == BakedQuad.Direction.UP || 
-                    quad.getFace() == BakedQuad.Direction.EAST ||
-                    quad.getFace() == BakedQuad.Direction.NORTH) {
-                    renderQuad2D(quad, itemModel, x, y, size);
+                BakedQuad.Direction face = quad.getFace();
+                boolean isFrontFace = face == BakedQuad.Direction.UP || face == BakedQuad.Direction.NORTH ||
+                                     (facingWest ? face == BakedQuad.Direction.EAST : face == BakedQuad.Direction.WEST);
+                if (isFrontFace) {
+                    renderQuad2D(quad, itemModel, x, y, size, rotX, rotY);
                 }
             }
         } else {
@@ -178,7 +195,7 @@ public class ItemRenderer {
      * Manually projects 3D vertices to 2D, then uses GL_QUADS with glVertex2f.
      * This matches how other UI elements render (HotbarRenderer, UIRenderHelper, etc.)
      */
-    private static void renderQuad2D(BakedQuad quad, BlockModel itemModel, float centerX, float centerY, float size) {
+    private static void renderQuad2D(BakedQuad quad, BlockModel itemModel, float centerX, float centerY, float size, float rotX, float rotY) {
         // Load and bind texture
         String texturePath = quad.getTexturePath();
         Texture texture = loadTexture(texturePath);
@@ -233,20 +250,20 @@ public class ItemRenderer {
             y -= 0.5f;
             z -= 0.5f;
             
-            // Apply isometric rotation (30° X-axis, 45° Y-axis)
-            float rad30 = (float) Math.toRadians(30);
-            float rad45 = (float) Math.toRadians(45);
+            // Apply isometric rotation using rotations from display transform
+            float radX = (float) Math.toRadians(rotX);
+            float radY = (float) Math.toRadians(rotY);
             
-            // Rotate around Y-axis by 45°
-            float cos45 = (float) Math.cos(rad45);
-            float sin45 = (float) Math.sin(rad45);
-            float x1 = x * cos45 - z * sin45;
-            float z1 = x * sin45 + z * cos45;
+            // Rotate around Y-axis
+            float cosY = (float) Math.cos(radY);
+            float sinY = (float) Math.sin(radY);
+            float x1 = x * cosY - z * sinY;
+            float z1 = x * sinY + z * cosY;
             
-            // Rotate around X-axis by 30°
-            float cos30 = (float) Math.cos(rad30);
-            float sin30 = (float) Math.sin(rad30);
-            float y1 = y * cos30 - z1 * sin30;
+            // Rotate around X-axis
+            float cosX = (float) Math.cos(radX);
+            float sinX = (float) Math.sin(radX);
+            float y1 = y * cosX - z1 * sinX;
             
             // Scale and project to screen
             projected[i][0] = centerX + x1 * size;
