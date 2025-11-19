@@ -38,6 +38,20 @@ public class ItemRenderer {
      * @param size Size of the rendered item in pixels
      */
     public static void renderItem(ItemStack stack, float x, float y, float size) {
+        renderItem(stack, x, y, size, false);
+    }
+    
+    /**
+     * Render an item at the specified screen position.
+     * Renders block items as orthographic 3D cubes (isometric view).
+     * 
+     * @param stack The item stack to render
+     * @param x Screen X position (center of item)
+     * @param y Screen Y position (center of item)
+     * @param size Size of the rendered item in pixels
+     * @param applyInventoryOffset Apply +18f Y offset for inventory screen block item rendering
+     */
+    public static void renderItem(ItemStack stack, float x, float y, float size, boolean applyInventoryOffset) {
         if (stack == null || stack.getItem() == null) {
             return;
         }
@@ -70,12 +84,15 @@ public class ItemRenderer {
             String originalParent = itemModel != null ? itemModel.getOriginalParent() : null;
             boolean isStairs = originalParent != null && originalParent.contains("stairs");
             
+            // Apply inventory offset for block items if requested
+            float adjustedY = applyInventoryOffset ? y + 18f : y;
+            
             if (isStairs) {
                 // Render as isometric stairs
-                renderIsometricStairs(texturePaths, itemModel, x, y, size);
+                renderIsometricStairs(texturePaths, itemModel, x, adjustedY, size);
             } else {
                 // Render as isometric 3D cube
-                renderIsometricCube(texturePaths, itemModel, x, y, size);
+                renderIsometricCube(texturePaths, itemModel, x, adjustedY, size);
             }
         } else {
             // Render as flat 2D icon (for non-block items)
@@ -83,10 +100,16 @@ public class ItemRenderer {
             if (texturePath == null) {
                 texturePath = texturePaths.values().iterator().next();
             }
+            
+            // Flat items need different offset than block items:
+            // - In inventory screen: no additional offset needed (already centered in slots)
+            // - In hotbar: need to move UP by 18f to align with slots (opposite of block items)
+            float adjustedY = applyInventoryOffset ? y : y - 18f;
+            
             if (texturePath != null) {
-                renderTextureAsFlat(texturePath, x, y, size);
+                renderTextureAsFlat(texturePath, x, adjustedY, size);
             } else {
-                renderFallbackItem(x, y, size);
+                renderFallbackItem(x, adjustedY, size);
             }
         }
     }
@@ -116,11 +139,6 @@ public class ItemRenderer {
         float isoWidth = scale * 0.5f;
         float isoHeight = scale * 0.5f;
         
-        // Adjust Y position to restore block positioning to match original placement
-        // Before fixing items, InventoryRenderer used +14f offset; now it uses +8f (6 GUI units = 18 pixels higher)
-        // Shift blocks down by 18 pixels to restore original positioning while keeping items correctly centered
-        float adjustedY = y + 18f;
-        
         // Capture the 3D geometry for a standard cube
         VertexCapture capture = new VertexCapture();
         
@@ -145,7 +163,7 @@ public class ItemRenderer {
             if (tex != null) {
                 tex.bind();
                 glColor4f(0.8f, 0.8f, 0.8f, 1.0f);
-                renderFacesIsometric(westFaces, x, adjustedY, isoWidth, isoHeight);
+                renderFacesIsometric(westFaces, x, y, isoWidth, isoHeight);
             }
         }
         
@@ -155,7 +173,7 @@ public class ItemRenderer {
             if (tex != null) {
                 tex.bind();
                 glColor4f(0.6f, 0.6f, 0.6f, 1.0f);
-                renderFacesIsometric(northFaces, x, adjustedY, isoWidth, isoHeight);
+                renderFacesIsometric(northFaces, x, y, isoWidth, isoHeight);
             }
         }
         
@@ -169,7 +187,7 @@ public class ItemRenderer {
                 float g = ((topTintColor >> 8) & 0xFF) / 255.0f;
                 float b = (topTintColor & 0xFF) / 255.0f;
                 glColor4f(r, g, b, 1.0f);
-                renderFacesIsometric(topFaces, x, adjustedY, isoWidth, isoHeight);
+                renderFacesIsometric(topFaces, x, y, isoWidth, isoHeight);
             }
         }
         
@@ -198,9 +216,6 @@ public class ItemRenderer {
         float scale = size * 2.0f;
         float isoWidth = scale * 0.5f;
         float isoHeight = scale * 0.5f;
-        
-        // Adjust Y position to restore stairs positioning to match original placement
-        float adjustedY = y + 18f;
         
         // Capture south-facing stairs geometry (step rises toward z=1 - back in isometric)
         VertexCapture capture = new VertexCapture();
@@ -239,7 +254,7 @@ public class ItemRenderer {
                     float brightness = isWestFacing ? 0.8f : 0.6f;
                     glColor4f(brightness, brightness, brightness, 1.0f);
                     
-                    renderFaceIsometric(face, x, adjustedY, isoWidth, isoHeight);
+                    renderFaceIsometric(face, x, y, isoWidth, isoHeight);
                 }
             }
         }
@@ -252,7 +267,7 @@ public class ItemRenderer {
                 glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
                 
                 for (VertexCapture.Face face : topFacesList) {
-                    renderFaceIsometric(face, x, adjustedY, isoWidth, isoHeight);
+                    renderFaceIsometric(face, x, y, isoWidth, isoHeight);
                 }
             }
         }

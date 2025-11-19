@@ -165,7 +165,7 @@ public class InventoryRenderer {
                 float slotCenterX = guiX + (hotbarX + i * 18f + 8f) * GUI_SCALE;
                 float slotCenterY = guiY + (hotbarY + 8f) * GUI_SCALE;
                 
-                mattmc.client.renderer.ItemRenderer.renderItem(stack, slotCenterX, slotCenterY, itemSize);
+                mattmc.client.renderer.ItemRenderer.renderItem(stack, slotCenterX, slotCenterY, itemSize, true);
                 
                 if (stack.getCount() > 1) {
                     renderItemCount(stack.getCount(), slotCenterX, slotCenterY, GUI_SCALE, itemSize);
@@ -186,7 +186,7 @@ public class InventoryRenderer {
                 float slotCenterX = guiX + (invX + col * 18f + 8f) * GUI_SCALE;
                 float slotCenterY = guiY + (invY + row * 18f + 8f) * GUI_SCALE;
                 
-                mattmc.client.renderer.ItemRenderer.renderItem(stack, slotCenterX, slotCenterY, itemSize);
+                mattmc.client.renderer.ItemRenderer.renderItem(stack, slotCenterX, slotCenterY, itemSize, true);
                 
                 if (stack.getCount() > 1) {
                     renderItemCount(stack.getCount(), slotCenterX, slotCenterY, GUI_SCALE, itemSize);
@@ -353,7 +353,7 @@ public class InventoryRenderer {
                     float itemX = slotX + (slotSizeScreen / 2f);
                     float itemY = slotY + (slotSizeScreen / 2f);
                     
-                    mattmc.client.renderer.ItemRenderer.renderItem(stack, itemX, itemY, itemSize);
+                    mattmc.client.renderer.ItemRenderer.renderItem(stack, itemX, itemY, itemSize, true);
                 }
             }
         }
