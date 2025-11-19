@@ -108,6 +108,9 @@ public class ItemRenderer {
         glMatrixMode(GL_MODELVIEW);
         glPushMatrix();
         
+        // Translate to center position
+        glTranslatef(x, y, 0);
+        
         // Apply isometric-style rotation to show 3 faces (like Minecraft GUI display)
         // These rotations show top, north, and east faces
         glRotatef(30, 1, 0, 0);   // Tilt down to see top
@@ -119,10 +122,6 @@ public class ItemRenderer {
         // Center the model (models are in 0-1 range)
         glTranslatef(-0.5f, -0.5f, -0.5f);
         
-        // Store center position for 2D rendering
-        float centerX = x;
-        float centerY = y;
-        
         // Render all quads from the baked model in back-to-front order
         List<BakedQuad> quads = bakedModel.getQuads();
         if (quads != null && !quads.isEmpty()) {
@@ -131,14 +130,14 @@ public class ItemRenderer {
                 if (quad.getFace() == BakedQuad.Direction.DOWN || 
                     quad.getFace() == BakedQuad.Direction.WEST ||
                     quad.getFace() == BakedQuad.Direction.SOUTH) {
-                    renderQuad2D(quad, itemModel, centerX, centerY);
+                    renderQuad3D(quad, itemModel);
                 }
             }
             for (BakedQuad quad : quads) {
                 if (quad.getFace() == BakedQuad.Direction.UP || 
                     quad.getFace() == BakedQuad.Direction.EAST ||
                     quad.getFace() == BakedQuad.Direction.NORTH) {
-                    renderQuad2D(quad, itemModel, centerX, centerY);
+                    renderQuad3D(quad, itemModel);
                 }
             }
         } else {
@@ -201,10 +200,10 @@ public class ItemRenderer {
     }
     
     /**
-     * Render a single quad from a baked model as 2D geometry.
-     * Transforms 3D vertices through modelview matrix and renders at centerX, centerY.
+     * Render a single quad from a baked model in 3D.
+     * Uses glVertex3f to let OpenGL handle the transformation through the modelview matrix.
      */
-    private static void renderQuad2D(BakedQuad quad, BlockModel itemModel, float centerX, float centerY) {
+    private static void renderQuad3D(BakedQuad quad, BlockModel itemModel) {
         // Load and bind texture
         String texturePath = quad.getTexturePath();
         Texture texture = loadTexture(texturePath);
@@ -245,25 +244,14 @@ public class ItemRenderer {
             shade = 0.6f;  // East/West face
         }
         
-        // Transform vertices through the current modelview matrix and render as 2D
-        float[][] transformedVerts = new float[4][3];
-        for (int i = 0; i < 4; i++) {
-            int offset = i * 12;
-            float x = vertices[offset + 0];
-            float y = vertices[offset + 1];
-            float z = vertices[offset + 2];
-            
-            // Apply current modelview transformation manually
-            // Get the transformed position by multiplying with the current matrix
-            float[] transformed = transform3DVertex(x, y, z);
-            transformedVerts[i] = transformed;
-        }
-        
         glBegin(GL_TRIANGLES);
         
         // First triangle: vertices 0, 1, 2
         for (int i : new int[]{0, 1, 2}) {
             int offset = i * 12;
+            float x = vertices[offset + 0];
+            float y = vertices[offset + 1];
+            float z = vertices[offset + 2];
             float u = vertices[offset + 3];
             float v = vertices[offset + 4];
             float vr = vertices[offset + 8] * r;
@@ -273,13 +261,15 @@ public class ItemRenderer {
             
             glColor4f(vr * shade, vg * shade, vb * shade, va);
             glTexCoord2f(u, v);
-            // Use transformed 2D coordinates, offset by center position
-            glVertex2f(centerX + transformedVerts[i][0], centerY + transformedVerts[i][1]);
+            glVertex3f(x, y, z);
         }
         
         // Second triangle: vertices 0, 2, 3
         for (int i : new int[]{0, 2, 3}) {
             int offset = i * 12;
+            float x = vertices[offset + 0];
+            float y = vertices[offset + 1];
+            float z = vertices[offset + 2];
             float u = vertices[offset + 3];
             float v = vertices[offset + 4];
             float vr = vertices[offset + 8] * r;
@@ -289,35 +279,10 @@ public class ItemRenderer {
             
             glColor4f(vr * shade, vg * shade, vb * shade, va);
             glTexCoord2f(u, v);
-            // Use transformed 2D coordinates, offset by center position
-            glVertex2f(centerX + transformedVerts[i][0], centerY + transformedVerts[i][1]);
+            glVertex3f(x, y, z);
         }
         
         glEnd();
-    }
-    
-    /**
-     * Transform a 3D vertex through the current modelview matrix.
-     * Returns the transformed x, y, z coordinates.
-     */
-    private static float[] transform3DVertex(float x, float y, float z) {
-        // Get current modelview matrix
-        java.nio.FloatBuffer matrixBuffer = java.nio.ByteBuffer.allocateDirect(16 * 4)
-            .order(java.nio.ByteOrder.nativeOrder()).asFloatBuffer();
-        glGetFloatv(GL_MODELVIEW_MATRIX, matrixBuffer);
-        
-        // Extract matrix elements (column-major order)
-        float m00 = matrixBuffer.get(0), m01 = matrixBuffer.get(1), m02 = matrixBuffer.get(2), m03 = matrixBuffer.get(3);
-        float m10 = matrixBuffer.get(4), m11 = matrixBuffer.get(5), m12 = matrixBuffer.get(6), m13 = matrixBuffer.get(7);
-        float m20 = matrixBuffer.get(8), m21 = matrixBuffer.get(9), m22 = matrixBuffer.get(10), m23 = matrixBuffer.get(11);
-        float m30 = matrixBuffer.get(12), m31 = matrixBuffer.get(13), m32 = matrixBuffer.get(14), m33 = matrixBuffer.get(15);
-        
-        // Transform the vertex
-        float tx = m00 * x + m10 * y + m20 * z + m30;
-        float ty = m01 * x + m11 * y + m21 * z + m31;
-        float tz = m02 * x + m12 * y + m22 * z + m32;
-        
-        return new float[]{tx, ty, tz};
     }
     
     /**
