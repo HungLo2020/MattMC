@@ -90,10 +90,21 @@ public class ItemRenderer {
     private static void renderBakedModel(BakedModel bakedModel, BlockModel itemModel, float x, float y, float size) {
         // Save GL state
         boolean textureWasEnabled = glIsEnabled(GL_TEXTURE_2D);
+        boolean depthTestWasEnabled = glIsEnabled(GL_DEPTH_TEST);
+        boolean cullFaceWasEnabled = glIsEnabled(GL_CULL_FACE);
+        
         glEnable(GL_TEXTURE_2D);
         glEnable(GL_DEPTH_TEST);
         
+        // Disable any edge/line rendering modes
+        glDisable(GL_LINE_SMOOTH);
+        glDisable(GL_LINE_STIPPLE);
+        glEdgeFlag(true);
+        
         // Ensure polygon mode is set to fill (not wireframe)
+        // Save current polygon mode and set to fill
+        int[] polygonMode = new int[1];
+        glGetIntegerv(GL_POLYGON_MODE, polygonMode);
         glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
         
         // Disable face culling so all faces are visible
@@ -133,10 +144,19 @@ public class ItemRenderer {
         glPopMatrix();
         
         // Restore GL state
-        glDisable(GL_DEPTH_TEST);
+        if (!depthTestWasEnabled) {
+            glDisable(GL_DEPTH_TEST);
+        }
         if (!textureWasEnabled) {
             glDisable(GL_TEXTURE_2D);
         }
+        if (cullFaceWasEnabled) {
+            glEnable(GL_CULL_FACE);
+        }
+        
+        // Restore polygon mode
+        glPolygonMode(GL_FRONT_AND_BACK, polygonMode[0]);
+        
         glColor4f(1f, 1f, 1f, 1f); // Reset color
     }
     
@@ -181,6 +201,9 @@ public class ItemRenderer {
      * Render a single quad from a baked model.
      */
     private static void renderQuad(BakedQuad quad, BlockModel itemModel) {
+        // Ensure we're in fill mode for every quad
+        glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
+        
         // Load and bind texture
         String texturePath = quad.getTexturePath();
         Texture texture = loadTexture(texturePath);
