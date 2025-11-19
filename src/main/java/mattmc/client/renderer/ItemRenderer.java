@@ -108,9 +108,6 @@ public class ItemRenderer {
         glMatrixMode(GL_MODELVIEW);
         glPushMatrix();
         
-        // Translate to item position
-        glTranslatef(x, y, 0);
-        
         // Apply isometric-style rotation to show 3 faces (like Minecraft GUI display)
         // These rotations show top, north, and east faces
         glRotatef(30, 1, 0, 0);   // Tilt down to see top
@@ -122,6 +119,10 @@ public class ItemRenderer {
         // Center the model (models are in 0-1 range)
         glTranslatef(-0.5f, -0.5f, -0.5f);
         
+        // Store center position for 2D rendering
+        float centerX = x;
+        float centerY = y;
+        
         // Render all quads from the baked model in back-to-front order
         List<BakedQuad> quads = bakedModel.getQuads();
         if (quads != null && !quads.isEmpty()) {
@@ -130,14 +131,14 @@ public class ItemRenderer {
                 if (quad.getFace() == BakedQuad.Direction.DOWN || 
                     quad.getFace() == BakedQuad.Direction.WEST ||
                     quad.getFace() == BakedQuad.Direction.SOUTH) {
-                    renderQuad3D(quad, itemModel);
+                    renderQuad2D(quad, itemModel, centerX, centerY);
                 }
             }
             for (BakedQuad quad : quads) {
                 if (quad.getFace() == BakedQuad.Direction.UP || 
                     quad.getFace() == BakedQuad.Direction.EAST ||
                     quad.getFace() == BakedQuad.Direction.NORTH) {
-                    renderQuad3D(quad, itemModel);
+                    renderQuad2D(quad, itemModel, centerX, centerY);
                 }
             }
         } else {
@@ -200,10 +201,10 @@ public class ItemRenderer {
     }
     
     /**
-     * Render a single quad from a baked model.
-     * Projects 3D vertices to 2D screen space after model transforms are applied.
+     * Render a single quad from a baked model as 2D geometry.
+     * Transforms 3D vertices through modelview matrix and renders at centerX, centerY.
      */
-    private static void renderQuad3D(BakedQuad quad, BlockModel itemModel) {
+    private static void renderQuad2D(BakedQuad quad, BlockModel itemModel, float centerX, float centerY) {
         // Load and bind texture
         String texturePath = quad.getTexturePath();
         Texture texture = loadTexture(texturePath);
@@ -272,8 +273,8 @@ public class ItemRenderer {
             
             glColor4f(vr * shade, vg * shade, vb * shade, va);
             glTexCoord2f(u, v);
-            // Use transformed 2D coordinates (ignore Z)
-            glVertex2f(transformedVerts[i][0], transformedVerts[i][1]);
+            // Use transformed 2D coordinates, offset by center position
+            glVertex2f(centerX + transformedVerts[i][0], centerY + transformedVerts[i][1]);
         }
         
         // Second triangle: vertices 0, 2, 3
@@ -288,8 +289,8 @@ public class ItemRenderer {
             
             glColor4f(vr * shade, vg * shade, vb * shade, va);
             glTexCoord2f(u, v);
-            // Use transformed 2D coordinates (ignore Z)
-            glVertex2f(transformedVerts[i][0], transformedVerts[i][1]);
+            // Use transformed 2D coordinates, offset by center position
+            glVertex2f(centerX + transformedVerts[i][0], centerY + transformedVerts[i][1]);
         }
         
         glEnd();
