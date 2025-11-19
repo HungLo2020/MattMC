@@ -38,6 +38,20 @@ public class ItemRenderer {
      * @param size Size of the rendered item in pixels
      */
     public static void renderItem(ItemStack stack, float x, float y, float size) {
+        renderItem(stack, x, y, size, false);
+    }
+    
+    /**
+     * Render an item at the specified screen position.
+     * Renders block items as orthographic 3D cubes (isometric view).
+     * 
+     * @param stack The item stack to render
+     * @param x Screen X position (center of item)
+     * @param y Screen Y position (center of item)
+     * @param size Size of the rendered item in pixels
+     * @param applyInventoryOffset Apply +18f Y offset for inventory screen block item rendering
+     */
+    public static void renderItem(ItemStack stack, float x, float y, float size, boolean applyInventoryOffset) {
         if (stack == null || stack.getItem() == null) {
             return;
         }
@@ -70,12 +84,15 @@ public class ItemRenderer {
             String originalParent = itemModel != null ? itemModel.getOriginalParent() : null;
             boolean isStairs = originalParent != null && originalParent.contains("stairs");
             
+            // Apply inventory offset for block items if requested
+            float adjustedY = applyInventoryOffset ? y + 18f : y;
+            
             if (isStairs) {
                 // Render as isometric stairs
-                renderIsometricStairs(texturePaths, itemModel, x, y, size);
+                renderIsometricStairs(texturePaths, itemModel, x, adjustedY, size);
             } else {
                 // Render as isometric 3D cube
-                renderIsometricCube(texturePaths, itemModel, x, y, size);
+                renderIsometricCube(texturePaths, itemModel, x, adjustedY, size);
             }
         } else {
             // Render as flat 2D icon (for non-block items)
