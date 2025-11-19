@@ -25,6 +25,14 @@ public class UVMapper {
     }
     
     /**
+     * Get the texture atlas.
+     * @return The texture atlas, or null if not available
+     */
+    public TextureAtlas getTextureAtlas() {
+        return textureAtlas;
+    }
+    
+    /**
      * Get UV mapping from texture atlas for a face.
      * Returns null if no atlas or texture not found.
      */
