@@ -23,14 +23,16 @@ public class WallTorchBlock extends TorchBlock {
     private static final VoxelShape EAST_SHAPE = VoxelShape.box(0.0, 0.1875, 0.34375, 0.3125, 0.8125, 0.65625);
     
     /**
-     * Create a new wall torch block with RGB light emission.
+     * Create a new wall torch block with full light emission parameters.
      * 
+     * @param solid Whether the block is solid (has collision)
+     * @param lightEmission Overall light emission level (0-15), used for intensity
      * @param lightEmissionR Red channel light emission (0-15)
      * @param lightEmissionG Green channel light emission (0-15)
      * @param lightEmissionB Blue channel light emission (0-15)
      */
-    public WallTorchBlock(int lightEmissionR, int lightEmissionG, int lightEmissionB) {
-        super(lightEmissionR, lightEmissionG, lightEmissionB);
+    public WallTorchBlock(boolean solid, int lightEmission, int lightEmissionR, int lightEmissionG, int lightEmissionB) {
+        super(solid, lightEmission, lightEmissionR, lightEmissionG, lightEmissionB);
     }
     
     /**

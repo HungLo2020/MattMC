@@ -14,14 +14,16 @@ public class TorchBlock extends Block {
     private static final VoxelShape TORCH_SHAPE = VoxelShape.box(0.375, 0.0, 0.375, 0.625, 0.625, 0.625);
     
     /**
-     * Create a new torch block with RGB light emission.
+     * Create a new torch block with full light emission parameters.
      * 
+     * @param solid Whether the block is solid (has collision)
+     * @param lightEmission Overall light emission level (0-15), used for intensity
      * @param lightEmissionR Red channel light emission (0-15)
      * @param lightEmissionG Green channel light emission (0-15)
      * @param lightEmissionB Blue channel light emission (0-15)
      */
-    public TorchBlock(int lightEmissionR, int lightEmissionG, int lightEmissionB) {
-        super(false, lightEmissionR, lightEmissionG, lightEmissionB);
+    public TorchBlock(boolean solid, int lightEmission, int lightEmissionR, int lightEmissionG, int lightEmissionB) {
+        super(solid, lightEmission, lightEmissionR, lightEmissionG, lightEmissionB);
     }
     
     /**
