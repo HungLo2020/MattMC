@@ -63,9 +63,28 @@ public class TorchGeometryBuilder {
             return currentVertex; // No model or elements, skip rendering
         }
         
+        // Determine Y-axis rotation for wall torches
+        // Wall torches use rotation based on facing direction (from blockstate)
+        int yRotation = 0;
+        if (block instanceof mattmc.world.level.block.WallTorchBlock && face.blockState != null) {
+            mattmc.world.level.block.state.properties.Direction facing = 
+                face.blockState.getDirection("facing");
+            if (facing != null) {
+                // Rotation values from wall_torch.json blockstate
+                // facing=east: 0 (default), facing=north: 270, facing=south: 90, facing=west: 180
+                yRotation = switch (facing) {
+                    case NORTH -> 270;
+                    case SOUTH -> 90;
+                    case WEST -> 180;
+                    case EAST -> 0;
+                    default -> 0;
+                };
+            }
+        }
+        
         // Process each element in the model
         for (ModelElement element : model.getElements()) {
-            currentVertex = addModelElement(face, element, model, x, y, z, vertices, indices, currentVertex);
+            currentVertex = addModelElement(face, element, model, x, y, z, yRotation, vertices, indices, currentVertex);
         }
         
         return currentVertex;
@@ -74,11 +93,13 @@ public class TorchGeometryBuilder {
     /**
      * Add a single model element to the mesh.
      * Converts from Minecraft's 0-16 coordinate system to block-relative 0-1 coordinates.
+     * Applies Y-axis rotation if specified.
      */
     private int addModelElement(BlockFaceCollector.FaceData face,
                                  ModelElement element,
                                  BlockModel model,
                                  float blockX, float blockY, float blockZ,
+                                 int yRotation,
                                  FloatList vertices,
                                  IntList indices,
                                  int currentVertex) {
@@ -90,12 +111,31 @@ public class TorchGeometryBuilder {
         }
         
         // Convert from Minecraft's 0-16 coordinate system to 0-1 block-relative coordinates
-        float x0 = blockX + from.get(0) / 16.0f;
-        float y0 = blockY + from.get(1) / 16.0f;
-        float z0 = blockZ + from.get(2) / 16.0f;
-        float x1 = blockX + to.get(0) / 16.0f;
-        float y1 = blockY + to.get(1) / 16.0f;
-        float z1 = blockZ + to.get(2) / 16.0f;
+        // First in local block space (0-1)
+        float localX0 = from.get(0) / 16.0f;
+        float localY0 = from.get(1) / 16.0f;
+        float localZ0 = from.get(2) / 16.0f;
+        float localX1 = to.get(0) / 16.0f;
+        float localY1 = to.get(1) / 16.0f;
+        float localZ1 = to.get(2) / 16.0f;
+        
+        // Apply Y-axis rotation around block center (0.5, 0.5, 0.5)
+        if (yRotation != 0) {
+            float[] rotated0 = rotateY(localX0, localZ0, yRotation);
+            float[] rotated1 = rotateY(localX1, localZ1, yRotation);
+            localX0 = rotated0[0];
+            localZ0 = rotated0[1];
+            localX1 = rotated1[0];
+            localZ1 = rotated1[1];
+        }
+        
+        // Now add block position offset
+        float x0 = blockX + localX0;
+        float y0 = blockY + localY0;
+        float z0 = blockZ + localZ0;
+        float x1 = blockX + localX1;
+        float y1 = blockY + localY1;
+        float z1 = blockZ + localZ1;
         
         Map<String, ModelElement.ElementFace> faces = element.getFaces();
         if (faces == null) {
@@ -251,6 +291,8 @@ public class TorchGeometryBuilder {
     
     /**
      * Resolve texture path from model textures.
+     * Converts from model format (e.g., "mattmc:block/torch") to file path format
+     * (e.g., "assets/textures/block/torch.png") for texture atlas lookup.
      */
     private String resolveTexturePath(BlockModel model) {
         if (model.getTextures() == null) {
@@ -266,7 +308,18 @@ public class TorchGeometryBuilder {
             texture = model.getTexture("all");
         }
         
-        return texture;
+        if (texture == null) {
+            return null;
+        }
+        
+        // Convert from model format to file path format
+        // "mattmc:block/torch" -> "assets/textures/block/torch.png"
+        if (texture.contains(":")) {
+            String[] parts = texture.split(":", 2);
+            texture = parts[1];  // Use just the path part (e.g., "block/torch")
+        }
+        
+        return "assets/textures/" + texture + ".png";
     }
     
     /**
@@ -281,6 +334,43 @@ public class TorchGeometryBuilder {
         // We'll use a simple approach: query the texture atlas directly
         return uvMapper.getTextureAtlas() != null ? 
                uvMapper.getTextureAtlas().getUVMapping(texturePath) : null;
+    }
+    
+    /**
+     * Rotate a point around the Y-axis (around block center at 0.5, 0.5).
+     * @param x X coordinate in block-local space (0-1)
+     * @param z Z coordinate in block-local space (0-1)
+     * @param degrees Rotation angle in degrees (90, 180, 270)
+     * @return Rotated [x, z] coordinates
+     */
+    private float[] rotateY(float x, float z, int degrees) {
+        // Translate to origin (block center is at 0.5, 0.5)
+        float cx = x - 0.5f;
+        float cz = z - 0.5f;
+        
+        // Rotate around origin
+        float rotatedX, rotatedZ;
+        switch (degrees) {
+            case 90 -> {
+                rotatedX = -cz;
+                rotatedZ = cx;
+            }
+            case 180 -> {
+                rotatedX = -cx;
+                rotatedZ = -cz;
+            }
+            case 270 -> {
+                rotatedX = cz;
+                rotatedZ = -cx;
+            }
+            default -> {
+                rotatedX = cx;
+                rotatedZ = cz;
+            }
+        }
+        
+        // Translate back
+        return new float[]{rotatedX + 0.5f, rotatedZ + 0.5f};
     }
     
     /**
