@@ -27,6 +27,7 @@ public class MeshBuilder {
     private final VertexLightSampler lightSampler;
     private final UVMapper uvMapper;
     private final StairsGeometryBuilder stairsBuilder;
+    private final TorchGeometryBuilder torchBuilder;
     
     /**
      * Create a mesh builder with optional texture atlas support.
@@ -37,6 +38,7 @@ public class MeshBuilder {
         this.lightSampler = new VertexLightSampler();
         this.uvMapper = new UVMapper(textureAtlas);
         this.stairsBuilder = new StairsGeometryBuilder(lightSampler, uvMapper);
+        this.torchBuilder = new TorchGeometryBuilder(lightSampler, uvMapper);
     }
     
     /**
@@ -81,6 +83,13 @@ public class MeshBuilder {
                 if ("stairs".equals(face.faceType)) {
                     // Add stairs geometry instead of regular face, passing blockstate and face for lighting
                     currentVertex = stairsBuilder.addStairsGeometry(face, vertices, indices, currentVertex);
+                    continue;
+                }
+                
+                // Check if this is a torch block (special marker)
+                if ("torch".equals(face.faceType)) {
+                    // Add torch geometry from JSON model
+                    currentVertex = torchBuilder.addTorchGeometry(face, vertices, indices, currentVertex);
                     continue;
                 }
                 
