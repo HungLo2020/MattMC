@@ -100,6 +100,18 @@ public class ItemRenderer {
         glEnable(GL_BLEND);
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
         
+        // Extract rotation from display.gui.rotation if available (JSON model data-driven)
+        float xRotation = 30f;  // Default X rotation for isometric view
+        float yRotation = -45f; // Default Y rotation for isometric view
+        
+        if (itemModel != null && itemModel.getDisplay() != null) {
+            ModelDisplay.Transform guiTransform = itemModel.getDisplay().get("gui");
+            if (guiTransform != null && guiTransform.getRotation() != null && guiTransform.getRotation().size() >= 2) {
+                xRotation = guiTransform.getRotation().get(0);
+                yRotation = guiTransform.getRotation().get(1);
+            }
+        }
+        
         // Render all quads from the baked model in back-to-front order
         // Painter's algorithm for isometric view: back faces first, front faces last
         // From isometric view (Y=-45°, X=30°), we see: right (EAST), front (NORTH), top (UP)
@@ -109,27 +121,27 @@ public class ItemRenderer {
             // Render back/bottom faces first (most occluded)
             for (BakedQuad quad : quads) {
                 if (quad.getFace() == BakedQuad.Direction.DOWN) {   // Bottom face - render first
-                    renderQuad2D(quad, itemModel, x, y, size);
+                    renderQuad2D(quad, itemModel, x, y, size, xRotation, yRotation);
                 }
             }
             // Render back side faces
             for (BakedQuad quad : quads) {
                 if (quad.getFace() == BakedQuad.Direction.SOUTH ||  // Back face
                     quad.getFace() == BakedQuad.Direction.WEST) {   // Back-left face
-                    renderQuad2D(quad, itemModel, x, y, size);
+                    renderQuad2D(quad, itemModel, x, y, size, xRotation, yRotation);
                 }
             }
             // Render front side faces
             for (BakedQuad quad : quads) {
                 if (quad.getFace() == BakedQuad.Direction.NORTH ||  // Front face
                     quad.getFace() == BakedQuad.Direction.EAST) {   // Front-right face
-                    renderQuad2D(quad, itemModel, x, y, size);
+                    renderQuad2D(quad, itemModel, x, y, size, xRotation, yRotation);
                 }
             }
             // Render top face LAST (most visible, should occlude everything else)
             for (BakedQuad quad : quads) {
                 if (quad.getFace() == BakedQuad.Direction.UP) {     // Top face - render last!
-                    renderQuad2D(quad, itemModel, x, y, size);
+                    renderQuad2D(quad, itemModel, x, y, size, xRotation, yRotation);
                 }
             }
         } else {
@@ -192,7 +204,7 @@ public class ItemRenderer {
      * Manually projects 3D vertices to 2D, then uses GL_QUADS with glVertex2f.
      * This matches how other UI elements render (HotbarRenderer, UIRenderHelper, etc.)
      */
-    private static void renderQuad2D(BakedQuad quad, BlockModel itemModel, float centerX, float centerY, float size) {
+    private static void renderQuad2D(BakedQuad quad, BlockModel itemModel, float centerX, float centerY, float size, float xRotation, float yRotation) {
         // Load and bind texture
         String texturePath = quad.getTexturePath();
         Texture texture = loadTexture(texturePath);
@@ -247,21 +259,21 @@ public class ItemRenderer {
             y -= 0.5f;
             z -= 0.5f;
             
-            // Apply isometric rotation (30° X-axis, -45° Y-axis default)
-            // Y-axis rotation can be overridden by display.gui.rotation in JSON
-            float rad30 = (float) Math.toRadians(30);
-            float rad45 = (float) Math.toRadians(-45);  // Default -45° for isometric view
+            // Apply rotation from JSON model (data-driven)
+            // X rotation and Y rotation come from display.gui.rotation in the JSON
+            float radX = (float) Math.toRadians(xRotation);
+            float radY = (float) Math.toRadians(yRotation);
             
-            // Rotate around Y-axis by -45° (default)
-            float cos45 = (float) Math.cos(rad45);
-            float sin45 = (float) Math.sin(rad45);
-            float x1 = x * cos45 - z * sin45;
-            float z1 = x * sin45 + z * cos45;
+            // Rotate around Y-axis (uses yRotation from JSON)
+            float cosY = (float) Math.cos(radY);
+            float sinY = (float) Math.sin(radY);
+            float x1 = x * cosY - z * sinY;
+            float z1 = x * sinY + z * cosY;
             
-            // Rotate around X-axis by 30°
-            float cos30 = (float) Math.cos(rad30);
-            float sin30 = (float) Math.sin(rad30);
-            float y1 = y * cos30 - z1 * sin30;
+            // Rotate around X-axis (uses xRotation from JSON)
+            float cosX = (float) Math.cos(radX);
+            float sinX = (float) Math.sin(radX);
+            float y1 = y * cosX - z1 * sinX;
             
             // Scale and project to screen
             // x,y are top-left of the item area, not center
