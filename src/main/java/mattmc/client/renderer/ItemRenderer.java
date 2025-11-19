@@ -112,8 +112,8 @@ public class ItemRenderer {
         
         // Determine face rendering order based on Y rotation
         // For rotations closer to 45° (looking SW to NE): WEST, SOUTH are back
-        // For rotations closer to 135° (looking SE to NW): EAST, SOUTH are back
-        boolean isRotation45 = Math.abs(rotY - 45.0f) < Math.abs(rotY - 135.0f);
+        // For rotations closer to 225° (looking NW to SE): NORTH, WEST are back
+        boolean isRotation45 = Math.abs(rotY - 45.0f) < Math.abs(rotY - 225.0f);
         
         // Render all quads from the baked model in back-to-front order
         List<BakedQuad> quads = bakedModel.getQuads();
@@ -121,8 +121,18 @@ public class ItemRenderer {
             // Render back faces first
             for (BakedQuad quad : quads) {
                 BakedQuad.Direction face = quad.getFace();
-                boolean isBackFace = face == BakedQuad.Direction.DOWN || face == BakedQuad.Direction.SOUTH ||
-                                    (isRotation45 ? face == BakedQuad.Direction.WEST : face == BakedQuad.Direction.EAST);
+                boolean isBackFace;
+                if (isRotation45) {
+                    // 45° rotation: WEST, SOUTH, DOWN are back
+                    isBackFace = face == BakedQuad.Direction.DOWN || 
+                                face == BakedQuad.Direction.SOUTH ||
+                                face == BakedQuad.Direction.WEST;
+                } else {
+                    // 225° rotation: NORTH, WEST, DOWN are back
+                    isBackFace = face == BakedQuad.Direction.DOWN || 
+                                face == BakedQuad.Direction.NORTH ||
+                                face == BakedQuad.Direction.WEST;
+                }
                 if (isBackFace) {
                     renderQuad2D(quad, itemModel, x, y, size, rotX, rotY);
                 }
@@ -130,8 +140,18 @@ public class ItemRenderer {
             // Render front faces second
             for (BakedQuad quad : quads) {
                 BakedQuad.Direction face = quad.getFace();
-                boolean isFrontFace = face == BakedQuad.Direction.UP || face == BakedQuad.Direction.NORTH ||
-                                     (isRotation45 ? face == BakedQuad.Direction.EAST : face == BakedQuad.Direction.WEST);
+                boolean isFrontFace;
+                if (isRotation45) {
+                    // 45° rotation: EAST, NORTH, UP are front
+                    isFrontFace = face == BakedQuad.Direction.UP || 
+                                 face == BakedQuad.Direction.NORTH ||
+                                 face == BakedQuad.Direction.EAST;
+                } else {
+                    // 225° rotation: EAST, SOUTH, UP are front
+                    isFrontFace = face == BakedQuad.Direction.UP || 
+                                 face == BakedQuad.Direction.SOUTH ||
+                                 face == BakedQuad.Direction.EAST;
+                }
                 if (isFrontFace) {
                     renderQuad2D(quad, itemModel, x, y, size, rotX, rotY);
                 }
@@ -252,7 +272,8 @@ public class ItemRenderer {
             z -= 0.5f;
             
             // Apply isometric rotation using values from display transform
-            float radX = (float) Math.toRadians(rotX);
+            // Note: X rotation is negated to look down from above (not up from below)
+            float radX = (float) Math.toRadians(-rotX);
             float radY = (float) Math.toRadians(rotY);
             
             // Rotate around Y-axis
