@@ -118,8 +118,8 @@ public class HotbarRenderer {
                     float slotStartY = hotbarY + 3f * HOTBAR_SCALE; // 3 pixel border at top too
                     
                     float slotX = slotStartX + i * slotSpacing;
-                    // Slots in hotbar are 18x18 pixels, items are 16x16, center in slot
-                    float itemX = slotX + 9f * HOTBAR_SCALE;
+                    // Slots in hotbar are 18x18 pixels, items are 16x16, move left 1 pixel from center
+                    float itemX = slotX + 8f * HOTBAR_SCALE;
                     float itemY = slotStartY + 9f * HOTBAR_SCALE;
                     
                     // Use data-driven rendering with GUI context

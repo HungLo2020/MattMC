@@ -170,8 +170,8 @@ public class InventoryRenderer {
                 // Slot spacing is 18 pixels, items are 16x16, so 1 pixel offset on each side
                 float slotX = guiX + (hotbarX + i * 18f) * GUI_SCALE;
                 float slotY = guiY + hotbarY * GUI_SCALE;
-                // Items are rendered center-based, offset by 1 pixel to center 16px item in 18px slot
-                float itemCenterX = slotX + 9f * GUI_SCALE;
+                // Items are rendered center-based, move left 1 pixel from center
+                float itemCenterX = slotX + 8f * GUI_SCALE;
                 float itemCenterY = slotY + 9f * GUI_SCALE;
                 
                 // Use data-driven rendering with GUI context
@@ -202,8 +202,8 @@ public class InventoryRenderer {
                 // Position item at slot top-left corner
                 float slotX = guiX + (invX + col * 18f) * GUI_SCALE;
                 float slotY = guiY + (invY + row * 18f) * GUI_SCALE;
-                // Items are rendered center-based, offset by 1 pixel to center 16px item in 18px slot
-                float itemCenterX = slotX + 9f * GUI_SCALE;
+                // Items are rendered center-based, move left 1 pixel from center
+                float itemCenterX = slotX + 8f * GUI_SCALE;
                 float itemCenterY = slotY + 9f * GUI_SCALE;
                 
                 // Use data-driven rendering with GUI context
@@ -381,10 +381,10 @@ public class InventoryRenderer {
                     Item item = allItems.get(itemIndex);
                     ItemStack stack = new ItemStack(item, 1);
                     
-                    // Position at slot center (16px items centered in 18px slots)
+                    // Position at slot center, move left 1 pixel
                     float slotX = guiX + startX + col * slotSpacing;
                     float slotY = guiY + startY + row * slotSpacing;
-                    float itemX = slotX + 9f * GUI_SCALE;
+                    float itemX = slotX + 8f * GUI_SCALE;
                     float itemY = slotY + 9f * GUI_SCALE;
                     
                     // Use data-driven rendering for creative inventory
