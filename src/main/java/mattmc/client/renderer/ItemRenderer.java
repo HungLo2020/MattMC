@@ -600,14 +600,15 @@ public class ItemRenderer {
             case GUI:
                 if (isBlockItem) {
                     // Block items in GUI: rotated isometric view, scaled to 16x16
-                    // Move down 5 pixels (in texture coordinates) to align properly
+                    // Move down 6 pixels (in texture coordinates) to align properly
                     transform.setRotation(java.util.Arrays.asList(30f, 225f, 0f));
-                    transform.setTranslation(java.util.Arrays.asList(0f, 5f, 0f));
+                    transform.setTranslation(java.util.Arrays.asList(0f, 6f, 0f));
                     transform.setScale(java.util.Arrays.asList(0.889f, 0.889f, 0.889f)); // 16/18 = 0.889
                 } else {
                     // Flat items in GUI: no rotation, scaled to 16x16
+                    // Move up 1 pixel (in texture coordinates) to align properly
                     transform.setRotation(java.util.Arrays.asList(0f, 0f, 0f));
-                    transform.setTranslation(java.util.Arrays.asList(0f, 0f, 0f));
+                    transform.setTranslation(java.util.Arrays.asList(0f, -1f, 0f));
                     transform.setScale(java.util.Arrays.asList(0.889f, 0.889f, 0.889f)); // 16/18 = 0.889
                 }
                 break;
