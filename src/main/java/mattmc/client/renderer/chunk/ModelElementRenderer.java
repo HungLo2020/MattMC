@@ -287,12 +287,26 @@ public class ModelElementRenderer {
      * Recursively resolves if the resolved value is also a variable.
      */
     private String resolveTexture(String textureRef, BlockModel model) {
+        return resolveTexture(textureRef, model, new java.util.HashSet<>());
+    }
+    
+    /**
+     * Resolve a texture reference with circular reference protection.
+     */
+    private String resolveTexture(String textureRef, BlockModel model, java.util.Set<String> visited) {
         if (!textureRef.startsWith("#")) {
             return textureRef; // Already a direct reference
         }
         
         // Resolve variable (e.g., "#torch" -> actual path)
         String varName = textureRef.substring(1);
+        
+        // Check for circular reference
+        if (visited.contains(varName)) {
+            System.err.println("Warning: Circular texture variable reference detected for #" + varName);
+            return null;
+        }
+        
         Map<String, String> textures = model.getTextures();
         if (textures != null) {
             String resolved = textures.get(varName);
@@ -302,9 +316,12 @@ public class ModelElementRenderer {
                 return null;
             }
             
+            // Add to visited set before recursing
+            visited.add(varName);
+            
             // Recursively resolve if the resolved value is also a variable
             if (resolved.startsWith("#")) {
-                return resolveTexture(resolved, model);
+                return resolveTexture(resolved, model, visited);
             }
             
             return resolved;
