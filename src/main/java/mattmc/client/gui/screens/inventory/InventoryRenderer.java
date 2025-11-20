@@ -156,10 +156,9 @@ public class InventoryRenderer {
         
         // Item size calculation:
         // - Slot texture is 18x18 pixels in the PNG
-        // - At GUI_SCALE=3.0, slot is 54 pixels on screen
-        // - Items are now scaled to 18x18 at texture scale (same as slots)
-        // - At screen scale: 18*3 = 54 pixels, half = 27 pixels
-        float itemSize = 27f;
+        // - Items are 16x16 pixels at texture scale
+        // - At GUI_SCALE=3.0: 16*3 = 48 pixels on screen, half = 24 pixels
+        float itemSize = 24f;
         
         // Draw items in hotbar (slots 0-8)
         float hotbarX = 8f;
@@ -168,10 +167,10 @@ public class InventoryRenderer {
             ItemStack stack = inventory.getStack(i);
             if (stack != null && stack.getItem() != null) {
                 // Position item at slot top-left corner
-                // Slot spacing is 18 pixels, items are now same size as slots
+                // Slot spacing is 18 pixels, items are 16x16, so 1 pixel offset on each side
                 float slotX = guiX + (hotbarX + i * 18f) * GUI_SCALE;
                 float slotY = guiY + hotbarY * GUI_SCALE;
-                // Items are rendered center-based, so add half the slot size to get to center
+                // Items are rendered center-based, offset by 1 pixel to center 16px item in 18px slot
                 float itemCenterX = slotX + 9f * GUI_SCALE;
                 float itemCenterY = slotY + 9f * GUI_SCALE;
                 
@@ -203,7 +202,7 @@ public class InventoryRenderer {
                 // Position item at slot top-left corner
                 float slotX = guiX + (invX + col * 18f) * GUI_SCALE;
                 float slotY = guiY + (invY + row * 18f) * GUI_SCALE;
-                // Items are rendered center-based, so add half the slot size to get to center
+                // Items are rendered center-based, offset by 1 pixel to center 16px item in 18px slot
                 float itemCenterX = slotX + 9f * GUI_SCALE;
                 float itemCenterY = slotY + 9f * GUI_SCALE;
                 
@@ -368,8 +367,8 @@ public class InventoryRenderer {
     }
     
     private void renderCreativeItems(List<Item> allItems, int scrollRow, float guiX, float guiY) {
-        // Item size: 18 pixels * GUI_SCALE = 54 pixels, half = 27 pixels
-        float itemSize = 27f;
+        // Item size: 16 pixels * GUI_SCALE = 48 pixels, half = 24 pixels
+        float itemSize = 24f;
         float startX = 8f * GUI_SCALE;
         float startY = 18f * GUI_SCALE;
         float slotSpacing = 18f * GUI_SCALE;
@@ -382,7 +381,7 @@ public class InventoryRenderer {
                     Item item = allItems.get(itemIndex);
                     ItemStack stack = new ItemStack(item, 1);
                     
-                    // Position at slot center (no offset needed, items are same size as slots)
+                    // Position at slot center (16px items centered in 18px slots)
                     float slotX = guiX + startX + col * slotSpacing;
                     float slotY = guiY + startY + row * slotSpacing;
                     float itemX = slotX + 9f * GUI_SCALE;

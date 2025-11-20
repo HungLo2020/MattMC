@@ -599,16 +599,16 @@ public class ItemRenderer {
         switch (context) {
             case GUI:
                 if (isBlockItem) {
-                    // Block items in GUI: rotated isometric view, scaled to fit slot
-                    // Items are now 18x18 at texture scale, so we need full scale (1.0)
+                    // Block items in GUI: rotated isometric view, scaled to 16x16
+                    // Move down 5 pixels (in texture coordinates) to align properly
                     transform.setRotation(java.util.Arrays.asList(30f, 225f, 0f));
-                    transform.setTranslation(java.util.Arrays.asList(0f, 0f, 0f));
-                    transform.setScale(java.util.Arrays.asList(1.0f, 1.0f, 1.0f));
+                    transform.setTranslation(java.util.Arrays.asList(0f, 5f, 0f));
+                    transform.setScale(java.util.Arrays.asList(0.889f, 0.889f, 0.889f)); // 16/18 = 0.889
                 } else {
-                    // Flat items in GUI: no rotation, normal scale
+                    // Flat items in GUI: no rotation, scaled to 16x16
                     transform.setRotation(java.util.Arrays.asList(0f, 0f, 0f));
                     transform.setTranslation(java.util.Arrays.asList(0f, 0f, 0f));
-                    transform.setScale(java.util.Arrays.asList(1f, 1f, 1f));
+                    transform.setScale(java.util.Arrays.asList(0.889f, 0.889f, 0.889f)); // 16/18 = 0.889
                 }
                 break;
                 
@@ -689,13 +689,13 @@ public class ItemRenderer {
         float scale = (scaleList != null && !scaleList.isEmpty()) ? scaleList.get(0) : 1.0f;
         float transformedSize = size * scale;
         
-        // Apply translation offset (in screen pixels)
-        // Translation is in 1/16 block units in JSON, convert to pixels for GUI
+        // Apply translation offset
+        // Translation is in texture pixels, scale by GUI_SCALE (3.0) to get screen pixels
         float offsetX = 0f;
         float offsetY = 0f;
         if (translationList != null && translationList.size() >= 2) {
-            offsetX = translationList.get(0);
-            offsetY = translationList.get(1);
+            offsetX = translationList.get(0) * 3.0f; // GUI_SCALE
+            offsetY = translationList.get(1) * 3.0f; // GUI_SCALE
         }
         
         // Check if this is a block item

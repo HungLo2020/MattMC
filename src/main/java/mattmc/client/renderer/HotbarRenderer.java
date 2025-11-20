@@ -99,8 +99,8 @@ public class HotbarRenderer {
             // Synchronize selected slot between HotbarRenderer and player inventory
             selectedHotbarSlot = inventory.getSelectedSlot();
             
-            // Item size: 18 pixels * HOTBAR_SCALE = 54 pixels, half = 27 pixels
-            float itemSize = 27f;
+            // Item size: 16 pixels * HOTBAR_SCALE = 48 pixels, half = 24 pixels
+            float itemSize = 24f;
             
             // Draw each item in the hotbar (slots 0-8)
             for (int i = 0; i < 9; i++) {
@@ -118,7 +118,7 @@ public class HotbarRenderer {
                     float slotStartY = hotbarY + 3f * HOTBAR_SCALE; // 3 pixel border at top too
                     
                     float slotX = slotStartX + i * slotSpacing;
-                    // Slots in hotbar are 18x18 pixels, items are now same size, center in slot
+                    // Slots in hotbar are 18x18 pixels, items are 16x16, center in slot
                     float itemX = slotX + 9f * HOTBAR_SCALE;
                     float itemY = slotStartY + 9f * HOTBAR_SCALE;
                     
