@@ -195,6 +195,9 @@ public class ModelElementRenderer {
         if (texturePath.startsWith("#")) {
             texturePath = resolveTexture(texturePath, model);
             if (texturePath == null) {
+                System.err.println("ERROR: Failed to resolve texture " + textureRef + " for block at " + 
+                                   face.x + "," + face.y + "," + face.z);
+                System.err.println("Model textures: " + (model.getTextures() != null ? model.getTextures() : "null"));
                 return currentVertex;
             }
         }
