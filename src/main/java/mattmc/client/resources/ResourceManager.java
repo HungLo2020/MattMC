@@ -187,13 +187,20 @@ public class ResourceManager {
         // Only resolve what we can - leave unresolvable references as-is for runtime resolution
         Map<String, String> resolvedTextures = new HashMap<>();
         for (Map.Entry<String, String> entry : textures.entrySet()) {
+            String key = entry.getKey();
             String value = entry.getValue();
+            
+            // Skip entries that are the same as their key to avoid self-reference issues
+            if (value.equals("#" + key)) {
+                continue; // Don't add self-referencing entries
+            }
+            
             String resolved = resolveTextureVariable(value, textures);
             // Only update if we actually resolved something (not just returned the original)
             if (resolved != null && !resolved.equals(value)) {
-                resolvedTextures.put(entry.getKey(), resolved);
+                resolvedTextures.put(key, resolved);
             } else {
-                resolvedTextures.put(entry.getKey(), value);
+                resolvedTextures.put(key, value);
             }
         }
         model.setTextures(resolvedTextures);
@@ -220,16 +227,19 @@ public class ResourceManager {
         
         String varName = texture.substring(1);
         
-        // Check for circular reference
-        if (visited.contains(varName)) {
-            System.err.println("Warning: Circular texture variable reference detected for: " + varName);
-            return texture;  // Return as-is to avoid infinite recursion
-        }
-        
+        // Check if the variable exists in the map first
         String resolved = textures.get(varName);
         
         if (resolved == null) {
-            return texture;  // Can't resolve, return as-is
+            // Variable doesn't exist (e.g., parent model references child model's variable)
+            // Return as-is for runtime resolution - this is NOT a circular reference
+            return texture;
+        }
+        
+        // Now check for circular reference (only if variable exists)
+        if (visited.contains(varName)) {
+            System.err.println("Warning: Circular texture variable reference detected for: " + varName);
+            return texture;  // Return as-is to avoid infinite recursion
         }
         
         // Add to visited set before recursing

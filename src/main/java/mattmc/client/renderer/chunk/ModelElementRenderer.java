@@ -304,34 +304,31 @@ public class ModelElementRenderer {
         // Resolve variable (e.g., "#torch" -> actual path)
         String varName = textureRef.substring(1);
         
+        Map<String, String> textures = model.getTextures();
+        if (textures == null || !textures.containsKey(varName)) {
+            // Variable doesn't exist in this model - return original ref unchanged
+            return textureRef;
+        }
+        
+        String resolved = textures.get(varName);
+        if (resolved == null) {
+            return textureRef;
+        }
+        
         // Check for circular reference
         if (visited.contains(varName)) {
-            System.err.println("Warning: Circular texture variable reference detected for #" + varName);
-            return null;
+            return textureRef; // Circular reference - return original
         }
         
-        Map<String, String> textures = model.getTextures();
-        if (textures != null) {
-            String resolved = textures.get(varName);
-            if (resolved == null) {
-                System.err.println("Warning: Could not resolve texture variable #" + varName + " in model");
-                System.err.println("Available textures: " + textures.keySet());
-                return null;
-            }
-            
-            // Add to visited set before recursing
-            visited.add(varName);
-            
-            // Recursively resolve if the resolved value is also a variable
-            if (resolved.startsWith("#")) {
-                return resolveTexture(resolved, model, visited);
-            }
-            
-            return resolved;
+        // Add to visited set before recursing
+        visited.add(varName);
+        
+        // Recursively resolve if the resolved value is also a variable
+        if (resolved.startsWith("#")) {
+            return resolveTexture(resolved, model, visited);
         }
         
-        System.err.println("Warning: Model has no textures map, cannot resolve #" + varName);
-        return null;
+        return resolved;
     }
     
     /**
