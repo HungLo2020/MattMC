@@ -184,10 +184,17 @@ public class ResourceManager {
         
         // Resolve any texture variables in the textures map itself
         // (e.g., "particle": "#side" should become "particle": "block/planks" if "side": "block/planks")
+        // Only resolve what we can - leave unresolvable references as-is for runtime resolution
         Map<String, String> resolvedTextures = new HashMap<>();
         for (Map.Entry<String, String> entry : textures.entrySet()) {
             String value = entry.getValue();
-            resolvedTextures.put(entry.getKey(), resolveTextureVariable(value, textures));
+            String resolved = resolveTextureVariable(value, textures);
+            // Only update if we actually resolved something (not just returned the original)
+            if (resolved != null && !resolved.equals(value)) {
+                resolvedTextures.put(entry.getKey(), resolved);
+            } else {
+                resolvedTextures.put(entry.getKey(), value);
+            }
         }
         model.setTextures(resolvedTextures);
         
