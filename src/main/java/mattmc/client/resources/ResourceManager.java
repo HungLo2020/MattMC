@@ -390,8 +390,20 @@ public class ResourceManager {
             // Check if parent is a block model (e.g., "block/grass_block" or "mattmc:block/stairs")
             if (parentPath.startsWith("block/") || parentPath.contains(":block/")) {
                 parentModel = loadBlockModel(parentPath);
+            } else if (parentPath.startsWith("item/")) {
+                // Parent is an item model with "item/" prefix (e.g., "item/generated")
+                // Strip the "item/" prefix since loadItemModelRaw already adds it
+                String itemModelName = parentPath.substring(5); // Remove "item/" prefix
+                parentModel = resolveItemModel(itemModelName);
+            } else if (parentPath.contains(":item/")) {
+                // Parent is an item model with namespace (e.g., "mattmc:item/generated")
+                // Strip the namespace and "item/" prefix
+                String[] parts = parentPath.split(":item/", 2);
+                if (parts.length == 2) {
+                    parentModel = resolveItemModel(parts[1]);
+                }
             } else {
-                // Try as item model
+                // Try as item model without prefix
                 parentModel = resolveItemModel(parentPath);
             }
             
