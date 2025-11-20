@@ -195,6 +195,12 @@ public class ModelElementRenderer {
             return currentVertex;
         }
         
+        // Strip namespace prefix if present (e.g., "mattmc:block/planks" -> "block/planks")
+        // The texture atlas stores paths without the namespace
+        if (texturePath.contains(":")) {
+            texturePath = texturePath.substring(texturePath.indexOf(':') + 1);
+        }
+        
         // Get UV mapping
         TextureAtlas.UVMapping uvMapping = uvMapper.getUVMappingForTexture(texturePath);
         
