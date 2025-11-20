@@ -306,18 +306,20 @@ public class ModelElementRenderer {
         
         Map<String, String> textures = model.getTextures();
         if (textures == null || !textures.containsKey(varName)) {
-            // Variable doesn't exist in this model - return original ref unchanged
+            // Variable doesn't exist in this model - return textureRef as-is
             return textureRef;
         }
         
         String resolved = textures.get(varName);
         if (resolved == null) {
+            // Resolved to null - return textureRef as-is
             return textureRef;
         }
         
         // Check for circular reference
         if (visited.contains(varName)) {
-            return textureRef; // Circular reference - return original
+            // Circular reference - return textureRef as-is
+            return textureRef;
         }
         
         // Add to visited set before recursing
