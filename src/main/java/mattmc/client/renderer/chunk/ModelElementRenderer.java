@@ -190,9 +190,13 @@ public class ModelElementRenderer {
         }
         
         // Resolve texture variable (e.g., "#torch" -> "block/torch")
-        String texturePath = resolveTexture(textureRef, model);
-        if (texturePath == null) {
-            return currentVertex;
+        // The texture might still be a variable reference, so we need to resolve it
+        String texturePath = textureRef;
+        if (texturePath.startsWith("#")) {
+            texturePath = resolveTexture(texturePath, model);
+            if (texturePath == null) {
+                return currentVertex;
+            }
         }
         
         // Strip namespace prefix if present (e.g., "mattmc:block/planks" -> "block/planks")
@@ -290,9 +294,15 @@ public class ModelElementRenderer {
         String varName = textureRef.substring(1);
         Map<String, String> textures = model.getTextures();
         if (textures != null) {
-            return textures.get(varName);
+            String resolved = textures.get(varName);
+            if (resolved == null) {
+                System.err.println("Warning: Could not resolve texture variable #" + varName + " in model");
+                System.err.println("Available textures: " + textures.keySet());
+            }
+            return resolved;
         }
         
+        System.err.println("Warning: Model has no textures map, cannot resolve #" + varName);
         return null;
     }
     

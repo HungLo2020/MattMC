@@ -167,15 +167,19 @@ public class ResourceManager {
      * Replaces #variable references with actual texture paths.
      * 
      * Example: texture "#side" with textures map {"side": "block/planks"} becomes "block/planks"
+     * 
+     * NOTE: We DON'T resolve texture variables in element faces here because those elements
+     * might be shared from a cached parent model. Instead, ModelElementRenderer resolves
+     * texture variables on-the-fly during rendering using the model's texture map.
      */
     private static void resolveTextureVariables(BlockModel model) {
-        if (model.getTextures() == null || model.getElements() == null) {
+        if (model.getTextures() == null) {
             return;
         }
         
         Map<String, String> textures = model.getTextures();
         
-        // First, resolve any texture variables in the textures map itself
+        // Resolve any texture variables in the textures map itself
         // (e.g., "particle": "#side" should become "particle": "block/planks" if "side": "block/planks")
         Map<String, String> resolvedTextures = new HashMap<>();
         for (Map.Entry<String, String> entry : textures.entrySet()) {
@@ -184,20 +188,8 @@ public class ResourceManager {
         }
         model.setTextures(resolvedTextures);
         
-        // Now resolve texture variables in element faces
-        for (ModelElement element : model.getElements()) {
-            if (element.getFaces() != null) {
-                for (ModelElement.ElementFace face : element.getFaces().values()) {
-                    if (face.getTexture() != null && face.getTexture().startsWith("#")) {
-                        String varName = face.getTexture().substring(1);
-                        String resolved = resolvedTextures.get(varName);
-                        if (resolved != null) {
-                            face.setTexture(resolved);
-                        }
-                    }
-                }
-            }
-        }
+        // DO NOT modify element faces here! They might be shared from a cached parent model.
+        // ModelElementRenderer will resolve texture variables on-the-fly using the model's texture map.
     }
     
     /**
