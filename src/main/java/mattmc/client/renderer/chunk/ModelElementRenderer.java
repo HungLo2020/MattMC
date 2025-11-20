@@ -194,6 +194,7 @@ public class ModelElementRenderer {
         String texturePath = textureRef;
         if (texturePath.startsWith("#")) {
             texturePath = resolveTexture(texturePath, model);
+            System.out.println("DEBUG: Resolved " + textureRef + " -> " + texturePath);
             if (texturePath == null) {
                 System.err.println("ERROR: Failed to resolve texture " + textureRef + " for block at " + 
                                    face.x + "," + face.y + "," + face.z);
@@ -205,11 +206,15 @@ public class ModelElementRenderer {
         // Strip namespace prefix if present (e.g., "mattmc:block/planks" -> "block/planks")
         // The texture atlas stores paths without the namespace
         if (texturePath.contains(":")) {
+            String before = texturePath;
             texturePath = texturePath.substring(texturePath.indexOf(':') + 1);
+            System.out.println("DEBUG: Stripped namespace " + before + " -> " + texturePath);
         }
         
         // Get UV mapping
+        System.out.println("DEBUG: Looking up UV mapping for: " + texturePath);
         TextureAtlas.UVMapping uvMapping = uvMapper.getUVMappingForTexture(texturePath);
+        System.out.println("DEBUG: UV mapping result: " + (uvMapping != null ? "found" : "NULL"));
         
         // Get UV coordinates from element face (in 0-16 space)
         List<Float> uvList = elementFace.getUv();
