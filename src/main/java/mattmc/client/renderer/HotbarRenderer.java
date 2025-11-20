@@ -114,8 +114,15 @@ public class HotbarRenderer {
                     float itemY = hotbarCenterY + slotCenterOffset;
                     
                     // Render the item using ItemRenderer (increased size: 16 * 1.2 * 1.1 = 21.12)
+                    // Use data-driven rendering with GUI context
                     float itemSize = 21.12f;
-                    ItemRenderer.renderItem(stack, itemX, itemY, itemSize);
+                    ItemRenderer.renderItemWithTransform(
+                        stack, 
+                        mattmc.client.renderer.item.ItemDisplayContext.GUI, 
+                        itemX, 
+                        itemY, 
+                        itemSize
+                    );
                     
                     // Draw item count in bottom-right of slot if > 1
                     if (stack.getCount() > 1) {
