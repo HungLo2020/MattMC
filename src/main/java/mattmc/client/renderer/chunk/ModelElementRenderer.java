@@ -204,17 +204,15 @@ public class ModelElementRenderer {
         }
         
         // Strip namespace prefix if present (e.g., "mattmc:block/planks" -> "block/planks")
-        // The texture atlas stores paths without the namespace
         if (texturePath.contains(":")) {
-            String before = texturePath;
             texturePath = texturePath.substring(texturePath.indexOf(':') + 1);
-            System.out.println("DEBUG: Stripped namespace " + before + " -> " + texturePath);
         }
         
+        // Convert to full atlas path format: "block/birch_planks" -> "assets/textures/block/birch_planks.png"
+        String atlasPath = "assets/textures/" + texturePath + ".png";
+        
         // Get UV mapping
-        System.out.println("DEBUG: Looking up UV mapping for: " + texturePath);
-        TextureAtlas.UVMapping uvMapping = uvMapper.getUVMappingForTexture(texturePath);
-        System.out.println("DEBUG: UV mapping result: " + (uvMapping != null ? "found" : "NULL"));
+        TextureAtlas.UVMapping uvMapping = uvMapper.getUVMappingForTexture(atlasPath);
         
         // Get UV coordinates from element face (in 0-16 space)
         List<Float> uvList = elementFace.getUv();
