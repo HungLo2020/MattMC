@@ -599,10 +599,11 @@ public class ItemRenderer {
         switch (context) {
             case GUI:
                 if (isBlockItem) {
-                    // Block items in GUI: rotated isometric view, scaled down
+                    // Block items in GUI: rotated isometric view, scaled to fit slot
+                    // Items are now 18x18 at texture scale, so we need full scale (1.0)
                     transform.setRotation(java.util.Arrays.asList(30f, 225f, 0f));
                     transform.setTranslation(java.util.Arrays.asList(0f, 0f, 0f));
-                    transform.setScale(java.util.Arrays.asList(0.625f, 0.625f, 0.625f));
+                    transform.setScale(java.util.Arrays.asList(1.0f, 1.0f, 1.0f));
                 } else {
                     // Flat items in GUI: no rotation, normal scale
                     transform.setRotation(java.util.Arrays.asList(0f, 0f, 0f));
