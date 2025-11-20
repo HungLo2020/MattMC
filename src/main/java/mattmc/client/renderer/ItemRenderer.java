@@ -240,9 +240,9 @@ public class ItemRenderer {
             y -= 0.5f;
             z -= 0.5f;
             
-            // Apply isometric rotation (30° X-axis, 225° Y-axis default for blocks)
+            // Apply isometric rotation (30° X-axis, 45° Y-axis default)
             float rad30 = (float) Math.toRadians(30);
-            float radY = (customRotY != null) ? (float) Math.toRadians(customRotY) : (float) Math.toRadians(225);
+            float radY = (customRotY != null) ? (float) Math.toRadians(customRotY) : (float) Math.toRadians(45);
             
             // Rotate around Y-axis
             float cosY = (float) Math.cos(radY);
