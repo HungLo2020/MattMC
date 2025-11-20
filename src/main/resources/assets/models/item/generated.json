@@ -1,7 +1,4 @@
 {
-    "textures": {
-        "layer0": "#layer0"
-    },
     "display": {
         "ground": {
             "rotation": [0, 0, 0],
