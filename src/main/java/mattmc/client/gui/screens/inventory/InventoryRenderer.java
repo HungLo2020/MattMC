@@ -154,7 +154,13 @@ public class InventoryRenderer {
         float guiX = (w - texWidth) / 2f + (CONTENT_OFFSET_X * GUI_SCALE);
         float guiY = (h - texHeight) / 2f + (CONTENT_OFFSET_Y * GUI_SCALE);
         
-        float itemSize = 19.2f;
+        // Item size calculation:
+        // - Slot texture is 18x18 pixels in the PNG
+        // - Item texture is 16x16 pixels
+        // - At GUI_SCALE=3.0, slot is 54 pixels on screen
+        // - Item should be 16*3 = 48 pixels to match texture scale
+        // - Half size for rendering (center-based): 48/2 = 24 pixels
+        float itemSize = 24f;
         
         // Draw items in hotbar (slots 0-8)
         float hotbarX = 8f;
@@ -162,20 +168,28 @@ public class InventoryRenderer {
         for (int i = 0; i < 9; i++) {
             ItemStack stack = inventory.getStack(i);
             if (stack != null && stack.getItem() != null) {
-                float slotCenterX = guiX + (hotbarX + i * 18f + 8f) * GUI_SCALE;
-                float slotCenterY = guiY + (hotbarY + 8f) * GUI_SCALE;
+                // Position item at slot top-left corner, then offset by 1 pixel (scaled)
+                // Slot spacing is 18 pixels, offset by 1 pixel to center 16x16 item in 18x18 slot
+                float slotX = guiX + (hotbarX + i * 18f) * GUI_SCALE;
+                float slotY = guiY + hotbarY * GUI_SCALE;
+                // Add 1 pixel offset (in PNG coords) scaled to screen coords for centering
+                float itemX = slotX + 1f * GUI_SCALE;
+                float itemY = slotY + 1f * GUI_SCALE;
+                // Items are rendered center-based, so add half the item size to get to center
+                float itemCenterX = itemX + itemSize;
+                float itemCenterY = itemY + itemSize;
                 
                 // Use data-driven rendering with GUI context
                 mattmc.client.renderer.ItemRenderer.renderItemWithTransform(
                     stack, 
                     mattmc.client.renderer.item.ItemDisplayContext.GUI, 
-                    slotCenterX, 
-                    slotCenterY, 
+                    itemCenterX, 
+                    itemCenterY, 
                     itemSize
                 );
                 
                 if (stack.getCount() > 1) {
-                    renderItemCount(stack.getCount(), slotCenterX, slotCenterY, GUI_SCALE, itemSize);
+                    renderItemCount(stack.getCount(), itemCenterX, itemCenterY, GUI_SCALE, itemSize);
                 }
             }
         }
@@ -190,20 +204,27 @@ public class InventoryRenderer {
                 int row = invIndex / 9;
                 int col = invIndex % 9;
                 
-                float slotCenterX = guiX + (invX + col * 18f + 8f) * GUI_SCALE;
-                float slotCenterY = guiY + (invY + row * 18f + 8f) * GUI_SCALE;
+                // Position item at slot top-left corner, then offset by 1 pixel (scaled)
+                float slotX = guiX + (invX + col * 18f) * GUI_SCALE;
+                float slotY = guiY + (invY + row * 18f) * GUI_SCALE;
+                // Add 1 pixel offset (in PNG coords) scaled to screen coords for centering
+                float itemX = slotX + 1f * GUI_SCALE;
+                float itemY = slotY + 1f * GUI_SCALE;
+                // Items are rendered center-based, so add half the item size to get to center
+                float itemCenterX = itemX + itemSize;
+                float itemCenterY = itemY + itemSize;
                 
                 // Use data-driven rendering with GUI context
                 mattmc.client.renderer.ItemRenderer.renderItemWithTransform(
                     stack, 
                     mattmc.client.renderer.item.ItemDisplayContext.GUI, 
-                    slotCenterX, 
-                    slotCenterY, 
+                    itemCenterX, 
+                    itemCenterY, 
                     itemSize
                 );
                 
                 if (stack.getCount() > 1) {
-                    renderItemCount(stack.getCount(), slotCenterX, slotCenterY, GUI_SCALE, itemSize);
+                    renderItemCount(stack.getCount(), itemCenterX, itemCenterY, GUI_SCALE, itemSize);
                 }
             }
         }
@@ -354,7 +375,8 @@ public class InventoryRenderer {
     }
     
     private void renderCreativeItems(List<Item> allItems, int scrollRow, float guiX, float guiY) {
-        float itemSize = 19.2f;
+        // Item size: 16 pixels * GUI_SCALE = 48 pixels, half = 24 pixels
+        float itemSize = 24f;
         float startX = 8f * GUI_SCALE;
         float startY = 18f * GUI_SCALE;
         float slotSpacing = 18f * GUI_SCALE;
@@ -367,12 +389,11 @@ public class InventoryRenderer {
                     Item item = allItems.get(itemIndex);
                     ItemStack stack = new ItemStack(item, 1);
                     
+                    // Position at slot top-left, add 1 pixel offset, then center
                     float slotX = guiX + startX + col * slotSpacing;
                     float slotY = guiY + startY + row * slotSpacing;
-                    // Slots are 16f GUI units = 48 screen pixels, center is at 24 pixels from top-left
-                    float slotSizeScreen = 16f * GUI_SCALE;
-                    float itemX = slotX + (slotSizeScreen / 2f);
-                    float itemY = slotY + (slotSizeScreen / 2f);
+                    float itemX = slotX + 1f * GUI_SCALE + itemSize;
+                    float itemY = slotY + 1f * GUI_SCALE + itemSize;
                     
                     // Use data-driven rendering for creative inventory
                     mattmc.client.renderer.ItemRenderer.renderItemWithTransform(

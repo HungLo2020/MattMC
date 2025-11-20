@@ -99,23 +99,30 @@ public class HotbarRenderer {
             // Synchronize selected slot between HotbarRenderer and player inventory
             selectedHotbarSlot = inventory.getSelectedSlot();
             
+            // Item size: 16 pixels * HOTBAR_SCALE = 48 pixels, half = 24 pixels
+            float itemSize = 24f;
+            
             // Draw each item in the hotbar (slots 0-8)
             for (int i = 0; i < 9; i++) {
                 mattmc.world.item.ItemStack stack = inventory.getStack(i);
                 if (stack != null && stack.getItem() != null) {
                     // Calculate position for this slot
-                    float slotWidth = (hotbarTexture.width * HOTBAR_SCALE) / 9f;
-                    float itemX = hotbarX + (i * slotWidth) + (slotWidth / 2f); // Center item in slot horizontally
+                    // Hotbar texture is 182 pixels wide in PNG, divided into 9 slots
+                    // Each slot is approximately 20.22 pixels wide in PNG
+                    // Slot spacing is 20 pixels per slot
+                    float slotSpacing = 20f * HOTBAR_SCALE;
                     
-                    // Calculate vertical center of the actual slot (not just hotbar texture)
-                    // Hotbar slots have padding/border, so the slot center is below the texture center
-                    float hotbarCenterY = hotbarY + (hotbarTexture.height * HOTBAR_SCALE / 2f);
-                    float slotCenterOffset = 19f; // Offset to center in the actual slot area
-                    float itemY = hotbarCenterY + slotCenterOffset;
+                    // Position at slot top-left, add offset for centering
+                    // First slot starts at x=3 in the hotbar texture (3 pixel border)
+                    float slotStartX = hotbarX + 3f * HOTBAR_SCALE;
+                    float slotStartY = hotbarY + 3f * HOTBAR_SCALE; // 3 pixel border at top too
                     
-                    // Render the item using ItemRenderer (increased size: 16 * 1.2 * 1.1 = 21.12)
+                    float slotX = slotStartX + i * slotSpacing;
+                    // Slots in hotbar are 18x18 pixels, items are 16x16, so 1 pixel offset
+                    float itemX = slotX + 1f * HOTBAR_SCALE + itemSize;
+                    float itemY = slotStartY + 1f * HOTBAR_SCALE + itemSize;
+                    
                     // Use data-driven rendering with GUI context
-                    float itemSize = 21.12f;
                     ItemRenderer.renderItemWithTransform(
                         stack, 
                         mattmc.client.renderer.item.ItemDisplayContext.GUI, 
@@ -127,8 +134,8 @@ public class HotbarRenderer {
                     // Draw item count in bottom-right of slot if > 1
                     if (stack.getCount() > 1) {
                         String countText = String.valueOf(stack.getCount());
-                        float countX = hotbarX + ((i + 1) * slotWidth) - 20; // Bottom-right corner
-                        float countY = hotbarY + (hotbarTexture.height * HOTBAR_SCALE) - 15;
+                        float countX = slotX + slotSpacing - 20; // Bottom-right corner
+                        float countY = slotStartY + 18f * HOTBAR_SCALE - 15;
                         UIRenderHelper.drawText(countText, countX, countY, 1.0f, 0xFFFFFF);
                     }
                 }

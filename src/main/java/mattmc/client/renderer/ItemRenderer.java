@@ -168,6 +168,8 @@ public class ItemRenderer {
     /**
      * Render an isometric cube showing three faces (west, north, and top).
      * Uses the actual in-game 3D block geometry projected to 2D isometric view.
+     * 
+     * @param size Half-width for the isometric projection
      */
     private static void renderIsometricCube(Map<String, String> texturePaths, mattmc.client.resources.model.BlockModel itemModel, float x, float y, float size) {
         // Get textures for each face
@@ -186,6 +188,7 @@ public class ItemRenderer {
         glEnable(GL_TEXTURE_2D);
         
         // Define scale for isometric projection
+        // size is the half-width, so double it for the full scale
         float scale = size * 2.0f;
         float isoWidth = scale * 0.5f;
         float isoHeight = scale * 0.5f;
@@ -487,6 +490,11 @@ public class ItemRenderer {
     
     /**
      * Render a texture as a flat 2D square.
+     * 
+     * @param texturePath Path to the texture
+     * @param x Center X coordinate
+     * @param y Center Y coordinate
+     * @param size Half-width/height of the item (item will be rendered as 2*size x 2*size)
      */
     private static void renderTextureAsFlat(String texturePath, float x, float y, float size) {
         Texture texture = loadTexture(texturePath);
@@ -502,8 +510,8 @@ public class ItemRenderer {
         texture.bind();
         glColor4f(1f, 1f, 1f, 1f);
         
-        // Scale flat items to match the visual size of isometric block items
-        // Isometric blocks have a diamond width of 2*size, so we scale flat items by 2x
+        // Render item centered at (x, y) with full size
+        // size parameter is the half-width, so total size is 2*size
         float halfSize = size;
         
         glBegin(GL_QUADS);
@@ -673,10 +681,21 @@ public class ItemRenderer {
             return;
         }
         
-        // Apply transform scale to size
+        // Apply transform scale and translation
         java.util.List<Float> scaleList = transform.getScale();
+        java.util.List<Float> translationList = transform.getTranslation();
+        
         float scale = (scaleList != null && !scaleList.isEmpty()) ? scaleList.get(0) : 1.0f;
         float transformedSize = size * scale;
+        
+        // Apply translation offset (in screen pixels)
+        // Translation is in 1/16 block units in JSON, convert to pixels for GUI
+        float offsetX = 0f;
+        float offsetY = 0f;
+        if (translationList != null && translationList.size() >= 2) {
+            offsetX = translationList.get(0);
+            offsetY = translationList.get(1);
+        }
         
         // Check if this is a block item
         boolean isBlockItem = texturePaths.containsKey("all") || texturePaths.containsKey("top") || 
@@ -686,9 +705,9 @@ public class ItemRenderer {
             // For block items, use isometric rendering with scaled size
             boolean isStairs = model.getOriginalParent() != null && model.getOriginalParent().contains("stairs");
             if (isStairs) {
-                renderIsometricStairs(texturePaths, model, x, y, transformedSize);
+                renderIsometricStairs(texturePaths, model, x + offsetX, y + offsetY, transformedSize);
             } else {
-                renderIsometricCube(texturePaths, model, x, y, transformedSize);
+                renderIsometricCube(texturePaths, model, x + offsetX, y + offsetY, transformedSize);
             }
         } else {
             // For flat items, render as 2D
@@ -698,9 +717,9 @@ public class ItemRenderer {
             }
             
             if (texturePath != null) {
-                renderTextureAsFlat(texturePath, x, y, transformedSize);
+                renderTextureAsFlat(texturePath, x + offsetX, y + offsetY, transformedSize);
             } else {
-                renderFallbackItem(x, y, transformedSize);
+                renderFallbackItem(x + offsetX, y + offsetY, transformedSize);
             }
         }
     }
