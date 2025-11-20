@@ -284,6 +284,7 @@ public class ModelElementRenderer {
     
     /**
      * Resolve texture variable reference to actual texture path.
+     * Recursively resolves if the resolved value is also a variable.
      */
     private String resolveTexture(String textureRef, BlockModel model) {
         if (!textureRef.startsWith("#")) {
@@ -298,7 +299,14 @@ public class ModelElementRenderer {
             if (resolved == null) {
                 System.err.println("Warning: Could not resolve texture variable #" + varName + " in model");
                 System.err.println("Available textures: " + textures.keySet());
+                return null;
             }
+            
+            // Recursively resolve if the resolved value is also a variable
+            if (resolved.startsWith("#")) {
+                return resolveTexture(resolved, model);
+            }
+            
             return resolved;
         }
         
