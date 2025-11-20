@@ -13,6 +13,9 @@ import com.google.gson.JsonParseException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.HashSet;
+import java.util.Set;
+
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -197,20 +200,37 @@ public class ResourceManager {
      * Recursively follows variable chains (e.g., #particle -> #side -> block/planks).
      */
     private static String resolveTextureVariable(String texture, Map<String, String> textures) {
+        return resolveTextureVariable(texture, textures, new HashSet<>());
+    }
+    
+    /**
+     * Resolve a single texture variable reference with circular reference protection.
+     */
+    private static String resolveTextureVariable(String texture, Map<String, String> textures, Set<String> visited) {
         if (texture == null || !texture.startsWith("#")) {
             return texture;
         }
         
         String varName = texture.substring(1);
+        
+        // Check for circular reference
+        if (visited.contains(varName)) {
+            System.err.println("Warning: Circular texture variable reference detected for: " + varName);
+            return texture;  // Return as-is to avoid infinite recursion
+        }
+        
         String resolved = textures.get(varName);
         
         if (resolved == null) {
             return texture;  // Can't resolve, return as-is
         }
         
+        // Add to visited set before recursing
+        visited.add(varName);
+        
         // Recursively resolve if the resolved value is also a variable
         if (resolved.startsWith("#")) {
-            return resolveTextureVariable(resolved, textures);
+            return resolveTextureVariable(resolved, textures, visited);
         }
         
         return resolved;
