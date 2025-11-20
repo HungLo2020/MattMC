@@ -65,26 +65,16 @@ public class BlockFaceCollector {
      */
     public void collectBlockFaces(float x, float y, float z, Block block, LevelChunk chunk, 
                                   int cx, int cy, int cz) {
-        // Check if this block uses custom rendering (e.g., stairs, torch)
+        // Check if this block uses custom rendering (model elements from JSON)
         if (block.hasCustomRendering()) {
-            // Determine the type of custom rendering based on block class
+            // Use data-driven rendering: read geometry from JSON model elements
             // Get the blockstate for this position
             mattmc.world.level.block.state.BlockState state = chunk.getBlockState(cx, cy, cz);
             int color = 0xFFFFFF;
             
-            // Determine marker type based on block instance
-            String markerType;
-            if (block instanceof mattmc.world.level.block.TorchBlock) {
-                markerType = "torch";
-            } else if (block instanceof mattmc.world.level.block.StairsBlock) {
-                markerType = "stairs";
-            } else {
-                // Default to stairs for unknown custom rendering blocks
-                markerType = "stairs";
-            }
-            
-            // Add to topFaces with a special marker, storing blockstate in the FaceData
-            topFaces.add(new FaceData(x, y, z, color, 1f, 1f, block, markerType, null, state, chunk, cx, cy, cz));
+            // Add to topFaces with "model_elements" marker for data-driven rendering
+            // The ModelElementRenderer will read geometry from the block's JSON model
+            topFaces.add(new FaceData(x, y, z, color, 1f, 1f, block, "model_elements", null, state, chunk, cx, cy, cz));
             return;
         }
         

@@ -26,8 +26,7 @@ public class MeshBuilder {
     private int currentVertex = 0;
     private final VertexLightSampler lightSampler;
     private final UVMapper uvMapper;
-    private final StairsGeometryBuilder stairsBuilder;
-    private final TorchGeometryBuilder torchBuilder;
+    private final ModelElementRenderer modelElementRenderer;
     
     /**
      * Create a mesh builder with optional texture atlas support.
@@ -37,8 +36,7 @@ public class MeshBuilder {
     public MeshBuilder(TextureAtlas textureAtlas) {
         this.lightSampler = new VertexLightSampler();
         this.uvMapper = new UVMapper(textureAtlas);
-        this.stairsBuilder = new StairsGeometryBuilder(lightSampler, uvMapper);
-        this.torchBuilder = new TorchGeometryBuilder(lightSampler, uvMapper);
+        this.modelElementRenderer = new ModelElementRenderer(lightSampler, uvMapper);
     }
     
     /**
@@ -79,17 +77,10 @@ public class MeshBuilder {
             for (int j = 0; j < faces.size(); j++) {
                 BlockFaceCollector.FaceData face = faces.get(j);
                 
-                // Check if this is a stairs block (special marker)
-                if ("stairs".equals(face.faceType)) {
-                    // Add stairs geometry instead of regular face, passing blockstate and face for lighting
-                    currentVertex = stairsBuilder.addStairsGeometry(face, vertices, indices, currentVertex);
-                    continue;
-                }
-                
-                // Check if this is a torch block (special marker)
-                if ("torch".equals(face.faceType)) {
-                    // Add torch geometry from JSON model
-                    currentVertex = torchBuilder.addTorchGeometry(face, vertices, indices, currentVertex);
+                // Check if this block uses model elements (data-driven geometry)
+                if ("model_elements".equals(face.faceType)) {
+                    // Render geometry from JSON model elements (data-driven)
+                    currentVertex = modelElementRenderer.renderModelElements(face, vertices, indices, currentVertex);
                     continue;
                 }
                 
