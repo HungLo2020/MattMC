@@ -268,6 +268,10 @@ public class ModelElementRenderer {
             uv[3] = uvList.get(3);
         }
         
+        // Get the per-face rotation from the model (0, 90, 180, or 270)
+        Integer faceRotation = elementFace.getRotation();
+        int faceRotDegrees = (faceRotation != null) ? faceRotation : 0;
+        
         // Apply UV rotation if uvlock is enabled and block is rotated
         // UVlock keeps textures aligned with world axes by counter-rotating UVs
         if (uvlock && (xRotation != 0 || yRotation != 0)) {
@@ -316,21 +320,9 @@ public class ModelElementRenderer {
             faceVerts[i][2] += blockZ;
         }
         
-        // Fix UV mapping for west/east faces - Minecraft's model format expects
-        // U to map to Z axis and V to map to Y axis, but our vertex order has them swapped
-        // So we need to swap the UV coordinates for these faces
-        float finalU0 = u0, finalV0 = v0, finalU1 = u1, finalV1 = v1;
-        if (faceDirection.equals("west") || faceDirection.equals("east")) {
-            // Swap U and V coordinates
-            finalU0 = v0;
-            finalV0 = u0;
-            finalU1 = v1;
-            finalV1 = u1;
-        }
-        
-        // Render the face with rotated vertices
-        currentVertex = addFaceQuadWithVertices(face, faceVerts, faceNormal, finalU0, finalV0, finalU1, finalV1, 
-                                                vertices, indices, currentVertex);
+        // Render the face with rotated vertices, passing the face rotation from the model
+        currentVertex = addFaceQuadWithVertices(face, faceVerts, faceNormal, u0, v0, u1, v1, 
+                                                faceRotDegrees, vertices, indices, currentVertex);
         
         return currentVertex;
     }
@@ -532,12 +524,6 @@ public class ModelElementRenderer {
             uv = rotateUVClockwise(uv, -xDegrees);
         }
         
-        // For vertical faces (north/south/east/west), apply 90° rotation to correct plank orientation
-        // This is needed because the model's UVs are set up for a specific orientation
-        if (face.equals("north") || face.equals("south") || face.equals("west") || face.equals("east")) {
-            uv = rotateUVClockwise(uv, 90);
-        }
-        
         return uv;
     }
     
@@ -664,11 +650,13 @@ public class ModelElementRenderer {
     
     /**
      * Add a face quad with pre-computed vertices and normal.
+     * Applies per-face UV rotation as specified in the model.
      */
     private int addFaceQuadWithVertices(BlockFaceCollector.FaceData face,
                                         float[][] faceVerts,
                                         float[] normal,
                                         float u0, float v0, float u1, float v1,
+                                        int faceRotation,
                                         FloatList vertices,
                                         IntList indices,
                                         int currentVertex) {
@@ -689,12 +677,24 @@ public class ModelElementRenderer {
         float[] light2 = lightSampler.sampleVertexLight(face, faceIndex, 2);
         float[] light3 = lightSampler.sampleVertexLight(face, faceIndex, 3);
         
-        // Add 4 vertices for the quad
+        // Apply per-face UV rotation by shifting which vertex gets which UV coordinate
+        // This follows Minecraft's BlockFaceUV logic where rotation shifts the vertex index
+        // Rotation is applied counter-clockwise: 0°, 90°, 180°, 270°
+        float[][] uvCoords = new float[4][2];
+        uvCoords[0] = new float[]{u0, v0};
+        uvCoords[1] = new float[]{u0, v1};
+        uvCoords[2] = new float[]{u1, v1};
+        uvCoords[3] = new float[]{u1, v0};
+        
+        // Shift UV assignment based on rotation (in 90-degree increments)
+        int rotationSteps = (faceRotation / 90) % 4;
+        
+        // Add 4 vertices for the quad with rotated UV assignment
         int baseVertex = currentVertex;
-        addVertex(vertices, faceVerts[0], u0, v0, normal, light0);
-        addVertex(vertices, faceVerts[1], u0, v1, normal, light1);
-        addVertex(vertices, faceVerts[2], u1, v1, normal, light2);
-        addVertex(vertices, faceVerts[3], u1, v0, normal, light3);
+        addVertex(vertices, faceVerts[0], uvCoords[(0 + rotationSteps) % 4][0], uvCoords[(0 + rotationSteps) % 4][1], normal, light0);
+        addVertex(vertices, faceVerts[1], uvCoords[(1 + rotationSteps) % 4][0], uvCoords[(1 + rotationSteps) % 4][1], normal, light1);
+        addVertex(vertices, faceVerts[2], uvCoords[(2 + rotationSteps) % 4][0], uvCoords[(2 + rotationSteps) % 4][1], normal, light2);
+        addVertex(vertices, faceVerts[3], uvCoords[(3 + rotationSteps) % 4][0], uvCoords[(3 + rotationSteps) % 4][1], normal, light3);
         
         // Add 2 triangles (6 indices)
         indices.add(baseVertex);
