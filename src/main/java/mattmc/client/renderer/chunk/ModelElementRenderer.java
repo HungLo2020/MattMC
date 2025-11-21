@@ -321,9 +321,18 @@ public class ModelElementRenderer {
             faceVerts[i][2] += blockZ;
         }
         
-        // Render the face with rotated vertices, passing the face rotation from the model
+        // Adjust face rotation to compensate for block Y-axis rotation
+        // When block rotates, we need to counter-rotate the UV assignment to maintain correct orientation
+        // Y rotation rotates horizontal faces, so we need to adjust their UV rotation inversely
+        int adjustedFaceRotation = faceRotDegrees;
+        if (yRotation != 0 && !faceDirection.equals("up") && !faceDirection.equals("down")) {
+            // For vertical faces (N/S/E/W), counter-rotate by the negative of Y rotation
+            adjustedFaceRotation = (faceRotDegrees - yRotation + 360) % 360;
+        }
+        
+        // Render the face with rotated vertices, passing the adjusted face rotation
         currentVertex = addFaceQuadWithVertices(face, faceVerts, faceNormal, u0, v0, u1, v1, 
-                                                faceRotDegrees, vertices, indices, currentVertex);
+                                                adjustedFaceRotation, vertices, indices, currentVertex);
         
         return currentVertex;
     }
