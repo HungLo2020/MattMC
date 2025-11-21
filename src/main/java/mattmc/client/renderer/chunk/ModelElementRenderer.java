@@ -532,13 +532,6 @@ public class ModelElementRenderer {
             uv = rotateUVClockwise(uv, -xDegrees);
         }
         
-        // Special fix for west and east faces: the model's UV mapping has U along Y and V along Z,
-        // but for plank textures to appear horizontal, we need to rotate -90° (counter-clockwise)
-        // This swaps the mapping so U goes along Z (horizontal) and V along Y (vertical)
-        if (face.equals("west") || face.equals("east")) {
-            uv = rotateUVClockwise(uv, -90);
-        }
-        
         return uv;
     }
     
@@ -760,9 +753,15 @@ public class ModelElementRenderer {
                 {x0, y0, z1}, {x1, y0, z1}, {x1, y1, z1}, {x0, y1, z1}
             };
             case "west" -> new float[][]{
-                {x0, y0, z0}, {x0, y0, z1}, {x0, y1, z1}, {x0, y1, z0}
+                // West face (x=x0): For Minecraft UV mapping, u maps Z axis, v maps Y axis
+                // V0→V1: V changes (v0→v1), so must be along Y axis
+                // V0→V3: U changes (u0→u1), so must be along Z axis
+                // Therefore: V0=bottom-north, V1=top-north, V2=top-south, V3=bottom-south
+                {x0, y0, z0}, {x0, y1, z0}, {x0, y1, z1}, {x0, y0, z1}
             };
             case "east" -> new float[][]{
+                // East face (x=x1): For Minecraft UV mapping, u maps Z axis, v maps Y axis  
+                // Same logic: V0=bottom-north, V1=top-north, V2=top-south, V3=bottom-south
                 {x1, y0, z0}, {x1, y1, z0}, {x1, y1, z1}, {x1, y0, z1}
             };
             default -> new float[][]{
