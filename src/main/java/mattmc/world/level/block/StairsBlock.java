@@ -71,17 +71,17 @@ public class StairsBlock extends Block {
         mattmc.world.level.block.state.BlockState state = new mattmc.world.level.block.state.BlockState();
         
         // Determine facing based on player's horizontal direction
-        // Stairs should face toward the player (ascend in the player's direction)
+        // Stairs face away from the player (the player climbs up toward the block)
         float dx = playerX - (blockX + 0.5f);
         float dz = playerZ - (blockZ + 0.5f);
         
         Direction facing;
         if (Math.abs(dx) > Math.abs(dz)) {
-            // Player is more to the east or west - stairs face toward player
-            facing = dx > 0 ? Direction.EAST : Direction.WEST;
+            // Player is more to the east or west
+            facing = dx > 0 ? Direction.WEST : Direction.EAST;
         } else {
-            // Player is more to the north or south - stairs face toward player
-            facing = dz > 0 ? Direction.SOUTH : Direction.NORTH;
+            // Player is more to the north or south
+            facing = dz > 0 ? Direction.NORTH : Direction.SOUTH;
         }
         
         // Determine half based on which face was clicked and where on the face was hit

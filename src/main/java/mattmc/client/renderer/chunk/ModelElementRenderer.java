@@ -268,6 +268,12 @@ public class ModelElementRenderer {
             uv[3] = uvList.get(3);
         }
         
+        // Apply UV rotation if uvlock is enabled and block is rotated
+        // UVlock keeps textures aligned with world axes by counter-rotating UVs
+        if (uvlock && (xRotation != 0 || yRotation != 0)) {
+            uv = rotateUVs(uv, faceDirection, xRotation, yRotation);
+        }
+        
         // Convert UV to 0-1 space and apply atlas mapping
         float u0, v0, u1, v1;
         if (uvMapping != null) {
@@ -450,6 +456,68 @@ public class ModelElementRenderer {
         }
         
         return face;
+    }
+    
+    /**
+     * Rotate UV coordinates for uvlock.
+     * When uvlock is true, UVs are rotated to maintain texture orientation with world axes.
+     * This is primarily used for horizontal faces (up/down) when Y rotation is applied.
+     * 
+     * @param uv Original UV coordinates [u0, v0, u1, v1] in 0-16 space
+     * @param face Face direction being rendered
+     * @param xDegrees X-axis rotation
+     * @param yDegrees Y-axis rotation
+     * @return Rotated UV coordinates
+     */
+    private float[] rotateUVs(float[] uv, String face, int xDegrees, int yDegrees) {
+        // UV rotation is primarily needed for Y-axis rotation on horizontal faces
+        // and X-axis rotation on vertical faces
+        
+        // For simplicity, we mainly handle Y rotation on up/down faces
+        // which is the most common case for uvlock (like stairs)
+        if (yDegrees != 0 && (face.equals("up") || face.equals("down"))) {
+            return rotateUVClockwise(uv, yDegrees);
+        }
+        
+        // For X rotation on north/south faces
+        if (xDegrees != 0 && (face.equals("north") || face.equals("south"))) {
+            return rotateUVClockwise(uv, xDegrees);
+        }
+        
+        // For X rotation on east/west faces
+        if (xDegrees != 0 && (face.equals("east") || face.equals("west"))) {
+            return rotateUVClockwise(uv, xDegrees);
+        }
+        
+        return uv;
+    }
+    
+    /**
+     * Rotate UV coordinates clockwise by the specified degrees.
+     * UV coordinates are in texture space [u0, v0, u1, v1] from 0-16.
+     */
+    private float[] rotateUVClockwise(float[] uv, int degrees) {
+        float u0 = uv[0], v0 = uv[1], u1 = uv[2], v1 = uv[3];
+        
+        // Number of 90-degree rotations
+        int rotations = (degrees / 90) % 4;
+        if (rotations < 0) rotations += 4;
+        
+        for (int i = 0; i < rotations; i++) {
+            // Rotate 90 degrees clockwise
+            // (u, v) -> (16-v, u) in texture space
+            float newU0 = 16 - v1;
+            float newV0 = u0;
+            float newU1 = 16 - v0;
+            float newV1 = u1;
+            
+            u0 = newU0;
+            v0 = newV0;
+            u1 = newU1;
+            v1 = newV1;
+        }
+        
+        return new float[]{u0, v0, u1, v1};
     }
     
     /**
