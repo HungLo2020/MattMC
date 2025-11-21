@@ -316,20 +316,8 @@ public class ModelElementRenderer {
             faceVerts[i][2] += blockZ;
         }
         
-        // Fix UV mapping for west/east faces - Minecraft's model format expects
-        // U to map to Z axis and V to map to Y axis, but our vertex order has them swapped
-        // So we need to swap the UV coordinates for these faces
-        float finalU0 = u0, finalV0 = v0, finalU1 = u1, finalV1 = v1;
-        if (faceDirection.equals("west") || faceDirection.equals("east")) {
-            // Swap U and V coordinates
-            finalU0 = v0;
-            finalV0 = u0;
-            finalU1 = v1;
-            finalV1 = u1;
-        }
-        
         // Render the face with rotated vertices
-        currentVertex = addFaceQuadWithVertices(face, faceVerts, faceNormal, finalU0, finalV0, finalU1, finalV1, 
+        currentVertex = addFaceQuadWithVertices(face, faceVerts, faceNormal, u0, v0, u1, v1, 
                                                 vertices, indices, currentVertex);
         
         return currentVertex;
@@ -530,6 +518,13 @@ public class ModelElementRenderer {
         // For stairs, this is used for upside-down variants (half=top with x=180)
         if (xDegrees != 0 && (face.equals("north") || face.equals("south"))) {
             uv = rotateUVClockwise(uv, -xDegrees);
+        }
+        
+        // Special case: west/east faces need 90-degree rotation to fix plank orientation
+        // The base model has UVs set up for east-facing stairs, and west faces
+        // need their UVs rotated to show planks horizontally
+        if (face.equals("west")) {
+            uv = rotateUVClockwise(uv, 90);
         }
         
         return uv;
