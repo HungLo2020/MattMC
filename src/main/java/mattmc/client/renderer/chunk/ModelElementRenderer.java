@@ -460,33 +460,34 @@ public class ModelElementRenderer {
     
     /**
      * Rotate UV coordinates for uvlock.
-     * When uvlock is true, UVs are rotated to maintain texture orientation with world axes.
+     * When uvlock is true, UVs are counter-rotated (opposite direction) to maintain 
+     * texture orientation with world axes, canceling out the block's rotation.
      * This is primarily used for horizontal faces (up/down) when Y rotation is applied.
      * 
      * @param uv Original UV coordinates [u0, v0, u1, v1] in 0-16 space
      * @param face Face direction being rendered
-     * @param xDegrees X-axis rotation
-     * @param yDegrees Y-axis rotation
-     * @return Rotated UV coordinates
+     * @param xDegrees X-axis rotation applied to block
+     * @param yDegrees Y-axis rotation applied to block
+     * @return Counter-rotated UV coordinates
      */
     private float[] rotateUVs(float[] uv, String face, int xDegrees, int yDegrees) {
         // UV rotation is primarily needed for Y-axis rotation on horizontal faces
         // and X-axis rotation on vertical faces
         
-        // For simplicity, we mainly handle Y rotation on up/down faces
-        // which is the most common case for uvlock (like stairs)
+        // For Y rotation on up/down faces, counter-rotate UVs (negate the rotation)
+        // This is the most common case for uvlock (like stairs)
         if (yDegrees != 0 && (face.equals("up") || face.equals("down"))) {
-            return rotateUVClockwise(uv, yDegrees);
+            return rotateUVClockwise(uv, -yDegrees);
         }
         
-        // For X rotation on north/south faces
+        // For X rotation on north/south faces, counter-rotate UVs
         if (xDegrees != 0 && (face.equals("north") || face.equals("south"))) {
-            return rotateUVClockwise(uv, xDegrees);
+            return rotateUVClockwise(uv, -xDegrees);
         }
         
-        // For X rotation on east/west faces
+        // For X rotation on east/west faces, counter-rotate UVs
         if (xDegrees != 0 && (face.equals("east") || face.equals("west"))) {
-            return rotateUVClockwise(uv, xDegrees);
+            return rotateUVClockwise(uv, -xDegrees);
         }
         
         return uv;
@@ -495,21 +496,24 @@ public class ModelElementRenderer {
     /**
      * Rotate UV coordinates clockwise by the specified degrees.
      * UV coordinates are in texture space [u0, v0, u1, v1] from 0-16.
+     * 
+     * For 90-degree clockwise rotation: (u, v) → (v, 16-u)
+     * This rotates the UV rectangle around the center of the 16x16 texture space.
      */
     private float[] rotateUVClockwise(float[] uv, int degrees) {
         float u0 = uv[0], v0 = uv[1], u1 = uv[2], v1 = uv[3];
         
-        // Number of 90-degree rotations
+        // Number of 90-degree rotations (handle negative degrees for counter-clockwise)
         int rotations = (degrees / 90) % 4;
         if (rotations < 0) rotations += 4;
         
         for (int i = 0; i < rotations; i++) {
-            // Rotate 90 degrees clockwise
-            // (u, v) -> (16-v, u) in texture space
-            float newU0 = 16 - v1;
-            float newV0 = u0;
-            float newU1 = 16 - v0;
-            float newV1 = u1;
+            // Rotate 90 degrees clockwise: (u, v) → (v, 16-u)
+            // Apply to both corners of the UV rectangle
+            float newU0 = v0;
+            float newV0 = 16 - u1;
+            float newU1 = v1;
+            float newV1 = 16 - u0;
             
             u0 = newU0;
             v0 = newV0;
