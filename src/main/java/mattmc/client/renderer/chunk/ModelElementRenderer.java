@@ -89,9 +89,11 @@ public class ModelElementRenderer {
                     uvlock = variant.getUvlock();
                 }
                 
-                // Get the model path from variant
+                // Get the model path from variant (e.g., "mattmc:block/stairs" or "block/stairs")
                 if (variant.getModel() != null) {
                     modelName = variant.getModel();
+                    // The model name might be a full path, use it as-is
+                    // ResourceManager.loadBlockModel() will handle namespace prefixes and "block/" paths
                 }
             }
         }
@@ -310,38 +312,58 @@ public class ModelElementRenderer {
      * Rotations are applied around the center (0.5, 0.5, 0.5).
      * X rotation is applied first, then Y rotation (following Minecraft's convention).
      * 
-     * @return Array of [x0, y0, z0, x1, y1, z1] after rotation, with proper min/max order
+     * To correctly compute the bounding box after rotation, we rotate all 8 corners
+     * of the original box and then find the min/max of all rotated corners.
+     * 
+     * @return Array of [x0, y0, z0, x1, y1, z1] after rotation, representing the axis-aligned bounding box
      */
     private float[] applyRotations(float x0, float y0, float z0, float x1, float y1, float z1, int xDegrees, int yDegrees) {
-        // Center the coordinates around (0.5, 0.5, 0.5)
-        float cx0 = x0 - 0.5f, cy0 = y0 - 0.5f, cz0 = z0 - 0.5f;
-        float cx1 = x1 - 0.5f, cy1 = y1 - 0.5f, cz1 = z1 - 0.5f;
-        
-        // Apply X rotation (around X axis)
-        if (xDegrees != 0) {
-            float[] rotatedMin = rotateX(cx0, cy0, cz0, xDegrees);
-            float[] rotatedMax = rotateX(cx1, cy1, cz1, xDegrees);
-            cx0 = rotatedMin[0]; cy0 = rotatedMin[1]; cz0 = rotatedMin[2];
-            cx1 = rotatedMax[0]; cy1 = rotatedMax[1]; cz1 = rotatedMax[2];
-        }
-        
-        // Apply Y rotation (around Y axis)
-        if (yDegrees != 0) {
-            float[] rotatedMin = rotateY(cx0, cy0, cz0, yDegrees);
-            float[] rotatedMax = rotateY(cx1, cy1, cz1, yDegrees);
-            cx0 = rotatedMin[0]; cy0 = rotatedMin[1]; cz0 = rotatedMin[2];
-            cx1 = rotatedMax[0]; cy1 = rotatedMax[1]; cz1 = rotatedMax[2];
-        }
-        
-        // Un-center the coordinates
-        float rx0 = cx0 + 0.5f, ry0 = cy0 + 0.5f, rz0 = cz0 + 0.5f;
-        float rx1 = cx1 + 0.5f, ry1 = cy1 + 0.5f, rz1 = cz1 + 0.5f;
-        
-        // Ensure min/max order is correct after rotation (min should be smaller than max)
-        return new float[]{
-            Math.min(rx0, rx1), Math.min(ry0, ry1), Math.min(rz0, rz1),
-            Math.max(rx0, rx1), Math.max(ry0, ry1), Math.max(rz0, rz1)
+        // Generate all 8 corners of the original bounding box
+        float[][] corners = new float[][] {
+            {x0, y0, z0}, {x1, y0, z0}, {x0, y1, z0}, {x1, y1, z0},
+            {x0, y0, z1}, {x1, y0, z1}, {x0, y1, z1}, {x1, y1, z1}
         };
+        
+        // Rotate each corner
+        for (int i = 0; i < 8; i++) {
+            // Center around (0.5, 0.5, 0.5)
+            float cx = corners[i][0] - 0.5f;
+            float cy = corners[i][1] - 0.5f;
+            float cz = corners[i][2] - 0.5f;
+            
+            // Apply X rotation
+            if (xDegrees != 0) {
+                float[] rotated = rotateX(cx, cy, cz, xDegrees);
+                cx = rotated[0]; cy = rotated[1]; cz = rotated[2];
+            }
+            
+            // Apply Y rotation
+            if (yDegrees != 0) {
+                float[] rotated = rotateY(cx, cy, cz, yDegrees);
+                cx = rotated[0]; cy = rotated[1]; cz = rotated[2];
+            }
+            
+            // Un-center
+            corners[i][0] = cx + 0.5f;
+            corners[i][1] = cy + 0.5f;
+            corners[i][2] = cz + 0.5f;
+        }
+        
+        // Find min and max of all rotated corners to get the new axis-aligned bounding box
+        float minX = corners[0][0], maxX = corners[0][0];
+        float minY = corners[0][1], maxY = corners[0][1];
+        float minZ = corners[0][2], maxZ = corners[0][2];
+        
+        for (int i = 1; i < 8; i++) {
+            minX = Math.min(minX, corners[i][0]);
+            maxX = Math.max(maxX, corners[i][0]);
+            minY = Math.min(minY, corners[i][1]);
+            maxY = Math.max(maxY, corners[i][1]);
+            minZ = Math.min(minZ, corners[i][2]);
+            maxZ = Math.max(maxZ, corners[i][2]);
+        }
+        
+        return new float[]{minX, minY, minZ, maxX, maxY, maxZ};
     }
     
     /**

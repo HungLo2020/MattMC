@@ -161,11 +161,16 @@ public class BlockState {
                 }
                 sb.append(entry.getKey()).append("=");
                 Object value = entry.getValue();
-                // Convert enum values to lowercase strings
+                // Convert enum values to lowercase strings (Minecraft convention)
+                // For other types, use toString() as-is
                 if (value instanceof Enum) {
                     sb.append(((Enum<?>) value).name().toLowerCase());
+                } else if (value instanceof String) {
+                    // String values should be lowercase in blockstate variants
+                    sb.append(((String) value).toLowerCase());
                 } else {
-                    sb.append(value.toString().toLowerCase());
+                    // Other types (numbers, booleans) use their string representation as-is
+                    sb.append(value.toString());
                 }
             });
         return sb.toString();
