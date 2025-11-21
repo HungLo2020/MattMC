@@ -460,31 +460,30 @@ public class ModelElementRenderer {
     
     /**
      * Rotate UV coordinates for uvlock.
-     * When uvlock is true, UVs are counter-rotated (opposite direction) to maintain 
-     * texture orientation with world axes, canceling out the block's rotation.
+     * When uvlock is true, UVs are counter-rotated to maintain texture orientation with world axes.
      * 
-     * The key principle: when a block rotates around an axis, faces perpendicular to that
-     * axis need their UVs counter-rotated to keep texture orientation consistent.
+     * Key principle: rotation around an axis only affects faces perpendicular to that axis.
+     * - Y-axis rotation: affects horizontal faces (up/down) - they see the texture rotate
+     * - X-axis rotation: affects vertical north/south faces - they see the texture rotate  
+     * - Z-axis rotation: affects vertical east/west faces - they see the texture rotate
      * 
      * @param uv Original UV coordinates [u0, v0, u1, v1] in 0-16 space
-     * @param face Face direction being rendered (after rotation has been applied)
+     * @param face Face direction (BEFORE any rotation is applied to geometry)
      * @param xDegrees X-axis rotation applied to block
      * @param yDegrees Y-axis rotation applied to block
      * @return Counter-rotated UV coordinates
      */
     private float[] rotateUVs(float[] uv, String face, int xDegrees, int yDegrees) {
-        // Y-axis rotation affects faces perpendicular to Y (horizontal faces and vertical faces)
-        // For stairs, all faces need UV adjustment when Y rotation is applied
-        if (yDegrees != 0) {
+        // Y-axis rotation only affects horizontal faces (up/down)
+        // Vertical faces maintain their texture orientation relative to the face normal
+        if (yDegrees != 0 && (face.equals("up") || face.equals("down"))) {
             // Counter-rotate UVs to maintain world-axis alignment
             uv = rotateUVClockwise(uv, -yDegrees);
         }
         
-        // X-axis rotation affects faces perpendicular to X
-        // This is used for upside-down stairs (half=top with x=180)
-        if (xDegrees == 180) {
-            // For 180-degree X rotation (upside down), we need to flip UVs
-            // This is equivalent to two 90-degree rotations
+        // X-axis rotation affects north/south faces (perpendicular to X axis)
+        // For stairs, this is used for upside-down variants (half=top with x=180)
+        if (xDegrees != 0 && (face.equals("north") || face.equals("south"))) {
             uv = rotateUVClockwise(uv, -xDegrees);
         }
         
