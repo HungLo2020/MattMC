@@ -532,6 +532,12 @@ public class ModelElementRenderer {
             uv = rotateUVClockwise(uv, -xDegrees);
         }
         
+        // For vertical faces (north/south/east/west), apply 90° rotation to correct plank orientation
+        // This is needed because the model's UVs are set up for a specific orientation
+        if (face.equals("north") || face.equals("south") || face.equals("west") || face.equals("east")) {
+            uv = rotateUVClockwise(uv, 90);
+        }
+        
         return uv;
     }
     
@@ -753,15 +759,9 @@ public class ModelElementRenderer {
                 {x0, y0, z1}, {x1, y0, z1}, {x1, y1, z1}, {x0, y1, z1}
             };
             case "west" -> new float[][]{
-                // West face (x=x0): For Minecraft UV mapping, u maps Z axis, v maps Y axis
-                // V0→V1: V changes (v0→v1), so must be along Y axis
-                // V0→V3: U changes (u0→u1), so must be along Z axis
-                // Therefore: V0=bottom-north, V1=top-north, V2=top-south, V3=bottom-south
-                {x0, y0, z0}, {x0, y1, z0}, {x0, y1, z1}, {x0, y0, z1}
+                {x0, y0, z0}, {x0, y0, z1}, {x0, y1, z1}, {x0, y1, z0}
             };
             case "east" -> new float[][]{
-                // East face (x=x1): For Minecraft UV mapping, u maps Z axis, v maps Y axis  
-                // Same logic: V0=bottom-north, V1=top-north, V2=top-south, V3=bottom-south
                 {x1, y0, z0}, {x1, y1, z0}, {x1, y1, z1}, {x1, y0, z1}
             };
             default -> new float[][]{
