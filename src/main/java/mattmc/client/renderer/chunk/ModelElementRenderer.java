@@ -190,13 +190,29 @@ public class ModelElementRenderer {
         }
         
         // Resolve texture variable (e.g., "#torch" -> "block/torch")
-        String texturePath = resolveTexture(textureRef, model);
-        if (texturePath == null) {
-            return currentVertex;
+        // The texture might still be a variable reference, so we need to resolve it
+        String texturePath = textureRef;
+        if (texturePath.startsWith("#")) {
+            texturePath = resolveTexture(texturePath, model);
+            System.out.println("DEBUG: Resolved " + textureRef + " -> " + texturePath);
+            if (texturePath == null) {
+                System.err.println("ERROR: Failed to resolve texture " + textureRef + " for block at " + 
+                                   face.x + "," + face.y + "," + face.z);
+                System.err.println("Model textures: " + (model.getTextures() != null ? model.getTextures() : "null"));
+                return currentVertex;
+            }
         }
         
+        // Strip namespace prefix if present (e.g., "mattmc:block/planks" -> "block/planks")
+        if (texturePath.contains(":")) {
+            texturePath = texturePath.substring(texturePath.indexOf(':') + 1);
+        }
+        
+        // Convert to full atlas path format: "block/birch_planks" -> "assets/textures/block/birch_planks.png"
+        String atlasPath = "assets/textures/" + texturePath + ".png";
+        
         // Get UV mapping
-        TextureAtlas.UVMapping uvMapping = uvMapper.getUVMappingForTexture(texturePath);
+        TextureAtlas.UVMapping uvMapping = uvMapper.getUVMappingForTexture(atlasPath);
         
         // Get UV coordinates from element face (in 0-16 space)
         List<Float> uvList = elementFace.getUv();
@@ -274,20 +290,50 @@ public class ModelElementRenderer {
     
     /**
      * Resolve texture variable reference to actual texture path.
+     * Recursively resolves if the resolved value is also a variable.
      */
     private String resolveTexture(String textureRef, BlockModel model) {
+        return resolveTexture(textureRef, model, new java.util.HashSet<>());
+    }
+    
+    /**
+     * Resolve a texture reference with circular reference protection.
+     */
+    private String resolveTexture(String textureRef, BlockModel model, java.util.Set<String> visited) {
         if (!textureRef.startsWith("#")) {
             return textureRef; // Already a direct reference
         }
         
         // Resolve variable (e.g., "#torch" -> actual path)
         String varName = textureRef.substring(1);
+        
         Map<String, String> textures = model.getTextures();
-        if (textures != null) {
-            return textures.get(varName);
+        if (textures == null || !textures.containsKey(varName)) {
+            // Variable doesn't exist in this model - return textureRef as-is
+            return textureRef;
         }
         
-        return null;
+        String resolved = textures.get(varName);
+        if (resolved == null) {
+            // Resolved to null - return textureRef as-is
+            return textureRef;
+        }
+        
+        // Check for circular reference
+        if (visited.contains(varName)) {
+            // Circular reference - return textureRef as-is
+            return textureRef;
+        }
+        
+        // Add to visited set before recursing
+        visited.add(varName);
+        
+        // Recursively resolve if the resolved value is also a variable
+        if (resolved.startsWith("#")) {
+            return resolveTexture(resolved, model, visited);
+        }
+        
+        return resolved;
     }
     
     /**
