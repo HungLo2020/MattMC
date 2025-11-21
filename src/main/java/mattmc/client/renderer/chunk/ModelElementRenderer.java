@@ -322,12 +322,13 @@ public class ModelElementRenderer {
         }
         
         // Adjust face rotation to compensate for block Y-axis rotation
-        // When block rotates, we need to counter-rotate the UV assignment to maintain correct orientation
-        // Y rotation rotates horizontal faces, so we need to adjust their UV rotation inversely
+        // When block rotates, the vertex order changes, so we need to adjust the UV rotation
+        // to maintain the correct texture orientation relative to the rotated geometry
+        // Following Minecraft's BlockFaceUV.getShiftedIndex(), we ADD rotation to shift the index
         int adjustedFaceRotation = faceRotDegrees;
         if (yRotation != 0 && !faceDirection.equals("up") && !faceDirection.equals("down")) {
-            // For vertical faces (N/S/E/W), counter-rotate by the negative of Y rotation
-            adjustedFaceRotation = (faceRotDegrees - yRotation + 360) % 360;
+            // For vertical faces (N/S/E/W), add the Y rotation to compensate
+            adjustedFaceRotation = (faceRotDegrees + yRotation) % 360;
         }
         
         // Render the face with rotated vertices, passing the adjusted face rotation
