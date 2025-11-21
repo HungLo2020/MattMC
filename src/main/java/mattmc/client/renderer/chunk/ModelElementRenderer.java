@@ -272,11 +272,12 @@ public class ModelElementRenderer {
         Integer faceRotation = elementFace.getRotation();
         int faceRotDegrees = (faceRotation != null) ? faceRotation : 0;
         
-        // Apply UV rotation if uvlock is enabled and block is rotated
-        // UVlock keeps textures aligned with world axes by counter-rotating UVs
-        if (uvlock && (xRotation != 0 || yRotation != 0)) {
-            uv = rotateUVs(uv, faceDirection, xRotation, yRotation);
-        }
+        // TODO: Implement proper uvlock UV transformation using transformation matrices
+        // For now, disable uvlock UV rotation as it's causing incorrect texture scaling
+        // The per-face rotation property should handle most cases correctly
+        //if (uvlock && (xRotation != 0 || yRotation != 0)) {
+        //    uv = rotateUVs(uv, faceDirection, xRotation, yRotation);
+        //}
         
         // Convert UV to 0-1 space and apply atlas mapping
         float u0, v0, u1, v1;
