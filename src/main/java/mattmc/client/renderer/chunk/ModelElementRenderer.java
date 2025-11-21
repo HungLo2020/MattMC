@@ -511,10 +511,12 @@ public class ModelElementRenderer {
      * @return Counter-rotated UV coordinates
      */
     private float[] rotateUVs(float[] uv, String face, int xDegrees, int yDegrees) {
-        // Y-axis rotation only affects horizontal faces (up/down)
-        // Vertical faces maintain their texture orientation relative to the face normal
-        if (yDegrees != 0 && (face.equals("up") || face.equals("down"))) {
-            // Counter-rotate UVs to maintain world-axis alignment
+        // With uvlock enabled, counter-rotate UVs to maintain world-axis alignment
+        // This applies to all faces that are affected by the rotation
+        
+        // Y-axis rotation affects horizontal (up/down) AND vertical (N/S/E/W) faces
+        // All faces need UV counter-rotation to keep textures aligned with world axes
+        if (yDegrees != 0) {
             uv = rotateUVClockwise(uv, -yDegrees);
         }
         
