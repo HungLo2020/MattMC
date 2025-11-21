@@ -532,10 +532,10 @@ public class ModelElementRenderer {
             uv = rotateUVClockwise(uv, -xDegrees);
         }
         
-        // Special fix for west faces: the model's UV mapping has U along Y and V along Z,
+        // Special fix for west and east faces: the model's UV mapping has U along Y and V along Z,
         // but for plank textures to appear horizontal, we need to rotate -90° (counter-clockwise)
         // This swaps the mapping so U goes along Z (horizontal) and V along Y (vertical)
-        if (face.equals("west")) {
+        if (face.equals("west") || face.equals("east")) {
             uv = rotateUVClockwise(uv, -90);
         }
         
