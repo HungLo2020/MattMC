@@ -310,7 +310,7 @@ public class ModelElementRenderer {
      * Rotations are applied around the center (0.5, 0.5, 0.5).
      * X rotation is applied first, then Y rotation (following Minecraft's convention).
      * 
-     * @return Array of [x0, y0, z0, x1, y1, z1] after rotation
+     * @return Array of [x0, y0, z0, x1, y1, z1] after rotation, with proper min/max order
      */
     private float[] applyRotations(float x0, float y0, float z0, float x1, float y1, float z1, int xDegrees, int yDegrees) {
         // Center the coordinates around (0.5, 0.5, 0.5)
@@ -334,9 +334,13 @@ public class ModelElementRenderer {
         }
         
         // Un-center the coordinates
+        float rx0 = cx0 + 0.5f, ry0 = cy0 + 0.5f, rz0 = cz0 + 0.5f;
+        float rx1 = cx1 + 0.5f, ry1 = cy1 + 0.5f, rz1 = cz1 + 0.5f;
+        
+        // Ensure min/max order is correct after rotation (min should be smaller than max)
         return new float[]{
-            cx0 + 0.5f, cy0 + 0.5f, cz0 + 0.5f,
-            cx1 + 0.5f, cy1 + 0.5f, cz1 + 0.5f
+            Math.min(rx0, rx1), Math.min(ry0, ry1), Math.min(rz0, rz1),
+            Math.max(rx0, rx1), Math.max(ry0, ry1), Math.max(rz0, rz1)
         };
     }
     
