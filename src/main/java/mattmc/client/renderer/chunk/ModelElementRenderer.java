@@ -290,25 +290,35 @@ public class ModelElementRenderer {
             v1 = uv[3] / 16.0f;
         }
         
-        // Apply rotations to coordinates if needed
+        // Get face vertices and normal BEFORE rotation
+        // This ensures UVs are mapped correctly to the original face orientation
+        float[][] faceVerts = getFaceVertices(faceDirection, x0, y0, z0, x1, y1, z1);
+        float[] faceNormal = getFaceNormal(faceDirection);
+        
+        // Apply rotations to vertex positions if needed
         // Rotations are applied in order: X first, then Y (following Minecraft's convention)
         if (xRotation != 0 || yRotation != 0) {
-            float[] rotated = applyRotations(x0, y0, z0, x1, y1, z1, xRotation, yRotation);
-            x0 = rotated[0]; y0 = rotated[1]; z0 = rotated[2];
-            x1 = rotated[3]; y1 = rotated[4]; z1 = rotated[5];
-            
-            // Also rotate the face direction to match the rotated coordinates
-            faceDirection = rotateFaceDirection(faceDirection, xRotation, yRotation);
+            for (int i = 0; i < 4; i++) {
+                float[] rotated = rotatePoint(faceVerts[i][0], faceVerts[i][1], faceVerts[i][2], xRotation, yRotation);
+                faceVerts[i][0] = rotated[0];
+                faceVerts[i][1] = rotated[1];
+                faceVerts[i][2] = rotated[2];
+            }
+            // Also rotate the face normal
+            float[] rotatedNormal = rotatePoint(faceNormal[0], faceNormal[1], faceNormal[2], xRotation, yRotation);
+            faceNormal = rotatedNormal;
         }
         
-        // Add world position offset
-        x0 += blockX; x1 += blockX;
-        y0 += blockY; y1 += blockY;
-        z0 += blockZ; z1 += blockZ;
+        // Add world position offset to vertices
+        for (int i = 0; i < 4; i++) {
+            faceVerts[i][0] += blockX;
+            faceVerts[i][1] += blockY;
+            faceVerts[i][2] += blockZ;
+        }
         
-        // Render the face based on direction
-        currentVertex = addFaceQuad(face, faceDirection, x0, y0, z0, x1, y1, z1,
-                                    u0, v0, u1, v1, vertices, indices, currentVertex);
+        // Render the face with rotated vertices
+        currentVertex = addFaceQuadWithVertices(face, faceVerts, faceNormal, u0, v0, u1, v1, 
+                                                vertices, indices, currentVertex);
         
         return currentVertex;
     }
@@ -370,6 +380,29 @@ public class ModelElementRenderer {
         }
         
         return new float[]{minX, minY, minZ, maxX, maxY, maxZ};
+    }
+    
+    /**
+     * Rotate a single point around X and Y axes (around center 0.5, 0.5, 0.5).
+     */
+    private float[] rotatePoint(float x, float y, float z, int xDegrees, int yDegrees) {
+        // Center around origin
+        float cx = x - 0.5f, cy = y - 0.5f, cz = z - 0.5f;
+        
+        // Apply X rotation
+        if (xDegrees != 0) {
+            float[] rotated = rotateX(cx, cy, cz, xDegrees);
+            cx = rotated[0]; cy = rotated[1]; cz = rotated[2];
+        }
+        
+        // Apply Y rotation
+        if (yDegrees != 0) {
+            float[] rotated = rotateY(cx, cy, cz, yDegrees);
+            cx = rotated[0]; cy = rotated[1]; cz = rotated[2];
+        }
+        
+        // Un-center
+        return new float[]{cx + 0.5f, cy + 0.5f, cz + 0.5f};
     }
     
     /**
@@ -592,6 +625,51 @@ public class ModelElementRenderer {
         
         // Get face vertices based on direction
         float[][] faceVerts = getFaceVertices(faceDirection, x0, y0, z0, x1, y1, z1);
+        
+        // Add 4 vertices for the quad
+        int baseVertex = currentVertex;
+        addVertex(vertices, faceVerts[0], u0, v0, normal, light0);
+        addVertex(vertices, faceVerts[1], u0, v1, normal, light1);
+        addVertex(vertices, faceVerts[2], u1, v1, normal, light2);
+        addVertex(vertices, faceVerts[3], u1, v0, normal, light3);
+        
+        // Add 2 triangles (6 indices)
+        indices.add(baseVertex);
+        indices.add(baseVertex + 1);
+        indices.add(baseVertex + 2);
+        indices.add(baseVertex);
+        indices.add(baseVertex + 2);
+        indices.add(baseVertex + 3);
+        
+        return currentVertex + 4;
+    }
+    
+    /**
+     * Add a face quad with pre-computed vertices and normal.
+     */
+    private int addFaceQuadWithVertices(BlockFaceCollector.FaceData face,
+                                        float[][] faceVerts,
+                                        float[] normal,
+                                        float u0, float v0, float u1, float v1,
+                                        FloatList vertices,
+                                        IntList indices,
+                                        int currentVertex) {
+        // For lighting, we need to determine which face index to use
+        // Use a default face index based on the normal direction
+        int faceIndex = 0; // Default to up
+        if (Math.abs(normal[1]) > 0.9f) {
+            faceIndex = normal[1] > 0 ? 0 : 1; // up or down
+        } else if (Math.abs(normal[2]) > 0.9f) {
+            faceIndex = normal[2] < 0 ? 2 : 3; // north or south
+        } else if (Math.abs(normal[0]) > 0.9f) {
+            faceIndex = normal[0] < 0 ? 4 : 5; // west or east
+        }
+        
+        // Sample lighting for vertices
+        float[] light0 = lightSampler.sampleVertexLight(face, faceIndex, 0);
+        float[] light1 = lightSampler.sampleVertexLight(face, faceIndex, 1);
+        float[] light2 = lightSampler.sampleVertexLight(face, faceIndex, 2);
+        float[] light3 = lightSampler.sampleVertexLight(face, faceIndex, 3);
         
         // Add 4 vertices for the quad
         int baseVertex = currentVertex;
