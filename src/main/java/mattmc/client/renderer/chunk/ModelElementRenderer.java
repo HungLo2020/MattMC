@@ -316,8 +316,20 @@ public class ModelElementRenderer {
             faceVerts[i][2] += blockZ;
         }
         
+        // Fix UV mapping for west/east faces - Minecraft's model format expects
+        // U to map to Z axis and V to map to Y axis, but our vertex order has them swapped
+        // So we need to swap the UV coordinates for these faces
+        float finalU0 = u0, finalV0 = v0, finalU1 = u1, finalV1 = v1;
+        if (faceDirection.equals("west") || faceDirection.equals("east")) {
+            // Swap U and V coordinates
+            finalU0 = v0;
+            finalV0 = u0;
+            finalU1 = v1;
+            finalV1 = u1;
+        }
+        
         // Render the face with rotated vertices
-        currentVertex = addFaceQuadWithVertices(face, faceVerts, faceNormal, u0, v0, u1, v1, 
+        currentVertex = addFaceQuadWithVertices(face, faceVerts, faceNormal, finalU0, finalV0, finalU1, finalV1, 
                                                 vertices, indices, currentVertex);
         
         return currentVertex;
@@ -520,11 +532,11 @@ public class ModelElementRenderer {
             uv = rotateUVClockwise(uv, -xDegrees);
         }
         
-        // Special case: west/east faces need 90-degree rotation to fix plank orientation
-        // The base model has UVs set up for east-facing stairs, and west faces
-        // need their UVs rotated to show planks horizontally
+        // Special fix for west faces: the model's UV mapping has U along Y and V along Z,
+        // but for plank textures to appear horizontal, we need to rotate -90° (counter-clockwise)
+        // This swaps the mapping so U goes along Z (horizontal) and V along Y (vertical)
         if (face.equals("west")) {
-            uv = rotateUVClockwise(uv, 90);
+            uv = rotateUVClockwise(uv, -90);
         }
         
         return uv;
