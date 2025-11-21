@@ -1,5 +1,7 @@
 package mattmc.client.resources.model;
 
+import mattmc.client.renderer.item.ItemDisplayContext;
+
 import java.util.List;
 import java.util.Map;
 
@@ -25,6 +27,17 @@ public class ModelDisplay {
      */
     public Transform getTransform(String mode) {
         return display != null ? display.get(mode) : null;
+    }
+    
+    /**
+     * Get transform for a specific display context.
+     * Returns null if no transform is defined for this context.
+     * 
+     * @param context The display context enum
+     * @return Transform for that context, or null if not defined
+     */
+    public Transform getTransform(ItemDisplayContext context) {
+        return getTransform(context.getJsonKey());
     }
     
     /**

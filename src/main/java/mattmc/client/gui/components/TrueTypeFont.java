@@ -7,6 +7,7 @@ import org.lwjgl.stb.STBTTFontinfo;
 import org.lwjgl.stb.STBTruetype;
 import org.lwjgl.system.MemoryStack;
 
+import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
 import java.nio.FloatBuffer;
@@ -99,7 +100,7 @@ public final class TrueTypeFont implements AutoCloseable {
             ByteBuffer buf = BufferUtils.createByteBuffer(tmp.length);
             buf.put(tmp).flip();
             return buf;
-        } catch (Exception e) {
+        } catch (IOException e) {
             throw new RuntimeException("Failed to read font resource: " + path, e);
         }
     }

@@ -71,6 +71,7 @@ public class StairsBlock extends Block {
         mattmc.world.level.block.state.BlockState state = new mattmc.world.level.block.state.BlockState();
         
         // Determine facing based on player's horizontal direction
+        // Stairs face away from the player (the player climbs up toward the block)
         float dx = playerX - (blockX + 0.5f);
         float dz = playerZ - (blockZ + 0.5f);
         
@@ -105,6 +106,8 @@ public class StairsBlock extends Block {
         
         state.setValue("facing", facing);
         state.setValue("half", half);
+        // For now, always use straight shape (no corner detection yet)
+        state.setValue("shape", mattmc.world.level.block.state.properties.StairsShape.STRAIGHT);
         
         return state;
     }

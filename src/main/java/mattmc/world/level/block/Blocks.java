@@ -66,7 +66,8 @@ public class Blocks {
     public static final Block CRIMSON_PLANKS = register("crimson_planks", new Block(true, 0, 0, 0, 0));
     public static final Block WARPED_PLANKS = register("warped_planks", new Block(true, 0, 0, 0, 0));
     public static final Block BIRCH_STAIRS = register("birch_stairs", new StairsBlock());
-    public static final Block TORCH = register("torch", new Block(false, 14, 14, 11, 0));
+    public static final Block TORCH = register("torch", new TorchBlock(false, 14, 14, 11, 0));
+    public static final Block WALL_TORCH = register("wall_torch", new WallTorchBlock(false, 14, 14, 11, 0));
     public static final Block PEARLESCENT_FROGLIGHT = register("pearlescent_froglight", new RotatedPillarBlock(false, 14, 14, 9, 12));
     public static final Block VERDANT_FROGLIGHT = register("verdant_froglight", new RotatedPillarBlock(false, 14, 11, 13, 11));
     public static final Block OCHRE_FROGLIGHT = register("ochre_froglight", new RotatedPillarBlock(false, 14, 14, 12, 7));
@@ -96,6 +97,18 @@ public class Blocks {
         Block registeredBlock;
         if (block instanceof StairsBlock) {
             registeredBlock = new StairsBlock(identifier);
+        } else if (block instanceof WallTorchBlock) {
+            int lightEmission = Math.max(block.getLightEmissionR(), Math.max(block.getLightEmissionG(), block.getLightEmissionB()));
+            registeredBlock = new WallTorchBlock(block.isSolid(), 
+                lightEmission,
+                block.getLightEmissionR(), block.getLightEmissionG(), block.getLightEmissionB(), 
+                identifier);
+        } else if (block instanceof TorchBlock) {
+            int lightEmission = Math.max(block.getLightEmissionR(), Math.max(block.getLightEmissionG(), block.getLightEmissionB()));
+            registeredBlock = new TorchBlock(block.isSolid(), 
+                lightEmission,
+                block.getLightEmissionR(), block.getLightEmissionG(), block.getLightEmissionB(), 
+                identifier);
         } else if (block instanceof RotatedPillarBlock) {
             int lightEmission = Math.max(block.getLightEmissionR(), Math.max(block.getLightEmissionG(), block.getLightEmissionB()));
             registeredBlock = new RotatedPillarBlock(block.isSolid(), 
@@ -138,6 +151,18 @@ public class Blocks {
         Block registeredBlock;
         if (block instanceof StairsBlock) {
             registeredBlock = new StairsBlock(identifier);
+        } else if (block instanceof WallTorchBlock) {
+            int lightEmission = Math.max(block.getLightEmissionR(), Math.max(block.getLightEmissionG(), block.getLightEmissionB()));
+            registeredBlock = new WallTorchBlock(block.isSolid(), 
+                lightEmission,
+                block.getLightEmissionR(), block.getLightEmissionG(), block.getLightEmissionB(), 
+                identifier);
+        } else if (block instanceof TorchBlock) {
+            int lightEmission = Math.max(block.getLightEmissionR(), Math.max(block.getLightEmissionG(), block.getLightEmissionB()));
+            registeredBlock = new TorchBlock(block.isSolid(), 
+                lightEmission,
+                block.getLightEmissionR(), block.getLightEmissionG(), block.getLightEmissionB(), 
+                identifier);
         } else if (block instanceof RotatedPillarBlock) {
             int lightEmission = Math.max(block.getLightEmissionR(), Math.max(block.getLightEmissionG(), block.getLightEmissionB()));
             registeredBlock = new RotatedPillarBlock(block.isSolid(), 

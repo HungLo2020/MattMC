@@ -1,0 +1,6 @@
+{
+  "parent": "mattmc:block/template_wall_torch",
+  "textures": {
+    "torch": "mattmc:block/torch"
+  }
+}

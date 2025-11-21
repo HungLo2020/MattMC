@@ -67,20 +67,18 @@ class ModelLoadingTest {
         BlockModel model = ResourceManager.loadBlockModel("cobblestone");
         assertNotNull(model, "Model should load");
         
-        // Texture variables like #all should be resolved in elements
-        if (model.getElements() != null) {
-            for (ModelElement element : model.getElements()) {
-                if (element.getFaces() != null) {
-                    for (ModelElement.ElementFace face : element.getFaces().values()) {
-                        String texture = face.getTexture();
-                        if (texture != null) {
-                            assertFalse(texture.startsWith("#"), 
-                                "Texture variables should be resolved: " + texture);
-                        }
-                    }
-                }
+        // Texture variables in the model's texture map should be resolved
+        assertNotNull(model.getTextures(), "Model should have textures");
+        for (Map.Entry<String, String> entry : model.getTextures().entrySet()) {
+            String value = entry.getValue();
+            if (value != null) {
+                assertFalse(value.startsWith("#"), 
+                    "Texture map values should be resolved: " + entry.getKey() + " = " + value);
             }
         }
+        
+        // Element face textures may still contain #variable references (resolved at render time)
+        // This is intentional to avoid model caching issues with shared parent models
     }
     
     @Test
@@ -145,5 +143,26 @@ class ModelLoadingTest {
         // Should inherit from outer_stairs parent
         assertNotNull(model.getElements(), "Should have elements");
         assertEquals(2, model.getElements().size(), "Outer stairs should have 2 elements");
+    }
+    
+    @Test
+    void testMissingItemModelHandling() {
+        // Test that loading a non-existent item model returns null instead of throwing NPE
+        BlockModel model = ResourceManager.loadItemModel("nonexistent_item_model_12345");
+        assertNull(model, "Non-existent item model should return null");
+    }
+    
+    @Test
+    void testMissingBlockModelHandling() {
+        // Test that loading a non-existent block model returns null instead of throwing NPE
+        BlockModel model = ResourceManager.loadBlockModel("nonexistent_block_model_12345");
+        assertNull(model, "Non-existent block model should return null");
+    }
+    
+    @Test
+    void testMissingBlockStateHandling() {
+        // Test that loading a non-existent blockstate returns null instead of throwing NPE
+        BlockState blockState = ResourceManager.loadBlockState("nonexistent_blockstate_12345");
+        assertNull(blockState, "Non-existent blockstate should return null");
     }
 }

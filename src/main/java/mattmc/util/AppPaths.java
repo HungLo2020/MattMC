@@ -5,6 +5,7 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.net.URI;
+import java.net.URISyntaxException;
 import java.nio.file.*;
 import java.nio.file.attribute.PosixFilePermission;
 import java.util.EnumSet;
@@ -25,7 +26,7 @@ public final class AppPaths {
             }
             // Running from classes dir or an exploded install dir
             return Files.isDirectory(p) ? p : p.getParent();
-        } catch (Exception e) {
+        } catch (URISyntaxException | IOException e) {
             // Fallback to current working dir
             return Paths.get(".").toAbsolutePath().normalize();
         }

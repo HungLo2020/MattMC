@@ -25,6 +25,14 @@ public class UVMapper {
     }
     
     /**
+     * Get the texture atlas.
+     * @return The texture atlas, or null if not available
+     */
+    public TextureAtlas getTextureAtlas() {
+        return textureAtlas;
+    }
+    
+    /**
      * Get UV mapping from texture atlas for a face.
      * Returns null if no atlas or texture not found.
      */
@@ -35,6 +43,19 @@ public class UVMapper {
         
         String texturePath = face.block.getTexturePath(face.faceType);
         if (texturePath == null) {
+            return null;
+        }
+        
+        return textureAtlas.getUVMapping(texturePath);
+    }
+    
+    /**
+     * Get UV mapping from texture atlas for a specific texture path.
+     * Returns null if no atlas or texture not found.
+     * Used by ModelElementRenderer for data-driven geometry rendering.
+     */
+    public TextureAtlas.UVMapping getUVMappingForTexture(String texturePath) {
+        if (textureAtlas == null || texturePath == null) {
             return null;
         }
         
