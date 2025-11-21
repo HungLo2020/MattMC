@@ -35,7 +35,7 @@ public class ModelElementRenderer {
     
     /**
      * Render block geometry from JSON model elements.
-     * Reads the block's model file and renders all defined elements.
+     * Reads the block's blockstate and model files and renders all defined elements with proper rotations.
      * 
      * @param face The face data containing block, position, and state
      * @param vertices The vertex list to add to
@@ -61,18 +61,56 @@ public class ModelElementRenderer {
         
         // Extract the block name from identifier (e.g., "mattmc:torch" -> "torch")
         String blockName = identifier.contains(":") ? identifier.split(":")[1] : identifier;
-        BlockModel model = ResourceManager.loadBlockModel(blockName);
+        
+        // Try to load blockstate JSON to get rotation information
+        mattmc.client.resources.model.BlockState blockStateJson = ResourceManager.loadBlockState(blockName);
+        int xRotation = 0;
+        int yRotation = 0;
+        boolean uvlock = false;
+        String modelName = blockName;
+        
+        if (blockStateJson != null && state != null && !state.isEmpty()) {
+            // Build the variant string from the block's state (e.g., "facing=north,half=bottom,shape=straight")
+            String variantString = state.toVariantString();
+            List<mattmc.client.resources.model.BlockStateVariant> variants = blockStateJson.getVariantsForState(variantString);
+            
+            if (variants != null && !variants.isEmpty()) {
+                // Use the first variant (if multiple, one is chosen randomly, but we just use first)
+                mattmc.client.resources.model.BlockStateVariant variant = variants.get(0);
+                
+                // Get rotation values from variant
+                if (variant.getX() != null) {
+                    xRotation = variant.getX();
+                }
+                if (variant.getY() != null) {
+                    yRotation = variant.getY();
+                }
+                if (variant.getUvlock() != null) {
+                    uvlock = variant.getUvlock();
+                }
+                
+                // Get the model path from variant
+                if (variant.getModel() != null) {
+                    modelName = variant.getModel();
+                }
+            }
+        }
+        
+        // If no blockstate variant found, fall back to old rotation logic
+        if (blockStateJson == null && state != null) {
+            yRotation = getYRotationFromState(block, state);
+        }
+        
+        // Load the model
+        BlockModel model = ResourceManager.loadBlockModel(modelName);
         
         if (model == null || model.getElements() == null) {
             return currentVertex; // No model or elements, skip rendering
         }
         
-        // Get rotation from blockstate if present
-        int yRotation = getYRotationFromState(block, state);
-        
         // Process each element in the model
         for (ModelElement element : model.getElements()) {
-            currentVertex = renderElement(face, element, model, x, y, z, yRotation, vertices, indices, currentVertex);
+            currentVertex = renderElement(face, element, model, x, y, z, xRotation, yRotation, uvlock, vertices, indices, currentVertex);
         }
         
         return currentVertex;
@@ -121,13 +159,15 @@ public class ModelElementRenderer {
     /**
      * Render a single model element.
      * Converts from Minecraft's 0-16 coordinate system to block-relative 0-1 coordinates.
-     * Applies Y-axis rotation if specified.
+     * Applies X and Y axis rotations if specified.
      */
     private int renderElement(BlockFaceCollector.FaceData face,
                               ModelElement element,
                               BlockModel model,
                               float blockX, float blockY, float blockZ,
+                              int xRotation,
                               int yRotation,
+                              boolean uvlock,
                               FloatList vertices,
                               IntList indices,
                               int currentVertex) {
@@ -162,7 +202,7 @@ public class ModelElementRenderer {
             currentVertex = renderElementFace(face, faceDir, elementFace, model,
                                              blockX, blockY, blockZ,
                                              x0, y0, z0, x1, y1, z1,
-                                             yRotation, vertices, indices, currentVertex);
+                                             xRotation, yRotation, uvlock, vertices, indices, currentVertex);
         }
         
         return currentVertex;
@@ -178,7 +218,9 @@ public class ModelElementRenderer {
                                    float blockX, float blockY, float blockZ,
                                    float x0, float y0, float z0,
                                    float x1, float y1, float z1,
+                                   int xRotation,
                                    int yRotation,
+                                   boolean uvlock,
                                    FloatList vertices,
                                    IntList indices,
                                    int currentVertex) {
@@ -240,10 +282,15 @@ public class ModelElementRenderer {
             v1 = uv[3] / 16.0f;
         }
         
-        // Apply Y rotation to coordinates if needed
-        if (yRotation != 0) {
-            float[] rotated = applyYRotation(x0, z0, x1, z1, yRotation);
-            x0 = rotated[0]; z0 = rotated[1]; x1 = rotated[2]; z1 = rotated[3];
+        // Apply rotations to coordinates if needed
+        // Rotations are applied in order: X first, then Y (following Minecraft's convention)
+        if (xRotation != 0 || yRotation != 0) {
+            float[] rotated = applyRotations(x0, y0, z0, x1, y1, z1, xRotation, yRotation);
+            x0 = rotated[0]; y0 = rotated[1]; z0 = rotated[2];
+            x1 = rotated[3]; y1 = rotated[4]; z1 = rotated[5];
+            
+            // Also rotate the face direction to match the rotated coordinates
+            faceDirection = rotateFaceDirection(faceDirection, xRotation, yRotation);
         }
         
         // Add world position offset
@@ -259,33 +306,124 @@ public class ModelElementRenderer {
     }
     
     /**
-     * Apply Y-axis rotation to element coordinates.
+     * Apply X and Y axis rotations to element coordinates.
+     * Rotations are applied around the center (0.5, 0.5, 0.5).
+     * X rotation is applied first, then Y rotation (following Minecraft's convention).
+     * 
+     * @return Array of [x0, y0, z0, x1, y1, z1] after rotation
      */
-    private float[] applyYRotation(float x0, float z0, float x1, float z1, int degrees) {
-        // Rotate around center (0.5, 0.5)
-        float cx0 = x0 - 0.5f, cz0 = z0 - 0.5f;
-        float cx1 = x1 - 0.5f, cz1 = z1 - 0.5f;
+    private float[] applyRotations(float x0, float y0, float z0, float x1, float y1, float z1, int xDegrees, int yDegrees) {
+        // Center the coordinates around (0.5, 0.5, 0.5)
+        float cx0 = x0 - 0.5f, cy0 = y0 - 0.5f, cz0 = z0 - 0.5f;
+        float cx1 = x1 - 0.5f, cy1 = y1 - 0.5f, cz1 = z1 - 0.5f;
         
-        float rx0, rz0, rx1, rz1;
-        switch (degrees) {
-            case 90 -> {
-                rx0 = -cz0; rz0 = cx0;
-                rx1 = -cz1; rz1 = cx1;
-            }
-            case 180 -> {
-                rx0 = -cx0; rz0 = -cz0;
-                rx1 = -cx1; rz1 = -cz1;
-            }
-            case 270 -> {
-                rx0 = cz0; rz0 = -cx0;
-                rx1 = cz1; rz1 = -cx1;
-            }
-            default -> {
-                return new float[]{x0, z0, x1, z1};
-            }
+        // Apply X rotation (around X axis)
+        if (xDegrees != 0) {
+            float[] rotatedMin = rotateX(cx0, cy0, cz0, xDegrees);
+            float[] rotatedMax = rotateX(cx1, cy1, cz1, xDegrees);
+            cx0 = rotatedMin[0]; cy0 = rotatedMin[1]; cz0 = rotatedMin[2];
+            cx1 = rotatedMax[0]; cy1 = rotatedMax[1]; cz1 = rotatedMax[2];
         }
         
-        return new float[]{rx0 + 0.5f, rz0 + 0.5f, rx1 + 0.5f, rz1 + 0.5f};
+        // Apply Y rotation (around Y axis)
+        if (yDegrees != 0) {
+            float[] rotatedMin = rotateY(cx0, cy0, cz0, yDegrees);
+            float[] rotatedMax = rotateY(cx1, cy1, cz1, yDegrees);
+            cx0 = rotatedMin[0]; cy0 = rotatedMin[1]; cz0 = rotatedMin[2];
+            cx1 = rotatedMax[0]; cy1 = rotatedMax[1]; cz1 = rotatedMax[2];
+        }
+        
+        // Un-center the coordinates
+        return new float[]{
+            cx0 + 0.5f, cy0 + 0.5f, cz0 + 0.5f,
+            cx1 + 0.5f, cy1 + 0.5f, cz1 + 0.5f
+        };
+    }
+    
+    /**
+     * Rotate a point around the X axis.
+     */
+    private float[] rotateX(float x, float y, float z, int degrees) {
+        return switch (degrees) {
+            case 90 -> new float[]{x, -z, y};
+            case 180 -> new float[]{x, -y, -z};
+            case 270 -> new float[]{x, z, -y};
+            default -> new float[]{x, y, z};
+        };
+    }
+    
+    /**
+     * Rotate a point around the Y axis.
+     */
+    private float[] rotateY(float x, float y, float z, int degrees) {
+        return switch (degrees) {
+            case 90 -> new float[]{-z, y, x};
+            case 180 -> new float[]{-x, y, -z};
+            case 270 -> new float[]{z, y, -x};
+            default -> new float[]{x, y, z};
+        };
+    }
+    
+    /**
+     * Rotate a face direction string based on X and Y rotations.
+     * This ensures the face culling and normals are correct after rotation.
+     */
+    private String rotateFaceDirection(String face, int xDegrees, int yDegrees) {
+        // Apply X rotation first
+        if (xDegrees == 90) {
+            face = switch (face) {
+                case "up" -> "north";
+                case "north" -> "down";
+                case "down" -> "south";
+                case "south" -> "up";
+                default -> face;
+            };
+        } else if (xDegrees == 180) {
+            face = switch (face) {
+                case "up" -> "down";
+                case "down" -> "up";
+                case "north" -> "south";
+                case "south" -> "north";
+                default -> face;
+            };
+        } else if (xDegrees == 270) {
+            face = switch (face) {
+                case "up" -> "south";
+                case "south" -> "down";
+                case "down" -> "north";
+                case "north" -> "up";
+                default -> face;
+            };
+        }
+        
+        // Apply Y rotation second
+        if (yDegrees == 90) {
+            face = switch (face) {
+                case "north" -> "east";
+                case "east" -> "south";
+                case "south" -> "west";
+                case "west" -> "north";
+                default -> face;
+            };
+        } else if (yDegrees == 180) {
+            face = switch (face) {
+                case "north" -> "south";
+                case "south" -> "north";
+                case "east" -> "west";
+                case "west" -> "east";
+                default -> face;
+            };
+        } else if (yDegrees == 270) {
+            face = switch (face) {
+                case "north" -> "west";
+                case "west" -> "south";
+                case "south" -> "east";
+                case "east" -> "north";
+                default -> face;
+            };
+        }
+        
+        return face;
     }
     
     /**

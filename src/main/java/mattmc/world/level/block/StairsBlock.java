@@ -105,6 +105,8 @@ public class StairsBlock extends Block {
         
         state.setValue("facing", facing);
         state.setValue("half", half);
+        // For now, always use straight shape (no corner detection yet)
+        state.setValue("shape", mattmc.world.level.block.state.properties.StairsShape.STRAIGHT);
         
         return state;
     }
