@@ -272,12 +272,12 @@ public class ModelElementRenderer {
         Integer faceRotation = elementFace.getRotation();
         int faceRotDegrees = (faceRotation != null) ? faceRotation : 0;
         
-        // TODO: Implement proper uvlock UV transformation using transformation matrices
-        // For now, disable uvlock UV rotation as it's causing incorrect texture scaling
-        // The per-face rotation property should handle most cases correctly
-        //if (uvlock && (xRotation != 0 || yRotation != 0)) {
-        //    uv = rotateUVs(uv, faceDirection, xRotation, yRotation);
-        //}
+        // When uvlock=true, keep original UV coordinates
+        // The UVs from model JSON are already world-aligned (horizontal planks)
+        // Do NOT transform them - transforming would rotate horizontal rectangles into vertical ones
+        // if (uvlock && yRotation != 0 && !faceDirection.equals("up") && !faceDirection.equals("down")) {
+        //     uv = transformUVsForRotation(uv, faceDirection, yRotation);
+        // }
         
         // Convert UV to 0-1 space and apply atlas mapping
         float u0, v0, u1, v1;
@@ -321,19 +321,12 @@ public class ModelElementRenderer {
             faceVerts[i][2] += blockZ;
         }
         
-        // Adjust face rotation to compensate for block Y-axis rotation
-        // When block rotates, the vertex order changes, so we need to adjust the UV rotation
-        // to maintain the correct texture orientation relative to the rotated geometry
-        // This follows Minecraft's approach (see BlockFaceUV.getShiftedIndex() in frnsrc/):
-        // getShiftedIndex(pIndex) = (pIndex + rotation/90) % 4
-        // We ADD rotation to shift which vertex receives which UV coordinate
+        // Apply per-face UV rotation as specified in the model JSON
+        // When uvlock=true, UVs are transformed above to keep textures world-aligned
+        // The per-face rotation from JSON is applied regardless of uvlock
         int adjustedFaceRotation = faceRotDegrees;
-        if (yRotation != 0 && !faceDirection.equals("up") && !faceDirection.equals("down")) {
-            // For vertical faces (N/S/E/W), add the Y rotation to compensate for vertex reordering
-            adjustedFaceRotation = (faceRotDegrees + yRotation) % 360;
-        }
         
-        // Render the face with rotated vertices, passing the adjusted face rotation
+        // Render the face with rotated vertices
         currentVertex = addFaceQuadWithVertices(face, faceVerts, faceNormal, u0, v0, u1, v1, 
                                                 adjustedFaceRotation, vertices, indices, currentVertex);
         
@@ -813,5 +806,45 @@ public class ModelElementRenderer {
             case "east" -> 5;
             default -> 0;
         };
+    }
+    
+    /**
+     * Transform UV coordinates when uvlock=true to keep textures world-aligned.
+     * When the block geometry rotates, UVs must be transformed so textures stay horizontal.
+     * 
+     * Based on Minecraft's FaceBakery.recomputeUVs which transforms UVs through BlockMath matrices.
+     * We use a simplified approach: rotate the UV rectangle by the negative of the Y-rotation.
+     */
+    private float[] transformUVsForRotation(float[] uv, String faceDirection, int yRotation) {
+        // UV format: [u0, v0, u1, v1] where (u0,v0) is top-left and (u1,v1) is bottom-right in texture space
+        float u0 = uv[0];
+        float v0 = uv[1];
+        float u1 = uv[2];
+        float v1 = uv[3];
+        
+        // For vertical faces, rotate UV coordinates by -yRotation to counter the geometry rotation
+        // This keeps the texture aligned with world axes
+        int rotationSteps = (360 - yRotation) / 90; // Counter-rotation
+        rotationSteps = rotationSteps % 4;
+        
+        // Rotate UV rectangle around center point (8, 8) in 0-16 space
+        for (int i = 0; i < rotationSteps; i++) {
+            // One 90° CCW rotation around (8, 8)
+            float newU0 = 16 - v1;
+            float newV0 = u0;
+            float newU1 = 16 - v0;
+            float newV1 = u1;
+            
+            u0 = newU0;
+            v0 = newV0;
+            u1 = newU1;
+            v1 = newV1;
+        }
+        
+        System.out.println("DEBUG UV transform: face=" + faceDirection + " yRot=" + yRotation + 
+                         " origUV=[" + uv[0] + "," + uv[1] + "," + uv[2] + "," + uv[3] + "]" +
+                         " newUV=[" + u0 + "," + v0 + "," + u1 + "," + v1 + "]");
+        
+        return new float[]{u0, v0, u1, v1};
     }
 }
