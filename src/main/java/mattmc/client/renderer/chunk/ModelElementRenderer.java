@@ -342,44 +342,96 @@ public class ModelElementRenderer {
     
     /**
      * Calculate the adjusted UV rotation when uvlock is enabled.
-     * Based on Minecraft's FaceBakery.recomputeUVs which transforms UV direction vectors
-     * and recalculates rotation from the transformed vectors.
+     * Based on Minecraft's FaceBakery.recomputeUVs (line 100) which:
+     * 1. Transforms UV direction vector through matrix
+     * 2. Calculates new rotation: -round(atan2(y,x)/90)*90
      * 
-     * For Y-axis rotation (most common for stairs):
-     * - Each face direction has a specific transformation pattern
-     * - The rotation adjustment depends on both the face direction and Y-rotation angle
+     * For Y-axis rotation applied to each face direction:
+     * The transformation effectively rotates the UV coordinate space
      */
     private int calculateUvlockRotation(String faceDirection, int faceRotation, int yRotation) {
         // Normalize Y-rotation to 0-359 range
         yRotation = ((yRotation % 360) + 360) % 360;
         
-        // Based on analysis of Minecraft's BlockMath.getUVLockTransform:
-        // The transform composes: global_to_local(face) -> inverse(model_rotation) -> local_to_global(rotated_face)
-        // This results in specific rotation adjustments per face
+        // Convert face rotation to radians for direction vector
+        double rotRad = Math.toRadians(faceRotation);
+        double cos = Math.cos(rotRad);
+        double sin = Math.sin(rotRad);
         
-        // For stairs (Y-rotation only, no X-rotation):
+        // Apply transformation based on face and Y-rotation
+        // This mimics BlockMath.getUVLockTransform's effect on the rotation vector
+        double newX = cos;
+        double newY = sin;
+        
         switch (faceDirection) {
             case "north":
-                // North face: needs rotation adjustment that varies with Y-rotation
-                // Y=90: subtract 90, Y=180: no change, Y=270: add 90
-                return (faceRotation + yRotation) % 360;
+                // North face with Y-rotation: UV coordinates rotate opposite to Y
+                if (yRotation == 90) {
+                    newX = -sin; newY = cos; // Rotate -90
+                } else if (yRotation == 180) {
+                    newX = -cos; newY = -sin; // Rotate -180
+                } else if (yRotation == 270) {
+                    newX = sin; newY = -cos; // Rotate -270
+                }
+                break;
             case "south":
-                // South face: opposite pattern to north
-                return (faceRotation + yRotation) % 360;
-            case "west":
-                // West face: different pattern
-                return (faceRotation + yRotation) % 360;
+                // South face: UVs rotate same direction as Y
+                if (yRotation == 90) {
+                    newX = sin; newY = -cos; // Rotate +90
+                } else if (yRotation == 180) {
+                    newX = -cos; newY = -sin; // Rotate +180
+                } else if (yRotation == 270) {
+                    newX = -sin; newY = cos; // Rotate +270
+                }
+                break;
             case "east":
-                // East face: different pattern
-                return (faceRotation + yRotation) % 360;
+                // East face: rotates perpendicular
+                if (yRotation == 90) {
+                    newX = sin; newY = -cos;
+                } else if (yRotation == 180) {
+                    newX = -cos; newY = -sin;
+                } else if (yRotation == 270) {
+                    newX = -sin; newY = cos;
+                }
+                break;
+            case "west":
+                // West face: rotates perpendicular opposite
+                if (yRotation == 90) {
+                    newX = -sin; newY = cos;
+                } else if (yRotation == 180) {
+                    newX = -cos; newY = -sin;
+                } else if (yRotation == 270) {
+                    newX = sin; newY = -cos;
+                }
+                break;
             case "up":
+                // Up face: UVs rotate with block
+                if (yRotation == 90) {
+                    newX = sin; newY = -cos;
+                } else if (yRotation == 180) {
+                    newX = -cos; newY = -sin;
+                } else if (yRotation == 270) {
+                    newX = -sin; newY = cos;
+                }
+                break;
             case "down":
-                // Horizontal faces: Y-rotation doesn't affect their UV orientation
-                // They rotate with the block
-                return (faceRotation + yRotation) % 360;
-            default:
-                return faceRotation;
+                // Down face: UVs rotate opposite
+                if (yRotation == 90) {
+                    newX = -sin; newY = cos;
+                } else if (yRotation == 180) {
+                    newX = -cos; newY = -sin;
+                } else if (yRotation == 270) {
+                    newX = sin; newY = -cos;
+                }
+                break;
         }
+        
+        // Calculate new rotation from transformed vector (Minecraft's formula line 100)
+        // int i = Math.floorMod(-((int)Math.round(Math.toDegrees(Math.atan2(y, x)) / 90.0)) * 90, 360);
+        double angle = Math.toDegrees(Math.atan2(newY, newX));
+        int newRotation = Math.floorMod(-((int)Math.round(angle / 90.0)) * 90, 360);
+        
+        return newRotation;
     }
     
     /**
