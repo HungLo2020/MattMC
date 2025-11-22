@@ -782,12 +782,12 @@ public class ModelElementRenderer {
                 {x1, y0, z1}, {x1, y1, z1}, {x0, y1, z1}, {x0, y0, z1}
             };
             // West face: viewed from east (positive X), looking at -X face
-            // Order: bottom-left, bottom-right, top-right, top-left (where left=south, right=north)
+            // V0=(x0,y0,z1):bottom-left(S), V1=(x0,y0,z0):bottom-right(N), V2=(x0,y1,z0):top-right(N), V3=(x0,y1,z1):top-left(S)
             case "west" -> new float[][]{
                 {x0, y0, z1}, {x0, y0, z0}, {x0, y1, z0}, {x0, y1, z1}
             };
             // East face: viewed from west (negative X), looking at +X face
-            // Order: bottom-right, bottom-left, top-left, top-right (where left=north, right=south)
+            // V0=(x1,y0,z1):bottom-right(S), V1=(x1,y0,z0):bottom-left(N), V2=(x1,y1,z0):top-left(N), V3=(x1,y1,z1):top-right(S)
             case "east" -> new float[][]{
                 {x1, y0, z1}, {x1, y0, z0}, {x1, y1, z0}, {x1, y1, z1}
             };
