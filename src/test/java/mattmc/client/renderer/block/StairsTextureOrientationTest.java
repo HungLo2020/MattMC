@@ -271,15 +271,11 @@ public class StairsTextureOrientationTest {
                 // Simulate the uvlock rotation effect
                 int effectiveRotation = (face.getRotation() != null) ? face.getRotation() : 0;
                 
-                // For vertical faces, apply Y-rotation compensation based on face direction
-                // North/west faces: subtract rotation, South/east faces: add rotation
+                // For vertical faces, add Y-rotation to counter-rotate UVs
+                // This keeps textures world-aligned (horizontal) when block rotates
                 boolean isVerticalFace = !faceDir.equals("up") && !faceDir.equals("down");
                 if (uvlock && yRotation != 0 && isVerticalFace) {
-                    if (faceDir.equals("north") || faceDir.equals("west")) {
-                        effectiveRotation = (effectiveRotation - yRotation + 360) % 360;
-                    } else if (faceDir.equals("south") || faceDir.equals("east")) {
-                        effectiveRotation = (effectiveRotation + yRotation) % 360;
-                    }
+                    effectiveRotation = (effectiveRotation + yRotation) % 360;
                 }
                 
                 // Check if rotation swaps width and height
@@ -287,9 +283,14 @@ public class StairsTextureOrientationTest {
                 
                 // Determine final orientation
                 boolean isVertical;
-                if (isRotated90or270) {
+                // Square UVs (width == height) are always "correct" regardless of rotation
+                if (Math.abs(uvWidth - uvHeight) < 0.01f) {
+                    isVertical = false; // Square textures are neither horizontal nor vertical, mark as horizontal
+                } else if (isRotated90or270) {
+                    // 90° or 270° rotation swaps dimensions
                     isVertical = uvWidth > uvHeight;
                 } else {
+                    // 0° or 180° rotation doesn't swap dimensions
                     isVertical = uvHeight > uvWidth;
                 }
                 
