@@ -271,11 +271,14 @@ public class StairsTextureOrientationTest {
                 // Simulate the uvlock rotation effect
                 int effectiveRotation = (face.getRotation() != null) ? face.getRotation() : 0;
                 
-                // When uvlock=true, counter-rotate UVs to compensate for vertex rotation
-                // Subtract Y-rotation for vertical faces to keep texture world-aligned
+                // When uvlock=true, apply face-specific rotation based on Minecraft's FaceBakery logic
+                // For 90° and 270° rotations, north and west faces need 180° added
                 boolean isVerticalFace = !faceDir.equals("up") && !faceDir.equals("down");
                 if (uvlock && yRotation != 0 && isVerticalFace) {
-                    effectiveRotation = (effectiveRotation - yRotation + 360) % 360;
+                    if ((yRotation == 90 || yRotation == 270) && 
+                        (faceDir.equals("north") || faceDir.equals("west"))) {
+                        effectiveRotation = (effectiveRotation + 180) % 360;
+                    }
                 }
                 
                 // Check if rotation swaps width and height

@@ -322,16 +322,20 @@ public class ModelElementRenderer {
         }
         
         // Apply per-face UV rotation as specified in the model JSON
-        // When uvlock=true, counter-rotate UVs to compensate for vertex rotation
+        // When uvlock=true, apply face-specific rotation to keep textures world-aligned
         // When uvlock=false, texture rotates naturally with the geometry
         int adjustedFaceRotation = faceRotDegrees;
         
-        // For uvlock, counter-rotate UVs to keep texture world-aligned
-        // When vertices rotate by Y degrees, UVs must rotate by -Y degrees to compensate
-        // Only apply to vertical faces (not up/down) since those are affected by Y-rotation
+        // For uvlock, apply face-specific rotation based on Minecraft's FaceBakery logic
+        // Based on user feedback: when facing NORTH (Y=270°), north and west faces need fixing
+        // Pattern: At Y-rotations of 90° and 270°, north and west faces need 180° added
         if (uvlock && yRotation != 0 && !faceDirection.equals("up") && !faceDirection.equals("down")) {
-            // Subtract Y-rotation to counter-rotate (vertices rotate one way, UVs rotate opposite)
-            adjustedFaceRotation = (faceRotDegrees - yRotation + 360) % 360;
+            // For 90° and 270° rotations, north and west faces need 180° added to flip orientation
+            if ((yRotation == 90 || yRotation == 270) && 
+                (faceDirection.equals("north") || faceDirection.equals("west"))) {
+                adjustedFaceRotation = (faceRotDegrees + 180) % 360;
+            }
+            // South and east faces work correctly at these angles with no adjustment
         }
         
         // For uvlock with X-rotation, counter-rotate UVs on north/south faces
