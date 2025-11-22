@@ -57,9 +57,14 @@ public class StairsTextureOrientationTest {
      */
     @Test
     public void testStairsTextureOrientationAllDirections() {
-        System.out.println("\n=== STAIRS TEXTURE ORIENTATION DIAGNOSTIC TEST ===\n");
-        System.out.println("This test analyzes the UV coordinates for stairs in all configurations");
-        System.out.println("to determine which faces have CORRECT vs VERTICAL texture orientation.\n");
+        System.out.println("\n");
+        System.out.println("╔════════════════════════════════════════════════════════════════════════╗");
+        System.out.println("║        STAIRS TEXTURE ORIENTATION DIAGNOSTIC TEST                      ║");
+        System.out.println("╚════════════════════════════════════════════════════════════════════════╝");
+        System.out.println();
+        System.out.println("This test checks if wood plank textures on stairs appear HORIZONTAL (✓)");
+        System.out.println("or VERTICAL (✗). The wood grain should run horizontally, not vertically.");
+        System.out.println();
         
         List<TextureOrientationResult> results = new ArrayList<>();
         
@@ -81,43 +86,69 @@ public class StairsTextureOrientationTest {
             }
         }
         
-        // Print table header
-        System.out.println("FACING HALF    | ROTATIONS     | UVLOCK  | STATUS   | ANALYSIS");
-        System.out.println("-------|--------|---------------|---------|----------|--------------------------------");
-        
-        // Print all results
-        for (TextureOrientationResult result : results) {
-            System.out.println(result);
-        }
-        
-        // Summary analysis
-        System.out.println("\n=== SUMMARY ===");
-        System.out.println(String.format("Total configurations: %d", results.size()));
-        
+        // Count results by type
         long correctCount = results.stream().filter(r -> "CORRECT".equals(r.textureOrientation)).count();
+        long mixedCount = results.stream().filter(r -> "MIXED".equals(r.textureOrientation)).count();
         long verticalCount = results.stream().filter(r -> "VERTICAL".equals(r.textureOrientation)).count();
-        long unknownCount = results.stream().filter(r -> "UNKNOWN".equals(r.textureOrientation)).count();
         
-        System.out.println(String.format("Correct orientation:  %d ✓", correctCount));
-        System.out.println(String.format("Vertical (wrong):     %d ✗", verticalCount));
-        System.out.println(String.format("Unknown/Ambiguous:    %d ?", unknownCount));
+        // Print results grouped by status
+        System.out.println("┌────────────────────────────────────────────────────────────────────────┐");
+        System.out.println("│ TEST RESULTS BY STAIR DIRECTION                                        │");
+        System.out.println("└────────────────────────────────────────────────────────────────────────┘");
+        System.out.println();
         
-        if (verticalCount > 0) {
-            System.out.println("\n=== FACES WITH VERTICAL TEXTURE (INCORRECT) ===");
+        // Show correct configurations
+        if (correctCount > 0) {
+            System.out.println("✓ CORRECT - Textures are HORIZONTAL (wood grain runs left-right):");
+            System.out.println("  ┌──────────────────────────────────────────────────────────┐");
             results.stream()
-                .filter(r -> "VERTICAL".equals(r.textureOrientation))
-                .forEach(r -> System.out.println(String.format("  ✗ %s %s (Y=%d°, uvlock=%s)", 
-                    r.facing, r.half, r.yRotation, r.uvlock)));
+                .filter(r -> "CORRECT".equals(r.textureOrientation))
+                .forEach(r -> System.out.println(String.format("  │  ✓ %-10s %-6s  (Rotation: Y=%3d°)              │", 
+                    r.facing, r.half, r.yRotation)));
+            System.out.println("  └──────────────────────────────────────────────────────────┘");
+            System.out.println();
         }
+        
+        // Show mixed/incorrect configurations
+        if (mixedCount > 0 || verticalCount > 0) {
+            System.out.println("✗ INCORRECT - Textures are VERTICAL (wood grain runs up-down):");
+            System.out.println("  ┌──────────────────────────────────────────────────────────┐");
+            results.stream()
+                .filter(r -> "MIXED".equals(r.textureOrientation) || "VERTICAL".equals(r.textureOrientation))
+                .forEach(r -> System.out.println(String.format("  │  ✗ %-10s %-6s  (Rotation: Y=%3d°)  ← WRONG    │", 
+                    r.facing, r.half, r.yRotation)));
+            System.out.println("  └──────────────────────────────────────────────────────────┘");
+            System.out.println();
+        }
+        
+        // Print summary
+        System.out.println("┌────────────────────────────────────────────────────────────────────────┐");
+        System.out.println("│ SUMMARY                                                                │");
+        System.out.println("└────────────────────────────────────────────────────────────────────────┘");
+        System.out.println();
+        System.out.println(String.format("  Total stair configurations tested: %d", results.size()));
+        System.out.println(String.format("  ✓ Correct (horizontal texture):   %d", correctCount));
+        System.out.println(String.format("  ✗ Wrong (vertical texture):       %d", mixedCount + verticalCount));
+        System.out.println();
         
         if (correctCount == results.size()) {
-            System.out.println("\n✓ ALL CONFIGURATIONS HAVE CORRECT TEXTURE ORIENTATION!");
+            System.out.println("  ╔══════════════════════════════════════════════════════════╗");
+            System.out.println("  ║  ✓✓✓ ALL STAIRS HAVE CORRECT TEXTURE ORIENTATION! ✓✓✓  ║");
+            System.out.println("  ╚══════════════════════════════════════════════════════════╝");
         } else {
-            System.out.println("\n✗ Some configurations have incorrect texture orientation.");
-            System.out.println("  The uvlock implementation needs adjustment for these rotation angles.");
+            System.out.println("  ╔══════════════════════════════════════════════════════════╗");
+            System.out.println("  ║  ✗ PROBLEM FOUND: Some stairs have vertical textures    ║");
+            System.out.println("  ╚══════════════════════════════════════════════════════════╝");
+            System.out.println();
+            System.out.println("  EXPLANATION:");
+            System.out.println("  - Stairs facing EAST/WEST are correct (Y-rotation 0°/180°)");
+            System.out.println("  - Stairs facing NORTH/SOUTH are wrong (Y-rotation 90°/270°)");
+            System.out.println("  - The uvlock implementation needs adjustment for 90°/270° rotations");
         }
         
-        System.out.println("\n=== END OF DIAGNOSTIC TEST ===\n");
+        System.out.println();
+        System.out.println("════════════════════════════════════════════════════════════════════════");
+        System.out.println();
     }
     
     /**
