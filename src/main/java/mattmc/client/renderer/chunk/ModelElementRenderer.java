@@ -767,8 +767,9 @@ public class ModelElementRenderer {
                 {x0, y1, z0}, {x0, y1, z1}, {x1, y1, z1}, {x1, y1, z0}
             };
             // Down face: viewed from below, looking up at -Y face
+            // Order: southwest, southeast, northeast, northwest (CCW from below)
             case "down" -> new float[][]{
-                {x0, y0, z0}, {x1, y0, z0}, {x1, y0, z1}, {x0, y0, z1}
+                {x0, y0, z1}, {x1, y0, z1}, {x1, y0, z0}, {x0, y0, z0}
             };
             // North face: viewed from south (positive Z), looking at -Z face
             // Order: bottom-left, top-left, top-right, bottom-right
