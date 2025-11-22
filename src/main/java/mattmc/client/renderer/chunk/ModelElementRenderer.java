@@ -514,28 +514,18 @@ public class ModelElementRenderer {
      * @return Rotation adjustment to add to the face rotation
      */
     private int calculateUVLockRotation(String face, int xDegrees, int yDegrees) {
-        // Determine the face direction after block rotation
-        String rotatedFace = rotateFaceDirection(face, xDegrees, yDegrees);
+        // The UV rotation adjustment depends on which axis the block is rotating around
+        // and which faces are affected by that rotation
         
-        // The UV rotation adjustment depends on how the face direction changes
-        // This is based on Minecraft's matrix transformation in getUVLockTransform
-        
-        // For Y-axis rotations (most common case)
+        // For Y-axis rotations (most common case for stairs)
+        // All faces need counter-rotation to maintain world-aligned textures
         if (yDegrees != 0 && xDegrees == 0) {
-            // Vertical side faces (N/S/E/W) need counter-rotation
-            if (!face.equals("up") && !face.equals("down")) {
-                // Counter-rotate by the amount the block rotated
-                return -yDegrees;
-            }
-            // Horizontal faces (up/down) also need adjustment for Y rotation
-            else {
-                return -yDegrees;
-            }
+            return -yDegrees;
         }
         
-        // For X-axis rotations
+        // For X-axis rotations (used for upside-down stairs)
+        // Only faces perpendicular to X axis are affected
         if (xDegrees != 0) {
-            // X rotation affects faces perpendicular to X axis (up/down and north/south)
             if (face.equals("up") || face.equals("down") || 
                 face.equals("north") || face.equals("south")) {
                 return -xDegrees;
