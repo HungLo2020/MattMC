@@ -750,28 +750,45 @@ public class ModelElementRenderer {
     }
     
     /**
-     * Get vertices for a face in CCW order.
+     * Get vertices for a face in CCW order (counter-clockwise when viewed from outside).
+     * This follows Minecraft's FaceInfo vertex ordering convention.
+     * 
+     * Vertex UV mapping (with rotation=0):
+     * - Vertex 0: (u0, v0)
+     * - Vertex 1: (u0, v1)
+     * - Vertex 2: (u1, v1)
+     * - Vertex 3: (u1, v0)
      */
     private float[][] getFaceVertices(String direction, float x0, float y0, float z0,
                                       float x1, float y1, float z1) {
         return switch (direction) {
+            // Up face: viewed from above, looking down at +Y face
             case "up" -> new float[][]{
                 {x0, y1, z0}, {x0, y1, z1}, {x1, y1, z1}, {x1, y1, z0}
             };
+            // Down face: viewed from below, looking up at -Y face
             case "down" -> new float[][]{
                 {x0, y0, z0}, {x1, y0, z0}, {x1, y0, z1}, {x0, y0, z1}
             };
+            // North face: viewed from south (positive Z), looking at -Z face
+            // Order: bottom-left, top-left, top-right, bottom-right
             case "north" -> new float[][]{
                 {x0, y0, z0}, {x0, y1, z0}, {x1, y1, z0}, {x1, y0, z0}
             };
+            // South face: viewed from north (negative Z), looking at +Z face
+            // Order: bottom-right, top-right, top-left, bottom-left
             case "south" -> new float[][]{
-                {x0, y0, z1}, {x1, y0, z1}, {x1, y1, z1}, {x0, y1, z1}
+                {x1, y0, z1}, {x1, y1, z1}, {x0, y1, z1}, {x0, y0, z1}
             };
+            // West face: viewed from east (positive X), looking at -X face
+            // Order: bottom-left, bottom-right, top-right, top-left (where left=south, right=north)
             case "west" -> new float[][]{
-                {x0, y0, z0}, {x0, y0, z1}, {x0, y1, z1}, {x0, y1, z0}
+                {x0, y0, z1}, {x0, y0, z0}, {x0, y1, z0}, {x0, y1, z1}
             };
+            // East face: viewed from west (negative X), looking at +X face
+            // Order: bottom-right, bottom-left, top-left, top-right (where left=north, right=south)
             case "east" -> new float[][]{
-                {x1, y0, z0}, {x1, y1, z0}, {x1, y1, z1}, {x1, y0, z1}
+                {x1, y0, z1}, {x1, y0, z0}, {x1, y1, z0}, {x1, y1, z1}
             };
             default -> new float[][]{
                 {x0, y0, z0}, {x0, y1, z0}, {x1, y1, z0}, {x1, y0, z0}
