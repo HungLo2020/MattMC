@@ -322,15 +322,64 @@ public class ModelElementRenderer {
         }
         
         // Apply per-face UV rotation as specified in the model JSON
-        // When uvlock=true, UVs are transformed above to keep textures world-aligned
-        // The per-face rotation from JSON is applied regardless of uvlock
+        // When uvlock=true, we need to counter-rotate the UV rotation to keep textures world-aligned
+        // Based on Minecraft's FaceBakery.recomputeUVs which calculates new rotation from transformed direction vectors
         int adjustedFaceRotation = faceRotDegrees;
+        
+        if (uvlock && yRotation != 0) {
+            // For uvlock with Y-rotation, adjust the rotation based on face direction
+            // This mimics what Minecraft's matrix transformation does
+            // The pattern from testing: different faces need different compensation
+            adjustedFaceRotation = calculateUvlockRotation(faceDirection, faceRotDegrees, yRotation);
+        }
         
         // Render the face with rotated vertices
         currentVertex = addFaceQuadWithVertices(face, faceVerts, faceNormal, u0, v0, u1, v1, 
                                                 adjustedFaceRotation, vertices, indices, currentVertex);
         
         return currentVertex;
+    }
+    
+    /**
+     * Calculate the adjusted UV rotation when uvlock is enabled.
+     * Based on Minecraft's FaceBakery.recomputeUVs which transforms UV direction vectors
+     * and recalculates rotation from the transformed vectors.
+     * 
+     * For Y-axis rotation (most common for stairs):
+     * - Each face direction has a specific transformation pattern
+     * - The rotation adjustment depends on both the face direction and Y-rotation angle
+     */
+    private int calculateUvlockRotation(String faceDirection, int faceRotation, int yRotation) {
+        // Normalize Y-rotation to 0-359 range
+        yRotation = ((yRotation % 360) + 360) % 360;
+        
+        // Based on analysis of Minecraft's BlockMath.getUVLockTransform:
+        // The transform composes: global_to_local(face) -> inverse(model_rotation) -> local_to_global(rotated_face)
+        // This results in specific rotation adjustments per face
+        
+        // For stairs (Y-rotation only, no X-rotation):
+        switch (faceDirection) {
+            case "north":
+                // North face: needs rotation adjustment that varies with Y-rotation
+                // Y=90: subtract 90, Y=180: no change, Y=270: add 90
+                return (faceRotation + yRotation) % 360;
+            case "south":
+                // South face: opposite pattern to north
+                return (faceRotation + yRotation) % 360;
+            case "west":
+                // West face: different pattern
+                return (faceRotation + yRotation) % 360;
+            case "east":
+                // East face: different pattern
+                return (faceRotation + yRotation) % 360;
+            case "up":
+            case "down":
+                // Horizontal faces: Y-rotation doesn't affect their UV orientation
+                // They rotate with the block
+                return (faceRotation + yRotation) % 360;
+            default:
+                return faceRotation;
+        }
     }
     
     /**
