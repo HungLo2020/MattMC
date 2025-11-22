@@ -322,10 +322,21 @@ public class ModelElementRenderer {
         }
         
         // Apply per-face UV rotation as specified in the model JSON
-        // Note: When uvlock=false (default), UVs should NOT counter-rotate when the block rotates
-        // The texture rotates with the geometry naturally through vertex rotation
-        // Only the per-face rotation property from the JSON should affect UV mapping
+        // When uvlock=true, counter-rotate UVs to keep texture aligned with world axes
+        // When uvlock=false, texture rotates naturally with the geometry
         int adjustedFaceRotation = faceRotDegrees;
+        
+        // For uvlock, add the Y-axis rotation to counter-rotate UVs on vertical faces
+        // This compensates for the vertex rotation so texture stays world-aligned
+        if (uvlock && yRotation != 0 && !faceDirection.equals("up") && !faceDirection.equals("down")) {
+            adjustedFaceRotation = (faceRotDegrees + yRotation) % 360;
+        }
+        
+        // For uvlock with X-rotation, counter-rotate UVs on affected faces
+        // X-rotation affects north/south faces when flipping stairs upside-down
+        if (uvlock && xRotation == 180 && (faceDirection.equals("north") || faceDirection.equals("south"))) {
+            adjustedFaceRotation = (adjustedFaceRotation + 180) % 360;
+        }
         
         // Render the face with rotated vertices
         currentVertex = addFaceQuadWithVertices(face, faceVerts, faceNormal, u0, v0, u1, v1, 
@@ -750,46 +761,28 @@ public class ModelElementRenderer {
     }
     
     /**
-     * Get vertices for a face in CCW order (counter-clockwise when viewed from outside).
-     * This follows Minecraft's FaceInfo vertex ordering convention.
-     * 
-     * Vertex UV mapping (with rotation=0):
-     * - Vertex 0: (u0, v0)
-     * - Vertex 1: (u0, v1)
-     * - Vertex 2: (u1, v1)
-     * - Vertex 3: (u1, v0)
+     * Get vertices for a face in CCW order.
      */
     private float[][] getFaceVertices(String direction, float x0, float y0, float z0,
                                       float x1, float y1, float z1) {
         return switch (direction) {
-            // Up face: viewed from above, looking down at +Y face
             case "up" -> new float[][]{
                 {x0, y1, z0}, {x0, y1, z1}, {x1, y1, z1}, {x1, y1, z0}
             };
-            // Down face: viewed from below, looking up at -Y face
-            // Order: southwest, southeast, northeast, northwest (CCW from below)
             case "down" -> new float[][]{
-                {x0, y0, z1}, {x1, y0, z1}, {x1, y0, z0}, {x0, y0, z0}
+                {x0, y0, z0}, {x1, y0, z0}, {x1, y0, z1}, {x0, y0, z1}
             };
-            // North face: viewed from south (positive Z), looking at -Z face
-            // Order: bottom-left, top-left, top-right, bottom-right
             case "north" -> new float[][]{
                 {x0, y0, z0}, {x0, y1, z0}, {x1, y1, z0}, {x1, y0, z0}
             };
-            // South face: viewed from north (negative Z), looking at +Z face
-            // Order: bottom-right, top-right, top-left, bottom-left
             case "south" -> new float[][]{
-                {x1, y0, z1}, {x1, y1, z1}, {x0, y1, z1}, {x0, y0, z1}
+                {x0, y0, z1}, {x1, y0, z1}, {x1, y1, z1}, {x0, y1, z1}
             };
-            // West face: viewed from east (positive X), looking at -X face
-            // V0=(x0,y0,z1):bottom-left(S), V1=(x0,y0,z0):bottom-right(N), V2=(x0,y1,z0):top-right(N), V3=(x0,y1,z1):top-left(S)
             case "west" -> new float[][]{
-                {x0, y0, z1}, {x0, y0, z0}, {x0, y1, z0}, {x0, y1, z1}
+                {x0, y0, z0}, {x0, y0, z1}, {x0, y1, z1}, {x0, y1, z0}
             };
-            // East face: viewed from west (negative X), looking at +X face
-            // V0=(x1,y0,z1):bottom-right(S), V1=(x1,y0,z0):bottom-left(N), V2=(x1,y1,z0):top-left(N), V3=(x1,y1,z1):top-right(S)
             case "east" -> new float[][]{
-                {x1, y0, z1}, {x1, y0, z0}, {x1, y1, z0}, {x1, y1, z1}
+                {x1, y0, z0}, {x1, y1, z0}, {x1, y1, z1}, {x1, y0, z1}
             };
             default -> new float[][]{
                 {x0, y0, z0}, {x0, y1, z0}, {x1, y1, z0}, {x1, y0, z0}
