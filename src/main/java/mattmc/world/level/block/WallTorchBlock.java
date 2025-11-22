@@ -63,6 +63,7 @@ public class WallTorchBlock extends TorchBlock {
                 case SOUTH -> SOUTH_SHAPE;
                 case WEST -> WEST_SHAPE;
                 case EAST -> EAST_SHAPE;
+                default -> NORTH_SHAPE; // UP and DOWN fallback
             };
         }
         return NORTH_SHAPE;

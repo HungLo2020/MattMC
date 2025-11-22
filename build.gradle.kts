@@ -37,6 +37,9 @@ dependencies {
     // JSON parsing for block models and blockstates
     implementation("com.google.code.gson:gson:2.10.1")
     
+    // JOML for matrix math (used by Minecraft for uvlock transformations)
+    implementation("org.joml:joml:1.10.5")
+    
     // Logging framework
     implementation("org.slf4j:slf4j-api:2.0.9")
     implementation("ch.qos.logback:logback-classic:1.4.11")

@@ -272,12 +272,27 @@ public class ModelElementRenderer {
         Integer faceRotation = elementFace.getRotation();
         int faceRotDegrees = (faceRotation != null) ? faceRotation : 0;
         
-        // When uvlock=true, adjust the rotation value to keep textures aligned with world axes
-        // Following Minecraft's FaceBakery.recomputeUVs approach
+        // When uvlock=true, recompute UVs using Minecraft's exact algorithm
+        // This is a verbatim implementation of Minecraft's FaceBakery.recomputeUVs
         if (uvlock && (xRotation != 0 || yRotation != 0)) {
-            int uvlockRotation = calculateUVLockRotation(faceDirection, xRotation, yRotation);
-            faceRotDegrees = (faceRotDegrees + uvlockRotation) % 360;
-            if (faceRotDegrees < 0) faceRotDegrees += 360;
+            // Create a BlockFaceUV with the current UV coordinates and rotation
+            mattmc.client.renderer.block.model.BlockFaceUV blockFaceUV = 
+                new mattmc.client.renderer.block.model.BlockFaceUV(uv, faceRotDegrees);
+            
+            // Create a Transformation from the X and Y rotations
+            mattmc.client.renderer.block.model.Transformation modelRotation = 
+                createTransformation(xRotation, yRotation);
+            
+            // Convert face direction string to Direction enum
+            Direction faceDir = stringToDirection(faceDirection);
+            
+            // Recompute UVs using Minecraft's exact algorithm
+            mattmc.client.renderer.block.model.BlockFaceUV recomputedUV = 
+                mattmc.client.renderer.block.model.FaceBakery.recomputeUVs(blockFaceUV, faceDir, modelRotation);
+            
+            // Update UV coordinates and rotation with the recomputed values
+            uv = recomputedUV.uvs;
+            faceRotDegrees = recomputedUV.rotation;
         }
         
         // Convert UV to 0-1 space and apply atlas mapping
@@ -503,36 +518,36 @@ public class ModelElementRenderer {
     }
     
     /**
-     * Calculate the UV rotation adjustment for uvlock.
-     * When uvlock is true, we adjust the face rotation value to keep textures aligned with world axes.
-     * This follows Minecraft's FaceBakery.recomputeUVs which transforms UVs through matrices
-     * and recomputes the rotation value.
-     * 
-     * @param face Face direction (BEFORE any rotation is applied to geometry)
-     * @param xDegrees X-axis rotation applied to block
-     * @param yDegrees Y-axis rotation applied to block
-     * @return Rotation adjustment to add to the face rotation
+     * Create a Transformation from X and Y rotation values (in degrees).
+     * Follows Minecraft's rotation application order.
      */
-    private int calculateUVLockRotation(String face, int xDegrees, int yDegrees) {
-        // The UV rotation adjustment depends on which axis the block is rotating around
-        // and which faces are affected by that rotation
+    private mattmc.client.renderer.block.model.Transformation createTransformation(int xDegrees, int yDegrees) {
+        org.joml.Quaternionf rotation = new org.joml.Quaternionf();
         
-        // For Y-axis rotations (most common case for stairs)
-        // All faces need counter-rotation to maintain world-aligned textures
-        if (yDegrees != 0 && xDegrees == 0) {
-            return -yDegrees;
-        }
-        
-        // For X-axis rotations (used for upside-down stairs)
-        // Only faces perpendicular to X axis are affected
+        // Apply rotations in Minecraft's order: X first, then Y
         if (xDegrees != 0) {
-            if (face.equals("up") || face.equals("down") || 
-                face.equals("north") || face.equals("south")) {
-                return -xDegrees;
-            }
+            rotation.rotateX((float)Math.toRadians(xDegrees));
+        }
+        if (yDegrees != 0) {
+            rotation.rotateY((float)Math.toRadians(yDegrees));
         }
         
-        return 0;
+        return new mattmc.client.renderer.block.model.Transformation(null, rotation, null, null);
+    }
+    
+    /**
+     * Convert face direction string to Direction enum.
+     */
+    private Direction stringToDirection(String face) {
+        return switch (face.toLowerCase()) {
+            case "up" -> Direction.UP;
+            case "down" -> Direction.DOWN;
+            case "north" -> Direction.NORTH;
+            case "south" -> Direction.SOUTH;
+            case "west" -> Direction.WEST;
+            case "east" -> Direction.EAST;
+            default -> Direction.NORTH;
+        };
     }
 
     
