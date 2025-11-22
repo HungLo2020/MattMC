@@ -271,10 +271,15 @@ public class StairsTextureOrientationTest {
                 // Simulate the uvlock rotation effect
                 int effectiveRotation = (face.getRotation() != null) ? face.getRotation() : 0;
                 
-                // For vertical faces (north/south/east/west), apply Y-rotation when uvlock is enabled
+                // For vertical faces, apply Y-rotation compensation based on face direction
+                // North/west faces: subtract rotation, South/east faces: add rotation
                 boolean isVerticalFace = !faceDir.equals("up") && !faceDir.equals("down");
                 if (uvlock && yRotation != 0 && isVerticalFace) {
-                    effectiveRotation = (effectiveRotation + yRotation) % 360;
+                    if (faceDir.equals("north") || faceDir.equals("west")) {
+                        effectiveRotation = (effectiveRotation - yRotation + 360) % 360;
+                    } else if (faceDir.equals("south") || faceDir.equals("east")) {
+                        effectiveRotation = (effectiveRotation + yRotation) % 360;
+                    }
                 }
                 
                 // Check if rotation swaps width and height

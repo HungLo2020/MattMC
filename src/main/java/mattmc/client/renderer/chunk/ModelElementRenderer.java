@@ -326,10 +326,17 @@ public class ModelElementRenderer {
         // When uvlock=false, texture rotates naturally with the geometry
         int adjustedFaceRotation = faceRotDegrees;
         
-        // For uvlock, add the Y-axis rotation to counter-rotate UVs on vertical faces
-        // This compensates for the vertex rotation so texture stays world-aligned
+        // For uvlock, counter-rotate UVs on vertical faces to keep texture world-aligned
+        // The rotation direction depends on which face we're rendering
         if (uvlock && yRotation != 0 && !faceDirection.equals("up") && !faceDirection.equals("down")) {
-            adjustedFaceRotation = (faceRotDegrees + yRotation) % 360;
+            // For north/west faces, subtract the rotation
+            // For south/east faces, add the rotation
+            // This accounts for how the faces are oriented relative to the rotation axis
+            if (faceDirection.equals("north") || faceDirection.equals("west")) {
+                adjustedFaceRotation = (faceRotDegrees - yRotation + 360) % 360;
+            } else if (faceDirection.equals("south") || faceDirection.equals("east")) {
+                adjustedFaceRotation = (faceRotDegrees + yRotation) % 360;
+            }
         }
         
         // For uvlock with X-rotation, counter-rotate UVs on affected faces
