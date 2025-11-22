@@ -22,6 +22,18 @@ import java.util.Map;
  */
 public class StairsTextureOrientationTest {
     
+    private static class FaceStatus {
+        String elementName;
+        String faceName;
+        boolean isCorrect;
+        
+        FaceStatus(String elementName, String faceName, boolean isCorrect) {
+            this.elementName = elementName;
+            this.faceName = faceName;
+            this.isCorrect = isCorrect;
+        }
+    }
+    
     private static class TextureOrientationResult {
         Direction facing;
         Half half;
@@ -31,9 +43,11 @@ public class StairsTextureOrientationTest {
         String variantKey;
         String textureOrientation; // "CORRECT", "VERTICAL", or "UNKNOWN"
         String analysisDetails;
+        List<FaceStatus> faceStatuses;
         
         TextureOrientationResult(Direction facing, Half half, int xRotation, int yRotation, 
-                                boolean uvlock, String variantKey, String textureOrientation, String analysisDetails) {
+                                boolean uvlock, String variantKey, String textureOrientation, 
+                                String analysisDetails, List<FaceStatus> faceStatuses) {
             this.facing = facing;
             this.half = half;
             this.xRotation = xRotation;
@@ -42,6 +56,7 @@ public class StairsTextureOrientationTest {
             this.variantKey = variantKey;
             this.textureOrientation = textureOrientation;
             this.analysisDetails = analysisDetails;
+            this.faceStatuses = faceStatuses;
         }
         
         @Override
@@ -62,8 +77,7 @@ public class StairsTextureOrientationTest {
         System.out.println("║        STAIRS TEXTURE ORIENTATION DIAGNOSTIC TEST                      ║");
         System.out.println("╚════════════════════════════════════════════════════════════════════════╝");
         System.out.println();
-        System.out.println("This test checks if wood plank textures on stairs appear HORIZONTAL (✓)");
-        System.out.println("or VERTICAL (✗). The wood grain should run horizontally, not vertically.");
+        System.out.println("Legend: ✓ = Horizontal texture (correct)  ✗ = Vertical texture (wrong)");
         System.out.println();
         
         List<TextureOrientationResult> results = new ArrayList<>();
@@ -79,82 +93,69 @@ public class StairsTextureOrientationTest {
         // Test all combinations of direction and half
         for (Direction facing : Direction.values()) {
             for (Half half : Half.values()) {
-                TextureOrientationResult result = analyzeStairsConfiguration(blockState, facing, half);
+                TextureOrientationResult result = analyzeStairsConfigurationDetailed(blockState, facing, half);
                 if (result != null) {
                     results.add(result);
+                    printDetailedResult(result);
                 }
             }
         }
         
         // Count results by type
         long correctCount = results.stream().filter(r -> "CORRECT".equals(r.textureOrientation)).count();
-        long mixedCount = results.stream().filter(r -> "MIXED".equals(r.textureOrientation)).count();
-        long verticalCount = results.stream().filter(r -> "VERTICAL".equals(r.textureOrientation)).count();
-        
-        // Print results grouped by status
-        System.out.println("┌────────────────────────────────────────────────────────────────────────┐");
-        System.out.println("│ TEST RESULTS BY STAIR DIRECTION                                        │");
-        System.out.println("└────────────────────────────────────────────────────────────────────────┘");
-        System.out.println();
-        
-        // Show correct configurations
-        if (correctCount > 0) {
-            System.out.println("✓ CORRECT - Textures are HORIZONTAL (wood grain runs left-right):");
-            System.out.println("  ┌──────────────────────────────────────────────────────────┐");
-            results.stream()
-                .filter(r -> "CORRECT".equals(r.textureOrientation))
-                .forEach(r -> System.out.println(String.format("  │  ✓ %-10s %-6s  (Rotation: Y=%3d°)              │", 
-                    r.facing, r.half, r.yRotation)));
-            System.out.println("  └──────────────────────────────────────────────────────────┘");
-            System.out.println();
-        }
-        
-        // Show mixed/incorrect configurations
-        if (mixedCount > 0 || verticalCount > 0) {
-            System.out.println("✗ INCORRECT - Textures are VERTICAL (wood grain runs up-down):");
-            System.out.println("  ┌──────────────────────────────────────────────────────────┐");
-            results.stream()
-                .filter(r -> "MIXED".equals(r.textureOrientation) || "VERTICAL".equals(r.textureOrientation))
-                .forEach(r -> System.out.println(String.format("  │  ✗ %-10s %-6s  (Rotation: Y=%3d°)  ← WRONG    │", 
-                    r.facing, r.half, r.yRotation)));
-            System.out.println("  └──────────────────────────────────────────────────────────┘");
-            System.out.println();
-        }
+        long wrongCount = results.size() - correctCount;
         
         // Print summary
-        System.out.println("┌────────────────────────────────────────────────────────────────────────┐");
-        System.out.println("│ SUMMARY                                                                │");
-        System.out.println("└────────────────────────────────────────────────────────────────────────┘");
+        System.out.println("╔════════════════════════════════════════════════════════════════╗");
+        System.out.println("║ SUMMARY                                                        ║");
+        System.out.println("╚════════════════════════════════════════════════════════════════╝");
         System.out.println();
         System.out.println(String.format("  Total stair configurations tested: %d", results.size()));
-        System.out.println(String.format("  ✓ Correct (horizontal texture):   %d", correctCount));
-        System.out.println(String.format("  ✗ Wrong (vertical texture):       %d", mixedCount + verticalCount));
+        System.out.println(String.format("  ✓ Correct (all faces horizontal): %d", correctCount));
+        System.out.println(String.format("  ✗ Wrong (some faces vertical):    %d", wrongCount));
         System.out.println();
         
         if (correctCount == results.size()) {
-            System.out.println("  ╔══════════════════════════════════════════════════════════╗");
-            System.out.println("  ║  ✓✓✓ ALL STAIRS HAVE CORRECT TEXTURE ORIENTATION! ✓✓✓  ║");
-            System.out.println("  ╚══════════════════════════════════════════════════════════╝");
+            System.out.println("  ✓✓✓ ALL STAIRS HAVE CORRECT TEXTURE ORIENTATION! ✓✓✓");
         } else {
-            System.out.println("  ╔══════════════════════════════════════════════════════════╗");
-            System.out.println("  ║  ✗ PROBLEM FOUND: Some stairs have vertical textures    ║");
-            System.out.println("  ╚══════════════════════════════════════════════════════════╝");
-            System.out.println();
-            System.out.println("  EXPLANATION:");
-            System.out.println("  - Stairs facing EAST/WEST are correct (Y-rotation 0°/180°)");
-            System.out.println("  - Stairs facing NORTH/SOUTH are wrong (Y-rotation 90°/270°)");
-            System.out.println("  - The uvlock implementation needs adjustment for 90°/270° rotations");
+            System.out.println("  ✗ PROBLEM: Some stairs have vertical textures on certain faces");
+            System.out.println("  → Stairs facing EAST/WEST work correctly (Y-rotation 0°/180°)");
+            System.out.println("  → Stairs facing NORTH/SOUTH have issues (Y-rotation 90°/270°)");
         }
         
         System.out.println();
-        System.out.println("════════════════════════════════════════════════════════════════════════");
+        System.out.println("════════════════════════════════════════════════════════════════");
+        System.out.println();
+    }
+    
+    /**
+     * Print detailed results for a single configuration.
+     */
+    private void printDetailedResult(TextureOrientationResult result) {
+        String status = "CORRECT".equals(result.textureOrientation) ? "✓" : "✗";
+        
+        System.out.println("┌────────────────────────────────────────────────────────────────┐");
+        System.out.println(String.format("│ %s STAIRS FACING: %-10s   HALF: %-6s   Y-ROTATION: %3d°   │", 
+            status, result.facing, result.half, result.yRotation));
+        System.out.println("├────────────────────────────────────────────────────────────────┤");
+        
+        if (result.faceStatuses != null && !result.faceStatuses.isEmpty()) {
+            for (FaceStatus faceStatus : result.faceStatuses) {
+                String faceSymbol = faceStatus.isCorrect ? "✓" : "✗";
+                String statusText = faceStatus.isCorrect ? "HORIZONTAL" : "VERTICAL ";
+                System.out.println(String.format("│  %s %-18s %-10s : %s texture      │", 
+                    faceSymbol, faceStatus.elementName, faceStatus.faceName, statusText));
+            }
+        }
+        
+        System.out.println("└────────────────────────────────────────────────────────────────┘");
         System.out.println();
     }
     
     /**
      * Analyze the configuration for stairs with given facing and half.
      */
-    private TextureOrientationResult analyzeStairsConfiguration(BlockState blockState, 
+    private TextureOrientationResult analyzeStairsConfigurationDetailed(BlockState blockState, 
                                                                  Direction facing, Half half) {
         // Build variant key: "facing=north,half=bottom,shape=straight"
         String facingStr = facing.toString().toLowerCase();
@@ -183,10 +184,88 @@ public class StairsTextureOrientationTest {
         }
         
         // Analyze the texture orientation based on the model and rotation
-        String orientation = analyzeTextureOrientation(modelPath, xRotation, yRotation, uvlock);
-        String details = getOrientationDetails(modelPath, xRotation, yRotation, uvlock);
+        List<FaceStatus> faceStatuses = analyzeFacesByElement(modelPath, xRotation, yRotation, uvlock);
+        String orientation = determineOverallOrientation(faceStatuses);
+        String details = String.format("%d faces analyzed", faceStatuses.size());
         
-        return new TextureOrientationResult(facing, half, xRotation, yRotation, uvlock, variantKey, orientation, details);
+        return new TextureOrientationResult(facing, half, xRotation, yRotation, uvlock, variantKey, 
+                                           orientation, details, faceStatuses);
+    }
+    
+    /**
+     * Determine overall orientation based on face statuses.
+     */
+    private String determineOverallOrientation(List<FaceStatus> faceStatuses) {
+        long correctCount = faceStatuses.stream().filter(f -> f.isCorrect).count();
+        long wrongCount = faceStatuses.stream().filter(f -> !f.isCorrect).count();
+        
+        if (wrongCount == 0 && correctCount > 0) {
+            return "CORRECT";
+        } else if (wrongCount > 0 && correctCount == 0) {
+            return "VERTICAL";
+        } else if (wrongCount > 0) {
+            return "MIXED";
+        } else {
+            return "UNKNOWN";
+        }
+    }
+    
+    /**
+     * Analyze faces element by element.
+     */
+    private List<FaceStatus> analyzeFacesByElement(String modelPath, int xRotation, int yRotation, boolean uvlock) {
+        List<FaceStatus> faceStatuses = new ArrayList<>();
+        
+        BlockModel model = ResourceManager.loadBlockModel(modelPath);
+        if (model == null || model.getElements() == null) {
+            return faceStatuses;
+        }
+        
+        for (int elemIdx = 0; elemIdx < model.getElements().size(); elemIdx++) {
+            ModelElement element = model.getElements().get(elemIdx);
+            String elementName = elemIdx == 0 ? "Bottom slab" : "Top step";
+            
+            Map<String, ModelElement.ElementFace> faces = element.getFaces();
+            if (faces == null) continue;
+            
+            // Check each vertical face
+            for (String faceDir : new String[]{"north", "south", "east", "west"}) {
+                ModelElement.ElementFace face = faces.get(faceDir);
+                if (face == null) continue;
+                
+                List<Float> uv = face.getUv();
+                if (uv == null || uv.size() < 4) continue;
+                
+                // Get UV dimensions
+                float u0 = uv.get(0);
+                float v0 = uv.get(1);
+                float u1 = uv.get(2);
+                float v1 = uv.get(3);
+                float uvWidth = Math.abs(u1 - u0);
+                float uvHeight = Math.abs(v1 - v0);
+                
+                // Simulate the uvlock rotation effect
+                int effectiveRotation = (face.getRotation() != null) ? face.getRotation() : 0;
+                if (uvlock && yRotation != 0) {
+                    effectiveRotation = (effectiveRotation + yRotation) % 360;
+                }
+                
+                // Check if rotation swaps width and height
+                boolean isRotated90or270 = (effectiveRotation % 180) == 90;
+                
+                // Determine final orientation
+                boolean isVertical;
+                if (isRotated90or270) {
+                    isVertical = uvWidth > uvHeight;
+                } else {
+                    isVertical = uvHeight > uvWidth;
+                }
+                
+                faceStatuses.add(new FaceStatus(elementName, faceDir, !isVertical));
+            }
+        }
+        
+        return faceStatuses;
     }
     
     /**
