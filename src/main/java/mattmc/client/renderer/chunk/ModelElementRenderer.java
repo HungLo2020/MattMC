@@ -322,14 +322,22 @@ public class ModelElementRenderer {
         }
         
         // Apply per-face UV rotation as specified in the model JSON
-        // When uvlock=true, disable UV rotation to keep texture aligned with world axes
+        // When uvlock=true, counter-rotate UVs to compensate for vertex rotation
         // When uvlock=false, texture rotates naturally with the geometry
         int adjustedFaceRotation = faceRotDegrees;
         
-        // For uvlock, set rotation to 0 to keep texture in natural orientation (horizontal)
-        // This prevents texture from rotating with the block geometry
-        if (uvlock) {
-            adjustedFaceRotation = 0;
+        // For uvlock, counter-rotate UVs to keep texture world-aligned
+        // When vertices rotate by Y degrees, UVs must rotate by -Y degrees to compensate
+        // Only apply to vertical faces (not up/down) since those are affected by Y-rotation
+        if (uvlock && yRotation != 0 && !faceDirection.equals("up") && !faceDirection.equals("down")) {
+            // Subtract Y-rotation to counter-rotate (vertices rotate one way, UVs rotate opposite)
+            adjustedFaceRotation = (faceRotDegrees - yRotation + 360) % 360;
+        }
+        
+        // For uvlock with X-rotation, counter-rotate UVs on north/south faces
+        // X-rotation affects these faces when flipping stairs upside-down
+        if (uvlock && xRotation == 180 && (faceDirection.equals("north") || faceDirection.equals("south"))) {
+            adjustedFaceRotation = (adjustedFaceRotation + 180) % 360;
         }
         
         // Render the face with rotated vertices
