@@ -277,7 +277,7 @@ public class ModelElementRenderer {
         if (uvlock && (xRotation != 0 || yRotation != 0)) {
             // Create a BlockFaceUV with the current UV coordinates and rotation
             mattmc.client.renderer.block.model.BlockFaceUV blockFaceUV = 
-                new mattmc.client.renderer.block.model.BlockFaceUV(uv, faceRotDegrees);
+                new mattmc.client.renderer.block.model.BlockFaceUV(uv.clone(), faceRotDegrees);
             
             // Create a Transformation from the X and Y rotations
             mattmc.client.renderer.block.model.Transformation modelRotation = 
@@ -286,6 +286,11 @@ public class ModelElementRenderer {
             // Convert face direction string to Direction enum
             Direction faceDir = stringToDirection(faceDirection);
             
+            // Debug logging
+            System.out.println(String.format("UVLOCK: face=%s xRot=%d yRot=%d uvlock=%b | UV before: [%.1f,%.1f,%.1f,%.1f] rot=%d",
+                faceDirection, xRotation, yRotation, uvlock,
+                uv[0], uv[1], uv[2], uv[3], faceRotDegrees));
+            
             // Recompute UVs using Minecraft's exact algorithm
             mattmc.client.renderer.block.model.BlockFaceUV recomputedUV = 
                 mattmc.client.renderer.block.model.FaceBakery.recomputeUVs(blockFaceUV, faceDir, modelRotation);
@@ -293,6 +298,9 @@ public class ModelElementRenderer {
             // Update UV coordinates and rotation with the recomputed values
             uv = recomputedUV.uvs;
             faceRotDegrees = recomputedUV.rotation;
+            
+            System.out.println(String.format("         UV after:  [%.1f,%.1f,%.1f,%.1f] rot=%d",
+                uv[0], uv[1], uv[2], uv[3], faceRotDegrees));
         }
         
         // Convert UV to 0-1 space and apply atlas mapping
