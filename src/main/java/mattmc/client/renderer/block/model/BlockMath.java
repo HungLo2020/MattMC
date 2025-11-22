@@ -61,9 +61,15 @@ public class BlockMath {
         // 1. Transform from face-local UV space to world space (using original face direction)
         // 2. Apply inverse model rotation
         // 3. Transform back from world space to face-local UV space (using new face direction)
-        Transformation result = VANILLA_UV_TRANSFORM_GLOBAL_TO_LOCAL.get(facingBefore)
-            .compose(inverseRotation)
-            .compose(VANILLA_UV_TRANSFORM_LOCAL_TO_GLOBAL.get(facingAfter));
+        Transformation globalToLocal = VANILLA_UV_TRANSFORM_GLOBAL_TO_LOCAL.get(facingBefore);
+        Transformation localToGlobal = VANILLA_UV_TRANSFORM_LOCAL_TO_GLOBAL.get(facingAfter);
+        
+        if (globalToLocal == null || localToGlobal == null) {
+            System.err.println("Missing UV transform for direction: " + facingBefore + " or " + facingAfter);
+            return Transformation.identity();
+        }
+        
+        Transformation result = globalToLocal.compose(inverseRotation).compose(localToGlobal);
         
         return blockCenterToCorner(result);
     }

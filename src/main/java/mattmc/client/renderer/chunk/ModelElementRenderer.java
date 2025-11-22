@@ -273,7 +273,7 @@ public class ModelElementRenderer {
         int faceRotDegrees = (faceRotation != null) ? faceRotation : 0;
         
         // When uvlock=true, recompute UVs using Minecraft's exact algorithm
-        // This is a verbatim implementation of Minecraft's FaceBakery.recomputeUVs
+        // Delegates to FaceBakery.recomputeUVs which is a verbatim port of Minecraft's method
         if (uvlock && (xRotation != 0 || yRotation != 0)) {
             // Create a BlockFaceUV with the current UV coordinates and rotation
             mattmc.client.renderer.block.model.BlockFaceUV blockFaceUV = 
