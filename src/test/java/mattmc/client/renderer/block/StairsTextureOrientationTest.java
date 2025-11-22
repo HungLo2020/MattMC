@@ -26,11 +26,20 @@ public class StairsTextureOrientationTest {
         String elementName;
         String faceName;
         boolean isCorrect;
+        boolean faceExists;
         
         FaceStatus(String elementName, String faceName, boolean isCorrect) {
             this.elementName = elementName;
             this.faceName = faceName;
             this.isCorrect = isCorrect;
+            this.faceExists = true;
+        }
+        
+        FaceStatus(String elementName, String faceName, boolean isCorrect, boolean faceExists) {
+            this.elementName = elementName;
+            this.faceName = faceName;
+            this.isCorrect = isCorrect;
+            this.faceExists = faceExists;
         }
     }
     
@@ -143,10 +152,16 @@ public class StairsTextureOrientationTest {
         
         if (result.faceStatuses != null && !result.faceStatuses.isEmpty()) {
             for (FaceStatus faceStatus : result.faceStatuses) {
-                String faceSymbol = faceStatus.isCorrect ? "✓" : "✗";
-                String statusText = faceStatus.isCorrect ? "HORIZONTAL" : "VERTICAL ";
-                System.out.println(String.format("│  %s %-18s %-10s : %s texture      │ [ ]          │", 
-                    faceSymbol, faceStatus.elementName, faceStatus.faceName, statusText));
+                if (!faceStatus.faceExists) {
+                    // Show N/A for faces that don't exist in the model
+                    System.out.println(String.format("│  - %-18s %-10s : N/A (not in model)        │ [ ]          │", 
+                        faceStatus.elementName, faceStatus.faceName));
+                } else {
+                    String faceSymbol = faceStatus.isCorrect ? "✓" : "✗";
+                    String statusText = faceStatus.isCorrect ? "HORIZONTAL" : "VERTICAL ";
+                    System.out.println(String.format("│  %s %-18s %-10s : %s texture      │ [ ]          │", 
+                        faceSymbol, faceStatus.elementName, faceStatus.faceName, statusText));
+                }
             }
         }
         
@@ -228,15 +243,22 @@ public class StairsTextureOrientationTest {
             String elementName = elemIdx == 0 ? "Bottom slab" : "Top step";
             
             Map<String, ModelElement.ElementFace> faces = element.getFaces();
-            if (faces == null) continue;
             
-            // Check all faces including top and bottom
+            // Always check all 6 faces in consistent order, even if they don't exist in the model
             for (String faceDir : new String[]{"up", "down", "north", "south", "east", "west"}) {
-                ModelElement.ElementFace face = faces.get(faceDir);
-                if (face == null) continue;
+                // Check if face exists in model
+                if (faces == null || faces.get(faceDir) == null) {
+                    // Add placeholder for missing face
+                    faceStatuses.add(new FaceStatus(elementName, faceDir, true, false)); // Mark as non-existent
+                    continue;
+                }
                 
+                ModelElement.ElementFace face = faces.get(faceDir);
                 List<Float> uv = face.getUv();
-                if (uv == null || uv.size() < 4) continue;
+                if (uv == null || uv.size() < 4) {
+                    faceStatuses.add(new FaceStatus(elementName, faceDir, true, false));
+                    continue;
+                }
                 
                 // Get UV dimensions
                 float u0 = uv.get(0);
