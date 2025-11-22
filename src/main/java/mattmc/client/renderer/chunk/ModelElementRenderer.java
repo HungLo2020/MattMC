@@ -326,22 +326,10 @@ public class ModelElementRenderer {
         // When uvlock=false, texture rotates naturally with the geometry
         int adjustedFaceRotation = faceRotDegrees;
         
-        // For uvlock, apply face-specific rotation based on Minecraft's FaceBakery logic
-        // Based on user feedback: when facing NORTH (Y=270°), north and west faces need fixing
-        // Pattern: At Y-rotations of 90° and 270°, north and west faces need 180° added
-        if (uvlock && yRotation != 0 && !faceDirection.equals("up") && !faceDirection.equals("down")) {
-            // For 90° and 270° rotations, north and west faces need 180° added to flip orientation
-            if ((yRotation == 90 || yRotation == 270) && 
-                (faceDirection.equals("north") || faceDirection.equals("west"))) {
-                adjustedFaceRotation = (faceRotDegrees + 180) % 360;
-            }
-            // South and east faces work correctly at these angles with no adjustment
-        }
-        
-        // For uvlock with X-rotation, counter-rotate UVs on north/south faces
-        // X-rotation affects these faces when flipping stairs upside-down
-        if (uvlock && xRotation == 180 && (faceDirection.equals("north") || faceDirection.equals("south"))) {
-            adjustedFaceRotation = (adjustedFaceRotation + 180) % 360;
+        // DEBUG: Try completely disabling rotation when uvlock=true to see if that's even the issue
+        if (uvlock) {
+            adjustedFaceRotation = 0;
+            System.out.println("DEBUG uvlock: face=" + faceDirection + " yRot=" + yRotation + " xRot=" + xRotation + " origRot=" + faceRotDegrees + " adjRot=" + adjustedFaceRotation);
         }
         
         // Render the face with rotated vertices
