@@ -134,21 +134,23 @@ public class StairsTextureOrientationTest {
     private void printDetailedResult(TextureOrientationResult result) {
         String status = "CORRECT".equals(result.textureOrientation) ? "✓" : "✗";
         
-        System.out.println("┌────────────────────────────────────────────────────────────────┐");
-        System.out.println(String.format("│ %s STAIRS FACING: %-10s   HALF: %-6s   Y-ROTATION: %3d°   │", 
+        System.out.println("┌─────────────────────────────────────────────────────────────────────────────┐");
+        System.out.println(String.format("│ %s STAIRS FACING: %-10s   HALF: %-6s   Y-ROTATION: %3d°             │", 
             status, result.facing, result.half, result.yRotation));
-        System.out.println("├────────────────────────────────────────────────────────────────┤");
+        System.out.println("├──────────────────────────────────────────────────────────────┬──────────────┤");
+        System.out.println("│ Face Analysis (Predicted by Test)                           │ Manual Check │");
+        System.out.println("├──────────────────────────────────────────────────────────────┼──────────────┤");
         
         if (result.faceStatuses != null && !result.faceStatuses.isEmpty()) {
             for (FaceStatus faceStatus : result.faceStatuses) {
                 String faceSymbol = faceStatus.isCorrect ? "✓" : "✗";
                 String statusText = faceStatus.isCorrect ? "HORIZONTAL" : "VERTICAL ";
-                System.out.println(String.format("│  %s %-18s %-10s : %s texture      │", 
+                System.out.println(String.format("│  %s %-18s %-10s : %s texture      │ [ ]          │", 
                     faceSymbol, faceStatus.elementName, faceStatus.faceName, statusText));
             }
         }
         
-        System.out.println("└────────────────────────────────────────────────────────────────┘");
+        System.out.println("└──────────────────────────────────────────────────────────────┴──────────────┘");
         System.out.println();
     }
     
