@@ -50,6 +50,8 @@ public class BlockMath {
         // Determine which direction this face will be after rotation
         Direction facingAfter = rotate(modelRotation.getMatrix(), facingBefore);
         
+        System.out.println(String.format("  getUVLockTransform: %s -> %s", facingBefore, facingAfter));
+        
         // Get the inverse of the model rotation
         Transformation inverseRotation = modelRotation.inverse();
         if (inverseRotation == null) {
