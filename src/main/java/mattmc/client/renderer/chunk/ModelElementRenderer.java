@@ -272,12 +272,11 @@ public class ModelElementRenderer {
         Integer faceRotation = elementFace.getRotation();
         int faceRotDegrees = (faceRotation != null) ? faceRotation : 0;
         
-        // When uvlock=true, keep original UV coordinates
-        // The UVs from model JSON are already world-aligned (horizontal planks)
-        // Do NOT transform them - transforming would rotate horizontal rectangles into vertical ones
-        // if (uvlock && yRotation != 0 && !faceDirection.equals("up") && !faceDirection.equals("down")) {
-        //     uv = transformUVsForRotation(uv, faceDirection, yRotation);
-        // }
+        // When uvlock=true, counter-rotate UVs to keep textures aligned with world axes
+        // This prevents textures from rotating with the block
+        if (uvlock && (xRotation != 0 || yRotation != 0)) {
+            uv = rotateUVs(uv, faceDirection, xRotation, yRotation);
+        }
         
         // Convert UV to 0-1 space and apply atlas mapping
         float u0, v0, u1, v1;
