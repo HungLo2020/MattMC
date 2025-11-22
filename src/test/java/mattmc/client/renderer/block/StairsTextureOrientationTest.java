@@ -271,11 +271,10 @@ public class StairsTextureOrientationTest {
                 // Simulate the uvlock rotation effect
                 int effectiveRotation = (face.getRotation() != null) ? face.getRotation() : 0;
                 
-                // For vertical faces, add Y-rotation to counter-rotate UVs
-                // This keeps textures world-aligned (horizontal) when block rotates
-                boolean isVerticalFace = !faceDir.equals("up") && !faceDir.equals("down");
-                if (uvlock && yRotation != 0 && isVerticalFace) {
-                    effectiveRotation = (effectiveRotation + yRotation) % 360;
+                // When uvlock=true, set rotation to 0 to keep texture in natural orientation
+                // This prevents texture from rotating with the block geometry
+                if (uvlock) {
+                    effectiveRotation = 0;
                 }
                 
                 // Check if rotation swaps width and height
