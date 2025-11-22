@@ -272,10 +272,12 @@ public class ModelElementRenderer {
         Integer faceRotation = elementFace.getRotation();
         int faceRotDegrees = (faceRotation != null) ? faceRotation : 0;
         
-        // When uvlock=true, counter-rotate UVs to keep textures aligned with world axes
-        // This prevents textures from rotating with the block
+        // When uvlock=true, adjust the rotation value to keep textures aligned with world axes
+        // Following Minecraft's FaceBakery.recomputeUVs approach
         if (uvlock && (xRotation != 0 || yRotation != 0)) {
-            uv = rotateUVs(uv, faceDirection, xRotation, yRotation);
+            int uvlockRotation = calculateUVLockRotation(faceDirection, xRotation, yRotation);
+            faceRotDegrees = (faceRotDegrees + uvlockRotation) % 360;
+            if (faceRotDegrees < 0) faceRotDegrees += 360;
         }
         
         // Convert UV to 0-1 space and apply atlas mapping
@@ -501,69 +503,48 @@ public class ModelElementRenderer {
     }
     
     /**
-     * Rotate UV coordinates for uvlock.
-     * When uvlock is true, UVs are counter-rotated to maintain texture orientation with world axes.
+     * Calculate the UV rotation adjustment for uvlock.
+     * When uvlock is true, we adjust the face rotation value to keep textures aligned with world axes.
+     * This follows Minecraft's FaceBakery.recomputeUVs which transforms UVs through matrices
+     * and recomputes the rotation value.
      * 
-     * Key principle: rotation around an axis only affects faces perpendicular to that axis.
-     * - Y-axis rotation: affects horizontal faces (up/down) - they see the texture rotate
-     * - X-axis rotation: affects vertical north/south faces - they see the texture rotate  
-     * - Z-axis rotation: affects vertical east/west faces - they see the texture rotate
-     * 
-     * @param uv Original UV coordinates [u0, v0, u1, v1] in 0-16 space
      * @param face Face direction (BEFORE any rotation is applied to geometry)
      * @param xDegrees X-axis rotation applied to block
      * @param yDegrees Y-axis rotation applied to block
-     * @return Counter-rotated UV coordinates
+     * @return Rotation adjustment to add to the face rotation
      */
-    private float[] rotateUVs(float[] uv, String face, int xDegrees, int yDegrees) {
-        // With uvlock enabled, counter-rotate UVs to maintain world-axis alignment
-        // This applies to all faces that are affected by the rotation
+    private int calculateUVLockRotation(String face, int xDegrees, int yDegrees) {
+        // Determine the face direction after block rotation
+        String rotatedFace = rotateFaceDirection(face, xDegrees, yDegrees);
         
-        // Y-axis rotation affects horizontal (up/down) AND vertical (N/S/E/W) faces
-        // All faces need UV counter-rotation to keep textures aligned with world axes
-        if (yDegrees != 0) {
-            uv = rotateUVClockwise(uv, -yDegrees);
+        // The UV rotation adjustment depends on how the face direction changes
+        // This is based on Minecraft's matrix transformation in getUVLockTransform
+        
+        // For Y-axis rotations (most common case)
+        if (yDegrees != 0 && xDegrees == 0) {
+            // Vertical side faces (N/S/E/W) need counter-rotation
+            if (!face.equals("up") && !face.equals("down")) {
+                // Counter-rotate by the amount the block rotated
+                return -yDegrees;
+            }
+            // Horizontal faces (up/down) also need adjustment for Y rotation
+            else {
+                return -yDegrees;
+            }
         }
         
-        // X-axis rotation affects north/south faces (perpendicular to X axis)
-        // For stairs, this is used for upside-down variants (half=top with x=180)
-        if (xDegrees != 0 && (face.equals("north") || face.equals("south"))) {
-            uv = rotateUVClockwise(uv, -xDegrees);
+        // For X-axis rotations
+        if (xDegrees != 0) {
+            // X rotation affects faces perpendicular to X axis (up/down and north/south)
+            if (face.equals("up") || face.equals("down") || 
+                face.equals("north") || face.equals("south")) {
+                return -xDegrees;
+            }
         }
         
-        return uv;
+        return 0;
     }
-    
-    /**
-     * Rotate UV coordinates clockwise by the specified degrees.
-     * UV coordinates are in texture space [u0, v0, u1, v1] from 0-16.
-     * 
-     * For 90-degree clockwise rotation: (u, v) → (v, 16-u)
-     * This rotates the UV rectangle around the center of the 16x16 texture space.
-     */
-    private float[] rotateUVClockwise(float[] uv, int degrees) {
-        float u0 = uv[0], v0 = uv[1], u1 = uv[2], v1 = uv[3];
-        
-        // Number of 90-degree rotations (handle negative degrees for counter-clockwise)
-        int rotations = (degrees / 90) % 4;
-        if (rotations < 0) rotations += 4;
-        
-        for (int i = 0; i < rotations; i++) {
-            // Rotate 90 degrees clockwise: (u, v) → (v, 16-u)
-            // Apply to both corners of the UV rectangle
-            float newU0 = v0;
-            float newV0 = 16 - u1;
-            float newU1 = v1;
-            float newV1 = 16 - u0;
-            
-            u0 = newU0;
-            v0 = newV0;
-            u1 = newU1;
-            v1 = newV1;
-        }
-        
-        return new float[]{u0, v0, u1, v1};
-    }
+
     
     /**
      * Resolve texture variable reference to actual texture path.
