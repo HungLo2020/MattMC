@@ -321,19 +321,13 @@ public class ModelElementRenderer {
             faceVerts[i][2] += blockZ;
         }
         
-        // Adjust face rotation to compensate for block Y-axis rotation
-        // When block rotates, the vertex order changes, so we need to adjust the UV rotation
-        // to maintain the correct texture orientation relative to the rotated geometry
-        // This follows Minecraft's approach (see BlockFaceUV.getShiftedIndex() in frnsrc/):
-        // getShiftedIndex(pIndex) = (pIndex + rotation/90) % 4
-        // We ADD rotation to shift which vertex receives which UV coordinate
+        // Apply per-face UV rotation as specified in the model JSON
+        // Note: When uvlock=false (default), UVs should NOT counter-rotate when the block rotates
+        // The texture rotates with the geometry naturally through vertex rotation
+        // Only the per-face rotation property from the JSON should affect UV mapping
         int adjustedFaceRotation = faceRotDegrees;
-        if (yRotation != 0 && !faceDirection.equals("up") && !faceDirection.equals("down")) {
-            // For vertical faces (N/S/E/W), add the Y rotation to compensate for vertex reordering
-            adjustedFaceRotation = (faceRotDegrees + yRotation) % 360;
-        }
         
-        // Render the face with rotated vertices, passing the adjusted face rotation
+        // Render the face with rotated vertices
         currentVertex = addFaceQuadWithVertices(face, faceVerts, faceNormal, u0, v0, u1, v1, 
                                                 adjustedFaceRotation, vertices, indices, currentVertex);
         
