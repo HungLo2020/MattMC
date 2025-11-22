@@ -228,8 +228,8 @@ public class StairsTextureOrientationTest {
             Map<String, ModelElement.ElementFace> faces = element.getFaces();
             if (faces == null) continue;
             
-            // Check each vertical face
-            for (String faceDir : new String[]{"north", "south", "east", "west"}) {
+            // Check all faces including top and bottom
+            for (String faceDir : new String[]{"up", "down", "north", "south", "east", "west"}) {
                 ModelElement.ElementFace face = faces.get(faceDir);
                 if (face == null) continue;
                 
@@ -246,7 +246,10 @@ public class StairsTextureOrientationTest {
                 
                 // Simulate the uvlock rotation effect
                 int effectiveRotation = (face.getRotation() != null) ? face.getRotation() : 0;
-                if (uvlock && yRotation != 0) {
+                
+                // For vertical faces (north/south/east/west), apply Y-rotation when uvlock is enabled
+                boolean isVerticalFace = !faceDir.equals("up") && !faceDir.equals("down");
+                if (uvlock && yRotation != 0 && isVerticalFace) {
                     effectiveRotation = (effectiveRotation + yRotation) % 360;
                 }
                 
