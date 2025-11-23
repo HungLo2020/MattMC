@@ -238,11 +238,8 @@ public class ModelElementRenderer {
         String texturePath = textureRef;
         if (texturePath.startsWith("#")) {
             texturePath = resolveTexture(texturePath, model);
-            System.out.println("DEBUG: Resolved " + textureRef + " -> " + texturePath);
             if (texturePath == null) {
-                System.err.println("ERROR: Failed to resolve texture " + textureRef + " for block at " + 
-                                   face.x + "," + face.y + "," + face.z);
-                System.err.println("Model textures: " + (model.getTextures() != null ? model.getTextures() : "null"));
+                // Failed to resolve texture - skip this face
                 return currentVertex;
             }
         }
@@ -272,12 +269,13 @@ public class ModelElementRenderer {
         Integer faceRotation = elementFace.getRotation();
         int faceRotDegrees = (faceRotation != null) ? faceRotation : 0;
         
-        // When uvlock=true, keep original UV coordinates
-        // The UVs from model JSON are already world-aligned (horizontal planks)
-        // Do NOT transform them - transforming would rotate horizontal rectangles into vertical ones
-        // if (uvlock && yRotation != 0 && !faceDirection.equals("up") && !faceDirection.equals("down")) {
-        //     uv = transformUVsForRotation(uv, faceDirection, yRotation);
-        // }
+        // When uvlock=true, transform UV coordinates to account for geometry rotation
+        // This keeps textures aligned with world axes by rotating the UV rectangle
+        // Note: Only Y-rotation is handled here as stairs only rotate around Y-axis
+        // X-rotation is used for upside-down stairs (half=top) but doesn't require UV transformation
+        if (uvlock && yRotation != 0) {
+            uv = transformUVsForRotation(uv, faceDirection, yRotation);
+        }
         
         // Convert UV to 0-1 space and apply atlas mapping
         float u0, v0, u1, v1;
@@ -295,38 +293,35 @@ public class ModelElementRenderer {
             v1 = uv[3] / 16.0f;
         }
         
-        // Get face vertices and normal BEFORE rotation
-        // This ensures UVs are mapped correctly to the original face orientation
-        float[][] faceVerts = getFaceVertices(faceDirection, x0, y0, z0, x1, y1, z1);
-        float[] faceNormal = getFaceNormal(faceDirection);
-        
-        // Apply rotations to vertex positions if needed
-        // Rotations are applied in order: X first, then Y (following Minecraft's convention)
-        if (xRotation != 0 || yRotation != 0) {
-            for (int i = 0; i < 4; i++) {
-                float[] rotated = rotatePoint(faceVerts[i][0], faceVerts[i][1], faceVerts[i][2], xRotation, yRotation);
-                faceVerts[i][0] = rotated[0];
-                faceVerts[i][1] = rotated[1];
-                faceVerts[i][2] = rotated[2];
+        // Build vertices following Minecraft's FaceBakery approach:
+        // For each vertex index, get the corner position based on face direction,
+        // then apply rotations. This maintains vertex-UV correspondence.
+        float[][] faceVerts = new float[4][3];
+        for (int i = 0; i < 4; i++) {
+            // Get corner position for this vertex index based on face direction
+            float[] corner = getFaceVertexCorner(faceDirection, i, x0, y0, z0, x1, y1, z1);
+            
+            // Apply element rotations if needed
+            if (xRotation != 0 || yRotation != 0) {
+                corner = rotatePoint(corner[0], corner[1], corner[2], xRotation, yRotation);
             }
-            // Also rotate the face normal
-            float[] rotatedNormal = rotatePoint(faceNormal[0], faceNormal[1], faceNormal[2], xRotation, yRotation);
-            faceNormal = rotatedNormal;
+            
+            // Add world position offset
+            faceVerts[i][0] = corner[0] + blockX;
+            faceVerts[i][1] = corner[1] + blockY;
+            faceVerts[i][2] = corner[2] + blockZ;
         }
         
-        // Add world position offset to vertices
-        for (int i = 0; i < 4; i++) {
-            faceVerts[i][0] += blockX;
-            faceVerts[i][1] += blockY;
-            faceVerts[i][2] += blockZ;
+        // Get face normal and rotate it if needed
+        float[] faceNormal = getFaceNormal(faceDirection);
+        if (xRotation != 0 || yRotation != 0) {
+            faceNormal = rotatePoint(faceNormal[0], faceNormal[1], faceNormal[2], xRotation, yRotation);
         }
         
         // Apply per-face UV rotation as specified in the model JSON
-        // When uvlock=true, UVs are transformed above to keep textures world-aligned
-        // The per-face rotation from JSON is applied regardless of uvlock
         int adjustedFaceRotation = faceRotDegrees;
         
-        // Render the face with rotated vertices
+        // Render the face with rotated vertices and transformed UVs
         currentVertex = addFaceQuadWithVertices(face, faceVerts, faceNormal, u0, v0, u1, v1, 
                                                 adjustedFaceRotation, vertices, indices, currentVertex);
         
@@ -635,8 +630,11 @@ public class ModelElementRenderer {
         // Get face normal
         float[] normal = getFaceNormal(faceDirection);
         
-        // Get face vertices based on direction
-        float[][] faceVerts = getFaceVertices(faceDirection, x0, y0, z0, x1, y1, z1);
+        // Get face vertices based on direction using new per-vertex approach
+        float[][] faceVerts = new float[4][3];
+        for (int i = 0; i < 4; i++) {
+            faceVerts[i] = getFaceVertexCorner(faceDirection, i, x0, y0, z0, x1, y1, z1);
+        }
         
         // Add 4 vertices for the quad
         int baseVertex = currentVertex;
@@ -749,31 +747,75 @@ public class ModelElementRenderer {
     }
     
     /**
-     * Get vertices for a face in CCW order.
+     * Get the corner position for a specific vertex index of a face.
+     * This EXACTLY follows Minecraft's FaceInfo.VertexInfo mapping from FaceInfo.java.
+     * 
+     * Constants mapping: MIN_X=x0, MAX_X=x1, MIN_Y=y0, MAX_Y=y1, MIN_Z=z0, MAX_Z=z1
+     * 
+     * @param direction Face direction (up, down, north, south, east, west)
+     * @param vertexIndex Vertex index (0-3)
+     * @param x0, y0, z0, x1, y1, z1 Element bounds
+     * @return Corner position as [x, y, z]
      */
-    private float[][] getFaceVertices(String direction, float x0, float y0, float z0,
-                                      float x1, float y1, float z1) {
+    private float[] getFaceVertexCorner(String direction, int vertexIndex, float x0, float y0, float z0,
+                                       float x1, float y1, float z1) {
+        // EXACT mapping from Minecraft's FaceInfo enum (FaceInfo.java lines 10-15)
         return switch (direction) {
-            case "up" -> new float[][]{
-                {x0, y1, z0}, {x0, y1, z1}, {x1, y1, z1}, {x1, y1, z0}
+            case "up" -> switch (vertexIndex) {
+                // UP: (MIN_X,MAX_Y,MIN_Z), (MIN_X,MAX_Y,MAX_Z), (MAX_X,MAX_Y,MAX_Z), (MAX_X,MAX_Y,MIN_Z)
+                case 0 -> new float[]{x0, y1, z0};
+                case 1 -> new float[]{x0, y1, z1};
+                case 2 -> new float[]{x1, y1, z1};
+                case 3 -> new float[]{x1, y1, z0};
+                default -> new float[]{x0, y1, z0};
             };
-            case "down" -> new float[][]{
-                {x0, y0, z0}, {x1, y0, z0}, {x1, y0, z1}, {x0, y0, z1}
+            case "down" -> switch (vertexIndex) {
+                // DOWN: (MIN_X,MIN_Y,MAX_Z), (MIN_X,MIN_Y,MIN_Z), (MAX_X,MIN_Y,MIN_Z), (MAX_X,MIN_Y,MAX_Z)
+                case 0 -> new float[]{x0, y0, z1};
+                case 1 -> new float[]{x0, y0, z0};
+                case 2 -> new float[]{x1, y0, z0};
+                case 3 -> new float[]{x1, y0, z1};
+                default -> new float[]{x0, y0, z1};
             };
-            case "north" -> new float[][]{
-                {x0, y0, z0}, {x0, y1, z0}, {x1, y1, z0}, {x1, y0, z0}
+            case "north" -> switch (vertexIndex) {
+                // NORTH: (MAX_X,MAX_Y,MIN_Z), (MAX_X,MIN_Y,MIN_Z), (MIN_X,MIN_Y,MIN_Z), (MIN_X,MAX_Y,MIN_Z)
+                case 0 -> new float[]{x1, y1, z0};
+                case 1 -> new float[]{x1, y0, z0};
+                case 2 -> new float[]{x0, y0, z0};
+                case 3 -> new float[]{x0, y1, z0};
+                default -> new float[]{x1, y1, z0};
             };
-            case "south" -> new float[][]{
-                {x0, y0, z1}, {x1, y0, z1}, {x1, y1, z1}, {x0, y1, z1}
+            case "south" -> switch (vertexIndex) {
+                // SOUTH: (MIN_X,MAX_Y,MAX_Z), (MIN_X,MIN_Y,MAX_Z), (MAX_X,MIN_Y,MAX_Z), (MAX_X,MAX_Y,MAX_Z)
+                case 0 -> new float[]{x0, y1, z1};
+                case 1 -> new float[]{x0, y0, z1};
+                case 2 -> new float[]{x1, y0, z1};
+                case 3 -> new float[]{x1, y1, z1};
+                default -> new float[]{x0, y1, z1};
             };
-            case "west" -> new float[][]{
-                {x0, y0, z0}, {x0, y0, z1}, {x0, y1, z1}, {x0, y1, z0}
+            case "west" -> switch (vertexIndex) {
+                // WEST: (MIN_X,MAX_Y,MIN_Z), (MIN_X,MIN_Y,MIN_Z), (MIN_X,MIN_Y,MAX_Z), (MIN_X,MAX_Y,MAX_Z)
+                case 0 -> new float[]{x0, y1, z0};
+                case 1 -> new float[]{x0, y0, z0};
+                case 2 -> new float[]{x0, y0, z1};
+                case 3 -> new float[]{x0, y1, z1};
+                default -> new float[]{x0, y1, z0};
             };
-            case "east" -> new float[][]{
-                {x1, y0, z0}, {x1, y1, z0}, {x1, y1, z1}, {x1, y0, z1}
+            case "east" -> switch (vertexIndex) {
+                // EAST: (MAX_X,MAX_Y,MAX_Z), (MAX_X,MIN_Y,MAX_Z), (MAX_X,MIN_Y,MIN_Z), (MAX_X,MAX_Y,MIN_Z)
+                case 0 -> new float[]{x1, y1, z1};
+                case 1 -> new float[]{x1, y0, z1};
+                case 2 -> new float[]{x1, y0, z0};
+                case 3 -> new float[]{x1, y1, z0};
+                default -> new float[]{x1, y1, z1};
             };
-            default -> new float[][]{
-                {x0, y0, z0}, {x0, y1, z0}, {x1, y1, z0}, {x1, y0, z0}
+            default -> switch (vertexIndex) {
+                // Default to NORTH if unknown
+                case 0 -> new float[]{x1, y1, z0};
+                case 1 -> new float[]{x1, y0, z0};
+                case 2 -> new float[]{x0, y0, z0};
+                case 3 -> new float[]{x0, y1, z0};
+                default -> new float[]{x1, y1, z0};
             };
         };
     }
@@ -829,21 +871,20 @@ public class ModelElementRenderer {
         
         // Rotate UV rectangle around center point (8, 8) in 0-16 space
         for (int i = 0; i < rotationSteps; i++) {
-            // One 90° CCW rotation around (8, 8)
-            float newU0 = 16 - v1;
-            float newV0 = u0;
-            float newU1 = 16 - v0;
-            float newV1 = u1;
+            // One 90° CCW rotation around (8, 8):
+            // Point (u, v) -> (16-v, u)
+            // After rotation, corners may swap so we need to find new min/max
+            float rotU0 = 16 - v0;
+            float rotU1 = 16 - v1;
+            float rotV0 = u0;
+            float rotV1 = u1;
             
-            u0 = newU0;
-            v0 = newV0;
-            u1 = newU1;
-            v1 = newV1;
+            // Ensure u0 < u1 and v0 < v1
+            u0 = Math.min(rotU0, rotU1);
+            u1 = Math.max(rotU0, rotU1);
+            v0 = Math.min(rotV0, rotV1);
+            v1 = Math.max(rotV0, rotV1);
         }
-        
-        System.out.println("DEBUG UV transform: face=" + faceDirection + " yRot=" + yRotation + 
-                         " origUV=[" + uv[0] + "," + uv[1] + "," + uv[2] + "," + uv[3] + "]" +
-                         " newUV=[" + u0 + "," + v0 + "," + u1 + "," + v1 + "]");
         
         return new float[]{u0, v0, u1, v1};
     }
