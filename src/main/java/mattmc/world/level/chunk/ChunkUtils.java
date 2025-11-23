@@ -62,20 +62,30 @@ public final class ChunkUtils {
     
     /**
      * Get chunk-local X coordinate from world X coordinate.
+     * Note: For negative coordinates, this produces Minecraft-style wrapping behavior.
+     * For example, worldX=-1 returns 15, worldX=-16 returns 0, worldX=-17 returns 15.
+     * This matches Minecraft's coordinate system where negative coordinates wrap around
+     * within their chunk rather than producing negative local coordinates.
+     * 
      * @param worldX World X coordinate
      * @return Chunk-local X (0-15)
      */
     public static int worldToLocalX(int worldX) {
-        return worldX & 15; // Modulo 16
+        return worldX & 15; // Modulo 16 with proper negative handling
     }
     
     /**
      * Get chunk-local Z coordinate from world Z coordinate.
+     * Note: For negative coordinates, this produces Minecraft-style wrapping behavior.
+     * For example, worldZ=-1 returns 15, worldZ=-16 returns 0, worldZ=-17 returns 15.
+     * This matches Minecraft's coordinate system where negative coordinates wrap around
+     * within their chunk rather than producing negative local coordinates.
+     * 
      * @param worldZ World Z coordinate
      * @return Chunk-local Z (0-15)
      */
     public static int worldToLocalZ(int worldZ) {
-        return worldZ & 15; // Modulo 16
+        return worldZ & 15; // Modulo 16 with proper negative handling
     }
     
     /**
