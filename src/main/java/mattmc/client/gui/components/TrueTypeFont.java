@@ -94,15 +94,12 @@ public final class TrueTypeFont implements AutoCloseable {
     }
     
     private static ByteBuffer readResourceToBuffer(String path) {
-        try (InputStream in = TrueTypeFont.class.getResourceAsStream(path)) {
-            if (in == null) return null;
-            byte[] tmp = in.readAllBytes();
-            ByteBuffer buf = BufferUtils.createByteBuffer(tmp.length);
-            buf.put(tmp).flip();
-            return buf;
-        } catch (IOException e) {
-            throw new RuntimeException("Failed to read font resource: " + path, e);
-        }
+        byte[] data = mattmc.util.ResourceLoader.loadBinaryResource(path);
+        if (data == null) return null;
+        
+        ByteBuffer buf = BufferUtils.createByteBuffer(data.length);
+        buf.put(data).flip();
+        return buf;
     }
     
     /**

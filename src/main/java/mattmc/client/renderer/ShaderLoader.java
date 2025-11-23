@@ -1,11 +1,6 @@
 package mattmc.client.renderer;
 
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.nio.charset.StandardCharsets;
-import java.util.stream.Collectors;
+import mattmc.util.ResourceLoader;
 
 /**
  * Utility class for loading shader source code from resources.
@@ -21,17 +16,12 @@ public class ShaderLoader {
      */
     public static String loadShader(String filename) {
         String resourcePath = "/assets/shaders/" + filename;
+        String source = ResourceLoader.loadTextResource(resourcePath);
         
-        try (InputStream is = ShaderLoader.class.getResourceAsStream(resourcePath)) {
-            if (is == null) {
-                throw new RuntimeException("Shader file not found: " + resourcePath);
-            }
-            
-            try (BufferedReader reader = new BufferedReader(new InputStreamReader(is, StandardCharsets.UTF_8))) {
-                return reader.lines().collect(Collectors.joining("\n"));
-            }
-        } catch (IOException e) {
-            throw new RuntimeException("Failed to load shader: " + resourcePath, e);
+        if (source == null) {
+            throw new RuntimeException("Shader file not found: " + resourcePath);
         }
+        
+        return source;
     }
 }
