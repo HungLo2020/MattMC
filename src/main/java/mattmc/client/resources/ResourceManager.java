@@ -16,10 +16,6 @@ import org.slf4j.LoggerFactory;
 import java.util.HashSet;
 import java.util.Set;
 
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.io.Reader;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -67,20 +63,11 @@ public class ResourceManager {
         
         String resourcePath = "/assets/models/block/" + path + ".json";
         
-        try {
-            InputStream is = ResourceManager.class.getResourceAsStream(resourcePath);
-            if (is == null) {
-                logger.error("Block model not found: {}", resourcePath);
-                return null;
-            }
-            try (Reader reader = new InputStreamReader(is)) {
-                BlockModel model = GSON.fromJson(reader, BlockModel.class);
-                return model;
-            }
-        } catch (Exception e) {
-            logger.error("Failed to load block model: {}", resourcePath, e);
-            return null;
+        BlockModel model = mattmc.util.ResourceLoader.loadJsonResource(resourcePath, GSON, BlockModel.class);
+        if (model == null) {
+            logger.error("Block model not found: {}", resourcePath);
         }
+        return model;
     }
     
     /**
@@ -265,21 +252,13 @@ public class ResourceManager {
         }
         
         String path = "/assets/blockstates/" + name + ".json";
-        try {
-            InputStream is = ResourceManager.class.getResourceAsStream(path);
-            if (is == null) {
-                logger.error("Blockstate not found: {}", path);
-                return null;
-            }
-            try (Reader reader = new InputStreamReader(is)) {
-                BlockState blockState = GSON.fromJson(reader, BlockState.class);
-                BLOCKSTATE_CACHE.put(name, blockState);
-                return blockState;
-            }
-        } catch (Exception e) {
-            logger.error("Failed to load blockstate: {}", path, e);
+        BlockState blockState = mattmc.util.ResourceLoader.loadJsonResource(path, GSON, BlockState.class);
+        if (blockState == null) {
+            logger.error("Blockstate not found: {}", path);
             return null;
         }
+        BLOCKSTATE_CACHE.put(name, blockState);
+        return blockState;
     }
     
     /**
@@ -365,20 +344,11 @@ public class ResourceManager {
      */
     private static BlockModel loadItemModelRaw(String name) {
         String path = "/assets/models/item/" + name + ".json";
-        try {
-            InputStream is = ResourceManager.class.getResourceAsStream(path);
-            if (is == null) {
-                logger.error("Item model not found: {}", path);
-                return null;
-            }
-            try (Reader reader = new InputStreamReader(is)) {
-                BlockModel model = GSON.fromJson(reader, BlockModel.class);
-                return model;
-            }
-        } catch (Exception e) {
-            logger.error("Failed to load item model: {}", path, e);
-            return null;
+        BlockModel model = mattmc.util.ResourceLoader.loadJsonResource(path, GSON, BlockModel.class);
+        if (model == null) {
+            logger.error("Item model not found: {}", path);
         }
+        return model;
     }
     
     /**

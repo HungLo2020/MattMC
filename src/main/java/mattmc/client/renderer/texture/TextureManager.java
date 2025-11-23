@@ -98,7 +98,7 @@ public class TextureManager {
             return textureCache.get(path);
         }
         
-        try (InputStream is = getClass().getClassLoader().getResourceAsStream(path)) {
+        try (InputStream is = mattmc.util.ResourceLoader.getResourceStreamFromClassLoader(path)) {
             if (is == null) {
                 logger.error("Texture not found: {}{}", path, " (expected in resources folder)");
                 return 0;

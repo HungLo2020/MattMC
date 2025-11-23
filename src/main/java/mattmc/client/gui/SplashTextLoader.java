@@ -1,9 +1,7 @@
 package mattmc.client.gui;
 
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
+import mattmc.util.ResourceLoader;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
@@ -24,26 +22,19 @@ public class SplashTextLoader {
      * Load splash texts from the file.
      */
     private static void loadSplashTexts() {
-        try (InputStream in = SplashTextLoader.class.getResourceAsStream(SPLASH_TEXT_PATH)) {
-            if (in == null) {
-                // Fallback if file not found
-                splashTexts.add("Awesome!");
-                return;
-            }
-            
-            try (BufferedReader reader = new BufferedReader(new InputStreamReader(in))) {
-                String line;
-                while ((line = reader.readLine()) != null) {
-                    line = line.trim();
-                    if (!line.isEmpty()) {
-                        splashTexts.add(line);
-                    }
-                }
-            }
-        } catch (IOException e) {
-            // Use fallback on error
-            splashTexts.clear();
+        List<String> lines = ResourceLoader.loadTextLines(SPLASH_TEXT_PATH);
+        
+        if (lines.isEmpty()) {
+            // Fallback if file not found or empty
             splashTexts.add("Awesome!");
+            return;
+        }
+        
+        for (String line : lines) {
+            line = line.trim();
+            if (!line.isEmpty()) {
+                splashTexts.add(line);
+            }
         }
         
         // Ensure we have at least one splash text

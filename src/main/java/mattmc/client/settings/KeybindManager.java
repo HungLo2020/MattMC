@@ -141,12 +141,13 @@ public class KeybindManager {
             }
             
             // Copy from resources
-            try (InputStream input = KeybindManager.class.getResourceAsStream(DEFAULT_OPTIONS_RESOURCE)) {
-                if (input == null) {
-                    logger.error("DefaultOptions.txt not found in resources, creating with hardcoded defaults...");
-                    saveKeybinds();
-                    return;
-                }
+            InputStream input = mattmc.util.ResourceLoader.getResourceStream(DEFAULT_OPTIONS_RESOURCE);
+            if (input == null) {
+                logger.error("DefaultOptions.txt not found in resources, creating with hardcoded defaults...");
+                saveKeybinds();
+                return;
+            }
+            try (input) {
                 Files.copy(input, targetPath, StandardCopyOption.REPLACE_EXISTING);
                 logger.info("Copied DefaultOptions.txt to {}", targetPath);
             }
