@@ -45,6 +45,21 @@ public final class ResourceLoader {
     }
     
     /**
+     * Load a resource as InputStream using ClassLoader (for paths without leading slash).
+     * This is useful for compatibility with code that uses ClassLoader.getResourceAsStream().
+     * 
+     * @param resourcePath Path to resource (no leading slash, e.g., "assets/textures/block/dirt.png")
+     * @return InputStream or null if not found
+     */
+    public static InputStream getResourceStreamFromClassLoader(String resourcePath) {
+        InputStream stream = ResourceLoader.class.getClassLoader().getResourceAsStream(resourcePath);
+        if (stream == null) {
+            logger.warn("Resource not found: {}", resourcePath);
+        }
+        return stream;
+    }
+    
+    /**
      * Load a text resource as String.
      * 
      * @param resourcePath Path to resource (must start with /)

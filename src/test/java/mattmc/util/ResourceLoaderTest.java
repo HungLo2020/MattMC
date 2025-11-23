@@ -123,6 +123,20 @@ public class ResourceLoaderTest {
         }
     }
     
+    @Test
+    public void testGetResourceStreamFromClassLoader_ExistingResource() {
+        // Test with path without leading slash (classloader style)
+        InputStream stream = ResourceLoader.getResourceStreamFromClassLoader("assets/splashtext");
+        assertNotNull(stream, "Should load existing resource using classloader");
+        assertDoesNotThrow(() -> stream.close());
+    }
+    
+    @Test
+    public void testGetResourceStreamFromClassLoader_NonExistingResource() {
+        InputStream stream = ResourceLoader.getResourceStreamFromClassLoader("nonexistent/resource.txt");
+        assertNull(stream, "Should return null for non-existing resource");
+    }
+    
     /**
      * Test data class for JSON parsing.
      */

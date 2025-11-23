@@ -152,7 +152,7 @@ public class TextureAtlas implements AutoCloseable {
      * Load a texture image from resources.
      */
     private BufferedImage loadTexture(String path) {
-        try (InputStream is = getClass().getClassLoader().getResourceAsStream(path)) {
+        try (InputStream is = mattmc.util.ResourceLoader.getResourceStreamFromClassLoader(path)) {
             if (is == null) {
                 logger.error("Texture not found: {}", path);
                 return null;
