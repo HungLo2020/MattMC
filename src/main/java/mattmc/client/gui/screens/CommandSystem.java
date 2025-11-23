@@ -181,7 +181,7 @@ public class CommandSystem {
         for (int x = minX; x <= maxX; x++) {
             for (int worldY = minY; worldY <= maxY; worldY++) {
                 // Convert world Y to chunk Y for setBlock call
-                int chunkY = LevelChunk.worldYToChunkY(worldY);
+                int chunkY = mattmc.world.level.chunk.ChunkUtils.worldToLocalY(worldY);
                 for (int z = minZ; z <= maxZ; z++) {
                     world.setBlock(x, chunkY, z, block);
                     blocksSet++;

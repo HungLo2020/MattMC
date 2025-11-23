@@ -124,8 +124,8 @@ public class WorldGenerator {
                 int terrainHeight = getTerrainHeight(worldX, worldZ);
                 
                 // Fill terrain from bottom to surface
-                for (int worldY = mattmc.world.level.chunk.LevelChunk.MIN_Y; worldY <= terrainHeight && worldY <= mattmc.world.level.chunk.LevelChunk.MAX_Y; worldY++) {
-                    int chunkY = mattmc.world.level.chunk.LevelChunk.worldYToChunkY(worldY);
+                for (int worldY = mattmc.world.level.chunk.ChunkUtils.MIN_Y; worldY <= terrainHeight && worldY <= mattmc.world.level.chunk.ChunkUtils.MAX_Y; worldY++) {
+                    int chunkY = mattmc.world.level.chunk.ChunkUtils.worldToLocalY(worldY);
                     
                     mattmc.world.level.block.Block block;
                     if (worldY == terrainHeight) {
@@ -147,7 +147,7 @@ public class WorldGenerator {
                 // Add water for ocean areas
                 if (terrainHeight < SEA_LEVEL) {
                     for (int worldY = terrainHeight + 1; worldY <= SEA_LEVEL; worldY++) {
-                        int chunkY = mattmc.world.level.chunk.LevelChunk.worldYToChunkY(worldY);
+                        int chunkY = mattmc.world.level.chunk.ChunkUtils.worldToLocalY(worldY);
                         // For now, use stone to represent water (no water block implemented yet)
                         // chunk.setBlock(localX, chunkY, localZ, Blocks.WATER);
                     }

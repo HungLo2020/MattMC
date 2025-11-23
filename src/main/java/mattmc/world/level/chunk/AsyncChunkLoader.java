@@ -489,7 +489,7 @@ public class AsyncChunkLoader {
                         if (block.isAir()) continue;
                         
                         float wx = x;
-                        float wy = LevelChunk.chunkYToWorldY(y);
+                        float wy = ChunkUtils.localToWorldY(y);
                         float wz = z;
                         
                         collector.collectBlockFaces(wx, wy, wz, block, chunk, x, y, z);

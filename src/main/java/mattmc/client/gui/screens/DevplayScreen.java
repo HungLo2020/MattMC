@@ -351,7 +351,7 @@ public final class DevplayScreen implements Screen {
             ColorUtils.setGLColor(0x000000, 1f);  // Black outline
             
             // Draw complete outline around the targeted block
-            BlockFaceGeometry.drawCompleteBlockOutline(hit.x, LevelChunk.chunkYToWorldY(hit.y), hit.z);
+            BlockFaceGeometry.drawCompleteBlockOutline(hit.x, mattmc.world.level.chunk.ChunkUtils.localToWorldY(hit.y), hit.z);
             
             glEnd();
             
