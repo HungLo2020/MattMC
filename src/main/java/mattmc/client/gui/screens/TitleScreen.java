@@ -11,6 +11,7 @@ import mattmc.client.gui.components.TextRenderer;
 import mattmc.client.gui.SplashTextLoader;
 import mattmc.client.util.CoordinateUtils;
 import mattmc.util.ColorUtils;
+import mattmc.util.MathUtils;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -213,7 +214,7 @@ public final class TitleScreen implements Screen {
         float logoScale = targetWidth / logoTexture.width;
         
         // Clamp scale to reasonable bounds
-        logoScale = Math.max(0.3f, Math.min(logoScale, 2.0f));
+        logoScale = MathUtils.clamp(logoScale, 0.3f, 2.0f);
         
         float logoWidth = logoTexture.width * logoScale;
         float logoHeight = logoTexture.height * logoScale;
@@ -250,7 +251,7 @@ public final class TitleScreen implements Screen {
         int h = window.height();
         float targetWidth = w * 0.6f;
         float logoScale = targetWidth / logoTexture.width;
-        logoScale = Math.max(0.3f, Math.min(logoScale, 2.0f));
+        logoScale = MathUtils.clamp(logoScale, 0.3f, 2.0f);
         
         float logoWidth = logoTexture.width * logoScale;
         float logoHeight = logoTexture.height * logoScale;

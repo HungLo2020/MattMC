@@ -1,5 +1,7 @@
 package mattmc.nbt;
 
+import mattmc.util.MathUtils;
+
 /**
  * Bit-packed array implementation for efficiently storing block states.
  * Based on Minecraft Java Edition's palette-based bit packing approach.
@@ -144,6 +146,6 @@ public class BitPackedArray {
         int bits = 32 - Integer.numberOfLeadingZeros(paletteSize - 1);
         
         // Minecraft uses a minimum of 4 bits for performance
-        return Math.max(4, Math.min(bits, 15));
+        return MathUtils.clamp(bits, 4, 15);
     }
 }
