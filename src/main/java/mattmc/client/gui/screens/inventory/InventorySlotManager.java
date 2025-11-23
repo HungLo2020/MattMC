@@ -1,15 +1,10 @@
 package mattmc.client.gui.screens.inventory;
 
 import mattmc.client.Window;
-import org.lwjgl.system.MemoryStack;
+import mattmc.client.util.CoordinateUtils;
 
-import java.nio.IntBuffer;
 import java.util.ArrayList;
 import java.util.List;
-
-import static org.lwjgl.glfw.GLFW.glfwGetFramebufferSize;
-import static org.lwjgl.glfw.GLFW.glfwGetWindowSize;
-import static org.lwjgl.system.MemoryStack.stackPush;
 
 /**
  * Manages slot positions and detects slot clicks for the inventory screen.
@@ -77,21 +72,13 @@ public class InventorySlotManager {
      */
     public int findClickedSlot(double mouseXWin, double mouseYWin, float guiX, float guiY, float guiScale, Window window) {
         // Convert window mouse coordinates to framebuffer coordinates
-        float mouseFBX, mouseFBY;
-        try (MemoryStack stack = stackPush()) {
-            IntBuffer winW = stack.mallocInt(1), winH = stack.mallocInt(1);
-            IntBuffer fbW  = stack.mallocInt(1), fbH  = stack.mallocInt(1);
-            glfwGetWindowSize(window.handle(), winW, winH);
-            glfwGetFramebufferSize(window.handle(), fbW, fbH);
-            float sx = fbW.get(0) / Math.max(1f, winW.get(0));
-            float sy = fbH.get(0) / Math.max(1f, winH.get(0));
-            mouseFBX = (float) mouseXWin * sx;
-            mouseFBY = (float) mouseYWin * sy;
-        }
+        CoordinateUtils.Point2D fbCoords = CoordinateUtils.windowToFramebuffer(
+            window.handle(), mouseXWin, mouseYWin
+        );
         
         // Convert mouse position to GUI-relative coordinates
-        float mouseGuiX = (mouseFBX - guiX) / guiScale;
-        float mouseGuiY = (mouseFBY - guiY) / guiScale;
+        float mouseGuiX = (fbCoords.x - guiX) / guiScale;
+        float mouseGuiY = (fbCoords.y - guiY) / guiScale;
         
         // Find clicked slot
         for (InventorySlot slot : slots) {

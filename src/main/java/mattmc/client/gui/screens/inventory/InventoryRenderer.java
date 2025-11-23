@@ -5,20 +5,16 @@ import mattmc.client.renderer.BlurEffect;
 import mattmc.client.renderer.BlurRenderer;
 import mattmc.client.renderer.TooltipRenderer;
 import mattmc.client.renderer.texture.Texture;
+import mattmc.client.util.CoordinateUtils;
 import mattmc.util.ColorUtils;
 import mattmc.world.item.Inventory;
 import mattmc.world.item.Item;
 import mattmc.world.item.ItemStack;
-import org.lwjgl.system.MemoryStack;
 
-import java.nio.IntBuffer;
 import java.util.List;
 
 import static mattmc.client.settings.OptionsManager.isMenuScreenBlurEnabled;
-import static org.lwjgl.glfw.GLFW.glfwGetFramebufferSize;
-import static org.lwjgl.glfw.GLFW.glfwGetWindowSize;
 import static org.lwjgl.opengl.GL11.*;
-import static org.lwjgl.system.MemoryStack.stackPush;
 
 /**
  * Renders inventory GUI elements.
@@ -108,21 +104,13 @@ public class InventoryRenderer {
         float guiY = (h - texHeight) / 2f + (CONTENT_OFFSET_Y * GUI_SCALE);
         
         // Convert window mouse coordinates to framebuffer coordinates
-        float mouseFBX, mouseFBY;
-        try (MemoryStack stack = stackPush()) {
-            IntBuffer winW = stack.mallocInt(1), winH = stack.mallocInt(1);
-            IntBuffer fbW  = stack.mallocInt(1), fbH  = stack.mallocInt(1);
-            glfwGetWindowSize(window.handle(), winW, winH);
-            glfwGetFramebufferSize(window.handle(), fbW, fbH);
-            float sx = fbW.get(0) / Math.max(1f, winW.get(0));
-            float sy = fbH.get(0) / Math.max(1f, winH.get(0));
-            mouseFBX = (float) mouseXWin * sx;
-            mouseFBY = (float) mouseYWin * sy;
-        }
+        CoordinateUtils.Point2D fbCoords = CoordinateUtils.windowToFramebuffer(
+            window.handle(), mouseXWin, mouseYWin
+        );
         
         // Convert mouse position to GUI-relative coordinates
-        float mouseGuiX = (mouseFBX - guiX) / GUI_SCALE;
-        float mouseGuiY = (mouseFBY - guiY) / GUI_SCALE;
+        float mouseGuiX = (fbCoords.x - guiX) / GUI_SCALE;
+        float mouseGuiY = (fbCoords.y - guiY) / GUI_SCALE;
         
         // Check which slot the mouse is over
         for (InventorySlot slot : slotManager.getSlots()) {
@@ -251,30 +239,22 @@ public class InventoryRenderer {
         if (heldItem == null) return;
         
         // Convert window mouse coordinates to framebuffer coordinates
-        float mouseFBX, mouseFBY;
-        try (MemoryStack stack = stackPush()) {
-            IntBuffer winW = stack.mallocInt(1), winH = stack.mallocInt(1);
-            IntBuffer fbW  = stack.mallocInt(1), fbH  = stack.mallocInt(1);
-            glfwGetWindowSize(window.handle(), winW, winH);
-            glfwGetFramebufferSize(window.handle(), fbW, fbH);
-            float sx = fbW.get(0) / Math.max(1f, winW.get(0));
-            float sy = fbH.get(0) / Math.max(1f, winH.get(0));
-            mouseFBX = (float) mouseXWin * sx;
-            mouseFBY = (float) mouseYWin * sy;
-        }
+        CoordinateUtils.Point2D fbCoords = CoordinateUtils.windowToFramebuffer(
+            window.handle(), mouseXWin, mouseYWin
+        );
         
         float itemSize = 19.2f;
         // Use data-driven rendering for held items (using GUI context as they're in the GUI)
         mattmc.client.renderer.ItemRenderer.renderItemWithTransform(
             heldItem, 
             mattmc.client.renderer.item.ItemDisplayContext.GUI, 
-            mouseFBX, 
-            mouseFBY, 
+            fbCoords.x, 
+            fbCoords.y, 
             itemSize
         );
         
         if (heldItem.getCount() > 1) {
-            renderItemCount(heldItem.getCount(), mouseFBX, mouseFBY, 1.0f, itemSize);
+            renderItemCount(heldItem.getCount(), fbCoords.x, fbCoords.y, 1.0f, itemSize);
         }
     }
     
@@ -317,17 +297,9 @@ public class InventoryRenderer {
         float guiY = (h - contentHeight) / 2f;
         
         // Get mouse position in framebuffer coordinates
-        float mouseFBX, mouseFBY;
-        try (MemoryStack stack = stackPush()) {
-            IntBuffer winW = stack.mallocInt(1), winH = stack.mallocInt(1);
-            IntBuffer fbW  = stack.mallocInt(1), fbH  = stack.mallocInt(1);
-            glfwGetWindowSize(window.handle(), winW, winH);
-            glfwGetFramebufferSize(window.handle(), fbW, fbH);
-            float sx = fbW.get(0) / Math.max(1f, winW.get(0));
-            float sy = fbH.get(0) / Math.max(1f, winH.get(0));
-            mouseFBX = (float) mouseXWin * sx;
-            mouseFBY = (float) mouseYWin * sy;
-        }
+        CoordinateUtils.Point2D fbCoords = CoordinateUtils.windowToFramebuffer(
+            window.handle(), mouseXWin, mouseYWin
+        );
         
         float startX = guiX + 8f * GUI_SCALE;
         float startY = guiY + 18f * GUI_SCALE;
@@ -338,8 +310,8 @@ public class InventoryRenderer {
                 float slotX = startX + col * slotSpacing;
                 float slotY = startY + row * slotSpacing;
                 
-                if (mouseFBX >= slotX && mouseFBX < slotX + slotSpacing &&
-                    mouseFBY >= slotY && mouseFBY < slotY + slotSpacing) {
+                if (fbCoords.x >= slotX && fbCoords.x < slotX + slotSpacing &&
+                    fbCoords.y >= slotY && fbCoords.y < slotY + slotSpacing) {
                     
                     int itemIndex = (scrollRow + row) * CREATIVE_COLS + col;
                     
