@@ -272,12 +272,11 @@ public class ModelElementRenderer {
         Integer faceRotation = elementFace.getRotation();
         int faceRotDegrees = (faceRotation != null) ? faceRotation : 0;
         
-        // When uvlock=true, keep original UV coordinates
-        // The UVs from model JSON are already world-aligned (horizontal planks)
-        // Do NOT transform them - transforming would rotate horizontal rectangles into vertical ones
-        // if (uvlock && yRotation != 0 && !faceDirection.equals("up") && !faceDirection.equals("down")) {
-        //     uv = transformUVsForRotation(uv, faceDirection, yRotation);
-        // }
+        // When uvlock=true, transform UV coordinates to account for geometry rotation
+        // This keeps textures aligned with world axes by rotating the UV rectangle
+        if (uvlock && yRotation != 0) {
+            uv = transformUVsForRotation(uv, faceDirection, yRotation);
+        }
         
         // Convert UV to 0-1 space and apply atlas mapping
         float u0, v0, u1, v1;
@@ -322,19 +321,9 @@ public class ModelElementRenderer {
         }
         
         // Apply per-face UV rotation as specified in the model JSON
-        // When uvlock=true, add counter-rotation to keep textures world-aligned
-        // The geometry rotates clockwise, so we counter-rotate UVs counter-clockwise (negative rotation)
         int adjustedFaceRotation = faceRotDegrees;
         
-        // When uvlock=true, counter-rotate the UV assignment to compensate for Y-axis geometry rotation
-        // This keeps textures aligned with world axes instead of rotating with the block
-        if (uvlock && yRotation != 0) {
-            // For vertical faces (not up/down), apply counter-rotation
-            // Horizontal faces (up/down) also need rotation compensation
-            adjustedFaceRotation = (adjustedFaceRotation - yRotation + 360) % 360;
-        }
-        
-        // Render the face with rotated vertices
+        // Render the face with rotated vertices and transformed UVs
         currentVertex = addFaceQuadWithVertices(face, faceVerts, faceNormal, u0, v0, u1, v1, 
                                                 adjustedFaceRotation, vertices, indices, currentVertex);
         
