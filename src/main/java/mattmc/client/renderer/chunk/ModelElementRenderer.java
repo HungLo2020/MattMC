@@ -238,11 +238,8 @@ public class ModelElementRenderer {
         String texturePath = textureRef;
         if (texturePath.startsWith("#")) {
             texturePath = resolveTexture(texturePath, model);
-            System.out.println("DEBUG: Resolved " + textureRef + " -> " + texturePath);
             if (texturePath == null) {
-                System.err.println("ERROR: Failed to resolve texture " + textureRef + " for block at " + 
-                                   face.x + "," + face.y + "," + face.z);
-                System.err.println("Model textures: " + (model.getTextures() != null ? model.getTextures() : "null"));
+                // Failed to resolve texture - skip this face
                 return currentVertex;
             }
         }
@@ -837,10 +834,6 @@ public class ModelElementRenderer {
             u1 = newU1;
             v1 = newV1;
         }
-        
-        System.out.println("DEBUG UV transform: face=" + faceDirection + " yRot=" + yRotation + 
-                         " origUV=[" + uv[0] + "," + uv[1] + "," + uv[2] + "," + uv[3] + "]" +
-                         " newUV=[" + u0 + "," + v0 + "," + u1 + "," + v1 + "]");
         
         return new float[]{u0, v0, u1, v1};
     }
