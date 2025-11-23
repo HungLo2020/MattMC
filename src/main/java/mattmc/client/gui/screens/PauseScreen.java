@@ -7,6 +7,7 @@ import mattmc.client.renderer.BlurRenderer;
 import mattmc.client.gui.components.Button;
 import mattmc.client.gui.components.ButtonRenderer;
 import mattmc.client.gui.components.TextRenderer;
+import mattmc.util.ColorUtils;
 import mattmc.world.level.Level;
 import mattmc.world.level.storage.LevelStorageSource;
 import org.lwjgl.system.MemoryStack;
@@ -178,7 +179,7 @@ public final class PauseScreen implements Screen {
         glEnable(GL_BLEND);
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
         
-        setColor(0x000000, 0.5f);
+        ColorUtils.setGLColor(0x000000, 0.5f);
         glBegin(GL_QUADS);
         glVertex2f(0, 0);
         glVertex2f(w, 0);
@@ -205,13 +206,6 @@ public final class PauseScreen implements Screen {
 
 
 
-    private void setColor(int rgb, float a) {
-        float r = ((rgb >> 16) & 0xFF) / 255f;
-        float g = ((rgb >> 8) & 0xFF) / 255f;
-        float b = (rgb & 0xFF) / 255f;
-        glColor4f(r, g, b, a);
-    }
-
     private void drawTitle(String text, float cx, float cy, float scale, int rgb) {
         float tw = TextRenderer.getTextWidth(text, scale);
         float th = TextRenderer.getTextHeight(text, scale);
@@ -229,7 +223,7 @@ public final class PauseScreen implements Screen {
     }
 
     private void drawText(String text, float x, float y, float scale, int rgb) {
-        setColor(rgb, 1f);
+        ColorUtils.setGLColor(rgb, 1f);
         TextRenderer.drawText(text, x, y, scale);
     }
 

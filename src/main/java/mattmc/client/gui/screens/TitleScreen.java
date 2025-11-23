@@ -9,6 +9,7 @@ import mattmc.client.gui.components.Button;
 import mattmc.client.gui.components.ButtonRenderer;
 import mattmc.client.gui.components.TextRenderer;
 import mattmc.client.gui.SplashTextLoader;
+import mattmc.util.ColorUtils;
 import org.lwjgl.system.MemoryStack;
 
 import java.nio.IntBuffer;
@@ -189,13 +190,6 @@ public final class TitleScreen implements Screen {
 
 
 
-    private void setColor(int rgb, float a) {
-        float r = ((rgb >> 16) & 0xFF) / 255f;
-        float g = ((rgb >> 8) & 0xFF) / 255f;
-        float b = (rgb & 0xFF) / 255f;
-        glColor4f(r, g, b, a);
-    }
-
     private void drawTitle(String text, float cx, float cy, float scale, int rgb) {
         float tw = TextRenderer.getTextWidth(text, scale);
         float th = TextRenderer.getTextHeight(text, scale);
@@ -213,7 +207,7 @@ public final class TitleScreen implements Screen {
     }
 
     private void drawText(String text, float x, float y, float scale, int rgb) {
-        setColor(rgb, 1f);
+        ColorUtils.setGLColor(rgb, 1f);
         TextRenderer.drawText(text, x, y, scale);
     }
 
@@ -297,7 +291,7 @@ public final class TitleScreen implements Screen {
         
         // Draw text centered on the anchor point
         // Draw in yellow color (0xFFFF00)
-        setColor(0xFFFF00, 1f);
+        ColorUtils.setGLColor(0xFFFF00, 1f);
         TextRenderer.drawText(splashText, offsetX, 0, animatedScale);
         
         // Restore matrix state
