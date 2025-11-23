@@ -748,8 +748,9 @@ public class ModelElementRenderer {
     
     /**
      * Get the corner position for a specific vertex index of a face.
-     * This follows Minecraft's FaceInfo.VertexInfo mapping which determines
-     * which corner of the element bounds each vertex index represents.
+     * This EXACTLY follows Minecraft's FaceInfo.VertexInfo mapping from FaceInfo.java.
+     * 
+     * Constants mapping: MIN_X=x0, MAX_X=x1, MIN_Y=y0, MAX_Y=y1, MIN_Z=z0, MAX_Z=z1
      * 
      * @param direction Face direction (up, down, north, south, east, west)
      * @param vertexIndex Vertex index (0-3)
@@ -758,10 +759,10 @@ public class ModelElementRenderer {
      */
     private float[] getFaceVertexCorner(String direction, int vertexIndex, float x0, float y0, float z0,
                                        float x1, float y1, float z1) {
-        // Mapping follows Minecraft's FaceInfo.VertexInfo for each face direction
-        // This ensures vertex index 0 always corresponds to the same corner relative to the face
+        // EXACT mapping from Minecraft's FaceInfo enum (FaceInfo.java lines 10-15)
         return switch (direction) {
             case "up" -> switch (vertexIndex) {
+                // UP: (MIN_X,MAX_Y,MIN_Z), (MIN_X,MAX_Y,MAX_Z), (MAX_X,MAX_Y,MAX_Z), (MAX_X,MAX_Y,MIN_Z)
                 case 0 -> new float[]{x0, y1, z0};
                 case 1 -> new float[]{x0, y1, z1};
                 case 2 -> new float[]{x1, y1, z1};
@@ -769,46 +770,52 @@ public class ModelElementRenderer {
                 default -> new float[]{x0, y1, z0};
             };
             case "down" -> switch (vertexIndex) {
-                case 0 -> new float[]{x0, y0, z0};
-                case 1 -> new float[]{x1, y0, z0};
-                case 2 -> new float[]{x1, y0, z1};
-                case 3 -> new float[]{x0, y0, z1};
-                default -> new float[]{x0, y0, z0};
-            };
-            case "north" -> switch (vertexIndex) {
-                case 0 -> new float[]{x0, y0, z0};
-                case 1 -> new float[]{x0, y1, z0};
-                case 2 -> new float[]{x1, y1, z0};
-                case 3 -> new float[]{x1, y0, z0};
-                default -> new float[]{x0, y0, z0};
-            };
-            case "south" -> switch (vertexIndex) {
+                // DOWN: (MIN_X,MIN_Y,MAX_Z), (MIN_X,MIN_Y,MIN_Z), (MAX_X,MIN_Y,MIN_Z), (MAX_X,MIN_Y,MAX_Z)
                 case 0 -> new float[]{x0, y0, z1};
-                case 1 -> new float[]{x1, y0, z1};
-                case 2 -> new float[]{x1, y1, z1};
-                case 3 -> new float[]{x0, y1, z1};
+                case 1 -> new float[]{x0, y0, z0};
+                case 2 -> new float[]{x1, y0, z0};
+                case 3 -> new float[]{x1, y0, z1};
                 default -> new float[]{x0, y0, z1};
             };
-            case "west" -> switch (vertexIndex) {
-                case 0 -> new float[]{x0, y0, z0};
-                case 1 -> new float[]{x0, y0, z1};
-                case 2 -> new float[]{x0, y1, z1};
+            case "north" -> switch (vertexIndex) {
+                // NORTH: (MAX_X,MAX_Y,MIN_Z), (MAX_X,MIN_Y,MIN_Z), (MIN_X,MIN_Y,MIN_Z), (MIN_X,MAX_Y,MIN_Z)
+                case 0 -> new float[]{x1, y1, z0};
+                case 1 -> new float[]{x1, y0, z0};
+                case 2 -> new float[]{x0, y0, z0};
                 case 3 -> new float[]{x0, y1, z0};
-                default -> new float[]{x0, y0, z0};
+                default -> new float[]{x1, y1, z0};
+            };
+            case "south" -> switch (vertexIndex) {
+                // SOUTH: (MIN_X,MAX_Y,MAX_Z), (MIN_X,MIN_Y,MAX_Z), (MAX_X,MIN_Y,MAX_Z), (MAX_X,MAX_Y,MAX_Z)
+                case 0 -> new float[]{x0, y1, z1};
+                case 1 -> new float[]{x0, y0, z1};
+                case 2 -> new float[]{x1, y0, z1};
+                case 3 -> new float[]{x1, y1, z1};
+                default -> new float[]{x0, y1, z1};
+            };
+            case "west" -> switch (vertexIndex) {
+                // WEST: (MIN_X,MAX_Y,MIN_Z), (MIN_X,MIN_Y,MIN_Z), (MIN_X,MIN_Y,MAX_Z), (MIN_X,MAX_Y,MAX_Z)
+                case 0 -> new float[]{x0, y1, z0};
+                case 1 -> new float[]{x0, y0, z0};
+                case 2 -> new float[]{x0, y0, z1};
+                case 3 -> new float[]{x0, y1, z1};
+                default -> new float[]{x0, y1, z0};
             };
             case "east" -> switch (vertexIndex) {
-                case 0 -> new float[]{x1, y0, z0};
-                case 1 -> new float[]{x1, y1, z0};
-                case 2 -> new float[]{x1, y1, z1};
-                case 3 -> new float[]{x1, y0, z1};
-                default -> new float[]{x1, y0, z0};
+                // EAST: (MAX_X,MAX_Y,MAX_Z), (MAX_X,MIN_Y,MAX_Z), (MAX_X,MIN_Y,MIN_Z), (MAX_X,MAX_Y,MIN_Z)
+                case 0 -> new float[]{x1, y1, z1};
+                case 1 -> new float[]{x1, y0, z1};
+                case 2 -> new float[]{x1, y0, z0};
+                case 3 -> new float[]{x1, y1, z0};
+                default -> new float[]{x1, y1, z1};
             };
             default -> switch (vertexIndex) {
-                case 0 -> new float[]{x0, y0, z0};
-                case 1 -> new float[]{x0, y1, z0};
-                case 2 -> new float[]{x1, y1, z0};
-                case 3 -> new float[]{x1, y0, z0};
-                default -> new float[]{x0, y0, z0};
+                // Default to NORTH if unknown
+                case 0 -> new float[]{x1, y1, z0};
+                case 1 -> new float[]{x1, y0, z0};
+                case 2 -> new float[]{x0, y0, z0};
+                case 3 -> new float[]{x0, y1, z0};
+                default -> new float[]{x1, y1, z0};
             };
         };
     }
