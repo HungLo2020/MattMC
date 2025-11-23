@@ -73,7 +73,21 @@ public class BlockMath {
         
         Transformation result = globalToLocal.compose(inverseRotation).compose(localToGlobal);
         
+        // WORKAROUND: For opposite-facing transformations (N↔S, E↔W with 180° rotation),
+        // the composition produces identity due to cancellation. Apply the model rotation directly instead.
+        if (isOppositeFaces(facingBefore, facingAfter)) {
+            System.out.println("  WORKAROUND: Opposite faces detected, using model rotation directly");
+            result = modelRotation;
+        }
+        
         return blockCenterToCorner(result);
+    }
+    
+    /**
+     * Check if two directions are opposite to each other.
+     */
+    private static boolean isOppositeFaces(Direction a, Direction b) {
+        return a.getOpposite() == b;
     }
     
     /**
