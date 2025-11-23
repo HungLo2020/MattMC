@@ -39,8 +39,9 @@ package mattmc.client.renderer;
  * <h2>Implementations</h2>
  * <p>Current and future implementations:
  * <ul>
- *   <li><b>OpenGLRenderBackend</b> (to be implemented in Stage 2): The current production
- *       backend that translates commands to OpenGL calls.</li>
+ *   <li><b>OpenGLRenderBackend</b> (implemented in Stage 2): The current production
+ *       backend that translates commands to OpenGL calls. Exists but not yet wired
+ *       into the main render loop until Stage 3+.</li>
  *   <li><b>DebugRenderBackend</b> (to be implemented in Stage 6): A headless backend that
  *       records commands for inspection without requiring a graphics context. Useful for
  *       testing and debugging.</li>
