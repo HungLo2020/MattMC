@@ -310,6 +310,10 @@ public class ModelElementRenderer {
             // Also rotate the face normal
             float[] rotatedNormal = rotatePoint(faceNormal[0], faceNormal[1], faceNormal[2], xRotation, yRotation);
             faceNormal = rotatedNormal;
+            
+            // After rotation, reorder vertices to maintain consistent winding
+            // This is critical for UV mapping to work correctly with uvlock
+            faceVerts = reorderVerticesAfterRotation(faceVerts, faceDirection, faceNormal);
         }
         
         // Add world position offset to vertices
@@ -841,5 +845,44 @@ public class ModelElementRenderer {
         }
         
         return new float[]{u0, v0, u1, v1};
+    }
+    
+    /**
+     * Reorder vertices after rotation to maintain consistent winding order.
+     * After rotation, vertices may be in a different order relative to their UV coordinates.
+     * This method reorders them to match the expected UV assignment pattern.
+     * 
+     * For horizontal faces (up/down), vertices are ordered by X coordinate, then Z coordinate.
+     * This ensures UV (0,0) is at min-X/min-Z, UV (1,1) is at max-X/max-Z, etc.
+     */
+    private float[][] reorderVerticesAfterRotation(float[][] vertices, String originalFaceDirection, float[] normal) {
+        // Determine if this is a horizontal face based on the rotated normal
+        boolean isHorizontal = Math.abs(normal[1]) > 0.9f; // Normal points up or down
+        
+        if (isHorizontal) {
+            // For horizontal faces, sort by X then Z to get consistent CCW winding
+            // This creates the pattern: (minX,minZ), (minX,maxZ), (maxX,maxZ), (maxX,minZ)
+            java.util.Arrays.sort(vertices, (a, b) -> {
+                int cmpX = Float.compare(a[0], b[0]);
+                return cmpX != 0 ? cmpX : Float.compare(a[2], b[2]);
+            });
+        } else {
+            // For vertical faces, sort differently based on which axis is dominant
+            if (Math.abs(normal[0]) > 0.9f) {
+                // East/West face: sort by Z then Y
+                java.util.Arrays.sort(vertices, (a, b) -> {
+                    int cmpZ = Float.compare(a[2], b[2]);
+                    return cmpZ != 0 ? cmpZ : Float.compare(a[1], b[1]);
+                });
+            } else {
+                // North/South face: sort by X then Y
+                java.util.Arrays.sort(vertices, (a, b) -> {
+                    int cmpX = Float.compare(a[0], b[0]);
+                    return cmpX != 0 ? cmpX : Float.compare(a[1], b[1]);
+                });
+            }
+        }
+        
+        return vertices;
     }
 }
