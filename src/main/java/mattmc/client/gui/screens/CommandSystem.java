@@ -7,6 +7,7 @@ import mattmc.world.item.Items;
 import mattmc.world.item.ItemStack;
 import mattmc.world.level.block.Block;
 import mattmc.world.level.block.Blocks;
+import mattmc.world.level.chunk.ChunkUtils;
 import mattmc.world.level.chunk.LevelChunk;
 import mattmc.world.level.Level;
 import org.slf4j.Logger;
@@ -181,7 +182,7 @@ public class CommandSystem {
         for (int x = minX; x <= maxX; x++) {
             for (int worldY = minY; worldY <= maxY; worldY++) {
                 // Convert world Y to chunk Y for setBlock call
-                int chunkY = mattmc.world.level.chunk.ChunkUtils.worldToLocalY(worldY);
+                int chunkY = ChunkUtils.worldToLocalY(worldY);
                 for (int z = minZ; z <= maxZ; z++) {
                     world.setBlock(x, chunkY, z, block);
                     blocksSet++;

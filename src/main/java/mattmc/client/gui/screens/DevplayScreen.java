@@ -13,6 +13,7 @@ import mattmc.client.renderer.UIRenderer;
 import mattmc.client.renderer.block.BlockFaceGeometry;
 import mattmc.util.ColorUtils;
 import mattmc.world.item.Inventory;
+import mattmc.world.level.chunk.ChunkUtils;
 import mattmc.world.level.chunk.LevelChunk;
 import mattmc.world.level.Level;
 import mattmc.world.level.storage.LevelStorageSource;
@@ -351,7 +352,7 @@ public final class DevplayScreen implements Screen {
             ColorUtils.setGLColor(0x000000, 1f);  // Black outline
             
             // Draw complete outline around the targeted block
-            BlockFaceGeometry.drawCompleteBlockOutline(hit.x, mattmc.world.level.chunk.ChunkUtils.localToWorldY(hit.y), hit.z);
+            BlockFaceGeometry.drawCompleteBlockOutline(hit.x, ChunkUtils.localToWorldY(hit.y), hit.z);
             
             glEnd();
             
