@@ -274,8 +274,7 @@ public class ModelElementRenderer {
         
         // When uvlock=true, recompute UVs using Minecraft's exact algorithm
         // Delegates to FaceBakery.recomputeUVs which is a verbatim port of Minecraft's method
-        // TEMPORARILY DISABLED: The UV lock algorithm is producing identity matrices for most transformations
-        if (false && uvlock && (xRotation != 0 || yRotation != 0)) {
+        if (uvlock && (xRotation != 0 || yRotation != 0)) {
             // Create a BlockFaceUV with the current UV coordinates and rotation
             mattmc.client.renderer.block.model.BlockFaceUV blockFaceUV = 
                 new mattmc.client.renderer.block.model.BlockFaceUV(uv.clone(), faceRotDegrees);
