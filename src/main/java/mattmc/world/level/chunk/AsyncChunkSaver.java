@@ -87,6 +87,10 @@ public class AsyncChunkSaver {
                     activeTasks.incrementAndGet();
                     try {
                         saveChunkToRegion(task);
+                    } catch (Exception e) {
+                        // Catch any exception during save to prevent thread death
+                        logger.error("Unexpected error saving chunk ({}, {}): {}", 
+                                   task.chunkX, task.chunkZ, e.getMessage(), e);
                     } finally {
                         activeTasks.decrementAndGet();
                     }
@@ -94,8 +98,12 @@ public class AsyncChunkSaver {
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
                 break;
+            } catch (Exception e) {
+                // Catch any other exception to prevent thread death
+                logger.error("Unexpected error in save queue processing: {}", e.getMessage(), e);
             }
         }
+        logger.info("Save queue processing thread stopped");
     }
     
     /**
@@ -116,11 +124,23 @@ public class AsyncChunkSaver {
     public void flush() {
         // Wait for queue to drain and active tasks to complete
         // Use exponential backoff to reduce CPU usage while waiting
+        // Add timeout to prevent infinite loops if background thread dies
+        long startTime = System.currentTimeMillis();
+        long timeoutMs = 60000; // 60 second timeout
         long sleepTime = 1;
+        
         while (!saveQueue.isEmpty() || activeTasks.get() > 0) {
             try {
                 Thread.sleep(sleepTime);
                 sleepTime = Math.min(sleepTime * 2, 100); // Cap at 100ms
+                
+                // Check for timeout
+                if (System.currentTimeMillis() - startTime > timeoutMs) {
+                    logger.error("Flush timeout after 60 seconds. Queue size: {}, Active tasks: {}", 
+                               saveQueue.size(), activeTasks.get());
+                    logger.error("Background thread may have died. Forcing flush to complete.");
+                    break;
+                }
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
                 break;

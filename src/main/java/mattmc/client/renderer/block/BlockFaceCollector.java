@@ -65,14 +65,16 @@ public class BlockFaceCollector {
      */
     public void collectBlockFaces(float x, float y, float z, Block block, LevelChunk chunk, 
                                   int cx, int cy, int cz) {
-        // Check if this block uses custom rendering (e.g., stairs)
+        // Check if this block uses custom rendering (model elements from JSON)
         if (block.hasCustomRendering()) {
-            // For stairs blocks, add a special marker that MeshBuilder will handle
+            // Use data-driven rendering: read geometry from JSON model elements
             // Get the blockstate for this position
             mattmc.world.level.block.state.BlockState state = chunk.getBlockState(cx, cy, cz);
             int color = 0xFFFFFF;
-            // Add to topFaces with a special marker, storing blockstate in the FaceData
-            topFaces.add(new FaceData(x, y, z, color, 1f, 1f, block, "stairs", null, state, chunk, cx, cy, cz));
+            
+            // Add to topFaces with "model_elements" marker for data-driven rendering
+            // The ModelElementRenderer will read geometry from the block's JSON model
+            topFaces.add(new FaceData(x, y, z, color, 1f, 1f, block, "model_elements", null, state, chunk, cx, cy, cz));
             return;
         }
         

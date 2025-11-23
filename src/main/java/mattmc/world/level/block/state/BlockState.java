@@ -140,4 +140,39 @@ public class BlockState {
     public boolean isEmpty() {
         return properties.isEmpty();
     }
+    
+    /**
+     * Convert this blockstate to a variant string for blockstate JSON lookup.
+     * Example: "facing=north,half=bottom,shape=straight"
+     * Properties are sorted alphabetically for consistent lookup.
+     */
+    public String toVariantString() {
+        if (properties.isEmpty()) {
+            return "";
+        }
+        
+        StringBuilder sb = new StringBuilder();
+        // Sort properties alphabetically for consistent lookup
+        properties.entrySet().stream()
+            .sorted(Map.Entry.comparingByKey())
+            .forEach(entry -> {
+                if (sb.length() > 0) {
+                    sb.append(",");
+                }
+                sb.append(entry.getKey()).append("=");
+                Object value = entry.getValue();
+                // Convert enum values to lowercase strings (Minecraft convention)
+                // For other types, use toString() as-is
+                if (value instanceof Enum) {
+                    sb.append(((Enum<?>) value).name().toLowerCase());
+                } else if (value instanceof String) {
+                    // String values should be lowercase in blockstate variants
+                    sb.append(((String) value).toLowerCase());
+                } else {
+                    // Other types (numbers, booleans) use their string representation as-is
+                    sb.append(value.toString());
+                }
+            });
+        return sb.toString();
+    }
 }

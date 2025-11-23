@@ -11,6 +11,7 @@ import mattmc.world.level.Level;
 import mattmc.world.level.storage.LevelStorageSource;
 import org.lwjgl.system.MemoryStack;
 
+import java.io.IOException;
 import java.nio.IntBuffer;
 import java.util.ArrayList;
 import java.util.List;
@@ -182,7 +183,7 @@ public final class SelectWorldScreen implements Screen {
             game.setScreen(new DevplayScreen(game, worldName, result.world,
                 result.metadata.playerX, result.metadata.playerY, result.metadata.playerZ,
                 result.metadata.playerYaw, result.metadata.playerPitch, result.metadata.playerInventory));
-        } catch (Exception e) {
+        } catch (IOException e) {
             logger.error("Failed to load world: {}", worldName, e);
         }
     }
@@ -196,7 +197,7 @@ public final class SelectWorldScreen implements Screen {
             selectedWorldIndex = -1;
             deleteConfirmMode = false;
             recomputeLayout();
-        } catch (Exception e) {
+        } catch (IOException e) {
             logger.error("Failed to delete world: {}", worldName, e);
         }
     }

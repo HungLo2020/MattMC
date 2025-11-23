@@ -1,6 +1,3 @@
 {
-  "model": {
-    "type": "mattmc:model",
-    "model": "mattmc:block/ochre_froglight"
-  }
+  "parent": "mattmc:block/ochre_froglight"
 }

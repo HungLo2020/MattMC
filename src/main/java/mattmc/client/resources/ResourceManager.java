@@ -9,9 +9,14 @@ import mattmc.client.resources.model.ModelElement;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
+import com.google.gson.JsonParseException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.HashSet;
+import java.util.Set;
+
+import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.Reader;
@@ -62,12 +67,18 @@ public class ResourceManager {
         
         String resourcePath = "/assets/models/block/" + path + ".json";
         
-        try (InputStream is = ResourceManager.class.getResourceAsStream(resourcePath);
-             Reader reader = new InputStreamReader(is)) {
-            BlockModel model = GSON.fromJson(reader, BlockModel.class);
-            return model;
+        try {
+            InputStream is = ResourceManager.class.getResourceAsStream(resourcePath);
+            if (is == null) {
+                logger.error("Block model not found: {}", resourcePath);
+                return null;
+            }
+            try (Reader reader = new InputStreamReader(is)) {
+                BlockModel model = GSON.fromJson(reader, BlockModel.class);
+                return model;
+            }
         } catch (Exception e) {
-            logger.debug("Failed to load block model: {}", resourcePath);
+            logger.error("Failed to load block model: {}", resourcePath, e);
             return null;
         }
     }
@@ -159,37 +170,43 @@ public class ResourceManager {
      * Replaces #variable references with actual texture paths.
      * 
      * Example: texture "#side" with textures map {"side": "block/planks"} becomes "block/planks"
+     * 
+     * NOTE: We DON'T resolve texture variables in element faces here because those elements
+     * might be shared from a cached parent model. Instead, ModelElementRenderer resolves
+     * texture variables on-the-fly during rendering using the model's texture map.
      */
     private static void resolveTextureVariables(BlockModel model) {
-        if (model.getTextures() == null || model.getElements() == null) {
+        if (model.getTextures() == null) {
             return;
         }
         
         Map<String, String> textures = model.getTextures();
         
-        // First, resolve any texture variables in the textures map itself
+        // Resolve any texture variables in the textures map itself
         // (e.g., "particle": "#side" should become "particle": "block/planks" if "side": "block/planks")
+        // Only resolve what we can - leave unresolvable references as-is for runtime resolution
         Map<String, String> resolvedTextures = new HashMap<>();
         for (Map.Entry<String, String> entry : textures.entrySet()) {
+            String key = entry.getKey();
             String value = entry.getValue();
-            resolvedTextures.put(entry.getKey(), resolveTextureVariable(value, textures));
+            
+            // Skip entries that are the same as their key to avoid self-reference issues
+            if (value.equals("#" + key)) {
+                continue; // Don't add self-referencing entries
+            }
+            
+            String resolved = resolveTextureVariable(value, textures);
+            // Only update if we actually resolved something (not just returned the original)
+            if (resolved != null && !resolved.equals(value)) {
+                resolvedTextures.put(key, resolved);
+            } else {
+                resolvedTextures.put(key, value);
+            }
         }
         model.setTextures(resolvedTextures);
         
-        // Now resolve texture variables in element faces
-        for (ModelElement element : model.getElements()) {
-            if (element.getFaces() != null) {
-                for (ModelElement.ElementFace face : element.getFaces().values()) {
-                    if (face.getTexture() != null && face.getTexture().startsWith("#")) {
-                        String varName = face.getTexture().substring(1);
-                        String resolved = resolvedTextures.get(varName);
-                        if (resolved != null) {
-                            face.setTexture(resolved);
-                        }
-                    }
-                }
-            }
-        }
+        // DO NOT modify element faces here! They might be shared from a cached parent model.
+        // ModelElementRenderer will resolve texture variables on-the-fly using the model's texture map.
     }
     
     /**
@@ -197,20 +214,40 @@ public class ResourceManager {
      * Recursively follows variable chains (e.g., #particle -> #side -> block/planks).
      */
     private static String resolveTextureVariable(String texture, Map<String, String> textures) {
+        return resolveTextureVariable(texture, textures, new HashSet<>());
+    }
+    
+    /**
+     * Resolve a single texture variable reference with circular reference protection.
+     */
+    private static String resolveTextureVariable(String texture, Map<String, String> textures, Set<String> visited) {
         if (texture == null || !texture.startsWith("#")) {
             return texture;
         }
         
         String varName = texture.substring(1);
+        
+        // Check if the variable exists in the map first
         String resolved = textures.get(varName);
         
         if (resolved == null) {
-            return texture;  // Can't resolve, return as-is
+            // Variable doesn't exist (e.g., parent model references child model's variable)
+            // Return as-is for runtime resolution - this is NOT a circular reference
+            return texture;
         }
+        
+        // Now check for circular reference (only if variable exists)
+        if (visited.contains(varName)) {
+            System.err.println("Warning: Circular texture variable reference detected for: " + varName);
+            return texture;  // Return as-is to avoid infinite recursion
+        }
+        
+        // Add to visited set before recursing
+        visited.add(varName);
         
         // Recursively resolve if the resolved value is also a variable
         if (resolved.startsWith("#")) {
-            return resolveTextureVariable(resolved, textures);
+            return resolveTextureVariable(resolved, textures, visited);
         }
         
         return resolved;
@@ -228,11 +265,17 @@ public class ResourceManager {
         }
         
         String path = "/assets/blockstates/" + name + ".json";
-        try (InputStream is = ResourceManager.class.getResourceAsStream(path);
-             Reader reader = new InputStreamReader(is)) {
-            BlockState blockState = GSON.fromJson(reader, BlockState.class);
-            BLOCKSTATE_CACHE.put(name, blockState);
-            return blockState;
+        try {
+            InputStream is = ResourceManager.class.getResourceAsStream(path);
+            if (is == null) {
+                logger.error("Blockstate not found: {}", path);
+                return null;
+            }
+            try (Reader reader = new InputStreamReader(is)) {
+                BlockState blockState = GSON.fromJson(reader, BlockState.class);
+                BLOCKSTATE_CACHE.put(name, blockState);
+                return blockState;
+            }
         } catch (Exception e) {
             logger.error("Failed to load blockstate: {}", path, e);
             return null;
@@ -322,12 +365,18 @@ public class ResourceManager {
      */
     private static BlockModel loadItemModelRaw(String name) {
         String path = "/assets/models/item/" + name + ".json";
-        try (InputStream is = ResourceManager.class.getResourceAsStream(path);
-             Reader reader = new InputStreamReader(is)) {
-            BlockModel model = GSON.fromJson(reader, BlockModel.class);
-            return model;
+        try {
+            InputStream is = ResourceManager.class.getResourceAsStream(path);
+            if (is == null) {
+                logger.error("Item model not found: {}", path);
+                return null;
+            }
+            try (Reader reader = new InputStreamReader(is)) {
+                BlockModel model = GSON.fromJson(reader, BlockModel.class);
+                return model;
+            }
         } catch (Exception e) {
-            logger.debug("Failed to load item model: {}", path);
+            logger.error("Failed to load item model: {}", path, e);
             return null;
         }
     }
@@ -370,8 +419,20 @@ public class ResourceManager {
             // Check if parent is a block model (e.g., "block/grass_block" or "mattmc:block/stairs")
             if (parentPath.startsWith("block/") || parentPath.contains(":block/")) {
                 parentModel = loadBlockModel(parentPath);
+            } else if (parentPath.startsWith("item/")) {
+                // Parent is an item model with "item/" prefix (e.g., "item/generated")
+                // Strip the "item/" prefix since loadItemModelRaw already adds it
+                String itemModelName = parentPath.substring(5); // Remove "item/" prefix
+                parentModel = resolveItemModel(itemModelName);
+            } else if (parentPath.contains(":item/")) {
+                // Parent is an item model with namespace (e.g., "mattmc:item/generated")
+                // Strip the namespace and "item/" prefix
+                String[] parts = parentPath.split(":item/", 2);
+                if (parts.length == 2) {
+                    parentModel = resolveItemModel(parts[1]);
+                }
             } else {
-                // Try as item model
+                // Try as item model without prefix
                 parentModel = resolveItemModel(parentPath);
             }
             

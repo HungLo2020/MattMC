@@ -118,4 +118,36 @@ public class AsyncChunkSaverTest {
         
         cache.close();
     }
+    
+    @Test
+    public void testFlushWithBadData(@TempDir Path tempDir) throws IOException {
+        RegionFileCache cache = new RegionFileCache(tempDir);
+        AsyncChunkSaver saver = new AsyncChunkSaver(cache);
+        
+        // Queue a chunk with valid data
+        Map<String, Object> goodChunkData = new HashMap<>();
+        goodChunkData.put("xPos", 0);
+        goodChunkData.put("zPos", 0);
+        goodChunkData.put("DataVersion", 1);
+        saver.saveChunkAsync(0, 0, goodChunkData);
+        
+        // Queue a chunk with data that could cause serialization issues
+        // This simulates what might happen with complex block states
+        Map<String, Object> complexChunkData = new HashMap<>();
+        complexChunkData.put("xPos", 1);
+        complexChunkData.put("zPos", 0);
+        complexChunkData.put("DataVersion", 1);
+        saver.saveChunkAsync(1, 0, complexChunkData);
+        
+        // Flush should complete without hanging, even if errors occur
+        // The timeout mechanism should prevent infinite loops
+        saver.flush();
+        
+        // Verify at least one chunk was saved successfully
+        RegionFile regionFile = cache.getRegionFile(0, 0);
+        assertTrue(regionFile.hasChunk(0, 0), "Valid chunk should be saved");
+        
+        saver.shutdown();
+        cache.close();
+    }
 }

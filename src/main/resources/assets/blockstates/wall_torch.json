@@ -1,0 +1,19 @@
+{
+  "variants": {
+    "facing=north": {
+      "model": "mattmc:block/wall_torch",
+      "y": 270
+    },
+    "facing=south": {
+      "model": "mattmc:block/wall_torch",
+      "y": 90
+    },
+    "facing=west": {
+      "model": "mattmc:block/wall_torch",
+      "y": 180
+    },
+    "facing=east": {
+      "model": "mattmc:block/wall_torch"
+    }
+  }
+}
