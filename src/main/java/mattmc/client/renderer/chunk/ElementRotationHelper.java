@@ -2,7 +2,7 @@ package mattmc.client.renderer.chunk;
 
 /**
  * Handles 3D rotation transformations for model elements.
- * Provides methods to rotate points and bounding boxes around X and Y axes,
+ * Provides methods to rotate points around X and Y axes,
  * centered at (0.5, 0.5, 0.5) to match Minecraft's rotation convention.
  * 
  * This is separated from ModelElementRenderer to keep rotation mathematics isolated,
