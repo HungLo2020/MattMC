@@ -600,6 +600,18 @@ import java.util.stream.Collectors;
 /**
  * Centralized utility for loading resources from classpath.
  * Handles common resource loading patterns with proper error handling.
+ * 
+ * <p>All resource paths must start with a forward slash (/) and are relative
+ * to the classpath root. For example: "/assets/textures/blocks/dirt.png"
+ * 
+ * <p>This class provides consistent error handling, UTF-8 encoding by default,
+ * and proper resource cleanup via try-with-resources patterns.
+ * 
+ * <p>Example usage:
+ * <pre>{@code
+ * String shader = ResourceLoader.loadTextResource("/assets/shaders/basic.vert");
+ * BlockModel model = ResourceLoader.loadJsonResource("/assets/models/block/dirt.json", gson, BlockModel.class);
+ * }</pre>
  */
 public final class ResourceLoader {
     private static final Logger logger = LoggerFactory.getLogger(ResourceLoader.class);
@@ -785,7 +797,7 @@ public final class ChunkUtils {
     public static final int MIN_Y = LevelChunk.MIN_Y;
     public static final int MAX_Y = LevelChunk.MAX_Y;
     
-    private ChunkUtils() {} // Utility class - no instantiation
+    private ChunkUtils() {} // Prevent instantiation
     
     // === Coordinate Conversions ===
     
@@ -1222,7 +1234,16 @@ package mattmc.util;
  */
 public final class MathUtils {
     
+    /**
+     * Epsilon value for float comparisons.
+     * Used to determine if two floats are approximately equal (within 0.000001).
+     */
     public static final float EPSILON = 1e-6f;
+    
+    /**
+     * Epsilon value for double comparisons.
+     * Used to determine if two doubles are approximately equal (within 0.0000000001).
+     */
     public static final double EPSILON_D = 1e-10;
     
     private MathUtils() {} // Prevent instantiation
