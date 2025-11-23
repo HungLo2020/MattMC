@@ -4,6 +4,7 @@ import mattmc.client.settings.OptionsManager;
 import mattmc.world.level.block.Block;
 
 import mattmc.client.Minecraft;
+import mattmc.client.util.CoordinateUtils;
 import mattmc.world.entity.player.PlayerInput;
 import mattmc.client.gui.components.Button;
 import mattmc.client.gui.components.ButtonRenderer;
@@ -107,20 +108,11 @@ public final class ControlsScreen extends AbstractMenuScreen {
     public void tick() {
         // Custom tick for ControlsScreen with scroll handling
         // Convert window coords -> framebuffer coords
-        float mxFB, myFB;
-        org.lwjgl.system.MemoryStack stack = org.lwjgl.system.MemoryStack.stackPush();
-        try {
-            java.nio.IntBuffer winW = stack.mallocInt(1), winH = stack.mallocInt(1);
-            java.nio.IntBuffer fbW  = stack.mallocInt(1),  fbH  = stack.mallocInt(1);
-            glfwGetWindowSize(window.handle(), winW, winH);
-            glfwGetFramebufferSize(window.handle(), fbW, fbH);
-            float sx = fbW.get(0) / Math.max(1f, winW.get(0));
-            float sy = fbH.get(0) / Math.max(1f, winH.get(0));
-            mxFB = (float) mouseXWin * sx;
-            myFB = (float) mouseYWin * sy;
-        } finally {
-            stack.close();
-        }
+        CoordinateUtils.Point2D fbCoords = CoordinateUtils.windowToFramebuffer(
+            window.handle(), mouseXWin, mouseYWin
+        );
+        float mxFB = fbCoords.x;
+        float myFB = fbCoords.y;
 
         for (var kb : keybindButtons) {
             // Apply scroll offset to button position for hover detection

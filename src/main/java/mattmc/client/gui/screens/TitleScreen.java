@@ -9,17 +9,15 @@ import mattmc.client.gui.components.Button;
 import mattmc.client.gui.components.ButtonRenderer;
 import mattmc.client.gui.components.TextRenderer;
 import mattmc.client.gui.SplashTextLoader;
+import mattmc.client.util.CoordinateUtils;
 import mattmc.util.ColorUtils;
-import org.lwjgl.system.MemoryStack;
 
-import java.nio.IntBuffer;
 import java.util.ArrayList;
 import java.util.List;
 
 import static org.lwjgl.glfw.GLFW.*;
 import static org.lwjgl.opengl.GL11.*;
 import static org.lwjgl.opengl.GL13.*;
-import static org.lwjgl.system.MemoryStack.stackPush;
 
 /** Title screen with a time-based, fluid cubemap panorama and game logic at fixed 20 TPS. */
 public final class TitleScreen implements Screen {
@@ -115,17 +113,11 @@ public final class TitleScreen implements Screen {
         // Panorama rotation is now updated during rendering to prevent jitter
 
         // Hover every frame for responsiveness (not tied to TPS)
-        float mxFB, myFB;
-        try (MemoryStack stack = stackPush()) {
-            IntBuffer winW = stack.mallocInt(1), winH = stack.mallocInt(1);
-            IntBuffer fbW  = stack.mallocInt(1),  fbH  = stack.mallocInt(1);
-            glfwGetWindowSize(window.handle(), winW, winH);
-            glfwGetFramebufferSize(window.handle(), fbW, fbH);
-            float sx = fbW.get(0) / Math.max(1f, winW.get(0));
-            float sy = fbH.get(0) / Math.max(1f, winH.get(0));
-            mxFB = (float)mouseXWin * sx;
-            myFB = (float)mouseYWin * sy;
-        }
+        CoordinateUtils.Point2D fbCoords = CoordinateUtils.windowToFramebuffer(
+            window.handle(), mouseXWin, mouseYWin
+        );
+        float mxFB = fbCoords.x;
+        float myFB = fbCoords.y;
         for (var b : buttons) b.setHover(b.contains(mxFB, myFB));
 
         // Fixed 20 TPS for game logic
