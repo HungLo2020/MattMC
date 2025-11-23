@@ -125,21 +125,26 @@ public final class ColorUtils {
      * Interpolate between two colors.
      * @param color1 First color
      * @param color2 Second color
-     * @param t Interpolation factor (0.0-1.0)
+     * @param t Interpolation factor (0.0-1.0, will be clamped)
      * @return Interpolated color
      */
     public static int lerp(int color1, int color2, float t) {
-        float r1 = extractRed(color1) / 255f;
-        float g1 = extractGreen(color1) / 255f;
-        float b1 = extractBlue(color1) / 255f;
+        // Clamp t to valid range
+        t = Math.max(0.0f, Math.min(1.0f, t));
         
-        float r2 = extractRed(color2) / 255f;
-        float g2 = extractGreen(color2) / 255f;
-        float b2 = extractBlue(color2) / 255f;
+        // Extract components
+        int r1 = extractRed(color1);
+        int g1 = extractGreen(color1);
+        int b1 = extractBlue(color1);
         
-        int r = (int)((r1 + (r2 - r1) * t) * 255f);
-        int g = (int)((g1 + (g2 - g1) * t) * 255f);
-        int b = (int)((b1 + (b2 - b1) * t) * 255f);
+        int r2 = extractRed(color2);
+        int g2 = extractGreen(color2);
+        int b2 = extractBlue(color2);
+        
+        // Interpolate in integer space to avoid float conversions
+        int r = r1 + (int)((r2 - r1) * t);
+        int g = g1 + (int)((g2 - g1) * t);
+        int b = b1 + (int)((b2 - b1) * t);
         
         return packRGB(r, g, b);
     }
@@ -154,10 +159,12 @@ public final class ColorUtils {
 ```
 
 **Migration:**
-1. Enhance existing `mattmc.client.renderer.ColorUtils` with new methods
-2. Move to `mattmc.util.ColorUtils` for broader accessibility
+1. **Option A (Recommended):** Move existing `mattmc.client.renderer.ColorUtils` to `mattmc.util.ColorUtils` and enhance it with new methods. Update all imports.
+2. **Option B:** Keep in `mattmc.client.renderer` package and enhance with new methods. This maintains current package structure but limits accessibility to renderer-only code.
 3. Update all 15+ call sites to use `ColorUtils.toNormalizedRGBA()` or `ColorUtils.setGLColor()`
 4. Remove duplicate `setColor()` methods from screen classes
+
+**Note:** Option A is preferred as color utilities are useful beyond just rendering (e.g., in resource loading, GUI calculations).
 
 **Benefits:**
 - Eliminates 15+ duplicate implementations (~60 lines of duplicate code)
@@ -306,7 +313,9 @@ public final class CoordinateUtils {
 **Migration:**
 1. Create new `mattmc.client.util.CoordinateUtils` class
 2. Update all screen classes to use `CoordinateUtils.windowToFramebuffer()`
-3. Consider caching scale factors in Window class for performance
+3. **Important:** Cache scale factors in Window class for better performance - these rarely change and calling GLFW every frame is expensive
+
+**Performance Note:** In practice, the `Window` class should track scale factors and update them only when the framebuffer size changes. The utility methods shown here are for one-off conversions; high-frequency calls should use cached values.
 
 **Example usage:**
 ```java
@@ -789,7 +798,10 @@ package mattmc.world.level.chunk;
  */
 public final class ChunkUtils {
     
-    // Chunk dimensions (reference LevelChunk constants for single source of truth)
+    // Note: These constants reference LevelChunk for single source of truth.
+    // Alternative approach: Make LevelChunk constants public and use them directly
+    // throughout the codebase instead of these aliases. However, having them here
+    // provides better API discoverability and cleaner call sites.
     public static final int CHUNK_WIDTH = LevelChunk.WIDTH;
     public static final int CHUNK_DEPTH = LevelChunk.DEPTH;
     public static final int CHUNK_HEIGHT = LevelChunk.HEIGHT;
@@ -1361,13 +1373,14 @@ public final class Validate {
     
     /**
      * Check that object is not null.
+     * Note: Consider using java.util.Objects.requireNonNull() instead,
+     * which is standard library. This method is included for API completeness
+     * and consistency with other validation methods in this class.
+     * 
      * @throws NullPointerException if null
      */
     public static <T> T requireNonNull(T obj, String message) {
-        if (obj == null) {
-            throw new NullPointerException(message);
-        }
-        return obj;
+        return java.util.Objects.requireNonNull(obj, message);
     }
     
     /**
