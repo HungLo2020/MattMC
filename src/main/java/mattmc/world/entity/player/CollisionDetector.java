@@ -1,6 +1,7 @@
 package mattmc.world.entity.player;
 
 import mattmc.world.level.block.Block;
+import mattmc.world.level.chunk.ChunkUtils;
 import mattmc.world.level.chunk.LevelChunk;
 import mattmc.world.level.LevelAccessor;
 import mattmc.world.phys.AABB;
@@ -52,7 +53,7 @@ public class CollisionDetector {
             for (int by = startY; by <= endY; by++) {
                 for (int bz = startZ; bz <= endZ; bz++) {
                     // Convert world Y to chunk Y
-                    int chunkY = LevelChunk.worldYToChunkY(by);
+                    int chunkY = ChunkUtils.worldToLocalY(by);
                     
                     // Check if block coordinates are valid
                     if (chunkY >= 0 && chunkY < LevelChunk.HEIGHT) {
@@ -113,16 +114,16 @@ public class CollisionDetector {
         int blockZ = (int) Math.floor(z);
         
         // Search from top down
-        for (int worldY = LevelChunk.MAX_Y; worldY >= LevelChunk.MIN_Y; worldY--) {
-            int chunkY = LevelChunk.worldYToChunkY(worldY);
+        for (int worldY = ChunkUtils.MAX_Y; worldY >= ChunkUtils.MIN_Y; worldY--) {
+            int chunkY = ChunkUtils.worldToLocalY(worldY);
             
             // Check if this is a solid block
             Block block = world.getBlock(blockX, chunkY, blockZ);
             if (!block.isAir()) {
                 // Check if there's enough headroom (at least 2 blocks of air above)
                 int spawnWorldY = worldY + 1;
-                int spawnChunkY = LevelChunk.worldYToChunkY(spawnWorldY);
-                int headChunkY = LevelChunk.worldYToChunkY(spawnWorldY + 1);
+                int spawnChunkY = ChunkUtils.worldToLocalY(spawnWorldY);
+                int headChunkY = ChunkUtils.worldToLocalY(spawnWorldY + 1);
                 
                 if (spawnChunkY >= 0 && spawnChunkY < LevelChunk.HEIGHT && 
                     headChunkY >= 0 && headChunkY < LevelChunk.HEIGHT) {

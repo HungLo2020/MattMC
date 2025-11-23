@@ -1,6 +1,7 @@
 package mattmc.world.level.lighting;
 
 import mattmc.world.level.block.Block;
+import mattmc.world.level.chunk.ChunkUtils;
 import mattmc.world.level.chunk.LevelChunk;
 
 import java.util.ArrayDeque;
@@ -69,9 +70,9 @@ public class SkylightEngine {
 		
 		// Set skylight values based on heightmap
 		for (int y = 0; y < LevelChunk.HEIGHT; y++) {
-			int worldY = LevelChunk.chunkYToWorldY(y);
+			int worldY = ChunkUtils.localToWorldY(y);
 			
-			if (heightmapY == LevelChunk.MIN_Y || worldY > heightmapY) {
+			if (heightmapY == ChunkUtils.MIN_Y || worldY > heightmapY) {
 				// Above the heightmap OR no opaque blocks - full skylight from direct sky access
 				// Note: For open columns (no opaque blocks), propagateSkylightBelowHeightmap
 				// will re-process with attenuation where needed
@@ -106,7 +107,7 @@ public class SkylightEngine {
 				
 				// For open columns (heightmap = MIN_Y), add all lit blocks to seed
 				// horizontal propagation to neighboring columns/cavities
-				if (heightmapY == LevelChunk.MIN_Y) {
+				if (heightmapY == ChunkUtils.MIN_Y) {
 					for (int y = 0; y < LevelChunk.HEIGHT; y++) {
 						int light = chunk.getSkyLight(x, y, z);
 						if (light > 0) {
@@ -173,7 +174,7 @@ public class SkylightEngine {
 	 * @param oldBlock The old block
 	 */
 	public void updateColumnSkylight(LevelChunk chunk, int x, int y, int z, Block newBlock, Block oldBlock) {
-		int worldY = LevelChunk.chunkYToWorldY(y);
+		int worldY = ChunkUtils.localToWorldY(y);
 		int oldHeightmapY = chunk.getHeightmap().getHeight(x, z);
 		
 		// Check if opacity changed
@@ -212,7 +213,7 @@ public class SkylightEngine {
 		if (newHeightmapY > oldHeightmapY) {
 			// Heightmap increased (block placed above) - remove skylight below
 			for (int y = 0; y < LevelChunk.HEIGHT; y++) {
-				int worldY = LevelChunk.chunkYToWorldY(y);
+				int worldY = ChunkUtils.localToWorldY(y);
 				if (worldY > oldHeightmapY && worldY <= newHeightmapY) {
 					// This area lost sky access
 					removeSkylightAt(chunk, x, y, z);
@@ -224,7 +225,7 @@ public class SkylightEngine {
 			
 			// First pass: set skylight to 15 for all positions that gained sky access
 			for (int y = 0; y < LevelChunk.HEIGHT; y++) {
-				int worldY = LevelChunk.chunkYToWorldY(y);
+				int worldY = ChunkUtils.localToWorldY(y);
 				if (worldY > newHeightmapY && worldY <= oldHeightmapY) {
 					// This area gained sky access - set to full skylight
 					chunk.setSkyLight(x, y, z, 15);
@@ -378,9 +379,9 @@ public class SkylightEngine {
 		for (int y = LevelChunk.HEIGHT - 1; y >= 0; y--) {
 			Block block = chunk.getBlock(x, y, z);
 			if (block != null && block.getOpacity() >= 15) {
-				return LevelChunk.chunkYToWorldY(y);
+				return ChunkUtils.localToWorldY(y);
 			}
 		}
-		return LevelChunk.MIN_Y;
+		return ChunkUtils.MIN_Y;
 	}
 }

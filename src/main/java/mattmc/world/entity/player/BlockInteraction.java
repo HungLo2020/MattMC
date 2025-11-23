@@ -8,6 +8,7 @@ import mattmc.world.item.ItemStack;
 import mattmc.world.item.Items;
 import mattmc.world.level.block.Block;
 import mattmc.world.level.block.Blocks;
+import mattmc.world.level.chunk.ChunkUtils;
 import mattmc.world.level.chunk.LevelChunk;
 import mattmc.world.level.LevelAccessor;
 
@@ -130,7 +131,7 @@ public class BlockInteraction {
         
         // Initialize last block position to the starting position
         int lastBlockX = (int) Math.floor(rayX);
-        int lastBlockY = LevelChunk.worldYToChunkY((int) Math.floor(rayY));
+        int lastBlockY = ChunkUtils.worldToLocalY((int) Math.floor(rayY));
         int lastBlockZ = (int) Math.floor(rayZ);
         
         for (int i = 0; i < steps; i++) {
@@ -143,7 +144,7 @@ public class BlockInteraction {
             int blockZ = (int) Math.floor(rayZ);
             
             // Convert world Y to chunk Y
-            int chunkY = LevelChunk.worldYToChunkY(blockY);
+            int chunkY = ChunkUtils.worldToLocalY(blockY);
             
             // Check if Y is valid
             if (chunkY >= 0 && chunkY < LevelChunk.HEIGHT) {
