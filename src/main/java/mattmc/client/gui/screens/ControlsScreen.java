@@ -4,6 +4,7 @@ import mattmc.client.settings.OptionsManager;
 import mattmc.world.level.block.Block;
 
 import mattmc.client.Minecraft;
+import mattmc.client.util.CoordinateUtils;
 import mattmc.world.entity.player.PlayerInput;
 import mattmc.client.gui.components.Button;
 import mattmc.client.gui.components.ButtonRenderer;
@@ -107,7 +108,7 @@ public final class ControlsScreen extends AbstractMenuScreen {
     public void tick() {
         // Custom tick for ControlsScreen with scroll handling
         // Convert window coords -> framebuffer coords
-        mattmc.client.util.CoordinateUtils.Point2D fbCoords = mattmc.client.util.CoordinateUtils.windowToFramebuffer(
+        CoordinateUtils.Point2D fbCoords = CoordinateUtils.windowToFramebuffer(
             window.handle(), mouseXWin, mouseYWin
         );
         float mxFB = fbCoords.x;
