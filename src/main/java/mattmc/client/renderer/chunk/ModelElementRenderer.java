@@ -322,9 +322,17 @@ public class ModelElementRenderer {
         }
         
         // Apply per-face UV rotation as specified in the model JSON
-        // When uvlock=true, UVs are transformed above to keep textures world-aligned
-        // The per-face rotation from JSON is applied regardless of uvlock
+        // When uvlock=true, add counter-rotation to keep textures world-aligned
+        // The geometry rotates clockwise, so we counter-rotate UVs counter-clockwise (negative rotation)
         int adjustedFaceRotation = faceRotDegrees;
+        
+        // When uvlock=true, counter-rotate the UV assignment to compensate for Y-axis geometry rotation
+        // This keeps textures aligned with world axes instead of rotating with the block
+        if (uvlock && yRotation != 0) {
+            // For vertical faces (not up/down), apply counter-rotation
+            // Horizontal faces (up/down) also need rotation compensation
+            adjustedFaceRotation = (adjustedFaceRotation - yRotation + 360) % 360;
+        }
         
         // Render the face with rotated vertices
         currentVertex = addFaceQuadWithVertices(face, faceVerts, faceNormal, u0, v0, u1, v1, 
