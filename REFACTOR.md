@@ -144,11 +144,12 @@ public final class ColorUtils {
         return packRGB(r, g, b);
     }
     
-    // Keep existing methods from current ColorUtils:
-    // - darkenColor()
-    // - adjustColorBrightness()
-    // - applyTint()
-    // - setGLColor()
+    // Note: The following methods already exist in ColorUtils and should be preserved:
+    // - darkenColor(int rgb) - reduces brightness to 50%
+    // - adjustColorBrightness(int rgb, float factor) - adjusts brightness
+    // - applyTint(int baseColor, int tintColor, float brightnessFactor) - applies color tint
+    // - setGLColor(int rgb, float a) - sets OpenGL color from RGB
+    // These existing methods complement the new extraction utilities above.
 }
 ```
 
@@ -776,13 +777,13 @@ package mattmc.world.level.chunk;
  */
 public final class ChunkUtils {
     
-    // Chunk dimensions (reference LevelChunk constants)
-    public static final int CHUNK_WIDTH = LevelChunk.WIDTH;       // 16
-    public static final int CHUNK_DEPTH = LevelChunk.DEPTH;       // 16
-    public static final int CHUNK_HEIGHT = LevelChunk.HEIGHT;     // 384
-    public static final int SECTION_HEIGHT = LevelChunk.SECTION_HEIGHT; // 16
-    public static final int MIN_Y = LevelChunk.MIN_Y;             // -64
-    public static final int MAX_Y = LevelChunk.MAX_Y;             // 319
+    // Chunk dimensions (reference LevelChunk constants for single source of truth)
+    public static final int CHUNK_WIDTH = LevelChunk.WIDTH;
+    public static final int CHUNK_DEPTH = LevelChunk.DEPTH;
+    public static final int CHUNK_HEIGHT = LevelChunk.HEIGHT;
+    public static final int SECTION_HEIGHT = LevelChunk.SECTION_HEIGHT;
+    public static final int MIN_Y = LevelChunk.MIN_Y;
+    public static final int MAX_Y = LevelChunk.MAX_Y;
     
     private ChunkUtils() {} // Utility class - no instantiation
     
@@ -1439,9 +1440,9 @@ Validate.notEmpty(name, "Name cannot be empty");
 private static final Logger logger = LoggerFactory.getLogger(ClassName.class);
 ```
 
-**Recommendation:** While this is standard practice and works well, could consider Lombok's `@Slf4j` annotation if adding Lombok dependency is acceptable. However, **this is NOT recommended** as it adds external dependency for minimal benefit.
+**Recommendation:** Keep current approach - it's explicit and standard Java practice. While alternatives like Lombok's `@Slf4j` annotation exist, they add external dependencies for minimal benefit in this context. The current pattern is clear, type-safe, and widely understood.
 
-**Action:** Keep current approach - it's explicit and standard Java practice.
+**Action:** No change needed - current implementation is preferred.
 
 ---
 
