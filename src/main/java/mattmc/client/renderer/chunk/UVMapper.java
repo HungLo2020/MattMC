@@ -50,6 +50,19 @@ public class UVMapper {
     }
     
     /**
+     * Get UV mapping from texture atlas for a specific texture path.
+     * Returns null if no atlas or texture not found.
+     * Used by ModelElementRenderer for data-driven geometry rendering.
+     */
+    public TextureAtlas.UVMapping getUVMappingForTexture(String texturePath) {
+        if (textureAtlas == null || texturePath == null) {
+            return null;
+        }
+        
+        return textureAtlas.getUVMapping(texturePath);
+    }
+    
+    /**
      * Extract RGBA color from face data.
      * Uses white color with brightness when texture atlas is available,
      * otherwise uses fallback colors.
