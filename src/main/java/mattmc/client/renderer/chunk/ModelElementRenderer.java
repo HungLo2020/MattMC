@@ -271,9 +271,9 @@ public class ModelElementRenderer {
         
         // When uvlock=true, transform UV coordinates to account for geometry rotation
         // This keeps textures aligned with world axes by rotating the UV rectangle
-        // Note: Only Y-rotation is handled here as stairs only rotate around Y-axis
-        // X-rotation is used for upside-down stairs (half=top) but doesn't require UV transformation
-        if (uvlock && yRotation != 0) {
+        // Note: Only horizontal faces (up/down) need UV transformation for Y-axis rotation
+        // Vertical faces already have correct UVs in the JSON for their face direction
+        if (uvlock && yRotation != 0 && (faceDirection.equals("up") || faceDirection.equals("down"))) {
             uv = transformUVsForRotation(uv, faceDirection, yRotation);
         }
         
