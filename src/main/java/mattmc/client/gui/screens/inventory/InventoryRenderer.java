@@ -5,6 +5,7 @@ import mattmc.client.renderer.BlurEffect;
 import mattmc.client.renderer.BlurRenderer;
 import mattmc.client.renderer.TooltipRenderer;
 import mattmc.client.renderer.texture.Texture;
+import mattmc.util.ColorUtils;
 import mattmc.world.item.Inventory;
 import mattmc.world.item.Item;
 import mattmc.world.item.ItemStack;
@@ -64,7 +65,7 @@ public class InventoryRenderer {
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
         
         // Semi-transparent black background
-        setColor(0x000000, 0.5f);
+        ColorUtils.setGLColor(0x000000, 0.5f);
         glBegin(GL_QUADS);
         glVertex2f(0, 0);
         glVertex2f(screenWidth, 0);
@@ -410,12 +411,7 @@ public class InventoryRenderer {
         tooltipRenderer.renderTooltip(itemName, mouseXWin, mouseYWin, window.handle(), window.width(), window.height());
     }
     
-    private void setColor(int rgb, float a) {
-        float r = ((rgb >> 16) & 0xFF) / 255f;
-        float g = ((rgb >> 8) & 0xFF) / 255f;
-        float b = (rgb & 0xFF) / 255f;
-        glColor4f(r, g, b, a);
-    }
+
     
     public void close() {
         if (inventoryTexture != null) {

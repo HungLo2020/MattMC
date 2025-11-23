@@ -11,7 +11,7 @@ import mattmc.world.entity.player.PlayerInput;
 import mattmc.client.renderer.LevelRenderer;
 import mattmc.client.renderer.UIRenderer;
 import mattmc.client.renderer.block.BlockFaceGeometry;
-import mattmc.client.renderer.ColorUtils;
+import mattmc.util.ColorUtils;
 import mattmc.world.item.Inventory;
 import mattmc.world.level.chunk.LevelChunk;
 import mattmc.world.level.Level;

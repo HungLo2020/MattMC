@@ -1,6 +1,6 @@
 package mattmc.client.renderer.block;
 
-import mattmc.client.renderer.ColorUtils;
+import mattmc.util.ColorUtils;
 
 import mattmc.world.level.block.Block;
 import mattmc.world.level.chunk.LevelChunk;

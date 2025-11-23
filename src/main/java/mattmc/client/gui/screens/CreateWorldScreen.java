@@ -9,6 +9,7 @@ import mattmc.client.gui.components.Button;
 import mattmc.client.gui.components.ButtonRenderer;
 import mattmc.client.gui.components.EditBox;
 import mattmc.client.gui.components.TextRenderer;
+import mattmc.util.ColorUtils;
 import mattmc.world.level.storage.LevelStorageSource;
 import org.lwjgl.system.MemoryStack;
 
@@ -274,12 +275,12 @@ public final class CreateWorldScreen implements Screen {
     private void drawTextField(EditBox tf) {
         // Background
         int bgColor = tf.isFocused() ? 0x000000 : 0x222222;
-        setColor(bgColor, 0.8f);
+        ColorUtils.setGLColor(bgColor, 0.8f);
         fillRect(tf.x, tf.y, tf.w, tf.h);
         
         // Border
         int borderColor = tf.isFocused() ? 0xFFFFFF : 0x888888;
-        setColor(borderColor, 1f);
+        ColorUtils.setGLColor(borderColor, 1f);
         glBegin(GL_LINE_LOOP);
         glVertex2f(tf.x, tf.y);
         glVertex2f(tf.x + tf.w, tf.y);
@@ -297,7 +298,7 @@ public final class CreateWorldScreen implements Screen {
         if (tf.isFocused() && (System.currentTimeMillis() / 500) % 2 == 0) {
             float textWidth = TextRenderer.getTextWidth(text, 1.0f);
             float cursorX = tf.x + 8f + textWidth;
-            setColor(0xFFFFFF, 1f);
+            ColorUtils.setGLColor(0xFFFFFF, 1f);
             glBegin(GL_LINES);
             glVertex2f(cursorX, tf.y + 6f);
             glVertex2f(cursorX, tf.y + tf.h - 6f);
@@ -314,13 +315,6 @@ public final class CreateWorldScreen implements Screen {
         glVertex2f(x + w, y + h);
         glVertex2f(x, y + h);
         glEnd();
-    }
-
-    private void setColor(int rgb, float a) {
-        float r = ((rgb >> 16) & 0xFF) / 255f;
-        float g = ((rgb >> 8) & 0xFF) / 255f;
-        float b = (rgb & 0xFF) / 255f;
-        glColor4f(r, g, b, a);
     }
 
     private void drawTitle(String text, float cx, float cy, float scale, int rgb) {
@@ -340,7 +334,7 @@ public final class CreateWorldScreen implements Screen {
     }
 
     private void drawText(String text, float x, float y, float scale, int rgb) {
-        setColor(rgb, 1f);
+        ColorUtils.setGLColor(rgb, 1f);
         TextRenderer.drawText(text, x, y, scale);
     }
 
