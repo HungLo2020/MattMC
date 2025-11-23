@@ -1,6 +1,7 @@
 package mattmc.client.renderer;
 
 import mattmc.client.gui.components.TextRenderer;
+import mattmc.util.MathUtils;
 import org.lwjgl.system.MemoryStack;
 
 import java.nio.IntBuffer;
@@ -75,8 +76,8 @@ public class TooltipRenderer extends AbstractBlurBox {
         float tooltipY = mouseFBY + TOOLTIP_OFFSET_Y - boxHeight;
         
         // Clamp to screen bounds
-        tooltipX = Math.max(0, Math.min(tooltipX, screenWidth - boxWidth));
-        tooltipY = Math.max(0, Math.min(tooltipY, screenHeight - boxHeight));
+        tooltipX = MathUtils.clamp(tooltipX, 0, screenWidth - boxWidth);
+        tooltipY = MathUtils.clamp(tooltipY, 0, screenHeight - boxHeight);
         
         // Apply blur to the tooltip region BEFORE drawing the tooltip
         applyRegionalBlur(tooltipX, tooltipY, boxWidth, boxHeight, screenWidth, screenHeight);

@@ -9,6 +9,7 @@ import mattmc.world.entity.player.PlayerInput;
 import mattmc.client.gui.components.Button;
 import mattmc.client.gui.components.ButtonRenderer;
 import mattmc.client.settings.KeybindManager;
+import mattmc.util.MathUtils;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -243,7 +244,7 @@ public final class ControlsScreen extends AbstractMenuScreen {
             // yOffset: positive when scrolling up, negative when scrolling down
             // Negate yOffset so scrolling down increases scrollOffset (moves content up)
             int scrollAmount = (int)(-yOffset * SCROLL_SPEED);
-            scrollOffset = Math.max(0, Math.min(maxScrollOffset, scrollOffset + scrollAmount));
+            scrollOffset = MathUtils.clamp(scrollOffset + scrollAmount, 0, maxScrollOffset);
         });
     }
     

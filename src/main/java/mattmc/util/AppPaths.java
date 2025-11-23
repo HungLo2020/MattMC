@@ -2,6 +2,7 @@ package mattmc.util;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import static mattmc.util.Validate.notEmpty;
 
 import java.io.IOException;
 import java.net.URI;
@@ -41,9 +42,7 @@ public final class AppPaths {
      */
     public static Path ensureDataDirInJarParent(String dirName) throws IOException {
         // Validate dirName to prevent path traversal
-        if (dirName == null || dirName.isEmpty()) {
-            throw new IllegalArgumentException("Directory name cannot be null or empty");
-        }
+        notEmpty(dirName, "Directory name cannot be null or empty");
         if (dirName.contains("..") || dirName.contains("/") || dirName.contains("\\")) {
             throw new IllegalArgumentException("Directory name contains invalid characters: " + dirName);
         }

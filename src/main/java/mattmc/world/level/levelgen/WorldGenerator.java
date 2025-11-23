@@ -2,6 +2,7 @@ package mattmc.world.level.levelgen;
 
 import mattmc.world.level.chunk.ChunkUtils;
 import mattmc.world.level.lighting.WorldLightManager;
+import mattmc.util.MathUtils;
 
 /**
  * World generator using Minecraft-style noise-based terrain generation.
@@ -77,7 +78,7 @@ public class WorldGenerator {
         int height = SEA_LEVEL + (int)Math.round(heightOffset);
         
         // Clamp to valid range
-        height = Math.max(MIN_HEIGHT, Math.min(height, MAX_HEIGHT));
+        height = MathUtils.clamp(height, MIN_HEIGHT, MAX_HEIGHT);
         
         return height;
     }

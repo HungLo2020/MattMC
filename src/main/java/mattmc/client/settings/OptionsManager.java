@@ -6,6 +6,7 @@ import java.util.HashMap;
 import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import mattmc.util.MathUtils;
 
 /**
  * Manages game options/settings (excluding keybinds).
@@ -66,14 +67,14 @@ public class OptionsManager {
      * Validate and clamp FPS cap value to valid range.
      */
     private static int validateFpsCap(int fps) {
-        return Math.max(MIN_FPS_CAP, Math.min(MAX_FPS_CAP, fps));
+        return MathUtils.clamp(fps, MIN_FPS_CAP, MAX_FPS_CAP);
     }
     
     /**
      * Validate and clamp render distance value to valid range.
      */
     private static int validateRenderDistance(int distance) {
-        return Math.max(MIN_RENDER_DISTANCE, Math.min(MAX_RENDER_DISTANCE, distance));
+        return MathUtils.clamp(distance, MIN_RENDER_DISTANCE, MAX_RENDER_DISTANCE);
     }
     
     /**

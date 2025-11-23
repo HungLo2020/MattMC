@@ -5,6 +5,7 @@ import mattmc.client.util.CoordinateUtils;
 import mattmc.world.item.Inventory;
 import mattmc.world.item.Item;
 import mattmc.world.item.ItemStack;
+import mattmc.util.MathUtils;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -50,7 +51,7 @@ public class CreativeInventoryManager {
             // Scroll down (negative yoffset) = increase row to show later items
             // Scroll up (positive yoffset) = decrease row to show earlier items
             scrollRow += (int) -yoffset;
-            scrollRow = Math.max(0, Math.min(scrollRow, maxScrollRow));
+            scrollRow = MathUtils.clamp(scrollRow, 0, maxScrollRow);
         }
     }
     

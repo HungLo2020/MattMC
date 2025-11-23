@@ -85,7 +85,7 @@ public final class ColorUtils {
      */
     public static int lerp(int color1, int color2, float t) {
         // Clamp t to valid range
-        t = Math.max(0.0f, Math.min(1.0f, t));
+        t = MathUtils.clamp(t, 0.0f, 1.0f);
         
         // Extract components
         int r1 = extractRed(color1);
@@ -120,9 +120,9 @@ public final class ColorUtils {
      * @return Adjusted color
      */
     public static int adjustColorBrightness(int rgb, float factor) {
-        int r = Math.min(255, (int)(extractRed(rgb) * factor));
-        int g = Math.min(255, (int)(extractGreen(rgb) * factor));
-        int b = Math.min(255, (int)(extractBlue(rgb) * factor));
+        int r = MathUtils.min(255, (int)(extractRed(rgb) * factor));
+        int g = MathUtils.min(255, (int)(extractGreen(rgb) * factor));
+        int b = MathUtils.min(255, (int)(extractBlue(rgb) * factor));
         return packRGB(r, g, b);
     }
     
@@ -146,9 +146,9 @@ public final class ColorUtils {
         int tintB = extractBlue(tintColor);
         
         // Multiply components (treating them as 0-1 range)
-        int r = Math.min(255, (int)((baseR * tintR / 255.0f) * brightnessFactor));
-        int g = Math.min(255, (int)((baseG * tintG / 255.0f) * brightnessFactor));
-        int b = Math.min(255, (int)((baseB * tintB / 255.0f) * brightnessFactor));
+        int r = MathUtils.min(255, (int)((baseR * tintR / 255.0f) * brightnessFactor));
+        int g = MathUtils.min(255, (int)((baseG * tintG / 255.0f) * brightnessFactor));
+        int b = MathUtils.min(255, (int)((baseB * tintB / 255.0f) * brightnessFactor));
         
         return packRGB(r, g, b);
     }
