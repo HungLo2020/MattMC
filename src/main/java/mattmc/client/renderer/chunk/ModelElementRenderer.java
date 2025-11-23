@@ -825,16 +825,19 @@ public class ModelElementRenderer {
         
         // Rotate UV rectangle around center point (8, 8) in 0-16 space
         for (int i = 0; i < rotationSteps; i++) {
-            // One 90° CCW rotation around (8, 8)
-            float newU0 = 16 - v1;
-            float newV0 = u0;
-            float newU1 = 16 - v0;
-            float newV1 = u1;
+            // One 90° CCW rotation around (8, 8):
+            // Point (u, v) -> (16-v, u)
+            // After rotation, corners may swap so we need to find new min/max
+            float rotU0 = 16 - v0;
+            float rotU1 = 16 - v1;
+            float rotV0 = u0;
+            float rotV1 = u1;
             
-            u0 = newU0;
-            v0 = newV0;
-            u1 = newU1;
-            v1 = newV1;
+            // Ensure u0 < u1 and v0 < v1
+            u0 = Math.min(rotU0, rotU1);
+            u1 = Math.max(rotU0, rotU1);
+            v0 = Math.min(rotV0, rotV1);
+            v1 = Math.max(rotV0, rotV1);
         }
         
         return new float[]{u0, v0, u1, v1};
