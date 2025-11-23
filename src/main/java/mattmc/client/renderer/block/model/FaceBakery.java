@@ -21,6 +21,9 @@ public class FaceBakery {
             return "Unable to resolve UVLock for model";
         }).getMatrix();
         
+        System.out.println(String.format("  UV Transform Matrix: m00=%.2f m01=%.2f m10=%.2f m11=%.2f", 
+            matrix4f.m00(), matrix4f.m01(), matrix4f.m10(), matrix4f.m11()));
+        
         // Get the first corner UV coordinates (reverse index 0)
         float f = uvs.getU(uvs.getReverseIndex(0));
         float f1 = uvs.getV(uvs.getReverseIndex(0));
@@ -62,6 +65,9 @@ public class FaceBakery {
         Matrix3f matrix3f = new Matrix3f(matrix4f);
         Vector3f vector3f = matrix3f.transform(new Vector3f(cos(f12), sin(f12), 0.0F));
         int i = Math.floorMod(-((int)Math.round(Math.toDegrees(Math.atan2((double)vector3f.y(), (double)vector3f.x())) / 90.0D)) * 90, 360);
+        
+        System.out.println(String.format("  Rotation: %d -> %d | UV: [%.1f,%.1f,%.1f,%.1f] -> [%.1f,%.1f,%.1f,%.1f]",
+            uvs.rotation, i, uvs.uvs[0], uvs.uvs[1], uvs.uvs[2], uvs.uvs[3], f8, f10, f9, f11));
         
         return new BlockFaceUV(new float[]{f8, f10, f9, f11}, i);
     }
