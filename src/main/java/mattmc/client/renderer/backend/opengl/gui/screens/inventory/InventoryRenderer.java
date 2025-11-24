@@ -8,7 +8,7 @@ import mattmc.client.gui.screens.inventory.CreativeInventoryManager;
 import mattmc.client.renderer.backend.opengl.Window;
 import mattmc.client.renderer.backend.opengl.BlurEffect;
 import mattmc.client.renderer.backend.opengl.BlurRenderer;
-import mattmc.client.renderer.backend.opengl.TooltipRenderer;
+import mattmc.client.renderer.TooltipRenderer;
 import mattmc.client.renderer.backend.opengl.Texture;
 import mattmc.client.util.CoordinateUtils;
 import mattmc.util.ColorUtils;
@@ -17,10 +17,15 @@ import mattmc.world.item.Inventory;
 import mattmc.world.item.Item;
 import mattmc.world.item.ItemStack;
 
+import java.nio.IntBuffer;
 import java.util.List;
 
+import org.lwjgl.system.MemoryStack;
+
 import static mattmc.client.settings.OptionsManager.isMenuScreenBlurEnabled;
+import static org.lwjgl.glfw.GLFW.*;
 import static org.lwjgl.opengl.GL11.*;
+import static org.lwjgl.system.MemoryStack.stackPush;
 
 /**
  * Renders inventory GUI elements.
@@ -45,6 +50,15 @@ public class InventoryRenderer {
         this.inventoryTexture = Texture.load("/assets/textures/gui/container/inventory.png");
         this.creativeInventoryTexture = Texture.load("/assets/textures/gui/container/creativeinv.png");
         this.tooltipRenderer = new TooltipRenderer();
+    }
+    
+    /**
+     * Set the render backend for tooltip rendering.
+     */
+    public void setBackend(mattmc.client.renderer.backend.RenderBackend backend) {
+        if (tooltipRenderer != null) {
+            tooltipRenderer.setBackend(backend);
+        }
     }
     
     public void renderBackground(int screenWidth, int screenHeight) {
@@ -386,7 +400,23 @@ public class InventoryRenderer {
         String itemName = identifier.contains(":") ? identifier.substring(identifier.indexOf(':') + 1) : identifier;
         itemName = itemName.substring(0, 1).toUpperCase() + itemName.substring(1).replace('_', ' ');
         
-        tooltipRenderer.renderTooltip(itemName, mouseXWin, mouseYWin, window.handle(), window.width(), window.height());
+        // Convert window coordinates to framebuffer coordinates
+        float mouseFBX, mouseFBY;
+        int fbWidth, fbHeight;
+        try (MemoryStack stack = stackPush()) {
+            IntBuffer winW = stack.mallocInt(1), winH = stack.mallocInt(1);
+            IntBuffer fbW  = stack.mallocInt(1), fbH  = stack.mallocInt(1);
+            glfwGetWindowSize(window.handle(), winW, winH);
+            glfwGetFramebufferSize(window.handle(), fbW, fbH);
+            float sx = fbW.get(0) / Math.max(1f, winW.get(0));
+            float sy = fbH.get(0) / Math.max(1f, winH.get(0));
+            mouseFBX = (float) mouseXWin * sx;
+            mouseFBY = (float) mouseYWin * sy;
+            fbWidth = fbW.get(0);
+            fbHeight = fbH.get(0);
+        }
+        
+        tooltipRenderer.renderTooltip(itemName, mouseFBX, mouseFBY, fbWidth, fbHeight);
     }
     
 
@@ -404,10 +434,8 @@ public class InventoryRenderer {
             blurEffect.close();
             blurEffect = null;
         }
-        if (tooltipRenderer != null) {
-            tooltipRenderer.close();
-            tooltipRenderer = null;
-        }
+        // TooltipRenderer no longer needs cleanup
+        tooltipRenderer = null;
     }
     
     public Texture getInventoryTexture() {
