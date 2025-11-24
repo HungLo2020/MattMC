@@ -821,4 +821,24 @@ public class OpenGLRenderBackend implements RenderBackend {
     public void resetColor() {
         glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
     }
+    
+    @Override
+    public void drawText(String text, float x, float y, float scale) {
+        mattmc.client.renderer.backend.opengl.gui.components.TextRenderer.drawText(text, x, y, scale);
+    }
+    
+    @Override
+    public void drawCenteredText(String text, float centerX, float y, float scale) {
+        mattmc.client.renderer.backend.opengl.gui.components.TextRenderer.drawCenteredText(text, centerX, y, scale);
+    }
+    
+    @Override
+    public float getTextWidth(String text, float scale) {
+        return mattmc.client.renderer.backend.opengl.gui.components.TextRenderer.getTextWidth(text, scale);
+    }
+    
+    @Override
+    public float getTextHeight(String text, float scale) {
+        return mattmc.client.renderer.backend.opengl.gui.components.TextRenderer.getTextHeight(text, scale);
+    }
 }

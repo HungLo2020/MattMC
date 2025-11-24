@@ -302,4 +302,45 @@ public interface RenderBackend {
      * </ul>
      */
     void resetColor();
+    
+    /**
+     * Draw text at the specified position with the given scale.
+     * 
+     * <p>Renders text using the backend's font system. The position represents the
+     * top-left corner of the text bounding box.
+     * 
+     * @param text the text to render
+     * @param x X position (left edge)
+     * @param y Y position (top edge)
+     * @param scale text scale multiplier
+     */
+    void drawText(String text, float x, float y, float scale);
+    
+    /**
+     * Draw text centered horizontally at the specified position.
+     * 
+     * @param text the text to render
+     * @param centerX center X position
+     * @param y Y position (top edge)
+     * @param scale text scale multiplier
+     */
+    void drawCenteredText(String text, float centerX, float y, float scale);
+    
+    /**
+     * Get the width of text at the given scale.
+     * 
+     * @param text the text to measure
+     * @param scale text scale multiplier
+     * @return width in pixels
+     */
+    float getTextWidth(String text, float scale);
+    
+    /**
+     * Get the height of text at the given scale.
+     * 
+     * @param text the text to measure
+     * @param scale text scale multiplier
+     * @return height in pixels
+     */
+    float getTextHeight(String text, float scale);
 }

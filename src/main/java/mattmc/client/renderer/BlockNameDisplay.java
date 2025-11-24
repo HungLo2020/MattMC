@@ -2,7 +2,6 @@ package mattmc.client.renderer;
 
 import mattmc.client.renderer.backend.DrawCommand;
 import mattmc.client.renderer.backend.RenderBackend;
-import mattmc.client.renderer.backend.opengl.gui.components.TextRenderer;
 import mattmc.world.level.block.Block;
 
 /**
@@ -92,8 +91,8 @@ public class BlockNameDisplay {
         float textScale = 1.5f;
         
         // Measure text dimensions
-        int textWidth = (int) TextRenderer.getTextWidth(blockName, textScale);
-        int textHeight = (int) TextRenderer.getTextHeight(blockName, textScale);
+        int textWidth = (int) backend.getTextWidth(blockName, textScale);
+        int textHeight = (int) backend.getTextHeight(blockName, textScale);
         
         // Calculate box dimensions
         int boxWidth = textWidth + (PADDING * 2);
@@ -117,7 +116,7 @@ public class BlockNameDisplay {
         backend.resetColor();
         
         // Draw the block name text using TextRenderer
-        TextRenderer.drawText(blockName, x + PADDING, y + PADDING, textScale);
+        backend.drawText(blockName, x + PADDING, y + PADDING, textScale);
         
         // Restore projection (delegated to backend)
         backend.restore2DProjection();
