@@ -53,6 +53,9 @@ public final class InventoryScreen implements Screen {
         this.creativeManager = new CreativeInventoryManager();
         this.renderer = new InventoryRenderer(window, slotManager);
         
+        // Set the render backend for tooltip rendering
+        this.renderer.setBackend(gameScreen.getRenderBackend());
+        
         // Release mouse cursor
         glfwSetInputMode(window.handle(), GLFW_CURSOR, GLFW_CURSOR_NORMAL);
 

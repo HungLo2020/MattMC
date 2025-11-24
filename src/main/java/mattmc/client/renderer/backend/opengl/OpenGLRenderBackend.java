@@ -662,15 +662,11 @@ public class OpenGLRenderBackend implements RenderBackend {
         UIRenderLogic.TextRenderInfo textInfo = UIRenderLogic.getTextInfo(textId);
         if (textInfo == null) return;
         
-        // Approximate size calculation (tooltips need size for blur/border)
+        // Render tooltip text directly
         float TOOLTIP_PADDING = 13.5f;
-        float textWidth = textInfo.text.length() * 8 * textInfo.scale;
-        float textHeight = 16 * textInfo.scale;
-        float boxWidth = textWidth + TOOLTIP_PADDING * 2;
-        float boxHeight = textHeight + TOOLTIP_PADDING * 2;
-        
-        // Render tooltip using TooltipRenderer
-        TooltipRenderer.renderTooltipDirect(textInfo.text, x, y, (int)boxWidth, (int)boxHeight, TOOLTIP_PADDING);
+        glColor4f(1f, 1f, 1f, 1f);
+        mattmc.client.renderer.backend.opengl.gui.components.TextRenderer.drawText(
+            textInfo.text, x + TOOLTIP_PADDING, y + TOOLTIP_PADDING, textInfo.scale);
     }
     
     /**
@@ -814,5 +810,15 @@ public class OpenGLRenderBackend implements RenderBackend {
         
         // Delegate to blur helper's drawing method
         blurHelper.drawRoundedRectBorder(x, y, width, height, radius, borderWidth, r, g, b, a);
+    }
+    
+    /**
+     * Reset the OpenGL color to white.
+     * This ensures that subsequent drawing operations (like text) appear in white
+     * instead of inheriting colors from previous operations (like blue borders).
+     */
+    @Override
+    public void resetColor() {
+        glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
     }
 }

@@ -395,6 +395,14 @@ public final class DevplayScreen implements Screen {
     }
     
     /**
+     * Get the render backend for UI rendering.
+     * @return The render backend instance
+     */
+    public mattmc.client.renderer.backend.RenderBackend getRenderBackend() {
+        return worldRenderer.getRenderBackend();
+    }
+    
+    /**
      * Sync player previous position to current position.
      * Called by overlay screens (pause, inventory) to prevent flickering during interpolation.
      */
