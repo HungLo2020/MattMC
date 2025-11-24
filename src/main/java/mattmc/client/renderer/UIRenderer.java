@@ -37,16 +37,20 @@ public class UIRenderer {
      * Set the render backend for UI rendering (Stage 4).
      * Propagates the backend to all child renderers.
      * 
+     * <p>Note: BlockNameDisplay is not included as it's a specialized effect renderer
+     * (with blur effects) which is out of Stage 4 scope per RENDERINGREFACTOR.md.
+     * 
      * @param backend the backend to use, or null to use legacy rendering
      */
     public void setBackend(RenderBackend backend) {
         this.backend = backend;
-        // Propagate backend to all child renderers
+        // Propagate backend to all Stage 4 child renderers
         crosshairRenderer.setBackend(backend);
         hotbarRenderer.setBackend(backend);
         commandUIRenderer.setBackend(backend);
         debugInfoRenderer.setBackend(backend);
         systemInfoRenderer.setBackend(backend);
+        // Note: BlockNameDisplay (specialized blur effect) not in Stage 4 scope
     }
     
     /**
