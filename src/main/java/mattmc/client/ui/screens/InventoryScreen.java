@@ -1,11 +1,11 @@
-package mattmc.client.renderer.backend.opengl.gui.screens;
+package mattmc.client.ui.screens;
 
 import mattmc.client.gui.screens.Screen;
 import mattmc.client.Minecraft;
 import mattmc.client.renderer.backend.opengl.Window;
 import mattmc.client.gui.screens.inventory.CreativeInventoryManager;
 import mattmc.client.gui.screens.inventory.InventoryInputHandler;
-import mattmc.client.renderer.backend.opengl.gui.screens.inventory.InventoryRenderer;
+import mattmc.client.ui.screens.inventory.InventoryRenderer;
 import mattmc.client.gui.screens.inventory.InventorySlotManager;
 import mattmc.world.entity.player.PlayerInput;
 import mattmc.world.item.Item;

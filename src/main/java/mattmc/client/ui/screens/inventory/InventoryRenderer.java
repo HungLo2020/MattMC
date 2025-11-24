@@ -1,4 +1,4 @@
-package mattmc.client.renderer.backend.opengl.gui.screens.inventory;
+package mattmc.client.ui.screens.inventory;
 
 import mattmc.client.renderer.backend.opengl.ItemRenderer;
 import mattmc.client.ui.components.TextRenderer;

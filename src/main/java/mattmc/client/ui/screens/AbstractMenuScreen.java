@@ -1,4 +1,4 @@
-package mattmc.client.renderer.backend.opengl.gui.screens;
+package mattmc.client.ui.screens;
 
 import mattmc.client.gui.screens.Screen;
 import mattmc.client.Minecraft;
