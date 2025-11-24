@@ -1,6 +1,6 @@
 package mattmc.client.renderer.chunk;
 
-import mattmc.client.renderer.backend.opengl.util.ColorUtils;
+import mattmc.util.ColorUtils;
 import mattmc.client.renderer.block.BlockFaceCollector;
 import mattmc.client.renderer.backend.opengl.TextureAtlas;
 import mattmc.world.level.block.Blocks;

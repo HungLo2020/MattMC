@@ -3,7 +3,7 @@ package mattmc.client.renderer.backend.opengl;
 import mattmc.client.renderer.CommandBuffer;
 
 import mattmc.client.renderer.UIRenderLogic;
-import mattmc.client.renderer.backend.opengl.util.SystemInfo;
+import mattmc.client.util.SystemInfo;
 
 import mattmc.client.renderer.backend.DrawCommand;
 

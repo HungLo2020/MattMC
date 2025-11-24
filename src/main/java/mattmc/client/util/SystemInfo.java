@@ -1,4 +1,4 @@
-package mattmc.client.renderer.backend.opengl.util;
+package mattmc.client.util;
 
 import org.lwjgl.glfw.GLFW;
 import org.lwjgl.opengl.GL11;

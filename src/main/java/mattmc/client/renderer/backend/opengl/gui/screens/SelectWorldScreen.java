@@ -9,7 +9,8 @@ import mattmc.client.gui.components.Button;
 import mattmc.client.renderer.backend.opengl.gui.components.ButtonRenderer;
 import mattmc.client.renderer.backend.opengl.gui.components.TextRenderer;
 import mattmc.client.util.CoordinateUtils;
-import mattmc.client.renderer.backend.opengl.util.ColorUtils;
+import mattmc.util.ColorUtils;
+import mattmc.client.renderer.backend.opengl.OpenGLColorHelper;
 import mattmc.world.level.Level;
 import mattmc.world.level.storage.LevelStorageSource;
 
@@ -257,7 +258,7 @@ public final class SelectWorldScreen implements Screen {
     }
 
     private void drawText(String text, float x, float y, float scale, int rgb) {
-        ColorUtils.setGLColor(rgb, 1f);
+        OpenGLColorHelper.setGLColor(rgb, 1f);
         TextRenderer.drawText(text, x, y, scale);
     }
 
