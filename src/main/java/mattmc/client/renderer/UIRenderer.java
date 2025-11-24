@@ -1,9 +1,7 @@
 package mattmc.client.renderer;
 
 import mattmc.client.renderer.backend.RenderBackend;
-import mattmc.client.renderer.backend.opengl.CrosshairRenderer;
 import mattmc.client.renderer.backend.opengl.DebugInfoRenderer;
-import mattmc.client.renderer.backend.opengl.HotbarRenderer;
 import mattmc.client.renderer.backend.opengl.CommandUIRenderer;
 import mattmc.client.renderer.backend.opengl.LightingDebugRenderer;
 import mattmc.client.renderer.backend.opengl.SystemInfoRenderer;
