@@ -146,9 +146,9 @@ public class UIRenderLogic {
      * @return encoded data
      */
     private int encodeHotbarData(int x, int y, int width, int height, int type) {
-        // Encode type in lower bits, position/size in upper bits
-        // This is temporary for Stage 4
-        return type | ((x & 0xFFF) << 2) | ((y & 0xFFF) << 14) | ((width & 0x3F) << 26);
+        // Encode type in lower bits, position in upper bits
+        // Width and height are calculated by backend based on type
+        return type | ((x & 0xFFF) << 2) | ((y & 0xFFF) << 14);
     }
     
     /**

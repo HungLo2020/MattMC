@@ -349,9 +349,11 @@ public class OpenGLRenderBackend implements RenderBackend {
         int type = cmd.materialId & 0x3; // 0=background, 1=selection
         int x = (cmd.materialId >> 2) & 0xFFF;
         int y = (cmd.materialId >> 14) & 0xFFF;
-        int width = (cmd.materialId >> 26) & 0x3F;
-        // Height not encoded - calculate from type
-        int height = (type == 0) ? 22 * 3 : 24 * 3; // 22 or 24 pixels * HOTBAR_SCALE(3)
+        
+        // Calculate width and height based on type and HOTBAR_SCALE
+        float HOTBAR_SCALE = 3.0f;
+        int width = (type == 0) ? (int)(182 * HOTBAR_SCALE) : (int)(24 * HOTBAR_SCALE);
+        int height = (type == 0) ? (int)(22 * HOTBAR_SCALE) : (int)(24 * HOTBAR_SCALE);
         
         // Load textures using HotbarRenderer's texture paths
         String texturePath = (type == 0) ? 
