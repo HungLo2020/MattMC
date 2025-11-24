@@ -66,6 +66,66 @@ This directory implements the OpenGL rendering backend for MattMC. It:
 3. **Separate concerns**: Keep pure logic/math separate from OpenGL rendering code
 4. **Follow the pattern**: Look at existing classes as examples of proper organization
 
+## ⚠️ CRITICAL: This Directory Should Only Be Accessed From Within backend/
+
+**CLASSES IN THIS DIRECTORY MUST NOT BE DIRECTLY IMPORTED BY CODE OUTSIDE THE `backend/` DIRECTORY!**
+
+### The Abstraction Boundary Rule
+
+Code outside `mattmc.client.renderer.backend` should NEVER directly import or use classes from this `opengl/` directory.
+
+#### ❌ VIOLATIONS (Do Not Do This)
+```java
+// In mattmc.client.renderer.UIRenderer (OUTSIDE backend/)
+import mattmc.client.renderer.backend.opengl.CrosshairRenderer;  // ❌ WRONG!
+import mattmc.client.renderer.backend.opengl.Texture;            // ❌ WRONG!
+import mattmc.client.renderer.backend.opengl.Window;             // ❌ WRONG!
+
+public class UIRenderer {
+    private CrosshairRenderer crosshairRenderer;  // ❌ Direct coupling to OpenGL
+}
+```
+
+#### ✅ CORRECT APPROACH
+```java
+// In mattmc.client.renderer.UIRenderer
+import mattmc.client.renderer.backend.RenderBackend;  // ✅ Use interface
+import mattmc.client.renderer.backend.DrawCommand;    // ✅ Use abstraction
+
+public class UIRenderer {
+    private RenderBackend backend;  // ✅ Depends on interface, not implementation
+    
+    public void render() {
+        backend.submit(new DrawCommand(...));  // ✅ Goes through abstraction
+    }
+}
+```
+
+### Why This Rule Exists
+
+1. **Backend Independence**: If you import OpenGL classes, your code becomes tied to OpenGL forever
+2. **No Alternative Backends**: Direct OpenGL imports make it impossible to support Vulkan, DirectX, or any other rendering API
+3. **Breaks Abstraction**: The whole point of the `backend/` directory is to hide implementation details
+4. **Testing Nightmare**: Code with direct OpenGL dependencies cannot be unit tested without an OpenGL context
+
+### If You Need OpenGL Functionality Outside backend/
+
+**You're doing it wrong.** The solution is:
+1. Define what you need as a method on the `RenderBackend` interface
+2. Implement that method in `OpenGLRenderBackend`
+3. Call it through the interface
+
+The backend exists to provide ALL rendering functionality needed by the rest of the application.
+
+### Current Violations
+
+This codebase currently has many violations of this rule that need to be fixed:
+- `UIRenderer` directly instantiates OpenGL-specific renderers
+- `Minecraft.java` imports `Window` from OpenGL backend
+- Various renderer classes import OpenGL-specific types
+
+These are **technical debt** and should be refactored to use the `RenderBackend` interface instead.
+
 ## Related Documentation
 
 - See `/src/main/java/mattmc/client/renderer/backend/README.md` for backend abstraction information
