@@ -67,14 +67,17 @@ public class HotbarRenderer {
                 backend.submit(cmd);
             }
             
+            // Draw items in hotbar slots (must be within the frame)
+            renderHotbarItems(screenWidth, screenHeight, player);
+            
             backend.endFrame();
         } else {
             // Legacy rendering path
             renderLegacy(screenWidth, screenHeight);
+            
+            // Draw items in hotbar slots (common to both paths)
+            renderHotbarItems(screenWidth, screenHeight, player);
         }
-        
-        // Draw items in hotbar slots (common to both paths)
-        renderHotbarItems(screenWidth, screenHeight, player);
         
         glDisable(GL_BLEND);
         UIRenderHelper.restore2DProjection();
