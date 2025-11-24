@@ -2,28 +2,25 @@ package mattmc.client.renderer;
 
 import mattmc.client.renderer.backend.DrawCommand;
 import mattmc.client.renderer.backend.RenderBackend;
-import mattmc.client.renderer.backend.opengl.UIRenderHelper;
 import mattmc.world.entity.player.LocalPlayer;
 
-import static org.lwjgl.opengl.GL11.*;
-
 /**
- * Hotbar renderer coordinator.
+ * Backend-agnostic hotbar renderer.
  * 
  * <p>This class is responsible for determining <em>what</em> to draw (the hotbar)
- * and coordinating with the backend to actually render it.
+ * and coordinating with the backend to actually render it. It contains NO OpenGL-specific
+ * code and works purely through the {@link RenderBackend} abstraction.
  * 
  * <p><b>Architecture:</b> This is a "coordinator" class that:
  * <ul>
  *   <li>Uses {@link UIRenderLogic} to build draw commands (what to draw)</li>
  *   <li>Submits commands to the {@link RenderBackend} (how to draw)</li>
- *   <li>Handles 2D projection setup (OpenGL infrastructure code)</li>
+ *   <li>Delegates projection setup to the backend (backend-agnostic)</li>
  * </ul>
  * 
- * <p><b>Note:</b> While this class lives outside backend/opengl/, it does use
- * {@link UIRenderHelper} for 2D projection setup, which is OpenGL-specific infrastructure.
- * This is necessary infrastructure code for UI rendering that would need to be abstracted
- * further for true multi-backend support.
+ * <p><b>Abstraction Layer:</b> This class lives outside the backend/ directory
+ * and can be safely used by any code in the application. It depends only on the
+ * backend interface, not on any specific implementation.
  */
 public class HotbarRenderer {
     
@@ -58,8 +55,8 @@ public class HotbarRenderer {
     /**
      * Render the hotbar at the bottom center of the screen.
      * 
-     * <p>This method coordinates the rendering process by setting up the 2D projection,
-     * building draw commands, and submitting them to the backend.
+     * <p>This method is completely backend-agnostic. It delegates projection setup,
+     * builds draw commands, and submits them to the backend for rendering.
      * 
      * @param screenWidth Screen width in pixels
      * @param screenHeight Screen height in pixels
@@ -71,12 +68,8 @@ public class HotbarRenderer {
             throw new IllegalStateException("Backend must be set before calling render()");
         }
         
-        // Setup 2D projection for UI rendering
-        UIRenderHelper.setup2DProjection(screenWidth, screenHeight);
-        
-        // Enable blending for texture rendering
-        glEnable(GL_BLEND);
-        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        // Setup 2D projection for UI rendering (delegated to backend)
+        backend.setup2DProjection(screenWidth, screenHeight);
         
         // Synchronize selected slot from player inventory
         if (player != null && player.getInventory() != null) {
@@ -95,9 +88,8 @@ public class HotbarRenderer {
         }
         backend.endFrame();
         
-        // Restore projection
-        glDisable(GL_BLEND);
-        UIRenderHelper.restore2DProjection();
+        // Restore projection (delegated to backend)
+        backend.restore2DProjection();
         
         // TODO: Item rendering in hotbar slots needs to be refactored to use backend
         // For now, this is commented out to maintain backend-agnostic nature

@@ -132,4 +132,50 @@ public interface RenderBackend {
      * @see #beginFrame()
      */
     void endFrame();
+    
+    /**
+     * Setup 2D orthographic projection for UI rendering.
+     * 
+     * <p>This method configures the projection matrix for 2D screen-space rendering,
+     * where coordinates map directly to screen pixels. The coordinate system has:
+     * <ul>
+     *   <li>Origin (0,0) at the top-left corner</li>
+     *   <li>X-axis increases to the right</li>
+     *   <li>Y-axis increases downward</li>
+     *   <li>Z-axis unused (2D rendering)</li>
+     * </ul>
+     * 
+     * <p><b>Implementation Notes:</b>
+     * <ul>
+     *   <li><b>OpenGL:</b> Sets up orthographic projection with glOrtho, pushes matrices</li>
+     *   <li><b>Vulkan (future):</b> Would configure viewport and scissor for 2D rendering</li>
+     *   <li><b>Debug:</b> Records projection state for inspection</li>
+     * </ul>
+     * 
+     * <p>This method must be paired with {@link #restore2DProjection()} to restore the
+     * previous projection state after 2D rendering is complete.
+     * 
+     * @param screenWidth the width of the screen/viewport in pixels
+     * @param screenHeight the height of the screen/viewport in pixels
+     * @see #restore2DProjection()
+     */
+    void setup2DProjection(int screenWidth, int screenHeight);
+    
+    /**
+     * Restore the previous projection state after 2D rendering.
+     * 
+     * <p>This method restores the projection matrix that was active before
+     * {@link #setup2DProjection(int, int)} was called. It must be called after
+     * completing 2D rendering to return to the previous rendering mode (typically 3D).
+     * 
+     * <p><b>Implementation Notes:</b>
+     * <ul>
+     *   <li><b>OpenGL:</b> Pops the projection and modelview matrices</li>
+     *   <li><b>Vulkan (future):</b> Would restore previous viewport/scissor state</li>
+     *   <li><b>Debug:</b> Records projection state restoration</li>
+     * </ul>
+     * 
+     * @see #setup2DProjection(int, int)
+     */
+    void restore2DProjection();
 }

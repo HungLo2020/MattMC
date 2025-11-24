@@ -669,4 +669,50 @@ public class OpenGLRenderBackend implements RenderBackend {
         // Render tooltip using TooltipRenderer
         TooltipRenderer.renderTooltipDirect(textInfo.text, x, y, (int)boxWidth, (int)boxHeight, TOOLTIP_PADDING);
     }
+    
+    /**
+     * Setup 2D orthographic projection for UI rendering.
+     * 
+     * <p>Configures OpenGL for 2D screen-space rendering with an orthographic projection
+     * where (0,0) is the top-left corner and coordinates map directly to screen pixels.
+     * Also enables blending for transparent UI elements.
+     * 
+     * @param screenWidth the width of the screen/viewport in pixels
+     * @param screenHeight the height of the screen/viewport in pixels
+     */
+    @Override
+    public void setup2DProjection(int screenWidth, int screenHeight) {
+        // Setup projection matrix for 2D rendering
+        glMatrixMode(GL_PROJECTION);
+        glPushMatrix();
+        glLoadIdentity();
+        glOrtho(0, screenWidth, screenHeight, 0, -1, 1);
+        
+        // Setup modelview matrix
+        glMatrixMode(GL_MODELVIEW);
+        glPushMatrix();
+        glLoadIdentity();
+        
+        // Enable blending for transparent UI elements
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    }
+    
+    /**
+     * Restore the previous projection state after 2D rendering.
+     * 
+     * <p>Pops the projection and modelview matrices that were pushed by
+     * {@link #setup2DProjection(int, int)} and disables blending.
+     */
+    @Override
+    public void restore2DProjection() {
+        // Disable blending
+        glDisable(GL_BLEND);
+        
+        // Restore matrices
+        glPopMatrix();
+        glMatrixMode(GL_PROJECTION);
+        glPopMatrix();
+        glMatrixMode(GL_MODELVIEW);
+    }
 }
