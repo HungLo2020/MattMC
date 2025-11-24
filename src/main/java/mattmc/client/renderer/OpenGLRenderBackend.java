@@ -322,4 +322,71 @@ public class OpenGLRenderBackend implements RenderBackend {
     public boolean hasTransform(int transformIndex) {
         return transformRegistry.containsKey(transformIndex);
     }
+    
+    // ===== Stage 4: UI/2D Rendering Support =====
+    
+    /**
+     * Information about a 2D quad for UI rendering.
+     * Used for rendering UI elements like hotbar, crosshair, etc.
+     * 
+     * @since Stage 4
+     */
+    private static class UIQuadInfo {
+        final float x, y, width, height;
+        final int textureId;
+        
+        UIQuadInfo(float x, float y, float width, float height, int textureId) {
+            this.x = x;
+            this.y = y;
+            this.width = width;
+            this.height = height;
+            this.textureId = textureId;
+        }
+    }
+    
+    // UI quad registry for 2D elements
+    private final Map<Integer, UIQuadInfo> uiQuadRegistry = new HashMap<>();
+    
+    /**
+     * Register a UI quad for 2D rendering.
+     * 
+     * @param quadId unique ID for this quad
+     * @param x screen X position
+     * @param y screen Y position
+     * @param width quad width
+     * @param height quad height
+     * @param textureId OpenGL texture ID
+     */
+    public void registerUIQuad(int quadId, float x, float y, float width, float height, int textureId) {
+        uiQuadRegistry.put(quadId, new UIQuadInfo(x, y, width, height, textureId));
+    }
+    
+    /**
+     * Unregister a UI quad.
+     * 
+     * @param quadId the quad ID to remove
+     * @return the quad info that was removed, or null if not found
+     */
+    public UIQuadInfo unregisterUIQuad(int quadId) {
+        return uiQuadRegistry.remove(quadId);
+    }
+    
+    /**
+     * Render a UI quad directly (for Stage 4 UI support).
+     * This method handles 2D quads differently from 3D chunk meshes.
+     * 
+     * @param quadInfo the quad to render
+     */
+    private void renderUIQuad(UIQuadInfo quadInfo) {
+        // Bind texture
+        glBindTexture(GL_TEXTURE_2D, quadInfo.textureId);
+        
+        // Render quad using immediate mode (simple for Stage 4)
+        glBegin(GL_QUADS);
+        glTexCoord2f(0, 1); glVertex2f(quadInfo.x, quadInfo.y);
+        glTexCoord2f(1, 1); glVertex2f(quadInfo.x + quadInfo.width, quadInfo.y);
+        glTexCoord2f(1, 0); glVertex2f(quadInfo.x + quadInfo.width, quadInfo.y + quadInfo.height);
+        glTexCoord2f(0, 0); glVertex2f(quadInfo.x, quadInfo.y + quadInfo.height);
+        glEnd();
+    }
 }
