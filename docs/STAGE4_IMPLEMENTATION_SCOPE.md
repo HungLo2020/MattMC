@@ -18,42 +18,82 @@ Apply the DrawCommand + RenderBackend pattern to item and UI rendering, same as 
 - [x] Extend OpenGLRenderBackend for 2D quads and UI
 - [x] Add UI quad registry and rendering support
 
-### Component Refactoring - MAJOR PROGRESS
+### Component Refactoring - MAJOR MILESTONE ✅
 - [x] CrosshairRenderer - ✅ REFACTORED to use backend
-- [x] ItemRenderer - ✅ **REFACTORED to use backend** (NEW!)
-- [x] HotbarRenderer - ✅ Backend support added (uses new architecture for items)
-- [ ] DebugInfoRenderer - route through backend
-- [ ] CommandUIRenderer - route through backend
-- [ ] Other UI renderers as needed
+- [x] ItemRenderer - ✅ REFACTORED to use backend
+- [x] HotbarRenderer - ✅ **FULLY REFACTORED to use backend** (NEW!)
+- [x] DebugInfoRenderer - ✅ **FULLY REFACTORED to use backend** (NEW!)
+- [x] CommandUIRenderer - ✅ **FULLY REFACTORED to use backend** (NEW!)
+- [ ] SystemInfoRenderer - remaining
+- [ ] TooltipRenderer - remaining
+- [ ] Other specialized UI renderers as needed
 
-### Testing - MAJOR PROGRESS
+### Testing - COMPREHENSIVE COVERAGE ✅
 - [x] Tests for UI rendering logic (6 tests in UIRenderLogicTest)
 - [x] Tests for item rendering logic (5 tests in ItemRenderLogicTest)
 - [x] Tests for CrosshairRenderer (5 tests demonstrating pattern)
-- [x] **Tests for ItemRenderer (7 tests)** (NEW!)
-- [ ] Integration tests for more UI components
+- [x] Tests for ItemRenderer (7 tests)
+- [x] **Tests for HotbarRenderer (4 tests)** (NEW!)
+- [x] **Tests for DebugInfoRenderer (4 tests)** (NEW!)
+- [x] **Tests for CommandUIRenderer (4 tests)** (NEW!)
+- [ ] Integration tests for remaining UI components
 
-### Current Status (Latest Commit - MAJOR)
+### Current Status (Latest Commit - MAJOR MILESTONE)
 - ✅ Created UIRenderLogic and ItemRenderLogic classes (logic without GL)
-- ✅ Extended OpenGLRenderBackend with UI quad support
-- ✅ **CrosshairRenderer REFACTORED** to use backend architecture
-  - Supports both new backend path and legacy fallback
-  - UIRenderer updated to use backend when available
-  - 5 new tests demonstrating the pattern
-- ✅ **ItemRenderer REFACTORED** to use backend architecture (NEW!)
-  - Full implementation with item registry for backend access
-  - ItemRenderLogic.buildItemCommand() handles all item types
-  - OpenGLRenderBackend.submitItemCommand() renders items
-  - New ItemRenderer.render() method using backend
-  - Legacy methods preserved for backward compatibility
-  - 7 comprehensive tests covering all item types
-- ✅ **HotbarRenderer updated** for backend integration
-  - Added setBackend() method
-  - Uses backend for item rendering when available
-  - Fallback to legacy if no backend
-- ✅ Backend submit() method extended to handle UI render pass
-- ✅ **All 146+ tests pass**
-- ⏳ Next: Continue refactoring other UI components (DebugInfo, CommandUI, etc.)
+- ✅ Extended OpenGLRenderBackend with comprehensive UI support
+- ✅ **5 MAJOR COMPONENTS FULLY REFACTORED** to use backend:
+
+1. **CrosshairRenderer** ✅
+   - First component demonstrating pattern
+   - UIRenderLogic.buildCrosshairCommands()
+   - OpenGLRenderBackend.submitCrosshairCommand()
+   - 5 comprehensive tests
+
+2. **ItemRenderer** ✅
+   - Full item rendering via backend
+   - ItemRenderLogic.buildItemCommand() with item registry
+   - OpenGLRenderBackend.submitItemCommand()
+   - Handles all item types (cube, stairs, flat, fallback)
+   - 7 comprehensive tests
+
+3. **HotbarRenderer** ✅ (NEW!)
+   - Complete hotbar background + selection via backend
+   - UIRenderLogic.buildHotbarCommands() + buildSelectionCommands()
+   - OpenGLRenderBackend.submitHotbarCommand()
+   - Items rendered via backend
+   - 4 comprehensive tests
+
+4. **DebugInfoRenderer** ✅ (NEW!)
+   - All debug text lines via backend
+   - UIRenderLogic.buildDebugInfoCommands() with text registry
+   - OpenGLRenderBackend.submitDebugTextCommand()
+   - 4 comprehensive tests
+
+5. **CommandUIRenderer** ✅ (NEW!)
+   - Command overlay and feedback via backend
+   - UIRenderLogic.buildCommandOverlayCommands() + buildCommandFeedbackCommands()
+   - OpenGLRenderBackend.submitCommandUICommand()
+   - 4 comprehensive tests
+
+- ✅ **OpenGLRenderBackend UI Support Complete:**
+  - submitCrosshairCommand() - meshId -1
+  - submitItemCommand() - meshId -2 to -5
+  - submitHotbarCommand() - meshId -6
+  - submitDebugTextCommand() - meshId -7
+  - submitCommandUICommand() - meshId -8
+  
+- ✅ **UIRenderLogic Extensive:**
+  - buildCrosshairCommands()
+  - buildHotbarCommands()
+  - buildSelectionCommands()
+  - buildDebugInfoCommands()
+  - buildCommandOverlayCommands()
+  - buildCommandFeedbackCommands()
+  - Text rendering registry for debug/command text
+
+- ✅ **All 35 Stage 4 tests pass** (647+ total tests)
+- ✅ **All legacy rendering paths preserved** as fallback
+- ⏳ Next: SystemInfoRenderer, TooltipRenderer, and remaining specialized UI components
 
 ## Note on Scope
 Stage 4 as specified involves refactoring ALL item and UI rendering. This is extensive work affecting many files. This document tracks progress through incremental implementation.

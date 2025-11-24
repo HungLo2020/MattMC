@@ -72,9 +72,83 @@ public class UIRenderLogic {
      * @param buffer the command buffer to add commands to
      */
     public void buildHotbarCommands(int screenWidth, int screenHeight, int selectedSlot, CommandBuffer buffer) {
-        // TODO: Build commands for hotbar background
-        // TODO: Build commands for hotbar selection overlay  
-        // TODO: Integrate with ItemRenderLogic for items in slots
+        // Constants from HotbarRenderer
+        float HOTBAR_SCALE = 3.0f;
+        
+        // Calculate hotbar position (centered at bottom)
+        // Hotbar texture is 182 pixels wide, 22 pixels tall
+        float texWidth = 182 * HOTBAR_SCALE;
+        float texHeight = 22 * HOTBAR_SCALE;
+        float hotbarX = (screenWidth - texWidth) / 2f;
+        float hotbarY = screenHeight - texHeight - 10;
+        
+        // Create command for hotbar background
+        // meshId -6 = hotbar background
+        DrawCommand hotbarBg = new DrawCommand(
+            -6, // hotbar background marker
+            encodeHotbarData((int)hotbarX, (int)hotbarY, (int)texWidth, (int)texHeight, 0), // type 0 = background
+            0,  // screen-space
+            RenderPass.UI
+        );
+        buffer.add(hotbarBg);
+        
+        // Create command for selection overlay
+        buildSelectionCommands(screenWidth, screenHeight, selectedSlot, buffer);
+    }
+    
+    /**
+     * Builds draw commands for the hotbar selection overlay.
+     * 
+     * @param screenWidth screen width
+     * @param screenHeight screen height
+     * @param selectedSlot the selected slot (0-8)
+     * @param buffer the command buffer to add commands to
+     */
+    public void buildSelectionCommands(int screenWidth, int screenHeight, int selectedSlot, CommandBuffer buffer) {
+        // Constants from HotbarRenderer
+        float HOTBAR_SCALE = 3.0f;
+        
+        // Calculate hotbar position
+        float hotbarTexWidth = 182 * HOTBAR_SCALE;
+        float hotbarTexHeight = 22 * HOTBAR_SCALE;
+        float hotbarX = (screenWidth - hotbarTexWidth) / 2f;
+        float hotbarY = screenHeight - hotbarTexHeight - 10;
+        
+        // Calculate selection overlay position
+        // Selection texture is 24 pixels wide, 24 pixels tall
+        float slotWidth = hotbarTexWidth / 9f;
+        float selectionWidth = 24 * HOTBAR_SCALE;
+        float selectionHeight = 24 * HOTBAR_SCALE;
+        
+        float centerOffset = (selectionWidth - slotWidth) / 2f;
+        float selectionX = hotbarX + (selectedSlot * slotWidth) - centerOffset;
+        float selectionY = hotbarY - (1 * HOTBAR_SCALE);
+        
+        // Create command for selection overlay
+        // meshId -6 = hotbar, type 1 = selection
+        DrawCommand selection = new DrawCommand(
+            -6, // hotbar marker
+            encodeHotbarData((int)selectionX, (int)selectionY, (int)selectionWidth, (int)selectionHeight, 1), // type 1 = selection
+            0,  // screen-space
+            RenderPass.UI
+        );
+        buffer.add(selection);
+    }
+    
+    /**
+     * Encode hotbar UI data into a single integer.
+     * 
+     * @param x X position
+     * @param y Y position  
+     * @param width width
+     * @param height height
+     * @param type 0=background, 1=selection
+     * @return encoded data
+     */
+    private int encodeHotbarData(int x, int y, int width, int height, int type) {
+        // Encode type in lower bits, position/size in upper bits
+        // This is temporary for Stage 4
+        return type | ((x & 0xFFF) << 2) | ((y & 0xFFF) << 14) | ((width & 0x3F) << 26);
     }
     
     /**
@@ -136,5 +210,207 @@ public class UIRenderLogic {
         // This is a Stage 4 temporary solution
         // In a full implementation, we'd have proper data structures
         return (horizontal ? 1 : 0) | ((x & 0xFFF) << 1) | ((y & 0xFFF) << 13) | ((width & 0xFF) << 25);
+    }
+    
+    // Debug info and command UI text registry
+    private static int nextTextId = 0;
+    private static final java.util.Map<Integer, TextRenderInfo> textRegistry = new java.util.HashMap<>();
+    
+    /**
+     * Information about text to render.
+     */
+    public static class TextRenderInfo {
+        public final String text;
+        public final float x;
+        public final float y;
+        public final float scale;
+        public final int color;
+        
+        public TextRenderInfo(String text, float x, float y, float scale, int color) {
+            this.text = text;
+            this.x = x;
+            this.y = y;
+            this.scale = scale;
+            this.color = color;
+        }
+    }
+    
+    /**
+     * Register text for rendering and get an ID.
+     */
+    private static int registerText(String text, float x, float y, float scale, int color) {
+        int id = nextTextId++;
+        textRegistry.put(id, new TextRenderInfo(text, x, y, scale, color));
+        return id;
+    }
+    
+    /**
+     * Get text info by ID.
+     */
+    public static TextRenderInfo getTextInfo(int id) {
+        return textRegistry.get(id);
+    }
+    
+    /**
+     * Clear text registry (call at start of frame).
+     */
+    public static void clearTextRegistry() {
+        textRegistry.clear();
+        nextTextId = 0;
+    }
+    
+    /**
+     * Build commands for debug info rendering.
+     * 
+     * @param screenWidth screen width
+     * @param screenHeight screen height
+     * @param playerX player X position
+     * @param playerY player Y position
+     * @param playerZ player Z position
+     * @param yaw camera yaw
+     * @param pitch camera pitch
+     * @param roll camera roll
+     * @param fps frames per second
+     * @param loadedChunks number of loaded chunks
+     * @param pendingChunks number of pending chunks
+     * @param activeWorkers number of active workers
+     * @param renderedChunks number of rendered chunks
+     * @param culledChunks number of culled chunks
+     * @param buffer command buffer
+     */
+    public void buildDebugInfoCommands(int screenWidth, int screenHeight, 
+                                      float playerX, float playerY, float playerZ,
+                                      float yaw, float pitch, float roll, double fps,
+                                      int loadedChunks, int pendingChunks, int activeWorkers,
+                                      int renderedChunks, int culledChunks,
+                                      CommandBuffer buffer) {
+        float x = 10f;
+        float y = 10f;
+        float lineHeight = 20f;
+        float scale = 1.5f;
+        int color = 0xFFFFFF;
+        
+        // Build all debug text lines
+        String[] lines = new String[9];
+        lines[0] = "MattMC: " + mattmc.client.main.Main.VERSION + ": Debug Screen";
+        lines[1] = String.format("FPS: %.0f", fps);
+        
+        float normalizedYaw = ((yaw % 360) + 360) % 360;
+        String direction = getCardinalDirection(normalizedYaw);
+        lines[2] = String.format("Position: %.2f, %.2f, %.2f (Facing: %s)", playerX, playerY, playerZ, direction);
+        lines[3] = String.format("Yaw: %.2f, Pitch: %.2f, Roll: %.2f", normalizedYaw, pitch, roll);
+        
+        int chunkX = Math.floorDiv((int)playerX, 16); // LevelChunk.WIDTH
+        int chunkZ = Math.floorDiv((int)playerZ, 16); // LevelChunk.DEPTH
+        lines[4] = String.format("LevelChunk: %d, %d", chunkX, chunkZ);
+        
+        int regionX = Math.floorDiv(chunkX, 8); // Region.REGION_SIZE
+        int regionZ = Math.floorDiv(chunkZ, 8);
+        lines[5] = String.format("Region: %d, %d", regionX, regionZ);
+        
+        lines[6] = String.format("Loaded Chunks: %d", loadedChunks);
+        lines[7] = String.format("Pending: %d | Workers: %d", pendingChunks, activeWorkers);
+        lines[8] = String.format("Rendered: %d | Culled: %d", renderedChunks, culledChunks);
+        
+        // Create draw command for each line
+        for (int i = 0; i < lines.length; i++) {
+            int textId = registerText(lines[i], x, y + lineHeight * i, scale, color);
+            DrawCommand cmd = new DrawCommand(
+                -7, // debug info marker
+                0,  // unused
+                textId, // text ID in registry
+                RenderPass.UI
+            );
+            buffer.add(cmd);
+        }
+    }
+    
+    /**
+     * Get cardinal direction from yaw.
+     */
+    private String getCardinalDirection(float normalizedYaw) {
+        if (normalizedYaw >= 337.5 || normalizedYaw < 22.5) return "South";
+        else if (normalizedYaw >= 22.5 && normalizedYaw < 67.5) return "South-West";
+        else if (normalizedYaw >= 67.5 && normalizedYaw < 112.5) return "West";
+        else if (normalizedYaw >= 112.5 && normalizedYaw < 157.5) return "North-West";
+        else if (normalizedYaw >= 157.5 && normalizedYaw < 202.5) return "North";
+        else if (normalizedYaw >= 202.5 && normalizedYaw < 247.5) return "North-East";
+        else if (normalizedYaw >= 247.5 && normalizedYaw < 292.5) return "East";
+        else return "South-East";
+    }
+    
+    /**
+     * Build commands for command overlay rendering.
+     * 
+     * @param screenWidth screen width
+     * @param screenHeight screen height
+     * @param commandText the command text to display
+     * @param buffer command buffer
+     */
+    public void buildCommandOverlayCommands(int screenWidth, int screenHeight, String commandText, CommandBuffer buffer) {
+        // Register command text
+        int boxHeight = 50;
+        int boxY = screenHeight - boxHeight - 20;
+        int boxX = 20;
+        
+        String displayText = commandText + "_";
+        int textId = registerText(displayText, boxX + 10, boxY + 15, 1.5f, 0xFFFFFF);
+        
+        // Create command for overlay box and text
+        // Encode box dimensions in materialId
+        int encoded = encodeCommandUIData(boxX, boxY, screenWidth - 40, boxHeight, 0); // type 0 = overlay
+        DrawCommand cmd = new DrawCommand(
+            -8, // command UI marker
+            encoded,
+            textId, // text ID
+            RenderPass.UI
+        );
+        buffer.add(cmd);
+    }
+    
+    /**
+     * Build commands for command feedback rendering.
+     * 
+     * @param screenWidth screen width
+     * @param screenHeight screen height
+     * @param message the feedback message
+     * @param buffer command buffer
+     */
+    public void buildCommandFeedbackCommands(int screenWidth, int screenHeight, String message, CommandBuffer buffer) {
+        if (message == null || message.isEmpty()) return;
+        
+        int messageY = screenHeight - 120; // FEEDBACK_Y_OFFSET
+        float textScale = 1.2f;
+        
+        // Estimate text width
+        int textWidth = (int)(message.length() * 8 * textScale); // CHAR_WIDTH_ESTIMATE
+        int textX = (screenWidth - textWidth) / 2;
+        
+        // Register feedback text
+        int textId = registerText(message, textX, messageY, textScale, 0xFFFFFF);
+        
+        // Create command for feedback
+        int padding = 8;
+        int bgX = (screenWidth - textWidth) / 2 - padding;
+        int bgY = messageY - padding;
+        int bgWidth = textWidth + padding * 2;
+        int bgHeight = (int)(16 * textScale) + padding * 2;
+        
+        int encoded = encodeCommandUIData(bgX, bgY, bgWidth, bgHeight, 1); // type 1 = feedback
+        DrawCommand cmd = new DrawCommand(
+            -8, // command UI marker
+            encoded,
+            textId, // text ID
+            RenderPass.UI
+        );
+        buffer.add(cmd);
+    }
+    
+    /**
+     * Encode command UI data.
+     */
+    private int encodeCommandUIData(int x, int y, int width, int height, int type) {
+        // Encode type and position data
+        return type | ((x & 0xFFF) << 2) | ((y & 0xFFF) << 14) | ((width & 0x3F) << 26);
     }
 }

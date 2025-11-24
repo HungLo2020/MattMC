@@ -249,10 +249,10 @@ public class OpenGLRenderBackend implements RenderBackend {
     private void submitUICommand(DrawCommand cmd) {
         // Handle different UI element types based on meshId:
         // -1 = crosshair
-        // -2 = fallback item (magenta square)
-        // -3 = isometric cube item
-        // -4 = isometric stairs item
-        // -5 = flat item
+        // -2 to -5 = items (fallback, cube, stairs, flat)
+        // -6 = hotbar (background/selection)
+        // -7 = debug info text
+        // -8 = command UI (overlay/feedback)
         
         if (cmd.meshId == -1) {
             // Crosshair rendering
@@ -260,8 +260,16 @@ public class OpenGLRenderBackend implements RenderBackend {
         } else if (cmd.meshId <= -2 && cmd.meshId >= -5) {
             // Item rendering
             submitItemCommand(cmd);
+        } else if (cmd.meshId == -6) {
+            // Hotbar rendering
+            submitHotbarCommand(cmd);
+        } else if (cmd.meshId == -7) {
+            // Debug info text
+            submitDebugTextCommand(cmd);
+        } else if (cmd.meshId == -8) {
+            // Command UI
+            submitCommandUICommand(cmd);
         }
-        // Future: handle other UI element types (hotbar background, etc.)
     }
     
     /**
@@ -322,6 +330,108 @@ public class OpenGLRenderBackend implements RenderBackend {
                 // Use the standard rendering path which handles all item types
                 ItemRenderer.renderItem(itemInfo.stack, itemInfo.x, itemInfo.y, itemInfo.size);
                 break;
+        }
+    }
+    
+    /**
+     * Render a hotbar command (background or selection).
+     */
+    private void submitHotbarCommand(DrawCommand cmd) {
+        // Decode hotbar data from materialId
+        int type = cmd.materialId & 0x3; // 0=background, 1=selection
+        int x = (cmd.materialId >> 2) & 0xFFF;
+        int y = (cmd.materialId >> 14) & 0xFFF;
+        int width = (cmd.materialId >> 26) & 0x3F;
+        // Height not encoded - calculate from type
+        int height = (type == 0) ? 22 * 3 : 24 * 3; // 22 or 24 pixels * HOTBAR_SCALE(3)
+        
+        // Load textures using HotbarRenderer's texture paths
+        String texturePath = (type == 0) ? 
+            "/assets/textures/gui/sprites/hud/hotbar.png" :
+            "/assets/textures/gui/sprites/hud/hotbar_selection.png";
+        
+        mattmc.client.renderer.texture.Texture texture = 
+            mattmc.client.renderer.texture.Texture.load(texturePath);
+        
+        if (texture != null) {
+            glEnable(GL_TEXTURE_2D);
+            texture.bind();
+            glColor4f(1f, 1f, 1f, 1f);
+            
+            glBegin(GL_QUADS);
+            glTexCoord2f(0, 1); glVertex2f(x, y);
+            glTexCoord2f(1, 1); glVertex2f(x + width, y);
+            glTexCoord2f(1, 0); glVertex2f(x + width, y + height);
+            glTexCoord2f(0, 0); glVertex2f(x, y + height);
+            glEnd();
+            
+            glDisable(GL_TEXTURE_2D);
+        }
+    }
+    
+    /**
+     * Render a debug info text command.
+     */
+    private void submitDebugTextCommand(DrawCommand cmd) {
+        // Get text info from registry
+        UIRenderLogic.TextRenderInfo textInfo = UIRenderLogic.getTextInfo(cmd.transformIndex);
+        
+        if (textInfo == null) {
+            logger.warn("Text info not found for transformIndex: {}", cmd.transformIndex);
+            return;
+        }
+        
+        // Delegate to UIRenderHelper for text rendering
+        UIRenderHelper.drawText(textInfo.text, textInfo.x, textInfo.y, textInfo.scale, textInfo.color);
+    }
+    
+    /**
+     * Render a command UI command (overlay or feedback).
+     */
+    private void submitCommandUICommand(DrawCommand cmd) {
+        // Decode command UI data
+        int type = cmd.materialId & 0x3; // 0=overlay, 1=feedback
+        int x = (cmd.materialId >> 2) & 0xFFF;
+        int y = (cmd.materialId >> 14) & 0xFFF;
+        int width = (cmd.materialId >> 26) & 0x3F;
+        
+        // Get text info from registry
+        UIRenderLogic.TextRenderInfo textInfo = UIRenderLogic.getTextInfo(cmd.transformIndex);
+        
+        if (type == 0) {
+            // Command overlay - draw box and text
+            int boxHeight = 50;
+            
+            // Draw semi-transparent background
+            UIRenderHelper.setColor(0x000000, 0.7f);
+            UIRenderHelper.fillRect(x, y, width, boxHeight);
+            
+            // Draw border
+            UIRenderHelper.setColor(0xFFFFFF, 1.0f);
+            glBegin(GL_LINE_LOOP);
+            glVertex2f(x, y);
+            glVertex2f(x + width, y);
+            glVertex2f(x + width, y + boxHeight);
+            glVertex2f(x, y + boxHeight);
+            glEnd();
+            
+            // Draw text
+            if (textInfo != null) {
+                UIRenderHelper.drawText(textInfo.text, textInfo.x, textInfo.y, textInfo.scale, textInfo.color);
+            }
+        } else {
+            // Command feedback - draw background and text
+            int padding = 8;
+            int bgHeight = (int)(16 * 1.2f) + padding * 2;
+            
+            // Draw background
+            UIRenderHelper.setColor(0x000000, 0.6f);
+            UIRenderHelper.fillRect(x, y, width, bgHeight);
+            
+            // Draw text
+            if (textInfo != null) {
+                UIRenderHelper.drawText(textInfo.text, textInfo.x, textInfo.y, textInfo.scale, textInfo.color);
+            }
         }
     }
     
