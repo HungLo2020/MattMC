@@ -1,4 +1,4 @@
-package mattmc.client.renderer;
+package mattmc.client.renderer.backend.opengl;
 
 import mattmc.client.gui.components.TextRenderer;
 import mattmc.world.level.block.Block;

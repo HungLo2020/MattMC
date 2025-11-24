@@ -1,4 +1,12 @@
-package mattmc.client.renderer;
+package mattmc.client.renderer.backend.opengl;
+
+import mattmc.client.renderer.CommandBuffer;
+
+import mattmc.client.renderer.UIRenderLogic;
+
+import mattmc.client.renderer.backend.DrawCommand;
+
+import mattmc.client.renderer.backend.RenderBackend;
 
 import mattmc.world.level.chunk.LevelChunk;
 import mattmc.world.level.chunk.Region;
@@ -46,12 +54,10 @@ public class DebugInfoRenderer {
                 loadedChunks, pendingChunks, activeWorkers, renderedChunks, culledChunks,
                 buffer);
             
-            // Submit to backend with frame management
-            backend.beginFrame();
+            // Submit to backend
             for (DrawCommand cmd : buffer.getCommands()) {
                 backend.submit(cmd);
             }
-            backend.endFrame();
         } else {
             // Legacy rendering path
             renderLegacy(screenWidth, screenHeight, playerX, playerY, playerZ,

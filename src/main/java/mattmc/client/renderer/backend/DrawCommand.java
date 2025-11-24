@@ -1,4 +1,4 @@
-package mattmc.client.renderer;
+package mattmc.client.renderer.backend;
 
 /**
  * Represents a single API-agnostic draw command for rendering an object.

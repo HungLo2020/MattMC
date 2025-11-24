@@ -1,4 +1,6 @@
-package mattmc.client.renderer.chunk;
+package mattmc.client.renderer.backend.opengl;
+
+import mattmc.client.renderer.chunk.ChunkMeshBuffer;
 
 import org.lwjgl.BufferUtils;
 

@@ -1,8 +1,18 @@
-package mattmc.client.renderer;
+package mattmc.client.renderer.backend.opengl;
+
+import mattmc.client.renderer.VertexCapture;
+
+import mattmc.client.renderer.CommandBuffer;
+
+import mattmc.client.renderer.ItemRenderLogic;
+
+import mattmc.client.renderer.backend.DrawCommand;
+
+import mattmc.client.renderer.backend.RenderBackend;
 
 import mattmc.client.renderer.block.BlockGeometryCapture;
 import mattmc.client.renderer.item.ItemDisplayContext;
-import mattmc.client.renderer.texture.Texture;
+import mattmc.client.renderer.backend.opengl.Texture;
 import mattmc.client.resources.ResourceManager;
 import mattmc.client.resources.model.BlockModel;
 import mattmc.client.resources.model.ModelDisplay;
@@ -604,7 +614,6 @@ public class ItemRenderer {
         logic.buildItemCommand(stack, x, y, size, buffer);
         
         // Submit commands to backend
-        // Note: Frame management is handled by the caller (e.g. HotbarRenderer)
         for (DrawCommand cmd : buffer.getCommands()) {
             backend.submit(cmd);
         }

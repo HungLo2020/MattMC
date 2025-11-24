@@ -1,4 +1,9 @@
-package mattmc.client.renderer;
+package mattmc.client.renderer.backend.opengl;
+
+import mattmc.client.renderer.backend.RenderBackend;
+import mattmc.client.renderer.backend.DrawCommand;
+import mattmc.client.renderer.UIRenderLogic;
+import mattmc.client.renderer.CommandBuffer;
 
 import static org.lwjgl.opengl.GL11.*;
 

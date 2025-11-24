@@ -1,4 +1,6 @@
 package mattmc.client.renderer;
+import mattmc.client.renderer.backend.RenderPass;
+import mattmc.client.renderer.backend.DrawCommand;
 
 /**
  * Front-end logic for UI rendering that builds draw commands without making GL calls.

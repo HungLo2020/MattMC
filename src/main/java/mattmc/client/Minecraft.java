@@ -1,8 +1,8 @@
 package mattmc.client;
 
 import mattmc.client.settings.OptionsManager;
-import mattmc.client.renderer.CubeMap;
-import mattmc.client.renderer.PanoramaRenderer;
+import mattmc.client.renderer.backend.opengl.CubeMap;
+import mattmc.client.renderer.backend.opengl.PanoramaRenderer;
 import mattmc.client.gui.screens.Screen;
 
 public final class Minecraft {

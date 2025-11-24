@@ -1,4 +1,12 @@
-package mattmc.client.renderer;
+package mattmc.client.renderer.backend.opengl;
+
+import mattmc.client.renderer.CommandBuffer;
+
+import mattmc.client.renderer.UIRenderLogic;
+
+import mattmc.client.renderer.backend.DrawCommand;
+
+import mattmc.client.renderer.backend.RenderBackend;
 
 import static org.lwjgl.opengl.GL11.*;
 
@@ -46,12 +54,10 @@ public class CommandUIRenderer {
             // Build command overlay commands
             logic.buildCommandOverlayCommands(screenWidth, screenHeight, commandText, buffer);
             
-            // Submit to backend with frame management
-            backend.beginFrame();
+            // Submit to backend
             for (DrawCommand cmd : buffer.getCommands()) {
                 backend.submit(cmd);
             }
-            backend.endFrame();
         } else {
             // Legacy rendering path
             renderCommandOverlayLegacy(screenWidth, screenHeight, commandText);
@@ -121,12 +127,10 @@ public class CommandUIRenderer {
             // Build command feedback commands
             logic.buildCommandFeedbackCommands(screenWidth, screenHeight, message, buffer);
             
-            // Submit to backend with frame management
-            backend.beginFrame();
+            // Submit to backend
             for (DrawCommand cmd : buffer.getCommands()) {
                 backend.submit(cmd);
             }
-            backend.endFrame();
         } else {
             // Legacy rendering path
             renderCommandFeedbackLegacy(screenWidth, screenHeight, message);

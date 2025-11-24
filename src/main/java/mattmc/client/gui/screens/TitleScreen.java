@@ -4,7 +4,7 @@ import mattmc.client.settings.OptionsManager;
 
 import mattmc.client.Minecraft;
 import mattmc.client.Window;
-import mattmc.client.renderer.texture.Texture;
+import mattmc.client.renderer.backend.opengl.Texture;
 import mattmc.client.gui.components.Button;
 import mattmc.client.gui.components.ButtonRenderer;
 import mattmc.client.gui.components.TextRenderer;

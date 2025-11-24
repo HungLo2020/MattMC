@@ -1,4 +1,4 @@
-package mattmc.client.renderer;
+package mattmc.client.renderer.backend.opengl;
 
 import java.nio.FloatBuffer;
 import org.lwjgl.system.MemoryStack;

@@ -1,6 +1,14 @@
-package mattmc.client.renderer;
+package mattmc.client.renderer.backend.opengl;
 
-import mattmc.client.renderer.texture.Texture;
+import mattmc.client.renderer.CommandBuffer;
+
+import mattmc.client.renderer.UIRenderLogic;
+
+import mattmc.client.renderer.backend.DrawCommand;
+
+import mattmc.client.renderer.backend.RenderBackend;
+
+import mattmc.client.renderer.backend.opengl.Texture;
 
 import static org.lwjgl.opengl.GL11.*;
 
@@ -52,26 +60,17 @@ public class HotbarRenderer {
             // Build hotbar commands
             logic.buildHotbarCommands(screenWidth, screenHeight, selectedHotbarSlot, buffer);
             
-            // Begin frame for all hotbar rendering (including items)
-            backend.beginFrame();
-            
-            // Submit hotbar background/selection commands
+            // Submit to backend
             for (DrawCommand cmd : buffer.getCommands()) {
                 backend.submit(cmd);
             }
-            
-            // Draw items in hotbar slots (within the same frame)
-            renderHotbarItems(screenWidth, screenHeight, player);
-            
-            // End frame after all hotbar rendering is complete
-            backend.endFrame();
         } else {
             // Legacy rendering path
             renderLegacy(screenWidth, screenHeight);
-            
-            // Draw items in hotbar slots (common to both paths)
-            renderHotbarItems(screenWidth, screenHeight, player);
         }
+        
+        // Draw items in hotbar slots (common to both paths)
+        renderHotbarItems(screenWidth, screenHeight, player);
         
         glDisable(GL_BLEND);
         UIRenderHelper.restore2DProjection();

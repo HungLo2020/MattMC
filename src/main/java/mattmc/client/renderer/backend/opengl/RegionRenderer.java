@@ -1,7 +1,7 @@
-package mattmc.client.renderer.chunk;
+package mattmc.client.renderer.backend.opengl;
 
 import mattmc.client.Minecraft;
-import mattmc.client.renderer.LevelRenderer;
+import mattmc.client.renderer.backend.opengl.LevelRenderer;
 
 import mattmc.world.entity.player.LocalPlayer;
 import mattmc.world.level.chunk.Region;

@@ -1,7 +1,7 @@
 package mattmc.world.level.block;
 
 import mattmc.client.Minecraft;
-import mattmc.client.renderer.texture.Texture;
+import mattmc.client.renderer.backend.opengl.Texture;
 
 import mattmc.client.resources.ResourceManager;
 import mattmc.world.phys.shapes.VoxelShape;

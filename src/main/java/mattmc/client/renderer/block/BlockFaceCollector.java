@@ -1,5 +1,7 @@
 package mattmc.client.renderer.block;
 
+import mattmc.client.renderer.backend.opengl.BlockFaceGeometry;
+
 import mattmc.util.ColorUtils;
 
 import mattmc.world.level.block.Block;

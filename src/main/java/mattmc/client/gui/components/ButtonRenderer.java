@@ -1,6 +1,6 @@
 package mattmc.client.gui.components;
 
-import mattmc.client.renderer.texture.Texture;
+import mattmc.client.renderer.backend.opengl.Texture;
 
 import static org.lwjgl.opengl.GL11.*;
 

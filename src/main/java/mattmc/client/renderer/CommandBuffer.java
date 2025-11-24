@@ -1,5 +1,7 @@
 package mattmc.client.renderer;
 
+import mattmc.client.renderer.backend.DrawCommand;
+
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;

@@ -2,8 +2,8 @@ package mattmc.client.gui.screens;
 
 import mattmc.client.Minecraft;
 import mattmc.client.Window;
-import mattmc.client.renderer.BlurEffect;
-import mattmc.client.renderer.BlurRenderer;
+import mattmc.client.renderer.backend.opengl.BlurEffect;
+import mattmc.client.renderer.backend.opengl.BlurRenderer;
 import mattmc.client.gui.components.Button;
 import mattmc.client.gui.components.ButtonRenderer;
 import mattmc.client.gui.components.TextRenderer;

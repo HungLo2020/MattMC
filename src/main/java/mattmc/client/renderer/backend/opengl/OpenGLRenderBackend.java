@@ -1,7 +1,19 @@
-package mattmc.client.renderer;
+package mattmc.client.renderer.backend.opengl;
 
-import mattmc.client.renderer.chunk.ChunkVAO;
-import mattmc.client.renderer.texture.TextureAtlas;
+import mattmc.client.renderer.VoxelLitShader;
+
+import mattmc.client.renderer.ItemRenderLogic;
+
+import mattmc.client.renderer.UIRenderLogic;
+
+import mattmc.client.renderer.backend.RenderPass;
+
+import mattmc.client.renderer.backend.DrawCommand;
+
+import mattmc.client.renderer.backend.RenderBackend;
+
+import mattmc.client.renderer.backend.opengl.ChunkVAO;
+import mattmc.client.renderer.backend.opengl.TextureAtlas;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -336,8 +348,7 @@ public class OpenGLRenderBackend implements RenderBackend {
             case -5:
                 // Delegate to ItemRenderer's existing rendering methods
                 // Use the standard rendering path which handles all item types
-                // applyInventoryOffset=true for proper hotbar positioning (matches legacy behavior)
-                ItemRenderer.renderItem(itemInfo.stack, itemInfo.x, itemInfo.y, itemInfo.size, true);
+                ItemRenderer.renderItem(itemInfo.stack, itemInfo.x, itemInfo.y, itemInfo.size);
                 break;
         }
     }
@@ -350,19 +361,17 @@ public class OpenGLRenderBackend implements RenderBackend {
         int type = cmd.materialId & 0x3; // 0=background, 1=selection
         int x = (cmd.materialId >> 2) & 0xFFF;
         int y = (cmd.materialId >> 14) & 0xFFF;
-        
-        // Calculate width and height based on type and HOTBAR_SCALE
-        float HOTBAR_SCALE = 3.0f;
-        int width = (type == 0) ? (int)(182 * HOTBAR_SCALE) : (int)(24 * HOTBAR_SCALE);
-        int height = (type == 0) ? (int)(22 * HOTBAR_SCALE) : (int)(24 * HOTBAR_SCALE);
+        int width = (cmd.materialId >> 26) & 0x3F;
+        // Height not encoded - calculate from type
+        int height = (type == 0) ? 22 * 3 : 24 * 3; // 22 or 24 pixels * HOTBAR_SCALE(3)
         
         // Load textures using HotbarRenderer's texture paths
         String texturePath = (type == 0) ? 
             "/assets/textures/gui/sprites/hud/hotbar.png" :
             "/assets/textures/gui/sprites/hud/hotbar_selection.png";
         
-        mattmc.client.renderer.texture.Texture texture = 
-            mattmc.client.renderer.texture.Texture.load(texturePath);
+        Texture texture = 
+            Texture.load(texturePath);
         
         if (texture != null) {
             glEnable(GL_TEXTURE_2D);

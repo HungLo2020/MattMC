@@ -1,6 +1,9 @@
 package mattmc.client.renderer;
+import mattmc.client.renderer.backend.RenderPass;
+import mattmc.client.renderer.backend.DrawCommand;
 
-import mattmc.client.renderer.chunk.ChunkRenderer;
+import mattmc.client.renderer.backend.opengl.ChunkRenderer;
+import mattmc.client.renderer.backend.opengl.Frustum;
 import mattmc.world.level.Level;
 import mattmc.world.level.chunk.LevelChunk;
 import org.slf4j.Logger;

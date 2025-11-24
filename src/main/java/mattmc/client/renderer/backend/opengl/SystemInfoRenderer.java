@@ -1,4 +1,12 @@
-package mattmc.client.renderer;
+package mattmc.client.renderer.backend.opengl;
+
+import mattmc.client.renderer.CommandBuffer;
+
+import mattmc.client.renderer.UIRenderLogic;
+
+import mattmc.client.renderer.backend.DrawCommand;
+
+import mattmc.client.renderer.backend.RenderBackend;
 
 import static org.lwjgl.opengl.GL11.*;
 
@@ -71,12 +79,9 @@ public class SystemInfoRenderer {
             CommandBuffer buffer = new CommandBuffer();
             logic.buildSystemInfoCommands(screenWidth, screenHeight, systemInfo, buffer);
             
-            // Submit to backend with frame management
-            backend.beginFrame();
             for (DrawCommand cmd : buffer.getCommands()) {
                 backend.submit(cmd);
             }
-            backend.endFrame();
         } else {
             // Legacy rendering (fallback)
             renderLegacy(screenWidth, screenHeight, systemInfo);

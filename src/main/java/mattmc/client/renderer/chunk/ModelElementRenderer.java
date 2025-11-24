@@ -1,7 +1,7 @@
 package mattmc.client.renderer.chunk;
 
 import mattmc.client.renderer.block.BlockFaceCollector;
-import mattmc.client.renderer.texture.TextureAtlas;
+import mattmc.client.renderer.backend.opengl.TextureAtlas;
 import mattmc.client.resources.ResourceManager;
 import mattmc.client.resources.model.BlockModel;
 import mattmc.client.resources.model.ModelElement;

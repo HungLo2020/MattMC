@@ -1,4 +1,4 @@
-package mattmc.client.renderer;
+package mattmc.client.renderer.backend.opengl;
 
 import org.lwjgl.BufferUtils;
 import org.lwjgl.stb.STBImage;

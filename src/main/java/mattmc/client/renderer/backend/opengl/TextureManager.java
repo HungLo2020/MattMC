@@ -1,4 +1,4 @@
-package mattmc.client.renderer.texture;
+package mattmc.client.renderer.backend.opengl;
 
 import mattmc.client.Minecraft;
 import mattmc.client.settings.OptionsManager;

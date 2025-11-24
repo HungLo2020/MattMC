@@ -1,4 +1,4 @@
-package mattmc.client.renderer;
+package mattmc.client.renderer.backend;
 
 /**
  * Interface for graphics API-specific rendering backends.

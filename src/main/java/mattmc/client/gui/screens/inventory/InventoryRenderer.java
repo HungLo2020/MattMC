@@ -1,10 +1,10 @@
 package mattmc.client.gui.screens.inventory;
 
 import mattmc.client.Window;
-import mattmc.client.renderer.BlurEffect;
-import mattmc.client.renderer.BlurRenderer;
-import mattmc.client.renderer.TooltipRenderer;
-import mattmc.client.renderer.texture.Texture;
+import mattmc.client.renderer.backend.opengl.BlurEffect;
+import mattmc.client.renderer.backend.opengl.BlurRenderer;
+import mattmc.client.renderer.backend.opengl.TooltipRenderer;
+import mattmc.client.renderer.backend.opengl.Texture;
 import mattmc.client.util.CoordinateUtils;
 import mattmc.util.ColorUtils;
 import mattmc.world.item.Inventory;
@@ -164,7 +164,7 @@ public class InventoryRenderer {
                 float itemCenterY = slotY + 9f * GUI_SCALE;
                 
                 // Use data-driven rendering with GUI context
-                mattmc.client.renderer.ItemRenderer.renderItemWithTransform(
+                mattmc.client.renderer.backend.opengl.ItemRenderer.renderItemWithTransform(
                     stack, 
                     mattmc.client.renderer.item.ItemDisplayContext.GUI, 
                     itemCenterX, 
@@ -196,7 +196,7 @@ public class InventoryRenderer {
                 float itemCenterY = slotY + 9f * GUI_SCALE;
                 
                 // Use data-driven rendering with GUI context
-                mattmc.client.renderer.ItemRenderer.renderItemWithTransform(
+                mattmc.client.renderer.backend.opengl.ItemRenderer.renderItemWithTransform(
                     stack, 
                     mattmc.client.renderer.item.ItemDisplayContext.GUI, 
                     itemCenterX, 
@@ -245,7 +245,7 @@ public class InventoryRenderer {
         
         float itemSize = 19.2f;
         // Use data-driven rendering for held items (using GUI context as they're in the GUI)
-        mattmc.client.renderer.ItemRenderer.renderItemWithTransform(
+        mattmc.client.renderer.backend.opengl.ItemRenderer.renderItemWithTransform(
             heldItem, 
             mattmc.client.renderer.item.ItemDisplayContext.GUI, 
             fbCoords.x, 
@@ -361,7 +361,7 @@ public class InventoryRenderer {
                     float itemY = slotY + 9f * GUI_SCALE;
                     
                     // Use data-driven rendering for creative inventory
-                    mattmc.client.renderer.ItemRenderer.renderItemWithTransform(
+                    mattmc.client.renderer.backend.opengl.ItemRenderer.renderItemWithTransform(
                         stack, 
                         mattmc.client.renderer.item.ItemDisplayContext.GUI, 
                         itemX, 

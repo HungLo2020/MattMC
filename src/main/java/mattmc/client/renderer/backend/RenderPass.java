@@ -1,4 +1,4 @@
-package mattmc.client.renderer;
+package mattmc.client.renderer.backend;
 
 /**
  * Represents the different rendering passes used in the rendering pipeline.

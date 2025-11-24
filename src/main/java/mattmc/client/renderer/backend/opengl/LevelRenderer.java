@@ -1,9 +1,16 @@
-package mattmc.client.renderer;
+package mattmc.client.renderer.backend.opengl;
 
-import mattmc.client.renderer.texture.TextureAtlas;
-import mattmc.client.renderer.chunk.ChunkRenderer;
+import mattmc.client.renderer.backend.RenderBackend;
+import mattmc.client.renderer.backend.DrawCommand;
+import mattmc.client.renderer.backend.RenderPass;
+import mattmc.client.renderer.CommandBuffer;
+import mattmc.client.renderer.ChunkRenderLogic;
+import mattmc.client.renderer.VoxelLitShader;
+
+import mattmc.client.renderer.backend.opengl.TextureAtlas;
+import mattmc.client.renderer.backend.opengl.ChunkRenderer;
 import mattmc.client.renderer.chunk.ChunkMeshBuffer;
-import mattmc.client.renderer.chunk.ChunkVAO;
+import mattmc.client.renderer.backend.opengl.ChunkVAO;
 import mattmc.world.level.chunk.LevelChunk;
 import mattmc.world.level.Level;
 
