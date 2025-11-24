@@ -2,24 +2,25 @@ package mattmc.client.renderer;
 
 import mattmc.client.renderer.backend.RenderBackend;
 import mattmc.client.renderer.backend.DrawCommand;
+import mattmc.client.renderer.backend.opengl.UIRenderHelper;
 
 /**
- * Backend-agnostic crosshair renderer.
+ * Crosshair renderer coordinator.
  * 
  * <p>This class is responsible for determining <em>what</em> to draw (the crosshair)
- * and coordinating with the backend to actually render it. It contains NO OpenGL-specific
- * code and works purely through the {@link RenderBackend} abstraction.
+ * and coordinating with the backend to actually render it.
  * 
  * <p><b>Architecture:</b> This is a "coordinator" class that:
  * <ul>
  *   <li>Uses {@link UIRenderLogic} to build draw commands (what to draw)</li>
  *   <li>Submits commands to the {@link RenderBackend} (how to draw)</li>
- *   <li>Contains no graphics API-specific code (OpenGL, Vulkan, etc.)</li>
+ *   <li>Handles 2D projection setup (OpenGL infrastructure code)</li>
  * </ul>
  * 
- * <p><b>Abstraction Layer:</b> This class lives outside the backend/ directory
- * and can be safely used by any code in the application. It depends only on the
- * backend interface, not on any specific implementation.
+ * <p><b>Note:</b> While this class lives outside backend/opengl/, it does use
+ * {@link UIRenderHelper} for 2D projection setup, which is OpenGL-specific infrastructure.
+ * This is necessary infrastructure code for UI rendering that would need to be abstracted
+ * further for true multi-backend support.
  */
 public class CrosshairRenderer {
     
@@ -51,8 +52,8 @@ public class CrosshairRenderer {
     /**
      * Render the crosshair in the center of the screen.
      * 
-     * <p>This method is completely backend-agnostic. It builds draw commands
-     * describing what to draw and submits them to the backend for rendering.
+     * <p>This method coordinates the rendering process by setting up the 2D projection,
+     * building draw commands, and submitting them to the backend.
      * 
      * @param screenWidth screen width in pixels
      * @param screenHeight screen height in pixels
@@ -62,6 +63,9 @@ public class CrosshairRenderer {
         if (backend == null) {
             throw new IllegalStateException("Backend must be set before calling render()");
         }
+        
+        // Setup 2D projection for UI rendering
+        UIRenderHelper.setup2DProjection(screenWidth, screenHeight);
         
         // Build draw commands using backend-agnostic logic
         buffer.clear();
@@ -73,5 +77,8 @@ public class CrosshairRenderer {
             backend.submit(cmd);
         }
         backend.endFrame();
+        
+        // Restore projection
+        UIRenderHelper.restore2DProjection();
     }
 }
