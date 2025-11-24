@@ -106,7 +106,7 @@ public class UIRenderer {
 1. **Backend Independence**: If you import OpenGL classes, your code becomes tied to OpenGL forever
 2. **No Alternative Backends**: Direct OpenGL imports make it impossible to support Vulkan, DirectX, or any other rendering API
 3. **Breaks Abstraction**: The whole point of the `backend/` directory is to hide implementation details
-4. **Testing Nightmare**: Code with direct OpenGL dependencies cannot be unit tested without an OpenGL context
+4. **Testing Complexity**: Code with direct OpenGL dependencies makes unit testing significantly more complex and requires specialized test infrastructure
 
 ### If You Need OpenGL Functionality Outside backend/
 
@@ -117,12 +117,13 @@ public class UIRenderer {
 
 The backend exists to provide ALL rendering functionality needed by the rest of the application.
 
-### Current Violations
+### Current Violations (Technical Debt)
 
-This codebase currently has many violations of this rule that need to be fixed:
-- `UIRenderer` directly instantiates OpenGL-specific renderers
-- `Minecraft.java` imports `Window` from OpenGL backend
-- Various renderer classes import OpenGL-specific types
+This codebase currently has violations of this rule that need to be fixed:
+- `UIRenderer` (src/main/java/mattmc/client/renderer/UIRenderer.java) - directly instantiates `CrosshairRenderer`, `DebugInfoRenderer`, `HotbarRenderer`, etc.
+- `Minecraft.java` (src/main/java/mattmc/client/Minecraft.java) - imports `Window`, `CubeMap`, `PanoramaRenderer` from OpenGL backend
+- `ChunkRenderLogic.java` (src/main/java/mattmc/client/renderer/ChunkRenderLogic.java) - imports `ChunkRenderer`, `Frustum`
+- Various renderer classes import `TextureAtlas`, `Shader`, and other OpenGL-specific types
 
 These are **technical debt** and should be refactored to use the `RenderBackend` interface instead.
 
