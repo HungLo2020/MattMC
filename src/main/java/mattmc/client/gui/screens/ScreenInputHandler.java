@@ -1,6 +1,6 @@
 package mattmc.client.gui.screens;
 
-import mattmc.client.Window;
+import mattmc.client.renderer.backend.opengl.Window;
 
 import static org.lwjgl.glfw.GLFW.*;
 

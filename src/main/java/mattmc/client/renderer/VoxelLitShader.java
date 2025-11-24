@@ -1,5 +1,7 @@
 package mattmc.client.renderer;
 
+import mattmc.client.renderer.backend.opengl.Shader;
+
 /**
  * Shader program for rendering voxel chunks with per-vertex lighting.
  * Supports gamma-corrected lighting with configurable gamma curve and emissive boost.

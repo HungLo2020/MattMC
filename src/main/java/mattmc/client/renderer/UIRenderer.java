@@ -1,9 +1,21 @@
 package mattmc.client.renderer;
 
+import mattmc.client.renderer.backend.RenderBackend;
+import mattmc.client.renderer.backend.opengl.CrosshairRenderer;
+import mattmc.client.renderer.backend.opengl.DebugInfoRenderer;
+import mattmc.client.renderer.backend.opengl.HotbarRenderer;
+import mattmc.client.renderer.backend.opengl.CommandUIRenderer;
+import mattmc.client.renderer.backend.opengl.LightingDebugRenderer;
+import mattmc.client.renderer.backend.opengl.SystemInfoRenderer;
+import mattmc.client.renderer.backend.opengl.BlockNameDisplay;
+
 /**
  * Handles rendering of UI elements.
  * Similar to Minecraft's GuiIngame class.
  * Delegates rendering to specialized renderer classes.
+ * 
+ * <p><b>Stage 4:</b> Now supports backend-based rendering for UI elements.
+ * Components that have been refactored to use the backend will use it when available.
  */
 public class UIRenderer {
     
@@ -18,6 +30,9 @@ public class UIRenderer {
     // Block name display with blur effect
     private BlockNameDisplay blockNameDisplay;
     
+    // Stage 4: Backend for UI rendering (optional, for backward compatibility)
+    private RenderBackend backend;
+    
     public UIRenderer() {
         this.crosshairRenderer = new CrosshairRenderer();
         this.debugInfoRenderer = new DebugInfoRenderer();
@@ -28,7 +43,29 @@ public class UIRenderer {
     }
     
     /**
+     * Set the render backend for UI rendering (Stage 4).
+     * Propagates the backend to all child renderers.
+     * 
+     * <p>Note: BlockNameDisplay is not included as it's a specialized effect renderer
+     * (with blur effects) which is out of Stage 4 scope per RENDERINGREFACTOR.md.
+     * 
+     * @param backend the backend to use, or null to use legacy rendering
+     */
+    public void setBackend(RenderBackend backend) {
+        this.backend = backend;
+        // Propagate backend to all Stage 4 child renderers
+        crosshairRenderer.setBackend(backend);
+        hotbarRenderer.setBackend(backend);
+        commandUIRenderer.setBackend(backend);
+        debugInfoRenderer.setBackend(backend);
+        systemInfoRenderer.setBackend(backend);
+        // Note: BlockNameDisplay (specialized blur effect) not in Stage 4 scope
+    }
+    
+    /**
      * Draw crosshair in the center of the screen.
+     * 
+     * <p><b>Stage 4:</b> Uses backend architecture via child renderer.
      */
     public void drawCrosshair(int screenWidth, int screenHeight) {
         crosshairRenderer.render(screenWidth, screenHeight);
