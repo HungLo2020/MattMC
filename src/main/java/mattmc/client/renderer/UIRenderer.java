@@ -43,6 +43,7 @@ public class UIRenderer {
         this.commandUIRenderer = new CommandUIRenderer();
         this.lightingDebugRenderer = new LightingDebugRenderer();
         this.systemInfoRenderer = new SystemInfoRenderer();
+        this.blockNameDisplay = new BlockNameDisplay();
     }
     
     /**
