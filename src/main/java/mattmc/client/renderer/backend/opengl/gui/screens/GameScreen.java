@@ -80,7 +80,7 @@ public final class GameScreen extends AbstractMenuScreen {
             }
             
             mattmc.client.settings.OptionsManager.setFpsCap(commonValues[nextIndex]);
-            game.window().applyFpsCapSetting();
+            window.applyFpsCapSetting();
             game.updateFpsCap();
             recomputeLayout();
             return;

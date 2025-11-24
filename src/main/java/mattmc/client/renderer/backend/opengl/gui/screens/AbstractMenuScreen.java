@@ -38,7 +38,7 @@ public abstract class AbstractMenuScreen implements Screen {
     
     protected AbstractMenuScreen(Minecraft game) {
         this.game = game;
-        this.window = game.window();
+        this.window = (Window) game.window();
     }
     
     /**

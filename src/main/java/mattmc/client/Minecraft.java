@@ -1,6 +1,7 @@
 package mattmc.client;
 
 import mattmc.client.settings.OptionsManager;
+import mattmc.client.renderer.window.WindowHandle;
 import mattmc.client.renderer.backend.opengl.Window;
 import mattmc.client.renderer.backend.opengl.CubeMap;
 import mattmc.client.renderer.backend.opengl.PanoramaRenderer;
@@ -26,7 +27,12 @@ public final class Minecraft {
         // Cache the FPS cap
         this.cachedFpsCap = OptionsManager.getFpsCap();
     }
-    public Window window() { return window; }
+    
+    /**
+     * Get the window handle for use by other code.
+     * Returns the backend-agnostic WindowHandle interface.
+     */
+    public WindowHandle window() { return window; }
     public PanoramaRenderer panorama() { return sharedPanorama; }
     
     /**

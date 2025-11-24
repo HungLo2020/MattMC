@@ -43,7 +43,7 @@ public final class CreateWorldScreen implements Screen {
 
     public CreateWorldScreen(Minecraft game) {
         this.game = game;
-        this.window = game.window();
+        this.window = (Window) game.window();
 
         glfwSetCursorPosCallback(window.handle(), (h, x, y) -> { mouseXWin = x; mouseYWin = y; });
         glfwSetMouseButtonCallback(window.handle(), (h, button, action, mods) -> {
