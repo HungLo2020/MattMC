@@ -1,4 +1,4 @@
-package mattmc.client;
+package mattmc.client.renderer.backend.opengl;
 
 import mattmc.client.settings.OptionsManager;
 import org.lwjgl.opengl.GL;

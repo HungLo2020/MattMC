@@ -8,7 +8,7 @@ import mattmc.client.renderer.backend.DrawCommand;
 
 import mattmc.client.renderer.backend.RenderBackend;
 
-import mattmc.client.gui.components.TextRenderer;
+import mattmc.client.renderer.backend.opengl.gui.components.TextRenderer;
 import mattmc.util.MathUtils;
 import org.lwjgl.system.MemoryStack;
 

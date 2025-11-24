@@ -1,7 +1,7 @@
 package mattmc.client.renderer.backend.opengl;
 
-import mattmc.client.gui.components.TextRenderer;
-import mattmc.util.ColorUtils;
+import mattmc.client.renderer.backend.opengl.gui.components.TextRenderer;
+import mattmc.client.renderer.backend.opengl.util.ColorUtils;
 
 import static org.lwjgl.opengl.GL11.*;
 

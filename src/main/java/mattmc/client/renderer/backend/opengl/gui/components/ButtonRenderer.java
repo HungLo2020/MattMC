@@ -1,5 +1,6 @@
-package mattmc.client.gui.components;
+package mattmc.client.renderer.backend.opengl.gui.components;
 
+import mattmc.client.gui.components.Button;
 import mattmc.client.renderer.backend.opengl.Texture;
 
 import static org.lwjgl.opengl.GL11.*;

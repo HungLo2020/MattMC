@@ -1,6 +1,6 @@
 package mattmc.client.gui.screens.inventory;
 
-import mattmc.client.Window;
+import mattmc.client.renderer.backend.opengl.Window;
 import mattmc.client.util.CoordinateUtils;
 import mattmc.world.item.Inventory;
 import mattmc.world.item.Item;

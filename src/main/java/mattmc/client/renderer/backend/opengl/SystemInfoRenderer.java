@@ -3,6 +3,7 @@ package mattmc.client.renderer.backend.opengl;
 import mattmc.client.renderer.CommandBuffer;
 
 import mattmc.client.renderer.UIRenderLogic;
+import mattmc.client.renderer.backend.opengl.util.SystemInfo;
 
 import mattmc.client.renderer.backend.DrawCommand;
 
@@ -40,15 +41,15 @@ public class SystemInfoRenderer {
      */
     public void render(int screenWidth, int screenHeight, long windowHandle) {
         // Get system information
-        String javaVersion = "Java: " + mattmc.client.util.SystemInfo.getJavaVersion();
-        long usedMemMB = mattmc.client.util.SystemInfo.getUsedMemoryMB();
-        long maxMemMB = mattmc.client.util.SystemInfo.getMaxMemoryMB();
-        int memPercent = mattmc.client.util.SystemInfo.getMemoryUsagePercent();
+        String javaVersion = "Java: " + SystemInfo.getJavaVersion();
+        long usedMemMB = SystemInfo.getUsedMemoryMB();
+        long maxMemMB = SystemInfo.getMaxMemoryMB();
+        int memPercent = SystemInfo.getMemoryUsagePercent();
         String memoryInfo = String.format("Memory: %d/%d MB (%d%%)", usedMemMB, maxMemMB, memPercent);
         
-        String cpuName = mattmc.client.util.SystemInfo.getCPUName();
-        int cpuCores = mattmc.client.util.SystemInfo.getCPUCores();
-        double cpuUsage = mattmc.client.util.SystemInfo.getCPUUsage();
+        String cpuName = SystemInfo.getCPUName();
+        int cpuCores = SystemInfo.getCPUCores();
+        double cpuUsage = SystemInfo.getCPUUsage();
         String cpuInfo;
         if (cpuUsage >= 0) {
             cpuInfo = String.format("CPU: %s (%d cores, %.1f%%)", cpuName, cpuCores, cpuUsage);
@@ -56,11 +57,11 @@ public class SystemInfoRenderer {
             cpuInfo = String.format("CPU: %s (%d cores)", cpuName, cpuCores);
         }
         
-        String displayRes = "Display: " + mattmc.client.util.SystemInfo.getDisplayResolution(windowHandle);
-        String gpuName = "GPU: " + mattmc.client.util.SystemInfo.getGPUName();
+        String displayRes = "Display: " + SystemInfo.getDisplayResolution(windowHandle);
+        String gpuName = "GPU: " + SystemInfo.getGPUName();
         
-        int gpuUsage = mattmc.client.util.SystemInfo.getGPUUsage();
-        String vramUsage = mattmc.client.util.SystemInfo.getGPUVRAMUsage();
+        int gpuUsage = SystemInfo.getGPUUsage();
+        String vramUsage = SystemInfo.getGPUVRAMUsage();
         String gpuUsageInfo;
         if (gpuUsage >= 0 && !vramUsage.equals("N/A")) {
             gpuUsageInfo = String.format("GPU Usage: %d%%, VRAM: %s", gpuUsage, vramUsage);

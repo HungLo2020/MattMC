@@ -1,12 +1,17 @@
-package mattmc.client.gui.screens.inventory;
+package mattmc.client.renderer.backend.opengl.gui.screens.inventory;
 
-import mattmc.client.Window;
+import mattmc.client.renderer.backend.opengl.ItemRenderer;
+import mattmc.client.renderer.backend.opengl.gui.components.TextRenderer;
+import mattmc.client.gui.screens.inventory.InventorySlotManager;
+import mattmc.client.gui.screens.inventory.InventorySlot;
+import mattmc.client.gui.screens.inventory.CreativeInventoryManager;
+import mattmc.client.renderer.backend.opengl.Window;
 import mattmc.client.renderer.backend.opengl.BlurEffect;
 import mattmc.client.renderer.backend.opengl.BlurRenderer;
 import mattmc.client.renderer.backend.opengl.TooltipRenderer;
 import mattmc.client.renderer.backend.opengl.Texture;
 import mattmc.client.util.CoordinateUtils;
-import mattmc.util.ColorUtils;
+import mattmc.client.renderer.backend.opengl.util.ColorUtils;
 import mattmc.world.item.Inventory;
 import mattmc.world.item.Item;
 import mattmc.world.item.ItemStack;
@@ -226,11 +231,11 @@ public class InventoryRenderer {
         
         // Draw shadow
         glColor4f(0.25f, 0.25f, 0.25f, 1.0f);
-        mattmc.client.gui.components.TextRenderer.drawText(countText, textX + 1, textY + 1, textScale);
+        TextRenderer.drawText(countText, textX + 1, textY + 1, textScale);
         
         // Draw main text
         glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
-        mattmc.client.gui.components.TextRenderer.drawText(countText, textX, textY, textScale);
+        TextRenderer.drawText(countText, textX, textY, textScale);
         
         glDisable(GL_BLEND);
     }

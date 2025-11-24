@@ -1,4 +1,4 @@
-package mattmc.client.gui.components;
+package mattmc.client.renderer.backend.opengl.gui.components;
 
 import mattmc.client.Minecraft;
 

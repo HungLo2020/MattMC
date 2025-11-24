@@ -1,7 +1,10 @@
-package mattmc.client.gui.screens;
+package mattmc.client.renderer.backend.opengl.gui.screens;
 
+import mattmc.client.gui.screens.CommandSystem;
+import mattmc.client.gui.screens.DevplayUIState;
+import mattmc.client.gui.screens.Screen;
 import mattmc.client.Minecraft;
-import mattmc.client.Window;
+import mattmc.client.renderer.backend.opengl.Window;
 import mattmc.client.settings.OptionsManager;
 import mattmc.world.entity.player.BlockInteraction;
 import mattmc.world.entity.player.LocalPlayer;
@@ -11,7 +14,7 @@ import mattmc.world.entity.player.PlayerInput;
 import mattmc.client.renderer.backend.opengl.LevelRenderer;
 import mattmc.client.renderer.UIRenderer;
 import mattmc.client.renderer.backend.opengl.BlockFaceGeometry;
-import mattmc.util.ColorUtils;
+import mattmc.client.renderer.backend.opengl.util.ColorUtils;
 import mattmc.world.item.Inventory;
 import mattmc.world.level.chunk.ChunkUtils;
 import mattmc.world.level.chunk.LevelChunk;

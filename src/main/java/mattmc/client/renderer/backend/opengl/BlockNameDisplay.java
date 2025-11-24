@@ -1,6 +1,6 @@
 package mattmc.client.renderer.backend.opengl;
 
-import mattmc.client.gui.components.TextRenderer;
+import mattmc.client.renderer.backend.opengl.gui.components.TextRenderer;
 import mattmc.world.level.block.Block;
 
 import static org.lwjgl.opengl.GL11.*;

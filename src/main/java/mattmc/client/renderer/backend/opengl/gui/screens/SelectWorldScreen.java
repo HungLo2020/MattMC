@@ -1,14 +1,15 @@
-package mattmc.client.gui.screens;
+package mattmc.client.renderer.backend.opengl.gui.screens;
 
+import mattmc.client.gui.screens.Screen;
 import mattmc.client.settings.OptionsManager;
 
 import mattmc.client.Minecraft;
-import mattmc.client.Window;
+import mattmc.client.renderer.backend.opengl.Window;
 import mattmc.client.gui.components.Button;
-import mattmc.client.gui.components.ButtonRenderer;
-import mattmc.client.gui.components.TextRenderer;
+import mattmc.client.renderer.backend.opengl.gui.components.ButtonRenderer;
+import mattmc.client.renderer.backend.opengl.gui.components.TextRenderer;
 import mattmc.client.util.CoordinateUtils;
-import mattmc.util.ColorUtils;
+import mattmc.client.renderer.backend.opengl.util.ColorUtils;
 import mattmc.world.level.Level;
 import mattmc.world.level.storage.LevelStorageSource;
 

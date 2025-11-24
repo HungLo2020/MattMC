@@ -1,5 +1,6 @@
-package mattmc.util;
+package mattmc.client.renderer.backend.opengl.util;
 
+import mattmc.util.MathUtils;
 import static org.lwjgl.opengl.GL11.*;
 
 /**

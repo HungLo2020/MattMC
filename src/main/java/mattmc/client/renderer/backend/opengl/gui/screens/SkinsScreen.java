@@ -1,15 +1,16 @@
-package mattmc.client.gui.screens;
+package mattmc.client.renderer.backend.opengl.gui.screens;
 
+import mattmc.client.gui.screens.Screen;
 import mattmc.client.settings.OptionsManager;
 
 import mattmc.client.Minecraft;
 import mattmc.client.gui.components.Button;
-import mattmc.client.gui.components.ButtonRenderer;
+import mattmc.client.renderer.backend.opengl.gui.components.ButtonRenderer;
 
-/** Sounds options submenu screen. */
-public final class SoundsScreen extends AbstractMenuScreen {
+/** Skins options submenu screen. */
+public final class SkinsScreen extends AbstractMenuScreen {
 
-    public SoundsScreen(Minecraft game) {
+    public SkinsScreen(Minecraft game) {
         super(game);
         recomputeLayout();
     }
@@ -49,7 +50,7 @@ public final class SoundsScreen extends AbstractMenuScreen {
             ButtonRenderer.drawButton(b);
             drawTextCentered(b.label, b.x + b.w / 2f, b.y + b.h / 2f, 1.2f, 0xFFFFFF);
         }
-        drawTitle("Sounds", titleCX, titleCY, titleScale, 0xFFFFFF);
-        drawTitle("Sound settings (coming soon)", titleCX, titleCY + 48f, 1.0f, 0xB0C4DE);
+        drawTitle("Skins", titleCX, titleCY, titleScale, 0xFFFFFF);
+        drawTitle("Skin customization (coming soon)", titleCX, titleCY + 48f, 1.0f, 0xB0C4DE);
     }
 }

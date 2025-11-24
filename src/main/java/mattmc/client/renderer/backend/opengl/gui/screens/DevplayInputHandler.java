@@ -1,7 +1,10 @@
-package mattmc.client.gui.screens;
+package mattmc.client.renderer.backend.opengl.gui.screens;
 
+import mattmc.client.gui.screens.CommandSystem;
+import mattmc.client.gui.screens.DevplayUIState;
+import mattmc.client.gui.screens.Screen;
 import mattmc.client.Minecraft;
-import mattmc.client.Window;
+import mattmc.client.renderer.backend.opengl.Window;
 import mattmc.world.entity.player.BlockInteraction;
 import mattmc.world.entity.player.LocalPlayer;
 import mattmc.world.entity.player.PlayerInput;
