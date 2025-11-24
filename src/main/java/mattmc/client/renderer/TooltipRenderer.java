@@ -83,9 +83,12 @@ public class TooltipRenderer extends AbstractBlurBox {
             CommandBuffer buffer = new CommandBuffer();
             logic.buildTooltipCommands(text, mouseFBX, mouseFBY, screenWidth, screenHeight, buffer);
             
+            // Submit to backend with frame management
+            backend.beginFrame();
             for (DrawCommand cmd : buffer.getCommands()) {
                 backend.submit(cmd);
             }
+            backend.endFrame();
         } else {
             // Legacy rendering (fallback)
             renderTooltipLegacy(text, mouseFBX, mouseFBY, screenWidth, screenHeight);

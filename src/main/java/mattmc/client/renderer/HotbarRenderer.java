@@ -52,10 +52,12 @@ public class HotbarRenderer {
             // Build hotbar commands
             logic.buildHotbarCommands(screenWidth, screenHeight, selectedHotbarSlot, buffer);
             
-            // Submit to backend
+            // Submit to backend with frame management
+            backend.beginFrame();
             for (DrawCommand cmd : buffer.getCommands()) {
                 backend.submit(cmd);
             }
+            backend.endFrame();
         } else {
             // Legacy rendering path
             renderLegacy(screenWidth, screenHeight);

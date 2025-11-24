@@ -46,10 +46,12 @@ public class DebugInfoRenderer {
                 loadedChunks, pendingChunks, activeWorkers, renderedChunks, culledChunks,
                 buffer);
             
-            // Submit to backend
+            // Submit to backend with frame management
+            backend.beginFrame();
             for (DrawCommand cmd : buffer.getCommands()) {
                 backend.submit(cmd);
             }
+            backend.endFrame();
         } else {
             // Legacy rendering path
             renderLegacy(screenWidth, screenHeight, playerX, playerY, playerZ,

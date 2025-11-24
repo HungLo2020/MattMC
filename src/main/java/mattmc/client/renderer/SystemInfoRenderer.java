@@ -71,9 +71,12 @@ public class SystemInfoRenderer {
             CommandBuffer buffer = new CommandBuffer();
             logic.buildSystemInfoCommands(screenWidth, screenHeight, systemInfo, buffer);
             
+            // Submit to backend with frame management
+            backend.beginFrame();
             for (DrawCommand cmd : buffer.getCommands()) {
                 backend.submit(cmd);
             }
+            backend.endFrame();
         } else {
             // Legacy rendering (fallback)
             renderLegacy(screenWidth, screenHeight, systemInfo);

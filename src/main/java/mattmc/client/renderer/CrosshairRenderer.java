@@ -51,10 +51,12 @@ public class CrosshairRenderer {
             buffer.clear();
             logic.buildCrosshairCommands(screenWidth, screenHeight, buffer);
             
-            // Submit commands to backend
+            // Submit commands to backend with frame management
+            backend.beginFrame();
             for (DrawCommand cmd : buffer.getCommands()) {
                 backend.submit(cmd);
             }
+            backend.endFrame();
             
             // Restore projection (infrastructure)
             UIRenderHelper.restore2DProjection();

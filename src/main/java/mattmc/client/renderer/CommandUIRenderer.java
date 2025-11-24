@@ -46,10 +46,12 @@ public class CommandUIRenderer {
             // Build command overlay commands
             logic.buildCommandOverlayCommands(screenWidth, screenHeight, commandText, buffer);
             
-            // Submit to backend
+            // Submit to backend with frame management
+            backend.beginFrame();
             for (DrawCommand cmd : buffer.getCommands()) {
                 backend.submit(cmd);
             }
+            backend.endFrame();
         } else {
             // Legacy rendering path
             renderCommandOverlayLegacy(screenWidth, screenHeight, commandText);
@@ -119,10 +121,12 @@ public class CommandUIRenderer {
             // Build command feedback commands
             logic.buildCommandFeedbackCommands(screenWidth, screenHeight, message, buffer);
             
-            // Submit to backend
+            // Submit to backend with frame management
+            backend.beginFrame();
             for (DrawCommand cmd : buffer.getCommands()) {
                 backend.submit(cmd);
             }
+            backend.endFrame();
         } else {
             // Legacy rendering path
             renderCommandFeedbackLegacy(screenWidth, screenHeight, message);

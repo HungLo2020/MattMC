@@ -603,10 +603,12 @@ public class ItemRenderer {
         CommandBuffer buffer = new CommandBuffer();
         logic.buildItemCommand(stack, x, y, size, buffer);
         
-        // Submit commands to backend
+        // Submit commands to backend with frame management
+        backend.beginFrame();
         for (DrawCommand cmd : buffer.getCommands()) {
             backend.submit(cmd);
         }
+        backend.endFrame();
     }
     
     /**
