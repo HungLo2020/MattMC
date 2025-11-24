@@ -206,4 +206,60 @@ public class ChunkRenderer {
 		vaoCache.clear();
 		chunkByKey.clear();
 	}
+	
+	// ===== Stage 3: Backend Integration Support =====
+	
+	/**
+	 * Get the mesh ID for a chunk.
+	 * Returns the hash code of the chunk object, which serves as a unique identifier.
+	 * Returns -1 if the chunk has no mesh.
+	 * 
+	 * @param chunk the chunk to get mesh ID for
+	 * @return mesh ID or -1 if no mesh
+	 */
+	public int getMeshIdForChunk(LevelChunk chunk) {
+		if (!hasChunkMesh(chunk)) {
+			return -1;
+		}
+		// Use chunk's identity hash code as mesh ID
+		return System.identityHashCode(chunk);
+	}
+	
+	/**
+	 * Get the VAO for a chunk by mesh ID.
+	 * This is used by the backend to look up the actual VAO to render.
+	 * 
+	 * @param meshId the mesh ID (from getMeshIdForChunk)
+	 * @return the ChunkVAO or null if not found
+	 */
+	public ChunkVAO getVAOByMeshId(int meshId) {
+		// Search through cache to find chunk with matching identity hash
+		for (Map.Entry<LevelChunk, ChunkVAO> entry : vaoCache.entrySet()) {
+			if (System.identityHashCode(entry.getKey()) == meshId) {
+				return entry.getValue();
+			}
+		}
+		return null;
+	}
+	
+	/**
+	 * Get the default material ID for chunk rendering.
+	 * All chunks currently use the same material (shader + texture atlas).
+	 * 
+	 * @return default material ID (always 0 for now)
+	 */
+	public int getDefaultMaterialId() {
+		return 0;
+	}
+	
+	/**
+	 * Initialize the shader if not already done.
+	 * Call this before registering materials with the backend.
+	 */
+	public void ensureShaderInitialized() {
+		if (shader == null) {
+			shader = new VoxelLitShader();
+			logger.info("Initialized VoxelLitShader for chunk rendering");
+		}
+	}
 }

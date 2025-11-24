@@ -1,11 +1,11 @@
 package mattmc.client.renderer;
 
 import mattmc.client.renderer.texture.TextureAtlas;
-
-import mattmc.world.level.chunk.LevelChunk;
-import mattmc.world.level.Level;
 import mattmc.client.renderer.chunk.ChunkRenderer;
 import mattmc.client.renderer.chunk.ChunkMeshBuffer;
+import mattmc.client.renderer.chunk.ChunkVAO;
+import mattmc.world.level.chunk.LevelChunk;
+import mattmc.world.level.Level;
 
 import java.util.List;
 
@@ -15,133 +15,172 @@ import org.slf4j.LoggerFactory;
 
 /**
  * Renders all loaded chunks in an infinite world.
- * Similar to RegionRenderer but works with the Level system.
  * 
- * Now handles async mesh uploads from background threads and texture atlas.
+ * <p><b>Stage 3 Refactor:</b> This class now uses the {@link RenderBackend} abstraction
+ * to render chunks. Direct OpenGL calls have been removed and replaced with:
+ * <ul>
+ *   <li>{@link ChunkRenderLogic} - Builds draw commands (what to render)</li>
+ *   <li>{@link OpenGLRenderBackend} - Executes draw commands (how to render)</li>
+ * </ul>
+ * 
+ * <p>Now handles async mesh uploads from background threads and texture atlas.
  * Implements frustum culling to skip rendering chunks outside the camera view.
- * Simplified version with no lighting or shadow effects.
  */
 public class LevelRenderer {
     private static final Logger logger = LoggerFactory.getLogger(LevelRenderer.class);
 
     private final ChunkRenderer chunkRenderer;
     private final Frustum frustum;
+    private final ChunkRenderLogic chunkLogic;
+    private final OpenGLRenderBackend renderBackend;
+    private final CommandBuffer commandBuffer;
+    
     private Level currentLevel;
     private boolean textureAtlasInitialized = false;
+    private boolean backendInitialized = false;
     private boolean firstRenderLogged = false;
-    
-    // Statistics for debugging
-    private int totalChunks = 0;
-    private int renderedChunks = 0;
-    private int culledChunks = 0;
     
     public LevelRenderer() {
         this.chunkRenderer = new ChunkRenderer();
         this.frustum = new Frustum();
+        this.chunkLogic = new ChunkRenderLogic(chunkRenderer, frustum);
+        this.renderBackend = new OpenGLRenderBackend();
+        this.commandBuffer = new CommandBuffer(1000); // Initial capacity for ~1000 chunks
     }
     
     /**
      * Initialize the renderer with a level.
      * This sets up the chunk unload listener and builds the texture atlas.
+     * Also initializes the rendering backend with materials.
      */
     public void initWithLevel(Level level) {
         if (currentLevel != null) {
             currentLevel.setChunkUnloadListener(null);
         }
         this.currentLevel = level;
-        level.setChunkUnloadListener(chunk -> chunkRenderer.removeChunkFromCache(chunk));
+        level.setChunkUnloadListener(chunk -> {
+            // Unregister mesh from backend
+            int meshId = chunkRenderer.getMeshIdForChunk(chunk);
+            if (meshId >= 0) {
+                renderBackend.unregisterMesh(meshId);
+            }
+            // Remove from chunk renderer cache
+            chunkRenderer.removeChunkFromCache(chunk);
+        });
         
         // Build texture atlas once on first initialization
         if (!textureAtlasInitialized) {
-            // logger.info("Initializing texture atlas for VBO rendering...");
             TextureAtlas atlas = new TextureAtlas();
             chunkRenderer.setTextureAtlas(atlas);
             level.getAsyncLoader().setTextureAtlas(atlas);
             textureAtlasInitialized = true;
-            // logger.info("Texture atlas initialized with {} textures", atlas.getTextureCount());
+        }
+        
+        // Initialize backend with materials
+        if (!backendInitialized) {
+            initializeBackend();
+            backendInitialized = true;
         }
     }
     
     /**
+     * Initialize the rendering backend with shaders and materials.
+     */
+    private void initializeBackend() {
+        // Ensure shader is initialized
+        chunkRenderer.ensureShaderInitialized();
+        
+        // Register default material (shader + texture atlas)
+        int materialId = chunkRenderer.getDefaultMaterialId();
+        renderBackend.registerMaterial(materialId, 
+                                      chunkRenderer.getShader(), 
+                                      chunkRenderer.getTextureAtlas());
+    }
+    
+    /**
      * Render all loaded chunks in the world.
-     * Also processes pending mesh uploads from background threads and handles dirty chunks.
-     * Uses frustum culling to skip chunks outside the camera view.
+     * 
+     * <p><b>Stage 3:</b> Now uses {@link RenderBackend} abstraction:
+     * <ol>
+     *   <li>Process async mesh uploads and register them with backend</li>
+     *   <li>Build draw commands via {@link ChunkRenderLogic}</li>
+     *   <li>Submit commands to {@link OpenGLRenderBackend}</li>
+     * </ol>
+     * 
+     * <p>This method no longer makes direct OpenGL calls for rendering chunks.
      */
     public void render(Level world, float playerX, float playerY, float playerZ) {
-        // Update frustum from current GL matrices (must be called after camera setup)
-        frustum.update();
-        
-        // Reset statistics
-        totalChunks = 0;
-        renderedChunks = 0;
-        culledChunks = 0;
-        
         // Process completed mesh buffers from async loader first
         // This makes newly loaded chunk meshes available for rendering
         List<ChunkMeshBuffer> completedMeshBuffers = world.getAsyncLoader().collectCompletedMeshBuffers();
         for (ChunkMeshBuffer meshBuffer : completedMeshBuffers) {
             chunkRenderer.uploadMeshBuffer(meshBuffer);
+            
+            // Register mesh with backend
+            registerMeshWithBackend(meshBuffer);
         }
         
-        glPushMatrix();
-        
-        // Render each loaded chunk with frustum culling
+        // Handle dirty chunks
         for (LevelChunk chunk : world.getLoadedChunks()) {
-            totalChunks++;
-            
-            // Frustum culling: skip chunks outside the camera view early
-            // This is done before registration and dirty checks to avoid unnecessary operations for culled chunks
-            if (!frustum.isChunkVisible(chunk.chunkX(), chunk.chunkZ(), 
-                                       LevelChunk.WIDTH, LevelChunk.DEPTH, 
-                                       LevelChunk.MIN_Y, LevelChunk.MAX_Y)) {
-                culledChunks++;
-                continue;
-            }
-            
-            // Register chunk for mesh uploads (idempotent operation)
-            chunkRenderer.registerChunk(chunk);
-            
-            // Check if chunk is dirty and needs mesh rebuild
             if (chunk.isDirty()) {
-                // Don't invalidate the old VAO yet - keep it visible until new one is ready
                 chunk.setDirty(false);
                 world.getAsyncLoader().requestChunkMeshRebuild(chunk);
             }
-            
-            // Skip chunks without mesh data to avoid wasted GL calls
-            // These are counted as culled since they can't be rendered
-            if (!chunkRenderer.hasChunkMesh(chunk)) {
-                culledChunks++;
-                continue;
-            }
-            
-            // Calculate chunk world position
-            int chunkWorldX = chunk.chunkX() * LevelChunk.WIDTH;
-            int chunkWorldZ = chunk.chunkZ() * LevelChunk.DEPTH;
-            
-            // Only do GL matrix operations if we're actually going to render
-            glPushMatrix();
-            glTranslatef(chunkWorldX, 0, chunkWorldZ);
-            
-            // Render chunk with basic shader (no lighting/shadows)
-            boolean rendered = chunkRenderer.renderChunk(chunk);
-            
-            if (rendered) {
-                renderedChunks++;
-            } else {
-                // Chunk lost its VAO between the hasChunkMesh check and now
-                // This is rare but can happen with concurrent modifications
-                culledChunks++;
-            }
-            glPopMatrix();
         }
+        
+        // Clear command buffer from previous frame
+        commandBuffer.clear();
+        
+        // Build draw commands (front-end logic, no GL calls)
+        chunkLogic.buildCommands(world, commandBuffer);
+        
+        // Render via backend
+        glPushMatrix();
+        
+        renderBackend.beginFrame();
+        for (DrawCommand cmd : commandBuffer.getCommands()) {
+            renderBackend.submit(cmd);
+        }
+        renderBackend.endFrame();
         
         glPopMatrix();
         
         // Log rendering stats on first render only
-        if (!firstRenderLogged && renderedChunks > 0) {
-            logger.info("Rendering {} chunks with basic shader", renderedChunks);
+        if (!firstRenderLogged && chunkLogic.getVisibleChunkCount() > 0) {
+            logger.info("Rendering {} chunks via RenderBackend (Stage 3)", 
+                       chunkLogic.getVisibleChunkCount());
             firstRenderLogged = true;
+        }
+    }
+    
+    /**
+     * Register a mesh with the backend after it's been uploaded.
+     */
+    private void registerMeshWithBackend(ChunkMeshBuffer meshBuffer) {
+        // Find the chunk for this mesh buffer
+        long key = meshBuffer.getChunkX() | ((long)meshBuffer.getChunkZ() << 32);
+        
+        // Get the chunk to find its mesh ID
+        for (LevelChunk chunk : currentLevel.getLoadedChunks()) {
+            if (chunk.chunkX() == meshBuffer.getChunkX() && 
+                chunk.chunkZ() == meshBuffer.getChunkZ()) {
+                
+                int meshId = chunkRenderer.getMeshIdForChunk(chunk);
+                if (meshId >= 0) {
+                    ChunkVAO vao = chunkRenderer.getVAOByMeshId(meshId);
+                    if (vao != null) {
+                        // Register mesh with backend
+                        renderBackend.registerMesh(meshId, vao);
+                        
+                        // Register transform for this chunk
+                        int transformId = (chunk.chunkX() << 16) | (chunk.chunkZ() & 0xFFFF);
+                        float worldX = chunk.chunkX() * LevelChunk.WIDTH;
+                        float worldZ = chunk.chunkZ() * LevelChunk.DEPTH;
+                        renderBackend.registerTransform(transformId, worldX, 0, worldZ);
+                    }
+                }
+                break;
+            }
         }
     }
     
@@ -149,20 +188,20 @@ public class LevelRenderer {
      * Get the number of chunks that were rendered in the last frame.
      */
     public int getRenderedChunkCount() {
-        return renderedChunks;
+        return chunkLogic.getVisibleChunkCount();
     }
     
     /**
      * Get the number of chunks that were culled (not rendered) in the last frame.
      */
     public int getCulledChunkCount() {
-        return culledChunks;
+        return chunkLogic.getCulledChunkCount();
     }
     
     /**
      * Get the total number of loaded chunks in the last frame.
      */
     public int getTotalChunkCount() {
-        return totalChunks;
+        return chunkLogic.getTotalChunkCount();
     }
 }
