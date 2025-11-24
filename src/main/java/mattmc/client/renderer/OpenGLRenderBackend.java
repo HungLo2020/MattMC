@@ -253,6 +253,8 @@ public class OpenGLRenderBackend implements RenderBackend {
         // -6 = hotbar (background/selection)
         // -7 = debug info text
         // -8 = command UI (overlay/feedback)
+        // -9 = system info text
+        // -10 = tooltip
         
         if (cmd.meshId == -1) {
             // Crosshair rendering
@@ -269,6 +271,12 @@ public class OpenGLRenderBackend implements RenderBackend {
         } else if (cmd.meshId == -8) {
             // Command UI
             submitCommandUICommand(cmd);
+        } else if (cmd.meshId == -9) {
+            // System info text
+            submitSystemInfoCommand(cmd);
+        } else if (cmd.meshId == -10) {
+            // Tooltip
+            submitTooltipCommand(cmd);
         }
     }
     
@@ -590,5 +598,60 @@ public class OpenGLRenderBackend implements RenderBackend {
         glTexCoord2f(1, 0); glVertex2f(quadInfo.x + quadInfo.width, quadInfo.y + quadInfo.height);
         glTexCoord2f(0, 0); glVertex2f(quadInfo.x, quadInfo.y + quadInfo.height);
         glEnd();
+    }
+    
+    /**
+     * Handle system info text rendering.
+     * meshId: -9
+     * materialId: number of lines
+     * transformIndex: first text ID
+     */
+    private void submitSystemInfoCommand(DrawCommand cmd) {
+        int numLines = cmd.materialId;
+        int firstTextId = cmd.transformIndex;
+        
+        // Look up and render all text lines
+        for (int i = 0; i < numLines; i++) {
+            UIRenderLogic.TextRenderInfo textInfo = UIRenderLogic.getTextInfo(firstTextId + i);
+            if (textInfo != null) {
+                // Right-aligned text rendering
+                SystemInfoRenderer.renderSystemInfoLine(textInfo.text, (int)textInfo.x, (int)textInfo.y, textInfo.scale, textInfo.color);
+            }
+        }
+    }
+    
+    /**
+     * Handle tooltip rendering.
+     * meshId: -10
+     * materialId: position (x, y packed)
+     * transformIndex: text ID
+     * 
+     * Tooltips come in pairs: first command has position, second has size
+     */
+    private void submitTooltipCommand(DrawCommand cmd) {
+        // Check if this is size info (high bit set in transformIndex)
+        if ((cmd.transformIndex & 0x80000000) != 0) {
+            // This is the size command, skip it (we'll get size when we need it)
+            return;
+        }
+        
+        // Decode position from materialId
+        int x = cmd.materialId & 0xFFFF;
+        int y = (cmd.materialId >> 16) & 0xFFFF;
+        
+        // Get text info
+        int textId = cmd.transformIndex;
+        UIRenderLogic.TextRenderInfo textInfo = UIRenderLogic.getTextInfo(textId);
+        if (textInfo == null) return;
+        
+        // Approximate size calculation (tooltips need size for blur/border)
+        float TOOLTIP_PADDING = 13.5f;
+        float textWidth = textInfo.text.length() * 8 * textInfo.scale;
+        float textHeight = 16 * textInfo.scale;
+        float boxWidth = textWidth + TOOLTIP_PADDING * 2;
+        float boxHeight = textHeight + TOOLTIP_PADDING * 2;
+        
+        // Render tooltip using TooltipRenderer
+        TooltipRenderer.renderTooltipDirect(textInfo.text, x, y, (int)boxWidth, (int)boxHeight, TOOLTIP_PADDING);
     }
 }

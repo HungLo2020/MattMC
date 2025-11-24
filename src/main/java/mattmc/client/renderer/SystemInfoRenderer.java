@@ -5,8 +5,23 @@ import static org.lwjgl.opengl.GL11.*;
 /**
  * Renders system information on the right side of the screen.
  * Shows Java version, memory usage, CPU info, display resolution, GPU info.
+ * 
+ * <p>Stage 4 refactor: Now supports backend rendering via UIRenderLogic + RenderBackend.
  */
 public class SystemInfoRenderer {
+    
+    private RenderBackend backend;
+    private final UIRenderLogic logic = new UIRenderLogic();
+    
+    /**
+     * Set the render backend to use for rendering.
+     * When set, system info will be rendered via the backend.
+     * 
+     * @param backend the render backend
+     */
+    public void setBackend(RenderBackend backend) {
+        this.backend = backend;
+    }
     
     /**
      * Draw system information on the right side of the screen.
@@ -16,13 +31,6 @@ public class SystemInfoRenderer {
      * @param windowHandle GLFW window handle for display resolution
      */
     public void render(int screenWidth, int screenHeight, long windowHandle) {
-        UIRenderHelper.setup2DProjection(screenWidth, screenHeight);
-        
-        // Position in top-right corner
-        float lineHeight = 20f;
-        float scale = 1.5f;
-        float y = 10f;
-        
         // Get system information
         String javaVersion = "Java: " + mattmc.client.util.SystemInfo.getJavaVersion();
         long usedMemMB = mattmc.client.util.SystemInfo.getUsedMemoryMB();
@@ -56,24 +64,46 @@ public class SystemInfoRenderer {
             gpuUsageInfo = "GPU Usage: N/A";
         }
         
+        String[] systemInfo = {javaVersion, memoryInfo, cpuInfo, displayRes, gpuName, gpuUsageInfo};
+        
+        if (backend != null) {
+            // Use backend rendering
+            CommandBuffer buffer = new CommandBuffer();
+            logic.buildSystemInfoCommands(screenWidth, screenHeight, systemInfo, buffer);
+            
+            for (DrawCommand cmd : buffer.getCommands()) {
+                backend.submit(cmd);
+            }
+        } else {
+            // Legacy rendering (fallback)
+            renderLegacy(screenWidth, screenHeight, systemInfo);
+        }
+    }
+    
+    /**
+     * Legacy rendering method (fallback when no backend is set).
+     */
+    private void renderLegacy(int screenWidth, int screenHeight, String[] systemInfo) {
+        UIRenderHelper.setup2DProjection(screenWidth, screenHeight);
+        
+        float lineHeight = 20f;
+        float scale = 1.5f;
+        float y = 10f;
+        
         // Draw each line right-aligned
-        UIRenderHelper.drawTextRightAligned(javaVersion, screenWidth - 10f, y, scale, 0xFFFFFF);
-        y += lineHeight;
-        
-        UIRenderHelper.drawTextRightAligned(memoryInfo, screenWidth - 10f, y, scale, 0xFFFFFF);
-        y += lineHeight;
-        
-        UIRenderHelper.drawTextRightAligned(cpuInfo, screenWidth - 10f, y, scale, 0xFFFFFF);
-        y += lineHeight;
-        
-        UIRenderHelper.drawTextRightAligned(displayRes, screenWidth - 10f, y, scale, 0xFFFFFF);
-        y += lineHeight;
-        
-        UIRenderHelper.drawTextRightAligned(gpuName, screenWidth - 10f, y, scale, 0xFFFFFF);
-        y += lineHeight;
-        
-        UIRenderHelper.drawTextRightAligned(gpuUsageInfo, screenWidth - 10f, y, scale, 0xFFFFFF);
+        for (String line : systemInfo) {
+            UIRenderHelper.drawTextRightAligned(line, screenWidth - 10f, y, scale, 0xFFFFFF);
+            y += lineHeight;
+        }
         
         UIRenderHelper.restore2DProjection();
+    }
+    
+    /**
+     * Render a single system info line (used by backend).
+     * Package-private for backend access.
+     */
+    static void renderSystemInfoLine(String text, int x, int y, float scale, int color) {
+        UIRenderHelper.drawTextRightAligned(text, x, y, scale, color);
     }
 }

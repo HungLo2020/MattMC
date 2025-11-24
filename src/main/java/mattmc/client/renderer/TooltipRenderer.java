@@ -14,6 +14,8 @@ import static org.lwjgl.system.MemoryStack.stackPush;
  * Renders tooltips for inventory items.
  * Displays a small semi-transparent gray box with rounded edges, blue outline,
  * and the item name.
+ * 
+ * <p>Stage 4 refactor: Now supports backend rendering via UIRenderLogic + RenderBackend.
  */
 public class TooltipRenderer extends AbstractBlurBox {
     private static final float TOOLTIP_PADDING = 13.5f;  // Increased by another 50% (9 * 1.5 = 13.5)
@@ -31,8 +33,21 @@ public class TooltipRenderer extends AbstractBlurBox {
     private static final float BORDER_ALPHA = 1.0f;
     private static final float BORDER_WIDTH = 6f;  // Increased 3x (2 * 3 = 6)
     
+    private RenderBackend backend;
+    private final UIRenderLogic logic = new UIRenderLogic();
+    
     public TooltipRenderer() {
         super();
+    }
+    
+    /**
+     * Set the render backend to use for rendering.
+     * When set, tooltips will be rendered via the backend.
+     * 
+     * @param backend the render backend
+     */
+    public void setBackend(RenderBackend backend) {
+        this.backend = backend;
     }
     
     /**
@@ -63,6 +78,24 @@ public class TooltipRenderer extends AbstractBlurBox {
             mouseFBY = (float) mouseY * sy;
         }
         
+        if (backend != null) {
+            // Use backend rendering
+            CommandBuffer buffer = new CommandBuffer();
+            logic.buildTooltipCommands(text, mouseFBX, mouseFBY, screenWidth, screenHeight, buffer);
+            
+            for (DrawCommand cmd : buffer.getCommands()) {
+                backend.submit(cmd);
+            }
+        } else {
+            // Legacy rendering (fallback)
+            renderTooltipLegacy(text, mouseFBX, mouseFBY, screenWidth, screenHeight);
+        }
+    }
+    
+    /**
+     * Legacy tooltip rendering (fallback when no backend is set).
+     */
+    private void renderTooltipLegacy(String text, float mouseFBX, float mouseFBY, int screenWidth, int screenHeight) {
         // Calculate text dimensions
         float textWidth = TextRenderer.getTextWidth(text, TEXT_SCALE);
         float textHeight = TextRenderer.getTextHeight(text, TEXT_SCALE);
@@ -92,5 +125,17 @@ public class TooltipRenderer extends AbstractBlurBox {
         // Draw text
         glColor4f(1f, 1f, 1f, 1f);
         TextRenderer.drawText(text, tooltipX + TOOLTIP_PADDING, tooltipY + TOOLTIP_PADDING, TEXT_SCALE);
+    }
+    
+    /**
+     * Render tooltip directly (used by backend).
+     * Package-private for backend access.
+     */
+    static void renderTooltipDirect(String text, float x, float y, int boxWidth, int boxHeight, float padding) {
+        // NOTE: This is a simplified version for backend rendering
+        // Full blur/border rendering requires instance methods which aren't available here
+        // For now, just render the text (blur/border can be added later if needed)
+        glColor4f(1f, 1f, 1f, 1f);
+        TextRenderer.drawText(text, x + padding, y + padding, TEXT_SCALE);
     }
 }

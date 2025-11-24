@@ -413,4 +413,102 @@ public class UIRenderLogic {
         // Encode type and position data
         return type | ((x & 0xFFF) << 2) | ((y & 0xFFF) << 14) | ((width & 0x3F) << 26);
     }
+    
+    /**
+     * Build commands for system info rendering.
+     * 
+     * @param screenWidth screen width
+     * @param screenHeight screen height
+     * @param systemInfo array of system info strings (Java, memory, CPU, display, GPU, GPU usage)
+     * @param buffer command buffer
+     */
+    public void buildSystemInfoCommands(int screenWidth, int screenHeight, String[] systemInfo, CommandBuffer buffer) {
+        if (systemInfo == null || systemInfo.length == 0) return;
+        
+        float lineHeight = 20f;
+        float scale = 1.5f;
+        float y = 10f;
+        
+        // Register all system info text lines
+        int firstTextId = -1;
+        for (int i = 0; i < systemInfo.length; i++) {
+            int x = screenWidth - 10; // right-aligned
+            int textId = registerText(systemInfo[i], (int)x, (int)y, scale, 0xFFFFFF);
+            if (i == 0) firstTextId = textId;
+            y += lineHeight;
+        }
+        
+        // Create single command with first text ID (backend will look up all in sequence)
+        DrawCommand cmd = new DrawCommand(
+            -9, // system info marker
+            systemInfo.length, // number of lines
+            firstTextId, // first text ID
+            RenderPass.UI
+        );
+        buffer.add(cmd);
+    }
+    
+    /**
+     * Build commands for tooltip rendering.
+     * 
+     * @param text tooltip text
+     * @param mouseX mouse X position (framebuffer coords)
+     * @param mouseY mouse Y position (framebuffer coords)
+     * @param screenWidth screen width
+     * @param screenHeight screen height
+     * @param buffer command buffer
+     */
+    public void buildTooltipCommands(String text, float mouseX, float mouseY, int screenWidth, int screenHeight, CommandBuffer buffer) {
+        if (text == null || text.isEmpty()) return;
+        
+        // Constants from TooltipRenderer
+        float TOOLTIP_PADDING = 13.5f;
+        float TOOLTIP_OFFSET_X = 18f;
+        float TOOLTIP_OFFSET_Y = -18f;
+        float TEXT_SCALE = 1.8f;
+        
+        // Calculate text dimensions (approximate)
+        float textWidth = text.length() * 8 * TEXT_SCALE; // approximate
+        float textHeight = 16 * TEXT_SCALE;
+        
+        // Calculate tooltip box dimensions
+        float boxWidth = textWidth + TOOLTIP_PADDING * 2;
+        float boxHeight = textHeight + TOOLTIP_PADDING * 2;
+        
+        // Calculate tooltip position (above and to the right of cursor)
+        float tooltipX = mouseX + TOOLTIP_OFFSET_X;
+        float tooltipY = mouseY + TOOLTIP_OFFSET_Y - boxHeight;
+        
+        // Clamp to screen bounds
+        tooltipX = Math.max(0, Math.min(tooltipX, screenWidth - boxWidth));
+        tooltipY = Math.max(0, Math.min(tooltipY, screenHeight - boxHeight));
+        
+        // Register tooltip text
+        int textId = registerText(text, (int)(tooltipX + TOOLTIP_PADDING), (int)(tooltipY + TOOLTIP_PADDING), TEXT_SCALE, 0xFFFFFF);
+        
+        // Encode tooltip data: position and size
+        // Use materialId to encode position (x, y)
+        int encodedPos = ((int)tooltipX & 0xFFFF) | (((int)tooltipY & 0xFFFF) << 16);
+        
+        // Use transformIndex to encode size and text ID
+        int encodedSize = ((int)boxWidth & 0xFFFF) | (((int)boxHeight & 0xFFFF) << 16);
+        
+        // Create command for tooltip
+        DrawCommand cmd = new DrawCommand(
+            -10, // tooltip marker
+            encodedPos, // position
+            textId, // text ID (also used for size lookup via transformIndex pattern)
+            RenderPass.UI
+        );
+        buffer.add(cmd);
+        
+        // Store size info using second command with special encoding
+        DrawCommand sizeCmd = new DrawCommand(
+            -10, // tooltip marker
+            encodedSize, // size
+            textId | 0x80000000, // mark as size info with high bit
+            RenderPass.UI
+        );
+        buffer.add(sizeCmd);
+    }
 }
