@@ -5,10 +5,272 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
- * Tests for ChunkUtils, specifically the isSectionEmpty method
- * that was causing invisible block rendering bugs.
+ * Tests for ChunkUtils coordinate conversions and operations.
  */
 public class ChunkUtilsTest {
+    
+    // === Constants Tests ===
+    
+    @Test
+    public void testConstants() {
+        assertEquals(16, ChunkUtils.CHUNK_WIDTH);
+        assertEquals(16, ChunkUtils.CHUNK_DEPTH);
+        assertEquals(384, ChunkUtils.CHUNK_HEIGHT);
+        assertEquals(16, ChunkUtils.SECTION_HEIGHT);
+        assertEquals(-64, ChunkUtils.MIN_Y);
+        assertEquals(319, ChunkUtils.MAX_Y);
+    }
+    
+    // === Coordinate Conversion Tests ===
+    
+    @Test
+    public void testWorldToChunkX() {
+        assertEquals(0, ChunkUtils.worldToChunkX(0));
+        assertEquals(0, ChunkUtils.worldToChunkX(15));
+        assertEquals(1, ChunkUtils.worldToChunkX(16));
+        assertEquals(1, ChunkUtils.worldToChunkX(31));
+        assertEquals(2, ChunkUtils.worldToChunkX(32));
+        
+        // Negative coordinates
+        assertEquals(-1, ChunkUtils.worldToChunkX(-1));
+        assertEquals(-1, ChunkUtils.worldToChunkX(-16));
+        assertEquals(-2, ChunkUtils.worldToChunkX(-17));
+    }
+    
+    @Test
+    public void testWorldToChunkZ() {
+        assertEquals(0, ChunkUtils.worldToChunkZ(0));
+        assertEquals(0, ChunkUtils.worldToChunkZ(15));
+        assertEquals(1, ChunkUtils.worldToChunkZ(16));
+        assertEquals(1, ChunkUtils.worldToChunkZ(31));
+        
+        // Negative coordinates
+        assertEquals(-1, ChunkUtils.worldToChunkZ(-1));
+        assertEquals(-1, ChunkUtils.worldToChunkZ(-16));
+        assertEquals(-2, ChunkUtils.worldToChunkZ(-17));
+    }
+    
+    @Test
+    public void testChunkToWorldX() {
+        assertEquals(0, ChunkUtils.chunkToWorldX(0));
+        assertEquals(16, ChunkUtils.chunkToWorldX(1));
+        assertEquals(32, ChunkUtils.chunkToWorldX(2));
+        assertEquals(-16, ChunkUtils.chunkToWorldX(-1));
+        assertEquals(-32, ChunkUtils.chunkToWorldX(-2));
+    }
+    
+    @Test
+    public void testChunkToWorldZ() {
+        assertEquals(0, ChunkUtils.chunkToWorldZ(0));
+        assertEquals(16, ChunkUtils.chunkToWorldZ(1));
+        assertEquals(32, ChunkUtils.chunkToWorldZ(2));
+        assertEquals(-16, ChunkUtils.chunkToWorldZ(-1));
+        assertEquals(-32, ChunkUtils.chunkToWorldZ(-2));
+    }
+    
+    @Test
+    public void testWorldToLocalX() {
+        assertEquals(0, ChunkUtils.worldToLocalX(0));
+        assertEquals(15, ChunkUtils.worldToLocalX(15));
+        assertEquals(0, ChunkUtils.worldToLocalX(16));
+        assertEquals(1, ChunkUtils.worldToLocalX(17));
+        assertEquals(5, ChunkUtils.worldToLocalX(37));
+        
+        // Negative coordinates
+        assertEquals(15, ChunkUtils.worldToLocalX(-1));
+        assertEquals(0, ChunkUtils.worldToLocalX(-16));
+        assertEquals(15, ChunkUtils.worldToLocalX(-17));
+    }
+    
+    @Test
+    public void testWorldToLocalZ() {
+        assertEquals(0, ChunkUtils.worldToLocalZ(0));
+        assertEquals(15, ChunkUtils.worldToLocalZ(15));
+        assertEquals(0, ChunkUtils.worldToLocalZ(16));
+        assertEquals(1, ChunkUtils.worldToLocalZ(17));
+        
+        // Negative coordinates
+        assertEquals(15, ChunkUtils.worldToLocalZ(-1));
+        assertEquals(0, ChunkUtils.worldToLocalZ(-16));
+        assertEquals(15, ChunkUtils.worldToLocalZ(-17));
+    }
+    
+    @Test
+    public void testWorldToLocalY() {
+        // Valid range
+        assertEquals(0, ChunkUtils.worldToLocalY(-64));
+        assertEquals(1, ChunkUtils.worldToLocalY(-63));
+        assertEquals(64, ChunkUtils.worldToLocalY(0));
+        assertEquals(319, ChunkUtils.worldToLocalY(255));
+        assertEquals(383, ChunkUtils.worldToLocalY(319));
+        
+        // Out of bounds
+        assertEquals(-1, ChunkUtils.worldToLocalY(-65));
+        assertEquals(-1, ChunkUtils.worldToLocalY(320));
+        assertEquals(-1, ChunkUtils.worldToLocalY(400));
+    }
+    
+    @Test
+    public void testLocalToWorldY() {
+        assertEquals(-64, ChunkUtils.localToWorldY(0));
+        assertEquals(-63, ChunkUtils.localToWorldY(1));
+        assertEquals(0, ChunkUtils.localToWorldY(64));
+        assertEquals(255, ChunkUtils.localToWorldY(319));
+        assertEquals(319, ChunkUtils.localToWorldY(383));
+    }
+    
+    @Test
+    public void testWorldYRoundTrip() {
+        // Test that converting world Y to local and back gives the same value
+        for (int worldY = -64; worldY <= 319; worldY++) {
+            int localY = ChunkUtils.worldToLocalY(worldY);
+            assertEquals(worldY, ChunkUtils.localToWorldY(localY), 
+                "Round trip failed for world Y: " + worldY);
+        }
+    }
+    
+    // === Section Calculation Tests ===
+    
+    @Test
+    public void testGetSectionIndex() {
+        assertEquals(0, ChunkUtils.getSectionIndex(0));
+        assertEquals(0, ChunkUtils.getSectionIndex(15));
+        assertEquals(1, ChunkUtils.getSectionIndex(16));
+        assertEquals(1, ChunkUtils.getSectionIndex(31));
+        assertEquals(2, ChunkUtils.getSectionIndex(32));
+        assertEquals(23, ChunkUtils.getSectionIndex(383));
+    }
+    
+    @Test
+    public void testGetSectionLocalY() {
+        assertEquals(0, ChunkUtils.getSectionLocalY(0));
+        assertEquals(15, ChunkUtils.getSectionLocalY(15));
+        assertEquals(0, ChunkUtils.getSectionLocalY(16));
+        assertEquals(1, ChunkUtils.getSectionLocalY(17));
+        assertEquals(5, ChunkUtils.getSectionLocalY(37));
+        assertEquals(15, ChunkUtils.getSectionLocalY(383));
+    }
+    
+    @Test
+    public void testWorldYToSectionIndex() {
+        // Valid range
+        assertEquals(0, ChunkUtils.worldYToSectionIndex(-64));
+        assertEquals(0, ChunkUtils.worldYToSectionIndex(-49));
+        assertEquals(1, ChunkUtils.worldYToSectionIndex(-48));
+        assertEquals(4, ChunkUtils.worldYToSectionIndex(0));
+        assertEquals(23, ChunkUtils.worldYToSectionIndex(319));
+        
+        // Out of bounds
+        assertEquals(-1, ChunkUtils.worldYToSectionIndex(-65));
+        assertEquals(-1, ChunkUtils.worldYToSectionIndex(320));
+    }
+    
+    // === Validation Tests ===
+    
+    @Test
+    public void testIsValidWorldY() {
+        assertTrue(ChunkUtils.isValidWorldY(-64));
+        assertTrue(ChunkUtils.isValidWorldY(-63));
+        assertTrue(ChunkUtils.isValidWorldY(0));
+        assertTrue(ChunkUtils.isValidWorldY(255));
+        assertTrue(ChunkUtils.isValidWorldY(319));
+        
+        assertFalse(ChunkUtils.isValidWorldY(-65));
+        assertFalse(ChunkUtils.isValidWorldY(320));
+        assertFalse(ChunkUtils.isValidWorldY(-1000));
+        assertFalse(ChunkUtils.isValidWorldY(1000));
+    }
+    
+    @Test
+    public void testIsValidLocalCoords() {
+        // Valid coordinates
+        assertTrue(ChunkUtils.isValidLocalCoords(0, 0, 0));
+        assertTrue(ChunkUtils.isValidLocalCoords(15, 383, 15));
+        assertTrue(ChunkUtils.isValidLocalCoords(8, 200, 8));
+        
+        // Invalid X
+        assertFalse(ChunkUtils.isValidLocalCoords(-1, 0, 0));
+        assertFalse(ChunkUtils.isValidLocalCoords(16, 0, 0));
+        
+        // Invalid Y
+        assertFalse(ChunkUtils.isValidLocalCoords(0, -1, 0));
+        assertFalse(ChunkUtils.isValidLocalCoords(0, 384, 0));
+        
+        // Invalid Z
+        assertFalse(ChunkUtils.isValidLocalCoords(0, 0, -1));
+        assertFalse(ChunkUtils.isValidLocalCoords(0, 0, 16));
+    }
+    
+    // === Chunk Key Tests ===
+    
+    @Test
+    public void testChunkKey() {
+        long key1 = ChunkUtils.chunkKey(0, 0);
+        long key2 = ChunkUtils.chunkKey(1, 0);
+        long key3 = ChunkUtils.chunkKey(0, 1);
+        long key4 = ChunkUtils.chunkKey(1, 1);
+        
+        // Keys should be unique
+        assertNotEquals(key1, key2);
+        assertNotEquals(key1, key3);
+        assertNotEquals(key1, key4);
+        assertNotEquals(key2, key3);
+        assertNotEquals(key2, key4);
+        assertNotEquals(key3, key4);
+    }
+    
+    @Test
+    public void testChunkKeyWithNegativeCoordinates() {
+        long key1 = ChunkUtils.chunkKey(-1, 0);
+        long key2 = ChunkUtils.chunkKey(-2, 0);
+        long key3 = ChunkUtils.chunkKey(0, 0);
+        
+        // Keys should be unique
+        assertNotEquals(key1, key2);
+        assertNotEquals(key1, key3);
+        assertNotEquals(key2, key3);
+        
+        // Same coordinates should produce same key
+        assertEquals(key1, ChunkUtils.chunkKey(-1, 0));
+    }
+    
+    @Test
+    public void testChunkXFromKey() {
+        assertEquals(0, ChunkUtils.chunkXFromKey(ChunkUtils.chunkKey(0, 0)));
+        assertEquals(1, ChunkUtils.chunkXFromKey(ChunkUtils.chunkKey(1, 0)));
+        assertEquals(100, ChunkUtils.chunkXFromKey(ChunkUtils.chunkKey(100, 50)));
+        assertEquals(-1, ChunkUtils.chunkXFromKey(ChunkUtils.chunkKey(-1, 0)));
+        assertEquals(-100, ChunkUtils.chunkXFromKey(ChunkUtils.chunkKey(-100, 50)));
+    }
+    
+    @Test
+    public void testChunkZFromKey() {
+        assertEquals(0, ChunkUtils.chunkZFromKey(ChunkUtils.chunkKey(0, 0)));
+        assertEquals(1, ChunkUtils.chunkZFromKey(ChunkUtils.chunkKey(0, 1)));
+        assertEquals(50, ChunkUtils.chunkZFromKey(ChunkUtils.chunkKey(100, 50)));
+        assertEquals(-1, ChunkUtils.chunkZFromKey(ChunkUtils.chunkKey(0, -1)));
+        assertEquals(-50, ChunkUtils.chunkZFromKey(ChunkUtils.chunkKey(100, -50)));
+    }
+    
+    @Test
+    public void testChunkKeyRoundTrip() {
+        // Test that creating a key and extracting coordinates gives back original values
+        int[][] testCases = {
+            {0, 0}, {1, 1}, {-1, -1}, {100, 50}, {-100, -50},
+            {Integer.MAX_VALUE / 2, Integer.MAX_VALUE / 2},
+            {Integer.MIN_VALUE / 2, Integer.MIN_VALUE / 2}
+        };
+        
+        for (int[] coords : testCases) {
+            long key = ChunkUtils.chunkKey(coords[0], coords[1]);
+            assertEquals(coords[0], ChunkUtils.chunkXFromKey(key), 
+                "X coordinate round trip failed for " + coords[0] + ", " + coords[1]);
+            assertEquals(coords[1], ChunkUtils.chunkZFromKey(key), 
+                "Z coordinate round trip failed for " + coords[0] + ", " + coords[1]);
+        }
+    }
+    
+    // === Section Empty Tests (existing) ===
     
     @Test
     public void testIsSectionEmptyWithFullyEmptySection() {
@@ -97,21 +359,5 @@ public class ChunkUtilsTest {
                 }
             }
         }
-    }
-    
-    @Test
-    public void testChunkKeyWithNegativeCoordinates() {
-        // Test chunk key generation with negative coordinates
-        long key1 = ChunkUtils.chunkKey(-1, 0);
-        long key2 = ChunkUtils.chunkKey(-2, 0);
-        long key3 = ChunkUtils.chunkKey(0, 0);
-        
-        // Keys should be unique
-        assertNotEquals(key1, key2, "Different chunk coordinates should produce different keys");
-        assertNotEquals(key1, key3, "Different chunk coordinates should produce different keys");
-        assertNotEquals(key2, key3, "Different chunk coordinates should produce different keys");
-        
-        // Same coordinates should produce same key
-        assertEquals(key1, ChunkUtils.chunkKey(-1, 0), "Same coordinates should produce same key");
     }
 }

@@ -1,6 +1,8 @@
 package mattmc.world.level.block;
 
 import mattmc.client.Minecraft;
+import mattmc.util.MathUtils;
+import mattmc.util.Validate;
 
 import java.util.Collections;
 import java.util.HashMap;
@@ -82,12 +84,8 @@ public class Blocks {
      * @return The registered Block with identifier set
      */
     private static Block register(String name, Block block) {
-        if (name == null) {
-            throw new NullPointerException("Block name cannot be null");
-        }
-        if (block == null) {
-            throw new NullPointerException("Block cannot be null");
-        }
+        Validate.notNull(name, "Block name cannot be null");
+        Validate.notNull(block, "Block cannot be null");
         String identifier = DEFAULT_NAMESPACE + ":" + name;
         if (REGISTRY.containsKey(identifier)) {
             throw new IllegalStateException("Block with identifier '" + identifier + "' is already registered!");
@@ -98,25 +96,25 @@ public class Blocks {
         if (block instanceof StairsBlock) {
             registeredBlock = new StairsBlock(identifier);
         } else if (block instanceof WallTorchBlock) {
-            int lightEmission = Math.max(block.getLightEmissionR(), Math.max(block.getLightEmissionG(), block.getLightEmissionB()));
+            int lightEmission = MathUtils.max(block.getLightEmissionR(), MathUtils.max(block.getLightEmissionG(), block.getLightEmissionB()));
             registeredBlock = new WallTorchBlock(block.isSolid(), 
                 lightEmission,
                 block.getLightEmissionR(), block.getLightEmissionG(), block.getLightEmissionB(), 
                 identifier);
         } else if (block instanceof TorchBlock) {
-            int lightEmission = Math.max(block.getLightEmissionR(), Math.max(block.getLightEmissionG(), block.getLightEmissionB()));
+            int lightEmission = MathUtils.max(block.getLightEmissionR(), MathUtils.max(block.getLightEmissionG(), block.getLightEmissionB()));
             registeredBlock = new TorchBlock(block.isSolid(), 
                 lightEmission,
                 block.getLightEmissionR(), block.getLightEmissionG(), block.getLightEmissionB(), 
                 identifier);
         } else if (block instanceof RotatedPillarBlock) {
-            int lightEmission = Math.max(block.getLightEmissionR(), Math.max(block.getLightEmissionG(), block.getLightEmissionB()));
+            int lightEmission = MathUtils.max(block.getLightEmissionR(), MathUtils.max(block.getLightEmissionG(), block.getLightEmissionB()));
             registeredBlock = new RotatedPillarBlock(block.isSolid(), 
                 lightEmission,
                 block.getLightEmissionR(), block.getLightEmissionG(), block.getLightEmissionB(), 
                 identifier);
         } else {
-            int lightEmission = Math.max(block.getLightEmissionR(), Math.max(block.getLightEmissionG(), block.getLightEmissionB()));
+            int lightEmission = MathUtils.max(block.getLightEmissionR(), MathUtils.max(block.getLightEmissionG(), block.getLightEmissionB()));
             registeredBlock = new Block(block.isSolid(), 
                 lightEmission,
                 block.getLightEmissionR(), block.getLightEmissionG(), block.getLightEmissionB(), 
@@ -137,40 +135,35 @@ public class Blocks {
      * @throws NullPointerException if identifier or block is null
      */
     public static Block registerBlock(String identifier, Block block) {
-        if (identifier == null) {
-            throw new NullPointerException("Block identifier cannot be null");
-        }
-        if (block == null) {
-            throw new NullPointerException("Block cannot be null");
-        }
-        if (REGISTRY.containsKey(identifier)) {
-            throw new IllegalArgumentException("Block with identifier '" + identifier + "' is already registered!");
-        }
+        Validate.notNull(identifier, "Block identifier cannot be null");
+        Validate.notNull(block, "Block cannot be null");
+        Validate.isFalse(REGISTRY.containsKey(identifier), 
+            "Block with identifier '" + identifier + "' is already registered!");
         
         // Create a new block instance with the identifier set
         Block registeredBlock;
         if (block instanceof StairsBlock) {
             registeredBlock = new StairsBlock(identifier);
         } else if (block instanceof WallTorchBlock) {
-            int lightEmission = Math.max(block.getLightEmissionR(), Math.max(block.getLightEmissionG(), block.getLightEmissionB()));
+            int lightEmission = MathUtils.max(block.getLightEmissionR(), MathUtils.max(block.getLightEmissionG(), block.getLightEmissionB()));
             registeredBlock = new WallTorchBlock(block.isSolid(), 
                 lightEmission,
                 block.getLightEmissionR(), block.getLightEmissionG(), block.getLightEmissionB(), 
                 identifier);
         } else if (block instanceof TorchBlock) {
-            int lightEmission = Math.max(block.getLightEmissionR(), Math.max(block.getLightEmissionG(), block.getLightEmissionB()));
+            int lightEmission = MathUtils.max(block.getLightEmissionR(), MathUtils.max(block.getLightEmissionG(), block.getLightEmissionB()));
             registeredBlock = new TorchBlock(block.isSolid(), 
                 lightEmission,
                 block.getLightEmissionR(), block.getLightEmissionG(), block.getLightEmissionB(), 
                 identifier);
         } else if (block instanceof RotatedPillarBlock) {
-            int lightEmission = Math.max(block.getLightEmissionR(), Math.max(block.getLightEmissionG(), block.getLightEmissionB()));
+            int lightEmission = MathUtils.max(block.getLightEmissionR(), MathUtils.max(block.getLightEmissionG(), block.getLightEmissionB()));
             registeredBlock = new RotatedPillarBlock(block.isSolid(), 
                 lightEmission,
                 block.getLightEmissionR(), block.getLightEmissionG(), block.getLightEmissionB(), 
                 identifier);
         } else {
-            int lightEmission = Math.max(block.getLightEmissionR(), Math.max(block.getLightEmissionG(), block.getLightEmissionB()));
+            int lightEmission = MathUtils.max(block.getLightEmissionR(), MathUtils.max(block.getLightEmissionG(), block.getLightEmissionB()));
             registeredBlock = new Block(block.isSolid(), 
                 lightEmission,
                 block.getLightEmissionR(), block.getLightEmissionG(), block.getLightEmissionB(), 
@@ -188,9 +181,7 @@ public class Blocks {
      * @throws NullPointerException if identifier is null
      */
     public static Block getBlock(String identifier) {
-        if (identifier == null) {
-            throw new NullPointerException("Block identifier cannot be null");
-        }
+        Validate.notNull(identifier, "Block identifier cannot be null");
         return REGISTRY.get(identifier);
     }
     
@@ -202,9 +193,7 @@ public class Blocks {
      * @throws NullPointerException if identifier is null
      */
     public static boolean isRegistered(String identifier) {
-        if (identifier == null) {
-            throw new NullPointerException("Block identifier cannot be null");
-        }
+        Validate.notNull(identifier, "Block identifier cannot be null");
         return REGISTRY.containsKey(identifier);
     }
     

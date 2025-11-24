@@ -1,6 +1,7 @@
 package mattmc.world.level.lighting;
 
 import mattmc.world.level.block.Block;
+import mattmc.world.level.chunk.ChunkUtils;
 import mattmc.world.level.chunk.LevelChunk;
 
 /**
@@ -49,11 +50,11 @@ public class SkylightInitializer {
 		
 		// Set skylight values based on heightmap
 		for (int y = 0; y < LevelChunk.HEIGHT; y++) {
-			int worldY = LevelChunk.chunkYToWorldY(y);
+			int worldY = ChunkUtils.localToWorldY(y);
 			
 			// If heightmap is MIN_Y, there are no opaque blocks, so all blocks get full skylight
 			// Otherwise, blocks above the heightmap get full skylight, blocks at/below get none
-			if (heightmapY == LevelChunk.MIN_Y || worldY > heightmapY) {
+			if (heightmapY == ChunkUtils.MIN_Y || worldY > heightmapY) {
 				// Above the heightmap (or no opaque blocks) - full skylight
 				chunk.setSkyLight(x, y, z, 15);
 			} else {
@@ -83,12 +84,12 @@ public class SkylightInitializer {
 			// Check if this block is opaque (blocks light)
 			if (block.getOpacity() > 0) {
 				// Found the topmost opaque block - return its world Y
-				return LevelChunk.chunkYToWorldY(y);
+				return ChunkUtils.localToWorldY(y);
 			}
 		}
 		
 		// No opaque blocks found in this column - return minimum Y
-		return LevelChunk.MIN_Y;
+		return ChunkUtils.MIN_Y;
 	}
 	
 	/**

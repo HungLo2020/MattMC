@@ -1,8 +1,8 @@
 package mattmc.client.main;
 
 import mattmc.client.Minecraft;
-import mattmc.client.Window;
-import mattmc.client.gui.screens.TitleScreen;
+import mattmc.client.renderer.backend.opengl.Window;
+import mattmc.client.renderer.backend.opengl.gui.screens.TitleScreen;
 import mattmc.util.AppPaths;
 import mattmc.client.settings.KeybindManager;
 import mattmc.client.settings.OptionsManager;

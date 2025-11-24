@@ -15,6 +15,7 @@ import mattmc.world.level.chunk.AsyncChunkLoader;
 import mattmc.world.level.chunk.AsyncChunkSaver;
 import mattmc.world.level.chunk.ChunkUtils;
 import mattmc.world.level.levelgen.WorldGenerator;
+import mattmc.util.MathUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -419,7 +420,7 @@ public class Level implements LevelAccessor {
      * Set the render distance in chunks.
      */
     public void setRenderDistance(int distance) {
-        this.renderDistance = Math.max(2, Math.min(distance, 32));
+        this.renderDistance = MathUtils.clamp(distance, 2, 32);
     }
     
     /**

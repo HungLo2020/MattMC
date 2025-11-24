@@ -1,18 +1,14 @@
 package mattmc.client.gui.screens.inventory;
 
-import mattmc.client.Window;
+import mattmc.client.renderer.backend.opengl.Window;
+import mattmc.client.util.CoordinateUtils;
 import mattmc.world.item.Inventory;
 import mattmc.world.item.Item;
 import mattmc.world.item.ItemStack;
-import org.lwjgl.system.MemoryStack;
+import mattmc.util.MathUtils;
 
-import java.nio.IntBuffer;
 import java.util.ArrayList;
 import java.util.List;
-
-import static org.lwjgl.glfw.GLFW.glfwGetFramebufferSize;
-import static org.lwjgl.glfw.GLFW.glfwGetWindowSize;
-import static org.lwjgl.system.MemoryStack.stackPush;
 
 /**
  * Manages creative mode item selection and scrolling.
@@ -55,7 +51,7 @@ public class CreativeInventoryManager {
             // Scroll down (negative yoffset) = increase row to show later items
             // Scroll up (positive yoffset) = decrease row to show earlier items
             scrollRow += (int) -yoffset;
-            scrollRow = Math.max(0, Math.min(scrollRow, maxScrollRow));
+            scrollRow = MathUtils.clamp(scrollRow, 0, maxScrollRow);
         }
     }
     
@@ -68,17 +64,9 @@ public class CreativeInventoryManager {
      */
     public int findClickedCreativeItem(double mouseXWin, double mouseYWin, Window window) {
         // Get mouse position in framebuffer coordinates
-        float mouseFBX, mouseFBY;
-        try (MemoryStack stack = stackPush()) {
-            IntBuffer winW = stack.mallocInt(1), winH = stack.mallocInt(1);
-            IntBuffer fbW  = stack.mallocInt(1), fbH  = stack.mallocInt(1);
-            glfwGetWindowSize(window.handle(), winW, winH);
-            glfwGetFramebufferSize(window.handle(), fbW, fbH);
-            float sx = fbW.get(0) / Math.max(1f, winW.get(0));
-            float sy = fbH.get(0) / Math.max(1f, winH.get(0));
-            mouseFBX = (float) mouseXWin * sx;
-            mouseFBY = (float) mouseYWin * sy;
-        }
+        CoordinateUtils.Point2D fbCoords = CoordinateUtils.windowToFramebuffer(
+            window.handle(), mouseXWin, mouseYWin
+        );
         
         // Calculate creative inventory position
         int w = window.width(), h = window.height();
@@ -99,8 +87,8 @@ public class CreativeInventoryManager {
                 float slotY = startY + row * slotSpacing;
                 
                 // Check if mouse is within this slot
-                if (mouseFBX >= slotX && mouseFBX < slotX + slotSpacing &&
-                    mouseFBY >= slotY && mouseFBY < slotY + slotSpacing) {
+                if (fbCoords.x >= slotX && fbCoords.x < slotX + slotSpacing &&
+                    fbCoords.y >= slotY && fbCoords.y < slotY + slotSpacing) {
                     int itemIndex = (scrollRow + row) * CREATIVE_COLS + col;
                     return itemIndex;
                 }

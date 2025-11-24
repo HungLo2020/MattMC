@@ -1,10 +1,11 @@
 package mattmc.world.level.block;
 
 import mattmc.client.Minecraft;
-import mattmc.client.renderer.texture.Texture;
+import mattmc.client.renderer.backend.opengl.Texture;
 
 import mattmc.client.resources.ResourceManager;
 import mattmc.world.phys.shapes.VoxelShape;
+import mattmc.util.MathUtils;
 
 import java.util.Map;
 
@@ -75,10 +76,10 @@ public class Block {
      */
     public Block(boolean solid, int lightEmission, int lightEmissionR, int lightEmissionG, int lightEmissionB) {
         this.solid = solid;
-        this.lightEmission = Math.max(0, Math.min(15, lightEmission));
-        this.lightEmissionR = Math.max(0, Math.min(15, lightEmissionR));
-        this.lightEmissionG = Math.max(0, Math.min(15, lightEmissionG));
-        this.lightEmissionB = Math.max(0, Math.min(15, lightEmissionB));
+        this.lightEmission = MathUtils.clamp(lightEmission, 0, 15);
+        this.lightEmissionR = MathUtils.clamp(lightEmissionR, 0, 15);
+        this.lightEmissionG = MathUtils.clamp(lightEmissionG, 0, 15);
+        this.lightEmissionB = MathUtils.clamp(lightEmissionB, 0, 15);
         this.identifier = null; // Will be set during registration
     }
     
@@ -87,10 +88,10 @@ public class Block {
      */
     Block(boolean solid, int lightEmission, int lightEmissionR, int lightEmissionG, int lightEmissionB, String identifier) {
         this.solid = solid;
-        this.lightEmission = Math.max(0, Math.min(15, lightEmission));
-        this.lightEmissionR = Math.max(0, Math.min(15, lightEmissionR));
-        this.lightEmissionG = Math.max(0, Math.min(15, lightEmissionG));
-        this.lightEmissionB = Math.max(0, Math.min(15, lightEmissionB));
+        this.lightEmission = MathUtils.clamp(lightEmission, 0, 15);
+        this.lightEmissionR = MathUtils.clamp(lightEmissionR, 0, 15);
+        this.lightEmissionG = MathUtils.clamp(lightEmissionG, 0, 15);
+        this.lightEmissionB = MathUtils.clamp(lightEmissionB, 0, 15);
         this.identifier = identifier;
     }
     

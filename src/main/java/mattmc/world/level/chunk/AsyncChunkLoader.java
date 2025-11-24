@@ -4,7 +4,7 @@ import mattmc.client.renderer.chunk.ChunkMeshData;
 import mattmc.client.renderer.chunk.ChunkMeshBuffer;
 import mattmc.client.renderer.chunk.MeshBuilder;
 import mattmc.client.renderer.chunk.VertexLightSampler;
-import mattmc.client.renderer.texture.TextureAtlas;
+import mattmc.client.renderer.backend.opengl.TextureAtlas;
 import mattmc.client.renderer.block.BlockFaceCollector;
 import mattmc.world.level.block.Block;
 import mattmc.world.level.block.Blocks;
@@ -489,7 +489,7 @@ public class AsyncChunkLoader {
                         if (block.isAir()) continue;
                         
                         float wx = x;
-                        float wy = LevelChunk.chunkYToWorldY(y);
+                        float wy = ChunkUtils.localToWorldY(y);
                         float wz = z;
                         
                         collector.collectBlockFaces(wx, wy, wz, block, chunk, x, y, z);
