@@ -1,5 +1,6 @@
 package mattmc.client.renderer.backend.opengl;
 
+import mattmc.client.renderer.texture.TextureCoordinateProvider;
 import mattmc.client.settings.OptionsManager;
 import mattmc.world.level.block.Block;
 import mattmc.world.level.block.Blocks;
@@ -23,6 +24,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
+ * OpenGL implementation of texture coordinate provider using texture atlas.
  * Runtime texture atlas builder for block textures.
  * Packs all block textures into a single atlas at game startup,
  * enabling VBO rendering with multiple textures.
@@ -30,28 +32,14 @@ import org.slf4j.LoggerFactory;
  * Similar to modern Minecraft's texture atlas system.
  * Implements AutoCloseable to ensure OpenGL resources are properly released.
  */
-public class TextureAtlas implements AutoCloseable {
+public class TextureAtlas implements TextureCoordinateProvider, AutoCloseable {
     private static final Logger logger = LoggerFactory.getLogger(TextureAtlas.class);
 
     private final int atlasTextureId;
     private final int atlasWidth;
     private final int atlasHeight;
     private final int textureSize = 16; // Standard Minecraft texture size
-    private final Map<String, UVMapping> uvMappings = new HashMap<>();
-    
-    /**
-     * UV coordinates for a texture in the atlas.
-     */
-    public static class UVMapping {
-        public final float u0, v0, u1, v1;
-        
-        public UVMapping(float u0, float v0, float u1, float v1) {
-            this.u0 = u0;
-            this.v0 = v0;
-            this.u1 = u1;
-            this.v1 = v1;
-        }
-    }
+    private final Map<String, TextureCoordinateProvider.UVMapping> uvMappings = new HashMap<>();
     
     /**
      * Build the texture atlas from all registered blocks.
@@ -122,7 +110,7 @@ public class TextureAtlas implements AutoCloseable {
                     float u1 = (float) (x + textureSize) / atlasWidth;
                     float v1 = (float) (y + textureSize) / atlasHeight;
                     
-                    uvMappings.put(texturePath, new UVMapping(u0, v0, u1, v1));
+                    uvMappings.put(texturePath, new TextureCoordinateProvider.UVMapping(u0, v0, u1, v1));
                     
                     // logger.info("  Packed: {} at ({},{}) UV: {},{} -> {},{}", texturePath, x, y, u0, v0, u1, v1);
                 } else {
