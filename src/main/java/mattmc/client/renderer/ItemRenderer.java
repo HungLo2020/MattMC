@@ -529,8 +529,9 @@ public class ItemRenderer {
     
     /**
      * Render a fallback magenta square when texture is missing.
+     * Package-private for backend access.
      */
-    private static void renderFallbackItem(float x, float y, float size) {
+    static void renderFallbackItem(float x, float y, float size) {
         glColor4f(1f, 0f, 1f, 1f); // Magenta
         
         // Match the scale of flat items (which matches isometric block items)
@@ -580,6 +581,32 @@ public class ItemRenderer {
             }
         }
         TEXTURE_CACHE.clear();
+    }
+    
+    /**
+     * Render an item using the backend architecture (Stage 4).
+     * This method uses ItemRenderLogic to build commands and submits them to the backend.
+     * 
+     * @param stack the item stack to render
+     * @param x screen X position
+     * @param y screen Y position
+     * @param size size of the item
+     * @param backend the render backend to use
+     */
+    public static void render(ItemStack stack, float x, float y, float size, RenderBackend backend) {
+        if (stack == null || backend == null) {
+            return;
+        }
+        
+        // Use ItemRenderLogic to build commands
+        ItemRenderLogic logic = new ItemRenderLogic();
+        CommandBuffer buffer = new CommandBuffer();
+        logic.buildItemCommand(stack, x, y, size, buffer);
+        
+        // Submit commands to backend
+        for (DrawCommand cmd : buffer.getCommands()) {
+            backend.submit(cmd);
+        }
     }
     
     /**

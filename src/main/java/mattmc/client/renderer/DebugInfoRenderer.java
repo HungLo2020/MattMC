@@ -11,12 +11,62 @@ import static org.lwjgl.opengl.GL11.*;
  */
 public class DebugInfoRenderer {
     
+    // Backend support (Stage 4)
+    private RenderBackend backend = null;
+    
+    /**
+     * Set the render backend to use for rendering (Stage 4).
+     * 
+     * @param backend the backend to use, or null to use legacy rendering
+     */
+    public void setBackend(RenderBackend backend) {
+        this.backend = backend;
+    }
+    
     /**
      * Draw debug information in the top-left corner.
      */
     public void render(int screenWidth, int screenHeight, float playerX, float playerY, float playerZ, 
                        float yaw, float pitch, float roll, double fps, 
                        int loadedChunks, int pendingChunks, int activeWorkers, int renderedChunks, int culledChunks) {
+        UIRenderHelper.setup2DProjection(screenWidth, screenHeight);
+        
+        // Use backend if available (Stage 4)
+        if (backend != null) {
+            // Build and submit commands via backend
+            UIRenderLogic logic = new UIRenderLogic();
+            CommandBuffer buffer = new CommandBuffer();
+            
+            // Clear text registry for this frame
+            UIRenderLogic.clearTextRegistry();
+            
+            // Build debug info commands
+            logic.buildDebugInfoCommands(screenWidth, screenHeight, 
+                playerX, playerY, playerZ, yaw, pitch, roll, fps,
+                loadedChunks, pendingChunks, activeWorkers, renderedChunks, culledChunks,
+                buffer);
+            
+            // Submit to backend
+            for (DrawCommand cmd : buffer.getCommands()) {
+                backend.submit(cmd);
+            }
+        } else {
+            // Legacy rendering path
+            renderLegacy(screenWidth, screenHeight, playerX, playerY, playerZ,
+                yaw, pitch, roll, fps, loadedChunks, pendingChunks, activeWorkers,
+                renderedChunks, culledChunks);
+        }
+        
+        UIRenderHelper.restore2DProjection();
+    }
+    
+    /**
+     * Legacy rendering path (before backend).
+     */
+    private void renderLegacy(int screenWidth, int screenHeight, float playerX, float playerY, float playerZ,
+                             float yaw, float pitch, float roll, double fps,
+                             int loadedChunks, int pendingChunks, int activeWorkers,
+                             int renderedChunks, int culledChunks) {
         // Calculate chunk position from player position
         int chunkX = Math.floorDiv((int)playerX, LevelChunk.WIDTH);
         int chunkZ = Math.floorDiv((int)playerZ, LevelChunk.DEPTH);
@@ -24,8 +74,6 @@ public class DebugInfoRenderer {
         // Calculate region position from chunk position
         int regionX = Math.floorDiv(chunkX, Region.REGION_SIZE);
         int regionZ = Math.floorDiv(chunkZ, Region.REGION_SIZE);
-        
-        UIRenderHelper.setup2DProjection(screenWidth, screenHeight);
         
         // Draw debug text in top-left corner
         float x = 10f;
@@ -69,8 +117,6 @@ public class DebugInfoRenderer {
         // Frustum culling stats
         String renderText = String.format("Rendered: %d | Culled: %d", renderedChunks, culledChunks);
         UIRenderHelper.drawText(renderText, x, y + lineHeight * 8, scale, 0xFFFFFF);
-        
-        UIRenderHelper.restore2DProjection();
     }
     
     /**

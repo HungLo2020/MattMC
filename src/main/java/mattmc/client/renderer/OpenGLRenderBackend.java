@@ -174,6 +174,13 @@ public class OpenGLRenderBackend implements RenderBackend {
             throw new NullPointerException("DrawCommand cannot be null");
         }
         
+        // Stage 4: Handle UI render pass differently from OPAQUE/TRANSPARENT
+        if (cmd.pass == RenderPass.UI) {
+            submitUICommand(cmd);
+            return;
+        }
+        
+        // Original 3D mesh rendering for OPAQUE, TRANSPARENT, SHADOW passes
         // Look up resources
         ChunkVAO vao = meshRegistry.get(cmd.meshId);
         MaterialInfo material = materialRegistry.get(cmd.materialId);
@@ -231,6 +238,209 @@ public class OpenGLRenderBackend implements RenderBackend {
         
         // Restore transformation
         glPopMatrix();
+    }
+    
+    /**
+     * Handle UI render pass commands (Stage 4).
+     * UI commands use a simplified rendering path for 2D elements.
+     * 
+     * @param cmd the UI draw command
+     */
+    private void submitUICommand(DrawCommand cmd) {
+        // Handle different UI element types based on meshId:
+        // -1 = crosshair
+        // -2 to -5 = items (fallback, cube, stairs, flat)
+        // -6 = hotbar (background/selection)
+        // -7 = debug info text
+        // -8 = command UI (overlay/feedback)
+        // -9 = system info text
+        // -10 = tooltip
+        
+        if (cmd.meshId == -1) {
+            // Crosshair rendering
+            submitCrosshairCommand(cmd);
+        } else if (cmd.meshId <= -2 && cmd.meshId >= -5) {
+            // Item rendering
+            submitItemCommand(cmd);
+        } else if (cmd.meshId == -6) {
+            // Hotbar rendering
+            submitHotbarCommand(cmd);
+        } else if (cmd.meshId == -7) {
+            // Debug info text
+            submitDebugTextCommand(cmd);
+        } else if (cmd.meshId == -8) {
+            // Command UI
+            submitCommandUICommand(cmd);
+        } else if (cmd.meshId == -9) {
+            // System info text
+            submitSystemInfoCommand(cmd);
+        } else if (cmd.meshId == -10) {
+            // Tooltip
+            submitTooltipCommand(cmd);
+        }
+    }
+    
+    /**
+     * Render a crosshair command.
+     */
+    private void submitCrosshairCommand(DrawCommand cmd) {
+        // Decode crosshair data from materialId
+        boolean horizontal = (cmd.materialId & 1) == 1;
+        int centerX = (cmd.materialId >> 1) & 0xFFF;
+        int centerY = (cmd.materialId >> 13) & 0xFFF;
+        int size = (cmd.materialId >> 25) & 0xFF;
+        
+        // Render the crosshair quad using immediate mode
+        if (horizontal) {
+            float thickness = 2f;
+            glColor4f(1f, 1f, 1f, 1f);
+            glBegin(GL_QUADS);
+            glVertex2f(centerX - size/2f, centerY - thickness/2);
+            glVertex2f(centerX + size/2f, centerY - thickness/2);
+            glVertex2f(centerX + size/2f, centerY + thickness/2);
+            glVertex2f(centerX - size/2f, centerY + thickness/2);
+            glEnd();
+        } else {
+            float thickness = 2f;
+            glColor4f(1f, 1f, 1f, 1f);
+            glBegin(GL_QUADS);
+            glVertex2f(centerX - thickness/2, centerY - size/2f);
+            glVertex2f(centerX + thickness/2, centerY - size/2f);
+            glVertex2f(centerX + thickness/2, centerY + size/2f);
+            glVertex2f(centerX - thickness/2, centerY + size/2f);
+            glEnd();
+        }
+    }
+    
+    /**
+     * Render an item command.
+     * Looks up the item from ItemRenderLogic registry and delegates to ItemRenderer.
+     */
+    private void submitItemCommand(DrawCommand cmd) {
+        // Get item info from registry using transformIndex as the item ID
+        ItemRenderLogic.ItemStackRenderInfo itemInfo = ItemRenderLogic.getItemInfo(cmd.transformIndex);
+        
+        if (itemInfo == null) {
+            logger.warn("Item info not found for transformIndex: {}", cmd.transformIndex);
+            return;
+        }
+        
+        // Render based on meshId type
+        switch (cmd.meshId) {
+            case -2:
+                // Fallback item (magenta square)
+                ItemRenderer.renderFallbackItem(itemInfo.x, itemInfo.y, itemInfo.size);
+                break;
+            case -3:
+            case -4:
+            case -5:
+                // Delegate to ItemRenderer's existing rendering methods
+                // Use the standard rendering path which handles all item types
+                ItemRenderer.renderItem(itemInfo.stack, itemInfo.x, itemInfo.y, itemInfo.size);
+                break;
+        }
+    }
+    
+    /**
+     * Render a hotbar command (background or selection).
+     */
+    private void submitHotbarCommand(DrawCommand cmd) {
+        // Decode hotbar data from materialId
+        int type = cmd.materialId & 0x3; // 0=background, 1=selection
+        int x = (cmd.materialId >> 2) & 0xFFF;
+        int y = (cmd.materialId >> 14) & 0xFFF;
+        int width = (cmd.materialId >> 26) & 0x3F;
+        // Height not encoded - calculate from type
+        int height = (type == 0) ? 22 * 3 : 24 * 3; // 22 or 24 pixels * HOTBAR_SCALE(3)
+        
+        // Load textures using HotbarRenderer's texture paths
+        String texturePath = (type == 0) ? 
+            "/assets/textures/gui/sprites/hud/hotbar.png" :
+            "/assets/textures/gui/sprites/hud/hotbar_selection.png";
+        
+        mattmc.client.renderer.texture.Texture texture = 
+            mattmc.client.renderer.texture.Texture.load(texturePath);
+        
+        if (texture != null) {
+            glEnable(GL_TEXTURE_2D);
+            texture.bind();
+            glColor4f(1f, 1f, 1f, 1f);
+            
+            glBegin(GL_QUADS);
+            glTexCoord2f(0, 1); glVertex2f(x, y);
+            glTexCoord2f(1, 1); glVertex2f(x + width, y);
+            glTexCoord2f(1, 0); glVertex2f(x + width, y + height);
+            glTexCoord2f(0, 0); glVertex2f(x, y + height);
+            glEnd();
+            
+            glDisable(GL_TEXTURE_2D);
+        }
+    }
+    
+    /**
+     * Render a debug info text command.
+     */
+    private void submitDebugTextCommand(DrawCommand cmd) {
+        // Get text info from registry
+        UIRenderLogic.TextRenderInfo textInfo = UIRenderLogic.getTextInfo(cmd.transformIndex);
+        
+        if (textInfo == null) {
+            logger.warn("Text info not found for transformIndex: {}", cmd.transformIndex);
+            return;
+        }
+        
+        // Delegate to UIRenderHelper for text rendering
+        UIRenderHelper.drawText(textInfo.text, textInfo.x, textInfo.y, textInfo.scale, textInfo.color);
+    }
+    
+    /**
+     * Render a command UI command (overlay or feedback).
+     */
+    private void submitCommandUICommand(DrawCommand cmd) {
+        // Decode command UI data
+        int type = cmd.materialId & 0x3; // 0=overlay, 1=feedback
+        int x = (cmd.materialId >> 2) & 0xFFF;
+        int y = (cmd.materialId >> 14) & 0xFFF;
+        int width = (cmd.materialId >> 26) & 0x3F;
+        
+        // Get text info from registry
+        UIRenderLogic.TextRenderInfo textInfo = UIRenderLogic.getTextInfo(cmd.transformIndex);
+        
+        if (type == 0) {
+            // Command overlay - draw box and text
+            int boxHeight = 50;
+            
+            // Draw semi-transparent background
+            UIRenderHelper.setColor(0x000000, 0.7f);
+            UIRenderHelper.fillRect(x, y, width, boxHeight);
+            
+            // Draw border
+            UIRenderHelper.setColor(0xFFFFFF, 1.0f);
+            glBegin(GL_LINE_LOOP);
+            glVertex2f(x, y);
+            glVertex2f(x + width, y);
+            glVertex2f(x + width, y + boxHeight);
+            glVertex2f(x, y + boxHeight);
+            glEnd();
+            
+            // Draw text
+            if (textInfo != null) {
+                UIRenderHelper.drawText(textInfo.text, textInfo.x, textInfo.y, textInfo.scale, textInfo.color);
+            }
+        } else {
+            // Command feedback - draw background and text
+            int padding = 8;
+            int bgHeight = (int)(16 * 1.2f) + padding * 2;
+            
+            // Draw background
+            UIRenderHelper.setColor(0x000000, 0.6f);
+            UIRenderHelper.fillRect(x, y, width, bgHeight);
+            
+            // Draw text
+            if (textInfo != null) {
+                UIRenderHelper.drawText(textInfo.text, textInfo.x, textInfo.y, textInfo.scale, textInfo.color);
+            }
+        }
     }
     
     @Override
@@ -321,5 +531,127 @@ public class OpenGLRenderBackend implements RenderBackend {
      */
     public boolean hasTransform(int transformIndex) {
         return transformRegistry.containsKey(transformIndex);
+    }
+    
+    // ===== Stage 4: UI/2D Rendering Support =====
+    
+    /**
+     * Information about a 2D quad for UI rendering.
+     * Used for rendering UI elements like hotbar, crosshair, etc.
+     * 
+     * @since Stage 4
+     */
+    private static class UIQuadInfo {
+        final float x, y, width, height;
+        final int textureId;
+        
+        UIQuadInfo(float x, float y, float width, float height, int textureId) {
+            this.x = x;
+            this.y = y;
+            this.width = width;
+            this.height = height;
+            this.textureId = textureId;
+        }
+    }
+    
+    // UI quad registry for 2D elements
+    private final Map<Integer, UIQuadInfo> uiQuadRegistry = new HashMap<>();
+    
+    /**
+     * Register a UI quad for 2D rendering.
+     * 
+     * @param quadId unique ID for this quad
+     * @param x screen X position
+     * @param y screen Y position
+     * @param width quad width
+     * @param height quad height
+     * @param textureId OpenGL texture ID
+     */
+    public void registerUIQuad(int quadId, float x, float y, float width, float height, int textureId) {
+        uiQuadRegistry.put(quadId, new UIQuadInfo(x, y, width, height, textureId));
+    }
+    
+    /**
+     * Unregister a UI quad.
+     * 
+     * @param quadId the quad ID to remove
+     * @return the quad info that was removed, or null if not found
+     */
+    public UIQuadInfo unregisterUIQuad(int quadId) {
+        return uiQuadRegistry.remove(quadId);
+    }
+    
+    /**
+     * Render a UI quad directly (for Stage 4 UI support).
+     * This method handles 2D quads differently from 3D chunk meshes.
+     * 
+     * @param quadInfo the quad to render
+     */
+    private void renderUIQuad(UIQuadInfo quadInfo) {
+        // Bind texture
+        glBindTexture(GL_TEXTURE_2D, quadInfo.textureId);
+        
+        // Render quad using immediate mode (simple for Stage 4)
+        glBegin(GL_QUADS);
+        glTexCoord2f(0, 1); glVertex2f(quadInfo.x, quadInfo.y);
+        glTexCoord2f(1, 1); glVertex2f(quadInfo.x + quadInfo.width, quadInfo.y);
+        glTexCoord2f(1, 0); glVertex2f(quadInfo.x + quadInfo.width, quadInfo.y + quadInfo.height);
+        glTexCoord2f(0, 0); glVertex2f(quadInfo.x, quadInfo.y + quadInfo.height);
+        glEnd();
+    }
+    
+    /**
+     * Handle system info text rendering.
+     * meshId: -9
+     * materialId: number of lines
+     * transformIndex: first text ID
+     */
+    private void submitSystemInfoCommand(DrawCommand cmd) {
+        int numLines = cmd.materialId;
+        int firstTextId = cmd.transformIndex;
+        
+        // Look up and render all text lines
+        for (int i = 0; i < numLines; i++) {
+            UIRenderLogic.TextRenderInfo textInfo = UIRenderLogic.getTextInfo(firstTextId + i);
+            if (textInfo != null) {
+                // Right-aligned text rendering
+                SystemInfoRenderer.renderSystemInfoLine(textInfo.text, (int)textInfo.x, (int)textInfo.y, textInfo.scale, textInfo.color);
+            }
+        }
+    }
+    
+    /**
+     * Handle tooltip rendering.
+     * meshId: -10
+     * materialId: position (x, y packed)
+     * transformIndex: text ID
+     * 
+     * Tooltips come in pairs: first command has position, second has size
+     */
+    private void submitTooltipCommand(DrawCommand cmd) {
+        // Check if this is size info (high bit set in transformIndex)
+        if ((cmd.transformIndex & 0x80000000) != 0) {
+            // This is the size command, skip it (we'll get size when we need it)
+            return;
+        }
+        
+        // Decode position from materialId
+        int x = cmd.materialId & 0xFFFF;
+        int y = (cmd.materialId >> 16) & 0xFFFF;
+        
+        // Get text info
+        int textId = cmd.transformIndex;
+        UIRenderLogic.TextRenderInfo textInfo = UIRenderLogic.getTextInfo(textId);
+        if (textInfo == null) return;
+        
+        // Approximate size calculation (tooltips need size for blur/border)
+        float TOOLTIP_PADDING = 13.5f;
+        float textWidth = textInfo.text.length() * 8 * textInfo.scale;
+        float textHeight = 16 * textInfo.scale;
+        float boxWidth = textWidth + TOOLTIP_PADDING * 2;
+        float boxHeight = textHeight + TOOLTIP_PADDING * 2;
+        
+        // Render tooltip using TooltipRenderer
+        TooltipRenderer.renderTooltipDirect(textInfo.text, x, y, (int)boxWidth, (int)boxHeight, TOOLTIP_PADDING);
     }
 }
