@@ -35,11 +35,17 @@ public class UIRenderer {
     
     /**
      * Set the render backend for UI rendering (Stage 4).
+     * Propagates the backend to all child renderers.
      * 
      * @param backend the backend to use, or null to use legacy rendering
      */
     public void setBackend(RenderBackend backend) {
         this.backend = backend;
+        // Propagate backend to all child renderers
+        hotbarRenderer.setBackend(backend);
+        commandUIRenderer.setBackend(backend);
+        debugInfoRenderer.setBackend(backend);
+        systemInfoRenderer.setBackend(backend);
     }
     
     /**

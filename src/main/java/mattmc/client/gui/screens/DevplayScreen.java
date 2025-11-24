@@ -148,6 +148,10 @@ public final class DevplayScreen implements Screen {
         this.worldRenderer = new LevelRenderer();
         this.worldRenderer.initWithLevel(this.world);
         this.uiRenderer = new UIRenderer();
+        
+        // Stage 4: Share the render backend between world and UI rendering
+        // This ensures UI elements use the same backend abstraction as chunks
+        this.uiRenderer.setBackend(this.worldRenderer.getRenderBackend());
 
         // Initialize UI state, command system, and input handler
         this.uiState = new DevplayUIState(now());

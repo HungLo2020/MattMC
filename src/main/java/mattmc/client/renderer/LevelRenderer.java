@@ -276,4 +276,14 @@ public class LevelRenderer {
     public int getTotalChunkCount() {
         return chunkLogic.getTotalChunkCount();
     }
+    
+    /**
+     * Get the render backend used by this renderer.
+     * This allows sharing the backend with UI rendering (Stage 4).
+     * 
+     * @return the OpenGL render backend
+     */
+    public OpenGLRenderBackend getRenderBackend() {
+        return renderBackend;
+    }
 }

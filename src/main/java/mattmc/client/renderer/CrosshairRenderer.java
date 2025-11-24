@@ -33,15 +33,8 @@ public class CrosshairRenderer {
      * @param backend the render backend to submit commands to
      */
     public void render(int screenWidth, int screenHeight, RenderBackend backend) {
-        // Setup 2D projection for UI rendering
-        glMatrixMode(GL_PROJECTION);
-        glPushMatrix();
-        glLoadIdentity();
-        glOrtho(0, screenWidth, screenHeight, 0, -1, 1);
-        
-        glMatrixMode(GL_MODELVIEW);
-        glPushMatrix();
-        glLoadIdentity();
+        // Setup 2D projection for UI rendering (infrastructure)
+        UIRenderHelper.setup2DProjection(screenWidth, screenHeight);
         
         // Stage 4: Build commands using logic layer (no GL calls in logic)
         buffer.clear();
@@ -52,11 +45,8 @@ public class CrosshairRenderer {
             backend.submit(cmd);
         }
         
-        // Restore matrices
-        glPopMatrix();
-        glMatrixMode(GL_PROJECTION);
-        glPopMatrix();
-        glMatrixMode(GL_MODELVIEW);
+        // Restore projection (infrastructure)
+        UIRenderHelper.restore2DProjection();
     }
     
     /**
