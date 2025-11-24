@@ -247,38 +247,82 @@ public class OpenGLRenderBackend implements RenderBackend {
      * @param cmd the UI draw command
      */
     private void submitUICommand(DrawCommand cmd) {
-        // For Stage 4, meshId = -1 indicates a crosshair UI element
-        // The materialId encodes position/size data
+        // Handle different UI element types based on meshId:
+        // -1 = crosshair
+        // -2 = fallback item (magenta square)
+        // -3 = isometric cube item
+        // -4 = isometric stairs item
+        // -5 = flat item
+        
         if (cmd.meshId == -1) {
-            // Decode crosshair data from materialId
-            boolean horizontal = (cmd.materialId & 1) == 1;
-            int centerX = (cmd.materialId >> 1) & 0xFFF;
-            int centerY = (cmd.materialId >> 13) & 0xFFF;
-            int size = (cmd.materialId >> 25) & 0xFF;
-            
-            // Render the crosshair quad using immediate mode
-            // (This is a Stage 4 implementation - could be optimized later)
-            if (horizontal) {
-                float thickness = 2f;
-                glColor4f(1f, 1f, 1f, 1f);
-                glBegin(GL_QUADS);
-                glVertex2f(centerX - size/2f, centerY - thickness/2);
-                glVertex2f(centerX + size/2f, centerY - thickness/2);
-                glVertex2f(centerX + size/2f, centerY + thickness/2);
-                glVertex2f(centerX - size/2f, centerY + thickness/2);
-                glEnd();
-            } else {
-                float thickness = 2f;
-                glColor4f(1f, 1f, 1f, 1f);
-                glBegin(GL_QUADS);
-                glVertex2f(centerX - thickness/2, centerY - size/2f);
-                glVertex2f(centerX + thickness/2, centerY - size/2f);
-                glVertex2f(centerX + thickness/2, centerY + size/2f);
-                glVertex2f(centerX - thickness/2, centerY + size/2f);
-                glEnd();
-            }
+            // Crosshair rendering
+            submitCrosshairCommand(cmd);
+        } else if (cmd.meshId <= -2 && cmd.meshId >= -5) {
+            // Item rendering
+            submitItemCommand(cmd);
         }
-        // Future: handle other UI element types (hotbar, etc.)
+        // Future: handle other UI element types (hotbar background, etc.)
+    }
+    
+    /**
+     * Render a crosshair command.
+     */
+    private void submitCrosshairCommand(DrawCommand cmd) {
+        // Decode crosshair data from materialId
+        boolean horizontal = (cmd.materialId & 1) == 1;
+        int centerX = (cmd.materialId >> 1) & 0xFFF;
+        int centerY = (cmd.materialId >> 13) & 0xFFF;
+        int size = (cmd.materialId >> 25) & 0xFF;
+        
+        // Render the crosshair quad using immediate mode
+        if (horizontal) {
+            float thickness = 2f;
+            glColor4f(1f, 1f, 1f, 1f);
+            glBegin(GL_QUADS);
+            glVertex2f(centerX - size/2f, centerY - thickness/2);
+            glVertex2f(centerX + size/2f, centerY - thickness/2);
+            glVertex2f(centerX + size/2f, centerY + thickness/2);
+            glVertex2f(centerX - size/2f, centerY + thickness/2);
+            glEnd();
+        } else {
+            float thickness = 2f;
+            glColor4f(1f, 1f, 1f, 1f);
+            glBegin(GL_QUADS);
+            glVertex2f(centerX - thickness/2, centerY - size/2f);
+            glVertex2f(centerX + thickness/2, centerY - size/2f);
+            glVertex2f(centerX + thickness/2, centerY + size/2f);
+            glVertex2f(centerX - thickness/2, centerY + size/2f);
+            glEnd();
+        }
+    }
+    
+    /**
+     * Render an item command.
+     * Looks up the item from ItemRenderLogic registry and delegates to ItemRenderer.
+     */
+    private void submitItemCommand(DrawCommand cmd) {
+        // Get item info from registry using transformIndex as the item ID
+        ItemRenderLogic.ItemStackRenderInfo itemInfo = ItemRenderLogic.getItemInfo(cmd.transformIndex);
+        
+        if (itemInfo == null) {
+            logger.warn("Item info not found for transformIndex: {}", cmd.transformIndex);
+            return;
+        }
+        
+        // Render based on meshId type
+        switch (cmd.meshId) {
+            case -2:
+                // Fallback item (magenta square)
+                ItemRenderer.renderFallbackItem(itemInfo.x, itemInfo.y, itemInfo.size);
+                break;
+            case -3:
+            case -4:
+            case -5:
+                // Delegate to ItemRenderer's existing rendering methods
+                // Use the standard rendering path which handles all item types
+                ItemRenderer.renderItem(itemInfo.stack, itemInfo.x, itemInfo.y, itemInfo.size);
+                break;
+        }
     }
     
     @Override

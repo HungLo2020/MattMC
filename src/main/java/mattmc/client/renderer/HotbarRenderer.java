@@ -18,6 +18,9 @@ public class HotbarRenderer {
     // Selected hotbar slot (0-8 for slots 1-9)
     private int selectedHotbarSlot = 0;
     
+    // Backend support (Stage 4)
+    private RenderBackend backend = null;
+    
     /**
      * Draw hotbar at the bottom center of the screen.
      * 
@@ -122,14 +125,19 @@ public class HotbarRenderer {
                     float itemX = slotX + 8f * HOTBAR_SCALE;
                     float itemY = slotStartY + 9f * HOTBAR_SCALE;
                     
-                    // Use data-driven rendering with GUI context
-                    ItemRenderer.renderItemWithTransform(
-                        stack, 
-                        mattmc.client.renderer.item.ItemDisplayContext.GUI, 
-                        itemX, 
-                        itemY, 
-                        itemSize
-                    );
+                    // Use backend if available (Stage 4), otherwise legacy rendering
+                    if (backend != null) {
+                        ItemRenderer.render(stack, itemX, itemY, itemSize, backend);
+                    } else {
+                        // Use data-driven rendering with GUI context (legacy)
+                        ItemRenderer.renderItemWithTransform(
+                            stack, 
+                            mattmc.client.renderer.item.ItemDisplayContext.GUI, 
+                            itemX, 
+                            itemY, 
+                            itemSize
+                        );
+                    }
                     
                     // Draw item count in bottom-right of slot if > 1
                     if (stack.getCount() > 1) {
@@ -161,5 +169,15 @@ public class HotbarRenderer {
         if (slot >= 0 && slot <= 8) {
             selectedHotbarSlot = slot;
         }
+    }
+    
+    /**
+     * Set the render backend to use for rendering (Stage 4).
+     * When set, items will be rendered via the backend architecture.
+     * 
+     * @param backend the backend to use, or null to use legacy rendering
+     */
+    public void setBackend(RenderBackend backend) {
+        this.backend = backend;
     }
 }

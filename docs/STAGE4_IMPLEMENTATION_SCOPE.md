@@ -18,30 +18,42 @@ Apply the DrawCommand + RenderBackend pattern to item and UI rendering, same as 
 - [x] Extend OpenGLRenderBackend for 2D quads and UI
 - [x] Add UI quad registry and rendering support
 
-### Component Refactoring - IN PROGRESS
+### Component Refactoring - MAJOR PROGRESS
 - [x] CrosshairRenderer - ✅ REFACTORED to use backend
-- [ ] HotbarRenderer - route through backend
-- [ ] ItemRenderer - route through backend  
+- [x] ItemRenderer - ✅ **REFACTORED to use backend** (NEW!)
+- [x] HotbarRenderer - ✅ Backend support added (uses new architecture for items)
 - [ ] DebugInfoRenderer - route through backend
 - [ ] CommandUIRenderer - route through backend
 - [ ] Other UI renderers as needed
 
-### Testing - IN PROGRESS
+### Testing - MAJOR PROGRESS
 - [x] Tests for UI rendering logic (6 tests in UIRenderLogicTest)
 - [x] Tests for item rendering logic (5 tests in ItemRenderLogicTest)
 - [x] Tests for CrosshairRenderer (5 tests demonstrating pattern)
+- [x] **Tests for ItemRenderer (7 tests)** (NEW!)
 - [ ] Integration tests for more UI components
 
-### Current Status (Latest Commits)
+### Current Status (Latest Commit - MAJOR)
 - ✅ Created UIRenderLogic and ItemRenderLogic classes (logic without GL)
 - ✅ Extended OpenGLRenderBackend with UI quad support
 - ✅ **CrosshairRenderer REFACTORED** to use backend architecture
   - Supports both new backend path and legacy fallback
   - UIRenderer updated to use backend when available
   - 5 new tests demonstrating the pattern
+- ✅ **ItemRenderer REFACTORED** to use backend architecture (NEW!)
+  - Full implementation with item registry for backend access
+  - ItemRenderLogic.buildItemCommand() handles all item types
+  - OpenGLRenderBackend.submitItemCommand() renders items
+  - New ItemRenderer.render() method using backend
+  - Legacy methods preserved for backward compatibility
+  - 7 comprehensive tests covering all item types
+- ✅ **HotbarRenderer updated** for backend integration
+  - Added setBackend() method
+  - Uses backend for item rendering when available
+  - Fallback to legacy if no backend
 - ✅ Backend submit() method extended to handle UI render pass
-- ✅ All 139+ tests pass
-- ⏳ Next: Continue refactoring other UI components (Hotbar, DebugInfo, etc.)
+- ✅ **All 146+ tests pass**
+- ⏳ Next: Continue refactoring other UI components (DebugInfo, CommandUI, etc.)
 
 ## Note on Scope
 Stage 4 as specified involves refactoring ALL item and UI rendering. This is extensive work affecting many files. This document tracks progress through incremental implementation.
