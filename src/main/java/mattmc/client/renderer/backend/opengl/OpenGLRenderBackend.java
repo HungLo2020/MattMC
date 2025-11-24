@@ -630,7 +630,7 @@ public class OpenGLRenderBackend implements RenderBackend {
             UIRenderLogic.TextRenderInfo textInfo = UIRenderLogic.getTextInfo(firstTextId + i);
             if (textInfo != null) {
                 // Right-aligned text rendering
-                SystemInfoRenderer.renderSystemInfoLine(textInfo.text, (int)textInfo.x, (int)textInfo.y, textInfo.scale, textInfo.color);
+                UIRenderHelper.drawTextRightAligned(textInfo.text, (int)textInfo.x, (int)textInfo.y, textInfo.scale, textInfo.color);
             }
         }
     }
