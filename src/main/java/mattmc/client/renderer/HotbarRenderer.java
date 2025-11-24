@@ -86,14 +86,69 @@ public class HotbarRenderer {
         for (DrawCommand cmd : buffer.getCommands()) {
             backend.submit(cmd);
         }
+        
+        // Render items in hotbar slots (within the frame)
+        renderHotbarItems(screenWidth, screenHeight, player);
+        
         backend.endFrame();
         
         // Restore projection (delegated to backend)
         backend.restore2DProjection();
+    }
+    
+    /**
+     * Render items in hotbar slots.
+     * This is a temporary solution using ItemRenderer from backend/opengl.
+     * TODO: Refactor to use backend-agnostic approach with UIRenderLogic
+     * 
+     * @param screenWidth Screen width
+     * @param screenHeight Screen height
+     * @param player The player whose inventory to display
+     */
+    private void renderHotbarItems(int screenWidth, int screenHeight, LocalPlayer player) {
+        if (player == null || player.getInventory() == null) {
+            return;
+        }
         
-        // TODO: Item rendering in hotbar slots needs to be refactored to use backend
-        // For now, this is commented out to maintain backend-agnostic nature
-        // The item rendering logic should also be moved to UIRenderLogic in the future
+        mattmc.world.item.Inventory inventory = player.getInventory();
+        
+        // Constants from original implementation
+        final float HOTBAR_SCALE = 3.0f;
+        
+        // Calculate hotbar position
+        float texWidth = 182 * HOTBAR_SCALE;
+        float texHeight = 22 * HOTBAR_SCALE;
+        float hotbarX = (screenWidth - texWidth) / 2f;
+        float hotbarY = screenHeight - texHeight - 10;
+        
+        // Item size
+        float itemSize = 24f;
+        
+        // Draw each item in the hotbar (slots 0-8)
+        for (int i = 0; i < 9; i++) {
+            mattmc.world.item.ItemStack stack = inventory.getStack(i);
+            if (stack != null && stack.getItem() != null) {
+                // Calculate position for this slot
+                float slotSpacing = 20f * HOTBAR_SCALE;
+                float slotStartX = hotbarX + 3f * HOTBAR_SCALE;
+                float slotStartY = hotbarY + 3f * HOTBAR_SCALE;
+                
+                float slotX = slotStartX + i * slotSpacing;
+                float itemX = slotX + 8f * HOTBAR_SCALE;
+                float itemY = slotStartY + 9f * HOTBAR_SCALE;
+                
+                // Render item using backend
+                mattmc.client.renderer.backend.opengl.ItemRenderer.render(stack, itemX, itemY, itemSize, backend);
+                
+                // Draw item count in bottom-right of slot if > 1
+                if (stack.getCount() > 1) {
+                    String countText = String.valueOf(stack.getCount());
+                    float countX = slotX + slotSpacing - 20;
+                    float countY = slotStartY + 18f * HOTBAR_SCALE - 15;
+                    mattmc.client.renderer.backend.opengl.UIRenderHelper.drawText(countText, countX, countY, 1.0f, 0xFFFFFF);
+                }
+            }
+        }
     }
     
     /**
