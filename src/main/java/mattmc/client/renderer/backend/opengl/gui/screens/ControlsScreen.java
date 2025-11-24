@@ -1,4 +1,4 @@
-package mattmc.client.ui.screens;
+package mattmc.client.renderer.backend.opengl.gui.screens;
 
 import mattmc.client.gui.screens.Screen;
 import mattmc.client.settings.OptionsManager;
@@ -8,7 +8,7 @@ import mattmc.client.Minecraft;
 import mattmc.client.util.CoordinateUtils;
 import mattmc.world.entity.player.PlayerInput;
 import mattmc.client.gui.components.Button;
-import mattmc.client.ui.components.ButtonRenderer;
+import mattmc.client.renderer.backend.opengl.gui.components.ButtonRenderer;
 import mattmc.client.settings.KeybindManager;
 import mattmc.util.MathUtils;
 

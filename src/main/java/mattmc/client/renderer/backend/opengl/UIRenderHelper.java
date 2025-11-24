@@ -1,6 +1,6 @@
 package mattmc.client.renderer.backend.opengl;
 
-import mattmc.client.ui.components.TextRenderer;
+import mattmc.client.renderer.backend.opengl.gui.components.TextRenderer;
 import mattmc.util.ColorUtils;
 import mattmc.client.renderer.backend.opengl.OpenGLColorHelper;
 

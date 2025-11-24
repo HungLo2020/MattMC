@@ -1,4 +1,4 @@
-package mattmc.client.ui.screens;
+package mattmc.client.renderer.backend.opengl.gui.screens;
 
 import mattmc.client.gui.screens.CommandSystem;
 import mattmc.client.gui.screens.DevplayUIState;

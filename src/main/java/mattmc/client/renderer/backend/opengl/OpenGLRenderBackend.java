@@ -665,7 +665,7 @@ public class OpenGLRenderBackend implements RenderBackend {
         // Render tooltip text directly
         float TOOLTIP_PADDING = 13.5f;
         glColor4f(1f, 1f, 1f, 1f);
-        mattmc.client.ui.components.TextRenderer.drawText(
+        mattmc.client.renderer.backend.opengl.gui.components.TextRenderer.drawText(
             textInfo.text, x + TOOLTIP_PADDING, y + TOOLTIP_PADDING, textInfo.scale);
     }
     

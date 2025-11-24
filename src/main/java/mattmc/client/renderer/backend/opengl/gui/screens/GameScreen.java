@@ -1,11 +1,11 @@
-package mattmc.client.ui.screens;
+package mattmc.client.renderer.backend.opengl.gui.screens;
 
 import mattmc.client.gui.screens.Screen;
 import mattmc.client.settings.OptionsManager;
 
 import mattmc.client.Minecraft;
 import mattmc.client.gui.components.Button;
-import mattmc.client.ui.components.ButtonRenderer;
+import mattmc.client.renderer.backend.opengl.gui.components.ButtonRenderer;
 
 /** Game options submenu screen. */
 public final class GameScreen extends AbstractMenuScreen {

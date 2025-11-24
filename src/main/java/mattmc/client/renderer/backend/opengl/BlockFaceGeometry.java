@@ -1,4 +1,4 @@
-package mattmc.client.renderer.block;
+package mattmc.client.renderer.backend.opengl;
 
 import static org.lwjgl.opengl.GL11.*;
 

@@ -1,4 +1,4 @@
-package mattmc.client.ui.components;
+package mattmc.client.renderer.backend.opengl.gui.components;
 
 import mattmc.client.gui.components.Button;
 import mattmc.client.renderer.backend.opengl.Texture;

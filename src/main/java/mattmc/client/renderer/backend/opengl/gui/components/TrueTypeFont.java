@@ -1,4 +1,4 @@
-package mattmc.client.ui.components;
+package mattmc.client.renderer.backend.opengl.gui.components;
 
 import org.lwjgl.BufferUtils;
 import org.lwjgl.stb.STBTTAlignedQuad;
