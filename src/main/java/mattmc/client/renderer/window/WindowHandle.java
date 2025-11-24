@@ -34,4 +34,22 @@ public interface WindowHandle {
      * @return the window height
      */
     int height();
+    
+    /**
+     * Set the window size.
+     * @param width new width in pixels
+     * @param height new height in pixels
+     */
+    void setSize(int width, int height);
+    
+    /**
+     * Set fullscreen mode.
+     * @param fullscreen true to enable fullscreen, false for windowed
+     */
+    void setFullscreen(boolean fullscreen);
+    
+    /**
+     * Apply FPS cap settings (enable/disable VSync based on settings).
+     */
+    void applyFpsCapSetting();
 }

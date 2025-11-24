@@ -381,4 +381,112 @@ public interface RenderBackend {
      * @return height in pixels
      */
     float getTextHeight(String text, float scale);
+    
+    // === Input Callback Methods ===
+    
+    /**
+     * Set cursor position callback for mouse movement.
+     * 
+     * @param windowHandle the native window handle
+     * @param callback the callback to invoke when cursor moves, receives (x, y) coordinates
+     */
+    void setCursorPosCallback(long windowHandle, CursorPosCallback callback);
+    
+    /**
+     * Set mouse button callback for mouse clicks.
+     * 
+     * @param windowHandle the native window handle
+     * @param callback the callback to invoke when mouse button is pressed/released
+     */
+    void setMouseButtonCallback(long windowHandle, MouseButtonCallback callback);
+    
+    /**
+     * Set framebuffer size callback for window resizing.
+     * 
+     * @param windowHandle the native window handle
+     * @param callback the callback to invoke when framebuffer is resized
+     */
+    void setFramebufferSizeCallback(long windowHandle, FramebufferSizeCallback callback);
+    
+    /**
+     * Set keyboard callback for key presses.
+     * 
+     * @param windowHandle the native window handle
+     * @param callback the callback to invoke when a key is pressed/released
+     */
+    void setKeyCallback(long windowHandle, KeyCallback callback);
+    
+    /**
+     * Set character callback for text input.
+     * 
+     * @param windowHandle the native window handle
+     * @param callback the callback to invoke when a character is typed
+     */
+    void setCharCallback(long windowHandle, CharCallback callback);
+    
+    /**
+     * Set scroll callback for mouse wheel scrolling.
+     * 
+     * @param windowHandle the native window handle
+     * @param callback the callback to invoke when scroll wheel is used
+     */
+    void setScrollCallback(long windowHandle, ScrollCallback callback);
+    
+    /**
+     * Update the viewport dimensions.
+     * 
+     * @param x viewport X position
+     * @param y viewport Y position
+     * @param width viewport width
+     * @param height viewport height
+     */
+    void setViewport(int x, int y, int width, int height);
+    
+    // === Callback Interfaces ===
+    
+    @FunctionalInterface
+    interface CursorPosCallback {
+        void invoke(double x, double y);
+    }
+    
+    @FunctionalInterface
+    interface MouseButtonCallback {
+        void invoke(int button, int action, int mods);
+    }
+    
+    @FunctionalInterface
+    interface FramebufferSizeCallback {
+        void invoke(int width, int height);
+    }
+    
+    @FunctionalInterface
+    interface KeyCallback {
+        void invoke(int key, int scancode, int action, int mods);
+    }
+    
+    @FunctionalInterface
+    interface CharCallback {
+        void invoke(int codepoint);
+    }
+    
+    @FunctionalInterface
+    interface ScrollCallback {
+        void invoke(double xoffset, double yoffset);
+    }
+    
+    // === Input Constants ===
+    
+    /** Mouse button left */
+    int MOUSE_BUTTON_LEFT = 0;
+    /** Mouse button right */
+    int MOUSE_BUTTON_RIGHT = 1;
+    /** Mouse button middle */
+    int MOUSE_BUTTON_MIDDLE = 2;
+    
+    /** Key/button action: released */
+    int ACTION_RELEASE = 0;
+    /** Key/button action: pressed */
+    int ACTION_PRESS = 1;
+    /** Key/button action: repeat (held down) */
+    int ACTION_REPEAT = 2;
 }

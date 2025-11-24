@@ -2,7 +2,9 @@ package mattmc.client;
 
 import mattmc.client.settings.OptionsManager;
 import mattmc.client.renderer.window.WindowHandle;
+import mattmc.client.renderer.backend.RenderBackend;
 import mattmc.client.renderer.backend.opengl.Window;
+import mattmc.client.renderer.backend.opengl.OpenGLRenderBackend;
 import mattmc.client.renderer.backend.opengl.CubeMap;
 import mattmc.client.renderer.backend.opengl.PanoramaRenderer;
 import mattmc.client.gui.screens.Screen;
@@ -14,6 +16,7 @@ public final class Minecraft {
     private static final double SLEEP_BUFFER = 0.002;          // 2ms - buffer to avoid oversleeping
     
     private final Window window;
+    private final RenderBackend renderBackend;
     private Screen current;
     private boolean running = true;
     private PanoramaRenderer sharedPanorama;
@@ -21,6 +24,7 @@ public final class Minecraft {
 
     public Minecraft(Window window) { 
         this.window = window;
+        this.renderBackend = new OpenGLRenderBackend();
         // Load shared panorama once
         CubeMap sky = CubeMap.load("/assets/textures/gui/panorama1_", ".png");
         this.sharedPanorama = new PanoramaRenderer(sky);
@@ -34,6 +38,12 @@ public final class Minecraft {
      */
     public WindowHandle window() { return window; }
     public PanoramaRenderer panorama() { return sharedPanorama; }
+    
+    /**
+     * Get the render backend for use by screens and renderers.
+     * Returns the backend-agnostic RenderBackend interface.
+     */
+    public RenderBackend getRenderBackend() { return renderBackend; }
     
     /**
      * Update the cached FPS cap. Call this when the FPS setting changes.

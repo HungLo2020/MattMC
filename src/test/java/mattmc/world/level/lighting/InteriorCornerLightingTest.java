@@ -43,13 +43,12 @@ public class InteriorCornerLightingTest {
 		// Now create a FaceData for the top face of block at (8, 64, 8)
 		// which is at the interior corner
 		BlockFaceCollector.FaceData cornerFace = new BlockFaceCollector.FaceData(
-			8, 64, 8, // world position
+			8f, 64f, 8f, // world position
 			0xFFFFFF, // white color
 			1.0f, // brightness
 			1.0f, // colorBrightness
 			Blocks.STONE, // block
 			"top", // face type
-			null, // renderer (not needed for this test)
 			null, // blockState
 			chunk, // chunk reference
 			8, y, 8 // chunk-local coordinates
@@ -136,7 +135,7 @@ public class InteriorCornerLightingTest {
 		
 		// Create a face for testing
 		BlockFaceCollector.FaceData testFace = new BlockFaceCollector.FaceData(
-			8, 64, 8, 0xFFFFFF, 1.0f, 1.0f, Blocks.STONE, "top", null, null, chunk, 8, y, 8
+			8f, 64f, 8f, 0xFFFFFF, 1.0f, 1.0f, Blocks.STONE, "top", null, chunk, 8, y, 8
 		);
 		
 		VertexLightSampler lightSampler = new VertexLightSampler();
@@ -206,7 +205,7 @@ public class InteriorCornerLightingTest {
 		
 		// Create a face for the bottom (ceiling) of this block
 		BlockFaceCollector.FaceData ceilingFace = new BlockFaceCollector.FaceData(
-			8, 65, 8, 0xFFFFFF, 1.0f, 0.5f, Blocks.STONE, "bottom", null, null, chunk, 8, y, 8
+			8f, 65f, 8f, 0xFFFFFF, 1.0f, 0.5f, Blocks.STONE, "bottom", null, chunk, 8, y, 8
 		);
 		
 		VertexLightSampler lightSampler = new VertexLightSampler();

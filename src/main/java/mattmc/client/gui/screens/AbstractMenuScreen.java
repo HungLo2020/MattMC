@@ -1,27 +1,28 @@
-package mattmc.client.renderer.backend.opengl.gui.screens;
+package mattmc.client.gui.screens;
 
-import mattmc.client.gui.screens.Screen;
 import mattmc.client.Minecraft;
-import mattmc.client.renderer.backend.opengl.Window;
 import mattmc.client.gui.components.Button;
-import mattmc.client.renderer.backend.opengl.gui.components.TextRenderer;
+import mattmc.client.renderer.backend.RenderBackend;
+import mattmc.client.renderer.window.WindowHandle;
 import mattmc.client.util.CoordinateUtils;
-import mattmc.util.ColorUtils;
-import mattmc.client.renderer.backend.opengl.OpenGLColorHelper;
 
 import java.util.ArrayList;
 import java.util.List;
 
-import static org.lwjgl.glfw.GLFW.*;
-import static org.lwjgl.opengl.GL11.*;
-
 /**
  * Abstract base class for menu screens that share common functionality.
  * Provides mouse handling, layout utilities, and rendering helpers.
+ * 
+ * <p>This class is backend-agnostic and uses the {@link RenderBackend} interface
+ * for all rendering operations. No OpenGL-specific code is used.
+ * 
+ * <p><b>Architecture:</b> This class lives outside the backend/ directory and
+ * uses only backend-agnostic interfaces for rendering and input handling.
  */
 public abstract class AbstractMenuScreen implements Screen {
     protected final Minecraft game;
-    protected final Window window;
+    protected final WindowHandle window;
+    protected final RenderBackend backend;
     protected final List<Button> buttons = new ArrayList<>();
     
     // Mouse state
@@ -38,7 +39,8 @@ public abstract class AbstractMenuScreen implements Screen {
     
     protected AbstractMenuScreen(Minecraft game) {
         this.game = game;
-        this.window = (Window) game.window();
+        this.window = game.window();
+        this.backend = game.getRenderBackend();
     }
     
     /**
@@ -75,13 +77,18 @@ public abstract class AbstractMenuScreen implements Screen {
     
     @Override
     public void onOpen() {
-        // Set up callbacks when screen opens
-        glfwSetCursorPosCallback(window.handle(), (h, x, y) -> { mouseXWin = x; mouseYWin = y; });
-        glfwSetMouseButtonCallback(window.handle(), (h, button, action, mods) -> {
-            if (button == GLFW_MOUSE_BUTTON_LEFT) mouseDown = (action == GLFW_PRESS);
+        // Set up callbacks when screen opens using backend-agnostic interface
+        backend.setCursorPosCallback(window.handle(), (x, y) -> { 
+            mouseXWin = x; 
+            mouseYWin = y; 
         });
-        glfwSetFramebufferSizeCallback(window.handle(), (win, newW, newH) -> {
-            glViewport(0, 0, Math.max(newW, 1), Math.max(newH, 1));
+        backend.setMouseButtonCallback(window.handle(), (button, action, mods) -> {
+            if (button == RenderBackend.MOUSE_BUTTON_LEFT) {
+                mouseDown = (action == RenderBackend.ACTION_PRESS);
+            }
+        });
+        backend.setFramebufferSizeCallback(window.handle(), (newW, newH) -> {
+            backend.setViewport(0, 0, Math.max(newW, 1), Math.max(newH, 1));
             recomputeLayout();
         });
     }
@@ -95,37 +102,37 @@ public abstract class AbstractMenuScreen implements Screen {
     
     protected void setupOrtho() {
         int w = window.width(), h = window.height();
-        glMatrixMode(GL_PROJECTION);
-        glLoadIdentity();
-        glOrtho(0, w, h, 0, -1, 1);
-        glMatrixMode(GL_MODELVIEW);
-        glLoadIdentity();
+        backend.setup2DProjection(w, h);
+    }
+    
+    protected void restoreOrtho() {
+        backend.restore2DProjection();
     }
     
     protected void drawTitle(String text, float cx, float cy, float scale, int rgb) {
-        float tw = TextRenderer.getTextWidth(text, scale);
-        float th = TextRenderer.getTextHeight(text, scale);
+        float tw = backend.getTextWidth(text, scale);
+        float th = backend.getTextHeight(text, scale);
         float x = cx - tw / 2f;
         float y = cy - th / 2f;
         drawText(text, x, y, scale, rgb);
     }
     
     protected void drawTextCentered(String text, float cx, float cy, float scale, int rgb) {
-        float tw = TextRenderer.getTextWidth(text, scale);
-        float th = TextRenderer.getTextHeight(text, scale);
+        float tw = backend.getTextWidth(text, scale);
+        float th = backend.getTextHeight(text, scale);
         float x = cx - tw / 2f;
         float y = cy - th / 2f;
         drawText(text, x, y, scale, rgb);
     }
     
     protected void drawTextRight(String text, float rx, float y, float scale, int rgb) {
-        float tw = TextRenderer.getTextWidth(text, scale);
+        float tw = backend.getTextWidth(text, scale);
         float x = rx - tw;
         drawText(text, x, y, scale, rgb);
     }
     
     protected void drawText(String text, float x, float y, float scale, int rgb) {
-        OpenGLColorHelper.setGLColor(rgb, 1f);
-        TextRenderer.drawText(text, x, y, scale);
+        backend.setColor(rgb, 1f);
+        backend.drawText(text, x, y, scale);
     }
 }

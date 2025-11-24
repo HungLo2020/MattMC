@@ -1,5 +1,7 @@
 package mattmc.client.renderer.backend.opengl.gui.screens;
 
+import mattmc.client.gui.screens.AbstractMenuScreen;
+
 import mattmc.client.gui.screens.Screen;
 import mattmc.client.settings.OptionsManager;
 import mattmc.world.level.block.Block;
