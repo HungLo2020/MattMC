@@ -5,7 +5,7 @@ import mattmc.client.settings.OptionsManager;
 
 import mattmc.client.Minecraft;
 import mattmc.client.gui.components.Button;
-import mattmc.client.renderer.backend.opengl.gui.components.ButtonRenderer;
+import mattmc.client.ui.components.ButtonRenderer;
 
 /** Graphics options submenu screen. */
 public final class GraphicsScreen extends AbstractMenuScreen {

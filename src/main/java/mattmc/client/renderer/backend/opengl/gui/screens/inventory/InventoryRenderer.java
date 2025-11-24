@@ -1,7 +1,7 @@
 package mattmc.client.renderer.backend.opengl.gui.screens.inventory;
 
 import mattmc.client.renderer.backend.opengl.ItemRenderer;
-import mattmc.client.renderer.backend.opengl.gui.components.TextRenderer;
+import mattmc.client.ui.components.TextRenderer;
 import mattmc.client.gui.screens.inventory.InventorySlotManager;
 import mattmc.client.gui.screens.inventory.InventorySlot;
 import mattmc.client.gui.screens.inventory.CreativeInventoryManager;
