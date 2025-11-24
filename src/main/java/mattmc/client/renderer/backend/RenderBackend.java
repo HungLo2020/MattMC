@@ -489,4 +489,18 @@ public interface RenderBackend {
     int ACTION_PRESS = 1;
     /** Key/button action: repeat (held down) */
     int ACTION_REPEAT = 2;
+    
+    // === Factory Methods ===
+    
+    /**
+     * Create a panorama renderer for the menu background.
+     * 
+     * <p>The panorama renderer displays a rotating skybox background, typically used
+     * in menu screens. The renderer can optionally apply a blur effect.
+     * 
+     * @param basePath base path for the cubemap textures (without index and extension)
+     * @param extension file extension for the texture files (e.g., ".png")
+     * @return a new panorama renderer instance
+     */
+    mattmc.client.renderer.panorama.PanoramaRenderer createPanoramaRenderer(String basePath, String extension);
 }

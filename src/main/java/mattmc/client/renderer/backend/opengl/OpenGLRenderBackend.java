@@ -908,4 +908,10 @@ public class OpenGLRenderBackend implements RenderBackend {
     public void setViewport(int x, int y, int width, int height) {
         glViewport(x, y, width, height);
     }
+    
+    @Override
+    public mattmc.client.renderer.panorama.PanoramaRenderer createPanoramaRenderer(String basePath, String extension) {
+        CubeMap sky = CubeMap.load(basePath, extension);
+        return new OpenGLPanoramaRenderer(sky);
+    }
 }

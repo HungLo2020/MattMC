@@ -121,5 +121,6 @@ public class TooltipRendererTest {
         @Override public void setCharCallback(long h, CharCallback c) {}
         @Override public void setScrollCallback(long h, ScrollCallback c) {}
         @Override public void setViewport(int x, int y, int w, int h) {}
+        @Override public mattmc.client.renderer.panorama.PanoramaRenderer createPanoramaRenderer(String basePath, String ext) { return null; }
     }
 }

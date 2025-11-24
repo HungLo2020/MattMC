@@ -3,10 +3,9 @@ package mattmc.client;
 import mattmc.client.settings.OptionsManager;
 import mattmc.client.renderer.window.WindowHandle;
 import mattmc.client.renderer.backend.RenderBackend;
+import mattmc.client.renderer.panorama.PanoramaRenderer;
 import mattmc.client.renderer.backend.opengl.Window;
 import mattmc.client.renderer.backend.opengl.OpenGLRenderBackend;
-import mattmc.client.renderer.backend.opengl.CubeMap;
-import mattmc.client.renderer.backend.opengl.PanoramaRenderer;
 import mattmc.client.gui.screens.Screen;
 
 public final class Minecraft {
@@ -25,9 +24,8 @@ public final class Minecraft {
     public Minecraft(Window window) { 
         this.window = window;
         this.renderBackend = new OpenGLRenderBackend();
-        // Load shared panorama once
-        CubeMap sky = CubeMap.load("/assets/textures/gui/panorama1_", ".png");
-        this.sharedPanorama = new PanoramaRenderer(sky);
+        // Load shared panorama through the backend interface
+        this.sharedPanorama = renderBackend.createPanoramaRenderer("/assets/textures/gui/panorama1_", ".png");
         // Cache the FPS cap
         this.cachedFpsCap = OptionsManager.getFpsCap();
     }
