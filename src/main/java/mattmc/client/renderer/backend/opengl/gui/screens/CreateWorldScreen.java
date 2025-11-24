@@ -161,7 +161,7 @@ public final class CreateWorldScreen implements Screen {
 
     private void onClick(String label) {
         if ("Back".equals(label)) {
-            game.setScreen(new SelectWorldScreen(game));
+            game.setScreen(new mattmc.client.gui.screens.SelectWorldScreen(game));
             return;
         }
         if ("Create World".equals(label)) {

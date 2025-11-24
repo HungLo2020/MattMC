@@ -140,12 +140,12 @@ public final class PauseScreen implements Screen {
             
             // Return to title screen
             glfwSetInputMode(window.handle(), GLFW_CURSOR, GLFW_CURSOR_NORMAL);
-            game.setScreen(new TitleScreen(game));
+            game.setScreen(new mattmc.client.gui.screens.TitleScreen(game));
         } catch (IOException e) {
             logger.error("Failed to save world", e);
             // Still exit even if save failed
             glfwSetInputMode(window.handle(), GLFW_CURSOR, GLFW_CURSOR_NORMAL);
-            game.setScreen(new TitleScreen(game));
+            game.setScreen(new mattmc.client.gui.screens.TitleScreen(game));
         }
     }
 

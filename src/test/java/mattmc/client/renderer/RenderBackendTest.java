@@ -92,6 +92,19 @@ public class RenderBackendTest {
         @Override public void drawCenteredText(String t, float x, float y, float s) {}
         @Override public float getTextWidth(String t, float s) { return 0; }
         @Override public float getTextHeight(String t, float s) { return 0; }
+        @Override public void drawButton(mattmc.client.gui.components.Button button) {}
+        @Override public void drawButton(mattmc.client.gui.components.Button button, boolean selected) {}
+        @Override public int loadTexture(String path) { return 0; }
+        @Override public void drawTexture(int textureId, float x, float y, float width, float height) {}
+        @Override public int getTextureWidth(int textureId) { return 0; }
+        @Override public int getTextureHeight(int textureId) { return 0; }
+        @Override public void releaseTexture(int textureId) {}
+        @Override public void pushMatrix() {}
+        @Override public void popMatrix() {}
+        @Override public void translateMatrix(float x, float y, float z) {}
+        @Override public void rotateMatrix(float angle, float x, float y, float z) {}
+        @Override public void setCursorMode(long windowHandle, int mode) {}
+        @Override public void setWindowShouldClose(long windowHandle, boolean shouldClose) {}
         @Override public void setCursorPosCallback(long h, CursorPosCallback c) {}
         @Override public void setMouseButtonCallback(long h, MouseButtonCallback c) {}
         @Override public void setFramebufferSizeCallback(long h, FramebufferSizeCallback c) {}

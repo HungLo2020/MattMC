@@ -1,34 +1,27 @@
-package mattmc.client.renderer.backend.opengl.gui.screens;
-
-import mattmc.client.gui.screens.Screen;
-import mattmc.client.settings.OptionsManager;
+package mattmc.client.gui.screens;
 
 import mattmc.client.Minecraft;
-import mattmc.client.renderer.backend.opengl.Window;
 import mattmc.client.gui.components.Button;
-import mattmc.client.renderer.backend.opengl.gui.components.ButtonRenderer;
-import mattmc.client.renderer.backend.opengl.gui.components.TextRenderer;
+import mattmc.client.renderer.backend.RenderBackend;
+import mattmc.client.renderer.window.WindowHandle;
+import mattmc.client.settings.OptionsManager;
 import mattmc.client.util.CoordinateUtils;
-import mattmc.util.ColorUtils;
-import mattmc.client.renderer.backend.opengl.OpenGLColorHelper;
-import mattmc.world.level.Level;
 import mattmc.world.level.storage.LevelStorageSource;
 
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
-import static org.lwjgl.glfw.GLFW.*;
-import static org.lwjgl.opengl.GL11.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-/* Simple singleplayer menu with buttons to create/load worlds. */
+/** Simple singleplayer menu with buttons to create/load worlds. */
 public final class SelectWorldScreen implements Screen {
     private static final Logger logger = LoggerFactory.getLogger(SelectWorldScreen.class);
 
     private final Minecraft game;
-    private final Window window;
+    private final WindowHandle window;
+    private final RenderBackend backend;
     private final List<Button> buttons = new ArrayList<>();
     private final List<String> worldList = new ArrayList<>();
     private final List<Button> worldButtons = new ArrayList<>();
@@ -45,17 +38,26 @@ public final class SelectWorldScreen implements Screen {
 
     public SelectWorldScreen(Minecraft game) {
         this.game = game;
-        this.window = (Window) game.window();
-
-        glfwSetCursorPosCallback(window.handle(), (h, x, y) -> { mouseXWin = x; mouseYWin = y; });
-        glfwSetMouseButtonCallback(window.handle(), (h, button, action, mods) -> {
-            if (button == GLFW_MOUSE_BUTTON_LEFT) mouseDown = (action == GLFW_PRESS);
-        });
+        this.window = game.window();
+        this.backend = game.getRenderBackend();
 
         recomputeLayout();
-
-        glfwSetFramebufferSizeCallback(window.handle(), (win, newW, newH) -> {
-            glViewport(0, 0, Math.max(newW, 1), Math.max(newH, 1));
+    }
+    
+    @Override
+    public void onOpen() {
+        // Set up callbacks using backend-agnostic interface
+        backend.setCursorPosCallback(window.handle(), (x, y) -> { 
+            mouseXWin = x; 
+            mouseYWin = y; 
+        });
+        backend.setMouseButtonCallback(window.handle(), (button, action, mods) -> {
+            if (button == RenderBackend.MOUSE_BUTTON_LEFT) {
+                mouseDown = (action == RenderBackend.ACTION_PRESS);
+            }
+        });
+        backend.setFramebufferSizeCallback(window.handle(), (newW, newH) -> {
+            backend.setViewport(0, 0, Math.max(newW, 1), Math.max(newH, 1));
             recomputeLayout();
         });
     }
@@ -139,7 +141,8 @@ public final class SelectWorldScreen implements Screen {
         }
         if ("Create New World".equals(label)) {
             logger.info("→ Create World clicked");
-            game.setScreen(new CreateWorldScreen(game));
+            // Use the OpenGL-specific CreateWorldScreen for now (still needs refactoring)
+            game.setScreen(new mattmc.client.renderer.backend.opengl.gui.screens.CreateWorldScreen(game));
             return;
         }
         if ("Play Selected".equals(label)) {
@@ -175,7 +178,8 @@ public final class SelectWorldScreen implements Screen {
             logger.info("→ Loading world: {}", worldName);
             LevelStorageSource.WorldLoadResult result = LevelStorageSource.loadWorld(worldName);
             
-            game.setScreen(new DevplayScreen(game, worldName, result.world,
+            // Use the OpenGL-specific DevplayScreen for now (still needs refactoring)
+            game.setScreen(new mattmc.client.renderer.backend.opengl.gui.screens.DevplayScreen(game, worldName, result.world,
                 result.metadata.playerX, result.metadata.playerY, result.metadata.playerZ,
                 result.metadata.playerYaw, result.metadata.playerPitch, result.metadata.playerInventory));
         } catch (IOException e) {
@@ -200,22 +204,22 @@ public final class SelectWorldScreen implements Screen {
     @Override
     public void render(double alpha) {
         // Render panorama background with blur based on settings
-        boolean blurred = mattmc.client.settings.OptionsManager.isMenuScreenBlurEnabled();
+        boolean blurred = OptionsManager.isMenuScreenBlurEnabled();
         game.panorama().render(window.width(), window.height(), blurred);
 
-        setupOrtho();
+        backend.setup2DProjection(window.width(), window.height());
         
         // Draw world list
         for (int i = 0; i < worldButtons.size(); i++) {
             Button b = worldButtons.get(i);
             boolean selected = i == selectedWorldIndex;
-            ButtonRenderer.drawButton(b, selected);
+            backend.drawButton(b, selected);
             drawTextCentered(b.label, b.x + b.w / 2f, b.y + b.h / 2f, 1.0f, 0xFFFFFF);
         }
         
         // Draw main buttons
         for (var b : buttons) {
-            ButtonRenderer.drawButton(b);
+            backend.drawButton(b);
             drawTextCentered(b.label, b.x + b.w / 2f, b.y + b.h / 2f, 1.2f, 0xFFFFFF);
         }
         
@@ -230,40 +234,27 @@ public final class SelectWorldScreen implements Screen {
         }
     }
 
-    private void setupOrtho() {
-        int w = window.width(), h = window.height();
-        glMatrixMode(GL_PROJECTION);
-        glLoadIdentity();
-        glOrtho(0, w, h, 0, -1, 1);
-        glMatrixMode(GL_MODELVIEW);
-        glLoadIdentity();
-    }
-
-
-
     private void drawTitle(String text, float cx, float cy, float scale, int rgb) {
-        float tw = TextRenderer.getTextWidth(text, scale);
-        float th = TextRenderer.getTextHeight(text, scale);
+        float tw = backend.getTextWidth(text, scale);
+        float th = backend.getTextHeight(text, scale);
         float x = cx - tw / 2f;
         float y = cy - th / 2f;
         drawText(text, x, y, scale, rgb);
     }
 
     private void drawTextCentered(String text, float cx, float cy, float scale, int rgb) {
-        float tw = TextRenderer.getTextWidth(text, scale);
-        float th = TextRenderer.getTextHeight(text, scale);
+        float tw = backend.getTextWidth(text, scale);
+        float th = backend.getTextHeight(text, scale);
         float x = cx - tw / 2f;
         float y = cy - th / 2f;
         drawText(text, x, y, scale, rgb);
     }
 
     private void drawText(String text, float x, float y, float scale, int rgb) {
-        OpenGLColorHelper.setGLColor(rgb, 1f);
-        TextRenderer.drawText(text, x, y, scale);
+        backend.setColor(rgb, 1f);
+        backend.drawText(text, x, y, scale);
     }
 
-    @Override
-    public void onOpen() {}
     @Override
     public void onClose() {
         // Panorama is now shared and managed by Minecraft

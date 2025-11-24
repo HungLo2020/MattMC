@@ -382,6 +382,120 @@ public interface RenderBackend {
      */
     float getTextHeight(String text, float scale);
     
+    // === Button Rendering ===
+    
+    /**
+     * Draw a button widget at its current position.
+     * 
+     * <p>The button appearance changes based on its hover state.
+     * 
+     * @param button the button to render
+     */
+    void drawButton(mattmc.client.gui.components.Button button);
+    
+    /**
+     * Draw a button widget at its current position with optional selection state.
+     * 
+     * <p>The button appearance changes based on hover and selection state.
+     * 
+     * @param button the button to render
+     * @param selected whether the button is selected/clicked
+     */
+    void drawButton(mattmc.client.gui.components.Button button, boolean selected);
+    
+    // === Texture/Image Rendering ===
+    
+    /**
+     * Load a texture resource (if not already loaded) and return its ID.
+     * 
+     * @param path resource path to the texture
+     * @return texture ID for use with other methods
+     */
+    int loadTexture(String path);
+    
+    /**
+     * Draw a texture at the specified position with scaling.
+     * 
+     * @param textureId texture ID from loadTexture
+     * @param x X position (left edge)
+     * @param y Y position (top edge)
+     * @param width target width
+     * @param height target height
+     */
+    void drawTexture(int textureId, float x, float y, float width, float height);
+    
+    /**
+     * Get the native width of a loaded texture.
+     * 
+     * @param textureId texture ID from loadTexture
+     * @return width in pixels
+     */
+    int getTextureWidth(int textureId);
+    
+    /**
+     * Get the native height of a loaded texture.
+     * 
+     * @param textureId texture ID from loadTexture
+     * @return height in pixels
+     */
+    int getTextureHeight(int textureId);
+    
+    /**
+     * Release a texture resource.
+     * 
+     * @param textureId texture ID from loadTexture
+     */
+    void releaseTexture(int textureId);
+    
+    // === Matrix Operations ===
+    
+    /**
+     * Push the current matrix state onto the stack.
+     */
+    void pushMatrix();
+    
+    /**
+     * Pop the matrix state from the stack.
+     */
+    void popMatrix();
+    
+    /**
+     * Translate (move) the current matrix.
+     * 
+     * @param x translation in X
+     * @param y translation in Y
+     * @param z translation in Z
+     */
+    void translateMatrix(float x, float y, float z);
+    
+    /**
+     * Rotate the current matrix around an axis.
+     * 
+     * @param angle rotation angle in degrees
+     * @param x X component of rotation axis
+     * @param y Y component of rotation axis
+     * @param z Z component of rotation axis
+     */
+    void rotateMatrix(float angle, float x, float y, float z);
+    
+    // === Window Control ===
+    
+    /**
+     * Set the cursor input mode.
+     * 
+     * @param windowHandle the native window handle
+     * @param mode cursor mode (CURSOR_NORMAL, CURSOR_DISABLED, etc.)
+     */
+    void setCursorMode(long windowHandle, int mode);
+    
+    /**
+     * Set whether the window should close.
+     * 
+     * @param windowHandle the native window handle
+     * @param shouldClose true to signal window should close
+     */
+    void setWindowShouldClose(long windowHandle, boolean shouldClose);
+    
     // === Input Callback Methods ===
     
     /**
@@ -489,6 +603,20 @@ public interface RenderBackend {
     int ACTION_PRESS = 1;
     /** Key/button action: repeat (held down) */
     int ACTION_REPEAT = 2;
+    
+    // === Cursor Mode Constants ===
+    
+    /** Normal cursor mode (visible and not captured) */
+    int CURSOR_NORMAL = 0x00034001; // GLFW_CURSOR_NORMAL
+    /** Hidden cursor mode */
+    int CURSOR_HIDDEN = 0x00034002; // GLFW_CURSOR_HIDDEN
+    /** Disabled cursor mode (captured and invisible, used for FPS controls) */
+    int CURSOR_DISABLED = 0x00034003; // GLFW_CURSOR_DISABLED
+    
+    // === Key Constants ===
+    
+    /** Escape key */
+    int KEY_ESCAPE = 256;
     
     // === Factory Methods ===
     

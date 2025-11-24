@@ -909,6 +909,126 @@ public class OpenGLRenderBackend implements RenderBackend {
         glViewport(x, y, width, height);
     }
     
+    // === Button Rendering ===
+    
+    @Override
+    public void drawButton(mattmc.client.gui.components.Button button) {
+        mattmc.client.renderer.backend.opengl.gui.components.ButtonRenderer.drawButton(button);
+    }
+    
+    @Override
+    public void drawButton(mattmc.client.gui.components.Button button, boolean selected) {
+        mattmc.client.renderer.backend.opengl.gui.components.ButtonRenderer.drawButton(button, selected);
+    }
+    
+    // === Texture Management ===
+    
+    // Cache of loaded textures: path -> Texture
+    private final Map<String, Texture> textureCache = new HashMap<>();
+    // Reverse map: texture ID -> path (for cleanup)
+    private final Map<Integer, String> textureIdToPath = new HashMap<>();
+    
+    @Override
+    public int loadTexture(String path) {
+        Texture tex = textureCache.get(path);
+        if (tex == null) {
+            tex = Texture.load(path);
+            textureCache.put(path, tex);
+            textureIdToPath.put(tex.id, path);
+        }
+        return tex.id;
+    }
+    
+    @Override
+    public void drawTexture(int textureId, float x, float y, float width, float height) {
+        glEnable(GL_TEXTURE_2D);
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        
+        glBindTexture(GL_TEXTURE_2D, textureId);
+        glColor4f(1f, 1f, 1f, 1f);
+        
+        // Note: Textures are loaded with vertical flip, so we flip the V coordinates
+        glBegin(GL_QUADS);
+        glTexCoord2f(0, 1); glVertex2f(x, y);
+        glTexCoord2f(1, 1); glVertex2f(x + width, y);
+        glTexCoord2f(1, 0); glVertex2f(x + width, y + height);
+        glTexCoord2f(0, 0); glVertex2f(x, y + height);
+        glEnd();
+        
+        glDisable(GL_BLEND);
+        glDisable(GL_TEXTURE_2D);
+    }
+    
+    @Override
+    public int getTextureWidth(int textureId) {
+        String path = textureIdToPath.get(textureId);
+        if (path != null) {
+            Texture tex = textureCache.get(path);
+            if (tex != null) {
+                return tex.width;
+            }
+        }
+        return 0;
+    }
+    
+    @Override
+    public int getTextureHeight(int textureId) {
+        String path = textureIdToPath.get(textureId);
+        if (path != null) {
+            Texture tex = textureCache.get(path);
+            if (tex != null) {
+                return tex.height;
+            }
+        }
+        return 0;
+    }
+    
+    @Override
+    public void releaseTexture(int textureId) {
+        String path = textureIdToPath.remove(textureId);
+        if (path != null) {
+            Texture tex = textureCache.remove(path);
+            if (tex != null) {
+                tex.close();
+            }
+        }
+    }
+    
+    // === Matrix Operations ===
+    
+    @Override
+    public void pushMatrix() {
+        glPushMatrix();
+    }
+    
+    @Override
+    public void popMatrix() {
+        glPopMatrix();
+    }
+    
+    @Override
+    public void translateMatrix(float x, float y, float z) {
+        glTranslatef(x, y, z);
+    }
+    
+    @Override
+    public void rotateMatrix(float angle, float x, float y, float z) {
+        glRotatef(angle, x, y, z);
+    }
+    
+    // === Window Control ===
+    
+    @Override
+    public void setCursorMode(long windowHandle, int mode) {
+        org.lwjgl.glfw.GLFW.glfwSetInputMode(windowHandle, org.lwjgl.glfw.GLFW.GLFW_CURSOR, mode);
+    }
+    
+    @Override
+    public void setWindowShouldClose(long windowHandle, boolean shouldClose) {
+        org.lwjgl.glfw.GLFW.glfwSetWindowShouldClose(windowHandle, shouldClose);
+    }
+    
     @Override
     public mattmc.client.renderer.panorama.PanoramaRenderer createPanoramaRenderer(String basePath, String extension) {
         CubeMap sky = CubeMap.load(basePath, extension);

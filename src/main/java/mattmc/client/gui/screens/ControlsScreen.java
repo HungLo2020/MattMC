@@ -1,24 +1,16 @@
-package mattmc.client.renderer.backend.opengl.gui.screens;
-
-import mattmc.client.gui.screens.AbstractMenuScreen;
-
-import mattmc.client.gui.screens.Screen;
-import mattmc.client.settings.OptionsManager;
-import mattmc.world.level.block.Block;
+package mattmc.client.gui.screens;
 
 import mattmc.client.Minecraft;
-import mattmc.client.util.CoordinateUtils;
-import mattmc.world.entity.player.PlayerInput;
 import mattmc.client.gui.components.Button;
-import mattmc.client.renderer.backend.opengl.gui.components.ButtonRenderer;
+import mattmc.client.renderer.backend.RenderBackend;
 import mattmc.client.settings.KeybindManager;
+import mattmc.client.settings.OptionsManager;
+import mattmc.client.util.CoordinateUtils;
 import mattmc.util.MathUtils;
+import mattmc.world.entity.player.PlayerInput;
 
 import java.util.ArrayList;
 import java.util.List;
-
-import static org.lwjgl.glfw.GLFW.*;
-import static org.lwjgl.opengl.GL11.*;
 
 /** Keybinds configuration screen. */
 public final class ControlsScreen extends AbstractMenuScreen {
@@ -150,7 +142,7 @@ public final class ControlsScreen extends AbstractMenuScreen {
     @Override
     public void render(double alpha) {
         // Render panorama background with blur based on settings
-        boolean blurred = mattmc.client.settings.OptionsManager.isMenuScreenBlurEnabled();
+        boolean blurred = OptionsManager.isMenuScreenBlurEnabled();
         game.panorama().render(window.width(), window.height(), blurred);
 
         setupOrtho();
@@ -172,14 +164,14 @@ public final class ControlsScreen extends AbstractMenuScreen {
                 // Temporarily adjust button Y for rendering
                 int originalY = b.y;
                 b.y = adjustedY;
-                ButtonRenderer.drawButton(b, waiting);
+                backend.drawButton(b, waiting);
                 drawKeybindButtonText(kb, waiting, b);
                 b.y = originalY;
             }
         }
         
         // Draw back button
-        ButtonRenderer.drawButton(backButton);
+        backend.drawButton(backButton);
         drawTextCentered(backButton.label, backButton.x + backButton.w / 2f, backButton.y + backButton.h / 2f, 1.2f, 0xFFFFFF);
     }
 
@@ -195,13 +187,16 @@ public final class ControlsScreen extends AbstractMenuScreen {
 
     @Override
     public void onOpen() {
-        // Set up callbacks when screen opens
-        glfwSetCursorPosCallback(window.handle(), (h, x, y) -> { mouseXWin = x; mouseYWin = y; });
-        glfwSetMouseButtonCallback(window.handle(), (h, button, action, mods) -> {
-            if (button == GLFW_MOUSE_BUTTON_LEFT) {
-                if (action == GLFW_PRESS) {
+        // Set up callbacks when screen opens using backend-agnostic interface
+        backend.setCursorPosCallback(window.handle(), (x, y) -> { 
+            mouseXWin = x; 
+            mouseYWin = y; 
+        });
+        backend.setMouseButtonCallback(window.handle(), (button, action, mods) -> {
+            if (button == RenderBackend.MOUSE_BUTTON_LEFT) {
+                if (action == RenderBackend.ACTION_PRESS) {
                     mouseDown = true;
-                } else if (action == GLFW_RELEASE && waitingForKey != null) {
+                } else if (action == RenderBackend.ACTION_RELEASE && waitingForKey != null) {
                     // Ignore the release from the initial click
                     if (ignoreNextRelease) {
                         ignoreNextRelease = false;
@@ -213,7 +208,7 @@ public final class ControlsScreen extends AbstractMenuScreen {
                     KeybindManager.saveKeybinds();
                     waitingForKey = null;
                 }
-            } else if (waitingForKey != null && action == GLFW_RELEASE) {
+            } else if (waitingForKey != null && action == RenderBackend.ACTION_RELEASE) {
                 // Bind other mouse buttons (non-left clicks)
                 int mouseButton = -(button + 1);
                 PlayerInput.getInstance().setKeybind(waitingForKey, mouseButton);
@@ -223,9 +218,9 @@ public final class ControlsScreen extends AbstractMenuScreen {
         });
         
         // Key callback for binding keys
-        glfwSetKeyCallback(window.handle(), (win, key, scancode, action, mods) -> {
-            if (action == GLFW_PRESS && waitingForKey != null) {
-                if (key == GLFW_KEY_ESCAPE) {
+        backend.setKeyCallback(window.handle(), (key, scancode, action, mods) -> {
+            if (action == RenderBackend.ACTION_PRESS && waitingForKey != null) {
+                if (key == RenderBackend.KEY_ESCAPE) {
                     // Cancel binding
                     waitingForKey = null;
                 } else {
@@ -237,13 +232,13 @@ public final class ControlsScreen extends AbstractMenuScreen {
             }
         });
 
-        glfwSetFramebufferSizeCallback(window.handle(), (win, newW, newH) -> {
-            glViewport(0, 0, Math.max(newW, 1), Math.max(newH, 1));
+        backend.setFramebufferSizeCallback(window.handle(), (newW, newH) -> {
+            backend.setViewport(0, 0, Math.max(newW, 1), Math.max(newH, 1));
             recomputeLayout();
         });
         
         // Scroll callback for mouse wheel scrolling
-        glfwSetScrollCallback(window.handle(), (win, xOffset, yOffset) -> {
+        backend.setScrollCallback(window.handle(), (xOffset, yOffset) -> {
             // yOffset: positive when scrolling up, negative when scrolling down
             // Negate yOffset so scrolling down increases scrollOffset (moves content up)
             int scrollAmount = (int)(-yOffset * SCROLL_SPEED);

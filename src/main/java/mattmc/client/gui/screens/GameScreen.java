@@ -1,15 +1,10 @@
-package mattmc.client.renderer.backend.opengl.gui.screens;
-
-import mattmc.client.gui.screens.AbstractMenuScreen;
-
-import mattmc.client.gui.screens.Screen;
-import mattmc.client.settings.OptionsManager;
+package mattmc.client.gui.screens;
 
 import mattmc.client.Minecraft;
 import mattmc.client.gui.components.Button;
-import mattmc.client.renderer.backend.opengl.gui.components.ButtonRenderer;
+import mattmc.client.settings.OptionsManager;
 
-/** Game options submenu screen. */
+/** Game settings submenu screen. */
 public final class GameScreen extends AbstractMenuScreen {
 
     public GameScreen(Minecraft game) {
@@ -37,17 +32,17 @@ public final class GameScreen extends AbstractMenuScreen {
     }
     
     private String getFpsCapButtonLabel() {
-        int fpsCap = mattmc.client.settings.OptionsManager.getFpsCap();
+        int fpsCap = OptionsManager.getFpsCap();
         return "FPS Cap: " + fpsCap + " (-/+)";
     }
     
     private String getRenderDistanceButtonLabel() {
-        int renderDistance = mattmc.client.settings.OptionsManager.getRenderDistance();
+        int renderDistance = OptionsManager.getRenderDistance();
         return "Render Distance: " + renderDistance + " chunks";
     }
     
     private String getBlockNameDisplayButtonLabel() {
-        boolean enabled = mattmc.client.settings.OptionsManager.isShowBlockNameEnabled();
+        boolean enabled = OptionsManager.isShowBlockNameEnabled();
         return "Block Name Display: " + (enabled ? "ON" : "OFF");
     }
 
@@ -64,7 +59,7 @@ public final class GameScreen extends AbstractMenuScreen {
         }
         if (label.startsWith("FPS Cap:")) {
             // Cycle through common FPS values
-            int current = mattmc.client.settings.OptionsManager.getFpsCap();
+            int current = OptionsManager.getFpsCap();
             int[] commonValues = {30, 60, 75, 120, 144, 165, 240, 360, 999};
             int nextIndex = 0;
             
@@ -81,7 +76,7 @@ public final class GameScreen extends AbstractMenuScreen {
                 nextIndex = 0;
             }
             
-            mattmc.client.settings.OptionsManager.setFpsCap(commonValues[nextIndex]);
+            OptionsManager.setFpsCap(commonValues[nextIndex]);
             window.applyFpsCapSetting();
             game.updateFpsCap();
             recomputeLayout();
@@ -89,8 +84,8 @@ public final class GameScreen extends AbstractMenuScreen {
         }
         if (label.startsWith("Render Distance:")) {
             // Cycle through allowed render distance values
-            int current = mattmc.client.settings.OptionsManager.getRenderDistance();
-            int[] allowedValues = mattmc.client.settings.OptionsManager.ALLOWED_RENDER_DISTANCES;
+            int current = OptionsManager.getRenderDistance();
+            int[] allowedValues = OptionsManager.ALLOWED_RENDER_DISTANCES;
             
             // Find the current or next higher allowed value
             int nextIndex = 0;
@@ -115,13 +110,13 @@ public final class GameScreen extends AbstractMenuScreen {
                 nextIndex = 0;
             }
             
-            mattmc.client.settings.OptionsManager.setRenderDistance(allowedValues[nextIndex]);
+            OptionsManager.setRenderDistance(allowedValues[nextIndex]);
             recomputeLayout();
             return;
         }
         if (label.startsWith("Block Name Display:")) {
             // Toggle block name display
-            mattmc.client.settings.OptionsManager.toggleShowBlockName();
+            OptionsManager.toggleShowBlockName();
             recomputeLayout();
             return;
         }
@@ -130,12 +125,12 @@ public final class GameScreen extends AbstractMenuScreen {
     @Override
     public void render(double alpha) {
         // Render panorama background with blur based on settings
-        boolean blurred = mattmc.client.settings.OptionsManager.isMenuScreenBlurEnabled();
+        boolean blurred = OptionsManager.isMenuScreenBlurEnabled();
         game.panorama().render(window.width(), window.height(), blurred);
 
         setupOrtho();
         for (var b : buttons) {
-            ButtonRenderer.drawButton(b);
+            backend.drawButton(b);
             drawTextCentered(b.label, b.x + b.w / 2f, b.y + b.h / 2f, 1.2f, 0xFFFFFF);
         }
         drawTitle("Game", titleCX, titleCY, titleScale, 0xFFFFFF);

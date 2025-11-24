@@ -1,13 +1,7 @@
-package mattmc.client.renderer.backend.opengl.gui.screens;
-
-import mattmc.client.gui.screens.AbstractMenuScreen;
-
-import mattmc.client.gui.screens.Screen;
-import mattmc.client.settings.OptionsManager;
+package mattmc.client.gui.screens;
 
 import mattmc.client.Minecraft;
 import mattmc.client.gui.components.Button;
-import mattmc.client.renderer.backend.opengl.gui.components.ButtonRenderer;
 
 /** Options menu screen. */
 public final class OptionsScreen extends AbstractMenuScreen {
@@ -74,7 +68,7 @@ public final class OptionsScreen extends AbstractMenuScreen {
 
         setupOrtho();
         for (var b : buttons) {
-            ButtonRenderer.drawButton(b);
+            backend.drawButton(b);
             drawTextCentered(b.label, b.x + b.w / 2f, b.y + b.h / 2f, 1.2f, 0xFFFFFF);
         }
         drawTitle("Options", titleCX, titleCY, titleScale, 0xFFFFFF);

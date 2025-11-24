@@ -1,38 +1,29 @@
-package mattmc.client.renderer.backend.opengl.gui.screens;
-
-import mattmc.client.gui.screens.Screen;
-import mattmc.client.settings.OptionsManager;
+package mattmc.client.gui.screens;
 
 import mattmc.client.Minecraft;
-import mattmc.client.renderer.backend.opengl.Window;
-import mattmc.client.renderer.backend.opengl.Texture;
-import mattmc.client.gui.components.Button;
-import mattmc.client.renderer.backend.opengl.gui.components.ButtonRenderer;
-import mattmc.client.renderer.backend.opengl.gui.components.TextRenderer;
 import mattmc.client.gui.SplashTextLoader;
+import mattmc.client.gui.components.Button;
+import mattmc.client.renderer.backend.RenderBackend;
+import mattmc.client.renderer.window.WindowHandle;
+import mattmc.client.settings.OptionsManager;
 import mattmc.client.util.CoordinateUtils;
-import mattmc.util.ColorUtils;
-import mattmc.client.renderer.backend.opengl.OpenGLColorHelper;
 import mattmc.util.MathUtils;
 
 import java.util.ArrayList;
 import java.util.List;
 
-import static org.lwjgl.glfw.GLFW.*;
-import static org.lwjgl.opengl.GL11.*;
-import static org.lwjgl.opengl.GL13.*;
-
 /** Title screen with a time-based, fluid cubemap panorama and game logic at fixed 20 TPS. */
 public final class TitleScreen implements Screen {
     // Core
     private final Minecraft game;
-    private final Window window;
+    private final WindowHandle window;
+    private final RenderBackend backend;
 
     // UI
     private final List<Button> buttons = new ArrayList<>();
     private double mouseXWin, mouseYWin;
     private boolean mouseDown;
-    private Texture logoTexture;
+    private int logoTextureId = -1;
     private String splashText;
 
     // Fixed 20 TPS logic clock
@@ -56,23 +47,32 @@ public final class TitleScreen implements Screen {
 
     public TitleScreen(Minecraft game) {
         this.game = game;
-        this.window = (Window) game.window();
+        this.window = game.window();
+        this.backend = game.getRenderBackend();
         
         // Load the MattMC logo texture
-        logoTexture = Texture.load("/assets/textures/gui/MattMC.png");
+        logoTextureId = backend.loadTexture("/assets/textures/gui/MattMC.png");
         
         // Load random splash text
         splashText = SplashTextLoader.getRandomSplashText();
 
-        glfwSetCursorPosCallback(window.handle(), (h, x, y) -> { mouseXWin = x; mouseYWin = y; });
-        glfwSetMouseButtonCallback(window.handle(), (h, button, action, mods) -> {
-            if (button == GLFW_MOUSE_BUTTON_LEFT) mouseDown = (action == GLFW_PRESS);
-        });
-
         recomputeLayout();
-
-        glfwSetFramebufferSizeCallback(window.handle(), (win, newW, newH) -> {
-            glViewport(0, 0, Math.max(newW, 1), Math.max(newH, 1));
+    }
+    
+    @Override
+    public void onOpen() {
+        // Set up callbacks using backend-agnostic interface
+        backend.setCursorPosCallback(window.handle(), (x, y) -> { 
+            mouseXWin = x; 
+            mouseYWin = y; 
+        });
+        backend.setMouseButtonCallback(window.handle(), (button, action, mods) -> {
+            if (button == RenderBackend.MOUSE_BUTTON_LEFT) {
+                mouseDown = (action == RenderBackend.ACTION_PRESS);
+            }
+        });
+        backend.setFramebufferSizeCallback(window.handle(), (newW, newH) -> {
+            backend.setViewport(0, 0, Math.max(newW, 1), Math.max(newH, 1));
             recomputeLayout();
         });
     }
@@ -86,7 +86,7 @@ public final class TitleScreen implements Screen {
         subtitleCX = w / 2f;
         subtitleCY = titleCY + 56f;
 
-        int subtitleH = (int)(TextRenderer.getTextHeight("A", subtitleScale));
+        int subtitleH = (int)(backend.getTextHeight("A", subtitleScale));
         int minButtonsTop = (int)(subtitleCY + subtitleH + 24);
 
         int totalButtonsH = 3 * buttonHeight + 2 * buttonGap;
@@ -149,7 +149,7 @@ public final class TitleScreen implements Screen {
             case "Singleplayer" -> game.setScreen(new SelectWorldScreen(game));
             case "Options"      -> game.setScreen(new OptionsScreen(game));
             case "Quit"         -> {
-                glfwSetWindowShouldClose(window.handle(), true);
+                backend.setWindowShouldClose(window.handle(), true);
                 game.quit();
             }
         }
@@ -158,13 +158,13 @@ public final class TitleScreen implements Screen {
     @Override
     public void render(double alpha) {
         // 1) draw rotating cubemap panorama (perspective) - blur based on settings
-        boolean blurred = mattmc.client.settings.OptionsManager.isTitleScreenBlurEnabled();
+        boolean blurred = OptionsManager.isTitleScreenBlurEnabled();
         game.panorama().render(window.width(), window.height(), blurred);
 
         // 2) switch to orthographic for UI and draw
-        setupOrtho();
+        backend.setup2DProjection(window.width(), window.height());
         for (var b : buttons) {
-            ButtonRenderer.drawButton(b);
+            backend.drawButton(b);
             drawTextCentered(b.label, b.x + b.w / 2f, b.y + b.h / 2f, 1.2f, 0xFFFFFF);
         }
         drawLogo();
@@ -172,93 +172,69 @@ public final class TitleScreen implements Screen {
         drawSplashText();
     }
 
-
-
-    private void setupOrtho() {
-        int w = window.width(), h = window.height();
-        glMatrixMode(GL_PROJECTION);
-        glLoadIdentity();
-        glOrtho(0, w, h, 0, -1, 1);
-        glMatrixMode(GL_MODELVIEW);
-        glLoadIdentity();
-    }
-
-
-
     private void drawTitle(String text, float cx, float cy, float scale, int rgb) {
-        float tw = TextRenderer.getTextWidth(text, scale);
-        float th = TextRenderer.getTextHeight(text, scale);
+        float tw = backend.getTextWidth(text, scale);
+        float th = backend.getTextHeight(text, scale);
         float x = cx - tw / 2f;
         float y = cy - th / 2f;
         drawText(text, x, y, scale, rgb);
     }
 
     private void drawTextCentered(String text, float cx, float cy, float scale, int rgb) {
-        float tw = TextRenderer.getTextWidth(text, scale);
-        float th = TextRenderer.getTextHeight(text, scale);
+        float tw = backend.getTextWidth(text, scale);
+        float th = backend.getTextHeight(text, scale);
         float x = cx - tw / 2f;
         float y = cy - th / 2f;
         drawText(text, x, y, scale, rgb);
     }
 
     private void drawText(String text, float x, float y, float scale, int rgb) {
-        OpenGLColorHelper.setGLColor(rgb, 1f);
-        TextRenderer.drawText(text, x, y, scale);
+        backend.setColor(rgb, 1f);
+        backend.drawText(text, x, y, scale);
     }
 
     private void drawLogo() {
-        if (logoTexture == null) return;
+        if (logoTextureId < 0) return;
         
         // Calculate logo dimensions - adaptive scaling based on window size
         // Target width is roughly 60% of screen width for good visibility
         int w = window.width();
+        int logoWidth = backend.getTextureWidth(logoTextureId);
+        int logoHeight = backend.getTextureHeight(logoTextureId);
+        
         float targetWidth = w * 0.6f;
-        float logoScale = targetWidth / logoTexture.width;
+        float logoScale = targetWidth / logoWidth;
         
         // Clamp scale to reasonable bounds
         logoScale = MathUtils.clamp(logoScale, 0.3f, 2.0f);
         
-        float logoWidth = logoTexture.width * logoScale;
-        float logoHeight = logoTexture.height * logoScale;
-        float logoX = titleCX - logoWidth / 2f;
-        float logoY = titleCY - logoHeight / 2f;
+        float scaledWidth = logoWidth * logoScale;
+        float scaledHeight = logoHeight * logoScale;
+        float logoX = titleCX - scaledWidth / 2f;
+        float logoY = titleCY - scaledHeight / 2f;
         
-        // Enable texturing and blending for transparency
-        glEnable(GL_TEXTURE_2D);
-        glEnable(GL_BLEND);
-        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-        
-        logoTexture.bind();
-        glColor4f(1f, 1f, 1f, 1f);
-        
-        // Flip texture coordinates vertically to fix upside-down issue
-        // (Texture loader flips vertically, so we need to flip back for proper display)
-        glBegin(GL_QUADS);
-        glTexCoord2f(0, 1); glVertex2f(logoX, logoY);
-        glTexCoord2f(1, 1); glVertex2f(logoX + logoWidth, logoY);
-        glTexCoord2f(1, 0); glVertex2f(logoX + logoWidth, logoY + logoHeight);
-        glTexCoord2f(0, 0); glVertex2f(logoX, logoY + logoHeight);
-        glEnd();
-        
-        glDisable(GL_BLEND);
-        glDisable(GL_TEXTURE_2D);
+        backend.drawTexture(logoTextureId, logoX, logoY, scaledWidth, scaledHeight);
     }
 
     private void drawSplashText() {
         if (splashText == null || splashText.isEmpty()) return;
+        if (logoTextureId < 0) return;
         
         // Position splash text further to the left from the logo
         // Calculate logo bottom-right position
         int w = window.width();
         int h = window.height();
+        int logoWidth = backend.getTextureWidth(logoTextureId);
+        int logoHeight = backend.getTextureHeight(logoTextureId);
+        
         float targetWidth = w * 0.6f;
-        float logoScale = targetWidth / logoTexture.width;
+        float logoScale = targetWidth / logoWidth;
         logoScale = MathUtils.clamp(logoScale, 0.3f, 2.0f);
         
-        float logoWidth = logoTexture.width * logoScale;
-        float logoHeight = logoTexture.height * logoScale;
-        float logoRight = titleCX + logoWidth / 2f;
-        float logoBottom = titleCY + logoHeight / 2f;
+        float scaledWidth = logoWidth * logoScale;
+        float scaledHeight = logoHeight * logoScale;
+        float logoRight = titleCX + scaledWidth / 2f;
+        float logoBottom = titleCY + scaledHeight / 2f;
         
         // Position splash text with offset from logo - moved left by 1/10 screen width and up by 1/10 screen height
         float splashX = logoRight - 80f - (w * 0.05f); // Left by 1/10 screen width
@@ -272,30 +248,33 @@ public final class TitleScreen implements Screen {
         float animatedScale = baseScale + scaleAmplitude * (float)Math.sin(splashAnimationTime * 1.5 * Math.PI * 0.5);
         
         // Save current matrix state
-        glPushMatrix();
+        backend.pushMatrix();
         
         // Move to the splash text position
-        glTranslatef(splashX, splashY, 0);
+        backend.translateMatrix(splashX, splashY, 0);
         
-        // Rotate -30 degrees (top of text faces top-left corner)
-        glRotatef(-20f, 0, 0, 1);
+        // Rotate -20 degrees (top of text faces top-left corner)
+        backend.rotateMatrix(-20f, 0, 0, 1);
         
         // Center the text on the anchor point by offsetting by half the text width
-        float textWidth = TextRenderer.getTextWidth(splashText, animatedScale);
+        float textWidth = backend.getTextWidth(splashText, animatedScale);
         float offsetX = -textWidth / 2f;
         
         // Draw text centered on the anchor point
         // Draw in yellow color (0xFFFF00)
-        OpenGLColorHelper.setGLColor(0xFFFF00, 1f);
-        TextRenderer.drawText(splashText, offsetX, 0, animatedScale);
+        backend.setColor(0xFFFF00, 1f);
+        backend.drawText(splashText, offsetX, 0, animatedScale);
         
         // Restore matrix state
-        glPopMatrix();
+        backend.popMatrix();
     }
 
     @Override
     public void onClose() {
         // Panorama is now shared and managed by Minecraft, don't close it
-        if (logoTexture != null) { logoTexture.close(); logoTexture = null; }
+        if (logoTextureId >= 0) { 
+            backend.releaseTexture(logoTextureId); 
+            logoTextureId = -1; 
+        }
     }
 }
