@@ -603,12 +603,11 @@ public class ItemRenderer {
         CommandBuffer buffer = new CommandBuffer();
         logic.buildItemCommand(stack, x, y, size, buffer);
         
-        // Submit commands to backend with frame management
-        backend.beginFrame();
+        // Submit commands to backend
+        // Note: Frame management is handled by the caller (e.g. HotbarRenderer)
         for (DrawCommand cmd : buffer.getCommands()) {
             backend.submit(cmd);
         }
-        backend.endFrame();
     }
     
     /**
