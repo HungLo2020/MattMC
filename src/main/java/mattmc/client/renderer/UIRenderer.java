@@ -3,13 +3,13 @@ package mattmc.client.renderer;
 // Backend-agnostic renderers (refactored to be outside backend/)
 import mattmc.client.renderer.CrosshairRenderer;
 import mattmc.client.renderer.HotbarRenderer;
+import mattmc.client.renderer.DebugInfoRenderer;
+import mattmc.client.renderer.CommandUIRenderer;
 
 // Backend interface
 import mattmc.client.renderer.backend.RenderBackend;
 
 // Still OpenGL-specific (TODO: refactor these as well)
-import mattmc.client.renderer.backend.opengl.DebugInfoRenderer;
-import mattmc.client.renderer.backend.opengl.CommandUIRenderer;
 import mattmc.client.renderer.backend.opengl.LightingDebugRenderer;
 import mattmc.client.renderer.backend.opengl.SystemInfoRenderer;
 import mattmc.client.renderer.backend.opengl.BlockNameDisplay;
