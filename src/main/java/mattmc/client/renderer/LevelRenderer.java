@@ -157,7 +157,13 @@ public class LevelRenderer {
      * <p>This method no longer makes direct OpenGL calls for rendering chunks.
      */
     public void render(Level world, float playerX, float playerY, float playerZ) {
-        // Process completed mesh buffers from async loader first
+        // IMPORTANT: Register all chunks FIRST before processing mesh uploads
+        // This ensures chunks are in the registry when uploadMeshBuffer tries to look them up
+        for (LevelChunk chunk : world.getLoadedChunks()) {
+            chunkRenderer.registerChunk(chunk);
+        }
+        
+        // Process completed mesh buffers from async loader
         // This makes newly loaded chunk meshes available for rendering
         List<ChunkMeshBuffer> completedMeshBuffers = world.getAsyncLoader().collectCompletedMeshBuffers();
         for (ChunkMeshBuffer meshBuffer : completedMeshBuffers) {

@@ -192,6 +192,7 @@ public class OpenGLRenderBackend implements RenderBackend {
         
         // Transform is optional for now - if not found, assume identity
         if (transform == null) {
+            logger.warn("Transform ID {} not found in registry, using identity transform", cmd.transformIndex);
             transform = new TransformInfo(0, 0, 0);
         }
         

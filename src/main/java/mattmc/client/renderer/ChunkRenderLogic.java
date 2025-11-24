@@ -106,10 +106,8 @@ public class ChunkRenderLogic {
                 continue;
             }
             
-            // Register chunk for mesh uploads (idempotent operation)
-            chunkRenderer.registerChunk(chunk);
-            
             // Skip chunks without mesh data
+            // Note: chunks are pre-registered in LevelRenderer.render() before buildCommands() is called
             if (!chunkRenderer.hasChunkMesh(chunk)) {
                 culledChunks++;
                 continue;
