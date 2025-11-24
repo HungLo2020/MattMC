@@ -3,7 +3,6 @@ package mattmc.client.renderer;
 import mattmc.client.renderer.backend.DrawCommand;
 import mattmc.client.renderer.backend.RenderBackend;
 import mattmc.client.util.SystemInfo;
-import mattmc.client.renderer.backend.opengl.OpenGLSystemInfo;
 
 /**
  * Backend-agnostic system info renderer.
@@ -83,11 +82,11 @@ public class SystemInfoRenderer {
             cpuInfo = String.format("CPU: %s (%d cores)", cpuName, cpuCores);
         }
         
-        String displayRes = "Display: " + OpenGLSystemInfo.getDisplayResolution(windowHandle);
-        String gpuName = "GPU: " + OpenGLSystemInfo.getGPUName();
+        String displayRes = "Display: " + backend.getDisplayResolution(windowHandle);
+        String gpuName = "GPU: " + backend.getGPUName();
         
-        int gpuUsage = OpenGLSystemInfo.getGPUUsage();
-        String vramUsage = OpenGLSystemInfo.getGPUVRAMUsage();
+        int gpuUsage = backend.getGPUUsage();
+        String vramUsage = backend.getGPUVRAMUsage();
         String gpuUsageInfo;
         if (gpuUsage >= 0 && !vramUsage.equals("N/A")) {
             gpuUsageInfo = String.format("GPU Usage: %d%%, VRAM: %s", gpuUsage, vramUsage);

@@ -178,4 +178,55 @@ public interface RenderBackend {
      * @see #setup2DProjection(int, int)
      */
     void restore2DProjection();
+    
+    /**
+     * Get the display resolution as a formatted string.
+     * 
+     * <p>This method retrieves the current window/display resolution from the backend.
+     * Different backends may query this information differently:
+     * <ul>
+     *   <li><b>OpenGL:</b> Uses GLFW to query window size</li>
+     *   <li><b>Vulkan (future):</b> Would query surface capabilities</li>
+     *   <li><b>Debug:</b> Returns a mock resolution</li>
+     * </ul>
+     * 
+     * @param windowHandle Platform-specific window handle (e.g., GLFW window pointer)
+     * @return Display resolution string (e.g., "1920x1080")
+     */
+    String getDisplayResolution(long windowHandle);
+    
+    /**
+     * Get the graphics processing unit (GPU) name.
+     * 
+     * <p>This method retrieves the name/model of the GPU from the backend.
+     * Different backends query this differently:
+     * <ul>
+     *   <li><b>OpenGL:</b> Uses glGetString(GL_RENDERER)</li>
+     *   <li><b>Vulkan (future):</b> Would query physical device properties</li>
+     *   <li><b>Debug:</b> Returns a mock GPU name</li>
+     * </ul>
+     * 
+     * @return Graphics card/GPU name, or "Unknown" if not available
+     */
+    String getGPUName();
+    
+    /**
+     * Get the current GPU usage percentage.
+     * 
+     * <p>This method attempts to retrieve GPU utilization information.
+     * Note that GPU usage is not always reliably available through standard APIs.
+     * 
+     * @return GPU usage percentage (0-100), or -1 if not available
+     */
+    int getGPUUsage();
+    
+    /**
+     * Get the current GPU VRAM usage as a formatted string.
+     * 
+     * <p>This method attempts to retrieve video memory usage information.
+     * Note that VRAM usage is not always reliably available through standard APIs.
+     * 
+     * @return VRAM usage string (e.g., "2048 MB / 4096 MB"), or "N/A" if not available
+     */
+    String getGPUVRAMUsage();
 }

@@ -715,4 +715,45 @@ public class OpenGLRenderBackend implements RenderBackend {
         glPopMatrix();
         glMatrixMode(GL_MODELVIEW);
     }
+    
+    /**
+     * Get the display resolution using GLFW.
+     * 
+     * @param windowHandle GLFW window handle
+     * @return Display resolution string (e.g., "1920x1080")
+     */
+    @Override
+    public String getDisplayResolution(long windowHandle) {
+        return OpenGLSystemInfo.getDisplayResolution(windowHandle);
+    }
+    
+    /**
+     * Get the GPU name using OpenGL.
+     * 
+     * @return Graphics card name from GL_RENDERER
+     */
+    @Override
+    public String getGPUName() {
+        return OpenGLSystemInfo.getGPUName();
+    }
+    
+    /**
+     * Get GPU usage percentage.
+     * 
+     * @return GPU usage percentage or -1 if not available
+     */
+    @Override
+    public int getGPUUsage() {
+        return OpenGLSystemInfo.getGPUUsage();
+    }
+    
+    /**
+     * Get GPU VRAM usage.
+     * 
+     * @return VRAM usage string or "N/A" if not available
+     */
+    @Override
+    public String getGPUVRAMUsage() {
+        return OpenGLSystemInfo.getGPUVRAMUsage();
+    }
 }
