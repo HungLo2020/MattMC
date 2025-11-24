@@ -95,6 +95,53 @@ public class LevelRenderer {
         renderBackend.registerMaterial(materialId, 
                                       chunkRenderer.getShader(), 
                                       chunkRenderer.getTextureAtlas());
+        
+        // Register any chunks that already have meshes
+        // This handles chunks that were loaded before backend initialization
+        if (currentLevel != null) {
+            registerExistingChunks();
+        }
+    }
+    
+    /**
+     * Register all existing chunks with meshes to the backend.
+     * Called during initialization to handle chunks loaded before backend setup.
+     */
+    private void registerExistingChunks() {
+        int registeredCount = 0;
+        for (LevelChunk chunk : currentLevel.getLoadedChunks()) {
+            // Check if chunk has a mesh
+            if (!chunkRenderer.hasChunkMesh(chunk)) {
+                continue;
+            }
+            
+            // Get mesh ID
+            int meshId = chunkRenderer.getMeshIdForChunk(chunk);
+            if (meshId < 0) {
+                continue;
+            }
+            
+            // Get VAO
+            ChunkVAO vao = chunkRenderer.getVAOByMeshId(meshId);
+            if (vao == null) {
+                continue;
+            }
+            
+            // Register mesh with backend
+            renderBackend.registerMesh(meshId, vao);
+            
+            // Register transform
+            int transformId = (chunk.chunkX() << 16) | (chunk.chunkZ() & 0xFFFF);
+            float worldX = chunk.chunkX() * LevelChunk.WIDTH;
+            float worldZ = chunk.chunkZ() * LevelChunk.DEPTH;
+            renderBackend.registerTransform(transformId, worldX, 0, worldZ);
+            
+            registeredCount++;
+        }
+        
+        if (registeredCount > 0) {
+            logger.info("Registered {} existing chunks with backend during initialization", registeredCount);
+        }
     }
     
     /**
@@ -197,6 +244,10 @@ public class LevelRenderer {
         float worldX = chunk.chunkX() * LevelChunk.WIDTH;
         float worldZ = chunk.chunkZ() * LevelChunk.DEPTH;
         renderBackend.registerTransform(transformId, worldX, 0, worldZ);
+        
+        // Debug: Log chunk registration
+        // logger.debug("Registered chunk ({},{}) with backend: meshId={}, transformId={}", 
+        //             chunk.chunkX(), chunk.chunkZ(), meshId, transformId);
     }
     
     /**
