@@ -41,6 +41,8 @@ public class DebugInfoRenderer {
         
         // Use backend if available (Stage 4)
         if (backend != null) {
+            backend.beginFrame();
+            
             // Build and submit commands via backend
             UIRenderLogic logic = new UIRenderLogic();
             CommandBuffer buffer = new CommandBuffer();
@@ -58,6 +60,8 @@ public class DebugInfoRenderer {
             for (DrawCommand cmd : buffer.getCommands()) {
                 backend.submit(cmd);
             }
+            
+            backend.endFrame();
         } else {
             // Legacy rendering path
             renderLegacy(screenWidth, screenHeight, playerX, playerY, playerZ,

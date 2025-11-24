@@ -76,6 +76,8 @@ public class SystemInfoRenderer {
         String[] systemInfo = {javaVersion, memoryInfo, cpuInfo, displayRes, gpuName, gpuUsageInfo};
         
         if (backend != null) {
+            backend.beginFrame();
+            
             // Use backend rendering
             CommandBuffer buffer = new CommandBuffer();
             logic.buildSystemInfoCommands(screenWidth, screenHeight, systemInfo, buffer);
@@ -83,6 +85,8 @@ public class SystemInfoRenderer {
             for (DrawCommand cmd : buffer.getCommands()) {
                 backend.submit(cmd);
             }
+            
+            backend.endFrame();
         } else {
             // Legacy rendering (fallback)
             renderLegacy(screenWidth, screenHeight, systemInfo);

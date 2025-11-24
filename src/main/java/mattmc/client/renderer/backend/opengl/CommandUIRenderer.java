@@ -44,6 +44,8 @@ public class CommandUIRenderer {
         
         // Use backend if available (Stage 4)
         if (backend != null) {
+            backend.beginFrame();
+            
             // Build and submit commands via backend
             UIRenderLogic logic = new UIRenderLogic();
             CommandBuffer buffer = new CommandBuffer();
@@ -58,6 +60,8 @@ public class CommandUIRenderer {
             for (DrawCommand cmd : buffer.getCommands()) {
                 backend.submit(cmd);
             }
+            
+            backend.endFrame();
         } else {
             // Legacy rendering path
             renderCommandOverlayLegacy(screenWidth, screenHeight, commandText);
@@ -117,6 +121,8 @@ public class CommandUIRenderer {
         
         // Use backend if available (Stage 4)
         if (backend != null) {
+            backend.beginFrame();
+            
             // Build and submit commands via backend
             UIRenderLogic logic = new UIRenderLogic();
             CommandBuffer buffer = new CommandBuffer();
@@ -131,6 +137,8 @@ public class CommandUIRenderer {
             for (DrawCommand cmd : buffer.getCommands()) {
                 backend.submit(cmd);
             }
+            
+            backend.endFrame();
         } else {
             // Legacy rendering path
             renderCommandFeedbackLegacy(screenWidth, screenHeight, message);
