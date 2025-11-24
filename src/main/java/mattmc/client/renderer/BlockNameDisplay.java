@@ -1,15 +1,31 @@
-package mattmc.client.renderer.backend.opengl;
+package mattmc.client.renderer;
 
+import mattmc.client.renderer.backend.DrawCommand;
+import mattmc.client.renderer.backend.RenderBackend;
 import mattmc.client.renderer.backend.opengl.gui.components.TextRenderer;
 import mattmc.world.level.block.Block;
 
-import static org.lwjgl.opengl.GL11.*;
-
 /**
- * Displays the name of the block the player is looking at in the top-left corner.
- * Uses AbstractBlurBox to create a blurred background behind the text.
+ * Backend-agnostic block name display renderer.
+ * 
+ * <p>This class is responsible for determining <em>what</em> to draw (block name in top-left)
+ * and coordinating with the backend to actually render it. It contains NO OpenGL-specific
+ * code and works purely through the {@link RenderBackend} abstraction.
+ * 
+ * <p><b>Architecture:</b> This is a "coordinator" class that:
+ * <ul>
+ *   <li>Uses {@link UIRenderLogic} to build draw commands (what to draw)</li>
+ *   <li>Submits commands to the {@link RenderBackend} (how to draw)</li>
+ *   <li>Delegates projection setup to the backend (backend-agnostic)</li>
+ *   <li>Uses backend blur and border drawing methods (backend-agnostic)</li>
+ * </ul>
+ * 
+ * <p><b>Blur Effects:</b> Now implemented through backend abstraction. The backend
+ * interface provides {@link RenderBackend#applyRegionalBlur} for blur effects and
+ * {@link RenderBackend#drawRoundedRectBorder} for rounded borders, allowing the
+ * frosted glass UI effect while maintaining backend abstraction.
  */
-public class BlockNameDisplay extends AbstractBlurBox {
+public class BlockNameDisplay {
     private static final int PADDING = 10;
     private static final int MARGIN = 10;
     
@@ -21,13 +37,48 @@ public class BlockNameDisplay extends AbstractBlurBox {
     private static final float BORDER_B = 1.0f;
     private static final float BORDER_ALPHA = 1.0f;
     
+    
+    private final UIRenderLogic logic;
+    private final CommandBuffer buffer;
+    private RenderBackend backend;
+    
+    /**
+     * Create a new block name display renderer.
+     */
+    public BlockNameDisplay() {
+        this.logic = new UIRenderLogic();
+        this.buffer = new CommandBuffer();
+    }
+    
+    /**
+     * Set the render backend to use for rendering.
+     * 
+     * @param backend the backend to use (must not be null)
+     * @throws IllegalArgumentException if backend is null
+     */
+    public void setBackend(RenderBackend backend) {
+        if (backend == null) {
+            throw new IllegalArgumentException("Backend cannot be null");
+        }
+        this.backend = backend;
+    }
+    
     /**
      * Render the block name display in the top-left corner.
-     * @param screenWidth The width of the screen
-     * @param screenHeight The height of the screen
+     * 
+     * <p>This method is completely backend-agnostic. It delegates projection setup,
+     * blur effects, rounded borders, and text rendering to the backend for rendering.
+     * 
+     * @param screenWidth The width of the screen in pixels
+     * @param screenHeight The height of the screen in pixels
      * @param block The block to display the name of (can be null)
+     * @throws IllegalStateException if backend has not been set
      */
     public void render(int screenWidth, int screenHeight, Block block) {
+        if (backend == null) {
+            throw new IllegalStateException("Backend must be set before calling render()");
+        }
+        
         if (block == null || block.isAir()) {
             return; // Don't display anything if no block is targeted
         }
@@ -52,36 +103,21 @@ public class BlockNameDisplay extends AbstractBlurBox {
         int x = MARGIN;
         int y = MARGIN;
         
-        // Apply blur effect to the background
-        applyRegionalBlur(x, y, boxWidth, boxHeight, screenWidth, screenHeight);
+        // Apply blur effect to the background (delegated to backend)
+        backend.applyRegionalBlur(x, y, boxWidth, boxHeight, screenWidth, screenHeight);
         
-        // Switch to 2D orthographic projection for drawing
-        glMatrixMode(GL_PROJECTION);
-        glPushMatrix();
-        glLoadIdentity();
-        glOrtho(0, screenWidth, screenHeight, 0, -1, 1);
+        // Setup 2D projection for UI rendering (delegated to backend)
+        backend.setup2DProjection(screenWidth, screenHeight);
         
-        glMatrixMode(GL_MODELVIEW);
-        glPushMatrix();
-        glLoadIdentity();
+        // Draw blue rounded border (delegated to backend)
+        backend.drawRoundedRectBorder(x, y, boxWidth, boxHeight, CORNER_RADIUS,
+                                     BORDER_WIDTH, BORDER_R, BORDER_G, BORDER_B, BORDER_ALPHA);
         
-        // Enable blending
-        glEnable(GL_BLEND);
-        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-        
-        // Draw blue rounded border
-        drawRoundedRectBorder(x, y, boxWidth, boxHeight, CORNER_RADIUS, 
-                             BORDER_WIDTH, BORDER_R, BORDER_G, BORDER_B, BORDER_ALPHA);
-        
-        // Draw the block name text in white
-        glColor4f(1f, 1f, 1f, 1f);
+        // Draw the block name text using TextRenderer
         TextRenderer.drawText(blockName, x + PADDING, y + PADDING, textScale);
         
-        // Restore matrices
-        glPopMatrix();
-        glMatrixMode(GL_PROJECTION);
-        glPopMatrix();
-        glMatrixMode(GL_MODELVIEW);
+        // Restore projection (delegated to backend)
+        backend.restore2DProjection();
     }
     
     /**

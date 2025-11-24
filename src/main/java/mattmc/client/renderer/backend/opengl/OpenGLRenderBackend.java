@@ -73,6 +73,9 @@ public class OpenGLRenderBackend implements RenderBackend {
     // Frame state
     private boolean frameActive = false;
     
+    // Blur helper for AbstractBlurBox functionality
+    private AbstractBlurBox blurHelper = null;
+    
     /**
      * Information about a material (shader + texture combination).
      */
@@ -630,7 +633,7 @@ public class OpenGLRenderBackend implements RenderBackend {
             UIRenderLogic.TextRenderInfo textInfo = UIRenderLogic.getTextInfo(firstTextId + i);
             if (textInfo != null) {
                 // Right-aligned text rendering
-                SystemInfoRenderer.renderSystemInfoLine(textInfo.text, (int)textInfo.x, (int)textInfo.y, textInfo.scale, textInfo.color);
+                UIRenderHelper.drawTextRightAligned(textInfo.text, (int)textInfo.x, (int)textInfo.y, textInfo.scale, textInfo.color);
             }
         }
     }
@@ -668,5 +671,148 @@ public class OpenGLRenderBackend implements RenderBackend {
         
         // Render tooltip using TooltipRenderer
         TooltipRenderer.renderTooltipDirect(textInfo.text, x, y, (int)boxWidth, (int)boxHeight, TOOLTIP_PADDING);
+    }
+    
+    /**
+     * Setup 2D orthographic projection for UI rendering.
+     * 
+     * <p>Configures OpenGL for 2D screen-space rendering with an orthographic projection
+     * where (0,0) is the top-left corner and coordinates map directly to screen pixels.
+     * Also enables blending for transparent UI elements.
+     * 
+     * @param screenWidth the width of the screen/viewport in pixels
+     * @param screenHeight the height of the screen/viewport in pixels
+     */
+    @Override
+    public void setup2DProjection(int screenWidth, int screenHeight) {
+        // Setup projection matrix for 2D rendering
+        glMatrixMode(GL_PROJECTION);
+        glPushMatrix();
+        glLoadIdentity();
+        glOrtho(0, screenWidth, screenHeight, 0, -1, 1);
+        
+        // Setup modelview matrix
+        glMatrixMode(GL_MODELVIEW);
+        glPushMatrix();
+        glLoadIdentity();
+        
+        // Enable blending for transparent UI elements
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    }
+    
+    /**
+     * Restore the previous projection state after 2D rendering.
+     * 
+     * <p>Pops the projection and modelview matrices that were pushed by
+     * {@link #setup2DProjection(int, int)} and disables blending.
+     */
+    @Override
+    public void restore2DProjection() {
+        // Disable blending
+        glDisable(GL_BLEND);
+        
+        // Restore matrices
+        glPopMatrix();
+        glMatrixMode(GL_PROJECTION);
+        glPopMatrix();
+        glMatrixMode(GL_MODELVIEW);
+    }
+    
+    /**
+     * Get the display resolution using GLFW.
+     * 
+     * @param windowHandle GLFW window handle
+     * @return Display resolution string (e.g., "1920x1080")
+     */
+    @Override
+    public String getDisplayResolution(long windowHandle) {
+        return OpenGLSystemInfo.getDisplayResolution(windowHandle);
+    }
+    
+    /**
+     * Get the GPU name using OpenGL.
+     * 
+     * @return Graphics card name from GL_RENDERER
+     */
+    @Override
+    public String getGPUName() {
+        return OpenGLSystemInfo.getGPUName();
+    }
+    
+    /**
+     * Get GPU usage percentage.
+     * 
+     * @return GPU usage percentage or -1 if not available
+     */
+    @Override
+    public int getGPUUsage() {
+        return OpenGLSystemInfo.getGPUUsage();
+    }
+    
+    /**
+     * Get GPU VRAM usage.
+     * 
+     * @return VRAM usage string or "N/A" if not available
+     */
+    @Override
+    public String getGPUVRAMUsage() {
+        return OpenGLSystemInfo.getGPUVRAMUsage();
+    }
+    
+    /**
+     * Apply regional blur effect using OpenGL framebuffers and shaders.
+     * 
+     * <p>Lazily initializes the blur helper on first use. The blur effect
+     * captures the screen region, applies Gaussian blur (horizontal + vertical pass),
+     * darkens the result, and renders it back to the same region.
+     * 
+     * @param x X position of the blur region
+     * @param y Y position of the blur region
+     * @param width Width of the blur region
+     * @param height Height of the blur region
+     * @param screenWidth Full screen width
+     * @param screenHeight Full screen height
+     */
+    @Override
+    public void applyRegionalBlur(float x, float y, float width, float height,
+                                   int screenWidth, int screenHeight) {
+        // Lazily initialize blur helper
+        if (blurHelper == null) {
+            blurHelper = new AbstractBlurBox();
+        }
+        
+        // Delegate to blur helper
+        blurHelper.applyRegionalBlur(x, y, width, height, screenWidth, screenHeight);
+    }
+    
+    /**
+     * Draw a rounded rectangle border using OpenGL line rendering.
+     * 
+     * <p>Lazily initializes the blur helper on first use (which contains
+     * the rounded border drawing logic). Draws a smooth rounded border
+     * around the specified rectangle.
+     * 
+     * @param x X position of the rectangle
+     * @param y Y position of the rectangle
+     * @param width Width of the rectangle
+     * @param height Height of the rectangle
+     * @param radius Corner radius
+     * @param borderWidth Width of the border line
+     * @param r Red component (0.0-1.0)
+     * @param g Green component (0.0-1.0)
+     * @param b Blue component (0.0-1.0)
+     * @param a Alpha component (0.0-1.0)
+     */
+    @Override
+    public void drawRoundedRectBorder(float x, float y, float width, float height, float radius,
+                                      float borderWidth, float r, float g, float b, float a) {
+        // Lazily initialize blur helper (contains shared drawing utilities)
+        if (blurHelper == null) {
+            blurHelper = new AbstractBlurBox();
+        }
+        
+        // Delegate to blur helper's drawing method
+        blurHelper.drawRoundedRectBorder(x, y, width, height, radius, borderWidth, r, g, b, a);
     }
 }

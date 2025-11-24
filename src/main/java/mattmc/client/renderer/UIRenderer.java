@@ -1,13 +1,16 @@
 package mattmc.client.renderer;
 
+// Backend-agnostic renderers (refactored to be outside backend/)
+import mattmc.client.renderer.CrosshairRenderer;
+import mattmc.client.renderer.HotbarRenderer;
+import mattmc.client.renderer.DebugInfoRenderer;
+import mattmc.client.renderer.CommandUIRenderer;
+import mattmc.client.renderer.SystemInfoRenderer;
+import mattmc.client.renderer.LightingDebugRenderer;
+import mattmc.client.renderer.BlockNameDisplay;
+
+// Backend interface
 import mattmc.client.renderer.backend.RenderBackend;
-import mattmc.client.renderer.backend.opengl.CrosshairRenderer;
-import mattmc.client.renderer.backend.opengl.DebugInfoRenderer;
-import mattmc.client.renderer.backend.opengl.HotbarRenderer;
-import mattmc.client.renderer.backend.opengl.CommandUIRenderer;
-import mattmc.client.renderer.backend.opengl.LightingDebugRenderer;
-import mattmc.client.renderer.backend.opengl.SystemInfoRenderer;
-import mattmc.client.renderer.backend.opengl.BlockNameDisplay;
 
 /**
  * Handles rendering of UI elements.
@@ -40,26 +43,25 @@ public class UIRenderer {
         this.commandUIRenderer = new CommandUIRenderer();
         this.lightingDebugRenderer = new LightingDebugRenderer();
         this.systemInfoRenderer = new SystemInfoRenderer();
+        this.blockNameDisplay = new BlockNameDisplay();
     }
     
     /**
-     * Set the render backend for UI rendering (Stage 4).
+     * Set the render backend for UI rendering.
      * Propagates the backend to all child renderers.
      * 
-     * <p>Note: BlockNameDisplay is not included as it's a specialized effect renderer
-     * (with blur effects) which is out of Stage 4 scope per RENDERINGREFACTOR.md.
-     * 
-     * @param backend the backend to use, or null to use legacy rendering
+     * @param backend the backend to use
      */
     public void setBackend(RenderBackend backend) {
         this.backend = backend;
-        // Propagate backend to all Stage 4 child renderers
+        // Propagate backend to all child renderers
         crosshairRenderer.setBackend(backend);
         hotbarRenderer.setBackend(backend);
         commandUIRenderer.setBackend(backend);
         debugInfoRenderer.setBackend(backend);
         systemInfoRenderer.setBackend(backend);
-        // Note: BlockNameDisplay (specialized blur effect) not in Stage 4 scope
+        lightingDebugRenderer.setBackend(backend);
+        blockNameDisplay.setBackend(backend);
     }
     
     /**

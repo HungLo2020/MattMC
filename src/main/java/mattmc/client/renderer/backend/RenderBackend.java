@@ -132,4 +132,158 @@ public interface RenderBackend {
      * @see #beginFrame()
      */
     void endFrame();
+    
+    /**
+     * Setup 2D orthographic projection for UI rendering.
+     * 
+     * <p>This method configures the projection matrix for 2D screen-space rendering,
+     * where coordinates map directly to screen pixels. The coordinate system has:
+     * <ul>
+     *   <li>Origin (0,0) at the top-left corner</li>
+     *   <li>X-axis increases to the right</li>
+     *   <li>Y-axis increases downward</li>
+     *   <li>Z-axis unused (2D rendering)</li>
+     * </ul>
+     * 
+     * <p><b>Implementation Notes:</b>
+     * <ul>
+     *   <li><b>OpenGL:</b> Sets up orthographic projection with glOrtho, pushes matrices</li>
+     *   <li><b>Vulkan (future):</b> Would configure viewport and scissor for 2D rendering</li>
+     *   <li><b>Debug:</b> Records projection state for inspection</li>
+     * </ul>
+     * 
+     * <p>This method must be paired with {@link #restore2DProjection()} to restore the
+     * previous projection state after 2D rendering is complete.
+     * 
+     * @param screenWidth the width of the screen/viewport in pixels
+     * @param screenHeight the height of the screen/viewport in pixels
+     * @see #restore2DProjection()
+     */
+    void setup2DProjection(int screenWidth, int screenHeight);
+    
+    /**
+     * Restore the previous projection state after 2D rendering.
+     * 
+     * <p>This method restores the projection matrix that was active before
+     * {@link #setup2DProjection(int, int)} was called. It must be called after
+     * completing 2D rendering to return to the previous rendering mode (typically 3D).
+     * 
+     * <p><b>Implementation Notes:</b>
+     * <ul>
+     *   <li><b>OpenGL:</b> Pops the projection and modelview matrices</li>
+     *   <li><b>Vulkan (future):</b> Would restore previous viewport/scissor state</li>
+     *   <li><b>Debug:</b> Records projection state restoration</li>
+     * </ul>
+     * 
+     * @see #setup2DProjection(int, int)
+     */
+    void restore2DProjection();
+    
+    /**
+     * Get the display resolution as a formatted string.
+     * 
+     * <p>This method retrieves the current window/display resolution from the backend.
+     * Different backends may query this information differently:
+     * <ul>
+     *   <li><b>OpenGL:</b> Uses GLFW to query window size</li>
+     *   <li><b>Vulkan (future):</b> Would query surface capabilities</li>
+     *   <li><b>Debug:</b> Returns a mock resolution</li>
+     * </ul>
+     * 
+     * @param windowHandle Platform-specific window handle (e.g., GLFW window pointer)
+     * @return Display resolution string (e.g., "1920x1080")
+     */
+    String getDisplayResolution(long windowHandle);
+    
+    /**
+     * Get the graphics processing unit (GPU) name.
+     * 
+     * <p>This method retrieves the name/model of the GPU from the backend.
+     * Different backends query this differently:
+     * <ul>
+     *   <li><b>OpenGL:</b> Uses glGetString(GL_RENDERER)</li>
+     *   <li><b>Vulkan (future):</b> Would query physical device properties</li>
+     *   <li><b>Debug:</b> Returns a mock GPU name</li>
+     * </ul>
+     * 
+     * @return Graphics card/GPU name, or "Unknown" if not available
+     */
+    String getGPUName();
+    
+    /**
+     * Get the current GPU usage percentage.
+     * 
+     * <p>This method attempts to retrieve GPU utilization information.
+     * Note that GPU usage is not always reliably available through standard APIs.
+     * 
+     * @return GPU usage percentage (0-100), or -1 if not available
+     */
+    int getGPUUsage();
+    
+    /**
+     * Get the current GPU VRAM usage as a formatted string.
+     * 
+     * <p>This method attempts to retrieve video memory usage information.
+     * Note that VRAM usage is not always reliably available through standard APIs.
+     * 
+     * @return VRAM usage string (e.g., "2048 MB / 4096 MB"), or "N/A" if not available
+     */
+    String getGPUVRAMUsage();
+    
+    /**
+     * Apply a Gaussian blur effect to a rectangular region of the screen.
+     * 
+     * <p>This method captures the current screen content in the specified region,
+     * applies a Gaussian blur with optional darkening/tinting, and renders it back
+     * to the same region. This is commonly used for UI backgrounds to create
+     * a "frosted glass" effect.
+     * 
+     * <p><b>Implementation Notes:</b>
+     * <ul>
+     *   <li><b>OpenGL:</b> Uses framebuffers, shaders, and texture sampling for blur</li>
+     *   <li><b>Vulkan (future):</b> Would use compute shaders or render passes</li>
+     *   <li><b>Debug:</b> Records blur command for inspection</li>
+     * </ul>
+     * 
+     * <p>The blur effect applies a two-pass Gaussian blur (horizontal then vertical)
+     * and optionally darkens the result to create a subtle overlay effect suitable
+     * for UI backgrounds.
+     * 
+     * @param x X position of the rectangular region (top-left corner)
+     * @param y Y position of the rectangular region (top-left corner)
+     * @param width Width of the rectangular region
+     * @param height Height of the rectangular region
+     * @param screenWidth Full screen width for proper coordinate mapping
+     * @param screenHeight Full screen height for proper coordinate mapping
+     */
+    void applyRegionalBlur(float x, float y, float width, float height, 
+                          int screenWidth, int screenHeight);
+    
+    /**
+     * Draw a rounded rectangle border (outline only, not filled).
+     * 
+     * <p>This method draws a border around a rectangle with rounded corners.
+     * The border is drawn as a continuous line with specified width and color.
+     * This is commonly used for UI elements like tooltips and overlays.
+     * 
+     * <p><b>Implementation Notes:</b>
+     * <ul>
+     *   <li><b>OpenGL:</b> Uses GL_LINE_STRIP with trigonometric calculations for corners</li>
+     *   <li><b>Vulkan (future):</b> Would use line rendering or geometry shaders</li>
+     *   <li><b>Debug:</b> Records border command for inspection</li>
+     * </ul>
+     * 
+     * @param x X position of the rectangle (top-left corner)
+     * @param y Y position of the rectangle (top-left corner)
+     * @param width Width of the rectangle
+     * @param height Height of the rectangle
+     * @param radius Corner radius for rounding
+     * @param borderWidth Width of the border line
+     * @param r Red component of border color (0.0-1.0)
+     * @param g Green component of border color (0.0-1.0)
+     * @param b Blue component of border color (0.0-1.0)
+     * @param a Alpha component of border color (0.0-1.0)
+     */
+    void drawRoundedRectBorder(float x, float y, float width, float height, float radius,
+                               float borderWidth, float r, float g, float b, float a);
 }

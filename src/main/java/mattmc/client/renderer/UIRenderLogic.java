@@ -513,4 +513,67 @@ public class UIRenderLogic {
         );
         buffer.add(sizeCmd);
     }
+    
+    /**
+     * Build draw commands for lighting debug overlay.
+     * Shows relight scheduler statistics in top-right corner.
+     * 
+     * @param screenWidth Screen width
+     * @param screenHeight Screen height
+     * @param backlogSize Number of pending light updates
+     * @param nodesProcessed Number of nodes processed last frame
+     * @param timeSpent Time spent in milliseconds last frame
+     * @param buffer Command buffer to add commands to
+     */
+    public void buildLightingDebugCommands(int screenWidth, int screenHeight, 
+                                          int backlogSize, int nodesProcessed, 
+                                          double timeSpent, CommandBuffer buffer) {
+        // Position in top-right corner
+        float x = screenWidth - 250;
+        float y = 10f;
+        float lineHeight = 20f;
+        float scale = 1.5f;
+        
+        // Register background quad (semi-transparent black)
+        // Note: Background rendering would need special handling in backend
+        // For now, we'll just render the text
+        
+        // Build text lines
+        int textId1 = registerText("Lighting Debug", (int)x, (int)y, scale, 0xFFFFFF);
+        int textId2 = registerText(String.format("Backlog: %d", backlogSize), 
+                                   (int)x, (int)(y + lineHeight), scale, 0xFFFFFF);
+        int textId3 = registerText(String.format("Nodes/frame: %d", nodesProcessed), 
+                                   (int)x, (int)(y + lineHeight * 2), scale, 0xFFFFFF);
+        
+        // Color code time spent (green if < 2ms, yellow if < 5ms, red if >= 5ms)
+        int timeColor = timeSpent < 2.0 ? 0x00FF00 : (timeSpent < 5.0 ? 0xFFFF00 : 0xFF0000);
+        int textId4 = registerText(String.format("Time: %.2fms", timeSpent), 
+                                   (int)x, (int)(y + lineHeight * 3), scale, timeColor);
+        
+        // Create draw commands for each text line
+        buffer.add(new DrawCommand(-7, 0, textId1, RenderPass.UI));
+        buffer.add(new DrawCommand(-7, 0, textId2, RenderPass.UI));
+        buffer.add(new DrawCommand(-7, 0, textId3, RenderPass.UI));
+        buffer.add(new DrawCommand(-7, 0, textId4, RenderPass.UI));
+    }
+    
+    /**
+     * Build draw commands for block name display.
+     * Shows the name of the targeted block in top-left corner.
+     * 
+     * @param blockName The display name of the block
+     * @param x X position (left margin)
+     * @param y Y position (top margin)
+     * @param buffer Command buffer to add commands to
+     */
+    public void buildBlockNameDisplayCommands(String blockName, int x, int y, 
+                                             CommandBuffer buffer) {
+        float textScale = 1.5f;
+        
+        // Register and draw the block name text
+        int textId = registerText(blockName, x + 10, y + 10, textScale, 0xFFFFFF);
+        
+        // Create draw command for the text
+        buffer.add(new DrawCommand(-7, 0, textId, RenderPass.UI));
+    }
 }
