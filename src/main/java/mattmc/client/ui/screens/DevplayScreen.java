@@ -13,7 +13,7 @@ import mattmc.world.entity.player.PlayerPhysics;
 import mattmc.world.entity.player.PlayerInput;
 import mattmc.client.renderer.backend.opengl.LevelRenderer;
 import mattmc.client.renderer.UIRenderer;
-import mattmc.client.renderer.backend.opengl.BlockFaceGeometry;
+import mattmc.client.renderer.block.BlockFaceGeometry;
 import mattmc.util.ColorUtils;
 import mattmc.client.renderer.backend.opengl.OpenGLColorHelper;
 import mattmc.world.item.Inventory;
