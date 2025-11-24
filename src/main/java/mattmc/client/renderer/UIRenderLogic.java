@@ -80,11 +80,61 @@ public class UIRenderLogic {
     /**
      * Builds draw commands for the crosshair.
      * 
+     * <p>The crosshair consists of two quads (horizontal and vertical lines) forming a cross
+     * at the center of the screen.
+     * 
      * @param screenWidth screen width
      * @param screenHeight screen height
      * @param buffer the command buffer to add commands to
      */
     public void buildCrosshairCommands(int screenWidth, int screenHeight, CommandBuffer buffer) {
-        // TODO: Build command for crosshair at screen center
+        // Crosshair parameters (matching original CrosshairRenderer)
+        float centerX = screenWidth / 2f;
+        float centerY = screenHeight / 2f;
+        float size = 10f;
+        float thickness = 2f;
+        
+        // Create commands for the two crosshair quads
+        // For Stage 4, we use special mesh IDs to indicate UI quads
+        // The backend will recognize these and render them as 2D quads
+        
+        // Horizontal line: meshId = -1 indicates UI quad (convention)
+        // materialId encodes position/size info
+        // transformIndex = 0 for screen-space rendering
+        DrawCommand horizontalLine = new DrawCommand(
+            -1, // UI quad marker
+            encodeCrosshairData((int)centerX, (int)centerY, (int)(size*2), (int)thickness, true),
+            0,  // screen-space transform
+            RenderPass.UI
+        );
+        
+        // Vertical line
+        DrawCommand verticalLine = new DrawCommand(
+            -1, // UI quad marker
+            encodeCrosshairData((int)centerX, (int)centerY, (int)thickness, (int)(size*2), false),
+            0,  // screen-space transform
+            RenderPass.UI
+        );
+        
+        buffer.add(horizontalLine);
+        buffer.add(verticalLine);
+    }
+    
+    /**
+     * Encode crosshair quad data into a single integer.
+     * This is a temporary encoding scheme for Stage 4.
+     * 
+     * @param x center X
+     * @param y center Y
+     * @param width quad width
+     * @param height quad height
+     * @param horizontal true for horizontal line, false for vertical
+     * @return encoded data
+     */
+    private int encodeCrosshairData(int x, int y, int width, int height, boolean horizontal) {
+        // Simple encoding: use bits to pack data
+        // This is a Stage 4 temporary solution
+        // In a full implementation, we'd have proper data structures
+        return (horizontal ? 1 : 0) | ((x & 0xFFF) << 1) | ((y & 0xFFF) << 13) | ((width & 0xFF) << 25);
     }
 }

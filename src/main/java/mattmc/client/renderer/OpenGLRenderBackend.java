@@ -174,6 +174,13 @@ public class OpenGLRenderBackend implements RenderBackend {
             throw new NullPointerException("DrawCommand cannot be null");
         }
         
+        // Stage 4: Handle UI render pass differently from OPAQUE/TRANSPARENT
+        if (cmd.pass == RenderPass.UI) {
+            submitUICommand(cmd);
+            return;
+        }
+        
+        // Original 3D mesh rendering for OPAQUE, TRANSPARENT, SHADOW passes
         // Look up resources
         ChunkVAO vao = meshRegistry.get(cmd.meshId);
         MaterialInfo material = materialRegistry.get(cmd.materialId);
@@ -231,6 +238,47 @@ public class OpenGLRenderBackend implements RenderBackend {
         
         // Restore transformation
         glPopMatrix();
+    }
+    
+    /**
+     * Handle UI render pass commands (Stage 4).
+     * UI commands use a simplified rendering path for 2D elements.
+     * 
+     * @param cmd the UI draw command
+     */
+    private void submitUICommand(DrawCommand cmd) {
+        // For Stage 4, meshId = -1 indicates a crosshair UI element
+        // The materialId encodes position/size data
+        if (cmd.meshId == -1) {
+            // Decode crosshair data from materialId
+            boolean horizontal = (cmd.materialId & 1) == 1;
+            int centerX = (cmd.materialId >> 1) & 0xFFF;
+            int centerY = (cmd.materialId >> 13) & 0xFFF;
+            int size = (cmd.materialId >> 25) & 0xFF;
+            
+            // Render the crosshair quad using immediate mode
+            // (This is a Stage 4 implementation - could be optimized later)
+            if (horizontal) {
+                float thickness = 2f;
+                glColor4f(1f, 1f, 1f, 1f);
+                glBegin(GL_QUADS);
+                glVertex2f(centerX - size/2f, centerY - thickness/2);
+                glVertex2f(centerX + size/2f, centerY - thickness/2);
+                glVertex2f(centerX + size/2f, centerY + thickness/2);
+                glVertex2f(centerX - size/2f, centerY + thickness/2);
+                glEnd();
+            } else {
+                float thickness = 2f;
+                glColor4f(1f, 1f, 1f, 1f);
+                glBegin(GL_QUADS);
+                glVertex2f(centerX - thickness/2, centerY - size/2f);
+                glVertex2f(centerX + thickness/2, centerY - size/2f);
+                glVertex2f(centerX + thickness/2, centerY + size/2f);
+                glVertex2f(centerX - thickness/2, centerY + size/2f);
+                glEnd();
+            }
+        }
+        // Future: handle other UI element types (hotbar, etc.)
     }
     
     @Override

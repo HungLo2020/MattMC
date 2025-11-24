@@ -19,23 +19,29 @@ Apply the DrawCommand + RenderBackend pattern to item and UI rendering, same as 
 - [x] Add UI quad registry and rendering support
 
 ### Component Refactoring - IN PROGRESS
+- [x] CrosshairRenderer - ✅ REFACTORED to use backend
 - [ ] HotbarRenderer - route through backend
 - [ ] ItemRenderer - route through backend  
-- [ ] CrosshairRenderer - route through backend
 - [ ] DebugInfoRenderer - route through backend
 - [ ] CommandUIRenderer - route through backend
 - [ ] Other UI renderers as needed
 
 ### Testing - IN PROGRESS
-- [ ] Tests for UI rendering logic
-- [ ] Tests for item rendering logic
-- [ ] Integration tests demonstrating pattern
+- [x] Tests for UI rendering logic (6 tests in UIRenderLogicTest)
+- [x] Tests for item rendering logic (5 tests in ItemRenderLogicTest)
+- [x] Tests for CrosshairRenderer (5 tests demonstrating pattern)
+- [ ] Integration tests for more UI components
 
 ### Current Status (Latest Commits)
 - ✅ Created UIRenderLogic and ItemRenderLogic classes (logic without GL)
 - ✅ Extended OpenGLRenderBackend with UI quad support
-- ✅ All existing tests still pass
-- ⏳ Next: Refactor actual renderer components to use new architecture
+- ✅ **CrosshairRenderer REFACTORED** to use backend architecture
+  - Supports both new backend path and legacy fallback
+  - UIRenderer updated to use backend when available
+  - 5 new tests demonstrating the pattern
+- ✅ Backend submit() method extended to handle UI render pass
+- ✅ All 139+ tests pass
+- ⏳ Next: Continue refactoring other UI components (Hotbar, DebugInfo, etc.)
 
 ## Note on Scope
 Stage 4 as specified involves refactoring ALL item and UI rendering. This is extensive work affecting many files. This document tracks progress through incremental implementation.

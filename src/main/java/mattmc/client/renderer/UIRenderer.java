@@ -4,6 +4,9 @@ package mattmc.client.renderer;
  * Handles rendering of UI elements.
  * Similar to Minecraft's GuiIngame class.
  * Delegates rendering to specialized renderer classes.
+ * 
+ * <p><b>Stage 4:</b> Now supports backend-based rendering for UI elements.
+ * Components that have been refactored to use the backend will use it when available.
  */
 public class UIRenderer {
     
@@ -18,6 +21,9 @@ public class UIRenderer {
     // Block name display with blur effect
     private BlockNameDisplay blockNameDisplay;
     
+    // Stage 4: Backend for UI rendering (optional, for backward compatibility)
+    private RenderBackend backend;
+    
     public UIRenderer() {
         this.crosshairRenderer = new CrosshairRenderer();
         this.debugInfoRenderer = new DebugInfoRenderer();
@@ -28,10 +34,27 @@ public class UIRenderer {
     }
     
     /**
+     * Set the render backend for UI rendering (Stage 4).
+     * 
+     * @param backend the backend to use, or null to use legacy rendering
+     */
+    public void setBackend(RenderBackend backend) {
+        this.backend = backend;
+    }
+    
+    /**
      * Draw crosshair in the center of the screen.
+     * 
+     * <p><b>Stage 4:</b> Uses backend if available, otherwise falls back to legacy rendering.
      */
     public void drawCrosshair(int screenWidth, int screenHeight) {
-        crosshairRenderer.render(screenWidth, screenHeight);
+        if (backend != null) {
+            // Stage 4: Use backend architecture
+            crosshairRenderer.render(screenWidth, screenHeight, backend);
+        } else {
+            // Legacy fallback
+            crosshairRenderer.render(screenWidth, screenHeight);
+        }
     }
     
     /**
