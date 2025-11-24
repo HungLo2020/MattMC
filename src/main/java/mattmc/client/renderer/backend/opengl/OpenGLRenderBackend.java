@@ -823,6 +823,24 @@ public class OpenGLRenderBackend implements RenderBackend {
     }
     
     @Override
+    public void setColor(int rgb, float alpha) {
+        float r = ((rgb >> 16) & 0xFF) / 255f;
+        float g = ((rgb >> 8) & 0xFF) / 255f;
+        float b = (rgb & 0xFF) / 255f;
+        glColor4f(r, g, b, alpha);
+    }
+    
+    @Override
+    public void fillRect(float x, float y, float width, float height) {
+        glBegin(GL_QUADS);
+        glVertex2f(x, y);
+        glVertex2f(x + width, y);
+        glVertex2f(x + width, y + height);
+        glVertex2f(x, y + height);
+        glEnd();
+    }
+    
+    @Override
     public void drawText(String text, float x, float y, float scale) {
         mattmc.client.renderer.backend.opengl.gui.components.TextRenderer.drawText(text, x, y, scale);
     }

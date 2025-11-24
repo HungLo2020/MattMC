@@ -304,6 +304,44 @@ public interface RenderBackend {
     void resetColor();
     
     /**
+     * Set the current drawing color from an RGB value and alpha.
+     * 
+     * <p>This method extracts RGB components from the integer value and sets
+     * the current drawing color for subsequent rendering operations.
+     * 
+     * <p>Backend-specific implementations:
+     * <ul>
+     *   <li><b>OpenGL:</b> Calls glColor4f with extracted RGB components</li>
+     *   <li><b>Vulkan (future):</b> Would set color uniform or push constant</li>
+     *   <li><b>Debug:</b> Records color set command</li>
+     * </ul>
+     * 
+     * @param rgb RGB color value (0xRRGGBB format)
+     * @param alpha Alpha value (0.0 to 1.0)
+     */
+    void setColor(int rgb, float alpha);
+    
+    /**
+     * Fill a rectangle with the current color.
+     * 
+     * <p>Draws a filled rectangle using the current drawing color.
+     * The rectangle is specified by its top-left corner and dimensions.
+     * 
+     * <p>Backend-specific implementations:
+     * <ul>
+     *   <li><b>OpenGL:</b> Uses GL_QUADS to render a filled quad</li>
+     *   <li><b>Vulkan (future):</b> Would use a quad mesh or geometry shader</li>
+     *   <li><b>Debug:</b> Records rectangle fill command</li>
+     * </ul>
+     * 
+     * @param x X position of the rectangle (top-left corner)
+     * @param y Y position of the rectangle (top-left corner)
+     * @param width Width of the rectangle
+     * @param height Height of the rectangle
+     */
+    void fillRect(float x, float y, float width, float height);
+    
+    /**
      * Draw text at the specified position with the given scale.
      * 
      * <p>Renders text using the backend's font system. The position represents the
