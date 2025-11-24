@@ -2,6 +2,7 @@ package mattmc.client.renderer;
 
 import mattmc.client.renderer.backend.DrawCommand;
 import mattmc.client.renderer.backend.RenderBackend;
+import mattmc.client.renderer.backend.opengl.gui.components.TextRenderer;
 import mattmc.world.level.block.Block;
 
 /**
@@ -16,16 +17,25 @@ import mattmc.world.level.block.Block;
  *   <li>Uses {@link UIRenderLogic} to build draw commands (what to draw)</li>
  *   <li>Submits commands to the {@link RenderBackend} (how to draw)</li>
  *   <li>Delegates projection setup to the backend (backend-agnostic)</li>
+ *   <li>Uses backend blur and border drawing methods (backend-agnostic)</li>
  * </ul>
  * 
- * <p><b>Note:</b> Blur effects have been removed in this backend-agnostic version.
- * The blur functionality was tightly coupled to OpenGL framebuffers and would require
- * significant refactoring to support multiple backends. For now, this displays block
- * names without the blurred background.
+ * <p><b>Blur Effects:</b> Now implemented through backend abstraction. The backend
+ * interface provides {@link RenderBackend#applyRegionalBlur} for blur effects and
+ * {@link RenderBackend#drawRoundedRectBorder} for rounded borders, allowing the
+ * frosted glass UI effect while maintaining backend abstraction.
  */
 public class BlockNameDisplay {
     private static final int PADDING = 10;
     private static final int MARGIN = 10;
+    
+    // Blue outline parameters matching tooltip style
+    private static final float CORNER_RADIUS = 9f;
+    private static final float BORDER_WIDTH = 6f;
+    private static final float BORDER_R = 0.3f;
+    private static final float BORDER_G = 0.5f;
+    private static final float BORDER_B = 1.0f;
+    private static final float BORDER_ALPHA = 1.0f;
     
     
     private final UIRenderLogic logic;
@@ -57,7 +67,7 @@ public class BlockNameDisplay {
      * Render the block name display in the top-left corner.
      * 
      * <p>This method is completely backend-agnostic. It delegates projection setup,
-     * builds draw commands, and submits them to the backend for rendering.
+     * blur effects, rounded borders, and text rendering to the backend for rendering.
      * 
      * @param screenWidth The width of the screen in pixels
      * @param screenHeight The height of the screen in pixels
@@ -78,19 +88,33 @@ public class BlockNameDisplay {
             return;
         }
         
+        // Text scale
+        float textScale = 1.5f;
+        
+        // Measure text dimensions
+        int textWidth = (int) TextRenderer.getTextWidth(blockName, textScale);
+        int textHeight = (int) TextRenderer.getTextHeight(blockName, textScale);
+        
+        // Calculate box dimensions
+        int boxWidth = textWidth + (PADDING * 2);
+        int boxHeight = textHeight + (PADDING * 2);
+        
+        // Position in top-left corner with margin
+        int x = MARGIN;
+        int y = MARGIN;
+        
+        // Apply blur effect to the background (delegated to backend)
+        backend.applyRegionalBlur(x, y, boxWidth, boxHeight, screenWidth, screenHeight);
+        
         // Setup 2D projection for UI rendering (delegated to backend)
         backend.setup2DProjection(screenWidth, screenHeight);
         
-        // Build draw commands using backend-agnostic logic
-        buffer.clear();
-        logic.buildBlockNameDisplayCommands(blockName, MARGIN, MARGIN, buffer);
+        // Draw blue rounded border (delegated to backend)
+        backend.drawRoundedRectBorder(x, y, boxWidth, boxHeight, CORNER_RADIUS,
+                                     BORDER_WIDTH, BORDER_R, BORDER_G, BORDER_B, BORDER_ALPHA);
         
-        // Submit commands to backend with frame management
-        backend.beginFrame();
-        for (DrawCommand cmd : buffer.getCommands()) {
-            backend.submit(cmd);
-        }
-        backend.endFrame();
+        // Draw the block name text using TextRenderer
+        TextRenderer.drawText(blockName, x + PADDING, y + PADDING, textScale);
         
         // Restore projection (delegated to backend)
         backend.restore2DProjection();

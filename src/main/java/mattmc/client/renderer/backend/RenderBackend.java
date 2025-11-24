@@ -229,4 +229,61 @@ public interface RenderBackend {
      * @return VRAM usage string (e.g., "2048 MB / 4096 MB"), or "N/A" if not available
      */
     String getGPUVRAMUsage();
+    
+    /**
+     * Apply a Gaussian blur effect to a rectangular region of the screen.
+     * 
+     * <p>This method captures the current screen content in the specified region,
+     * applies a Gaussian blur with optional darkening/tinting, and renders it back
+     * to the same region. This is commonly used for UI backgrounds to create
+     * a "frosted glass" effect.
+     * 
+     * <p><b>Implementation Notes:</b>
+     * <ul>
+     *   <li><b>OpenGL:</b> Uses framebuffers, shaders, and texture sampling for blur</li>
+     *   <li><b>Vulkan (future):</b> Would use compute shaders or render passes</li>
+     *   <li><b>Debug:</b> Records blur command for inspection</li>
+     * </ul>
+     * 
+     * <p>The blur effect applies a two-pass Gaussian blur (horizontal then vertical)
+     * and optionally darkens the result to create a subtle overlay effect suitable
+     * for UI backgrounds.
+     * 
+     * @param x X position of the rectangular region (top-left corner)
+     * @param y Y position of the rectangular region (top-left corner)
+     * @param width Width of the rectangular region
+     * @param height Height of the rectangular region
+     * @param screenWidth Full screen width for proper coordinate mapping
+     * @param screenHeight Full screen height for proper coordinate mapping
+     */
+    void applyRegionalBlur(float x, float y, float width, float height, 
+                          int screenWidth, int screenHeight);
+    
+    /**
+     * Draw a rounded rectangle border (outline only, not filled).
+     * 
+     * <p>This method draws a border around a rectangle with rounded corners.
+     * The border is drawn as a continuous line with specified width and color.
+     * This is commonly used for UI elements like tooltips and overlays.
+     * 
+     * <p><b>Implementation Notes:</b>
+     * <ul>
+     *   <li><b>OpenGL:</b> Uses GL_LINE_STRIP with trigonometric calculations for corners</li>
+     *   <li><b>Vulkan (future):</b> Would use line rendering or geometry shaders</li>
+     *   <li><b>Debug:</b> Records border command for inspection</li>
+     * </ul>
+     * 
+     * @param x X position of the rectangle (top-left corner)
+     * @param y Y position of the rectangle (top-left corner)
+     * @param width Width of the rectangle
+     * @param height Height of the rectangle
+     * @param radius Corner radius for rounding
+     * @param borderWidth Width of the border line
+     * @param r Red component of border color (0.0-1.0)
+     * @param g Green component of border color (0.0-1.0)
+     * @param b Blue component of border color (0.0-1.0)
+     * @param a Alpha component of border color (0.0-1.0)
+     */
+    void drawRoundedRectBorder(float x, float y, float width, float height, float radius,
+                               float borderWidth, float r, float g, float b, float a);
 }
