@@ -348,7 +348,8 @@ public class OpenGLRenderBackend implements RenderBackend {
             case -5:
                 // Delegate to ItemRenderer's existing rendering methods
                 // Use the standard rendering path which handles all item types
-                ItemRenderer.renderItem(itemInfo.stack, itemInfo.x, itemInfo.y, itemInfo.size);
+                // applyInventoryOffset=true for proper hotbar positioning (matches legacy behavior)
+                ItemRenderer.renderItem(itemInfo.stack, itemInfo.x, itemInfo.y, itemInfo.size, true);
                 break;
         }
     }
