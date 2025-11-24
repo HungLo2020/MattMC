@@ -48,26 +48,5 @@ public class SystemInfoTest {
         assertTrue(usage == -1 || (usage >= 0 && usage <= 100));
     }
     
-    @Test
-    public void testGetGPUName() {
-        // GPU name might not be available in headless environment
-        String gpuName = SystemInfo.getGPUName();
-        assertNotNull(gpuName);
-        // Should be either "Unknown" or an actual GPU name
-    }
-    
-    @Test
-    public void testGetGPUUsage() {
-        int usage = SystemInfo.getGPUUsage();
-        // Should be -1 (not available) in standard Java
-        assertEquals(-1, usage);
-    }
-    
-    @Test
-    public void testGetGPUVRAMUsage() {
-        String vram = SystemInfo.getGPUVRAMUsage();
-        assertNotNull(vram);
-        // Should be "N/A" in standard Java
-        assertEquals("N/A", vram);
-    }
+
 }

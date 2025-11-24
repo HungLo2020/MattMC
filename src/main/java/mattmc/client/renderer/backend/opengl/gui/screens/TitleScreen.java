@@ -11,7 +11,8 @@ import mattmc.client.renderer.backend.opengl.gui.components.ButtonRenderer;
 import mattmc.client.renderer.backend.opengl.gui.components.TextRenderer;
 import mattmc.client.gui.SplashTextLoader;
 import mattmc.client.util.CoordinateUtils;
-import mattmc.client.renderer.backend.opengl.util.ColorUtils;
+import mattmc.util.ColorUtils;
+import mattmc.client.renderer.backend.opengl.OpenGLColorHelper;
 import mattmc.util.MathUtils;
 
 import java.util.ArrayList;
@@ -201,7 +202,7 @@ public final class TitleScreen implements Screen {
     }
 
     private void drawText(String text, float x, float y, float scale, int rgb) {
-        ColorUtils.setGLColor(rgb, 1f);
+        OpenGLColorHelper.setGLColor(rgb, 1f);
         TextRenderer.drawText(text, x, y, scale);
     }
 
@@ -285,7 +286,7 @@ public final class TitleScreen implements Screen {
         
         // Draw text centered on the anchor point
         // Draw in yellow color (0xFFFF00)
-        ColorUtils.setGLColor(0xFFFF00, 1f);
+        OpenGLColorHelper.setGLColor(0xFFFF00, 1f);
         TextRenderer.drawText(splashText, offsetX, 0, animatedScale);
         
         // Restore matrix state

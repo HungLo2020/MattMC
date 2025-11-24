@@ -1,11 +1,9 @@
-package mattmc.client.renderer.backend.opengl.util;
-
-import mattmc.util.MathUtils;
-import static org.lwjgl.opengl.GL11.*;
+package mattmc.util;
 
 /**
  * Utility class for color manipulation operations.
  * Handles RGB color transformations, extractions, brightness adjustments, and tinting.
+ * This contains pure math operations with no OpenGL dependencies.
  */
 public final class ColorUtils {
     
@@ -152,17 +150,5 @@ public final class ColorUtils {
         int b = MathUtils.min(255, (int)((baseB * tintB / 255.0f) * brightnessFactor));
         
         return packRGB(r, g, b);
-    }
-    
-    /**
-     * Set the current OpenGL color from an RGB value and alpha.
-     * @param rgb RGB color value
-     * @param a Alpha value (0.0 to 1.0)
-     */
-    public static void setGLColor(int rgb, float a) {
-        float r = extractRed(rgb) / 255f;
-        float g = extractGreen(rgb) / 255f;
-        float b = extractBlue(rgb) / 255f;
-        glColor4f(r, g, b, a);
     }
 }

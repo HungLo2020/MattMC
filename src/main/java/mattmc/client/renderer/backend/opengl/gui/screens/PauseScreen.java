@@ -10,7 +10,8 @@ import mattmc.client.gui.components.Button;
 import mattmc.client.renderer.backend.opengl.gui.components.ButtonRenderer;
 import mattmc.client.renderer.backend.opengl.gui.components.TextRenderer;
 import mattmc.client.util.CoordinateUtils;
-import mattmc.client.renderer.backend.opengl.util.ColorUtils;
+import mattmc.util.ColorUtils;
+import mattmc.client.renderer.backend.opengl.OpenGLColorHelper;
 import mattmc.world.level.Level;
 import mattmc.world.level.storage.LevelStorageSource;
 
@@ -173,7 +174,7 @@ public final class PauseScreen implements Screen {
         glEnable(GL_BLEND);
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
         
-        ColorUtils.setGLColor(0x000000, 0.5f);
+        OpenGLColorHelper.setGLColor(0x000000, 0.5f);
         glBegin(GL_QUADS);
         glVertex2f(0, 0);
         glVertex2f(w, 0);
@@ -217,7 +218,7 @@ public final class PauseScreen implements Screen {
     }
 
     private void drawText(String text, float x, float y, float scale, int rgb) {
-        ColorUtils.setGLColor(rgb, 1f);
+        OpenGLColorHelper.setGLColor(rgb, 1f);
         TextRenderer.drawText(text, x, y, scale);
     }
 

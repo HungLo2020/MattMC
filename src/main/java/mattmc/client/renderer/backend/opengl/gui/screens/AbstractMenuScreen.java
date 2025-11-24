@@ -6,7 +6,8 @@ import mattmc.client.renderer.backend.opengl.Window;
 import mattmc.client.gui.components.Button;
 import mattmc.client.renderer.backend.opengl.gui.components.TextRenderer;
 import mattmc.client.util.CoordinateUtils;
-import mattmc.client.renderer.backend.opengl.util.ColorUtils;
+import mattmc.util.ColorUtils;
+import mattmc.client.renderer.backend.opengl.OpenGLColorHelper;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -124,7 +125,7 @@ public abstract class AbstractMenuScreen implements Screen {
     }
     
     protected void drawText(String text, float x, float y, float scale, int rgb) {
-        ColorUtils.setGLColor(rgb, 1f);
+        OpenGLColorHelper.setGLColor(rgb, 1f);
         TextRenderer.drawText(text, x, y, scale);
     }
 }

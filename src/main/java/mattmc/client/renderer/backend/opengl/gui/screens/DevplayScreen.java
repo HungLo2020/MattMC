@@ -14,7 +14,8 @@ import mattmc.world.entity.player.PlayerInput;
 import mattmc.client.renderer.backend.opengl.LevelRenderer;
 import mattmc.client.renderer.UIRenderer;
 import mattmc.client.renderer.backend.opengl.BlockFaceGeometry;
-import mattmc.client.renderer.backend.opengl.util.ColorUtils;
+import mattmc.util.ColorUtils;
+import mattmc.client.renderer.backend.opengl.OpenGLColorHelper;
 import mattmc.world.item.Inventory;
 import mattmc.world.level.chunk.ChunkUtils;
 import mattmc.world.level.chunk.LevelChunk;
@@ -356,7 +357,7 @@ public final class DevplayScreen implements Screen {
             
             // Set up line rendering
             glBegin(GL_LINES);
-            ColorUtils.setGLColor(0x000000, 1f);  // Black outline
+            OpenGLColorHelper.setGLColor(0x000000, 1f);  // Black outline
             
             // Draw complete outline around the targeted block
             BlockFaceGeometry.drawCompleteBlockOutline(hit.x, ChunkUtils.localToWorldY(hit.y), hit.z);

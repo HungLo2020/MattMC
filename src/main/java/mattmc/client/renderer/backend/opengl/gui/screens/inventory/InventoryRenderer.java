@@ -11,7 +11,8 @@ import mattmc.client.renderer.backend.opengl.BlurRenderer;
 import mattmc.client.renderer.backend.opengl.TooltipRenderer;
 import mattmc.client.renderer.backend.opengl.Texture;
 import mattmc.client.util.CoordinateUtils;
-import mattmc.client.renderer.backend.opengl.util.ColorUtils;
+import mattmc.util.ColorUtils;
+import mattmc.client.renderer.backend.opengl.OpenGLColorHelper;
 import mattmc.world.item.Inventory;
 import mattmc.world.item.Item;
 import mattmc.world.item.ItemStack;
@@ -66,7 +67,7 @@ public class InventoryRenderer {
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
         
         // Semi-transparent black background
-        ColorUtils.setGLColor(0x000000, 0.5f);
+        OpenGLColorHelper.setGLColor(0x000000, 0.5f);
         glBegin(GL_QUADS);
         glVertex2f(0, 0);
         glVertex2f(screenWidth, 0);

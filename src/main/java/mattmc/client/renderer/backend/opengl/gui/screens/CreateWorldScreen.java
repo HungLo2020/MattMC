@@ -11,7 +11,8 @@ import mattmc.client.renderer.backend.opengl.gui.components.ButtonRenderer;
 import mattmc.client.gui.components.EditBox;
 import mattmc.client.renderer.backend.opengl.gui.components.TextRenderer;
 import mattmc.client.util.CoordinateUtils;
-import mattmc.client.renderer.backend.opengl.util.ColorUtils;
+import mattmc.util.ColorUtils;
+import mattmc.client.renderer.backend.opengl.OpenGLColorHelper;
 import mattmc.world.level.storage.LevelStorageSource;
 
 import java.util.ArrayList;
@@ -268,12 +269,12 @@ public final class CreateWorldScreen implements Screen {
     private void drawTextField(EditBox tf) {
         // Background
         int bgColor = tf.isFocused() ? 0x000000 : 0x222222;
-        ColorUtils.setGLColor(bgColor, 0.8f);
+        OpenGLColorHelper.setGLColor(bgColor, 0.8f);
         fillRect(tf.x, tf.y, tf.w, tf.h);
         
         // Border
         int borderColor = tf.isFocused() ? 0xFFFFFF : 0x888888;
-        ColorUtils.setGLColor(borderColor, 1f);
+        OpenGLColorHelper.setGLColor(borderColor, 1f);
         glBegin(GL_LINE_LOOP);
         glVertex2f(tf.x, tf.y);
         glVertex2f(tf.x + tf.w, tf.y);
@@ -291,7 +292,7 @@ public final class CreateWorldScreen implements Screen {
         if (tf.isFocused() && (System.currentTimeMillis() / 500) % 2 == 0) {
             float textWidth = TextRenderer.getTextWidth(text, 1.0f);
             float cursorX = tf.x + 8f + textWidth;
-            ColorUtils.setGLColor(0xFFFFFF, 1f);
+            OpenGLColorHelper.setGLColor(0xFFFFFF, 1f);
             glBegin(GL_LINES);
             glVertex2f(cursorX, tf.y + 6f);
             glVertex2f(cursorX, tf.y + tf.h - 6f);
@@ -327,7 +328,7 @@ public final class CreateWorldScreen implements Screen {
     }
 
     private void drawText(String text, float x, float y, float scale, int rgb) {
-        ColorUtils.setGLColor(rgb, 1f);
+        OpenGLColorHelper.setGLColor(rgb, 1f);
         TextRenderer.drawText(text, x, y, scale);
     }
 
