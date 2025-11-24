@@ -2,20 +2,17 @@ package mattmc.client.renderer.level;
 
 import mattmc.world.entity.player.LocalPlayer;
 import mattmc.world.level.chunk.Region;
-import mattmc.world.level.block.Block;
 import mattmc.world.level.chunk.LevelChunk;
-
-import mattmc.client.renderer.backend.opengl.ChunkRenderer;
 
 /**
  * Handles rendering of entire regions (32x32 chunks).
  * 
- * <p>This class is backend-agnostic and coordinates chunk rendering through
- * the ChunkRenderer. It contains minimal rendering-specific code and focuses
- * on the game logic of determining which chunks to render.
+ * <p>This class focuses on game logic (render distance, chunk iteration) and is mostly
+ * backend-agnostic. It uses a callback pattern to delegate actual rendering to the caller.
  * 
  * <p><b>Refactored:</b> This class has been moved from backend/opengl to renderer/level
- * and made agnostic to the rendering backend. Direct OpenGL calls have been removed.
+ * and refactored to use callbacks instead of direct OpenGL calls. The game logic of
+ * determining which chunks to render is separated from the rendering implementation.
  * 
  * <p>Optimizations:
  * <ul>
@@ -24,15 +21,9 @@ import mattmc.client.renderer.backend.opengl.ChunkRenderer;
  * </ul>
  */
 public class RegionRenderer {
-    private final ChunkRenderer chunkRenderer;
-    
     // Render distance in chunks (similar to Minecraft's render distance setting)
     // 8 chunks = 128 blocks radius, similar to Minecraft's render distance 8
     public static final int RENDER_DISTANCE = 8;
-    
-    public RegionRenderer() {
-        this.chunkRenderer = new ChunkRenderer();
-    }
     
     /**
      * Render all chunks in a region with optimizations.
@@ -45,9 +36,6 @@ public class RegionRenderer {
         // Get player position in chunk coordinates
         float playerChunkX = player.getX() / LevelChunk.WIDTH;
         float playerChunkZ = player.getZ() / LevelChunk.DEPTH;
-        
-        int chunksRendered = 0;
-        int chunksCulled = 0;
         
         for (int cx = 0; cx < Region.REGION_SIZE; cx++) {
             for (int cz = 0; cz < Region.REGION_SIZE; cz++) {
@@ -64,7 +52,6 @@ public class RegionRenderer {
                 float dx = Math.abs(chunkX - playerChunkX);
                 float dz = Math.abs(chunkZ - playerChunkZ);
                 if (dx + dz > RENDER_DISTANCE * 1.5f) {
-                    chunksCulled++;
                     continue;  // Too far away
                 }
                 
@@ -74,8 +61,6 @@ public class RegionRenderer {
                 
                 // Render via callback (allows backend-specific transform handling)
                 renderCallback.renderChunk(chunk, chunkWorldX, 0, chunkWorldZ);
-                
-                chunksRendered++;
             }
         }
     }
