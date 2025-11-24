@@ -1,6 +1,7 @@
 package mattmc.client.renderer.backend.opengl;
 
 import mattmc.client.renderer.chunk.ChunkMeshBuffer;
+import mattmc.client.renderer.chunk.ChunkMeshRegistry;
 
 import mattmc.client.renderer.VoxelLitShader;
 import mattmc.client.renderer.backend.opengl.TextureAtlas;
@@ -16,10 +17,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
+ * OpenGL implementation of chunk mesh registry and rendering.
  * Handles rendering of chunks using VBO/VAO with texture atlas and per-vertex lighting.
  * Supports gamma-corrected lighting with configurable gamma curve.
  */
-public class ChunkRenderer {
+public class ChunkRenderer implements ChunkMeshRegistry {
     private static final Logger logger = LoggerFactory.getLogger(ChunkRenderer.class);
 
     // Calculate expected chunk count based on maximum render distance

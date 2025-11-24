@@ -2,7 +2,7 @@ package mattmc.client.renderer;
 import mattmc.client.renderer.backend.RenderPass;
 import mattmc.client.renderer.backend.DrawCommand;
 
-import mattmc.client.renderer.backend.opengl.ChunkRenderer;
+import mattmc.client.renderer.chunk.ChunkMeshRegistry;
 import mattmc.client.renderer.Frustum;
 import mattmc.world.level.Level;
 import mattmc.world.level.chunk.LevelChunk;
@@ -51,7 +51,7 @@ import org.slf4j.LoggerFactory;
 public class ChunkRenderLogic {
     private static final Logger logger = LoggerFactory.getLogger(ChunkRenderLogic.class);
     
-    private final ChunkRenderer chunkRenderer;
+    private final ChunkMeshRegistry meshRegistry;
     private final Frustum frustum;
     
     // Statistics
@@ -60,13 +60,13 @@ public class ChunkRenderLogic {
     private int culledChunks = 0;
     
     /**
-     * Creates chunk render logic with the given renderer and frustum.
+     * Creates chunk render logic with the given mesh registry and frustum.
      * 
-     * @param chunkRenderer the chunk renderer for checking mesh availability
+     * @param meshRegistry the mesh registry for checking mesh availability
      * @param frustum the frustum for visibility culling
      */
-    public ChunkRenderLogic(ChunkRenderer chunkRenderer, Frustum frustum) {
-        this.chunkRenderer = chunkRenderer;
+    public ChunkRenderLogic(ChunkMeshRegistry meshRegistry, Frustum frustum) {
+        this.meshRegistry = meshRegistry;
         this.frustum = frustum;
     }
     
@@ -109,13 +109,13 @@ public class ChunkRenderLogic {
             
             // Skip chunks without mesh data
             // Note: chunks are pre-registered in LevelRenderer.render() before buildCommands() is called
-            if (!chunkRenderer.hasChunkMesh(chunk)) {
+            if (!meshRegistry.hasChunkMesh(chunk)) {
                 culledChunks++;
                 continue;
             }
             
             // Get mesh ID for this chunk
-            int meshId = chunkRenderer.getMeshIdForChunk(chunk);
+            int meshId = meshRegistry.getMeshIdForChunk(chunk);
             if (meshId < 0) {
                 // Chunk doesn't have a mesh ID assigned yet
                 culledChunks++;
@@ -123,7 +123,7 @@ public class ChunkRenderLogic {
             }
             
             // Get material ID (all chunks use the same material for now)
-            int materialId = chunkRenderer.getDefaultMaterialId();
+            int materialId = meshRegistry.getDefaultMaterialId();
             
             // Get transform ID for this chunk's world position
             int transformId = getTransformIdForChunk(chunk);
