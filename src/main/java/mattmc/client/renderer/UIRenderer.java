@@ -42,6 +42,7 @@ public class UIRenderer {
     public void setBackend(RenderBackend backend) {
         this.backend = backend;
         // Propagate backend to all child renderers
+        crosshairRenderer.setBackend(backend);
         hotbarRenderer.setBackend(backend);
         commandUIRenderer.setBackend(backend);
         debugInfoRenderer.setBackend(backend);
@@ -51,16 +52,10 @@ public class UIRenderer {
     /**
      * Draw crosshair in the center of the screen.
      * 
-     * <p><b>Stage 4:</b> Uses backend if available, otherwise falls back to legacy rendering.
+     * <p><b>Stage 4:</b> Uses backend architecture via child renderer.
      */
     public void drawCrosshair(int screenWidth, int screenHeight) {
-        if (backend != null) {
-            // Stage 4: Use backend architecture
-            crosshairRenderer.render(screenWidth, screenHeight, backend);
-        } else {
-            // Legacy fallback
-            crosshairRenderer.render(screenWidth, screenHeight);
-        }
+        crosshairRenderer.render(screenWidth, screenHeight);
     }
     
     /**

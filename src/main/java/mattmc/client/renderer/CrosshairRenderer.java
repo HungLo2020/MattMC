@@ -16,6 +16,7 @@ public class CrosshairRenderer {
     
     private final UIRenderLogic logic;
     private final CommandBuffer buffer;
+    private RenderBackend backend = null;
     
     /**
      * Create a new crosshair renderer.
@@ -26,49 +27,56 @@ public class CrosshairRenderer {
     }
     
     /**
+     * Set the render backend to use for rendering (Stage 4).
+     * 
+     * @param backend the backend to use, or null to use legacy rendering
+     */
+    public void setBackend(RenderBackend backend) {
+        this.backend = backend;
+    }
+    
+    /**
      * Draw crosshair in the center of the screen using backend architecture.
      * 
      * @param screenWidth screen width
-     * @param screenHeight screen height  
-     * @param backend the render backend to submit commands to
+     * @param screenHeight screen height
      */
-    public void render(int screenWidth, int screenHeight, RenderBackend backend) {
-        // Setup 2D projection for UI rendering (infrastructure)
-        UIRenderHelper.setup2DProjection(screenWidth, screenHeight);
-        
-        // Stage 4: Build commands using logic layer (no GL calls in logic)
-        buffer.clear();
-        logic.buildCrosshairCommands(screenWidth, screenHeight, buffer);
-        
-        // Submit commands to backend
-        for (DrawCommand cmd : buffer.getCommands()) {
-            backend.submit(cmd);
+    public void render(int screenWidth, int screenHeight) {
+        // Use backend if available (Stage 4)
+        if (backend != null) {
+            // Setup 2D projection for UI rendering (infrastructure)
+            UIRenderHelper.setup2DProjection(screenWidth, screenHeight);
+            
+            // Stage 4: Build commands using logic layer (no GL calls in logic)
+            buffer.clear();
+            logic.buildCrosshairCommands(screenWidth, screenHeight, buffer);
+            
+            // Submit commands to backend
+            for (DrawCommand cmd : buffer.getCommands()) {
+                backend.submit(cmd);
+            }
+            
+            // Restore projection (infrastructure)
+            UIRenderHelper.restore2DProjection();
+        } else {
+            // Legacy fallback
+            renderLegacy(screenWidth, screenHeight);
         }
-        
-        // Restore projection (infrastructure)
-        UIRenderHelper.restore2DProjection();
     }
     
     /**
      * Legacy render method for compatibility.
-     * This method is deprecated and will be removed once all callers are updated.
+     * This method is deprecated and will be removed once backend is always provided.
      * 
      * @param screenWidth screen width
      * @param screenHeight screen height
-     * @deprecated Use {@link #render(int, int, RenderBackend)} instead
+     * @deprecated Backend should always be provided via setBackend()
      */
     @Deprecated
-    public void render(int screenWidth, int screenHeight) {
+    private void renderLegacy(int screenWidth, int screenHeight) {
         // Fallback to direct rendering if no backend provided
         // This maintains compatibility during transition
-        glMatrixMode(GL_PROJECTION);
-        glPushMatrix();
-        glLoadIdentity();
-        glOrtho(0, screenWidth, screenHeight, 0, -1, 1);
-        
-        glMatrixMode(GL_MODELVIEW);
-        glPushMatrix();
-        glLoadIdentity();
+        UIRenderHelper.setup2DProjection(screenWidth, screenHeight);
         
         // Draw white crosshair (original implementation)
         float centerX = screenWidth / 2f;
@@ -90,10 +98,7 @@ public class CrosshairRenderer {
         glVertex2f(centerX - thickness/2, centerY + size);
         glEnd();
         
-        // Restore matrices
-        glPopMatrix();
-        glMatrixMode(GL_PROJECTION);
-        glPopMatrix();
-        glMatrixMode(GL_MODELVIEW);
+        // Restore projection
+        UIRenderHelper.restore2DProjection();
     }
 }
