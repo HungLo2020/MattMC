@@ -1,5 +1,6 @@
 package mattmc.client.renderer.backend.opengl;
 
+import mattmc.client.renderer.window.WindowHandle;
 import mattmc.client.settings.OptionsManager;
 import org.lwjgl.opengl.GL;
 import static org.lwjgl.glfw.GLFW.*;
@@ -7,7 +8,7 @@ import static org.lwjgl.opengl.GL11.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public final class Window implements AutoCloseable {
+public final class Window implements WindowHandle, AutoCloseable {
     private static final Logger logger = LoggerFactory.getLogger(Window.class);
 
     private final long handle;
