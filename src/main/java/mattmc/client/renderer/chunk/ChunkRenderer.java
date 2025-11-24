@@ -262,4 +262,17 @@ public class ChunkRenderer {
 			logger.info("Initialized VoxelLitShader for chunk rendering");
 		}
 	}
+	
+	/**
+	 * Get the chunk for given coordinates from the chunk registry.
+	 * Returns null if the chunk is not registered.
+	 * 
+	 * @param chunkX chunk X coordinate
+	 * @param chunkZ chunk Z coordinate
+	 * @return the registered chunk or null
+	 */
+	public LevelChunk getRegisteredChunk(int chunkX, int chunkZ) {
+		long key = chunkKey(chunkX, chunkZ);
+		return chunkByKey.get(key);
+	}
 }

@@ -114,10 +114,12 @@ public class LevelRenderer {
         // This makes newly loaded chunk meshes available for rendering
         List<ChunkMeshBuffer> completedMeshBuffers = world.getAsyncLoader().collectCompletedMeshBuffers();
         for (ChunkMeshBuffer meshBuffer : completedMeshBuffers) {
-            chunkRenderer.uploadMeshBuffer(meshBuffer);
+            boolean uploaded = chunkRenderer.uploadMeshBuffer(meshBuffer);
             
-            // Register mesh with backend
-            registerMeshWithBackend(meshBuffer);
+            // Register mesh with backend if upload was successful
+            if (uploaded) {
+                registerMeshWithBackend(meshBuffer);
+            }
         }
         
         // Handle dirty chunks
@@ -157,31 +159,44 @@ public class LevelRenderer {
      * Register a mesh with the backend after it's been uploaded.
      */
     private void registerMeshWithBackend(ChunkMeshBuffer meshBuffer) {
-        // Find the chunk for this mesh buffer
-        long key = meshBuffer.getChunkX() | ((long)meshBuffer.getChunkZ() << 32);
+        // Get the chunk from the renderer's registry (same one used by uploadMeshBuffer)
+        LevelChunk chunk = chunkRenderer.getRegisteredChunk(
+            meshBuffer.getChunkX(), 
+            meshBuffer.getChunkZ()
+        );
         
-        // Get the chunk to find its mesh ID
-        for (LevelChunk chunk : currentLevel.getLoadedChunks()) {
-            if (chunk.chunkX() == meshBuffer.getChunkX() && 
-                chunk.chunkZ() == meshBuffer.getChunkZ()) {
-                
-                int meshId = chunkRenderer.getMeshIdForChunk(chunk);
-                if (meshId >= 0) {
-                    ChunkVAO vao = chunkRenderer.getVAOByMeshId(meshId);
-                    if (vao != null) {
-                        // Register mesh with backend
-                        renderBackend.registerMesh(meshId, vao);
-                        
-                        // Register transform for this chunk
-                        int transformId = (chunk.chunkX() << 16) | (chunk.chunkZ() & 0xFFFF);
-                        float worldX = chunk.chunkX() * LevelChunk.WIDTH;
-                        float worldZ = chunk.chunkZ() * LevelChunk.DEPTH;
-                        renderBackend.registerTransform(transformId, worldX, 0, worldZ);
-                    }
-                }
-                break;
-            }
+        // If chunk is not registered or was unloaded, skip
+        if (chunk == null) {
+            return;
         }
+        
+        // Check if the chunk now has a mesh (it should after upload)
+        if (!chunkRenderer.hasChunkMesh(chunk)) {
+            // Mesh was empty, skip registration
+            return;
+        }
+        
+        // Get mesh ID for this chunk
+        int meshId = chunkRenderer.getMeshIdForChunk(chunk);
+        if (meshId < 0) {
+            return;
+        }
+        
+        // Get the VAO that was just created
+        ChunkVAO vao = chunkRenderer.getVAOByMeshId(meshId);
+        if (vao == null) {
+            // VAO lookup failed, this shouldn't happen
+            return;
+        }
+        
+        // Register mesh with backend
+        renderBackend.registerMesh(meshId, vao);
+        
+        // Register transform for this chunk
+        int transformId = (chunk.chunkX() << 16) | (chunk.chunkZ() & 0xFFFF);
+        float worldX = chunk.chunkX() * LevelChunk.WIDTH;
+        float worldZ = chunk.chunkZ() * LevelChunk.DEPTH;
+        renderBackend.registerTransform(transformId, worldX, 0, worldZ);
     }
     
     /**
