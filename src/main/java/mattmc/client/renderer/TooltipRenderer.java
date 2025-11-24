@@ -77,17 +77,17 @@ public class TooltipRenderer {
         // Apply blur to the tooltip region BEFORE drawing the tooltip
         backend.applyRegionalBlur(tooltipX, tooltipY, boxWidth, boxHeight, screenWidth, screenHeight);
         
-        // Build and submit tooltip rendering commands
-        CommandBuffer buffer = new CommandBuffer();
-        logic.buildTooltipCommands(text, tooltipX, tooltipY, screenWidth, screenHeight, buffer);
-        
-        for (DrawCommand cmd : buffer.getCommands()) {
-            backend.submit(cmd);
-        }
-        
         // Draw blue border with rounded corners
         backend.drawRoundedRectBorder(tooltipX, tooltipY, boxWidth, boxHeight, TOOLTIP_CORNER_RADIUS, 
                                      BORDER_WIDTH, BORDER_R, BORDER_G, BORDER_B, BORDER_ALPHA);
+        
+        // Reset GL color to white before drawing text so it appears white not blue
+        backend.resetColor();
+        
+        // Draw the text (positioned with padding)
+        float textX = tooltipX + TOOLTIP_PADDING;
+        float textY = tooltipY + TOOLTIP_PADDING;
+        TextRenderer.drawText(text, textX, textY, TEXT_SCALE);
         
         backend.endFrame();
         

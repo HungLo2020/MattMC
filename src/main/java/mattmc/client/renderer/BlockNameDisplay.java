@@ -113,6 +113,9 @@ public class BlockNameDisplay {
         backend.drawRoundedRectBorder(x, y, boxWidth, boxHeight, CORNER_RADIUS,
                                      BORDER_WIDTH, BORDER_R, BORDER_G, BORDER_B, BORDER_ALPHA);
         
+        // Reset GL color to white before drawing text so it appears white not blue
+        backend.resetColor();
+        
         // Draw the block name text using TextRenderer
         TextRenderer.drawText(blockName, x + PADDING, y + PADDING, textScale);
         

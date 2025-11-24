@@ -811,4 +811,14 @@ public class OpenGLRenderBackend implements RenderBackend {
         // Delegate to blur helper's drawing method
         blurHelper.drawRoundedRectBorder(x, y, width, height, radius, borderWidth, r, g, b, a);
     }
+    
+    /**
+     * Reset the OpenGL color to white.
+     * This ensures that subsequent drawing operations (like text) appear in white
+     * instead of inheriting colors from previous operations (like blue borders).
+     */
+    @Override
+    public void resetColor() {
+        glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
+    }
 }

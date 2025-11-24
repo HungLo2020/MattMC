@@ -286,4 +286,20 @@ public interface RenderBackend {
      */
     void drawRoundedRectBorder(float x, float y, float width, float height, float radius,
                                float borderWidth, float r, float g, float b, float a);
+    
+    /**
+     * Resets the current drawing color to white (1.0, 1.0, 1.0, 1.0).
+     * 
+     * <p>This is useful when drawing operations (like borders) set specific colors
+     * that need to be reset before drawing text or other elements that should appear
+     * in their default white color.
+     * 
+     * <p>Backend-specific implementations:
+     * <ul>
+     *   <li><b>OpenGL:</b> Calls glColor4f(1.0, 1.0, 1.0, 1.0)</li>
+     *   <li><b>Vulkan (future):</b> Would set color uniform or push constant</li>
+     *   <li><b>Debug:</b> Records color reset command</li>
+     * </ul>
+     */
+    void resetColor();
 }
