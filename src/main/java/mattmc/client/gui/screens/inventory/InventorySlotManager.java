@@ -1,6 +1,6 @@
 package mattmc.client.gui.screens.inventory;
 
-import mattmc.client.renderer.backend.opengl.Window;
+import mattmc.client.renderer.window.WindowHandle;
 import mattmc.client.util.CoordinateUtils;
 
 import java.util.ArrayList;
@@ -70,7 +70,7 @@ public class InventorySlotManager {
      * @param window Window reference for coordinate conversion
      * @return Inventory index of clicked slot, or -1 if no valid slot clicked
      */
-    public int findClickedSlot(double mouseXWin, double mouseYWin, float guiX, float guiY, float guiScale, Window window) {
+    public int findClickedSlot(double mouseXWin, double mouseYWin, float guiX, float guiY, float guiScale, WindowHandle window) {
         // Convert window mouse coordinates to framebuffer coordinates
         CoordinateUtils.Point2D fbCoords = CoordinateUtils.windowToFramebuffer(
             window.handle(), mouseXWin, mouseYWin

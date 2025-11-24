@@ -143,10 +143,18 @@ public class Block {
             return path;
         }
         
+        // Map directional faces (north/south/east/west) to "side" texture
+        if ("north".equals(face) || "south".equals(face) || "west".equals(face) || "east".equals(face)) {
+            path = paths.get("side");
+            if (path != null) {
+                return path;
+            }
+        }
+        
         // Fall back to "all" texture (for simple cube_all models)
         return paths.get("all");
     }
-    
+
     /**
      * Get the texture path for this block (backward compatibility).
      * Returns the "all" texture, or the first available texture.

@@ -1,6 +1,7 @@
 package mattmc.client.renderer;
 
-import mattmc.client.renderer.chunk.ChunkRenderer;
+import mattmc.client.renderer.backend.opengl.ChunkRenderer;
+import mattmc.client.renderer.Frustum;
 import mattmc.world.level.Level;
 import mattmc.world.level.chunk.LevelChunk;
 import org.junit.jupiter.api.BeforeEach;

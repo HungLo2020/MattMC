@@ -45,7 +45,7 @@ public final class SelectWorldScreen implements Screen {
 
     public SelectWorldScreen(Minecraft game) {
         this.game = game;
-        this.window = game.window();
+        this.window = (Window) game.window();
 
         glfwSetCursorPosCallback(window.handle(), (h, x, y) -> { mouseXWin = x; mouseYWin = y; });
         glfwSetMouseButtonCallback(window.handle(), (h, button, action, mods) -> {

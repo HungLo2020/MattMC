@@ -1,10 +1,15 @@
 package mattmc.client.renderer.backend.opengl;
 
+import mattmc.client.renderer.shader.ShaderProgram;
+
 import static org.lwjgl.opengl.GL11.*;
 import static org.lwjgl.opengl.GL20.*;
 
-/** Simple shader program wrapper for GLSL shaders. */
-public class Shader implements AutoCloseable {
+/** 
+ * OpenGL implementation of shader program wrapper for GLSL shaders.
+ * This class implements the backend-agnostic ShaderProgram interface.
+ */
+public class Shader implements ShaderProgram {
     private final int programId;
     
     public Shader(String vertexSource, String fragmentSource) {

@@ -1,5 +1,7 @@
 package mattmc.client.renderer.backend.opengl.gui.screens;
 
+import mattmc.client.gui.screens.AbstractMenuScreen;
+
 import mattmc.client.gui.screens.Screen;
 import mattmc.client.settings.OptionsManager;
 
@@ -80,7 +82,7 @@ public final class GameScreen extends AbstractMenuScreen {
             }
             
             mattmc.client.settings.OptionsManager.setFpsCap(commonValues[nextIndex]);
-            game.window().applyFpsCapSetting();
+            window.applyFpsCapSetting();
             game.updateFpsCap();
             recomputeLayout();
             return;

@@ -3,8 +3,8 @@ package mattmc.client.renderer.backend.opengl;
 import static org.lwjgl.opengl.GL11.*;
 import static org.lwjgl.opengl.GL13.*;
 
-/** Renders a panorama (cubemap skybox) with optional blur effect. */
-public final class PanoramaRenderer {
+/** OpenGL implementation of panorama (cubemap skybox) rendering with optional blur effect. */
+public final class OpenGLPanoramaRenderer implements mattmc.client.renderer.panorama.PanoramaRenderer {
     private final CubeMap sky;
     private float yawDeg = 0f;
     private float pitchDeg = 5f;
@@ -16,7 +16,7 @@ public final class PanoramaRenderer {
     private Framebuffer renderTarget;
     private int lastWidth = -1, lastHeight = -1;
 
-    public PanoramaRenderer(CubeMap sky) {
+    public OpenGLPanoramaRenderer(CubeMap sky) {
         this.sky = sky;
         this.blurEffect = new BlurEffect();
     }
@@ -28,6 +28,7 @@ public final class PanoramaRenderer {
      * @param height viewport height
      * @param blurred if true, applies a Gaussian blur shader effect
      */
+    @Override
     public void render(int width, int height, boolean blurred) {
         // Update rotation based on time since last render
         // This ensures smooth rotation synchronized with actual displayed frames
@@ -160,6 +161,7 @@ public final class PanoramaRenderer {
         glDisable(GL_TEXTURE_2D);
     }
 
+    @Override
     public void close() {
         sky.close();
         if (blurEffect != null) blurEffect.close();

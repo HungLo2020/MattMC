@@ -1,16 +1,14 @@
-package mattmc.client.renderer.backend.opengl;
-
-import java.nio.FloatBuffer;
-import org.lwjgl.system.MemoryStack;
-
-import static org.lwjgl.opengl.GL11.*;
+package mattmc.client.renderer;
 
 /**
- * Frustum culling implementation for OpenGL.
- * Extracts the view frustum planes from the current modelview and projection matrices
- * and provides methods to test if objects (like chunks) are visible.
+ * Frustum culling implementation that is rendering backend agnostic.
+ * Extracts the view frustum planes from provided matrices and provides methods
+ * to test if objects (like chunks) are visible.
  * 
- * Based on the classic Gribb-Hartmann method for extracting frustum planes.
+ * <p>This class contains NO OpenGL-specific code and works with pure math.
+ * It can receive matrices from any source (OpenGL, Vulkan, CPU-computed, etc.).
+ * 
+ * <p>Based on the classic Gribb-Hartmann method for extracting frustum planes.
  */
 public class Frustum {
     // Six frustum planes: left, right, bottom, top, near, far
@@ -25,95 +23,103 @@ public class Frustum {
     private static final int FAR = 5;
     
     /**
-     * Update the frustum planes from the current OpenGL matrices.
-     * Call this after setting up the projection and modelview matrices.
+     * Update the frustum planes from provided projection and modelview matrices.
+     * The matrices should be in column-major order (OpenGL/Vulkan standard).
+     * 
+     * @param projectionMatrix 16-element float array in column-major order
+     * @param modelviewMatrix 16-element float array in column-major order
      */
-    public void update() {
-        try (MemoryStack stack = MemoryStack.stackPush()) {
-            FloatBuffer proj = stack.mallocFloat(16);
-            FloatBuffer modl = stack.mallocFloat(16);
-            FloatBuffer clip = stack.mallocFloat(16);
-            
-            // Get current matrices
-            glGetFloatv(GL_PROJECTION_MATRIX, proj);
-            glGetFloatv(GL_MODELVIEW_MATRIX, modl);
-            
-            // Multiply projection * modelview to get clip matrix
-            multiplyMatrices(clip, proj, modl);
-            
-            // Extract the six frustum planes from the clip matrix
-            extractPlanes(clip);
+    public void update(float[] projectionMatrix, float[] modelviewMatrix) {
+        if (projectionMatrix == null || projectionMatrix.length != 16) {
+            throw new IllegalArgumentException("Projection matrix must be 16 elements");
         }
+        if (modelviewMatrix == null || modelviewMatrix.length != 16) {
+            throw new IllegalArgumentException("Modelview matrix must be 16 elements");
+        }
+        
+        // Multiply projection * modelview to get clip matrix
+        float[] clipMatrix = new float[16];
+        multiplyMatrices(clipMatrix, projectionMatrix, modelviewMatrix);
+        
+        // Extract the six frustum planes from the clip matrix
+        extractPlanes(clipMatrix);
     }
     
     /**
      * Multiply two 4x4 matrices in column-major order (result = a * b).
-     * OpenGL matrices are stored in column-major order.
+     * 
+     * @param result Output matrix (16 elements)
+     * @param a First matrix (16 elements)
+     * @param b Second matrix (16 elements)
      */
-    private void multiplyMatrices(FloatBuffer result, FloatBuffer a, FloatBuffer b) {
+    private void multiplyMatrices(float[] result, float[] a, float[] b) {
         for (int row = 0; row < 4; row++) {
             for (int col = 0; col < 4; col++) {
                 float sum = 0;
                 for (int k = 0; k < 4; k++) {
                     // Column-major: matrix[col * 4 + row]
-                    sum += a.get(k * 4 + row) * b.get(col * 4 + k);
+                    sum += a[k * 4 + row] * b[col * 4 + k];
                 }
-                result.put(col * 4 + row, sum);
+                result[col * 4 + row] = sum;
             }
         }
     }
     
     /**
      * Extract frustum planes from the clip matrix.
-     * The clip matrix is in column-major order (OpenGL format).
+     * The clip matrix is in column-major order.
      * Plane equation: Ax + By + Cz + D = 0
+     * 
+     * @param clip 16-element clip matrix in column-major order
      */
-    private void extractPlanes(FloatBuffer clip) {
+    private void extractPlanes(float[] clip) {
         // Left plane: 4th column + 1st column
-        planes[LEFT][0] = clip.get(3) + clip.get(0);
-        planes[LEFT][1] = clip.get(7) + clip.get(4);
-        planes[LEFT][2] = clip.get(11) + clip.get(8);
-        planes[LEFT][3] = clip.get(15) + clip.get(12);
+        planes[LEFT][0] = clip[3] + clip[0];
+        planes[LEFT][1] = clip[7] + clip[4];
+        planes[LEFT][2] = clip[11] + clip[8];
+        planes[LEFT][3] = clip[15] + clip[12];
         normalizePlane(LEFT);
         
         // Right plane: 4th column - 1st column
-        planes[RIGHT][0] = clip.get(3) - clip.get(0);
-        planes[RIGHT][1] = clip.get(7) - clip.get(4);
-        planes[RIGHT][2] = clip.get(11) - clip.get(8);
-        planes[RIGHT][3] = clip.get(15) - clip.get(12);
+        planes[RIGHT][0] = clip[3] - clip[0];
+        planes[RIGHT][1] = clip[7] - clip[4];
+        planes[RIGHT][2] = clip[11] - clip[8];
+        planes[RIGHT][3] = clip[15] - clip[12];
         normalizePlane(RIGHT);
         
         // Bottom plane: 4th column + 2nd column
-        planes[BOTTOM][0] = clip.get(3) + clip.get(1);
-        planes[BOTTOM][1] = clip.get(7) + clip.get(5);
-        planes[BOTTOM][2] = clip.get(11) + clip.get(9);
-        planes[BOTTOM][3] = clip.get(15) + clip.get(13);
+        planes[BOTTOM][0] = clip[3] + clip[1];
+        planes[BOTTOM][1] = clip[7] + clip[5];
+        planes[BOTTOM][2] = clip[11] + clip[9];
+        planes[BOTTOM][3] = clip[15] + clip[13];
         normalizePlane(BOTTOM);
         
         // Top plane: 4th column - 2nd column
-        planes[TOP][0] = clip.get(3) - clip.get(1);
-        planes[TOP][1] = clip.get(7) - clip.get(5);
-        planes[TOP][2] = clip.get(11) - clip.get(9);
-        planes[TOP][3] = clip.get(15) - clip.get(13);
+        planes[TOP][0] = clip[3] - clip[1];
+        planes[TOP][1] = clip[7] - clip[5];
+        planes[TOP][2] = clip[11] - clip[9];
+        planes[TOP][3] = clip[15] - clip[13];
         normalizePlane(TOP);
         
         // Near plane: 4th column + 3rd column
-        planes[NEAR][0] = clip.get(3) + clip.get(2);
-        planes[NEAR][1] = clip.get(7) + clip.get(6);
-        planes[NEAR][2] = clip.get(11) + clip.get(10);
-        planes[NEAR][3] = clip.get(15) + clip.get(14);
+        planes[NEAR][0] = clip[3] + clip[2];
+        planes[NEAR][1] = clip[7] + clip[6];
+        planes[NEAR][2] = clip[11] + clip[10];
+        planes[NEAR][3] = clip[15] + clip[14];
         normalizePlane(NEAR);
         
         // Far plane: 4th column - 3rd column
-        planes[FAR][0] = clip.get(3) - clip.get(2);
-        planes[FAR][1] = clip.get(7) - clip.get(6);
-        planes[FAR][2] = clip.get(11) - clip.get(10);
-        planes[FAR][3] = clip.get(15) - clip.get(14);
+        planes[FAR][0] = clip[3] - clip[2];
+        planes[FAR][1] = clip[7] - clip[6];
+        planes[FAR][2] = clip[11] - clip[10];
+        planes[FAR][3] = clip[15] - clip[14];
         normalizePlane(FAR);
     }
     
     /**
      * Normalize a frustum plane.
+     * 
+     * @param plane Index of the plane to normalize
      */
     private void normalizePlane(int plane) {
         float length = (float) Math.sqrt(

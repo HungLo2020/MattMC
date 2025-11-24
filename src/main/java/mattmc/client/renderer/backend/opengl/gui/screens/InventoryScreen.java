@@ -41,7 +41,7 @@ public final class InventoryScreen implements Screen {
 
     public InventoryScreen(Minecraft game, DevplayScreen gameScreen) {
         this.game = game;
-        this.window = game.window();
+        this.window = (Window) game.window();
         this.gameScreen = gameScreen;
         
         // Sync player position to prevent flickering during interpolation

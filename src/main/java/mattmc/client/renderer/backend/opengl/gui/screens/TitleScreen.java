@@ -56,7 +56,7 @@ public final class TitleScreen implements Screen {
 
     public TitleScreen(Minecraft game) {
         this.game = game;
-        this.window = game.window();
+        this.window = (Window) game.window();
         
         // Load the MattMC logo texture
         logoTexture = Texture.load("/assets/textures/gui/MattMC.png");

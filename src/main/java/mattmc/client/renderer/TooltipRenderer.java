@@ -2,7 +2,6 @@ package mattmc.client.renderer;
 
 import mattmc.client.renderer.backend.DrawCommand;
 import mattmc.client.renderer.backend.RenderBackend;
-import mattmc.client.renderer.backend.opengl.gui.components.TextRenderer;
 import mattmc.util.MathUtils;
 
 /**
@@ -54,8 +53,8 @@ public class TooltipRenderer {
         }
         
         // Calculate text dimensions
-        float textWidth = TextRenderer.getTextWidth(text, TEXT_SCALE);
-        float textHeight = TextRenderer.getTextHeight(text, TEXT_SCALE);
+        float textWidth = backend.getTextWidth(text, TEXT_SCALE);
+        float textHeight = backend.getTextHeight(text, TEXT_SCALE);
         
         // Calculate tooltip box dimensions
         float boxWidth = textWidth + TOOLTIP_PADDING * 2;
@@ -87,7 +86,7 @@ public class TooltipRenderer {
         // Draw the text (positioned with padding)
         float textX = tooltipX + TOOLTIP_PADDING;
         float textY = tooltipY + TOOLTIP_PADDING;
-        TextRenderer.drawText(text, textX, textY, TEXT_SCALE);
+        backend.drawText(text, textX, textY, TEXT_SCALE);
         
         backend.endFrame();
         

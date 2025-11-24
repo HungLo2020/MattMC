@@ -302,4 +302,205 @@ public interface RenderBackend {
      * </ul>
      */
     void resetColor();
+    
+    /**
+     * Set the current drawing color from an RGB value and alpha.
+     * 
+     * <p>This method extracts RGB components from the integer value and sets
+     * the current drawing color for subsequent rendering operations.
+     * 
+     * <p>Backend-specific implementations:
+     * <ul>
+     *   <li><b>OpenGL:</b> Calls glColor4f with extracted RGB components</li>
+     *   <li><b>Vulkan (future):</b> Would set color uniform or push constant</li>
+     *   <li><b>Debug:</b> Records color set command</li>
+     * </ul>
+     * 
+     * @param rgb RGB color value (0xRRGGBB format)
+     * @param alpha Alpha value (0.0 to 1.0)
+     */
+    void setColor(int rgb, float alpha);
+    
+    /**
+     * Fill a rectangle with the current color.
+     * 
+     * <p>Draws a filled rectangle using the current drawing color.
+     * The rectangle is specified by its top-left corner and dimensions.
+     * 
+     * <p>Backend-specific implementations:
+     * <ul>
+     *   <li><b>OpenGL:</b> Uses GL_QUADS to render a filled quad</li>
+     *   <li><b>Vulkan (future):</b> Would use a quad mesh or geometry shader</li>
+     *   <li><b>Debug:</b> Records rectangle fill command</li>
+     * </ul>
+     * 
+     * @param x X position of the rectangle (top-left corner)
+     * @param y Y position of the rectangle (top-left corner)
+     * @param width Width of the rectangle
+     * @param height Height of the rectangle
+     */
+    void fillRect(float x, float y, float width, float height);
+    
+    /**
+     * Draw text at the specified position with the given scale.
+     * 
+     * <p>Renders text using the backend's font system. The position represents the
+     * top-left corner of the text bounding box.
+     * 
+     * @param text the text to render
+     * @param x X position (left edge)
+     * @param y Y position (top edge)
+     * @param scale text scale multiplier
+     */
+    void drawText(String text, float x, float y, float scale);
+    
+    /**
+     * Draw text centered horizontally at the specified position.
+     * 
+     * @param text the text to render
+     * @param centerX center X position
+     * @param y Y position (top edge)
+     * @param scale text scale multiplier
+     */
+    void drawCenteredText(String text, float centerX, float y, float scale);
+    
+    /**
+     * Get the width of text at the given scale.
+     * 
+     * @param text the text to measure
+     * @param scale text scale multiplier
+     * @return width in pixels
+     */
+    float getTextWidth(String text, float scale);
+    
+    /**
+     * Get the height of text at the given scale.
+     * 
+     * @param text the text to measure
+     * @param scale text scale multiplier
+     * @return height in pixels
+     */
+    float getTextHeight(String text, float scale);
+    
+    // === Input Callback Methods ===
+    
+    /**
+     * Set cursor position callback for mouse movement.
+     * 
+     * @param windowHandle the native window handle
+     * @param callback the callback to invoke when cursor moves, receives (x, y) coordinates
+     */
+    void setCursorPosCallback(long windowHandle, CursorPosCallback callback);
+    
+    /**
+     * Set mouse button callback for mouse clicks.
+     * 
+     * @param windowHandle the native window handle
+     * @param callback the callback to invoke when mouse button is pressed/released
+     */
+    void setMouseButtonCallback(long windowHandle, MouseButtonCallback callback);
+    
+    /**
+     * Set framebuffer size callback for window resizing.
+     * 
+     * @param windowHandle the native window handle
+     * @param callback the callback to invoke when framebuffer is resized
+     */
+    void setFramebufferSizeCallback(long windowHandle, FramebufferSizeCallback callback);
+    
+    /**
+     * Set keyboard callback for key presses.
+     * 
+     * @param windowHandle the native window handle
+     * @param callback the callback to invoke when a key is pressed/released
+     */
+    void setKeyCallback(long windowHandle, KeyCallback callback);
+    
+    /**
+     * Set character callback for text input.
+     * 
+     * @param windowHandle the native window handle
+     * @param callback the callback to invoke when a character is typed
+     */
+    void setCharCallback(long windowHandle, CharCallback callback);
+    
+    /**
+     * Set scroll callback for mouse wheel scrolling.
+     * 
+     * @param windowHandle the native window handle
+     * @param callback the callback to invoke when scroll wheel is used
+     */
+    void setScrollCallback(long windowHandle, ScrollCallback callback);
+    
+    /**
+     * Update the viewport dimensions.
+     * 
+     * @param x viewport X position
+     * @param y viewport Y position
+     * @param width viewport width
+     * @param height viewport height
+     */
+    void setViewport(int x, int y, int width, int height);
+    
+    // === Callback Interfaces ===
+    
+    @FunctionalInterface
+    interface CursorPosCallback {
+        void invoke(double x, double y);
+    }
+    
+    @FunctionalInterface
+    interface MouseButtonCallback {
+        void invoke(int button, int action, int mods);
+    }
+    
+    @FunctionalInterface
+    interface FramebufferSizeCallback {
+        void invoke(int width, int height);
+    }
+    
+    @FunctionalInterface
+    interface KeyCallback {
+        void invoke(int key, int scancode, int action, int mods);
+    }
+    
+    @FunctionalInterface
+    interface CharCallback {
+        void invoke(int codepoint);
+    }
+    
+    @FunctionalInterface
+    interface ScrollCallback {
+        void invoke(double xoffset, double yoffset);
+    }
+    
+    // === Input Constants ===
+    
+    /** Mouse button left */
+    int MOUSE_BUTTON_LEFT = 0;
+    /** Mouse button right */
+    int MOUSE_BUTTON_RIGHT = 1;
+    /** Mouse button middle */
+    int MOUSE_BUTTON_MIDDLE = 2;
+    
+    /** Key/button action: released */
+    int ACTION_RELEASE = 0;
+    /** Key/button action: pressed */
+    int ACTION_PRESS = 1;
+    /** Key/button action: repeat (held down) */
+    int ACTION_REPEAT = 2;
+    
+    // === Factory Methods ===
+    
+    /**
+     * Create a panorama renderer for the menu background.
+     * 
+     * <p>The panorama renderer displays a rotating skybox background, typically used
+     * in menu screens. The renderer can optionally apply a blur effect.
+     * 
+     * @param basePath base path for the cubemap textures (without index and extension)
+     * @param extension file extension for the texture files (e.g., ".png")
+     * @return a new panorama renderer instance
+     */
+    mattmc.client.renderer.panorama.PanoramaRenderer createPanoramaRenderer(String basePath, String extension);
 }

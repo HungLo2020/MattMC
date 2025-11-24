@@ -87,7 +87,7 @@ public final class DevplayScreen implements Screen {
     
     public DevplayScreen(Minecraft game, String worldName, Level world, long seed, float playerX, float playerY, float playerZ, float playerYaw, float playerPitch, Inventory playerInventory) {
         this.game = game;
-        this.window = game.window();
+        this.window = (Window) game.window();
         this.worldName = worldName;
         
         // Initialize infinite world (use provided or create new)

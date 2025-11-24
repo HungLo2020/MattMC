@@ -1,5 +1,9 @@
 package mattmc.client.renderer;
 
+import mattmc.client.renderer.backend.RenderBackend;
+import mattmc.client.renderer.backend.DrawCommand;
+import mattmc.client.renderer.backend.RenderPass;
+
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 

@@ -222,7 +222,7 @@ public class OpenGLRenderBackend implements RenderBackend {
         if (material.shader != currentShader || material.atlas != currentAtlas) {
             // Unbind previous shader/texture
             if (currentShader != null) {
-                VoxelLitShader.unbind();
+                Shader.unbind();
             }
             if (currentAtlas != null) {
                 glBindTexture(GL_TEXTURE_2D, 0);
@@ -469,7 +469,7 @@ public class OpenGLRenderBackend implements RenderBackend {
         
         // Unbind any active resources
         if (currentShader != null) {
-            VoxelLitShader.unbind();
+            Shader.unbind();
             currentShader = null;
         }
         
@@ -820,5 +820,98 @@ public class OpenGLRenderBackend implements RenderBackend {
     @Override
     public void resetColor() {
         glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
+    }
+    
+    @Override
+    public void setColor(int rgb, float alpha) {
+        float r = ((rgb >> 16) & 0xFF) / 255f;
+        float g = ((rgb >> 8) & 0xFF) / 255f;
+        float b = (rgb & 0xFF) / 255f;
+        glColor4f(r, g, b, alpha);
+    }
+    
+    @Override
+    public void fillRect(float x, float y, float width, float height) {
+        glBegin(GL_QUADS);
+        glVertex2f(x, y);
+        glVertex2f(x + width, y);
+        glVertex2f(x + width, y + height);
+        glVertex2f(x, y + height);
+        glEnd();
+    }
+    
+    @Override
+    public void drawText(String text, float x, float y, float scale) {
+        mattmc.client.renderer.backend.opengl.gui.components.TextRenderer.drawText(text, x, y, scale);
+    }
+    
+    @Override
+    public void drawCenteredText(String text, float centerX, float y, float scale) {
+        mattmc.client.renderer.backend.opengl.gui.components.TextRenderer.drawCenteredText(text, centerX, y, scale);
+    }
+    
+    @Override
+    public float getTextWidth(String text, float scale) {
+        return mattmc.client.renderer.backend.opengl.gui.components.TextRenderer.getTextWidth(text, scale);
+    }
+    
+    @Override
+    public float getTextHeight(String text, float scale) {
+        return mattmc.client.renderer.backend.opengl.gui.components.TextRenderer.getTextHeight(text, scale);
+    }
+    
+    // === Input Callback Implementations ===
+    
+    @Override
+    public void setCursorPosCallback(long windowHandle, CursorPosCallback callback) {
+        org.lwjgl.glfw.GLFW.glfwSetCursorPosCallback(windowHandle, (h, x, y) -> {
+            if (callback != null) callback.invoke(x, y);
+        });
+    }
+    
+    @Override
+    public void setMouseButtonCallback(long windowHandle, MouseButtonCallback callback) {
+        org.lwjgl.glfw.GLFW.glfwSetMouseButtonCallback(windowHandle, (h, button, action, mods) -> {
+            if (callback != null) callback.invoke(button, action, mods);
+        });
+    }
+    
+    @Override
+    public void setFramebufferSizeCallback(long windowHandle, FramebufferSizeCallback callback) {
+        org.lwjgl.glfw.GLFW.glfwSetFramebufferSizeCallback(windowHandle, (win, newW, newH) -> {
+            if (callback != null) callback.invoke(newW, newH);
+        });
+    }
+    
+    @Override
+    public void setKeyCallback(long windowHandle, KeyCallback callback) {
+        org.lwjgl.glfw.GLFW.glfwSetKeyCallback(windowHandle, (h, key, scancode, action, mods) -> {
+            if (callback != null) callback.invoke(key, scancode, action, mods);
+        });
+    }
+    
+    @Override
+    public void setCharCallback(long windowHandle, CharCallback callback) {
+        org.lwjgl.glfw.GLFW.glfwSetCharCallback(windowHandle, (h, codepoint) -> {
+            if (callback != null) callback.invoke(codepoint);
+        });
+    }
+    
+    @Override
+    public void setScrollCallback(long windowHandle, ScrollCallback callback) {
+        org.lwjgl.glfw.GLFW.glfwSetScrollCallback(windowHandle, (h, xoffset, yoffset) -> {
+            if (callback != null) callback.invoke(xoffset, yoffset);
+        });
+    }
+    
+    @Override
+    public void setViewport(int x, int y, int width, int height) {
+        glViewport(x, y, width, height);
+    }
+    
+    @Override
+    public mattmc.client.renderer.panorama.PanoramaRenderer createPanoramaRenderer(String basePath, String extension) {
+        CubeMap sky = CubeMap.load(basePath, extension);
+        return new OpenGLPanoramaRenderer(sky);
     }
 }
