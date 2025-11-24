@@ -77,16 +77,7 @@ public class ChunkRenderer {
 		}
 		
 		// Initialize shader if not already done
-		if (shader == null) {
-			// Create OpenGL shader implementation
-			Shader openglShader = new Shader(
-				mattmc.client.renderer.ShaderLoader.loadShader("voxel_lit.vs"),
-				mattmc.client.renderer.ShaderLoader.loadShader("voxel_lit.fs")
-			);
-			// Wrap in VoxelLitShader for game-specific configuration
-			shader = new VoxelLitShader(openglShader);
-			logger.info("Initialized VoxelLitShader for chunk rendering");
-		}
+		ensureShaderInitialized();
 		
 		// Use the shader
 		shader.use();

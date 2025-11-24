@@ -94,16 +94,6 @@ setLightGamma(DEFAULT_LIGHT_GAMMA);
 setEmissiveBoost(DEFAULT_EMISSIVE_BOOST);
 }
 
-/**
- * Get the underlying shader program.
- * This allows access to additional shader operations if needed.
- * 
- * @return the shader program
- */
-public ShaderProgram getShaderProgram() {
-return shader;
-}
-
 @Override
 public void close() {
 shader.close();
