@@ -222,7 +222,7 @@ public class OpenGLRenderBackend implements RenderBackend {
         if (material.shader != currentShader || material.atlas != currentAtlas) {
             // Unbind previous shader/texture
             if (currentShader != null) {
-                VoxelLitShader.unbind();
+                Shader.unbind();
             }
             if (currentAtlas != null) {
                 glBindTexture(GL_TEXTURE_2D, 0);
@@ -469,7 +469,7 @@ public class OpenGLRenderBackend implements RenderBackend {
         
         // Unbind any active resources
         if (currentShader != null) {
-            VoxelLitShader.unbind();
+            Shader.unbind();
             currentShader = null;
         }
         

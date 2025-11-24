@@ -78,7 +78,13 @@ public class ChunkRenderer {
 		
 		// Initialize shader if not already done
 		if (shader == null) {
-			shader = new VoxelLitShader();
+			// Create OpenGL shader implementation
+			Shader openglShader = new Shader(
+				mattmc.client.renderer.ShaderLoader.loadShader("voxel_lit.vs"),
+				mattmc.client.renderer.ShaderLoader.loadShader("voxel_lit.fs")
+			);
+			// Wrap in VoxelLitShader for game-specific configuration
+			shader = new VoxelLitShader(openglShader);
 			logger.info("Initialized VoxelLitShader for chunk rendering");
 		}
 		
@@ -100,7 +106,7 @@ public class ChunkRenderer {
 		vao.render();
 		
 		// Unbind shader and texture
-		VoxelLitShader.unbind();
+		Shader.unbind();
 		glBindTexture(GL_TEXTURE_2D, 0);
 		
 		return true;
@@ -260,7 +266,13 @@ public class ChunkRenderer {
 	 */
 	public void ensureShaderInitialized() {
 		if (shader == null) {
-			shader = new VoxelLitShader();
+			// Create OpenGL shader implementation
+			Shader openglShader = new Shader(
+				mattmc.client.renderer.ShaderLoader.loadShader("voxel_lit.vs"),
+				mattmc.client.renderer.ShaderLoader.loadShader("voxel_lit.fs")
+			);
+			// Wrap in VoxelLitShader for game-specific configuration
+			shader = new VoxelLitShader(openglShader);
 			logger.info("Initialized VoxelLitShader for chunk rendering");
 		}
 	}
