@@ -1,14 +1,15 @@
-package mattmc.client.renderer.backend.opengl;
+package mattmc.client.renderer.level;
 
-import mattmc.client.renderer.backend.RenderBackend;
 import mattmc.client.renderer.backend.DrawCommand;
 import mattmc.client.renderer.backend.RenderPass;
 import mattmc.client.renderer.CommandBuffer;
 import mattmc.client.renderer.ChunkRenderLogic;
 import mattmc.client.renderer.VoxelLitShader;
+import mattmc.client.renderer.Frustum;
 
 import mattmc.client.renderer.backend.opengl.TextureAtlas;
 import mattmc.client.renderer.backend.opengl.ChunkRenderer;
+import mattmc.client.renderer.backend.opengl.OpenGLRenderBackend;
 import mattmc.client.renderer.chunk.ChunkMeshBuffer;
 import mattmc.client.renderer.backend.opengl.ChunkVAO;
 import mattmc.world.level.chunk.LevelChunk;
@@ -16,22 +17,29 @@ import mattmc.world.level.Level;
 
 import java.util.List;
 
-import static org.lwjgl.opengl.GL11.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
  * Renders all loaded chunks in an infinite world.
  * 
- * <p><b>Stage 3 Refactor:</b> This class now uses the {@link RenderBackend} abstraction
- * to render chunks. Direct OpenGL calls have been removed and replaced with:
+ * <p><b>Refactored:</b> This class has been moved from backend/opengl to renderer/level
+ * to better represent its role as game-level rendering logic. While it still depends
+ * on OpenGLRenderBackend for now, the rendering LOGIC is separated from OpenGL-specific
+ * calls.
+ * 
+ * <p>It now uses:
  * <ul>
  *   <li>{@link ChunkRenderLogic} - Builds draw commands (what to render)</li>
  *   <li>{@link OpenGLRenderBackend} - Executes draw commands (how to render)</li>
+ *   <li>{@link Frustum} - Culling logic (no OpenGL dependency)</li>
  * </ul>
  * 
  * <p>Now handles async mesh uploads from background threads and texture atlas.
  * Implements frustum culling to skip rendering chunks outside the camera view.
+ * 
+ * <p><b>Note:</b> This class still uses OpenGLRenderBackend directly because it needs
+ * to register meshes and materials. Full backend abstraction is a future enhancement.
  */
 public class LevelRenderer {
     private static final Logger logger = LoggerFactory.getLogger(LevelRenderer.class);
@@ -47,11 +55,17 @@ public class LevelRenderer {
     private boolean backendInitialized = false;
     private boolean firstRenderLogged = false;
     
-    public LevelRenderer() {
+    /**
+     * Create a new level renderer with the given backend and frustum.
+     * 
+     * @param backend the OpenGL render backend to use
+     * @param frustum the frustum for culling
+     */
+    public LevelRenderer(OpenGLRenderBackend backend, Frustum frustum) {
         this.chunkRenderer = new ChunkRenderer();
-        this.frustum = new Frustum();
+        this.frustum = frustum;
         this.chunkLogic = new ChunkRenderLogic(chunkRenderer, frustum);
-        this.renderBackend = new OpenGLRenderBackend();
+        this.renderBackend = backend;
         this.commandBuffer = new CommandBuffer(1000); // Initial capacity for ~1000 chunks
     }
     
@@ -154,14 +168,19 @@ public class LevelRenderer {
     /**
      * Render all loaded chunks in the world.
      * 
-     * <p><b>Stage 3:</b> Now uses {@link RenderBackend} abstraction:
+     * <p>This method is backend-agnostic and uses the {@link RenderBackend} abstraction:
      * <ol>
      *   <li>Process async mesh uploads and register them with backend</li>
      *   <li>Build draw commands via {@link ChunkRenderLogic}</li>
-     *   <li>Submit commands to {@link OpenGLRenderBackend}</li>
+     *   <li>Submit commands to {@link RenderBackend}</li>
      * </ol>
      * 
-     * <p>This method no longer makes direct OpenGL calls for rendering chunks.
+     * <p>This method makes NO direct OpenGL calls for rendering chunks.
+     * 
+     * @param world the world to render
+     * @param playerX player X position (unused, kept for compatibility)
+     * @param playerY player Y position (unused, kept for compatibility)
+     * @param playerZ player Z position (unused, kept for compatibility)
      */
     public void render(Level world, float playerX, float playerY, float playerZ) {
         // IMPORTANT: Register all chunks FIRST before processing mesh uploads
@@ -194,22 +213,19 @@ public class LevelRenderer {
         commandBuffer.clear();
         
         // Build draw commands (front-end logic, no GL calls)
+        // Note: frustum should be updated externally before calling render()
         chunkLogic.buildCommands(world, commandBuffer);
         
         // Render via backend
-        glPushMatrix();
-        
         renderBackend.beginFrame();
         for (DrawCommand cmd : commandBuffer.getCommands()) {
             renderBackend.submit(cmd);
         }
         renderBackend.endFrame();
         
-        glPopMatrix();
-        
         // Log rendering stats on first render only
         if (!firstRenderLogged && chunkLogic.getVisibleChunkCount() > 0) {
-            logger.info("Rendering {} chunks via RenderBackend (Stage 3)", 
+            logger.info("Rendering {} chunks via RenderBackend (backend-agnostic)", 
                        chunkLogic.getVisibleChunkCount());
             firstRenderLogged = true;
         }
@@ -286,11 +302,20 @@ public class LevelRenderer {
     
     /**
      * Get the render backend used by this renderer.
-     * This allows sharing the backend with UI rendering (Stage 4).
+     * This allows sharing the backend with UI rendering.
      * 
      * @return the OpenGL render backend
      */
     public OpenGLRenderBackend getRenderBackend() {
         return renderBackend;
+    }
+    
+    /**
+     * Get the frustum used by this renderer.
+     * 
+     * @return the frustum for culling
+     */
+    public Frustum getFrustum() {
+        return frustum;
     }
 }

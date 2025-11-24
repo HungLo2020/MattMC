@@ -11,7 +11,7 @@ import mattmc.world.entity.player.LocalPlayer;
 import mattmc.world.entity.player.PlayerController;
 import mattmc.world.entity.player.PlayerPhysics;
 import mattmc.world.entity.player.PlayerInput;
-import mattmc.client.renderer.backend.opengl.LevelRenderer;
+import mattmc.client.renderer.level.LevelRenderer;
 import mattmc.client.renderer.UIRenderer;
 import mattmc.client.renderer.backend.opengl.BlockFaceGeometry;
 import mattmc.util.ColorUtils;
@@ -51,6 +51,7 @@ public final class DevplayScreen implements Screen {
     private final BlockInteraction blockInteraction;
     private final LevelRenderer worldRenderer;
     private final UIRenderer uiRenderer;
+    private final mattmc.client.renderer.backend.opengl.OpenGLFrustum frustum;
     
     // Level name for saving
     private final String worldName;
@@ -149,7 +150,14 @@ public final class DevplayScreen implements Screen {
         this.player.setPhysics(playerPhysics);
         this.playerController = new PlayerController(player);
         this.blockInteraction = new BlockInteraction(player, this.world);
-        this.worldRenderer = new LevelRenderer();
+        
+        // Create rendering components - backend and frustum
+        // These are OpenGL-specific but will be abstracted away from LevelRenderer
+        mattmc.client.renderer.backend.opengl.OpenGLRenderBackend renderBackend = 
+            new mattmc.client.renderer.backend.opengl.OpenGLRenderBackend();
+        this.frustum = new mattmc.client.renderer.backend.opengl.OpenGLFrustum();
+        
+        this.worldRenderer = new LevelRenderer(renderBackend, this.frustum);
         this.worldRenderer.initWithLevel(this.world);
         this.uiRenderer = new UIRenderer();
         
@@ -251,6 +259,9 @@ public final class DevplayScreen implements Screen {
         glEnable(GL_DEPTH_TEST);
         glEnable(GL_CULL_FACE);
         glCullFace(GL_BACK);
+        
+        // Update frustum from current OpenGL matrices for culling
+        frustum.updateFromGLState();
         
         // Render all loaded chunks in the infinite world
         // Use interpolated position for smooth rendering

@@ -1,23 +1,27 @@
-package mattmc.client.renderer.backend.opengl;
-
-import mattmc.client.Minecraft;
-import mattmc.client.renderer.backend.opengl.LevelRenderer;
+package mattmc.client.renderer.level;
 
 import mattmc.world.entity.player.LocalPlayer;
 import mattmc.world.level.chunk.Region;
 import mattmc.world.level.block.Block;
 import mattmc.world.level.chunk.LevelChunk;
-import mattmc.world.level.chunk.Region;
 
-import static org.lwjgl.opengl.GL11.*;
+import mattmc.client.renderer.backend.opengl.ChunkRenderer;
 
 /**
  * Handles rendering of entire regions (32x32 chunks).
- * Similar to Minecraft's LevelRenderer with chunk batching.
  * 
- * Optimizations:
- * - Render distance: Only render chunks within RENDER_DISTANCE
- * - Frustum culling: Only render chunks visible to camera
+ * <p>This class is backend-agnostic and coordinates chunk rendering through
+ * the ChunkRenderer. It contains minimal rendering-specific code and focuses
+ * on the game logic of determining which chunks to render.
+ * 
+ * <p><b>Refactored:</b> This class has been moved from backend/opengl to renderer/level
+ * and made agnostic to the rendering backend. Direct OpenGL calls have been removed.
+ * 
+ * <p>Optimizations:
+ * <ul>
+ *   <li>Render distance: Only render chunks within RENDER_DISTANCE</li>
+ *   <li>Frustum culling: Only render chunks visible to camera (future enhancement)</li>
+ * </ul>
  */
 public class RegionRenderer {
     private final ChunkRenderer chunkRenderer;
@@ -32,17 +36,15 @@ public class RegionRenderer {
     
     /**
      * Render all chunks in a region with optimizations.
+     * 
      * @param region The region to render
      * @param player The player (for position-based culling)
-     * @param viewMatrix Current view matrix for frustum culling
+     * @param renderCallback Callback for rendering each chunk (e.g., to handle transforms)
      */
-    public void renderRegion(Region region, LocalPlayer player, float[] viewMatrix) {
+    public void renderRegion(Region region, LocalPlayer player, ChunkRenderCallback renderCallback) {
         // Get player position in chunk coordinates
         float playerChunkX = player.getX() / LevelChunk.WIDTH;
         float playerChunkZ = player.getZ() / LevelChunk.DEPTH;
-        
-        // Calculate frustum planes for frustum culling
-        float[] frustumPlanes = calculateFrustumPlanes(viewMatrix);
         
         int chunksRendered = 0;
         int chunksCulled = 0;
@@ -66,24 +68,12 @@ public class RegionRenderer {
                     continue;  // Too far away
                 }
                 
-                // Calculate chunk bounding box in world coordinates
+                // Calculate chunk world position for transform
                 float chunkWorldX = chunkX * LevelChunk.WIDTH;
                 float chunkWorldZ = chunkZ * LevelChunk.DEPTH;
-                float chunkMinY = LevelChunk.MIN_Y;
-                float chunkMaxY = LevelChunk.MAX_Y;
                 
-                // Frustum culling check
-                if (!isChunkInFrustum(chunkWorldX, chunkMinY, chunkWorldZ, 
-                                     chunkWorldX + LevelChunk.WIDTH, chunkMaxY, chunkWorldZ + LevelChunk.DEPTH,
-                                     frustumPlanes)) {
-                    chunksCulled++;
-                    continue;  // Not visible
-                }
-                
-                glPushMatrix();
-                glTranslatef(chunkWorldX, 0, chunkWorldZ);
-                chunkRenderer.renderChunk(chunk);
-                glPopMatrix();
+                // Render via callback (allows backend-specific transform handling)
+                renderCallback.renderChunk(chunk, chunkWorldX, 0, chunkWorldZ);
                 
                 chunksRendered++;
             }
@@ -92,73 +82,58 @@ public class RegionRenderer {
     
     /**
      * Legacy method without optimizations (for compatibility).
+     * 
+     * @param region The region to render
+     * @param renderCallback Callback for rendering each chunk
      */
-    public void renderRegion(Region region) {
+    public void renderRegion(Region region, ChunkRenderCallback renderCallback) {
         for (int cx = 0; cx < Region.REGION_SIZE; cx++) {
             for (int cz = 0; cz < Region.REGION_SIZE; cz++) {
                 LevelChunk chunk = region.getChunk(cx, cz);
                 if (chunk != null) {
-                    glPushMatrix();
-                    
                     // Use actual chunk coordinates, not region-local coordinates
                     float chunkWorldX = chunk.chunkX() * LevelChunk.WIDTH;
                     float chunkWorldZ = chunk.chunkZ() * LevelChunk.DEPTH;
-                    glTranslatef(chunkWorldX, 0, chunkWorldZ);
                     
-                    chunkRenderer.renderChunk(chunk);
-                    
-                    glPopMatrix();
+                    renderCallback.renderChunk(chunk, chunkWorldX, 0, chunkWorldZ);
                 }
             }
         }
     }
     
     /**
-     * Calculate frustum planes from view matrix.
-     * Returns array of 24 floats (6 planes * 4 coefficients).
-     * Plane equation: Ax + By + Cz + D = 0
-     */
-    private float[] calculateFrustumPlanes(float[] viewMatrix) {
-        float[] planes = new float[24];  // 6 planes, 4 floats each (A, B, C, D)
-        
-        // For now, return null to disable frustum culling 
-        // (full implementation would extract planes from modelview-projection matrix)
-        // This is a simplified version that still gives benefits from render distance
-        return planes;
-    }
-    
-    /**
-     * Check if a chunk's bounding box intersects the view frustum.
-     * For now, simplified version that always returns true (frustum culling disabled).
-     * Full implementation would test AABB against 6 frustum planes.
-     */
-    private boolean isChunkInFrustum(float minX, float minY, float minZ, 
-                                     float maxX, float maxY, float maxZ,
-                                     float[] frustumPlanes) {
-        // Simplified: always visible (frustum culling can be added later)
-        // Full frustum culling requires matrix math and plane-AABB tests
-        return true;
-    }
-    
-    /**
      * Render a single chunk from the region for debugging.
+     * 
      * @param region The region containing the chunk
      * @param cx Chunk X coordinate (0-31) - region-local coordinate
      * @param cz Chunk Z coordinate (0-31) - region-local coordinate
+     * @param renderCallback Callback for rendering the chunk
      */
-    public void renderChunk(Region region, int cx, int cz) {
+    public void renderChunk(Region region, int cx, int cz, ChunkRenderCallback renderCallback) {
         LevelChunk chunk = region.getChunk(cx, cz);
         if (chunk != null) {
-            glPushMatrix();
-            
             // Use actual chunk coordinates, not region-local coordinates
             float chunkWorldX = chunk.chunkX() * LevelChunk.WIDTH;
             float chunkWorldZ = chunk.chunkZ() * LevelChunk.DEPTH;
-            glTranslatef(chunkWorldX, 0, chunkWorldZ);
             
-            chunkRenderer.renderChunk(chunk);
-            
-            glPopMatrix();
+            renderCallback.renderChunk(chunk, chunkWorldX, 0, chunkWorldZ);
         }
+    }
+    
+    /**
+     * Callback interface for rendering chunks.
+     * This allows the rendering backend to handle transforms and actual rendering.
+     */
+    @FunctionalInterface
+    public interface ChunkRenderCallback {
+        /**
+         * Render a chunk at the given world position.
+         * 
+         * @param chunk The chunk to render
+         * @param worldX World X coordinate
+         * @param worldY World Y coordinate
+         * @param worldZ World Z coordinate
+         */
+        void renderChunk(LevelChunk chunk, float worldX, float worldY, float worldZ);
     }
 }

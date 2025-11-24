@@ -3,7 +3,7 @@ import mattmc.client.renderer.backend.RenderPass;
 import mattmc.client.renderer.backend.DrawCommand;
 
 import mattmc.client.renderer.backend.opengl.ChunkRenderer;
-import mattmc.client.renderer.backend.opengl.Frustum;
+import mattmc.client.renderer.Frustum;
 import mattmc.world.level.Level;
 import mattmc.world.level.chunk.LevelChunk;
 import org.slf4j.Logger;
@@ -75,7 +75,6 @@ public class ChunkRenderLogic {
      * 
      * <p>This method:
      * <ol>
-     *   <li>Updates the frustum from current GL matrices</li>
      *   <li>Iterates through all loaded chunks</li>
      *   <li>Culls chunks outside the frustum</li>
      *   <li>Skips chunks without mesh data</li>
@@ -85,13 +84,12 @@ public class ChunkRenderLogic {
      * <p>Commands are added to the provided buffer. The buffer is NOT cleared first,
      * allowing multiple logic classes to contribute commands to the same buffer.
      * 
+     * <p><b>Note:</b> The frustum should be updated externally before calling this method.
+     * 
      * @param world the world containing chunks to render
      * @param buffer the buffer to add commands to
      */
     public void buildCommands(Level world, CommandBuffer buffer) {
-        // Update frustum from current GL matrices
-        frustum.update();
-        
         // Reset statistics
         totalChunks = 0;
         visibleChunks = 0;
