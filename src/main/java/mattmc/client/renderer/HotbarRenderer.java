@@ -78,12 +78,12 @@ public class HotbarRenderer {
         UIRenderLogic.clearTextRegistry(); // Clear text registry for this frame
         logic.buildHotbarCommands(screenWidth, screenHeight, selectedHotbarSlot, buffer);
         
-        // Submit commands to backend
-        // Note: Frame management (beginFrame/endFrame) should be handled by the caller
-        // at a higher level, not per-component
+        // Submit commands to backend with frame management
+        backend.beginFrame();
         for (DrawCommand cmd : buffer.getCommands()) {
             backend.submit(cmd);
         }
+        backend.endFrame();
         
         // TODO: Item rendering in hotbar slots needs to be refactored to use backend
         // For now, this is commented out to maintain backend-agnostic nature
