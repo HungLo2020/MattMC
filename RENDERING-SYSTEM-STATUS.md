@@ -64,44 +64,26 @@ The rendering system follows a three-layer architecture:
 
 ## Critical Issues
 
-### 1. LWJGL Import in Non-Backend Code
+### 1. ~~LWJGL Import in Non-Backend Code~~ ✅ FIXED
 
 **Location**: `mattmc/client/renderer/chunk/ChunkMeshBuffer.java` (Line 5)
 
-**Problem**: The `ChunkMeshBuffer` class imports `org.lwjgl.BufferUtils`, violating the architectural principle that code outside `backend/` should not import graphics API-specific code.
+**Status**: **RESOLVED** - The LWJGL `BufferUtils` import has been replaced with standard Java NIO direct buffers, maintaining the backend-agnostic architecture.
+
+**Original Problem**: The `ChunkMeshBuffer` class imported `org.lwjgl.BufferUtils`, violating the architectural principle that code outside `backend/` should not import graphics API-specific code.
+
+**Solution Applied**: Buffer creation now uses standard Java NIO:
 
 ```java
-import org.lwjgl.BufferUtils;
-```
-
-**Why it's a problem**: 
-- Breaks the abstraction barrier between frontend and backend
-- Makes `ChunkMeshBuffer` OpenGL-dependent
-- Prevents headless testing of chunk mesh generation
-- Would require changes to support alternative backends (Vulkan)
-
-**Fix**: Move buffer creation to the backend layer or use standard Java NIO with direct buffers:
-
-```java
-// In ChunkMeshBuffer.java - use standard Java NIO direct buffers
+// Uses standard Java NIO direct buffers
 public FloatBuffer createVertexBuffer() {
     ByteBuffer byteBuffer = ByteBuffer.allocateDirect(vertices.length * Float.BYTES);
-    byteBuffer.order(java.nio.ByteOrder.nativeOrder());
+    byteBuffer.order(ByteOrder.nativeOrder());
     FloatBuffer buffer = byteBuffer.asFloatBuffer();
     buffer.put(vertices);
     buffer.flip();
     return buffer;
 }
-```
-
-Or better, move the GPU upload responsibility entirely to the backend:
-
-```java
-// ChunkMeshBuffer just holds raw arrays
-public float[] getVertices() { return vertices; }
-public int[] getIndices() { return indices; }
-
-// OpenGLChunkMeshManager handles buffer creation
 ```
 
 ---
