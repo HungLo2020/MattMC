@@ -41,6 +41,9 @@ public class ItemRenderer {
     // Cache for item textures
     private static final Map<String, Texture> TEXTURE_CACHE = new HashMap<>();
     
+    // Item texture dimension - items are rendered as 16x16 pixel textures
+    private static final float ITEM_TEXTURE_SIZE = 16.0f;
+    
     /**
      * Render an item at the specified screen position.
      * Renders block items as orthographic 3D cubes (isometric view).
@@ -499,6 +502,20 @@ public class ItemRenderer {
     }
     
     /**
+     * Calculate the vertical offset (1 texture pixel) to align flat items properly.
+     * 
+     * The size parameter represents half the rendered item size. Since items are 
+     * ITEM_TEXTURE_SIZE (16) pixels, and size is half of the total rendered size,
+     * one texture pixel equals: (2 * size) / ITEM_TEXTURE_SIZE = size / 8
+     * 
+     * @param size Half-width/height of the item
+     * @return The vertical offset representing 1 texture pixel
+     */
+    private static float calculateTexturePixelOffset(float size) {
+        return (2 * size) / ITEM_TEXTURE_SIZE;
+    }
+    
+    /**
      * Render a texture as a flat 2D square.
      * 
      * @param texturePath Path to the texture
@@ -515,6 +532,11 @@ public class ItemRenderer {
         
         // Save current GL state
         boolean textureWasEnabled = glIsEnabled(GL_TEXTURE_2D);
+        boolean blendWasEnabled = glIsEnabled(GL_BLEND);
+        
+        // Enable blending for transparent textures (prevents black background)
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
         
         glEnable(GL_TEXTURE_2D);
         texture.bind();
@@ -524,16 +546,22 @@ public class ItemRenderer {
         // size parameter is the half-width, so total size is 2*size
         float halfSize = size;
         
+        // Move items UP by 1 texture pixel to fix vertical alignment
+        float adjustedY = y - calculateTexturePixelOffset(size);
+        
         glBegin(GL_QUADS);
-        glTexCoord2f(0, 1); glVertex2f(x - halfSize, y - halfSize);
-        glTexCoord2f(1, 1); glVertex2f(x + halfSize, y - halfSize);
-        glTexCoord2f(1, 0); glVertex2f(x + halfSize, y + halfSize);
-        glTexCoord2f(0, 0); glVertex2f(x - halfSize, y + halfSize);
+        glTexCoord2f(0, 1); glVertex2f(x - halfSize, adjustedY - halfSize);
+        glTexCoord2f(1, 1); glVertex2f(x + halfSize, adjustedY - halfSize);
+        glTexCoord2f(1, 0); glVertex2f(x + halfSize, adjustedY + halfSize);
+        glTexCoord2f(0, 0); glVertex2f(x - halfSize, adjustedY + halfSize);
         glEnd();
         
         // Restore GL state
         if (!textureWasEnabled) {
             glDisable(GL_TEXTURE_2D);
+        }
+        if (!blendWasEnabled) {
+            glDisable(GL_BLEND);
         }
     }
     
@@ -547,11 +575,14 @@ public class ItemRenderer {
         // Match the scale of flat items (which matches isometric block items)
         float halfSize = size;
         
+        // Move fallback items UP by 1 texture pixel to match flat items alignment
+        float adjustedY = y - calculateTexturePixelOffset(size);
+        
         glBegin(GL_QUADS);
-        glVertex2f(x - halfSize, y - halfSize);
-        glVertex2f(x + halfSize, y - halfSize);
-        glVertex2f(x + halfSize, y + halfSize);
-        glVertex2f(x - halfSize, y + halfSize);
+        glVertex2f(x - halfSize, adjustedY - halfSize);
+        glVertex2f(x + halfSize, adjustedY - halfSize);
+        glVertex2f(x + halfSize, adjustedY + halfSize);
+        glVertex2f(x - halfSize, adjustedY + halfSize);
         glEnd();
     }
     
