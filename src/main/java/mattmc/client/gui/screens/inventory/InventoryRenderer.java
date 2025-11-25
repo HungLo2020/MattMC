@@ -276,7 +276,7 @@ public class InventoryRenderer {
         float contentHeight = creativeHeight * GUI_SCALE;
         // Position: right edge of screen, adjusted for visual alignment
         float x = w - contentWidth + 190f;
-        float y = (h - contentHeight) / 2f + 30f;
+        float y = (h - contentHeight) / 2f + 80f;
         
         // Draw texture (partial texture coordinates handled by backend implementation)
         backend.drawTexture(creativeInventoryTextureId, x, y, contentWidth, contentHeight);
@@ -293,7 +293,7 @@ public class InventoryRenderer {
         float contentHeight = creativeHeight * GUI_SCALE;
         // Position: right edge of screen, adjusted for visual alignment
         float guiX = w - contentWidth + 190f;
-        float guiY = (h - contentHeight) / 2f + 30f;
+        float guiY = (h - contentHeight) / 2f + 80f;
         
         // Get mouse position in framebuffer coordinates
         CoordinateUtils.Point2D fbCoords = CoordinateUtils.windowToFramebuffer(

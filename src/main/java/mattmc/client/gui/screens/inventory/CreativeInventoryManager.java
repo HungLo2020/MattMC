@@ -77,7 +77,7 @@ public class CreativeInventoryManager {
         float contentHeight = CREATIVE_TEXTURE_HEIGHT * GUI_SCALE;
         // Position: right edge of screen, adjusted for visual alignment
         float guiX = w - contentWidth + 190f;
-        float guiY = (h - contentHeight) / 2f + 30f;
+        float guiY = (h - contentHeight) / 2f + 80f;
         
         // Slot grid parameters
         float startX = guiX + 8f * GUI_SCALE;
