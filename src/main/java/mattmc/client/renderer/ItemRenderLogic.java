@@ -111,7 +111,6 @@ public class ItemRenderLogic {
         String itemName = itemId.contains(":") ? itemId.substring(itemId.indexOf(':') + 1) : itemId;
         
         // Get texture paths for this item
-        mattmc.client.resources.ResourceManager resourceManager = new mattmc.client.resources.ResourceManager();
         java.util.Map<String, String> texturePaths = mattmc.client.resources.ResourceManager.getItemTexturePaths(itemName);
         
         if (texturePaths == null || texturePaths.isEmpty()) {

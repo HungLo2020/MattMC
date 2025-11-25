@@ -88,23 +88,15 @@ public FloatBuffer createVertexBuffer() {
 
 ---
 
-### 2. Unused `ResourceManager` Instantiation
+### 2. ~~Unused `ResourceManager` Instantiation~~ ✅ FIXED
 
 **Location**: `mattmc/client/renderer/ItemRenderLogic.java` (Line 114)
 
-**Problem**: Creates a new `ResourceManager` instance that is never used:
+**Status**: **RESOLVED** - Removed the unused `ResourceManager` instantiation that was creating wasteful objects every time an item was rendered.
 
-```java
-mattmc.client.resources.ResourceManager resourceManager = new mattmc.client.resources.ResourceManager();
-java.util.Map<String, String> texturePaths = mattmc.client.resources.ResourceManager.getItemTexturePaths(itemName);
-```
+**Original Problem**: Created a new `ResourceManager` instance that was never used - only static methods were called.
 
-**Why it's a problem**:
-- Wasteful object creation every time an item is rendered
-- The instance `resourceManager` is never used - static methods are called instead
-- Shows incomplete refactoring
-
-**Fix**: Remove the unused instantiation:
+**Solution Applied**: Removed the unused instantiation, now directly calling the static method:
 
 ```java
 Map<String, String> texturePaths = ResourceManager.getItemTexturePaths(itemName);
