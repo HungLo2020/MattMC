@@ -137,8 +137,9 @@ public final class TextRenderer {
      * @param rgb Color in 0xRRGGBB format
      */
     public void drawTextRightAligned(String text, float rightX, float y, float scale, int rgb) {
+        float textWidth = backend.getTextWidth(text, scale);
         backend.setColor(rgb, 1.0f);
-        drawTextRightAligned(text, rightX, y, scale);
+        backend.drawText(text, rightX - textWidth, y, scale);
         backend.resetColor();
     }
 }

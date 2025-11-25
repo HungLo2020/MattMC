@@ -19,8 +19,20 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * TrueType font renderer using STBTrueType with bitmap baking.
- * Loads a TTF font and renders text using a pre-baked texture atlas.
+ * OpenGL-specific TrueType font renderer using STBTrueType with bitmap baking.
+ * 
+ * <p><b>INTERNAL USE ONLY:</b> This class is part of the OpenGL backend implementation
+ * and should NOT be used directly by code outside the backend/opengl package.
+ * For text rendering, use {@link mattmc.client.renderer.gui.components.TextRenderer}
+ * or the {@link mattmc.client.renderer.backend.RenderBackend#drawText} methods instead.
+ * 
+ * <p>This class loads a TTF font, bakes it into a texture atlas, and renders text
+ * using OpenGL immediate mode. It manages the OpenGL texture resource and provides
+ * methods for text measurement and rendering.
+ * 
+ * @since OpenGL Backend - Internal Implementation
+ * @see OpenGLTextRenderer The wrapper that uses this class
+ * @see mattmc.client.renderer.gui.components.TextRenderer API-agnostic text rendering
  */
 public final class TrueTypeFont implements AutoCloseable {
     private static final Logger logger = LoggerFactory.getLogger(TrueTypeFont.class);

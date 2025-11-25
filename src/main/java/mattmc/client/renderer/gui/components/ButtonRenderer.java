@@ -76,11 +76,7 @@ public final class ButtonRenderer {
         backend.drawButton(button);
         
         // Draw centered text on button
-        float centerX = button.x + button.w / 2f;
-        float textHeight = backend.getTextHeight(label, textScale);
-        float centerY = button.y + (button.h - textHeight) / 2f;
-        
-        backend.drawCenteredText(label, centerX, centerY, textScale);
+        drawCenteredLabelOnButton(button, label, textScale);
     }
     
     /**
@@ -96,6 +92,17 @@ public final class ButtonRenderer {
         backend.drawButton(button, selected);
         
         // Draw centered text on button
+        drawCenteredLabelOnButton(button, label, textScale);
+    }
+    
+    /**
+     * Helper method to draw centered text on a button.
+     * 
+     * @param button The button to center text on
+     * @param label The text to draw
+     * @param textScale Scale for the text
+     */
+    private void drawCenteredLabelOnButton(Button button, String label, float textScale) {
         float centerX = button.x + button.w / 2f;
         float textHeight = backend.getTextHeight(label, textScale);
         float centerY = button.y + (button.h - textHeight) / 2f;
