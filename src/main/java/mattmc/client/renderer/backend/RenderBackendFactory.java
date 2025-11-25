@@ -2,6 +2,7 @@ package mattmc.client.renderer.backend;
 
 import mattmc.client.renderer.window.WindowHandle;
 import mattmc.client.renderer.WorldRenderer;
+import mattmc.client.renderer.item.ItemRenderer;
 
 /**
  * Factory for creating render backends and associated windows.
@@ -67,6 +68,19 @@ public interface RenderBackendFactory {
      * @return a world renderer instance
      */
     WorldRenderer createWorldRenderer();
+    
+    /**
+     * Get the item renderer for the configured graphics API.
+     * 
+     * <p>The item renderer implementation depends on the factory type:
+     * <ul>
+     *   <li><b>OpenGL:</b> Returns OpenGLItemRenderer instance</li>
+     *   <li><b>Vulkan (future):</b> Would return VulkanItemRenderer</li>
+     * </ul>
+     * 
+     * @return the item renderer instance
+     */
+    ItemRenderer getItemRenderer();
     
     /**
      * Get a closeable wrapper for the window that handles proper resource cleanup.

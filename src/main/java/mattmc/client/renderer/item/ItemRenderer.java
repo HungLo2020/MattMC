@@ -19,8 +19,17 @@ import mattmc.world.item.ItemStack;
  * 3D geometry and projecting it to 2D screen coordinates.
  * For regular items, renders a 2D icon.
  * 
+ * <p><b>Obtaining an instance:</b>
+ * <pre>
+ * // From a RenderBackend:
+ * ItemRenderer itemRenderer = backend.getItemRenderer();
+ * 
+ * // From a RenderBackendFactory:
+ * ItemRenderer itemRenderer = factory.getItemRenderer();
+ * </pre>
+ * 
  * @see ItemDisplayContext
- * @see mattmc.client.renderer.backend.opengl.OpenGLItemRenderer OpenGL implementation
+ * @see mattmc.client.renderer.backend.RenderBackend#getItemRenderer()
  */
 public interface ItemRenderer {
     

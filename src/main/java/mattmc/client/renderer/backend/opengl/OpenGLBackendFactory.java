@@ -4,6 +4,7 @@ import mattmc.client.renderer.backend.RenderBackend;
 import mattmc.client.renderer.backend.RenderBackendFactory;
 import mattmc.client.renderer.window.WindowHandle;
 import mattmc.client.renderer.WorldRenderer;
+import mattmc.client.renderer.item.ItemRenderer;
 import mattmc.client.renderer.level.LevelRenderer;
 
 /**
@@ -14,6 +15,7 @@ import mattmc.client.renderer.level.LevelRenderer;
  *   <li>Window: GLFW window with OpenGL context</li>
  *   <li>Backend: OpenGLRenderBackend for rendering operations</li>
  *   <li>WorldRenderer: Backend-agnostic LevelRenderer with OpenGL mesh manager</li>
+ *   <li>ItemRenderer: OpenGLItemRenderer for item rendering</li>
  * </ul>
  * 
  * <p><b>INTERNAL USE:</b> This class should not be directly instantiated by code
@@ -51,6 +53,11 @@ public class OpenGLBackendFactory implements RenderBackendFactory {
         }
         
         return new LevelRenderer(meshManager, backend);
+    }
+    
+    @Override
+    public ItemRenderer getItemRenderer() {
+        return OpenGLItemRenderer.getInstance();
     }
     
     @Override

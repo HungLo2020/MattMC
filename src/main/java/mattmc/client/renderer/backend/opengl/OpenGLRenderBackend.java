@@ -1064,6 +1064,11 @@ public class OpenGLRenderBackend implements RenderBackend {
         return new OpenGLPanoramaRenderer(sky);
     }
     
+    @Override
+    public mattmc.client.renderer.item.ItemRenderer getItemRenderer() {
+        return OpenGLItemRenderer.getInstance();
+    }
+    
     // === 3D Rendering Methods ===
     
     @Override

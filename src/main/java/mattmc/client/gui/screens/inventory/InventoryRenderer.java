@@ -1,6 +1,7 @@
 package mattmc.client.gui.screens.inventory;
 
 import mattmc.client.renderer.backend.RenderBackend;
+import mattmc.client.renderer.item.ItemRenderer;
 import mattmc.client.renderer.TooltipRenderer;
 import mattmc.client.renderer.window.WindowHandle;
 import mattmc.client.util.CoordinateUtils;
@@ -144,7 +145,7 @@ public class InventoryRenderer {
         // - At GUI_SCALE=3.0: 16*3 = 48 pixels on screen, half = 24 pixels
         float itemSize = 24f;
         
-        // Begin frame for item rendering (OpenGLItemRenderer.renderStatic() submits commands to backend)
+        // Begin frame for item rendering (backend.getItemRenderer().render() submits commands to backend)
         backend.beginFrame();
         
         // Draw items in hotbar (slots 0-8)
@@ -162,7 +163,7 @@ public class InventoryRenderer {
                 float itemCenterY = slotY + 9f * GUI_SCALE;
                 
                 // Use data-driven rendering with GUI context
-                mattmc.client.renderer.backend.opengl.OpenGLItemRenderer.renderStatic(
+                backend.getItemRenderer().render(
                     stack, 
                     itemCenterX, 
                     itemCenterY, 
@@ -194,7 +195,7 @@ public class InventoryRenderer {
                 float itemCenterY = slotY + 9f * GUI_SCALE;
                 
                 // Use data-driven rendering with GUI context
-                mattmc.client.renderer.backend.opengl.OpenGLItemRenderer.renderStatic(
+                backend.getItemRenderer().render(
                     stack, 
                     itemCenterX, 
                     itemCenterY, 
@@ -247,11 +248,11 @@ public class InventoryRenderer {
         
         float itemSize = 19.2f;
         
-        // Begin frame for item rendering (OpenGLItemRenderer.renderStatic() submits commands to backend)
+        // Begin frame for item rendering (backend.getItemRenderer().render() submits commands to backend)
         backend.beginFrame();
         
         // Use data-driven rendering for held items (using GUI context as they're in the GUI)
-        mattmc.client.renderer.backend.opengl.OpenGLItemRenderer.renderStatic(
+        backend.getItemRenderer().render(
             heldItem, 
             fbCoords.x, 
             fbCoords.y, 
@@ -339,7 +340,7 @@ public class InventoryRenderer {
         float startY = 18f * GUI_SCALE;
         float slotSpacing = 18f * GUI_SCALE;
         
-        // Begin frame for item rendering (OpenGLItemRenderer.renderStatic() submits commands to backend)
+        // Begin frame for item rendering (backend.getItemRenderer().render() submits commands to backend)
         backend.beginFrame();
         
         for (int row = 0; row < CREATIVE_ROWS; row++) {
@@ -357,7 +358,7 @@ public class InventoryRenderer {
                     float itemY = slotY + 9f * GUI_SCALE;
                     
                     // Use data-driven rendering for creative inventory
-                    mattmc.client.renderer.backend.opengl.OpenGLItemRenderer.renderStatic(
+                    backend.getItemRenderer().render(
                         stack, 
                         itemX, 
                         itemY, 
