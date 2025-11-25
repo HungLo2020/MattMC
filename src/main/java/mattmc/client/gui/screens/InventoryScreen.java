@@ -253,6 +253,9 @@ public final class InventoryScreen implements Screen {
         renderer.renderInventoryBackground();
         renderer.renderSlotHighlight(mouseXWin, mouseYWin);
         
+        // Begin frame for all item rendering (ItemRenderer.render() submits commands to backend)
+        backend.beginFrame();
+        
         // Draw items in inventory slots
         mattmc.world.entity.player.LocalPlayer player = gameScreen.getPlayer();
         if (player != null && player.getInventory() != null) {
@@ -265,6 +268,9 @@ public final class InventoryScreen implements Screen {
         
         // Draw held item under mouse cursor
         renderer.renderHeldItem(inputHandler.getHeldItem(), mouseXWin, mouseYWin);
+        
+        // End frame after all items are rendered
+        backend.endFrame();
         
         // Draw tooltip for hovered item (but not when holding an item)
         if (inputHandler.getHeldItem() == null) {
