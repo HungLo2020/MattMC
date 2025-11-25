@@ -1,13 +1,11 @@
 package mattmc.client.renderer.backend.opengl;
 
 import mattmc.client.MattMC;
-import mattmc.client.renderer.backend.opengl.LevelRenderer;
 
 import mattmc.world.entity.player.LocalPlayer;
 import mattmc.world.level.chunk.Region;
 import mattmc.world.level.block.Block;
 import mattmc.world.level.chunk.LevelChunk;
-import mattmc.world.level.chunk.Region;
 
 import static org.lwjgl.opengl.GL11.*;
 
