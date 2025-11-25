@@ -12,7 +12,8 @@ import mattmc.world.level.chunk.LevelChunk;
  * <p><b>Architecture:</b> Implementations of this interface handle the actual
  * rendering of chunk geometry to the graphics API.
  * 
- * @see mattmc.client.renderer.backend.opengl.ChunkRenderer OpenGL implementation
+ * @see ChunkRenderer Extended interface with additional operations
+ * @see mattmc.client.renderer.backend.opengl.OpenGLChunkRenderer OpenGL implementation
  */
 public interface RegionChunkRenderer {
     

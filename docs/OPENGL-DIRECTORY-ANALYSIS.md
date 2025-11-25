@@ -38,11 +38,11 @@ After reviewing all files in the OpenGL backend directory against the establishe
 | `ChunkMeshManager.java` | ✅ NEW | Interface in `renderer/level/ChunkMeshManager.java` - abstracts chunk mesh operations |
 | `RegionRenderer.java` | ✅ MOVED | Now in `renderer/level/RegionRenderer.java` - backend-agnostic, uses RenderBackend interface |
 | `RegionChunkRenderer.java` | ✅ NEW | Interface in `renderer/level/RegionChunkRenderer.java` - abstracts chunk rendering for regions |
+| `ChunkRenderer.java` | ✅ SPLIT | Interface in `renderer/level/ChunkRenderer.java`, impl in `backend/opengl/OpenGLChunkRenderer.java` |
 
 ### Files That SHOULD BE MOVED OUT of opengl/
 | File | Recommendation | Reason |
 |------|----------------|--------|
-| `ChunkRenderer.java` | ⚠️ SPLIT/MOVE | Contains both OpenGL rendering AND chunk-to-VAO mapping logic - split into cache and renderer |
 | `BlockFaceGeometry.java` | ⚠️ MOVE TO `renderer/block/` | Contains game-specific geometry generation for blocks and stairs - not pure OpenGL |
 | `ItemRenderer.java` | ⚠️ MOVE TO `renderer/item/` OR `client/ui/item/` | Contains game logic (item types, texture paths, model handling) mixed with OpenGL rendering |
 | `UIRenderHelper.java` | ⚠️ ASSESS | Contains OpenGL projection setup (keep) and text/shape helpers (could be delegated) |
@@ -138,27 +138,23 @@ The class now coordinates **what** to render without knowing **how** it's render
 
 ## 4. Files That Should Still Be Moved or Split
 
-### `ChunkRenderer.java` - ⚠️ SHOULD SPLIT
+### `ChunkRenderer.java` - ✅ COMPLETED (SPLIT)
 
-**Current Location:** `backend/opengl/ChunkRenderer.java`
-**Recommended Location:** Split into two classes
+**Old Location:** `backend/opengl/ChunkRenderer.java`
+**New Locations:** 
+- `renderer/level/ChunkRenderer.java` - Backend-agnostic interface
+- `backend/opengl/OpenGLChunkRenderer.java` - OpenGL implementation
 
-**Analysis:**
-This class has **mixed responsibilities**:
+**Changes Made:**
+- ✅ Created `renderer/level/ChunkRenderer.java` - interface extending `RegionChunkRenderer`
+- ✅ Created `backend/opengl/OpenGLChunkRenderer.java` - OpenGL-specific rendering only
+- ✅ Mesh caching/mapping now handled by `OpenGLChunkMeshManager` (already existed)
+- ✅ `OpenGLChunkRenderer` takes mesh manager as dependency for VAO lookup
+- ✅ Deleted old monolithic `backend/opengl/ChunkRenderer.java`
 
-1. **OpenGL Rendering (should stay):**
-   - VAO cache management (OpenGL resources)
-   - Shader binding and rendering
-   - Texture atlas binding
-
-2. **Chunk Mapping Logic (should move):**
-   - LevelChunk to VAO mapping
-   - Mesh buffer upload coordination
-   - Chunk registration and tracking
-
-**Recommendation:**
-- **Keep in opengl/:** `OpenGLChunkRenderer.java` - only OpenGL rendering operations
-- **Move to renderer/chunk/:** `ChunkVAOCache.java` - chunk-to-mesh mapping logic
+**Separation of Concerns:**
+- **OpenGLChunkRenderer**: Only handles shader binding, texture binding, and VAO rendering
+- **OpenGLChunkMeshManager**: Handles VAO caching, chunk registration, mesh upload
 
 ---
 
