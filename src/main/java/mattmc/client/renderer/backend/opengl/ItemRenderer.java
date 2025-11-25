@@ -41,6 +41,9 @@ public class ItemRenderer {
     // Cache for item textures
     private static final Map<String, Texture> TEXTURE_CACHE = new HashMap<>();
     
+    // Item texture dimension - items are rendered as 16x16 pixel textures
+    private static final float ITEM_TEXTURE_SIZE = 16.0f;
+    
     /**
      * Render an item at the specified screen position.
      * Renders block items as orthographic 3D cubes (isometric view).
@@ -499,6 +502,20 @@ public class ItemRenderer {
     }
     
     /**
+     * Calculate the vertical offset (1 texture pixel) to align flat items properly.
+     * 
+     * The size parameter represents half the rendered item size. Since items are 
+     * ITEM_TEXTURE_SIZE (16) pixels, and size is half of the total rendered size,
+     * one texture pixel equals: (2 * size) / ITEM_TEXTURE_SIZE = size / 8
+     * 
+     * @param size Half-width/height of the item
+     * @return The vertical offset representing 1 texture pixel
+     */
+    private static float calculateTexturePixelOffset(float size) {
+        return (2 * size) / ITEM_TEXTURE_SIZE;
+    }
+    
+    /**
      * Render a texture as a flat 2D square.
      * 
      * @param texturePath Path to the texture
@@ -530,9 +547,7 @@ public class ItemRenderer {
         float halfSize = size;
         
         // Move items UP by 1 texture pixel to fix vertical alignment
-        // 1 texture pixel = size / 8 (since size is half the item, and items are 16x16 textures)
-        float oneTexturePixel = size / 8.0f;
-        float adjustedY = y - oneTexturePixel;
+        float adjustedY = y - calculateTexturePixelOffset(size);
         
         glBegin(GL_QUADS);
         glTexCoord2f(0, 1); glVertex2f(x - halfSize, adjustedY - halfSize);
@@ -561,9 +576,7 @@ public class ItemRenderer {
         float halfSize = size;
         
         // Move fallback items UP by 1 texture pixel to match flat items alignment
-        // 1 texture pixel = size / 8 (since size is half the item, and items are 16x16 textures)
-        float oneTexturePixel = size / 8.0f;
-        float adjustedY = y - oneTexturePixel;
+        float adjustedY = y - calculateTexturePixelOffset(size);
         
         glBegin(GL_QUADS);
         glVertex2f(x - halfSize, adjustedY - halfSize);
