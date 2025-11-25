@@ -1,133 +1,174 @@
-# OpenGL Backend Directory
+# OpenGL Backend Implementation
 
-This directory contains the OpenGL-specific implementation of the MattMC rendering backend.
+This directory contains MattMC's OpenGL-specific rendering backend implementation. All OpenGL API calls are isolated within this directory to maintain the rendering abstraction.
 
-## ⚠️ IMPORTANT: OpenGL-Only Code
+## Overview
 
-**ALL CLASSES IN THIS DIRECTORY MUST BE OPENGL-SPECIFIC!**
+The OpenGL backend implements the `RenderBackend` interface using LWJGL (Lightweight Java Game Library) to make OpenGL and GLFW calls. This is currently the primary (and only) graphics backend for MattMC.
 
-This means:
-- ✅ **DO** put classes here that import `org.lwjgl.opengl.*`
-- ✅ **DO** put classes here that make OpenGL API calls (glVertex, glColor, glBindTexture, etc.)
-- ✅ **DO** put classes here that manage OpenGL resources (VAOs, VBOs, shaders, textures, framebuffers)
-- ❌ **DO NOT** put pure utility classes here (color math, system info, etc.)
-- ❌ **DO NOT** put generic rendering logic here that doesn't use OpenGL
+**Key Principle**: All OpenGL-specific code belongs here. Code outside this directory must remain graphics API-agnostic.
+
+## Directory Contents
+
+### Core Backend Files
+
+| File | Purpose |
+|------|---------|
+| `OpenGLRenderBackend.java` | Main `RenderBackend` implementation - translates DrawCommands to GL calls |
+| `OpenGLBackendFactory.java` | Factory for creating OpenGL backend and window instances |
+| `Window.java` | GLFW window creation and OpenGL context management |
+| `Shader.java` | GLSL shader program loading and management |
+| `Texture.java` | OpenGL texture loading and binding |
+| `TextureManager.java` | Texture caching with LRU eviction |
+| `TextureAtlas.java` | Runtime texture atlas generation |
+| `Framebuffer.java` | OpenGL framebuffer objects for render-to-texture |
+| `CubeMap.java` | Cubemap texture loading for skyboxes |
+| `ChunkVAO.java` | VAO/VBO management for chunk meshes |
+
+### Rendering Components
+
+| File | Purpose |
+|------|---------|
+| `OpenGLChunkRenderer.java` | Chunk mesh rendering with VAO caching |
+| `OpenGLChunkMeshManager.java` | Manages chunk mesh upload and lifecycle |
+| `OpenGLItemRenderer.java` | Item rendering for UI (hotbar, inventory) |
+| `OpenGLPanoramaRenderer.java` | Rotating cubemap backgrounds for menus |
+| `OpenGLFrustum.java` | Frustum culling using OpenGL matrix state |
+
+### Effects and Utilities
+
+| File | Purpose |
+|------|---------|
+| `BlurEffect.java` | Gaussian blur post-processing shader |
+| `BlurRenderer.java` | Blur effect helper for UI backgrounds |
+| `AbstractBlurBox.java` | Blurred rectangle region rendering |
+| `UIRenderHelper.java` | UI drawing utilities (text, shapes, projection) |
+| `OpenGLColorHelper.java` | OpenGL color state management |
+| `OpenGLSystemInfo.java` | System information queries via OpenGL |
+
+### GUI Components (`gui/` subdirectory)
+
+Contains OpenGL-specific GUI rendering:
+- `components/` - Button renderer, text renderer, TrueType font handling
+- `screens/` - Menu screens (title, pause, inventory, options, etc.)
 
 ## Code Organization Rules
 
-If a class in this directory does NOT use OpenGL:
-1. Move it to an appropriate utility package (e.g., `mattmc.util.*` or `mattmc.client.util.*`)
-2. Update all imports in files that reference it
-3. Ensure the class has no OpenGL dependencies
+### ✅ Code That Belongs Here
 
-If a class has BOTH OpenGL and non-OpenGL code:
-1. Split the class into two parts:
-   - OpenGL-specific code stays here
-   - Pure utility/math code moves to appropriate util package
-2. Update all imports accordingly
+- Classes that import `org.lwjgl.opengl.*`
+- Classes that make direct `gl*()` function calls
+- OpenGL resource management (VAOs, VBOs, textures, shaders, FBOs)
+- GLFW window and input handling
+- OpenGL-specific rendering techniques
 
-## Examples
+### ❌ Code That Does NOT Belong Here
 
-### ✅ Belongs Here
-- `OpenGLRenderBackend.java` - Implements OpenGL rendering backend
-- `Shader.java` - Manages OpenGL shaders
-- `Texture.java` - Manages OpenGL textures
-- `ChunkVAO.java` - Manages OpenGL Vertex Array Objects
-- `OpenGLColorHelper.java` - Sets OpenGL color state using `glColor4f()`
+- Pure mathematical utilities (color math, vector operations)
+- Game logic (block states, entity behavior)
+- Abstract data structures that don't require OpenGL
+- System utilities that don't query OpenGL state
 
-### ❌ Does NOT Belong Here
-- Pure color math utilities (extractRed, packRGB, lerp colors) → Move to `mattmc.util.ColorUtils`
-- System information gathering (CPU, memory, GPU info) → Move to `mattmc.client.util.SystemInfo`
-- Mathematical calculations without OpenGL calls → Move to `mattmc.util.MathUtils`
+**If a class doesn't import anything from `org.lwjgl.opengl.*` or make `gl*()` calls, it probably belongs elsewhere.**
 
-## Purpose
+## The Abstraction Boundary
 
-This directory implements the OpenGL rendering backend for MattMC. It:
-- Implements the `RenderBackend` interface using OpenGL
-- Manages all OpenGL state and resources
-- Provides OpenGL-specific rendering utilities
-- Handles shader compilation and management
-- Manages textures, framebuffers, and other OpenGL objects
+### Critical Rule
 
-## Key Classes
+**Code outside `mattmc.client.renderer.backend` must NEVER directly import classes from this `opengl/` directory.**
 
-- **OpenGLRenderBackend** - Main backend implementation
-- **Shader** - OpenGL shader management
-- **Texture** - Texture loading and management
-- **Window** - GLFW window and OpenGL context management
-- **ChunkRenderer** - Chunk mesh rendering using OpenGL
-- **UIRenderHelper** - UI rendering utilities using OpenGL
-- **Framebuffer** - OpenGL framebuffer management
-
-## Guidelines for Contributors
-
-1. **Check imports**: If your class doesn't import anything from `org.lwjgl.opengl.*`, it probably doesn't belong here
-2. **Check API calls**: If your class doesn't call any `gl*()` functions, it probably doesn't belong here
-3. **Separate concerns**: Keep pure logic/math separate from OpenGL rendering code
-4. **Follow the pattern**: Look at existing classes as examples of proper organization
-
-## ⚠️ CRITICAL: This Directory Should Only Be Accessed From Within backend/
-
-**CLASSES IN THIS DIRECTORY MUST NOT BE DIRECTLY IMPORTED BY CODE OUTSIDE THE `backend/` DIRECTORY!**
-
-### The Abstraction Boundary Rule
-
-Code outside `mattmc.client.renderer.backend` should NEVER directly import or use classes from this `opengl/` directory.
-
-#### ❌ VIOLATIONS (Do Not Do This)
 ```java
-// In mattmc.client.renderer.UIRenderer (OUTSIDE backend/)
-import mattmc.client.renderer.backend.opengl.CrosshairRenderer;  // ❌ WRONG!
-import mattmc.client.renderer.backend.opengl.Texture;            // ❌ WRONG!
-import mattmc.client.renderer.backend.opengl.Window;             // ❌ WRONG!
+// ❌ WRONG - Direct OpenGL import outside backend/
+import mattmc.client.renderer.backend.opengl.Texture;
+import mattmc.client.renderer.backend.opengl.Window;
 
-public class UIRenderer {
-    private CrosshairRenderer crosshairRenderer;  // ❌ Direct coupling to OpenGL
-}
+// ✅ CORRECT - Use the RenderBackend interface
+import mattmc.client.renderer.backend.RenderBackend;
+backend.loadTexture("/path/to/texture.png");
+backend.drawTexture(textureId, x, y, width, height);
 ```
 
-#### ✅ CORRECT APPROACH
-```java
-// In mattmc.client.renderer.UIRenderer
-import mattmc.client.renderer.backend.RenderBackend;  // ✅ Use interface
-import mattmc.client.renderer.backend.DrawCommand;    // ✅ Use abstraction
+### Why This Matters
 
-public class UIRenderer {
-    private RenderBackend backend;  // ✅ Depends on interface, not implementation
-    
-    public void render() {
-        backend.submit(new DrawCommand(...));  // ✅ Goes through abstraction
-    }
-}
+1. **Backend Portability**: Direct OpenGL imports make code impossible to use with Vulkan
+2. **Testability**: OpenGL dependencies require a GL context, preventing unit testing
+3. **Architecture**: The backend is an implementation detail that should be hidden
+4. **Future-Proofing**: Adding new backends requires zero changes to game code
+
+### If You Need OpenGL Functionality Outside
+
+**Don't import OpenGL classes.** Instead:
+
+1. Define the needed functionality as a method on `RenderBackend`
+2. Implement it in `OpenGLRenderBackend`
+3. Call it through the backend interface
+
+## OpenGLRenderBackend Implementation
+
+The `OpenGLRenderBackend` class is the heart of this directory. It:
+
+1. **Maintains resource registries** mapping abstract IDs to OpenGL resources:
+   - Mesh IDs → ChunkVAO objects
+   - Material IDs → Shader + texture combinations
+   - Transform IDs → Translation/transformation data
+
+2. **Translates DrawCommands** into OpenGL calls:
+   - Looks up resources by ID
+   - Binds appropriate shaders and textures
+   - Applies transformations
+   - Issues draw calls
+
+3. **Manages OpenGL state** for different render passes:
+   - OPAQUE: Depth testing enabled, no blending
+   - TRANSPARENT: Alpha blending enabled
+   - UI: 2D orthographic projection, blending enabled
+
+## Usage Pattern
+
+```java
+// The backend is created through the factory (outside this directory)
+RenderBackendFactory factory = RenderBackendFactory.createOpenGL();
+RenderBackend backend = factory.createBackend();
+
+// All rendering goes through the interface
+backend.beginFrame();
+backend.clearBuffers();
+
+// Submit draw commands
+backend.submit(new DrawCommand(meshId, materialId, transformId, RenderPass.OPAQUE));
+
+// 2D UI rendering
+backend.setup2DProjection(screenWidth, screenHeight);
+backend.drawText("Hello World", 10, 10, 1.5f);
+backend.restore2DProjection();
+
+backend.endFrame();
 ```
 
-### Why This Rule Exists
+## Current State
 
-1. **Backend Independence**: If you import OpenGL classes, your code becomes tied to OpenGL forever
-2. **No Alternative Backends**: Direct OpenGL imports make it impossible to support Vulkan, DirectX, or any other rendering API
-3. **Breaks Abstraction**: The whole point of the `backend/` directory is to hide implementation details
-4. **Testing Complexity**: Code with direct OpenGL dependencies makes unit testing significantly more complex and requires specialized test infrastructure
+- ✅ Full `RenderBackend` interface implementation
+- ✅ Window/context management via GLFW
+- ✅ Shader compilation and management
+- ✅ Texture loading with caching
+- ✅ Chunk mesh rendering with VAO pooling
+- ✅ UI rendering (text, buttons, textures)
+- ✅ Post-processing effects (blur)
+- ✅ Input callback abstraction
+- 🔄 Ongoing: Migrating remaining direct GL usages from outside backend/
 
-### If You Need OpenGL Functionality Outside backend/
+## Technical Notes
 
-**You're doing it wrong.** The solution is:
-1. Define what you need as a method on the `RenderBackend` interface
-2. Implement that method in `OpenGLRenderBackend`
-3. Call it through the interface
+### OpenGL Version
+The backend targets OpenGL 2.1+ with compatibility profile for maximum hardware support. Modern features (VAOs, shaders) are used where available.
 
-The backend exists to provide ALL rendering functionality needed by the rest of the application.
+### Thread Safety
+OpenGL operations are NOT thread-safe. All rendering must occur on the main thread that owns the GL context.
 
-### Current Violations (Technical Debt)
-
-This codebase currently has violations of this rule that need to be fixed:
-- `UIRenderer` (src/main/java/mattmc/client/renderer/UIRenderer.java) - directly instantiates `CrosshairRenderer`, `DebugInfoRenderer`, `HotbarRenderer`, etc.
-- `Minecraft.java` (src/main/java/mattmc/client/Minecraft.java) - imports `Window`, `CubeMap`, `PanoramaRenderer` from OpenGL backend
-- `ChunkRenderLogic.java` (src/main/java/mattmc/client/renderer/ChunkRenderLogic.java) - imports `ChunkRenderer`, `Frustum`
-- Various renderer classes import `TextureAtlas`, `Shader`, and other OpenGL-specific types
-
-These are **technical debt** and should be refactored to use the `RenderBackend` interface instead.
+### Resource Cleanup
+OpenGL resources (textures, shaders, VAOs, FBOs) must be explicitly deleted. Use appropriate cleanup methods when resources are no longer needed.
 
 ## Related Documentation
 
-- See `/src/main/java/mattmc/client/renderer/backend/README.md` for backend abstraction information
-- See `OPENGL-REFACTOR.md` in the project root for refactoring guidelines
+- See `../README.md` for the abstraction layer overview
+- See `docs/RENDERING-SYSTEM.md` for comprehensive system documentation
