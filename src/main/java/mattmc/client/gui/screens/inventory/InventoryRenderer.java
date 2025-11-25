@@ -271,8 +271,9 @@ public class InventoryRenderer {
         if (backend == null || creativeInventoryTextureId < 0) return;
         
         int w = window.width(), h = window.height();
-        float contentWidth = 176f * GUI_SCALE;
-        float contentHeight = 296f * GUI_SCALE;
+        // Use actual texture dimensions * GUI_SCALE (same as player inventory)
+        float contentWidth = creativeWidth * GUI_SCALE;
+        float contentHeight = creativeHeight * GUI_SCALE;
         float x = w - contentWidth - 20f;
         float y = (h - contentHeight) / 2f;
         
@@ -286,8 +287,9 @@ public class InventoryRenderer {
         if (backend == null || creativeInventoryTextureId < 0) return;
         
         int w = window.width(), h = window.height();
-        float contentWidth = 176f * GUI_SCALE;
-        float contentHeight = 296f * GUI_SCALE;
+        // Use actual texture dimensions * GUI_SCALE (same as player inventory)
+        float contentWidth = creativeWidth * GUI_SCALE;
+        float contentHeight = creativeHeight * GUI_SCALE;
         float guiX = w - contentWidth - 20f;
         float guiY = (h - contentHeight) / 2f;
         
