@@ -45,7 +45,12 @@ After reviewing all files in the OpenGL backend directory against the establishe
 ### Files That SHOULD BE MOVED OUT of opengl/
 | File | Recommendation | Reason |
 |------|----------------|--------|
-| `UIRenderHelper.java` | ⚠️ ASSESS | Contains OpenGL projection setup (keep) and text/shape helpers (could be delegated) |
+| *(none remaining)* | - | All files requiring refactoring have been addressed |
+
+### Files Assessed and Confirmed Correct
+| File | Status | Reason |
+|------|--------|--------|
+| `UIRenderHelper.java` | ✅ CORRECT | Internal OpenGL helper - used ONLY by `OpenGLRenderBackend`, abstraction exposed via `RenderBackend` interface |
 
 ---
 
@@ -197,27 +202,29 @@ The class now coordinates **what** to render without knowing **how** it's render
 
 ---
 
-### `UIRenderHelper.java` - ⚠️ ASSESS FOR FURTHER CLEANUP
+### `UIRenderHelper.java` - ✅ ASSESSED (CORRECTLY PLACED)
 
 **Current Location:** `backend/opengl/UIRenderHelper.java`
-**Status:** Partially refactored
+**Status:** Correctly placed - internal OpenGL helper
 
 **Analysis:**
 - Contains OpenGL projection setup (`setup2DProjection`, `restore2DProjection`)
 - Contains text rendering delegation (calls `OpenGLTextRenderer`)
 - Contains `fillRect` using immediate mode
-- Has deprecated `setColor` method
+- Has deprecated `setColor` method (delegates to `OpenGLColorHelper`)
 
 **Current State:**
 - Already marked as "INTERNAL USE ONLY"
-- Delegates color operations to `OpenGLColorHelper`
-- Delegates text rendering to `OpenGLTextRenderer`
+- Used ONLY by `OpenGLRenderBackend.java` - no external usages
+- All functionality is already exposed via `RenderBackend` interface:
+  - `setup2DProjection()` / `restore2DProjection()` - interface methods
+  - `drawText()` - interface method
+  - `fillRect()` - interface method
 
-**Recommendation:**
-- **Keep in opengl/** - but consider:
-  - Moving projection setup to `OpenGLRenderBackend` (already partially there)
-  - Removing the deprecated `setColor` method
-  - Eventually this class may become unnecessary if all functionality moves to backend
+**Assessment:** **No changes needed** - The class is an internal OpenGL implementation detail:
+- It's properly encapsulated within the OpenGL backend
+- The `RenderBackend` interface already provides the abstraction layer
+- Code outside `backend/` uses the interface, not this class directly
 
 ---
 
