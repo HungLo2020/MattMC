@@ -75,9 +75,9 @@ public class CreativeInventoryManager {
         int w = window.width(), h = window.height();
         float contentWidth = CREATIVE_TEXTURE_WIDTH * GUI_SCALE;
         float contentHeight = CREATIVE_TEXTURE_HEIGHT * GUI_SCALE;
-        // Position: right edge of screen, moved right by reducing the offset
-        float guiX = w - contentWidth + 90f;
-        float guiY = (h - contentHeight) / 2f;
+        // Position: right edge of screen, adjusted for visual alignment
+        float guiX = w - contentWidth + 190f;
+        float guiY = (h - contentHeight) / 2f + 30f;
         
         // Slot grid parameters
         float startX = guiX + 8f * GUI_SCALE;
