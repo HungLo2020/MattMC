@@ -26,12 +26,12 @@ public final class OpenGLTextRenderer {
 
     
     private static TrueTypeFont font;
-    private static final String FONT_PATH = "/assets/fonts/MattMC.ttf";
+    private static final String FONT_PATH = "/assets/fonts/Minecraft.ttf";
     
     private OpenGLTextRenderer() {} // Prevent instantiation
     
     /**
-     * Initialize the text renderer with the MattMC font.
+     * Initialize the text renderer with the Minecraft font.
      * This is automatically called on first use, but can be called explicitly
      * at application startup for better error handling.
      */

@@ -144,6 +144,9 @@ public class InventoryRenderer {
         // - At GUI_SCALE=3.0: 16*3 = 48 pixels on screen, half = 24 pixels
         float itemSize = 24f;
         
+        // Begin frame for item rendering (ItemRenderer.render() submits commands to backend)
+        backend.beginFrame();
+        
         // Draw items in hotbar (slots 0-8)
         float hotbarX = 8f;
         float hotbarY = 142f;
@@ -204,6 +207,9 @@ public class InventoryRenderer {
                 }
             }
         }
+        
+        // End frame after all items are rendered
+        backend.endFrame();
     }
     
     public void renderItemCount(int count, float itemCenterX, float itemCenterY, float guiScale, float itemSize) {
@@ -240,6 +246,10 @@ public class InventoryRenderer {
         );
         
         float itemSize = 19.2f;
+        
+        // Begin frame for item rendering (ItemRenderer.render() submits commands to backend)
+        backend.beginFrame();
+        
         // Use data-driven rendering for held items (using GUI context as they're in the GUI)
         mattmc.client.renderer.backend.opengl.ItemRenderer.render(
             heldItem, 
@@ -248,6 +258,9 @@ public class InventoryRenderer {
             itemSize,
             backend
         );
+        
+        // End frame after held item is rendered
+        backend.endFrame();
         
         if (heldItem.getCount() > 1) {
             renderItemCount(heldItem.getCount(), fbCoords.x, fbCoords.y, 1.0f, itemSize);
@@ -322,6 +335,9 @@ public class InventoryRenderer {
         float startY = 18f * GUI_SCALE;
         float slotSpacing = 18f * GUI_SCALE;
         
+        // Begin frame for item rendering (ItemRenderer.render() submits commands to backend)
+        backend.beginFrame();
+        
         for (int row = 0; row < CREATIVE_ROWS; row++) {
             for (int col = 0; col < CREATIVE_COLS; col++) {
                 int itemIndex = (scrollRow + row) * CREATIVE_COLS + col;
@@ -347,6 +363,9 @@ public class InventoryRenderer {
                 }
             }
         }
+        
+        // End frame after all creative items are rendered
+        backend.endFrame();
     }
     
     public void renderTooltip(Item hoveredItem, double mouseXWin, double mouseYWin) {
