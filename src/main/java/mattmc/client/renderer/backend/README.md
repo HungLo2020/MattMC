@@ -81,7 +81,7 @@ RenderBackend backend = factory.createBackend();
 
 ### The Abstraction Boundary
 
-**Code outside the `backend/` directory must never directly import or use classes from backend implementation directories.**
+**Code outside the `backend/` directory must not directly import or use classes from backend implementation directories.**
 
 This is the foundational rule that enables backend independence:
 

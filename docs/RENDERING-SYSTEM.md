@@ -405,7 +405,7 @@ backend.endFrame();
 
 ### The Golden Rule
 
-**Code outside `mattmc.client.renderer.backend` must NEVER import classes from `mattmc.client.renderer.backend.opengl`.**
+**Code outside `mattmc.client.renderer.backend` must not import classes from `mattmc.client.renderer.backend.opengl`.**
 
 ### Violations to Avoid
 
