@@ -515,6 +515,11 @@ public class ItemRenderer {
         
         // Save current GL state
         boolean textureWasEnabled = glIsEnabled(GL_TEXTURE_2D);
+        boolean blendWasEnabled = glIsEnabled(GL_BLEND);
+        
+        // Enable blending for transparent textures (prevents black background)
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
         
         glEnable(GL_TEXTURE_2D);
         texture.bind();
@@ -524,16 +529,24 @@ public class ItemRenderer {
         // size parameter is the half-width, so total size is 2*size
         float halfSize = size;
         
+        // Move items UP by 1 texture pixel to fix vertical alignment
+        // 1 texture pixel = size / 8 (since size is half the item, and items are 16x16 textures)
+        float oneTexturePixel = size / 8.0f;
+        float adjustedY = y - oneTexturePixel;
+        
         glBegin(GL_QUADS);
-        glTexCoord2f(0, 1); glVertex2f(x - halfSize, y - halfSize);
-        glTexCoord2f(1, 1); glVertex2f(x + halfSize, y - halfSize);
-        glTexCoord2f(1, 0); glVertex2f(x + halfSize, y + halfSize);
-        glTexCoord2f(0, 0); glVertex2f(x - halfSize, y + halfSize);
+        glTexCoord2f(0, 1); glVertex2f(x - halfSize, adjustedY - halfSize);
+        glTexCoord2f(1, 1); glVertex2f(x + halfSize, adjustedY - halfSize);
+        glTexCoord2f(1, 0); glVertex2f(x + halfSize, adjustedY + halfSize);
+        glTexCoord2f(0, 0); glVertex2f(x - halfSize, adjustedY + halfSize);
         glEnd();
         
         // Restore GL state
         if (!textureWasEnabled) {
             glDisable(GL_TEXTURE_2D);
+        }
+        if (!blendWasEnabled) {
+            glDisable(GL_BLEND);
         }
     }
     
@@ -547,11 +560,16 @@ public class ItemRenderer {
         // Match the scale of flat items (which matches isometric block items)
         float halfSize = size;
         
+        // Move fallback items UP by 1 texture pixel to match flat items alignment
+        // 1 texture pixel = size / 8 (since size is half the item, and items are 16x16 textures)
+        float oneTexturePixel = size / 8.0f;
+        float adjustedY = y - oneTexturePixel;
+        
         glBegin(GL_QUADS);
-        glVertex2f(x - halfSize, y - halfSize);
-        glVertex2f(x + halfSize, y - halfSize);
-        glVertex2f(x + halfSize, y + halfSize);
-        glVertex2f(x - halfSize, y + halfSize);
+        glVertex2f(x - halfSize, adjustedY - halfSize);
+        glVertex2f(x + halfSize, adjustedY - halfSize);
+        glVertex2f(x + halfSize, adjustedY + halfSize);
+        glVertex2f(x - halfSize, adjustedY + halfSize);
         glEnd();
     }
     
