@@ -274,8 +274,8 @@ public class InventoryRenderer {
         // Use actual texture dimensions for rendering the full texture
         float contentWidth = creativeWidth * GUI_SCALE;
         float contentHeight = creativeHeight * GUI_SCALE;
-        // Position: right edge of screen with 20px buffer
-        float x = w - contentWidth - 20f;
+        // Position: right edge of screen with small buffer
+        float x = w - contentWidth - 10f;
         float y = (h - contentHeight) / 2f;
         
         // Draw texture (partial texture coordinates handled by backend implementation)
@@ -291,8 +291,8 @@ public class InventoryRenderer {
         // Use actual texture dimensions for position calculation (must match renderCreativeInventory)
         float contentWidth = creativeWidth * GUI_SCALE;
         float contentHeight = creativeHeight * GUI_SCALE;
-        // Position: right edge of screen with 20px buffer
-        float guiX = w - contentWidth - 20f;
+        // Position: right edge of screen with small buffer
+        float guiX = w - contentWidth - 10f;
         float guiY = (h - contentHeight) / 2f;
         
         // Get mouse position in framebuffer coordinates
