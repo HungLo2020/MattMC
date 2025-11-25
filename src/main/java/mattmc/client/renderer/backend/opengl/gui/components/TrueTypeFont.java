@@ -123,12 +123,12 @@ public final class TrueTypeFont implements AutoCloseable {
     /**
      * Update the font scale for rendering at a different size.
      * Note: This doesn't rebake the font, just changes the reference size for scaling calculations.
-     * The actual scaling is done via glScale in TextRenderer.
+     * The actual scaling is done via glScale in OpenGLTextRenderer.
      * @param pixelHeight Desired font height in pixels
      */
     public void updateScale(float pixelHeight) {
         // This method is kept for API compatibility but doesn't need to do anything
-        // since scaling is handled by TextRenderer using glScale
+        // since scaling is handled by OpenGLTextRenderer using glScale
     }
     
     /**

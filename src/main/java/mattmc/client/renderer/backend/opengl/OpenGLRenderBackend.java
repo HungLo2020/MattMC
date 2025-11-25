@@ -665,7 +665,7 @@ public class OpenGLRenderBackend implements RenderBackend {
         // Render tooltip text directly
         float TOOLTIP_PADDING = 13.5f;
         glColor4f(1f, 1f, 1f, 1f);
-        mattmc.client.renderer.backend.opengl.gui.components.TextRenderer.drawText(
+        mattmc.client.renderer.backend.opengl.gui.components.OpenGLTextRenderer.drawText(
             textInfo.text, x + TOOLTIP_PADDING, y + TOOLTIP_PADDING, textInfo.scale);
     }
     
@@ -871,22 +871,22 @@ public class OpenGLRenderBackend implements RenderBackend {
     
     @Override
     public void drawText(String text, float x, float y, float scale) {
-        mattmc.client.renderer.backend.opengl.gui.components.TextRenderer.drawText(text, x, y, scale);
+        mattmc.client.renderer.backend.opengl.gui.components.OpenGLTextRenderer.drawText(text, x, y, scale);
     }
     
     @Override
     public void drawCenteredText(String text, float centerX, float y, float scale) {
-        mattmc.client.renderer.backend.opengl.gui.components.TextRenderer.drawCenteredText(text, centerX, y, scale);
+        mattmc.client.renderer.backend.opengl.gui.components.OpenGLTextRenderer.drawCenteredText(text, centerX, y, scale);
     }
     
     @Override
     public float getTextWidth(String text, float scale) {
-        return mattmc.client.renderer.backend.opengl.gui.components.TextRenderer.getTextWidth(text, scale);
+        return mattmc.client.renderer.backend.opengl.gui.components.OpenGLTextRenderer.getTextWidth(text, scale);
     }
     
     @Override
     public float getTextHeight(String text, float scale) {
-        return mattmc.client.renderer.backend.opengl.gui.components.TextRenderer.getTextHeight(text, scale);
+        return mattmc.client.renderer.backend.opengl.gui.components.OpenGLTextRenderer.getTextHeight(text, scale);
     }
     
     // === Input Callback Implementations ===
@@ -942,12 +942,12 @@ public class OpenGLRenderBackend implements RenderBackend {
     
     @Override
     public void drawButton(mattmc.client.gui.components.Button button) {
-        mattmc.client.renderer.backend.opengl.gui.components.ButtonRenderer.drawButton(button);
+        mattmc.client.renderer.backend.opengl.gui.components.OpenGLButtonRenderer.drawButton(button);
     }
     
     @Override
     public void drawButton(mattmc.client.gui.components.Button button, boolean selected) {
-        mattmc.client.renderer.backend.opengl.gui.components.ButtonRenderer.drawButton(button, selected);
+        mattmc.client.renderer.backend.opengl.gui.components.OpenGLButtonRenderer.drawButton(button, selected);
     }
     
     // === Texture Management ===

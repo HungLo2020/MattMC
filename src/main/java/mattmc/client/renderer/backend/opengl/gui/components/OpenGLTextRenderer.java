@@ -7,17 +7,28 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Utility class for rendering text using TrueType fonts.
- * Provides centered, scaled text rendering capabilities with the Minecraft font.
+ * OpenGL-specific text rendering implementation using TrueType fonts.
+ * 
+ * <p><b>INTERNAL USE ONLY:</b> This class is part of the OpenGL backend implementation
+ * and should NOT be used directly by code outside the backend/opengl package.
+ * Use {@link mattmc.client.renderer.gui.components.TextRenderer} instead for
+ * API-agnostic text rendering, or use the {@link mattmc.client.renderer.backend.RenderBackend}
+ * interface methods directly.
+ * 
+ * <p>This class provides the actual OpenGL implementation of text rendering
+ * using TrueType fonts baked into a texture atlas.
+ * 
+ * @since OpenGL Backend - Internal Implementation
+ * @see mattmc.client.renderer.gui.components.TextRenderer API-agnostic wrapper
  */
-public final class TextRenderer {
-    private static final Logger logger = LoggerFactory.getLogger(TextRenderer.class);
+public final class OpenGLTextRenderer {
+    private static final Logger logger = LoggerFactory.getLogger(OpenGLTextRenderer.class);
 
     
     private static TrueTypeFont font;
     private static final String FONT_PATH = "/assets/fonts/Minecraft.ttf";
     
-    private TextRenderer() {} // Prevent instantiation
+    private OpenGLTextRenderer() {} // Prevent instantiation
     
     /**
      * Initialize the text renderer with the Minecraft font.

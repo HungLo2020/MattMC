@@ -145,7 +145,10 @@ public class HotbarRenderer {
                     String countText = String.valueOf(stack.getCount());
                     float countX = slotX + slotSpacing - 20;
                     float countY = slotStartY + 18f * HOTBAR_SCALE - 15;
-                    mattmc.client.renderer.backend.opengl.UIRenderHelper.drawText(countText, countX, countY, 1.0f, 0xFFFFFF);
+                    // Use backend for text rendering (API-agnostic)
+                    backend.setColor(0xFFFFFF, 1.0f);
+                    backend.drawText(countText, countX, countY, 1.0f);
+                    backend.resetColor();
                 }
             }
         }
