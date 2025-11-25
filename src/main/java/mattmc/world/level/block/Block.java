@@ -1,6 +1,6 @@
 package mattmc.world.level.block;
 
-import mattmc.client.Minecraft;
+import mattmc.client.MattMC;
 import mattmc.client.renderer.backend.opengl.Texture;
 
 import mattmc.client.resources.ResourceManager;
@@ -11,7 +11,7 @@ import java.util.Map;
 
 /**
  * Represents a single block in the world.
- * Similar to Minecraft's Block class.
+ * Similar to MattMC's Block class.
  * 
  * Each block has properties like solidity and texture paths.
  * Blocks are registered in the Blocks class with unique identifiers.

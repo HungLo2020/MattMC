@@ -1,12 +1,12 @@
 package mattmc.world.entity.player;
 
-import mattmc.client.Minecraft;
+import mattmc.client.MattMC;
 
 import static org.lwjgl.glfw.GLFW.*;
 
 /**
  * Handles player input and controls.
- * Similar to Minecraft's PlayerController/MovementInput classes.
+ * Similar to MattMC's PlayerController/MovementInput classes.
  */
 public class PlayerController {
     // Mouse sensitivity multiplier (1.0 = default, 0.5 = half speed, 2.0 = double speed)

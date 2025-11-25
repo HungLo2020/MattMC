@@ -74,7 +74,7 @@ public class UVMapper {
             // Use white color for texture modulation
             renderColor = 0xFFFFFF;
             
-            // Apply grass green tint for grass_block top face (vanilla Minecraft-like)
+            // Apply grass green tint for grass_block top face (vanilla MattMC-like)
             if (face.block == Blocks.GRASS_BLOCK && face.faceType != null && "top".equals(face.faceType)) {
                 renderColor = 0x5BB53B; // Grass green
             }

@@ -144,6 +144,9 @@ public class InventoryRenderer {
         // - At GUI_SCALE=3.0: 16*3 = 48 pixels on screen, half = 24 pixels
         float itemSize = 24f;
         
+        // Begin frame for item rendering (ItemRenderer.render() submits commands to backend)
+        backend.beginFrame();
+        
         // Draw items in hotbar (slots 0-8)
         float hotbarX = 8f;
         float hotbarY = 142f;
@@ -204,6 +207,9 @@ public class InventoryRenderer {
                 }
             }
         }
+        
+        // End frame after all inventory items are rendered
+        backend.endFrame();
     }
     
     public void renderItemCount(int count, float itemCenterX, float itemCenterY, float guiScale, float itemSize) {
@@ -240,6 +246,10 @@ public class InventoryRenderer {
         );
         
         float itemSize = 19.2f;
+        
+        // Begin frame for item rendering (ItemRenderer.render() submits commands to backend)
+        backend.beginFrame();
+        
         // Use data-driven rendering for held items (using GUI context as they're in the GUI)
         mattmc.client.renderer.backend.opengl.ItemRenderer.render(
             heldItem, 
@@ -248,6 +258,9 @@ public class InventoryRenderer {
             itemSize,
             backend
         );
+        
+        // End frame after held item is rendered
+        backend.endFrame();
         
         if (heldItem.getCount() > 1) {
             renderItemCount(heldItem.getCount(), fbCoords.x, fbCoords.y, 1.0f, itemSize);
@@ -258,10 +271,12 @@ public class InventoryRenderer {
         if (backend == null || creativeInventoryTextureId < 0) return;
         
         int w = window.width(), h = window.height();
-        float contentWidth = 176f * GUI_SCALE;
-        float contentHeight = 296f * GUI_SCALE;
-        float x = w - contentWidth - 20f;
-        float y = (h - contentHeight) / 2f;
+        // Use actual texture dimensions for rendering the full texture
+        float contentWidth = creativeWidth * GUI_SCALE;
+        float contentHeight = creativeHeight * GUI_SCALE;
+        // Position: right edge of screen, adjusted for visual alignment
+        float x = w - contentWidth + 190f;
+        float y = (h - contentHeight) / 2f + 80f;
         
         // Draw texture (partial texture coordinates handled by backend implementation)
         backend.drawTexture(creativeInventoryTextureId, x, y, contentWidth, contentHeight);
@@ -273,10 +288,12 @@ public class InventoryRenderer {
         if (backend == null || creativeInventoryTextureId < 0) return;
         
         int w = window.width(), h = window.height();
-        float contentWidth = 176f * GUI_SCALE;
-        float contentHeight = 296f * GUI_SCALE;
-        float guiX = w - contentWidth - 20f;
-        float guiY = (h - contentHeight) / 2f;
+        // Use actual texture dimensions for position calculation (must match renderCreativeInventory)
+        float contentWidth = creativeWidth * GUI_SCALE;
+        float contentHeight = creativeHeight * GUI_SCALE;
+        // Position: right edge of screen, adjusted for visual alignment
+        float guiX = w - contentWidth + 190f;
+        float guiY = (h - contentHeight) / 2f + 80f;
         
         // Get mouse position in framebuffer coordinates
         CoordinateUtils.Point2D fbCoords = CoordinateUtils.windowToFramebuffer(
@@ -322,6 +339,9 @@ public class InventoryRenderer {
         float startY = 18f * GUI_SCALE;
         float slotSpacing = 18f * GUI_SCALE;
         
+        // Begin frame for item rendering (ItemRenderer.render() submits commands to backend)
+        backend.beginFrame();
+        
         for (int row = 0; row < CREATIVE_ROWS; row++) {
             for (int col = 0; col < CREATIVE_COLS; col++) {
                 int itemIndex = (scrollRow + row) * CREATIVE_COLS + col;
@@ -347,6 +367,9 @@ public class InventoryRenderer {
                 }
             }
         }
+        
+        // End frame after all creative items are rendered
+        backend.endFrame();
     }
     
     public void renderTooltip(Item hoveredItem, double mouseXWin, double mouseYWin) {

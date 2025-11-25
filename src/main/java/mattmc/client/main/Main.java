@@ -1,7 +1,8 @@
 package mattmc.client.main;
 
-import mattmc.client.Minecraft;
-import mattmc.client.renderer.backend.opengl.Window;
+import mattmc.client.MattMC;
+import mattmc.client.renderer.backend.RenderBackendFactory;
+import mattmc.client.renderer.window.WindowHandle;
 import mattmc.client.gui.screens.TitleScreen;
 import mattmc.util.AppPaths;
 import mattmc.client.settings.KeybindManager;
@@ -37,14 +38,22 @@ public final class Main {
         // Load options (blur settings, etc.)
         OptionsManager.loadOptions();
 
-        // Boot the game with configured resolution
+        // Boot the game with configured resolution using the backend factory
+        // This avoids directly importing OpenGL-specific classes
         int width = OptionsManager.getResolutionWidth();
         int height = OptionsManager.getResolutionHeight();
-        try (var window = new Window(width, height, "MattMC")) {
-            var game = new Minecraft(window);
-            // If your Minecraft wants to know the dataDir, you can add a setter/ctor and pass it in.
+        
+        RenderBackendFactory factory = RenderBackendFactory.createDefault();
+        WindowHandle window = factory.createWindow(width, height, "MattMC");
+        
+        try (AutoCloseable windowCloseable = factory.getWindowCloseable()) {
+            var game = new MattMC(window, factory);
+            // If your MattMC wants to know the dataDir, you can add a setter/ctor and pass it in.
             game.setScreen(new TitleScreen(game));
             game.run();
+        } catch (Exception e) {
+            logger.error("Error during game execution: {}", e.getMessage(), e);
+            throw new RuntimeException("Game execution failed", e);
         }
     }
 }

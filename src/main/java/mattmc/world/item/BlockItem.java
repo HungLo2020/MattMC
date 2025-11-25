@@ -4,7 +4,7 @@ import mattmc.world.level.block.Block;
 
 /**
  * Represents an item that can place a block.
- * Similar to Minecraft's BlockItem class.
+ * Similar to MattMC's BlockItem class.
  * 
  * BlockItems are used for placeable blocks like dirt, stone, grass, etc.
  * When used (right-clicked), they place the associated block in the world.

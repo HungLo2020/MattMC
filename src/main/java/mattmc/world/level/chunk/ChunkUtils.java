@@ -62,9 +62,9 @@ public final class ChunkUtils {
     
     /**
      * Get chunk-local X coordinate from world X coordinate.
-     * Note: For negative coordinates, this produces Minecraft-style wrapping behavior.
+     * Note: For negative coordinates, this produces MattMC-style wrapping behavior.
      * For example, worldX=-1 returns 15, worldX=-16 returns 0, worldX=-17 returns 15.
-     * This matches Minecraft's coordinate system where negative coordinates wrap around
+     * This matches MattMC's coordinate system where negative coordinates wrap around
      * within their chunk rather than producing negative local coordinates.
      * 
      * @param worldX World X coordinate
@@ -76,9 +76,9 @@ public final class ChunkUtils {
     
     /**
      * Get chunk-local Z coordinate from world Z coordinate.
-     * Note: For negative coordinates, this produces Minecraft-style wrapping behavior.
+     * Note: For negative coordinates, this produces MattMC-style wrapping behavior.
      * For example, worldZ=-1 returns 15, worldZ=-16 returns 0, worldZ=-17 returns 15.
-     * This matches Minecraft's coordinate system where negative coordinates wrap around
+     * This matches MattMC's coordinate system where negative coordinates wrap around
      * within their chunk rather than producing negative local coordinates.
      * 
      * @param worldZ World Z coordinate
@@ -165,7 +165,7 @@ public final class ChunkUtils {
     
     /**
      * Convert chunk coordinates to a unique long key for storage.
-     * Uses the same format as Minecraft: upper 32 bits for X, lower 32 bits for Z.
+     * Uses the same format as MattMC: upper 32 bits for X, lower 32 bits for Z.
      */
     public static long chunkKey(int chunkX, int chunkZ) {
         return ((long)chunkX << 32) | (chunkZ & 0xFFFFFFFFL);

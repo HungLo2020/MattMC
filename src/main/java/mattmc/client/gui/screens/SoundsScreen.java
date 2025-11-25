@@ -1,13 +1,13 @@
 package mattmc.client.gui.screens;
 
-import mattmc.client.Minecraft;
+import mattmc.client.MattMC;
 import mattmc.client.gui.components.Button;
 import mattmc.client.settings.OptionsManager;
 
 /** Sounds options submenu screen. */
 public final class SoundsScreen extends AbstractMenuScreen {
 
-    public SoundsScreen(Minecraft game) {
+    public SoundsScreen(MattMC game) {
         super(game);
         recomputeLayout();
     }

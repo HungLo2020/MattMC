@@ -1,13 +1,13 @@
 package mattmc.client.gui.screens;
 
-import mattmc.client.Minecraft;
+import mattmc.client.MattMC;
 import mattmc.client.gui.components.Button;
 import mattmc.client.settings.OptionsManager;
 
 /** Skins options submenu screen. */
 public final class SkinsScreen extends AbstractMenuScreen {
 
-    public SkinsScreen(Minecraft game) {
+    public SkinsScreen(MattMC game) {
         super(game);
         recomputeLayout();
     }

@@ -4,10 +4,10 @@ import java.util.*;
 
 /**
  * Central registry for all creative mode tabs.
- * Similar to Minecraft's CreativeModeTabs class.
+ * Similar to MattMC's CreativeModeTabs class.
  * 
  * This class provides predefined tabs for organizing items in the creative inventory,
- * similar to how Minecraft organizes items (Building Blocks, Redstone, Tools, etc.).
+ * similar to how MattMC organizes items (Building Blocks, Redstone, Tools, etc.).
  * 
  * <h2>Usage Examples:</h2>
  * <pre>{@code
@@ -32,7 +32,7 @@ public class CreativeTabs {
     // Map for quick tab lookup by identifier
     private static final Map<String, CreativeTab> TAB_MAP = new HashMap<>();
     
-    // Predefined creative tabs - similar to Minecraft's creative tabs
+    // Predefined creative tabs - similar to MattMC's creative tabs
     // Note: Icons will be set to appropriate items when they are registered
     
     /**

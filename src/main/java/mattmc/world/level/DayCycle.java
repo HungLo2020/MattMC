@@ -1,9 +1,9 @@
 package mattmc.world.level;
 
 /**
- * Manages the day/night cycle calculations for Minecraft-like worlds.
+ * Manages the day/night cycle calculations for MattMC-like worlds.
  * 
- * In Minecraft:
+ * In MattMC:
  * - Full cycle = 24,000 ticks (20 real-world minutes at 20 TPS)
  * - Day (sunrise to sunset) = 0-12,000 ticks (~10 minutes)
  * - Sunset/Dusk = 12,000-13,000 ticks (~1.5 minutes)

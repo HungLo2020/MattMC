@@ -1,14 +1,23 @@
 package mattmc.client.renderer.backend.opengl;
 
-import mattmc.client.renderer.backend.opengl.gui.components.TextRenderer;
+import mattmc.client.renderer.backend.opengl.gui.components.OpenGLTextRenderer;
 import mattmc.util.ColorUtils;
 import mattmc.client.renderer.backend.opengl.OpenGLColorHelper;
 
 import static org.lwjgl.opengl.GL11.*;
 
 /**
- * Helper class containing common UI rendering utilities.
- * Provides methods for drawing text, shapes, and color management.
+ * OpenGL-specific UI rendering helper utilities.
+ * 
+ * <p><b>INTERNAL USE ONLY:</b> This class is part of the OpenGL backend implementation
+ * and should NOT be used directly by code outside the backend/opengl package.
+ * Use {@link mattmc.client.renderer.backend.RenderBackend} interface methods instead
+ * for API-agnostic UI rendering.
+ * 
+ * <p>This class provides OpenGL-specific helper methods for text rendering,
+ * shape drawing, and color management used internally by the OpenGL backend.
+ * 
+ * @since OpenGL Backend - Internal Implementation
  */
 public class UIRenderHelper {
     
@@ -17,7 +26,7 @@ public class UIRenderHelper {
      */
     public static void drawText(String text, float x, float y, float scale, int rgb) {
         OpenGLColorHelper.setGLColor(rgb, 1f);
-        TextRenderer.drawText(text, x, y, scale);
+        OpenGLTextRenderer.drawText(text, x, y, scale);
     }
     
     /**
@@ -25,11 +34,11 @@ public class UIRenderHelper {
      */
     public static void drawTextRightAligned(String text, float x, float y, float scale, int rgb) {
         // Get accurate text width
-        float textWidth = TextRenderer.getTextWidth(text, scale);
+        float textWidth = OpenGLTextRenderer.getTextWidth(text, scale);
         
         // Draw text at position adjusted for right alignment
         OpenGLColorHelper.setGLColor(rgb, 1f);
-        TextRenderer.drawText(text, x - textWidth, y, scale);
+        OpenGLTextRenderer.drawText(text, x - textWidth, y, scale);
     }
     
     /**

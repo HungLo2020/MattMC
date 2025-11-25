@@ -2,7 +2,7 @@ package mattmc.world.item;
 
 /**
  * Represents a stack of items in an inventory slot.
- * Similar to Minecraft's ItemStack class.
+ * Similar to MattMC's ItemStack class.
  * 
  * An ItemStack contains an Item type and a count.
  * The count cannot exceed the item's maximum stack size.

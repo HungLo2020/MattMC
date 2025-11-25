@@ -1,6 +1,6 @@
 package mattmc.client.gui.screens;
 
-import mattmc.client.Minecraft;
+import mattmc.client.MattMC;
 import mattmc.client.renderer.backend.RenderBackend;
 import mattmc.client.renderer.window.WindowHandle;
 import mattmc.client.settings.OptionsManager;
@@ -9,9 +9,9 @@ import mattmc.world.entity.player.LocalPlayer;
 import mattmc.world.entity.player.PlayerController;
 import mattmc.world.entity.player.PlayerPhysics;
 import mattmc.world.entity.player.PlayerInput;
-import mattmc.client.renderer.backend.opengl.LevelRenderer;
+import mattmc.client.renderer.WorldRenderer;
 import mattmc.client.renderer.UIRenderer;
-import mattmc.client.renderer.backend.opengl.BlockFaceGeometry;
+import mattmc.client.renderer.block.BlockOutlineRenderer;
 import mattmc.world.item.Inventory;
 import mattmc.world.level.chunk.ChunkUtils;
 import mattmc.world.level.Level;
@@ -34,17 +34,17 @@ import org.slf4j.LoggerFactory;
 public final class DevplayScreen implements Screen {
     private static final Logger logger = LoggerFactory.getLogger(DevplayScreen.class);
 
-    private final Minecraft game;
+    private final MattMC game;
     private final WindowHandle window;
     private final RenderBackend backend;
     
-    // Minecraft components (following Minecraft's architecture)
+    // Game components (following game architecture)
     private final Level world;
     private final LocalPlayer player;
     private final PlayerController playerController;
     private final PlayerPhysics playerPhysics;
     private final BlockInteraction blockInteraction;
-    private final LevelRenderer worldRenderer;
+    private final WorldRenderer worldRenderer;
     private final UIRenderer uiRenderer;
     
     // Level name for saving
@@ -60,27 +60,27 @@ public final class DevplayScreen implements Screen {
     // Flag to track if world should be shut down on close
     private boolean shouldShutdownWorld = false;
 
-    public DevplayScreen(Minecraft game, String worldName) {
+    public DevplayScreen(MattMC game, String worldName) {
         this(game, worldName, new java.util.Random().nextLong());
     }
     
-    public DevplayScreen(Minecraft game, String worldName, long seed) {
+    public DevplayScreen(MattMC game, String worldName, long seed) {
         this(game, worldName, null, seed, 0f, 0f, 0f, 0f, 0f);
     }
     
-    public DevplayScreen(Minecraft game, String worldName, Level world, float playerX, float playerY, float playerZ, float playerYaw, float playerPitch) {
+    public DevplayScreen(MattMC game, String worldName, Level world, float playerX, float playerY, float playerZ, float playerYaw, float playerPitch) {
         this(game, worldName, world, new java.util.Random().nextLong(), playerX, playerY, playerZ, playerYaw, playerPitch, null);
     }
     
-    public DevplayScreen(Minecraft game, String worldName, Level world, float playerX, float playerY, float playerZ, float playerYaw, float playerPitch, Inventory playerInventory) {
+    public DevplayScreen(MattMC game, String worldName, Level world, float playerX, float playerY, float playerZ, float playerYaw, float playerPitch, Inventory playerInventory) {
         this(game, worldName, world, new java.util.Random().nextLong(), playerX, playerY, playerZ, playerYaw, playerPitch, playerInventory);
     }
     
-    public DevplayScreen(Minecraft game, String worldName, Level world, long seed, float playerX, float playerY, float playerZ, float playerYaw, float playerPitch) {
+    public DevplayScreen(MattMC game, String worldName, Level world, long seed, float playerX, float playerY, float playerZ, float playerYaw, float playerPitch) {
         this(game, worldName, world, seed, playerX, playerY, playerZ, playerYaw, playerPitch, null);
     }
     
-    public DevplayScreen(Minecraft game, String worldName, Level world, long seed, float playerX, float playerY, float playerZ, float playerYaw, float playerPitch, Inventory playerInventory) {
+    public DevplayScreen(MattMC game, String worldName, Level world, long seed, float playerX, float playerY, float playerZ, float playerYaw, float playerPitch, Inventory playerInventory) {
         this.game = game;
         this.window = game.window();
         this.backend = game.getRenderBackend();
@@ -144,7 +144,7 @@ public final class DevplayScreen implements Screen {
         this.player.setPhysics(playerPhysics);
         this.playerController = new PlayerController(player);
         this.blockInteraction = new BlockInteraction(player, this.world);
-        this.worldRenderer = new LevelRenderer();
+        this.worldRenderer = game.getBackendFactory().createWorldRenderer();
         this.worldRenderer.initWithLevel(this.world);
         this.uiRenderer = new UIRenderer();
         
@@ -325,7 +325,7 @@ public final class DevplayScreen implements Screen {
             backend.setColor(0x000000, 1f);  // Black outline
             
             // Draw complete outline around the targeted block
-            BlockFaceGeometry.drawCompleteBlockOutlineWithBackend(hit.x, ChunkUtils.localToWorldY(hit.y), hit.z, backend);
+            BlockOutlineRenderer.drawBlockOutline(hit.x, ChunkUtils.localToWorldY(hit.y), hit.z, backend);
             
             backend.end3DLines();
             

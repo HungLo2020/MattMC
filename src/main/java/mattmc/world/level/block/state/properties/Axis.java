@@ -3,7 +3,7 @@ package mattmc.world.level.block.state.properties;
 /**
  * Enum for block axes (X, Y, Z).
  * Used by blocks that can be rotated along different axes like logs, pillars, and froglights.
- * Similar to Minecraft's Direction.Axis enum.
+ * Similar to MattMC's Direction.Axis enum.
  */
 public enum Axis {
     X("x"),

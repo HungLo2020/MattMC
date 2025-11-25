@@ -1,13 +1,13 @@
 package mattmc.client.gui.screens;
 
-import mattmc.client.Minecraft;
+import mattmc.client.MattMC;
 import mattmc.client.gui.components.Button;
 import mattmc.client.settings.OptionsManager;
 
 /** Game settings submenu screen. */
 public final class GameScreen extends AbstractMenuScreen {
 
-    public GameScreen(Minecraft game) {
+    public GameScreen(MattMC game) {
         super(game);
         recomputeLayout();
     }

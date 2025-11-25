@@ -2,7 +2,7 @@ package mattmc.world.level.block.state.properties;
 
 /**
  * Enum for stairs shape.
- * Similar to Minecraft's StairsShape enum.
+ * Similar to MattMC's StairsShape enum.
  */
 public enum StairsShape {
     STRAIGHT,

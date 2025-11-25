@@ -6,7 +6,7 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Represents display transforms for different view modes in Minecraft's model format.
+ * Represents display transforms for different view modes in MattMC's model format.
  * Controls how items/blocks appear in GUI, hand, head, etc.
  */
 public class ModelDisplay {

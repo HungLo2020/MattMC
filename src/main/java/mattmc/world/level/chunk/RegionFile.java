@@ -1,6 +1,6 @@
 package mattmc.world.level.chunk;
 
-import mattmc.client.Minecraft;
+import mattmc.client.MattMC;
 
 import mattmc.nbt.NBTUtil;
 import org.slf4j.Logger;
@@ -15,8 +15,8 @@ import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 /**
- * Represents a Minecraft-style region file (.mca) that stores 32x32 chunks.
- * Based on the Anvil format used in modern Minecraft Java Edition.
+ * Represents a MattMC-style region file (.mca) that stores 32x32 chunks.
+ * Based on the Anvil format used in modern MattMC Java Edition.
  * 
  * Thread-safe: Uses ReentrantReadWriteLock to allow concurrent reads while ensuring exclusive writes.
  */
@@ -39,7 +39,7 @@ public class RegionFile implements AutoCloseable {
     // Timestamp table: last modified timestamp for each chunk
     private final int[] timestamps = new int[REGION_SIZE * REGION_SIZE];
     
-    // Keep file handle open for reuse (Minecraft Java Edition approach)
+    // Keep file handle open for reuse (MattMC Java Edition approach)
     // This file handle is accessed via synchronized methods for thread safety.
     // Set to null when close() is called to release resources.
     private RandomAccessFile file;
@@ -220,7 +220,7 @@ public class RegionFile implements AutoCloseable {
             // Check if we can reuse the existing space
             int offset;
             if (oldSectorCount >= sectorsNeeded && oldOffset >= 2) {
-                // Reuse existing space (Minecraft Java optimization)
+                // Reuse existing space (MattMC Java optimization)
                 offset = oldOffset;
             } else {
                 // Need to find new space
@@ -252,7 +252,7 @@ public class RegionFile implements AutoCloseable {
     /**
      * Find free space in the region file for the given number of sectors.
      * Returns the sector offset where data can be written.
-     * Improved to reuse freed space (Minecraft Java optimization).
+     * Improved to reuse freed space (MattMC Java optimization).
      */
     private int findFreeSpace(int sectorsNeeded, int excludeIndex) throws IOException {
         // Build a map of used sectors

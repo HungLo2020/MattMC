@@ -1,13 +1,13 @@
 package mattmc.nbt;
 
-import mattmc.client.Minecraft;
+import mattmc.client.MattMC;
 
 import java.io.*;
 import java.util.*;
 import java.util.zip.*;
 
 /**
- * Simple NBT (Named Binary Tag) utility for reading/writing Minecraft-style data.
+ * Simple NBT (Named Binary Tag) utility for reading/writing MattMC-style data.
  * Supports only the subset of NBT needed for world saving/loading.
  */
 public class NBTUtil {
@@ -34,7 +34,7 @@ public class NBTUtil {
     
     /**
      * Write a compound tag to a stream (compressed with gzip).
-     * Uses BufferedOutputStream for better performance (Minecraft Java Edition approach).
+     * Uses BufferedOutputStream for better performance (MattMC Java Edition approach).
      */
     public static void writeCompressed(Map<String, Object> compound, OutputStream out) throws IOException {
         try (BufferedOutputStream buffered = new BufferedOutputStream(out, 8192);
@@ -50,7 +50,7 @@ public class NBTUtil {
     
     /**
      * Read a compound tag from a stream (compressed with gzip).
-     * Uses BufferedInputStream for better performance (Minecraft Java Edition approach).
+     * Uses BufferedInputStream for better performance (MattMC Java Edition approach).
      */
     public static Map<String, Object> readCompressed(InputStream in) throws IOException {
         try (BufferedInputStream buffered = new BufferedInputStream(in, 8192);
@@ -71,7 +71,7 @@ public class NBTUtil {
     
     /**
      * Write a compound tag to a stream (deflate compression).
-     * Uses BufferedOutputStream for better performance (Minecraft Java Edition approach).
+     * Uses BufferedOutputStream for better performance (MattMC Java Edition approach).
      * Uses compression level 1 for faster compression with acceptable compression ratio.
      */
     public static void writeDeflated(Map<String, Object> compound, OutputStream out) throws IOException {
@@ -88,7 +88,7 @@ public class NBTUtil {
     
     /**
      * Read a compound tag from a stream (deflate compression).
-     * Uses BufferedInputStream for better performance (Minecraft Java Edition approach).
+     * Uses BufferedInputStream for better performance (MattMC Java Edition approach).
      */
     public static Map<String, Object> readDeflated(InputStream in) throws IOException {
         try (BufferedInputStream buffered = new BufferedInputStream(in, 8192);

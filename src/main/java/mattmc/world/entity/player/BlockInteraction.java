@@ -1,6 +1,6 @@
 package mattmc.world.entity.player;
 
-import mattmc.client.Minecraft;
+import mattmc.client.MattMC;
 
 import mattmc.world.item.BlockItem;
 import mattmc.world.item.Item;
@@ -14,7 +14,7 @@ import mattmc.world.level.LevelAccessor;
 
 /**
  * Handles block breaking and placing mechanics.
- * Similar to Minecraft's PlayerInteractionManager class.
+ * Similar to MattMC's PlayerInteractionManager class.
  */
 public class BlockInteraction {
     private final LocalPlayer player;
@@ -72,7 +72,7 @@ public class BlockInteraction {
     
     /**
      * Pick the block the player is looking at and add it to their inventory.
-     * Similar to Minecraft's middle-click pick block functionality.
+     * Similar to MattMC's middle-click pick block functionality.
      * Adds the block to the first empty slot, starting with the hotbar.
      * 
      * @return true if a block was picked successfully

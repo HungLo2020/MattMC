@@ -1,6 +1,6 @@
 package mattmc.client.renderer.backend.opengl;
 
-import mattmc.client.Minecraft;
+import mattmc.client.MattMC;
 import mattmc.client.settings.OptionsManager;
 
 import org.lwjgl.BufferUtils;
@@ -23,7 +23,7 @@ import org.slf4j.LoggerFactory;
 
 /**
  * Manages texture loading and binding for block textures.
- * Similar to Minecraft's texture management system.
+ * Similar to MattMC's texture management system.
  * 
  * ISSUE-005 fix: Implements LRU eviction to prevent unbounded memory growth.
  * ISSUE-013 fix: Supports runtime texture filtering changes via reapplyFilteringSettings().

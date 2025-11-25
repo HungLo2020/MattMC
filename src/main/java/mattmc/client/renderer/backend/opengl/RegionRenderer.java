@@ -1,6 +1,6 @@
 package mattmc.client.renderer.backend.opengl;
 
-import mattmc.client.Minecraft;
+import mattmc.client.MattMC;
 import mattmc.client.renderer.backend.opengl.LevelRenderer;
 
 import mattmc.world.entity.player.LocalPlayer;
@@ -13,7 +13,7 @@ import static org.lwjgl.opengl.GL11.*;
 
 /**
  * Handles rendering of entire regions (32x32 chunks).
- * Similar to Minecraft's LevelRenderer with chunk batching.
+ * Similar to MattMC's LevelRenderer with chunk batching.
  * 
  * Optimizations:
  * - Render distance: Only render chunks within RENDER_DISTANCE
@@ -22,8 +22,8 @@ import static org.lwjgl.opengl.GL11.*;
 public class RegionRenderer {
     private final ChunkRenderer chunkRenderer;
     
-    // Render distance in chunks (similar to Minecraft's render distance setting)
-    // 8 chunks = 128 blocks radius, similar to Minecraft's render distance 8
+    // Render distance in chunks (similar to MattMC's render distance setting)
+    // 8 chunks = 128 blocks radius, similar to MattMC's render distance 8
     public static final int RENDER_DISTANCE = 8;
     
     public RegionRenderer() {

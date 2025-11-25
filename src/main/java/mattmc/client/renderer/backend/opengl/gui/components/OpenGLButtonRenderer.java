@@ -6,13 +6,26 @@ import mattmc.client.renderer.backend.opengl.Texture;
 import static org.lwjgl.opengl.GL11.*;
 
 /**
- * Utility class for rendering buttons using the buttonswide.png texture.
- * The texture contains 3 vertically stacked button states of equal height:
- * - Top third: clicked state
- * - Middle third: regular state  
- * - Bottom third: highlighted/hover state
+ * OpenGL-specific button rendering implementation.
+ * 
+ * <p><b>INTERNAL USE ONLY:</b> This class is part of the OpenGL backend implementation
+ * and should NOT be used directly by code outside the backend/opengl package.
+ * Use {@link mattmc.client.renderer.gui.components.ButtonRenderer} instead for
+ * API-agnostic button rendering, or use the {@link mattmc.client.renderer.backend.RenderBackend}
+ * interface methods directly.
+ * 
+ * <p>This class renders buttons using the buttonswide.png texture which contains
+ * 3 vertically stacked button states of equal height:
+ * <ul>
+ *   <li>Top third: clicked state</li>
+ *   <li>Middle third: regular state</li>
+ *   <li>Bottom third: highlighted/hover state</li>
+ * </ul>
+ * 
+ * @since OpenGL Backend - Internal Implementation
+ * @see mattmc.client.renderer.gui.components.ButtonRenderer API-agnostic wrapper
  */
-public final class ButtonRenderer {
+public final class OpenGLButtonRenderer {
     private static Texture buttonTexture;
     private static final String TEXTURE_PATH = "/assets/textures/gui/sprites/buttonswide.png";
     

@@ -6,7 +6,7 @@ import mattmc.world.level.block.state.properties.Direction;
 
 /**
  * Represents a wall-mounted torch block.
- * Based on Minecraft's WallTorchBlock class.
+ * Based on MattMC's WallTorchBlock class.
  * 
  * Wall torches attach to the side of blocks and have a directional facing property.
  * They have different collision shapes based on which direction they face.

@@ -1,6 +1,6 @@
 package mattmc.world.level.storage;
 
-import mattmc.client.Minecraft;
+import mattmc.client.MattMC;
 import mattmc.world.entity.player.LocalPlayer;
 import mattmc.world.level.Level;
 
@@ -12,7 +12,7 @@ import java.nio.file.Path;
 import java.util.*;
 
 /**
- * Represents the level.dat file structure for a Minecraft-style world.
+ * Represents the level.dat file structure for a MattMC-style world.
  * Stores world metadata and player information.
  */
 public class LevelData {

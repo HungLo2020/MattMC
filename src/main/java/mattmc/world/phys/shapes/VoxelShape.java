@@ -7,7 +7,7 @@ import java.util.List;
 
 /**
  * Represents a shape made up of one or more AABBs.
- * Similar to Minecraft's VoxelShape class.
+ * Similar to MattMC's VoxelShape class.
  */
 public class VoxelShape {
     private final List<AABB> boxes;
