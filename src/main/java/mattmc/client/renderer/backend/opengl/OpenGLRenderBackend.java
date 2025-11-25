@@ -344,15 +344,15 @@ public class OpenGLRenderBackend implements RenderBackend {
         switch (cmd.meshId) {
             case -2:
                 // Fallback item (magenta square)
-                ItemRenderer.renderFallbackItem(itemInfo.x, itemInfo.y, itemInfo.size);
+                OpenGLItemRenderer.renderFallbackItemStatic(itemInfo.x, itemInfo.y, itemInfo.size);
                 break;
             case -3:
             case -4:
             case -5:
-                // Delegate to ItemRenderer's existing rendering methods
+                // Delegate to OpenGLItemRenderer's existing rendering methods
                 // Use the standard rendering path which handles all item types
                 // applyInventoryOffset=true for proper hotbar positioning (matches legacy behavior)
-                ItemRenderer.renderItem(itemInfo.stack, itemInfo.x, itemInfo.y, itemInfo.size, true);
+                OpenGLItemRenderer.renderItemStatic(itemInfo.stack, itemInfo.x, itemInfo.y, itemInfo.size, true);
                 break;
         }
     }

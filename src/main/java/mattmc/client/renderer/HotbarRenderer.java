@@ -138,7 +138,7 @@ public class HotbarRenderer {
                 float itemY = slotStartY + 9f * HOTBAR_SCALE;
                 
                 // Render item using backend
-                mattmc.client.renderer.backend.opengl.ItemRenderer.render(stack, itemX, itemY, itemSize, backend);
+                mattmc.client.renderer.backend.opengl.OpenGLItemRenderer.renderStatic(stack, itemX, itemY, itemSize, backend);
                 
                 // Draw item count in bottom-right of slot if > 1
                 if (stack.getCount() > 1) {

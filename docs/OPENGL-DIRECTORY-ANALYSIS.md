@@ -40,11 +40,11 @@ After reviewing all files in the OpenGL backend directory against the establishe
 | `RegionChunkRenderer.java` | ✅ NEW | Interface in `renderer/level/RegionChunkRenderer.java` - abstracts chunk rendering for regions |
 | `ChunkRenderer.java` | ✅ SPLIT | Interface in `renderer/level/ChunkRenderer.java`, impl in `backend/opengl/OpenGLChunkRenderer.java` |
 | `BlockFaceGeometry.java` | ✅ DELETED | Unused legacy code - geometry now in `BlockGeometryCapture` (VertexCapture) and `BlockOutlineRenderer` (RenderBackend) |
+| `ItemRenderer.java` | ✅ SPLIT | Interface in `renderer/item/ItemRenderer.java`, impl renamed to `backend/opengl/OpenGLItemRenderer.java` |
 
 ### Files That SHOULD BE MOVED OUT of opengl/
 | File | Recommendation | Reason |
 |------|----------------|--------|
-| `ItemRenderer.java` | ⚠️ MOVE TO `renderer/item/` OR `client/ui/item/` | Contains game logic (item types, texture paths, model handling) mixed with OpenGL rendering |
 | `UIRenderHelper.java` | ⚠️ ASSESS | Contains OpenGL projection setup (keep) and text/shape helpers (could be delegated) |
 
 ---
@@ -57,7 +57,7 @@ These files are **pure OpenGL backend implementations** and are correctly placed
 
 #### `OpenGLRenderBackend.java`
 - **OpenGL Usage:** Heavy - glPushMatrix, glTranslatef, glBegin/glEnd, texture binding, shader binding, callback setup via GLFW
-- **Dependencies:** ChunkVAO, TextureAtlas, VoxelLitShader, ItemRenderer, UIRenderHelper
+- **Dependencies:** ChunkVAO, TextureAtlas, VoxelLitShader, OpenGLItemRenderer, UIRenderHelper
 - **Assessment:** This is the **core backend implementation** that translates DrawCommands into OpenGL calls - exactly what should be here.
 
 #### `OpenGLChunkMeshManager.java` (NEW)
@@ -175,32 +175,25 @@ The class now coordinates **what** to render without knowing **how** it's render
 
 ---
 
-### `ItemRenderer.java` - ⚠️ SHOULD MOVE
+### `ItemRenderer.java` - ✅ COMPLETED (SPLIT)
 
-**Current Location:** `backend/opengl/ItemRenderer.java`
-**Recommended Location:** `renderer/item/ItemRenderer.java` or `client/ui/item/ItemRenderer.java`
+**Old Location:** `backend/opengl/ItemRenderer.java`
+**New Locations:**
+- `renderer/item/ItemRenderer.java` - Backend-agnostic interface
+- `backend/opengl/OpenGLItemRenderer.java` - OpenGL implementation
 
-**Analysis:**
-- Heavy OpenGL usage (texture binding, immediate mode rendering)
-- Contains significant **game logic**:
-  - Item model resolution from ResourceManager
-  - Block item vs flat item detection
-  - Isometric projection calculations
-  - Tint color application
-  - Display context transforms
+**Changes Made:**
+- ✅ Created `renderer/item/ItemRenderer.java` - interface defining item rendering contract
+- ✅ Renamed `backend/opengl/ItemRenderer.java` to `OpenGLItemRenderer.java`
+- ✅ Updated `OpenGLItemRenderer` to implement the interface
+- ✅ Added singleton pattern with `getInstance()` for flexibility
+- ✅ Static convenience methods renamed to `*Static` for backwards compatibility
+- ✅ Updated all callers (`HotbarRenderer`, `InventoryRenderer`, `OpenGLRenderBackend`, tests)
 
-**Issues:**
-- Mixes game knowledge (item types, models, textures) with OpenGL calls
-- Has static texture cache (`TEXTURE_CACHE`)
-- Contains isometric projection math (not OpenGL-specific)
-
-**Recommendation:**
-- **Split into two parts:**
-  1. **ItemRenderLogic.java** (already exists) - Keep building draw commands
-  2. **OpenGLItemRenderer.java** - Stay in opengl/, only do actual GL rendering
-- Or alternatively:
-  - Move whole class out and have it call backend methods
-  - Backend handles actual texture binding and quad rendering
+**Architecture:**
+- **ItemRenderer interface**: Defines contract for rendering items
+- **OpenGLItemRenderer**: Handles OpenGL-specific texture loading, binding, and immediate mode rendering
+- **ItemRenderLogic** (unchanged): Builds draw commands without making GL calls
 
 ---
 
