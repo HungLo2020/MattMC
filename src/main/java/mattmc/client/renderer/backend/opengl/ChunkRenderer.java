@@ -2,6 +2,7 @@ package mattmc.client.renderer.backend.opengl;
 
 import mattmc.client.renderer.chunk.ChunkMeshBuffer;
 import mattmc.client.renderer.chunk.ChunkMeshRegistry;
+import mattmc.client.renderer.level.RegionChunkRenderer;
 
 import mattmc.client.renderer.VoxelLitShader;
 import mattmc.client.renderer.backend.opengl.TextureAtlas;
@@ -20,8 +21,11 @@ import org.slf4j.LoggerFactory;
  * OpenGL implementation of chunk mesh registry and rendering.
  * Handles rendering of chunks using VBO/VAO with texture atlas and per-vertex lighting.
  * Supports gamma-corrected lighting with configurable gamma curve.
+ * 
+ * <p>Also implements {@link RegionChunkRenderer} for use with the backend-agnostic
+ * {@link mattmc.client.renderer.level.RegionRenderer}.
  */
-public class ChunkRenderer implements ChunkMeshRegistry {
+public class ChunkRenderer implements ChunkMeshRegistry, RegionChunkRenderer {
     private static final Logger logger = LoggerFactory.getLogger(ChunkRenderer.class);
 
     // Calculate expected chunk count based on maximum render distance
@@ -59,6 +63,7 @@ public class ChunkRenderer implements ChunkMeshRegistry {
      * @param chunk The chunk to check
      * @return true if the chunk has a VAO and can be rendered
      */
+    @Override
     public boolean hasChunkMesh(LevelChunk chunk) {
         return vaoCache.get(chunk) != null;
     }
@@ -70,6 +75,7 @@ public class ChunkRenderer implements ChunkMeshRegistry {
 	 * @param chunk The chunk to render
 	 * @return true if the chunk was rendered, false if no VAO available
 	 */
+	@Override
 	public boolean renderChunk(LevelChunk chunk) {
 		// Get VAO
 		ChunkVAO vao = vaoCache.get(chunk);

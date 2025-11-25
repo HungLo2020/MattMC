@@ -36,12 +36,12 @@ After reviewing all files in the OpenGL backend directory against the establishe
 |------|--------|----------|
 | `LevelRenderer.java` | ✅ MOVED | Now in `renderer/level/LevelRenderer.java` - backend-agnostic, uses RenderBackend interface |
 | `ChunkMeshManager.java` | ✅ NEW | Interface in `renderer/level/ChunkMeshManager.java` - abstracts chunk mesh operations |
+| `RegionRenderer.java` | ✅ MOVED | Now in `renderer/level/RegionRenderer.java` - backend-agnostic, uses RenderBackend interface |
+| `RegionChunkRenderer.java` | ✅ NEW | Interface in `renderer/level/RegionChunkRenderer.java` - abstracts chunk rendering for regions |
 
 ### Files That SHOULD BE MOVED OUT of opengl/
 | File | Recommendation | Reason |
 |------|----------------|--------|
-| `LevelRenderer.java` (old) | ⚠️ TO BE DELETED | Replaced by backend-agnostic version in `renderer/level/` |
-| `RegionRenderer.java` | ⚠️ MOVE TO `renderer/level/` | Contains game logic (render distance, player position), only uses minimal GL calls |
 | `ChunkRenderer.java` | ⚠️ SPLIT/MOVE | Contains both OpenGL rendering AND chunk-to-VAO mapping logic - split into cache and renderer |
 | `BlockFaceGeometry.java` | ⚠️ MOVE TO `renderer/block/` | Contains game-specific geometry generation for blocks and stairs - not pure OpenGL |
 | `ItemRenderer.java` | ⚠️ MOVE TO `renderer/item/` OR `client/ui/item/` | Contains game logic (item types, texture paths, model handling) mixed with OpenGL rendering |
@@ -120,29 +120,23 @@ These files follow the correct pattern after recent refactoring:
 
 The class now coordinates **what** to render without knowing **how** it's rendered.
 
+### `RegionRenderer.java` - ✅ COMPLETED
+
+**Old Location:** `backend/opengl/RegionRenderer.java`
+**New Location:** `renderer/level/RegionRenderer.java`
+
+**Changes Made:**
+- ✅ Moved to `renderer/level/` directory
+- ✅ Replaced `glPushMatrix/glTranslatef/glPopMatrix` with `backend.pushMatrix/translateMatrix/popMatrix`
+- ✅ Created `RegionChunkRenderer` interface for abstracting chunk rendering
+- ✅ Updated `ChunkRenderer` to implement `RegionChunkRenderer`
+- ✅ Constructor now takes `RegionChunkRenderer` and `RenderBackend` as dependencies
+
+The class now coordinates **what** to render without knowing **how** it's rendered.
+
 ---
 
 ## 4. Files That Should Still Be Moved or Split
-
-### `RegionRenderer.java` - ⚠️ SHOULD MOVE
-
-**Current Location:** `backend/opengl/RegionRenderer.java`
-**Recommended Location:** `renderer/level/RegionRenderer.java`
-
-**Analysis:**
-- Only uses `glPushMatrix()`, `glTranslatef()`, `glPopMatrix()` for GL calls
-- Contains game logic:
-  - Render distance calculations
-  - Player position-based culling
-  - Region/chunk iteration logic
-- Creates its own `ChunkRenderer` internally
-
-**Recommendation:**
-- Move to `renderer/level/` directory
-- Replace GL matrix operations with backend abstraction
-- Inject dependencies rather than creating internally
-
----
 
 ### `ChunkRenderer.java` - ⚠️ SHOULD SPLIT
 
