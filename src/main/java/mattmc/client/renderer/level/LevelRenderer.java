@@ -153,7 +153,7 @@ public class LevelRenderer implements WorldRenderer {
         
         // Log rendering stats on first render only
         if (!firstRenderLogged && chunkLogic.getVisibleChunkCount() > 0) {
-            logger.info("Rendering {} chunks via RenderBackend (backend-agnostic)", 
+            logger.info("Started world rendering with {} visible chunks", 
                        chunkLogic.getVisibleChunkCount());
             firstRenderLogged = true;
         }

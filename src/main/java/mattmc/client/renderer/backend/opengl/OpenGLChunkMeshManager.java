@@ -25,10 +25,14 @@ import org.slf4j.LoggerFactory;
  *   <li>Backend material registration</li>
  * </ul>
  * 
- * <p>This class is created by the {@link OpenGLBackendFactory} and passed to
- * the backend-agnostic {@link mattmc.client.renderer.level.LevelRenderer}.
+ * <p><b>Design Note:</b> This class is created by the {@link OpenGLBackendFactory}
+ * and is designed to work specifically with {@link OpenGLRenderBackend}. The factory
+ * ensures this pairing at construction time. Methods that accept {@link RenderBackend}
+ * will fail fast with an {@link IllegalArgumentException} if passed a non-OpenGL backend.
+ * This design maintains the interface abstraction while ensuring type safety.
  * 
  * @see ChunkMeshManager
+ * @see OpenGLBackendFactory
  */
 public class OpenGLChunkMeshManager implements ChunkMeshManager {
     private static final Logger logger = LoggerFactory.getLogger(OpenGLChunkMeshManager.class);
@@ -101,8 +105,9 @@ public class OpenGLChunkMeshManager implements ChunkMeshManager {
         }
         
         // Register mesh with backend if upload was successful
-        if (newVAO != null && backend instanceof OpenGLRenderBackend) {
-            registerMeshWithBackend(chunk, (OpenGLRenderBackend) backend);
+        if (newVAO != null) {
+            OpenGLRenderBackend glBackend = requireOpenGLBackend(backend, "uploadMeshBuffer");
+            registerMeshWithBackend(chunk, glBackend);
         }
         
         return true;
@@ -135,8 +140,9 @@ public class OpenGLChunkMeshManager implements ChunkMeshManager {
     @Override
     public void unregisterMesh(LevelChunk chunk, RenderBackend backend) {
         int meshId = getMeshIdForChunk(chunk);
-        if (meshId >= 0 && backend instanceof OpenGLRenderBackend) {
-            ((OpenGLRenderBackend) backend).unregisterMesh(meshId);
+        if (meshId >= 0) {
+            OpenGLRenderBackend glBackend = requireOpenGLBackend(backend, "unregisterMesh");
+            glBackend.unregisterMesh(meshId);
         }
     }
     
@@ -160,12 +166,7 @@ public class OpenGLChunkMeshManager implements ChunkMeshManager {
     
     @Override
     public void initializeBackend(RenderBackend backend) {
-        if (!(backend instanceof OpenGLRenderBackend)) {
-            logger.warn("OpenGLChunkMeshManager requires OpenGLRenderBackend");
-            return;
-        }
-        
-        OpenGLRenderBackend glBackend = (OpenGLRenderBackend) backend;
+        OpenGLRenderBackend glBackend = requireOpenGLBackend(backend, "initializeBackend");
         
         // Ensure shader is initialized
         ensureShaderInitialized();
@@ -196,11 +197,7 @@ public class OpenGLChunkMeshManager implements ChunkMeshManager {
     
     @Override
     public void registerExistingChunks(Level level, RenderBackend backend) {
-        if (!(backend instanceof OpenGLRenderBackend)) {
-            return;
-        }
-        
-        OpenGLRenderBackend glBackend = (OpenGLRenderBackend) backend;
+        OpenGLRenderBackend glBackend = requireOpenGLBackend(backend, "registerExistingChunks");
         int registeredCount = 0;
         
         for (LevelChunk chunk : level.getLoadedChunks()) {
@@ -233,6 +230,24 @@ public class OpenGLChunkMeshManager implements ChunkMeshManager {
         if (registeredCount > 0) {
             logger.info("Registered {} existing chunks with backend during initialization", registeredCount);
         }
+    }
+    
+    /**
+     * Validate that the provided backend is an OpenGLRenderBackend.
+     * 
+     * @param backend the backend to validate
+     * @param methodName the method name for error reporting
+     * @return the backend cast to OpenGLRenderBackend
+     * @throws IllegalArgumentException if backend is not an OpenGLRenderBackend
+     */
+    private OpenGLRenderBackend requireOpenGLBackend(RenderBackend backend, String methodName) {
+        if (!(backend instanceof OpenGLRenderBackend)) {
+            throw new IllegalArgumentException(
+                "OpenGLChunkMeshManager." + methodName + "() requires OpenGLRenderBackend, " +
+                "but was given " + (backend != null ? backend.getClass().getName() : "null") +
+                ". This class must be paired with OpenGLRenderBackend via OpenGLBackendFactory.");
+        }
+        return (OpenGLRenderBackend) backend;
     }
     
     /**
