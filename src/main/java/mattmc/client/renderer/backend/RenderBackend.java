@@ -648,6 +648,24 @@ public interface RenderBackend {
     /** Escape key */
     int KEY_ESCAPE = 256;
     
+    /** Enter/Return key */
+    int KEY_ENTER = 257;
+    
+    /** Backspace key */
+    int KEY_BACKSPACE = 259;
+    
+    /** Space key */
+    int KEY_SPACE = 32;
+    
+    /** F3 key */
+    int KEY_F3 = 292;
+    
+    /** F4 key */
+    int KEY_F4 = 293;
+    
+    /** Slash key */
+    int KEY_SLASH = 47;
+    
     // === Factory Methods ===
     
     /**

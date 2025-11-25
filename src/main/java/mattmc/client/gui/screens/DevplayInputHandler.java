@@ -106,14 +106,14 @@ public class DevplayInputHandler {
             if (key == RenderBackend.KEY_ESCAPE) {
                 // Close command overlay without executing
                 uiState.closeCommandOverlay();
-            } else if (key == 257) { // GLFW_KEY_ENTER
+            } else if (key == RenderBackend.KEY_ENTER) {
                 // Execute command and close overlay
                 String feedback = commandSystem.executeCommand(uiState.getCommandText());
                 if (feedback != null) {
                     uiState.setCommandFeedback(feedback, 3.0);
                 }
                 uiState.closeCommandOverlay();
-            } else if (key == 259) { // GLFW_KEY_BACKSPACE
+            } else if (key == RenderBackend.KEY_BACKSPACE) {
                 uiState.deleteFromCommand();
             }
         }
@@ -124,16 +124,16 @@ public class DevplayInputHandler {
             if (key == RenderBackend.KEY_ESCAPE) {
                 // Open pause menu
                 onPauseRequested.run();
-            } else if (key == 32) { // GLFW_KEY_SPACE
+            } else if (key == RenderBackend.KEY_SPACE) {
                 // Handle jump/fly
                 playerController.handleSpacePress();
-            } else if (key == 292) { // GLFW_KEY_F3
+            } else if (key == RenderBackend.KEY_F3) {
                 // Toggle debug menu
                 uiState.toggleDebugMenu();
-            } else if (key == 293) { // GLFW_KEY_F4
+            } else if (key == RenderBackend.KEY_F4) {
                 // Toggle lighting debug overlay
                 uiState.toggleLightingDebug();
-            } else if (key == 47) { // GLFW_KEY_SLASH
+            } else if (key == RenderBackend.KEY_SLASH) {
                 // Open command overlay
                 uiState.openCommandOverlay();
             }

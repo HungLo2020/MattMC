@@ -74,10 +74,10 @@ public final class CreateWorldScreen implements Screen {
         backend.setKeyCallback(window.handle(), (key, scancode, action, mods) -> {
             EditBox focusedField = getFocusedField();
             if (focusedField != null) {
-                if ((action == RenderBackend.ACTION_PRESS || action == RenderBackend.ACTION_REPEAT) && key == 259) { // GLFW_KEY_BACKSPACE
+                if ((action == RenderBackend.ACTION_PRESS || action == RenderBackend.ACTION_REPEAT) && key == RenderBackend.KEY_BACKSPACE) {
                     focusedField.backspace();
                 }
-                if (action == RenderBackend.ACTION_PRESS && key == 257) { // GLFW_KEY_ENTER
+                if (action == RenderBackend.ACTION_PRESS && key == RenderBackend.KEY_ENTER) {
                     // Create world on Enter
                     createWorld();
                 }
