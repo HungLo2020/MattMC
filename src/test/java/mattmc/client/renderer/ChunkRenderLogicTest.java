@@ -1,6 +1,7 @@
 package mattmc.client.renderer;
 
-import mattmc.client.renderer.backend.opengl.ChunkRenderer;
+import mattmc.client.renderer.backend.opengl.OpenGLChunkMeshManager;
+import mattmc.client.renderer.chunk.ChunkMeshRegistry;
 import mattmc.client.renderer.Frustum;
 import mattmc.world.level.Level;
 import mattmc.world.level.chunk.LevelChunk;
@@ -22,15 +23,15 @@ import static org.junit.jupiter.api.Assertions.*;
  */
 public class ChunkRenderLogicTest {
     
-    private ChunkRenderer chunkRenderer;
+    private ChunkMeshRegistry meshRegistry;
     private Frustum frustum;
     private ChunkRenderLogic logic;
     
     @BeforeEach
     public void setUp() {
-        chunkRenderer = new ChunkRenderer();
+        meshRegistry = new OpenGLChunkMeshManager();
         frustum = new Frustum();
-        logic = new ChunkRenderLogic(chunkRenderer, frustum);
+        logic = new ChunkRenderLogic(meshRegistry, frustum);
     }
     
     @Test
@@ -51,15 +52,15 @@ public class ChunkRenderLogicTest {
     }
     
     @Test
-    public void testHasChunkRenderer() {
-        // Verify that logic has a chunk renderer
-        assertNotNull(chunkRenderer);
+    public void testHasMeshRegistry() {
+        // Verify that logic has a mesh registry
+        assertNotNull(meshRegistry);
     }
     
     @Test
     public void testCanCreateLogic() {
         // Verify we can create logic without errors
-        ChunkRenderLogic newLogic = new ChunkRenderLogic(chunkRenderer, frustum);
+        ChunkRenderLogic newLogic = new ChunkRenderLogic(meshRegistry, frustum);
         assertNotNull(newLogic);
     }
     

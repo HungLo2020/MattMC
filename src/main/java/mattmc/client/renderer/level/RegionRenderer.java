@@ -1,37 +1,56 @@
-package mattmc.client.renderer.backend.opengl;
+package mattmc.client.renderer.level;
 
-import mattmc.client.MattMC;
-import mattmc.client.renderer.backend.opengl.LevelRenderer;
-
+import mattmc.client.renderer.backend.RenderBackend;
 import mattmc.world.entity.player.LocalPlayer;
 import mattmc.world.level.chunk.Region;
-import mattmc.world.level.block.Block;
 import mattmc.world.level.chunk.LevelChunk;
-import mattmc.world.level.chunk.Region;
-
-import static org.lwjgl.opengl.GL11.*;
 
 /**
- * Handles rendering of entire regions (32x32 chunks).
- * Similar to MattMC's LevelRenderer with chunk batching.
+ * Renderer-agnostic implementation for rendering entire regions (32x32 chunks).
  * 
- * Optimizations:
- * - Render distance: Only render chunks within RENDER_DISTANCE
- * - Frustum culling: Only render chunks visible to camera
+ * <p>This class coordinates region rendering using the {@link RenderBackend} abstraction.
+ * It does not make any direct graphics API calls (no OpenGL, Vulkan, etc.).
+ * All rendering is done through the backend interface.
+ * 
+ * <p><b>Architecture:</b> This class sits in the rendering front-end layer:
+ * <ul>
+ *   <li><b>Game/World Layer:</b> Provides regions, chunks, blocks</li>
+ *   <li><b>Rendering Front-End (this class):</b> Decides what to draw based on culling</li>
+ *   <li><b>Rendering Back-End:</b> Executes rendering with specific graphics API</li>
+ * </ul>
+ * 
+ * <p>Optimizations:
+ * <ul>
+ *   <li>Render distance: Only render chunks within RENDER_DISTANCE</li>
+ *   <li>Frustum culling: Only render chunks visible to camera</li>
+ * </ul>
+ * 
+ * @see RenderBackend
+ * @see RegionChunkRenderer
  */
 public class RegionRenderer {
-    private final ChunkRenderer chunkRenderer;
+    
+    private final RegionChunkRenderer chunkRenderer;
+    private final RenderBackend renderBackend;
     
     // Render distance in chunks (similar to MattMC's render distance setting)
     // 8 chunks = 128 blocks radius, similar to MattMC's render distance 8
     public static final int RENDER_DISTANCE = 8;
     
-    public RegionRenderer() {
-        this.chunkRenderer = new ChunkRenderer();
+    /**
+     * Create a new RegionRenderer with the given dependencies.
+     * 
+     * @param chunkRenderer the chunk renderer for rendering individual chunks
+     * @param renderBackend the render backend for executing draw commands
+     */
+    public RegionRenderer(RegionChunkRenderer chunkRenderer, RenderBackend renderBackend) {
+        this.chunkRenderer = chunkRenderer;
+        this.renderBackend = renderBackend;
     }
     
     /**
      * Render all chunks in a region with optimizations.
+     * 
      * @param region The region to render
      * @param player The player (for position-based culling)
      * @param viewMatrix Current view matrix for frustum culling
@@ -80,10 +99,11 @@ public class RegionRenderer {
                     continue;  // Not visible
                 }
                 
-                glPushMatrix();
-                glTranslatef(chunkWorldX, 0, chunkWorldZ);
+                // Use backend matrix operations instead of direct GL calls
+                renderBackend.pushMatrix();
+                renderBackend.translateMatrix(chunkWorldX, 0, chunkWorldZ);
                 chunkRenderer.renderChunk(chunk);
-                glPopMatrix();
+                renderBackend.popMatrix();
                 
                 chunksRendered++;
             }
@@ -92,22 +112,25 @@ public class RegionRenderer {
     
     /**
      * Legacy method without optimizations (for compatibility).
+     * 
+     * @param region The region to render
      */
     public void renderRegion(Region region) {
         for (int cx = 0; cx < Region.REGION_SIZE; cx++) {
             for (int cz = 0; cz < Region.REGION_SIZE; cz++) {
                 LevelChunk chunk = region.getChunk(cx, cz);
                 if (chunk != null) {
-                    glPushMatrix();
+                    // Use backend matrix operations instead of direct GL calls
+                    renderBackend.pushMatrix();
                     
                     // Use actual chunk coordinates, not region-local coordinates
                     float chunkWorldX = chunk.chunkX() * LevelChunk.WIDTH;
                     float chunkWorldZ = chunk.chunkZ() * LevelChunk.DEPTH;
-                    glTranslatef(chunkWorldX, 0, chunkWorldZ);
+                    renderBackend.translateMatrix(chunkWorldX, 0, chunkWorldZ);
                     
                     chunkRenderer.renderChunk(chunk);
                     
-                    glPopMatrix();
+                    renderBackend.popMatrix();
                 }
             }
         }
@@ -142,6 +165,7 @@ public class RegionRenderer {
     
     /**
      * Render a single chunk from the region for debugging.
+     * 
      * @param region The region containing the chunk
      * @param cx Chunk X coordinate (0-31) - region-local coordinate
      * @param cz Chunk Z coordinate (0-31) - region-local coordinate
@@ -149,16 +173,17 @@ public class RegionRenderer {
     public void renderChunk(Region region, int cx, int cz) {
         LevelChunk chunk = region.getChunk(cx, cz);
         if (chunk != null) {
-            glPushMatrix();
+            // Use backend matrix operations instead of direct GL calls
+            renderBackend.pushMatrix();
             
             // Use actual chunk coordinates, not region-local coordinates
             float chunkWorldX = chunk.chunkX() * LevelChunk.WIDTH;
             float chunkWorldZ = chunk.chunkZ() * LevelChunk.DEPTH;
-            glTranslatef(chunkWorldX, 0, chunkWorldZ);
+            renderBackend.translateMatrix(chunkWorldX, 0, chunkWorldZ);
             
             chunkRenderer.renderChunk(chunk);
             
-            glPopMatrix();
+            renderBackend.popMatrix();
         }
     }
 }

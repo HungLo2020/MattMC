@@ -2,6 +2,7 @@ package mattmc.client.renderer;
 
 import mattmc.client.renderer.backend.DrawCommand;
 import mattmc.client.renderer.backend.RenderBackend;
+import mattmc.client.renderer.item.ItemRenderer;
 import mattmc.world.entity.player.LocalPlayer;
 
 /**
@@ -98,8 +99,7 @@ public class HotbarRenderer {
     
     /**
      * Render items in hotbar slots.
-     * This is a temporary solution using ItemRenderer from backend/opengl.
-     * TODO: Refactor to use backend-agnostic approach with UIRenderLogic
+     * Uses the backend-agnostic ItemRenderer interface obtained from the backend.
      * 
      * @param screenWidth Screen width
      * @param screenHeight Screen height
@@ -111,6 +111,7 @@ public class HotbarRenderer {
         }
         
         mattmc.world.item.Inventory inventory = player.getInventory();
+        ItemRenderer itemRenderer = backend.getItemRenderer();
         
         // Constants from original implementation
         final float HOTBAR_SCALE = 3.0f;
@@ -137,8 +138,8 @@ public class HotbarRenderer {
                 float itemX = slotX + 8f * HOTBAR_SCALE;
                 float itemY = slotStartY + 9f * HOTBAR_SCALE;
                 
-                // Render item using backend
-                mattmc.client.renderer.backend.opengl.ItemRenderer.render(stack, itemX, itemY, itemSize, backend);
+                // Render item using backend-agnostic ItemRenderer
+                itemRenderer.render(stack, itemX, itemY, itemSize, backend);
                 
                 // Draw item count in bottom-right of slot if > 1
                 if (stack.getCount() > 1) {

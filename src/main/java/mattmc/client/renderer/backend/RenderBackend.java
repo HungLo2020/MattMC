@@ -1,5 +1,7 @@
 package mattmc.client.renderer.backend;
 
+import mattmc.client.renderer.item.ItemRenderer;
+
 /**
  * Interface for graphics API-specific rendering backends.
  * 
@@ -787,4 +789,21 @@ public interface RenderBackend {
      * @return a new panorama renderer instance
      */
     mattmc.client.renderer.panorama.PanoramaRenderer createPanoramaRenderer(String basePath, String extension);
+    
+    /**
+     * Get the item renderer for this backend.
+     * 
+     * <p>The item renderer is responsible for rendering items in the UI (hotbar, inventory, etc.).
+     * This method provides access to the backend-specific implementation without directly
+     * coupling to specific implementation classes.
+     * 
+     * <p><b>Usage:</b>
+     * <pre>
+     * ItemRenderer itemRenderer = backend.getItemRenderer();
+     * itemRenderer.render(itemStack, x, y, size, backend);
+     * </pre>
+     * 
+     * @return the item renderer for this backend
+     */
+    ItemRenderer getItemRenderer();
 }

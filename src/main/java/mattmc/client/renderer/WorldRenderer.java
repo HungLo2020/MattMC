@@ -13,7 +13,7 @@ import mattmc.world.level.Level;
  * <p><b>Architecture:</b> This allows screen code to be defined outside the
  * backend/ directory while the actual world rendering remains in the backend.
  * 
- * @see mattmc.client.renderer.backend.opengl.LevelRenderer OpenGL implementation
+ * @see mattmc.client.renderer.level.LevelRenderer Backend-agnostic implementation
  */
 public interface WorldRenderer {
     
