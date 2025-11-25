@@ -3,9 +3,8 @@ package mattmc.client;
 import mattmc.client.settings.OptionsManager;
 import mattmc.client.renderer.window.WindowHandle;
 import mattmc.client.renderer.backend.RenderBackend;
+import mattmc.client.renderer.backend.RenderBackendFactory;
 import mattmc.client.renderer.panorama.PanoramaRenderer;
-import mattmc.client.renderer.backend.opengl.Window;
-import mattmc.client.renderer.backend.opengl.OpenGLRenderBackend;
 import mattmc.client.gui.screens.Screen;
 
 public final class Minecraft {
@@ -14,16 +13,16 @@ public final class Minecraft {
     private static final double SHORT_SLEEP_THRESHOLD = 0.001; // 1ms - use short sleep
     private static final double SLEEP_BUFFER = 0.002;          // 2ms - buffer to avoid oversleeping
     
-    private final Window window;
+    private final WindowHandle window;
     private final RenderBackend renderBackend;
     private Screen current;
     private boolean running = true;
     private PanoramaRenderer sharedPanorama;
     private int cachedFpsCap;
 
-    public Minecraft(Window window) { 
+    public Minecraft(WindowHandle window, RenderBackendFactory factory) { 
         this.window = window;
-        this.renderBackend = new OpenGLRenderBackend();
+        this.renderBackend = factory.createBackend();
         // Load shared panorama through the backend interface
         this.sharedPanorama = renderBackend.createPanoramaRenderer("/assets/textures/gui/panorama1_", ".png");
         // Cache the FPS cap

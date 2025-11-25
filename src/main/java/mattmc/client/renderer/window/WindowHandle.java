@@ -52,4 +52,21 @@ public interface WindowHandle {
      * Apply FPS cap settings (enable/disable VSync based on settings).
      */
     void applyFpsCapSetting();
+    
+    /**
+     * Check if the window should close.
+     * 
+     * <p>This method should also poll for window events (e.g., input events).
+     * 
+     * @return true if the window should close
+     */
+    boolean shouldClose();
+    
+    /**
+     * Swap the front and back buffers (present the frame).
+     * 
+     * <p>This method should be called after rendering each frame to display
+     * the rendered content.
+     */
+    void swap();
 }
