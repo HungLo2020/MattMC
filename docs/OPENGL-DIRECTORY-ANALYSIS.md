@@ -39,11 +39,11 @@ After reviewing all files in the OpenGL backend directory against the establishe
 | `RegionRenderer.java` | ✅ MOVED | Now in `renderer/level/RegionRenderer.java` - backend-agnostic, uses RenderBackend interface |
 | `RegionChunkRenderer.java` | ✅ NEW | Interface in `renderer/level/RegionChunkRenderer.java` - abstracts chunk rendering for regions |
 | `ChunkRenderer.java` | ✅ SPLIT | Interface in `renderer/level/ChunkRenderer.java`, impl in `backend/opengl/OpenGLChunkRenderer.java` |
+| `BlockFaceGeometry.java` | ✅ DELETED | Unused legacy code - geometry now in `BlockGeometryCapture` (VertexCapture) and `BlockOutlineRenderer` (RenderBackend) |
 
 ### Files That SHOULD BE MOVED OUT of opengl/
 | File | Recommendation | Reason |
 |------|----------------|--------|
-| `BlockFaceGeometry.java` | ⚠️ MOVE TO `renderer/block/` | Contains game-specific geometry generation for blocks and stairs - not pure OpenGL |
 | `ItemRenderer.java` | ⚠️ MOVE TO `renderer/item/` OR `client/ui/item/` | Contains game logic (item types, texture paths, model handling) mixed with OpenGL rendering |
 | `UIRenderHelper.java` | ⚠️ ASSESS | Contains OpenGL projection setup (keep) and text/shape helpers (could be delegated) |
 
@@ -158,27 +158,20 @@ The class now coordinates **what** to render without knowing **how** it's render
 
 ---
 
-### `BlockFaceGeometry.java` - ⚠️ SHOULD MOVE
+### `BlockFaceGeometry.java` - ✅ DELETED (WAS DEAD CODE)
 
-**Current Location:** `backend/opengl/BlockFaceGeometry.java`
-**Recommended Location:** `renderer/block/BlockGeometry.java` or `world/level/block/BlockGeometry.java`
+**Former Location:** `backend/opengl/BlockFaceGeometry.java`
+**Status:** Deleted - no usages found in codebase
 
 **Analysis:**
-- Uses `glVertex3f`, `glTexCoord2f` (immediate mode OpenGL)
-- Contains **game-specific geometry definitions** for:
-  - Standard cube faces (top, bottom, north, south, west, east)
-  - Block outlines
-  - Stairs geometry
+- Used deprecated `glVertex3f`, `glTexCoord2f` (immediate mode OpenGL)
+- All functionality already replaced by:
+  - `renderer/block/BlockGeometryCapture.java` - for mesh building via VertexCapture
+  - `renderer/block/BlockOutlineRenderer.java` - for block outlines via RenderBackend
+- No imports or method calls found in any other file
 
-**Issues:**
-- Game-specific geometry knowledge doesn't belong in the backend
-- Uses deprecated immediate mode (glBegin/glEnd pattern)
-- Already has a partial abstraction with `drawCompleteBlockOutlineWithBackend()` method
-
-**Recommendation:**
-- Move to `renderer/block/BlockGeometry.java`
-- Convert immediate mode calls to use data structures (vertex arrays)
-- Backend should receive pre-built vertex data, not generate it
+**Action Taken:**
+- Deleted the unused file
 
 ---
 
