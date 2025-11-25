@@ -1,5 +1,6 @@
 package mattmc.client.renderer.backend.opengl;
 
+import mattmc.client.renderer.window.WindowHandle;
 import mattmc.client.settings.OptionsManager;
 import org.lwjgl.opengl.GL;
 import static org.lwjgl.glfw.GLFW.*;
@@ -7,7 +8,7 @@ import static org.lwjgl.opengl.GL11.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public final class Window implements AutoCloseable {
+public final class Window implements WindowHandle, AutoCloseable {
     private static final Logger logger = LoggerFactory.getLogger(Window.class);
 
     private final long handle;
@@ -81,6 +82,7 @@ public final class Window implements AutoCloseable {
      * Change the window size to a new resolution.
      * This will trigger the framebuffer size callback and recompute layouts.
      */
+    @Override
     public void setSize(int newWidth, int newHeight) {
         glfwSetWindowSize(handle, newWidth, newHeight);
         this.width = newWidth;
@@ -91,6 +93,7 @@ public final class Window implements AutoCloseable {
      * Apply the FPS cap setting from OptionsManager.
      * VSync is disabled to allow manual FPS control.
      */
+    @Override
     public void applyFpsCapSetting() {
         // Disable VSync for manual FPS control
         glfwSwapInterval(0);
@@ -100,6 +103,7 @@ public final class Window implements AutoCloseable {
      * Toggle fullscreen mode on/off.
      * @param fullscreen true for fullscreen, false for windowed
      */
+    @Override
     public void setFullscreen(boolean fullscreen) {
         long monitor = glfwGetPrimaryMonitor();
         if (monitor == 0) {

@@ -73,6 +73,9 @@ public class OpenGLRenderBackend implements RenderBackend {
     // Frame state
     private boolean frameActive = false;
     
+    // Blur helper for AbstractBlurBox functionality
+    private AbstractBlurBox blurHelper = null;
+    
     /**
      * Information about a material (shader + texture combination).
      */
@@ -219,7 +222,7 @@ public class OpenGLRenderBackend implements RenderBackend {
         if (material.shader != currentShader || material.atlas != currentAtlas) {
             // Unbind previous shader/texture
             if (currentShader != null) {
-                VoxelLitShader.unbind();
+                Shader.unbind();
             }
             if (currentAtlas != null) {
                 glBindTexture(GL_TEXTURE_2D, 0);
@@ -466,7 +469,7 @@ public class OpenGLRenderBackend implements RenderBackend {
         
         // Unbind any active resources
         if (currentShader != null) {
-            VoxelLitShader.unbind();
+            Shader.unbind();
             currentShader = null;
         }
         
@@ -630,7 +633,7 @@ public class OpenGLRenderBackend implements RenderBackend {
             UIRenderLogic.TextRenderInfo textInfo = UIRenderLogic.getTextInfo(firstTextId + i);
             if (textInfo != null) {
                 // Right-aligned text rendering
-                SystemInfoRenderer.renderSystemInfoLine(textInfo.text, (int)textInfo.x, (int)textInfo.y, textInfo.scale, textInfo.color);
+                UIRenderHelper.drawTextRightAligned(textInfo.text, (int)textInfo.x, (int)textInfo.y, textInfo.scale, textInfo.color);
             }
         }
     }
@@ -659,14 +662,520 @@ public class OpenGLRenderBackend implements RenderBackend {
         UIRenderLogic.TextRenderInfo textInfo = UIRenderLogic.getTextInfo(textId);
         if (textInfo == null) return;
         
-        // Approximate size calculation (tooltips need size for blur/border)
+        // Render tooltip text directly
         float TOOLTIP_PADDING = 13.5f;
-        float textWidth = textInfo.text.length() * 8 * textInfo.scale;
-        float textHeight = 16 * textInfo.scale;
-        float boxWidth = textWidth + TOOLTIP_PADDING * 2;
-        float boxHeight = textHeight + TOOLTIP_PADDING * 2;
+        glColor4f(1f, 1f, 1f, 1f);
+        mattmc.client.renderer.backend.opengl.gui.components.TextRenderer.drawText(
+            textInfo.text, x + TOOLTIP_PADDING, y + TOOLTIP_PADDING, textInfo.scale);
+    }
+    
+    /**
+     * Setup 2D orthographic projection for UI rendering.
+     * 
+     * <p>Configures OpenGL for 2D screen-space rendering with an orthographic projection
+     * where (0,0) is the top-left corner and coordinates map directly to screen pixels.
+     * Also enables blending for transparent UI elements.
+     * 
+     * @param screenWidth the width of the screen/viewport in pixels
+     * @param screenHeight the height of the screen/viewport in pixels
+     */
+    @Override
+    public void setup2DProjection(int screenWidth, int screenHeight) {
+        // Setup projection matrix for 2D rendering
+        glMatrixMode(GL_PROJECTION);
+        glPushMatrix();
+        glLoadIdentity();
+        glOrtho(0, screenWidth, screenHeight, 0, -1, 1);
         
-        // Render tooltip using TooltipRenderer
-        TooltipRenderer.renderTooltipDirect(textInfo.text, x, y, (int)boxWidth, (int)boxHeight, TOOLTIP_PADDING);
+        // Setup modelview matrix
+        glMatrixMode(GL_MODELVIEW);
+        glPushMatrix();
+        glLoadIdentity();
+        
+        // Enable blending for transparent UI elements
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    }
+    
+    /**
+     * Restore the previous projection state after 2D rendering.
+     * 
+     * <p>Pops the projection and modelview matrices that were pushed by
+     * {@link #setup2DProjection(int, int)} and disables blending.
+     */
+    @Override
+    public void restore2DProjection() {
+        // Disable blending
+        glDisable(GL_BLEND);
+        
+        // Restore matrices
+        glPopMatrix();
+        glMatrixMode(GL_PROJECTION);
+        glPopMatrix();
+        glMatrixMode(GL_MODELVIEW);
+    }
+    
+    /**
+     * Get the display resolution using GLFW.
+     * 
+     * @param windowHandle GLFW window handle
+     * @return Display resolution string (e.g., "1920x1080")
+     */
+    @Override
+    public String getDisplayResolution(long windowHandle) {
+        return OpenGLSystemInfo.getDisplayResolution(windowHandle);
+    }
+    
+    /**
+     * Get the GPU name using OpenGL.
+     * 
+     * @return Graphics card name from GL_RENDERER
+     */
+    @Override
+    public String getGPUName() {
+        return OpenGLSystemInfo.getGPUName();
+    }
+    
+    /**
+     * Get GPU usage percentage.
+     * 
+     * @return GPU usage percentage or -1 if not available
+     */
+    @Override
+    public int getGPUUsage() {
+        return OpenGLSystemInfo.getGPUUsage();
+    }
+    
+    /**
+     * Get GPU VRAM usage.
+     * 
+     * @return VRAM usage string or "N/A" if not available
+     */
+    @Override
+    public String getGPUVRAMUsage() {
+        return OpenGLSystemInfo.getGPUVRAMUsage();
+    }
+    
+    /**
+     * Apply regional blur effect using OpenGL framebuffers and shaders.
+     * 
+     * <p>Lazily initializes the blur helper on first use. The blur effect
+     * captures the screen region, applies Gaussian blur (horizontal + vertical pass),
+     * darkens the result, and renders it back to the same region.
+     * 
+     * @param x X position of the blur region
+     * @param y Y position of the blur region
+     * @param width Width of the blur region
+     * @param height Height of the blur region
+     * @param screenWidth Full screen width
+     * @param screenHeight Full screen height
+     */
+    @Override
+    public void applyRegionalBlur(float x, float y, float width, float height,
+                                   int screenWidth, int screenHeight) {
+        // Lazily initialize blur helper
+        if (blurHelper == null) {
+            blurHelper = new AbstractBlurBox();
+        }
+        
+        // Delegate to blur helper
+        blurHelper.applyRegionalBlur(x, y, width, height, screenWidth, screenHeight);
+    }
+    
+    /**
+     * Draw a rounded rectangle border using OpenGL line rendering.
+     * 
+     * <p>Lazily initializes the blur helper on first use (which contains
+     * the rounded border drawing logic). Draws a smooth rounded border
+     * around the specified rectangle.
+     * 
+     * @param x X position of the rectangle
+     * @param y Y position of the rectangle
+     * @param width Width of the rectangle
+     * @param height Height of the rectangle
+     * @param radius Corner radius
+     * @param borderWidth Width of the border line
+     * @param r Red component (0.0-1.0)
+     * @param g Green component (0.0-1.0)
+     * @param b Blue component (0.0-1.0)
+     * @param a Alpha component (0.0-1.0)
+     */
+    @Override
+    public void drawRoundedRectBorder(float x, float y, float width, float height, float radius,
+                                      float borderWidth, float r, float g, float b, float a) {
+        // Lazily initialize blur helper (contains shared drawing utilities)
+        if (blurHelper == null) {
+            blurHelper = new AbstractBlurBox();
+        }
+        
+        // Delegate to blur helper's drawing method
+        blurHelper.drawRoundedRectBorder(x, y, width, height, radius, borderWidth, r, g, b, a);
+    }
+    
+    /**
+     * Reset the OpenGL color to white.
+     * This ensures that subsequent drawing operations (like text) appear in white
+     * instead of inheriting colors from previous operations (like blue borders).
+     */
+    @Override
+    public void resetColor() {
+        glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
+    }
+    
+    @Override
+    public void setColor(int rgb, float alpha) {
+        float r = ((rgb >> 16) & 0xFF) / 255f;
+        float g = ((rgb >> 8) & 0xFF) / 255f;
+        float b = (rgb & 0xFF) / 255f;
+        glColor4f(r, g, b, alpha);
+    }
+    
+    @Override
+    public void fillRect(float x, float y, float width, float height) {
+        glBegin(GL_QUADS);
+        glVertex2f(x, y);
+        glVertex2f(x + width, y);
+        glVertex2f(x + width, y + height);
+        glVertex2f(x, y + height);
+        glEnd();
+    }
+    
+    @Override
+    public void drawRect(float x, float y, float width, float height) {
+        glBegin(GL_LINE_LOOP);
+        glVertex2f(x, y);
+        glVertex2f(x + width, y);
+        glVertex2f(x + width, y + height);
+        glVertex2f(x, y + height);
+        glEnd();
+    }
+    
+    @Override
+    public void drawLine(float x1, float y1, float x2, float y2) {
+        glBegin(GL_LINES);
+        glVertex2f(x1, y1);
+        glVertex2f(x2, y2);
+        glEnd();
+    }
+    
+    @Override
+    public void enableBlend() {
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    }
+    
+    @Override
+    public void disableBlend() {
+        glDisable(GL_BLEND);
+    }
+    
+    @Override
+    public void drawText(String text, float x, float y, float scale) {
+        mattmc.client.renderer.backend.opengl.gui.components.TextRenderer.drawText(text, x, y, scale);
+    }
+    
+    @Override
+    public void drawCenteredText(String text, float centerX, float y, float scale) {
+        mattmc.client.renderer.backend.opengl.gui.components.TextRenderer.drawCenteredText(text, centerX, y, scale);
+    }
+    
+    @Override
+    public float getTextWidth(String text, float scale) {
+        return mattmc.client.renderer.backend.opengl.gui.components.TextRenderer.getTextWidth(text, scale);
+    }
+    
+    @Override
+    public float getTextHeight(String text, float scale) {
+        return mattmc.client.renderer.backend.opengl.gui.components.TextRenderer.getTextHeight(text, scale);
+    }
+    
+    // === Input Callback Implementations ===
+    
+    @Override
+    public void setCursorPosCallback(long windowHandle, CursorPosCallback callback) {
+        org.lwjgl.glfw.GLFW.glfwSetCursorPosCallback(windowHandle, (h, x, y) -> {
+            if (callback != null) callback.invoke(x, y);
+        });
+    }
+    
+    @Override
+    public void setMouseButtonCallback(long windowHandle, MouseButtonCallback callback) {
+        org.lwjgl.glfw.GLFW.glfwSetMouseButtonCallback(windowHandle, (h, button, action, mods) -> {
+            if (callback != null) callback.invoke(button, action, mods);
+        });
+    }
+    
+    @Override
+    public void setFramebufferSizeCallback(long windowHandle, FramebufferSizeCallback callback) {
+        org.lwjgl.glfw.GLFW.glfwSetFramebufferSizeCallback(windowHandle, (win, newW, newH) -> {
+            if (callback != null) callback.invoke(newW, newH);
+        });
+    }
+    
+    @Override
+    public void setKeyCallback(long windowHandle, KeyCallback callback) {
+        org.lwjgl.glfw.GLFW.glfwSetKeyCallback(windowHandle, (h, key, scancode, action, mods) -> {
+            if (callback != null) callback.invoke(key, scancode, action, mods);
+        });
+    }
+    
+    @Override
+    public void setCharCallback(long windowHandle, CharCallback callback) {
+        org.lwjgl.glfw.GLFW.glfwSetCharCallback(windowHandle, (h, codepoint) -> {
+            if (callback != null) callback.invoke(codepoint);
+        });
+    }
+    
+    @Override
+    public void setScrollCallback(long windowHandle, ScrollCallback callback) {
+        org.lwjgl.glfw.GLFW.glfwSetScrollCallback(windowHandle, (h, xoffset, yoffset) -> {
+            if (callback != null) callback.invoke(xoffset, yoffset);
+        });
+    }
+    
+    @Override
+    public void setViewport(int x, int y, int width, int height) {
+        glViewport(x, y, width, height);
+    }
+    
+    // === Button Rendering ===
+    
+    @Override
+    public void drawButton(mattmc.client.gui.components.Button button) {
+        mattmc.client.renderer.backend.opengl.gui.components.ButtonRenderer.drawButton(button);
+    }
+    
+    @Override
+    public void drawButton(mattmc.client.gui.components.Button button, boolean selected) {
+        mattmc.client.renderer.backend.opengl.gui.components.ButtonRenderer.drawButton(button, selected);
+    }
+    
+    // === Texture Management ===
+    
+    // Cache of loaded textures: path -> Texture
+    private final Map<String, Texture> textureCache = new HashMap<>();
+    // Reverse map: texture ID -> path (for cleanup)
+    private final Map<Integer, String> textureIdToPath = new HashMap<>();
+    
+    @Override
+    public int loadTexture(String path) {
+        Texture tex = textureCache.get(path);
+        if (tex == null) {
+            tex = Texture.load(path);
+            textureCache.put(path, tex);
+            textureIdToPath.put(tex.id, path);
+        }
+        return tex.id;
+    }
+    
+    @Override
+    public void drawTexture(int textureId, float x, float y, float width, float height) {
+        glEnable(GL_TEXTURE_2D);
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        
+        glBindTexture(GL_TEXTURE_2D, textureId);
+        glColor4f(1f, 1f, 1f, 1f);
+        
+        // Note: Textures are loaded with vertical flip, so we flip the V coordinates
+        glBegin(GL_QUADS);
+        glTexCoord2f(0, 1); glVertex2f(x, y);
+        glTexCoord2f(1, 1); glVertex2f(x + width, y);
+        glTexCoord2f(1, 0); glVertex2f(x + width, y + height);
+        glTexCoord2f(0, 0); glVertex2f(x, y + height);
+        glEnd();
+        
+        glDisable(GL_BLEND);
+        glDisable(GL_TEXTURE_2D);
+    }
+    
+    @Override
+    public int getTextureWidth(int textureId) {
+        String path = textureIdToPath.get(textureId);
+        if (path != null) {
+            Texture tex = textureCache.get(path);
+            if (tex != null) {
+                return tex.width;
+            }
+        }
+        return 0;
+    }
+    
+    @Override
+    public int getTextureHeight(int textureId) {
+        String path = textureIdToPath.get(textureId);
+        if (path != null) {
+            Texture tex = textureCache.get(path);
+            if (tex != null) {
+                return tex.height;
+            }
+        }
+        return 0;
+    }
+    
+    @Override
+    public void releaseTexture(int textureId) {
+        String path = textureIdToPath.remove(textureId);
+        if (path != null) {
+            Texture tex = textureCache.remove(path);
+            if (tex != null) {
+                tex.close();
+            }
+        }
+    }
+    
+    // === Matrix Operations ===
+    
+    @Override
+    public void pushMatrix() {
+        glPushMatrix();
+    }
+    
+    @Override
+    public void popMatrix() {
+        glPopMatrix();
+    }
+    
+    @Override
+    public void translateMatrix(float x, float y, float z) {
+        glTranslatef(x, y, z);
+    }
+    
+    @Override
+    public void rotateMatrix(float angle, float x, float y, float z) {
+        glRotatef(angle, x, y, z);
+    }
+    
+    // === Window Control ===
+    
+    @Override
+    public void setCursorMode(long windowHandle, int mode) {
+        org.lwjgl.glfw.GLFW.glfwSetInputMode(windowHandle, org.lwjgl.glfw.GLFW.GLFW_CURSOR, mode);
+    }
+    
+    @Override
+    public void setWindowShouldClose(long windowHandle, boolean shouldClose) {
+        org.lwjgl.glfw.GLFW.glfwSetWindowShouldClose(windowHandle, shouldClose);
+    }
+    
+    @Override
+    public mattmc.client.renderer.panorama.PanoramaRenderer createPanoramaRenderer(String basePath, String extension) {
+        CubeMap sky = CubeMap.load(basePath, extension);
+        return new OpenGLPanoramaRenderer(sky);
+    }
+    
+    // === 3D Rendering Methods ===
+    
+    @Override
+    public void setupPerspectiveProjection(float fov, float aspect, float nearPlane, float farPlane) {
+        glMatrixMode(GL_PROJECTION);
+        glLoadIdentity();
+        float top = (float) (Math.tan(Math.toRadians(fov * 0.5)) * nearPlane);
+        float bottom = -top;
+        float right = top * aspect;
+        float left = -right;
+        glFrustum(left, right, bottom, top, nearPlane, farPlane);
+        glMatrixMode(GL_MODELVIEW);
+        glLoadIdentity();
+    }
+    
+    @Override
+    public void setClearColor(float r, float g, float b, float a) {
+        glClearColor(r, g, b, a);
+    }
+    
+    @Override
+    public void clearBuffers() {
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    }
+    
+    @Override
+    public void enableDepthTest() {
+        glEnable(GL_DEPTH_TEST);
+    }
+    
+    @Override
+    public void disableDepthTest() {
+        glDisable(GL_DEPTH_TEST);
+    }
+    
+    @Override
+    public void enableCullFace() {
+        glEnable(GL_CULL_FACE);
+        glCullFace(GL_BACK);
+    }
+    
+    @Override
+    public void disableCullFace() {
+        glDisable(GL_CULL_FACE);
+    }
+    
+    @Override
+    public void enableLighting() {
+        glEnable(GL_LIGHTING);
+        glEnable(GL_LIGHT0);
+        glEnable(GL_COLOR_MATERIAL);
+        glColorMaterial(GL_FRONT_AND_BACK, GL_AMBIENT_AND_DIFFUSE);
+    }
+    
+    @Override
+    public void disableLighting() {
+        glDisable(GL_LIGHTING);
+        glDisable(GL_LIGHT0);
+    }
+    
+    @Override
+    public void setupDirectionalLight(float dirX, float dirY, float dirZ, float brightness) {
+        // Position with w=0 makes it directional (parallel rays)
+        float[] lightPos = {dirX, dirY, dirZ, 0.0f};
+        glLightfv(GL_LIGHT0, GL_POSITION, lightPos);
+        
+        // Set light colors based on brightness
+        float[] ambient = {0.4f * brightness, 0.4f * brightness, 0.4f * brightness, 1.0f};
+        float[] diffuse = {brightness, brightness, brightness, 1.0f};
+        float[] specular = {0.0f, 0.0f, 0.0f, 1.0f};  // No specular for Minecraft-like look
+        
+        glLightfv(GL_LIGHT0, GL_AMBIENT, ambient);
+        glLightfv(GL_LIGHT0, GL_DIFFUSE, diffuse);
+        glLightfv(GL_LIGHT0, GL_SPECULAR, specular);
+        
+        // Set global ambient light (very dim)
+        float[] globalAmbient = {0.2f, 0.2f, 0.2f, 1.0f};
+        glLightModelfv(GL_LIGHT_MODEL_AMBIENT, globalAmbient);
+    }
+    
+    @Override
+    public void loadIdentityMatrix() {
+        glLoadIdentity();
+    }
+    
+    @Override
+    public void begin3DLines() {
+        glBegin(GL_LINES);
+    }
+    
+    @Override
+    public void end3DLines() {
+        glEnd();
+    }
+    
+    @Override
+    public void addLineVertex(float x, float y, float z) {
+        glVertex3f(x, y, z);
+    }
+    
+    @Override
+    public void enableTexture2D() {
+        glEnable(GL_TEXTURE_2D);
+    }
+    
+    @Override
+    public void disableTexture2D() {
+        glDisable(GL_TEXTURE_2D);
+    }
+    
+    @Override
+    public boolean isTexture2DEnabled() {
+        return glIsEnabled(GL_TEXTURE_2D);
     }
 }

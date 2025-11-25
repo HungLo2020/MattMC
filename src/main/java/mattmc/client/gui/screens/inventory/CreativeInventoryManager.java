@@ -1,6 +1,6 @@
 package mattmc.client.gui.screens.inventory;
 
-import mattmc.client.renderer.backend.opengl.Window;
+import mattmc.client.renderer.window.WindowHandle;
 import mattmc.client.util.CoordinateUtils;
 import mattmc.world.item.Inventory;
 import mattmc.world.item.Item;
@@ -62,7 +62,7 @@ public class CreativeInventoryManager {
      * @param window Window reference for coordinate conversion
      * @return Item index in allItems list, or -1 if no item was clicked
      */
-    public int findClickedCreativeItem(double mouseXWin, double mouseYWin, Window window) {
+    public int findClickedCreativeItem(double mouseXWin, double mouseYWin, WindowHandle window) {
         // Get mouse position in framebuffer coordinates
         CoordinateUtils.Point2D fbCoords = CoordinateUtils.windowToFramebuffer(
             window.handle(), mouseXWin, mouseYWin

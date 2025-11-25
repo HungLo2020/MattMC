@@ -2,8 +2,8 @@ package mattmc.client.renderer;
 import mattmc.client.renderer.backend.RenderPass;
 import mattmc.client.renderer.backend.DrawCommand;
 
-import mattmc.client.renderer.backend.opengl.ChunkRenderer;
-import mattmc.client.renderer.backend.opengl.Frustum;
+import mattmc.client.renderer.chunk.ChunkMeshRegistry;
+import mattmc.client.renderer.Frustum;
 import mattmc.world.level.Level;
 import mattmc.world.level.chunk.LevelChunk;
 import org.slf4j.Logger;
@@ -51,7 +51,7 @@ import org.slf4j.LoggerFactory;
 public class ChunkRenderLogic {
     private static final Logger logger = LoggerFactory.getLogger(ChunkRenderLogic.class);
     
-    private final ChunkRenderer chunkRenderer;
+    private final ChunkMeshRegistry meshRegistry;
     private final Frustum frustum;
     
     // Statistics
@@ -60,13 +60,13 @@ public class ChunkRenderLogic {
     private int culledChunks = 0;
     
     /**
-     * Creates chunk render logic with the given renderer and frustum.
+     * Creates chunk render logic with the given mesh registry and frustum.
      * 
-     * @param chunkRenderer the chunk renderer for checking mesh availability
+     * @param meshRegistry the mesh registry for checking mesh availability
      * @param frustum the frustum for visibility culling
      */
-    public ChunkRenderLogic(ChunkRenderer chunkRenderer, Frustum frustum) {
-        this.chunkRenderer = chunkRenderer;
+    public ChunkRenderLogic(ChunkMeshRegistry meshRegistry, Frustum frustum) {
+        this.meshRegistry = meshRegistry;
         this.frustum = frustum;
     }
     
@@ -75,7 +75,6 @@ public class ChunkRenderLogic {
      * 
      * <p>This method:
      * <ol>
-     *   <li>Updates the frustum from current GL matrices</li>
      *   <li>Iterates through all loaded chunks</li>
      *   <li>Culls chunks outside the frustum</li>
      *   <li>Skips chunks without mesh data</li>
@@ -85,13 +84,12 @@ public class ChunkRenderLogic {
      * <p>Commands are added to the provided buffer. The buffer is NOT cleared first,
      * allowing multiple logic classes to contribute commands to the same buffer.
      * 
+     * <p><b>Note:</b> The frustum should be updated externally before calling this method.
+     * 
      * @param world the world containing chunks to render
      * @param buffer the buffer to add commands to
      */
     public void buildCommands(Level world, CommandBuffer buffer) {
-        // Update frustum from current GL matrices
-        frustum.update();
-        
         // Reset statistics
         totalChunks = 0;
         visibleChunks = 0;
@@ -111,13 +109,13 @@ public class ChunkRenderLogic {
             
             // Skip chunks without mesh data
             // Note: chunks are pre-registered in LevelRenderer.render() before buildCommands() is called
-            if (!chunkRenderer.hasChunkMesh(chunk)) {
+            if (!meshRegistry.hasChunkMesh(chunk)) {
                 culledChunks++;
                 continue;
             }
             
             // Get mesh ID for this chunk
-            int meshId = chunkRenderer.getMeshIdForChunk(chunk);
+            int meshId = meshRegistry.getMeshIdForChunk(chunk);
             if (meshId < 0) {
                 // Chunk doesn't have a mesh ID assigned yet
                 culledChunks++;
@@ -125,7 +123,7 @@ public class ChunkRenderLogic {
             }
             
             // Get material ID (all chunks use the same material for now)
-            int materialId = chunkRenderer.getDefaultMaterialId();
+            int materialId = meshRegistry.getDefaultMaterialId();
             
             // Get transform ID for this chunk's world position
             int transformId = getTransformIdForChunk(chunk);

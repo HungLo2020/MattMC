@@ -6,6 +6,7 @@ import mattmc.client.renderer.backend.RenderPass;
 import mattmc.client.renderer.CommandBuffer;
 import mattmc.client.renderer.ChunkRenderLogic;
 import mattmc.client.renderer.VoxelLitShader;
+import mattmc.client.renderer.Frustum;
 
 import mattmc.client.renderer.backend.opengl.TextureAtlas;
 import mattmc.client.renderer.backend.opengl.ChunkRenderer;
