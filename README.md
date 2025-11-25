@@ -32,7 +32,6 @@ This project reimagines Minecraft with a focus on:
   - Samples 8 nearby voxels per vertex for smooth gradients
   - 3-block corner rule for ambient occlusion darkening
   - Runtime toggle via `smooth_lighting` setting
-  - See [SMOOTH_LIGHTING.md](docs/SMOOTH_LIGHTING.md) for details
 - **Cascaded Shadow Maps (CSM)**: Real-time shadows from directional sunlight
   - 3 cascades (near, mid, far) for optimal quality distribution
   - 2048×2048 depth map per cascade
@@ -40,7 +39,6 @@ This project reimagines Minecraft with a focus on:
   - Integrated with day/night cycle (only renders during daytime)
   - Runtime toggle via `shadows` setting (disabled by default)
   - Similar to Minecraft Complementary shaders approach
-  - See [CASCADED_SHADOW_MAPS.md](docs/CASCADED_SHADOW_MAPS.md) for details
 
 ### Game Features
 - World creation and management
@@ -57,6 +55,7 @@ This project reimagines Minecraft with a focus on:
 - **Libraries**:
   - LWJGL (OpenGL, GLFW, STB)
   - Gson for JSON parsing
+  - SLF4J/Logback for logging
 
 ## Project Structure
 
@@ -69,15 +68,28 @@ src/main/java/mattmc/
 │   │   └── components/ # UI components (buttons, text boxes, etc.)
 │   ├── resources/      # Resource management (models, textures)
 │   ├── settings/       # Game settings and keybindings
+│   ├── util/           # Client utilities
 │   └── renderer/       # Rendering systems
+│       ├── backend/    # Render backend abstraction
+│       │   └── opengl/ # OpenGL implementation
 │       ├── chunk/      # Chunk rendering
 │       ├── block/      # Block rendering
-│       └── texture/    # Texture management
+│       ├── item/       # Item rendering
+│       ├── level/      # Level rendering
+│       ├── panorama/   # Panorama rendering
+│       ├── shader/     # Shader management
+│       ├── texture/    # Texture management
+│       ├── window/     # Window management
+│       └── gui/        # GUI rendering
 ├── world/              # World and level management
 │   ├── entity/         # Entities (player, mobs, etc.)
+│   ├── item/           # Item system
+│   ├── phys/           # Physics and collision (shapes)
 │   └── level/          # Level/world systems
 │       ├── chunk/      # Chunk system
 │       ├── block/      # Block types and properties
+│       ├── lighting/   # Light storage and calculations
+│       ├── levelgen/   # World generation
 │       └── storage/    # World save/load (Anvil format, NBT)
 ├── nbt/                # NBT (Named Binary Tag) data structures
 └── util/               # Utility classes
@@ -117,13 +129,8 @@ The distributable zip will be created in `build/releases/`.
 
 For in-depth technical information, see:
 
-- [**Chunk System**](CHUNK_SYSTEM.md) - Details on the chunk-based voxel rendering system
-- [**Smooth Lighting**](docs/SMOOTH_LIGHTING.md) - Per-vertex light sampling and ambient occlusion
-- [**Cascaded Shadow Maps**](docs/CASCADED_SHADOW_MAPS.md) - CSM implementation similar to Complementary shaders
-- [**Day/Night Cycle**](docs/DAY_NIGHT_CYCLE.md) - Sun movement and sky brightness calculations
-- [**Efficiency Analysis**](EFFICIENCY_ANALYSIS.md) - Performance optimizations and analysis
-- [**World Save Format**](WORLD_SAVE_FORMAT.md) - World storage format and NBT structures
-- [**Refactoring Summary**](REFACTORING_SUMMARY.md) - Architectural decisions and code organization
+- [**Rendering System**](docs/RENDERING-SYSTEM.md) - Backend abstraction architecture and rendering pipeline
+- [**JSON Model System**](docs/JSON_MODEL_SYSTEM.md) - Minecraft-compatible JSON model and blockstate loading
 
 ## Development Philosophy
 
