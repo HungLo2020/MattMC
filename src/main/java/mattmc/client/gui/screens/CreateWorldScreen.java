@@ -184,8 +184,7 @@ public final class CreateWorldScreen implements Screen {
         long seed = parseSeed(seedText);
         
         logger.info("→ Creating world: {} with seed: {}", worldName, seed);
-        // Use the OpenGL-specific DevplayScreen for now (still needs refactoring)
-        game.setScreen(new mattmc.client.renderer.backend.opengl.gui.screens.DevplayScreen(game, worldName, seed));
+        game.setScreen(new DevplayScreen(game, worldName, seed));
     }
     
     /**

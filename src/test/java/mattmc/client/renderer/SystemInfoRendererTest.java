@@ -150,5 +150,22 @@ public class SystemInfoRendererTest {
         @Override public void setScrollCallback(long h, ScrollCallback c) {}
         @Override public void setViewport(int x, int y, int w, int h) {}
         @Override public mattmc.client.renderer.panorama.PanoramaRenderer createPanoramaRenderer(String basePath, String ext) { return null; }
+        @Override public void setupPerspectiveProjection(float fov, float aspect, float nearPlane, float farPlane) {}
+        @Override public void setClearColor(float r, float g, float b, float a) {}
+        @Override public void clearBuffers() {}
+        @Override public void enableDepthTest() {}
+        @Override public void disableDepthTest() {}
+        @Override public void enableCullFace() {}
+        @Override public void disableCullFace() {}
+        @Override public void enableLighting() {}
+        @Override public void disableLighting() {}
+        @Override public void setupDirectionalLight(float dirX, float dirY, float dirZ, float brightness) {}
+        @Override public void loadIdentityMatrix() {}
+        @Override public void begin3DLines() {}
+        @Override public void end3DLines() {}
+        @Override public void addLineVertex(float x, float y, float z) {}
+        @Override public void enableTexture2D() {}
+        @Override public void disableTexture2D() {}
+        @Override public boolean isTexture2DEnabled() { return false; }
     }
 }

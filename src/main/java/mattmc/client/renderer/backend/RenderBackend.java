@@ -666,6 +666,114 @@ public interface RenderBackend {
     /** Slash key */
     int KEY_SLASH = 47;
     
+    // === 3D Rendering Methods ===
+    
+    /**
+     * Set up perspective projection for 3D rendering.
+     * 
+     * @param fov field of view in degrees
+     * @param aspect aspect ratio (width/height)
+     * @param nearPlane near clipping plane distance
+     * @param farPlane far clipping plane distance
+     */
+    void setupPerspectiveProjection(float fov, float aspect, float nearPlane, float farPlane);
+    
+    /**
+     * Set the clear color for the frame buffer.
+     * 
+     * @param r red component (0-1)
+     * @param g green component (0-1)
+     * @param b blue component (0-1)
+     * @param a alpha component (0-1)
+     */
+    void setClearColor(float r, float g, float b, float a);
+    
+    /**
+     * Clear the color and depth buffers.
+     */
+    void clearBuffers();
+    
+    /**
+     * Enable depth testing for 3D rendering.
+     */
+    void enableDepthTest();
+    
+    /**
+     * Disable depth testing.
+     */
+    void disableDepthTest();
+    
+    /**
+     * Enable back-face culling.
+     */
+    void enableCullFace();
+    
+    /**
+     * Disable face culling.
+     */
+    void disableCullFace();
+    
+    /**
+     * Enable lighting for 3D rendering.
+     */
+    void enableLighting();
+    
+    /**
+     * Disable lighting.
+     */
+    void disableLighting();
+    
+    /**
+     * Set up a directional light (sun light).
+     * 
+     * @param dirX light direction X component
+     * @param dirY light direction Y component
+     * @param dirZ light direction Z component
+     * @param brightness overall light brightness (0-1)
+     */
+    void setupDirectionalLight(float dirX, float dirY, float dirZ, float brightness);
+    
+    /**
+     * Reset the modelview matrix to identity.
+     */
+    void loadIdentityMatrix();
+    
+    /**
+     * Begin rendering 3D lines (for block outlines).
+     */
+    void begin3DLines();
+    
+    /**
+     * End rendering 3D lines.
+     */
+    void end3DLines();
+    
+    /**
+     * Add a 3D line vertex (used between begin3DLines and end3DLines).
+     * 
+     * @param x vertex X position
+     * @param y vertex Y position
+     * @param z vertex Z position
+     */
+    void addLineVertex(float x, float y, float z);
+    
+    /**
+     * Enable texturing.
+     */
+    void enableTexture2D();
+    
+    /**
+     * Disable texturing.
+     */
+    void disableTexture2D();
+    
+    /**
+     * Check if texturing is currently enabled.
+     * 
+     * @return true if texture 2D is enabled
+     */
+    boolean isTexture2DEnabled();
+    
     // === Factory Methods ===
     
     /**

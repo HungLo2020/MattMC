@@ -1,11 +1,8 @@
-package mattmc.client.renderer.backend.opengl.gui.screens;
+package mattmc.client.gui.screens;
 
-import mattmc.client.gui.screens.CommandSystem;
-import mattmc.client.gui.screens.DevplayInputHandler;
-import mattmc.client.gui.screens.DevplayUIState;
-import mattmc.client.gui.screens.Screen;
 import mattmc.client.Minecraft;
-import mattmc.client.renderer.backend.opengl.Window;
+import mattmc.client.renderer.backend.RenderBackend;
+import mattmc.client.renderer.window.WindowHandle;
 import mattmc.client.settings.OptionsManager;
 import mattmc.world.entity.player.BlockInteraction;
 import mattmc.world.entity.player.LocalPlayer;
@@ -15,18 +12,14 @@ import mattmc.world.entity.player.PlayerInput;
 import mattmc.client.renderer.backend.opengl.LevelRenderer;
 import mattmc.client.renderer.UIRenderer;
 import mattmc.client.renderer.backend.opengl.BlockFaceGeometry;
-import mattmc.util.ColorUtils;
-import mattmc.client.renderer.backend.opengl.OpenGLColorHelper;
 import mattmc.world.item.Inventory;
 import mattmc.world.level.chunk.ChunkUtils;
-import mattmc.world.level.chunk.LevelChunk;
 import mattmc.world.level.Level;
 import mattmc.world.level.storage.LevelStorageSource;
 
 import java.io.IOException;
 import java.nio.file.Path;
 
-import static org.lwjgl.opengl.GL11.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -42,7 +35,8 @@ public final class DevplayScreen implements Screen {
     private static final Logger logger = LoggerFactory.getLogger(DevplayScreen.class);
 
     private final Minecraft game;
-    private final Window window;
+    private final WindowHandle window;
+    private final RenderBackend backend;
     
     // Minecraft components (following Minecraft's architecture)
     private final Level world;
@@ -88,7 +82,8 @@ public final class DevplayScreen implements Screen {
     
     public DevplayScreen(Minecraft game, String worldName, Level world, long seed, float playerX, float playerY, float playerZ, float playerYaw, float playerPitch, Inventory playerInventory) {
         this.game = game;
-        this.window = (Window) game.window();
+        this.window = game.window();
+        this.backend = game.getRenderBackend();
         this.worldName = worldName;
         
         // Initialize infinite world (use provided or create new)
@@ -97,7 +92,6 @@ public final class DevplayScreen implements Screen {
         // Apply render distance from settings
         int renderDistance = OptionsManager.getRenderDistance();
         this.world.setRenderDistance(renderDistance);
-        // logger.info("Set render distance to: {}{}", renderDistance, " chunks");
         
         // Set world directory for new worlds so chunks can be saved during unload
         if (world == null) {
@@ -162,11 +156,11 @@ public final class DevplayScreen implements Screen {
         this.uiState = new DevplayUIState(now());
         this.commandSystem = new CommandSystem(player, this.world);
         this.inputHandler = new DevplayInputHandler(
-            game, window, game.getRenderBackend(),
+            game, window, backend,
             player, this.world, blockInteraction, uiState, commandSystem,
             playerController, uiRenderer,
-            () -> game.setScreen(new mattmc.client.gui.screens.PauseScreen(game, this)),
-            () -> game.setScreen(new mattmc.client.gui.screens.InventoryScreen(game, this))
+            () -> game.setScreen(new PauseScreen(game, this)),
+            () -> game.setScreen(new InventoryScreen(game, this))
         );
 
         // Register input callbacks
@@ -223,51 +217,40 @@ public final class DevplayScreen implements Screen {
 
         // Get sky color from day/night cycle
         float[] skyColor = world.getDayCycle().getSkyColor();
-        glClearColor(skyColor[0], skyColor[1], skyColor[2], 1f);
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        backend.setClearColor(skyColor[0], skyColor[1], skyColor[2], 1f);
+        backend.clearBuffers();
 
         // Perspective projection
         float aspect = Math.max(1f, (float) w / Math.max(1, h));
-        glMatrixMode(GL_PROJECTION);
-        glLoadIdentity();
         float fov = 70f, zn = 0.1f, zf = 500f;
-        float top = (float) (Math.tan(Math.toRadians(fov * 0.5)) * zn);
-        float bottom = -top;
-        float right = top * aspect;
-        float left = -right;
-        glFrustum(left, right, bottom, top, zn, zf);
-
-        glMatrixMode(GL_MODELVIEW);
-        glLoadIdentity();
+        backend.setupPerspectiveProjection(fov, aspect, zn, zf);
 
         // Apply camera transformations (pitch, yaw, then position)
         // Use interpolated values for smooth rendering between ticks
         // Camera is at eye level (1.62 blocks above feet)
-        glRotatef(player.getPitch(alphaF), 1f, 0f, 0f);
-        glRotatef(player.getYaw(alphaF), 0f, 1f, 0f);
-        glTranslatef(-player.getX(alphaF), -player.getEyeY(alphaF), -player.getZ(alphaF));
+        backend.rotateMatrix(player.getPitch(alphaF), 1f, 0f, 0f);
+        backend.rotateMatrix(player.getYaw(alphaF), 0f, 1f, 0f);
+        backend.translateMatrix(-player.getX(alphaF), -player.getEyeY(alphaF), -player.getZ(alphaF));
 
         // Set up directional light based on sun position
         setupDirectionalLight();
 
-        glEnable(GL_DEPTH_TEST);
-        glEnable(GL_CULL_FACE);
-        glCullFace(GL_BACK);
+        backend.enableDepthTest();
+        backend.enableCullFace();
         
         // Render all loaded chunks in the infinite world
         // Use interpolated position for smooth rendering
         worldRenderer.render(world, player.getX(alphaF), player.getEyeY(alphaF), player.getZ(alphaF));
         
-        glDisable(GL_CULL_FACE);
+        backend.disableCullFace();
         
         // Render outline on the block the player is looking at
         renderTargetedBlockOutline();
         
         // Disable lighting for UI rendering
-        glDisable(GL_LIGHTING);
-        glDisable(GL_LIGHT0);
+        backend.disableLighting();
         
-        glDisable(GL_DEPTH_TEST);
+        backend.disableDepthTest();
         
         // Draw debug information in top-left corner (only if F3 is pressed)
         if (uiState.isDebugMenuVisible()) {
@@ -285,7 +268,7 @@ public final class DevplayScreen implements Screen {
             uiRenderer.drawSystemInfo(w, h, window.handle());
         } else {
             // Draw block name display in top-left corner (only if debug menu is not visible and option is enabled)
-            if (mattmc.client.settings.OptionsManager.isShowBlockNameEnabled()) {
+            if (OptionsManager.isShowBlockNameEnabled()) {
                 BlockInteraction.BlockHitResult hit = blockInteraction.getTargetedBlock();
                 if (hit != null) {
                     mattmc.world.level.block.Block targetedBlock = world.getBlock(hit.x, hit.y, hit.z);
@@ -314,7 +297,7 @@ public final class DevplayScreen implements Screen {
     }
 
     /**
-     * Set up OpenGL directional light based on the sun position.
+     * Set up directional light based on the sun position.
      * The sun acts as a directional light source that rotates through the day/night cycle.
      */
     private void setupDirectionalLight() {
@@ -322,29 +305,9 @@ public final class DevplayScreen implements Screen {
         float[] sunDir = world.getDayCycle().getSunDirection();
         float brightness = world.getDayCycle().getSkyBrightness();
         
-        // Enable lighting
-        glEnable(GL_LIGHTING);
-        glEnable(GL_LIGHT0);
-        glEnable(GL_COLOR_MATERIAL);
-        glColorMaterial(GL_FRONT_AND_BACK, GL_AMBIENT_AND_DIFFUSE);
-        
-        // Set up directional light (GL_LIGHT0)
-        // Position with w=0 makes it directional (parallel rays)
-        float[] lightPos = {sunDir[0], sunDir[1], sunDir[2], 0.0f};
-        glLightfv(GL_LIGHT0, GL_POSITION, lightPos);
-        
-        // Set light colors based on brightness
-        float[] ambient = {0.4f * brightness, 0.4f * brightness, 0.4f * brightness, 1.0f};
-        float[] diffuse = {brightness, brightness, brightness, 1.0f};
-        float[] specular = {0.0f, 0.0f, 0.0f, 1.0f};  // No specular for Minecraft-like look
-        
-        glLightfv(GL_LIGHT0, GL_AMBIENT, ambient);
-        glLightfv(GL_LIGHT0, GL_DIFFUSE, diffuse);
-        glLightfv(GL_LIGHT0, GL_SPECULAR, specular);
-        
-        // Set global ambient light (very dim)
-        float[] globalAmbient = {0.2f, 0.2f, 0.2f, 1.0f};
-        glLightModelfv(GL_LIGHT_MODEL_AMBIENT, globalAmbient);
+        // Enable lighting and set up directional light
+        backend.enableLighting();
+        backend.setupDirectionalLight(sunDir[0], sunDir[1], sunDir[2], brightness);
     }
 
     /**
@@ -354,21 +317,21 @@ public final class DevplayScreen implements Screen {
         BlockInteraction.BlockHitResult hit = blockInteraction.getTargetedBlock();
         if (hit != null) {
             // Save texture state and disable texturing for outline
-            boolean textureEnabled = glIsEnabled(GL_TEXTURE_2D);
-            glDisable(GL_TEXTURE_2D);
+            boolean textureEnabled = backend.isTexture2DEnabled();
+            backend.disableTexture2D();
             
             // Set up line rendering
-            glBegin(GL_LINES);
-            OpenGLColorHelper.setGLColor(0x000000, 1f);  // Black outline
+            backend.begin3DLines();
+            backend.setColor(0x000000, 1f);  // Black outline
             
             // Draw complete outline around the targeted block
-            BlockFaceGeometry.drawCompleteBlockOutline(hit.x, ChunkUtils.localToWorldY(hit.y), hit.z);
+            BlockFaceGeometry.drawCompleteBlockOutlineWithBackend(hit.x, ChunkUtils.localToWorldY(hit.y), hit.z, backend);
             
-            glEnd();
+            backend.end3DLines();
             
             // Restore texture state
             if (textureEnabled) {
-                glEnable(GL_TEXTURE_2D);
+                backend.enableTexture2D();
             }
         }
     }
@@ -400,7 +363,7 @@ public final class DevplayScreen implements Screen {
      * Get the render backend for UI rendering.
      * @return The render backend instance
      */
-    public mattmc.client.renderer.backend.RenderBackend getRenderBackend() {
+    public RenderBackend getRenderBackend() {
         return worldRenderer.getRenderBackend();
     }
     

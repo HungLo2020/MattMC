@@ -24,7 +24,7 @@ public final class PauseScreen implements Screen {
     private final Minecraft game;
     private final WindowHandle window;
     private final RenderBackend backend;
-    private final mattmc.client.renderer.backend.opengl.gui.screens.DevplayScreen gameScreen;
+    private final DevplayScreen gameScreen;
     private final List<Button> buttons = new ArrayList<>();
     private double mouseXWin, mouseYWin;
     private boolean mouseDown;
@@ -34,7 +34,7 @@ public final class PauseScreen implements Screen {
     private int buttonWidth = 300, buttonHeight = 44, buttonGap = 12;
     private int buttonsStartY;
 
-    public PauseScreen(Minecraft game, mattmc.client.renderer.backend.opengl.gui.screens.DevplayScreen gameScreen) {
+    public PauseScreen(Minecraft game, DevplayScreen gameScreen) {
         this.game = game;
         this.window = game.window();
         this.backend = game.getRenderBackend();

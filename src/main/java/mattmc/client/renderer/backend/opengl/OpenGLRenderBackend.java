@@ -1063,4 +1063,119 @@ public class OpenGLRenderBackend implements RenderBackend {
         CubeMap sky = CubeMap.load(basePath, extension);
         return new OpenGLPanoramaRenderer(sky);
     }
+    
+    // === 3D Rendering Methods ===
+    
+    @Override
+    public void setupPerspectiveProjection(float fov, float aspect, float nearPlane, float farPlane) {
+        glMatrixMode(GL_PROJECTION);
+        glLoadIdentity();
+        float top = (float) (Math.tan(Math.toRadians(fov * 0.5)) * nearPlane);
+        float bottom = -top;
+        float right = top * aspect;
+        float left = -right;
+        glFrustum(left, right, bottom, top, nearPlane, farPlane);
+        glMatrixMode(GL_MODELVIEW);
+        glLoadIdentity();
+    }
+    
+    @Override
+    public void setClearColor(float r, float g, float b, float a) {
+        glClearColor(r, g, b, a);
+    }
+    
+    @Override
+    public void clearBuffers() {
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    }
+    
+    @Override
+    public void enableDepthTest() {
+        glEnable(GL_DEPTH_TEST);
+    }
+    
+    @Override
+    public void disableDepthTest() {
+        glDisable(GL_DEPTH_TEST);
+    }
+    
+    @Override
+    public void enableCullFace() {
+        glEnable(GL_CULL_FACE);
+        glCullFace(GL_BACK);
+    }
+    
+    @Override
+    public void disableCullFace() {
+        glDisable(GL_CULL_FACE);
+    }
+    
+    @Override
+    public void enableLighting() {
+        glEnable(GL_LIGHTING);
+        glEnable(GL_LIGHT0);
+        glEnable(GL_COLOR_MATERIAL);
+        glColorMaterial(GL_FRONT_AND_BACK, GL_AMBIENT_AND_DIFFUSE);
+    }
+    
+    @Override
+    public void disableLighting() {
+        glDisable(GL_LIGHTING);
+        glDisable(GL_LIGHT0);
+    }
+    
+    @Override
+    public void setupDirectionalLight(float dirX, float dirY, float dirZ, float brightness) {
+        // Position with w=0 makes it directional (parallel rays)
+        float[] lightPos = {dirX, dirY, dirZ, 0.0f};
+        glLightfv(GL_LIGHT0, GL_POSITION, lightPos);
+        
+        // Set light colors based on brightness
+        float[] ambient = {0.4f * brightness, 0.4f * brightness, 0.4f * brightness, 1.0f};
+        float[] diffuse = {brightness, brightness, brightness, 1.0f};
+        float[] specular = {0.0f, 0.0f, 0.0f, 1.0f};  // No specular for Minecraft-like look
+        
+        glLightfv(GL_LIGHT0, GL_AMBIENT, ambient);
+        glLightfv(GL_LIGHT0, GL_DIFFUSE, diffuse);
+        glLightfv(GL_LIGHT0, GL_SPECULAR, specular);
+        
+        // Set global ambient light (very dim)
+        float[] globalAmbient = {0.2f, 0.2f, 0.2f, 1.0f};
+        glLightModelfv(GL_LIGHT_MODEL_AMBIENT, globalAmbient);
+    }
+    
+    @Override
+    public void loadIdentityMatrix() {
+        glLoadIdentity();
+    }
+    
+    @Override
+    public void begin3DLines() {
+        glBegin(GL_LINES);
+    }
+    
+    @Override
+    public void end3DLines() {
+        glEnd();
+    }
+    
+    @Override
+    public void addLineVertex(float x, float y, float z) {
+        glVertex3f(x, y, z);
+    }
+    
+    @Override
+    public void enableTexture2D() {
+        glEnable(GL_TEXTURE_2D);
+    }
+    
+    @Override
+    public void disableTexture2D() {
+        glDisable(GL_TEXTURE_2D);
+    }
+    
+    @Override
+    public boolean isTexture2DEnabled() {
+        return glIsEnabled(GL_TEXTURE_2D);
+    }
 }

@@ -26,7 +26,7 @@ public final class InventoryScreen implements Screen {
     private final Minecraft game;
     private final WindowHandle window;
     private final RenderBackend backend;
-    private final mattmc.client.renderer.backend.opengl.gui.screens.DevplayScreen gameScreen;
+    private final DevplayScreen gameScreen;
     
     // Mouse tracking for slot highlighting
     private double mouseXWin, mouseYWin;
@@ -37,7 +37,7 @@ public final class InventoryScreen implements Screen {
     private final CreativeInventoryManager creativeManager;
     private final InventoryRenderer renderer;
 
-    public InventoryScreen(Minecraft game, mattmc.client.renderer.backend.opengl.gui.screens.DevplayScreen gameScreen) {
+    public InventoryScreen(Minecraft game, DevplayScreen gameScreen) {
         this.game = game;
         this.window = game.window();
         this.backend = game.getRenderBackend();

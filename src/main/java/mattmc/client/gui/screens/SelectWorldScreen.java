@@ -177,8 +177,7 @@ public final class SelectWorldScreen implements Screen {
             logger.info("→ Loading world: {}", worldName);
             LevelStorageSource.WorldLoadResult result = LevelStorageSource.loadWorld(worldName);
             
-            // Use the OpenGL-specific DevplayScreen for now (still needs refactoring)
-            game.setScreen(new mattmc.client.renderer.backend.opengl.gui.screens.DevplayScreen(game, worldName, result.world,
+            game.setScreen(new DevplayScreen(game, worldName, result.world,
                 result.metadata.playerX, result.metadata.playerY, result.metadata.playerZ,
                 result.metadata.playerYaw, result.metadata.playerPitch, result.metadata.playerInventory));
         } catch (IOException e) {
