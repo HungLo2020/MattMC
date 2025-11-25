@@ -9,7 +9,7 @@ import java.util.Map;
 
 /**
  * Represents a 16x16x384 chunk of blocks.
- * Similar to Minecraft's chunk system:
+ * Similar to MattMC's chunk system:
  * - 16 blocks wide (X)
  * - 384 blocks tall (Y: -64 to 319)
  * - 16 blocks deep (Z)
@@ -28,7 +28,7 @@ public final class LevelChunk {
     private final int chunkZ;
     
     // 3D array to store blocks [x][y][z]
-    // We store the full array for simplicity, but Minecraft uses sections
+    // We store the full array for simplicity, but MattMC uses sections
     private final Block[][][] blocks;
     
     // Block states for blocks that need them (sparse storage)

@@ -4,7 +4,7 @@ import mattmc.util.MathUtils;
 
 /**
  * Bit-packed array implementation for efficiently storing block states.
- * Based on Minecraft Java Edition's palette-based bit packing approach.
+ * Based on MattMC Java Edition's palette-based bit packing approach.
  * 
  * Instead of storing each block as a full long (64 bits), this packs multiple
  * block indices into each long using only the minimum required bits per entry.
@@ -132,7 +132,7 @@ public class BitPackedArray {
     
     /**
      * Calculate the minimum bits needed to represent a palette of the given size.
-     * Minecraft uses a minimum of 4 bits per entry for performance reasons.
+     * MattMC uses a minimum of 4 bits per entry for performance reasons.
      */
     public static int calculateBitsPerEntry(int paletteSize) {
         if (paletteSize <= 0) {
@@ -145,7 +145,7 @@ public class BitPackedArray {
         // Calculate bits needed: ceil(log2(paletteSize))
         int bits = 32 - Integer.numberOfLeadingZeros(paletteSize - 1);
         
-        // Minecraft uses a minimum of 4 bits for performance
+        // MattMC uses a minimum of 4 bits for performance
         return MathUtils.clamp(bits, 4, 15);
     }
 }

@@ -1,6 +1,6 @@
 package mattmc.client.main;
 
-import mattmc.client.Minecraft;
+import mattmc.client.MattMC;
 import mattmc.client.renderer.backend.RenderBackendFactory;
 import mattmc.client.renderer.window.WindowHandle;
 import mattmc.client.gui.screens.TitleScreen;
@@ -47,8 +47,8 @@ public final class Main {
         WindowHandle window = factory.createWindow(width, height, "MattMC");
         
         try (AutoCloseable windowCloseable = factory.getWindowCloseable()) {
-            var game = new Minecraft(window, factory);
-            // If your Minecraft wants to know the dataDir, you can add a setter/ctor and pass it in.
+            var game = new MattMC(window, factory);
+            // If your MattMC wants to know the dataDir, you can add a setter/ctor and pass it in.
             game.setScreen(new TitleScreen(game));
             game.run();
         } catch (Exception e) {

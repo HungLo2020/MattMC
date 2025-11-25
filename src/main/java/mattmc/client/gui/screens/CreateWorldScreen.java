@@ -1,6 +1,6 @@
 package mattmc.client.gui.screens;
 
-import mattmc.client.Minecraft;
+import mattmc.client.MattMC;
 import mattmc.client.gui.components.Button;
 import mattmc.client.gui.components.EditBox;
 import mattmc.client.renderer.backend.RenderBackend;
@@ -19,7 +19,7 @@ import org.slf4j.LoggerFactory;
 public final class CreateWorldScreen implements Screen {
     private static final Logger logger = LoggerFactory.getLogger(CreateWorldScreen.class);
 
-    private final Minecraft game;
+    private final MattMC game;
     private final WindowHandle window;
     private final RenderBackend backend;
     private final List<Button> buttons = new ArrayList<>();
@@ -34,7 +34,7 @@ public final class CreateWorldScreen implements Screen {
     private int textFieldWidth = 300, textFieldHeight = 32;
     private int buttonsStartY;
 
-    public CreateWorldScreen(Minecraft game) {
+    public CreateWorldScreen(MattMC game) {
         this.game = game;
         this.window = game.window();
         this.backend = game.getRenderBackend();
@@ -191,7 +191,7 @@ public final class CreateWorldScreen implements Screen {
      * Parse a seed from text input.
      * If the text is a valid long number, use it directly.
      * Otherwise, use the hash code of the string.
-     * This matches Minecraft's behavior.
+     * This matches MattMC's behavior.
      */
     private long parseSeed(String seedText) {
         if (seedText.isEmpty()) {
@@ -202,7 +202,7 @@ public final class CreateWorldScreen implements Screen {
             // Try to parse as a long number
             return Long.parseLong(seedText);
         } catch (NumberFormatException e) {
-            // Use hash code of the string (like Minecraft does)
+            // Use hash code of the string (like MattMC does)
             return seedText.hashCode();
         }
     }
@@ -306,6 +306,6 @@ public final class CreateWorldScreen implements Screen {
 
     @Override
     public void onClose() {
-        // Panorama is now shared and managed by Minecraft
+        // Panorama is now shared and managed by MattMC
     }
 }

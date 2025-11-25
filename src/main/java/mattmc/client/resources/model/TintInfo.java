@@ -2,7 +2,7 @@ package mattmc.client.resources.model;
 
 /**
  * Represents tint information for block/item models.
- * Similar to Minecraft's tint format in item models.
+ * Similar to MattMC's tint format in item models.
  * 
  * Example:
  * {
@@ -49,7 +49,7 @@ public class TintInfo {
     public int getTintColor() {
         if ("minecraft:grass".equals(type) || "grass".equals(type)) {
             // Return grass green color
-            // In full Minecraft, this would vary based on temperature and downfall
+            // In full MattMC, this would vary based on temperature and downfall
             // For now, we use the standard grass green
             return 0x5BB53B;
         }

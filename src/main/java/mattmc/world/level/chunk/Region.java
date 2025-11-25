@@ -6,7 +6,7 @@ import mattmc.world.level.block.Blocks;
 
 /**
  * Represents a 32x32 region of chunks (512x512 blocks horizontally).
- * Similar to Minecraft's region system:
+ * Similar to MattMC's region system:
  * - 32 chunks wide (X) = 512 blocks
  * - 384 blocks tall (Y: -64 to 319) - same as chunk
  * - 32 chunks deep (Z) = 512 blocks

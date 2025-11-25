@@ -1,6 +1,6 @@
 package mattmc.client.gui.screens;
 
-import mattmc.client.Minecraft;
+import mattmc.client.MattMC;
 import mattmc.client.gui.components.Button;
 import mattmc.client.renderer.backend.RenderBackend;
 import mattmc.client.renderer.window.WindowHandle;
@@ -19,7 +19,7 @@ import org.slf4j.LoggerFactory;
 public final class SelectWorldScreen implements Screen {
     private static final Logger logger = LoggerFactory.getLogger(SelectWorldScreen.class);
 
-    private final Minecraft game;
+    private final MattMC game;
     private final WindowHandle window;
     private final RenderBackend backend;
     private final List<Button> buttons = new ArrayList<>();
@@ -36,7 +36,7 @@ public final class SelectWorldScreen implements Screen {
     private int worldButtonHeight = 36;
     private int buttonsStartY;
 
-    public SelectWorldScreen(Minecraft game) {
+    public SelectWorldScreen(MattMC game) {
         this.game = game;
         this.window = game.window();
         this.backend = game.getRenderBackend();
@@ -255,6 +255,6 @@ public final class SelectWorldScreen implements Screen {
 
     @Override
     public void onClose() {
-        // Panorama is now shared and managed by Minecraft
+        // Panorama is now shared and managed by MattMC
     }
 }

@@ -6,7 +6,7 @@ package mattmc.client.renderer.chunk;
  * and per-face UV rotation as specified in model JSON files.
  * 
  * This is separated from ModelElementRenderer to isolate UV transformation logic,
- * following the pattern in Minecraft's BlockFaceUV and FaceBakery classes.
+ * following the pattern in MattMC's BlockFaceUV and FaceBakery classes.
  */
 public class UVTransformer {
     
@@ -14,7 +14,7 @@ public class UVTransformer {
      * Transform UV coordinates when uvlock=true to keep textures world-aligned.
      * When the block geometry rotates, UVs must be transformed so textures stay horizontal.
      * 
-     * Based on Minecraft's FaceBakery.recomputeUVs which transforms UVs through BlockMath matrices.
+     * Based on MattMC's FaceBakery.recomputeUVs which transforms UVs through BlockMath matrices.
      * We use a simplified approach: rotate the UV rectangle by the negative of the Y-rotation.
      * 
      * @param uv UV coordinates [u0, v0, u1, v1] in 0-16 space
@@ -56,7 +56,7 @@ public class UVTransformer {
     
     /**
      * Apply per-face UV rotation by shifting which vertex gets which UV coordinate.
-     * This follows Minecraft's BlockFaceUV logic where rotation shifts the vertex index.
+     * This follows MattMC's BlockFaceUV logic where rotation shifts the vertex index.
      * Rotation is applied counter-clockwise: 0°, 90°, 180°, 270°.
      * 
      * @param u0 Minimum U coordinate in atlas space

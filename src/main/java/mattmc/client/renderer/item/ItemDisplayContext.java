@@ -4,7 +4,7 @@ package mattmc.client.renderer.item;
  * Represents the context in which an item is being rendered.
  * This determines which display transform to use from the item model's "display" section.
  * 
- * Matches Minecraft's ItemDisplayContext enum for compatibility with vanilla JSON models.
+ * Matches MattMC's ItemDisplayContext enum for compatibility with vanilla JSON models.
  * 
  * Example usage in model JSON:
  * {

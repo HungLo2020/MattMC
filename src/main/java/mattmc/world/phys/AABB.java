@@ -2,7 +2,7 @@ package mattmc.world.phys;
 
 /**
  * Axis-Aligned Bounding Box for collision detection.
- * Similar to Minecraft's AABB class.
+ * Similar to MattMC's AABB class.
  */
 public class AABB {
     public final double minX;

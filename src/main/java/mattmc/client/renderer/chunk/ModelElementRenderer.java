@@ -17,7 +17,7 @@ import java.util.Map;
  * This replaces specialized geometry builders (StairsGeometryBuilder, TorchGeometryBuilder)
  * with a fully data-driven approach that reads element geometry from JSON models.
  * 
- * This makes the rendering system compatible with Minecraft's model format where
+ * This makes the rendering system compatible with MattMC's model format where
  * all block geometry is defined in JSON "elements" arrays rather than hardcoded in Java.
  */
 public class ModelElementRenderer {
@@ -128,7 +128,7 @@ public class ModelElementRenderer {
     
     /**
      * Render a single model element.
-     * Converts from Minecraft's 0-16 coordinate system to block-relative 0-1 coordinates.
+     * Converts from MattMC's 0-16 coordinate system to block-relative 0-1 coordinates.
      * Applies X and Y axis rotations if specified.
      */
     private int renderElement(BlockFaceCollector.FaceData face,
@@ -261,7 +261,7 @@ public class ModelElementRenderer {
             v1 = uv[3] / 16.0f;
         }
         
-        // Build vertices following Minecraft's FaceBakery approach:
+        // Build vertices following MattMC's FaceBakery approach:
         // For each vertex index, get the corner position based on face direction,
         // then apply rotations. This maintains vertex-UV correspondence.
         float[][] faceVerts = new float[4][3];
@@ -390,7 +390,7 @@ public class ModelElementRenderer {
         float[] light3 = lightSampler.sampleVertexLight(face, faceIndex, 3);
         
         // Apply per-face UV rotation by shifting which vertex gets which UV coordinate
-        // This follows Minecraft's BlockFaceUV logic where rotation shifts the vertex index
+        // This follows MattMC's BlockFaceUV logic where rotation shifts the vertex index
         // Rotation is applied counter-clockwise: 0°, 90°, 180°, 270°
         float[][] uvCoords = UVTransformer.getRotatedUVCoordinates(u0, v0, u1, v1, faceRotation);
         

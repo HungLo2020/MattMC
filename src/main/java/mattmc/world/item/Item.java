@@ -6,7 +6,7 @@ import java.util.Map;
 
 /**
  * Represents a single item in the game.
- * Similar to Minecraft's Item class.
+ * Similar to MattMC's Item class.
  * 
  * Each item has properties like max stack size and texture paths.
  * Items are registered in the Items class with unique identifiers.
@@ -17,7 +17,7 @@ public class Item {
     // Fallback color used when texture is missing or fails to load
     private static final int FALLBACK_COLOR = 0xFF00FF; // Magenta
     
-    // Default max stack size (similar to Minecraft's default of 64)
+    // Default max stack size (similar to MattMC's default of 64)
     private static final int DEFAULT_MAX_STACK_SIZE = 64;
     
     private final int maxStackSize;

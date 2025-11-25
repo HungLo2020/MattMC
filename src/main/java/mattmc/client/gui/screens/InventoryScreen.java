@@ -1,6 +1,6 @@
 package mattmc.client.gui.screens;
 
-import mattmc.client.Minecraft;
+import mattmc.client.MattMC;
 import mattmc.client.gui.screens.inventory.CreativeInventoryManager;
 import mattmc.client.gui.screens.inventory.InventoryInputHandler;
 import mattmc.client.gui.screens.inventory.InventoryRenderer;
@@ -23,7 +23,7 @@ public final class InventoryScreen implements Screen {
     private static final float CONTENT_OFFSET_X = 40f;
     private static final float CONTENT_OFFSET_Y = 45f;
     
-    private final Minecraft game;
+    private final MattMC game;
     private final WindowHandle window;
     private final RenderBackend backend;
     private final DevplayScreen gameScreen;
@@ -37,7 +37,7 @@ public final class InventoryScreen implements Screen {
     private final CreativeInventoryManager creativeManager;
     private final InventoryRenderer renderer;
 
-    public InventoryScreen(Minecraft game, DevplayScreen gameScreen) {
+    public InventoryScreen(MattMC game, DevplayScreen gameScreen) {
         this.game = game;
         this.window = game.window();
         this.backend = game.getRenderBackend();

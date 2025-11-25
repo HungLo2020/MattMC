@@ -2,7 +2,7 @@ package mattmc.world.item;
 
 /**
  * Represents a player's inventory.
- * Similar to Minecraft's Inventory class.
+ * Similar to MattMC's Inventory class.
  * 
  * The inventory consists of:
  * - 9 hotbar slots (indices 0-8)

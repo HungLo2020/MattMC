@@ -5,7 +5,7 @@ import mattmc.world.level.block.state.properties.Axis;
 
 /**
  * Represents a rotated pillar block in the world.
- * Similar to Minecraft's RotatedPillarBlock class.
+ * Similar to MattMC's RotatedPillarBlock class.
  * 
  * Rotated pillar blocks can be placed along different axes (X, Y, Z).
  * Examples include logs, basalt pillars, and froglights.

@@ -1,12 +1,12 @@
 package mattmc.client.gui.screens;
 
-import mattmc.client.Minecraft;
+import mattmc.client.MattMC;
 import mattmc.client.gui.components.Button;
 
 /** Options menu screen. */
 public final class OptionsScreen extends AbstractMenuScreen {
 
-    public OptionsScreen(Minecraft game) {
+    public OptionsScreen(MattMC game) {
         super(game);
         recomputeLayout();
     }

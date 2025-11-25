@@ -3,7 +3,7 @@ package mattmc.client.resources.model;
 import java.util.List;
 
 /**
- * Represents a model element (cuboid) in Minecraft's block model format.
+ * Represents a model element (cuboid) in MattMC's block model format.
  * Each element defines a box shape with UV-mapped faces.
  */
 public class ModelElement {

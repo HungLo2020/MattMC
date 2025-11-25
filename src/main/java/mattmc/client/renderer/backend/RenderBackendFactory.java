@@ -1,6 +1,7 @@
 package mattmc.client.renderer.backend;
 
 import mattmc.client.renderer.window.WindowHandle;
+import mattmc.client.renderer.WorldRenderer;
 
 /**
  * Factory for creating render backends and associated windows.
@@ -53,6 +54,19 @@ public interface RenderBackendFactory {
      * @return a render backend instance
      */
     RenderBackend createBackend();
+    
+    /**
+     * Create a world renderer for the configured graphics API.
+     * 
+     * <p>The world renderer implementation depends on the factory type:
+     * <ul>
+     *   <li><b>OpenGL:</b> Creates LevelRenderer (OpenGL implementation)</li>
+     *   <li><b>Vulkan (future):</b> Would create VulkanLevelRenderer</li>
+     * </ul>
+     * 
+     * @return a world renderer instance
+     */
+    WorldRenderer createWorldRenderer();
     
     /**
      * Get a closeable wrapper for the window that handles proper resource cleanup.

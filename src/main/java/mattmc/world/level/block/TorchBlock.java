@@ -4,7 +4,7 @@ import mattmc.world.phys.shapes.VoxelShape;
 
 /**
  * Represents a torch block in the world.
- * Based on Minecraft's TorchBlock class.
+ * Based on MattMC's TorchBlock class.
  * 
  * Torches are non-solid blocks that emit light and have a small collision shape.
  * They can only be placed on solid surfaces below them.

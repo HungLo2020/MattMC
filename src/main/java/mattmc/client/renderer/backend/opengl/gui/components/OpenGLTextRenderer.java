@@ -1,6 +1,6 @@
 package mattmc.client.renderer.backend.opengl.gui.components;
 
-import mattmc.client.Minecraft;
+import mattmc.client.MattMC;
 
 import static org.lwjgl.opengl.GL11.*;
 import org.slf4j.Logger;
@@ -26,12 +26,12 @@ public final class OpenGLTextRenderer {
 
     
     private static TrueTypeFont font;
-    private static final String FONT_PATH = "/assets/fonts/Minecraft.ttf";
+    private static final String FONT_PATH = "/assets/fonts/MattMC.ttf";
     
     private OpenGLTextRenderer() {} // Prevent instantiation
     
     /**
-     * Initialize the text renderer with the Minecraft font.
+     * Initialize the text renderer with the MattMC font.
      * This is automatically called on first use, but can be called explicitly
      * at application startup for better error handling.
      */

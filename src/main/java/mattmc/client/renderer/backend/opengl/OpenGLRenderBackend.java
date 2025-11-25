@@ -1133,7 +1133,7 @@ public class OpenGLRenderBackend implements RenderBackend {
         // Set light colors based on brightness
         float[] ambient = {0.4f * brightness, 0.4f * brightness, 0.4f * brightness, 1.0f};
         float[] diffuse = {brightness, brightness, brightness, 1.0f};
-        float[] specular = {0.0f, 0.0f, 0.0f, 1.0f};  // No specular for Minecraft-like look
+        float[] specular = {0.0f, 0.0f, 0.0f, 1.0f};  // No specular for MattMC-like look
         
         glLightfv(GL_LIGHT0, GL_AMBIENT, ambient);
         glLightfv(GL_LIGHT0, GL_DIFFUSE, diffuse);

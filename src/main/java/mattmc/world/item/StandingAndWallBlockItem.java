@@ -4,7 +4,7 @@ import mattmc.world.level.block.Block;
 
 /**
  * Represents an item that can place two different blocks depending on placement context.
- * Based on Minecraft's StandingAndWallBlockItem class (used for torches, signs, etc.).
+ * Based on MattMC's StandingAndWallBlockItem class (used for torches, signs, etc.).
  * 
  * This item places the standing block when placing on horizontal surfaces (floor/ceiling)
  * and the wall block when placing on vertical surfaces (walls).

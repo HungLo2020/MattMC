@@ -49,7 +49,7 @@ public class CommandUIRenderer {
     }
     
     /**
-     * Render command overlay at bottom of screen (like Minecraft).
+     * Render command overlay at bottom of screen (like MattMC).
      * Shows command input box with cursor.
      * 
      * <p>This method is completely backend-agnostic. It delegates projection setup,
@@ -87,7 +87,7 @@ public class CommandUIRenderer {
     /**
      * Render command feedback message above the hotbar area.
      * This message appears independently of the command input overlay and fades after a few seconds.
-     * Similar to Minecraft's action bar messages.
+     * Similar to MattMC's action bar messages.
      * 
      * <p>This method is completely backend-agnostic. It delegates projection setup,
      * builds draw commands, and submits them to the backend for rendering.

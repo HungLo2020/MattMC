@@ -34,7 +34,7 @@ import org.slf4j.LoggerFactory;
  * <p>Now handles async mesh uploads from background threads and texture atlas.
  * Implements frustum culling to skip rendering chunks outside the camera view.
  */
-public class LevelRenderer {
+public class LevelRenderer implements mattmc.client.renderer.WorldRenderer {
     private static final Logger logger = LoggerFactory.getLogger(LevelRenderer.class);
 
     private final ChunkRenderer chunkRenderer;
@@ -61,6 +61,7 @@ public class LevelRenderer {
      * This sets up the chunk unload listener and builds the texture atlas.
      * Also initializes the rendering backend with materials.
      */
+    @Override
     public void initWithLevel(Level level) {
         if (currentLevel != null) {
             currentLevel.setChunkUnloadListener(null);
@@ -164,6 +165,7 @@ public class LevelRenderer {
      * 
      * <p>This method no longer makes direct OpenGL calls for rendering chunks.
      */
+    @Override
     public void render(Level world, float playerX, float playerY, float playerZ) {
         // IMPORTANT: Register all chunks FIRST before processing mesh uploads
         // This ensures chunks are in the registry when uploadMeshBuffer tries to look them up
@@ -267,6 +269,7 @@ public class LevelRenderer {
     /**
      * Get the number of chunks that were rendered in the last frame.
      */
+    @Override
     public int getRenderedChunkCount() {
         return chunkLogic.getVisibleChunkCount();
     }
@@ -274,6 +277,7 @@ public class LevelRenderer {
     /**
      * Get the number of chunks that were culled (not rendered) in the last frame.
      */
+    @Override
     public int getCulledChunkCount() {
         return chunkLogic.getCulledChunkCount();
     }
@@ -291,7 +295,8 @@ public class LevelRenderer {
      * 
      * @return the OpenGL render backend
      */
-    public OpenGLRenderBackend getRenderBackend() {
+    @Override
+    public RenderBackend getRenderBackend() {
         return renderBackend;
     }
 }

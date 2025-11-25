@@ -3,6 +3,7 @@ package mattmc.client.renderer.backend.opengl;
 import mattmc.client.renderer.backend.RenderBackend;
 import mattmc.client.renderer.backend.RenderBackendFactory;
 import mattmc.client.renderer.window.WindowHandle;
+import mattmc.client.renderer.WorldRenderer;
 
 /**
  * OpenGL implementation of the render backend factory.
@@ -11,6 +12,7 @@ import mattmc.client.renderer.window.WindowHandle;
  * <ul>
  *   <li>Window: GLFW window with OpenGL context</li>
  *   <li>Backend: OpenGLRenderBackend for rendering operations</li>
+ *   <li>WorldRenderer: LevelRenderer for world/chunk rendering</li>
  * </ul>
  * 
  * <p><b>INTERNAL USE:</b> This class should not be directly instantiated by code
@@ -32,6 +34,11 @@ public class OpenGLBackendFactory implements RenderBackendFactory {
     @Override
     public RenderBackend createBackend() {
         return new OpenGLRenderBackend();
+    }
+    
+    @Override
+    public WorldRenderer createWorldRenderer() {
+        return new LevelRenderer();
     }
     
     @Override

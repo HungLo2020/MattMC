@@ -5,7 +5,7 @@ import mattmc.world.level.lighting.WorldLightManager;
 import mattmc.util.MathUtils;
 
 /**
- * World generator using Minecraft-style noise-based terrain generation.
+ * World generator using MattMC-style noise-based terrain generation.
  * 
  * Combines multiple noise parameters (continentalness, erosion, peaks/valleys, weirdness)
  * to create varied, natural-looking terrain with mountains, plains, and oceans.
@@ -14,7 +14,7 @@ public class WorldGenerator {
     private final NoiseParameters noiseParams;
     private final long seed;
     
-    // Terrain height configuration (matching Minecraft's ranges)
+    // Terrain height configuration (matching MattMC's ranges)
     private static final int SEA_LEVEL = 63;
     private static final int MIN_HEIGHT = -64;
     private static final int MAX_HEIGHT = 319;
@@ -54,7 +54,7 @@ public class WorldGenerator {
         double weirdness = noiseParams.sampleWeirdness(x, z);
         
         // Combine noise values to determine base height
-        // This is a simplified version of Minecraft's density function approach
+        // This is a simplified version of MattMC's density function approach
         
         // Start with continentalness controlling base elevation
         // Map from [-1, 1] to elevation offset

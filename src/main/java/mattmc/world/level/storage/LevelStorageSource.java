@@ -1,6 +1,6 @@
 package mattmc.world.level.storage;
 
-import mattmc.client.Minecraft;
+import mattmc.client.MattMC;
 import mattmc.world.item.Inventory;
 import mattmc.world.level.Level;
 import mattmc.world.level.block.Block;
@@ -18,7 +18,7 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 /**
- * Manages saving and loading worlds to/from disk using Minecraft-style format.
+ * Manages saving and loading worlds to/from disk using MattMC-style format.
  * Uses region files (.mca) in Anvil format and level.dat with NBT.
  */
 public final class LevelStorageSource {
@@ -90,7 +90,7 @@ public final class LevelStorageSource {
     }
     
     /**
-     * Save a world to disk using Minecraft-style format.
+     * Save a world to disk using MattMC-style format.
      */
     public static void saveWorld(Level world, String worldName, float playerX, float playerY, float playerZ, float playerYaw, float playerPitch, Inventory playerInventory) throws IOException {
         Path savesDir = getSavesDirectory();
@@ -180,7 +180,7 @@ public final class LevelStorageSource {
     }
     
     /**
-     * Load a world from disk using Minecraft-style format.
+     * Load a world from disk using MattMC-style format.
      * Returns the loaded Level and metadata.
      */
     public static WorldLoadResult loadWorld(String worldName) throws IOException {

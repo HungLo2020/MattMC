@@ -7,7 +7,11 @@ import mattmc.client.renderer.backend.RenderBackendFactory;
 import mattmc.client.renderer.panorama.PanoramaRenderer;
 import mattmc.client.gui.screens.Screen;
 
-public final class Minecraft {
+/**
+ * Main game class for MattMC.
+ * Handles the game loop, screen management, and render backend coordination.
+ */
+public final class MattMC {
     // ISSUE-017 fix: Tiered sleep strategy for better power efficiency and frame timing
     private static final double LONG_SLEEP_THRESHOLD = 0.010;  // 10ms - use long sleep
     private static final double SHORT_SLEEP_THRESHOLD = 0.001; // 1ms - use short sleep
@@ -19,9 +23,11 @@ public final class Minecraft {
     private boolean running = true;
     private PanoramaRenderer sharedPanorama;
     private int cachedFpsCap;
+    private final RenderBackendFactory factory;
 
-    public Minecraft(WindowHandle window, RenderBackendFactory factory) { 
+    public MattMC(WindowHandle window, RenderBackendFactory factory) { 
         this.window = window;
+        this.factory = factory;
         this.renderBackend = factory.createBackend();
         // Load shared panorama through the backend interface
         this.sharedPanorama = renderBackend.createPanoramaRenderer("/assets/textures/gui/panorama1_", ".png");
@@ -43,6 +49,12 @@ public final class Minecraft {
     public RenderBackend getRenderBackend() { return renderBackend; }
     
     /**
+     * Get the render backend factory for creating backend-specific objects.
+     * This allows screens to create world renderers without importing backend classes.
+     */
+    public RenderBackendFactory getBackendFactory() { return factory; }
+    
+    /**
      * Update the cached FPS cap. Call this when the FPS setting changes.
      */
     public void updateFpsCap() {
@@ -58,7 +70,7 @@ public final class Minecraft {
     public void quit() { running = false; }
 
     public void run() {
-        final double TICK_RATE = 20.0;  // 20 ticks per second (Minecraft standard)
+        final double TICK_RATE = 20.0;  // 20 ticks per second (MattMC standard)
         final double tickTime = 1.0 / TICK_RATE;
         double lastTime = now();
         double tickAccumulator = 0.0;

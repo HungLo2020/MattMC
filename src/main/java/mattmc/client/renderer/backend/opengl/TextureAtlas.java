@@ -29,7 +29,7 @@ import org.slf4j.LoggerFactory;
  * Packs all block textures into a single atlas at game startup,
  * enabling VBO rendering with multiple textures.
  * 
- * Similar to modern Minecraft's texture atlas system.
+ * Similar to modern MattMC's texture atlas system.
  * Implements AutoCloseable to ensure OpenGL resources are properly released.
  */
 public class TextureAtlas implements TextureCoordinateProvider, AutoCloseable {
@@ -38,7 +38,7 @@ public class TextureAtlas implements TextureCoordinateProvider, AutoCloseable {
     private final int atlasTextureId;
     private final int atlasWidth;
     private final int atlasHeight;
-    private final int textureSize = 16; // Standard Minecraft texture size
+    private final int textureSize = 16; // Standard MattMC texture size
     private final Map<String, TextureCoordinateProvider.UVMapping> uvMappings = new HashMap<>();
     
     /**

@@ -29,7 +29,7 @@ import static org.lwjgl.opengl.GL11.*;
 
 /**
  * Handles rendering of items in the UI (hotbar, inventory, etc.).
- * Similar to Minecraft's ItemRenderer class.
+ * Similar to MattMC's ItemRenderer class.
  * 
  * For block items, renders an isometric 3D view by capturing the actual in-game
  * 3D geometry and projecting it to 2D screen coordinates.
@@ -57,7 +57,7 @@ public class ItemRenderer {
     /**
      * Render an item using data-driven 3D perspective rendering with display transforms.
      * This method reads display transforms from the item's JSON model and applies them,
-     * making it compatible with Minecraft's data-driven rendering system.
+     * making it compatible with MattMC's data-driven rendering system.
      * 
      * @param stack The item stack to render
      * @param context The display context (GUI, firstperson, thirdperson, etc.)
@@ -621,7 +621,7 @@ public class ItemRenderer {
     
     /**
      * Get default display transform for a context when none is defined in the model.
-     * These defaults match Minecraft's standard transforms.
+     * These defaults match MattMC's standard transforms.
      */
     private static ModelDisplay.Transform getDefaultTransform(ItemDisplayContext context, BlockModel model) {
         ModelDisplay.Transform transform = new ModelDisplay.Transform();

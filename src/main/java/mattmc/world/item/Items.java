@@ -10,7 +10,7 @@ import java.util.Set;
 
 /**
  * Central registry for all items in the game.
- * Similar to Minecraft's Items class where items are registered with resource location identifiers.
+ * Similar to MattMC's Items class where items are registered with resource location identifiers.
  * 
  * Each item is registered with a unique identifier in the format "namespace:name" (e.g., "mattmc:diamond").
  * This allows for modding and resource pack support in the future.
@@ -44,7 +44,7 @@ public class Items {
     // Registry maps item identifiers to Item instances
     private static final Map<String, Item> REGISTRY = new HashMap<>();
 
-    // Static item instances - similar to Minecraft's public static final Item fields
+    // Static item instances - similar to MattMC's public static final Item fields
     // Each item is defined with its properties (max stack size)
     // Textures are loaded from item model JSON files
     // If texture loading fails, a magenta fallback color is automatically used
@@ -81,7 +81,7 @@ public class Items {
     //public static final Item GOLD_INGOT = register("gold_ingot", new Item(64));
     //public static final Item DIAMOND = register("diamond", new Item(64));
     
-    // Tools (non-stackable, 1 max - similar to Minecraft tools)
+    // Tools (non-stackable, 1 max - similar to MattMC tools)
     //public static final Item WOODEN_PICKAXE = register("wooden_pickaxe", new Item(1));
     //public static final Item STONE_PICKAXE = register("stone_pickaxe", new Item(1));
     //public static final Item IRON_PICKAXE = register("iron_pickaxe", new Item(1));

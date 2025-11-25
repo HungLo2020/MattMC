@@ -1,6 +1,6 @@
 package mattmc.client.gui.screens;
 
-import mattmc.client.Minecraft;
+import mattmc.client.MattMC;
 import mattmc.client.gui.components.Button;
 import mattmc.client.renderer.backend.RenderBackend;
 import mattmc.client.renderer.window.WindowHandle;
@@ -16,12 +16,12 @@ import org.slf4j.LoggerFactory;
 
 /**
  * Pause menu overlay shown when player presses ESC in-game.
- * Similar to Minecraft's pause screen.
+ * Similar to MattMC's pause screen.
  */
 public final class PauseScreen implements Screen {
     private static final Logger logger = LoggerFactory.getLogger(PauseScreen.class);
 
-    private final Minecraft game;
+    private final MattMC game;
     private final WindowHandle window;
     private final RenderBackend backend;
     private final DevplayScreen gameScreen;
@@ -34,7 +34,7 @@ public final class PauseScreen implements Screen {
     private int buttonWidth = 300, buttonHeight = 44, buttonGap = 12;
     private int buttonsStartY;
 
-    public PauseScreen(Minecraft game, DevplayScreen gameScreen) {
+    public PauseScreen(MattMC game, DevplayScreen gameScreen) {
         this.game = game;
         this.window = game.window();
         this.backend = game.getRenderBackend();

@@ -12,7 +12,7 @@ import java.util.Set;
  * by recursively looking up variables in the model's texture map.
  * 
  * This is separated from ModelElementRenderer to keep texture resolution logic isolated
- * and testable, following Minecraft's separation of concerns pattern.
+ * and testable, following MattMC's separation of concerns pattern.
  */
 public class TextureVariableResolver {
     

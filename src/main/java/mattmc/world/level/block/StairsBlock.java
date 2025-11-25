@@ -6,7 +6,7 @@ import mattmc.world.level.block.state.properties.Half;
 
 /**
  * Represents a stairs block in the world.
- * Similar to Minecraft's StairsBlock class.
+ * Similar to MattMC's StairsBlock class.
  * 
  * Stairs blocks are decorative blocks that form a staircase.
  * They have complex collision boxes and multiple variants based on:
@@ -19,7 +19,7 @@ import mattmc.world.level.block.state.properties.Half;
 public class StairsBlock extends Block {
     
     // Collision shape for bottom stairs (north-facing) - full block with south-east quarter removed
-    // This is more accurate to Minecraft - a single shape with a corner cut out
+    // This is more accurate to MattMC - a single shape with a corner cut out
     private static final VoxelShape BOTTOM_SHAPE = VoxelShape.or(
         VoxelShape.box(0.0, 0.0, 0.0, 1.0, 0.5, 1.0),      // Bottom slab (full width/depth, half height)
         VoxelShape.box(0.0, 0.5, 0.0, 1.0, 1.0, 0.5)       // Top step (north half only, upper half)

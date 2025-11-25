@@ -1,6 +1,6 @@
 package mattmc.client.gui.screens;
 
-import mattmc.client.Minecraft;
+import mattmc.client.MattMC;
 import mattmc.client.renderer.backend.RenderBackend;
 import mattmc.client.renderer.window.WindowHandle;
 import mattmc.world.entity.player.BlockInteraction;
@@ -16,7 +16,7 @@ import mattmc.world.item.ItemStack;
  * Manages keyboard and mouse input, delegates to appropriate handlers.
  */
 public class DevplayInputHandler {
-    private final Minecraft game;
+    private final MattMC game;
     private final WindowHandle window;
     private final RenderBackend backend;
     private final LocalPlayer player;
@@ -32,7 +32,7 @@ public class DevplayInputHandler {
     // Callback to open inventory
     private final Runnable onInventoryRequested;
     
-    public DevplayInputHandler(Minecraft game, WindowHandle window, RenderBackend backend, 
+    public DevplayInputHandler(MattMC game, WindowHandle window, RenderBackend backend, 
                                LocalPlayer player, Level world, 
                                BlockInteraction blockInteraction, DevplayUIState uiState,
                                CommandSystem commandSystem, PlayerController playerController,

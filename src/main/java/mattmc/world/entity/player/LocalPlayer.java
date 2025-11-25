@@ -1,15 +1,15 @@
 package mattmc.world.entity.player;
 
 
-import mattmc.client.Minecraft;
+import mattmc.client.MattMC;
 import mattmc.world.item.Inventory;
 /**
  * Represents the player in the game world.
- * Similar to Minecraft's EntityPlayer class.
+ * Similar to MattMC's EntityPlayer class.
  * Handles player position, orientation, and movement.
  */
 public class LocalPlayer {
-    // Eye height offset from feet (Minecraft default is 1.62 blocks)
+    // Eye height offset from feet (MattMC default is 1.62 blocks)
     public static final float EYE_HEIGHT = 1.62f;
     
     // LocalPlayer position in world coordinates (feet position)
@@ -31,11 +31,11 @@ public class LocalPlayer {
     private float prevPitch;
     
     // Movement speed
-    private float moveSpeed = 4.317f; // Minecraft walking speed (blocks/second)
-    private float sprintSpeed = 5.612f; // Minecraft sprinting speed (1.3x walking)
-    private float sneakSpeed = 1.295f; // Minecraft sneaking speed (0.3x walking)
-    private float flySpeed = 10.92f;   // Minecraft flying speed
-    private float flySprintSpeed = 21.84f; // Minecraft flying sprint speed (2x flying)
+    private float moveSpeed = 4.317f; // MattMC walking speed (blocks/second)
+    private float sprintSpeed = 5.612f; // MattMC sprinting speed (1.3x walking)
+    private float sneakSpeed = 1.295f; // MattMC sneaking speed (0.3x walking)
+    private float flySpeed = 10.92f;   // MattMC flying speed
+    private float flySprintSpeed = 21.84f; // MattMC flying sprint speed (2x flying)
     
     // Physics reference (set externally)
     private PlayerPhysics physics;
@@ -177,7 +177,7 @@ public class LocalPlayer {
     
     /**
      * Get the Y coordinate of the player's eyes (camera position).
-     * In Minecraft, the camera is 1.62 blocks above the feet.
+     * In MattMC, the camera is 1.62 blocks above the feet.
      */
     public float getEyeY() { return y + EYE_HEIGHT; }
     

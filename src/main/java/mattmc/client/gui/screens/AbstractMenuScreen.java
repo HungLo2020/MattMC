@@ -1,6 +1,6 @@
 package mattmc.client.gui.screens;
 
-import mattmc.client.Minecraft;
+import mattmc.client.MattMC;
 import mattmc.client.gui.components.Button;
 import mattmc.client.renderer.backend.RenderBackend;
 import mattmc.client.renderer.window.WindowHandle;
@@ -20,7 +20,7 @@ import java.util.List;
  * uses only backend-agnostic interfaces for rendering and input handling.
  */
 public abstract class AbstractMenuScreen implements Screen {
-    protected final Minecraft game;
+    protected final MattMC game;
     protected final WindowHandle window;
     protected final RenderBackend backend;
     protected final List<Button> buttons = new ArrayList<>();
@@ -37,7 +37,7 @@ public abstract class AbstractMenuScreen implements Screen {
     protected int buttonGap = 12;
     protected int buttonsStartY;
     
-    protected AbstractMenuScreen(Minecraft game) {
+    protected AbstractMenuScreen(MattMC game) {
         this.game = game;
         this.window = game.window();
         this.backend = game.getRenderBackend();
@@ -95,7 +95,7 @@ public abstract class AbstractMenuScreen implements Screen {
     
     @Override
     public void onClose() {
-        // Panorama is now shared and managed by Minecraft
+        // Panorama is now shared and managed by MattMC
     }
     
     // === Rendering Utilities ===
