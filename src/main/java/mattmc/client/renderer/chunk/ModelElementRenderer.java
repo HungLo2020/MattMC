@@ -1,7 +1,7 @@
 package mattmc.client.renderer.chunk;
 
 import mattmc.client.renderer.block.BlockFaceCollector;
-import mattmc.client.renderer.backend.opengl.TextureAtlas;
+import mattmc.client.renderer.texture.TextureCoordinateProvider;
 import mattmc.client.resources.ResourceManager;
 import mattmc.client.resources.model.BlockModel;
 import mattmc.client.resources.model.ModelElement;
@@ -221,7 +221,7 @@ public class ModelElementRenderer {
         String atlasPath = "assets/textures/" + texturePath + ".png";
         
         // Get UV mapping
-        TextureAtlas.UVMapping uvMapping = uvMapper.getUVMappingForTexture(atlasPath);
+        TextureCoordinateProvider.UVMapping uvMapping = uvMapper.getUVMappingForTexture(atlasPath);
         
         // Get UV coordinates from element face (in 0-16 space)
         List<Float> uvList = elementFace.getUv();

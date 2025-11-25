@@ -1,7 +1,8 @@
 package mattmc.client.renderer.backend.opengl;
 
 import mattmc.client.renderer.backend.opengl.gui.components.TextRenderer;
-import mattmc.client.renderer.backend.opengl.util.ColorUtils;
+import mattmc.util.ColorUtils;
+import mattmc.client.renderer.backend.opengl.OpenGLColorHelper;
 
 import static org.lwjgl.opengl.GL11.*;
 
@@ -15,7 +16,7 @@ public class UIRenderHelper {
      * Helper method to draw text at the specified position.
      */
     public static void drawText(String text, float x, float y, float scale, int rgb) {
-        ColorUtils.setGLColor(rgb, 1f);
+        OpenGLColorHelper.setGLColor(rgb, 1f);
         TextRenderer.drawText(text, x, y, scale);
     }
     
@@ -27,7 +28,7 @@ public class UIRenderHelper {
         float textWidth = TextRenderer.getTextWidth(text, scale);
         
         // Draw text at position adjusted for right alignment
-        ColorUtils.setGLColor(rgb, 1f);
+        OpenGLColorHelper.setGLColor(rgb, 1f);
         TextRenderer.drawText(text, x - textWidth, y, scale);
     }
     
@@ -45,11 +46,11 @@ public class UIRenderHelper {
     
     /**
      * Helper method to set color from RGB integer.
-     * @deprecated Use {@link ColorUtils#setGLColor(int, float)} instead.
+     * @deprecated Use {@link OpenGLColorHelper#setGLColor(int, float)} instead.
      */
     @Deprecated
     public static void setColor(int rgb, float a) {
-        ColorUtils.setGLColor(rgb, a);
+        OpenGLColorHelper.setGLColor(rgb, a);
     }
     
     /**

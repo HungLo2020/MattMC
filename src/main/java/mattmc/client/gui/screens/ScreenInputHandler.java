@@ -1,6 +1,6 @@
 package mattmc.client.gui.screens;
 
-import mattmc.client.renderer.backend.opengl.Window;
+import mattmc.client.renderer.window.WindowHandle;
 
 import static org.lwjgl.glfw.GLFW.*;
 
@@ -11,9 +11,9 @@ import static org.lwjgl.glfw.GLFW.*;
 public class ScreenInputHandler {
     private double mouseXWin, mouseYWin;
     private boolean mouseDown;
-    private final Window window;
+    private final WindowHandle window;
     
-    public ScreenInputHandler(Window window) {
+    public ScreenInputHandler(WindowHandle window) {
         this.window = window;
         setupCallbacks();
     }

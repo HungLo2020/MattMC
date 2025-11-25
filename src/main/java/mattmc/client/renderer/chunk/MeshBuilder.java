@@ -1,8 +1,8 @@
 package mattmc.client.renderer.chunk;
 
-import mattmc.client.renderer.backend.opengl.util.ColorUtils;
+import mattmc.util.ColorUtils;
 import mattmc.client.renderer.block.BlockFaceCollector;
-import mattmc.client.renderer.backend.opengl.TextureAtlas;
+import mattmc.client.renderer.texture.TextureCoordinateProvider;
 import mattmc.world.level.block.Blocks;
 
 import java.util.List;
@@ -33,7 +33,7 @@ public class MeshBuilder {
      * 
      * @param textureAtlas Texture atlas for UV mapping, or null to use fallback colors
      */
-    public MeshBuilder(TextureAtlas textureAtlas) {
+    public MeshBuilder(TextureCoordinateProvider textureAtlas) {
         this.lightSampler = new VertexLightSampler();
         this.uvMapper = new UVMapper(textureAtlas);
         this.modelElementRenderer = new ModelElementRenderer(lightSampler, uvMapper);
@@ -86,7 +86,7 @@ public class MeshBuilder {
                 
                 // Extract color components and UV mapping
                 float[] color = uvMapper.extractColor(face);
-                TextureAtlas.UVMapping uvMapping = uvMapper.getUVMapping(face);
+                TextureCoordinateProvider.UVMapping uvMapping = uvMapper.getUVMapping(face);
                 
                 // Add the face with correct orientation, passing face data for light sampling
                 switch (type) {
@@ -117,7 +117,7 @@ public class MeshBuilder {
     /**
      * Add top face vertices and indices.
      */
-    private void addTopFace(BlockFaceCollector.FaceData face, float[] color, TextureAtlas.UVMapping uvMapping) {
+    private void addTopFace(BlockFaceCollector.FaceData face, float[] color, TextureCoordinateProvider.UVMapping uvMapping) {
         float x = face.x, y = face.y, z = face.z;
         float x0 = x, x1 = x + 1;
         float y1 = y + 1;
@@ -155,7 +155,7 @@ public class MeshBuilder {
     /**
      * Add bottom face vertices and indices.
      */
-    private void addBottomFace(BlockFaceCollector.FaceData face, float[] color, TextureAtlas.UVMapping uvMapping) {
+    private void addBottomFace(BlockFaceCollector.FaceData face, float[] color, TextureCoordinateProvider.UVMapping uvMapping) {
         float x = face.x, y = face.y, z = face.z;
         float x0 = x, x1 = x + 1;
         float y0 = y;
@@ -193,7 +193,7 @@ public class MeshBuilder {
     /**
      * Add south face vertices and indices.
      */
-    private void addSouthFace(BlockFaceCollector.FaceData face, float[] color, TextureAtlas.UVMapping uvMapping) {
+    private void addSouthFace(BlockFaceCollector.FaceData face, float[] color, TextureCoordinateProvider.UVMapping uvMapping) {
         float x = face.x, y = face.y, z = face.z;
         float x0 = x, x1 = x + 1;
         float y0 = y, y1 = y + 1;
@@ -231,7 +231,7 @@ public class MeshBuilder {
     /**
      * Add west face vertices and indices.
      */
-    private void addWestFace(BlockFaceCollector.FaceData face, float[] color, TextureAtlas.UVMapping uvMapping) {
+    private void addWestFace(BlockFaceCollector.FaceData face, float[] color, TextureCoordinateProvider.UVMapping uvMapping) {
         float x = face.x, y = face.y, z = face.z;
         float x0 = x;
         float y0 = y, y1 = y + 1;
@@ -269,7 +269,7 @@ public class MeshBuilder {
     /**
      * Add east face vertices and indices.
      */
-    private void addEastFace(BlockFaceCollector.FaceData face, float[] color, TextureAtlas.UVMapping uvMapping) {
+    private void addEastFace(BlockFaceCollector.FaceData face, float[] color, TextureCoordinateProvider.UVMapping uvMapping) {
         float x = face.x, y = face.y, z = face.z;
         float x1 = x + 1;
         float y0 = y, y1 = y + 1;
@@ -307,7 +307,7 @@ public class MeshBuilder {
     /**
      * Add north face vertices and indices.
      */
-    private void addNorthFace(BlockFaceCollector.FaceData face, float[] color, TextureAtlas.UVMapping uvMapping) {
+    private void addNorthFace(BlockFaceCollector.FaceData face, float[] color, TextureCoordinateProvider.UVMapping uvMapping) {
         float x = face.x, y = face.y, z = face.z;
         float x0 = x, x1 = x + 1;
         float y0 = y, y1 = y + 1;

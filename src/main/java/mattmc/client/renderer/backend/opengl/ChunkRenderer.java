@@ -1,6 +1,7 @@
 package mattmc.client.renderer.backend.opengl;
 
 import mattmc.client.renderer.chunk.ChunkMeshBuffer;
+import mattmc.client.renderer.chunk.ChunkMeshRegistry;
 
 import mattmc.client.renderer.VoxelLitShader;
 import mattmc.client.renderer.backend.opengl.TextureAtlas;
@@ -16,10 +17,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
+ * OpenGL implementation of chunk mesh registry and rendering.
  * Handles rendering of chunks using VBO/VAO with texture atlas and per-vertex lighting.
  * Supports gamma-corrected lighting with configurable gamma curve.
  */
-public class ChunkRenderer {
+public class ChunkRenderer implements ChunkMeshRegistry {
     private static final Logger logger = LoggerFactory.getLogger(ChunkRenderer.class);
 
     // Calculate expected chunk count based on maximum render distance
@@ -77,10 +79,7 @@ public class ChunkRenderer {
 		}
 		
 		// Initialize shader if not already done
-		if (shader == null) {
-			shader = new VoxelLitShader();
-			logger.info("Initialized VoxelLitShader for chunk rendering");
-		}
+		ensureShaderInitialized();
 		
 		// Use the shader
 		shader.use();
@@ -100,7 +99,7 @@ public class ChunkRenderer {
 		vao.render();
 		
 		// Unbind shader and texture
-		VoxelLitShader.unbind();
+		Shader.unbind();
 		glBindTexture(GL_TEXTURE_2D, 0);
 		
 		return true;
@@ -260,7 +259,13 @@ public class ChunkRenderer {
 	 */
 	public void ensureShaderInitialized() {
 		if (shader == null) {
-			shader = new VoxelLitShader();
+			// Create OpenGL shader implementation
+			Shader openglShader = new Shader(
+				mattmc.client.renderer.ShaderLoader.loadShader("voxel_lit.vs"),
+				mattmc.client.renderer.ShaderLoader.loadShader("voxel_lit.fs")
+			);
+			// Wrap in VoxelLitShader for game-specific configuration
+			shader = new VoxelLitShader(openglShader);
 			logger.info("Initialized VoxelLitShader for chunk rendering");
 		}
 	}

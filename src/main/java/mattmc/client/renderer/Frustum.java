@@ -1,0 +1,187 @@
+package mattmc.client.renderer;
+
+/**
+ * Frustum culling implementation that is rendering backend agnostic.
+ * Extracts the view frustum planes from provided matrices and provides methods
+ * to test if objects (like chunks) are visible.
+ * 
+ * <p>This class contains NO OpenGL-specific code and works with pure math.
+ * It can receive matrices from any source (OpenGL, Vulkan, CPU-computed, etc.).
+ * 
+ * <p>Based on the classic Gribb-Hartmann method for extracting frustum planes.
+ */
+public class Frustum {
+    // Six frustum planes: left, right, bottom, top, near, far
+    private final float[][] planes = new float[6][4];
+    
+    // Plane indices
+    private static final int LEFT = 0;
+    private static final int RIGHT = 1;
+    private static final int BOTTOM = 2;
+    private static final int TOP = 3;
+    private static final int NEAR = 4;
+    private static final int FAR = 5;
+    
+    /**
+     * Update the frustum planes from provided projection and modelview matrices.
+     * The matrices should be in column-major order (OpenGL/Vulkan standard).
+     * 
+     * @param projectionMatrix 16-element float array in column-major order
+     * @param modelviewMatrix 16-element float array in column-major order
+     */
+    public void update(float[] projectionMatrix, float[] modelviewMatrix) {
+        if (projectionMatrix == null || projectionMatrix.length != 16) {
+            throw new IllegalArgumentException("Projection matrix must be 16 elements");
+        }
+        if (modelviewMatrix == null || modelviewMatrix.length != 16) {
+            throw new IllegalArgumentException("Modelview matrix must be 16 elements");
+        }
+        
+        // Multiply projection * modelview to get clip matrix
+        float[] clipMatrix = new float[16];
+        multiplyMatrices(clipMatrix, projectionMatrix, modelviewMatrix);
+        
+        // Extract the six frustum planes from the clip matrix
+        extractPlanes(clipMatrix);
+    }
+    
+    /**
+     * Multiply two 4x4 matrices in column-major order (result = a * b).
+     * 
+     * @param result Output matrix (16 elements)
+     * @param a First matrix (16 elements)
+     * @param b Second matrix (16 elements)
+     */
+    private void multiplyMatrices(float[] result, float[] a, float[] b) {
+        for (int row = 0; row < 4; row++) {
+            for (int col = 0; col < 4; col++) {
+                float sum = 0;
+                for (int k = 0; k < 4; k++) {
+                    // Column-major: matrix[col * 4 + row]
+                    sum += a[k * 4 + row] * b[col * 4 + k];
+                }
+                result[col * 4 + row] = sum;
+            }
+        }
+    }
+    
+    /**
+     * Extract frustum planes from the clip matrix.
+     * The clip matrix is in column-major order.
+     * Plane equation: Ax + By + Cz + D = 0
+     * 
+     * @param clip 16-element clip matrix in column-major order
+     */
+    private void extractPlanes(float[] clip) {
+        // Left plane: 4th column + 1st column
+        planes[LEFT][0] = clip[3] + clip[0];
+        planes[LEFT][1] = clip[7] + clip[4];
+        planes[LEFT][2] = clip[11] + clip[8];
+        planes[LEFT][3] = clip[15] + clip[12];
+        normalizePlane(LEFT);
+        
+        // Right plane: 4th column - 1st column
+        planes[RIGHT][0] = clip[3] - clip[0];
+        planes[RIGHT][1] = clip[7] - clip[4];
+        planes[RIGHT][2] = clip[11] - clip[8];
+        planes[RIGHT][3] = clip[15] - clip[12];
+        normalizePlane(RIGHT);
+        
+        // Bottom plane: 4th column + 2nd column
+        planes[BOTTOM][0] = clip[3] + clip[1];
+        planes[BOTTOM][1] = clip[7] + clip[5];
+        planes[BOTTOM][2] = clip[11] + clip[9];
+        planes[BOTTOM][3] = clip[15] + clip[13];
+        normalizePlane(BOTTOM);
+        
+        // Top plane: 4th column - 2nd column
+        planes[TOP][0] = clip[3] - clip[1];
+        planes[TOP][1] = clip[7] - clip[5];
+        planes[TOP][2] = clip[11] - clip[9];
+        planes[TOP][3] = clip[15] - clip[13];
+        normalizePlane(TOP);
+        
+        // Near plane: 4th column + 3rd column
+        planes[NEAR][0] = clip[3] + clip[2];
+        planes[NEAR][1] = clip[7] + clip[6];
+        planes[NEAR][2] = clip[11] + clip[10];
+        planes[NEAR][3] = clip[15] + clip[14];
+        normalizePlane(NEAR);
+        
+        // Far plane: 4th column - 3rd column
+        planes[FAR][0] = clip[3] - clip[2];
+        planes[FAR][1] = clip[7] - clip[6];
+        planes[FAR][2] = clip[11] - clip[10];
+        planes[FAR][3] = clip[15] - clip[14];
+        normalizePlane(FAR);
+    }
+    
+    /**
+     * Normalize a frustum plane.
+     * 
+     * @param plane Index of the plane to normalize
+     */
+    private void normalizePlane(int plane) {
+        float length = (float) Math.sqrt(
+            planes[plane][0] * planes[plane][0] +
+            planes[plane][1] * planes[plane][1] +
+            planes[plane][2] * planes[plane][2]
+        );
+        
+        if (length > 0) {
+            planes[plane][0] /= length;
+            planes[plane][1] /= length;
+            planes[plane][2] /= length;
+            planes[plane][3] /= length;
+        }
+    }
+    
+    /**
+     * Test if an axis-aligned bounding box is inside or intersecting the frustum.
+     * 
+     * @param minX Minimum X coordinate of the box
+     * @param minY Minimum Y coordinate of the box
+     * @param minZ Minimum Z coordinate of the box
+     * @param maxX Maximum X coordinate of the box
+     * @param maxY Maximum Y coordinate of the box
+     * @param maxZ Maximum Z coordinate of the box
+     * @return true if the box is visible (inside or intersecting frustum), false if completely outside
+     */
+    public boolean isBoxVisible(float minX, float minY, float minZ, float maxX, float maxY, float maxZ) {
+        // Test each plane
+        for (int i = 0; i < 6; i++) {
+            // Find the p-vertex (most positive vertex along the plane normal)
+            float px = planes[i][0] > 0 ? maxX : minX;
+            float py = planes[i][1] > 0 ? maxY : minY;
+            float pz = planes[i][2] > 0 ? maxZ : minZ;
+            
+            // If the p-vertex is outside (behind) this plane, the box is completely outside
+            if (planes[i][0] * px + planes[i][1] * py + planes[i][2] * pz + planes[i][3] < 0) {
+                return false;
+            }
+        }
+        
+        return true;
+    }
+    
+    /**
+     * Test if a chunk is visible in the frustum.
+     * 
+     * @param chunkX Chunk X coordinate
+     * @param chunkZ Chunk Z coordinate
+     * @param chunkWidth Width of the chunk in blocks
+     * @param chunkDepth Depth of the chunk in blocks
+     * @param minY Minimum Y coordinate of the chunk
+     * @param maxY Maximum Y coordinate of the chunk
+     * @return true if the chunk is visible
+     */
+    public boolean isChunkVisible(int chunkX, int chunkZ, int chunkWidth, int chunkDepth, int minY, int maxY) {
+        // Calculate world coordinates of the chunk bounding box
+        float minX = chunkX * chunkWidth;
+        float minZ = chunkZ * chunkDepth;
+        float maxX = minX + chunkWidth;
+        float maxZ = minZ + chunkDepth;
+        
+        return isBoxVisible(minX, minY, minZ, maxX, maxY, maxZ);
+    }
+}

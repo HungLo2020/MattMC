@@ -1,8 +1,6 @@
 package mattmc.client.renderer.block;
 
-import mattmc.client.renderer.backend.opengl.BlockFaceGeometry;
-
-import mattmc.client.renderer.backend.opengl.util.ColorUtils;
+import mattmc.util.ColorUtils;
 
 import mattmc.world.level.block.Block;
 import mattmc.world.level.chunk.LevelChunk;
@@ -76,7 +74,7 @@ public class BlockFaceCollector {
             
             // Add to topFaces with "model_elements" marker for data-driven rendering
             // The ModelElementRenderer will read geometry from the block's JSON model
-            topFaces.add(new FaceData(x, y, z, color, 1f, 1f, block, "model_elements", null, state, chunk, cx, cy, cz));
+            topFaces.add(new FaceData(x, y, z, color, 1f, 1f, block, "model_elements", state, chunk, cx, cy, cz));
             return;
         }
         
@@ -95,28 +93,22 @@ public class BlockFaceCollector {
         // Collect visible faces for batched rendering
         // Store both the adjusted color and the brightness factor for fallback color
         if (topVisible) {
-            topFaces.add(new FaceData(x, y, z, color, 1f, 1f, block, "top", 
-                BlockFaceGeometry::drawTopFace, null, chunk, cx, cy, cz));
+            topFaces.add(new FaceData(x, y, z, color, 1f, 1f, block, "top", null, chunk, cx, cy, cz));
         }
         if (bottomVisible) {
-            bottomFaces.add(new FaceData(x, y, z, ColorUtils.darkenColor(color), 1f, 0.5f, block, "bottom", 
-                BlockFaceGeometry::drawBottomFace, null, chunk, cx, cy, cz));
+            bottomFaces.add(new FaceData(x, y, z, ColorUtils.darkenColor(color), 1f, 0.5f, block, "bottom", null, chunk, cx, cy, cz));
         }
         if (northVisible) {
-            northFaces.add(new FaceData(x, y, z, ColorUtils.adjustColorBrightness(color, 0.8f), 1f, 0.8f, block, "side", 
-                BlockFaceGeometry::drawNorthFace, null, chunk, cx, cy, cz));
+            northFaces.add(new FaceData(x, y, z, ColorUtils.adjustColorBrightness(color, 0.8f), 1f, 0.8f, block, "north", null, chunk, cx, cy, cz));
         }
         if (southVisible) {
-            southFaces.add(new FaceData(x, y, z, ColorUtils.adjustColorBrightness(color, 0.8f), 1f, 0.8f, block, "side", 
-                BlockFaceGeometry::drawSouthFace, null, chunk, cx, cy, cz));
+            southFaces.add(new FaceData(x, y, z, ColorUtils.adjustColorBrightness(color, 0.8f), 1f, 0.8f, block, "south", null, chunk, cx, cy, cz));
         }
         if (westVisible) {
-            westFaces.add(new FaceData(x, y, z, ColorUtils.adjustColorBrightness(color, 0.6f), 1f, 0.6f, block, "side", 
-                BlockFaceGeometry::drawWestFace, null, chunk, cx, cy, cz));
+            westFaces.add(new FaceData(x, y, z, ColorUtils.adjustColorBrightness(color, 0.6f), 1f, 0.6f, block, "west", null, chunk, cx, cy, cz));
         }
         if (eastVisible) {
-            eastFaces.add(new FaceData(x, y, z, ColorUtils.adjustColorBrightness(color, 0.6f), 1f, 0.6f, block, "side", 
-                BlockFaceGeometry::drawEastFace, null, chunk, cx, cy, cz));
+            eastFaces.add(new FaceData(x, y, z, ColorUtils.adjustColorBrightness(color, 0.6f), 1f, 0.6f, block, "east", null, chunk, cx, cy, cz));
         }
     }
     
@@ -154,14 +146,6 @@ public class BlockFaceCollector {
     public List<FaceData> getEastFaces() { return eastFaces; }
     
     /**
-     * Functional interface for rendering a single face.
-     */
-    @FunctionalInterface
-    public interface FaceRenderer {
-        void render(float x, float y, float z);
-    }
-    
-    /**
      * Data class to store face rendering information.
      */
     public static class FaceData {
@@ -171,23 +155,22 @@ public class BlockFaceCollector {
         public final float brightness;
         public final float colorBrightness; // Brightness adjustment for the base color (for fallback)
         public final Block block;
-        public final String faceType; // "top", "bottom", "side", etc.
-        public final FaceRenderer renderer; // The renderer method to use for drawing this face
+        public final String faceType; // "top", "bottom", "north", "south", "west", "east", "model_elements"
         public final mattmc.world.level.block.state.BlockState blockState; // Block state for custom rendering
         public final LevelChunk chunk; // Reference to the chunk (for light sampling)
         
         public FaceData(float x, float y, float z, int color, float brightness, float colorBrightness, 
-                       Block block, String faceType, FaceRenderer renderer) {
-            this(x, y, z, color, brightness, colorBrightness, block, faceType, renderer, null, null, 0, 0, 0);
+                       Block block, String faceType) {
+            this(x, y, z, color, brightness, colorBrightness, block, faceType, null, null, 0, 0, 0);
         }
         
         public FaceData(float x, float y, float z, int color, float brightness, float colorBrightness, 
-                       Block block, String faceType, FaceRenderer renderer, mattmc.world.level.block.state.BlockState blockState) {
-            this(x, y, z, color, brightness, colorBrightness, block, faceType, renderer, blockState, null, 0, 0, 0);
+                       Block block, String faceType, mattmc.world.level.block.state.BlockState blockState) {
+            this(x, y, z, color, brightness, colorBrightness, block, faceType, blockState, null, 0, 0, 0);
         }
         
         public FaceData(float x, float y, float z, int color, float brightness, float colorBrightness, 
-                       Block block, String faceType, FaceRenderer renderer, mattmc.world.level.block.state.BlockState blockState,
+                       Block block, String faceType, mattmc.world.level.block.state.BlockState blockState,
                        LevelChunk chunk, int cx, int cy, int cz) {
             this.x = x;
             this.y = y;
@@ -200,7 +183,6 @@ public class BlockFaceCollector {
             this.colorBrightness = colorBrightness;
             this.block = block;
             this.faceType = faceType;
-            this.renderer = renderer;
             this.blockState = blockState;
             this.chunk = chunk;
         }

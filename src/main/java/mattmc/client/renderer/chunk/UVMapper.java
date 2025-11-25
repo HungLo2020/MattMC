@@ -1,8 +1,8 @@
 package mattmc.client.renderer.chunk;
 
-import mattmc.client.renderer.backend.opengl.util.ColorUtils;
+import mattmc.util.ColorUtils;
 import mattmc.client.renderer.block.BlockFaceCollector;
-import mattmc.client.renderer.backend.opengl.TextureAtlas;
+import mattmc.client.renderer.texture.TextureCoordinateProvider;
 import mattmc.world.level.block.Blocks;
 
 /**
@@ -13,14 +13,14 @@ import mattmc.world.level.block.Blocks;
  */
 public class UVMapper {
     
-    private final TextureAtlas textureAtlas;
+    private final TextureCoordinateProvider textureAtlas;
     
     /**
      * Create a UV mapper with optional texture atlas support.
      * 
      * @param textureAtlas Texture atlas for UV mapping, or null to use fallback colors
      */
-    public UVMapper(TextureAtlas textureAtlas) {
+    public UVMapper(TextureCoordinateProvider textureAtlas) {
         this.textureAtlas = textureAtlas;
     }
     
@@ -28,7 +28,7 @@ public class UVMapper {
      * Get the texture atlas.
      * @return The texture atlas, or null if not available
      */
-    public TextureAtlas getTextureAtlas() {
+    public TextureCoordinateProvider getTextureCoordinateProvider() {
         return textureAtlas;
     }
     
@@ -36,7 +36,7 @@ public class UVMapper {
      * Get UV mapping from texture atlas for a face.
      * Returns null if no atlas or texture not found.
      */
-    public TextureAtlas.UVMapping getUVMapping(BlockFaceCollector.FaceData face) {
+    public TextureCoordinateProvider.UVMapping getUVMapping(BlockFaceCollector.FaceData face) {
         if (textureAtlas == null) {
             return null;
         }
@@ -54,7 +54,7 @@ public class UVMapper {
      * Returns null if no atlas or texture not found.
      * Used by ModelElementRenderer for data-driven geometry rendering.
      */
-    public TextureAtlas.UVMapping getUVMappingForTexture(String texturePath) {
+    public TextureCoordinateProvider.UVMapping getUVMappingForTexture(String texturePath) {
         if (textureAtlas == null || texturePath == null) {
             return null;
         }
