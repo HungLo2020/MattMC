@@ -141,8 +141,7 @@ public final class SelectWorldScreen implements Screen {
         }
         if ("Create New World".equals(label)) {
             logger.info("→ Create World clicked");
-            // Use the OpenGL-specific CreateWorldScreen for now (still needs refactoring)
-            game.setScreen(new mattmc.client.renderer.backend.opengl.gui.screens.CreateWorldScreen(game));
+            game.setScreen(new CreateWorldScreen(game));
             return;
         }
         if ("Play Selected".equals(label)) {

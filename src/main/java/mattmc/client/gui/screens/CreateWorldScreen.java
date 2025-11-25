@@ -1,34 +1,27 @@
-package mattmc.client.renderer.backend.opengl.gui.screens;
-
-import mattmc.client.gui.screens.Screen;
-import mattmc.client.settings.OptionsManager;
-import mattmc.world.level.Level;
+package mattmc.client.gui.screens;
 
 import mattmc.client.Minecraft;
-import mattmc.client.renderer.backend.opengl.Window;
 import mattmc.client.gui.components.Button;
-import mattmc.client.renderer.backend.opengl.gui.components.ButtonRenderer;
 import mattmc.client.gui.components.EditBox;
-import mattmc.client.renderer.backend.opengl.gui.components.TextRenderer;
+import mattmc.client.renderer.backend.RenderBackend;
+import mattmc.client.renderer.window.WindowHandle;
+import mattmc.client.settings.OptionsManager;
 import mattmc.client.util.CoordinateUtils;
-import mattmc.util.ColorUtils;
-import mattmc.client.renderer.backend.opengl.OpenGLColorHelper;
 import mattmc.world.level.storage.LevelStorageSource;
 
 import java.util.ArrayList;
 import java.util.List;
 
-import static org.lwjgl.glfw.GLFW.*;
-import static org.lwjgl.opengl.GL11.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-/* Create Level screen - allows creating a new world. */
+/** Create Level screen - allows creating a new world. */
 public final class CreateWorldScreen implements Screen {
     private static final Logger logger = LoggerFactory.getLogger(CreateWorldScreen.class);
 
     private final Minecraft game;
-    private final Window window;
+    private final WindowHandle window;
+    private final RenderBackend backend;
     private final List<Button> buttons = new ArrayList<>();
     private EditBox worldNameField;
     private EditBox seedField;
@@ -43,15 +36,26 @@ public final class CreateWorldScreen implements Screen {
 
     public CreateWorldScreen(Minecraft game) {
         this.game = game;
-        this.window = (Window) game.window();
+        this.window = game.window();
+        this.backend = game.getRenderBackend();
 
-        glfwSetCursorPosCallback(window.handle(), (h, x, y) -> { mouseXWin = x; mouseYWin = y; });
-        glfwSetMouseButtonCallback(window.handle(), (h, button, action, mods) -> {
-            if (button == GLFW_MOUSE_BUTTON_LEFT) mouseDown = (action == GLFW_PRESS);
+        recomputeLayout();
+    }
+    
+    @Override
+    public void onOpen() {
+        backend.setCursorPosCallback(window.handle(), (x, y) -> { 
+            mouseXWin = x; 
+            mouseYWin = y; 
+        });
+        backend.setMouseButtonCallback(window.handle(), (button, action, mods) -> {
+            if (button == RenderBackend.MOUSE_BUTTON_LEFT) {
+                mouseDown = (action == RenderBackend.ACTION_PRESS);
+            }
         });
         
         // Set up character callback for text field input
-        glfwSetCharCallback(window.handle(), (win, codepoint) -> {
+        backend.setCharCallback(window.handle(), (codepoint) -> {
             EditBox focusedField = getFocusedField();
             if (focusedField != null) {
                 char c = (char) codepoint;
@@ -67,23 +71,21 @@ public final class CreateWorldScreen implements Screen {
         });
         
         // Set up key callback for backspace and enter
-        glfwSetKeyCallback(window.handle(), (win, key, scancode, action, mods) -> {
+        backend.setKeyCallback(window.handle(), (key, scancode, action, mods) -> {
             EditBox focusedField = getFocusedField();
             if (focusedField != null) {
-                if ((action == GLFW_PRESS || action == GLFW_REPEAT) && key == GLFW_KEY_BACKSPACE) {
+                if ((action == RenderBackend.ACTION_PRESS || action == RenderBackend.ACTION_REPEAT) && key == 259) { // GLFW_KEY_BACKSPACE
                     focusedField.backspace();
                 }
-                if (action == GLFW_PRESS && key == GLFW_KEY_ENTER) {
+                if (action == RenderBackend.ACTION_PRESS && key == 257) { // GLFW_KEY_ENTER
                     // Create world on Enter
                     createWorld();
                 }
             }
         });
 
-        recomputeLayout();
-
-        glfwSetFramebufferSizeCallback(window.handle(), (win, newW, newH) -> {
-            glViewport(0, 0, Math.max(newW, 1), Math.max(newH, 1));
+        backend.setFramebufferSizeCallback(window.handle(), (newW, newH) -> {
+            backend.setViewport(0, 0, Math.max(newW, 1), Math.max(newH, 1));
             recomputeLayout();
         });
     }
@@ -122,8 +124,6 @@ public final class CreateWorldScreen implements Screen {
 
     @Override
     public void tick() {
-        // Panorama rotation is now updated during rendering to prevent jitter
-        
         // Convert window coords -> framebuffer coords for accurate hit-testing on HiDPI
         CoordinateUtils.Point2D fbCoords = CoordinateUtils.windowToFramebuffer(
             window.handle(), mouseXWin, mouseYWin
@@ -161,7 +161,7 @@ public final class CreateWorldScreen implements Screen {
 
     private void onClick(String label) {
         if ("Back".equals(label)) {
-            game.setScreen(new mattmc.client.gui.screens.SelectWorldScreen(game));
+            game.setScreen(new SelectWorldScreen(game));
             return;
         }
         if ("Create World".equals(label)) {
@@ -184,7 +184,8 @@ public final class CreateWorldScreen implements Screen {
         long seed = parseSeed(seedText);
         
         logger.info("→ Creating world: {} with seed: {}", worldName, seed);
-        game.setScreen(new DevplayScreen(game, worldName, seed));
+        // Use the OpenGL-specific DevplayScreen for now (still needs refactoring)
+        game.setScreen(new mattmc.client.renderer.backend.opengl.gui.screens.DevplayScreen(game, worldName, seed));
     }
     
     /**
@@ -239,17 +240,17 @@ public final class CreateWorldScreen implements Screen {
     @Override
     public void render(double alpha) {
         // Render panorama background with blur based on settings
-        boolean blurred = mattmc.client.settings.OptionsManager.isMenuScreenBlurEnabled();
+        boolean blurred = OptionsManager.isMenuScreenBlurEnabled();
         game.panorama().render(window.width(), window.height(), blurred);
 
-        setupOrtho();
+        backend.setup2DProjection(window.width(), window.height());
         
         // Draw text fields
         if (worldNameField != null) drawTextField(worldNameField);
         if (seedField != null) drawTextField(seedField);
         
         for (var b : buttons) {
-            ButtonRenderer.drawButton(b);
+            backend.drawButton(b);
             drawTextCentered(b.label, b.x + b.w / 2f, b.y + b.h / 2f, 1.2f, 0xFFFFFF);
         }
         drawTitle("Create New World", titleCX, titleCY, titleScale, 0xFFFFFF);
@@ -257,30 +258,16 @@ public final class CreateWorldScreen implements Screen {
         drawTitle("Seed:", titleCX, seedField.y - 20f, 1.0f, 0xB0C4DE);
     }
 
-    private void setupOrtho() {
-        int w = window.width(), h = window.height();
-        glMatrixMode(GL_PROJECTION);
-        glLoadIdentity();
-        glOrtho(0, w, h, 0, -1, 1);
-        glMatrixMode(GL_MODELVIEW);
-        glLoadIdentity();
-    }
-
     private void drawTextField(EditBox tf) {
         // Background
         int bgColor = tf.isFocused() ? 0x000000 : 0x222222;
-        OpenGLColorHelper.setGLColor(bgColor, 0.8f);
-        fillRect(tf.x, tf.y, tf.w, tf.h);
+        backend.setColor(bgColor, 0.8f);
+        backend.fillRect(tf.x, tf.y, tf.w, tf.h);
         
         // Border
         int borderColor = tf.isFocused() ? 0xFFFFFF : 0x888888;
-        OpenGLColorHelper.setGLColor(borderColor, 1f);
-        glBegin(GL_LINE_LOOP);
-        glVertex2f(tf.x, tf.y);
-        glVertex2f(tf.x + tf.w, tf.y);
-        glVertex2f(tf.x + tf.w, tf.y + tf.h);
-        glVertex2f(tf.x, tf.y + tf.h);
-        glEnd();
+        backend.setColor(borderColor, 1f);
+        backend.drawRect(tf.x, tf.y, tf.w, tf.h);
         
         // Text
         String text = tf.getText();
@@ -290,50 +277,34 @@ public final class CreateWorldScreen implements Screen {
         
         // Cursor
         if (tf.isFocused() && (System.currentTimeMillis() / 500) % 2 == 0) {
-            float textWidth = TextRenderer.getTextWidth(text, 1.0f);
+            float textWidth = backend.getTextWidth(text, 1.0f);
             float cursorX = tf.x + 8f + textWidth;
-            OpenGLColorHelper.setGLColor(0xFFFFFF, 1f);
-            glBegin(GL_LINES);
-            glVertex2f(cursorX, tf.y + 6f);
-            glVertex2f(cursorX, tf.y + tf.h - 6f);
-            glEnd();
+            backend.setColor(0xFFFFFF, 1f);
+            backend.drawLine(cursorX, tf.y + 6f, cursorX, tf.y + tf.h - 6f);
         }
-    }
-    
-
-
-    private void fillRect(int x, int y, int w, int h) {
-        glBegin(GL_QUADS);
-        glVertex2f(x, y);
-        glVertex2f(x + w, y);
-        glVertex2f(x + w, y + h);
-        glVertex2f(x, y + h);
-        glEnd();
     }
 
     private void drawTitle(String text, float cx, float cy, float scale, int rgb) {
-        float tw = TextRenderer.getTextWidth(text, scale);
-        float th = TextRenderer.getTextHeight(text, scale);
+        float tw = backend.getTextWidth(text, scale);
+        float th = backend.getTextHeight(text, scale);
         float x = cx - tw / 2f;
         float y = cy - th / 2f;
         drawText(text, x, y, scale, rgb);
     }
 
     private void drawTextCentered(String text, float cx, float cy, float scale, int rgb) {
-        float tw = TextRenderer.getTextWidth(text, scale);
-        float th = TextRenderer.getTextHeight(text, scale);
+        float tw = backend.getTextWidth(text, scale);
+        float th = backend.getTextHeight(text, scale);
         float x = cx - tw / 2f;
         float y = cy - th / 2f;
         drawText(text, x, y, scale, rgb);
     }
 
     private void drawText(String text, float x, float y, float scale, int rgb) {
-        OpenGLColorHelper.setGLColor(rgb, 1f);
-        TextRenderer.drawText(text, x, y, scale);
+        backend.setColor(rgb, 1f);
+        backend.drawText(text, x, y, scale);
     }
 
-    @Override
-    public void onOpen() {}
     @Override
     public void onClose() {
         // Panorama is now shared and managed by Minecraft

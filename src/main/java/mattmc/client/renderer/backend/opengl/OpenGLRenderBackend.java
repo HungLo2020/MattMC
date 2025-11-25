@@ -841,6 +841,35 @@ public class OpenGLRenderBackend implements RenderBackend {
     }
     
     @Override
+    public void drawRect(float x, float y, float width, float height) {
+        glBegin(GL_LINE_LOOP);
+        glVertex2f(x, y);
+        glVertex2f(x + width, y);
+        glVertex2f(x + width, y + height);
+        glVertex2f(x, y + height);
+        glEnd();
+    }
+    
+    @Override
+    public void drawLine(float x1, float y1, float x2, float y2) {
+        glBegin(GL_LINES);
+        glVertex2f(x1, y1);
+        glVertex2f(x2, y2);
+        glEnd();
+    }
+    
+    @Override
+    public void enableBlend() {
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    }
+    
+    @Override
+    public void disableBlend() {
+        glDisable(GL_BLEND);
+    }
+    
+    @Override
     public void drawText(String text, float x, float y, float scale) {
         mattmc.client.renderer.backend.opengl.gui.components.TextRenderer.drawText(text, x, y, scale);
     }

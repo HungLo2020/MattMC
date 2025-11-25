@@ -76,6 +76,10 @@ public class ItemRendererTest {
         @Override public void resetColor() {}
         @Override public void setColor(int rgb, float a) {}
         @Override public void fillRect(float x, float y, float w, float h) {}
+        @Override public void drawRect(float x, float y, float w, float h) {}
+        @Override public void drawLine(float x1, float y1, float x2, float y2) {}
+        @Override public void enableBlend() {}
+        @Override public void disableBlend() {}
         @Override public void drawText(String t, float x, float y, float s) {}
         @Override public void drawCenteredText(String t, float x, float y, float s) {}
         @Override public float getTextWidth(String t, float s) { return 0; }

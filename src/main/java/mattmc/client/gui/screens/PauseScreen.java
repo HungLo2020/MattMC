@@ -1,28 +1,16 @@
-package mattmc.client.renderer.backend.opengl.gui.screens;
+package mattmc.client.gui.screens;
 
-import mattmc.client.settings.OptionsManager;
-import mattmc.client.gui.screens.Screen;
 import mattmc.client.Minecraft;
-import mattmc.client.renderer.backend.opengl.Window;
-import mattmc.client.renderer.backend.opengl.BlurEffect;
-import mattmc.client.renderer.backend.opengl.BlurRenderer;
 import mattmc.client.gui.components.Button;
-import mattmc.client.renderer.backend.opengl.gui.components.ButtonRenderer;
-import mattmc.client.renderer.backend.opengl.gui.components.TextRenderer;
+import mattmc.client.renderer.backend.RenderBackend;
+import mattmc.client.renderer.window.WindowHandle;
+import mattmc.client.settings.OptionsManager;
 import mattmc.client.util.CoordinateUtils;
-import mattmc.util.ColorUtils;
-import mattmc.client.renderer.backend.opengl.OpenGLColorHelper;
-import mattmc.world.level.Level;
-import mattmc.world.level.storage.LevelStorageSource;
 
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
-import static mattmc.client.settings.OptionsManager.isMenuScreenBlurEnabled;
-import static org.lwjgl.glfw.GLFW.*;
-import static org.lwjgl.opengl.GL11.*;
-import static org.lwjgl.opengl.GL30.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -34,8 +22,9 @@ public final class PauseScreen implements Screen {
     private static final Logger logger = LoggerFactory.getLogger(PauseScreen.class);
 
     private final Minecraft game;
-    private final Window window;
-    private final DevplayScreen gameScreen;
+    private final WindowHandle window;
+    private final RenderBackend backend;
+    private final mattmc.client.renderer.backend.opengl.gui.screens.DevplayScreen gameScreen;
     private final List<Button> buttons = new ArrayList<>();
     private double mouseXWin, mouseYWin;
     private boolean mouseDown;
@@ -44,39 +33,45 @@ public final class PauseScreen implements Screen {
     private float titleCX, titleCY;
     private int buttonWidth = 300, buttonHeight = 44, buttonGap = 12;
     private int buttonsStartY;
-    
-    // Blur effect for background
-    private BlurEffect blurEffect;
 
-    public PauseScreen(Minecraft game, DevplayScreen gameScreen) {
+    public PauseScreen(Minecraft game, mattmc.client.renderer.backend.opengl.gui.screens.DevplayScreen gameScreen) {
         this.game = game;
-        this.window = (Window) game.window();
+        this.window = game.window();
+        this.backend = game.getRenderBackend();
         this.gameScreen = gameScreen;
         
         // Sync player position to prevent flickering during interpolation
         gameScreen.syncPlayerPosition();
 
-        glfwSetCursorPosCallback(window.handle(), (h, x, y) -> { mouseXWin = x; mouseYWin = y; });
-        glfwSetMouseButtonCallback(window.handle(), (h, button, action, mods) -> {
-            if (button == GLFW_MOUSE_BUTTON_LEFT) mouseDown = (action == GLFW_PRESS);
+        recomputeLayout();
+    }
+    
+    @Override
+    public void onOpen() {
+        backend.setCursorPosCallback(window.handle(), (x, y) -> { 
+            mouseXWin = x; 
+            mouseYWin = y; 
+        });
+        backend.setMouseButtonCallback(window.handle(), (button, action, mods) -> {
+            if (button == RenderBackend.MOUSE_BUTTON_LEFT) {
+                mouseDown = (action == RenderBackend.ACTION_PRESS);
+            }
         });
         
         // Set up key callback for ESC to unpause
-        glfwSetKeyCallback(window.handle(), (win, key, scancode, action, mods) -> {
-            if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS) {
+        backend.setKeyCallback(window.handle(), (key, scancode, action, mods) -> {
+            if (key == RenderBackend.KEY_ESCAPE && action == RenderBackend.ACTION_PRESS) {
                 unpause();
             }
         });
 
-        recomputeLayout();
-
-        glfwSetFramebufferSizeCallback(window.handle(), (win, newW, newH) -> {
-            glViewport(0, 0, Math.max(newW, 1), Math.max(newH, 1));
+        backend.setFramebufferSizeCallback(window.handle(), (newW, newH) -> {
+            backend.setViewport(0, 0, Math.max(newW, 1), Math.max(newH, 1));
             recomputeLayout();
         });
         
         // Release mouse cursor
-        glfwSetInputMode(window.handle(), GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+        backend.setCursorMode(window.handle(), RenderBackend.CURSOR_NORMAL);
     }
 
     private void recomputeLayout() {
@@ -96,7 +91,7 @@ public final class PauseScreen implements Screen {
     
     private void unpause() {
         // Recapture mouse for FPS controls
-        glfwSetInputMode(window.handle(), GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+        backend.setCursorMode(window.handle(), RenderBackend.CURSOR_DISABLED);
         game.setScreen(gameScreen);
     }
 
@@ -139,13 +134,13 @@ public final class PauseScreen implements Screen {
             gameScreen.saveAndShutdown();
             
             // Return to title screen
-            glfwSetInputMode(window.handle(), GLFW_CURSOR, GLFW_CURSOR_NORMAL);
-            game.setScreen(new mattmc.client.gui.screens.TitleScreen(game));
+            backend.setCursorMode(window.handle(), RenderBackend.CURSOR_NORMAL);
+            game.setScreen(new TitleScreen(game));
         } catch (IOException e) {
             logger.error("Failed to save world", e);
             // Still exit even if save failed
-            glfwSetInputMode(window.handle(), GLFW_CURSOR, GLFW_CURSOR_NORMAL);
-            game.setScreen(new mattmc.client.gui.screens.TitleScreen(game));
+            backend.setCursorMode(window.handle(), RenderBackend.CURSOR_NORMAL);
+            game.setScreen(new TitleScreen(game));
         }
     }
 
@@ -157,79 +152,51 @@ public final class PauseScreen implements Screen {
         gameScreen.render(alpha);
         
         // Apply blur if enabled
-        if (isMenuScreenBlurEnabled()) {
-            if (blurEffect == null) {
-                blurEffect = new BlurEffect();
-            }
-            BlurRenderer.renderBlurredBackground(blurEffect, w, h);
+        if (OptionsManager.isMenuScreenBlurEnabled()) {
+            backend.applyRegionalBlur(0, 0, w, h, w, h);
         }
         
+        // Set up 2D projection for UI
+        backend.setup2DProjection(w, h);
+        
+        // Enable blending for transparent overlay
+        backend.enableBlend();
+        
         // Draw dark overlay
-        glMatrixMode(GL_PROJECTION);
-        glLoadIdentity();
-        glOrtho(0, w, h, 0, -1, 1);
-        glMatrixMode(GL_MODELVIEW);
-        glLoadIdentity();
-        
-        glEnable(GL_BLEND);
-        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-        
-        OpenGLColorHelper.setGLColor(0x000000, 0.5f);
-        glBegin(GL_QUADS);
-        glVertex2f(0, 0);
-        glVertex2f(w, 0);
-        glVertex2f(w, h);
-        glVertex2f(0, h);
-        glEnd();
+        backend.setColor(0x000000, 0.5f);
+        backend.fillRect(0, 0, w, h);
         
         // Draw UI
         for (var b : buttons) {
-            ButtonRenderer.drawButton(b);
+            backend.drawButton(b);
             drawTextCentered(b.label, b.x + b.w / 2f, b.y + b.h / 2f, 1.2f, 0xFFFFFF);
         }
         drawTitle("Game Paused", titleCX, titleCY, titleScale, 0xFFFFFF);
     }
 
-    private void setupOrtho() {
-        int w = window.width(), h = window.height();
-        glMatrixMode(GL_PROJECTION);
-        glLoadIdentity();
-        glOrtho(0, w, h, 0, -1, 1);
-        glMatrixMode(GL_MODELVIEW);
-        glLoadIdentity();
-    }
-
-
-
     private void drawTitle(String text, float cx, float cy, float scale, int rgb) {
-        float tw = TextRenderer.getTextWidth(text, scale);
-        float th = TextRenderer.getTextHeight(text, scale);
+        float tw = backend.getTextWidth(text, scale);
+        float th = backend.getTextHeight(text, scale);
         float x = cx - tw / 2f;
         float y = cy - th / 2f;
         drawText(text, x, y, scale, rgb);
     }
 
     private void drawTextCentered(String text, float cx, float cy, float scale, int rgb) {
-        float tw = TextRenderer.getTextWidth(text, scale);
-        float th = TextRenderer.getTextHeight(text, scale);
+        float tw = backend.getTextWidth(text, scale);
+        float th = backend.getTextHeight(text, scale);
         float x = cx - tw / 2f;
         float y = cy - th / 2f;
         drawText(text, x, y, scale, rgb);
     }
 
     private void drawText(String text, float x, float y, float scale, int rgb) {
-        OpenGLColorHelper.setGLColor(rgb, 1f);
-        TextRenderer.drawText(text, x, y, scale);
+        backend.setColor(rgb, 1f);
+        backend.drawText(text, x, y, scale);
     }
 
     @Override
-    public void onOpen() {}
-    
-    @Override
     public void onClose() {
-        if (blurEffect != null) {
-            blurEffect.close();
-            blurEffect = null;
-        }
+        // Blur effect is managed by the backend now
     }
 }

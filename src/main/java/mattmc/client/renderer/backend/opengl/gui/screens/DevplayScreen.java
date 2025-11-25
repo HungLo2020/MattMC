@@ -163,7 +163,7 @@ public final class DevplayScreen implements Screen {
         this.inputHandler = new DevplayInputHandler(
             game, window, player, this.world, blockInteraction, uiState, commandSystem,
             playerController, uiRenderer,
-            () -> game.setScreen(new PauseScreen(game, this)),
+            () -> game.setScreen(new mattmc.client.gui.screens.PauseScreen(game, this)),
             () -> game.setScreen(new InventoryScreen(game, this))
         );
 

@@ -342,6 +342,36 @@ public interface RenderBackend {
     void fillRect(float x, float y, float width, float height);
     
     /**
+     * Draw a rectangle outline (border only, no fill).
+     * 
+     * @param x X position of the rectangle (top-left corner)
+     * @param y Y position of the rectangle (top-left corner)
+     * @param width Width of the rectangle
+     * @param height Height of the rectangle
+     */
+    void drawRect(float x, float y, float width, float height);
+    
+    /**
+     * Draw a line between two points.
+     * 
+     * @param x1 Start X position
+     * @param y1 Start Y position
+     * @param x2 End X position
+     * @param y2 End Y position
+     */
+    void drawLine(float x1, float y1, float x2, float y2);
+    
+    /**
+     * Enable alpha blending for transparent rendering.
+     */
+    void enableBlend();
+    
+    /**
+     * Disable alpha blending.
+     */
+    void disableBlend();
+    
+    /**
      * Draw text at the specified position with the given scale.
      * 
      * <p>Renders text using the backend's font system. The position represents the
