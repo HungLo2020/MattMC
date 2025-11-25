@@ -17,9 +17,9 @@ public class CreativeInventoryManager {
     private static final int CREATIVE_COLS = 9;
     private static final int CREATIVE_ROWS = 15;
     private static final float GUI_SCALE = 3.0f;
-    // Creative inventory logical content dimensions (for rendering and click detection)
-    private static final float CREATIVE_CONTENT_WIDTH = 176f;
-    private static final float CREATIVE_CONTENT_HEIGHT = 296f;
+    // Creative inventory texture dimensions (for rendering and click detection)
+    private static final float CREATIVE_TEXTURE_WIDTH = 256f;
+    private static final float CREATIVE_TEXTURE_HEIGHT = 384f;
     
     private final List<Item> allItems = new ArrayList<>();
     private int scrollRow = 0;
@@ -73,8 +73,8 @@ public class CreativeInventoryManager {
         
         // Calculate creative inventory position (must match InventoryRenderer)
         int w = window.width(), h = window.height();
-        float contentWidth = CREATIVE_CONTENT_WIDTH * GUI_SCALE;
-        float contentHeight = CREATIVE_CONTENT_HEIGHT * GUI_SCALE;
+        float contentWidth = CREATIVE_TEXTURE_WIDTH * GUI_SCALE;
+        float contentHeight = CREATIVE_TEXTURE_HEIGHT * GUI_SCALE;
         // Position: right edge of screen with 20px buffer
         float guiX = w - contentWidth - 20f;
         float guiY = (h - contentHeight) / 2f;

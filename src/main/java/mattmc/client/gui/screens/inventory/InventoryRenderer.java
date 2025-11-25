@@ -271,9 +271,9 @@ public class InventoryRenderer {
         if (backend == null || creativeInventoryTextureId < 0) return;
         
         int w = window.width(), h = window.height();
-        // Use logical content dimensions (176x296) for the creative inventory display area
-        float contentWidth = 176f * GUI_SCALE;
-        float contentHeight = 296f * GUI_SCALE;
+        // Use actual texture dimensions for rendering the full texture
+        float contentWidth = creativeWidth * GUI_SCALE;
+        float contentHeight = creativeHeight * GUI_SCALE;
         // Position: right edge of screen with 20px buffer
         float x = w - contentWidth - 20f;
         float y = (h - contentHeight) / 2f;
@@ -288,9 +288,9 @@ public class InventoryRenderer {
         if (backend == null || creativeInventoryTextureId < 0) return;
         
         int w = window.width(), h = window.height();
-        // Use logical content dimensions (176x296) for the creative inventory display area
-        float contentWidth = 176f * GUI_SCALE;
-        float contentHeight = 296f * GUI_SCALE;
+        // Use actual texture dimensions for position calculation (must match renderCreativeInventory)
+        float contentWidth = creativeWidth * GUI_SCALE;
+        float contentHeight = creativeHeight * GUI_SCALE;
         // Position: right edge of screen with 20px buffer
         float guiX = w - contentWidth - 20f;
         float guiY = (h - contentHeight) / 2f;
