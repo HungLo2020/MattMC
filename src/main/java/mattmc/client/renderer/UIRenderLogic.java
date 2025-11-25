@@ -185,9 +185,10 @@ public class UIRenderLogic {
         );
         
         // Vertical line
+        // Note: we pass size*2 as the width parameter because that's what gets encoded as the line length
         DrawCommand verticalLine = new DrawCommand(
             -1, // UI quad marker
-            encodeCrosshairData((int)centerX, (int)centerY, (int)thickness, (int)(size*2), false),
+            encodeCrosshairData((int)centerX, (int)centerY, (int)(size*2), (int)thickness, false),
             0,  // screen-space transform
             RenderPass.UI
         );
