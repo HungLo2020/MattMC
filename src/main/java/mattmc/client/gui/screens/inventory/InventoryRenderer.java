@@ -1,34 +1,19 @@
-package mattmc.client.renderer.backend.opengl.gui.screens.inventory;
+package mattmc.client.gui.screens.inventory;
 
-import mattmc.client.renderer.backend.opengl.ItemRenderer;
-import mattmc.client.renderer.backend.opengl.gui.components.TextRenderer;
-import mattmc.client.gui.screens.inventory.InventorySlotManager;
-import mattmc.client.gui.screens.inventory.InventorySlot;
-import mattmc.client.gui.screens.inventory.CreativeInventoryManager;
-import mattmc.client.renderer.backend.opengl.Window;
-import mattmc.client.renderer.backend.opengl.BlurEffect;
-import mattmc.client.renderer.backend.opengl.BlurRenderer;
+import mattmc.client.renderer.backend.RenderBackend;
 import mattmc.client.renderer.TooltipRenderer;
-import mattmc.client.renderer.backend.opengl.Texture;
+import mattmc.client.renderer.window.WindowHandle;
 import mattmc.client.util.CoordinateUtils;
-import mattmc.util.ColorUtils;
-import mattmc.client.renderer.backend.opengl.OpenGLColorHelper;
 import mattmc.world.item.Inventory;
 import mattmc.world.item.Item;
 import mattmc.world.item.ItemStack;
 
-import java.nio.IntBuffer;
 import java.util.List;
 
-import org.lwjgl.system.MemoryStack;
-
 import static mattmc.client.settings.OptionsManager.isMenuScreenBlurEnabled;
-import static org.lwjgl.glfw.GLFW.*;
-import static org.lwjgl.opengl.GL11.*;
-import static org.lwjgl.system.MemoryStack.stackPush;
 
 /**
- * Renders inventory GUI elements.
+ * Renders inventory GUI elements using the RenderBackend abstraction.
  */
 public class InventoryRenderer {
     private static final float GUI_SCALE = 3.0f;
@@ -37,89 +22,84 @@ public class InventoryRenderer {
     private static final int CREATIVE_COLS = 9;
     private static final int CREATIVE_ROWS = 15;
     
-    private final Window window;
+    private final WindowHandle window;
     private final InventorySlotManager slotManager;
-    private Texture inventoryTexture;
-    private Texture creativeInventoryTexture;
-    private BlurEffect blurEffect;
+    private RenderBackend backend;
+    private int inventoryTextureId = -1;
+    private int creativeInventoryTextureId = -1;
+    private int inventoryWidth, inventoryHeight;
+    private int creativeWidth, creativeHeight;
     private TooltipRenderer tooltipRenderer;
     
-    public InventoryRenderer(Window window, InventorySlotManager slotManager) {
+    public InventoryRenderer(WindowHandle window, InventorySlotManager slotManager) {
         this.window = window;
         this.slotManager = slotManager;
-        this.inventoryTexture = Texture.load("/assets/textures/gui/container/inventory.png");
-        this.creativeInventoryTexture = Texture.load("/assets/textures/gui/container/creativeinv.png");
         this.tooltipRenderer = new TooltipRenderer();
     }
     
     /**
-     * Set the render backend for tooltip rendering.
+     * Set the render backend for rendering operations.
      */
-    public void setBackend(mattmc.client.renderer.backend.RenderBackend backend) {
+    public void setBackend(RenderBackend backend) {
+        this.backend = backend;
         if (tooltipRenderer != null) {
             tooltipRenderer.setBackend(backend);
+        }
+        // Load textures if not already loaded
+        if (inventoryTextureId < 0) {
+            inventoryTextureId = backend.loadTexture("/assets/textures/gui/container/inventory.png");
+            if (inventoryTextureId >= 0) {
+                inventoryWidth = backend.getTextureWidth(inventoryTextureId);
+                inventoryHeight = backend.getTextureHeight(inventoryTextureId);
+            }
+        }
+        if (creativeInventoryTextureId < 0) {
+            creativeInventoryTextureId = backend.loadTexture("/assets/textures/gui/container/creativeinv.png");
+            if (creativeInventoryTextureId >= 0) {
+                creativeWidth = backend.getTextureWidth(creativeInventoryTextureId);
+                creativeHeight = backend.getTextureHeight(creativeInventoryTextureId);
+            }
         }
     }
     
     public void renderBackground(int screenWidth, int screenHeight) {
+        if (backend == null) return;
+        
         // Apply blur if enabled
         if (isMenuScreenBlurEnabled()) {
-            if (blurEffect == null) {
-                blurEffect = new BlurEffect();
-            }
-            BlurRenderer.renderBlurredBackground(blurEffect, screenWidth, screenHeight);
+            backend.applyRegionalBlur(0, 0, screenWidth, screenHeight, screenWidth, screenHeight);
         }
         
-        // Draw dark overlay
-        glMatrixMode(GL_PROJECTION);
-        glLoadIdentity();
-        glOrtho(0, screenWidth, screenHeight, 0, -1, 1);
-        glMatrixMode(GL_MODELVIEW);
-        glLoadIdentity();
+        // Set up 2D projection
+        backend.setup2DProjection(screenWidth, screenHeight);
         
-        glEnable(GL_BLEND);
-        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        // Enable blending for transparent overlay
+        backend.enableBlend();
         
         // Semi-transparent black background
-        OpenGLColorHelper.setGLColor(0x000000, 0.5f);
-        glBegin(GL_QUADS);
-        glVertex2f(0, 0);
-        glVertex2f(screenWidth, 0);
-        glVertex2f(screenWidth, screenHeight);
-        glVertex2f(0, screenHeight);
-        glEnd();
+        backend.setColor(0x000000, 0.5f);
+        backend.fillRect(0, 0, screenWidth, screenHeight);
     }
     
     public void renderInventoryBackground() {
-        if (inventoryTexture == null) return;
+        if (backend == null || inventoryTextureId < 0) return;
         
         int w = window.width(), h = window.height();
         
-        glEnable(GL_TEXTURE_2D);
-        inventoryTexture.bind();
-        glColor4f(1f, 1f, 1f, 1f);
-        
-        float texWidth = inventoryTexture.width * GUI_SCALE;
-        float texHeight = inventoryTexture.height * GUI_SCALE;
+        float texWidth = inventoryWidth * GUI_SCALE;
+        float texHeight = inventoryHeight * GUI_SCALE;
         float x = (w - texWidth) / 2f + (CONTENT_OFFSET_X * GUI_SCALE);
         float y = (h - texHeight) / 2f + (CONTENT_OFFSET_Y * GUI_SCALE);
         
-        glBegin(GL_QUADS);
-        glTexCoord2f(0, 1); glVertex2f(x, y);
-        glTexCoord2f(1, 1); glVertex2f(x + texWidth, y);
-        glTexCoord2f(1, 0); glVertex2f(x + texWidth, y + texHeight);
-        glTexCoord2f(0, 0); glVertex2f(x, y + texHeight);
-        glEnd();
-        
-        glDisable(GL_TEXTURE_2D);
+        backend.drawTexture(inventoryTextureId, x, y, texWidth, texHeight);
     }
     
     public void renderSlotHighlight(double mouseXWin, double mouseYWin) {
-        if (inventoryTexture == null) return;
+        if (backend == null || inventoryTextureId < 0) return;
         
         int w = window.width(), h = window.height();
-        float texWidth = inventoryTexture.width * GUI_SCALE;
-        float texHeight = inventoryTexture.height * GUI_SCALE;
+        float texWidth = inventoryWidth * GUI_SCALE;
+        float texHeight = inventoryHeight * GUI_SCALE;
         float guiX = (w - texWidth) / 2f + (CONTENT_OFFSET_X * GUI_SCALE);
         float guiY = (h - texHeight) / 2f + (CONTENT_OFFSET_Y * GUI_SCALE);
         
@@ -141,13 +121,8 @@ public class InventoryRenderer {
                 float slotScreenW = slot.width * GUI_SCALE;
                 float slotScreenH = slot.height * GUI_SCALE;
                 
-                glColor4f(1f, 1f, 1f, 0.3f);
-                glBegin(GL_QUADS);
-                glVertex2f(slotScreenX, slotScreenY);
-                glVertex2f(slotScreenX + slotScreenW, slotScreenY);
-                glVertex2f(slotScreenX + slotScreenW, slotScreenY + slotScreenH);
-                glVertex2f(slotScreenX, slotScreenY + slotScreenH);
-                glEnd();
+                backend.setColor(0xFFFFFF, 0.3f);
+                backend.fillRect(slotScreenX, slotScreenY, slotScreenW, slotScreenH);
                 
                 break;
             }
@@ -155,11 +130,11 @@ public class InventoryRenderer {
     }
     
     public void renderInventoryItems(Inventory inventory) {
-        if (inventoryTexture == null || inventory == null) return;
+        if (backend == null || inventoryTextureId < 0 || inventory == null) return;
         
         int w = window.width(), h = window.height();
-        float texWidth = inventoryTexture.width * GUI_SCALE;
-        float texHeight = inventoryTexture.height * GUI_SCALE;
+        float texWidth = inventoryWidth * GUI_SCALE;
+        float texHeight = inventoryHeight * GUI_SCALE;
         float guiX = (w - texWidth) / 2f + (CONTENT_OFFSET_X * GUI_SCALE);
         float guiY = (h - texHeight) / 2f + (CONTENT_OFFSET_Y * GUI_SCALE);
         
@@ -184,12 +159,12 @@ public class InventoryRenderer {
                 float itemCenterY = slotY + 9f * GUI_SCALE;
                 
                 // Use data-driven rendering with GUI context
-                mattmc.client.renderer.backend.opengl.ItemRenderer.renderItemWithTransform(
+                mattmc.client.renderer.backend.opengl.ItemRenderer.render(
                     stack, 
-                    mattmc.client.renderer.item.ItemDisplayContext.GUI, 
                     itemCenterX, 
                     itemCenterY, 
-                    itemSize
+                    itemSize,
+                    backend
                 );
                 
                 if (stack.getCount() > 1) {
@@ -216,12 +191,12 @@ public class InventoryRenderer {
                 float itemCenterY = slotY + 9f * GUI_SCALE;
                 
                 // Use data-driven rendering with GUI context
-                mattmc.client.renderer.backend.opengl.ItemRenderer.renderItemWithTransform(
+                mattmc.client.renderer.backend.opengl.ItemRenderer.render(
                     stack, 
-                    mattmc.client.renderer.item.ItemDisplayContext.GUI, 
                     itemCenterX, 
                     itemCenterY, 
-                    itemSize
+                    itemSize,
+                    backend
                 );
                 
                 if (stack.getCount() > 1) {
@@ -232,6 +207,8 @@ public class InventoryRenderer {
     }
     
     public void renderItemCount(int count, float itemCenterX, float itemCenterY, float guiScale, float itemSize) {
+        if (backend == null) return;
+        
         String countText = String.valueOf(count);
         
         float slotSize = 16f * guiScale;
@@ -241,22 +218,21 @@ public class InventoryRenderer {
         float textX = itemCenterX + halfSlot - 12f;
         float textY = itemCenterY + halfSlot - 30f;
         
-        glEnable(GL_BLEND);
-        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        backend.enableBlend();
         
         // Draw shadow
-        glColor4f(0.25f, 0.25f, 0.25f, 1.0f);
-        TextRenderer.drawText(countText, textX + 1, textY + 1, textScale);
+        backend.setColor(0x404040, 1.0f);
+        backend.drawText(countText, textX + 1, textY + 1, textScale);
         
         // Draw main text
-        glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
-        TextRenderer.drawText(countText, textX, textY, textScale);
+        backend.setColor(0xFFFFFF, 1.0f);
+        backend.drawText(countText, textX, textY, textScale);
         
-        glDisable(GL_BLEND);
+        backend.disableBlend();
     }
     
     public void renderHeldItem(ItemStack heldItem, double mouseXWin, double mouseYWin) {
-        if (heldItem == null) return;
+        if (backend == null || heldItem == null) return;
         
         // Convert window mouse coordinates to framebuffer coordinates
         CoordinateUtils.Point2D fbCoords = CoordinateUtils.windowToFramebuffer(
@@ -265,12 +241,12 @@ public class InventoryRenderer {
         
         float itemSize = 19.2f;
         // Use data-driven rendering for held items (using GUI context as they're in the GUI)
-        mattmc.client.renderer.backend.opengl.ItemRenderer.renderItemWithTransform(
+        mattmc.client.renderer.backend.opengl.ItemRenderer.render(
             heldItem, 
-            mattmc.client.renderer.item.ItemDisplayContext.GUI, 
             fbCoords.x, 
             fbCoords.y, 
-            itemSize
+            itemSize,
+            backend
         );
         
         if (heldItem.getCount() > 1) {
@@ -279,7 +255,7 @@ public class InventoryRenderer {
     }
     
     public void renderCreativeInventory(List<Item> allItems, int scrollRow) {
-        if (creativeInventoryTexture == null) return;
+        if (backend == null || creativeInventoryTextureId < 0) return;
         
         int w = window.width(), h = window.height();
         float contentWidth = 176f * GUI_SCALE;
@@ -287,28 +263,14 @@ public class InventoryRenderer {
         float x = w - contentWidth - 20f;
         float y = (h - contentHeight) / 2f;
         
-        // Render texture
-        glEnable(GL_TEXTURE_2D);
-        creativeInventoryTexture.bind();
-        glColor4f(1f, 1f, 1f, 1f);
-        
-        float texU = 176f / 256f;
-        float texV_bottom = 1.0f - (296f / 384f);
-        
-        glBegin(GL_QUADS);
-        glTexCoord2f(0, 1); glVertex2f(x, y);
-        glTexCoord2f(texU, 1); glVertex2f(x + contentWidth, y);
-        glTexCoord2f(texU, texV_bottom); glVertex2f(x + contentWidth, y + contentHeight);
-        glTexCoord2f(0, texV_bottom); glVertex2f(x, y + contentHeight);
-        glEnd();
-        
-        glDisable(GL_TEXTURE_2D);
+        // Draw texture (partial texture coordinates handled by backend implementation)
+        backend.drawTexture(creativeInventoryTextureId, x, y, contentWidth, contentHeight);
         
         renderCreativeItems(allItems, scrollRow, x, y);
     }
     
     public void renderCreativeHoverHighlight(double mouseXWin, double mouseYWin, List<Item> allItems, int scrollRow) {
-        if (creativeInventoryTexture == null) return;
+        if (backend == null || creativeInventoryTextureId < 0) return;
         
         int w = window.width(), h = window.height();
         float contentWidth = 176f * GUI_SCALE;
@@ -340,18 +302,10 @@ public class InventoryRenderer {
                         float highlightX = slotX + (slotSpacing - highlightSize) / 2f - 3f;
                         float highlightY = slotY + (slotSpacing - highlightSize) / 2f - 3f;
                         
-                        glEnable(GL_BLEND);
-                        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-                        glColor4f(1f, 1f, 1f, 0.3f);
-                        
-                        glBegin(GL_QUADS);
-                        glVertex2f(highlightX, highlightY);
-                        glVertex2f(highlightX + highlightSize, highlightY);
-                        glVertex2f(highlightX + highlightSize, highlightY + highlightSize);
-                        glVertex2f(highlightX, highlightY + highlightSize);
-                        glEnd();
-                        
-                        glDisable(GL_BLEND);
+                        backend.enableBlend();
+                        backend.setColor(0xFFFFFF, 0.3f);
+                        backend.fillRect(highlightX, highlightY, highlightSize, highlightSize);
+                        backend.disableBlend();
                         return;
                     }
                 }
@@ -360,6 +314,8 @@ public class InventoryRenderer {
     }
     
     private void renderCreativeItems(List<Item> allItems, int scrollRow, float guiX, float guiY) {
+        if (backend == null) return;
+        
         // Item size: 16 pixels * GUI_SCALE = 48 pixels, half = 24 pixels
         float itemSize = 24f;
         float startX = 8f * GUI_SCALE;
@@ -381,12 +337,12 @@ public class InventoryRenderer {
                     float itemY = slotY + 9f * GUI_SCALE;
                     
                     // Use data-driven rendering for creative inventory
-                    mattmc.client.renderer.backend.opengl.ItemRenderer.renderItemWithTransform(
+                    mattmc.client.renderer.backend.opengl.ItemRenderer.render(
                         stack, 
-                        mattmc.client.renderer.item.ItemDisplayContext.GUI, 
                         itemX, 
                         itemY, 
-                        itemSize
+                        itemSize,
+                        backend
                     );
                 }
             }
@@ -394,51 +350,43 @@ public class InventoryRenderer {
     }
     
     public void renderTooltip(Item hoveredItem, double mouseXWin, double mouseYWin) {
-        if (hoveredItem == null || hoveredItem.getIdentifier() == null || tooltipRenderer == null) return;
+        if (hoveredItem == null || hoveredItem.getIdentifier() == null || tooltipRenderer == null || backend == null) return;
         
         String identifier = hoveredItem.getIdentifier();
         String itemName = identifier.contains(":") ? identifier.substring(identifier.indexOf(':') + 1) : identifier;
         itemName = itemName.substring(0, 1).toUpperCase() + itemName.substring(1).replace('_', ' ');
         
         // Convert window coordinates to framebuffer coordinates
-        float mouseFBX, mouseFBY;
-        int fbWidth, fbHeight;
-        try (MemoryStack stack = stackPush()) {
-            IntBuffer winW = stack.mallocInt(1), winH = stack.mallocInt(1);
-            IntBuffer fbW  = stack.mallocInt(1), fbH  = stack.mallocInt(1);
-            glfwGetWindowSize(window.handle(), winW, winH);
-            glfwGetFramebufferSize(window.handle(), fbW, fbH);
-            float sx = fbW.get(0) / Math.max(1f, winW.get(0));
-            float sy = fbH.get(0) / Math.max(1f, winH.get(0));
-            mouseFBX = (float) mouseXWin * sx;
-            mouseFBY = (float) mouseYWin * sy;
-            fbWidth = fbW.get(0);
-            fbHeight = fbH.get(0);
-        }
+        CoordinateUtils.Point2D fbCoords = CoordinateUtils.windowToFramebuffer(
+            window.handle(), mouseXWin, mouseYWin
+        );
         
-        tooltipRenderer.renderTooltip(itemName, mouseFBX, mouseFBY, fbWidth, fbHeight);
+        tooltipRenderer.renderTooltip(itemName, fbCoords.x, fbCoords.y, window.width(), window.height());
     }
     
-
-    
     public void close() {
-        if (inventoryTexture != null) {
-            inventoryTexture.close();
-            inventoryTexture = null;
+        if (backend != null) {
+            if (inventoryTextureId >= 0) {
+                backend.releaseTexture(inventoryTextureId);
+                inventoryTextureId = -1;
+            }
+            if (creativeInventoryTextureId >= 0) {
+                backend.releaseTexture(creativeInventoryTextureId);
+                creativeInventoryTextureId = -1;
+            }
         }
-        if (creativeInventoryTexture != null) {
-            creativeInventoryTexture.close();
-            creativeInventoryTexture = null;
-        }
-        if (blurEffect != null) {
-            blurEffect.close();
-            blurEffect = null;
-        }
-        // TooltipRenderer no longer needs cleanup
         tooltipRenderer = null;
     }
     
-    public Texture getInventoryTexture() {
-        return inventoryTexture;
+    public int getInventoryWidth() {
+        return inventoryWidth;
+    }
+    
+    public int getInventoryHeight() {
+        return inventoryHeight;
+    }
+    
+    public boolean hasInventoryTexture() {
+        return inventoryTextureId >= 0;
     }
 }

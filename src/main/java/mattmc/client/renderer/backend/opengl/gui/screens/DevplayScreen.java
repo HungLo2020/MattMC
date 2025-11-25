@@ -1,6 +1,7 @@
 package mattmc.client.renderer.backend.opengl.gui.screens;
 
 import mattmc.client.gui.screens.CommandSystem;
+import mattmc.client.gui.screens.DevplayInputHandler;
 import mattmc.client.gui.screens.DevplayUIState;
 import mattmc.client.gui.screens.Screen;
 import mattmc.client.Minecraft;
@@ -161,10 +162,11 @@ public final class DevplayScreen implements Screen {
         this.uiState = new DevplayUIState(now());
         this.commandSystem = new CommandSystem(player, this.world);
         this.inputHandler = new DevplayInputHandler(
-            game, window, player, this.world, blockInteraction, uiState, commandSystem,
+            game, window, game.getRenderBackend(),
+            player, this.world, blockInteraction, uiState, commandSystem,
             playerController, uiRenderer,
             () -> game.setScreen(new mattmc.client.gui.screens.PauseScreen(game, this)),
-            () -> game.setScreen(new InventoryScreen(game, this))
+            () -> game.setScreen(new mattmc.client.gui.screens.InventoryScreen(game, this))
         );
 
         // Register input callbacks

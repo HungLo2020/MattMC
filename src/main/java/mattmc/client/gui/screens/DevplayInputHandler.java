@@ -1,10 +1,8 @@
-package mattmc.client.renderer.backend.opengl.gui.screens;
+package mattmc.client.gui.screens;
 
-import mattmc.client.gui.screens.CommandSystem;
-import mattmc.client.gui.screens.DevplayUIState;
-import mattmc.client.gui.screens.Screen;
 import mattmc.client.Minecraft;
-import mattmc.client.renderer.backend.opengl.Window;
+import mattmc.client.renderer.backend.RenderBackend;
+import mattmc.client.renderer.window.WindowHandle;
 import mattmc.world.entity.player.BlockInteraction;
 import mattmc.world.entity.player.LocalPlayer;
 import mattmc.world.entity.player.PlayerInput;
@@ -13,16 +11,14 @@ import mattmc.world.level.Level;
 import mattmc.client.renderer.UIRenderer;
 import mattmc.world.item.ItemStack;
 
-import static org.lwjgl.glfw.GLFW.*;
-import static org.lwjgl.opengl.GL11.*;
-
 /**
  * Handles input callbacks for the Devplay screen.
  * Manages keyboard and mouse input, delegates to appropriate handlers.
  */
 public class DevplayInputHandler {
     private final Minecraft game;
-    private final Window window;
+    private final WindowHandle window;
+    private final RenderBackend backend;
     private final LocalPlayer player;
     private final Level world;
     private final BlockInteraction blockInteraction;
@@ -36,13 +32,15 @@ public class DevplayInputHandler {
     // Callback to open inventory
     private final Runnable onInventoryRequested;
     
-    public DevplayInputHandler(Minecraft game, Window window, LocalPlayer player, Level world, 
+    public DevplayInputHandler(Minecraft game, WindowHandle window, RenderBackend backend, 
+                               LocalPlayer player, Level world, 
                                BlockInteraction blockInteraction, DevplayUIState uiState,
                                CommandSystem commandSystem, PlayerController playerController,
                                UIRenderer uiRenderer, Runnable onPauseRequested,
                                Runnable onInventoryRequested) {
         this.game = game;
         this.window = window;
+        this.backend = backend;
         this.player = player;
         this.world = world;
         this.blockInteraction = blockInteraction;
@@ -60,22 +58,22 @@ public class DevplayInputHandler {
      */
     public void registerCallbacks() {
         // Capture mouse for FPS-style controls
-        glfwSetInputMode(window.handle(), GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+        backend.setCursorMode(window.handle(), RenderBackend.CURSOR_DISABLED);
         
         // Resize -> update viewport
-        glfwSetFramebufferSizeCallback(window.handle(), (win, w, h) -> {
-            glViewport(0, 0, Math.max(w, 1), Math.max(h, 1));
+        backend.setFramebufferSizeCallback(window.handle(), (w, h) -> {
+            backend.setViewport(0, 0, Math.max(w, 1), Math.max(h, 1));
         });
 
         // Setup character callback for command input
-        glfwSetCharCallback(window.handle(), (win, codepoint) -> {
+        backend.setCharCallback(window.handle(), (codepoint) -> {
             if (uiState.isCommandOverlayVisible() && codepoint < 128) {
                 uiState.appendToCommand((char) codepoint);
             }
         });
         
         // ESC to release mouse and go back; Space for jumping/flying; F3 to toggle debug menu; F4 to toggle lighting debug; / to toggle command overlay
-        glfwSetKeyCallback(window.handle(), (win, key, scancode, action, mods) -> {
+        backend.setKeyCallback(window.handle(), (key, scancode, action, mods) -> {
             if (uiState.isCommandOverlayVisible()) {
                 handleCommandOverlayInput(key, action);
             } else {
@@ -84,19 +82,19 @@ public class DevplayInputHandler {
         });
         
         // Mouse callback for looking around
-        glfwSetCursorPosCallback(window.handle(), (win, xpos, ypos) -> {
+        backend.setCursorPosCallback(window.handle(), (xpos, ypos) -> {
             playerController.handleMouseMovement(xpos, ypos);
         });
         
         // Setup mouse button callback for block interaction
-        glfwSetMouseButtonCallback(window.handle(), (win, button, action, mods) -> {
+        backend.setMouseButtonCallback(window.handle(), (button, action, mods) -> {
             if (!uiState.isCommandOverlayVisible()) {
                 handleMouseInput(button, action);
             }
         });
         
         // Setup scroll callback for hotbar scrolling
-        glfwSetScrollCallback(window.handle(), (win, xOffset, yOffset) -> {
+        backend.setScrollCallback(window.handle(), (xOffset, yOffset) -> {
             if (!uiState.isCommandOverlayVisible()) {
                 handleScroll(yOffset);
             }
@@ -104,38 +102,38 @@ public class DevplayInputHandler {
     }
     
     private void handleCommandOverlayInput(int key, int action) {
-        if (action == GLFW_PRESS || action == GLFW_REPEAT) {
-            if (key == GLFW_KEY_ESCAPE) {
+        if (action == RenderBackend.ACTION_PRESS || action == RenderBackend.ACTION_REPEAT) {
+            if (key == RenderBackend.KEY_ESCAPE) {
                 // Close command overlay without executing
                 uiState.closeCommandOverlay();
-            } else if (key == GLFW_KEY_ENTER) {
+            } else if (key == 257) { // GLFW_KEY_ENTER
                 // Execute command and close overlay
                 String feedback = commandSystem.executeCommand(uiState.getCommandText());
                 if (feedback != null) {
                     uiState.setCommandFeedback(feedback, 3.0);
                 }
                 uiState.closeCommandOverlay();
-            } else if (key == GLFW_KEY_BACKSPACE) {
+            } else if (key == 259) { // GLFW_KEY_BACKSPACE
                 uiState.deleteFromCommand();
             }
         }
     }
     
     private void handleGameInput(int key, int action) {
-        if (action == GLFW_PRESS) {
-            if (key == GLFW_KEY_ESCAPE) {
+        if (action == RenderBackend.ACTION_PRESS) {
+            if (key == RenderBackend.KEY_ESCAPE) {
                 // Open pause menu
                 onPauseRequested.run();
-            } else if (key == GLFW_KEY_SPACE) {
+            } else if (key == 32) { // GLFW_KEY_SPACE
                 // Handle jump/fly
                 playerController.handleSpacePress();
-            } else if (key == GLFW_KEY_F3) {
+            } else if (key == 292) { // GLFW_KEY_F3
                 // Toggle debug menu
                 uiState.toggleDebugMenu();
-            } else if (key == GLFW_KEY_F4) {
+            } else if (key == 293) { // GLFW_KEY_F4
                 // Toggle lighting debug overlay
                 uiState.toggleLightingDebug();
-            } else if (key == GLFW_KEY_SLASH) {
+            } else if (key == 47) { // GLFW_KEY_SLASH
                 // Open command overlay
                 uiState.openCommandOverlay();
             }
@@ -167,18 +165,18 @@ public class DevplayInputHandler {
     }
     
     private void handleMouseInput(int button, int action) {
-        if (action == GLFW_PRESS) {
-            if (button == GLFW_MOUSE_BUTTON_LEFT) {
+        if (action == RenderBackend.ACTION_PRESS) {
+            if (button == RenderBackend.MOUSE_BUTTON_LEFT) {
                 // Break block
                 blockInteraction.breakBlock();
-            } else if (button == GLFW_MOUSE_BUTTON_RIGHT) {
+            } else if (button == RenderBackend.MOUSE_BUTTON_RIGHT) {
                 // Place block from hotbar
                 ItemStack selectedStack = player.getInventory().getSelectedStack();
                 if (selectedStack != null) {
                     // Try to use the item
                     selectedStack.getItem().onUse(blockInteraction);
                 }
-            } else if (button == GLFW_MOUSE_BUTTON_MIDDLE) {
+            } else if (button == RenderBackend.MOUSE_BUTTON_MIDDLE) {
                 // Pick block - raycast and add to inventory
                 blockInteraction.pickBlock();
             }

@@ -1,18 +1,15 @@
-package mattmc.client.renderer.backend.opengl.gui.screens;
+package mattmc.client.gui.screens;
 
-import mattmc.client.gui.screens.Screen;
 import mattmc.client.Minecraft;
-import mattmc.client.renderer.backend.opengl.Window;
 import mattmc.client.gui.screens.inventory.CreativeInventoryManager;
 import mattmc.client.gui.screens.inventory.InventoryInputHandler;
-import mattmc.client.renderer.backend.opengl.gui.screens.inventory.InventoryRenderer;
+import mattmc.client.gui.screens.inventory.InventoryRenderer;
 import mattmc.client.gui.screens.inventory.InventorySlotManager;
+import mattmc.client.renderer.backend.RenderBackend;
+import mattmc.client.renderer.window.WindowHandle;
 import mattmc.world.entity.player.PlayerInput;
 import mattmc.world.item.Item;
 import mattmc.world.item.ItemStack;
-
-import static org.lwjgl.glfw.GLFW.*;
-import static org.lwjgl.opengl.GL11.*;
 
 /**
  * Inventory screen overlay - displays the inventory.png centered on screen.
@@ -27,8 +24,9 @@ public final class InventoryScreen implements Screen {
     private static final float CONTENT_OFFSET_Y = 45f;
     
     private final Minecraft game;
-    private final Window window;
-    private final DevplayScreen gameScreen;
+    private final WindowHandle window;
+    private final RenderBackend backend;
+    private final mattmc.client.renderer.backend.opengl.gui.screens.DevplayScreen gameScreen;
     
     // Mouse tracking for slot highlighting
     private double mouseXWin, mouseYWin;
@@ -39,9 +37,10 @@ public final class InventoryScreen implements Screen {
     private final CreativeInventoryManager creativeManager;
     private final InventoryRenderer renderer;
 
-    public InventoryScreen(Minecraft game, DevplayScreen gameScreen) {
+    public InventoryScreen(Minecraft game, mattmc.client.renderer.backend.opengl.gui.screens.DevplayScreen gameScreen) {
         this.game = game;
-        this.window = (Window) game.window();
+        this.window = game.window();
+        this.backend = game.getRenderBackend();
         this.gameScreen = gameScreen;
         
         // Sync player position to prevent flickering during interpolation
@@ -53,33 +52,36 @@ public final class InventoryScreen implements Screen {
         this.creativeManager = new CreativeInventoryManager();
         this.renderer = new InventoryRenderer(window, slotManager);
         
-        // Set the render backend for tooltip rendering
-        this.renderer.setBackend(gameScreen.getRenderBackend());
-        
+        // Set the render backend for rendering operations
+        this.renderer.setBackend(backend);
+    }
+    
+    @Override
+    public void onOpen() {
         // Release mouse cursor
-        glfwSetInputMode(window.handle(), GLFW_CURSOR, GLFW_CURSOR_NORMAL);
+        backend.setCursorMode(window.handle(), RenderBackend.CURSOR_NORMAL);
 
         // Track mouse position for slot highlighting
-        glfwSetCursorPosCallback(window.handle(), (h, x, y) -> { 
+        backend.setCursorPosCallback(window.handle(), (x, y) -> { 
             mouseXWin = x; 
             mouseYWin = y; 
         });
 
         // Handle mouse button clicks for inventory interaction
-        glfwSetMouseButtonCallback(window.handle(), (h, button, action, mods) -> {
-            if (action == GLFW_PRESS) {
-                if (button == GLFW_MOUSE_BUTTON_LEFT) {
+        backend.setMouseButtonCallback(window.handle(), (button, action, mods) -> {
+            if (action == RenderBackend.ACTION_PRESS) {
+                if (button == RenderBackend.MOUSE_BUTTON_LEFT) {
                     handleLeftClick(mods);
-                } else if (button == GLFW_MOUSE_BUTTON_RIGHT) {
+                } else if (button == RenderBackend.MOUSE_BUTTON_RIGHT) {
                     handleRightClick(mods);
                 }
             }
         });
 
         // Set up key callback for inventory key (respects user configuration) or ESC to close
-        glfwSetKeyCallback(window.handle(), (win, key, scancode, action, mods) -> {
-            if (action == GLFW_PRESS) {
-                if (key == GLFW_KEY_ESCAPE) {
+        backend.setKeyCallback(window.handle(), (key, scancode, action, mods) -> {
+            if (action == RenderBackend.ACTION_PRESS) {
+                if (key == RenderBackend.KEY_ESCAPE) {
                     closeInventory();
                 } else {
                     // Check if this is the inventory key
@@ -97,12 +99,12 @@ public final class InventoryScreen implements Screen {
         });
         
         // Handle scroll wheel for creative inventory
-        glfwSetScrollCallback(window.handle(), (win, xoffset, yoffset) -> {
+        backend.setScrollCallback(window.handle(), (xoffset, yoffset) -> {
             creativeManager.handleScroll(yoffset);
         });
 
-        glfwSetFramebufferSizeCallback(window.handle(), (win, newW, newH) -> {
-            glViewport(0, 0, Math.max(newW, 1), Math.max(newH, 1));
+        backend.setFramebufferSizeCallback(window.handle(), (newW, newH) -> {
+            backend.setViewport(0, 0, Math.max(newW, 1), Math.max(newH, 1));
         });
     }
 
@@ -127,7 +129,7 @@ public final class InventoryScreen implements Screen {
         }
         
         // Recapture mouse for FPS controls
-        glfwSetInputMode(window.handle(), GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+        backend.setCursorMode(window.handle(), RenderBackend.CURSOR_DISABLED);
         game.setScreen(gameScreen);
     }
     
@@ -147,9 +149,9 @@ public final class InventoryScreen implements Screen {
         }
         
         // Otherwise handle normal inventory click
-        if (renderer.getInventoryTexture() != null) {
-            float texWidth = renderer.getInventoryTexture().width * GUI_SCALE;
-            float texHeight = renderer.getInventoryTexture().height * GUI_SCALE;
+        if (renderer.hasInventoryTexture()) {
+            float texWidth = renderer.getInventoryWidth() * GUI_SCALE;
+            float texHeight = renderer.getInventoryHeight() * GUI_SCALE;
             float guiX = (window.width() - texWidth) / 2f + (CONTENT_OFFSET_X * GUI_SCALE);
             float guiY = (window.height() - texHeight) / 2f + (CONTENT_OFFSET_Y * GUI_SCALE);
             
@@ -168,9 +170,9 @@ public final class InventoryScreen implements Screen {
         
         mattmc.world.item.Inventory inventory = player.getInventory();
         
-        if (renderer.getInventoryTexture() != null) {
-            float texWidth = renderer.getInventoryTexture().width * GUI_SCALE;
-            float texHeight = renderer.getInventoryTexture().height * GUI_SCALE;
+        if (renderer.hasInventoryTexture()) {
+            float texWidth = renderer.getInventoryWidth() * GUI_SCALE;
+            float texHeight = renderer.getInventoryHeight() * GUI_SCALE;
             float guiX = (window.width() - texWidth) / 2f + (CONTENT_OFFSET_X * GUI_SCALE);
             float guiY = (window.height() - texHeight) / 2f + (CONTENT_OFFSET_Y * GUI_SCALE);
             
@@ -187,9 +189,9 @@ public final class InventoryScreen implements Screen {
         
         mattmc.world.item.Inventory inventory = player.getInventory();
         
-        if (renderer.getInventoryTexture() != null) {
-            float texWidth = renderer.getInventoryTexture().width * GUI_SCALE;
-            float texHeight = renderer.getInventoryTexture().height * GUI_SCALE;
+        if (renderer.hasInventoryTexture()) {
+            float texWidth = renderer.getInventoryWidth() * GUI_SCALE;
+            float texHeight = renderer.getInventoryHeight() * GUI_SCALE;
             float guiX = (window.width() - texWidth) / 2f + (CONTENT_OFFSET_X * GUI_SCALE);
             float guiY = (window.height() - texHeight) / 2f + (CONTENT_OFFSET_Y * GUI_SCALE);
             
@@ -213,9 +215,9 @@ public final class InventoryScreen implements Screen {
         }
         
         // Check regular inventory slots
-        if (renderer.getInventoryTexture() != null) {
-            float texWidth = renderer.getInventoryTexture().width * GUI_SCALE;
-            float texHeight = renderer.getInventoryTexture().height * GUI_SCALE;
+        if (renderer.hasInventoryTexture()) {
+            float texWidth = renderer.getInventoryWidth() * GUI_SCALE;
+            float texHeight = renderer.getInventoryHeight() * GUI_SCALE;
             float guiX = (window.width() - texWidth) / 2f + (CONTENT_OFFSET_X * GUI_SCALE);
             float guiY = (window.height() - texHeight) / 2f + (CONTENT_OFFSET_Y * GUI_SCALE);
             
@@ -270,21 +272,11 @@ public final class InventoryScreen implements Screen {
             renderer.renderTooltip(hoveredItem, mouseXWin, mouseYWin);
         }
         
-        glDisable(GL_BLEND);
+        backend.disableBlend();
     }
 
     @Override
-    public void onOpen() {}
-    
-    @Override
     public void onClose() {
-        // Clear GLFW callbacks to prevent memory leaks
-        glfwSetCursorPosCallback(window.handle(), null);
-        glfwSetMouseButtonCallback(window.handle(), null);
-        glfwSetKeyCallback(window.handle(), null);
-        glfwSetScrollCallback(window.handle(), null);
-        glfwSetFramebufferSizeCallback(window.handle(), null);
-        
         // Close renderer resources
         renderer.close();
     }
