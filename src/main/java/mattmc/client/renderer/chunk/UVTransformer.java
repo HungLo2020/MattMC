@@ -127,26 +127,20 @@ public class UVTransformer {
     
     /**
      * Build a rotation matrix from X and Y rotation angles.
-     * This creates a PURE rotation matrix (no translation) like Minecraft's Transformation.
-     * The center-to-corner transform is applied separately in getUVLockTransform.
+     * This is an EXACT port of Minecraft's BlockModelRotation constructor (line 49).
      * 
-     * In Minecraft, the blockstate rotation is applied as: first rotate around Y, then around X.
-     * This means the matrix is: Rx * Ry (X rotation applied after Y rotation).
-     * In JOML, rotate() multiplies on the right, so we need to call rotate(X) first, then rotate(Y).
+     * Minecraft uses: rotateYXZ(-yDegrees, -xDegrees, 0) - note the NEGATIVE angles!
+     * This creates the proper rotation matrix for blockstate rotations.
      */
     private static Matrix4f buildRotationMatrix(int xDegrees, int yDegrees) {
-        Matrix4f matrix = new Matrix4f();
-        
-        // Build Rx * Ry matrix: call rotate(X) first, then rotate(Y)
-        // This is because JOML's rotate() multiplies on the right
-        if (xDegrees != 0) {
-            matrix.rotate((float)Math.toRadians(xDegrees), 1, 0, 0);
-        }
-        if (yDegrees != 0) {
-            matrix.rotate((float)Math.toRadians(yDegrees), 0, 1, 0);
-        }
-        
-        return matrix;
+        // Minecraft's exact approach from BlockModelRotation:
+        // new Quaternionf().rotateYXZ((float)(-pY) * ((float)Math.PI / 180F), (float)(-pX) * ((float)Math.PI / 180F), 0.0F)
+        Quaternionf quaternion = new Quaternionf().rotateYXZ(
+            (float)(-yDegrees) * ((float)Math.PI / 180F),
+            (float)(-xDegrees) * ((float)Math.PI / 180F),
+            0.0F
+        );
+        return new Matrix4f().rotation(quaternion);
     }
     
     /**
