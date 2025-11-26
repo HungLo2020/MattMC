@@ -183,19 +183,25 @@ public class CommandBuffer {
     }
     
     /**
-     * Sorts commands by depth (transform index) for proper transparent object ordering.
+     * Sorts commands by transform index.
      * 
-     * <p>Transparent objects must typically be rendered back-to-front to achieve
-     * correct blending results. This method sorts by transform index, which can
-     * be used as a proxy for depth when transforms are registered in depth order.
+     * <p>This method can be used for depth-based sorting of transparent objects
+     * when transform indices are assigned based on camera distance. Transparent
+     * objects typically need to be rendered back-to-front to achieve correct
+     * blending results.
      * 
-     * <p><b>Note:</b> For true depth sorting, the caller should ensure transform
-     * indices correspond to depth ordering, or use a custom comparator.
+     * <p><b>Important:</b> Transform index is not inherently a depth value - it's
+     * an index into a transform buffer. This sorting is only useful for depth
+     * ordering if the caller has assigned transform indices in depth order
+     * (e.g., farther objects have higher indices).
      * 
-     * @param backToFront if true, sorts from highest to lowest transform index
-     *                    (back to front); if false, sorts front to back
+     * <p><b>Use case:</b> When rendering transparent objects where transform
+     * indices have been pre-calculated based on camera distance.
+     * 
+     * @param backToFront if true, sorts from highest to lowest transform index;
+     *                    if false, sorts from lowest to highest transform index
      */
-    public void sortByDepth(boolean backToFront) {
+    public void sortByTransformIndex(boolean backToFront) {
         if (backToFront) {
             commands.sort(Comparator.comparingInt((DrawCommand cmd) -> cmd.transformIndex).reversed());
         } else {

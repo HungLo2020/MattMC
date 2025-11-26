@@ -248,12 +248,12 @@ public class CommandBufferTest {
     }
     
     @Test
-    public void testSortByDepthBackToFront() {
+    public void testSortByTransformIndexBackToFront() {
         buffer.add(new DrawCommand(1, 1, 10, RenderPass.TRANSPARENT));
         buffer.add(new DrawCommand(2, 1, 50, RenderPass.TRANSPARENT));
         buffer.add(new DrawCommand(3, 1, 30, RenderPass.TRANSPARENT));
         
-        buffer.sortByDepth(true); // back to front (highest first)
+        buffer.sortByTransformIndex(true); // back to front (highest first)
         
         assertEquals(50, buffer.get(0).transformIndex);
         assertEquals(30, buffer.get(1).transformIndex);
@@ -261,12 +261,12 @@ public class CommandBufferTest {
     }
     
     @Test
-    public void testSortByDepthFrontToBack() {
+    public void testSortByTransformIndexFrontToBack() {
         buffer.add(new DrawCommand(1, 1, 50, RenderPass.OPAQUE));
         buffer.add(new DrawCommand(2, 1, 10, RenderPass.OPAQUE));
         buffer.add(new DrawCommand(3, 1, 30, RenderPass.OPAQUE));
         
-        buffer.sortByDepth(false); // front to back (lowest first)
+        buffer.sortByTransformIndex(false); // front to back (lowest first)
         
         assertEquals(10, buffer.get(0).transformIndex);
         assertEquals(30, buffer.get(1).transformIndex);
@@ -280,7 +280,7 @@ public class CommandBufferTest {
             buffer.sortByMaterial();
             buffer.sortByRenderPass();
             buffer.sortForRendering();
-            buffer.sortByDepth(true);
+            buffer.sortByTransformIndex(true);
         });
     }
     
