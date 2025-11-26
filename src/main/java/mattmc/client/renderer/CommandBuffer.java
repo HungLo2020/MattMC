@@ -4,6 +4,7 @@ import mattmc.client.renderer.backend.DrawCommand;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 
 /**
@@ -127,6 +128,79 @@ public class CommandBuffer {
      */
     public void clear() {
         commands.clear();
+    }
+    
+    // ===== Sorting and Batching Methods =====
+    
+    /**
+     * Sorts commands by material ID to minimize state changes in OpenGL.
+     * 
+     * <p>Batching similar materials together reduces the number of shader/texture
+     * binding operations, which is a significant performance optimization for
+     * rendering large numbers of objects.
+     * 
+     * <p><b>Use case:</b> Call this before submitting commands to the backend
+     * to reduce state changes when all commands are in the same render pass.
+     */
+    public void sortByMaterial() {
+        commands.sort(Comparator.comparingInt(cmd -> cmd.materialId));
+    }
+    
+    /**
+     * Sorts commands by render pass.
+     * 
+     * <p>This ensures proper rendering order:
+     * <ol>
+     *   <li>OPAQUE - rendered first with depth testing</li>
+     *   <li>TRANSPARENT - rendered after opaque with blending</li>
+     *   <li>SHADOW - for shadow map generation</li>
+     *   <li>UI - rendered last on top of everything</li>
+     * </ol>
+     * 
+     * <p><b>Use case:</b> Call this when commands from different render passes
+     * are mixed in the buffer and need to be separated for proper rendering.
+     */
+    public void sortByRenderPass() {
+        commands.sort(Comparator.comparing(cmd -> cmd.pass));
+    }
+    
+    /**
+     * Sorts commands optimally for rendering: first by render pass, then by material.
+     * 
+     * <p>This is the most efficient sorting strategy as it:
+     * <ul>
+     *   <li>Ensures correct render pass ordering (opaque → transparent → UI)</li>
+     *   <li>Minimizes state changes within each pass by batching materials</li>
+     * </ul>
+     * 
+     * <p><b>Use case:</b> Call this before submitting a full frame's worth of
+     * commands to the backend for optimal rendering performance.
+     */
+    public void sortForRendering() {
+        commands.sort(Comparator
+            .comparing((DrawCommand cmd) -> cmd.pass)
+            .thenComparingInt(cmd -> cmd.materialId));
+    }
+    
+    /**
+     * Sorts commands by depth (transform index) for proper transparent object ordering.
+     * 
+     * <p>Transparent objects must typically be rendered back-to-front to achieve
+     * correct blending results. This method sorts by transform index, which can
+     * be used as a proxy for depth when transforms are registered in depth order.
+     * 
+     * <p><b>Note:</b> For true depth sorting, the caller should ensure transform
+     * indices correspond to depth ordering, or use a custom comparator.
+     * 
+     * @param backToFront if true, sorts from highest to lowest transform index
+     *                    (back to front); if false, sorts front to back
+     */
+    public void sortByDepth(boolean backToFront) {
+        if (backToFront) {
+            commands.sort(Comparator.comparingInt((DrawCommand cmd) -> cmd.transformIndex).reversed());
+        } else {
+            commands.sort(Comparator.comparingInt(cmd -> cmd.transformIndex));
+        }
     }
     
     /**

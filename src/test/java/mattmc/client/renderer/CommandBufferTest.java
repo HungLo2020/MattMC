@@ -182,4 +182,116 @@ public class CommandBufferTest {
         assertEquals(0, buffer.get(0).meshId);
         assertEquals(9999, buffer.get(9999).meshId);
     }
+    
+    // ===== Sorting and Batching Tests =====
+    
+    @Test
+    public void testSortByMaterial() {
+        // Add commands with different materials in random order
+        buffer.add(new DrawCommand(1, 300, 1, RenderPass.OPAQUE));
+        buffer.add(new DrawCommand(2, 100, 2, RenderPass.OPAQUE));
+        buffer.add(new DrawCommand(3, 200, 3, RenderPass.OPAQUE));
+        buffer.add(new DrawCommand(4, 100, 4, RenderPass.OPAQUE));
+        
+        buffer.sortByMaterial();
+        
+        // Verify sorted by materialId
+        assertEquals(100, buffer.get(0).materialId);
+        assertEquals(100, buffer.get(1).materialId);
+        assertEquals(200, buffer.get(2).materialId);
+        assertEquals(300, buffer.get(3).materialId);
+    }
+    
+    @Test
+    public void testSortByRenderPass() {
+        // Add commands in wrong order
+        buffer.add(new DrawCommand(1, 1, 1, RenderPass.UI));
+        buffer.add(new DrawCommand(2, 2, 2, RenderPass.OPAQUE));
+        buffer.add(new DrawCommand(3, 3, 3, RenderPass.TRANSPARENT));
+        buffer.add(new DrawCommand(4, 4, 4, RenderPass.SHADOW));
+        
+        buffer.sortByRenderPass();
+        
+        // Verify sorted by pass order (OPAQUE < TRANSPARENT < SHADOW < UI)
+        assertEquals(RenderPass.OPAQUE, buffer.get(0).pass);
+        assertEquals(RenderPass.TRANSPARENT, buffer.get(1).pass);
+        assertEquals(RenderPass.SHADOW, buffer.get(2).pass);
+        assertEquals(RenderPass.UI, buffer.get(3).pass);
+    }
+    
+    @Test
+    public void testSortForRendering() {
+        // Add commands with mixed passes and materials
+        buffer.add(new DrawCommand(1, 200, 1, RenderPass.TRANSPARENT));
+        buffer.add(new DrawCommand(2, 100, 2, RenderPass.OPAQUE));
+        buffer.add(new DrawCommand(3, 300, 3, RenderPass.OPAQUE));
+        buffer.add(new DrawCommand(4, 100, 4, RenderPass.TRANSPARENT));
+        buffer.add(new DrawCommand(5, 50, 5, RenderPass.UI));
+        
+        buffer.sortForRendering();
+        
+        // Verify sorted by pass first, then by material within each pass
+        // OPAQUE commands: material 100 should come before 300
+        assertEquals(RenderPass.OPAQUE, buffer.get(0).pass);
+        assertEquals(100, buffer.get(0).materialId);
+        assertEquals(RenderPass.OPAQUE, buffer.get(1).pass);
+        assertEquals(300, buffer.get(1).materialId);
+        
+        // TRANSPARENT commands: material 100 should come before 200
+        assertEquals(RenderPass.TRANSPARENT, buffer.get(2).pass);
+        assertEquals(100, buffer.get(2).materialId);
+        assertEquals(RenderPass.TRANSPARENT, buffer.get(3).pass);
+        assertEquals(200, buffer.get(3).materialId);
+        
+        // UI command last
+        assertEquals(RenderPass.UI, buffer.get(4).pass);
+    }
+    
+    @Test
+    public void testSortByDepthBackToFront() {
+        buffer.add(new DrawCommand(1, 1, 10, RenderPass.TRANSPARENT));
+        buffer.add(new DrawCommand(2, 1, 50, RenderPass.TRANSPARENT));
+        buffer.add(new DrawCommand(3, 1, 30, RenderPass.TRANSPARENT));
+        
+        buffer.sortByDepth(true); // back to front (highest first)
+        
+        assertEquals(50, buffer.get(0).transformIndex);
+        assertEquals(30, buffer.get(1).transformIndex);
+        assertEquals(10, buffer.get(2).transformIndex);
+    }
+    
+    @Test
+    public void testSortByDepthFrontToBack() {
+        buffer.add(new DrawCommand(1, 1, 50, RenderPass.OPAQUE));
+        buffer.add(new DrawCommand(2, 1, 10, RenderPass.OPAQUE));
+        buffer.add(new DrawCommand(3, 1, 30, RenderPass.OPAQUE));
+        
+        buffer.sortByDepth(false); // front to back (lowest first)
+        
+        assertEquals(10, buffer.get(0).transformIndex);
+        assertEquals(30, buffer.get(1).transformIndex);
+        assertEquals(50, buffer.get(2).transformIndex);
+    }
+    
+    @Test
+    public void testSortEmptyBuffer() {
+        // Should not throw
+        assertDoesNotThrow(() -> {
+            buffer.sortByMaterial();
+            buffer.sortByRenderPass();
+            buffer.sortForRendering();
+            buffer.sortByDepth(true);
+        });
+    }
+    
+    @Test
+    public void testSortSingleCommand() {
+        DrawCommand cmd = new DrawCommand(1, 1, 1, RenderPass.OPAQUE);
+        buffer.add(cmd);
+        
+        buffer.sortForRendering();
+        
+        assertEquals(1, buffer.size());
+        assertEquals(cmd, buffer.get(0));
+    }
 }
