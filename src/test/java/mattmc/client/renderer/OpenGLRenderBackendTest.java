@@ -44,11 +44,24 @@ public class OpenGLRenderBackendTest {
     }
     
     @Test
-    public void testDoubleBeginFrameThrows() {
+    public void testNestedFramesAreSupported() {
+        // Frame management now supports nesting via reference counting.
+        // Multiple beginFrame() calls increase the depth; endFrame() decreases it.
+        // The actual GL state initialization only happens on the first beginFrame().
         backend.beginFrame();
-        assertThrows(IllegalStateException.class, () -> {
-            backend.beginFrame();
-        }, "Calling beginFrame() twice should throw");
+        assertTrue(backend.isFrameActive(), "Frame should be active after first beginFrame()");
+        
+        // Second beginFrame() should not throw - it just increments depth
+        backend.beginFrame();
+        assertTrue(backend.isFrameActive(), "Frame should still be active after nested beginFrame()");
+        
+        // First endFrame() - still active because depth > 0
+        backend.endFrame();
+        assertTrue(backend.isFrameActive(), "Frame should still be active after first endFrame() with nesting");
+        
+        // Second endFrame() - now inactive
+        backend.endFrame();
+        assertFalse(backend.isFrameActive(), "Frame should be inactive after all endFrame() calls balance beginFrame() calls");
     }
     
     @Test
