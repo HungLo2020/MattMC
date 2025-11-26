@@ -515,17 +515,23 @@ public class OpenGLRenderBackend implements RenderBackend {
         int width = (type == 0) ? (int)(182 * HOTBAR_SCALE) : (int)(24 * HOTBAR_SCALE);
         int height = (type == 0) ? (int)(22 * HOTBAR_SCALE) : (int)(24 * HOTBAR_SCALE);
         
-        // Load textures using HotbarRenderer's texture paths (cached via loadTexture)
+        // Load textures using HotbarRenderer's texture paths (cached via textureCache)
         String texturePath = (type == 0) ? 
             "/assets/textures/gui/sprites/hud/hotbar.png" :
             "/assets/textures/gui/sprites/hud/hotbar_selection.png";
         
-        // Use cached texture loading to avoid loading textures every frame
-        int textureId = loadTexture(texturePath);
+        // Use cached texture to avoid loading textures every frame
+        Texture texture = textureCache.get(texturePath);
+        if (texture == null) {
+            texture = Texture.load(texturePath);
+            if (texture != null) {
+                textureCache.put(texturePath, texture);
+            }
+        }
         
-        if (textureId > 0) {
+        if (texture != null) {
             glEnable(GL_TEXTURE_2D);
-            glBindTexture(GL_TEXTURE_2D, textureId);
+            texture.bind();
             glColor4f(1f, 1f, 1f, 1f);
             
             glBegin(GL_QUADS);
@@ -1119,10 +1125,6 @@ public class OpenGLRenderBackend implements RenderBackend {
         Texture tex = textureCache.get(path);
         if (tex == null) {
             tex = Texture.load(path);
-            if (tex == null) {
-                logger.warn("Failed to load texture: {}", path);
-                return 0;
-            }
             textureCache.put(path, tex);
             textureIdToPath.put(tex.id, path);
         }

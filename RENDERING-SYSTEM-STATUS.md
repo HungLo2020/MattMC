@@ -531,27 +531,27 @@ public class CommandBuffer {
 
 ### 18. ~~Texture Loading on Every Frame~~ ✅ FIXED
 
-**Location**: `mattmc/client/renderer/backend/opengl/OpenGLRenderBackend.java` (Lines 507-540)
+**Location**: `mattmc/client/renderer/backend/opengl/OpenGLRenderBackend.java` (Lines 507-544)
 
-**Status**: **RESOLVED** - Updated `submitHotbarCommand()` to use the existing `loadTexture()` method which caches textures in `textureCache`, avoiding texture reloading on every frame.
+**Status**: **RESOLVED** - Updated `submitHotbarCommand()` to use the existing `textureCache` map to cache textures, avoiding texture reloading on every frame.
 
 **Original Problem**: In `submitHotbarCommand()`, textures were loaded every time the hotbar was rendered using `Texture.load(texturePath)`, causing unnecessary texture loading and potential performance issues.
 
-**Solution Applied**: The method now uses the existing `loadTexture()` method which internally caches textures:
+**Solution Applied**: The method now caches textures in the existing `textureCache` map:
 
 ```java
 // Before: Direct texture loading (no caching)
 Texture texture = Texture.load(texturePath);
-if (texture != null) {
-    texture.bind();
 
 // After: Uses cached texture loading
-int textureId = loadTexture(texturePath);
-if (textureId > 0) {
-    glBindTexture(GL_TEXTURE_2D, textureId);
+Texture texture = textureCache.get(texturePath);
+if (texture == null) {
+    texture = Texture.load(texturePath);
+    textureCache.put(texturePath, texture);
+}
 ```
 
-The `loadTexture()` method (lines 1117-1126) maintains a `textureCache` map that stores loaded textures by path, ensuring each texture is only loaded once.
+Textures are loaded once on first use and reused on subsequent frames.
 
 ---
 
