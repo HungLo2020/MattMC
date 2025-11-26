@@ -90,6 +90,12 @@ public interface RenderBackend {
      * <p>After this call, the backend should be ready to accept {@link #submit(DrawCommand)}
      * calls.
      * 
+     * <p><b>Nested Calls:</b> This method supports nested calls via reference counting.
+     * Multiple renderers can safely call beginFrame()/endFrame() pairs independently.
+     * The frame is only actually started on the first call and ended on the last matching
+     * endFrame() call. This enables a gradual migration to centralized frame management
+     * while maintaining backward compatibility with existing code.
+     * 
      * @see #endFrame()
      */
     void beginFrame();
@@ -130,6 +136,10 @@ public interface RenderBackend {
      * 
      * <p>After this call, no more {@link #submit(DrawCommand)} calls should be made until
      * the next {@link #beginFrame()}.
+     * 
+     * <p><b>Nested Calls:</b> This method supports nested calls via reference counting.
+     * Each endFrame() must match a previous beginFrame() call. Only the final endFrame()
+     * (when nesting depth returns to 0) actually performs cleanup operations.
      * 
      * @see #beginFrame()
      */
@@ -510,6 +520,25 @@ public interface RenderBackend {
      */
     void rotateMatrix(float angle, float x, float y, float z);
     
+    /**
+     * Update a frustum from the current graphics API state.
+     * 
+     * <p>This method allows the backend to extract the current projection and modelview
+     * matrices and use them to update the provided frustum. This maintains the backend-agnostic
+     * design by allowing the frontend to use frustum culling without directly accessing
+     * graphics API state.
+     * 
+     * <p>The backend implementation will:
+     * <ul>
+     *   <li><b>OpenGL:</b> Read GL_PROJECTION_MATRIX and GL_MODELVIEW_MATRIX from OpenGL state</li>
+     *   <li><b>Vulkan (future):</b> Use the cached projection/view matrices</li>
+     *   <li><b>Debug:</b> Use identity matrices or stored test values</li>
+     * </ul>
+     * 
+     * @param frustum the frustum to update with current matrices
+     */
+    void updateFrustum(mattmc.client.renderer.Frustum frustum);
+
     // === Window Control ===
     
     /**

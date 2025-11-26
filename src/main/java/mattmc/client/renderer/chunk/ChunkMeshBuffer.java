@@ -1,8 +1,9 @@
 package mattmc.client.renderer.chunk;
 
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.nio.FloatBuffer;
 import java.nio.IntBuffer;
-import org.lwjgl.BufferUtils;
 
 /**
  * CPU-side container for chunk mesh vertex and index data.
@@ -75,9 +76,12 @@ public class ChunkMeshBuffer {
     
     /**
      * Create a direct FloatBuffer from vertex data for GPU upload.
+     * Uses standard Java NIO to maintain backend-agnostic architecture.
      */
     public FloatBuffer createVertexBuffer() {
-        FloatBuffer buffer = BufferUtils.createFloatBuffer(vertices.length);
+        ByteBuffer byteBuffer = ByteBuffer.allocateDirect(vertices.length * Float.BYTES);
+        byteBuffer.order(ByteOrder.nativeOrder());
+        FloatBuffer buffer = byteBuffer.asFloatBuffer();
         buffer.put(vertices);
         buffer.flip();
         return buffer;
@@ -85,9 +89,12 @@ public class ChunkMeshBuffer {
     
     /**
      * Create a direct IntBuffer from index data for GPU upload.
+     * Uses standard Java NIO to maintain backend-agnostic architecture.
      */
     public IntBuffer createIndexBuffer() {
-        IntBuffer buffer = BufferUtils.createIntBuffer(indices.length);
+        ByteBuffer byteBuffer = ByteBuffer.allocateDirect(indices.length * Integer.BYTES);
+        byteBuffer.order(ByteOrder.nativeOrder());
+        IntBuffer buffer = byteBuffer.asIntBuffer();
         buffer.put(indices);
         buffer.flip();
         return buffer;

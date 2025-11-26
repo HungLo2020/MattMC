@@ -11,6 +11,7 @@ import mattmc.client.renderer.backend.RenderPass;
 import mattmc.client.renderer.backend.DrawCommand;
 
 import mattmc.client.renderer.backend.RenderBackend;
+import mattmc.client.renderer.backend.UIMeshIds;
 
 import mattmc.client.renderer.backend.opengl.ChunkVAO;
 import mattmc.client.renderer.backend.opengl.TextureAtlas;
@@ -70,11 +71,23 @@ public class OpenGLRenderBackend implements RenderBackend {
     private VoxelLitShader currentShader = null;
     private TextureAtlas currentAtlas = null;
     
-    // Frame state
-    private boolean frameActive = false;
+    // Frame state - uses reference counting to support nested begin/end calls
+    private int frameDepth = 0;
     
     // Blur helper for AbstractBlurBox functionality
     private AbstractBlurBox blurHelper = null;
+    
+    // Sprite batcher for efficient 2D rendering (replaces immediate mode)
+    private SpriteBatcher spriteBatcher = null;
+    
+    // Shader for 2D sprite/UI rendering
+    private Shader spriteShader = null;
+    
+    // Current color state for 2D rendering
+    private float currentColorR = 1.0f;
+    private float currentColorG = 1.0f;
+    private float currentColorB = 1.0f;
+    private float currentColorA = 1.0f;
     
     /**
      * Information about a material (shader + texture combination).
@@ -160,28 +173,167 @@ public class OpenGLRenderBackend implements RenderBackend {
         transformRegistry.clear();
         currentShader = null;
         currentAtlas = null;
+        if (spriteBatcher != null) {
+            spriteBatcher.dispose();
+            spriteBatcher = null;
+        }
+        spriteShader = null;
     }
     
+    /**
+     * Initialize the sprite batcher and shader for 2D rendering.
+     * Called lazily on first use.
+     */
+    private void ensureSpriteBatcherInitialized() {
+        if (spriteBatcher == null) {
+            spriteBatcher = new SpriteBatcher();
+        }
+        if (spriteShader == null) {
+            // Simple 2D sprite shader (GLSL 130 for consistency)
+            String vertexSource = """
+                #version 130
+                in vec2 aPosition;
+                in vec2 aTexCoord;
+                in vec4 aColor;
+                
+                out vec2 vTexCoord;
+                out vec4 vColor;
+                
+                uniform mat4 uProjection;
+                
+                void main() {
+                    gl_Position = uProjection * vec4(aPosition, 0.0, 1.0);
+                    vTexCoord = aTexCoord;
+                    vColor = aColor;
+                }
+                """;
+            String fragmentSource = """
+                #version 130
+                in vec2 vTexCoord;
+                in vec4 vColor;
+                
+                uniform sampler2D uTexture;
+                uniform bool uUseTexture;
+                
+                out vec4 fragColor;
+                
+                void main() {
+                    if (uUseTexture) {
+                        fragColor = texture(uTexture, vTexCoord) * vColor;
+                    } else {
+                        fragColor = vColor;
+                    }
+                }
+                """;
+            spriteShader = new Shader(vertexSource, fragmentSource);
+        }
+    }
+    
+    // Current screen dimensions for 2D batching
+    private int screenWidth = 800;
+    private int screenHeight = 600;
+    
+    /**
+     * Set the screen dimensions for 2D rendering.
+     * Must be called when the window is resized.
+     */
+    public void setScreenDimensions(int width, int height) {
+        this.screenWidth = width;
+        this.screenHeight = height;
+    }
+    
+    /**
+     * Begin batched 2D sprite rendering.
+     * Sets up orthographic projection and binds the sprite shader.
+     * Call this before using fillRectBatched or addQuadToBatch.
+     */
+    private void beginSpriteBatch() {
+        ensureSpriteBatcherInitialized();
+        
+        // Bind shader and set up orthographic projection
+        spriteShader.use();
+        
+        // Create orthographic projection matrix (top-left origin)
+        float[] projection = createOrthoMatrix(0, screenWidth, screenHeight, 0, -1, 1);
+        spriteShader.setUniformMatrix4f("uProjection", projection);
+        spriteShader.setUniform1i("uUseTexture", 0); // Default to solid color
+        
+        spriteBatcher.begin();
+    }
+    
+    /**
+     * End batched 2D sprite rendering.
+     * Flushes all pending quads and restores state.
+     */
+    private void endSpriteBatch() {
+        if (spriteBatcher != null && spriteBatcher.isDrawing()) {
+            spriteBatcher.end();
+        }
+        Shader.unbind();
+    }
+    
+    /**
+     * Add a solid color quad to the current batch.
+     * Must be called between beginSpriteBatch() and endSpriteBatch().
+     */
+    private void addQuadToBatch(float x, float y, float width, float height) {
+        if (spriteBatcher == null || !spriteBatcher.isDrawing()) {
+            logger.warn("addQuadToBatch called outside of active batch - quad will not be rendered");
+            return;
+        }
+        spriteBatcher.addQuad(x, y, width, height);
+    }
+    
+    /**
+     * Set the color for subsequent batched quads.
+     */
+    private void setBatchColor(float r, float g, float b, float a) {
+        if (spriteBatcher == null) {
+            logger.warn("setBatchColor called before SpriteBatcher initialization");
+            return;
+        }
+        spriteBatcher.setColor(r, g, b, a);
+    }
+    
+    /**
+     * Create an orthographic projection matrix.
+     * Uses column-major order as expected by OpenGL.
+     */
+    private float[] createOrthoMatrix(float left, float right, float bottom, float top, float near, float far) {
+        float[] m = new float[16];
+        // Initialize all elements to 0
+        for (int i = 0; i < 16; i++) m[i] = 0.0f;
+        
+        // Set the non-zero elements
+        m[0] = 2.0f / (right - left);
+        m[5] = 2.0f / (top - bottom);
+        m[10] = -2.0f / (far - near);
+        m[12] = -(right + left) / (right - left);
+        m[13] = -(top + bottom) / (top - bottom);
+        m[14] = -(far + near) / (far - near);
+        m[15] = 1.0f;
+        return m;
+    }
+
     @Override
     public void beginFrame() {
-        if (frameActive) {
-            throw new IllegalStateException("Frame already active - endFrame() must be called before beginFrame()");
+        frameDepth++;
+        
+        // Only initialize on first nested call
+        if (frameDepth == 1) {
+            // Reset current state
+            currentShader = null;
+            currentAtlas = null;
+            
+            // OpenGL state setup could go here
+            // For now, we assume the caller has already set up the GL state
+            // (viewport, clear color, etc.) before calling beginFrame()
         }
-        
-        frameActive = true;
-        
-        // Reset current state
-        currentShader = null;
-        currentAtlas = null;
-        
-        // OpenGL state setup could go here
-        // For now, we assume the caller has already set up the GL state
-        // (viewport, clear color, etc.) before calling beginFrame()
     }
     
     @Override
     public void submit(DrawCommand cmd) {
-        if (!frameActive) {
+        if (frameDepth == 0) {
             throw new IllegalStateException("No active frame - beginFrame() must be called first");
         }
         
@@ -262,34 +414,28 @@ public class OpenGLRenderBackend implements RenderBackend {
      * @param cmd the UI draw command
      */
     private void submitUICommand(DrawCommand cmd) {
-        // Handle different UI element types based on meshId:
-        // -1 = crosshair
-        // -2 to -5 = items (fallback, cube, stairs, flat)
-        // -6 = hotbar (background/selection)
-        // -7 = debug info text
-        // -8 = command UI (overlay/feedback)
-        // -9 = system info text
-        // -10 = tooltip
+        // Handle different UI element types based on meshId
+        // See UIMeshIds for the complete list of constants
         
-        if (cmd.meshId == -1) {
+        if (cmd.meshId == UIMeshIds.CROSSHAIR) {
             // Crosshair rendering
             submitCrosshairCommand(cmd);
-        } else if (cmd.meshId <= -2 && cmd.meshId >= -5) {
-            // Item rendering
+        } else if (UIMeshIds.isItemMeshId(cmd.meshId)) {
+            // Item rendering (fallback, cube, stairs, flat)
             submitItemCommand(cmd);
-        } else if (cmd.meshId == -6) {
+        } else if (cmd.meshId == UIMeshIds.HOTBAR) {
             // Hotbar rendering
             submitHotbarCommand(cmd);
-        } else if (cmd.meshId == -7) {
+        } else if (cmd.meshId == UIMeshIds.DEBUG_TEXT) {
             // Debug info text
             submitDebugTextCommand(cmd);
-        } else if (cmd.meshId == -8) {
+        } else if (cmd.meshId == UIMeshIds.COMMAND_UI) {
             // Command UI
             submitCommandUICommand(cmd);
-        } else if (cmd.meshId == -9) {
+        } else if (cmd.meshId == UIMeshIds.SYSTEM_INFO) {
             // System info text
             submitSystemInfoCommand(cmd);
-        } else if (cmd.meshId == -10) {
+        } else if (cmd.meshId == UIMeshIds.TOOLTIP) {
             // Tooltip
             submitTooltipCommand(cmd);
         }
@@ -305,26 +451,21 @@ public class OpenGLRenderBackend implements RenderBackend {
         int centerY = (cmd.materialId >> 13) & 0xFFF;
         int size = (cmd.materialId >> 25) & 0xFF;
         
-        // Render the crosshair quad using immediate mode
+        // Use batched rendering instead of immediate mode.
+        // NOTE: Crosshair renders both horizontal and vertical bars in separate commands,
+        // but each is batched individually. Future optimization could combine them.
+        beginSpriteBatch();
+        setBatchColor(1f, 1f, 1f, 1f);
+        
         if (horizontal) {
             float thickness = 2f;
-            glColor4f(1f, 1f, 1f, 1f);
-            glBegin(GL_QUADS);
-            glVertex2f(centerX - size/2f, centerY - thickness/2);
-            glVertex2f(centerX + size/2f, centerY - thickness/2);
-            glVertex2f(centerX + size/2f, centerY + thickness/2);
-            glVertex2f(centerX - size/2f, centerY + thickness/2);
-            glEnd();
+            addQuadToBatch(centerX - size/2f, centerY - thickness/2, size, thickness);
         } else {
             float thickness = 2f;
-            glColor4f(1f, 1f, 1f, 1f);
-            glBegin(GL_QUADS);
-            glVertex2f(centerX - thickness/2, centerY - size/2f);
-            glVertex2f(centerX + thickness/2, centerY - size/2f);
-            glVertex2f(centerX + thickness/2, centerY + size/2f);
-            glVertex2f(centerX - thickness/2, centerY + size/2f);
-            glEnd();
+            addQuadToBatch(centerX - thickness/2, centerY - size/2f, thickness, size);
         }
+        
+        endSpriteBatch();
     }
     
     /**
@@ -340,19 +481,22 @@ public class OpenGLRenderBackend implements RenderBackend {
             return;
         }
         
-        // Render based on meshId type
+        // Get the item renderer instance (avoids static method usage)
+        OpenGLItemRenderer itemRenderer = OpenGLItemRenderer.getInstance();
+        
+        // Render based on meshId type using UIMeshIds constants
         switch (cmd.meshId) {
-            case -2:
+            case UIMeshIds.ITEM_FALLBACK:
                 // Fallback item (magenta square)
-                OpenGLItemRenderer.renderFallbackItemStatic(itemInfo.x, itemInfo.y, itemInfo.size);
+                itemRenderer.renderFallbackItem(itemInfo.x, itemInfo.y, itemInfo.size);
                 break;
-            case -3:
-            case -4:
-            case -5:
-                // Delegate to OpenGLItemRenderer's existing rendering methods
+            case UIMeshIds.ITEM_CUBE:
+            case UIMeshIds.ITEM_STAIRS:
+            case UIMeshIds.ITEM_FLAT:
+                // Delegate to ItemRenderer's existing rendering methods
                 // Use the standard rendering path which handles all item types
                 // applyInventoryOffset=true for proper hotbar positioning (matches legacy behavior)
-                OpenGLItemRenderer.renderItemStatic(itemInfo.stack, itemInfo.x, itemInfo.y, itemInfo.size, true);
+                itemRenderer.renderItem(itemInfo.stack, itemInfo.x, itemInfo.y, itemInfo.size, true);
                 break;
         }
     }
@@ -463,22 +607,25 @@ public class OpenGLRenderBackend implements RenderBackend {
     
     @Override
     public void endFrame() {
-        if (!frameActive) {
+        if (frameDepth == 0) {
             throw new IllegalStateException("No active frame - beginFrame() must be called first");
         }
         
-        // Unbind any active resources
-        if (currentShader != null) {
-            Shader.unbind();
-            currentShader = null;
-        }
+        frameDepth--;
         
-        if (currentAtlas != null) {
-            glBindTexture(GL_TEXTURE_2D, 0);
-            currentAtlas = null;
+        // Only cleanup on final nested call
+        if (frameDepth == 0) {
+            // Unbind any active resources
+            if (currentShader != null) {
+                Shader.unbind();
+                currentShader = null;
+            }
+            
+            if (currentAtlas != null) {
+                glBindTexture(GL_TEXTURE_2D, 0);
+                currentAtlas = null;
+            }
         }
-        
-        frameActive = false;
     }
     
     /**
@@ -488,7 +635,7 @@ public class OpenGLRenderBackend implements RenderBackend {
      * @return true if between beginFrame() and endFrame()
      */
     public boolean isFrameActive() {
-        return frameActive;
+        return frameDepth > 0;
     }
     
     /**
@@ -819,29 +966,38 @@ public class OpenGLRenderBackend implements RenderBackend {
      */
     @Override
     public void resetColor() {
+        currentColorR = 1.0f;
+        currentColorG = 1.0f;
+        currentColorB = 1.0f;
+        currentColorA = 1.0f;
         glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
     }
     
     @Override
     public void setColor(int rgb, float alpha) {
-        float r = ((rgb >> 16) & 0xFF) / 255f;
-        float g = ((rgb >> 8) & 0xFF) / 255f;
-        float b = (rgb & 0xFF) / 255f;
-        glColor4f(r, g, b, alpha);
+        currentColorR = ((rgb >> 16) & 0xFF) / 255f;
+        currentColorG = ((rgb >> 8) & 0xFF) / 255f;
+        currentColorB = (rgb & 0xFF) / 255f;
+        currentColorA = alpha;
+        glColor4f(currentColorR, currentColorG, currentColorB, currentColorA);
     }
     
     @Override
     public void fillRect(float x, float y, float width, float height) {
-        glBegin(GL_QUADS);
-        glVertex2f(x, y);
-        glVertex2f(x + width, y);
-        glVertex2f(x + width, y + height);
-        glVertex2f(x, y + height);
-        glEnd();
+        // Use batched rendering instead of immediate mode.
+        // NOTE: Currently each fillRect call creates its own batch for simplicity.
+        // For optimal performance, callers should use begin/endSpriteBatch externally
+        // to batch multiple quads together. This infrastructure allows that optimization
+        // in the future without changing the API.
+        beginSpriteBatch();
+        setBatchColor(currentColorR, currentColorG, currentColorB, currentColorA);
+        addQuadToBatch(x, y, width, height);
+        endSpriteBatch();
     }
     
     @Override
     public void drawRect(float x, float y, float width, float height) {
+        // Line rendering still uses immediate mode (cannot batch with quads)
         glBegin(GL_LINE_LOOP);
         glVertex2f(x, y);
         glVertex2f(x + width, y);
@@ -852,6 +1008,7 @@ public class OpenGLRenderBackend implements RenderBackend {
     
     @Override
     public void drawLine(float x1, float y1, float x2, float y2) {
+        // Line rendering still uses immediate mode (cannot batch with quads)
         glBegin(GL_LINES);
         glVertex2f(x1, y1);
         glVertex2f(x2, y2);
@@ -1046,6 +1203,27 @@ public class OpenGLRenderBackend implements RenderBackend {
         glRotatef(angle, x, y, z);
     }
     
+    @Override
+    public void updateFrustum(mattmc.client.renderer.Frustum frustum) {
+        try (org.lwjgl.system.MemoryStack stack = org.lwjgl.system.MemoryStack.stackPush()) {
+            java.nio.FloatBuffer projBuffer = stack.mallocFloat(16);
+            java.nio.FloatBuffer modlBuffer = stack.mallocFloat(16);
+            
+            // Get current matrices from OpenGL
+            glGetFloatv(GL_PROJECTION_MATRIX, projBuffer);
+            glGetFloatv(GL_MODELVIEW_MATRIX, modlBuffer);
+            
+            // Convert to arrays
+            float[] projectionMatrix = new float[16];
+            float[] modelviewMatrix = new float[16];
+            projBuffer.get(projectionMatrix);
+            modlBuffer.get(modelviewMatrix);
+            
+            // Update frustum with current matrices
+            frustum.update(projectionMatrix, modelviewMatrix);
+        }
+    }
+
     // === Window Control ===
     
     @Override

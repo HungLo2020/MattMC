@@ -137,6 +137,10 @@ public class LevelRenderer implements WorldRenderer {
         // Clear command buffer from previous frame
         commandBuffer.clear();
         
+        // Update frustum with current matrices from the backend
+        // This enables proper frustum culling based on the current view
+        renderBackend.updateFrustum(frustum);
+        
         // Build draw commands (front-end logic, no graphics API calls)
         chunkLogic.buildCommands(world, commandBuffer);
         

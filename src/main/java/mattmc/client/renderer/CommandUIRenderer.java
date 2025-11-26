@@ -70,7 +70,7 @@ public class CommandUIRenderer {
         
         // Build draw commands using backend-agnostic logic
         buffer.clear();
-        UIRenderLogic.clearTextRegistry(); // Clear text registry for this frame
+        logic.beginFrame(); // Clear text registry for this frame using instance method
         logic.buildCommandOverlayCommands(screenWidth, screenHeight, commandText, buffer);
         
         // Submit commands to backend with frame management
@@ -111,7 +111,7 @@ public class CommandUIRenderer {
         
         // Build draw commands using backend-agnostic logic
         buffer.clear();
-        UIRenderLogic.clearTextRegistry(); // Clear text registry for this frame
+        logic.beginFrame(); // Clear text registry for this frame using instance method
         logic.buildCommandFeedbackCommands(screenWidth, screenHeight, message, buffer);
         
         // Submit commands to backend with frame management
