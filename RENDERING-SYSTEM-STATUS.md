@@ -310,45 +310,42 @@ public class BlurUtility {
 
 ## Architectural Violations
 
-### 12. Immediate Mode Rendering in Backend
+### 12. ~~Immediate Mode Rendering in Backend~~ ✅ INFRASTRUCTURE ADDED
 
 **Location**: `mattmc/client/renderer/backend/opengl/OpenGLRenderBackend.java` (Multiple locations)
 
-**Problem**: Extensive use of OpenGL immediate mode rendering (`glBegin`/`glEnd`/`GL_QUADS`):
+**Status**: **INFRASTRUCTURE ADDED** - Created `SpriteBatcher` class with VBO-based batched rendering. The batcher supports:
+- Batching up to 1000 quads per draw call
+- Textured and solid color quads
+- Proper vertex attribute setup (position, texcoord, color)
+- Dynamic buffer updates
 
+**Files Added**:
+- `SpriteBatcher.java` - VAO/VBO-based 2D quad batcher
+
+**Current State**: The `SpriteBatcher` class is ready to use but immediate mode calls are still present for backward compatibility. Full migration requires:
+1. Setting up orthographic projection matrix for 2D rendering
+2. Creating and binding the sprite shader before rendering
+3. Migrating all `glBegin`/`glEnd` blocks to use `spriteBatcher.addQuad()`
+4. Handling line rendering separately (GL_LINES cannot be batched with quads)
+
+**Migration Example**:
 ```java
+// Before (immediate mode)
 glBegin(GL_QUADS);
 glTexCoord2f(0, 1); glVertex2f(x, y);
 glTexCoord2f(1, 1); glVertex2f(x + width, y);
-glTexCoord2f(1, 0); glVertex2f(x + width, y + height);
-glTexCoord2f(0, 0); glVertex2f(x, y + height);
+// ...
 glEnd();
+
+// After (batched)
+spriteBatcher.begin();
+spriteBatcher.addTexturedQuad(x, y, width, height, 0, 1, 1, 0);
+spriteBatcher.flush();
+spriteBatcher.end();
 ```
 
-**Count**: 48 instances of immediate mode rendering found.
-
-**Why it's a problem**:
-- Deprecated in modern OpenGL (removed in OpenGL 3.1+ core profile)
-- Significantly slower than batched VBO rendering
-- Won't work with Vulkan backend
-- Each quad is a separate draw call
-
-**Fix**: Create a 2D sprite batcher for UI rendering:
-
-```java
-public class SpriteBatcher {
-    private final FloatBuffer vertices;
-    private int vertexCount;
-    
-    public void addQuad(float x, float y, float w, float h, float u0, float v0, float u1, float v1) {
-        // Add to vertex buffer
-    }
-    
-    public void flush() {
-        // Single draw call for all quads
-    }
-}
-```
+**Remaining Work**: Incrementally migrate each immediate mode block to use the SpriteBatcher.
 
 ---
 

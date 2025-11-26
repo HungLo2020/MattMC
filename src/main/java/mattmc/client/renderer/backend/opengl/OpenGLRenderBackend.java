@@ -77,6 +77,12 @@ public class OpenGLRenderBackend implements RenderBackend {
     // Blur helper for AbstractBlurBox functionality
     private AbstractBlurBox blurHelper = null;
     
+    // Sprite batcher for efficient 2D rendering (replaces immediate mode)
+    private SpriteBatcher spriteBatcher = null;
+    
+    // Shader for 2D sprite/UI rendering
+    private Shader spriteShader = null;
+    
     /**
      * Information about a material (shader + texture combination).
      */
@@ -161,6 +167,60 @@ public class OpenGLRenderBackend implements RenderBackend {
         transformRegistry.clear();
         currentShader = null;
         currentAtlas = null;
+        if (spriteBatcher != null) {
+            spriteBatcher.dispose();
+            spriteBatcher = null;
+        }
+        spriteShader = null;
+    }
+    
+    /**
+     * Initialize the sprite batcher and shader for 2D rendering.
+     * Called lazily on first use.
+     */
+    private void ensureSpriteBatcherInitialized() {
+        if (spriteBatcher == null) {
+            spriteBatcher = new SpriteBatcher();
+        }
+        if (spriteShader == null) {
+            // Simple 2D sprite shader (GLSL 130 for consistency)
+            String vertexSource = """
+                #version 130
+                in vec2 aPosition;
+                in vec2 aTexCoord;
+                in vec4 aColor;
+                
+                out vec2 vTexCoord;
+                out vec4 vColor;
+                
+                uniform mat4 uProjection;
+                
+                void main() {
+                    gl_Position = uProjection * vec4(aPosition, 0.0, 1.0);
+                    vTexCoord = aTexCoord;
+                    vColor = aColor;
+                }
+                """;
+            String fragmentSource = """
+                #version 130
+                in vec2 vTexCoord;
+                in vec4 vColor;
+                
+                uniform sampler2D uTexture;
+                uniform bool uUseTexture;
+                
+                out vec4 fragColor;
+                
+                void main() {
+                    if (uUseTexture) {
+                        fragColor = texture(uTexture, vTexCoord) * vColor;
+                    } else {
+                        fragColor = vColor;
+                    }
+                }
+                """;
+            spriteShader = new Shader(vertexSource, fragmentSource);
+        }
     }
     
     @Override
