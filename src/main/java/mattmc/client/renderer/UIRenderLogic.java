@@ -42,6 +42,32 @@ import mattmc.client.renderer.backend.UIMeshIds;
  */
 public class UIRenderLogic {
     
+    // Instance-based text registry for proper lifecycle management
+    // Each UIRenderLogic instance has its own registry to support testing and isolation
+    private int nextTextId = 0;
+    private final java.util.Map<Integer, TextRenderInfo> textRegistry = new java.util.HashMap<>();
+    
+    // Static reference for backward compatibility with OpenGLRenderBackend lookups
+    // This is a temporary solution - ideally the backend would receive the registry reference
+    private static UIRenderLogic currentInstance = null;
+    
+    /**
+     * Create a new UIRenderLogic instance.
+     * Registers itself as the current instance for static lookups.
+     */
+    public UIRenderLogic() {
+        currentInstance = this;
+    }
+    
+    /**
+     * Begin a new frame - clears the text registry.
+     * Should be called at the start of each frame before building commands.
+     */
+    public void beginFrame() {
+        textRegistry.clear();
+        nextTextId = 0;
+    }
+    
     /**
      * Builds draw commands for UI elements.
      * 
@@ -214,10 +240,6 @@ public class UIRenderLogic {
         return (horizontal ? 1 : 0) | ((x & 0xFFF) << 1) | ((y & 0xFFF) << 13) | ((width & 0xFF) << 25);
     }
     
-    // Debug info and command UI text registry
-    private static int nextTextId = 0;
-    private static final java.util.Map<Integer, TextRenderInfo> textRegistry = new java.util.HashMap<>();
-    
     /**
      * Information about text to render.
      */
@@ -239,8 +261,9 @@ public class UIRenderLogic {
     
     /**
      * Register text for rendering and get an ID.
+     * Uses instance registry for proper lifecycle management.
      */
-    private static int registerText(String text, float x, float y, float scale, int color) {
+    private int registerText(String text, float x, float y, float scale, int color) {
         int id = nextTextId++;
         textRegistry.put(id, new TextRenderInfo(text, x, y, scale, color));
         return id;
@@ -248,17 +271,27 @@ public class UIRenderLogic {
     
     /**
      * Get text info by ID.
+     * Uses the current instance's registry for lookup.
+     * 
+     * @param id the text ID to look up
+     * @return the TextRenderInfo or null if not found
      */
     public static TextRenderInfo getTextInfo(int id) {
-        return textRegistry.get(id);
+        if (currentInstance != null) {
+            return currentInstance.textRegistry.get(id);
+        }
+        return null;
     }
     
     /**
      * Clear text registry (call at start of frame).
+     * @deprecated Use instance method {@link #beginFrame()} instead
      */
+    @Deprecated
     public static void clearTextRegistry() {
-        textRegistry.clear();
-        nextTextId = 0;
+        if (currentInstance != null) {
+            currentInstance.beginFrame();
+        }
     }
     
     /**

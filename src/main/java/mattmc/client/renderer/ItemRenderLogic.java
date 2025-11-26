@@ -48,10 +48,31 @@ import java.util.Map;
  */
 public class ItemRenderLogic {
     
-    // Registry to store ItemStack references for backend rendering
-    // This is a temporary solution for Stage 4 - maps transform index to ItemStack
-    private static final Map<Integer, ItemStackRenderInfo> itemRegistry = new HashMap<>();
-    private static int nextItemId = 1000; // Start at 1000 to avoid conflicts
+    // Instance-based item registry for proper lifecycle management
+    // Each ItemRenderLogic instance has its own registry to support testing and isolation
+    private final Map<Integer, ItemStackRenderInfo> itemRegistry = new HashMap<>();
+    private int nextItemId = 1000; // Start at 1000 to avoid conflicts
+    
+    // Static reference for backward compatibility with OpenGLRenderBackend lookups
+    // This is a temporary solution - ideally the backend would receive the registry reference
+    private static ItemRenderLogic currentInstance = null;
+    
+    /**
+     * Create a new ItemRenderLogic instance.
+     * Registers itself as the current instance for static lookups.
+     */
+    public ItemRenderLogic() {
+        currentInstance = this;
+    }
+    
+    /**
+     * Begin a new frame - clears the item registry.
+     * Should be called at the start of each frame before building commands.
+     */
+    public void beginFrame() {
+        itemRegistry.clear();
+        nextItemId = 1000;
+    }
     
     /**
      * Information needed to render an item.
@@ -73,17 +94,27 @@ public class ItemRenderLogic {
     /**
      * Get item render info by transform index.
      * Used by OpenGLRenderBackend to retrieve item details.
+     * Uses the current instance's registry for lookup.
+     * 
+     * @param transformIndex the transform index to look up
+     * @return the ItemStackRenderInfo or null if not found
      */
     public static ItemStackRenderInfo getItemInfo(int transformIndex) {
-        return itemRegistry.get(transformIndex);
+        if (currentInstance != null) {
+            return currentInstance.itemRegistry.get(transformIndex);
+        }
+        return null;
     }
     
     /**
      * Clear the item registry (call at end of frame).
+     * @deprecated Use instance method {@link #beginFrame()} instead
      */
+    @Deprecated
     public static void clearItemRegistry() {
-        itemRegistry.clear();
-        nextItemId = 1000;
+        if (currentInstance != null) {
+            currentInstance.beginFrame();
+        }
     }
     
     /**

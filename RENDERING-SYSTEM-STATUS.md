@@ -201,82 +201,49 @@ renderer.renderItem(stack, x, y, size);
 
 ---
 
-### 7. Static Registries in Logic Classes
+### 7. ~~Static Registries in Logic Classes~~ ✅ FIXED
 
 **Location**: 
-- `mattmc/client/renderer/UIRenderLogic.java` (Lines 219-263)
-- `mattmc/client/renderer/ItemRenderLogic.java` (Lines 52-86)
+- `mattmc/client/renderer/UIRenderLogic.java`
+- `mattmc/client/renderer/ItemRenderLogic.java`
 
-**Problem**: Both classes use static registries that must be manually cleared:
+**Status**: **RESOLVED** - Converted static registries to instance-based fields with proper lifecycle management. Both classes now have instance fields for their registries and a `beginFrame()` method to clear them. Static accessor methods for backward compatibility with `OpenGLRenderBackend` are preserved but deprecated.
+
+**Solution Applied**:
 
 ```java
-// UIRenderLogic.java
-private static int nextTextId = 0;
-private static final java.util.Map<Integer, TextRenderInfo> textRegistry = new java.util.HashMap<>();
+// Instance-based registry fields
+private int nextTextId = 0;
+private final Map<Integer, TextRenderInfo> textRegistry = new HashMap<>();
 
-public static void clearTextRegistry() {
+// Current instance tracking for backward-compatible static lookups
+private static UIRenderLogic currentInstance = null;
+
+public UIRenderLogic() {
+    currentInstance = this;
+}
+
+public void beginFrame() {
     textRegistry.clear();
     nextTextId = 0;
 }
 ```
 
-**Why it's a problem**:
-- Static state is problematic for testing
-- Risk of memory leaks if not properly cleared
-- Makes the code not thread-safe
-- Requires careful manual lifecycle management
-
-**Fix**: Make registries instance-based and manage lifecycle properly:
-
-```java
-public class UIRenderLogic {
-    private int nextTextId = 0;
-    private final Map<Integer, TextRenderInfo> textRegistry = new HashMap<>();
-    
-    public void beginFrame() {
-        textRegistry.clear();
-        nextTextId = 0;
-    }
-}
-```
-
 ---
 
-### 8. Hardcoded GLSL Shader Versions
+### 8. ~~Hardcoded GLSL Shader Versions~~ ✅ FIXED
 
-**Location**: Multiple shader definitions in `backend/opengl/`
+**Location**: Multiple shader definitions in `backend/opengl/` and `resources/assets/shaders/`
 
-**Problem**: Shaders use different GLSL versions inconsistently:
+**Status**: **RESOLVED** - All shaders now standardized on GLSL version 130 (OpenGL 3.0), which matches the project's use of OpenGL 3.0 features (GL30 imports).
 
-```java
-// BlurEffect.java
-String vertexShader = """
-    #version 120
-    ...
-    """;
+**Files Updated**:
+- `voxel_lit.vs` - Updated from `#version 120` to `#version 130`
+- `voxel_lit.fs` - Updated from `#version 120` to `#version 130`
+- `AbstractBlurBox.java` - Updated inline shaders from `#version 120` to `#version 130`
+- `BlurEffect.java` - Updated inline shaders from `#version 120` to `#version 130`
 
-// AbstractBlurBox.java  
-String vertexShader = """
-    #version 120
-    ...
-    """;
-```
-
-While external shader files may use different versions:
-```glsl
-// voxel_lit.vs (assumed external file)
-#version 330 core
-```
-
-**Why it's a problem**:
-- Version mismatch can cause shader compilation failures on some systems
-- OpenGL 2.1 (GLSL 120) and OpenGL 3.3 (GLSL 330) have different capabilities
-- No runtime validation of supported GL version
-
-**Fix**: 
-1. Standardize on a single GLSL version
-2. Add version detection and fallback
-3. Document minimum OpenGL requirements
+**Minimum OpenGL Requirement**: OpenGL 3.0 (GLSL 130)
 
 ---
 

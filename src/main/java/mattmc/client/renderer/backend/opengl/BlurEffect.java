@@ -20,9 +20,9 @@ public class BlurEffect {
      * Create the Gaussian blur shader.
      */
     private Shader createBlurShader() {
-        // Simple passthrough vertex shader
+        // Simple passthrough vertex shader (GLSL 130 = OpenGL 3.0)
         String vertexShader = """
-            #version 120
+            #version 130
             varying vec2 vTexCoord;
             void main() {
                 gl_Position = gl_ModelViewProjectionMatrix * gl_Vertex;
@@ -30,9 +30,9 @@ public class BlurEffect {
             }
             """;
         
-        // Gaussian blur fragment shader
+        // Gaussian blur fragment shader (GLSL 130 = OpenGL 3.0)
         String fragmentShader = """
-            #version 120
+            #version 130
             uniform sampler2D uTexture;
             uniform vec2 uDirection;
             uniform vec2 uResolution;
