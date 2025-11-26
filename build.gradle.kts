@@ -34,6 +34,9 @@ dependencies {
     runtimeOnly("org.lwjgl:lwjgl-opengl:$lwjgl:natives-linux")
     runtimeOnly("org.lwjgl:lwjgl-stb:$lwjgl:natives-linux")
     
+    // JOML for matrix math (needed for UV lock transformation matching Minecraft)
+    implementation("org.joml:joml:1.10.5")
+    
     // JSON parsing for block models and blockstates
     implementation("com.google.code.gson:gson:2.10.1")
     

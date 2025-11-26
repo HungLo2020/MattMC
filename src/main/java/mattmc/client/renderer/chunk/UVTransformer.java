@@ -1,21 +1,81 @@
 package mattmc.client.renderer.chunk;
 
+import org.joml.Matrix3f;
+import org.joml.Matrix4f;
+import org.joml.Quaternionf;
+import org.joml.Vector3f;
+import org.joml.Vector4f;
+
+import java.util.HashMap;
+import java.util.Map;
+
 /**
  * Handles UV coordinate transformations for block models.
- * Provides uvlock transformation to keep textures world-aligned when geometry rotates,
- * and per-face UV rotation as specified in model JSON files.
+ * This is an EXACT port of Minecraft's BlockMath and FaceBakery UV lock system.
  * 
- * This implements Minecraft's matrix-based UV lock transformation system from
- * BlockMath.getUVLockTransform() and FaceBakery.recomputeUVs() to properly handle
- * all face directions and rotation combinations (X and Y axes).
+ * Implements the matrix-based UV lock transformation from:
+ * - BlockMath.getUVLockTransform()
+ * - FaceBakery.recomputeUVs()
  * 
- * The key insight is that Minecraft uses transformation matrices per face direction:
- * - LOCAL_TO_GLOBAL: transforms from face-local UV space to world-aligned UV space
- * - GLOBAL_TO_LOCAL: the inverse transformation
- * 
- * For UV lock, we compute: GLOBAL_TO_LOCAL[original] * inverse_rotation * LOCAL_TO_GLOBAL[rotated]
+ * The formula is: GLOBAL_TO_LOCAL[original] * inverse_rotation * LOCAL_TO_GLOBAL[rotated]
  */
 public class UVTransformer {
+    
+    // Direction constants matching Minecraft's Direction enum order
+    private static final int DOWN = 0;
+    private static final int UP = 1;
+    private static final int NORTH = 2;
+    private static final int SOUTH = 3;
+    private static final int WEST = 4;
+    private static final int EAST = 5;
+    
+    // Direction normals
+    private static final int[][] DIRECTION_NORMALS = {
+        {0, -1, 0},  // DOWN
+        {0, 1, 0},   // UP
+        {0, 0, -1},  // NORTH
+        {0, 0, 1},   // SOUTH
+        {-1, 0, 0},  // WEST
+        {1, 0, 0}    // EAST
+    };
+    
+    /**
+     * LOCAL_TO_GLOBAL transforms from face-local UV space to world-aligned UV space.
+     * These are the exact matrices from Minecraft's BlockMath.VANILLA_UV_TRANSFORM_LOCAL_TO_GLOBAL
+     */
+    private static final Matrix4f[] LOCAL_TO_GLOBAL = new Matrix4f[6];
+    
+    /**
+     * GLOBAL_TO_LOCAL is the inverse of LOCAL_TO_GLOBAL.
+     * These are the exact matrices from Minecraft's BlockMath.VANILLA_UV_TRANSFORM_GLOBAL_TO_LOCAL
+     */
+    private static final Matrix4f[] GLOBAL_TO_LOCAL = new Matrix4f[6];
+    
+    static {
+        // Initialize LOCAL_TO_GLOBAL matrices exactly as Minecraft does
+        // SOUTH is identity (the reference face)
+        LOCAL_TO_GLOBAL[SOUTH] = new Matrix4f(); // identity
+        
+        // EAST: rotateY(PI/2)
+        LOCAL_TO_GLOBAL[EAST] = new Matrix4f().rotation(new Quaternionf().rotateY((float)Math.PI / 2f));
+        
+        // WEST: rotateY(-PI/2)
+        LOCAL_TO_GLOBAL[WEST] = new Matrix4f().rotation(new Quaternionf().rotateY(-(float)Math.PI / 2f));
+        
+        // NORTH: rotateY(PI)
+        LOCAL_TO_GLOBAL[NORTH] = new Matrix4f().rotation(new Quaternionf().rotateY((float)Math.PI));
+        
+        // UP: rotateX(-PI/2)
+        LOCAL_TO_GLOBAL[UP] = new Matrix4f().rotation(new Quaternionf().rotateX(-(float)Math.PI / 2f));
+        
+        // DOWN: rotateX(PI/2)
+        LOCAL_TO_GLOBAL[DOWN] = new Matrix4f().rotation(new Quaternionf().rotateX((float)Math.PI / 2f));
+        
+        // Compute inverses for GLOBAL_TO_LOCAL
+        for (int i = 0; i < 6; i++) {
+            GLOBAL_TO_LOCAL[i] = new Matrix4f(LOCAL_TO_GLOBAL[i]).invert();
+        }
+    }
     
     /**
      * Result of UV lock transformation including new UV coordinates and additional rotation.
@@ -32,10 +92,7 @@ public class UVTransformer {
     
     /**
      * Transform UV coordinates when uvlock=true to keep textures world-aligned.
-     * This implements Minecraft's full matrix-based UV lock transformation.
-     * 
-     * Based on Minecraft's FaceBakery.recomputeUVs() which transforms UVs through 
-     * BlockMath matrices. This handles all face directions and both X and Y rotations.
+     * This is an EXACT port of Minecraft's FaceBakery.recomputeUVs() method.
      * 
      * @param uv UV coordinates [u0, v0, u1, v1] in 0-16 space
      * @param faceDirection Original face direction (before rotation): up, down, north, south, east, west
@@ -55,251 +112,191 @@ public class UVTransformer {
             return new UVLockResult(uv.clone(), faceRotation);
         }
         
-        // Step 1: Determine the rotated face direction after applying geometry rotation
-        String rotatedFace = getRotatedFaceDirection(faceDirection, xRotation, yRotation);
+        int faceIndex = getDirectionIndex(faceDirection);
         
-        // Step 2: Compute the UV lock transformation matrix
-        // This is: GLOBAL_TO_LOCAL[original] * inverse_rotation * LOCAL_TO_GLOBAL[rotated]
-        float[] transformedUV = applyUVLockTransform(uv, faceDirection, rotatedFace, xRotation, yRotation);
+        // Build the model rotation matrix (matches Minecraft's Transformation)
+        Matrix4f modelRotation = buildRotationMatrix(xRotation, yRotation);
         
-        // Step 3: Calculate the additional rotation needed for the face
-        int additionalRotation = calculateUVLockRotation(faceDirection, rotatedFace, xRotation, yRotation, faceRotation);
+        // Get the UV lock transform matrix using Minecraft's BlockMath.getUVLockTransform algorithm
+        Matrix4f uvLockMatrix = getUVLockTransform(modelRotation, faceIndex);
         
-        return new UVLockResult(transformedUV, additionalRotation);
+        // Apply the transformation to UV coordinates (matching FaceBakery.recomputeUVs)
+        return applyUVLockTransform(uv, uvLockMatrix, faceRotation);
     }
     
     /**
-     * Get the face direction after applying X and Y rotation to the geometry.
-     * This simulates rotating the face normal through the transformation.
+     * Build a rotation matrix from X and Y rotation angles.
+     * Matches how Minecraft builds the model transformation from blockstate x/y values.
      */
-    private static String getRotatedFaceDirection(String originalFace, int xRotation, int yRotation) {
-        // Start with the original face
-        String face = originalFace;
+    private static Matrix4f buildRotationMatrix(int xDegrees, int yDegrees) {
+        Matrix4f matrix = new Matrix4f();
         
-        // Apply X rotation first (rotates around X-axis: affects Y and Z components)
-        if (xRotation != 0) {
-            face = rotateDirectionAroundX(face, xRotation);
+        // Apply rotations around center (0.5, 0.5, 0.5)
+        matrix.translate(0.5f, 0.5f, 0.5f);
+        
+        // Apply Y rotation first, then X rotation (Minecraft's order)
+        if (yDegrees != 0) {
+            matrix.rotate((float)Math.toRadians(yDegrees), 0, 1, 0);
+        }
+        if (xDegrees != 0) {
+            matrix.rotate((float)Math.toRadians(xDegrees), 1, 0, 0);
         }
         
-        // Then apply Y rotation (rotates around Y-axis: affects X and Z components)
-        if (yRotation != 0) {
-            face = rotateDirectionAroundY(face, yRotation);
+        matrix.translate(-0.5f, -0.5f, -0.5f);
+        
+        return matrix;
+    }
+    
+    /**
+     * Get the UV lock transform matrix.
+     * This is an EXACT port of Minecraft's BlockMath.getUVLockTransform().
+     * 
+     * Formula: GLOBAL_TO_LOCAL[original] * inverse(modelRotation) * LOCAL_TO_GLOBAL[rotated]
+     */
+    private static Matrix4f getUVLockTransform(Matrix4f modelRotation, int originalFaceIndex) {
+        // Find where this face ends up after rotation
+        int rotatedFaceIndex = rotateFaceDirection(modelRotation, originalFaceIndex);
+        
+        // Compute inverse of model rotation
+        Matrix4f inverseRotation = new Matrix4f(modelRotation).invert();
+        if (!inverseRotation.isFinite()) {
+            // Fallback to identity if inverse fails
+            return new Matrix4f();
         }
         
-        return face;
+        // Compose: GLOBAL_TO_LOCAL[original] * inverse * LOCAL_TO_GLOBAL[rotated]
+        Matrix4f result = new Matrix4f(GLOBAL_TO_LOCAL[originalFaceIndex]);
+        result.mul(inverseRotation);
+        result.mul(LOCAL_TO_GLOBAL[rotatedFaceIndex]);
+        
+        // Apply blockCenterToCorner transform (from Minecraft's BlockMath)
+        Matrix4f centered = new Matrix4f().translation(0.5f, 0.5f, 0.5f);
+        centered.mul(result);
+        centered.translate(-0.5f, -0.5f, -0.5f);
+        
+        return centered;
     }
     
     /**
-     * Rotate a face direction around the X-axis.
+     * Rotate a face direction through a matrix.
+     * This is an EXACT port of Minecraft's Direction.rotate(Matrix4f, Direction).
      */
-    private static String rotateDirectionAroundX(String face, int degrees) {
-        // Normalize degrees to handle negative values
-        int steps = (((degrees / 90) % 4) + 4) % 4;
-        for (int i = 0; i < steps; i++) {
-            face = switch (face) {
-                case "up" -> "south";
-                case "south" -> "down";
-                case "down" -> "north";
-                case "north" -> "up";
-                // East and West are unaffected by X rotation
-                default -> face;
-            };
-        }
-        return face;
+    private static int rotateFaceDirection(Matrix4f matrix, int faceIndex) {
+        int[] normal = DIRECTION_NORMALS[faceIndex];
+        Vector4f transformed = matrix.transform(new Vector4f(normal[0], normal[1], normal[2], 0.0f));
+        return getNearest(transformed.x(), transformed.y(), transformed.z());
     }
     
     /**
-     * Rotate a face direction around the Y-axis.
+     * Get the nearest direction for a vector.
+     * This is an EXACT port of Minecraft's Direction.getNearest().
      */
-    private static String rotateDirectionAroundY(String face, int degrees) {
-        // Normalize degrees to handle negative values
-        int steps = (((degrees / 90) % 4) + 4) % 4;
-        for (int i = 0; i < steps; i++) {
-            face = switch (face) {
-                case "north" -> "east";
-                case "east" -> "south";
-                case "south" -> "west";
-                case "west" -> "north";
-                // Up and Down are unaffected by Y rotation
-                default -> face;
-            };
-        }
-        return face;
-    }
-    
-    /**
-     * Apply the UV lock transformation to UV coordinates.
-     * This implements the matrix composition: GLOBAL_TO_LOCAL[original] * inverse * LOCAL_TO_GLOBAL[rotated]
-     */
-    private static float[] applyUVLockTransform(float[] uv, String originalFace, String rotatedFace,
-                                                 int xRotation, int yRotation) {
-        float u0 = uv[0];
-        float v0 = uv[1];
-        float u1 = uv[2];
-        float v1 = uv[3];
+    private static int getNearest(float x, float y, float z) {
+        int nearest = NORTH;
+        float maxDot = Float.MIN_VALUE;
         
-        // Transform UV center point and use that to determine the new UV bounds
-        // The transformation depends on both the original and rotated face directions
-        
-        // For most cases, we need to consider how the UV space maps between faces
-        // Each face has a "local" UV coordinate system that needs to be aligned with the world
-        
-        // Calculate the effective UV rotation needed to counteract the geometry rotation
-        int uvRotation = calculateEffectiveUVRotation(originalFace, rotatedFace, xRotation, yRotation);
-        
-        // Apply the UV rotation to the bounding box
-        return rotateUVBounds(u0, v0, u1, v1, uvRotation);
-    }
-    
-    /**
-     * Calculate the effective UV rotation needed based on face transformation.
-     * This is the core of UV lock: determining how much to rotate the UVs to
-     * compensate for the geometry rotation while keeping textures world-aligned.
-     */
-    private static int calculateEffectiveUVRotation(String originalFace, String rotatedFace,
-                                                     int xRotation, int yRotation) {
-        // The UV rotation depends on:
-        // 1. The original face's local-to-global transformation
-        // 2. The inverse of the geometry rotation
-        // 3. The rotated face's global-to-local transformation
-        
-        // For horizontal faces (up/down), Y-rotation directly affects UV rotation
-        // For vertical faces, the relationship is more complex
-        
-        if (originalFace.equals("up") || originalFace.equals("down")) {
-            // Horizontal faces: UV rotation is the negative of Y rotation
-            // (to counter the geometry rotation and keep textures world-aligned)
-            int rotation = (360 - yRotation) % 360;
-            
-            // For down face, the rotation direction is inverted due to flipped normals
-            if (originalFace.equals("down")) {
-                rotation = (360 - rotation) % 360;
+        for (int i = 0; i < 6; i++) {
+            int[] normal = DIRECTION_NORMALS[i];
+            float dot = x * normal[0] + y * normal[1] + z * normal[2];
+            if (dot > maxDot) {
+                maxDot = dot;
+                nearest = i;
             }
-            
-            // X rotation also affects up/down faces when it's 180 degrees
-            if (xRotation == 180) {
-                rotation = (rotation + 180) % 360;
-            }
-            
-            return rotation;
+        }
+        
+        return nearest;
+    }
+    
+    /**
+     * Apply UV lock transformation to UV coordinates.
+     * This is an EXACT port of Minecraft's FaceBakery.recomputeUVs().
+     */
+    private static UVLockResult applyUVLockTransform(float[] uv, Matrix4f matrix, int originalRotation) {
+        // Get UV coordinates for corners 0 and 2 (using reverse index like Minecraft)
+        // getReverseIndex(0) and getReverseIndex(2) account for existing rotation
+        int idx0 = getReverseIndex(0, originalRotation);
+        int idx2 = getReverseIndex(2, originalRotation);
+        
+        float u0 = getUForIndex(uv, idx0);
+        float v0 = getVForIndex(uv, idx0);
+        float u2 = getUForIndex(uv, idx2);
+        float v2 = getVForIndex(uv, idx2);
+        
+        // Transform both corners through the matrix
+        Vector4f corner0 = matrix.transform(new Vector4f(u0 / 16.0f, v0 / 16.0f, 0.0f, 1.0f));
+        Vector4f corner2 = matrix.transform(new Vector4f(u2 / 16.0f, v2 / 16.0f, 0.0f, 1.0f));
+        
+        float newU0 = 16.0f * corner0.x();
+        float newV0 = 16.0f * corner0.y();
+        float newU2 = 16.0f * corner2.x();
+        float newV2 = 16.0f * corner2.y();
+        
+        // Determine final UV bounds, handling potential flips
+        float finalU0, finalU1;
+        if (Math.signum(u2 - u0) == Math.signum(newU2 - newU0)) {
+            finalU0 = newU0;
+            finalU1 = newU2;
         } else {
-            // Vertical faces (north, south, east, west)
-            return calculateVerticalFaceUVRotation(originalFace, rotatedFace, xRotation, yRotation);
+            finalU0 = newU2;
+            finalU1 = newU0;
         }
-    }
-    
-    /**
-     * Calculate UV rotation for vertical faces.
-     * This handles the complex interaction between face direction changes and UV orientation.
-     */
-    private static int calculateVerticalFaceUVRotation(String originalFace, String rotatedFace,
-                                                        int xRotation, int yRotation) {
-        int rotation = 0;
         
-        // Get the "base" orientation for each face
-        // In Minecraft's UV space, SOUTH is the reference (identity) face
-        int originalOffset = getFaceYRotationOffset(originalFace);
-        int rotatedOffset = getFaceYRotationOffset(rotatedFace);
-        
-        // The UV rotation needs to account for:
-        // 1. The difference in face orientations
-        // 2. The geometry Y rotation applied
-        // 3. Any X rotation effects
-        
-        // If the face has been rotated to a horizontal face (up/down) by X rotation,
-        // the UV mapping is completely different
-        if (rotatedFace.equals("up") || rotatedFace.equals("down")) {
-            // Face has been rotated to horizontal - special handling
-            rotation = yRotation;
-            if (rotatedFace.equals("down")) {
-                rotation = (360 - rotation) % 360;
-            }
+        float finalV0, finalV1;
+        if (Math.signum(v2 - v0) == Math.signum(newV2 - newV0)) {
+            finalV0 = newV0;
+            finalV1 = newV2;
         } else {
-            // Face is still vertical
-            // Calculate the net rotation difference
-            int faceDelta = (rotatedOffset - originalOffset + 360) % 360;
-            
-            // The UV rotation compensates for this face rotation
-            // We apply the inverse to keep textures world-aligned
-            rotation = (360 - faceDelta) % 360;
-            
-            // X rotation of 180 flips the face vertically, affecting UV rotation
-            if (xRotation == 180) {
-                rotation = (rotation + 180) % 360;
-            }
+            finalV0 = newV2;
+            finalV1 = newV0;
         }
         
-        return rotation;
+        // Calculate new rotation by transforming a direction vector through the matrix
+        float rotRadians = (float)Math.toRadians(originalRotation);
+        Matrix3f rotMatrix = new Matrix3f(matrix);
+        Vector3f rotVector = rotMatrix.transform(new Vector3f((float)Math.cos(rotRadians), (float)Math.sin(rotRadians), 0.0f));
+        int newRotation = Math.floorMod(-((int)Math.round(Math.toDegrees(Math.atan2(rotVector.y(), rotVector.x())) / 90.0)) * 90, 360);
+        
+        return new UVLockResult(new float[]{finalU0, finalV0, finalU1, finalV1}, newRotation);
     }
     
     /**
-     * Get the Y-axis rotation offset for a face direction.
-     * This represents how much a face is rotated from the reference SOUTH face.
+     * Get reverse index for UV rotation (from Minecraft's BlockFaceUV.getReverseIndex).
      */
-    private static int getFaceYRotationOffset(String face) {
-        return switch (face) {
-            case "south" -> 0;
-            case "west" -> 90;
-            case "north" -> 180;
-            case "east" -> 270;
-            default -> 0; // up/down don't have Y offset in this context
+    private static int getReverseIndex(int index, int rotation) {
+        return (index + 4 - rotation / 90) % 4;
+    }
+    
+    /**
+     * Get U coordinate for a vertex index (from Minecraft's BlockFaceUV.getU).
+     * uvs format: [u0, v0, u1, v1]
+     */
+    private static float getUForIndex(float[] uvs, int index) {
+        // index 0 or 1 -> uvs[0], index 2 or 3 -> uvs[2]
+        return uvs[(index != 0 && index != 1) ? 2 : 0];
+    }
+    
+    /**
+     * Get V coordinate for a vertex index (from Minecraft's BlockFaceUV.getV).
+     * uvs format: [u0, v0, u1, v1]
+     */
+    private static float getVForIndex(float[] uvs, int index) {
+        // index 0 or 3 -> uvs[1], index 1 or 2 -> uvs[3]
+        return uvs[(index != 0 && index != 3) ? 3 : 1];
+    }
+    
+    /**
+     * Convert face direction string to index.
+     */
+    private static int getDirectionIndex(String direction) {
+        return switch (direction.toLowerCase()) {
+            case "down" -> DOWN;
+            case "up" -> UP;
+            case "north" -> NORTH;
+            case "south" -> SOUTH;
+            case "west" -> WEST;
+            case "east" -> EAST;
+            default -> NORTH;
         };
-    }
-    
-    /**
-     * Rotate UV bounding box by the specified degrees.
-     */
-    private static float[] rotateUVBounds(float u0, float v0, float u1, float v1, int degrees) {
-        int steps = ((degrees % 360) + 360) % 360 / 90;
-        
-        for (int i = 0; i < steps; i++) {
-            // 90° CCW rotation around center (8, 8) in 0-16 space
-            // (u, v) -> (16 - v, u)
-            float newU0 = 16 - v1;
-            float newV0 = u0;
-            float newU1 = 16 - v0;
-            float newV1 = u1;
-            
-            u0 = newU0;
-            v0 = newV0;
-            u1 = newU1;
-            v1 = newV1;
-        }
-        
-        // Ensure u0 < u1 and v0 < v1
-        float minU = Math.min(u0, u1);
-        float maxU = Math.max(u0, u1);
-        float minV = Math.min(v0, v1);
-        float maxV = Math.max(v0, v1);
-        
-        return new float[]{minU, minV, maxU, maxV};
-    }
-    
-    /**
-     * Calculate the total rotation to apply to UV coordinates including the face JSON rotation.
-     */
-    private static int calculateUVLockRotation(String originalFace, String rotatedFace,
-                                                int xRotation, int yRotation, int faceRotation) {
-        int uvRotation = calculateEffectiveUVRotation(originalFace, rotatedFace, xRotation, yRotation);
-        
-        // The face's JSON rotation is also affected by the UV lock transformation
-        // We need to transform this rotation through the same matrix
-        int transformedFaceRotation = transformFaceRotation(faceRotation, originalFace, rotatedFace, xRotation, yRotation);
-        
-        return (uvRotation + transformedFaceRotation) % 360;
-    }
-    
-    /**
-     * Transform the face's JSON rotation through the UV lock transformation.
-     */
-    private static int transformFaceRotation(int faceRotation, String originalFace, String rotatedFace,
-                                              int xRotation, int yRotation) {
-        // The face rotation is specified in the model's local coordinate system
-        // We need to keep it relative to the world, so we apply the inverse transformation
-        
-        // For simplicity, we return the face rotation as-is since the UV bounds rotation
-        // already accounts for the geometry transformation
-        return faceRotation;
     }
     
     /**
