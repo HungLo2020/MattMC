@@ -2,6 +2,7 @@ package mattmc.world.entity.player;
 
 
 import mattmc.client.MattMC;
+import mattmc.world.Gamemode;
 import mattmc.world.item.Inventory;
 /**
  * Represents the player in the game world.
@@ -43,6 +44,9 @@ public class LocalPlayer {
     // Player inventory
     private final Inventory inventory;
     
+    // Player gamemode
+    private Gamemode gamemode;
+    
     public LocalPlayer(float x, float y, float z) {
         this.x = x;
         this.y = y;
@@ -55,6 +59,7 @@ public class LocalPlayer {
         this.prevYaw = 0f;
         this.prevPitch = 0f;
         this.inventory = new Inventory();
+        this.gamemode = Gamemode.CREATIVE; // Default to CREATIVE
     }
     
     /**
@@ -237,4 +242,18 @@ public class LocalPlayer {
      * @return The inventory
      */
     public Inventory getInventory() { return inventory; }
+    
+    /**
+     * Get the player's gamemode.
+     * 
+     * @return The current gamemode
+     */
+    public Gamemode getGamemode() { return gamemode; }
+    
+    /**
+     * Set the player's gamemode.
+     * 
+     * @param gamemode The new gamemode
+     */
+    public void setGamemode(Gamemode gamemode) { this.gamemode = gamemode; }
 }

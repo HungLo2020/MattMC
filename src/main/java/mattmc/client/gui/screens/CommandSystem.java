@@ -1,5 +1,6 @@
 package mattmc.client.gui.screens;
 
+import mattmc.world.Gamemode;
 import mattmc.world.entity.player.LocalPlayer;
 import mattmc.world.item.Inventory;
 import mattmc.world.item.Item;
@@ -15,7 +16,7 @@ import org.slf4j.LoggerFactory;
 
 /**
  * Handles command parsing and execution for the game.
- * Supports commands: /tp, /pos1, /pos2, /set, /give
+ * Supports commands: /tp, /pos1, /pos2, /set, /give, /gamemode
  */
 public class CommandSystem {
     private static final Logger logger = LoggerFactory.getLogger(CommandSystem.class);
@@ -64,6 +65,8 @@ public class CommandSystem {
             return executeGiveCommand(cmd);
         } else if (cmd.startsWith("/time ")) {
             return executeTimeCommand(cmd);
+        } else if (cmd.startsWith("/gamemode ")) {
+            return executeGamemodeCommand(cmd);
         } else {
             return "Unknown command: " + cmd;
         }
@@ -326,5 +329,28 @@ public class CommandSystem {
         } catch (NumberFormatException e) {
             return "Error executing time command: " + e.getMessage();
         }
+    }
+    
+    /**
+     * Execute /gamemode command - sets the player's gamemode.
+     * Usage: /gamemode creative or /gamemode survival
+     */
+    private String executeGamemodeCommand(String cmd) {
+        String[] parts = cmd.substring(10).trim().split("\\s+");
+        
+        if (parts.length == 0 || parts[0].isEmpty()) {
+            return "Usage: /gamemode <creative|survival>";
+        }
+        
+        String modeName = parts[0];
+        Gamemode gamemode = Gamemode.fromName(modeName);
+        
+        if (gamemode == null) {
+            return "Unknown gamemode: " + modeName + ". Use creative or survival.";
+        }
+        
+        player.setGamemode(gamemode);
+        logger.info("Set player gamemode to: {}", gamemode.getDisplayName());
+        return "Gamemode set to " + gamemode.getDisplayName();
     }
 }

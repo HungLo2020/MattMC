@@ -1,6 +1,7 @@
 package mattmc.world.level.storage;
 
 import mattmc.nbt.NBTUtil;
+import mattmc.world.Gamemode;
 import mattmc.world.item.Inventory;
 import mattmc.world.item.Item;
 import mattmc.world.item.ItemStack;
@@ -15,7 +16,7 @@ import java.util.*;
 
 /**
  * Represents player data stored in player.dat file.
- * Stores inventory and other player-specific information.
+ * Stores inventory, gamemode, and other player-specific information.
  */
 public class PlayerData {
     
@@ -23,11 +24,11 @@ public class PlayerData {
     }
     
     /**
-     * Convert inventory to NBT format (Map-based).
+     * Convert inventory and gamemode to NBT format (Map-based).
      */
-    public static Map<String, Object> inventoryToNBT(Inventory inventory) {
-        // Pre-allocate with exact size (Inventory and SelectedItemSlot)
-        Map<String, Object> data = new HashMap<>(2);
+    public static Map<String, Object> toNBT(Inventory inventory, Gamemode gamemode) {
+        // Pre-allocate with exact size (Inventory, SelectedItemSlot, Gamemode)
+        Map<String, Object> data = new HashMap<>(3);
         
         // Pre-allocate with exact capacity (inventory size) for worst-case scenario
         List<Map<String, Object>> items = new ArrayList<>(inventory.getSize());
@@ -56,14 +57,34 @@ public class PlayerData {
         
         data.put("Inventory", items);
         data.put("SelectedItemSlot", inventory.getSelectedSlot());
+        data.put("Gamemode", gamemode.getId());
         
         return data;
     }
     
     /**
-     * Load inventory from NBT format (Map-based).
+     * Convert inventory to NBT format (Map-based).
+     * @deprecated Use {@link #toNBT(Inventory, Gamemode)} instead
      */
+    @Deprecated
+    public static Map<String, Object> inventoryToNBT(Inventory inventory) {
+        return toNBT(inventory, Gamemode.CREATIVE);
+    }
+    
+    /**
+     * Load inventory from NBT format (Map-based).
+     * @deprecated Use {@link #fromNBT(Inventory, Map)} instead
+     */
+    @Deprecated
     public static void inventoryFromNBT(Inventory inventory, Map<String, Object> data) {
+        fromNBT(inventory, data);
+    }
+    
+    /**
+     * Load inventory and gamemode from NBT format (Map-based).
+     * Returns the loaded gamemode, defaults to CREATIVE for legacy support.
+     */
+    public static Gamemode fromNBT(Inventory inventory, Map<String, Object> data) {
         // Clear existing inventory
         inventory.clear();
         
@@ -123,15 +144,31 @@ public class PlayerData {
         } else if (data.get("SelectedItemSlot") instanceof Byte) {
             inventory.setSelectedSlot(((Byte) data.get("SelectedItemSlot")).intValue());
         }
+        
+        // Load gamemode with legacy support (defaults to CREATIVE if not present)
+        if (data.get("Gamemode") instanceof Integer) {
+            return Gamemode.fromId((Integer) data.get("Gamemode"));
+        }
+        // Legacy world without Gamemode field - default to CREATIVE
+        return Gamemode.CREATIVE;
     }
     
     /**
      * Save player data to a file.
+     * @deprecated Use {@link #save(Path, Inventory, Gamemode)} instead
      */
+    @Deprecated
     public static void save(Path filePath, Inventory inventory) throws IOException {
+        save(filePath, inventory, Gamemode.CREATIVE);
+    }
+    
+    /**
+     * Save player data (inventory and gamemode) to a file.
+     */
+    public static void save(Path filePath, Inventory inventory, Gamemode gamemode) throws IOException {
         Files.createDirectories(filePath.getParent());
         
-        Map<String, Object> data = inventoryToNBT(inventory);
+        Map<String, Object> data = toNBT(inventory, gamemode);
         
         try (OutputStream out = Files.newOutputStream(filePath)) {
             NBTUtil.writeCompressed(data, out);
@@ -140,11 +177,24 @@ public class PlayerData {
     
     /**
      * Load player data from a file.
+     * @deprecated Use {@link #load(Path, Inventory)} which returns the Gamemode instead
      */
-    public static void load(Path filePath, Inventory inventory) throws IOException {
+    @Deprecated
+    public static void loadLegacy(Path filePath, Inventory inventory) throws IOException {
         try (InputStream in = Files.newInputStream(filePath)) {
             Map<String, Object> data = NBTUtil.readCompressed(in);
-            inventoryFromNBT(inventory, data);
+            fromNBT(inventory, data);
+        }
+    }
+    
+    /**
+     * Load player data from a file.
+     * Returns the loaded gamemode (or CREATIVE for legacy worlds).
+     */
+    public static Gamemode load(Path filePath, Inventory inventory) throws IOException {
+        try (InputStream in = Files.newInputStream(filePath)) {
+            Map<String, Object> data = NBTUtil.readCompressed(in);
+            return fromNBT(inventory, data);
         }
     }
 }

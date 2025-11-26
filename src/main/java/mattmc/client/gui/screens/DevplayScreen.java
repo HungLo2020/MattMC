@@ -4,6 +4,7 @@ import mattmc.client.MattMC;
 import mattmc.client.renderer.backend.RenderBackend;
 import mattmc.client.renderer.window.WindowHandle;
 import mattmc.client.settings.OptionsManager;
+import mattmc.world.Gamemode;
 import mattmc.world.entity.player.BlockInteraction;
 import mattmc.world.entity.player.LocalPlayer;
 import mattmc.world.entity.player.PlayerController;
@@ -50,6 +51,9 @@ public final class DevplayScreen implements Screen {
     // Level name for saving
     private final String worldName;
     
+    // Default gamemode for the world
+    private final Gamemode defaultGamemode;
+    
     private double lastFrameTimeSec = now();
     
     // Extracted components
@@ -61,30 +65,43 @@ public final class DevplayScreen implements Screen {
     private boolean shouldShutdownWorld = false;
 
     public DevplayScreen(MattMC game, String worldName) {
-        this(game, worldName, new java.util.Random().nextLong());
+        this(game, worldName, new java.util.Random().nextLong(), Gamemode.CREATIVE);
     }
     
     public DevplayScreen(MattMC game, String worldName, long seed) {
-        this(game, worldName, null, seed, 0f, 0f, 0f, 0f, 0f);
+        this(game, worldName, null, seed, 0f, 0f, 0f, 0f, 0f, null, Gamemode.CREATIVE, Gamemode.CREATIVE);
+    }
+    
+    public DevplayScreen(MattMC game, String worldName, long seed, Gamemode defaultGamemode) {
+        this(game, worldName, null, seed, 0f, 0f, 0f, 0f, 0f, null, defaultGamemode, defaultGamemode);
     }
     
     public DevplayScreen(MattMC game, String worldName, Level world, float playerX, float playerY, float playerZ, float playerYaw, float playerPitch) {
-        this(game, worldName, world, new java.util.Random().nextLong(), playerX, playerY, playerZ, playerYaw, playerPitch, null);
+        this(game, worldName, world, new java.util.Random().nextLong(), playerX, playerY, playerZ, playerYaw, playerPitch, null, Gamemode.CREATIVE, Gamemode.CREATIVE);
     }
     
     public DevplayScreen(MattMC game, String worldName, Level world, float playerX, float playerY, float playerZ, float playerYaw, float playerPitch, Inventory playerInventory) {
-        this(game, worldName, world, new java.util.Random().nextLong(), playerX, playerY, playerZ, playerYaw, playerPitch, playerInventory);
+        this(game, worldName, world, new java.util.Random().nextLong(), playerX, playerY, playerZ, playerYaw, playerPitch, playerInventory, Gamemode.CREATIVE, Gamemode.CREATIVE);
+    }
+    
+    public DevplayScreen(MattMC game, String worldName, Level world, float playerX, float playerY, float playerZ, float playerYaw, float playerPitch, Inventory playerInventory, Gamemode defaultGamemode, Gamemode playerGamemode) {
+        this(game, worldName, world, new java.util.Random().nextLong(), playerX, playerY, playerZ, playerYaw, playerPitch, playerInventory, defaultGamemode, playerGamemode);
     }
     
     public DevplayScreen(MattMC game, String worldName, Level world, long seed, float playerX, float playerY, float playerZ, float playerYaw, float playerPitch) {
-        this(game, worldName, world, seed, playerX, playerY, playerZ, playerYaw, playerPitch, null);
+        this(game, worldName, world, seed, playerX, playerY, playerZ, playerYaw, playerPitch, null, Gamemode.CREATIVE, Gamemode.CREATIVE);
     }
     
     public DevplayScreen(MattMC game, String worldName, Level world, long seed, float playerX, float playerY, float playerZ, float playerYaw, float playerPitch, Inventory playerInventory) {
+        this(game, worldName, world, seed, playerX, playerY, playerZ, playerYaw, playerPitch, playerInventory, Gamemode.CREATIVE, Gamemode.CREATIVE);
+    }
+    
+    public DevplayScreen(MattMC game, String worldName, Level world, long seed, float playerX, float playerY, float playerZ, float playerYaw, float playerPitch, Inventory playerInventory, Gamemode defaultGamemode, Gamemode playerGamemode) {
         this.game = game;
         this.window = game.window();
         this.backend = game.getRenderBackend();
         this.worldName = worldName;
+        this.defaultGamemode = defaultGamemode;
         
         // Initialize infinite world (use provided or create new)
         this.world = world != null ? world : new Level();
@@ -130,6 +147,7 @@ public final class DevplayScreen implements Screen {
         this.player = new LocalPlayer(spawnX, spawnY, spawnZ);
         this.player.setYaw(playerYaw);
         this.player.setPitch(playerPitch);
+        this.player.setGamemode(playerGamemode);
         
         // Load player inventory if provided
         if (playerInventory != null) {
@@ -262,7 +280,8 @@ public final class DevplayScreen implements Screen {
             // Use interpolated position for smooth debug display
             uiRenderer.drawDebugInfo(w, h, player.getX(alphaF), player.getY(alphaF), player.getZ(alphaF), 
                                      player.getYaw(alphaF), player.getPitch(alphaF), 0f, uiState.getFPS(),
-                                     loadedChunks, pendingChunks, activeWorkers, renderedChunks, culledChunks);
+                                     loadedChunks, pendingChunks, activeWorkers, renderedChunks, culledChunks,
+                                     defaultGamemode.getDisplayName(), player.getGamemode().getDisplayName());
             
             // Draw system information on the right side
             uiRenderer.drawSystemInfo(w, h, window.handle());
@@ -344,11 +363,20 @@ public final class DevplayScreen implements Screen {
     public void saveWorld() throws java.io.IOException {
         LevelStorageSource.saveWorld(world, worldName, 
             player.getX(), player.getY(), player.getZ(),
-            player.getYaw(), player.getPitch(), player.getInventory());
+            player.getYaw(), player.getPitch(), player.getInventory(),
+            defaultGamemode, player.getGamemode());
     }
     
     public String getWorldName() {
         return worldName;
+    }
+    
+    /**
+     * Get the default gamemode for this world.
+     * @return The default gamemode
+     */
+    public Gamemode getDefaultGamemode() {
+        return defaultGamemode;
     }
     
     /**

@@ -73,6 +73,35 @@ public class DebugInfoRenderer {
     public void render(int screenWidth, int screenHeight, float playerX, float playerY, float playerZ, 
                        float yaw, float pitch, float roll, double fps, 
                        int loadedChunks, int pendingChunks, int activeWorkers, int renderedChunks, int culledChunks) {
+        render(screenWidth, screenHeight, playerX, playerY, playerZ, yaw, pitch, roll, fps,
+               loadedChunks, pendingChunks, activeWorkers, renderedChunks, culledChunks, null, null);
+    }
+    
+    /**
+     * Render debug information in the top-left corner with gamemode info.
+     * 
+     * @param screenWidth Screen width in pixels
+     * @param screenHeight Screen height in pixels
+     * @param playerX Player X position
+     * @param playerY Player Y position
+     * @param playerZ Player Z position
+     * @param yaw Player yaw rotation
+     * @param pitch Player pitch rotation
+     * @param roll Player roll rotation
+     * @param fps Current frames per second
+     * @param loadedChunks Number of loaded chunks
+     * @param pendingChunks Number of pending chunks
+     * @param activeWorkers Number of active workers
+     * @param renderedChunks Number of rendered chunks
+     * @param culledChunks Number of culled chunks
+     * @param defaultGamemode The world's default gamemode (can be null)
+     * @param playerGamemode The player's current gamemode (can be null)
+     * @throws IllegalStateException if backend has not been set
+     */
+    public void render(int screenWidth, int screenHeight, float playerX, float playerY, float playerZ, 
+                       float yaw, float pitch, float roll, double fps, 
+                       int loadedChunks, int pendingChunks, int activeWorkers, int renderedChunks, int culledChunks,
+                       String defaultGamemode, String playerGamemode) {
         if (backend == null) {
             throw new IllegalStateException("Backend must be set before calling render()");
         }
@@ -86,6 +115,7 @@ public class DebugInfoRenderer {
         logic.buildDebugInfoCommands(screenWidth, screenHeight, 
             playerX, playerY, playerZ, yaw, pitch, roll, fps,
             loadedChunks, pendingChunks, activeWorkers, renderedChunks, culledChunks,
+            defaultGamemode, playerGamemode,
             buffer);
         
         // Submit commands to backend with frame management
