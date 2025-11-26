@@ -1,6 +1,7 @@
 package mattmc.client.renderer;
 import mattmc.client.renderer.backend.RenderPass;
 import mattmc.client.renderer.backend.DrawCommand;
+import mattmc.client.renderer.backend.UIMeshIds;
 
 /**
  * Front-end logic for UI rendering that builds draw commands without making GL calls.
@@ -85,9 +86,8 @@ public class UIRenderLogic {
         float hotbarY = screenHeight - texHeight - 10;
         
         // Create command for hotbar background
-        // meshId -6 = hotbar background
         DrawCommand hotbarBg = new DrawCommand(
-            -6, // hotbar background marker
+            UIMeshIds.HOTBAR, // hotbar background marker
             encodeHotbarData((int)hotbarX, (int)hotbarY, (int)texWidth, (int)texHeight, 0), // type 0 = background
             0,  // screen-space
             RenderPass.UI
@@ -127,9 +127,8 @@ public class UIRenderLogic {
         float selectionY = hotbarY - (1 * HOTBAR_SCALE);
         
         // Create command for selection overlay
-        // meshId -6 = hotbar, type 1 = selection
         DrawCommand selection = new DrawCommand(
-            -6, // hotbar marker
+            UIMeshIds.HOTBAR, // hotbar marker
             encodeHotbarData((int)selectionX, (int)selectionY, (int)selectionWidth, (int)selectionHeight, 1), // type 1 = selection
             0,  // screen-space
             RenderPass.UI
@@ -174,11 +173,11 @@ public class UIRenderLogic {
         // For Stage 4, we use special mesh IDs to indicate UI quads
         // The backend will recognize these and render them as 2D quads
         
-        // Horizontal line: meshId = -1 indicates UI quad (convention)
+        // Horizontal line
         // materialId encodes position/size info
         // transformIndex = 0 for screen-space rendering
         DrawCommand horizontalLine = new DrawCommand(
-            -1, // UI quad marker
+            UIMeshIds.CROSSHAIR, // UI quad marker
             encodeCrosshairData((int)centerX, (int)centerY, (int)(size*2), (int)thickness, true),
             0,  // screen-space transform
             RenderPass.UI
@@ -187,7 +186,7 @@ public class UIRenderLogic {
         // Vertical line
         // Note: we pass size*2 as the width parameter because that's what gets encoded as the line length
         DrawCommand verticalLine = new DrawCommand(
-            -1, // UI quad marker
+            UIMeshIds.CROSSHAIR, // UI quad marker
             encodeCrosshairData((int)centerX, (int)centerY, (int)(size*2), (int)thickness, false),
             0,  // screen-space transform
             RenderPass.UI
@@ -319,7 +318,7 @@ public class UIRenderLogic {
         for (int i = 0; i < lines.length; i++) {
             int textId = registerText(lines[i], x, y + lineHeight * i, scale, color);
             DrawCommand cmd = new DrawCommand(
-                -7, // debug info marker
+                UIMeshIds.DEBUG_TEXT, // debug info marker
                 0,  // unused
                 textId, // text ID in registry
                 RenderPass.UI
@@ -363,7 +362,7 @@ public class UIRenderLogic {
         // Encode box dimensions in materialId
         int encoded = encodeCommandUIData(boxX, boxY, screenWidth - 40, boxHeight, 0); // type 0 = overlay
         DrawCommand cmd = new DrawCommand(
-            -8, // command UI marker
+            UIMeshIds.COMMAND_UI, // command UI marker
             encoded,
             textId, // text ID
             RenderPass.UI
@@ -401,7 +400,7 @@ public class UIRenderLogic {
         
         int encoded = encodeCommandUIData(bgX, bgY, bgWidth, bgHeight, 1); // type 1 = feedback
         DrawCommand cmd = new DrawCommand(
-            -8, // command UI marker
+            UIMeshIds.COMMAND_UI, // command UI marker
             encoded,
             textId, // text ID
             RenderPass.UI
@@ -443,7 +442,7 @@ public class UIRenderLogic {
         
         // Create single command with first text ID (backend will look up all in sequence)
         DrawCommand cmd = new DrawCommand(
-            -9, // system info marker
+            UIMeshIds.SYSTEM_INFO, // system info marker
             systemInfo.length, // number of lines
             firstTextId, // first text ID
             RenderPass.UI
@@ -498,7 +497,7 @@ public class UIRenderLogic {
         
         // Create command for tooltip
         DrawCommand cmd = new DrawCommand(
-            -10, // tooltip marker
+            UIMeshIds.TOOLTIP, // tooltip marker
             encodedPos, // position
             textId, // text ID (also used for size lookup via transformIndex pattern)
             RenderPass.UI
@@ -507,7 +506,7 @@ public class UIRenderLogic {
         
         // Store size info using second command with special encoding
         DrawCommand sizeCmd = new DrawCommand(
-            -10, // tooltip marker
+            UIMeshIds.TOOLTIP, // tooltip marker
             encodedSize, // size
             textId | 0x80000000, // mark as size info with high bit
             RenderPass.UI
@@ -552,10 +551,10 @@ public class UIRenderLogic {
                                    (int)x, (int)(y + lineHeight * 3), scale, timeColor);
         
         // Create draw commands for each text line
-        buffer.add(new DrawCommand(-7, 0, textId1, RenderPass.UI));
-        buffer.add(new DrawCommand(-7, 0, textId2, RenderPass.UI));
-        buffer.add(new DrawCommand(-7, 0, textId3, RenderPass.UI));
-        buffer.add(new DrawCommand(-7, 0, textId4, RenderPass.UI));
+        buffer.add(new DrawCommand(UIMeshIds.DEBUG_TEXT, 0, textId1, RenderPass.UI));
+        buffer.add(new DrawCommand(UIMeshIds.DEBUG_TEXT, 0, textId2, RenderPass.UI));
+        buffer.add(new DrawCommand(UIMeshIds.DEBUG_TEXT, 0, textId3, RenderPass.UI));
+        buffer.add(new DrawCommand(UIMeshIds.DEBUG_TEXT, 0, textId4, RenderPass.UI));
     }
     
     /**
@@ -575,6 +574,6 @@ public class UIRenderLogic {
         int textId = registerText(blockName, x + 10, y + 10, textScale, 0xFFFFFF);
         
         // Create draw command for the text
-        buffer.add(new DrawCommand(-7, 0, textId, RenderPass.UI));
+        buffer.add(new DrawCommand(UIMeshIds.DEBUG_TEXT, 0, textId, RenderPass.UI));
     }
 }

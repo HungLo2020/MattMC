@@ -11,6 +11,7 @@ import mattmc.client.renderer.backend.RenderPass;
 import mattmc.client.renderer.backend.DrawCommand;
 
 import mattmc.client.renderer.backend.RenderBackend;
+import mattmc.client.renderer.backend.UIMeshIds;
 
 import mattmc.client.renderer.backend.opengl.ChunkVAO;
 import mattmc.client.renderer.backend.opengl.TextureAtlas;
@@ -261,34 +262,28 @@ public class OpenGLRenderBackend implements RenderBackend {
      * @param cmd the UI draw command
      */
     private void submitUICommand(DrawCommand cmd) {
-        // Handle different UI element types based on meshId:
-        // -1 = crosshair
-        // -2 to -5 = items (fallback, cube, stairs, flat)
-        // -6 = hotbar (background/selection)
-        // -7 = debug info text
-        // -8 = command UI (overlay/feedback)
-        // -9 = system info text
-        // -10 = tooltip
+        // Handle different UI element types based on meshId
+        // See UIMeshIds for the complete list of constants
         
-        if (cmd.meshId == -1) {
+        if (cmd.meshId == UIMeshIds.CROSSHAIR) {
             // Crosshair rendering
             submitCrosshairCommand(cmd);
-        } else if (cmd.meshId <= -2 && cmd.meshId >= -5) {
-            // Item rendering
+        } else if (UIMeshIds.isItemMeshId(cmd.meshId)) {
+            // Item rendering (fallback, cube, stairs, flat)
             submitItemCommand(cmd);
-        } else if (cmd.meshId == -6) {
+        } else if (cmd.meshId == UIMeshIds.HOTBAR) {
             // Hotbar rendering
             submitHotbarCommand(cmd);
-        } else if (cmd.meshId == -7) {
+        } else if (cmd.meshId == UIMeshIds.DEBUG_TEXT) {
             // Debug info text
             submitDebugTextCommand(cmd);
-        } else if (cmd.meshId == -8) {
+        } else if (cmd.meshId == UIMeshIds.COMMAND_UI) {
             // Command UI
             submitCommandUICommand(cmd);
-        } else if (cmd.meshId == -9) {
+        } else if (cmd.meshId == UIMeshIds.SYSTEM_INFO) {
             // System info text
             submitSystemInfoCommand(cmd);
-        } else if (cmd.meshId == -10) {
+        } else if (cmd.meshId == UIMeshIds.TOOLTIP) {
             // Tooltip
             submitTooltipCommand(cmd);
         }
@@ -339,19 +334,22 @@ public class OpenGLRenderBackend implements RenderBackend {
             return;
         }
         
-        // Render based on meshId type
+        // Get the item renderer instance (avoids static method usage)
+        OpenGLItemRenderer itemRenderer = OpenGLItemRenderer.getInstance();
+        
+        // Render based on meshId type using UIMeshIds constants
         switch (cmd.meshId) {
-            case -2:
+            case UIMeshIds.ITEM_FALLBACK:
                 // Fallback item (magenta square)
-                OpenGLItemRenderer.renderFallbackItemStatic(itemInfo.x, itemInfo.y, itemInfo.size);
+                itemRenderer.renderFallbackItem(itemInfo.x, itemInfo.y, itemInfo.size);
                 break;
-            case -3:
-            case -4:
-            case -5:
-                // Delegate to OpenGLItemRenderer's existing rendering methods
+            case UIMeshIds.ITEM_CUBE:
+            case UIMeshIds.ITEM_STAIRS:
+            case UIMeshIds.ITEM_FLAT:
+                // Delegate to ItemRenderer's existing rendering methods
                 // Use the standard rendering path which handles all item types
                 // applyInventoryOffset=true for proper hotbar positioning (matches legacy behavior)
-                OpenGLItemRenderer.renderItemStatic(itemInfo.stack, itemInfo.x, itemInfo.y, itemInfo.size, true);
+                itemRenderer.renderItem(itemInfo.stack, itemInfo.x, itemInfo.y, itemInfo.size, true);
                 break;
         }
     }

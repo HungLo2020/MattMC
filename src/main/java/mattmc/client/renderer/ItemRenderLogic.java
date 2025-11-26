@@ -1,6 +1,7 @@
 package mattmc.client.renderer;
 import mattmc.client.renderer.backend.RenderPass;
 import mattmc.client.renderer.backend.DrawCommand;
+import mattmc.client.renderer.backend.UIMeshIds;
 
 import mattmc.world.item.ItemStack;
 import java.util.HashMap;
@@ -115,7 +116,7 @@ public class ItemRenderLogic {
         
         if (texturePaths == null || texturePaths.isEmpty()) {
             // Create command for fallback rendering (magenta square)
-            DrawCommand cmd = new DrawCommand(-2, -1, 0, RenderPass.UI);
+            DrawCommand cmd = new DrawCommand(UIMeshIds.ITEM_FALLBACK, -1, 0, RenderPass.UI);
             buffer.add(cmd);
             return;
         }
@@ -133,15 +134,15 @@ public class ItemRenderLogic {
         }
         
         // Encode item rendering data in DrawCommand fields:
-        // meshId: -3 = isometric cube, -4 = isometric stairs, -5 = flat item, -2 = fallback
+        // meshId: see UIMeshIds.ITEM_* constants
         // materialId: not used for items (0)
         // transformIndex: unique ID to look up item in registry
         
         int meshId;
         if (isBlockItem) {
-            meshId = isStairs ? -4 : -3; // -3 = cube, -4 = stairs
+            meshId = isStairs ? UIMeshIds.ITEM_STAIRS : UIMeshIds.ITEM_CUBE;
         } else {
-            meshId = -5; // -5 = flat item
+            meshId = UIMeshIds.ITEM_FLAT;
         }
         
         // Register the item stack for backend rendering

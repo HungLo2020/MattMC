@@ -143,28 +143,13 @@ This enables gradual migration to centralized frame management while maintaining
 
 ---
 
-### 5. Inconsistent Magic Numbers for UI Mesh IDs
+### 5. ~~Inconsistent Magic Numbers for UI Mesh IDs~~ ✅ FIXED
 
 **Location**: `mattmc/client/renderer/backend/opengl/OpenGLRenderBackend.java` (Lines 267-296)
 
-**Problem**: UI elements are identified by negative magic numbers without clear documentation:
+**Status**: **RESOLVED** - Created `UIMeshIds` constants class in `mattmc.client.renderer.backend` package. Updated all usages in `UIRenderLogic`, `ItemRenderLogic`, and `OpenGLRenderBackend` to use named constants instead of magic numbers.
 
-```java
-// meshId: -1 = crosshair
-// meshId: -2 to -5 = items
-// meshId: -6 = hotbar
-// meshId: -7 = debug info text
-// meshId: -8 = command UI
-// meshId: -9 = system info text
-// meshId: -10 = tooltip
-```
-
-**Why it's a problem**:
-- Magic numbers make code hard to understand and maintain
-- Easy to accidentally use wrong values
-- No compile-time safety
-
-**Fix**: Create constants or an enum:
+**Solution Applied**: Created new file `UIMeshIds.java`:
 
 ```java
 public final class UIMeshIds {
@@ -178,36 +163,35 @@ public final class UIMeshIds {
     public static final int COMMAND_UI = -8;
     public static final int SYSTEM_INFO = -9;
     public static final int TOOLTIP = -10;
+    
+    public static boolean isItemMeshId(int meshId) {
+        return meshId <= ITEM_FALLBACK && meshId >= ITEM_FLAT;
+    }
 }
 ```
 
 ---
 
-### 6. Inconsistent Static vs Instance Methods
+### 6. ~~Inconsistent Static vs Instance Methods~~ ✅ FIXED
 
 **Location**: `mattmc/client/renderer/backend/opengl/OpenGLItemRenderer.java`
 
-**Problem**: The class has both static and instance methods for the same functionality:
+**Status**: **RESOLVED** - Updated `OpenGLRenderBackend.submitItemCommand()` to use instance methods via `OpenGLItemRenderer.getInstance()` instead of static method calls. This follows the interface abstraction pattern.
+
+**Original Problem**: The class had both static and instance methods for the same functionality, encouraging direct coupling to the OpenGL implementation.
+
+**Solution Applied**: Modified `submitItemCommand()` to use instance methods:
 
 ```java
-// Static method
-public static void renderItemStatic(ItemStack stack, float x, float y, float size) {
-    INSTANCE.renderItem(stack, x, y, size, false);
-}
+// Before: Static method calls
+OpenGLItemRenderer.renderFallbackItemStatic(...);
+OpenGLItemRenderer.renderItemStatic(...);
 
-// Instance method (via interface) - calls overloaded version
-@Override
-public void renderItem(ItemStack stack, float x, float y, float size) {
-    renderItem(stack, x, y, size, false); // Calls renderItem(stack, x, y, size, applyInventoryOffset)
-}
+// After: Instance method calls via getInstance()
+OpenGLItemRenderer itemRenderer = OpenGLItemRenderer.getInstance();
+itemRenderer.renderFallbackItem(...);
+itemRenderer.renderItem(...);
 ```
-
-**Why it's a problem**:
-- Confusing API surface
-- Static methods bypass the interface abstraction
-- Encourages direct coupling to OpenGL implementation
-
-**Fix**: Remove static methods and use the interface consistently:
 
 ```java
 // Always access through the interface
