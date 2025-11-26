@@ -59,7 +59,16 @@ public class BlockState {
         if (property.getValueClass().isInstance(value)) {
             return (T) value;
         }
-        // Value exists but wrong type - return default
+        // Value exists but wrong type - try to parse it as a string
+        if (value instanceof String) {
+            java.util.Optional<T> parsed = property.parseValue((String) value);
+            if (parsed.isPresent()) {
+                // Cache the parsed value for future lookups
+                properties.put(property.getName(), parsed.get());
+                return parsed.get();
+            }
+        }
+        // Could not parse - return default
         return property.getDefaultValue();
     }
     

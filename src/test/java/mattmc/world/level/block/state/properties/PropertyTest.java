@@ -274,4 +274,21 @@ public class PropertyTest {
         assertEquals(Direction.EAST, restored.getValue(BlockStateProperties.HORIZONTAL_FACING));
         assertEquals(Half.TOP, restored.getValue(BlockStateProperties.HALF));
     }
+    
+    @Test
+    @DisplayName("BlockState getValue should handle string values from NBT conversion")
+    void testBlockStateStringValueConversion() {
+        // Simulate loading a blockstate from NBT where values are strings
+        java.util.Map<String, Object> nbtData = new java.util.HashMap<>();
+        nbtData.put("facing", "EAST");  // String, not Direction enum
+        nbtData.put("half", "TOP");     // String, not Half enum
+        nbtData.put("shape", "STRAIGHT"); // String, not StairsShape enum
+        
+        BlockState state = BlockState.fromNBT(nbtData);
+        
+        // getValue should properly convert string values to enums
+        assertEquals(Direction.EAST, state.getValue(BlockStateProperties.HORIZONTAL_FACING));
+        assertEquals(Half.TOP, state.getValue(BlockStateProperties.HALF));
+        assertEquals(StairsShape.STRAIGHT, state.getValue(BlockStateProperties.STAIRS_SHAPE));
+    }
 }
