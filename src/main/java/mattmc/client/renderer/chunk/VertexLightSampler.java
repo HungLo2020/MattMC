@@ -92,7 +92,7 @@ public class VertexLightSampler {
         
         // For wall faces (normalIndex 2-5), sample from current block position
         // to ensure consistent lighting across all wall faces at the same position
-        boolean isWallFace = normalIndex >= 2 && normalIndex <= 5;
+        boolean isWallFace = normalIndex >= FACE_NORTH && normalIndex <= FACE_EAST;
         
         // Sample light from positions based on face type
         int[] offsets = getVertexSampleOffsets(normalIndex, cornerIndex);
@@ -164,86 +164,79 @@ public class VertexLightSampler {
         return new float[] {avgSkyLight, avgBlockLightR, avgBlockLightG, avgBlockLightB, ao};
     }
     
+    // Face normal index constants for readability
+    private static final int FACE_TOP = 0;
+    private static final int FACE_BOTTOM = 1;
+    private static final int FACE_NORTH = 2;
+    private static final int FACE_SOUTH = 3;
+    private static final int FACE_WEST = 4;
+    private static final int FACE_EAST = 5;
+    
     /**
      * Get offsets for the 4 sample positions for a vertex (3 sides + 1 diagonal).
      * Returns array of 12 ints: [dx0,dy0,dz0, dx1,dy1,dz1, dx2,dy2,dz2, dx3,dy3,dz3]
      * 
      * FIX for wall lighting asymmetry bug: For all faces, we now sample from the
      * air block that the face is visible from (in the normal direction), plus
-     * neighbors in a consistent cross pattern. This ensures symmetric lighting
-     * for walls at the same position.
-     * 
-     * Previously, walls facing the light source would appear brighter because
-     * their samples included blocks closer to the light. Now we sample consistently
-     * so all walls at the same position get the same average light.
+     * neighbors around each specific corner vertex for smooth lighting.
      */
     private int[] getVertexSampleOffsets(int normalIndex, int cornerIndex) {
-        // For each face, we sample light from the air block the face is exposed to,
-        // plus its neighbors. The key is to sample symmetrically so all faces
-        // at the same position receive the same average light level.
-        //
-        // Strategy: Sample the block in the face normal direction, plus 3 neighbors
-        // that form a cross pattern in the plane perpendicular to the normal.
-        // This way, we're not biased by which direction the light is coming from.
+        // For each face and corner, sample from:
+        // 1. The block in the face normal direction (where the face is visible from)
+        // 2-4. Three neighbors around the vertex corner for smooth gradients
         
-        // Top face (normal = 0,1,0) - sample from above
-        if (normalIndex == 0) {
-            // Sample y+1 and neighbors in XZ plane
+        // Top face (normal = 0,1,0)
+        if (normalIndex == FACE_TOP) {
             switch (cornerIndex) {
-                case 0: return new int[] {0,1,0, -1,1,0, 0,1,-1, -1,1,-1}; // x0, z0
-                case 1: return new int[] {0,1,0, -1,1,0, 0,1,1, -1,1,1};   // x0, z1
-                case 2: return new int[] {0,1,0, 1,1,0, 0,1,1, 1,1,1};     // x1, z1
-                case 3: return new int[] {0,1,0, 1,1,0, 0,1,-1, 1,1,-1};   // x1, z0
+                case 0: return new int[] {0,1,0, -1,1,0, 0,1,-1, -1,1,-1}; // x0, z0 corner
+                case 1: return new int[] {0,1,0, -1,1,0, 0,1,1, -1,1,1};   // x0, z1 corner
+                case 2: return new int[] {0,1,0, 1,1,0, 0,1,1, 1,1,1};     // x1, z1 corner
+                case 3: return new int[] {0,1,0, 1,1,0, 0,1,-1, 1,1,-1};   // x1, z0 corner
             }
         }
-        // Bottom face (normal = 0,-1,0) - sample from below
-        else if (normalIndex == 1) {
+        // Bottom face (normal = 0,-1,0)
+        else if (normalIndex == FACE_BOTTOM) {
             switch (cornerIndex) {
-                case 0: return new int[] {0,-1,0, -1,-1,0, 0,-1,-1, -1,-1,-1}; // x0, z0
-                case 1: return new int[] {0,-1,0, 1,-1,0, 0,-1,-1, 1,-1,-1};   // x1, z0
-                case 2: return new int[] {0,-1,0, 1,-1,0, 0,-1,1, 1,-1,1};     // x1, z1
-                case 3: return new int[] {0,-1,0, -1,-1,0, 0,-1,1, -1,-1,1};   // x0, z1
+                case 0: return new int[] {0,-1,0, -1,-1,0, 0,-1,-1, -1,-1,-1}; // x0, z0 corner
+                case 1: return new int[] {0,-1,0, 1,-1,0, 0,-1,-1, 1,-1,-1};   // x1, z0 corner
+                case 2: return new int[] {0,-1,0, 1,-1,0, 0,-1,1, 1,-1,1};     // x1, z1 corner
+                case 3: return new int[] {0,-1,0, -1,-1,0, 0,-1,1, -1,-1,1};   // x0, z1 corner
             }
         }
-        // For wall faces (north/south/east/west), we want consistent lighting.
-        // Sample from the air space in the normal direction, but also include
-        // samples from above to capture light properly.
-        //
-        // North face (normal = 0,0,-1)
-        else if (normalIndex == 2) {
+        // North face (normal = 0,0,-1) - vertices ordered: x1y0, x0y0, x0y1, x1y1
+        else if (normalIndex == FACE_NORTH) {
             switch (cornerIndex) {
-                // For each corner, sample: face-normal-block, above, and the two side neighbors
-                case 0: return new int[] {0,0,-1, 0,1,-1, 1,0,-1, 1,1,-1};   // x1, y0 corner
-                case 1: return new int[] {0,0,-1, 0,1,-1, -1,0,-1, -1,1,-1}; // x0, y0 corner
-                case 2: return new int[] {0,0,-1, 0,1,-1, -1,0,-1, -1,1,-1}; // x0, y1 corner
-                case 3: return new int[] {0,0,-1, 0,1,-1, 1,0,-1, 1,1,-1};   // x1, y1 corner
+                case 0: return new int[] {0,0,-1, 1,0,-1, 0,-1,-1, 1,-1,-1};   // x1, y0 corner
+                case 1: return new int[] {0,0,-1, -1,0,-1, 0,-1,-1, -1,-1,-1}; // x0, y0 corner
+                case 2: return new int[] {0,0,-1, -1,0,-1, 0,1,-1, -1,1,-1};   // x0, y1 corner
+                case 3: return new int[] {0,0,-1, 1,0,-1, 0,1,-1, 1,1,-1};     // x1, y1 corner
             }
         }
-        // South face (normal = 0,0,1)
-        else if (normalIndex == 3) {
+        // South face (normal = 0,0,1) - vertices ordered: x0y0, x1y0, x1y1, x0y1
+        else if (normalIndex == FACE_SOUTH) {
             switch (cornerIndex) {
-                case 0: return new int[] {0,0,1, 0,1,1, -1,0,1, -1,1,1}; // x0, y0 corner
-                case 1: return new int[] {0,0,1, 0,1,1, 1,0,1, 1,1,1};   // x1, y0 corner
-                case 2: return new int[] {0,0,1, 0,1,1, 1,0,1, 1,1,1};   // x1, y1 corner
-                case 3: return new int[] {0,0,1, 0,1,1, -1,0,1, -1,1,1}; // x0, y1 corner
+                case 0: return new int[] {0,0,1, -1,0,1, 0,-1,1, -1,-1,1}; // x0, y0 corner
+                case 1: return new int[] {0,0,1, 1,0,1, 0,-1,1, 1,-1,1};   // x1, y0 corner
+                case 2: return new int[] {0,0,1, 1,0,1, 0,1,1, 1,1,1};     // x1, y1 corner
+                case 3: return new int[] {0,0,1, -1,0,1, 0,1,1, -1,1,1};   // x0, y1 corner
             }
         }
-        // West face (normal = -1,0,0)
-        else if (normalIndex == 4) {
+        // West face (normal = -1,0,0) - vertices ordered: z0y0, z1y0, z1y1, z0y1
+        else if (normalIndex == FACE_WEST) {
             switch (cornerIndex) {
-                case 0: return new int[] {-1,0,0, -1,1,0, -1,0,-1, -1,1,-1}; // z0, y0 corner
-                case 1: return new int[] {-1,0,0, -1,1,0, -1,0,1, -1,1,1};   // z1, y0 corner
-                case 2: return new int[] {-1,0,0, -1,1,0, -1,0,1, -1,1,1};   // z1, y1 corner
-                case 3: return new int[] {-1,0,0, -1,1,0, -1,0,-1, -1,1,-1}; // z0, y1 corner
+                case 0: return new int[] {-1,0,0, -1,0,-1, -1,-1,0, -1,-1,-1}; // z0, y0 corner
+                case 1: return new int[] {-1,0,0, -1,0,1, -1,-1,0, -1,-1,1};   // z1, y0 corner
+                case 2: return new int[] {-1,0,0, -1,0,1, -1,1,0, -1,1,1};     // z1, y1 corner
+                case 3: return new int[] {-1,0,0, -1,0,-1, -1,1,0, -1,1,-1};   // z0, y1 corner
             }
         }
-        // East face (normal = 1,0,0)
-        else if (normalIndex == 5) {
+        // East face (normal = 1,0,0) - vertices ordered: z1y0, z0y0, z0y1, z1y1
+        else if (normalIndex == FACE_EAST) {
             switch (cornerIndex) {
-                case 0: return new int[] {1,0,0, 1,1,0, 1,0,1, 1,1,1};   // z1, y0 corner
-                case 1: return new int[] {1,0,0, 1,1,0, 1,0,-1, 1,1,-1}; // z0, y0 corner
-                case 2: return new int[] {1,0,0, 1,1,0, 1,0,-1, 1,1,-1}; // z0, y1 corner
-                case 3: return new int[] {1,0,0, 1,1,0, 1,0,1, 1,1,1};   // z1, y1 corner
+                case 0: return new int[] {1,0,0, 1,0,1, 1,-1,0, 1,-1,1};   // z1, y0 corner
+                case 1: return new int[] {1,0,0, 1,0,-1, 1,-1,0, 1,-1,-1}; // z0, y0 corner
+                case 2: return new int[] {1,0,0, 1,0,-1, 1,1,0, 1,1,-1};   // z0, y1 corner
+                case 3: return new int[] {1,0,0, 1,0,1, 1,1,0, 1,1,1};     // z1, y1 corner
             }
         }
         
