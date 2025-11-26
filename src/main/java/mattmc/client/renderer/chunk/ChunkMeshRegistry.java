@@ -12,7 +12,7 @@ import mattmc.world.level.chunk.LevelChunk;
  * <p><b>Architecture:</b> This allows chunk rendering logic to be defined outside the
  * backend/ directory while the actual mesh storage implementation remains in the backend.
  * 
- * @see mattmc.client.renderer.backend.opengl.ChunkRenderer OpenGL implementation
+ * @see mattmc.client.renderer.backend.opengl.OpenGLChunkMeshManager OpenGL implementation
  */
 public interface ChunkMeshRegistry {
     

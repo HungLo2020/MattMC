@@ -249,44 +249,28 @@ public void beginFrame() {
 
 ## Dead Code & Unused Components
 
-### 9. Unused RegionRenderer Class
+### 9. ~~Unused RegionRenderer Class~~ ✅ FIXED
 
 **Location**: `mattmc/client/renderer/level/RegionRenderer.java`
 
-**Problem**: The `RegionRenderer` class appears to be legacy code that's no longer used in the main rendering pipeline. `LevelRenderer` handles chunk rendering directly without using regions.
+**Status**: **RESOLVED** - Removed `RegionRenderer.java` along with related dead code:
+- `RegionChunkRenderer.java` (interface only used by RegionRenderer)
+- `ChunkRenderer.java` (interface only used by OpenGLChunkRenderer)
 
-**Evidence**:
-- No imports of `RegionRenderer` found in main rendering code
-- The frustum culling in `RegionRenderer` is incomplete (always returns true)
-- Uses its own render distance constant separate from game settings
-
-**Why it's a problem**:
-- Dead code adds maintenance burden
-- Duplicate frustum culling logic (incomplete)
-- Confuses developers about the rendering architecture
-
-**Fix**: Either:
-1. Remove `RegionRenderer` if region-based rendering is not needed
-2. Or integrate it properly into the rendering pipeline
+The main chunk rendering pipeline uses `LevelRenderer` → `ChunkRenderLogic` → `OpenGLRenderBackend.submit()` without needing these region-based abstractions.
 
 ---
 
-### 10. Unused OpenGLChunkRenderer Class
+### 10. ~~Unused OpenGLChunkRenderer Class~~ ✅ FIXED
 
 **Location**: `mattmc/client/renderer/backend/opengl/OpenGLChunkRenderer.java`
 
-**Problem**: Similar to `RegionRenderer`, this class seems unused. The main chunk rendering goes through `LevelRenderer` → `ChunkRenderLogic` → `OpenGLRenderBackend.submit()`.
+**Status**: **RESOLVED** - Removed `OpenGLChunkRenderer.java`. This class was not used anywhere in the codebase. Chunk rendering is handled through the backend architecture:
+- `ChunkMeshManager` generates meshes
+- `OpenGLChunkMeshManager` stores VAOs
+- `OpenGLRenderBackend.submit()` renders draw commands
 
-**Evidence**:
-- `LevelRenderer` uses `ChunkMeshManager` and submits `DrawCommand`s directly
-- `OpenGLChunkRenderer` has its own shader/texture atlas references
-- No evidence of `OpenGLChunkRenderer.renderChunk()` being called
-
-**Why it's a problem**:
-- Dead code with duplicate resource management
-- Confusing alternative rendering path
-
-**Fix**: Remove if not used, or document and integrate if needed for specific use cases.
+Updated Javadoc in `ChunkMeshRegistry` to reference `OpenGLChunkMeshManager` instead.
 
 ---
 
