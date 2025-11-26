@@ -1,7 +1,7 @@
 package mattmc.client.renderer;
 
-import mattmc.client.renderer.backend.opengl.OpenGLChunkMeshManager;
 import mattmc.client.renderer.chunk.ChunkMeshRegistry;
+import mattmc.client.renderer.chunk.MockChunkMeshRegistry;
 import mattmc.client.renderer.Frustum;
 import mattmc.world.level.Level;
 import mattmc.world.level.chunk.LevelChunk;
@@ -17,6 +17,7 @@ import static org.junit.jupiter.api.Assertions.*;
  * Tests for ChunkRenderLogic class.
  * 
  * <p>Note: These tests focus on the logic without requiring OpenGL context.
+ * Uses MockChunkMeshRegistry to avoid OpenGL initialization in CI.
  * Full integration tests with actual rendering would need GL context.
  * 
  * This is part of Stage 3 of the rendering refactor.
@@ -29,7 +30,8 @@ public class ChunkRenderLogicTest {
     
     @BeforeEach
     public void setUp() {
-        meshRegistry = new OpenGLChunkMeshManager();
+        // Use mock to avoid OpenGL context requirement
+        meshRegistry = new MockChunkMeshRegistry();
         frustum = new Frustum();
         logic = new ChunkRenderLogic(meshRegistry, frustum);
     }
