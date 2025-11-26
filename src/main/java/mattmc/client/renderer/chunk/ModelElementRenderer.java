@@ -241,18 +241,19 @@ public class ModelElementRenderer {
 		int faceRotDegrees = (faceRotation != null) ? faceRotation : 0;
 		
 		// When uvlock=true, transform UV coordinates to account for geometry rotation
-        // This keeps textures aligned with world axes by rotating the UV rectangle
-        // Note: Only horizontal faces (up/down) need UV transformation for Y-axis rotation
-        // Vertical faces already have correct UVs in the JSON for their face direction
-        if (uvlock && yRotation != 0 && (faceDirection.equals("up") || faceDirection.equals("down"))) {
-            uv = UVTransformer.transformUVsForRotation(uv, faceDirection, yRotation);
+        // This keeps textures aligned with world axes using Minecraft's matrix-based approach.
+        // The transformation is applied to ALL faces (not just up/down) and handles both X and Y rotations.
+        int adjustedFaceRotation = faceRotDegrees;
+        if (uvlock && (xRotation != 0 || yRotation != 0)) {
+            UVTransformer.UVLockResult uvResult = UVTransformer.transformUVsWithUVLock(
+                uv, faceDirection, xRotation, yRotation, faceRotDegrees);
+            uv = uvResult.uv;
+            adjustedFaceRotation = uvResult.additionalRotation;
         }
         
         // Convert UV to 0-1 space and apply atlas mapping
         float u0, v0, u1, v1;
         if (uvMapping != null) {
-            float uvWidth = uv[2] - uv[0];
-            float uvHeight = uv[3] - uv[1];
             u0 = uvMapping.u0 + (uvMapping.u1 - uvMapping.u0) * (uv[0] / 16.0f);
             v0 = uvMapping.v0 + (uvMapping.v1 - uvMapping.v0) * (uv[1] / 16.0f);
             u1 = uvMapping.u0 + (uvMapping.u1 - uvMapping.u0) * (uv[2] / 16.0f);
@@ -264,7 +265,7 @@ public class ModelElementRenderer {
             v1 = uv[3] / 16.0f;
         }
         
-        // Build vertices following MattMC's FaceBakery approach:
+        // Build vertices following Minecraft's FaceBakery approach:
         // For each vertex index, get the corner position based on face direction,
         // then apply rotations. This maintains vertex-UV correspondence.
         float[][] faceVerts = new float[4][3];
@@ -288,9 +289,6 @@ public class ModelElementRenderer {
         if (xRotation != 0 || yRotation != 0) {
             faceNormal = rotatePoint(faceNormal[0], faceNormal[1], faceNormal[2], xRotation, yRotation);
         }
-        
-        // Apply per-face UV rotation as specified in the model JSON
-        int adjustedFaceRotation = faceRotDegrees;
         
         // Render the face with rotated vertices and transformed UVs
         currentVertex = addFaceQuadWithVertices(face, faceVerts, faceNormal, u0, v0, u1, v1, 
