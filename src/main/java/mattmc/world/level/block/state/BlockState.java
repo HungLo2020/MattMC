@@ -82,6 +82,67 @@ public class BlockState {
         return properties.containsKey(property.getName());
     }
     
+    // ==================== Legacy String-Based API ====================
+    // These methods maintain backward compatibility with code that uses string keys
+    
+    /**
+     * Set a property value using string key.
+     * @deprecated Use {@link #setValue(Property, Comparable)} for type safety
+     */
+    @Deprecated
+    public BlockState setValue(String property, Object value) {
+        properties.put(property, value);
+        return this;
+    }
+    
+    /**
+     * Get a property value using string key.
+     * @deprecated Use {@link #getValue(Property)} for type safety
+     */
+    @Deprecated
+    public Object getValue(String property) {
+        return properties.get(property);
+    }
+    
+    /**
+     * Get a Direction property using string key.
+     * @deprecated Use {@link #getValue(Property)} with BlockStateProperties.HORIZONTAL_FACING
+     */
+    @Deprecated
+    public Direction getDirection(String property) {
+        Object value = properties.get(property);
+        return value instanceof Direction ? (Direction) value : Direction.NORTH;
+    }
+    
+    /**
+     * Get a Half property using string key.
+     * @deprecated Use {@link #getValue(Property)} with BlockStateProperties.HALF
+     */
+    @Deprecated
+    public Half getHalf(String property) {
+        Object value = properties.get(property);
+        return value instanceof Half ? (Half) value : Half.BOTTOM;
+    }
+    
+    /**
+     * Get an Axis property using string key.
+     * @deprecated Use {@link #getValue(Property)} with BlockStateProperties.AXIS
+     */
+    @Deprecated
+    public Axis getAxis(String property) {
+        Object value = properties.get(property);
+        return value instanceof Axis ? (Axis) value : Axis.Y;
+    }
+    
+    /**
+     * Check if this blockstate has a property using string key.
+     * @deprecated Use {@link #hasProperty(Property)} for type safety
+     */
+    @Deprecated
+    public boolean hasProperty(String property) {
+        return properties.containsKey(property);
+    }
+    
     // ==================== Utility Methods ====================
     
     /**
