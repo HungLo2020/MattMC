@@ -194,50 +194,52 @@ public class ModelElementRenderer {
                                    FloatList vertices,
                                    IntList indices,
                                    int currentVertex) {
-        
-        // Get texture for this face
-        String textureRef = elementFace.getTexture();
-        if (textureRef == null) {
-            return currentVertex; // No texture, skip
-        }
-        
-        // Resolve texture variable (e.g., "#torch" -> "block/torch")
-        // The texture might still be a variable reference, so we need to resolve it
-        String texturePath = textureRef;
-        if (texturePath.startsWith("#")) {
-            texturePath = resolveTexture(texturePath, model);
-            if (texturePath == null) {
-                // Failed to resolve texture - skip this face
-                return currentVertex;
-            }
-        }
-        
-        // Strip namespace prefix if present (e.g., "mattmc:block/planks" -> "block/planks")
-        if (texturePath.contains(":")) {
-            texturePath = texturePath.substring(texturePath.indexOf(':') + 1);
-        }
-        
-        // Convert to full atlas path format: "block/birch_planks" -> "assets/textures/block/birch_planks.png"
-        String atlasPath = "assets/textures/" + texturePath + ".png";
-        
-        // Get UV mapping
-        TextureCoordinateProvider.UVMapping uvMapping = uvMapper.getUVMappingForTexture(atlasPath);
-        
-        // Get UV coordinates from element face (in 0-16 space)
-        List<Float> uvList = elementFace.getUv();
-        float[] uv = new float[]{0, 0, 16, 16}; // Default to full texture
-        if (uvList != null && uvList.size() >= 4) {
-            uv[0] = uvList.get(0);
-            uv[1] = uvList.get(1);
-            uv[2] = uvList.get(2);
-            uv[3] = uvList.get(3);
-        }
-        
-        // Get the per-face rotation from the model (0, 90, 180, or 270)
-        Integer faceRotation = elementFace.getRotation();
-        int faceRotDegrees = (faceRotation != null) ? faceRotation : 0;
-        
-        // When uvlock=true, transform UV coordinates to account for geometry rotation
+		
+		// Get texture for this face
+		String textureRef = elementFace.getTexture();
+		if (textureRef == null) {
+			return currentVertex; // No texture, skip
+		}
+		
+		// Resolve texture variable (e.g., "#torch" -> "block/torch")
+		// The texture might still be a variable reference, so we need to resolve it
+		String texturePath = textureRef;
+		if (texturePath.startsWith("#")) {
+			texturePath = resolveTexture(texturePath, model);
+			if (texturePath == null) {
+				// Failed to resolve texture - skip this face
+				return currentVertex;
+			}
+		}
+		
+		// Strip namespace prefix if present (e.g., "mattmc:block/planks" -> "block/planks")
+		if (texturePath.contains(":")) {
+			texturePath = texturePath.substring(texturePath.indexOf(':') + 1);
+		}
+		
+		// Convert to full atlas path format: "block/birch_planks" -> "assets/textures/block/birch_planks.png"
+		String atlasPath = "assets/textures/" + texturePath + ".png";
+		
+		// TODO: Pre-resolve texture IDs in baked model structures to avoid string→int conversion here.
+		// For now, resolve the texture ID once per face and use int-based UV lookup.
+		int textureId = uvMapper.resolveTextureId(atlasPath);
+		TextureCoordinateProvider.UVMapping uvMapping = (textureId >= 0) ? uvMapper.resolveUV(textureId) : null;
+		
+		// Get UV coordinates from element face (in 0-16 space)
+		List<Float> uvList = elementFace.getUv();
+		float[] uv = new float[]{0, 0, 16, 16}; // Default to full texture
+		if (uvList != null && uvList.size() >= 4) {
+			uv[0] = uvList.get(0);
+			uv[1] = uvList.get(1);
+			uv[2] = uvList.get(2);
+			uv[3] = uvList.get(3);
+		}
+		
+		// Get the per-face rotation from the model (0, 90, 180, or 270)
+		Integer faceRotation = elementFace.getRotation();
+		int faceRotDegrees = (faceRotation != null) ? faceRotation : 0;
+		
+		// When uvlock=true, transform UV coordinates to account for geometry rotation
         // This keeps textures aligned with world axes by rotating the UV rectangle
         // Note: Only horizontal faces (up/down) need UV transformation for Y-axis rotation
         // Vertical faces already have correct UVs in the JSON for their face direction

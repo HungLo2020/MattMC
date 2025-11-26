@@ -12,6 +12,14 @@ import java.util.List;
  * Converts BlockFaceCollector data into a format suitable for VBO/VAO rendering.
  * Supports texture atlas UV mapping for multi-texture VBO rendering.
  * 
+ * <p><b>Texture ID Performance:</b> The TextureAtlas uses integer texture IDs internally.
+ * String→int conversion happens once per texture lookup. For optimal performance in hot paths,
+ * use {@link UVMapper#resolveTextureId(String)} once, then {@link UVMapper#resolveUV(int)}
+ * for repeated lookups.
+ * 
+ * <p>TODO: Pre-resolve texture IDs in baked face data (e.g., BakedQuad) during model bake time
+ * so that MeshBuilder can use int IDs directly without string lookup in the inner loop.
+ * 
  * ISSUE-002 fix: Uses primitive FloatList and IntList instead of ArrayList<Float/Integer>
  * to eliminate boxing overhead and reduce GC pressure.
  * 
