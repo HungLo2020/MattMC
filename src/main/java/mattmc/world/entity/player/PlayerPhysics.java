@@ -1,6 +1,6 @@
 package mattmc.world.entity.player;
 
-import mattmc.client.Minecraft;
+import mattmc.client.MattMC;
 import mattmc.world.level.block.Blocks;
 
 import mattmc.world.level.block.Block;
@@ -9,20 +9,20 @@ import mattmc.world.level.LevelAccessor;
 
 /**
  * Handles player physics including gravity, collision detection, and flying.
- * Similar to Minecraft's EntityPlayerSP physics.
+ * Similar to MattMC's EntityPlayerSP physics.
  */
 public class PlayerPhysics {
-    // LocalPlayer hitbox dimensions (Minecraft-like)
+    // LocalPlayer hitbox dimensions (MattMC-like)
     public static final float PLAYER_WIDTH = 0.6f;
     public static final float PLAYER_HEIGHT = 1.8f;
     public static final float PLAYER_DEPTH = 0.6f;
     
-    // Physics constants (Minecraft Java Edition values adapted for our engine)
-    // Minecraft runs at 20 TPS (0.05s per tick)
+    // Physics constants (MattMC Java Edition values adapted for our engine)
+    // MattMC runs at 20 TPS (0.05s per tick)
     private static final float GRAVITY = 32f; // Blocks per second squared (MC: 0.08/tick² × 400)
     private static final float TERMINAL_VELOCITY = 78.4f; // Max fall speed (blocks/second)
     // Jump velocity: 8.17 blocks/s achieves exactly 1.25 block height with fixed dt=0.05s
-    // Matches Minecraft Java Edition jump height (MC uses 8.4 blocks/s with air resistance)
+    // Matches MattMC Java Edition jump height (MC uses 8.4 blocks/s with air resistance)
     private static final float JUMP_VELOCITY = 8.17f; // Initial jump speed (blocks/second)
     
     private final LocalPlayer player;
@@ -47,7 +47,7 @@ public class PlayerPhysics {
      */
     public void update(float deltaTime) {
         if (!flying) {
-            // Apply vertical movement FIRST using current velocity (Minecraft physics order)
+            // Apply vertical movement FIRST using current velocity (MattMC physics order)
             float newY = player.getY() + velocityY * deltaTime;
             
             // Check collision and adjust
@@ -69,7 +69,7 @@ public class PlayerPhysics {
             
             player.setY(newY);
             
-            // Apply gravity AFTER movement (correct Minecraft order)
+            // Apply gravity AFTER movement (correct MattMC order)
             velocityY -= GRAVITY * deltaTime;
             
             // Terminal velocity

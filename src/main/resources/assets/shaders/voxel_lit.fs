@@ -1,4 +1,4 @@
-#version 120
+#version 130
 
 // Inputs from vertex shader
 varying vec2 vTexCoord;

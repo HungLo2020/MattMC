@@ -1,13 +1,13 @@
 package mattmc.client.resources.model;
 
-import mattmc.client.Minecraft;
+import mattmc.client.MattMC;
 
 import java.util.List;
 import java.util.Map;
 
 /**
  * Represents a block model JSON file.
- * Similar to Minecraft's block model format.
+ * Similar to MattMC's block model format.
  * 
  * Example:
  * {

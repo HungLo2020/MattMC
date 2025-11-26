@@ -4,8 +4,11 @@ import mattmc.client.renderer.VertexCapture;
 
 /**
  * Generates vertex geometry for block faces that can be captured for isometric item rendering.
- * This class provides the same geometry as BlockFaceGeometry but outputs to a VertexCapture
- * instead of directly to OpenGL.
+ * This class provides backend-agnostic block geometry via a VertexCapture abstraction,
+ * allowing the geometry to be rendered by any backend implementation.
+ * 
+ * <p>Note: For block outline rendering, see {@link BlockOutlineRenderer} which uses
+ * the {@link mattmc.client.renderer.backend.RenderBackend} abstraction.
  */
 public final class BlockGeometryCapture {
     
@@ -127,7 +130,8 @@ public final class BlockGeometryCapture {
     
     /**
      * Capture vertices for a north-facing bottom stairs block.
-     * This uses the exact same geometry as BlockFaceGeometry.drawStairsNorthBottom.
+     * The stairs consist of a bottom slab (full block, half height)
+     * and a top step (north half only, full height).
      */
     public static void captureStairsNorthBottom(VertexCapture capture, float x, float y, float z) {
         float x0 = x, x1 = x + 1;

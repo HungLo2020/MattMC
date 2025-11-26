@@ -3,16 +3,16 @@ package mattmc.client.renderer.chunk;
 /**
  * Calculates vertex positions and normals for block faces.
  * Maps face directions to their corner vertices, following the exact vertex ordering
- * from Minecraft's FaceInfo enum to ensure consistent quad winding and lighting.
+ * from MattMC's FaceInfo enum to ensure consistent quad winding and lighting.
  * 
  * This is separated from ModelElementRenderer to isolate face geometry calculations,
- * matching the pattern in Minecraft's FaceInfo class.
+ * matching the pattern in MattMC's FaceInfo class.
  */
 public class FaceVertexCalculator {
     
     /**
      * Get the corner position for a specific vertex index of a face.
-     * This EXACTLY follows Minecraft's FaceInfo.VertexInfo mapping from FaceInfo.java.
+     * This EXACTLY follows MattMC's FaceInfo.VertexInfo mapping from FaceInfo.java.
      * 
      * Constants mapping: MIN_X=x0, MAX_X=x1, MIN_Y=y0, MAX_Y=y1, MIN_Z=z0, MAX_Z=z1
      * 
@@ -28,7 +28,7 @@ public class FaceVertexCalculator {
      */
     public static float[] getFaceVertexCorner(String direction, int vertexIndex, float x0, float y0, float z0,
                                               float x1, float y1, float z1) {
-        // EXACT mapping from Minecraft's FaceInfo enum (FaceInfo.java lines 10-15)
+        // EXACT mapping from MattMC's FaceInfo enum (FaceInfo.java lines 10-15)
         return switch (direction) {
             case "up" -> switch (vertexIndex) {
                 // UP: (MIN_X,MAX_Y,MIN_Z), (MIN_X,MAX_Y,MAX_Z), (MAX_X,MAX_Y,MAX_Z), (MAX_X,MAX_Y,MIN_Z)

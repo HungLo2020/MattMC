@@ -6,7 +6,7 @@ import java.util.List;
 
 /**
  * Represents a creative mode inventory tab.
- * Similar to Minecraft's CreativeModeTab system.
+ * Similar to MattMC's CreativeModeTab system.
  * 
  * Each tab has a name, an icon item, and a list of items that belong to it.
  * Items can be added to tabs programmatically.

@@ -5,7 +5,7 @@ package mattmc.world.item;
  * This class is separate from CreativeTabs (the registry) and handles
  * the actual population of items into tabs.
  * 
- * Similar to Minecraft's CreativeModeTabs class which populates the tabs
+ * Similar to MattMC's CreativeModeTabs class which populates the tabs
  * defined in CreativeTabs.
  */
 public class CreativeModeTabs {

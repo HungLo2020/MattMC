@@ -10,7 +10,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * Asynchronous chunk saver to prevent lag spikes when saving chunks.
- * Based on Minecraft Java Edition's approach of queuing chunk saves
+ * Based on MattMC Java Edition's approach of queuing chunk saves
  * and processing them on a background thread.
  */
 public class AsyncChunkSaver {

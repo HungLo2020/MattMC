@@ -1,17 +1,18 @@
 package mattmc.client.gui.screens;
 
-import mattmc.client.Minecraft;
+import mattmc.client.MattMC;
 import mattmc.client.renderer.backend.RenderBackend;
 import mattmc.client.renderer.window.WindowHandle;
 import mattmc.client.settings.OptionsManager;
+import mattmc.world.Gamemode;
 import mattmc.world.entity.player.BlockInteraction;
 import mattmc.world.entity.player.LocalPlayer;
 import mattmc.world.entity.player.PlayerController;
 import mattmc.world.entity.player.PlayerPhysics;
 import mattmc.world.entity.player.PlayerInput;
-import mattmc.client.renderer.backend.opengl.LevelRenderer;
+import mattmc.client.renderer.WorldRenderer;
 import mattmc.client.renderer.UIRenderer;
-import mattmc.client.renderer.backend.opengl.BlockFaceGeometry;
+import mattmc.client.renderer.block.BlockOutlineRenderer;
 import mattmc.world.item.Inventory;
 import mattmc.world.level.chunk.ChunkUtils;
 import mattmc.world.level.Level;
@@ -33,22 +34,28 @@ import org.slf4j.LoggerFactory;
  */
 public final class DevplayScreen implements Screen {
     private static final Logger logger = LoggerFactory.getLogger(DevplayScreen.class);
+    
+    /** Default gamemode for new worlds and legacy worlds without gamemode data. */
+    private static final Gamemode DEFAULT_GAMEMODE = Gamemode.CREATIVE;
 
-    private final Minecraft game;
+    private final MattMC game;
     private final WindowHandle window;
     private final RenderBackend backend;
     
-    // Minecraft components (following Minecraft's architecture)
+    // Game components (following game architecture)
     private final Level world;
     private final LocalPlayer player;
     private final PlayerController playerController;
     private final PlayerPhysics playerPhysics;
     private final BlockInteraction blockInteraction;
-    private final LevelRenderer worldRenderer;
+    private final WorldRenderer worldRenderer;
     private final UIRenderer uiRenderer;
     
     // Level name for saving
     private final String worldName;
+    
+    // Default gamemode for the world
+    private final Gamemode defaultGamemode;
     
     private double lastFrameTimeSec = now();
     
@@ -60,31 +67,44 @@ public final class DevplayScreen implements Screen {
     // Flag to track if world should be shut down on close
     private boolean shouldShutdownWorld = false;
 
-    public DevplayScreen(Minecraft game, String worldName) {
-        this(game, worldName, new java.util.Random().nextLong());
+    public DevplayScreen(MattMC game, String worldName) {
+        this(game, worldName, new java.util.Random().nextLong(), DEFAULT_GAMEMODE);
     }
     
-    public DevplayScreen(Minecraft game, String worldName, long seed) {
-        this(game, worldName, null, seed, 0f, 0f, 0f, 0f, 0f);
+    public DevplayScreen(MattMC game, String worldName, long seed) {
+        this(game, worldName, null, seed, 0f, 0f, 0f, 0f, 0f, null, DEFAULT_GAMEMODE, DEFAULT_GAMEMODE);
     }
     
-    public DevplayScreen(Minecraft game, String worldName, Level world, float playerX, float playerY, float playerZ, float playerYaw, float playerPitch) {
-        this(game, worldName, world, new java.util.Random().nextLong(), playerX, playerY, playerZ, playerYaw, playerPitch, null);
+    public DevplayScreen(MattMC game, String worldName, long seed, Gamemode defaultGamemode) {
+        this(game, worldName, null, seed, 0f, 0f, 0f, 0f, 0f, null, defaultGamemode, defaultGamemode);
     }
     
-    public DevplayScreen(Minecraft game, String worldName, Level world, float playerX, float playerY, float playerZ, float playerYaw, float playerPitch, Inventory playerInventory) {
-        this(game, worldName, world, new java.util.Random().nextLong(), playerX, playerY, playerZ, playerYaw, playerPitch, playerInventory);
+    public DevplayScreen(MattMC game, String worldName, Level world, float playerX, float playerY, float playerZ, float playerYaw, float playerPitch) {
+        this(game, worldName, world, new java.util.Random().nextLong(), playerX, playerY, playerZ, playerYaw, playerPitch, null, DEFAULT_GAMEMODE, DEFAULT_GAMEMODE);
     }
     
-    public DevplayScreen(Minecraft game, String worldName, Level world, long seed, float playerX, float playerY, float playerZ, float playerYaw, float playerPitch) {
-        this(game, worldName, world, seed, playerX, playerY, playerZ, playerYaw, playerPitch, null);
+    public DevplayScreen(MattMC game, String worldName, Level world, float playerX, float playerY, float playerZ, float playerYaw, float playerPitch, Inventory playerInventory) {
+        this(game, worldName, world, new java.util.Random().nextLong(), playerX, playerY, playerZ, playerYaw, playerPitch, playerInventory, DEFAULT_GAMEMODE, DEFAULT_GAMEMODE);
     }
     
-    public DevplayScreen(Minecraft game, String worldName, Level world, long seed, float playerX, float playerY, float playerZ, float playerYaw, float playerPitch, Inventory playerInventory) {
+    public DevplayScreen(MattMC game, String worldName, Level world, float playerX, float playerY, float playerZ, float playerYaw, float playerPitch, Inventory playerInventory, Gamemode defaultGamemode, Gamemode playerGamemode) {
+        this(game, worldName, world, new java.util.Random().nextLong(), playerX, playerY, playerZ, playerYaw, playerPitch, playerInventory, defaultGamemode, playerGamemode);
+    }
+    
+    public DevplayScreen(MattMC game, String worldName, Level world, long seed, float playerX, float playerY, float playerZ, float playerYaw, float playerPitch) {
+        this(game, worldName, world, seed, playerX, playerY, playerZ, playerYaw, playerPitch, null, DEFAULT_GAMEMODE, DEFAULT_GAMEMODE);
+    }
+    
+    public DevplayScreen(MattMC game, String worldName, Level world, long seed, float playerX, float playerY, float playerZ, float playerYaw, float playerPitch, Inventory playerInventory) {
+        this(game, worldName, world, seed, playerX, playerY, playerZ, playerYaw, playerPitch, playerInventory, DEFAULT_GAMEMODE, DEFAULT_GAMEMODE);
+    }
+    
+    public DevplayScreen(MattMC game, String worldName, Level world, long seed, float playerX, float playerY, float playerZ, float playerYaw, float playerPitch, Inventory playerInventory, Gamemode defaultGamemode, Gamemode playerGamemode) {
         this.game = game;
         this.window = game.window();
         this.backend = game.getRenderBackend();
         this.worldName = worldName;
+        this.defaultGamemode = defaultGamemode;
         
         // Initialize infinite world (use provided or create new)
         this.world = world != null ? world : new Level();
@@ -130,6 +150,7 @@ public final class DevplayScreen implements Screen {
         this.player = new LocalPlayer(spawnX, spawnY, spawnZ);
         this.player.setYaw(playerYaw);
         this.player.setPitch(playerPitch);
+        this.player.setGamemode(playerGamemode);
         
         // Load player inventory if provided
         if (playerInventory != null) {
@@ -144,7 +165,7 @@ public final class DevplayScreen implements Screen {
         this.player.setPhysics(playerPhysics);
         this.playerController = new PlayerController(player);
         this.blockInteraction = new BlockInteraction(player, this.world);
-        this.worldRenderer = new LevelRenderer();
+        this.worldRenderer = game.getBackendFactory().createWorldRenderer();
         this.worldRenderer.initWithLevel(this.world);
         this.uiRenderer = new UIRenderer();
         
@@ -262,7 +283,8 @@ public final class DevplayScreen implements Screen {
             // Use interpolated position for smooth debug display
             uiRenderer.drawDebugInfo(w, h, player.getX(alphaF), player.getY(alphaF), player.getZ(alphaF), 
                                      player.getYaw(alphaF), player.getPitch(alphaF), 0f, uiState.getFPS(),
-                                     loadedChunks, pendingChunks, activeWorkers, renderedChunks, culledChunks);
+                                     loadedChunks, pendingChunks, activeWorkers, renderedChunks, culledChunks,
+                                     defaultGamemode.getDisplayName(), player.getGamemode().getDisplayName());
             
             // Draw system information on the right side
             uiRenderer.drawSystemInfo(w, h, window.handle());
@@ -325,7 +347,7 @@ public final class DevplayScreen implements Screen {
             backend.setColor(0x000000, 1f);  // Black outline
             
             // Draw complete outline around the targeted block
-            BlockFaceGeometry.drawCompleteBlockOutlineWithBackend(hit.x, ChunkUtils.localToWorldY(hit.y), hit.z, backend);
+            BlockOutlineRenderer.drawBlockOutline(hit.x, ChunkUtils.localToWorldY(hit.y), hit.z, backend);
             
             backend.end3DLines();
             
@@ -344,11 +366,20 @@ public final class DevplayScreen implements Screen {
     public void saveWorld() throws java.io.IOException {
         LevelStorageSource.saveWorld(world, worldName, 
             player.getX(), player.getY(), player.getZ(),
-            player.getYaw(), player.getPitch(), player.getInventory());
+            player.getYaw(), player.getPitch(), player.getInventory(),
+            defaultGamemode, player.getGamemode());
     }
     
     public String getWorldName() {
         return worldName;
+    }
+    
+    /**
+     * Get the default gamemode for this world.
+     * @return The default gamemode
+     */
+    public Gamemode getDefaultGamemode() {
+        return defaultGamemode;
     }
     
     /**

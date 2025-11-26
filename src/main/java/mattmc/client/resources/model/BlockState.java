@@ -1,7 +1,7 @@
 package mattmc.client.resources.model;
 
 import com.google.gson.*;
-import mattmc.client.Minecraft;
+import mattmc.client.MattMC;
 
 import java.lang.reflect.Type;
 import java.util.ArrayList;
@@ -10,7 +10,7 @@ import java.util.Map;
 
 /**
  * Represents a blockstate JSON file.
- * Similar to Minecraft's blockstate format.
+ * Similar to MattMC's blockstate format.
  * 
  * Example:
  * {

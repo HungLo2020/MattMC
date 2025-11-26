@@ -1,7 +1,7 @@
 package mattmc.world.level.levelgen;
 
 /**
- * Minecraft-style noise parameters for terrain generation.
+ * MattMC-style noise parameters for terrain generation.
  * 
  * These parameters work together to create varied terrain:
  * - Continentalness: Controls land vs ocean
@@ -9,7 +9,7 @@ package mattmc.world.level.levelgen;
  * - Peaks and Valleys: Controls mountain peaks and valley depth
  * - Weirdness: Adds variety and special terrain features
  * 
- * Based on Minecraft 1.18+ terrain generation system.
+ * Based on MattMC 1.18+ terrain generation system.
  */
 public class NoiseParameters {
     private final OctaveNoise continentalness;
@@ -28,7 +28,7 @@ public class NoiseParameters {
      */
     public NoiseParameters(long seed) {
         // Initialize each noise type with different octave counts and seeds
-        // These values are inspired by Minecraft's actual parameters
+        // These values are inspired by MattMC's actual parameters
         
         // Continentalness: Large-scale land/ocean distribution
         this.continentalness = new OctaveNoise(seed, 4);

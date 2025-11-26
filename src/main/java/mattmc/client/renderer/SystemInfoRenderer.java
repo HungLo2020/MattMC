@@ -105,6 +105,7 @@ public class SystemInfoRenderer {
         
         // Build draw commands using backend-agnostic logic
         buffer.clear();
+        logic.beginFrame(); // Clear text registry and set this instance as current
         logic.buildSystemInfoCommands(screenWidth, screenHeight, systemInfo, buffer);
         
         // Submit commands to backend with frame management

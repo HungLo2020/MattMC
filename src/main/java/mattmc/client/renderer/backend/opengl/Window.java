@@ -67,15 +67,20 @@ public final class Window implements WindowHandle, AutoCloseable {
         glLoadIdentity();
     }
 
+    @Override
     public long handle() { return handle; }
+    @Override
     public int width() { return width; }
+    @Override
     public int height() { return height; }
 
+    @Override
     public boolean shouldClose() {
         glfwPollEvents();
         return glfwWindowShouldClose(handle);
     }
 
+    @Override
     public void swap() { glfwSwapBuffers(handle); }
     
     /**

@@ -1,8 +1,9 @@
 package mattmc.world.level.storage;
 
-import mattmc.client.Minecraft;
+import mattmc.client.MattMC;
 import mattmc.world.entity.player.LocalPlayer;
 import mattmc.world.level.Level;
+import mattmc.world.Gamemode;
 
 import mattmc.nbt.NBTUtil;
 
@@ -12,7 +13,7 @@ import java.nio.file.Path;
 import java.util.*;
 
 /**
- * Represents the level.dat file structure for a Minecraft-style world.
+ * Represents the level.dat file structure for a MattMC-style world.
  * Stores world metadata and player information.
  */
 public class LevelData {
@@ -26,6 +27,7 @@ public class LevelData {
     private boolean hardcore;
     private int difficulty;
     private long worldTime;
+    private Gamemode defaultGamemode;
     
     // LocalPlayer data
     private double playerX;
@@ -45,6 +47,7 @@ public class LevelData {
         this.hardcore = false;
         this.difficulty = 2; // Normal
         this.worldTime = 0L; // Start at sunrise
+        this.defaultGamemode = Gamemode.CREATIVE; // Default to CREATIVE
         this.playerX = 0.0;
         this.playerY = 65.0;
         this.playerZ = 0.0;
@@ -57,7 +60,7 @@ public class LevelData {
      */
     public Map<String, Object> toNBT() {
         // Pre-allocate with estimated size for all level metadata fields
-        Map<String, Object> data = new HashMap<>(11);
+        Map<String, Object> data = new HashMap<>(12);
         
         // Level metadata
         data.put("LevelName", worldName);
@@ -67,6 +70,7 @@ public class LevelData {
         data.put("SpawnY", spawnY);
         data.put("SpawnZ", spawnZ);
         data.put("GameType", gameMode);
+        data.put("DefaultGamemode", defaultGamemode.getId());
         data.put("hardcore", (byte) (hardcore ? 1 : 0));
         data.put("Difficulty", (byte) difficulty);
         data.put("Time", worldTime);
@@ -144,6 +148,13 @@ public class LevelData {
         }
         if (data.get("Time") instanceof Long) {
             levelData.worldTime = (Long) data.get("Time");
+        }
+        // Load default gamemode with legacy support (defaults to CREATIVE if not present)
+        if (data.get("DefaultGamemode") instanceof Integer) {
+            levelData.defaultGamemode = Gamemode.fromId((Integer) data.get("DefaultGamemode"));
+        } else {
+            // Legacy world without DefaultGamemode field - default to CREATIVE
+            levelData.defaultGamemode = Gamemode.CREATIVE;
         }
         
         // LocalPlayer data
@@ -243,4 +254,7 @@ public class LevelData {
     
     public long getWorldTime() { return worldTime; }
     public void setWorldTime(long worldTime) { this.worldTime = worldTime; }
+    
+    public Gamemode getDefaultGamemode() { return defaultGamemode; }
+    public void setDefaultGamemode(Gamemode defaultGamemode) { this.defaultGamemode = defaultGamemode; }
 }

@@ -1,4 +1,4 @@
-#version 120
+#version 130
 
 // Outputs to fragment shader
 varying vec2 vTexCoord;

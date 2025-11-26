@@ -3,16 +3,16 @@ package mattmc.client.renderer.chunk;
 /**
  * Handles 3D rotation transformations for model elements.
  * Provides methods to rotate points around X and Y axes,
- * centered at (0.5, 0.5, 0.5) to match Minecraft's rotation convention.
+ * centered at (0.5, 0.5, 0.5) to match MattMC's rotation convention.
  * 
  * This is separated from ModelElementRenderer to keep rotation mathematics isolated,
- * following the pattern in Minecraft's FaceBakery class.
+ * following the pattern in MattMC's FaceBakery class.
  */
 public class ElementRotationHelper {
     
     /**
      * Rotate a single point around X and Y axes (around center 0.5, 0.5, 0.5).
-     * X rotation is applied first, then Y rotation (following Minecraft's convention).
+     * X rotation is applied first, then Y rotation (following MattMC's convention).
      * 
      * @param x X coordinate in 0-1 space
      * @param y Y coordinate in 0-1 space

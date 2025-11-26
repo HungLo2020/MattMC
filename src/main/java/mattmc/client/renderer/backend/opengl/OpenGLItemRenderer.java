@@ -12,6 +12,7 @@ import mattmc.client.renderer.backend.RenderBackend;
 
 import mattmc.client.renderer.block.BlockGeometryCapture;
 import mattmc.client.renderer.item.ItemDisplayContext;
+import mattmc.client.renderer.item.ItemRenderer;
 import mattmc.client.renderer.backend.opengl.Texture;
 import mattmc.client.resources.ResourceManager;
 import mattmc.client.resources.model.BlockModel;
@@ -28,21 +29,45 @@ import java.util.Map;
 import static org.lwjgl.opengl.GL11.*;
 
 /**
- * Handles rendering of items in the UI (hotbar, inventory, etc.).
- * Similar to Minecraft's ItemRenderer class.
+ * OpenGL implementation of item rendering for the UI (hotbar, inventory, etc.).
  * 
- * For block items, renders an isometric 3D view by capturing the actual in-game
+ * <p>This class handles OpenGL-specific operations for rendering items:
+ * <ul>
+ *   <li>Texture loading and caching</li>
+ *   <li>Isometric 3D projection for block items</li>
+ *   <li>Flat 2D rendering for regular items</li>
+ *   <li>Display transform application from JSON models</li>
+ * </ul>
+ * 
+ * <p>For block items, renders an isometric 3D view by capturing the actual in-game
  * 3D geometry and projecting it to 2D screen coordinates.
  * For regular items, renders a 2D icon.
+ * 
+ * @see ItemRenderer
  */
-public class ItemRenderer {
-    private static final Logger logger = LoggerFactory.getLogger(ItemRenderer.class);
+public class OpenGLItemRenderer implements ItemRenderer {
+    private static final Logger logger = LoggerFactory.getLogger(OpenGLItemRenderer.class);
     
     // Cache for item textures
     private static final Map<String, Texture> TEXTURE_CACHE = new HashMap<>();
     
+    // Item texture dimension - items are rendered as 16x16 pixel textures
+    private static final float ITEM_TEXTURE_SIZE = 16.0f;
+    
+    // Singleton instance for static method compatibility
+    private static final OpenGLItemRenderer INSTANCE = new OpenGLItemRenderer();
+    
     /**
-     * Render an item at the specified screen position.
+     * Get the singleton instance.
+     * 
+     * @return the OpenGLItemRenderer instance
+     */
+    public static OpenGLItemRenderer getInstance() {
+        return INSTANCE;
+    }
+    
+    /**
+     * Render an item at the specified screen position (static convenience method).
      * Renders block items as orthographic 3D cubes (isometric view).
      * 
      * @param stack The item stack to render
@@ -50,14 +75,19 @@ public class ItemRenderer {
      * @param y Screen Y position (center of item)
      * @param size Size of the rendered item in pixels
      */
-    public static void renderItem(ItemStack stack, float x, float y, float size) {
+    public static void renderItemStatic(ItemStack stack, float x, float y, float size) {
+        INSTANCE.renderItem(stack, x, y, size, false);
+    }
+    
+    @Override
+    public void renderItem(ItemStack stack, float x, float y, float size) {
         renderItem(stack, x, y, size, false);
     }
     
     /**
-     * Render an item using data-driven 3D perspective rendering with display transforms.
+     * Render an item using data-driven 3D perspective rendering with display transforms (static version).
      * This method reads display transforms from the item's JSON model and applies them,
-     * making it compatible with Minecraft's data-driven rendering system.
+     * making it compatible with MattMC's data-driven rendering system.
      * 
      * @param stack The item stack to render
      * @param context The display context (GUI, firstperson, thirdperson, etc.)
@@ -65,7 +95,12 @@ public class ItemRenderer {
      * @param y Screen Y position (center of item)
      * @param size Base size for rendering
      */
-    public static void renderItemWithTransform(ItemStack stack, ItemDisplayContext context, float x, float y, float size) {
+    public static void renderItemWithTransformStatic(ItemStack stack, ItemDisplayContext context, float x, float y, float size) {
+        INSTANCE.renderItemWithTransform(stack, context, x, y, size);
+    }
+    
+    @Override
+    public void renderItemWithTransform(ItemStack stack, ItemDisplayContext context, float x, float y, float size) {
         if (stack == null || stack.getItem() == null) {
             return;
         }
@@ -82,7 +117,7 @@ public class ItemRenderer {
         BlockModel itemModel = ResourceManager.resolveItemModel(itemName);
         if (itemModel == null) {
             // Fallback to old rendering method
-            renderItem(stack, x, y, size, context == ItemDisplayContext.GUI);
+            renderItemImpl(stack, x, y, size, context == ItemDisplayContext.GUI);
             return;
         }
         
@@ -103,7 +138,7 @@ public class ItemRenderer {
     }
     
     /**
-     * Render an item at the specified screen position.
+     * Render an item at the specified screen position (static version for backwards compatibility).
      * Renders block items as orthographic 3D cubes (isometric view).
      * 
      * @param stack The item stack to render
@@ -112,7 +147,19 @@ public class ItemRenderer {
      * @param size Size of the rendered item in pixels
      * @param applyInventoryOffset Apply +18f Y offset for inventory screen block item rendering
      */
-    public static void renderItem(ItemStack stack, float x, float y, float size, boolean applyInventoryOffset) {
+    public static void renderItemStatic(ItemStack stack, float x, float y, float size, boolean applyInventoryOffset) {
+        INSTANCE.renderItem(stack, x, y, size, applyInventoryOffset);
+    }
+    
+    @Override
+    public void renderItem(ItemStack stack, float x, float y, float size, boolean applyInventoryOffset) {
+        renderItemImpl(stack, x, y, size, applyInventoryOffset);
+    }
+    
+    /**
+     * Internal implementation of renderItem.
+     */
+    private void renderItemImpl(ItemStack stack, float x, float y, float size, boolean applyInventoryOffset) {
         if (stack == null || stack.getItem() == null) {
             return;
         }
@@ -129,7 +176,7 @@ public class ItemRenderer {
         Map<String, String> texturePaths = ResourceManager.getItemTexturePaths(itemName);
         if (texturePaths == null || texturePaths.isEmpty()) {
             // Fallback: render magenta square
-            renderFallbackItem(x, y, size);
+            INSTANCE.renderFallbackItem(x, y, size);
             return;
         }
         
@@ -170,7 +217,7 @@ public class ItemRenderer {
             if (texturePath != null) {
                 renderTextureAsFlat(texturePath, x, adjustedY, size);
             } else {
-                renderFallbackItem(x, adjustedY, size);
+                INSTANCE.renderFallbackItem(x, adjustedY, size);
             }
         }
     }
@@ -499,6 +546,20 @@ public class ItemRenderer {
     }
     
     /**
+     * Calculate the vertical offset (1 texture pixel) to align flat items properly.
+     * 
+     * The size parameter represents half the rendered item size. Since items are 
+     * ITEM_TEXTURE_SIZE (16) pixels, and size is half of the total rendered size,
+     * one texture pixel equals: (2 * size) / ITEM_TEXTURE_SIZE = size / 8
+     * 
+     * @param size Half-width/height of the item
+     * @return The vertical offset representing 1 texture pixel
+     */
+    private static float calculateTexturePixelOffset(float size) {
+        return (2 * size) / ITEM_TEXTURE_SIZE;
+    }
+    
+    /**
      * Render a texture as a flat 2D square.
      * 
      * @param texturePath Path to the texture
@@ -509,12 +570,17 @@ public class ItemRenderer {
     private static void renderTextureAsFlat(String texturePath, float x, float y, float size) {
         Texture texture = loadTexture(texturePath);
         if (texture == null) {
-            renderFallbackItem(x, y, size);
+            INSTANCE.renderFallbackItem(x, y, size);
             return;
         }
         
         // Save current GL state
         boolean textureWasEnabled = glIsEnabled(GL_TEXTURE_2D);
+        boolean blendWasEnabled = glIsEnabled(GL_BLEND);
+        
+        // Enable blending for transparent textures (prevents black background)
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
         
         glEnable(GL_TEXTURE_2D);
         texture.bind();
@@ -524,34 +590,48 @@ public class ItemRenderer {
         // size parameter is the half-width, so total size is 2*size
         float halfSize = size;
         
+        // Move items UP by 1 texture pixel to fix vertical alignment
+        float adjustedY = y - calculateTexturePixelOffset(size);
+        
         glBegin(GL_QUADS);
-        glTexCoord2f(0, 1); glVertex2f(x - halfSize, y - halfSize);
-        glTexCoord2f(1, 1); glVertex2f(x + halfSize, y - halfSize);
-        glTexCoord2f(1, 0); glVertex2f(x + halfSize, y + halfSize);
-        glTexCoord2f(0, 0); glVertex2f(x - halfSize, y + halfSize);
+        glTexCoord2f(0, 1); glVertex2f(x - halfSize, adjustedY - halfSize);
+        glTexCoord2f(1, 1); glVertex2f(x + halfSize, adjustedY - halfSize);
+        glTexCoord2f(1, 0); glVertex2f(x + halfSize, adjustedY + halfSize);
+        glTexCoord2f(0, 0); glVertex2f(x - halfSize, adjustedY + halfSize);
         glEnd();
         
         // Restore GL state
         if (!textureWasEnabled) {
             glDisable(GL_TEXTURE_2D);
         }
+        if (!blendWasEnabled) {
+            glDisable(GL_BLEND);
+        }
     }
     
     /**
-     * Render a fallback magenta square when texture is missing.
+     * Render a fallback magenta square when texture is missing (static version).
      * Package-private for backend access.
      */
-    static void renderFallbackItem(float x, float y, float size) {
+    static void renderFallbackItemStatic(float x, float y, float size) {
+        INSTANCE.renderFallbackItem(x, y, size);
+    }
+    
+    @Override
+    public void renderFallbackItem(float x, float y, float size) {
         glColor4f(1f, 0f, 1f, 1f); // Magenta
         
         // Match the scale of flat items (which matches isometric block items)
         float halfSize = size;
         
+        // Move fallback items UP by 1 texture pixel to match flat items alignment
+        float adjustedY = y - calculateTexturePixelOffset(size);
+        
         glBegin(GL_QUADS);
-        glVertex2f(x - halfSize, y - halfSize);
-        glVertex2f(x + halfSize, y - halfSize);
-        glVertex2f(x + halfSize, y + halfSize);
-        glVertex2f(x - halfSize, y + halfSize);
+        glVertex2f(x - halfSize, adjustedY - halfSize);
+        glVertex2f(x + halfSize, adjustedY - halfSize);
+        glVertex2f(x + halfSize, adjustedY + halfSize);
+        glVertex2f(x - halfSize, adjustedY + halfSize);
         glEnd();
     }
     
@@ -582,9 +662,9 @@ public class ItemRenderer {
     }
     
     /**
-     * Clear the texture cache.
+     * Clear the texture cache (static version for backwards compatibility).
      */
-    public static void clearCache() {
+    public static void clearCacheStatic() {
         for (Texture texture : TEXTURE_CACHE.values()) {
             if (texture != null) {
                 texture.close();
@@ -593,8 +673,13 @@ public class ItemRenderer {
         TEXTURE_CACHE.clear();
     }
     
+    @Override
+    public void clearCache() {
+        clearCacheStatic();
+    }
+    
     /**
-     * Render an item using the backend architecture (Stage 4).
+     * Render an item using the backend architecture (Stage 4) - static version.
      * This method uses ItemRenderLogic to build commands and submits them to the backend.
      * 
      * @param stack the item stack to render
@@ -603,7 +688,12 @@ public class ItemRenderer {
      * @param size size of the item
      * @param backend the render backend to use
      */
-    public static void render(ItemStack stack, float x, float y, float size, RenderBackend backend) {
+    public static void renderStatic(ItemStack stack, float x, float y, float size, RenderBackend backend) {
+        INSTANCE.render(stack, x, y, size, backend);
+    }
+    
+    @Override
+    public void render(ItemStack stack, float x, float y, float size, RenderBackend backend) {
         if (stack == null || backend == null) {
             return;
         }
@@ -621,7 +711,7 @@ public class ItemRenderer {
     
     /**
      * Get default display transform for a context when none is defined in the model.
-     * These defaults match Minecraft's standard transforms.
+     * These defaults match MattMC's standard transforms.
      */
     private static ModelDisplay.Transform getDefaultTransform(ItemDisplayContext context, BlockModel model) {
         ModelDisplay.Transform transform = new ModelDisplay.Transform();
@@ -716,7 +806,7 @@ public class ItemRenderer {
         // Get texture paths
         Map<String, String> texturePaths = ResourceManager.getItemTexturePaths(itemName);
         if (texturePaths == null || texturePaths.isEmpty()) {
-            renderFallbackItem(x, y, size);
+            INSTANCE.renderFallbackItem(x, y, size);
             return;
         }
         
@@ -758,7 +848,7 @@ public class ItemRenderer {
             if (texturePath != null) {
                 renderTextureAsFlat(texturePath, x + offsetX, y + offsetY, transformedSize);
             } else {
-                renderFallbackItem(x + offsetX, y + offsetY, transformedSize);
+                INSTANCE.renderFallbackItem(x + offsetX, y + offsetY, transformedSize);
             }
         }
     }

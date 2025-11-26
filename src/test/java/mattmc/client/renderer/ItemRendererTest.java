@@ -3,7 +3,7 @@ package mattmc.client.renderer;
 import mattmc.client.renderer.backend.RenderBackend;
 import mattmc.client.renderer.backend.DrawCommand;
 import mattmc.client.renderer.backend.RenderPass;
-import mattmc.client.renderer.backend.opengl.ItemRenderer;
+import mattmc.client.renderer.backend.opengl.OpenGLItemRenderer;
 import mattmc.world.item.Item;
 import mattmc.world.item.ItemStack;
 import org.junit.jupiter.api.BeforeEach;
@@ -105,6 +105,7 @@ public class ItemRendererTest {
         @Override public void setScrollCallback(long h, ScrollCallback c) {}
         @Override public void setViewport(int x, int y, int w, int h) {}
         @Override public mattmc.client.renderer.panorama.PanoramaRenderer createPanoramaRenderer(String basePath, String ext) { return null; }
+        @Override public mattmc.client.renderer.item.ItemRenderer getItemRenderer() { return null; }
         @Override public void setupPerspectiveProjection(float fov, float aspect, float nearPlane, float farPlane) {}
         @Override public void setClearColor(float r, float g, float b, float a) {}
         @Override public void clearBuffers() {}
@@ -122,12 +123,13 @@ public class ItemRendererTest {
         @Override public void enableTexture2D() {}
         @Override public void disableTexture2D() {}
         @Override public boolean isTexture2DEnabled() { return false; }
+        @Override public void updateFrustum(mattmc.client.renderer.Frustum frustum) {}
     }
     
     @Test
     public void testRenderWithBackend() {
         // Render an item via backend
-        ItemRenderer.render(testStack, 100f, 100f, 24f, backend);
+        OpenGLItemRenderer.renderStatic(testStack, 100f, 100f, 24f, backend);
         
         // Should have submitted a command
         assertEquals(1, backend.getSubmittedCommands().size());
@@ -136,7 +138,7 @@ public class ItemRendererTest {
     @Test
     public void testItemCommandUsesUIPass() {
         // Render an item
-        ItemRenderer.render(testStack, 100f, 100f, 24f, backend);
+        OpenGLItemRenderer.renderStatic(testStack, 100f, 100f, 24f, backend);
         
         // Command should use UI render pass
         DrawCommand cmd = backend.getSubmittedCommands().get(0);
@@ -146,7 +148,7 @@ public class ItemRendererTest {
     @Test
     public void testItemCommandHasNegativeMeshId() {
         // Render an item
-        ItemRenderer.render(testStack, 100f, 100f, 24f, backend);
+        OpenGLItemRenderer.renderStatic(testStack, 100f, 100f, 24f, backend);
         
         // Command should have negative meshId (UI element marker)
         DrawCommand cmd = backend.getSubmittedCommands().get(0);
@@ -156,9 +158,9 @@ public class ItemRendererTest {
     @Test
     public void testMultipleItemsCreateMultipleCommands() {
         // Render multiple items
-        ItemRenderer.render(testStack, 100f, 100f, 24f, backend);
-        ItemRenderer.render(testStack, 200f, 200f, 24f, backend);
-        ItemRenderer.render(testStack, 300f, 300f, 24f, backend);
+        OpenGLItemRenderer.renderStatic(testStack, 100f, 100f, 24f, backend);
+        OpenGLItemRenderer.renderStatic(testStack, 200f, 200f, 24f, backend);
+        OpenGLItemRenderer.renderStatic(testStack, 300f, 300f, 24f, backend);
         
         // Should have 3 commands
         assertEquals(3, backend.getSubmittedCommands().size());
@@ -167,7 +169,7 @@ public class ItemRendererTest {
     @Test
     public void testNullStackDoesNotCreateCommand() {
         // Render null stack
-        ItemRenderer.render(null, 100f, 100f, 24f, backend);
+        OpenGLItemRenderer.renderStatic(null, 100f, 100f, 24f, backend);
         
         // Should have no commands
         assertEquals(0, backend.getSubmittedCommands().size());
@@ -177,7 +179,7 @@ public class ItemRendererTest {
     public void testNullBackendDoesNotCrash() {
         // Render with null backend (should not crash)
         assertDoesNotThrow(() -> {
-            ItemRenderer.render(testStack, 100f, 100f, 24f, null);
+            OpenGLItemRenderer.renderStatic(testStack, 100f, 100f, 24f, null);
         });
     }
     

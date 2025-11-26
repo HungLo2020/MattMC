@@ -117,6 +117,7 @@ public class RenderBackendTest {
         @Override public void setScrollCallback(long h, ScrollCallback c) {}
         @Override public void setViewport(int x, int y, int w, int h) {}
         @Override public mattmc.client.renderer.panorama.PanoramaRenderer createPanoramaRenderer(String basePath, String ext) { return null; }
+        @Override public mattmc.client.renderer.item.ItemRenderer getItemRenderer() { return null; }
         @Override public void setupPerspectiveProjection(float fov, float aspect, float nearPlane, float farPlane) {}
         @Override public void setClearColor(float r, float g, float b, float a) {}
         @Override public void clearBuffers() {}
@@ -134,6 +135,7 @@ public class RenderBackendTest {
         @Override public void enableTexture2D() {}
         @Override public void disableTexture2D() {}
         @Override public boolean isTexture2DEnabled() { return false; }
+        @Override public void updateFrustum(mattmc.client.renderer.Frustum frustum) {}
     }
     
     @Test

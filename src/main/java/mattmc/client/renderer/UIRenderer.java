@@ -14,7 +14,7 @@ import mattmc.client.renderer.backend.RenderBackend;
 
 /**
  * Handles rendering of UI elements.
- * Similar to Minecraft's GuiIngame class.
+ * Similar to MattMC's GuiIngame class.
  * Delegates rendering to specialized renderer classes.
  * 
  * <p><b>Stage 4:</b> Now supports backend-based rendering for UI elements.
@@ -86,6 +86,20 @@ public class UIRenderer {
     }
     
     /**
+     * Draw debug information in the top-left corner with gamemode info.
+     * Shows version, FPS, player position, chunk position, region position, culling stats, and gamemode.
+     */
+    public void drawDebugInfo(int screenWidth, int screenHeight, float playerX, float playerY, float playerZ, 
+                               float yaw, float pitch, float roll, double fps, 
+                               int loadedChunks, int pendingChunks, int activeWorkers, int renderedChunks, int culledChunks,
+                               String defaultGamemode, String playerGamemode) {
+        debugInfoRenderer.render(screenWidth, screenHeight, playerX, playerY, playerZ, 
+                                 yaw, pitch, roll, fps, loadedChunks, pendingChunks, 
+                                 activeWorkers, renderedChunks, culledChunks,
+                                 defaultGamemode, playerGamemode);
+    }
+    
+    /**
      * Draw hotbar at the bottom center of the screen.
      * 
      * @param screenWidth Screen width
@@ -97,7 +111,7 @@ public class UIRenderer {
     }
     
     /**
-     * Draw command overlay at bottom of screen (like Minecraft).
+     * Draw command overlay at bottom of screen (like MattMC).
      * Shows command input box with cursor.
      */
     public void drawCommandOverlay(int screenWidth, int screenHeight, String commandText) {
@@ -107,7 +121,7 @@ public class UIRenderer {
     /**
      * Draw command feedback message above the hotbar area.
      * This message appears independently of the command input overlay and fades after a few seconds.
-     * Similar to Minecraft's action bar messages.
+     * Similar to MattMC's action bar messages.
      * 
      * @param screenWidth Screen width
      * @param screenHeight Screen height

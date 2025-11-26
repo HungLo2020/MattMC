@@ -9,7 +9,7 @@ import java.util.Map;
 
 /**
  * Represents the state of a block with its properties.
- * Similar to Minecraft's BlockState class.
+ * Similar to MattMC's BlockState class.
  * 
  * BlockStates store property values for blocks like stairs (facing, half, shape) and pillars (axis).
  */
@@ -161,7 +161,7 @@ public class BlockState {
                 }
                 sb.append(entry.getKey()).append("=");
                 Object value = entry.getValue();
-                // Convert enum values to lowercase strings (Minecraft convention)
+                // Convert enum values to lowercase strings (MattMC convention)
                 // For other types, use toString() as-is
                 if (value instanceof Enum) {
                     sb.append(((Enum<?>) value).name().toLowerCase());

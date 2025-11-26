@@ -1,6 +1,6 @@
 package mattmc.world.level;
 
-import mattmc.client.Minecraft;
+import mattmc.client.MattMC;
 import mattmc.client.renderer.block.BlockFaceCollector;
 import mattmc.world.level.chunk.Region;
 
@@ -26,7 +26,7 @@ import java.util.Map;
 
 /**
  * Manages an infinite world with dynamic chunk loading/unloading.
- * Similar to Minecraft's world management system.
+ * Similar to MattMC's world management system.
  * 
  * Now uses asynchronous chunk loading and saving to prevent lag spikes.
  * Uses region file caching for better I/O performance.
@@ -245,7 +245,7 @@ public class Level implements LevelAccessor {
     /**
      * Try to load a chunk from disk.
      * Returns null if the chunk doesn't exist on disk or if world directory is not set.
-     * Uses region cache for better performance (Minecraft Java Edition approach).
+     * Uses region cache for better performance (MattMC Java Edition approach).
      */
     private LevelChunk loadChunkFromDisk(int chunkX, int chunkZ) {
         if (worldDirectory == null || regionCache == null) {

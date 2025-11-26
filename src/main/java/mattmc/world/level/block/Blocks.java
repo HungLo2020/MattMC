@@ -1,6 +1,6 @@
 package mattmc.world.level.block;
 
-import mattmc.client.Minecraft;
+import mattmc.client.MattMC;
 import mattmc.util.MathUtils;
 import mattmc.util.Validate;
 
@@ -11,7 +11,7 @@ import java.util.Set;
 
 /**
  * Central registry for all blocks in the game.
- * Similar to Minecraft's Blocks class where blocks are registered with resource location identifiers.
+ * Similar to MattMC's Blocks class where blocks are registered with resource location identifiers.
  * 
  * Each block is registered with a unique identifier in the format "namespace:name" (e.g., "mattmc:dirt").
  * This allows for modding and resource pack support in the future.
@@ -45,7 +45,7 @@ public class Blocks {
     // Registry maps block identifiers to Block instances
     private static final Map<String, Block> REGISTRY = new HashMap<>();
 
-    // Static block instances - similar to Minecraft's public static final Block fields
+    // Static block instances - similar to MattMC's public static final Block fields
     // Each block is defined in one line with its properties
     // Textures are loaded from blockstate and model JSON files
     // If texture loading fails, a magenta fallback color is automatically used

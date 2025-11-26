@@ -69,6 +69,7 @@ public class LightingDebugRenderer {
         
         // Build draw commands using backend-agnostic logic
         buffer.clear();
+        logic.beginFrame(); // Clear text registry and set this instance as current
         logic.buildLightingDebugCommands(screenWidth, screenHeight, backlogSize, 
                                          nodesProcessed, timeSpent, buffer);
         

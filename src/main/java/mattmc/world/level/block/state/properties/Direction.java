@@ -2,7 +2,7 @@ package mattmc.world.level.block.state.properties;
 
 /**
  * Enum for horizontal directions (North, South, East, West).
- * Similar to Minecraft's Direction enum (horizontal only).
+ * Similar to MattMC's Direction enum (horizontal only).
  */
 public enum Direction {
     NORTH(0, 0, -1),

@@ -7,7 +7,7 @@ package mattmc.world.level.levelgen;
  * more detailed and natural-looking terrain. Each octave has twice
  * the frequency and half the amplitude of the previous one.
  * 
- * This is commonly used in Minecraft-style terrain generation.
+ * This is commonly used in MattMC-style terrain generation.
  */
 public class OctaveNoise {
     private final PerlinNoise[] octaves;

@@ -1,12 +1,13 @@
 package mattmc.client.gui.screens;
 
-import mattmc.client.Minecraft;
+import mattmc.client.MattMC;
 import mattmc.client.gui.components.Button;
 import mattmc.client.gui.components.EditBox;
 import mattmc.client.renderer.backend.RenderBackend;
 import mattmc.client.renderer.window.WindowHandle;
 import mattmc.client.settings.OptionsManager;
 import mattmc.client.util.CoordinateUtils;
+import mattmc.world.Gamemode;
 import mattmc.world.level.storage.LevelStorageSource;
 
 import java.util.ArrayList;
@@ -19,12 +20,14 @@ import org.slf4j.LoggerFactory;
 public final class CreateWorldScreen implements Screen {
     private static final Logger logger = LoggerFactory.getLogger(CreateWorldScreen.class);
 
-    private final Minecraft game;
+    private final MattMC game;
     private final WindowHandle window;
     private final RenderBackend backend;
     private final List<Button> buttons = new ArrayList<>();
     private EditBox worldNameField;
     private EditBox seedField;
+    private Button gamemodeButton;
+    private Gamemode selectedGamemode = Gamemode.CREATIVE;
     private double mouseXWin, mouseYWin;
     private boolean mouseDown;
 
@@ -34,7 +37,7 @@ public final class CreateWorldScreen implements Screen {
     private int textFieldWidth = 300, textFieldHeight = 32;
     private int buttonsStartY;
 
-    public CreateWorldScreen(Minecraft game) {
+    public CreateWorldScreen(MattMC game) {
         this.game = game;
         this.window = game.window();
         this.backend = game.getRenderBackend();
@@ -95,11 +98,11 @@ public final class CreateWorldScreen implements Screen {
         titleCX = w / 2f;
         titleCY = h * 0.18f;
 
-        // Layout: world name field, seed field, then buttons below
+        // Layout: world name field, seed field, gamemode button, then buttons below
         int firstTextFieldY = (int)(h * 0.30f);
         int fieldGap = 15;
         int totalButtonsH = 2 * buttonHeight + 1 * buttonGap;
-        buttonsStartY = firstTextFieldY + 2 * textFieldHeight + fieldGap + 50;
+        buttonsStartY = firstTextFieldY + 2 * textFieldHeight + fieldGap + buttonHeight + fieldGap + 30;
 
         int x = (w - buttonWidth) / 2;
         int tfx = (w - textFieldWidth) / 2;
@@ -116,6 +119,10 @@ public final class CreateWorldScreen implements Screen {
         seedField = new EditBox(tfx, firstTextFieldY + textFieldHeight + fieldGap, textFieldWidth, textFieldHeight, 100);
         seedField.setText(String.valueOf(randomSeed));
         seedField.setFocused(false);
+        
+        // Create gamemode toggle button
+        int gamemodeButtonY = firstTextFieldY + 2 * textFieldHeight + 2 * fieldGap;
+        gamemodeButton = new Button("Gamemode: " + selectedGamemode.getDisplayName(), x, gamemodeButtonY, buttonWidth, buttonHeight);
 
         // Centered buttons
         buttons.add(new Button("Create World", x, buttonsStartY + 0 * (buttonHeight + buttonGap), buttonWidth, buttonHeight));
@@ -134,6 +141,7 @@ public final class CreateWorldScreen implements Screen {
         for (var b : buttons) b.setHover(b.contains(mxFB, myFB));
         if (worldNameField != null) worldNameField.setHover(worldNameField.contains(mxFB, myFB));
         if (seedField != null) seedField.setHover(seedField.contains(mxFB, myFB));
+        if (gamemodeButton != null) gamemodeButton.setHover(gamemodeButton.contains(mxFB, myFB));
 
         if (mouseDown) {
             // Check text field clicks
@@ -143,6 +151,11 @@ public final class CreateWorldScreen implements Screen {
             } else if (seedField != null && seedField.contains(mxFB, myFB)) {
                 seedField.setFocused(true);
                 if (worldNameField != null) worldNameField.setFocused(false);
+            } else if (gamemodeButton != null && gamemodeButton.contains(mxFB, myFB)) {
+                // Toggle gamemode
+                toggleGamemode();
+                if (worldNameField != null) worldNameField.setFocused(false);
+                if (seedField != null) seedField.setFocused(false);
             } else {
                 if (worldNameField != null) worldNameField.setFocused(false);
                 if (seedField != null) seedField.setFocused(false);
@@ -157,6 +170,18 @@ public final class CreateWorldScreen implements Screen {
             }
             mouseDown = false;
         }
+    }
+    
+    private void toggleGamemode() {
+        // Toggle between CREATIVE and SURVIVAL
+        if (selectedGamemode == Gamemode.CREATIVE) {
+            selectedGamemode = Gamemode.SURVIVAL;
+        } else {
+            selectedGamemode = Gamemode.CREATIVE;
+        }
+        // Recreate button with updated label (Button.label is final, so we must create a new instance)
+        gamemodeButton = new Button("Gamemode: " + selectedGamemode.getDisplayName(), 
+            gamemodeButton.x, gamemodeButton.y, gamemodeButton.w, gamemodeButton.h);
     }
 
     private void onClick(String label) {
@@ -183,15 +208,15 @@ public final class CreateWorldScreen implements Screen {
         String seedText = seedField.getText().trim();
         long seed = parseSeed(seedText);
         
-        logger.info("→ Creating world: {} with seed: {}", worldName, seed);
-        game.setScreen(new DevplayScreen(game, worldName, seed));
+        logger.info("→ Creating world: {} with seed: {} and gamemode: {}", worldName, seed, selectedGamemode);
+        game.setScreen(new DevplayScreen(game, worldName, seed, selectedGamemode));
     }
     
     /**
      * Parse a seed from text input.
      * If the text is a valid long number, use it directly.
      * Otherwise, use the hash code of the string.
-     * This matches Minecraft's behavior.
+     * This matches MattMC's behavior.
      */
     private long parseSeed(String seedText) {
         if (seedText.isEmpty()) {
@@ -202,7 +227,7 @@ public final class CreateWorldScreen implements Screen {
             // Try to parse as a long number
             return Long.parseLong(seedText);
         } catch (NumberFormatException e) {
-            // Use hash code of the string (like Minecraft does)
+            // Use hash code of the string (like MattMC does)
             return seedText.hashCode();
         }
     }
@@ -247,6 +272,12 @@ public final class CreateWorldScreen implements Screen {
         // Draw text fields
         if (worldNameField != null) drawTextField(worldNameField);
         if (seedField != null) drawTextField(seedField);
+        
+        // Draw gamemode button
+        if (gamemodeButton != null) {
+            backend.drawButton(gamemodeButton);
+            drawTextCentered(gamemodeButton.label, gamemodeButton.x + gamemodeButton.w / 2f, gamemodeButton.y + gamemodeButton.h / 2f, 1.2f, 0xFFFFFF);
+        }
         
         for (var b : buttons) {
             backend.drawButton(b);
@@ -306,6 +337,6 @@ public final class CreateWorldScreen implements Screen {
 
     @Override
     public void onClose() {
-        // Panorama is now shared and managed by Minecraft
+        // Panorama is now shared and managed by MattMC
     }
 }

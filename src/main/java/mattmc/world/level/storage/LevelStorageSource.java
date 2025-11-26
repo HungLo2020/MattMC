@@ -1,6 +1,7 @@
 package mattmc.world.level.storage;
 
-import mattmc.client.Minecraft;
+import mattmc.client.MattMC;
+import mattmc.world.Gamemode;
 import mattmc.world.item.Inventory;
 import mattmc.world.level.Level;
 import mattmc.world.level.block.Block;
@@ -18,7 +19,7 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 /**
- * Manages saving and loading worlds to/from disk using Minecraft-style format.
+ * Manages saving and loading worlds to/from disk using MattMC-style format.
  * Uses region files (.mca) in Anvil format and level.dat with NBT.
  */
 public final class LevelStorageSource {
@@ -90,9 +91,28 @@ public final class LevelStorageSource {
     }
     
     /**
-     * Save a world to disk using Minecraft-style format.
+     * Save a world to disk using MattMC-style format.
+     * @deprecated Use {@link #saveWorld(Level, String, float, float, float, float, float, Inventory, Gamemode, Gamemode)} instead
      */
+    @Deprecated
     public static void saveWorld(Level world, String worldName, float playerX, float playerY, float playerZ, float playerYaw, float playerPitch, Inventory playerInventory) throws IOException {
+        saveWorld(world, worldName, playerX, playerY, playerZ, playerYaw, playerPitch, playerInventory, Gamemode.CREATIVE, Gamemode.CREATIVE);
+    }
+    
+    /**
+     * Save a world to disk using MattMC-style format.
+     * @param world The Level to save
+     * @param worldName The name of the world
+     * @param playerX Player X position
+     * @param playerY Player Y position
+     * @param playerZ Player Z position
+     * @param playerYaw Player yaw rotation
+     * @param playerPitch Player pitch rotation
+     * @param playerInventory Player's inventory
+     * @param defaultGamemode The world's default gamemode
+     * @param playerGamemode The player's current gamemode
+     */
+    public static void saveWorld(Level world, String worldName, float playerX, float playerY, float playerZ, float playerYaw, float playerPitch, Inventory playerInventory, Gamemode defaultGamemode, Gamemode playerGamemode) throws IOException {
         Path savesDir = getSavesDirectory();
         Path worldDir = savesDir.resolve(worldName);
         // logger.debug("Saving world to: {}", worldDir.toAbsolutePath());
@@ -112,6 +132,7 @@ public final class LevelStorageSource {
         levelData.setPlayerZ(playerZ);
         levelData.setPlayerYaw(playerYaw);
         levelData.setPlayerPitch(playerPitch);
+        levelData.setDefaultGamemode(defaultGamemode);
         
         // Set spawn at player's location
         levelData.setSpawnX((int) playerX);
@@ -140,7 +161,7 @@ public final class LevelStorageSource {
             Path playerDatFile = playerdataDir.resolve("player.dat");
             
             try {
-                PlayerData.save(playerDatFile, playerInventory);
+                PlayerData.save(playerDatFile, playerInventory, playerGamemode);
                 // logger.debug("Player inventory saved to: {}", playerDatFile.toAbsolutePath());
             } catch (IOException e) {
                 logger.error("Failed to save player data: {}", e.getMessage(), e);
@@ -180,7 +201,7 @@ public final class LevelStorageSource {
     }
     
     /**
-     * Load a world from disk using Minecraft-style format.
+     * Load a world from disk using MattMC-style format.
      * Returns the loaded Level and metadata.
      */
     public static WorldLoadResult loadWorld(String worldName) throws IOException {
@@ -242,16 +263,19 @@ public final class LevelStorageSource {
         Path playerdataDir = worldDir.resolve("playerdata");
         Path playerDatFile = playerdataDir.resolve("player.dat");
         Inventory playerInventory = new Inventory();
+        Gamemode playerGamemode = Gamemode.CREATIVE; // Default for legacy support
         
         if (Files.exists(playerDatFile)) {
             try {
-                PlayerData.load(playerDatFile, playerInventory);
+                playerGamemode = PlayerData.load(playerDatFile, playerInventory);
                 // logger.debug("Player inventory loaded from: {}", playerDatFile.toAbsolutePath());
             } catch (IOException e) {
                 logger.warn("Failed to load player data, using empty inventory: {}", e.getMessage());
             }
         } else {
             // logger.debug("No player data found, using empty inventory");
+            // For legacy worlds without player.dat, default gamemode to the world's default
+            playerGamemode = levelData.getDefaultGamemode();
         }
         
         // Convert LevelData to WorldMetadata for compatibility
@@ -264,6 +288,8 @@ public final class LevelStorageSource {
         metadata.playerYaw = levelData.getPlayerYaw();
         metadata.playerPitch = levelData.getPlayerPitch();
         metadata.playerInventory = playerInventory;
+        metadata.defaultGamemode = levelData.getDefaultGamemode();
+        metadata.playerGamemode = playerGamemode;
         
         return new WorldLoadResult(world, metadata);
     }
@@ -369,6 +395,8 @@ public final class LevelStorageSource {
         public float playerYaw;
         public float playerPitch;
         public Inventory playerInventory; // Player inventory loaded from player.dat
+        public Gamemode defaultGamemode; // World's default gamemode
+        public Gamemode playerGamemode; // Player's current gamemode
     }
     
     /**

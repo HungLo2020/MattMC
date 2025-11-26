@@ -10,7 +10,7 @@ import java.util.Map;
 
 /**
  * Cache for RegionFile instances to avoid repeatedly opening/closing region files.
- * Based on Minecraft Java Edition's region file caching strategy.
+ * Based on MattMC Java Edition's region file caching strategy.
  * Uses LRU eviction to limit memory usage.
  */
 public class RegionFileCache implements AutoCloseable {

@@ -1,6 +1,6 @@
 package mattmc.client.gui.screens;
 
-import mattmc.client.Minecraft;
+import mattmc.client.MattMC;
 import mattmc.client.gui.SplashTextLoader;
 import mattmc.client.gui.components.Button;
 import mattmc.client.renderer.backend.RenderBackend;
@@ -15,7 +15,7 @@ import java.util.List;
 /** Title screen with a time-based, fluid cubemap panorama and game logic at fixed 20 TPS. */
 public final class TitleScreen implements Screen {
     // Core
-    private final Minecraft game;
+    private final MattMC game;
     private final WindowHandle window;
     private final RenderBackend backend;
 
@@ -45,7 +45,7 @@ public final class TitleScreen implements Screen {
     private float titleCX, titleCY, subtitleCX, subtitleCY;
     private int buttonsStartY;
 
-    public TitleScreen(Minecraft game) {
+    public TitleScreen(MattMC game) {
         this.game = game;
         this.window = game.window();
         this.backend = game.getRenderBackend();
@@ -271,7 +271,7 @@ public final class TitleScreen implements Screen {
 
     @Override
     public void onClose() {
-        // Panorama is now shared and managed by Minecraft, don't close it
+        // Panorama is now shared and managed by MattMC, don't close it
         if (logoTextureId >= 0) { 
             backend.releaseTexture(logoTextureId); 
             logoTextureId = -1; 

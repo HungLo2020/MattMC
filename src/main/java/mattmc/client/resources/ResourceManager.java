@@ -1,6 +1,6 @@
 package mattmc.client.resources;
 
-import mattmc.client.Minecraft;
+import mattmc.client.MattMC;
 
 import mattmc.client.resources.model.BlockModel;
 import mattmc.client.resources.model.BlockState;
@@ -21,7 +21,7 @@ import java.util.Map;
 
 /**
  * Manages loading of block models and blockstates from JSON files.
- * Similar to Minecraft's ModelBakery and ResourceManager.
+ * Similar to MattMC's ModelBakery and ResourceManager.
  * 
  * Implements proper model resolution with:
  * - Parent model inheritance
@@ -337,7 +337,7 @@ public class ResourceManager {
     
     /**
      * Load an item model from assets/models/item/{name}.json
-     * Uses standard Minecraft format with "parent" property.
+     * Uses standard MattMC format with "parent" property.
      * 
      * @param name The item model name (e.g., "diamond")
      * @return The loaded BlockModel (raw), or null if not found

@@ -1,6 +1,6 @@
 package mattmc.client.gui.screens;
 
-import mattmc.client.Minecraft;
+import mattmc.client.MattMC;
 import mattmc.client.gui.components.Button;
 import mattmc.client.renderer.backend.RenderBackend;
 import mattmc.client.settings.KeybindManager;
@@ -29,7 +29,7 @@ public final class ControlsScreen extends AbstractMenuScreen {
     private static final int SCROLL_BUFFER = 50; // Buffer room above/below keybinds
     private static final int SCROLL_SPEED = 20; // Pixels to scroll per mouse wheel notch
     
-    public ControlsScreen(Minecraft game) {
+    public ControlsScreen(MattMC game) {
         super(game);
         // Customize layout properties for this screen
         titleScale = 2.0f;

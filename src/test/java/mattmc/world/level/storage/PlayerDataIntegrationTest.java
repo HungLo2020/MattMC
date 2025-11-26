@@ -1,5 +1,6 @@
 package mattmc.world.level.storage;
 
+import mattmc.world.Gamemode;
 import mattmc.world.item.Inventory;
 import mattmc.world.item.ItemStack;
 import mattmc.world.item.Items;
@@ -25,14 +26,14 @@ public class PlayerDataIntegrationTest {
         Files.createDirectories(playerdataDir);
         Path playerDatFile = playerdataDir.resolve("player.dat");
         
-        // Create and save inventory
+        // Create and save inventory with gamemode
         Inventory inventory = new Inventory();
         inventory.setStack(0, new ItemStack(Items.STONE, 15));
         inventory.setStack(1, new ItemStack(Items.BIRCH_PLANKS, 1));
         inventory.setStack(9, new ItemStack(Items.STONE, 64));
         inventory.setSelectedSlot(1);
         
-        PlayerData.save(playerDatFile, inventory);
+        PlayerData.save(playerDatFile, inventory, Gamemode.SURVIVAL);
         
         // Verify file structure
         assertTrue(Files.exists(playerdataDir), "playerdata directory should exist");
@@ -41,7 +42,7 @@ public class PlayerDataIntegrationTest {
         
         // Load and verify
         Inventory loaded = new Inventory();
-        PlayerData.load(playerDatFile, loaded);
+        Gamemode loadedGamemode = PlayerData.load(playerDatFile, loaded);
         
         assertNotNull(loaded.getStack(0));
         assertEquals(Items.STONE, loaded.getStack(0).getItem());
@@ -56,6 +57,7 @@ public class PlayerDataIntegrationTest {
         assertEquals(64, loaded.getStack(9).getCount());
         
         assertEquals(1, loaded.getSelectedSlot());
+        assertEquals(Gamemode.SURVIVAL, loadedGamemode);
     }
     
     @Test
@@ -71,7 +73,7 @@ public class PlayerDataIntegrationTest {
         Inventory inventory = new Inventory();
         inventory.setStack(0, new ItemStack(Items.STONE, 1));
         
-        PlayerData.save(playerDatFile, inventory);
+        PlayerData.save(playerDatFile, inventory, Gamemode.CREATIVE);
         
         assertTrue(Files.exists(playerdataDir));
         assertTrue(Files.isDirectory(playerdataDir));
@@ -86,19 +88,20 @@ public class PlayerDataIntegrationTest {
         // First save
         Inventory inv1 = new Inventory();
         inv1.setStack(0, new ItemStack(Items.STONE, 5));
-        PlayerData.save(playerDatFile, inv1);
+        PlayerData.save(playerDatFile, inv1, Gamemode.CREATIVE);
         
         // Load and modify
         Inventory inv2 = new Inventory();
-        PlayerData.load(playerDatFile, inv2);
+        Gamemode gamemode = PlayerData.load(playerDatFile, inv2);
+        assertEquals(Gamemode.CREATIVE, gamemode);
         inv2.setStack(1, new ItemStack(Items.DARK_OAK_PLANKS, 10));
         
-        // Save again
-        PlayerData.save(playerDatFile, inv2);
+        // Save again with different gamemode
+        PlayerData.save(playerDatFile, inv2, Gamemode.SURVIVAL);
         
-        // Load and verify both items
+        // Load and verify both items and gamemode
         Inventory inv3 = new Inventory();
-        PlayerData.load(playerDatFile, inv3);
+        Gamemode loadedGamemode = PlayerData.load(playerDatFile, inv3);
         
         assertNotNull(inv3.getStack(0));
         assertEquals(Items.STONE, inv3.getStack(0).getItem());
@@ -107,6 +110,8 @@ public class PlayerDataIntegrationTest {
         assertNotNull(inv3.getStack(1));
         assertEquals(Items.DARK_OAK_PLANKS, inv3.getStack(1).getItem());
         assertEquals(10, inv3.getStack(1).getCount());
+        
+        assertEquals(Gamemode.SURVIVAL, loadedGamemode);
     }
     
     @Test
@@ -115,15 +120,17 @@ public class PlayerDataIntegrationTest {
         
         // Save empty inventory
         Inventory empty = new Inventory();
-        PlayerData.save(playerDatFile, empty);
+        PlayerData.save(playerDatFile, empty, Gamemode.CREATIVE);
         
         // Load and verify it's empty
         Inventory loaded = new Inventory();
-        PlayerData.load(playerDatFile, loaded);
+        Gamemode loadedGamemode = PlayerData.load(playerDatFile, loaded);
         
         for (int i = 0; i < loaded.getSize(); i++) {
             assertNull(loaded.getStack(i), "Slot " + i + " should be empty");
         }
+        
+        assertEquals(Gamemode.CREATIVE, loadedGamemode);
     }
 }
 

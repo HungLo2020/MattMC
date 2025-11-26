@@ -1,6 +1,6 @@
 package mattmc.world.level.chunk;
 
-import mattmc.client.Minecraft;
+import mattmc.client.MattMC;
 import mattmc.nbt.BitPackedArray;
 import mattmc.world.level.block.Block;
 import mattmc.world.level.block.Blocks;
@@ -9,7 +9,7 @@ import java.util.*;
 
 /**
  * Utility class for converting chunks to/from NBT format.
- * Follows Minecraft's chunk NBT structure.
+ * Follows MattMC's chunk NBT structure.
  */
 public class ChunkNBT {
     
@@ -60,7 +60,7 @@ public class ChunkNBT {
     /**
      * Create NBT for a single 16x16x16 section of the chunk.
      * Returns null if the section is empty (all air) and has default light values.
-     * Uses bit-packed arrays like Minecraft Java Edition for optimal storage.
+     * Uses bit-packed arrays like MattMC Java Edition for optimal storage.
      */
     private static Map<String, Object> createSection(LevelChunk chunk, int sectionY) {
         // Check if section is empty (all air)
@@ -125,7 +125,7 @@ public class ChunkNBT {
                 }
             }
             
-            // Calculate bits per entry (Minecraft-style)
+            // Calculate bits per entry (MattMC-style)
             int bitsPerEntry = BitPackedArray.calculateBitsPerEntry(paletteList.size());
             
             // Create bit-packed array for block states
@@ -247,7 +247,7 @@ public class ChunkNBT {
     
     /**
      * Load a single section into the chunk.
-     * Handles bit-packed block states like Minecraft Java Edition.
+     * Handles bit-packed block states like MattMC Java Edition.
      */
     private static void loadSection(LevelChunk chunk, Map<String, Object> section) {
         // Get section Y
