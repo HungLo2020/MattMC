@@ -39,7 +39,10 @@ public class VerticalShaftAndTunnelLightTest {
     private static final int START_WORLD_Y = 64;
     private static final int BOTTOM_WORLD_Y = 52;
     private static final int START_Z = -1;
-    private static final int TUNNEL_LENGTH = 11; // From z=-1 to z=-12 is 11 blocks
+    private static final int TUNNEL_END_Z = -12;
+    // Tunnel length: from z=-1 to z=-12 we dig at each position, that's 12 positions (including both ends)
+    // But for iteration, we use 12 as the length since we start at 0 and go to length-1
+    private static final int TUNNEL_LENGTH = Math.abs(TUNNEL_END_Z - START_Z) + 1; // 12 blocks
     
     @BeforeEach
     public void setup() throws IOException {
@@ -350,18 +353,9 @@ public class VerticalShaftAndTunnelLightTest {
         int asymmetry = maxDist - minDist;
         System.out.println("\nAsymmetry (max - min): " + asymmetry + " blocks");
         
-        // Document the observed behavior
-        if (asymmetry > 2) {
-            System.out.println("\n!!! POTENTIAL BUG DETECTED !!!");
-            System.out.println("Light propagation is asymmetric between directions.");
-            System.out.println("This may indicate a directional bug in the lighting system.");
-        }
-        
-        // Verify at least the primary tunnel direction works
-        // -Z is the expected direction based on the user's scenario
-        int minusZDistance = propagationDistances[3];
-        assertTrue(minusZDistance > 1, 
-            "Light should propagate more than 1 block in -Z tunnel (primary test direction). Got: " + minusZDistance);
+        assertTrue(asymmetry <= 2, 
+            "Light propagation should be similar in all directions. Asymmetry = " + asymmetry + 
+            " blocks. This indicates a directional bug in the lighting system.");
     }
     
     /**
@@ -490,23 +484,18 @@ public class VerticalShaftAndTunnelLightTest {
             if (side2Ok) passCount++;
             totalChecks += 2;
             
-            String status1 = side1Ok ? "✓" : "✗ BUG";
-            String status2 = side2Ok ? "✓" : "✗ BUG";
+            String status1 = side1Ok ? "OK" : "BUG";
+            String status2 = side2Ok ? "OK" : "BUG";
             
             System.out.println(directionNames[dir] + ": Side1 " + status1 + ", Side2 " + status2);
         }
         
         System.out.println("\nExpansion check: " + passCount + "/" + totalChecks + " passed");
         
-        if (!allExpansionsLit) {
-            System.out.println("\n!!! POTENTIAL BUG DETECTED !!!");
-            System.out.println("Light does not fully propagate into all expanded tunnel spaces.");
-            System.out.println("This may indicate a light propagation bug when breaking walls.");
-        }
-        
-        // Document the behavior - the test is to observe and report, not to fail on existing bugs
-        // The primary scenarios (+X and -Z) should work based on observed behavior
-        System.out.println("\nNote: This test documents observed light propagation behavior.");
+        assertTrue(allExpansionsLit, 
+            "Light should propagate into expanded tunnel spaces. " +
+            "If center has light, adjacent expansion should also have light. " +
+            "Passed " + passCount + "/" + totalChecks + " checks.");
     }
     
     /**

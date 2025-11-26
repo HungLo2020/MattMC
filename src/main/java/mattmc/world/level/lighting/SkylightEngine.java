@@ -18,6 +18,7 @@ import java.util.Queue;
  * - Add/remove queues for dynamic updates when terrain changes
  * - Heightmap updates when columns change
  * - Opacity blocking: fully opaque blocks (opacity >= 15) stop propagation
+ * - Cross-chunk propagation: light propagates seamlessly across chunk boundaries
  */
 public class SkylightEngine {
 	
@@ -25,20 +26,37 @@ public class SkylightEngine {
 	 * Represents a skylight node in the BFS queue.
 	 */
 	private static class SkyNode {
+		final LevelChunk chunk; // Added to support cross-chunk propagation
 		final int x, y, z;
 		final int lightLevel;
 		
-		SkyNode(int x, int y, int z, int lightLevel) {
+		SkyNode(LevelChunk chunk, int x, int y, int z, int lightLevel) {
+			this.chunk = chunk;
 			this.x = x;
 			this.y = y;
 			this.z = z;
 			this.lightLevel = lightLevel;
+		}
+		
+		// Convenience constructor for single-chunk use
+		SkyNode(int x, int y, int z, int lightLevel) {
+			this(null, x, y, z, lightLevel);
 		}
 	}
 	
 	// BFS queues
 	private final Queue<SkyNode> addQueue = new ArrayDeque<>();
 	private final Queue<SkyNode> removeQueue = new ArrayDeque<>();
+	
+	// Cross-chunk propagator for handling neighbor chunks
+	private CrossChunkLightPropagator crossChunkPropagator;
+	
+	/**
+	 * Set the cross-chunk propagator for handling neighbor chunks.
+	 */
+	public void setCrossChunkPropagator(CrossChunkLightPropagator propagator) {
+		this.crossChunkPropagator = propagator;
+	}
 	
 	/**
 	 * Initialize skylight for entire chunk with BFS propagation.
@@ -111,7 +129,7 @@ public class SkylightEngine {
 					for (int y = 0; y < LevelChunk.HEIGHT; y++) {
 						int light = chunk.getSkyLight(x, y, z);
 						if (light > 0) {
-							addQueue.offer(new SkyNode(x, y, z, light));
+							addQueue.offer(new SkyNode(chunk, x, y, z, light));
 						}
 					}
 				}
@@ -126,27 +144,39 @@ public class SkylightEngine {
 				continue;
 			}
 			
+			// Use the chunk from the node to support cross-chunk propagation
+			LevelChunk nodeChunk = node.chunk != null ? node.chunk : chunk;
+			
 			// Propagate to neighbors with attenuation
 			int newLight = node.lightLevel - 1;
 			if (newLight > 0) {
-				propagateSkyToNeighbor(chunk, node.x - 1, node.y, node.z, newLight);
-				propagateSkyToNeighbor(chunk, node.x + 1, node.y, node.z, newLight);
-				propagateSkyToNeighbor(chunk, node.x, node.y - 1, node.z, newLight);
-				propagateSkyToNeighbor(chunk, node.x, node.y + 1, node.z, newLight);
-				propagateSkyToNeighbor(chunk, node.x, node.y, node.z - 1, newLight);
-				propagateSkyToNeighbor(chunk, node.x, node.y, node.z + 1, newLight);
+				propagateSkyToNeighbor(nodeChunk, node.x - 1, node.y, node.z, newLight);
+				propagateSkyToNeighbor(nodeChunk, node.x + 1, node.y, node.z, newLight);
+				propagateSkyToNeighbor(nodeChunk, node.x, node.y - 1, node.z, newLight);
+				propagateSkyToNeighbor(nodeChunk, node.x, node.y + 1, node.z, newLight);
+				propagateSkyToNeighbor(nodeChunk, node.x, node.y, node.z - 1, newLight);
+				propagateSkyToNeighbor(nodeChunk, node.x, node.y, node.z + 1, newLight);
 			}
 		}
 	}
 	
 	/**
 	 * Propagate skylight to a neighbor position.
+	 * Now supports cross-chunk propagation.
 	 */
 	private void propagateSkyToNeighbor(LevelChunk chunk, int x, int y, int z, int newLight) {
-		// Check bounds
-		if (x < 0 || x >= LevelChunk.WIDTH || y < 0 || y >= LevelChunk.HEIGHT || 
-		    z < 0 || z >= LevelChunk.DEPTH) {
+		// Check if crossing chunk boundaries (X or Z out of bounds)
+		if (x < 0 || x >= LevelChunk.WIDTH || z < 0 || z >= LevelChunk.DEPTH) {
+			// Crossing chunk boundary - use cross-chunk propagator if available
+			if (crossChunkPropagator != null) {
+				crossChunkPropagator.propagateSkylightCross(chunk, x, y, z, newLight + 1);
+			}
 			return;
+		}
+		
+		// Check Y bounds (no chunk crossing for Y)
+		if (y < 0 || y >= LevelChunk.HEIGHT) {
+			return; // Out of world bounds
 		}
 		
 		// Check if block is opaque
@@ -158,7 +188,7 @@ public class SkylightEngine {
 		int currentLight = chunk.getSkyLight(x, y, z);
 		if (newLight > currentLight) {
 			chunk.setSkyLight(x, y, z, newLight);  // Set the light value before adding to queue
-			addQueue.offer(new SkyNode(x, y, z, newLight));
+			addQueue.offer(new SkyNode(chunk, x, y, z, newLight));
 		}
 	}
 	
@@ -230,21 +260,22 @@ public class SkylightEngine {
 					// This area gained sky access - set to full skylight
 					chunk.setSkyLight(x, y, z, 15);
 					// Add to queue for propagation
-					addQueue.offer(new SkyNode(x, y, z, 15));
+					addQueue.offer(new SkyNode(chunk, x, y, z, 15));
 				}
 			}
 			
 			// Second pass: BFS propagation to neighbors
 			SkyNode node;
 			while ((node = addQueue.poll()) != null) {
+				LevelChunk nodeChunk = node.chunk != null ? node.chunk : chunk;
 				int nextLight = node.lightLevel - 1;
 				if (nextLight > 0) {
-					propagateSkyToNeighbor(chunk, node.x - 1, node.y, node.z, nextLight);
-					propagateSkyToNeighbor(chunk, node.x + 1, node.y, node.z, nextLight);
-					propagateSkyToNeighbor(chunk, node.x, node.y - 1, node.z, nextLight);
-					propagateSkyToNeighbor(chunk, node.x, node.y + 1, node.z, nextLight);
-					propagateSkyToNeighbor(chunk, node.x, node.y, node.z - 1, nextLight);
-					propagateSkyToNeighbor(chunk, node.x, node.y, node.z + 1, nextLight);
+					propagateSkyToNeighbor(nodeChunk, node.x - 1, node.y, node.z, nextLight);
+					propagateSkyToNeighbor(nodeChunk, node.x + 1, node.y, node.z, nextLight);
+					propagateSkyToNeighbor(nodeChunk, node.x, node.y - 1, node.z, nextLight);
+					propagateSkyToNeighbor(nodeChunk, node.x, node.y + 1, node.z, nextLight);
+					propagateSkyToNeighbor(nodeChunk, node.x, node.y, node.z - 1, nextLight);
+					propagateSkyToNeighbor(nodeChunk, node.x, node.y, node.z + 1, nextLight);
 				}
 			}
 		}
@@ -255,9 +286,10 @@ public class SkylightEngine {
 	 */
 	private void addSkylightAt(LevelChunk chunk, int x, int y, int z) {
 		// Check what skylight should be here based on neighbors
+		// This also needs to check cross-chunk neighbors for proper propagation
 		int maxNeighborLight = 0;
 		
-		// Check all 6 neighbors
+		// Check all 6 neighbors (within same chunk for now, cross-chunk done via propagation)
 		maxNeighborLight = Math.max(maxNeighborLight, getSkyLightSafe(chunk, x - 1, y, z));
 		maxNeighborLight = Math.max(maxNeighborLight, getSkyLightSafe(chunk, x + 1, y, z));
 		maxNeighborLight = Math.max(maxNeighborLight, getSkyLightSafe(chunk, x, y - 1, z));
@@ -265,27 +297,83 @@ public class SkylightEngine {
 		maxNeighborLight = Math.max(maxNeighborLight, getSkyLightSafe(chunk, x, y, z - 1));
 		maxNeighborLight = Math.max(maxNeighborLight, getSkyLightSafe(chunk, x, y, z + 1));
 		
+		// Also check cross-chunk neighbors if we're at chunk edge
+		if (crossChunkPropagator != null) {
+			maxNeighborLight = Math.max(maxNeighborLight, getSkyLightAcrossChunks(chunk, x - 1, y, z));
+			maxNeighborLight = Math.max(maxNeighborLight, getSkyLightAcrossChunks(chunk, x + 1, y, z));
+			maxNeighborLight = Math.max(maxNeighborLight, getSkyLightAcrossChunks(chunk, x, y, z - 1));
+			maxNeighborLight = Math.max(maxNeighborLight, getSkyLightAcrossChunks(chunk, x, y, z + 1));
+		}
+		
 		if (maxNeighborLight > 1) {
 			int newLight = maxNeighborLight - 1;
 			chunk.setSkyLight(x, y, z, newLight);
 			
 			// Propagate to neighbors
 			addQueue.clear();
-			addQueue.offer(new SkyNode(x, y, z, newLight));
+			addQueue.offer(new SkyNode(chunk, x, y, z, newLight));
 			
 			SkyNode node2;
 			while ((node2 = addQueue.poll()) != null) {
+				LevelChunk nodeChunk = node2.chunk != null ? node2.chunk : chunk;
 				int nextLight = node2.lightLevel - 1;
 				if (nextLight > 0) {
-					propagateSkyToNeighbor(chunk, node2.x - 1, node2.y, node2.z, nextLight);
-					propagateSkyToNeighbor(chunk, node2.x + 1, node2.y, node2.z, nextLight);
-					propagateSkyToNeighbor(chunk, node2.x, node2.y - 1, node2.z, nextLight);
-					propagateSkyToNeighbor(chunk, node2.x, node2.y + 1, node2.z, nextLight);
-					propagateSkyToNeighbor(chunk, node2.x, node2.y, node2.z - 1, nextLight);
-					propagateSkyToNeighbor(chunk, node2.x, node2.y, node2.z + 1, nextLight);
+					propagateSkyToNeighbor(nodeChunk, node2.x - 1, node2.y, node2.z, nextLight);
+					propagateSkyToNeighbor(nodeChunk, node2.x + 1, node2.y, node2.z, nextLight);
+					propagateSkyToNeighbor(nodeChunk, node2.x, node2.y - 1, node2.z, nextLight);
+					propagateSkyToNeighbor(nodeChunk, node2.x, node2.y + 1, node2.z, nextLight);
+					propagateSkyToNeighbor(nodeChunk, node2.x, node2.y, node2.z - 1, nextLight);
+					propagateSkyToNeighbor(nodeChunk, node2.x, node2.y, node2.z + 1, nextLight);
 				}
 			}
 		}
+	}
+	
+	/**
+	 * Get skylight from a neighbor that might be in a different chunk.
+	 */
+	private int getSkyLightAcrossChunks(LevelChunk chunk, int x, int y, int z) {
+		if (y < 0 || y >= LevelChunk.HEIGHT) {
+			return 0;
+		}
+		
+		// If within current chunk, use normal method
+		if (x >= 0 && x < LevelChunk.WIDTH && z >= 0 && z < LevelChunk.DEPTH) {
+			return chunk.getSkyLight(x, y, z);
+		}
+		
+		// Need to check neighbor chunk
+		if (crossChunkPropagator == null) {
+			return 0;
+		}
+		
+		int targetChunkX = chunk.chunkX();
+		int targetChunkZ = chunk.chunkZ();
+		int targetLocalX = x;
+		int targetLocalZ = z;
+		
+		if (x < 0) {
+			targetChunkX--;
+			targetLocalX = LevelChunk.WIDTH + x;
+		} else if (x >= LevelChunk.WIDTH) {
+			targetChunkX++;
+			targetLocalX = x - LevelChunk.WIDTH;
+		}
+		
+		if (z < 0) {
+			targetChunkZ--;
+			targetLocalZ = LevelChunk.DEPTH + z;
+		} else if (z >= LevelChunk.DEPTH) {
+			targetChunkZ++;
+			targetLocalZ = z - LevelChunk.DEPTH;
+		}
+		
+		LevelChunk neighborChunk = crossChunkPropagator.getNeighborChunk(targetChunkX, targetChunkZ);
+		if (neighborChunk == null) {
+			return 0;
+		}
+		
+		return neighborChunk.getSkyLight(targetLocalX, y, targetLocalZ);
 	}
 	
 	/**
@@ -301,19 +389,20 @@ public class SkylightEngine {
 		
 		// BFS removal similar to blockLight
 		removeQueue.clear();
-		removeQueue.offer(new SkyNode(x, y, z, removedLight));
+		removeQueue.offer(new SkyNode(chunk, x, y, z, removedLight));
 		
 		Queue<SkyNode> boundaryQueue = new ArrayDeque<>();
 		
 		SkyNode node;
 		while ((node = removeQueue.poll()) != null) {
+			LevelChunk nodeChunk = node.chunk != null ? node.chunk : chunk;
 			
-			checkNeighborForRemoval(chunk, node.x - 1, node.y, node.z, node.lightLevel, boundaryQueue);
-			checkNeighborForRemoval(chunk, node.x + 1, node.y, node.z, node.lightLevel, boundaryQueue);
-			checkNeighborForRemoval(chunk, node.x, node.y - 1, node.z, node.lightLevel, boundaryQueue);
-			checkNeighborForRemoval(chunk, node.x, node.y + 1, node.z, node.lightLevel, boundaryQueue);
-			checkNeighborForRemoval(chunk, node.x, node.y, node.z - 1, node.lightLevel, boundaryQueue);
-			checkNeighborForRemoval(chunk, node.x, node.y, node.z + 1, node.lightLevel, boundaryQueue);
+			checkNeighborForRemoval(nodeChunk, node.x - 1, node.y, node.z, node.lightLevel, boundaryQueue);
+			checkNeighborForRemoval(nodeChunk, node.x + 1, node.y, node.z, node.lightLevel, boundaryQueue);
+			checkNeighborForRemoval(nodeChunk, node.x, node.y - 1, node.z, node.lightLevel, boundaryQueue);
+			checkNeighborForRemoval(nodeChunk, node.x, node.y + 1, node.z, node.lightLevel, boundaryQueue);
+			checkNeighborForRemoval(nodeChunk, node.x, node.y, node.z - 1, node.lightLevel, boundaryQueue);
+			checkNeighborForRemoval(nodeChunk, node.x, node.y, node.z + 1, node.lightLevel, boundaryQueue);
 		}
 		
 		// Re-propagate from boundary
@@ -322,16 +411,17 @@ public class SkylightEngine {
 		
 		SkyNode node3;
 		while ((node3 = addQueue.poll()) != null) {
-			int currentLight = chunk.getSkyLight(node3.x, node3.y, node3.z);
+			LevelChunk nodeChunk = node3.chunk != null ? node3.chunk : chunk;
+			int currentLight = nodeChunk.getSkyLight(node3.x, node3.y, node3.z);
 			int nextLight = currentLight - 1;
 			
 			if (nextLight > 0) {
-				propagateSkyToNeighbor(chunk, node3.x - 1, node3.y, node3.z, nextLight);
-				propagateSkyToNeighbor(chunk, node3.x + 1, node3.y, node3.z, nextLight);
-				propagateSkyToNeighbor(chunk, node3.x, node3.y - 1, node3.z, nextLight);
-				propagateSkyToNeighbor(chunk, node3.x, node3.y + 1, node3.z, nextLight);
-				propagateSkyToNeighbor(chunk, node3.x, node3.y, node3.z - 1, nextLight);
-				propagateSkyToNeighbor(chunk, node3.x, node3.y, node3.z + 1, nextLight);
+				propagateSkyToNeighbor(nodeChunk, node3.x - 1, node3.y, node3.z, nextLight);
+				propagateSkyToNeighbor(nodeChunk, node3.x + 1, node3.y, node3.z, nextLight);
+				propagateSkyToNeighbor(nodeChunk, node3.x, node3.y - 1, node3.z, nextLight);
+				propagateSkyToNeighbor(nodeChunk, node3.x, node3.y + 1, node3.z, nextLight);
+				propagateSkyToNeighbor(nodeChunk, node3.x, node3.y, node3.z - 1, nextLight);
+				propagateSkyToNeighbor(nodeChunk, node3.x, node3.y, node3.z + 1, nextLight);
 			}
 		}
 	}
@@ -354,10 +444,10 @@ public class SkylightEngine {
 		if (neighborLight < sourceLight) {
 			// This light came from the removed source
 			chunk.setSkyLight(x, y, z, 0);
-			removeQueue.offer(new SkyNode(x, y, z, neighborLight));
+			removeQueue.offer(new SkyNode(chunk, x, y, z, neighborLight));
 		} else {
 			// This light is from another source - boundary for re-propagation
-			boundaryQueue.offer(new SkyNode(x, y, z, neighborLight));
+			boundaryQueue.offer(new SkyNode(chunk, x, y, z, neighborLight));
 		}
 	}
 	
