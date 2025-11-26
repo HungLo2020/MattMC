@@ -35,49 +35,71 @@ import org.slf4j.LoggerFactory;
  * @see OpenGLBackendFactory
  */
 public class OpenGLChunkMeshManager implements ChunkMeshManager {
-    private static final Logger logger = LoggerFactory.getLogger(OpenGLChunkMeshManager.class);
+	private static final Logger logger = LoggerFactory.getLogger(OpenGLChunkMeshManager.class);
 
-    // Calculate expected chunk count based on maximum render distance
-    private static final int EXPECTED_CHUNK_COUNT = (32 * 2 + 1) * (32 * 2 + 1);
-    
-    // VAO cache: maps chunks to their VAOs
-    private final Map<LevelChunk, ChunkVAO> vaoCache = new HashMap<>(EXPECTED_CHUNK_COUNT);
-    
-    // Cache for chunk key to chunk mapping
-    private final Map<Long, LevelChunk> chunkByKey = new HashMap<>(EXPECTED_CHUNK_COUNT);
-    
-    // Texture atlas for VBO rendering
-    private TextureAtlas textureAtlas = null;
-    
-    // Shader for rendering
-    private VoxelLitShader shader = null;
-    
-    // Initialization state
-    private boolean textureAtlasInitialized = false;
-    private boolean backendInitialized = false;
-    
-    @Override
-    public void registerChunk(LevelChunk chunk) {
-        long key = chunkKey(chunk.chunkX(), chunk.chunkZ());
-        chunkByKey.putIfAbsent(key, chunk);
-    }
-    
-    @Override
-    public boolean hasChunkMesh(LevelChunk chunk) {
-        return vaoCache.get(chunk) != null;
-    }
-    
-    @Override
-    public int getMeshIdForChunk(LevelChunk chunk) {
-        if (!hasChunkMesh(chunk)) {
-            return -1;
-        }
-        return System.identityHashCode(chunk);
-    }
-    
-    @Override
-    public int getDefaultMaterialId() {
-        return 0;
+	// Calculate expected chunk count based on maximum render distance
+	private static final int EXPECTED_CHUNK_COUNT = (32 * 2 + 1) * (32 * 2 + 1);
+	
+	// VAO cache: maps chunks to their VAOs
+	private final Map<LevelChunk, ChunkVAO> vaoCache = new HashMap<>(EXPECTED_CHUNK_COUNT);
+	
+	// Cache for chunk key to chunk mapping
+	private final Map<Long, LevelChunk> chunkByKey = new HashMap<>(EXPECTED_CHUNK_COUNT);
+	
+	/**
+	 * Texture atlas for VBO rendering.
+	 * 
+	 * <p><b>Architecture:</b> The TextureAtlas is created at initialization time
+	 * (when the OpenGLChunkMeshManager is constructed), before any world is loaded.
+	 * This allows string→int texture ID mapping to be established early.
+	 * Blocks/items and game logic use string paths, but the rendering backend
+	 * uses fast integer texture IDs internally for performance.
+	 */
+	private final TextureAtlas textureAtlas;
+	
+	// Shader for rendering
+	private VoxelLitShader shader = null;
+	
+	// Initialization state
+	private boolean backendInitialized = false;
+	
+	/**
+	 * Create an OpenGL chunk mesh manager.
+	 * 
+	 * <p><b>Note:</b> The TextureAtlas is built during construction,
+	 * before any world is selected. This establishes the string→int
+	 * texture ID mapping that the rendering backend uses for performance.
+	 */
+	public OpenGLChunkMeshManager() {
+		// Build the texture atlas at startup, before any world is loaded.
+		// This converts all block/item string texture paths to integer IDs.
+		// The atlas instance will be passed to chunk loaders when levels are set.
+		this.textureAtlas = new TextureAtlas();
+		logger.info("TextureAtlas initialized at startup with {} textures", textureAtlas.getTextureCount());
+	}
+	
+	@Override
+	public void registerChunk(LevelChunk chunk) {
+		long key = chunkKey(chunk.chunkX(), chunk.chunkZ());
+		chunkByKey.putIfAbsent(key, chunk);
+	}
+	
+	@Override
+	public boolean hasChunkMesh(LevelChunk chunk) {
+		return vaoCache.get(chunk) != null;
+	}
+	
+	@Override
+	public int getMeshIdForChunk(LevelChunk chunk) {
+		if (!hasChunkMesh(chunk)) {
+			return -1;
+		}
+		return System.identityHashCode(chunk);
+	}
+	
+	@Override
+	public int getDefaultMaterialId() {
+		return 0;
     }
     
     @Override
@@ -164,38 +186,47 @@ public class OpenGLChunkMeshManager implements ChunkMeshManager {
         return chunkByKey.get(key);
     }
     
-    @Override
-    public void initializeBackend(RenderBackend backend) {
-        OpenGLRenderBackend glBackend = requireOpenGLBackend(backend, "initializeBackend");
-        
-        // Ensure shader is initialized
-        ensureShaderInitialized();
-        
-        // Register default material (shader + texture atlas)
-        int materialId = getDefaultMaterialId();
-        glBackend.registerMaterial(materialId, shader, textureAtlas);
-        
-        backendInitialized = true;
-    }
-    
-    @Override
-    public void initializeTextureAtlas(Level level) {
-        textureAtlas = new TextureAtlas();
-        level.getAsyncLoader().setTextureAtlas(textureAtlas);
-        textureAtlasInitialized = true;
-    }
-    
-    @Override
-    public boolean isTextureAtlasInitialized() {
-        return textureAtlasInitialized;
-    }
-    
-    @Override
-    public boolean isBackendInitialized() {
-        return backendInitialized;
-    }
-    
-    @Override
+	@Override
+	public void initializeBackend(RenderBackend backend) {
+		OpenGLRenderBackend glBackend = requireOpenGLBackend(backend, "initializeBackend");
+		
+		// Ensure shader is initialized
+		ensureShaderInitialized();
+		
+		// Register default material (shader + texture atlas)
+		int materialId = getDefaultMaterialId();
+		glBackend.registerMaterial(materialId, shader, textureAtlas);
+		
+		backendInitialized = true;
+	}
+	
+	/**
+	 * Set the texture atlas on the level's async loader.
+	 * 
+	 * <p><b>Note:</b> The TextureAtlas was already built at startup.
+	 * This method just passes the pre-built atlas to the level so it
+	 * can be used during async chunk mesh building.
+	 */
+	@Override
+	public void initializeTextureAtlas(Level level) {
+		// The atlas was built in constructor; just pass it to the level's async loader
+		level.getAsyncLoader().setTextureAtlas(textureAtlas);
+	}
+	
+	/**
+	 * Returns true since the TextureAtlas is built at construction time.
+	 */
+	@Override
+	public boolean isTextureAtlasInitialized() {
+		return textureAtlas != null;
+	}
+	
+	@Override
+	public boolean isBackendInitialized() {
+		return backendInitialized;
+	}
+	
+	@Override
     public void registerExistingChunks(Level level, RenderBackend backend) {
         OpenGLRenderBackend glBackend = requireOpenGLBackend(backend, "registerExistingChunks");
         int registeredCount = 0;

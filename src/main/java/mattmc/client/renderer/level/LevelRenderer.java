@@ -57,47 +57,51 @@ public class LevelRenderer implements WorldRenderer {
      * @param meshManager the chunk mesh manager for handling GPU resources
      * @param renderBackend the render backend for executing draw commands
      */
-    public LevelRenderer(ChunkMeshManager meshManager, RenderBackend renderBackend) {
-        this.meshManager = meshManager;
-        this.frustum = new Frustum();
-        this.chunkLogic = new ChunkRenderLogic(meshManager, frustum);
-        this.renderBackend = renderBackend;
-        this.commandBuffer = new CommandBuffer(1000); // Initial capacity for ~1000 chunks
-    }
-    
-    /**
-     * Initialize the renderer with a level.
-     * This sets up the chunk unload listener and builds the texture atlas.
-     * Also initializes the rendering backend with materials.
-     */
-    @Override
-    public void initWithLevel(Level level) {
-        if (currentLevel != null) {
-            currentLevel.setChunkUnloadListener(null);
-        }
-        this.currentLevel = level;
-        
-        // Set up chunk unload listener
-        level.setChunkUnloadListener(chunk -> {
-            meshManager.unregisterMesh(chunk, renderBackend);
-            meshManager.removeChunkFromCache(chunk);
-        });
-        
-        // Build texture atlas once on first initialization
-        if (!meshManager.isTextureAtlasInitialized()) {
-            meshManager.initializeTextureAtlas(level);
-        }
-        
-        // Initialize backend with materials
-        if (!meshManager.isBackendInitialized()) {
-            meshManager.initializeBackend(renderBackend);
-            
-            // Register any chunks that already have meshes
-            if (currentLevel != null) {
-                meshManager.registerExistingChunks(currentLevel, renderBackend);
-            }
-        }
-    }
+	public LevelRenderer(ChunkMeshManager meshManager, RenderBackend renderBackend) {
+		this.meshManager = meshManager;
+		this.frustum = new Frustum();
+		this.chunkLogic = new ChunkRenderLogic(meshManager, frustum);
+		this.renderBackend = renderBackend;
+		this.commandBuffer = new CommandBuffer(1000); // Initial capacity for ~1000 chunks
+	}
+	
+	/**
+	 * Initialize the renderer with a level.
+	 * Sets up the chunk unload listener and initializes rendering resources.
+	 * 
+	 * <p><b>Architecture:</b> The TextureAtlas was already built at startup
+	 * (in the ChunkMeshManager constructor). This method passes the pre-built
+	 * atlas to the level's async loader and initializes the backend with materials.
+	 * Blocks/items use string texture paths, but the rendering backend uses
+	 * fast integer texture IDs internally for performance.
+	 */
+	@Override
+	public void initWithLevel(Level level) {
+		if (currentLevel != null) {
+			currentLevel.setChunkUnloadListener(null);
+		}
+		this.currentLevel = level;
+		
+		// Set up chunk unload listener
+		level.setChunkUnloadListener(chunk -> {
+			meshManager.unregisterMesh(chunk, renderBackend);
+			meshManager.removeChunkFromCache(chunk);
+		});
+		
+		// Pass the pre-built texture atlas to this level's async loader
+		// (The atlas was built at startup; we just need to give it to each level)
+		meshManager.initializeTextureAtlas(level);
+		
+		// Initialize backend with materials (only done once)
+		if (!meshManager.isBackendInitialized()) {
+			meshManager.initializeBackend(renderBackend);
+			
+			// Register any chunks that already have meshes
+			if (currentLevel != null) {
+				meshManager.registerExistingChunks(currentLevel, renderBackend);
+			}
+		}
+	}
     
     /**
      * Render all loaded chunks in the world.
