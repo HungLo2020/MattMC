@@ -93,7 +93,8 @@ public class UVTransformer {
      * Rotate a face direction around the X-axis.
      */
     private static String rotateDirectionAroundX(String face, int degrees) {
-        int steps = (degrees / 90) % 4;
+        // Normalize degrees to handle negative values
+        int steps = (((degrees / 90) % 4) + 4) % 4;
         for (int i = 0; i < steps; i++) {
             face = switch (face) {
                 case "up" -> "south";
@@ -111,7 +112,8 @@ public class UVTransformer {
      * Rotate a face direction around the Y-axis.
      */
     private static String rotateDirectionAroundY(String face, int degrees) {
-        int steps = (degrees / 90) % 4;
+        // Normalize degrees to handle negative values
+        int steps = (((degrees / 90) % 4) + 4) % 4;
         for (int i = 0; i < steps; i++) {
             face = switch (face) {
                 case "north" -> "east";
@@ -304,9 +306,10 @@ public class UVTransformer {
      * Legacy method for backward compatibility.
      * Transform UV coordinates when uvlock=true (Y-rotation only).
      * 
-     * @deprecated Use {@link #transformUVsWithUVLock} instead for proper X+Y rotation handling.
+     * @deprecated since 1.0. Use {@link #transformUVsWithUVLock} instead for proper X+Y rotation handling.
+     *             This method will be removed in a future version.
      */
-    @Deprecated
+    @Deprecated(since = "1.0", forRemoval = true)
     public static float[] transformUVsForRotation(float[] uv, String faceDirection, int yRotation) {
         UVLockResult result = transformUVsWithUVLock(uv, faceDirection, 0, yRotation, 0);
         return result.uv;
