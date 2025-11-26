@@ -82,7 +82,7 @@ public class DebugInfoRenderer {
         
         // Build draw commands using backend-agnostic logic
         buffer.clear();
-        UIRenderLogic.clearTextRegistry(); // Clear text registry for this frame
+        logic.beginFrame(); // Clear text registry for this frame using instance method
         logic.buildDebugInfoCommands(screenWidth, screenHeight, 
             playerX, playerY, playerZ, yaw, pitch, roll, fps,
             loadedChunks, pendingChunks, activeWorkers, renderedChunks, culledChunks,

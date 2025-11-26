@@ -79,7 +79,7 @@ public class HotbarRenderer {
         
         // Build draw commands using backend-agnostic logic
         buffer.clear();
-        UIRenderLogic.clearTextRegistry(); // Clear text registry for this frame
+        logic.beginFrame(); // Clear text registry for this frame using instance method
         logic.buildHotbarCommands(screenWidth, screenHeight, selectedHotbarSlot, buffer);
         
         // Submit commands to backend with frame management

@@ -60,10 +60,12 @@ public class UIRenderLogic {
     }
     
     /**
-     * Begin a new frame - clears the text registry.
+     * Begin a new frame - clears the text registry and sets this instance as current.
      * Should be called at the start of each frame before building commands.
+     * This ensures that getTextInfo() will use this instance's registry.
      */
     public void beginFrame() {
+        currentInstance = this; // Ensure this instance is used for text lookups
         textRegistry.clear();
         nextTextId = 0;
     }
