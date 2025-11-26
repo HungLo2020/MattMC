@@ -1119,6 +1119,10 @@ public class OpenGLRenderBackend implements RenderBackend {
         Texture tex = textureCache.get(path);
         if (tex == null) {
             tex = Texture.load(path);
+            if (tex == null) {
+                logger.warn("Failed to load texture: {}", path);
+                return 0;
+            }
             textureCache.put(path, tex);
             textureIdToPath.put(tex.id, path);
         }
