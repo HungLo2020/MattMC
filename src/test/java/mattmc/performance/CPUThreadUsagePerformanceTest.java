@@ -3,7 +3,6 @@ package mattmc.performance;
 import mattmc.world.level.Level;
 import mattmc.world.level.chunk.LevelChunk;
 import mattmc.world.level.chunk.AsyncChunkLoader;
-import mattmc.world.level.chunk.ChunkTaskExecutor;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
