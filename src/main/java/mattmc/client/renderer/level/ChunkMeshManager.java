@@ -66,39 +66,47 @@ public interface ChunkMeshManager extends ChunkMeshRegistry {
      */
     LevelChunk getRegisteredChunk(int chunkX, int chunkZ);
     
-    /**
-     * Initialize the mesh manager and register materials with the backend.
-     * 
-     * @param backend the render backend
-     */
-    void initializeBackend(RenderBackend backend);
-    
-    /**
-     * Initialize the texture atlas and set it on the async loader.
-     * 
-     * @param level the level to initialize for
-     */
-    void initializeTextureAtlas(Level level);
-    
-    /**
-     * Check if the texture atlas has been initialized.
-     * 
-     * @return true if initialized
-     */
-    boolean isTextureAtlasInitialized();
-    
-    /**
-     * Check if the backend has been initialized.
-     * 
-     * @return true if initialized
-     */
-    boolean isBackendInitialized();
-    
-    /**
-     * Register all chunks that already have meshes with the backend.
-     * 
-     * @param level the level containing the chunks
-     * @param backend the render backend
-     */
-    void registerExistingChunks(Level level, RenderBackend backend);
+	/**
+	 * Initialize the mesh manager and register materials with the backend.
+	 * 
+	 * @param backend the render backend
+	 */
+	void initializeBackend(RenderBackend backend);
+	
+	/**
+	 * Set the pre-built texture atlas on the level's async loader.
+	 * 
+	 * <p><b>Architecture:</b> The TextureAtlas is built at startup, before any world
+	 * is selected. Blocks/items use string texture paths as canonical IDs.
+	 * The rendering backend converts these to integer IDs at resource load time.
+	 * This method passes the pre-built atlas to the level for async chunk mesh building.
+	 * 
+	 * @param level the level to initialize for
+	 */
+	void initializeTextureAtlas(Level level);
+	
+	/**
+	 * Check if the texture atlas is available.
+	 * 
+	 * <p>Since the atlas is built at startup, this should always return true
+	 * after construction.
+	 * 
+	 * @return true if the atlas is available
+	 */
+	boolean isTextureAtlasInitialized();
+	
+	/**
+	 * Check if the backend has been initialized.
+	 * 
+	 * @return true if initialized
+	 */
+	boolean isBackendInitialized();
+	
+	/**
+	 * Register all chunks that already have meshes with the backend.
+	 * 
+	 * @param level the level containing the chunks
+	 * @param backend the render backend
+	 */
+	void registerExistingChunks(Level level, RenderBackend backend);
 }
