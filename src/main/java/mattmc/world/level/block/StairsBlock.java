@@ -1,15 +1,12 @@
 package mattmc.world.level.block;
 
 import mattmc.world.phys.shapes.VoxelShape;
-import mattmc.world.level.block.state.BlockState;
-import mattmc.world.level.block.state.properties.BlockStateProperties;
 import mattmc.world.level.block.state.properties.Direction;
 import mattmc.world.level.block.state.properties.Half;
-import mattmc.world.level.block.state.properties.StairsShape;
 
 /**
  * Represents a stairs block in the world.
- * Similar to Minecraft's StairsBlock class.
+ * Similar to MattMC's StairsBlock class.
  * 
  * Stairs blocks are decorative blocks that form a staircase.
  * They have complex collision boxes and multiple variants based on:
@@ -22,7 +19,7 @@ import mattmc.world.level.block.state.properties.StairsShape;
 public class StairsBlock extends Block {
     
     // Collision shape for bottom stairs (north-facing) - full block with south-east quarter removed
-    // This is more accurate to Minecraft - a single shape with a corner cut out
+    // This is more accurate to MattMC - a single shape with a corner cut out
     private static final VoxelShape BOTTOM_SHAPE = VoxelShape.or(
         VoxelShape.box(0.0, 0.0, 0.0, 1.0, 0.5, 1.0),      // Bottom slab (full width/depth, half height)
         VoxelShape.box(0.0, 0.5, 0.0, 1.0, 1.0, 0.5)       // Top step (north half only, upper half)
@@ -66,12 +63,12 @@ public class StairsBlock extends Block {
      * Get the blockstate for stairs placement based on player position and clicked face.
      */
     @Override
-    public BlockState getPlacementState(
+    public mattmc.world.level.block.state.BlockState getPlacementState(
             float playerX, float playerY, float playerZ,
             int blockX, int blockY, int blockZ, int hitFace,
             float hitX, float hitY, float hitZ) {
         
-        BlockState state = new BlockState();
+        mattmc.world.level.block.state.BlockState state = new mattmc.world.level.block.state.BlockState();
         
         // Determine facing based on player's horizontal direction
         // Stairs face away from the player (the player climbs up toward the block)
@@ -107,10 +104,10 @@ public class StairsBlock extends Block {
             half = relativeY > 0.5f ? Half.TOP : Half.BOTTOM;
         }
         
-        state.setValue(BlockStateProperties.HORIZONTAL_FACING, facing);
-        state.setValue(BlockStateProperties.HALF, half);
+        state.setValue("facing", facing);
+        state.setValue("half", half);
         // For now, always use straight shape (no corner detection yet)
-        state.setValue(BlockStateProperties.STAIRS_SHAPE, StairsShape.STRAIGHT);
+        state.setValue("shape", mattmc.world.level.block.state.properties.StairsShape.STRAIGHT);
         
         return state;
     }

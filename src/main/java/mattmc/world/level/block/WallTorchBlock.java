@@ -2,12 +2,11 @@ package mattmc.world.level.block;
 
 import mattmc.world.phys.shapes.VoxelShape;
 import mattmc.world.level.block.state.BlockState;
-import mattmc.world.level.block.state.properties.BlockStateProperties;
 import mattmc.world.level.block.state.properties.Direction;
 
 /**
  * Represents a wall-mounted torch block.
- * Based on Minecraft's WallTorchBlock class.
+ * Based on MattMC's WallTorchBlock class.
  * 
  * Wall torches attach to the side of blocks and have a directional facing property.
  * They have different collision shapes based on which direction they face.
@@ -57,8 +56,8 @@ public class WallTorchBlock extends TorchBlock {
      * This method can be called by the renderer with the blockstate.
      */
     public VoxelShape getCollisionShape(BlockState state) {
-        if (state != null && state.hasProperty(BlockStateProperties.HORIZONTAL_FACING)) {
-            Direction facing = state.getValue(BlockStateProperties.HORIZONTAL_FACING);
+        if (state != null && state.hasProperty("facing")) {
+            Direction facing = state.getDirection("facing");
             return switch (facing) {
                 case NORTH -> NORTH_SHAPE;
                 case SOUTH -> SOUTH_SHAPE;
@@ -104,7 +103,7 @@ public class WallTorchBlock extends TorchBlock {
             default -> Direction.NORTH;
         };
         
-        state.setValue(BlockStateProperties.HORIZONTAL_FACING, facing);
+        state.setValue("facing", facing);
         return state;
     }
 }
