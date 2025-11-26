@@ -125,50 +125,21 @@ This maintains the backend-agnostic design while enabling proper frustum culling
 
 ## Inconsistencies & Code Quality Issues
 
-### 4. Inconsistent Frame Management Pattern
+### 4. ~~Inconsistent Frame Management Pattern~~ ✅ FIXED
 
 **Location**: Multiple renderer classes
 
-**Problem**: The `beginFrame()`/`endFrame()` pattern is used inconsistently:
+**Status**: **RESOLVED** - Implemented reference-counted frame management in `OpenGLRenderBackend`. The `beginFrame()`/`endFrame()` calls now support nesting via a `frameDepth` counter, allowing multiple renderers to call these methods safely without causing errors or state corruption.
 
-```java
-// CrosshairRenderer.java - Calls beginFrame/endFrame within render
-backend.beginFrame();
-for (DrawCommand cmd : buffer.getCommands()) {
-    backend.submit(cmd);
-}
-backend.endFrame();
+**Original Problem**: Each component called its own `beginFrame()`/`endFrame()`, and nested calls would throw exceptions.
 
-// HotbarRenderer.java - Same pattern
-backend.beginFrame();
-// ... rendering ...
-backend.endFrame();
+**Solution Applied**: 
+1. Changed `frameActive` boolean to `frameDepth` counter in `OpenGLRenderBackend`
+2. `beginFrame()` increments counter, only initializes state on first call
+3. `endFrame()` decrements counter, only cleans up state when counter reaches 0
+4. Updated documentation in `RenderBackend` interface to document the new nested call behavior
 
-// LevelRenderer.java - Same but with additional logic
-backend.beginFrame();
-for (DrawCommand cmd : commandBuffer.getCommands()) {
-    backend.submit(cmd);
-}
-backend.endFrame();
-```
-
-**Why it's a problem**:
-- Each component calls its own begin/endFrame, causing nested frame starts
-- If multiple UI elements render in sequence, each starts a new frame
-- This defeats the purpose of batching and can cause OpenGL state issues
-
-**Fix**: Implement a single frame lifecycle manager at the top level:
-
-```java
-// In the main render loop
-backend.beginFrame();
-
-// All rendering happens within a single frame
-worldRenderer.render(...);
-uiRenderer.render(...);
-
-backend.endFrame();
-```
+This enables gradual migration to centralized frame management while maintaining backward compatibility.
 
 ---
 

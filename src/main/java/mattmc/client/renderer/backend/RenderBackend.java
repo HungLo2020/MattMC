@@ -90,6 +90,12 @@ public interface RenderBackend {
      * <p>After this call, the backend should be ready to accept {@link #submit(DrawCommand)}
      * calls.
      * 
+     * <p><b>Nested Calls:</b> This method supports nested calls via reference counting.
+     * Multiple renderers can safely call beginFrame()/endFrame() pairs independently.
+     * The frame is only actually started on the first call and ended on the last matching
+     * endFrame() call. This enables a gradual migration to centralized frame management
+     * while maintaining backward compatibility with existing code.
+     * 
      * @see #endFrame()
      */
     void beginFrame();
@@ -130,6 +136,10 @@ public interface RenderBackend {
      * 
      * <p>After this call, no more {@link #submit(DrawCommand)} calls should be made until
      * the next {@link #beginFrame()}.
+     * 
+     * <p><b>Nested Calls:</b> This method supports nested calls via reference counting.
+     * Each endFrame() must match a previous beginFrame() call. Only the final endFrame()
+     * (when nesting depth returns to 0) actually performs cleanup operations.
      * 
      * @see #beginFrame()
      */

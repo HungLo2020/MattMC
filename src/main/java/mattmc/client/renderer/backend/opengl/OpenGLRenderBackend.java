@@ -70,8 +70,8 @@ public class OpenGLRenderBackend implements RenderBackend {
     private VoxelLitShader currentShader = null;
     private TextureAtlas currentAtlas = null;
     
-    // Frame state
-    private boolean frameActive = false;
+    // Frame state - uses reference counting to support nested begin/end calls
+    private int frameDepth = 0;
     
     // Blur helper for AbstractBlurBox functionality
     private AbstractBlurBox blurHelper = null;
@@ -164,24 +164,23 @@ public class OpenGLRenderBackend implements RenderBackend {
     
     @Override
     public void beginFrame() {
-        if (frameActive) {
-            throw new IllegalStateException("Frame already active - endFrame() must be called before beginFrame()");
+        frameDepth++;
+        
+        // Only initialize on first nested call
+        if (frameDepth == 1) {
+            // Reset current state
+            currentShader = null;
+            currentAtlas = null;
+            
+            // OpenGL state setup could go here
+            // For now, we assume the caller has already set up the GL state
+            // (viewport, clear color, etc.) before calling beginFrame()
         }
-        
-        frameActive = true;
-        
-        // Reset current state
-        currentShader = null;
-        currentAtlas = null;
-        
-        // OpenGL state setup could go here
-        // For now, we assume the caller has already set up the GL state
-        // (viewport, clear color, etc.) before calling beginFrame()
     }
     
     @Override
     public void submit(DrawCommand cmd) {
-        if (!frameActive) {
+        if (frameDepth == 0) {
             throw new IllegalStateException("No active frame - beginFrame() must be called first");
         }
         
@@ -463,22 +462,25 @@ public class OpenGLRenderBackend implements RenderBackend {
     
     @Override
     public void endFrame() {
-        if (!frameActive) {
+        if (frameDepth == 0) {
             throw new IllegalStateException("No active frame - beginFrame() must be called first");
         }
         
-        // Unbind any active resources
-        if (currentShader != null) {
-            Shader.unbind();
-            currentShader = null;
-        }
+        frameDepth--;
         
-        if (currentAtlas != null) {
-            glBindTexture(GL_TEXTURE_2D, 0);
-            currentAtlas = null;
+        // Only cleanup on final nested call
+        if (frameDepth == 0) {
+            // Unbind any active resources
+            if (currentShader != null) {
+                Shader.unbind();
+                currentShader = null;
+            }
+            
+            if (currentAtlas != null) {
+                glBindTexture(GL_TEXTURE_2D, 0);
+                currentAtlas = null;
+            }
         }
-        
-        frameActive = false;
     }
     
     /**
@@ -488,7 +490,7 @@ public class OpenGLRenderBackend implements RenderBackend {
      * @return true if between beginFrame() and endFrame()
      */
     public boolean isFrameActive() {
-        return frameActive;
+        return frameDepth > 0;
     }
     
     /**
