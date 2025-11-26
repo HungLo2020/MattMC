@@ -220,8 +220,9 @@ public class ModelElementRenderer {
 		// Convert to full atlas path format: "block/birch_planks" -> "assets/textures/block/birch_planks.png"
 		String atlasPath = "assets/textures/" + texturePath + ".png";
 		
-		// TODO: Pre-resolve texture IDs in baked model structures to avoid string→int conversion here.
-		// For now, resolve the texture ID once per face and use int-based UV lookup.
+		// Resolve texture ID once per face and use int-based UV lookup for performance.
+		// Future optimization: Pre-resolve texture IDs in baked model structures to avoid
+		// the string→int conversion entirely. This would require caching int IDs during model loading.
 		int textureId = uvMapper.resolveTextureId(atlasPath);
 		TextureCoordinateProvider.UVMapping uvMapping = (textureId >= 0) ? uvMapper.resolveUV(textureId) : null;
 		

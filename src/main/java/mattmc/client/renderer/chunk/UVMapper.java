@@ -68,6 +68,10 @@ public class UVMapper {
 	/**
 	 * Get UV mapping from texture atlas for a face.
 	 * Returns null if no atlas or texture not found.
+	 * 
+	 * <p>Resolves the texture path to an int ID, then uses int-based UV mapping lookup.
+	 * For repeated lookups of the same texture, prefer using 
+	 * {@link #resolveTextureId(String)} once, then {@link #resolveUV(int)} for better performance.
 	 */
 	public TextureCoordinateProvider.UVMapping getUVMapping(BlockFaceCollector.FaceData face) {
 		if (textureAtlas == null) {
@@ -79,7 +83,9 @@ public class UVMapper {
 			return null;
 		}
 		
-		return textureAtlas.getUVMapping(texturePath);
+		// Resolve to int ID, then use int-based UV lookup
+		int textureId = textureAtlas.getTextureId(texturePath);
+		return (textureId >= 0) ? textureAtlas.getUVMapping(textureId) : null;
 	}
 	
 	/**
@@ -87,15 +93,19 @@ public class UVMapper {
 	 * Returns null if no atlas or texture not found.
 	 * Used by ModelElementRenderer for data-driven geometry rendering.
 	 * 
-	 * <p><b>Note:</b> For hot paths, prefer using {@link #resolveTextureId(String)}
-	 * followed by {@link #resolveUV(int)} to avoid repeated string hashing.
+	 * <p>Resolves the texture path to an int ID, then uses int-based UV mapping lookup.
+	 * For repeated lookups of the same texture, prefer using 
+	 * {@link #resolveTextureId(String)} once, then {@link #resolveUV(int)} to avoid
+	 * repeated string→int conversion.
 	 */
 	public TextureCoordinateProvider.UVMapping getUVMappingForTexture(String texturePath) {
 		if (textureAtlas == null || texturePath == null) {
 			return null;
 		}
 		
-		return textureAtlas.getUVMapping(texturePath);
+		// Resolve to int ID, then use int-based UV lookup
+		int textureId = textureAtlas.getTextureId(texturePath);
+		return (textureId >= 0) ? textureAtlas.getUVMapping(textureId) : null;
 	}
 	
 	/**
