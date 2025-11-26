@@ -127,23 +127,20 @@ public class UVTransformer {
     
     /**
      * Build a rotation matrix from X and Y rotation angles.
-     * Matches how Minecraft builds the model transformation from blockstate x/y values.
+     * This creates a PURE rotation matrix (no translation) like Minecraft's Transformation.
+     * The center-to-corner transform is applied separately in getUVLockTransform.
      */
     private static Matrix4f buildRotationMatrix(int xDegrees, int yDegrees) {
         Matrix4f matrix = new Matrix4f();
         
-        // Apply rotations around center (0.5, 0.5, 0.5)
-        matrix.translate(0.5f, 0.5f, 0.5f);
-        
         // Apply Y rotation first, then X rotation (Minecraft's order)
+        // This is a PURE rotation - no translation applied here
         if (yDegrees != 0) {
             matrix.rotate((float)Math.toRadians(yDegrees), 0, 1, 0);
         }
         if (xDegrees != 0) {
             matrix.rotate((float)Math.toRadians(xDegrees), 1, 0, 0);
         }
-        
-        matrix.translate(-0.5f, -0.5f, -0.5f);
         
         return matrix;
     }
