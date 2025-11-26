@@ -834,6 +834,10 @@ public class OpenGLRenderBackend implements RenderBackend {
      */
     @Override
     public void setup2DProjection(int screenWidth, int screenHeight) {
+        // Update instance variables for SpriteBatcher orthographic projection
+        this.screenWidth = screenWidth;
+        this.screenHeight = screenHeight;
+        
         // Setup projection matrix for 2D rendering
         glMatrixMode(GL_PROJECTION);
         glPushMatrix();
