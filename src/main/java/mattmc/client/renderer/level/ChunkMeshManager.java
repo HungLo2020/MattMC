@@ -106,7 +106,7 @@ public interface ChunkMeshManager extends ChunkMeshRegistry {
 	 * Register all chunks that already have meshes with the backend.
 	 * 
 	 * @param level the level containing the chunks
-     * @param backend the render backend
-     */
-    void registerExistingChunks(Level level, RenderBackend backend);
+	 * @param backend the render backend
+	 */
+	void registerExistingChunks(Level level, RenderBackend backend);
 }

@@ -164,14 +164,17 @@ public class TextureAtlas implements TextureCoordinateProvider, AutoCloseable {
 	 * Register a texture in the atlas with int ID mapping.
 	 * Used during atlas building to associate texture paths with integer IDs.
 	 * 
+	 * <p>If the same path is registered multiple times, the existing ID and UV
+	 * mapping are kept (since the same texture should always have the same UVs).
+	 * 
 	 * @param path the texture path
 	 * @param uvMapping the UV coordinates for this texture
-	 * @return the assigned texture ID
+	 * @return the assigned texture ID (existing or newly created)
 	 */
 	private int registerTexture(String path, UVMapping uvMapping) {
 		Integer existing = pathToId.get(path);
 		if (existing != null) {
-			// If the same path appears again, keep the old ID and UV.
+			// Same path registered again - return existing ID (UVs should be identical)
 			return existing;
 		}
 		int id = idToPath.size();
@@ -339,8 +342,10 @@ public class TextureAtlas implements TextureCoordinateProvider, AutoCloseable {
 	
 	/**
 	 * Get the number of textures in the atlas.
+	 * 
+	 * @return the number of textures with UV mappings
 	 */
 	public int getTextureCount() {
-		return idToPath.size();
+		return uvMappings.size();
 	}
 }
