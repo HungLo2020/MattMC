@@ -515,17 +515,17 @@ public class OpenGLRenderBackend implements RenderBackend {
         int width = (type == 0) ? (int)(182 * HOTBAR_SCALE) : (int)(24 * HOTBAR_SCALE);
         int height = (type == 0) ? (int)(22 * HOTBAR_SCALE) : (int)(24 * HOTBAR_SCALE);
         
-        // Load textures using HotbarRenderer's texture paths
+        // Load textures using HotbarRenderer's texture paths (cached via loadTexture)
         String texturePath = (type == 0) ? 
             "/assets/textures/gui/sprites/hud/hotbar.png" :
             "/assets/textures/gui/sprites/hud/hotbar_selection.png";
         
-        Texture texture = 
-            Texture.load(texturePath);
+        // Use cached texture loading to avoid loading textures every frame
+        int textureId = loadTexture(texturePath);
         
-        if (texture != null) {
+        if (textureId > 0) {
             glEnable(GL_TEXTURE_2D);
-            texture.bind();
+            glBindTexture(GL_TEXTURE_2D, textureId);
             glColor4f(1f, 1f, 1f, 1f);
             
             glBegin(GL_QUADS);

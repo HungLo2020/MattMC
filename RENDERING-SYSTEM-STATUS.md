@@ -529,38 +529,29 @@ public class CommandBuffer {
 
 ## Performance Concerns
 
-### 18. Texture Loading on Every Frame
+### 18. ~~Texture Loading on Every Frame~~ ✅ FIXED
 
-**Location**: `mattmc/client/renderer/backend/opengl/OpenGLRenderBackend.java` (Lines 379-396)
+**Location**: `mattmc/client/renderer/backend/opengl/OpenGLRenderBackend.java` (Lines 507-540)
 
-**Problem**: In `submitHotbarCommand()`, textures are loaded every time the hotbar is rendered:
+**Status**: **RESOLVED** - Updated `submitHotbarCommand()` to use the existing `loadTexture()` method which caches textures in `textureCache`, avoiding texture reloading on every frame.
+
+**Original Problem**: In `submitHotbarCommand()`, textures were loaded every time the hotbar was rendered using `Texture.load(texturePath)`, causing unnecessary texture loading and potential performance issues.
+
+**Solution Applied**: The method now uses the existing `loadTexture()` method which internally caches textures:
 
 ```java
+// Before: Direct texture loading (no caching)
 Texture texture = Texture.load(texturePath);
+if (texture != null) {
+    texture.bind();
+
+// After: Uses cached texture loading
+int textureId = loadTexture(texturePath);
+if (textureId > 0) {
+    glBindTexture(GL_TEXTURE_2D, textureId);
 ```
 
-While `Texture.load()` might cache internally, this pattern suggests potential issues.
-
-**Why it's a problem**:
-- Unnecessary texture lookups per frame
-- If caching fails, textures could be reloaded repeatedly
-
-**Fix**: Pre-load and cache UI textures at initialization:
-
-```java
-public class UITextureCache {
-    private static final Map<String, Texture> cache = new HashMap<>();
-    
-    public static void preloadUITextures() {
-        cache.put("hotbar", Texture.load("/assets/textures/gui/sprites/hud/hotbar.png"));
-        cache.put("hotbar_selection", Texture.load("..."));
-    }
-    
-    public static Texture get(String name) {
-        return cache.get(name);
-    }
-}
-```
+The `loadTexture()` method (lines 1117-1126) maintains a `textureCache` map that stores loaded textures by path, ensuring each texture is only loaded once.
 
 ---
 
