@@ -310,42 +310,39 @@ public class BlurUtility {
 
 ## Architectural Violations
 
-### 12. ~~Immediate Mode Rendering in Backend~~ ✅ INFRASTRUCTURE ADDED
+### 12. ~~Immediate Mode Rendering in Backend~~ ✅ PARTIALLY MIGRATED
 
 **Location**: `mattmc/client/renderer/backend/opengl/OpenGLRenderBackend.java` (Multiple locations)
 
-**Status**: **INFRASTRUCTURE ADDED** - Created `SpriteBatcher` class with VBO-based batched rendering. The batcher supports:
-- Batching up to 1000 quads per draw call
-- Textured and solid color quads
-- Proper vertex attribute setup (position, texcoord, color)
-- Dynamic buffer updates
+**Status**: **PARTIALLY MIGRATED** - Created `SpriteBatcher` class with VBO-based batched rendering and migrated solid color quad rendering.
 
 **Files Added**:
-- `SpriteBatcher.java` - VAO/VBO-based 2D quad batcher
+- `SpriteBatcher.java` - VAO/VBO-based 2D quad batcher (1000 quads per draw call)
 
-**Current State**: The `SpriteBatcher` class is ready to use but immediate mode calls are still present for backward compatibility. Full migration requires:
-1. Setting up orthographic projection matrix for 2D rendering
-2. Creating and binding the sprite shader before rendering
-3. Migrating all `glBegin`/`glEnd` blocks to use `spriteBatcher.addQuad()`
-4. Handling line rendering separately (GL_LINES cannot be batched with quads)
+**Migrated Methods**:
+- `fillRect()` - Now uses SpriteBatcher instead of glBegin/glEnd
+- `submitCrosshairCommand()` - Now uses SpriteBatcher for crosshair quads
 
-**Migration Example**:
-```java
-// Before (immediate mode)
-glBegin(GL_QUADS);
-glTexCoord2f(0, 1); glVertex2f(x, y);
-glTexCoord2f(1, 1); glVertex2f(x + width, y);
-// ...
-glEnd();
+**Helper Methods Added**:
+- `beginSpriteBatch()` - Sets up orthographic projection and binds sprite shader
+- `endSpriteBatch()` - Flushes batch and restores state
+- `setBatchColor()` - Sets color for batched quads
+- `addQuadToBatch()` - Adds a solid color quad to the batch
+- `createOrthoMatrix()` - Creates orthographic projection matrix
 
-// After (batched)
-spriteBatcher.begin();
-spriteBatcher.addTexturedQuad(x, y, width, height, 0, 1, 1, 0);
-spriteBatcher.flush();
-spriteBatcher.end();
-```
+**Remaining Immediate Mode Calls** (7 total):
+1. `submitHotbarCommand` - Textured quad (needs texture batching)
+2. `submitTooltipCommand` - Textured quad (needs texture batching)
+3. `drawRect` - Line loop (cannot batch with quads)
+4. `drawLine` - Line segment (cannot batch with quads)
+5. `renderDebugBox` - Lines (cannot batch with quads)
+6. `drawTexturedQuad` - Textured quad (needs texture batching)
+7. `renderQuad` in tooltip - Textured quad (needs texture batching)
 
-**Remaining Work**: Incrementally migrate each immediate mode block to use the SpriteBatcher.
+**Next Steps**:
+1. Add texture support to SpriteBatcher with texture atlas batching
+2. Create a separate `LineBatcher` for line primitives
+3. Migrate remaining textured quad rendering
 
 ---
 

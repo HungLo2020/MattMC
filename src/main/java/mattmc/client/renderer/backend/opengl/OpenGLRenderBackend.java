@@ -83,6 +83,12 @@ public class OpenGLRenderBackend implements RenderBackend {
     // Shader for 2D sprite/UI rendering
     private Shader spriteShader = null;
     
+    // Current color state for 2D rendering
+    private float currentColorR = 1.0f;
+    private float currentColorG = 1.0f;
+    private float currentColorB = 1.0f;
+    private float currentColorA = 1.0f;
+    
     /**
      * Information about a material (shader + texture combination).
      */
@@ -223,6 +229,92 @@ public class OpenGLRenderBackend implements RenderBackend {
         }
     }
     
+    // Current screen dimensions for 2D batching
+    private int screenWidth = 800;
+    private int screenHeight = 600;
+    
+    /**
+     * Set the screen dimensions for 2D rendering.
+     * Must be called when the window is resized.
+     */
+    public void setScreenDimensions(int width, int height) {
+        this.screenWidth = width;
+        this.screenHeight = height;
+    }
+    
+    /**
+     * Begin batched 2D sprite rendering.
+     * Sets up orthographic projection and binds the sprite shader.
+     * Call this before using fillRectBatched or addQuadToBatch.
+     */
+    private void beginSpriteBatch() {
+        ensureSpriteBatcherInitialized();
+        
+        // Bind shader and set up orthographic projection
+        spriteShader.use();
+        
+        // Create orthographic projection matrix (top-left origin)
+        float[] projection = createOrthoMatrix(0, screenWidth, screenHeight, 0, -1, 1);
+        spriteShader.setUniformMatrix4f("uProjection", projection);
+        spriteShader.setUniform1i("uUseTexture", 0); // Default to solid color
+        
+        spriteBatcher.begin();
+    }
+    
+    /**
+     * End batched 2D sprite rendering.
+     * Flushes all pending quads and restores state.
+     */
+    private void endSpriteBatch() {
+        if (spriteBatcher != null && spriteBatcher.isDrawing()) {
+            spriteBatcher.end();
+        }
+        Shader.unbind();
+    }
+    
+    /**
+     * Add a solid color quad to the current batch.
+     * Must be called between beginSpriteBatch() and endSpriteBatch().
+     */
+    private void addQuadToBatch(float x, float y, float width, float height) {
+        if (spriteBatcher == null || !spriteBatcher.isDrawing()) {
+            logger.warn("addQuadToBatch called outside of active batch - quad will not be rendered");
+            return;
+        }
+        spriteBatcher.addQuad(x, y, width, height);
+    }
+    
+    /**
+     * Set the color for subsequent batched quads.
+     */
+    private void setBatchColor(float r, float g, float b, float a) {
+        if (spriteBatcher == null) {
+            logger.warn("setBatchColor called before SpriteBatcher initialization");
+            return;
+        }
+        spriteBatcher.setColor(r, g, b, a);
+    }
+    
+    /**
+     * Create an orthographic projection matrix.
+     * Uses column-major order as expected by OpenGL.
+     */
+    private float[] createOrthoMatrix(float left, float right, float bottom, float top, float near, float far) {
+        float[] m = new float[16];
+        // Initialize all elements to 0
+        for (int i = 0; i < 16; i++) m[i] = 0.0f;
+        
+        // Set the non-zero elements
+        m[0] = 2.0f / (right - left);
+        m[5] = 2.0f / (top - bottom);
+        m[10] = -2.0f / (far - near);
+        m[12] = -(right + left) / (right - left);
+        m[13] = -(top + bottom) / (top - bottom);
+        m[14] = -(far + near) / (far - near);
+        m[15] = 1.0f;
+        return m;
+    }
+
     @Override
     public void beginFrame() {
         frameDepth++;
@@ -359,26 +451,21 @@ public class OpenGLRenderBackend implements RenderBackend {
         int centerY = (cmd.materialId >> 13) & 0xFFF;
         int size = (cmd.materialId >> 25) & 0xFF;
         
-        // Render the crosshair quad using immediate mode
+        // Use batched rendering instead of immediate mode.
+        // NOTE: Crosshair renders both horizontal and vertical bars in separate commands,
+        // but each is batched individually. Future optimization could combine them.
+        beginSpriteBatch();
+        setBatchColor(1f, 1f, 1f, 1f);
+        
         if (horizontal) {
             float thickness = 2f;
-            glColor4f(1f, 1f, 1f, 1f);
-            glBegin(GL_QUADS);
-            glVertex2f(centerX - size/2f, centerY - thickness/2);
-            glVertex2f(centerX + size/2f, centerY - thickness/2);
-            glVertex2f(centerX + size/2f, centerY + thickness/2);
-            glVertex2f(centerX - size/2f, centerY + thickness/2);
-            glEnd();
+            addQuadToBatch(centerX - size/2f, centerY - thickness/2, size, thickness);
         } else {
             float thickness = 2f;
-            glColor4f(1f, 1f, 1f, 1f);
-            glBegin(GL_QUADS);
-            glVertex2f(centerX - thickness/2, centerY - size/2f);
-            glVertex2f(centerX + thickness/2, centerY - size/2f);
-            glVertex2f(centerX + thickness/2, centerY + size/2f);
-            glVertex2f(centerX - thickness/2, centerY + size/2f);
-            glEnd();
+            addQuadToBatch(centerX - thickness/2, centerY - size/2f, thickness, size);
         }
+        
+        endSpriteBatch();
     }
     
     /**
@@ -879,29 +966,38 @@ public class OpenGLRenderBackend implements RenderBackend {
      */
     @Override
     public void resetColor() {
+        currentColorR = 1.0f;
+        currentColorG = 1.0f;
+        currentColorB = 1.0f;
+        currentColorA = 1.0f;
         glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
     }
     
     @Override
     public void setColor(int rgb, float alpha) {
-        float r = ((rgb >> 16) & 0xFF) / 255f;
-        float g = ((rgb >> 8) & 0xFF) / 255f;
-        float b = (rgb & 0xFF) / 255f;
-        glColor4f(r, g, b, alpha);
+        currentColorR = ((rgb >> 16) & 0xFF) / 255f;
+        currentColorG = ((rgb >> 8) & 0xFF) / 255f;
+        currentColorB = (rgb & 0xFF) / 255f;
+        currentColorA = alpha;
+        glColor4f(currentColorR, currentColorG, currentColorB, currentColorA);
     }
     
     @Override
     public void fillRect(float x, float y, float width, float height) {
-        glBegin(GL_QUADS);
-        glVertex2f(x, y);
-        glVertex2f(x + width, y);
-        glVertex2f(x + width, y + height);
-        glVertex2f(x, y + height);
-        glEnd();
+        // Use batched rendering instead of immediate mode.
+        // NOTE: Currently each fillRect call creates its own batch for simplicity.
+        // For optimal performance, callers should use begin/endSpriteBatch externally
+        // to batch multiple quads together. This infrastructure allows that optimization
+        // in the future without changing the API.
+        beginSpriteBatch();
+        setBatchColor(currentColorR, currentColorG, currentColorB, currentColorA);
+        addQuadToBatch(x, y, width, height);
+        endSpriteBatch();
     }
     
     @Override
     public void drawRect(float x, float y, float width, float height) {
+        // Line rendering still uses immediate mode (cannot batch with quads)
         glBegin(GL_LINE_LOOP);
         glVertex2f(x, y);
         glVertex2f(x + width, y);
@@ -912,6 +1008,7 @@ public class OpenGLRenderBackend implements RenderBackend {
     
     @Override
     public void drawLine(float x1, float y1, float x2, float y2) {
+        // Line rendering still uses immediate mode (cannot batch with quads)
         glBegin(GL_LINES);
         glVertex2f(x1, y1);
         glVertex2f(x2, y2);
