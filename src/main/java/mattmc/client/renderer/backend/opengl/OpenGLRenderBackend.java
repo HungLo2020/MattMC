@@ -1046,6 +1046,27 @@ public class OpenGLRenderBackend implements RenderBackend {
         glRotatef(angle, x, y, z);
     }
     
+    @Override
+    public void updateFrustum(mattmc.client.renderer.Frustum frustum) {
+        try (org.lwjgl.system.MemoryStack stack = org.lwjgl.system.MemoryStack.stackPush()) {
+            java.nio.FloatBuffer projBuffer = stack.mallocFloat(16);
+            java.nio.FloatBuffer modlBuffer = stack.mallocFloat(16);
+            
+            // Get current matrices from OpenGL
+            glGetFloatv(GL_PROJECTION_MATRIX, projBuffer);
+            glGetFloatv(GL_MODELVIEW_MATRIX, modlBuffer);
+            
+            // Convert to arrays
+            float[] projectionMatrix = new float[16];
+            float[] modelviewMatrix = new float[16];
+            projBuffer.get(projectionMatrix);
+            modlBuffer.get(modelviewMatrix);
+            
+            // Update frustum with current matrices
+            frustum.update(projectionMatrix, modelviewMatrix);
+        }
+    }
+
     // === Window Control ===
     
     @Override

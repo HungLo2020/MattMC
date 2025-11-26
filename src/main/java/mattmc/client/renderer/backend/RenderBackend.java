@@ -510,6 +510,25 @@ public interface RenderBackend {
      */
     void rotateMatrix(float angle, float x, float y, float z);
     
+    /**
+     * Update a frustum from the current graphics API state.
+     * 
+     * <p>This method allows the backend to extract the current projection and modelview
+     * matrices and use them to update the provided frustum. This maintains the backend-agnostic
+     * design by allowing the frontend to use frustum culling without directly accessing
+     * graphics API state.
+     * 
+     * <p>The backend implementation will:
+     * <ul>
+     *   <li><b>OpenGL:</b> Read GL_PROJECTION_MATRIX and GL_MODELVIEW_MATRIX from OpenGL state</li>
+     *   <li><b>Vulkan (future):</b> Use the cached projection/view matrices</li>
+     *   <li><b>Debug:</b> Use identity matrices or stored test values</li>
+     * </ul>
+     * 
+     * @param frustum the frustum to update with current matrices
+     */
+    void updateFrustum(mattmc.client.renderer.Frustum frustum);
+
     // === Window Control ===
     
     /**

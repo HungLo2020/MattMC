@@ -104,22 +104,22 @@ Map<String, String> texturePaths = ResourceManager.getItemTexturePaths(itemName)
 
 ---
 
-### 3. Duplicate Frustum Implementations
+### 3. ~~Duplicate Frustum Implementations~~ ✅ FIXED
 
 **Location**: 
 - `mattmc/client/renderer/Frustum.java` (backend-agnostic)
 - `mattmc/client/renderer/backend/opengl/OpenGLFrustum.java` (OpenGL-specific)
 
-**Problem**: `OpenGLFrustum` extends the agnostic `Frustum` but is never used in the actual rendering pipeline. `LevelRenderer` uses `Frustum` directly without ever updating its matrices.
+**Status**: **RESOLVED** - Added `updateFrustum(Frustum)` method to `RenderBackend` interface and implemented it in `OpenGLRenderBackend`. The `LevelRenderer` now calls `renderBackend.updateFrustum(frustum)` before building draw commands, ensuring frustum culling uses the current camera matrices.
 
-**Why it's a problem**:
-- `OpenGLFrustum.updateFromGLState()` provides the OpenGL-specific matrix extraction but is never called
-- The base `Frustum` class requires external matrix input but `LevelRenderer` never provides it
-- Frustum culling may not be working correctly as a result
+**Original Problem**: `OpenGLFrustum` extended the agnostic `Frustum` but was never used. `LevelRenderer` used `Frustum` directly without ever updating its matrices, so frustum culling was effectively disabled.
 
-**Fix**: Either:
-1. Use `OpenGLFrustum` in the rendering pipeline and call `updateFromGLState()` before culling
-2. Or ensure `LevelRenderer` extracts and passes matrices to `Frustum.update()`
+**Solution Applied**: 
+1. Added `updateFrustum(Frustum frustum)` method to `RenderBackend` interface
+2. Implemented the method in `OpenGLRenderBackend` to read GL_PROJECTION_MATRIX and GL_MODELVIEW_MATRIX
+3. Modified `LevelRenderer.render()` to call `renderBackend.updateFrustum(frustum)` before building commands
+
+This maintains the backend-agnostic design while enabling proper frustum culling.
 
 ---
 
