@@ -21,9 +21,9 @@ public class StairsRenderFlowTest {
         // Test all four directions
         for (Direction dir : Direction.values()) {
             state = new BlockState();
-            state.setValue(BlockStateProperties.HORIZONTAL_FACING, dir);
-            state.setValue(BlockStateProperties.HALF, Half.BOTTOM);
-            state.setValue(BlockStateProperties.STAIRS_SHAPE, StairsShape.STRAIGHT);
+            state.setValue("facing", dir);
+            state.setValue("half", Half.BOTTOM);
+            state.setValue("shape", StairsShape.STRAIGHT);
             
             String variant = state.toVariantString();
             String expected = "facing=" + dir.name().toLowerCase() + ",half=bottom,shape=straight";
@@ -38,9 +38,9 @@ public class StairsRenderFlowTest {
     void testGetValueReturnsSetValue() {
         for (Direction dir : Direction.values()) {
             BlockState state = new BlockState();
-            state.setValue(BlockStateProperties.HORIZONTAL_FACING, dir);
+            state.setValue("facing", dir);
             
-            Direction retrieved = state.getValue(BlockStateProperties.HORIZONTAL_FACING);
+            Direction retrieved = state.getDirection("facing");
             
             System.out.println("Set " + dir + ", got " + retrieved);
             assertEquals(dir, retrieved, "getValue should return the same direction that was set");
@@ -51,9 +51,9 @@ public class StairsRenderFlowTest {
     @DisplayName("Properties map should contain correct key and value")
     void testPropertiesMapContents() {
         BlockState state = new BlockState();
-        state.setValue(BlockStateProperties.HORIZONTAL_FACING, Direction.EAST);
-        state.setValue(BlockStateProperties.HALF, Half.TOP);
-        state.setValue(BlockStateProperties.STAIRS_SHAPE, StairsShape.STRAIGHT);
+        state.setValue("facing", Direction.EAST);
+        state.setValue("half", Half.TOP);
+        state.setValue("shape", StairsShape.STRAIGHT);
         
         // Check the internal map via toVariantString
         String variant = state.toVariantString();
@@ -75,18 +75,18 @@ public class StairsRenderFlowTest {
         // "facing=north,half=top,shape=inner_left"
         
         BlockState state = new BlockState();
-        state.setValue(BlockStateProperties.HORIZONTAL_FACING, Direction.EAST);
-        state.setValue(BlockStateProperties.HALF, Half.BOTTOM);
-        state.setValue(BlockStateProperties.STAIRS_SHAPE, StairsShape.STRAIGHT);
+        state.setValue("facing", Direction.EAST);
+        state.setValue("half", Half.BOTTOM);
+        state.setValue("shape", StairsShape.STRAIGHT);
         
         String variant = state.toVariantString();
         assertEquals("facing=east,half=bottom,shape=straight", variant);
         
         // Test with INNER_LEFT shape
         state = new BlockState();
-        state.setValue(BlockStateProperties.HORIZONTAL_FACING, Direction.NORTH);
-        state.setValue(BlockStateProperties.HALF, Half.TOP);
-        state.setValue(BlockStateProperties.STAIRS_SHAPE, StairsShape.INNER_LEFT);
+        state.setValue("facing", Direction.NORTH);
+        state.setValue("half", Half.TOP);
+        state.setValue("shape", StairsShape.INNER_LEFT);
         
         variant = state.toVariantString();
         assertEquals("facing=north,half=top,shape=inner_left", variant);
