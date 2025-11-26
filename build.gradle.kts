@@ -51,6 +51,24 @@ dependencies {
 
 tasks.test {
     useJUnitPlatform()
+    
+    // Include stdout/stderr in test reports for performance metrics visibility
+    testLogging {
+        events("passed", "failed", "skipped", "standardOut", "standardError")
+        showExceptions = true
+        showCauses = true
+        showStackTraces = true
+        exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL
+        
+        // Show output for performance tests
+        showStandardStreams = true
+    }
+    
+    // Generate HTML report with test output included
+    reports {
+        html.required.set(true)
+        junitXml.required.set(true)
+    }
 }
 
 /**

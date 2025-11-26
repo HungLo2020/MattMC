@@ -6,12 +6,13 @@ This document provides comprehensive documentation for the MattMC performance te
 
 1. [Overview](#overview)
 2. [Running Performance Tests](#running-performance-tests)
-3. [Test Categories](#test-categories)
-4. [Test Files and Descriptions](#test-files-and-descriptions)
-5. [Performance Metrics](#performance-metrics)
-6. [Interpreting Results](#interpreting-results)
-7. [Performance Baselines](#performance-baselines)
-8. [Troubleshooting](#troubleshooting)
+3. [Viewing Performance Reports](#viewing-performance-reports)
+4. [Test Categories](#test-categories)
+5. [Test Files and Descriptions](#test-files-and-descriptions)
+6. [Performance Metrics](#performance-metrics)
+7. [Interpreting Results](#interpreting-results)
+8. [Performance Baselines](#performance-baselines)
+9. [Troubleshooting](#troubleshooting)
 
 ---
 
@@ -78,16 +79,56 @@ All tests are implemented using JUnit 5 and can be run alongside regular unit te
 ./gradlew test --tests "mattmc.performance.TerrainGenerationPerformanceTest.testSingleChunkGenerationTime"
 ```
 
-### Viewing Test Output
+---
 
-Performance tests output detailed metrics to stdout. To see this output:
+## Viewing Performance Reports
 
+After running performance tests, detailed metrics are available in multiple formats:
+
+### Dedicated Performance Report (Recommended)
+
+The most detailed performance data is available in the dedicated performance report:
+
+```
+build/reports/performance/
+├── performance-report.html  # Interactive HTML report with all metrics
+├── performance-report.txt   # Plain text report
+└── performance-report.csv   # CSV for spreadsheet analysis
+```
+
+**Open the HTML report in your browser for the best experience:**
 ```bash
-# Run with console output
-./gradlew test --info --tests "mattmc.performance.*"
+# On Linux
+xdg-open build/reports/performance/performance-report.html
 
-# Or check test reports
-cat build/reports/tests/test/index.html
+# On macOS
+open build/reports/performance/performance-report.html
+
+# On Windows
+start build/reports/performance/performance-report.html
+```
+
+The HTML report includes:
+- 📊 All measured metrics (execution time, memory, CPU time, etc.)
+- 📈 Per-iteration timing data
+- 🎯 Frame time percentiles (95th, 99th)
+- 💾 Memory usage deltas
+- 🧵 Thread count information
+
+### JUnit Test Report
+
+The standard JUnit HTML report is also available at:
+```
+build/reports/tests/test/index.html
+```
+
+This report now includes stdout/stderr output with detailed metrics in the "Standard output" section of each test.
+
+### Console Output
+
+For immediate feedback during development:
+```bash
+./gradlew test --tests "mattmc.performance.*" --info
 ```
 
 ---

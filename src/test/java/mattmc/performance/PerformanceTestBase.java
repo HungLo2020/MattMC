@@ -9,6 +9,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Supplier;
 
+import org.junit.jupiter.api.extension.ExtendWith;
+
 /**
  * Base class for performance tests providing common utilities for measuring:
  * - Execution time (nanoseconds/milliseconds)
@@ -17,7 +19,11 @@ import java.util.function.Supplier;
  * - Thread count and utilization
  * 
  * All performance tests should extend this class to ensure consistent measurement.
+ * 
+ * Performance results are automatically recorded to a dedicated report at:
+ * build/reports/performance/performance-report.html
  */
+@ExtendWith(PerformanceReportExtension.class)
 public abstract class PerformanceTestBase {
     
     protected static final MemoryMXBean memoryBean = ManagementFactory.getMemoryMXBean();
@@ -152,6 +158,7 @@ public abstract class PerformanceTestBase {
     
     /**
      * Measure the performance of an operation with warmup and iterations.
+     * Results are automatically recorded to the performance report.
      */
     protected PerformanceResult measureOperation(String name, int iterations, 
                                                   int warmupIterations, Runnable operation) {
@@ -182,7 +189,7 @@ public abstract class PerformanceTestBase {
         MemoryUsage heapAfter = memoryBean.getHeapMemoryUsage();
         long finalHeap = heapAfter.getUsed();
         
-        return new PerformanceResult(
+        PerformanceResult result = new PerformanceResult(
             name,
             endTime - startTime,
             finalHeap,
@@ -191,10 +198,16 @@ public abstract class PerformanceTestBase {
             finalCpuTime - initialCpuTime,
             iterations
         );
+        
+        // Record to performance report
+        PerformanceReportGenerator.recordResult(result);
+        
+        return result;
     }
     
     /**
      * Measure operation that returns a result (prevents dead code elimination).
+     * Results are automatically recorded to the performance report.
      */
     protected <T> PerformanceResult measureOperationWithResult(String name, int iterations,
                                                                 int warmupIterations, 
@@ -228,7 +241,7 @@ public abstract class PerformanceTestBase {
         MemoryUsage heapAfter = memoryBean.getHeapMemoryUsage();
         long finalHeap = heapAfter.getUsed();
         
-        return new PerformanceResult(
+        PerformanceResult perfResult = new PerformanceResult(
             name,
             endTime - startTime,
             finalHeap,
@@ -237,10 +250,43 @@ public abstract class PerformanceTestBase {
             finalCpuTime - initialCpuTime,
             iterations
         );
+        
+        // Record to performance report
+        PerformanceReportGenerator.recordResult(perfResult);
+        
+        return perfResult;
     }
     
     /**
      * Simulate frame timing measurement.
+     * Results are automatically recorded to the performance report.
+     */
+    protected FrameTimeMetrics measureFrameTimes(String testName, int frameCount, Runnable frameOperation) {
+        List<Double> frameTimes = new ArrayList<>(frameCount);
+        
+        // Warmup frames
+        for (int i = 0; i < 10; i++) {
+            frameOperation.run();
+        }
+        
+        // Measure frames
+        for (int i = 0; i < frameCount; i++) {
+            long start = System.nanoTime();
+            frameOperation.run();
+            long end = System.nanoTime();
+            frameTimes.add((end - start) / 1_000_000.0);
+        }
+        
+        FrameTimeMetrics metrics = new FrameTimeMetrics(frameTimes);
+        
+        // Record to performance report
+        PerformanceReportGenerator.recordResult(testName, metrics);
+        
+        return metrics;
+    }
+    
+    /**
+     * Simulate frame timing measurement (legacy method without auto-recording).
      */
     protected FrameTimeMetrics measureFrameTimes(int frameCount, Runnable frameOperation) {
         List<Double> frameTimes = new ArrayList<>(frameCount);
