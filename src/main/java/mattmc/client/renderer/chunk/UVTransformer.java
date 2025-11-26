@@ -129,17 +129,21 @@ public class UVTransformer {
      * Build a rotation matrix from X and Y rotation angles.
      * This creates a PURE rotation matrix (no translation) like Minecraft's Transformation.
      * The center-to-corner transform is applied separately in getUVLockTransform.
+     * 
+     * In Minecraft, the blockstate rotation is applied as: first rotate around Y, then around X.
+     * This means the matrix is: Rx * Ry (X rotation applied after Y rotation).
+     * In JOML, rotate() multiplies on the right, so we need to call rotate(X) first, then rotate(Y).
      */
     private static Matrix4f buildRotationMatrix(int xDegrees, int yDegrees) {
         Matrix4f matrix = new Matrix4f();
         
-        // Apply Y rotation first, then X rotation (Minecraft's order)
-        // This is a PURE rotation - no translation applied here
-        if (yDegrees != 0) {
-            matrix.rotate((float)Math.toRadians(yDegrees), 0, 1, 0);
-        }
+        // Build Rx * Ry matrix: call rotate(X) first, then rotate(Y)
+        // This is because JOML's rotate() multiplies on the right
         if (xDegrees != 0) {
             matrix.rotate((float)Math.toRadians(xDegrees), 1, 0, 0);
+        }
+        if (yDegrees != 0) {
+            matrix.rotate((float)Math.toRadians(yDegrees), 0, 1, 0);
         }
         
         return matrix;
