@@ -2,7 +2,6 @@ package mattmc.world.level.block;
 
 import mattmc.world.level.block.state.BlockState;
 import mattmc.world.level.block.state.properties.Axis;
-import mattmc.world.level.block.state.properties.BlockStateProperties;
 
 /**
  * Represents a rotated pillar block in the world.
@@ -144,7 +143,7 @@ public class RotatedPillarBlock extends Block {
                 break;
         }
         
-        state.setValue(BlockStateProperties.AXIS, axis);
+        state.setValue("axis", axis);
         
         return state;
     }

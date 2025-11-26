@@ -2,7 +2,6 @@ package mattmc.world.level.block;
 
 import mattmc.world.phys.shapes.VoxelShape;
 import mattmc.world.level.block.state.BlockState;
-import mattmc.world.level.block.state.properties.BlockStateProperties;
 import mattmc.world.level.block.state.properties.Direction;
 
 /**
@@ -57,8 +56,8 @@ public class WallTorchBlock extends TorchBlock {
      * This method can be called by the renderer with the blockstate.
      */
     public VoxelShape getCollisionShape(BlockState state) {
-        if (state != null && state.hasProperty(BlockStateProperties.HORIZONTAL_FACING)) {
-            Direction facing = state.getValue(BlockStateProperties.HORIZONTAL_FACING);
+        if (state != null && state.hasProperty("facing")) {
+            Direction facing = state.getDirection("facing");
             return switch (facing) {
                 case NORTH -> NORTH_SHAPE;
                 case SOUTH -> SOUTH_SHAPE;
@@ -104,7 +103,7 @@ public class WallTorchBlock extends TorchBlock {
             default -> Direction.NORTH;
         };
         
-        state.setValue(BlockStateProperties.HORIZONTAL_FACING, facing);
+        state.setValue("facing", facing);
         return state;
     }
 }

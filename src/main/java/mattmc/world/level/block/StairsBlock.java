@@ -1,10 +1,8 @@
 package mattmc.world.level.block;
 
 import mattmc.world.phys.shapes.VoxelShape;
-import mattmc.world.level.block.state.properties.BlockStateProperties;
 import mattmc.world.level.block.state.properties.Direction;
 import mattmc.world.level.block.state.properties.Half;
-import mattmc.world.level.block.state.properties.StairsShape;
 
 /**
  * Represents a stairs block in the world.
@@ -106,10 +104,10 @@ public class StairsBlock extends Block {
             half = relativeY > 0.5f ? Half.TOP : Half.BOTTOM;
         }
         
-        state.setValue(BlockStateProperties.HORIZONTAL_FACING, facing);
-        state.setValue(BlockStateProperties.HALF, half);
+        state.setValue("facing", facing);
+        state.setValue("half", half);
         // For now, always use straight shape (no corner detection yet)
-        state.setValue(BlockStateProperties.STAIRS_SHAPE, StairsShape.STRAIGHT);
+        state.setValue("shape", mattmc.world.level.block.state.properties.StairsShape.STRAIGHT);
         
         return state;
     }
