@@ -2,6 +2,7 @@ package mattmc.client.renderer.chunk;
 
 import mattmc.world.level.block.Block;
 import mattmc.world.level.block.state.BlockState;
+import mattmc.world.level.block.state.properties.BlockStateProperties;
 import mattmc.world.level.block.state.properties.Direction;
 
 /**
@@ -32,30 +33,24 @@ public class BlockRotationExtractor {
         
         // Handle wall torches and similar blocks that rotate based on facing
         if (block instanceof mattmc.world.level.block.WallTorchBlock) {
-            Direction facing = state.getDirection("facing");
-            if (facing != null) {
-                return switch (facing) {
-                    case NORTH -> 270;
-                    case SOUTH -> 90;
-                    case WEST -> 180;
-                    case EAST -> 0;
-                    default -> 0;
-                };
-            }
+            Direction facing = state.getValue(BlockStateProperties.HORIZONTAL_FACING);
+            return switch (facing) {
+                case NORTH -> 270;
+                case SOUTH -> 90;
+                case WEST -> 180;
+                case EAST -> 0;
+            };
         }
         
         // Handle stairs rotation
         if (block instanceof mattmc.world.level.block.StairsBlock) {
-            Direction facing = state.getDirection("facing");
-            if (facing != null) {
-                return switch (facing) {
-                    case NORTH -> 0;
-                    case SOUTH -> 180;
-                    case WEST -> 90;
-                    case EAST -> 270;
-                    default -> 0;
-                };
-            }
+            Direction facing = state.getValue(BlockStateProperties.HORIZONTAL_FACING);
+            return switch (facing) {
+                case NORTH -> 0;
+                case SOUTH -> 180;
+                case WEST -> 90;
+                case EAST -> 270;
+            };
         }
         
         return 0;

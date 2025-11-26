@@ -1,17 +1,22 @@
 package mattmc.world.level.block.state;
 
 import mattmc.world.level.block.state.properties.Axis;
+import mattmc.world.level.block.state.properties.BlockStateProperties;
 import mattmc.world.level.block.state.properties.Direction;
 import mattmc.world.level.block.state.properties.Half;
+import mattmc.world.level.block.state.properties.Property;
+import mattmc.world.level.block.state.properties.StairsShape;
 
 import java.util.HashMap;
 import java.util.Map;
 
 /**
  * Represents the state of a block with its properties.
- * Similar to MattMC's BlockState class.
+ * Similar to Minecraft's BlockState class.
  * 
  * BlockStates store property values for blocks like stairs (facing, half, shape) and pillars (axis).
+ * 
+ * This class uses a type-safe Property&lt;T&gt; API for compile-time validation.
  */
 public class BlockState {
     private final Map<String, Object> properties;
@@ -20,51 +25,55 @@ public class BlockState {
         this.properties = new HashMap<>();
     }
     
+    // ==================== Type-Safe API ====================
+    
     /**
-     * Set a property value.
+     * Set a property value using type-safe property.
+     * 
+     * @param property The property to set
+     * @param value The value to set (must be a valid value for this property)
+     * @return This blockstate for chaining
+     * @throws IllegalArgumentException if value is not valid for this property
      */
-    public BlockState setValue(String property, Object value) {
-        properties.put(property, value);
+    public <T extends Comparable<T>> BlockState setValue(Property<T> property, T value) {
+        if (!property.isValidValue(value)) {
+            throw new IllegalArgumentException("Value " + value + " is not valid for property " + property.getName() + 
+                ". Valid values: " + property.getPossibleValues());
+        }
+        properties.put(property.getName(), value);
         return this;
     }
     
     /**
-     * Get a property value.
+     * Get a property value using type-safe property.
+     * 
+     * @param property The property to get
+     * @return The value, or the property's default value if not set
      */
-    public Object getValue(String property) {
-        return properties.get(property);
+    @SuppressWarnings("unchecked")
+    public <T extends Comparable<T>> T getValue(Property<T> property) {
+        Object value = properties.get(property.getName());
+        if (value == null) {
+            return property.getDefaultValue();
+        }
+        if (property.getValueClass().isInstance(value)) {
+            return (T) value;
+        }
+        // Value exists but wrong type - return default
+        return property.getDefaultValue();
     }
     
     /**
-     * Get a Direction property.
+     * Check if this blockstate has a specific property set.
+     * 
+     * @param property The property to check
+     * @return true if the property is set
      */
-    public Direction getDirection(String property) {
-        Object value = properties.get(property);
-        return value instanceof Direction ? (Direction) value : Direction.NORTH;
+    public boolean hasProperty(Property<?> property) {
+        return properties.containsKey(property.getName());
     }
     
-    /**
-     * Get a Half property.
-     */
-    public Half getHalf(String property) {
-        Object value = properties.get(property);
-        return value instanceof Half ? (Half) value : Half.BOTTOM;
-    }
-    
-    /**
-     * Get an Axis property.
-     */
-    public Axis getAxis(String property) {
-        Object value = properties.get(property);
-        return value instanceof Axis ? (Axis) value : Axis.Y;
-    }
-    
-    /**
-     * Check if this blockstate has a property.
-     */
-    public boolean hasProperty(String property) {
-        return properties.containsKey(property);
-    }
+    // ==================== Utility Methods ====================
     
     /**
      * Create a copy of this blockstate.
@@ -101,37 +110,39 @@ public class BlockState {
             String key = entry.getKey();
             Object value = entry.getValue();
             
-            // Convert string values back to enums
+            // Convert string values back to enums based on property key
             if (value instanceof String) {
                 String str = (String) value;
-                // Try to parse as Direction
-                try {
-                    Direction dir = Direction.valueOf(str);
-                    state.setValue(key, dir);
-                    continue;
-                } catch (IllegalArgumentException ignored) {}
-                
-                // Try to parse as Half
-                try {
-                    Half half = Half.valueOf(str);
-                    state.setValue(key, half);
-                    continue;
-                } catch (IllegalArgumentException ignored) {}
-                
-                // Try to parse as Axis
-                try {
-                    Axis axis = Axis.valueOf(str);
-                    state.setValue(key, axis);
-                    continue;
-                } catch (IllegalArgumentException ignored) {}
-                
-                // Fall back to string
-                state.setValue(key, value);
+                Object parsedValue = parsePropertyValue(key, str);
+                state.properties.put(key, parsedValue);
             } else {
-                state.setValue(key, value);
+                state.properties.put(key, value);
             }
         }
         return state;
+    }
+    
+    /**
+     * Parse a property value from string based on property name.
+     */
+    private static Object parsePropertyValue(String key, String str) {
+        // Try to parse based on known property names
+        switch (key) {
+            case "facing":
+                try { return Direction.valueOf(str); } catch (IllegalArgumentException ignored) {}
+                break;
+            case "half":
+                try { return Half.valueOf(str); } catch (IllegalArgumentException ignored) {}
+                break;
+            case "axis":
+                try { return Axis.valueOf(str); } catch (IllegalArgumentException ignored) {}
+                break;
+            case "shape":
+                try { return StairsShape.valueOf(str); } catch (IllegalArgumentException ignored) {}
+                break;
+        }
+        // Fall back to string
+        return str;
     }
     
     /**
@@ -161,7 +172,7 @@ public class BlockState {
                 }
                 sb.append(entry.getKey()).append("=");
                 Object value = entry.getValue();
-                // Convert enum values to lowercase strings (MattMC convention)
+                // Convert enum values to lowercase strings (Minecraft convention)
                 // For other types, use toString() as-is
                 if (value instanceof Enum) {
                     sb.append(((Enum<?>) value).name().toLowerCase());
