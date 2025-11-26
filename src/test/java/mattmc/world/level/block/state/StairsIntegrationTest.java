@@ -60,11 +60,11 @@ public class StairsIntegrationTest {
                 }
             }
             
-            // Create the blockstate
+            // Create the blockstate using string keys
             BlockState state = new BlockState();
-            state.setValue(BlockStateProperties.HORIZONTAL_FACING, dir);
-            state.setValue(BlockStateProperties.HALF, half);
-            state.setValue(BlockStateProperties.STAIRS_SHAPE, shape);
+            state.setValue("facing", dir);
+            state.setValue("half", half);
+            state.setValue("shape", shape);
             
             String actual = state.toVariantString();
             
@@ -86,11 +86,11 @@ public class StairsIntegrationTest {
             return;
         }
         
-        // Create a state for north-facing stairs
+        // Create a state for north-facing stairs using string keys
         BlockState state = new BlockState();
-        state.setValue(BlockStateProperties.HORIZONTAL_FACING, Direction.NORTH);
-        state.setValue(BlockStateProperties.HALF, Half.BOTTOM);
-        state.setValue(BlockStateProperties.STAIRS_SHAPE, StairsShape.STRAIGHT);
+        state.setValue("facing", Direction.NORTH);
+        state.setValue("half", Half.BOTTOM);
+        state.setValue("shape", StairsShape.STRAIGHT);
         
         String variantString = state.toVariantString();
         System.out.println("Looking up variant: " + variantString);
