@@ -722,5 +722,5 @@ The project serves as both a functional game and an educational example of how t
 
 ---
 
-*Document generated: November 2024*
+*Document generated: 2025-11-26*
 *Based on MattMC codebase analysis*

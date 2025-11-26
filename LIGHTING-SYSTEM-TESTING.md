@@ -521,5 +521,5 @@ To create effective new tests:
 
 ---
 
-*Document generated: November 2024*
+*Document generated: 2025-11-26*
 *Based on MattMC lighting system analysis*

@@ -68,8 +68,10 @@ public class LightPropagationBugDetectionTest {
         assertEquals(8, chunk.getBlockLightI(13, y, 7), "Distance 6 should have 8");
         assertEquals(7, chunk.getBlockLightI(14, y, 7), "Distance 7 should have 7");
         
-        // Distance 14+ should be 0 (14 - 14 = 0, and stops at 1)
-        // Actually torch light propagates to distance 13 (14-1=13 steps before hitting 1)
+        // Light propagates from source with intensity 14
+        // At distance d, light = max(0, 14 - d)
+        // Light stops propagating when intensity reaches 1
+        // So maximum reach is 13 blocks (intensity goes: 14,13,12,...,2,1,stop)
     }
     
     @Test
@@ -171,10 +173,11 @@ public class LightPropagationBugDetectionTest {
         assertTrue(lightAfter > 0, "Middle should still have light from remaining torch");
         assertEquals(TORCH_INTENSITY - 4, lightAfter, "Light should come from torch B at distance 4");
         
-        // Position 3 should still have light from torch B (distance 9: 14-9=5)
-        // Torch B at x=12, position 3 is at distance 9
+        // Position 3 should still have light from torch B 
+        // Torch B is at x=12, position 3 is at x=3
+        // Distance = |12 - 3| = 9, so light = 14 - 9 = 5
         int lightAtPos3 = chunk.getBlockLightI(3, y, 8);
-        assertEquals(5, lightAtPos3, "Position 3 should have light from remaining torch B");
+        assertEquals(5, lightAtPos3, "Position 3 should have light=5 from remaining torch B (distance 9)");
     }
     
     // ========== OPACITY BLOCKING TESTS ==========

@@ -9,6 +9,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.DisplayName;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -241,7 +242,7 @@ public class RenderingSystemTest {
         commandBuffer.add(new DrawCommand(4, 0, 0, RenderPass.OPAQUE));
         
         // Get mutable copy of commands for sorting
-        List<DrawCommand> commands = new java.util.ArrayList<>(commandBuffer.getCommands());
+        List<DrawCommand> commands = new ArrayList<>(commandBuffer.getCommands());
         
         // Sort by pass ordinal
         commands.sort((a, b) -> a.pass.ordinal() - b.pass.ordinal());
