@@ -5,9 +5,8 @@ import org.joml.Matrix4f;
 import org.joml.Quaternionf;
 import org.joml.Vector3f;
 import org.joml.Vector4f;
-
-import java.util.HashMap;
-import java.util.Map;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 /**
  * Handles UV coordinate transformations for block models.
@@ -20,6 +19,8 @@ import java.util.Map;
  * The formula is: GLOBAL_TO_LOCAL[original] * inverse_rotation * LOCAL_TO_GLOBAL[rotated]
  */
 public class UVTransformer {
+    
+    private static final Logger LOGGER = LoggerFactory.getLogger(UVTransformer.class);
     
     // Direction constants matching Minecraft's Direction enum order
     private static final int DOWN = 0;
@@ -160,7 +161,8 @@ public class UVTransformer {
         // Compute inverse of model rotation
         Matrix4f inverseRotation = new Matrix4f(modelRotation).invert();
         if (!inverseRotation.isFinite()) {
-            // Fallback to identity if inverse fails
+            // Log warning and fallback to identity if inverse fails (indicates numerical issues)
+            LOGGER.warn("UV lock transform: matrix inverse is not finite, falling back to identity");
             return new Matrix4f();
         }
         
@@ -251,10 +253,18 @@ public class UVTransformer {
         }
         
         // Calculate new rotation by transforming a direction vector through the matrix
+        // This matches Minecraft's FaceBakery.recomputeUVs() rotation calculation
         float rotRadians = (float)Math.toRadians(originalRotation);
         Matrix3f rotMatrix = new Matrix3f(matrix);
         Vector3f rotVector = rotMatrix.transform(new Vector3f((float)Math.cos(rotRadians), (float)Math.sin(rotRadians), 0.0f));
-        int newRotation = Math.floorMod(-((int)Math.round(Math.toDegrees(Math.atan2(rotVector.y(), rotVector.x())) / 90.0)) * 90, 360);
+        
+        // Calculate the angle of the transformed vector
+        double transformedAngleRadians = Math.atan2(rotVector.y(), rotVector.x());
+        double transformedAngleDegrees = Math.toDegrees(transformedAngleRadians);
+        
+        // Quantize to 90-degree increments and negate (Minecraft convention)
+        int quantizedSteps = (int)Math.round(transformedAngleDegrees / 90.0);
+        int newRotation = Math.floorMod(-quantizedSteps * 90, 360);
         
         return new UVLockResult(new float[]{finalU0, finalV0, finalU1, finalV1}, newRotation);
     }
