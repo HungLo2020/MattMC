@@ -86,6 +86,20 @@ public class UIRenderer {
     }
     
     /**
+     * Draw debug information in the top-left corner with gamemode info.
+     * Shows version, FPS, player position, chunk position, region position, culling stats, and gamemode.
+     */
+    public void drawDebugInfo(int screenWidth, int screenHeight, float playerX, float playerY, float playerZ, 
+                               float yaw, float pitch, float roll, double fps, 
+                               int loadedChunks, int pendingChunks, int activeWorkers, int renderedChunks, int culledChunks,
+                               String defaultGamemode, String playerGamemode) {
+        debugInfoRenderer.render(screenWidth, screenHeight, playerX, playerY, playerZ, 
+                                 yaw, pitch, roll, fps, loadedChunks, pendingChunks, 
+                                 activeWorkers, renderedChunks, culledChunks,
+                                 defaultGamemode, playerGamemode);
+    }
+    
+    /**
      * Draw hotbar at the bottom center of the screen.
      * 
      * @param screenWidth Screen width
