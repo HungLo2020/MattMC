@@ -529,38 +529,29 @@ public class CommandBuffer {
 
 ## Performance Concerns
 
-### 18. Texture Loading on Every Frame
+### 18. ~~Texture Loading on Every Frame~~ ✅ FIXED
 
-**Location**: `mattmc/client/renderer/backend/opengl/OpenGLRenderBackend.java` (Lines 379-396)
+**Location**: `mattmc/client/renderer/backend/opengl/OpenGLRenderBackend.java` (Lines 507-544)
 
-**Problem**: In `submitHotbarCommand()`, textures are loaded every time the hotbar is rendered:
+**Status**: **RESOLVED** - Updated `submitHotbarCommand()` to use the existing `textureCache` map to cache textures, avoiding texture reloading on every frame.
+
+**Original Problem**: In `submitHotbarCommand()`, textures were loaded every time the hotbar was rendered using `Texture.load(texturePath)`, causing unnecessary texture loading and potential performance issues.
+
+**Solution Applied**: The method now caches textures in the existing `textureCache` map:
 
 ```java
+// Before: Direct texture loading (no caching)
 Texture texture = Texture.load(texturePath);
-```
 
-While `Texture.load()` might cache internally, this pattern suggests potential issues.
-
-**Why it's a problem**:
-- Unnecessary texture lookups per frame
-- If caching fails, textures could be reloaded repeatedly
-
-**Fix**: Pre-load and cache UI textures at initialization:
-
-```java
-public class UITextureCache {
-    private static final Map<String, Texture> cache = new HashMap<>();
-    
-    public static void preloadUITextures() {
-        cache.put("hotbar", Texture.load("/assets/textures/gui/sprites/hud/hotbar.png"));
-        cache.put("hotbar_selection", Texture.load("..."));
-    }
-    
-    public static Texture get(String name) {
-        return cache.get(name);
-    }
+// After: Uses cached texture loading
+Texture texture = textureCache.get(texturePath);
+if (texture == null) {
+    texture = Texture.load(texturePath);
+    textureCache.put(texturePath, texture);
 }
 ```
+
+Textures are loaded once on first use and reused on subsequent frames.
 
 ---
 

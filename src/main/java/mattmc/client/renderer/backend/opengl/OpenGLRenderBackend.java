@@ -515,13 +515,19 @@ public class OpenGLRenderBackend implements RenderBackend {
         int width = (type == 0) ? (int)(182 * HOTBAR_SCALE) : (int)(24 * HOTBAR_SCALE);
         int height = (type == 0) ? (int)(22 * HOTBAR_SCALE) : (int)(24 * HOTBAR_SCALE);
         
-        // Load textures using HotbarRenderer's texture paths
+        // Load textures using HotbarRenderer's texture paths (cached via textureCache)
         String texturePath = (type == 0) ? 
             "/assets/textures/gui/sprites/hud/hotbar.png" :
             "/assets/textures/gui/sprites/hud/hotbar_selection.png";
         
-        Texture texture = 
-            Texture.load(texturePath);
+        // Use cached texture to avoid loading textures every frame
+        Texture texture = textureCache.get(texturePath);
+        if (texture == null) {
+            texture = Texture.load(texturePath);
+            if (texture != null) {
+                textureCache.put(texturePath, texture);
+            }
+        }
         
         if (texture != null) {
             glEnable(GL_TEXTURE_2D);
@@ -828,6 +834,10 @@ public class OpenGLRenderBackend implements RenderBackend {
      */
     @Override
     public void setup2DProjection(int screenWidth, int screenHeight) {
+        // Update instance variables for SpriteBatcher orthographic projection
+        this.screenWidth = screenWidth;
+        this.screenHeight = screenHeight;
+        
         // Setup projection matrix for 2D rendering
         glMatrixMode(GL_PROJECTION);
         glPushMatrix();
