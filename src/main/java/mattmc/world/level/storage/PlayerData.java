@@ -73,10 +73,12 @@ public class PlayerData {
     
     /**
      * Load inventory from NBT format (Map-based).
-     * @deprecated Use {@link #fromNBT(Inventory, Map)} instead
+     * @deprecated Use {@link #fromNBT(Inventory, Map)} instead.
+     *             Note: This method does not return the loaded gamemode.
      */
     @Deprecated
     public static void inventoryFromNBT(Inventory inventory, Map<String, Object> data) {
+        // Note: Gamemode is loaded but discarded - use fromNBT() instead
         fromNBT(inventory, data);
     }
     
@@ -177,12 +179,14 @@ public class PlayerData {
     
     /**
      * Load player data from a file.
-     * @deprecated Use {@link #load(Path, Inventory)} which returns the Gamemode instead
+     * @deprecated Use {@link #load(Path, Inventory)} which returns the Gamemode instead.
+     *             Note: This method does not return the loaded gamemode.
      */
     @Deprecated
     public static void loadLegacy(Path filePath, Inventory inventory) throws IOException {
         try (InputStream in = Files.newInputStream(filePath)) {
             Map<String, Object> data = NBTUtil.readCompressed(in);
+            // Note: Gamemode is loaded but discarded - use load() instead
             fromNBT(inventory, data);
         }
     }

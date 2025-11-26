@@ -179,7 +179,7 @@ public final class CreateWorldScreen implements Screen {
         } else {
             selectedGamemode = Gamemode.CREATIVE;
         }
-        // Recreate button with updated label
+        // Recreate button with updated label (Button.label is final, so we must create a new instance)
         gamemodeButton = new Button("Gamemode: " + selectedGamemode.getDisplayName(), 
             gamemodeButton.x, gamemodeButton.y, gamemodeButton.w, gamemodeButton.h);
     }

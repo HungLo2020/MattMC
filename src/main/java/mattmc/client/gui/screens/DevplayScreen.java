@@ -34,6 +34,9 @@ import org.slf4j.LoggerFactory;
  */
 public final class DevplayScreen implements Screen {
     private static final Logger logger = LoggerFactory.getLogger(DevplayScreen.class);
+    
+    /** Default gamemode for new worlds and legacy worlds without gamemode data. */
+    private static final Gamemode DEFAULT_GAMEMODE = Gamemode.CREATIVE;
 
     private final MattMC game;
     private final WindowHandle window;
@@ -65,11 +68,11 @@ public final class DevplayScreen implements Screen {
     private boolean shouldShutdownWorld = false;
 
     public DevplayScreen(MattMC game, String worldName) {
-        this(game, worldName, new java.util.Random().nextLong(), Gamemode.CREATIVE);
+        this(game, worldName, new java.util.Random().nextLong(), DEFAULT_GAMEMODE);
     }
     
     public DevplayScreen(MattMC game, String worldName, long seed) {
-        this(game, worldName, null, seed, 0f, 0f, 0f, 0f, 0f, null, Gamemode.CREATIVE, Gamemode.CREATIVE);
+        this(game, worldName, null, seed, 0f, 0f, 0f, 0f, 0f, null, DEFAULT_GAMEMODE, DEFAULT_GAMEMODE);
     }
     
     public DevplayScreen(MattMC game, String worldName, long seed, Gamemode defaultGamemode) {
@@ -77,11 +80,11 @@ public final class DevplayScreen implements Screen {
     }
     
     public DevplayScreen(MattMC game, String worldName, Level world, float playerX, float playerY, float playerZ, float playerYaw, float playerPitch) {
-        this(game, worldName, world, new java.util.Random().nextLong(), playerX, playerY, playerZ, playerYaw, playerPitch, null, Gamemode.CREATIVE, Gamemode.CREATIVE);
+        this(game, worldName, world, new java.util.Random().nextLong(), playerX, playerY, playerZ, playerYaw, playerPitch, null, DEFAULT_GAMEMODE, DEFAULT_GAMEMODE);
     }
     
     public DevplayScreen(MattMC game, String worldName, Level world, float playerX, float playerY, float playerZ, float playerYaw, float playerPitch, Inventory playerInventory) {
-        this(game, worldName, world, new java.util.Random().nextLong(), playerX, playerY, playerZ, playerYaw, playerPitch, playerInventory, Gamemode.CREATIVE, Gamemode.CREATIVE);
+        this(game, worldName, world, new java.util.Random().nextLong(), playerX, playerY, playerZ, playerYaw, playerPitch, playerInventory, DEFAULT_GAMEMODE, DEFAULT_GAMEMODE);
     }
     
     public DevplayScreen(MattMC game, String worldName, Level world, float playerX, float playerY, float playerZ, float playerYaw, float playerPitch, Inventory playerInventory, Gamemode defaultGamemode, Gamemode playerGamemode) {
@@ -89,11 +92,11 @@ public final class DevplayScreen implements Screen {
     }
     
     public DevplayScreen(MattMC game, String worldName, Level world, long seed, float playerX, float playerY, float playerZ, float playerYaw, float playerPitch) {
-        this(game, worldName, world, seed, playerX, playerY, playerZ, playerYaw, playerPitch, null, Gamemode.CREATIVE, Gamemode.CREATIVE);
+        this(game, worldName, world, seed, playerX, playerY, playerZ, playerYaw, playerPitch, null, DEFAULT_GAMEMODE, DEFAULT_GAMEMODE);
     }
     
     public DevplayScreen(MattMC game, String worldName, Level world, long seed, float playerX, float playerY, float playerZ, float playerYaw, float playerPitch, Inventory playerInventory) {
-        this(game, worldName, world, seed, playerX, playerY, playerZ, playerYaw, playerPitch, playerInventory, Gamemode.CREATIVE, Gamemode.CREATIVE);
+        this(game, worldName, world, seed, playerX, playerY, playerZ, playerYaw, playerPitch, playerInventory, DEFAULT_GAMEMODE, DEFAULT_GAMEMODE);
     }
     
     public DevplayScreen(MattMC game, String worldName, Level world, long seed, float playerX, float playerY, float playerZ, float playerYaw, float playerPitch, Inventory playerInventory, Gamemode defaultGamemode, Gamemode playerGamemode) {

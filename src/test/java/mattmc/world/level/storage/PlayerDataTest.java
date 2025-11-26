@@ -1,5 +1,6 @@
 package mattmc.world.level.storage;
 
+import mattmc.world.Gamemode;
 import mattmc.world.item.Inventory;
 import mattmc.world.item.ItemStack;
 import mattmc.world.item.Items;
@@ -27,12 +28,12 @@ public class PlayerDataTest {
         inventory.setStack(9, new ItemStack(Items.BIRCH_PLANKS, 1));
         inventory.setSelectedSlot(2);
         
-        // Convert to NBT
-        Map<String, Object> nbt = PlayerData.inventoryToNBT(inventory);
+        // Convert to NBT with gamemode
+        Map<String, Object> nbt = PlayerData.toNBT(inventory, Gamemode.SURVIVAL);
         
         // Load into new inventory
         Inventory loaded = new Inventory();
-        PlayerData.inventoryFromNBT(loaded, nbt);
+        Gamemode loadedGamemode = PlayerData.fromNBT(loaded, nbt);
         
         // Verify items
         assertNotNull(loaded.getStack(0));
@@ -50,6 +51,9 @@ public class PlayerDataTest {
         // Verify selected slot
         assertEquals(2, loaded.getSelectedSlot());
         
+        // Verify gamemode
+        assertEquals(Gamemode.SURVIVAL, loadedGamemode);
+        
         // Verify empty slots remain empty
         assertNull(loaded.getStack(2));
         assertNull(loaded.getStack(35));
@@ -59,15 +63,18 @@ public class PlayerDataTest {
     public void testEmptyInventory() {
         Inventory inventory = new Inventory();
         
-        Map<String, Object> nbt = PlayerData.inventoryToNBT(inventory);
+        Map<String, Object> nbt = PlayerData.toNBT(inventory, Gamemode.CREATIVE);
         
         Inventory loaded = new Inventory();
-        PlayerData.inventoryFromNBT(loaded, nbt);
+        Gamemode loadedGamemode = PlayerData.fromNBT(loaded, nbt);
         
         // All slots should be empty
         for (int i = 0; i < inventory.getSize(); i++) {
             assertNull(loaded.getStack(i));
         }
+        
+        // Verify gamemode
+        assertEquals(Gamemode.CREATIVE, loadedGamemode);
     }
     
     @Test
@@ -80,14 +87,14 @@ public class PlayerDataTest {
         inventory.setStack(8, new ItemStack(Items.DARK_OAK_PLANKS, 32));
         inventory.setSelectedSlot(3);
         
-        // Save to file
-        PlayerData.save(playerDatFile, inventory);
+        // Save to file with gamemode
+        PlayerData.save(playerDatFile, inventory, Gamemode.SURVIVAL);
         
         assertTrue(Files.exists(playerDatFile));
         
         // Load from file
         Inventory loaded = new Inventory();
-        PlayerData.load(playerDatFile, loaded);
+        Gamemode loadedGamemode = PlayerData.load(playerDatFile, loaded);
         
         // Verify items
         assertNotNull(loaded.getStack(0));
@@ -99,6 +106,9 @@ public class PlayerDataTest {
         assertEquals(32, loaded.getStack(8).getCount());
         
         assertEquals(3, loaded.getSelectedSlot());
+        
+        // Verify gamemode
+        assertEquals(Gamemode.SURVIVAL, loadedGamemode);
     }
     
     @Test
@@ -113,9 +123,9 @@ public class PlayerDataTest {
         inventory.setSelectedSlot(5);
         
         // Save and load
-        PlayerData.save(playerDatFile, inventory);
+        PlayerData.save(playerDatFile, inventory, Gamemode.CREATIVE);
         Inventory loaded = new Inventory();
-        PlayerData.load(playerDatFile, loaded);
+        Gamemode loadedGamemode = PlayerData.load(playerDatFile, loaded);
         
         // Verify all items
         for (int i = 0; i < inventory.getSize(); i++) {
@@ -125,6 +135,7 @@ public class PlayerDataTest {
         }
         
         assertEquals(5, loaded.getSelectedSlot());
+        assertEquals(Gamemode.CREATIVE, loadedGamemode);
     }
     
     @Test
@@ -138,10 +149,27 @@ public class PlayerDataTest {
         inventory.setStack(0, new ItemStack(Items.STONE, 1));
         
         // Save should create the directory
-        PlayerData.save(playerDatFile, inventory);
+        PlayerData.save(playerDatFile, inventory, Gamemode.CREATIVE);
         
         assertTrue(Files.exists(playerdataDir));
         assertTrue(Files.isDirectory(playerdataDir));
         assertTrue(Files.exists(playerDatFile));
+    }
+    
+    @Test
+    public void testLegacyGamemodeDefault() {
+        // Test that legacy data without gamemode defaults to CREATIVE
+        Inventory inventory = new Inventory();
+        
+        // Create NBT without gamemode field (simulating legacy data)
+        Map<String, Object> legacyNbt = new java.util.HashMap<>();
+        legacyNbt.put("Inventory", new java.util.ArrayList<>());
+        legacyNbt.put("SelectedItemSlot", 0);
+        
+        Inventory loaded = new Inventory();
+        Gamemode loadedGamemode = PlayerData.fromNBT(loaded, legacyNbt);
+        
+        // Should default to CREATIVE for legacy support
+        assertEquals(Gamemode.CREATIVE, loadedGamemode);
     }
 }
