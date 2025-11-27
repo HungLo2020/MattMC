@@ -494,12 +494,21 @@ public class OpenGLItemRenderer implements ItemRenderer {
     /**
      * Get the texture for a specific face of a block.
      * Falls back to "all" texture if specific face not found.
+     * For pillar blocks (logs, etc.), "end" texture is used for top/bottom.
      */
     private static String getTextureForFace(Map<String, String> texturePaths, String faceKey) {
         // Try specific face first
         String texture = texturePaths.get(faceKey);
         if (texture != null) {
             return texture;
+        }
+        
+        // For top/bottom faces, try "end" texture (used by pillar blocks like logs)
+        if ("top".equals(faceKey) || "bottom".equals(faceKey)) {
+            texture = texturePaths.get("end");
+            if (texture != null) {
+                return texture;
+            }
         }
         
         // Fall back to "all" texture (for cube_all blocks)
