@@ -521,12 +521,20 @@ public class SkylightEngine {
 			return;
 		}
 		
-		if (neighborLight < sourceLight) {
-			// This light came from the removed source
+		// If neighbor light is less than OR EQUAL to source light, it was (or could have been)
+		// lit by this source and should be removed. Only if it's strictly greater can it
+		// have an independent light source.
+		// 
+		// BUG FIX: Previously used `neighborLight < sourceLight` which caused blocks with
+		// equal light to be treated as boundaries. This led to darkness not propagating
+		// properly on repeated block/reopen cycles because equal-light blocks would
+		// re-propagate their light back into cleared areas.
+		if (neighborLight <= sourceLight) {
+			// This light came from the removed source (or equal, meaning same step in BFS)
 			targetChunk.setSkyLight(targetX, y, targetZ, 0);
 			removeQueue.offer(new SkyNode(targetChunk, targetX, y, targetZ, neighborLight));
 		} else {
-			// This light is from another source - boundary for re-propagation
+			// This light is from a brighter source - boundary for re-propagation
 			boundaryQueue.offer(new SkyNode(targetChunk, targetX, y, targetZ, neighborLight));
 		}
 	}

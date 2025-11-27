@@ -857,4 +857,251 @@ public class VerticalShaftAndTunnelLightTest {
         assertTrue(lightReturnsToTunnels,
             "After reopening: Light should return to all tunnels that had light initially");
     }
+    
+    /**
+     * Test 6: Multiple block/reopen cycles - verify light system remains consistent.
+     * 
+     * This tests that repeatedly blocking and reopening the shaft doesn't cause
+     * the lighting system to degrade or stop working.
+     */
+    @Test
+    @DisplayName("Test 6: Multiple block/reopen cycles - verify consistency")
+    public void testMultipleBlockReopenCycles() {
+        System.out.println("=== Test 6: Multiple Block/Reopen Cycles ===\n");
+        
+        // Setup: Fill underground, dig shaft, and dig tunnels in all directions
+        System.out.println("Step 0: Setting up underground terrain and digging shaft with tunnels...");
+        fillWithStone(-20, 20, BOTTOM_WORLD_Y - 5, START_WORLD_Y - 1, -20, 20);
+        digVerticalShaft(START_X, START_WORLD_Y, BOTTOM_WORLD_Y, START_Z);
+        
+        // Dig tunnels in all 4 directions
+        for (int dir = 0; dir < 4; dir++) {
+            dig1x2Tunnel(START_X, BOTTOM_WORLD_Y, START_Z, dir, TUNNEL_LENGTH);
+        }
+        
+        System.out.println("  Shaft and tunnels created.\n");
+        
+        String[] dirNames = {"+X", "-X", "+Z", "-Z"};
+        int[][] testOffsets = {{3, 0}, {-3, 0}, {0, 3}, {0, -3}};
+        
+        // Record initial light state
+        int initialShaftBottomLight = getSkyLight(START_X, BOTTOM_WORLD_Y, START_Z);
+        int[] initialTunnelLights = new int[4];
+        for (int dir = 0; dir < 4; dir++) {
+            int x = START_X + testOffsets[dir][0];
+            int z = START_Z + testOffsets[dir][1];
+            initialTunnelLights[dir] = getSkyLight(x, BOTTOM_WORLD_Y, z);
+        }
+        
+        System.out.println("Initial state:");
+        System.out.println("  Shaft bottom: " + initialShaftBottomLight);
+        for (int dir = 0; dir < 4; dir++) {
+            System.out.println("  Tunnel " + dirNames[dir] + ": " + initialTunnelLights[dir]);
+        }
+        
+        // Perform multiple cycles
+        int numCycles = 5;
+        boolean allCyclesPassed = true;
+        
+        for (int cycle = 1; cycle <= numCycles; cycle++) {
+            System.out.println("\n=== CYCLE " + cycle + " ===");
+            
+            // Block the shaft
+            System.out.println("  Blocking shaft entrance...");
+            setBlock(START_X, START_WORLD_Y, START_Z, Blocks.STONE);
+            
+            // Check blocked state
+            int blockedShaftLight = getSkyLight(START_X, BOTTOM_WORLD_Y, START_Z);
+            int[] blockedTunnelLights = new int[4];
+            boolean allTunnelsDark = true;
+            
+            for (int dir = 0; dir < 4; dir++) {
+                int x = START_X + testOffsets[dir][0];
+                int z = START_Z + testOffsets[dir][1];
+                blockedTunnelLights[dir] = getSkyLight(x, BOTTOM_WORLD_Y, z);
+                if (blockedTunnelLights[dir] > 0) {
+                    allTunnelsDark = false;
+                }
+            }
+            
+            System.out.println("  After blocking:");
+            System.out.println("    Shaft bottom: " + blockedShaftLight + (blockedShaftLight == 0 ? " ✓" : " ✗ SHOULD BE 0"));
+            for (int dir = 0; dir < 4; dir++) {
+                String status = blockedTunnelLights[dir] == 0 ? " ✓" : " ✗ SHOULD BE 0";
+                System.out.println("    Tunnel " + dirNames[dir] + ": " + blockedTunnelLights[dir] + status);
+            }
+            
+            if (blockedShaftLight != 0 || !allTunnelsDark) {
+                System.out.println("  !!! DARKNESS PROPAGATION FAILED IN CYCLE " + cycle + " !!!");
+                allCyclesPassed = false;
+            }
+            
+            // Reopen the shaft
+            System.out.println("  Reopening shaft...");
+            setBlock(START_X, START_WORLD_Y, START_Z, Blocks.AIR);
+            
+            // Check reopened state
+            int reopenedShaftLight = getSkyLight(START_X, BOTTOM_WORLD_Y, START_Z);
+            int[] reopenedTunnelLights = new int[4];
+            boolean allTunnelsLit = true;
+            
+            for (int dir = 0; dir < 4; dir++) {
+                int x = START_X + testOffsets[dir][0];
+                int z = START_Z + testOffsets[dir][1];
+                reopenedTunnelLights[dir] = getSkyLight(x, BOTTOM_WORLD_Y, z);
+                if (reopenedTunnelLights[dir] != initialTunnelLights[dir]) {
+                    allTunnelsLit = false;
+                }
+            }
+            
+            System.out.println("  After reopening:");
+            System.out.println("    Shaft bottom: " + reopenedShaftLight + 
+                (reopenedShaftLight == initialShaftBottomLight ? " ✓" : " ✗ EXPECTED " + initialShaftBottomLight));
+            for (int dir = 0; dir < 4; dir++) {
+                String status = reopenedTunnelLights[dir] == initialTunnelLights[dir] ? " ✓" : 
+                    " ✗ EXPECTED " + initialTunnelLights[dir];
+                System.out.println("    Tunnel " + dirNames[dir] + ": " + reopenedTunnelLights[dir] + status);
+            }
+            
+            if (reopenedShaftLight != initialShaftBottomLight || !allTunnelsLit) {
+                System.out.println("  !!! LIGHT RESTORATION FAILED IN CYCLE " + cycle + " !!!");
+                allCyclesPassed = false;
+            }
+            
+            // Assert for this cycle
+            assertEquals(0, blockedShaftLight, 
+                "Cycle " + cycle + ": Shaft should be dark when blocked");
+            assertTrue(allTunnelsDark, 
+                "Cycle " + cycle + ": All tunnels should be dark when shaft is blocked");
+            assertEquals(initialShaftBottomLight, reopenedShaftLight, 
+                "Cycle " + cycle + ": Shaft light should match initial when reopened");
+        }
+        
+        System.out.println("\n=== FINAL RESULT ===");
+        System.out.println("All " + numCycles + " cycles: " + (allCyclesPassed ? "PASSED" : "FAILED"));
+        
+        assertTrue(allCyclesPassed, 
+            "All block/reopen cycles should maintain consistent lighting behavior");
+    }
+    
+    /**
+     * Test 7: Multiple block/reopen cycles with expanded tunnels crossing chunk boundaries.
+     * 
+     * This is a more aggressive test that may better reproduce real-world behavior
+     * where tunnels cross chunk boundaries.
+     */
+    @Test
+    @DisplayName("Test 7: Multiple cycles with expanded cross-chunk tunnels")
+    public void testMultipleCyclesWithExpandedTunnels() {
+        System.out.println("=== Test 7: Multiple Cycles with Expanded Cross-Chunk Tunnels ===\n");
+        
+        // Setup: Fill underground, dig shaft, and dig tunnels in all directions
+        System.out.println("Step 0: Setting up underground terrain and digging shaft with expanded tunnels...");
+        fillWithStone(-20, 20, BOTTOM_WORLD_Y - 5, START_WORLD_Y - 1, -20, 20);
+        digVerticalShaft(START_X, START_WORLD_Y, BOTTOM_WORLD_Y, START_Z);
+        
+        // Dig tunnels in all 4 directions
+        for (int dir = 0; dir < 4; dir++) {
+            dig1x2Tunnel(START_X, BOTTOM_WORLD_Y, START_Z, dir, TUNNEL_LENGTH);
+        }
+        
+        // Expand tunnels to 3 blocks wide (this crosses more chunk boundaries)
+        for (int dir = 0; dir < 4; dir++) {
+            expandTunnelTo3Wide(START_X, BOTTOM_WORLD_Y, START_Z, dir, TUNNEL_LENGTH);
+        }
+        
+        System.out.println("  Shaft and expanded tunnels created.\n");
+        
+        String[] dirNames = {"+X", "-X", "+Z", "-Z"};
+        // Test at multiple distances to cover cross-chunk scenarios
+        int[][] testDistances = {{3, 0}, {-3, 0}, {0, 3}, {0, -3}};
+        int[][] farDistances = {{10, 0}, {-10, 0}, {0, 10}, {0, -10}};
+        
+        // Record initial light state
+        int initialShaftBottomLight = getSkyLight(START_X, BOTTOM_WORLD_Y, START_Z);
+        int[] initialNearLights = new int[4];
+        int[] initialFarLights = new int[4];
+        
+        for (int dir = 0; dir < 4; dir++) {
+            initialNearLights[dir] = getSkyLight(START_X + testDistances[dir][0], BOTTOM_WORLD_Y, START_Z + testDistances[dir][1]);
+            initialFarLights[dir] = getSkyLight(START_X + farDistances[dir][0], BOTTOM_WORLD_Y, START_Z + farDistances[dir][1]);
+        }
+        
+        System.out.println("Initial state:");
+        System.out.println("  Shaft bottom: " + initialShaftBottomLight);
+        System.out.println("  Near tunnels (3 blocks): " + java.util.Arrays.toString(initialNearLights));
+        System.out.println("  Far tunnels (10 blocks): " + java.util.Arrays.toString(initialFarLights));
+        
+        // Perform more cycles
+        int numCycles = 10;
+        boolean allCyclesPassed = true;
+        
+        for (int cycle = 1; cycle <= numCycles; cycle++) {
+            System.out.println("\n=== CYCLE " + cycle + " ===");
+            
+            // Block the shaft
+            setBlock(START_X, START_WORLD_Y, START_Z, Blocks.STONE);
+            
+            // Check blocked state
+            int blockedShaftLight = getSkyLight(START_X, BOTTOM_WORLD_Y, START_Z);
+            boolean nearAllDark = true;
+            boolean farAllDark = true;
+            
+            for (int dir = 0; dir < 4; dir++) {
+                int nearLight = getSkyLight(START_X + testDistances[dir][0], BOTTOM_WORLD_Y, START_Z + testDistances[dir][1]);
+                int farLight = getSkyLight(START_X + farDistances[dir][0], BOTTOM_WORLD_Y, START_Z + farDistances[dir][1]);
+                if (nearLight > 0) nearAllDark = false;
+                if (farLight > 0) farAllDark = false;
+            }
+            
+            if (blockedShaftLight != 0 || !nearAllDark || !farAllDark) {
+                System.out.println("  BLOCKED: Shaft=" + blockedShaftLight + 
+                    ", NearDark=" + nearAllDark + ", FarDark=" + farAllDark);
+                if (blockedShaftLight != 0 || !nearAllDark) {
+                    System.out.println("  !!! DARKNESS PROPAGATION FAILED !!!");
+                    allCyclesPassed = false;
+                }
+            } else {
+                System.out.println("  BLOCKED: All dark ✓");
+            }
+            
+            // Reopen the shaft
+            setBlock(START_X, START_WORLD_Y, START_Z, Blocks.AIR);
+            
+            // Check reopened state
+            int reopenedShaftLight = getSkyLight(START_X, BOTTOM_WORLD_Y, START_Z);
+            boolean nearAllMatch = true;
+            boolean farAllMatch = true;
+            
+            for (int dir = 0; dir < 4; dir++) {
+                int nearLight = getSkyLight(START_X + testDistances[dir][0], BOTTOM_WORLD_Y, START_Z + testDistances[dir][1]);
+                int farLight = getSkyLight(START_X + farDistances[dir][0], BOTTOM_WORLD_Y, START_Z + farDistances[dir][1]);
+                if (nearLight != initialNearLights[dir]) nearAllMatch = false;
+                if (farLight != initialFarLights[dir]) farAllMatch = false;
+            }
+            
+            if (reopenedShaftLight != initialShaftBottomLight || !nearAllMatch || !farAllMatch) {
+                System.out.println("  REOPENED: Shaft=" + reopenedShaftLight + "/" + initialShaftBottomLight + 
+                    ", NearMatch=" + nearAllMatch + ", FarMatch=" + farAllMatch);
+                if (reopenedShaftLight != initialShaftBottomLight) {
+                    System.out.println("  !!! LIGHT RESTORATION FAILED !!!");
+                    allCyclesPassed = false;
+                }
+            } else {
+                System.out.println("  REOPENED: All light restored ✓");
+            }
+            
+            // Assert for this cycle
+            assertEquals(0, blockedShaftLight, 
+                "Cycle " + cycle + ": Shaft should be dark when blocked");
+            assertEquals(initialShaftBottomLight, reopenedShaftLight, 
+                "Cycle " + cycle + ": Shaft light should match initial when reopened");
+        }
+        
+        System.out.println("\n=== FINAL RESULT ===");
+        System.out.println("All " + numCycles + " cycles: " + (allCyclesPassed ? "PASSED" : "FAILED"));
+        
+        assertTrue(allCyclesPassed, 
+            "All block/reopen cycles should maintain consistent lighting behavior");
+    }
 }

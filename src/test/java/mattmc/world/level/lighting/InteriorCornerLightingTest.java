@@ -194,14 +194,15 @@ public class InteriorCornerLightingTest {
 		// Air at Y=64 with skylight
 		// Block at Y=65 (ceiling of the shaft)
 		
-		// Set skylight in the air below the ceiling block
+		// Place a ceiling block at Y=65 FIRST (before setting skylight)
+		// This prevents the lighting engine from removing our manually-set skylight
+		chunk.setBlock(8, y, 8, Blocks.STONE);
+		
+		// Set skylight in the air below the ceiling block AFTER placing the block
 		chunk.setSkyLight(8, y - 1, 8, 15); // Air directly below - full skylight
 		chunk.setSkyLight(7, y - 1, 8, 15); // Air to the west below
 		chunk.setSkyLight(8, y - 1, 7, 15); // Air to the north below
 		chunk.setSkyLight(7, y - 1, 7, 15); // Air to the northwest below
-		
-		// Place a ceiling block at Y=65
-		chunk.setBlock(8, y, 8, Blocks.STONE);
 		
 		// Create a face for the bottom (ceiling) of this block
 		BlockFaceCollector.FaceData ceilingFace = new BlockFaceCollector.FaceData(
