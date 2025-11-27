@@ -40,6 +40,11 @@ public class AnimatedTextureData {
         this.frameWidth = frameSize.width();
         this.frameHeight = frameSize.height();
         
+        // Validate frame dimensions to prevent division by zero
+        if (this.frameWidth <= 0 || this.frameHeight <= 0) {
+            throw new IllegalArgumentException("Frame dimensions must be positive: " + frameWidth + "x" + frameHeight);
+        }
+        
         // Calculate frame count (number of frames that fit in the source image)
         int framesWide = sourceImage.getWidth() / frameWidth;
         int framesHigh = sourceImage.getHeight() / frameHeight;

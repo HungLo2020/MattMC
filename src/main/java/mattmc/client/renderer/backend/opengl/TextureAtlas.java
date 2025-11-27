@@ -432,7 +432,8 @@ public class TextureAtlas implements TextureCoordinateProvider, AutoCloseable {
 	 * Call this once per game tick to advance animations.
 	 * 
 	 * <p>This method updates the OpenGL texture directly using glTexSubImage2D
-	 * for efficient partial updates.
+	 * for efficient partial updates. Mipmaps are regenerated once after all
+	 * texture updates are complete for better performance.
 	 */
 	public void tickAnimations() {
 		if (animatedTextures.isEmpty()) {
@@ -441,20 +442,31 @@ public class TextureAtlas implements TextureCoordinateProvider, AutoCloseable {
 		
 		boolean anyChanged = false;
 		
+		// Bind atlas texture once for all updates
+		glBindTexture(GL_TEXTURE_2D, atlasTextureId);
+		
 		for (Map.Entry<String, AnimatedTextureData> entry : animatedTextures.entrySet()) {
 			AnimatedTextureData animData = entry.getValue();
 			if (animData.tick()) {
 				// Frame changed, need to update atlas
 				anyChanged = true;
-				updateAnimatedTexture(entry.getKey(), animData);
+				updateAnimatedTextureNoMipmap(entry.getKey(), animData);
 			}
 		}
+		
+		// Regenerate mipmaps once after all updates (more efficient than per-texture)
+		if (anyChanged) {
+			glGenerateMipmap(GL_TEXTURE_2D);
+		}
+		
+		glBindTexture(GL_TEXTURE_2D, 0);
 	}
 	
 	/**
-	 * Update a single animated texture in the atlas.
+	 * Update a single animated texture in the atlas (without mipmap regeneration).
+	 * Called during tickAnimations() with the atlas already bound.
 	 */
-	private void updateAnimatedTexture(String texturePath, AnimatedTextureData animData) {
+	private void updateAnimatedTextureNoMipmap(String texturePath, AnimatedTextureData animData) {
 		int[] position = textureAtlasPositions.get(texturePath);
 		if (position == null) {
 			return;
@@ -477,8 +489,8 @@ public class TextureAtlas implements TextureCoordinateProvider, AutoCloseable {
 			return;
 		}
 		
-		// Upload the new frame to the atlas
-		uploadTextureRegion(currentFrame, x, y);
+		// Upload the new frame to the atlas (texture already bound)
+		uploadTextureRegionNoBindUnbind(currentFrame, x, y);
 	}
 	
 	/**
@@ -534,9 +546,10 @@ public class TextureAtlas implements TextureCoordinateProvider, AutoCloseable {
 	}
 	
 	/**
-	 * Upload a texture region to the atlas using glTexSubImage2D.
+	 * Upload a texture region to the atlas (assumes texture is already bound).
+	 * Used during batch animation updates for better performance.
 	 */
-	private void uploadTextureRegion(BufferedImage image, int x, int y) {
+	private void uploadTextureRegionNoBindUnbind(BufferedImage image, int x, int y) {
 		int width = Math.min(image.getWidth(), textureSize);
 		int height = Math.min(image.getHeight(), textureSize);
 		
@@ -556,13 +569,7 @@ public class TextureAtlas implements TextureCoordinateProvider, AutoCloseable {
 		}
 		buffer.flip();
 		
-		// Upload to GPU
-		glBindTexture(GL_TEXTURE_2D, atlasTextureId);
+		// Upload to GPU (texture already bound, mipmap regeneration handled by caller)
 		glTexSubImage2D(GL_TEXTURE_2D, 0, x, y, width, height, GL_RGBA, GL_UNSIGNED_BYTE, buffer);
-		
-		// Also regenerate mipmaps for this region
-		glGenerateMipmap(GL_TEXTURE_2D);
-		
-		glBindTexture(GL_TEXTURE_2D, 0);
 	}
 }

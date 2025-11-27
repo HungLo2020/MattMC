@@ -101,11 +101,12 @@ public class AnimationMetadataSection {
     /**
      * Load animation metadata from a .mcmeta file stream.
      * 
-     * @param inputStream the input stream for the .mcmeta file
+     * @param inputStream the input stream for the .mcmeta file (will be closed by this method)
      * @return the parsed AnimationMetadataSection, or EMPTY if parsing fails
      */
     public static AnimationMetadataSection load(InputStream inputStream) {
-        try (InputStreamReader reader = new InputStreamReader(inputStream, StandardCharsets.UTF_8)) {
+        try (InputStream is = inputStream;
+             InputStreamReader reader = new InputStreamReader(is, StandardCharsets.UTF_8)) {
             JsonObject root = JsonParser.parseReader(reader).getAsJsonObject();
             
             if (!root.has(SECTION_NAME)) {
