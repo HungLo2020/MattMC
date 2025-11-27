@@ -1,0 +1,13 @@
+{
+  "variants": {
+    "type=bottom": {
+      "model": "mattmc:block/mangrove_slab"
+    },
+    "type=double": {
+      "model": "mattmc:block/mangrove_planks"
+    },
+    "type=top": {
+      "model": "mattmc:block/mangrove_slab_top"
+    }
+  }
+}

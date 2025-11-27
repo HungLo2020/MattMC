@@ -1,0 +1,13 @@
+{
+  "variants": {
+    "type=bottom": {
+      "model": "mattmc:block/jungle_slab"
+    },
+    "type=double": {
+      "model": "mattmc:block/jungle_planks"
+    },
+    "type=top": {
+      "model": "mattmc:block/jungle_slab_top"
+    }
+  }
+}

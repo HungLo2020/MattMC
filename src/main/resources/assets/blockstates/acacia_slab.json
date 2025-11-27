@@ -1,0 +1,13 @@
+{
+  "variants": {
+    "type=bottom": {
+      "model": "mattmc:block/acacia_slab"
+    },
+    "type=double": {
+      "model": "mattmc:block/acacia_planks"
+    },
+    "type=top": {
+      "model": "mattmc:block/acacia_slab_top"
+    }
+  }
+}

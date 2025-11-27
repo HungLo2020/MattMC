@@ -1,0 +1,8 @@
+{
+  "parent": "mattmc:block/slab",
+  "textures": {
+    "bottom": "mattmc:block/warped_planks",
+    "side": "mattmc:block/warped_planks",
+    "top": "mattmc:block/warped_planks"
+  }
+}

@@ -1,0 +1,8 @@
+{
+  "parent": "mattmc:block/stairs",
+  "textures": {
+    "bottom": "mattmc:block/cherry_planks",
+    "side": "mattmc:block/cherry_planks",
+    "top": "mattmc:block/cherry_planks"
+  }
+}

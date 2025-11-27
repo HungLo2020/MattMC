@@ -68,6 +68,30 @@ public class Blocks {
     public static final Block CRIMSON_PLANKS = register("crimson_planks", new Block(true, 0, 0, 0, 0));
     public static final Block WARPED_PLANKS = register("warped_planks", new Block(true, 0, 0, 0, 0));
     public static final Block BIRCH_STAIRS = register("birch_stairs", new StairsBlock());
+    public static final Block OAK_STAIRS = register("oak_stairs", new StairsBlock());
+    public static final Block SPRUCE_STAIRS = register("spruce_stairs", new StairsBlock());
+    public static final Block JUNGLE_STAIRS = register("jungle_stairs", new StairsBlock());
+    public static final Block ACACIA_STAIRS = register("acacia_stairs", new StairsBlock());
+    public static final Block DARK_OAK_STAIRS = register("dark_oak_stairs", new StairsBlock());
+    public static final Block MANGROVE_STAIRS = register("mangrove_stairs", new StairsBlock());
+    public static final Block CHERRY_STAIRS = register("cherry_stairs", new StairsBlock());
+    public static final Block BAMBOO_STAIRS = register("bamboo_stairs", new StairsBlock());
+    public static final Block CRIMSON_STAIRS = register("crimson_stairs", new StairsBlock());
+    public static final Block WARPED_STAIRS = register("warped_stairs", new StairsBlock());
+    public static final Block SILVER_BIRCH_STAIRS = register("silver_birch_stairs", new StairsBlock());
+    // Wood slabs
+    public static final Block OAK_SLAB = register("oak_slab", new SlabBlock());
+    public static final Block SPRUCE_SLAB = register("spruce_slab", new SlabBlock());
+    public static final Block BIRCH_SLAB = register("birch_slab", new SlabBlock());
+    public static final Block JUNGLE_SLAB = register("jungle_slab", new SlabBlock());
+    public static final Block ACACIA_SLAB = register("acacia_slab", new SlabBlock());
+    public static final Block DARK_OAK_SLAB = register("dark_oak_slab", new SlabBlock());
+    public static final Block MANGROVE_SLAB = register("mangrove_slab", new SlabBlock());
+    public static final Block CHERRY_SLAB = register("cherry_slab", new SlabBlock());
+    public static final Block BAMBOO_SLAB = register("bamboo_slab", new SlabBlock());
+    public static final Block CRIMSON_SLAB = register("crimson_slab", new SlabBlock());
+    public static final Block WARPED_SLAB = register("warped_slab", new SlabBlock());
+    public static final Block SILVER_BIRCH_SLAB = register("silver_birch_slab", new SlabBlock());
     public static final Block TORCH = register("torch", new TorchBlock(false, 14, 14, 11, 0));
     public static final Block WALL_TORCH = register("wall_torch", new WallTorchBlock(false, 14, 14, 11, 0));
     public static final Block PEARLESCENT_FROGLIGHT = register("pearlescent_froglight", new RotatedPillarBlock(false, 14, 14, 9, 12));
@@ -105,7 +129,9 @@ public class Blocks {
         
         // Create a new block instance with the identifier set
         Block registeredBlock;
-        if (block instanceof StairsBlock) {
+        if (block instanceof SlabBlock) {
+            registeredBlock = new SlabBlock(identifier);
+        } else if (block instanceof StairsBlock) {
             registeredBlock = new StairsBlock(identifier);
         } else if (block instanceof WallTorchBlock) {
             int lightEmission = MathUtils.max(block.getLightEmissionR(), MathUtils.max(block.getLightEmissionG(), block.getLightEmissionB()));
@@ -154,7 +180,9 @@ public class Blocks {
         
         // Create a new block instance with the identifier set
         Block registeredBlock;
-        if (block instanceof StairsBlock) {
+        if (block instanceof SlabBlock) {
+            registeredBlock = new SlabBlock(identifier);
+        } else if (block instanceof StairsBlock) {
             registeredBlock = new StairsBlock(identifier);
         } else if (block instanceof WallTorchBlock) {
             int lightEmission = MathUtils.max(block.getLightEmissionR(), MathUtils.max(block.getLightEmissionG(), block.getLightEmissionB()));

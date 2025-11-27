@@ -1,0 +1,13 @@
+{
+  "variants": {
+    "type=bottom": {
+      "model": "mattmc:block/bamboo_slab"
+    },
+    "type=double": {
+      "model": "mattmc:block/bamboo_planks"
+    },
+    "type=top": {
+      "model": "mattmc:block/bamboo_slab_top"
+    }
+  }
+}
