@@ -69,6 +69,16 @@ public class RotatedPillarBlock extends Block {
     }
     
     /**
+     * Rotated pillar blocks use custom rendering because they need blockstate-based
+     * model variants for different axis orientations (X, Y, Z).
+     * The blockstate JSON files define different models and rotations for each axis.
+     */
+    @Override
+    public boolean hasCustomRendering() {
+        return true;
+    }
+    
+    /**
      * Get the texture path for a specific face.
      * Rotated pillar blocks use "end" texture for top/bottom and "side" texture for horizontal faces.
      * 
