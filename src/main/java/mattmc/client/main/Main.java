@@ -14,23 +14,26 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public final class Main {
+    // Initialize data directory BEFORE the logger so logback can use mattmc.dataDir property
+    private static final Path dataDir;
+    
+    static {
+        try {
+            dataDir = AppPaths.ensureDataDirInJarParent("MattMC");
+            // Set property before any logger is created so logback can use it
+            System.setProperty("mattmc.dataDir", dataDir.toString());
+        } catch (IOException | IllegalArgumentException e) {
+            throw new ExceptionInInitializerError("Failed to create data directory: " + e.getMessage());
+        }
+    }
+    
+    // Logger initialized AFTER mattmc.dataDir is set
     private static final Logger logger = LoggerFactory.getLogger(Main.class);
 
     public static final String VERSION = "0.0.10";
     
     public static void main(String[] args) {
-        // Ensure data dir in parent of the JAR directory (or classes dir when in IDE)
-        Path dataDir;
-        try {
-            dataDir = AppPaths.ensureDataDirInJarParent("MattMC");
-            // expose it for other systems that may want to read it
-            System.setProperty("mattmc.dataDir", dataDir.toString());
-            logger.info("MattMC data dir: {}", dataDir);
-        } catch (IOException | IllegalArgumentException e) {
-            // Hard fail if we can't make the data directory
-            logger.error("Failed to create data directory: {}", e);
-            throw new RuntimeException("Failed to create data directory", e);
-        }
+        logger.info("MattMC data dir: {}", dataDir);
 
         // Load keybinds from Options.txt
         KeybindManager.loadKeybinds();

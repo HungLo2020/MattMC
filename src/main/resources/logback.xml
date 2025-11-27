@@ -7,9 +7,23 @@
         </encoder>
     </appender>
 
-    <!-- File appender for debug logs -->
-    <appender name="FILE" class="ch.qos.logback.core.FileAppender">
-        <file>logs/mattmc.log</file>
+    <!-- 
+        File appender for debug logs - uses MattMC data directory when set, else current dir.
+        Uses RollingFileAppender to manage log file size:
+        - Starts fresh each session (current session logs in mattmc.log)
+        - Keeps up to 3 old log files (mattmc.1.log, mattmc.2.log, mattmc.3.log)
+        - Each file limited to 10MB
+    -->
+    <appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <file>${mattmc.dataDir:-.}/logs/mattmc.log</file>
+        <rollingPolicy class="ch.qos.logback.core.rolling.FixedWindowRollingPolicy">
+            <fileNamePattern>${mattmc.dataDir:-.}/logs/mattmc.%i.log</fileNamePattern>
+            <minIndex>1</minIndex>
+            <maxIndex>3</maxIndex>
+        </rollingPolicy>
+        <triggeringPolicy class="ch.qos.logback.core.rolling.SizeBasedTriggeringPolicy">
+            <maxFileSize>10MB</maxFileSize>
+        </triggeringPolicy>
         <encoder>
             <pattern>%d{yyyy-MM-dd HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
         </encoder>
