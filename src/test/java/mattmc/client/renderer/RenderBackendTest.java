@@ -136,6 +136,7 @@ public class RenderBackendTest {
         @Override public void disableTexture2D() {}
         @Override public boolean isTexture2DEnabled() { return false; }
         @Override public void updateFrustum(mattmc.client.renderer.Frustum frustum) {}
+        @Override public void tickTextureAnimations() {}
     }
     
     @Test

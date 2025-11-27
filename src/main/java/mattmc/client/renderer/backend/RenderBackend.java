@@ -835,4 +835,20 @@ public interface RenderBackend {
      * @return the item renderer for this backend
      */
     ItemRenderer getItemRenderer();
+    
+    /**
+     * Tick texture animations.
+     * 
+     * <p>This method should be called once per game tick (typically 20 times per second)
+     * to advance animated textures. Animated textures are those with associated .mcmeta
+     * files that define animation properties.
+     * 
+     * <p><b>Implementation Notes:</b>
+     * <ul>
+     *   <li><b>OpenGL:</b> Updates texture atlas regions using glTexSubImage2D</li>
+     *   <li><b>Vulkan (future):</b> Would update texture memory or use array textures</li>
+     *   <li><b>Debug:</b> Records tick command</li>
+     * </ul>
+     */
+    void tickTextureAnimations();
 }

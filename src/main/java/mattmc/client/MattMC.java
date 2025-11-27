@@ -89,6 +89,8 @@ public final class MattMC {
             // Fixed tick rate: run game logic at exactly 20 TPS
             while (tickAccumulator >= tickTime) {
                 if (current != null) current.tick();
+                // Tick texture animations at the game tick rate
+                renderBackend.tickTextureAnimations();
                 tickAccumulator -= tickTime;
             }
             

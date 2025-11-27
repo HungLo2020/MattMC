@@ -1,6 +1,9 @@
 package mattmc.client.renderer.backend.opengl;
 
+import mattmc.client.renderer.texture.AnimatedTextureData;
 import mattmc.client.renderer.texture.TextureCoordinateProvider;
+import mattmc.client.resources.metadata.animation.AnimationMetadataSection;
+import mattmc.client.resources.metadata.animation.FrameSize;
 import mattmc.client.settings.OptionsManager;
 import mattmc.world.level.block.Block;
 import mattmc.world.level.block.Blocks;
@@ -60,6 +63,12 @@ public class TextureAtlas implements TextureCoordinateProvider, AutoCloseable {
 	
 	// Reverse lookup for debugging/tooling: int ID → string path
 	private final List<String> idToPath = new ArrayList<>();
+	
+	// Animated texture data for textures with .mcmeta files
+	private final Map<String, AnimatedTextureData> animatedTextures = new HashMap<>();
+	
+	// Atlas position data for animated texture updates
+	private final Map<String, int[]> textureAtlasPositions = new HashMap<>();
     
 	/**
 	 * Build the texture atlas from all registered blocks.
@@ -121,11 +130,14 @@ public class TextureAtlas implements TextureCoordinateProvider, AutoCloseable {
 		
 		for (String texturePath : textureList) {
 			try {
-				// Load texture image
-				BufferedImage texture = loadTexture(texturePath);
+				// Load texture image (handles animated textures with .mcmeta files)
+				BufferedImage texture = loadTextureForAtlas(texturePath);
 				if (texture != null) {
 					// Draw texture into atlas
 					g.drawImage(texture, x, y, textureSize, textureSize, null);
+					
+					// Store atlas position for animated texture updates
+					textureAtlasPositions.put(texturePath, new int[]{x, y});
 					
 					// Calculate UV coordinates (0.0 to 1.0)
 					float u0 = (float) x / atlasWidth;
@@ -184,6 +196,54 @@ public class TextureAtlas implements TextureCoordinateProvider, AutoCloseable {
 		return id;
 	}
     
+	/**
+	 * Load a texture image from resources for atlas packing.
+	 * Handles animated textures by checking for .mcmeta files and extracting the first frame.
+	 * 
+	 * @param path the texture path (e.g., "assets/textures/block/crimson_stem.png")
+	 * @return the texture image (first frame for animated textures), or null if not found
+	 */
+	private BufferedImage loadTextureForAtlas(String path) {
+		// First, load the full texture image
+		BufferedImage fullImage = loadTexture(path);
+		if (fullImage == null) {
+			return null;
+		}
+		
+		// Check for animation metadata (.mcmeta file)
+		String mcmetaPath = path + ".mcmeta";
+		try (InputStream mcmetaStream = mattmc.util.ResourceLoader.getResourceStreamFromClassLoader(mcmetaPath)) {
+			if (mcmetaStream != null) {
+				// Parse the .mcmeta file
+				AnimationMetadataSection metadata = AnimationMetadataSection.load(mcmetaStream);
+				
+				if (metadata != AnimationMetadataSection.EMPTY) {
+					// This is an animated texture
+					// Calculate frame size
+					FrameSize frameSize = metadata.calculateFrameSize(fullImage.getWidth(), fullImage.getHeight());
+					
+					// Check if the image is actually taller than it is wide (animated strip)
+					if (fullImage.getHeight() > fullImage.getWidth() || 
+						fullImage.getHeight() > frameSize.height()) {
+						
+						// Create animated texture data for later animation updates
+						AnimatedTextureData animData = new AnimatedTextureData(path, fullImage, metadata);
+						animatedTextures.put(path, animData);
+						
+						// Return just the first frame for atlas packing
+						return animData.getFirstFrame();
+					}
+				}
+			}
+		} catch (IOException e) {
+			// No .mcmeta file or error reading it - treat as static texture
+			logger.debug("No .mcmeta file for {}: {}", path, e.getMessage());
+		}
+		
+		// Return the full image for static textures
+		return fullImage;
+	}
+	
 	/**
 	 * Load a texture image from resources.
 	 */
@@ -347,5 +407,169 @@ public class TextureAtlas implements TextureCoordinateProvider, AutoCloseable {
 	 */
 	public int getTextureCount() {
 		return uvMappings.size();
+	}
+	
+	/**
+	 * Check if this atlas has any animated textures.
+	 * 
+	 * @return true if there are animated textures
+	 */
+	public boolean hasAnimatedTextures() {
+		return !animatedTextures.isEmpty();
+	}
+	
+	/**
+	 * Get the number of animated textures in this atlas.
+	 * 
+	 * @return the number of animated textures
+	 */
+	public int getAnimatedTextureCount() {
+		return animatedTextures.size();
+	}
+	
+	/**
+	 * Tick all animated textures and update the atlas.
+	 * Call this once per game tick to advance animations.
+	 * 
+	 * <p>This method updates the OpenGL texture directly using glTexSubImage2D
+	 * for efficient partial updates. Mipmaps are regenerated once after all
+	 * texture updates are complete for better performance.
+	 */
+	public void tickAnimations() {
+		if (animatedTextures.isEmpty()) {
+			return;
+		}
+		
+		boolean anyChanged = false;
+		
+		// Bind atlas texture once for all updates
+		glBindTexture(GL_TEXTURE_2D, atlasTextureId);
+		
+		for (Map.Entry<String, AnimatedTextureData> entry : animatedTextures.entrySet()) {
+			AnimatedTextureData animData = entry.getValue();
+			if (animData.tick()) {
+				// Frame changed, need to update atlas
+				anyChanged = true;
+				updateAnimatedTextureNoMipmap(entry.getKey(), animData);
+			}
+		}
+		
+		// Regenerate mipmaps once after all updates (more efficient than per-texture)
+		if (anyChanged) {
+			glGenerateMipmap(GL_TEXTURE_2D);
+		}
+		
+		glBindTexture(GL_TEXTURE_2D, 0);
+	}
+	
+	/**
+	 * Update a single animated texture in the atlas (without mipmap regeneration).
+	 * Called during tickAnimations() with the atlas already bound.
+	 */
+	private void updateAnimatedTextureNoMipmap(String texturePath, AnimatedTextureData animData) {
+		int[] position = textureAtlasPositions.get(texturePath);
+		if (position == null) {
+			return;
+		}
+		
+		int x = position[0];
+		int y = position[1];
+		
+		// Get the current frame image
+		BufferedImage currentFrame;
+		
+		if (animData.isInterpolated()) {
+			// Interpolate between current and next frame
+			currentFrame = interpolateFrames(animData);
+		} else {
+			currentFrame = animData.getCurrentFrame();
+		}
+		
+		if (currentFrame == null) {
+			return;
+		}
+		
+		// Upload the new frame to the atlas (texture already bound)
+		uploadTextureRegionNoBindUnbind(currentFrame, x, y);
+	}
+	
+	/**
+	 * Interpolate between two frames for smooth animation.
+	 */
+	private BufferedImage interpolateFrames(AnimatedTextureData animData) {
+		BufferedImage current = animData.getCurrentFrame();
+		BufferedImage next = animData.getNextFrame();
+		float progress = animData.getInterpolationProgress();
+		
+		if (current == null || next == null || progress == 0.0f) {
+			return current;
+		}
+		
+		int width = current.getWidth();
+		int height = current.getHeight();
+		
+		BufferedImage interpolated = new BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB);
+		
+		for (int py = 0; py < height; py++) {
+			for (int px = 0; px < width; px++) {
+				int c1 = current.getRGB(px, py);
+				int c2 = next.getRGB(px, py);
+				
+				// Interpolate each color channel
+				int a1 = (c1 >> 24) & 0xFF;
+				int r1 = (c1 >> 16) & 0xFF;
+				int g1 = (c1 >> 8) & 0xFF;
+				int b1 = c1 & 0xFF;
+				
+				int a2 = (c2 >> 24) & 0xFF;
+				int r2 = (c2 >> 16) & 0xFF;
+				int g2 = (c2 >> 8) & 0xFF;
+				int b2 = c2 & 0xFF;
+				
+				int a = mix(progress, a1, a2);
+				int r = mix(progress, r1, r2);
+				int g = mix(progress, g1, g2);
+				int b = mix(progress, b1, b2);
+				
+				interpolated.setRGB(px, py, (a << 24) | (r << 16) | (g << 8) | b);
+			}
+		}
+		
+		return interpolated;
+	}
+	
+	/**
+	 * Mix two color values based on interpolation progress.
+	 */
+	private int mix(float progress, int c1, int c2) {
+		return (int) ((1.0f - progress) * c1 + progress * c2);
+	}
+	
+	/**
+	 * Upload a texture region to the atlas (assumes texture is already bound).
+	 * Used during batch animation updates for better performance.
+	 */
+	private void uploadTextureRegionNoBindUnbind(BufferedImage image, int x, int y) {
+		int width = Math.min(image.getWidth(), textureSize);
+		int height = Math.min(image.getHeight(), textureSize);
+		
+		// Convert image to ByteBuffer
+		int[] pixels = new int[width * height];
+		image.getRGB(0, 0, width, height, pixels, 0, width);
+		
+		ByteBuffer buffer = BufferUtils.createByteBuffer(width * height * 4);
+		for (int py = 0; py < height; py++) {
+			for (int px = 0; px < width; px++) {
+				int pixel = pixels[py * width + px];
+				buffer.put((byte) ((pixel >> 16) & 0xFF)); // Red
+				buffer.put((byte) ((pixel >> 8) & 0xFF));  // Green
+				buffer.put((byte) (pixel & 0xFF));         // Blue
+				buffer.put((byte) ((pixel >> 24) & 0xFF)); // Alpha
+			}
+		}
+		buffer.flip();
+		
+		// Upload to GPU (texture already bound, mipmap regeneration handled by caller)
+		glTexSubImage2D(GL_TEXTURE_2D, 0, x, y, width, height, GL_RGBA, GL_UNSIGNED_BYTE, buffer);
 	}
 }
