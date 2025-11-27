@@ -1257,6 +1257,16 @@ public class OpenGLRenderBackend implements RenderBackend {
         return OpenGLItemRenderer.getInstance();
     }
     
+    @Override
+    public void tickTextureAnimations() {
+        // Tick all registered texture atlases
+        for (MaterialInfo material : materialRegistry.values()) {
+            if (material.atlas != null) {
+                material.atlas.tickAnimations();
+            }
+        }
+    }
+    
     // === 3D Rendering Methods ===
     
     @Override
