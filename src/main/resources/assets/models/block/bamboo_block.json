@@ -1,0 +1,7 @@
+{
+  "parent": "mattmc:block/cube_column",
+  "textures": {
+    "end": "mattmc:block/bamboo_block_top",
+    "side": "mattmc:block/bamboo_block"
+  }
+}

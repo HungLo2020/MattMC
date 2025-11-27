@@ -30,6 +30,17 @@ public class CreativeModeTabs {
         CreativeTabs.BUILDING_BLOCKS.addItem(Items.COBBLESTONE);
         CreativeTabs.BUILDING_BLOCKS.addItem(Items.MOSSY_COBBLESTONE);
         CreativeTabs.BUILDING_BLOCKS.addItem(Items.OAK_LOG);
+        CreativeTabs.BUILDING_BLOCKS.addItem(Items.SPRUCE_LOG);
+        CreativeTabs.BUILDING_BLOCKS.addItem(Items.BIRCH_LOG);
+        CreativeTabs.BUILDING_BLOCKS.addItem(Items.JUNGLE_LOG);
+        CreativeTabs.BUILDING_BLOCKS.addItem(Items.ACACIA_LOG);
+        CreativeTabs.BUILDING_BLOCKS.addItem(Items.DARK_OAK_LOG);
+        CreativeTabs.BUILDING_BLOCKS.addItem(Items.MANGROVE_LOG);
+        CreativeTabs.BUILDING_BLOCKS.addItem(Items.CHERRY_LOG);
+        CreativeTabs.BUILDING_BLOCKS.addItem(Items.BAMBOO_BLOCK);
+        CreativeTabs.BUILDING_BLOCKS.addItem(Items.CRIMSON_STEM);
+        CreativeTabs.BUILDING_BLOCKS.addItem(Items.WARPED_STEM);
+        CreativeTabs.BUILDING_BLOCKS.addItem(Items.SILVER_BIRCH_LOG);
         CreativeTabs.BUILDING_BLOCKS.addItem(Items.OAK_PLANKS);
         CreativeTabs.BUILDING_BLOCKS.addItem(Items.SPRUCE_PLANKS);
         CreativeTabs.BUILDING_BLOCKS.addItem(Items.BIRCH_PLANKS);
