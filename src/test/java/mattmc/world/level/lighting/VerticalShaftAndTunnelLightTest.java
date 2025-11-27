@@ -585,4 +585,276 @@ public class VerticalShaftAndTunnelLightTest {
         
         assertTrue(lightAtShaftBottom > 0, "Vertical shaft should propagate light to bottom");
     }
+    
+    /**
+     * Test 5: Block the shaft, verify darkness propagates, then reopen and verify light returns.
+     * 
+     * This tests the full lifecycle of light updates:
+     * 1. Open shaft with light propagating through tunnels
+     * 2. Block the shaft entrance - darkness should propagate everywhere
+     * 3. Reopen the shaft - light should return to all tunnels
+     */
+    @Test
+    @DisplayName("Test 5: Block shaft -> verify darkness -> reopen -> verify light returns")
+    public void testBlockAndReopenShaft() {
+        System.out.println("=== Test 5: Block and Reopen Shaft ===\n");
+        
+        // Setup: Fill underground, dig shaft, and dig tunnels in all directions
+        System.out.println("Step 0: Setting up underground terrain and digging shaft with tunnels...");
+        fillWithStone(-20, 20, BOTTOM_WORLD_Y - 5, START_WORLD_Y - 1, -20, 20);
+        digVerticalShaft(START_X, START_WORLD_Y, BOTTOM_WORLD_Y, START_Z);
+        
+        // Dig tunnels in all 4 directions
+        for (int dir = 0; dir < 4; dir++) {
+            dig1x2Tunnel(START_X, BOTTOM_WORLD_Y, START_Z, dir, TUNNEL_LENGTH);
+        }
+        
+        // Expand tunnels to 3 blocks wide
+        for (int dir = 0; dir < 4; dir++) {
+            expandTunnelTo3Wide(START_X, BOTTOM_WORLD_Y, START_Z, dir, TUNNEL_LENGTH);
+        }
+        
+        System.out.println("  Shaft dug from (" + START_X + ", " + START_WORLD_Y + ", " + START_Z + 
+                          ") to (" + START_X + ", " + BOTTOM_WORLD_Y + ", " + START_Z + ")");
+        System.out.println("  Tunnels dug and expanded in all 4 directions\n");
+        
+        // =====================================================
+        // PHASE 1: Record initial light values (shaft open)
+        // =====================================================
+        System.out.println("=== PHASE 1: Initial Light State (Shaft Open) ===\n");
+        
+        String[] dirNames = {"+X", "-X", "+Z", "-Z"};
+        int[][] testOffsets = {{3, 0}, {-3, 0}, {0, 3}, {0, -3}};
+        int[][] wallOffsets = {{0, 1}, {0, 1}, {1, 0}, {1, 0}};
+        
+        // Record light at shaft
+        int initialShaftTopLight = getSkyLight(START_X, START_WORLD_Y, START_Z);
+        int initialShaftBottomLight = getSkyLight(START_X, BOTTOM_WORLD_Y, START_Z);
+        
+        System.out.println("Shaft light:");
+        System.out.println("  Top (y=64): " + initialShaftTopLight);
+        System.out.println("  Bottom (y=52): " + initialShaftBottomLight);
+        
+        // Record light in tunnels
+        System.out.println("\nTunnel light (at 3 blocks from shaft):");
+        System.out.println("Direction   Center  Side1  Side2");
+        System.out.println("---------   ------  -----  -----");
+        
+        int[][] initialTunnelLights = new int[4][3]; // [direction][center, side1, side2]
+        for (int dir = 0; dir < 4; dir++) {
+            int x = START_X + testOffsets[dir][0];
+            int z = START_Z + testOffsets[dir][1];
+            int center = getSkyLight(x, BOTTOM_WORLD_Y, z);
+            int side1 = getSkyLight(x + wallOffsets[dir][0], BOTTOM_WORLD_Y, z + wallOffsets[dir][1]);
+            int side2 = getSkyLight(x - wallOffsets[dir][0], BOTTOM_WORLD_Y, z - wallOffsets[dir][1]);
+            
+            initialTunnelLights[dir][0] = center;
+            initialTunnelLights[dir][1] = side1;
+            initialTunnelLights[dir][2] = side2;
+            
+            System.out.printf("%-9s   %2d      %2d     %2d%n", dirNames[dir], center, side1, side2);
+        }
+        
+        // Record light at tunnel ends
+        System.out.println("\nTunnel end light (at 11 blocks from shaft):");
+        int[] initialTunnelEndLights = new int[4];
+        int[][] endOffsets = {{11, 0}, {-11, 0}, {0, 11}, {0, -11}};
+        for (int dir = 0; dir < 4; dir++) {
+            int x = START_X + endOffsets[dir][0];
+            int z = START_Z + endOffsets[dir][1];
+            initialTunnelEndLights[dir] = getSkyLight(x, BOTTOM_WORLD_Y, z);
+            System.out.println("  " + dirNames[dir] + ": " + initialTunnelEndLights[dir]);
+        }
+        
+        // Verify initial state has light
+        assertTrue(initialShaftBottomLight > 0, "Initial: Shaft bottom should have light");
+        
+        // =====================================================
+        // PHASE 2: Block the shaft entrance and verify darkness
+        // =====================================================
+        System.out.println("\n=== PHASE 2: Blocking Shaft Entrance ===\n");
+        
+        // Block the shaft at the top (place stone at surface level)
+        System.out.println("Placing stone block at shaft entrance (0, 64, -1)...");
+        setBlock(START_X, START_WORLD_Y, START_Z, Blocks.STONE);
+        
+        // Record light after blocking
+        int blockedShaftTopLight = getSkyLight(START_X, START_WORLD_Y, START_Z);
+        int blockedShaftBottomLight = getSkyLight(START_X, BOTTOM_WORLD_Y, START_Z);
+        
+        System.out.println("\nShaft light after blocking:");
+        System.out.println("  Top (y=64): " + blockedShaftTopLight + " (was " + initialShaftTopLight + ")");
+        System.out.println("  Bottom (y=52): " + blockedShaftBottomLight + " (was " + initialShaftBottomLight + ")");
+        
+        // Record tunnel light after blocking
+        System.out.println("\nTunnel light after blocking (at 3 blocks from shaft):");
+        System.out.println("Direction   Center  Side1  Side2  (Change from initial)");
+        System.out.println("---------   ------  -----  -----  ---------------------");
+        
+        int[][] blockedTunnelLights = new int[4][3];
+        boolean darknessPropagatesToTunnels = true;
+        
+        for (int dir = 0; dir < 4; dir++) {
+            int x = START_X + testOffsets[dir][0];
+            int z = START_Z + testOffsets[dir][1];
+            int center = getSkyLight(x, BOTTOM_WORLD_Y, z);
+            int side1 = getSkyLight(x + wallOffsets[dir][0], BOTTOM_WORLD_Y, z + wallOffsets[dir][1]);
+            int side2 = getSkyLight(x - wallOffsets[dir][0], BOTTOM_WORLD_Y, z - wallOffsets[dir][1]);
+            
+            blockedTunnelLights[dir][0] = center;
+            blockedTunnelLights[dir][1] = side1;
+            blockedTunnelLights[dir][2] = side2;
+            
+            int centerDelta = center - initialTunnelLights[dir][0];
+            int side1Delta = side1 - initialTunnelLights[dir][1];
+            int side2Delta = side2 - initialTunnelLights[dir][2];
+            
+            System.out.printf("%-9s   %2d      %2d     %2d     (%+d, %+d, %+d)%n", 
+                dirNames[dir], center, side1, side2, centerDelta, side1Delta, side2Delta);
+            
+            // If initial had light but blocked still has light, darkness didn't propagate
+            if (initialTunnelLights[dir][0] > 0 && center > 0) {
+                darknessPropagatesToTunnels = false;
+            }
+        }
+        
+        // Record tunnel end light after blocking
+        System.out.println("\nTunnel end light after blocking:");
+        int[] blockedTunnelEndLights = new int[4];
+        for (int dir = 0; dir < 4; dir++) {
+            int x = START_X + endOffsets[dir][0];
+            int z = START_Z + endOffsets[dir][1];
+            blockedTunnelEndLights[dir] = getSkyLight(x, BOTTOM_WORLD_Y, z);
+            int delta = blockedTunnelEndLights[dir] - initialTunnelEndLights[dir];
+            System.out.printf("  %s: %d (was %d, %+d)%n", dirNames[dir], 
+                blockedTunnelEndLights[dir], initialTunnelEndLights[dir], delta);
+        }
+        
+        // Check darkness propagation results
+        System.out.println("\n=== Darkness Propagation Analysis ===");
+        System.out.println("Shaft bottom: " + (blockedShaftBottomLight == 0 ? "✓ Dark" : "✗ Still has light: " + blockedShaftBottomLight));
+        System.out.println("Tunnels: " + (darknessPropagatesToTunnels ? "✓ Dark" : "✗ Still have light"));
+        
+        // Verify darkness propagated
+        assertEquals(0, blockedShaftBottomLight, 
+            "After blocking: Shaft bottom should be dark (0), but was: " + blockedShaftBottomLight);
+        
+        // Verify darkness propagated to ALL tunnels (this catches the cross-chunk removal bug)
+        assertTrue(darknessPropagatesToTunnels,
+            "After blocking: All tunnels should be dark. Some tunnels still have light, " +
+            "indicating darkness removal failed to propagate across chunk boundaries.");
+        
+        // =====================================================
+        // PHASE 3: Reopen the shaft and verify light returns
+        // =====================================================
+        System.out.println("\n=== PHASE 3: Reopening Shaft ===\n");
+        
+        // Remove the blocking stone
+        System.out.println("Breaking stone block at shaft entrance (0, 64, -1)...");
+        setBlock(START_X, START_WORLD_Y, START_Z, Blocks.AIR);
+        
+        // Record light after reopening
+        int reopenedShaftTopLight = getSkyLight(START_X, START_WORLD_Y, START_Z);
+        int reopenedShaftBottomLight = getSkyLight(START_X, BOTTOM_WORLD_Y, START_Z);
+        
+        System.out.println("\nShaft light after reopening:");
+        System.out.println("  Top (y=64): " + reopenedShaftTopLight + " (initial was " + initialShaftTopLight + ")");
+        System.out.println("  Bottom (y=52): " + reopenedShaftBottomLight + " (initial was " + initialShaftBottomLight + ")");
+        
+        // Record tunnel light after reopening
+        System.out.println("\nTunnel light after reopening (at 3 blocks from shaft):");
+        System.out.println("Direction   Center  Side1  Side2  (vs Initial / vs Blocked)");
+        System.out.println("---------   ------  -----  -----  -------------------------");
+        
+        int[][] reopenedTunnelLights = new int[4][3];
+        boolean lightReturnsToTunnels = true;
+        
+        for (int dir = 0; dir < 4; dir++) {
+            int x = START_X + testOffsets[dir][0];
+            int z = START_Z + testOffsets[dir][1];
+            int center = getSkyLight(x, BOTTOM_WORLD_Y, z);
+            int side1 = getSkyLight(x + wallOffsets[dir][0], BOTTOM_WORLD_Y, z + wallOffsets[dir][1]);
+            int side2 = getSkyLight(x - wallOffsets[dir][0], BOTTOM_WORLD_Y, z - wallOffsets[dir][1]);
+            
+            reopenedTunnelLights[dir][0] = center;
+            reopenedTunnelLights[dir][1] = side1;
+            reopenedTunnelLights[dir][2] = side2;
+            
+            String vsInitial = String.format("(%+d, %+d, %+d)", 
+                center - initialTunnelLights[dir][0],
+                side1 - initialTunnelLights[dir][1],
+                side2 - initialTunnelLights[dir][2]);
+            
+            String vsBlocked = String.format("(%+d, %+d, %+d)", 
+                center - blockedTunnelLights[dir][0],
+                side1 - blockedTunnelLights[dir][1],
+                side2 - blockedTunnelLights[dir][2]);
+            
+            System.out.printf("%-9s   %2d      %2d     %2d     %s / %s%n", 
+                dirNames[dir], center, side1, side2, vsInitial, vsBlocked);
+            
+            // If initial had light but reopened doesn't, light didn't return
+            if (initialTunnelLights[dir][0] > 0 && center == 0) {
+                lightReturnsToTunnels = false;
+            }
+        }
+        
+        // Record tunnel end light after reopening
+        System.out.println("\nTunnel end light after reopening:");
+        int[] reopenedTunnelEndLights = new int[4];
+        for (int dir = 0; dir < 4; dir++) {
+            int x = START_X + endOffsets[dir][0];
+            int z = START_Z + endOffsets[dir][1];
+            reopenedTunnelEndLights[dir] = getSkyLight(x, BOTTOM_WORLD_Y, z);
+            int vsInitial = reopenedTunnelEndLights[dir] - initialTunnelEndLights[dir];
+            int vsBlocked = reopenedTunnelEndLights[dir] - blockedTunnelEndLights[dir];
+            System.out.printf("  %s: %d (vs initial: %+d, vs blocked: %+d)%n", 
+                dirNames[dir], reopenedTunnelEndLights[dir], vsInitial, vsBlocked);
+        }
+        
+        // =====================================================
+        // FINAL ANALYSIS
+        // =====================================================
+        System.out.println("\n=== FINAL ANALYSIS ===\n");
+        
+        // Check if light returned to the same levels as initial
+        boolean shaftLightMatches = (reopenedShaftBottomLight == initialShaftBottomLight);
+        System.out.println("Shaft bottom light:");
+        System.out.println("  Initial: " + initialShaftBottomLight);
+        System.out.println("  After blocking: " + blockedShaftBottomLight);
+        System.out.println("  After reopening: " + reopenedShaftBottomLight);
+        System.out.println("  Status: " + (shaftLightMatches ? "✓ Matches initial" : "✗ Does NOT match initial"));
+        
+        System.out.println("\nTunnel center light comparison:");
+        boolean allTunnelsMatch = true;
+        for (int dir = 0; dir < 4; dir++) {
+            boolean matches = (reopenedTunnelLights[dir][0] == initialTunnelLights[dir][0]);
+            if (!matches) allTunnelsMatch = false;
+            System.out.printf("  %s: Initial=%d, Blocked=%d, Reopened=%d %s%n",
+                dirNames[dir], 
+                initialTunnelLights[dir][0],
+                blockedTunnelLights[dir][0],
+                reopenedTunnelLights[dir][0],
+                matches ? "✓" : "✗ MISMATCH");
+        }
+        
+        System.out.println("\n=== TEST RESULTS ===");
+        System.out.println("1. Darkness propagation when blocked: " + 
+            (blockedShaftBottomLight == 0 ? "PASS" : "FAIL"));
+        System.out.println("2. Light returns when reopened: " + 
+            (reopenedShaftBottomLight > 0 ? "PASS" : "FAIL"));
+        System.out.println("3. Light matches initial after reopen: " + 
+            (shaftLightMatches && allTunnelsMatch ? "PASS" : "FAIL"));
+        
+        // Assertions
+        assertTrue(reopenedShaftBottomLight > 0, 
+            "After reopening: Shaft bottom should have light again, but was: " + reopenedShaftBottomLight);
+        
+        assertEquals(initialShaftBottomLight, reopenedShaftBottomLight,
+            "After reopening: Shaft bottom light should match initial. Initial=" + 
+            initialShaftBottomLight + ", Reopened=" + reopenedShaftBottomLight);
+        
+        assertTrue(lightReturnsToTunnels,
+            "After reopening: Light should return to all tunnels that had light initially");
+    }
 }
