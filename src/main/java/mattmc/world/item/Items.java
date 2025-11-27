@@ -73,6 +73,7 @@ public class Items {
     public static final BlockItem OCHRE_FROGLIGHT = register("ochre_froglight", new BlockItem(Blocks.OCHRE_FROGLIGHT));
     public static final BlockItem VERDANT_FROGLIGHT = register("verdant_froglight", new BlockItem(Blocks.VERDANT_FROGLIGHT));
     public static final BlockItem SEA_LANTERN = register("sea_lantern", new BlockItem(Blocks.SEA_LANTERN));
+    public static final BlockItem OAK_LOG = register("oak_log", new BlockItem(Blocks.OAK_LOG));
 
     // Basic materials (stackable, 64 max)
     //public static final Item STICK = register("stick", new Item(64));
