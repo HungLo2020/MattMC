@@ -521,14 +521,20 @@ public class SkylightEngine {
 			return;
 		}
 		
-		// If neighbor light is less than OR EQUAL to source light, it was (or could have been)
-		// lit by this source and should be removed. Only if it's strictly greater can it
-		// have an independent light source.
-		// 
-		// BUG FIX: Previously used `neighborLight < sourceLight` which caused blocks with
-		// equal light to be treated as boundaries. This led to darkness not propagating
-		// properly on repeated block/reopen cycles because equal-light blocks would
-		// re-propagate their light back into cleared areas.
+		// Check if the neighbor has DIRECT sky access (above its column's heightmap).
+		// If it does, its light comes from the sky, not from propagation, so we should
+		// NOT remove it - instead treat it as a boundary for re-propagation.
+		int neighborWorldY = ChunkUtils.localToWorldY(y);
+		int neighborHeightmap = targetChunk.getHeightmap().getHeight(targetX, targetZ);
+		
+		if (neighborWorldY > neighborHeightmap || neighborHeightmap == ChunkUtils.MIN_Y) {
+			// This block has direct sky access - its light comes from the sky, not from
+			// the block being removed. Add it to boundary queue for re-propagation.
+			boundaryQueue.offer(new SkyNode(targetChunk, targetX, y, targetZ, neighborLight));
+			return;
+		}
+		
+		// Neighbor is below its heightmap - check if its light came from the removed source
 		if (neighborLight <= sourceLight) {
 			// This light came from the removed source (or equal, meaning same step in BFS)
 			targetChunk.setSkyLight(targetX, y, targetZ, 0);
