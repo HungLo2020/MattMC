@@ -53,7 +53,32 @@ public class CreativeModeTabs {
         CreativeTabs.BUILDING_BLOCKS.addItem(Items.BAMBOO_PLANKS);
         CreativeTabs.BUILDING_BLOCKS.addItem(Items.CRIMSON_PLANKS);
         CreativeTabs.BUILDING_BLOCKS.addItem(Items.WARPED_PLANKS);
+        // Stairs
+        CreativeTabs.BUILDING_BLOCKS.addItem(Items.OAK_STAIRS);
+        CreativeTabs.BUILDING_BLOCKS.addItem(Items.SPRUCE_STAIRS);
         CreativeTabs.BUILDING_BLOCKS.addItem(Items.BIRCH_STAIRS);
+        CreativeTabs.BUILDING_BLOCKS.addItem(Items.JUNGLE_STAIRS);
+        CreativeTabs.BUILDING_BLOCKS.addItem(Items.ACACIA_STAIRS);
+        CreativeTabs.BUILDING_BLOCKS.addItem(Items.DARK_OAK_STAIRS);
+        CreativeTabs.BUILDING_BLOCKS.addItem(Items.MANGROVE_STAIRS);
+        CreativeTabs.BUILDING_BLOCKS.addItem(Items.CHERRY_STAIRS);
+        CreativeTabs.BUILDING_BLOCKS.addItem(Items.BAMBOO_STAIRS);
+        CreativeTabs.BUILDING_BLOCKS.addItem(Items.CRIMSON_STAIRS);
+        CreativeTabs.BUILDING_BLOCKS.addItem(Items.WARPED_STAIRS);
+        CreativeTabs.BUILDING_BLOCKS.addItem(Items.SILVER_BIRCH_STAIRS);
+        // Slabs
+        CreativeTabs.BUILDING_BLOCKS.addItem(Items.OAK_SLAB);
+        CreativeTabs.BUILDING_BLOCKS.addItem(Items.SPRUCE_SLAB);
+        CreativeTabs.BUILDING_BLOCKS.addItem(Items.BIRCH_SLAB);
+        CreativeTabs.BUILDING_BLOCKS.addItem(Items.JUNGLE_SLAB);
+        CreativeTabs.BUILDING_BLOCKS.addItem(Items.ACACIA_SLAB);
+        CreativeTabs.BUILDING_BLOCKS.addItem(Items.DARK_OAK_SLAB);
+        CreativeTabs.BUILDING_BLOCKS.addItem(Items.MANGROVE_SLAB);
+        CreativeTabs.BUILDING_BLOCKS.addItem(Items.CHERRY_SLAB);
+        CreativeTabs.BUILDING_BLOCKS.addItem(Items.BAMBOO_SLAB);
+        CreativeTabs.BUILDING_BLOCKS.addItem(Items.CRIMSON_SLAB);
+        CreativeTabs.BUILDING_BLOCKS.addItem(Items.WARPED_SLAB);
+        CreativeTabs.BUILDING_BLOCKS.addItem(Items.SILVER_BIRCH_SLAB);
         CreativeTabs.BUILDING_BLOCKS.addItem(Items.TORCH);
         CreativeTabs.BUILDING_BLOCKS.addItem(Items.PEARLESCENT_FROGLIGHT);
         CreativeTabs.BUILDING_BLOCKS.addItem(Items.OCHRE_FROGLIGHT);

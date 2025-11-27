@@ -1,0 +1,8 @@
+{
+  "parent": "mattmc:block/outer_stairs",
+  "textures": {
+    "bottom": "mattmc:block/mangrove_planks",
+    "side": "mattmc:block/mangrove_planks",
+    "top": "mattmc:block/mangrove_planks"
+  }
+}
