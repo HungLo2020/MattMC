@@ -1,0 +1,7 @@
+{
+  "parent": "mattmc:block/cube_column",
+  "textures": {
+    "end": "mattmc:block/spruce_log_top",
+    "side": "mattmc:block/spruce_log"
+  }
+}

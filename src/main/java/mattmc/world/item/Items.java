@@ -74,6 +74,17 @@ public class Items {
     public static final BlockItem VERDANT_FROGLIGHT = register("verdant_froglight", new BlockItem(Blocks.VERDANT_FROGLIGHT));
     public static final BlockItem SEA_LANTERN = register("sea_lantern", new BlockItem(Blocks.SEA_LANTERN));
     public static final BlockItem OAK_LOG = register("oak_log", new BlockItem(Blocks.OAK_LOG));
+    public static final BlockItem SPRUCE_LOG = register("spruce_log", new BlockItem(Blocks.SPRUCE_LOG));
+    public static final BlockItem BIRCH_LOG = register("birch_log", new BlockItem(Blocks.BIRCH_LOG));
+    public static final BlockItem JUNGLE_LOG = register("jungle_log", new BlockItem(Blocks.JUNGLE_LOG));
+    public static final BlockItem ACACIA_LOG = register("acacia_log", new BlockItem(Blocks.ACACIA_LOG));
+    public static final BlockItem DARK_OAK_LOG = register("dark_oak_log", new BlockItem(Blocks.DARK_OAK_LOG));
+    public static final BlockItem MANGROVE_LOG = register("mangrove_log", new BlockItem(Blocks.MANGROVE_LOG));
+    public static final BlockItem CHERRY_LOG = register("cherry_log", new BlockItem(Blocks.CHERRY_LOG));
+    public static final BlockItem BAMBOO_BLOCK = register("bamboo_block", new BlockItem(Blocks.BAMBOO_BLOCK));
+    public static final BlockItem CRIMSON_STEM = register("crimson_stem", new BlockItem(Blocks.CRIMSON_STEM));
+    public static final BlockItem WARPED_STEM = register("warped_stem", new BlockItem(Blocks.WARPED_STEM));
+    public static final BlockItem SILVER_BIRCH_LOG = register("silver_birch_log", new BlockItem(Blocks.SILVER_BIRCH_LOG));
 
     // Basic materials (stackable, 64 max)
     //public static final Item STICK = register("stick", new Item(64));

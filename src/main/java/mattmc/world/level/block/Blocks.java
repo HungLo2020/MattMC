@@ -75,6 +75,17 @@ public class Blocks {
     public static final Block OCHRE_FROGLIGHT = register("ochre_froglight", new RotatedPillarBlock(false, 14, 14, 12, 7));
     public static final Block SEA_LANTERN = register("sea_lantern", new Block(false, 14, 10, 14, 14));
     public static final Block OAK_LOG = register("oak_log", new RotatedPillarBlock(true));
+    public static final Block SPRUCE_LOG = register("spruce_log", new RotatedPillarBlock(true));
+    public static final Block BIRCH_LOG = register("birch_log", new RotatedPillarBlock(true));
+    public static final Block JUNGLE_LOG = register("jungle_log", new RotatedPillarBlock(true));
+    public static final Block ACACIA_LOG = register("acacia_log", new RotatedPillarBlock(true));
+    public static final Block DARK_OAK_LOG = register("dark_oak_log", new RotatedPillarBlock(true));
+    public static final Block MANGROVE_LOG = register("mangrove_log", new RotatedPillarBlock(true));
+    public static final Block CHERRY_LOG = register("cherry_log", new RotatedPillarBlock(true));
+    public static final Block BAMBOO_BLOCK = register("bamboo_block", new RotatedPillarBlock(true));
+    public static final Block CRIMSON_STEM = register("crimson_stem", new RotatedPillarBlock(true));
+    public static final Block WARPED_STEM = register("warped_stem", new RotatedPillarBlock(true));
+    public static final Block SILVER_BIRCH_LOG = register("silver_birch_log", new RotatedPillarBlock(true));
     
     /**
      * Register a block with a given name (without namespace).
