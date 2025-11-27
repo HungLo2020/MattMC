@@ -10,9 +10,9 @@
     <!-- 
         File appender for debug logs - uses MattMC data directory when set, else current dir.
         Uses RollingFileAppender to manage log file size:
-        - Starts fresh each session (current session logs in mattmc.log)
-        - Keeps up to 3 old log files (mattmc.1.log, mattmc.2.log, mattmc.3.log)
-        - Each file limited to 10MB
+        - Appends to existing log file (mattmc.log)
+        - When file reaches 10MB, rolls to backup (mattmc.1.log, etc.)
+        - Keeps up to 3 backup files
     -->
     <appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
         <file>${mattmc.dataDir:-.}/logs/mattmc.log</file>

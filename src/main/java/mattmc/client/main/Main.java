@@ -23,7 +23,9 @@ public final class Main {
             // Set property before any logger is created so logback can use it
             System.setProperty("mattmc.dataDir", dataDir.toString());
         } catch (IOException | IllegalArgumentException e) {
-            throw new ExceptionInInitializerError("Failed to create data directory: " + e.getMessage());
+            ExceptionInInitializerError error = new ExceptionInInitializerError("Failed to create data directory: " + e.getMessage());
+            error.initCause(e);
+            throw error;
         }
     }
     
