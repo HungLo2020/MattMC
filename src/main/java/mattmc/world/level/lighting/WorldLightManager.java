@@ -24,7 +24,8 @@ public class WorldLightManager {
 		// Wire up the propagators
 		this.blockLightPropagator.setCrossChunkPropagator(crossChunkPropagator);
 		this.crossChunkPropagator.setLightPropagator(blockLightPropagator);
-		// SkylightEngine will also need cross-chunk support (to be added)
+		// Wire up skylight engine for cross-chunk propagation
+		this.skylightEngine.setCrossChunkPropagator(crossChunkPropagator);
 	}
 	
 	/**
