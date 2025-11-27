@@ -29,6 +29,7 @@ public class CreativeModeTabs {
         CreativeTabs.BUILDING_BLOCKS.addItem(Items.DIRT);
         CreativeTabs.BUILDING_BLOCKS.addItem(Items.COBBLESTONE);
         CreativeTabs.BUILDING_BLOCKS.addItem(Items.MOSSY_COBBLESTONE);
+        CreativeTabs.BUILDING_BLOCKS.addItem(Items.OAK_LOG);
         CreativeTabs.BUILDING_BLOCKS.addItem(Items.OAK_PLANKS);
         CreativeTabs.BUILDING_BLOCKS.addItem(Items.SPRUCE_PLANKS);
         CreativeTabs.BUILDING_BLOCKS.addItem(Items.BIRCH_PLANKS);
