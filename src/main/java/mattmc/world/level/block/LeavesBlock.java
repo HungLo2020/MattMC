@@ -88,6 +88,15 @@ public class LeavesBlock extends Block {
     }
     
     @Override
+    public boolean canOcclude() {
+        // Leaves are transparent and should not occlude neighboring block faces.
+        // This means when you place leaves on top of grass_block, the grass_block's
+        // top face should still be rendered (visible through the leaves).
+        // This matches Minecraft's behavior where leaves have noOcclusion() set.
+        return false;
+    }
+    
+    @Override
     public int getOpacity() {
         // Leaves block some light but not all (value of 1 means slight light reduction)
         return 1;

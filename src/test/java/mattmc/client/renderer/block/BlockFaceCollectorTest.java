@@ -233,5 +233,79 @@ public class BlockFaceCollectorTest {
         assertFalse(collector.getWestFaces().isEmpty(), "West face should be visible");
     }
     
+    /**
+     * Test that transparent blocks like leaves do NOT occlude adjacent block faces.
+     * This is the bug fix for: when placing leaves on top of grass_block, the grass_block's
+     * top face should still be rendered (not culled).
+     * 
+     * In Minecraft, canOcclude() is separate from isSolid(). Leaves are solid (have collision)
+     * but cannot occlude (are transparent), so adjacent faces should be rendered.
+     */
+    @Test
+    public void testTransparentBlocksDoNotOccludeFaces() {
+        LevelChunk chunk = new LevelChunk(0, 0);
+        
+        // Place grass_block with leaves on top (simulates placing leaves on grass)
+        chunk.setBlock(8, 64, 8, Blocks.GRASS_BLOCK);
+        chunk.setBlock(8, 65, 8, Blocks.OAK_LEAVES);
+        
+        // Collect faces for the grass_block
+        BlockFaceCollector collector = new BlockFaceCollector();
+        collector.collectBlockFaces(8, 64, 8, Blocks.GRASS_BLOCK, chunk, 8, 64, 8);
+        
+        // The top face of grass_block should be VISIBLE because leaves cannot occlude
+        // (leaves are transparent - you can see through them)
+        assertFalse(collector.getTopFaces().isEmpty(), 
+            "Top face of grass_block should be visible when leaves are on top - leaves don't occlude");
+        
+        // Other faces should also be visible (air around them)
+        assertFalse(collector.getBottomFaces().isEmpty(), "Bottom face should be visible");
+        assertFalse(collector.getNorthFaces().isEmpty(), "North face should be visible");
+        assertFalse(collector.getSouthFaces().isEmpty(), "South face should be visible");
+        assertFalse(collector.getWestFaces().isEmpty(), "West face should be visible");
+        assertFalse(collector.getEastFaces().isEmpty(), "East face should be visible");
+    }
+    
+    /**
+     * Test that solid opaque blocks still occlude faces properly.
+     * Stone on top of stone should cull the middle face.
+     */
+    @Test
+    public void testSolidOpaqueBlocksStillOccludeFaces() {
+        LevelChunk chunk = new LevelChunk(0, 0);
+        
+        // Place stone with stone on top (both are solid and can occlude)
+        chunk.setBlock(8, 64, 8, Blocks.STONE);
+        chunk.setBlock(8, 65, 8, Blocks.STONE);
+        
+        // Collect faces for the bottom stone
+        BlockFaceCollector collector = new BlockFaceCollector();
+        collector.collectBlockFaces(8, 64, 8, Blocks.STONE, chunk, 8, 64, 8);
+        
+        // The top face of bottom stone should be CULLED because top stone can occlude
+        assertTrue(collector.getTopFaces().isEmpty(), 
+            "Top face of bottom stone should be culled when another stone is on top");
+        
+        // Other faces should be visible (air around them)
+        assertFalse(collector.getBottomFaces().isEmpty(), "Bottom face should be visible");
+    }
+    
+    /**
+     * Test leaves blocks specifically - they should not occlude neighboring block faces.
+     */
+    @Test
+    public void testLeavesBlockOcclusionProperties() {
+        // Verify leaves block properties
+        assertTrue(Blocks.OAK_LEAVES.isSolid(), 
+            "Leaves should be solid (have collision)");
+        assertFalse(Blocks.OAK_LEAVES.canOcclude(), 
+            "Leaves should NOT be able to occlude (are transparent)");
+        
+        // Compare with stone which should occlude
+        assertTrue(Blocks.STONE.isSolid(), 
+            "Stone should be solid");
+        assertTrue(Blocks.STONE.canOcclude(), 
+            "Stone SHOULD be able to occlude");
+    }
 
 }

@@ -113,7 +113,14 @@ public class BlockFaceCollector {
     }
     
     /**
-     * Check if a face should be rendered (is the adjacent block air or transparent?).
+     * Check if a face should be rendered (is the adjacent block air or non-occluding?).
+     * 
+     * A face should be rendered when the adjacent block:
+     * - Is air (nothing there)
+     * - Cannot occlude (transparent blocks like leaves, glass)
+     * 
+     * This matches Minecraft's face culling behavior where canOcclude() determines
+     * if a block hides adjacent faces, not isSolid() (which is for collision).
      */
     private boolean shouldRenderFace(LevelChunk chunk, int x, int y, int z) {
         // Check Y bounds first (no neighboring chunks in Y direction)
@@ -124,13 +131,15 @@ public class BlockFaceCollector {
         // If within chunk bounds, use direct chunk access
         if (x >= 0 && x < LevelChunk.WIDTH && z >= 0 && z < LevelChunk.DEPTH) {
             Block adjacent = chunk.getBlock(x, y, z);
-            return adjacent.isAir() || !adjacent.isSolid();  // Render if air or transparent (non-solid)
+            // Render if air or if adjacent block cannot occlude (transparent like leaves)
+            return adjacent.isAir() || !adjacent.canOcclude();
         }
         
         // Out of chunk bounds in X or Z - need to check neighboring chunk
         if (neighborAccessor != null) {
             Block adjacentBlock = neighborAccessor.getBlockAcrossChunks(chunk, x, y, z);
-            return adjacentBlock.isAir() || !adjacentBlock.isSolid();  // Render if air or transparent
+            // Render if air or if adjacent block cannot occlude (transparent like leaves)
+            return adjacentBlock.isAir() || !adjacentBlock.canOcclude();
         }
         
         // No neighbor accessor available - fall back to old behavior
