@@ -84,6 +84,18 @@ public class CreativeModeTabs {
         CreativeTabs.BUILDING_BLOCKS.addItem(Items.OCHRE_FROGLIGHT);
         CreativeTabs.BUILDING_BLOCKS.addItem(Items.VERDANT_FROGLIGHT);
         CreativeTabs.BUILDING_BLOCKS.addItem(Items.SEA_LANTERN);
+        // Leaves
+        CreativeTabs.BUILDING_BLOCKS.addItem(Items.OAK_LEAVES);
+        CreativeTabs.BUILDING_BLOCKS.addItem(Items.SPRUCE_LEAVES);
+        CreativeTabs.BUILDING_BLOCKS.addItem(Items.BIRCH_LEAVES);
+        CreativeTabs.BUILDING_BLOCKS.addItem(Items.JUNGLE_LEAVES);
+        CreativeTabs.BUILDING_BLOCKS.addItem(Items.ACACIA_LEAVES);
+        CreativeTabs.BUILDING_BLOCKS.addItem(Items.DARK_OAK_LEAVES);
+        CreativeTabs.BUILDING_BLOCKS.addItem(Items.MANGROVE_LEAVES);
+        CreativeTabs.BUILDING_BLOCKS.addItem(Items.CHERRY_LEAVES);
+        CreativeTabs.BUILDING_BLOCKS.addItem(Items.AZALEA_LEAVES);
+        CreativeTabs.BUILDING_BLOCKS.addItem(Items.FLOWERING_AZALEA_LEAVES);
+        CreativeTabs.BUILDING_BLOCKS.addItem(Items.PALE_OAK_LEAVES);
         
         // Tools tab
         //CreativeTabs.TOOLS.addItem(Items.WOODEN_PICKAXE);
