@@ -208,28 +208,36 @@ public class Inventory {
      * If the item already exists in the hotbar, switch to that slot.
      * If not in hotbar but exists in inventory, swap with current slot.
      * If not in inventory and hotbar is full, move current slot to first empty main inventory slot.
+     * If no empty slot exists, the pick is cancelled (item not added) to prevent item loss.
      * 
      * @param stack The item stack to set as picked
+     * @return true if the item was picked successfully, false if operation was cancelled
      */
-    public void setPickedItem(ItemStack stack) {
+    public boolean setPickedItem(ItemStack stack) {
         int existingSlot = findSlotMatchingItem(stack);
         
         if (isHotbarSlot(existingSlot)) {
             // Item is already in hotbar - just select that slot
             selectedHotbarSlot = existingSlot;
+            return true;
         } else if (existingSlot != -1) {
             // Item exists in main inventory - swap with current selected slot
             pickSlot(existingSlot);
+            return true;
         } else {
             // Item not in inventory - add to current slot
             // If current slot is occupied, move its contents to first empty slot
             if (items[selectedHotbarSlot] != null) {
                 int emptySlot = findFirstEmptySlotInMainInventory();
-                if (emptySlot != -1) {
-                    items[emptySlot] = items[selectedHotbarSlot];
+                if (emptySlot == -1) {
+                    // No empty slot available - cancel pick to prevent item loss
+                    // This matches Minecraft behavior where pick block does nothing when inventory is full
+                    return false;
                 }
+                items[emptySlot] = items[selectedHotbarSlot];
             }
             items[selectedHotbarSlot] = stack.copy();
+            return true;
         }
     }
     

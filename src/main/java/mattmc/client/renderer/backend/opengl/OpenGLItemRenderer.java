@@ -837,12 +837,13 @@ public class OpenGLItemRenderer implements ItemRenderer {
                 AnimationMetadataSection metadata = AnimationMetadataSection.load(mcmetaStream);
                 if (metadata != AnimationMetadataSection.EMPTY) {
                     // This is an animated texture - calculate V scale for first frame
-                    // Frame size is calculated based on texture dimensions
-                    int frameWidth = texture.width;
-                    int frameHeight = texture.width; // Animated textures have square frames (16x16)
+                    // Use metadata to properly calculate frame size
+                    mattmc.client.resources.metadata.animation.FrameSize frameSize = 
+                        metadata.calculateFrameSize(texture.width, texture.height);
+                    int frameHeight = frameSize.height();
                     
-                    // If texture height > width, it's a vertical strip of frames
-                    if (texture.height > texture.width) {
+                    // If texture height > frame height, it's a strip of frames
+                    if (texture.height > frameHeight) {
                         float vScale = (float) frameHeight / (float) texture.height;
                         ANIMATED_TEXTURE_V_SCALE.put(path, vScale);
                     }
