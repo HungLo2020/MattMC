@@ -193,6 +193,8 @@ public class SkyRenderer {
         backend.setBlendFunc(RenderBackend.BLEND_SRC_ALPHA, RenderBackend.BLEND_ONE_MINUS_SRC_ALPHA);
         backend.disableBlend();
         backend.setDepthMask(true);
+        // Re-enable texturing for subsequent world rendering
+        backend.enableTexture2D();
     }
     
     /**
