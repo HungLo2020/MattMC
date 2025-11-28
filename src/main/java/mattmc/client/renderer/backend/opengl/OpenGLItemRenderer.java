@@ -831,7 +831,8 @@ public class OpenGLItemRenderer implements ItemRenderer {
      */
     private static void checkAndCacheAnimatedTextureInfo(String path, String resourcePath, Texture texture) {
         // Check for .mcmeta file
-        String mcmetaPath = resourcePath + ".mcmeta";
+        // Remove leading slash if present (getResourceStreamFromClassLoader expects no leading slash)
+        String mcmetaPath = (resourcePath.startsWith("/") ? resourcePath.substring(1) : resourcePath) + ".mcmeta";
         try (InputStream mcmetaStream = mattmc.util.ResourceLoader.getResourceStreamFromClassLoader(mcmetaPath)) {
             if (mcmetaStream != null) {
                 AnimationMetadataSection metadata = AnimationMetadataSection.load(mcmetaStream);
@@ -846,11 +847,14 @@ public class OpenGLItemRenderer implements ItemRenderer {
                     if (texture.height > frameHeight) {
                         float vScale = (float) frameHeight / (float) texture.height;
                         ANIMATED_TEXTURE_V_SCALE.put(path, vScale);
+                        logger.info("Cached animated texture V scale for {}: {} (frame {}px / total {}px)", 
+                                   path, vScale, frameHeight, texture.height);
                     }
                 }
             }
         } catch (Exception e) {
             // No mcmeta file or error reading - treat as static texture
+            logger.debug("No mcmeta found or error reading for {}: {}", mcmetaPath, e.getMessage());
         }
     }
     
