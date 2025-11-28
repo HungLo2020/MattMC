@@ -148,12 +148,13 @@ public class VertexLightSampler {
                 // Sample from above this solid block instead
                 // This prevents interior edges from being too dark when adjacent
                 // solid blocks block the direct sampling path
-                int altY = sy + 1;
-                if (altY < LevelChunk.HEIGHT) {
-                    Block altBlock = getBlockSafe(face.chunk, sx, altY, sz);
+                // Search upward up to 3 blocks to find air
+                for (int searchY = sy + 1; searchY <= sy + 3 && searchY < LevelChunk.HEIGHT; searchY++) {
+                    Block altBlock = getBlockSafe(face.chunk, sx, searchY, sz);
                     if (altBlock == null || !altBlock.isSolid()) {
-                        // Use the position above the solid block
-                        sy = altY;
+                        // Found a non-solid position above
+                        sy = searchY;
+                        break;
                     }
                 }
             }
@@ -368,21 +369,20 @@ public class VertexLightSampler {
      * Uses the light accessor's getBlockAcrossChunks if available.
      */
     private Block getBlockSafe(LevelChunk chunk, int x, int y, int z) {
-        // Check bounds
+        // Check Y bounds
         if (y < 0 || y >= LevelChunk.HEIGHT) {
             return null;
         }
         
-        // If we have a light accessor and coordinates are out of chunk bounds, use cross-chunk access
-        if (lightAccessor != null && 
-            (x < 0 || x >= LevelChunk.WIDTH ||
-             z < 0 || z >= LevelChunk.DEPTH)) {
-            return lightAccessor.getBlockAcrossChunks(chunk, x, y, z);
-        }
+        // Check if coordinates are out of chunk bounds
+        boolean outOfChunkBounds = x < 0 || x >= LevelChunk.WIDTH ||
+                                   z < 0 || z >= LevelChunk.DEPTH;
         
-        // Within chunk bounds - use direct access
-        if (x < 0 || x >= LevelChunk.WIDTH ||
-            z < 0 || z >= LevelChunk.DEPTH) {
+        if (outOfChunkBounds) {
+            // Use cross-chunk access if available, otherwise return null
+            if (lightAccessor != null) {
+                return lightAccessor.getBlockAcrossChunks(chunk, x, y, z);
+            }
             return null;
         }
         
