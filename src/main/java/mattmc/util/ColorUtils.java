@@ -65,19 +65,6 @@ public final class ColorUtils {
     }
     
     /**
-     * Convert packed RGB to normalized float values and store in output array.
-     * PERFORMANCE FIX #7: Eliminates array allocation by using output parameter.
-     * 
-     * @param rgb Packed RGB color (0xRRGGBB)
-     * @param out Output array of at least length 3 to store [r, g, b]
-     */
-    public static void toNormalizedRGB(int rgb, float[] out) {
-        out[0] = extractRed(rgb) / NORMALIZE_DIVISOR;
-        out[1] = extractGreen(rgb) / NORMALIZE_DIVISOR;
-        out[2] = extractBlue(rgb) / NORMALIZE_DIVISOR;
-    }
-    
-    /**
      * Convert packed RGB to normalized float array [r, g, b, a].
      * @param rgb Packed RGB color (0xRRGGBB)
      * @param alpha Alpha value (0.0-1.0)
@@ -90,21 +77,6 @@ public final class ColorUtils {
             extractBlue(rgb) / NORMALIZE_DIVISOR,
             alpha
         };
-    }
-    
-    /**
-     * Convert packed RGB to normalized float values with alpha and store in output array.
-     * PERFORMANCE FIX #7: Eliminates array allocation by using output parameter.
-     * 
-     * @param rgb Packed RGB color (0xRRGGBB)
-     * @param alpha Alpha value (0.0-1.0)
-     * @param out Output array of at least length 4 to store [r, g, b, a]
-     */
-    public static void toNormalizedRGBA(int rgb, float alpha, float[] out) {
-        out[0] = extractRed(rgb) / NORMALIZE_DIVISOR;
-        out[1] = extractGreen(rgb) / NORMALIZE_DIVISOR;
-        out[2] = extractBlue(rgb) / NORMALIZE_DIVISOR;
-        out[3] = alpha;
     }
     
     /**

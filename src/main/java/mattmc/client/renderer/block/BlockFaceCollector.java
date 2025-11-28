@@ -7,14 +7,10 @@ import mattmc.world.level.chunk.LevelChunk;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.ArrayDeque;
-import java.util.Deque;
 
 /**
  * Collects visible block faces for batched rendering with face culling.
  * Separates faces by direction for optimized rendering.
- * 
- * PERFORMANCE FIX #6: Uses object pooling for FaceData to reduce allocations.
  */
 public class BlockFaceCollector {
     
@@ -41,10 +37,6 @@ public class BlockFaceCollector {
     private final List<FaceData> westFaces = new ArrayList<>();
     private final List<FaceData> eastFaces = new ArrayList<>();
     
-    // PERFORMANCE FIX #6: Object pool for FaceData to reduce allocations
-    private static final ThreadLocal<Deque<FaceData>> faceDataPool = 
-        ThreadLocal.withInitial(() -> new ArrayDeque<>(1024));
-    
     // Neighbor accessor for cross-chunk queries
     private ChunkNeighborAccessor neighborAccessor;
     
@@ -56,59 +48,15 @@ public class BlockFaceCollector {
     }
     
     /**
-     * PERFORMANCE FIX #6: Acquire a FaceData from the pool or create a new one.
-     */
-    private FaceData acquireFaceData(float x, float y, float z, int color, float brightness, 
-                                      float colorBrightness, Block block, String faceType,
-                                      mattmc.world.level.block.state.BlockState blockState,
-                                      LevelChunk chunk, int cx, int cy, int cz) {
-        Deque<FaceData> pool = faceDataPool.get();
-        FaceData data = pool.pollFirst();
-        if (data == null) {
-            // Pool is empty, create new object
-            return new FaceData(x, y, z, color, brightness, colorBrightness, block, faceType, blockState, chunk, cx, cy, cz);
-        }
-        // Reinitialize pooled object
-        data.reinit(x, y, z, color, brightness, colorBrightness, block, faceType, blockState, chunk, cx, cy, cz);
-        return data;
-    }
-    
-    /**
      * Clear all collected face data.
-     * PERFORMANCE FIX #6: Returns FaceData objects to the pool for reuse.
      */
     public void clear() {
-        Deque<FaceData> pool = faceDataPool.get();
-        
-        // Return all face data to pool (up to a reasonable limit to prevent memory bloat)
-        int poolLimit = 4096;
-        
-        returnToPool(topFaces, pool, poolLimit);
-        returnToPool(bottomFaces, pool, poolLimit);
-        returnToPool(northFaces, pool, poolLimit);
-        returnToPool(southFaces, pool, poolLimit);
-        returnToPool(westFaces, pool, poolLimit);
-        returnToPool(eastFaces, pool, poolLimit);
-        
         topFaces.clear();
         bottomFaces.clear();
         northFaces.clear();
         southFaces.clear();
         westFaces.clear();
         eastFaces.clear();
-    }
-    
-    private void returnToPool(List<FaceData> faces, Deque<FaceData> pool, int limit) {
-        // PERFORMANCE: Check once if pool has space before iterating
-        int available = limit - pool.size();
-        if (available <= 0) {
-            return; // Pool is full
-        }
-        
-        int toReturn = Math.min(available, faces.size());
-        for (int i = 0; i < toReturn; i++) {
-            pool.addLast(faces.get(i));
-        }
     }
     
     /**
@@ -126,7 +74,7 @@ public class BlockFaceCollector {
             
             // Add to topFaces with "model_elements" marker for data-driven rendering
             // The ModelElementRenderer will read geometry from the block's JSON model
-            topFaces.add(acquireFaceData(x, y, z, color, 1f, 1f, block, "model_elements", state, chunk, cx, cy, cz));
+            topFaces.add(new FaceData(x, y, z, color, 1f, 1f, block, "model_elements", state, chunk, cx, cy, cz));
             return;
         }
         
@@ -144,24 +92,23 @@ public class BlockFaceCollector {
         
         // Collect visible faces for batched rendering
         // Store both the adjusted color and the brightness factor for fallback color
-        // PERFORMANCE FIX #6: Use pooled FaceData objects
         if (topVisible) {
-            topFaces.add(acquireFaceData(x, y, z, color, 1f, 1f, block, "top", null, chunk, cx, cy, cz));
+            topFaces.add(new FaceData(x, y, z, color, 1f, 1f, block, "top", null, chunk, cx, cy, cz));
         }
         if (bottomVisible) {
-            bottomFaces.add(acquireFaceData(x, y, z, ColorUtils.darkenColor(color), 1f, 0.5f, block, "bottom", null, chunk, cx, cy, cz));
+            bottomFaces.add(new FaceData(x, y, z, ColorUtils.darkenColor(color), 1f, 0.5f, block, "bottom", null, chunk, cx, cy, cz));
         }
         if (northVisible) {
-            northFaces.add(acquireFaceData(x, y, z, ColorUtils.adjustColorBrightness(color, 0.8f), 1f, 0.8f, block, "north", null, chunk, cx, cy, cz));
+            northFaces.add(new FaceData(x, y, z, ColorUtils.adjustColorBrightness(color, 0.8f), 1f, 0.8f, block, "north", null, chunk, cx, cy, cz));
         }
         if (southVisible) {
-            southFaces.add(acquireFaceData(x, y, z, ColorUtils.adjustColorBrightness(color, 0.8f), 1f, 0.8f, block, "south", null, chunk, cx, cy, cz));
+            southFaces.add(new FaceData(x, y, z, ColorUtils.adjustColorBrightness(color, 0.8f), 1f, 0.8f, block, "south", null, chunk, cx, cy, cz));
         }
         if (westVisible) {
-            westFaces.add(acquireFaceData(x, y, z, ColorUtils.adjustColorBrightness(color, 0.6f), 1f, 0.6f, block, "west", null, chunk, cx, cy, cz));
+            westFaces.add(new FaceData(x, y, z, ColorUtils.adjustColorBrightness(color, 0.6f), 1f, 0.6f, block, "west", null, chunk, cx, cy, cz));
         }
         if (eastVisible) {
-            eastFaces.add(acquireFaceData(x, y, z, ColorUtils.adjustColorBrightness(color, 0.6f), 1f, 0.6f, block, "east", null, chunk, cx, cy, cz));
+            eastFaces.add(new FaceData(x, y, z, ColorUtils.adjustColorBrightness(color, 0.6f), 1f, 0.6f, block, "east", null, chunk, cx, cy, cz));
         }
     }
     
@@ -214,18 +161,17 @@ public class BlockFaceCollector {
     
     /**
      * Data class to store face rendering information.
-     * PERFORMANCE FIX #6: Made mutable to support object pooling.
      */
     public static class FaceData {
-        public float x, y, z;  // World/chunk-relative coordinates for rendering
-        public int cx, cy, cz; // Chunk-local coordinates (0-15, 0-383, 0-15)
-        public int color;
-        public float brightness;
-        public float colorBrightness; // Brightness adjustment for the base color (for fallback)
-        public Block block;
-        public String faceType; // "top", "bottom", "north", "south", "west", "east", "model_elements"
-        public mattmc.world.level.block.state.BlockState blockState; // Block state for custom rendering
-        public LevelChunk chunk; // Reference to the chunk (for light sampling)
+        public final float x, y, z;  // World/chunk-relative coordinates for rendering
+        public final int cx, cy, cz; // Chunk-local coordinates (0-15, 0-383, 0-15)
+        public final int color;
+        public final float brightness;
+        public final float colorBrightness; // Brightness adjustment for the base color (for fallback)
+        public final Block block;
+        public final String faceType; // "top", "bottom", "north", "south", "west", "east", "model_elements"
+        public final mattmc.world.level.block.state.BlockState blockState; // Block state for custom rendering
+        public final LevelChunk chunk; // Reference to the chunk (for light sampling)
         
         public FaceData(float x, float y, float z, int color, float brightness, float colorBrightness, 
                        Block block, String faceType) {
@@ -240,15 +186,6 @@ public class BlockFaceCollector {
         public FaceData(float x, float y, float z, int color, float brightness, float colorBrightness, 
                        Block block, String faceType, mattmc.world.level.block.state.BlockState blockState,
                        LevelChunk chunk, int cx, int cy, int cz) {
-            reinit(x, y, z, color, brightness, colorBrightness, block, faceType, blockState, chunk, cx, cy, cz);
-        }
-        
-        /**
-         * PERFORMANCE FIX #6: Reinitialize a pooled FaceData object with new values.
-         */
-        void reinit(float x, float y, float z, int color, float brightness, float colorBrightness, 
-                   Block block, String faceType, mattmc.world.level.block.state.BlockState blockState,
-                   LevelChunk chunk, int cx, int cy, int cz) {
             this.x = x;
             this.y = y;
             this.z = z;

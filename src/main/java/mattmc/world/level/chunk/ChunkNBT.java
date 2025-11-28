@@ -61,57 +61,32 @@ public class ChunkNBT {
      * Create NBT for a single 16x16x16 section of the chunk.
      * Returns null if the section is empty (all air) and has default light values.
      * Uses bit-packed arrays like MattMC Java Edition for optimal storage.
-     * 
-     * PERFORMANCE FIX #4: Uses single-pass algorithm instead of 3 separate iterations.
-     * This reduces getBlock() calls from 12,288 to 4,096 per section.
      */
     private static Map<String, Object> createSection(LevelChunk chunk, int sectionY) {
+        // Check if section is empty (all air)
+        boolean isEmpty = true;
         int baseY = sectionY * 16;
         
-        // PERFORMANCE FIX #4: Single-pass algorithm
-        // Build palette and collect block data in one iteration instead of three
-        List<String> paletteList = new ArrayList<>();
-        Map<String, Integer> paletteMap = new HashMap<>();
-        int[] paletteIndices = new int[4096];  // Temporary storage for palette indices
-        boolean isEmpty = true;
-        
-        // Single pass: check empty, build palette, and collect indices
-        for (int y = 0; y < 16; y++) {
-            for (int z = 0; z < 16; z++) {
-                for (int x = 0; x < 16; x++) {
-                    Block block = chunk.getBlock(x, baseY + y, z);
-                    String identifier = block.getIdentifier();
-                    if (identifier == null) identifier = "mattmc:air";
-                    
-                    if (block != Blocks.AIR) {
+        for (int x = 0; x < 16 && isEmpty; x++) {
+            for (int y = baseY; y < baseY + 16 && isEmpty; y++) {
+                for (int z = 0; z < 16 && isEmpty; z++) {
+                    if (chunk.getBlock(x, y, z) != Blocks.AIR) {
                         isEmpty = false;
                     }
-                    
-                    Integer paletteIndex = paletteMap.get(identifier);
-                    if (paletteIndex == null) {
-                        paletteIndex = paletteList.size();
-                        paletteMap.put(identifier, paletteIndex);
-                        paletteList.add(identifier);
-                    }
-                    
-                    int index = x + z * 16 + y * 16 * 16;
-                    paletteIndices[index] = paletteIndex;
                 }
             }
         }
         
-        // Check if light has non-default values (only if section is empty)
+        // Check if light has non-default values
         LightStorage lightStorage = chunk.getLightStorage(sectionY);
         boolean hasNonDefaultLight = false;
         if (lightStorage != null && isEmpty) {
             // Only check light if section is empty (to save time)
-            outerLoop:
-            for (int x = 0; x < 16; x++) {
-                for (int y = 0; y < 16; y++) {
-                    for (int z = 0; z < 16; z++) {
+            for (int x = 0; x < 16 && !hasNonDefaultLight; x++) {
+                for (int y = 0; y < 16 && !hasNonDefaultLight; y++) {
+                    for (int z = 0; z < 16 && !hasNonDefaultLight; z++) {
                         if (lightStorage.getSkyLight(x, y, z) != 15 || lightStorage.getBlockLightI(x, y, z) != 0) {
                             hasNonDefaultLight = true;
-                            break outerLoop;
                         }
                     }
                 }
@@ -130,20 +105,52 @@ public class ChunkNBT {
         section.put("Y", (byte) (sectionY + LevelChunk.MIN_Y / 16));
         
         if (!isEmpty) {
+            // Build palette - map unique blocks to palette indices
+            List<String> paletteList = new ArrayList<>();
+            Map<String, Integer> paletteMap = new HashMap<>();
+            
+            // First pass: collect unique blocks
+            for (int x = 0; x < 16; x++) {
+                for (int y = 0; y < 16; y++) {
+                    for (int z = 0; z < 16; z++) {
+                        Block block = chunk.getBlock(x, baseY + y, z);
+                        String identifier = block.getIdentifier();
+                        if (identifier == null) identifier = "mattmc:air";
+                        
+                        if (!paletteMap.containsKey(identifier)) {
+                            paletteMap.put(identifier, paletteList.size());
+                            paletteList.add(identifier);
+                        }
+                    }
+                }
+            }
+            
             // Calculate bits per entry (MattMC-style)
             int bitsPerEntry = BitPackedArray.calculateBitsPerEntry(paletteList.size());
             
             // Create bit-packed array for block states
             BitPackedArray blockStates = new BitPackedArray(bitsPerEntry, 16 * 16 * 16);
             
-            // Fill block states from pre-collected indices (no additional getBlock calls!)
-            for (int i = 0; i < 4096; i++) {
-                blockStates.set(i, paletteIndices[i]);
+            // Second pass: fill block states
+            for (int x = 0; x < 16; x++) {
+                for (int y = 0; y < 16; y++) {
+                    for (int z = 0; z < 16; z++) {
+                        Block block = chunk.getBlock(x, baseY + y, z);
+                        String identifier = block.getIdentifier();
+                        if (identifier == null) identifier = "mattmc:air";
+                        
+                        int index = x + z * 16 + y * 16 * 16;
+                        int paletteIndex = paletteMap.get(identifier);
+                        blockStates.set(index, paletteIndex);
+                    }
+                }
             }
             
             // Build palette for NBT
+            // Pre-allocate with exact size (number of unique blocks in palette)
             List<Map<String, Object>> palette = new ArrayList<>(paletteList.size());
             for (String identifier : paletteList) {
+                // Pre-allocate HashMap with single entry
                 Map<String, Object> paletteEntry = new HashMap<>(1);
                 paletteEntry.put("Name", identifier);
                 palette.add(paletteEntry);

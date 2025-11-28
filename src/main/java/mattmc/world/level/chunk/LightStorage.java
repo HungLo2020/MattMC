@@ -234,39 +234,6 @@ public class LightStorage {
 	}
 	
 	/**
-	 * Thread-local reusable array for getBlockLightRGBI().
-	 * PERFORMANCE FIX #1: Eliminates array allocation on every RGBI call.
-	 */
-	private static final ThreadLocal<int[]> RGBI_RESULT = ThreadLocal.withInitial(() -> new int[4]);
-	
-	/**
-	 * Get all block light RGBI levels at position in a single call.
-	 * PERFORMANCE FIX #1: This method performs only one bounds check and one index calculation
-	 * instead of four separate calls to getBlockLightR/G/B/I.
-	 * 
-	 * <p><b>IMPORTANT:</b> Returns a thread-local reusable array for performance.
-	 * The returned array is only valid until the next call to this method on the same thread.
-	 * Callers MUST consume the values immediately and NOT store the array reference.
-	 * 
-	 * @param x 0-15
-	 * @param y 0-15
-	 * @param z 0-15
-	 * @return int[4] containing {R, G, B, I} values (0-15 each). WARNING: This array is reused!
-	 */
-	public int[] getBlockLightRGBI(int x, int y, int z) {
-		int blockIndex = getBlockIndex(x, y, z);  // Single bounds check
-		int byteIndex = blockIndex * 2;
-		int packed = ((blockLight[byteIndex] & 0xFF) << 8) | (blockLight[byteIndex + 1] & 0xFF);
-		
-		int[] result = RGBI_RESULT.get();
-		result[0] = (packed >> 12) & 0x0F;  // R
-		result[1] = (packed >> 8) & 0x0F;   // G
-		result[2] = (packed >> 4) & 0x0F;   // B
-		result[3] = packed & 0x0F;          // I
-		return result;
-	}
-	
-	/**
 	 * Set block light RGBI levels at position.
 	 * @param x 0-15
 	 * @param y 0-15
