@@ -1,6 +1,5 @@
 package mattmc.world.level.storage;
 
-import mattmc.client.MattMC;
 import mattmc.world.entity.player.LocalPlayer;
 import mattmc.world.level.Level;
 import mattmc.world.Gamemode;

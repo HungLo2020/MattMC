@@ -1,7 +1,5 @@
 package mattmc.world.entity.player;
 
-import mattmc.client.MattMC;
-
 import mattmc.world.item.BlockItem;
 import mattmc.world.item.Item;
 import mattmc.world.item.ItemStack;
