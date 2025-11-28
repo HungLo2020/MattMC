@@ -456,6 +456,20 @@ public class AsyncChunkLoader {
                     
                     return new int[] {scaledR, scaledG, scaledB};
                 }
+                
+                @Override
+                public Block getBlockAcrossChunks(LevelChunk chunk, int x, int y, int z) {
+                    // Use the neighbor accessor for cross-chunk block access (for ambient occlusion)
+                    if (neighborAccessor != null) {
+                        return neighborAccessor.getBlockAcrossChunks(chunk, x, y, z);
+                    }
+                    // Fallback to within-chunk access
+                    if (x >= 0 && x < LevelChunk.WIDTH && z >= 0 && z < LevelChunk.DEPTH &&
+                        y >= 0 && y < LevelChunk.HEIGHT) {
+                        return chunk.getBlock(x, y, z);
+                    }
+                    return Blocks.AIR;
+                }
             });
         }
         
