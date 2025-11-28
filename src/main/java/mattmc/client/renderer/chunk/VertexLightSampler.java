@@ -65,8 +65,9 @@ public class VertexLightSampler {
     /**
      * Default light result for when chunk is null.
      * ISSUE-001 fix: Pre-allocated to avoid allocation on null chunk path.
+     * Note: AO (index 4) must be 1.0 for no occlusion, not 0.0 which would make surfaces black.
      */
-    private static final float[] DEFAULT_LIGHT_RESULT = new float[] {15.0f, 0.0f, 0.0f, 0.0f, 0.0f};
+    private static final float[] DEFAULT_LIGHT_RESULT = new float[] {15.0f, 0.0f, 0.0f, 0.0f, 1.0f};
     
     /**
      * Interface for sampling light values across chunk boundaries.

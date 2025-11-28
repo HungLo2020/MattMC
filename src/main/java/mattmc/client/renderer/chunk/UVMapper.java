@@ -111,11 +111,19 @@ public class UVMapper {
 	
 	/**
 	 * Extract RGBA color from face data.
-	 * Uses white color with brightness when texture atlas is available,
-	 * otherwise uses fallback colors.
+	 * Uses white color with directional brightness when texture atlas is available,
+	 * otherwise uses fallback colors with directional brightness.
+	 * 
+	 * The colorBrightness field contains Minecraft-style directional shading:
+	 * - TOP: 1.0 (brightest)
+	 * - BOTTOM: 0.5 (darkest)
+	 * - NORTH/SOUTH: 0.8
+	 * - WEST/EAST: 0.6
 	 */
 	public float[] extractColor(BlockFaceCollector.FaceData face) {
 		int renderColor;
+		// Use directional shading (colorBrightness) for both textured and fallback colors
+		float directionalBrightness = face.colorBrightness;
 		
 		if (textureAtlas != null && face.block.hasTexture()) {
 			// Use white color for texture modulation
@@ -134,11 +142,13 @@ public class UVMapper {
 				}
 			}
 		} else {
-			// Use fallback color when no texture atlas
+			// Use fallback color when no texture atlas (already has colorBrightness applied)
 			renderColor = ColorUtils.adjustColorBrightness(
 				face.block.getFallbackColor(), 
-				face.colorBrightness
+				directionalBrightness
 			);
+			// Don't apply directionalBrightness again since it's already baked in
+			directionalBrightness = 1.0f;
 			
 			// Apply grass green tint for grass_block top face
 			if (face.block == Blocks.GRASS_BLOCK && face.faceType != null && "top".equals(face.faceType)) {
@@ -154,17 +164,14 @@ public class UVMapper {
 			}
 		}
 		
-		// Apply brightness
-		float brightness = face.brightness;
-		
 		int r = (renderColor >> 16) & 0xFF;
 		int g = (renderColor >> 8) & 0xFF;
 		int b = renderColor & 0xFF;
 		
 		return new float[] {
-			(r / 255.0f) * brightness,
-			(g / 255.0f) * brightness,
-			(b / 255.0f) * brightness,
+			(r / 255.0f) * directionalBrightness,
+			(g / 255.0f) * directionalBrightness,
+			(b / 255.0f) * directionalBrightness,
 			1.0f // alpha
 		};
 	}

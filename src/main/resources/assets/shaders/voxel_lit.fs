@@ -61,13 +61,13 @@ void main() {
 	// Clamp to prevent over-brightening
 	finalLightColor = min(finalLightColor, vec3(1.0));
 	
-	// Ensure minimum brightness (never completely dark)
-	// Increased from 0.05 to 0.20, then to 0.25 to reduce interior corner darkness
-	finalLightColor = max(finalLightColor, vec3(0.25));
-	
 	// Apply ambient occlusion to darken occluded areas
 	// AO affects the overall brightness, creating shadows in corners
 	finalLightColor *= ao;
+	
+	// Ensure minimum brightness AFTER AO (never completely dark)
+	// This prevents fully occluded corners from being pitch black
+	finalLightColor = max(finalLightColor, vec3(0.03));
 	
 	// Apply optional emissive boost
 	finalLightColor *= uEmissiveBoost;
