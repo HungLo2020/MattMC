@@ -10,8 +10,11 @@ package mattmc.world.item;
  * Total: 36 slots
  */
 public class Inventory {
-    private static final int HOTBAR_SIZE = 9;
-    private static final int MAIN_SIZE = 27;
+    /** Size of the hotbar (9 slots). */
+    public static final int HOTBAR_SIZE = 9;
+    /** Size of the main inventory (27 slots). */
+    public static final int MAIN_SIZE = 27;
+    /** Total inventory size (36 slots = hotbar + main). */
     public static final int INVENTORY_SIZE = HOTBAR_SIZE + MAIN_SIZE; // 36 total
     
     private final ItemStack[] items;
