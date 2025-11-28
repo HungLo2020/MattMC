@@ -82,6 +82,9 @@ public class Block {
     
     /**
      * Internal constructor used during registration to set the identifier.
+     * 
+     * ISSUE-007 fix: Eagerly loads texture paths at registration time instead of lazily.
+     * This eliminates HashMap lookups and String.equals() calls in the hot rendering path.
      */
     Block(boolean solid, int lightEmission, int lightEmissionR, int lightEmissionG, int lightEmissionB, String identifier) {
         this.solid = solid;
@@ -90,6 +93,12 @@ public class Block {
         this.lightEmissionG = MathUtils.clamp(lightEmissionG, 0, 15);
         this.lightEmissionB = MathUtils.clamp(lightEmissionB, 0, 15);
         this.identifier = identifier;
+        
+        // ISSUE-007 fix: Eagerly load texture paths at registration time
+        if (identifier != null) {
+            String blockName = identifier.contains(":") ? identifier.substring(identifier.indexOf(':') + 1) : identifier;
+            this.texturePaths = ResourceManager.getBlockTexturePaths(blockName);
+        }
     }
     
     /**
@@ -108,13 +117,18 @@ public class Block {
     
     /**
      * Get the texture paths for this block.
-     * Lazily loads from blockstate/model JSON files on first access.
+     * 
+     * ISSUE-007 fix: Texture paths are now eagerly loaded at block registration time,
+     * eliminating the lazy-load check from the hot rendering path. This method simply
+     * returns the pre-cached paths.
      * 
      * @return A map of texture keys to paths (e.g., "top" -> "assets/textures/block/grass_block_top.png")
      */
     public Map<String, String> getTexturePaths() {
+        // ISSUE-007: Texture paths are now eagerly loaded during registration.
+        // The lazy loading is kept only as a fallback for blocks not created via registration.
         if (texturePaths == null && identifier != null) {
-            // Extract block name from identifier (e.g., "mattmc:dirt" -> "dirt")
+            // Fallback: lazy load if not already cached (shouldn't happen with proper registration)
             String blockName = identifier.contains(":") ? identifier.substring(identifier.indexOf(':') + 1) : identifier;
             texturePaths = ResourceManager.getBlockTexturePaths(blockName);
         }

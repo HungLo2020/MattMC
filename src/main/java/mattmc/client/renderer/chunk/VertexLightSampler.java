@@ -17,6 +17,58 @@ import mattmc.world.level.chunk.LevelChunk;
 public class VertexLightSampler {
     
     /**
+     * Pre-computed sample offsets for each face/corner combination.
+     * Format: SAMPLE_OFFSETS[normalIndex][cornerIndex] = int[12] {dx0,dy0,dz0, dx1,dy1,dz1, dx2,dy2,dz2, dx3,dy3,dz3}
+     * 
+     * ISSUE-001 fix: Static cache eliminates ~40K int[] allocations per chunk mesh build.
+     */
+    private static final int[][][] SAMPLE_OFFSETS = new int[6][4][];
+    
+    static {
+        // Top face (normal = 0,1,0)
+        SAMPLE_OFFSETS[0][0] = new int[] {0,1,0, -1,1,0, 0,1,-1, -1,1,-1}; // x0, z0
+        SAMPLE_OFFSETS[0][1] = new int[] {0,1,0, -1,1,0, 0,1,1, -1,1,1};   // x0, z1
+        SAMPLE_OFFSETS[0][2] = new int[] {0,1,0, 1,1,0, 0,1,1, 1,1,1};     // x1, z1
+        SAMPLE_OFFSETS[0][3] = new int[] {0,1,0, 1,1,0, 0,1,-1, 1,1,-1};   // x1, z0
+        
+        // Bottom face (normal = 0,-1,0)
+        SAMPLE_OFFSETS[1][0] = new int[] {0,-1,0, -1,-1,0, 0,-1,-1, -1,-1,-1}; // x0, z0
+        SAMPLE_OFFSETS[1][1] = new int[] {0,-1,0, 1,-1,0, 0,-1,-1, 1,-1,-1};   // x1, z0
+        SAMPLE_OFFSETS[1][2] = new int[] {0,-1,0, 1,-1,0, 0,-1,1, 1,-1,1};     // x1, z1
+        SAMPLE_OFFSETS[1][3] = new int[] {0,-1,0, -1,-1,0, 0,-1,1, -1,-1,1};   // x0, z1
+        
+        // North face (normal = 0,0,-1)
+        SAMPLE_OFFSETS[2][0] = new int[] {0,0,-1, 1,0,-1, 0,-1,-1, 1,-1,-1};   // x1, y0
+        SAMPLE_OFFSETS[2][1] = new int[] {0,0,-1, -1,0,-1, 0,-1,-1, -1,-1,-1}; // x0, y0
+        SAMPLE_OFFSETS[2][2] = new int[] {0,0,-1, -1,0,-1, 0,1,-1, -1,1,-1};   // x0, y1
+        SAMPLE_OFFSETS[2][3] = new int[] {0,0,-1, 1,0,-1, 0,1,-1, 1,1,-1};     // x1, y1
+        
+        // South face (normal = 0,0,1)
+        SAMPLE_OFFSETS[3][0] = new int[] {0,0,1, -1,0,1, 0,-1,1, -1,-1,1}; // x0, y0
+        SAMPLE_OFFSETS[3][1] = new int[] {0,0,1, 1,0,1, 0,-1,1, 1,-1,1};   // x1, y0
+        SAMPLE_OFFSETS[3][2] = new int[] {0,0,1, 1,0,1, 0,1,1, 1,1,1};     // x1, y1
+        SAMPLE_OFFSETS[3][3] = new int[] {0,0,1, -1,0,1, 0,1,1, -1,1,1};   // x0, y1
+        
+        // West face (normal = -1,0,0)
+        SAMPLE_OFFSETS[4][0] = new int[] {-1,0,0, -1,0,-1, -1,-1,0, -1,-1,-1}; // z0, y0
+        SAMPLE_OFFSETS[4][1] = new int[] {-1,0,0, -1,0,1, -1,-1,0, -1,-1,1};   // z1, y0
+        SAMPLE_OFFSETS[4][2] = new int[] {-1,0,0, -1,0,1, -1,1,0, -1,1,1};     // z1, y1
+        SAMPLE_OFFSETS[4][3] = new int[] {-1,0,0, -1,0,-1, -1,1,0, -1,1,-1};   // z0, y1
+        
+        // East face (normal = 1,0,0)
+        SAMPLE_OFFSETS[5][0] = new int[] {1,0,0, 1,0,1, 1,-1,0, 1,-1,1};   // z1, y0
+        SAMPLE_OFFSETS[5][1] = new int[] {1,0,0, 1,0,-1, 1,-1,0, 1,-1,-1}; // z0, y0
+        SAMPLE_OFFSETS[5][2] = new int[] {1,0,0, 1,0,-1, 1,1,0, 1,1,-1};   // z0, y1
+        SAMPLE_OFFSETS[5][3] = new int[] {1,0,0, 1,0,1, 1,1,0, 1,1,1};     // z1, y1
+    }
+    
+    /**
+     * Default light result for when chunk is null.
+     * ISSUE-001 fix: Pre-allocated to avoid allocation on null chunk path.
+     */
+    private static final float[] DEFAULT_LIGHT_RESULT = new float[] {15.0f, 0.0f, 0.0f, 0.0f, 0.0f};
+    
+    /**
      * Interface for sampling light values across chunk boundaries.
      */
     public interface ChunkLightAccessor {
@@ -72,6 +124,19 @@ public class VertexLightSampler {
     private final AmbientOcclusion ambientOcclusion;
     
     /**
+     * Thread-local reusable result array for sampleVertexLight().
+     * ISSUE-001 fix: Eliminates ~40K float[] allocations per chunk mesh build.
+     * Thread-local to ensure thread-safety during parallel mesh building.
+     */
+    private static final ThreadLocal<float[]> LIGHT_RESULT = ThreadLocal.withInitial(() -> new float[5]);
+    
+    /**
+     * Thread-local reusable array for RGB values.
+     * ISSUE-001/002 fix: Eliminates int[] allocations in getBlockLightRGBSafe().
+     */
+    private static final ThreadLocal<int[]> RGB_RESULT = ThreadLocal.withInitial(() -> new int[3]);
+    
+    /**
      * Create a new VertexLightSampler with ambient occlusion support.
      */
     public VertexLightSampler() {
@@ -102,6 +167,8 @@ public class VertexLightSampler {
      * Only non-zero light samples are averaged to prevent interior corners from being too dark.
      * This fixes the issue where solid blocks (with 0 light) would darken adjacent corners.
      * 
+     * ISSUE-001 fix: Uses pre-allocated arrays to eliminate ~40K allocations per chunk.
+     * 
      * @param face The face data containing chunk reference and position
      * @param normalIndex Which face (0=top, 1=bottom, 2=north, 3=south, 4=west, 5=east)
      * @param cornerIndex Which corner of the face (0-3)
@@ -110,9 +177,9 @@ public class VertexLightSampler {
     public float[] sampleVertexLight(BlockFaceCollector.FaceData face, 
                                       int normalIndex,
                                       int cornerIndex) {
-        // If no chunk reference, return default lighting
+        // If no chunk reference, return default lighting (pre-allocated static array)
         if (face.chunk == null) {
-            return new float[] {15.0f, 0.0f, 0.0f, 0.0f, 0.0f}; // Full skylight, no blocklight RGB, no AO
+            return DEFAULT_LIGHT_RESULT;
         }
         
         // Get chunk-local coordinates of the block
@@ -120,9 +187,8 @@ public class VertexLightSampler {
         int cy = face.cy;
         int cz = face.cz;
         
-        // Sample light from 4 positions around the vertex (3 sides + 1 diagonal)
-        // The positions depend on which face and which corner we're sampling
-        int[] offsets = getVertexSampleOffsets(normalIndex, cornerIndex);
+        // ISSUE-001 fix: Use pre-computed static offsets instead of allocating new array
+        int[] offsets = SAMPLE_OFFSETS[normalIndex][cornerIndex];
         
         float skyLightSum = 0;
         float blockLightRSum = 0;
@@ -161,6 +227,8 @@ public class VertexLightSampler {
             
             // Sample light at this position (possibly adjusted)
             int skyLight = getSkyLightSafe(face.chunk, sx, sy, sz);
+            
+            // ISSUE-001/002 fix: Use reusable array via getBlockLightRGBSafe
             int[] blockLightRGB = getBlockLightRGBSafe(face.chunk, sx, sy, sz);
             
             // Only include non-zero skylight samples in the average
@@ -190,74 +258,14 @@ public class VertexLightSampler {
         // Calculate ambient occlusion using Minecraft's algorithm
         float ao = ambientOcclusion.calculateVertexAO(face, normalIndex, cornerIndex);
         
-        return new float[] {avgSkyLight, avgBlockLightR, avgBlockLightG, avgBlockLightB, ao};
-    }
-    
-    /**
-     * Get offsets for the 4 sample positions for a vertex (3 sides + 1 diagonal).
-     * Returns array of 12 ints: [dx0,dy0,dz0, dx1,dy1,dz1, dx2,dy2,dz2, dx3,dy3,dz3]
-     */
-    private int[] getVertexSampleOffsets(int normalIndex, int cornerIndex) {
-        // For each face and corner, define the 4 sampling positions
-        // Format: [dx,dy,dz, dx,dy,dz, dx,dy,dz, dx,dy,dz]
-        
-        // Top face (normal = 0,1,0)
-        if (normalIndex == 0) {
-            switch (cornerIndex) {
-                case 0: return new int[] {0,1,0, -1,1,0, 0,1,-1, -1,1,-1}; // x0, z0
-                case 1: return new int[] {0,1,0, -1,1,0, 0,1,1, -1,1,1};   // x0, z1
-                case 2: return new int[] {0,1,0, 1,1,0, 0,1,1, 1,1,1};     // x1, z1
-                case 3: return new int[] {0,1,0, 1,1,0, 0,1,-1, 1,1,-1};   // x1, z0
-            }
-        }
-        // Bottom face (normal = 0,-1,0)
-        else if (normalIndex == 1) {
-            switch (cornerIndex) {
-                case 0: return new int[] {0,-1,0, -1,-1,0, 0,-1,-1, -1,-1,-1}; // x0, z0
-                case 1: return new int[] {0,-1,0, 1,-1,0, 0,-1,-1, 1,-1,-1};   // x1, z0
-                case 2: return new int[] {0,-1,0, 1,-1,0, 0,-1,1, 1,-1,1};     // x1, z1
-                case 3: return new int[] {0,-1,0, -1,-1,0, 0,-1,1, -1,-1,1};   // x0, z1
-            }
-        }
-        // North face (normal = 0,0,-1)
-        else if (normalIndex == 2) {
-            switch (cornerIndex) {
-                case 0: return new int[] {0,0,-1, 1,0,-1, 0,-1,-1, 1,-1,-1};   // x1, y0
-                case 1: return new int[] {0,0,-1, -1,0,-1, 0,-1,-1, -1,-1,-1}; // x0, y0
-                case 2: return new int[] {0,0,-1, -1,0,-1, 0,1,-1, -1,1,-1};   // x0, y1
-                case 3: return new int[] {0,0,-1, 1,0,-1, 0,1,-1, 1,1,-1};     // x1, y1
-            }
-        }
-        // South face (normal = 0,0,1)
-        else if (normalIndex == 3) {
-            switch (cornerIndex) {
-                case 0: return new int[] {0,0,1, -1,0,1, 0,-1,1, -1,-1,1}; // x0, y0
-                case 1: return new int[] {0,0,1, 1,0,1, 0,-1,1, 1,-1,1};   // x1, y0
-                case 2: return new int[] {0,0,1, 1,0,1, 0,1,1, 1,1,1};     // x1, y1
-                case 3: return new int[] {0,0,1, -1,0,1, 0,1,1, -1,1,1};   // x0, y1
-            }
-        }
-        // West face (normal = -1,0,0)
-        else if (normalIndex == 4) {
-            switch (cornerIndex) {
-                case 0: return new int[] {-1,0,0, -1,0,-1, -1,-1,0, -1,-1,-1}; // z0, y0
-                case 1: return new int[] {-1,0,0, -1,0,1, -1,-1,0, -1,-1,1};   // z1, y0
-                case 2: return new int[] {-1,0,0, -1,0,1, -1,1,0, -1,1,1};     // z1, y1
-                case 3: return new int[] {-1,0,0, -1,0,-1, -1,1,0, -1,1,-1};   // z0, y1
-            }
-        }
-        // East face (normal = 1,0,0)
-        else if (normalIndex == 5) {
-            switch (cornerIndex) {
-                case 0: return new int[] {1,0,0, 1,0,1, 1,-1,0, 1,-1,1};   // z1, y0
-                case 1: return new int[] {1,0,0, 1,0,-1, 1,-1,0, 1,-1,-1}; // z0, y0
-                case 2: return new int[] {1,0,0, 1,0,-1, 1,1,0, 1,1,-1};   // z0, y1
-                case 3: return new int[] {1,0,0, 1,0,1, 1,1,0, 1,1,1};     // z1, y1
-            }
-        }
-        
-        // Default: sample center position 4 times
-        return new int[] {0,0,0, 0,0,0, 0,0,0, 0,0,0};
+        // ISSUE-001 fix: Use thread-local reusable array instead of allocating new array
+        float[] result = LIGHT_RESULT.get();
+        result[0] = avgSkyLight;
+        result[1] = avgBlockLightR;
+        result[2] = avgBlockLightG;
+        result[3] = avgBlockLightB;
+        result[4] = ao;
+        return result;
     }
     
     /**
@@ -313,25 +321,42 @@ public class VertexLightSampler {
     /**
      * Get blocklight RGB values safely, returning [0,0,0] if out of bounds.
      * Scales RGB values by intensity to properly attenuate light with distance.
+     * 
+     * ISSUE-001/002 fix: Uses thread-local reusable array to eliminate allocations.
+     * 
      * @return Array of [R, G, B] values (0-15 each), scaled by intensity
      */
     private int[] getBlockLightRGBSafe(LevelChunk chunk, int x, int y, int z) {
+        // Get thread-local reusable result array
+        int[] result = RGB_RESULT.get();
+        
         // Check bounds
         if (y < 0 || y >= LevelChunk.HEIGHT) {
-            return new int[] {0, 0, 0}; // Out of bounds: no blocklight
+            result[0] = 0;
+            result[1] = 0;
+            result[2] = 0;
+            return result; // Out of bounds: no blocklight
         }
         
         // If we have a light accessor and coordinates are out of chunk bounds, use cross-chunk sampling
         if (lightAccessor != null && 
             (x < 0 || x >= LevelChunk.WIDTH ||
              z < 0 || z >= LevelChunk.DEPTH)) {
-            return lightAccessor.getBlockLightRGBAcrossChunks(chunk, x, y, z);
+            // Cross-chunk accessor may return new array; copy to our reusable array
+            int[] crossChunkRGB = lightAccessor.getBlockLightRGBAcrossChunks(chunk, x, y, z);
+            result[0] = crossChunkRGB[0];
+            result[1] = crossChunkRGB[1];
+            result[2] = crossChunkRGB[2];
+            return result;
         }
         
         // Within chunk bounds - use direct access
         if (x < 0 || x >= LevelChunk.WIDTH ||
             z < 0 || z >= LevelChunk.DEPTH) {
-            return new int[] {0, 0, 0}; // Out of chunk bounds without accessor: no blocklight
+            result[0] = 0;
+            result[1] = 0;
+            result[2] = 0;
+            return result; // Out of chunk bounds without accessor: no blocklight
         }
         
         // Get RGB and intensity values
@@ -342,7 +367,10 @@ public class VertexLightSampler {
         
         // If no light, return early
         if (intensity == 0) {
-            return new int[] {0, 0, 0};
+            result[0] = 0;
+            result[1] = 0;
+            result[2] = 0;
+            return result;
         }
         
         // Scale RGB by intensity ratio to properly attenuate light
@@ -352,16 +380,19 @@ public class VertexLightSampler {
         
         // If maxRGB is 0 but intensity is not, something is wrong - return intensity as white light
         if (maxRGB == 0) {
-            return new int[] {intensity, intensity, intensity};
+            result[0] = intensity;
+            result[1] = intensity;
+            result[2] = intensity;
+            return result;
         }
         
         // Scale RGB by the intensity ratio
         float scale = (float) intensity / maxRGB;
-        int scaledR = Math.round(r * scale);
-        int scaledG = Math.round(g * scale);
-        int scaledB = Math.round(b * scale);
+        result[0] = Math.round(r * scale);
+        result[1] = Math.round(g * scale);
+        result[2] = Math.round(b * scale);
         
-        return new int[] {scaledR, scaledG, scaledB};
+        return result;
     }
     
     /**

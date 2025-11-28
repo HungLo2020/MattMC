@@ -94,6 +94,27 @@ public final class LevelChunk {
     }
     
     /**
+     * Get a block at chunk-local coordinates WITHOUT bounds checking.
+     * 
+     * ISSUE-003 fix: For interior blocks where bounds are guaranteed valid,
+     * this avoids redundant bounds checks that waste CPU cycles.
+     * 
+     * WARNING: Caller MUST ensure coordinates are within valid range:
+     * - x: 0 to WIDTH-1 (0-15)
+     * - y: 0 to HEIGHT-1 (0-383)
+     * - z: 0 to DEPTH-1 (0-15)
+     * 
+     * @param x 0-15
+     * @param y 0-383 (world Y = y + MIN_Y)
+     * @param z 0-15
+     * @return The block at the given position, or AIR if null
+     */
+    public Block getBlockUnchecked(int x, int y, int z) {
+        Block block = blocks[x][y][z];
+        return block != null ? block : Blocks.AIR;
+    }
+    
+    /**
      * Get a blockstate at chunk-local coordinates.
      * Returns null if no blockstate exists.
      */
