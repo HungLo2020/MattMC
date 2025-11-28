@@ -26,12 +26,20 @@ public class SkyRenderer {
     // Star rendering constants (matching Minecraft)
     private static final int STAR_COUNT = 1500;
     
+    // Fixed seed for consistent star pattern across sessions (matches Minecraft's seed)
+    private static final long STAR_GENERATION_SEED = 10842L;
+    
+    // Moon phases texture is a 4x2 grid of 8 moon phases
+    private static final int MOON_TEXTURE_COLS = 4;
+    private static final int MOON_TEXTURE_ROWS = 2;
+    
     // Texture IDs (loaded lazily)
     private int sunTextureId = -1;
     private int moonTextureId = -1;
     
-    // Star vertex data (generated once)
+    // Star vertex data (generated once, excludes degenerate stars)
     private float[] starVertices = null;
+    private int validStarCount = 0;
     
     private final RenderBackend backend;
     
@@ -54,6 +62,7 @@ public class SkyRenderer {
     /**
      * Generate star vertex data (positions only).
      * Stars are rendered as small quads at random positions on a celestial sphere.
+     * Only valid stars are stored (degenerate stars are filtered out during generation).
      * 
      * This matches Minecraft's LevelRenderer.drawStars() algorithm.
      */
@@ -62,14 +71,11 @@ public class SkyRenderer {
             return;
         }
         
-        // Each star is a quad (4 vertices), each vertex has 3 floats (x, y, z)
-        // Total: STAR_COUNT * 4 * 3 floats
-        starVertices = new float[STAR_COUNT * 4 * 3];
+        // Use a temporary list to collect valid star vertices
+        java.util.List<Float> validVertices = new java.util.ArrayList<>();
         
         // Use fixed seed for consistent star pattern (matching Minecraft)
-        java.util.Random random = new java.util.Random(10842L);
-        
-        int vertexIndex = 0;
+        java.util.Random random = new java.util.Random(STAR_GENERATION_SEED);
         
         for (int i = 0; i < STAR_COUNT; i++) {
             // Random position on unit sphere
@@ -119,16 +125,19 @@ public class SkyRenderer {
                     double vy = ry2;
                     double vz = ry * sin1 + rx2 * cos1;
                     
-                    starVertices[vertexIndex++] = (float) (x + vx);
-                    starVertices[vertexIndex++] = (float) (y + vy);
-                    starVertices[vertexIndex++] = (float) (z + vz);
+                    validVertices.add((float) (x + vx));
+                    validVertices.add((float) (y + vy));
+                    validVertices.add((float) (z + vz));
                 }
-            } else {
-                // If point was rejected, add a degenerate quad (will be invisible)
-                for (int j = 0; j < 12; j++) {
-                    starVertices[vertexIndex++] = 0;
-                }
+                validStarCount++;
             }
+            // Skip degenerate stars (don't add them at all)
+        }
+        
+        // Convert list to array
+        starVertices = new float[validVertices.size()];
+        for (int i = 0; i < validVertices.size(); i++) {
+            starVertices[i] = validVertices.get(i);
         }
     }
     
@@ -214,7 +223,7 @@ public class SkyRenderer {
     
     /**
      * Render the moon as a textured quad with the correct phase.
-     * The moon_phases.png texture is 4x2 grid of moon phases.
+     * The moon_phases.png texture is a grid of moon phases.
      */
     private void renderMoon(int moonPhase) {
         if (moonTextureId <= 0) {
@@ -228,13 +237,12 @@ public class SkyRenderer {
         float halfSize = MOON_SIZE / 2.0f;
         
         // Calculate UV coordinates for the current moon phase
-        // Moon phases texture is 4 columns x 2 rows (8 phases total)
-        int phaseX = moonPhase % 4;
-        int phaseY = moonPhase / 4 % 2;
-        float u0 = (phaseX + 1) / 4.0f;  // Note: Minecraft uses reversed U for moon
-        float v0 = phaseY / 2.0f;
-        float u1 = phaseX / 4.0f;
-        float v1 = (phaseY + 1) / 2.0f;
+        int phaseX = moonPhase % MOON_TEXTURE_COLS;
+        int phaseY = moonPhase / MOON_TEXTURE_COLS % MOON_TEXTURE_ROWS;
+        float u0 = (phaseX + 1) / (float) MOON_TEXTURE_COLS;  // Note: Minecraft uses reversed U for moon
+        float v0 = phaseY / (float) MOON_TEXTURE_ROWS;
+        float u1 = phaseX / (float) MOON_TEXTURE_COLS;
+        float v1 = (phaseY + 1) / (float) MOON_TEXTURE_ROWS;
         
         // Draw moon quad at distance -100 (opposite of sun)
         backend.begin3DQuads();
@@ -250,9 +258,10 @@ public class SkyRenderer {
     
     /**
      * Render stars as small quads in the sky.
+     * Stars are pre-filtered during generation so we can render them all directly.
      */
     private void renderStars(float brightness) {
-        if (starVertices == null || brightness <= 0.0f) {
+        if (starVertices == null || starVertices.length == 0 || brightness <= 0.0f) {
             return;
         }
         
@@ -263,18 +272,15 @@ public class SkyRenderer {
         int starColor = 0xFFFFFF;
         backend.setColor(starColor, brightness);
         
-        // Draw stars as quads
+        // Draw all stars as quads (no filtering needed - degenerate stars excluded during generation)
         backend.begin3DQuads();
         
         for (int i = 0; i < starVertices.length; i += 12) {
-            // Only draw if not a degenerate quad
-            if (starVertices[i] != 0 || starVertices[i+1] != 0 || starVertices[i+2] != 0) {
-                // Add 4 vertices for the star quad
-                backend.addTexturedQuadVertex(starVertices[i], starVertices[i+1], starVertices[i+2], 0, 0);
-                backend.addTexturedQuadVertex(starVertices[i+3], starVertices[i+4], starVertices[i+5], 0, 0);
-                backend.addTexturedQuadVertex(starVertices[i+6], starVertices[i+7], starVertices[i+8], 0, 0);
-                backend.addTexturedQuadVertex(starVertices[i+9], starVertices[i+10], starVertices[i+11], 0, 0);
-            }
+            // Add 4 vertices for the star quad
+            backend.addTexturedQuadVertex(starVertices[i], starVertices[i+1], starVertices[i+2], 0, 0);
+            backend.addTexturedQuadVertex(starVertices[i+3], starVertices[i+4], starVertices[i+5], 0, 0);
+            backend.addTexturedQuadVertex(starVertices[i+6], starVertices[i+7], starVertices[i+8], 0, 0);
+            backend.addTexturedQuadVertex(starVertices[i+9], starVertices[i+10], starVertices[i+11], 0, 0);
         }
         
         backend.end3DQuads();

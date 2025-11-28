@@ -104,11 +104,18 @@ public class DayCycle {
      * Get the time of day as a float (0.0 to 1.0).
      * This matches Minecraft's DimensionType.timeOfDay() calculation.
      * 
-     * @return Time of day from 0.0 (sunrise) to 1.0 (next sunrise)
+     * @return Time of day from 0.0 (noon) to 1.0 (next noon)
      */
     public float getTimeOfDayFloat() {
-        // Minecraft's formula: frac(dayTime/24000 - 0.25) with cos adjustment
-        // This shifts the cycle so 0.0 = sunrise, 0.25 = noon, 0.5 = sunset
+        // Minecraft's exact formula from DimensionType.timeOfDay():
+        // double d0 = Mth.frac((double)fixedTime.orElse(dayTime) / 24000.0 - 0.25)
+        // double d1 = 0.5 - Math.cos(d0 * Math.PI) / 2.0
+        // return (float)(d0 * 2.0 + d1) / 3.0
+        // 
+        // The formula works as follows:
+        // - Subtracts 0.25 to shift so tick 6000 (noon) maps to d0=0
+        // - The cos adjustment smooths the transition at sunrise/sunset
+        // - The (d0 * 2 + d1) / 3 combines linear and cos-adjusted values
         double d0 = frac((double) worldTime / 24000.0 - 0.25);
         double d1 = 0.5 - Math.cos(d0 * Math.PI) / 2.0;
         return (float) ((d0 * 2.0 + d1) / 3.0);
