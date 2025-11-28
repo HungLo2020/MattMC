@@ -54,6 +54,9 @@ public class OpenGLItemRenderer implements ItemRenderer {
     // Item texture dimension - items are rendered as 16x16 pixel textures
     private static final float ITEM_TEXTURE_SIZE = 16.0f;
     
+    // Tolerance for float comparison in geometry detection
+    private static final float EPSILON = 0.01f;
+    
     // Singleton instance for static method compatibility
     private static final OpenGLItemRenderer INSTANCE = new OpenGLItemRenderer();
     
@@ -480,7 +483,7 @@ public class OpenGLItemRenderer implements ItemRenderer {
         float y3 = face.v3.y;
         
         // All Y values are the same and at 0.5 (slab top height)
-        return Math.abs(y1 - y2) < 0.01f && Math.abs(y2 - y3) < 0.01f && Math.abs(y1 - 0.5f) < 0.01f;
+        return Math.abs(y1 - y2) < EPSILON && Math.abs(y2 - y3) < EPSILON && Math.abs(y1 - 0.5f) < EPSILON;
     }
     
     /**
@@ -489,12 +492,12 @@ public class OpenGLItemRenderer implements ItemRenderer {
      */
     private static boolean isSlabVisibleSideFace(VertexCapture.Face face) {
         // Check if it's a West face (x=0)
-        if (face.v1.x < 0.01f && face.v2.x < 0.01f && face.v3.x < 0.01f) {
+        if (face.v1.x < EPSILON && face.v2.x < EPSILON && face.v3.x < EPSILON) {
             return true;
         }
         
         // Check if it's a North face (z=0)
-        if (face.v1.z < 0.01f && face.v2.z < 0.01f && face.v3.z < 0.01f) {
+        if (face.v1.z < EPSILON && face.v2.z < EPSILON && face.v3.z < EPSILON) {
             return true;
         }
         
@@ -510,7 +513,7 @@ public class OpenGLItemRenderer implements ItemRenderer {
         float y3 = face.v3.y;
         
         // All Y values are the same and greater than 0
-        return Math.abs(y1 - y2) < 0.01f && Math.abs(y2 - y3) < 0.01f && y1 > 0.01f;
+        return Math.abs(y1 - y2) < EPSILON && Math.abs(y2 - y3) < EPSILON && y1 > EPSILON;
     }
     
     /**
@@ -519,18 +522,18 @@ public class OpenGLItemRenderer implements ItemRenderer {
      */
     private static boolean isVisibleSideFace(VertexCapture.Face face) {
         // Check if it's a West face (x=0)
-        if (face.v1.x < 0.01f && face.v2.x < 0.01f && face.v3.x < 0.01f) {
+        if (face.v1.x < EPSILON && face.v2.x < EPSILON && face.v3.x < EPSILON) {
             return true;
         }
         
         // Check if it's a North face (z=0)
-        if (face.v1.z < 0.01f && face.v2.z < 0.01f && face.v3.z < 0.01f) {
+        if (face.v1.z < EPSILON && face.v2.z < EPSILON && face.v3.z < EPSILON) {
             return true;
         }
         
         // Check if it's an inner step face at z=0.5 (full width, vertical)
         float avgZ = (face.v1.z + face.v2.z + face.v3.z) / 3.0f;
-        if (Math.abs(avgZ - 0.5f) < 0.01f) {
+        if (Math.abs(avgZ - 0.5f) < EPSILON) {
             // Verify it's vertical (Y values differ significantly)
             float yMin = Math.min(face.v1.y, Math.min(face.v2.y, face.v3.y));
             float yMax = Math.max(face.v1.y, Math.max(face.v2.y, face.v3.y));
@@ -547,7 +550,7 @@ public class OpenGLItemRenderer implements ItemRenderer {
      */
     private static boolean isWestFacing(VertexCapture.Face face) {
         // West faces have all vertices at X=0
-        return face.v1.x < 0.01f && face.v2.x < 0.01f && face.v3.x < 0.01f;
+        return face.v1.x < EPSILON && face.v2.x < EPSILON && face.v3.x < EPSILON;
     }
     
     /**
