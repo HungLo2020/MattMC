@@ -1,7 +1,5 @@
 package mattmc.client.resources;
 
-import mattmc.client.MattMC;
-
 import mattmc.client.resources.model.BlockModel;
 import mattmc.client.resources.model.BlockState;
 import mattmc.client.resources.model.BlockStateVariant;
@@ -225,7 +223,7 @@ public class ResourceManager {
         
         // Now check for circular reference (only if variable exists)
         if (visited.contains(varName)) {
-            System.err.println("Warning: Circular texture variable reference detected for: " + varName);
+            logger.warn("Circular texture variable reference detected for: {}", varName);
             return texture;  // Return as-is to avoid infinite recursion
         }
         

@@ -1,6 +1,5 @@
 package mattmc.world.level;
 
-import mattmc.client.MattMC;
 import mattmc.client.renderer.block.BlockFaceCollector;
 import mattmc.world.level.chunk.Region;
 
@@ -459,11 +458,6 @@ public class Level implements LevelAccessor {
         dayCycle.tick();
     }
     
-    /**
-     * Process light updates with a time budget.
-     * Should be called each frame to incrementally update lighting.
-     * Uses the RelightScheduler for distance-based prioritization.
-     * 
     /**
      * Set a listener for chunk unload events.
      * Used by the renderer to clean up caches.

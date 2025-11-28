@@ -1,8 +1,5 @@
 package mattmc.world.level.block;
 
-import mattmc.client.MattMC;
-import mattmc.client.renderer.backend.opengl.Texture;
-
 import mattmc.client.resources.ResourceManager;
 import mattmc.world.phys.shapes.VoxelShape;
 import mattmc.util.MathUtils;

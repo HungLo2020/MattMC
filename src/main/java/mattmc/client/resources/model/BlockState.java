@@ -1,7 +1,6 @@
 package mattmc.client.resources.model;
 
 import com.google.gson.*;
-import mattmc.client.MattMC;
 
 import java.lang.reflect.Type;
 import java.util.ArrayList;

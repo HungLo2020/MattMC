@@ -115,10 +115,12 @@ public final class ColorUtils {
     /**
      * Adjust the brightness of an RGB color.
      * @param rgb RGB color value
-     * @param factor Brightness factor (0.0 to 1.0+)
+     * @param factor Brightness factor (0.0 to 1.0+). Negative values are treated as 0.
      * @return Adjusted color
      */
     public static int adjustColorBrightness(int rgb, float factor) {
+        // Clamp factor to non-negative to avoid negative color values
+        if (factor < 0.0f) factor = 0.0f;
         int r = MathUtils.min(255, (int)(extractRed(rgb) * factor));
         int g = MathUtils.min(255, (int)(extractGreen(rgb) * factor));
         int b = MathUtils.min(255, (int)(extractBlue(rgb) * factor));
@@ -131,10 +133,13 @@ public final class ColorUtils {
      * 
      * @param baseColor The base color (typically white 0xFFFFFF for textures)
      * @param tintColor The tint color to apply (e.g., 0x5BB53B for grass green)
-     * @param brightnessFactor Additional brightness adjustment
+     * @param brightnessFactor Additional brightness adjustment. Negative values are treated as 0.
      * @return The tinted color
      */
     public static int applyTint(int baseColor, int tintColor, float brightnessFactor) {
+        // Clamp factor to non-negative to avoid negative color values
+        if (brightnessFactor < 0.0f) brightnessFactor = 0.0f;
+        
         // Extract RGB components from base and tint
         int baseR = extractRed(baseColor);
         int baseG = extractGreen(baseColor);
