@@ -53,6 +53,12 @@ public class AmbientOcclusion {
     public static final int FACE_EAST = 5;
     
     /**
+     * Brightness value for solid blocks that cause occlusion.
+     * Matches Minecraft's shading for solid blocks.
+     */
+    private static final float SOLID_BLOCK_BRIGHTNESS = 0.2f;
+    
+    /**
      * Direction offsets for each face's adjacent directions.
      * For each face, we need the 4 edge directions that are perpendicular to the face normal.
      * 
@@ -131,12 +137,16 @@ public class AmbientOcclusion {
     /**
      * Calculate ambient occlusion brightness for a vertex.
      * 
-     * <p>This follows Minecraft's algorithm:
+     * <p>This follows Minecraft's algorithm from ModelBlockRenderer.AmbientOcclusionFace:
      * <ol>
-     *   <li>Sample brightness from 3 positions: 2 edge neighbors + face center</li>
-     *   <li>Only sample corner if both edge neighbors don't block light</li>
+     *   <li>Sample 4 positions: 2 edge neighbors, 1 corner (diagonal), and 1 face-adjacent</li>
+     *   <li>Check if corner should be sampled by looking one block in face direction</li>
      *   <li>Average the brightness values</li>
      * </ol>
+     * 
+     * <p>Key insight: For an UP face, we sample horizontal neighbors at the block's Y level,
+     * NOT at the face level (Y+1). The occlusion comes from neighboring blocks at the same
+     * height, not from blocks above.
      * 
      * @param face The face data containing position and chunk reference
      * @param faceIndex Face direction (0=UP, 1=DOWN, 2=NORTH, 3=SOUTH, 4=WEST, 5=EAST)
@@ -149,57 +159,67 @@ public class AmbientOcclusion {
         }
         
         LevelChunk chunk = face.chunk;
-        int cx = face.cx;
-        int cy = face.cy;
-        int cz = face.cz;
+        int bx = face.cx;  // Block position (not face position)
+        int by = face.cy;
+        int bz = face.cz;
         
-        // Get face normal
+        // Get face normal for checking if corners should be sampled
         int[] normal = FACE_NORMAL[faceIndex];
         
-        // Sample position is adjacent to the face (offset by face normal)
-        int sx = cx + normal[0];
-        int sy = cy + normal[1];
-        int sz = cz + normal[2];
-        
-        // Get the corner directions for this face (4 directions, each with 3 components dx,dy,dz)
+        // Get the corner directions for this face (4 directions perpendicular to face)
         int[][] corners = FACE_CORNERS[faceIndex];
-        int vertIdx = Math.min(vertexIndex, 3); // Ensure valid index
+        int vertIdx = Math.min(vertexIndex, 3);
         int[] vertCorners = VERTEX_CORNERS[faceIndex][vertIdx];
         int edge0Idx = vertCorners[0];
         int edge1Idx = vertCorners[1];
         
-        int[] edge0 = corners[edge0Idx];
-        int[] edge1 = corners[edge1Idx];
+        int[] edge0Dir = corners[edge0Idx];
+        int[] edge1Dir = corners[edge1Idx];
         
-        // Sample the 4 positions for this vertex
-        // 1. Face-adjacent position (the block directly adjacent to the face)
-        float faceBrightness = getShadeBrightness(chunk, sx, sy, sz);
+        // Sample the 4 neighbor positions (at block level, in directions perpendicular to face)
+        // These are the positions that create occlusion on this vertex
         
-        // 2. Edge0 position (edge0 direction from face-adjacent)
-        int e0x = sx + edge0[0];
-        int e0y = sy + edge0[1];
-        int e0z = sz + edge0[2];
+        // 1. Edge0 neighbor (e.g., EAST neighbor for UP face)
+        int e0x = bx + edge0Dir[0];
+        int e0y = by + edge0Dir[1];
+        int e0z = bz + edge0Dir[2];
         float edge0Brightness = getShadeBrightness(chunk, e0x, e0y, e0z);
-        boolean edge0Blocks = isBlockingLight(chunk, e0x, e0y, e0z);
         
-        // 3. Edge1 position (edge1 direction from face-adjacent)
-        int e1x = sx + edge1[0];
-        int e1y = sy + edge1[1];
-        int e1z = sz + edge1[2];
+        // 2. Edge1 neighbor (e.g., SOUTH neighbor for UP face)  
+        int e1x = bx + edge1Dir[0];
+        int e1y = by + edge1Dir[1];
+        int e1z = bz + edge1Dir[2];
         float edge1Brightness = getShadeBrightness(chunk, e1x, e1y, e1z);
-        boolean edge1Blocks = isBlockingLight(chunk, e1x, e1y, e1z);
         
-        // 4. Corner position (only sampled if at least one edge doesn't block)
+        // Check if we should sample the corner by looking at positions in the face direction
+        // (This is how Minecraft determines if the corner is "visible" or blocked)
+        int e0fx = e0x + normal[0];
+        int e0fy = e0y + normal[1];
+        int e0fz = e0z + normal[2];
+        boolean edge0CanSeeCorner = !isBlockingLight(chunk, e0fx, e0fy, e0fz);
+        
+        int e1fx = e1x + normal[0];
+        int e1fy = e1y + normal[1];
+        int e1fz = e1z + normal[2];
+        boolean edge1CanSeeCorner = !isBlockingLight(chunk, e1fx, e1fy, e1fz);
+        
+        // 3. Corner neighbor (diagonal - only sampled if at least one edge can see it)
         float cornerBrightness;
-        if (!edge0Blocks || !edge1Blocks) {
-            int cx2 = sx + edge0[0] + edge1[0];
-            int cy2 = sy + edge0[1] + edge1[1];
-            int cz2 = sz + edge0[2] + edge1[2];
+        if (edge0CanSeeCorner || edge1CanSeeCorner) {
+            int cx2 = bx + edge0Dir[0] + edge1Dir[0];
+            int cy2 = by + edge0Dir[1] + edge1Dir[1];
+            int cz2 = bz + edge0Dir[2] + edge1Dir[2];
             cornerBrightness = getShadeBrightness(chunk, cx2, cy2, cz2);
         } else {
-            // Both edges block - corner is occluded, use edge0's brightness as fallback
-            cornerBrightness = edge0Brightness;
+            // Both edges block - corner contributes minimum brightness
+            cornerBrightness = SOLID_BLOCK_BRIGHTNESS;
         }
+        
+        // 4. Face-adjacent position (position in normal direction from block)
+        int fx = bx + normal[0];
+        int fy = by + normal[1];
+        int fz = bz + normal[2];
+        float faceBrightness = getShadeBrightness(chunk, fx, fy, fz);
         
         // Average the 4 samples
         float ao = (faceBrightness + edge0Brightness + edge1Brightness + cornerBrightness) * 0.25f;
@@ -234,8 +254,7 @@ public class AmbientOcclusion {
         }
         
         // Solid blocks cause occlusion - return lower brightness
-        // Minecraft uses 0.2f for solid blocks that cause shadows
-        return 0.2f;
+        return SOLID_BLOCK_BRIGHTNESS;
     }
     
     /**
