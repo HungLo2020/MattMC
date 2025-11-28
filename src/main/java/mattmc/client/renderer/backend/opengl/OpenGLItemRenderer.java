@@ -265,9 +265,11 @@ public class OpenGLItemRenderer implements ItemRenderer {
         // Get textures for each face
         String topTexture = getTextureForFace(texturePaths, "top");
         String sideTexture = getTextureForFace(texturePaths, "side");
+        String overlayTexture = texturePaths.get("overlay"); // For grass blocks
         
-        // Check if there are tints and get the tint color for all faces
+        // Determine tint color and tint behavior
         int tintColor = 0xFFFFFF; // Default: no tint (white)
+        boolean tintAllFaces = false; // For leaves: tint all faces. For grass: only top and overlay
         
         // First check if this is a LeavesBlock item (has tint stored in block)
         if (stack != null && stack.getItem() instanceof BlockItem) {
@@ -276,6 +278,7 @@ public class OpenGLItemRenderer implements ItemRenderer {
                 LeavesBlock leavesBlock = (LeavesBlock) block;
                 if (leavesBlock.hasTinting()) {
                     tintColor = leavesBlock.getTintColor();
+                    tintAllFaces = true; // Leaves are tinted on all faces
                 }
             }
         }
@@ -284,6 +287,7 @@ public class OpenGLItemRenderer implements ItemRenderer {
         if (tintColor == 0xFFFFFF && itemModel != null && itemModel.getTints() != null && !itemModel.getTints().isEmpty()) {
             // Get the first tint (grass blocks typically have one tint)
             tintColor = itemModel.getTints().get(0).getTintColor();
+            tintAllFaces = false; // For grass: only top and overlay get tint
         }
         
         // Save GL state
@@ -324,34 +328,66 @@ public class OpenGLItemRenderer implements ItemRenderer {
         
         // Render the faces in back-to-front order for proper visibility
         
-        // 1. West face (left side, medium brightness - 80% with tint)
+        // 1. West face (left side, medium brightness - 80%)
         if (sideTexture != null) {
             Texture tex = loadTexture(sideTexture);
             if (tex != null) {
                 tex.bind();
-                glColor4f(0.8f * tintR, 0.8f * tintG, 0.8f * tintB, 1.0f);
+                // Apply tint only if tintAllFaces (for leaves), otherwise use white
+                if (tintAllFaces) {
+                    glColor4f(0.8f * tintR, 0.8f * tintG, 0.8f * tintB, 1.0f);
+                } else {
+                    glColor4f(0.8f, 0.8f, 0.8f, 1.0f);
+                }
                 float sideVScale = getAnimatedTextureVScale(sideTexture);
                 renderFacesIsometric(westFaces, x, y, isoWidth, isoHeight, sideVScale);
             }
         }
         
-        // 2. North face (right side, darker - 60% with tint)
+        // 1b. West face overlay (for grass blocks - tinted)
+        if (overlayTexture != null && !tintAllFaces) {
+            Texture tex = loadTexture(overlayTexture);
+            if (tex != null) {
+                tex.bind();
+                glColor4f(0.8f * tintR, 0.8f * tintG, 0.8f * tintB, 1.0f);
+                float overlayVScale = getAnimatedTextureVScale(overlayTexture);
+                renderFacesIsometric(westFaces, x, y, isoWidth, isoHeight, overlayVScale);
+            }
+        }
+        
+        // 2. North face (right side, darker - 60%)
         if (sideTexture != null) {
             Texture tex = loadTexture(sideTexture);
             if (tex != null) {
                 tex.bind();
-                glColor4f(0.6f * tintR, 0.6f * tintG, 0.6f * tintB, 1.0f);
+                // Apply tint only if tintAllFaces (for leaves), otherwise use white
+                if (tintAllFaces) {
+                    glColor4f(0.6f * tintR, 0.6f * tintG, 0.6f * tintB, 1.0f);
+                } else {
+                    glColor4f(0.6f, 0.6f, 0.6f, 1.0f);
+                }
                 float sideVScale = getAnimatedTextureVScale(sideTexture);
                 renderFacesIsometric(northFaces, x, y, isoWidth, isoHeight, sideVScale);
             }
         }
         
-        // 3. Top face (brightest - 100% with tint applied)
+        // 2b. North face overlay (for grass blocks - tinted)
+        if (overlayTexture != null && !tintAllFaces) {
+            Texture tex = loadTexture(overlayTexture);
+            if (tex != null) {
+                tex.bind();
+                glColor4f(0.6f * tintR, 0.6f * tintG, 0.6f * tintB, 1.0f);
+                float overlayVScale = getAnimatedTextureVScale(overlayTexture);
+                renderFacesIsometric(northFaces, x, y, isoWidth, isoHeight, overlayVScale);
+            }
+        }
+        
+        // 3. Top face (brightest - 100% with tint always applied for both leaves and grass)
         if (topTexture != null) {
             Texture tex = loadTexture(topTexture);
             if (tex != null) {
                 tex.bind();
-                // Apply tint color to the top face
+                // Apply tint color to the top face (for both grass and leaves)
                 glColor4f(tintR, tintG, tintB, 1.0f);
                 float topVScale = getAnimatedTextureVScale(topTexture);
                 renderFacesIsometric(topFaces, x, y, isoWidth, isoHeight, topVScale);
