@@ -249,19 +249,11 @@ public final class DevplayScreen implements Screen {
         float fov = 70f, zn = 0.1f, zf = 500f;
         backend.setupPerspectiveProjection(fov, aspect, zn, zf);
 
-        // Apply camera transformations (pitch, yaw, then position) for sky
-        // Sky rendering uses only rotation, not translation (sky is at infinity)
-        backend.pushMatrix();
-        backend.rotateMatrix(player.getPitch(alphaF), 1f, 0f, 0f);
-        backend.rotateMatrix(player.getYaw(alphaF), 0f, 1f, 0f);
-        
-        // Render sky (sun, moon, stars) before world geometry
-        // Sky is rendered without depth test so it appears behind everything
+        // Render sky first (sun, moon, stars) - sky only needs rotation, not translation
+        // SkyRenderer handles all its own state management
         skyRenderer.render(world.getDayCycle(), player.getPitch(alphaF), player.getYaw(alphaF));
-        
-        backend.popMatrix();
-        
-        // Apply camera transformations for world rendering
+
+        // Apply camera transformations (pitch, yaw, then position)
         // Use interpolated values for smooth rendering between ticks
         // Camera is at eye level (1.62 blocks above feet)
         backend.rotateMatrix(player.getPitch(alphaF), 1f, 0f, 0f);

@@ -143,6 +143,7 @@ public class SkyRenderer {
     
     /**
      * Render the complete sky including sun, moon, and stars.
+     * This method fully manages its own OpenGL state and restores everything when done.
      * 
      * @param dayCycle The day/night cycle manager
      * @param playerPitch Player's pitch for proper sky orientation
@@ -160,13 +161,17 @@ public class SkyRenderer {
         // Calculate rain level dimming (we don't have rain yet, so use 1.0)
         float clearness = 1.0f;
         
-        // Disable depth writing for sky (it's infinitely far away)
+        // Save current OpenGL state
         backend.setDepthMask(false);
         backend.enableBlend();
         backend.setBlendFunc(RenderBackend.BLEND_SRC_ALPHA, RenderBackend.BLEND_ONE);
         
-        // Save modelview matrix
+        // Save modelview matrix and apply camera rotation (but not translation - sky is at infinity)
         backend.pushMatrix();
+        
+        // Apply player camera rotation
+        backend.rotateMatrix(playerPitch, 1f, 0f, 0f);
+        backend.rotateMatrix(playerYaw, 0f, 1f, 0f);
         
         // Rotate by -90 degrees on Y axis (for proper sun path east to west)
         backend.rotateMatrix(-90.0f, 0.0f, 1.0f, 0.0f);
@@ -186,15 +191,16 @@ public class SkyRenderer {
             renderStars(starBrightness * clearness);
         }
         
-        // Restore modelview matrix
+        // Restore modelview matrix to identity (what setupPerspectiveProjection left it as)
         backend.popMatrix();
         
-        // Restore render state
+        // Restore all render state
         backend.setBlendFunc(RenderBackend.BLEND_SRC_ALPHA, RenderBackend.BLEND_ONE_MINUS_SRC_ALPHA);
         backend.disableBlend();
         backend.setDepthMask(true);
-        // Re-enable texturing for subsequent world rendering
         backend.enableTexture2D();
+        // Reset color to white with full alpha for subsequent rendering
+        backend.setColor(0xFFFFFF, 1.0f);
     }
     
     /**
