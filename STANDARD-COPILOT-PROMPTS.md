@@ -1,6 +1,6 @@
 # COPILOT PROMPTS:
 
-##
+## HOTKEYS:
 - SHIFT+ENTER: New Line from anywhere
 - HOME: Beginning of line
 - SHIFT+END: Select to end of line
