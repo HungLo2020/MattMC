@@ -1,11 +1,16 @@
 package mattmc.client.renderer.chunk;
 
 import mattmc.client.renderer.block.BlockFaceCollector;
+import mattmc.world.level.block.Block;
 import mattmc.world.level.chunk.LevelChunk;
 
 /**
  * Handles vertex light sampling for mesh building.
  * Samples light from adjacent blocks to create smooth lighting gradients.
+ * 
+ * <p>Now includes Minecraft-style ambient occlusion (AO) calculation.
+ * The AO value is stored in the vertex data and used by the shader to
+ * darken corners and edges where geometry creates shadows.
  * 
  * Extracted from MeshBuilder as part of refactoring to single-purpose classes.
  */
@@ -48,15 +53,44 @@ public class VertexLightSampler {
             int intensity = getBlockLightAcrossChunks(chunk, x, y, z);
             return new int[] {intensity, intensity, intensity};
         }
+        
+        /**
+         * Get block at chunk-local coordinates, checking neighboring chunks if necessary.
+         * Used for ambient occlusion calculation.
+         * @param chunk The current chunk
+         * @param x Chunk-local X coordinate (can be outside 0-15 range)
+         * @param y Chunk-local Y coordinate (0-383)
+         * @param z Chunk-local Z coordinate (can be outside 0-15 range)
+         * @return Block at the position
+         */
+        default Block getBlockAcrossChunks(LevelChunk chunk, int x, int y, int z) {
+            return mattmc.world.level.block.Blocks.AIR;
+        }
     }
     
     private ChunkLightAccessor lightAccessor;
+    private final AmbientOcclusion ambientOcclusion;
+    
+    /**
+     * Create a new VertexLightSampler with ambient occlusion support.
+     */
+    public VertexLightSampler() {
+        this.ambientOcclusion = new AmbientOcclusion();
+    }
     
     /**
      * Set the light accessor for cross-chunk light sampling.
+     * Also configures the ambient occlusion calculator with block access.
      */
     public void setLightAccessor(ChunkLightAccessor accessor) {
         this.lightAccessor = accessor;
+        
+        // Configure AO calculator with block accessor from light accessor
+        if (accessor != null) {
+            this.ambientOcclusion.setBlockAccessor((chunk, x, y, z) -> {
+                return accessor.getBlockAcrossChunks(chunk, x, y, z);
+            });
+        }
     }
     
     /**
@@ -134,7 +168,9 @@ public class VertexLightSampler {
         float avgBlockLightR = blockLightSamples > 0 ? blockLightRSum / blockLightSamples : 0.0f;
         float avgBlockLightG = blockLightSamples > 0 ? blockLightGSum / blockLightSamples : 0.0f;
         float avgBlockLightB = blockLightSamples > 0 ? blockLightBSum / blockLightSamples : 0.0f;
-        float ao = 0.0f; // No AO yet
+        
+        // Calculate ambient occlusion using Minecraft's algorithm
+        float ao = ambientOcclusion.calculateVertexAO(face, normalIndex, cornerIndex);
         
         return new float[] {avgSkyLight, avgBlockLightR, avgBlockLightG, avgBlockLightB, ao};
     }
