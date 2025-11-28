@@ -11,6 +11,9 @@ public final class EditBox {
     private final int maxLength;
     
     public EditBox(int x, int y, int w, int h, int maxLength) {
+        if (maxLength < 0) {
+            throw new IllegalArgumentException("maxLength must be non-negative, got: " + maxLength);
+        }
         this.x = x;
         this.y = y;
         this.w = w;

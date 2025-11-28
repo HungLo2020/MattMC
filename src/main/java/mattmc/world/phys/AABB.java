@@ -72,9 +72,12 @@ public class AABB {
      * Check if this AABB intersects with another AABB.
      * 
      * @param other The other AABB to check against
-     * @return true if the AABBs intersect
+     * @return true if the AABBs intersect, false if other is null
      */
     public boolean intersects(AABB other) {
+        if (other == null) {
+            return false;
+        }
         return this.minX < other.maxX && this.maxX > other.minX &&
                this.minY < other.maxY && this.maxY > other.minY &&
                this.minZ < other.maxZ && this.maxZ > other.minZ;

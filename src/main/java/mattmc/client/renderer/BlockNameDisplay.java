@@ -137,6 +137,11 @@ public class BlockNameDisplay {
             ? identifier.substring(identifier.indexOf(':') + 1) 
             : identifier;
         
+        // Guard against empty blockName (e.g., identifier was "mattmc:")
+        if (blockName.isEmpty()) {
+            return null;
+        }
+        
         // Convert to title case and replace underscores with spaces
         // "grass_block" -> "Grass Block"
         String[] words = blockName.split("_");
