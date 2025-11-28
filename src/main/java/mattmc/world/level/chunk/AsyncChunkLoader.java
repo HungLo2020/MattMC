@@ -6,6 +6,7 @@ import mattmc.client.renderer.chunk.MeshBuilder;
 import mattmc.client.renderer.chunk.VertexLightSampler;
 import mattmc.client.renderer.backend.opengl.TextureAtlas;
 import mattmc.client.renderer.block.BlockFaceCollector;
+import mattmc.util.LightUtils;
 import mattmc.world.level.block.Block;
 import mattmc.world.level.block.Blocks;
 import mattmc.world.level.levelgen.WorldGenerator;
@@ -435,26 +436,8 @@ public class AsyncChunkLoader {
                     int b = lightAccessor.getBlockLightB(chunk, x, y, z);
                     int intensity = lightAccessor.getBlockLightI(chunk, x, y, z);
                     
-                    // If no light, return early
-                    if (intensity == 0) {
-                        return new int[] {0, 0, 0};
-                    }
-                    
-                    // Scale RGB by intensity ratio to properly attenuate light
-                    int maxRGB = Math.max(r, Math.max(g, b));
-                    
-                    // If maxRGB is 0 but intensity is not, use intensity as white light
-                    if (maxRGB == 0) {
-                        return new int[] {intensity, intensity, intensity};
-                    }
-                    
-                    // Scale RGB by the intensity ratio
-                    float scale = (float) intensity / maxRGB;
-                    int scaledR = Math.round(r * scale);
-                    int scaledG = Math.round(g * scale);
-                    int scaledB = Math.round(b * scale);
-                    
-                    return new int[] {scaledR, scaledG, scaledB};
+                    // ISSUE-002 fix: Use shared utility method for RGB scaling
+                    return LightUtils.scaleRGBByIntensity(r, g, b, intensity);
                 }
                 
                 @Override
