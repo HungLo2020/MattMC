@@ -33,8 +33,9 @@ public class LeavesBlock extends Block {
      *                  or -1 for no tinting
      */
     public LeavesBlock(int tintColor) {
-        // Leaves are not solid (they don't block movement or light fully)
-        // but for rendering purposes we treat them as partially solid
+        // Leaves ARE solid for collision (player can't walk through them),
+        // but they are transparent for rendering (canOcclude() returns false).
+        // This matches Minecraft where leaves have hasCollision=true but noOcclusion().
         super(true, 0, 0, 0, 0);
         this.tintColor = tintColor;
     }
@@ -43,6 +44,7 @@ public class LeavesBlock extends Block {
      * Internal constructor used during registration to set the identifier.
      */
     LeavesBlock(int tintColor, String identifier) {
+        // Leaves ARE solid for collision but transparent for rendering (see above)
         super(true, 0, 0, 0, 0, identifier);
         this.tintColor = tintColor;
     }
@@ -84,6 +86,15 @@ public class LeavesBlock extends Block {
     @Override
     public boolean isOpaque() {
         // Leaves are not fully opaque - they allow some light through
+        return false;
+    }
+    
+    @Override
+    public boolean canOcclude() {
+        // Leaves are transparent and should not occlude neighboring block faces.
+        // This means when you place leaves on top of grass_block, the grass_block's
+        // top face should still be rendered (visible through the leaves).
+        // This matches Minecraft's behavior where leaves have noOcclusion() set.
         return false;
     }
     

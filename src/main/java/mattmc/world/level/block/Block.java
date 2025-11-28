@@ -198,6 +198,25 @@ public class Block {
         return solid;
     }
     
+    /**
+     * Check if this block can occlude neighboring block faces for face culling.
+     * This is used during rendering to determine if adjacent block faces should be hidden.
+     * 
+     * A block that can occlude will hide the faces of adjacent blocks that touch it.
+     * Transparent blocks like leaves, glass, etc. should NOT occlude because you can
+     * see through them - so the adjacent block's face should still be rendered.
+     * 
+     * This is separate from isSolid() which determines collision behavior.
+     * For example, leaves are solid (have collision) but don't occlude (transparent).
+     * 
+     * Based on Minecraft's canOcclude() from BlockBehaviour.Properties.
+     * 
+     * @return true if this block occludes neighboring faces (default: same as solid)
+     */
+    public boolean canOcclude() {
+        // By default, solid blocks occlude neighboring faces
+        return solid;
+    }
     
     /**
      * Get the RED channel light level emitted by this block.
