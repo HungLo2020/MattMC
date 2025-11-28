@@ -116,7 +116,7 @@ Flatten to a 1D array with inline index calculation, or reorder to `[y][x][z]` i
 private final Block[] blocks = new Block[16 * 384 * 16];  // 98,304 blocks
 
 public Block getBlock(int x, int y, int z) {
-    return blocks[x + (z << 4) + (y << 8)];  // y * 256 + z * 16 + x
+    return blocks[x + (z << 4) + (y << 8)];  // x + z * 16 + y * 256
 }
 
 // Option 2: Use section-based storage like Minecraft
@@ -528,7 +528,7 @@ Pack data more efficiently:
 3. Pack light values into bytes (0-15 fits in 4 bits each)
 
 ```java
-// Reduced format: 36 bytes per vertex instead of 68
+// Reduced format: 32 bytes per vertex instead of 68
 // Position: 3 floats = 12 bytes
 // UV: 2 floats = 8 bytes  
 // Color: 4 bytes (RGBA packed)
