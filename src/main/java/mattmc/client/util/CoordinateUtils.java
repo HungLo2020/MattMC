@@ -90,9 +90,12 @@ public final class CoordinateUtils {
      */
     public static Point2D framebufferToWindow(long windowHandle, float framebufferX, float framebufferY) {
         ScaleFactors scale = getFramebufferScale(windowHandle);
+        // Protect against division by zero (though getFramebufferScale prevents this)
+        float scaleX = Math.max(0.001f, scale.scaleX);
+        float scaleY = Math.max(0.001f, scale.scaleY);
         return new Point2D(
-            framebufferX / scale.scaleX,
-            framebufferY / scale.scaleY
+            framebufferX / scaleX,
+            framebufferY / scaleY
         );
     }
 }

@@ -23,11 +23,26 @@ public class DayCycle {
     /** Tick when sunset begins */
     public static final long SUNSET = 12000L;
     
+    /** Tick when sunset transition begins */
+    public static final long SUNSET_START = 11000L;
+    
     /** Tick when it's fully night (midnight) */
     public static final long MIDNIGHT = 18000L;
     
+    /** Tick when night phase starts */
+    public static final long NIGHT_START = 13000L;
+    
     /** Tick when sunrise begins */
     public static final long SUNRISE = 23000L;
+    
+    // Sky color constants (RGB components)
+    private static final float[] DAY_SKY_COLOR = {0.53f, 0.81f, 0.92f};
+    private static final float[] NIGHT_SKY_COLOR = {0.05f, 0.05f, 0.15f};
+    private static final float[] SUNSET_SKY_COLOR = {0.85f, 0.45f, 0.25f};
+    
+    // Brightness constants
+    private static final float FULL_BRIGHTNESS = 1.0f;
+    private static final float NIGHT_BRIGHTNESS = 0.3f;
     
     private long worldTime = 0L;
     
@@ -104,31 +119,40 @@ public class DayCycle {
         long timeOfDay = getTimeOfDay();
         
         // Day sky (light blue) - from sunrise through most of day
-        if (timeOfDay >= 0 && timeOfDay < 11000) {
-            return new float[] {0.53f, 0.81f, 0.92f};
+        if (timeOfDay >= 0 && timeOfDay < SUNSET_START) {
+            return DAY_SKY_COLOR.clone();
         }
         // Sunset transition (orange/red gradient) - 11000 to 13000
-        else if (timeOfDay >= 11000 && timeOfDay < 13000) {
-            float t = (timeOfDay - 11000) / 2000f; // 0.0 to 1.0
+        else if (timeOfDay >= SUNSET_START && timeOfDay < NIGHT_START) {
+            float t = (timeOfDay - SUNSET_START) / 2000f; // 0.0 to 1.0
             // Interpolate from day blue to sunset orange
-            float r = 0.53f + (0.85f - 0.53f) * t;
-            float g = 0.81f + (0.45f - 0.81f) * t;
-            float b = 0.92f + (0.25f - 0.92f) * t;
-            return new float[] {r, g, b};
+            return interpolateColor(DAY_SKY_COLOR, SUNSET_SKY_COLOR, t);
         }
         // Night (dark blue) - 13000 to 23000
-        else if (timeOfDay >= 13000 && timeOfDay < SUNRISE) {
-            return new float[] {0.05f, 0.05f, 0.15f};
+        else if (timeOfDay >= NIGHT_START && timeOfDay < SUNRISE) {
+            return NIGHT_SKY_COLOR.clone();
         }
         // Sunrise (orange/red gradient back to day) - 23000 to 24000
         else {
             float t = (timeOfDay - SUNRISE) / 1000f; // 0.0 to 1.0
             // Interpolate from sunset orange to day blue
-            float r = 0.85f + (0.53f - 0.85f) * t;
-            float g = 0.45f + (0.81f - 0.45f) * t;
-            float b = 0.25f + (0.92f - 0.25f) * t;
-            return new float[] {r, g, b};
+            return interpolateColor(SUNSET_SKY_COLOR, DAY_SKY_COLOR, t);
         }
+    }
+    
+    /**
+     * Interpolate between two RGB colors.
+     * @param color1 First color [r, g, b]
+     * @param color2 Second color [r, g, b]
+     * @param t Interpolation factor (0.0 to 1.0)
+     * @return Interpolated color [r, g, b]
+     */
+    private float[] interpolateColor(float[] color1, float[] color2, float t) {
+        return new float[] {
+            color1[0] + (color2[0] - color1[0]) * t,
+            color1[1] + (color2[1] - color1[1]) * t,
+            color1[2] + (color2[2] - color1[2]) * t
+        };
     }
     
     /**
@@ -163,22 +187,22 @@ public class DayCycle {
         long timeOfDay = getTimeOfDay();
         
         // Full brightness during day (0 to 11000)
-        if (timeOfDay >= 0 && timeOfDay < 11000) {
-            return 1.0f;
+        if (timeOfDay >= 0 && timeOfDay < SUNSET_START) {
+            return FULL_BRIGHTNESS;
         }
         // Fade to dim during sunset (11000 to 13000)
-        else if (timeOfDay >= 11000 && timeOfDay < 13000) {
-            float t = (timeOfDay - 11000) / 2000f; // 0.0 to 1.0
-            return 1.0f - (0.7f * t); // Dim to 30% brightness
+        else if (timeOfDay >= SUNSET_START && timeOfDay < NIGHT_START) {
+            float t = (timeOfDay - SUNSET_START) / 2000f; // 0.0 to 1.0
+            return FULL_BRIGHTNESS - ((FULL_BRIGHTNESS - NIGHT_BRIGHTNESS) * t);
         }
         // Dim during night (moon provides some light) (13000 to 23000)
-        else if (timeOfDay >= 13000 && timeOfDay < SUNRISE) {
-            return 0.3f;
+        else if (timeOfDay >= NIGHT_START && timeOfDay < SUNRISE) {
+            return NIGHT_BRIGHTNESS;
         }
         // Fade back to full during sunrise (23000 to 24000)
         else {
             float t = (timeOfDay - SUNRISE) / 1000f; // 0.0 to 1.0
-            return 0.3f + (0.7f * t);
+            return NIGHT_BRIGHTNESS + ((FULL_BRIGHTNESS - NIGHT_BRIGHTNESS) * t);
         }
     }
 }

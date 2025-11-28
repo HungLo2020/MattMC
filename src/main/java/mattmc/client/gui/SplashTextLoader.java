@@ -4,7 +4,7 @@ import mattmc.util.ResourceLoader;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Random;
+import java.util.concurrent.ThreadLocalRandom;
 
 /**
  * Loads and provides random splash text from the assets.
@@ -12,7 +12,6 @@ import java.util.Random;
 public class SplashTextLoader {
     private static final String SPLASH_TEXT_PATH = "/assets/splashtext";
     private static final List<String> splashTexts = new ArrayList<>();
-    private static final Random random = new Random();
     
     static {
         loadSplashTexts();
@@ -45,12 +44,13 @@ public class SplashTextLoader {
     
     /**
      * Get a random splash text.
+     * Uses ThreadLocalRandom for better thread safety and performance.
      * @return A random splash text string
      */
     public static String getRandomSplashText() {
         if (splashTexts.isEmpty()) {
             return "Awesome!";
         }
-        return splashTexts.get(random.nextInt(splashTexts.size()));
+        return splashTexts.get(ThreadLocalRandom.current().nextInt(splashTexts.size()));
     }
 }

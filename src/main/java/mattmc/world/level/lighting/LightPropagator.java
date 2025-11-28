@@ -112,11 +112,6 @@ public class LightPropagator {
 	}
 	
 	/**
-	 * Add blockLight from an emissive block (legacy method, converts to white RGB).
-	 * 
-	 * @param chunk The chunk containing the block
-	
-	/**
 	 * Propagate RGBI light to a neighbor position.
 	 * Now supports cross-chunk propagation.
 	 * Color (RGB) remains constant; only intensity decrements.
