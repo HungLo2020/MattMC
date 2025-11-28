@@ -121,13 +121,11 @@ public class UVMapper {
 	 * - WEST/EAST: 0.6
 	 */
 	public float[] extractColor(BlockFaceCollector.FaceData face) {
-		int renderColor;
-		// Use directional shading (colorBrightness) for both textured and fallback colors
-		float directionalBrightness = face.colorBrightness;
+		int r, g, b;
 		
 		if (textureAtlas != null && face.block.hasTexture()) {
-			// Use white color for texture modulation
-			renderColor = 0xFFFFFF;
+			// Use white color for texture modulation, with directional brightness applied
+			int renderColor = 0xFFFFFF;
 			
 			// Apply grass green tint for grass_block top face (vanilla MattMC-like)
 			if (face.block == Blocks.GRASS_BLOCK && face.faceType != null && "top".equals(face.faceType)) {
@@ -141,14 +139,19 @@ public class UVMapper {
 					renderColor = leavesBlock.getTintColor();
 				}
 			}
+			
+			// Extract RGB and apply directional brightness
+			float directionalBrightness = face.colorBrightness;
+			r = (int)(((renderColor >> 16) & 0xFF) * directionalBrightness);
+			g = (int)(((renderColor >> 8) & 0xFF) * directionalBrightness);
+			b = (int)((renderColor & 0xFF) * directionalBrightness);
 		} else {
-			// Use fallback color when no texture atlas (already has colorBrightness applied)
-			renderColor = ColorUtils.adjustColorBrightness(
+			// Use fallback color when no texture atlas
+			// Directional brightness is baked into the color via adjustColorBrightness
+			int renderColor = ColorUtils.adjustColorBrightness(
 				face.block.getFallbackColor(), 
-				directionalBrightness
+				face.colorBrightness
 			);
-			// Don't apply directionalBrightness again since it's already baked in
-			directionalBrightness = 1.0f;
 			
 			// Apply grass green tint for grass_block top face
 			if (face.block == Blocks.GRASS_BLOCK && face.faceType != null && "top".equals(face.faceType)) {
@@ -162,16 +165,16 @@ public class UVMapper {
 					renderColor = ColorUtils.applyTint(renderColor, leavesBlock.getTintColor(), face.colorBrightness);
 				}
 			}
+			
+			r = (renderColor >> 16) & 0xFF;
+			g = (renderColor >> 8) & 0xFF;
+			b = renderColor & 0xFF;
 		}
 		
-		int r = (renderColor >> 16) & 0xFF;
-		int g = (renderColor >> 8) & 0xFF;
-		int b = renderColor & 0xFF;
-		
 		return new float[] {
-			(r / 255.0f) * directionalBrightness,
-			(g / 255.0f) * directionalBrightness,
-			(b / 255.0f) * directionalBrightness,
+			r / 255.0f,
+			g / 255.0f,
+			b / 255.0f,
 			1.0f // alpha
 		};
 	}
