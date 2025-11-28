@@ -11,6 +11,7 @@ import mattmc.world.level.block.state.properties.Direction;
 
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Generic renderer for block geometry defined in JSON model files.
@@ -19,6 +20,8 @@ import java.util.Map;
  * 
  * This makes the rendering system compatible with MattMC's model format where
  * all block geometry is defined in JSON "elements" arrays rather than hardcoded in Java.
+ * 
+ * PERFORMANCE FIX #2: Added texture path caching to avoid repeated string operations.
  */
 public class ModelElementRenderer {
     
@@ -26,11 +29,37 @@ public class ModelElementRenderer {
     private final UVMapper uvMapper;
     
     /**
+     * PERFORMANCE FIX #2: Cache for resolved texture atlas paths.
+     * Maps raw texture path (e.g., "mattmc:block/planks") to atlas path (e.g., "assets/textures/block/planks.png")
+     * This eliminates repeated string.contains(), substring(), and concatenation in the hot path.
+     */
+    private static final ConcurrentHashMap<String, String> texturePathCache = new ConcurrentHashMap<>(256);
+    
+    /**
      * Create a model element renderer.
      */
     public ModelElementRenderer(VertexLightSampler lightSampler, UVMapper uvMapper) {
         this.lightSampler = lightSampler;
         this.uvMapper = uvMapper;
+    }
+    
+    /**
+     * PERFORMANCE FIX #2: Convert a texture path to atlas path using cache.
+     * Eliminates string operations in hot path by caching the result.
+     */
+    private String toAtlasPath(String texturePath) {
+        if (texturePath == null) {
+            return null;
+        }
+        return texturePathCache.computeIfAbsent(texturePath, path -> {
+            String resolved = path;
+            // Strip namespace prefix if present (e.g., "mattmc:block/planks" -> "block/planks")
+            if (resolved.contains(":")) {
+                resolved = resolved.substring(resolved.indexOf(':') + 1);
+            }
+            // Convert to full atlas path format: "block/birch_planks" -> "assets/textures/block/birch_planks.png"
+            return "assets/textures/" + resolved + ".png";
+        });
     }
     
     /**
@@ -212,17 +241,10 @@ public class ModelElementRenderer {
 			}
 		}
 		
-		// Strip namespace prefix if present (e.g., "mattmc:block/planks" -> "block/planks")
-		if (texturePath.contains(":")) {
-			texturePath = texturePath.substring(texturePath.indexOf(':') + 1);
-		}
-		
-		// Convert to full atlas path format: "block/birch_planks" -> "assets/textures/block/birch_planks.png"
-		String atlasPath = "assets/textures/" + texturePath + ".png";
+		// PERFORMANCE FIX #2: Use cached atlas path conversion instead of inline string operations
+		String atlasPath = toAtlasPath(texturePath);
 		
 		// Resolve texture ID once per face and use int-based UV lookup for performance.
-		// Future optimization: Pre-resolve texture IDs in baked model structures to avoid
-		// the string→int conversion entirely. This would require caching int IDs during model loading.
 		int textureId = uvMapper.resolveTextureId(atlasPath);
 		TextureCoordinateProvider.UVMapping uvMapping = (textureId >= 0) ? uvMapper.resolveUV(textureId) : null;
 		
