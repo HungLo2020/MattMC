@@ -33,8 +33,9 @@ public class LeavesBlock extends Block {
      *                  or -1 for no tinting
      */
     public LeavesBlock(int tintColor) {
-        // Leaves are not solid (they don't block movement or light fully)
-        // but for rendering purposes we treat them as partially solid
+        // Leaves ARE solid for collision (player can't walk through them),
+        // but they are transparent for rendering (canOcclude() returns false).
+        // This matches Minecraft where leaves have hasCollision=true but noOcclusion().
         super(true, 0, 0, 0, 0);
         this.tintColor = tintColor;
     }
@@ -43,6 +44,7 @@ public class LeavesBlock extends Block {
      * Internal constructor used during registration to set the identifier.
      */
     LeavesBlock(int tintColor, String identifier) {
+        // Leaves ARE solid for collision but transparent for rendering (see above)
         super(true, 0, 0, 0, 0, identifier);
         this.tintColor = tintColor;
     }
