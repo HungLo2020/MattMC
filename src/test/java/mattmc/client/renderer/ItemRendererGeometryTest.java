@@ -91,6 +91,53 @@ public class ItemRendererGeometryTest {
     }
     
     @Test
+    public void testSlabGeometryCapture() {
+        VertexCapture capture = new VertexCapture();
+        
+        // Capture slab geometry (half-height block)
+        BlockGeometryCapture.captureSlabBottom(capture, 0, 0, 0);
+        
+        // Slab has 6 faces (top, bottom, north, south, east, west) - each face is 2 triangles
+        assertEquals(12, capture.getFaces().size(), "Slab should have 12 triangles (6 faces x 2)");
+        
+        // Check that we have vertices at Y=0.5 (top of slab)
+        boolean hasTopVertex = false;
+        for (VertexCapture.Face face : capture.getFaces()) {
+            if (Math.abs(face.v1.y - 0.5f) < 0.001 || 
+                Math.abs(face.v2.y - 0.5f) < 0.001 || 
+                Math.abs(face.v3.y - 0.5f) < 0.001) {
+                hasTopVertex = true;
+                break;
+            }
+        }
+        assertTrue(hasTopVertex, "Slab should have vertices at Y=0.5 (top of slab)");
+        
+        // Check that we have vertices at Y=0 (bottom of slab)
+        boolean hasBottomVertex = false;
+        for (VertexCapture.Face face : capture.getFaces()) {
+            if (Math.abs(face.v1.y) < 0.001 || 
+                Math.abs(face.v2.y) < 0.001 || 
+                Math.abs(face.v3.y) < 0.001) {
+                hasBottomVertex = true;
+                break;
+            }
+        }
+        assertTrue(hasBottomVertex, "Slab should have vertices at Y=0 (bottom of slab)");
+        
+        // Check that slab does NOT have vertices at Y=1.0 (it's only half-height)
+        boolean hasFullHeightVertex = false;
+        for (VertexCapture.Face face : capture.getFaces()) {
+            if (Math.abs(face.v1.y - 1.0f) < 0.001 || 
+                Math.abs(face.v2.y - 1.0f) < 0.001 || 
+                Math.abs(face.v3.y - 1.0f) < 0.001) {
+                hasFullHeightVertex = true;
+                break;
+            }
+        }
+        assertFalse(hasFullHeightVertex, "Slab should NOT have vertices at Y=1.0 (it's half-height)");
+    }
+    
+    @Test
     public void testIsometricProjection() {
         // Test the isometric projection formula
         // For a point at (1, 1, 0), with center at (100, 100) and scale factors of 10:
