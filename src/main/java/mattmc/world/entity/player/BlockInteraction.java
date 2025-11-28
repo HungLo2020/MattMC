@@ -101,8 +101,10 @@ public class BlockInteraction {
     
     /**
      * Pick the block the player is looking at and add it to their inventory.
-     * Similar to MattMC's middle-click pick block functionality.
-     * Adds the block to the first empty slot, starting with the hotbar.
+     * Implements Minecraft's middle-click pick block behavior:
+     * 1. If the item is already in the hotbar, switch to that slot
+     * 2. If the item is in the main inventory, swap it with the current hotbar slot
+     * 3. If the item is not in inventory and hotbar is full, move current slot to inventory first
      * 
      * @return true if a block was picked successfully
      */
@@ -134,9 +136,12 @@ public class BlockInteraction {
             return false;
         }
         
-        // Add the item to the player's inventory
+        // Create an item stack for the picked block
         ItemStack stack = new ItemStack(item, 1);
-        return player.getInventory().addItem(stack);
+        
+        // Use Minecraft-style pick item behavior
+        player.getInventory().setPickedItem(stack);
+        return true;
     }
     
     /**
