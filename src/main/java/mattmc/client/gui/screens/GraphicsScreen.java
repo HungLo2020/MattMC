@@ -90,12 +90,20 @@ public final class GraphicsScreen extends AbstractMenuScreen {
             int nextIndex = (currentIndex == -1) ? 0 : (currentIndex + 1) % supportedResolutions.length;
             String nextRes = supportedResolutions[nextIndex];
             String[] parts = nextRes.split("x");
-            int newWidth = Integer.parseInt(parts[0]);
-            int newHeight = Integer.parseInt(parts[1]);
             
-            // Update settings and apply new resolution
-            mattmc.client.settings.OptionsManager.setResolution(newWidth, newHeight);
-            window.setSize(newWidth, newHeight);
+            // Validate the resolution format before parsing
+            if (parts.length == 2) {
+                try {
+                    int newWidth = Integer.parseInt(parts[0]);
+                    int newHeight = Integer.parseInt(parts[1]);
+                    
+                    // Update settings and apply new resolution
+                    mattmc.client.settings.OptionsManager.setResolution(newWidth, newHeight);
+                    window.setSize(newWidth, newHeight);
+                } catch (NumberFormatException e) {
+                    // Invalid resolution format in supportedResolutions - should not happen with valid config
+                }
+            }
             recomputeLayout();
             return;
         }

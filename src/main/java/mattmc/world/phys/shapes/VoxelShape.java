@@ -42,8 +42,20 @@ public class VoxelShape {
     
     /**
      * Combine two voxel shapes into one.
+     * @param shape1 First shape (if null, returns shape2 or empty)
+     * @param shape2 Second shape (if null, returns shape1 or empty)
+     * @return Combined shape, or empty shape if both are null
      */
     public static VoxelShape or(VoxelShape shape1, VoxelShape shape2) {
+        if (shape1 == null && shape2 == null) {
+            return empty();
+        }
+        if (shape1 == null) {
+            return shape2;
+        }
+        if (shape2 == null) {
+            return shape1;
+        }
         // Pre-allocate with exact combined size
         List<AABB> combined = new ArrayList<>(shape1.boxes.size() + shape2.boxes.size());
         combined.addAll(shape1.boxes);

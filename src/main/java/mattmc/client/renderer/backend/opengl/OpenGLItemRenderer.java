@@ -115,12 +115,17 @@ public class OpenGLItemRenderer implements ItemRenderer {
         }
         
         String itemId = stack.getItem().getIdentifier();
-        if (itemId == null) {
+        if (itemId == null || itemId.isEmpty()) {
             return;
         }
         
         // Extract item name from identifier
         String itemName = itemId.contains(":") ? itemId.substring(itemId.indexOf(':') + 1) : itemId;
+        
+        // Guard against empty itemName after splitting
+        if (itemName.isEmpty()) {
+            return;
+        }
         
         // Load the item model
         BlockModel itemModel = ResourceManager.resolveItemModel(itemName);
@@ -174,12 +179,19 @@ public class OpenGLItemRenderer implements ItemRenderer {
         }
         
         String itemId = stack.getItem().getIdentifier();
-        if (itemId == null) {
+        if (itemId == null || itemId.isEmpty()) {
             return;
         }
         
         // Extract item name from identifier (e.g., "mattmc:grass_block" -> "grass_block")
         String itemName = itemId.contains(":") ? itemId.substring(itemId.indexOf(':') + 1) : itemId;
+        
+        // Guard against empty itemName after splitting
+        if (itemName.isEmpty()) {
+            // Fallback: render magenta square
+            INSTANCE.renderFallbackItem(x, y, size);
+            return;
+        }
         
         // Get texture paths for this item
         Map<String, String> texturePaths = ResourceManager.getItemTexturePaths(itemName);
@@ -1008,7 +1020,17 @@ public class OpenGLItemRenderer implements ItemRenderer {
         
         // Get item name for texture lookup
         String itemId = stack.getItem().getIdentifier();
+        if (itemId == null || itemId.isEmpty()) {
+            INSTANCE.renderFallbackItem(x, y, size);
+            return;
+        }
         String itemName = itemId.contains(":") ? itemId.substring(itemId.indexOf(':') + 1) : itemId;
+        
+        // Guard against empty itemName after splitting
+        if (itemName.isEmpty()) {
+            INSTANCE.renderFallbackItem(x, y, size);
+            return;
+        }
         
         // Get texture paths
         Map<String, String> texturePaths = ResourceManager.getItemTexturePaths(itemName);

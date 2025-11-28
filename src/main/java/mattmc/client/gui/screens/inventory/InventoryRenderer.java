@@ -378,7 +378,14 @@ public class InventoryRenderer {
         
         String identifier = hoveredItem.getIdentifier();
         String itemName = identifier.contains(":") ? identifier.substring(identifier.indexOf(':') + 1) : identifier;
-        itemName = itemName.substring(0, 1).toUpperCase() + itemName.substring(1).replace('_', ' ');
+        
+        // Guard against empty itemName after splitting
+        if (itemName.isEmpty()) {
+            itemName = "Unknown";
+        } else {
+            itemName = itemName.substring(0, 1).toUpperCase() + 
+                       (itemName.length() > 1 ? itemName.substring(1).replace('_', ' ') : "");
+        }
         
         // Convert window coordinates to framebuffer coordinates
         CoordinateUtils.Point2D fbCoords = CoordinateUtils.windowToFramebuffer(

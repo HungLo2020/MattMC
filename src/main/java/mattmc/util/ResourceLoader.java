@@ -1,6 +1,8 @@
 package mattmc.util;
 
 import com.google.gson.Gson;
+import com.google.gson.JsonIOException;
+import com.google.gson.JsonSyntaxException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -114,8 +116,11 @@ public final class ResourceLoader {
             try (Reader reader = new InputStreamReader(is, StandardCharsets.UTF_8)) {
                 return gson.fromJson(reader, clazz);
             }
-        } catch (Exception e) {
-            logger.error("Failed to load/parse JSON resource: {}", resourcePath, e);
+        } catch (IOException e) {
+            logger.error("Failed to load JSON resource: {}", resourcePath, e);
+            return null;
+        } catch (JsonSyntaxException | JsonIOException e) {
+            logger.error("Failed to parse JSON resource: {}", resourcePath, e);
             return null;
         }
     }
