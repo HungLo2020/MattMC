@@ -18,7 +18,10 @@ import mattmc.client.resources.ResourceManager;
 import mattmc.client.resources.metadata.animation.AnimationMetadataSection;
 import mattmc.client.resources.model.BlockModel;
 import mattmc.client.resources.model.ModelDisplay;
+import mattmc.world.item.BlockItem;
 import mattmc.world.item.ItemStack;
+import mattmc.world.level.block.Block;
+import mattmc.world.level.block.LeavesBlock;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -224,8 +227,8 @@ public class OpenGLItemRenderer implements ItemRenderer {
                 // Render as isometric slab (half-height block)
                 renderIsometricSlab(texturePaths, itemModel, x, adjustedY, size);
             } else {
-                // Render as isometric 3D cube
-                renderIsometricCube(texturePaths, itemModel, x, adjustedY, size);
+                // Render as isometric 3D cube, passing the stack for LeavesBlock tint detection
+                renderIsometricCube(stack, texturePaths, itemModel, x, adjustedY, size);
             }
         } else {
             // Render as flat 2D icon (for non-block items)
@@ -251,23 +254,50 @@ public class OpenGLItemRenderer implements ItemRenderer {
      * Render an isometric cube showing three faces (west, north, and top).
      * Uses the actual in-game 3D block geometry projected to 2D isometric view.
      * 
+     * @param stack The item stack being rendered (for LeavesBlock tint detection)
+     * @param texturePaths Texture paths for each face
+     * @param itemModel The item model for tints from JSON
+     * @param x Center X position
+     * @param y Center Y position
      * @param size Half-width for the isometric projection
      */
-    private static void renderIsometricCube(Map<String, String> texturePaths, mattmc.client.resources.model.BlockModel itemModel, float x, float y, float size) {
+    private static void renderIsometricCube(ItemStack stack, Map<String, String> texturePaths, mattmc.client.resources.model.BlockModel itemModel, float x, float y, float size) {
         // Get textures for each face
         String topTexture = getTextureForFace(texturePaths, "top");
         String sideTexture = getTextureForFace(texturePaths, "side");
+        String overlayTexture = texturePaths.get("overlay"); // For grass blocks
         
-        // Check if there are tints and get the tint color for the top face
-        int topTintColor = 0xFFFFFF; // Default: no tint (white)
-        if (itemModel != null && itemModel.getTints() != null && !itemModel.getTints().isEmpty()) {
+        // Determine tint color and tint behavior
+        int tintColor = 0xFFFFFF; // Default: no tint (white)
+        boolean tintAllFaces = false; // For leaves: tint all faces. For grass: only top and overlay
+        
+        // First check if this is a LeavesBlock item (has tint stored in block)
+        if (stack != null && stack.getItem() instanceof BlockItem) {
+            Block block = ((BlockItem) stack.getItem()).getBlock();
+            if (block instanceof LeavesBlock) {
+                LeavesBlock leavesBlock = (LeavesBlock) block;
+                if (leavesBlock.hasTinting()) {
+                    tintColor = leavesBlock.getTintColor();
+                    tintAllFaces = true; // Leaves are tinted on all faces
+                }
+            }
+        }
+        
+        // If no tint from block, check the item model's tints list (for grass blocks etc.)
+        if (tintColor == 0xFFFFFF && itemModel != null && itemModel.getTints() != null && !itemModel.getTints().isEmpty()) {
             // Get the first tint (grass blocks typically have one tint)
-            topTintColor = itemModel.getTints().get(0).getTintColor();
+            tintColor = itemModel.getTints().get(0).getTintColor();
+            tintAllFaces = false; // For grass: only top and overlay get tint
         }
         
         // Save GL state
         boolean textureWasEnabled = glIsEnabled(GL_TEXTURE_2D);
+        boolean blendWasEnabled = glIsEnabled(GL_BLEND);
+        
         glEnable(GL_TEXTURE_2D);
+        // Enable blending for transparent textures (leaves)
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
         
         // Define scale for isometric projection
         // size is the half-width, so double it for the full scale
@@ -291,6 +321,11 @@ public class OpenGLItemRenderer implements ItemRenderer {
         BlockGeometryCapture.captureTopFace(capture, 0, 0, 0);
         List<VertexCapture.Face> topFaces = List.copyOf(capture.getFaces());
         
+        // Extract tint color components
+        float tintR = ((tintColor >> 16) & 0xFF) / 255.0f;
+        float tintG = ((tintColor >> 8) & 0xFF) / 255.0f;
+        float tintB = (tintColor & 0xFF) / 255.0f;
+        
         // Render the faces in back-to-front order for proper visibility
         
         // 1. West face (left side, medium brightness - 80%)
@@ -298,9 +333,25 @@ public class OpenGLItemRenderer implements ItemRenderer {
             Texture tex = loadTexture(sideTexture);
             if (tex != null) {
                 tex.bind();
-                glColor4f(0.8f, 0.8f, 0.8f, 1.0f);
+                // Apply tint only if tintAllFaces (for leaves), otherwise use white
+                if (tintAllFaces) {
+                    glColor4f(0.8f * tintR, 0.8f * tintG, 0.8f * tintB, 1.0f);
+                } else {
+                    glColor4f(0.8f, 0.8f, 0.8f, 1.0f);
+                }
                 float sideVScale = getAnimatedTextureVScale(sideTexture);
                 renderFacesIsometric(westFaces, x, y, isoWidth, isoHeight, sideVScale);
+            }
+        }
+        
+        // 1b. West face overlay (for grass blocks - tinted)
+        if (overlayTexture != null && !tintAllFaces) {
+            Texture tex = loadTexture(overlayTexture);
+            if (tex != null) {
+                tex.bind();
+                glColor4f(0.8f * tintR, 0.8f * tintG, 0.8f * tintB, 1.0f);
+                float overlayVScale = getAnimatedTextureVScale(overlayTexture);
+                renderFacesIsometric(westFaces, x, y, isoWidth, isoHeight, overlayVScale);
             }
         }
         
@@ -309,22 +360,35 @@ public class OpenGLItemRenderer implements ItemRenderer {
             Texture tex = loadTexture(sideTexture);
             if (tex != null) {
                 tex.bind();
-                glColor4f(0.6f, 0.6f, 0.6f, 1.0f);
+                // Apply tint only if tintAllFaces (for leaves), otherwise use white
+                if (tintAllFaces) {
+                    glColor4f(0.6f * tintR, 0.6f * tintG, 0.6f * tintB, 1.0f);
+                } else {
+                    glColor4f(0.6f, 0.6f, 0.6f, 1.0f);
+                }
                 float sideVScale = getAnimatedTextureVScale(sideTexture);
                 renderFacesIsometric(northFaces, x, y, isoWidth, isoHeight, sideVScale);
             }
         }
         
-        // 3. Top face (brightest - 100% with tint applied)
+        // 2b. North face overlay (for grass blocks - tinted)
+        if (overlayTexture != null && !tintAllFaces) {
+            Texture tex = loadTexture(overlayTexture);
+            if (tex != null) {
+                tex.bind();
+                glColor4f(0.6f * tintR, 0.6f * tintG, 0.6f * tintB, 1.0f);
+                float overlayVScale = getAnimatedTextureVScale(overlayTexture);
+                renderFacesIsometric(northFaces, x, y, isoWidth, isoHeight, overlayVScale);
+            }
+        }
+        
+        // 3. Top face (brightest - 100% with tint always applied for both leaves and grass)
         if (topTexture != null) {
             Texture tex = loadTexture(topTexture);
             if (tex != null) {
                 tex.bind();
-                // Apply tint color to the top face
-                float r = ((topTintColor >> 16) & 0xFF) / 255.0f;
-                float g = ((topTintColor >> 8) & 0xFF) / 255.0f;
-                float b = (topTintColor & 0xFF) / 255.0f;
-                glColor4f(r, g, b, 1.0f);
+                // Apply tint color to the top face (for both grass and leaves)
+                glColor4f(tintR, tintG, tintB, 1.0f);
                 float topVScale = getAnimatedTextureVScale(topTexture);
                 renderFacesIsometric(topFaces, x, y, isoWidth, isoHeight, topVScale);
             }
@@ -333,6 +397,9 @@ public class OpenGLItemRenderer implements ItemRenderer {
         // Restore GL state
         if (!textureWasEnabled) {
             glDisable(GL_TEXTURE_2D);
+        }
+        if (!blendWasEnabled) {
+            glDisable(GL_BLEND);
         }
         glColor4f(1f, 1f, 1f, 1f); // Reset color
     }
@@ -1065,7 +1132,7 @@ public class OpenGLItemRenderer implements ItemRenderer {
             if (isStairs) {
                 renderIsometricStairs(texturePaths, model, x + offsetX, y + offsetY, transformedSize);
             } else {
-                renderIsometricCube(texturePaths, model, x + offsetX, y + offsetY, transformedSize);
+                renderIsometricCube(stack, texturePaths, model, x + offsetX, y + offsetY, transformedSize);
             }
         } else {
             // For flat items, render as 2D

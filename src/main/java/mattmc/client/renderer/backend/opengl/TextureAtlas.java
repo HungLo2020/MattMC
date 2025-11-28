@@ -119,21 +119,26 @@ public class TextureAtlas implements TextureCoordinateProvider, AutoCloseable {
 		BufferedImage atlasImage = new BufferedImage(atlasWidth, atlasHeight, BufferedImage.TYPE_INT_ARGB);
 		Graphics2D g = atlasImage.createGraphics();
 		
-		// Fill with neutral gray (RGB: 128,128,128) to minimize color bleeding artifacts
-		// Gray is less noticeable than black or magenta when mipmaps/anisotropic filtering sample it
-		g.setColor(new Color(128, 128, 128, 255));
+		// Fill with transparent black to ensure proper alpha for textures with transparency
+		// This is important for leaves and other blocks with transparent pixels
+		g.setComposite(java.awt.AlphaComposite.Clear);
 		g.fillRect(0, 0, atlasWidth, atlasHeight);
+		g.setComposite(java.awt.AlphaComposite.SrcOver);
 		
 		// Pack textures into atlas
 		int x = 0, y = 0;
 		List<String> textureList = new ArrayList<>(uniqueTexturePaths);
+		
+		// Use Src composite to completely replace destination pixels with source pixels
+		// This preserves the texture's alpha channel instead of blending with the background
+		g.setComposite(java.awt.AlphaComposite.Src);
 		
 		for (String texturePath : textureList) {
 			try {
 				// Load texture image (handles animated textures with .mcmeta files)
 				BufferedImage texture = loadTextureForAtlas(texturePath);
 				if (texture != null) {
-					// Draw texture into atlas
+					// Draw texture into atlas (Src composite preserves alpha)
 					g.drawImage(texture, x, y, textureSize, textureSize, null);
 					
 					// Store atlas position for animated texture updates

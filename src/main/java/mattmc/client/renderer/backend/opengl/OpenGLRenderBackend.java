@@ -325,9 +325,12 @@ public class OpenGLRenderBackend implements RenderBackend {
             currentShader = null;
             currentAtlas = null;
             
-            // OpenGL state setup could go here
-            // For now, we assume the caller has already set up the GL state
-            // (viewport, clear color, etc.) before calling beginFrame()
+            // OpenGL state setup for 3D rendering
+            // Enable alpha blending for transparent textures (e.g., leaves)
+            // The fragment shader uses 'discard' for fully transparent pixels,
+            // but blending is still needed for proper alpha compositing
+            glEnable(GL_BLEND);
+            glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
         }
     }
     
@@ -631,6 +634,9 @@ public class OpenGLRenderBackend implements RenderBackend {
                 glBindTexture(GL_TEXTURE_2D, 0);
                 currentAtlas = null;
             }
+            
+            // Disable blending that was enabled in beginFrame
+            glDisable(GL_BLEND);
         }
     }
     

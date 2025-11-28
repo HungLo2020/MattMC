@@ -1,0 +1,6 @@
+{
+  "parent": "mattmc:block/leaves",
+  "textures": {
+    "all": "mattmc:block/azalea_leaves"
+  }
+}

@@ -109,6 +109,20 @@ public class Blocks {
     public static final Block CRIMSON_STEM = register("crimson_stem", new RotatedPillarBlock(true));
     public static final Block WARPED_STEM = register("warped_stem", new RotatedPillarBlock(true));
     public static final Block SILVER_BIRCH_LOG = register("silver_birch_log", new RotatedPillarBlock(true));
+    // Leaves blocks - tint colors from Minecraft item models
+    // Leaves with foliage tinting use negative ARGB values from MC (e.g., -12012264)
+    public static final Block OAK_LEAVES = register("oak_leaves", new LeavesBlock(-12012264));
+    public static final Block SPRUCE_LEAVES = register("spruce_leaves", new LeavesBlock(-10380959));
+    public static final Block BIRCH_LEAVES = register("birch_leaves", new LeavesBlock(-8345771));
+    public static final Block JUNGLE_LEAVES = register("jungle_leaves", new LeavesBlock(-12012264));
+    public static final Block ACACIA_LEAVES = register("acacia_leaves", new LeavesBlock(-12012264));
+    public static final Block DARK_OAK_LEAVES = register("dark_oak_leaves", new LeavesBlock(-12012264));
+    public static final Block MANGROVE_LEAVES = register("mangrove_leaves", new LeavesBlock(-7158200));
+    // Leaves without tinting
+    public static final Block CHERRY_LEAVES = register("cherry_leaves", new LeavesBlock());
+    public static final Block AZALEA_LEAVES = register("azalea_leaves", new LeavesBlock());
+    public static final Block FLOWERING_AZALEA_LEAVES = register("flowering_azalea_leaves", new LeavesBlock());
+    public static final Block PALE_OAK_LEAVES = register("pale_oak_leaves", new LeavesBlock());
     
     /**
      * Register a block with a given name (without namespace).
@@ -150,6 +164,9 @@ public class Blocks {
                 lightEmission,
                 block.getLightEmissionR(), block.getLightEmissionG(), block.getLightEmissionB(), 
                 identifier);
+        } else if (block instanceof LeavesBlock) {
+            LeavesBlock leavesBlock = (LeavesBlock) block;
+            registeredBlock = new LeavesBlock(leavesBlock.getRawTintColor(), identifier);
         } else {
             int lightEmission = MathUtils.max(block.getLightEmissionR(), MathUtils.max(block.getLightEmissionG(), block.getLightEmissionB()));
             registeredBlock = new Block(block.isSolid(), 
@@ -201,6 +218,9 @@ public class Blocks {
                 lightEmission,
                 block.getLightEmissionR(), block.getLightEmissionG(), block.getLightEmissionB(), 
                 identifier);
+        } else if (block instanceof LeavesBlock) {
+            LeavesBlock leavesBlock = (LeavesBlock) block;
+            registeredBlock = new LeavesBlock(leavesBlock.getRawTintColor(), identifier);
         } else {
             int lightEmission = MathUtils.max(block.getLightEmissionR(), MathUtils.max(block.getLightEmissionG(), block.getLightEmissionB()));
             registeredBlock = new Block(block.isSolid(), 
@@ -214,7 +234,7 @@ public class Blocks {
     
     /**
      * Get a block by its identifier.
-     * 
+     *
      * @param identifier The block identifier (e.g., "mattmc:dirt")
      * @return The Block, or null if not found
      * @throws NullPointerException if identifier is null

@@ -109,6 +109,18 @@ public class Items {
     public static final BlockItem CRIMSON_STEM = register("crimson_stem", new BlockItem(Blocks.CRIMSON_STEM));
     public static final BlockItem WARPED_STEM = register("warped_stem", new BlockItem(Blocks.WARPED_STEM));
     public static final BlockItem SILVER_BIRCH_LOG = register("silver_birch_log", new BlockItem(Blocks.SILVER_BIRCH_LOG));
+    // Leaves items
+    public static final BlockItem OAK_LEAVES = register("oak_leaves", new BlockItem(Blocks.OAK_LEAVES));
+    public static final BlockItem SPRUCE_LEAVES = register("spruce_leaves", new BlockItem(Blocks.SPRUCE_LEAVES));
+    public static final BlockItem BIRCH_LEAVES = register("birch_leaves", new BlockItem(Blocks.BIRCH_LEAVES));
+    public static final BlockItem JUNGLE_LEAVES = register("jungle_leaves", new BlockItem(Blocks.JUNGLE_LEAVES));
+    public static final BlockItem ACACIA_LEAVES = register("acacia_leaves", new BlockItem(Blocks.ACACIA_LEAVES));
+    public static final BlockItem DARK_OAK_LEAVES = register("dark_oak_leaves", new BlockItem(Blocks.DARK_OAK_LEAVES));
+    public static final BlockItem MANGROVE_LEAVES = register("mangrove_leaves", new BlockItem(Blocks.MANGROVE_LEAVES));
+    public static final BlockItem CHERRY_LEAVES = register("cherry_leaves", new BlockItem(Blocks.CHERRY_LEAVES));
+    public static final BlockItem AZALEA_LEAVES = register("azalea_leaves", new BlockItem(Blocks.AZALEA_LEAVES));
+    public static final BlockItem FLOWERING_AZALEA_LEAVES = register("flowering_azalea_leaves", new BlockItem(Blocks.FLOWERING_AZALEA_LEAVES));
+    public static final BlockItem PALE_OAK_LEAVES = register("pale_oak_leaves", new BlockItem(Blocks.PALE_OAK_LEAVES));
 
     // Basic materials (stackable, 64 max)
     //public static final Item STICK = register("stick", new Item(64));
