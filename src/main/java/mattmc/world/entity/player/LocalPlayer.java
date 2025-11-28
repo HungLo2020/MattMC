@@ -1,7 +1,6 @@
 package mattmc.world.entity.player;
 
 
-import mattmc.client.MattMC;
 import mattmc.world.Gamemode;
 import mattmc.world.item.Inventory;
 /**

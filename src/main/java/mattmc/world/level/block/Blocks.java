@@ -1,6 +1,5 @@
 package mattmc.world.level.block;
 
-import mattmc.client.MattMC;
 import mattmc.util.MathUtils;
 import mattmc.util.Validate;
 

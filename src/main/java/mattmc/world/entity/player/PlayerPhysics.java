@@ -1,6 +1,5 @@
 package mattmc.world.entity.player;
 
-import mattmc.client.MattMC;
 import mattmc.world.level.block.Blocks;
 
 import mattmc.world.level.block.Block;

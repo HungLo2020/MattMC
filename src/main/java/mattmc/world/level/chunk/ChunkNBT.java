@@ -1,6 +1,5 @@
 package mattmc.world.level.chunk;
 
-import mattmc.client.MattMC;
 import mattmc.nbt.BitPackedArray;
 import mattmc.world.level.block.Block;
 import mattmc.world.level.block.Blocks;

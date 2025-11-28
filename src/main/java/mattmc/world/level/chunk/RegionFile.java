@@ -1,7 +1,5 @@
 package mattmc.world.level.chunk;
 
-import mattmc.client.MattMC;
-
 import mattmc.nbt.NBTUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

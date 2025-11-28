@@ -1,6 +1,5 @@
 package mattmc.client.renderer.backend.opengl;
 
-import mattmc.client.MattMC;
 import mattmc.client.settings.OptionsManager;
 
 import org.lwjgl.BufferUtils;

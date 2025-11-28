@@ -1,7 +1,5 @@
 package mattmc.client.renderer.backend.opengl.gui.components;
 
-import mattmc.client.MattMC;
-
 import static org.lwjgl.opengl.GL11.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

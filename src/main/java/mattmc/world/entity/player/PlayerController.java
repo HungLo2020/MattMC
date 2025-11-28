@@ -1,7 +1,5 @@
 package mattmc.world.entity.player;
 
-import mattmc.client.MattMC;
-
 import static org.lwjgl.glfw.GLFW.*;
 
 /**
