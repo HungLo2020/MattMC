@@ -97,20 +97,20 @@ public class AmbientOcclusion {
      * Format: VERTEX_CORNERS[face][vertex] = {edge0, edge1}
      * where edge0 and edge1 are indices into FACE_CORNERS[face]
      */
-    private static final int[][] VERTEX_CORNERS = {
+    private static final int[][][] VERTEX_CORNERS = {
         // UP: vertex to corner mapping
         // v0 = EAST + SOUTH, v1 = EAST + NORTH, v2 = WEST + NORTH, v3 = WEST + SOUTH
-        {0, 3}, {0, 2}, {1, 2}, {1, 3},
+        {{0, 3}, {0, 2}, {1, 2}, {1, 3}},
         // DOWN: v0 = WEST + SOUTH, v1 = WEST + NORTH, v2 = EAST + NORTH, v3 = EAST + SOUTH
-        {0, 3}, {0, 2}, {1, 2}, {1, 3},
+        {{0, 3}, {0, 2}, {1, 2}, {1, 3}},
         // NORTH: v0 = UP + WEST, v1 = UP + EAST, v2 = DOWN + EAST, v3 = DOWN + WEST
-        {0, 3}, {0, 2}, {1, 2}, {1, 3},
+        {{0, 3}, {0, 2}, {1, 2}, {1, 3}},
         // SOUTH: v0 = UP + WEST, v1 = DOWN + WEST, v2 = DOWN + EAST, v3 = UP + EAST
-        {3, 0}, {2, 0}, {2, 1}, {3, 1},
+        {{3, 0}, {2, 0}, {2, 1}, {3, 1}},
         // WEST: v0 = UP + SOUTH, v1 = UP + NORTH, v2 = DOWN + NORTH, v3 = DOWN + SOUTH
-        {0, 3}, {0, 2}, {1, 2}, {1, 3},
+        {{0, 3}, {0, 2}, {1, 2}, {1, 3}},
         // EAST: v0 = DOWN + SOUTH, v1 = DOWN + NORTH, v2 = UP + NORTH, v3 = UP + SOUTH
-        {0, 3}, {0, 2}, {1, 2}, {1, 3}
+        {{0, 3}, {0, 2}, {1, 2}, {1, 3}}
     };
     
     private BlockAccessor blockAccessor;
@@ -164,7 +164,7 @@ public class AmbientOcclusion {
         // Get the corner directions for this face (4 directions, each with 3 components dx,dy,dz)
         int[][] corners = FACE_CORNERS[faceIndex];
         int vertIdx = Math.min(vertexIndex, 3); // Ensure valid index
-        int[] vertCorners = VERTEX_CORNERS[faceIndex * 4 + vertIdx];
+        int[] vertCorners = VERTEX_CORNERS[faceIndex][vertIdx];
         int edge0Idx = vertCorners[0];
         int edge1Idx = vertCorners[1];
         
@@ -243,7 +243,7 @@ public class AmbientOcclusion {
      */
     private boolean isBlockingLight(LevelChunk chunk, int x, int y, int z) {
         Block block = getBlockSafe(chunk, x, y, z);
-        return block.isSolid() && !block.isAir();
+        return block.isSolid();
     }
     
     /**
