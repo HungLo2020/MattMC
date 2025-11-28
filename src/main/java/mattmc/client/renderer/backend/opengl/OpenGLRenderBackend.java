@@ -1381,4 +1381,40 @@ public class OpenGLRenderBackend implements RenderBackend {
     public boolean isTexture2DEnabled() {
         return glIsEnabled(GL_TEXTURE_2D);
     }
+    
+    @Override
+    public void bindTexture(int textureId) {
+        glBindTexture(GL_TEXTURE_2D, textureId);
+    }
+    
+    @Override
+    public void unbindTexture() {
+        glBindTexture(GL_TEXTURE_2D, 0);
+    }
+    
+    @Override
+    public void begin3DQuads() {
+        glBegin(GL_QUADS);
+    }
+    
+    @Override
+    public void end3DQuads() {
+        glEnd();
+    }
+    
+    @Override
+    public void addTexturedQuadVertex(float x, float y, float z, float u, float v) {
+        glTexCoord2f(u, v);
+        glVertex3f(x, y, z);
+    }
+    
+    @Override
+    public void setDepthMask(boolean enable) {
+        glDepthMask(enable);
+    }
+    
+    @Override
+    public void setBlendFunc(int srcFactor, int dstFactor) {
+        glBlendFunc(srcFactor, dstFactor);
+    }
 }

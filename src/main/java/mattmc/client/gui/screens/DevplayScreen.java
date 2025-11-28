@@ -12,6 +12,7 @@ import mattmc.world.entity.player.PlayerPhysics;
 import mattmc.world.entity.player.PlayerInput;
 import mattmc.client.renderer.WorldRenderer;
 import mattmc.client.renderer.UIRenderer;
+import mattmc.client.renderer.SkyRenderer;
 import mattmc.client.renderer.block.BlockOutlineRenderer;
 import mattmc.world.item.Inventory;
 import mattmc.world.level.chunk.ChunkUtils;
@@ -50,6 +51,7 @@ public final class DevplayScreen implements Screen {
     private final BlockInteraction blockInteraction;
     private final WorldRenderer worldRenderer;
     private final UIRenderer uiRenderer;
+    private final SkyRenderer skyRenderer;
     
     // Level name for saving
     private final String worldName;
@@ -168,6 +170,7 @@ public final class DevplayScreen implements Screen {
         this.worldRenderer = game.getBackendFactory().createWorldRenderer();
         this.worldRenderer.initWithLevel(this.world);
         this.uiRenderer = new UIRenderer();
+        this.skyRenderer = new SkyRenderer(this.worldRenderer.getRenderBackend());
         
         // Stage 4: Share the render backend between world and UI rendering
         // This ensures UI elements use the same backend abstraction as chunks
@@ -246,7 +249,19 @@ public final class DevplayScreen implements Screen {
         float fov = 70f, zn = 0.1f, zf = 500f;
         backend.setupPerspectiveProjection(fov, aspect, zn, zf);
 
-        // Apply camera transformations (pitch, yaw, then position)
+        // Apply camera transformations (pitch, yaw, then position) for sky
+        // Sky rendering uses only rotation, not translation (sky is at infinity)
+        backend.pushMatrix();
+        backend.rotateMatrix(player.getPitch(alphaF), 1f, 0f, 0f);
+        backend.rotateMatrix(player.getYaw(alphaF), 0f, 1f, 0f);
+        
+        // Render sky (sun, moon, stars) before world geometry
+        // Sky is rendered without depth test so it appears behind everything
+        skyRenderer.render(world.getDayCycle(), player.getPitch(alphaF), player.getYaw(alphaF));
+        
+        backend.popMatrix();
+        
+        // Apply camera transformations for world rendering
         // Use interpolated values for smooth rendering between ticks
         // Camera is at eye level (1.62 blocks above feet)
         backend.rotateMatrix(player.getPitch(alphaF), 1f, 0f, 0f);
