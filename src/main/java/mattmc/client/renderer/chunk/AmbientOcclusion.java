@@ -94,28 +94,55 @@ public class AmbientOcclusion {
     };
     
     /**
-     * Vertex indices for each corner of each face.
-     * Each vertex is influenced by 2 edge neighbors and 1 corner neighbor.
+     * Vertex to edge mapping for each face.
      * 
-     * For UP face: vert0 = (corner0 + corner3), vert1 = (corner0 + corner2), etc.
-     * This follows Minecraft's AdjacencyInfo pattern.
+     * For each vertex on a face, we need to know which TWO edge directions (from FACE_CORNERS)
+     * to sample. Looking at Minecraft's code:
+     * 
+     * For UP face with corners = {EAST(0), WEST(1), NORTH(2), SOUTH(3)}:
+     *   f9 = vert0 uses f3(SOUTH) + f(EAST)   -> edges {0, 3}
+     *   f10 = vert1 uses f2(NORTH) + f(EAST)  -> edges {0, 2}
+     *   f11 = vert2 uses f2(NORTH) + f1(WEST) -> edges {1, 2}
+     *   f12 = vert3 uses f3(SOUTH) + f1(WEST) -> edges {1, 3}
+     * 
+     * But AmbientVertexRemap for UP is (2, 3, 0, 1), meaning:
+     *   output[0] = f11 -> edges {1, 2} (WEST + NORTH) for vertex at (x0, z0) = NW
+     *   output[1] = f12 -> edges {1, 3} (WEST + SOUTH) for vertex at (x0, z1) = SW
+     *   output[2] = f9  -> edges {0, 3} (EAST + SOUTH) for vertex at (x1, z1) = SE
+     *   output[3] = f10 -> edges {0, 2} (EAST + NORTH) for vertex at (x1, z0) = NE
+     * 
+     * MeshBuilder vertex order for TOP face:
+     *   Vertex 0: (x0, y1, z0) - NW corner -> needs WEST + NORTH
+     *   Vertex 1: (x0, y1, z1) - SW corner -> needs WEST + SOUTH
+     *   Vertex 2: (x1, y1, z1) - SE corner -> needs EAST + SOUTH
+     *   Vertex 3: (x1, y1, z0) - NE corner -> needs EAST + NORTH
      * 
      * Format: VERTEX_CORNERS[face][vertex] = {edge0, edge1}
-     * where edge0 and edge1 are indices into FACE_CORNERS[face]
      */
     private static final int[][][] VERTEX_CORNERS = {
-        // UP: vertex to corner mapping
-        // v0 = EAST + SOUTH, v1 = EAST + NORTH, v2 = WEST + NORTH, v3 = WEST + SOUTH
-        {{0, 3}, {0, 2}, {1, 2}, {1, 3}},
-        // DOWN: v0 = WEST + SOUTH, v1 = WEST + NORTH, v2 = EAST + NORTH, v3 = EAST + SOUTH
-        {{0, 3}, {0, 2}, {1, 2}, {1, 3}},
-        // NORTH: v0 = UP + WEST, v1 = UP + EAST, v2 = DOWN + EAST, v3 = DOWN + WEST
-        {{0, 3}, {0, 2}, {1, 2}, {1, 3}},
-        // SOUTH: v0 = UP + WEST, v1 = DOWN + WEST, v2 = DOWN + EAST, v3 = UP + EAST
-        {{3, 0}, {2, 0}, {2, 1}, {3, 1}},
-        // WEST: v0 = UP + SOUTH, v1 = UP + NORTH, v2 = DOWN + NORTH, v3 = DOWN + SOUTH
-        {{0, 3}, {0, 2}, {1, 2}, {1, 3}},
-        // EAST: v0 = DOWN + SOUTH, v1 = DOWN + NORTH, v2 = UP + NORTH, v3 = UP + SOUTH
+        // UP: corners = {EAST(0), WEST(1), NORTH(2), SOUTH(3)}
+        // MeshBuilder: v0=(x0,y1,z0), v1=(x0,y1,z1), v2=(x1,y1,z1), v3=(x1,y1,z0)
+        // v0 (NW) = WEST + NORTH, v1 (SW) = WEST + SOUTH, v2 (SE) = EAST + SOUTH, v3 (NE) = EAST + NORTH
+        {{1, 2}, {1, 3}, {0, 3}, {0, 2}},
+        // DOWN: corners = {WEST(0), EAST(1), NORTH(2), SOUTH(3)}
+        // MeshBuilder: v0=(x0,y0,z0), v1=(x1,y0,z0), v2=(x1,y0,z1), v3=(x0,y0,z1)
+        // v0 = WEST + NORTH, v1 = EAST + NORTH, v2 = EAST + SOUTH, v3 = WEST + SOUTH
+        {{0, 2}, {1, 2}, {1, 3}, {0, 3}},
+        // NORTH: corners = {UP(0), DOWN(1), EAST(2), WEST(3)}
+        // MeshBuilder: v0=(x1,y0,z0), v1=(x0,y0,z0), v2=(x0,y1,z0), v3=(x1,y1,z0)
+        // v0 = EAST + DOWN, v1 = WEST + DOWN, v2 = WEST + UP, v3 = EAST + UP
+        {{2, 1}, {3, 1}, {3, 0}, {2, 0}},
+        // SOUTH: corners = {WEST(0), EAST(1), DOWN(2), UP(3)}
+        // MeshBuilder: v0=(x0,y0,z1), v1=(x1,y0,z1), v2=(x1,y1,z1), v3=(x0,y1,z1)
+        // v0 = WEST + DOWN, v1 = EAST + DOWN, v2 = EAST + UP, v3 = WEST + UP
+        {{0, 2}, {1, 2}, {1, 3}, {0, 3}},
+        // WEST: corners = {UP(0), DOWN(1), NORTH(2), SOUTH(3)}
+        // MeshBuilder: v0=(x0,y0,z0), v1=(x0,y0,z1), v2=(x0,y1,z1), v3=(x0,y1,z0)
+        // v0 = DOWN + NORTH, v1 = DOWN + SOUTH, v2 = UP + SOUTH, v3 = UP + NORTH
+        {{1, 2}, {1, 3}, {0, 3}, {0, 2}},
+        // EAST: corners = {DOWN(0), UP(1), NORTH(2), SOUTH(3)}
+        // MeshBuilder: v0=(x1,y0,z1), v1=(x1,y0,z0), v2=(x1,y1,z0), v3=(x1,y1,z1)
+        // v0 = DOWN + SOUTH, v1 = DOWN + NORTH, v2 = UP + NORTH, v3 = UP + SOUTH
         {{0, 3}, {0, 2}, {1, 2}, {1, 3}}
     };
     
