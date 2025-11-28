@@ -559,4 +559,71 @@ public final class BlockGeometryCapture {
         capture.texCoord(1, 0); capture.addVertex(x1, y1, z05);
         capture.texCoord(0, 0); capture.addVertex(x0, y1, z05);
     }
+    
+    /**
+     * Capture vertices for a bottom slab (half-height block at y=0 to y=0.5).
+     * This is used for isometric item rendering of slabs in inventory.
+     * 
+     * Geometry:
+     * - Bottom slab: (0,0,0) to (1,0.5,1) - full block, half height
+     */
+    public static void captureSlabBottom(VertexCapture capture, float x, float y, float z) {
+        float x0 = x, x1 = x + 1;
+        float y0 = y, y05 = y + 0.5f;
+        float z0 = z, z1 = z + 1;
+        
+        // Top face of slab (at y=0.5)
+        capture.texCoord(0, 0); capture.addVertex(x0, y05, z0);
+        capture.texCoord(0, 1); capture.addVertex(x0, y05, z1);
+        capture.texCoord(1, 1); capture.addVertex(x1, y05, z1);
+        
+        capture.texCoord(0, 0); capture.addVertex(x0, y05, z0);
+        capture.texCoord(1, 1); capture.addVertex(x1, y05, z1);
+        capture.texCoord(1, 0); capture.addVertex(x1, y05, z0);
+        
+        // Bottom face of slab (at y=0)
+        capture.texCoord(0, 0); capture.addVertex(x0, y0, z0);
+        capture.texCoord(1, 0); capture.addVertex(x1, y0, z0);
+        capture.texCoord(1, 1); capture.addVertex(x1, y0, z1);
+        
+        capture.texCoord(0, 0); capture.addVertex(x0, y0, z0);
+        capture.texCoord(1, 1); capture.addVertex(x1, y0, z1);
+        capture.texCoord(0, 1); capture.addVertex(x0, y0, z1);
+        
+        // North face of slab (z=0, half height)
+        capture.texCoord(1, 1); capture.addVertex(x1, y0, z0);
+        capture.texCoord(0, 1); capture.addVertex(x0, y0, z0);
+        capture.texCoord(0, 0.5f); capture.addVertex(x0, y05, z0);
+        
+        capture.texCoord(1, 1); capture.addVertex(x1, y0, z0);
+        capture.texCoord(0, 0.5f); capture.addVertex(x0, y05, z0);
+        capture.texCoord(1, 0.5f); capture.addVertex(x1, y05, z0);
+        
+        // South face of slab (z=1, half height)
+        capture.texCoord(0, 1); capture.addVertex(x0, y0, z1);
+        capture.texCoord(1, 1); capture.addVertex(x1, y0, z1);
+        capture.texCoord(1, 0.5f); capture.addVertex(x1, y05, z1);
+        
+        capture.texCoord(0, 1); capture.addVertex(x0, y0, z1);
+        capture.texCoord(1, 0.5f); capture.addVertex(x1, y05, z1);
+        capture.texCoord(0, 0.5f); capture.addVertex(x0, y05, z1);
+        
+        // West face of slab (x=0, half height)
+        capture.texCoord(0, 1); capture.addVertex(x0, y0, z0);
+        capture.texCoord(1, 1); capture.addVertex(x0, y0, z1);
+        capture.texCoord(1, 0.5f); capture.addVertex(x0, y05, z1);
+        
+        capture.texCoord(0, 1); capture.addVertex(x0, y0, z0);
+        capture.texCoord(1, 0.5f); capture.addVertex(x0, y05, z1);
+        capture.texCoord(0, 0.5f); capture.addVertex(x0, y05, z0);
+        
+        // East face of slab (x=1, half height)
+        capture.texCoord(1, 1); capture.addVertex(x1, y0, z1);
+        capture.texCoord(0, 1); capture.addVertex(x1, y0, z0);
+        capture.texCoord(0, 0.5f); capture.addVertex(x1, y05, z0);
+        
+        capture.texCoord(1, 1); capture.addVertex(x1, y0, z1);
+        capture.texCoord(0, 0.5f); capture.addVertex(x1, y05, z0);
+        capture.texCoord(1, 0.5f); capture.addVertex(x1, y05, z1);
+    }
 }

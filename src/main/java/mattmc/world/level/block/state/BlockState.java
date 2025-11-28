@@ -3,6 +3,7 @@ package mattmc.world.level.block.state;
 import mattmc.world.level.block.state.properties.Axis;
 import mattmc.world.level.block.state.properties.Direction;
 import mattmc.world.level.block.state.properties.Half;
+import mattmc.world.level.block.state.properties.SlabType;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -57,6 +58,14 @@ public class BlockState {
     public Axis getAxis(String property) {
         Object value = properties.get(property);
         return value instanceof Axis ? (Axis) value : Axis.Y;
+    }
+    
+    /**
+     * Get a SlabType property.
+     */
+    public SlabType getSlabType(String property) {
+        Object value = properties.get(property);
+        return value instanceof SlabType ? (SlabType) value : SlabType.BOTTOM;
     }
     
     /**
@@ -122,6 +131,13 @@ public class BlockState {
                 try {
                     Axis axis = Axis.valueOf(str);
                     state.setValue(key, axis);
+                    continue;
+                } catch (IllegalArgumentException ignored) {}
+                
+                // Try to parse as SlabType
+                try {
+                    SlabType slabType = SlabType.valueOf(str);
+                    state.setValue(key, slabType);
                     continue;
                 } catch (IllegalArgumentException ignored) {}
                 

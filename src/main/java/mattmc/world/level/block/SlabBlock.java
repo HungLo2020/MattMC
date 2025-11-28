@@ -58,6 +58,72 @@ public class SlabBlock extends Block {
     }
     
     /**
+     * Check if this slab can be replaced by another slab to form a double slab.
+     * A slab can be replaced if:
+     * - The existing slab is not already a double slab
+     * - The placement would result in the opposite half being filled
+     * 
+     * @param existingState The current state of the existing slab
+     * @param hitFace The face being clicked (0=bottom, 1=top, 2-5=sides)
+     * @param hitY The exact Y position where the click occurred
+     * @return true if the slab can be replaced to form a double slab
+     */
+    public boolean canBeReplacedBy(mattmc.world.level.block.state.BlockState existingState, int hitFace, float hitY) {
+        if (existingState == null) {
+            return false;
+        }
+        
+        Object typeObj = existingState.getValue("type");
+        if (typeObj == null) {
+            return false;
+        }
+        
+        SlabType existingType;
+        if (typeObj instanceof SlabType) {
+            existingType = (SlabType) typeObj;
+        } else if (typeObj instanceof String) {
+            try {
+                existingType = SlabType.valueOf(((String) typeObj).toUpperCase());
+            } catch (IllegalArgumentException e) {
+                return false;
+            }
+        } else {
+            return false;
+        }
+        
+        // Can't replace a double slab
+        if (existingType == SlabType.DOUBLE) {
+            return false;
+        }
+        
+        // Determine where the player is trying to place based on hit position
+        float relativeY = hitY - (float) Math.floor(hitY);
+        boolean clickedTopHalf = relativeY > 0.5f;
+        
+        // Check if the click would place in the opposite half
+        if (hitFace == 0) {
+            // Clicked bottom face - would place as top half
+            // Can replace if existing is BOTTOM
+            return existingType == SlabType.BOTTOM;
+        } else if (hitFace == 1) {
+            // Clicked top face - would place as bottom half  
+            // Can replace if existing is TOP
+            return existingType == SlabType.TOP;
+        } else {
+            // Clicked side face - check based on Y position
+            if (clickedTopHalf) {
+                // Clicking top half of side - would place as top half
+                // Can replace if existing is BOTTOM
+                return existingType == SlabType.BOTTOM;
+            } else {
+                // Clicking bottom half of side - would place as bottom half
+                // Can replace if existing is TOP
+                return existingType == SlabType.TOP;
+            }
+        }
+    }
+    
+    /**
      * Get the blockstate for slab placement based on player position and clicked face.
      */
     @Override
@@ -87,6 +153,18 @@ public class SlabBlock extends Block {
         
         state.setValue("type", type);
         
+        return state;
+    }
+    
+    /**
+     * Get the blockstate for a double slab.
+     * Used when combining two half slabs.
+     * 
+     * @return A blockstate with type set to DOUBLE
+     */
+    public mattmc.world.level.block.state.BlockState getDoubleSlabState() {
+        mattmc.world.level.block.state.BlockState state = new mattmc.world.level.block.state.BlockState();
+        state.setValue("type", SlabType.DOUBLE);
         return state;
     }
 }

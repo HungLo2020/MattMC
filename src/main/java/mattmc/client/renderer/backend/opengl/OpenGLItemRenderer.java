@@ -188,9 +188,10 @@ public class OpenGLItemRenderer implements ItemRenderer {
             // Get the item model to check for tints and special rendering
             mattmc.client.resources.model.BlockModel itemModel = ResourceManager.resolveItemModel(itemName);
             
-            // Check if this is a stairs block by looking at the original parent before merging
+            // Check if this is a stairs or slab block by looking at the original parent before merging
             String originalParent = itemModel != null ? itemModel.getOriginalParent() : null;
             boolean isStairs = originalParent != null && originalParent.contains("stairs");
+            boolean isSlab = originalParent != null && originalParent.contains("slab");
             
             // Apply inventory offset for block items if requested
             float adjustedY = applyInventoryOffset ? y + 18f : y;
@@ -198,6 +199,9 @@ public class OpenGLItemRenderer implements ItemRenderer {
             if (isStairs) {
                 // Render as isometric stairs
                 renderIsometricStairs(texturePaths, itemModel, x, adjustedY, size);
+            } else if (isSlab) {
+                // Render as isometric slab (half-height block)
+                renderIsometricSlab(texturePaths, itemModel, x, adjustedY, size);
             } else {
                 // Render as isometric 3D cube
                 renderIsometricCube(texturePaths, itemModel, x, adjustedY, size);
@@ -387,6 +391,114 @@ public class OpenGLItemRenderer implements ItemRenderer {
             glDisable(GL_TEXTURE_2D);
         }
         glColor4f(1f, 1f, 1f, 1f);
+    }
+    
+    /**
+     * Render a slab as an isometric 3D half-height block.
+     * Slabs are rendered at half the height of a full block.
+     */
+    private static void renderIsometricSlab(Map<String, String> texturePaths, mattmc.client.resources.model.BlockModel itemModel, float x, float y, float size) {
+        // Get textures for each face
+        String topTexture = getTextureForFace(texturePaths, "top");
+        String sideTexture = getTextureForFace(texturePaths, "side");
+        String bottomTexture = getTextureForFace(texturePaths, "bottom");
+        
+        boolean textureWasEnabled = glIsEnabled(GL_TEXTURE_2D);
+        if (!textureWasEnabled) {
+            glEnable(GL_TEXTURE_2D);
+        }
+        
+        // Isometric projection parameters
+        float scale = size * 2.0f;
+        float isoWidth = scale * 0.5f;
+        float isoHeight = scale * 0.5f;
+        
+        // Capture slab geometry (half-height block)
+        VertexCapture capture = new VertexCapture();
+        BlockGeometryCapture.captureSlabBottom(capture, 0, 0, 0);
+        List<VertexCapture.Face> allFaces = capture.getFaces();
+        
+        // Separate faces by type
+        List<VertexCapture.Face> topFacesList = new ArrayList<>();
+        List<VertexCapture.Face> visibleSideFaces = new ArrayList<>();
+        
+        for (VertexCapture.Face face : allFaces) {
+            if (isSlabTopFace(face)) {
+                topFacesList.add(face);
+            } else {
+                // Only render visible side faces (West and North faces)
+                if (isSlabVisibleSideFace(face)) {
+                    visibleSideFaces.add(face);
+                }
+            }
+        }
+        
+        // Render visible side faces first with appropriate shading
+        if (sideTexture != null) {
+            Texture tex = loadTexture(sideTexture);
+            if (tex != null) {
+                tex.bind();
+                
+                for (VertexCapture.Face face : visibleSideFaces) {
+                    // Determine brightness based on face orientation
+                    // West-facing faces (x=0) get 0.8 brightness
+                    // North-facing faces (z=0) get 0.6 brightness
+                    boolean isWestFacing = isWestFacing(face);
+                    float brightness = isWestFacing ? 0.8f : 0.6f;
+                    glColor4f(brightness, brightness, brightness, 1.0f);
+                    
+                    renderFaceIsometric(face, x, y, isoWidth, isoHeight);
+                }
+            }
+        }
+        
+        // Render top faces last with full brightness
+        if (topTexture != null) {
+            Texture tex = loadTexture(topTexture);
+            if (tex != null) {
+                tex.bind();
+                glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
+                
+                for (VertexCapture.Face face : topFacesList) {
+                    renderFaceIsometric(face, x, y, isoWidth, isoHeight);
+                }
+            }
+        }
+        
+        if (!textureWasEnabled) {
+            glDisable(GL_TEXTURE_2D);
+        }
+        glColor4f(1f, 1f, 1f, 1f);
+    }
+    
+    /**
+     * Check if a face is a slab top face (horizontal, at y=0.5).
+     */
+    private static boolean isSlabTopFace(VertexCapture.Face face) {
+        float y1 = face.v1.y;
+        float y2 = face.v2.y;
+        float y3 = face.v3.y;
+        
+        // All Y values are the same and at 0.5 (slab top height)
+        return Math.abs(y1 - y2) < 0.01f && Math.abs(y2 - y3) < 0.01f && Math.abs(y1 - 0.5f) < 0.01f;
+    }
+    
+    /**
+     * Check if a slab side face is visible in isometric view.
+     * Only West (x=0) and North (z=0) faces are visible.
+     */
+    private static boolean isSlabVisibleSideFace(VertexCapture.Face face) {
+        // Check if it's a West face (x=0)
+        if (face.v1.x < 0.01f && face.v2.x < 0.01f && face.v3.x < 0.01f) {
+            return true;
+        }
+        
+        // Check if it's a North face (z=0)
+        if (face.v1.z < 0.01f && face.v2.z < 0.01f && face.v3.z < 0.01f) {
+            return true;
+        }
+        
+        return false;
     }
     
     /**
