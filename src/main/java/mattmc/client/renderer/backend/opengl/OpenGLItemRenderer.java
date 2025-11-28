@@ -15,12 +15,14 @@ import mattmc.client.renderer.item.ItemDisplayContext;
 import mattmc.client.renderer.item.ItemRenderer;
 import mattmc.client.renderer.backend.opengl.Texture;
 import mattmc.client.resources.ResourceManager;
+import mattmc.client.resources.metadata.animation.AnimationMetadataSection;
 import mattmc.client.resources.model.BlockModel;
 import mattmc.client.resources.model.ModelDisplay;
 import mattmc.world.item.ItemStack;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -50,6 +52,10 @@ public class OpenGLItemRenderer implements ItemRenderer {
     
     // Cache for item textures
     private static final Map<String, Texture> TEXTURE_CACHE = new HashMap<>();
+    
+    // Cache for animated texture UV scale (maps texture path to V scale for first frame)
+    // Value is the V coordinate for the bottom of the first frame (e.g., 0.2 for 16x80 texture)
+    private static final Map<String, Float> ANIMATED_TEXTURE_V_SCALE = new HashMap<>();
     
     // Item texture dimension - items are rendered as 16x16 pixel textures
     private static final float ITEM_TEXTURE_SIZE = 16.0f;
@@ -281,7 +287,8 @@ public class OpenGLItemRenderer implements ItemRenderer {
             if (tex != null) {
                 tex.bind();
                 glColor4f(0.8f, 0.8f, 0.8f, 1.0f);
-                renderFacesIsometric(westFaces, x, y, isoWidth, isoHeight);
+                float sideVScale = getAnimatedTextureVScale(sideTexture);
+                renderFacesIsometric(westFaces, x, y, isoWidth, isoHeight, sideVScale);
             }
         }
         
@@ -291,7 +298,8 @@ public class OpenGLItemRenderer implements ItemRenderer {
             if (tex != null) {
                 tex.bind();
                 glColor4f(0.6f, 0.6f, 0.6f, 1.0f);
-                renderFacesIsometric(northFaces, x, y, isoWidth, isoHeight);
+                float sideVScale = getAnimatedTextureVScale(sideTexture);
+                renderFacesIsometric(northFaces, x, y, isoWidth, isoHeight, sideVScale);
             }
         }
         
@@ -305,7 +313,8 @@ public class OpenGLItemRenderer implements ItemRenderer {
                 float g = ((topTintColor >> 8) & 0xFF) / 255.0f;
                 float b = (topTintColor & 0xFF) / 255.0f;
                 glColor4f(r, g, b, 1.0f);
-                renderFacesIsometric(topFaces, x, y, isoWidth, isoHeight);
+                float topVScale = getAnimatedTextureVScale(topTexture);
+                renderFacesIsometric(topFaces, x, y, isoWidth, isoHeight, topVScale);
             }
         }
         
@@ -363,6 +372,7 @@ public class OpenGLItemRenderer implements ItemRenderer {
             Texture tex = loadTexture(sideTexture);
             if (tex != null) {
                 tex.bind();
+                float sideVScale = getAnimatedTextureVScale(sideTexture);
                 
                 for (VertexCapture.Face face : visibleSideFaces) {
                     // Determine brightness based on face orientation
@@ -372,7 +382,7 @@ public class OpenGLItemRenderer implements ItemRenderer {
                     float brightness = isWestFacing ? 0.8f : 0.6f;
                     glColor4f(brightness, brightness, brightness, 1.0f);
                     
-                    renderFaceIsometric(face, x, y, isoWidth, isoHeight);
+                    renderFaceIsometric(face, x, y, isoWidth, isoHeight, sideVScale);
                 }
             }
         }
@@ -383,9 +393,10 @@ public class OpenGLItemRenderer implements ItemRenderer {
             if (tex != null) {
                 tex.bind();
                 glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
+                float topVScale = getAnimatedTextureVScale(topTexture);
                 
                 for (VertexCapture.Face face : topFacesList) {
-                    renderFaceIsometric(face, x, y, isoWidth, isoHeight);
+                    renderFaceIsometric(face, x, y, isoWidth, isoHeight, topVScale);
                 }
             }
         }
@@ -441,6 +452,7 @@ public class OpenGLItemRenderer implements ItemRenderer {
             Texture tex = loadTexture(sideTexture);
             if (tex != null) {
                 tex.bind();
+                float sideVScale = getAnimatedTextureVScale(sideTexture);
                 
                 for (VertexCapture.Face face : visibleSideFaces) {
                     // Determine brightness based on face orientation
@@ -450,7 +462,7 @@ public class OpenGLItemRenderer implements ItemRenderer {
                     float brightness = isWestFacing ? 0.8f : 0.6f;
                     glColor4f(brightness, brightness, brightness, 1.0f);
                     
-                    renderFaceIsometric(face, x, y, isoWidth, isoHeight);
+                    renderFaceIsometric(face, x, y, isoWidth, isoHeight, sideVScale);
                 }
             }
         }
@@ -461,9 +473,10 @@ public class OpenGLItemRenderer implements ItemRenderer {
             if (tex != null) {
                 tex.bind();
                 glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
+                float topVScale = getAnimatedTextureVScale(topTexture);
                 
                 for (VertexCapture.Face face : topFacesList) {
-                    renderFaceIsometric(face, x, y, isoWidth, isoHeight);
+                    renderFaceIsometric(face, x, y, isoWidth, isoHeight, topVScale);
                 }
             }
         }
@@ -573,8 +586,16 @@ public class OpenGLItemRenderer implements ItemRenderer {
      * Render a list of captured faces using isometric projection.
      */
     private static void renderFacesIsometric(List<VertexCapture.Face> faces, float centerX, float centerY, float isoWidth, float isoHeight) {
+        renderFacesIsometric(faces, centerX, centerY, isoWidth, isoHeight, 1.0f);
+    }
+    
+    /**
+     * Render a list of captured faces using isometric projection with UV scaling.
+     * @param vScale V coordinate scale for animated textures (e.g., 0.2 for first frame of 16x80 texture)
+     */
+    private static void renderFacesIsometric(List<VertexCapture.Face> faces, float centerX, float centerY, float isoWidth, float isoHeight, float vScale) {
         for (VertexCapture.Face face : faces) {
-            renderFaceIsometric(face, centerX, centerY, isoWidth, isoHeight);
+            renderFaceIsometric(face, centerX, centerY, isoWidth, isoHeight, vScale);
         }
     }
     
@@ -582,25 +603,34 @@ public class OpenGLItemRenderer implements ItemRenderer {
      * Render a single captured face using isometric projection.
      */
     private static void renderFaceIsometric(VertexCapture.Face face, float centerX, float centerY, float isoWidth, float isoHeight) {
+        renderFaceIsometric(face, centerX, centerY, isoWidth, isoHeight, 1.0f);
+    }
+    
+    /**
+     * Render a single captured face using isometric projection with UV scaling.
+     * @param vScale V coordinate scale for animated textures (e.g., 0.2 for first frame of 16x80 texture)
+     */
+    private static void renderFaceIsometric(VertexCapture.Face face, float centerX, float centerY, float isoWidth, float isoHeight, float vScale) {
         glBegin(GL_TRIANGLES);
         
         // Project and render vertex 1
         float x1 = project2Dx(face.v1.x, face.v1.y, face.v1.z, centerX, isoWidth);
         float y1 = project2Dy(face.v1.x, face.v1.y, face.v1.z, centerY, isoHeight);
         // Flip V coordinate for 2D rendering (3D geometry has pre-flipped coords for 3D rendering)
-        glTexCoord2f(face.v1.u, 1.0f - face.v1.v);
+        // For animated textures, scale V to only use first frame (vScale portion of texture)
+        glTexCoord2f(face.v1.u, (1.0f - face.v1.v) * vScale);
         glVertex2f(x1, y1);
         
         // Project and render vertex 2
         float x2 = project2Dx(face.v2.x, face.v2.y, face.v2.z, centerX, isoWidth);
         float y2 = project2Dy(face.v2.x, face.v2.y, face.v2.z, centerY, isoHeight);
-        glTexCoord2f(face.v2.u, 1.0f - face.v2.v);
+        glTexCoord2f(face.v2.u, (1.0f - face.v2.v) * vScale);
         glVertex2f(x2, y2);
         
         // Project and render vertex 3
         float x3 = project2Dx(face.v3.x, face.v3.y, face.v3.z, centerX, isoWidth);
         float y3 = project2Dy(face.v3.x, face.v3.y, face.v3.z, centerY, isoHeight);
-        glTexCoord2f(face.v3.u, 1.0f - face.v3.v);
+        glTexCoord2f(face.v3.u, (1.0f - face.v3.v) * vScale);
         glVertex2f(x3, y3);
         
         glEnd();
@@ -717,11 +747,16 @@ public class OpenGLItemRenderer implements ItemRenderer {
         // Move items UP by 1 texture pixel to fix vertical alignment
         float adjustedY = y - calculateTexturePixelOffset(size);
         
+        // For animated textures, only render the first frame (use V scale)
+        float vScale = getAnimatedTextureVScale(texturePath);
+        float vTop = 0.0f;       // Top of first frame
+        float vBottom = vScale;   // Bottom of first frame (e.g., 0.2 for 16x80)
+        
         glBegin(GL_QUADS);
-        glTexCoord2f(0, 1); glVertex2f(x - halfSize, adjustedY - halfSize);
-        glTexCoord2f(1, 1); glVertex2f(x + halfSize, adjustedY - halfSize);
-        glTexCoord2f(1, 0); glVertex2f(x + halfSize, adjustedY + halfSize);
-        glTexCoord2f(0, 0); glVertex2f(x - halfSize, adjustedY + halfSize);
+        glTexCoord2f(0, vBottom); glVertex2f(x - halfSize, adjustedY - halfSize);
+        glTexCoord2f(1, vBottom); glVertex2f(x + halfSize, adjustedY - halfSize);
+        glTexCoord2f(1, vTop); glVertex2f(x + halfSize, adjustedY + halfSize);
+        glTexCoord2f(0, vTop); glVertex2f(x - halfSize, adjustedY + halfSize);
         glEnd();
         
         // Restore GL state
@@ -778,11 +813,53 @@ public class OpenGLItemRenderer implements ItemRenderer {
             String resourcePath = path.startsWith("/") ? path : "/" + path;
             Texture texture = Texture.load(resourcePath);
             TEXTURE_CACHE.put(path, texture);
+            
+            // Check for animated texture and calculate V scale
+            checkAndCacheAnimatedTextureInfo(path, resourcePath, texture);
+            
             return texture;
         } catch (Exception e) {
             logger.error("Failed to load texture: {}", path, e);
             return null;
         }
+    }
+    
+    /**
+     * Check if a texture is animated and cache its UV scale for first frame rendering.
+     * For animated textures (e.g., 16x80 with 5 frames), we need to render only the first frame (16x16).
+     * This method calculates the V scale factor (e.g., 0.2 for 16/80).
+     */
+    private static void checkAndCacheAnimatedTextureInfo(String path, String resourcePath, Texture texture) {
+        // Check for .mcmeta file
+        String mcmetaPath = resourcePath + ".mcmeta";
+        try (InputStream mcmetaStream = mattmc.util.ResourceLoader.getResourceStreamFromClassLoader(mcmetaPath)) {
+            if (mcmetaStream != null) {
+                AnimationMetadataSection metadata = AnimationMetadataSection.load(mcmetaStream);
+                if (metadata != AnimationMetadataSection.EMPTY) {
+                    // This is an animated texture - calculate V scale for first frame
+                    // Frame size is calculated based on texture dimensions
+                    int frameWidth = texture.width;
+                    int frameHeight = texture.width; // Animated textures have square frames (16x16)
+                    
+                    // If texture height > width, it's a vertical strip of frames
+                    if (texture.height > texture.width) {
+                        float vScale = (float) frameHeight / (float) texture.height;
+                        ANIMATED_TEXTURE_V_SCALE.put(path, vScale);
+                    }
+                }
+            }
+        } catch (Exception e) {
+            // No mcmeta file or error reading - treat as static texture
+        }
+    }
+    
+    /**
+     * Get the V scale for the first frame of an animated texture.
+     * Returns 1.0f for non-animated textures (use full texture height).
+     */
+    private static float getAnimatedTextureVScale(String path) {
+        Float scale = ANIMATED_TEXTURE_V_SCALE.get(path);
+        return scale != null ? scale : 1.0f;
     }
     
     /**
@@ -795,6 +872,7 @@ public class OpenGLItemRenderer implements ItemRenderer {
             }
         }
         TEXTURE_CACHE.clear();
+        ANIMATED_TEXTURE_V_SCALE.clear();
     }
     
     @Override
