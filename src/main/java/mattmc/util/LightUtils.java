@@ -51,7 +51,9 @@ public final class LightUtils {
     /**
      * Scale RGB light values by intensity ratio, returning a new array.
      * 
-     * Note: For performance-critical code, prefer the version that takes a pre-allocated array.
+     * <p><b>Note:</b> For performance-critical code, prefer the version that takes a 
+     * pre-allocated array to avoid allocation overhead. This method allocates a new
+     * array on each call, which creates GC pressure in hot paths.
      * 
      * @param r Red channel (0-15)
      * @param g Green channel (0-15)

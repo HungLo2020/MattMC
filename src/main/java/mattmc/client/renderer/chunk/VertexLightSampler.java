@@ -167,12 +167,18 @@ public class VertexLightSampler {
      * Only non-zero light samples are averaged to prevent interior corners from being too dark.
      * This fixes the issue where solid blocks (with 0 light) would darken adjacent corners.
      * 
-     * ISSUE-001 fix: Uses pre-allocated arrays to eliminate ~40K allocations per chunk.
+     * <p><b>IMPORTANT:</b> This method returns a thread-local reusable array for performance.
+     * The returned array is only valid until the next call to this method on the same thread.
+     * Callers MUST consume the values immediately (e.g., pass to addVertex) and NOT store
+     * the array reference for later use.
+     * 
+     * <p>ISSUE-001 fix: Uses pre-allocated arrays to eliminate ~40K allocations per chunk.
      * 
      * @param face The face data containing chunk reference and position
      * @param normalIndex Which face (0=top, 1=bottom, 2=north, 3=south, 4=west, 5=east)
      * @param cornerIndex Which corner of the face (0-3)
-     * @return [skyLight, blockLightR, blockLightG, blockLightB, ao] as floats (0-15 for light, 0-3 for ao)
+     * @return [skyLight, blockLightR, blockLightG, blockLightB, ao] as floats (0-15 for light, 0-3 for ao).
+     *         WARNING: This array is reused - consume values immediately!
      */
     public float[] sampleVertexLight(BlockFaceCollector.FaceData face, 
                                       int normalIndex,
