@@ -137,16 +137,15 @@ public class AmbientOcclusion {
     /**
      * Calculate ambient occlusion brightness for a vertex.
      * 
-     * <p>This follows Minecraft's algorithm from ModelBlockRenderer.AmbientOcclusionFace:
+     * <p>This follows Minecraft's algorithm from ModelBlockRenderer.AmbientOcclusionFace exactly:
      * <ol>
-     *   <li>Sample 4 positions: 2 edge neighbors, 1 corner (diagonal), and 1 face-adjacent</li>
-     *   <li>Check if corner should be sampled by looking one block in face direction</li>
-     *   <li>Average the brightness values</li>
+     *   <li>blockpos = block position + face_normal (for a full block)</li>
+     *   <li>Sample 4 edge neighbors at blockpos + corners[0-3]</li>
+     *   <li>For corners (diagonals), check if blockpos + corner + face_normal blocks view</li>
+     *   <li>If corner is visible, sample blockpos + corner0 + corner1</li>
+     *   <li>Also sample face-adjacent position for the center brightness</li>
+     *   <li>Average: (f[corner0] + f[corner1] + f[diagonal] + f[center]) * 0.25</li>
      * </ol>
-     * 
-     * <p>Key insight: For an UP face, we sample horizontal neighbors at the block's Y level,
-     * NOT at the face level (Y+1). The occlusion comes from neighboring blocks at the same
-     * height, not from blocks above.
      * 
      * @param face The face data containing position and chunk reference
      * @param faceIndex Face direction (0=UP, 1=DOWN, 2=NORTH, 3=SOUTH, 4=WEST, 5=EAST)
@@ -159,12 +158,18 @@ public class AmbientOcclusion {
         }
         
         LevelChunk chunk = face.chunk;
-        int bx = face.cx;  // Block position (not face position)
+        int bx = face.cx;  // Block position
         int by = face.cy;
         int bz = face.cz;
         
-        // Get face normal for checking if corners should be sampled
+        // Get face normal
         int[] normal = FACE_NORMAL[faceIndex];
+        
+        // blockpos = block position + face_normal (position adjacent to face)
+        // For an UP face, this is the air block directly above
+        int sx = bx + normal[0];
+        int sy = by + normal[1];
+        int sz = bz + normal[2];
         
         // Get the corner directions for this face (4 directions perpendicular to face)
         int[][] corners = FACE_CORNERS[faceIndex];
@@ -176,53 +181,45 @@ public class AmbientOcclusion {
         int[] edge0Dir = corners[edge0Idx];
         int[] edge1Dir = corners[edge1Idx];
         
-        // Sample the 4 neighbor positions (at block level, in directions perpendicular to face)
-        // These are the positions that create occlusion on this vertex
+        // Sample 4 edge neighbors at blockpos + corners[0-3]
+        // For this vertex, we need edge0 and edge1
         
-        // 1. Edge0 neighbor (e.g., EAST neighbor for UP face)
-        int e0x = bx + edge0Dir[0];
-        int e0y = by + edge0Dir[1];
-        int e0z = bz + edge0Dir[2];
+        // Edge0 position: blockpos + edge0Dir
+        int e0x = sx + edge0Dir[0];
+        int e0y = sy + edge0Dir[1];
+        int e0z = sz + edge0Dir[2];
         float edge0Brightness = getShadeBrightness(chunk, e0x, e0y, e0z);
         
-        // 2. Edge1 neighbor (e.g., SOUTH neighbor for UP face)  
-        int e1x = bx + edge1Dir[0];
-        int e1y = by + edge1Dir[1];
-        int e1z = bz + edge1Dir[2];
+        // Edge1 position: blockpos + edge1Dir  
+        int e1x = sx + edge1Dir[0];
+        int e1y = sy + edge1Dir[1];
+        int e1z = sz + edge1Dir[2];
         float edge1Brightness = getShadeBrightness(chunk, e1x, e1y, e1z);
         
-        // Check if we should sample the corner by looking at positions in the face direction
-        // (This is how Minecraft determines if the corner is "visible" or blocked)
-        int e0fx = e0x + normal[0];
-        int e0fy = e0y + normal[1];
-        int e0fz = e0z + normal[2];
-        boolean edge0CanSeeCorner = !isBlockingLight(chunk, e0fx, e0fy, e0fz);
+        // Check if corner is visible by looking at (edge position + face_normal)
+        // This is Minecraft's flag check for whether to sample the diagonal
+        boolean edge0CanSeeCorner = !isViewBlocking(chunk, e0x + normal[0], e0y + normal[1], e0z + normal[2]);
+        boolean edge1CanSeeCorner = !isViewBlocking(chunk, e1x + normal[0], e1y + normal[1], e1z + normal[2]);
         
-        int e1fx = e1x + normal[0];
-        int e1fy = e1y + normal[1];
-        int e1fz = e1z + normal[2];
-        boolean edge1CanSeeCorner = !isBlockingLight(chunk, e1fx, e1fy, e1fz);
-        
-        // 3. Corner neighbor (diagonal - only sampled if at least one edge can see it)
+        // Corner (diagonal) position: blockpos + edge0Dir + edge1Dir
+        // Only sample if at least one edge can see it
         float cornerBrightness;
         if (edge0CanSeeCorner || edge1CanSeeCorner) {
-            int cx2 = bx + edge0Dir[0] + edge1Dir[0];
-            int cy2 = by + edge0Dir[1] + edge1Dir[1];
-            int cz2 = bz + edge0Dir[2] + edge1Dir[2];
-            cornerBrightness = getShadeBrightness(chunk, cx2, cy2, cz2);
+            int cx = sx + edge0Dir[0] + edge1Dir[0];
+            int cy = sy + edge0Dir[1] + edge1Dir[1];
+            int cz = sz + edge0Dir[2] + edge1Dir[2];
+            cornerBrightness = getShadeBrightness(chunk, cx, cy, cz);
         } else {
-            // Both edges block - corner contributes minimum brightness
-            cornerBrightness = SOLID_BLOCK_BRIGHTNESS;
+            // Both edges block the corner - use edge0's brightness as fallback
+            cornerBrightness = edge0Brightness;
         }
         
-        // 4. Face-adjacent position (position in normal direction from block)
-        int fx = bx + normal[0];
-        int fy = by + normal[1];
-        int fz = bz + normal[2];
-        float faceBrightness = getShadeBrightness(chunk, fx, fy, fz);
+        // Face center brightness: sample the block at blockpos (face-adjacent)
+        // This is f8 in Minecraft's code
+        float faceBrightness = getShadeBrightness(chunk, sx, sy, sz);
         
-        // Average the 4 samples
-        float ao = (faceBrightness + edge0Brightness + edge1Brightness + cornerBrightness) * 0.25f;
+        // Average the 4 samples (matching Minecraft's formula)
+        float ao = (edge0Brightness + edge1Brightness + cornerBrightness + faceBrightness) * 0.25f;
         
         return ao;
     }
@@ -258,10 +255,13 @@ public class AmbientOcclusion {
     }
     
     /**
-     * Check if a block at the given position blocks light for AO calculation.
+     * Check if a block at the given position blocks view for corner visibility.
+     * Matches Minecraft's isViewBlocking check.
      */
-    private boolean isBlockingLight(LevelChunk chunk, int x, int y, int z) {
+    private boolean isViewBlocking(LevelChunk chunk, int x, int y, int z) {
         Block block = getBlockSafe(chunk, x, y, z);
+        // In Minecraft: !blockstate.isViewBlocking() || blockstate.getLightBlock() == 0
+        // We simplify this: solid blocks block view, air/non-solid don't
         return block.isSolid();
     }
     

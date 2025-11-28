@@ -72,8 +72,9 @@ public class AmbientOcclusionTest {
     /**
      * Test that a vertex next to a solid block gets reduced brightness.
      * 
-     * For Minecraft-style AO, occlusion comes from neighboring blocks at the same level.
-     * A block at (9, 64, 8) will darken the eastern edge of block (8, 64, 8)'s top face.
+     * For Minecraft-style AO, the sampling is done at the FACE level (block + face_normal).
+     * For an UP face at (8, y, 8), samples are at (8, y+1, 8) + corner directions.
+     * A solid block at (9, y+1, 8) (above and to the east) will darken the eastern vertices.
      */
     @Test
     public void testEdgeOcclusion() {
@@ -85,8 +86,9 @@ public class AmbientOcclusionTest {
         // Place the test block
         chunk.setBlock(8, y, 8, Blocks.STONE);
         
-        // Place an adjacent block to the east (same level - this creates edge occlusion)
-        chunk.setBlock(9, y, 8, Blocks.STONE);
+        // Place a block above and to the east - this creates edge occlusion on the UP face
+        // Because AO samples at face level (y+1) + corner direction (EAST = +1,0,0)
+        chunk.setBlock(9, y + 1, 8, Blocks.STONE);
         
         // Create FaceData for top face
         BlockFaceCollector.FaceData face = new BlockFaceCollector.FaceData(
@@ -114,8 +116,8 @@ public class AmbientOcclusionTest {
     /**
      * Test that interior corner (two solid edges) gets significant darkening.
      * 
-     * For Minecraft-style AO, corners are darkened when two adjacent neighbors are solid.
-     * Blocks at (9, 64, 8) and (8, 64, 9) will darken the SE corner of (8, 64, 8).
+     * For Minecraft-style AO, sampling is at face level.
+     * Blocks at (9, y+1, 8) and (8, y+1, 9) will darken the SE corner of (8, y, 8)'s UP face.
      */
     @Test
     public void testCornerOcclusion() {
@@ -127,10 +129,11 @@ public class AmbientOcclusionTest {
         // Place the test block
         chunk.setBlock(8, y, 8, Blocks.STONE);
         
-        // Create an interior corner by placing blocks on two adjacent sides (same level)
-        chunk.setBlock(9, y, 8, Blocks.STONE);  // East neighbor
-        chunk.setBlock(8, y, 9, Blocks.STONE);  // South neighbor
-        chunk.setBlock(9, y, 9, Blocks.STONE);  // Diagonal corner
+        // Create an interior corner by placing blocks above and at adjacent sides
+        // These are at face level (y+1) in the corner directions
+        chunk.setBlock(9, y + 1, 8, Blocks.STONE);  // East at face level
+        chunk.setBlock(8, y + 1, 9, Blocks.STONE);  // South at face level
+        chunk.setBlock(9, y + 1, 9, Blocks.STONE);  // Diagonal corner at face level
         
         // Create FaceData for top face
         BlockFaceCollector.FaceData face = new BlockFaceCollector.FaceData(
