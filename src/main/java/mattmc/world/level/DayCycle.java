@@ -252,8 +252,9 @@ public class DayCycle {
         float y = (float) Math.sin(angle);
         float z = 0.0f;
         
-        // Normalize - cos and sin produce values in [-1, 1], so length should always be 1.0
-        // for a unit circle. The calculation is included for safety/clarity.
+        // Defensive normalization: Since x=cos(angle) and y=sin(angle) on a unit circle,
+        // the length is mathematically always 1.0 for valid inputs. This check guards
+        // against potential floating-point edge cases (NaN, Inf) from corrupted inputs.
         float length = (float) Math.sqrt(x*x + y*y + z*z);
         if (length < 1e-6f) {
             // Fallback: return noon sun direction (sun directly overhead)

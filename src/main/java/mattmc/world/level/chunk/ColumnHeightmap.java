@@ -36,8 +36,11 @@ public class ColumnHeightmap {
 		}
 		// Validate all inner arrays have correct length
 		for (int x = 0; x < COLUMN_SIZE; x++) {
-			if (data[x] == null || data[x].length != COLUMN_SIZE) {
-				throw new IllegalArgumentException("Heightmap data must be 16×16, row " + x + " has incorrect length");
+			if (data[x] == null) {
+				throw new IllegalArgumentException("Heightmap data must be 16×16, row " + x + " is null");
+			}
+			if (data[x].length != COLUMN_SIZE) {
+				throw new IllegalArgumentException("Heightmap data must be 16×16, row " + x + " has length " + data[x].length + " but expected " + COLUMN_SIZE);
 			}
 		}
 		this.heights = new int[COLUMN_SIZE][COLUMN_SIZE];
