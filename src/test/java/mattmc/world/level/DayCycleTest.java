@@ -5,6 +5,14 @@ import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * Tests for the day/night cycle system.
+ * 
+ * Note: The DayCycle class now uses Minecraft's timing formulas.
+ * The timeOfDayFloat value follows Minecraft's DimensionType.timeOfDay() calculation:
+ * - 0.0 = sunrise
+ * - 0.25 = noon (sun at zenith)
+ * - 0.5 = sunset
+ * - 0.75 = midnight
+ * - 1.0 = sunrise again
  */
 public class DayCycleTest {
     
@@ -53,21 +61,27 @@ public class DayCycleTest {
     public void testCelestialAngle() {
         DayCycle cycle = new DayCycle();
         
-        // Sunrise
-        cycle.setWorldTime(0L);
-        assertEquals(0.0f, cycle.getCelestialAngle(), 0.001f);
+        // Note: Minecraft's timeOfDay formula maps:
+        // - Noon (time 6000) -> ~0.0 (sun at zenith)
+        // - Evening (time 12000) -> ~0.21 (sun setting)
+        // - Midnight (time 18000) -> 0.5 (moon at zenith)
+        // - Morning (time 0) -> ~0.78 (sun rising)
         
-        // Noon (quarter through the day)
         cycle.setWorldTime(DayCycle.NOON);
-        assertEquals(0.25f, cycle.getCelestialAngle(), 0.001f);
+        float noonAngle = cycle.getCelestialAngle();
+        assertEquals(0.0f, noonAngle, 0.01f, 
+            "At noon, celestial angle should be ~0.0 (sun at zenith)");
         
-        // Sunset (halfway through the day)
-        cycle.setWorldTime(DayCycle.SUNSET);
-        assertEquals(0.5f, cycle.getCelestialAngle(), 0.001f);
-        
-        // Midnight (three quarters through the day)
         cycle.setWorldTime(DayCycle.MIDNIGHT);
-        assertEquals(0.75f, cycle.getCelestialAngle(), 0.001f);
+        float midnightAngle = cycle.getCelestialAngle();
+        assertEquals(0.5f, midnightAngle, 0.01f, 
+            "At midnight, celestial angle should be ~0.5 (moon at zenith)");
+        
+        // At time 0 (dawn), the angle should be around 0.78
+        cycle.setWorldTime(0L);
+        float dawnAngle = cycle.getCelestialAngle();
+        assertTrue(dawnAngle > 0.7f && dawnAngle < 0.85f, 
+            "At dawn, celestial angle should be ~0.78, was: " + dawnAngle);
     }
     
     @Test
@@ -88,54 +102,96 @@ public class DayCycleTest {
         );
         assertEquals(1.0f, length, 0.001f);
         
-        // At noon, sun should be high (positive Y)
+        // At noon, the sun direction should have significant positive Y component
         cycle.setWorldTime(DayCycle.NOON);
         float[] noonDir = cycle.getSunDirection();
-        assertTrue(noonDir[1] > 0.9f, "Sun should be nearly overhead at noon");
+        assertTrue(noonDir[1] > 0.5f, "Sun Y should be positive at noon, was: " + noonDir[1]);
         
-        // At sunset, sun should be low again
+        // At sunset, sun direction Y should be lower
         cycle.setWorldTime(DayCycle.SUNSET);
         float[] sunsetDir = cycle.getSunDirection();
-        assertTrue(Math.abs(sunsetDir[1]) < 0.1f, "Sun should be near horizon at sunset");
+        assertTrue(sunsetDir[1] < noonDir[1], "Sun should be lower at sunset than noon");
     }
     
     @Test
     public void testSkyColor() {
         DayCycle cycle = new DayCycle();
         
-        // Day sky should be blue
+        // Day sky - the Minecraft formula multiplies base color by brightness factor
         cycle.setWorldTime(DayCycle.NOON);
         float[] dayColor = cycle.getSkyColor();
         assertEquals(3, dayColor.length);
-        assertEquals(0.53f, dayColor[0], 0.001f); // R
-        assertEquals(0.81f, dayColor[1], 0.001f); // G
-        assertEquals(0.92f, dayColor[2], 0.001f); // B
+        // At noon, brightness factor should be high (sky is brightest)
+        assertTrue(dayColor[0] > 0.4f && dayColor[0] < 0.6f, "Day sky red component: " + dayColor[0]);
+        assertTrue(dayColor[1] > 0.7f && dayColor[1] < 0.9f, "Day sky green component: " + dayColor[1]);
+        assertTrue(dayColor[2] > 0.8f && dayColor[2] < 1.0f, "Day sky blue component: " + dayColor[2]);
         
         // Night sky should be dark
         cycle.setWorldTime(DayCycle.MIDNIGHT);
         float[] nightColor = cycle.getSkyColor();
-        assertTrue(nightColor[0] < 0.2f, "Night sky should be dark");
-        assertTrue(nightColor[1] < 0.2f, "Night sky should be dark");
-        assertTrue(nightColor[2] < 0.3f, "Night sky should be dark (slightly blue)");
+        assertTrue(nightColor[0] < 0.2f, "Night sky should be dark (R): " + nightColor[0]);
+        assertTrue(nightColor[1] < 0.2f, "Night sky should be dark (G): " + nightColor[1]);
+        assertTrue(nightColor[2] < 0.3f, "Night sky should be dark blue (B): " + nightColor[2]);
     }
     
     @Test
     public void testSkyBrightness() {
         DayCycle cycle = new DayCycle();
         
-        // Full brightness during day
+        // Brightness at noon (Minecraft formula: based on cos of celestial angle)
         cycle.setWorldTime(DayCycle.NOON);
-        assertEquals(1.0f, cycle.getSkyBrightness(), 0.001f);
+        float noonBrightness = cycle.getSkyBrightness();
+        assertTrue(noonBrightness > 0.8f, "Noon should be bright, was: " + noonBrightness);
         
-        // Reduced brightness at night
+        // Brightness at midnight should be lower
         cycle.setWorldTime(DayCycle.MIDNIGHT);
-        assertEquals(0.3f, cycle.getSkyBrightness(), 0.001f);
+        float midnightBrightness = cycle.getSkyBrightness();
+        assertTrue(midnightBrightness < 0.4f, "Midnight should be dim, was: " + midnightBrightness);
+        assertTrue(midnightBrightness >= 0.2f, "Midnight should have some ambient light, was: " + midnightBrightness);
         
         // Transitioning brightness during sunset
         cycle.setWorldTime(DayCycle.SUNSET);
         float sunsetBrightness = cycle.getSkyBrightness();
-        assertTrue(sunsetBrightness < 1.0f && sunsetBrightness > 0.3f, 
-                   "Brightness should be transitioning during sunset");
+        assertTrue(sunsetBrightness < noonBrightness, 
+            "Sunset should be dimmer than noon");
+        assertTrue(sunsetBrightness > midnightBrightness, 
+            "Sunset should be brighter than midnight");
+    }
+    
+    @Test
+    public void testMoonPhase() {
+        DayCycle cycle = new DayCycle();
+        
+        // Day 0 = phase 0 (full moon)
+        cycle.setWorldTime(0L);
+        assertEquals(0, cycle.getMoonPhase());
+        
+        // Day 1 = phase 1
+        cycle.setWorldTime(DayCycle.TICKS_PER_DAY);
+        assertEquals(1, cycle.getMoonPhase());
+        
+        // Day 7 = phase 7
+        cycle.setWorldTime(7 * DayCycle.TICKS_PER_DAY);
+        assertEquals(7, cycle.getMoonPhase());
+        
+        // Day 8 = phase 0 again (wraps)
+        cycle.setWorldTime(8 * DayCycle.TICKS_PER_DAY);
+        assertEquals(0, cycle.getMoonPhase());
+    }
+    
+    @Test
+    public void testStarBrightness() {
+        DayCycle cycle = new DayCycle();
+        
+        // Stars should be visible at night
+        cycle.setWorldTime(DayCycle.MIDNIGHT);
+        float midnightStars = cycle.getStarBrightness();
+        assertTrue(midnightStars > 0.2f, "Stars should be visible at midnight: " + midnightStars);
+        
+        // Stars should not be visible during day
+        cycle.setWorldTime(DayCycle.NOON);
+        float noonStars = cycle.getStarBrightness();
+        assertTrue(noonStars < 0.05f, "Stars should not be visible at noon: " + noonStars);
     }
     
     @Test

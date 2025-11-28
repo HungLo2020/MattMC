@@ -805,6 +805,66 @@ public interface RenderBackend {
      */
     boolean isTexture2DEnabled();
     
+    /**
+     * Bind a texture for 3D rendering.
+     * 
+     * @param textureId the texture ID from loadTexture
+     */
+    void bindTexture(int textureId);
+    
+    /**
+     * Unbind the current texture.
+     */
+    void unbindTexture();
+    
+    /**
+     * Begin rendering 3D textured quads.
+     * Call this before addTexturedQuadVertex calls, then end3DQuads when done.
+     */
+    void begin3DQuads();
+    
+    /**
+     * End rendering 3D textured quads.
+     */
+    void end3DQuads();
+    
+    /**
+     * Add a vertex to the current 3D textured quad.
+     * Vertices must be added in groups of 4 for quads.
+     * 
+     * @param x vertex X position
+     * @param y vertex Y position
+     * @param z vertex Z position
+     * @param u texture U coordinate (0-1)
+     * @param v texture V coordinate (0-1)
+     */
+    void addTexturedQuadVertex(float x, float y, float z, float u, float v);
+    
+    /**
+     * Set depth mask (enable/disable depth buffer writing).
+     * 
+     * @param enable true to enable depth writing, false to disable
+     */
+    void setDepthMask(boolean enable);
+    
+    /**
+     * Set the blend function for blending.
+     * Uses standard OpenGL-like blend factors.
+     * 
+     * @param srcFactor source blend factor
+     * @param dstFactor destination blend factor
+     */
+    void setBlendFunc(int srcFactor, int dstFactor);
+    
+    /** Blend factor: source alpha */
+    int BLEND_SRC_ALPHA = 0x0302;
+    /** Blend factor: one */
+    int BLEND_ONE = 1;
+    /** Blend factor: one minus source alpha */
+    int BLEND_ONE_MINUS_SRC_ALPHA = 0x0303;
+    /** Blend factor: zero */
+    int BLEND_ZERO = 0;
+    
     // === Factory Methods ===
     
     /**
