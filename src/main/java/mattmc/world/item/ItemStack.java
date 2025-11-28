@@ -81,10 +81,14 @@ public class ItemStack {
      * Increase the count by the specified amount.
      * The count will not exceed the item's max stack size.
      * 
-     * @param amount Amount to add
+     * @param amount Amount to add (must be non-negative)
      * @return The actual amount added (may be less if we hit max stack size)
+     * @throws IllegalArgumentException if amount is negative
      */
     public int grow(int amount) {
+        if (amount < 0) {
+            throw new IllegalArgumentException("Amount must be non-negative, got: " + amount);
+        }
         int newCount = Math.min(count + amount, item.getMaxStackSize());
         int actualAdded = newCount - count;
         count = newCount;
@@ -94,10 +98,13 @@ public class ItemStack {
     /**
      * Decrease the count by the specified amount.
      * 
-     * @param amount Amount to remove
-     * @throws IllegalArgumentException if the amount would make count <= 0
+     * @param amount Amount to remove (must be non-negative)
+     * @throws IllegalArgumentException if amount is negative or if the amount would make count <= 0
      */
     public void shrink(int amount) {
+        if (amount < 0) {
+            throw new IllegalArgumentException("Amount must be non-negative, got: " + amount);
+        }
         if (count - amount <= 0) {
             throw new IllegalArgumentException("Cannot shrink below 1. Use isEmpty() to check if stack should be removed.");
         }

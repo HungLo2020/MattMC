@@ -28,10 +28,17 @@ public class ColumnHeightmap {
 	/**
 	 * Create a heightmap from existing data.
 	 * @param data 2D array of height values (16×16)
+	 * @throws IllegalArgumentException if data is not exactly 16×16
 	 */
 	public ColumnHeightmap(int[][] data) {
-		if (data.length != COLUMN_SIZE || data[0].length != COLUMN_SIZE) {
+		if (data == null || data.length != COLUMN_SIZE) {
 			throw new IllegalArgumentException("Heightmap data must be 16×16");
+		}
+		// Validate all inner arrays have correct length
+		for (int x = 0; x < COLUMN_SIZE; x++) {
+			if (data[x] == null || data[x].length != COLUMN_SIZE) {
+				throw new IllegalArgumentException("Heightmap data must be 16×16, row " + x + " has incorrect length");
+			}
 		}
 		this.heights = new int[COLUMN_SIZE][COLUMN_SIZE];
 		for (int x = 0; x < COLUMN_SIZE; x++) {

@@ -154,8 +154,15 @@ public class OptionsManager {
                         try {
                             String[] resParts = value.split("x");
                             if (resParts.length == 2) {
-                                resolutionWidth = Integer.parseInt(resParts[0].trim());
-                                resolutionHeight = Integer.parseInt(resParts[1].trim());
+                                int width = Integer.parseInt(resParts[0].trim());
+                                int height = Integer.parseInt(resParts[1].trim());
+                                // Validate resolution values are positive
+                                if (width > 0 && height > 0) {
+                                    resolutionWidth = width;
+                                    resolutionHeight = height;
+                                } else {
+                                    logger.error("Invalid resolution value (must be positive): {}", value);
+                                }
                             }
                         } catch (NumberFormatException e) {
                             logger.error("Invalid resolution value: {}", value);

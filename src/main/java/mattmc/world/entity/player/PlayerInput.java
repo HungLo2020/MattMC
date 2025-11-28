@@ -1,7 +1,5 @@
 package mattmc.world.entity.player;
 
-import mattmc.client.gui.screens.Screen;
-
 import java.util.HashMap;
 import java.util.Map;
 

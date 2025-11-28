@@ -114,8 +114,11 @@ public final class ResourceLoader {
             try (Reader reader = new InputStreamReader(is, StandardCharsets.UTF_8)) {
                 return gson.fromJson(reader, clazz);
             }
-        } catch (Exception e) {
-            logger.error("Failed to load/parse JSON resource: {}", resourcePath, e);
+        } catch (IOException e) {
+            logger.error("Failed to load JSON resource: {}", resourcePath, e);
+            return null;
+        } catch (com.google.gson.JsonSyntaxException | com.google.gson.JsonIOException e) {
+            logger.error("Failed to parse JSON resource: {}", resourcePath, e);
             return null;
         }
     }
