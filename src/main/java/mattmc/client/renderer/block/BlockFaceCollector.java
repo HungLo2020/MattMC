@@ -99,10 +99,15 @@ public class BlockFaceCollector {
     }
     
     private void returnToPool(List<FaceData> faces, Deque<FaceData> pool, int limit) {
-        for (FaceData face : faces) {
-            if (pool.size() < limit) {
-                pool.addLast(face);
-            }
+        // PERFORMANCE: Check once if pool has space before iterating
+        int available = limit - pool.size();
+        if (available <= 0) {
+            return; // Pool is full
+        }
+        
+        int toReturn = Math.min(available, faces.size());
+        for (int i = 0; i < toReturn; i++) {
+            pool.addLast(faces.get(i));
         }
     }
     
