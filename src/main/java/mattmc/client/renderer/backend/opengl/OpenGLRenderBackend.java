@@ -327,12 +327,10 @@ public class OpenGLRenderBackend implements RenderBackend {
             
             // OpenGL state setup for 3D rendering
             // Enable alpha blending for transparent textures (e.g., leaves)
+            // The fragment shader uses 'discard' for fully transparent pixels,
+            // but blending is still needed for proper alpha compositing
             glEnable(GL_BLEND);
             glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-            
-            // Enable alpha test to properly discard transparent pixels
-            glEnable(GL_ALPHA_TEST);
-            glAlphaFunc(GL_GREATER, 0.1f);
         }
     }
     
@@ -637,8 +635,7 @@ public class OpenGLRenderBackend implements RenderBackend {
                 currentAtlas = null;
             }
             
-            // Disable alpha test and blending that was enabled in beginFrame
-            glDisable(GL_ALPHA_TEST);
+            // Disable blending that was enabled in beginFrame
             glDisable(GL_BLEND);
         }
     }
