@@ -59,6 +59,20 @@ public class AsyncChunkLoader {
         int getSkyLight(LevelChunk chunk, int x, int y, int z);
         int getBlockLight(LevelChunk chunk, int x, int y, int z);
         
+        /**
+         * Get block at chunk-local coordinates, checking neighboring chunks if necessary.
+         * This is used for transparency checks in the 3x3x3 smooth lighting grid.
+         * 
+         * @param chunk The current chunk
+         * @param x Chunk-local X coordinate (can be outside 0-15 range)
+         * @param y Chunk-local Y coordinate
+         * @param z Chunk-local Z coordinate (can be outside 0-15 range)
+         * @return The block at the position, or AIR if unknown
+         */
+        default mattmc.world.level.block.Block getBlock(LevelChunk chunk, int x, int y, int z) {
+            return mattmc.world.level.block.Blocks.AIR; // Fallback to air
+        }
+        
         // RGBI light methods for proper color and attenuation
         default int getBlockLightR(LevelChunk chunk, int x, int y, int z) {
             return getBlockLight(chunk, x, y, z); // Fallback to intensity for white light
@@ -425,6 +439,11 @@ public class AsyncChunkLoader {
                 @Override
                 public int getBlockLightAcrossChunks(LevelChunk chunk, int x, int y, int z) {
                     return lightAccessor.getBlockLight(chunk, x, y, z);
+                }
+                
+                @Override
+                public mattmc.world.level.block.Block getBlockAcrossChunks(LevelChunk chunk, int x, int y, int z) {
+                    return lightAccessor.getBlock(chunk, x, y, z);
                 }
                 
                 @Override

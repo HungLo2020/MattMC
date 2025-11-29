@@ -1,7 +1,6 @@
 package mattmc.client.renderer.chunk;
 
 import mattmc.client.renderer.block.BlockFaceCollector;
-import mattmc.client.settings.OptionsManager;
 import mattmc.world.level.block.Block;
 import mattmc.world.level.block.Blocks;
 import mattmc.world.level.chunk.LevelChunk;
@@ -19,8 +18,7 @@ import mattmc.world.level.chunk.LevelChunk;
  *   <li>Calculate final light values via trilinear interpolation based on vertex position</li>
  * </ol>
  * 
- * <p>When smooth lighting is disabled via {@link OptionsManager#isSmoothLightingEnabled()},
- * only the face-adjacent block's light value is used (flat lighting).</p>
+ * <p>Smooth lighting is always enabled for best visual quality.</p>
  * 
  * <p>This implementation extends Minecraft's algorithm to support RGB blocklight (MattMC feature).</p>
  * 
@@ -168,8 +166,7 @@ public class VertexLightSampler {
      *   <li>Use trilinear interpolation based on vertex position</li>
      * </ol>
      * 
-     * <p>When {@link OptionsManager#isSmoothLightingEnabled()} returns false, only the face-adjacent
-     * block's light is returned (flat lighting mode).</p>
+     * <p>Smooth lighting is always enabled for best visual quality.</p>
      * 
      * @param face The face data containing chunk reference and position
      * @param normalIndex Which face (0=top, 1=bottom, 2=north, 3=south, 4=west, 5=east)
@@ -189,19 +186,7 @@ public class VertexLightSampler {
         int cy = face.cy;
         int cz = face.cz;
         
-        // Get face-adjacent position for flat lighting mode
-        int[] normal = DIRECTION_STEPS[normalIndex];
-        int faceX = cx + normal[0];
-        int faceY = cy + normal[1];
-        int faceZ = cz + normal[2];
-        
-        // If smooth lighting is disabled, just return the face-adjacent light (flat lighting)
-        if (!OptionsManager.isSmoothLightingEnabled()) {
-            int faceSkyLight = getSkyLightSafe(face.chunk, faceX, faceY, faceZ);
-            int[] faceBlockLightRGB = getBlockLightRGBSafe(face.chunk, faceX, faceY, faceZ);
-            return new float[] {faceSkyLight, faceBlockLightRGB[0], faceBlockLightRGB[1], faceBlockLightRGB[2], 1.0f};
-        }
-        
+        // Smooth lighting is always enabled
         // Check if we need to recompute lighting for this block
         if (!lightingComputed || cachedChunk != face.chunk || 
             cachedCx != cx || cachedCy != cy || cachedCz != cz) {
