@@ -708,6 +708,14 @@ public final class DevplayScreen implements Screen {
                     default:
                         break;
                 }
+                
+                // Enable or disable lighting based on render type
+                // Particles like flames (PARTICLE_SHEET_OPAQUE) should be fullbright
+                if (renderType.usesLighting()) {
+                    backend.enableLighting();
+                } else {
+                    backend.disableLighting();
+                }
             }
         );
         
@@ -716,6 +724,9 @@ public final class DevplayScreen implements Screen {
         org.lwjgl.opengl.GL11.glDepthMask(true);
         backend.disableBlend();
         backend.enableCullFace();
+        
+        // Restore lighting state to enabled (it was enabled before particle rendering)
+        backend.enableLighting();
         
         // Restore the modelview matrix
         org.lwjgl.opengl.GL11.glPopMatrix();
