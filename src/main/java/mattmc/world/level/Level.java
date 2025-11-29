@@ -231,6 +231,15 @@ public class Level implements LevelAccessor {
             // Set the world light manager for automatic light updates
             chunk.setWorldLightManager(worldLightManager);
             
+            // Set up neighbor dirty callback for smooth lighting updates
+            // When light changes at chunk edges, adjacent chunks need to rebuild their meshes
+            chunk.setNeighborDirtyCallback((neighborChunkX, neighborChunkZ) -> {
+                LevelChunk neighborChunk = chunkManager.getChunk(neighborChunkX, neighborChunkZ);
+                if (neighborChunk != null) {
+                    neighborChunk.setDirty(true);
+                }
+            });
+            
             chunkManager.addChunk(chunk);
             
             // Process any deferred light updates for this chunk
