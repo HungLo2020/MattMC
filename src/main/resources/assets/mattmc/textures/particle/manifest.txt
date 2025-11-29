@@ -1,15 +1,3 @@
-cherry_0.png
-cherry_1.png
-cherry_10.png
-cherry_11.png
-cherry_2.png
-cherry_3.png
-cherry_4.png
-cherry_5.png
-cherry_6.png
-cherry_7.png
-cherry_8.png
-cherry_9.png
 flame.png
 generic_0.png
 generic_1.png

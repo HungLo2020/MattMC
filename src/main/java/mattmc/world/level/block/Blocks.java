@@ -170,8 +170,6 @@ public class Blocks {
             registeredBlock = new FallingLeavesBlock(fallingLeaves.getRawTintColor(),
                 fallingLeaves.getParticleRed(), fallingLeaves.getParticleGreen(), fallingLeaves.getParticleBlue(),
                 identifier);
-        } else if (block instanceof CherryLeavesBlock) {
-            registeredBlock = new CherryLeavesBlock(identifier);
         } else if (block instanceof LeavesBlock) {
             LeavesBlock leavesBlock = (LeavesBlock) block;
             registeredBlock = new LeavesBlock(leavesBlock.getRawTintColor(), identifier);
@@ -231,8 +229,6 @@ public class Blocks {
             registeredBlock = new FallingLeavesBlock(fallingLeaves.getRawTintColor(),
                 fallingLeaves.getParticleRed(), fallingLeaves.getParticleGreen(), fallingLeaves.getParticleBlue(),
                 identifier);
-        } else if (block instanceof CherryLeavesBlock) {
-            registeredBlock = new CherryLeavesBlock(identifier);
         } else if (block instanceof LeavesBlock) {
             LeavesBlock leavesBlock = (LeavesBlock) block;
             registeredBlock = new LeavesBlock(leavesBlock.getRawTintColor(), identifier);
