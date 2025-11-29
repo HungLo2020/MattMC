@@ -244,6 +244,10 @@ public final class DevplayScreen implements Screen {
         }
     }
     
+    // Debug: track particle spawn count
+    private int particleSpawnCount = 0;
+    private long lastParticleLogTime = 0;
+    
     /**
      * Animate blocks near the player (spawn particles for torches, leaves, etc.)
      * Called every tick to mimic Minecraft's ClientLevel.animateTick behavior.
@@ -257,11 +261,26 @@ public final class DevplayScreen implements Screen {
         mattmc.world.level.block.Block.ParticleSpawner spawner = (particleType, x, y, z, xSpeed, ySpeed, zSpeed) -> {
             mattmc.core.particles.ParticleOptions options = getParticleOptions(particleType);
             if (options != null) {
-                particleEngine.createParticle(options, x, y, z, xSpeed, ySpeed, zSpeed);
+                mattmc.client.particle.Particle particle = particleEngine.createParticle(options, x, y, z, xSpeed, ySpeed, zSpeed);
+                if (particle != null) {
+                    particleSpawnCount++;
+                }
             }
         };
         
         world.animateTick(playerBlockX, playerBlockY, playerBlockZ, animateTickRandom, spawner);
+        
+        // Log particle stats every 5 seconds
+        long now = System.currentTimeMillis();
+        if (now - lastParticleLogTime > 5000) {
+            int activeParticles = particleEngine.countParticles();
+            if (particleSpawnCount > 0 || activeParticles > 0) {
+                logger.info("[Particle Debug] Spawned {} particles in last 5s, {} active particles", 
+                           particleSpawnCount, activeParticles);
+            }
+            particleSpawnCount = 0;
+            lastParticleLogTime = now;
+        }
     }
     
     /**
@@ -542,12 +561,25 @@ public final class DevplayScreen implements Screen {
             return;
         }
         
+        int particleCount = particleEngine.countParticles();
+        if (particleCount == 0) {
+            return;
+        }
+        
         // Save the current modelview matrix
         org.lwjgl.opengl.GL11.glPushMatrix();
         
-        // Load identity - particles calculate their own camera-relative positions
-        // The projection matrix stays as-is (perspective)
+        // Load identity then apply only camera ROTATION (not translation)
+        // Particles already have camera-relative positions (they subtract camera pos in render())
+        // but they still need to be rotated to face the camera correctly
         org.lwjgl.opengl.GL11.glLoadIdentity();
+        
+        // Apply camera rotation (pitch then yaw) - same as in main render()
+        // This makes particles appear in the correct screen position
+        float pitch = player.getPitch(partialTicks);
+        float yaw = player.getYaw(partialTicks);
+        org.lwjgl.opengl.GL11.glRotatef(pitch, 1f, 0f, 0f);
+        org.lwjgl.opengl.GL11.glRotatef(yaw, 0f, 1f, 0f);
         
         // Set up render state for particles
         backend.enableBlend();
