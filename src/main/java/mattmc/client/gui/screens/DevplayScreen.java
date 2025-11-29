@@ -586,15 +586,19 @@ public final class DevplayScreen implements Screen {
         org.lwjgl.opengl.GL11.glRotatef(yaw, 0f, 1f, 0f);
         
         // Set up render state for particles
-        backend.enableBlend();
         backend.disableCullFace();
         backend.enableDepthTest();
         
-        // Disable depth write for translucent particles (they should not occlude each other)
-        org.lwjgl.opengl.GL11.glDepthMask(false);
-        
         // Enable texturing
         org.lwjgl.opengl.GL11.glEnable(org.lwjgl.opengl.GL11.GL_TEXTURE_2D);
+        
+        // Enable alpha testing to discard transparent pixels (alpha < 0.1)
+        // This is how Minecraft handles particles with transparency in legacy OpenGL
+        org.lwjgl.opengl.GL11.glEnable(org.lwjgl.opengl.GL11.GL_ALPHA_TEST);
+        org.lwjgl.opengl.GL11.glAlphaFunc(org.lwjgl.opengl.GL11.GL_GREATER, 0.1f);
+        
+        // Enable blending for proper alpha handling
+        backend.enableBlend();
         
         // Bind particle atlas texture
         atlas.bind();
@@ -634,7 +638,8 @@ public final class DevplayScreen implements Screen {
                         break;
                     case PARTICLE_SHEET_OPAQUE:
                     case PARTICLE_SHEET_LIT:
-                        backend.disableBlend();
+                        // Even opaque particles need blend for texture alpha
+                        backend.enableBlend();
                         org.lwjgl.opengl.GL11.glDepthMask(true);
                         break;
                     default:
@@ -644,6 +649,7 @@ public final class DevplayScreen implements Screen {
         );
         
         // Restore render state
+        org.lwjgl.opengl.GL11.glDisable(org.lwjgl.opengl.GL11.GL_ALPHA_TEST);
         org.lwjgl.opengl.GL11.glDepthMask(true);
         backend.disableBlend();
         backend.enableCullFace();
