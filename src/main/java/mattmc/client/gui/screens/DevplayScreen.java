@@ -546,16 +546,14 @@ public final class DevplayScreen implements Screen {
         backend.enableBlend();
         backend.disableCullFace();
         
+        // Enable texturing
+        org.lwjgl.opengl.GL11.glEnable(org.lwjgl.opengl.GL11.GL_TEXTURE_2D);
+        
         // Bind particle atlas texture
         atlas.bind();
         
-        // Store camera position for vertex builder
-        final double camX = cameraX;
-        final double camY = cameraY;
-        final double camZ = cameraZ;
-        
         // Create a simple vertex builder for particle rendering
-        // For now, use immediate mode rendering (will be optimized later)
+        // Particle positions are already camera-relative from SingleQuadParticle.render()
         particleEngine.render(
             new mattmc.client.particle.ParticleVertexBuilder() {
                 @Override
@@ -569,7 +567,8 @@ public final class DevplayScreen implements Screen {
                                    float r, float g, float b, float a, int light) {
                     org.lwjgl.opengl.GL11.glColor4f(r, g, b, a);
                     org.lwjgl.opengl.GL11.glTexCoord2f(u, v);
-                    org.lwjgl.opengl.GL11.glVertex3d(x - camX, y - camY, z - camZ);
+                    // Positions are already camera-relative from particle render method
+                    org.lwjgl.opengl.GL11.glVertex3f(x, y, z);
                 }
                 
                 @Override
