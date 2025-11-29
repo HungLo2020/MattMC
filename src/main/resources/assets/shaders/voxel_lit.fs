@@ -13,24 +13,13 @@ uniform float uLightGamma; // Gamma exponent for light curve (default 1.4)
 uniform float uEmissiveBoost; // Brightness boost for emissive textures (default 1.0)
 uniform float uSkyDarkness; // Sky light multiplier for day/night (0.0-1.0, default 1.0)
 
-// Minecraft-style brightness lookup
-// In Minecraft, light level 15 = 1.0, level 0 = ambient light (about 0.05)
-// The formula is: level/15 with ambient light interpolation
-// Minecraft also applies a slight curve to make middle values brighter
+// Simple light level to brightness conversion
+// Light level 15 = full brightness (1.0), level 0 = minimum ambient
 float getLightBrightness(float lightLevel) {
-	// Normalize to 0-1 range
-	float normalized = clamp(lightLevel / 15.0, 0.0, 1.0);
-	
-	// Apply a subtle curve to boost mid-range values (like Minecraft's notGamma)
-	// This makes light level 7-10 brighter than a linear curve
-	float curved = 1.0 - (1.0 - normalized) * (1.0 - normalized) * (1.0 - normalized) * (1.0 - normalized);
-	
-	// Mix between curved and linear for a balanced response
-	return mix(normalized, curved, 0.5);
+	return clamp(lightLevel / 15.0, 0.0, 1.0);
 }
 
 // Get directional shade based on face normal (Minecraft style)
-// In Minecraft, this affects the BASE color of vertices, creating visible face edges
 // UP = 1.0, DOWN = 0.5, NORTH/SOUTH = 0.8, WEST/EAST = 0.6
 const float AXIS_DOMINANT_THRESHOLD = 0.9;
 
@@ -45,7 +34,7 @@ float getDirectionalShade(vec3 normal) {
 		return 0.6;
 	}
 	
-	// For angled faces, interpolate based on normal components
+	// For angled faces, interpolate
 	float upShade = max(0.0, normal.y);
 	float downShade = max(0.0, -normal.y) * 0.5;
 	float sideShade = (absNormal.x * 0.6 + absNormal.z * 0.8);
@@ -57,64 +46,54 @@ void main() {
 	// Sample texture
 	vec4 texColor = texture2D(uTexture, vTexCoord);
 	
-	// Discard fully transparent pixels for proper alpha testing
+	// Discard fully transparent pixels
 	if (texColor.a < 0.01) {
 		discard;
 	}
 	
 	// Extract light components (0-15 range)
 	float skyLight = vLightData.x;
-	vec3 blockLightRGB = vLightData.yzw; // R, G, B
+	vec3 blockLightRGB = vLightData.yzw;
 	
-	// Calculate sky light brightness (with day/night multiplier)
-	float skyBrightness = getLightBrightness(skyLight) * uSkyDarkness;
+	// Calculate sky light brightness
+	// Use uSkyDarkness if it's set (> 0), otherwise assume full daylight (1.0)
+	float skyDarknessFactor = uSkyDarkness > 0.001 ? uSkyDarkness : 1.0;
+	float skyBrightness = getLightBrightness(skyLight) * skyDarknessFactor;
 	
-	// Calculate block light brightness for each RGB channel
-	// This preserves your colored block lights!
+	// Calculate block light brightness for each RGB channel (preserves colored lights!)
 	vec3 blockBrightness = vec3(
 		getLightBrightness(blockLightRGB.r),
 		getLightBrightness(blockLightRGB.g),
 		getLightBrightness(blockLightRGB.b)
 	);
 	
-	// Combine sky light (white) with colored block light using MAX blend
-	// This is how Minecraft combines them - take the brighter of the two
-	// But we use a soft max to allow colored lights to tint even in daylight
+	// Combine sky light (white) with colored block light
+	// Take the MAX of sky and block light, then add block color boost
 	vec3 skyColor = vec3(skyBrightness);
 	vec3 combinedLight = max(skyColor, blockBrightness);
 	
-	// Also add a portion of the block light color on top for color blending
-	// This lets colored lights show their color even when sky light is present
-	vec3 blockColorBoost = blockBrightness * 0.3;
+	// Add block light color on top so colored lights show even in daylight
+	vec3 blockColorBoost = blockBrightness * 0.5;
 	vec3 finalLightColor = combinedLight + blockColorBoost;
 	
 	// Clamp to prevent over-brightening
 	finalLightColor = min(finalLightColor, vec3(1.0));
 	
-	// Apply ambient occlusion (subtle darkening in corners)
-	// vAO is 0.0-1.0 where 1.0 = no occlusion, 0.0 = full occlusion
-	// Use a gentle strength so it's not too harsh
-	float aoStrength = 0.4;
-	float aoFactor = mix(1.0, vAO, aoStrength);
+	// Apply ambient occlusion very gently (20% strength)
+	float aoFactor = mix(1.0, vAO, 0.2);
 	finalLightColor *= aoFactor;
 	
-	// Apply directional face shading (Minecraft-style block face visibility)
-	// This is separate from lighting - it's about making block faces distinguishable
+	// Apply directional face shading gently (30% strength)
 	float directionalShade = getDirectionalShade(vNormal);
-	
-	// Apply directional shade more gently - blend with 1.0 instead of pure multiply
-	// This prevents faces from becoming too dark
-	float shadeStrength = 0.5; // 0 = no shading, 1 = full Minecraft shading
-	float appliedShade = mix(1.0, directionalShade, shadeStrength);
+	float appliedShade = mix(1.0, directionalShade, 0.3);
 	finalLightColor *= appliedShade;
 	
-	// Ensure minimum ambient brightness (never pitch black)
-	// 0.1 is a good balance - dark but not unplayable
-	finalLightColor = max(finalLightColor, vec3(0.1));
+	// Ensure minimum ambient brightness
+	finalLightColor = max(finalLightColor, vec3(0.15));
 	
 	// Apply optional emissive boost
 	finalLightColor *= uEmissiveBoost;
 	
-	// Apply lighting to final color, preserving texture alpha for transparency
+	// Apply lighting to final color
 	gl_FragColor = vColor * texColor * vec4(finalLightColor, 1.0);
 }
