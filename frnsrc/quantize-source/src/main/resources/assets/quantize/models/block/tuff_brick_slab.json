@@ -1,0 +1,8 @@
+{
+  "parent": "minecraft:block/slab",
+  "textures": {
+    "bottom": "quantize:block/tuff_bricks",
+    "side": "quantize:block/tuff_bricks",
+    "top": "quantize:block/tuff_bricks"
+  }
+}

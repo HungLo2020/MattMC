@@ -1,0 +1,14 @@
+{
+  "parent": "minecraft:item/generated",
+  "textures": {
+    "layer0": "quantize:item/pupfish_locator"
+  },
+  "overrides": [
+    {
+      "predicate": {
+        "in_chunk": 1
+      },
+      "model": "quantize:item/pupfish_locator_in_chunk"
+    }
+  ]
+}

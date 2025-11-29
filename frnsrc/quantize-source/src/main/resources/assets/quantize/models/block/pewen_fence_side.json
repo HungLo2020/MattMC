@@ -1,0 +1,6 @@
+{
+  "parent": "minecraft:block/fence_side",
+  "textures": {
+    "texture": "quantize:block/pewen/pewen_planks"
+  }
+}

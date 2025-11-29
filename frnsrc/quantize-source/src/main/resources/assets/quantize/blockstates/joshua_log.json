@@ -1,0 +1,16 @@
+{
+  "variants": {
+    "axis=x": {
+      "model": "quantize:block/joshua_log",
+      "x": 90,
+      "y": 90
+    },
+    "axis=y": {
+      "model": "quantize:block/joshua_log"
+    },
+    "axis=z": {
+      "model": "quantize:block/joshua_log",
+      "x": 90
+    }
+  }
+}

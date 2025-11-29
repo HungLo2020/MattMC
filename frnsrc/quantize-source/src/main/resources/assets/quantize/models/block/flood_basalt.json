@@ -1,0 +1,8 @@
+{
+    "parent": "block/cube_bottom_top",
+    "textures": {
+        "side": "quantize:block/flood_basalt",
+        "bottom": "quantize:block/flood_basalt_top",
+        "top": "quantize:block/flood_basalt_top"
+    }
+}

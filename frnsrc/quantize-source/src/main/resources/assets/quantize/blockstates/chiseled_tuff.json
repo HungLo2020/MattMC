@@ -1,0 +1,7 @@
+{
+  "variants": {
+    "": {
+      "model": "quantize:block/chiseled_tuff"
+    }
+  }
+}

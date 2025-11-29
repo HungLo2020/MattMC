@@ -1,0 +1,7 @@
+{
+  "parent": "block/cube_all",
+  "textures": {
+    "all": "quantize:block/joshua_log",
+    "particle": "quantize:block/joshua_log"
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "variants": {
+    "facing=down": {
+      "model": "quantize:block/limestone_chiseled",
+      "x": 90
+    },
+    "facing=east": {
+      "model": "quantize:block/limestone_chiseled",
+      "y": 90
+    },
+    "facing=north": {
+      "model": "quantize:block/limestone_chiseled"
+    },
+    "facing=south": {
+      "model": "quantize:block/limestone_chiseled",
+      "y": 180
+    },
+    "facing=up": {
+      "model": "quantize:block/limestone_chiseled",
+      "x": 270
+    },
+    "facing=west": {
+      "model": "quantize:block/limestone_chiseled",
+      "y": 270
+    }
+  }
+}

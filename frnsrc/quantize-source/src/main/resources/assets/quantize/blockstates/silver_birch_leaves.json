@@ -1,0 +1,7 @@
+{
+  "variants": {
+    "": {
+      "model": "quantize:block/silver_birch_leaves"
+    }
+  }
+}

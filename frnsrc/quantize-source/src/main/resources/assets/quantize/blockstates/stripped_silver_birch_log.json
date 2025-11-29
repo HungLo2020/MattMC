@@ -1,0 +1,19 @@
+{
+  "variants": {
+    "axis=x": {
+      "model": "quantize:block/stripped_silver_birch_log",
+      "x": 90,
+      "y": 90
+    },
+    "axis=y,is_base=true": {
+      "model": "quantize:block/stripped_silver_birch_log"
+    },
+    "axis=y,is_base=false": {
+      "model": "quantize:block/stripped_silver_birch_log"
+    },
+    "axis=z": {
+      "model": "quantize:block/stripped_silver_birch_log",
+      "x": 90
+    }
+  }
+}

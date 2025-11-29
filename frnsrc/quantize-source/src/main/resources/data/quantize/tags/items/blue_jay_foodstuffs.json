@@ -1,0 +1,9 @@
+{
+  "__comment": "Will follow with these items in your hand",
+  "replace": false,
+  "values": [
+    "#quantize:blue_jay_alert_foods",
+    "#quantize:blue_jay_breedables",
+    "#quantize:blue_jay_teaming_foods"
+  ]
+}

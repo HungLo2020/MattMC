@@ -1,0 +1,12 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "ingredients": [
+    {
+      "item": "quantize:cooked_dinosaur_chop"
+    }
+  ],
+  "result": {
+    "item": "quantize:dinosaur_nugget",
+    "count": 12
+  }
+}

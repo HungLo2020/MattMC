@@ -1,0 +1,11 @@
+{
+  "type": "quantize:botany_pot",
+  "seed": { "item": "minecraft:cherry_sapling" },
+  "soil": { "tag": "quantize:botany_soils" },
+  "growth_ticks": 1200,
+  "drops": [
+    { "output": { "item": "minecraft:cherry_log" }, "chance": 1.0, "min": 4, "max": 6 },
+    { "output": { "item": "minecraft:cherry_sapling" },   "chance": 1.0, "min": 1, "max": 1 },
+    { "output": { "item": "minecraft:pink_petals" },   "chance": 1.0, "min": 1, "max": 2 }
+  ]
+}

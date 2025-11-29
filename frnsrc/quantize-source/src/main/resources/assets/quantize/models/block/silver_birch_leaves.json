@@ -1,0 +1,7 @@
+{
+  "parent": "block/leaves",
+  "textures": {
+    "all": "quantize:block/silver_birch_leaves",
+    "particle": "quantize:block/silver_birch_leaves"
+  }
+}

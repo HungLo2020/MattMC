@@ -1,0 +1,17 @@
+{
+  "__comment": "test",
+  "replace": false,
+  "values": [
+    "minecraft:chicken",
+    "minecraft:tropical_fish",
+    "minecraft:cod",
+    "minecraft:salmon",
+    "minecraft:parrot",
+    "minecraft:rabbit",
+    "minecraft:frog",
+    "quantize:crow",
+    "quantize:toucan",
+    "quantize:catfish",
+    "quantize:crab"
+  ]
+}

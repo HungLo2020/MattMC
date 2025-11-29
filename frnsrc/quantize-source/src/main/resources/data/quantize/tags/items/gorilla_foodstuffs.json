@@ -1,0 +1,12 @@
+{
+  "__comment": "Heals when given",
+  "replace": false,
+  "values": [
+    "#quantize:gorilla_tameables",
+    "#quantize:gorilla_breedables",
+    "#minecraft:leaves",
+    "minecraft:sugar_cane",
+    "minecraft:apple",
+    "minecraft:bamboo"
+  ]
+}

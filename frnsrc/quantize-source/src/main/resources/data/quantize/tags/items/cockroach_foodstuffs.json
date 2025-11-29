@@ -1,0 +1,8 @@
+{
+  "__comment": "Stops Cockroaches from running away",
+  "replace": false,
+  "values": [
+    "#quantize:cockroach_breedables",
+    "minecraft:bread"
+  ]
+}

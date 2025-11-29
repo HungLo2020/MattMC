@@ -1,0 +1,6 @@
+{
+  "parent": "minecraft:block/button",
+  "textures": {
+    "texture": "quantize:block/pewen/pewen_planks"
+  }
+}

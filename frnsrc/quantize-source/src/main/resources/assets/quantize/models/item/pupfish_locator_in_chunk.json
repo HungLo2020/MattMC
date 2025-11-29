@@ -1,0 +1,6 @@
+{
+  "parent": "minecraft:item/generated",
+  "textures": {
+    "layer0": "quantize:item/pupfish_locator_in_chunk"
+  }
+}

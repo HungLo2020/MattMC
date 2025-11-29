@@ -1,0 +1,8 @@
+{
+  "parent": "quantize:block/beard_block",
+  "textures": {
+    "particle": "quantize:block/joshua_beard",
+    "cross": "quantize:block/joshua_beard"
+  },
+  "render_type": "cutout"
+}

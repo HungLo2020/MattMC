@@ -1,0 +1,8 @@
+{
+  "replace": false,
+  "values": [
+    "#quantize:insect_items",
+    "quantize:lobster_tail",
+    "quantize:cooked_lobster_tail"
+  ]
+}

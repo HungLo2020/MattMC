@@ -1,0 +1,19 @@
+{
+  "variants": {
+    "facing=east": {
+      "model": "quantize:block/palm_beard",
+      "y": 90
+    },
+    "facing=north": {
+      "model": "quantize:block/palm_beard"
+    },
+    "facing=south": {
+      "model": "quantize:block/palm_beard",
+      "y": 180
+    },
+    "facing=west": {
+      "model": "quantize:block/palm_beard",
+      "y": 270
+    }
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "parent": "minecraft:block/cube",
+  "textures": {
+    "up": "quantize:block/jade_bricks_up",
+    "down": "quantize:block/jade_bricks_up",
+    "north": "quantize:block/jade_bricks",
+    "south": "quantize:block/jade_bricks",
+    "east": "quantize:block/jade_bricks",
+    "west": "quantize:block/jade_bricks",
+    "particle": "quantize:block/jade_bricks"
+  }
+}

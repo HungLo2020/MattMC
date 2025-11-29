@@ -1,0 +1,7 @@
+{
+    "parent": "quantize:block/wall_inventory",
+    "textures": {
+        "wall": "quantize:block/limestone",
+        "top" : "quantize:block/limestone"
+    }
+}

@@ -1,0 +1,9 @@
+{
+  "type": "quantize:botany_pot",
+  "seed": { "item": "minecraft:brown_mushroom" },
+  "soil": { "tag": "quantize:botany_mycelium" },
+  "growth_ticks": 1200,
+  "drops": [
+    { "output": { "item": "minecraft:brown_mushroom" }, "chance": 1.0, "min": 1, "max": 1 }
+  ]
+}

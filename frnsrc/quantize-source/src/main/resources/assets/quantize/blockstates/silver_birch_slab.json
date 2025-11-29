@@ -1,0 +1,13 @@
+{
+  "variants": {
+    "type=bottom": {
+      "model": "quantize:block/silver_birch_slab"
+    },
+    "type=top": {
+      "model": "quantize:block/silver_birch_slab_top"
+    },
+    "type=double": {
+      "model": "quantize:block/silver_birch_slab_full"
+    }
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "replace": false,
+  "values": [
+    "quantize:silver_birch_leaves",
+    "quantize:cypress_leaves",
+    "quantize:palm_leaves",
+    "quantize:joshua_leaves"
+  ]
+}

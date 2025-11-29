@@ -1,0 +1,9 @@
+{
+  "type": "quantize:botany_pot",
+  "seed": { "item": "minecraft:cactus" },
+  "soil": { "tag": "quantize:botany_sands" },
+  "growth_ticks": 1200,
+  "drops": [
+    { "output": { "item": "minecraft:cactus" }, "chance": 1.0, "min": 1, "max": 1 }
+  ]
+}

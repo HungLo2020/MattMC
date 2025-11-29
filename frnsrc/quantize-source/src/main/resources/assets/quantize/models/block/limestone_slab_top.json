@@ -1,0 +1,8 @@
+{
+  "parent": "minecraft:block/slab_top",
+  "textures": {
+    "bottom": "quantize:block/limestone",
+    "side": "quantize:block/limestone",
+    "top": "quantize:block/limestone"
+  }
+}

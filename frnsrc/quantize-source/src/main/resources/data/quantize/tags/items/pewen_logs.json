@@ -1,0 +1,8 @@
+{
+  "values": [
+    "quantize:pewen_log",
+    "quantize:pewen_wood",
+    "quantize:stripped_pewen_log",
+    "quantize:stripped_pewen_wood"
+  ]
+}

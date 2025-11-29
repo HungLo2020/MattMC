@@ -1,0 +1,34 @@
+{
+  "variants": {
+    "fungus=0": [
+      {
+        "model": "quantize:block/leafcutter_ant_chamber"
+      }
+    ],
+    "fungus=1": [
+      {
+        "model": "quantize:block/leafcutter_ant_chamber"
+      }
+    ],
+    "fungus=2": [
+      {
+        "model": "quantize:block/leafcutter_ant_chamber"
+      }
+    ],
+    "fungus=3": [
+      {
+        "model": "quantize:block/leafcutter_ant_chamber"
+      }
+    ],
+    "fungus=4": [
+      {
+        "model": "quantize:block/leafcutter_ant_chamber"
+      }
+    ],
+    "fungus=5": [
+      {
+        "model": "quantize:block/leafcutter_ant_chamber_fungus"
+      }
+    ]
+  }
+}

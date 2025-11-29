@@ -1,0 +1,11 @@
+{
+	"parent": "quantize:block/tremorsaurus_egg_template",
+	"textures": {
+		"east": "quantize:block/egg/tremorsaurus_egg_east_cracked",
+		"south": "quantize:block/egg/tremorsaurus_egg_south_cracked",
+		"west": "quantize:block/egg/tremorsaurus_egg_west_cracked",
+		"north": "quantize:block/egg/tremorsaurus_egg_north_cracked",
+		"bottom" : "quantize:block/egg/tremorsaurus_egg_bottom_cracked",
+		"top" : "quantize:block/egg/tremorsaurus_egg_top_cracked"
+	}
+}

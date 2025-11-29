@@ -1,0 +1,9 @@
+{
+  "type": "quantize:botany_pot",
+  "seed": { "item": "minecraft:wither_rose" },
+  "soil": { "tag": "quantize:botany_nether" },
+  "growth_ticks": 2400,
+  "drops": [
+    { "output": { "item": "minecraft:wither_rose" }, "chance": 1.0, "min": 1, "max": 1 }
+  ]
+}

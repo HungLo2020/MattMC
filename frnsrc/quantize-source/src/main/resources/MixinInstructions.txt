@@ -1,0 +1,2 @@
+To add Mixin put the file from com/matt/quantize/mixin/<FILE NAME>
+into quantize.mixins.json in this directory under "mixins".

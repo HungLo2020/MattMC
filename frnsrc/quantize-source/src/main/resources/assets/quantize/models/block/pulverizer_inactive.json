@@ -1,0 +1,26 @@
+{
+  "parent": "minecraft:block/cube",
+  "textures": {
+    "up": "quantize:block/machine_top",
+    "down": "quantize:block/machine_side",
+    "north": "quantize:block/machine_pulverizer",
+    "south": "quantize:block/machine_side",
+    "east": "quantize:block/machine_side",
+    "west": "quantize:block/machine_side",
+    "particle": "quantize:block/machine_side"
+  },
+  "elements": [
+    {
+      "from": [0, 0, 0],
+      "to": [16, 16, 16],
+      "faces": {
+        "up":    { "texture": "#up", "cullface": "up" },
+        "down":  { "texture": "#down", "cullface": "down" },
+        "north": { "texture": "#north", "cullface": "north" },
+        "south": { "texture": "#south", "cullface": "south" },
+        "west":  { "texture": "#west", "cullface": "west" },
+        "east":  { "texture": "#east", "cullface": "east" }
+      }
+    }
+  ]
+}

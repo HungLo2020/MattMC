@@ -1,0 +1,8 @@
+{
+  "parent": "minecraft:block/outer_stairs",
+  "textures": {
+    "bottom": "quantize:block/tuff",
+    "side": "quantize:block/tuff",
+    "top": "quantize:block/tuff"
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "type": "quantize:forlorn_ruins",
+  "config": {
+    "structures": [
+      "quantize:caveman_house_0",
+      "quantize:caveman_house_1",
+      "quantize:caveman_house_2",
+      "quantize:caveman_house_3",
+      "quantize:caveman_house_4",
+      "quantize:caveman_house_5",
+      "quantize:caveman_house_6"
+    ],
+    "chest_loot": "quantize:chests/caveman_house",
+    "sink_by": -4
+  }
+}

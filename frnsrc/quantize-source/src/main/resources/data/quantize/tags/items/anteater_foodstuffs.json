@@ -1,0 +1,7 @@
+{
+  "__comment": "Will follow with these items in your hand and heals when given",
+  "replace": false,
+  "values": [
+    "#quantize:insect_items"
+  ]
+}

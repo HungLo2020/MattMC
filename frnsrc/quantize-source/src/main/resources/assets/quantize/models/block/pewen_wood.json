@@ -1,0 +1,7 @@
+{
+  "parent": "minecraft:block/cube_column",
+  "textures": {
+    "end": "quantize:block/pewen/pewen_log",
+    "side": "quantize:block/pewen/pewen_log"
+  }
+}

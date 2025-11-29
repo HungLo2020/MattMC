@@ -1,0 +1,8 @@
+{
+  "values": [
+    "quantize:cypress_log",
+    "quantize:joshua_log",
+    "quantize:palm_log",
+    "quantize:silver_birch_log"
+  ]
+}

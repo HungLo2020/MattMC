@@ -1,0 +1,7 @@
+{
+  "parent": "minecraft:block/cube_all",
+  "render_type": "cutout",
+  "textures": {
+    "all": "quantize:block/exposed_copper_grate"
+  }
+}

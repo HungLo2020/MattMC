@@ -1,0 +1,11 @@
+{
+  "values": [
+    "quantize:pewen_branch",
+    "quantize:pewen_pines",
+    "quantize:tree_star",
+    "quantize:thornwood_branch",
+    "#minecraft:leaves",
+    "minecraft:mangrove_propagule",
+    "minecraft:cocoa"
+  ]
+}

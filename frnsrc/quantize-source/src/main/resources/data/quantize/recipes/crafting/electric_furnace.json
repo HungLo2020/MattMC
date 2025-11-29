@@ -1,0 +1,29 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "redstone",
+  "group": "electric_furnace",
+  "key": {
+    "I": {
+      "item": "minecraft:iron_ingot"
+    },
+    "C": {
+      "item": "minecraft:furnace"
+    },
+    "R": {
+      "item": "minecraft:redstone"
+    },
+    "D": {
+      "item": "minecraft:dropper"
+    }
+  },
+  "pattern": [
+    "III",
+    "ICI",
+    "RDR"
+  ],
+  "result": {
+    "count": 1,
+    "item": "quantize:electric_furnace"
+  },
+  "show_notification": true
+}

@@ -1,0 +1,8 @@
+{
+  "variants": {
+    "facing=north": { "model": "quantize:block/energy_conduit", "y": 0 },
+    "facing=south": { "model": "quantize:block/energy_conduit", "y": 180 },
+    "facing=west": { "model": "quantize:block/energy_conduit", "y": 270 },
+    "facing=east": { "model": "quantize:block/energy_conduit", "y": 90 }
+  }
+}

@@ -1,0 +1,8 @@
+{
+    "parent": "block/cube_bottom_top",
+    "textures": {
+        "side": "quantize:block/limestone_pillar",
+        "bottom": "quantize:block/limestone_pillar_top",
+        "top": "quantize:block/limestone_pillar_top"
+    }
+}

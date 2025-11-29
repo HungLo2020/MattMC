@@ -1,0 +1,10 @@
+{
+  "replace": false,
+  "values": [
+    "quantize:nuke",
+    "quantize:raygun",
+    "quantize:desolate_dagger",
+    "quantize:dark_arrow",
+    "quantize:spirit_dinosaur"
+  ]
+}

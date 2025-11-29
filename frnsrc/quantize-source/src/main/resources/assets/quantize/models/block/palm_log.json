@@ -1,0 +1,12 @@
+{
+  "parent": "block/cube",
+  "textures": {
+    "down": "quantize:block/palm_log_top",
+    "up": "quantize:block/palm_log_top",
+    "north": "quantize:block/palm_log",
+    "east": "quantize:block/palm_log",
+    "south": "quantize:block/palm_log",
+    "west": "quantize:block/palm_log",
+    "particle": "quantize:block/palm_log_top"
+  }
+}

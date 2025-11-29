@@ -1,0 +1,11 @@
+{
+  "__comment": "test",
+  "replace": false,
+  "values": [
+    "#quantize:passive_land_animals",
+    "quantize:caiman",
+    "#quantize:villagers",
+    "quantize:gelada_monkey",
+    "quantize:catfish"
+  ]
+}

@@ -1,0 +1,13 @@
+{
+  "variants": {
+    "type=bottom": {
+      "model": "quantize:block/limestone_slab"
+    },
+    "type=double": {
+      "model": "quantize:block/limestone"
+    },
+    "type=top": {
+      "model": "quantize:block/limestone_slab_top"
+    }
+  }
+}

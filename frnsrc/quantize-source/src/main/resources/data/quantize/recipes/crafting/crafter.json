@@ -1,0 +1,29 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "redstone",
+  "group": "crafter",
+  "key": {
+    "I": {
+      "item": "minecraft:iron_ingot"
+    },
+    "C": {
+      "item": "minecraft:crafting_table"
+    },
+    "R": {
+      "item": "minecraft:redstone"
+    },
+    "D": {
+      "item": "minecraft:dropper"
+    }
+  },
+  "pattern": [
+    "III",
+    "ICI",
+    "RDR"
+  ],
+  "result": {
+    "count": 1,
+    "item": "quantize:crafter"
+  },
+  "show_notification": true
+}

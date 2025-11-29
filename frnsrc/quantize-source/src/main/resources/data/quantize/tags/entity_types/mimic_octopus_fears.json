@@ -1,0 +1,15 @@
+{
+  "__comment": "All mobs that mimic octopus flees, players included separately.",
+  "replace": false,
+  "values": [
+    "minecraft:drowned",
+    "minecraft:dolphin",
+    "quantize:orca",
+    "quantize:hammerhead_shark",
+    "quantize:mantis_shrimp",
+    "quantize:cachalot_whale",
+    "quantize:frilled_shark",
+    "quantize:catfish",
+    "quantize:caiman"
+  ]
+}

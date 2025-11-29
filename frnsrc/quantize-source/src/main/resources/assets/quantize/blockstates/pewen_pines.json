@@ -1,0 +1,9 @@
+{
+  "variants": {
+    "": [
+      {
+        "model": "quantize:block/pewen_pines"
+      }
+    ]
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "variants": {
+    "type=bottom": {
+      "model": "quantize:block/cypress_slab"
+    },
+    "type=top": {
+      "model": "quantize:block/cypress_slab_top"
+    },
+    "type=double": {
+      "model": "quantize:block/cypress_slab_full"
+    }
+  }
+}

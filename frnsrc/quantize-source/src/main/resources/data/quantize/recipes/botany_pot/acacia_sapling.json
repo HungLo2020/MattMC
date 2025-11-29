@@ -1,0 +1,11 @@
+{
+  "type": "quantize:botany_pot",
+  "seed": { "item": "minecraft:acacia_sapling" },
+  "soil": { "tag": "quantize:botany_soils" },
+  "growth_ticks": 1200,
+  "drops": [
+    { "output": { "item": "minecraft:acacia_log" }, "chance": 1.0, "min": 4, "max": 6 },
+    { "output": { "item": "minecraft:acacia_sapling" },   "chance": 1.0, "min": 1, "max": 1 },
+    { "output": { "item": "quantize:acacia_blossom" },   "chance": 0.1, "min": 1, "max": 1 }
+  ]
+}

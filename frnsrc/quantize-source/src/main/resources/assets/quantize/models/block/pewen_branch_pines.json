@@ -1,0 +1,16 @@
+{
+	"parent": "quantize:block/pewen_branch_base",
+	"textures": {
+		"branch": "quantize:block/pewen/pewen_branch",
+		"branch_top": "quantize:block/pewen/pewen_branch_top",
+		"pines1": "quantize:block/pewen/pewen_pines_0",
+		"pines2": "quantize:block/pewen/pewen_pines_1",
+		"pines3": "quantize:block/pewen/pewen_pines_2",
+		"pines4": "quantize:block/pewen/pewen_pines_3",
+		"pines5": "quantize:block/pewen/pewen_pines_4",
+		"pines6": "quantize:block/pewen/pewen_pines_5",
+		"pines7": "quantize:block/pewen/pewen_pines_6",
+		"pines8": "quantize:block/pewen/pewen_pines_7",
+		"particle": "quantize:block/pewen/pewen_branch"
+	}
+}

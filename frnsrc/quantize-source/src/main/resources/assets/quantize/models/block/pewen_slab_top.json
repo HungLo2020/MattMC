@@ -1,0 +1,8 @@
+{
+  "parent": "minecraft:block/slab_top",
+  "textures": {
+    "bottom": "quantize:block/pewen/pewen_planks",
+    "side": "quantize:block/pewen/pewen_planks",
+    "top": "quantize:block/pewen/pewen_planks"
+  }
+}

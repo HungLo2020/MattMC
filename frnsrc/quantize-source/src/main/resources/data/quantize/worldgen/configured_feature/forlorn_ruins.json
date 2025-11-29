@@ -1,0 +1,17 @@
+{
+  "type": "quantize:forlorn_ruins",
+  "config": {
+    "structures": [
+      "quantize:forlorn_hut_0",
+      "quantize:forlorn_hut_1",
+      "quantize:forlorn_hut_2",
+      "quantize:forlorn_hut_3",
+      "quantize:forlorn_hut_4",
+      "quantize:forlorn_hut_5",
+      "quantize:forlorn_hut_6",
+      "quantize:forlorn_idol"
+    ],
+    "chest_loot": "quantize:chests/forlorn_ruins",
+    "sink_by": -1
+  }
+}

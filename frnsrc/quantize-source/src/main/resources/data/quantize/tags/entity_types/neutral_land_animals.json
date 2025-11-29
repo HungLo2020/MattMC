@@ -1,0 +1,18 @@
+{
+  "__comment": "\"quantize:moose\",\n    \"quantize:raccoon\",\n    \"quantize:rattlesnake\",                         all land animal (non villager, non player) mobs that neutral AND somewhat strong. For big predators to target.",
+  "replace": false,
+  "values": [
+    "minecraft:polar_bear",
+    "quantize:bald_eagle",
+    "quantize:elephant",
+    "quantize:endergrade",
+    "quantize:grizzly_bear",
+    "quantize:gorilla",
+    "quantize:kangaroo",
+    "quantize:snow_leopard",
+    "quantize:tiger",
+    "quantize:anteater",
+    "quantize:gelada_monkey",
+    "quantize:caiman"
+  ]
+}

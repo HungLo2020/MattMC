@@ -1,0 +1,39 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "net.matt.quantize.mixin",
+  "refmap": "quantize.mixins.refmap.json",
+  "compatibilityLevel": "JAVA_17",
+  "mixins": [
+    "PanoramaRendererMixin",
+    "VertexBufferMixin",
+    "FontMixin",
+    "BaseCoralPlantTypeBlockMixin",
+    "GameRenderMixin",
+    "BiomeSourceMixin",
+    "MultiNoiseBiomeSourceMixin",
+    "ChunkStatusMixin",
+    "ChunkGeneratorMixin",
+    "NoiseGeneratorSettingsMixin",
+    "PrimaryLevelDataMixin",
+    "LightTextureMixin",
+    "NaturalSpawnerMixin",
+    "OfflineSkinMixin",
+    "MobEntityMixin",
+    "WolfEntityMixin",
+    "WolfEntityRendererMixin"
+  ],
+  "client": [],
+  "server": [],
+  "injectors": {
+    "defaultRequire": 1
+  },
+  "_comments": [
+    "ChickenEntityMixin",
+    "ChickenEntityRendererMixin",
+    "CowEntityMixin",
+    "CowEntityRendererMixin",
+    "PigEntityMixin",
+    "PigEntityRendererMixin"
+  ]
+}

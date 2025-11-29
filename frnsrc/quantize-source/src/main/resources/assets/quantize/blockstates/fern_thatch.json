@@ -1,0 +1,9 @@
+{
+  "variants": {
+    "": [
+      {
+        "model": "quantize:block/fern_thatch"
+      }
+    ]
+  }
+}

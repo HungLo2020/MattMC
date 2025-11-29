@@ -1,0 +1,11 @@
+{
+  "replace": false,
+  "values": [
+    "quantize:silver_birch_log",
+    "quantize:cypress_log",
+    "quantize:palm_log",
+    "quantize:palm_wood",
+    "quantize:joshua_log",
+    "quantize:joshua_wood"
+  ]
+}

@@ -1,0 +1,7 @@
+{
+	"parent": "quantize:block/dinosaur_chop_2_template",
+	"textures": {
+		"side": "quantize:block/dinosaur_chop_raw_side",
+		"front": "quantize:block/dinosaur_chop_raw"
+	}
+}

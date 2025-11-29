@@ -1,0 +1,9 @@
+{
+  "type": "quantize:botany_pot",
+  "seed": { "item": "quantize:fiddlehead" },
+  "soil": { "tag": "quantize:botany_soils" },
+  "growth_ticks": 1200,
+  "drops": [
+    { "output": { "item": "quantize:fiddlehead" }, "chance": 1.0, "min": 1, "max": 1 }
+  ]
+}

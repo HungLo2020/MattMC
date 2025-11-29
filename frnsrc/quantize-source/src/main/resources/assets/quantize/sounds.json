@@ -1,0 +1,1374 @@
+{
+  "entity.crab.idle": {
+    "sounds": []
+  },
+  "entity.crab.hurt": {
+    "sounds": []
+  },
+  "entity.crab.die": {
+    "sounds": []
+  },
+  "entity.comb_jelly.hurt": {
+    "sounds": [
+      "quantize:entity/comb_jelly/comb_jelly_hurt_0",
+      "quantize:entity/comb_jelly/comb_jelly_hurt_1"
+    ]
+  },
+  "entity.seagull.hurt": {
+    "sounds": [
+      "quantize:entity/seagull/seagull_hurt_0",
+      "quantize:entity/seagull/seagull_hurt_1"
+    ]
+  },
+  "entity.potoo.call": {
+    "sounds": [
+      "quantize:entity/potoo/potoo_call_0",
+      "quantize:entity/potoo/potoo_call_1",
+      "quantize:entity/potoo/potoo_call_2",
+      "quantize:entity/potoo/potoo_call_3",
+      "quantize:entity/potoo/potoo_call_4"
+    ]
+  },
+  "entity.potoo.hurt": {
+    "sounds": [
+      "quantize:entity/potoo/potoo_hurt_0",
+      "quantize:entity/potoo/potoo_hurt_1",
+      "quantize:entity/potoo/potoo_hurt_2"
+    ]
+  },
+  "entity.rhinoceros.hurt": {
+    "sounds": [
+      "quantize:entity/rhinoceros/rhinoceros_hurt_0",
+      "quantize:entity/rhinoceros/rhinoceros_hurt_1"
+    ]
+  },
+  "entity.rhinoceros.idle": {
+    "sounds": [
+      "quantize:entity/rhinoceros/rhinoceros_idle_0",
+      "quantize:entity/rhinoceros/rhinoceros_idle_1",
+      "quantize:entity/rhinoceros/rhinoceros_idle_2"
+    ]
+  },
+  "entity.roadrunner.hurt": {
+    "sounds": [
+      "quantize:entity/roadrunner/roadrunner_hurt_0",
+      "quantize:entity/roadrunner/roadrunner_hurt_1"
+    ]
+  },
+  "entity.roadrunner.idle": {
+    "sounds": [
+      "quantize:entity/roadrunner/roadrunner_idle_0",
+      "quantize:entity/roadrunner/roadrunner_idle_1",
+      "quantize:entity/roadrunner/roadrunner_idle_2"
+    ]
+  },
+  "entity.roadrunner.meep": {
+    "sounds": [
+      "quantize:entity/roadrunner/roadrunner_meep"
+    ]
+  },
+  "entity.seagull.idle": {
+    "sounds": [
+      "quantize:entity/seagull/seagull_idle_0",
+      "quantize:entity/seagull/seagull_idle_1",
+      "quantize:entity/seagull/seagull_idle_2",
+      "quantize:entity/seagull/seagull_idle_3",
+      "quantize:entity/seagull/seagull_idle_4"
+    ]
+  },
+  "entity.snow_leopard.hurt": {
+    "sounds": [
+      "quantize:entity/snow_leopard/snow_leopard_hurt_0",
+      "quantize:entity/snow_leopard/snow_leopard_hurt_1",
+      "quantize:entity/snow_leopard/snow_leopard_hurt_2"
+    ]
+  },
+  "entity.snow_leopard.idle": {
+    "sounds": [
+      "quantize:entity/snow_leopard/snow_leopard_idle_0",
+      "quantize:entity/snow_leopard/snow_leopard_idle_1",
+      "quantize:entity/snow_leopard/snow_leopard_idle_2"
+    ]
+  },
+  "entity.seal.idle": {
+    "sounds": [
+      "quantize:entity/seal/seal_idle_0",
+      "quantize:entity/seal/seal_idle_1",
+      "quantize:entity/seal/seal_idle_2",
+      "quantize:entity/seal/seal_idle_3"
+    ]
+  },
+  "entity.seal.hurt": {
+    "sounds": [
+      "quantize:entity/seal/seal_hurt_0",
+      "quantize:entity/seal/seal_hurt_1",
+      "quantize:entity/seal/seal_hurt_2"
+    ]
+  },
+  "entity.tiger.idle": {
+    "sounds": [
+      "quantize:entity/tiger/tiger_idle_0",
+      "quantize:entity/tiger/tiger_idle_1",
+      "quantize:entity/tiger/tiger_idle_2",
+      "quantize:entity/tiger/tiger_idle_3"
+    ]
+  },
+  "entity.tiger.hurt": {
+    "sounds": [
+      "quantize:entity/tiger/tiger_hurt_0",
+      "quantize:entity/tiger/tiger_hurt_1",
+      "quantize:entity/tiger/tiger_hurt_2"
+    ]
+  },
+  "entity.tiger.angry": {
+    "sounds": [
+      "quantize:entity/tiger/tiger_angry_0",
+      "quantize:entity/tiger/tiger_angry_1",
+      "quantize:entity/tiger/tiger_angry_2"
+    ]
+  },
+  "entity.toucan.hurt": {
+    "sounds": [
+      "quantize:entity/toucan/toucan_hurt_0",
+      "quantize:entity/toucan/toucan_hurt_1"
+    ]
+  },
+  "entity.toucan.idle": {
+    "sounds": [
+      "quantize:entity/toucan/toucan_idle_0",
+      "quantize:entity/toucan/toucan_idle_1",
+      "quantize:entity/toucan/toucan_idle_2"
+    ]
+  },
+  "entity.underminer.hurt": {
+    "sounds": [
+      "quantize:entity/underminer/underminer_hurt_0",
+      "quantize:entity/underminer/underminer_hurt_1"
+    ]
+  },
+  "entity.underminer.idle": {
+    "sounds": [
+      "quantize:entity/underminer/underminer_idle_0",
+      "quantize:entity/underminer/underminer_idle_1",
+      "quantize:entity/underminer/underminer_idle_2",
+      "quantize:entity/underminer/underminer_idle_3"
+    ]
+  },
+  "entity.underminer.step": {
+    "sounds": [
+      "quantize:entity/underminer/underminer_step_0",
+      "quantize:entity/underminer/underminer_step_1",
+      "quantize:entity/underminer/underminer_step_2",
+      "quantize:entity/underminer/underminer_step_3"
+    ]
+  },
+  "entity.komodo_dragon.hurt": {
+    "sounds": [
+      "quantize:entity/komodo_dragon/komodo_dragon_hurt_0",
+      "quantize:entity/komodo_dragon/komodo_dragon_hurt_1"
+    ]
+  },
+  "entity.komodo_dragon.idle": {
+    "sounds": [
+      "quantize:entity/komodo_dragon/komodo_dragon_idle_0",
+      "quantize:entity/komodo_dragon/komodo_dragon_idle_1"
+    ]
+  },
+  "entity.grizzly_bear.die": {
+    "sounds": [
+      "quantize:entity/grizzly_bear/grizzly_bear_die_0",
+      "quantize:entity/grizzly_bear/grizzly_bear_die_1"
+    ]
+  },
+  "entity.grizzly_bear.power_outage": {
+    "sounds": [
+      "quantize:entity/grizzly_bear/april_fools_power_outage_"
+    ]
+  },
+  "entity.grizzly_bear.scream": {
+    "sounds": [
+      "quantize:entity/grizzly_bear/april_fools_scream"
+    ]
+  },
+  "entity.grizzly_bear.hurt": {
+    "sounds": [
+      "quantize:entity/grizzly_bear/grizzly_bear_hurt_0",
+      "quantize:entity/grizzly_bear/grizzly_bear_hurt_1",
+      "quantize:entity/grizzly_bear/grizzly_bear_hurt_2"
+    ]
+  },
+  "entity.grizzly_bear.idle": {
+    "sounds": [
+      "quantize:entity/grizzly_bear/grizzly_bear_idle_0",
+      "quantize:entity/grizzly_bear/grizzly_bear_idle_1",
+      "quantize:entity/grizzly_bear/grizzly_bear_idle_2",
+      "quantize:entity/grizzly_bear/grizzly_bear_idle_3"
+    ]
+  },
+  "entity.gazelle.hurt": {
+    "sounds": [
+      "quantize:entity/gazelle/gazelle_hurt_0",
+      "quantize:entity/gazelle/gazelle_hurt_1"
+    ]
+  },
+  "entity.gorilla.hurt": {
+    "sounds": [
+      "quantize:entity/gorilla/gorilla_hurt_0",
+      "quantize:entity/gorilla/gorilla_hurt_1",
+      "quantize:entity/gorilla/gorilla_hurt_2"
+    ]
+  },
+  "entity.gorilla.idle": {
+    "sounds": [
+      "quantize:entity/gorilla/gorilla_idle_0",
+      "quantize:entity/gorilla/gorilla_idle_1",
+      "quantize:entity/gorilla/gorilla_idle_2",
+      "quantize:entity/gorilla/gorilla_idle_3"
+    ]
+  },
+  "entity.gelada_monkey.hurt": {
+    "sounds": [
+      "quantize:entity/gelada_monkey/gelada_monkey_hurt_0",
+      "quantize:entity/gelada_monkey/gelada_monkey_hurt_1",
+      "quantize:entity/gelada_monkey/gelada_monkey_hurt_2"
+    ]
+  },
+  "entity.gelada_monkey.idle": {
+    "sounds": [
+      "quantize:entity/gelada_monkey/gelada_monkey_idle_0",
+      "quantize:entity/gelada_monkey/gelada_monkey_idle_1",
+      "quantize:entity/gelada_monkey/gelada_monkey_idle_2"
+    ]
+  },
+  "entity.enderiophage.squish": {
+    "sounds": [
+      "quantize:entity/enderiophage/enderiophage_squish_0",
+      "quantize:entity/enderiophage/enderiophage_squish_1",
+      "quantize:entity/enderiophage/enderiophage_squish_2"
+    ]
+  },
+  "entity.enderiophage.walk": {
+    "sounds": [
+      "quantize:entity/enderiophage/enderiophage_walk_0",
+      "quantize:entity/enderiophage/enderiophage_walk_1",
+      "quantize:entity/enderiophage/enderiophage_walk_2"
+    ]
+  },
+  "entity.enderiophage.hurt": {
+    "sounds": [
+      "quantize:entity/enderiophage/enderiophage_hurt_0",
+      "quantize:entity/enderiophage/enderiophage_hurt_1"
+    ]
+  },
+  "entity.endergrade.hurt": {
+    "sounds": [
+      "quantize:entity/endergrade/endergrade_hurt_0"
+    ]
+  },
+  "entity.endergrade.idle": {
+    "sounds": [
+      "quantize:entity/endergrade/endergrade_idle_0",
+      "quantize:entity/endergrade/endergrade_idle_1",
+      "quantize:entity/endergrade/endergrade_idle_2"
+    ]
+  },
+  "entity.elephant.die": {
+    "sounds": [
+      "quantize:entity/elephant/elephant_die_0",
+      "quantize:entity/elephant/elephant_die_1"
+    ]
+  },
+  "entity.elephant.hurt": {
+    "sounds": [
+      "quantize:entity/elephant/elephant_hurt_0",
+      "quantize:entity/elephant/elephant_hurt_1",
+      "quantize:entity/elephant/elephant_hurt_2"
+    ]
+  },
+  "entity.elephant.idle": {
+    "sounds": [
+      "quantize:entity/elephant/elephant_idle_0",
+      "quantize:entity/elephant/elephant_idle_1",
+      "quantize:entity/elephant/elephant_idle_2",
+      "quantize:entity/elephant/elephant_idle_4"
+    ]
+  },
+  "entity.elephant.trumpet": {
+    "sounds": [
+      "quantize:entity/elephant/elephant_trumpet_0",
+      "quantize:entity/elephant/elephant_trumpet_1",
+      "quantize:entity/elephant/elephant_trumpet_2"
+    ]
+  },
+  "entity.elephant.walk": {
+    "sounds": [
+      "quantize:entity/elephant/elephant_walk_0",
+      "quantize:entity/elephant/elephant_walk_1",
+      "quantize:entity/elephant/elephant_walk_2",
+      "quantize:entity/elephant/elephant_walk_3"
+    ]
+  },
+  "entity.cosmic_cod.hurt": {
+    "sounds": [
+      "quantize:entity/cosmic_cod/cosmic_cod_hurt_0",
+      "quantize:entity/cosmic_cod/cosmic_cod_hurt_1",
+      "quantize:entity/cosmic_cod/cosmic_cod_hurt_2"
+    ]
+  },
+  "entity.crow.hurt": {
+    "sounds": [
+      "quantize:entity/crow/crow_hurt_0",
+      "quantize:entity/crow/crow_hurt_1"
+    ]
+  },
+  "entity.crow.idle": {
+    "sounds": [
+      "quantize:entity/crow/crow_idle_0",
+      "quantize:entity/crow/crow_idle_1",
+      "quantize:entity/crow/crow_idle_2",
+      "quantize:entity/crow/crow_idle_3"
+    ]
+  },
+  "entity.caiman.hurt": {
+    "sounds": [
+      "quantize:entity/caiman/caiman_hurt_0",
+      "quantize:entity/caiman/caiman_hurt_1"
+    ]
+  },
+  "entity.caiman.idle": {
+    "sounds": [
+      "quantize:entity/caiman/caiman_idle_0",
+      "quantize:entity/caiman/caiman_idle_1",
+      "quantize:entity/caiman/caiman_idle_2",
+      "quantize:entity/caiman/caiman_idle_3"
+    ]
+  },
+  "entity.caiman.splash": {
+    "sounds": [
+      "quantize:entity/caiman/caiman_splash_0",
+      "quantize:entity/caiman/caiman_splash_1",
+      "quantize:entity/caiman/caiman_splash_2"
+    ]
+  },
+  "entity.emu.hurt": {
+    "sounds": [
+      "quantize:entity/emu/emu_hurt_0",
+      "quantize:entity/emu/emu_hurt_1",
+      "quantize:entity/emu/emu_hurt_2"
+    ]
+  },
+  "entity.emu.idle": {
+    "sounds": [
+      "quantize:entity/emu/emu_idle_0",
+      "quantize:entity/emu/emu_idle_1",
+      "quantize:entity/emu/emu_idle_2"
+    ]
+  },
+  "item.bucket.fill_crab": {
+    "sounds": [
+      "item/bucket/fill_fish1",
+      "item/bucket/fill_fish2",
+      "item/bucket/fill_fish3"
+    ]
+  },
+  "item.bucket.empty_crab": {
+    "sounds": [
+      "item/bucket/fill_fish1",
+      "item/bucket/fill_fish2",
+      "item/bucket/fill_fish3"
+    ]
+  },
+  "entity.crocodile.baby": {
+    "sounds": [
+      "quantize:entity/crocodile/crocodile_baby_0",
+      "quantize:entity/crocodile/crocodile_baby_1"
+    ]
+  },
+  "entity.crocodile.bite": {
+    "sounds": [
+      "quantize:entity/crocodile/crocodile_bite_0",
+      "quantize:entity/crocodile/crocodile_bite_1"
+    ]
+  },
+  "entity.crocodile.hurt": {
+    "sounds": [
+      "quantize:entity/crocodile/crocodile_hurt_0",
+      "quantize:entity/crocodile/crocodile_hurt_1",
+      "quantize:entity/crocodile/crocodile_hurt_2"
+    ]
+  },
+  "entity.crocodile.idle": {
+    "sounds": [
+      "quantize:entity/crocodile/crocodile_idle_0",
+      "quantize:entity/crocodile/crocodile_idle_1",
+      "quantize:entity/crocodile/crocodile_idle_2",
+      "quantize:entity/crocodile/crocodile_idle_3"
+    ]
+  },
+  "entity.cave_centipede.attack": {
+    "sounds": [
+      "quantize:entity/cave_centipede/centipede_attack_0",
+      "quantize:entity/cave_centipede/centipede_attack_1"
+    ]
+  },
+  "entity.cave_centipede.hurt": {
+    "sounds": [
+      "quantize:entity/cave_centipede/centipede_hurt_0",
+      "quantize:entity/cave_centipede/centipede_hurt_1",
+      "quantize:entity/cave_centipede/centipede_hurt_2"
+    ]
+  },
+  "entity.cave_centipede.walk": {
+    "sounds": [
+      "quantize:entity/cave_centipede/centipede_walk_0",
+      "quantize:entity/cave_centipede/centipede_walk_1",
+      "quantize:entity/cave_centipede/centipede_walk_2",
+      "quantize:entity/cave_centipede/centipede_walk_3",
+      "quantize:entity/cave_centipede/centipede_walk_4"
+    ]
+  },
+  "entity.cockroach.hurt": {
+    "sounds": [
+      "quantize:entity/cockroach/cockroach_hurt_0",
+      "quantize:entity/cockroach/cockroach_hurt_1",
+      "quantize:entity/cockroach/cockroach_hurt_2"
+    ]
+  },
+  "entity.lobster.hurt": {
+    "sounds": [
+      "quantize:entity/lobster/lobster_hurt_0",
+      "quantize:entity/lobster/lobster_hurt_1"
+    ]
+  },
+  "entity.lobster.attack": {
+    "sounds": [
+      "quantize:entity/lobster/lobster_attack"
+    ]
+  },
+  "entity.mantis_shrimp.hurt": {
+    "sounds": [
+      "quantize:entity/mantis_shrimp/mantis_shrimp_hurt_0",
+      "quantize:entity/mantis_shrimp/mantis_shrimp_hurt_1"
+    ]
+  },
+  "entity.mantis_shrimp.snap": {
+    "sounds": [
+      "quantize:entity/mantis_shrimp/mantis_shrimp_snap_0",
+      "quantize:entity/mantis_shrimp/mantis_shrimp_snap_1",
+      "quantize:entity/mantis_shrimp/mantis_shrimp_snap_2"
+    ]
+  },
+  "entity.mimic_octopus.hurt": {
+    "sounds": [
+      "quantize:entity/mimic_octopus/mimic_octopus_hurt_0",
+      "quantize:entity/mimic_octopus/mimic_octopus_hurt_1"
+    ]
+  },
+  "entity.mimic_octopus.idle": {
+    "sounds": [
+      "quantize:entity/mimic_octopus/mimic_octopus_idle_0",
+      "quantize:entity/mimic_octopus/mimic_octopus_idle_1",
+      "quantize:entity/mimic_octopus/mimic_octopus_idle_2"
+    ]
+  },
+  "entity.alligator_snapping_turtle.hurt": {
+    "sounds": [
+      "quantize:entity/alligator_snapping_turtle/alligator_snapping_turtle_hurt_0",
+      "quantize:entity/alligator_snapping_turtle/alligator_snapping_turtle_hurt_1"
+    ]
+  },
+  "entity.alligator_snapping_turtle.idle": {
+    "sounds": [
+      "quantize:entity/alligator_snapping_turtle/alligator_snapping_turtle_idle_0",
+      "quantize:entity/alligator_snapping_turtle/alligator_snapping_turtle_idle_1",
+      "quantize:entity/alligator_snapping_turtle/alligator_snapping_turtle_idle_2"
+    ]
+  },
+  "entity.shoebill.hurt": {
+    "sounds": [
+      "quantize:entity/shoebill/shoebill_hurt_0",
+      "quantize:entity/shoebill/shoebill_hurt_1",
+      "quantize:entity/shoebill/shoebill_hurt_2"
+    ]
+  },
+  "entity.anaconda.attack": {
+    "sounds": [
+      "quantize:entity/anaconda/anaconda_attack_0",
+      "quantize:entity/anaconda/anaconda_attack_1"
+    ]
+  },
+  "entity.anaconda.hurt": {
+    "sounds": [
+      "quantize:entity/anaconda/anaconda_hurt_0",
+      "quantize:entity/anaconda/anaconda_hurt_1"
+    ]
+  },
+  "entity.anaconda.slither": {
+    "sounds": [
+      "quantize:entity/anaconda/anaconda_slither_0",
+      "quantize:entity/anaconda/anaconda_slither_1",
+      "quantize:entity/anaconda/anaconda_slither_2",
+      "quantize:entity/anaconda/anaconda_slither_3"
+    ]
+  },
+  "entity.leafcutter_ant.hurt": {
+    "sounds": [
+      "quantize:entity/leafcutter_ant/leafcutter_ant_hurt_0",
+      "quantize:entity/leafcutter_ant/leafcutter_ant_hurt_1"
+    ]
+  },
+  "entity.leafcutter_ant.queen_hurt": {
+    "sounds": [
+      "quantize:entity/leafcutter_ant/leafcutter_ant_queen_hurt_0",
+      "quantize:entity/leafcutter_ant/leafcutter_ant_queen_hurt_1"
+    ]
+  },
+  "entity.anteater.hurt": {
+    "sounds": [
+      "quantize:entity/anteater/anteater_hurt_0",
+      "quantize:entity/anteater/anteater_hurt_1"
+    ]
+  },
+  "entity.bald_eagle.hurt": {
+    "sounds": [
+      "quantize:entity/bald_eagle/bald_eagle_hurt_0",
+      "quantize:entity/bald_eagle/bald_eagle_hurt_1"
+    ]
+  },
+  "entity.bald_eagle.idle": {
+    "sounds": [
+      "quantize:entity/bald_eagle/bald_eagle_idle_0",
+      "quantize:entity/bald_eagle/bald_eagle_idle_1",
+      "quantize:entity/bald_eagle/bald_eagle_idle_2"
+    ]
+  },
+  "entity.cachalot_whale.hurt": {
+    "sounds": [
+      "quantize:entity/cachalot_whale/cachalot_whale_hurt_0",
+      "quantize:entity/cachalot_whale/cachalot_whale_hurt_1",
+      "quantize:entity/cachalot_whale/cachalot_whale_hurt_2"
+    ]
+  },
+  "entity.cachalot_whale.idle": {
+    "sounds": [
+      "quantize:entity/cachalot_whale/cachalot_whale_idle_0",
+      "quantize:entity/cachalot_whale/cachalot_whale_idle_1",
+      "quantize:entity/cachalot_whale/cachalot_whale_idle_2"
+    ]
+  },
+  "entity.cachalot_whale.click": {
+    "sounds": [
+      "quantize:entity/cachalot_whale/cachalot_whale_click_0",
+      "quantize:entity/cachalot_whale/cachalot_whale_click_1",
+      "quantize:entity/cachalot_whale/cachalot_whale_click_2"
+    ]
+  },
+  "entity.giant_squid.hurt": {
+    "sounds": [
+      "quantize:entity/giant_squid/giant_squid_hurt_0",
+      "quantize:entity/giant_squid/giant_squid_hurt_1",
+      "quantize:entity/giant_squid/giant_squid_hurt_2"
+    ]
+  },
+  "entity.giant_squid.games": {
+    "sounds": [
+      "quantize:entity/giant_squid/giant_squid_games"
+    ]
+  },
+  "entity.giant_squid.tentacle": {
+    "sounds": [
+      "quantize:entity/giant_squid/giant_squid_tentacle_0",
+      "quantize:entity/giant_squid/giant_squid_tentacle_1",
+      "quantize:entity/giant_squid/giant_squid_tentacle_2",
+      "quantize:entity/giant_squid/giant_squid_tentacle_3",
+      "quantize:entity/giant_squid/giant_squid_tentacle_4"
+    ]
+  },
+  "entity.orca.idle": {
+    "sounds": [
+      "quantize:entity/orca/orca_idle_0",
+      "quantize:entity/orca/orca_idle_1",
+      "quantize:entity/orca/orca_idle_2"
+    ]
+  },
+  "entity.orca.hurt": {
+    "sounds": [
+      "quantize:entity/orca/orca_hurt_0",
+      "quantize:entity/orca/orca_hurt_1"
+    ]
+  },
+  "entity.orca.die": {
+    "sounds": [
+      "quantize:entity/orca/orca_die_0",
+      "quantize:entity/orca/orca_die_1"
+    ]
+  },
+  "entity.atlatitan.idle": {
+    "sounds": [
+      "quantize:entity/atlatitan/atlatitan_idle_0",
+      "quantize:entity/atlatitan/atlatitan_idle_1",
+      "quantize:entity/atlatitan/atlatitan_idle_2"
+    ],
+    "subtitle": "quantize.sound.subtitle.atlatitan_idle"
+  },
+  "entity.atlatitan.hurt": {
+    "sounds": [
+      "quantize:entity/atlatitan/atlatitan_hurt_0",
+      "quantize:entity/atlatitan/atlatitan_hurt_1",
+      "quantize:entity/atlatitan/atlatitan_hurt_2"
+    ],
+    "subtitle": "quantize.sound.subtitle.atlatitan_hurt"
+  },
+  "entity.atlatitan.death": {
+    "sounds": [
+      "quantize:entity/atlatitan/atlatitan_death_0",
+      "quantize:entity/atlatitan/atlatitan_death_1"
+    ],
+    "subtitle": "quantize.sound.subtitle.atlatitan_death"
+  },
+  "entity.atlatitan.step": {
+    "sounds": [
+      "quantize:entity/atlatitan/atlatitan_step_0",
+      "quantize:entity/atlatitan/atlatitan_step_1",
+      "quantize:entity/atlatitan/atlatitan_step_2",
+      "quantize:entity/atlatitan/atlatitan_step_3",
+      "quantize:entity/atlatitan/atlatitan_step_4",
+      "quantize:entity/atlatitan/atlatitan_step_5"
+    ],
+    "subtitle": "quantize.sound.subtitle.atlatitan_step"
+  },
+  "entity.atlatitan.stomp": {
+    "sounds": [
+      "quantize:entity/atlatitan/atlatitan_stomp_0",
+      "quantize:entity/atlatitan/atlatitan_stomp_1"
+    ],
+    "subtitle": "quantize.sound.subtitle.atlatitan_stomp"
+  },
+  "entity.atlatitan.kick": {
+    "sounds": [
+      "quantize:entity/atlatitan/atlatitan_kick_0",
+      "quantize:entity/atlatitan/atlatitan_kick_1",
+      "quantize:entity/atlatitan/atlatitan_kick_2"
+    ],
+    "subtitle": "quantize.sound.subtitle.atlatitan_kick"
+  },
+  "entity.atlatitan.tail": {
+    "sounds": [
+      "quantize:entity/atlatitan/atlatitan_tail_0",
+      "quantize:entity/atlatitan/atlatitan_tail_1"
+    ],
+    "subtitle": "quantize.sound.subtitle.atlatitan_tail"
+  },
+  "entity.subterranodon.idle": {
+    "sounds": [
+      "quantize:entity/subterranodon/subterranodon_idle_0",
+      "quantize:entity/subterranodon/subterranodon_idle_1",
+      "quantize:entity/subterranodon/subterranodon_idle_2",
+      "quantize:entity/subterranodon/subterranodon_idle_3"
+    ],
+    "subtitle": "quantize.sound.subtitle.subterranodon_idle"
+  },
+  "entity.subterranodon.hurt": {
+    "sounds": [
+      "quantize:entity/subterranodon/subterranodon_hurt_0",
+      "quantize:entity/subterranodon/subterranodon_hurt_1",
+      "quantize:entity/subterranodon/subterranodon_hurt_2"
+    ],
+    "subtitle": "quantize.sound.subtitle.subterranodon_hurt"
+  },
+  "entity.subterranodon.death": {
+    "sounds": [
+      "quantize:entity/subterranodon/subterranodon_death_0",
+      "quantize:entity/subterranodon/subterranodon_death_1",
+      "quantize:entity/subterranodon/subterranodon_death_2"
+    ],
+    "subtitle": "quantize.sound.subtitle.subterranodon_death"
+  },
+  "entity.subterranodon.flap": {
+    "sounds": [
+      "quantize:entity/subterranodon/subterranodon_flap_0",
+      "quantize:entity/subterranodon/subterranodon_flap_1",
+      "quantize:entity/subterranodon/subterranodon_flap_2",
+      "quantize:entity/subterranodon/subterranodon_flap_3",
+      "quantize:entity/subterranodon/subterranodon_flap_4",
+      "quantize:entity/subterranodon/subterranodon_flap_5"
+    ],
+    "subtitle": "quantize.sound.subtitle.subterranodon_flap"
+  },
+  "entity.subterranodon.attack": {
+    "sounds": [
+      "quantize:entity/subterranodon/subterranodon_attack_0",
+      "quantize:entity/subterranodon/subterranodon_attack_1",
+      "quantize:entity/subterranodon/subterranodon_attack_2"
+    ],
+    "subtitle": "quantize.sound.subtitle.subterranodon_attack"
+  },
+  "entity.vallumraptor.idle": {
+    "sounds": [
+      "quantize:entity/vallumraptor/vallumraptor_idle_0",
+      "quantize:entity/vallumraptor/vallumraptor_idle_1",
+      "quantize:entity/vallumraptor/vallumraptor_idle_2"
+    ],
+    "subtitle": "quantize.sound.subtitle.vallumraptor_idle"
+  },
+  "entity.vallumraptor.hurt": {
+    "sounds": [
+      "quantize:entity/vallumraptor/vallumraptor_hurt_0",
+      "quantize:entity/vallumraptor/vallumraptor_hurt_1",
+      "quantize:entity/vallumraptor/vallumraptor_hurt_2"
+    ],
+    "subtitle": "quantize.sound.subtitle.vallumraptor_hurt"
+  },
+  "entity.vallumraptor.death": {
+    "sounds": [
+      "quantize:entity/vallumraptor/vallumraptor_death_0",
+      "quantize:entity/vallumraptor/vallumraptor_death_1"
+    ],
+    "subtitle": "quantize.sound.subtitle.vallumraptor_death"
+  },
+  "entity.vallumraptor.call": {
+    "sounds": [
+      "quantize:entity/vallumraptor/vallumraptor_call_0",
+      "quantize:entity/vallumraptor/vallumraptor_call_1",
+      "quantize:entity/vallumraptor/vallumraptor_call_2"
+    ],
+    "subtitle": "quantize.sound.subtitle.vallumraptor_call"
+  },
+  "entity.vallumraptor.attack": {
+    "sounds": [
+      "quantize:entity/vallumraptor/vallumraptor_attack_0",
+      "quantize:entity/vallumraptor/vallumraptor_attack_1",
+      "quantize:entity/vallumraptor/vallumraptor_attack_2"
+    ],
+    "subtitle": "quantize.sound.subtitle.vallumraptor_attack"
+  },
+  "entity.vallumraptor.scratch": {
+    "sounds": [
+      "quantize:entity/vallumraptor/vallumraptor_scratch_0",
+      "quantize:entity/vallumraptor/vallumraptor_scratch_1",
+      "quantize:entity/vallumraptor/vallumraptor_scratch_2"
+    ],
+    "subtitle": "quantize.sound.subtitle.vallumraptor_scratch"
+  },
+  "entity.vallumraptor.sleep": {
+    "sounds": [
+      "quantize:entity/vallumraptor/vallumraptor_sleep_0",
+      "quantize:entity/vallumraptor/vallumraptor_sleep_1",
+      "quantize:entity/vallumraptor/vallumraptor_sleep_2"
+    ],
+    "subtitle": "quantize.sound.subtitle.vallumraptor_sleep"
+  },
+  "entity.grottoceratops.idle": {
+    "sounds": [
+      "quantize:entity/grottoceratops/grottoceratops_idle_0",
+      "quantize:entity/grottoceratops/grottoceratops_idle_1",
+      "quantize:entity/grottoceratops/grottoceratops_idle_2"
+    ],
+    "subtitle": "quantize.sound.subtitle.grottoceratops_idle"
+  },
+  "entity.grottoceratops.hurt": {
+    "sounds": [
+      "quantize:entity/grottoceratops/grottoceratops_hurt_0",
+      "quantize:entity/grottoceratops/grottoceratops_hurt_1",
+      "quantize:entity/grottoceratops/grottoceratops_hurt_2"
+    ],
+    "subtitle": "quantize.sound.subtitle.grottoceratops_hurt"
+  },
+  "entity.grottoceratops.death": {
+    "sounds": [
+      "quantize:entity/grottoceratops/grottoceratops_death_0",
+      "quantize:entity/grottoceratops/grottoceratops_death_1",
+      "quantize:entity/grottoceratops/grottoceratops_death_2"
+    ],
+    "subtitle": "quantize.sound.subtitle.grottoceratops_death"
+  },
+  "entity.grottoceratops.call": {
+    "sounds": [
+      "quantize:entity/grottoceratops/grottoceratops_call_0",
+      "quantize:entity/grottoceratops/grottoceratops_call_1",
+      "quantize:entity/grottoceratops/grottoceratops_call_2"
+    ],
+    "subtitle": "quantize.sound.subtitle.grottoceratops_call"
+  },
+  "entity.grottoceratops.attack": {
+    "sounds": [
+      "quantize:entity/grottoceratops/grottoceratops_attack_0",
+      "quantize:entity/grottoceratops/grottoceratops_attack_1",
+      "quantize:entity/grottoceratops/grottoceratops_attack_2"
+    ],
+    "subtitle": "quantize.sound.subtitle.grottoceratops_attack"
+  },
+  "entity.grottoceratops.graze": {
+    "sounds": [
+      "quantize:entity/grottoceratops/grottoceratops_graze_0",
+      "quantize:entity/grottoceratops/grottoceratops_graze_1",
+      "quantize:entity/grottoceratops/grottoceratops_graze_2"
+    ],
+    "subtitle": "quantize.sound.subtitle.grottoceratops_graze"
+  },
+  "entity.grottoceratops.step": {
+    "sounds": [
+      "quantize:entity/grottoceratops/grottoceratops_step_0",
+      "quantize:entity/grottoceratops/grottoceratops_step_1",
+      "quantize:entity/grottoceratops/grottoceratops_step_2",
+      "quantize:entity/grottoceratops/grottoceratops_step_3"
+    ],
+    "subtitle": "quantize.sound.subtitle.grottoceratops_step"
+  },
+  "entity.trilocaris.hurt": {
+    "sounds": [
+      "quantize:entity/trilocaris/trilocaris_hurt_0",
+      "quantize:entity/trilocaris/trilocaris_hurt_1",
+      "quantize:entity/trilocaris/trilocaris_hurt_2"
+    ],
+    "subtitle": "quantize.sound.subtitle.trilocaris_hurt"
+  },
+  "entity.trilocaris.death": {
+    "sounds": [
+      "quantize:entity/trilocaris/trilocaris_death_0",
+      "quantize:entity/trilocaris/trilocaris_death_1",
+      "quantize:entity/trilocaris/trilocaris_death_2"
+    ],
+    "subtitle": "quantize.sound.subtitle.trilocaris_death"
+  },
+  "entity.trilocaris.step": {
+    "sounds": [
+      "quantize:entity/trilocaris/trilocaris_step_0",
+      "quantize:entity/trilocaris/trilocaris_step_1",
+      "quantize:entity/trilocaris/trilocaris_step_2"
+    ],
+    "subtitle": "quantize.sound.subtitle.trilocaris_step"
+  },
+  "entity.tremorsaurus.idle": {
+    "sounds": [
+      "quantize:entity/tremorsaurus/tremorsaurus_idle_0",
+      "quantize:entity/tremorsaurus/tremorsaurus_idle_1",
+      "quantize:entity/tremorsaurus/tremorsaurus_idle_2"
+    ],
+    "subtitle": "quantize.sound.subtitle.tremorsaurus_idle"
+  },
+  "entity.tremorsaurus.hurt": {
+    "sounds": [
+      "quantize:entity/tremorsaurus/tremorsaurus_hurt_0",
+      "quantize:entity/tremorsaurus/tremorsaurus_hurt_1"
+    ],
+    "subtitle": "quantize.sound.subtitle.tremorsaurus_hurt"
+  },
+  "entity.tremorsaurus.death": {
+    "sounds": [
+      "quantize:entity/tremorsaurus/tremorsaurus_death"
+    ],
+    "subtitle": "quantize.sound.subtitle.tremorsaurus_death"
+  },
+  "entity.tremorsaurus.roar": {
+    "sounds": [
+      "quantize:entity/tremorsaurus/tremorsaurus_roar_0",
+      "quantize:entity/tremorsaurus/tremorsaurus_roar_1",
+      "quantize:entity/tremorsaurus/tremorsaurus_roar_2"
+    ],
+    "subtitle": "quantize.sound.subtitle.tremorsaurus_roar"
+  },
+  "entity.tremorsaurus.bite": {
+    "sounds": [
+      "quantize:entity/tremorsaurus/tremorsaurus_bite"
+    ],
+    "subtitle": "quantize.sound.subtitle.tremorsaurus_bite"
+  },
+  "entity.tremorsaurus.throw": {
+    "sounds": [
+      "quantize:entity/tremorsaurus/tremorsaurus_throw"
+    ],
+    "subtitle": "quantize.sound.subtitle.tremorsaurus_throw"
+  },
+  "entity.tremorsaurus.stomp": {
+    "sounds": [
+      "quantize:entity/tremorsaurus/tremorsaurus_stomp_0",
+      "quantize:entity/tremorsaurus/tremorsaurus_stomp_1",
+      "quantize:entity/tremorsaurus/tremorsaurus_stomp_2",
+      "quantize:entity/tremorsaurus/tremorsaurus_stomp_3"
+    ],
+    "subtitle": "quantize.sound.subtitle.tremorsaurus_stomp"
+  },
+  "entity.relicheirus.idle": {
+    "sounds": [
+      "quantize:entity/relicheirus/relicheirus_idle_0",
+      "quantize:entity/relicheirus/relicheirus_idle_1",
+      "quantize:entity/relicheirus/relicheirus_idle_2"
+    ],
+    "subtitle": "quantize.sound.subtitle.relicheirus_idle"
+  },
+  "entity.relicheirus.hurt": {
+    "sounds": [
+      "quantize:entity/relicheirus/relicheirus_hurt_0",
+      "quantize:entity/relicheirus/relicheirus_hurt_1",
+      "quantize:entity/relicheirus/relicheirus_hurt_2"
+    ],
+    "subtitle": "quantize.sound.subtitle.relicheirus_hurt"
+  },
+  "entity.relicheirus.death": {
+    "sounds": [
+      "quantize:entity/relicheirus/relicheirus_death_0",
+      "quantize:entity/relicheirus/relicheirus_death_1",
+      "quantize:entity/relicheirus/relicheirus_death_2"
+    ],
+    "subtitle": "quantize.sound.subtitle.relicheirus_death"
+  },
+  "entity.relicheirus.scratch": {
+    "sounds": [
+      "quantize:entity/relicheirus/relicheirus_scratch_0",
+      "quantize:entity/relicheirus/relicheirus_scratch_1",
+      "quantize:entity/relicheirus/relicheirus_scratch_2"
+    ],
+    "subtitle": "quantize.sound.subtitle.relicheirus_scratch"
+  },
+  "entity.relicheirus.step": {
+    "sounds": [
+      "quantize:entity/relicheirus/relicheirus_step_0",
+      "quantize:entity/relicheirus/relicheirus_step_1",
+      "quantize:entity/relicheirus/relicheirus_step_2",
+      "quantize:entity/relicheirus/relicheirus_step_3"
+    ],
+    "subtitle": "quantize.sound.subtitle.relicheirus_step"
+  },
+  "entity.relicheirus.topple": {
+    "sounds": [
+      "quantize:entity/relicheirus/relicheirus_topple_0",
+      "quantize:entity/relicheirus/relicheirus_topple_1",
+      "quantize:entity/relicheirus/relicheirus_topple_2"
+    ],
+    "subtitle": "quantize.sound.subtitle.relicheirus_topple"
+  },
+  "entity.luxtructosaurus.idle": {
+    "sounds": [
+      "quantize:entity/luxtructosaurus/luxtructosaurus_idle_0",
+      "quantize:entity/luxtructosaurus/luxtructosaurus_idle_1",
+      "quantize:entity/luxtructosaurus/luxtructosaurus_idle_2",
+      "quantize:entity/luxtructosaurus/luxtructosaurus_idle_3"
+    ],
+    "subtitle": "quantize.sound.subtitle.luxtructosaurus_idle"
+  },
+  "entity.luxtructosaurus.hurt": {
+    "sounds": [
+      "quantize:entity/luxtructosaurus/luxtructosaurus_hurt_0",
+      "quantize:entity/luxtructosaurus/luxtructosaurus_hurt_1",
+      "quantize:entity/luxtructosaurus/luxtructosaurus_hurt_2"
+    ],
+    "subtitle": "quantize.sound.subtitle.luxtructosaurus_hurt"
+  },
+  "entity.luxtructosaurus.death": {
+    "sounds": [
+      "quantize:entity/luxtructosaurus/luxtructosaurus_death"
+    ],
+    "subtitle": "quantize.sound.subtitle.luxtructosaurus_death"
+  },
+  "entity.luxtructosaurus.snort": {
+    "sounds": [
+      "quantize:entity/luxtructosaurus/luxtructosaurus_snort_0",
+      "quantize:entity/luxtructosaurus/luxtructosaurus_snort_1",
+      "quantize:entity/luxtructosaurus/luxtructosaurus_snort_2"
+    ],
+    "subtitle": "quantize.sound.subtitle.luxtructosaurus_snort"
+  },
+  "entity.luxtructosaurus.step": {
+    "sounds": [
+      "quantize:entity/luxtructosaurus/luxtructosaurus_step_0",
+      "quantize:entity/luxtructosaurus/luxtructosaurus_step_1",
+      "quantize:entity/luxtructosaurus/luxtructosaurus_step_2",
+      "quantize:entity/luxtructosaurus/luxtructosaurus_step_3",
+      "quantize:entity/luxtructosaurus/luxtructosaurus_step_4",
+      "quantize:entity/luxtructosaurus/luxtructosaurus_step_5"
+    ],
+    "subtitle": "quantize.sound.subtitle.luxtructosaurus_step"
+  },
+  "entity.luxtructosaurus.stomp": {
+    "sounds": [
+      "quantize:entity/luxtructosaurus/luxtructosaurus_stomp_0",
+      "quantize:entity/luxtructosaurus/luxtructosaurus_stomp_1",
+      "quantize:entity/luxtructosaurus/luxtructosaurus_stomp_2"
+    ],
+    "subtitle": "quantize.sound.subtitle.luxtructosaurus_stomp"
+  },
+  "entity.luxtructosaurus.kick": {
+    "sounds": [
+      "quantize:entity/luxtructosaurus/luxtructosaurus_kick_0",
+      "quantize:entity/luxtructosaurus/luxtructosaurus_kick_1",
+      "quantize:entity/luxtructosaurus/luxtructosaurus_kick_2"
+    ],
+    "subtitle": "quantize.sound.subtitle.luxtructosaurus_kick"
+  },
+  "luxtructosaurus.tail": {
+    "sounds": [
+      "quantize:entity/luxtructosaurus/luxtructosaurus_tail_0",
+      "quantize:entity/luxtructosaurus/luxtructosaurus_tail_1"
+    ],
+    "subtitle": "quantize.sound.subtitle.luxtructosaurus_tail"
+  },
+  "entity.luxtructosaurus.breathe": {
+    "sounds": [
+      "quantize:entity/luxtructosaurus/luxtructosaurus_breathe_0",
+      "quantize:entity/luxtructosaurus/luxtructosaurus_breathe_1",
+      "quantize:entity/luxtructosaurus/luxtructosaurus_breathe_2"
+    ],
+    "subtitle": "quantize.sound.subtitle.luxtructosaurus_breathe"
+  },
+  "entity.luxtructosaurus.roar": {
+    "sounds": [
+      "quantize:entity/luxtructosaurus/luxtructosaurus_roar"
+    ],
+    "subtitle": "quantize.sound.subtitle.luxtructosaurus_roar"
+  },
+  "entity.luxtructosaurus.attack_stomp": {
+    "sounds": [
+      "quantize:entity/luxtructosaurus/luxtructosaurus_attack_stomp_0",
+      "quantize:entity/luxtructosaurus/luxtructosaurus_attack_stomp_1"
+    ],
+    "subtitle": "quantize.sound.subtitle.luxtructosaurus_attack_stomp"
+  },
+  "entity.luxtructosaurus.summon": {
+    "sounds": [
+      "quantize:entity/luxtructosaurus/luxtructosaurus_summon"
+    ],
+    "subtitle": "quantize.sound.subtitle.luxtructosaurus_summon"
+  },
+  "entity.luxtructosaurus.jump": {
+    "sounds": [
+      "quantize:entity/luxtructosaurus/luxtructosaurus_jump"
+    ],
+    "subtitle": "quantize.sound.subtitle.luxtructosaurus_jump"
+  },
+  "entity.tremorzilla.idle": {
+    "sounds": [
+      "quantize:entity/tremorzilla/tremorzilla_idle_0",
+      "quantize:entity/tremorzilla/tremorzilla_idle_1",
+      "quantize:entity/tremorzilla/tremorzilla_idle_2",
+      "quantize:entity/tremorzilla/tremorzilla_idle_3"
+    ],
+    "subtitle": "quantize.sound.subtitle.tremorzilla_idle"
+  },
+  "entity.tremorzilla.hurt": {
+    "sounds": [
+      "quantize:entity/tremorzilla/tremorzilla_hurt_0",
+      "quantize:entity/tremorzilla/tremorzilla_hurt_1",
+      "quantize:entity/tremorzilla/tremorzilla_hurt_2"
+    ],
+    "subtitle": "quantize.sound.subtitle.tremorzilla_hurt"
+  },
+  "entity.tremorzilla.death": {
+    "sounds": [
+      "quantize:entity/tremorzilla/tremorzilla_death"
+    ],
+    "subtitle": "quantize.sound.subtitle.tremorzilla_death"
+  },
+  "entity.tremorzilla.stomp": {
+    "sounds": [
+      "quantize:entity/tremorzilla/tremorzilla_stomp_0",
+      "quantize:entity/tremorzilla/tremorzilla_stomp_1",
+      "quantize:entity/tremorzilla/tremorzilla_stomp_2",
+      "quantize:entity/tremorzilla/tremorzilla_stomp_3"
+    ],
+    "subtitle": "quantize.sound.subtitle.tremorzilla_stomp"
+  },
+  "entity.tremorzilla.beam_start": {
+    "sounds": [
+      "quantize:entity/tremorzilla/tremorzilla_beam_start"
+    ],
+    "subtitle": "quantize.sound.subtitle.tremorzilla_beam_start"
+  },
+  "entity.tremorzilla.beam_end": {
+    "sounds": [
+      "quantize:entity/tremorzilla/tremorzilla_beam_end"
+    ],
+    "subtitle": "quantize.sound.subtitle.tremorzilla_beam_end"
+  },
+  "entity.tremorzilla.beam_loop": {
+    "sounds": [
+      {
+        "name": "quantize:entity/tremorzilla/tremorzilla_beam_loop",
+        "attenuation_distance": 64
+      }
+    ],
+    "subtitle": "quantize.sound.subtitle.tremorzilla_beam_loop"
+  },
+  "entity.tremorzilla.charge_normal": {
+    "sounds": [
+      "quantize:entity/tremorzilla/tremorzilla_charge_normal"
+    ],
+    "subtitle": "quantize.sound.subtitle.tremorzilla_charge_normal"
+  },
+  "entity.tremorzilla.charge_complete": {
+    "sounds": [
+      "quantize:entity/tremorzilla/tremorzilla_charge_complete"
+    ],
+    "subtitle": "quantize.sound.subtitle.tremorzilla_charge_complete"
+  },
+  "entity.tremorzilla.roar": {
+    "sounds": [
+      "quantize:entity/tremorzilla/tremorzilla_roar"
+    ],
+    "subtitle": "quantize.sound.subtitle.tremorzilla_roar"
+  },
+  "entity.tremorzilla.bite": {
+    "sounds": [
+      "quantize:entity/tremorzilla/tremorzilla_bite"
+    ],
+    "subtitle": "quantize.sound.subtitle.tremorzilla_bite"
+  },
+  "entity.tremorzilla.eat": {
+    "sounds": [
+      "quantize:entity/tremorzilla/tremorzilla_eat_0",
+      "quantize:entity/tremorzilla/tremorzilla_eat_1",
+      "quantize:entity/tremorzilla/tremorzilla_eat_2"
+    ],
+    "subtitle": "quantize.sound.subtitle.tremorzilla_eat"
+  },
+  "entity.tremorzilla.scratch_attack": {
+    "sounds": [
+      "quantize:entity/tremorzilla/tremorzilla_scratch_attack"
+    ],
+    "subtitle": "quantize.sound.subtitle.tremorzilla_scratch_attack"
+  },
+  "entity.tremorzilla.stomp_attack": {
+    "sounds": [
+      "quantize:entity/tremorzilla/tremorzilla_stomp_attack"
+    ],
+    "subtitle": "quantize.sound.subtitle.tremorzilla_stomp_attack"
+  },
+  "entity.tremorzilla.tail_attack": {
+    "sounds": [
+      "quantize:entity/tremorzilla/tremorzilla_tail_attack"
+    ],
+    "subtitle": "quantize.sound.subtitle.tremorzilla_tail_attack"
+  },
+  "entity.tephra.whistle": {
+    "sounds": [
+      {
+        "name": "quantize:entity/tephra/tephra_whistle_0",
+        "stream": true,
+        "attenuation_distance": 128,
+        "volume": 0.5
+      },
+      {
+        "name": "quantize:entity/tephra/tephra_whistle_1",
+        "stream": true,
+        "attenuation_distance": 128,
+        "volume": 0.5
+      },
+      {
+        "name": "quantize:entity/tephra/tephra_whistle_2",
+        "stream": true,
+        "attenuation_distance": 128,
+        "volume": 0.5
+      }
+    ],
+    "subtitle": "quantize.sound.subtitle.tephra_whistle"
+  },
+  "entity.tephra.hit": {
+    "sounds": [
+      "quantize:entity/tephra/tephra_hit_0",
+      "quantize:entity/tephra/tephra_hit_1",
+      "quantize:entity/tephra/tephra_hit_2"
+    ],
+    "subtitle": "quantize.sound.subtitle.tephra_hit"
+  },
+  "entity.capuchin_monkey.hurt": {
+    "sounds": [
+      "quantize:entity/capuchin_monkey/capuchin_monkey_hurt_0",
+      "quantize:entity/capuchin_monkey/capuchin_monkey_hurt_1",
+      "quantize:entity/capuchin_monkey/capuchin_monkey_hurt_2",
+      "quantize:entity/capuchin_monkey/capuchin_monkey_hurt_3"
+    ]
+  },
+  "entity.capuchin_monkey.idle": {
+    "sounds": [
+      "quantize:entity/capuchin_monkey/capuchin_monkey_idle_0",
+      "quantize:entity/capuchin_monkey/capuchin_monkey_idle_1",
+      "quantize:entity/capuchin_monkey/capuchin_monkey_idle_2",
+      "quantize:entity/capuchin_monkey/capuchin_monkey_idle_3"
+    ]
+  },
+
+
+
+
+
+  "item.tectonic_shard.transform": {
+    "sounds": [
+      "quantize:item/tectonic_shard_transform_0",
+      "quantize:item/tectonic_shard_transform_1",
+      "quantize:item/tectonic_shard_transform_2"
+    ]
+  },
+
+
+
+
+  "block.firefly_bush.bush1": {
+    "sounds": [
+      "quantize:block/firefly_bush/firefly_bush_bush1"
+    ]
+  },
+  "block.firefly_bush.bush2": {
+    "sounds": [
+      "quantize:block/firefly_bush/firefly_bush_bush2"
+    ]
+  },
+  "block.firefly_bush.bush3": {
+    "sounds": [
+      "quantize:block/firefly_bush/firefly_bush_bush3"
+    ]
+  },
+  "block.firefly_bush.bush4": {
+    "sounds": [
+      "quantize:block/firefly_bush/firefly_bush_bush4"
+    ]
+  },
+  "block.firefly_bush.bush5": {
+    "sounds": [
+      "quantize:block/firefly_bush/firefly_bush_bush5"
+    ]
+  },
+  "block.firefly_bush.bush6": {
+    "sounds": [
+      "quantize:block/firefly_bush/firefly_bush_bush6"
+    ]
+  },
+  "block.firefly_bush.bush7": {
+    "sounds": [
+      "quantize:block/firefly_bush/firefly_bush_bush7"
+    ]
+  },
+  "block.firefly_bush.bush8": {
+    "sounds": [
+      "quantize:block/firefly_bush/firefly_bush_bush8"
+    ]
+  },
+  "block.firefly_bush.bush9": {
+    "sounds": [
+      "quantize:block/firefly_bush/firefly_bush_bush9"
+    ]
+  },
+  "block.firefly_bush.bush10": {
+    "sounds": [
+      "quantize:block/firefly_bush/firefly_bush_bush10"
+    ]
+  },
+  "block.firefly_bush.bush11": {
+    "sounds": [
+      "quantize:block/firefly_bush/firefly_bush_bush11"
+    ]
+  },
+  "block.pewen_branch.break": {
+    "sounds": [
+      "quantize:block/pewen_branch/pewen_branch_break_0",
+      "quantize:block/pewen_branch/pewen_branch_break_1",
+      "quantize:block/pewen_branch/pewen_branch_break_2",
+      "quantize:block/pewen_branch/pewen_branch_break_3",
+      "quantize:block/pewen_branch/pewen_branch_break_4"
+    ]
+  },
+  "block.amber.break": {
+    "sounds": [
+      "quantize:block/amber/amber_break_0",
+      "quantize:block/amber/amber_break_1",
+      "quantize:block/amber/amber_break_2",
+      "quantize:block/amber/amber_break_3"
+    ]
+  },
+  "block.amber.breaking": {
+    "sounds": [
+      "quantize:block/amber/amber_breaking_0",
+      "quantize:block/amber/amber_breaking_1",
+      "quantize:block/amber/amber_breaking_2",
+      "quantize:block/amber/amber_breaking_3"
+    ]
+  },
+  "block.amber.monolith_place": {
+    "sounds": [
+      "quantize:block/amber/amber_monolith_place_0"
+    ]
+  },
+  "block.amber.monolith_summon": {
+    "sounds": [
+      "quantize:block/amber/amber_monolith_summon_0",
+      "quantize:block/amber/amber_monolith_summon_1",
+      "quantize:block/amber/amber_monolith_summon_2"
+    ]
+  },
+  "block.amber.place": {
+    "sounds": [
+      "quantize:block/amber/amber_place_0",
+      "quantize:block/amber/amber_place_1",
+      "quantize:block/amber/amber_place_2",
+      "quantize:block/amber/amber_place_3"
+    ]
+  },
+  "block.amber.step": {
+    "sounds": [
+      "quantize:block/amber/amber_step_0",
+      "quantize:block/amber/amber_step_1",
+      "quantize:block/amber/amber_step_2",
+      "quantize:block/amber/amber_step_3"
+    ]
+  },
+  "block.flood_basalt.step": {
+    "sounds": [
+      "quantize:block/flood_basalt/flood_basalt_step_0",
+      "quantize:block/flood_basalt/flood_basalt_step_1",
+      "quantize:block/flood_basalt/flood_basalt_step_2",
+      "quantize:block/flood_basalt/flood_basalt_step_3",
+      "quantize:block/flood_basalt/flood_basalt_step_4"
+    ],
+    "subtitle": "quantize.sound.subtitle.flood_basalt_step"
+  },
+  "block.flood_basalt.place": {
+    "sounds": [
+      "quantize:block/flood_basalt/flood_basalt_place_0",
+      "quantize:block/flood_basalt/flood_basalt_place_1",
+      "quantize:block/flood_basalt/flood_basalt_place_2",
+      "quantize:block/flood_basalt/flood_basalt_place_3",
+      "quantize:block/flood_basalt/flood_basalt_place_4"
+    ],
+    "subtitle": "quantize.sound.subtitle.flood_basalt_place"
+  },
+  "block.flood_basalt.break": {
+    "sounds": [
+      "quantize:block/flood_basalt/flood_basalt_break_0",
+      "quantize:block/flood_basalt/flood_basalt_break_1",
+      "quantize:block/flood_basalt/flood_basalt_break_2",
+      "quantize:block/flood_basalt/flood_basalt_break_3",
+      "quantize:block/flood_basalt/flood_basalt_break_4"
+    ],
+    "subtitle": "quantize.sound.subtitle.flood_basalt_break"
+  },
+  "block.flood_basalt.breaking": {
+    "sounds": [
+      "quantize:block/flood_basalt/flood_basalt_breaking_0",
+      "quantize:block/flood_basalt/flood_basalt_breaking_1",
+      "quantize:block/flood_basalt/flood_basalt_breaking_2",
+      "quantize:block/flood_basalt/flood_basalt_breaking_3",
+      "quantize:block/flood_basalt/flood_basalt_breaking_4"
+    ],
+    "subtitle": "quantize.sound.subtitle.flood_basalt_breaking"
+  },
+  "block.elevator.teleport": {
+    "sounds": [
+      "quantize:block/elevator/teleport"
+    ]
+  },
+  "block.primal_magma.fissure_close": {
+    "sounds": [
+      "quantize:block/primal_magma/primal_magma_fissure_close_0",
+      "quantize:block/primal_magma/primal_magma_fissure_close_1",
+      "quantize:block/primal_magma/primal_magma_fissure_close_2"
+    ],
+    "subtitle": "quantize.sound.subtitle.primal_magma_fissure_close"
+  },
+  "item.maracas.maraca": {
+    "sounds": [
+      "quantize:item/maracas/maraca_0",
+      "quantize:item/maracas/maraca_1",
+      "quantize:item/maracas/maraca_2",
+      "quantize:item/maracas/maraca_3"
+    ]
+  }
+}

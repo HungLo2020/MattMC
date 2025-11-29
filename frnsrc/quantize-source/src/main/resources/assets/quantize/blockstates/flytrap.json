@@ -1,0 +1,12 @@
+{
+  "variants": {
+    "open=true": [
+      { "model": "quantize:block/flytrap_open" },
+      { "model": "quantize:block/flytrap_open", "y": 90 }
+    ],
+    "open=false": [
+      { "model": "quantize:block/flytrap_closed" },
+      { "model": "quantize:block/flytrap_closed", "y": 90 }
+    ]
+  }
+}

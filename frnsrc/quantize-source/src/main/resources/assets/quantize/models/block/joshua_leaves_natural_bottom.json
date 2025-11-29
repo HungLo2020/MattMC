@@ -1,0 +1,9 @@
+{
+  "parent": "quantize:block/joshua_leaves_natural_bottom_base",
+  "textures": {
+    "particle": "quantize:block/joshua_leaves_bottom",
+    "cross": "quantize:block/joshua_leaves_bottom",
+    "beard": "quantize:block/joshua_beard"
+  },
+  "render_type": "cutout"
+}

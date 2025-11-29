@@ -1,0 +1,20 @@
+{
+    "parent": "item/generated",
+    "textures": {
+        "layer0": "quantize:item/crab_bucket"
+    },
+    "overrides": [
+        {
+            "predicate": {
+                "quantize:variant": 1
+            },
+            "model": "quantize:item/crab_bucket_blue"
+        },
+        {
+            "predicate": {
+                "quantize:variant": 2
+            },
+            "model": "quantize:item/crab_bucket_green"
+        }
+    ]
+}

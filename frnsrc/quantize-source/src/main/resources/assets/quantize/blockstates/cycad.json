@@ -1,0 +1,10 @@
+{
+  "variants": {
+    "top=false": {
+      "model": "quantize:block/cycad_trunk"
+    },
+    "top=true": {
+      "model": "quantize:block/cycad_top"
+    }
+  }
+}

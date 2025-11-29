@@ -1,0 +1,7 @@
+{
+  "parent": "block/leaves",
+  "textures": {
+    "all": "quantize:block/cypress_leaves",
+    "particle": "quantize:block/cypress_leaves"
+  }
+}

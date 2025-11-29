@@ -1,0 +1,8 @@
+{
+	"parent": "quantize:block/grottoceratops_egg_template",
+	"textures": {
+		"side": "quantize:block/egg/grottoceratops_egg_side_cracked",
+		"bottom" : "quantize:block/egg/grottoceratops_egg_bottom_cracked",
+		"top" : "quantize:block/egg/grottoceratops_egg_top_cracked"
+	}
+}

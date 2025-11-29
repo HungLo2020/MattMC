@@ -1,0 +1,10 @@
+{
+	"parent": "quantize:block/flowering_lily_pad_base",
+	"textures": {
+		"0": "quantize:block/flowering_lily_pad",
+		"1": "quantize:block/flowering_lily_pad_bottom",
+		"2": "quantize:block/flowering_lily_pad_flower_closed",
+		"particle": "quantize:block/flowering_lily_pad"
+	},
+	"render_type": "cutout"
+}

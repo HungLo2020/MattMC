@@ -1,0 +1,6 @@
+{
+  "parent": "quantize:block/template_two_caiman_eggs",
+  "textures": {
+    "0": "quantize:block/caiman_eggs"
+  }
+}

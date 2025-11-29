@@ -1,0 +1,9 @@
+{
+  "type": "quantize:botany_pot",
+  "seed": { "item": "quantize:sandy_grass" },
+  "soil": { "tag": "quantize:botany_sands" },
+  "growth_ticks": 1200,
+  "drops": [
+    { "output": { "item": "quantize:sandy_grass" }, "chance": 1.0, "min": 1, "max": 1 }
+  ]
+}

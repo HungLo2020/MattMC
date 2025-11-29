@@ -1,0 +1,19 @@
+package net.matt.quantize.block.block;
+
+import net.minecraft.world.item.context.BlockPlaceContext;
+import net.minecraft.world.level.block.SaplingBlock;
+import net.minecraft.world.level.block.SoundType;
+import net.minecraft.world.level.block.grower.AbstractTreeGrower;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.material.PushReaction;
+
+public class ModSaplingBlock extends SaplingBlock {
+    public ModSaplingBlock(AbstractTreeGrower tree) {
+        super(tree, Properties.of().pushReaction(PushReaction.DESTROY).ignitedByLava().noCollission().instabreak().sound(SoundType.GRASS).randomTicks());
+    }
+
+    @Override
+    public boolean canBeReplaced(BlockState state, BlockPlaceContext context) {
+        return false;
+    }
+}

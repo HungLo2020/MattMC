@@ -1,0 +1,10 @@
+{
+  "variants": {
+    "is_red=false": {
+      "model": "quantize:block/sandy_grass"
+    },
+    "is_red=true": {
+      "model": "quantize:block/red_sandy_grass"
+    }
+  }
+}

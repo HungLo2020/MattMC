@@ -1,0 +1,16 @@
+{
+  "variants": {
+    "axis=x": {
+      "model": "quantize:block/flood_basalt",
+      "x": 90,
+      "y": 90
+    },
+    "axis=y": {
+      "model": "quantize:block/flood_basalt"
+    },
+    "axis=z": {
+      "model": "quantize:block/flood_basalt",
+      "x": 90
+    }
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "type": "minecraft:smelting",
+  "ingredient": {
+    "item": "quantize:lobster_tail"
+  },
+  "result": "quantize:cooked_lobster_tail",
+  "experience": 0.15,
+  "cookingtime": 200
+}

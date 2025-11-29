@@ -1,0 +1,7 @@
+{
+  "__comment": "all mobs that dont take fall damage.",
+  "values": [
+    "quantize:subterranodon",
+    "quantize:luxtructosaurus"
+  ]
+}

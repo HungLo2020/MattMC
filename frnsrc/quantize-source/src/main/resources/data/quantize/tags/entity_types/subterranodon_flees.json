@@ -1,0 +1,7 @@
+{
+  "__comment": "all mobs that scare subterranodons.",
+  "values": [
+    "quantize:tremorsaurus",
+    "quantize:tremorzilla"
+  ]
+}

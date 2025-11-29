@@ -1,0 +1,7 @@
+{
+  "replace": false,
+  "values": [
+    "quantize:raygun",
+    "quantize:dark_arrow"
+  ]
+}

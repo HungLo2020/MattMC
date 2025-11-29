@@ -1,0 +1,10 @@
+{
+  "type": "quantize:botany_pot",
+  "seed": { "item": "minecraft:melon_seeds" },
+  "soil": { "tag": "quantize:botany_soils" },
+  "growth_ticks": 1200,
+  "drops": [
+    { "output": { "item": "minecraft:melon" }, "chance": 1.0, "min": 1, "max": 3 },
+    { "output": { "item": "minecraft:melon_seeds" }, "chance": 0.5, "min": 1, "max": 1 }
+  ]
+}

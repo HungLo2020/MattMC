@@ -1,0 +1,17 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    "G",
+    "G",
+    "G"
+  ],
+  "key": {
+    "G": {
+      "item": "minecraft:bone_block"
+    }
+  },
+  "result": {
+    "item": "quantize:thin_bone",
+    "count": 9
+  }
+}

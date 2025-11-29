@@ -1,0 +1,19 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    "E",
+    "G"
+  ],
+  "key": {
+    "G": {
+      "item": "minecraft:stick"
+    },
+    "E": {
+      "item": "minecraft:iron_ingot"
+    }
+  },
+  "result": {
+    "item": "quantize:trowel",
+    "count": 1
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    "BBB",
+    "BAB",
+    "BBB"
+  ],
+  "key": {
+    "A": {
+      "item": "quantize:amber_curiosity"
+    },
+    "B": {
+      "item": "quantize:heavy_bone"
+    }
+  },
+  "result": {
+    "item": "quantize:ominous_catalyst"
+  }
+}

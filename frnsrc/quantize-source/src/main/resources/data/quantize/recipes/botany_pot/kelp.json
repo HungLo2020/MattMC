@@ -1,0 +1,9 @@
+{
+  "type": "quantize:botany_pot",
+  "seed": { "item": "minecraft:kelp" },
+  "soil": { "tag": "quantize:botany_water" },
+  "growth_ticks": 1200,
+  "drops": [
+    { "output": { "item": "minecraft:kelp" }, "chance": 1.0, "min": 2, "max": 4 }
+  ]
+}

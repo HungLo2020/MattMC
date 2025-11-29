@@ -1,0 +1,12 @@
+{
+  "parent": "quantize:block/leaves_all",
+  "textures": {
+    "north": "quantize:block/palm_leaves_side",
+    "south": "quantize:block/palm_leaves_side",
+    "east": "quantize:block/palm_leaves_side",
+    "west": "quantize:block/palm_leaves_side",
+    "up": "quantize:block/palm_leaves_top",
+    "down": "quantize:block/palm_leaves_top",
+    "particle": "quantize:block/palm_leaves_side"
+  }
+}

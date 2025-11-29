@@ -1,0 +1,22 @@
+{
+  "replace": false,
+  "values": [
+    "#minecraft:leaves",
+    "#minecraft:saplings",
+    "minecraft:sugar_cane",
+    "minecraft:apple",
+    "minecraft:beetroot",
+    "minecraft:potato",
+    "minecraft:carrot",
+    "minecraft:golden_carrot",
+    "minecraft:baked_potato",
+    "minecraft:hay_block",
+    "minecraft:bamboo",
+    "#quantize:bananas",
+    "quantize:acacia_blossom",
+    "minecraft:melon_slice",
+    "minecraft:sweet_berries",
+    "#quantize:elephant_breedables",
+    "#quantize:elephant_tameables"
+  ]
+}

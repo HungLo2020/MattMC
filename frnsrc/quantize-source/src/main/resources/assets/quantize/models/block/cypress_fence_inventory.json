@@ -1,0 +1,7 @@
+{
+  "parent": "block/fence_inventory",
+  "textures": {
+    "texture": "quantize:block/cypress_planks",
+    "particle": "quantize:block/cypress_planks"
+  }
+}

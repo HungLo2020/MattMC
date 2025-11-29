@@ -1,0 +1,9 @@
+{
+  "fireflies": {
+    "textures": [
+      "quantize:particle/firefly_bush/fireflies_1",
+      "quantize:particle/firefly_bush/fireflies_2",
+      "quantize:particle/firefly_bush/fireflies_3"
+    ]
+  }
+}

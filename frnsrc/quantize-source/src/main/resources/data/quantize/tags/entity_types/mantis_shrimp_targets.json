@@ -1,0 +1,14 @@
+{
+  "__comment": "all non-player targets of the mantis shrimp mob.",
+  "replace": false,
+  "values": [
+    "quantize:mimic_octopus",
+    "quantize:lobster",
+    "minecraft:shulker",
+    "minecraft:squid",
+    "minecraft:guardian",
+    "minecraft:elder_guardian",
+    "minecraft:tropical_fish",
+    "quantize:catfish"
+  ]
+}

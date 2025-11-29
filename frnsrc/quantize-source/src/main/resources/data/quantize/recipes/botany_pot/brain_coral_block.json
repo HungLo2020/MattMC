@@ -1,0 +1,11 @@
+{
+  "type": "quantize:botany_pot",
+  "seed": { "item": "minecraft:brain_coral_block" },
+  "soil": { "tag": "quantize:botany_water" },
+  "growth_ticks": 1200,
+  "drops": [
+    { "output": { "item": "minecraft:brain_coral_block" }, "chance": 1.0, "min": 1, "max": 1 },
+    { "output": { "item": "minecraft:brain_coral" }, "chance": 1.0, "min": 1, "max": 1 },
+    { "output": { "item": "minecraft:brain_coral_fan" }, "chance": 1.0, "min": 1, "max": 1 }
+  ]
+}

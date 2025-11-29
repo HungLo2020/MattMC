@@ -1,0 +1,9 @@
+{
+  "type": "quantize:botany_pot",
+  "seed": { "item": "minecraft:warped_fungus" },
+  "soil": { "tag": "quantize:botany_nether" },
+  "growth_ticks": 1200,
+  "drops": [
+    { "output": { "item": "minecraft:warped_fungus" }, "chance": 1.0, "min": 1, "max": 1 }
+  ]
+}

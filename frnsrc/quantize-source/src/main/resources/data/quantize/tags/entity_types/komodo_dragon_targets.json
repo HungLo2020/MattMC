@@ -1,0 +1,9 @@
+{
+  "__comment": "all non-player targets of the komodo dragon mob.",
+  "replace": false,
+  "values": [
+    "#quantize:passive_land_animals",
+    "#quantize:villagers",
+    "quantize:gelada_monkey"
+  ]
+}

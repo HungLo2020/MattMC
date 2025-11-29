@@ -1,0 +1,100 @@
+package net.matt.quantize.utils;
+
+import net.matt.quantize.sounds.QSounds;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.sounds.SoundSource;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.level.BlockGetter;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.phys.Vec3;
+import net.minecraftforge.network.NetworkEvent;
+import net.matt.quantize.block.block.ElevatorBlock;
+import net.matt.quantize.network.packet.TeleportRequest;
+
+import java.util.function.Supplier;
+
+public class TeleportHandler {
+    public static void handle(TeleportRequest message, Supplier<NetworkEvent.Context> ctx) {
+        ctx.get().enqueueWork(() -> {
+            ServerPlayer player = ctx.get().getSender();
+            if (isBadTeleportPacket(message, player))
+                return;
+
+            if (!(player.level() instanceof ServerLevel world))
+                return;
+
+            BlockPos toPos = message.getTo();
+            BlockState toState = world.getBlockState(message.getTo());
+
+            // Check yaw and pitch
+            /*final float yaw = toState.getValue(ElevatorBlock.DIRECTIONAL)
+                    ? toState.getValue(ElevatorBlock.FACING).toYRot() : player.getYRot();*/
+
+            final float yaw = player.getYRot();
+            final float pitch = player.getXRot();
+
+            final double toX = toPos.getX() + 0.5D;
+            final double toZ = toPos.getZ() + 0.5D;
+
+            double blockYOffset = toState.getBlockSupportShape(world, toPos).max(Direction.Axis.Y);
+            player.teleportTo(world, toX, Math.max(toPos.getY(), toPos.getY() + blockYOffset), toZ, yaw, pitch);
+            player.setDeltaMovement(player.getDeltaMovement().multiply(new Vec3(1D, 0D, 1D)));
+
+            world.playSound(null, toPos, QSounds.TELEPORT.get(), SoundSource.BLOCKS, 1F, 1F);
+        });
+
+        ctx.get().setPacketHandled(true);
+    }
+
+    private static boolean isBadTeleportPacket(TeleportRequest msg, ServerPlayer player) {
+        if (player == null || !player.isAlive())
+            return true;
+
+        Level world = player.level();
+        BlockPos fromPos = msg.getFrom();
+        BlockPos toPos = msg.getTo();
+
+        if (!world.isLoaded(fromPos) || !world.isLoaded(toPos))
+            return true;
+
+        // This ensures the player is still standing on the "from" elevator
+        final double distanceSq = player.distanceToSqr(Vec3.atCenterOf(fromPos));
+        if (distanceSq > 6D)
+            return true;
+
+        if (fromPos.getX() != toPos.getX() || fromPos.getZ() != toPos.getZ())
+            return true;
+
+        if (fromPos.getY() == toPos.getY())
+            return true;
+
+        ElevatorBlock fromElevator = getElevator(world.getBlockState(fromPos));
+        ElevatorBlock toElevator = getElevator(world.getBlockState(toPos));
+
+        if (fromElevator == null || toElevator == null)
+            return true;
+
+        if (!isValidPos(world, toPos))
+            return true;
+
+        return false; //ModConfig.GENERAL.sameColor.get() && fromElevator.getColor() != toElevator.getColor();
+    }
+
+    private static int getPlayerExperienceProgress(Player player) {
+        return Math.round(player.experienceProgress * player.getXpNeededForNextLevel());
+    }
+
+    public static boolean isValidPos(BlockGetter world, BlockPos pos) {
+        return world.getBlockState(pos.above()).getCollisionShape(world, pos.above()).isEmpty();
+    }
+
+    public static ElevatorBlock getElevator(BlockState blockState) {
+        if (blockState.getBlock() instanceof ElevatorBlock elevator)
+            return elevator;
+        return null;
+    }
+}

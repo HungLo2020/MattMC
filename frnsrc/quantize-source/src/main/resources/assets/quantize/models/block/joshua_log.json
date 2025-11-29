@@ -1,0 +1,12 @@
+{
+  "parent": "block/cube",
+  "textures": {
+    "down": "quantize:block/joshua_log_top",
+    "up": "quantize:block/joshua_log_top",
+    "north": "quantize:block/joshua_log",
+    "east": "quantize:block/joshua_log",
+    "south": "quantize:block/joshua_log",
+    "west": "quantize:block/joshua_log",
+    "particle": "quantize:block/joshua_log_top"
+  }
+}

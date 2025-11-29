@@ -1,0 +1,23 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "ingredients": [
+    {
+      "item": "minecraft:glass_bottle"
+    },
+    {
+      "item": "quantize:komodo_spit"
+    },
+    {
+      "item": "quantize:komodo_spit"
+    },
+    {
+      "item": "quantize:komodo_spit"
+    },
+    {
+      "item": "quantize:komodo_spit"
+    }
+  ],
+  "result": {
+    "item": "quantize:komodo_spit_bottle"
+  }
+}

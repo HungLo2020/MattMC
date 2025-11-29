@@ -1,0 +1,8 @@
+{
+  "feature": "quantize:leafcutter_anthill",
+  "placement": [
+    {
+      "type": "minecraft:in_square"
+    }
+  ]
+}

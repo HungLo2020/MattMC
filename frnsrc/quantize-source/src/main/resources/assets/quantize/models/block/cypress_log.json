@@ -1,0 +1,12 @@
+{
+  "parent": "block/cube",
+  "textures": {
+    "down": "quantize:block/cypress_log_top",
+    "up": "quantize:block/cypress_log_top",
+    "north": "quantize:block/cypress_log",
+    "east": "quantize:block/cypress_log",
+    "south": "quantize:block/cypress_log",
+    "west": "quantize:block/cypress_log",
+    "particle": "quantize:block/cypress_log_top"
+  }
+}

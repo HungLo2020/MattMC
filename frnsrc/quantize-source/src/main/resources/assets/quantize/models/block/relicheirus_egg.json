@@ -1,0 +1,8 @@
+{
+	"parent": "quantize:block/relicheirus_egg_template",
+	"textures": {
+		"side": "quantize:block/egg/relicheirus_egg_side",
+		"bottom" : "quantize:block/egg/relicheirus_egg_bottom",
+		"top" : "quantize:block/egg/relicheirus_egg_top"
+	}
+}

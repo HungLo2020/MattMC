@@ -1,0 +1,6 @@
+{
+	"parent": "quantize:block/small_dinosaur_egg_2_template",
+	"textures": {
+		"egg": "quantize:block/egg/vallumraptor_egg"
+	}
+}

@@ -1,0 +1,11 @@
+{
+  "parent": "quantize:block/leafed_plant",
+  "textures": {
+    "all": "quantize:block/elephant_ear_leaf",
+    "particle": "quantize:block/elephant_ear_leaf",
+    "0": "quantize:block/elephant_ear_leaf",
+    "1": "quantize:block/elephant_ear_plant",
+    "2": "block/grass"
+  },
+  "render_type": "cutout"
+}

@@ -1,0 +1,36 @@
+{
+  "type": "quantize:palm_tree",
+  "config": {
+    "branch_provider": {
+      "type": "minecraft:simple_state_provider",
+      "state": {
+        "Name": "quantize:palm_beard",
+        "Properties": {
+          "facing": "north"
+        }
+      }
+    },
+    "foliage_provider": {
+      "type": "minecraft:simple_state_provider",
+      "state": {
+        "Name": "quantize:palm_leaves",
+        "Properties": {
+          "distance": "7",
+          "persistent": "false",
+          "waterlogged": "false"
+        }
+      }
+    },
+    "minimum_size": 8,
+    "size_variation": 5,
+    "trunk_provider": {
+      "type": "minecraft:simple_state_provider",
+      "state": {
+        "Name": "quantize:palm_log",
+        "Properties": {
+          "axis": "y"
+        }
+      }
+    }
+  }
+}

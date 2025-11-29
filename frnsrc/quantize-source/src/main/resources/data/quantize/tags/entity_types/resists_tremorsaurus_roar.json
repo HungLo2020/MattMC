@@ -1,0 +1,8 @@
+{
+  "__comment": "all mobs that are not shaken by a tremorsaurus roar.",
+  "values": [
+    "quantize:tremorsaurus",
+    "quantize:luxtructosaurus",
+    "quantize:tremorzilla"
+  ]
+}

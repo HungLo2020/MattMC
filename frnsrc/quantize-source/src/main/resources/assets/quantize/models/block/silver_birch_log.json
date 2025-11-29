@@ -1,0 +1,12 @@
+{
+  "parent": "block/cube",
+  "textures": {
+    "down": "quantize:block/silver_birch_log_top",
+    "up": "quantize:block/silver_birch_log_top",
+    "north": "quantize:block/silver_birch_log",
+    "east": "quantize:block/silver_birch_log",
+    "south": "quantize:block/silver_birch_log",
+    "west": "quantize:block/silver_birch_log",
+    "particle": "quantize:block/silver_birch_log"
+  }
+}

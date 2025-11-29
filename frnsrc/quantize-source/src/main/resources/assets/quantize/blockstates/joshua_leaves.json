@@ -1,0 +1,13 @@
+{
+  "variants": {
+    "half=upper": {
+      "model": "quantize:block/joshua_leaves_top"
+    },
+    "half=lower,natural=false": {
+      "model": "quantize:block/joshua_leaves_bottom"
+    },
+    "half=lower,natural=true": {
+      "model": "quantize:block/joshua_leaves_natural_bottom"
+    }
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "parent": "minecraft:item/generated",
+  "textures": {
+    "layer0": "quantize:item/sombrero"
+  },
+  "overrides": [
+    {
+      "predicate": {
+        "silly": 1
+      },
+      "model": "quantize:item/sombrero_upside_down"
+    }
+  ]
+}

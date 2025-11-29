@@ -1,0 +1,8 @@
+{
+  "replace": false,
+  "values": [
+    "quantize:maggot",
+    "quantize:mosquito_larva",
+    "quantize:leafcutter_ant_pupa"
+  ]
+}

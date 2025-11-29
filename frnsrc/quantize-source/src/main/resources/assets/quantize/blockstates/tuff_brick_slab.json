@@ -1,0 +1,13 @@
+{
+  "variants": {
+    "type=bottom": {
+      "model": "quantize:block/tuff_brick_slab"
+    },
+    "type=double": {
+      "model": "quantize:block/tuff_bricks"
+    },
+    "type=top": {
+      "model": "quantize:block/tuff_brick_slab_top"
+    }
+  }
+}

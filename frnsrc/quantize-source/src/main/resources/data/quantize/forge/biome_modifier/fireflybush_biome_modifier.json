@@ -1,0 +1,9 @@
+{
+  "type": "forge:add_features",
+  "biomes": [
+    "river",
+    "swamp"
+  ],
+  "features": "quantize:fireflybush",
+  "step": "vegetal_decoration"
+}

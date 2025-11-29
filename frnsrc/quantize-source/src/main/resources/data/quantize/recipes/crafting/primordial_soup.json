@@ -1,0 +1,20 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "ingredients": [
+    {
+      "item": "quantize:cooked_trilocaris_tail"
+    },
+    {
+      "item": "quantize:cooked_trilocaris_tail"
+    },
+    {
+      "item": "quantize:tree_star"
+    },
+    {
+      "item": "minecraft:bowl"
+    }
+  ],
+  "result": {
+    "item": "quantize:primordial_soup"
+  }
+}

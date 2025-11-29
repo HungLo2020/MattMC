@@ -1,0 +1,15 @@
+{
+  "variants": {
+    "": [
+      {
+        "model": "quantize:block/flowering_lily_pad"
+      },
+      {
+        "model": "quantize:block/flowering_lily_pad"
+      },
+      {
+        "model": "quantize:block/flowering_lily_pad_closed"
+      }
+    ]
+  }
+}

@@ -1,0 +1,7 @@
+{
+  "variants": {
+    "": {
+      "model": "quantize:block/uranium_ore"
+    }
+  }
+}

@@ -1,0 +1,7 @@
+{
+  "parent": "minecraft:item/generated",
+  "textures": {
+    "layer0" : "quantize:item/lower_bucket",
+    "layer1" : "quantize:item/bucket_content/devils_hole_pupfish"
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "structures": [
+    {
+      "structure": "quantize:dino_bowl",
+      "weight": 1
+    }
+  ],
+  "placement": {
+    "type": "minecraft:random_spread",
+    "salt": 1,
+    "spacing": 4,
+    "separation": 2
+  }
+}

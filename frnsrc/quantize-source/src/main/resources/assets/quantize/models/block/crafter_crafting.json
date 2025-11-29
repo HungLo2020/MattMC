@@ -1,0 +1,9 @@
+{
+  "parent": "quantize:block/crafter_triggered",
+  "textures": {
+    "top": "quantize:block/crafter_top_crafting",
+    "north": "quantize:block/crafter_north_crafting",
+    "east": "quantize:block/crafter_east_crafting",
+    "west": "quantize:block/crafter_west_crafting"
+  }
+}

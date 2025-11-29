@@ -1,0 +1,6 @@
+{
+  "parent": "quantize:item/stink_ray_hand_base",
+   "textures": {
+    "texture": "quantize:item/stink_ray_empty_model"
+  }
+}

@@ -1,0 +1,6 @@
+{
+  "parent": "quantize:block/template_crocodile_egg",
+  "textures": {
+    "all": "quantize:block/crocodile_egg_slightly_cracked"
+  }
+}

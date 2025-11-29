@@ -1,0 +1,26 @@
+{
+  "parent": "minecraft:block/cube",
+  "textures": {
+    "up": "quantize:block/cog_block_off",
+    "down": "quantize:block/cog_block_off",
+    "north": "quantize:block/cog_block_off",
+    "south": "quantize:block/cog_block_off",
+    "east": "quantize:block/cog_block_off",
+    "west": "quantize:block/cog_block_off",
+    "particle": "quantize:block/cog_block_off"
+  },
+  "elements": [
+    {
+      "from": [0, 0, 0],
+      "to": [16, 16, 16],
+      "faces": {
+        "up":    { "texture": "#up", "cullface": "up" },
+        "down":  { "texture": "#down", "cullface": "down" },
+        "north": { "texture": "#north", "cullface": "north" },
+        "south": { "texture": "#south", "cullface": "south" },
+        "west":  { "texture": "#west", "cullface": "west" },
+        "east":  { "texture": "#east", "cullface": "east" }
+      }
+    }
+  ]
+}

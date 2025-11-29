@@ -1,0 +1,17 @@
+{
+  "type": "quantize:covered_block_blob",
+  "config": {
+    "block": {
+      "type": "minecraft:simple_state_provider",
+      "state": {
+        "Name": "quantize:limestone"
+      }
+    },
+    "cover": {
+      "type": "minecraft:simple_state_provider",
+      "state": {
+        "Name": "minecraft:moss_carpet"
+      }
+    }
+  }
+}
