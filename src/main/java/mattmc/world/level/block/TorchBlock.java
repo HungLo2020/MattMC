@@ -1,5 +1,6 @@
 package mattmc.world.level.block;
 
+import mattmc.world.level.Level;
 import mattmc.world.phys.shapes.VoxelShape;
 
 /**
@@ -57,5 +58,24 @@ public class TorchBlock extends Block {
     @Override
     public boolean hasRandomTick() {
         return true;
+    }
+    
+    /**
+     * Called periodically client-side to spawn flame and smoke particles.
+     * Mirrors Minecraft's TorchBlock.animateTick.
+     */
+    @Override
+    public void animateTick(Level level, int x, int y, int z, java.util.Random random,
+                           ParticleSpawner particleSpawner) {
+        // Spawn at the top center of the torch
+        double px = x + 0.5;
+        double py = y + 0.7;
+        double pz = z + 0.5;
+        
+        // Spawn smoke particle
+        particleSpawner.spawn("smoke", px, py, pz, 0.0, 0.0, 0.0);
+        
+        // Spawn flame particle
+        particleSpawner.spawn("flame", px, py, pz, 0.0, 0.0, 0.0);
     }
 }

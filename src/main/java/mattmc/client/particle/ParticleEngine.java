@@ -290,6 +290,9 @@ public class ParticleEngine {
             // Let the consumer set up render state
             renderTypeConsumer.accept(type);
             
+            // Begin vertex building for this render type
+            builder.begin();
+            
             // Render all particles of this type
             for (Particle particle : queue) {
                 try {
@@ -298,6 +301,9 @@ public class ParticleEngine {
                     logger.error("Error rendering particle: {}", particle, e);
                 }
             }
+            
+            // End and flush vertices
+            builder.end();
         }
     }
     

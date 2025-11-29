@@ -520,4 +520,49 @@ public class Level implements LevelAccessor {
         
         logger.info("Level shutdown complete");
     }
+    
+    /**
+     * Called periodically client-side to animate blocks near the player.
+     * This spawns particles for torches, falling leaves, etc.
+     * 
+     * <p>Mirrors Minecraft's ClientLevel.animateTick method which iterates
+     * 1334 random blocks (667 * 2) around the player each frame.
+     * 
+     * @param playerX player X position (block coordinate)
+     * @param playerY player Y position (block coordinate)
+     * @param playerZ player Z position (block coordinate)
+     * @param random random source for particle effects
+     * @param particleSpawner callback to spawn particles
+     */
+    public void animateTick(int playerX, int playerY, int playerZ, 
+                           java.util.Random random, Block.ParticleSpawner particleSpawner) {
+        // Iterate 667 times for range 16 and 667 times for range 32
+        // This matches Minecraft's behavior exactly
+        for (int i = 0; i < 667; i++) {
+            doAnimateTick(playerX, playerY, playerZ, 16, random, particleSpawner);
+            doAnimateTick(playerX, playerY, playerZ, 32, random, particleSpawner);
+        }
+    }
+    
+    /**
+     * Animate a single random block within range of the player.
+     */
+    private void doAnimateTick(int playerX, int playerY, int playerZ, int range,
+                              java.util.Random random, Block.ParticleSpawner particleSpawner) {
+        // Pick a random block within range
+        int x = playerX + random.nextInt(range) - random.nextInt(range);
+        int y = playerY + random.nextInt(range) - random.nextInt(range);
+        int z = playerZ + random.nextInt(range) - random.nextInt(range);
+        
+        // Clamp Y to valid range
+        if (y < 0 || y >= 384) {
+            return;
+        }
+        
+        // Get the block at this position
+        Block block = getBlock(x, y, z);
+        if (block != null && !block.isAir()) {
+            block.animateTick(this, x, y, z, random, particleSpawner);
+        }
+    }
 }

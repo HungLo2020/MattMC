@@ -10,6 +10,12 @@ package mattmc.client.particle;
 public interface ParticleVertexBuilder {
     
     /**
+     * Begin building vertices for a batch of particles.
+     * Called before rendering each render type group.
+     */
+    default void begin() {}
+    
+    /**
      * Add a vertex with position, texture coordinates, color, and light.
      * 
      * @param x position X
@@ -31,4 +37,10 @@ public interface ParticleVertexBuilder {
     default void vertex(double x, double y, double z, float u, float v, float r, float g, float b, float a, int light) {
         vertex((float) x, (float) y, (float) z, u, v, r, g, b, a, light);
     }
+    
+    /**
+     * End building vertices and flush to GPU.
+     * Called after rendering each render type group.
+     */
+    default void end() {}
 }
