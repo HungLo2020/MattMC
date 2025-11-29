@@ -118,8 +118,9 @@ public class Blocks {
     public static final Block ACACIA_LEAVES = register("acacia_leaves", new LeavesBlock(-12012264));
     public static final Block DARK_OAK_LEAVES = register("dark_oak_leaves", new LeavesBlock(-12012264));
     public static final Block MANGROVE_LEAVES = register("mangrove_leaves", new LeavesBlock(-7158200));
-    // Leaves without tinting
-    public static final Block CHERRY_LEAVES = register("cherry_leaves", new CherryLeavesBlock());
+     // Leaves without tinting
+    // Cherry leaves uses FallingLeavesBlock with pink tint for falling petal particles
+    public static final Block CHERRY_LEAVES = register("cherry_leaves", new FallingLeavesBlock(1.0f, 0.7f, 0.8f));
     public static final Block AZALEA_LEAVES = register("azalea_leaves", new LeavesBlock());
     public static final Block FLOWERING_AZALEA_LEAVES = register("flowering_azalea_leaves", new LeavesBlock());
     public static final Block PALE_OAK_LEAVES = register("pale_oak_leaves", new LeavesBlock());
@@ -163,6 +164,11 @@ public class Blocks {
             registeredBlock = new RotatedPillarBlock(block.isSolid(), 
                 lightEmission,
                 block.getLightEmissionR(), block.getLightEmissionG(), block.getLightEmissionB(), 
+                identifier);
+        } else if (block instanceof FallingLeavesBlock) {
+            FallingLeavesBlock fallingLeaves = (FallingLeavesBlock) block;
+            registeredBlock = new FallingLeavesBlock(fallingLeaves.getRawTintColor(),
+                fallingLeaves.getParticleRed(), fallingLeaves.getParticleGreen(), fallingLeaves.getParticleBlue(),
                 identifier);
         } else if (block instanceof CherryLeavesBlock) {
             registeredBlock = new CherryLeavesBlock(identifier);
@@ -219,6 +225,11 @@ public class Blocks {
             registeredBlock = new RotatedPillarBlock(block.isSolid(), 
                 lightEmission,
                 block.getLightEmissionR(), block.getLightEmissionG(), block.getLightEmissionB(), 
+                identifier);
+        } else if (block instanceof FallingLeavesBlock) {
+            FallingLeavesBlock fallingLeaves = (FallingLeavesBlock) block;
+            registeredBlock = new FallingLeavesBlock(fallingLeaves.getRawTintColor(),
+                fallingLeaves.getParticleRed(), fallingLeaves.getParticleGreen(), fallingLeaves.getParticleBlue(),
                 identifier);
         } else if (block instanceof CherryLeavesBlock) {
             registeredBlock = new CherryLeavesBlock(identifier);

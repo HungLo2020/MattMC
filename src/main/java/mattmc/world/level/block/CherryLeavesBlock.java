@@ -11,7 +11,12 @@ import java.util.Random;
  * particle below them if there's air below.
  * 
  * <p>Mirrors Minecraft's CherryLeavesBlock.
+ * 
+ * @deprecated Use {@link FallingLeavesBlock} instead, which supports RGB tinting
+ *             for the falling leaves particles. Cherry leaves now uses
+ *             FallingLeavesBlock with a pink tint color (1.0, 0.7, 0.8).
  */
+@Deprecated
 public class CherryLeavesBlock extends LeavesBlock {
     
     /**

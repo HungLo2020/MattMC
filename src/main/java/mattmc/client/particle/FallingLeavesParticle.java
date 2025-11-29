@@ -4,19 +4,16 @@ import mattmc.core.particles.SimpleParticleType;
 import mattmc.world.level.Level;
 
 /**
- * Cherry blossom falling leaves particle.
+ * Falling leaves particle with RGB tinting support.
  * 
- * <p>These particles have a slow falling motion with a gentle horizontal sway
- * and rotation, simulating falling cherry blossom petals.
+ * <p>This particle uses grayscale leaf textures (leaves_0 through leaves_11) that
+ * can be tinted with any RGB color. This allows different tree types to have
+ * falling leaves particles in their own colors.
  * 
- * <p>Mirrors Minecraft's CherryParticle behavior.
- * 
- * @deprecated Use {@link FallingLeavesParticle} instead, which supports RGB tinting
- *             of grayscale textures. Create a FallingLeavesParticle with pink tint
- *             (1.0, 0.7, 0.8) for cherry blossom particles.
+ * <p>The particle behavior is similar to cherry blossom petals: slow falling motion
+ * with a gentle horizontal sway and rotation.
  */
-@Deprecated
-public class CherryParticle extends TextureSheetParticle {
+public class FallingLeavesParticle extends TextureSheetParticle {
     
     /** Scale factor for wind acceleration application. */
     private static final float ACCELERATION_SCALE = 0.0025f;
@@ -40,7 +37,20 @@ public class CherryParticle extends TextureSheetParticle {
     private final float particleRandom;
     private final float spinAcceleration;
     
-    protected CherryParticle(Level level, double x, double y, double z, SpriteSet spriteSet) {
+    /**
+     * Create a falling leaves particle with RGB tinting.
+     * 
+     * @param level the level the particle is in
+     * @param x spawn X position
+     * @param y spawn Y position
+     * @param z spawn Z position
+     * @param spriteSet the sprite set for the particle
+     * @param red red color component (0.0-1.0)
+     * @param green green color component (0.0-1.0)
+     * @param blue blue color component (0.0-1.0)
+     */
+    protected FallingLeavesParticle(Level level, double x, double y, double z, SpriteSet spriteSet,
+                                    float red, float green, float blue) {
         super(level, x, y, z);
         
         // Pick a random sprite from the sprite set
@@ -68,10 +78,10 @@ public class CherryParticle extends TextureSheetParticle {
         // No physics collision needed for leaves
         this.hasPhysics = false;
         
-        // Cherry blossom pink color
-        this.rCol = 1.0f;
-        this.gCol = 0.9f;
-        this.bCol = 0.95f;
+        // Apply the tint color
+        this.rCol = red;
+        this.gCol = green;
+        this.bCol = blue;
     }
     
     @Override
@@ -129,7 +139,45 @@ public class CherryParticle extends TextureSheetParticle {
     }
     
     /**
-     * Provider factory for cherry particles.
+     * Provider factory for falling leaves particles with a specific tint color.
+     * 
+     * <p>This provider creates particles tinted with the specified RGB color.
+     * The tint is applied to the grayscale leaf textures.
+     */
+    public static class ColoredProvider implements ParticleProvider<SimpleParticleType> {
+        private final SpriteSet sprites;
+        private final float red;
+        private final float green;
+        private final float blue;
+        
+        /**
+         * Create a provider with the specified tint color.
+         * 
+         * @param sprites the sprite set for the particle
+         * @param red red color component (0.0-1.0)
+         * @param green green color component (0.0-1.0)
+         * @param blue blue color component (0.0-1.0)
+         */
+        public ColoredProvider(SpriteSet sprites, float red, float green, float blue) {
+            this.sprites = sprites;
+            this.red = red;
+            this.green = green;
+            this.blue = blue;
+        }
+        
+        @Override
+        public Particle createParticle(SimpleParticleType options, Level level,
+                                       double x, double y, double z,
+                                       double xSpeed, double ySpeed, double zSpeed) {
+            return new FallingLeavesParticle(level, x, y, z, sprites, red, green, blue);
+        }
+    }
+    
+    /**
+     * Provider factory for falling leaves particles with default white color.
+     * 
+     * <p>This provider creates particles with no tinting (white), useful for
+     * registration where the sprite set is needed but no color is specified.
      */
     public static class Provider implements ParticleProvider<SimpleParticleType> {
         private final SpriteSet sprites;
@@ -142,7 +190,7 @@ public class CherryParticle extends TextureSheetParticle {
         public Particle createParticle(SimpleParticleType options, Level level,
                                        double x, double y, double z,
                                        double xSpeed, double ySpeed, double zSpeed) {
-            return new CherryParticle(level, x, y, z, sprites);
+            return new FallingLeavesParticle(level, x, y, z, sprites, 1.0f, 1.0f, 1.0f);
         }
     }
 }

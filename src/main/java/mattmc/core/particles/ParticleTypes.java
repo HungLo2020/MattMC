@@ -29,6 +29,7 @@ public final class ParticleTypes {
     public static final SimpleParticleType CRIT = register("crit", new SimpleParticleType(false));
     public static final SimpleParticleType BLOCK = register("block", new SimpleParticleType(false));
     public static final SimpleParticleType CHERRY_LEAVES = register("cherry_leaves", new SimpleParticleType(false));
+    public static final SimpleParticleType FALLING_LEAVES = register("falling_leaves", new SimpleParticleType(false));
     
     private ParticleTypes() {} // Prevent instantiation
     
