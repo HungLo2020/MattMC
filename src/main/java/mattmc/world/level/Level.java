@@ -109,7 +109,7 @@ public class Level implements LevelAccessor {
             }
             
             @Override
-            public mattmc.world.level.block.Block getBlock(LevelChunk chunk, int x, int y, int z) {
+            public Block getBlock(LevelChunk chunk, int x, int y, int z) {
                 return blockAccess.getBlockAcrossChunks(chunk, x, y, z);
             }
             

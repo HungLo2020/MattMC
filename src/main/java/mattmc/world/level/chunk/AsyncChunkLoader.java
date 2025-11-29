@@ -69,8 +69,8 @@ public class AsyncChunkLoader {
          * @param z Chunk-local Z coordinate (can be outside 0-15 range)
          * @return The block at the position, or AIR if unknown
          */
-        default mattmc.world.level.block.Block getBlock(LevelChunk chunk, int x, int y, int z) {
-            return mattmc.world.level.block.Blocks.AIR; // Fallback to air
+        default Block getBlock(LevelChunk chunk, int x, int y, int z) {
+            return Blocks.AIR; // Fallback to air
         }
         
         // RGBI light methods for proper color and attenuation
