@@ -9,33 +9,35 @@ import mattmc.world.level.Level;
  * <p>Flame particles are bright, float upward, and shrink over time.
  * They ignore world lighting and are always fully bright.
  * 
- * <p>This mirrors Minecraft's FlameParticle behavior.
+ * <p>This mirrors Minecraft's FlameParticle (extends RisingParticle) behavior exactly.
  */
 public class FlameParticle extends TextureSheetParticle {
     
     protected FlameParticle(Level level, double x, double y, double z,
                            double xSpeed, double ySpeed, double zSpeed) {
+        // Call 6-parameter constructor so xd/yd/zd get random initial values
         super(level, x, y, z, xSpeed, ySpeed, zSpeed);
         
-        // Set velocity with upward bias
-        this.xd = xSpeed + (random.nextFloat() - 0.5f) * 0.1f;
-        this.yd = ySpeed + random.nextFloat() * 0.2f;
-        this.zd = zSpeed + (random.nextFloat() - 0.5f) * 0.1f;
-        
-        // Bright orange/yellow color
-        this.rCol = 1.0f;
-        this.gCol = 0.8f + random.nextFloat() * 0.2f;
-        this.bCol = 0.3f + random.nextFloat() * 0.3f;
-        
-        // Scale
-        this.quadSize *= 0.5f + random.nextFloat() * 0.5f;
-        
-        // Lifetime
-        this.lifetime = (int) (6.0f / (random.nextFloat() * 0.5f + 0.5f)) + 2;
-        
-        // Physics - no gravity, just float
-        this.gravity = 0.0f;
+        // Matches Minecraft's RisingParticle constructor exactly
         this.friction = 0.96f;
+        
+        // Apply small random multiplier to initial velocity, then add speed parameter
+        // xd/yd/zd were set to random values by base Particle constructor
+        this.xd = this.xd * 0.01 + xSpeed;
+        this.yd = this.yd * 0.01 + ySpeed;
+        this.zd = this.zd * 0.01 + zSpeed;
+        
+        // Add small random position offset (not velocity) - matches Minecraft exactly
+        this.x += (random.nextFloat() - random.nextFloat()) * 0.05;
+        this.y += (random.nextFloat() - random.nextFloat()) * 0.05;
+        this.z += (random.nextFloat() - random.nextFloat()) * 0.05;
+        
+        // Lifetime formula matches Minecraft exactly: (int)(8.0 / (random * 0.8 + 0.2)) + 4
+        // This gives range of approximately 6-44 ticks
+        this.lifetime = (int) (8.0 / (random.nextDouble() * 0.8 + 0.2)) + 4;
+        
+        // No gravity for flame particles - they just drift with friction
+        this.gravity = 0.0f;
         this.hasPhysics = false;
     }
     
@@ -46,7 +48,8 @@ public class FlameParticle extends TextureSheetParticle {
     
     @Override
     public void move(double x, double y, double z) {
-        // Override to skip collision detection
+        // Matches Minecraft's FlameParticle.move exactly
+        // Simply moves without collision detection by updating bounding box position
         this.x += x;
         this.y += y;
         this.z += z;
@@ -61,13 +64,22 @@ public class FlameParticle extends TextureSheetParticle {
     
     @Override
     protected int getLightColor(float partialTicks) {
-        // Always fully bright (emissive)
+        // Matches Minecraft's FlameParticle.getLightColor exactly
+        // Adds additional brightness based on particle age
         float progress = ((float) this.age + partialTicks) / (float) this.lifetime;
-        progress = Math.min(progress, 1.0f);
+        progress = Math.max(0.0f, Math.min(progress, 1.0f)); // Clamp 0-1
         
-        // Max brightness with some scaling based on age
-        int brightness = (int) (15.0f * 16.0f);
-        return brightness | (brightness << 16);
+        int baseLight = super.getLightColor(partialTicks);
+        int blockLight = baseLight & 255;
+        int skyLight = (baseLight >> 16) & 255;
+        
+        // Add brightness based on age (emissive effect)
+        blockLight += (int) (progress * 15.0f * 16.0f);
+        if (blockLight > 240) {
+            blockLight = 240;
+        }
+        
+        return blockLight | (skyLight << 16);
     }
     
     /**
