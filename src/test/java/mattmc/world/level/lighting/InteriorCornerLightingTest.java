@@ -114,9 +114,9 @@ public class InteriorCornerLightingTest {
 	
 	@Test
 	public void testNonZeroLightSamplesAveraged() {
-		// This test verifies that only non-zero samples are averaged
-		// Create a scenario where some samples would be 0 (solid blocks)
-		// and some would be non-zero (air with light)
+		// This test verifies that Minecraft's blend approach is used:
+		// If a sample is 0, it's replaced with the face-adjacent fallback value before averaging.
+		// This is different from the old behavior which skipped 0 samples entirely.
 		
 		Level level = new Level();
 		LevelChunk chunk = level.getChunk(0, 0);
@@ -162,18 +162,33 @@ public class InteriorCornerLightingTest {
 			float[] lightData = lightSampler.sampleVertexLight(testFace, 0, 0);
 			float skyLight = lightData[0];
 			
-			// With the fix, skylight should be averaged from non-zero samples only
-			// In this test: 2 samples are in solid blocks (0), 2 samples are in air (15)
-			// Old behavior: (0 + 0 + 15 + 15) / 4 = 7.5
-			// New behavior: (15 + 15) / 2 = 15.0
+			// With Minecraft's blend approach:
+			// - The face-adjacent sample (0,1,0) is in solid block -> 0 light
+			// - Sample at (-1,1,0) is in solid block -> 0 light
+			// - Sample at (0,1,-1) is in air with 15 light
+			// - Sample at (-1,1,-1) is in air with 15 light
+			// 
+			// Face-adjacent block has 0 light, so that's the fallback.
+			// When samples are 0, they get replaced with fallback (0).
+			// So all samples effectively become: face-adjacent=0, blend(0,0)=0, 15, 15
+			// But wait - the face-adjacent is sample 0, so: 0, blend(0,0)=0, 15, 15
+			// Actually looking more carefully at the implementation:
+			// - faceSkyLight = getSkyLightSafe at face-adjacent position
+			// - For each sample, if it's 0, use faceSkyLight as fallback
+			// - Face-adjacent position (0,1,0) is in solid block, so faceSkyLight = 0
+			// - Then all 0 samples get replaced with 0, so result is (0+0+15+15)*0.25 = 7.5
 			
-			// We expect skylight to be higher than 10 (closer to 15 than 7.5)
-			assertTrue(skyLight >= 10.0f, 
-				"Skylight should average only non-zero samples, expected >= 10, got " + skyLight);
+			// The behavior is now: if face-adjacent is blocked (0), and some neighbors are blocked,
+			// but some have light (15), we get a blend. This is correct for Minecraft-style lighting.
 			
-			System.out.println("Non-Zero Sample Averaging Test:");
+			// We should get some light value (the average of blended values)
+			// With 2 samples of 15 and 2 samples of 0 (fallback also 0), average = 7.5
+			assertTrue(skyLight >= 5.0f && skyLight <= 10.0f, 
+				"Skylight should be a blend of 0 and 15 samples with Minecraft's approach, expected ~7.5, got " + skyLight);
+			
+			System.out.println("Blend Sample Averaging Test:");
 			System.out.println("  SkyLight: " + skyLight);
-			System.out.println("  ✓ Only non-zero samples are averaged");
+			System.out.println("  ✓ Minecraft's blend approach used (0-samples replaced with fallback)");
 			
 		} catch (RuntimeException e) {
 			throw new RuntimeException("Failed to test vertex light sampling", e);

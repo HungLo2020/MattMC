@@ -1,12 +1,19 @@
 package mattmc.client.renderer.chunk;
 
 import mattmc.client.renderer.block.BlockFaceCollector;
-import mattmc.world.level.block.Block;
+import mattmc.client.settings.OptionsManager;
 import mattmc.world.level.chunk.LevelChunk;
 
 /**
  * Handles vertex light sampling for mesh building.
- * Samples light from adjacent blocks to create smooth lighting gradients.
+ * Uses Minecraft's 4-sample averaging approach for smooth lighting.
+ * 
+ * <p>For each vertex, samples 4 neighbors: the face-adjacent block + 2 edge neighbors + 1 corner.
+ * Uses a blend function where if a sample is 0 (blocked), it's replaced with a fallback value
+ * (the face-adjacent light value) before averaging. This matches Minecraft's approach.</p>
+ * 
+ * <p>When smooth lighting is disabled via {@link OptionsManager#isSmoothLightingEnabled()},
+ * only the face-adjacent block's light value is used (flat lighting).</p>
  * 
  * Extracted from MeshBuilder as part of refactoring to single-purpose classes.
  */
@@ -61,13 +68,17 @@ public class VertexLightSampler {
     }
     
     /**
-     * Sample light for a vertex using smart smooth lighting.
+     * Sample light for a vertex using Minecraft's 4-sample averaging approach.
      * 
-     * For each vertex, we sample light from the 3 adjacent faces + 1 diagonal corner.
-     * This creates smooth lighting gradients across block edges without banding.
+     * <p>For each vertex, we sample light from 4 positions: face-adjacent + 2 edge neighbors + 1 corner.
+     * This creates smooth lighting gradients across block edges.</p>
      * 
-     * Only non-zero light samples are averaged to prevent interior corners from being too dark.
-     * This fixes the issue where solid blocks (with 0 light) would darken adjacent corners.
+     * <p>If a sample has 0 light (e.g., blocked by solid block), it's replaced with the face-adjacent
+     * light value as a fallback, matching Minecraft's blend() function behavior. All 4 samples are
+     * always averaged together: (s0 + s1 + s2 + s3) * 0.25f</p>
+     * 
+     * <p>When {@link OptionsManager#isSmoothLightingEnabled()} returns false, only the face-adjacent
+     * block's light is returned (flat lighting mode).</p>
      * 
      * @param face The face data containing chunk reference and position
      * @param normalIndex Which face (0=top, 1=bottom, 2=north, 3=south, 4=west, 5=east)
@@ -87,18 +98,32 @@ public class VertexLightSampler {
         int cy = face.cy;
         int cz = face.cz;
         
-        // Sample light from 4 positions around the vertex (3 sides + 1 diagonal)
-        // The positions depend on which face and which corner we're sampling
+        // Get the offsets for the 4 sample positions for this vertex
         int[] offsets = getVertexSampleOffsets(normalIndex, cornerIndex);
+        
+        // Position 0 is always the face-adjacent block (used as fallback in blend)
+        int faceX = cx + offsets[0];
+        int faceY = cy + offsets[1];
+        int faceZ = cz + offsets[2];
+        
+        // Sample the face-adjacent block's light (this is the fallback/primary value)
+        int faceSkyLight = getSkyLightSafe(face.chunk, faceX, faceY, faceZ);
+        int[] faceBlockLightRGB = getBlockLightRGBSafe(face.chunk, faceX, faceY, faceZ);
+        
+        // If smooth lighting is disabled, just return the face-adjacent light (flat lighting)
+        if (!OptionsManager.isSmoothLightingEnabled()) {
+            return createLightArray(faceSkyLight, faceBlockLightRGB[0], faceBlockLightRGB[1], faceBlockLightRGB[2]);
+        }
+        
+        // Smooth lighting enabled: sample all 4 positions and average
+        // Using Minecraft's blend approach: if a sample is 0, use the face-adjacent value as fallback
         
         float skyLightSum = 0;
         float blockLightRSum = 0;
         float blockLightGSum = 0;
         float blockLightBSum = 0;
-        int skyLightSamples = 0;
-        int blockLightSamples = 0;
         
-        // Sample 4 positions (3 adjacent + 1 diagonal)
+        // Sample all 4 positions
         for (int i = 0; i < 4; i++) {
             int dx = offsets[i * 3];
             int dy = offsets[i * 3 + 1];
@@ -108,54 +133,49 @@ public class VertexLightSampler {
             int sy = cy + dy;
             int sz = cz + dz;
             
-            // Check if sample position is inside a solid block
-            // If so, we should sample from an alternative position above/around it
-            Block sampleBlock = getBlockSafe(face.chunk, sx, sy, sz);
-            if (sampleBlock != null && sampleBlock.isSolid()) {
-                // Sample from above this solid block instead
-                // This prevents interior edges from being too dark when adjacent
-                // solid blocks block the direct sampling path
-                // Search upward up to 3 blocks to find air
-                for (int searchY = sy + 1; searchY <= sy + 3 && searchY < LevelChunk.HEIGHT; searchY++) {
-                    Block altBlock = getBlockSafe(face.chunk, sx, searchY, sz);
-                    if (altBlock == null || !altBlock.isSolid()) {
-                        // Found a non-solid position above
-                        sy = searchY;
-                        break;
-                    }
-                }
-            }
-            
-            // Sample light at this position (possibly adjusted)
+            // Sample light at this position
             int skyLight = getSkyLightSafe(face.chunk, sx, sy, sz);
             int[] blockLightRGB = getBlockLightRGBSafe(face.chunk, sx, sy, sz);
             
-            // Only include non-zero skylight samples in the average
-            // This prevents solid blocks (with 0 skylight) from darkening interior corners
-            if (skyLight > 0) {
-                skyLightSum += skyLight;
-                skyLightSamples++;
-            }
-            
-            // Only include non-zero blocklight samples in the average
-            // Check if any RGB component is non-zero
-            if (blockLightRGB[0] > 0 || blockLightRGB[1] > 0 || blockLightRGB[2] > 0) {
-                blockLightRSum += blockLightRGB[0];
-                blockLightGSum += blockLightRGB[1];
-                blockLightBSum += blockLightRGB[2];
-                blockLightSamples++;
-            }
+            // Minecraft's blend approach: if sample is 0, use the face-adjacent value as fallback
+            skyLightSum += blendLight(skyLight, faceSkyLight);
+            blockLightRSum += blendLight(blockLightRGB[0], faceBlockLightRGB[0]);
+            blockLightGSum += blendLight(blockLightRGB[1], faceBlockLightRGB[1]);
+            blockLightBSum += blendLight(blockLightRGB[2], faceBlockLightRGB[2]);
         }
         
-        // Average only the non-zero samples to prevent interior corners from being too dark
-        // If all samples are zero, use zero (fully dark, but shader has minimum brightness)
-        float avgSkyLight = skyLightSamples > 0 ? skyLightSum / skyLightSamples : 0.0f;
-        float avgBlockLightR = blockLightSamples > 0 ? blockLightRSum / blockLightSamples : 0.0f;
-        float avgBlockLightG = blockLightSamples > 0 ? blockLightGSum / blockLightSamples : 0.0f;
-        float avgBlockLightB = blockLightSamples > 0 ? blockLightBSum / blockLightSamples : 0.0f;
-        float ao = 0.0f; // No AO yet
-        
-        return new float[] {avgSkyLight, avgBlockLightR, avgBlockLightG, avgBlockLightB, ao};
+        // Average all 4 samples (Minecraft: >> 2 which is * 0.25)
+        return createLightArray(
+            skyLightSum * 0.25f,
+            blockLightRSum * 0.25f,
+            blockLightGSum * 0.25f,
+            blockLightBSum * 0.25f
+        );
+    }
+    
+    /**
+     * Create a light data array from individual light values.
+     * @param skyLight Skylight value (0-15)
+     * @param blockLightR Block light red component (0-15)
+     * @param blockLightG Block light green component (0-15)
+     * @param blockLightB Block light blue component (0-15)
+     * @return Array of [skyLight, blockLightR, blockLightG, blockLightB, ao]
+     */
+    private float[] createLightArray(float skyLight, float blockLightR, float blockLightG, float blockLightB) {
+        return new float[] {skyLight, blockLightR, blockLightG, blockLightB, 0.0f}; // 0.0f = no AO yet
+    }
+    
+    /**
+     * Blend a light value with a fallback value.
+     * If the light value is 0 (blocked), use the fallback value instead.
+     * This matches Minecraft's blend() function behavior.
+     * 
+     * @param light The sampled light value
+     * @param fallback The fallback value (typically the face-adjacent block's light)
+     * @return The blended light value
+     */
+    private float blendLight(int light, int fallback) {
+        return light == 0 ? (float) fallback : (float) light;
     }
     
     /**
@@ -251,31 +271,6 @@ public class VertexLightSampler {
     }
     
     /**
-     * Get blocklight value safely, returning 0 if out of bounds.
-     */
-    private int getBlockLightSafe(LevelChunk chunk, int x, int y, int z) {
-        // Check bounds
-        if (y < 0 || y >= LevelChunk.HEIGHT) {
-            return 0; // Out of bounds: no blocklight
-        }
-        
-        // If we have a light accessor and coordinates are out of chunk bounds, use cross-chunk sampling
-        if (lightAccessor != null && 
-            (x < 0 || x >= LevelChunk.WIDTH ||
-             z < 0 || z >= LevelChunk.DEPTH)) {
-            return lightAccessor.getBlockLightAcrossChunks(chunk, x, y, z);
-        }
-        
-        // Within chunk bounds - use direct access
-        if (x < 0 || x >= LevelChunk.WIDTH ||
-            z < 0 || z >= LevelChunk.DEPTH) {
-            return 0; // Out of chunk bounds without accessor: no blocklight
-        }
-        
-        return chunk.getBlockLightI(x, y, z);
-    }
-    
-    /**
      * Get blocklight RGB values safely, returning [0,0,0] if out of bounds.
      * Scales RGB values by intensity to properly attenuate light with distance.
      * @return Array of [R, G, B] values (0-15 each), scaled by intensity
@@ -327,24 +322,5 @@ public class VertexLightSampler {
         int scaledB = Math.round(b * scale);
         
         return new int[] {scaledR, scaledG, scaledB};
-    }
-    
-    /**
-     * Get block at position safely, returning null if out of bounds.
-     * Used for checking if a sample position is inside a solid block.
-     */
-    private Block getBlockSafe(LevelChunk chunk, int x, int y, int z) {
-        // Check Y bounds
-        if (y < 0 || y >= LevelChunk.HEIGHT) {
-            return null;
-        }
-        
-        // Check if coordinates are out of chunk bounds
-        if (x < 0 || x >= LevelChunk.WIDTH ||
-            z < 0 || z >= LevelChunk.DEPTH) {
-            return null;
-        }
-        
-        return chunk.getBlock(x, y, z);
     }
 }
