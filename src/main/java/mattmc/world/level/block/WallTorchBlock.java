@@ -1,8 +1,12 @@
 package mattmc.world.level.block;
 
+import mattmc.world.level.Level;
+import mattmc.world.level.chunk.ChunkUtils;
 import mattmc.world.phys.shapes.VoxelShape;
 import mattmc.world.level.block.state.BlockState;
 import mattmc.world.level.block.state.properties.Direction;
+
+import java.util.Random;
 
 /**
  * Represents a wall-mounted torch block.
@@ -105,5 +109,48 @@ public class WallTorchBlock extends TorchBlock {
         
         state.setValue("facing", facing);
         return state;
+    }
+    
+    /**
+     * Called periodically client-side to spawn flame and smoke particles.
+     * Wall torches spawn particles offset from the center based on facing direction.
+     * Mirrors Minecraft's WallTorchBlock.animateTick.
+     */
+    @Override
+    public void animateTick(Level level, int x, int y, int z, Random random,
+                           ParticleSpawner particleSpawner) {
+        // Get the blockstate to determine facing direction
+        int chunkY = ChunkUtils.worldToLocalY(y);
+        if (chunkY < 0) {
+            return;
+        }
+        
+        BlockState state = level.getBlockState(x, chunkY, z);
+        
+        // Get facing direction (default to NORTH if not available)
+        Direction facing = Direction.NORTH;
+        if (state != null && state.hasProperty("facing")) {
+            facing = state.getDirection("facing");
+        }
+        
+        // Get the opposite direction (where the wall is)
+        Direction opposite = facing.getOpposite();
+        
+        // Base position is center of block
+        double px = x + 0.5;
+        double py = y + 0.7;
+        double pz = z + 0.5;
+        
+        // Offset 0.27 blocks towards the wall, 0.22 blocks higher than standing torch
+        // Matches Minecraft's exact values from WallTorchBlock.animateTick
+        double offsetX = 0.27 * opposite.getOffsetX();
+        double offsetZ = 0.27 * opposite.getOffsetZ();
+        double offsetY = 0.22;
+        
+        // Spawn smoke particle
+        particleSpawner.spawn("smoke", px + offsetX, py + offsetY, pz + offsetZ, 0.0, 0.0, 0.0);
+        
+        // Spawn flame particle
+        particleSpawner.spawn("flame", px + offsetX, py + offsetY, pz + offsetZ, 0.0, 0.0, 0.0);
     }
 }
