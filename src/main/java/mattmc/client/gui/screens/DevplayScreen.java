@@ -257,10 +257,7 @@ public final class DevplayScreen implements Screen {
         mattmc.world.level.block.Block.ParticleSpawner spawner = (particleType, x, y, z, xSpeed, ySpeed, zSpeed) -> {
             mattmc.core.particles.ParticleOptions options = getParticleOptions(particleType);
             if (options != null) {
-                mattmc.client.particle.Particle p = particleEngine.createParticle(options, x, y, z, xSpeed, ySpeed, zSpeed);
-                if (p != null) {
-                    logger.debug("Created particle {} at ({}, {}, {})", particleType, x, y, z);
-                }
+                particleEngine.createParticle(options, x, y, z, xSpeed, ySpeed, zSpeed);
             }
         };
         
@@ -543,12 +540,6 @@ public final class DevplayScreen implements Screen {
         mattmc.client.particle.ParticleAtlas atlas = particleEngine.getParticleAtlas();
         if (atlas == null) {
             return;
-        }
-        
-        // Debug: log particle count
-        int particleCount = particleEngine.countParticles();
-        if (particleCount > 0) {
-            logger.debug("Rendering {} particles", particleCount);
         }
         
         // Save the current modelview matrix
