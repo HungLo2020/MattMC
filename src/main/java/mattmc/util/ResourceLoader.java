@@ -62,6 +62,31 @@ public final class ResourceLoader {
     }
     
     /**
+     * Load an optional resource as InputStream.
+     * Unlike {@link #getResourceStream}, this method does not log a warning when the resource is not found.
+     * Use this for resources that may or may not exist (e.g., optional .mcmeta animation files).
+     * 
+     * @param resourcePath Path to resource (must start with /)
+     * @return InputStream or null if not found
+     */
+    public static InputStream getOptionalResourceStream(String resourcePath) {
+        return ResourceLoader.class.getResourceAsStream(resourcePath);
+    }
+    
+    /**
+     * Load an optional resource as InputStream using ClassLoader (for paths without leading slash).
+     * Unlike {@link #getResourceStreamFromClassLoader}, this method does not log a warning when 
+     * the resource is not found. Use this for resources that may or may not exist 
+     * (e.g., optional .mcmeta animation files).
+     * 
+     * @param resourcePath Path to resource (no leading slash, e.g., "assets/textures/block/dirt.png.mcmeta")
+     * @return InputStream or null if not found
+     */
+    public static InputStream getOptionalResourceStreamFromClassLoader(String resourcePath) {
+        return ResourceLoader.class.getClassLoader().getResourceAsStream(resourcePath);
+    }
+    
+    /**
      * Load a text resource as String.
      * 
      * @param resourcePath Path to resource (must start with /)

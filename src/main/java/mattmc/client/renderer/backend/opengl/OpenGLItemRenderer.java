@@ -910,9 +910,9 @@ public class OpenGLItemRenderer implements ItemRenderer {
      */
     private static void checkAndCacheAnimatedTextureInfo(String path, String resourcePath, Texture texture) {
         // Check for .mcmeta file
-        // Remove leading slash if present (getResourceStreamFromClassLoader expects no leading slash)
+        // Remove leading slash if present (getOptionalResourceStreamFromClassLoader expects no leading slash)
         String mcmetaPath = (resourcePath.startsWith("/") ? resourcePath.substring(1) : resourcePath) + ".mcmeta";
-        try (InputStream mcmetaStream = mattmc.util.ResourceLoader.getResourceStreamFromClassLoader(mcmetaPath)) {
+        try (InputStream mcmetaStream = mattmc.util.ResourceLoader.getOptionalResourceStreamFromClassLoader(mcmetaPath)) {
             if (mcmetaStream != null) {
                 AnimationMetadataSection metadata = AnimationMetadataSection.load(mcmetaStream);
                 if (metadata != AnimationMetadataSection.EMPTY) {
