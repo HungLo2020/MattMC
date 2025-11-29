@@ -51,6 +51,16 @@ public class VertexLightSampler {
     private static final int FULL_OPACITY = 15;
     
     /** 
+     * Full brightness light values for emissive blocks.
+     * Format: [skyLight, blockLightR, blockLightG, blockLightB, ambientOcclusion]
+     * All light values are set to maximum (15), AO is set to 1.0 (no darkening).
+     * Used to ensure light-emitting blocks are never shaded.
+     * 
+     * <p><b>Note:</b> This array is returned directly for performance. Callers must NOT modify it.
+     */
+    private static final float[] FULL_BRIGHTNESS = {15.0f, 15.0f, 15.0f, 15.0f, 1.0f};
+    
+    /** 
      * Direction step values for the 6 faces.
      * Index mapping: 0=UP, 1=DOWN, 2=NORTH, 3=SOUTH, 4=WEST, 5=EAST
      * Each entry is {stepX, stepY, stepZ} for the face normal direction.
@@ -176,6 +186,13 @@ public class VertexLightSampler {
     public float[] sampleVertexLight(BlockFaceCollector.FaceData face, 
                                       int normalIndex,
                                       int cornerIndex) {
+        // Emissive blocks (light-emitting blocks like torches, sea lanterns, froglights)
+        // should always be rendered at full brightness without any shading or AO.
+        // This matches Minecraft's emissiveRendering behavior.
+        if (face.block != null && face.block.isEmissive()) {
+            return FULL_BRIGHTNESS;
+        }
+        
         // If no chunk reference, return default lighting
         if (face.chunk == null) {
             return new float[] {15.0f, 0.0f, 0.0f, 0.0f, 1.0f}; // Full skylight, no blocklight RGB, full AO brightness
@@ -242,6 +259,13 @@ public class VertexLightSampler {
     public float[] sampleVertexLightWithPosition(BlockFaceCollector.FaceData face,
                                                   float vertexX, float vertexY, float vertexZ,
                                                   float normalX, float normalY, float normalZ) {
+        // Emissive blocks (light-emitting blocks like torches, sea lanterns, froglights)
+        // should always be rendered at full brightness without any shading or AO.
+        // This matches Minecraft's emissiveRendering behavior.
+        if (face.block != null && face.block.isEmissive()) {
+            return FULL_BRIGHTNESS;
+        }
+        
         // If no chunk reference, return default lighting
         if (face.chunk == null) {
             return new float[] {15.0f, 0.0f, 0.0f, 0.0f, 1.0f};
