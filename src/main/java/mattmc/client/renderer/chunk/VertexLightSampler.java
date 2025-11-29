@@ -1,6 +1,7 @@
 package mattmc.client.renderer.chunk;
 
 import mattmc.client.renderer.block.BlockFaceCollector;
+import mattmc.world.level.block.Block;
 import mattmc.world.level.chunk.LevelChunk;
 
 /**
@@ -107,7 +108,25 @@ public class VertexLightSampler {
             int sy = cy + dy;
             int sz = cz + dz;
             
-            // Sample light at this position
+            // Check if sample position is inside a solid block
+            // If so, we should sample from an alternative position above/around it
+            Block sampleBlock = getBlockSafe(face.chunk, sx, sy, sz);
+            if (sampleBlock != null && sampleBlock.isSolid()) {
+                // Sample from above this solid block instead
+                // This prevents interior edges from being too dark when adjacent
+                // solid blocks block the direct sampling path
+                // Search upward up to 3 blocks to find air
+                for (int searchY = sy + 1; searchY <= sy + 3 && searchY < LevelChunk.HEIGHT; searchY++) {
+                    Block altBlock = getBlockSafe(face.chunk, sx, searchY, sz);
+                    if (altBlock == null || !altBlock.isSolid()) {
+                        // Found a non-solid position above
+                        sy = searchY;
+                        break;
+                    }
+                }
+            }
+            
+            // Sample light at this position (possibly adjusted)
             int skyLight = getSkyLightSafe(face.chunk, sx, sy, sz);
             int[] blockLightRGB = getBlockLightRGBSafe(face.chunk, sx, sy, sz);
             
@@ -308,5 +327,24 @@ public class VertexLightSampler {
         int scaledB = Math.round(b * scale);
         
         return new int[] {scaledR, scaledG, scaledB};
+    }
+    
+    /**
+     * Get block at position safely, returning null if out of bounds.
+     * Used for checking if a sample position is inside a solid block.
+     */
+    private Block getBlockSafe(LevelChunk chunk, int x, int y, int z) {
+        // Check Y bounds
+        if (y < 0 || y >= LevelChunk.HEIGHT) {
+            return null;
+        }
+        
+        // Check if coordinates are out of chunk bounds
+        if (x < 0 || x >= LevelChunk.WIDTH ||
+            z < 0 || z >= LevelChunk.DEPTH) {
+            return null;
+        }
+        
+        return chunk.getBlock(x, y, z);
     }
 }

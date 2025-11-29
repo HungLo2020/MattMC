@@ -113,7 +113,17 @@ public class BlockFaceCollector {
     }
     
     /**
-     * Check if a face should be rendered (is the adjacent block air or transparent?).
+     * Check if a face should be rendered (is the adjacent block air or non-occluding?).
+     * 
+     * A face should be rendered when the adjacent block:
+     * - Is air (nothing there)
+     * - Cannot occlude (transparent blocks like leaves, glass)
+     * 
+     * This matches Minecraft's face culling behavior where canOcclude() determines
+     * if a block hides adjacent faces, not isSolid() (which is for collision).
+     * 
+     * ISSUE-003 fix: Uses getBlockUnchecked() for interior blocks to avoid
+     * redundant bounds checking on every face.
      */
     private boolean shouldRenderFace(LevelChunk chunk, int x, int y, int z) {
         // Check Y bounds first (no neighboring chunks in Y direction)
@@ -121,16 +131,20 @@ public class BlockFaceCollector {
             return true; // Out of world bounds, render the face
         }
         
-        // If within chunk bounds, use direct chunk access
+        // ISSUE-003 fix: Use unchecked access for interior blocks (vast majority of cases)
+        // Only the edge blocks (x=0,15 or z=0,15) need cross-chunk checking
         if (x >= 0 && x < LevelChunk.WIDTH && z >= 0 && z < LevelChunk.DEPTH) {
-            Block adjacent = chunk.getBlock(x, y, z);
-            return adjacent.isAir() || !adjacent.isSolid();  // Render if air or transparent (non-solid)
+            // Interior block - use unchecked access for performance
+            Block adjacent = chunk.getBlockUnchecked(x, y, z);
+            // Render if air or if adjacent block cannot occlude (transparent like leaves)
+            return adjacent.isAir() || !adjacent.canOcclude();
         }
         
         // Out of chunk bounds in X or Z - need to check neighboring chunk
         if (neighborAccessor != null) {
             Block adjacentBlock = neighborAccessor.getBlockAcrossChunks(chunk, x, y, z);
-            return adjacentBlock.isAir() || !adjacentBlock.isSolid();  // Render if air or transparent
+            // Render if air or if adjacent block cannot occlude (transparent like leaves)
+            return adjacentBlock.isAir() || !adjacentBlock.canOcclude();
         }
         
         // No neighbor accessor available - fall back to old behavior

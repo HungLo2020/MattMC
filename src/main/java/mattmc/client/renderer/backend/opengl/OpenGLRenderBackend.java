@@ -325,9 +325,12 @@ public class OpenGLRenderBackend implements RenderBackend {
             currentShader = null;
             currentAtlas = null;
             
-            // OpenGL state setup could go here
-            // For now, we assume the caller has already set up the GL state
-            // (viewport, clear color, etc.) before calling beginFrame()
+            // OpenGL state setup for 3D rendering
+            // Enable alpha blending for transparent textures (e.g., leaves)
+            // The fragment shader uses 'discard' for fully transparent pixels,
+            // but blending is still needed for proper alpha compositing
+            glEnable(GL_BLEND);
+            glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
         }
     }
     
@@ -631,6 +634,9 @@ public class OpenGLRenderBackend implements RenderBackend {
                 glBindTexture(GL_TEXTURE_2D, 0);
                 currentAtlas = null;
             }
+            
+            // Disable blending that was enabled in beginFrame
+            glDisable(GL_BLEND);
         }
     }
     
@@ -1257,6 +1263,16 @@ public class OpenGLRenderBackend implements RenderBackend {
         return OpenGLItemRenderer.getInstance();
     }
     
+    @Override
+    public void tickTextureAnimations() {
+        // Tick all registered texture atlases
+        for (MaterialInfo material : materialRegistry.values()) {
+            if (material.atlas != null) {
+                material.atlas.tickAnimations();
+            }
+        }
+    }
+    
     // === 3D Rendering Methods ===
     
     @Override
@@ -1370,5 +1386,41 @@ public class OpenGLRenderBackend implements RenderBackend {
     @Override
     public boolean isTexture2DEnabled() {
         return glIsEnabled(GL_TEXTURE_2D);
+    }
+    
+    @Override
+    public void bindTexture(int textureId) {
+        glBindTexture(GL_TEXTURE_2D, textureId);
+    }
+    
+    @Override
+    public void unbindTexture() {
+        glBindTexture(GL_TEXTURE_2D, 0);
+    }
+    
+    @Override
+    public void begin3DQuads() {
+        glBegin(GL_QUADS);
+    }
+    
+    @Override
+    public void end3DQuads() {
+        glEnd();
+    }
+    
+    @Override
+    public void addTexturedQuadVertex(float x, float y, float z, float u, float v) {
+        glTexCoord2f(u, v);
+        glVertex3f(x, y, z);
+    }
+    
+    @Override
+    public void setDepthMask(boolean enable) {
+        glDepthMask(enable);
+    }
+    
+    @Override
+    public void setBlendFunc(int srcFactor, int dstFactor) {
+        glBlendFunc(srcFactor, dstFactor);
     }
 }

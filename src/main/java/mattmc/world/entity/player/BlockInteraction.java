@@ -1,13 +1,12 @@
 package mattmc.world.entity.player;
 
-import mattmc.client.MattMC;
-
 import mattmc.world.item.BlockItem;
 import mattmc.world.item.Item;
 import mattmc.world.item.ItemStack;
 import mattmc.world.item.Items;
 import mattmc.world.level.block.Block;
 import mattmc.world.level.block.Blocks;
+import mattmc.world.level.block.SlabBlock;
 import mattmc.world.level.chunk.ChunkUtils;
 import mattmc.world.level.chunk.LevelChunk;
 import mattmc.world.level.LevelAccessor;
@@ -40,11 +39,39 @@ public class BlockInteraction {
     
     /**
      * Attempt to place a block on the face the player is looking at.
+     * Handles special cases like slab-to-slab placement to form double slabs.
      * @param block The block to place
      */
     public void placeBlock(Block block) {
         BlockHitResult hit = raycastBlock();
-        if (hit != null && hit.adjacentY >= 0 && hit.adjacentY < LevelChunk.HEIGHT) {
+        if (hit == null) {
+            return;
+        }
+        
+        // Check if we can combine slabs
+        if (block instanceof SlabBlock) {
+            SlabBlock slabToPlace = (SlabBlock) block;
+            
+            // Check if the hit block is the same type of slab
+            Block hitBlock = world.getBlock(hit.x, hit.y, hit.z);
+            if (hitBlock instanceof SlabBlock && hitBlock.getIdentifier() != null 
+                && hitBlock.getIdentifier().equals(block.getIdentifier())) {
+                
+                SlabBlock existingSlab = (SlabBlock) hitBlock;
+                mattmc.world.level.block.state.BlockState existingState = world.getBlockState(hit.x, hit.y, hit.z);
+                
+                // Check if we can combine these slabs into a double slab
+                if (existingSlab.canBeReplacedBy(existingState, hit.hitFace, hit.hitY)) {
+                    // Replace with double slab
+                    mattmc.world.level.block.state.BlockState doubleState = slabToPlace.getDoubleSlabState();
+                    world.setBlock(hit.x, hit.y, hit.z, block, doubleState);
+                    return;
+                }
+            }
+        }
+        
+        // Normal placement in adjacent position
+        if (hit.adjacentY >= 0 && hit.adjacentY < LevelChunk.HEIGHT) {
             // Place block at the adjacent position (the face we hit)
             Block existing = world.getBlock(hit.adjacentX, hit.adjacentY, hit.adjacentZ);
             if (existing.isAir()) {
@@ -72,8 +99,10 @@ public class BlockInteraction {
     
     /**
      * Pick the block the player is looking at and add it to their inventory.
-     * Similar to MattMC's middle-click pick block functionality.
-     * Adds the block to the first empty slot, starting with the hotbar.
+     * Implements Minecraft's middle-click pick block behavior:
+     * 1. If the item is already in the hotbar, switch to that slot
+     * 2. If the item is in the main inventory, swap it with the current hotbar slot
+     * 3. If the item is not in inventory and hotbar is full, move current slot to inventory first
      * 
      * @return true if a block was picked successfully
      */
@@ -105,9 +134,12 @@ public class BlockInteraction {
             return false;
         }
         
-        // Add the item to the player's inventory
+        // Create an item stack for the picked block
         ItemStack stack = new ItemStack(item, 1);
-        return player.getInventory().addItem(stack);
+        
+        // Use Minecraft-style pick item behavior
+        player.getInventory().setPickedItem(stack);
+        return true;
     }
     
     /**

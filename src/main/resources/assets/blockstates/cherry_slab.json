@@ -1,0 +1,13 @@
+{
+  "variants": {
+    "type=bottom": {
+      "model": "mattmc:block/cherry_slab"
+    },
+    "type=double": {
+      "model": "mattmc:block/cherry_planks"
+    },
+    "type=top": {
+      "model": "mattmc:block/cherry_slab_top"
+    }
+  }
+}

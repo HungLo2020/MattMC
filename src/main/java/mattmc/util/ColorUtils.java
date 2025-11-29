@@ -7,6 +7,21 @@ package mattmc.util;
  */
 public final class ColorUtils {
     
+    /** Mask for extracting a single color channel (8 bits). */
+    private static final int CHANNEL_MASK = 0xFF;
+    
+    /** Bit shift for the red channel in a packed RGB integer. */
+    private static final int RED_SHIFT = 16;
+    
+    /** Bit shift for the green channel in a packed RGB integer. */
+    private static final int GREEN_SHIFT = 8;
+    
+    /** Maximum value for a color channel (255). */
+    public static final int MAX_CHANNEL_VALUE = 255;
+    
+    /** Normalization divisor for converting byte color (0-255) to float (0.0-1.0). */
+    private static final float NORMALIZE_DIVISOR = 255f;
+    
     private ColorUtils() {} // Prevent instantiation
     
     /**
@@ -15,7 +30,7 @@ public final class ColorUtils {
      * @return Red component (0-255)
      */
     public static int extractRed(int rgb) {
-        return (rgb >> 16) & 0xFF;
+        return (rgb >> RED_SHIFT) & CHANNEL_MASK;
     }
     
     /**
@@ -24,7 +39,7 @@ public final class ColorUtils {
      * @return Green component (0-255)
      */
     public static int extractGreen(int rgb) {
-        return (rgb >> 8) & 0xFF;
+        return (rgb >> GREEN_SHIFT) & CHANNEL_MASK;
     }
     
     /**
@@ -33,7 +48,7 @@ public final class ColorUtils {
      * @return Blue component (0-255)
      */
     public static int extractBlue(int rgb) {
-        return rgb & 0xFF;
+        return rgb & CHANNEL_MASK;
     }
     
     /**
@@ -43,9 +58,9 @@ public final class ColorUtils {
      */
     public static float[] toNormalizedRGB(int rgb) {
         return new float[] {
-            extractRed(rgb) / 255f,
-            extractGreen(rgb) / 255f,
-            extractBlue(rgb) / 255f
+            extractRed(rgb) / NORMALIZE_DIVISOR,
+            extractGreen(rgb) / NORMALIZE_DIVISOR,
+            extractBlue(rgb) / NORMALIZE_DIVISOR
         };
     }
     
@@ -57,9 +72,9 @@ public final class ColorUtils {
      */
     public static float[] toNormalizedRGBA(int rgb, float alpha) {
         return new float[] {
-            extractRed(rgb) / 255f,
-            extractGreen(rgb) / 255f,
-            extractBlue(rgb) / 255f,
+            extractRed(rgb) / NORMALIZE_DIVISOR,
+            extractGreen(rgb) / NORMALIZE_DIVISOR,
+            extractBlue(rgb) / NORMALIZE_DIVISOR,
             alpha
         };
     }
@@ -72,7 +87,7 @@ public final class ColorUtils {
      * @return Packed RGB integer
      */
     public static int packRGB(int r, int g, int b) {
-        return ((r & 0xFF) << 16) | ((g & 0xFF) << 8) | (b & 0xFF);
+        return ((r & CHANNEL_MASK) << RED_SHIFT) | ((g & CHANNEL_MASK) << GREEN_SHIFT) | (b & CHANNEL_MASK);
     }
     
     /**
@@ -115,13 +130,15 @@ public final class ColorUtils {
     /**
      * Adjust the brightness of an RGB color.
      * @param rgb RGB color value
-     * @param factor Brightness factor (0.0 to 1.0+)
+     * @param factor Brightness factor (0.0 to 1.0+). Negative values are treated as 0.
      * @return Adjusted color
      */
     public static int adjustColorBrightness(int rgb, float factor) {
-        int r = MathUtils.min(255, (int)(extractRed(rgb) * factor));
-        int g = MathUtils.min(255, (int)(extractGreen(rgb) * factor));
-        int b = MathUtils.min(255, (int)(extractBlue(rgb) * factor));
+        // Clamp factor to non-negative to avoid negative color values
+        if (factor < 0.0f) factor = 0.0f;
+        int r = MathUtils.min(MAX_CHANNEL_VALUE, (int)(extractRed(rgb) * factor));
+        int g = MathUtils.min(MAX_CHANNEL_VALUE, (int)(extractGreen(rgb) * factor));
+        int b = MathUtils.min(MAX_CHANNEL_VALUE, (int)(extractBlue(rgb) * factor));
         return packRGB(r, g, b);
     }
     
@@ -131,10 +148,13 @@ public final class ColorUtils {
      * 
      * @param baseColor The base color (typically white 0xFFFFFF for textures)
      * @param tintColor The tint color to apply (e.g., 0x5BB53B for grass green)
-     * @param brightnessFactor Additional brightness adjustment
+     * @param brightnessFactor Additional brightness adjustment. Negative values are treated as 0.
      * @return The tinted color
      */
     public static int applyTint(int baseColor, int tintColor, float brightnessFactor) {
+        // Clamp factor to non-negative to avoid negative color values
+        if (brightnessFactor < 0.0f) brightnessFactor = 0.0f;
+        
         // Extract RGB components from base and tint
         int baseR = extractRed(baseColor);
         int baseG = extractGreen(baseColor);
@@ -145,9 +165,9 @@ public final class ColorUtils {
         int tintB = extractBlue(tintColor);
         
         // Multiply components (treating them as 0-1 range)
-        int r = MathUtils.min(255, (int)((baseR * tintR / 255.0f) * brightnessFactor));
-        int g = MathUtils.min(255, (int)((baseG * tintG / 255.0f) * brightnessFactor));
-        int b = MathUtils.min(255, (int)((baseB * tintB / 255.0f) * brightnessFactor));
+        int r = MathUtils.min(MAX_CHANNEL_VALUE, (int)((baseR * tintR / NORMALIZE_DIVISOR) * brightnessFactor));
+        int g = MathUtils.min(MAX_CHANNEL_VALUE, (int)((baseG * tintG / NORMALIZE_DIVISOR) * brightnessFactor));
+        int b = MathUtils.min(MAX_CHANNEL_VALUE, (int)((baseB * tintB / NORMALIZE_DIVISOR) * brightnessFactor));
         
         return packRGB(r, g, b);
     }

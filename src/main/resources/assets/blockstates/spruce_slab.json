@@ -1,0 +1,13 @@
+{
+  "variants": {
+    "type=bottom": {
+      "model": "mattmc:block/spruce_slab"
+    },
+    "type=double": {
+      "model": "mattmc:block/spruce_planks"
+    },
+    "type=top": {
+      "model": "mattmc:block/spruce_slab_top"
+    }
+  }
+}

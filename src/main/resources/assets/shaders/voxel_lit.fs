@@ -33,6 +33,11 @@ void main() {
 	// Sample texture
 	vec4 texColor = texture2D(uTexture, vTexCoord);
 	
+	// Discard fully transparent pixels for proper alpha testing
+	if (texColor.a < 0.01) {
+		discard;
+	}
+	
 	// Extract light components (0-15 range)
 	float skyLight = vLightData.x;
 	vec3 blockLightRGB = vLightData.yzw; // R, G, B
@@ -60,6 +65,6 @@ void main() {
 	// Apply optional emissive boost
 	finalLightColor *= uEmissiveBoost;
 	
-	// Apply lighting to final color
+	// Apply lighting to final color, preserving texture alpha for transparency
 	gl_FragColor = vColor * texColor * vec4(finalLightColor, 1.0);
 }

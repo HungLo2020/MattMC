@@ -26,8 +26,16 @@ public class BitPackedArray {
      * 
      * @param bitsPerEntry Number of bits per entry (0-64). 0 means all entries are the same (no data needed).
      * @param size Total number of entries to store
+     * @throws IllegalArgumentException if bitsPerEntry is negative or greater than 64, or if size is negative
      */
     public BitPackedArray(int bitsPerEntry, int size) {
+        if (bitsPerEntry < 0 || bitsPerEntry > 64) {
+            throw new IllegalArgumentException("bitsPerEntry must be 0-64, got: " + bitsPerEntry);
+        }
+        if (size < 0) {
+            throw new IllegalArgumentException("size must be non-negative, got: " + size);
+        }
+        
         this.bitsPerEntry = bitsPerEntry;
         this.size = size;
         

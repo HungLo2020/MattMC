@@ -12,6 +12,7 @@ import mattmc.world.entity.player.PlayerPhysics;
 import mattmc.world.entity.player.PlayerInput;
 import mattmc.client.renderer.WorldRenderer;
 import mattmc.client.renderer.UIRenderer;
+import mattmc.client.renderer.SkyRenderer;
 import mattmc.client.renderer.block.BlockOutlineRenderer;
 import mattmc.world.item.Inventory;
 import mattmc.world.level.chunk.ChunkUtils;
@@ -50,6 +51,7 @@ public final class DevplayScreen implements Screen {
     private final BlockInteraction blockInteraction;
     private final WorldRenderer worldRenderer;
     private final UIRenderer uiRenderer;
+    private final SkyRenderer skyRenderer;
     
     // Level name for saving
     private final String worldName;
@@ -168,6 +170,7 @@ public final class DevplayScreen implements Screen {
         this.worldRenderer = game.getBackendFactory().createWorldRenderer();
         this.worldRenderer.initWithLevel(this.world);
         this.uiRenderer = new UIRenderer();
+        this.skyRenderer = new SkyRenderer(this.worldRenderer.getRenderBackend());
         
         // Stage 4: Share the render backend between world and UI rendering
         // This ensures UI elements use the same backend abstraction as chunks
@@ -245,6 +248,10 @@ public final class DevplayScreen implements Screen {
         float aspect = Math.max(1f, (float) w / Math.max(1, h));
         float fov = 70f, zn = 0.1f, zf = 500f;
         backend.setupPerspectiveProjection(fov, aspect, zn, zf);
+
+        // Render sky first (sun, moon, stars) - sky only needs rotation, not translation
+        // SkyRenderer handles all its own state management
+        skyRenderer.render(world.getDayCycle(), player.getPitch(alphaF), player.getYaw(alphaF));
 
         // Apply camera transformations (pitch, yaw, then position)
         // Use interpolated values for smooth rendering between ticks

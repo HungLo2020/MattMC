@@ -1,0 +1,13 @@
+{
+  "variants": {
+    "type=bottom": {
+      "model": "mattmc:block/dark_oak_slab"
+    },
+    "type=double": {
+      "model": "mattmc:block/dark_oak_planks"
+    },
+    "type=top": {
+      "model": "mattmc:block/dark_oak_slab_top"
+    }
+  }
+}

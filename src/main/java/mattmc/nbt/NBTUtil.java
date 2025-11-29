@@ -1,7 +1,5 @@
 package mattmc.nbt;
 
-import mattmc.client.MattMC;
-
 import java.io.*;
 import java.util.*;
 import java.util.zip.*;

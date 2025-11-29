@@ -47,9 +47,13 @@ public final class KeyNameParser {
         
         // Function keys
         if (keyName.matches("f\\d+")) {
-            int num = Integer.parseInt(keyName.substring(1));
-            if (num >= 1 && num <= 12) {
-                return GLFW_KEY_F1 + (num - 1);
+            try {
+                int num = Integer.parseInt(keyName.substring(1));
+                if (num >= 1 && num <= 12) {
+                    return GLFW_KEY_F1 + (num - 1);
+                }
+            } catch (NumberFormatException e) {
+                // Number too large (e.g., "f999999999999") - return null below
             }
         }
         

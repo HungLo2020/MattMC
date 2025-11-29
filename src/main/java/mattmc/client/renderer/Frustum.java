@@ -128,7 +128,8 @@ public class Frustum {
             planes[plane][2] * planes[plane][2]
         );
         
-        if (length > 0) {
+        // Use epsilon to avoid division by near-zero values which can cause numerical instability
+        if (length > 1e-6f) {
             planes[plane][0] /= length;
             planes[plane][1] /= length;
             planes[plane][2] /= length;

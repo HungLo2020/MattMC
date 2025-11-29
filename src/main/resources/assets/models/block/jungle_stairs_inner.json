@@ -1,0 +1,8 @@
+{
+  "parent": "mattmc:block/inner_stairs",
+  "textures": {
+    "bottom": "mattmc:block/jungle_planks",
+    "side": "mattmc:block/jungle_planks",
+    "top": "mattmc:block/jungle_planks"
+  }
+}

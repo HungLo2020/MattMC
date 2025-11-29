@@ -135,12 +135,20 @@ public class ItemRenderLogic {
         }
         
         String itemId = stack.getItem().getIdentifier();
-        if (itemId == null) {
+        if (itemId == null || itemId.isEmpty()) {
             return;
         }
         
         // Extract item name from identifier
         String itemName = itemId.contains(":") ? itemId.substring(itemId.indexOf(':') + 1) : itemId;
+        
+        // Guard against empty itemName after splitting
+        if (itemName.isEmpty()) {
+            // Fallback rendering for malformed identifier
+            DrawCommand cmd = new DrawCommand(UIMeshIds.ITEM_FALLBACK, -1, 0, RenderPass.UI);
+            buffer.add(cmd);
+            return;
+        }
         
         // Get texture paths for this item
         java.util.Map<String, String> texturePaths = mattmc.client.resources.ResourceManager.getItemTexturePaths(itemName);

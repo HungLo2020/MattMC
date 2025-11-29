@@ -1,7 +1,5 @@
 package mattmc.world.item;
 
-import mattmc.client.resources.ResourceManager;
-
 import java.util.Map;
 
 /**
@@ -85,13 +83,9 @@ public class Item {
      * @return A map of texture keys to paths (e.g., "layer0" -> "assets/textures/item/diamond.png")
      */
     public Map<String, String> getTexturePaths() {
-        if (texturePaths == null && identifier != null) {
-            // Extract item name from identifier (e.g., "mattmc:diamond" -> "diamond")
-            String itemName = identifier.contains(":") ? identifier.substring(identifier.indexOf(':') + 1) : identifier;
-            // Note: Item texture paths are currently not loaded from ResourceManager
-            // They should be set explicitly when registering items
-            texturePaths = null;
-        }
+        // Note: Item texture paths are currently not implemented
+        // They should be set explicitly when registering items
+        // or loaded from item model JSON files similar to how blocks work
         return texturePaths;
     }
     

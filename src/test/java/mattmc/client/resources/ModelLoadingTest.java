@@ -165,4 +165,38 @@ class ModelLoadingTest {
         BlockState blockState = ResourceManager.loadBlockState("nonexistent_blockstate_12345");
         assertNull(blockState, "Non-existent blockstate should return null");
     }
+    
+    @Test
+    void testOakLogBlockStateAxisVariants() {
+        // Load oak_log blockstate which uses axis=x, axis=y, axis=z variants
+        BlockState blockState = ResourceManager.loadBlockState("oak_log");
+        assertNotNull(blockState, "Oak log blockstate should load");
+        
+        // Test axis=y (vertical, default)
+        List<BlockStateVariant> variantsY = blockState.getVariantsForState("axis=y");
+        assertNotNull(variantsY, "Should have variant for axis=y");
+        assertFalse(variantsY.isEmpty(), "axis=y variant list should not be empty");
+        BlockStateVariant varY = variantsY.get(0);
+        assertEquals("mattmc:block/oak_log", varY.getModel(), "axis=y should use vertical model");
+        assertNull(varY.getX(), "axis=y should have no X rotation");
+        assertNull(varY.getY(), "axis=y should have no Y rotation");
+        
+        // Test axis=x (horizontal along X)
+        List<BlockStateVariant> variantsX = blockState.getVariantsForState("axis=x");
+        assertNotNull(variantsX, "Should have variant for axis=x");
+        assertFalse(variantsX.isEmpty(), "axis=x variant list should not be empty");
+        BlockStateVariant varX = variantsX.get(0);
+        assertEquals("mattmc:block/oak_log_horizontal", varX.getModel(), "axis=x should use horizontal model");
+        assertEquals(90, varX.getX(), "axis=x should have X rotation 90");
+        assertEquals(90, varX.getY(), "axis=x should have Y rotation 90");
+        
+        // Test axis=z (horizontal along Z)
+        List<BlockStateVariant> variantsZ = blockState.getVariantsForState("axis=z");
+        assertNotNull(variantsZ, "Should have variant for axis=z");
+        assertFalse(variantsZ.isEmpty(), "axis=z variant list should not be empty");
+        BlockStateVariant varZ = variantsZ.get(0);
+        assertEquals("mattmc:block/oak_log_horizontal", varZ.getModel(), "axis=z should use horizontal model");
+        assertEquals(90, varZ.getX(), "axis=z should have X rotation 90");
+        assertNull(varZ.getY(), "axis=z should have no Y rotation");
+    }
 }

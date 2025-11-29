@@ -15,12 +15,17 @@ import mattmc.client.renderer.item.ItemDisplayContext;
 import mattmc.client.renderer.item.ItemRenderer;
 import mattmc.client.renderer.backend.opengl.Texture;
 import mattmc.client.resources.ResourceManager;
+import mattmc.client.resources.metadata.animation.AnimationMetadataSection;
 import mattmc.client.resources.model.BlockModel;
 import mattmc.client.resources.model.ModelDisplay;
+import mattmc.world.item.BlockItem;
 import mattmc.world.item.ItemStack;
+import mattmc.world.level.block.Block;
+import mattmc.world.level.block.LeavesBlock;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -51,8 +56,15 @@ public class OpenGLItemRenderer implements ItemRenderer {
     // Cache for item textures
     private static final Map<String, Texture> TEXTURE_CACHE = new HashMap<>();
     
+    // Cache for animated texture UV scale (maps texture path to V scale for first frame)
+    // Value is the V coordinate for the bottom of the first frame (e.g., 0.2 for 16x80 texture)
+    private static final Map<String, Float> ANIMATED_TEXTURE_V_SCALE = new HashMap<>();
+    
     // Item texture dimension - items are rendered as 16x16 pixel textures
     private static final float ITEM_TEXTURE_SIZE = 16.0f;
+    
+    // Tolerance for float comparison in geometry detection
+    private static final float EPSILON = 0.01f;
     
     // Singleton instance for static method compatibility
     private static final OpenGLItemRenderer INSTANCE = new OpenGLItemRenderer();
@@ -106,12 +118,17 @@ public class OpenGLItemRenderer implements ItemRenderer {
         }
         
         String itemId = stack.getItem().getIdentifier();
-        if (itemId == null) {
+        if (itemId == null || itemId.isEmpty()) {
             return;
         }
         
         // Extract item name from identifier
         String itemName = itemId.contains(":") ? itemId.substring(itemId.indexOf(':') + 1) : itemId;
+        
+        // Guard against empty itemName after splitting
+        if (itemName.isEmpty()) {
+            return;
+        }
         
         // Load the item model
         BlockModel itemModel = ResourceManager.resolveItemModel(itemName);
@@ -165,12 +182,19 @@ public class OpenGLItemRenderer implements ItemRenderer {
         }
         
         String itemId = stack.getItem().getIdentifier();
-        if (itemId == null) {
+        if (itemId == null || itemId.isEmpty()) {
             return;
         }
         
         // Extract item name from identifier (e.g., "mattmc:grass_block" -> "grass_block")
         String itemName = itemId.contains(":") ? itemId.substring(itemId.indexOf(':') + 1) : itemId;
+        
+        // Guard against empty itemName after splitting
+        if (itemName.isEmpty()) {
+            // Fallback: render magenta square
+            INSTANCE.renderFallbackItem(x, y, size);
+            return;
+        }
         
         // Get texture paths for this item
         Map<String, String> texturePaths = ResourceManager.getItemTexturePaths(itemName);
@@ -188,9 +212,10 @@ public class OpenGLItemRenderer implements ItemRenderer {
             // Get the item model to check for tints and special rendering
             mattmc.client.resources.model.BlockModel itemModel = ResourceManager.resolveItemModel(itemName);
             
-            // Check if this is a stairs block by looking at the original parent before merging
+            // Check if this is a stairs or slab block by looking at the original parent before merging
             String originalParent = itemModel != null ? itemModel.getOriginalParent() : null;
             boolean isStairs = originalParent != null && originalParent.contains("stairs");
+            boolean isSlab = originalParent != null && originalParent.contains("slab");
             
             // Apply inventory offset for block items if requested
             float adjustedY = applyInventoryOffset ? y + 18f : y;
@@ -198,9 +223,12 @@ public class OpenGLItemRenderer implements ItemRenderer {
             if (isStairs) {
                 // Render as isometric stairs
                 renderIsometricStairs(texturePaths, itemModel, x, adjustedY, size);
+            } else if (isSlab) {
+                // Render as isometric slab (half-height block)
+                renderIsometricSlab(texturePaths, itemModel, x, adjustedY, size);
             } else {
-                // Render as isometric 3D cube
-                renderIsometricCube(texturePaths, itemModel, x, adjustedY, size);
+                // Render as isometric 3D cube, passing the stack for LeavesBlock tint detection
+                renderIsometricCube(stack, texturePaths, itemModel, x, adjustedY, size);
             }
         } else {
             // Render as flat 2D icon (for non-block items)
@@ -226,23 +254,50 @@ public class OpenGLItemRenderer implements ItemRenderer {
      * Render an isometric cube showing three faces (west, north, and top).
      * Uses the actual in-game 3D block geometry projected to 2D isometric view.
      * 
+     * @param stack The item stack being rendered (for LeavesBlock tint detection)
+     * @param texturePaths Texture paths for each face
+     * @param itemModel The item model for tints from JSON
+     * @param x Center X position
+     * @param y Center Y position
      * @param size Half-width for the isometric projection
      */
-    private static void renderIsometricCube(Map<String, String> texturePaths, mattmc.client.resources.model.BlockModel itemModel, float x, float y, float size) {
+    private static void renderIsometricCube(ItemStack stack, Map<String, String> texturePaths, mattmc.client.resources.model.BlockModel itemModel, float x, float y, float size) {
         // Get textures for each face
         String topTexture = getTextureForFace(texturePaths, "top");
         String sideTexture = getTextureForFace(texturePaths, "side");
+        String overlayTexture = texturePaths.get("overlay"); // For grass blocks
         
-        // Check if there are tints and get the tint color for the top face
-        int topTintColor = 0xFFFFFF; // Default: no tint (white)
-        if (itemModel != null && itemModel.getTints() != null && !itemModel.getTints().isEmpty()) {
+        // Determine tint color and tint behavior
+        int tintColor = 0xFFFFFF; // Default: no tint (white)
+        boolean tintAllFaces = false; // For leaves: tint all faces. For grass: only top and overlay
+        
+        // First check if this is a LeavesBlock item (has tint stored in block)
+        if (stack != null && stack.getItem() instanceof BlockItem) {
+            Block block = ((BlockItem) stack.getItem()).getBlock();
+            if (block instanceof LeavesBlock) {
+                LeavesBlock leavesBlock = (LeavesBlock) block;
+                if (leavesBlock.hasTinting()) {
+                    tintColor = leavesBlock.getTintColor();
+                    tintAllFaces = true; // Leaves are tinted on all faces
+                }
+            }
+        }
+        
+        // If no tint from block, check the item model's tints list (for grass blocks etc.)
+        if (tintColor == 0xFFFFFF && itemModel != null && itemModel.getTints() != null && !itemModel.getTints().isEmpty()) {
             // Get the first tint (grass blocks typically have one tint)
-            topTintColor = itemModel.getTints().get(0).getTintColor();
+            tintColor = itemModel.getTints().get(0).getTintColor();
+            tintAllFaces = false; // For grass: only top and overlay get tint
         }
         
         // Save GL state
         boolean textureWasEnabled = glIsEnabled(GL_TEXTURE_2D);
+        boolean blendWasEnabled = glIsEnabled(GL_BLEND);
+        
         glEnable(GL_TEXTURE_2D);
+        // Enable blending for transparent textures (leaves)
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
         
         // Define scale for isometric projection
         // size is the half-width, so double it for the full scale
@@ -266,6 +321,11 @@ public class OpenGLItemRenderer implements ItemRenderer {
         BlockGeometryCapture.captureTopFace(capture, 0, 0, 0);
         List<VertexCapture.Face> topFaces = List.copyOf(capture.getFaces());
         
+        // Extract tint color components
+        float tintR = ((tintColor >> 16) & 0xFF) / 255.0f;
+        float tintG = ((tintColor >> 8) & 0xFF) / 255.0f;
+        float tintB = (tintColor & 0xFF) / 255.0f;
+        
         // Render the faces in back-to-front order for proper visibility
         
         // 1. West face (left side, medium brightness - 80%)
@@ -273,8 +333,25 @@ public class OpenGLItemRenderer implements ItemRenderer {
             Texture tex = loadTexture(sideTexture);
             if (tex != null) {
                 tex.bind();
-                glColor4f(0.8f, 0.8f, 0.8f, 1.0f);
-                renderFacesIsometric(westFaces, x, y, isoWidth, isoHeight);
+                // Apply tint only if tintAllFaces (for leaves), otherwise use white
+                if (tintAllFaces) {
+                    glColor4f(0.8f * tintR, 0.8f * tintG, 0.8f * tintB, 1.0f);
+                } else {
+                    glColor4f(0.8f, 0.8f, 0.8f, 1.0f);
+                }
+                float sideVScale = getAnimatedTextureVScale(sideTexture);
+                renderFacesIsometric(westFaces, x, y, isoWidth, isoHeight, sideVScale);
+            }
+        }
+        
+        // 1b. West face overlay (for grass blocks - tinted)
+        if (overlayTexture != null && !tintAllFaces) {
+            Texture tex = loadTexture(overlayTexture);
+            if (tex != null) {
+                tex.bind();
+                glColor4f(0.8f * tintR, 0.8f * tintG, 0.8f * tintB, 1.0f);
+                float overlayVScale = getAnimatedTextureVScale(overlayTexture);
+                renderFacesIsometric(westFaces, x, y, isoWidth, isoHeight, overlayVScale);
             }
         }
         
@@ -283,28 +360,46 @@ public class OpenGLItemRenderer implements ItemRenderer {
             Texture tex = loadTexture(sideTexture);
             if (tex != null) {
                 tex.bind();
-                glColor4f(0.6f, 0.6f, 0.6f, 1.0f);
-                renderFacesIsometric(northFaces, x, y, isoWidth, isoHeight);
+                // Apply tint only if tintAllFaces (for leaves), otherwise use white
+                if (tintAllFaces) {
+                    glColor4f(0.6f * tintR, 0.6f * tintG, 0.6f * tintB, 1.0f);
+                } else {
+                    glColor4f(0.6f, 0.6f, 0.6f, 1.0f);
+                }
+                float sideVScale = getAnimatedTextureVScale(sideTexture);
+                renderFacesIsometric(northFaces, x, y, isoWidth, isoHeight, sideVScale);
             }
         }
         
-        // 3. Top face (brightest - 100% with tint applied)
+        // 2b. North face overlay (for grass blocks - tinted)
+        if (overlayTexture != null && !tintAllFaces) {
+            Texture tex = loadTexture(overlayTexture);
+            if (tex != null) {
+                tex.bind();
+                glColor4f(0.6f * tintR, 0.6f * tintG, 0.6f * tintB, 1.0f);
+                float overlayVScale = getAnimatedTextureVScale(overlayTexture);
+                renderFacesIsometric(northFaces, x, y, isoWidth, isoHeight, overlayVScale);
+            }
+        }
+        
+        // 3. Top face (brightest - 100% with tint always applied for both leaves and grass)
         if (topTexture != null) {
             Texture tex = loadTexture(topTexture);
             if (tex != null) {
                 tex.bind();
-                // Apply tint color to the top face
-                float r = ((topTintColor >> 16) & 0xFF) / 255.0f;
-                float g = ((topTintColor >> 8) & 0xFF) / 255.0f;
-                float b = (topTintColor & 0xFF) / 255.0f;
-                glColor4f(r, g, b, 1.0f);
-                renderFacesIsometric(topFaces, x, y, isoWidth, isoHeight);
+                // Apply tint color to the top face (for both grass and leaves)
+                glColor4f(tintR, tintG, tintB, 1.0f);
+                float topVScale = getAnimatedTextureVScale(topTexture);
+                renderFacesIsometric(topFaces, x, y, isoWidth, isoHeight, topVScale);
             }
         }
         
         // Restore GL state
         if (!textureWasEnabled) {
             glDisable(GL_TEXTURE_2D);
+        }
+        if (!blendWasEnabled) {
+            glDisable(GL_BLEND);
         }
         glColor4f(1f, 1f, 1f, 1f); // Reset color
     }
@@ -356,6 +451,7 @@ public class OpenGLItemRenderer implements ItemRenderer {
             Texture tex = loadTexture(sideTexture);
             if (tex != null) {
                 tex.bind();
+                float sideVScale = getAnimatedTextureVScale(sideTexture);
                 
                 for (VertexCapture.Face face : visibleSideFaces) {
                     // Determine brightness based on face orientation
@@ -365,7 +461,7 @@ public class OpenGLItemRenderer implements ItemRenderer {
                     float brightness = isWestFacing ? 0.8f : 0.6f;
                     glColor4f(brightness, brightness, brightness, 1.0f);
                     
-                    renderFaceIsometric(face, x, y, isoWidth, isoHeight);
+                    renderFaceIsometric(face, x, y, isoWidth, isoHeight, sideVScale);
                 }
             }
         }
@@ -376,9 +472,10 @@ public class OpenGLItemRenderer implements ItemRenderer {
             if (tex != null) {
                 tex.bind();
                 glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
+                float topVScale = getAnimatedTextureVScale(topTexture);
                 
                 for (VertexCapture.Face face : topFacesList) {
-                    renderFaceIsometric(face, x, y, isoWidth, isoHeight);
+                    renderFaceIsometric(face, x, y, isoWidth, isoHeight, topVScale);
                 }
             }
         }
@@ -390,6 +487,116 @@ public class OpenGLItemRenderer implements ItemRenderer {
     }
     
     /**
+     * Render a slab as an isometric 3D half-height block.
+     * Slabs are rendered at half the height of a full block.
+     */
+    private static void renderIsometricSlab(Map<String, String> texturePaths, mattmc.client.resources.model.BlockModel itemModel, float x, float y, float size) {
+        // Get textures for each face
+        String topTexture = getTextureForFace(texturePaths, "top");
+        String sideTexture = getTextureForFace(texturePaths, "side");
+        String bottomTexture = getTextureForFace(texturePaths, "bottom");
+        
+        boolean textureWasEnabled = glIsEnabled(GL_TEXTURE_2D);
+        if (!textureWasEnabled) {
+            glEnable(GL_TEXTURE_2D);
+        }
+        
+        // Isometric projection parameters
+        float scale = size * 2.0f;
+        float isoWidth = scale * 0.5f;
+        float isoHeight = scale * 0.5f;
+        
+        // Capture slab geometry (half-height block)
+        VertexCapture capture = new VertexCapture();
+        BlockGeometryCapture.captureSlabBottom(capture, 0, 0, 0);
+        List<VertexCapture.Face> allFaces = capture.getFaces();
+        
+        // Separate faces by type
+        List<VertexCapture.Face> topFacesList = new ArrayList<>();
+        List<VertexCapture.Face> visibleSideFaces = new ArrayList<>();
+        
+        for (VertexCapture.Face face : allFaces) {
+            if (isSlabTopFace(face)) {
+                topFacesList.add(face);
+            } else {
+                // Only render visible side faces (West and North faces)
+                if (isSlabVisibleSideFace(face)) {
+                    visibleSideFaces.add(face);
+                }
+            }
+        }
+        
+        // Render visible side faces first with appropriate shading
+        if (sideTexture != null) {
+            Texture tex = loadTexture(sideTexture);
+            if (tex != null) {
+                tex.bind();
+                float sideVScale = getAnimatedTextureVScale(sideTexture);
+                
+                for (VertexCapture.Face face : visibleSideFaces) {
+                    // Determine brightness based on face orientation
+                    // West-facing faces (x=0) get 0.8 brightness
+                    // North-facing faces (z=0) get 0.6 brightness
+                    boolean isWestFacing = isWestFacing(face);
+                    float brightness = isWestFacing ? 0.8f : 0.6f;
+                    glColor4f(brightness, brightness, brightness, 1.0f);
+                    
+                    renderFaceIsometric(face, x, y, isoWidth, isoHeight, sideVScale);
+                }
+            }
+        }
+        
+        // Render top faces last with full brightness
+        if (topTexture != null) {
+            Texture tex = loadTexture(topTexture);
+            if (tex != null) {
+                tex.bind();
+                glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
+                float topVScale = getAnimatedTextureVScale(topTexture);
+                
+                for (VertexCapture.Face face : topFacesList) {
+                    renderFaceIsometric(face, x, y, isoWidth, isoHeight, topVScale);
+                }
+            }
+        }
+        
+        if (!textureWasEnabled) {
+            glDisable(GL_TEXTURE_2D);
+        }
+        glColor4f(1f, 1f, 1f, 1f);
+    }
+    
+    /**
+     * Check if a face is a slab top face (horizontal, at y=0.5).
+     */
+    private static boolean isSlabTopFace(VertexCapture.Face face) {
+        float y1 = face.v1.y;
+        float y2 = face.v2.y;
+        float y3 = face.v3.y;
+        
+        // All Y values are the same and at 0.5 (slab top height)
+        return Math.abs(y1 - y2) < EPSILON && Math.abs(y2 - y3) < EPSILON && Math.abs(y1 - 0.5f) < EPSILON;
+    }
+    
+    /**
+     * Check if a slab side face is visible in isometric view.
+     * Only West (x=0) and North (z=0) faces are visible.
+     */
+    private static boolean isSlabVisibleSideFace(VertexCapture.Face face) {
+        // Check if it's a West face (x=0)
+        if (face.v1.x < EPSILON && face.v2.x < EPSILON && face.v3.x < EPSILON) {
+            return true;
+        }
+        
+        // Check if it's a North face (z=0)
+        if (face.v1.z < EPSILON && face.v2.z < EPSILON && face.v3.z < EPSILON) {
+            return true;
+        }
+        
+        return false;
+    }
+    
+    /**
      * Check if a face is a top face (horizontal, all Y coordinates equal and > 0).
      */
     private static boolean isTopFace(VertexCapture.Face face) {
@@ -398,7 +605,7 @@ public class OpenGLItemRenderer implements ItemRenderer {
         float y3 = face.v3.y;
         
         // All Y values are the same and greater than 0
-        return Math.abs(y1 - y2) < 0.01f && Math.abs(y2 - y3) < 0.01f && y1 > 0.01f;
+        return Math.abs(y1 - y2) < EPSILON && Math.abs(y2 - y3) < EPSILON && y1 > EPSILON;
     }
     
     /**
@@ -407,18 +614,18 @@ public class OpenGLItemRenderer implements ItemRenderer {
      */
     private static boolean isVisibleSideFace(VertexCapture.Face face) {
         // Check if it's a West face (x=0)
-        if (face.v1.x < 0.01f && face.v2.x < 0.01f && face.v3.x < 0.01f) {
+        if (face.v1.x < EPSILON && face.v2.x < EPSILON && face.v3.x < EPSILON) {
             return true;
         }
         
         // Check if it's a North face (z=0)
-        if (face.v1.z < 0.01f && face.v2.z < 0.01f && face.v3.z < 0.01f) {
+        if (face.v1.z < EPSILON && face.v2.z < EPSILON && face.v3.z < EPSILON) {
             return true;
         }
         
         // Check if it's an inner step face at z=0.5 (full width, vertical)
         float avgZ = (face.v1.z + face.v2.z + face.v3.z) / 3.0f;
-        if (Math.abs(avgZ - 0.5f) < 0.01f) {
+        if (Math.abs(avgZ - 0.5f) < EPSILON) {
             // Verify it's vertical (Y values differ significantly)
             float yMin = Math.min(face.v1.y, Math.min(face.v2.y, face.v3.y));
             float yMax = Math.max(face.v1.y, Math.max(face.v2.y, face.v3.y));
@@ -435,7 +642,7 @@ public class OpenGLItemRenderer implements ItemRenderer {
      */
     private static boolean isWestFacing(VertexCapture.Face face) {
         // West faces have all vertices at X=0
-        return face.v1.x < 0.01f && face.v2.x < 0.01f && face.v3.x < 0.01f;
+        return face.v1.x < EPSILON && face.v2.x < EPSILON && face.v3.x < EPSILON;
     }
     
     /**
@@ -458,8 +665,16 @@ public class OpenGLItemRenderer implements ItemRenderer {
      * Render a list of captured faces using isometric projection.
      */
     private static void renderFacesIsometric(List<VertexCapture.Face> faces, float centerX, float centerY, float isoWidth, float isoHeight) {
+        renderFacesIsometric(faces, centerX, centerY, isoWidth, isoHeight, 1.0f);
+    }
+    
+    /**
+     * Render a list of captured faces using isometric projection with UV scaling.
+     * @param vScale V coordinate scale for animated textures (e.g., 0.2 for first frame of 16x80 texture)
+     */
+    private static void renderFacesIsometric(List<VertexCapture.Face> faces, float centerX, float centerY, float isoWidth, float isoHeight, float vScale) {
         for (VertexCapture.Face face : faces) {
-            renderFaceIsometric(face, centerX, centerY, isoWidth, isoHeight);
+            renderFaceIsometric(face, centerX, centerY, isoWidth, isoHeight, vScale);
         }
     }
     
@@ -467,25 +682,34 @@ public class OpenGLItemRenderer implements ItemRenderer {
      * Render a single captured face using isometric projection.
      */
     private static void renderFaceIsometric(VertexCapture.Face face, float centerX, float centerY, float isoWidth, float isoHeight) {
+        renderFaceIsometric(face, centerX, centerY, isoWidth, isoHeight, 1.0f);
+    }
+    
+    /**
+     * Render a single captured face using isometric projection with UV scaling.
+     * @param vScale V coordinate scale for animated textures (e.g., 0.2 for first frame of 16x80 texture)
+     */
+    private static void renderFaceIsometric(VertexCapture.Face face, float centerX, float centerY, float isoWidth, float isoHeight, float vScale) {
         glBegin(GL_TRIANGLES);
         
         // Project and render vertex 1
         float x1 = project2Dx(face.v1.x, face.v1.y, face.v1.z, centerX, isoWidth);
         float y1 = project2Dy(face.v1.x, face.v1.y, face.v1.z, centerY, isoHeight);
         // Flip V coordinate for 2D rendering (3D geometry has pre-flipped coords for 3D rendering)
-        glTexCoord2f(face.v1.u, 1.0f - face.v1.v);
+        // For animated textures, scale V to only use first frame (vScale portion of texture)
+        glTexCoord2f(face.v1.u, (1.0f - face.v1.v) * vScale);
         glVertex2f(x1, y1);
         
         // Project and render vertex 2
         float x2 = project2Dx(face.v2.x, face.v2.y, face.v2.z, centerX, isoWidth);
         float y2 = project2Dy(face.v2.x, face.v2.y, face.v2.z, centerY, isoHeight);
-        glTexCoord2f(face.v2.u, 1.0f - face.v2.v);
+        glTexCoord2f(face.v2.u, (1.0f - face.v2.v) * vScale);
         glVertex2f(x2, y2);
         
         // Project and render vertex 3
         float x3 = project2Dx(face.v3.x, face.v3.y, face.v3.z, centerX, isoWidth);
         float y3 = project2Dy(face.v3.x, face.v3.y, face.v3.z, centerY, isoHeight);
-        glTexCoord2f(face.v3.u, 1.0f - face.v3.v);
+        glTexCoord2f(face.v3.u, (1.0f - face.v3.v) * vScale);
         glVertex2f(x3, y3);
         
         glEnd();
@@ -494,12 +718,21 @@ public class OpenGLItemRenderer implements ItemRenderer {
     /**
      * Get the texture for a specific face of a block.
      * Falls back to "all" texture if specific face not found.
+     * For pillar blocks (logs, etc.), "end" texture is used for top/bottom.
      */
     private static String getTextureForFace(Map<String, String> texturePaths, String faceKey) {
         // Try specific face first
         String texture = texturePaths.get(faceKey);
         if (texture != null) {
             return texture;
+        }
+        
+        // For top/bottom faces, try "end" texture (used by pillar blocks like logs)
+        if ("top".equals(faceKey) || "bottom".equals(faceKey)) {
+            texture = texturePaths.get("end");
+            if (texture != null) {
+                return texture;
+            }
         }
         
         // Fall back to "all" texture (for cube_all blocks)
@@ -593,11 +826,16 @@ public class OpenGLItemRenderer implements ItemRenderer {
         // Move items UP by 1 texture pixel to fix vertical alignment
         float adjustedY = y - calculateTexturePixelOffset(size);
         
+        // For animated textures, only render the first frame (use V scale)
+        float vScale = getAnimatedTextureVScale(texturePath);
+        float vTop = 0.0f;       // Top of first frame
+        float vBottom = vScale;   // Bottom of first frame (e.g., 0.2 for 16x80)
+        
         glBegin(GL_QUADS);
-        glTexCoord2f(0, 1); glVertex2f(x - halfSize, adjustedY - halfSize);
-        glTexCoord2f(1, 1); glVertex2f(x + halfSize, adjustedY - halfSize);
-        glTexCoord2f(1, 0); glVertex2f(x + halfSize, adjustedY + halfSize);
-        glTexCoord2f(0, 0); glVertex2f(x - halfSize, adjustedY + halfSize);
+        glTexCoord2f(0, vBottom); glVertex2f(x - halfSize, adjustedY - halfSize);
+        glTexCoord2f(1, vBottom); glVertex2f(x + halfSize, adjustedY - halfSize);
+        glTexCoord2f(1, vTop); glVertex2f(x + halfSize, adjustedY + halfSize);
+        glTexCoord2f(0, vTop); glVertex2f(x - halfSize, adjustedY + halfSize);
         glEnd();
         
         // Restore GL state
@@ -654,11 +892,58 @@ public class OpenGLItemRenderer implements ItemRenderer {
             String resourcePath = path.startsWith("/") ? path : "/" + path;
             Texture texture = Texture.load(resourcePath);
             TEXTURE_CACHE.put(path, texture);
+            
+            // Check for animated texture and calculate V scale
+            checkAndCacheAnimatedTextureInfo(path, resourcePath, texture);
+            
             return texture;
         } catch (Exception e) {
             logger.error("Failed to load texture: {}", path, e);
             return null;
         }
+    }
+    
+    /**
+     * Check if a texture is animated and cache its UV scale for first frame rendering.
+     * For animated textures (e.g., 16x80 with 5 frames), we need to render only the first frame (16x16).
+     * This method calculates the V scale factor (e.g., 0.2 for 16/80).
+     */
+    private static void checkAndCacheAnimatedTextureInfo(String path, String resourcePath, Texture texture) {
+        // Check for .mcmeta file
+        // Remove leading slash if present (getResourceStreamFromClassLoader expects no leading slash)
+        String mcmetaPath = (resourcePath.startsWith("/") ? resourcePath.substring(1) : resourcePath) + ".mcmeta";
+        try (InputStream mcmetaStream = mattmc.util.ResourceLoader.getResourceStreamFromClassLoader(mcmetaPath)) {
+            if (mcmetaStream != null) {
+                AnimationMetadataSection metadata = AnimationMetadataSection.load(mcmetaStream);
+                if (metadata != AnimationMetadataSection.EMPTY) {
+                    // This is an animated texture - calculate V scale for first frame
+                    // Use metadata to properly calculate frame size
+                    mattmc.client.resources.metadata.animation.FrameSize frameSize = 
+                        metadata.calculateFrameSize(texture.width, texture.height);
+                    int frameHeight = frameSize.height();
+                    
+                    // If texture height > frame height, it's a strip of frames
+                    if (texture.height > frameHeight) {
+                        float vScale = (float) frameHeight / (float) texture.height;
+                        ANIMATED_TEXTURE_V_SCALE.put(path, vScale);
+                        logger.info("Cached animated texture V scale for {}: {} (frame {}px / total {}px)", 
+                                   path, vScale, frameHeight, texture.height);
+                    }
+                }
+            }
+        } catch (Exception e) {
+            // No mcmeta file or error reading - treat as static texture
+            logger.debug("No mcmeta found or error reading for {}: {}", mcmetaPath, e.getMessage());
+        }
+    }
+    
+    /**
+     * Get the V scale for the first frame of an animated texture.
+     * Returns 1.0f for non-animated textures (use full texture height).
+     */
+    private static float getAnimatedTextureVScale(String path) {
+        Float scale = ANIMATED_TEXTURE_V_SCALE.get(path);
+        return scale != null ? scale : 1.0f;
     }
     
     /**
@@ -671,6 +956,7 @@ public class OpenGLItemRenderer implements ItemRenderer {
             }
         }
         TEXTURE_CACHE.clear();
+        ANIMATED_TEXTURE_V_SCALE.clear();
     }
     
     @Override
@@ -801,7 +1087,17 @@ public class OpenGLItemRenderer implements ItemRenderer {
         
         // Get item name for texture lookup
         String itemId = stack.getItem().getIdentifier();
+        if (itemId == null || itemId.isEmpty()) {
+            INSTANCE.renderFallbackItem(x, y, size);
+            return;
+        }
         String itemName = itemId.contains(":") ? itemId.substring(itemId.indexOf(':') + 1) : itemId;
+        
+        // Guard against empty itemName after splitting
+        if (itemName.isEmpty()) {
+            INSTANCE.renderFallbackItem(x, y, size);
+            return;
+        }
         
         // Get texture paths
         Map<String, String> texturePaths = ResourceManager.getItemTexturePaths(itemName);
@@ -836,7 +1132,7 @@ public class OpenGLItemRenderer implements ItemRenderer {
             if (isStairs) {
                 renderIsometricStairs(texturePaths, model, x + offsetX, y + offsetY, transformedSize);
             } else {
-                renderIsometricCube(texturePaths, model, x + offsetX, y + offsetY, transformedSize);
+                renderIsometricCube(stack, texturePaths, model, x + offsetX, y + offsetY, transformedSize);
             }
         } else {
             // For flat items, render as 2D

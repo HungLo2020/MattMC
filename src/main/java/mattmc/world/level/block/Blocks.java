@@ -1,6 +1,5 @@
 package mattmc.world.level.block;
 
-import mattmc.client.MattMC;
 import mattmc.util.MathUtils;
 import mattmc.util.Validate;
 
@@ -68,12 +67,62 @@ public class Blocks {
     public static final Block CRIMSON_PLANKS = register("crimson_planks", new Block(true, 0, 0, 0, 0));
     public static final Block WARPED_PLANKS = register("warped_planks", new Block(true, 0, 0, 0, 0));
     public static final Block BIRCH_STAIRS = register("birch_stairs", new StairsBlock());
+    public static final Block OAK_STAIRS = register("oak_stairs", new StairsBlock());
+    public static final Block SPRUCE_STAIRS = register("spruce_stairs", new StairsBlock());
+    public static final Block JUNGLE_STAIRS = register("jungle_stairs", new StairsBlock());
+    public static final Block ACACIA_STAIRS = register("acacia_stairs", new StairsBlock());
+    public static final Block DARK_OAK_STAIRS = register("dark_oak_stairs", new StairsBlock());
+    public static final Block MANGROVE_STAIRS = register("mangrove_stairs", new StairsBlock());
+    public static final Block CHERRY_STAIRS = register("cherry_stairs", new StairsBlock());
+    public static final Block BAMBOO_STAIRS = register("bamboo_stairs", new StairsBlock());
+    public static final Block CRIMSON_STAIRS = register("crimson_stairs", new StairsBlock());
+    public static final Block WARPED_STAIRS = register("warped_stairs", new StairsBlock());
+    public static final Block SILVER_BIRCH_STAIRS = register("silver_birch_stairs", new StairsBlock());
+    // Wood slabs
+    public static final Block OAK_SLAB = register("oak_slab", new SlabBlock());
+    public static final Block SPRUCE_SLAB = register("spruce_slab", new SlabBlock());
+    public static final Block BIRCH_SLAB = register("birch_slab", new SlabBlock());
+    public static final Block JUNGLE_SLAB = register("jungle_slab", new SlabBlock());
+    public static final Block ACACIA_SLAB = register("acacia_slab", new SlabBlock());
+    public static final Block DARK_OAK_SLAB = register("dark_oak_slab", new SlabBlock());
+    public static final Block MANGROVE_SLAB = register("mangrove_slab", new SlabBlock());
+    public static final Block CHERRY_SLAB = register("cherry_slab", new SlabBlock());
+    public static final Block BAMBOO_SLAB = register("bamboo_slab", new SlabBlock());
+    public static final Block CRIMSON_SLAB = register("crimson_slab", new SlabBlock());
+    public static final Block WARPED_SLAB = register("warped_slab", new SlabBlock());
+    public static final Block SILVER_BIRCH_SLAB = register("silver_birch_slab", new SlabBlock());
     public static final Block TORCH = register("torch", new TorchBlock(false, 14, 14, 11, 0));
     public static final Block WALL_TORCH = register("wall_torch", new WallTorchBlock(false, 14, 14, 11, 0));
     public static final Block PEARLESCENT_FROGLIGHT = register("pearlescent_froglight", new RotatedPillarBlock(false, 14, 14, 9, 12));
     public static final Block VERDANT_FROGLIGHT = register("verdant_froglight", new RotatedPillarBlock(false, 14, 11, 13, 11));
     public static final Block OCHRE_FROGLIGHT = register("ochre_froglight", new RotatedPillarBlock(false, 14, 14, 12, 7));
     public static final Block SEA_LANTERN = register("sea_lantern", new Block(false, 14, 10, 14, 14));
+    public static final Block OAK_LOG = register("oak_log", new RotatedPillarBlock(true));
+    public static final Block SPRUCE_LOG = register("spruce_log", new RotatedPillarBlock(true));
+    public static final Block BIRCH_LOG = register("birch_log", new RotatedPillarBlock(true));
+    public static final Block JUNGLE_LOG = register("jungle_log", new RotatedPillarBlock(true));
+    public static final Block ACACIA_LOG = register("acacia_log", new RotatedPillarBlock(true));
+    public static final Block DARK_OAK_LOG = register("dark_oak_log", new RotatedPillarBlock(true));
+    public static final Block MANGROVE_LOG = register("mangrove_log", new RotatedPillarBlock(true));
+    public static final Block CHERRY_LOG = register("cherry_log", new RotatedPillarBlock(true));
+    public static final Block BAMBOO_BLOCK = register("bamboo_block", new RotatedPillarBlock(true));
+    public static final Block CRIMSON_STEM = register("crimson_stem", new RotatedPillarBlock(true));
+    public static final Block WARPED_STEM = register("warped_stem", new RotatedPillarBlock(true));
+    public static final Block SILVER_BIRCH_LOG = register("silver_birch_log", new RotatedPillarBlock(true));
+    // Leaves blocks - tint colors from Minecraft item models
+    // Leaves with foliage tinting use negative ARGB values from MC (e.g., -12012264)
+    public static final Block OAK_LEAVES = register("oak_leaves", new LeavesBlock(-12012264));
+    public static final Block SPRUCE_LEAVES = register("spruce_leaves", new LeavesBlock(-10380959));
+    public static final Block BIRCH_LEAVES = register("birch_leaves", new LeavesBlock(-8345771));
+    public static final Block JUNGLE_LEAVES = register("jungle_leaves", new LeavesBlock(-12012264));
+    public static final Block ACACIA_LEAVES = register("acacia_leaves", new LeavesBlock(-12012264));
+    public static final Block DARK_OAK_LEAVES = register("dark_oak_leaves", new LeavesBlock(-12012264));
+    public static final Block MANGROVE_LEAVES = register("mangrove_leaves", new LeavesBlock(-7158200));
+    // Leaves without tinting
+    public static final Block CHERRY_LEAVES = register("cherry_leaves", new LeavesBlock());
+    public static final Block AZALEA_LEAVES = register("azalea_leaves", new LeavesBlock());
+    public static final Block FLOWERING_AZALEA_LEAVES = register("flowering_azalea_leaves", new LeavesBlock());
+    public static final Block PALE_OAK_LEAVES = register("pale_oak_leaves", new LeavesBlock());
     
     /**
      * Register a block with a given name (without namespace).
@@ -93,7 +142,9 @@ public class Blocks {
         
         // Create a new block instance with the identifier set
         Block registeredBlock;
-        if (block instanceof StairsBlock) {
+        if (block instanceof SlabBlock) {
+            registeredBlock = new SlabBlock(identifier);
+        } else if (block instanceof StairsBlock) {
             registeredBlock = new StairsBlock(identifier);
         } else if (block instanceof WallTorchBlock) {
             int lightEmission = MathUtils.max(block.getLightEmissionR(), MathUtils.max(block.getLightEmissionG(), block.getLightEmissionB()));
@@ -113,6 +164,9 @@ public class Blocks {
                 lightEmission,
                 block.getLightEmissionR(), block.getLightEmissionG(), block.getLightEmissionB(), 
                 identifier);
+        } else if (block instanceof LeavesBlock) {
+            LeavesBlock leavesBlock = (LeavesBlock) block;
+            registeredBlock = new LeavesBlock(leavesBlock.getRawTintColor(), identifier);
         } else {
             int lightEmission = MathUtils.max(block.getLightEmissionR(), MathUtils.max(block.getLightEmissionG(), block.getLightEmissionB()));
             registeredBlock = new Block(block.isSolid(), 
@@ -142,7 +196,9 @@ public class Blocks {
         
         // Create a new block instance with the identifier set
         Block registeredBlock;
-        if (block instanceof StairsBlock) {
+        if (block instanceof SlabBlock) {
+            registeredBlock = new SlabBlock(identifier);
+        } else if (block instanceof StairsBlock) {
             registeredBlock = new StairsBlock(identifier);
         } else if (block instanceof WallTorchBlock) {
             int lightEmission = MathUtils.max(block.getLightEmissionR(), MathUtils.max(block.getLightEmissionG(), block.getLightEmissionB()));
@@ -162,6 +218,9 @@ public class Blocks {
                 lightEmission,
                 block.getLightEmissionR(), block.getLightEmissionG(), block.getLightEmissionB(), 
                 identifier);
+        } else if (block instanceof LeavesBlock) {
+            LeavesBlock leavesBlock = (LeavesBlock) block;
+            registeredBlock = new LeavesBlock(leavesBlock.getRawTintColor(), identifier);
         } else {
             int lightEmission = MathUtils.max(block.getLightEmissionR(), MathUtils.max(block.getLightEmissionG(), block.getLightEmissionB()));
             registeredBlock = new Block(block.isSolid(), 
@@ -175,7 +234,7 @@ public class Blocks {
     
     /**
      * Get a block by its identifier.
-     * 
+     *
      * @param identifier The block identifier (e.g., "mattmc:dirt")
      * @return The Block, or null if not found
      * @throws NullPointerException if identifier is null

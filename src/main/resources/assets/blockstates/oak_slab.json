@@ -1,0 +1,13 @@
+{
+  "variants": {
+    "type=bottom": {
+      "model": "mattmc:block/oak_slab"
+    },
+    "type=double": {
+      "model": "mattmc:block/oak_planks"
+    },
+    "type=top": {
+      "model": "mattmc:block/oak_slab_top"
+    }
+  }
+}

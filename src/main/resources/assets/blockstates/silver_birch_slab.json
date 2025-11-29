@@ -1,0 +1,13 @@
+{
+  "variants": {
+    "type=bottom": {
+      "model": "mattmc:block/silver_birch_slab"
+    },
+    "type=double": {
+      "model": "mattmc:block/silver_birch_planks"
+    },
+    "type=top": {
+      "model": "mattmc:block/silver_birch_slab_top"
+    }
+  }
+}

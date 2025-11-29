@@ -1,7 +1,5 @@
 package mattmc.client.resources.model;
 
-import mattmc.client.MattMC;
-
 import java.util.List;
 import java.util.Map;
 

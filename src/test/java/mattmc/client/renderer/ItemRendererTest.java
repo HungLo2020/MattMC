@@ -123,7 +123,15 @@ public class ItemRendererTest {
         @Override public void enableTexture2D() {}
         @Override public void disableTexture2D() {}
         @Override public boolean isTexture2DEnabled() { return false; }
+        @Override public void bindTexture(int textureId) {}
+        @Override public void unbindTexture() {}
+        @Override public void begin3DQuads() {}
+        @Override public void end3DQuads() {}
+        @Override public void addTexturedQuadVertex(float x, float y, float z, float u, float v) {}
+        @Override public void setDepthMask(boolean enable) {}
+        @Override public void setBlendFunc(int srcFactor, int dstFactor) {}
         @Override public void updateFrustum(mattmc.client.renderer.Frustum frustum) {}
+        @Override public void tickTextureAnimations() {}
     }
     
     @Test

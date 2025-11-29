@@ -1,8 +1,0 @@
-{
-  "parent": "mattmc:block/stairs",
-  "textures": {
-    "bottom": "mattmc:block/birch_planks",
-    "side": "mattmc:block/birch_planks",
-    "top": "mattmc:block/birch_planks"
-  }
-}

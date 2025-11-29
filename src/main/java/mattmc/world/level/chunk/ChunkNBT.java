@@ -1,6 +1,5 @@
 package mattmc.world.level.chunk;
 
-import mattmc.client.MattMC;
 import mattmc.nbt.BitPackedArray;
 import mattmc.world.level.block.Block;
 import mattmc.world.level.block.Blocks;
@@ -43,16 +42,17 @@ public class ChunkNBT {
         
         root.put("sections", sections);
         
-        // Save heightmap data (versioned extension)
+        // ISSUE-004 fix: Save heightmap data using primitive int[] instead of ArrayList<Integer>
+        // This eliminates 256 Integer boxing operations per chunk save
         int[][] heightmapData = chunk.getHeightmap().getData();
-        // Pre-allocate with exact size (16 * 16 = 256)
-        List<Integer> heightmapList = new ArrayList<>(256);
+        int[] heightmapArray = new int[256];
+        int index = 0;
         for (int x = 0; x < 16; x++) {
             for (int z = 0; z < 16; z++) {
-                heightmapList.add(heightmapData[x][z]);
+                heightmapArray[index++] = heightmapData[x][z];
             }
         }
-        root.put("Heightmap", heightmapList);
+        root.put("Heightmap", heightmapArray);
         
         return root;
     }
@@ -212,23 +212,28 @@ public class ChunkNBT {
         }
         
         // Load heightmap (versioned extension - optional for backward compatibility)
+        // ISSUE-004 fix: Support both primitive int[] (new) and List<Integer> (legacy) formats
         Object heightmapObj = nbt.get("Heightmap");
-        if (heightmapObj instanceof List) {
-            @SuppressWarnings("unchecked")
-            List<Integer> heightmapList = (List<Integer>) heightmapObj;
-            if (heightmapList.size() == 256) { // 16x16
-                int[][] heightmapData = new int[16][16];
+        if (heightmapObj instanceof int[]) {
+            // New optimized format: primitive int[]
+            int[] heightmapArray = (int[]) heightmapObj;
+            if (heightmapArray.length == 256) { // 16x16
                 int index = 0;
                 for (int x = 0; x < 16; x++) {
                     for (int z = 0; z < 16; z++) {
-                        heightmapData[x][z] = heightmapList.get(index++);
+                        chunk.getHeightmap().setHeight(x, z, heightmapArray[index++]);
                     }
                 }
-                ColumnHeightmap heightmap = new ColumnHeightmap(heightmapData);
-                // Note: Cannot directly set heightmap as it's final, but we can update it
+            }
+        } else if (heightmapObj instanceof List) {
+            // Legacy format: List<Integer>
+            @SuppressWarnings("unchecked")
+            List<Integer> heightmapList = (List<Integer>) heightmapObj;
+            if (heightmapList.size() == 256) { // 16x16
+                int index = 0;
                 for (int x = 0; x < 16; x++) {
                     for (int z = 0; z < 16; z++) {
-                        chunk.getHeightmap().setHeight(x, z, heightmapData[x][z]);
+                        chunk.getHeightmap().setHeight(x, z, heightmapList.get(index++));
                     }
                 }
             }

@@ -272,8 +272,6 @@ public class LightStorage {
 	}
 	
 	/**
-	
-	/**
 	 * Get the raw sky light array for serialization.
 	 * @return Clone of sky light array (2048 bytes)
 	 */

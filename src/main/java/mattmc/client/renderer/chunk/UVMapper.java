@@ -4,6 +4,7 @@ import mattmc.util.ColorUtils;
 import mattmc.client.renderer.block.BlockFaceCollector;
 import mattmc.client.renderer.texture.TextureCoordinateProvider;
 import mattmc.world.level.block.Blocks;
+import mattmc.world.level.block.LeavesBlock;
 
 /**
  * Handles UV mapping and color extraction for mesh building.
@@ -124,6 +125,14 @@ public class UVMapper {
 			if (face.block == Blocks.GRASS_BLOCK && face.faceType != null && "top".equals(face.faceType)) {
 				renderColor = 0x5BB53B; // Grass green
 			}
+			
+			// Apply tinting for leaves blocks
+			if (face.block instanceof LeavesBlock) {
+				LeavesBlock leavesBlock = (LeavesBlock) face.block;
+				if (leavesBlock.hasTinting()) {
+					renderColor = leavesBlock.getTintColor();
+				}
+			}
 		} else {
 			// Use fallback color when no texture atlas
 			renderColor = ColorUtils.adjustColorBrightness(
@@ -134,6 +143,14 @@ public class UVMapper {
 			// Apply grass green tint for grass_block top face
 			if (face.block == Blocks.GRASS_BLOCK && face.faceType != null && "top".equals(face.faceType)) {
 				renderColor = ColorUtils.applyTint(renderColor, 0x5BB53B, face.colorBrightness);
+			}
+			
+			// Apply tinting for leaves blocks
+			if (face.block instanceof LeavesBlock) {
+				LeavesBlock leavesBlock = (LeavesBlock) face.block;
+				if (leavesBlock.hasTinting()) {
+					renderColor = ColorUtils.applyTint(renderColor, leavesBlock.getTintColor(), face.colorBrightness);
+				}
 			}
 		}
 		

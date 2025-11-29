@@ -10,8 +10,11 @@ package mattmc.world.item;
  * Total: 36 slots
  */
 public class Inventory {
-    private static final int HOTBAR_SIZE = 9;
-    private static final int MAIN_SIZE = 27;
+    /** Size of the hotbar (9 slots). */
+    public static final int HOTBAR_SIZE = 9;
+    /** Size of the main inventory (27 slots). */
+    public static final int MAIN_SIZE = 27;
+    /** Total inventory size (36 slots = hotbar + main). */
     public static final int INVENTORY_SIZE = HOTBAR_SIZE + MAIN_SIZE; // 36 total
     
     private final ItemStack[] items;
@@ -172,5 +175,112 @@ public class Inventory {
      */
     public static boolean isMainInventorySlot(int slot) {
         return slot >= HOTBAR_SIZE && slot < INVENTORY_SIZE;
+    }
+    
+    /**
+     * Find the slot containing an item matching the given stack.
+     * Matches by item type (identifier).
+     * Searches all slots (hotbar first, then main inventory).
+     * 
+     * @param stack The item stack to match
+     * @return The slot index containing the matching item, or -1 if not found
+     */
+    public int findSlotMatchingItem(ItemStack stack) {
+        if (stack == null || stack.getItem() == null) {
+            return -1;
+        }
+        String targetId = stack.getItem().getIdentifier();
+        if (targetId == null) {
+            return -1;
+        }
+        
+        for (int i = 0; i < INVENTORY_SIZE; i++) {
+            ItemStack existing = items[i];
+            if (existing != null && existing.getItem() != null) {
+                String existingId = existing.getItem().getIdentifier();
+                if (targetId.equals(existingId)) {
+                    return i;
+                }
+            }
+        }
+        return -1;
+    }
+    
+    /**
+     * Set the picked item similar to Minecraft's behavior.
+     * If the item already exists in the hotbar, switch to that slot.
+     * If not in hotbar but exists in inventory, swap with current slot.
+     * If not in inventory and hotbar is full, move current slot to first empty main inventory slot.
+     * If no empty slot exists, the pick is cancelled (item not added) to prevent item loss.
+     * 
+     * @param stack The item stack to set as picked
+     * @return true if the item was picked successfully, false if operation was cancelled
+     */
+    public boolean setPickedItem(ItemStack stack) {
+        int existingSlot = findSlotMatchingItem(stack);
+        
+        if (isHotbarSlot(existingSlot)) {
+            // Item is already in hotbar - just select that slot
+            selectedHotbarSlot = existingSlot;
+            return true;
+        } else if (existingSlot != -1) {
+            // Item exists in main inventory - swap with current selected slot
+            pickSlot(existingSlot);
+            return true;
+        } else {
+            // Item not in inventory - add to current slot
+            // If current slot is occupied, move its contents to first empty slot
+            if (items[selectedHotbarSlot] != null) {
+                int emptySlot = findFirstEmptySlotInMainInventory();
+                if (emptySlot == -1) {
+                    // No empty slot available - cancel pick to prevent item loss
+                    // This matches Minecraft behavior where pick block does nothing when inventory is full
+                    return false;
+                }
+                items[emptySlot] = items[selectedHotbarSlot];
+            }
+            items[selectedHotbarSlot] = stack.copy();
+            return true;
+        }
+    }
+    
+    /**
+     * Swap the contents of the given slot with the currently selected hotbar slot.
+     * This is used when picking an item from the main inventory.
+     * 
+     * @param slot The slot to swap with
+     */
+    public void pickSlot(int slot) {
+        ItemStack temp = items[selectedHotbarSlot];
+        items[selectedHotbarSlot] = items[slot];
+        items[slot] = temp;
+    }
+    
+    /**
+     * Find the first empty slot in the main inventory only (slots 9-35).
+     * 
+     * @return The slot index, or -1 if main inventory is full
+     */
+    public int findFirstEmptySlotInMainInventory() {
+        for (int i = HOTBAR_SIZE; i < INVENTORY_SIZE; i++) {
+            if (items[i] == null) {
+                return i;
+            }
+        }
+        return -1;
+    }
+    
+    /**
+     * Find the first empty slot in the hotbar only (slots 0-8).
+     * 
+     * @return The slot index, or -1 if hotbar is full
+     */
+    public int findFirstEmptySlotInHotbar() {
+        for (int i = 0; i < HOTBAR_SIZE; i++) {
+            if (items[i] == null) {
+                return i;
+            }
+        }
+        return -1;
     }
 }
