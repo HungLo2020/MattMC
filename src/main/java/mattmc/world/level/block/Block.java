@@ -334,10 +334,15 @@ public class Block {
      * 
      * <p>Mirrors Minecraft's Block.animateTick method.
      * 
+     * <p><b>Coordinate System:</b> All coordinates (x, y, z) are in WORLD coordinates.
+     * World Y ranges from -64 to 319. When calling level.getBlock(), you must convert
+     * world Y to chunk-local Y (0-383) using {@link mattmc.world.level.chunk.ChunkUtils#worldToLocalY(int)}.
+     * Particle spawn positions should use world coordinates directly.
+     * 
      * @param level the level the block is in
-     * @param x block X position
-     * @param y block Y position
-     * @param z block Z position
+     * @param x block X position (world coordinates)
+     * @param y block Y position (world coordinates, range -64 to 319)
+     * @param z block Z position (world coordinates)
      * @param random random source for particle effects
      * @param particleSpawner callback to spawn particles
      */
