@@ -15,7 +15,6 @@ import java.awt.image.BufferedImage;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
-import java.net.URL;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 
@@ -205,29 +204,12 @@ public class ParticleAtlasBuilder {
                 return files;
             }
         } catch (Exception e) {
-            // Manifest not found, try alternate approach
+            logger.warn("Failed to read manifest file: {}", manifestPath, e);
         }
         
-        // Fallback: try known texture names
-        // This is used when we can't enumerate the directory
-        String[] knownTextures = {
-            // Generic particles (smoke-like)
-            "generic_0.png", "generic_1.png", "generic_2.png", "generic_3.png",
-            "generic_4.png", "generic_5.png", "generic_6.png", "generic_7.png",
-            // Flame
-            "flame.png",
-            // Cherry petals
-            "cherry_0.png", "cherry_1.png", "cherry_2.png", "cherry_3.png",
-            "cherry_4.png", "cherry_5.png", "cherry_6.png", "cherry_7.png",
-            "cherry_8.png", "cherry_9.png", "cherry_10.png", "cherry_11.png"
-        };
-        
-        for (String name : knownTextures) {
-            String path = basePath + "/" + name;
-            if (ParticleAtlasBuilder.class.getResource(path) != null) {
-                files.add(name);
-            }
-        }
+        // No manifest found - this is expected for new resource packs
+        // The manifest.txt file should be generated at build time or included in the JAR
+        logger.debug("No manifest.txt found at {}, no textures will be loaded from this directory", basePath);
         
         return files;
     }
@@ -319,8 +301,10 @@ public class ParticleAtlasBuilder {
      * Create the missing texture (magenta/black checkerboard).
      */
     private static BufferedImage createMissingTexture(int size) {
+        // Ensure minimum size to prevent division by zero
+        size = Math.max(size, 2);
         BufferedImage image = new BufferedImage(size, size, BufferedImage.TYPE_INT_ARGB);
-        int halfSize = size / 2;
+        int halfSize = Math.max(size / 2, 1); // Ensure halfSize is at least 1
         for (int y = 0; y < size; y++) {
             for (int x = 0; x < size; x++) {
                 boolean checker = ((x / halfSize) + (y / halfSize)) % 2 == 0;
