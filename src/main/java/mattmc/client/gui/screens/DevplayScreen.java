@@ -257,7 +257,10 @@ public final class DevplayScreen implements Screen {
         mattmc.world.level.block.Block.ParticleSpawner spawner = (particleType, x, y, z, xSpeed, ySpeed, zSpeed) -> {
             mattmc.core.particles.ParticleOptions options = getParticleOptions(particleType);
             if (options != null) {
-                particleEngine.createParticle(options, x, y, z, xSpeed, ySpeed, zSpeed);
+                mattmc.client.particle.Particle p = particleEngine.createParticle(options, x, y, z, xSpeed, ySpeed, zSpeed);
+                if (p != null) {
+                    logger.debug("Created particle {} at ({}, {}, {})", particleType, x, y, z);
+                }
             }
         };
         
@@ -542,9 +545,26 @@ public final class DevplayScreen implements Screen {
             return;
         }
         
+        // Debug: log particle count
+        int particleCount = particleEngine.countParticles();
+        if (particleCount > 0) {
+            logger.debug("Rendering {} particles", particleCount);
+        }
+        
+        // Save the current modelview matrix
+        org.lwjgl.opengl.GL11.glPushMatrix();
+        
+        // Load identity - particles calculate their own camera-relative positions
+        // The projection matrix stays as-is (perspective)
+        org.lwjgl.opengl.GL11.glLoadIdentity();
+        
         // Set up render state for particles
         backend.enableBlend();
         backend.disableCullFace();
+        backend.enableDepthTest();
+        
+        // Disable depth write for translucent particles (they should not occlude each other)
+        org.lwjgl.opengl.GL11.glDepthMask(false);
         
         // Enable texturing
         org.lwjgl.opengl.GL11.glEnable(org.lwjgl.opengl.GL11.GL_TEXTURE_2D);
@@ -583,10 +603,12 @@ public final class DevplayScreen implements Screen {
                 switch (renderType) {
                     case PARTICLE_SHEET_TRANSLUCENT:
                         backend.enableBlend();
+                        org.lwjgl.opengl.GL11.glDepthMask(false);
                         break;
                     case PARTICLE_SHEET_OPAQUE:
                     case PARTICLE_SHEET_LIT:
                         backend.disableBlend();
+                        org.lwjgl.opengl.GL11.glDepthMask(true);
                         break;
                     default:
                         break;
@@ -595,7 +617,11 @@ public final class DevplayScreen implements Screen {
         );
         
         // Restore render state
+        org.lwjgl.opengl.GL11.glDepthMask(true);
         backend.disableBlend();
         backend.enableCullFace();
+        
+        // Restore the modelview matrix
+        org.lwjgl.opengl.GL11.glPopMatrix();
     }
 }
