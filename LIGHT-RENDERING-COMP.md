@@ -472,3 +472,94 @@ MattMC's "flat" appearance is primarily due to:
 5. Simple linear lighting instead of Minecraft's curved response
 
 The good news is that MattMC already has many of the building blocks in place (per-vertex lighting, AO calculation, directional shade values). The fixes are mostly about connecting these existing systems and adding the missing color processing in the shader.
+
+---
+
+## Implemented Changes (PR #XX)
+
+The following 5 changes were implemented to make MattMC's lighting more like Minecraft while preserving the RGB block light feature:
+
+### 1. Reduced Minimum Brightness (0.25 → 0.04)
+**File:** `voxel_lit.fs`
+
+Changed the minimum brightness floor from 0.25 to 0.04. This makes caves and unlit areas much darker, matching Minecraft's atmospheric cave lighting.
+
+```glsl
+// Before: finalLightColor = max(finalLightColor, vec3(0.25));
+// After:
+finalLightColor = max(finalLightColor, vec3(0.04));
+```
+
+### 2. Applied Ambient Occlusion in Fragment Shader
+**File:** `voxel_lit.fs`
+
+The AO value was already being computed and passed to the shader via `vAO` but was never used. Now it's applied with a configurable strength:
+
+```glsl
+// Apply ambient occlusion (vAO is 0.0-1.0 where 1.0 = no occlusion)
+float aoStrength = 0.6;
+float aoFactor = mix(1.0, vAO, aoStrength);
+finalLightColor *= aoFactor;
+```
+
+### 3. Implemented Minecraft's Brightness Curve
+**File:** `voxel_lit.fs`
+
+Replaced the simple `pow(x, gamma)` curve with Minecraft's actual brightness formula `f / (4.0 - 3.0 * f)`. This creates a non-linear response that's brighter in the middle light range, matching Minecraft's look:
+
+```glsl
+float minecraftBrightness(float lightLevel) {
+    float f = clamp(lightLevel / 15.0, 0.0, 1.0);
+    return f / (4.0 - 3.0 * f);
+}
+```
+
+### 4. Added Directional Face Shading in Shader
+**Files:** `voxel_lit.fs`, `voxel_lit.vs`
+
+Implemented Minecraft's face shading where different face orientations have different brightness:
+- UP = 1.0 (brightest)
+- DOWN = 0.5 (darkest)
+- NORTH/SOUTH = 0.8
+- WEST/EAST = 0.6
+
+The vertex shader now passes the face normal to the fragment shader, which calculates the appropriate shade:
+
+```glsl
+float getDirectionalShade(vec3 normal) {
+    if (absNormal.y > 0.9) return normal.y > 0.0 ? 1.0 : 0.5;
+    if (absNormal.z > 0.9) return 0.8;
+    if (absNormal.x > 0.9) return 0.6;
+    // ... interpolation for angled faces
+}
+```
+
+### 5. Added Sky Darkness Uniform for Day/Night Cycle
+**Files:** `voxel_lit.fs`, `VoxelLitShader.java`
+
+Added `uSkyDarkness` uniform that multiplies with sky light. This prepares the rendering system for proper day/night transitions like Minecraft:
+
+```java
+// VoxelLitShader.java
+public void setSkyDarkness(float darkness) {
+    this.skyDarkness = darkness;
+    shader.setUniform1f("uSkyDarkness", darkness);
+}
+```
+
+```glsl
+// voxel_lit.fs
+float skyBrightness = lightToBrightness(skyLight) * uSkyDarkness;
+```
+
+### Summary of Changes
+
+| Change | Impact | Files Modified |
+|--------|--------|----------------|
+| Reduce min brightness 0.25→0.04 | Darker caves | voxel_lit.fs |
+| Apply AO in shader | Subtle corner shadows | voxel_lit.fs |
+| Minecraft brightness curve | More natural light falloff | voxel_lit.fs |
+| Directional face shading | Visible 3D block faces | voxel_lit.fs, voxel_lit.vs |
+| Sky darkness uniform | Day/night ready | voxel_lit.fs, VoxelLitShader.java |
+
+All changes preserve the existing RGB block light system - colored lights from torches and other sources still work exactly as before, but now with more realistic lighting behavior.
