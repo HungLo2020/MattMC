@@ -64,8 +64,13 @@ public class RotatedPillarBlock extends Block {
     /**
      * Internal constructor used during registration to set the identifier.
      */
-    RotatedPillarBlock(boolean solid, int lightEmission, int lightEmissionR, int lightEmissionG, int lightEmissionB, String identifier) {
+    protected RotatedPillarBlock(boolean solid, int lightEmission, int lightEmissionR, int lightEmissionG, int lightEmissionB, String identifier) {
         super(solid, lightEmission, lightEmissionR, lightEmissionG, lightEmissionB, identifier);
+    }
+    
+    @Override
+    public Block withIdentifier(String identifier) {
+        return new RotatedPillarBlock(isSolid(), computeLightEmission(), getLightEmissionR(), getLightEmissionG(), getLightEmissionB(), identifier);
     }
     
     /**

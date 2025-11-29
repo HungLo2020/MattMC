@@ -37,8 +37,13 @@ public class StairsBlock extends Block {
     /**
      * Internal constructor used during registration to set the identifier.
      */
-    StairsBlock(String identifier) {
+    protected StairsBlock(String identifier) {
         super(false, 0, 0, 0, 0, identifier);  // Stairs are transparent/non-solid for rendering, no light emission
+    }
+    
+    @Override
+    public Block withIdentifier(String identifier) {
+        return new StairsBlock(identifier);
     }
     
     /**

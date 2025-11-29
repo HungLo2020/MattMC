@@ -62,11 +62,16 @@ public class FallingLeavesBlock extends LeavesBlock {
     /**
      * Internal constructor used during registration.
      */
-    FallingLeavesBlock(int blockTintColor, float particleRed, float particleGreen, float particleBlue, String identifier) {
+    protected FallingLeavesBlock(int blockTintColor, float particleRed, float particleGreen, float particleBlue, String identifier) {
         super(blockTintColor, identifier);
         this.particleRed = particleRed;
         this.particleGreen = particleGreen;
         this.particleBlue = particleBlue;
+    }
+    
+    @Override
+    public Block withIdentifier(String identifier) {
+        return new FallingLeavesBlock(getRawTintColor(), particleRed, particleGreen, particleBlue, identifier);
     }
     
     /**

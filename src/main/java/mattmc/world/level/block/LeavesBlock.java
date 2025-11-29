@@ -43,10 +43,15 @@ public class LeavesBlock extends Block {
     /**
      * Internal constructor used during registration to set the identifier.
      */
-    LeavesBlock(int tintColor, String identifier) {
+    protected LeavesBlock(int tintColor, String identifier) {
         // Leaves ARE solid for collision but transparent for rendering (see above)
         super(true, 0, 0, 0, 0, identifier);
         this.tintColor = tintColor;
+    }
+    
+    @Override
+    public Block withIdentifier(String identifier) {
+        return new LeavesBlock(tintColor, identifier);
     }
     
     /**

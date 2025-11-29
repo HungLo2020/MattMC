@@ -88,7 +88,7 @@ public class Block {
      * ISSUE-007 fix: Eagerly loads texture paths at registration time instead of lazily.
      * This eliminates HashMap lookups and String.equals() calls in the hot rendering path.
      */
-    Block(boolean solid, int lightEmission, int lightEmissionR, int lightEmissionG, int lightEmissionB, String identifier) {
+    protected Block(boolean solid, int lightEmission, int lightEmissionR, int lightEmissionG, int lightEmissionB, String identifier) {
         this.solid = solid;
         this.lightEmission = MathUtils.clamp(lightEmission, 0, 15);
         this.lightEmissionR = MathUtils.clamp(lightEmissionR, 0, 15);
@@ -101,6 +101,34 @@ public class Block {
             String blockName = identifier.contains(":") ? identifier.substring(identifier.indexOf(':') + 1) : identifier;
             this.texturePaths = ResourceManager.getBlockTexturePaths(blockName);
         }
+    }
+    
+    /**
+     * Create a copy of this block with the specified identifier.
+     * This method is used by the block registry to set the identifier during registration.
+     * 
+     * <p>Each subclass should override this method to properly copy its specific properties
+     * while setting the new identifier. This eliminates the need for instanceof checks
+     * in the registry.
+     * 
+     * @param identifier The block identifier to set (e.g., "mattmc:dirt")
+     * @return A new Block instance with the same properties and the given identifier
+     */
+    public Block withIdentifier(String identifier) {
+        return new Block(solid, computeLightEmission(), lightEmissionR, lightEmissionG, lightEmissionB, identifier);
+    }
+    
+    /**
+     * Compute the overall light emission level from the RGB components.
+     * Returns the maximum of the R, G, and B light emission values.
+     * 
+     * <p>This is used by {@link #withIdentifier(String)} and subclass overrides
+     * to avoid duplicating the light emission calculation logic.
+     * 
+     * @return The computed light emission level (0-15)
+     */
+    protected int computeLightEmission() {
+        return MathUtils.max(lightEmissionR, MathUtils.max(lightEmissionG, lightEmissionB));
     }
     
     /**
