@@ -13,10 +13,23 @@ import mattmc.world.level.Level;
  */
 public class CherryParticle extends TextureSheetParticle {
     
+    /** Scale factor for wind acceleration application. */
     private static final float ACCELERATION_SCALE = 0.0025f;
+    
+    /** How long the particle lives (in ticks). */
     private static final int INITIAL_LIFETIME = 300;
-    private static final float FALL_ACC = 0.25f;
+    
+    /** Maximum wind strength multiplier. */
     private static final float WIND_BIG = 2.0f;
+    
+    /** Frequency of wind oscillation (in degrees). */
+    private static final float WIND_FREQUENCY_DEGREES = 60.0f;
+    
+    /** Power curve for wind acceleration over time. */
+    private static final float WIND_ACCELERATION_POWER = 1.25f;
+    
+    /** Number of ticks per second for time conversion. */
+    private static final float TICKS_PER_SECOND = 20.0f;
     
     private float rotSpeed;
     private final float particleRandom;
@@ -73,28 +86,31 @@ public class CherryParticle extends TextureSheetParticle {
         }
         
         if (!this.removed) {
-            // Calculate wind effect based on lifetime
-            float f = (float) (INITIAL_LIFETIME - this.lifetime);
-            float f1 = Math.min(f / (float) INITIAL_LIFETIME, 1.0f);
+            // Calculate wind effect based on lifetime progression
+            float elapsedTime = (float) (INITIAL_LIFETIME - this.lifetime);
+            float progressRatio = Math.min(elapsedTime / (float) INITIAL_LIFETIME, 1.0f);
             
             // Sinusoidal horizontal movement (swaying)
-            double windX = Math.cos(Math.toRadians(this.particleRandom * 60.0f)) * WIND_BIG * Math.pow(f1, 1.25);
-            double windZ = Math.sin(Math.toRadians(this.particleRandom * 60.0f)) * WIND_BIG * Math.pow(f1, 1.25);
+            double windStrength = WIND_BIG * Math.pow(progressRatio, WIND_ACCELERATION_POWER);
+            double windX = Math.cos(Math.toRadians(this.particleRandom * WIND_FREQUENCY_DEGREES)) * windStrength;
+            double windZ = Math.sin(Math.toRadians(this.particleRandom * WIND_FREQUENCY_DEGREES)) * windStrength;
             
             this.xd += windX * ACCELERATION_SCALE;
             this.zd += windZ * ACCELERATION_SCALE;
             this.yd -= this.gravity;
             
-            // Update rotation
-            this.rotSpeed += this.spinAcceleration / 20.0f;
+            // Update rotation (convert per-second values to per-tick)
+            this.rotSpeed += this.spinAcceleration / TICKS_PER_SECOND;
             this.oRoll = this.roll;
-            this.roll += this.rotSpeed / 20.0f;
+            this.roll += this.rotSpeed / TICKS_PER_SECOND;
             
             // Apply movement
             this.move(this.xd, this.yd, this.zd);
             
-            // Remove if on ground or stuck
-            if (this.onGround || (this.lifetime < (INITIAL_LIFETIME - 1) && (this.xd == 0.0 || this.zd == 0.0))) {
+            // Remove if on ground or stuck (no horizontal movement after first tick)
+            boolean hasLanded = this.onGround;
+            boolean isStuck = this.lifetime < (INITIAL_LIFETIME - 1) && (this.xd == 0.0 || this.zd == 0.0);
+            if (hasLanded || isStuck) {
                 this.remove();
             }
             

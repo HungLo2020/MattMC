@@ -219,6 +219,10 @@ public class OpenGLParticleAtlas implements ParticleAtlas, AutoCloseable {
             int centerX = textureSize / 2;
             int centerY = textureSize / 2;
             
+            // Petal ellipse shape factors - width is narrower (2.0), height is taller (0.5)
+            final float PETAL_WIDTH_FACTOR = 2.0f;  // Stretched horizontally (narrow petal)
+            final float PETAL_HEIGHT_FACTOR = 0.5f; // Compressed vertically (tall petal)
+            
             for (int py = 0; py < textureSize; py++) {
                 for (int px = 0; px < textureSize; px++) {
                     float dx = (px - centerX + 0.5f) / (textureSize / 2.0f);
@@ -231,7 +235,7 @@ public class OpenGLParticleAtlas implements ParticleAtlas, AutoCloseable {
                     float rdy = dx * sin + dy * cos;
                     
                     // Petal shape: ellipse with pointed ends
-                    float shape = (rdx * rdx * 2.0f) + (rdy * rdy * 0.5f);
+                    float shape = (rdx * rdx * PETAL_WIDTH_FACTOR) + (rdy * rdy * PETAL_HEIGHT_FACTOR);
                     float t = Math.max(0, 1.0f - shape * 2.0f);
                     t = t * t;
                     
