@@ -173,12 +173,19 @@ public final class CreateWorldScreen implements Screen {
     }
     
     private void toggleGamemode() {
-        // Toggle between CREATIVE and SURVIVAL
-        if (selectedGamemode == Gamemode.CREATIVE) {
-            selectedGamemode = Gamemode.SURVIVAL;
-        } else {
-            selectedGamemode = Gamemode.CREATIVE;
-        }
+        // Toggle between gamemodes that are selectable as default (excludes SPECTATOR)
+        Gamemode[] modes = Gamemode.values();
+        int currentIndex = selectedGamemode.ordinal();
+        int checked = 0;
+        
+        // Find next selectable gamemode, with protection against infinite loop
+        do {
+            currentIndex = (currentIndex + 1) % modes.length;
+            checked++;
+        } while (!modes[currentIndex].isSelectableAsDefault() && checked < modes.length);
+        
+        selectedGamemode = modes[currentIndex];
+        
         // Recreate button with updated label (Button.label is final, so we must create a new instance)
         gamemodeButton = new Button("Gamemode: " + selectedGamemode.getDisplayName(), 
             gamemodeButton.x, gamemodeButton.y, gamemodeButton.w, gamemodeButton.h);

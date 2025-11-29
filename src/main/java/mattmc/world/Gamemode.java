@@ -5,15 +5,18 @@ package mattmc.world;
  * This enum allows for future extension with additional game modes like Spectator.
  */
 public enum Gamemode {
-    SURVIVAL(0, "Survival"),
-    CREATIVE(1, "Creative");
+    SURVIVAL(0, "Survival", true),
+    CREATIVE(1, "Creative", true),
+    SPECTATOR(2, "Spectator", false);
     
     private final int id;
     private final String displayName;
+    private final boolean selectableAsDefault;
     
-    Gamemode(int id, String displayName) {
+    Gamemode(int id, String displayName, boolean selectableAsDefault) {
         this.id = id;
         this.displayName = displayName;
+        this.selectableAsDefault = selectableAsDefault;
     }
     
     /**
@@ -29,6 +32,14 @@ public enum Gamemode {
      */
     public String getDisplayName() {
         return displayName;
+    }
+    
+    /**
+     * Check if this gamemode can be selected as the default gamemode in the create world screen.
+     * Spectator mode, for example, should not be selectable as a default.
+     */
+    public boolean isSelectableAsDefault() {
+        return selectableAsDefault;
     }
     
     /**

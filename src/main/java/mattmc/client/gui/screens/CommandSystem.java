@@ -333,20 +333,20 @@ public class CommandSystem {
     
     /**
      * Execute /gamemode command - sets the player's gamemode.
-     * Usage: /gamemode creative or /gamemode survival
+     * Usage: /gamemode creative, /gamemode survival, or /gamemode spectator
      */
     private String executeGamemodeCommand(String cmd) {
         String[] parts = cmd.substring(10).trim().split("\\s+");
         
         if (parts.length == 0 || parts[0].isEmpty()) {
-            return "Usage: /gamemode <creative|survival>";
+            return "Usage: /gamemode <creative|survival|spectator>";
         }
         
         String modeName = parts[0];
         Gamemode gamemode = Gamemode.fromName(modeName);
         
         if (gamemode == null) {
-            return "Unknown gamemode: " + modeName + ". Use creative or survival.";
+            return "Unknown gamemode: " + modeName + ". Use creative, survival, or spectator.";
         }
         
         player.setGamemode(gamemode);
