@@ -275,14 +275,13 @@ public final class DevplayScreen implements Screen {
         
         world.animateTick(playerBlockX, playerBlockY, playerBlockZ, animateTickRandom, spawner);
         
-        // Log particle stats periodically for debugging
+        // Log particle stats periodically for debugging - ALWAYS log to help diagnose issues
         long now = System.currentTimeMillis();
         if (now - lastParticleLogTime > PARTICLE_DEBUG_LOG_INTERVAL_MS) {
             int activeParticles = particleEngine.countParticles();
-            if (particleSpawnCount > 0 || activeParticles > 0) {
-                logger.info("[Particle Debug] Spawned {} particles in last {}s, {} active particles", 
-                           particleSpawnCount, PARTICLE_DEBUG_LOG_INTERVAL_MS / 1000, activeParticles);
-            }
+            // Always log, even if 0 particles, to confirm the system is running
+            logger.info("[Particle Debug] animateBlockTick running - Spawned {} particles in last {}s, {} active particles", 
+                       particleSpawnCount, PARTICLE_DEBUG_LOG_INTERVAL_MS / 1000, activeParticles);
             particleSpawnCount = 0;
             lastParticleLogTime = now;
         }

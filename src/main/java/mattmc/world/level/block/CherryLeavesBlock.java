@@ -42,6 +42,13 @@ public class CherryLeavesBlock extends LeavesBlock {
      * 
      * <p>Only spawns a particle 10% of the time, and only if there's no solid
      * block directly below (so petals can fall).
+     * 
+     * @param level the level the block is in
+     * @param x block X position (world coordinates)
+     * @param y block Y position (world coordinates)
+     * @param z block Z position (world coordinates)
+     * @param random random source
+     * @param particleSpawner callback to spawn particles
      */
     @Override
     public void animateTick(Level level, int x, int y, int z, Random random,
@@ -52,7 +59,13 @@ public class CherryLeavesBlock extends LeavesBlock {
         }
         
         // Check if there's space below for the particle to fall
-        Block blockBelow = level.getBlock(x, y - 1, z);
+        // Convert world Y to chunk-local Y for getBlock()
+        int chunkYBelow = mattmc.world.level.chunk.ChunkUtils.worldToLocalY(y - 1);
+        if (chunkYBelow < 0) {
+            return;  // Below world minimum
+        }
+        
+        Block blockBelow = level.getBlock(x, chunkYBelow, z);
         if (blockBelow != null && blockBelow.isSolid()) {
             return;  // Don't spawn if there's a solid block below
         }

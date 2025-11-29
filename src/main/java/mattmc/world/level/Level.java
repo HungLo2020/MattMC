@@ -547,23 +547,37 @@ public class Level implements LevelAccessor {
     
     /**
      * Animate a single random block within range of the player.
+     * 
+     * @param playerX player X position (world coordinates)
+     * @param playerY player Y position (world coordinates, e.g., -64 to 319)
+     * @param playerZ player Z position (world coordinates)
+     * @param range range in blocks to check around the player
+     * @param random random source
+     * @param particleSpawner callback to spawn particles
      */
     private void doAnimateTick(int playerX, int playerY, int playerZ, int range,
                               Random random, Block.ParticleSpawner particleSpawner) {
-        // Pick a random block within range
-        int x = playerX + random.nextInt(range) - random.nextInt(range);
-        int y = playerY + random.nextInt(range) - random.nextInt(range);
-        int z = playerZ + random.nextInt(range) - random.nextInt(range);
+        // Pick a random block within range (world coordinates)
+        int worldX = playerX + random.nextInt(range) - random.nextInt(range);
+        int worldY = playerY + random.nextInt(range) - random.nextInt(range);
+        int worldZ = playerZ + random.nextInt(range) - random.nextInt(range);
         
-        // Clamp Y to valid range
-        if (y < 0 || y >= 384) {
+        // Clamp world Y to valid range (-64 to 319)
+        if (worldY < LevelChunk.MIN_Y || worldY > LevelChunk.MAX_Y) {
             return;
         }
         
-        // Get the block at this position
-        Block block = getBlock(x, y, z);
+        // Convert world Y to chunk-local Y (0-383)
+        int chunkY = ChunkUtils.worldToLocalY(worldY);
+        if (chunkY < 0) {
+            return;
+        }
+        
+        // Get the block at this position (uses chunk-local Y)
+        Block block = getBlock(worldX, chunkY, worldZ);
         if (block != null && !block.isAir()) {
-            block.animateTick(this, x, y, z, random, particleSpawner);
+            // Pass world coordinates to animateTick so particles spawn at correct world position
+            block.animateTick(this, worldX, worldY, worldZ, random, particleSpawner);
         }
     }
 }
