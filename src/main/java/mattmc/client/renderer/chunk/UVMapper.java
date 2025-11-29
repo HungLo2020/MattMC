@@ -111,21 +111,15 @@ public class UVMapper {
 	
 	/**
 	 * Extract RGBA color from face data.
-	 * Uses white color with directional brightness when texture atlas is available,
-	 * otherwise uses fallback colors with directional brightness.
-	 * 
-	 * The colorBrightness field contains Minecraft-style directional shading:
-	 * - TOP: 1.0 (brightest)
-	 * - BOTTOM: 0.5 (darkest)
-	 * - NORTH/SOUTH: 0.8
-	 * - WEST/EAST: 0.6
+	 * Uses white color with brightness when texture atlas is available,
+	 * otherwise uses fallback colors.
 	 */
 	public float[] extractColor(BlockFaceCollector.FaceData face) {
-		int r, g, b;
+		int renderColor;
 		
 		if (textureAtlas != null && face.block.hasTexture()) {
-			// Use white color for texture modulation, with directional brightness applied
-			int renderColor = 0xFFFFFF;
+			// Use white color for texture modulation
+			renderColor = 0xFFFFFF;
 			
 			// Apply grass green tint for grass_block top face (vanilla MattMC-like)
 			if (face.block == Blocks.GRASS_BLOCK && face.faceType != null && "top".equals(face.faceType)) {
@@ -139,16 +133,9 @@ public class UVMapper {
 					renderColor = leavesBlock.getTintColor();
 				}
 			}
-			
-			// Extract RGB and apply directional brightness
-			float directionalBrightness = face.colorBrightness;
-			r = (int)(((renderColor >> 16) & 0xFF) * directionalBrightness);
-			g = (int)(((renderColor >> 8) & 0xFF) * directionalBrightness);
-			b = (int)((renderColor & 0xFF) * directionalBrightness);
 		} else {
 			// Use fallback color when no texture atlas
-			// Directional brightness is baked into the color via adjustColorBrightness
-			int renderColor = ColorUtils.adjustColorBrightness(
+			renderColor = ColorUtils.adjustColorBrightness(
 				face.block.getFallbackColor(), 
 				face.colorBrightness
 			);
@@ -165,16 +152,19 @@ public class UVMapper {
 					renderColor = ColorUtils.applyTint(renderColor, leavesBlock.getTintColor(), face.colorBrightness);
 				}
 			}
-			
-			r = (renderColor >> 16) & 0xFF;
-			g = (renderColor >> 8) & 0xFF;
-			b = renderColor & 0xFF;
 		}
 		
+		// Apply brightness
+		float brightness = face.brightness;
+		
+		int r = (renderColor >> 16) & 0xFF;
+		int g = (renderColor >> 8) & 0xFF;
+		int b = renderColor & 0xFF;
+		
 		return new float[] {
-			r / 255.0f,
-			g / 255.0f,
-			b / 255.0f,
+			(r / 255.0f) * brightness,
+			(g / 255.0f) * brightness,
+			(b / 255.0f) * brightness,
 			1.0f // alpha
 		};
 	}
