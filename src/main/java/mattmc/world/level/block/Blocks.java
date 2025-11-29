@@ -120,10 +120,10 @@ public class Blocks {
     public static final Block DARK_OAK_LEAVES = register("dark_oak_leaves", new FallingLeavesBlock(-12012264, 0.28f, 0.71f, 0.09f));
     public static final Block MANGROVE_LEAVES = register("mangrove_leaves", new FallingLeavesBlock(-7158200, 0.57f, 0.78f, 0.28f));
     // Leaves without block tinting - particle colors match their appearance
-    public static final Block CHERRY_LEAVES = register("cherry_leaves", new FallingLeavesBlock(1.0f, 0.85f, 0.90f));
+    public static final Block CHERRY_LEAVES = register("cherry_leaves", new FallingLeavesBlock(1.0f, 0.55f, 0.75f));
     public static final Block AZALEA_LEAVES = register("azalea_leaves", new FallingLeavesBlock(0.55f, 0.70f, 0.35f));
     public static final Block FLOWERING_AZALEA_LEAVES = register("flowering_azalea_leaves", new FallingLeavesBlock(0.65f, 0.50f, 0.60f));
-    public static final Block PALE_OAK_LEAVES = register("pale_oak_leaves", new FallingLeavesBlock(0.60f, 0.65f, 0.55f));
+    public static final Block PALE_OAK_LEAVES = register("pale_oak_leaves", new FallingLeavesBlock(0.85f, 0.88f, 0.82f));
     
     /**
      * Register a block with a given name (without namespace).
