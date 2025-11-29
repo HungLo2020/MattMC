@@ -244,8 +244,13 @@ public final class DevplayScreen implements Screen {
         }
     }
     
-    // Debug: track particle spawn count
+    /** Interval in milliseconds between particle debug log messages. */
+    private static final long PARTICLE_DEBUG_LOG_INTERVAL_MS = 5000;
+    
+    /** Debug counter for particles spawned since last log. */
     private int particleSpawnCount = 0;
+    
+    /** Timestamp of last particle debug log. */
     private long lastParticleLogTime = 0;
     
     /**
@@ -270,13 +275,13 @@ public final class DevplayScreen implements Screen {
         
         world.animateTick(playerBlockX, playerBlockY, playerBlockZ, animateTickRandom, spawner);
         
-        // Log particle stats every 5 seconds
+        // Log particle stats periodically for debugging
         long now = System.currentTimeMillis();
-        if (now - lastParticleLogTime > 5000) {
+        if (now - lastParticleLogTime > PARTICLE_DEBUG_LOG_INTERVAL_MS) {
             int activeParticles = particleEngine.countParticles();
             if (particleSpawnCount > 0 || activeParticles > 0) {
-                logger.info("[Particle Debug] Spawned {} particles in last 5s, {} active particles", 
-                           particleSpawnCount, activeParticles);
+                logger.info("[Particle Debug] Spawned {} particles in last {}s, {} active particles", 
+                           particleSpawnCount, PARTICLE_DEBUG_LOG_INTERVAL_MS / 1000, activeParticles);
             }
             particleSpawnCount = 0;
             lastParticleLogTime = now;
