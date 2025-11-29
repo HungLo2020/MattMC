@@ -41,7 +41,7 @@ void main() {
 	// Extract light components (0-15 range)
 	float skyLight = vLightData.x;
 	vec3 blockLightRGB = vLightData.yzw; // R, G, B
-	float ao = vAO; // Not used yet, reserved for ambient occlusion
+	float ao = vAO; // Ambient occlusion (0.0 to 1.0 range)
 	
 	// Convert to brightness/color with gamma curve
 	float skyBrightness = lightToBrightness(skyLight, uLightGamma);
@@ -57,6 +57,10 @@ void main() {
 	
 	// Clamp to prevent over-brightening
 	finalLightColor = min(finalLightColor, vec3(1.0));
+	
+	// Apply ambient occlusion - darkens corners and edges next to solid blocks
+	// AO is in 0.0-1.0 range where 1.0 = full brightness, 0.0 = full occlusion
+	finalLightColor *= ao;
 	
 	// Ensure minimum brightness (never completely dark)
 	// Increased from 0.05 to 0.20, then to 0.25 to reduce interior corner darkness
