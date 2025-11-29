@@ -26,12 +26,14 @@ dependencies {
     implementation("org.lwjgl:lwjgl:$lwjgl")
     implementation("org.lwjgl:lwjgl-glfw:$lwjgl")
     implementation("org.lwjgl:lwjgl-opengl:$lwjgl")
+    implementation("org.lwjgl:lwjgl-openal:$lwjgl")
     implementation("org.lwjgl:lwjgl-stb:$lwjgl")
 
     // Linux natives only (add macOS/Windows if you need cross-platform zips)
     runtimeOnly("org.lwjgl:lwjgl:$lwjgl:natives-linux")
     runtimeOnly("org.lwjgl:lwjgl-glfw:$lwjgl:natives-linux")
     runtimeOnly("org.lwjgl:lwjgl-opengl:$lwjgl:natives-linux")
+    runtimeOnly("org.lwjgl:lwjgl-openal:$lwjgl:natives-linux")
     runtimeOnly("org.lwjgl:lwjgl-stb:$lwjgl:natives-linux")
     
     // JOML for matrix math (needed for UV lock transformation matching Minecraft)

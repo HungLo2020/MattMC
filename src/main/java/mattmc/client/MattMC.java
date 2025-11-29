@@ -6,6 +6,8 @@ import mattmc.client.renderer.backend.RenderBackend;
 import mattmc.client.renderer.backend.RenderBackendFactory;
 import mattmc.client.renderer.panorama.PanoramaRenderer;
 import mattmc.client.gui.screens.Screen;
+import mattmc.client.sounds.MusicManager;
+import mattmc.client.sounds.SoundManager;
 
 /**
  * Main game class for MattMC.
@@ -24,8 +26,12 @@ public final class MattMC {
     private PanoramaRenderer sharedPanorama;
     private int cachedFpsCap;
     private final RenderBackendFactory factory;
+    
+    // Sound system
+    private final SoundManager soundManager;
+    private final MusicManager musicManager;
 
-    public MattMC(WindowHandle window, RenderBackendFactory factory) { 
+    public MattMC(WindowHandle window, RenderBackendFactory factory, SoundManager soundManager) { 
         this.window = window;
         this.factory = factory;
         this.renderBackend = factory.createBackend();
@@ -33,6 +39,10 @@ public final class MattMC {
         this.sharedPanorama = renderBackend.createPanoramaRenderer("/assets/textures/gui/panorama1_", ".png");
         // Cache the FPS cap
         this.cachedFpsCap = OptionsManager.getFpsCap();
+        
+        // Initialize sound system
+        this.soundManager = soundManager;
+        this.musicManager = new MusicManager(soundManager);
     }
     
     /**
@@ -53,6 +63,16 @@ public final class MattMC {
      * This allows screens to create world renderers without importing backend classes.
      */
     public RenderBackendFactory getBackendFactory() { return factory; }
+    
+    /**
+     * Get the sound manager for playing sounds.
+     */
+    public SoundManager getSoundManager() { return soundManager; }
+    
+    /**
+     * Get the music manager for background music control.
+     */
+    public MusicManager getMusicManager() { return musicManager; }
     
     /**
      * Update the cached FPS cap. Call this when the FPS setting changes.
@@ -91,6 +111,14 @@ public final class MattMC {
                 if (current != null) current.tick();
                 // Tick texture animations at the game tick rate
                 renderBackend.tickTextureAnimations();
+                
+                // Tick the sound system (handles delayed sounds, cleanup, etc.)
+                // TODO: Pass actual game pause state when pause system is implemented
+                soundManager.tick(false);
+                
+                // TODO: Tick music manager with situational music when biome/dimension system is implemented
+                // musicManager.tick(getSituationalMusic());
+                
                 tickAccumulator -= tickTime;
             }
             

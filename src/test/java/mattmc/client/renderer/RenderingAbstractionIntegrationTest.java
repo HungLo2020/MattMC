@@ -79,6 +79,7 @@ public class RenderingAbstractionIntegrationTest {
         @Override public float getTextHeight(String t, float s) { return 0; }
         @Override public void drawButton(mattmc.client.gui.components.Button button) {}
         @Override public void drawButton(mattmc.client.gui.components.Button button, boolean selected) {}
+        @Override public void drawSlider(mattmc.client.gui.components.SliderButton slider) {}
         @Override public int loadTexture(String path) { return 0; }
         @Override public void drawTexture(int textureId, float x, float y, float width, float height) {}
         @Override public int getTextureWidth(int textureId) { return 0; }

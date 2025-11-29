@@ -1123,6 +1123,11 @@ public class OpenGLRenderBackend implements RenderBackend {
         mattmc.client.renderer.backend.opengl.gui.components.OpenGLButtonRenderer.drawButton(button, selected);
     }
     
+    @Override
+    public void drawSlider(mattmc.client.gui.components.SliderButton slider) {
+        mattmc.client.renderer.backend.opengl.gui.components.OpenGLSliderRenderer.drawSlider(slider);
+    }
+    
     // === Texture Management ===
     
     // Cache of loaded textures: path -> Texture
