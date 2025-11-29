@@ -364,6 +364,7 @@ public class ModelElementRenderer {
     /**
      * Add a face quad with pre-computed vertices and normal.
      * Applies per-face UV rotation as specified in the model.
+     * Uses actual rotated vertex positions for correct smooth lighting on rotated blocks.
      */
     private int addFaceQuadWithVertices(BlockFaceCollector.FaceData face,
                                         float[][] faceVerts,
@@ -373,22 +374,25 @@ public class ModelElementRenderer {
                                         FloatList vertices,
                                         IntList indices,
                                         int currentVertex) {
-        // For lighting, we need to determine which face index to use
-        // Use a default face index based on the normal direction
-        int faceIndex = 0; // Default to up
-        if (Math.abs(normal[1]) > 0.9f) {
-            faceIndex = normal[1] > 0 ? 0 : 1; // up or down
-        } else if (Math.abs(normal[2]) > 0.9f) {
-            faceIndex = normal[2] < 0 ? 2 : 3; // north or south
-        } else if (Math.abs(normal[0]) > 0.9f) {
-            faceIndex = normal[0] < 0 ? 4 : 5; // west or east
-        }
+        // Get block position to calculate local vertex coordinates
+        float blockX = face.x;
+        float blockY = face.y;
+        float blockZ = face.z;
         
-        // Sample lighting for vertices
-        float[] light0 = lightSampler.sampleVertexLight(face, faceIndex, 0);
-        float[] light1 = lightSampler.sampleVertexLight(face, faceIndex, 1);
-        float[] light2 = lightSampler.sampleVertexLight(face, faceIndex, 2);
-        float[] light3 = lightSampler.sampleVertexLight(face, faceIndex, 3);
+        // Sample lighting using actual rotated vertex positions and normal
+        // This fixes AO/shading on rotated blocks like horizontal logs and stairs
+        float[] light0 = lightSampler.sampleVertexLightWithPosition(face,
+            faceVerts[0][0] - blockX, faceVerts[0][1] - blockY, faceVerts[0][2] - blockZ,
+            normal[0], normal[1], normal[2]);
+        float[] light1 = lightSampler.sampleVertexLightWithPosition(face,
+            faceVerts[1][0] - blockX, faceVerts[1][1] - blockY, faceVerts[1][2] - blockZ,
+            normal[0], normal[1], normal[2]);
+        float[] light2 = lightSampler.sampleVertexLightWithPosition(face,
+            faceVerts[2][0] - blockX, faceVerts[2][1] - blockY, faceVerts[2][2] - blockZ,
+            normal[0], normal[1], normal[2]);
+        float[] light3 = lightSampler.sampleVertexLightWithPosition(face,
+            faceVerts[3][0] - blockX, faceVerts[3][1] - blockY, faceVerts[3][2] - blockZ,
+            normal[0], normal[1], normal[2]);
         
         // Apply per-face UV rotation by shifting which vertex gets which UV coordinate
         // This follows MattMC's BlockFaceUV logic where rotation shifts the vertex index

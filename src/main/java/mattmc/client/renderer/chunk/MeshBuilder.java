@@ -63,6 +63,9 @@ public class MeshBuilder {
         indices.clear();
         currentVertex = 0;
         
+        // Invalidate lighting cache to ensure fresh light data for rebuild
+        lightSampler.invalidateCache();
+        
         // ISSUE-015 fix: Process all face types in a flattened structure
         // to reduce method call overhead and iterator allocations
         List<BlockFaceCollector.FaceData>[] allFaces = new List[] {

@@ -109,6 +109,11 @@ public class Level implements LevelAccessor {
             }
             
             @Override
+            public Block getBlock(LevelChunk chunk, int x, int y, int z) {
+                return blockAccess.getBlockAcrossChunks(chunk, x, y, z);
+            }
+            
+            @Override
             public int getBlockLightR(LevelChunk chunk, int x, int y, int z) {
                 return blockAccess.getBlockLightRAcrossChunks(chunk, x, y, z);
             }
@@ -225,6 +230,15 @@ public class Level implements LevelAccessor {
             
             // Set the world light manager for automatic light updates
             chunk.setWorldLightManager(worldLightManager);
+            
+            // Set up neighbor dirty callback for smooth lighting updates
+            // When light changes at chunk edges, adjacent chunks need to rebuild their meshes
+            chunk.setNeighborDirtyCallback((neighborChunkX, neighborChunkZ) -> {
+                LevelChunk neighborChunk = chunkManager.getChunk(neighborChunkX, neighborChunkZ);
+                if (neighborChunk != null) {
+                    neighborChunk.setDirty(true);
+                }
+            });
             
             chunkManager.addChunk(chunk);
             
