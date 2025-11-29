@@ -62,7 +62,10 @@ shader.setUniform1i("uTexture", unit);
  * but is no longer used by the shader.
  * 
  * @param gamma Gamma exponent (typically 1.0-2.0, default 1.4)
+ * @deprecated The shader now uses Minecraft's brightness curve instead of gamma.
+ *             This method is retained for API compatibility but has no effect.
  */
+@Deprecated
 public void setLightGamma(float gamma) {
 this.lightGamma = gamma;
 shader.setUniform1f("uLightGamma", gamma);

@@ -479,59 +479,58 @@ The good news is that MattMC already has many of the building blocks in place (p
 
 The following 5 changes were implemented to make MattMC's lighting more like Minecraft while preserving the RGB block light feature:
 
-### 1. Reduced Minimum Brightness (0.25 → 0.04)
+### 1. Adjusted Minimum Brightness (0.25 → 0.1)
 **File:** `voxel_lit.fs`
 
-Changed the minimum brightness floor from 0.25 to 0.04. This makes caves and unlit areas much darker, matching Minecraft's atmospheric cave lighting.
+Changed the minimum brightness floor from 0.25 to 0.1. This makes caves darker while still being playable. The value was tuned to avoid being too dark when combined with other effects.
 
 ```glsl
 // Before: finalLightColor = max(finalLightColor, vec3(0.25));
 // After:
-finalLightColor = max(finalLightColor, vec3(0.04));
+finalLightColor = max(finalLightColor, vec3(0.1));
 ```
 
-### 2. Applied Ambient Occlusion in Fragment Shader
+### 2. Applied Ambient Occlusion in Fragment Shader (Gentle)
 **File:** `voxel_lit.fs`
 
-The AO value was already being computed and passed to the shader via `vAO` but was never used. Now it's applied with a configurable strength:
+The AO value was already being computed and passed to the shader via `vAO` but was never used. Now it's applied with a gentle 40% strength to avoid over-darkening:
 
 ```glsl
-// Apply ambient occlusion (vAO is 0.0-1.0 where 1.0 = no occlusion)
-float aoStrength = 0.6;
+// Apply ambient occlusion (subtle darkening in corners)
+float aoStrength = 0.4;
 float aoFactor = mix(1.0, vAO, aoStrength);
 finalLightColor *= aoFactor;
 ```
 
-### 3. Implemented Minecraft's Brightness Curve
+### 3. Implemented Minecraft-style Brightness Curve
 **File:** `voxel_lit.fs`
 
-Replaced the simple `pow(x, gamma)` curve with Minecraft's actual brightness formula `f / (4.0 - 3.0 * f)`. This creates a non-linear response that's brighter in the middle light range, matching Minecraft's look:
+Replaced the simple `pow(x, gamma)` curve with a Minecraft-inspired inverse quartic curve (notGamma style). This boosts mid-range light values for a more natural appearance:
 
 ```glsl
-float minecraftBrightness(float lightLevel) {
-    float f = clamp(lightLevel / 15.0, 0.0, 1.0);
-    return f / (4.0 - 3.0 * f);
+float getLightBrightness(float lightLevel) {
+    float normalized = clamp(lightLevel / 15.0, 0.0, 1.0);
+    // Inverse quartic curve (like Minecraft's notGamma)
+    float curved = 1.0 - (1.0 - normalized) * (1.0 - normalized) * 
+                         (1.0 - normalized) * (1.0 - normalized);
+    return mix(normalized, curved, 0.5);
 }
 ```
 
-### 4. Added Directional Face Shading in Shader
+### 4. Added Directional Face Shading in Shader (Balanced)
 **Files:** `voxel_lit.fs`, `voxel_lit.vs`
 
-Implemented Minecraft's face shading where different face orientations have different brightness:
+Implemented Minecraft's face shading at 50% strength to make faces distinguishable without over-darkening:
 - UP = 1.0 (brightest)
 - DOWN = 0.5 (darkest)
 - NORTH/SOUTH = 0.8
 - WEST/EAST = 0.6
 
-The vertex shader now passes the face normal to the fragment shader, which calculates the appropriate shade:
-
 ```glsl
-float getDirectionalShade(vec3 normal) {
-    if (absNormal.y > 0.9) return normal.y > 0.0 ? 1.0 : 0.5;
-    if (absNormal.z > 0.9) return 0.8;
-    if (absNormal.x > 0.9) return 0.6;
-    // ... interpolation for angled faces
-}
+// Apply directional shade gently - blend with 1.0 instead of pure multiply
+float shadeStrength = 0.5; // 0 = no shading, 1 = full Minecraft shading
+float appliedShade = mix(1.0, directionalShade, shadeStrength);
+finalLightColor *= appliedShade;
 ```
 
 ### 5. Added Sky Darkness Uniform for Day/Night Cycle
@@ -549,17 +548,37 @@ public void setSkyDarkness(float darkness) {
 
 ```glsl
 // voxel_lit.fs
-float skyBrightness = lightToBrightness(skyLight) * uSkyDarkness;
+float skyBrightness = getLightBrightness(skyLight) * uSkyDarkness;
+```
+
+### Colored Block Light Preservation
+
+Block lights with RGB colors are fully preserved! The shader applies the brightness curve to each RGB channel independently:
+
+```glsl
+vec3 blockBrightness = vec3(
+    getLightBrightness(blockLightRGB.r),
+    getLightBrightness(blockLightRGB.g),
+    getLightBrightness(blockLightRGB.b)
+);
+```
+
+Sky and block light are combined using MAX blend with a color boost, allowing colored lights to show through even in daylight:
+
+```glsl
+vec3 combinedLight = max(skyColor, blockBrightness);
+vec3 blockColorBoost = blockBrightness * 0.3;
+vec3 finalLightColor = combinedLight + blockColorBoost;
 ```
 
 ### Summary of Changes
 
 | Change | Impact | Files Modified |
 |--------|--------|----------------|
-| Reduce min brightness 0.25→0.04 | Darker caves | voxel_lit.fs |
-| Apply AO in shader | Subtle corner shadows | voxel_lit.fs |
-| Minecraft brightness curve | More natural light falloff | voxel_lit.fs |
-| Directional face shading | Visible 3D block faces | voxel_lit.fs, voxel_lit.vs |
+| Reduce min brightness 0.25→0.1 | Darker caves (balanced) | voxel_lit.fs |
+| Apply AO in shader (40% strength) | Subtle corner shadows | voxel_lit.fs |
+| Minecraft-style brightness curve | Brighter mid-range | voxel_lit.fs |
+| Directional face shading (50% strength) | Visible 3D block faces | voxel_lit.fs, voxel_lit.vs |
 | Sky darkness uniform | Day/night ready | voxel_lit.fs, VoxelLitShader.java |
 
-All changes preserve the existing RGB block light system - colored lights from torches and other sources still work exactly as before, but now with more realistic lighting behavior.
+All changes preserve the existing RGB block light system - colored lights from torches and other sources still work exactly as before, but now with more Minecraft-like lighting behavior.
