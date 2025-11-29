@@ -6,6 +6,7 @@ import mattmc.world.phys.shapes.VoxelShape;
 import mattmc.util.MathUtils;
 
 import java.util.Map;
+import java.util.Random;
 
 /**
  * Represents a single block in the world.
@@ -340,7 +341,7 @@ public class Block {
      * @param random random source for particle effects
      * @param particleSpawner callback to spawn particles
      */
-    public void animateTick(Level level, int x, int y, int z, java.util.Random random, 
+    public void animateTick(Level level, int x, int y, int z, Random random, 
                            ParticleSpawner particleSpawner) {
         // Default: do nothing - override in subclasses that need particle effects
     }

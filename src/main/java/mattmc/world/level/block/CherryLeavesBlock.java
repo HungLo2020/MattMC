@@ -2,6 +2,8 @@ package mattmc.world.level.block;
 
 import mattmc.world.level.Level;
 
+import java.util.Random;
+
 /**
  * Cherry leaves block that spawns falling cherry blossom particles.
  * 
@@ -42,7 +44,7 @@ public class CherryLeavesBlock extends LeavesBlock {
      * block directly below (so petals can fall).
      */
     @Override
-    public void animateTick(Level level, int x, int y, int z, java.util.Random random,
+    public void animateTick(Level level, int x, int y, int z, Random random,
                            ParticleSpawner particleSpawner) {
         // Only 10% chance to spawn a particle (like Minecraft)
         if (random.nextInt(10) != 0) {

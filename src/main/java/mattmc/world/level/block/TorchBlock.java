@@ -3,6 +3,8 @@ package mattmc.world.level.block;
 import mattmc.world.level.Level;
 import mattmc.world.phys.shapes.VoxelShape;
 
+import java.util.Random;
+
 /**
  * Represents a torch block in the world.
  * Based on MattMC's TorchBlock class.
@@ -65,7 +67,7 @@ public class TorchBlock extends Block {
      * Mirrors Minecraft's TorchBlock.animateTick.
      */
     @Override
-    public void animateTick(Level level, int x, int y, int z, java.util.Random random,
+    public void animateTick(Level level, int x, int y, int z, Random random,
                            ParticleSpawner particleSpawner) {
         // Spawn at the top center of the torch
         double px = x + 0.5;

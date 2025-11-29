@@ -22,6 +22,7 @@ import java.io.IOException;
 import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
+import java.util.Random;
 
 /**
  * Manages an infinite world with dynamic chunk loading/unloading.
@@ -535,7 +536,7 @@ public class Level implements LevelAccessor {
      * @param particleSpawner callback to spawn particles
      */
     public void animateTick(int playerX, int playerY, int playerZ, 
-                           java.util.Random random, Block.ParticleSpawner particleSpawner) {
+                           Random random, Block.ParticleSpawner particleSpawner) {
         // Iterate 667 times for range 16 and 667 times for range 32
         // This matches Minecraft's behavior exactly
         for (int i = 0; i < 667; i++) {
@@ -548,7 +549,7 @@ public class Level implements LevelAccessor {
      * Animate a single random block within range of the player.
      */
     private void doAnimateTick(int playerX, int playerY, int playerZ, int range,
-                              java.util.Random random, Block.ParticleSpawner particleSpawner) {
+                              Random random, Block.ParticleSpawner particleSpawner) {
         // Pick a random block within range
         int x = playerX + random.nextInt(range) - random.nextInt(range);
         int y = playerY + random.nextInt(range) - random.nextInt(range);
