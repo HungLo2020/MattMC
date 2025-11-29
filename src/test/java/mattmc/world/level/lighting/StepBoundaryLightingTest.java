@@ -67,14 +67,6 @@ public class StepBoundaryLightingTest {
                 int b = c.getBlockLightB(x, y, z);
                 return new int[] {r, g, b};
             }
-            
-            @Override
-            public Block getBlockAcrossChunks(LevelChunk c, int x, int y, int z) {
-                if (x < 0 || x >= 16 || z < 0 || z >= 16 || y < 0 || y >= LevelChunk.HEIGHT) {
-                    return Blocks.AIR;
-                }
-                return c.getBlock(x, y, z);
-            }
         });
     }
     
