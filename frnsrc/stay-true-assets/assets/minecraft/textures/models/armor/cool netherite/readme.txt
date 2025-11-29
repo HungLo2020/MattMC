@@ -1,0 +1,1 @@
+Simply drag the netherite texture files into the armor folder to use this textures.
