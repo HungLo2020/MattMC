@@ -1,6 +1,5 @@
 package mattmc.world.level.block;
 
-import mattmc.util.MathUtils;
 import mattmc.util.Validate;
 
 import java.util.Collections;
@@ -141,45 +140,7 @@ public class Blocks {
             throw new IllegalStateException("Block with identifier '" + identifier + "' is already registered!");
         }
         
-        // Create a new block instance with the identifier set
-        Block registeredBlock;
-        if (block instanceof SlabBlock) {
-            registeredBlock = new SlabBlock(identifier);
-        } else if (block instanceof StairsBlock) {
-            registeredBlock = new StairsBlock(identifier);
-        } else if (block instanceof WallTorchBlock) {
-            int lightEmission = MathUtils.max(block.getLightEmissionR(), MathUtils.max(block.getLightEmissionG(), block.getLightEmissionB()));
-            registeredBlock = new WallTorchBlock(block.isSolid(), 
-                lightEmission,
-                block.getLightEmissionR(), block.getLightEmissionG(), block.getLightEmissionB(), 
-                identifier);
-        } else if (block instanceof TorchBlock) {
-            int lightEmission = MathUtils.max(block.getLightEmissionR(), MathUtils.max(block.getLightEmissionG(), block.getLightEmissionB()));
-            registeredBlock = new TorchBlock(block.isSolid(), 
-                lightEmission,
-                block.getLightEmissionR(), block.getLightEmissionG(), block.getLightEmissionB(), 
-                identifier);
-        } else if (block instanceof RotatedPillarBlock) {
-            int lightEmission = MathUtils.max(block.getLightEmissionR(), MathUtils.max(block.getLightEmissionG(), block.getLightEmissionB()));
-            registeredBlock = new RotatedPillarBlock(block.isSolid(), 
-                lightEmission,
-                block.getLightEmissionR(), block.getLightEmissionG(), block.getLightEmissionB(), 
-                identifier);
-        } else if (block instanceof FallingLeavesBlock) {
-            FallingLeavesBlock fallingLeaves = (FallingLeavesBlock) block;
-            registeredBlock = new FallingLeavesBlock(fallingLeaves.getRawTintColor(),
-                fallingLeaves.getParticleRed(), fallingLeaves.getParticleGreen(), fallingLeaves.getParticleBlue(),
-                identifier);
-        } else if (block instanceof LeavesBlock) {
-            LeavesBlock leavesBlock = (LeavesBlock) block;
-            registeredBlock = new LeavesBlock(leavesBlock.getRawTintColor(), identifier);
-        } else {
-            int lightEmission = MathUtils.max(block.getLightEmissionR(), MathUtils.max(block.getLightEmissionG(), block.getLightEmissionB()));
-            registeredBlock = new Block(block.isSolid(), 
-                lightEmission,
-                block.getLightEmissionR(), block.getLightEmissionG(), block.getLightEmissionB(), 
-                identifier);
-        }
+        Block registeredBlock = block.withIdentifier(identifier);
         REGISTRY.put(identifier, registeredBlock);
         return registeredBlock;
     }
@@ -200,45 +161,7 @@ public class Blocks {
         Validate.isFalse(REGISTRY.containsKey(identifier), 
             "Block with identifier '" + identifier + "' is already registered!");
         
-        // Create a new block instance with the identifier set
-        Block registeredBlock;
-        if (block instanceof SlabBlock) {
-            registeredBlock = new SlabBlock(identifier);
-        } else if (block instanceof StairsBlock) {
-            registeredBlock = new StairsBlock(identifier);
-        } else if (block instanceof WallTorchBlock) {
-            int lightEmission = MathUtils.max(block.getLightEmissionR(), MathUtils.max(block.getLightEmissionG(), block.getLightEmissionB()));
-            registeredBlock = new WallTorchBlock(block.isSolid(), 
-                lightEmission,
-                block.getLightEmissionR(), block.getLightEmissionG(), block.getLightEmissionB(), 
-                identifier);
-        } else if (block instanceof TorchBlock) {
-            int lightEmission = MathUtils.max(block.getLightEmissionR(), MathUtils.max(block.getLightEmissionG(), block.getLightEmissionB()));
-            registeredBlock = new TorchBlock(block.isSolid(), 
-                lightEmission,
-                block.getLightEmissionR(), block.getLightEmissionG(), block.getLightEmissionB(), 
-                identifier);
-        } else if (block instanceof RotatedPillarBlock) {
-            int lightEmission = MathUtils.max(block.getLightEmissionR(), MathUtils.max(block.getLightEmissionG(), block.getLightEmissionB()));
-            registeredBlock = new RotatedPillarBlock(block.isSolid(), 
-                lightEmission,
-                block.getLightEmissionR(), block.getLightEmissionG(), block.getLightEmissionB(), 
-                identifier);
-        } else if (block instanceof FallingLeavesBlock) {
-            FallingLeavesBlock fallingLeaves = (FallingLeavesBlock) block;
-            registeredBlock = new FallingLeavesBlock(fallingLeaves.getRawTintColor(),
-                fallingLeaves.getParticleRed(), fallingLeaves.getParticleGreen(), fallingLeaves.getParticleBlue(),
-                identifier);
-        } else if (block instanceof LeavesBlock) {
-            LeavesBlock leavesBlock = (LeavesBlock) block;
-            registeredBlock = new LeavesBlock(leavesBlock.getRawTintColor(), identifier);
-        } else {
-            int lightEmission = MathUtils.max(block.getLightEmissionR(), MathUtils.max(block.getLightEmissionG(), block.getLightEmissionB()));
-            registeredBlock = new Block(block.isSolid(), 
-                lightEmission,
-                block.getLightEmissionR(), block.getLightEmissionG(), block.getLightEmissionB(), 
-                identifier);
-        }
+        Block registeredBlock = block.withIdentifier(identifier);
         REGISTRY.put(identifier, registeredBlock);
         return registeredBlock;
     }

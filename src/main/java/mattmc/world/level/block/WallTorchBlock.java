@@ -42,8 +42,13 @@ public class WallTorchBlock extends TorchBlock {
     /**
      * Internal constructor used during registration to set the identifier.
      */
-    WallTorchBlock(boolean solid, int lightEmission, int lightEmissionR, int lightEmissionG, int lightEmissionB, String identifier) {
+    protected WallTorchBlock(boolean solid, int lightEmission, int lightEmissionR, int lightEmissionG, int lightEmissionB, String identifier) {
         super(solid, lightEmission, lightEmissionR, lightEmissionG, lightEmissionB, identifier);
+    }
+    
+    @Override
+    public Block withIdentifier(String identifier) {
+        return new WallTorchBlock(isSolid(), computeLightEmission(), getLightEmissionR(), getLightEmissionG(), getLightEmissionB(), identifier);
     }
     
     /**

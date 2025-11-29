@@ -35,8 +35,13 @@ public class SlabBlock extends Block {
     /**
      * Internal constructor used during registration to set the identifier.
      */
-    SlabBlock(String identifier) {
+    protected SlabBlock(String identifier) {
         super(false, 0, 0, 0, 0, identifier);  // Slabs are transparent/non-solid for rendering, no light emission
+    }
+    
+    @Override
+    public Block withIdentifier(String identifier) {
+        return new SlabBlock(identifier);
     }
     
     /**
