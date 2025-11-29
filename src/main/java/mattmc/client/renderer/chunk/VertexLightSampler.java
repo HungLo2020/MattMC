@@ -221,6 +221,66 @@ public class VertexLightSampler {
     }
     
     /**
+     * Sample vertex light using actual vertex position and normal.
+     * This is used for rotated model elements (like horizontal logs, stairs, etc.)
+     * where the vertex positions don't match the standard cube face positions.
+     * 
+     * <p>This matches Minecraft's QuadLighter.process() approach where:
+     * <pre>
+     * adjustedPosition = position - 0.5 + (normal * 0.5)
+     * </pre>
+     * 
+     * @param face The face data containing chunk reference and block position
+     * @param vertexX Vertex X position relative to block origin (0-1)
+     * @param vertexY Vertex Y position relative to block origin (0-1)
+     * @param vertexZ Vertex Z position relative to block origin (0-1)
+     * @param normalX Normal X component (-1 to 1)
+     * @param normalY Normal Y component (-1 to 1)
+     * @param normalZ Normal Z component (-1 to 1)
+     * @return [skyLight, blockLightR, blockLightG, blockLightB, ao] as floats
+     */
+    public float[] sampleVertexLightWithPosition(BlockFaceCollector.FaceData face,
+                                                  float vertexX, float vertexY, float vertexZ,
+                                                  float normalX, float normalY, float normalZ) {
+        // If no chunk reference, return default lighting
+        if (face.chunk == null) {
+            return new float[] {15.0f, 0.0f, 0.0f, 0.0f, 1.0f};
+        }
+        
+        // Get chunk-local coordinates of the block
+        int cx = face.cx;
+        int cy = face.cy;
+        int cz = face.cz;
+        
+        // Check if we need to recompute lighting for this block
+        if (!lightingComputed || cachedChunk != face.chunk || 
+            cachedCx != cx || cachedCy != cy || cachedCz != cz) {
+            computeLightingAt(face.chunk, cx, cy, cz);
+            cachedChunk = face.chunk;
+            cachedCx = cx;
+            cachedCy = cy;
+            cachedCz = cz;
+            lightingComputed = true;
+        }
+        
+        // Convert vertex position from 0-1 block space to -0.5 to 0.5 centered space
+        // Then apply normal offset matching Minecraft's approach
+        float x = vertexX - 0.5f + normalX * 0.5f;
+        float y = vertexY - 0.5f + normalY * 0.5f;
+        float z = vertexZ - 0.5f + normalZ * 0.5f;
+        
+        // Calculate interpolated light values
+        float sky = calcLightmap(skyLight, x, y, z);
+        float blR = calcLightmap(blockLightR, x, y, z);
+        float blG = calcLightmap(blockLightG, x, y, z);
+        float blB = calcLightmap(blockLightB, x, y, z);
+        float aoValue = calculateBrightness(new float[] {x, y, z});
+        
+        // Convert from 0-1 range to 0-15 range for light values
+        return new float[] {sky * 15.0f, blR * 15.0f, blG * 15.0f, blB * 15.0f, aoValue};
+    }
+    
+    /**
      * Compute lighting data for a block position.
      * This populates the 3x3x3 sample grids and precomputes corner light values.
      */
