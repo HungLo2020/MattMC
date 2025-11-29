@@ -19,3 +19,15 @@ generic_4.png
 generic_5.png
 generic_6.png
 generic_7.png
+leaves_0.png
+leaves_1.png
+leaves_2.png
+leaves_3.png
+leaves_4.png
+leaves_5.png
+leaves_6.png
+leaves_7.png
+leaves_8.png
+leaves_9.png
+leaves_10.png
+leaves_11.png

@@ -298,6 +298,8 @@ public final class DevplayScreen implements Screen {
                 return mattmc.core.particles.ParticleTypes.FLAME;
             case "cherry_leaves":
                 return mattmc.core.particles.ParticleTypes.CHERRY_LEAVES;
+            case "falling_leaves":
+                return mattmc.core.particles.ParticleTypes.FALLING_LEAVES;
             case "poof":
                 return mattmc.core.particles.ParticleTypes.POOF;
             default:
@@ -324,6 +326,9 @@ public final class DevplayScreen implements Screen {
             mattmc.client.particle.PoofParticle.Provider::new);
         particleEngine.register(mattmc.core.particles.ParticleTypes.CHERRY_LEAVES, 
             mattmc.client.particle.CherryParticle.Provider::new);
+        // Register falling_leaves with cherry pink tint (matches FallingLeavesBlock for cherry leaves)
+        particleEngine.register(mattmc.core.particles.ParticleTypes.FALLING_LEAVES, 
+            sprites -> new mattmc.client.particle.FallingLeavesParticle.ColoredProvider(sprites, 1.0f, 0.7f, 0.8f));
         
         // Load particle definitions (binds textures to sprite sets)
         particleEngine.loadParticleDefinitions();
