@@ -45,9 +45,10 @@ Each pixel in the lightmap stores the RGB color that should be applied for that 
 1. **Color Tinting**: Block light has a warm orange/yellow tint:
    ```java
    // From LightTexture.java lines 118-122
-   float f9 = f9 * ((f9 * 0.6F + 0.4F) * 0.6F + 0.4F); // Green channel
-   float f10 = f9 * (f9 * f9 * 0.6F + 0.4F);           // Blue channel
-   vector3f1.set(f9, f10, f11);  // Orange-ish tint for block light
+   // f9 = blockLightBrightness (red channel stays as-is)
+   float f10 = f9 * ((f9 * 0.6F + 0.4F) * 0.6F + 0.4F); // Green channel (reduced)
+   float f11 = f9 * (f9 * f9 * 0.6F + 0.4F);            // Blue channel (most reduced)
+   vector3f1.set(f9, f10, f11);  // Creates warm orange tint for block light
    ```
 
 2. **Torch Flicker**: Subtle random brightness variation:
