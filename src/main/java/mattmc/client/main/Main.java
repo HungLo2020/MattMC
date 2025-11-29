@@ -4,6 +4,7 @@ import mattmc.client.MattMC;
 import mattmc.client.renderer.backend.RenderBackendFactory;
 import mattmc.client.renderer.window.WindowHandle;
 import mattmc.client.gui.screens.TitleScreen;
+import mattmc.client.sounds.SoundManager;
 import mattmc.util.AppPaths;
 import mattmc.client.settings.KeybindManager;
 import mattmc.client.settings.OptionsManager;
@@ -35,8 +36,17 @@ public final class Main {
         // Load keybinds from Options.txt
         KeybindManager.loadKeybinds();
         
-        // Load options (blur settings, etc.)
+        // Load options (blur settings, sound volumes, etc.)
         OptionsManager.loadOptions();
+        
+        // Initialize the sound system
+        SoundManager soundManager = new SoundManager();
+        soundManager.init();
+        
+        // Wire up volume change listener to update sound engine in real-time
+        OptionsManager.setSoundVolumeChangeListener((source, volume) -> {
+            soundManager.updateSourceVolume(source, volume);
+        });
 
         // Boot the game with configured resolution using the backend factory
         // This avoids directly importing OpenGL-specific classes
@@ -47,13 +57,16 @@ public final class Main {
         WindowHandle window = factory.createWindow(width, height, "MattMC");
         
         try (AutoCloseable windowCloseable = factory.getWindowCloseable()) {
-            var game = new MattMC(window, factory);
+            var game = new MattMC(window, factory, soundManager);
             // If your MattMC wants to know the dataDir, you can add a setter/ctor and pass it in.
             game.setScreen(new TitleScreen(game));
             game.run();
         } catch (Exception e) {
             logger.error("Error during game execution: {}", e.getMessage(), e);
             throw new RuntimeException("Game execution failed", e);
+        } finally {
+            // Clean up sound system
+            soundManager.destroy();
         }
     }
 }

@@ -7,6 +7,7 @@ import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import mattmc.util.MathUtils;
+import mattmc.client.sounds.SoundSource;
 
 /**
  * Manages game options/settings (excluding keybinds).
@@ -62,6 +63,27 @@ public class OptionsManager {
     
     // Allowed anisotropic filtering levels
     public static final int[] ALLOWED_ANISOTROPIC_LEVELS = {0, 2, 4, 8, 16};
+    
+    // Sound volume settings (0.0 - 1.0)
+    private static final Map<SoundSource, Float> soundSourceVolumes = new HashMap<>();
+    
+    // Sound volume change listener (for real-time updates to sound engine)
+    private static SoundVolumeChangeListener soundVolumeChangeListener;
+    
+    static {
+        // Initialize all sound sources to 100% (1.0)
+        for (SoundSource source : SoundSource.values()) {
+            soundSourceVolumes.put(source, 1.0f);
+        }
+    }
+    
+    /**
+     * Listener interface for sound volume changes.
+     */
+    @FunctionalInterface
+    public interface SoundVolumeChangeListener {
+        void onVolumeChanged(SoundSource source, float volume);
+    }
     
     /**
      * Validate and clamp FPS cap value to valid range.
@@ -194,6 +216,18 @@ public class OptionsManager {
                         smoothLightingEnabled = Boolean.parseBoolean(value);
                     } else if (key.equals("shadows")) {
                         shadowsEnabled = Boolean.parseBoolean(value);
+                    } else if (key.startsWith("soundVolume_")) {
+                        // Parse sound volume settings (format: soundVolume_category=0.0-1.0)
+                        String categoryName = key.substring("soundVolume_".length());
+                        SoundSource source = SoundSource.byName(categoryName);
+                        if (source != null) {
+                            try {
+                                float vol = Float.parseFloat(value);
+                                soundSourceVolumes.put(source, MathUtils.clamp(vol, 0.0f, 1.0f));
+                            } catch (NumberFormatException e) {
+                                logger.error("Invalid sound volume value for {}: {}", categoryName, value);
+                            }
+                        }
                     }
                 }
             }
@@ -324,6 +358,14 @@ public class OptionsManager {
                 writer.write("shadows=" + shadowsEnabled + "\n");
                 writer.write("\n");
                 
+                // Write sound volume settings
+                writer.write("# Sound volume settings (0.0 - 1.0)\n");
+                for (SoundSource source : SoundSource.values()) {
+                    writer.write("soundVolume_" + source.getName() + "=" + 
+                        soundSourceVolumes.getOrDefault(source, 1.0f) + "\n");
+                }
+                writer.write("\n");
+                
                 // Write keybinds section header
                 writer.write("# Keybinds (format: action=key_name)\n");
                 writer.write("# Keyboard keys: a-z, 0-9, space, left_shift, left_ctrl, left_alt, etc.\n");
@@ -338,7 +380,7 @@ public class OptionsManager {
                         !key.equals("resolution") && !key.equals("fullscreen") &&
                         !key.equals("render_distance") && !key.equals("mipmaps") &&
                         !key.equals("anisotropic_filtering") && !key.equals("smooth_lighting") &&
-                        !key.equals("shadows")) {
+                        !key.equals("shadows") && !key.startsWith("soundVolume_")) {
                         writer.write(key + "=" + entry.getValue() + "\n");
                     }
                 }
@@ -512,5 +554,68 @@ public class OptionsManager {
     public static void toggleShadows() {
         shadowsEnabled = !shadowsEnabled;
         saveOptions();
+    }
+    
+    // === Sound Volume Settings ===
+    
+    /**
+     * Get the volume for a specific sound source (0.0 - 1.0).
+     * @param source The sound source/category
+     * @return Volume between 0.0 and 1.0
+     */
+    public static float getSoundSourceVolume(SoundSource source) {
+        return soundSourceVolumes.getOrDefault(source, 1.0f);
+    }
+    
+    /**
+     * Set the volume for a specific sound source.
+     * @param source The sound source/category
+     * @param volume Volume between 0.0 and 1.0
+     */
+    public static void setSoundSourceVolume(SoundSource source, float volume) {
+        float clampedVolume = MathUtils.clamp(volume, 0.0f, 1.0f);
+        soundSourceVolumes.put(source, clampedVolume);
+        
+        // Notify listener if registered
+        if (soundVolumeChangeListener != null) {
+            soundVolumeChangeListener.onVolumeChanged(source, clampedVolume);
+        }
+        
+        saveOptions();
+    }
+    
+    /**
+     * Set the volume for a specific sound source without saving (for real-time slider updates).
+     */
+    public static void setSoundSourceVolumeNoSave(SoundSource source, float volume) {
+        float clampedVolume = MathUtils.clamp(volume, 0.0f, 1.0f);
+        soundSourceVolumes.put(source, clampedVolume);
+        
+        // Notify listener if registered
+        if (soundVolumeChangeListener != null) {
+            soundVolumeChangeListener.onVolumeChanged(source, clampedVolume);
+        }
+    }
+    
+    /**
+     * Set the listener for sound volume changes.
+     * This is typically set by the SoundManager to receive real-time updates.
+     */
+    public static void setSoundVolumeChangeListener(SoundVolumeChangeListener listener) {
+        soundVolumeChangeListener = listener;
+    }
+    
+    /**
+     * Get the volume as a percentage (0 - 100).
+     */
+    public static int getSoundSourceVolumePercent(SoundSource source) {
+        return Math.round(getSoundSourceVolume(source) * 100);
+    }
+    
+    /**
+     * Set the volume from a percentage (0 - 100).
+     */
+    public static void setSoundSourceVolumePercent(SoundSource source, int percent) {
+        setSoundSourceVolume(source, percent / 100.0f);
     }
 }

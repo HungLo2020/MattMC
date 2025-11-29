@@ -445,6 +445,16 @@ public interface RenderBackend {
      */
     void drawButton(mattmc.client.gui.components.Button button, boolean selected);
     
+    /**
+     * Draw a slider widget at its current position.
+     * 
+     * <p>The slider displays a track with a draggable handle. The position of the
+     * handle reflects the current value (0.0 - 1.0).
+     * 
+     * @param slider the slider to render
+     */
+    void drawSlider(mattmc.client.gui.components.SliderButton slider);
+    
     // === Texture/Image Rendering ===
     
     /**
