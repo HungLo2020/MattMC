@@ -6,7 +6,6 @@ import mattmc.client.renderer.chunk.MeshBuilder;
 import mattmc.client.renderer.chunk.VertexLightSampler;
 import mattmc.client.renderer.backend.opengl.TextureAtlas;
 import mattmc.client.renderer.block.BlockFaceCollector;
-import mattmc.util.LightUtils;
 import mattmc.world.level.block.Block;
 import mattmc.world.level.block.Blocks;
 import mattmc.world.level.levelgen.WorldGenerator;
@@ -436,22 +435,26 @@ public class AsyncChunkLoader {
                     int b = lightAccessor.getBlockLightB(chunk, x, y, z);
                     int intensity = lightAccessor.getBlockLightI(chunk, x, y, z);
                     
-                    // ISSUE-002 fix: Use shared utility method for RGB scaling
-                    return LightUtils.scaleRGBByIntensity(r, g, b, intensity);
-                }
-                
-                @Override
-                public Block getBlockAcrossChunks(LevelChunk chunk, int x, int y, int z) {
-                    // Use the neighbor accessor for cross-chunk block access (for ambient occlusion)
-                    if (neighborAccessor != null) {
-                        return neighborAccessor.getBlockAcrossChunks(chunk, x, y, z);
+                    // If no light, return early
+                    if (intensity == 0) {
+                        return new int[] {0, 0, 0};
                     }
-                    // Fallback to within-chunk access
-                    if (x >= 0 && x < LevelChunk.WIDTH && z >= 0 && z < LevelChunk.DEPTH &&
-                        y >= 0 && y < LevelChunk.HEIGHT) {
-                        return chunk.getBlock(x, y, z);
+                    
+                    // Scale RGB by intensity ratio to properly attenuate light
+                    int maxRGB = Math.max(r, Math.max(g, b));
+                    
+                    // If maxRGB is 0 but intensity is not, use intensity as white light
+                    if (maxRGB == 0) {
+                        return new int[] {intensity, intensity, intensity};
                     }
-                    return Blocks.AIR;
+                    
+                    // Scale RGB by the intensity ratio
+                    float scale = (float) intensity / maxRGB;
+                    int scaledR = Math.round(r * scale);
+                    int scaledG = Math.round(g * scale);
+                    int scaledB = Math.round(b * scale);
+                    
+                    return new int[] {scaledR, scaledG, scaledB};
                 }
             });
         }

@@ -4,7 +4,7 @@
 varying vec2 vTexCoord;
 varying vec4 vColor;
 varying vec4 vLightData; // (skyLight, blockLightR, blockLightG, blockLightB)
-varying float vAO; // Ambient occlusion (0.0-1.0, where 1.0 = no occlusion)
+varying float vAO; // Ambient occlusion
 
 // Uniforms
 uniform sampler2D uTexture;
@@ -41,10 +41,7 @@ void main() {
 	// Extract light components (0-15 range)
 	float skyLight = vLightData.x;
 	vec3 blockLightRGB = vLightData.yzw; // R, G, B
-	
-	// Ambient occlusion value (0.0-1.0)
-	// Apply to final brightness to darken occluded corners
-	float ao = clamp(vAO, 0.0, 1.0);
+	float ao = vAO; // Not used yet, reserved for ambient occlusion
 	
 	// Convert to brightness/color with gamma curve
 	float skyBrightness = lightToBrightness(skyLight, uLightGamma);
@@ -64,10 +61,6 @@ void main() {
 	// Ensure minimum brightness (never completely dark)
 	// Increased from 0.05 to 0.20, then to 0.25 to reduce interior corner darkness
 	finalLightColor = max(finalLightColor, vec3(0.25));
-	
-	// Apply ambient occlusion to darken occluded areas
-	// AO affects the overall brightness, creating shadows in corners
-	finalLightColor *= ao;
 	
 	// Apply optional emissive boost
 	finalLightColor *= uEmissiveBoost;
