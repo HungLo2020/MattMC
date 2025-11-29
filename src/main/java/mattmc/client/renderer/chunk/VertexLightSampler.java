@@ -52,14 +52,19 @@ public class VertexLightSampler {
     /** Full opacity value for block opacity checks */
     private static final int FULL_OPACITY = 15;
     
-    /** Direction step values for the 6 faces (UP, DOWN, NORTH, SOUTH, WEST, EAST) */
+    /** 
+     * Direction step values for the 6 faces.
+     * Index mapping: 0=UP, 1=DOWN, 2=NORTH, 3=SOUTH, 4=WEST, 5=EAST
+     * Each entry is {stepX, stepY, stepZ} for the face normal direction.
+     * Used in face occlusion checks and flat lighting mode.
+     */
     private static final int[][] DIRECTION_STEPS = {
-        {0, 1, 0},   // UP
-        {0, -1, 0},  // DOWN
-        {0, 0, -1},  // NORTH
-        {0, 0, 1},   // SOUTH
-        {-1, 0, 0},  // WEST
-        {1, 0, 0}    // EAST
+        {0, 1, 0},   // 0: UP (Y+)
+        {0, -1, 0},  // 1: DOWN (Y-)
+        {0, 0, -1},  // 2: NORTH (Z-)
+        {0, 0, 1},   // 3: SOUTH (Z+)
+        {-1, 0, 0},  // 4: WEST (X-)
+        {1, 0, 0}    // 5: EAST (X+)
     };
     
     // Per-block 3x3x3 sample grid arrays
@@ -308,7 +313,10 @@ public class VertexLightSampler {
                     int bBx = bB[x1][1][1], bBy = bB[1][y1][1], bBz = bB[1][1][z1];
                     boolean tx = t[x1][1][1], ty = t[1][y1][1], tz = t[1][1][z1];
                     
-                    // Visibility check: if edge is transparent, corner value is visible; else use face fallback
+                    // Corner visibility check: A corner is visible if at least one of its two
+                    // adjacent edges (perpendicular to the face normal) is transparent.
+                    // This allows light to reach corners even when one edge is blocked.
+                    // This matches Minecraft's SmoothQuadLighter logic: `txz || txy ? sxyz : sx`
                     boolean canSeeCornerXZ = txz || txy;
                     boolean canSeeCornerXY = txy || tyz;
                     boolean canSeeCornerYZ = tyz || txz;
@@ -349,13 +357,18 @@ public class VertexLightSampler {
     
     /**
      * Combine 4 light samples with transparency-based fallback logic.
-     * Matches Minecraft's SmoothQuadLighter.combine() function.
+     * This is an exact copy of Minecraft's SmoothQuadLighter.combine() function.
+     * 
+     * <p>The function uses cascading fallback logic: if a position is blocked (value=0)
+     * and not transparent, it uses a neighboring value minus 1 as a fallback. The order
+     * of operations matters - later calculations use potentially modified earlier values.
+     * This is intentional and matches Minecraft's behavior.</p>
      * 
      * @param c Center value (face-adjacent)
      * @param s1 Edge neighbor 1
      * @param s2 Edge neighbor 2
      * @param s3 Corner value
-     * @param t0 Center transparency
+     * @param t0 Center transparency (true if light can pass through)
      * @param t1 Edge 1 transparency
      * @param t2 Edge 2 transparency
      * @param t3 Corner transparency
@@ -364,11 +377,11 @@ public class VertexLightSampler {
     private float combine(int c, int s1, int s2, int s3, boolean t0, boolean t1, boolean t2, boolean t3) {
         // If center is blocked and not transparent, use max of neighbors - 1
         if (c == 0 && !t0) c = Math.max(0, Math.max(s1, s2) - 1);
-        // If edge 1 is blocked and not transparent, use center - 1
+        // If edge 1 is blocked and not transparent, use (potentially modified) center - 1
         if (s1 == 0 && !t1) s1 = Math.max(0, c - 1);
-        // If edge 2 is blocked and not transparent, use center - 1
+        // If edge 2 is blocked and not transparent, use (potentially modified) center - 1
         if (s2 == 0 && !t2) s2 = Math.max(0, c - 1);
-        // If corner is blocked and not transparent, use max of edges - 1
+        // If corner is blocked and not transparent, use max of (potentially modified) edges - 1
         if (s3 == 0 && !t3) s3 = Math.max(0, Math.max(s1, s2) - 1);
         
         // Return average in 0-1 range
