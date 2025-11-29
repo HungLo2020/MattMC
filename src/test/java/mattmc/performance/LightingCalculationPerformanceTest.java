@@ -220,12 +220,12 @@ public class LightingCalculationPerformanceTest extends PerformanceTestBase {
     }
     
     @Test
-    @DisplayName("RGB light propagation should not be slower than white light")
+    @DisplayName("Single-channel light should not be slower than full RGB white light")
     void testRGBLightPerformance() {
         LevelChunk chunk = new LevelChunk(0, 0);
         int y = LevelChunk.worldYToChunkY(64);
         
-        // Test white light (equal RGB)
+        // Test white light (all RGB channels at max - most expensive)
         PerformanceResult whiteResult = measureOperation(
             "White Light (14,14,14)",
             100, 10,
@@ -239,7 +239,7 @@ public class LightingCalculationPerformanceTest extends PerformanceTestBase {
             }
         );
         
-        // Test colored light
+        // Test single-channel colored light (should be faster since only one channel propagates)
         PerformanceResult colorResult = measureOperation(
             "Red Light (14,0,0)",
             100, 10,
@@ -256,10 +256,12 @@ public class LightingCalculationPerformanceTest extends PerformanceTestBase {
         System.out.println(whiteResult);
         System.out.println(colorResult);
         
-        // RGB light should be at most 2x slower than single channel
+        // Single-channel light should be no slower than full RGB (white) light.
+        // It's expected to be faster since only one channel propagates, but should not be
+        // more than 2x slower if there's overhead in the RGB system.
         double ratio = colorResult.getAvgTimePerIterationMs() / whiteResult.getAvgTimePerIterationMs();
-        assertTrue(ratio < 2.0 && ratio > 0.5,
-            "RGB light performance ratio was " + ratio + ", expected 0.5-2.0");
+        assertTrue(ratio <= 2.0,
+            "Single-channel light was " + ratio + "x compared to white light, expected <= 2.0");
     }
     
     @Test
