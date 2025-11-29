@@ -290,6 +290,25 @@ public class Block {
     }
     
     /**
+     * Check if this block should be rendered at full brightness (emissive/fullbright).
+     * 
+     * <p>Emissive blocks are light-emitting blocks that should never be shaded or 
+     * affected by ambient occlusion. This includes blocks like sea lanterns, 
+     * froglights, and torches. Their textures should always appear at full brightness
+     * regardless of surrounding light levels.
+     * 
+     * <p>This is similar to Minecraft's {@code emissiveRendering} block property.
+     * By default, any block that emits light (has any RGB light emission > 0) is 
+     * considered emissive.
+     * 
+     * @return true if this block should render at full brightness
+     */
+    public boolean isEmissive() {
+        // A block is emissive if it emits any light
+        return lightEmissionR > 0 || lightEmissionG > 0 || lightEmissionB > 0;
+    }
+    
+    /**
      * Get the opacity of this block (how much it blocks light).
      * 
      * @return Opacity level (0-15), where 0 means fully transparent and 15 means fully opaque
