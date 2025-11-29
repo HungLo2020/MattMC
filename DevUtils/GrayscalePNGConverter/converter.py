@@ -65,6 +65,47 @@ def convert_to_grayscale_in_place(path: Path, normalize_to_white: bool = True) -
 	print(f"Converted (in-place): {path.name}")
 
 
+def normalize_grayscale_brightness(path: Path) -> bool:
+	"""
+	Normalize an already-grayscale image to have maximum brightness of 255.
+	
+	This ensures that when the grayscale texture is tinted in the shader,
+	it produces vibrant colors instead of dark/muddy ones.
+	
+	Returns True if the image was modified, False if already at full brightness.
+	"""
+	img = Image.open(path).convert("RGBA")
+	pixels = list(img.getdata())
+	
+	# Find max brightness
+	max_gray = 0
+	for r, g, b, a in pixels:
+		if a > 0:
+			max_gray = max(max_gray, r)  # R=G=B for grayscale
+	
+	# Already at full brightness
+	if max_gray >= 255:
+		return False
+	
+	# Normalize
+	if max_gray > 0:
+		scale = 255.0 / max_gray
+		new_pixels = []
+		for r, g, b, a in pixels:
+			if a > 0:
+				new_val = min(255, int(r * scale))
+				new_pixels.append((new_val, new_val, new_val, a))
+			else:
+				new_pixels.append((0, 0, 0, 0))
+		
+		new_img = Image.new("RGBA", img.size)
+		new_img.putdata(new_pixels)
+		new_img.save(path, format="PNG")
+		return True
+	
+	return False
+
+
 def main() -> int:
 	script_path = Path(__file__).resolve()
 	script_dir = script_path.parent
@@ -84,7 +125,11 @@ def main() -> int:
 			continue
 
 		if is_grayscale(img):
-			print(f"Skipping (already grayscale): {path.name}")
+			# For grayscale images, normalize brightness to 255
+			if normalize_grayscale_brightness(path):
+				print(f"Normalized brightness: {path.name}")
+			else:
+				print(f"Skipping (already full brightness): {path.name}")
 			continue
 
 		convert_to_grayscale_in_place(path)
