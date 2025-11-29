@@ -53,3 +53,7 @@ Options.txt
 
 # Log files
 logs/
+
+# Python cache
+__pycache__/
+*.pyc
