@@ -53,7 +53,10 @@ public class OpenGLParticleAtlas implements ParticleAtlas, AutoCloseable {
         String[] textureNames = {
             "generic_0", "generic_1", "generic_2", "generic_3",
             "generic_4", "generic_5", "generic_6", "generic_7",
-            "flame"
+            "flame",
+            "cherry_0", "cherry_1", "cherry_2", "cherry_3",
+            "cherry_4", "cherry_5", "cherry_6", "cherry_7",
+            "cherry_8", "cherry_9", "cherry_10", "cherry_11"
         };
         
         // Calculate atlas size
@@ -201,6 +204,43 @@ public class OpenGLParticleAtlas implements ParticleAtlas, AutoCloseable {
                     int b = (int) (50 * t * t * t);
                     int a = (int) (255 * t);
                     image.setRGB(px, py, (a << 24) | (r << 16) | (green << 8) | b);
+                }
+            }
+        } else if (name.startsWith("cherry_")) {
+            // Create cherry petal texture - pink/white petal shapes
+            int stage = 0;
+            try {
+                stage = Integer.parseInt(name.substring(7));
+            } catch (NumberFormatException ignored) {}
+            
+            // Each stage is a slightly different petal orientation
+            float rotation = stage * 0.5f;
+            
+            int centerX = textureSize / 2;
+            int centerY = textureSize / 2;
+            
+            for (int py = 0; py < textureSize; py++) {
+                for (int px = 0; px < textureSize; px++) {
+                    float dx = (px - centerX + 0.5f) / (textureSize / 2.0f);
+                    float dy = (py - centerY + 0.5f) / (textureSize / 2.0f);
+                    
+                    // Rotate based on stage
+                    float cos = (float) Math.cos(rotation);
+                    float sin = (float) Math.sin(rotation);
+                    float rdx = dx * cos - dy * sin;
+                    float rdy = dx * sin + dy * cos;
+                    
+                    // Petal shape: ellipse with pointed ends
+                    float shape = (rdx * rdx * 2.0f) + (rdy * rdy * 0.5f);
+                    float t = Math.max(0, 1.0f - shape * 2.0f);
+                    t = t * t;
+                    
+                    // Pink color (cherry blossom pink)
+                    int red = (int) (255 * t);
+                    int green = (int) (180 * t);
+                    int blue = (int) (200 * t);
+                    int alpha = (int) (255 * t);
+                    image.setRGB(px, py, (alpha << 24) | (red << 16) | (green << 8) | blue);
                 }
             }
         } else {

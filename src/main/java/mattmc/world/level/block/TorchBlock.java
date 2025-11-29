@@ -8,6 +8,7 @@ import mattmc.world.phys.shapes.VoxelShape;
  * 
  * Torches are non-solid blocks that emit light and have a small collision shape.
  * They can only be placed on solid surfaces below them.
+ * Torches also spawn flame and smoke particles.
  */
 public class TorchBlock extends Block {
     // Torch collision shape - small box in the center
@@ -47,6 +48,14 @@ public class TorchBlock extends Block {
      */
     @Override
     public boolean hasCustomRendering() {
+        return true;
+    }
+    
+    /**
+     * Torches spawn flame and smoke particles.
+     */
+    @Override
+    public boolean hasRandomTick() {
         return true;
     }
 }

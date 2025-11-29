@@ -312,5 +312,14 @@ public class Block {
             float hitX, float hitY, float hitZ) {
         return null;  // Most blocks don't need placement state
     }
+    
+    /**
+     * Whether this block should receive random ticks for particle effects.
+     * Override in subclasses that spawn particles (like torches or cherry leaves).
+     * 
+     * @return true if this block spawns particles on random ticks
+     */
+    public boolean hasRandomTick() {
+        return false;
+    }
 }
-
