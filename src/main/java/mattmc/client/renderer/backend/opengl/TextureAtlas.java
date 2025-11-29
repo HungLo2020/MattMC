@@ -217,7 +217,7 @@ public class TextureAtlas implements TextureCoordinateProvider, AutoCloseable {
 		
 		// Check for animation metadata (.mcmeta file)
 		String mcmetaPath = path + ".mcmeta";
-		try (InputStream mcmetaStream = mattmc.util.ResourceLoader.getResourceStreamFromClassLoader(mcmetaPath)) {
+		try (InputStream mcmetaStream = mattmc.util.ResourceLoader.getOptionalResourceStreamFromClassLoader(mcmetaPath)) {
 			if (mcmetaStream != null) {
 				// Parse the .mcmeta file
 				AnimationMetadataSection metadata = AnimationMetadataSection.load(mcmetaStream);

@@ -137,6 +137,45 @@ public class ResourceLoaderTest {
         assertNull(stream, "Should return null for non-existing resource");
     }
     
+    @Test
+    public void testGetOptionalResourceStream_ExistingResource() {
+        // Test with an existing resource (splash text file)
+        InputStream stream = ResourceLoader.getOptionalResourceStream("/assets/splashtext");
+        assertNotNull(stream, "Should load existing resource");
+        assertDoesNotThrow(() -> stream.close());
+    }
+    
+    @Test
+    public void testGetOptionalResourceStream_NonExistingResource() {
+        // Test with a non-existing resource - should return null without logging warning
+        InputStream stream = ResourceLoader.getOptionalResourceStream("/nonexistent/resource.txt");
+        assertNull(stream, "Should return null for non-existing resource");
+    }
+    
+    @Test
+    public void testGetOptionalResourceStreamFromClassLoader_ExistingResource() {
+        // Test with path without leading slash (classloader style)
+        InputStream stream = ResourceLoader.getOptionalResourceStreamFromClassLoader("assets/splashtext");
+        assertNotNull(stream, "Should load existing resource using classloader");
+        assertDoesNotThrow(() -> stream.close());
+    }
+    
+    @Test
+    public void testGetOptionalResourceStreamFromClassLoader_NonExistingResource() {
+        // Test with a non-existing resource - should return null without logging warning
+        InputStream stream = ResourceLoader.getOptionalResourceStreamFromClassLoader("nonexistent/resource.txt");
+        assertNull(stream, "Should return null for non-existing resource");
+    }
+    
+    @Test
+    public void testGetOptionalResourceStreamFromClassLoader_MissingMcmeta() {
+        // Test the specific use case - .mcmeta file that doesn't exist (optional)
+        // This should NOT log a warning since .mcmeta files are optional
+        InputStream stream = ResourceLoader.getOptionalResourceStreamFromClassLoader("assets/textures/block/dirt.png.mcmeta");
+        // dirt.png doesn't have a .mcmeta file, so this should return null silently
+        assertNull(stream, "Should return null for non-existing .mcmeta file");
+    }
+    
     /**
      * Test data class for JSON parsing.
      */
