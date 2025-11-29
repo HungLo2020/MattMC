@@ -53,6 +53,10 @@ public final class DevplayScreen implements Screen {
     private final UIRenderer uiRenderer;
     private final SkyRenderer skyRenderer;
     
+    // Particle system
+    private final mattmc.client.particle.ParticleEngine particleEngine;
+    private final java.util.Random animateTickRandom = new java.util.Random();
+    
     // Level name for saving
     private final String worldName;
     
@@ -172,6 +176,10 @@ public final class DevplayScreen implements Screen {
         this.uiRenderer = new UIRenderer();
         this.skyRenderer = new SkyRenderer(this.worldRenderer.getRenderBackend());
         
+        // Initialize particle engine
+        this.particleEngine = new mattmc.client.particle.ParticleEngine(this.world);
+        initializeParticleSystem();
+        
         // Stage 4: Share the render backend between world and UI rendering
         // This ensures UI elements use the same backend abstraction as chunks
         this.uiRenderer.setBackend(this.worldRenderer.getRenderBackend());
@@ -205,6 +213,13 @@ public final class DevplayScreen implements Screen {
         // Update chunks based on player position (load/unload) with frustum prioritization
         world.updateChunksAroundPlayer(player.getX(), player.getZ(), player.getYaw());
         
+        // Client-side block animations (particle spawning for torches, leaves, etc.)
+        // This is called every tick, mirroring Minecraft's animateTick behavior
+        animateBlockTick();
+        
+        // Tick particles
+        particleEngine.tick();
+        
         // Update physics (gravity, collision) - only if command overlay is not visible
         if (!uiState.isCommandOverlayVisible()) {
             playerPhysics.update(FIXED_DT);
@@ -227,6 +242,93 @@ public final class DevplayScreen implements Screen {
             lastFrameTimeSec = now;
             uiState.updateFeedbackTimer(dt);
         }
+    }
+    
+    /** Interval in milliseconds between particle debug log messages. */
+    private static final long PARTICLE_DEBUG_LOG_INTERVAL_MS = 5000;
+    
+    /** Debug counter for particles spawned since last log. */
+    private int particleSpawnCount = 0;
+    
+    /** Timestamp of last particle debug log. */
+    private long lastParticleLogTime = 0;
+    
+    /**
+     * Animate blocks near the player (spawn particles for torches, leaves, etc.)
+     * Called every tick to mimic Minecraft's ClientLevel.animateTick behavior.
+     */
+    private void animateBlockTick() {
+        int playerBlockX = (int) Math.floor(player.getX());
+        int playerBlockY = (int) Math.floor(player.getY());
+        int playerBlockZ = (int) Math.floor(player.getZ());
+        
+        // Create a particle spawner that maps particle type names to actual particles
+        mattmc.world.level.block.Block.ParticleSpawner spawner = (particleType, x, y, z, xSpeed, ySpeed, zSpeed) -> {
+            mattmc.core.particles.ParticleOptions options = getParticleOptions(particleType);
+            if (options != null) {
+                mattmc.client.particle.Particle particle = particleEngine.createParticle(options, x, y, z, xSpeed, ySpeed, zSpeed);
+                if (particle != null) {
+                    particleSpawnCount++;
+                }
+            }
+        };
+        
+        world.animateTick(playerBlockX, playerBlockY, playerBlockZ, animateTickRandom, spawner);
+        
+        // Log particle stats periodically for debugging
+        long now = System.currentTimeMillis();
+        if (now - lastParticleLogTime > PARTICLE_DEBUG_LOG_INTERVAL_MS) {
+            int activeParticles = particleEngine.countParticles();
+            // Use debug level to avoid excessive log output in production
+            logger.debug("[Particle Debug] animateBlockTick running - Spawned {} particles in last {}s, {} active particles", 
+                       particleSpawnCount, PARTICLE_DEBUG_LOG_INTERVAL_MS / 1000, activeParticles);
+            particleSpawnCount = 0;
+            lastParticleLogTime = now;
+        }
+    }
+    
+    /**
+     * Get particle options for a particle type name.
+     */
+    private mattmc.core.particles.ParticleOptions getParticleOptions(String particleType) {
+        switch (particleType) {
+            case "smoke":
+                return mattmc.core.particles.ParticleTypes.SMOKE;
+            case "flame":
+                return mattmc.core.particles.ParticleTypes.FLAME;
+            case "cherry_leaves":
+                return mattmc.core.particles.ParticleTypes.CHERRY_LEAVES;
+            case "poof":
+                return mattmc.core.particles.ParticleTypes.POOF;
+            default:
+                logger.debug("Unknown particle type: {}", particleType);
+                return null;
+        }
+    }
+    
+    /**
+     * Initialize the particle system with providers and atlas.
+     */
+    private void initializeParticleSystem() {
+        // Create and set the particle atlas using the OpenGL backend
+        mattmc.client.renderer.backend.opengl.OpenGLParticleAtlas atlas = 
+            new mattmc.client.renderer.backend.opengl.OpenGLParticleAtlas();
+        particleEngine.setParticleAtlas(atlas);
+        
+        // Register particle providers (sprite-based)
+        particleEngine.register(mattmc.core.particles.ParticleTypes.SMOKE, 
+            mattmc.client.particle.SmokeParticle.Provider::new);
+        particleEngine.register(mattmc.core.particles.ParticleTypes.FLAME, 
+            mattmc.client.particle.FlameParticle.Provider::new);
+        particleEngine.register(mattmc.core.particles.ParticleTypes.POOF, 
+            mattmc.client.particle.PoofParticle.Provider::new);
+        particleEngine.register(mattmc.core.particles.ParticleTypes.CHERRY_LEAVES, 
+            mattmc.client.particle.CherryParticle.Provider::new);
+        
+        // Load particle definitions (binds textures to sprite sets)
+        particleEngine.loadParticleDefinitions();
+        
+        logger.info("Particle system initialized");
     }
 
     @Override
@@ -269,6 +371,9 @@ public final class DevplayScreen implements Screen {
         // Render all loaded chunks in the infinite world
         // Use interpolated position for smooth rendering
         worldRenderer.render(world, player.getX(alphaF), player.getEyeY(alphaF), player.getZ(alphaF));
+        
+        // Render particles (after world, before outline and UI)
+        renderParticles(player.getX(alphaF), player.getEyeY(alphaF), player.getZ(alphaF), alphaF);
         
         backend.disableCullFace();
         
@@ -444,5 +549,112 @@ public final class DevplayScreen implements Screen {
     public void saveAndShutdown() throws java.io.IOException {
         shouldShutdownWorld = true;
         saveWorld();
+    }
+    
+    /**
+     * Render particles.
+     * 
+     * @param cameraX camera X position
+     * @param cameraY camera Y position
+     * @param cameraZ camera Z position
+     * @param partialTicks interpolation factor (0-1)
+     */
+    private void renderParticles(double cameraX, double cameraY, double cameraZ, float partialTicks) {
+        mattmc.client.particle.ParticleAtlas atlas = particleEngine.getParticleAtlas();
+        if (atlas == null) {
+            return;
+        }
+        
+        int particleCount = particleEngine.countParticles();
+        if (particleCount == 0) {
+            return;
+        }
+        
+        // Save the current modelview matrix
+        org.lwjgl.opengl.GL11.glPushMatrix();
+        
+        // Load identity then apply only camera ROTATION (not translation)
+        // Particles already have camera-relative positions (they subtract camera pos in render())
+        // but they still need to be rotated to face the camera correctly
+        org.lwjgl.opengl.GL11.glLoadIdentity();
+        
+        // Apply camera rotation (pitch then yaw) - same as in main render()
+        // This makes particles appear in the correct screen position
+        float pitch = player.getPitch(partialTicks);
+        float yaw = player.getYaw(partialTicks);
+        org.lwjgl.opengl.GL11.glRotatef(pitch, 1f, 0f, 0f);
+        org.lwjgl.opengl.GL11.glRotatef(yaw, 0f, 1f, 0f);
+        
+        // Set up render state for particles
+        backend.disableCullFace();
+        backend.enableDepthTest();
+        
+        // Enable texturing
+        org.lwjgl.opengl.GL11.glEnable(org.lwjgl.opengl.GL11.GL_TEXTURE_2D);
+        
+        // Enable alpha testing to discard transparent pixels (alpha < 0.1)
+        // This is how Minecraft handles particles with transparency in legacy OpenGL
+        org.lwjgl.opengl.GL11.glEnable(org.lwjgl.opengl.GL11.GL_ALPHA_TEST);
+        org.lwjgl.opengl.GL11.glAlphaFunc(org.lwjgl.opengl.GL11.GL_GREATER, 0.1f);
+        
+        // Enable blending for proper alpha handling
+        backend.enableBlend();
+        
+        // Bind particle atlas texture
+        atlas.bind();
+        
+        // Create a simple vertex builder for particle rendering
+        // Particle positions are already camera-relative from SingleQuadParticle.render()
+        particleEngine.render(
+            new mattmc.client.particle.ParticleVertexBuilder() {
+                @Override
+                public void begin() {
+                    // Begin immediate mode rendering
+                    org.lwjgl.opengl.GL11.glBegin(org.lwjgl.opengl.GL11.GL_QUADS);
+                }
+                
+                @Override
+                public void vertex(float x, float y, float z, float u, float v, 
+                                   float r, float g, float b, float a, int light) {
+                    org.lwjgl.opengl.GL11.glColor4f(r, g, b, a);
+                    org.lwjgl.opengl.GL11.glTexCoord2f(u, v);
+                    // Positions are already camera-relative from particle render method
+                    org.lwjgl.opengl.GL11.glVertex3f(x, y, z);
+                }
+                
+                @Override
+                public void end() {
+                    org.lwjgl.opengl.GL11.glEnd();
+                }
+            },
+            cameraX, cameraY, cameraZ,
+            partialTicks,
+            renderType -> {
+                // Set up render state based on render type
+                switch (renderType) {
+                    case PARTICLE_SHEET_TRANSLUCENT:
+                        backend.enableBlend();
+                        org.lwjgl.opengl.GL11.glDepthMask(false);
+                        break;
+                    case PARTICLE_SHEET_OPAQUE:
+                    case PARTICLE_SHEET_LIT:
+                        // Even opaque particles need blend for texture alpha
+                        backend.enableBlend();
+                        org.lwjgl.opengl.GL11.glDepthMask(true);
+                        break;
+                    default:
+                        break;
+                }
+            }
+        );
+        
+        // Restore render state
+        org.lwjgl.opengl.GL11.glDisable(org.lwjgl.opengl.GL11.GL_ALPHA_TEST);
+        org.lwjgl.opengl.GL11.glDepthMask(true);
+        backend.disableBlend();
+        backend.enableCullFace();
+        
+        // Restore the modelview matrix
+        org.lwjgl.opengl.GL11.glPopMatrix();
     }
 }

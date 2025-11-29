@@ -89,6 +89,37 @@ public class Shader implements ShaderProgram {
         }
     }
     
+    /**
+     * Set a matrix uniform from a FloatBuffer.
+     */
+    public void setUniformMatrix4(String name, java.nio.FloatBuffer buffer) {
+        int location = glGetUniformLocation(programId, name);
+        if (location != -1) {
+            glUniformMatrix4fv(location, false, buffer);
+        }
+    }
+    
+    /**
+     * Set an integer uniform.
+     */
+    public void setUniformInt(String name, int value) {
+        setUniform1i(name, value);
+    }
+    
+    /**
+     * Bind this shader for use.
+     */
+    public void bind() {
+        use();
+    }
+    
+    /**
+     * Dispose of shader resources.
+     */
+    public void dispose() {
+        close();
+    }
+    
     public static void unbind() {
         glUseProgram(0);
     }

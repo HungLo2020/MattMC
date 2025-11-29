@@ -119,7 +119,7 @@ public class Blocks {
     public static final Block DARK_OAK_LEAVES = register("dark_oak_leaves", new LeavesBlock(-12012264));
     public static final Block MANGROVE_LEAVES = register("mangrove_leaves", new LeavesBlock(-7158200));
     // Leaves without tinting
-    public static final Block CHERRY_LEAVES = register("cherry_leaves", new LeavesBlock());
+    public static final Block CHERRY_LEAVES = register("cherry_leaves", new CherryLeavesBlock());
     public static final Block AZALEA_LEAVES = register("azalea_leaves", new LeavesBlock());
     public static final Block FLOWERING_AZALEA_LEAVES = register("flowering_azalea_leaves", new LeavesBlock());
     public static final Block PALE_OAK_LEAVES = register("pale_oak_leaves", new LeavesBlock());
@@ -164,6 +164,8 @@ public class Blocks {
                 lightEmission,
                 block.getLightEmissionR(), block.getLightEmissionG(), block.getLightEmissionB(), 
                 identifier);
+        } else if (block instanceof CherryLeavesBlock) {
+            registeredBlock = new CherryLeavesBlock(identifier);
         } else if (block instanceof LeavesBlock) {
             LeavesBlock leavesBlock = (LeavesBlock) block;
             registeredBlock = new LeavesBlock(leavesBlock.getRawTintColor(), identifier);
@@ -218,6 +220,8 @@ public class Blocks {
                 lightEmission,
                 block.getLightEmissionR(), block.getLightEmissionG(), block.getLightEmissionB(), 
                 identifier);
+        } else if (block instanceof CherryLeavesBlock) {
+            registeredBlock = new CherryLeavesBlock(identifier);
         } else if (block instanceof LeavesBlock) {
             LeavesBlock leavesBlock = (LeavesBlock) block;
             registeredBlock = new LeavesBlock(leavesBlock.getRawTintColor(), identifier);

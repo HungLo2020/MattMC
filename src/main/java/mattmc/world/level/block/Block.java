@@ -1,10 +1,12 @@
 package mattmc.world.level.block;
 
 import mattmc.client.resources.ResourceManager;
+import mattmc.world.level.Level;
 import mattmc.world.phys.shapes.VoxelShape;
 import mattmc.util.MathUtils;
 
 import java.util.Map;
+import java.util.Random;
 
 /**
  * Represents a single block in the world.
@@ -312,5 +314,61 @@ public class Block {
             float hitX, float hitY, float hitZ) {
         return null;  // Most blocks don't need placement state
     }
+    
+    /**
+     * Whether this block should receive random ticks for particle effects.
+     * Override in subclasses that spawn particles (like torches or cherry leaves).
+     * 
+     * @return true if this block spawns particles on random ticks
+     */
+    public boolean hasRandomTick() {
+        return false;
+    }
+    
+    /**
+     * Called periodically client-side on blocks near the player to show effects
+     * (like torch flames, furnace fire particles, falling cherry leaves, etc.).
+     * 
+     * <p>This is NOT the same as randomTick which is server-side for game logic.
+     * animateTick is purely visual and runs on the client.
+     * 
+     * <p>Mirrors Minecraft's Block.animateTick method.
+     * 
+     * <p><b>Coordinate System:</b> All coordinates (x, y, z) are in WORLD coordinates.
+     * World Y ranges from -64 to 319. When calling level.getBlock(), you must convert
+     * world Y to chunk-local Y (0-383) using {@link mattmc.world.level.chunk.ChunkUtils#worldToLocalY(int)}.
+     * Particle spawn positions should use world coordinates directly.
+     * 
+     * @param level the level the block is in
+     * @param x block X position (world coordinates)
+     * @param y block Y position (world coordinates, range -64 to 319)
+     * @param z block Z position (world coordinates)
+     * @param random random source for particle effects
+     * @param particleSpawner callback to spawn particles
+     */
+    public void animateTick(Level level, int x, int y, int z, Random random, 
+                           ParticleSpawner particleSpawner) {
+        // Default: do nothing - override in subclasses that need particle effects
+    }
+    
+    /**
+     * Functional interface for spawning particles.
+     * This allows blocks to spawn particles without depending on the particle system directly.
+     */
+    @FunctionalInterface
+    public interface ParticleSpawner {
+        /**
+         * Spawn a particle at the given position.
+         * 
+         * @param particleType the particle type identifier (e.g., "smoke", "flame")
+         * @param x spawn X position
+         * @param y spawn Y position  
+         * @param z spawn Z position
+         * @param xSpeed initial X velocity
+         * @param ySpeed initial Y velocity
+         * @param zSpeed initial Z velocity
+         */
+        void spawn(String particleType, double x, double y, double z, 
+                   double xSpeed, double ySpeed, double zSpeed);
+    }
 }
-
