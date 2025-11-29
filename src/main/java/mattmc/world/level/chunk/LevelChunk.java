@@ -49,30 +49,6 @@ public final class LevelChunk {
     // World light manager reference (optional, for automatic light updates)
     private mattmc.world.level.lighting.WorldLightManager worldLightManager = null;
     
-    /**
-     * Callback interface for marking neighbor chunks dirty when light changes at chunk edges.
-     * This is needed for smooth lighting which samples a 3x3x3 grid around each block.
-     */
-    public interface NeighborDirtyCallback {
-        /**
-         * Mark the chunk at the given position dirty.
-         * @param chunkX The chunk X coordinate
-         * @param chunkZ The chunk Z coordinate
-         */
-        void markChunkDirty(int chunkX, int chunkZ);
-    }
-    
-    // Callback for marking neighbor chunks dirty (optional)
-    private NeighborDirtyCallback neighborDirtyCallback = null;
-    
-    /**
-     * Set the neighbor dirty callback for smooth lighting updates.
-     * When light changes at a chunk edge, this callback marks adjacent chunks dirty.
-     */
-    public void setNeighborDirtyCallback(NeighborDirtyCallback callback) {
-        this.neighborDirtyCallback = callback;
-    }
-    
     public LevelChunk(int chunkX, int chunkZ) {
         this.chunkX = chunkX;
         this.chunkZ = chunkZ;
@@ -305,35 +281,6 @@ public final class LevelChunk {
         lightSections[sectionIndex].setSkyLight(x, sectionY, z, level);
         // Mark chunk dirty to trigger mesh rebuild with new lighting
         setDirty(true);
-        
-        // Mark adjacent chunks dirty if light changed at chunk edge
-        // This is needed for smooth lighting which samples a 3x3x3 grid
-        markNeighborsDirtyIfOnEdge(x, z);
-    }
-    
-    /**
-     * Helper to mark neighboring chunks dirty if a light change happened at a chunk edge.
-     * Smooth lighting samples from adjacent blocks, so if light changes at position (15, y, z),
-     * the chunk at (chunkX+1, chunkZ) needs to rebuild its mesh to pick up the new light values.
-     */
-    private void markNeighborsDirtyIfOnEdge(int x, int z) {
-        if (neighborDirtyCallback == null) {
-            return;
-        }
-        
-        // Check X edges (0 or 15)
-        if (x == 0) {
-            neighborDirtyCallback.markChunkDirty(chunkX - 1, chunkZ);
-        } else if (x == WIDTH - 1) {
-            neighborDirtyCallback.markChunkDirty(chunkX + 1, chunkZ);
-        }
-        
-        // Check Z edges (0 or 15)
-        if (z == 0) {
-            neighborDirtyCallback.markChunkDirty(chunkX, chunkZ - 1);
-        } else if (z == DEPTH - 1) {
-            neighborDirtyCallback.markChunkDirty(chunkX, chunkZ + 1);
-        }
     }
     
     /**
@@ -419,9 +366,6 @@ public final class LevelChunk {
         lightSections[sectionIndex].setBlockLightRGBI(x, sectionY, z, r, g, b, i);
         // Mark chunk dirty to trigger mesh rebuild with new lighting
         setDirty(true);
-        
-        // Mark adjacent chunks dirty if light changed at chunk edge
-        markNeighborsDirtyIfOnEdge(x, z);
     }
     
     /**
@@ -442,9 +386,6 @@ public final class LevelChunk {
         lightSections[sectionIndex].setBlockLightRGB(x, sectionY, z, r, g, b);
         // Mark chunk dirty to trigger mesh rebuild with new lighting
         setDirty(true);
-        
-        // Mark adjacent chunks dirty if light changed at chunk edge
-        markNeighborsDirtyIfOnEdge(x, z);
     }
     
     /**
