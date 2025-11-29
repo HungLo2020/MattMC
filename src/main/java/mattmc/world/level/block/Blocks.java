@@ -111,19 +111,19 @@ public class Blocks {
     public static final Block SILVER_BIRCH_LOG = register("silver_birch_log", new RotatedPillarBlock(true));
     // Leaves blocks - tint colors from Minecraft item models
     // Leaves with foliage tinting use negative ARGB values from MC (e.g., -12012264)
-    public static final Block OAK_LEAVES = register("oak_leaves", new LeavesBlock(-12012264));
-    public static final Block SPRUCE_LEAVES = register("spruce_leaves", new LeavesBlock(-10380959));
-    public static final Block BIRCH_LEAVES = register("birch_leaves", new LeavesBlock(-8345771));
-    public static final Block JUNGLE_LEAVES = register("jungle_leaves", new LeavesBlock(-12012264));
-    public static final Block ACACIA_LEAVES = register("acacia_leaves", new LeavesBlock(-12012264));
-    public static final Block DARK_OAK_LEAVES = register("dark_oak_leaves", new LeavesBlock(-12012264));
-    public static final Block MANGROVE_LEAVES = register("mangrove_leaves", new LeavesBlock(-7158200));
-     // Leaves without tinting
-    // Cherry leaves uses FallingLeavesBlock with pink tint for falling petal particles
-    public static final Block CHERRY_LEAVES = register("cherry_leaves", new FallingLeavesBlock(1.0f, 0.7f, 0.8f));
-    public static final Block AZALEA_LEAVES = register("azalea_leaves", new LeavesBlock());
-    public static final Block FLOWERING_AZALEA_LEAVES = register("flowering_azalea_leaves", new LeavesBlock());
-    public static final Block PALE_OAK_LEAVES = register("pale_oak_leaves", new LeavesBlock());
+    // All leaves use FallingLeavesBlock with particle tint matching their foliage color
+    public static final Block OAK_LEAVES = register("oak_leaves", new FallingLeavesBlock(-12012264, 0.28f, 0.71f, 0.09f));
+    public static final Block SPRUCE_LEAVES = register("spruce_leaves", new FallingLeavesBlock(-10380959, 0.38f, 0.60f, 0.38f));
+    public static final Block BIRCH_LEAVES = register("birch_leaves", new FallingLeavesBlock(-8345771, 0.50f, 0.65f, 0.33f));
+    public static final Block JUNGLE_LEAVES = register("jungle_leaves", new FallingLeavesBlock(-12012264, 0.28f, 0.71f, 0.09f));
+    public static final Block ACACIA_LEAVES = register("acacia_leaves", new FallingLeavesBlock(-12012264, 0.28f, 0.71f, 0.09f));
+    public static final Block DARK_OAK_LEAVES = register("dark_oak_leaves", new FallingLeavesBlock(-12012264, 0.28f, 0.71f, 0.09f));
+    public static final Block MANGROVE_LEAVES = register("mangrove_leaves", new FallingLeavesBlock(-7158200, 0.57f, 0.78f, 0.28f));
+    // Leaves without block tinting - particle colors match their appearance
+    public static final Block CHERRY_LEAVES = register("cherry_leaves", new FallingLeavesBlock(1.0f, 0.55f, 0.75f));
+    public static final Block AZALEA_LEAVES = register("azalea_leaves", new FallingLeavesBlock(0.55f, 0.70f, 0.35f));
+    public static final Block FLOWERING_AZALEA_LEAVES = register("flowering_azalea_leaves", new FallingLeavesBlock(0.65f, 0.50f, 0.60f));
+    public static final Block PALE_OAK_LEAVES = register("pale_oak_leaves", new FallingLeavesBlock(0.85f, 0.88f, 0.82f));
     
     /**
      * Register a block with a given name (without namespace).

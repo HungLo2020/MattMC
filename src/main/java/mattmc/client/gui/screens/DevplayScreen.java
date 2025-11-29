@@ -263,12 +263,32 @@ public final class DevplayScreen implements Screen {
         int playerBlockZ = (int) Math.floor(player.getZ());
         
         // Create a particle spawner that maps particle type names to actual particles
-        mattmc.world.level.block.Block.ParticleSpawner spawner = (particleType, x, y, z, xSpeed, ySpeed, zSpeed) -> {
-            mattmc.core.particles.ParticleOptions options = getParticleOptions(particleType);
-            if (options != null) {
-                mattmc.client.particle.Particle particle = particleEngine.createParticle(options, x, y, z, xSpeed, ySpeed, zSpeed);
-                if (particle != null) {
-                    particleSpawnCount++;
+        mattmc.world.level.block.Block.ParticleSpawner spawner = new mattmc.world.level.block.Block.ParticleSpawner() {
+            @Override
+            public void spawn(String particleType, double x, double y, double z, 
+                              double xSpeed, double ySpeed, double zSpeed) {
+                mattmc.core.particles.ParticleOptions options = getParticleOptions(particleType);
+                if (options != null) {
+                    mattmc.client.particle.Particle particle = particleEngine.createParticle(options, x, y, z, xSpeed, ySpeed, zSpeed);
+                    if (particle != null) {
+                        particleSpawnCount++;
+                    }
+                }
+            }
+            
+            @Override
+            public void spawnTinted(String particleType, double x, double y, double z,
+                                    double xSpeed, double ySpeed, double zSpeed,
+                                    float red, float green, float blue) {
+                if ("falling_leaves".equals(particleType)) {
+                    mattmc.client.particle.Particle particle = createTintedFallingLeavesParticle(
+                        x, y, z, xSpeed, ySpeed, zSpeed, red, green, blue);
+                    if (particle != null) {
+                        particleSpawnCount++;
+                    }
+                } else {
+                    // Fall back to regular spawn for non-tinted particle types
+                    spawn(particleType, x, y, z, xSpeed, ySpeed, zSpeed);
                 }
             }
         };
@@ -285,6 +305,43 @@ public final class DevplayScreen implements Screen {
             particleSpawnCount = 0;
             lastParticleLogTime = now;
         }
+    }
+    
+    /**
+     * Create a tinted falling leaves particle with the specified RGB color.
+     * 
+     * @param x spawn X position
+     * @param y spawn Y position
+     * @param z spawn Z position
+     * @param xSpeed initial X velocity
+     * @param ySpeed initial Y velocity
+     * @param zSpeed initial Z velocity
+     * @param red red color component (0.0-1.0)
+     * @param green green color component (0.0-1.0)
+     * @param blue blue color component (0.0-1.0)
+     * @return the created particle, or null if creation failed
+     */
+    private mattmc.client.particle.Particle createTintedFallingLeavesParticle(double x, double y, double z,
+                                                                               double xSpeed, double ySpeed, double zSpeed,
+                                                                               float red, float green, float blue) {
+        // Get the sprite set for falling_leaves
+        mattmc.client.particle.SpriteSet sprites = particleEngine.getSpriteSet(
+            new mattmc.util.ResourceLocation("mattmc", "falling_leaves"));
+        if (sprites == null) {
+            return null;
+        }
+        
+        // Create a provider with the specified color, then use it to create the particle
+        mattmc.client.particle.FallingLeavesParticle.ColoredProvider provider = 
+            new mattmc.client.particle.FallingLeavesParticle.ColoredProvider(sprites, red, green, blue);
+        
+        mattmc.client.particle.Particle particle = provider.createParticle(
+            mattmc.core.particles.ParticleTypes.FALLING_LEAVES, world, x, y, z, xSpeed, ySpeed, zSpeed);
+        
+        if (particle != null) {
+            particleEngine.add(particle);
+        }
+        return particle;
     }
     
     /**
@@ -326,9 +383,10 @@ public final class DevplayScreen implements Screen {
             mattmc.client.particle.PoofParticle.Provider::new);
         particleEngine.register(mattmc.core.particles.ParticleTypes.CHERRY_LEAVES, 
             mattmc.client.particle.CherryParticle.Provider::new);
-        // Register falling_leaves with cherry pink tint (matches FallingLeavesBlock for cherry leaves)
+        // Register falling_leaves with default white color. Actual tinting is done dynamically
+        // via spawnTinted() in animateBlockTick() using the block's RGB values.
         particleEngine.register(mattmc.core.particles.ParticleTypes.FALLING_LEAVES, 
-            sprites -> new mattmc.client.particle.FallingLeavesParticle.ColoredProvider(sprites, 1.0f, 0.7f, 0.8f));
+            sprites -> new mattmc.client.particle.FallingLeavesParticle.ColoredProvider(sprites, 1.0f, 1.0f, 1.0f));
         
         // Load particle definitions (binds textures to sprite sets)
         particleEngine.loadParticleDefinitions();

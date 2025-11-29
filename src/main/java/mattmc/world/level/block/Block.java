@@ -370,5 +370,27 @@ public class Block {
          */
         void spawn(String particleType, double x, double y, double z, 
                    double xSpeed, double ySpeed, double zSpeed);
+        
+        /**
+         * Spawn a tinted particle at the given position.
+         * Used for particles like falling leaves that can be tinted with RGB colors.
+         * 
+         * @param particleType the particle type identifier (e.g., "falling_leaves")
+         * @param x spawn X position
+         * @param y spawn Y position  
+         * @param z spawn Z position
+         * @param xSpeed initial X velocity
+         * @param ySpeed initial Y velocity
+         * @param zSpeed initial Z velocity
+         * @param red red color component (0.0-1.0)
+         * @param green green color component (0.0-1.0)
+         * @param blue blue color component (0.0-1.0)
+         */
+        default void spawnTinted(String particleType, double x, double y, double z,
+                                 double xSpeed, double ySpeed, double zSpeed,
+                                 float red, float green, float blue) {
+            // Default implementation ignores color and falls back to regular spawn
+            spawn(particleType, x, y, z, xSpeed, ySpeed, zSpeed);
+        }
     }
 }
