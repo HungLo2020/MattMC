@@ -355,6 +355,7 @@ public class Block {
      * Functional interface for spawning particles.
      * This allows blocks to spawn particles without depending on the particle system directly.
      */
+    @FunctionalInterface
     public interface ParticleSpawner {
         /**
          * Spawn a particle at the given position.
