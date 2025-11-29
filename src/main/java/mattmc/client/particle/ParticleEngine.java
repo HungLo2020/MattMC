@@ -343,6 +343,16 @@ public class ParticleEngine {
     }
     
     /**
+     * Get the sprite set for a particle type.
+     * 
+     * @param particleId the resource location of the particle type
+     * @return the sprite set, or null if not found
+     */
+    public SpriteSet getSpriteSet(ResourceLocation particleId) {
+        return spriteSets.get(particleId);
+    }
+    
+    /**
      * Mutable sprite set that can be rebound when resources are reloaded.
      */
     public static class MutableSpriteSet implements SpriteSet {

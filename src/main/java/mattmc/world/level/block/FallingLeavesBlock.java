@@ -142,8 +142,8 @@ public class FallingLeavesBlock extends LeavesBlock {
         double py = y - 0.05;  // Slightly below the block
         double pz = z + random.nextDouble();
         
-        // Spawn the falling_leaves particle
-        // Note: The particle color is handled by the particle provider registered for this block type
-        particleSpawner.spawn("falling_leaves", px, py, pz, 0.0, 0.0, 0.0);
+        // Spawn the falling_leaves particle with the block's tint color
+        particleSpawner.spawnTinted("falling_leaves", px, py, pz, 0.0, 0.0, 0.0,
+                                    particleRed, particleGreen, particleBlue);
     }
 }

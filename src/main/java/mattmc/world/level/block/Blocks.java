@@ -111,7 +111,8 @@ public class Blocks {
     public static final Block SILVER_BIRCH_LOG = register("silver_birch_log", new RotatedPillarBlock(true));
     // Leaves blocks - tint colors from Minecraft item models
     // Leaves with foliage tinting use negative ARGB values from MC (e.g., -12012264)
-    public static final Block OAK_LEAVES = register("oak_leaves", new LeavesBlock(-12012264));
+    // Oak leaves uses FallingLeavesBlock with green tint matching its foliage color
+    public static final Block OAK_LEAVES = register("oak_leaves", new FallingLeavesBlock(-12012264, 0.28f, 0.71f, 0.09f));
     public static final Block SPRUCE_LEAVES = register("spruce_leaves", new LeavesBlock(-10380959));
     public static final Block BIRCH_LEAVES = register("birch_leaves", new LeavesBlock(-8345771));
     public static final Block JUNGLE_LEAVES = register("jungle_leaves", new LeavesBlock(-12012264));
