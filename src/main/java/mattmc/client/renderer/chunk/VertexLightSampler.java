@@ -19,6 +19,15 @@ import mattmc.world.level.chunk.LevelChunk;
  */
 public class VertexLightSampler {
     
+    /** Number of sample positions for smooth lighting (4-sample average) */
+    private static final int SAMPLE_COUNT = 4;
+    
+    /** Divisor for averaging samples (1/SAMPLE_COUNT) */
+    private static final float SAMPLE_DIVISOR = 0.25f;
+    
+    /** Default ambient occlusion value when AO is not calculated */
+    private static final float NO_AO = 0.0f;
+    
     /**
      * Interface for sampling light values across chunk boundaries.
      */
@@ -146,10 +155,10 @@ public class VertexLightSampler {
         
         // Average all 4 samples (Minecraft: >> 2 which is * 0.25)
         return createLightArray(
-            skyLightSum * 0.25f,
-            blockLightRSum * 0.25f,
-            blockLightGSum * 0.25f,
-            blockLightBSum * 0.25f
+            skyLightSum * SAMPLE_DIVISOR,
+            blockLightRSum * SAMPLE_DIVISOR,
+            blockLightGSum * SAMPLE_DIVISOR,
+            blockLightBSum * SAMPLE_DIVISOR
         );
     }
     
@@ -162,7 +171,7 @@ public class VertexLightSampler {
      * @return Array of [skyLight, blockLightR, blockLightG, blockLightB, ao]
      */
     private float[] createLightArray(float skyLight, float blockLightR, float blockLightG, float blockLightB) {
-        return new float[] {skyLight, blockLightR, blockLightG, blockLightB, 0.0f}; // 0.0f = no AO yet
+        return new float[] {skyLight, blockLightR, blockLightG, blockLightB, NO_AO};
     }
     
     /**
