@@ -201,6 +201,14 @@ public class VertexLightSampler {
         // Get vertex position relative to block center (range -0.5 to 0.5)
         float[] vertexPos = getVertexPosition(normalIndex, cornerIndex);
         
+        // Apply normal offset to push sample position toward the face
+        // This matches Minecraft's behavior: position + (normal * 0.5)
+        // This ensures the vertex samples light from the correct side of the block
+        int[] normal = DIRECTION_STEPS[normalIndex];
+        vertexPos[0] += normal[0] * 0.5f;
+        vertexPos[1] += normal[1] * 0.5f;
+        vertexPos[2] += normal[2] * 0.5f;
+        
         // Calculate interpolated light values
         float sky = calcLightmap(skyLight, vertexPos[0], vertexPos[1], vertexPos[2]);
         float blR = calcLightmap(blockLightR, vertexPos[0], vertexPos[1], vertexPos[2]);
