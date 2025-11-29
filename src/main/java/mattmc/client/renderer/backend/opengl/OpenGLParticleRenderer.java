@@ -195,6 +195,9 @@ public class OpenGLParticleRenderer implements AutoCloseable {
         }
         
         // Get matrices from current OpenGL state
+        // Note: This uses the deprecated fixed-function matrix stack (GL_PROJECTION_MATRIX, GL_MODELVIEW_MATRIX)
+        // which is consistent with the rest of the codebase's immediate-mode OpenGL usage.
+        // A future Vulkan backend would receive matrices as explicit parameters instead.
         FloatBuffer projectionBuffer = BufferUtils.createFloatBuffer(16);
         FloatBuffer modelViewBuffer = BufferUtils.createFloatBuffer(16);
         glGetFloatv(GL_PROJECTION_MATRIX, projectionBuffer);

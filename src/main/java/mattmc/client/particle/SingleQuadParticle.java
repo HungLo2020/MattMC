@@ -26,10 +26,10 @@ public abstract class SingleQuadParticle extends Particle {
     
     @Override
     public void render(ParticleVertexBuilder builder, double cameraX, double cameraY, double cameraZ, float partialTicks) {
-        // Interpolate position
-        float x = (float) (lerp(partialTicks, this.xo, this.x) - cameraX);
-        float y = (float) (lerp(partialTicks, this.yo, this.y) - cameraY);
-        float z = (float) (lerp(partialTicks, this.zo, this.z) - cameraZ);
+        // Interpolate position relative to camera
+        float px = (float) (lerp(partialTicks, this.xo, this.x) - cameraX);
+        float py = (float) (lerp(partialTicks, this.yo, this.y) - cameraY);
+        float pz = (float) (lerp(partialTicks, this.zo, this.z) - cameraZ);
         
         // Get the current quad size (can be animated)
         float size = this.getQuadSize(partialTicks);
@@ -43,42 +43,76 @@ public abstract class SingleQuadParticle extends Particle {
         // Get light level
         int light = this.getLightColor(partialTicks);
         
-        // Create billboard vertices
-        // These offsets create a camera-facing quad
-        // The actual billboard rotation should be applied by the renderer based on camera orientation
-        // For simplicity, we create axis-aligned quads here and let the rendering system handle rotation
+        // Calculate billboard orientation
+        // The camera is at origin (0, 0, 0) in camera space
+        // The particle is at (px, py, pz) relative to the camera
         
-        // Simple billboard: vertical quad facing +Z (will be rotated by camera later)
-        // Vertices in order: bottom-left, bottom-right, top-right, top-left (counter-clockwise for front-facing)
+        // Calculate the direction from particle to camera
+        float dx = -px;
+        float dz = -pz;
+        float distXZ = (float) Math.sqrt(dx * dx + dz * dz);
         
-        // For a proper billboard, we need camera rotation
-        // For now, create a Y-axis aligned billboard (always faces the XZ plane toward camera)
-        // This is simpler and still looks good for most particles
+        // Right vector (perpendicular to look direction in XZ plane)
+        float rightX, rightZ;
+        if (distXZ > 0.001f) {
+            rightX = -dz / distXZ;
+            rightZ = dx / distXZ;
+        } else {
+            // Camera is directly above/below, use default orientation
+            rightX = 1.0f;
+            rightZ = 0.0f;
+        }
         
-        float halfSize = size;
+        // Up vector (always world up for simplicity - cylindrical billboard)
+        float upX = 0.0f;
+        float upY = 1.0f;
+        float upZ = 0.0f;
         
         // Interpolate roll if present
         float roll = lerp(partialTicks, this.oRoll, this.roll);
+        if (roll != 0.0f) {
+            // Apply roll rotation around the look direction
+            float cos = (float) Math.cos(roll);
+            float sin = (float) Math.sin(roll);
+            
+            // Rotate right and up vectors
+            float newRightX = rightX * cos + upX * sin;
+            float newRightZ = rightZ * cos + upZ * sin;
+            float newUpY = upY * cos;
+            
+            rightX = newRightX;
+            rightZ = newRightZ;
+            upY = newUpY;
+        }
         
-        // Create rotated quad corners
-        float cos = (float) Math.cos(roll);
-        float sin = (float) Math.sin(roll);
+        // Scale vectors by quad size
+        rightX *= size;
+        rightZ *= size;
+        upY *= size;
         
-        // Billboard vertices (Y-axis aligned, simple approach)
-        // These create a quad in the XY plane at the particle position
-        // A full camera-facing billboard would require camera rotation quaternion
+        // Create the four corners of the billboard quad
+        // Vertex order: bottom-left, top-left, top-right, bottom-right
+        float x0 = px - rightX - upX;
+        float y0 = py - upY;
+        float z0 = pz - rightZ - upZ;
         
-        // Simplified billboard: just offset in X and Y for now
-        // The backend renderer will handle full camera rotation
+        float x1 = px - rightX + upX;
+        float y1 = py + upY;
+        float z1 = pz - rightZ + upZ;
         
-        builder.vertex(x - halfSize * cos - halfSize * sin, y - halfSize * cos + halfSize * sin, z, 
-                      u1, v1, rCol, gCol, bCol, alpha, light);
-        builder.vertex(x - halfSize * cos + halfSize * sin, y + halfSize * cos + halfSize * sin, z,
-                      u1, v0, rCol, gCol, bCol, alpha, light);
-        builder.vertex(x + halfSize * cos + halfSize * sin, y + halfSize * cos - halfSize * sin, z,
-                      u0, v0, rCol, gCol, bCol, alpha, light);
-        builder.vertex(x + halfSize * cos - halfSize * sin, y - halfSize * cos - halfSize * sin, z,
-                      u0, v1, rCol, gCol, bCol, alpha, light);
+        float x2 = px + rightX + upX;
+        float y2 = py + upY;
+        float z2 = pz + rightZ + upZ;
+        
+        float x3 = px + rightX - upX;
+        float y3 = py - upY;
+        float z3 = pz + rightZ - upZ;
+        
+        // Emit vertices (counter-clockwise winding)
+        builder.vertex(x0, y0, z0, u1, v1, rCol, gCol, bCol, alpha, light);
+        builder.vertex(x1, y1, z1, u1, v0, rCol, gCol, bCol, alpha, light);
+        builder.vertex(x2, y2, z2, u0, v0, rCol, gCol, bCol, alpha, light);
+        builder.vertex(x3, y3, z3, u0, v1, rCol, gCol, bCol, alpha, light);
     }
     
     /**

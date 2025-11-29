@@ -108,9 +108,10 @@ public class TerrainParticle extends TextureSheetParticle {
     protected int getLightColor(float partialTicks) {
         // Sample light at particle position
         // For now, return a reasonable default
+        // Light is packed as: (skyLight) | (blockLight << 16)
         int blockLight = 15;
         int skyLight = 15;
-        return (skyLight << 4) | (blockLight << 20);
+        return skyLight | (blockLight << 16);
     }
     
     /**

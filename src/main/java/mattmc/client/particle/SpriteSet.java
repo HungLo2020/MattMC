@@ -48,8 +48,9 @@ public interface SpriteSet {
         @Override
         public ParticleSprite get(int age, int lifetime) {
             if (sprites.isEmpty()) return null;
-            // Map age to sprite index
-            int index = age * (sprites.size() - 1) / Math.max(1, lifetime);
+            // Map age to sprite index using floating point for precision
+            float progress = (float) age / Math.max(1, lifetime);
+            int index = Math.round(progress * (sprites.size() - 1));
             return sprites.get(Math.min(index, sprites.size() - 1));
         }
         

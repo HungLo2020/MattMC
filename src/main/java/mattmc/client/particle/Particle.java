@@ -83,10 +83,10 @@ public abstract class Particle {
      */
     public Particle(Level level, double x, double y, double z, double xSpeed, double ySpeed, double zSpeed) {
         this(level, x, y, z);
-        this.xd = xSpeed + (Math.random() * 2.0 - 1.0) * 0.4;
-        this.yd = ySpeed + (Math.random() * 2.0 - 1.0) * 0.4;
-        this.zd = zSpeed + (Math.random() * 2.0 - 1.0) * 0.4;
-        double d0 = (Math.random() + Math.random() + 1.0) * 0.15;
+        this.xd = xSpeed + (random.nextDouble() * 2.0 - 1.0) * 0.4;
+        this.yd = ySpeed + (random.nextDouble() * 2.0 - 1.0) * 0.4;
+        this.zd = zSpeed + (random.nextDouble() * 2.0 - 1.0) * 0.4;
+        double d0 = (random.nextDouble() + random.nextDouble() + 1.0) * 0.15;
         double d1 = Math.sqrt(this.xd * this.xd + this.yd * this.yd + this.zd * this.zd);
         this.xd = this.xd / d1 * d0 * 0.4;
         this.yd = this.yd / d1 * d0 * 0.4 + 0.1;
