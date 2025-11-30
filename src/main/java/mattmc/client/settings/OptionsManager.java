@@ -52,9 +52,6 @@ public class OptionsManager {
     // Anisotropic filtering setting (0 = off, 2/4/8/16 = filtering level)
     private static int anisotropicFiltering = 16;  // Default: 16
     
-    // Anti-aliasing (MSAA) setting (0 = off, 2/4/8/16 = sample count)
-    private static int antiAliasingSamples = 0;  // Default: off
-    
     // Smooth lighting setting (true = smooth, false = flat)
     private static boolean smoothLightingEnabled = true;  // Default: enabled
     
@@ -66,9 +63,6 @@ public class OptionsManager {
     
     // Allowed anisotropic filtering levels
     public static final int[] ALLOWED_ANISOTROPIC_LEVELS = {0, 2, 4, 8, 16};
-    
-    // Allowed anti-aliasing (MSAA) sample counts
-    public static final int[] ALLOWED_AA_SAMPLES = {0, 2, 4, 8, 16};
     
     // Sound volume settings (0.0 - 1.0)
     private static final Map<SoundSource, Float> soundSourceVolumes = new HashMap<>();
@@ -127,28 +121,6 @@ public class OptionsManager {
         for (int validLevel : ALLOWED_ANISOTROPIC_LEVELS) {
             if (validLevel == 0) continue; // Skip 0, already handled above
             int difference = Math.abs(level - validLevel);
-            if (difference < minDifference) {
-                minDifference = difference;
-                closestLevel = validLevel;
-            }
-        }
-        
-        return closestLevel;
-    }
-    
-    /**
-     * Validate anti-aliasing sample count (0=off, or one of 2,4,8,16).
-     */
-    private static int validateAASamples(int samples) {
-        if (samples <= 0) return 0;
-        
-        // Find closest valid sample count
-        int closestLevel = ALLOWED_AA_SAMPLES[1]; // Start with 2
-        int minDifference = Math.abs(samples - closestLevel);
-        
-        for (int validLevel : ALLOWED_AA_SAMPLES) {
-            if (validLevel == 0) continue; // Skip 0, already handled above
-            int difference = Math.abs(samples - validLevel);
             if (difference < minDifference) {
                 minDifference = difference;
                 closestLevel = validLevel;
@@ -240,13 +212,6 @@ public class OptionsManager {
                         } catch (NumberFormatException e) {
                             logger.error("Invalid anisotropic filtering value: {}", value);
                         }
-                    } else if (key.equals("anti_aliasing")) {
-                        try {
-                            int samples = Integer.parseInt(value);
-                            antiAliasingSamples = validateAASamples(samples);
-                        } catch (NumberFormatException e) {
-                            logger.error("Invalid anti-aliasing value: {}", value);
-                        }
                     } else if (key.equals("smooth_lighting")) {
                         smoothLightingEnabled = Boolean.parseBoolean(value);
                     } else if (key.equals("shadows")) {
@@ -323,9 +288,6 @@ public class OptionsManager {
             // Update anisotropic filtering setting
             options.put("anisotropic_filtering", String.valueOf(anisotropicFiltering));
             
-            // Update anti-aliasing setting
-            options.put("anti_aliasing", String.valueOf(antiAliasingSamples));
-            
             // Update smooth lighting setting
             options.put("smooth_lighting", String.valueOf(smoothLightingEnabled));
             
@@ -386,11 +348,6 @@ public class OptionsManager {
                 writer.write("anisotropic_filtering=" + anisotropicFiltering + "\n");
                 writer.write("\n");
                 
-                // Write anti-aliasing setting
-                writer.write("# Anti-aliasing/MSAA (off, 2, 4, 8, 16) - requires restart\n");
-                writer.write("anti_aliasing=" + antiAliasingSamples + "\n");
-                writer.write("\n");
-                
                 // Write smooth lighting setting
                 writer.write("# Smooth lighting (true = smooth, false = flat)\n");
                 writer.write("smooth_lighting=" + smoothLightingEnabled + "\n");
@@ -422,8 +379,7 @@ public class OptionsManager {
                         !key.equals("show_block_name") && !key.equals("fps_cap") &&
                         !key.equals("resolution") && !key.equals("fullscreen") &&
                         !key.equals("render_distance") && !key.equals("mipmaps") &&
-                        !key.equals("anisotropic_filtering") && !key.equals("anti_aliasing") &&
-                        !key.equals("smooth_lighting") &&
+                        !key.equals("anisotropic_filtering") && !key.equals("smooth_lighting") &&
                         !key.equals("shadows") && !key.startsWith("soundVolume_")) {
                         writer.write(key + "=" + entry.getValue() + "\n");
                     }
@@ -552,16 +508,6 @@ public class OptionsManager {
     
     public static void setAnisotropicFiltering(int level) {
         anisotropicFiltering = validateAnisotropicLevel(level);
-        saveOptions();
-    }
-    
-    // Anti-aliasing (MSAA) getters and setters
-    public static int getAntiAliasingSamples() {
-        return antiAliasingSamples;
-    }
-    
-    public static void setAntiAliasingSamples(int samples) {
-        antiAliasingSamples = validateAASamples(samples);
         saveOptions();
     }
     

@@ -5,7 +5,6 @@ import mattmc.client.settings.OptionsManager;
 import org.lwjgl.opengl.GL;
 import static org.lwjgl.glfw.GLFW.*;
 import static org.lwjgl.opengl.GL11.*;
-import static org.lwjgl.opengl.GL13.GL_MULTISAMPLE;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -31,24 +30,12 @@ public final class Window implements WindowHandle, AutoCloseable {
         glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 3);
         glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 2);
         glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_COMPAT_PROFILE);
-        
-        // Configure MSAA (Multi-Sample Anti-Aliasing)
-        int msaaSamples = OptionsManager.getAntiAliasingSamples();
-        if (msaaSamples > 0) {
-            glfwWindowHint(GLFW_SAMPLES, msaaSamples);
-            logger.info("MSAA enabled with {} samples", msaaSamples);
-        }
 
         handle = glfwCreateWindow(w, h, title, 0, 0);
         if (handle == 0) throw new IllegalStateException("Window creation failed");
 
         glfwMakeContextCurrent(handle);
         GL.createCapabilities();
-        
-        // Enable MSAA if configured
-        if (msaaSamples > 0) {
-            glEnable(GL_MULTISAMPLE);
-        }
         
         // Configure swap interval based on FPS cap setting
         applyFpsCapSetting();

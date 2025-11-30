@@ -17,7 +17,7 @@ public final class GraphicsScreen extends AbstractMenuScreen {
         titleCX = w / 2f;
         titleCY = h * 0.18f;
 
-        int totalButtonsH = 8 * buttonHeight + 7 * buttonGap;
+        int totalButtonsH = 7 * buttonHeight + 6 * buttonGap;
         buttonsStartY = (int)(h / 2f - totalButtonsH / 2f);
 
         int x = (w - buttonWidth) / 2;
@@ -30,8 +30,7 @@ public final class GraphicsScreen extends AbstractMenuScreen {
         buttons.add(new Button(getTitleBlurButtonLabel(), x, buttonsStartY + 3 * (buttonHeight + buttonGap), buttonWidth, buttonHeight));
         buttons.add(new Button(getMipmapButtonLabel(), x, buttonsStartY + 4 * (buttonHeight + buttonGap), buttonWidth, buttonHeight));
         buttons.add(new Button(getAnisotropicButtonLabel(), x, buttonsStartY + 5 * (buttonHeight + buttonGap), buttonWidth, buttonHeight));
-        buttons.add(new Button(getAntiAliasingButtonLabel(), x, buttonsStartY + 6 * (buttonHeight + buttonGap), buttonWidth, buttonHeight));
-        buttons.add(new Button("Back",     x, buttonsStartY + 7 * (buttonHeight + buttonGap), buttonWidth, buttonHeight));
+        buttons.add(new Button("Back",     x, buttonsStartY + 6 * (buttonHeight + buttonGap), buttonWidth, buttonHeight));
     }
     
     private String getResolutionButtonLabel() {
@@ -65,14 +64,6 @@ public final class GraphicsScreen extends AbstractMenuScreen {
             return "Anisotropic Filtering: OFF";
         }
         return "Anisotropic Filtering: " + level + "x";
-    }
-    
-    private String getAntiAliasingButtonLabel() {
-        int samples = mattmc.client.settings.OptionsManager.getAntiAliasingSamples();
-        if (samples == 0) {
-            return "Anti-Aliasing: OFF";
-        }
-        return "Anti-Aliasing: " + samples + "x (restart)";
     }
 
     @Override
@@ -165,24 +156,6 @@ public final class GraphicsScreen extends AbstractMenuScreen {
             }
             
             mattmc.client.settings.OptionsManager.setAnisotropicFiltering(allowedValues[nextIndex]);
-            recomputeLayout();
-            return;
-        }
-        if (label.startsWith("Anti-Aliasing:")) {
-            // Cycle through anti-aliasing levels: off, 2x, 4x, 8x, 16x
-            int current = mattmc.client.settings.OptionsManager.getAntiAliasingSamples();
-            int[] allowedValues = mattmc.client.settings.OptionsManager.ALLOWED_AA_SAMPLES;
-            
-            // Find next value in the cycle
-            int nextIndex = 0;
-            for (int i = 0; i < allowedValues.length; i++) {
-                if (allowedValues[i] == current) {
-                    nextIndex = (i + 1) % allowedValues.length;
-                    break;
-                }
-            }
-            
-            mattmc.client.settings.OptionsManager.setAntiAliasingSamples(allowedValues[nextIndex]);
             recomputeLayout();
             return;
         }

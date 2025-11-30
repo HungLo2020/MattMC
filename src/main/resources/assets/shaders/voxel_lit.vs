@@ -1,13 +1,10 @@
 #version 130
 
 // Outputs to fragment shader
-// Using centroid qualifier to prevent MSAA edge sampling artifacts.
-// Centroid interpolation ensures sample points stay within the triangle primitive,
-// preventing off-color banding caused by samples falling outside triangle boundaries.
-centroid varying vec2 vTexCoord;
-centroid varying vec4 vColor;
-centroid varying vec4 vLightData; // (skyLight, blockLightR, blockLightG, blockLightB)
-centroid varying float vAO; // Ambient occlusion
+varying vec2 vTexCoord;
+varying vec4 vColor;
+varying vec4 vLightData; // (skyLight, blockLightR, blockLightG, blockLightB)
+varying float vAO; // Ambient occlusion
 
 void main() {
 	// Transform vertex position

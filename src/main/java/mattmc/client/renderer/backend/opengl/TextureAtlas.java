@@ -145,8 +145,8 @@ public class TextureAtlas implements TextureCoordinateProvider, AutoCloseable {
 					textureAtlasPositions.put(texturePath, new int[]{x, y});
 					
 					// Calculate UV coordinates (0.0 to 1.0) with half-texel inset
-					// The inset prevents MSAA and texture filtering from sampling outside
-					// the intended texture region in the atlas (prevents color bleeding)
+					// The inset prevents anisotropic filtering from sampling outside the
+					// texture region and bleeding into adjacent textures in the atlas
 					float halfTexelU = 0.5f / atlasWidth;
 					float halfTexelV = 0.5f / atlasHeight;
 					float u0 = (float) x / atlasWidth + halfTexelU;
