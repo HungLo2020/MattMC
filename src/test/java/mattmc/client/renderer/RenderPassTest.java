@@ -21,10 +21,12 @@ public class RenderPassTest {
         // Verify that all expected render passes are defined
         RenderPass[] passes = RenderPass.values();
         
-        assertEquals(4, passes.length, "Should have exactly 4 render passes");
+        assertEquals(6, passes.length, "Should have exactly 6 render passes");
         
         // Verify each expected pass exists
         assertNotNull(RenderPass.valueOf("OPAQUE"));
+        assertNotNull(RenderPass.valueOf("CUTOUT"));
+        assertNotNull(RenderPass.valueOf("CUTOUT_MIPPED"));
         assertNotNull(RenderPass.valueOf("TRANSPARENT"));
         assertNotNull(RenderPass.valueOf("SHADOW"));
         assertNotNull(RenderPass.valueOf("UI"));
@@ -37,24 +39,30 @@ public class RenderPassTest {
         RenderPass[] passes = RenderPass.values();
         
         assertEquals(RenderPass.OPAQUE, passes[0], "OPAQUE should be first");
-        assertEquals(RenderPass.TRANSPARENT, passes[1], "TRANSPARENT should be second");
-        assertEquals(RenderPass.SHADOW, passes[2], "SHADOW should be third");
-        assertEquals(RenderPass.UI, passes[3], "UI should be fourth");
+        assertEquals(RenderPass.CUTOUT, passes[1], "CUTOUT should be second");
+        assertEquals(RenderPass.CUTOUT_MIPPED, passes[2], "CUTOUT_MIPPED should be third");
+        assertEquals(RenderPass.TRANSPARENT, passes[3], "TRANSPARENT should be fourth");
+        assertEquals(RenderPass.SHADOW, passes[4], "SHADOW should be fifth");
+        assertEquals(RenderPass.UI, passes[5], "UI should be sixth");
     }
     
     @Test
     public void testRenderPassOrdinals() {
         // Verify ordinal values are as expected (can be useful for indexing)
         assertEquals(0, RenderPass.OPAQUE.ordinal());
-        assertEquals(1, RenderPass.TRANSPARENT.ordinal());
-        assertEquals(2, RenderPass.SHADOW.ordinal());
-        assertEquals(3, RenderPass.UI.ordinal());
+        assertEquals(1, RenderPass.CUTOUT.ordinal());
+        assertEquals(2, RenderPass.CUTOUT_MIPPED.ordinal());
+        assertEquals(3, RenderPass.TRANSPARENT.ordinal());
+        assertEquals(4, RenderPass.SHADOW.ordinal());
+        assertEquals(5, RenderPass.UI.ordinal());
     }
     
     @Test
     public void testRenderPassNames() {
         // Verify string representation of enum values
         assertEquals("OPAQUE", RenderPass.OPAQUE.name());
+        assertEquals("CUTOUT", RenderPass.CUTOUT.name());
+        assertEquals("CUTOUT_MIPPED", RenderPass.CUTOUT_MIPPED.name());
         assertEquals("TRANSPARENT", RenderPass.TRANSPARENT.name());
         assertEquals("SHADOW", RenderPass.SHADOW.name());
         assertEquals("UI", RenderPass.UI.name());
@@ -64,6 +72,8 @@ public class RenderPassTest {
     public void testRenderPassValueOf() {
         // Test valueOf with valid names
         assertEquals(RenderPass.OPAQUE, RenderPass.valueOf("OPAQUE"));
+        assertEquals(RenderPass.CUTOUT, RenderPass.valueOf("CUTOUT"));
+        assertEquals(RenderPass.CUTOUT_MIPPED, RenderPass.valueOf("CUTOUT_MIPPED"));
         assertEquals(RenderPass.TRANSPARENT, RenderPass.valueOf("TRANSPARENT"));
         assertEquals(RenderPass.SHADOW, RenderPass.valueOf("SHADOW"));
         assertEquals(RenderPass.UI, RenderPass.valueOf("UI"));
@@ -84,6 +94,8 @@ public class RenderPassTest {
         for (RenderPass pass : RenderPass.values()) {
             String description = switch (pass) {
                 case OPAQUE -> "Solid geometry";
+                case CUTOUT -> "Binary transparency (no mipmaps)";
+                case CUTOUT_MIPPED -> "Binary transparency (with mipmaps)";
                 case TRANSPARENT -> "Blended geometry";
                 case SHADOW -> "Shadow maps";
                 case UI -> "User interface";
@@ -112,6 +124,8 @@ public class RenderPassTest {
         // This is useful for rendering pipelines that need to process passes sequentially
         RenderPass[] expectedOrder = {
             RenderPass.OPAQUE,
+            RenderPass.CUTOUT,
+            RenderPass.CUTOUT_MIPPED,
             RenderPass.TRANSPARENT,
             RenderPass.SHADOW,
             RenderPass.UI
