@@ -287,6 +287,11 @@ public class TextureAtlas implements TextureCoordinateProvider, AutoCloseable {
 	
 	/**
 	 * Load a texture image from resources.
+	 * Ensures the image is in ARGB format for consistent atlas packing.
+	 * 
+	 * <p>This is important for grayscale textures (like grass_block_top.png) which
+	 * need to be explicitly converted to ARGB to ensure correct alpha handling
+	 * during atlas composition and mipmap generation.
 	 */
 	private BufferedImage loadTexture(String path) {
 		try (InputStream is = mattmc.util.ResourceLoader.getResourceStreamFromClassLoader(path)) {
@@ -294,7 +299,28 @@ public class TextureAtlas implements TextureCoordinateProvider, AutoCloseable {
 				logger.error("Texture not found: {}", path);
 				return null;
 			}
-			return ImageIO.read(is);
+			BufferedImage original = ImageIO.read(is);
+			if (original == null) {
+				logger.error("Failed to read texture: {}", path);
+				return null;
+			}
+			
+			// Convert to TYPE_INT_ARGB if not already, to ensure consistent handling
+			// This is especially important for grayscale images which otherwise may
+			// have inconsistent alpha behavior when drawn to the atlas
+			if (original.getType() != BufferedImage.TYPE_INT_ARGB) {
+				BufferedImage converted = new BufferedImage(
+					original.getWidth(), original.getHeight(), BufferedImage.TYPE_INT_ARGB);
+				Graphics2D g = converted.createGraphics();
+				// Use nearest neighbor interpolation for pixel-perfect texture conversion
+				g.setRenderingHint(RenderingHints.KEY_INTERPOLATION, RenderingHints.VALUE_INTERPOLATION_NEAREST_NEIGHBOR);
+				// Use Src composite to directly copy pixels without alpha blending
+				g.setComposite(AlphaComposite.Src);
+				g.drawImage(original, 0, 0, null);
+				g.dispose();
+				return converted;
+			}
+			return original;
 		} catch (IOException e) {
 			logger.error("Failed to load texture: {}", path, e);
 			return null;
@@ -377,28 +403,52 @@ public class TextureAtlas implements TextureCoordinateProvider, AutoCloseable {
 	 * 
 	 * Uses Minecraft's mipmap generation algorithm for proper sRGB color blending.
 	 * Sets all necessary OpenGL texture parameters to match Minecraft's behavior.
+	 * 
+	 * <p><b>Texture Atlas LOD Limiting:</b> For texture atlases, we limit the maximum
+	 * LOD to prevent texture bleeding. At high mipmap levels, adjacent textures in
+	 * the atlas would blend together, causing gray artifacts on distant terrain.
+	 * The limit ensures each mipmap texel represents at most one individual texture.
 	 */
 	private int createGLTexture(BufferedImage image) {
 		int mipmapLevel = OptionsManager.getMipmapLevel();
 		
-		// Generate gamma-correct mipmaps like Minecraft
+		// Calculate maximum safe LOD for texture atlas to prevent texture bleeding.
+		// At high mipmap levels, adjacent textures in the atlas blend together.
+		// The maximum safe LOD ensures each mipmap texel covers at most one individual texture.
+		// Formula: maxSafeLOD = log2(atlasSize / textureSize) - 1
+		// For a 256x256 atlas with 16x16 textures: log2(256/16) - 1 = log2(16) - 1 = 4 - 1 = 3
+		// We subtract 1 as safety margin because GL_NEAREST_MIPMAP_LINEAR interpolates
+		// between two mip levels, which could cause bleeding at the transition.
+		// Note: texturesPerSide is always a power of 2 because both atlasWidth (power of 2)
+		// and textureSize (16, also power of 2) are powers of 2. We use bit shifting for
+		// precise calculation without floating point operations.
+		int texturesPerSide = Math.max(1, atlasWidth / textureSize);
+		int log2TexturesPerSide = Integer.SIZE - 1 - Integer.numberOfLeadingZeros(texturesPerSide);
+		int maxSafeLOD = Math.max(0, log2TexturesPerSide - 1);
+		
+		// Use the more restrictive of user setting and safe LOD limit
+		int effectiveMaxLevel = Math.min(mipmapLevel, maxSafeLOD);
+		
+		// Generate gamma-correct mipmaps only up to effectiveMaxLevel to save memory
 		BufferedImage[] mipLevels = 
-			mattmc.client.renderer.texture.MipmapGenerator.generateMipLevels(image, mipmapLevel);
+			mattmc.client.renderer.texture.MipmapGenerator.generateMipLevels(image, effectiveMaxLevel);
 		
 		// Generate texture ID
 		int textureID = glGenTextures();
 		glBindTexture(GL_TEXTURE_2D, textureID);
 		
 		// Set mipmap parameters BEFORE uploading textures (like Minecraft's TextureUtil.prepareImage)
-		if (mipmapLevel >= 0) {
-			int actualMaxLevel = Math.min(mipmapLevel, mipLevels.length - 1);
+		if (effectiveMaxLevel >= 0) {
+			int actualMaxLevel = Math.min(effectiveMaxLevel, mipLevels.length - 1);
+			
 			// GL_TEXTURE_MAX_LEVEL - maximum mipmap level that can be used
+			// Set to actualMaxLevel to prevent GPU from generating/using unsafe mip levels
 			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, actualMaxLevel);
 			// GL_TEXTURE_BASE_LEVEL - base mipmap level (always 0)
 			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_BASE_LEVEL, 0);
 			// GL_TEXTURE_MIN_LOD - minimum LOD value (clamping)
 			glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_LOD, 0.0f);
-			// GL_TEXTURE_MAX_LOD - maximum LOD value (clamping)
+			// GL_TEXTURE_MAX_LOD - maximum LOD value (clamping to prevent atlas bleeding)
 			glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAX_LOD, (float) actualMaxLevel);
 			// GL_TEXTURE_LOD_BIAS - LOD bias (set to 0 like Minecraft)
 			glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_LOD_BIAS, 0.0f);
