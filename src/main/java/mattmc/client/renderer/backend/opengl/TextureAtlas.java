@@ -144,11 +144,15 @@ public class TextureAtlas implements TextureCoordinateProvider, AutoCloseable {
 					// Store atlas position for animated texture updates
 					textureAtlasPositions.put(texturePath, new int[]{x, y});
 					
-					// Calculate UV coordinates (0.0 to 1.0)
-					float u0 = (float) x / atlasWidth;
-					float v0 = (float) y / atlasHeight;
-					float u1 = (float) (x + textureSize) / atlasWidth;
-					float v1 = (float) (y + textureSize) / atlasHeight;
+					// Calculate UV coordinates (0.0 to 1.0) with half-texel inset
+					// The inset prevents MSAA and texture filtering from sampling outside
+					// the intended texture region in the atlas (prevents color bleeding)
+					float halfTexelU = 0.5f / atlasWidth;
+					float halfTexelV = 0.5f / atlasHeight;
+					float u0 = (float) x / atlasWidth + halfTexelU;
+					float v0 = (float) y / atlasHeight + halfTexelV;
+					float u1 = (float) (x + textureSize) / atlasWidth - halfTexelU;
+					float v1 = (float) (y + textureSize) / atlasHeight - halfTexelV;
 					
 					// Register texture with int ID mapping
 					registerTexture(texturePath, new TextureCoordinateProvider.UVMapping(u0, v0, u1, v1));
