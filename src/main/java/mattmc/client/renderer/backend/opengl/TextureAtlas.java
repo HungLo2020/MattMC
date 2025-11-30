@@ -135,11 +135,11 @@ public class TextureAtlas implements TextureCoordinateProvider, AutoCloseable {
 		BufferedImage atlasImage = new BufferedImage(atlasWidth, atlasHeight, BufferedImage.TYPE_INT_ARGB);
 		Graphics2D g = atlasImage.createGraphics();
 		
-		// Fill with transparent black to ensure proper alpha for textures with transparency
-		// This is important for leaves and other blocks with transparent pixels
-		g.setComposite(java.awt.AlphaComposite.Clear);
+		// Fill with magenta initially as a fallback for any unfilled regions
+		// This helps diagnose issues - if magenta is visible, padding logic has a bug
+		// Normal operation: magenta is fully overwritten by textures and padding
+		g.setColor(new Color(255, 0, 255, 255));
 		g.fillRect(0, 0, atlasWidth, atlasHeight);
-		g.setComposite(java.awt.AlphaComposite.SrcOver);
 		
 		// Pack textures into atlas
 		int x = 0, y = 0;
@@ -148,6 +148,11 @@ public class TextureAtlas implements TextureCoordinateProvider, AutoCloseable {
 		// Use Src composite to completely replace destination pixels with source pixels
 		// This preserves the texture's alpha channel instead of blending with the background
 		g.setComposite(java.awt.AlphaComposite.Src);
+		
+		// Track position of last filled texture for filling unused space
+		int lastFilledX = 0;
+		int lastFilledY = 0;
+		int texturesPlaced = 0;
 		
 		for (String texturePath : textureList) {
 			try {
@@ -170,6 +175,11 @@ public class TextureAtlas implements TextureCoordinateProvider, AutoCloseable {
 					// The shrink ratio prevents texture bleeding at lower mipmap levels
 					registerTexture(texturePath, new TextureCoordinateProvider.UVMapping(u0, v0, u1, v1, uvShrinkRatio));
 					
+					// Keep track of last texture position for padding
+					lastFilledX = x;
+					lastFilledY = y;
+					texturesPlaced++;
+					
 					// logger.info("  Packed: {} at ({},{}) UV: {},{} -> {},{}", texturePath, x, y, u0, v0, u1, v1);
 				} else {
 					logger.error("  Failed to load: {}", texturePath);
@@ -184,6 +194,15 @@ public class TextureAtlas implements TextureCoordinateProvider, AutoCloseable {
 				x = 0;
 				y += textureSize;
 			}
+		}
+		
+		// Fill remaining space with edge-pixel padding to prevent mipmap bleeding
+		// This is critical to prevent gray artifacts on distant terrain
+		// Only fill if at least one texture was placed and there's unused space
+		boolean hasUnusedHorizontalSpace = (lastFilledX + textureSize) < atlasWidth;
+		boolean hasUnusedVerticalSpace = (lastFilledY + textureSize) < atlasHeight;
+		if (texturesPlaced > 0 && (hasUnusedHorizontalSpace || hasUnusedVerticalSpace)) {
+			fillUnusedAtlasSpace(atlasImage, lastFilledX, lastFilledY, atlasWidth, atlasHeight, textureSize);
 		}
 		
 		g.dispose();
@@ -291,6 +310,66 @@ public class TextureAtlas implements TextureCoordinateProvider, AutoCloseable {
 			power *= 2;
 		}
 		return power;
+	}
+	
+	/**
+	 * Fill unused atlas space to prevent mipmap bleeding artifacts.
+	 * 
+	 * <p>When textures don't completely fill the power-of-2 atlas, the unused space
+	 * (if left as transparent black or magenta) will bleed into adjacent textures during
+	 * mipmap generation, causing gray artifacts on distant terrain.
+	 * 
+	 * <p>This method fills unused space by:
+	 * 1. Filling remaining slots in the last row with copies of the last texture (tile pattern)
+	 * 2. Filling remaining rows by copying the entire last-filled row
+	 * 
+	 * <p>This approach ensures that mipmap filtering near the edges of the used area
+	 * samples from valid texture data rather than empty space.
+	 * 
+	 * @param atlas the atlas image to fill
+	 * @param lastFilledX X position of last filled texture
+	 * @param lastFilledY Y position of last filled texture (start of last row with content)
+	 * @param atlasWidth total atlas width
+	 * @param atlasHeight total atlas height
+	 * @param textureSize size of each texture slot
+	 */
+	private void fillUnusedAtlasSpace(BufferedImage atlas, int lastFilledX, int lastFilledY, 
+									   int atlasWidth, int atlasHeight, int textureSize) {
+		// Get the underlying pixel data for efficient batch operations
+		int[] atlasPixels = new int[atlasWidth * atlasHeight];
+		atlas.getRGB(0, 0, atlasWidth, atlasHeight, atlasPixels, 0, atlasWidth);
+		
+		// Fill remaining slots in the current row by copying the last filled texture slot
+		int nextX = lastFilledX + textureSize;
+		int currentY = lastFilledY;
+		
+		while (nextX < atlasWidth) {
+			// Copy the last filled texture to this position (efficient array copy)
+			for (int py = 0; py < textureSize; py++) {
+				int srcRowStart = (currentY + py) * atlasWidth + lastFilledX;
+				int dstRowStart = (currentY + py) * atlasWidth + nextX;
+				System.arraycopy(atlasPixels, srcRowStart, atlasPixels, dstRowStart, textureSize);
+			}
+			
+			nextX += textureSize;
+		}
+		
+		// Copy the last filled row (now fully extended) to fill all remaining rows below
+		int nextRowY = lastFilledY + textureSize;
+		
+		while (nextRowY < atlasHeight) {
+			// Copy entire texture row using efficient array operations
+			for (int py = 0; py < textureSize; py++) {
+				int srcRowStart = (lastFilledY + py) * atlasWidth;
+				int dstRowStart = (nextRowY + py) * atlasWidth;
+				System.arraycopy(atlasPixels, srcRowStart, atlasPixels, dstRowStart, atlasWidth);
+			}
+			
+			nextRowY += textureSize;
+		}
+		
+		// Write the modified pixels back to the atlas
+		atlas.setRGB(0, 0, atlasWidth, atlasHeight, atlasPixels, 0, atlasWidth);
 	}
 	
 	/**
