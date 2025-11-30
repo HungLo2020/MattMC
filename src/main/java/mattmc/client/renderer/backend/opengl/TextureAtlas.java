@@ -49,11 +49,19 @@ import org.slf4j.LoggerFactory;
  */
 public class TextureAtlas implements TextureCoordinateProvider, AutoCloseable {
 	private static final Logger logger = LoggerFactory.getLogger(TextureAtlas.class);
+	
+	/**
+	 * Padding (in pixels) added around each texture in the atlas.
+	 * This prevents color bleeding when anisotropic filtering samples across texture boundaries.
+	 * A value of 2 is sufficient for up to x16 anisotropic filtering.
+	 */
+	private static final int PADDING = 2;
 
 	private final int atlasTextureId;
 	private final int atlasWidth;
 	private final int atlasHeight;
 	private final int textureSize = 16; // Standard MattMC texture size
+	private final int paddedTextureSize = textureSize + 2 * PADDING; // Texture size including padding
 	
 	// Int-keyed UV mappings for fast hot path lookup
 	private final Map<Integer, TextureCoordinateProvider.UVMapping> uvMappings = new HashMap<>();
@@ -106,8 +114,8 @@ public class TextureAtlas implements TextureCoordinateProvider, AutoCloseable {
 		int textureCount = uniqueTexturePaths.size();
 		int texturesPerRow = (int) Math.ceil(Math.sqrt(textureCount));
 		
-		// Round up to next power of 2
-		int powerOf2Width = nextPowerOf2(texturesPerRow * textureSize);
+		// Round up to next power of 2 (using padded texture size)
+		int powerOf2Width = nextPowerOf2(texturesPerRow * paddedTextureSize);
 		int powerOf2Height = powerOf2Width; // Keep it square
 		
 		atlasWidth = powerOf2Width;
@@ -138,22 +146,27 @@ public class TextureAtlas implements TextureCoordinateProvider, AutoCloseable {
 				// Load texture image (handles animated textures with .mcmeta files)
 				BufferedImage texture = loadTextureForAtlas(texturePath);
 				if (texture != null) {
-					// Draw texture into atlas (Src composite preserves alpha)
-					g.drawImage(texture, x, y, textureSize, textureSize, null);
+					// Draw texture into atlas at padded position (Src composite preserves alpha)
+					int drawX = x + PADDING;
+					int drawY = y + PADDING;
+					g.drawImage(texture, drawX, drawY, textureSize, textureSize, null);
 					
-					// Store atlas position for animated texture updates
-					textureAtlasPositions.put(texturePath, new int[]{x, y});
+					// Extrude edge pixels into padding to prevent color bleeding with anisotropic filtering
+					extrudeEdgePixels(atlasImage, drawX, drawY, textureSize, textureSize);
 					
-					// Calculate UV coordinates (0.0 to 1.0)
-					float u0 = (float) x / atlasWidth;
-					float v0 = (float) y / atlasHeight;
-					float u1 = (float) (x + textureSize) / atlasWidth;
-					float v1 = (float) (y + textureSize) / atlasHeight;
+					// Store atlas position for animated texture updates (padded position)
+					textureAtlasPositions.put(texturePath, new int[]{drawX, drawY});
+					
+					// Calculate UV coordinates (0.0 to 1.0) for the inner texture area only
+					float u0 = (float) drawX / atlasWidth;
+					float v0 = (float) drawY / atlasHeight;
+					float u1 = (float) (drawX + textureSize) / atlasWidth;
+					float v1 = (float) (drawY + textureSize) / atlasHeight;
 					
 					// Register texture with int ID mapping
 					registerTexture(texturePath, new TextureCoordinateProvider.UVMapping(u0, v0, u1, v1));
 					
-					// logger.info("  Packed: {} at ({},{}) UV: {},{} -> {},{}", texturePath, x, y, u0, v0, u1, v1);
+					// logger.info("  Packed: {} at ({},{}) UV: {},{} -> {},{}", texturePath, drawX, drawY, u0, v0, u1, v1);
 				} else {
 					logger.error("  Failed to load: {}", texturePath);
 				}
@@ -161,11 +174,11 @@ public class TextureAtlas implements TextureCoordinateProvider, AutoCloseable {
 				logger.error("  Error loading {}: {}", texturePath, e.getMessage());
 			}
 			
-			// Move to next position
-			x += textureSize;
+			// Move to next position (using padded texture size)
+			x += paddedTextureSize;
 			if (x >= atlasWidth) {
 				x = 0;
-				y += textureSize;
+				y += paddedTextureSize;
 			}
 		}
 		
@@ -262,6 +275,83 @@ public class TextureAtlas implements TextureCoordinateProvider, AutoCloseable {
 		} catch (IOException e) {
 			logger.error("Failed to load texture: {}", path, e);
 			return null;
+		}
+	}
+	
+	/**
+	 * Extrude edge pixels of a texture into the surrounding padding region.
+	 * This prevents color bleeding when anisotropic filtering samples across texture boundaries.
+	 * 
+	 * @param atlasImage the atlas image to modify
+	 * @param texX the X position of the texture content (the padded position)
+	 * @param texY the Y position of the texture content (the padded position)
+	 * @param width the width of the texture
+	 * @param height the height of the texture
+	 */
+	private void extrudeEdgePixels(BufferedImage atlasImage, int texX, int texY, int width, int height) {
+		// Extrude left edge
+		for (int py = 0; py < height; py++) {
+			int edgePixel = atlasImage.getRGB(texX, texY + py);
+			for (int px = 1; px <= PADDING; px++) {
+				atlasImage.setRGB(texX - px, texY + py, edgePixel);
+			}
+		}
+		
+		// Extrude right edge
+		for (int py = 0; py < height; py++) {
+			int edgePixel = atlasImage.getRGB(texX + width - 1, texY + py);
+			for (int px = 0; px < PADDING; px++) {
+				atlasImage.setRGB(texX + width + px, texY + py, edgePixel);
+			}
+		}
+		
+		// Extrude top edge
+		for (int px = 0; px < width; px++) {
+			int edgePixel = atlasImage.getRGB(texX + px, texY);
+			for (int py = 1; py <= PADDING; py++) {
+				atlasImage.setRGB(texX + px, texY - py, edgePixel);
+			}
+		}
+		
+		// Extrude bottom edge
+		for (int px = 0; px < width; px++) {
+			int edgePixel = atlasImage.getRGB(texX + px, texY + height - 1);
+			for (int py = 0; py < PADDING; py++) {
+				atlasImage.setRGB(texX + px, texY + height + py, edgePixel);
+			}
+		}
+		
+		// Fill corners with corner pixels
+		// Top-left corner
+		int topLeftPixel = atlasImage.getRGB(texX, texY);
+		for (int py = 1; py <= PADDING; py++) {
+			for (int px = 1; px <= PADDING; px++) {
+				atlasImage.setRGB(texX - px, texY - py, topLeftPixel);
+			}
+		}
+		
+		// Top-right corner
+		int topRightPixel = atlasImage.getRGB(texX + width - 1, texY);
+		for (int py = 1; py <= PADDING; py++) {
+			for (int px = 0; px < PADDING; px++) {
+				atlasImage.setRGB(texX + width + px, texY - py, topRightPixel);
+			}
+		}
+		
+		// Bottom-left corner
+		int bottomLeftPixel = atlasImage.getRGB(texX, texY + height - 1);
+		for (int py = 0; py < PADDING; py++) {
+			for (int px = 1; px <= PADDING; px++) {
+				atlasImage.setRGB(texX - px, texY + height + py, bottomLeftPixel);
+			}
+		}
+		
+		// Bottom-right corner
+		int bottomRightPixel = atlasImage.getRGB(texX + width - 1, texY + height - 1);
+		for (int py = 0; py < PADDING; py++) {
+			for (int px = 0; px < PADDING; px++) {
+				atlasImage.setRGB(texX + width + px, texY + height + py, bottomRightPixel);
+			}
 		}
 	}
 	
@@ -470,6 +560,7 @@ public class TextureAtlas implements TextureCoordinateProvider, AutoCloseable {
 	/**
 	 * Update a single animated texture in the atlas (without mipmap regeneration).
 	 * Called during tickAnimations() with the atlas already bound.
+	 * Includes extrusion of edge pixels into padding to prevent color bleeding.
 	 */
 	private void updateAnimatedTextureNoMipmap(String texturePath, AnimatedTextureData animData) {
 		int[] position = textureAtlasPositions.get(texturePath);
@@ -477,8 +568,9 @@ public class TextureAtlas implements TextureCoordinateProvider, AutoCloseable {
 			return;
 		}
 		
-		int x = position[0];
-		int y = position[1];
+		// Position is the padded position (where actual texture starts)
+		int texX = position[0];
+		int texY = position[1];
 		
 		// Get the current frame image
 		BufferedImage currentFrame;
@@ -494,8 +586,8 @@ public class TextureAtlas implements TextureCoordinateProvider, AutoCloseable {
 			return;
 		}
 		
-		// Upload the new frame to the atlas (texture already bound)
-		uploadTextureRegionNoBindUnbind(currentFrame, x, y);
+		// Upload the new frame to the atlas with extruded padding (texture already bound)
+		uploadTextureRegionWithPaddingNoBindUnbind(currentFrame, texX, texY);
 	}
 	
 	/**
@@ -551,21 +643,41 @@ public class TextureAtlas implements TextureCoordinateProvider, AutoCloseable {
 	}
 	
 	/**
-	 * Upload a texture region to the atlas (assumes texture is already bound).
+	 * Upload a texture region to the atlas with extruded padding (assumes texture is already bound).
+	 * Creates a padded image with extruded edge pixels and uploads the entire padded region.
 	 * Used during batch animation updates for better performance.
+	 * 
+	 * @param image the texture image to upload
+	 * @param texX the X position of the texture content (not including padding)
+	 * @param texY the Y position of the texture content (not including padding)
 	 */
-	private void uploadTextureRegionNoBindUnbind(BufferedImage image, int x, int y) {
-		int width = Math.min(image.getWidth(), textureSize);
-		int height = Math.min(image.getHeight(), textureSize);
+	private void uploadTextureRegionWithPaddingNoBindUnbind(BufferedImage image, int texX, int texY) {
+		int contentWidth = Math.min(image.getWidth(), textureSize);
+		int contentHeight = Math.min(image.getHeight(), textureSize);
 		
-		// Convert image to ByteBuffer
-		int[] pixels = new int[width * height];
-		image.getRGB(0, 0, width, height, pixels, 0, width);
+		// Calculate padded dimensions
+		int paddedWidth = contentWidth + 2 * PADDING;
+		int paddedHeight = contentHeight + 2 * PADDING;
 		
-		ByteBuffer buffer = BufferUtils.createByteBuffer(width * height * 4);
-		for (int py = 0; py < height; py++) {
-			for (int px = 0; px < width; px++) {
-				int pixel = pixels[py * width + px];
+		// Create padded image with extruded edges
+		BufferedImage paddedImage = new BufferedImage(paddedWidth, paddedHeight, BufferedImage.TYPE_INT_ARGB);
+		
+		// Copy original texture content to center
+		int[] pixels = new int[contentWidth * contentHeight];
+		image.getRGB(0, 0, contentWidth, contentHeight, pixels, 0, contentWidth);
+		paddedImage.setRGB(PADDING, PADDING, contentWidth, contentHeight, pixels, 0, contentWidth);
+		
+		// Extrude edge pixels into padding
+		extrudeEdgePixels(paddedImage, PADDING, PADDING, contentWidth, contentHeight);
+		
+		// Convert padded image to ByteBuffer
+		int[] paddedPixels = new int[paddedWidth * paddedHeight];
+		paddedImage.getRGB(0, 0, paddedWidth, paddedHeight, paddedPixels, 0, paddedWidth);
+		
+		ByteBuffer buffer = BufferUtils.createByteBuffer(paddedWidth * paddedHeight * 4);
+		for (int py = 0; py < paddedHeight; py++) {
+			for (int px = 0; px < paddedWidth; px++) {
+				int pixel = paddedPixels[py * paddedWidth + px];
 				buffer.put((byte) ((pixel >> 16) & 0xFF)); // Red
 				buffer.put((byte) ((pixel >> 8) & 0xFF));  // Green
 				buffer.put((byte) (pixel & 0xFF));         // Blue
@@ -574,7 +686,7 @@ public class TextureAtlas implements TextureCoordinateProvider, AutoCloseable {
 		}
 		buffer.flip();
 		
-		// Upload to GPU (texture already bound, mipmap regeneration handled by caller)
-		glTexSubImage2D(GL_TEXTURE_2D, 0, x, y, width, height, GL_RGBA, GL_UNSIGNED_BYTE, buffer);
+		// Upload to GPU at padded position (texture already bound, mipmap regeneration handled by caller)
+		glTexSubImage2D(GL_TEXTURE_2D, 0, texX - PADDING, texY - PADDING, paddedWidth, paddedHeight, GL_RGBA, GL_UNSIGNED_BYTE, buffer);
 	}
 }
