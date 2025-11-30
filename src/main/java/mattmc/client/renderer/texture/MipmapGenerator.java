@@ -28,6 +28,16 @@ public class MipmapGenerator {
     private static final int ALPHA_CUTOUT_CUTOFF = 96;
     
     /**
+     * Gamma value for sRGB to linear conversion (2.2).
+     */
+    private static final double GAMMA = 2.2D;
+    
+    /**
+     * Inverse gamma for linear to sRGB conversion (1/2.2 ≈ 0.454545).
+     */
+    private static final double GAMMA_INVERSE = 1.0D / GAMMA;
+    
+    /**
      * Precomputed gamma 2.2 lookup table for fast sRGB to linear conversion.
      * POW22[i] = (i/255)^2.2
      */
@@ -35,7 +45,7 @@ public class MipmapGenerator {
     
     static {
         for (int i = 0; i < 256; i++) {
-            POW22[i] = (float) Math.pow((double) ((float) i / 255.0F), 2.2D);
+            POW22[i] = (float) Math.pow((double) ((float) i / 255.0F), GAMMA);
         }
     }
     
@@ -125,6 +135,24 @@ public class MipmapGenerator {
     }
     
     /**
+     * Add color components from a pixel to the accumulator arrays if the pixel is not fully transparent.
+     * 
+     * @param color the ARGB color value
+     * @param a alpha accumulator (single-element array)
+     * @param r red accumulator (single-element array)
+     * @param g green accumulator (single-element array)
+     * @param b blue accumulator (single-element array)
+     */
+    private static void addColorComponentsIfOpaque(int color, float[] a, float[] r, float[] g, float[] b) {
+        if ((color >> 24) != 0) {
+            a[0] += getPow22(color >> 24);
+            r[0] += getPow22(color >> 16);
+            g[0] += getPow22(color >> 8);
+            b[0] += getPow22(color);
+        }
+    }
+    
+    /**
      * Blend 4 colors using gamma-correct averaging.
      * This is the core of Minecraft's mipmap generation.
      * 
@@ -138,51 +166,28 @@ public class MipmapGenerator {
     private static int alphaBlend(int col0, int col1, int col2, int col3, boolean hasTransparent) {
         if (hasTransparent) {
             // For textures with transparency, only blend non-transparent pixels
-            float a = 0.0F;
-            float r = 0.0F;
-            float g = 0.0F;
-            float b = 0.0F;
+            float[] a = {0.0F};
+            float[] r = {0.0F};
+            float[] g = {0.0F};
+            float[] b = {0.0F};
             
             // Only include pixels that are not fully transparent
-            if ((col0 >> 24) != 0) {
-                a += getPow22(col0 >> 24);
-                r += getPow22(col0 >> 16);
-                g += getPow22(col0 >> 8);
-                b += getPow22(col0);
-            }
-            
-            if ((col1 >> 24) != 0) {
-                a += getPow22(col1 >> 24);
-                r += getPow22(col1 >> 16);
-                g += getPow22(col1 >> 8);
-                b += getPow22(col1);
-            }
-            
-            if ((col2 >> 24) != 0) {
-                a += getPow22(col2 >> 24);
-                r += getPow22(col2 >> 16);
-                g += getPow22(col2 >> 8);
-                b += getPow22(col2);
-            }
-            
-            if ((col3 >> 24) != 0) {
-                a += getPow22(col3 >> 24);
-                r += getPow22(col3 >> 16);
-                g += getPow22(col3 >> 8);
-                b += getPow22(col3);
-            }
+            addColorComponentsIfOpaque(col0, a, r, g, b);
+            addColorComponentsIfOpaque(col1, a, r, g, b);
+            addColorComponentsIfOpaque(col2, a, r, g, b);
+            addColorComponentsIfOpaque(col3, a, r, g, b);
             
             // Average in linear space
-            a /= 4.0F;
-            r /= 4.0F;
-            g /= 4.0F;
-            b /= 4.0F;
+            a[0] /= 4.0F;
+            r[0] /= 4.0F;
+            g[0] /= 4.0F;
+            b[0] /= 4.0F;
             
-            // Convert back to sRGB (gamma 1/2.2)
-            int aOut = (int) (Math.pow((double) a, 0.45454545454545453D) * 255.0D);
-            int rOut = (int) (Math.pow((double) r, 0.45454545454545453D) * 255.0D);
-            int gOut = (int) (Math.pow((double) g, 0.45454545454545453D) * 255.0D);
-            int bOut = (int) (Math.pow((double) b, 0.45454545454545453D) * 255.0D);
+            // Convert back to sRGB using inverse gamma
+            int aOut = (int) (Math.pow((double) a[0], GAMMA_INVERSE) * 255.0D);
+            int rOut = (int) (Math.pow((double) r[0], GAMMA_INVERSE) * 255.0D);
+            int gOut = (int) (Math.pow((double) g[0], GAMMA_INVERSE) * 255.0D);
+            int bOut = (int) (Math.pow((double) b[0], GAMMA_INVERSE) * 255.0D);
             
             // Apply alpha cutoff threshold
             if (aOut < ALPHA_CUTOUT_CUTOFF) {
@@ -217,9 +222,9 @@ public class MipmapGenerator {
         float c2 = getPow22(col2 >> bitOffset);
         float c3 = getPow22(col3 >> bitOffset);
         
-        // Average in linear space, then convert back to sRGB
+        // Average in linear space, then convert back to sRGB using inverse gamma
         float avg = (c0 + c1 + c2 + c3) * 0.25F;
-        float result = (float) Math.pow((double) avg, 0.45454545454545453D);
+        float result = (float) Math.pow((double) avg, GAMMA_INVERSE);
         
         return (int) ((double) result * 255.0D);
     }
