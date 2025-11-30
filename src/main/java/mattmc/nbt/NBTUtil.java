@@ -162,6 +162,14 @@ public class NBTUtil {
                 for (long l : array) {
                     dos.writeLong(l);
                 }
+            } else if (value instanceof int[]) {
+                dos.writeByte(TAG_INT_ARRAY);
+                dos.writeUTF(name);
+                int[] array = (int[]) value;
+                dos.writeInt(array.length);
+                for (int i : array) {
+                    dos.writeInt(i);
+                }
             } else if (value instanceof List) {
                 writeList(dos, name, (List<?>) value);
             } else if (value instanceof Map) {
@@ -338,6 +346,17 @@ public class NBTUtil {
                     long[] array = new long[length];
                     for (int i = 0; i < length; i++) {
                         array[i] = dis.readLong();
+                    }
+                    yield array;
+                }
+                case TAG_INT_ARRAY -> {
+                    int length = dis.readInt();
+                    if (length < 0 || length > MAX_LONG_ARRAY_SIZE) { // Reuse same limit
+                        throw new NBTDeserializationException("Invalid int array length: " + length, tagName, type, position);
+                    }
+                    int[] array = new int[length];
+                    for (int i = 0; i < length; i++) {
+                        array[i] = dis.readInt();
                     }
                     yield array;
                 }
