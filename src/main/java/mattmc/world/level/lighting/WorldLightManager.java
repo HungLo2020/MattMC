@@ -12,6 +12,12 @@ import mattmc.world.level.chunk.LevelChunk;
  */
 public class WorldLightManager {
 	
+	/**
+	 * Minimum light intensity required to propagate to the next block.
+	 * Light attenuates by 1 per block, so intensity 1 cannot propagate further.
+	 */
+	private static final int MIN_LIGHT_FOR_PROPAGATION = 2;
+	
 	private CrossChunkLightPropagator crossChunkPropagator;
 	private LightPropagator blockLightPropagator;
 	private SkylightEngine skylightEngine;
@@ -145,7 +151,7 @@ public class WorldLightManager {
 				int sourceI = fromChunk.getBlockLightI(fromX, y, fromZ);
 				
 				// Check if source has light that should propagate
-				if (sourceI > 1) {
+				if (sourceI >= MIN_LIGHT_FOR_PROPAGATION) {
 					int newI = sourceI - 1;
 					int currentI = toChunk.getBlockLightI(toX, y, toZ);
 					
@@ -164,7 +170,7 @@ public class WorldLightManager {
 				
 				// Also check skylight
 				int sourceSky = fromChunk.getSkyLight(fromX, y, fromZ);
-				if (sourceSky > 1) {
+				if (sourceSky >= MIN_LIGHT_FOR_PROPAGATION) {
 					int newSky = sourceSky - 1;
 					int currentSky = toChunk.getSkyLight(toX, y, toZ);
 					
