@@ -25,7 +25,7 @@ public class ReloadBlockChangeLightTest {
     
     @Test
     @DisplayName("Light propagates into cave after reload and block break")
-    public void testLightPropagatesAfterReloadAndBlockBreak(@TempDir Path tempDir) throws Exception {
+    public void testLightPropagatesAfterReloadAndBlockBreak(@TempDir Path tempDir) throws java.io.IOException {
         // First session - create cave, close hole, save
         Level level1 = new Level();
         level1.setWorldDirectory(tempDir);
@@ -70,14 +70,8 @@ public class ReloadBlockChangeLightTest {
         System.out.println("  Skylight in cave center: " + chunk.getSkyLight(8, caveY, 8));
         System.out.println("  Heightmap at (8,8): " + chunk.getHeightmap().getHeight(8, 8));
         
-        // Force chunk save by unloading it
-        System.out.println("\nMoving player far away to trigger chunk unload and save...");
+        // Force chunk save by unloading it, then shutdown (which flushes async saves)
         level1.updateChunksAroundPlayer(1000, 1000);
-        
-        // Wait a bit for async save to complete
-        Thread.sleep(500);
-        
-        // Shutdown level (also flushes saves)
         level1.shutdown();
         
         // Second session - reload and try to reopen hole
@@ -130,7 +124,7 @@ public class ReloadBlockChangeLightTest {
     
     @Test
     @DisplayName("Cave with single block opening - light cycles correctly after reload")
-    public void testCaveLightCycleAfterReload(@TempDir Path tempDir) throws Exception {
+    public void testCaveLightCycleAfterReload(@TempDir Path tempDir) {
         // Setup: Create world with cave and opening
         Level level1 = new Level();
         level1.setWorldDirectory(tempDir);
