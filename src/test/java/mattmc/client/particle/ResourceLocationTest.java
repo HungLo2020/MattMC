@@ -69,7 +69,7 @@ class ResourceLocationTest {
     void testToFilePath() {
         ResourceLocation loc = new ResourceLocation("mattmc:particles/smoke");
         String path = loc.toFilePath("assets/", ".json");
-        // Namespace is no longer included in path since resources are directly under assets/
+        // Namespace is no longer included in the path since resources are directly under assets/
         assertEquals("assets/particles/smoke.json", path);
     }
     
