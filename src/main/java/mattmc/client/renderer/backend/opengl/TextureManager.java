@@ -34,6 +34,14 @@ public class TextureManager {
     // ISSUE-005 fix: LRU cache with maximum size limit
     private static final int MAX_TEXTURE_CACHE_SIZE = 256;
     
+    /**
+     * LOD bias to favor higher-resolution mipmap levels.
+     * A small negative value reduces the distance at which LOD transitions occur,
+     * which helps reduce visible banding patterns on flat surfaces at a distance.
+     * Used by both TextureManager and TextureAtlas for consistency.
+     */
+    public static final float LOD_BIAS = -0.25f;
+    
     private final Map<String, Integer> textureCache = new java.util.LinkedHashMap<String, Integer>(16, 0.75f, true) {
         @Override
         protected boolean removeEldestEntry(Map.Entry<String, Integer> eldest) {
@@ -56,14 +64,31 @@ public class TextureManager {
      * 
      * <p>Sets LOD parameters to match Minecraft's TextureUtil.prepareImage behavior.
      * 
+     * <p><b>Banding Fix:</b> When anisotropic filtering is enabled (> 0), we use trilinear
+     * filtering (GL_LINEAR_MIPMAP_LINEAR) instead of GL_NEAREST_MIPMAP_LINEAR to eliminate
+     * visible banding patterns on flat surfaces at a distance. The anisotropic filtering
+     * combined with the slightly blurred mipmaps produces smoother LOD transitions without
+     * the harsh bands that occur with nearest-neighbor mipmap sampling.
+     * 
      * @param useMipmaps Whether to use mipmap filtering (for block textures use GL_NEAREST, for UI use GL_LINEAR)
      */
     public static void applyTextureFiltering(boolean useMipmaps) {
         int mipmapLevel = OptionsManager.getMipmapLevel();
+        int anisotropicLevel = OptionsManager.getAnisotropicFiltering();
         
         if (mipmapLevel > 0 && useMipmaps) {
-            // Use mipmap filtering (NEAREST for block textures to maintain pixelated look)
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST_MIPMAP_LINEAR);
+            // When anisotropic filtering is enabled, use trilinear filtering (GL_LINEAR_MIPMAP_LINEAR)
+            // to prevent visible banding on flat surfaces at a distance. The anisotropic filtering
+            // works with the trilinear filtering to provide smooth LOD transitions.
+            // When anisotropic filtering is disabled, use GL_NEAREST_MIPMAP_LINEAR for pixelated look.
+            if (anisotropicLevel > 0) {
+                // Trilinear filtering: smooth mipmap transitions, eliminates banding
+                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+            } else {
+                // Standard Minecraft-style: nearest within level, linear between levels
+                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST_MIPMAP_LINEAR);
+            }
+            // Always use NEAREST for magnification to maintain pixelated look up close
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
             // Set mipmap level parameters like Minecraft
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, mipmapLevel);
@@ -71,7 +96,9 @@ public class TextureManager {
             // Set LOD parameters like Minecraft's TextureUtil.prepareImage
             glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_LOD, 0.0f);
             glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAX_LOD, (float) mipmapLevel);
-            glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_LOD_BIAS, 0.0f);
+            // Small negative LOD bias to favor higher-resolution mipmap levels,
+            // which helps reduce banding at LOD transitions
+            glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_LOD_BIAS, LOD_BIAS);
         } else if (useMipmaps) {
             // No mipmaps for block textures
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
@@ -83,7 +110,6 @@ public class TextureManager {
         }
         
         // Apply anisotropic filtering settings
-        int anisotropicLevel = OptionsManager.getAnisotropicFiltering();
         if (anisotropicLevel > 0) {
             try {
                 // Get max anisotropic level supported by GPU

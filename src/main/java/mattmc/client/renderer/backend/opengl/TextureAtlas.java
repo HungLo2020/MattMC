@@ -450,8 +450,10 @@ public class TextureAtlas implements TextureCoordinateProvider, AutoCloseable {
 			glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_LOD, 0.0f);
 			// GL_TEXTURE_MAX_LOD - maximum LOD value (clamping to prevent atlas bleeding)
 			glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAX_LOD, (float) actualMaxLevel);
-			// GL_TEXTURE_LOD_BIAS - LOD bias (set to 0 like Minecraft)
-			glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_LOD_BIAS, 0.0f);
+			// GL_TEXTURE_LOD_BIAS - small negative bias to favor higher-resolution mipmap levels
+			// This helps reduce visible banding on flat surfaces at a distance by using
+			// sharper textures where possible
+			glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_LOD_BIAS, TextureManager.LOD_BIAS);
 		}
 		
 		// Upload each mipmap level
