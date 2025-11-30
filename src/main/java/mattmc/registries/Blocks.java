@@ -106,6 +106,19 @@ public class Blocks {
     public static final Block CRIMSON_STEM = register("crimson_stem", new RotatedPillarBlock(true));
     public static final Block WARPED_STEM = register("warped_stem", new RotatedPillarBlock(true));
     public static final Block SILVER_BIRCH_LOG = register("silver_birch_log", new RotatedPillarBlock(true));
+    // Stripped logs
+    public static final Block STRIPPED_OAK_LOG = register("stripped_oak_log", new RotatedPillarBlock(true));
+    public static final Block STRIPPED_SPRUCE_LOG = register("stripped_spruce_log", new RotatedPillarBlock(true));
+    public static final Block STRIPPED_BIRCH_LOG = register("stripped_birch_log", new RotatedPillarBlock(true));
+    public static final Block STRIPPED_JUNGLE_LOG = register("stripped_jungle_log", new RotatedPillarBlock(true));
+    public static final Block STRIPPED_ACACIA_LOG = register("stripped_acacia_log", new RotatedPillarBlock(true));
+    public static final Block STRIPPED_DARK_OAK_LOG = register("stripped_dark_oak_log", new RotatedPillarBlock(true));
+    public static final Block STRIPPED_MANGROVE_LOG = register("stripped_mangrove_log", new RotatedPillarBlock(true));
+    public static final Block STRIPPED_CHERRY_LOG = register("stripped_cherry_log", new RotatedPillarBlock(true));
+    public static final Block STRIPPED_BAMBOO_BLOCK = register("stripped_bamboo_block", new RotatedPillarBlock(true));
+    public static final Block STRIPPED_CRIMSON_STEM = register("stripped_crimson_stem", new RotatedPillarBlock(true));
+    public static final Block STRIPPED_WARPED_STEM = register("stripped_warped_stem", new RotatedPillarBlock(true));
+    public static final Block STRIPPED_PALE_OAK_LOG = register("stripped_pale_oak_log", new RotatedPillarBlock(true));
     // Leaves blocks - tint colors from Minecraft item models
     // Leaves with foliage tinting use negative ARGB values from MC (e.g., -12012264)
     // All leaves use FallingLeavesBlock with particle tint matching their foliage color
