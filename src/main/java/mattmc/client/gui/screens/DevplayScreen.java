@@ -455,11 +455,12 @@ public final class DevplayScreen implements Screen {
             int activeWorkers = world.getAsyncLoader().getActiveTaskCount();
             int renderedChunks = worldRenderer.getRenderedChunkCount();
             int culledChunks = worldRenderer.getCulledChunkCount();
+            long seed = world.getSeed();
             // Use interpolated position for smooth debug display
             uiRenderer.drawDebugInfo(w, h, player.getX(alphaF), player.getY(alphaF), player.getZ(alphaF), 
                                      player.getYaw(alphaF), player.getPitch(alphaF), 0f, uiState.getFPS(),
                                      loadedChunks, pendingChunks, activeWorkers, renderedChunks, culledChunks,
-                                     defaultGamemode.getDisplayName(), player.getGamemode().getDisplayName());
+                                     defaultGamemode.getDisplayName(), player.getGamemode().getDisplayName(), seed);
             
             // Draw system information on the right side
             uiRenderer.drawSystemInfo(w, h, window.handle());
