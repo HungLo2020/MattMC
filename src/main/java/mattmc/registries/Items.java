@@ -105,6 +105,19 @@ public class Items {
     public static final BlockItem CRIMSON_STEM = register("crimson_stem", new BlockItem(Blocks.CRIMSON_STEM));
     public static final BlockItem WARPED_STEM = register("warped_stem", new BlockItem(Blocks.WARPED_STEM));
     public static final BlockItem SILVER_BIRCH_LOG = register("silver_birch_log", new BlockItem(Blocks.SILVER_BIRCH_LOG));
+    // Stripped logs items
+    public static final BlockItem STRIPPED_OAK_LOG = register("stripped_oak_log", new BlockItem(Blocks.STRIPPED_OAK_LOG));
+    public static final BlockItem STRIPPED_SPRUCE_LOG = register("stripped_spruce_log", new BlockItem(Blocks.STRIPPED_SPRUCE_LOG));
+    public static final BlockItem STRIPPED_BIRCH_LOG = register("stripped_birch_log", new BlockItem(Blocks.STRIPPED_BIRCH_LOG));
+    public static final BlockItem STRIPPED_JUNGLE_LOG = register("stripped_jungle_log", new BlockItem(Blocks.STRIPPED_JUNGLE_LOG));
+    public static final BlockItem STRIPPED_ACACIA_LOG = register("stripped_acacia_log", new BlockItem(Blocks.STRIPPED_ACACIA_LOG));
+    public static final BlockItem STRIPPED_DARK_OAK_LOG = register("stripped_dark_oak_log", new BlockItem(Blocks.STRIPPED_DARK_OAK_LOG));
+    public static final BlockItem STRIPPED_MANGROVE_LOG = register("stripped_mangrove_log", new BlockItem(Blocks.STRIPPED_MANGROVE_LOG));
+    public static final BlockItem STRIPPED_CHERRY_LOG = register("stripped_cherry_log", new BlockItem(Blocks.STRIPPED_CHERRY_LOG));
+    public static final BlockItem STRIPPED_BAMBOO_BLOCK = register("stripped_bamboo_block", new BlockItem(Blocks.STRIPPED_BAMBOO_BLOCK));
+    public static final BlockItem STRIPPED_CRIMSON_STEM = register("stripped_crimson_stem", new BlockItem(Blocks.STRIPPED_CRIMSON_STEM));
+    public static final BlockItem STRIPPED_WARPED_STEM = register("stripped_warped_stem", new BlockItem(Blocks.STRIPPED_WARPED_STEM));
+    public static final BlockItem STRIPPED_PALE_OAK_LOG = register("stripped_pale_oak_log", new BlockItem(Blocks.STRIPPED_PALE_OAK_LOG));
     // Leaves items
     public static final BlockItem OAK_LEAVES = register("oak_leaves", new BlockItem(Blocks.OAK_LEAVES));
     public static final BlockItem SPRUCE_LEAVES = register("spruce_leaves", new BlockItem(Blocks.SPRUCE_LEAVES));

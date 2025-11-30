@@ -1,0 +1,7 @@
+{
+  "parent": "mattmc:block/cube_column_horizontal",
+  "textures": {
+    "end": "mattmc:block/stripped_cherry_log_top",
+    "side": "mattmc:block/stripped_cherry_log"
+  }
+}

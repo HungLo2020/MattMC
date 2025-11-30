@@ -41,6 +41,19 @@ public class CreativeModeTabs {
         CreativeTabs.BUILDING_BLOCKS.addItem(Items.CRIMSON_STEM);
         CreativeTabs.BUILDING_BLOCKS.addItem(Items.WARPED_STEM);
         CreativeTabs.BUILDING_BLOCKS.addItem(Items.SILVER_BIRCH_LOG);
+        // Stripped logs
+        CreativeTabs.BUILDING_BLOCKS.addItem(Items.STRIPPED_OAK_LOG);
+        CreativeTabs.BUILDING_BLOCKS.addItem(Items.STRIPPED_SPRUCE_LOG);
+        CreativeTabs.BUILDING_BLOCKS.addItem(Items.STRIPPED_BIRCH_LOG);
+        CreativeTabs.BUILDING_BLOCKS.addItem(Items.STRIPPED_JUNGLE_LOG);
+        CreativeTabs.BUILDING_BLOCKS.addItem(Items.STRIPPED_ACACIA_LOG);
+        CreativeTabs.BUILDING_BLOCKS.addItem(Items.STRIPPED_DARK_OAK_LOG);
+        CreativeTabs.BUILDING_BLOCKS.addItem(Items.STRIPPED_MANGROVE_LOG);
+        CreativeTabs.BUILDING_BLOCKS.addItem(Items.STRIPPED_CHERRY_LOG);
+        CreativeTabs.BUILDING_BLOCKS.addItem(Items.STRIPPED_BAMBOO_BLOCK);
+        CreativeTabs.BUILDING_BLOCKS.addItem(Items.STRIPPED_CRIMSON_STEM);
+        CreativeTabs.BUILDING_BLOCKS.addItem(Items.STRIPPED_WARPED_STEM);
+        CreativeTabs.BUILDING_BLOCKS.addItem(Items.STRIPPED_PALE_OAK_LOG);
         CreativeTabs.BUILDING_BLOCKS.addItem(Items.OAK_PLANKS);
         CreativeTabs.BUILDING_BLOCKS.addItem(Items.SPRUCE_PLANKS);
         CreativeTabs.BUILDING_BLOCKS.addItem(Items.BIRCH_PLANKS);
