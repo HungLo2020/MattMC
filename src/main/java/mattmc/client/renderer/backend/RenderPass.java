@@ -28,6 +28,22 @@ public enum RenderPass {
     OPAQUE,
     
     /**
+     * Cutout geometry pass - renders objects with binary transparency (alpha testing).
+     * This pass is rendered after opaque geometry with alpha testing enabled.
+     * Unlike transparent objects, cutout geometry doesn't need sorting since pixels
+     * are either fully opaque or fully transparent.
+     * Examples: grass, flowers, saplings, rails, torches.
+     */
+    CUTOUT,
+    
+    /**
+     * Cutout geometry pass with mipmapping - renders cutout objects that benefit from
+     * texture filtering at distance. Identical to CUTOUT but with mipmap filtering.
+     * Examples: leaves, glass panes, iron bars.
+     */
+    CUTOUT_MIPPED,
+    
+    /**
      * Transparent geometry pass - renders objects requiring alpha blending.
      * This should typically be rendered after opaque geometry, often with back-to-front
      * sorting to ensure proper transparency blending.

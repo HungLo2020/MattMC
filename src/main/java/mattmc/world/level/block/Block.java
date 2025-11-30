@@ -29,6 +29,7 @@ public class Block {
     private final int lightEmissionG; // Green channel light emission (0-15)
     private final int lightEmissionB; // Blue channel light emission (0-15)
     private Map<String, String> texturePaths; // Lazily loaded from JSON (top, bottom, side, overlay, etc.)
+    private mattmc.client.renderer.RenderType cachedRenderType; // Cached render type for performance
     
     /**
      * Create a new block with the given properties.
@@ -338,6 +339,71 @@ public class Block {
      */
     public boolean hasCustomRendering() {
         return false;
+    }
+    
+    /**
+     * Get the render type for this block.
+     * 
+     * <p>The render type determines how transparency is handled:
+     * <ul>
+     *   <li><b>SOLID:</b> No transparency (default)</li>
+     *   <li><b>CUTOUT:</b> Binary transparency via alpha testing (for grass, flowers, etc.)</li>
+     *   <li><b>CUTOUT_MIPPED:</b> Same as CUTOUT but with mipmapping (for leaves)</li>
+     *   <li><b>TRANSLUCENT:</b> Full alpha blending (for glass, ice, water)</li>
+     * </ul>
+     * 
+     * <p>The render type is read from the block's model JSON file (the "render_type" field).
+     * If not specified, returns {@link mattmc.client.renderer.RenderType#SOLID}.
+     * 
+     * <p>The result is cached after first lookup for performance during rendering.
+     * 
+     * @return the render type for this block
+     */
+    public mattmc.client.renderer.RenderType getRenderType() {
+        // Return cached value if available
+        if (cachedRenderType != null) {
+            return cachedRenderType;
+        }
+        
+        if (identifier == null) {
+            cachedRenderType = mattmc.client.renderer.RenderType.SOLID;
+            return cachedRenderType;
+        }
+        
+        String blockName = identifier.contains(":") ? identifier.substring(identifier.indexOf(':') + 1) : identifier;
+        mattmc.client.resources.model.BlockModel model = ResourceManager.loadBlockModel(blockName);
+        
+        if (model != null) {
+            cachedRenderType = model.getRenderType();
+        } else {
+            cachedRenderType = mattmc.client.renderer.RenderType.SOLID;
+        }
+        
+        return cachedRenderType;
+    }
+    
+    /**
+     * Check if this block uses cutout rendering (alpha testing).
+     * 
+     * <p>Cutout blocks have binary transparency - pixels are either fully opaque or
+     * fully transparent. This is used for blocks like grass, flowers, and saplings.
+     * 
+     * @return true if this block uses cutout rendering
+     */
+    public boolean isCutout() {
+        return getRenderType().isCutout();
+    }
+    
+    /**
+     * Check if this block uses translucent rendering (alpha blending).
+     * 
+     * <p>Translucent blocks have smooth transparency and require depth sorting.
+     * This is used for blocks like stained glass and ice.
+     * 
+     * @return true if this block uses translucent rendering
+     */
+    public boolean isTranslucent() {
+        return getRenderType().isTranslucent();
     }
     
     /**

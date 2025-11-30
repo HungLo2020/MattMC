@@ -1,0 +1,6 @@
+{
+    "parent": "mattmc:block/cross",
+    "textures": {
+        "cross": "#plant"
+    }
+}

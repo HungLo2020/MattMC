@@ -144,6 +144,14 @@ public class ResourceManager {
         // Keep child's tints
         merged.setTints(child.getTints());
         
+        // Merge render_type (child overrides parent)
+        // This allows a block model to specify "render_type": "cutout" and inherit other properties from parent
+        if (child.hasRenderType()) {
+            merged.setRenderTypeString(child.getRenderTypeString());
+        } else if (parent.hasRenderType()) {
+            merged.setRenderTypeString(parent.getRenderTypeString());
+        }
+        
         // Parent is now resolved, so we don't set it on merged model
         merged.setParent(null);
         
