@@ -55,6 +55,19 @@ public class TextureAtlas implements TextureCoordinateProvider, AutoCloseable {
 	private final int atlasHeight;
 	private final int textureSize = 16; // Standard MattMC texture size
 	
+	/**
+	 * Border padding around each texture tile in pixels.
+	 * This padding duplicates edge pixels to prevent mipmap bleeding when
+	 * mipmaps sample across texture tile boundaries. A value of 2 is sufficient
+	 * for most mipmap levels and anisotropic filtering.
+	 */
+	private static final int BORDER_PADDING = 2;
+	
+	/**
+	 * Total size of each texture cell in the atlas (texture + padding on both sides).
+	 */
+	private final int cellSize = textureSize + BORDER_PADDING * 2;
+	
 	// Int-keyed UV mappings for fast hot path lookup
 	private final Map<Integer, TextureCoordinateProvider.UVMapping> uvMappings = new HashMap<>();
 	
@@ -103,11 +116,12 @@ public class TextureAtlas implements TextureCoordinateProvider, AutoCloseable {
 		// logger.info("Found {} unique textures", uniqueTexturePaths.size());
 		
 		// Calculate atlas dimensions (must be power of 2 for mipmaps)
+		// Each texture cell includes the texture plus border padding on all sides
 		int textureCount = uniqueTexturePaths.size();
 		int texturesPerRow = (int) Math.ceil(Math.sqrt(textureCount));
 		
-		// Round up to next power of 2
-		int powerOf2Width = nextPowerOf2(texturesPerRow * textureSize);
+		// Round up to next power of 2 (using cellSize which includes padding)
+		int powerOf2Width = nextPowerOf2(texturesPerRow * cellSize);
 		int powerOf2Height = powerOf2Width; // Keep it square
 		
 		atlasWidth = powerOf2Width;
@@ -125,8 +139,8 @@ public class TextureAtlas implements TextureCoordinateProvider, AutoCloseable {
 		g.fillRect(0, 0, atlasWidth, atlasHeight);
 		g.setComposite(java.awt.AlphaComposite.SrcOver);
 		
-		// Pack textures into atlas
-		int x = 0, y = 0;
+		// Pack textures into atlas with border padding
+		int cellX = 0, cellY = 0;
 		List<String> textureList = new ArrayList<>(uniqueTexturePaths);
 		
 		// Use Src composite to completely replace destination pixels with source pixels
@@ -138,22 +152,37 @@ public class TextureAtlas implements TextureCoordinateProvider, AutoCloseable {
 				// Load texture image (handles animated textures with .mcmeta files)
 				BufferedImage texture = loadTextureForAtlas(texturePath);
 				if (texture != null) {
-					// Draw texture into atlas (Src composite preserves alpha)
-					g.drawImage(texture, x, y, textureSize, textureSize, null);
+					// Calculate the position where the actual texture goes (inside the padding)
+					int textureX = cellX + BORDER_PADDING;
+					int textureY = cellY + BORDER_PADDING;
 					
-					// Store atlas position for animated texture updates
-					textureAtlasPositions.put(texturePath, new int[]{x, y});
+					// Draw the main texture into the atlas at the padded position
+					g.drawImage(texture, textureX, textureY, textureSize, textureSize, null);
 					
-					// Calculate UV coordinates (0.0 to 1.0)
-					float u0 = (float) x / atlasWidth;
-					float v0 = (float) y / atlasHeight;
-					float u1 = (float) (x + textureSize) / atlasWidth;
-					float v1 = (float) (y + textureSize) / atlasHeight;
+					// Draw border padding by duplicating edge pixels
+					// This prevents mipmap bleeding when the GPU generates lower mip levels
+					drawBorderPadding(g, texture, cellX, cellY);
 					
-					// Register texture with int ID mapping
-					registerTexture(texturePath, new TextureCoordinateProvider.UVMapping(u0, v0, u1, v1));
+					// Store atlas position for animated texture updates (the inner texture position)
+					textureAtlasPositions.put(texturePath, new int[]{textureX, textureY});
 					
-					// logger.info("  Packed: {} at ({},{}) UV: {},{} -> {},{}", texturePath, x, y, u0, v0, u1, v1);
+					// Calculate UV coordinates (0.0 to 1.0) for the inner texture area only
+					// The padding is not included in UV coordinates
+					float u0 = (float) textureX / atlasWidth;
+					float v0 = (float) textureY / atlasHeight;
+					float u1 = (float) (textureX + textureSize) / atlasWidth;
+					float v1 = (float) (textureY + textureSize) / atlasHeight;
+					
+					// Calculate UV shrink ratio following Minecraft's formula: 4.0f / atlasSize
+					// This provides additional protection against texture bleeding when mipmaps are enabled.
+					// With border padding, a smaller shrink ratio may be sufficient.
+					float atlasSize = Math.max(atlasWidth, atlasHeight);
+					float uvShrinkRatio = 4.0f / atlasSize;
+					
+					// Register texture with int ID mapping including shrink ratio
+					registerTexture(texturePath, new TextureCoordinateProvider.UVMapping(u0, v0, u1, v1, uvShrinkRatio));
+					
+					// logger.info("  Packed: {} at ({},{}) UV: {},{} -> {},{}", texturePath, textureX, textureY, u0, v0, u1, v1);
 				} else {
 					logger.error("  Failed to load: {}", texturePath);
 				}
@@ -161,11 +190,11 @@ public class TextureAtlas implements TextureCoordinateProvider, AutoCloseable {
 				logger.error("  Error loading {}: {}", texturePath, e.getMessage());
 			}
 			
-			// Move to next position
-			x += textureSize;
-			if (x >= atlasWidth) {
-				x = 0;
-				y += textureSize;
+			// Move to next cell position (each cell includes texture + padding)
+			cellX += cellSize;
+			if (cellX + cellSize > atlasWidth) {
+				cellX = 0;
+				cellY += cellSize;
 			}
 		}
 		
@@ -262,6 +291,99 @@ public class TextureAtlas implements TextureCoordinateProvider, AutoCloseable {
 		} catch (IOException e) {
 			logger.error("Failed to load texture: {}", path, e);
 			return null;
+		}
+	}
+	
+	/**
+	 * Draw border padding around a texture tile by duplicating edge pixels.
+	 * This prevents mipmap bleeding when the GPU generates lower mip levels,
+	 * as the padding ensures that edge samples blend with the correct color
+	 * rather than neighboring tiles in the atlas.
+	 * 
+	 * @param g the graphics context to draw into
+	 * @param texture the source texture image
+	 * @param cellX the X coordinate of the cell (top-left corner including padding)
+	 * @param cellY the Y coordinate of the cell (top-left corner including padding)
+	 */
+	private void drawBorderPadding(Graphics2D g, BufferedImage texture, int cellX, int cellY) {
+		int texWidth = Math.min(texture.getWidth(), textureSize);
+		int texHeight = Math.min(texture.getHeight(), textureSize);
+		
+		// Calculate inner texture position
+		int textureX = cellX + BORDER_PADDING;
+		int textureY = cellY + BORDER_PADDING;
+		
+		// Draw top padding: duplicate the top row of pixels
+		for (int p = 1; p <= BORDER_PADDING; p++) {
+			for (int i = 0; i < texWidth; i++) {
+				int pixel = texture.getRGB(i, 0);
+				g.setColor(new Color(pixel, true));
+				g.fillRect(textureX + i, textureY - p, 1, 1);
+			}
+		}
+		
+		// Draw bottom padding: duplicate the bottom row of pixels
+		for (int p = 0; p < BORDER_PADDING; p++) {
+			for (int i = 0; i < texWidth; i++) {
+				int pixel = texture.getRGB(i, texHeight - 1);
+				g.setColor(new Color(pixel, true));
+				g.fillRect(textureX + i, textureY + texHeight + p, 1, 1);
+			}
+		}
+		
+		// Draw left padding: duplicate the left column of pixels
+		for (int p = 1; p <= BORDER_PADDING; p++) {
+			for (int i = 0; i < texHeight; i++) {
+				int pixel = texture.getRGB(0, i);
+				g.setColor(new Color(pixel, true));
+				g.fillRect(textureX - p, textureY + i, 1, 1);
+			}
+		}
+		
+		// Draw right padding: duplicate the right column of pixels
+		for (int p = 0; p < BORDER_PADDING; p++) {
+			for (int i = 0; i < texHeight; i++) {
+				int pixel = texture.getRGB(texWidth - 1, i);
+				g.setColor(new Color(pixel, true));
+				g.fillRect(textureX + texWidth + p, textureY + i, 1, 1);
+			}
+		}
+		
+		// Draw corner padding: duplicate corner pixels
+		// Top-left corner
+		int topLeftPixel = texture.getRGB(0, 0);
+		g.setColor(new Color(topLeftPixel, true));
+		for (int py = 1; py <= BORDER_PADDING; py++) {
+			for (int px = 1; px <= BORDER_PADDING; px++) {
+				g.fillRect(textureX - px, textureY - py, 1, 1);
+			}
+		}
+		
+		// Top-right corner
+		int topRightPixel = texture.getRGB(texWidth - 1, 0);
+		g.setColor(new Color(topRightPixel, true));
+		for (int py = 1; py <= BORDER_PADDING; py++) {
+			for (int px = 0; px < BORDER_PADDING; px++) {
+				g.fillRect(textureX + texWidth + px, textureY - py, 1, 1);
+			}
+		}
+		
+		// Bottom-left corner
+		int bottomLeftPixel = texture.getRGB(0, texHeight - 1);
+		g.setColor(new Color(bottomLeftPixel, true));
+		for (int py = 0; py < BORDER_PADDING; py++) {
+			for (int px = 1; px <= BORDER_PADDING; px++) {
+				g.fillRect(textureX - px, textureY + texHeight + py, 1, 1);
+			}
+		}
+		
+		// Bottom-right corner
+		int bottomRightPixel = texture.getRGB(texWidth - 1, texHeight - 1);
+		g.setColor(new Color(bottomRightPixel, true));
+		for (int py = 0; py < BORDER_PADDING; py++) {
+			for (int px = 0; px < BORDER_PADDING; px++) {
+				g.fillRect(textureX + texWidth + px, textureY + texHeight + py, 1, 1);
+			}
 		}
 	}
 	
@@ -470,6 +592,7 @@ public class TextureAtlas implements TextureCoordinateProvider, AutoCloseable {
 	/**
 	 * Update a single animated texture in the atlas (without mipmap regeneration).
 	 * Called during tickAnimations() with the atlas already bound.
+	 * Also updates the border padding to prevent mipmap bleeding.
 	 */
 	private void updateAnimatedTextureNoMipmap(String texturePath, AnimatedTextureData animData) {
 		int[] position = textureAtlasPositions.get(texturePath);
@@ -477,8 +600,9 @@ public class TextureAtlas implements TextureCoordinateProvider, AutoCloseable {
 			return;
 		}
 		
-		int x = position[0];
-		int y = position[1];
+		// position[0] and position[1] are the inner texture position (inside the padding)
+		int textureX = position[0];
+		int textureY = position[1];
 		
 		// Get the current frame image
 		BufferedImage currentFrame;
@@ -495,7 +619,10 @@ public class TextureAtlas implements TextureCoordinateProvider, AutoCloseable {
 		}
 		
 		// Upload the new frame to the atlas (texture already bound)
-		uploadTextureRegionNoBindUnbind(currentFrame, x, y);
+		uploadTextureRegionNoBindUnbind(currentFrame, textureX, textureY);
+		
+		// Also update the border padding to prevent mipmap bleeding
+		uploadBorderPaddingNoBindUnbind(currentFrame, textureX, textureY);
 	}
 	
 	/**
@@ -575,6 +702,112 @@ public class TextureAtlas implements TextureCoordinateProvider, AutoCloseable {
 		buffer.flip();
 		
 		// Upload to GPU (texture already bound, mipmap regeneration handled by caller)
+		glTexSubImage2D(GL_TEXTURE_2D, 0, x, y, width, height, GL_RGBA, GL_UNSIGNED_BYTE, buffer);
+	}
+	
+	/**
+	 * Upload border padding for an animated texture (assumes texture is already bound).
+	 * Uploads edge-duplicated pixels around the texture to prevent mipmap bleeding.
+	 * 
+	 * @param image the source texture image
+	 * @param textureX the X coordinate of the inner texture (inside padding)
+	 * @param textureY the Y coordinate of the inner texture (inside padding)
+	 */
+	private void uploadBorderPaddingNoBindUnbind(BufferedImage image, int textureX, int textureY) {
+		int texWidth = Math.min(image.getWidth(), textureSize);
+		int texHeight = Math.min(image.getHeight(), textureSize);
+		
+		// Upload top padding (rows above the texture)
+		for (int p = 1; p <= BORDER_PADDING; p++) {
+			ByteBuffer buffer = BufferUtils.createByteBuffer(texWidth * 4);
+			for (int i = 0; i < texWidth; i++) {
+				int pixel = image.getRGB(i, 0);
+				buffer.put((byte) ((pixel >> 16) & 0xFF));
+				buffer.put((byte) ((pixel >> 8) & 0xFF));
+				buffer.put((byte) (pixel & 0xFF));
+				buffer.put((byte) ((pixel >> 24) & 0xFF));
+			}
+			buffer.flip();
+			glTexSubImage2D(GL_TEXTURE_2D, 0, textureX, textureY - p, texWidth, 1, GL_RGBA, GL_UNSIGNED_BYTE, buffer);
+		}
+		
+		// Upload bottom padding (rows below the texture)
+		for (int p = 0; p < BORDER_PADDING; p++) {
+			ByteBuffer buffer = BufferUtils.createByteBuffer(texWidth * 4);
+			for (int i = 0; i < texWidth; i++) {
+				int pixel = image.getRGB(i, texHeight - 1);
+				buffer.put((byte) ((pixel >> 16) & 0xFF));
+				buffer.put((byte) ((pixel >> 8) & 0xFF));
+				buffer.put((byte) (pixel & 0xFF));
+				buffer.put((byte) ((pixel >> 24) & 0xFF));
+			}
+			buffer.flip();
+			glTexSubImage2D(GL_TEXTURE_2D, 0, textureX, textureY + texHeight + p, texWidth, 1, GL_RGBA, GL_UNSIGNED_BYTE, buffer);
+		}
+		
+		// Upload left padding (columns to the left of the texture)
+		for (int p = 1; p <= BORDER_PADDING; p++) {
+			ByteBuffer buffer = BufferUtils.createByteBuffer(texHeight * 4);
+			for (int i = 0; i < texHeight; i++) {
+				int pixel = image.getRGB(0, i);
+				buffer.put((byte) ((pixel >> 16) & 0xFF));
+				buffer.put((byte) ((pixel >> 8) & 0xFF));
+				buffer.put((byte) (pixel & 0xFF));
+				buffer.put((byte) ((pixel >> 24) & 0xFF));
+			}
+			buffer.flip();
+			glTexSubImage2D(GL_TEXTURE_2D, 0, textureX - p, textureY, 1, texHeight, GL_RGBA, GL_UNSIGNED_BYTE, buffer);
+		}
+		
+		// Upload right padding (columns to the right of the texture)
+		for (int p = 0; p < BORDER_PADDING; p++) {
+			ByteBuffer buffer = BufferUtils.createByteBuffer(texHeight * 4);
+			for (int i = 0; i < texHeight; i++) {
+				int pixel = image.getRGB(texWidth - 1, i);
+				buffer.put((byte) ((pixel >> 16) & 0xFF));
+				buffer.put((byte) ((pixel >> 8) & 0xFF));
+				buffer.put((byte) (pixel & 0xFF));
+				buffer.put((byte) ((pixel >> 24) & 0xFF));
+			}
+			buffer.flip();
+			glTexSubImage2D(GL_TEXTURE_2D, 0, textureX + texWidth + p, textureY, 1, texHeight, GL_RGBA, GL_UNSIGNED_BYTE, buffer);
+		}
+		
+		// Upload corner padding
+		// Top-left corner
+		int topLeftPixel = image.getRGB(0, 0);
+		uploadCornerPadding(topLeftPixel, textureX - BORDER_PADDING, textureY - BORDER_PADDING, BORDER_PADDING, BORDER_PADDING);
+		
+		// Top-right corner
+		int topRightPixel = image.getRGB(texWidth - 1, 0);
+		uploadCornerPadding(topRightPixel, textureX + texWidth, textureY - BORDER_PADDING, BORDER_PADDING, BORDER_PADDING);
+		
+		// Bottom-left corner
+		int bottomLeftPixel = image.getRGB(0, texHeight - 1);
+		uploadCornerPadding(bottomLeftPixel, textureX - BORDER_PADDING, textureY + texHeight, BORDER_PADDING, BORDER_PADDING);
+		
+		// Bottom-right corner
+		int bottomRightPixel = image.getRGB(texWidth - 1, texHeight - 1);
+		uploadCornerPadding(bottomRightPixel, textureX + texWidth, textureY + texHeight, BORDER_PADDING, BORDER_PADDING);
+	}
+	
+	/**
+	 * Upload a corner padding region filled with a single color.
+	 */
+	private void uploadCornerPadding(int pixel, int x, int y, int width, int height) {
+		ByteBuffer buffer = BufferUtils.createByteBuffer(width * height * 4);
+		byte r = (byte) ((pixel >> 16) & 0xFF);
+		byte g = (byte) ((pixel >> 8) & 0xFF);
+		byte b = (byte) (pixel & 0xFF);
+		byte a = (byte) ((pixel >> 24) & 0xFF);
+		
+		for (int i = 0; i < width * height; i++) {
+			buffer.put(r);
+			buffer.put(g);
+			buffer.put(b);
+			buffer.put(a);
+		}
+		buffer.flip();
 		glTexSubImage2D(GL_TEXTURE_2D, 0, x, y, width, height, GL_RGBA, GL_UNSIGNED_BYTE, buffer);
 	}
 }
