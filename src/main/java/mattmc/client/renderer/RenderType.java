@@ -106,7 +106,7 @@ public enum RenderType {
             return SOLID;
         }
         
-        String normalized = value.toLowerCase();
+        String normalized = value.toLowerCase(java.util.Locale.ROOT);
         
         // Fast O(1) lookup using static map
         RenderType result = JSON_NAME_MAP.get(normalized);
