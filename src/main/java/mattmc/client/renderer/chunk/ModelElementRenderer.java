@@ -251,13 +251,21 @@ public class ModelElementRenderer {
             adjustedFaceRotation = uvResult.additionalRotation;
         }
         
-        // Convert UV to 0-1 space and apply atlas mapping
+        // Convert UV to 0-1 space and apply atlas mapping with shrunk coordinates
+        // Use shrunk UV coordinates to prevent texture bleeding at lower mipmap levels
         float u0, v0, u1, v1;
         if (uvMapping != null) {
-            u0 = uvMapping.u0 + (uvMapping.u1 - uvMapping.u0) * (uv[0] / 16.0f);
-            v0 = uvMapping.v0 + (uvMapping.v1 - uvMapping.v0) * (uv[1] / 16.0f);
-            u1 = uvMapping.u0 + (uvMapping.u1 - uvMapping.u0) * (uv[2] / 16.0f);
-            v1 = uvMapping.v0 + (uvMapping.v1 - uvMapping.v0) * (uv[3] / 16.0f);
+            // Calculate the UV region within the shrunk atlas coordinates
+            // This maps the element's UV (0-16 space) to the shrunk atlas region
+            float uShrunk0 = uvMapping.u0Shrunk;
+            float vShrunk0 = uvMapping.v0Shrunk;
+            float uShrunk1 = uvMapping.u1Shrunk;
+            float vShrunk1 = uvMapping.v1Shrunk;
+            
+            u0 = uShrunk0 + (uShrunk1 - uShrunk0) * (uv[0] / 16.0f);
+            v0 = vShrunk0 + (vShrunk1 - vShrunk0) * (uv[1] / 16.0f);
+            u1 = uShrunk0 + (uShrunk1 - uShrunk0) * (uv[2] / 16.0f);
+            v1 = vShrunk0 + (vShrunk1 - vShrunk0) * (uv[3] / 16.0f);
         } else {
             u0 = uv[0] / 16.0f;
             v0 = uv[1] / 16.0f;

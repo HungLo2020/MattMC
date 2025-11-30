@@ -134,13 +134,14 @@ public class MeshBuilder {
         float y1 = y + 1;
         float z0 = z, z1 = z + 1;
         
-        // Get UV coordinates (0-1 if no atlas)
+        // Get shrunk UV coordinates to prevent texture bleeding at lower mipmap levels
+        // Use shrunk coordinates (inset toward center) instead of raw coordinates
         float u0 = 0, v0 = 0, u1 = 1, v1 = 1;
         if (uvMapping != null) {
-            u0 = uvMapping.u0;
-            v0 = uvMapping.v0;
-            u1 = uvMapping.u1;
-            v1 = uvMapping.v1;
+            u0 = uvMapping.u0Shrunk;
+            v0 = uvMapping.v0Shrunk;
+            u1 = uvMapping.u1Shrunk;
+            v1 = uvMapping.v1Shrunk;
         }
         
         int baseVertex = currentVertex;
@@ -172,13 +173,13 @@ public class MeshBuilder {
         float y0 = y;
         float z0 = z, z1 = z + 1;
         
-        // Get UV coordinates
+        // Get shrunk UV coordinates to prevent texture bleeding at lower mipmap levels
         float u0 = 0, v0 = 0, u1 = 1, v1 = 1;
         if (uvMapping != null) {
-            u0 = uvMapping.u0;
-            v0 = uvMapping.v0;
-            u1 = uvMapping.u1;
-            v1 = uvMapping.v1;
+            u0 = uvMapping.u0Shrunk;
+            v0 = uvMapping.v0Shrunk;
+            u1 = uvMapping.u1Shrunk;
+            v1 = uvMapping.v1Shrunk;
         }
         
         int baseVertex = currentVertex;
@@ -210,13 +211,13 @@ public class MeshBuilder {
         float y0 = y, y1 = y + 1;
         float z1 = z + 1;
         
-        // Get UV coordinates
+        // Get shrunk UV coordinates to prevent texture bleeding at lower mipmap levels
         float u0 = 0, v0 = 0, u1 = 1, v1 = 1;
         if (uvMapping != null) {
-            u0 = uvMapping.u0;
-            v0 = uvMapping.v0;
-            u1 = uvMapping.u1;
-            v1 = uvMapping.v1;
+            u0 = uvMapping.u0Shrunk;
+            v0 = uvMapping.v0Shrunk;
+            u1 = uvMapping.u1Shrunk;
+            v1 = uvMapping.v1Shrunk;
         }
         
         int baseVertex = currentVertex;
@@ -248,13 +249,13 @@ public class MeshBuilder {
         float y0 = y, y1 = y + 1;
         float z0 = z, z1 = z + 1;
         
-        // Get UV coordinates
+        // Get shrunk UV coordinates to prevent texture bleeding at lower mipmap levels
         float u0 = 0, v0 = 0, u1 = 1, v1 = 1;
         if (uvMapping != null) {
-            u0 = uvMapping.u0;
-            v0 = uvMapping.v0;
-            u1 = uvMapping.u1;
-            v1 = uvMapping.v1;
+            u0 = uvMapping.u0Shrunk;
+            v0 = uvMapping.v0Shrunk;
+            u1 = uvMapping.u1Shrunk;
+            v1 = uvMapping.v1Shrunk;
         }
         
         int baseVertex = currentVertex;
@@ -286,13 +287,13 @@ public class MeshBuilder {
         float y0 = y, y1 = y + 1;
         float z0 = z, z1 = z + 1;
         
-        // Get UV coordinates
+        // Get shrunk UV coordinates to prevent texture bleeding at lower mipmap levels
         float u0 = 0, v0 = 0, u1 = 1, v1 = 1;
         if (uvMapping != null) {
-            u0 = uvMapping.u0;
-            v0 = uvMapping.v0;
-            u1 = uvMapping.u1;
-            v1 = uvMapping.v1;
+            u0 = uvMapping.u0Shrunk;
+            v0 = uvMapping.v0Shrunk;
+            u1 = uvMapping.u1Shrunk;
+            v1 = uvMapping.v1Shrunk;
         }
         
         int baseVertex = currentVertex;
@@ -324,13 +325,13 @@ public class MeshBuilder {
         float y0 = y, y1 = y + 1;
         float z0 = z;
         
-        // Get UV coordinates
+        // Get shrunk UV coordinates to prevent texture bleeding at lower mipmap levels
         float u0 = 0, v0 = 0, u1 = 1, v1 = 1;
         if (uvMapping != null) {
-            u0 = uvMapping.u0;
-            v0 = uvMapping.v0;
-            u1 = uvMapping.u1;
-            v1 = uvMapping.v1;
+            u0 = uvMapping.u0Shrunk;
+            v0 = uvMapping.v0Shrunk;
+            u1 = uvMapping.u1Shrunk;
+            v1 = uvMapping.v1Shrunk;
         }
         
         int baseVertex = currentVertex;

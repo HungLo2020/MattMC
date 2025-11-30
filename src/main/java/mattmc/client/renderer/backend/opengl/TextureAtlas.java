@@ -56,6 +56,13 @@ public class TextureAtlas implements TextureCoordinateProvider, AutoCloseable {
 	private final int atlasHeight;
 	private final int textureSize = 16; // Standard MattMC texture size
 	
+	/**
+	 * UV shrink ratio for preventing texture bleeding at lower mipmap levels.
+	 * Computed as 4.0f / max(atlasWidth, atlasHeight), matching Minecraft's
+	 * TextureAtlasSprite.uvShrinkRatio() algorithm.
+	 */
+	private final float uvShrinkRatio;
+	
 	// Int-keyed UV mappings for fast hot path lookup
 	private final Map<Integer, TextureCoordinateProvider.UVMapping> uvMappings = new HashMap<>();
 	
@@ -114,6 +121,14 @@ public class TextureAtlas implements TextureCoordinateProvider, AutoCloseable {
 		atlasWidth = powerOf2Width;
 		atlasHeight = powerOf2Height;
 		
+		// Compute UV shrink ratio to prevent texture bleeding at lower mipmap levels.
+		// This matches Minecraft's TextureAtlasSprite.uvShrinkRatio() algorithm:
+		// uvShrinkRatio = 4.0f / atlasSize
+		// where atlasSize = max(atlasWidth, atlasHeight) * textureSize / spriteSize
+		// For our standard 16x16 textures in the atlas, this simplifies to:
+		float atlasSize = (float) Math.max(atlasWidth, atlasHeight);
+		this.uvShrinkRatio = 4.0f / atlasSize;
+		
 		// logger.info("Atlas size: {}x{} ({} textures, {} per row)", atlasWidth, atlasHeight, textureCount, texturesPerRow);
 		
 		// Create atlas image
@@ -151,8 +166,9 @@ public class TextureAtlas implements TextureCoordinateProvider, AutoCloseable {
 					float u1 = (float) (x + textureSize) / atlasWidth;
 					float v1 = (float) (y + textureSize) / atlasHeight;
 					
-					// Register texture with int ID mapping
-					registerTexture(texturePath, new TextureCoordinateProvider.UVMapping(u0, v0, u1, v1));
+					// Register texture with int ID mapping and UV shrink ratio
+					// The shrink ratio prevents texture bleeding at lower mipmap levels
+					registerTexture(texturePath, new TextureCoordinateProvider.UVMapping(u0, v0, u1, v1, uvShrinkRatio));
 					
 					// logger.info("  Packed: {} at ({},{}) UV: {},{} -> {},{}", texturePath, x, y, u0, v0, u1, v1);
 				} else {
