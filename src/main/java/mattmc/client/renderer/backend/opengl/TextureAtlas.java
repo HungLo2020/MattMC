@@ -53,9 +53,9 @@ public class TextureAtlas implements TextureCoordinateProvider, AutoCloseable {
 	/**
 	 * Padding (in pixels) added around each texture in the atlas.
 	 * This prevents color bleeding when anisotropic filtering samples across texture boundaries.
-	 * A value of 2 is sufficient for up to x16 anisotropic filtering.
+	 * A value of 4 is recommended for x16 anisotropic filtering at oblique viewing angles.
 	 */
-	private static final int PADDING = 2;
+	private static final int PADDING = 4;
 
 	private final int atlasTextureId;
 	private final int atlasWidth;
