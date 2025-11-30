@@ -127,7 +127,7 @@ public class TextureAtlas implements TextureCoordinateProvider, AutoCloseable {
 		// where atlasSize = max(atlasWidth, atlasHeight) * textureSize / spriteSize
 		// For our standard 16x16 textures in the atlas, this simplifies to:
 		float atlasSize = (float) Math.max(atlasWidth, atlasHeight);
-		this.uvShrinkRatio = 4.0f / atlasSize;
+		this.uvShrinkRatio = atlasSize > 0 ? 4.0f / atlasSize : 0.0f;
 		
 		// logger.info("Atlas size: {}x{} ({} textures, {} per row)", atlasWidth, atlasHeight, textureCount, texturesPerRow);
 		
