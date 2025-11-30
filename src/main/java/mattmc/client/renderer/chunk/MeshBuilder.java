@@ -144,6 +144,10 @@ public class MeshBuilder {
             v1 = uvMapping.v1Shrunk;
         }
         
+        // Apply per-vertex UV micro-inset like Minecraft's FaceBakery
+        // Vertex UV order for top face: (u0,v0), (u0,v1), (u1,v1), (u1,v0)
+        float[] uv = applyUVMicroInset(u0, v0, u0, v1, u1, v1, u1, v0);
+        
         int baseVertex = currentVertex;
         
         // Sample light for each vertex (4 corners of top face)
@@ -152,11 +156,11 @@ public class MeshBuilder {
         float[] light2 = lightSampler.sampleVertexLight(face, 0, 2);
         float[] light3 = lightSampler.sampleVertexLight(face, 0, 3);
         
-        // 4 vertices for the quad with atlas UVs, normal (0,1,0) for top face, and light data
-        addVertex(x0, y1, z0, u0, v0, color, 0, 1, 0, light0[0], light0[1], light0[2], light0[3], light0[4]); // 0
-        addVertex(x0, y1, z1, u0, v1, color, 0, 1, 0, light1[0], light1[1], light1[2], light1[3], light1[4]); // 1
-        addVertex(x1, y1, z1, u1, v1, color, 0, 1, 0, light2[0], light2[1], light2[2], light2[3], light2[4]); // 2
-        addVertex(x1, y1, z0, u1, v0, color, 0, 1, 0, light3[0], light3[1], light3[2], light3[3], light3[4]); // 3
+        // 4 vertices for the quad with micro-inset UVs, normal (0,1,0) for top face, and light data
+        addVertex(x0, y1, z0, uv[0], uv[1], color, 0, 1, 0, light0[0], light0[1], light0[2], light0[3], light0[4]); // 0
+        addVertex(x0, y1, z1, uv[2], uv[3], color, 0, 1, 0, light1[0], light1[1], light1[2], light1[3], light1[4]); // 1
+        addVertex(x1, y1, z1, uv[4], uv[5], color, 0, 1, 0, light2[0], light2[1], light2[2], light2[3], light2[4]); // 2
+        addVertex(x1, y1, z0, uv[6], uv[7], color, 0, 1, 0, light3[0], light3[1], light3[2], light3[3], light3[4]); // 3
         
         // 2 triangles (6 indices)
         addQuadIndices(baseVertex);
@@ -182,6 +186,10 @@ public class MeshBuilder {
             v1 = uvMapping.v1Shrunk;
         }
         
+        // Apply per-vertex UV micro-inset like Minecraft's FaceBakery
+        // Vertex UV order for bottom face: (u0,v0), (u1,v0), (u1,v1), (u0,v1)
+        float[] uv = applyUVMicroInset(u0, v0, u1, v0, u1, v1, u0, v1);
+        
         int baseVertex = currentVertex;
         
         // Sample light for each vertex
@@ -190,11 +198,11 @@ public class MeshBuilder {
         float[] light2 = lightSampler.sampleVertexLight(face, 1, 2);
         float[] light3 = lightSampler.sampleVertexLight(face, 1, 3);
         
-        // 4 vertices for the quad with atlas UVs, normal (0,-1,0) for bottom face, and light data
-        addVertex(x0, y0, z0, u0, v0, color, 0, -1, 0, light0[0], light0[1], light0[2], light0[3], light0[4]); // 0
-        addVertex(x1, y0, z0, u1, v0, color, 0, -1, 0, light1[0], light1[1], light1[2], light1[3], light1[4]); // 1
-        addVertex(x1, y0, z1, u1, v1, color, 0, -1, 0, light2[0], light2[1], light2[2], light2[3], light2[4]); // 2
-        addVertex(x0, y0, z1, u0, v1, color, 0, -1, 0, light3[0], light3[1], light3[2], light3[3], light3[4]); // 3
+        // 4 vertices for the quad with micro-inset UVs, normal (0,-1,0) for bottom face, and light data
+        addVertex(x0, y0, z0, uv[0], uv[1], color, 0, -1, 0, light0[0], light0[1], light0[2], light0[3], light0[4]); // 0
+        addVertex(x1, y0, z0, uv[2], uv[3], color, 0, -1, 0, light1[0], light1[1], light1[2], light1[3], light1[4]); // 1
+        addVertex(x1, y0, z1, uv[4], uv[5], color, 0, -1, 0, light2[0], light2[1], light2[2], light2[3], light2[4]); // 2
+        addVertex(x0, y0, z1, uv[6], uv[7], color, 0, -1, 0, light3[0], light3[1], light3[2], light3[3], light3[4]); // 3
         
         // 2 triangles (6 indices)
         addQuadIndices(baseVertex);
@@ -220,6 +228,10 @@ public class MeshBuilder {
             v1 = uvMapping.v1Shrunk;
         }
         
+        // Apply per-vertex UV micro-inset like Minecraft's FaceBakery
+        // Vertex UV order for south face: (u0,v1), (u1,v1), (u1,v0), (u0,v0)
+        float[] uv = applyUVMicroInset(u0, v1, u1, v1, u1, v0, u0, v0);
+        
         int baseVertex = currentVertex;
         
         // Sample light for each vertex
@@ -228,11 +240,11 @@ public class MeshBuilder {
         float[] light2 = lightSampler.sampleVertexLight(face, 3, 2);
         float[] light3 = lightSampler.sampleVertexLight(face, 3, 3);
         
-        // 4 vertices for the quad with atlas UVs, normal (0,0,1) for south face, and light data
-        addVertex(x0, y0, z1, u0, v1, color, 0, 0, 1, light0[0], light0[1], light0[2], light0[3], light0[4]); // 0
-        addVertex(x1, y0, z1, u1, v1, color, 0, 0, 1, light1[0], light1[1], light1[2], light1[3], light1[4]); // 1
-        addVertex(x1, y1, z1, u1, v0, color, 0, 0, 1, light2[0], light2[1], light2[2], light2[3], light2[4]); // 2
-        addVertex(x0, y1, z1, u0, v0, color, 0, 0, 1, light3[0], light3[1], light3[2], light3[3], light3[4]); // 3
+        // 4 vertices for the quad with micro-inset UVs, normal (0,0,1) for south face, and light data
+        addVertex(x0, y0, z1, uv[0], uv[1], color, 0, 0, 1, light0[0], light0[1], light0[2], light0[3], light0[4]); // 0
+        addVertex(x1, y0, z1, uv[2], uv[3], color, 0, 0, 1, light1[0], light1[1], light1[2], light1[3], light1[4]); // 1
+        addVertex(x1, y1, z1, uv[4], uv[5], color, 0, 0, 1, light2[0], light2[1], light2[2], light2[3], light2[4]); // 2
+        addVertex(x0, y1, z1, uv[6], uv[7], color, 0, 0, 1, light3[0], light3[1], light3[2], light3[3], light3[4]); // 3
         
         // 2 triangles (6 indices)
         addQuadIndices(baseVertex);
@@ -258,6 +270,10 @@ public class MeshBuilder {
             v1 = uvMapping.v1Shrunk;
         }
         
+        // Apply per-vertex UV micro-inset like Minecraft's FaceBakery
+        // Vertex UV order for west face: (u0,v1), (u1,v1), (u1,v0), (u0,v0)
+        float[] uv = applyUVMicroInset(u0, v1, u1, v1, u1, v0, u0, v0);
+        
         int baseVertex = currentVertex;
         
         // Sample light for each vertex
@@ -266,11 +282,11 @@ public class MeshBuilder {
         float[] light2 = lightSampler.sampleVertexLight(face, 4, 2);
         float[] light3 = lightSampler.sampleVertexLight(face, 4, 3);
         
-        // 4 vertices for the quad with atlas UVs, normal (-1,0,0) for west face, and light data
-        addVertex(x0, y0, z0, u0, v1, color, -1, 0, 0, light0[0], light0[1], light0[2], light0[3], light0[4]); // 0
-        addVertex(x0, y0, z1, u1, v1, color, -1, 0, 0, light1[0], light1[1], light1[2], light1[3], light1[4]); // 1
-        addVertex(x0, y1, z1, u1, v0, color, -1, 0, 0, light2[0], light2[1], light2[2], light2[3], light2[4]); // 2
-        addVertex(x0, y1, z0, u0, v0, color, -1, 0, 0, light3[0], light3[1], light3[2], light3[3], light3[4]); // 3
+        // 4 vertices for the quad with micro-inset UVs, normal (-1,0,0) for west face, and light data
+        addVertex(x0, y0, z0, uv[0], uv[1], color, -1, 0, 0, light0[0], light0[1], light0[2], light0[3], light0[4]); // 0
+        addVertex(x0, y0, z1, uv[2], uv[3], color, -1, 0, 0, light1[0], light1[1], light1[2], light1[3], light1[4]); // 1
+        addVertex(x0, y1, z1, uv[4], uv[5], color, -1, 0, 0, light2[0], light2[1], light2[2], light2[3], light2[4]); // 2
+        addVertex(x0, y1, z0, uv[6], uv[7], color, -1, 0, 0, light3[0], light3[1], light3[2], light3[3], light3[4]); // 3
         
         // 2 triangles (6 indices)
         addQuadIndices(baseVertex);
@@ -296,6 +312,10 @@ public class MeshBuilder {
             v1 = uvMapping.v1Shrunk;
         }
         
+        // Apply per-vertex UV micro-inset like Minecraft's FaceBakery
+        // Vertex UV order for east face: (u1,v1), (u0,v1), (u0,v0), (u1,v0)
+        float[] uv = applyUVMicroInset(u1, v1, u0, v1, u0, v0, u1, v0);
+        
         int baseVertex = currentVertex;
         
         // Sample light for each vertex
@@ -304,11 +324,11 @@ public class MeshBuilder {
         float[] light2 = lightSampler.sampleVertexLight(face, 5, 2);
         float[] light3 = lightSampler.sampleVertexLight(face, 5, 3);
         
-        // 4 vertices for the quad with atlas UVs, normal (1,0,0) for east face, and light data
-        addVertex(x1, y0, z1, u1, v1, color, 1, 0, 0, light0[0], light0[1], light0[2], light0[3], light0[4]); // 0
-        addVertex(x1, y0, z0, u0, v1, color, 1, 0, 0, light1[0], light1[1], light1[2], light1[3], light1[4]); // 1
-        addVertex(x1, y1, z0, u0, v0, color, 1, 0, 0, light2[0], light2[1], light2[2], light2[3], light2[4]); // 2
-        addVertex(x1, y1, z1, u1, v0, color, 1, 0, 0, light3[0], light3[1], light3[2], light3[3], light3[4]); // 3
+        // 4 vertices for the quad with micro-inset UVs, normal (1,0,0) for east face, and light data
+        addVertex(x1, y0, z1, uv[0], uv[1], color, 1, 0, 0, light0[0], light0[1], light0[2], light0[3], light0[4]); // 0
+        addVertex(x1, y0, z0, uv[2], uv[3], color, 1, 0, 0, light1[0], light1[1], light1[2], light1[3], light1[4]); // 1
+        addVertex(x1, y1, z0, uv[4], uv[5], color, 1, 0, 0, light2[0], light2[1], light2[2], light2[3], light2[4]); // 2
+        addVertex(x1, y1, z1, uv[6], uv[7], color, 1, 0, 0, light3[0], light3[1], light3[2], light3[3], light3[4]); // 3
         
         // 2 triangles (6 indices)
         addQuadIndices(baseVertex);
@@ -334,6 +354,10 @@ public class MeshBuilder {
             v1 = uvMapping.v1Shrunk;
         }
         
+        // Apply per-vertex UV micro-inset like Minecraft's FaceBakery
+        // Vertex UV order for north face: (u1,v1), (u0,v1), (u0,v0), (u1,v0)
+        float[] uv = applyUVMicroInset(u1, v1, u0, v1, u0, v0, u1, v0);
+        
         int baseVertex = currentVertex;
         
         // Sample light for each vertex
@@ -342,16 +366,45 @@ public class MeshBuilder {
         float[] light2 = lightSampler.sampleVertexLight(face, 2, 2);
         float[] light3 = lightSampler.sampleVertexLight(face, 2, 3);
         
-        // 4 vertices for the quad with atlas UVs, normal (0,0,-1) for north face, and light data
-        addVertex(x1, y0, z0, u1, v1, color, 0, 0, -1, light0[0], light0[1], light0[2], light0[3], light0[4]); // 0
-        addVertex(x0, y0, z0, u0, v1, color, 0, 0, -1, light1[0], light1[1], light1[2], light1[3], light1[4]); // 1
-        addVertex(x0, y1, z0, u0, v0, color, 0, 0, -1, light2[0], light2[1], light2[2], light2[3], light2[4]); // 2
-        addVertex(x1, y1, z0, u1, v0, color, 0, 0, -1, light3[0], light3[1], light3[2], light3[3], light3[4]); // 3
+        // 4 vertices for the quad with micro-inset UVs, normal (0,0,-1) for north face, and light data
+        addVertex(x1, y0, z0, uv[0], uv[1], color, 0, 0, -1, light0[0], light0[1], light0[2], light0[3], light0[4]); // 0
+        addVertex(x0, y0, z0, uv[2], uv[3], color, 0, 0, -1, light1[0], light1[1], light1[2], light1[3], light1[4]); // 1
+        addVertex(x0, y1, z0, uv[4], uv[5], color, 0, 0, -1, light2[0], light2[1], light2[2], light2[3], light2[4]); // 2
+        addVertex(x1, y1, z0, uv[6], uv[7], color, 0, 0, -1, light3[0], light3[1], light3[2], light3[3], light3[4]); // 3
         
         // 2 triangles (6 indices)
         addQuadIndices(baseVertex);
         
         currentVertex += 4;
+    }
+    
+    /**
+     * Apply per-vertex UV micro-inset like Minecraft's FaceBakery.
+     * Each vertex's UV is blended 99.9% toward itself and 0.1% toward the opposite corner.
+     * This prevents texture edge bleeding when distant mipmaps are sampled.
+     * 
+     * @param u0 Vertex 0 U coordinate
+     * @param v0 Vertex 0 V coordinate
+     * @param u1 Vertex 1 U coordinate
+     * @param v1 Vertex 1 V coordinate
+     * @param u2 Vertex 2 U coordinate
+     * @param v2 Vertex 2 V coordinate
+     * @param u3 Vertex 3 U coordinate
+     * @param v3 Vertex 3 V coordinate
+     * @return Output array with micro-inset UVs: [u0', v0', u1', v1', u2', v2', u3', v3']
+     */
+    private float[] applyUVMicroInset(float u0, float v0, float u1, float v1, float u2, float v2, float u3, float v3) {
+        // Each vertex blends 99.9% toward itself and 0.1% toward opposite corner
+        // Opposite corners: 0<->2, 1<->3
+        // Note: This allocates a small array per quad. While a reusable array could reduce GC pressure,
+        // the simplicity and thread-safety of returning a new array is preferred here since mesh building
+        // happens on background threads during chunk loading.
+        return new float[] {
+            u0 * UVMicroInset.MICRO_INSET + u2 * UVMicroInset.MICRO_BLEND, v0 * UVMicroInset.MICRO_INSET + v2 * UVMicroInset.MICRO_BLEND,  // Vertex 0
+            u1 * UVMicroInset.MICRO_INSET + u3 * UVMicroInset.MICRO_BLEND, v1 * UVMicroInset.MICRO_INSET + v3 * UVMicroInset.MICRO_BLEND,  // Vertex 1
+            u2 * UVMicroInset.MICRO_INSET + u0 * UVMicroInset.MICRO_BLEND, v2 * UVMicroInset.MICRO_INSET + v0 * UVMicroInset.MICRO_BLEND,  // Vertex 2
+            u3 * UVMicroInset.MICRO_INSET + u1 * UVMicroInset.MICRO_BLEND, v3 * UVMicroInset.MICRO_INSET + v1 * UVMicroInset.MICRO_BLEND   // Vertex 3
+        };
     }
     
     /**

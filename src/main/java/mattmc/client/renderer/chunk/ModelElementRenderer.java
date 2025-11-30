@@ -351,12 +351,21 @@ public class ModelElementRenderer {
             faceVerts[i] = FaceVertexCalculator.getFaceVertexCorner(faceDirection, i, x0, y0, z0, x1, y1, z1);
         }
         
-        // Add 4 vertices for the quad
+        // Build UV coordinates array for the 4 vertices
+        // Vertex order: (u0,v0), (u0,v1), (u1,v1), (u1,v0)
+        float[][] uvCoords = {
+            {u0, v0}, {u0, v1}, {u1, v1}, {u1, v0}
+        };
+        
+        // Apply per-vertex UV micro-inset like Minecraft's FaceBakery
+        applyUVMicroInset(uvCoords);
+        
+        // Add 4 vertices for the quad with micro-inset UVs
         int baseVertex = currentVertex;
-        addVertex(vertices, faceVerts[0], u0, v0, normal, light0);
-        addVertex(vertices, faceVerts[1], u0, v1, normal, light1);
-        addVertex(vertices, faceVerts[2], u1, v1, normal, light2);
-        addVertex(vertices, faceVerts[3], u1, v0, normal, light3);
+        addVertex(vertices, faceVerts[0], uvCoords[0][0], uvCoords[0][1], normal, light0);
+        addVertex(vertices, faceVerts[1], uvCoords[1][0], uvCoords[1][1], normal, light1);
+        addVertex(vertices, faceVerts[2], uvCoords[2][0], uvCoords[2][1], normal, light2);
+        addVertex(vertices, faceVerts[3], uvCoords[3][0], uvCoords[3][1], normal, light3);
         
         // Add 2 triangles (6 indices)
         indices.add(baseVertex);
@@ -407,6 +416,11 @@ public class ModelElementRenderer {
         // Rotation is applied counter-clockwise: 0°, 90°, 180°, 270°
         float[][] uvCoords = UVTransformer.getRotatedUVCoordinates(u0, v0, u1, v1, faceRotation);
         
+        // Apply per-vertex UV micro-inset like Minecraft's FaceBakery (lines 139-140)
+        // Each vertex UV is blended 99.9% toward itself and 0.1% toward the opposite corner
+        // This prevents texture edge bleeding at distant mipmap levels
+        applyUVMicroInset(uvCoords);
+        
         // Add 4 vertices for the quad with rotated UV assignment
         int baseVertex = currentVertex;
         addVertex(vertices, faceVerts[0], uvCoords[0][0], uvCoords[0][1], normal, light0);
@@ -456,6 +470,32 @@ public class ModelElementRenderer {
         vertices.add(light[2]);
         vertices.add(light[3]);
         vertices.add(light[4]);
+    }
+    
+    /**
+     * Apply per-vertex UV micro-inset in-place like Minecraft's FaceBakery.
+     * Each vertex's UV is blended 99.9% toward itself and 0.1% toward the opposite corner.
+     * This prevents texture edge bleeding when distant mipmaps are sampled.
+     * 
+     * @param uvCoords UV coordinates array [[u,v], [u,v], [u,v], [u,v]] for vertices 0-3
+     *                 Modified in place.
+     */
+    private void applyUVMicroInset(float[][] uvCoords) {
+        // Opposite corners: 0<->2, 1<->3
+        float u0 = uvCoords[0][0], v0 = uvCoords[0][1];
+        float u1 = uvCoords[1][0], v1 = uvCoords[1][1];
+        float u2 = uvCoords[2][0], v2 = uvCoords[2][1];
+        float u3 = uvCoords[3][0], v3 = uvCoords[3][1];
+        
+        // Blend each vertex 99.9% toward itself and 0.1% toward opposite corner
+        uvCoords[0][0] = u0 * UVMicroInset.MICRO_INSET + u2 * UVMicroInset.MICRO_BLEND;
+        uvCoords[0][1] = v0 * UVMicroInset.MICRO_INSET + v2 * UVMicroInset.MICRO_BLEND;
+        uvCoords[1][0] = u1 * UVMicroInset.MICRO_INSET + u3 * UVMicroInset.MICRO_BLEND;
+        uvCoords[1][1] = v1 * UVMicroInset.MICRO_INSET + v3 * UVMicroInset.MICRO_BLEND;
+        uvCoords[2][0] = u2 * UVMicroInset.MICRO_INSET + u0 * UVMicroInset.MICRO_BLEND;
+        uvCoords[2][1] = v2 * UVMicroInset.MICRO_INSET + v0 * UVMicroInset.MICRO_BLEND;
+        uvCoords[3][0] = u3 * UVMicroInset.MICRO_INSET + u1 * UVMicroInset.MICRO_BLEND;
+        uvCoords[3][1] = v3 * UVMicroInset.MICRO_INSET + v1 * UVMicroInset.MICRO_BLEND;
     }
     
 }
