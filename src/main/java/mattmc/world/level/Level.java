@@ -244,6 +244,10 @@ public class Level implements LevelAccessor {
             
             // Process any deferred light updates for this chunk
             worldLightManager.processDeferredUpdates(chunk);
+            
+            // Propagate light from neighboring chunks into this newly loaded chunk
+            // This is needed because deferred updates are lost when the world is reloaded
+            worldLightManager.propagateLightFromNeighbors(chunk);
         }
         
         return chunk;
