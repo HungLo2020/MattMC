@@ -323,7 +323,7 @@ public class UIRenderLogic {
                                       CommandBuffer buffer) {
         buildDebugInfoCommands(screenWidth, screenHeight, playerX, playerY, playerZ, 
                                yaw, pitch, roll, fps, loadedChunks, pendingChunks, 
-                               activeWorkers, renderedChunks, culledChunks, null, null, buffer);
+                               activeWorkers, renderedChunks, culledChunks, null, null, 0L, buffer);
     }
     
     /**
@@ -354,6 +354,42 @@ public class UIRenderLogic {
                                       int renderedChunks, int culledChunks,
                                       String defaultGamemode, String playerGamemode,
                                       CommandBuffer buffer) {
+        buildDebugInfoCommands(screenWidth, screenHeight, playerX, playerY, playerZ, 
+                               yaw, pitch, roll, fps, loadedChunks, pendingChunks, 
+                               activeWorkers, renderedChunks, culledChunks, 
+                               defaultGamemode, playerGamemode, 0L, buffer);
+    }
+    
+    /**
+     * Build commands for debug info rendering with gamemode info and world seed.
+     * 
+     * @param screenWidth screen width
+     * @param screenHeight screen height
+     * @param playerX player X position
+     * @param playerY player Y position
+     * @param playerZ player Z position
+     * @param yaw camera yaw
+     * @param pitch camera pitch
+     * @param roll camera roll
+     * @param fps frames per second
+     * @param loadedChunks number of loaded chunks
+     * @param pendingChunks number of pending chunks
+     * @param activeWorkers number of active workers
+     * @param renderedChunks number of rendered chunks
+     * @param culledChunks number of culled chunks
+     * @param defaultGamemode the world's default gamemode (can be null)
+     * @param playerGamemode the player's current gamemode (can be null)
+     * @param seed the world seed
+     * @param buffer command buffer
+     */
+    public void buildDebugInfoCommands(int screenWidth, int screenHeight, 
+                                      float playerX, float playerY, float playerZ,
+                                      float yaw, float pitch, float roll, double fps,
+                                      int loadedChunks, int pendingChunks, int activeWorkers,
+                                      int renderedChunks, int culledChunks,
+                                      String defaultGamemode, String playerGamemode,
+                                      long seed,
+                                      CommandBuffer buffer) {
         float x = 10f;
         float y = 10f;
         float lineHeight = 20f;
@@ -361,7 +397,7 @@ public class UIRenderLogic {
         int color = 0xFFFFFF;
         
         // Build all debug text lines
-        int numLines = (defaultGamemode != null && playerGamemode != null) ? 10 : 9;
+        int numLines = (defaultGamemode != null && playerGamemode != null) ? 11 : 10;
         String[] lines = new String[numLines];
         lines[0] = "MattMC: " + mattmc.client.main.Main.VERSION + ": Debug Screen";
         lines[1] = String.format("FPS: %.0f", fps);
@@ -382,10 +418,11 @@ public class UIRenderLogic {
         lines[6] = String.format("Loaded Chunks: %d", loadedChunks);
         lines[7] = String.format("Pending: %d | Workers: %d", pendingChunks, activeWorkers);
         lines[8] = String.format("Rendered: %d | Culled: %d", renderedChunks, culledChunks);
+        lines[9] = String.format("Seed: %d", seed);
         
         // Add gamemode info if provided
         if (defaultGamemode != null && playerGamemode != null) {
-            lines[9] = String.format("DefaultGamemode: %s, Gamemode: %s", defaultGamemode, playerGamemode);
+            lines[10] = String.format("DefaultGamemode: %s, Gamemode: %s", defaultGamemode, playerGamemode);
         }
         
         // Create draw command for each line

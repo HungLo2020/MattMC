@@ -24,9 +24,9 @@ public class DebugInfoRendererTest {
         logic.buildDebugInfoCommands(800, 600, 100f, 64f, 200f, 
             45f, 30f, 0f, 60.0, 10, 2, 4, 8, 2, buffer);
         
-        // Should create commands for all debug text lines (9 lines)
+        // Should create commands for all debug text lines (10 lines with seed)
         assertFalse(buffer.getCommands().isEmpty(), "Should build debug info commands");
-        assertTrue(buffer.getCommands().size() >= 9, "Should have commands for all 9 debug lines");
+        assertTrue(buffer.getCommands().size() >= 10, "Should have commands for all 10 debug lines");
     }
     
     @Test
