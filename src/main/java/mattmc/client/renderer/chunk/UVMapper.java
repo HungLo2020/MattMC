@@ -3,7 +3,7 @@ package mattmc.client.renderer.chunk;
 import mattmc.util.ColorUtils;
 import mattmc.client.renderer.block.BlockFaceCollector;
 import mattmc.client.renderer.texture.TextureCoordinateProvider;
-import mattmc.world.level.block.Blocks;
+import mattmc.registries.Blocks;
 import mattmc.world.level.block.LeavesBlock;
 
 /**

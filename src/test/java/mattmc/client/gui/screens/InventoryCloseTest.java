@@ -2,7 +2,7 @@ package mattmc.client.gui.screens;
 
 import mattmc.world.item.Inventory;
 import mattmc.world.item.ItemStack;
-import mattmc.world.item.Items;
+import mattmc.registries.Items;
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 

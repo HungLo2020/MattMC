@@ -1,11 +1,9 @@
-package mattmc.world.level.block;
+package mattmc.registries;
 
 import mattmc.util.Validate;
+import mattmc.world.level.block.*;
 
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 
 /**
  * Central registry for all blocks in the game.

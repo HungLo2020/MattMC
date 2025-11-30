@@ -1,6 +1,6 @@
 package mattmc.client.particle;
 
-import mattmc.core.particles.ParticleTypes;
+import mattmc.registries.ParticleTypes;
 import mattmc.core.particles.SimpleParticleType;
 import mattmc.util.ResourceLocation;
 import org.junit.jupiter.api.Test;

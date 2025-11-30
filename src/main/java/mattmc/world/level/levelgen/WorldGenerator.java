@@ -133,14 +133,14 @@ public class WorldGenerator {
                     if (worldY == terrainHeight) {
                         // Surface block - grass above sea level, sand/dirt below
                         if (terrainHeight >= SEA_LEVEL) {
-                            block = mattmc.world.level.block.Blocks.GRASS_BLOCK;
+                            block = mattmc.registries.Blocks.GRASS_BLOCK;
                         } else {
-                            block = mattmc.world.level.block.Blocks.DIRT;
+                            block = mattmc.registries.Blocks.DIRT;
                         }
                     } else if (worldY >= terrainHeight - 3) {
-                        block = mattmc.world.level.block.Blocks.DIRT;
+                        block = mattmc.registries.Blocks.DIRT;
                     } else {
-                        block = mattmc.world.level.block.Blocks.STONE;
+                        block = mattmc.registries.Blocks.STONE;
                     }
                     
                     chunk.setBlock(localX, chunkY, localZ, block);

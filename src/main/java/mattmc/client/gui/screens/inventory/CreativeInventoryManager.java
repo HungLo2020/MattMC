@@ -35,9 +35,9 @@ public class CreativeInventoryManager {
     private void initializeItems() {
         allItems.clear();
         // Ensure creative mode tabs are initialized
-        mattmc.world.item.CreativeModeTabs.init();
+        mattmc.registries.CreativeModeTabs.init();
         // Get all unique items from creative tabs
-        allItems.addAll(mattmc.world.item.CreativeTabs.getAllUniqueItems());
+        allItems.addAll(mattmc.registries.CreativeTabs.getAllUniqueItems());
     }
     
     /**

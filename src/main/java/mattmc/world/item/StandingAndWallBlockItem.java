@@ -46,7 +46,7 @@ public class StandingAndWallBlockItem extends BlockItem {
      * @param maxStackSize Maximum stack size
      * @param identifier The item identifier
      */
-    StandingAndWallBlockItem(Block standingBlock, Block wallBlock, int maxStackSize, String identifier) {
+    public StandingAndWallBlockItem(Block standingBlock, Block wallBlock, int maxStackSize, String identifier) {
         super(standingBlock, maxStackSize, identifier);
         this.standingBlock = standingBlock;
         this.wallBlock = wallBlock;

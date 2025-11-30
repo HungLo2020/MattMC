@@ -1,12 +1,8 @@
-package mattmc.world.item;
+package mattmc.registries;
 
-import mattmc.world.level.block.Block;
-import mattmc.world.level.block.Blocks;
+import mattmc.world.item.*;
 
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 
 /**
  * Central registry for all items in the game.

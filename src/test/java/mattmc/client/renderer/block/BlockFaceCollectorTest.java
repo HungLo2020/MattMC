@@ -1,7 +1,7 @@
 package mattmc.client.renderer.block;
 
 import mattmc.world.level.block.Block;
-import mattmc.world.level.block.Blocks;
+import mattmc.registries.Blocks;
 import mattmc.world.level.chunk.LevelChunk;
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;

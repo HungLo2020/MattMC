@@ -1,7 +1,7 @@
 package mattmc.world.level.lighting;
 
 import mattmc.world.level.Level;
-import mattmc.world.level.block.Blocks;
+import mattmc.registries.Blocks;
 import mattmc.world.level.chunk.LevelChunk;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;

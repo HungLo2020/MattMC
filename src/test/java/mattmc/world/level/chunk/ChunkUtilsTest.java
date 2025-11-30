@@ -1,6 +1,6 @@
 package mattmc.world.level.chunk;
 
-import mattmc.world.level.block.Blocks;
+import mattmc.registries.Blocks;
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
 

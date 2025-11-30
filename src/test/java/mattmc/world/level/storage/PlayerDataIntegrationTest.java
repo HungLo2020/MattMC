@@ -3,7 +3,7 @@ package mattmc.world.level.storage;
 import mattmc.world.Gamemode;
 import mattmc.world.item.Inventory;
 import mattmc.world.item.ItemStack;
-import mattmc.world.item.Items;
+import mattmc.registries.Items;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 

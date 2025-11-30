@@ -1,6 +1,6 @@
 package mattmc.performance;
 
-import mattmc.world.level.block.Blocks;
+import mattmc.registries.Blocks;
 import mattmc.world.level.chunk.LevelChunk;
 import mattmc.world.level.lighting.LightPropagator;
 import mattmc.world.level.lighting.SkylightEngine;

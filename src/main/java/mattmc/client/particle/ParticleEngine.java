@@ -5,7 +5,7 @@ import com.google.gson.GsonBuilder;
 import com.google.gson.JsonObject;
 import mattmc.core.particles.ParticleOptions;
 import mattmc.core.particles.ParticleType;
-import mattmc.core.particles.ParticleTypes;
+import mattmc.registries.ParticleTypes;
 import mattmc.util.ResourceLocation;
 import mattmc.world.level.Level;
 import org.slf4j.Logger;
@@ -141,7 +141,7 @@ public class ParticleEngine {
      * Load a single particle definition and bind its sprites.
      */
     private void loadParticleDefinition(ResourceLocation particleId) {
-        String jsonPath = "/assets/" + particleId.getNamespace() + "/particles/" + particleId.getPath() + ".json";
+        String jsonPath = "/assets/particles/" + particleId.getPath() + ".json";
         
         try (InputStream is = getClass().getResourceAsStream(jsonPath)) {
             if (is == null) {

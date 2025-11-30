@@ -2,7 +2,7 @@ package mattmc.world.level.lighting;
 
 import mattmc.world.level.Level;
 import mattmc.world.level.block.Block;
-import mattmc.world.level.block.Blocks;
+import mattmc.registries.Blocks;
 import mattmc.world.level.chunk.LevelChunk;
 
 import java.io.IOException;

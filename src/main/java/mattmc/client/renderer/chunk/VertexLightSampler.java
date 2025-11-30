@@ -2,7 +2,7 @@ package mattmc.client.renderer.chunk;
 
 import mattmc.client.renderer.block.BlockFaceCollector;
 import mattmc.world.level.block.Block;
-import mattmc.world.level.block.Blocks;
+import mattmc.registries.Blocks;
 import mattmc.world.level.chunk.LevelChunk;
 
 /**

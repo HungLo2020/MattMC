@@ -123,7 +123,7 @@ public class ParticleAtlasBuilder {
      * Load the atlas configuration from atlases/particles.json.
      */
     private static AtlasConfig loadAtlasConfig() {
-        String configPath = "/assets/" + DEFAULT_NAMESPACE + "/atlases/particles.json";
+        String configPath = "/assets/atlases/particles.json";
         try (InputStream is = ParticleAtlasBuilder.class.getResourceAsStream(configPath)) {
             if (is != null) {
                 JsonObject json = GSON.fromJson(new InputStreamReader(is, StandardCharsets.UTF_8), JsonObject.class);
@@ -158,7 +158,7 @@ public class ParticleAtlasBuilder {
     private static void collectFromDirectory(Map<ResourceLocation, BufferedImage> textures, 
                                              String sourceDir, String prefix) {
         // Scan the textures/particle directory for .png files
-        String basePath = "/assets/" + DEFAULT_NAMESPACE + "/textures/" + sourceDir;
+        String basePath = "/assets/textures/" + sourceDir;
         
         // Get list of files in the directory
         List<String> files = listResourceFiles(basePath, ".png");

@@ -298,7 +298,7 @@ public class AmbientOcclusion {
     private Block getBlockSafe(LevelChunk chunk, int x, int y, int z) {
         // Check Y bounds
         if (y < 0 || y >= LevelChunk.HEIGHT) {
-            return mattmc.world.level.block.Blocks.AIR;
+            return mattmc.registries.Blocks.AIR;
         }
         
         // If within chunk bounds, use direct access
@@ -312,7 +312,7 @@ public class AmbientOcclusion {
         }
         
         // No accessor - return air (no occlusion at chunk edges)
-        return mattmc.world.level.block.Blocks.AIR;
+        return mattmc.registries.Blocks.AIR;
     }
     
     /**
