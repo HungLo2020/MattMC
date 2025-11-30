@@ -154,6 +154,7 @@ public class TextureAtlas implements TextureCoordinateProvider, AutoCloseable {
 					// This prevents texture bleeding when mipmaps are enabled.
 					// atlasSize() = textureSize / (u1 - u0) = textureSize / (textureSize / atlasWidth) = atlasWidth
 					// This is mathematically equivalent to Minecraft's TextureAtlasSprite.atlasSize() calculation.
+					// Note: Our atlas is always square (see line 111), so Math.max() is safe.
 					float atlasSize = Math.max(atlasWidth, atlasHeight);
 					float uvShrinkRatio = 4.0f / atlasSize;
 					
