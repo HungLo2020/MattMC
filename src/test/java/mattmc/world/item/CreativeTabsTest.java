@@ -1,4 +1,7 @@
 package mattmc.world.item;
+import mattmc.registries.Blocks;
+import mattmc.registries.Items;
+import mattmc.registries.CreativeTabs;
 
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;

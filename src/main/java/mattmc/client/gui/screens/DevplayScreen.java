@@ -336,7 +336,7 @@ public final class DevplayScreen implements Screen {
             new mattmc.client.particle.FallingLeavesParticle.ColoredProvider(sprites, red, green, blue);
         
         mattmc.client.particle.Particle particle = provider.createParticle(
-            mattmc.core.particles.ParticleTypes.FALLING_LEAVES, world, x, y, z, xSpeed, ySpeed, zSpeed);
+            mattmc.registries.ParticleTypes.FALLING_LEAVES, world, x, y, z, xSpeed, ySpeed, zSpeed);
         
         if (particle != null) {
             particleEngine.add(particle);
@@ -350,15 +350,15 @@ public final class DevplayScreen implements Screen {
     private mattmc.core.particles.ParticleOptions getParticleOptions(String particleType) {
         switch (particleType) {
             case "smoke":
-                return mattmc.core.particles.ParticleTypes.SMOKE;
+                return mattmc.registries.ParticleTypes.SMOKE;
             case "flame":
-                return mattmc.core.particles.ParticleTypes.FLAME;
+                return mattmc.registries.ParticleTypes.FLAME;
             case "cherry_leaves":
-                return mattmc.core.particles.ParticleTypes.CHERRY_LEAVES;
+                return mattmc.registries.ParticleTypes.CHERRY_LEAVES;
             case "falling_leaves":
-                return mattmc.core.particles.ParticleTypes.FALLING_LEAVES;
+                return mattmc.registries.ParticleTypes.FALLING_LEAVES;
             case "poof":
-                return mattmc.core.particles.ParticleTypes.POOF;
+                return mattmc.registries.ParticleTypes.POOF;
             default:
                 logger.debug("Unknown particle type: {}", particleType);
                 return null;
@@ -375,17 +375,17 @@ public final class DevplayScreen implements Screen {
         particleEngine.setParticleAtlas(atlas);
         
         // Register particle providers (sprite-based)
-        particleEngine.register(mattmc.core.particles.ParticleTypes.SMOKE, 
+        particleEngine.register(mattmc.registries.ParticleTypes.SMOKE, 
             mattmc.client.particle.SmokeParticle.Provider::new);
-        particleEngine.register(mattmc.core.particles.ParticleTypes.FLAME, 
+        particleEngine.register(mattmc.registries.ParticleTypes.FLAME, 
             mattmc.client.particle.FlameParticle.Provider::new);
-        particleEngine.register(mattmc.core.particles.ParticleTypes.POOF, 
+        particleEngine.register(mattmc.registries.ParticleTypes.POOF, 
             mattmc.client.particle.PoofParticle.Provider::new);
-        particleEngine.register(mattmc.core.particles.ParticleTypes.CHERRY_LEAVES, 
+        particleEngine.register(mattmc.registries.ParticleTypes.CHERRY_LEAVES, 
             mattmc.client.particle.CherryParticle.Provider::new);
         // Register falling_leaves with default white color. Actual tinting is done dynamically
         // via spawnTinted() in animateBlockTick() using the block's RGB values.
-        particleEngine.register(mattmc.core.particles.ParticleTypes.FALLING_LEAVES, 
+        particleEngine.register(mattmc.registries.ParticleTypes.FALLING_LEAVES, 
             sprites -> new mattmc.client.particle.FallingLeavesParticle.ColoredProvider(sprites, 1.0f, 1.0f, 1.0f));
         
         // Load particle definitions (binds textures to sprite sets)

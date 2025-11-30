@@ -1,4 +1,4 @@
-package mattmc.world.item;
+package mattmc.registries;
 
 /**
  * Initializes all creative mode tabs and assigns items to them.

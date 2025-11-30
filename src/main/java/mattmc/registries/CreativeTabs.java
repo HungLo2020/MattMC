@@ -1,4 +1,6 @@
-package mattmc.world.item;
+package mattmc.registries;
+
+import mattmc.world.item.*;
 
 import java.util.*;
 

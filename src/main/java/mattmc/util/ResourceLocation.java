@@ -114,12 +114,15 @@ public class ResourceLocation implements Comparable<ResourceLocation> {
     /**
      * Convert to a file path for loading resources.
      * 
-     * @param prefix prefix to prepend (e.g., "assets/")
+     * <p>The namespace is not included in the file path since resources are organized
+     * directly under assets/ without namespace subdirectories.
+     * 
+     * @param prefix prefix to prepend (e.g., "/assets/")
      * @param suffix suffix to append (e.g., ".json" or ".png")
      * @return the full file path
      */
     public String toFilePath(String prefix, String suffix) {
-        return prefix + namespace + "/" + path + suffix;
+        return prefix + path + suffix;
     }
     
     @Override

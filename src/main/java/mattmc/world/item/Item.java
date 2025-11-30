@@ -43,7 +43,7 @@ public class Item {
     /**
      * Internal constructor used during registration to set the identifier.
      */
-    Item(int maxStackSize, String identifier) {
+    public Item(int maxStackSize, String identifier) {
         this.maxStackSize = maxStackSize;
         this.identifier = identifier;
     }

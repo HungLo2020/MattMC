@@ -2,7 +2,7 @@ package mattmc.world.level.chunk;
 
 import mattmc.world.level.LevelAccessor;
 import mattmc.world.level.block.Block;
-import mattmc.world.level.block.Blocks;
+import mattmc.registries.Blocks;
 
 /**
  * Represents a 32x32 region of chunks (512x512 blocks horizontally).

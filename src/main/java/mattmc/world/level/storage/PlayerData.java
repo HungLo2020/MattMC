@@ -5,7 +5,7 @@ import mattmc.world.Gamemode;
 import mattmc.world.item.Inventory;
 import mattmc.world.item.Item;
 import mattmc.world.item.ItemStack;
-import mattmc.world.item.Items;
+import mattmc.registries.Items;
 
 import java.io.IOException;
 import java.io.InputStream;

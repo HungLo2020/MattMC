@@ -3,7 +3,7 @@ package mattmc.world.level.lighting;
 import mattmc.client.renderer.block.BlockFaceCollector;
 import mattmc.client.renderer.chunk.VertexLightSampler;
 import mattmc.world.level.block.Block;
-import mattmc.world.level.block.Blocks;
+import mattmc.registries.Blocks;
 import mattmc.world.level.chunk.LevelChunk;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;

@@ -1,6 +1,7 @@
 package mattmc.world.level.block;
 
 import mattmc.client.resources.ResourceManager;
+import mattmc.registries.Blocks;
 import mattmc.world.level.Level;
 import mattmc.world.phys.shapes.VoxelShape;
 import mattmc.util.MathUtils;

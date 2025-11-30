@@ -1,6 +1,6 @@
 package mattmc.world.level.lighting;
 
-import mattmc.world.level.block.Blocks;
+import mattmc.registries.Blocks;
 import mattmc.world.level.chunk.LevelChunk;
 import mattmc.client.renderer.block.BlockFaceCollector;
 import mattmc.client.renderer.chunk.VertexLightSampler;

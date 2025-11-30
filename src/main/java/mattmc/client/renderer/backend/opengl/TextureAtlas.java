@@ -6,7 +6,7 @@ import mattmc.client.resources.metadata.animation.AnimationMetadataSection;
 import mattmc.client.resources.metadata.animation.FrameSize;
 import mattmc.client.settings.OptionsManager;
 import mattmc.world.level.block.Block;
-import mattmc.world.level.block.Blocks;
+import mattmc.registries.Blocks;
 import org.lwjgl.BufferUtils;
 
 import javax.imageio.ImageIO;

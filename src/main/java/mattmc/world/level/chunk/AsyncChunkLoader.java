@@ -7,7 +7,7 @@ import mattmc.client.renderer.chunk.VertexLightSampler;
 import mattmc.client.renderer.backend.opengl.TextureAtlas;
 import mattmc.client.renderer.block.BlockFaceCollector;
 import mattmc.world.level.block.Block;
-import mattmc.world.level.block.Blocks;
+import mattmc.registries.Blocks;
 import mattmc.world.level.levelgen.WorldGenerator;
 import mattmc.world.level.lighting.WorldLightManager;
 import org.slf4j.Logger;

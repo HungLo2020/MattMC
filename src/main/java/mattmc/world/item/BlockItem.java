@@ -39,7 +39,7 @@ public class BlockItem extends Item {
      * @param maxStackSize Maximum stack size
      * @param identifier The item identifier
      */
-    BlockItem(Block block, int maxStackSize, String identifier) {
+    public BlockItem(Block block, int maxStackSize, String identifier) {
         super(maxStackSize, identifier);
         this.block = block;
     }

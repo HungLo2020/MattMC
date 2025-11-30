@@ -1,6 +1,6 @@
 package mattmc.world.entity.player;
 
-import mattmc.world.level.block.Blocks;
+import mattmc.registries.Blocks;
 
 import mattmc.world.level.block.Block;
 import mattmc.world.level.chunk.LevelChunk;

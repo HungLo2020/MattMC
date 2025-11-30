@@ -1,6 +1,6 @@
 package mattmc.performance;
 
-import mattmc.world.level.block.Blocks;
+import mattmc.registries.Blocks;
 import mattmc.world.level.chunk.LevelChunk;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;

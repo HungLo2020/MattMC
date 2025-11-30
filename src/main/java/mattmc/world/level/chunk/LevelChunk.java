@@ -1,7 +1,7 @@
 package mattmc.world.level.chunk;
 
 import mattmc.world.level.block.Block;
-import mattmc.world.level.block.Blocks;
+import mattmc.registries.Blocks;
 import mattmc.world.level.block.state.BlockState;
 
 import java.util.HashMap;

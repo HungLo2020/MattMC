@@ -1,7 +1,7 @@
 package mattmc.world.level;
 
 import mattmc.world.level.block.Block;
-import mattmc.world.level.block.Blocks;
+import mattmc.registries.Blocks;
 import mattmc.world.level.block.state.BlockState;
 import mattmc.world.level.chunk.ChunkManager;
 import mattmc.world.level.chunk.LevelChunk;

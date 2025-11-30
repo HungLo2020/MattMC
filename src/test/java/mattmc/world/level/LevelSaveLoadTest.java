@@ -1,6 +1,6 @@
 package mattmc.world.level;
 
-import mattmc.world.level.block.Blocks;
+import mattmc.registries.Blocks;
 import mattmc.world.level.chunk.LevelChunk;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;

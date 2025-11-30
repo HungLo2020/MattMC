@@ -1,4 +1,5 @@
 package mattmc.world.item;
+import mattmc.registries.Items;
 
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.BeforeEach;
