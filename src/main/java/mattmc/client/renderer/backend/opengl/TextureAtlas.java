@@ -277,36 +277,53 @@ public class TextureAtlas implements TextureCoordinateProvider, AutoCloseable {
 	}
 	
 	/**
-	 * Create an OpenGL texture from a BufferedImage.
+	 * Create an OpenGL texture from a BufferedImage with gamma-correct mipmaps.
+	 * 
+	 * Uses Minecraft's mipmap generation algorithm for proper sRGB color blending.
 	 */
 	private int createGLTexture(BufferedImage image) {
-		int width = image.getWidth();
-		int height = image.getHeight();
+		int mipmapLevel = OptionsManager.getMipmapLevel();
 		
-		// Convert image to ByteBuffer
-		int[] pixels = new int[width * height];
-		image.getRGB(0, 0, width, height, pixels, 0, width);
-		
-		ByteBuffer buffer = BufferUtils.createByteBuffer(width * height * 4);
-		for (int y = 0; y < height; y++) {
-			for (int x = 0; x < width; x++) {
-				int pixel = pixels[y * width + x];
-				buffer.put((byte) ((pixel >> 16) & 0xFF)); // Red
-				buffer.put((byte) ((pixel >> 8) & 0xFF));  // Green
-				buffer.put((byte) (pixel & 0xFF));         // Blue
-				buffer.put((byte) ((pixel >> 24) & 0xFF)); // Alpha
-			}
-		}
-		buffer.flip();
+		// Generate gamma-correct mipmaps like Minecraft
+		BufferedImage[] mipLevels = 
+			mattmc.client.renderer.texture.MipmapGenerator.generateMipLevels(image, mipmapLevel);
 		
 		// Generate texture ID
 		int textureID = glGenTextures();
 		glBindTexture(GL_TEXTURE_2D, textureID);
 		
-		// Upload texture data
-		glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, buffer);
+		// Set max mipmap level parameter before uploading
+		if (mipmapLevel > 0) {
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, Math.min(mipmapLevel, mipLevels.length - 1));
+		}
 		
-		// Apply texture filtering including mipmaps (atlas is now power-of-2 and uses transparent fill)
+		// Upload each mipmap level
+		for (int level = 0; level < mipLevels.length; level++) {
+			BufferedImage mipImage = mipLevels[level];
+			int width = mipImage.getWidth();
+			int height = mipImage.getHeight();
+			
+			// Convert image to ByteBuffer
+			int[] pixels = new int[width * height];
+			mipImage.getRGB(0, 0, width, height, pixels, 0, width);
+			
+			ByteBuffer buffer = BufferUtils.createByteBuffer(width * height * 4);
+			for (int y = 0; y < height; y++) {
+				for (int x = 0; x < width; x++) {
+					int pixel = pixels[y * width + x];
+					buffer.put((byte) ((pixel >> 16) & 0xFF)); // Red
+					buffer.put((byte) ((pixel >> 8) & 0xFF));  // Green
+					buffer.put((byte) (pixel & 0xFF));         // Blue
+					buffer.put((byte) ((pixel >> 24) & 0xFF)); // Alpha
+				}
+			}
+			buffer.flip();
+			
+			// Upload this mipmap level
+			glTexImage2D(GL_TEXTURE_2D, level, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, buffer);
+		}
+		
+		// Apply texture filtering settings (no longer generates mipmaps, just sets filter params)
 		TextureManager.applyTextureFiltering(true);
 		
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
@@ -460,6 +477,10 @@ public class TextureAtlas implements TextureCoordinateProvider, AutoCloseable {
 		}
 		
 		// Regenerate mipmaps once after all updates (more efficient than per-texture)
+		// Note: We use glGenerateMipmap here for animated textures for performance reasons.
+		// The gamma-correct software mipmap generation is used for static textures at load time,
+		// but for animated frame updates that happen every tick, the hardware-generated mipmaps
+		// are acceptable since animated regions are typically small and the visual impact is minimal.
 		if (anyChanged) {
 			glGenerateMipmap(GL_TEXTURE_2D);
 		}

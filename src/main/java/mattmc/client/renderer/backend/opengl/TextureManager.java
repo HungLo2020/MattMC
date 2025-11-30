@@ -48,7 +48,10 @@ public class TextureManager {
     
     /**
      * Apply texture filtering settings (mipmaps and anisotropic filtering) to the currently bound texture.
-     * This should be called after glTexImage2D and before unbinding the texture.
+     * This should be called after mipmap levels are uploaded and before unbinding the texture.
+     * 
+     * <p><b>Note:</b> This method no longer generates mipmaps - use {@link #uploadWithMipmaps} 
+     * for proper gamma-correct mipmap generation like Minecraft.
      * 
      * @param useMipmaps Whether to use mipmap filtering (for block textures use GL_NEAREST, for UI use GL_LINEAR)
      */
@@ -56,8 +59,6 @@ public class TextureManager {
         int mipmapLevel = OptionsManager.getMipmapLevel();
         
         if (mipmapLevel > 0 && useMipmaps) {
-            // Generate mipmaps
-            glGenerateMipmap(GL_TEXTURE_2D);
             // Use mipmap filtering (NEAREST for block textures to maintain pixelated look)
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST_MIPMAP_LINEAR);
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
@@ -89,27 +90,40 @@ public class TextureManager {
     }
     
     /**
-     * Load a texture from resources and return its OpenGL texture ID.
-     * Textures are cached to avoid reloading.
+     * Upload a texture with gamma-correct software-generated mipmaps.
+     * 
+     * <p>This method uses Minecraft's mipmap generation algorithm which performs
+     * proper sRGB gamma correction when blending colors. This prevents the gray
+     * artifacting that occurs with simple linear averaging (glGenerateMipmap).
+     * 
+     * @param image the source image to upload
+     * @return the OpenGL texture ID
      */
-    public int loadTexture(String path) {
-        if (textureCache.containsKey(path)) {
-            return textureCache.get(path);
+    public static int uploadWithMipmaps(java.awt.image.BufferedImage image) {
+        int mipmapLevel = OptionsManager.getMipmapLevel();
+        
+        // Generate gamma-correct mipmaps
+        java.awt.image.BufferedImage[] mipLevels = 
+            mattmc.client.renderer.texture.MipmapGenerator.generateMipLevels(image, mipmapLevel);
+        
+        // Generate texture ID
+        int textureID = glGenTextures();
+        glBindTexture(GL_TEXTURE_2D, textureID);
+        
+        // Set max mipmap level parameter before uploading
+        if (mipmapLevel > 0) {
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, Math.min(mipmapLevel, mipLevels.length - 1));
         }
         
-        try (InputStream is = mattmc.util.ResourceLoader.getResourceStreamFromClassLoader(path)) {
-            if (is == null) {
-                logger.error("Texture not found: {}{}", path, " (expected in resources folder)");
-                return 0;
-            }
-            
-            BufferedImage image = ImageIO.read(is);
-            int width = image.getWidth();
-            int height = image.getHeight();
+        // Upload each mipmap level
+        for (int level = 0; level < mipLevels.length; level++) {
+            java.awt.image.BufferedImage mipImage = mipLevels[level];
+            int width = mipImage.getWidth();
+            int height = mipImage.getHeight();
             
             // Convert image to ByteBuffer
             int[] pixels = new int[width * height];
-            image.getRGB(0, 0, width, height, pixels, 0, width);
+            mipImage.getRGB(0, 0, width, height, pixels, 0, width);
             
             ByteBuffer buffer = BufferUtils.createByteBuffer(width * height * 4);
             for (int y = 0; y < height; y++) {
@@ -123,12 +137,70 @@ public class TextureManager {
             }
             buffer.flip();
             
+            // Upload this mipmap level
+            glTexImage2D(GL_TEXTURE_2D, level, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, buffer);
+        }
+        
+        return textureID;
+    }
+    
+    /**
+     * Load a texture from resources and return its OpenGL texture ID.
+     * Textures are cached to avoid reloading.
+     * Uses gamma-correct mipmap generation like Minecraft.
+     */
+    public int loadTexture(String path) {
+        if (textureCache.containsKey(path)) {
+            return textureCache.get(path);
+        }
+        
+        try (InputStream is = mattmc.util.ResourceLoader.getResourceStreamFromClassLoader(path)) {
+            if (is == null) {
+                logger.error("Texture not found: {}{}", path, " (expected in resources folder)");
+                return 0;
+            }
+            
+            BufferedImage image = ImageIO.read(is);
+            int mipmapLevel = OptionsManager.getMipmapLevel();
+            
+            // Generate gamma-correct mipmaps like Minecraft
+            BufferedImage[] mipLevels = 
+                mattmc.client.renderer.texture.MipmapGenerator.generateMipLevels(image, mipmapLevel);
+            
             // Generate texture ID
             int textureID = glGenTextures();
             glBindTexture(GL_TEXTURE_2D, textureID);
             
-            // Upload texture data
-            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, buffer);
+            // Set max mipmap level parameter before uploading
+            if (mipmapLevel > 0) {
+                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, Math.min(mipmapLevel, mipLevels.length - 1));
+            }
+            
+            // Upload each mipmap level
+            for (int level = 0; level < mipLevels.length; level++) {
+                BufferedImage mipImage = mipLevels[level];
+                int width = mipImage.getWidth();
+                int height = mipImage.getHeight();
+                
+                // Convert image to ByteBuffer
+                int[] pixels = new int[width * height];
+                mipImage.getRGB(0, 0, width, height, pixels, 0, width);
+                
+                ByteBuffer buffer = BufferUtils.createByteBuffer(width * height * 4);
+                for (int y = 0; y < height; y++) {
+                    for (int x = 0; x < width; x++) {
+                        int pixel = pixels[y * width + x];
+                        buffer.put((byte) ((pixel >> 16) & 0xFF)); // Red
+                        buffer.put((byte) ((pixel >> 8) & 0xFF));  // Green
+                        buffer.put((byte) (pixel & 0xFF));         // Blue
+                        buffer.put((byte) ((pixel >> 24) & 0xFF)); // Alpha
+                    }
+                }
+                buffer.flip();
+                
+                // Upload this mipmap level
+                glTexImage2D(GL_TEXTURE_2D, level, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, buffer);
+            }
             
             // Apply filtering settings (using NEAREST for block textures)
             applyTextureFiltering(true);
