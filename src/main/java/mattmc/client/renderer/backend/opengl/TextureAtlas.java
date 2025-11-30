@@ -150,8 +150,15 @@ public class TextureAtlas implements TextureCoordinateProvider, AutoCloseable {
 					float u1 = (float) (x + textureSize) / atlasWidth;
 					float v1 = (float) (y + textureSize) / atlasHeight;
 					
-					// Register texture with int ID mapping
-					registerTexture(texturePath, new TextureCoordinateProvider.UVMapping(u0, v0, u1, v1));
+					// Calculate UV shrink ratio following Minecraft's formula: 4.0f / atlasSize
+					// This prevents texture bleeding when mipmaps are enabled.
+					// atlasSize() = textureSize / (u1 - u0) = textureSize / (textureSize / atlasWidth) = atlasWidth
+					// This is mathematically equivalent to Minecraft's TextureAtlasSprite.atlasSize() calculation.
+					float atlasSize = Math.max(atlasWidth, atlasHeight);
+					float uvShrinkRatio = 4.0f / atlasSize;
+					
+					// Register texture with int ID mapping including shrink ratio
+					registerTexture(texturePath, new TextureCoordinateProvider.UVMapping(u0, v0, u1, v1, uvShrinkRatio));
 					
 					// logger.info("  Packed: {} at ({},{}) UV: {},{} -> {},{}", texturePath, x, y, u0, v0, u1, v1);
 				} else {

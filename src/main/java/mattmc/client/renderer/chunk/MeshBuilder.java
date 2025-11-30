@@ -134,13 +134,13 @@ public class MeshBuilder {
         float y1 = y + 1;
         float z0 = z, z1 = z + 1;
         
-        // Get UV coordinates (0-1 if no atlas)
+        // Get UV coordinates with shrinking applied to prevent mipmap bleeding
         float u0 = 0, v0 = 0, u1 = 1, v1 = 1;
         if (uvMapping != null) {
-            u0 = uvMapping.u0;
-            v0 = uvMapping.v0;
-            u1 = uvMapping.u1;
-            v1 = uvMapping.v1;
+            u0 = uvMapping.getShrunkU0();
+            v0 = uvMapping.getShrunkV0();
+            u1 = uvMapping.getShrunkU1();
+            v1 = uvMapping.getShrunkV1();
         }
         
         int baseVertex = currentVertex;
@@ -172,13 +172,13 @@ public class MeshBuilder {
         float y0 = y;
         float z0 = z, z1 = z + 1;
         
-        // Get UV coordinates
+        // Get UV coordinates with shrinking applied to prevent mipmap bleeding
         float u0 = 0, v0 = 0, u1 = 1, v1 = 1;
         if (uvMapping != null) {
-            u0 = uvMapping.u0;
-            v0 = uvMapping.v0;
-            u1 = uvMapping.u1;
-            v1 = uvMapping.v1;
+            u0 = uvMapping.getShrunkU0();
+            v0 = uvMapping.getShrunkV0();
+            u1 = uvMapping.getShrunkU1();
+            v1 = uvMapping.getShrunkV1();
         }
         
         int baseVertex = currentVertex;
@@ -210,13 +210,13 @@ public class MeshBuilder {
         float y0 = y, y1 = y + 1;
         float z1 = z + 1;
         
-        // Get UV coordinates
+        // Get UV coordinates with shrinking applied to prevent mipmap bleeding
         float u0 = 0, v0 = 0, u1 = 1, v1 = 1;
         if (uvMapping != null) {
-            u0 = uvMapping.u0;
-            v0 = uvMapping.v0;
-            u1 = uvMapping.u1;
-            v1 = uvMapping.v1;
+            u0 = uvMapping.getShrunkU0();
+            v0 = uvMapping.getShrunkV0();
+            u1 = uvMapping.getShrunkU1();
+            v1 = uvMapping.getShrunkV1();
         }
         
         int baseVertex = currentVertex;
@@ -248,13 +248,13 @@ public class MeshBuilder {
         float y0 = y, y1 = y + 1;
         float z0 = z, z1 = z + 1;
         
-        // Get UV coordinates
+        // Get UV coordinates with shrinking applied to prevent mipmap bleeding
         float u0 = 0, v0 = 0, u1 = 1, v1 = 1;
         if (uvMapping != null) {
-            u0 = uvMapping.u0;
-            v0 = uvMapping.v0;
-            u1 = uvMapping.u1;
-            v1 = uvMapping.v1;
+            u0 = uvMapping.getShrunkU0();
+            v0 = uvMapping.getShrunkV0();
+            u1 = uvMapping.getShrunkU1();
+            v1 = uvMapping.getShrunkV1();
         }
         
         int baseVertex = currentVertex;
@@ -286,13 +286,13 @@ public class MeshBuilder {
         float y0 = y, y1 = y + 1;
         float z0 = z, z1 = z + 1;
         
-        // Get UV coordinates
+        // Get UV coordinates with shrinking applied to prevent mipmap bleeding
         float u0 = 0, v0 = 0, u1 = 1, v1 = 1;
         if (uvMapping != null) {
-            u0 = uvMapping.u0;
-            v0 = uvMapping.v0;
-            u1 = uvMapping.u1;
-            v1 = uvMapping.v1;
+            u0 = uvMapping.getShrunkU0();
+            v0 = uvMapping.getShrunkV0();
+            u1 = uvMapping.getShrunkU1();
+            v1 = uvMapping.getShrunkV1();
         }
         
         int baseVertex = currentVertex;
@@ -324,13 +324,13 @@ public class MeshBuilder {
         float y0 = y, y1 = y + 1;
         float z0 = z;
         
-        // Get UV coordinates
+        // Get UV coordinates with shrinking applied to prevent mipmap bleeding
         float u0 = 0, v0 = 0, u1 = 1, v1 = 1;
         if (uvMapping != null) {
-            u0 = uvMapping.u0;
-            v0 = uvMapping.v0;
-            u1 = uvMapping.u1;
-            v1 = uvMapping.v1;
+            u0 = uvMapping.getShrunkU0();
+            v0 = uvMapping.getShrunkV0();
+            u1 = uvMapping.getShrunkU1();
+            v1 = uvMapping.getShrunkV1();
         }
         
         int baseVertex = currentVertex;
