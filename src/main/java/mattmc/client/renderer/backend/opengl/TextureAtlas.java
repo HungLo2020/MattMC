@@ -21,6 +21,7 @@ import java.util.List;
 import static org.lwjgl.opengl.GL11.*;
 import static org.lwjgl.opengl.GL12.*;
 import static org.lwjgl.opengl.GL13.*;
+import static org.lwjgl.opengl.GL14.*;
 import static org.lwjgl.opengl.GL30.*;
 import static org.lwjgl.opengl.EXTTextureFilterAnisotropic.*;
 import org.slf4j.Logger;
@@ -280,6 +281,7 @@ public class TextureAtlas implements TextureCoordinateProvider, AutoCloseable {
 	 * Create an OpenGL texture from a BufferedImage with gamma-correct mipmaps.
 	 * 
 	 * Uses Minecraft's mipmap generation algorithm for proper sRGB color blending.
+	 * Sets all necessary OpenGL texture parameters to match Minecraft's behavior.
 	 */
 	private int createGLTexture(BufferedImage image) {
 		int mipmapLevel = OptionsManager.getMipmapLevel();
@@ -292,9 +294,19 @@ public class TextureAtlas implements TextureCoordinateProvider, AutoCloseable {
 		int textureID = glGenTextures();
 		glBindTexture(GL_TEXTURE_2D, textureID);
 		
-		// Set max mipmap level parameter before uploading
-		if (mipmapLevel > 0) {
-			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, Math.min(mipmapLevel, mipLevels.length - 1));
+		// Set mipmap parameters BEFORE uploading textures (like Minecraft's TextureUtil.prepareImage)
+		if (mipmapLevel >= 0) {
+			int actualMaxLevel = Math.min(mipmapLevel, mipLevels.length - 1);
+			// GL_TEXTURE_MAX_LEVEL - maximum mipmap level that can be used
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, actualMaxLevel);
+			// GL_TEXTURE_BASE_LEVEL - base mipmap level (always 0)
+			glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_BASE_LEVEL, 0);
+			// GL_TEXTURE_MIN_LOD - minimum LOD value (clamping)
+			glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_LOD, 0.0f);
+			// GL_TEXTURE_MAX_LOD - maximum LOD value (clamping)
+			glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAX_LOD, (float) actualMaxLevel);
+			// GL_TEXTURE_LOD_BIAS - LOD bias (set to 0 like Minecraft)
+			glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_LOD_BIAS, 0.0f);
 		}
 		
 		// Upload each mipmap level
@@ -326,8 +338,9 @@ public class TextureAtlas implements TextureCoordinateProvider, AutoCloseable {
 		// Apply texture filtering settings (no longer generates mipmaps, just sets filter params)
 		TextureManager.applyTextureFiltering(true);
 		
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+		// Use CLAMP_TO_EDGE for texture atlas to prevent edge bleeding
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 		
 		glBindTexture(GL_TEXTURE_2D, 0);
 		

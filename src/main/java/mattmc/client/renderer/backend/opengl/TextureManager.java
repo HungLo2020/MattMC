@@ -15,6 +15,7 @@ import java.util.Map;
 import static org.lwjgl.opengl.GL11.*;
 import static org.lwjgl.opengl.GL12.*;
 import static org.lwjgl.opengl.GL13.*;
+import static org.lwjgl.opengl.GL14.*;
 import static org.lwjgl.opengl.GL30.*;
 import static org.lwjgl.opengl.EXTTextureFilterAnisotropic.*;
 import org.slf4j.Logger;
@@ -53,6 +54,8 @@ public class TextureManager {
      * <p><b>Note:</b> This method no longer generates mipmaps - use {@link #uploadWithMipmaps} 
      * for proper gamma-correct mipmap generation like Minecraft.
      * 
+     * <p>Sets LOD parameters to match Minecraft's TextureUtil.prepareImage behavior.
+     * 
      * @param useMipmaps Whether to use mipmap filtering (for block textures use GL_NEAREST, for UI use GL_LINEAR)
      */
     public static void applyTextureFiltering(boolean useMipmaps) {
@@ -62,8 +65,13 @@ public class TextureManager {
             // Use mipmap filtering (NEAREST for block textures to maintain pixelated look)
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST_MIPMAP_LINEAR);
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-            // Set max mipmap level
+            // Set mipmap level parameters like Minecraft
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, mipmapLevel);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_BASE_LEVEL, 0);
+            // Set LOD parameters like Minecraft's TextureUtil.prepareImage
+            glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_LOD, 0.0f);
+            glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAX_LOD, (float) mipmapLevel);
+            glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_LOD_BIAS, 0.0f);
         } else if (useMipmaps) {
             // No mipmaps for block textures
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
@@ -171,9 +179,14 @@ public class TextureManager {
             int textureID = glGenTextures();
             glBindTexture(GL_TEXTURE_2D, textureID);
             
-            // Set max mipmap level parameter before uploading
-            if (mipmapLevel > 0) {
-                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, Math.min(mipmapLevel, mipLevels.length - 1));
+            // Set mipmap parameters BEFORE uploading textures (like Minecraft's TextureUtil.prepareImage)
+            if (mipmapLevel >= 0) {
+                int actualMaxLevel = Math.min(mipmapLevel, mipLevels.length - 1);
+                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, actualMaxLevel);
+                glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_BASE_LEVEL, 0);
+                glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MIN_LOD, 0.0f);
+                glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAX_LOD, (float) actualMaxLevel);
+                glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_LOD_BIAS, 0.0f);
             }
             
             // Upload each mipmap level
@@ -205,8 +218,9 @@ public class TextureManager {
             // Apply filtering settings (using NEAREST for block textures)
             applyTextureFiltering(true);
             
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+            // Use CLAMP_TO_EDGE to prevent edge bleeding
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
             
             textureCache.put(path, textureID);
             // logger.info("Loaded texture: {} (ID: {})", path, textureID);
