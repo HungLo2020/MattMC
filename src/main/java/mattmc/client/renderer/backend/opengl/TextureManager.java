@@ -73,16 +73,50 @@ public class TextureManager {
      * @param useMipmaps Whether to use mipmap filtering (for block textures use GL_NEAREST, for UI use GL_LINEAR)
      */
     public static void applyTextureFiltering(boolean useMipmaps) {
+        applyTextureFiltering(useMipmaps, 0);
+    }
+    
+    /**
+     * Apply texture filtering settings with an optional maximum anisotropic filtering level.
+     * 
+     * <p>For texture atlases, anisotropic filtering can cause texture bleeding (gray banding)
+     * because the elongated sampling footprint can cross sprite boundaries. This method allows
+     * callers to limit the anisotropic level for such cases.
+     * 
+     * <p><b>Atlas Anisotropic Limit Calculation:</b> For a texture atlas with NxN textures of size S,
+     * the safe anisotropic level is limited to prevent the sampling footprint from extending
+     * beyond the UV shrink margin. A conservative limit is 2x for most atlas configurations,
+     * which provides some filtering benefit while avoiding cross-sprite bleeding.
+     * 
+     * @param useMipmaps Whether to use mipmap filtering
+     * @param maxAnisoForAtlas Maximum anisotropic level for texture atlases (0 = use user setting)
+     */
+    public static void applyTextureFiltering(boolean useMipmaps, int maxAnisoForAtlas) {
         int mipmapLevel = OptionsManager.getMipmapLevel();
         int anisotropicLevel = OptionsManager.getAnisotropicFiltering();
         
+        // Limit or disable anisotropic filtering for texture atlases to prevent cross-sprite bleeding.
+        // maxAnisoForAtlas == 0: completely disable anisotropic filtering (for texture atlases)
+        // maxAnisoForAtlas > 0: limit to this level
+        // maxAnisoForAtlas < 0: no limit (use user's configured setting)
+        if (maxAnisoForAtlas == 0) {
+            // Completely disable anisotropic filtering for this texture
+            anisotropicLevel = 0;
+        } else if (maxAnisoForAtlas > 0 && anisotropicLevel > maxAnisoForAtlas) {
+            anisotropicLevel = maxAnisoForAtlas;
+        }
+        
+        // Determine if user wants filtering quality (anisotropic enabled in settings)
+        // even if we disable it for this specific texture (atlas)
+        boolean userWantsFiltering = OptionsManager.getAnisotropicFiltering() > 0;
+        
         if (mipmapLevel > 0 && useMipmaps) {
-            // When anisotropic filtering is enabled, use trilinear filtering (GL_LINEAR_MIPMAP_LINEAR)
-            // to prevent visible banding on flat surfaces at a distance. The anisotropic filtering
-            // works with the trilinear filtering to provide smooth LOD transitions.
-            // When anisotropic filtering is disabled, use GL_NEAREST_MIPMAP_LINEAR for pixelated look.
-            if (anisotropicLevel > 0) {
-                // Trilinear filtering: smooth mipmap transitions, eliminates banding
+            // When user has anisotropic filtering enabled in settings, use trilinear filtering
+            // (GL_LINEAR_MIPMAP_LINEAR) to provide smooth LOD transitions. This gives a quality
+            // look even when we can't actually apply anisotropic filtering to an atlas.
+            // When user has anisotropic disabled, use GL_NEAREST_MIPMAP_LINEAR for pixelated look.
+            if (userWantsFiltering) {
+                // Trilinear filtering: smooth mipmap transitions
                 glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
             } else {
                 // Standard Minecraft-style: nearest within level, linear between levels
@@ -109,7 +143,7 @@ public class TextureManager {
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
         }
         
-        // Apply anisotropic filtering settings
+        // Apply anisotropic filtering settings (only if not disabled for this texture)
         if (anisotropicLevel > 0) {
             try {
                 // Get max anisotropic level supported by GPU
@@ -119,6 +153,13 @@ public class TextureManager {
             } catch (IllegalStateException | IllegalArgumentException e) {
                 // Anisotropic filtering extension not supported, silently ignore
                 // logger.debug("Anisotropic filtering not supported: {}", e.getMessage());
+            }
+        } else {
+            // Explicitly set anisotropic to 1.0 (disabled) to ensure no aniso from previous state
+            try {
+                glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAX_ANISOTROPY_EXT, 1.0f);
+            } catch (IllegalStateException | IllegalArgumentException e) {
+                // Extension not supported
             }
         }
     }

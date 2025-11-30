@@ -399,6 +399,36 @@ public class TextureAtlas implements TextureCoordinateProvider, AutoCloseable {
 	}
 	
 	/**
+	 * Anisotropic filtering level for texture atlases: DISABLED.
+	 * 
+	 * <p><b>Why anisotropic filtering is disabled for texture atlases:</b>
+	 * Anisotropic filtering samples texels in an elongated footprint along the direction
+	 * of maximum texture compression. On flat terrain viewed at a grazing angle, this
+	 * footprint can extend many texels - easily crossing sprite boundaries in the atlas
+	 * and causing gray banding artifacts (sampling adjacent textures).
+	 * 
+	 * <p>This is a fundamental incompatibility between anisotropic filtering and texture
+	 * atlases. Even at 2x anisotropic filtering, the elongated sample footprint at grazing
+	 * angles can extend beyond the UV shrink margin and sample neighboring textures.
+	 * 
+	 * <p><b>Alternative solutions considered:</b>
+	 * <ul>
+	 *   <li>UV shrinking with 4.0/atlasSize - not enough margin for aniso sampling</li>
+	 *   <li>Per-vertex UV micro-inset - doesn't prevent aniso from sampling outside</li>
+	 *   <li>Limiting to 2x aniso - still causes banding on flat surfaces</li>
+	 * </ul>
+	 * 
+	 * <p>The only reliable solution is to completely disable anisotropic filtering for
+	 * texture atlases. The trilinear filtering (GL_LINEAR_MIPMAP_LINEAR) still provides
+	 * smooth mipmap transitions without the cross-sprite bleeding issue.
+	 * 
+	 * <p>To properly support anisotropic filtering, the renderer would need to use
+	 * GL_TEXTURE_2D_ARRAY (texture arrays) instead of a texture atlas, which is a
+	 * significant architectural change.
+	 */
+	private static final int MAX_ATLAS_ANISOTROPIC_LEVEL = 0; // 0 = disabled
+	
+	/**
 	 * Create an OpenGL texture from a BufferedImage with gamma-correct mipmaps.
 	 * 
 	 * Uses Minecraft's mipmap generation algorithm for proper sRGB color blending.
@@ -408,6 +438,11 @@ public class TextureAtlas implements TextureCoordinateProvider, AutoCloseable {
 	 * LOD to prevent texture bleeding. At high mipmap levels, adjacent textures in
 	 * the atlas would blend together, causing gray artifacts on distant terrain.
 	 * The limit ensures each mipmap texel represents at most one individual texture.
+	 * 
+	 * <p><b>Anisotropic Filtering Limiting:</b> Anisotropic filtering is limited to
+	 * {@value #MAX_ATLAS_ANISOTROPIC_LEVEL}x for texture atlases to prevent the elongated
+	 * sampling footprint from crossing sprite boundaries, which causes gray banding
+	 * on distant flat terrain.
 	 */
 	private int createGLTexture(BufferedImage image) {
 		int mipmapLevel = OptionsManager.getMipmapLevel();
@@ -482,8 +517,9 @@ public class TextureAtlas implements TextureCoordinateProvider, AutoCloseable {
 			glTexImage2D(GL_TEXTURE_2D, level, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, buffer);
 		}
 		
-		// Apply texture filtering settings (no longer generates mipmaps, just sets filter params)
-		TextureManager.applyTextureFiltering(true);
+		// Apply texture filtering settings with atlas-specific anisotropic limit
+		// The limit prevents the anisotropic sampling footprint from crossing sprite boundaries
+		TextureManager.applyTextureFiltering(true, MAX_ATLAS_ANISOTROPIC_LEVEL);
 		
 		// Use CLAMP_TO_EDGE for texture atlas to prevent edge bleeding
 		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
@@ -580,6 +616,30 @@ public class TextureAtlas implements TextureCoordinateProvider, AutoCloseable {
 	@Override
 	public void close() {
 		glDeleteTextures(atlasTextureId);
+	}
+	
+	/**
+	 * Reapply texture filtering settings to the atlas.
+	 * 
+	 * <p>Call this when graphics settings (mipmap level, anisotropic filtering) change
+	 * to apply the new settings immediately without restarting.
+	 * 
+	 * <p><b>Note:</b> Anisotropic filtering is limited to {@value #MAX_ATLAS_ANISOTROPIC_LEVEL}x
+	 * for texture atlases to prevent cross-sprite bleeding.
+	 */
+	public void reapplyFilteringSettings() {
+		int currentBinding = glGetInteger(GL_TEXTURE_BINDING_2D);
+		boolean needsRestore = currentBinding != atlasTextureId;
+		
+		if (needsRestore) {
+			glBindTexture(GL_TEXTURE_2D, atlasTextureId);
+		}
+		
+		TextureManager.applyTextureFiltering(true, MAX_ATLAS_ANISOTROPIC_LEVEL);
+		
+		if (needsRestore) {
+			glBindTexture(GL_TEXTURE_2D, currentBinding);
+		}
 	}
 	
 	/**
