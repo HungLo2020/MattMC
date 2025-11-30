@@ -325,10 +325,9 @@ public class AsyncChunkLoader {
                         LevelChunk chunk = ChunkNBT.fromNBT(chunkNBT);
                         // Set the world light manager for automatic light updates
                         chunk.setWorldLightManager(worldLightManager);
-                        // Initialize skylight for loaded chunks with BFS propagation
-                        if (worldLightManager != null) {
-                            worldLightManager.initializeChunkSkylight(chunk);
-                        }
+                        // NOTE: Do NOT call initializeChunkSkylight() here!
+                        // Loaded chunks already have correct heightmap and light data.
+                        // Calling it would overwrite the saved values.
                         return chunk;
                     }
                 }
@@ -369,10 +368,9 @@ public class AsyncChunkLoader {
                     LevelChunk chunk = ChunkNBT.fromNBT(chunkNBT);
                     // Set the world light manager for automatic light updates
                     chunk.setWorldLightManager(worldLightManager);
-                    // Initialize skylight for loaded chunks with BFS propagation
-                    if (worldLightManager != null) {
-                        worldLightManager.initializeChunkSkylight(chunk);
-                    }
+                    // NOTE: Do NOT call initializeChunkSkylight() here!
+                    // Loaded chunks already have correct heightmap and light data.
+                    // Calling it would overwrite the saved values.
                     return chunk;
                 }
             }
