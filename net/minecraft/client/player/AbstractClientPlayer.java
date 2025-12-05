@@ -34,7 +34,7 @@ public abstract class AbstractClientPlayer extends Player implements ClientAvata
 
 	public AbstractClientPlayer(ClientLevel clientLevel, GameProfile gameProfile) {
 		super(clientLevel, gameProfile);
-		this.showExtraEars = "deadmau5".equals(this.getGameProfile().name());
+		this.showExtraEars = "deadmau5".equals(this.getGameProfile().getName());
 	}
 
 	@Nullable

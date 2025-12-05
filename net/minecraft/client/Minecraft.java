@@ -782,7 +782,7 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 			GameProfile gameProfile = profileResult.profile();
 			Set<ProfileActionType> set = profileResult.actions();
 			if (set.contains(ProfileActionType.FORCED_NAME_CHANGE)) {
-				list.add((Function)runnable -> BanNoticeScreens.createNameBan(gameProfile.name(), runnable));
+				list.add((Function)runnable -> BanNoticeScreens.createNameBan(gameProfile.getName(), runnable));
 			}
 
 			if (set.contains(ProfileActionType.USING_BANNED_SKIN)) {
@@ -812,7 +812,7 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 		}
 
 		stringBuilder.append(" ");
-		stringBuilder.append(SharedConstants.getCurrentVersion().name());
+		stringBuilder.append(SharedConstants.getCurrentVersion().getName());
 		ClientPacketListener clientPacketListener = this.getConnection();
 		if (clientPacketListener != null && clientPacketListener.getConnection().isConnected()) {
 			stringBuilder.append(" - ");
@@ -1537,7 +1537,7 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 
 		Path path;
 		try {
-			String string2 = String.format(Locale.ROOT, "%s-%s-%s", Util.getFilenameFormattedDateTime(), string, SharedConstants.getCurrentVersion().id());
+			String string2 = String.format(Locale.ROOT, "%s-%s-%s", Util.getFilenameFormattedDateTime(), string, SharedConstants.getCurrentVersion().getId());
 			String string3 = FileUtil.findAvailableName(MetricsPersister.PROFILING_RESULTS_DIR, string2, ".zip");
 			path = MetricsPersister.PROFILING_RESULTS_DIR.resolve(string3);
 		} catch (IOException var21) {

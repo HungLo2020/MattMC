@@ -199,7 +199,7 @@ public class ExtraCodecs {
 				}
 			})).ifRight(list -> {
 				for (Property property : list) {
-					builder.put(property.name(), property);
+					builder.put(property.getName(), property);
 				}
 			});
 			return new PropertyMap(builder.build());

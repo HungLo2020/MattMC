@@ -15,11 +15,11 @@ public record NameAndId(UUID id, String name) {
 	);
 
 	public NameAndId(GameProfile gameProfile) {
-		this(gameProfile.id(), gameProfile.name());
+		this(gameProfile.getId(), gameProfile.getName());
 	}
 
 	public NameAndId(com.mojang.authlib.yggdrasil.response.NameAndId nameAndId) {
-		this(nameAndId.id(), nameAndId.name());
+		this(nameAndId.getId(), nameAndId.getName());
 	}
 
 	@Nullable
@@ -41,8 +41,8 @@ public record NameAndId(UUID id, String name) {
 	}
 
 	public void appendTo(JsonObject jsonObject) {
-		jsonObject.addProperty("uuid", this.id().toString());
-		jsonObject.addProperty("name", this.name());
+		jsonObject.addProperty("uuid", this.getId().toString());
+		jsonObject.addProperty("name", this.getName());
 	}
 
 	public static NameAndId createOffline(String string) {
