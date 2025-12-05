@@ -1974,7 +1974,7 @@ public class ClientPacketListener extends ClientCommonPacketListenerImpl impleme
 					RemoteChatSession remoteChatSession = data.validate(gameProfile, signatureValidator);
 					playerInfo.setChatSession(remoteChatSession);
 				} catch (ValidationException var7) {
-					LOGGER.error("Failed to validate profile key for player: '{}'", gameProfile.name(), var7);
+					LOGGER.error("Failed to validate profile key for player: '{}'", gameProfile.getName(), var7);
 					playerInfo.clearChatSession(this.enforcesSecureChat());
 				}
 			} else {
@@ -2463,7 +2463,7 @@ public class ClientPacketListener extends ClientCommonPacketListenerImpl impleme
 	@Nullable
 	public PlayerInfo getPlayerInfo(String string) {
 		for (PlayerInfo playerInfo : this.playerInfoMap.values()) {
-			if (playerInfo.getProfile().name().equals(string)) {
+			if (playerInfo.getProfile().getName().equals(string)) {
 				return playerInfo;
 			}
 		}
@@ -2478,7 +2478,7 @@ public class ClientPacketListener extends ClientCommonPacketListenerImpl impleme
 	@Nullable
 	public PlayerInfo getPlayerInfoIgnoreCase(String string) {
 		for (PlayerInfo playerInfo : this.playerInfoMap.values()) {
-			if (playerInfo.getProfile().name().equalsIgnoreCase(string)) {
+			if (playerInfo.getProfile().getName().equalsIgnoreCase(string)) {
 				return playerInfo;
 			}
 		}
@@ -2643,7 +2643,7 @@ public class ClientPacketListener extends ClientCommonPacketListenerImpl impleme
 		}
 
 		if (this.keyPairFuture != null && this.keyPairFuture.isDone()) {
-			((Optional)this.keyPairFuture.join()).ifPresent(this::setKeyPair);
+			((Optional<ProfileKeyPair>)this.keyPairFuture.join()).ifPresent(this::setKeyPair);
 			this.keyPairFuture = null;
 		}
 
@@ -2678,10 +2678,10 @@ public class ClientPacketListener extends ClientCommonPacketListenerImpl impleme
 	}
 
 	private void setKeyPair(ProfileKeyPair profileKeyPair) {
-		if (this.minecraft.isLocalPlayer(this.localGameProfile.id())) {
+		if (this.minecraft.isLocalPlayer(this.localGameProfile.getId())) {
 			if (this.chatSession == null || !this.chatSession.keyPair().equals(profileKeyPair)) {
 				this.chatSession = LocalChatSession.create(profileKeyPair);
-				this.signedMessageEncoder = this.chatSession.createMessageEncoder(this.localGameProfile.id());
+				this.signedMessageEncoder = this.chatSession.createMessageEncoder(this.localGameProfile.getId());
 				this.send(new ServerboundChatSessionUpdatePacket(this.chatSession.asRemote().asData()));
 			}
 		}
