@@ -63,10 +63,10 @@ public record EquipmentClientInfo(Map<EquipmentClientInfo.LayerType, List<Equipm
 
 		public EquipmentClientInfo build() {
 			return new EquipmentClientInfo(
-				(Map<EquipmentClientInfo.LayerType, List<EquipmentClientInfo.Layer>>)this.layersByType
+				(Map<EquipmentClientInfo.LayerType, List<EquipmentClientInfo.Layer>>)(Map<?, ?>)this.layersByType
 					.entrySet()
 					.stream()
-					.collect(ImmutableMap.toImmutableMap(Entry::getKey, entry -> List.copyOf((Collection)entry.getValue())))
+					.collect(ImmutableMap.toImmutableMap(Entry::getKey, entry -> List.copyOf((Collection<EquipmentClientInfo.Layer>)entry.getValue())))
 			);
 		}
 	}
