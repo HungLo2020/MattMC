@@ -66,7 +66,8 @@ dependencies {
     
     // Google libraries
     implementation 'com.google.guava:guava:32.1.2-jre'
-    implementation 'com.google.code.gson:gson:2.10.1'
+    // Using Gson 2.11+ for Strictness enum
+    implementation 'com.google.code.gson:gson:2.11.0'
     
     // Apache Commons
     implementation 'org.apache.commons:commons-lang3:3.14.0'
@@ -111,6 +112,9 @@ dependencies {
     
     // ICU4J for Unicode support
     implementation 'com.ibm.icu:icu4j:74.2'
+    
+    // Java-ObjC-Bridge for macOS Objective-C interop
+    implementation 'ca.weblite:java-objc-bridge:1.2'
     
     // ===== CLIENT DEPENDENCIES =====
     
