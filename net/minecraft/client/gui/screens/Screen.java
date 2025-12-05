@@ -271,6 +271,7 @@ public abstract class Screen extends AbstractContainerEventHandler implements Re
 		switch (clickEvent) {
 			case RunCommand var6:
 				RunCommand var10000 = var6;
+				String var12;
 
 				try {
 					var12 = var10000.command();
@@ -299,6 +300,7 @@ public abstract class Screen extends AbstractContainerEventHandler implements Re
 		boolean bl = switch (clickEvent) {
 			case OpenUrl var6 -> {
 				OpenUrl var23 = var6;
+				URI var24;
 
 				try {
 					var24 = var23.uri();
@@ -316,6 +318,7 @@ public abstract class Screen extends AbstractContainerEventHandler implements Re
 			}
 			case SuggestCommand var9 -> {
 				SuggestCommand var21 = var9;
+				String var22;
 
 				try {
 					var22 = var21.command();
@@ -332,6 +335,7 @@ public abstract class Screen extends AbstractContainerEventHandler implements Re
 			}
 			case CopyToClipboard var11 -> {
 				CopyToClipboard var19 = var11;
+				String var20;
 
 				try {
 					var20 = var19.value();

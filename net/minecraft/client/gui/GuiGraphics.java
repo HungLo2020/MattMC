@@ -832,6 +832,7 @@ public class GuiGraphics {
 				switch (style.getHoverEvent()) {
 					case ShowItem var7:
 						ShowItem var23 = var7;
+						ItemStack var24;
 
 						try {
 							var24 = var23.item();
@@ -844,6 +845,7 @@ public class GuiGraphics {
 						break;
 					case ShowEntity var9:
 						ShowEntity var21 = var9;
+						EntityTooltipInfo var22;
 
 						try {
 							var22 = var21.entity();
@@ -858,6 +860,7 @@ public class GuiGraphics {
 						break;
 					case ShowText var11:
 						ShowText var19 = var11;
+						Component var20;
 
 						try {
 							var20 = var19.value();
