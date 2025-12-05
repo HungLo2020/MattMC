@@ -311,7 +311,7 @@ public class FontManager implements PreparableReloadListener, AutoCloseable {
 		public Optional<List<GlyphProvider.Conditional>> resolve(Function<ResourceLocation, List<GlyphProvider.Conditional>> function) {
 			return this.result
 				.map(
-					completableFuture -> ((Optional)completableFuture.join()).map(glyphProvider -> List.of(new GlyphProvider.Conditional(glyphProvider, this.filter))),
+								completableFuture -> ((Optional<GlyphProvider>)completableFuture.join()).map(glyphProvider -> List.of(new GlyphProvider.Conditional(glyphProvider, this.filter))),
 					resourceLocation -> {
 						List<GlyphProvider.Conditional> list = (List<GlyphProvider.Conditional>)function.apply(resourceLocation);
 						if (list == null) {
