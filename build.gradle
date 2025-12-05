@@ -1,0 +1,213 @@
+plugins {
+    id 'java'
+    id 'application'
+}
+
+group = 'net.minecraft'
+version = '1.21.10'
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(21)
+    }
+}
+
+repositories {
+    mavenCentral()
+    // Minecraft libraries (primary source for Mojang dependencies)
+    maven { 
+        url 'https://libraries.minecraft.net'
+        content {
+            includeGroup 'com.mojang'
+        }
+    }
+    // JitPack for open-source Mojang libraries
+    maven { 
+        url 'https://jitpack.io'
+        content {
+            includeGroup 'com.github.Mojang'
+        }
+    }
+    // Forge mirrors for Mojang libraries
+    maven { 
+        url 'https://maven.minecraftforge.net/'
+        content {
+            includeGroup 'com.mojang'
+            includeGroup 'net.minecraftforge'
+        }
+    }
+}
+
+// Minecraft 1.21.10 dependencies
+dependencies {
+    // Mojang libraries
+    implementation 'com.mojang:brigadier:1.3.10'
+    implementation 'com.mojang:datafixerupper:8.0.16'
+    implementation 'com.mojang:authlib:6.0.55'
+    implementation 'com.mojang:logging:1.2.7'
+    implementation 'com.mojang:jtracy:1.0.29'
+    implementation 'com.mojang:blocklist:1.0.10'
+    implementation 'com.mojang:patchy:2.2.10'
+    implementation 'com.mojang:text2speech:1.17.9'
+    
+    // Google libraries
+    implementation 'com.google.guava:guava:32.1.2-jre'
+    implementation 'com.google.code.gson:gson:2.10.1'
+    
+    // Apache Commons
+    implementation 'org.apache.commons:commons-lang3:3.14.0'
+    implementation 'commons-io:commons-io:2.15.1'
+    implementation 'org.apache.commons:commons-compress:1.26.0'
+    implementation 'org.apache.httpcomponents:httpclient:4.5.14'
+    implementation 'org.apache.httpcomponents:httpcore:4.4.16'
+    
+    // Logging
+    implementation 'org.slf4j:slf4j-api:2.0.9'
+    implementation 'org.apache.logging.log4j:log4j-slf4j2-impl:2.22.1'
+    implementation 'org.apache.logging.log4j:log4j-core:2.22.1'
+    implementation 'org.apache.logging.log4j:log4j-api:2.22.1'
+    
+    // Netty
+    implementation 'io.netty:netty-all:4.1.97.Final'
+    
+    // FastUtil
+    implementation 'it.unimi.dsi:fastutil:8.5.12'
+    
+    // JNA (Java Native Access)
+    implementation 'net.java.dev.jna:jna:5.14.0'
+    implementation 'net.java.dev.jna:jna-platform:5.14.0'
+    
+    // JOML (Java OpenGL Math Library)
+    implementation 'org.joml:joml:1.10.5'
+    
+    // JOptSimple (command line parsing)
+    implementation 'net.sf.jopt-simple:jopt-simple:5.0.4'
+    
+    // Microsoft MSAL4J for authentication
+    implementation 'com.microsoft.azure:msal4j:1.14.3'
+    
+    // JetBrains annotations
+    implementation 'org.jetbrains:annotations:24.1.0'
+    
+    // LZMA SDK for compression
+    implementation 'org.lz4:lz4-java:1.8.0'
+    
+    // OSHI for system info
+    implementation 'com.github.oshi:oshi-core:6.4.10'
+    
+    // ICU4J for Unicode support
+    implementation 'com.ibm.icu:icu4j:74.2'
+}
+
+sourceSets {
+    main {
+        java {
+            srcDirs = ['.']
+            exclude 'gradle/**'
+            exclude 'build/**'
+            exclude '.git/**'
+            exclude '.idea/**'
+        }
+        resources {
+            srcDirs = ['src/main/resources']
+        }
+    }
+}
+
+// Server run configuration
+application {
+    mainClass = 'net.minecraft.server.Main'
+}
+
+// Task to run the dedicated server
+tasks.register('runServer', JavaExec) {
+    group = 'minecraft'
+    description = 'Runs the Minecraft dedicated server'
+    
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'net.minecraft.server.Main'
+    
+    workingDir = file('run')
+    
+    jvmArgs = [
+        '-Xmx2G',
+        '-Xms1G',
+        '-XX:+UseG1GC',
+        '-XX:+ParallelRefProcEnabled',
+        '-XX:MaxGCPauseMillis=200',
+        '-XX:+UnlockExperimentalVMOptions',
+        '-XX:+DisableExplicitGC',
+        '-XX:G1NewSizePercent=30',
+        '-XX:G1MaxNewSizePercent=40',
+        '-XX:G1HeapRegionSize=8M',
+        '-XX:G1ReservePercent=20',
+        '-XX:G1HeapWastePercent=5',
+        '-XX:G1MixedGCCountTarget=4',
+        '-XX:InitiatingHeapOccupancyPercent=15',
+        '-XX:G1MixedGCLiveThresholdPercent=90',
+        '-XX:G1RSetUpdatingPauseTimePercent=5',
+        '-XX:SurvivorRatio=32',
+        '-XX:+PerfDisableSharedMem',
+        '-XX:MaxTenuringThreshold=1'
+    ]
+    
+    args = ['--nogui']
+    
+    doFirst {
+        workingDir.mkdirs()
+    }
+    
+    standardInput = System.in
+}
+
+// Task for client (placeholder - client code not included in this server-only source)
+tasks.register('runClient') {
+    group = 'minecraft'
+    description = 'Client is not available - this is a server-only source distribution'
+    doLast {
+        throw new GradleException('Client source code is not included in this distribution. Only the dedicated server can be run.')
+    }
+}
+
+// Task to create eula.txt
+tasks.register('acceptEula') {
+    group = 'minecraft'
+    description = 'Creates eula.txt with EULA accepted (required to run server)'
+    doLast {
+        def runDir = file('run')
+        runDir.mkdirs()
+        def eulaFile = new File(runDir, 'eula.txt')
+        eulaFile.text = '#By changing the setting below to TRUE you are indicating your agreement to our EULA (https://aka.ms/MinecraftEULA).\neula=true\n'
+        println 'EULA accepted. You can now run the server.'
+    }
+}
+
+// Ensure run directory and eula exist before running server
+runServer.dependsOn acceptEula
+
+// Build task configuration
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+    options.release = 21
+    options.compilerArgs += ['-Xlint:-deprecation', '-Xlint:-unchecked']
+}
+
+// Create a fat jar with all dependencies
+tasks.register('fatJar', Jar) {
+    group = 'build'
+    description = 'Creates a fat JAR with all dependencies'
+    archiveClassifier = 'all'
+    
+    from sourceSets.main.output
+    
+    dependsOn configurations.runtimeClasspath
+    from {
+        configurations.runtimeClasspath.findAll { it.name.endsWith('jar') }.collect { zipTree(it) }
+    }
+    
+    manifest {
+        attributes 'Main-Class': 'net.minecraft.server.Main'
+    }
+    
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+}

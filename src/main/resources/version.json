@@ -1,0 +1,15 @@
+{
+  "id": "1.21.10",
+  "name": "1.21.10",
+  "world_version": 4556,
+  "series_id": "main",
+  "protocol_version": 773,
+  "pack_version": {
+    "resource_major": 69,
+    "resource_minor": 0,
+    "data_major": 88,
+    "data_minor": 0
+  },
+  "build_time": "2025-01-01T00:00:00+00:00",
+  "stable": true
+}
