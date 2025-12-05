@@ -27,13 +27,14 @@ public class TemptingSensor extends Sensor<PathfinderMob> {
 	protected void doTick(ServerLevel serverLevel, PathfinderMob pathfinderMob) {
 		Brain<?> brain = pathfinderMob.getBrain();
 		TargetingConditions targetingConditions = TEMPT_TARGETING.copy().range((float)pathfinderMob.getAttributeValue(Attributes.TEMPT_RANGE));
-		List<Player> list = (List<Player>)serverLevel.players()
+		List<Player> list = serverLevel.players()
 			.stream()
 			.filter(EntitySelector.NO_SPECTATORS)
 			.filter(serverPlayer -> targetingConditions.test(serverLevel, pathfinderMob, serverPlayer))
 			.filter(this::playerHoldingTemptation)
 			.filter(serverPlayer -> !pathfinderMob.hasPassenger(serverPlayer))
 			.sorted(Comparator.comparingDouble(pathfinderMob::distanceToSqr))
+			.<Player>map(player -> player)
 			.collect(Collectors.toList());
 		if (!list.isEmpty()) {
 			Player player = (Player)list.get(0);
