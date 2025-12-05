@@ -54,7 +54,7 @@ public class PigRenderer extends MobRenderer<Pig, PigRenderState, PigModel> {
 
 	public void submit(PigRenderState pigRenderState, PoseStack poseStack, SubmitNodeCollector submitNodeCollector, CameraRenderState cameraRenderState) {
 		if (pigRenderState.variant != null) {
-			this.model = (EntityModel)((AdultAndBabyModelPair)this.models.get(pigRenderState.variant.modelAndTexture().model())).getModel(pigRenderState.isBaby);
+			this.model = ((AdultAndBabyModelPair<PigModel>)this.models.get(pigRenderState.variant.modelAndTexture().model())).getModel(pigRenderState.isBaby);
 			super.submit(pigRenderState, poseStack, submitNodeCollector, cameraRenderState);
 		}
 	}

@@ -105,7 +105,7 @@ public record StatePropertiesPredicate(List<StatePropertiesPredicate.PropertyMat
 		public <T extends Comparable<T>> boolean match(StateHolder<?, ?> stateHolder, Property<T> property) {
 			T comparable = stateHolder.getValue(property);
 			Optional<T> optional = property.getValue(this.value);
-			return optional.isPresent() && comparable.compareTo((Comparable)optional.get()) == 0;
+			return optional.isPresent() && comparable.compareTo(optional.get()) == 0;
 		}
 	}
 
@@ -150,14 +150,14 @@ public record StatePropertiesPredicate(List<StatePropertiesPredicate.PropertyMat
 			T comparable = stateHolder.getValue(property);
 			if (this.minValue.isPresent()) {
 				Optional<T> optional = property.getValue((String)this.minValue.get());
-				if (optional.isEmpty() || comparable.compareTo((Comparable)optional.get()) < 0) {
+				if (optional.isEmpty() || comparable.compareTo(optional.get()) < 0) {
 					return false;
 				}
 			}
 
 			if (this.maxValue.isPresent()) {
 				Optional<T> optional = property.getValue((String)this.maxValue.get());
-				if (optional.isEmpty() || comparable.compareTo((Comparable)optional.get()) > 0) {
+				if (optional.isEmpty() || comparable.compareTo(optional.get()) > 0) {
 					return false;
 				}
 			}

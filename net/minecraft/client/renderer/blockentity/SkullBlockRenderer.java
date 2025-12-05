@@ -38,7 +38,7 @@ import org.jetbrains.annotations.Nullable;
 @Environment(EnvType.CLIENT)
 public class SkullBlockRenderer implements BlockEntityRenderer<SkullBlockEntity, SkullBlockRenderState> {
 	private final Function<Type, SkullModelBase> modelByType;
-	private static final Map<Type, ResourceLocation> SKIN_BY_TYPE = (Map<Type, ResourceLocation>)Util.make(Maps.newHashMap(), hashMap -> {
+	private static final Map<Type, ResourceLocation> SKIN_BY_TYPE = Util.make(Maps.<Type, ResourceLocation>newHashMap(), hashMap -> {
 		hashMap.put(Types.SKELETON, ResourceLocation.withDefaultNamespace("textures/entity/skeleton/skeleton.png"));
 		hashMap.put(Types.WITHER_SKELETON, ResourceLocation.withDefaultNamespace("textures/entity/skeleton/wither_skeleton.png"));
 		hashMap.put(Types.ZOMBIE, ResourceLocation.withDefaultNamespace("textures/entity/zombie/zombie.png"));

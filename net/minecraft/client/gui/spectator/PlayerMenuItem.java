@@ -17,12 +17,12 @@ public class PlayerMenuItem implements SpectatorMenuItem {
 
 	public PlayerMenuItem(PlayerInfo playerInfo) {
 		this.playerInfo = playerInfo;
-		this.name = Component.literal(playerInfo.getProfile().name());
+		this.name = Component.literal(playerInfo.getProfile().getName());
 	}
 
 	@Override
 	public void selectItem(SpectatorMenu spectatorMenu) {
-		Minecraft.getInstance().getConnection().send(new ServerboundTeleportToEntityPacket(this.playerInfo.getProfile().id()));
+		Minecraft.getInstance().getConnection().send(new ServerboundTeleportToEntityPacket(this.playerInfo.getProfile().getId()));
 	}
 
 	@Override

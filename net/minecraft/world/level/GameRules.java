@@ -251,16 +251,15 @@ public class GameRules {
 	public static <T extends GameRules.Value<T>> Codec<GameRules.Key<T>> keyCodec(Class<T> class_) {
 		return Codec.STRING
 			.comapFlatMap(
-				string -> (DataResult)GAME_RULE_TYPES.entrySet()
+				string -> (DataResult<GameRules.Key<T>>)GAME_RULE_TYPES.entrySet()
 					.stream()
 					.filter(entry -> ((GameRules.Type)entry.getValue()).valueClass == class_)
 					.map(entry -> (GameRules.Key<T>)entry.getKey())
 					.filter(key -> key.getId().equals(string))
-					.map(key -> key)
 					.findFirst()
 					.map(DataResult::success)
 					.orElseGet(() -> DataResult.error(() -> "Invalid game rule ID for type: " + string)),
-				key -> key.getId()
+				(GameRules.Key<T> key) -> key.getId()
 			);
 	}
 

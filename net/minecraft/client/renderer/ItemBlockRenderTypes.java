@@ -18,7 +18,7 @@ import net.minecraft.world.level.material.Fluids;
 
 @Environment(EnvType.CLIENT)
 public class ItemBlockRenderTypes {
-	private static final Map<Block, ChunkSectionLayer> TYPE_BY_BLOCK = (Map<Block, ChunkSectionLayer>)Util.make(Maps.newHashMap(), hashMap -> {
+	private static final Map<Block, ChunkSectionLayer> TYPE_BY_BLOCK = Util.make(Maps.<Block, ChunkSectionLayer>newHashMap(), hashMap -> {
 		ChunkSectionLayer chunkSectionLayer = ChunkSectionLayer.TRIPWIRE;
 		hashMap.put(Blocks.TRIPWIRE, chunkSectionLayer);
 		ChunkSectionLayer chunkSectionLayer2 = ChunkSectionLayer.CUTOUT_MIPPED;
@@ -356,7 +356,7 @@ public class ItemBlockRenderTypes {
 		hashMap.put(Blocks.BUBBLE_COLUMN, chunkSectionLayer4);
 		hashMap.put(Blocks.TINTED_GLASS, chunkSectionLayer4);
 	});
-	private static final Map<Fluid, ChunkSectionLayer> LAYER_BY_FLUID = (Map<Fluid, ChunkSectionLayer>)Util.make(Maps.newHashMap(), hashMap -> {
+	private static final Map<Fluid, ChunkSectionLayer> LAYER_BY_FLUID = Util.make(Maps.<Fluid, ChunkSectionLayer>newHashMap(), hashMap -> {
 		hashMap.put(Fluids.FLOWING_WATER, ChunkSectionLayer.TRANSLUCENT);
 		hashMap.put(Fluids.WATER, ChunkSectionLayer.TRANSLUCENT);
 	});

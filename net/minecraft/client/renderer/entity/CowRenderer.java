@@ -55,7 +55,7 @@ public class CowRenderer extends MobRenderer<Cow, CowRenderState, CowModel> {
 
 	public void submit(CowRenderState cowRenderState, PoseStack poseStack, SubmitNodeCollector submitNodeCollector, CameraRenderState cameraRenderState) {
 		if (cowRenderState.variant != null) {
-			this.model = (EntityModel)((AdultAndBabyModelPair)this.models.get(cowRenderState.variant.modelAndTexture().model())).getModel(cowRenderState.isBaby);
+			this.model = ((AdultAndBabyModelPair<CowModel>)this.models.get(cowRenderState.variant.modelAndTexture().model())).getModel(cowRenderState.isBaby);
 			super.submit(cowRenderState, poseStack, submitNodeCollector, cameraRenderState);
 		}
 	}

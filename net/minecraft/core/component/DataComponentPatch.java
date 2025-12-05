@@ -21,7 +21,7 @@ import org.jetbrains.annotations.Nullable;
 public final class DataComponentPatch {
 	public static final DataComponentPatch EMPTY = new DataComponentPatch(Reference2ObjectMaps.emptyMap());
 	public static final Codec<DataComponentPatch> CODEC = Codec.dispatchedMap(DataComponentPatch.PatchKey.CODEC, DataComponentPatch.PatchKey::valueCodec)
-		.xmap(map -> {
+		.xmap((Map<DataComponentPatch.PatchKey, ?> map) -> {
 			if (map.isEmpty()) {
 				return EMPTY;
 			} else {
@@ -38,8 +38,8 @@ public final class DataComponentPatch {
 
 				return new DataComponentPatch(reference2ObjectMap);
 			}
-		}, dataComponentPatch -> {
-			Reference2ObjectMap<DataComponentPatch.PatchKey, Object> reference2ObjectMap = new Reference2ObjectArrayMap<>(dataComponentPatch.map.size());
+		}, (DataComponentPatch dataComponentPatch) -> {
+			Map<DataComponentPatch.PatchKey, Object> reference2ObjectMap = new Reference2ObjectArrayMap<>(dataComponentPatch.map.size());
 
 			for (Entry<DataComponentType<?>, Optional<?>> entry : Reference2ObjectMaps.fastIterable(dataComponentPatch.map)) {
 				DataComponentType<?> dataComponentType = (DataComponentType<?>)entry.getKey();
