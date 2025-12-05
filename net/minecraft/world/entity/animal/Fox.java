@@ -168,12 +168,12 @@ public class Fox extends Animal {
 		this.goalSelector
 			.addGoal(
 				4,
-				new AvoidEntityGoal(
-					this, Player.class, 16.0F, 1.6, 1.4, livingEntity -> AVOID_PLAYERS.test(livingEntity) && !this.trusts(livingEntity) && !this.isDefending()
+				new AvoidEntityGoal<>(
+					this, Player.class, 16.0F, 1.6, 1.4, (LivingEntity livingEntity) -> AVOID_PLAYERS.test(livingEntity) && !this.trusts(livingEntity) && !this.isDefending()
 				)
 			);
-		this.goalSelector.addGoal(4, new AvoidEntityGoal(this, Wolf.class, 8.0F, 1.6, 1.4, livingEntity -> !((Wolf)livingEntity).isTame() && !this.isDefending()));
-		this.goalSelector.addGoal(4, new AvoidEntityGoal(this, PolarBear.class, 8.0F, 1.6, 1.4, livingEntity -> !this.isDefending()));
+		this.goalSelector.addGoal(4, new AvoidEntityGoal<>(this, Wolf.class, 8.0F, 1.6, 1.4, (LivingEntity livingEntity) -> !((Wolf)livingEntity).isTame() && !this.isDefending()));
+		this.goalSelector.addGoal(4, new AvoidEntityGoal<>(this, PolarBear.class, 8.0F, 1.6, 1.4, (LivingEntity livingEntity) -> !this.isDefending()));
 		this.goalSelector.addGoal(5, new Fox.StalkPreyGoal());
 		this.goalSelector.addGoal(6, new Fox.FoxPounceGoal());
 		this.goalSelector.addGoal(6, new Fox.SeekShelterGoal(1.25));
@@ -431,7 +431,7 @@ public class Fox extends Animal {
 	protected void readAdditionalSaveData(ValueInput valueInput) {
 		super.readAdditionalSaveData(valueInput);
 		this.clearTrusted();
-		((List)valueInput.read("Trusted", TRUSTED_LIST_CODEC).orElse(List.of())).forEach(this::addTrustedEntity);
+		((List<EntityReference<LivingEntity>>)valueInput.read("Trusted", TRUSTED_LIST_CODEC).orElse(List.of())).forEach(ref -> this.addTrustedEntity(ref));
 		this.setSleeping(valueInput.getBooleanOr("Sleeping", false));
 		this.setVariant((Fox.Variant)valueInput.read("Type", Fox.Variant.CODEC).orElse(Fox.Variant.DEFAULT));
 		this.setSitting(valueInput.getBooleanOr("Sitting", false));

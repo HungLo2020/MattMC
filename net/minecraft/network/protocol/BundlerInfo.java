@@ -40,7 +40,7 @@ public interface BundlerInfo {
 						} else if (this.bundlePackets.size() >= 4096) {
 							throw new IllegalStateException("Too many packets in a bundle");
 						} else {
-							this.bundlePackets.add(packet);
+							this.bundlePackets.add((Packet<? super T>)packet);
 							return null;
 						}
 					}

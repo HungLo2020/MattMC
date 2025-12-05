@@ -157,9 +157,9 @@ public class StructureTemplate {
 	private static List<StructureTemplate.StructureBlockInfo> buildInfoList(
 		List<StructureTemplate.StructureBlockInfo> list, List<StructureTemplate.StructureBlockInfo> list2, List<StructureTemplate.StructureBlockInfo> list3
 	) {
-		Comparator<StructureTemplate.StructureBlockInfo> comparator = Comparator.comparingInt(structureBlockInfo -> structureBlockInfo.pos.getY())
-			.thenComparingInt(structureBlockInfo -> structureBlockInfo.pos.getX())
-			.thenComparingInt(structureBlockInfo -> structureBlockInfo.pos.getZ());
+		Comparator<StructureTemplate.StructureBlockInfo> comparator = Comparator.<StructureTemplate.StructureBlockInfo>comparingInt(structureBlockInfo -> structureBlockInfo.pos().getY())
+			.thenComparingInt(structureBlockInfo -> structureBlockInfo.pos().getX())
+			.thenComparingInt(structureBlockInfo -> structureBlockInfo.pos().getZ());
 		list.sort(comparator);
 		list3.sort(comparator);
 		list2.sort(comparator);

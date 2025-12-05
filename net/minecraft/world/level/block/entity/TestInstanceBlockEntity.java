@@ -100,7 +100,7 @@ public class TestInstanceBlockEntity extends BlockEntity implements BeaconBeamOw
 	}
 
 	public Component getTestName() {
-		return (Component)this.test().map(resourceKey -> Component.literal(resourceKey.location().toString())).orElse(INVALID_TEST_NAME);
+		return this.test().map(resourceKey -> (Component)Component.literal(resourceKey.location().toString())).orElse(INVALID_TEST_NAME);
 	}
 
 	private Optional<Holder.Reference<GameTestInstance>> getTestHolder() {

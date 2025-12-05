@@ -11,7 +11,7 @@ import org.jetbrains.annotations.Nullable;
 public class ChunkTaskPriorityQueue {
 	public static final int PRIORITY_LEVEL_COUNT = ChunkLevel.MAX_LEVEL + 2;
 	private final List<Long2ObjectLinkedOpenHashMap<List<Runnable>>> queuesPerPriority = IntStream.range(0, PRIORITY_LEVEL_COUNT)
-		.mapToObj(i -> new Long2ObjectLinkedOpenHashMap())
+		.mapToObj(i -> new Long2ObjectLinkedOpenHashMap<List<Runnable>>())
 		.toList();
 	private volatile int topPriorityQueueIndex = PRIORITY_LEVEL_COUNT;
 	private final String name;

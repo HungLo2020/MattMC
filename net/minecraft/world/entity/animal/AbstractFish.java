@@ -91,7 +91,7 @@ public abstract class AbstractFish extends WaterAnimal implements Bucketable {
 	protected void registerGoals() {
 		super.registerGoals();
 		this.goalSelector.addGoal(0, new PanicGoal(this, 1.25));
-		this.goalSelector.addGoal(2, new AvoidEntityGoal(this, Player.class, 8.0F, 1.6, 1.4, EntitySelector.NO_SPECTATORS::test));
+		this.goalSelector.addGoal(2, new AvoidEntityGoal<>(this, Player.class, 8.0F, 1.6, 1.4, entity -> EntitySelector.NO_SPECTATORS.test(entity)));
 		this.goalSelector.addGoal(4, new AbstractFish.FishSwimGoal(this));
 	}
 

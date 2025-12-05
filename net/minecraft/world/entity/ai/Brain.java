@@ -85,7 +85,7 @@ public class Brain<E extends LivingEntity> {
 									DataResult<? extends Brain.MemoryValue<?>> dataResult2 = dataResult.flatMap(
 										memoryModuleType -> this.captureRead(memoryModuleType, dynamicOps, (T)pair.getSecond())
 									);
-									mutableObject.setValue(mutableObject.getValue().apply2(Builder::add, dataResult2));
+									mutableObjectx.setValue(((DataResult<Builder<Brain.MemoryValue<?>>>)mutableObjectx.getValue()).apply2(Builder::add, dataResult2));
 								}
 							);
 						ImmutableList<Brain.MemoryValue<?>> immutableList = (ImmutableList<Brain.MemoryValue<?>>)mutableObjectx.getValue()
@@ -439,7 +439,7 @@ public class Brain<E extends LivingEntity> {
 			for (Entry<Activity, Set<BehaviorControl<? super E>>> entry : map.entrySet()) {
 				Activity activity = (Activity)entry.getKey();
 				if (this.activeActivities.contains(activity)) {
-					for (BehaviorControl<? super E> behaviorControl : (Set)entry.getValue()) {
+					for (BehaviorControl<? super E> behaviorControl : (Set<BehaviorControl<? super E>>)entry.getValue()) {
 						if (behaviorControl.getStatus() == Behavior.Status.STOPPED) {
 							behaviorControl.tryStart(serverLevel, livingEntity, l);
 						}
@@ -461,7 +461,7 @@ public class Brain<E extends LivingEntity> {
 		if (!this.activityRequirements.containsKey(activity)) {
 			return false;
 		} else {
-			for (Pair<MemoryModuleType<?>, MemoryStatus> pair : (Set)this.activityRequirements.get(activity)) {
+			for (Pair<MemoryModuleType<?>, MemoryStatus> pair : (Set<Pair<MemoryModuleType<?>, MemoryStatus>>)this.activityRequirements.get(activity)) {
 				MemoryModuleType<?> memoryModuleType = pair.getFirst();
 				MemoryStatus memoryStatus = pair.getSecond();
 				if (!this.checkMemory(memoryModuleType, memoryStatus)) {

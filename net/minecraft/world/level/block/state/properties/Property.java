@@ -17,10 +17,10 @@ public abstract class Property<T extends Comparable<T>> {
 	private Integer hashCode;
 	private final Codec<T> codec = Codec.STRING
 		.comapFlatMap(
-			stringx -> (DataResult)this.getValue(stringx)
+			stringx -> (DataResult<T>)this.getValue(stringx)
 				.map(DataResult::success)
 				.orElseGet(() -> DataResult.error(() -> "Unable to read property: " + this + " with value: " + stringx)),
-			this::getName
+			value -> this.getName(value)
 		);
 	private final Codec<Property.Value<T>> valueCodec = this.codec.xmap(this::value, Property.Value::value);
 

@@ -23,8 +23,8 @@ public interface DataComponentPredicate {
 			ByteBufCodecs.list(64)
 		)
 		.map(
-			list -> (Map)list.stream().collect(Collectors.toMap(DataComponentPredicate.Single::type, DataComponentPredicate.Single::predicate)),
-			map -> map.entrySet().stream().map(DataComponentPredicate.Single::fromEntry).toList()
+			list -> (Map<DataComponentPredicate.Type<?>, DataComponentPredicate>)list.stream().collect(Collectors.toMap(DataComponentPredicate.Single::type, DataComponentPredicate.Single::predicate)),
+			map -> map.entrySet().stream().map(entry -> DataComponentPredicate.Single.fromEntry((Entry<DataComponentPredicate.Type<?>, DataComponentPredicate>)entry)).toList()
 		);
 
 	static MapCodec<DataComponentPredicate.Single<?>> singleCodec(String string) {
