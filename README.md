@@ -1,6 +1,6 @@
-# Mattcraft - Minecraft Server Source
+# Mattcraft - Minecraft Source
 
-This repository contains the decompiled source code for Minecraft Java Edition 1.21.10 (dedicated server).
+This repository contains the decompiled source code for Minecraft Java Edition 1.21.10 (both client and server).
 
 ## Prerequisites
 
@@ -32,37 +32,36 @@ Before building and running, ensure you have:
    gradlew.bat build
    ```
 
+## Running the Client
+
+```bash
+./gradlew runClient
+```
+
+The client will:
+- Create a `run/` directory for game files
+- Launch with offline mode (no authentication required)
+
+**Note:** You will need game assets (textures, sounds, etc.) in the `run/assets` directory for full functionality.
+
 ## Running the Server
 
-### Quick Start (GUI mode)
+### Headless Mode (No GUI)
 
 ```bash
 ./gradlew runServer
 ```
 
+### With GUI
+
+```bash
+./gradlew runServerGui
+```
+
 The first run will:
 - Create a `run/` directory for server files
 - Automatically accept the EULA (by setting `eula=true` in `run/eula.txt`)
-- Start the server in no-GUI mode
-
-### Running with GUI
-
-To run with the server GUI:
-
-```bash
-./gradlew runServer --args=""
-```
-
-Or modify the `runServer` task in `build.gradle` to remove `--nogui` from the args.
-
-### Manual Execution
-
-After building, you can run the server directly:
-
-```bash
-cd run
-java -Xmx2G -Xms1G -jar ../build/libs/Mattcraft-1.21.10.jar
-```
+- Start the server
 
 ## Configuration
 
@@ -79,10 +78,10 @@ After the first run, edit `run/server.properties` to configure:
 
 The default JVM arguments in `build.gradle` are optimized for performance:
 - `-Xmx2G`: Maximum heap size of 2GB
-- `-Xms1G`: Initial heap size of 1GB
+- `-Xms1G`: Initial heap size of 1GB (server) / 512M (client)
 - G1 garbage collector with optimized settings
 
-Modify the `runServer` task in `build.gradle` to adjust these settings.
+Modify the tasks in `build.gradle` to adjust these settings.
 
 ## Creating a Fat JAR
 
@@ -103,8 +102,11 @@ Mattcraft/
 ├── gradle.properties     # Build properties
 ├── gradlew / gradlew.bat # Gradle wrapper scripts
 ├── gradle/               # Gradle wrapper files
-├── com/                  # com.mojang.math source files
+├── com/                  # com.mojang source files (blaze3d, realmsclient, etc.)
 ├── net/minecraft/        # Main Minecraft source code
+│   ├── client/           # Client-specific code
+│   │   ├── main/Main.java # Client entry point
+│   │   └── ...
 │   ├── server/           # Server-specific code
 │   │   ├── Main.java     # Server entry point
 │   │   └── ...
@@ -113,14 +115,10 @@ Mattcraft/
 │   └── ...
 ├── src/main/resources/   # Resource files
 │   └── version.json      # Version information
-└── run/                  # Server runtime directory (created on first run)
+└── run/                  # Runtime directory (created on first run)
 ```
 
 ## Notes
-
-### Client Code
-
-This distribution contains **server-only** source code. The client source code (rendering, GUI, input handling, etc.) is not included. The `runClient` task will display an error message indicating that client code is not available.
 
 ### EULA
 
@@ -152,11 +150,17 @@ If you have multiple Java versions, set `JAVA_HOME` to Java 21's path.
 
 ### Out of memory errors
 
-Increase the heap size in the `runServer` task:
+Increase the heap size in the run tasks:
 
 ```groovy
 jvmArgs = ['-Xmx4G', '-Xms2G', ...]
 ```
+
+### Client crashes on startup
+
+Make sure you have:
+- A graphics driver that supports OpenGL 4.4+
+- Game assets in `run/assets` directory
 
 ## License
 

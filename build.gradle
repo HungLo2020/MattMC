@@ -6,6 +6,16 @@ plugins {
 group = 'net.minecraft'
 version = '1.21.10'
 
+// LWJGL version and natives configuration
+def lwjglVersion = '3.3.3'
+def lwjglNatives = System.getProperty('os.name').toLowerCase().contains('mac') 
+    ? (System.getProperty('os.arch').contains('aarch64') ? 'natives-macos-arm64' : 'natives-macos')
+    : System.getProperty('os.name').toLowerCase().contains('win') 
+        ? (System.getProperty('os.arch').contains('64') ? 'natives-windows' : 'natives-windows-x86')
+        : (System.getProperty('os.arch').contains('arm') || System.getProperty('os.arch').contains('aarch64')) 
+            ? 'natives-linux-arm64' 
+            : 'natives-linux'
+
 java {
     toolchain {
         languageVersion = JavaLanguageVersion.of(21)
@@ -35,6 +45,10 @@ repositories {
             includeGroup 'com.mojang'
             includeGroup 'net.minecraftforge'
         }
+    }
+    // Fabric Maven for Fabric API
+    maven {
+        url 'https://maven.fabricmc.net/'
     }
 }
 
@@ -97,6 +111,32 @@ dependencies {
     
     // ICU4J for Unicode support
     implementation 'com.ibm.icu:icu4j:74.2'
+    
+    // ===== CLIENT DEPENDENCIES =====
+    
+    // LWJGL - Lightweight Java Game Library (OpenGL, GLFW, OpenAL, etc.)
+    implementation platform("org.lwjgl:lwjgl-bom:${lwjglVersion}")
+    implementation 'org.lwjgl:lwjgl'
+    implementation 'org.lwjgl:lwjgl-glfw'
+    implementation 'org.lwjgl:lwjgl-opengl'
+    implementation 'org.lwjgl:lwjgl-openal'
+    implementation 'org.lwjgl:lwjgl-stb'
+    implementation 'org.lwjgl:lwjgl-tinyfd'
+    implementation 'org.lwjgl:lwjgl-freetype'
+    implementation 'org.lwjgl:lwjgl-jemalloc'
+    
+    // LWJGL natives
+    runtimeOnly "org.lwjgl:lwjgl::${lwjglNatives}"
+    runtimeOnly "org.lwjgl:lwjgl-glfw::${lwjglNatives}"
+    runtimeOnly "org.lwjgl:lwjgl-opengl::${lwjglNatives}"
+    runtimeOnly "org.lwjgl:lwjgl-openal::${lwjglNatives}"
+    runtimeOnly "org.lwjgl:lwjgl-stb::${lwjglNatives}"
+    runtimeOnly "org.lwjgl:lwjgl-tinyfd::${lwjglNatives}"
+    runtimeOnly "org.lwjgl:lwjgl-freetype::${lwjglNatives}"
+    runtimeOnly "org.lwjgl:lwjgl-jemalloc::${lwjglNatives}"
+    
+    // Fabric API (for annotations like @Environment)
+    implementation 'net.fabricmc:fabric-loader:0.16.9'
 }
 
 sourceSets {
@@ -119,38 +159,63 @@ application {
     mainClass = 'net.minecraft.server.Main'
 }
 
-// Task to run the dedicated server
+// Common JVM arguments for server tasks
+def serverJvmArgs = [
+    '-Xmx2G',
+    '-Xms1G',
+    '-XX:+UseG1GC',
+    '-XX:+ParallelRefProcEnabled',
+    '-XX:MaxGCPauseMillis=200',
+    '-XX:+UnlockExperimentalVMOptions',
+    '-XX:+DisableExplicitGC',
+    '-XX:G1NewSizePercent=30',
+    '-XX:G1MaxNewSizePercent=40',
+    '-XX:G1HeapRegionSize=8M',
+    '-XX:G1ReservePercent=20',
+    '-XX:G1HeapWastePercent=5',
+    '-XX:G1MixedGCCountTarget=4',
+    '-XX:InitiatingHeapOccupancyPercent=15',
+    '-XX:G1MixedGCLiveThresholdPercent=90',
+    '-XX:G1RSetUpdatingPauseTimePercent=5',
+    '-XX:SurvivorRatio=32',
+    '-XX:+PerfDisableSharedMem',
+    '-XX:MaxTenuringThreshold=1'
+]
+
+// Common JVM arguments for client tasks
+def clientJvmArgs = [
+    '-Xmx2G',
+    '-Xms512M',
+    '-XX:+UseG1GC',
+    '-XX:+ParallelRefProcEnabled',
+    '-XX:MaxGCPauseMillis=200',
+    '-XX:+UnlockExperimentalVMOptions',
+    '-XX:+DisableExplicitGC',
+    '-XX:G1NewSizePercent=30',
+    '-XX:G1MaxNewSizePercent=40',
+    '-XX:G1HeapRegionSize=8M',
+    '-XX:G1ReservePercent=20',
+    '-XX:G1HeapWastePercent=5',
+    '-XX:G1MixedGCCountTarget=4',
+    '-XX:InitiatingHeapOccupancyPercent=15',
+    '-XX:G1MixedGCLiveThresholdPercent=90',
+    '-XX:G1RSetUpdatingPauseTimePercent=5',
+    '-XX:SurvivorRatio=32',
+    '-XX:+PerfDisableSharedMem',
+    '-XX:MaxTenuringThreshold=1',
+    '-Dorg.lwjgl.util.Debug=true'
+]
+
+// Task to run the dedicated server (no GUI - headless mode)
 tasks.register('runServer', JavaExec) {
     group = 'minecraft'
-    description = 'Runs the Minecraft dedicated server'
+    description = 'Runs the Minecraft dedicated server (no GUI)'
     
     classpath = sourceSets.main.runtimeClasspath
     mainClass = 'net.minecraft.server.Main'
     
     workingDir = file('run')
-    
-    jvmArgs = [
-        '-Xmx2G',
-        '-Xms1G',
-        '-XX:+UseG1GC',
-        '-XX:+ParallelRefProcEnabled',
-        '-XX:MaxGCPauseMillis=200',
-        '-XX:+UnlockExperimentalVMOptions',
-        '-XX:+DisableExplicitGC',
-        '-XX:G1NewSizePercent=30',
-        '-XX:G1MaxNewSizePercent=40',
-        '-XX:G1HeapRegionSize=8M',
-        '-XX:G1ReservePercent=20',
-        '-XX:G1HeapWastePercent=5',
-        '-XX:G1MixedGCCountTarget=4',
-        '-XX:InitiatingHeapOccupancyPercent=15',
-        '-XX:G1MixedGCLiveThresholdPercent=90',
-        '-XX:G1RSetUpdatingPauseTimePercent=5',
-        '-XX:SurvivorRatio=32',
-        '-XX:+PerfDisableSharedMem',
-        '-XX:MaxTenuringThreshold=1'
-    ]
-    
+    jvmArgs = serverJvmArgs
     args = ['--nogui']
     
     doFirst {
@@ -160,13 +225,51 @@ tasks.register('runServer', JavaExec) {
     standardInput = System.in
 }
 
-// Task for client (placeholder - client code not included in this server-only source)
-tasks.register('runClient') {
+// Task to run the dedicated server with GUI
+tasks.register('runServerGui', JavaExec) {
     group = 'minecraft'
-    description = 'Client is not available - this is a server-only source distribution'
-    doLast {
-        throw new GradleException('Client source code is not included in this distribution. Only the dedicated server can be run.')
+    description = 'Runs the Minecraft dedicated server with GUI'
+    
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'net.minecraft.server.Main'
+    
+    workingDir = file('run')
+    jvmArgs = serverJvmArgs
+    // No --nogui argument means GUI will be shown
+    
+    doFirst {
+        workingDir.mkdirs()
     }
+    
+    standardInput = System.in
+}
+
+// Task to run the Minecraft client
+tasks.register('runClient', JavaExec) {
+    group = 'minecraft'
+    description = 'Runs the Minecraft client'
+    
+    classpath = sourceSets.main.runtimeClasspath
+    mainClass = 'net.minecraft.client.main.Main'
+    
+    workingDir = file('run')
+    jvmArgs = clientJvmArgs
+    
+    // Required client arguments
+    args = [
+        '--version', '1.21.10',
+        '--accessToken', '0',
+        '--gameDir', file('run').absolutePath,
+        '--assetsDir', file('run/assets').absolutePath
+    ]
+    
+    doFirst {
+        workingDir.mkdirs()
+        file('run/assets').mkdirs()
+        file('run/resourcepacks').mkdirs()
+    }
+    
+    standardInput = System.in
 }
 
 // Task to create eula.txt
@@ -184,6 +287,7 @@ tasks.register('acceptEula') {
 
 // Ensure run directory and eula exist before running server
 runServer.dependsOn acceptEula
+runServerGui.dependsOn acceptEula
 
 // Build task configuration
 tasks.withType(JavaCompile).configureEach {
