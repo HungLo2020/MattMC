@@ -116,6 +116,9 @@ dependencies {
     // Java-ObjC-Bridge for macOS Objective-C interop
     implementation 'ca.weblite:java-objc-bridge:1.2'
     
+    // JOrbis - Ogg Vorbis audio decoder
+    implementation 'org.jcraft:jorbis:0.0.17'
+    
     // ===== CLIENT DEPENDENCIES =====
     
     // LWJGL - Lightweight Java Game Library (OpenGL, GLFW, OpenAL, etc.)
