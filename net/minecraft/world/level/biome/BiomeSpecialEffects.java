@@ -271,6 +271,7 @@ public class BiomeSpecialEffects {
 		},
 		SWAMP("swamp") {
 			@Override
+			@SuppressWarnings("removal")
 			public int modifyColor(double d, double e, int i) {
 				double f = Biome.BIOME_INFO_NOISE.getValue(d * 0.0225, e * 0.0225, false);
 				return f < -0.1 ? 5011004 : 6975545;

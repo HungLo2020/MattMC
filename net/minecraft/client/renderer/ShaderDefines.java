@@ -17,7 +17,7 @@ public record ShaderDefines(Map<String, String> values, Set<String> flags) {
 	public static final Codec<ShaderDefines> CODEC = RecordCodecBuilder.create(
 		instance -> instance.group(
 				Codec.unboundedMap(Codec.STRING, Codec.STRING).optionalFieldOf("values", Map.of()).forGetter(ShaderDefines::values),
-				Codec.STRING.listOf().<Set>xmap(Set::copyOf, List::copyOf).optionalFieldOf("flags", Set.of()).forGetter(ShaderDefines::flags)
+				Codec.STRING.listOf().<Set<String>>xmap(Set::copyOf, List::copyOf).optionalFieldOf("flags", Set.of()).forGetter(shaderDefines -> shaderDefines.flags())
 			)
 			.apply(instance, ShaderDefines::new)
 	);
