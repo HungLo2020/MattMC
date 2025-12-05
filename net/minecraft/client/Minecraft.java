@@ -427,9 +427,8 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 		this.vanillaPackResources = clientPackSource.getVanillaPack();
 		this.proxy = gameConfig.user.proxy;
 		this.offlineDeveloperMode = gameConfig.game.offlineDeveloperMode;
-		YggdrasilAuthenticationService yggdrasilAuthenticationService = this.offlineDeveloperMode
-			? YggdrasilAuthenticationService.createOffline(this.proxy)
-			: new YggdrasilAuthenticationService(this.proxy);
+		// YggdrasilAuthenticationService.createOffline doesn't exist in public API, use regular constructor
+		YggdrasilAuthenticationService yggdrasilAuthenticationService = new YggdrasilAuthenticationService(this.proxy);
 		this.services = Services.create(yggdrasilAuthenticationService, this.gameDirectory);
 		this.user = gameConfig.user.user;
 		this.profileFuture = this.offlineDeveloperMode
@@ -762,13 +761,13 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 	private boolean addInitialScreens(List<Function<Runnable, Screen>> list) {
 		boolean bl = false;
 		if (this.options.onboardAccessibility || SharedConstants.DEBUG_FORCE_ONBOARDING_SCREEN) {
-			list.add((Function)runnable -> new AccessibilityOnboardingScreen(this.options, runnable));
+			list.add((Function<Runnable, Screen>)(Runnable runnable) -> new AccessibilityOnboardingScreen(this.options, runnable));
 			bl = true;
 		}
 
 		BanDetails banDetails = this.multiplayerBan();
 		if (banDetails != null) {
-			list.add((Function)runnable -> BanNoticeScreens.create(blx -> {
+			list.add((Function<Runnable, Screen>)(Runnable runnable) -> BanNoticeScreens.create(blx -> {
 				if (blx) {
 					Util.getPlatform().openUri(CommonLinks.SUSPENSION_HELP);
 				}
@@ -782,7 +781,7 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 			GameProfile gameProfile = profileResult.profile();
 			Set<ProfileActionType> set = profileResult.actions();
 			if (set.contains(ProfileActionType.FORCED_NAME_CHANGE)) {
-				list.add((Function)runnable -> BanNoticeScreens.createNameBan(gameProfile.getName(), runnable));
+				list.add((Function<Runnable, Screen>)(Runnable runnable) -> BanNoticeScreens.createNameBan(gameProfile.getName(), runnable));
 			}
 
 			if (set.contains(ProfileActionType.USING_BANNED_SKIN)) {
