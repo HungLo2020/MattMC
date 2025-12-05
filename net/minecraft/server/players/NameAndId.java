@@ -19,7 +19,7 @@ public record NameAndId(UUID id, String name) {
 	}
 
 	public NameAndId(com.mojang.authlib.yggdrasil.response.NameAndId nameAndId) {
-		this(nameAndId.getId(), nameAndId.getName());
+		this(nameAndId.id(), nameAndId.name());
 	}
 
 	@Nullable
@@ -41,8 +41,8 @@ public record NameAndId(UUID id, String name) {
 	}
 
 	public void appendTo(JsonObject jsonObject) {
-		jsonObject.addProperty("uuid", this.getId().toString());
-		jsonObject.addProperty("name", this.getName());
+		jsonObject.addProperty("uuid", this.id().toString());
+		jsonObject.addProperty("name", this.name());
 	}
 
 	public static NameAndId createOffline(String string) {

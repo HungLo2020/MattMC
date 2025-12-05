@@ -935,7 +935,7 @@ public abstract class MinecraftServer extends ReentrantBlockableEventLoop<TickTa
 		}
 	}
 
-	protected void doRunTask(TickTask tickTask) {
+	public void doRunTask(TickTask tickTask) {
 		Profiler.get().incrementCounter("runTask");
 		super.doRunTask(tickTask);
 	}
