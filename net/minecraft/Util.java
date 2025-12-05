@@ -1086,6 +1086,7 @@ public class Util {
 			this.telemetryName = string2;
 		}
 
+		@SuppressWarnings("removal")
 		public void openUri(URI uRI) {
 			try {
 				Process process = (Process)AccessController.doPrivileged((PrivilegedExceptionAction<Process>)() -> Runtime.getRuntime().exec(this.getOpenUriArguments(uRI)));

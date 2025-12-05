@@ -111,6 +111,7 @@ import net.minecraft.world.level.material.FluidState;
 import net.minecraft.world.level.saveddata.maps.MapId;
 import net.minecraft.world.level.saveddata.maps.MapItemSavedData;
 import net.minecraft.world.level.storage.WritableLevelData;
+import net.minecraft.world.level.storage.LevelData;
 import net.minecraft.world.level.storage.LevelData.RespawnData;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
