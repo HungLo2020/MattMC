@@ -15,7 +15,7 @@ public record NameAndId(UUID id, String name) {
 	);
 
 	public NameAndId(GameProfile gameProfile) {
-		this(gameProfile.id(), gameProfile.name());
+		this(gameProfile.getId(), gameProfile.getName());
 	}
 
 	public NameAndId(com.mojang.authlib.yggdrasil.response.NameAndId nameAndId) {

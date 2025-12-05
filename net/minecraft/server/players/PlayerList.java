@@ -142,8 +142,8 @@ public abstract class PlayerList {
 	public void placeNewPlayer(Connection connection, ServerPlayer serverPlayer, CommonListenerCookie commonListenerCookie) {
 		NameAndId nameAndId = serverPlayer.nameAndId();
 		UserNameToIdResolver userNameToIdResolver = this.server.services().nameToIdCache();
-		Optional<NameAndId> optional = userNameToIdResolver.get(nameAndId.id());
-		String string = (String)optional.map(NameAndId::name).orElse(nameAndId.name());
+		Optional<NameAndId> optional = userNameToIdResolver.get(nameAndId.getId());
+		String string = (String)optional.map(NameAndId::name).orElse(nameAndId.getName());
 		userNameToIdResolver.add(nameAndId);
 		ServerLevel serverLevel = serverPlayer.level();
 		String string2 = connection.getLoggableAddress(this.server.logIPs());
@@ -194,7 +194,7 @@ public abstract class PlayerList {
 		this.updateEntireScoreboard(serverLevel.getScoreboard(), serverPlayer);
 		this.server.invalidateStatus();
 		MutableComponent mutableComponent;
-		if (serverPlayer.getGameProfile().name().equalsIgnoreCase(string)) {
+		if (serverPlayer.getGameProfile().getName().equalsIgnoreCase(string)) {
 			mutableComponent = Component.translatable("multiplayer.player.joined", serverPlayer.getDisplayName());
 		} else {
 			mutableComponent = Component.translatable("multiplayer.player.joined.renamed", serverPlayer.getDisplayName(), string);
@@ -516,7 +516,7 @@ public abstract class PlayerList {
 		String[] strings = new String[this.players.size()];
 
 		for (int i = 0; i < this.players.size(); i++) {
-			strings[i] = ((ServerPlayer)this.players.get(i)).getGameProfile().name();
+			strings[i] = ((ServerPlayer)this.players.get(i)).getGameProfile().getName();
 		}
 
 		return strings;
@@ -541,7 +541,7 @@ public abstract class PlayerList {
 					nameAndId, (Integer)optional.orElse(this.server.operatorUserPermissionLevel()), (Boolean)optional2.orElse(this.ops.canBypassPlayerLimit(nameAndId))
 				)
 			);
-		ServerPlayer serverPlayer = this.getPlayer(nameAndId.id());
+		ServerPlayer serverPlayer = this.getPlayer(nameAndId.getId());
 		if (serverPlayer != null) {
 			this.sendPlayerPermissionLevel(serverPlayer);
 		}
@@ -549,7 +549,7 @@ public abstract class PlayerList {
 
 	public void deop(NameAndId nameAndId) {
 		if (this.ops.remove(nameAndId)) {
-			ServerPlayer serverPlayer = this.getPlayer(nameAndId.id());
+			ServerPlayer serverPlayer = this.getPlayer(nameAndId.getId());
 			if (serverPlayer != null) {
 				this.sendPlayerPermissionLevel(serverPlayer);
 			}
@@ -589,7 +589,7 @@ public abstract class PlayerList {
 
 		for (int j = 0; j < i; j++) {
 			ServerPlayer serverPlayer = (ServerPlayer)this.players.get(j);
-			if (serverPlayer.getGameProfile().name().equalsIgnoreCase(string)) {
+			if (serverPlayer.getGameProfile().getName().equalsIgnoreCase(string)) {
 				return serverPlayer;
 			}
 		}
@@ -757,13 +757,13 @@ public abstract class PlayerList {
 
 	public ServerStatsCounter getPlayerStats(Player player) {
 		GameProfile gameProfile = player.getGameProfile();
-		UUID uUID = gameProfile.id();
+		UUID uUID = gameProfile.getId();
 		ServerStatsCounter serverStatsCounter = (ServerStatsCounter)this.stats.get(uUID);
 		if (serverStatsCounter == null) {
 			File file = this.server.getWorldPath(LevelResource.PLAYER_STATS_DIR).toFile();
 			File file2 = new File(file, uUID + ".json");
 			if (!file2.exists()) {
-				File file3 = new File(file, gameProfile.name() + ".json");
+				File file3 = new File(file, gameProfile.getName() + ".json");
 				Path path = file3.toPath();
 				if (FileUtil.isPathNormalized(path) && FileUtil.isPathPortable(path) && path.startsWith(file.getPath()) && file3.isFile()) {
 					file3.renameTo(file2);
@@ -824,7 +824,7 @@ public abstract class PlayerList {
 	@Nullable
 	public ServerPlayer getPlayer(String string) {
 		for (ServerPlayer serverPlayer : this.players) {
-			if (serverPlayer.getGameProfile().name().equalsIgnoreCase(string)) {
+			if (serverPlayer.getGameProfile().getName().equalsIgnoreCase(string)) {
 				return serverPlayer;
 			}
 		}

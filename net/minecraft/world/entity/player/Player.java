@@ -181,7 +181,7 @@ public abstract class Player extends Avatar implements ContainerUser {
 
 	public Player(Level level, GameProfile gameProfile) {
 		super(EntityType.PLAYER, level);
-		this.setUUID(gameProfile.id());
+		this.setUUID(gameProfile.getId());
 		this.gameProfile = gameProfile;
 		this.inventory = new Inventory(this, this.equipment);
 		this.inventoryMenu = new InventoryMenu(this.inventory, !level.isClientSide(), this);
@@ -633,7 +633,7 @@ public abstract class Player extends Avatar implements ContainerUser {
 	@Override
 	protected void readAdditionalSaveData(ValueInput valueInput) {
 		super.readAdditionalSaveData(valueInput);
-		this.setUUID(this.gameProfile.id());
+		this.setUUID(this.gameProfile.getId());
 		this.inventory.load(valueInput.listOrEmpty("Inventory", ItemStackWithSlot.CODEC));
 		this.inventory.setSelectedSlot(valueInput.getIntOr("SelectedItemSlot", 0));
 		this.sleepCounter = valueInput.getShortOr("SleepTimer", (short)0);
@@ -750,12 +750,12 @@ public abstract class Player extends Avatar implements ContainerUser {
 	}
 
 	@Override
-	protected void hurtArmor(DamageSource damageSource, float f) {
+	public void hurtArmor(DamageSource damageSource, float f) {
 		this.doHurtEquipment(damageSource, f, new EquipmentSlot[]{EquipmentSlot.FEET, EquipmentSlot.LEGS, EquipmentSlot.CHEST, EquipmentSlot.HEAD});
 	}
 
 	@Override
-	protected void hurtHelmet(DamageSource damageSource, float f) {
+	public void hurtHelmet(DamageSource damageSource, float f) {
 		this.doHurtEquipment(damageSource, f, new EquipmentSlot[]{EquipmentSlot.HEAD});
 	}
 
@@ -1526,12 +1526,12 @@ public abstract class Player extends Avatar implements ContainerUser {
 
 	@Override
 	public Component getName() {
-		return Component.literal(this.gameProfile.name());
+		return Component.literal(this.gameProfile.getName());
 	}
 
 	@Override
 	public String getPlainTextName() {
-		return this.gameProfile.name();
+		return this.gameProfile.getName();
 	}
 
 	public PlayerEnderChestContainer getEnderChestInventory() {
@@ -1581,7 +1581,7 @@ public abstract class Player extends Avatar implements ContainerUser {
 	}
 
 	private MutableComponent decorateDisplayNameComponent(MutableComponent mutableComponent) {
-		String string = this.getGameProfile().name();
+		String string = this.getGameProfile().getName();
 		return mutableComponent.withStyle(
 			style -> style.withClickEvent(new ClickEvent.SuggestCommand("/tell " + string + " ")).withHoverEvent(this.createHoverEvent()).withInsertion(string)
 		);
@@ -1589,7 +1589,7 @@ public abstract class Player extends Avatar implements ContainerUser {
 
 	@Override
 	public String getScoreboardName() {
-		return this.getGameProfile().name();
+		return this.getGameProfile().getName();
 	}
 
 	@Override
