@@ -82,7 +82,7 @@ public class IntegratedServer extends MinecraftServer {
 		this.loadLevel();
 		GameProfile gameProfile = this.getSingleplayerProfile();
 		String string = this.getWorldData().getLevelName();
-		this.setMotd(gameProfile != null ? gameProfile.name() + " - " + string : string);
+			this.setMotd(gameProfile != null ? gameProfile.getName() + " - " + string : string);
 		return true;
 	}
 
@@ -251,8 +251,8 @@ public class IntegratedServer extends MinecraftServer {
 		this.uuid = uUID;
 	}
 
-	public boolean isSingleplayerOwner(NameAndId nameAndId) {
-		return this.getSingleplayerProfile() != null && nameAndId.name().equalsIgnoreCase(this.getSingleplayerProfile().name());
+		public boolean isSingleplayerOwner(NameAndId nameAndId) {
+		return this.getSingleplayerProfile() != null && nameAndId.name().equalsIgnoreCase(this.getSingleplayerProfile().getName());
 	}
 
 	public int getScaledTrackingDistance(int i) {

@@ -55,7 +55,7 @@ public class ClientSuggestionProvider implements PermissionSource, SharedSuggest
 		List<String> list = Lists.<String>newArrayList();
 
 		for (PlayerInfo playerInfo : this.connection.getOnlinePlayers()) {
-			list.add(playerInfo.getProfile().name());
+			list.add(playerInfo.getProfile().getName());
 		}
 
 		return list;
@@ -130,7 +130,7 @@ public class ClientSuggestionProvider implements PermissionSource, SharedSuggest
 			BlockPos blockPos = ((BlockHitResult)hitResult).getBlockPos();
 			return Collections.singleton(new TextCoordinates(prettyPrint(blockPos.getX()), prettyPrint(blockPos.getY()), prettyPrint(blockPos.getZ())));
 		} else {
-			return super.getRelevantCoordinates();
+			return SharedSuggestionProvider.super.getRelevantCoordinates();
 		}
 	}
 
@@ -140,7 +140,7 @@ public class ClientSuggestionProvider implements PermissionSource, SharedSuggest
 			Vec3 vec3 = hitResult.getLocation();
 			return Collections.singleton(new TextCoordinates(prettyPrint(vec3.x), prettyPrint(vec3.y), prettyPrint(vec3.z)));
 		} else {
-			return super.getAbsoluteCoordinates();
+			return SharedSuggestionProvider.super.getAbsoluteCoordinates();
 		}
 	}
 

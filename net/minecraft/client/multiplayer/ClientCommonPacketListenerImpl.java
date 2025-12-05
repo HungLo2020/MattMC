@@ -43,6 +43,7 @@ import net.minecraft.core.Holder;
 import net.minecraft.nbt.Tag;
 import net.minecraft.network.Connection;
 import net.minecraft.network.DisconnectionDetails;
+import net.minecraft.network.PacketListener;
 import net.minecraft.network.ServerboundPacketListener;
 import net.minecraft.network.chat.CommonComponents;
 import net.minecraft.network.chat.Component;
@@ -143,7 +144,7 @@ public abstract class ClientCommonPacketListenerImpl implements ClientCommonPack
 	}
 
 	public boolean shouldHandleMessage(Packet<?> packet) {
-		return super.shouldHandleMessage(packet)
+		return this.isAcceptingMessages()
 			? true
 			: this.isTransferring && (packet instanceof ClientboundStoreCookiePacket || packet instanceof ClientboundTransferPacket);
 	}

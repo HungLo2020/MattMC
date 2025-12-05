@@ -75,7 +75,7 @@ public class ModelFeatureRenderer {
 		for (Entry<RenderType, List<SubmitNodeStorage.ModelSubmit<?>>> entry : iterable) {
 			VertexConsumer vertexConsumer = bufferSource.getBuffer((RenderType)entry.getKey());
 
-			for (SubmitNodeStorage.ModelSubmit<?> modelSubmit : (List)entry.getValue()) {
+			for (SubmitNodeStorage.ModelSubmit<?> modelSubmit : (List<SubmitNodeStorage.ModelSubmit<?>>)entry.getValue()) {
 				this.renderModel(modelSubmit, (RenderType)entry.getKey(), vertexConsumer, outlineBufferSource, bufferSource2);
 			}
 		}

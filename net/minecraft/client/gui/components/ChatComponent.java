@@ -497,8 +497,10 @@ public class ChatComponent {
 			: chatConstructor.create(chatMethod.prefix(), false);
 	}
 
-	public void openScreen(ChatComponent.ChatMethod chatMethod, ChatScreen.ChatConstructor<?> chatConstructor) {
-		this.minecraft.setScreen(this.createScreen(chatMethod, (ChatScreen.ChatConstructor<Screen>)chatConstructor));
+		public void openScreen(ChatComponent.ChatMethod chatMethod, ChatScreen.ChatConstructor<?> chatConstructor) {
+		@SuppressWarnings("unchecked")
+		ChatScreen.ChatConstructor<ChatScreen> typedConstructor = (ChatScreen.ChatConstructor<ChatScreen>)(ChatScreen.ChatConstructor<?>)chatConstructor;
+		this.minecraft.setScreen(this.createScreen(chatMethod, typedConstructor));
 	}
 
 	public void preserveCurrentChatScreen() {

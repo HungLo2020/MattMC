@@ -203,6 +203,7 @@ public class FilePackResources extends AbstractPackResources {
 			}
 		}
 
+		@SuppressWarnings("removal")
 		protected void finalize() throws Throwable {
 			this.close();
 			super.finalize();

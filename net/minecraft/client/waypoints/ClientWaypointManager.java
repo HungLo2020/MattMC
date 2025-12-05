@@ -33,10 +33,10 @@ public class ClientWaypointManager implements TrackedWaypointManager {
 	}
 
 	public void forEachWaypoint(Entity entity, Consumer<TrackedWaypoint> consumer) {
-		this.waypoints
+			this.waypoints
 			.values()
 			.stream()
-			.sorted(Comparator.comparingDouble(trackedWaypoint -> trackedWaypoint.distanceSquared(entity)).reversed())
+			.sorted(Comparator.<TrackedWaypoint>comparingDouble(trackedWaypoint -> trackedWaypoint.distanceSquared(entity)).reversed())
 			.forEachOrdered(consumer);
 	}
 }

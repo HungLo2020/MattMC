@@ -219,7 +219,7 @@ public abstract class TrackingDebugSynchronizer<T> {
 			}
 
 			for (Entry<BlockPos, TrackingDebugSynchronizer.ValueSource<T>> entry : this.blockEntitySources.entrySet()) {
-				T object = ((TrackingDebugSynchronizer.ValueSource)entry.getValue()).lastSyncedValue;
+				T object = ((TrackingDebugSynchronizer.ValueSource<T>)entry.getValue()).lastSyncedValue;
 				if (object != null) {
 					BlockPos blockPos = (BlockPos)entry.getKey();
 					if (chunkPos.contains(blockPos)) {

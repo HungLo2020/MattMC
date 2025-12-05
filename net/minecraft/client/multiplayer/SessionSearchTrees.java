@@ -68,7 +68,7 @@ public class SessionSearchTrees {
 				TooltipFlag tooltipFlag = Default.NORMAL;
 				CompletableFuture<?> completableFuture = this.recipeSearch;
 				this.recipeSearch = CompletableFuture.supplyAsync(
-					() -> new FullTextSearchTree(
+					() -> new FullTextSearchTree<RecipeCollection>(
 						recipeCollection -> getTooltipLines(
 							recipeCollection.getRecipes().stream().flatMap(recipeDisplayEntry -> recipeDisplayEntry.resultItems(contextMap).stream()), tooltipContext, tooltipFlag
 						),
@@ -92,10 +92,10 @@ public class SessionSearchTrees {
 	public void updateCreativeTags(List<ItemStack> list) {
 		this.register(
 			CREATIVE_TAGS,
-			() -> {
+				() -> {
 				CompletableFuture<?> completableFuture = this.creativeByTagSearch;
 				this.creativeByTagSearch = CompletableFuture.supplyAsync(
-					() -> new IdSearchTree(itemStack -> itemStack.getTags().map(TagKey::location), list), Util.backgroundExecutor()
+					() -> new IdSearchTree<ItemStack>(itemStack -> itemStack.getTags().map(TagKey::location), list), Util.backgroundExecutor()
 				);
 				completableFuture.cancel(true);
 			}
@@ -109,12 +109,12 @@ public class SessionSearchTrees {
 	public void updateCreativeTooltips(Provider provider, List<ItemStack> list) {
 		this.register(
 			CREATIVE_NAMES,
-			() -> {
+				() -> {
 				TooltipContext tooltipContext = TooltipContext.of(provider);
 				TooltipFlag tooltipFlag = Default.NORMAL.asCreative();
 				CompletableFuture<?> completableFuture = this.creativeByNameSearch;
 				this.creativeByNameSearch = CompletableFuture.supplyAsync(
-					() -> new FullTextSearchTree(
+					() -> new FullTextSearchTree<ItemStack>(
 						itemStack -> getTooltipLines(Stream.of(itemStack), tooltipContext, tooltipFlag),
 						itemStack -> itemStack.getItemHolder().unwrapKey().map(ResourceKey::location).stream(),
 						list

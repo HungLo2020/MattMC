@@ -43,7 +43,7 @@ public class ClientMannequin extends Mannequin implements ClientAvatarEntity {
 		this.avatarState.tick(this.position(), this.getDeltaMovement());
 		if (this.skinLookup != null && this.skinLookup.isDone()) {
 			try {
-				((Optional)this.skinLookup.get()).ifPresent(this::setSkin);
+				((Optional<PlayerSkin>)this.skinLookup.get()).ifPresent(this::setSkin);
 				this.skinLookup = null;
 			} catch (Exception var2) {
 				LOGGER.error("Error when trying to look up skin", (Throwable)var2);

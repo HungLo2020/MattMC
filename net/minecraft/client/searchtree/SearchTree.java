@@ -21,7 +21,7 @@ public interface SearchTree<T> {
 			SuffixArray<T> suffixArray = new SuffixArray<>();
 
 			for (T object : list) {
-				((Stream)function.apply(object)).forEach(string -> suffixArray.add(object, string.toLowerCase(Locale.ROOT)));
+				((Stream<String>)function.apply(object)).forEach(string -> suffixArray.add(object, string.toLowerCase(Locale.ROOT)));
 			}
 
 			suffixArray.generate();

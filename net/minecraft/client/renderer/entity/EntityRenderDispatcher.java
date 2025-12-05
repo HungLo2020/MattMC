@@ -93,12 +93,13 @@ public class EntityRenderDispatcher implements ResourceManagerReloadListener {
 		this.equipmentAssets = equipmentAssetManager;
 	}
 
+	@SuppressWarnings({"unchecked", "rawtypes"})
 	public <T extends Entity> EntityRenderer<? super T, ?> getRenderer(T entity) {
 		return (EntityRenderer<? super T, ?>)(switch (entity) {
 			case AbstractClientPlayer abstractClientPlayer -> this.getAvatarRenderer(
-				(Map<PlayerModelType, AvatarRenderer<T>>)this.playerRenderers, (T)abstractClientPlayer
+				(Map)this.playerRenderers, abstractClientPlayer
 			);
-			case ClientMannequin clientMannequin -> this.getAvatarRenderer((Map<PlayerModelType, AvatarRenderer<T>>)this.mannequinRenderers, (T)clientMannequin);
+			case ClientMannequin clientMannequin -> this.getAvatarRenderer((Map)this.mannequinRenderers, clientMannequin);
 			default -> (EntityRenderer)this.renderers.get(entity.getType());
 		});
 	}

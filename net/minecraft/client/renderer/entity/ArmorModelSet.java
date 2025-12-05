@@ -37,6 +37,6 @@ public record ArmorModelSet<T>(T head, T chest, T legs, T feet) {
 	public static <M extends HumanoidModel<?>> ArmorModelSet<M> bake(
 		ArmorModelSet<ModelLayerLocation> armorModelSet, EntityModelSet entityModelSet, Function<ModelPart, M> function
 	) {
-		return armorModelSet.map(modelLayerLocation -> (HumanoidModel)function.apply(entityModelSet.bakeLayer(modelLayerLocation)));
+		return armorModelSet.map(modelLayerLocation -> function.apply(entityModelSet.bakeLayer(modelLayerLocation)));
 	}
 }

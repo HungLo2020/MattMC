@@ -121,7 +121,7 @@ public class BiomeGenerationSettings {
 
 		public BiomeGenerationSettings build() {
 			return new BiomeGenerationSettings(
-				HolderSet.direct(this.carvers), (List<HolderSet<PlacedFeature>>)this.features.stream().map(HolderSet::direct).collect(ImmutableList.toImmutableList())
+				HolderSet.direct(this.carvers), this.features.stream().map(HolderSet::direct).collect(ImmutableList.toImmutableList())
 			);
 		}
 	}

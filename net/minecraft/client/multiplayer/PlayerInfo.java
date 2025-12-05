@@ -36,7 +36,7 @@ public class PlayerInfo {
 
 	private static Supplier<PlayerSkin> createSkinLookup(GameProfile gameProfile) {
 		Minecraft minecraft = Minecraft.getInstance();
-		boolean bl = !minecraft.isLocalPlayer(gameProfile.id());
+		boolean bl = !minecraft.isLocalPlayer(gameProfile.getId());
 		return minecraft.getSkinManager().createLookup(gameProfile, bl);
 	}
 
@@ -97,7 +97,7 @@ public class PlayerInfo {
 
 	@Nullable
 	public PlayerTeam getTeam() {
-		return Minecraft.getInstance().level.getScoreboard().getPlayersTeam(this.getProfile().name());
+		return Minecraft.getInstance().level.getScoreboard().getPlayersTeam(this.getProfile().getName());
 	}
 
 	public void setTabListDisplayName(@Nullable Component component) {

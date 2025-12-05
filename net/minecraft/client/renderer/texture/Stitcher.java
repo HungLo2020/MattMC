@@ -13,8 +13,8 @@ import org.jetbrains.annotations.Nullable;
 
 @Environment(EnvType.CLIENT)
 public class Stitcher<T extends Stitcher.Entry> {
-	private static final Comparator<Stitcher.Holder<?>> HOLDER_COMPARATOR = Comparator.comparing(holder -> -holder.height)
-		.thenComparing(holder -> -holder.width)
+	private static final Comparator<Stitcher.Holder<?>> HOLDER_COMPARATOR = Comparator.<Stitcher.Holder<?>>comparingInt(holder -> -holder.height)
+		.thenComparingInt(holder -> -holder.width)
 		.thenComparing(holder -> holder.entry.name());
 	private final int mipLevel;
 	private final List<Stitcher.Holder<T>> texturesToBeStitched = new ArrayList();

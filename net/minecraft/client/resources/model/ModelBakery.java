@@ -184,8 +184,9 @@ public class ModelBakery {
 		}
 
 		@Override
+		@SuppressWarnings("unchecked")
 		public <T> T compute(ModelBaker.SharedOperationKey<T> sharedOperationKey) {
-			return (T)this.operationCache.computeIfAbsent(sharedOperationKey, this.cacheComputeFunction);
+			return (T)this.operationCache.computeIfAbsent((ModelBaker.SharedOperationKey<Object>)(ModelBaker.SharedOperationKey<?>)sharedOperationKey, this.cacheComputeFunction);
 		}
 	}
 }

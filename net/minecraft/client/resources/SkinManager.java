@@ -91,7 +91,7 @@ public class SkinManager {
 				PlayerSkin playerSkin2 = (PlayerSkin)optional.filter(playerSkinx -> !bl || playerSkinx.secure()).orElse(playerSkin);
 				return () -> playerSkin2;
 			} else {
-				return () -> (PlayerSkin)((Optional)completableFuture.getNow(Optional.empty())).filter(playerSkinxx -> !bl || playerSkinxx.secure()).orElse(playerSkin);
+				return () -> (PlayerSkin)((Optional<PlayerSkin>)completableFuture.getNow(Optional.empty())).filter(playerSkinxx -> !bl || playerSkinxx.secure()).orElse(playerSkin);
 			}
 		}
 	}
@@ -102,7 +102,7 @@ public class SkinManager {
 			return CompletableFuture.completedFuture(Optional.of(playerSkin));
 		} else {
 			Property property = this.services.sessionService().getPackedTextures(gameProfile);
-			return this.skinCache.getUnchecked(new SkinManager.CacheKey(gameProfile.id(), property));
+			return this.skinCache.getUnchecked(new SkinManager.CacheKey(gameProfile.getId(), property));
 		}
 	}
 
