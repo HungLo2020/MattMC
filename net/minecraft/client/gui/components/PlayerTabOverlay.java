@@ -54,10 +54,10 @@ public class PlayerTabOverlay {
 	private static final ResourceLocation HEART_FULL_SPRITE = ResourceLocation.withDefaultNamespace("hud/heart/full");
 	private static final ResourceLocation HEART_ABSORBING_HALF_BLINKING_SPRITE = ResourceLocation.withDefaultNamespace("hud/heart/absorbing_half_blinking");
 	private static final ResourceLocation HEART_HALF_SPRITE = ResourceLocation.withDefaultNamespace("hud/heart/half");
-	private static final Comparator<PlayerInfo> PLAYER_COMPARATOR = Comparator.comparingInt(playerInfo -> -playerInfo.getTabListOrder())
+	private static final Comparator<PlayerInfo> PLAYER_COMPARATOR = Comparator.<PlayerInfo>comparingInt(playerInfo -> -playerInfo.getTabListOrder())
 		.thenComparingInt(playerInfo -> playerInfo.getGameMode() == GameType.SPECTATOR ? 1 : 0)
 		.thenComparing(playerInfo -> (String)Optionull.mapOrDefault(playerInfo.getTeam(), PlayerTeam::getName, ""))
-		.thenComparing(playerInfo -> playerInfo.getProfile().name(), String::compareToIgnoreCase);
+		.thenComparing(playerInfo -> playerInfo.getProfile().getName(), String::compareToIgnoreCase);
 	public static final int MAX_ROWS_PER_COL = 20;
 	private final Minecraft minecraft;
 	private final Gui gui;

@@ -54,7 +54,7 @@ public class VibrationSelector {
 		if (this.currentVibrationData.isEmpty()) {
 			return Optional.empty();
 		} else {
-			return ((Pair)this.currentVibrationData.get()).getRight() < l
+			return ((Long)((Pair)this.currentVibrationData.get()).getRight()) < l
 				? Optional.of((VibrationInfo)((Pair)this.currentVibrationData.get()).getLeft())
 				: Optional.empty();
 		}

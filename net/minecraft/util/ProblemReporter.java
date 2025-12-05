@@ -97,7 +97,7 @@ public interface ProblemReporter {
 					entry -> " at "
 						+ (String)entry.getKey()
 						+ ": "
-						+ (String)((Collection)entry.getValue()).stream().map(ProblemReporter.Problem::description).collect(Collectors.joining("; "))
+						+ (String)((Collection<ProblemReporter.Problem>)entry.getValue()).stream().map(problem -> problem.description()).collect(Collectors.joining("; "))
 				)
 				.collect(Collectors.joining("\n"));
 		}

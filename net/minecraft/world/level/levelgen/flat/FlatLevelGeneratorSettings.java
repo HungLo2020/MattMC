@@ -155,7 +155,7 @@ public class FlatLevelGeneratorSettings {
 					if (i != GenerationStep.Decoration.UNDERGROUND_STRUCTURES.ordinal()
 						&& i != GenerationStep.Decoration.SURFACE_STRUCTURES.ordinal()
 						&& (!this.addLakes || i != GenerationStep.Decoration.LAKES.ordinal())) {
-						for (Holder<PlacedFeature> holder3 : (HolderSet)list.get(i)) {
+						for (Holder<PlacedFeature> holder3 : (HolderSet<PlacedFeature>)list.get(i)) {
 							plainBuilder.addFeature(i, holder3);
 						}
 					}

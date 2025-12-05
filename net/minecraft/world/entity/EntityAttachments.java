@@ -28,7 +28,7 @@ public class EntityAttachments {
 		return new EntityAttachments(Util.makeEnumMap(EntityAttachment.class, entityAttachment -> {
 			List<Vec3> list = new ArrayList();
 
-			for (Vec3 vec3 : (List)this.attachments.get(entityAttachment)) {
+			for (Vec3 vec3 : (List<Vec3>)this.attachments.get(entityAttachment)) {
 				list.add(vec3.multiply(f, g, h));
 			}
 

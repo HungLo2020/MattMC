@@ -87,9 +87,9 @@ public class PlayerChunkSender {
 		int i = Mth.floor(this.batchQuota);
 		List<LevelChunk> list;
 		if (!this.memoryConnection && this.pendingChunks.size() > i) {
-			list = ((List)this.pendingChunks.stream().collect(Comparators.least(i, Comparator.comparingInt(chunkPos::distanceSquared))))
+			list = ((List<Long>)this.pendingChunks.stream().collect(Comparators.least(i, Comparator.comparingInt(chunkPos::distanceSquared))))
 				.stream()
-				.mapToLong(Long::longValue)
+				.mapToLong(l -> l.longValue())
 				.mapToObj(chunkMap::getChunkToSend)
 				.filter(Objects::nonNull)
 				.toList();

@@ -293,19 +293,19 @@ public final class DensityFunctions {
 					}
 					break;
 				case MIN:
-					double e = this.argument2.minValue();
+					double eMin = this.argument2.minValue();
 
 					for (int k = 0; k < ds.length; k++) {
 						double f = ds[k];
-						ds[k] = f < e ? f : Math.min(f, this.argument2.compute(contextProvider.forIndex(k)));
+						ds[k] = f < eMin ? f : Math.min(f, this.argument2.compute(contextProvider.forIndex(k)));
 					}
 					break;
 				case MAX:
-					double e = this.argument2.maxValue();
+					double eMax = this.argument2.maxValue();
 
 					for (int k = 0; k < ds.length; k++) {
 						double f = ds[k];
-						ds[k] = f > e ? f : Math.max(f, this.argument2.compute(contextProvider.forIndex(k)));
+						ds[k] = f > eMax ? f : Math.max(f, this.argument2.compute(contextProvider.forIndex(k)));
 					}
 			}
 		}

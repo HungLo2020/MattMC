@@ -40,7 +40,7 @@ public class MobSensor<T extends LivingEntity> extends Sensor<T> {
 	public void checkForMobsNearby(T livingEntity) {
 		Optional<List<LivingEntity>> optional = livingEntity.getBrain().getMemory(MemoryModuleType.NEAREST_LIVING_ENTITIES);
 		if (!optional.isEmpty()) {
-			boolean bl = ((List)optional.get()).stream().anyMatch(livingEntity2 -> this.mobTest.test(livingEntity, livingEntity2));
+			boolean bl = ((List<LivingEntity>)optional.get()).stream().anyMatch(livingEntity2 -> this.mobTest.test(livingEntity, livingEntity2));
 			if (bl) {
 				this.mobDetected(livingEntity);
 			}

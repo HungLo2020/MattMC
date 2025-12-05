@@ -169,7 +169,7 @@ public abstract class StoredUserList<K, V extends StoredUserEntry<K>> {
 						JsonObject jsonObject = GsonHelper.convertToJsonObject(jsonElement, "entry");
 						StoredUserEntry<K> storedUserEntry = this.createEntry(jsonObject);
 						if (storedUserEntry.getUser() != null) {
-							this.map.put(this.getKeyForUser(storedUserEntry.getUser()), storedUserEntry);
+							this.map.put(this.getKeyForUser(storedUserEntry.getUser()), (V)storedUserEntry);
 						}
 					}
 				} catch (Throwable var8) {

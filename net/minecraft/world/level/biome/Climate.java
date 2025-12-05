@@ -137,13 +137,13 @@ public class Climate {
 
 		public static <T> Codec<Climate.ParameterList<T>> codec(MapCodec<T> mapCodec) {
 			return ExtraCodecs.nonEmptyList(
-					RecordCodecBuilder.<T>create(
-							instance -> instance.group(Climate.ParameterPoint.CODEC.fieldOf("parameters").forGetter(Pair::getFirst), mapCodec.forGetter(Pair::getSecond))
+					RecordCodecBuilder.<Pair<Climate.ParameterPoint, T>>create(
+							instance -> instance.group(Climate.ParameterPoint.CODEC.fieldOf("parameters").forGetter(pair -> pair.getFirst()), mapCodec.forGetter(pair -> pair.getSecond()))
 								.apply(instance, Pair::of)
 						)
 						.listOf()
 				)
-				.xmap(Climate.ParameterList::new, Climate.ParameterList::values);
+				.xmap(list -> new Climate.ParameterList<T>(list), parameterList -> parameterList.values());
 		}
 
 		public ParameterList(List<Pair<Climate.ParameterPoint, T>> list) {

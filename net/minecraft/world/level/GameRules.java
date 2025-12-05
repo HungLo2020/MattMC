@@ -254,13 +254,13 @@ public class GameRules {
 				string -> (DataResult)GAME_RULE_TYPES.entrySet()
 					.stream()
 					.filter(entry -> ((GameRules.Type)entry.getValue()).valueClass == class_)
-					.map(Entry::getKey)
+					.map(entry -> (GameRules.Key<T>)entry.getKey())
 					.filter(key -> key.getId().equals(string))
 					.map(key -> key)
 					.findFirst()
 					.map(DataResult::success)
 					.orElseGet(() -> DataResult.error(() -> "Invalid game rule ID for type: " + string)),
-				GameRules.Key::getId
+				key -> key.getId()
 			);
 	}
 

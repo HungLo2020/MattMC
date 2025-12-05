@@ -79,8 +79,8 @@ public class StateDefinition<O, S extends StateHolder<O, S>> {
 		return Codec.mapPair(
 				mapCodec, property.valueCodec().fieldOf(string).orElseGet((Consumer<String>)(stringx -> {}), () -> property.value((StateHolder<?, ?>)supplier.get()))
 			)
-			.xmap(
-				pair -> (StateHolder)((StateHolder)pair.getFirst()).setValue(property, ((Property.Value)pair.getSecond()).value()),
+			.<S>xmap(
+				pair -> (S)((StateHolder)pair.getFirst()).setValue(property, ((Property.Value)pair.getSecond()).value()),
 				stateHolder -> Pair.of(stateHolder, property.value((StateHolder<?, ?>) stateHolder))
 			);
 	}

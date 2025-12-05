@@ -314,9 +314,9 @@ public class WorldCreationUiState {
 		private static final Component CUSTOM_WORLD_DESCRIPTION = Component.translatable("generator.custom");
 
 		public Component describePreset() {
-			return (Component)Optional.ofNullable(this.preset)
+			return Optional.ofNullable(this.preset)
 				.flatMap(Holder::unwrapKey)
-				.map(resourceKey -> Component.translatable(resourceKey.location().toLanguageKey("generator")))
+				.map(resourceKey -> (Component)Component.translatable(resourceKey.location().toLanguageKey("generator")))
 				.orElse(CUSTOM_WORLD_DESCRIPTION);
 		}
 

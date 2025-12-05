@@ -56,7 +56,7 @@ public interface MinMaxBounds<T extends Number & Comparable<T>> {
 		}
 
 		public static <T extends Number & Comparable<T>> MinMaxBounds.Bounds<T> any() {
-			return new MinMaxBounds.Bounds<>(Optional.empty(), Optional.empty());
+			return new MinMaxBounds.Bounds<T>(Optional.empty(), Optional.empty());
 		}
 
 		public static <T extends Number & Comparable<T>> MinMaxBounds.Bounds<T> exactly(T number) {
@@ -87,9 +87,9 @@ public interface MinMaxBounds<T extends Number & Comparable<T>> {
 					)
 					.apply(instance, MinMaxBounds.Bounds::new)
 			);
-			return Codec.either(codec2, codec).xmap(either -> either.map(bounds -> bounds, object -> exactly((T)object)), bounds -> {
+			return Codec.either(codec2, codec).xmap(either -> either.map(bounds -> bounds, object -> exactly(object)), bounds -> {
 				Optional<T> optional = bounds.asPoint();
-				return optional.isPresent() ? Either.right((Number)optional.get()) : Either.left(bounds);
+				return optional.isPresent() ? Either.<MinMaxBounds.Bounds<T>, T>right(optional.get()) : Either.<MinMaxBounds.Bounds<T>, T>left(bounds);
 			});
 		}
 
@@ -160,7 +160,7 @@ public interface MinMaxBounds<T extends Number & Comparable<T>> {
 				return Optional.empty();
 			} else {
 				try {
-					return Optional.of((Number)function.apply(string));
+					return Optional.of(function.apply(string));
 				} catch (NumberFormatException var6) {
 					throw ((DynamicCommandExceptionType)supplier.get()).createWithContext(stringReader, string);
 				}
