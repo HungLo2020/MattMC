@@ -33,8 +33,9 @@ public class RecipeMap {
 		return new RecipeMap(builder.build(), builder2.build());
 	}
 
+	@SuppressWarnings("unchecked")
 	public <I extends RecipeInput, T extends Recipe<I>> Collection<RecipeHolder<T>> byType(RecipeType<T> recipeType) {
-		return (Collection<RecipeHolder<T>>)this.byType.get(recipeType);
+		return (Collection<RecipeHolder<T>>)(Collection<?>)this.byType.get(recipeType);
 	}
 
 	public Collection<RecipeHolder<?>> values() {
