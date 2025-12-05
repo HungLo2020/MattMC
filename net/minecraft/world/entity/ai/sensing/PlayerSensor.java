@@ -26,15 +26,16 @@ public class PlayerSensor extends Sensor<LivingEntity> {
 
 	@Override
 	protected void doTick(ServerLevel serverLevel, LivingEntity livingEntity) {
-		List<Player> list = (List<Player>)serverLevel.players()
+		List<Player> list = serverLevel.players()
 			.stream()
 			.filter(EntitySelector.NO_SPECTATORS)
 			.filter(serverPlayer -> livingEntity.closerThan(serverPlayer, this.getFollowDistance(livingEntity)))
 			.sorted(Comparator.comparingDouble(livingEntity::distanceToSqr))
+			.<Player>map(player -> player)
 			.collect(Collectors.toList());
 		Brain<?> brain = livingEntity.getBrain();
 		brain.setMemory(MemoryModuleType.NEAREST_PLAYERS, list);
-		List<Player> list2 = (List<Player>)list.stream().filter(player -> isEntityTargetable(serverLevel, livingEntity, player)).collect(Collectors.toList());
+		List<Player> list2 = list.stream().filter(player -> isEntityTargetable(serverLevel, livingEntity, player)).collect(Collectors.toList());
 		brain.setMemory(MemoryModuleType.NEAREST_VISIBLE_PLAYER, list2.isEmpty() ? null : (Player)list2.get(0));
 		List<Player> list3 = list2.stream().filter(player -> isEntityAttackable(serverLevel, livingEntity, player)).toList();
 		brain.setMemory(MemoryModuleType.NEAREST_VISIBLE_ATTACKABLE_PLAYERS, list3);

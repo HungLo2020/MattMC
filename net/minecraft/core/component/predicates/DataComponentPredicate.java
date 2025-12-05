@@ -24,7 +24,7 @@ public interface DataComponentPredicate {
 		)
 		.map(
 			list -> (Map<DataComponentPredicate.Type<?>, DataComponentPredicate>)list.stream().collect(Collectors.toMap(DataComponentPredicate.Single::type, DataComponentPredicate.Single::predicate)),
-			map -> map.entrySet().stream().map(entry -> DataComponentPredicate.Single.fromEntry((Entry<DataComponentPredicate.Type<?>, DataComponentPredicate>)entry)).toList()
+			map -> map.entrySet().stream().<DataComponentPredicate.Single<?>>map(entry -> DataComponentPredicate.Single.fromEntry((Entry<DataComponentPredicate.Type<?>, DataComponentPredicate>)entry)).toList()
 		);
 
 	static MapCodec<DataComponentPredicate.Single<?>> singleCodec(String string) {
