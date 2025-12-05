@@ -223,7 +223,7 @@ public class ParticleResources implements PreparableReloadListener {
 			profilerFiller.popPush("bindSpriteSets");
 			Set<ResourceLocation> set = new HashSet();
 			TextureAtlasSprite textureAtlasSprite = preparations.missing();
-					((List<ParticleResources.ResolvedParticleDefinition>)completableFuture.join()).forEach(arg -> {
+					((List<ParticleResources.ParticleDefinition>)completableFuture.join()).forEach(arg -> {
 				Optional<List<ResourceLocation>> optional = arg.sprites();
 				if (!optional.isEmpty()) {
 					List<TextureAtlasSprite> list = new ArrayList();

@@ -449,7 +449,7 @@ public class CreateWorldScreen extends Screen {
 	private void applyNewPackConfig(PackRepository packRepository, WorldDataConfiguration worldDataConfiguration, Consumer<WorldDataConfiguration> consumer) {
 		this.minecraft.setScreenAndShow(new GenericMessageScreen(Component.translatable("dataPack.validation.working")));
 		InitConfig initConfig = createDefaultLoadConfig(packRepository, worldDataConfiguration);
-		WorldLoader.load(
+		WorldLoader.<DataLoadOutput<DataPackReloadCookie>, WorldCreationContext>load(
 				initConfig,
 				dataLoadContext -> {
 					if (dataLoadContext.datapackWorldgen().lookupOrThrow(Registries.WORLD_PRESET).listElements().findAny().isEmpty()) {
@@ -464,7 +464,7 @@ public class CreateWorldScreen extends Screen {
 						DynamicOps<JsonElement> dynamicOps2 = dataLoadContext.datapackWorldgen().createSerializationContext(JsonOps.INSTANCE);
 						WorldGenSettings worldGenSettings = dataResult.<WorldGenSettings>flatMap(jsonElement -> WorldGenSettings.CODEC.parse(dynamicOps2, jsonElement))
 							.getOrThrow(string -> new IllegalStateException("Error parsing worldgen settings after loading data packs: " + string));
-						return new DataLoadOutput(new DataPackReloadCookie(worldGenSettings, dataLoadContext.dataConfiguration()), dataLoadContext.datapackDimensions());
+						return new DataLoadOutput<>(new DataPackReloadCookie(worldGenSettings, dataLoadContext.dataConfiguration()), dataLoadContext.datapackDimensions());
 					}
 				},
 				(closeableResourceManager, reloadableServerResources, layeredRegistryAccess, dataPackReloadCookie) -> {
@@ -480,7 +480,7 @@ public class CreateWorldScreen extends Screen {
 				worldCreationContext.validate();
 				return worldCreationContext;
 			})
-			.thenAcceptAsync(this.uiState::setSettings, this.minecraft)
+			.thenAcceptAsync(worldCreationContext -> this.uiState.setSettings(worldCreationContext), this.minecraft)
 			.handleAsync(
 				(void_, throwable) -> {
 					if (throwable != null) {

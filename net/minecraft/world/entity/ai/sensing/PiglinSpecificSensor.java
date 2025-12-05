@@ -97,7 +97,7 @@ public class PiglinSpecificSensor extends Sensor<LivingEntity> {
 			}
 		}
 
-		for (LivingEntity livingEntity3 : (List)brain.getMemory(MemoryModuleType.NEAREST_LIVING_ENTITIES).orElse(ImmutableList.of())) {
+		for (LivingEntity livingEntity3 : (List<LivingEntity>)brain.getMemory(MemoryModuleType.NEAREST_LIVING_ENTITIES).orElse(ImmutableList.of())) {
 			if (livingEntity3 instanceof AbstractPiglin abstractPiglin && abstractPiglin.isAdult()) {
 				list2.add(abstractPiglin);
 			}

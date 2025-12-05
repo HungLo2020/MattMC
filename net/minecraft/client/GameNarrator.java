@@ -66,7 +66,7 @@ public class GameNarrator {
 	}
 
 	private void narrateMessage(String string, boolean bl) {
-		this.narrator.say(string, bl, this.minecraft.options.getFinalSoundSourceVolume(SoundSource.VOICE));
+		this.narrator.say(string, bl);
 	}
 
 	private NarratorStatus getStatus() {
