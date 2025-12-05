@@ -1,0 +1,833 @@
+matt@HungLoDE:~/Documents/Repos/Mattcraft$ ./gradlew runClient
+Path for java installation '/usr/lib/jvm/openjdk-17' (Common Linux Locations) does not contain a java executable
+Path for java installation '/usr/lib/jvm/openjdk-21' (Common Linux Locations) does not contain a java executable
+
+> Task :compileJava
+/home/matt/Documents/Repos/Mattcraft/net/minecraft/world/level/levelgen/Heightmap.java:48: warning: [removal] getHighestSectionPosition() in ChunkAccess has been deprecated and marked for removal
+                        int j = chunkAccess.getHighestSectionPosition() + 16;
+                                           ^
+/home/matt/Documents/Repos/Mattcraft/net/minecraft/world/level/GameRules.java:253: error: incompatible types: cannot infer type-variable(s) S
+                        .comapFlatMap(
+                                     ^
+    (argument mismatch; invalid method reference
+      method getId in class Key<T> cannot be applied to given types
+        required: no arguments
+        found:    Object
+        reason: actual and formal argument lists differ in length)
+  where S,A,T are type-variables:
+    S extends Object declared in method <S>comapFlatMap(Function<? super A,? extends DataResult<? extends S>>,Function<? super S,? extends A>)
+    A extends Object declared in interface Codec
+    T extends Value<T> declared in class Key
+/home/matt/Documents/Repos/Mattcraft/net/minecraft/world/entity/ai/village/poi/PoiManager.java:255: error: incompatible types: invalid method reference
+                        .filter(pair -> !(Boolean)((Optional)pair.getSecond()).map(PoiSection::isValid).orElse(false))
+                                                                                   ^
+    method isValid in class PoiSection cannot be applied to given types
+      required: no arguments
+      found:    Object
+      reason: actual and formal argument lists differ in length
+/home/matt/Documents/Repos/Mattcraft/net/minecraft/world/entity/ai/village/poi/PoiSection.java:138: error: incompatible types: Object cannot be converted to BlockPos
+                                short s = SectionPos.sectionRelativePos(blockPos);
+                                                                        ^
+/home/matt/Documents/Repos/Mattcraft/net/minecraft/world/entity/ai/village/poi/PoiSection.java:139: error: incompatible types: Object cannot be converted to BlockPos
+                                PoiRecord poiRecord = short2ObjectMap.computeIfAbsent(s, (Short2ObjectFunction<? extends PoiRecord>)(sx -> new PoiRecord(blockPos, holder, this.setDirty)));
+                                                                                                                                                         ^
+/home/matt/Documents/Repos/Mattcraft/net/minecraft/world/entity/raid/Raider.java:366: error: incompatible types: Class<ItemEntity> cannot be converted to Class<T>
+                                        .getEntitiesOfClass((Class<T>)ItemEntity.class, this.mob.getBoundingBox().inflate(d, 8.0, d), Raider.ALLOWED_ITEMS)) {
+                                                                                ^
+  where T is a type-variable:
+    T extends Raider declared in class Raider.ObtainRaidLeaderBannerGoal
+/home/matt/Documents/Repos/Mattcraft/net/minecraft/world/entity/animal/AbstractFish.java:94: error: incompatible types: invalid method reference
+                this.goalSelector.addGoal(2, new AvoidEntityGoal(this, Player.class, 8.0F, 1.6, 1.4, EntitySelector.NO_SPECTATORS::test));
+                                                                                                     ^
+    incompatible types: Object cannot be converted to Entity
+  where T is a type-variable:
+    T extends Object declared in interface Predicate
+/home/matt/Documents/Repos/Mattcraft/net/minecraft/world/entity/animal/Fox.java:172: error: incompatible types: Object cannot be converted to Entity
+                                        this, Player.class, 16.0F, 1.6, 1.4, livingEntity -> AVOID_PLAYERS.test(livingEntity) && !this.trusts(livingEntity) && !this.isDefending()
+                                                                                                                ^
+/home/matt/Documents/Repos/Mattcraft/net/minecraft/world/entity/animal/Fox.java:172: error: incompatible types: Object cannot be converted to LivingEntity
+                                        this, Player.class, 16.0F, 1.6, 1.4, livingEntity -> AVOID_PLAYERS.test(livingEntity) && !this.trusts(livingEntity) && !this.isDefending()
+                                                                                                                                              ^
+/home/matt/Documents/Repos/Mattcraft/net/minecraft/world/entity/animal/Fox.java:434: error: incompatible types: invalid method reference
+                ((List)valueInput.read("Trusted", TRUSTED_LIST_CODEC).orElse(List.of())).forEach(this::addTrustedEntity);
+                                                                                                 ^
+    no suitable method found for addTrustedEntity(Object)
+        method Fox.addTrustedEntity(LivingEntity) is not applicable
+          (argument mismatch; Object cannot be converted to LivingEntity)
+        method Fox.addTrustedEntity(EntityReference<LivingEntity>) is not applicable
+          (argument mismatch; Object cannot be converted to EntityReference<LivingEntity>)
+/home/matt/Documents/Repos/Mattcraft/net/minecraft/world/entity/monster/Phantom.java:250: error: incompatible types: cannot infer type-variable(s) T,U
+                                        list.sort(Comparator.comparing(Entity::getY).reversed());
+                                                                      ^
+    (argument mismatch; invalid method reference
+      incompatible types: Object cannot be converted to double)
+  where T,U are type-variables:
+    T extends Object declared in method <T,U>comparing(Function<? super T,? extends U>)
+    U extends Comparable<? super U> declared in method <T,U>comparing(Function<? super T,? extends U>)
+/home/matt/Documents/Repos/Mattcraft/net/minecraft/world/level/pathfinder/PathFinder.java:71: error: incompatible types: Set<Object> cannot be converted to Set<Node>
+                Set<Node> set2 = (Set<Node>)(bl ? new HashSet() : Set.of());
+                                            ^
+/home/matt/Documents/Repos/Mattcraft/net/minecraft/world/entity/EntityAttachments.java:31: error: incompatible types: Object cannot be converted to Vec3
+                        for (Vec3 vec3 : (List)this.attachments.get(entityAttachment)) {
+                                         ^
+/home/matt/Documents/Repos/Mattcraft/net/minecraft/util/ProblemReporter.java:100: error: incompatible types: invalid method reference
+                                                + (String)((Collection)entry.getValue()).stream().map(ProblemReporter.Problem::description).collect(Collectors.joining("; "))
+                                                                                                      ^
+    method description in interface Problem cannot be applied to given types
+      required: no arguments
+      found:    Object
+      reason: actual and formal argument lists differ in length
+/home/matt/Documents/Repos/Mattcraft/net/minecraft/network/chat/LastSeenMessages.java:45: error: reference to Packed is ambiguous
+                        this(friendlyByteBuf.readCollection(FriendlyByteBuf.limitValue(ArrayList::new, 20), MessageSignature.Packed::read));
+                        ^
+  both constructor net.minecraft.network.chat.LastSeenMessages.Packed(FriendlyByteBuf) in net.minecraft.network.chat.LastSeenMessages.Packed and constructor net.minecraft.network.chat.LastSeenMessages.Packed(List<net.minecraft.network.chat.MessageSignature.Packed>) in net.minecraft.network.chat.LastSeenMessages.Packed match
+/home/matt/Documents/Repos/Mattcraft/net/minecraft/network/chat/LastSeenMessages.java:45: error: incompatible types: inference variable C has incompatible bounds
+                        this(friendlyByteBuf.readCollection(FriendlyByteBuf.limitValue(ArrayList::new, 20), MessageSignature.Packed::read));
+                                                           ^
+    upper bounds: FriendlyByteBuf,Object,Collection<T>
+    lower bounds: ArrayList<E>
+  where C,T,E are type-variables:
+    C extends Collection<T> declared in method <T,C>readCollection(IntFunction<C>,StreamDecoder<? super FriendlyByteBuf,T>)
+    T extends Object declared in method <T,C>readCollection(IntFunction<C>,StreamDecoder<? super FriendlyByteBuf,T>)
+    E extends Object declared in class ArrayList
+/home/matt/Documents/Repos/Mattcraft/net/minecraft/world/item/crafting/SelectableRecipe.java:35: error: incompatible types: inference variable V has incompatible equality constraints SingleInputEntry<T>,SingleInputEntry<Recipe<?>>
+                        return StreamCodec.composite(
+                                                    ^
+  where V,B,T are type-variables:
+    V extends Object declared in method <B,V>list()
+    B extends ByteBuf declared in method <B,V>list()
+    T extends Recipe<?> declared in method <T>noRecipeCodec()
+/home/matt/Documents/Repos/Mattcraft/net/minecraft/util/debug/DebugSubscription.java:59: error: incompatible types: invalid method reference
+                                .map(object -> new DebugSubscription.Event<>(debugSubscription, (T)object), DebugSubscription.Event::value);
+                                                                                                            ^
+    method value in record Event<T> cannot be applied to given types
+      required: no arguments
+      found:    Object
+      reason: actual and formal argument lists differ in length
+  where T is a type-variable:
+    T extends Object declared in record Event
+/home/matt/Documents/Repos/Mattcraft/net/minecraft/util/debug/DebugSubscription.java:69: error: cannot infer type arguments for Update<>
+                                .map(optional -> new DebugSubscription.Update<>(debugSubscription, optional), DebugSubscription.Update::value);
+                                                 ^
+  reason: cannot infer type-variable(s) T
+    (argument mismatch; Object cannot be converted to Optional<T>)
+  where T is a type-variable:
+    T extends Object declared in record Update
+/home/matt/Documents/Repos/Mattcraft/net/minecraft/util/debug/DebugSubscription.java:69: error: incompatible types: invalid method reference
+                                .map(optional -> new DebugSubscription.Update<>(debugSubscription, optional), DebugSubscription.Update::value);
+                                                                                                              ^
+    method value in record Update<T> cannot be applied to given types
+      required: no arguments
+      found:    Object
+      reason: actual and formal argument lists differ in length
+  where T is a type-variable:
+    T extends Object declared in record Update
+/home/matt/Documents/Repos/Mattcraft/net/minecraft/core/component/DataComponentType.java:102: error: incompatible types: Registry<DataComponentType<?>> cannot be converted to Registry<SimpleType<T>>
+                                return Util.getRegisteredName((Registry<DataComponentType.Builder.SimpleType<T>>)BuiltInRegistries.DATA_COMPONENT_TYPE, this);
+                                                                                                                                  ^
+  where T is a type-variable:
+    T extends Object declared in class SimpleType
+/home/matt/Documents/Repos/Mattcraft/net/minecraft/core/component/DataComponentPatch.java:24: error: incompatible types: cannot infer type-variable(s) S
+                .xmap(map -> {
+                     ^
+    (argument mismatch; bad return type in lambda expression
+      Reference2ObjectMap<PatchKey,Object> cannot be converted to Map<PatchKey,CAP#1>)
+  where S,A are type-variables:
+    S extends Object declared in method <S>xmap(Function<? super A,? extends S>,Function<? super S,? extends A>)
+    A extends Object declared in interface Codec
+  where CAP#1 is a fresh type-variable:
+    CAP#1 extends Object from capture of ?
+/home/matt/Documents/Repos/Mattcraft/net/minecraft/core/NonNullList.java:28: error: incompatible types: cannot infer type arguments for NonNullList<>
+                return new NonNullList<>(Arrays.asList(objects), object);
+                                      ^
+    reason: inference variable E#1 has incompatible bounds
+      equality constraints: E#2,T
+      lower bounds: Object,E#2
+  where E#1,E#2,T are type-variables:
+    E#1 extends Object declared in class NonNullList
+    E#2 extends Object declared in method <E#2>withSize(int,E#2)
+    T extends Object declared in method <T>asList(T...)
+/home/matt/Documents/Repos/Mattcraft/net/minecraft/server/players/StoredUserList.java:172: error: incompatible types: StoredUserEntry<K> cannot be converted to V
+                                                        this.map.put(this.getKeyForUser(storedUserEntry.getUser()), storedUserEntry);
+                                                                                                                    ^
+  where K,V are type-variables:
+    K extends Object declared in class StoredUserList
+    V extends StoredUserEntry<K> declared in class StoredUserList
+/home/matt/Documents/Repos/Mattcraft/net/minecraft/stats/ServerStatsCounter.java:50: error: incompatible types: inference variable R has incompatible bounds
+                Codec<Stat<?>> codec2 = codec.flatComapMap(
+                                                          ^
+    upper bounds: T,Object
+    lower bounds: Object
+  where R,T are type-variables:
+    R extends Object declared in method <R>success(R)
+    T extends Object declared in method <T>createTypedStatsCodec(StatType<T>)
+/home/matt/Documents/Repos/Mattcraft/net/minecraft/network/Connection.java:310: error: cannot find symbol
+                        this.pendingActions.add((Consumer)connection -> connection.sendPacket(packet, channelFutureListener, bl));
+                                                                                  ^
+  symbol:   method sendPacket(Packet<CAP#1>,@org.jetbrains.annotations.Nullable ChannelFutureListener,boolean)
+  location: variable connection of type Object
+  where CAP#1 is a fresh type-variable:
+    CAP#1 extends PacketListener from capture of ?
+/home/matt/Documents/Repos/Mattcraft/net/minecraft/server/network/PlayerChunkSender.java:92: error: incompatible types: invalid method reference
+                                .mapToLong(Long::longValue)
+                                           ^
+    method longValue in class Long cannot be applied to given types
+      required: no arguments
+      found:    Object
+      reason: actual and formal argument lists differ in length
+/home/matt/Documents/Repos/Mattcraft/net/minecraft/world/level/block/entity/TestInstanceBlockEntity.java:103: error: incompatible types: Component cannot be converted to MutableComponent
+                return (Component)this.test().map(resourceKey -> Component.literal(resourceKey.location().toString())).orElse(INVALID_TEST_NAME);
+                                                                                                                              ^
+/home/matt/Documents/Repos/Mattcraft/net/minecraft/network/protocol/common/custom/CustomPacketPayload.java:30: error: incompatible types: Map<ResourceLocation,StreamCodec<CAP#1,CAP#2>> cannot be converted to Map<ResourceLocation,StreamCodec<? super B,? extends CustomPacketPayload>>
+                        .collect(Collectors.toUnmodifiableMap(typeAndCodec -> typeAndCodec.type().id(), CustomPacketPayload.TypeAndCodec::codec));
+                                ^
+  where B is a type-variable:
+    B extends FriendlyByteBuf declared in method <B>codec(FallbackProvider<B>,List<TypeAndCodec<? super B,?>>)
+  where CAP#1,CAP#2 are fresh type-variables:
+    CAP#1 extends FriendlyByteBuf super: B from capture of ? super B
+    CAP#2 extends CustomPacketPayload from capture of ?
+/home/matt/Documents/Repos/Mattcraft/net/minecraft/network/protocol/common/custom/CustomPacketPayload.java:39: error: incompatible types: StreamCodec<CAP#1,CAP#2> cannot be converted to StreamCodec<B,T>
+                                StreamCodec<B, T> streamCodec = this.findCodec(type.id);
+                                                                              ^
+  where B,T are type-variables:
+    B extends FriendlyByteBuf declared in method <B>codec(FallbackProvider<B>,List<TypeAndCodec<? super B,?>>)
+    T extends CustomPacketPayload declared in method <T>writeCap(B,Type<T>,CustomPacketPayload)
+  where CAP#1,CAP#2 are fresh type-variables:
+    CAP#1 extends Object super: B from capture of ? super B
+    CAP#2 extends CustomPacketPayload from capture of ? extends CustomPacketPayload
+/home/matt/Documents/Repos/Mattcraft/net/minecraft/world/level/levelgen/structure/templatesystem/StructureTemplate.java:160: error: cannot find symbol
+                Comparator<StructureTemplate.StructureBlockInfo> comparator = Comparator.comparingInt(structureBlockInfo -> structureBlockInfo.pos.getY())
+                                                                                                                                              ^
+  symbol:   variable pos
+  location: variable structureBlockInfo of type Object
+/home/matt/Documents/Repos/Mattcraft/net/minecraft/world/level/levelgen/structure/templatesystem/StructureTemplate.java:161: error: cannot find symbol
+                        .thenComparingInt(structureBlockInfo -> structureBlockInfo.pos.getX())
+                                                                                  ^
+  symbol:   variable pos
+  location: variable structureBlockInfo of type Object
+/home/matt/Documents/Repos/Mattcraft/net/minecraft/world/level/levelgen/structure/templatesystem/StructureTemplate.java:162: error: cannot find symbol
+                        .thenComparingInt(structureBlockInfo -> structureBlockInfo.pos.getZ());
+                                                                                  ^
+  symbol:   variable pos
+  location: variable structureBlockInfo of type Object
+/home/matt/Documents/Repos/Mattcraft/net/minecraft/world/level/levelgen/structure/templatesystem/StructureTemplate.java:162: error: incompatible types: Comparator<Object> cannot be converted to Comparator<StructureBlockInfo>
+                        .thenComparingInt(structureBlockInfo -> structureBlockInfo.pos.getZ());
+                                         ^
+/home/matt/Documents/Repos/Mattcraft/net/minecraft/world/level/levelgen/placement/NoiseBasedCountPlacement.java:35: warning: [removal] BIOME_INFO_NOISE in Biome has been deprecated and marked for removal
+                double d = Biome.BIOME_INFO_NOISE.getValue(blockPos.getX() / this.noiseFactor, blockPos.getZ() / this.noiseFactor, false);
+                                ^
+/home/matt/Documents/Repos/Mattcraft/net/minecraft/world/level/levelgen/placement/NoiseThresholdCountPlacement.java:35: warning: [removal] BIOME_INFO_NOISE in Biome has been deprecated and marked for removal
+                double d = Biome.BIOME_INFO_NOISE.getValue(blockPos.getX() / 200.0, blockPos.getZ() / 200.0, false);
+                                ^
+/home/matt/Documents/Repos/Mattcraft/net/minecraft/world/level/levelgen/feature/configurations/MultifaceGrowthConfiguration.java:40: error: no suitable method found for apply(Instance<MultifaceGrowthConfiguration>,MultifaceG[...]::new)
+                        .apply(instance, MultifaceGrowthConfiguration::new)
+                        ^
+    method P7.<R#1>apply(Applicative<Mu<MultifaceGrowthConfiguration>,?>,Function7<Block,Integer,Boolean,Boolean,Boolean,Float,HolderSet<Block>,R#1>) is not applicable
+      (cannot infer type-variable(s) R#1
+        (argument mismatch; invalid constructor reference
+          incompatible types: Block cannot be converted to MultifaceSpreadeableBlock))
+    method P7.<R#2>apply(Applicative<Mu<MultifaceGrowthConfiguration>,?>,App<Mu<MultifaceGrowthConfiguration>,Function7<Block,Integer,Boolean,Boolean,Boolean,Float,HolderSet<Block>,R#2>>) is not applicable
+      (cannot infer type-variable(s) R#2
+        (argument mismatch; App is not a functional interface
+          no abstract method found in interface App))
+  where R#1,F,T1,T2,T3,T4,T5,T6,T7,R#2 are type-variables:
+    R#1 extends Object declared in method <R#1>apply(Applicative<F,?>,Function7<T1,T2,T3,T4,T5,T6,T7,R#1>)
+    F extends K1 declared in class P7
+    T1 extends Object declared in class P7
+    T2 extends Object declared in class P7
+    T3 extends Object declared in class P7
+    T4 extends Object declared in class P7
+    T5 extends Object declared in class P7
+    T6 extends Object declared in class P7
+    T7 extends Object declared in class P7
+    R#2 extends Object declared in method <R#2>apply(Applicative<F,?>,App<F,Function7<T1,T2,T3,T4,T5,T6,T7,R#2>>)
+/home/matt/Documents/Repos/Mattcraft/net/minecraft/world/level/block/state/properties/Property.java:19: error: incompatible types: cannot infer type-variable(s) S
+                .comapFlatMap(
+                             ^
+    (argument mismatch; invalid method reference
+      incompatible types: Object cannot be converted to T)
+  where S,A,T are type-variables:
+    S extends Object declared in method <S>comapFlatMap(Function<? super A,? extends DataResult<? extends S>>,Function<? super S,? extends A>)
+    A extends Object declared in interface Codec
+    T extends Comparable<T> declared in class Property
+/home/matt/Documents/Repos/Mattcraft/net/minecraft/world/level/block/state/StateDefinition.java:82: error: incompatible types: inference variable S#1 has incompatible bounds
+                        .xmap(
+                             ^
+    equality constraints: S#2
+    lower bounds: StateHolder
+  where S#1,A,S#2,T are type-variables:
+    S#1 extends Object declared in method <S#1>xmap(Function<? super A,? extends S#1>,Function<? super S#1,? extends A>)
+    A extends Object declared in class MapCodec
+    S#2 extends StateHolder<?,S#2> declared in method <S#2,T>appendPropertyCodec(MapCodec<S#2>,Supplier<S#2>,String,Property<T>)
+    T extends Comparable<T> declared in method <S#2,T>appendPropertyCodec(MapCodec<S#2>,Supplier<S#2>,String,Property<T>)
+/home/matt/Documents/Repos/Mattcraft/net/minecraft/util/random/Weighted.java:21: error: method pauseInIde in class Util cannot be applied to given types;
+                        throw (IllegalArgumentException)Util.pauseInIde((T)(new IllegalArgumentException("Weight should be >= 0")));
+                                                            ^
+  required: T#1
+  found:    T#2
+  reason: inference variable T#1 has incompatible bounds
+    upper bounds: Throwable
+    lower bounds: T#2
+  where T#1,T#2 are type-variables:
+    T#1 extends Throwable declared in method <T#1>pauseInIde(T#1)
+    T#2 extends Object declared in record Weighted
+/home/matt/Documents/Repos/Mattcraft/net/minecraft/world/level/levelgen/feature/trunkplacers/UpwardsBranchingTrunkPlacer.java:25: error: no suitable method found for and(P4<Mu<UpwardsBranchingTrunkPlacer>,IntProvider,Float,IntProvider,HolderSet<Block>>)
+                        .<IntProvider, float, IntProvider, HolderSet<Block>>and(
+                        ^
+    method P3.<T4#1>and(App<Mu<UpwardsBranchingTrunkPlacer>,T4#1>) is not applicable
+      (wrong number of type arguments; required 1)
+    method P3.<T4#2,T5#1>and(P2<Mu<UpwardsBranchingTrunkPlacer>,T4#2,T5#1>) is not applicable
+      (wrong number of type arguments; required 2)
+    method P3.<T4#3,T5#2,T6#1>and(P3<Mu<UpwardsBranchingTrunkPlacer>,T4#3,T5#2,T6#1>) is not applicable
+      (wrong number of type arguments; required 3)
+    method P3.<T4#4,T5#3,T6#2,T7#1>and(P4<Mu<UpwardsBranchingTrunkPlacer>,T4#4,T5#3,T6#2,T7#1>) is not applicable
+      (explicit type argument float does not conform to declared bound(s) Object)
+    method P3.<T4#5,T5#4,T6#3,T7#2,T8>and(P5<Mu<UpwardsBranchingTrunkPlacer>,T4#5,T5#4,T6#3,T7#2,T8>) is not applicable
+      (wrong number of type arguments; required 5)
+  where T4#1,F,T1,T2,T3,T4#2,T5#1,T4#3,T5#2,T6#1,T4#4,T5#3,T6#2,T7#1,T4#5,T5#4,T6#3,T7#2,T8 are type-variables:
+    T4#1 extends Object declared in method <T4#1>and(App<F,T4#1>)
+    F extends K1 declared in class P3
+    T1 extends Object declared in class P3
+    T2 extends Object declared in class P3
+    T3 extends Object declared in class P3
+    T4#2 extends Object declared in method <T4#2,T5#1>and(P2<F,T4#2,T5#1>)
+    T5#1 extends Object declared in method <T4#2,T5#1>and(P2<F,T4#2,T5#1>)
+    T4#3 extends Object declared in method <T4#3,T5#2,T6#1>and(P3<F,T4#3,T5#2,T6#1>)
+    T5#2 extends Object declared in method <T4#3,T5#2,T6#1>and(P3<F,T4#3,T5#2,T6#1>)
+    T6#1 extends Object declared in method <T4#3,T5#2,T6#1>and(P3<F,T4#3,T5#2,T6#1>)
+    T4#4 extends Object declared in method <T4#4,T5#3,T6#2,T7#1>and(P4<F,T4#4,T5#3,T6#2,T7#1>)
+    T5#3 extends Object declared in method <T4#4,T5#3,T6#2,T7#1>and(P4<F,T4#4,T5#3,T6#2,T7#1>)
+    T6#2 extends Object declared in method <T4#4,T5#3,T6#2,T7#1>and(P4<F,T4#4,T5#3,T6#2,T7#1>)
+    T7#1 extends Object declared in method <T4#4,T5#3,T6#2,T7#1>and(P4<F,T4#4,T5#3,T6#2,T7#1>)
+    T4#5 extends Object declared in method <T4#5,T5#4,T6#3,T7#2,T8>and(P5<F,T4#5,T5#4,T6#3,T7#2,T8>)
+    T5#4 extends Object declared in method <T4#5,T5#4,T6#3,T7#2,T8>and(P5<F,T4#5,T5#4,T6#3,T7#2,T8>)
+    T6#3 extends Object declared in method <T4#5,T5#4,T6#3,T7#2,T8>and(P5<F,T4#5,T5#4,T6#3,T7#2,T8>)
+    T7#2 extends Object declared in method <T4#5,T5#4,T6#3,T7#2,T8>and(P5<F,T4#5,T5#4,T6#3,T7#2,T8>)
+    T8 extends Object declared in method <T4#5,T5#4,T6#3,T7#2,T8>and(P5<F,T4#5,T5#4,T6#3,T7#2,T8>)
+/home/matt/Documents/Repos/Mattcraft/net/minecraft/world/level/levelgen/feature/trunkplacers/UpwardsBranchingTrunkPlacer.java:25: error: unexpected type
+                        .<IntProvider, float, IntProvider, HolderSet<Block>>and(
+                                       ^
+  required: reference
+  found:    float
+/home/matt/Documents/Repos/Mattcraft/net/minecraft/world/level/chunk/ChunkGeneratorStructureState.java:53: error: incompatible types: List<Reference<StructureSet>> cannot be converted to List<Holder<StructureSet>>
+                        .collect(Collectors.toUnmodifiableList());
+                                ^
+/home/matt/Documents/Repos/Mattcraft/net/minecraft/world/level/TicketStorage.java:91: error: incompatible types: Object cannot be converted to Ticket
+                        for (Ticket ticket : (List)entry.getValue()) {
+                                             ^
+/home/matt/Documents/Repos/Mattcraft/net/minecraft/world/level/TicketStorage.java:99: error: incompatible types: Object cannot be converted to Ticket
+                        for (Ticket ticket : (List)entry.getValue()) {
+                                             ^
+/home/matt/Documents/Repos/Mattcraft/net/minecraft/world/level/TicketStorage.java:369: error: incompatible types: Object cannot be converted to Ticket
+                        for (Ticket ticket : (List)entry.getValue()) {
+                                             ^
+/home/matt/Documents/Repos/Mattcraft/net/minecraft/world/level/TicketStorage.java:398: error: incompatible types: Object cannot be converted to Ticket
+                        for (Ticket ticket : (List)entry.getValue()) {
+                                             ^
+/home/matt/Documents/Repos/Mattcraft/net/minecraft/util/StaticCache2D.java:36: error: incompatible types: Object cannot be converted to T
+                        consumer.accept(object);
+                                        ^
+  where T is a type-variable:
+    T extends Object declared in class StaticCache2D
+/home/matt/Documents/Repos/Mattcraft/net/minecraft/server/level/ChunkTaskPriorityQueue.java:15: error: incompatible types: List<Long2ObjectLinkedOpenHashMap> cannot be converted to List<Long2ObjectLinkedOpenHashMap<List<Runnable>>>
+                .toList();
+                       ^
+/home/matt/Documents/Repos/Mattcraft/net/minecraft/server/level/ChunkTaskPriorityQueue.java:36: error: cannot find symbol
+                                        .addAll(list);
+                                        ^
+  symbol:   method addAll(List<Runnable>)
+  location: class Object
+/home/matt/Documents/Repos/Mattcraft/net/minecraft/server/level/ChunkTaskPriorityQueue.java:45: error: cannot find symbol
+                        .add(runnable);
+                        ^
+  symbol:   method add(Runnable)
+  location: class Object
+/home/matt/Documents/Repos/Mattcraft/net/minecraft/world/level/biome/Climate.java:141: error: incompatible types: cannot infer type-variable(s) O
+                                                        instance -> instance.group(Climate.ParameterPoint.CODEC.fieldOf("parameters").forGetter(Pair::getFirst), mapCodec.forGetter(Pair::getSecond))
+                                                                                  ^
+    (argument mismatch; invalid method reference
+      method getFirst in class Pair<F,S> cannot be applied to given types
+        required: no arguments
+        found:    T
+        reason: actual and formal argument lists differ in length)
+  where O,A,T,F,S are type-variables:
+    O extends Object declared in method <O>forGetter(Function<O,A>)
+    A extends Object declared in class MapCodec
+    T extends Object declared in method <T>codec(MapCodec<T>)
+    F extends Object declared in class Pair
+    S extends Object declared in class Pair
+/home/matt/Documents/Repos/Mattcraft/net/minecraft/world/level/biome/Climate.java:146: error: incompatible types: cannot infer type-variable(s) S
+                                .xmap(Climate.ParameterList::new, Climate.ParameterList::values);
+                                     ^
+    (argument mismatch; invalid constructor reference
+      constructor ParameterList in class ParameterList<T#2> cannot be applied to given types
+        required: List
+        found:    List<T#1>
+        reason: cannot infer type-variable(s) T#2
+          (argument mismatch; List<T#1> cannot be converted to List<Pair<ParameterPoint,T#2>>))
+  where S,A,T#1,T#2 are type-variables:
+    S extends Object declared in method <S>xmap(Function<? super A,? extends S>,Function<? super S,? extends A>)
+    A extends Object declared in interface Codec
+    T#1 extends Object declared in method <T#1>codec(MapCodec<T#1>)
+    T#2 extends Object declared in class ParameterList
+/home/matt/Documents/Repos/Mattcraft/net/minecraft/world/level/levelgen/NoiseSettings.java:13: error: no suitable method found for group(RecordCodecBuilder<NoiseSettings,Integer>,RecordCodecBuilder<NoiseSettings,Integer>,RecordCodecBuilder<NoiseSettings,Integer>,RecordCodecBuilder<NoiseSettings,Integer>)
+                        instance -> instance.group(
+                                            ^
+    method Kind1.<T1#1>group(App<Mu<Object>,T1#1>) is not applicable
+      (cannot infer type-variable(s) T1#1
+        (actual and formal argument lists differ in length))
+    method Kind1.<T1#2,T2#1>group(App<Mu<Object>,T1#2>,App<Mu<Object>,T2#1>) is not applicable
+      (cannot infer type-variable(s) T1#2,T2#1
+        (actual and formal argument lists differ in length))
+    method Kind1.<T1#3,T2#2,T3#1>group(App<Mu<Object>,T1#3>,App<Mu<Object>,T2#2>,App<Mu<Object>,T3#1>) is not applicable
+      (cannot infer type-variable(s) T1#3,T2#2,T3#1
+        (actual and formal argument lists differ in length))
+    method Kind1.<T1#4,T2#3,T3#2,T4#1>group(App<Mu<Object>,T1#4>,App<Mu<Object>,T2#3>,App<Mu<Object>,T3#2>,App<Mu<Object>,T4#1>) is not applicable
+      (inference variable O has incompatible bounds
+        equality constraints: Object
+        upper bounds: Object,NoiseSettings)
+    method Kind1.<T1#5,T2#4,T3#3,T4#2,T5#1>group(App<Mu<Object>,T1#5>,App<Mu<Object>,T2#4>,App<Mu<Object>,T3#3>,App<Mu<Object>,T4#2>,App<Mu<Object>,T5#1>) is not applicable
+      (cannot infer type-variable(s) T1#5,T2#4,T3#3,T4#2,T5#1
+        (actual and formal argument lists differ in length))
+    method Kind1.<T1#6,T2#5,T3#4,T4#3,T5#2,T6#1>group(App<Mu<Object>,T1#6>,App<Mu<Object>,T2#5>,App<Mu<Object>,T3#4>,App<Mu<Object>,T4#3>,App<Mu<Object>,T5#2>,App<Mu<Object>,T6#1>) is not applicable
+      (cannot infer type-variable(s) T1#6,T2#5,T3#4,T4#3,T5#2,T6#1
+        (actual and formal argument lists differ in length))
+    method Kind1.<T1#7,T2#6,T3#5,T4#4,T5#3,T6#2,T7#1>group(App<Mu<Object>,T1#7>,App<Mu<Object>,T2#6>,App<Mu<Object>,T3#5>,App<Mu<Object>,T4#4>,App<Mu<Object>,T5#3>,App<Mu<Object>,T6#2>,App<Mu<Object>,T7#1>) is not applicable
+      (cannot infer type-variable(s) T1#7,T2#6,T3#5,T4#4,T5#3,T6#2,T7#1
+        (actual and formal argument lists differ in length))
+    method Kind1.<T1#8,T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8#1>group(App<Mu<Object>,T1#8>,App<Mu<Object>,T2#7>,App<Mu<Object>,T3#6>,App<Mu<Object>,T4#5>,App<Mu<Object>,T5#4>,App<Mu<Object>,T6#3>,App<Mu<Object>,T7#2>,App<Mu<Object>,T8#1>) is not applicable
+      (cannot infer type-variable(s) T1#8,T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8#1
+        (actual and formal argument lists differ in length))
+    method Kind1.<T1#9,T2#8,T3#7,T4#6,T5#5,T6#4,T7#3,T8#2,T9#1>group(App<Mu<Object>,T1#9>,App<Mu<Object>,T2#8>,App<Mu<Object>,T3#7>,App<Mu<Object>,T4#6>,App<Mu<Object>,T5#5>,App<Mu<Object>,T6#4>,App<Mu<Object>,T7#3>,App<Mu<Object>,T8#2>,App<Mu<Object>,T9#1>) is not applicable
+      (cannot infer type-variable(s) T1#9,T2#8,T3#7,T4#6,T5#5,T6#4,T7#3,T8#2,T9#1
+        (actual and formal argument lists differ in length))
+    method Kind1.<T1#10,T2#9,T3#8,T4#7,T5#6,T6#5,T7#4,T8#3,T9#2,T10#1>group(App<Mu<Object>,T1#10>,App<Mu<Object>,T2#9>,App<Mu<Object>,T3#8>,App<Mu<Object>,T4#7>,App<Mu<Object>,T5#6>,App<Mu<Object>,T6#5>,App<Mu<Object>,T7#4>,App<Mu<Object>,T8#3>,App<Mu<Object>,T9#2>,App<Mu<Object>,T10#1>) is not applicable
+      (cannot infer type-variable(s) T1#10,T2#9,T3#8,T4#7,T5#6,T6#5,T7#4,T8#3,T9#2,T10#1
+        (actual and formal argument lists differ in length))
+    method Kind1.<T1#11,T2#10,T3#9,T4#8,T5#7,T6#6,T7#5,T8#4,T9#3,T10#2,T11#1>group(App<Mu<Object>,T1#11>,App<Mu<Object>,T2#10>,App<Mu<Object>,T3#9>,App<Mu<Object>,T4#8>,App<Mu<Object>,T5#7>,App<Mu<Object>,T6#6>,App<Mu<Object>,T7#5>,App<Mu<Object>,T8#4>,App<Mu<Object>,T9#3>,App<Mu<Object>,T10#2>,App<Mu<Object>,T11#1>) is not applicable
+      (cannot infer type-variable(s) T1#11,T2#10,T3#9,T4#8,T5#7,T6#6,T7#5,T8#4,T9#3,T10#2,T11#1
+        (actual and formal argument lists differ in length))
+    method Kind1.<T1#12,T2#11,T3#10,T4#9,T5#8,T6#7,T7#6,T8#5,T9#4,T10#3,T11#2,T12#1>group(App<Mu<Object>,T1#12>,App<Mu<Object>,T2#11>,App<Mu<Object>,T3#10>,App<Mu<Object>,T4#9>,App<Mu<Object>,T5#8>,App<Mu<Object>,T6#7>,App<Mu<Object>,T7#6>,App<Mu<Object>,T8#5>,App<Mu<Object>,T9#4>,App<Mu<Object>,T10#3>,App<Mu<Object>,T11#2>,App<Mu<Object>,T12#1>) is not applicable
+      (cannot infer type-variable(s) T1#12,T2#11,T3#10,T4#9,T5#8,T6#7,T7#6,T8#5,T9#4,T10#3,T11#2,T12#1
+        (actual and formal argument lists differ in length))
+    method Kind1.<T1#13,T2#12,T3#11,T4#10,T5#9,T6#8,T7#7,T8#6,T9#5,T10#4,T11#3,T12#2,T13#1>group(App<Mu<Object>,T1#13>,App<Mu<Object>,T2#12>,App<Mu<Object>,T3#11>,App<Mu<Object>,T4#10>,App<Mu<Object>,T5#9>,App<Mu<Object>,T6#8>,App<Mu<Object>,T7#7>,App<Mu<Object>,T8#6>,App<Mu<Object>,T9#5>,App<Mu<Object>,T10#4>,App<Mu<Object>,T11#3>,App<Mu<Object>,T12#2>,App<Mu<Object>,T13#1>) is not applicable
+      (cannot infer type-variable(s) T1#13,T2#12,T3#11,T4#10,T5#9,T6#8,T7#7,T8#6,T9#5,T10#4,T11#3,T12#2,T13#1
+        (actual and formal argument lists differ in length))
+    method Kind1.<T1#14,T2#13,T3#12,T4#11,T5#10,T6#9,T7#8,T8#7,T9#6,T10#5,T11#4,T12#3,T13#2,T14#1>group(App<Mu<Object>,T1#14>,App<Mu<Object>,T2#13>,App<Mu<Object>,T3#12>,App<Mu<Object>,T4#11>,App<Mu<Object>,T5#10>,App<Mu<Object>,T6#9>,App<Mu<Object>,T7#8>,App<Mu<Object>,T8#7>,App<Mu<Object>,T9#6>,App<Mu<Object>,T10#5>,App<Mu<Object>,T11#4>,App<Mu<Object>,T12#3>,App<Mu<Object>,T13#2>,App<Mu<Object>,T14#1>) is not applicable
+      (cannot infer type-variable(s) T1#14,T2#13,T3#12,T4#11,T5#10,T6#9,T7#8,T8#7,T9#6,T10#5,T11#4,T12#3,T13#2,T14#1
+        (actual and formal argument lists differ in length))
+    method Kind1.<T1#15,T2#14,T3#13,T4#12,T5#11,T6#10,T7#9,T8#8,T9#7,T10#6,T11#5,T12#4,T13#3,T14#2,T15#1>group(App<Mu<Object>,T1#15>,App<Mu<Object>,T2#14>,App<Mu<Object>,T3#13>,App<Mu<Object>,T4#12>,App<Mu<Object>,T5#11>,App<Mu<Object>,T6#10>,App<Mu<Object>,T7#9>,App<Mu<Object>,T8#8>,App<Mu<Object>,T9#7>,App<Mu<Object>,T10#6>,App<Mu<Object>,T11#5>,App<Mu<Object>,T12#4>,App<Mu<Object>,T13#3>,App<Mu<Object>,T14#2>,App<Mu<Object>,T15#1>) is not applicable
+      (cannot infer type-variable(s) T1#15,T2#14,T3#13,T4#12,T5#11,T6#10,T7#9,T8#8,T9#7,T10#6,T11#5,T12#4,T13#3,T14#2,T15#1
+        (actual and formal argument lists differ in length))
+    method Kind1.<T1#16,T2#15,T3#14,T4#13,T5#12,T6#11,T7#10,T8#9,T9#8,T10#7,T11#6,T12#5,T13#4,T14#3,T15#2,T16>group(App<Mu<Object>,T1#16>,App<Mu<Object>,T2#15>,App<Mu<Object>,T3#14>,App<Mu<Object>,T4#13>,App<Mu<Object>,T5#12>,App<Mu<Object>,T6#11>,App<Mu<Object>,T7#10>,App<Mu<Object>,T8#9>,App<Mu<Object>,T9#8>,App<Mu<Object>,T10#7>,App<Mu<Object>,T11#6>,App<Mu<Object>,T12#5>,App<Mu<Object>,T13#4>,App<Mu<Object>,T14#3>,App<Mu<Object>,T15#2>,App<Mu<Object>,T16>) is not applicable
+      (cannot infer type-variable(s) T1#16,T2#15,T3#14,T4#13,T5#12,T6#11,T7#10,T8#9,T9#8,T10#7,T11#6,T12#5,T13#4,T14#3,T15#2,T16
+        (actual and formal argument lists differ in length))
+  where T1#1,F,T1#2,T2#1,T1#3,T2#2,T3#1,T1#4,T2#3,T3#2,T4#1,O,A,T1#5,T2#4,T3#3,T4#2,T5#1,T1#6,T2#5,T3#4,T4#3,T5#2,T6#1,T1#7,T2#6,T3#5,T4#4,T5#3,T6#2,T7#1,T1#8,T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8#1,T1#9,T2#8,T3#7,T4#6,T5#5,T6#4,T7#3,T8#2,T9#1,T1#10,T2#9,T3#8,T4#7,T5#6,T6#5,T7#4,T8#3,T9#2,T10#1,T1#11,T2#10,T3#9,T4#8,T5#7,T6#6,T7#5,T8#4,T9#3,T10#2,T11#1,T1#12,T2#11,T3#10,T4#9,T5#8,T6#7,T7#6,T8#5,T9#4,T10#3,T11#2,T12#1,T1#13,T2#12,T3#11,T4#10,T5#9,T6#8,T7#7,T8#6,T9#5,T10#4,T11#3,T12#2,T13#1,T1#14,T2#13,T3#12,T4#11,T5#10,T6#9,T7#8,T8#7,T9#6,T10#5,T11#4,T12#3,T13#2,T14#1,T1#15,T2#14,T3#13,T4#12,T5#11,T6#10,T7#9,T8#8,T9#7,T10#6,T11#5,T12#4,T13#3,T14#2,T15#1,T1#16,T2#15,T3#14,T4#13,T5#12,T6#11,T7#10,T8#9,T9#8,T10#7,T11#6,T12#5,T13#4,T14#3,T15#2,T16 are type-variables:
+    T1#1 extends Object declared in method <T1#1>group(App<F,T1#1>)
+    F extends K1 declared in interface Kind1
+    T1#2 extends Object declared in method <T1#2,T2#1>group(App<F,T1#2>,App<F,T2#1>)
+    T2#1 extends Object declared in method <T1#2,T2#1>group(App<F,T1#2>,App<F,T2#1>)
+    T1#3 extends Object declared in method <T1#3,T2#2,T3#1>group(App<F,T1#3>,App<F,T2#2>,App<F,T3#1>)
+    T2#2 extends Object declared in method <T1#3,T2#2,T3#1>group(App<F,T1#3>,App<F,T2#2>,App<F,T3#1>)
+    T3#1 extends Object declared in method <T1#3,T2#2,T3#1>group(App<F,T1#3>,App<F,T2#2>,App<F,T3#1>)
+    T1#4 extends Object declared in method <T1#4,T2#3,T3#2,T4#1>group(App<F,T1#4>,App<F,T2#3>,App<F,T3#2>,App<F,T4#1>)
+    T2#3 extends Object declared in method <T1#4,T2#3,T3#2,T4#1>group(App<F,T1#4>,App<F,T2#3>,App<F,T3#2>,App<F,T4#1>)
+    T3#2 extends Object declared in method <T1#4,T2#3,T3#2,T4#1>group(App<F,T1#4>,App<F,T2#3>,App<F,T3#2>,App<F,T4#1>)
+    T4#1 extends Object declared in method <T1#4,T2#3,T3#2,T4#1>group(App<F,T1#4>,App<F,T2#3>,App<F,T3#2>,App<F,T4#1>)
+    O extends Object declared in method <O>forGetter(Function<O,A>)
+    A extends Object declared in class MapCodec
+    T1#5 extends Object declared in method <T1#5,T2#4,T3#3,T4#2,T5#1>group(App<F,T1#5>,App<F,T2#4>,App<F,T3#3>,App<F,T4#2>,App<F,T5#1>)
+    T2#4 extends Object declared in method <T1#5,T2#4,T3#3,T4#2,T5#1>group(App<F,T1#5>,App<F,T2#4>,App<F,T3#3>,App<F,T4#2>,App<F,T5#1>)
+    T3#3 extends Object declared in method <T1#5,T2#4,T3#3,T4#2,T5#1>group(App<F,T1#5>,App<F,T2#4>,App<F,T3#3>,App<F,T4#2>,App<F,T5#1>)
+    T4#2 extends Object declared in method <T1#5,T2#4,T3#3,T4#2,T5#1>group(App<F,T1#5>,App<F,T2#4>,App<F,T3#3>,App<F,T4#2>,App<F,T5#1>)
+    T5#1 extends Object declared in method <T1#5,T2#4,T3#3,T4#2,T5#1>group(App<F,T1#5>,App<F,T2#4>,App<F,T3#3>,App<F,T4#2>,App<F,T5#1>)
+    T1#6 extends Object declared in method <T1#6,T2#5,T3#4,T4#3,T5#2,T6#1>group(App<F,T1#6>,App<F,T2#5>,App<F,T3#4>,App<F,T4#3>,App<F,T5#2>,App<F,T6#1>)
+    T2#5 extends Object declared in method <T1#6,T2#5,T3#4,T4#3,T5#2,T6#1>group(App<F,T1#6>,App<F,T2#5>,App<F,T3#4>,App<F,T4#3>,App<F,T5#2>,App<F,T6#1>)
+    T3#4 extends Object declared in method <T1#6,T2#5,T3#4,T4#3,T5#2,T6#1>group(App<F,T1#6>,App<F,T2#5>,App<F,T3#4>,App<F,T4#3>,App<F,T5#2>,App<F,T6#1>)
+    T4#3 extends Object declared in method <T1#6,T2#5,T3#4,T4#3,T5#2,T6#1>group(App<F,T1#6>,App<F,T2#5>,App<F,T3#4>,App<F,T4#3>,App<F,T5#2>,App<F,T6#1>)
+    T5#2 extends Object declared in method <T1#6,T2#5,T3#4,T4#3,T5#2,T6#1>group(App<F,T1#6>,App<F,T2#5>,App<F,T3#4>,App<F,T4#3>,App<F,T5#2>,App<F,T6#1>)
+    T6#1 extends Object declared in method <T1#6,T2#5,T3#4,T4#3,T5#2,T6#1>group(App<F,T1#6>,App<F,T2#5>,App<F,T3#4>,App<F,T4#3>,App<F,T5#2>,App<F,T6#1>)
+    T1#7 extends Object declared in method <T1#7,T2#6,T3#5,T4#4,T5#3,T6#2,T7#1>group(App<F,T1#7>,App<F,T2#6>,App<F,T3#5>,App<F,T4#4>,App<F,T5#3>,App<F,T6#2>,App<F,T7#1>)
+    T2#6 extends Object declared in method <T1#7,T2#6,T3#5,T4#4,T5#3,T6#2,T7#1>group(App<F,T1#7>,App<F,T2#6>,App<F,T3#5>,App<F,T4#4>,App<F,T5#3>,App<F,T6#2>,App<F,T7#1>)
+    T3#5 extends Object declared in method <T1#7,T2#6,T3#5,T4#4,T5#3,T6#2,T7#1>group(App<F,T1#7>,App<F,T2#6>,App<F,T3#5>,App<F,T4#4>,App<F,T5#3>,App<F,T6#2>,App<F,T7#1>)
+    T4#4 extends Object declared in method <T1#7,T2#6,T3#5,T4#4,T5#3,T6#2,T7#1>group(App<F,T1#7>,App<F,T2#6>,App<F,T3#5>,App<F,T4#4>,App<F,T5#3>,App<F,T6#2>,App<F,T7#1>)
+    T5#3 extends Object declared in method <T1#7,T2#6,T3#5,T4#4,T5#3,T6#2,T7#1>group(App<F,T1#7>,App<F,T2#6>,App<F,T3#5>,App<F,T4#4>,App<F,T5#3>,App<F,T6#2>,App<F,T7#1>)
+    T6#2 extends Object declared in method <T1#7,T2#6,T3#5,T4#4,T5#3,T6#2,T7#1>group(App<F,T1#7>,App<F,T2#6>,App<F,T3#5>,App<F,T4#4>,App<F,T5#3>,App<F,T6#2>,App<F,T7#1>)
+    T7#1 extends Object declared in method <T1#7,T2#6,T3#5,T4#4,T5#3,T6#2,T7#1>group(App<F,T1#7>,App<F,T2#6>,App<F,T3#5>,App<F,T4#4>,App<F,T5#3>,App<F,T6#2>,App<F,T7#1>)
+    T1#8 extends Object declared in method <T1#8,T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8#1>group(App<F,T1#8>,App<F,T2#7>,App<F,T3#6>,App<F,T4#5>,App<F,T5#4>,App<F,T6#3>,App<F,T7#2>,App<F,T8#1>)
+    T2#7 extends Object declared in method <T1#8,T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8#1>group(App<F,T1#8>,App<F,T2#7>,App<F,T3#6>,App<F,T4#5>,App<F,T5#4>,App<F,T6#3>,App<F,T7#2>,App<F,T8#1>)
+    T3#6 extends Object declared in method <T1#8,T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8#1>group(App<F,T1#8>,App<F,T2#7>,App<F,T3#6>,App<F,T4#5>,App<F,T5#4>,App<F,T6#3>,App<F,T7#2>,App<F,T8#1>)
+    T4#5 extends Object declared in method <T1#8,T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8#1>group(App<F,T1#8>,App<F,T2#7>,App<F,T3#6>,App<F,T4#5>,App<F,T5#4>,App<F,T6#3>,App<F,T7#2>,App<F,T8#1>)
+    T5#4 extends Object declared in method <T1#8,T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8#1>group(App<F,T1#8>,App<F,T2#7>,App<F,T3#6>,App<F,T4#5>,App<F,T5#4>,App<F,T6#3>,App<F,T7#2>,App<F,T8#1>)
+    T6#3 extends Object declared in method <T1#8,T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8#1>group(App<F,T1#8>,App<F,T2#7>,App<F,T3#6>,App<F,T4#5>,App<F,T5#4>,App<F,T6#3>,App<F,T7#2>,App<F,T8#1>)
+    T7#2 extends Object declared in method <T1#8,T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8#1>group(App<F,T1#8>,App<F,T2#7>,App<F,T3#6>,App<F,T4#5>,App<F,T5#4>,App<F,T6#3>,App<F,T7#2>,App<F,T8#1>)
+    T8#1 extends Object declared in method <T1#8,T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8#1>group(App<F,T1#8>,App<F,T2#7>,App<F,T3#6>,App<F,T4#5>,App<F,T5#4>,App<F,T6#3>,App<F,T7#2>,App<F,T8#1>)
+    T1#9 extends Object declared in method <T1#9,T2#8,T3#7,T4#6,T5#5,T6#4,T7#3,T8#2,T9#1>group(App<F,T1#9>,App<F,T2#8>,App<F,T3#7>,App<F,T4#6>,App<F,T5#5>,App<F,T6#4>,App<F,T7#3>,App<F,T8#2>,App<F,T9#1>)
+    T2#8 extends Object declared in method <T1#9,T2#8,T3#7,T4#6,T5#5,T6#4,T7#3,T8#2,T9#1>group(App<F,T1#9>,App<F,T2#8>,App<F,T3#7>,App<F,T4#6>,App<F,T5#5>,App<F,T6#4>,App<F,T7#3>,App<F,T8#2>,App<F,T9#1>)
+    T3#7 extends Object declared in method <T1#9,T2#8,T3#7,T4#6,T5#5,T6#4,T7#3,T8#2,T9#1>group(App<F,T1#9>,App<F,T2#8>,App<F,T3#7>,App<F,T4#6>,App<F,T5#5>,App<F,T6#4>,App<F,T7#3>,App<F,T8#2>,App<F,T9#1>)
+    T4#6 extends Object declared in method <T1#9,T2#8,T3#7,T4#6,T5#5,T6#4,T7#3,T8#2,T9#1>group(App<F,T1#9>,App<F,T2#8>,App<F,T3#7>,App<F,T4#6>,App<F,T5#5>,App<F,T6#4>,App<F,T7#3>,App<F,T8#2>,App<F,T9#1>)
+    T5#5 extends Object declared in method <T1#9,T2#8,T3#7,T4#6,T5#5,T6#4,T7#3,T8#2,T9#1>group(App<F,T1#9>,App<F,T2#8>,App<F,T3#7>,App<F,T4#6>,App<F,T5#5>,App<F,T6#4>,App<F,T7#3>,App<F,T8#2>,App<F,T9#1>)
+    T6#4 extends Object declared in method <T1#9,T2#8,T3#7,T4#6,T5#5,T6#4,T7#3,T8#2,T9#1>group(App<F,T1#9>,App<F,T2#8>,App<F,T3#7>,App<F,T4#6>,App<F,T5#5>,App<F,T6#4>,App<F,T7#3>,App<F,T8#2>,App<F,T9#1>)
+    T7#3 extends Object declared in method <T1#9,T2#8,T3#7,T4#6,T5#5,T6#4,T7#3,T8#2,T9#1>group(App<F,T1#9>,App<F,T2#8>,App<F,T3#7>,App<F,T4#6>,App<F,T5#5>,App<F,T6#4>,App<F,T7#3>,App<F,T8#2>,App<F,T9#1>)
+    T8#2 extends Object declared in method <T1#9,T2#8,T3#7,T4#6,T5#5,T6#4,T7#3,T8#2,T9#1>group(App<F,T1#9>,App<F,T2#8>,App<F,T3#7>,App<F,T4#6>,App<F,T5#5>,App<F,T6#4>,App<F,T7#3>,App<F,T8#2>,App<F,T9#1>)
+    T9#1 extends Object declared in method <T1#9,T2#8,T3#7,T4#6,T5#5,T6#4,T7#3,T8#2,T9#1>group(App<F,T1#9>,App<F,T2#8>,App<F,T3#7>,App<F,T4#6>,App<F,T5#5>,App<F,T6#4>,App<F,T7#3>,App<F,T8#2>,App<F,T9#1>)
+    T1#10 extends Object declared in method <T1#10,T2#9,T3#8,T4#7,T5#6,T6#5,T7#4,T8#3,T9#2,T10#1>group(App<F,T1#10>,App<F,T2#9>,App<F,T3#8>,App<F,T4#7>,App<F,T5#6>,App<F,T6#5>,App<F,T7#4>,App<F,T8#3>,App<F,T9#2>,App<F,T10#1>)
+    T2#9 extends Object declared in method <T1#10,T2#9,T3#8,T4#7,T5#6,T6#5,T7#4,T8#3,T9#2,T10#1>group(App<F,T1#10>,App<F,T2#9>,App<F,T3#8>,App<F,T4#7>,App<F,T5#6>,App<F,T6#5>,App<F,T7#4>,App<F,T8#3>,App<F,T9#2>,App<F,T10#1>)
+    T3#8 extends Object declared in method <T1#10,T2#9,T3#8,T4#7,T5#6,T6#5,T7#4,T8#3,T9#2,T10#1>group(App<F,T1#10>,App<F,T2#9>,App<F,T3#8>,App<F,T4#7>,App<F,T5#6>,App<F,T6#5>,App<F,T7#4>,App<F,T8#3>,App<F,T9#2>,App<F,T10#1>)
+    T4#7 extends Object declared in method <T1#10,T2#9,T3#8,T4#7,T5#6,T6#5,T7#4,T8#3,T9#2,T10#1>group(App<F,T1#10>,App<F,T2#9>,App<F,T3#8>,App<F,T4#7>,App<F,T5#6>,App<F,T6#5>,App<F,T7#4>,App<F,T8#3>,App<F,T9#2>,App<F,T10#1>)
+    T5#6 extends Object declared in method <T1#10,T2#9,T3#8,T4#7,T5#6,T6#5,T7#4,T8#3,T9#2,T10#1>group(App<F,T1#10>,App<F,T2#9>,App<F,T3#8>,App<F,T4#7>,App<F,T5#6>,App<F,T6#5>,App<F,T7#4>,App<F,T8#3>,App<F,T9#2>,App<F,T10#1>)
+    T6#5 extends Object declared in method <T1#10,T2#9,T3#8,T4#7,T5#6,T6#5,T7#4,T8#3,T9#2,T10#1>group(App<F,T1#10>,App<F,T2#9>,App<F,T3#8>,App<F,T4#7>,App<F,T5#6>,App<F,T6#5>,App<F,T7#4>,App<F,T8#3>,App<F,T9#2>,App<F,T10#1>)
+    T7#4 extends Object declared in method <T1#10,T2#9,T3#8,T4#7,T5#6,T6#5,T7#4,T8#3,T9#2,T10#1>group(App<F,T1#10>,App<F,T2#9>,App<F,T3#8>,App<F,T4#7>,App<F,T5#6>,App<F,T6#5>,App<F,T7#4>,App<F,T8#3>,App<F,T9#2>,App<F,T10#1>)
+    T8#3 extends Object declared in method <T1#10,T2#9,T3#8,T4#7,T5#6,T6#5,T7#4,T8#3,T9#2,T10#1>group(App<F,T1#10>,App<F,T2#9>,App<F,T3#8>,App<F,T4#7>,App<F,T5#6>,App<F,T6#5>,App<F,T7#4>,App<F,T8#3>,App<F,T9#2>,App<F,T10#1>)
+    T9#2 extends Object declared in method <T1#10,T2#9,T3#8,T4#7,T5#6,T6#5,T7#4,T8#3,T9#2,T10#1>group(App<F,T1#10>,App<F,T2#9>,App<F,T3#8>,App<F,T4#7>,App<F,T5#6>,App<F,T6#5>,App<F,T7#4>,App<F,T8#3>,App<F,T9#2>,App<F,T10#1>)
+    T10#1 extends Object declared in method <T1#10,T2#9,T3#8,T4#7,T5#6,T6#5,T7#4,T8#3,T9#2,T10#1>group(App<F,T1#10>,App<F,T2#9>,App<F,T3#8>,App<F,T4#7>,App<F,T5#6>,App<F,T6#5>,App<F,T7#4>,App<F,T8#3>,App<F,T9#2>,App<F,T10#1>)
+    T1#11 extends Object declared in method <T1#11,T2#10,T3#9,T4#8,T5#7,T6#6,T7#5,T8#4,T9#3,T10#2,T11#1>group(App<F,T1#11>,App<F,T2#10>,App<F,T3#9>,App<F,T4#8>,App<F,T5#7>,App<F,T6#6>,App<F,T7#5>,App<F,T8#4>,App<F,T9#3>,App<F,T10#2>,App<F,T11#1>)
+    T2#10 extends Object declared in method <T1#11,T2#10,T3#9,T4#8,T5#7,T6#6,T7#5,T8#4,T9#3,T10#2,T11#1>group(App<F,T1#11>,App<F,T2#10>,App<F,T3#9>,App<F,T4#8>,App<F,T5#7>,App<F,T6#6>,App<F,T7#5>,App<F,T8#4>,App<F,T9#3>,App<F,T10#2>,App<F,T11#1>)
+    T3#9 extends Object declared in method <T1#11,T2#10,T3#9,T4#8,T5#7,T6#6,T7#5,T8#4,T9#3,T10#2,T11#1>group(App<F,T1#11>,App<F,T2#10>,App<F,T3#9>,App<F,T4#8>,App<F,T5#7>,App<F,T6#6>,App<F,T7#5>,App<F,T8#4>,App<F,T9#3>,App<F,T10#2>,App<F,T11#1>)
+    T4#8 extends Object declared in method <T1#11,T2#10,T3#9,T4#8,T5#7,T6#6,T7#5,T8#4,T9#3,T10#2,T11#1>group(App<F,T1#11>,App<F,T2#10>,App<F,T3#9>,App<F,T4#8>,App<F,T5#7>,App<F,T6#6>,App<F,T7#5>,App<F,T8#4>,App<F,T9#3>,App<F,T10#2>,App<F,T11#1>)
+    T5#7 extends Object declared in method <T1#11,T2#10,T3#9,T4#8,T5#7,T6#6,T7#5,T8#4,T9#3,T10#2,T11#1>group(App<F,T1#11>,App<F,T2#10>,App<F,T3#9>,App<F,T4#8>,App<F,T5#7>,App<F,T6#6>,App<F,T7#5>,App<F,T8#4>,App<F,T9#3>,App<F,T10#2>,App<F,T11#1>)
+    T6#6 extends Object declared in method <T1#11,T2#10,T3#9,T4#8,T5#7,T6#6,T7#5,T8#4,T9#3,T10#2,T11#1>group(App<F,T1#11>,App<F,T2#10>,App<F,T3#9>,App<F,T4#8>,App<F,T5#7>,App<F,T6#6>,App<F,T7#5>,App<F,T8#4>,App<F,T9#3>,App<F,T10#2>,App<F,T11#1>)
+    T7#5 extends Object declared in method <T1#11,T2#10,T3#9,T4#8,T5#7,T6#6,T7#5,T8#4,T9#3,T10#2,T11#1>group(App<F,T1#11>,App<F,T2#10>,App<F,T3#9>,App<F,T4#8>,App<F,T5#7>,App<F,T6#6>,App<F,T7#5>,App<F,T8#4>,App<F,T9#3>,App<F,T10#2>,App<F,T11#1>)
+    T8#4 extends Object declared in method <T1#11,T2#10,T3#9,T4#8,T5#7,T6#6,T7#5,T8#4,T9#3,T10#2,T11#1>group(App<F,T1#11>,App<F,T2#10>,App<F,T3#9>,App<F,T4#8>,App<F,T5#7>,App<F,T6#6>,App<F,T7#5>,App<F,T8#4>,App<F,T9#3>,App<F,T10#2>,App<F,T11#1>)
+    T9#3 extends Object declared in method <T1#11,T2#10,T3#9,T4#8,T5#7,T6#6,T7#5,T8#4,T9#3,T10#2,T11#1>group(App<F,T1#11>,App<F,T2#10>,App<F,T3#9>,App<F,T4#8>,App<F,T5#7>,App<F,T6#6>,App<F,T7#5>,App<F,T8#4>,App<F,T9#3>,App<F,T10#2>,App<F,T11#1>)
+    T10#2 extends Object declared in method <T1#11,T2#10,T3#9,T4#8,T5#7,T6#6,T7#5,T8#4,T9#3,T10#2,T11#1>group(App<F,T1#11>,App<F,T2#10>,App<F,T3#9>,App<F,T4#8>,App<F,T5#7>,App<F,T6#6>,App<F,T7#5>,App<F,T8#4>,App<F,T9#3>,App<F,T10#2>,App<F,T11#1>)
+    T11#1 extends Object declared in method <T1#11,T2#10,T3#9,T4#8,T5#7,T6#6,T7#5,T8#4,T9#3,T10#2,T11#1>group(App<F,T1#11>,App<F,T2#10>,App<F,T3#9>,App<F,T4#8>,App<F,T5#7>,App<F,T6#6>,App<F,T7#5>,App<F,T8#4>,App<F,T9#3>,App<F,T10#2>,App<F,T11#1>)
+    T1#12 extends Object declared in method <T1#12,T2#11,T3#10,T4#9,T5#8,T6#7,T7#6,T8#5,T9#4,T10#3,T11#2,T12#1>group(App<F,T1#12>,App<F,T2#11>,App<F,T3#10>,App<F,T4#9>,App<F,T5#8>,App<F,T6#7>,App<F,T7#6>,App<F,T8#5>,App<F,T9#4>,App<F,T10#3>,App<F,T11#2>,App<F,T12#1>)
+    T2#11 extends Object declared in method <T1#12,T2#11,T3#10,T4#9,T5#8,T6#7,T7#6,T8#5,T9#4,T10#3,T11#2,T12#1>group(App<F,T1#12>,App<F,T2#11>,App<F,T3#10>,App<F,T4#9>,App<F,T5#8>,App<F,T6#7>,App<F,T7#6>,App<F,T8#5>,App<F,T9#4>,App<F,T10#3>,App<F,T11#2>,App<F,T12#1>)
+    T3#10 extends Object declared in method <T1#12,T2#11,T3#10,T4#9,T5#8,T6#7,T7#6,T8#5,T9#4,T10#3,T11#2,T12#1>group(App<F,T1#12>,App<F,T2#11>,App<F,T3#10>,App<F,T4#9>,App<F,T5#8>,App<F,T6#7>,App<F,T7#6>,App<F,T8#5>,App<F,T9#4>,App<F,T10#3>,App<F,T11#2>,App<F,T12#1>)
+    T4#9 extends Object declared in method <T1#12,T2#11,T3#10,T4#9,T5#8,T6#7,T7#6,T8#5,T9#4,T10#3,T11#2,T12#1>group(App<F,T1#12>,App<F,T2#11>,App<F,T3#10>,App<F,T4#9>,App<F,T5#8>,App<F,T6#7>,App<F,T7#6>,App<F,T8#5>,App<F,T9#4>,App<F,T10#3>,App<F,T11#2>,App<F,T12#1>)
+    T5#8 extends Object declared in method <T1#12,T2#11,T3#10,T4#9,T5#8,T6#7,T7#6,T8#5,T9#4,T10#3,T11#2,T12#1>group(App<F,T1#12>,App<F,T2#11>,App<F,T3#10>,App<F,T4#9>,App<F,T5#8>,App<F,T6#7>,App<F,T7#6>,App<F,T8#5>,App<F,T9#4>,App<F,T10#3>,App<F,T11#2>,App<F,T12#1>)
+    T6#7 extends Object declared in method <T1#12,T2#11,T3#10,T4#9,T5#8,T6#7,T7#6,T8#5,T9#4,T10#3,T11#2,T12#1>group(App<F,T1#12>,App<F,T2#11>,App<F,T3#10>,App<F,T4#9>,App<F,T5#8>,App<F,T6#7>,App<F,T7#6>,App<F,T8#5>,App<F,T9#4>,App<F,T10#3>,App<F,T11#2>,App<F,T12#1>)
+    T7#6 extends Object declared in method <T1#12,T2#11,T3#10,T4#9,T5#8,T6#7,T7#6,T8#5,T9#4,T10#3,T11#2,T12#1>group(App<F,T1#12>,App<F,T2#11>,App<F,T3#10>,App<F,T4#9>,App<F,T5#8>,App<F,T6#7>,App<F,T7#6>,App<F,T8#5>,App<F,T9#4>,App<F,T10#3>,App<F,T11#2>,App<F,T12#1>)
+    T8#5 extends Object declared in method <T1#12,T2#11,T3#10,T4#9,T5#8,T6#7,T7#6,T8#5,T9#4,T10#3,T11#2,T12#1>group(App<F,T1#12>,App<F,T2#11>,App<F,T3#10>,App<F,T4#9>,App<F,T5#8>,App<F,T6#7>,App<F,T7#6>,App<F,T8#5>,App<F,T9#4>,App<F,T10#3>,App<F,T11#2>,App<F,T12#1>)
+    T9#4 extends Object declared in method <T1#12,T2#11,T3#10,T4#9,T5#8,T6#7,T7#6,T8#5,T9#4,T10#3,T11#2,T12#1>group(App<F,T1#12>,App<F,T2#11>,App<F,T3#10>,App<F,T4#9>,App<F,T5#8>,App<F,T6#7>,App<F,T7#6>,App<F,T8#5>,App<F,T9#4>,App<F,T10#3>,App<F,T11#2>,App<F,T12#1>)
+    T10#3 extends Object declared in method <T1#12,T2#11,T3#10,T4#9,T5#8,T6#7,T7#6,T8#5,T9#4,T10#3,T11#2,T12#1>group(App<F,T1#12>,App<F,T2#11>,App<F,T3#10>,App<F,T4#9>,App<F,T5#8>,App<F,T6#7>,App<F,T7#6>,App<F,T8#5>,App<F,T9#4>,App<F,T10#3>,App<F,T11#2>,App<F,T12#1>)
+    T11#2 extends Object declared in method <T1#12,T2#11,T3#10,T4#9,T5#8,T6#7,T7#6,T8#5,T9#4,T10#3,T11#2,T12#1>group(App<F,T1#12>,App<F,T2#11>,App<F,T3#10>,App<F,T4#9>,App<F,T5#8>,App<F,T6#7>,App<F,T7#6>,App<F,T8#5>,App<F,T9#4>,App<F,T10#3>,App<F,T11#2>,App<F,T12#1>)
+    T12#1 extends Object declared in method <T1#12,T2#11,T3#10,T4#9,T5#8,T6#7,T7#6,T8#5,T9#4,T10#3,T11#2,T12#1>group(App<F,T1#12>,App<F,T2#11>,App<F,T3#10>,App<F,T4#9>,App<F,T5#8>,App<F,T6#7>,App<F,T7#6>,App<F,T8#5>,App<F,T9#4>,App<F,T10#3>,App<F,T11#2>,App<F,T12#1>)
+    T1#13 extends Object declared in method <T1#13,T2#12,T3#11,T4#10,T5#9,T6#8,T7#7,T8#6,T9#5,T10#4,T11#3,T12#2,T13#1>group(App<F,T1#13>,App<F,T2#12>,App<F,T3#11>,App<F,T4#10>,App<F,T5#9>,App<F,T6#8>,App<F,T7#7>,App<F,T8#6>,App<F,T9#5>,App<F,T10#4>,App<F,T11#3>,App<F,T12#2>,App<F,T13#1>)
+    T2#12 extends Object declared in method <T1#13,T2#12,T3#11,T4#10,T5#9,T6#8,T7#7,T8#6,T9#5,T10#4,T11#3,T12#2,T13#1>group(App<F,T1#13>,App<F,T2#12>,App<F,T3#11>,App<F,T4#10>,App<F,T5#9>,App<F,T6#8>,App<F,T7#7>,App<F,T8#6>,App<F,T9#5>,App<F,T10#4>,App<F,T11#3>,App<F,T12#2>,App<F,T13#1>)
+    T3#11 extends Object declared in method <T1#13,T2#12,T3#11,T4#10,T5#9,T6#8,T7#7,T8#6,T9#5,T10#4,T11#3,T12#2,T13#1>group(App<F,T1#13>,App<F,T2#12>,App<F,T3#11>,App<F,T4#10>,App<F,T5#9>,App<F,T6#8>,App<F,T7#7>,App<F,T8#6>,App<F,T9#5>,App<F,T10#4>,App<F,T11#3>,App<F,T12#2>,App<F,T13#1>)
+    T4#10 extends Object declared in method <T1#13,T2#12,T3#11,T4#10,T5#9,T6#8,T7#7,T8#6,T9#5,T10#4,T11#3,T12#2,T13#1>group(App<F,T1#13>,App<F,T2#12>,App<F,T3#11>,App<F,T4#10>,App<F,T5#9>,App<F,T6#8>,App<F,T7#7>,App<F,T8#6>,App<F,T9#5>,App<F,T10#4>,App<F,T11#3>,App<F,T12#2>,App<F,T13#1>)
+    T5#9 extends Object declared in method <T1#13,T2#12,T3#11,T4#10,T5#9,T6#8,T7#7,T8#6,T9#5,T10#4,T11#3,T12#2,T13#1>group(App<F,T1#13>,App<F,T2#12>,App<F,T3#11>,App<F,T4#10>,App<F,T5#9>,App<F,T6#8>,App<F,T7#7>,App<F,T8#6>,App<F,T9#5>,App<F,T10#4>,App<F,T11#3>,App<F,T12#2>,App<F,T13#1>)
+    T6#8 extends Object declared in method <T1#13,T2#12,T3#11,T4#10,T5#9,T6#8,T7#7,T8#6,T9#5,T10#4,T11#3,T12#2,T13#1>group(App<F,T1#13>,App<F,T2#12>,App<F,T3#11>,App<F,T4#10>,App<F,T5#9>,App<F,T6#8>,App<F,T7#7>,App<F,T8#6>,App<F,T9#5>,App<F,T10#4>,App<F,T11#3>,App<F,T12#2>,App<F,T13#1>)
+    T7#7 extends Object declared in method <T1#13,T2#12,T3#11,T4#10,T5#9,T6#8,T7#7,T8#6,T9#5,T10#4,T11#3,T12#2,T13#1>group(App<F,T1#13>,App<F,T2#12>,App<F,T3#11>,App<F,T4#10>,App<F,T5#9>,App<F,T6#8>,App<F,T7#7>,App<F,T8#6>,App<F,T9#5>,App<F,T10#4>,App<F,T11#3>,App<F,T12#2>,App<F,T13#1>)
+    T8#6 extends Object declared in method <T1#13,T2#12,T3#11,T4#10,T5#9,T6#8,T7#7,T8#6,T9#5,T10#4,T11#3,T12#2,T13#1>group(App<F,T1#13>,App<F,T2#12>,App<F,T3#11>,App<F,T4#10>,App<F,T5#9>,App<F,T6#8>,App<F,T7#7>,App<F,T8#6>,App<F,T9#5>,App<F,T10#4>,App<F,T11#3>,App<F,T12#2>,App<F,T13#1>)
+    T9#5 extends Object declared in method <T1#13,T2#12,T3#11,T4#10,T5#9,T6#8,T7#7,T8#6,T9#5,T10#4,T11#3,T12#2,T13#1>group(App<F,T1#13>,App<F,T2#12>,App<F,T3#11>,App<F,T4#10>,App<F,T5#9>,App<F,T6#8>,App<F,T7#7>,App<F,T8#6>,App<F,T9#5>,App<F,T10#4>,App<F,T11#3>,App<F,T12#2>,App<F,T13#1>)
+    T10#4 extends Object declared in method <T1#13,T2#12,T3#11,T4#10,T5#9,T6#8,T7#7,T8#6,T9#5,T10#4,T11#3,T12#2,T13#1>group(App<F,T1#13>,App<F,T2#12>,App<F,T3#11>,App<F,T4#10>,App<F,T5#9>,App<F,T6#8>,App<F,T7#7>,App<F,T8#6>,App<F,T9#5>,App<F,T10#4>,App<F,T11#3>,App<F,T12#2>,App<F,T13#1>)
+    T11#3 extends Object declared in method <T1#13,T2#12,T3#11,T4#10,T5#9,T6#8,T7#7,T8#6,T9#5,T10#4,T11#3,T12#2,T13#1>group(App<F,T1#13>,App<F,T2#12>,App<F,T3#11>,App<F,T4#10>,App<F,T5#9>,App<F,T6#8>,App<F,T7#7>,App<F,T8#6>,App<F,T9#5>,App<F,T10#4>,App<F,T11#3>,App<F,T12#2>,App<F,T13#1>)
+    T12#2 extends Object declared in method <T1#13,T2#12,T3#11,T4#10,T5#9,T6#8,T7#7,T8#6,T9#5,T10#4,T11#3,T12#2,T13#1>group(App<F,T1#13>,App<F,T2#12>,App<F,T3#11>,App<F,T4#10>,App<F,T5#9>,App<F,T6#8>,App<F,T7#7>,App<F,T8#6>,App<F,T9#5>,App<F,T10#4>,App<F,T11#3>,App<F,T12#2>,App<F,T13#1>)
+    T13#1 extends Object declared in method <T1#13,T2#12,T3#11,T4#10,T5#9,T6#8,T7#7,T8#6,T9#5,T10#4,T11#3,T12#2,T13#1>group(App<F,T1#13>,App<F,T2#12>,App<F,T3#11>,App<F,T4#10>,App<F,T5#9>,App<F,T6#8>,App<F,T7#7>,App<F,T8#6>,App<F,T9#5>,App<F,T10#4>,App<F,T11#3>,App<F,T12#2>,App<F,T13#1>)
+    T1#14 extends Object declared in method <T1#14,T2#13,T3#12,T4#11,T5#10,T6#9,T7#8,T8#7,T9#6,T10#5,T11#4,T12#3,T13#2,T14#1>group(App<F,T1#14>,App<F,T2#13>,App<F,T3#12>,App<F,T4#11>,App<F,T5#10>,App<F,T6#9>,App<F,T7#8>,App<F,T8#7>,App<F,T9#6>,App<F,T10#5>,App<F,T11#4>,App<F,T12#3>,App<F,T13#2>,App<F,T14#1>)
+    T2#13 extends Object declared in method <T1#14,T2#13,T3#12,T4#11,T5#10,T6#9,T7#8,T8#7,T9#6,T10#5,T11#4,T12#3,T13#2,T14#1>group(App<F,T1#14>,App<F,T2#13>,App<F,T3#12>,App<F,T4#11>,App<F,T5#10>,App<F,T6#9>,App<F,T7#8>,App<F,T8#7>,App<F,T9#6>,App<F,T10#5>,App<F,T11#4>,App<F,T12#3>,App<F,T13#2>,App<F,T14#1>)
+    T3#12 extends Object declared in method <T1#14,T2#13,T3#12,T4#11,T5#10,T6#9,T7#8,T8#7,T9#6,T10#5,T11#4,T12#3,T13#2,T14#1>group(App<F,T1#14>,App<F,T2#13>,App<F,T3#12>,App<F,T4#11>,App<F,T5#10>,App<F,T6#9>,App<F,T7#8>,App<F,T8#7>,App<F,T9#6>,App<F,T10#5>,App<F,T11#4>,App<F,T12#3>,App<F,T13#2>,App<F,T14#1>)
+    T4#11 extends Object declared in method <T1#14,T2#13,T3#12,T4#11,T5#10,T6#9,T7#8,T8#7,T9#6,T10#5,T11#4,T12#3,T13#2,T14#1>group(App<F,T1#14>,App<F,T2#13>,App<F,T3#12>,App<F,T4#11>,App<F,T5#10>,App<F,T6#9>,App<F,T7#8>,App<F,T8#7>,App<F,T9#6>,App<F,T10#5>,App<F,T11#4>,App<F,T12#3>,App<F,T13#2>,App<F,T14#1>)
+    T5#10 extends Object declared in method <T1#14,T2#13,T3#12,T4#11,T5#10,T6#9,T7#8,T8#7,T9#6,T10#5,T11#4,T12#3,T13#2,T14#1>group(App<F,T1#14>,App<F,T2#13>,App<F,T3#12>,App<F,T4#11>,App<F,T5#10>,App<F,T6#9>,App<F,T7#8>,App<F,T8#7>,App<F,T9#6>,App<F,T10#5>,App<F,T11#4>,App<F,T12#3>,App<F,T13#2>,App<F,T14#1>)
+    T6#9 extends Object declared in method <T1#14,T2#13,T3#12,T4#11,T5#10,T6#9,T7#8,T8#7,T9#6,T10#5,T11#4,T12#3,T13#2,T14#1>group(App<F,T1#14>,App<F,T2#13>,App<F,T3#12>,App<F,T4#11>,App<F,T5#10>,App<F,T6#9>,App<F,T7#8>,App<F,T8#7>,App<F,T9#6>,App<F,T10#5>,App<F,T11#4>,App<F,T12#3>,App<F,T13#2>,App<F,T14#1>)
+    T7#8 extends Object declared in method <T1#14,T2#13,T3#12,T4#11,T5#10,T6#9,T7#8,T8#7,T9#6,T10#5,T11#4,T12#3,T13#2,T14#1>group(App<F,T1#14>,App<F,T2#13>,App<F,T3#12>,App<F,T4#11>,App<F,T5#10>,App<F,T6#9>,App<F,T7#8>,App<F,T8#7>,App<F,T9#6>,App<F,T10#5>,App<F,T11#4>,App<F,T12#3>,App<F,T13#2>,App<F,T14#1>)
+    T8#7 extends Object declared in method <T1#14,T2#13,T3#12,T4#11,T5#10,T6#9,T7#8,T8#7,T9#6,T10#5,T11#4,T12#3,T13#2,T14#1>group(App<F,T1#14>,App<F,T2#13>,App<F,T3#12>,App<F,T4#11>,App<F,T5#10>,App<F,T6#9>,App<F,T7#8>,App<F,T8#7>,App<F,T9#6>,App<F,T10#5>,App<F,T11#4>,App<F,T12#3>,App<F,T13#2>,App<F,T14#1>)
+    T9#6 extends Object declared in method <T1#14,T2#13,T3#12,T4#11,T5#10,T6#9,T7#8,T8#7,T9#6,T10#5,T11#4,T12#3,T13#2,T14#1>group(App<F,T1#14>,App<F,T2#13>,App<F,T3#12>,App<F,T4#11>,App<F,T5#10>,App<F,T6#9>,App<F,T7#8>,App<F,T8#7>,App<F,T9#6>,App<F,T10#5>,App<F,T11#4>,App<F,T12#3>,App<F,T13#2>,App<F,T14#1>)
+    T10#5 extends Object declared in method <T1#14,T2#13,T3#12,T4#11,T5#10,T6#9,T7#8,T8#7,T9#6,T10#5,T11#4,T12#3,T13#2,T14#1>group(App<F,T1#14>,App<F,T2#13>,App<F,T3#12>,App<F,T4#11>,App<F,T5#10>,App<F,T6#9>,App<F,T7#8>,App<F,T8#7>,App<F,T9#6>,App<F,T10#5>,App<F,T11#4>,App<F,T12#3>,App<F,T13#2>,App<F,T14#1>)
+    T11#4 extends Object declared in method <T1#14,T2#13,T3#12,T4#11,T5#10,T6#9,T7#8,T8#7,T9#6,T10#5,T11#4,T12#3,T13#2,T14#1>group(App<F,T1#14>,App<F,T2#13>,App<F,T3#12>,App<F,T4#11>,App<F,T5#10>,App<F,T6#9>,App<F,T7#8>,App<F,T8#7>,App<F,T9#6>,App<F,T10#5>,App<F,T11#4>,App<F,T12#3>,App<F,T13#2>,App<F,T14#1>)
+    T12#3 extends Object declared in method <T1#14,T2#13,T3#12,T4#11,T5#10,T6#9,T7#8,T8#7,T9#6,T10#5,T11#4,T12#3,T13#2,T14#1>group(App<F,T1#14>,App<F,T2#13>,App<F,T3#12>,App<F,T4#11>,App<F,T5#10>,App<F,T6#9>,App<F,T7#8>,App<F,T8#7>,App<F,T9#6>,App<F,T10#5>,App<F,T11#4>,App<F,T12#3>,App<F,T13#2>,App<F,T14#1>)
+    T13#2 extends Object declared in method <T1#14,T2#13,T3#12,T4#11,T5#10,T6#9,T7#8,T8#7,T9#6,T10#5,T11#4,T12#3,T13#2,T14#1>group(App<F,T1#14>,App<F,T2#13>,App<F,T3#12>,App<F,T4#11>,App<F,T5#10>,App<F,T6#9>,App<F,T7#8>,App<F,T8#7>,App<F,T9#6>,App<F,T10#5>,App<F,T11#4>,App<F,T12#3>,App<F,T13#2>,App<F,T14#1>)
+    T14#1 extends Object declared in method <T1#14,T2#13,T3#12,T4#11,T5#10,T6#9,T7#8,T8#7,T9#6,T10#5,T11#4,T12#3,T13#2,T14#1>group(App<F,T1#14>,App<F,T2#13>,App<F,T3#12>,App<F,T4#11>,App<F,T5#10>,App<F,T6#9>,App<F,T7#8>,App<F,T8#7>,App<F,T9#6>,App<F,T10#5>,App<F,T11#4>,App<F,T12#3>,App<F,T13#2>,App<F,T14#1>)
+    T1#15 extends Object declared in method <T1#15,T2#14,T3#13,T4#12,T5#11,T6#10,T7#9,T8#8,T9#7,T10#6,T11#5,T12#4,T13#3,T14#2,T15#1>group(App<F,T1#15>,App<F,T2#14>,App<F,T3#13>,App<F,T4#12>,App<F,T5#11>,App<F,T6#10>,App<F,T7#9>,App<F,T8#8>,App<F,T9#7>,App<F,T10#6>,App<F,T11#5>,App<F,T12#4>,App<F,T13#3>,App<F,T14#2>,App<F,T15#1>)
+    T2#14 extends Object declared in method <T1#15,T2#14,T3#13,T4#12,T5#11,T6#10,T7#9,T8#8,T9#7,T10#6,T11#5,T12#4,T13#3,T14#2,T15#1>group(App<F,T1#15>,App<F,T2#14>,App<F,T3#13>,App<F,T4#12>,App<F,T5#11>,App<F,T6#10>,App<F,T7#9>,App<F,T8#8>,App<F,T9#7>,App<F,T10#6>,App<F,T11#5>,App<F,T12#4>,App<F,T13#3>,App<F,T14#2>,App<F,T15#1>)
+    T3#13 extends Object declared in method <T1#15,T2#14,T3#13,T4#12,T5#11,T6#10,T7#9,T8#8,T9#7,T10#6,T11#5,T12#4,T13#3,T14#2,T15#1>group(App<F,T1#15>,App<F,T2#14>,App<F,T3#13>,App<F,T4#12>,App<F,T5#11>,App<F,T6#10>,App<F,T7#9>,App<F,T8#8>,App<F,T9#7>,App<F,T10#6>,App<F,T11#5>,App<F,T12#4>,App<F,T13#3>,App<F,T14#2>,App<F,T15#1>)
+    T4#12 extends Object declared in method <T1#15,T2#14,T3#13,T4#12,T5#11,T6#10,T7#9,T8#8,T9#7,T10#6,T11#5,T12#4,T13#3,T14#2,T15#1>group(App<F,T1#15>,App<F,T2#14>,App<F,T3#13>,App<F,T4#12>,App<F,T5#11>,App<F,T6#10>,App<F,T7#9>,App<F,T8#8>,App<F,T9#7>,App<F,T10#6>,App<F,T11#5>,App<F,T12#4>,App<F,T13#3>,App<F,T14#2>,App<F,T15#1>)
+    T5#11 extends Object declared in method <T1#15,T2#14,T3#13,T4#12,T5#11,T6#10,T7#9,T8#8,T9#7,T10#6,T11#5,T12#4,T13#3,T14#2,T15#1>group(App<F,T1#15>,App<F,T2#14>,App<F,T3#13>,App<F,T4#12>,App<F,T5#11>,App<F,T6#10>,App<F,T7#9>,App<F,T8#8>,App<F,T9#7>,App<F,T10#6>,App<F,T11#5>,App<F,T12#4>,App<F,T13#3>,App<F,T14#2>,App<F,T15#1>)
+    T6#10 extends Object declared in method <T1#15,T2#14,T3#13,T4#12,T5#11,T6#10,T7#9,T8#8,T9#7,T10#6,T11#5,T12#4,T13#3,T14#2,T15#1>group(App<F,T1#15>,App<F,T2#14>,App<F,T3#13>,App<F,T4#12>,App<F,T5#11>,App<F,T6#10>,App<F,T7#9>,App<F,T8#8>,App<F,T9#7>,App<F,T10#6>,App<F,T11#5>,App<F,T12#4>,App<F,T13#3>,App<F,T14#2>,App<F,T15#1>)
+    T7#9 extends Object declared in method <T1#15,T2#14,T3#13,T4#12,T5#11,T6#10,T7#9,T8#8,T9#7,T10#6,T11#5,T12#4,T13#3,T14#2,T15#1>group(App<F,T1#15>,App<F,T2#14>,App<F,T3#13>,App<F,T4#12>,App<F,T5#11>,App<F,T6#10>,App<F,T7#9>,App<F,T8#8>,App<F,T9#7>,App<F,T10#6>,App<F,T11#5>,App<F,T12#4>,App<F,T13#3>,App<F,T14#2>,App<F,T15#1>)
+    T8#8 extends Object declared in method <T1#15,T2#14,T3#13,T4#12,T5#11,T6#10,T7#9,T8#8,T9#7,T10#6,T11#5,T12#4,T13#3,T14#2,T15#1>group(App<F,T1#15>,App<F,T2#14>,App<F,T3#13>,App<F,T4#12>,App<F,T5#11>,App<F,T6#10>,App<F,T7#9>,App<F,T8#8>,App<F,T9#7>,App<F,T10#6>,App<F,T11#5>,App<F,T12#4>,App<F,T13#3>,App<F,T14#2>,App<F,T15#1>)
+    T9#7 extends Object declared in method <T1#15,T2#14,T3#13,T4#12,T5#11,T6#10,T7#9,T8#8,T9#7,T10#6,T11#5,T12#4,T13#3,T14#2,T15#1>group(App<F,T1#15>,App<F,T2#14>,App<F,T3#13>,App<F,T4#12>,App<F,T5#11>,App<F,T6#10>,App<F,T7#9>,App<F,T8#8>,App<F,T9#7>,App<F,T10#6>,App<F,T11#5>,App<F,T12#4>,App<F,T13#3>,App<F,T14#2>,App<F,T15#1>)
+    T10#6 extends Object declared in method <T1#15,T2#14,T3#13,T4#12,T5#11,T6#10,T7#9,T8#8,T9#7,T10#6,T11#5,T12#4,T13#3,T14#2,T15#1>group(App<F,T1#15>,App<F,T2#14>,App<F,T3#13>,App<F,T4#12>,App<F,T5#11>,App<F,T6#10>,App<F,T7#9>,App<F,T8#8>,App<F,T9#7>,App<F,T10#6>,App<F,T11#5>,App<F,T12#4>,App<F,T13#3>,App<F,T14#2>,App<F,T15#1>)
+    T11#5 extends Object declared in method <T1#15,T2#14,T3#13,T4#12,T5#11,T6#10,T7#9,T8#8,T9#7,T10#6,T11#5,T12#4,T13#3,T14#2,T15#1>group(App<F,T1#15>,App<F,T2#14>,App<F,T3#13>,App<F,T4#12>,App<F,T5#11>,App<F,T6#10>,App<F,T7#9>,App<F,T8#8>,App<F,T9#7>,App<F,T10#6>,App<F,T11#5>,App<F,T12#4>,App<F,T13#3>,App<F,T14#2>,App<F,T15#1>)
+    T12#4 extends Object declared in method <T1#15,T2#14,T3#13,T4#12,T5#11,T6#10,T7#9,T8#8,T9#7,T10#6,T11#5,T12#4,T13#3,T14#2,T15#1>group(App<F,T1#15>,App<F,T2#14>,App<F,T3#13>,App<F,T4#12>,App<F,T5#11>,App<F,T6#10>,App<F,T7#9>,App<F,T8#8>,App<F,T9#7>,App<F,T10#6>,App<F,T11#5>,App<F,T12#4>,App<F,T13#3>,App<F,T14#2>,App<F,T15#1>)
+    T13#3 extends Object declared in method <T1#15,T2#14,T3#13,T4#12,T5#11,T6#10,T7#9,T8#8,T9#7,T10#6,T11#5,T12#4,T13#3,T14#2,T15#1>group(App<F,T1#15>,App<F,T2#14>,App<F,T3#13>,App<F,T4#12>,App<F,T5#11>,App<F,T6#10>,App<F,T7#9>,App<F,T8#8>,App<F,T9#7>,App<F,T10#6>,App<F,T11#5>,App<F,T12#4>,App<F,T13#3>,App<F,T14#2>,App<F,T15#1>)
+    T14#2 extends Object declared in method <T1#15,T2#14,T3#13,T4#12,T5#11,T6#10,T7#9,T8#8,T9#7,T10#6,T11#5,T12#4,T13#3,T14#2,T15#1>group(App<F,T1#15>,App<F,T2#14>,App<F,T3#13>,App<F,T4#12>,App<F,T5#11>,App<F,T6#10>,App<F,T7#9>,App<F,T8#8>,App<F,T9#7>,App<F,T10#6>,App<F,T11#5>,App<F,T12#4>,App<F,T13#3>,App<F,T14#2>,App<F,T15#1>)
+    T15#1 extends Object declared in method <T1#15,T2#14,T3#13,T4#12,T5#11,T6#10,T7#9,T8#8,T9#7,T10#6,T11#5,T12#4,T13#3,T14#2,T15#1>group(App<F,T1#15>,App<F,T2#14>,App<F,T3#13>,App<F,T4#12>,App<F,T5#11>,App<F,T6#10>,App<F,T7#9>,App<F,T8#8>,App<F,T9#7>,App<F,T10#6>,App<F,T11#5>,App<F,T12#4>,App<F,T13#3>,App<F,T14#2>,App<F,T15#1>)
+    T1#16 extends Object declared in method <T1#16,T2#15,T3#14,T4#13,T5#12,T6#11,T7#10,T8#9,T9#8,T10#7,T11#6,T12#5,T13#4,T14#3,T15#2,T16>group(App<F,T1#16>,App<F,T2#15>,App<F,T3#14>,App<F,T4#13>,App<F,T5#12>,App<F,T6#11>,App<F,T7#10>,App<F,T8#9>,App<F,T9#8>,App<F,T10#7>,App<F,T11#6>,App<F,T12#5>,App<F,T13#4>,App<F,T14#3>,App<F,T15#2>,App<F,T16>)
+    T2#15 extends Object declared in method <T1#16,T2#15,T3#14,T4#13,T5#12,T6#11,T7#10,T8#9,T9#8,T10#7,T11#6,T12#5,T13#4,T14#3,T15#2,T16>group(App<F,T1#16>,App<F,T2#15>,App<F,T3#14>,App<F,T4#13>,App<F,T5#12>,App<F,T6#11>,App<F,T7#10>,App<F,T8#9>,App<F,T9#8>,App<F,T10#7>,App<F,T11#6>,App<F,T12#5>,App<F,T13#4>,App<F,T14#3>,App<F,T15#2>,App<F,T16>)
+    T3#14 extends Object declared in method <T1#16,T2#15,T3#14,T4#13,T5#12,T6#11,T7#10,T8#9,T9#8,T10#7,T11#6,T12#5,T13#4,T14#3,T15#2,T16>group(App<F,T1#16>,App<F,T2#15>,App<F,T3#14>,App<F,T4#13>,App<F,T5#12>,App<F,T6#11>,App<F,T7#10>,App<F,T8#9>,App<F,T9#8>,App<F,T10#7>,App<F,T11#6>,App<F,T12#5>,App<F,T13#4>,App<F,T14#3>,App<F,T15#2>,App<F,T16>)
+    T4#13 extends Object declared in method <T1#16,T2#15,T3#14,T4#13,T5#12,T6#11,T7#10,T8#9,T9#8,T10#7,T11#6,T12#5,T13#4,T14#3,T15#2,T16>group(App<F,T1#16>,App<F,T2#15>,App<F,T3#14>,App<F,T4#13>,App<F,T5#12>,App<F,T6#11>,App<F,T7#10>,App<F,T8#9>,App<F,T9#8>,App<F,T10#7>,App<F,T11#6>,App<F,T12#5>,App<F,T13#4>,App<F,T14#3>,App<F,T15#2>,App<F,T16>)
+    T5#12 extends Object declared in method <T1#16,T2#15,T3#14,T4#13,T5#12,T6#11,T7#10,T8#9,T9#8,T10#7,T11#6,T12#5,T13#4,T14#3,T15#2,T16>group(App<F,T1#16>,App<F,T2#15>,App<F,T3#14>,App<F,T4#13>,App<F,T5#12>,App<F,T6#11>,App<F,T7#10>,App<F,T8#9>,App<F,T9#8>,App<F,T10#7>,App<F,T11#6>,App<F,T12#5>,App<F,T13#4>,App<F,T14#3>,App<F,T15#2>,App<F,T16>)
+    T6#11 extends Object declared in method <T1#16,T2#15,T3#14,T4#13,T5#12,T6#11,T7#10,T8#9,T9#8,T10#7,T11#6,T12#5,T13#4,T14#3,T15#2,T16>group(App<F,T1#16>,App<F,T2#15>,App<F,T3#14>,App<F,T4#13>,App<F,T5#12>,App<F,T6#11>,App<F,T7#10>,App<F,T8#9>,App<F,T9#8>,App<F,T10#7>,App<F,T11#6>,App<F,T12#5>,App<F,T13#4>,App<F,T14#3>,App<F,T15#2>,App<F,T16>)
+    T7#10 extends Object declared in method <T1#16,T2#15,T3#14,T4#13,T5#12,T6#11,T7#10,T8#9,T9#8,T10#7,T11#6,T12#5,T13#4,T14#3,T15#2,T16>group(App<F,T1#16>,App<F,T2#15>,App<F,T3#14>,App<F,T4#13>,App<F,T5#12>,App<F,T6#11>,App<F,T7#10>,App<F,T8#9>,App<F,T9#8>,App<F,T10#7>,App<F,T11#6>,App<F,T12#5>,App<F,T13#4>,App<F,T14#3>,App<F,T15#2>,App<F,T16>)
+    T8#9 extends Object declared in method <T1#16,T2#15,T3#14,T4#13,T5#12,T6#11,T7#10,T8#9,T9#8,T10#7,T11#6,T12#5,T13#4,T14#3,T15#2,T16>group(App<F,T1#16>,App<F,T2#15>,App<F,T3#14>,App<F,T4#13>,App<F,T5#12>,App<F,T6#11>,App<F,T7#10>,App<F,T8#9>,App<F,T9#8>,App<F,T10#7>,App<F,T11#6>,App<F,T12#5>,App<F,T13#4>,App<F,T14#3>,App<F,T15#2>,App<F,T16>)
+    T9#8 extends Object declared in method <T1#16,T2#15,T3#14,T4#13,T5#12,T6#11,T7#10,T8#9,T9#8,T10#7,T11#6,T12#5,T13#4,T14#3,T15#2,T16>group(App<F,T1#16>,App<F,T2#15>,App<F,T3#14>,App<F,T4#13>,App<F,T5#12>,App<F,T6#11>,App<F,T7#10>,App<F,T8#9>,App<F,T9#8>,App<F,T10#7>,App<F,T11#6>,App<F,T12#5>,App<F,T13#4>,App<F,T14#3>,App<F,T15#2>,App<F,T16>)
+    T10#7 extends Object declared in method <T1#16,T2#15,T3#14,T4#13,T5#12,T6#11,T7#10,T8#9,T9#8,T10#7,T11#6,T12#5,T13#4,T14#3,T15#2,T16>group(App<F,T1#16>,App<F,T2#15>,App<F,T3#14>,App<F,T4#13>,App<F,T5#12>,App<F,T6#11>,App<F,T7#10>,App<F,T8#9>,App<F,T9#8>,App<F,T10#7>,App<F,T11#6>,App<F,T12#5>,App<F,T13#4>,App<F,T14#3>,App<F,T15#2>,App<F,T16>)
+    T11#6 extends Object declared in method <T1#16,T2#15,T3#14,T4#13,T5#12,T6#11,T7#10,T8#9,T9#8,T10#7,T11#6,T12#5,T13#4,T14#3,T15#2,T16>group(App<F,T1#16>,App<F,T2#15>,App<F,T3#14>,App<F,T4#13>,App<F,T5#12>,App<F,T6#11>,App<F,T7#10>,App<F,T8#9>,App<F,T9#8>,App<F,T10#7>,App<F,T11#6>,App<F,T12#5>,App<F,T13#4>,App<F,T14#3>,App<F,T15#2>,App<F,T16>)
+    T12#5 extends Object declared in method <T1#16,T2#15,T3#14,T4#13,T5#12,T6#11,T7#10,T8#9,T9#8,T10#7,T11#6,T12#5,T13#4,T14#3,T15#2,T16>group(App<F,T1#16>,App<F,T2#15>,App<F,T3#14>,App<F,T4#13>,App<F,T5#12>,App<F,T6#11>,App<F,T7#10>,App<F,T8#9>,App<F,T9#8>,App<F,T10#7>,App<F,T11#6>,App<F,T12#5>,App<F,T13#4>,App<F,T14#3>,App<F,T15#2>,App<F,T16>)
+    T13#4 extends Object declared in method <T1#16,T2#15,T3#14,T4#13,T5#12,T6#11,T7#10,T8#9,T9#8,T10#7,T11#6,T12#5,T13#4,T14#3,T15#2,T16>group(App<F,T1#16>,App<F,T2#15>,App<F,T3#14>,App<F,T4#13>,App<F,T5#12>,App<F,T6#11>,App<F,T7#10>,App<F,T8#9>,App<F,T9#8>,App<F,T10#7>,App<F,T11#6>,App<F,T12#5>,App<F,T13#4>,App<F,T14#3>,App<F,T15#2>,App<F,T16>)
+    T14#3 extends Object declared in method <T1#16,T2#15,T3#14,T4#13,T5#12,T6#11,T7#10,T8#9,T9#8,T10#7,T11#6,T12#5,T13#4,T14#3,T15#2,T16>group(App<F,T1#16>,App<F,T2#15>,App<F,T3#14>,App<F,T4#13>,App<F,T5#12>,App<F,T6#11>,App<F,T7#10>,App<F,T8#9>,App<F,T9#8>,App<F,T10#7>,App<F,T11#6>,App<F,T12#5>,App<F,T13#4>,App<F,T14#3>,App<F,T15#2>,App<F,T16>)
+    T15#2 extends Object declared in method <T1#16,T2#15,T3#14,T4#13,T5#12,T6#11,T7#10,T8#9,T9#8,T10#7,T11#6,T12#5,T13#4,T14#3,T15#2,T16>group(App<F,T1#16>,App<F,T2#15>,App<F,T3#14>,App<F,T4#13>,App<F,T5#12>,App<F,T6#11>,App<F,T7#10>,App<F,T8#9>,App<F,T9#8>,App<F,T10#7>,App<F,T11#6>,App<F,T12#5>,App<F,T13#4>,App<F,T14#3>,App<F,T15#2>,App<F,T16>)
+    T16 extends Object declared in method <T1#16,T2#15,T3#14,T4#13,T5#12,T6#11,T7#10,T8#9,T9#8,T10#7,T11#6,T12#5,T13#4,T14#3,T15#2,T16>group(App<F,T1#16>,App<F,T2#15>,App<F,T3#14>,App<F,T4#13>,App<F,T5#12>,App<F,T6#11>,App<F,T7#10>,App<F,T8#9>,App<F,T9#8>,App<F,T10#7>,App<F,T11#6>,App<F,T12#5>,App<F,T13#4>,App<F,T14#3>,App<F,T15#2>,App<F,T16>)
+/home/matt/Documents/Repos/Mattcraft/net/minecraft/world/level/levelgen/NoiseSettings.java:21: error: incompatible types: invalid method reference
+                .comapFlatMap(NoiseSettings::guardY, Function.identity());
+                              ^
+    incompatible types: Object cannot be converted to NoiseSettings
+/home/matt/Documents/Repos/Mattcraft/net/minecraft/world/level/levelgen/SurfaceRules.java:180: error: cannot reference context before supertype constructor has been called
+                                        super(context);
+                                              ^
+/home/matt/Documents/Repos/Mattcraft/net/minecraft/world/level/levelgen/SurfaceRules.java:521: error: cannot reference context before supertype constructor has been called
+                                        super(context);
+                                              ^
+/home/matt/Documents/Repos/Mattcraft/net/minecraft/world/level/levelgen/SurfaceRules.java:660: error: cannot reference context before supertype constructor has been called
+                                        super(context);
+                                              ^
+/home/matt/Documents/Repos/Mattcraft/net/minecraft/world/level/levelgen/SurfaceRules.java:752: error: cannot reference context before supertype constructor has been called
+                                        super(context);
+                                              ^
+/home/matt/Documents/Repos/Mattcraft/net/minecraft/world/level/levelgen/SurfaceRules.java:794: error: cannot reference context before supertype constructor has been called
+                                        super(context);
+                                              ^
+/home/matt/Documents/Repos/Mattcraft/net/minecraft/world/level/levelgen/SurfaceRules.java:829: error: cannot reference context before supertype constructor has been called
+                                        super(context);
+                                              ^
+/home/matt/Documents/Repos/Mattcraft/net/minecraft/world/level/levelgen/DensityFunctions.java:304: error: variable e is already defined in method fillArray(double[],ContextProvider)
+                                        double e = this.argument2.maxValue();
+                                               ^
+/home/matt/Documents/Repos/Mattcraft/net/minecraft/util/CubicSpline.java:38: error: incompatible types: cannot infer type-variable(s) O
+                        instance -> instance.group(
+                                                  ^
+    (argument mismatch; bad return type in lambda expression
+      List<Point> cannot be converted to List<Point<C,I>>)
+  where O,A,C,I are type-variables:
+    O extends Object declared in method <O>forGetter(Function<O,A>)
+    A extends Object declared in class MapCodec
+    C extends Object declared in method <C,I>codec(Codec<I>)
+    I extends BoundedFloatFunction<C> declared in method <C,I>codec(Codec<I>)
+/home/matt/Documents/Repos/Mattcraft/net/minecraft/network/protocol/BundlerInfo.java:43: error: incompatible types: Packet<CAP#1> cannot be converted to Packet<? super T>
+                                                        this.bundlePackets.add(packet);
+                                                                               ^
+  where T,P are type-variables:
+    T extends PacketListener declared in method <T,P>createForPacket(PacketType<P>,Function<Iterable<Packet<? super T>>,P>,BundleDelimiterPacket<? super T>)
+    P extends BundlePacket<? super T> declared in method <T,P>createForPacket(PacketType<P>,Function<Iterable<Packet<? super T>>,P>,BundleDelimiterPacket<? super T>)
+  where CAP#1 is a fresh type-variable:
+    CAP#1 extends PacketListener from capture of ?
+/home/matt/Documents/Repos/Mattcraft/net/minecraft/world/level/block/entity/TheEndGatewayBlockEntity.java:228: warning: [removal] getHighestSectionPosition() in ChunkAccess has been deprecated and marked for removal
+                int i = levelChunk.getHighestSectionPosition() + 16 - 1;
+                                  ^
+/home/matt/Documents/Repos/Mattcraft/net/minecraft/world/level/block/entity/BeehiveBlockEntity.java:291: error: incompatible types: invalid method reference
+                ((List)valueInput.read("bees", BeehiveBlockEntity.Occupant.LIST_CODEC).orElse(List.of())).forEach(this::storeBee);
+                                                                                                                  ^
+    incompatible types: Object cannot be converted to Occupant
+/home/matt/Documents/Repos/Mattcraft/net/minecraft/world/level/block/BaseEntityBlock.java:40: error: incompatible types: bad type in conditional expression
+                return blockEntityType2 == blockEntityType ? blockEntityTicker : null;
+                                                             ^
+    BlockEntityTicker<CAP#1> cannot be converted to @org.jetbrains.annotations.Nullable BlockEntityTicker<A>
+  where E,A are type-variables:
+    E extends BlockEntity declared in method <E,A>createTickerHelper(BlockEntityType<A>,BlockEntityType<E>,BlockEntityTicker<? super E>)
+    A extends BlockEntity declared in method <E,A>createTickerHelper(BlockEntityType<A>,BlockEntityType<E>,BlockEntityTicker<? super E>)
+  where CAP#1 is a fresh type-variable:
+    CAP#1 extends BlockEntity super: E from capture of ? super E
+/home/matt/Documents/Repos/Mattcraft/net/minecraft/world/level/block/state/properties/EnumProperty.java:49: error: incompatible types: inference variable T#1 has incompatible bounds
+                return Optional.ofNullable((Enum)this.names.get(string));
+                                          ^
+    equality constraints: T#2
+    lower bounds: Enum
+  where T#1,T#2 are type-variables:
+    T#1 extends Object declared in method <T#1>ofNullable(T#1)
+    T#2 extends Enum<T#2>,StringRepresentable declared in class EnumProperty
+/home/matt/Documents/Repos/Mattcraft/net/minecraft/world/level/block/state/properties/EnumProperty.java:80: error: incompatible types: Predicate<T> cannot be converted to Predicate<? super Enum>
+                return create(string, class_, (List<T>)Arrays.stream((Enum[])class_.getEnumConstants()).filter(predicate).collect(Collectors.toList()));
+                                                                                                               ^
+  where T is a type-variable:
+    T extends Enum<T>,StringRepresentable declared in method <T>create(String,Class<T>,Predicate<T>)
+/home/matt/Documents/Repos/Mattcraft/net/minecraft/world/level/gameevent/vibrations/VibrationSelector.java:57: error: bad operand types for binary operator '<'
+                        return ((Pair)this.currentVibrationData.get()).getRight() < l
+                                                                                  ^
+  first type:  Object
+  second type: long
+/home/matt/Documents/Repos/Mattcraft/net/minecraft/world/level/gameevent/EntityPositionSource.java:61: error: incompatible types: inference variable L has incompatible bounds
+                        .ifPresent(entity -> this.entityOrUuidOrId = Either.left(entity));
+                                                                                ^
+    equality constraints: Entity
+    lower bounds: Object
+  where L,R are type-variables:
+    L extends Object declared in method <L,R>left(L)
+    R extends Object declared in method <L,R>left(L)
+/home/matt/Documents/Repos/Mattcraft/net/minecraft/world/level/block/SculkSpreader.java:103: error: incompatible types: invalid method reference
+                ((List)valueInput.read("cursors", SculkSpreader.ChargeCursor.CODEC.sizeLimitedListOf(32)).orElse(List.of())).forEach(this::addCursor);
+                                                                                                                                     ^
+    incompatible types: Object cannot be converted to ChargeCursor
+/home/matt/Documents/Repos/Mattcraft/net/minecraft/world/item/component/ResolvableProfile.java:89: error: constructor GameProfile in class GameProfile cannot be applied to given types;
+                return new GameProfile(uUID, string, propertyMap);
+                       ^
+  required: UUID,String
+  found:    UUID,String,PropertyMap
+  reason: actual and formal argument lists differ in length
+/home/matt/Documents/Repos/Mattcraft/net/minecraft/world/item/component/ResolvableProfile.java:99: error: cannot find symbol
+                        super(ResolvableProfile.createPartialProfile(either.left(), either.right(), PropertyMap.EMPTY), patch);
+                                                                                                               ^
+  symbol:   variable EMPTY
+  location: class PropertyMap
+/home/matt/Documents/Repos/Mattcraft/net/minecraft/world/item/component/ResolvableProfile.java:120: error: cannot find symbol
+                        return Either.right(new ResolvableProfile.Partial(this.nameOrId.left(), this.nameOrId.right(), PropertyMap.EMPTY));
+                                                                                                                                  ^
+  symbol:   variable EMPTY
+  location: class PropertyMap
+/home/matt/Documents/Repos/Mattcraft/net/minecraft/world/item/component/ResolvableProfile.java:135: error: cannot find symbol
+                public static final ResolvableProfile.Partial EMPTY = new ResolvableProfile.Partial(Optional.empty(), Optional.empty(), PropertyMap.EMPTY);
+                                                                                                                                                   ^
+  symbol:   variable EMPTY
+  location: class PropertyMap
+/home/matt/Documents/Repos/Mattcraft/net/minecraft/world/item/component/ResolvableProfile.java:140: error: cannot find symbol
+                                        ExtraCodecs.PROPERTY_MAP.optionalFieldOf("properties", PropertyMap.EMPTY).forGetter(ResolvableProfile.Partial::properties)
+                                                                                                          ^
+  symbol:   variable EMPTY
+  location: class PropertyMap
+/home/matt/Documents/Repos/Mattcraft/net/minecraft/world/item/component/ResolvableProfile.java:180: error: cannot find symbol
+                        return this.contents.map(gameProfile -> Optional.of(gameProfile.name()), partial -> partial.name);
+                                                                                       ^
+  symbol:   method name()
+  location: variable gameProfile of type GameProfile
+/home/matt/Documents/Repos/Mattcraft/net/minecraft/advancements/critereon/MinMaxBounds.java:59: error: cannot infer type arguments for Bounds<>
+                        return new MinMaxBounds.Bounds<>(Optional.empty(), Optional.empty());
+                               ^
+  reason: inferred type does not conform to equality constraint(s)
+    inferred: T#1
+    equality constraints(s): T#2,T#3
+  where T#1,T#2,T#3 are type-variables:
+    T#1 extends Number,Comparable<T#2>
+    T#2 extends Number,Comparable<T#2>
+    T#3 extends Object declared in method <T#3>empty()
+/home/matt/Documents/Repos/Mattcraft/net/minecraft/advancements/critereon/MinMaxBounds.java:90: error: incompatible types: inference variable R has incompatible bounds
+                        return Codec.either(codec2, codec).xmap(either -> either.map(bounds -> bounds, object -> exactly((T)object)), bounds -> {
+                                                               ^
+    equality constraints: T
+    lower bounds: Number
+  where R,L,T are type-variables:
+    R extends Object declared in method <L,R>right(R)
+    L extends Object declared in method <L,R>right(R)
+    T extends Number,Comparable<T> declared in method <T>createCodec(Codec<T>)
+/home/matt/Documents/Repos/Mattcraft/net/minecraft/advancements/critereon/MinMaxBounds.java:163: error: incompatible types: inference variable T#1 has incompatible bounds
+                                        return Optional.of((Number)function.apply(string));
+                                                          ^
+    equality constraints: T#2
+    lower bounds: Number
+  where T#1,T#2 are type-variables:
+    T#1 extends Object declared in method <T#1>of(T#1)
+    T#2 extends Number declared in method <T#2>readNumber(StringReader,Function<String,T#2>,Supplier<DynamicCommandExceptionType>)
+/home/matt/Documents/Repos/Mattcraft/net/minecraft/core/component/predicates/DataComponentPredicate.java:25: error: incompatible types: cannot infer type-variable(s) O
+                .map(
+                    ^
+    (argument mismatch; bad return type in lambda expression
+      List<Single<DataComponentPredicate>> cannot be converted to List<Single<?>>)
+  where O,V,B are type-variables:
+    O extends Object declared in method <O>map(Function<? super V,? extends O>,Function<? super O,? extends V>)
+    V extends Object declared in interface StreamCodec
+    B extends Object declared in interface StreamCodec
+/home/matt/Documents/Repos/Mattcraft/net/minecraft/world/entity/ai/sensing/SensorType.java:32: error: incompatible types: invalid method reference
+                "armadillo_scare_detected", () -> new MobSensor(5, Armadillo::isScaredBy, Armadillo::canStayRolledUp, MemoryModuleType.DANGER_DETECTED_RECENTLY, 80)
+                                                                   ^
+    method isScaredBy in class Armadillo cannot be applied to given types
+      required: LivingEntity
+      found:    Object,Object
+      reason: actual and formal argument lists differ in length
+/home/matt/Documents/Repos/Mattcraft/net/minecraft/world/entity/ai/Brain.java:88: error: cannot find symbol
+                                                                        mutableObject.setValue(mutableObject.getValue().apply2(Builder::add, dataResult2));
+                                                                                                                       ^
+  symbol:   method apply2(Builder::add,DataResult<CAP#1>)
+  location: interface Codec<Brain<E>>
+  where E is a type-variable:
+    E extends LivingEntity declared in method <E>codec(Collection<? extends MemoryModuleType<?>>,Collection<? extends SensorType<? extends Sensor<? super E>>>)
+  where CAP#1 is a fresh type-variable:
+    CAP#1 extends MemoryValue<?> from capture of ? extends MemoryValue<?>
+/home/matt/Documents/Repos/Mattcraft/net/minecraft/world/entity/ai/Brain.java:442: error: incompatible types: Object cannot be converted to BehaviorControl<? super E>
+                                        for (BehaviorControl<? super E> behaviorControl : (Set)entry.getValue()) {
+                                                                                          ^
+  where E is a type-variable:
+    E extends LivingEntity declared in class Brain
+/home/matt/Documents/Repos/Mattcraft/net/minecraft/world/entity/ai/Brain.java:464: error: incompatible types: Object cannot be converted to Pair<MemoryModuleType<?>,MemoryStatus>
+                        for (Pair<MemoryModuleType<?>, MemoryStatus> pair : (Set)this.activityRequirements.get(activity)) {
+                                                                            ^
+/home/matt/Documents/Repos/Mattcraft/net/minecraft/world/entity/schedule/ScheduleBuilder.java:23: error: incompatible types: invalid method reference
+                        .forEach(this.schedule::ensureTimelineExistsFor);
+                                 ^
+    incompatible types: Object cannot be converted to Activity
+/home/matt/Documents/Repos/Mattcraft/net/minecraft/world/entity/ai/sensing/PlayerSensor.java:34: error: incompatible types: List<ServerPlayer> cannot be converted to List<Player>
+                        .collect(Collectors.toList());
+                                ^
+/home/matt/Documents/Repos/Mattcraft/net/minecraft/world/entity/ai/sensing/GolemSensor.java:37: error: cannot find symbol
+                        boolean bl = ((List)optional.get()).stream().anyMatch(livingEntityx -> livingEntityx.getType().equals(EntityType.IRON_GOLEM));
+                                                                                                            ^
+  symbol:   method getType()
+  location: variable livingEntityx of type Object
+/home/matt/Documents/Repos/Mattcraft/net/minecraft/world/entity/ai/sensing/MobSensor.java:43: error: incompatible types: Object cannot be converted to LivingEntity
+                        boolean bl = ((List)optional.get()).stream().anyMatch(livingEntity2 -> this.mobTest.test(livingEntity, livingEntity2));
+                                                                                                                               ^
+/home/matt/Documents/Repos/Mattcraft/net/minecraft/world/entity/ai/sensing/PiglinSpecificSensor.java:100: error: incompatible types: Object cannot be converted to LivingEntity
+                for (LivingEntity livingEntity3 : (List)brain.getMemory(MemoryModuleType.NEAREST_LIVING_ENTITIES).orElse(ImmutableList.of())) {
+                                                  ^
+/home/matt/Documents/Repos/Mattcraft/net/minecraft/client/particle/ParticleResources.java:226: error: cannot find symbol
+                                        ((List<ParticleResources.ResolvedParticleDefinition>)completableFuture.join()).forEach(arg -> {
+                                                                ^
+  symbol:   class ResolvedParticleDefinition
+  location: class ParticleResources
+/home/matt/Documents/Repos/Mattcraft/net/minecraft/client/GameNarrator.java:69: error: method say in interface Narrator cannot be applied to given types;
+                this.narrator.say(string, bl, this.minecraft.options.getFinalSoundSourceVolume(SoundSource.VOICE));
+                             ^
+  required: String,boolean
+  found:    String,boolean,float
+  reason: actual and formal argument lists differ in length
+/home/matt/Documents/Repos/Mattcraft/net/minecraft/client/multiplayer/chat/ChatListener.java:213: error: cannot find symbol
+                        UUID uUID2 = this.minecraft.player.getGameProfile().id();
+                                                                           ^
+  symbol:   method id()
+  location: class GameProfile
+/home/matt/Documents/Repos/Mattcraft/net/minecraft/client/gui/screens/worldselection/WorldCreationUiState.java:320: error: incompatible types: Component cannot be converted to MutableComponent
+                                .orElse(CUSTOM_WORLD_DESCRIPTION);
+                                        ^
+/home/matt/Documents/Repos/Mattcraft/net/minecraft/world/level/levelgen/flat/FlatLevelGeneratorSettings.java:158: error: incompatible types: Object cannot be converted to Holder<PlacedFeature>
+                                                for (Holder<PlacedFeature> holder3 : (HolderSet)list.get(i)) {
+                                                                                     ^
+/home/matt/Documents/Repos/Mattcraft/net/minecraft/client/gui/screens/worldselection/CreateWorldScreen.java:192: error: incompatible types: Object cannot be converted to DataPackReloadCookie
+                                return worldCreationContextMapper.apply(reloadableServerResources, layeredRegistryAccess, dataPackReloadCookie);
+                                                                                                                          ^
+/home/matt/Documents/Repos/Mattcraft/net/minecraft/client/gui/screens/worldselection/CreateWorldScreen.java:473: error: cannot find symbol
+                                                dataPackReloadCookie.worldGenSettings(), layeredRegistryAccess, reloadableServerResources, dataPackReloadCookie.dataConfiguration()
+                                                                    ^
+  symbol:   method worldGenSettings()
+  location: variable dataPackReloadCookie of type Object
+/home/matt/Documents/Repos/Mattcraft/net/minecraft/client/gui/screens/worldselection/CreateWorldScreen.java:473: error: cannot find symbol
+                                                dataPackReloadCookie.worldGenSettings(), layeredRegistryAccess, reloadableServerResources, dataPackReloadCookie.dataConfiguration()
+                                                                                                                                                               ^
+  symbol:   method dataConfiguration()
+  location: variable dataPackReloadCookie of type Object
+/home/matt/Documents/Repos/Mattcraft/net/minecraft/client/gui/screens/worldselection/CreateWorldScreen.java:480: error: cannot find symbol
+                                worldCreationContext.validate();
+                                                    ^
+  symbol:   method validate()
+  location: variable worldCreationContext of type Object
+/home/matt/Documents/Repos/Mattcraft/net/minecraft/client/gui/screens/worldselection/CreateWorldScreen.java:483: error: incompatible types: invalid method reference
+                        .thenAcceptAsync(this.uiState::setSettings, this.minecraft)
+                                         ^
+    incompatible types: Object cannot be converted to WorldCreationContext
+/home/matt/Documents/Repos/Mattcraft/net/minecraft/client/gui/components/PlayerTabOverlay.java:57: error: cannot find symbol
+        private static final Comparator<PlayerInfo> PLAYER_COMPARATOR = Comparator.comparingInt(playerInfo -> -playerInfo.getTabListOrder())
+                                                                                                                         ^
+  symbol:   method getTabListOrder()
+  location: variable playerInfo of type Object
+/home/matt/Documents/Repos/Mattcraft/net/minecraft/client/gui/components/PlayerTabOverlay.java:58: error: cannot find symbol
+                .thenComparingInt(playerInfo -> playerInfo.getGameMode() == GameType.SPECTATOR ? 1 : 0)
+                                                          ^
+  symbol:   method getGameMode()
+  location: variable playerInfo of type Object
+/home/matt/Documents/Repos/Mattcraft/net/minecraft/client/gui/components/PlayerTabOverlay.java:59: error: cannot find symbol
+                .thenComparing(playerInfo -> (String)Optionull.mapOrDefault(playerInfo.getTeam(), PlayerTeam::getName, ""))
+                                                                                      ^
+  symbol:   method getTeam()
+  location: variable playerInfo of type Object
+Note: Some input files use or override a deprecated API.
+Note: Recompile with -Xlint:deprecation for details.
+Note: Some input files use unchecked or unsafe operations.
+Note: Recompile with -Xlint:unchecked for details.
+Note: Some messages have been simplified; recompile with -Xdiags:verbose to get full output
+100 errors
+4 warnings
+only showing the first 100 errors, of 441 total; use -Xmaxerrs if you would like to see more
+
+> Task :compileJava FAILED
+
+FAILURE: Build failed with an exception.
