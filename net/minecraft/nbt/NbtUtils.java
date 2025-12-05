@@ -40,10 +40,10 @@ import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 
 public final class NbtUtils {
-	private static final Comparator<ListTag> YXZ_LISTTAG_INT_COMPARATOR = Comparator.comparingInt(listTag -> listTag.getIntOr(1, 0))
+	private static final Comparator<ListTag> YXZ_LISTTAG_INT_COMPARATOR = Comparator.<ListTag>comparingInt(listTag -> listTag.getIntOr(1, 0))
 		.thenComparingInt(listTag -> listTag.getIntOr(0, 0))
 		.thenComparingInt(listTag -> listTag.getIntOr(2, 0));
-	private static final Comparator<ListTag> YXZ_LISTTAG_DOUBLE_COMPARATOR = Comparator.comparingDouble(listTag -> listTag.getDoubleOr(1, 0.0))
+	private static final Comparator<ListTag> YXZ_LISTTAG_DOUBLE_COMPARATOR = Comparator.<ListTag>comparingDouble(listTag -> listTag.getDoubleOr(1, 0.0))
 		.thenComparingDouble(listTag -> listTag.getDoubleOr(0, 0.0))
 		.thenComparingDouble(listTag -> listTag.getDoubleOr(2, 0.0));
 	private static final Codec<ResourceKey<Block>> BLOCK_NAME_CODEC = ResourceKey.codec(Registries.BLOCK);

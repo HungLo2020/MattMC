@@ -19,9 +19,10 @@ import net.minecraft.server.RegistryLayer;
 import net.minecraft.server.packs.repository.KnownPack;
 
 public class RegistrySynchronization {
-	private static final Set<ResourceKey<? extends Registry<?>>> NETWORKABLE_REGISTRIES = (Set<ResourceKey<? extends Registry<?>>>)RegistryDataLoader.SYNCHRONIZED_REGISTRIES
+	private static final Set<ResourceKey<? extends Registry<?>>> NETWORKABLE_REGISTRIES = RegistryDataLoader.SYNCHRONIZED_REGISTRIES
 		.stream()
 		.map(RegistryDataLoader.RegistryData::key)
+		.<ResourceKey<? extends Registry<?>>>map(key -> key)
 		.collect(Collectors.toUnmodifiableSet());
 
 	public static void packRegistries(

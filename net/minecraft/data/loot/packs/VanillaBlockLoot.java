@@ -99,7 +99,7 @@ public class VanillaBlockLoot extends BlockLootSubProvider {
 	}
 
 	@Override
-	protected void generate() {
+	public void generate() {
 		HolderLookup.RegistryLookup<Enchantment> registryLookup = this.registries.lookupOrThrow(Registries.ENCHANTMENT);
 		HolderLookup.RegistryLookup<Item> registryLookup2 = this.registries.lookupOrThrow(Registries.ITEM);
 		this.dropSelf(Blocks.GRANITE);

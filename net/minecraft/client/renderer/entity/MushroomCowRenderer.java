@@ -15,7 +15,7 @@ import net.minecraft.world.entity.animal.MushroomCow.Variant;
 
 @Environment(EnvType.CLIENT)
 public class MushroomCowRenderer extends AgeableMobRenderer<MushroomCow, MushroomCowRenderState, CowModel> {
-	private static final Map<Variant, ResourceLocation> TEXTURES = (Map<Variant, ResourceLocation>)Util.make(Maps.newHashMap(), hashMap -> {
+	private static final Map<Variant, ResourceLocation> TEXTURES = Util.make(Maps.<Variant, ResourceLocation>newHashMap(), hashMap -> {
 		hashMap.put(Variant.BROWN, ResourceLocation.withDefaultNamespace("textures/entity/cow/brown_mooshroom.png"));
 		hashMap.put(Variant.RED, ResourceLocation.withDefaultNamespace("textures/entity/cow/red_mooshroom.png"));
 	});

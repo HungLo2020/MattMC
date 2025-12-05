@@ -84,7 +84,7 @@ import org.slf4j.Logger;
 
 public class RegistryDataLoader {
 	private static final Logger LOGGER = LogUtils.getLogger();
-	private static final Comparator<ResourceKey<?>> ERROR_KEY_COMPARATOR = Comparator.comparing(ResourceKey::registry).thenComparing(ResourceKey::location);
+	private static final Comparator<ResourceKey<?>> ERROR_KEY_COMPARATOR = Comparator.<ResourceKey<?>, ResourceLocation>comparing(ResourceKey::registry).thenComparing(ResourceKey::location);
 	private static final RegistrationInfo NETWORK_REGISTRATION_INFO = new RegistrationInfo(Optional.empty(), Lifecycle.experimental());
 	private static final Function<Optional<KnownPack>, RegistrationInfo> REGISTRATION_INFO_CACHE = Util.memoize(
 		(Function<Optional<KnownPack>, RegistrationInfo>)(optional -> {
@@ -238,9 +238,9 @@ public class RegistryDataLoader {
 			);
 		map2.entrySet().stream().sorted(Entry.comparingByKey()).forEach(entry -> {
 			printWriter.printf("> Errors in registry %s:%n", entry.getKey());
-			((Map)entry.getValue()).entrySet().stream().sorted(Entry.comparingByKey()).forEach(entryx -> {
-				printWriter.printf(">> Errors in element %s:%n", entryx.getKey());
-				((Exception)entryx.getValue()).printStackTrace(printWriter);
+			((Map<?, ?>)entry.getValue()).entrySet().stream().sorted(Entry.comparingByKey()).forEach(entryx -> {
+				printWriter.printf(">> Errors in element %s:%n", ((Entry<?, ?>)entryx).getKey());
+				((Exception)((Entry<?, ?>)entryx).getValue()).printStackTrace(printWriter);
 			});
 		});
 		printWriter.flush();

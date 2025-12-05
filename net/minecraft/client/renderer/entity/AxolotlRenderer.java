@@ -15,7 +15,7 @@ import net.minecraft.world.entity.animal.axolotl.Axolotl.Variant;
 
 @Environment(EnvType.CLIENT)
 public class AxolotlRenderer extends AgeableMobRenderer<Axolotl, AxolotlRenderState, AxolotlModel> {
-	private static final Map<Variant, ResourceLocation> TEXTURE_BY_TYPE = (Map<Variant, ResourceLocation>)Util.make(Maps.newHashMap(), hashMap -> {
+	private static final Map<Variant, ResourceLocation> TEXTURE_BY_TYPE = Util.make(Maps.<Variant, ResourceLocation>newHashMap(), hashMap -> {
 		for (Variant variant : Variant.values()) {
 			hashMap.put(variant, ResourceLocation.withDefaultNamespace(String.format(Locale.ROOT, "textures/entity/axolotl/axolotl_%s.png", variant.getName())));
 		}

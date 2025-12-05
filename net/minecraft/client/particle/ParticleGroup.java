@@ -53,8 +53,9 @@ public abstract class ParticleGroup<P extends Particle> {
 		}
 	}
 
+	@SuppressWarnings("unchecked")
 	public void add(Particle particle) {
-		this.particles.add(particle);
+		this.particles.add((P)particle);
 	}
 
 	public int size() {

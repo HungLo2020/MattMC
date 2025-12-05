@@ -76,7 +76,7 @@ public class PlayerTabOverlay {
 	public Component getNameForDisplay(PlayerInfo playerInfo) {
 		return playerInfo.getTabListDisplayName() != null
 			? this.decorateName(playerInfo, playerInfo.getTabListDisplayName().copy())
-			: this.decorateName(playerInfo, PlayerTeam.formatNameForTeam(playerInfo.getTeam(), Component.literal(playerInfo.getProfile().name())));
+			: this.decorateName(playerInfo, PlayerTeam.formatNameForTeam(playerInfo.getTeam(), Component.literal(playerInfo.getProfile().getName())));
 	}
 
 	private Component decorateName(PlayerInfo playerInfo, MutableComponent mutableComponent) {
@@ -130,7 +130,7 @@ public class PlayerTabOverlay {
 		}
 
 		if (!this.healthStates.isEmpty()) {
-			Set<UUID> set = (Set<UUID>)list.stream().map(playerInfo -> playerInfo.getProfile().id()).collect(Collectors.toSet());
+			Set<UUID> set = list.stream().map(playerInfo -> playerInfo.getProfile().getId()).collect(Collectors.toSet());
 			this.healthStates.keySet().removeIf(uUID -> !set.contains(uUID));
 		}
 
@@ -202,7 +202,7 @@ public class PlayerTabOverlay {
 				PlayerTabOverlay.ScoreDisplayEntry scoreDisplayEntry = (PlayerTabOverlay.ScoreDisplayEntry)list2.get(x);
 				GameProfile gameProfile = playerInfo2.getProfile();
 				if (bl) {
-					Player player = this.minecraft.level.getPlayerByUUID(gameProfile.id());
+					Player player = this.minecraft.level.getPlayerByUUID(gameProfile.getId());
 					boolean bl2 = player != null && AvatarRenderer.isPlayerUpsideDown(player);
 					PlayerFaceRenderer.draw(guiGraphics, playerInfo2.getSkin().body().texturePath(), z, aa, 8, playerInfo2.showHat(), bl2, -1);
 					z += 9;
@@ -213,7 +213,7 @@ public class PlayerTabOverlay {
 					int ab = z + k + 1;
 					int ac = ab + r;
 					if (ac - ab > 5) {
-						this.renderTablistScore(objective, aa, scoreDisplayEntry, ab, ac, gameProfile.id(), guiGraphics);
+						this.renderTablistScore(objective, aa, scoreDisplayEntry, ab, ac, gameProfile.getId(), guiGraphics);
 					}
 				}
 

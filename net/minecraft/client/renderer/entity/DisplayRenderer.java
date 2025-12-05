@@ -155,7 +155,7 @@ public abstract class DisplayRenderer<T extends Display, S, ST extends DisplayEn
 		}
 
 		public void extractRenderState(BlockDisplay blockDisplay, BlockDisplayEntityRenderState blockDisplayEntityRenderState, float f) {
-			super.extractRenderState((T)blockDisplay, blockDisplayEntityRenderState, f);
+			super.extractRenderState(blockDisplay, blockDisplayEntityRenderState, f);
 			blockDisplayEntityRenderState.blockRenderState = blockDisplay.blockRenderState();
 		}
 
@@ -182,7 +182,7 @@ public abstract class DisplayRenderer<T extends Display, S, ST extends DisplayEn
 		}
 
 		public void extractRenderState(ItemDisplay itemDisplay, ItemDisplayEntityRenderState itemDisplayEntityRenderState, float f) {
-			super.extractRenderState((T)itemDisplay, itemDisplayEntityRenderState, f);
+			super.extractRenderState(itemDisplay, itemDisplayEntityRenderState, f);
 			ItemRenderState itemRenderState = itemDisplay.itemRenderState();
 			if (itemRenderState != null) {
 				this.itemModelResolver.updateForNonLiving(itemDisplayEntityRenderState.item, itemRenderState.itemStack(), itemRenderState.itemTransform(), itemDisplay);
@@ -215,7 +215,7 @@ public abstract class DisplayRenderer<T extends Display, S, ST extends DisplayEn
 		}
 
 		public void extractRenderState(TextDisplay textDisplay, TextDisplayEntityRenderState textDisplayEntityRenderState, float f) {
-			super.extractRenderState((T)textDisplay, textDisplayEntityRenderState, f);
+			super.extractRenderState(textDisplay, textDisplayEntityRenderState, f);
 			textDisplayEntityRenderState.textRenderState = textDisplay.textRenderState();
 			textDisplayEntityRenderState.cachedInfo = textDisplay.cacheDisplay(this::splitLines);
 		}

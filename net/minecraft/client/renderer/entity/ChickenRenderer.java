@@ -44,7 +44,7 @@ public class ChickenRenderer extends MobRenderer<Chicken, ChickenRenderState, Ch
 
 	public void submit(ChickenRenderState chickenRenderState, PoseStack poseStack, SubmitNodeCollector submitNodeCollector, CameraRenderState cameraRenderState) {
 		if (chickenRenderState.variant != null) {
-			this.model = (EntityModel)((AdultAndBabyModelPair)this.models.get(chickenRenderState.variant.modelAndTexture().model())).getModel(chickenRenderState.isBaby);
+			this.model = ((AdultAndBabyModelPair<ChickenModel>)this.models.get(chickenRenderState.variant.modelAndTexture().model())).getModel(chickenRenderState.isBaby);
 			super.submit(chickenRenderState, poseStack, submitNodeCollector, cameraRenderState);
 		}
 	}

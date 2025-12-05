@@ -176,17 +176,9 @@ public abstract class DialogScreen<T extends Dialog> extends Screen {
 
 	private void handleDialogClickEvent(ClickEvent clickEvent, @Nullable Screen screen) {
 		switch (clickEvent) {
-			case RunCommand var5:
-				RunCommand var10000 = var5;
-
-				try {
-					var11 = var10000.command();
-				} catch (Throwable var9) {
-					throw new MatchException(var9.toString(), var9);
-				}
-
-				String var10 = var11;
-				this.connectionAccess.runCommand(Commands.trimOptionalPrefix(var10), screen);
+			case RunCommand runCommand:
+				String command = runCommand.command();
+				this.connectionAccess.runCommand(Commands.trimOptionalPrefix(command), screen);
 				break;
 			case ShowDialog showDialog:
 				this.connectionAccess.openDialog(showDialog.dialog(), screen);
@@ -214,7 +206,7 @@ public abstract class DialogScreen<T extends Dialog> extends Screen {
 		int l = k * i;
 
 		for (int m = 0; m < l; m++) {
-			gridLayout.addChild((T)((LayoutElement)list.get(m)), m / i, m % i);
+			gridLayout.addChild(list.get(m), m / i, m % i);
 		}
 
 		if (j != l) {
@@ -222,7 +214,7 @@ public abstract class DialogScreen<T extends Dialog> extends Screen {
 			linearLayout.defaultCellSetting().alignHorizontallyCenter();
 
 			for (int n = l; n < j; n++) {
-				linearLayout.addChild((T)((LayoutElement)list.get(n)));
+				linearLayout.addChild(list.get(n));
 			}
 
 			gridLayout.addChild(linearLayout, k, 0, 1, i);

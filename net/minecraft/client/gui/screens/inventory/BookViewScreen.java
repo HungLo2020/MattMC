@@ -208,30 +208,14 @@ public class BookViewScreen extends Screen {
 	protected void handleClickEvent(Minecraft minecraft, ClickEvent clickEvent) {
 		LocalPlayer localPlayer = (LocalPlayer)Objects.requireNonNull(minecraft.player, "Player not available");
 		switch (clickEvent) {
-			case ChangePage var6:
-				ChangePage var15 = var6;
-
-				try {
-					var16 = var15.page();
-				} catch (Throwable var12) {
-					throw new MatchException(var12.toString(), var12);
-				}
-
-				int var13 = var16;
-				this.forcePage(var13 - 1);
+			case ChangePage changePage:
+				int pageNum = changePage.page();
+				this.forcePage(pageNum - 1);
 				break;
-			case RunCommand var8:
-				RunCommand var10000 = var8;
-
-				try {
-					var14 = var10000.command();
-				} catch (Throwable var11) {
-					throw new MatchException(var11.toString(), var11);
-				}
-
-				String var10 = var14;
+			case RunCommand runCommand:
+				String command = runCommand.command();
 				this.closeContainerOnServer();
-				clickCommandAction(localPlayer, var10, null);
+				clickCommandAction(localPlayer, command, null);
 				break;
 			default:
 				defaultHandleGameClickEvent(clickEvent, minecraft, this);

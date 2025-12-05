@@ -72,7 +72,7 @@ public class VanillaRecipeProvider extends RecipeProvider {
 	}
 
 	@Override
-	protected void buildRecipes() {
+	public void buildRecipes() {
 		this.output.includeRootAdvancement();
 		this.generateForEnabledBlockFamilies(FeatureFlagSet.of(FeatureFlags.VANILLA));
 		this.planksFromLog(Blocks.ACACIA_PLANKS, ItemTags.ACACIA_LOGS, 4);
