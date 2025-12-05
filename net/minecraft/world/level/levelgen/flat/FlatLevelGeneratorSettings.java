@@ -45,9 +45,9 @@ public class FlatLevelGeneratorSettings {
 						.lenientOptionalFieldOf("biome")
 						.orElseGet(Optional::empty)
 						.forGetter((FlatLevelGeneratorSettings flatLevelGeneratorSettings) -> Optional.of(flatLevelGeneratorSettings.biome)),
-					RegistryOps.retrieveElement(Biomes.PLAINS),
-					RegistryOps.retrieveElement(MiscOverworldPlacements.LAKE_LAVA_UNDERGROUND),
-					RegistryOps.retrieveElement(MiscOverworldPlacements.LAKE_LAVA_SURFACE)
+					RegistryOps.<Biome, FlatLevelGeneratorSettings>retrieveElement(Biomes.PLAINS),
+					RegistryOps.<PlacedFeature, FlatLevelGeneratorSettings>retrieveElement(MiscOverworldPlacements.LAKE_LAVA_UNDERGROUND),
+					RegistryOps.<PlacedFeature, FlatLevelGeneratorSettings>retrieveElement(MiscOverworldPlacements.LAKE_LAVA_SURFACE)
 				)
 				.apply(instance, FlatLevelGeneratorSettings::new)
 		)
