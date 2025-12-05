@@ -96,11 +96,11 @@ public class Brain<E extends LivingEntity> {
 					}
 
 					private <T, U> DataResult<Brain.MemoryValue<U>> captureRead(MemoryModuleType<U> memoryModuleType, DynamicOps<T> dynamicOps, T object) {
-						return ((DataResult)memoryModuleType.getCodec()
+						return ((DataResult<Codec<ExpirableValue<U>>>)memoryModuleType.getCodec()
 								.map(DataResult::success)
 								.orElseGet(() -> DataResult.error(() -> "No codec for memory: " + memoryModuleType)))
 							.flatMap(codec -> codec.parse(dynamicOps, object))
-							.map(expirableValue -> new Brain.MemoryValue<>(memoryModuleType, Optional.of(expirableValue)));
+							.map(expirableValue -> new Brain.MemoryValue<U>(memoryModuleType, Optional.of(expirableValue)));
 					}
 
 					public <T> RecordBuilder<T> encode(Brain<E> brain, DynamicOps<T> dynamicOps, RecordBuilder<T> recordBuilder) {
@@ -191,14 +191,14 @@ public class Brain<E extends LivingEntity> {
 		if (optional == null) {
 			throw new IllegalStateException("Unregistered memory fetched: " + memoryModuleType);
 		} else {
-			return optional.map(ExpirableValue::getValue);
+			return (Optional<U>)optional.map(ExpirableValue::getValue);
 		}
 	}
 
 	@Nullable
 	public <U> Optional<U> getMemoryInternal(MemoryModuleType<U> memoryModuleType) {
 		Optional<? extends ExpirableValue<?>> optional = (Optional<? extends ExpirableValue<?>>)this.memories.get(memoryModuleType);
-		return optional == null ? null : optional.map(ExpirableValue::getValue);
+		return optional == null ? null : (Optional<U>)optional.map(ExpirableValue::getValue);
 	}
 
 	public <U> long getTimeUntilExpiry(MemoryModuleType<U> memoryModuleType) {
