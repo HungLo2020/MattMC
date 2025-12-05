@@ -106,7 +106,7 @@ public abstract class ServerCommonPacketListenerImpl implements ServerCommonPack
 	public void handleResourcePackResponse(ServerboundResourcePackPacket serverboundResourcePackPacket) {
 		PacketUtils.ensureRunningOnSameThread(serverboundResourcePackPacket, this, this.server.packetProcessor());
 		if (serverboundResourcePackPacket.action() == ServerboundResourcePackPacket.Action.DECLINED && this.server.isResourcePackRequired()) {
-			LOGGER.info("Disconnecting {} due to resource pack {} rejection", this.playerProfile().name(), serverboundResourcePackPacket.id());
+   LOGGER.info("Disconnecting {} due to resource pack {} rejection", net.minecraft.util.AuthlibCompat.name(this.playerProfile()), serverboundResourcePackPacket.id());
 			this.disconnect(Component.translatable("multiplayer.requiredTexturePrompt.disconnect"));
 		}
 	}

@@ -281,8 +281,11 @@ public class GameRules {
 
 	public GameRules(FeatureFlagSet featureFlagSet) {
 		this(
-			(Map<GameRules.Key<?>, GameRules.Value<?>>)availableRules(featureFlagSet)
-				.collect(ImmutableMap.toImmutableMap(Entry::getKey, entry -> ((GameRules.Type)entry.getValue()).createRule())),
+			availableRules(featureFlagSet)
+				.collect(ImmutableMap.toImmutableMap(
+					entry -> (GameRules.Key<?>) entry.getKey(),
+					entry -> (GameRules.Value<?>) ((GameRules.Type<?>) entry.getValue()).createRule()
+				)),
 			featureFlagSet
 		);
 	}
@@ -316,18 +319,15 @@ public class GameRules {
 	}
 
 	public GameRules copy(FeatureFlagSet featureFlagSet) {
-		return new GameRules(
-			(Map<GameRules.Key<?>, GameRules.Value<?>>)availableRules(featureFlagSet)
-				.collect(
-					ImmutableMap.toImmutableMap(
-						Entry::getKey,
-						entry -> this.rules.containsKey(entry.getKey())
-							? ((GameRules.Value)this.rules.get(entry.getKey())).copy()
-							: ((GameRules.Type)entry.getValue()).createRule()
-					)
-				),
-			featureFlagSet
-		);
+		ImmutableMap<GameRules.Key<?>, GameRules.Value<?>> map =
+			availableRules(featureFlagSet)
+				.collect(ImmutableMap.toImmutableMap(
+					e -> (GameRules.Key<?>) e.getKey(),
+					e -> (GameRules.Value<?>) (this.rules.containsKey(e.getKey())
+						? ((GameRules.Value<?>) this.rules.get(e.getKey())).copy()
+						: ((GameRules.Type<?>) e.getValue()).createRule())
+				));
+		return new GameRules(map, featureFlagSet);
 	}
 
 	public void visitGameRuleTypes(GameRules.GameRuleTypeVisitor gameRuleTypeVisitor) {
@@ -336,9 +336,14 @@ public class GameRules {
 
 	private <T extends GameRules.Value<T>> void callVisitorCap(GameRules.GameRuleTypeVisitor gameRuleTypeVisitor, GameRules.Key<?> key, GameRules.Type<?> type) {
 		if (type.requiredFeatures.isSubsetOf(this.enabledFeatures)) {
-			gameRuleTypeVisitor.visit(key, type);
-			type.callVisitor(gameRuleTypeVisitor, key);
+			callVisitorUnchecked(gameRuleTypeVisitor, (GameRules.Key) key, (GameRules.Type) type);
 		}
+	}
+
+	@SuppressWarnings({"unchecked", "rawtypes"})
+	private static void callVisitorUnchecked(GameRules.GameRuleTypeVisitor visitor, GameRules.Key key, GameRules.Type type) {
+		visitor.visit(key, type);
+		type.callVisitor(visitor, key);
 	}
 
 	public void assignFrom(GameRules gameRules, @Nullable MinecraftServer minecraftServer) {

@@ -142,8 +142,8 @@ public abstract class PlayerList {
 	public void placeNewPlayer(Connection connection, ServerPlayer serverPlayer, CommonListenerCookie commonListenerCookie) {
 		NameAndId nameAndId = serverPlayer.nameAndId();
 		UserNameToIdResolver userNameToIdResolver = this.server.services().nameToIdCache();
-		Optional<NameAndId> optional = userNameToIdResolver.get(nameAndId.getId());
-		String string = (String)optional.map(NameAndId::name).orElse(nameAndId.getName());
+  Optional<NameAndId> optional = userNameToIdResolver.get(nameAndId.id());
+		String string = (String)optional.map(NameAndId::name).orElse(nameAndId.name());
 		userNameToIdResolver.add(nameAndId);
 		ServerLevel serverLevel = serverPlayer.level();
 		String string2 = connection.getLoggableAddress(this.server.logIPs());
@@ -541,7 +541,7 @@ public abstract class PlayerList {
 					nameAndId, (Integer)optional.orElse(this.server.operatorUserPermissionLevel()), (Boolean)optional2.orElse(this.ops.canBypassPlayerLimit(nameAndId))
 				)
 			);
-		ServerPlayer serverPlayer = this.getPlayer(nameAndId.getId());
+		ServerPlayer serverPlayer = this.getPlayer(nameAndId.id());
 		if (serverPlayer != null) {
 			this.sendPlayerPermissionLevel(serverPlayer);
 		}
@@ -549,7 +549,7 @@ public abstract class PlayerList {
 
 	public void deop(NameAndId nameAndId) {
 		if (this.ops.remove(nameAndId)) {
-			ServerPlayer serverPlayer = this.getPlayer(nameAndId.getId());
+			ServerPlayer serverPlayer = this.getPlayer(nameAndId.id());
 			if (serverPlayer != null) {
 				this.sendPlayerPermissionLevel(serverPlayer);
 			}

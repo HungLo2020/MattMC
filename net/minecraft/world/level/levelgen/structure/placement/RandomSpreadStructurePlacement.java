@@ -14,7 +14,7 @@ import net.minecraft.world.level.levelgen.WorldgenRandom;
 public class RandomSpreadStructurePlacement extends StructurePlacement {
 	public static final MapCodec<RandomSpreadStructurePlacement> CODEC = RecordCodecBuilder.<RandomSpreadStructurePlacement>mapCodec(
 			instance -> placementCodec(instance)
-				.<int, int, RandomSpreadType>and(
+				.and(
 					instance.group(
 						Codec.intRange(0, 4096).fieldOf("spacing").forGetter(RandomSpreadStructurePlacement::spacing),
 						Codec.intRange(0, 4096).fieldOf("separation").forGetter(RandomSpreadStructurePlacement::separation),

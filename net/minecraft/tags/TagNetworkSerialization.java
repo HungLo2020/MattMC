@@ -21,10 +21,12 @@ public class TagNetworkSerialization {
 	public static Map<ResourceKey<? extends Registry<?>>, TagNetworkSerialization.NetworkPayload> serializeTagsToNetwork(
 		LayeredRegistryAccess<RegistryLayer> layeredRegistryAccess
 	) {
-		return (Map<ResourceKey<? extends Registry<?>>, TagNetworkSerialization.NetworkPayload>)RegistrySynchronization.networkSafeRegistries(layeredRegistryAccess)
+		Map<ResourceKey<? extends Registry<?>>, TagNetworkSerialization.NetworkPayload> result = new HashMap<>();
+		RegistrySynchronization.networkSafeRegistries(layeredRegistryAccess)
 			.map(registryEntry -> Pair.of(registryEntry.key(), serializeToNetwork(registryEntry.value())))
-			.filter(pair -> !((TagNetworkSerialization.NetworkPayload)pair.getSecond()).isEmpty())
-			.collect(Collectors.toMap(Pair::getFirst, Pair::getSecond));
+			.filter(pair -> !pair.getSecond().isEmpty())
+			.forEach(pair -> result.put(pair.getFirst(), pair.getSecond()));
+		return result;
 	}
 
 	private static <T> TagNetworkSerialization.NetworkPayload serializeToNetwork(Registry<T> registry) {
@@ -50,7 +52,11 @@ public class TagNetworkSerialization {
 		Map<TagKey<T>, List<Holder<T>>> map = new HashMap();
 		networkPayload.tags.forEach((resourceLocation, intList) -> {
 			TagKey<T> tagKey = TagKey.create(resourceKey, resourceLocation);
-			List<Holder<T>> list = (List<Holder<T>>)intList.intStream().mapToObj(registry::get).flatMap(Optional::stream).collect(Collectors.toUnmodifiableList());
+			List<Holder<T>> list = intList.intStream()
+				.mapToObj(registry::get)
+				.flatMap(Optional::stream)
+				.map(ref -> (Holder<T>) ref)
+				.collect(Collectors.toUnmodifiableList());
 			map.put(tagKey, list);
 		});
 		return new TagLoader.LoadResult<>(resourceKey, map);

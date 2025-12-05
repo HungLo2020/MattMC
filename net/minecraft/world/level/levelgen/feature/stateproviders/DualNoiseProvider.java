@@ -22,7 +22,7 @@ public class DualNoiseProvider extends NoiseProvider {
 				NormalNoise.NoiseParameters.DIRECT_CODEC.fieldOf("slow_noise").forGetter(dualNoiseProvider -> dualNoiseProvider.slowNoiseParameters),
 				ExtraCodecs.POSITIVE_FLOAT.fieldOf("slow_scale").forGetter(dualNoiseProvider -> dualNoiseProvider.slowScale)
 			)
-			.<long, NormalNoise.NoiseParameters, float, List<BlockState>>and(noiseProviderCodec(instance))
+			.and(noiseProviderCodec(instance))
 			.apply(instance, DualNoiseProvider::new)
 	);
 	private final InclusiveRange<Integer> variety;

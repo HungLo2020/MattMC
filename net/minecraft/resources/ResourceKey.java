@@ -50,7 +50,7 @@ public class ResourceKey<T> {
 	}
 
 	public <E> Optional<ResourceKey<E>> cast(ResourceKey<? extends Registry<E>> resourceKey) {
-		return this.isFor(resourceKey) ? Optional.of(this) : Optional.empty();
+		return this.isFor(resourceKey) ? Optional.of((ResourceKey<E>) this) : Optional.empty();
 	}
 
 	public ResourceLocation location() {
