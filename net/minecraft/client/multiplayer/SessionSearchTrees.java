@@ -68,7 +68,7 @@ public class SessionSearchTrees {
 				TooltipFlag tooltipFlag = Default.NORMAL;
 				CompletableFuture<?> completableFuture = this.recipeSearch;
 				this.recipeSearch = CompletableFuture.supplyAsync(
-					() -> new FullTextSearchTree(
+					() -> new FullTextSearchTree<RecipeCollection>(
 						recipeCollection -> getTooltipLines(
 							recipeCollection.getRecipes().stream().flatMap(recipeDisplayEntry -> recipeDisplayEntry.resultItems(contextMap).stream()), tooltipContext, tooltipFlag
 						),
