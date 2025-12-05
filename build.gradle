@@ -137,6 +137,10 @@ dependencies {
     
     // Fabric API (for annotations like @Environment)
     implementation 'net.fabricmc:fabric-loader:0.16.9'
+    
+    // Fabric API - Full API for all the Fabric interfaces used in the source
+    // Using the version compatible with Minecraft 1.21.x
+    implementation 'net.fabricmc.fabric-api:fabric-api:0.107.0+1.21.1'
 }
 
 sourceSets {
