@@ -1965,7 +1965,7 @@ public class ClientPacketListener extends ClientCommonPacketListenerImpl impleme
 		GameProfile gameProfile = playerInfo.getProfile();
 		SignatureValidator signatureValidator = this.minecraft.services().profileKeySignatureValidator();
 		if (signatureValidator == null) {
-			LOGGER.warn("Ignoring chat session from {} due to missing Services public key", gameProfile.name());
+			LOGGER.warn("Ignoring chat session from {} due to missing Services public key", gameProfile.getName());
 			playerInfo.clearChatSession(this.enforcesSecureChat());
 		} else {
 			Data data = entry.chatSession();
