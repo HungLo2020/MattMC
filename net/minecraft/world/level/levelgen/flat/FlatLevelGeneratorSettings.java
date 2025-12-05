@@ -32,19 +32,19 @@ import net.minecraft.world.level.levelgen.structure.StructureSet;
 import org.slf4j.Logger;
 
 public class FlatLevelGeneratorSettings {
-	private static final Logger LOGGER = LogUtils.getLogger();
-	public static final Codec<FlatLevelGeneratorSettings> CODEC = RecordCodecBuilder.create(
+		private static final Logger LOGGER = LogUtils.getLogger();
+	public static final Codec<FlatLevelGeneratorSettings> CODEC = RecordCodecBuilder.<FlatLevelGeneratorSettings>create(
 			instance -> instance.group(
 					RegistryCodecs.homogeneousList(Registries.STRUCTURE_SET)
 						.lenientOptionalFieldOf("structure_overrides")
-						.forGetter(flatLevelGeneratorSettings -> flatLevelGeneratorSettings.structureOverrides),
+						.forGetter((FlatLevelGeneratorSettings flatLevelGeneratorSettings) -> flatLevelGeneratorSettings.structureOverrides),
 					FlatLayerInfo.CODEC.listOf().fieldOf("layers").forGetter(FlatLevelGeneratorSettings::getLayersInfo),
-					Codec.BOOL.fieldOf("lakes").orElse(false).forGetter(flatLevelGeneratorSettings -> flatLevelGeneratorSettings.addLakes),
-					Codec.BOOL.fieldOf("features").orElse(false).forGetter(flatLevelGeneratorSettings -> flatLevelGeneratorSettings.decoration),
+					Codec.BOOL.fieldOf("lakes").orElse(false).forGetter((FlatLevelGeneratorSettings flatLevelGeneratorSettings) -> flatLevelGeneratorSettings.addLakes),
+					Codec.BOOL.fieldOf("features").orElse(false).forGetter((FlatLevelGeneratorSettings flatLevelGeneratorSettings) -> flatLevelGeneratorSettings.decoration),
 					Biome.CODEC
 						.lenientOptionalFieldOf("biome")
 						.orElseGet(Optional::empty)
-						.forGetter(flatLevelGeneratorSettings -> Optional.of(flatLevelGeneratorSettings.biome)),
+						.forGetter((FlatLevelGeneratorSettings flatLevelGeneratorSettings) -> Optional.of(flatLevelGeneratorSettings.biome)),
 					RegistryOps.retrieveElement(Biomes.PLAINS),
 					RegistryOps.retrieveElement(MiscOverworldPlacements.LAKE_LAVA_UNDERGROUND),
 					RegistryOps.retrieveElement(MiscOverworldPlacements.LAKE_LAVA_SURFACE)
