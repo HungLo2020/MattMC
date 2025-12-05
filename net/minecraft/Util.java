@@ -35,6 +35,7 @@ import java.nio.file.Path;
 import java.nio.file.spi.FileSystemProvider;
 import java.security.AccessController;
 import java.security.PrivilegedActionException;
+import java.security.PrivilegedExceptionAction;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZonedDateTime;
@@ -1086,7 +1087,7 @@ public class Util {
 
 		public void openUri(URI uRI) {
 			try {
-				Process process = (Process)AccessController.doPrivileged(() -> Runtime.getRuntime().exec(this.getOpenUriArguments(uRI)));
+				Process process = (Process)AccessController.doPrivileged((PrivilegedExceptionAction<Process>)() -> Runtime.getRuntime().exec(this.getOpenUriArguments(uRI)));
 				process.getInputStream().close();
 				process.getErrorStream().close();
 				process.getOutputStream().close();
