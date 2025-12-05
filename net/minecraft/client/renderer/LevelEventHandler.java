@@ -463,9 +463,9 @@ public class LevelEventHandler {
 				int u = j >> 6;
 				if (u > 0) {
 					if (randomSource.nextFloat() < 0.3F + u * 0.1F) {
-						float n = 0.15F + 0.02F * u * u * randomSource.nextFloat();
+						float volume = 0.15F + 0.02F * u * u * randomSource.nextFloat();
 						float y = 0.4F + 0.3F * u * randomSource.nextFloat();
-						this.level.playLocalSound(blockPos, SoundEvents.SCULK_BLOCK_CHARGE, SoundSource.BLOCKS, n, y, false);
+						this.level.playLocalSound(blockPos, SoundEvents.SCULK_BLOCK_CHARGE, SoundSource.BLOCKS, volume, y, false);
 					}
 
 					byte b = (byte)(j & 63);

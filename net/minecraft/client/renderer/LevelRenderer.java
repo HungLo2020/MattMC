@@ -1024,7 +1024,7 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 					);
 					((List)enumMap.get(chunkSectionLayer2))
 						.add(
-							new RenderPass.Draw(
+							new RenderPass.Draw<GpuBufferSlice[]>(
 								0,
 								sectionBuffers.getVertexBuffer(),
 								gpuBuffer,

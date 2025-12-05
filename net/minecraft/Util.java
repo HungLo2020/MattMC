@@ -543,10 +543,11 @@ public class Util {
 		return object;
 	}
 
+	@SuppressWarnings("unchecked")
 	public static <K extends Enum<K>, V> Map<K, V> makeEnumMap(Class<K> class_, Function<K, V> function) {
 		EnumMap<K, V> enumMap = new EnumMap(class_);
 
-		for (K enum_ : (Enum[])class_.getEnumConstants()) {
+		for (K enum_ : (K[])class_.getEnumConstants()) {
 			enumMap.put(enum_, function.apply(enum_));
 		}
 

@@ -1118,7 +1118,7 @@ public class ClientLevel extends Level implements CacheSlot.Cleaner<ClientLevel>
 		}
 
 		public void fillCrashReportCategory(CrashReportCategory crashReportCategory, LevelHeightAccessor levelHeightAccessor) {
-			super.fillCrashReportCategory(crashReportCategory, levelHeightAccessor);
+			LevelData.super.fillCrashReportCategory(crashReportCategory, levelHeightAccessor);
 		}
 
 		public void setDifficulty(Difficulty difficulty) {
