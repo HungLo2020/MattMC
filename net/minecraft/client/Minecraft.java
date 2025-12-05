@@ -811,7 +811,7 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 		}
 
 		stringBuilder.append(" ");
-		stringBuilder.append(SharedConstants.getCurrentVersion().getName());
+		stringBuilder.append(SharedConstants.getCurrentVersion().name());
 		ClientPacketListener clientPacketListener = this.getConnection();
 		if (clientPacketListener != null && clientPacketListener.getConnection().isConnected()) {
 			stringBuilder.append(" - ");
@@ -1536,7 +1536,7 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 
 		Path path;
 		try {
-			String string2 = String.format(Locale.ROOT, "%s-%s-%s", Util.getFilenameFormattedDateTime(), string, SharedConstants.getCurrentVersion().getId());
+			String string2 = String.format(Locale.ROOT, "%s-%s-%s", Util.getFilenameFormattedDateTime(), string, SharedConstants.getCurrentVersion().id());
 			String string3 = FileUtil.findAvailableName(MetricsPersister.PROFILING_RESULTS_DIR, string2, ".zip");
 			path = MetricsPersister.PROFILING_RESULTS_DIR.resolve(string3);
 		} catch (IOException var21) {
@@ -2420,7 +2420,7 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 	}
 
 	public CompletableFuture<Void> delayTextureReload() {
-		return this.submit(this::reloadResourcePacks).thenCompose(completableFuture -> completableFuture);
+		return this.<CompletableFuture<Void>>submit(this::reloadResourcePacks).thenCompose(completableFuture -> completableFuture);
 	}
 
 	public void updateReportEnvironment(ReportEnvironment reportEnvironment) {
