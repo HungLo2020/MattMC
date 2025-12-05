@@ -35,7 +35,7 @@ public record RemoteChatSession(UUID sessionId, ProfilePublicKey profilePublicKe
 		}
 
 		public RemoteChatSession validate(GameProfile gameProfile, SignatureValidator signatureValidator) throws ProfilePublicKey.ValidationException {
-			return new RemoteChatSession(this.sessionId, ProfilePublicKey.createValidated(signatureValidator, gameProfile.id(), this.profilePublicKey));
+   return new RemoteChatSession(this.sessionId, ProfilePublicKey.createValidated(signatureValidator, net.minecraft.util.AuthlibCompat.id(gameProfile), this.profilePublicKey));
 		}
 	}
 }

@@ -11,7 +11,7 @@ import net.fabricmc.api.Environment;
 public class ScreenNarrationCollector {
 	int generation;
 	final Map<ScreenNarrationCollector.EntryKey, ScreenNarrationCollector.NarrationEntry> entries = Maps.newTreeMap(
-		Comparator.comparing(entryKey -> entryKey.type).thenComparing(entryKey -> entryKey.depth)
+		Comparator.comparing(ScreenNarrationCollector.EntryKey::type).thenComparingInt(ScreenNarrationCollector.EntryKey::depth)
 	);
 
 	public void update(Consumer<NarrationElementOutput> consumer) {

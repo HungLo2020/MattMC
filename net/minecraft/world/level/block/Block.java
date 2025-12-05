@@ -549,7 +549,10 @@ public class Block extends BlockBehaviour implements ItemLike, FabricBlock {
 	}
 
 	protected Function<BlockState, VoxelShape> getShapeForEachState(Function<BlockState, VoxelShape> function) {
-		return ((ImmutableMap)this.stateDefinition.getPossibleStates().stream().collect(ImmutableMap.toImmutableMap(Function.identity(), function)))::get;
+		ImmutableMap<BlockState, VoxelShape> map = (ImmutableMap<BlockState, VoxelShape>) this.stateDefinition.getPossibleStates()
+			.stream()
+			.collect(ImmutableMap.toImmutableMap(Function.identity(), function));
+		return state -> map.get(state);
 	}
 
 	protected Function<BlockState, VoxelShape> getShapeForEachState(Function<BlockState, VoxelShape> function, Property<?>... propertys) {
@@ -569,8 +572,9 @@ public class Block extends BlockBehaviour implements ItemLike, FabricBlock {
 		};
 	}
 
-	private static <S extends StateHolder<?, S>, T extends Comparable<T>> S setValueHelper(S stateHolder, Property<T> property, Object object) {
-		return stateHolder.setValue(property, (Comparable)object);
+	private static <S extends StateHolder<?, S>, T extends Comparable<T>> S setValueHelper(S stateHolder, Property<T> property, Object value) {
+		T casted = property.getValueClass().cast(value);
+		return stateHolder.setValue(property, casted);
 	}
 
 	@Deprecated

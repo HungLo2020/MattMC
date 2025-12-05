@@ -52,6 +52,21 @@ repositories {
     }
 }
 
+configurations.all {
+    resolutionStrategy {
+        force 'com.mojang:authlib:6.0.55'
+        force 'com.mojang:brigadier:1.3.10'
+        force 'com.mojang:datafixerupper:8.0.16'
+        // Disallow older Authlib versions pulled transitively
+        eachDependency { details ->
+            if (details.requested.group == 'com.mojang' && details.requested.name == 'authlib' && details.requested.version != '6.0.55') {
+                details.useVersion '6.0.55'
+                details.because 'Align with Minecraft 1.21.10 sources that use GameProfile.id()/name() accessors'
+            }
+        }
+    }
+}
+
 // Minecraft 1.21.10 dependencies
 dependencies {
     // Mojang libraries
@@ -157,6 +172,8 @@ sourceSets {
             exclude 'build/**'
             exclude '.git/**'
             exclude '.idea/**'
+            // Exclude bundled Mojang sources that shadow Maven dependencies
+            exclude 'com/mojang/authlib/**'
         }
         resources {
             srcDirs = ['src/main/resources']

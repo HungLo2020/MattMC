@@ -14,7 +14,7 @@ public record ArgumentSignatures(List<ArgumentSignatures.Entry> entries) {
 	private static final int MAX_ARGUMENT_NAME_LENGTH = 16;
 
 	public ArgumentSignatures(FriendlyByteBuf friendlyByteBuf) {
-		this(friendlyByteBuf.readCollection(FriendlyByteBuf.limitValue(ArrayList::new, 8), ArgumentSignatures.Entry::new));
+		this(friendlyByteBuf.readCollection(FriendlyByteBuf.limitValue((java.util.function.IntFunction<List<ArgumentSignatures.Entry>>) ArrayList::new, 8), buf -> new ArgumentSignatures.Entry(buf)));
 	}
 
 	public void write(FriendlyByteBuf friendlyByteBuf) {

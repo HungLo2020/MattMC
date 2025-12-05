@@ -192,17 +192,17 @@ public class ExtraCodecs {
 	);
 	public static final Codec<PropertyMap> PROPERTY_MAP = Codec.either(Codec.unboundedMap(Codec.STRING, Codec.STRING.listOf()), PROPERTY.listOf())
 		.xmap(either -> {
-			Builder<String, Property> builder = ImmutableMultimap.builder();
+			PropertyMap mapOut = new PropertyMap();
 			either.ifLeft(map -> map.forEach((string, list) -> {
 				for (String string2 : list) {
-					builder.put(string, new Property(string, string2));
+					mapOut.put(string, new Property(string, string2));
 				}
 			})).ifRight(list -> {
 				for (Property property : list) {
-					builder.put(property.getName(), property);
+					mapOut.put(property.name(), property);
 				}
 			});
-			return new PropertyMap(builder.build());
+			return mapOut;
 		}, propertyMap -> Either.right(propertyMap.values().stream().toList()));
 	public static final Codec<String> PLAYER_NAME = Codec.string(0, 16)
 		.validate(
@@ -247,33 +247,40 @@ public class ExtraCodecs {
 	}
 
 	public static <P, I> Codec<I> intervalCodec(
-		Codec<P> codec, String string, String string2, BiFunction<P, P, DataResult<I>> biFunction, Function<I, P> function, Function<I, P> function2
+		Codec<P> pointCodec, String leftKey, String rightKey, BiFunction<P, P, DataResult<I>> fromPoints, Function<I, P> toLeft, Function<I, P> toRight
 	) {
-		Codec<I> codec2 = Codec.list(codec).comapFlatMap(list -> Util.fixedSize(list, 2).flatMap(listx -> {
-			P object = (P)listx.get(0);
-			P object2 = (P)listx.get(1);
-			return (DataResult)biFunction.apply(object, object2);
-		}), object -> ImmutableList.of(function.apply(object), function2.apply(object)));
-		Codec<I> codec3 = RecordCodecBuilder.create(
-				instance -> instance.group(codec.fieldOf(string).forGetter(Pair::getFirst), codec.fieldOf(string2).forGetter(Pair::getSecond)).apply(instance, Pair::of)
-			)
-			.comapFlatMap(pair -> (DataResult)biFunction.apply(pair.getFirst(), pair.getSecond()), object -> Pair.of(function.apply(object), function2.apply(object)));
-		Codec<I> codec4 = Codec.withAlternative(codec2, codec3);
-		return Codec.either(codec, codec4)
-			.comapFlatMap(either -> either.map(object -> (DataResult)biFunction.apply(object, object), DataResult::success), object -> {
-				P object2 = (P)function.apply(object);
-				P object3 = (P)function2.apply(object);
-				return Objects.equals(object2, object3) ? Either.left(object2) : Either.right(object);
-			});
+		Codec<I> listForm = pointCodec.listOf().comapFlatMap(
+			list -> Util.fixedSize(list, 2).flatMap(values -> fromPoints.apply(values.get(0), values.get(1))),
+			i -> ImmutableList.of(toLeft.apply(i), toRight.apply(i))
+		);
+		Codec<Pair<P, P>> pairCodec = RecordCodecBuilder.<Pair<P, P>>create(instance ->
+			instance.group(
+				pointCodec.fieldOf(leftKey).forGetter(Pair::getFirst),
+				pointCodec.fieldOf(rightKey).forGetter(Pair::getSecond)
+			).apply(instance, Pair::of)
+		);
+		Codec<I> objectForm = pairCodec.comapFlatMap(
+			pair -> fromPoints.apply(pair.getFirst(), pair.getSecond()),
+			i -> Pair.of(toLeft.apply(i), toRight.apply(i))
+		);
+		Codec<I> alt = Codec.withAlternative(listForm, objectForm);
+		return Codec.either(pointCodec, alt).comapFlatMap(
+			either -> either.map(p -> fromPoints.apply(p, p), DataResult::success),
+			i -> {
+				P a = toLeft.apply(i);
+				P b = toRight.apply(i);
+				return Objects.equals(a, b) ? Either.left(a) : Either.right(i);
+			}
+		);
 	}
 
 	public static <A> ResultFunction<A> orElsePartial(A object) {
 		return new ResultFunction<A>() {
 			@Override
-			public <T> DataResult<Pair<A, T>> apply(DynamicOps<T> dynamicOps, T object, DataResult<Pair<A, T>> dataResult) {
+			public <T> DataResult<Pair<A, T>> apply(DynamicOps<T> dynamicOps, T value, DataResult<Pair<A, T>> dataResult) {
 				MutableObject<String> mutableObject = new MutableObject<>();
 				Optional<Pair<A, T>> optional = dataResult.resultOrPartial(mutableObject::setValue);
-				return optional.isPresent() ? dataResult : DataResult.error(() -> "(" + mutableObject.getValue() + " -> using default)", Pair.of(object, object));
+				return optional.isPresent() ? dataResult : DataResult.error(() -> "(" + mutableObject.getValue() + " -> using default)", Pair.of(object, value));
 			}
 
 			@Override
@@ -293,7 +300,7 @@ public class ExtraCodecs {
 				integer -> (DataResult)Optional.ofNullable(intFunction.apply(integer))
 					.map(DataResult::success)
 					.orElseGet(() -> DataResult.error(() -> "Unknown element id: " + integer)),
-				object -> {
+				(E object) -> {
 					int j = toIntFunction.applyAsInt(object);
 					return j == i ? DataResult.error(() -> "Element with unknown id: " + object) : DataResult.success(j);
 				}
@@ -505,11 +512,15 @@ public class ExtraCodecs {
 	private static MapCodec<GameProfile> gameProfileCodec(Codec<UUID> codec) {
 		return RecordCodecBuilder.mapCodec(
 			instance -> instance.group(
-					codec.fieldOf("id").forGetter(GameProfile::id),
-					PLAYER_NAME.fieldOf("name").forGetter(GameProfile::name),
-					PROPERTY_MAP.optionalFieldOf("properties", PropertyMap.EMPTY).forGetter(GameProfile::properties)
+					codec.fieldOf("id").forGetter(GameProfile::getId),
+					PLAYER_NAME.fieldOf("name").forGetter(GameProfile::getName),
+					PROPERTY_MAP.optionalFieldOf("properties", new PropertyMap()).forGetter(GameProfile::getProperties)
 				)
-				.apply(instance, GameProfile::new)
+				.apply(instance, (uuid, name, props) -> {
+					GameProfile gp = new GameProfile(uuid, name);
+					gp.getProperties().putAll(props);
+					return gp;
+				})
 		);
 	}
 
@@ -538,7 +549,7 @@ public class ExtraCodecs {
 				T object = mapLike.get(string);
 				return object == null ? DataResult.error(() -> "Missing \"" + string + "\" in: " + mapLike) : codec.decode(dynamicOps, object).flatMap(pair -> {
 					T objectx = (T)Objects.requireNonNullElseGet(mapLike.get(string2), dynamicOps::emptyMap);
-					return ((Codec)function2.apply(pair.getFirst())).decode(dynamicOps, objectx).map(Pair::getFirst);
+     return ((Codec)function2.apply(pair.getFirst())).decode(dynamicOps, objectx).map(p -> ((Pair<?, ?>) p).getFirst());
 				});
 			}
 
@@ -584,7 +595,7 @@ public class ExtraCodecs {
 	public static <E extends Enum<E>> Codec<E> legacyEnum(Function<String, E> function) {
 		return Codec.STRING.comapFlatMap(string -> {
 			try {
-				return DataResult.success((Enum)function.apply(string));
+				return DataResult.success(function.apply(string));
 			} catch (IllegalArgumentException var3) {
 				return DataResult.error(() -> "No value with id: " + string);
 			}
