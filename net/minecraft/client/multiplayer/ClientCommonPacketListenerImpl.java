@@ -144,7 +144,7 @@ public abstract class ClientCommonPacketListenerImpl implements ClientCommonPack
 	}
 
 	public boolean shouldHandleMessage(Packet<?> packet) {
-		return PacketListener.super.shouldHandleMessage(packet)
+		return this.isAcceptingMessages()
 			? true
 			: this.isTransferring && (packet instanceof ClientboundStoreCookiePacket || packet instanceof ClientboundTransferPacket);
 	}

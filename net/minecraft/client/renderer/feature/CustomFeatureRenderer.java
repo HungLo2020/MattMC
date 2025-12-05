@@ -25,7 +25,7 @@ public class CustomFeatureRenderer {
 		for (Entry<RenderType, List<SubmitNodeStorage.CustomGeometrySubmit>> entry : storage.customGeometrySubmits.entrySet()) {
 			VertexConsumer vertexConsumer = bufferSource.getBuffer((RenderType)entry.getKey());
 
-			for (SubmitNodeStorage.CustomGeometrySubmit customGeometrySubmit : (List)entry.getValue()) {
+			for (SubmitNodeStorage.CustomGeometrySubmit customGeometrySubmit : (List<SubmitNodeStorage.CustomGeometrySubmit>)entry.getValue()) {
 				customGeometrySubmit.customGeometryRenderer().render(customGeometrySubmit.pose(), vertexConsumer);
 			}
 		}
