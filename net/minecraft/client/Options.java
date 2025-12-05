@@ -1399,6 +1399,7 @@ public class Options {
 							return null;
 						} else if (tag instanceof StringTag var3) {
 							StringTag var10000 = var3;
+							String var7;
 
 							try {
 								var7 = var10000.value();

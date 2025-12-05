@@ -33,7 +33,7 @@ public class RealmsText {
 		if (!I18n.exists(this.translationKey)) {
 			return null;
 		} else {
-			return this.args == null ? Component.translatable(this.translationKey) : Component.translatable(this.translationKey, this.args);
+			return this.args == null ? Component.translatable(this.translationKey) : Component.translatable(this.translationKey, (Object[])this.args);
 		}
 	}
 
