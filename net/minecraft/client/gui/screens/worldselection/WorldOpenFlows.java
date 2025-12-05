@@ -187,17 +187,17 @@ public class WorldOpenFlows {
 					dataLoadContext.datapackDimensions()
 				);
 			},
-			(closeableResourceManager, reloadableServerResources, layeredRegistryAccess, arg) -> {
+			(CloseableResourceManager closeableResourceManager, ReloadableServerResources reloadableServerResources, LayeredRegistryAccess<RegistryLayer> layeredRegistryAccess, Data arg) -> {
 				closeableResourceManager.close();
 				InitialWorldCreationOptions initialWorldCreationOptions = new InitialWorldCreationOptions(WorldCreationUiState.SelectedGameMode.SURVIVAL, Set.of(), null);
 				return Pair.of(
-					arg.levelSettings,
+					arg.levelSettings(),
 					new WorldCreationContext(
-						arg.options,
-						new WorldDimensions(arg.existingDimensions),
+						arg.options(),
+						new WorldDimensions(arg.existingDimensions()),
 						layeredRegistryAccess,
 						reloadableServerResources,
-						arg.levelSettings.getDataConfiguration(),
+						arg.levelSettings().getDataConfiguration(),
 						initialWorldCreationOptions
 					)
 				);
