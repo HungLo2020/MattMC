@@ -233,7 +233,7 @@ public class DedicatedServerProperties extends Settings<DedicatedServerPropertie
 				.orElseThrow(() -> new IllegalStateException("Invalid datapack contents: can't find default preset"));
 			Holder<WorldPreset> holder = (Holder<WorldPreset>)Optional.ofNullable(ResourceLocation.tryParse(this.levelType))
 				.map(resourceLocation -> ResourceKey.create(Registries.WORLD_PRESET, resourceLocation))
-				.or(() -> Optional.ofNullable((ResourceKey)LEGACY_PRESET_NAMES.get(this.levelType)))
+				.or(() -> Optional.ofNullable(LEGACY_PRESET_NAMES.get(this.levelType)))
 				.flatMap(holderLookup::get)
 				.orElseGet(() -> {
 					DedicatedServerProperties.LOGGER.warn("Failed to parse level-type {}, defaulting to {}", this.levelType, reference.key().location());

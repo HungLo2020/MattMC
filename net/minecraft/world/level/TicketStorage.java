@@ -88,7 +88,7 @@ public class TicketStorage extends SavedData {
 		for (Entry<List<Ticket>> entry : Long2ObjectMaps.fastIterable(long2ObjectOpenHashMap)) {
 			ChunkPos chunkPos = new ChunkPos(entry.getLongKey());
 
-			for (Ticket ticket : (List)entry.getValue()) {
+			for (Ticket ticket : (List<Ticket>)entry.getValue()) {
 				biConsumer.accept(chunkPos, ticket);
 			}
 		}
@@ -96,7 +96,7 @@ public class TicketStorage extends SavedData {
 
 	public void activateAllDeactivatedTickets() {
 		for (Entry<List<Ticket>> entry : Long2ObjectMaps.fastIterable(this.deactivatedTickets)) {
-			for (Ticket ticket : (List)entry.getValue()) {
+			for (Ticket ticket : (List<Ticket>)entry.getValue()) {
 				this.addTicket(entry.getLongKey(), ticket);
 			}
 		}
@@ -366,7 +366,7 @@ public class TicketStorage extends SavedData {
 		List<Pair<Ticket, Long>> list = new ArrayList();
 
 		for (Entry<List<Ticket>> entry : this.tickets.long2ObjectEntrySet()) {
-			for (Ticket ticket : (List)entry.getValue()) {
+			for (Ticket ticket : (List<Ticket>)entry.getValue()) {
 				if (ticket.getType() == ticketType) {
 					list.add(Pair.of(ticket, entry.getLongKey()));
 				}
@@ -395,7 +395,7 @@ public class TicketStorage extends SavedData {
 		LongOpenHashSet longOpenHashSet = new LongOpenHashSet();
 
 		for (Entry<List<Ticket>> entry : Long2ObjectMaps.fastIterable(this.tickets)) {
-			for (Ticket ticket : (List)entry.getValue()) {
+			for (Ticket ticket : (List<Ticket>)entry.getValue()) {
 				if (predicate.test(ticket)) {
 					longOpenHashSet.add(entry.getLongKey());
 					break;

@@ -19,8 +19,8 @@ public class ScheduleBuilder {
 	}
 
 	public Schedule build() {
-		((Set)this.transitions.stream().map(ScheduleBuilder.ActivityTransition::getActivity).collect(Collectors.toSet()))
-			.forEach(this.schedule::ensureTimelineExistsFor);
+		((Set<Activity>)this.transitions.stream().map(ScheduleBuilder.ActivityTransition::getActivity).collect(Collectors.toSet()))
+			.forEach(activity -> this.schedule.ensureTimelineExistsFor(activity));
 		this.transitions.forEach(activityTransition -> {
 			Activity activity = activityTransition.getActivity();
 			this.schedule.getAllTimelinesExceptFor(activity).forEach(timeline -> timeline.addKeyframe(activityTransition.getTime(), 0.0F));

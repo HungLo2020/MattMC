@@ -360,6 +360,7 @@ public class FallbackResourceManager implements ResourceManager {
 			this.closed = true;
 		}
 
+		@SuppressWarnings("removal")
 		protected void finalize() throws Throwable {
 			if (!this.closed) {
 				FallbackResourceManager.LOGGER.warn("{}", this.message.get());

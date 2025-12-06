@@ -26,8 +26,8 @@ public interface CustomPacketPayload {
 	static <B extends FriendlyByteBuf> StreamCodec<B, CustomPacketPayload> codec(
 		CustomPacketPayload.FallbackProvider<B> fallbackProvider, List<CustomPacketPayload.TypeAndCodec<? super B, ?>> list
 	) {
-		final Map<ResourceLocation, StreamCodec<? super B, ? extends CustomPacketPayload>> map = (Map<ResourceLocation, StreamCodec<? super B, ? extends CustomPacketPayload>>)list.stream()
-			.collect(Collectors.toUnmodifiableMap(typeAndCodec -> typeAndCodec.type().id(), CustomPacketPayload.TypeAndCodec::codec));
+		final Map<ResourceLocation, StreamCodec<? super B, ? extends CustomPacketPayload>> map = list.stream()
+			.collect(Collectors.toUnmodifiableMap(typeAndCodec -> typeAndCodec.type().id(), typeAndCodec -> (StreamCodec<? super B, ? extends CustomPacketPayload>)typeAndCodec.codec()));
 		return new StreamCodec<B, CustomPacketPayload>() {
 			private StreamCodec<? super B, ? extends CustomPacketPayload> findCodec(ResourceLocation resourceLocation) {
 				StreamCodec<? super B, ? extends CustomPacketPayload> streamCodec = (StreamCodec<? super B, ? extends CustomPacketPayload>)map.get(resourceLocation);
@@ -36,7 +36,7 @@ public interface CustomPacketPayload {
 
 			private <T extends CustomPacketPayload> void writeCap(B friendlyByteBuf, CustomPacketPayload.Type<T> type, CustomPacketPayload customPacketPayload) {
 				friendlyByteBuf.writeResourceLocation(type.id());
-				StreamCodec<B, T> streamCodec = this.findCodec(type.id);
+				StreamCodec<B, T> streamCodec = (StreamCodec<B, T>)this.findCodec(type.id());
 				streamCodec.encode(friendlyByteBuf, (T)customPacketPayload);
 			}
 

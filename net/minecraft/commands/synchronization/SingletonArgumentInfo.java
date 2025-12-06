@@ -14,8 +14,9 @@ public class SingletonArgumentInfo<A extends ArgumentType<?>> implements Argumen
 		this.template = new SingletonArgumentInfo.Template(function);
 	}
 
+	@SuppressWarnings("unchecked")
 	public static <T extends ArgumentType<?>> SingletonArgumentInfo<T> contextFree(Supplier<T> supplier) {
-		return new SingletonArgumentInfo<>(commandBuildContext -> (ArgumentType)supplier.get());
+		return new SingletonArgumentInfo<>(commandBuildContext -> (T)supplier.get());
 	}
 
 	public static <T extends ArgumentType<?>> SingletonArgumentInfo<T> contextAware(Function<CommandBuildContext, T> function) {

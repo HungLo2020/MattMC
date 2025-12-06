@@ -55,10 +55,12 @@ public class EntityEquipmentToArmorAndHandFix extends DataFix {
 					type3,
 					type4,
 					dynamicOps -> {
-						ItemStackNew object = (ItemStackNew)((Pair)type2.read(new Dynamic(dynamicOps).emptyMap())
-								.result()
-								.orElseThrow(() -> new IllegalStateException("Could not parse newly created empty itemstack.")))
-							.getFirst();
+						@SuppressWarnings("unchecked")
+						Optional<Pair<ItemStackNew, ?>> optResult = (Optional<Pair<ItemStackNew, ?>>)(Optional<?>)type2.read(new Dynamic(dynamicOps).emptyMap()).result();
+						if (!optResult.isPresent()) {
+							throw new IllegalStateException("Could not parse newly created empty itemstack.");
+						}
+						ItemStackNew object = optResult.get().getFirst();
 						Either<ItemStackNew, Unit> either = Either.right(DSL.unit());
 						return pair -> pair.mapSecond(either2 -> {
 							List<ItemStackOld> list = either2.map(Function.identity(), unit -> List.of());
@@ -72,7 +74,9 @@ public class EntityEquipmentToArmorAndHandFix extends DataFix {
 								List<ItemStackNew> list2 = Lists.<ItemStackNew>newArrayList(object, object, object, object);
 
 								for (int i = 1; i < Math.min(list.size(), 5); i++) {
-									list2.set(i - 1, list.get(i));
+									@SuppressWarnings("unchecked")
+									ItemStackNew item = (ItemStackNew)(Object)list.get(i);
+									list2.set(i - 1, item);
 								}
 
 								either4 = Either.left(list2);
@@ -90,7 +94,7 @@ public class EntityEquipmentToArmorAndHandFix extends DataFix {
 		Optional<? extends Stream<? extends Dynamic<?>>> optional = dynamic.get("DropChances").asStreamOpt().result();
 		dynamic = dynamic.remove("DropChances");
 		if (optional.isPresent()) {
-			Iterator<Float> iterator = Stream.concat(((Stream)optional.get()).map(dynamicx -> dynamicx.asFloat(0.0F)), Stream.generate(() -> 0.0F)).iterator();
+			Iterator<Float> iterator = Stream.concat(optional.get().map((Dynamic<?> dynamicx) -> dynamicx.asFloat(0.0F)), Stream.generate(() -> 0.0F)).iterator();
 			float f = (Float)iterator.next();
 			if (dynamic.get("HandDropChances").result().isEmpty()) {
 				dynamic = dynamic.set("HandDropChances", dynamic.createList(Stream.of(f, 0.0F).map(dynamic::createFloat)));

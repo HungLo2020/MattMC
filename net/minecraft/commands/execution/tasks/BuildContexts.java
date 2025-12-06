@@ -53,8 +53,10 @@ public class BuildContexts<T extends ExecutionCommandSource<T>> {
 					}
 
 					RedirectModifier<T> redirectModifier = commandContext.getRedirectModifier();
-					if (redirectModifier instanceof CustomModifierExecutor<T> customModifierExecutor) {
-						customModifierExecutor.apply(executionCommandSource, list2, contextChain, chainModifiers2, ExecutionControl.create(executionContext, frame));
+					@SuppressWarnings("unchecked")
+					CustomModifierExecutor<T> customModifierExecutorCheck = (redirectModifier instanceof CustomModifierExecutor) ? (CustomModifierExecutor<T>) redirectModifier : null;
+					if (customModifierExecutorCheck != null) {
+						customModifierExecutorCheck.apply(executionCommandSource, list2, contextChain, chainModifiers2, ExecutionControl.create(executionContext, frame));
 						return;
 					}
 
@@ -90,15 +92,19 @@ public class BuildContexts<T extends ExecutionCommandSource<T>> {
 
 		if (list2.isEmpty()) {
 			if (chainModifiers2.isReturn()) {
-				executionContext.queueNext(new CommandQueueEntry<>(frame, FallthroughTask.instance()));
+				@SuppressWarnings("unchecked")
+				CommandQueueEntry<T> entry = new CommandQueueEntry<>(frame, (EntryAction<T>)FallthroughTask.instance());
+				executionContext.queueNext(entry);
 			}
 		} else {
 			CommandContext<T> commandContext2 = contextChain.getTopContext();
-			if (commandContext2.getCommand() instanceof CustomCommandExecutor<T> customCommandExecutor) {
+			@SuppressWarnings("unchecked")
+			CustomCommandExecutor<T> customCommandExecutorCheck = (commandContext2.getCommand() instanceof CustomCommandExecutor) ? (CustomCommandExecutor<T>) commandContext2.getCommand() : null;
+			if (customCommandExecutorCheck != null) {
 				ExecutionControl<T> executionControl = ExecutionControl.create(executionContext, frame);
 
 				for (T executionCommandSource3 : list2) {
-					customCommandExecutor.run(executionCommandSource3, contextChain, chainModifiers2, executionControl);
+					customCommandExecutorCheck.run(executionCommandSource3, contextChain, chainModifiers2, executionControl);
 				}
 			} else {
 				if (chainModifiers2.isReturn()) {

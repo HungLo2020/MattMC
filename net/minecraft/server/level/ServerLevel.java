@@ -465,8 +465,10 @@ public class ServerLevel extends Level implements ServerEntityGetter, WorldGenLe
 
 	private void wakeUpAllPlayers() {
 		this.sleepStatus.removeAllSleepers();
-		((List)this.players.stream().filter(LivingEntity::isSleeping).collect(Collectors.toList()))
-			.forEach(serverPlayer -> serverPlayer.stopSleepInBed(false, false));
+		this.players.stream()
+			.filter(LivingEntity::isSleeping)
+			.toList()
+			.forEach(sp -> sp.stopSleepInBed(false, false));
 	}
 
 	public void tickChunk(LevelChunk levelChunk, int i) {
@@ -1712,7 +1714,7 @@ public class ServerLevel extends Level implements ServerEntityGetter, WorldGenLe
 
 			return (String)object2IntOpenHashMap.object2IntEntrySet()
 				.stream()
-				.sorted(Comparator.comparing(Entry::getIntValue).reversed())
+				.sorted(Comparator.<it.unimi.dsi.fastutil.objects.Object2IntMap.Entry<String>>comparingInt(it.unimi.dsi.fastutil.objects.Object2IntMap.Entry::getIntValue).reversed())
 				.limit(5L)
 				.map(entry -> (String)entry.getKey() + ":" + entry.getIntValue())
 				.collect(Collectors.joining(","));

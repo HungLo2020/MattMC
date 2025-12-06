@@ -6,6 +6,7 @@ import com.mojang.serialization.DataResult;
 import it.unimi.dsi.fastutil.objects.Reference2ObjectArrayMap;
 import it.unimi.dsi.fastutil.objects.Reference2ObjectMap;
 import it.unimi.dsi.fastutil.objects.Reference2ObjectMaps;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.Map.Entry;
@@ -21,7 +22,7 @@ import org.jetbrains.annotations.Nullable;
 public final class DataComponentPatch {
 	public static final DataComponentPatch EMPTY = new DataComponentPatch(Reference2ObjectMaps.emptyMap());
 	public static final Codec<DataComponentPatch> CODEC = Codec.dispatchedMap(DataComponentPatch.PatchKey.CODEC, DataComponentPatch.PatchKey::valueCodec)
-		.xmap(map -> {
+		.xmap((Map<DataComponentPatch.PatchKey, ?> map) -> {
 			if (map.isEmpty()) {
 				return EMPTY;
 			} else {
@@ -38,8 +39,9 @@ public final class DataComponentPatch {
 
 				return new DataComponentPatch(reference2ObjectMap);
 			}
-		}, dataComponentPatch -> {
-			Reference2ObjectMap<DataComponentPatch.PatchKey, Object> reference2ObjectMap = new Reference2ObjectArrayMap<>(dataComponentPatch.map.size());
+		}, (DataComponentPatch dataComponentPatch) -> {
+			@SuppressWarnings("unchecked")
+			Map<DataComponentPatch.PatchKey, Object> reference2ObjectMap = new Reference2ObjectArrayMap<>(dataComponentPatch.map.size());
 
 			for (Entry<DataComponentType<?>, Optional<?>> entry : Reference2ObjectMaps.fastIterable(dataComponentPatch.map)) {
 				DataComponentType<?> dataComponentType = (DataComponentType<?>)entry.getKey();
@@ -53,7 +55,7 @@ public final class DataComponentPatch {
 				}
 			}
 
-			return reference2ObjectMap;
+			return (Map)reference2ObjectMap;
 		});
 	public static final StreamCodec<RegistryFriendlyByteBuf, DataComponentPatch> STREAM_CODEC = createStreamCodec(new DataComponentPatch.CodecGetter() {
 		@Override

@@ -459,7 +459,7 @@ public class BlockPos extends Vec3i {
 	public static int breadthFirstTraversal(
 		BlockPos blockPos, int i, int j, BiConsumer<BlockPos, Consumer<BlockPos>> biConsumer, Function<BlockPos, BlockPos.TraversalNodeStatus> function
 	) {
-		Queue<Pair<BlockPos, Integer>> queue = new ArrayDeque();
+		Queue<Pair<BlockPos, Integer>> queue = new ArrayDeque<>();
 		LongSet longSet = new LongOpenHashSet();
 		queue.add(Pair.of(blockPos, 0));
 		int k = 0;
@@ -481,7 +481,7 @@ public class BlockPos extends Vec3i {
 					}
 
 					if (l < i) {
-						biConsumer.accept(blockPos2, (Consumer)blockPosx -> queue.add(Pair.of(blockPosx, l + 1)));
+						biConsumer.accept(blockPos2, (Consumer<BlockPos>)(blockPosx -> queue.add(Pair.of(blockPosx, l + 1))));
 					}
 				}
 			}

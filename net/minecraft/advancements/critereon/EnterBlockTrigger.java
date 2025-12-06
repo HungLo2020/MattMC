@@ -35,11 +35,11 @@ public class EnterBlockTrigger extends SimpleCriterionTrigger<EnterBlockTrigger.
 			.validate(EnterBlockTrigger.TriggerInstance::validate);
 
 		private static DataResult<EnterBlockTrigger.TriggerInstance> validate(EnterBlockTrigger.TriggerInstance triggerInstance) {
-			return (DataResult<EnterBlockTrigger.TriggerInstance>)triggerInstance.block
-				.flatMap(
+			return triggerInstance.block
+				.<DataResult<EnterBlockTrigger.TriggerInstance>>flatMap(
 					holder -> triggerInstance.state
 						.flatMap(statePropertiesPredicate -> statePropertiesPredicate.checkState(((Block)holder.value()).getStateDefinition()))
-						.map(string -> DataResult.error(() -> "Block" + holder + " has no property " + string))
+						.map(string -> DataResult.<EnterBlockTrigger.TriggerInstance>error(() -> "Block" + holder + " has no property " + string))
 				)
 				.orElseGet(() -> DataResult.success(triggerInstance));
 		}

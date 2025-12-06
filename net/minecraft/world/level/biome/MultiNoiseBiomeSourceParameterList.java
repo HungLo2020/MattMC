@@ -84,10 +84,10 @@ public class MultiNoiseBiomeSourceParameterList {
 			.collect(Collectors.toMap(MultiNoiseBiomeSourceParameterList.Preset::id, preset -> preset));
 		public static final Codec<MultiNoiseBiomeSourceParameterList.Preset> CODEC = ResourceLocation.CODEC
 			.flatXmap(
-				resourceLocation -> (DataResult)Optional.ofNullable((MultiNoiseBiomeSourceParameterList.Preset)BY_NAME.get(resourceLocation))
-					.map(DataResult::success)
+				resourceLocation -> Optional.ofNullable(BY_NAME.get(resourceLocation))
+					.<DataResult<MultiNoiseBiomeSourceParameterList.Preset>>map(DataResult::success)
 					.orElseGet(() -> DataResult.error(() -> "Unknown preset: " + resourceLocation)),
-				preset -> DataResult.success(preset.id)
+				(MultiNoiseBiomeSourceParameterList.Preset preset) -> DataResult.success(preset.id)
 			);
 
 		static <T> Climate.ParameterList<T> generateOverworldBiomes(Function<ResourceKey<Biome>, T> function) {

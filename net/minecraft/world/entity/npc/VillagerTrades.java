@@ -1525,9 +1525,10 @@ public class VillagerTrades {
 		}
 
 		@Override
-		public MerchantOffer getOffer(Entity entity, RandomSource randomSource) {
+			public MerchantOffer getOffer(Entity entity, RandomSource randomSource) {
 			ItemCost itemCost = new ItemCost(Items.EMERALD, this.emeraldCost);
-			List<Holder<Potion>> list = (List<Holder<Potion>>)BuiltInRegistries.POTION
+			@SuppressWarnings("unchecked")
+			List<Holder<Potion>> list = (List<Holder<Potion>>)(List<?>)BuiltInRegistries.POTION
 				.listElements()
 				.filter(reference -> !((Potion)reference.value()).getEffects().isEmpty() && entity.level().potionBrewing().isBrewablePotion(reference))
 				.collect(Collectors.toList());

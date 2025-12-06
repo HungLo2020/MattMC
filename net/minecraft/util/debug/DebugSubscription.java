@@ -55,8 +55,8 @@ public class DebugSubscription<T> {
 			.dispatch(DebugSubscription.Event::subscription, DebugSubscription.Event::streamCodec);
 
 		private static <T> StreamCodec<? super RegistryFriendlyByteBuf, DebugSubscription.Event<T>> streamCodec(DebugSubscription<T> debugSubscription) {
-			return ((StreamCodec)Objects.requireNonNull(debugSubscription.valueStreamCodec))
-				.map(object -> new DebugSubscription.Event<>(debugSubscription, (T)object), DebugSubscription.Event::value);
+			return ((StreamCodec<RegistryFriendlyByteBuf, T>)Objects.requireNonNull(debugSubscription.valueStreamCodec))
+				.map(object -> new DebugSubscription.Event<>(debugSubscription, object), event -> event.value());
 		}
 	}
 
@@ -65,8 +65,8 @@ public class DebugSubscription<T> {
 			.dispatch(DebugSubscription.Update::subscription, DebugSubscription.Update::streamCodec);
 
 		private static <T> StreamCodec<? super RegistryFriendlyByteBuf, DebugSubscription.Update<T>> streamCodec(DebugSubscription<T> debugSubscription) {
-			return ByteBufCodecs.optional((StreamCodec)Objects.requireNonNull(debugSubscription.valueStreamCodec))
-				.map(optional -> new DebugSubscription.Update<>(debugSubscription, optional), DebugSubscription.Update::value);
+			return ByteBufCodecs.<RegistryFriendlyByteBuf, T>optional((StreamCodec<RegistryFriendlyByteBuf, T>)Objects.requireNonNull(debugSubscription.valueStreamCodec))
+				.map(optional -> new DebugSubscription.Update<>(debugSubscription, optional), update -> update.value());
 		}
 	}
 }

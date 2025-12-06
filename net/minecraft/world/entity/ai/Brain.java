@@ -85,7 +85,7 @@ public class Brain<E extends LivingEntity> {
 									DataResult<? extends Brain.MemoryValue<?>> dataResult2 = dataResult.flatMap(
 										memoryModuleType -> this.captureRead(memoryModuleType, dynamicOps, (T)pair.getSecond())
 									);
-									mutableObject.setValue(mutableObject.getValue().apply2(Builder::add, dataResult2));
+									mutableObjectx.setValue(((DataResult<Builder<Brain.MemoryValue<?>>>)mutableObjectx.getValue()).apply2(Builder::add, dataResult2));
 								}
 							);
 						ImmutableList<Brain.MemoryValue<?>> immutableList = (ImmutableList<Brain.MemoryValue<?>>)mutableObjectx.getValue()
@@ -96,11 +96,11 @@ public class Brain<E extends LivingEntity> {
 					}
 
 					private <T, U> DataResult<Brain.MemoryValue<U>> captureRead(MemoryModuleType<U> memoryModuleType, DynamicOps<T> dynamicOps, T object) {
-						return ((DataResult)memoryModuleType.getCodec()
+						return ((DataResult<Codec<ExpirableValue<U>>>)memoryModuleType.getCodec()
 								.map(DataResult::success)
 								.orElseGet(() -> DataResult.error(() -> "No codec for memory: " + memoryModuleType)))
 							.flatMap(codec -> codec.parse(dynamicOps, object))
-							.map(expirableValue -> new Brain.MemoryValue<>(memoryModuleType, Optional.of(expirableValue)));
+							.map(expirableValue -> new Brain.MemoryValue<U>(memoryModuleType, Optional.of(expirableValue)));
 					}
 
 					public <T> RecordBuilder<T> encode(Brain<E> brain, DynamicOps<T> dynamicOps, RecordBuilder<T> recordBuilder) {
@@ -191,14 +191,14 @@ public class Brain<E extends LivingEntity> {
 		if (optional == null) {
 			throw new IllegalStateException("Unregistered memory fetched: " + memoryModuleType);
 		} else {
-			return optional.map(ExpirableValue::getValue);
+			return (Optional<U>)optional.map(ExpirableValue::getValue);
 		}
 	}
 
 	@Nullable
 	public <U> Optional<U> getMemoryInternal(MemoryModuleType<U> memoryModuleType) {
 		Optional<? extends ExpirableValue<?>> optional = (Optional<? extends ExpirableValue<?>>)this.memories.get(memoryModuleType);
-		return optional == null ? null : optional.map(ExpirableValue::getValue);
+		return optional == null ? null : (Optional<U>)optional.map(ExpirableValue::getValue);
 	}
 
 	public <U> long getTimeUntilExpiry(MemoryModuleType<U> memoryModuleType) {
@@ -439,7 +439,7 @@ public class Brain<E extends LivingEntity> {
 			for (Entry<Activity, Set<BehaviorControl<? super E>>> entry : map.entrySet()) {
 				Activity activity = (Activity)entry.getKey();
 				if (this.activeActivities.contains(activity)) {
-					for (BehaviorControl<? super E> behaviorControl : (Set)entry.getValue()) {
+					for (BehaviorControl<? super E> behaviorControl : (Set<BehaviorControl<? super E>>)entry.getValue()) {
 						if (behaviorControl.getStatus() == Behavior.Status.STOPPED) {
 							behaviorControl.tryStart(serverLevel, livingEntity, l);
 						}
@@ -461,7 +461,7 @@ public class Brain<E extends LivingEntity> {
 		if (!this.activityRequirements.containsKey(activity)) {
 			return false;
 		} else {
-			for (Pair<MemoryModuleType<?>, MemoryStatus> pair : (Set)this.activityRequirements.get(activity)) {
+			for (Pair<MemoryModuleType<?>, MemoryStatus> pair : (Set<Pair<MemoryModuleType<?>, MemoryStatus>>)this.activityRequirements.get(activity)) {
 				MemoryModuleType<?> memoryModuleType = pair.getFirst();
 				MemoryStatus memoryStatus = pair.getSecond();
 				if (!this.checkMemory(memoryModuleType, memoryStatus)) {

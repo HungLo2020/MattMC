@@ -36,7 +36,7 @@ public record Grammar<T>(Dictionary<StringReader> rules, NamedRule<StringReader,
 			return (T)optional.get();
 		} else {
 			List<ErrorEntry<StringReader>> list = longestOnly.entries();
-			List<Exception> list2 = list.stream().mapMulti((errorEntry, consumer) -> {
+			List<Exception> list2 = list.stream().<Exception>mapMulti((errorEntry, consumer) -> {
 				if (errorEntry.reason() instanceof DelayedException<?> delayedException) {
 					consumer.accept(delayedException.create(stringReader.getString(), errorEntry.cursor()));
 				} else if (errorEntry.reason() instanceof Exception exceptionx) {

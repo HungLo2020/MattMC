@@ -28,7 +28,7 @@ public interface BlockGetter extends LevelHeightAccessor, FabricBlockView {
 
 	default <T extends BlockEntity> Optional<T> getBlockEntity(BlockPos blockPos, BlockEntityType<T> blockEntityType) {
 		BlockEntity blockEntity = this.getBlockEntity(blockPos);
-		return blockEntity != null && blockEntity.getType() == blockEntityType ? Optional.of(blockEntity) : Optional.empty();
+		return blockEntity != null && blockEntity.getType() == blockEntityType ? Optional.of((T) blockEntity) : Optional.empty();
 	}
 
 	BlockState getBlockState(BlockPos blockPos);

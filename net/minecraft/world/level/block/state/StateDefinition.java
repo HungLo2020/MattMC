@@ -34,7 +34,7 @@ public class StateDefinition<O, S extends StateHolder<O, S>> {
 	protected StateDefinition(Function<O, S> function, O object, StateDefinition.Factory<O, S> factory, Map<String, Property<?>> map) {
 		this.owner = object;
 		this.propertiesByName = ImmutableSortedMap.copyOf(map);
-		Supplier<S> supplier = () -> (StateHolder)function.apply(object);
+		Supplier<S> supplier = () -> function.apply(object);
 		MapCodec<S> mapCodec = MapCodec.of(Encoder.empty(), Decoder.unit(supplier));
 
 		for (Entry<String, Property<?>> entry : this.propertiesByName.entrySet()) {
@@ -79,9 +79,9 @@ public class StateDefinition<O, S extends StateHolder<O, S>> {
 		return Codec.mapPair(
 				mapCodec, property.valueCodec().fieldOf(string).orElseGet((Consumer<String>)(stringx -> {}), () -> property.value((StateHolder<?, ?>)supplier.get()))
 			)
-			.xmap(
-				pair -> (StateHolder)((StateHolder)pair.getFirst()).setValue(property, ((Property.Value)pair.getSecond()).value()),
-				stateHolder -> Pair.of(stateHolder, property.value(stateHolder))
+			.<S>xmap(
+				pair -> (S)((StateHolder)pair.getFirst()).setValue(property, ((Property.Value)pair.getSecond()).value()),
+				stateHolder -> Pair.of(stateHolder, property.value((StateHolder<?, ?>) stateHolder))
 			);
 	}
 

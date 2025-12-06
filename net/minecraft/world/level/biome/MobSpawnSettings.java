@@ -87,10 +87,11 @@ public class MobSpawnSettings {
 			return this;
 		}
 
+			@SuppressWarnings("unchecked")
 		public MobSpawnSettings build() {
 			return new MobSpawnSettings(
 				this.creatureGenerationProbability,
-				(Map<MobCategory, WeightedList<MobSpawnSettings.SpawnerData>>)this.spawners
+				(Map<MobCategory, WeightedList<MobSpawnSettings.SpawnerData>>)(Map<?, ?>)this.spawners
 					.entrySet()
 					.stream()
 					.collect(ImmutableMap.toImmutableMap(Entry::getKey, entry -> ((WeightedList.Builder)entry.getValue()).build())),

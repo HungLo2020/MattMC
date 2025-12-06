@@ -74,7 +74,7 @@ public class ServerConfigurationPacketListenerImpl
 
 	@Override
 	public void onDisconnect(DisconnectionDetails disconnectionDetails) {
-		LOGGER.info("{} ({}) lost connection: {}", this.gameProfile.name(), this.gameProfile.id(), disconnectionDetails.reason().getString());
+		LOGGER.info("{} ({}) lost connection: {}", this.gameProfile.getName(), this.gameProfile.getId(), disconnectionDetails.reason().getString());
 		if (this.prepareSpawnTask != null) {
 			this.prepareSpawnTask.close();
 			this.prepareSpawnTask = null;
@@ -170,7 +170,7 @@ public class ServerConfigurationPacketListenerImpl
 
 		try {
 			PlayerList playerList = this.server.getPlayerList();
-			if (playerList.getPlayer(this.gameProfile.id()) != null) {
+			if (playerList.getPlayer(this.gameProfile.getId()) != null) {
 				this.disconnect(PlayerList.DUPLICATE_LOGIN_DISCONNECT_MESSAGE);
 				return;
 			}

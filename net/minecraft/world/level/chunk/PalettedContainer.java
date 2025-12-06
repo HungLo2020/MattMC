@@ -50,14 +50,14 @@ public class PalettedContainer<T> implements PaletteResize<T>, PalettedContainer
 	private static <T, C extends PalettedContainerRO<T>> Codec<C> codec(
 		Codec<T> codec, Strategy<T> strategy, T object, PalettedContainerRO.Unpacker<T, C> unpacker
 	) {
-		return RecordCodecBuilder.create(
+		return RecordCodecBuilder.<PalettedContainerRO.PackedData<T>>create(
 				instance -> instance.group(
-						codec.mapResult(ExtraCodecs.orElsePartial(object)).listOf().fieldOf("palette").forGetter(PalettedContainerRO.PackedData::paletteEntries),
-						Codec.LONG_STREAM.lenientOptionalFieldOf("data").forGetter(PalettedContainerRO.PackedData::storage)
+						codec.mapResult(ExtraCodecs.orElsePartial(object)).listOf().fieldOf("palette").forGetter(pd -> pd.paletteEntries()),
+						Codec.LONG_STREAM.lenientOptionalFieldOf("data").forGetter(pd -> pd.storage())
 					)
-					.apply(instance, PalettedContainerRO.PackedData::new)
-			)
-			.comapFlatMap(packedData -> unpacker.read(strategy, packedData), palettedContainerRO -> palettedContainerRO.pack(strategy));
+					.apply(instance, (palette, storage) -> new PalettedContainerRO.PackedData<T>(palette, storage))
+				)
+				.comapFlatMap((PalettedContainerRO.PackedData<T> packedData) -> unpacker.read(strategy, packedData), ro -> ro.pack(strategy));
 	}
 
 	private PalettedContainer(Strategy<T> strategy, Configuration configuration, BitStorage bitStorage, Palette<T> palette) {

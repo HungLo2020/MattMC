@@ -22,7 +22,7 @@ public class MultifaceGrowthConfiguration implements FeatureConfiguration {
 				BuiltInRegistries.BLOCK
 					.byNameCodec()
 					.fieldOf("block")
-					.<Block>flatXmap(MultifaceGrowthConfiguration::apply, DataResult::success)
+					.<MultifaceSpreadeableBlock>flatXmap(MultifaceGrowthConfiguration::apply, block -> DataResult.success((Block)block))
 					.orElse((MultifaceSpreadeableBlock)Blocks.GLOW_LICHEN)
 					.forGetter(multifaceGrowthConfiguration -> multifaceGrowthConfiguration.placeBlock),
 				Codec.intRange(1, 64).fieldOf("search_range").orElse(10).forGetter(multifaceGrowthConfiguration -> multifaceGrowthConfiguration.searchRange),

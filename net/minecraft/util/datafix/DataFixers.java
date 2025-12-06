@@ -1114,7 +1114,7 @@ public class DataFixers {
 		Schema schema164 = dataFixerBuilder.addSchema(3086, SAME_NAMESPACED);
 		dataFixerBuilder.addFixer(
 			new EntityVariantFix(
-				schema164, "Change cat variant type", References.ENTITY, "minecraft:cat", "CatType", Util.make(new Int2ObjectOpenHashMap(), int2ObjectOpenHashMap -> {
+				schema164, "Change cat variant type", References.ENTITY, "minecraft:cat", "CatType", Util.make(new Int2ObjectOpenHashMap<String>(), int2ObjectOpenHashMap -> {
 					int2ObjectOpenHashMap.defaultReturnValue("minecraft:tabby");
 					int2ObjectOpenHashMap.put(0, "minecraft:tabby");
 					int2ObjectOpenHashMap.put(1, "minecraft:black");
@@ -1151,7 +1151,7 @@ public class DataFixers {
 		Schema schema165 = dataFixerBuilder.addSchema(3087, SAME_NAMESPACED);
 		dataFixerBuilder.addFixer(
 			new EntityVariantFix(
-				schema165, "Change frog variant type", References.ENTITY, "minecraft:frog", "Variant", Util.make(new Int2ObjectOpenHashMap(), int2ObjectOpenHashMap -> {
+				schema165, "Change frog variant type", References.ENTITY, "minecraft:frog", "Variant", Util.make(new Int2ObjectOpenHashMap<String>(), int2ObjectOpenHashMap -> {
 					int2ObjectOpenHashMap.put(0, "minecraft:temperate");
 					int2ObjectOpenHashMap.put(1, "minecraft:warm");
 					int2ObjectOpenHashMap.put(2, "minecraft:cold");

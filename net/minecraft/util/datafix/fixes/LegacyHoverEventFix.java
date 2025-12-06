@@ -55,12 +55,12 @@ public class LegacyHoverEventFix extends DataFix {
 					Optional<? extends Dynamic<?>> optional = dynamic.get("hoverEvent").result();
 					if (optional.isEmpty()) {
 						return pairxxx;
-					} else {
+							} else {
 						Optional<? extends Dynamic<?>> optional2 = ((Dynamic)optional.get()).get("value").result();
 						if (optional2.isEmpty()) {
 							return pairxxx;
 						} else {
-							String string = (String)((Either)pairxxx.getFirst()).left().map(Pair::getFirst).orElse("");
+							String string = (String)((Either<Pair<String, ?>, ?>)pairxxx.getFirst()).left().map(p -> p.getFirst()).orElse("");
 							H pair2 = this.fixHoverEvent(type2, string, (Dynamic<?>)optional.get());
 							return pairxxx.mapFirst(eitherx -> Either.left(pair2));
 						}

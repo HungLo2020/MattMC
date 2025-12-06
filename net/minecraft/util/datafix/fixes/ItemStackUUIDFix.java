@@ -32,11 +32,11 @@ public class ItemStackUUIDFix extends AbstractUUIDFix {
 	private Dynamic<?> updateAttributeModifiers(Dynamic<?> dynamic) {
 		return dynamic.update(
 			"AttributeModifiers",
-			dynamic2 -> dynamic.createList(dynamic2.asStream().map(dynamicxx -> (Dynamic)replaceUUIDLeastMost(dynamicxx, "UUID", "UUID").orElse(dynamicxx)))
+			dynamic2 -> dynamic.createList(dynamic2.asStream().map(dynamicxx -> replaceUUIDLeastMost(dynamicxx, "UUID", "UUID").orElse(dynamicxx)))
 		);
 	}
 
 	private Dynamic<?> updateSkullOwner(Dynamic<?> dynamic) {
-		return dynamic.update("SkullOwner", dynamicx -> (Dynamic)replaceUUIDString(dynamicx, "Id", "Id").orElse(dynamicx));
+		return dynamic.update("SkullOwner", dynamicx -> replaceUUIDString(dynamicx, "Id", "Id").orElse(dynamicx));
 	}
 }

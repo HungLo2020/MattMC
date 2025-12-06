@@ -953,7 +953,7 @@ public class ServerGamePacketListenerImpl
 		if (itemStack.has(DataComponents.WRITABLE_BOOK_CONTENT)) {
 			ItemStack itemStack2 = itemStack.transmuteCopy(Items.WRITTEN_BOOK);
 			itemStack2.remove(DataComponents.WRITABLE_BOOK_CONTENT);
-			List<Filterable<Component>> list2 = list.stream().map(filteredTextx -> this.filterableFromOutgoing(filteredTextx).map(Component::literal)).toList();
+   List<Filterable<Component>> list2 = list.stream().map(filteredTextx -> this.filterableFromOutgoing(filteredTextx).map(s -> (Component) Component.literal(s))).toList();
 			itemStack2.set(
 				DataComponents.WRITTEN_BOOK_CONTENT, new WrittenBookContent(this.filterableFromOutgoing(filteredText), this.player.getPlainTextName(), 0, list2, true)
 			);
@@ -1292,7 +1292,7 @@ public class ServerGamePacketListenerImpl
 						this.send(new ClientboundBlockUpdatePacket(serverLevel, blockPos));
 						this.send(new ClientboundBlockUpdatePacket(serverLevel, blockPos.relative(direction)));
 					} else {
-						LOGGER.warn("Rejecting UseItemOnPacket from {}: Location {} too far away from hit block {}.", this.player.getGameProfile().name(), vec3, blockPos);
+      LOGGER.warn("Rejecting UseItemOnPacket from {}: Location {} too far away from hit block {}.", net.minecraft.util.AuthlibCompat.name(this.player.getGameProfile()), vec3, blockPos);
 					}
 				}
 			}
@@ -1420,7 +1420,7 @@ public class ServerGamePacketListenerImpl
 	private void performUnsignedChatCommand(String string) {
 		ParseResults<CommandSourceStack> parseResults = this.parseCommand(string);
 		if (this.server.enforceSecureProfile() && SignableCommand.hasSignableArguments(parseResults)) {
-			LOGGER.error("Received unsigned command packet from {}, but the command requires signable arguments: {}", this.player.getGameProfile().name(), string);
+   LOGGER.error("Received unsigned command packet from {}, but the command requires signable arguments: {}", net.minecraft.util.AuthlibCompat.name(this.player.getGameProfile()), string);
 			this.player.sendSystemMessage(INVALID_COMMAND_SIGNATURE);
 		} else {
 			this.server.getCommands().performCommand(parseResults, string);
@@ -1455,7 +1455,7 @@ public class ServerGamePacketListenerImpl
 	}
 
 	private void handleMessageDecodeFailure(SignedMessageChain.DecodeException decodeException) {
-		LOGGER.warn("Failed to update secure chat state for {}: '{}'", this.player.getGameProfile().name(), decodeException.getComponent().getString());
+  LOGGER.warn("Failed to update secure chat state for {}: '{}'", net.minecraft.util.AuthlibCompat.name(this.player.getGameProfile()), decodeException.getComponent().getString());
 		this.player.sendSystemMessage(decodeException.getComponent().copy().withStyle(ChatFormatting.RED));
 	}
 
@@ -1937,7 +1937,7 @@ public class ServerGamePacketListenerImpl
 		if (!this.player.hasPermissions(2) && !this.isSingleplayerOwner()) {
 			LOGGER.warn(
 				"Player {} tried to change difficulty to {} without required permissions",
-				this.player.getGameProfile().name(),
+				net.minecraft.util.AuthlibCompat.name(this.player.getGameProfile()),
 				serverboundChangeDifficultyPacket.difficulty().getDisplayName()
 			);
 		} else {
@@ -1951,7 +1951,7 @@ public class ServerGamePacketListenerImpl
 		if (!this.player.hasPermissions(2)) {
 			LOGGER.warn(
 				"Player {} tried to change game mode to {} without required permissions",
-				this.player.getGameProfile().name(),
+    net.minecraft.util.AuthlibCompat.name(this.player.getGameProfile()),
 				serverboundChangeGameModePacket.mode().getShortDisplayName().getString()
 			);
 		} else {
@@ -1980,7 +1980,7 @@ public class ServerGamePacketListenerImpl
 				try {
 					SignatureValidator signatureValidator = this.server.services().profileKeySignatureValidator();
 					if (signatureValidator == null) {
-						LOGGER.warn("Ignoring chat session from {} due to missing Services public key", this.player.getGameProfile().name());
+      LOGGER.warn("Ignoring chat session from {} due to missing Services public key", net.minecraft.util.AuthlibCompat.name(this.player.getGameProfile()));
 						return;
 					}
 

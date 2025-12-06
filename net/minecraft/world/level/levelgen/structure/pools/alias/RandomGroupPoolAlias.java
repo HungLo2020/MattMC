@@ -24,7 +24,7 @@ public record RandomGroupPoolAlias(WeightedList<List<PoolAliasBinding>> groups) 
 
 	@Override
 	public Stream<ResourceKey<StructureTemplatePool>> allTargets() {
-		return this.groups.unwrap().stream().flatMap(weighted -> ((List)weighted.value()).stream()).flatMap(PoolAliasBinding::allTargets);
+		return this.groups.unwrap().stream().flatMap(weighted -> ((List<PoolAliasBinding>)weighted.value()).stream()).flatMap(binding -> binding.allTargets());
 	}
 
 	@Override

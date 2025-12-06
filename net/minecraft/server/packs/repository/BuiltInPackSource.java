@@ -81,7 +81,7 @@ public abstract class BuiltInPackSource implements RepositorySource {
 					path,
 					this.validator,
 					(pathx, resourcesSupplier) -> biConsumer.accept(
-						pathToId(pathx), (Function)string -> this.createBuiltinPack(string, resourcesSupplier, this.getPackTitle(string))
+						pathToId(pathx), (Function<String, Pack>)(string -> this.createBuiltinPack(string, resourcesSupplier, this.getPackTitle(string)))
 					)
 				);
 			} catch (IOException var4) {

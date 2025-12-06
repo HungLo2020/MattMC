@@ -33,7 +33,7 @@ public class PiglinBruteSpecificSensor extends Sensor<LivingEntity> {
 			)
 			.map(Mob.class::cast);
 
-		for (LivingEntity livingEntity2 : (List)brain.getMemory(MemoryModuleType.NEAREST_LIVING_ENTITIES).orElse(ImmutableList.of())) {
+			for (LivingEntity livingEntity2 : (List<LivingEntity>)brain.getMemory(MemoryModuleType.NEAREST_LIVING_ENTITIES).orElse(ImmutableList.of())) {
 			if (livingEntity2 instanceof AbstractPiglin && ((AbstractPiglin)livingEntity2).isAdult()) {
 				list.add((AbstractPiglin)livingEntity2);
 			}

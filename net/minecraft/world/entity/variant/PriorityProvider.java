@@ -97,8 +97,8 @@ public interface PriorityProvider<Context, Condition extends PriorityProvider.Se
 	}
 
 	public record UnpackedEntry<C, T>(T entry, int priority, PriorityProvider.SelectorCondition<C> condition) {
-		public static final Comparator<PriorityProvider.UnpackedEntry<?, ?>> HIGHEST_PRIORITY_FIRST = Comparator.comparingInt(
-				PriorityProvider.UnpackedEntry::priority
+		public static final Comparator<PriorityProvider.UnpackedEntry<?, ?>> HIGHEST_PRIORITY_FIRST = Comparator.<PriorityProvider.UnpackedEntry<?, ?>>comparingInt(
+				unpackedEntry -> unpackedEntry.priority()
 			)
 			.reversed();
 	}

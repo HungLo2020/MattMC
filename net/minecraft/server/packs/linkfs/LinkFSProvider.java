@@ -78,7 +78,7 @@ class LinkFSProvider extends FileSystemProvider {
 						} catch (IOException var3) {
 							throw new DirectoryIteratorException(var3);
 						}
-					}).map(linkFSPath -> linkFSPath).iterator();
+					}).<Path>map(linkFSPath -> linkFSPath).iterator();
 				}
 
 				public void close() {

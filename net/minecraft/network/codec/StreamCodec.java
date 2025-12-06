@@ -44,17 +44,17 @@ public interface StreamCodec<B, V> extends StreamDecoder<B, V>, StreamEncoder<B,
 		};
 	}
 
-	static <B, V> StreamCodec<B, V> unit(V object) {
+	static <B, V> StreamCodec<B, V> unit(V value) {
 		return new StreamCodec<B, V>() {
 			@Override
-			public V decode(B object) {
-				return object;
+			public V decode(B ignore) {
+				return value;
 			}
 
 			@Override
-			public void encode(B object, V object2) {
-				if (!object2.equals(object)) {
-					throw new IllegalStateException("Can't encode '" + object2 + "', expected '" + object + "'");
+			public void encode(B ignore, V v) {
+				if (!v.equals(value)) {
+					throw new IllegalStateException("Can't encode '" + v + "', expected '" + value + "'");
 				}
 			}
 		};
@@ -492,13 +492,15 @@ public interface StreamCodec<B, V> extends StreamDecoder<B, V>, StreamEncoder<B,
 
 			@Override
 			public void encode(B object, T object2) {
-				((StreamCodec)this.inner.get()).encode(object, (V)object2);
+				((StreamCodec)this.inner.get()).encode(object, object2);
 			}
 		};
 	}
 
 	default <S extends B> StreamCodec<S, V> cast() {
-		return this;
+		@SuppressWarnings("unchecked")
+		StreamCodec<S, V> self = (StreamCodec<S, V>) this;
+		return self;
 	}
 
 	@FunctionalInterface

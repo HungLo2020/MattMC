@@ -16,7 +16,7 @@ import net.minecraft.world.level.storage.loot.predicates.LootItemCondition;
 public class SetBannerPatternFunction extends LootItemConditionalFunction {
 	public static final MapCodec<SetBannerPatternFunction> CODEC = RecordCodecBuilder.mapCodec(
 		instance -> commonFields(instance)
-			.<BannerPatternLayers, boolean>and(
+			.<BannerPatternLayers, Boolean>and(
 				instance.group(
 					BannerPatternLayers.CODEC.fieldOf("patterns").forGetter(setBannerPatternFunction -> setBannerPatternFunction.patterns),
 					Codec.BOOL.fieldOf("append").forGetter(setBannerPatternFunction -> setBannerPatternFunction.append)

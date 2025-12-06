@@ -28,11 +28,11 @@ public interface CubicSpline<C, I extends BoundedFloatFunction<C>> extends Bound
 
 		Codec<Point<C, I>> codec2 = RecordCodecBuilder.create(
 			instance -> instance.group(
-					Codec.FLOAT.fieldOf("location").forGetter(Point::location),
-					Codec.lazyInitialized(mutableObject::getValue).fieldOf("value").forGetter(Point::value),
-					Codec.FLOAT.fieldOf("derivative").forGetter(Point::derivative)
+					Codec.FLOAT.fieldOf("location").forGetter(point -> point.location()),
+					Codec.lazyInitialized(mutableObject::getValue).fieldOf("value").forGetter(point -> point.value()),
+					Codec.FLOAT.fieldOf("derivative").forGetter(point -> point.derivative())
 				)
-				.apply(instance, (f, cubicSpline, g) -> new Point(f, cubicSpline, g))
+				.apply(instance, (f, cubicSpline, g) -> new Point<C, I>(f, cubicSpline, g))
 		);
 		Codec<CubicSpline.Multipoint<C, I>> codec3 = RecordCodecBuilder.create(
 			instance -> instance.group(
@@ -41,7 +41,7 @@ public interface CubicSpline<C, I extends BoundedFloatFunction<C>> extends Bound
 						.fieldOf("points")
 						.forGetter(
 							multipoint -> IntStream.range(0, multipoint.locations.length)
-								.mapToObj(i -> new Point(multipoint.locations()[i], (CubicSpline<C, I>)multipoint.values().get(i), multipoint.derivatives()[i]))
+								.mapToObj(i -> new Point<C, I>(multipoint.locations()[i], (CubicSpline<C, I>)multipoint.values().get(i), multipoint.derivatives()[i]))
 								.toList()
 						)
 				)

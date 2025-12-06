@@ -247,7 +247,7 @@ public class Phantom extends Mob implements Enemy {
 				ServerLevel serverLevel = getServerLevel(Phantom.this.level());
 				List<Player> list = serverLevel.getNearbyPlayers(this.attackTargeting, Phantom.this, Phantom.this.getBoundingBox().inflate(16.0, 64.0, 16.0));
 				if (!list.isEmpty()) {
-					list.sort(Comparator.comparing(Entity::getY).reversed());
+					list.sort(Comparator.<Player, Double>comparing(player -> player.getY()).reversed());
 
 					for (Player player : list) {
 						if (Phantom.this.canAttack(serverLevel, player, TargetingConditions.DEFAULT)) {

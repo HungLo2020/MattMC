@@ -11,7 +11,7 @@ import org.jetbrains.annotations.Nullable;
 public class ChunkTaskPriorityQueue {
 	public static final int PRIORITY_LEVEL_COUNT = ChunkLevel.MAX_LEVEL + 2;
 	private final List<Long2ObjectLinkedOpenHashMap<List<Runnable>>> queuesPerPriority = IntStream.range(0, PRIORITY_LEVEL_COUNT)
-		.mapToObj(i -> new Long2ObjectLinkedOpenHashMap())
+		.mapToObj(i -> new Long2ObjectLinkedOpenHashMap<List<Runnable>>())
 		.toList();
 	private volatile int topPriorityQueueIndex = PRIORITY_LEVEL_COUNT;
 	private final String name;
@@ -31,8 +31,8 @@ public class ChunkTaskPriorityQueue {
 			}
 
 			if (list != null && !list.isEmpty()) {
-				((Long2ObjectLinkedOpenHashMap)this.queuesPerPriority.get(j))
-					.computeIfAbsent(chunkPos.toLong(), (Long2ObjectFunction<? extends List>)(l -> Lists.newArrayList()))
+				((Long2ObjectLinkedOpenHashMap<List<Runnable>>)this.queuesPerPriority.get(j))
+					.computeIfAbsent(chunkPos.toLong(), (Long2ObjectFunction<List<Runnable>>)(l -> Lists.newArrayList()))
 					.addAll(list);
 				this.topPriorityQueueIndex = Math.min(this.topPriorityQueueIndex, j);
 			}
@@ -40,8 +40,8 @@ public class ChunkTaskPriorityQueue {
 	}
 
 	protected void submit(Runnable runnable, long l, int i) {
-		((Long2ObjectLinkedOpenHashMap)this.queuesPerPriority.get(i))
-			.computeIfAbsent(l, (Long2ObjectFunction<? extends List>)(lx -> Lists.newArrayList()))
+		((Long2ObjectLinkedOpenHashMap<List<Runnable>>)this.queuesPerPriority.get(i))
+			.computeIfAbsent(l, (Long2ObjectFunction<List<Runnable>>)(lx -> Lists.newArrayList()))
 			.add(runnable);
 		this.topPriorityQueueIndex = Math.min(this.topPriorityQueueIndex, i);
 	}

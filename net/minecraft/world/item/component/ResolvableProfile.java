@@ -86,7 +86,9 @@ public abstract sealed class ResolvableProfile implements TooltipProvider permit
 	static GameProfile createPartialProfile(Optional<String> optional, Optional<UUID> optional2, PropertyMap propertyMap) {
 		String string = (String)optional.orElse("");
 		UUID uUID = (UUID)optional2.orElseGet(() -> (UUID)optional.map(UUIDUtil::createOfflinePlayerUUID).orElse(Util.NIL_UUID));
-		return new GameProfile(uUID, string, propertyMap);
+		GameProfile profile = new GameProfile(uUID, string);
+		profile.getProperties().putAll(propertyMap);
+		return profile;
 	}
 
 	public abstract Optional<String> name();
@@ -96,7 +98,7 @@ public abstract sealed class ResolvableProfile implements TooltipProvider permit
 		private final Either<String, UUID> nameOrId;
 
 		Dynamic(Either<String, UUID> either, PlayerSkin.Patch patch) {
-			super(ResolvableProfile.createPartialProfile(either.left(), either.right(), PropertyMap.EMPTY), patch);
+			super(ResolvableProfile.createPartialProfile(either.left(), either.right(), new PropertyMap()), patch);
 			this.nameOrId = either;
 		}
 
@@ -117,7 +119,7 @@ public abstract sealed class ResolvableProfile implements TooltipProvider permit
 
 		@Override
 		protected Either<GameProfile, ResolvableProfile.Partial> unpack() {
-			return Either.right(new ResolvableProfile.Partial(this.nameOrId.left(), this.nameOrId.right(), PropertyMap.EMPTY));
+			return Either.right(new ResolvableProfile.Partial(this.nameOrId.left(), this.nameOrId.right(), new PropertyMap()));
 		}
 
 		@Override
@@ -132,12 +134,12 @@ public abstract sealed class ResolvableProfile implements TooltipProvider permit
 	}
 
 	protected record Partial(Optional<String> name, Optional<UUID> id, PropertyMap properties) {
-		public static final ResolvableProfile.Partial EMPTY = new ResolvableProfile.Partial(Optional.empty(), Optional.empty(), PropertyMap.EMPTY);
+		public static final ResolvableProfile.Partial EMPTY = new ResolvableProfile.Partial(Optional.empty(), Optional.empty(), new PropertyMap());
 		static final MapCodec<ResolvableProfile.Partial> MAP_CODEC = RecordCodecBuilder.mapCodec(
 			instance -> instance.group(
 					ExtraCodecs.PLAYER_NAME.optionalFieldOf("name").forGetter(ResolvableProfile.Partial::name),
 					UUIDUtil.CODEC.optionalFieldOf("id").forGetter(ResolvableProfile.Partial::id),
-					ExtraCodecs.PROPERTY_MAP.optionalFieldOf("properties", PropertyMap.EMPTY).forGetter(ResolvableProfile.Partial::properties)
+					ExtraCodecs.PROPERTY_MAP.optionalFieldOf("properties", new PropertyMap()).forGetter(ResolvableProfile.Partial::properties)
 				)
 				.apply(instance, ResolvableProfile.Partial::new)
 		);
@@ -177,7 +179,7 @@ public abstract sealed class ResolvableProfile implements TooltipProvider permit
 
 		@Override
 		public Optional<String> name() {
-			return this.contents.map(gameProfile -> Optional.of(gameProfile.name()), partial -> partial.name);
+			return this.contents.map(gameProfile -> Optional.of(gameProfile.getName()), partial -> partial.name);
 		}
 
 		public boolean equals(Object object) {

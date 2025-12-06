@@ -22,7 +22,7 @@ import net.minecraft.world.level.levelgen.feature.foliageplacers.FoliagePlacer;
 public class UpwardsBranchingTrunkPlacer extends TrunkPlacer {
 	public static final MapCodec<UpwardsBranchingTrunkPlacer> CODEC = RecordCodecBuilder.mapCodec(
 		instance -> trunkPlacerParts(instance)
-			.<IntProvider, float, IntProvider, HolderSet<Block>>and(
+			.<IntProvider, Float, IntProvider, HolderSet<Block>>and(
 				instance.group(
 					IntProvider.POSITIVE_CODEC.fieldOf("extra_branch_steps").forGetter(upwardsBranchingTrunkPlacer -> upwardsBranchingTrunkPlacer.extraBranchSteps),
 					Codec.floatRange(0.0F, 1.0F)

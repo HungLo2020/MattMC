@@ -54,10 +54,10 @@ public class VanillaPackResources implements PackResources {
 	}
 
 	public void listRawPaths(PackType packType, ResourceLocation resourceLocation, Consumer<Path> consumer) {
-		FileUtil.decomposePath(resourceLocation.getPath()).ifSuccess(list -> {
+			FileUtil.decomposePath(resourceLocation.getPath()).ifSuccess(list -> {
 			String string = resourceLocation.getNamespace();
 
-			for (Path path : (List)this.pathsForType.get(packType)) {
+			for (Path path : (List<Path>)this.pathsForType.get(packType)) {
 				Path path2 = path.resolve(string);
 				consumer.accept(FileUtil.resolvePath(path2, list));
 			}
@@ -97,10 +97,10 @@ public class VanillaPackResources implements PackResources {
 	@Nullable
 	@Override
 	public IoSupplier<InputStream> getResource(PackType packType, ResourceLocation resourceLocation) {
-		return FileUtil.decomposePath(resourceLocation.getPath()).mapOrElse(list -> {
+			return FileUtil.decomposePath(resourceLocation.getPath()).mapOrElse(list -> {
 			String string = resourceLocation.getNamespace();
 
-			for (Path path : (List)this.pathsForType.get(packType)) {
+			for (Path path : (List<Path>)this.pathsForType.get(packType)) {
 				Path path2 = FileUtil.resolvePath(path.resolve(string), list);
 				if (Files.exists(path2, new LinkOption[0]) && PathPackResources.validatePath(path2)) {
 					return IoSupplier.create(path2);

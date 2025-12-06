@@ -134,7 +134,7 @@ public class PoiSection {
 		if (!this.isValid) {
 			Short2ObjectMap<PoiRecord> short2ObjectMap = new Short2ObjectOpenHashMap<>(this.records);
 			this.clear();
-			consumer.accept((BiConsumer)(blockPos, holder) -> {
+			consumer.accept((BiConsumer<BlockPos, Holder<PoiType>>)(blockPos, holder) -> {
 				short s = SectionPos.sectionRelativePos(blockPos);
 				PoiRecord poiRecord = short2ObjectMap.computeIfAbsent(s, (Short2ObjectFunction<? extends PoiRecord>)(sx -> new PoiRecord(blockPos, holder, this.setDirty)));
 				this.add(poiRecord);

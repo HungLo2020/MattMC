@@ -68,9 +68,14 @@ public class MinecraftGameRuleServiceImpl implements MinecraftGameRuleService {
 		return stream.filter(entry -> ((net.minecraft.world.level.GameRules.Key)entry.getKey()).getId().equals(string)).findFirst().map(Entry::getKey);
 	}
 
+	@SuppressWarnings("unchecked")
+	private <T extends net.minecraft.world.level.GameRules.Value<T>> T getRuleUnchecked(net.minecraft.world.level.GameRules.Key<?> key) {
+		return (T)this.server.getGameRules().getRule((net.minecraft.world.level.GameRules.Key<T>)(net.minecraft.world.level.GameRules.Key<?>)key);
+	}
+
 	private net.minecraft.world.level.GameRules.Value<?> getRuleValue(String string) {
 		net.minecraft.world.level.GameRules.Key<?> key = (net.minecraft.world.level.GameRules.Key<?>)this.getRuleKey(string)
 			.orElseThrow(() -> new InvalidParameterJsonRpcException("Game rule '" + string + "' does not exist"));
-		return this.server.getGameRules().getRule((net.minecraft.world.level.GameRules.Key<net.minecraft.world.level.GameRules.Value<?>>)key);
+		return getRuleUnchecked(key);
 	}
 }

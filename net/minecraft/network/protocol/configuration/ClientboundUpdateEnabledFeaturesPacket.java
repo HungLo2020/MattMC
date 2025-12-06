@@ -14,7 +14,7 @@ public record ClientboundUpdateEnabledFeaturesPacket(Set<ResourceLocation> featu
 	);
 
 	private ClientboundUpdateEnabledFeaturesPacket(FriendlyByteBuf friendlyByteBuf) {
-		this(friendlyByteBuf.readCollection(HashSet::new, FriendlyByteBuf::readResourceLocation));
+		this(new HashSet<>(friendlyByteBuf.readList(FriendlyByteBuf::readResourceLocation)));
 	}
 
 	private void write(FriendlyByteBuf friendlyByteBuf) {

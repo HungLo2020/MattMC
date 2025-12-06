@@ -18,6 +18,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Optional;
 import java.util.stream.Collectors;
 import net.minecraft.Util;
@@ -185,18 +186,18 @@ public class LevelDataGeneratorOptionsFix extends DataFix {
 			(Map<T, T>)map.entrySet()
 				.stream()
 				.map(
-					entry -> Pair.of(
+						entry -> Pair.of(
 						dynamicOps.createString(((String)entry.getKey()).toLowerCase(Locale.ROOT)),
 						dynamicOps.createMap(
-							(Map<T, T>)((Map)entry.getValue())
+							(Map<T, T>)((Map<String, String>)entry.getValue())
 								.entrySet()
 								.stream()
-								.map(entryx -> Pair.of(dynamicOps.createString((String)entryx.getKey()), dynamicOps.createString((String)entryx.getValue())))
-								.collect(Collectors.toMap(Pair::getFirst, Pair::getSecond))
+								.map((java.util.Map.Entry<String, String> entryx) -> Pair.of(dynamicOps.createString(entryx.getKey()), dynamicOps.createString(entryx.getValue())))
+								.<Pair<T, T>>map(p -> p).collect(Collectors.toMap(Pair::getFirst, Pair::getSecond))
 						)
 					)
 				)
-				.collect(Collectors.toMap(Pair::getFirst, Pair::getSecond))
+				.<Pair<T, T>>map(p -> p).collect(Collectors.toMap(Pair::getFirst, Pair::getSecond))
 		);
 		return new Dynamic<>(
 			dynamicOps,

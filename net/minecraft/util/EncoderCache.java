@@ -28,10 +28,11 @@ public class EncoderCache {
 			}
 
 			@Override
+			@SuppressWarnings("unchecked")
 			public <T> DataResult<T> encode(A object, DynamicOps<T> dynamicOps, T object2) {
-				return EncoderCache.this.cache
-					.getUnchecked(new EncoderCache.Key<>(codec, object, dynamicOps))
-					.map(objectx -> objectx instanceof Tag tag ? tag.copy() : objectx);
+				return ((DataResult<T>)EncoderCache.this.cache
+					.getUnchecked(new EncoderCache.Key<>(codec, object, dynamicOps)))
+					.map(objectx -> objectx instanceof Tag tag ? (T)tag.copy() : (T)objectx);
 			}
 		};
 	}

@@ -242,15 +242,15 @@ public class EntitySelector {
 			List<Predicate<Entity>> list2 = new ObjectArrayList<>(this.contextFreePredicates.size() + i);
 			list2.addAll(this.contextFreePredicates);
 			if (bl) {
-				list2.add((Predicate)entity -> entity.getType().isEnabled(featureFlagSet));
+				list2.add((Predicate<Entity>)(entity -> entity.getType().isEnabled(featureFlagSet)));
 			}
 
 			if (bl2) {
-				list2.add((Predicate)entity -> aABB.intersects(entity.getBoundingBox()));
+				list2.add((Predicate<Entity>)(entity -> aABB.intersects(entity.getBoundingBox())));
 			}
 
 			if (bl3) {
-				list2.add((Predicate)entity -> this.range.matchesSqr(entity.distanceToSqr(vec3)));
+				list2.add((Predicate<Entity>)(entity -> this.range.matchesSqr(entity.distanceToSqr(vec3))));
 			}
 
 			list = list2;

@@ -54,11 +54,11 @@ public class EntityPositionSource implements PositionSource {
 
 	private void resolveEntity(Level level) {
 		this.entityOrUuidOrId
-			.<Optional>map(
+			.<Optional<Entity>>map(
 				Optional::of,
 				either -> Optional.ofNullable((Entity)either.map(uUID -> level instanceof ServerLevel serverLevel ? serverLevel.getEntity(uUID) : null, level::getEntity))
 			)
-			.ifPresent(entity -> this.entityOrUuidOrId = Either.left(entity));
+			.ifPresent(entity -> this.entityOrUuidOrId = Either.<Entity, Either<UUID, Integer>>left(entity));
 	}
 
 	public UUID getUuid() {

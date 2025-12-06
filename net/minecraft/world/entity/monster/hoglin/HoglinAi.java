@@ -19,6 +19,7 @@ import net.minecraft.world.entity.ai.Brain;
 import net.minecraft.world.entity.ai.behavior.AnimalMakeLove;
 import net.minecraft.world.entity.ai.behavior.BabyFollowAdult;
 import net.minecraft.world.entity.ai.behavior.BecomePassiveIfMemoryPresent;
+import net.minecraft.world.entity.ai.behavior.BehaviorControl;
 import net.minecraft.world.entity.ai.behavior.BehaviorUtils;
 import net.minecraft.world.entity.ai.behavior.DoNothing;
 import net.minecraft.world.entity.ai.behavior.EraseMemoryIf;
@@ -108,11 +109,11 @@ public class HoglinAi {
 		brain.addActivityAndRemoveMemoryWhenStopped(
 			Activity.AVOID,
 			10,
-			ImmutableList.of(
+			ImmutableList.<BehaviorControl<? super Hoglin>>of(
 				SetWalkTargetAwayFrom.entity(MemoryModuleType.AVOID_TARGET, 1.3F, 15, false),
 				createIdleMovementBehaviors(),
 				SetEntityLookTargetSometimes.create(8.0F, UniformInt.of(30, 60)),
-				EraseMemoryIf.<PathfinderMob>create(HoglinAi::wantsToStopFleeing, MemoryModuleType.AVOID_TARGET)
+				EraseMemoryIf.<Hoglin>create(HoglinAi::wantsToStopFleeing, MemoryModuleType.AVOID_TARGET)
 			),
 			MemoryModuleType.AVOID_TARGET
 		);

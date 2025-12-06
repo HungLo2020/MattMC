@@ -48,7 +48,7 @@ public record TagKey<T>(ResourceKey<? extends Registry<T>> registry, ResourceLoc
 	}
 
 	public <E> Optional<TagKey<E>> cast(ResourceKey<? extends Registry<E>> resourceKey) {
-		return this.isFor(resourceKey) ? Optional.of(this) : Optional.empty();
+		return this.isFor(resourceKey) ? Optional.of((TagKey<E>) (TagKey<?>) this) : Optional.empty();
 	}
 
 	public String toString() {

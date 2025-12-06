@@ -26,8 +26,9 @@ public class HashMapPalette<T> implements Palette<T> {
 		this.values = crudeIncrementalIntIdentityHashBiMap;
 	}
 
+	@SuppressWarnings("unchecked")
 	public static <A> Palette<A> create(int i, List<A> list) {
-		return new HashMapPalette(i, (List<T>)list);
+		return new HashMapPalette(i, (List<A>)list);
 	}
 
 	@Override

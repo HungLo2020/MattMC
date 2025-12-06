@@ -18,7 +18,7 @@ public record TooltipDisplay(boolean hideTooltip, SequencedSet<DataComponentType
 	public static final Codec<TooltipDisplay> CODEC = RecordCodecBuilder.create(
 		instance -> instance.group(
 				Codec.BOOL.optionalFieldOf("hide_tooltip", false).forGetter(TooltipDisplay::hideTooltip),
-				COMPONENT_SET_CODEC.optionalFieldOf("hidden_components", ReferenceSortedSets.<DataComponentType<?>>emptySet()).forGetter(TooltipDisplay::hiddenComponents)
+				COMPONENT_SET_CODEC.optionalFieldOf("hidden_components", new ReferenceLinkedOpenHashSet<DataComponentType<?>>()).forGetter(TooltipDisplay::hiddenComponents)
 			)
 			.apply(instance, TooltipDisplay::new)
 	);
@@ -29,7 +29,7 @@ public record TooltipDisplay(boolean hideTooltip, SequencedSet<DataComponentType
 		TooltipDisplay::hiddenComponents,
 		TooltipDisplay::new
 	);
-	public static final TooltipDisplay DEFAULT = new TooltipDisplay(false, ReferenceSortedSets.<DataComponentType<?>>emptySet());
+	public static final TooltipDisplay DEFAULT = new TooltipDisplay(false, new ReferenceLinkedOpenHashSet<DataComponentType<?>>());
 
 	public TooltipDisplay withHidden(DataComponentType<?> dataComponentType, boolean bl) {
 		if (this.hiddenComponents.contains(dataComponentType) == bl) {

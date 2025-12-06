@@ -325,7 +325,7 @@ public class EntityBlockStateFix extends DataFix {
 		Type<Either<Pair<String, Dynamic<?>>, Unit>> type2 = DSL.optional(DSL.field("BlockState", DSL.named(References.BLOCK_STATE.typeName(), DSL.remainderType())));
 		Dynamic<?> dynamic = typed.get(DSL.remainderFinder());
 		return typed.update(type.finder(), type2, either -> {
-			int i = either.<Integer>map(pair -> ((Either)pair.getSecond()).map(integer -> integer, EntityBlockStateFix::getBlockId), unit -> {
+			int i = either.<Integer>map(pair -> ((Either<Integer, String>)pair.getSecond()).<Integer>map(integer -> integer, (String s) -> getBlockId(s)), unit -> {
 				Optional<Number> optional = dynamic.get("TileID").asNumber().result();
 				return (Integer)optional.map(Number::intValue).orElseGet(() -> dynamic.get("Tile").asByte((byte)0) & 0xFF);
 			});
@@ -341,7 +341,7 @@ public class EntityBlockStateFix extends DataFix {
 		Type<Pair<String, Dynamic<?>>> type2 = DSL.field(string3, DSL.named(References.BLOCK_STATE.typeName(), DSL.remainderType()));
 		Dynamic<?> dynamic = typed.getOrCreate(DSL.remainderFinder());
 		return typed.update(type.finder(), type2, pair -> {
-			int i = ((Either)pair.getSecond()).<Integer>map(integer -> integer, EntityBlockStateFix::getBlockId);
+			int i = ((Either<Integer, String>)pair.getSecond()).<Integer>map(integer -> integer, (String s) -> getBlockId(s));
 			int j = dynamic.get(string2).asInt(0) & 15;
 			return Pair.of(References.BLOCK_STATE.typeName(), BlockStateData.getTag(i << 4 | j));
 		}).set(DSL.remainderFinder(), dynamic.remove(string2));

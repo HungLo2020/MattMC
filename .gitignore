@@ -1,0 +1,24 @@
+# Gradle
+.gradle/
+build/
+!gradle/wrapper/gradle-wrapper.jar
+
+# IDE
+.idea/workspace.xml
+.idea/shelf/
+.idea/mavenHomeManager.xml
+*.iws
+out/
+
+# Runtime
+run/
+logs/
+crash-reports/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Misc
+*.log
+*.tmp

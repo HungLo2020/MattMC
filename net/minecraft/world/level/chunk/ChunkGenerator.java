@@ -333,7 +333,8 @@ public abstract class ChunkGenerator {
 				for (int k = 0; k < j; k++) {
 					int m = 0;
 					if (structureManager.shouldGenerateStructures()) {
-						for (Structure structure : (List)map.getOrDefault(k, Collections.emptyList())) {
+						List<Structure> structList = map.getOrDefault(k, Collections.emptyList());
+						for (Structure structure : structList) {
 							worldgenRandom.setFeatureSeed(l, m, k);
 							Supplier<String> supplier = () -> (String)registry.getResourceKey(structure).map(Object::toString).orElseGet(structure::toString);
 

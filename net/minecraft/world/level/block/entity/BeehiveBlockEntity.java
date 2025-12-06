@@ -288,7 +288,7 @@ public class BeehiveBlockEntity extends BlockEntity {
 	protected void loadAdditional(ValueInput valueInput) {
 		super.loadAdditional(valueInput);
 		this.stored.clear();
-		((List)valueInput.read("bees", BeehiveBlockEntity.Occupant.LIST_CODEC).orElse(List.of())).forEach(this::storeBee);
+		((List<BeehiveBlockEntity.Occupant>)valueInput.read("bees", BeehiveBlockEntity.Occupant.LIST_CODEC).orElse(List.of())).forEach(occupant -> this.storeBee(occupant));
 		this.savedFlowerPos = (BlockPos)valueInput.read("flower_pos", BlockPos.CODEC).orElse(null);
 	}
 

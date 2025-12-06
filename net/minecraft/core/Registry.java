@@ -37,13 +37,13 @@ public interface Registry<T> extends Keyable, HolderLookup.RegistryLookup<T>, Id
 	private Codec<Holder.Reference<T>> referenceHolderWithLifecycle() {
 		Codec<Holder.Reference<T>> codec = ResourceLocation.CODEC
 			.comapFlatMap(
-				resourceLocation -> (DataResult)this.get(resourceLocation)
+				resourceLocation -> this.get(resourceLocation)
 					.map(DataResult::success)
 					.orElseGet(() -> DataResult.error(() -> "Unknown registry key in " + this.key() + ": " + resourceLocation)),
-				reference -> reference.key().location()
+				(Holder.Reference<T> reference) -> reference.key().location()
 			);
 		return ExtraCodecs.overrideLifecycle(
-			codec, reference -> (Lifecycle)this.registrationInfo(reference.key()).map(RegistrationInfo::lifecycle).orElse(Lifecycle.experimental())
+			codec, reference -> this.registrationInfo(reference.key()).map(RegistrationInfo::lifecycle).orElse(Lifecycle.experimental())
 		);
 	}
 
@@ -163,7 +163,7 @@ public interface Registry<T> extends Keyable, HolderLookup.RegistryLookup<T>, Id
 			}
 
 			public Iterator<Holder<T>> iterator() {
-				return Registry.this.listElements().map(reference -> reference).iterator();
+				return (Iterator<Holder<T>>) (Iterator<?>) Registry.this.listElements().map(reference -> (Holder<T>) reference).iterator();
 			}
 		};
 	}

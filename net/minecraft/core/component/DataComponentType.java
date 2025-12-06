@@ -99,7 +99,7 @@ public interface DataComponentType<T> {
 			}
 
 			public String toString() {
-				return Util.getRegisteredName((Registry<DataComponentType.Builder.SimpleType<T>>)BuiltInRegistries.DATA_COMPONENT_TYPE, this);
+				return Util.getRegisteredName((Registry)BuiltInRegistries.DATA_COMPONENT_TYPE, this);
 			}
 		}
 	}

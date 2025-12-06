@@ -9,6 +9,7 @@ import com.google.gson.JsonSyntaxException;
 import com.mojang.authlib.GameProfile;
 import com.mojang.authlib.properties.Property;
 import com.mojang.authlib.properties.PropertyMap;
+import java.util.UUID;
 import com.mojang.datafixers.util.Either;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.DynamicOps;
@@ -214,17 +215,17 @@ public interface ByteBufCodecs {
 
 		public PropertyMap decode(ByteBuf byteBuf) {
 			int i = ByteBufCodecs.readCount(byteBuf, 16);
-			Builder<String, Property> builder = ImmutableMultimap.builder();
+			PropertyMap map = new PropertyMap();
 
 			for (int j = 0; j < i; j++) {
 				String string = Utf8String.read(byteBuf, 64);
 				String string2 = Utf8String.read(byteBuf, 32767);
 				String string3 = FriendlyByteBuf.readNullable(byteBuf, byteBufx -> Utf8String.read(byteBufx, 1024));
 				Property property = new Property(string, string2, string3);
-				builder.put(property.name(), property);
+				map.put(property.name(), property);
 			}
 
-			return new PropertyMap(builder.build());
+			return map;
 		}
 
 		public void encode(ByteBuf byteBuf, PropertyMap propertyMap) {
@@ -238,9 +239,23 @@ public interface ByteBufCodecs {
 		}
 	};
 	StreamCodec<ByteBuf, String> PLAYER_NAME = stringUtf8(16);
-	StreamCodec<ByteBuf, GameProfile> GAME_PROFILE = StreamCodec.composite(
-		UUIDUtil.STREAM_CODEC, GameProfile::id, PLAYER_NAME, GameProfile::name, GAME_PROFILE_PROPERTIES, GameProfile::properties, GameProfile::new
-	);
+	StreamCodec<ByteBuf, GameProfile> GAME_PROFILE = new StreamCodec<ByteBuf, GameProfile>() {
+		@Override
+		public GameProfile decode(ByteBuf byteBuf) {
+			UUID id = UUIDUtil.STREAM_CODEC.decode(byteBuf);
+			String name = PLAYER_NAME.decode(byteBuf);
+			PropertyMap props = GAME_PROFILE_PROPERTIES.decode(byteBuf);
+			GameProfile gp = new GameProfile(id, name);
+			gp.getProperties().putAll(props);
+			return gp;
+		}
+		@Override
+		public void encode(ByteBuf byteBuf, GameProfile gp) {
+			UUIDUtil.STREAM_CODEC.encode(byteBuf, net.minecraft.util.AuthlibCompat.id(gp));
+			PLAYER_NAME.encode(byteBuf, net.minecraft.util.AuthlibCompat.name(gp));
+			GAME_PROFILE_PROPERTIES.encode(byteBuf, gp.getProperties());
+		}
+	};
 	StreamCodec<ByteBuf, Integer> RGB_COLOR = new StreamCodec<ByteBuf, Integer>() {
 		public Integer decode(ByteBuf byteBuf) {
 			return ARGB.color(byteBuf.readByte() & 0xFF, byteBuf.readByte() & 0xFF, byteBuf.readByte() & 0xFF);

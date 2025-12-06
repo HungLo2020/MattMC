@@ -71,7 +71,7 @@ public class DebugConfigCommand {
 
 		for (Connection connection : minecraftServer.getConnection().getConnections()) {
 			if (connection.getPacketListener() instanceof ServerConfigurationPacketListenerImpl serverConfigurationPacketListenerImpl) {
-				set.add(serverConfigurationPacketListenerImpl.getOwner().id().toString());
+				set.add(serverConfigurationPacketListenerImpl.getOwner().getId().toString());
 			}
 		}
 
@@ -81,7 +81,7 @@ public class DebugConfigCommand {
 	private static int config(CommandSourceStack commandSourceStack, ServerPlayer serverPlayer) {
 		GameProfile gameProfile = serverPlayer.getGameProfile();
 		serverPlayer.connection.switchToConfig();
-		commandSourceStack.sendSuccess(() -> Component.literal("Switched player " + gameProfile.name() + "(" + gameProfile.id() + ") to config mode"), false);
+		commandSourceStack.sendSuccess(() -> Component.literal("Switched player " + gameProfile.getName() + "(" + gameProfile.getId() + ") to config mode"), false);
 		return 1;
 	}
 
@@ -89,7 +89,7 @@ public class DebugConfigCommand {
 	private static ServerConfigurationPacketListenerImpl findConfigPlayer(MinecraftServer minecraftServer, UUID uUID) {
 		for (Connection connection : minecraftServer.getConnection().getConnections()) {
 			if (connection.getPacketListener() instanceof ServerConfigurationPacketListenerImpl serverConfigurationPacketListenerImpl
-				&& serverConfigurationPacketListenerImpl.getOwner().id().equals(uUID)) {
+				&& serverConfigurationPacketListenerImpl.getOwner().getId().equals(uUID)) {
 				return serverConfigurationPacketListenerImpl;
 			}
 		}
