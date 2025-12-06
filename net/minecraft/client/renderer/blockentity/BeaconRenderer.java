@@ -83,34 +83,26 @@ public class BeaconRenderer<T extends BlockEntity & BeaconBeamOwner> implements 
 		float o = Mth.frac(n * 0.2F - Mth.floor(n * 0.1F));
 		poseStack.pushPose();
 		poseStack.mulPose(Axis.YP.rotationDegrees(g * 2.25F - 45.0F));
-		float p = 0.0F;
-		float s = 0.0F;
-		float t = -h;
-		float u = 0.0F;
-		float v = 0.0F;
+		float t1 = -h;
 		float w = -h;
-		float x = 0.0F;
-		float y = 1.0F;
-		float z = -1.0F + o;
-		float aa = j * f * (0.5F / h) + z;
+		float z1 = -1.0F + o;
+		float aa1 = j * f * (0.5F / h) + z1;
 		submitNodeCollector.submitCustomGeometry(
 			poseStack,
 			RenderType.beaconBeam(resourceLocation, false),
-			(pose, vertexConsumer) -> renderPart(pose, vertexConsumer, k, i, m, 0.0F, h, h, 0.0F, t, 0.0F, 0.0F, w, 0.0F, 1.0F, aa, z)
+			(pose, vertexConsumer) -> renderPart(pose, vertexConsumer, k, i, m, 0.0F, h, h, 0.0F, t1, 0.0F, 0.0F, w, 0.0F, 1.0F, aa1, z1)
 		);
 		poseStack.popPose();
-		p = -l;
-		float q = -l;
-		s = -l;
-		t = -l;
-		x = 0.0F;
-		y = 1.0F;
-		z = -1.0F + o;
-		aa = j * f + z;
+		float p2 = -l;
+		float q2 = -l;
+		float s2 = -l;
+		float t2 = -l;
+		float z2 = -1.0F + o;
+		float aa2 = j * f + z2;
 		submitNodeCollector.submitCustomGeometry(
 			poseStack,
 			RenderType.beaconBeam(resourceLocation, true),
-			(pose, vertexConsumer) -> renderPart(pose, vertexConsumer, ARGB.color(32, k), i, m, p, q, l, s, t, l, l, l, 0.0F, 1.0F, aa, z)
+			(pose, vertexConsumer) -> renderPart(pose, vertexConsumer, ARGB.color(32, k), i, m, p2, q2, l, s2, t2, l, l, l, 0.0F, 1.0F, aa2, z2)
 		);
 		poseStack.popPose();
 	}

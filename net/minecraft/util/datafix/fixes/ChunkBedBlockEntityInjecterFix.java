@@ -33,7 +33,7 @@ public class ChunkBedBlockEntityInjecterFix extends DataFix {
 		}
 	}
 
-	@SuppressWarnings("unchecked")
+	@SuppressWarnings({"unchecked", "rawtypes"})
 	private <TE> TypeRewriteRule cap(Type<?> type, ListType<TE> listType) {
 		Type<TE> type2 = listType.getElement();
 		OpticFinder<?> opticFinder = DSL.fieldFinder("Level", type);
@@ -42,9 +42,9 @@ public class ChunkBedBlockEntityInjecterFix extends DataFix {
 		return TypeRewriteRule.seq(
 			this.fixTypeEverywhere(
 				"InjectBedBlockEntityType",
-				this.getInputSchema().findChoiceType(References.BLOCK_ENTITY),
-				this.getOutputSchema().findChoiceType(References.BLOCK_ENTITY),
-				dynamicOps -> (Pair<String, ?> pair) -> pair
+				(Type)this.getInputSchema().findChoiceType(References.BLOCK_ENTITY),
+				(Type)this.getOutputSchema().findChoiceType(References.BLOCK_ENTITY),
+				dynamicOps -> pair -> pair
 			),
 			this.fixTypeEverywhereTyped(
 				"BedBlockEntityInjecter",
