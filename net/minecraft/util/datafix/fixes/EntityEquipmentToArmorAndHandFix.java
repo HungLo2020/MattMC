@@ -55,10 +55,12 @@ public class EntityEquipmentToArmorAndHandFix extends DataFix {
 					type3,
 					type4,
 					dynamicOps -> {
-						ItemStackNew object = (ItemStackNew)((Pair)type2.read(new Dynamic(dynamicOps).emptyMap())
-								.result()
-								.orElseThrow(() -> new IllegalStateException("Could not parse newly created empty itemstack.")))
-							.getFirst();
+						@SuppressWarnings("unchecked")
+						Optional<Pair<ItemStackNew, ?>> optResult = (Optional<Pair<ItemStackNew, ?>>)(Optional<?>)type2.read(new Dynamic(dynamicOps).emptyMap()).result();
+						if (!optResult.isPresent()) {
+							throw new IllegalStateException("Could not parse newly created empty itemstack.");
+						}
+						ItemStackNew object = optResult.get().getFirst();
 						Either<ItemStackNew, Unit> either = Either.right(DSL.unit());
 						return pair -> pair.mapSecond(either2 -> {
 							List<ItemStackOld> list = either2.map(Function.identity(), unit -> List.of());
