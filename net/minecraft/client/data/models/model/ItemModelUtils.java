@@ -130,9 +130,9 @@ public class ItemModelUtils {
 	public static <T extends Comparable<T>> ItemModel.Unbaked selectBlockItemProperty(
 		Property<T> property, ItemModel.Unbaked unbaked, Map<T, ItemModel.Unbaked> map
 	) {
-		List<SelectItemModel.SwitchCase<String>> list = map.entrySet().stream().sorted(Entry.comparingByKey()).map(entry -> {
-			String string = property.getName((Comparable)entry.getKey());
-			return new SelectItemModel.SwitchCase(List.of(string), (ItemModel.Unbaked)entry.getValue());
+		List<SelectItemModel.SwitchCase<String>> list = map.entrySet().stream().sorted(Entry.comparingByKey()).<SelectItemModel.SwitchCase<String>>map(entry -> {
+			String string = property.getName(entry.getKey());
+			return new SelectItemModel.SwitchCase<>(List.of(string), (ItemModel.Unbaked)entry.getValue());
 		}).toList();
 		return select(new ItemBlockState(property.getName()), unbaked, list);
 	}

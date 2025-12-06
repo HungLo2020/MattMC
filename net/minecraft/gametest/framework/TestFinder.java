@@ -74,10 +74,16 @@ public class TestFinder implements TestInstanceFinder, TestPosFinder {
 		}
 
 		private TestFinder build(CommandSourceStack commandSourceStack, TestInstanceFinder testInstanceFinder, TestPosFinder testPosFinder) {
+			@SuppressWarnings("unchecked")
+			Supplier<Stream<Holder.Reference<GameTestInstance>>> testSupplier = 
+				(Supplier<Stream<Holder.Reference<GameTestInstance>>>)this.testFinderWrapper.apply(testInstanceFinder::findTests);
+			@SuppressWarnings("unchecked")
+			Supplier<Stream<BlockPos>> posSupplier = 
+				(Supplier<Stream<BlockPos>>)this.structureBlockPosFinderWrapper.apply(testPosFinder::findTestPos);
 			return new TestFinder(
 				commandSourceStack,
-				((Supplier)this.testFinderWrapper.apply(testInstanceFinder::findTests))::get,
-				((Supplier)this.structureBlockPosFinderWrapper.apply(testPosFinder::findTestPos))::get
+				testSupplier::get,
+				posSupplier::get
 			);
 		}
 

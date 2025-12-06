@@ -24,11 +24,12 @@ public record ComponentContents<T>(DataComponentType<T> componentType) implement
 			.validate(
 				dataComponentType -> dataComponentType.isTransient() ? DataResult.error(() -> "Component can't be serialized") : DataResult.success(dataComponentType)
 			);
-		MapCodec<SelectItemModel.UnbakedSwitch<ComponentContents<T>, T>> mapCodec = codec.dispatchMap(
+		@SuppressWarnings("unchecked")
+		MapCodec<SelectItemModel.UnbakedSwitch<ComponentContents<T>, T>> mapCodec = (MapCodec<SelectItemModel.UnbakedSwitch<ComponentContents<T>, T>>)(MapCodec<?>)codec.dispatchMap(
 			"component",
-			unbakedSwitch -> ((ComponentContents)unbakedSwitch.property()).componentType,
+			unbakedSwitch -> ((ComponentContents<?>)unbakedSwitch.property()).componentType,
 			dataComponentType -> SelectItemModelProperty.Type.createCasesFieldCodec(dataComponentType.codecOrThrow())
-				.xmap(list -> new SelectItemModel.UnbakedSwitch<>(new ComponentContents(dataComponentType), list), SelectItemModel.UnbakedSwitch::cases)
+				.xmap(list -> new SelectItemModel.UnbakedSwitch<>(new ComponentContents<>(dataComponentType), list), SelectItemModel.UnbakedSwitch::cases)
 		);
 		return new SelectItemModelProperty.Type<>(mapCodec);
 	}

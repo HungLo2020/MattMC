@@ -82,10 +82,12 @@ public class ConditionalItemModel implements ItemModel {
 			}
 		}
 
+		@SuppressWarnings("unchecked")
 		private static <T extends ConditionalItemModelProperty> T swapContext(
 			T conditionalItemModelProperty, RegistryContextSwapper registryContextSwapper, ClientLevel clientLevel
 		) {
-			return (T)registryContextSwapper.swapTo(conditionalItemModelProperty.type().codec(), conditionalItemModelProperty, clientLevel.registryAccess())
+			Codec<T> codec = (Codec<T>)conditionalItemModelProperty.type().codec();
+			return registryContextSwapper.swapTo(codec, conditionalItemModelProperty, clientLevel.registryAccess())
 				.result()
 				.orElse(conditionalItemModelProperty);
 		}
