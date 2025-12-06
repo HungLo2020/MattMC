@@ -6,13 +6,21 @@ This repository contains the decompiled source code for Minecraft Java Edition 1
 
 Before building and running, ensure you have:
 
-1. **Java 21** or later installed
+1. **Bundled JDK (Recommended)**
+   - The project uses Temurin OpenJDK 21 bundled with the application
+   - On Linux, it's automatically downloaded when needed
+   - For Windows/macOS or manual setup, see [libraries/JDK-README.md](libraries/JDK-README.md)
+   
+   **OR**
+
+   **System Java 21** (Alternative)
    - Download from [Adoptium](https://adoptium.net/) or [Oracle](https://www.oracle.com/java/technologies/downloads/)
    - Verify with: `java -version`
 
 2. **Internet access** to download dependencies from:
    - Maven Central
    - libraries.minecraft.net (Mojang's library server)
+   - Adoptium (for automatic JDK download on Linux)
 
 ## Building the Project
 
@@ -127,6 +135,27 @@ By running the server, you automatically accept the [Minecraft EULA](https://aka
 ### Legal Notice
 
 This source code is for educational and development purposes. Minecraft is a trademark of Mojang Studios/Microsoft. Please ensure you have the appropriate rights to use this code.
+
+## Bundled JDK
+
+This project uses **Temurin OpenJDK 21** bundled with the application to ensure consistency across all environments. The bundled JDK is:
+
+- **Automatically downloaded** on Linux when you run build/launch tasks
+- **Not committed to git** (too large, ~200MB)
+- **Included in distributions** so users don't need to install Java separately
+
+### Using the Bundled JDK
+
+The bundled JDK is automatically used when you run:
+```bash
+./gradlew runClient      # Client with bundled JDK
+./gradlew runServer      # Server with bundled JDK
+./gradlew clientDist     # Distribution with bundled JDK
+```
+
+### Manual JDK Setup
+
+For Windows/macOS or if automatic download fails, see detailed instructions in [libraries/JDK-README.md](libraries/JDK-README.md).
 
 ## Troubleshooting
 

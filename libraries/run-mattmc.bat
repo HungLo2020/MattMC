@@ -3,7 +3,16 @@ REM MattMC Client Launcher
 
 cd /d "%~dp0"
 
-java -Xmx2G -Xms512M ^
+REM Use bundled JDK if available, otherwise use system java
+if exist "run\jdk-21\bin\java.exe" (
+    set JAVA_CMD=run\jdk-21\bin\java.exe
+    echo Using bundled JDK
+) else (
+    set JAVA_CMD=java
+    echo Using system Java
+)
+
+"%JAVA_CMD%" -Xmx2G -Xms512M ^
     -XX:+UseG1GC ^
     -XX:+ParallelRefProcEnabled ^
     -XX:MaxGCPauseMillis=200 ^

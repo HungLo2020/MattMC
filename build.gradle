@@ -238,6 +238,8 @@ tasks.register('runServer', JavaExec) {
     group = 'minecraft'
     description = 'Runs the Minecraft dedicated server (no GUI)'
     
+    dependsOn 'copyJdkToRun'
+    
     classpath = sourceSets.main.runtimeClasspath
     mainClass = 'net.minecraft.server.Main'
     
@@ -247,6 +249,13 @@ tasks.register('runServer', JavaExec) {
     
     doFirst {
         workingDir.mkdirs()
+        
+        // Use bundled JDK if available
+        def bundledJdk = file('run/jdk-21/bin/java')
+        if (bundledJdk.exists()) {
+            executable = bundledJdk.absolutePath
+            println "Using bundled JDK: ${bundledJdk.absolutePath}"
+        }
     }
     
     standardInput = System.in
@@ -257,6 +266,8 @@ tasks.register('runServerGui', JavaExec) {
     group = 'minecraft'
     description = 'Runs the Minecraft dedicated server with GUI'
     
+    dependsOn 'copyJdkToRun'
+    
     classpath = sourceSets.main.runtimeClasspath
     mainClass = 'net.minecraft.server.Main'
     
@@ -266,6 +277,13 @@ tasks.register('runServerGui', JavaExec) {
     
     doFirst {
         workingDir.mkdirs()
+        
+        // Use bundled JDK if available
+        def bundledJdk = file('run/jdk-21/bin/java')
+        if (bundledJdk.exists()) {
+            executable = bundledJdk.absolutePath
+            println "Using bundled JDK: ${bundledJdk.absolutePath}"
+        }
     }
     
     standardInput = System.in
@@ -275,6 +293,8 @@ tasks.register('runServerGui', JavaExec) {
 tasks.register('runClient', JavaExec) {
     group = 'minecraft'
     description = 'Runs the Minecraft client'
+    
+    dependsOn 'copyJdkToRun'
     
     classpath = sourceSets.main.runtimeClasspath
     mainClass = 'net.minecraft.client.main.Main'
@@ -304,9 +324,58 @@ tasks.register('runClient', JavaExec) {
                 into file('run/assets')
             }
         }
+        
+        // Use bundled JDK if available
+        def bundledJdk = file('run/jdk-21/bin/java')
+        if (bundledJdk.exists()) {
+            executable = bundledJdk.absolutePath
+            println "Using bundled JDK: ${bundledJdk.absolutePath}"
+        }
     }
     
     standardInput = System.in
+}
+
+// Task to download bundled JDK if not present
+tasks.register('downloadJdk', Exec) {
+    group = 'minecraft'
+    description = 'Downloads Temurin OpenJDK 21 if not already present'
+    
+    def jdkDir = file('libraries/jdk-21')
+    def javaExe = new File(jdkDir, 'bin/java')
+    
+    // Only run if JDK doesn't exist
+    onlyIf { !javaExe.exists() }
+    
+    workingDir = file('.')
+    commandLine 'bash', 'libraries/download-jdk.sh'
+}
+
+// Task to copy JDK to run directory
+tasks.register('copyJdkToRun') {
+    group = 'minecraft'
+    description = 'Copies bundled JDK to run directory'
+    
+    dependsOn 'downloadJdk'
+    
+    def srcJdkDir = file('libraries/jdk-21')
+    def destJdkDir = file('run/jdk-21')
+    
+    inputs.dir srcJdkDir
+    outputs.dir destJdkDir
+    
+    doLast {
+        if (!srcJdkDir.exists()) {
+            throw new GradleException("JDK not found at ${srcJdkDir}. Run 'downloadJdk' task first.")
+        }
+        
+        println "📂 Copying JDK to run directory..."
+        copy {
+            from srcJdkDir
+            into destJdkDir
+        }
+        println "✅ JDK copied to ${destJdkDir}"
+    }
 }
 
 // Task to create eula.txt
@@ -397,7 +466,7 @@ tasks.register('clientDist') {
     group = 'distribution'
     description = 'Creates a runnable client distribution'
     
-    dependsOn 'jar', 'classes'
+    dependsOn 'jar', 'classes', 'downloadJdk'
     
     def distDir = "${buildDir}/client-dist/MattMC"
     
@@ -426,6 +495,17 @@ tasks.register('clientDist') {
         copy {
             from 'src/main/resources'
             into "${distDir}/resources"
+        }
+        
+        // Copy bundled JDK to distribution
+        def srcJdkDir = file('libraries/jdk-21')
+        if (srcJdkDir.exists()) {
+            println "📂 Copying bundled JDK to distribution..."
+            copy {
+                from srcJdkDir
+                into "${distDir}/run/jdk-21"
+            }
+            println "✅ JDK copied to distribution"
         }
         
         // Copy assets from src/main/resources/assets directory

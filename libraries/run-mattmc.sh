@@ -3,7 +3,16 @@
 
 cd "$(dirname "$0")"
 
-java -Xmx2G -Xms512M \
+# Use bundled JDK if available, otherwise use system java
+if [[ -x "run/jdk-21/bin/java" ]]; then
+    JAVA_CMD="run/jdk-21/bin/java"
+    echo "Using bundled JDK: $(run/jdk-21/bin/java -version 2>&1 | head -n 1)"
+else
+    JAVA_CMD="java"
+    echo "Using system Java"
+fi
+
+"$JAVA_CMD" -Xmx2G -Xms512M \
     -XX:+UseG1GC \
     -XX:+ParallelRefProcEnabled \
     -XX:MaxGCPauseMillis=200 \
