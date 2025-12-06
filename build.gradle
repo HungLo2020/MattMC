@@ -350,10 +350,11 @@ tasks.register('fatJar', Jar) {
 tasks.register('clientFatJar', Jar) {
     group = 'build'
     description = 'Creates a fat JAR with all dependencies for the client'
-    archiveBaseName = 'Mattcraft-Client'
+    archiveBaseName = 'MattMC-Client'
     archiveClassifier = 'all'
     zip64 = true
     
+    dependsOn 'classes'
     from sourceSets.main.output
     
     dependsOn configurations.runtimeClasspath
@@ -375,7 +376,7 @@ tasks.register('clientDist', Copy) {
     
     dependsOn 'clientFatJar'
     
-    def distDir = "${buildDir}/client-dist/Mattcraft"
+    def distDir = "${buildDir}/client-dist/MattMC"
     
     // Copy the fat jar
     from(tasks.named('clientFatJar')) {
@@ -396,9 +397,9 @@ tasks.register('clientDist', Copy) {
         file("${distDir}/run/resourcepacks").mkdirs()
         
         // Create launch script for Linux
-        def launchScript = file("${distDir}/run-mattcraft.sh")
+        def launchScript = file("${distDir}/run-mattmc.sh")
         launchScript.text = '''#!/bin/bash
-# Mattcraft Client Launcher
+# MattMC Client Launcher
 
 cd "$(dirname "$0")"
 
@@ -420,7 +421,7 @@ java -Xmx2G -Xms512M \\
     -XX:SurvivorRatio=32 \\
     -XX:+PerfDisableSharedMem \\
     -XX:MaxTenuringThreshold=1 \\
-    -jar lib/Mattcraft-Client-''' + version + '''-all.jar \\
+    -jar lib/MattMC-Client-''' + version + '''-all.jar \\
     --version ''' + version + ''' \\
     --accessToken 0 \\
     --gameDir run \\
@@ -429,9 +430,9 @@ java -Xmx2G -Xms512M \\
         launchScript.setExecutable(true)
         
         // Create launch script for Windows
-        def launchScriptWin = file("${distDir}/run-mattcraft.bat")
+        def launchScriptWin = file("${distDir}/run-mattmc.bat")
         launchScriptWin.text = '''@echo off
-REM Mattcraft Client Launcher
+REM MattMC Client Launcher
 
 cd /d "%~dp0"
 
@@ -453,7 +454,7 @@ java -Xmx2G -Xms512M ^
     -XX:SurvivorRatio=32 ^
     -XX:+PerfDisableSharedMem ^
     -XX:MaxTenuringThreshold=1 ^
-    -jar lib\\Mattcraft-Client-''' + version + '''-all.jar ^
+    -jar lib\\MattMC-Client-''' + version + '''-all.jar ^
     --version ''' + version + ''' ^
     --accessToken 0 ^
     --gameDir run ^
@@ -469,7 +470,7 @@ tasks.register('clientDistZip', Zip) {
     
     dependsOn 'clientDist'
     
-    archiveBaseName = 'Mattcraft-Client'
+    archiveBaseName = 'MattMC-Client'
     
     from "${buildDir}/client-dist"
     

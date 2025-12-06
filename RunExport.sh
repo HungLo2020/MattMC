@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# RunExport.sh - Build and export Mattcraft client distribution
+# RunExport.sh - Build and export MattMC client distribution
 # Builds the project, creates a runnable distribution, zips it,
 # copies to Downloads folder, and extracts it
 
@@ -9,10 +9,10 @@ set -e
 # Downloads directory - defaults to matt's home on Kubuntu
 # Override with: DOWNLOADS_DIR=/path/to/dir ./RunExport.sh
 DOWNLOADS_DIR="${DOWNLOADS_DIR:-/home/matt/Downloads}"
-PROJECT_NAME="Mattcraft"
+PROJECT_NAME="MattMC"
 
 echo "========================================="
-echo "  Mattcraft Client Export Script"
+echo "  MattMC Client Export Script"
 echo "========================================="
 echo ""
 
@@ -21,11 +21,11 @@ echo "[1/5] Building client distribution..."
 ./gradlew clientDistZip --no-daemon
 
 # Get the built zip file
-ZIP_FILE="build/distributions/Mattcraft-Client-$(./gradlew properties -q | grep '^version:' | awk '{print $2}').zip"
+ZIP_FILE="build/distributions/MattMC-Client-$(./gradlew properties -q | grep '^version:' | awk '{print $2}').zip"
 
 # Fallback: find the zip if version detection fails
 if [ ! -f "$ZIP_FILE" ]; then
-    ZIP_FILE=$(find build/distributions -name "Mattcraft-Client-*.zip" -type f | head -n 1)
+    ZIP_FILE=$(find build/distributions -name "MattMC-Client-*.zip" -type f | head -n 1)
 fi
 
 if [ ! -f "$ZIP_FILE" ]; then
@@ -67,5 +67,5 @@ echo "  $DOWNLOADS_DIR/$PROJECT_NAME"
 echo ""
 echo "To run the game:"
 echo "  cd $DOWNLOADS_DIR/$PROJECT_NAME"
-echo "  ./run-mattcraft.sh"
+echo "  ./run-mattmc.sh"
 echo ""
