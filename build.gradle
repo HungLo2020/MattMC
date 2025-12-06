@@ -240,15 +240,9 @@ def configureBundledJdk(JavaExec task) {
     def bundledJdkDir = file('run/jdk-21')
     def bundledJavaExe = new File(bundledJdkDir, 'bin/java')
     
-    // Configure javaLauncher during configuration phase
-    // Use a provider to check at execution time if bundled JDK exists
-    task.javaLauncher.set(provider {
-        // Return null to disable toolchain if bundled JDK exists, otherwise use default
-        if (bundledJavaExe.exists()) {
-            return null
-        }
-        return task.javaLauncher.getOrNull()
-    })
+    // Disable toolchain launcher by setting javaLauncher to an empty provider
+    // This allows us to use a custom executable without toolchain conflicts
+    task.javaLauncher.set(provider { null })
     
     // Set executable in doFirst to use bundled JDK
     task.doFirst {
