@@ -26,6 +26,3 @@ Thumbs.db
 
 # JDK (too large to commit)
 libraries/jdk-21/
-
-# Bundled dependencies (downloaded by script, too large to commit)
-libraries/deps/
