@@ -12,6 +12,7 @@ import net.minecraft.world.entity.npc.Villager;
 import net.minecraft.world.entity.npc.VillagerProfession;
 
 public class PoiCompetitorScan {
+	@SuppressWarnings("unchecked")
 	public static BehaviorControl<Villager> create() {
 		return BehaviorBuilder.create(
 			instance -> instance.group(instance.present(MemoryModuleType.JOB_SITE), instance.present(MemoryModuleType.NEAREST_LIVING_ENTITIES))
@@ -22,7 +23,7 @@ public class PoiCompetitorScan {
 						serverLevel.getPoiManager()
 							.getType(globalPos.pos())
 							.ifPresent(
-								holder -> instance.<List<LivingEntity>>get(memoryAccessor2)
+								holder -> ((List<LivingEntity>)instance.get(memoryAccessor2))
 									.stream()
 									.filter(livingEntity -> livingEntity instanceof Villager && livingEntity != villager)
 									.map(livingEntity -> (Villager)livingEntity)

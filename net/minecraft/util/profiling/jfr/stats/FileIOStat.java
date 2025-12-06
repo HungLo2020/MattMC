@@ -22,8 +22,8 @@ public record FileIOStat(Duration duration, @Nullable String path, long bytes) {
 					.collect(Collectors.groupingBy(fileIOStat -> fileIOStat.path, Collectors.summingLong(fileIOStat -> fileIOStat.bytes))))
 					.entrySet()
 				.stream()
-				.sorted(Entry.<String, Long>comparingByValue().reversed())
-				.map((Entry<String, Long> entry) -> Pair.of(entry.getKey(), entry.getValue()))
+				.sorted(java.util.Map.Entry.<String, Long>comparingByValue().reversed())
+				.map(entry -> Pair.of(entry.getKey(), entry.getValue()))
 				.limit(10L)
 				.toList()
 		);
