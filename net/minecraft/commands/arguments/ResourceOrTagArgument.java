@@ -142,7 +142,11 @@ public class ResourceOrTagArgument<T> implements ArgumentType<ResourceOrTagArgum
 
 		@Override
 		public <E> Optional<ResourceOrTagArgument.Result<E>> cast(ResourceKey<? extends Registry<E>> resourceKey) {
-			return this.value.key().isFor(resourceKey) ? Optional.of(this) : Optional.empty();
+			@SuppressWarnings("unchecked")
+			Optional<ResourceOrTagArgument.Result<E>> result = this.value.key().isFor(resourceKey) 
+				? Optional.of((ResourceOrTagArgument.Result<E>)this) 
+				: Optional.empty();
+			return result;
 		}
 
 		public boolean test(Holder<T> holder) {
@@ -171,7 +175,11 @@ public class ResourceOrTagArgument<T> implements ArgumentType<ResourceOrTagArgum
 
 		@Override
 		public <E> Optional<ResourceOrTagArgument.Result<E>> cast(ResourceKey<? extends Registry<E>> resourceKey) {
-			return this.tag.key().isFor(resourceKey) ? Optional.of(this) : Optional.empty();
+			@SuppressWarnings("unchecked")
+			Optional<ResourceOrTagArgument.Result<E>> result = this.tag.key().isFor(resourceKey)
+				? Optional.of((ResourceOrTagArgument.Result<E>)this)
+				: Optional.empty();
+			return result;
 		}
 
 		public boolean test(Holder<T> holder) {
