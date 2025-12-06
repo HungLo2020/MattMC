@@ -982,9 +982,9 @@ public class ExecuteCommand {
 			Entity entity = commandSourceStack.getEntity();
 			return (Collection<CommandSourceStack>)(entity == null
 				? List.of()
-				: (Collection)((Optional)function.apply(entity))
-					.filter(entityx -> !entityx.isRemoved())
-					.map(entityx -> List.of(commandSourceStack.withEntity(entityx)))
+				: (Collection)function.apply(entity)
+					.filter((Entity entityx) -> !entityx.isRemoved())
+					.map((Entity entityx) -> List.of(commandSourceStack.withEntity(entityx)))
 					.orElse(List.of()));
 		};
 	}

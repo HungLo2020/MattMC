@@ -32,7 +32,7 @@ public class PacketReport implements DataProvider {
 
 	private JsonElement serializePackets() {
 		JsonObject jsonObject = new JsonObject();
-		((Map)Stream.of(
+			Stream.of(
 					HandshakeProtocols.SERVERBOUND_TEMPLATE,
 					StatusProtocols.CLIENTBOUND_TEMPLATE,
 					StatusProtocols.SERVERBOUND_TEMPLATE,
@@ -44,11 +44,11 @@ public class PacketReport implements DataProvider {
 					GameProtocols.SERVERBOUND_TEMPLATE
 				)
 				.map(ProtocolInfo.DetailsProvider::details)
-				.collect(Collectors.groupingBy(ProtocolInfo.Details::id)))
+				.collect(Collectors.groupingBy(ProtocolInfo.Details::id))
 			.forEach((connectionProtocol, list) -> {
 				JsonObject jsonObject2 = new JsonObject();
 				jsonObject.add(connectionProtocol.id(), jsonObject2);
-				list.forEach(details -> {
+				((List<ProtocolInfo.Details>)list).forEach(details -> {
 					JsonObject jsonObject2x = new JsonObject();
 					jsonObject2.add(details.flow().id(), jsonObject2x);
 					details.listPackets((packetType, i) -> {

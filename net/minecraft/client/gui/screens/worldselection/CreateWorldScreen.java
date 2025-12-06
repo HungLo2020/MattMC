@@ -182,7 +182,7 @@ public class CreateWorldScreen extends Screen {
 			? new WorldDataConfiguration(new DataPackConfig(List.of("vanilla", "tests"), List.of()), FeatureFlags.DEFAULT_FLAGS)
 			: WorldDataConfiguration.DEFAULT;
 		InitConfig initConfig = createDefaultLoadConfig(packRepository, worldDataConfiguration);
-		CompletableFuture<WorldCreationContext> completableFuture = WorldLoader.<DataLoadOutput<DataPackReloadCookie>, WorldCreationContext>load(
+		CompletableFuture<WorldCreationContext> completableFuture = WorldLoader.<DataPackReloadCookie, WorldCreationContext>load(
 			initConfig,
 			dataLoadContext -> new DataLoadOutput<>(
 				new DataPackReloadCookie((WorldGenSettings)function.apply(dataLoadContext), dataLoadContext.dataConfiguration()), dataLoadContext.datapackDimensions()
@@ -449,7 +449,7 @@ public class CreateWorldScreen extends Screen {
 	private void applyNewPackConfig(PackRepository packRepository, WorldDataConfiguration worldDataConfiguration, Consumer<WorldDataConfiguration> consumer) {
 		this.minecraft.setScreenAndShow(new GenericMessageScreen(Component.translatable("dataPack.validation.working")));
 		InitConfig initConfig = createDefaultLoadConfig(packRepository, worldDataConfiguration);
-		WorldLoader.<DataLoadOutput<DataPackReloadCookie>, WorldCreationContext>load(
+		WorldLoader.<DataPackReloadCookie, WorldCreationContext>load(
 				initConfig,
 				dataLoadContext -> {
 					if (dataLoadContext.datapackWorldgen().lookupOrThrow(Registries.WORLD_PRESET).listElements().findAny().isEmpty()) {

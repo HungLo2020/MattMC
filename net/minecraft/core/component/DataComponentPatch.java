@@ -40,6 +40,7 @@ public final class DataComponentPatch {
 				return new DataComponentPatch(reference2ObjectMap);
 			}
 		}, (DataComponentPatch dataComponentPatch) -> {
+			@SuppressWarnings("unchecked")
 			Map<DataComponentPatch.PatchKey, Object> reference2ObjectMap = new Reference2ObjectArrayMap<>(dataComponentPatch.map.size());
 
 			for (Entry<DataComponentType<?>, Optional<?>> entry : Reference2ObjectMaps.fastIterable(dataComponentPatch.map)) {
@@ -54,7 +55,7 @@ public final class DataComponentPatch {
 				}
 			}
 
-			return reference2ObjectMap;
+			return (Map)reference2ObjectMap;
 		});
 	public static final StreamCodec<RegistryFriendlyByteBuf, DataComponentPatch> STREAM_CODEC = createStreamCodec(new DataComponentPatch.CodecGetter() {
 		@Override
