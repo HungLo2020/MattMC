@@ -419,7 +419,7 @@ public class EntitySelectorOptions {
 							stringReader.expect('=');
 							stringReader.skipWhitespace();
 							boolean bl = stringReader.readBoolean();
-							map2.put(string, (Predicate)criterionProgress -> criterionProgress.isDone() == bl);
+							map2.put(string, (Predicate<CriterionProgress>)(criterionProgress -> criterionProgress.isDone() == bl));
 							stringReader.skipWhitespace();
 							if (stringReader.canRead() && stringReader.peek() == ',') {
 								stringReader.skip();
@@ -429,7 +429,7 @@ public class EntitySelectorOptions {
 						stringReader.skipWhitespace();
 						stringReader.expect('}');
 						stringReader.skipWhitespace();
-						map.put(resourceLocation, (Predicate)advancementProgress -> {
+						map.put(resourceLocation, (Predicate<AdvancementProgress>)(advancementProgress -> {
 							for (Entry<String, Predicate<CriterionProgress>> entry : map2.entrySet()) {
 								CriterionProgress criterionProgress = advancementProgress.getCriterion((String)entry.getKey());
 								if (criterionProgress == null || !((Predicate)entry.getValue()).test(criterionProgress)) {
@@ -438,10 +438,10 @@ public class EntitySelectorOptions {
 							}
 
 							return true;
-						});
+						}));
 					} else {
 						boolean bl2 = stringReader.readBoolean();
-						map.put(resourceLocation, (Predicate)advancementProgress -> advancementProgress.isDone() == bl2);
+						map.put(resourceLocation, (Predicate<AdvancementProgress>)(advancementProgress -> advancementProgress.isDone() == bl2));
 					}
 
 					stringReader.skipWhitespace();
