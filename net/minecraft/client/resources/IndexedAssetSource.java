@@ -40,8 +40,20 @@ public class IndexedAssetSource {
 						JsonObject jsonObject3 = (JsonObject)entry.getValue();
 						String string2 = (String)entry.getKey();
 						List<String> list = PATH_SPLITTER.splitToList(string2);
-						String string3 = GsonHelper.getAsString(jsonObject3, "hash");
-						Path path4 = path2.resolve(string3.substring(0, 2) + "/" + string3);
+						
+						// Check if there's a 'path' field for direct file access (new format)
+						String customPath = GsonHelper.getAsString(jsonObject3, "path", null);
+						Path path4;
+						
+						if (customPath != null) {
+							// Use the direct path if available (supports proper file names)
+							path4 = path.resolve(customPath);
+						} else {
+							// Fall back to hash-based path for backward compatibility
+							String string3 = GsonHelper.getAsString(jsonObject3, "hash");
+							path4 = path2.resolve(string3.substring(0, 2) + "/" + string3);
+						}
+						
 						builder.put(list, path4);
 					}
 				}
