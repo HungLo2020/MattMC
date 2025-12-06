@@ -287,13 +287,23 @@ tasks.register('runClient', JavaExec) {
         '--version', '1.21.10',
         '--accessToken', '0',
         '--gameDir', file('run').absolutePath,
-        '--assetsDir', file('run/assets').absolutePath
+        '--assetsDir', file('run/assets').absolutePath,
+        '--assetIndex', '27'
     ]
     
     doFirst {
         workingDir.mkdirs()
         file('run/assets').mkdirs()
         file('run/resourcepacks').mkdirs()
+        
+        // Copy assets from libraries/assets to run/assets for dev environment
+        def librariesAssetsDir = file('libraries/assets')
+        if (librariesAssetsDir.exists() && librariesAssetsDir.isDirectory()) {
+            copy {
+                from librariesAssetsDir
+                into file('run/assets')
+            }
+        }
     }
     
     standardInput = System.in
@@ -418,16 +428,16 @@ tasks.register('clientDist') {
             into "${distDir}/resources"
         }
         
-        // Copy assets from project assets directory if it exists
-        // This is where Minecraft assets (sounds, textures, etc.) should be placed
-        // Assets should be in the standard Minecraft structure: assets/indexes/, assets/objects/
-        def projectAssetsDir = file('assets')
-        if (projectAssetsDir.exists() && projectAssetsDir.isDirectory()) {
+        // Copy assets from libraries/assets directory
+        // This is where Minecraft assets (sounds, textures, etc.) are stored
+        // Assets should be in the standard Minecraft structure: indexes/, objects/
+        def librariesAssetsDir = file('libraries/assets')
+        if (librariesAssetsDir.exists() && librariesAssetsDir.isDirectory()) {
             copy {
-                from projectAssetsDir
+                from librariesAssetsDir
                 into "${distDir}/run/assets"
             }
-            println "Copied assets from ${projectAssetsDir.absolutePath}"
+            println "Copied assets from ${librariesAssetsDir.absolutePath}"
         }
         
         // Build classpath string for launch scripts
@@ -435,10 +445,8 @@ tasks.register('clientDist') {
         def classpathLinux = "lib/${jarName}:lib/" + configurations.runtimeClasspath.files.collect { it.name }.join(':lib/')
         def classpathWindows = "lib\\${jarName};lib\\" + configurations.runtimeClasspath.files.collect { it.name }.join(';lib\\')
         
-        // Asset index is typically the major.minor version (e.g., "1.21" for 1.21.10)
-        // This should match the index file in assets/indexes/<assetIndex>.json
-        def versionParts = version.split('\\.')
-        def assetIndex = versionParts.length >= 2 ? "${versionParts[0]}.${versionParts[1]}" : version
+        // Asset index - this should match the index file in assets/indexes/<assetIndex>.json
+        def assetIndex = '27'
         
         // Copy and process launch scripts from libraries directory
         // Linux script
