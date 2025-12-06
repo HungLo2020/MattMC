@@ -24,33 +24,57 @@ java {
     }
 }
 
+// Check if bundled dependencies are available
+def bundledDepsDir = file('libraries/deps')
+def useBundledDeps = bundledDepsDir.exists() && bundledDepsDir.isDirectory()
+
+if (useBundledDeps) {
+    println "✓ Using bundled dependencies from libraries/deps/"
+    println "  Run './libraries/download-dependencies.sh' to update bundled dependencies"
+}
+
 repositories {
+    // Always include Maven Central (for most dependencies)
     mavenCentral()
-    // Minecraft libraries (primary source for Mojang dependencies)
-    maven { 
-        url 'https://libraries.minecraft.net'
-        content {
-            includeGroup 'com.mojang'
+    
+    // Only add remote repositories if bundled dependencies are NOT available
+    if (!useBundledDeps) {
+        println "⚠ Bundled dependencies not found. Using remote repositories."
+        println "  Run './libraries/download-dependencies.sh' to download dependencies for offline builds."
+        
+        // Minecraft libraries (primary source for Mojang dependencies)
+        maven { 
+            url 'https://libraries.minecraft.net'
+            content {
+                includeGroup 'com.mojang'
+            }
+        }
+        // JitPack for open-source Mojang libraries
+        maven { 
+            url 'https://jitpack.io'
+            content {
+                includeGroup 'com.github.Mojang'
+            }
+        }
+        // Forge mirrors for Mojang libraries
+        maven { 
+            url 'https://maven.minecraftforge.net/'
+            content {
+                includeGroup 'com.mojang'
+                includeGroup 'net.minecraftforge'
+            }
+        }
+        // Fabric Maven for Fabric API
+        maven {
+            url 'https://maven.fabricmc.net/'
         }
     }
-    // JitPack for open-source Mojang libraries
-    maven { 
-        url 'https://jitpack.io'
-        content {
-            includeGroup 'com.github.Mojang'
+    
+    // Add bundled dependencies as a flat directory repository
+    if (useBundledDeps) {
+        flatDir {
+            dirs bundledDepsDir
         }
-    }
-    // Forge mirrors for Mojang libraries
-    maven { 
-        url 'https://maven.minecraftforge.net/'
-        content {
-            includeGroup 'com.mojang'
-            includeGroup 'net.minecraftforge'
-        }
-    }
-    // Fabric Maven for Fabric API
-    maven {
-        url 'https://maven.fabricmc.net/'
     }
 }
 
@@ -71,15 +95,28 @@ configurations.all {
 
 // Minecraft 1.21.10 dependencies
 dependencies {
-    // Mojang libraries
-    implementation 'com.mojang:brigadier:1.3.10'
-    implementation 'com.mojang:datafixerupper:8.0.16'
-    implementation 'com.mojang:authlib:6.0.55'
-    implementation 'com.mojang:logging:1.2.7'
-    implementation 'com.mojang:jtracy:1.0.29'
-    implementation 'com.mojang:blocklist:1.0.10'
-    implementation 'com.mojang:patchy:2.2.10'
-    implementation 'com.mojang:text2speech:1.17.9'
+    // Mojang libraries - use bundled JARs if available, otherwise use Maven coordinates
+    if (useBundledDeps) {
+        // Bundled Mojang libraries from libraries/deps/
+        implementation files('libraries/deps/brigadier-1.3.10.jar')
+        implementation files('libraries/deps/datafixerupper-8.0.16.jar')
+        implementation files('libraries/deps/authlib-6.0.55.jar')
+        implementation files('libraries/deps/logging-1.2.7.jar')
+        implementation files('libraries/deps/jtracy-1.0.29.jar')
+        implementation files('libraries/deps/blocklist-1.0.10.jar')
+        implementation files('libraries/deps/patchy-2.2.10.jar')
+        implementation files('libraries/deps/text2speech-1.17.9.jar')
+    } else {
+        // Remote Mojang libraries
+        implementation 'com.mojang:brigadier:1.3.10'
+        implementation 'com.mojang:datafixerupper:8.0.16'
+        implementation 'com.mojang:authlib:6.0.55'
+        implementation 'com.mojang:logging:1.2.7'
+        implementation 'com.mojang:jtracy:1.0.29'
+        implementation 'com.mojang:blocklist:1.0.10'
+        implementation 'com.mojang:patchy:2.2.10'
+        implementation 'com.mojang:text2speech:1.17.9'
+    }
     
     // Google libraries
     implementation 'com.google.guava:guava:32.1.2-jre'
@@ -160,7 +197,23 @@ dependencies {
     runtimeOnly "org.lwjgl:lwjgl-jemalloc::${lwjglNatives}"
     
     // Fabric Loader (for annotations like @Environment and @EnvType)
-    implementation 'net.fabricmc:fabric-loader:0.16.9'
+    if (useBundledDeps) {
+        // Bundled Fabric loader and its transitive dependencies
+        implementation files('libraries/deps/fabric-loader-0.16.9.jar')
+        implementation files('libraries/deps/tiny-mappings-parser-0.3.0+build.17.jar')
+        implementation files('libraries/deps/sponge-mixin-0.15.3+mixin.0.8.7.jar')
+        implementation files('libraries/deps/tiny-remapper-0.10.3.jar')
+        implementation files('libraries/deps/access-widener-2.1.0.jar')
+        implementation files('libraries/deps/mapping-io-0.6.1.jar')
+        // ASM dependencies (needed by Fabric/Mixin)
+        implementation files('libraries/deps/asm-9.7.1.jar')
+        implementation files('libraries/deps/asm-analysis-9.7.1.jar')
+        implementation files('libraries/deps/asm-commons-9.7.1.jar')
+        implementation files('libraries/deps/asm-tree-9.7.1.jar')
+        implementation files('libraries/deps/asm-util-9.7.1.jar')
+    } else {
+        implementation 'net.fabricmc:fabric-loader:0.16.9'
+    }
     
     // Note: Fabric API stub interfaces are included in the source tree under net/fabricmc/fabric/api/
     // These are empty interfaces that satisfy the compilation requirements
