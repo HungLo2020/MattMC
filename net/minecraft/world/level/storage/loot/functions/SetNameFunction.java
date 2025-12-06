@@ -56,8 +56,9 @@ public class SetNameFunction extends LootItemConditionalFunction {
 	}
 
 	@Override
+	@SuppressWarnings("unchecked")
 	public Set<ContextKey<?>> getReferencedContextParams() {
-		return (Set<ContextKey<?>>)this.resolutionContext.map(entityTarget -> Set.of(entityTarget.getParam())).orElse(Set.of());
+		return this.resolutionContext.map(entityTarget -> (Set<ContextKey<?>>)Set.<ContextKey<?>>of(entityTarget.getParam())).orElse(Set.of());
 	}
 
 	public static UnaryOperator<Component> createResolver(LootContext lootContext, @Nullable LootContext.EntityTarget entityTarget) {

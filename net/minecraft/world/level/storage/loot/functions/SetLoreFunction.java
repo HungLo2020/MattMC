@@ -46,8 +46,9 @@ public class SetLoreFunction extends LootItemConditionalFunction {
 	}
 
 	@Override
+	@SuppressWarnings("unchecked")
 	public Set<ContextKey<?>> getReferencedContextParams() {
-		return (Set<ContextKey<?>>)this.resolutionContext.map(entityTarget -> Set.of(entityTarget.getParam())).orElseGet(Set::of);
+		return this.resolutionContext.map(entityTarget -> (Set<ContextKey<?>>)Set.<ContextKey<?>>of(entityTarget.getParam())).orElseGet(Set::of);
 	}
 
 	@Override

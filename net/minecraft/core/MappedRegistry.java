@@ -90,9 +90,9 @@ public class MappedRegistry<T> implements WritableRegistry<T> {
 		Objects.requireNonNull(resourceKey);
 		Objects.requireNonNull(object);
 		if (this.byLocation.containsKey(resourceKey.location())) {
-			throw (IllegalStateException)Util.pauseInIde((T)(new IllegalStateException("Adding duplicate key '" + resourceKey + "' to registry")));
+			throw Util.pauseInIde(new IllegalStateException("Adding duplicate key '" + resourceKey + "' to registry"));
 		} else if (this.byValue.containsKey(object)) {
-			throw (IllegalStateException)Util.pauseInIde((T)(new IllegalStateException("Adding duplicate value '" + object + "' to registry")));
+			throw Util.pauseInIde(new IllegalStateException("Adding duplicate value '" + object + "' to registry"));
 		} else {
 			Holder.Reference<T> reference;
 			if (this.unregisteredIntrusiveHolders != null) {

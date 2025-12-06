@@ -19,7 +19,7 @@ import net.minecraft.world.level.storage.loot.predicates.LootItemCondition;
 public class SetContainerLootTable extends LootItemConditionalFunction {
 	public static final MapCodec<SetContainerLootTable> CODEC = RecordCodecBuilder.mapCodec(
 		instance -> commonFields(instance)
-			.<ResourceKey<LootTable>, long, Holder<BlockEntityType<?>>>and(
+			.<ResourceKey<LootTable>, Long, Holder<BlockEntityType<?>>>and(
 				instance.group(
 					LootTable.KEY_CODEC.fieldOf("name").forGetter(setContainerLootTable -> setContainerLootTable.name),
 					Codec.LONG.optionalFieldOf("seed", 0L).forGetter(setContainerLootTable -> setContainerLootTable.seed),

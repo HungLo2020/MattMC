@@ -77,10 +77,10 @@ public class ChunkBedBlockEntityInjecterFix extends DataFix {
 							.forEachOrdered(
 								map -> {
 									if (map != null) {
-										list.add(
-											((Pair)type2.read(dynamic2.createMap(map)).result().orElseThrow(() -> new IllegalStateException("Could not parse newly created bed block entity.")))
-												.getFirst()
-										);
+										@SuppressWarnings("unchecked")
+										Object first = ((Pair<Object, Object>)type2.read(dynamic2.createMap(map)).result().orElseThrow(() -> new IllegalStateException("Could not parse newly created bed block entity.")))
+											.getFirst();
+										list.add(first);
 									}
 								}
 							);

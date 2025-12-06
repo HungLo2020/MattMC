@@ -32,9 +32,9 @@ public class EntitySpawnerItemVariantComponentFix extends DataFix {
 				String string = (String)typed.getOptional(opticFinder).map(Pair::getSecond).orElse("");
 
 				return switch (string) {
-					case "minecraft:salmon_bucket" -> typed.updateTyped(opticFinder2, EntitySpawnerItemVariantComponentFix::fixSalmonBucket);
-					case "minecraft:axolotl_bucket" -> typed.updateTyped(opticFinder2, EntitySpawnerItemVariantComponentFix::fixAxolotlBucket);
-					case "minecraft:tropical_fish_bucket" -> typed.updateTyped(opticFinder2, EntitySpawnerItemVariantComponentFix::fixTropicalFishBucket);
+					case "minecraft:salmon_bucket" -> typed.updateTyped(opticFinder2, typedx -> EntitySpawnerItemVariantComponentFix.fixSalmonBucket(typedx));
+					case "minecraft:axolotl_bucket" -> typed.updateTyped(opticFinder2, typedx -> EntitySpawnerItemVariantComponentFix.fixAxolotlBucket(typedx));
+					case "minecraft:tropical_fish_bucket" -> typed.updateTyped(opticFinder2, typedx -> EntitySpawnerItemVariantComponentFix.fixTropicalFishBucket(typedx));
 					case "minecraft:painting" -> typed.updateTyped(
 						opticFinder2, typedx -> Util.writeAndReadTypedOrThrow(typedx, typedx.getType(), EntitySpawnerItemVariantComponentFix::fixPainting)
 					);

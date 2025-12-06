@@ -90,8 +90,9 @@ public class EntityDataSerializers {
 		BlockPos.STREAM_CODEC.apply(ByteBufCodecs::optional)
 	);
 	public static final EntityDataSerializer<Direction> DIRECTION = EntityDataSerializer.forValueType(Direction.STREAM_CODEC);
+	@SuppressWarnings("unchecked")
 	public static final EntityDataSerializer<Optional<EntityReference<LivingEntity>>> OPTIONAL_LIVING_ENTITY_REFERENCE = EntityDataSerializer.forValueType(
-		EntityReference.streamCodec().apply(ByteBufCodecs::optional)
+		(StreamCodec<RegistryFriendlyByteBuf, Optional<EntityReference<LivingEntity>>>)(StreamCodec)EntityReference.<LivingEntity>streamCodec().apply(ByteBufCodecs::optional)
 	);
 	public static final EntityDataSerializer<Optional<GlobalPos>> OPTIONAL_GLOBAL_POS = EntityDataSerializer.forValueType(
 		GlobalPos.STREAM_CODEC.apply(ByteBufCodecs::optional)

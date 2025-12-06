@@ -86,13 +86,13 @@ public class EquipmentFormatFix extends DataFix {
 						Either<ItemStackOld, Unit> either7 = getItemFromList(0, list2, predicate);
 						Either<ItemStackOld, Unit> either8 = getItemFromList(1, list2, predicate);
 						return areAllEmpty(either, either2, either3, either4, either5, either6, either7, either8)
-							? Pair.of(string, Either.right(Unit.INSTANCE))
+							? Pair.of(string, Either.<Pair<Either<ItemStackNew, Unit>, Pair<Either<ItemStackNew, Unit>, Pair<Either<ItemStackNew, Unit>, Pair<Either<ItemStackNew, Unit>, Pair<Either<ItemStackNew, Unit>, Pair<Either<ItemStackNew, Unit>, Pair<Either<ItemStackNew, Unit>, Pair<Either<ItemStackNew, Unit>, Dynamic<?>>>>>>>>>, Unit>right(Unit.INSTANCE))
 							: Pair.of(
 								string,
-								Either.left(
+								Either.<Pair<Either<ItemStackNew, Unit>, Pair<Either<ItemStackNew, Unit>, Pair<Either<ItemStackNew, Unit>, Pair<Either<ItemStackNew, Unit>, Pair<Either<ItemStackNew, Unit>, Pair<Either<ItemStackNew, Unit>, Pair<Either<ItemStackNew, Unit>, Pair<Either<ItemStackNew, Unit>, Dynamic<?>>>>>>>>>, Unit>left(
 									Pair.of(
-										either7,
-										Pair.of(either8, Pair.of(either3, Pair.of(either4, Pair.of(either5, Pair.of(either6, Pair.of(either, Pair.of(either2, new Dynamic(dynamicOps))))))))
+										(Either<ItemStackNew, Unit>)(Either<?, Unit>)either7,
+										Pair.of((Either<ItemStackNew, Unit>)(Either<?, Unit>)either8, Pair.of((Either<ItemStackNew, Unit>)(Either<?, Unit>)either3, Pair.of((Either<ItemStackNew, Unit>)(Either<?, Unit>)either4, Pair.of((Either<ItemStackNew, Unit>)(Either<?, Unit>)either5, Pair.of((Either<ItemStackNew, Unit>)(Either<?, Unit>)either6, Pair.of((Either<ItemStackNew, Unit>)(Either<?, Unit>)either, Pair.of((Either<ItemStackNew, Unit>)(Either<?, Unit>)either2, new Dynamic<>(dynamicOps))))))))
 									)
 								)
 							);

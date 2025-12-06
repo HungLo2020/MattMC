@@ -170,14 +170,14 @@ public class PiglinAi {
 		brain.addActivityAndRemoveMemoryWhenStopped(
 			Activity.FIGHT,
 			10,
-			ImmutableList.of(
+			ImmutableList.<BehaviorControl<? super Piglin>>of(
 				StopAttackingIfTargetInvalid.create((serverLevel, livingEntity) -> !isNearestValidAttackTarget(serverLevel, piglin, livingEntity)),
 				BehaviorBuilder.triggerIf(PiglinAi::hasCrossbow, BackUpIfTooClose.create(5, 0.75F)),
 				SetWalkTargetFromAttackTargetIfTargetOutOfReach.create(1.0F),
 				MeleeAttack.create(20),
 				new CrossbowAttack(),
 				RememberIfHoglinWasKilled.create(),
-				EraseMemoryIf.create(PiglinAi::isNearZombified, MemoryModuleType.ATTACK_TARGET)
+				EraseMemoryIf.<Piglin>create(PiglinAi::isNearZombified, MemoryModuleType.ATTACK_TARGET)
 			),
 			MemoryModuleType.ATTACK_TARGET
 		);
@@ -242,7 +242,7 @@ public class PiglinAi {
 					TriggerGate.triggerOneShuffled(
 						ImmutableList.<Pair<? extends Trigger<? super LivingEntity>, Integer>>builder()
 							.addAll(createLookBehaviors())
-							.add(Pair.of(BehaviorBuilder.<Piglin>triggerIf(piglin -> true), 1))
+							.add(Pair.<Trigger<? super LivingEntity>, Integer>of(BehaviorBuilder.<LivingEntity>triggerIf(entity -> true), 1))
 							.build()
 					)
 				),
