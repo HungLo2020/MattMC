@@ -6,6 +6,7 @@ import io.netty.handler.codec.MessageToByteEncoder;
 import java.util.zip.Deflater;
 
 public class CompressionEncoder extends MessageToByteEncoder<ByteBuf> {
+	public static final int MAXIMUM_UNCOMPRESSED_LENGTH = 8388608;
 	private final byte[] encodeBuf = new byte[8192];
 	private final Deflater deflater;
 	private int threshold;
@@ -17,8 +18,8 @@ public class CompressionEncoder extends MessageToByteEncoder<ByteBuf> {
 
 	protected void encode(ChannelHandlerContext channelHandlerContext, ByteBuf byteBuf, ByteBuf byteBuf2) {
 		int i = byteBuf.readableBytes();
-		if (i > 8388608) {
-			throw new IllegalArgumentException("Packet too big (is " + i + ", should be less than 8388608)");
+		if (i > MAXIMUM_UNCOMPRESSED_LENGTH) {
+			throw new IllegalArgumentException("Packet too big (is " + i + ", should be less than " + MAXIMUM_UNCOMPRESSED_LENGTH + ")");
 		} else {
 			if (i < this.threshold) {
 				VarInt.write(byteBuf2, 0);

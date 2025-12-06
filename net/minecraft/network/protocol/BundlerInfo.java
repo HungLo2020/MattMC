@@ -8,7 +8,7 @@ import net.minecraft.network.PacketListener;
 import org.jetbrains.annotations.Nullable;
 
 public interface BundlerInfo {
-	int BUNDLE_SIZE_LIMIT = 4096;
+	int MAX_BUNDLE_PACKET_COUNT = 4096;
 
 	static <T extends PacketListener, P extends BundlePacket<? super T>> BundlerInfo createForPacket(
 		PacketType<P> packetType, Function<Iterable<Packet<? super T>>, P> function, BundleDelimiterPacket<? super T> bundleDelimiterPacket
@@ -37,7 +37,7 @@ public interface BundlerInfo {
 					public Packet<?> addPacket(Packet<?> packet) {
 						if (packet == bundleDelimiterPacket) {
 							return (Packet<?>)function.apply(this.bundlePackets);
-						} else if (this.bundlePackets.size() >= 4096) {
+						} else if (this.bundlePackets.size() >= MAX_BUNDLE_PACKET_COUNT) {
 							throw new IllegalStateException("Too many packets in a bundle");
 						} else {
 							this.bundlePackets.add((Packet<? super T>)packet);
