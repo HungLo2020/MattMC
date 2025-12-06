@@ -1,14 +1,17 @@
 matt@HungLoDE:~/Documents/Repos/Mattcraft$ ./gradlew build
 Path for java installation '/usr/lib/jvm/openjdk-17' (Common Linux Locations) does not contain a java executable
 Path for java installation '/usr/lib/jvm/openjdk-21' (Common Linux Locations) does not contain a java executable
-/home/matt/Documents/Repos/Mattcraft/net/minecraft/data/info/RegistryDumpReport.java:41: error: incompatible types: Registry<CAP#1> cannot be converted to CAP#2
-                int i = builtinRegistry.getId((Registry<?>)registry);
-                                              ^
-  where CAP#1,CAP#2 are fresh type-variables:
-    CAP#1 extends Object from capture of ?
-    CAP#2 extends Registry<?> from capture of ? extends Registry<?>
+/home/matt/Documents/Repos/Mattcraft/net/minecraft/world/level/levelgen/placement/NoiseBasedCountPlacement.java:35: warning: [removal] BIOME_INFO_NOISE in Biome has been deprecated and marked for removal
+                double d = Biome.BIOME_INFO_NOISE.getValue(blockPos.getX() / this.noiseFactor, blockPos.getZ() / this.noiseFactor, false);
+                                ^
+/home/matt/Documents/Repos/Mattcraft/net/minecraft/world/level/levelgen/placement/NoiseThresholdCountPlacement.java:35: warning: [removal] BIOME_INFO_NOISE in Biome has been deprecated and marked for removal
+                double d = Biome.BIOME_INFO_NOISE.getValue(blockPos.getX() / 200.0, blockPos.getZ() / 200.0, false);
+                                ^
+/home/matt/Documents/Repos/Mattcraft/net/minecraft/world/level/block/entity/TheEndGatewayBlockEntity.java:228: warning: [removal] getHighestSectionPosition() in ChunkAccess has been deprecated and marked for removal
+                int i = levelChunk.getHighestSectionPosition() + 16 - 1;
+                                  ^
 /home/matt/Documents/Repos/Mattcraft/net/minecraft/client/renderer/item/properties/select/ComponentContents.java:32: error: cannot infer type arguments for UnbakedSwitch<>
-                                .xmap(list -> new SelectItemModel.UnbakedSwitch<>(new ComponentContents<>(dataComponentType), list), SelectItemModel.UnbakedSwitch::cases)
+                                .xmap(list -> new SelectItemModel.UnbakedSwitch<>(new ComponentContents<>(dataComponentType), list), (SelectItemModel.UnbakedSwitch s) -> s.cases())
                                               ^
   reason: inference variable T has incompatible equality constraints CAP#1,CAP#2
   where T is a type-variable:
@@ -16,156 +19,13 @@ Path for java installation '/usr/lib/jvm/openjdk-21' (Common Linux Locations) do
   where CAP#1,CAP#2 are fresh type-variables:
     CAP#1 extends Object from capture of ?
     CAP#2 extends Object from capture of ?
-/home/matt/Documents/Repos/Mattcraft/net/minecraft/client/renderer/item/properties/select/ComponentContents.java:30: error: cannot find symbol
-                        unbakedSwitch -> ((ComponentContents<?>)unbakedSwitch.property()).componentType,
-                                                                             ^
-  symbol:   method property()
-  location: variable unbakedSwitch of type Object
-/home/matt/Documents/Repos/Mattcraft/net/minecraft/client/renderer/item/properties/select/ComponentContents.java:28: error: incompatible types: cannot infer type-variable(s) E,S
-                MapCodec<SelectItemModel.UnbakedSwitch<ComponentContents<T>, T>> mapCodec = (MapCodec<SelectItemModel.UnbakedSwitch<ComponentContents<T>, T>>)(MapCodec<?>)codec.dispatchMap(
-                                                                                                                                                                                            ^
-    (argument mismatch; bad return type in lambda expression
-      DataComponentType<CAP#1> cannot be converted to CAP#2)
-  where E,A#1,S,A#2 are type-variables:
-    E extends Object declared in method <E>dispatchMap(String,Function<? super E,? extends A#1>,Function<? super A#1,? extends MapCodec<? extends E>>)
-    A#1 extends Object declared in interface Codec
-    S extends Object declared in method <S>xmap(Function<? super A#2,? extends S>,Function<? super S,? extends A#2>)
-    A#2 extends Object declared in class MapCodec
-  where CAP#1,CAP#2 are fresh type-variables:
-    CAP#1 extends Object from capture of ?
-    CAP#2 extends DataComponentType<?> from capture of ? extends DataComponentType<?>
-/home/matt/Documents/Repos/Mattcraft/net/minecraft/commands/arguments/OperationArgument.java:57: error: lambda expression not expected here
-                return (OperationArgument.Operation)(string.equals("><") ? (scoreAccess, scoreAccess2) -> {
-                                                                           ^
-/home/matt/Documents/Repos/Mattcraft/net/minecraft/server/commands/ReturnCommand.java:25: error: incompatible types: ArgumentBuilder cannot be converted to LiteralArgumentBuilder<T>
-                                .then(LiteralArgumentBuilder.<T>literal("run").forward(commandDispatcher.getRoot(), new ReturnCommand.ReturnFromCommandCustomModifier<>(), false))
-                                     ^
-  where T is a type-variable:
-    T extends ExecutionCommandSource<T> declared in method <T>register(CommandDispatcher<T>)
 /home/matt/Documents/Repos/Mattcraft/net/minecraft/server/commands/ReturnCommand.java:22: error: incompatible types: inference variable T has incompatible bounds
-                        ((LiteralArgumentBuilder)LiteralArgumentBuilder.literal("return").requires(Commands.hasPermission(2)))
-                                                                                         ^
+                LiteralArgumentBuilder<T> builder = (LiteralArgumentBuilder<T>)LiteralArgumentBuilder.literal("return").requires(Commands.hasPermission(2));
+                                                                                                                       ^
     equality constraints: Object
     upper bounds: PermissionSource
   where T is a type-variable:
     T extends PermissionSource declared in method <T>hasPermission(int)
-/home/matt/Documents/Repos/Mattcraft/net/minecraft/server/players/CachedUserNameToIdResolver.java:66: error: cannot find symbol
-                        Optional<NameAndId> optional = gameProfileRepository.findProfileByName(string).map(NameAndId::new);
-                                                                            ^
-  symbol:   method findProfileByName(String)
-  location: variable gameProfileRepository of type GameProfileRepository
-/home/matt/Documents/Repos/Mattcraft/net/minecraft/commands/synchronization/SingletonArgumentInfo.java:18: error: incompatible types: cannot infer type arguments for SingletonArgumentInfo<>
-                return new SingletonArgumentInfo<>(commandBuildContext -> (ArgumentType)supplier.get());
-                                                ^
-    reason: inference variable A has incompatible bounds
-      equality constraints: T
-      lower bounds: ArgumentType
-  where A,T are type-variables:
-    A extends ArgumentType<?> declared in class SingletonArgumentInfo
-    T extends ArgumentType<?> declared in method <T>contextFree(Supplier<T>)
-/home/matt/Documents/Repos/Mattcraft/net/minecraft/commands/synchronization/SuggestionProviders.java:45: error: incompatible types: RegisteredSuggestion cannot be converted to SuggestionProvider<S>
-                        return new SuggestionProviders.RegisteredSuggestion(resourceLocation, suggestionProvider);
-                               ^
-  where S is a type-variable:
-    S extends SharedSuggestionProvider declared in method <S>register(ResourceLocation,SuggestionProvider<SharedSuggestionProvider>)
-/home/matt/Documents/Repos/Mattcraft/net/minecraft/commands/synchronization/ArgumentTypeInfos.java:122: error: incompatible types: cannot infer type-variable(s) A,T#1,T#2
-                register(registry, "resource_or_tag", fixClassType(ResourceOrTagArgument.class), new ResourceOrTagArgument.Info());
-                        ^
-    (argument mismatch; Class<ResourceOrTagArgument> cannot be converted to Class<? extends ArgumentType<?>>)
-  where A,T#1,T#2 are type-variables:
-    A extends ArgumentType<?> declared in method <A,T#1>register(Registry<ArgumentTypeInfo<?,?>>,String,Class<? extends A>,ArgumentTypeInfo<A,T#1>)
-    T#1 extends Template<A> declared in method <A,T#1>register(Registry<ArgumentTypeInfo<?,?>>,String,Class<? extends A>,ArgumentTypeInfo<A,T#1>)
-    T#2 extends ArgumentType<?> declared in method <T#2>fixClassType(Class<? super T#2>)
-/home/matt/Documents/Repos/Mattcraft/net/minecraft/commands/synchronization/ArgumentTypeInfos.java:123: error: incompatible types: cannot infer type-variable(s) A,T#1,T#2
-                register(registry, "resource_or_tag_key", fixClassType(ResourceOrTagKeyArgument.class), new ResourceOrTagKeyArgument.Info());
-                        ^
-    (argument mismatch; Class<ResourceOrTagKeyArgument> cannot be converted to Class<? extends ArgumentType<?>>)
-  where A,T#1,T#2 are type-variables:
-    A extends ArgumentType<?> declared in method <A,T#1>register(Registry<ArgumentTypeInfo<?,?>>,String,Class<? extends A>,ArgumentTypeInfo<A,T#1>)
-    T#1 extends Template<A> declared in method <A,T#1>register(Registry<ArgumentTypeInfo<?,?>>,String,Class<? extends A>,ArgumentTypeInfo<A,T#1>)
-    T#2 extends ArgumentType<?> declared in method <T#2>fixClassType(Class<? super T#2>)
-/home/matt/Documents/Repos/Mattcraft/net/minecraft/commands/synchronization/ArgumentTypeInfos.java:124: error: incompatible types: cannot infer type-variable(s) A,T#1,T#2
-                register(registry, "resource", fixClassType(ResourceArgument.class), new ResourceArgument.Info());
-                        ^
-    (argument mismatch; Class<ResourceArgument> cannot be converted to Class<? extends ArgumentType<?>>)
-  where A,T#1,T#2 are type-variables:
-    A extends ArgumentType<?> declared in method <A,T#1>register(Registry<ArgumentTypeInfo<?,?>>,String,Class<? extends A>,ArgumentTypeInfo<A,T#1>)
-    T#1 extends Template<A> declared in method <A,T#1>register(Registry<ArgumentTypeInfo<?,?>>,String,Class<? extends A>,ArgumentTypeInfo<A,T#1>)
-    T#2 extends ArgumentType<?> declared in method <T#2>fixClassType(Class<? super T#2>)
-/home/matt/Documents/Repos/Mattcraft/net/minecraft/commands/synchronization/ArgumentTypeInfos.java:125: error: incompatible types: cannot infer type-variable(s) A,T#1,T#2
-                register(registry, "resource_key", fixClassType(ResourceKeyArgument.class), new ResourceKeyArgument.Info());
-                        ^
-    (argument mismatch; Class<ResourceKeyArgument> cannot be converted to Class<? extends ArgumentType<?>>)
-  where A,T#1,T#2 are type-variables:
-    A extends ArgumentType<?> declared in method <A,T#1>register(Registry<ArgumentTypeInfo<?,?>>,String,Class<? extends A>,ArgumentTypeInfo<A,T#1>)
-    T#1 extends Template<A> declared in method <A,T#1>register(Registry<ArgumentTypeInfo<?,?>>,String,Class<? extends A>,ArgumentTypeInfo<A,T#1>)
-    T#2 extends ArgumentType<?> declared in method <T#2>fixClassType(Class<? super T#2>)
-/home/matt/Documents/Repos/Mattcraft/net/minecraft/commands/synchronization/ArgumentTypeInfos.java:126: error: incompatible types: cannot infer type-variable(s) A,T#1,T#2
-                register(registry, "resource_selector", fixClassType(ResourceSelectorArgument.class), new ResourceSelectorArgument.Info());
-                        ^
-    (argument mismatch; Class<ResourceSelectorArgument> cannot be converted to Class<? extends ArgumentType<?>>)
-  where A,T#1,T#2 are type-variables:
-    A extends ArgumentType<?> declared in method <A,T#1>register(Registry<ArgumentTypeInfo<?,?>>,String,Class<? extends A>,ArgumentTypeInfo<A,T#1>)
-    T#1 extends Template<A> declared in method <A,T#1>register(Registry<ArgumentTypeInfo<?,?>>,String,Class<? extends A>,ArgumentTypeInfo<A,T#1>)
-    T#2 extends ArgumentType<?> declared in method <T#2>fixClassType(Class<? super T#2>)
-/home/matt/Documents/Repos/Mattcraft/net/minecraft/commands/execution/tasks/BuildContexts.java:56: error: RedirectModifier<T> cannot be safely cast to CustomModifierExecutor<T>
-                                        if (redirectModifier instanceof CustomModifierExecutor<T> customModifierExecutor) {
-                                            ^
-  where T is a type-variable:
-    T extends ExecutionCommandSource<T> declared in class BuildContexts
-/home/matt/Documents/Repos/Mattcraft/net/minecraft/commands/execution/tasks/BuildContexts.java:93: error: cannot infer type arguments for CommandQueueEntry<>
-                                executionContext.queueNext(new CommandQueueEntry<>(frame, FallthroughTask.instance()));
-                                                           ^
-  reason: inferred type does not conform to equality constraint(s)
-    inferred: T#1
-    equality constraints(s): T#1,T#2
-  where T#1,T#2 are type-variables:
-    T#1 extends ExecutionCommandSource<T#1>
-    T#2 extends ExecutionCommandSource<T#1>
-/home/matt/Documents/Repos/Mattcraft/net/minecraft/commands/execution/tasks/BuildContexts.java:97: error: Command<T> cannot be safely cast to CustomCommandExecutor<T>
-                        if (commandContext2.getCommand() instanceof CustomCommandExecutor<T> customCommandExecutor) {
-                                                      ^
-  where T is a type-variable:
-    T extends ExecutionCommandSource<T> declared in class BuildContexts
-/home/matt/Documents/Repos/Mattcraft/net/minecraft/util/EncoderCache.java:34: error: incompatible types: inference variable T#1 has incompatible bounds
-                                        .map(objectx -> objectx instanceof Tag tag ? tag.copy() : objectx);
-                                            ^
-    equality constraints: T#2
-    lower bounds: CAP#1,Tag
-  where T#1,R,T#2,A are type-variables:
-    T#1 extends Object declared in method <T#1>map(Function<? super R,? extends T#1>)
-    R extends Object declared in interface DataResult
-    T#2 extends Object declared in method <T#2>encode(A,DynamicOps<T#2>,T#2)
-    A extends Object declared in method <A>wrap(Codec<A>)
-  where CAP#1 is a fresh type-variable:
-    CAP#1 extends Object from capture of ?
-/home/matt/Documents/Repos/Mattcraft/net/minecraft/util/datafix/fixes/EntityBlockStateFix.java:328: error: incompatible types: invalid method reference
-                        int i = either.<Integer>map(pair -> ((Either)pair.getSecond()).map(integer -> integer, EntityBlockStateFix::getBlockId), unit -> {
-                                                                                                               ^
-    incompatible types: Object cannot be converted to String
-/home/matt/Documents/Repos/Mattcraft/net/minecraft/util/datafix/fixes/EntityBlockStateFix.java:344: error: incompatible types: invalid method reference
-                        int i = ((Either)pair.getSecond()).<Integer>map(integer -> integer, EntityBlockStateFix::getBlockId);
-                                                                                            ^
-    incompatible types: Object cannot be converted to String
-/home/matt/Documents/Repos/Mattcraft/net/minecraft/util/datafix/fixes/EntityVariantFix.java:26: error: incompatible types: bad return type in lambda expression
-                        Function<T, T> function2 = objectx -> ((Dynamic)function.apply(new Dynamic<>(dynamicOps, (T)objectx))).getValue();
-                                                                                                                                       ^
-    Object cannot be converted to T
-  where T is a type-variable:
-    T extends Object declared in method <T>updateAndRename(Dynamic<T>,String,String,Function<Dynamic<T>,Dynamic<T>>)
-/home/matt/Documents/Repos/Mattcraft/net/minecraft/util/datafix/fixes/DropInvalidSignDataFix.java:43: error: incompatible types: Stream<Dynamic<T>> cannot be converted to Stream<Dynamic>
-                        List<Dynamic<T>> list2 = Streams.<Dynamic, Dynamic<T>>mapWithIndex((Stream<Dynamic>)optional.get(), (dynamic2x, l) -> {
-                                                                                                                        ^
-  where T is a type-variable:
-    T extends Object declared in method <T>fixText(Dynamic<T>)
-/home/matt/Documents/Repos/Mattcraft/net/minecraft/util/datafix/fixes/TextComponentHoverAndClickEventFix.java:57: error: cannot find symbol
-                                                Pair<Either<H, Unit>, Dynamic<?>> pair2 = (Pair<Either<H, Unit>, Dynamic<?>>)((Pair)pairx.getSecond()).getSecond();
-                                                                                                                                         ^
-  symbol:   method getSecond()
-  location: variable pairx of type Object
-/home/matt/Documents/Repos/Mattcraft/net/minecraft/util/datafix/fixes/TextComponentHoverAndClickEventFix.java:56: error: incompatible types: Object cannot be converted to boolean
-                                        boolean bl = ((Either)pair.getSecond()).<Boolean>map(either -> false, pairx -> {
-                                                                                            ^
 /home/matt/Documents/Repos/Mattcraft/net/minecraft/util/datafix/fixes/TextComponentHoverAndClickEventFix.java:51: error: incompatible types: inference variable B has incompatible bounds
                         return this.fixTypeEverywhere(
                                                      ^
@@ -177,10 +37,7 @@ Path for java installation '/usr/lib/jvm/openjdk-21' (Common Linux Locations) do
     C2 extends Object declared in method <C1,C2,H>createFixer(Type<C1>,Type<C2>,Type<H>)
     C1 extends Object declared in method <C1,C2,H>createFixer(Type<C1>,Type<C2>,Type<H>)
     H extends Pair<String,?> declared in method <C1,C2,H>createFixer(Type<C1>,Type<C2>,Type<H>)
-/home/matt/Documents/Repos/Mattcraft/net/minecraft/util/datafix/fixes/ItemPotionFix.java:171: error: incompatible types: Object cannot be converted to Dynamic<?>
-                                                Dynamic<?> dynamic2 = ((Typed)optional2.get()).get(DSL.remainderFinder());
-                                                                                                  ^
-/home/matt/Documents/Repos/Mattcraft/net/minecraft/util/datafix/fixes/ChunkBedBlockEntityInjecterFix.java:42: error: incompatible types: cannot infer type-variable(s) A,B
+/home/matt/Documents/Repos/Mattcraft/net/minecraft/util/datafix/fixes/ChunkBedBlockEntityInjecterFix.java:43: error: incompatible types: cannot infer type-variable(s) A,B
                         this.fixTypeEverywhere(
                                               ^
     (argument mismatch; bad return type in lambda expression
@@ -188,92 +45,22 @@ Path for java installation '/usr/lib/jvm/openjdk-21' (Common Linux Locations) do
   where A,B are type-variables:
     A extends Object declared in method <A,B>fixTypeEverywhere(String,Type<A>,Type<B>,Function<DynamicOps<?>,Function<A,B>>)
     B extends Object declared in method <A,B>fixTypeEverywhere(String,Type<A>,Type<B>,Function<DynamicOps<?>,Function<A,B>>)
-/home/matt/Documents/Repos/Mattcraft/net/minecraft/util/datafix/fixes/ChunkBedBlockEntityInjecterFix.java:81: error: incompatible types: Pair<TE,Dynamic<CAP#1>> cannot be converted to Pair<Object,Object>
-                                                                                Object first = ((Pair<Object, Object>)type2.read(dynamic2.createMap(map)).result().orElseThrow(() -> new IllegalStateException("Could not parse newly created bed block entity.")))
-                                                                                                                                                                              ^
-  where TE is a type-variable:
-    TE extends Object declared in method <TE>cap(Type<?>,ListType<TE>)
-  where CAP#1 is a fresh type-variable:
-    CAP#1 extends Object from capture of ?
-/home/matt/Documents/Repos/Mattcraft/net/minecraft/util/datafix/fixes/ChunkBedBlockEntityInjecterFix.java:83: error: incompatible types: Object cannot be converted to TE
-                                                                                list.add(first);
-                                                                                         ^
-  where TE is a type-variable:
-    TE extends Object declared in method <TE>cap(Type<?>,ListType<TE>)
-/home/matt/Documents/Repos/Mattcraft/net/minecraft/util/datafix/fixes/EntitySpawnerItemVariantComponentFix.java:35: error: method fixSalmonBucket in class EntitySpawnerItemVariantComponentFix cannot be applied to given types;
-                                        case "minecraft:salmon_bucket" -> typed.updateTyped(opticFinder2, typedx -> EntitySpawnerItemVariantComponentFix.fixSalmonBucket(typedx));
-                                                                                                                                                        ^
-  required: Dynamic<T>,Dynamic<T>
-  found:    Typed<CAP#1>
-  reason: cannot infer type-variable(s) T
-    (actual and formal argument lists differ in length)
-  where T is a type-variable:
-    T extends Object declared in method <T>fixSalmonBucket(Dynamic<T>,Dynamic<T>)
-  where CAP#1 is a fresh type-variable:
-    CAP#1 extends Object from capture of ?
-/home/matt/Documents/Repos/Mattcraft/net/minecraft/util/datafix/fixes/EntitySpawnerItemVariantComponentFix.java:36: error: method fixAxolotlBucket in class EntitySpawnerItemVariantComponentFix cannot be applied to given types;
-                                        case "minecraft:axolotl_bucket" -> typed.updateTyped(opticFinder2, typedx -> EntitySpawnerItemVariantComponentFix.fixAxolotlBucket(typedx));
-                                                                                                                                                         ^
-  required: Dynamic<T>,Dynamic<T>
-  found:    Typed<CAP#1>
-  reason: cannot infer type-variable(s) T
-    (actual and formal argument lists differ in length)
-  where T is a type-variable:
-    T extends Object declared in method <T>fixAxolotlBucket(Dynamic<T>,Dynamic<T>)
-  where CAP#1 is a fresh type-variable:
-    CAP#1 extends Object from capture of ?
-/home/matt/Documents/Repos/Mattcraft/net/minecraft/util/datafix/fixes/EntitySpawnerItemVariantComponentFix.java:37: error: method fixTropicalFishBucket in class EntitySpawnerItemVariantComponentFix cannot be applied to given types;
-                                        case "minecraft:tropical_fish_bucket" -> typed.updateTyped(opticFinder2, typedx -> EntitySpawnerItemVariantComponentFix.fixTropicalFishBucket(typedx));
-                                                                                                                                                               ^
-  required: Dynamic<T>,Dynamic<T>
-  found:    Typed<CAP#1>
-  reason: cannot infer type-variable(s) T
-    (actual and formal argument lists differ in length)
-  where T is a type-variable:
-    T extends Object declared in method <T>fixTropicalFishBucket(Dynamic<T>,Dynamic<T>)
-  where CAP#1 is a fresh type-variable:
-    CAP#1 extends Object from capture of ?
-/home/matt/Documents/Repos/Mattcraft/net/minecraft/util/datafix/fixes/OptionsKeyLwjgl3Fix.java:172: error: incompatible types: Dynamic<CAP#1> cannot be converted to Dynamic<CAP#2>
-                                        .orElse(dynamic)
-                                                ^
-  where CAP#1,CAP#2 are fresh type-variables:
-    CAP#1 extends Object from capture of ?
-    CAP#2 extends Object from capture of ?
 error: incompatible types: incompatible parameter types in lambda expression
-/home/matt/Documents/Repos/Mattcraft/net/minecraft/util/datafix/fixes/OptionsKeyTranslationFix.java:38: error: incompatible types: Dynamic<CAP#1> cannot be converted to Dynamic<CAP#2>
-                                        .orElse(dynamic)
-                                                ^
-  where CAP#1,CAP#2 are fresh type-variables:
-    CAP#1 extends Object from capture of ?
-    CAP#2 extends Object from capture of ?
-/home/matt/Documents/Repos/Mattcraft/net/minecraft/util/datafix/fixes/BlockEntityUUIDFix.java:28: error: incompatible types: Dynamic<CAP#1> cannot be converted to Dynamic<CAP#2>
+/home/matt/Documents/Repos/Mattcraft/net/minecraft/util/datafix/fixes/BlockEntityUUIDFix.java:27: error: incompatible types: Dynamic<CAP#1> cannot be converted to Dynamic<CAP#2>
                         .orElse(dynamic);
                                 ^
   where CAP#1,CAP#2 are fresh type-variables:
     CAP#1 extends Object from capture of ?
     CAP#2 extends Object from capture of ?
-/home/matt/Documents/Repos/Mattcraft/net/minecraft/world/item/AdventureModePredicate.java:122: error: incompatible types: List<MutableComponent> cannot be converted to List<Component>
-                        .toList();
-                               ^
-/home/matt/Documents/Repos/Mattcraft/net/minecraft/world/item/HoneycombItem.java:109: error: incompatible types: TryEmptyHandInteraction cannot be converted to Success
-                }).orElse(InteractionResult.TRY_WITH_EMPTY_HAND);
+/home/matt/Documents/Repos/Mattcraft/net/minecraft/world/item/HoneycombItem.java:109: error: incompatible types: Pass cannot be converted to Success
+                }).orElse(InteractionResult.PASS);
                                            ^
-/home/matt/Documents/Repos/Mattcraft/net/minecraft/world/item/component/DebugStickState.java:22: error: incompatible types: cannot infer type-variable(s) S
-                .xmap(map -> new DebugStickState((Map<Holder<Block>, Property<?>>)(Map)map), state -> (Map<Holder<Block>, Property<? extends Comparable<?>>>)(Map)state.properties());
-                     ^
-    (argument mismatch; bad return type in lambda expression
-      Map<Holder<Block>,Property<? extends Comparable<?>>> cannot be converted to Map<Holder<Block>,Property<CAP#1>>)
-  where S,A are type-variables:
-    S extends Object declared in method <S>xmap(Function<? super A,? extends S>,Function<? super S,? extends A>)
-    A extends Object declared in interface Codec
-  where CAP#1 is a fresh type-variable:
-    CAP#1 extends Comparable<CAP#1> from capture of ?
 Note: Some input files use or override a deprecated API.
 Note: Recompile with -Xlint:deprecation for details.
 Note: Some input files use unchecked or unsafe operations.
 Note: Recompile with -Xlint:unchecked for details.
 Note: Some messages have been simplified; recompile with -Xdiags:verbose to get full output
-41 errors
+7 errors
 4 warnings
 > Task :compileJava FAILED
 
@@ -287,7 +74,7 @@ Execution failed for task ':compileJava'.
 > Run with --info option to get more log output.
 > Run with --scan to get full insights.
 
-BUILD FAILED in 6s
+BUILD FAILED in 1m 6s
 1 actionable task: 1 executed
 matt@HungLoDE:~/Documents/Repos/Mattcraft$
 
