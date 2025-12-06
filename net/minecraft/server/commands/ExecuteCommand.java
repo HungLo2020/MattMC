@@ -993,7 +993,7 @@ public class ExecuteCommand {
 		return commandContext -> {
 			CommandSourceStack commandSourceStack = commandContext.getSource();
 			Entity entity = commandSourceStack.getEntity();
-			return entity == null ? List.of() : ((Stream)function.apply(entity)).filter(entityx -> !entityx.isRemoved()).map(commandSourceStack::withEntity).toList();
+			return entity == null ? List.of() : function.apply(entity).filter(entityx -> !entityx.isRemoved()).map(commandSourceStack::withEntity).toList();
 		};
 	}
 
