@@ -6,6 +6,8 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd -- "$(dirname -- "$0")" && pwd)"
 JDK_DIR="${SCRIPT_DIR}/jdk-21"
+
+# JDK version configuration - change these to update version
 JDK_VERSION="21.0.5+11"
 JDK_BUILD="21.0.5_11"
 

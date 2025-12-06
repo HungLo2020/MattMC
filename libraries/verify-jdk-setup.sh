@@ -17,7 +17,7 @@ JDK_LIB_DIR="libraries/jdk-21"
 if [[ -d "$JDK_LIB_DIR" && -x "$JDK_LIB_DIR/bin/java" ]]; then
     echo "✅ Bundled JDK found in libraries/"
     echo "   Location: $JDK_LIB_DIR"
-    echo "   Version: $("$JDK_LIB_DIR/bin/java" -version 2>&1 | head -n 1)"
+    echo "   Version: $("$JDK_LIB_DIR/bin/java" -version 2>&1 | head -n 1 || echo 'unknown')"
 else
     echo "❌ Bundled JDK NOT found in libraries/"
     echo "   Expected location: $JDK_LIB_DIR"

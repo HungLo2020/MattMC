@@ -1,12 +1,15 @@
 #!/bin/bash
 # MattMC Client Launcher
 
-cd "$(dirname "$0")"
+# Get the directory containing this script (should be project root in distribution)
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+cd "$SCRIPT_DIR"
 
 # Use bundled JDK if available, otherwise use system java
-if [[ -x "run/jdk-21/bin/java" ]]; then
-    JAVA_CMD="run/jdk-21/bin/java"
-    echo "Using bundled JDK: $(run/jdk-21/bin/java -version 2>&1 | head -n 1)"
+BUNDLED_JAVA="${SCRIPT_DIR}/run/jdk-21/bin/java"
+if [[ -x "$BUNDLED_JAVA" ]]; then
+    JAVA_CMD="$BUNDLED_JAVA"
+    echo "Using bundled JDK: $("$BUNDLED_JAVA" -version 2>&1 | head -n 1)"
 else
     JAVA_CMD="java"
     echo "Using system Java"
