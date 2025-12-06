@@ -322,7 +322,7 @@ tasks.withType(JavaCompile).configureEach {
     options.release = 21
     options.fork = true
     options.forkOptions.memoryMaximumSize = "8g"
-    options.compilerArgs += ['-Xlint:-deprecation', '-Xlint:-unchecked', '-Xdiags:verbose']
+    options.compilerArgs += ['-Xlint:-deprecation', '-Xlint:-unchecked']
 }
 
 // Create a fat jar with all dependencies
