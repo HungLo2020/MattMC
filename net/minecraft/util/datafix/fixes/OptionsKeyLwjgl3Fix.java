@@ -163,11 +163,11 @@ public class OptionsKeyLwjgl3Fix extends DataFix {
 								return Pair.of((Dynamic)entry.getKey(), ((Dynamic)entry.getValue()).createString(string2));
 							}
 							} else {
-							return Pair.of((Dynamic<?>)entry.getKey(), (Dynamic<?>)entry.getValue());
+								return Pair.of((Dynamic<?>)entry.getKey(), (Dynamic<?>)entry.getValue());
 						}
-					}).collect(Collectors.<Pair<Dynamic<?>, Dynamic<?>>, Dynamic<?>, Dynamic<?>>toMap(Pair::getFirst, Pair::getSecond))))
+					}).<Pair<Dynamic<?>, Dynamic<?>>>map(p -> p).collect(Collectors.toMap(Pair::getFirst, Pair::getSecond))))
 					.result()
-					.orElse((Dynamic)dynamic)
+					.orElse(dynamic)
 			)
 		);
 	}
