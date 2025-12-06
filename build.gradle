@@ -393,6 +393,11 @@ tasks.register('copyJdkToRun') {
             return
         }
         
+        // Delete existing JDK directory to avoid permission issues with existing files
+        if (destJdkDir.exists()) {
+            delete destJdkDir
+        }
+        
         println "📂 Copying JDK to run directory..."
         copy {
             from srcJdkDir
