@@ -51,14 +51,15 @@ public class EnchantRandomlyFunction extends LootItemConditionalFunction {
 	}
 
 	@Override
+	@SuppressWarnings("unchecked")
 	public ItemStack run(ItemStack itemStack, LootContext lootContext) {
 		RandomSource randomSource = lootContext.getRandom();
 		boolean bl = itemStack.is(Items.BOOK);
 		boolean bl2 = !bl && this.onlyCompatible;
-		Stream<Holder<Enchantment>> stream = ((Stream)this.options
+		Stream<Holder<Enchantment>> stream = ((Stream<Holder<Enchantment>>)this.options
 				.map(HolderSet::stream)
 				.orElseGet(() -> lootContext.getLevel().registryAccess().lookupOrThrow(Registries.ENCHANTMENT).listElements().map(Function.identity())))
-			.filter(holder -> !bl2 || ((Enchantment)holder.value()).canEnchant(itemStack));
+			.filter(holder -> !bl2 || holder.value().canEnchant(itemStack));
 		List<Holder<Enchantment>> list = stream.toList();
 		Optional<Holder<Enchantment>> optional = Util.getRandomSafe(list, randomSource);
 		if (optional.isEmpty()) {
