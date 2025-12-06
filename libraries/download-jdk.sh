@@ -40,7 +40,6 @@ fi
 # Check if JDK already exists
 if [[ -d "$JDK_DIR" && -f "$JDK_DIR/bin/java" ]]; then
     echo "✅ JDK already exists at: $JDK_DIR"
-    "$JDK_DIR/bin/java" -version
     exit 0
 fi
 

@@ -343,17 +343,18 @@ tasks.register('downloadJdk', Exec) {
     
     def jdkDir = file('libraries/jdk-21')
     def javaExe = new File(jdkDir, 'bin/java')
+    def isLinux = System.getProperty('os.name').toLowerCase().contains('linux')
     
     // Only run if JDK doesn't exist and OS is Linux
     onlyIf { 
-        !javaExe.exists() && System.getProperty('os.name').toLowerCase().contains('linux')
+        !javaExe.exists() && isLinux
     }
     
     workingDir = file('.')
     commandLine 'bash', 'libraries/download-jdk.sh'
     
     doFirst {
-        if (!System.getProperty('os.name').toLowerCase().contains('linux')) {
+        if (!isLinux) {
             println "⚠️  Automatic JDK download is only available on Linux."
             println "   For Windows/macOS, please see: libraries/JDK-README.md"
         }
@@ -370,10 +371,8 @@ tasks.register('copyJdkToRun') {
     def srcJdkDir = file('libraries/jdk-21')
     def destJdkDir = file('run/jdk-21')
     
-    // Only declare inputs/outputs if source exists to avoid Gradle errors
-    if (srcJdkDir.exists()) {
-        inputs.dir srcJdkDir
-    }
+    // Declare inputs/outputs unconditionally
+    inputs.dir(srcJdkDir).skipWhenEmpty()
     outputs.dir destJdkDir
     
     // Only run if source JDK exists

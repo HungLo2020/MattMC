@@ -9,7 +9,7 @@ cd "$SCRIPT_DIR"
 BUNDLED_JAVA="${SCRIPT_DIR}/run/jdk-21/bin/java"
 if [[ -x "$BUNDLED_JAVA" ]]; then
     JAVA_CMD="$BUNDLED_JAVA"
-    echo "Using bundled JDK: $("$BUNDLED_JAVA" -version 2>&1 | head -n 1)"
+    echo "Using bundled JDK"
 else
     JAVA_CMD="java"
     echo "Using system Java"
