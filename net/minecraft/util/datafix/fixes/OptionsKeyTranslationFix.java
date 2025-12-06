@@ -31,9 +31,9 @@ public class OptionsKeyTranslationFix extends DataFix {
 						}
 
 						return Pair.of((Dynamic<?>)entry.getKey(), (Dynamic<?>)entry.getValue());
-					}).<Map<? extends Dynamic<?>, ? extends Dynamic<?>>>collect(Collectors.toMap(p -> p.getFirst(), p -> p.getSecond()))))
+					}).collect(Collectors.<Pair<Dynamic<?>, Dynamic<?>>, Dynamic<?>, Dynamic<?>>toMap(Pair::getFirst, Pair::getSecond))))
 					.result()
-					.orElse(dynamic)
+					.orElse((Dynamic)dynamic)
 			)
 		);
 	}

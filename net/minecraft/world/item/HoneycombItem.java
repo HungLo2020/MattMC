@@ -106,7 +106,7 @@ public class HoneycombItem extends Item implements SignApplicator {
 			}
 
 			return InteractionResult.SUCCESS;
-		}).orElse(InteractionResult.PASS);
+		}).orElse(InteractionResult.PASS_TO_DEFAULT_BLOCK_INTERACTION);
 	}
 
 	public static Optional<BlockState> getWaxed(BlockState blockState) {

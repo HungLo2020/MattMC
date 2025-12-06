@@ -18,6 +18,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Optional;
 import java.util.stream.Collectors;
 import net.minecraft.Util;
@@ -192,11 +193,11 @@ public class LevelDataGeneratorOptionsFix extends DataFix {
 								.entrySet()
 								.stream()
 								.map((Entry<String, String> entryx) -> Pair.of(dynamicOps.createString(entryx.getKey()), dynamicOps.createString(entryx.getValue())))
-								.collect(Collectors.toMap(p -> p.getFirst(), p -> p.getSecond()))
+								.collect(Collectors.<Pair<T, T>, T, T>toMap(Pair::getFirst, Pair::getSecond))
 						)
 					)
 				)
-				.collect(Collectors.toMap(p -> p.getFirst(), p -> p.getSecond()))
+				.collect(Collectors.<Pair<T, T>, T, T>toMap(Pair::getFirst, Pair::getSecond))
 		);
 		return new Dynamic<>(
 			dynamicOps,

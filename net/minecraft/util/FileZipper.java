@@ -68,7 +68,7 @@ public class FileZipper implements Closeable {
 				Stream<Path> stream = Files.find(path, Integer.MAX_VALUE, (pathx, basicFileAttributes) -> basicFileAttributes.isRegularFile(), new FileVisitOption[0]);
 
 				try {
-					for (Path path4 : (List)stream.collect(Collectors.toList())) {
+					for (Path path4 : (List<Path>)stream.collect(Collectors.toList())) {
 						Path path5 = path2.resolve(path.relativize(path4).toString());
 						Files.createDirectories(path5.getParent());
 						Files.copy(path4, path5);

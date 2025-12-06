@@ -294,7 +294,7 @@ public class EditGameRulesScreen extends Screen {
 							.entrySet()
 							.stream()
 							.sorted(java.util.Map.Entry.comparingByKey(Comparator.comparing((GameRules.Key<?> key) -> key.getId())))
-							.forEach(entryx -> this.addEntry((EditGameRulesScreen.RuleEntry)((Entry<?, ?>)entryx).getValue()));
+							.forEach(entryx -> this.addEntry((EditGameRulesScreen.RuleEntry)((java.util.Map.Entry<?, ?>)entryx).getValue()));
 					}
 				);
 		}
