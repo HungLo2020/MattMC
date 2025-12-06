@@ -33,6 +33,7 @@ public class ChunkBedBlockEntityInjecterFix extends DataFix {
 		}
 	}
 
+	@SuppressWarnings("unchecked")
 	private <TE> TypeRewriteRule cap(Type<?> type, ListType<TE> listType) {
 		Type<TE> type2 = listType.getElement();
 		OpticFinder<?> opticFinder = DSL.fieldFinder("Level", type);
@@ -77,8 +78,7 @@ public class ChunkBedBlockEntityInjecterFix extends DataFix {
 							.forEachOrdered(
 								map -> {
 									if (map != null) {
-										@SuppressWarnings("unchecked")
-										Object first = ((Pair<Object, Object>)type2.read(dynamic2.createMap(map)).result().orElseThrow(() -> new IllegalStateException("Could not parse newly created bed block entity.")))
+										TE first = (TE)((Pair<?, ?>)type2.read(dynamic2.createMap(map)).result().orElseThrow(() -> new IllegalStateException("Could not parse newly created bed block entity.")))
 											.getFirst();
 										list.add(first);
 									}

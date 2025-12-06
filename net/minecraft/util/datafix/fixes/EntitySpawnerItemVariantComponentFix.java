@@ -32,9 +32,24 @@ public class EntitySpawnerItemVariantComponentFix extends DataFix {
 				String string = (String)typed.getOptional(opticFinder).map(Pair::getSecond).orElse("");
 
 				return switch (string) {
-					case "minecraft:salmon_bucket" -> typed.updateTyped(opticFinder2, typedx -> EntitySpawnerItemVariantComponentFix.fixSalmonBucket(typedx));
-					case "minecraft:axolotl_bucket" -> typed.updateTyped(opticFinder2, typedx -> EntitySpawnerItemVariantComponentFix.fixAxolotlBucket(typedx));
-					case "minecraft:tropical_fish_bucket" -> typed.updateTyped(opticFinder2, typedx -> EntitySpawnerItemVariantComponentFix.fixTropicalFishBucket(typedx));
+					case "minecraft:salmon_bucket" -> typed.updateTyped(opticFinder2, typedx -> new EntitySpawnerItemVariantComponentFix.Fixer() {
+						@Override
+						public <T> Dynamic<T> fixRemainder(Dynamic<T> dynamic, Dynamic<T> dynamic2) {
+							return EntitySpawnerItemVariantComponentFix.fixSalmonBucket(dynamic, dynamic2);
+						}
+					}.apply(typedx));
+					case "minecraft:axolotl_bucket" -> typed.updateTyped(opticFinder2, typedx -> new EntitySpawnerItemVariantComponentFix.Fixer() {
+						@Override
+						public <T> Dynamic<T> fixRemainder(Dynamic<T> dynamic, Dynamic<T> dynamic2) {
+							return EntitySpawnerItemVariantComponentFix.fixAxolotlBucket(dynamic, dynamic2);
+						}
+					}.apply(typedx));
+					case "minecraft:tropical_fish_bucket" -> typed.updateTyped(opticFinder2, typedx -> new EntitySpawnerItemVariantComponentFix.Fixer() {
+						@Override
+						public <T> Dynamic<T> fixRemainder(Dynamic<T> dynamic, Dynamic<T> dynamic2) {
+							return EntitySpawnerItemVariantComponentFix.fixTropicalFishBucket(dynamic, dynamic2);
+						}
+					}.apply(typedx));
 					case "minecraft:painting" -> typed.updateTyped(
 						opticFinder2, typedx -> Util.writeAndReadTypedOrThrow(typedx, typedx.getType(), EntitySpawnerItemVariantComponentFix::fixPainting)
 					);

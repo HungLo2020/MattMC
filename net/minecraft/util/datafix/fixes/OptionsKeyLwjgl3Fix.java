@@ -141,35 +141,37 @@ public class OptionsKeyLwjgl3Fix extends DataFix {
 			this.getInputSchema().getType(References.OPTIONS),
 			typed -> typed.update(
 				DSL.remainderFinder(),
-				dynamic -> (Dynamic)dynamic.getMapValues()
-					.map(map -> dynamic.createMap((Map<? extends Dynamic<?>, ? extends Dynamic<?>>)map.entrySet().stream().map(entry -> {
-						if (((Dynamic)entry.getKey()).asString("").startsWith("key_")) {
-							int i = Integer.parseInt(((Dynamic)entry.getValue()).asString(""));
-							if (i < 0) {
-								int j = i + 100;
-								String string;
-								if (j == 0) {
-									string = "key.mouse.left";
-								} else if (j == 1) {
-									string = "key.mouse.right";
-								} else if (j == 2) {
-									string = "key.mouse.middle";
-								} else {
-									string = "key.mouse." + (j + 1);
-								}
+				dynamic -> {
+					Dynamic<?> result = dynamic.getMapValues()
+						.map(map -> dynamic.createMap((Map<? extends Dynamic<?>, ? extends Dynamic<?>>)map.entrySet().stream().map(entry -> {
+							if (((Dynamic)entry.getKey()).asString("").startsWith("key_")) {
+								int i = Integer.parseInt(((Dynamic)entry.getValue()).asString(""));
+								if (i < 0) {
+									int j = i + 100;
+									String string;
+									if (j == 0) {
+										string = "key.mouse.left";
+									} else if (j == 1) {
+										string = "key.mouse.right";
+									} else if (j == 2) {
+										string = "key.mouse.middle";
+									} else {
+										string = "key.mouse." + (j + 1);
+									}
 
-								return (Pair<Dynamic<?>, Dynamic<?>>)Pair.of((Dynamic<?>)entry.getKey(), (Dynamic<?>)((Dynamic)entry.getValue()).createString(string));
+									return (Pair<Dynamic<?>, Dynamic<?>>)Pair.of((Dynamic<?>)entry.getKey(), (Dynamic<?>)((Dynamic)entry.getValue()).createString(string));
+								} else {
+									String string2 = MAP.getOrDefault(i, "key.unknown");
+									return (Pair<Dynamic<?>, Dynamic<?>>)Pair.of((Dynamic<?>)entry.getKey(), (Dynamic<?>)((Dynamic)entry.getValue()).createString(string2));
+								}
 							} else {
-								String string2 = MAP.getOrDefault(i, "key.unknown");
-								return (Pair<Dynamic<?>, Dynamic<?>>)Pair.of((Dynamic<?>)entry.getKey(), (Dynamic<?>)((Dynamic)entry.getValue()).createString(string2));
+								return (Pair<Dynamic<?>, Dynamic<?>>)Pair.of((Dynamic<?>)entry.getKey(), (Dynamic<?>)entry.getValue());
 							}
-						} else {
-							return (Pair<Dynamic<?>, Dynamic<?>>)Pair.of((Dynamic<?>)entry.getKey(), (Dynamic<?>)entry.getValue());
-						}
-					}).collect(Collectors.toMap((Pair<Dynamic<?>, Dynamic<?>> p) -> p.getFirst(), (Pair<Dynamic<?>, Dynamic<?>> p) -> p.getSecond()))))
-					.result()
-					.map(d -> (Dynamic<?>)d)
-					.orElse(dynamic)
+						}).collect(Collectors.toMap((Pair<Dynamic<?>, Dynamic<?>> p) -> p.getFirst(), (Pair<Dynamic<?>, Dynamic<?>> p) -> p.getSecond()))))
+						.result()
+						.orElse(null);
+					return result != null ? result : dynamic;
+				}
 			)
 		);
 	}

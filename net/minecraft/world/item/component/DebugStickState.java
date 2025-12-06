@@ -12,14 +12,13 @@ import net.minecraft.world.level.block.state.properties.Property;
 public record DebugStickState(Map<Holder<Block>, Property<?>> properties) {
 	public static final DebugStickState EMPTY = new DebugStickState(Map.of());
 	@SuppressWarnings("unchecked")
-	@SuppressWarnings("unchecked")
 	public static final Codec<DebugStickState> CODEC = Codec.dispatchedMap(
 			BuiltInRegistries.BLOCK.holderByNameCodec(), holder -> Codec.STRING.comapFlatMap(string -> {
 				Property<?> property = ((Block)holder.value()).getStateDefinition().getProperty(string);
 				return property != null ? DataResult.success(property) : DataResult.error(() -> "No property on " + holder.getRegisteredName() + " with name: " + string);
 			}, Property::getName)
 		)
-		.xmap(map -> new DebugStickState((Map<Holder<Block>, Property<?>>)(Map)map), state -> (Map<Holder<Block>, Property<? extends Comparable<?>>>)(Map)state.properties());
+		.xmap(map -> new DebugStickState((Map<Holder<Block>, Property<?>>)map), state -> (Map)state.properties());
 
 	public DebugStickState withProperty(Holder<Block> holder, Property<?> property) {
 		return new DebugStickState(Util.copyAndPut(this.properties, holder, property));

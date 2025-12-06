@@ -54,11 +54,15 @@ public class OperationArgument implements ArgumentType<OperationArgument.Operati
 	}
 
 	private static OperationArgument.Operation getOperation(String string) throws CommandSyntaxException {
-		return (OperationArgument.Operation)(string.equals("><") ? (scoreAccess, scoreAccess2) -> {
-			int i = scoreAccess.get();
-			scoreAccess.set(scoreAccess2.get());
-			scoreAccess2.set(i);
-		} : getSimpleOperation(string));
+		if (string.equals("><")) {
+			return (OperationArgument.Operation)(scoreAccess, scoreAccess2) -> {
+				int i = scoreAccess.get();
+				scoreAccess.set(scoreAccess2.get());
+				scoreAccess2.set(i);
+			};
+		} else {
+			return getSimpleOperation(string);
+		}
 	}
 
 	private static OperationArgument.SimpleOperation getSimpleOperation(String string) throws CommandSyntaxException {

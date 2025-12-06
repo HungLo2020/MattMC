@@ -168,11 +168,12 @@ public class ItemPotionFix extends DataFix {
 					short s = dynamic.get("Damage").asShort((short)0);
 					if (optional2.isPresent()) {
 						Typed<?> typed2 = typed;
-						Dynamic<?> dynamic2 = ((Typed)optional2.get()).get(DSL.remainderFinder());
+						Typed<?> optTyped = optional2.get();
+						Dynamic<?> dynamic2 = optTyped.get(DSL.remainderFinder());
 						Optional<String> optional3 = dynamic2.get("Potion").asString().result();
 						if (optional3.isEmpty()) {
 							String string = POTIONS[s & 127];
-							Typed<?> typed3 = ((Typed)optional2.get())
+							Typed<?> typed3 = optTyped
 								.set(DSL.remainderFinder(), dynamic2.set("Potion", dynamic2.createString(string == null ? "minecraft:water" : string)));
 							typed2 = typed.set(opticFinder2, typed3);
 							if ((s & 16384) == 16384) {

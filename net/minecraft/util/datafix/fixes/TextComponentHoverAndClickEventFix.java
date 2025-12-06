@@ -52,9 +52,10 @@ public class TextComponentHoverAndClickEventFix extends DataFix {
 				"TextComponentHoverAndClickEventFix",
 				type4,
 				type2,
-				dynamicOps -> pair -> {
-					boolean bl = ((Either)pair.getSecond()).<Boolean>map(either -> false, pairx -> {
-						Pair<Either<H, Unit>, Dynamic<?>> pair2 = (Pair<Either<H, Unit>, Dynamic<?>>)((Pair)pairx.getSecond()).getSecond();
+				dynamicOps -> (Pair<String, Either<Either<String, List<C1>>, Pair<Either<List<C1>, Unit>, Pair<Either<C1, Unit>, Pair<Either<H, Unit>, Dynamic<?>>>>>> pair) -> {
+					@SuppressWarnings("unchecked")
+					boolean bl = ((Either<Either<String, List<C1>>, Pair<Either<List<C1>, Unit>, Pair<Either<C1, Unit>, Pair<Either<H, Unit>, Dynamic<?>>>>>)pair.getSecond()).<Boolean>map(either -> false, (Pair<Either<List<C1>, Unit>, Pair<Either<C1, Unit>, Pair<Either<H, Unit>, Dynamic<?>>>> pairx) -> {
+						Pair<Either<H, Unit>, Dynamic<?>> pair2 = pairx.getSecond().getSecond();
 						boolean blx = pair2.getFirst().left().isPresent();
 						boolean bl2 = pair2.getSecond().get("clickEvent").result().isPresent();
 						return blx || bl2;

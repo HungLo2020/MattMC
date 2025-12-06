@@ -17,9 +17,11 @@ import net.minecraft.commands.execution.tasks.BuildContexts;
 import net.minecraft.commands.execution.tasks.FallthroughTask;
 
 public class ReturnCommand {
+	@SuppressWarnings("unchecked")
 	public static <T extends ExecutionCommandSource<T>> void register(CommandDispatcher<T> commandDispatcher) {
+		LiteralArgumentBuilder<T> builder = (LiteralArgumentBuilder<T>)LiteralArgumentBuilder.literal("return").requires(Commands.hasPermission(2));
 		commandDispatcher.register(
-			((LiteralArgumentBuilder)LiteralArgumentBuilder.literal("return").requires(Commands.hasPermission(2)))
+			builder
 				.then(RequiredArgumentBuilder.<T, Integer>argument("value", IntegerArgumentType.integer()).executes(new ReturnCommand.ReturnValueCustomExecutor<>()))
 				.then(LiteralArgumentBuilder.<T>literal("fail").executes(new ReturnCommand.ReturnFailCustomExecutor<>()))
 				.then(LiteralArgumentBuilder.<T>literal("run").forward(commandDispatcher.getRoot(), new ReturnCommand.ReturnFromCommandCustomModifier<>(), false))

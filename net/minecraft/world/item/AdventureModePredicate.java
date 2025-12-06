@@ -118,7 +118,7 @@ public class AdventureModePredicate {
 		return list.stream()
 			.flatMap(blockPredicatex -> ((HolderSet<?>)blockPredicatex.blocks().orElseThrow()).stream())
 			.distinct()
-			.map(holder -> ((Block)holder.value()).getName().withStyle(ChatFormatting.DARK_GRAY))
+			.<Component>map(holder -> ((Block)holder.value()).getName().withStyle(ChatFormatting.DARK_GRAY))
 			.toList();
 	}
 

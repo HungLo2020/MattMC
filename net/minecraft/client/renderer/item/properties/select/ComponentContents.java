@@ -18,18 +18,18 @@ import org.jetbrains.annotations.Nullable;
 public record ComponentContents<T>(DataComponentType<T> componentType) implements SelectItemModelProperty<T> {
 	private static final SelectItemModelProperty.Type<? extends ComponentContents<?>, ?> TYPE = createType();
 
+	@SuppressWarnings({"unchecked", "rawtypes"})
 	private static <T> SelectItemModelProperty.Type<ComponentContents<T>, T> createType() {
-		Codec<? extends DataComponentType<?>> codec = BuiltInRegistries.DATA_COMPONENT_TYPE
+		Codec<DataComponentType<?>> codec = BuiltInRegistries.DATA_COMPONENT_TYPE
 			.byNameCodec()
 			.validate(
 				dataComponentType -> dataComponentType.isTransient() ? DataResult.error(() -> "Component can't be serialized") : DataResult.success(dataComponentType)
 			);
-		@SuppressWarnings("unchecked")
-		MapCodec<SelectItemModel.UnbakedSwitch<ComponentContents<T>, T>> mapCodec = (MapCodec<SelectItemModel.UnbakedSwitch<ComponentContents<T>, T>>)(MapCodec<?>)codec.dispatchMap(
+		MapCodec<SelectItemModel.UnbakedSwitch<ComponentContents<T>, T>> mapCodec = (MapCodec)codec.dispatchMap(
 			"component",
-			unbakedSwitch -> ((ComponentContents<?>)unbakedSwitch.property()).componentType,
+			(SelectItemModel.UnbakedSwitch unbakedSwitch) -> ((ComponentContents<?>)unbakedSwitch.property()).componentType,
 			dataComponentType -> SelectItemModelProperty.Type.createCasesFieldCodec(dataComponentType.codecOrThrow())
-				.xmap(list -> new SelectItemModel.UnbakedSwitch<>(new ComponentContents<>(dataComponentType), list), SelectItemModel.UnbakedSwitch::cases)
+				.xmap(list -> new SelectItemModel.UnbakedSwitch<>(new ComponentContents<>(dataComponentType), list), (SelectItemModel.UnbakedSwitch s) -> s.cases())
 		);
 		return new SelectItemModelProperty.Type<>(mapCodec);
 	}

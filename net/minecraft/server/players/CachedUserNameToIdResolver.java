@@ -9,7 +9,9 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParseException;
+import com.mojang.authlib.GameProfile;
 import com.mojang.authlib.GameProfileRepository;
+import com.mojang.authlib.ProfileLookupCallback;
 import com.mojang.logging.LogUtils;
 import java.io.File;
 import java.io.FileNotFoundException;
@@ -63,7 +65,18 @@ public class CachedUserNameToIdResolver implements UserNameToIdResolver {
 		if (!StringUtil.isValidPlayerName(string)) {
 			return this.createUnknownProfile(string);
 		} else {
-			Optional<NameAndId> optional = gameProfileRepository.findProfileByName(string).map(NameAndId::new);
+			final GameProfile[] foundProfile = {null};
+			gameProfileRepository.findProfilesByNames(new String[]{string}, new ProfileLookupCallback() {
+				@Override
+				public void onProfileLookupSucceeded(GameProfile profile) {
+					foundProfile[0] = profile;
+				}
+
+				@Override
+				public void onProfileLookupFailed(String profileName, Exception exception) {
+				}
+			});
+			Optional<NameAndId> optional = foundProfile[0] != null ? Optional.of(new NameAndId(foundProfile[0])) : Optional.empty();
 			return optional.isEmpty() ? this.createUnknownProfile(string) : optional;
 		}
 	}
