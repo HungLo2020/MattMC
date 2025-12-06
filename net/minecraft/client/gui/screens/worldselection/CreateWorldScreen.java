@@ -182,9 +182,9 @@ public class CreateWorldScreen extends Screen {
 			? new WorldDataConfiguration(new DataPackConfig(List.of("vanilla", "tests"), List.of()), FeatureFlags.DEFAULT_FLAGS)
 			: WorldDataConfiguration.DEFAULT;
 		InitConfig initConfig = createDefaultLoadConfig(packRepository, worldDataConfiguration);
-		CompletableFuture<WorldCreationContext> completableFuture = WorldLoader.load(
+		CompletableFuture<WorldCreationContext> completableFuture = WorldLoader.<DataLoadOutput<DataPackReloadCookie>, WorldCreationContext>load(
 			initConfig,
-			dataLoadContext -> new DataLoadOutput(
+			dataLoadContext -> new DataLoadOutput<>(
 				new DataPackReloadCookie((WorldGenSettings)function.apply(dataLoadContext), dataLoadContext.dataConfiguration()), dataLoadContext.datapackDimensions()
 			),
 			(closeableResourceManager, reloadableServerResources, layeredRegistryAccess, dataPackReloadCookie) -> {
