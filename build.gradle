@@ -17,6 +17,8 @@ def lwjglNatives = System.getProperty('os.name').toLowerCase().contains('mac')
             : 'natives-linux'
 
 java {
+    // Keep toolchain configuration for compilation
+    // But we'll override at runtime for JavaExec tasks
     toolchain {
         languageVersion = JavaLanguageVersion.of(21)
     }
@@ -247,14 +249,21 @@ tasks.register('runServer', JavaExec) {
     jvmArgs = serverJvmArgs
     args = ['--nogui']
     
+    // Configure to use bundled JDK if available
+    def bundledJdkDir = file('run/jdk-21')
+    def bundledJavaExe = new File(bundledJdkDir, 'bin/java')
+    if (bundledJavaExe.exists()) {
+        // Override the executable property
+        executable bundledJavaExe.absolutePath
+        // Ensure we don't use the toolchain launcher
+        javaLauncher.set(provider { null })
+    }
+    
     doFirst {
         workingDir.mkdirs()
         
-        // Use bundled JDK if available
-        def bundledJdk = file('run/jdk-21/bin/java')
-        if (bundledJdk.exists()) {
-            executable = bundledJdk.absolutePath
-            println "Using bundled JDK: ${bundledJdk.absolutePath}"
+        if (bundledJavaExe.exists()) {
+            println "Using bundled JDK from: ${bundledJdkDir.absolutePath}"
         }
     }
     
@@ -275,14 +284,21 @@ tasks.register('runServerGui', JavaExec) {
     jvmArgs = serverJvmArgs
     // No --nogui argument means GUI will be shown
     
+    // Configure to use bundled JDK if available
+    def bundledJdkDir = file('run/jdk-21')
+    def bundledJavaExe = new File(bundledJdkDir, 'bin/java')
+    if (bundledJavaExe.exists()) {
+        // Override the executable property
+        executable bundledJavaExe.absolutePath
+        // Ensure we don't use the toolchain launcher
+        javaLauncher.set(provider { null })
+    }
+    
     doFirst {
         workingDir.mkdirs()
         
-        // Use bundled JDK if available
-        def bundledJdk = file('run/jdk-21/bin/java')
-        if (bundledJdk.exists()) {
-            executable = bundledJdk.absolutePath
-            println "Using bundled JDK: ${bundledJdk.absolutePath}"
+        if (bundledJavaExe.exists()) {
+            println "Using bundled JDK from: ${bundledJdkDir.absolutePath}"
         }
     }
     
@@ -311,6 +327,16 @@ tasks.register('runClient', JavaExec) {
         '--assetIndex', '27'
     ]
     
+    // Configure to use bundled JDK if available
+    def bundledJdkDir = file('run/jdk-21')
+    def bundledJavaExe = new File(bundledJdkDir, 'bin/java')
+    if (bundledJavaExe.exists()) {
+        // Override the executable property
+        executable bundledJavaExe.absolutePath
+        // Ensure we don't use the toolchain launcher
+        javaLauncher.set(provider { null })
+    }
+    
     doFirst {
         workingDir.mkdirs()
         file('run/assets').mkdirs()
@@ -325,11 +351,8 @@ tasks.register('runClient', JavaExec) {
             }
         }
         
-        // Use bundled JDK if available
-        def bundledJdk = file('run/jdk-21/bin/java')
-        if (bundledJdk.exists()) {
-            executable = bundledJdk.absolutePath
-            println "Using bundled JDK: ${bundledJdk.absolutePath}"
+        if (bundledJavaExe.exists()) {
+            println "Using bundled JDK from: ${bundledJdkDir.absolutePath}"
         }
     }
     
