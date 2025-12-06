@@ -43,7 +43,7 @@ public class FeatureSorter {
 			i = Math.max(i, list3.size());
 
 			for (int j = 0; j < list3.size(); j++) {
-				for (Holder<PlacedFeature> holder : (HolderSet)list3.get(j)) {
+				for (Holder<PlacedFeature> holder : (HolderSet<PlacedFeature>)list3.get(j)) {
 					PlacedFeature placedFeature = holder.value();
 					list2.add(
 						new FeatureData(

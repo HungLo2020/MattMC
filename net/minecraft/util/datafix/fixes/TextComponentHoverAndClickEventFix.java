@@ -53,15 +53,24 @@ public class TextComponentHoverAndClickEventFix extends DataFix {
 				type4,
 				type2,
 				dynamicOps -> pair -> {
-					boolean bl = ((Either)pair.getSecond()).<Boolean>map(either -> false, pairx -> {
-						Pair<Either<H, Unit>, Dynamic<?>> pair2 = (Pair<Either<H, Unit>, Dynamic<?>>)((Pair)pairx.getSecond()).getSecond();
-						boolean blx = pair2.getFirst().left().isPresent();
-						boolean bl2 = pair2.getSecond().get("clickEvent").result().isPresent();
-						return blx || bl2;
-					});
-					return !bl
-						? pair
-						: Util.writeAndReadTypedOrThrow(ExtraDataFixUtils.cast(type5, pair, dynamicOps), type2, TextComponentHoverAndClickEventFix::fixTextComponent).getValue();
+					@SuppressWarnings("unchecked")
+					Either<Either<String, List<C1>>, Pair<Either<List<C1>, Unit>, Pair<Either<C1, Unit>, Pair<Either<H, Unit>, Dynamic<?>>>>> second = 
+						(Either<Either<String, List<C1>>, Pair<Either<List<C1>, Unit>, Pair<Either<C1, Unit>, Pair<Either<H, Unit>, Dynamic<?>>>>>) pair.getSecond();
+					boolean bl = second.<Boolean>map(
+						either -> false, 
+						pairx -> {
+							Pair<Either<H, Unit>, Dynamic<?>> pair2 = pairx.getSecond().getSecond();
+							boolean blx = pair2.getFirst().left().isPresent();
+							boolean bl2 = pair2.getSecond().get("clickEvent").result().isPresent();
+							return blx || bl2;
+						}
+					);
+					if (!bl) {
+						@SuppressWarnings("unchecked")
+						C2 result = (C2) pair;
+						return result;
+					}
+					return Util.writeAndReadTypedOrThrow(ExtraDataFixUtils.cast(type5, pair, dynamicOps), type2, TextComponentHoverAndClickEventFix::fixTextComponent).getValue();
 				}
 			);
 		}

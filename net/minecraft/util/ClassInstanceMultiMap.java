@@ -52,13 +52,14 @@ public class ClassInstanceMultiMap<T> extends AbstractCollection<T> {
 		return this.find(object.getClass()).contains(object);
 	}
 
+	@SuppressWarnings("unchecked")
 	public <S> Collection<S> find(Class<S> class_) {
 		if (!this.baseClass.isAssignableFrom(class_)) {
 			throw new IllegalArgumentException("Don't know how to search for " + class_);
 		} else {
 			List<? extends T> list = (List<? extends T>)this.byClass
 				.computeIfAbsent(class_, class_x -> (List)this.allInstances.stream().filter(class_x::isInstance).collect(Util.toMutableList()));
-			return Collections.unmodifiableCollection(list);
+			return (Collection<S>)Collections.unmodifiableCollection(list);
 		}
 	}
 

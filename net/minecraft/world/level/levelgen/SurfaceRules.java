@@ -175,9 +175,10 @@ public class SurfaceRules {
 		}
 
 		public SurfaceRules.Condition apply(SurfaceRules.Context context) {
+			final SurfaceRules.Context ctx = context;
 			class BiomeCondition extends SurfaceRules.LazyYCondition {
 				BiomeCondition() {
-					super(context);
+					super(ctx);
 				}
 
 				@Override
@@ -515,10 +516,11 @@ public class SurfaceRules {
 
 		public SurfaceRules.Condition apply(SurfaceRules.Context context) {
 			final NormalNoise normalNoise = context.randomState.getOrCreateNoise(this.noise);
+			final SurfaceRules.Context ctx = context;
 
 			class NoiseThresholdCondition extends SurfaceRules.LazyXZCondition {
 				NoiseThresholdCondition() {
-					super(context);
+					super(ctx);
 				}
 
 				@Override
@@ -654,10 +656,11 @@ public class SurfaceRules {
 
 		public SurfaceRules.Condition apply(SurfaceRules.Context context) {
 			final boolean bl = this.surfaceType == CaveSurface.CEILING;
+			final SurfaceRules.Context ctx = context;
 
 			class StoneDepthCondition extends SurfaceRules.LazyYCondition {
 				StoneDepthCondition() {
-					super(context);
+					super(ctx);
 				}
 
 				@Override
@@ -746,22 +749,23 @@ public class SurfaceRules {
 			final int i = this.trueAtAndBelow().resolveY(context.context);
 			final int j = this.falseAtAndAbove().resolveY(context.context);
 			final PositionalRandomFactory positionalRandomFactory = context.randomState.getOrCreateRandomFactory(this.randomName());
+			final SurfaceRules.Context ctx = context;
 
 			class VerticalGradientCondition extends SurfaceRules.LazyYCondition {
 				VerticalGradientCondition() {
-					super(context);
+					super(ctx);
 				}
 
 				@Override
 				protected boolean compute() {
-					int i = this.context.blockY;
-					if (i <= i) {
+					int iVal = this.context.blockY;
+					if (iVal <= i) {
 						return true;
-					} else if (i >= j) {
+					} else if (iVal >= j) {
 						return false;
 					} else {
-						double d = Mth.map((double)i, (double)i, (double)j, 1.0, 0.0);
-						RandomSource randomSource = positionalRandomFactory.at(this.context.blockX, i, this.context.blockZ);
+						double d = Mth.map((double)iVal, (double)i, (double)j, 1.0, 0.0);
+						RandomSource randomSource = positionalRandomFactory.at(this.context.blockX, iVal, this.context.blockZ);
 						return randomSource.nextFloat() < d;
 					}
 				}
@@ -789,9 +793,10 @@ public class SurfaceRules {
 		}
 
 		public SurfaceRules.Condition apply(SurfaceRules.Context context) {
+			final SurfaceRules.Context ctx = context;
 			class WaterCondition extends SurfaceRules.LazyYCondition {
 				WaterCondition() {
-					super(context);
+					super(ctx);
 				}
 
 				@Override
@@ -824,9 +829,10 @@ public class SurfaceRules {
 		}
 
 		public SurfaceRules.Condition apply(SurfaceRules.Context context) {
+			final SurfaceRules.Context ctx = context;
 			class YCondition extends SurfaceRules.LazyYCondition {
 				YCondition() {
-					super(context);
+					super(ctx);
 				}
 
 				@Override

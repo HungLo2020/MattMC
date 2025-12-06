@@ -1,0 +1,143 @@
+matt@HungLoDE:~/Documents/Repos/Mattcraft$ export JAVA_HOME=/usr/lib/jvm/java-21-openjdk-amd64
+export PATH="$JAVA_HOME/bin:$PATH"
+matt@HungLoDE:~/Documents/Repos/Mattcraft$ ./gradlew runclient
+Starting a Gradle Daemon, 1 incompatible and 2 stopped Daemons could not be reused, use --status for details
+Path for java installation '/usr/lib/jvm/openjdk-21' (Common Linux Locations) does not contain a java executable
+Path for java installation '/usr/lib/jvm/openjdk-17' (Common Linux Locations) does not contain a java executable
+
+> Task :runClient
+[20:40:50] [Datafixer Bootstrap/INFO]: 278 Datafixer optimizations took 186 milliseconds
+[LWJGL] Version: 3.3.3+5
+         OS: Linux v6.14.0-36-generic
+        JRE: Linux amd64 21.0.9
+        JVM: OpenJDK 64-Bit Server VM v21.0.9+10-Ubuntu-125.04 by Ubuntu
+[LWJGL] Loading JNI library: lwjgl
+        Module: org.lwjgl
+        Extracting: file:/home/matt/.gradle/caches/modules-2/files-2.1/org.lwjgl/lwjgl/3.3.3/1713758e3660ba66e1e954396fd18126038b33c0/lwjgl-3.3.3-natives-linux.jar!/linux/x64/org/lwjgl/liblwjgl.so
+        Loaded from org.lwjgl.librarypath: /tmp/lwjgl_matt/3.3.3+5/x64/liblwjgl.so
+[LWJGL] Loading library: glfw
+        Module: org.lwjgl.glfw
+        Extracting: file:/home/matt/.gradle/caches/modules-2/files-2.1/org.lwjgl/lwjgl-glfw/3.3.3/a03684c5e4b1b1dbbe0d29dbbdc27b985b6840f2/lwjgl-glfw-3.3.3-natives-linux.jar!/linux/x64/org/lwjgl/glfw/libglfw.so
+        Loaded from org.lwjgl.librarypath: /tmp/lwjgl_matt/3.3.3+5/x64/libglfw.so
+[20:40:52] [main/WARN]: Failed to get system info for Render Extensions
+java.lang.IllegalStateException: Can't getDevice() before it was initialized
+        at com.mojang.blaze3d.systems.RenderSystem.getDevice(RenderSystem.java:343) ~[main/:?]
+        at net.minecraft.client.Minecraft.lambda$fillSystemReport$46(Minecraft.java:2379) ~[main/:?]
+        at net.minecraft.SystemReport.setDetail(SystemReport.java:77) [main/:?]
+        at net.minecraft.client.Minecraft.fillSystemReport(Minecraft.java:2379) [main/:?]
+        at net.minecraft.client.Minecraft.fillReport(Minecraft.java:2352) [main/:?]
+        at net.minecraft.client.main.Main.main(Main.java:184) [main/:?]
+---- Minecraft Crash Report ----
+// Don't do that.
+
+Time: 2025-12-05 20:40:52
+Description: Bootstrap
+
+java.lang.ExceptionInInitializerError
+        at net.minecraft.network.chat.contents.TranslatableContents.decompose(TranslatableContents.java:90)
+        at net.minecraft.network.chat.contents.TranslatableContents.visit(TranslatableContents.java:183)
+        at net.minecraft.network.chat.Component.visit(Component.java:91)
+        at net.minecraft.network.chat.FormattedText.getString(FormattedText.java:88)
+        at net.minecraft.network.chat.Component.getString(Component.java:35)
+        at net.minecraft.world.item.CreativeModeTabs.validate(CreativeModeTabs.java:1974)
+        at net.minecraft.server.Bootstrap.bootStrap(Bootstrap.java:58)
+        at net.minecraft.client.main.Main.main(Main.java:118)
+Caused by: java.lang.NullPointerException
+        at java.base/java.io.Reader.<init>(Reader.java:168)
+        at java.base/java.io.InputStreamReader.<init>(InputStreamReader.java:123)
+        at net.minecraft.locale.Language.loadFromJson(Language.java:94)
+        at net.minecraft.locale.Language.parseTranslations(Language.java:72)
+        at net.minecraft.locale.Language.loadDefault(Language.java:38)
+        at net.minecraft.locale.Language.<clinit>(Language.java:32)
+        ... 8 more
+
+
+A detailed walkthrough of the error, its code path and all known details is as follows:
+---------------------------------------------------------------------------------------
+
+-- Head --
+Thread: main
+Stacktrace:
+        at net.minecraft.network.chat.contents.TranslatableContents.decompose(TranslatableContents.java:90)
+        at net.minecraft.network.chat.contents.TranslatableContents.visit(TranslatableContents.java:183)
+        at net.minecraft.network.chat.Component.visit(Component.java:91)
+        at net.minecraft.network.chat.FormattedText.getString(FormattedText.java:88)
+        at net.minecraft.network.chat.Component.getString(Component.java:35)
+        at net.minecraft.world.item.CreativeModeTabs.validate(CreativeModeTabs.java:1974)
+        at net.minecraft.server.Bootstrap.bootStrap(Bootstrap.java:58)
+
+-- Initialization --
+Details:
+        Modules:
+Stacktrace:
+        at net.minecraft.client.main.Main.main(Main.java:118)
+
+-- System Details --
+Details:
+        Minecraft Version: 1.21.10
+        Minecraft Version ID: 1.21.10
+        Operating System: Linux (amd64) version 6.14.0-36-generic
+        Java Version: 21.0.9, Ubuntu
+        Java VM Version: OpenJDK 64-Bit Server VM (mixed mode, sharing), Ubuntu
+        Memory: 344084496 bytes (328 MiB) / 536870912 bytes (512 MiB) up to 2147483648 bytes (2048 MiB)
+        CPUs: 20
+        Processor Vendor: GenuineIntel
+        Processor Name: 12th Gen Intel(R) Core(TM) i7-12700K
+        Identifier: Intel64 Family 6 Model 151 Stepping 2
+        Microarchitecture: Alder Lake
+        Frequency (GHz): 5.10
+        Number of physical packages: 1
+        Number of physical CPUs: 12
+        Number of logical CPUs: 20
+        Graphics card #0 name: GA102 [GeForce RTX 3080 Ti]
+        Graphics card #0 vendor: NVIDIA Corporation (0x10de)
+        Graphics card #0 VRAM (MiB): 16416.00
+        Graphics card #0 deviceId: 0x2208
+        Graphics card #0 versionInfo: unknown
+        Virtual memory max (MiB): 32300.84
+        Virtual memory used (MiB): 15803.11
+        Swap memory total (MiB): 16384.00
+        Swap memory used (MiB): 0.00
+        Space in storage for jna.tmpdir (MiB): <path not set>
+        Space in storage for org.lwjgl.system.SharedLibraryExtractPath (MiB): <path not set>
+        Space in storage for io.netty.native.workdir (MiB): <path not set>
+        Space in storage for java.io.tmpdir (MiB): available: 15897.16, total: 15916.84
+        Space in storage for workdir (MiB): available: 295460.00, total: 937500.69
+        JVM Flags: 19 total; -XX:+UseG1GC -XX:+ParallelRefProcEnabled -XX:MaxGCPauseMillis=200 -XX:+UnlockExperimentalVMOptions -XX:+DisableExplicitGC -XX:G1NewSizePercent=30 -XX:G1MaxNewSizePercent=40 -XX:G1HeapRegionSize=8M -XX:G1ReservePercent=20 -XX:G1HeapWastePercent=5 -XX:G1MixedGCCountTarget=4 -XX:InitiatingHeapOccupancyPercent=15 -XX:G1MixedGCLiveThresholdPercent=90 -XX:G1RSetUpdatingPauseTimePercent=5 -XX:SurvivorRatio=32 -XX:+PerfDisableSharedMem -XX:MaxTenuringThreshold=1 -Xms512M -Xmx2G
+        Debug Flags: 0 total;
+        Launched Version: 1.21.10
+        Backend library: LWJGL version 3.3.3+5
+        Backend API: Unknown
+        Window size: <not initialized>
+        GFLW Platform: <error>
+        Render Extensions: ERR
+        GL debug messages: <no renderer available>
+        Is Modded: Very likely; Client jar signature invalidated
+        Universe: 404
+        Type: Client (map_client.txt)
+        Locale: en_US
+        System encoding: UTF-8
+        File encoding: UTF-8
+        CPU: 20x 12th Gen Intel(R) Core(TM) i7-12700K
+#@!@# Game crashed! Crash report saved to: #@!@# /home/matt/Documents/Repos/Mattcraft/run/crash-reports/crash-2025-12-05_20.40.52-client.txt
+
+> Task :runClient FAILED
+
+FAILURE: Build failed with an exception.
+
+* What went wrong:
+Execution failed for task ':runClient'.
+> Process 'command '/usr/lib/jvm/java-21-openjdk-amd64/bin/java'' finished with non-zero exit value 255
+
+* Try:
+> Run with --stacktrace option to get the stack trace.
+> Run with --info or --debug option to get more log output.
+> Run with --scan to get full insights.
+> Get more help at https://help.gradle.org.
+
+BUILD FAILED in 5s
+3 actionable tasks: 1 executed, 2 up-to-date
+matt@HungLoDE:~/Documents/Repos/Mattcraft$
+
+
+

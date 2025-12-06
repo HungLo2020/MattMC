@@ -28,7 +28,7 @@ import net.minecraft.world.level.storage.loot.providers.number.NumberProviders;
 public class SetAttributesFunction extends LootItemConditionalFunction {
 	public static final MapCodec<SetAttributesFunction> CODEC = RecordCodecBuilder.mapCodec(
 		instance -> commonFields(instance)
-			.<List<SetAttributesFunction.Modifier>, boolean>and(
+			.<List<SetAttributesFunction.Modifier>, Boolean>and(
 				instance.group(
 					SetAttributesFunction.Modifier.CODEC.listOf().fieldOf("modifiers").forGetter(setAttributesFunction -> setAttributesFunction.modifiers),
 					Codec.BOOL.optionalFieldOf("replace", true).forGetter(setAttributesFunction -> setAttributesFunction.replace)

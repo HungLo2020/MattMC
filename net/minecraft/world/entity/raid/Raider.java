@@ -363,7 +363,7 @@ public abstract class Raider extends PatrollingMonster {
 
 				for (ItemEntity itemEntity : this.mob
 					.level()
-					.getEntitiesOfClass((Class<T>)ItemEntity.class, this.mob.getBoundingBox().inflate(d, 8.0, d), Raider.ALLOWED_ITEMS)) {
+					.getEntitiesOfClass(ItemEntity.class, this.mob.getBoundingBox().inflate(d, 8.0, d), Raider.ALLOWED_ITEMS)) {
 					long l = this.unreachableBannerCache.getOrDefault(itemEntity.getId(), Long.MIN_VALUE);
 					if (Raider.this.level().getGameTime() < l) {
 						int2LongOpenHashMap.put(itemEntity.getId(), l);

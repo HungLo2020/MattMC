@@ -442,7 +442,7 @@ public class Wolf extends TamableAnimal implements NeutralMob {
 	}
 
 	@Override
-	protected void hurtArmor(DamageSource damageSource, float f) {
+	public void hurtArmor(DamageSource damageSource, float f) {
 		this.doHurtEquipment(damageSource, f, new EquipmentSlot[]{EquipmentSlot.BODY});
 	}
 

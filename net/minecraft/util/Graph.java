@@ -17,7 +17,7 @@ public final class Graph {
 		} else {
 			set2.add(object);
 
-			for (T object2 : (Set)map.getOrDefault(object, ImmutableSet.of())) {
+			for (T object2 : map.getOrDefault(object, ImmutableSet.of())) {
 				if (depthFirstSearch(map, set, set2, consumer, object2)) {
 					return true;
 				}

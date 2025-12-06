@@ -23,7 +23,7 @@ import net.minecraft.world.level.storage.loot.providers.number.NumberProviders;
 public class SetEnchantmentsFunction extends LootItemConditionalFunction {
 	public static final MapCodec<SetEnchantmentsFunction> CODEC = RecordCodecBuilder.mapCodec(
 		instance -> commonFields(instance)
-			.<Map<Holder<Enchantment>, NumberProvider>, boolean>and(
+			.<Map<Holder<Enchantment>, NumberProvider>, Boolean>and(
 				instance.group(
 					Codec.unboundedMap(Enchantment.CODEC, NumberProviders.CODEC)
 						.optionalFieldOf("enchantments", Map.of())

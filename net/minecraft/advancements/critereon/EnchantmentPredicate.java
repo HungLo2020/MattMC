@@ -30,7 +30,7 @@ public record EnchantmentPredicate(Optional<HolderSet<Enchantment>> enchantments
 
 	public boolean containedIn(ItemEnchantments itemEnchantments) {
 		if (this.enchantments.isPresent()) {
-			for (Holder<Enchantment> holder : (HolderSet)this.enchantments.get()) {
+			for (Holder<Enchantment> holder : this.enchantments.get()) {
 				if (this.matchesEnchantment(itemEnchantments, holder)) {
 					return true;
 				}

@@ -33,7 +33,7 @@ public class StaticCache2D<T> {
 
 	public void forEach(Consumer<T> consumer) {
 		for (Object object : this.cache) {
-			consumer.accept(object);
+			consumer.accept((T)object);
 		}
 	}
 

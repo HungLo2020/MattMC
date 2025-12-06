@@ -124,7 +124,7 @@ public abstract class Settings<T extends Settings<T>> {
 	private static <V extends Number> Function<String, V> wrapNumberDeserializer(Function<String, V> function) {
 		return string -> {
 			try {
-				return (Number)function.apply(string);
+				return function.apply(string);
 			} catch (NumberFormatException var3) {
 				return null;
 			}
@@ -168,7 +168,7 @@ public abstract class Settings<T extends Settings<T>> {
 		String string2 = this.getStringRaw(string);
 		V object2 = MoreObjects.firstNonNull((V)(string2 != null ? function.apply(string2) : null), object);
 		this.properties.put(string, function2.apply(object2));
-		return new Settings.MutableValue<>(string, object2, function2);
+		return this.new MutableValue<>(string, object2, function2);
 	}
 
 	protected <V> V get(String string, Function<String, V> function, UnaryOperator<V> unaryOperator, Function<V, String> function2, V object) {

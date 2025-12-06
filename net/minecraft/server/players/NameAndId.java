@@ -15,12 +15,10 @@ public record NameAndId(UUID id, String name) {
 	);
 
 	public NameAndId(GameProfile gameProfile) {
-		this(gameProfile.id(), gameProfile.name());
+		this(gameProfile.getId(), gameProfile.getName());
 	}
 
-	public NameAndId(com.mojang.authlib.yggdrasil.response.NameAndId nameAndId) {
-		this(nameAndId.id(), nameAndId.name());
-	}
+	// Note: Yggdrasil response type may not be on classpath in all configurations; prefer explicit factory methods instead.
 
 	@Nullable
 	public static NameAndId fromJson(JsonObject jsonObject) {

@@ -15,6 +15,7 @@ import net.minecraft.world.entity.npc.VillagerProfession;
 import net.minecraft.world.level.pathfinder.Path;
 
 public class YieldJobSite {
+	@SuppressWarnings("unchecked")
 	public static BehaviorControl<Villager> create(float f) {
 		return BehaviorBuilder.create(
 			instance -> instance.group(
@@ -37,7 +38,7 @@ public class YieldJobSite {
 							if (optional.isEmpty()) {
 								return true;
 							} else {
-								instance.<List>get(memoryAccessor3)
+								((List<LivingEntity>)instance.get(memoryAccessor3))
 									.stream()
 									.filter(livingEntity -> livingEntity instanceof Villager && livingEntity != villager)
 									.map(livingEntity -> (Villager)livingEntity)

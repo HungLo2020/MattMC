@@ -9,7 +9,7 @@ public record SavedDataType<T extends SavedData>(
 	String id, Function<SavedData.Context, T> constructor, Function<SavedData.Context, Codec<T>> codec, DataFixTypes dataFixType
 ) {
 	public SavedDataType(String string, Supplier<T> supplier, Codec<T> codec, DataFixTypes dataFixTypes) {
-		this(string, context -> (SavedData)supplier.get(), context -> codec, dataFixTypes);
+		this(string, context -> (T)supplier.get(), context -> codec, dataFixTypes);
 	}
 
 	public boolean equals(Object object) {

@@ -32,22 +32,22 @@ import net.minecraft.world.level.levelgen.structure.StructureSet;
 import org.slf4j.Logger;
 
 public class FlatLevelGeneratorSettings {
-	private static final Logger LOGGER = LogUtils.getLogger();
-	public static final Codec<FlatLevelGeneratorSettings> CODEC = RecordCodecBuilder.create(
+		private static final Logger LOGGER = LogUtils.getLogger();
+	public static final Codec<FlatLevelGeneratorSettings> CODEC = RecordCodecBuilder.<FlatLevelGeneratorSettings>create(
 			instance -> instance.group(
 					RegistryCodecs.homogeneousList(Registries.STRUCTURE_SET)
 						.lenientOptionalFieldOf("structure_overrides")
-						.forGetter(flatLevelGeneratorSettings -> flatLevelGeneratorSettings.structureOverrides),
+						.forGetter((FlatLevelGeneratorSettings flatLevelGeneratorSettings) -> flatLevelGeneratorSettings.structureOverrides),
 					FlatLayerInfo.CODEC.listOf().fieldOf("layers").forGetter(FlatLevelGeneratorSettings::getLayersInfo),
-					Codec.BOOL.fieldOf("lakes").orElse(false).forGetter(flatLevelGeneratorSettings -> flatLevelGeneratorSettings.addLakes),
-					Codec.BOOL.fieldOf("features").orElse(false).forGetter(flatLevelGeneratorSettings -> flatLevelGeneratorSettings.decoration),
+					Codec.BOOL.fieldOf("lakes").orElse(false).forGetter((FlatLevelGeneratorSettings flatLevelGeneratorSettings) -> flatLevelGeneratorSettings.addLakes),
+					Codec.BOOL.fieldOf("features").orElse(false).forGetter((FlatLevelGeneratorSettings flatLevelGeneratorSettings) -> flatLevelGeneratorSettings.decoration),
 					Biome.CODEC
 						.lenientOptionalFieldOf("biome")
 						.orElseGet(Optional::empty)
-						.forGetter(flatLevelGeneratorSettings -> Optional.of(flatLevelGeneratorSettings.biome)),
-					RegistryOps.retrieveElement(Biomes.PLAINS),
-					RegistryOps.retrieveElement(MiscOverworldPlacements.LAKE_LAVA_UNDERGROUND),
-					RegistryOps.retrieveElement(MiscOverworldPlacements.LAKE_LAVA_SURFACE)
+						.forGetter((FlatLevelGeneratorSettings flatLevelGeneratorSettings) -> Optional.of(flatLevelGeneratorSettings.biome)),
+					RegistryOps.<Biome, FlatLevelGeneratorSettings>retrieveElement(Biomes.PLAINS),
+					RegistryOps.<PlacedFeature, FlatLevelGeneratorSettings>retrieveElement(MiscOverworldPlacements.LAKE_LAVA_UNDERGROUND),
+					RegistryOps.<PlacedFeature, FlatLevelGeneratorSettings>retrieveElement(MiscOverworldPlacements.LAKE_LAVA_SURFACE)
 				)
 				.apply(instance, FlatLevelGeneratorSettings::new)
 		)
@@ -155,7 +155,7 @@ public class FlatLevelGeneratorSettings {
 					if (i != GenerationStep.Decoration.UNDERGROUND_STRUCTURES.ordinal()
 						&& i != GenerationStep.Decoration.SURFACE_STRUCTURES.ordinal()
 						&& (!this.addLakes || i != GenerationStep.Decoration.LAKES.ordinal())) {
-						for (Holder<PlacedFeature> holder3 : (HolderSet)list.get(i)) {
+						for (Holder<PlacedFeature> holder3 : (HolderSet<PlacedFeature>)list.get(i)) {
 							plainBuilder.addFeature(i, holder3);
 						}
 					}

@@ -21,11 +21,11 @@ public record TracingExecutor(ExecutorService service) implements Executor {
 				}
 			});
 		} else {
-			return (Executor)(TracyClient.isAvailable() ? runnable -> this.service.execute(() -> {
+			return TracyClient.isAvailable() ? (Executor)(runnable -> this.service.execute(() -> {
 				try (Zone zone = TracyClient.beginZone(string, SharedConstants.IS_RUNNING_IN_IDE)) {
 					runnable.run();
 				}
-			}) : this.service);
+			})) : this.service;
 		}
 	}
 

@@ -47,10 +47,10 @@ public class ServerStatsCounter extends StatsCounter {
 
 	private static <T> Codec<Map<Stat<?>, Integer>> createTypedStatsCodec(StatType<T> statType) {
 		Codec<T> codec = statType.getRegistry().byNameCodec();
-		Codec<Stat<?>> codec2 = codec.flatComapMap(
-			statType::get,
+		Codec<Stat<?>> codec2 = codec.<Stat<?>>flatComapMap(
+			t -> statType.get(t),
 			stat -> stat.getType() == statType
-				? DataResult.success(stat.getValue())
+				? DataResult.success((T)stat.getValue())
 				: DataResult.error(() -> "Expected type " + statType + ", but got " + stat.getType())
 		);
 		return Codec.unboundedMap(codec2, Codec.INT);

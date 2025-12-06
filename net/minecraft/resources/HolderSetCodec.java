@@ -48,7 +48,9 @@ public class HolderSetCodec<E> implements Codec<HolderSet<E>> {
 					.decode(dynamicOps, object)
 					.flatMap(
 						pair -> {
-							DataResult<HolderSet<E>> dataResult = ((Either)pair.getFirst())
+							@SuppressWarnings("unchecked")
+							Either<TagKey<E>, List<Holder<E>>> either = (Either<TagKey<E>, List<Holder<E>>>)pair.getFirst();
+							DataResult<HolderSet<E>> dataResult = either
 								.map(tagKey -> lookupTag(holderGetter, tagKey), list -> DataResult.success(HolderSet.direct(list)));
 							return dataResult.map(holderSet -> Pair.of(holderSet, pair.getSecond()));
 						}
@@ -60,8 +62,8 @@ public class HolderSetCodec<E> implements Codec<HolderSet<E>> {
 	}
 
 	private static <E> DataResult<HolderSet<E>> lookupTag(HolderGetter<E> holderGetter, TagKey<E> tagKey) {
-		return (DataResult<HolderSet<E>>)holderGetter.get(tagKey)
-			.map(DataResult::success)
+		return holderGetter.get(tagKey)
+			.<DataResult<HolderSet<E>>>map(named -> DataResult.success(named))
 			.orElseGet(() -> DataResult.error(() -> "Missing tag: '" + tagKey.location() + "' in '" + tagKey.registry().location() + "'"));
 	}
 
@@ -84,7 +86,9 @@ public class HolderSetCodec<E> implements Codec<HolderSet<E>> {
 		return this.elementCodec.listOf().decode(dynamicOps, object).flatMap(pair -> {
 			List<Holder.Direct<E>> list = new ArrayList();
 
-			for (Holder<E> holder : (List)pair.getFirst()) {
+			@SuppressWarnings("unchecked")
+			List<Holder<E>> holderList = (List<Holder<E>>)pair.getFirst();
+			for (Holder<E> holder : holderList) {
 				if (!(holder instanceof Holder.Direct<E> direct)) {
 					return DataResult.error(() -> "Can't decode element " + holder + " without registry");
 				}

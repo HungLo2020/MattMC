@@ -581,9 +581,9 @@ public abstract class RecipeProvider {
 	}
 
 	public void waxRecipes(FeatureFlagSet featureFlagSet) {
-		((BiMap)HoneycombItem.WAXABLES.get())
+		((BiMap<Block, Block>)HoneycombItem.WAXABLES.get())
 			.forEach(
-				(block, block2) -> {
+				(Block block, Block block2) -> {
 					if (block2.requiredFeatures().isSubsetOf(featureFlagSet)) {
 						this.shapeless(RecipeCategory.BUILDING_BLOCKS, block2)
 							.requires(block)
@@ -780,6 +780,7 @@ public abstract class RecipeProvider {
 							}
 
 							@Override
+							@SuppressWarnings("removal")
 							public Advancement.Builder advancement() {
 								return Advancement.Builder.recipeAdvancement().parent(RecipeBuilder.ROOT_RECIPE_ADVANCEMENT);
 							}

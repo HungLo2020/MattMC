@@ -47,8 +47,8 @@ public class FilledProfileResults implements ProfileResults {
 		}
 	};
 	private static final Splitter SPLITTER = Splitter.on('\u001e');
-	private static final Comparator<Entry<String, FilledProfileResults.CounterCollector>> COUNTER_ENTRY_COMPARATOR = Entry.comparingByValue(
-			Comparator.comparingLong(counterCollector -> counterCollector.totalValue)
+	private static final Comparator<Entry<String, FilledProfileResults.CounterCollector>> COUNTER_ENTRY_COMPARATOR = Entry.<String, FilledProfileResults.CounterCollector>comparingByValue(
+			Comparator.comparingLong((FilledProfileResults.CounterCollector counterCollector) -> counterCollector.totalValue)
 		)
 		.reversed();
 	private final Map<String, ? extends ProfilerPathEntry> entries;

@@ -282,7 +282,7 @@ public record PackFormat(int major, int minor) implements Comparable<PackFormat>
 					}
 				}
 
-				return DataResult.success(new InclusiveRange(j, k).map(PackFormat::of));
+				return DataResult.success(new InclusiveRange<Integer>(j, k).map(PackFormat::of));
 			}
 		}
 

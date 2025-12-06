@@ -391,7 +391,8 @@ public class DataComponents {
 		return CUSTOM_DATA;
 	}
 
+	@SuppressWarnings("unchecked")
 	private static <T> DataComponentType<T> register(String string, UnaryOperator<DataComponentType.Builder<T>> unaryOperator) {
-		return Registry.register(BuiltInRegistries.DATA_COMPONENT_TYPE, string, ((DataComponentType.Builder)unaryOperator.apply(DataComponentType.builder())).build());
+		return (DataComponentType<T>)Registry.register(BuiltInRegistries.DATA_COMPONENT_TYPE, string, (DataComponentType<?>)((DataComponentType.Builder)unaryOperator.apply(DataComponentType.builder())).build());
 	}
 }

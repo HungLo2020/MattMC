@@ -74,6 +74,11 @@ public class ArgumentTypeInfos {
 		return Registry.register(registry, string, argumentTypeInfo);
 	}
 
+	@SuppressWarnings("unchecked")
+	private static <T extends ArgumentType<?>> Class<T> fixClassType(Class<? super T> class_) {
+		return (Class<T>)class_;
+	}
+
 	public static ArgumentTypeInfo<?, ?> bootstrap(Registry<ArgumentTypeInfo<?, ?>> registry) {
 		register(registry, "brigadier:bool", BoolArgumentType.class, SingletonArgumentInfo.contextFree(BoolArgumentType::bool));
 		register(registry, "brigadier:float", FloatArgumentType.class, new FloatArgumentInfo());
@@ -119,11 +124,11 @@ public class ArgumentTypeInfos {
 		register(registry, "dimension", DimensionArgument.class, SingletonArgumentInfo.contextFree(DimensionArgument::dimension));
 		register(registry, "gamemode", GameModeArgument.class, SingletonArgumentInfo.contextFree(GameModeArgument::gameMode));
 		register(registry, "time", TimeArgument.class, new TimeArgument.Info());
-		register(registry, "resource_or_tag", fixClassType(ResourceOrTagArgument.class), new ResourceOrTagArgument.Info());
-		register(registry, "resource_or_tag_key", fixClassType(ResourceOrTagKeyArgument.class), new ResourceOrTagKeyArgument.Info());
-		register(registry, "resource", fixClassType(ResourceArgument.class), new ResourceArgument.Info());
-		register(registry, "resource_key", fixClassType(ResourceKeyArgument.class), new ResourceKeyArgument.Info());
-		register(registry, "resource_selector", fixClassType(ResourceSelectorArgument.class), new ResourceSelectorArgument.Info());
+		register(registry, "resource_or_tag", ResourceOrTagArgument.class, new ResourceOrTagArgument.Info());
+		register(registry, "resource_or_tag_key", ResourceOrTagKeyArgument.class, new ResourceOrTagKeyArgument.Info());
+		register(registry, "resource", ResourceArgument.class, new ResourceArgument.Info());
+		register(registry, "resource_key", ResourceKeyArgument.class, new ResourceKeyArgument.Info());
+		register(registry, "resource_selector", ResourceSelectorArgument.class, new ResourceSelectorArgument.Info());
 		register(registry, "template_mirror", TemplateMirrorArgument.class, SingletonArgumentInfo.contextFree(TemplateMirrorArgument::templateMirror));
 		register(registry, "template_rotation", TemplateRotationArgument.class, SingletonArgumentInfo.contextFree(TemplateRotationArgument::templateRotation));
 		register(registry, "heightmap", HeightmapTypeArgument.class, SingletonArgumentInfo.contextFree(HeightmapTypeArgument::heightmap));
@@ -134,10 +139,6 @@ public class ArgumentTypeInfos {
 		register(registry, "loot_modifier", ResourceOrIdArgument.LootModifierArgument.class, SingletonArgumentInfo.contextAware(ResourceOrIdArgument::lootModifier));
 		register(registry, "dialog", ResourceOrIdArgument.DialogArgument.class, SingletonArgumentInfo.contextAware(ResourceOrIdArgument::dialog));
 		return register(registry, "uuid", UuidArgument.class, SingletonArgumentInfo.contextFree(UuidArgument::uuid));
-	}
-
-	private static <T extends ArgumentType<?>> Class<T> fixClassType(Class<? super T> class_) {
-		return (Class<T>)class_;
 	}
 
 	public static boolean isClassRecognized(Class<?> class_) {

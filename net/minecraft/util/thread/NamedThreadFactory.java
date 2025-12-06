@@ -11,6 +11,7 @@ public class NamedThreadFactory implements ThreadFactory {
 	private final AtomicInteger threadNumber = new AtomicInteger(1);
 	private final String namePrefix;
 
+	@SuppressWarnings("removal")
 	public NamedThreadFactory(String string) {
 		SecurityManager securityManager = System.getSecurityManager();
 		this.group = securityManager != null ? securityManager.getThreadGroup() : Thread.currentThread().getThreadGroup();

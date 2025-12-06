@@ -21,7 +21,7 @@ import net.minecraft.world.level.storage.loot.providers.number.NumberProvider;
 import net.minecraft.world.level.storage.loot.providers.number.NumberProviders;
 
 public class SetCustomModelDataFunction extends LootItemConditionalFunction {
-	private static final Codec<NumberProvider> COLOR_PROVIDER_CODEC = Codec.withAlternative(NumberProviders.CODEC, ExtraCodecs.RGB_COLOR_CODEC, ConstantValue::new);
+	private static final Codec<NumberProvider> COLOR_PROVIDER_CODEC = Codec.withAlternative(NumberProviders.CODEC, ExtraCodecs.RGB_COLOR_CODEC, i -> ConstantValue.exactly(i.floatValue()));
 	public static final MapCodec<SetCustomModelDataFunction> CODEC = RecordCodecBuilder.mapCodec(
 		instance -> commonFields(instance)
 			.<Optional<ListOperation.StandAlone<NumberProvider>>, Optional<ListOperation.StandAlone<Boolean>>, Optional<ListOperation.StandAlone<String>>, Optional<ListOperation.StandAlone<NumberProvider>>>and(
@@ -78,10 +78,11 @@ public class SetCustomModelDataFunction extends LootItemConditionalFunction {
 		return (List<T>)optional.map(standAlone -> standAlone.apply(list)).orElse(list);
 	}
 
+	@SuppressWarnings("unchecked")
 	private static <T, E> List<E> apply(Optional<ListOperation.StandAlone<T>> optional, List<E> list, Function<T, E> function) {
-		return (List<E>)optional.map(standAlone -> {
+		return optional.map(standAlone -> {
 			List<E> list2 = standAlone.value().stream().map(function).toList();
-			return standAlone.operation().apply((List<T>)list, (List<T>)list2);
+			return (List<E>)standAlone.operation().apply((List)list, (List)list2);
 		}).orElse(list);
 	}
 

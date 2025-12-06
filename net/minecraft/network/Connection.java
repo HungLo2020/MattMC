@@ -307,7 +307,7 @@ public class Connection extends SimpleChannelInboundHandler<Packet<?>> {
 			this.flushQueue();
 			this.sendPacket(packet, channelFutureListener, bl);
 		} else {
-			this.pendingActions.add((Consumer)connection -> connection.sendPacket(packet, channelFutureListener, bl));
+			this.pendingActions.add((Consumer<Connection>)(connection -> connection.sendPacket(packet, channelFutureListener, bl)));
 		}
 	}
 

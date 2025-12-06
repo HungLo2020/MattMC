@@ -14,7 +14,8 @@ public record StaticAction(ClickEvent value) implements Action {
 
 		for (ClickEvent.Action action : (ClickEvent.Action[])ClickEvent.Action.class.getEnumConstants()) {
 			if (action.isAllowedFromServer()) {
-				MapCodec<ClickEvent> mapCodec = action.valueCodec();
+				@SuppressWarnings("unchecked")
+				MapCodec<ClickEvent> mapCodec = (MapCodec<ClickEvent>)action.valueCodec();
 				map.put(action, mapCodec.xmap(StaticAction::new, StaticAction::value));
 			}
 		}

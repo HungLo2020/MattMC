@@ -100,7 +100,7 @@ public class SculkSpreader {
 
 	public void load(ValueInput valueInput) {
 		this.cursors.clear();
-		((List)valueInput.read("cursors", SculkSpreader.ChargeCursor.CODEC.sizeLimitedListOf(32)).orElse(List.of())).forEach(this::addCursor);
+		((List<SculkSpreader.ChargeCursor>)valueInput.read("cursors", SculkSpreader.ChargeCursor.CODEC.sizeLimitedListOf(32)).orElse(List.of())).forEach(cursor -> this.addCursor(cursor));
 	}
 
 	public void save(ValueOutput valueOutput) {

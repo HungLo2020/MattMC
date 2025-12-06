@@ -66,8 +66,8 @@ public class ChunkToProtochunkFix extends DataFix {
 				.asStreamOpt()
 				.result()
 				.map(
-					stream -> {
-						List<ShortList> list = (List<ShortList>)IntStream.range(0, 16).mapToObj(i -> new ShortArrayList()).collect(Collectors.toList());
+						stream -> {
+						List<ShortList> list = IntStream.range(0, 16).mapToObj(i -> (ShortList)new ShortArrayList()).collect(Collectors.toList());
 						stream.forEach(dynamicxx -> {
 							int i = dynamicxx.get("x").asInt(0);
 							int j = dynamicxx.get("y").asInt(0);

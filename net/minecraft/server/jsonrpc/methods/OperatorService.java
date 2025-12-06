@@ -35,7 +35,7 @@ public class OperatorService {
 			.map(playerDto -> minecraftApi.playerListService().getUser(playerDto.id(), playerDto.name()))
 			.toList();
 
-		for (Optional<NameAndId> optional : (List)Util.sequence(list2).join()) {
+		for (Optional<NameAndId> optional : Util.<Optional<NameAndId>>sequence(list2).join()) {
 			optional.ifPresent(nameAndId -> minecraftApi.operatorListService().deop(nameAndId, clientInfo));
 		}
 
@@ -51,7 +51,7 @@ public class OperatorService {
 			)
 			.toList();
 
-		for (Optional<OperatorService.Op> optional : (List)Util.sequence(list2).join()) {
+			for (Optional<OperatorService.Op> optional : Util.<Optional<OperatorService.Op>>sequence(list2).join()) {
 			optional.ifPresent(op -> minecraftApi.operatorListService().op(op.user(), op.permissionLevel(), op.bypassesPlayerLimit(), clientInfo));
 		}
 
@@ -66,10 +66,10 @@ public class OperatorService {
 					.thenApply(optional -> optional.map(nameAndId -> new OperatorService.Op(nameAndId, operatorDto.permissionLevel(), operatorDto.bypassesPlayerLimit())))
 			)
 			.toList();
-		Set<OperatorService.Op> set = (Set<OperatorService.Op>)((List)Util.sequence(list2).join())
+		Set<OperatorService.Op> set = Util.<Optional<OperatorService.Op>>sequence(list2).join()
 			.stream()
 			.filter(Optional::isPresent)
-			.map(Optional::get)
+			.map(opt -> opt.get())
 			.collect(Collectors.toSet());
 		Set<OperatorService.Op> set2 = (Set<OperatorService.Op>)minecraftApi.operatorListService()
 			.getEntries()

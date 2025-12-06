@@ -32,12 +32,12 @@ public class ServerStateService {
 		if (component == null) {
 			return false;
 		} else {
-			if (systemMessage.receivingPlayers().isPresent()) {
-				if (((List)systemMessage.receivingPlayers().get()).isEmpty()) {
+				if (systemMessage.receivingPlayers().isPresent()) {
+				if (systemMessage.receivingPlayers().get().isEmpty()) {
 					return false;
 				}
 
-				for (PlayerDto playerDto : (List)systemMessage.receivingPlayers().get()) {
+				for (PlayerDto playerDto : systemMessage.receivingPlayers().get()) {
 					ServerPlayer serverPlayer;
 					if (playerDto.id().isPresent()) {
 						serverPlayer = minecraftApi.playerListService().getPlayer((UUID)playerDto.id().get());

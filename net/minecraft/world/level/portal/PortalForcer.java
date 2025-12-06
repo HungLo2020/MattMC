@@ -46,7 +46,7 @@ public class PortalForcer {
 			.map(PoiRecord::getPos)
 			.filter(worldBorder::isWithinBounds)
 			.filter(blockPosx -> this.level.getBlockState(blockPosx).hasProperty(BlockStateProperties.HORIZONTAL_AXIS))
-			.min(Comparator.comparingDouble(blockPos2 -> blockPos2.distSqr(blockPos)).thenComparingInt(Vec3i::getY));
+			.min(Comparator.comparingDouble((BlockPos bp2) -> bp2.distSqr(blockPos)).thenComparingInt(bp2 -> bp2.getY()));
 	}
 
 	public Optional<BlockUtil.FoundRectangle> createPortal(BlockPos blockPos, Direction.Axis axis) {

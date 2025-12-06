@@ -69,8 +69,8 @@ public class CopyComponentsFunction extends LootItemConditionalFunction {
 				itemStack.applyComponents(dataComponentMap.filter(this.bakedPredicate));
 			} else {
 				Collection<DataComponentType<?>> collection = (Collection<DataComponentType<?>>)this.exclude.orElse(List.of());
-				((Stream)this.include.map(Collection::stream).orElse(BuiltInRegistries.DATA_COMPONENT_TYPE.listElements().map(Holder::value)))
-					.forEach(dataComponentType -> {
+				Stream<DataComponentType<?>> stream = this.include.map(Collection::stream).orElse(BuiltInRegistries.DATA_COMPONENT_TYPE.listElements().map(Holder::value));
+				stream.forEach(dataComponentType -> {
 						if (!collection.contains(dataComponentType)) {
 							TypedDataComponent<?> typedDataComponent = dataComponentGetter.getTyped(dataComponentType);
 							if (typedDataComponent != null) {

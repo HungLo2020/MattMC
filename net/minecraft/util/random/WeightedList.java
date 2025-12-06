@@ -61,7 +61,7 @@ public final class WeightedList<E> {
 	}
 
 	public <T> WeightedList<T> map(Function<E, T> function) {
-		return new WeightedList(Lists.transform(this.items, weighted -> weighted.map((Function<T, E>)function)));
+		return new WeightedList<>(Lists.transform(this.items, weighted -> weighted.map(function)));
 	}
 
 	public Optional<E> getRandom(RandomSource randomSource) {

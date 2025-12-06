@@ -48,7 +48,7 @@ public interface ScoreHolder {
 	}
 
 	static ScoreHolder fromGameProfile(GameProfile gameProfile) {
-		final String string = gameProfile.name();
+		final String string = gameProfile.getName();
 		return new ScoreHolder() {
 			@Override
 			public String getScoreboardName() {

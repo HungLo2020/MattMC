@@ -29,7 +29,7 @@ public class SortedArraySet<T> extends AbstractSet<T> {
 	}
 
 	public static <T extends Comparable<T>> SortedArraySet<T> create(int i) {
-		return new SortedArraySet<>(i, Comparator.naturalOrder());
+		return new SortedArraySet<T>(i, Comparator.<T>naturalOrder());
 	}
 
 	public static <T> SortedArraySet<T> create(Comparator<T> comparator) {

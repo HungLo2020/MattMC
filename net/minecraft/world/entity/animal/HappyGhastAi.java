@@ -7,6 +7,7 @@ import net.minecraft.util.valueproviders.UniformInt;
 import net.minecraft.world.entity.ai.Brain;
 import net.minecraft.world.entity.ai.behavior.AnimalPanic;
 import net.minecraft.world.entity.ai.behavior.BabyFollowAdult;
+import net.minecraft.world.entity.ai.behavior.BehaviorControl;
 import net.minecraft.world.entity.ai.behavior.CountDownCooldownTicks;
 import net.minecraft.world.entity.ai.behavior.FollowTemptation;
 import net.minecraft.world.entity.ai.behavior.LookAtTargetSink;
@@ -67,7 +68,7 @@ public class HappyGhastAi {
 		brain.addActivity(
 			Activity.CORE,
 			0,
-			ImmutableList.of(
+			ImmutableList.<BehaviorControl<? super HappyGhast>>of(
 				new Swim<>(0.8F),
 				new AnimalPanic(2.0F, 0),
 				new LookAtTargetSink(45, 90),

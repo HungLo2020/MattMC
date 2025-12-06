@@ -53,7 +53,7 @@ public class TagLoader<T> {
 			ResourceLocation resourceLocation = (ResourceLocation)entry.getKey();
 			ResourceLocation resourceLocation2 = fileToIdConverter.fileToId(resourceLocation);
 
-			for (Resource resource : (List)entry.getValue()) {
+			for (Resource resource : entry.getValue()) {
 				try {
 					Reader reader = resource.openAsReader();
 
@@ -140,7 +140,7 @@ public class TagLoader<T> {
 	}
 
 	public static List<Registry.PendingTags<?>> loadTagsForExistingRegistries(ResourceManager resourceManager, RegistryAccess registryAccess) {
-		return (List<Registry.PendingTags<?>>)registryAccess.registries()
+		return registryAccess.registries()
 			.map(registryEntry -> loadPendingTags(resourceManager, registryEntry.value()))
 			.flatMap(Optional::stream)
 			.collect(Collectors.toUnmodifiableList());

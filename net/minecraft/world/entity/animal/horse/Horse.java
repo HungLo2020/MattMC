@@ -233,7 +233,7 @@ public class Horse extends AbstractHorse {
 	}
 
 	@Override
-	protected void hurtArmor(DamageSource damageSource, float f) {
+	public void hurtArmor(DamageSource damageSource, float f) {
 		this.doHurtEquipment(damageSource, f, new EquipmentSlot[]{EquipmentSlot.BODY});
 	}
 

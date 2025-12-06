@@ -115,7 +115,7 @@ public class InteractWithDoor {
 	private static boolean areOtherMobsComingThroughDoor(LivingEntity livingEntity, BlockPos blockPos, Optional<List<LivingEntity>> optional) {
 		return optional.isEmpty()
 			? false
-			: ((List)optional.get())
+			: optional.get()
 				.stream()
 				.filter(livingEntity2 -> livingEntity2.getType() == livingEntity.getType())
 				.filter(livingEntityx -> blockPos.closerToCenterThan(livingEntityx.position(), 2.0))

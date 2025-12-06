@@ -48,8 +48,9 @@ public class ChunkGeneratorStructureState {
 	}
 
 	public static ChunkGeneratorStructureState createForNormal(RandomState randomState, long l, BiomeSource biomeSource, HolderLookup<StructureSet> holderLookup) {
-		List<Holder<StructureSet>> list = (List<Holder<StructureSet>>)holderLookup.listElements()
+		List<Holder<StructureSet>> list = holderLookup.listElements()
 			.filter(reference -> hasBiomesForStructureSet((StructureSet)reference.value(), biomeSource))
+			.map(reference -> (Holder<StructureSet>)reference)
 			.collect(Collectors.toUnmodifiableList());
 		return new ChunkGeneratorStructureState(randomState, biomeSource, l, l, list);
 	}

@@ -33,8 +33,8 @@ public record SelectableRecipe<T extends Recipe<?>>(SlotDisplay optionDisplay, O
 
 		public static <T extends Recipe<?>> StreamCodec<RegistryFriendlyByteBuf, SelectableRecipe.SingleInputSet<T>> noRecipeCodec() {
 			return StreamCodec.composite(
-				SelectableRecipe.SingleInputEntry.noRecipeCodec().apply(ByteBufCodecs.list()),
-				SelectableRecipe.SingleInputSet::entries,
+				SelectableRecipe.SingleInputEntry.<T>noRecipeCodec().apply(ByteBufCodecs.list()),
+				SingleInputSet::entries,
 				SelectableRecipe.SingleInputSet::new
 			);
 		}

@@ -33,17 +33,20 @@ public class ChunkBedBlockEntityInjecterFix extends DataFix {
 		}
 	}
 
+	@SuppressWarnings({"unchecked", "rawtypes"})
 	private <TE> TypeRewriteRule cap(Type<?> type, ListType<TE> listType) {
 		Type<TE> type2 = listType.getElement();
 		OpticFinder<?> opticFinder = DSL.fieldFinder("Level", type);
 		OpticFinder<List<TE>> opticFinder2 = DSL.fieldFinder("TileEntities", listType);
 		int i = 416;
+		Type inputType = this.getInputSchema().findChoiceType(References.BLOCK_ENTITY);
+		Type outputType = this.getOutputSchema().findChoiceType(References.BLOCK_ENTITY);
 		return TypeRewriteRule.seq(
 			this.fixTypeEverywhere(
 				"InjectBedBlockEntityType",
-				this.getInputSchema().findChoiceType(References.BLOCK_ENTITY),
-				this.getOutputSchema().findChoiceType(References.BLOCK_ENTITY),
-				dynamicOps -> pair -> pair
+				inputType,
+				outputType,
+				dynamicOps -> (Function)(pair -> pair)
 			),
 			this.fixTypeEverywhereTyped(
 				"BedBlockEntityInjecter",
@@ -77,10 +80,9 @@ public class ChunkBedBlockEntityInjecterFix extends DataFix {
 							.forEachOrdered(
 								map -> {
 									if (map != null) {
-										list.add(
-											((Pair)type2.read(dynamic2.createMap(map)).result().orElseThrow(() -> new IllegalStateException("Could not parse newly created bed block entity.")))
-												.getFirst()
-										);
+										TE first = (TE)((Pair<?, ?>)type2.read(dynamic2.createMap(map)).result().orElseThrow(() -> new IllegalStateException("Could not parse newly created bed block entity.")))
+											.getFirst();
+										list.add(first);
 									}
 								}
 							);

@@ -25,13 +25,14 @@ public record JukeboxPlayablePredicate(Optional<HolderSet<JukeboxSong>> song) im
 		return DataComponents.JUKEBOX_PLAYABLE;
 	}
 
+	@SuppressWarnings("unchecked")
 	public boolean matches(JukeboxPlayable jukeboxPlayable) {
 		if (!this.song.isPresent()) {
 			return true;
 		} else {
 			boolean bl = false;
 
-			for (Holder<JukeboxSong> holder : (HolderSet)this.song.get()) {
+			for (Holder<JukeboxSong> holder : (HolderSet<JukeboxSong>)this.song.get()) {
 				Optional<ResourceKey<JukeboxSong>> optional = holder.unwrapKey();
 				if (!optional.isEmpty() && optional.equals(jukeboxPlayable.song().key())) {
 					bl = true;

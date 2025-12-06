@@ -138,7 +138,13 @@ public abstract class StateHolder<O, S> {
 
 			for (Entry<Property<?>, Comparable<?>> entry : this.values.entrySet()) {
 				Property<?> property = (Property<?>)entry.getKey();
-				map2.put(property, property.getPossibleValues().stream().map(comparable -> map.get(this.makeNeighbourValues(property, comparable))).toArray());
+				List<?> possibles = property.getPossibleValues();
+				S[] arr = (S[]) new StateHolder[possibles.size()];
+				int idx = 0;
+				for (Object comparable : possibles) {
+					arr[idx++] = map.get(this.makeNeighbourValues(property, (Comparable<?>) comparable));
+				}
+				map2.put(property, arr);
 			}
 
 			this.neighbours = map2;
@@ -155,15 +161,17 @@ public abstract class StateHolder<O, S> {
 		return this.values;
 	}
 
-	protected static <O, S extends StateHolder<O, S>> Codec<S> codec(Codec<O> codec, Function<O, S> function) {
-		return codec.dispatch(
+	protected static <O, S extends StateHolder<O, S>> Codec<S> codec(Codec<O> ownerCodec, Function<O, S> factory) {
+		return ownerCodec.dispatch(
 			"Name",
-			stateHolder -> stateHolder.owner,
-			object -> {
-				S stateHolder = (S)function.apply(object);
-				return stateHolder.getValues().isEmpty()
-					? MapCodec.unit(stateHolder)
-					: stateHolder.propertiesCodec.codec().lenientOptionalFieldOf("Properties").xmap(optional -> (StateHolder)optional.orElse(stateHolder), Optional::of);
+			(S sh) -> sh.owner,
+			(O owner) -> {
+				S base = factory.apply(owner);
+				return base.getValues().isEmpty()
+					? MapCodec.unit(base)
+					: base.propertiesCodec.codec()
+						.lenientOptionalFieldOf("Properties")
+						.xmap(opt -> opt.orElse(base), s -> s.equals(base) ? Optional.empty() : Optional.of(s));
 			}
 		);
 	}

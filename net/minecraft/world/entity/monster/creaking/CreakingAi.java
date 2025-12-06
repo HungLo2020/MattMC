@@ -9,6 +9,7 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.valueproviders.UniformInt;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.ai.Brain;
+import net.minecraft.world.entity.ai.behavior.BehaviorControl;
 import net.minecraft.world.entity.ai.behavior.DoNothing;
 import net.minecraft.world.entity.ai.behavior.LookAtTargetSink;
 import net.minecraft.world.entity.ai.behavior.MeleeAttack;
@@ -47,9 +48,10 @@ public class CreakingAi {
 	);
 
 	static void initCoreActivity(Brain<Creaking> brain) {
-		brain.addActivity(Activity.CORE, 0, ImmutableList.of(new Swim<Creaking>(0.8F) {
+		brain.addActivity(Activity.CORE, 0, ImmutableList.<BehaviorControl<? super Creaking>>of(new Swim<Creaking>(0.8F) {
+			@Override
 			protected boolean checkExtraStartConditions(ServerLevel serverLevel, Creaking creaking) {
-				return creaking.canMove() && super.checkExtraStartConditions(serverLevel, (LivingEntity)creaking);
+				return creaking.canMove() && super.checkExtraStartConditions(serverLevel, creaking);
 			}
 		}, new LookAtTargetSink(45, 90), new MoveToTargetSink()));
 	}

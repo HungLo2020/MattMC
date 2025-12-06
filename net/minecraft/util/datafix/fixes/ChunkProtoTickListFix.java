@@ -127,9 +127,9 @@ public class ChunkProtoTickListFix extends DataFix {
 		for (int k = 0; k < list.size(); k++) {
 			int l = k + b;
 			Supplier<ChunkProtoTickListFix.PoorMansPalettedContainer> supplier = int2ObjectMap.get(l);
-			Stream<? extends Dynamic<?>> stream2 = ((Dynamic)list.get(k))
+			Stream<? extends Dynamic<?>> stream2 = list.get(k)
 				.asStream()
-				.mapToInt(dynamicx -> dynamicx.asShort((short)-1))
+				.mapToInt((Dynamic<?> dynamicx) -> dynamicx.asShort((short)-1))
 				.filter(ix -> ix > 0)
 				.mapToObj(lx -> this.createTick(dynamic, supplier, i, l, j, lx, function));
 			stream = Stream.concat(stream, stream2);
@@ -171,7 +171,7 @@ public class ChunkProtoTickListFix extends DataFix {
 		int o = l >>> 8 & 15;
 		String string = (String)function.apply(supplier != null ? ((ChunkProtoTickListFix.PoorMansPalettedContainer)supplier.get()).get(m, n, o) : null);
 		return dynamic.createMap(
-			ImmutableMap.builder()
+			ImmutableMap.<Dynamic<?>, Dynamic<?>>builder()
 				.put(dynamic.createString("i"), dynamic.createString(string))
 				.put(dynamic.createString("x"), dynamic.createInt(i * 16 + m))
 				.put(dynamic.createString("y"), dynamic.createInt(j * 16 + n))

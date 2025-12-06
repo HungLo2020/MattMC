@@ -56,7 +56,7 @@ public interface MinMaxBounds<T extends Number & Comparable<T>> {
 		}
 
 		public static <T extends Number & Comparable<T>> MinMaxBounds.Bounds<T> any() {
-			return new MinMaxBounds.Bounds<>(Optional.empty(), Optional.empty());
+			return new MinMaxBounds.Bounds<T>(Optional.empty(), Optional.empty());
 		}
 
 		public static <T extends Number & Comparable<T>> MinMaxBounds.Bounds<T> exactly(T number) {
@@ -87,9 +87,9 @@ public interface MinMaxBounds<T extends Number & Comparable<T>> {
 					)
 					.apply(instance, MinMaxBounds.Bounds::new)
 			);
-			return Codec.either(codec2, codec).xmap(either -> either.map(bounds -> bounds, object -> exactly((T)object)), bounds -> {
+			return Codec.either(codec2, codec).xmap(either -> either.map(bounds -> bounds, object -> exactly(object)), bounds -> {
 				Optional<T> optional = bounds.asPoint();
-				return optional.isPresent() ? Either.right((Number)optional.get()) : Either.left(bounds);
+				return optional.isPresent() ? Either.<MinMaxBounds.Bounds<T>, T>right(optional.get()) : Either.<MinMaxBounds.Bounds<T>, T>left(bounds);
 			});
 		}
 
@@ -160,7 +160,7 @@ public interface MinMaxBounds<T extends Number & Comparable<T>> {
 				return Optional.empty();
 			} else {
 				try {
-					return Optional.of((Number)function.apply(string));
+					return Optional.of(function.apply(string));
 				} catch (NumberFormatException var6) {
 					throw ((DynamicCommandExceptionType)supplier.get()).createWithContext(stringReader, string);
 				}
@@ -179,11 +179,11 @@ public interface MinMaxBounds<T extends Number & Comparable<T>> {
 
 	public record Doubles(MinMaxBounds.Bounds<Double> bounds, MinMaxBounds.Bounds<Double> boundsSqr) implements MinMaxBounds<Double> {
 		public static final MinMaxBounds.Doubles ANY = new MinMaxBounds.Doubles(MinMaxBounds.Bounds.any());
-		public static final Codec<MinMaxBounds.Doubles> CODEC = MinMaxBounds.Bounds.createCodec((Codec<T>)Codec.DOUBLE)
+		public static final Codec<MinMaxBounds.Doubles> CODEC = MinMaxBounds.Bounds.<Double>createCodec(Codec.DOUBLE)
 			.validate(MinMaxBounds.Bounds::validateSwappedBoundsInCodec)
 			.xmap(MinMaxBounds.Doubles::new, MinMaxBounds.Doubles::bounds);
-		public static final StreamCodec<ByteBuf, MinMaxBounds.Doubles> STREAM_CODEC = MinMaxBounds.Bounds.createStreamCodec(
-				(StreamCodec<ByteBuf, T>)ByteBufCodecs.DOUBLE
+		public static final StreamCodec<ByteBuf, MinMaxBounds.Doubles> STREAM_CODEC = MinMaxBounds.Bounds.<ByteBuf, Double>createStreamCodec(
+				ByteBufCodecs.DOUBLE
 			)
 			.map(MinMaxBounds.Doubles::new, MinMaxBounds.Doubles::bounds);
 
@@ -192,19 +192,19 @@ public interface MinMaxBounds<T extends Number & Comparable<T>> {
 		}
 
 		public static MinMaxBounds.Doubles exactly(double d) {
-			return new MinMaxBounds.Doubles(MinMaxBounds.Bounds.exactly((T)d));
+			return new MinMaxBounds.Doubles(MinMaxBounds.Bounds.exactly(d));
 		}
 
 		public static MinMaxBounds.Doubles between(double d, double e) {
-			return new MinMaxBounds.Doubles(MinMaxBounds.Bounds.between((T)d, (T)e));
+			return new MinMaxBounds.Doubles(MinMaxBounds.Bounds.between(d, e));
 		}
 
 		public static MinMaxBounds.Doubles atLeast(double d) {
-			return new MinMaxBounds.Doubles(MinMaxBounds.Bounds.atLeast((T)d));
+			return new MinMaxBounds.Doubles(MinMaxBounds.Bounds.atLeast(d));
 		}
 
 		public static MinMaxBounds.Doubles atMost(double d) {
-			return new MinMaxBounds.Doubles(MinMaxBounds.Bounds.atMost((T)d));
+			return new MinMaxBounds.Doubles(MinMaxBounds.Bounds.atMost(d));
 		}
 
 		public boolean matches(double d) {
@@ -231,10 +231,10 @@ public interface MinMaxBounds<T extends Number & Comparable<T>> {
 
 	public record FloatDegrees(MinMaxBounds.Bounds<Float> bounds) implements MinMaxBounds<Float> {
 		public static final MinMaxBounds.FloatDegrees ANY = new MinMaxBounds.FloatDegrees(MinMaxBounds.Bounds.any());
-		public static final Codec<MinMaxBounds.FloatDegrees> CODEC = MinMaxBounds.Bounds.createCodec((Codec<T>)Codec.FLOAT)
+		public static final Codec<MinMaxBounds.FloatDegrees> CODEC = MinMaxBounds.Bounds.<Float>createCodec(Codec.FLOAT)
 			.xmap(MinMaxBounds.FloatDegrees::new, MinMaxBounds.FloatDegrees::bounds);
-		public static final StreamCodec<ByteBuf, MinMaxBounds.FloatDegrees> STREAM_CODEC = MinMaxBounds.Bounds.createStreamCodec(
-				(StreamCodec<ByteBuf, T>)ByteBufCodecs.FLOAT
+		public static final StreamCodec<ByteBuf, MinMaxBounds.FloatDegrees> STREAM_CODEC = MinMaxBounds.Bounds.<ByteBuf, Float>createStreamCodec(
+				ByteBufCodecs.FLOAT
 			)
 			.map(MinMaxBounds.FloatDegrees::new, MinMaxBounds.FloatDegrees::bounds);
 
@@ -248,10 +248,10 @@ public interface MinMaxBounds<T extends Number & Comparable<T>> {
 
 	public record Ints(MinMaxBounds.Bounds<Integer> bounds, MinMaxBounds.Bounds<Long> boundsSqr) implements MinMaxBounds<Integer> {
 		public static final MinMaxBounds.Ints ANY = new MinMaxBounds.Ints(MinMaxBounds.Bounds.any());
-		public static final Codec<MinMaxBounds.Ints> CODEC = MinMaxBounds.Bounds.createCodec((Codec<T>)Codec.INT)
+		public static final Codec<MinMaxBounds.Ints> CODEC = MinMaxBounds.Bounds.<Integer>createCodec(Codec.INT)
 			.validate(MinMaxBounds.Bounds::validateSwappedBoundsInCodec)
 			.xmap(MinMaxBounds.Ints::new, MinMaxBounds.Ints::bounds);
-		public static final StreamCodec<ByteBuf, MinMaxBounds.Ints> STREAM_CODEC = MinMaxBounds.Bounds.createStreamCodec((StreamCodec<ByteBuf, T>)ByteBufCodecs.INT)
+		public static final StreamCodec<ByteBuf, MinMaxBounds.Ints> STREAM_CODEC = MinMaxBounds.Bounds.<ByteBuf, Integer>createStreamCodec(ByteBufCodecs.INT)
 			.map(MinMaxBounds.Ints::new, MinMaxBounds.Ints::bounds);
 
 		private Ints(MinMaxBounds.Bounds<Integer> bounds) {
@@ -259,19 +259,19 @@ public interface MinMaxBounds<T extends Number & Comparable<T>> {
 		}
 
 		public static MinMaxBounds.Ints exactly(int i) {
-			return new MinMaxBounds.Ints(MinMaxBounds.Bounds.exactly((T)i));
+			return new MinMaxBounds.Ints(MinMaxBounds.Bounds.exactly(i));
 		}
 
 		public static MinMaxBounds.Ints between(int i, int j) {
-			return new MinMaxBounds.Ints(MinMaxBounds.Bounds.between((T)i, (T)j));
+			return new MinMaxBounds.Ints(MinMaxBounds.Bounds.between(i, j));
 		}
 
 		public static MinMaxBounds.Ints atLeast(int i) {
-			return new MinMaxBounds.Ints(MinMaxBounds.Bounds.atLeast((T)i));
+			return new MinMaxBounds.Ints(MinMaxBounds.Bounds.atLeast(i));
 		}
 
 		public static MinMaxBounds.Ints atMost(int i) {
-			return new MinMaxBounds.Ints(MinMaxBounds.Bounds.atMost((T)i));
+			return new MinMaxBounds.Ints(MinMaxBounds.Bounds.atMost(i));
 		}
 
 		public boolean matches(int i) {

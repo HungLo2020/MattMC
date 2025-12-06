@@ -42,9 +42,10 @@ public class FixProjectileStoredItem extends DataFix {
 		return fixChoiceCap(string, subFixer, type, type2);
 	}
 
+	@SuppressWarnings("unchecked")
 	private static <T> Function<Typed<?>, Typed<?>> fixChoiceCap(String string, FixProjectileStoredItem.SubFixer<?> subFixer, Type<?> type, Type<T> type2) {
 		OpticFinder<?> opticFinder = DSL.namedChoice(string, type);
-		return typed -> typed.updateTyped(opticFinder, type2, typedx -> subFixer.fix(typedx, type2));
+		return typed -> typed.updateTyped(opticFinder, type2, typedx -> ((FixProjectileStoredItem.SubFixer<T>)subFixer).fix(typedx, type2));
 	}
 
 	private static <T> Typed<T> fixArrow(Typed<?> typed, Type<T> type) {

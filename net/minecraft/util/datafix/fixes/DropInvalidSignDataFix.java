@@ -33,15 +33,16 @@ public class DropInvalidSignDataFix extends DataFix {
 		return dynamic;
 	}
 
+	@SuppressWarnings("unchecked")
 	private static <T> Dynamic<T> fixText(Dynamic<T> dynamic) {
 		Optional<Stream<Dynamic<T>>> optional = dynamic.get("filtered_messages").asStreamOpt().result();
 		if (optional.isEmpty()) {
 			return dynamic;
 		} else {
 			Dynamic<T> dynamic2 = LegacyComponentDataFixUtils.createEmptyComponent(dynamic.getOps());
-			List<Dynamic<T>> list = ((Stream)dynamic.get("messages").asStreamOpt().result().orElse(Stream.of())).toList();
-			List<Dynamic<T>> list2 = Streams.<Dynamic, Dynamic<T>>mapWithIndex((Stream<Dynamic>)optional.get(), (dynamic2x, l) -> {
-				Dynamic<T> dynamic3 = l < list.size() ? (Dynamic)list.get((int)l) : dynamic2;
+			List<Dynamic<T>> list = ((Stream<Dynamic<T>>)dynamic.get("messages").asStreamOpt().result().orElse(Stream.of())).toList();
+			List<Dynamic<T>> list2 = Streams.<Dynamic<T>, Dynamic<T>>mapWithIndex(optional.get(), (Dynamic<T> dynamic2x, long l) -> {
+				Dynamic<T> dynamic3 = l < list.size() ? (Dynamic<T>)list.get((int)l) : dynamic2;
 				return dynamic2x.equals(dynamic2) ? dynamic3 : dynamic2x;
 			}).toList();
 			return list2.equals(list) ? dynamic.remove("filtered_messages") : dynamic.set("filtered_messages", dynamic.createList(list2.stream()));

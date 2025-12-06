@@ -15,15 +15,15 @@ public record FileIOStat(Duration duration, @Nullable String path, long bytes) {
 			l,
 			(double)l / duration.getSeconds(),
 			list.size(),
-			(double)list.size() / duration.getSeconds(),
+				(double)list.size() / duration.getSeconds(),
 			(Duration)list.stream().map(FileIOStat::duration).reduce(Duration.ZERO, Duration::plus),
-			((Map)list.stream()
+			((Map<String, Long>)list.stream()
 					.filter(fileIOStat -> fileIOStat.path != null)
 					.collect(Collectors.groupingBy(fileIOStat -> fileIOStat.path, Collectors.summingLong(fileIOStat -> fileIOStat.bytes))))
-				.entrySet()
+					.entrySet()
 				.stream()
-				.sorted(Entry.comparingByValue().reversed())
-				.map(entry -> Pair.of((String)entry.getKey(), (Long)entry.getValue()))
+				.sorted(java.util.Map.Entry.<String, Long>comparingByValue().reversed())
+				.map(entry -> Pair.of(entry.getKey(), entry.getValue()))
 				.limit(10L)
 				.toList()
 		);

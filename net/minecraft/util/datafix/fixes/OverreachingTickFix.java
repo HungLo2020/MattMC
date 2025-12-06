@@ -35,7 +35,7 @@ public class OverreachingTickFix extends DataFix {
 
 	private static Dynamic<?> extractOverreachingTicks(Dynamic<?> dynamic, int i, int j, Optional<? extends Dynamic<?>> optional, String string) {
 		if (optional.isPresent()) {
-			List<? extends Dynamic<?>> list = ((Dynamic)optional.get()).asStream().filter(dynamicx -> {
+			List<? extends Dynamic<?>> list = optional.get().asStream().filter((Dynamic<?> dynamicx) -> {
 				int k = dynamicx.get("x").asInt(0);
 				int l = dynamicx.get("z").asInt(0);
 				int m = Math.abs(i - (k >> 4));

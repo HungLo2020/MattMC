@@ -13,7 +13,11 @@ public interface DataComponentHolder extends DataComponentGetter {
 	}
 
 	default <T> Stream<T> getAllOfType(Class<? extends T> class_) {
-		return this.getComponents().stream().map(TypedDataComponent::value).filter(object -> class_.isAssignableFrom(object.getClass())).map(object -> object);
+		return (Stream<T>) this.getComponents()
+			.stream()
+			.map(TypedDataComponent::value)
+			.filter(class_::isInstance)
+			.map(object -> (T) class_.cast(object));
 	}
 
 	@Override

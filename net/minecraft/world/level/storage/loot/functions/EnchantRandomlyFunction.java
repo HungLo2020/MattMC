@@ -28,7 +28,7 @@ public class EnchantRandomlyFunction extends LootItemConditionalFunction {
 	private static final Logger LOGGER = LogUtils.getLogger();
 	public static final MapCodec<EnchantRandomlyFunction> CODEC = RecordCodecBuilder.mapCodec(
 		instance -> commonFields(instance)
-			.<Optional<HolderSet<Enchantment>>, boolean>and(
+			.<Optional<HolderSet<Enchantment>>, Boolean>and(
 				instance.group(
 					RegistryCodecs.homogeneousList(Registries.ENCHANTMENT).optionalFieldOf("options").forGetter(enchantRandomlyFunction -> enchantRandomlyFunction.options),
 					Codec.BOOL.optionalFieldOf("only_compatible", true).forGetter(enchantRandomlyFunction -> enchantRandomlyFunction.onlyCompatible)
@@ -51,14 +51,15 @@ public class EnchantRandomlyFunction extends LootItemConditionalFunction {
 	}
 
 	@Override
+	@SuppressWarnings("unchecked")
 	public ItemStack run(ItemStack itemStack, LootContext lootContext) {
 		RandomSource randomSource = lootContext.getRandom();
 		boolean bl = itemStack.is(Items.BOOK);
 		boolean bl2 = !bl && this.onlyCompatible;
-		Stream<Holder<Enchantment>> stream = ((Stream)this.options
+		Stream<Holder<Enchantment>> stream = ((Stream<Holder<Enchantment>>)this.options
 				.map(HolderSet::stream)
 				.orElseGet(() -> lootContext.getLevel().registryAccess().lookupOrThrow(Registries.ENCHANTMENT).listElements().map(Function.identity())))
-			.filter(holder -> !bl2 || ((Enchantment)holder.value()).canEnchant(itemStack));
+			.filter(holder -> !bl2 || holder.value().canEnchant(itemStack));
 		List<Holder<Enchantment>> list = stream.toList();
 		Optional<Holder<Enchantment>> optional = Util.getRandomSafe(list, randomSource);
 		if (optional.isEmpty()) {

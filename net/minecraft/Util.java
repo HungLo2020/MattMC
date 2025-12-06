@@ -35,6 +35,7 @@ import java.nio.file.Path;
 import java.nio.file.spi.FileSystemProvider;
 import java.security.AccessController;
 import java.security.PrivilegedActionException;
+import java.security.PrivilegedExceptionAction;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.ZonedDateTime;
@@ -542,10 +543,11 @@ public class Util {
 		return object;
 	}
 
+	@SuppressWarnings("unchecked")
 	public static <K extends Enum<K>, V> Map<K, V> makeEnumMap(Class<K> class_, Function<K, V> function) {
 		EnumMap<K, V> enumMap = new EnumMap(class_);
 
-		for (K enum_ : (Enum[])class_.getEnumConstants()) {
+		for (K enum_ : (K[])class_.getEnumConstants()) {
 			enumMap.put(enum_, function.apply(enum_));
 		}
 
@@ -1084,9 +1086,10 @@ public class Util {
 			this.telemetryName = string2;
 		}
 
+		@SuppressWarnings("removal")
 		public void openUri(URI uRI) {
 			try {
-				Process process = (Process)AccessController.doPrivileged(() -> Runtime.getRuntime().exec(this.getOpenUriArguments(uRI)));
+				Process process = (Process)AccessController.doPrivileged((PrivilegedExceptionAction<Process>)() -> Runtime.getRuntime().exec(this.getOpenUriArguments(uRI)));
 				process.getInputStream().close();
 				process.getErrorStream().close();
 				process.getOutputStream().close();

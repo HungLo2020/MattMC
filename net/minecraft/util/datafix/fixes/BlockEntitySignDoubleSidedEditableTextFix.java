@@ -33,9 +33,10 @@ public class BlockEntitySignDoubleSidedEditableTextFix extends NamedEntityWriteR
 		return dynamic;
 	}
 
+	@SuppressWarnings("unchecked")
 	private static <T> Dynamic<T> fixFrontTextTag(Dynamic<T> dynamic) {
 		Dynamic<T> dynamic2 = LegacyComponentDataFixUtils.createEmptyComponent(dynamic.getOps());
-		List<Dynamic<T>> list = getLines(dynamic, "Text").map(optional -> (Dynamic)optional.orElse(dynamic2)).toList();
+		List<Dynamic<T>> list = getLines(dynamic, "Text").map(optional -> (Dynamic<T>)optional.orElse(dynamic2)).toList();
 		Dynamic<T> dynamic3 = dynamic.emptyMap()
 			.set("messages", dynamic.createList(list.stream()))
 			.set("color", (Dynamic<?>)dynamic.get("Color").result().orElse(dynamic.createString("black")))

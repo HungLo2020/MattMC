@@ -37,6 +37,6 @@ public abstract class BaseEntityBlock extends Block implements EntityBlock {
 	protected static <E extends BlockEntity, A extends BlockEntity> BlockEntityTicker<A> createTickerHelper(
 		BlockEntityType<A> blockEntityType, BlockEntityType<E> blockEntityType2, BlockEntityTicker<? super E> blockEntityTicker
 	) {
-		return blockEntityType2 == blockEntityType ? blockEntityTicker : null;
+		return blockEntityType2 == blockEntityType ? (BlockEntityTicker<A>)blockEntityTicker : null;
 	}
 }

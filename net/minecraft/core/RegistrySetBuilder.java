@@ -148,9 +148,9 @@ public class RegistrySetBuilder {
 	) {
 		RegistrySetBuilder.UniversalOwner universalOwner = new RegistrySetBuilder.UniversalOwner();
 		MutableObject<HolderLookup.Provider> mutableObject = new MutableObject<>();
-		List<HolderLookup.RegistryLookup<?>> list = (List<HolderLookup.RegistryLookup<?>>)map.keySet()
+		List<HolderLookup.RegistryLookup<?>> list = map.keySet()
 			.stream()
-			.map(resourceKey -> this.createLazyFullPatchedRegistries(universalOwner, factory, resourceKey, provider2, provider, mutableObject))
+			.<HolderLookup.RegistryLookup<?>>map(resourceKey -> this.createLazyFullPatchedRegistries(universalOwner, factory, resourceKey, provider2, provider, mutableObject))
 			.collect(Collectors.toUnmodifiableList());
 		HolderLookup.Provider provider3 = buildProviderWithContext(universalOwner, registryAccess, list.stream());
 		mutableObject.setValue(provider3);
@@ -384,9 +384,11 @@ public class RegistrySetBuilder {
 				java.util.Map.Entry<ResourceKey<?>, RegistrySetBuilder.RegisteredValue<?>> entry = (java.util.Map.Entry<ResourceKey<?>, RegistrySetBuilder.RegisteredValue<?>>)iterator.next();
 				ResourceKey<?> resourceKey = (ResourceKey<?>)entry.getKey();
 				if (resourceKey.isFor(this.key)) {
+					@SuppressWarnings("unchecked")
+					ResourceKey<T> typedKey = (ResourceKey<T>)resourceKey;
 					RegistrySetBuilder.RegisteredValue<T> registeredValue = (RegistrySetBuilder.RegisteredValue<T>)entry.getValue();
 					Holder.Reference<T> reference = (Holder.Reference<T>)buildState.lookup.holders.remove(resourceKey);
-					map.put(resourceKey, new RegistrySetBuilder.ValueAndHolder<>(registeredValue, Optional.ofNullable(reference)));
+					map.put(typedKey, new RegistrySetBuilder.ValueAndHolder<>(registeredValue, Optional.ofNullable(reference)));
 					iterator.remove();
 				}
 			}
@@ -408,13 +410,16 @@ public class RegistrySetBuilder {
 		}
 
 		<T> Holder.Reference<T> getOrCreate(ResourceKey<T> resourceKey) {
-			return (Holder.Reference<T>)this.holders.computeIfAbsent(resourceKey, resourceKeyx -> Holder.Reference.createStandAlone(this.owner, resourceKeyx));
+			@SuppressWarnings("unchecked")
+			ResourceKey<Object> objectKey = (ResourceKey<Object>)resourceKey;
+			return (Holder.Reference<T>)this.holders.computeIfAbsent(objectKey, resourceKeyx -> Holder.Reference.createStandAlone(this.owner, resourceKeyx));
 		}
 	}
 
 	static class UniversalOwner implements HolderOwner<Object> {
+		@SuppressWarnings("unchecked")
 		public <T> HolderOwner<T> cast() {
-			return this;
+			return (HolderOwner<T>)this;
 		}
 	}
 

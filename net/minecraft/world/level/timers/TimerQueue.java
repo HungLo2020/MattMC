@@ -29,7 +29,7 @@ public class TimerQueue<T> {
 	private final Table<String, Long, TimerQueue.Event<T>> events = HashBasedTable.create();
 
 	private static <T> Comparator<TimerQueue.Event<T>> createComparator() {
-		return Comparator.comparingLong(event -> event.triggerTime).thenComparing(event -> event.sequentialId);
+		return Comparator.<TimerQueue.Event<T>>comparingLong(event -> event.triggerTime).thenComparing(event -> event.sequentialId);
 	}
 
 	public TimerQueue(TimerCallbacks<T> timerCallbacks, Stream<? extends Dynamic<?>> stream) {
