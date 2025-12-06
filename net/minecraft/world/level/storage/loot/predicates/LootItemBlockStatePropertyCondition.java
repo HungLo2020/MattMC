@@ -24,10 +24,11 @@ public record LootItemBlockStatePropertyCondition(Holder<Block> block, Optional<
 		)
 		.validate(LootItemBlockStatePropertyCondition::validate);
 
+	@SuppressWarnings("unchecked")
 	private static DataResult<LootItemBlockStatePropertyCondition> validate(LootItemBlockStatePropertyCondition lootItemBlockStatePropertyCondition) {
 		return (DataResult<LootItemBlockStatePropertyCondition>)lootItemBlockStatePropertyCondition.properties()
 			.flatMap(statePropertiesPredicate -> statePropertiesPredicate.checkState(lootItemBlockStatePropertyCondition.block().value().getStateDefinition()))
-			.map(string -> DataResult.error(() -> "Block " + lootItemBlockStatePropertyCondition.block() + " has no property" + string))
+			.map(string -> (DataResult<LootItemBlockStatePropertyCondition>)DataResult.error(() -> "Block " + lootItemBlockStatePropertyCondition.block() + " has no property" + string))
 			.orElse(DataResult.success(lootItemBlockStatePropertyCondition));
 	}
 

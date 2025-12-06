@@ -113,9 +113,10 @@ public interface EnchantmentEffectComponents {
 		return DAMAGE_PROTECTION;
 	}
 
+	@SuppressWarnings("unchecked")
 	private static <T> DataComponentType<T> register(String string, UnaryOperator<DataComponentType.Builder<T>> unaryOperator) {
-		return Registry.register(
-			BuiltInRegistries.ENCHANTMENT_EFFECT_COMPONENT_TYPE, string, ((DataComponentType.Builder)unaryOperator.apply(DataComponentType.builder())).build()
+		return (DataComponentType<T>)Registry.register(
+			BuiltInRegistries.ENCHANTMENT_EFFECT_COMPONENT_TYPE, string, ((DataComponentType.Builder<T>)unaryOperator.apply(DataComponentType.builder())).build()
 		);
 	}
 }

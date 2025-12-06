@@ -28,6 +28,7 @@ public class EquipmentFormatFix extends DataFix {
 		return this.fix(type, type2, opticFinder);
 	}
 
+	@SuppressWarnings("unchecked")
 	private <ItemStackOld, ItemStackNew> TypeRewriteRule fix(Type<ItemStackOld> type, Type<ItemStackNew> type2, OpticFinder<?> opticFinder) {
 		Type<Pair<String, Pair<Either<List<ItemStackOld>, Unit>, Pair<Either<List<ItemStackOld>, Unit>, Pair<Either<ItemStackOld, Unit>, Either<ItemStackOld, Unit>>>>>> type3 = DSL.named(
 			References.ENTITY_EQUIPMENT.typeName(),

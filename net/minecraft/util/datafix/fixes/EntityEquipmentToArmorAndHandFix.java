@@ -72,7 +72,9 @@ public class EntityEquipmentToArmorAndHandFix extends DataFix {
 								List<ItemStackNew> list2 = Lists.<ItemStackNew>newArrayList(object, object, object, object);
 
 								for (int i = 1; i < Math.min(list.size(), 5); i++) {
-									list2.set(i - 1, list.get(i));
+									@SuppressWarnings("unchecked")
+									ItemStackNew item = (ItemStackNew)(Object)list.get(i);
+									list2.set(i - 1, item);
 								}
 
 								either4 = Either.left(list2);
