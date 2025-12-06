@@ -19,7 +19,7 @@ public record PlayerDto(Optional<UUID> id, Optional<String> name) {
 	);
 
 	public static PlayerDto from(GameProfile gameProfile) {
-		return new PlayerDto(Optional.of(gameProfile.id()), Optional.of(gameProfile.name()));
+		return new PlayerDto(Optional.of(gameProfile.getId()), Optional.of(gameProfile.getName()));
 	}
 
 	public static PlayerDto from(NameAndId nameAndId) {

@@ -85,7 +85,7 @@ public class SocialInteractionsPlayerList extends ContainerObjectSelectionList<P
 
 	private PlayerEntry makePlayerEntry(UUID uUID, PlayerInfo playerInfo) {
 		return new PlayerEntry(
-			this.minecraft, this.socialInteractionsScreen, uUID, playerInfo.getProfile().name(), playerInfo::getSkin, playerInfo.hasVerifiableChat()
+			this.minecraft, this.socialInteractionsScreen, uUID, playerInfo.getProfile().getName(), playerInfo::getSkin, playerInfo.hasVerifiableChat()
 		);
 	}
 
@@ -101,8 +101,8 @@ public class SocialInteractionsPlayerList extends ContainerObjectSelectionList<P
 							PlayerEntry playerEntryx = new PlayerEntry(
 								this.minecraft,
 								this.socialInteractionsScreen,
-								gameProfile.id(),
-								gameProfile.name(),
+								gameProfile.getId(),
+								gameProfile.getName(),
 								this.minecraft.getSkinManager().createLookup(gameProfile, true),
 								true
 							);
@@ -182,7 +182,7 @@ public class SocialInteractionsPlayerList extends ContainerObjectSelectionList<P
 	}
 
 	public void addPlayer(PlayerInfo playerInfo, SocialInteractionsScreen.Page page) {
-		UUID uUID = playerInfo.getProfile().id();
+		UUID uUID = playerInfo.getProfile().getId();
 
 		for (PlayerEntry playerEntry : this.players) {
 			if (playerEntry.getPlayerId().equals(uUID)) {
@@ -192,10 +192,10 @@ public class SocialInteractionsPlayerList extends ContainerObjectSelectionList<P
 		}
 
 		if ((page == SocialInteractionsScreen.Page.ALL || this.minecraft.getPlayerSocialManager().shouldHideMessageFrom(uUID))
-			&& (Strings.isNullOrEmpty(this.filter) || playerInfo.getProfile().name().toLowerCase(Locale.ROOT).contains(this.filter))) {
+			&& (Strings.isNullOrEmpty(this.filter) || playerInfo.getProfile().getName().toLowerCase(Locale.ROOT).contains(this.filter))) {
 			boolean bl = playerInfo.hasVerifiableChat();
 			PlayerEntry playerEntryx = new PlayerEntry(
-				this.minecraft, this.socialInteractionsScreen, playerInfo.getProfile().id(), playerInfo.getProfile().name(), playerInfo::getSkin, bl
+				this.minecraft, this.socialInteractionsScreen, playerInfo.getProfile().getId(), playerInfo.getProfile().getName(), playerInfo::getSkin, bl
 			);
 			this.addEntry(playerEntryx);
 			this.players.add(playerEntryx);

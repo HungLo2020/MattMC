@@ -67,7 +67,7 @@ public class ChatSelectionLogFiller {
 		if (this.canReport.test(player)) {
 			this.contextBuilder.trackContext(playerChatMessage);
 			if (this.previousLink != null && !this.previousLink.isDescendantOf(playerChatMessage.link())) {
-				output.acceptDivider(Component.translatable("gui.chatSelection.join", new Object[]{player.profile().name()}).withStyle(ChatFormatting.YELLOW));
+				output.acceptDivider(Component.translatable("gui.chatSelection.join", new Object[]{player.profile().getName()}).withStyle(ChatFormatting.YELLOW));
 			}
 
 			this.previousLink = playerChatMessage.link();
