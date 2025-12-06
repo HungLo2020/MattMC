@@ -10,57 +10,45 @@ Path for java installation '/usr/lib/jvm/openjdk-21' (Common Linux Locations) do
 /home/matt/Documents/Repos/Mattcraft/net/minecraft/world/level/block/entity/TheEndGatewayBlockEntity.java:228: warning: [removal] getHighestSectionPosition() in ChunkAccess has been deprecated and marked for removal
                 int i = levelChunk.getHighestSectionPosition() + 16 - 1;
                                   ^
-/home/matt/Documents/Repos/Mattcraft/net/minecraft/client/renderer/item/properties/select/ComponentContents.java:32: error: cannot infer type arguments for UnbakedSwitch<>
-                                .xmap(list -> new SelectItemModel.UnbakedSwitch<>(new ComponentContents<>(dataComponentType), list), (SelectItemModel.UnbakedSwitch s) -> s.cases())
-                                              ^
-  reason: inference variable T has incompatible equality constraints CAP#1,CAP#2
-  where T is a type-variable:
-    T extends Object declared in record ComponentContents
-  where CAP#1,CAP#2 are fresh type-variables:
-    CAP#1 extends Object from capture of ?
-    CAP#2 extends Object from capture of ?
-/home/matt/Documents/Repos/Mattcraft/net/minecraft/server/commands/ReturnCommand.java:22: error: incompatible types: inference variable T has incompatible bounds
-                LiteralArgumentBuilder<T> builder = (LiteralArgumentBuilder<T>)LiteralArgumentBuilder.literal("return").requires(Commands.hasPermission(2));
-                                                                                                                       ^
-    equality constraints: Object
-    upper bounds: PermissionSource
-  where T is a type-variable:
-    T extends PermissionSource declared in method <T>hasPermission(int)
-/home/matt/Documents/Repos/Mattcraft/net/minecraft/util/datafix/fixes/TextComponentHoverAndClickEventFix.java:51: error: incompatible types: inference variable B has incompatible bounds
-                        return this.fixTypeEverywhere(
-                                                     ^
-    equality constraints: C2
-    lower bounds: C2,Pair<String,Either<Either<String,List<C1>>,Pair<Either<List<C1>,Unit>,Pair<Either<C1,Unit>,Pair<Either<H,Unit>,Dynamic<?>>>>>>
-  where B,A,C2,C1,H are type-variables:
-    B extends Object declared in method <A,B>fixTypeEverywhere(String,Type<A>,Type<B>,Function<DynamicOps<?>,Function<A,B>>)
-    A extends Object declared in method <A,B>fixTypeEverywhere(String,Type<A>,Type<B>,Function<DynamicOps<?>,Function<A,B>>)
-    C2 extends Object declared in method <C1,C2,H>createFixer(Type<C1>,Type<C2>,Type<H>)
-    C1 extends Object declared in method <C1,C2,H>createFixer(Type<C1>,Type<C2>,Type<H>)
-    H extends Pair<String,?> declared in method <C1,C2,H>createFixer(Type<C1>,Type<C2>,Type<H>)
-/home/matt/Documents/Repos/Mattcraft/net/minecraft/util/datafix/fixes/ChunkBedBlockEntityInjecterFix.java:43: error: incompatible types: cannot infer type-variable(s) A,B
+/home/matt/Documents/Repos/Mattcraft/net/minecraft/client/renderer/blockentity/BeaconRenderer.java:99: error: local variables referenced from a lambda expression must be final or effectively final
+                        (pose, vertexConsumer) -> renderPart(pose, vertexConsumer, k, i, m, 0.0F, h, h, 0.0F, t, 0.0F, 0.0F, w, 0.0F, 1.0F, aa, z)
+                                                                                                              ^
+/home/matt/Documents/Repos/Mattcraft/net/minecraft/client/renderer/blockentity/BeaconRenderer.java:99: error: local variables referenced from a lambda expression must be final or effectively final
+                        (pose, vertexConsumer) -> renderPart(pose, vertexConsumer, k, i, m, 0.0F, h, h, 0.0F, t, 0.0F, 0.0F, w, 0.0F, 1.0F, aa, z)
+                                                                                                                                            ^
+/home/matt/Documents/Repos/Mattcraft/net/minecraft/client/renderer/blockentity/BeaconRenderer.java:99: error: local variables referenced from a lambda expression must be final or effectively final
+                        (pose, vertexConsumer) -> renderPart(pose, vertexConsumer, k, i, m, 0.0F, h, h, 0.0F, t, 0.0F, 0.0F, w, 0.0F, 1.0F, aa, z)
+                                                                                                                                                ^
+/home/matt/Documents/Repos/Mattcraft/net/minecraft/client/renderer/blockentity/BeaconRenderer.java:113: error: local variables referenced from a lambda expression must be final or effectively final
+                        (pose, vertexConsumer) -> renderPart(pose, vertexConsumer, ARGB.color(32, k), i, m, p, q, l, s, t, l, l, l, 0.0F, 1.0F, aa, z)
+                                                                                                            ^
+/home/matt/Documents/Repos/Mattcraft/net/minecraft/client/renderer/blockentity/BeaconRenderer.java:113: error: local variables referenced from a lambda expression must be final or effectively final
+                        (pose, vertexConsumer) -> renderPart(pose, vertexConsumer, ARGB.color(32, k), i, m, p, q, l, s, t, l, l, l, 0.0F, 1.0F, aa, z)
+                                                                                                                     ^
+/home/matt/Documents/Repos/Mattcraft/net/minecraft/client/renderer/blockentity/BeaconRenderer.java:113: error: local variables referenced from a lambda expression must be final or effectively final
+                        (pose, vertexConsumer) -> renderPart(pose, vertexConsumer, ARGB.color(32, k), i, m, p, q, l, s, t, l, l, l, 0.0F, 1.0F, aa, z)
+                                                                                                                        ^
+/home/matt/Documents/Repos/Mattcraft/net/minecraft/client/renderer/blockentity/BeaconRenderer.java:113: error: local variables referenced from a lambda expression must be final or effectively final
+                        (pose, vertexConsumer) -> renderPart(pose, vertexConsumer, ARGB.color(32, k), i, m, p, q, l, s, t, l, l, l, 0.0F, 1.0F, aa, z)
+                                                                                                                                                ^
+/home/matt/Documents/Repos/Mattcraft/net/minecraft/client/renderer/blockentity/BeaconRenderer.java:113: error: local variables referenced from a lambda expression must be final or effectively final
+                        (pose, vertexConsumer) -> renderPart(pose, vertexConsumer, ARGB.color(32, k), i, m, p, q, l, s, t, l, l, l, 0.0F, 1.0F, aa, z)
+                                                                                                                                                    ^
+/home/matt/Documents/Repos/Mattcraft/net/minecraft/util/datafix/fixes/ChunkBedBlockEntityInjecterFix.java:43: error: incompatible types: inference variable A has incompatible equality constraints Pair<String,?>,Pair<CAP#1,?>
                         this.fixTypeEverywhere(
                                               ^
-    (argument mismatch; bad return type in lambda expression
-      incompatible parameter types in lambda expression)
   where A,B are type-variables:
     A extends Object declared in method <A,B>fixTypeEverywhere(String,Type<A>,Type<B>,Function<DynamicOps<?>,Function<A,B>>)
     B extends Object declared in method <A,B>fixTypeEverywhere(String,Type<A>,Type<B>,Function<DynamicOps<?>,Function<A,B>>)
-error: incompatible types: incompatible parameter types in lambda expression
-/home/matt/Documents/Repos/Mattcraft/net/minecraft/util/datafix/fixes/BlockEntityUUIDFix.java:27: error: incompatible types: Dynamic<CAP#1> cannot be converted to Dynamic<CAP#2>
-                        .orElse(dynamic);
-                                ^
-  where CAP#1,CAP#2 are fresh type-variables:
+  where CAP#1 is a fresh type-variable:
     CAP#1 extends Object from capture of ?
-    CAP#2 extends Object from capture of ?
-/home/matt/Documents/Repos/Mattcraft/net/minecraft/world/item/HoneycombItem.java:109: error: incompatible types: Pass cannot be converted to Success
-                }).orElse(InteractionResult.PASS);
-                                           ^
+error: incompatible types: incompatible parameter types in lambda expression
 Note: Some input files use or override a deprecated API.
 Note: Recompile with -Xlint:deprecation for details.
 Note: Some input files use unchecked or unsafe operations.
 Note: Recompile with -Xlint:unchecked for details.
 Note: Some messages have been simplified; recompile with -Xdiags:verbose to get full output
-7 errors
+10 errors
 4 warnings
 > Task :compileJava FAILED
 
@@ -74,7 +62,7 @@ Execution failed for task ':compileJava'.
 > Run with --info option to get more log output.
 > Run with --scan to get full insights.
 
-BUILD FAILED in 1m 6s
+BUILD FAILED in 1m 9s
 1 actionable task: 1 executed
 matt@HungLoDE:~/Documents/Repos/Mattcraft$
 
