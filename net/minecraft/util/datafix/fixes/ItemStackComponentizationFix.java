@@ -367,13 +367,13 @@ public class ItemStackComponentizationFix extends DataFix {
 	) {
 		Optional<? extends Dynamic<?>> optional = itemStackData.removeTag(string).result();
 		if (!optional.isEmpty()) {
-			Dynamic<?> dynamic2 = dynamic.emptyMap()
+		Dynamic<?> dynamic2 = dynamic.emptyMap()
 				.set(
 					"predicates",
 					dynamic.createList(
 						((Dynamic)optional.get())
 							.asStream()
-							.map(dynamicx -> DataFixUtils.orElse(dynamicx.asString().map(stringx -> fixBlockStatePredicate(dynamicx, stringx)).result(), dynamicx))
+							.map((Dynamic<?> dynamicx) -> DataFixUtils.orElse(dynamicx.asString().map(stringx -> fixBlockStatePredicate(dynamicx, stringx)).result(), dynamicx))
 					)
 				);
 			if (bl) {
@@ -677,14 +677,14 @@ public class ItemStackComponentizationFix extends DataFix {
 				map.entrySet()
 					.stream()
 					.flatMap(
-						entry -> ((List)entry.getValue())
+							entry -> ((List<Pair<String, Optional<String>>>)entry.getValue())
 							.stream()
 							.map(
-								pair -> {
+								(Pair<String, Optional<String>> pair) -> {
 									Dynamic<?> dynamic = optionalDynamic.emptyMap()
 										.set("name", optionalDynamic.createString((String)entry.getKey()))
-										.set("value", optionalDynamic.createString((String)pair.getFirst()));
-									Optional<String> optional = (Optional<String>)pair.getSecond();
+										.set("value", optionalDynamic.createString(pair.getFirst()));
+									Optional<String> optional = pair.getSecond();
 									return optional.isPresent() ? dynamic.set("signature", optionalDynamic.createString((String)optional.get())) : dynamic;
 								}
 							)
