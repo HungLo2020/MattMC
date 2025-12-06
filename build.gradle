@@ -330,6 +330,7 @@ tasks.register('fatJar', Jar) {
     group = 'build'
     description = 'Creates a fat JAR with all dependencies'
     archiveClassifier = 'all'
+    zip64 = true
     
     from sourceSets.main.output
     
@@ -351,6 +352,7 @@ tasks.register('clientFatJar', Jar) {
     description = 'Creates a fat JAR with all dependencies for the client'
     archiveBaseName = 'Mattcraft-Client'
     archiveClassifier = 'all'
+    zip64 = true
     
     from sourceSets.main.output
     
