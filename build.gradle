@@ -382,39 +382,54 @@ tasks.register('clientFatJar', Jar) {
     exclude 'META-INF/*.RSA', 'META-INF/*.SF', 'META-INF/*.DSA'
 }
 
-// Task to create a runnable client distribution
-tasks.register('clientDist', Copy) {
+// Task to create a runnable client distribution using classpath (more reliable than fat JAR)
+tasks.register('clientDist') {
     group = 'distribution'
     description = 'Creates a runnable client distribution'
     
-    dependsOn 'clientFatJar'
+    dependsOn 'jar', 'classes'
     
     def distDir = "${buildDir}/client-dist/MattMC"
     
-    // Copy the fat jar
-    from(tasks.named('clientFatJar')) {
-        into 'lib'
-    }
-    
-    // Copy resources
-    from('src/main/resources') {
-        into 'resources'
-    }
-    
-    into distDir
+    outputs.dir distDir
     
     doLast {
-        // Create run directory structure
+        // Create directory structure
+        file("${distDir}/lib").mkdirs()
         file("${distDir}/run").mkdirs()
         file("${distDir}/run/assets").mkdirs()
         file("${distDir}/run/resourcepacks").mkdirs()
         
+        // Copy project JAR
+        copy {
+            from tasks.jar.archiveFile
+            into "${distDir}/lib"
+        }
+        
+        // Copy all dependency JARs
+        copy {
+            from configurations.runtimeClasspath
+            into "${distDir}/lib"
+        }
+        
+        // Copy resources
+        copy {
+            from 'src/main/resources'
+            into "${distDir}/resources"
+        }
+        
+        // Build classpath string for launch scripts
+        def jarName = tasks.jar.archiveFileName.get()
+        def depJars = configurations.runtimeClasspath.files.collect { it.name }.join(':')
+        def classpathLinux = "lib/${jarName}:lib/" + configurations.runtimeClasspath.files.collect { it.name }.join(':lib/')
+        def classpathWindows = "lib\\${jarName};lib\\" + configurations.runtimeClasspath.files.collect { it.name }.join(';lib\\')
+        
         // Create launch script for Linux
         def launchScript = file("${distDir}/run-mattmc.sh")
-        launchScript.text = '''#!/bin/bash
+        launchScript.text = """#!/bin/bash
 # MattMC Client Launcher
 
-cd "$(dirname "$0")"
+cd "\$(dirname "\$0")"
 
 java -Xmx2G -Xms512M \\
     -XX:+UseG1GC \\
@@ -434,17 +449,18 @@ java -Xmx2G -Xms512M \\
     -XX:SurvivorRatio=32 \\
     -XX:+PerfDisableSharedMem \\
     -XX:MaxTenuringThreshold=1 \\
-    -jar lib/MattMC-Client-''' + version + '''-all.jar \\
-    --version ''' + version + ''' \\
+    -cp "${classpathLinux}" \\
+    net.minecraft.client.main.Main \\
+    --version ${version} \\
     --accessToken 0 \\
     --gameDir run \\
     --assetsDir run/assets
-'''
+"""
         launchScript.setExecutable(true)
         
         // Create launch script for Windows
         def launchScriptWin = file("${distDir}/run-mattmc.bat")
-        launchScriptWin.text = '''@echo off
+        launchScriptWin.text = """@echo off
 REM MattMC Client Launcher
 
 cd /d "%~dp0"
@@ -467,12 +483,13 @@ java -Xmx2G -Xms512M ^
     -XX:SurvivorRatio=32 ^
     -XX:+PerfDisableSharedMem ^
     -XX:MaxTenuringThreshold=1 ^
-    -jar lib\\MattMC-Client-''' + version + '''-all.jar ^
-    --version ''' + version + ''' ^
+    -cp "${classpathWindows}" ^
+    net.minecraft.client.main.Main ^
+    --version ${version} ^
     --accessToken 0 ^
     --gameDir run ^
     --assetsDir run\\assets
-'''
+"""
     }
 }
 
