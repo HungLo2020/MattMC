@@ -1,6 +1,6 @@
 matt@HungLoDE:~/Documents/Repos/Mattcraft$ ./gradlew build
-Path for java installation '/usr/lib/jvm/openjdk-21' (Common Linux Locations) does not contain a java executable
 Path for java installation '/usr/lib/jvm/openjdk-17' (Common Linux Locations) does not contain a java executable
+Path for java installation '/usr/lib/jvm/openjdk-21' (Common Linux Locations) does not contain a java executable
 
 > Task :compileJava
 /home/matt/Documents/Repos/Mattcraft/net/minecraft/world/level/levelgen/Heightmap.java:48: warning: [removal] getHighestSectionPosition() in ChunkAccess has been deprecated and marked for removal
@@ -92,119 +92,14 @@ Path for java installation '/usr/lib/jvm/openjdk-17' (Common Linux Locations) do
   where CAP#1,CAP#2 are fresh type-variables:
     CAP#1 extends Object from capture of ?
     CAP#2 extends DataComponentType<?> from capture of ? extends DataComponentType<?>
-/home/matt/Documents/Repos/Mattcraft/net/minecraft/client/renderer/item/ConditionalItemModel.java:89: error: cannot find symbol
-                        Codec<T> codec = (Codec<T>)conditionalItemModelProperty.type().codec();
-                        ^
-  symbol:   class Codec
-  location: class Unbaked
-/home/matt/Documents/Repos/Mattcraft/net/minecraft/client/renderer/item/ConditionalItemModel.java:89: error: cannot find symbol
-                        Codec<T> codec = (Codec<T>)conditionalItemModelProperty.type().codec();
-                                          ^
-  symbol:   class Codec
-  location: class Unbaked
 /home/matt/Documents/Repos/Mattcraft/net/minecraft/client/gui/screens/inventory/BookViewScreen.java:277: error: incompatible types: List<MutableComponent> cannot be converted to List<Component>
                                 return writableBookContent != null ? new BookViewScreen.BookAccess(writableBookContent.getPages(bl).map(Component::literal).toList()) : null;
                                                                                                                                                                   ^
-/home/matt/Documents/Repos/Mattcraft/net/minecraft/client/gui/screens/social/SocialInteractionsPlayerList.java:139: error: cannot find symbol
-                        if (this.minecraft.isLocalPlayer(playerEntry.getPlayerId())) {
-                                                                    ^
-  symbol:   method getPlayerId()
-  location: variable playerEntry of type Object
-/home/matt/Documents/Repos/Mattcraft/net/minecraft/client/gui/screens/social/SocialInteractionsPlayerList.java:141: error: cannot find symbol
-                        } else if (this.minecraft.getReportingContext().hasDraftReportFor(playerEntry.getPlayerId())) {
-                                                                                                     ^
-  symbol:   method getPlayerId()
-  location: variable playerEntry of type Object
-/home/matt/Documents/Repos/Mattcraft/net/minecraft/client/gui/screens/social/SocialInteractionsPlayerList.java:143: error: cannot find symbol
-                        } else if (playerEntry.getPlayerId().version() == 2) {
-                                              ^
-  symbol:   method getPlayerId()
-  location: variable playerEntry of type Object
-/home/matt/Documents/Repos/Mattcraft/net/minecraft/client/gui/screens/social/SocialInteractionsPlayerList.java:146: error: cannot find symbol
-                                return playerEntry.hasRecentMessages() ? 2 : 3;
-                                                  ^
-  symbol:   method hasRecentMessages()
-  location: variable playerEntry of type Object
-/home/matt/Documents/Repos/Mattcraft/net/minecraft/client/gui/screens/social/SocialInteractionsPlayerList.java:149: error: cannot find symbol
-                        if (!playerEntry.getPlayerName().isBlank()) {
-                                        ^
-  symbol:   method getPlayerName()
-  location: variable playerEntry of type Object
-/home/matt/Documents/Repos/Mattcraft/net/minecraft/client/gui/screens/social/SocialInteractionsPlayerList.java:150: error: cannot find symbol
-                                int i = playerEntry.getPlayerName().codePointAt(0);
-                                                   ^
-  symbol:   method getPlayerName()
-  location: variable playerEntry of type Object
-/home/matt/Documents/Repos/Mattcraft/net/minecraft/client/gui/screens/social/SocialInteractionsPlayerList.java:157: error: no suitable method found for thenComparing(PlayerEntr[...]rName,String::co[...]eCase)
-                }).thenComparing(PlayerEntry::getPlayerName, String::compareToIgnoreCase));
-                  ^
-    method Comparator.<U#1>thenComparing(Function<? super Object,? extends U#1>,Comparator<? super U#1>) is not applicable
-      (cannot infer type-variable(s) U#1
-        (argument mismatch; invalid method reference
-          method getPlayerName in class PlayerEntry cannot be applied to given types
-            required: no arguments
-            found:    Object
-            reason: actual and formal argument lists differ in length))
-    method Comparator.<U#2>thenComparing(Function<? super Object,? extends U#2>) is not applicable
-      (cannot infer type-variable(s) U#2
-        (actual and formal argument lists differ in length))
-  where U#1,T,U#2 are type-variables:
-    U#1 extends Object declared in method <U#1>thenComparing(Function<? super T,? extends U#1>,Comparator<? super U#1>)
-    T extends Object declared in interface Comparator
-    U#2 extends Comparable<? super U#2> declared in method <U#2>thenComparing(Function<? super T,? extends U#2>)
-/home/matt/Documents/Repos/Mattcraft/net/minecraft/client/gui/screens/PresetFlatWorldScreen.java:306: error: incompatible types: Component cannot be converted to MutableComponent
-                                        .orElse(PresetFlatWorldScreen.UNKNOWN_PRESET);
-                                                                     ^
-/home/matt/Documents/Repos/Mattcraft/net/minecraft/client/gui/screens/AccessibilityOnboardingScreen.java:166: error: method say in interface Narrator cannot be applied to given types;
-                                Narrator.getNarrator().say(ONBOARDING_NARRATOR_MESSAGE.getString(), true, this.minecraft.options.getFinalSoundSourceVolume(SoundSource.VOICE));
-                                                      ^
-  required: String,boolean
-  found:    String,boolean,float
-  reason: actual and formal argument lists differ in length
-/home/matt/Documents/Repos/Mattcraft/net/minecraft/client/gui/screens/worldselection/EditGameRulesScreen.java:296: error: incompatible types: cannot infer type-variable(s) T#1,U
-                                                        .sorted(java.util.Map.Entry.comparingByKey(Comparator.comparing(Key::getId)))
-                                                                                                  ^
-    (argument mismatch; invalid method reference
-      method getId in class Key<T#2> cannot be applied to given types
-        required: no arguments
-        found:    Object
-        reason: actual and formal argument lists differ in length)
-  where T#1,U,T#2 are type-variables:
-    T#1 extends Object declared in method <T#1,U>comparing(Function<? super T#1,? extends U>)
-    U extends Comparable<? super U> declared in method <T#1,U>comparing(Function<? super T#1,? extends U>)
-    T#2 extends Value<T#2> declared in class Key
-/home/matt/Documents/Repos/Mattcraft/net/minecraft/network/protocol/configuration/ClientboundUpdateEnabledFeaturesPacket.java:17: error: reference to ClientboundUpdateEnabledFeaturesPacket is ambiguous
-                this(friendlyByteBuf.readCollection(HashSet::new, FriendlyByteBuf::readResourceLocation));
-                ^
-  both constructor ClientboundUpdateEnabledFeaturesPacket(FriendlyByteBuf) in ClientboundUpdateEnabledFeaturesPacket and constructor ClientboundUpdateEnabledFeaturesPacket(Set<ResourceLocation>) in ClientboundUpdateEnabledFeaturesPacket match
-/home/matt/Documents/Repos/Mattcraft/net/minecraft/network/protocol/configuration/ClientboundUpdateEnabledFeaturesPacket.java:17: error: incompatible types: inference variable C has incompatible bounds
-                this(friendlyByteBuf.readCollection(HashSet::new, FriendlyByteBuf::readResourceLocation));
-                                                   ^
-    upper bounds: FriendlyByteBuf,Collection<T>
-    lower bounds: HashSet<E>
-  where C,T,E are type-variables:
-    C extends Collection<T> declared in method <T,C>readCollection(IntFunction<C>,StreamDecoder<? super FriendlyByteBuf,T>)
-    T extends Object declared in method <T,C>readCollection(IntFunction<C>,StreamDecoder<? super FriendlyByteBuf,T>)
-    E extends Object declared in class HashSet
-/home/matt/Documents/Repos/Mattcraft/net/minecraft/client/multiplayer/AccountProfileKeyPairManager.java:62: error: incompatible types: invalid method reference
-                        ? (Boolean)((Optional)this.keyPair.join()).map(ProfileKeyPair::dueRefresh).orElse(true)
-                                                                       ^
-    method dueRefresh in record ProfileKeyPair cannot be applied to given types
-      required: no arguments
-      found:    Object
-      reason: actual and formal argument lists differ in length
-/home/matt/Documents/Repos/Mattcraft/net/minecraft/advancements/critereon/SlideDownBlockTrigger.java:44: error: incompatible types: DataResult<Object> cannot be converted to DataResult<TriggerInstance>
-                                .orElseGet(() -> DataResult.success(triggerInstance));
-                                          ^
-/home/matt/Documents/Repos/Mattcraft/net/minecraft/advancements/critereon/EnchantmentPredicate.java:33: error: incompatible types: Object cannot be converted to Holder<Enchantment>
-                        for (Holder<Enchantment> holder : (HolderSet)this.enchantments.get()) {
-                                                          ^
-/home/matt/Documents/Repos/Mattcraft/net/minecraft/server/dedicated/Settings.java:127: error: incompatible types: bad return type in lambda expression
-                                return (Number)function.apply(string);
-                                       ^
-    Number cannot be converted to V
-  where V is a type-variable:
-    V extends Number declared in method <V>wrapNumberDeserializer(Function<String,V>)
+/home/matt/Documents/Repos/Mattcraft/net/minecraft/client/gui/screens/worldselection/EditGameRulesScreen.java:297: error: cannot find symbol
+                                                        .forEach(entryx -> this.addEntry((EditGameRulesScreen.RuleEntry)entryx.getValue()));
+                                                                                                                              ^
+  symbol:   method getValue()
+  location: variable entryx of type Object
 /home/matt/Documents/Repos/Mattcraft/net/minecraft/server/dedicated/Settings.java:171: error: improperly formed type, type arguments given on a raw type
                 return new Settings.MutableValue<>(string, object2, function2);
                                                 ^
@@ -227,11 +122,6 @@ Path for java installation '/usr/lib/jvm/openjdk-17' (Common Linux Locations) do
     T extends Value<T> declared in method <T>getRule(Key<T>)
   where CAP#1 is a fresh type-variable:
     CAP#1 extends Value<CAP#1> from capture of ?
-/home/matt/Documents/Repos/Mattcraft/net/minecraft/server/dialog/action/StaticAction.java:17: error: incompatible types: MapCodec<CAP#1> cannot be converted to MapCodec<ClickEvent>
-                                MapCodec<ClickEvent> mapCodec = action.valueCodec();
-                                                                                 ^
-  where CAP#1 is a fresh type-variable:
-    CAP#1 extends ClickEvent from capture of ? extends ClickEvent
 /home/matt/Documents/Repos/Mattcraft/net/minecraft/server/jsonrpc/internalapi/MinecraftGameRuleServiceImpl.java:74: error: type argument Value<?> is not within bounds of type-variable T
                 return this.server.getGameRules().getRule((net.minecraft.world.level.GameRules.Key<net.minecraft.world.level.GameRules.Value<?>>)key);
                                                                                                                                             ^
@@ -247,82 +137,6 @@ Path for java installation '/usr/lib/jvm/openjdk-17' (Common Linux Locations) do
     T extends Value<T> declared in method <T>getRule(Key<T>)
   where CAP#1 is a fresh type-variable:
     CAP#1 extends Value<CAP#1> from capture of ?
-/home/matt/Documents/Repos/Mattcraft/net/minecraft/server/jsonrpc/methods/OperatorService.java:38: error: incompatible types: Object cannot be converted to Optional<NameAndId>
-                for (Optional<NameAndId> optional : (List)Util.sequence(list2).join()) {
-                                                    ^
-/home/matt/Documents/Repos/Mattcraft/net/minecraft/server/jsonrpc/methods/OperatorService.java:54: error: incompatible types: Object cannot be converted to Optional<Op>
-                for (Optional<OperatorService.Op> optional : (List)Util.sequence(list2).join()) {
-                                                             ^
-/home/matt/Documents/Repos/Mattcraft/net/minecraft/server/jsonrpc/methods/OperatorService.java:71: error: incompatible types: invalid method reference
-                        .filter(Optional::isPresent)
-                                ^
-    method isPresent in class Optional<T> cannot be applied to given types
-      required: no arguments
-      found:    Object
-      reason: actual and formal argument lists differ in length
-  where T is a type-variable:
-    T extends Object declared in class Optional
-/home/matt/Documents/Repos/Mattcraft/net/minecraft/server/jsonrpc/methods/BanlistService.java:46: error: incompatible types: Object cannot be converted to Optional<UserBan>
-                for (Optional<BanlistService.UserBan> optional : (List)Util.sequence(list2).join()) {
-                                                                 ^
-/home/matt/Documents/Repos/Mattcraft/net/minecraft/server/jsonrpc/methods/BanlistService.java:70: error: incompatible types: Object cannot be converted to Optional<NameAndId>
-                for (Optional<NameAndId> optional : (List)Util.sequence(list2).join()) {
-                                                    ^
-/home/matt/Documents/Repos/Mattcraft/net/minecraft/server/jsonrpc/methods/BanlistService.java:89: error: incompatible types: invalid method reference
-                        .filter(Optional::isPresent)
-                                ^
-    method isPresent in class Optional<T> cannot be applied to given types
-      required: no arguments
-      found:    Object
-      reason: actual and formal argument lists differ in length
-  where T is a type-variable:
-    T extends Object declared in class Optional
-/home/matt/Documents/Repos/Mattcraft/net/minecraft/server/jsonrpc/methods/ServerStateService.java:40: error: incompatible types: Object cannot be converted to PlayerDto
-                                for (PlayerDto playerDto : (List)systemMessage.receivingPlayers().get()) {
-                                                           ^
-/home/matt/Documents/Repos/Mattcraft/net/minecraft/server/jsonrpc/methods/AllowlistService.java:30: error: incompatible types: Object cannot be converted to Optional<NameAndId>
-                for (Optional<NameAndId> optional : (List)Util.sequence(list2).join()) {
-                                                    ^
-/home/matt/Documents/Repos/Mattcraft/net/minecraft/server/jsonrpc/methods/AllowlistService.java:47: error: incompatible types: Object cannot be converted to Optional<NameAndId>
-                for (Optional<NameAndId> optional : (List)Util.sequence(list2).join()) {
-                                                    ^
-/home/matt/Documents/Repos/Mattcraft/net/minecraft/server/jsonrpc/methods/AllowlistService.java:59: error: incompatible types: invalid method reference
-                Set<NameAndId> set = (Set<NameAndId>)((List)Util.sequence(list2).join()).stream().filter(Optional::isPresent).map(Optional::get).collect(Collectors.toSet());
-                                                                                                         ^
-    method isPresent in class Optional<T> cannot be applied to given types
-      required: no arguments
-      found:    Object
-      reason: actual and formal argument lists differ in length
-  where T is a type-variable:
-    T extends Object declared in class Optional
-/home/matt/Documents/Repos/Mattcraft/net/minecraft/server/packs/linkfs/LinkFSProvider.java:81: error: incompatible types: Iterator<LinkFSPath> cannot be converted to Iterator<Path>
-                                        }).map(linkFSPath -> linkFSPath).iterator();
-                                                                                 ^
-/home/matt/Documents/Repos/Mattcraft/net/minecraft/commands/arguments/ResourceOrTagArgument.java:145: error: incompatible types: bad type in conditional expression
-                        return this.value.key().isFor(resourceKey) ? Optional.of(this) : Optional.empty();
-                                                                                ^
-    inference variable T#1 has incompatible bounds
-      equality constraints: Result<E>
-      lower bounds: ResourceResult<T#2>
-  where T#1,E,T#2 are type-variables:
-    T#1 extends Object declared in method <T#1>of(T#1)
-    E extends Object declared in method <E>cast(ResourceKey<? extends Registry<E>>)
-    T#2 extends Object declared in record ResourceResult
-/home/matt/Documents/Repos/Mattcraft/net/minecraft/commands/arguments/ResourceOrTagArgument.java:174: error: incompatible types: bad type in conditional expression
-                        return this.tag.key().isFor(resourceKey) ? Optional.of(this) : Optional.empty();
-                                                                              ^
-    inference variable T#1 has incompatible bounds
-      equality constraints: Result<E>
-      lower bounds: TagResult<T#2>
-  where T#1,E,T#2 are type-variables:
-    T#1 extends Object declared in method <T#1>of(T#1)
-    E extends Object declared in method <E>cast(ResourceKey<? extends Registry<E>>)
-    T#2 extends Object declared in record TagResult
-/home/matt/Documents/Repos/Mattcraft/net/minecraft/server/commands/DebugConfigCommand.java:74: error: cannot find symbol
-                                set.add(serverConfigurationPacketListenerImpl.getOwner().id().toString());
-                                                                                        ^
-  symbol:   method id()
-  location: class GameProfile
 /home/matt/Documents/Repos/Mattcraft/net/minecraft/commands/arguments/OperationArgument.java:57: error: lambda expression not expected here
                 return (OperationArgument.Operation)(string.equals("><") ? (scoreAccess, scoreAccess2) -> {
                                                                            ^
@@ -346,20 +160,6 @@ Path for java installation '/usr/lib/jvm/openjdk-17' (Common Linux Locations) do
 /home/matt/Documents/Repos/Mattcraft/net/minecraft/server/commands/ExecuteCommand.java:987: error: incompatible types: Object cannot be converted to Entity
                                         .map(entityx -> List.of(commandSourceStack.withEntity(entityx)))
                                                                                               ^
-/home/matt/Documents/Repos/Mattcraft/net/minecraft/server/commands/ForceLoadCommand.java:185: error: cannot find symbol
-                                                                t,
-                                                                ^
-  symbol:   variable t
-  location: class ForceLoadCommand
-/home/matt/Documents/Repos/Mattcraft/net/minecraft/server/commands/ListPlayersCommand.java:30: error: cannot find symbol
-                        serverPlayer -> Component.translatable("commands.list.nameAndId", serverPlayer.getName(), Component.translationArg(serverPlayer.getGameProfile().id()))
-                                                                                                                                                                        ^
-  symbol:   method id()
-  location: class GameProfile
-/home/matt/Documents/Repos/Mattcraft/net/minecraft/commands/arguments/item/ItemInput.java:81: error: incompatible types: bad return type in lambda expression
-                return this.item.unwrapKey().map(ResourceKey::location).orElseGet(() -> "unknown[" + this.item + "]").toString();
-                                                                                                               ^
-    String cannot be converted to ResourceLocation
 /home/matt/Documents/Repos/Mattcraft/net/minecraft/server/players/OldUsersConverter.java:57: error: method onProfileLookupSucceeded in interface ProfileLookupCallback cannot be applied to given types;
                                 profileLookupCallback.onProfileLookupSucceeded(string, UUIDUtil.createOfflinePlayerUUID(string));
                                                      ^
@@ -455,35 +255,6 @@ Path for java installation '/usr/lib/jvm/openjdk-17' (Common Linux Locations) do
     A extends ArgumentType<?> declared in method <A,T#1>register(Registry<ArgumentTypeInfo<?,?>>,String,Class<? extends A>,ArgumentTypeInfo<A,T#1>)
     T#1 extends Template<A> declared in method <A,T#1>register(Registry<ArgumentTypeInfo<?,?>>,String,Class<? extends A>,ArgumentTypeInfo<A,T#1>)
     T#2 extends ArgumentType<?> declared in method <T#2>fixClassType(Class<? super T#2>)
-/home/matt/Documents/Repos/Mattcraft/net/minecraft/commands/arguments/selector/options/EntitySelectorOptions.java:422: error: cannot find symbol
-                                                        map2.put(string, (Predicate)criterionProgress -> criterionProgress.isDone() == bl);
-                                                                                                                          ^
-  symbol:   method isDone()
-  location: variable criterionProgress of type Object
-/home/matt/Documents/Repos/Mattcraft/net/minecraft/commands/arguments/selector/options/EntitySelectorOptions.java:434: error: cannot find symbol
-                                                                CriterionProgress criterionProgress = advancementProgress.getCriterion((String)entry.getKey());
-                                                                                                                         ^
-  symbol:   method getCriterion(String)
-  location: variable advancementProgress of type Object
-/home/matt/Documents/Repos/Mattcraft/net/minecraft/commands/arguments/selector/options/EntitySelectorOptions.java:444: error: cannot find symbol
-                                                map.put(resourceLocation, (Predicate)advancementProgress -> advancementProgress.isDone() == bl2);
-                                                                                                                               ^
-  symbol:   method isDone()
-  location: variable advancementProgress of type Object
-/home/matt/Documents/Repos/Mattcraft/net/minecraft/commands/arguments/blocks/BlockStateParser.java:491: error: method setValue in class StateHolder<O,S> cannot be applied to given types;
-                        this.state = this.state.setValue(property, (Comparable)optional.get());
-                                               ^
-  required: Property<T#1>,V
-  found:    Property<T#2>,Comparable
-  reason: inference variable T#1 has incompatible bounds
-    equality constraints: T#2
-    lower bounds: V,Comparable
-  where T#1,V,S,T#2,O are type-variables:
-    T#1 extends Comparable<T#1> declared in method <T#1,V>setValue(Property<T#1>,V)
-    V extends T#1 declared in method <T#1,V>setValue(Property<T#1>,V)
-    S extends Object declared in class StateHolder
-    T#2 extends Comparable<T#2> declared in method <T#2>setValue(Property<T#2>,String,int)
-    O extends Object declared in class StateHolder
 /home/matt/Documents/Repos/Mattcraft/net/minecraft/commands/execution/tasks/BuildContexts.java:56: error: RedirectModifier<T> cannot be safely cast to CustomModifierExecutor<T>
                                         if (redirectModifier instanceof CustomModifierExecutor<T> customModifierExecutor) {
                                             ^
@@ -503,22 +274,6 @@ Path for java installation '/usr/lib/jvm/openjdk-17' (Common Linux Locations) do
                                                       ^
   where T is a type-variable:
     T extends ExecutionCommandSource<T> declared in class BuildContexts
-/home/matt/Documents/Repos/Mattcraft/net/minecraft/util/random/WeightedRandom.java:29: error: method pauseInIde in class Util cannot be applied to given types;
-                        throw (IllegalArgumentException)Util.pauseInIde((T)(new IllegalArgumentException("Negative total weight in getRandomItem")));
-                                                            ^
-  required: T#1
-  found:    T#2
-  reason: inference variable T#1 has incompatible bounds
-    upper bounds: Throwable
-    lower bounds: T#2
-  where T#1,T#2 are type-variables:
-    T#1 extends Throwable declared in method <T#1>pauseInIde(T#1)
-    T#2 extends Object declared in method <T#2>getRandomItem(RandomSource,List<T#2>,int,ToIntFunction<T#2>)
-/home/matt/Documents/Repos/Mattcraft/net/minecraft/util/Graph.java:20: error: incompatible types: Object cannot be converted to T
-                        for (T object2 : (Set)map.getOrDefault(object, ImmutableSet.of())) {
-                                         ^
-  where T is a type-variable:
-    T extends Object declared in method <T>depthFirstSearch(Map<T,Set<T>>,Set<T>,Set<T>,Consumer<T>,T)
 /home/matt/Documents/Repos/Mattcraft/net/minecraft/util/EncoderCache.java:34: error: incompatible types: inference variable T#1 has incompatible bounds
                                         .map(objectx -> objectx instanceof Tag tag ? tag.copy() : objectx);
                                             ^
@@ -531,31 +286,6 @@ Path for java installation '/usr/lib/jvm/openjdk-17' (Common Linux Locations) do
     A extends Object declared in method <A>wrap(Codec<A>)
   where CAP#1 is a fresh type-variable:
     CAP#1 extends Object from capture of ?
-/home/matt/Documents/Repos/Mattcraft/net/minecraft/util/PlaceholderLookupProvider.java:46: error: incompatible types: bad return type in lambda expression
-                                                        () -> Optional.of(
-                                                                         ^
-    Optional<RegistryInfo> cannot be converted to Optional<? extends RegistryInfo<T>>
-  where T is a type-variable:
-    T extends Object declared in method <T>lookup(ResourceKey<? extends Registry<? extends T>>)
-/home/matt/Documents/Repos/Mattcraft/net/minecraft/util/PlaceholderLookupProvider.java:102: error: incompatible types: PlaceholderLookupProvider.UniversalLookup cannot be converted to HolderGetter<T>
-                        return this;
-                               ^
-  where T is a type-variable:
-    T extends Object declared in method <T>castAsLookup()
-/home/matt/Documents/Repos/Mattcraft/net/minecraft/util/PlaceholderLookupProvider.java:106: error: incompatible types: PlaceholderLookupProvider.UniversalLookup cannot be converted to HolderOwner<T>
-                        return this;
-                               ^
-  where T is a type-variable:
-    T extends Object declared in method <T>castAsOwner()
-/home/matt/Documents/Repos/Mattcraft/net/minecraft/util/SortedArraySet.java:32: error: cannot infer type arguments for SortedArraySet<>
-                return new SortedArraySet<>(i, Comparator.naturalOrder());
-                       ^
-  reason: inferred type does not conform to equality constraint(s)
-    inferred: T#1
-    equality constraints(s): T#2
-  where T#1,T#2 are type-variables:
-    T#1 extends Comparable<? super T#1>
-    T#2 extends Comparable<? super T#1>
 /home/matt/Documents/Repos/Mattcraft/net/minecraft/util/datafix/fixes/LegacyHoverEventFix.java:63: error: incompatible types: invalid method reference
                                                         String string = (String)((Either)pairxxx.getFirst()).left().map(Pair::getFirst).orElse("");
                                                                                                                         ^
@@ -601,6 +331,286 @@ Path for java installation '/usr/lib/jvm/openjdk-17' (Common Linux Locations) do
 /home/matt/Documents/Repos/Mattcraft/net/minecraft/util/datafix/fixes/StatsCounterFix.java:244: error: incompatible types: Object cannot be converted to Entry<? extends Dynamic<?>,? extends Dynamic<?>>
                                 for (Entry<? extends Dynamic<?>, ? extends Dynamic<?>> entry : ((Map)optional.get()).entrySet()) {
                                                                                                                              ^
+/home/matt/Documents/Repos/Mattcraft/net/minecraft/util/datafix/fixes/DropInvalidSignDataFix.java:43: error: incompatible types: Stream<Dynamic<T>> cannot be converted to Stream<Dynamic>
+                        List<Dynamic<T>> list2 = Streams.<Dynamic, Dynamic<T>>mapWithIndex((Stream<Dynamic>)optional.get(), (dynamic2x, l) -> {
+                                                                                                                        ^
+  where T is a type-variable:
+    T extends Object declared in method <T>fixText(Dynamic<T>)
+/home/matt/Documents/Repos/Mattcraft/net/minecraft/util/datafix/fixes/TextComponentHoverAndClickEventFix.java:57: error: cannot find symbol
+                                                Pair<Either<H, Unit>, Dynamic<?>> pair2 = (Pair<Either<H, Unit>, Dynamic<?>>)((Pair)pairx.getSecond()).getSecond();
+                                                                                                                                         ^
+  symbol:   method getSecond()
+  location: variable pairx of type Object
+/home/matt/Documents/Repos/Mattcraft/net/minecraft/util/datafix/fixes/TextComponentHoverAndClickEventFix.java:56: error: incompatible types: Object cannot be converted to boolean
+                                        boolean bl = ((Either)pair.getSecond()).<Boolean>map(either -> false, pairx -> {
+                                                                                            ^
+/home/matt/Documents/Repos/Mattcraft/net/minecraft/util/datafix/fixes/TextComponentHoverAndClickEventFix.java:51: error: incompatible types: inference variable B has incompatible bounds
+                        return this.fixTypeEverywhere(
+                                                     ^
+    equality constraints: C2
+    lower bounds: C2,Pair<String,Either<Either<String,List<C1>>,Pair<Either<List<C1>,Unit>,Pair<Either<C1,Unit>,Pair<Either<H,Unit>,Dynamic<?>>>>>>
+  where B,A,C2,C1,H are type-variables:
+    B extends Object declared in method <A,B>fixTypeEverywhere(String,Type<A>,Type<B>,Function<DynamicOps<?>,Function<A,B>>)
+    A extends Object declared in method <A,B>fixTypeEverywhere(String,Type<A>,Type<B>,Function<DynamicOps<?>,Function<A,B>>)
+    C2 extends Object declared in method <C1,C2,H>createFixer(Type<C1>,Type<C2>,Type<H>)
+    C1 extends Object declared in method <C1,C2,H>createFixer(Type<C1>,Type<C2>,Type<H>)
+    H extends Pair<String,?> declared in method <C1,C2,H>createFixer(Type<C1>,Type<C2>,Type<H>)
+/home/matt/Documents/Repos/Mattcraft/net/minecraft/util/datafix/fixes/ItemPotionFix.java:171: error: incompatible types: Object cannot be converted to Dynamic<?>
+                                                Dynamic<?> dynamic2 = ((Typed)optional2.get()).get(DSL.remainderFinder());
+                                                                                                  ^
+/home/matt/Documents/Repos/Mattcraft/net/minecraft/util/datafix/fixes/ChunkBedBlockEntityInjecterFix.java:42: error: incompatible types: cannot infer type-variable(s) A,B
+                        this.fixTypeEverywhere(
+                                              ^
+    (argument mismatch; bad return type in lambda expression
+      incompatible parameter types in lambda expression)
+  where A,B are type-variables:
+    A extends Object declared in method <A,B>fixTypeEverywhere(String,Type<A>,Type<B>,Function<DynamicOps<?>,Function<A,B>>)
+    B extends Object declared in method <A,B>fixTypeEverywhere(String,Type<A>,Type<B>,Function<DynamicOps<?>,Function<A,B>>)
+/home/matt/Documents/Repos/Mattcraft/net/minecraft/util/datafix/fixes/ChunkBedBlockEntityInjecterFix.java:82: error: incompatible types: Object cannot be converted to TE
+                                                                                                .getFirst()
+                                                                                                         ^
+  where TE is a type-variable:
+    TE extends Object declared in method <TE>cap(Type<?>,ListType<TE>)
+/home/matt/Documents/Repos/Mattcraft/net/minecraft/util/datafix/fixes/EntitySpawnerItemVariantComponentFix.java:35: error: no suitable method found for updateTyped(OpticFinder<CAP#1>,EntitySpaw[...]ucket)
+                                        case "minecraft:salmon_bucket" -> typed.updateTyped(opticFinder2, EntitySpawnerItemVariantComponentFix::fixSalmonBucket);
+                                                                               ^
+    method Typed.<FT#1>updateTyped(OpticFinder<FT#1>,Function<Typed<?>,Typed<?>>) is not applicable
+      (cannot infer type-variable(s) FT#1
+        (argument mismatch; incompatible parameter types in method reference))
+    method Typed.<FT#2,FR>updateTyped(OpticFinder<FT#2>,Type<FR>,Function<Typed<?>,Typed<?>>) is not applicable
+      (cannot infer type-variable(s) FT#2,FR
+        (actual and formal argument lists differ in length))
+  where FT#1,FT#2,FR are type-variables:
+    FT#1 extends Object declared in method <FT#1>updateTyped(OpticFinder<FT#1>,Function<Typed<?>,Typed<?>>)
+    FT#2 extends Object declared in method <FT#2,FR>updateTyped(OpticFinder<FT#2>,Type<FR>,Function<Typed<?>,Typed<?>>)
+    FR extends Object declared in method <FT#2,FR>updateTyped(OpticFinder<FT#2>,Type<FR>,Function<Typed<?>,Typed<?>>)
+  where CAP#1 is a fresh type-variable:
+    CAP#1 extends Object from capture of ?
+/home/matt/Documents/Repos/Mattcraft/net/minecraft/util/datafix/fixes/EntitySpawnerItemVariantComponentFix.java:36: error: no suitable method found for updateTyped(OpticFinder<CAP#1>,EntitySpaw[...]ucket)
+                                        case "minecraft:axolotl_bucket" -> typed.updateTyped(opticFinder2, EntitySpawnerItemVariantComponentFix::fixAxolotlBucket);
+                                                                                ^
+    method Typed.<FT#1>updateTyped(OpticFinder<FT#1>,Function<Typed<?>,Typed<?>>) is not applicable
+      (cannot infer type-variable(s) FT#1
+        (argument mismatch; incompatible parameter types in method reference))
+    method Typed.<FT#2,FR>updateTyped(OpticFinder<FT#2>,Type<FR>,Function<Typed<?>,Typed<?>>) is not applicable
+      (cannot infer type-variable(s) FT#2,FR
+        (actual and formal argument lists differ in length))
+  where FT#1,FT#2,FR are type-variables:
+    FT#1 extends Object declared in method <FT#1>updateTyped(OpticFinder<FT#1>,Function<Typed<?>,Typed<?>>)
+    FT#2 extends Object declared in method <FT#2,FR>updateTyped(OpticFinder<FT#2>,Type<FR>,Function<Typed<?>,Typed<?>>)
+    FR extends Object declared in method <FT#2,FR>updateTyped(OpticFinder<FT#2>,Type<FR>,Function<Typed<?>,Typed<?>>)
+  where CAP#1 is a fresh type-variable:
+    CAP#1 extends Object from capture of ?
+/home/matt/Documents/Repos/Mattcraft/net/minecraft/util/datafix/fixes/EntitySpawnerItemVariantComponentFix.java:37: error: no suitable method found for updateTyped(OpticFinder<CAP#1>,EntitySpaw[...]ucket)
+                                        case "minecraft:tropical_fish_bucket" -> typed.updateTyped(opticFinder2, EntitySpawnerItemVariantComponentFix::fixTropicalFishBucket);
+                                                                                      ^
+    method Typed.<FT#1>updateTyped(OpticFinder<FT#1>,Function<Typed<?>,Typed<?>>) is not applicable
+      (cannot infer type-variable(s) FT#1
+        (argument mismatch; incompatible parameter types in method reference))
+    method Typed.<FT#2,FR>updateTyped(OpticFinder<FT#2>,Type<FR>,Function<Typed<?>,Typed<?>>) is not applicable
+      (cannot infer type-variable(s) FT#2,FR
+        (actual and formal argument lists differ in length))
+  where FT#1,FT#2,FR are type-variables:
+    FT#1 extends Object declared in method <FT#1>updateTyped(OpticFinder<FT#1>,Function<Typed<?>,Typed<?>>)
+    FT#2 extends Object declared in method <FT#2,FR>updateTyped(OpticFinder<FT#2>,Type<FR>,Function<Typed<?>,Typed<?>>)
+    FR extends Object declared in method <FT#2,FR>updateTyped(OpticFinder<FT#2>,Type<FR>,Function<Typed<?>,Typed<?>>)
+  where CAP#1 is a fresh type-variable:
+    CAP#1 extends Object from capture of ?
+/home/matt/Documents/Repos/Mattcraft/net/minecraft/util/datafix/fixes/MobSpawnerEntityIdentifiersFix.java:41: error: cannot find symbol
+                                                                        Optional<String> optionalx = dynamicx.get("Type").asString().result();
+                                                                                                             ^
+  symbol:   method get(String)
+  location: variable dynamicx of type Object
+/home/matt/Documents/Repos/Mattcraft/net/minecraft/util/datafix/fixes/MobSpawnerEntityIdentifiersFix.java:43: error: cannot find symbol
+                                                                                Dynamic<?> dynamic2 = DataFixUtils.orElse(dynamicx.get("Properties").result(), dynamicx.emptyMap())
+                                                                                                                                  ^
+  symbol:   method get(String)
+  location: variable dynamicx of type Object
+/home/matt/Documents/Repos/Mattcraft/net/minecraft/util/datafix/fixes/MobSpawnerEntityIdentifiersFix.java:43: error: cannot find symbol
+                                                                                Dynamic<?> dynamic2 = DataFixUtils.orElse(dynamicx.get("Properties").result(), dynamicx.emptyMap())
+                                                                                                                                                                       ^
+  symbol:   method emptyMap()
+  location: variable dynamicx of type Object
+/home/matt/Documents/Repos/Mattcraft/net/minecraft/util/datafix/fixes/MobSpawnerEntityIdentifiersFix.java:44: error: cannot find symbol
+                                                                                        .set("id", dynamicx.createString((String)optionalx.get()));
+                                                                                                           ^
+  symbol:   method createString(String)
+  location: variable dynamicx of type Object
+/home/matt/Documents/Repos/Mattcraft/net/minecraft/util/datafix/fixes/MobSpawnerEntityIdentifiersFix.java:45: error: cannot find symbol
+                                                                                return dynamicx.set("Entity", dynamic2).remove("Type").remove("Properties");
+                                                                                               ^
+  symbol:   method set(String,Dynamic<CAP#1>)
+  location: variable dynamicx of type Object
+  where CAP#1 is a fresh type-variable:
+    CAP#1 extends Object from capture of ?
+/home/matt/Documents/Repos/Mattcraft/net/minecraft/util/datafix/fixes/OverreachingTickFix.java:39: error: cannot find symbol
+                                int k = dynamicx.get("x").asInt(0);
+                                                ^
+  symbol:   method get(String)
+  location: variable dynamicx of type Object
+/home/matt/Documents/Repos/Mattcraft/net/minecraft/util/datafix/fixes/OverreachingTickFix.java:40: error: cannot find symbol
+                                int l = dynamicx.get("z").asInt(0);
+                                                ^
+  symbol:   method get(String)
+  location: variable dynamicx of type Object
+/home/matt/Documents/Repos/Mattcraft/net/minecraft/util/datafix/fixes/EmptyItemInHotbarFix.java:27: error: incompatible types: invalid method reference
+                                Optional<String> optional = ((Either)pairx.getFirst()).left().map(Pair::getSecond);
+                                                                                                  ^
+    method getSecond in class Pair<F,S> cannot be applied to given types
+      required: no arguments
+      found:    Object
+      reason: actual and formal argument lists differ in length
+  where F,S are type-variables:
+    F extends Object declared in class Pair
+    S extends Object declared in class Pair
+/home/matt/Documents/Repos/Mattcraft/net/minecraft/util/datafix/fixes/SavedDataUUIDFix.java:34: error: incompatible types: cannot infer type-variable(s) R
+                                                                                        dynamicxxxx.asStream().map(dynamicxxxxx -> (Dynamic)createUUIDFromLongs(dynamicxxxxx, "UUIDMost", "UUIDLeast").orElseGet(() -> {
+                                                                                                                  ^
+    (argument mismatch; incompatible parameter types in lambda expression)
+  where R,T are type-variables:
+    R extends Object declared in method <R>map(Function<? super T,? extends R>)
+    T extends Object declared in interface Stream
+/home/matt/Documents/Repos/Mattcraft/net/minecraft/util/datafix/fixes/FixProjectileStoredItem.java:47: error: incompatible types: Type<T> cannot be converted to Type<CAP#1>
+                return typed -> typed.updateTyped(opticFinder, type2, typedx -> subFixer.fix(typedx, type2));
+                                                                                                     ^
+  where T is a type-variable:
+    T extends Object declared in method <T>fixChoiceCap(String,SubFixer<?>,Type<?>,Type<T>)
+  where CAP#1 is a fresh type-variable:
+    CAP#1 extends Object from capture of ?
+/home/matt/Documents/Repos/Mattcraft/net/minecraft/util/datafix/fixes/EffectDurationFix.java:36: error: incompatible types: Object cannot be converted to Dynamic<?>
+                                                Dynamic<?> dynamic = ((Typed)optional.get()).get(DSL.remainderFinder());
+                                                                                                ^
+/home/matt/Documents/Repos/Mattcraft/net/minecraft/util/datafix/fixes/OptionsKeyLwjgl3Fix.java:168: error: incompatible types: Map<Dynamic,Dynamic> cannot be converted to Map<? extends Dynamic<?>,? extends Dynamic<?>>
+                                        }).collect(Collectors.toMap(Pair::getFirst, Pair::getSecond))))
+                                                  ^
+/home/matt/Documents/Repos/Mattcraft/net/minecraft/util/datafix/fixes/EntityEquipmentToArmorAndHandFix.java:75: error: incompatible types: ItemStackOld cannot be converted to ItemStackNew
+                                                                        list2.set(i - 1, list.get(i));
+                                                                                                 ^
+  where ItemStackOld,ItemStackNew are type-variables:
+    ItemStackOld extends Object declared in method <ItemStackOld,ItemStackNew>cap(Type<ItemStackOld>,Type<ItemStackNew>)
+    ItemStackNew extends Object declared in method <ItemStackOld,ItemStackNew>cap(Type<ItemStackOld>,Type<ItemStackNew>)
+/home/matt/Documents/Repos/Mattcraft/net/minecraft/util/datafix/fixes/EntityEquipmentToArmorAndHandFix.java:93: error: cannot find symbol
+                        Iterator<Float> iterator = Stream.concat(((Stream)optional.get()).map(dynamicx -> dynamicx.asFloat(0.0F)), Stream.generate(() -> 0.0F)).iterator();
+                                                                                                                  ^
+  symbol:   method asFloat(float)
+  location: variable dynamicx of type Object
+/home/matt/Documents/Repos/Mattcraft/net/minecraft/util/datafix/fixes/GossipUUIDFix.java:24: error: incompatible types: invalid method reference
+                                                .map(dynamicx::createList),
+                                                     ^
+    incompatible types: Stream<Dynamic> cannot be converted to Stream<? extends Dynamic<?>>
+  where T is a type-variable:
+    T extends Object declared in class DynamicLike
+/home/matt/Documents/Repos/Mattcraft/net/minecraft/util/datafix/fixes/ItemStackUUIDFix.java:35: error: incompatible types: cannot infer type-variable(s) R
+                        dynamic2 -> dynamic.createList(dynamic2.asStream().map(dynamicxx -> (Dynamic)replaceUUIDLeastMost(dynamicxx, "UUID", "UUID").orElse(dynamicxx)))
+                                                                              ^
+    (argument mismatch; incompatible parameter types in lambda expression)
+  where R,T are type-variables:
+    R extends Object declared in method <R>map(Function<? super T,? extends R>)
+    T extends Object declared in interface Stream
+/home/matt/Documents/Repos/Mattcraft/net/minecraft/util/datafix/fixes/ItemStackComponentizationFix.java:376: error: cannot find symbol
+                                                        .map(dynamicx -> DataFixUtils.orElse(dynamicx.asString().map(stringx -> fixBlockStatePredicate(dynamicx, stringx)).result(), dynamicx))
+                                                                                                     ^
+  symbol:   method asString()
+  location: variable dynamicx of type Object
+/home/matt/Documents/Repos/Mattcraft/net/minecraft/util/datafix/fixes/ItemStackComponentizationFix.java:686: error: cannot find symbol
+                                                                                .set("value", optionalDynamic.createString((String)pair.getFirst()));
+                                                                                                                                       ^
+  symbol:   method getFirst()
+  location: variable pair of type Object
+/home/matt/Documents/Repos/Mattcraft/net/minecraft/util/datafix/fixes/ItemStackComponentizationFix.java:687: error: cannot find symbol
+                                                                        Optional<String> optional = (Optional<String>)pair.getSecond();
+                                                                                                                          ^
+  symbol:   method getSecond()
+  location: variable pair of type Object
+/home/matt/Documents/Repos/Mattcraft/net/minecraft/util/datafix/fixes/BlockEntitySignDoubleSidedEditableTextFix.java:38: error: incompatible types: List<Dynamic> cannot be converted to List<Dynamic<T>>
+                List<Dynamic<T>> list = getLines(dynamic, "Text").map(optional -> (Dynamic)optional.orElse(dynamic2)).toList();
+                                                                                                                            ^
+  where T is a type-variable:
+    T extends Object declared in method <T>fixFrontTextTag(Dynamic<T>)
+/home/matt/Documents/Repos/Mattcraft/net/minecraft/util/datafix/fixes/EquipmentFormatFix.java:65: error: incompatible types: inference variable F has incompatible bounds
+                        return this.fixTypeEverywhere(
+                                                     ^
+    equality constraints: Either<ItemStackNew,Unit>
+    lower bounds: Either<ItemStackOld,Unit>
+  where F,S,ItemStackNew,ItemStackOld are type-variables:
+    F extends Object declared in method <F,S>of(F,S)
+    S extends Object declared in method <F,S>of(F,S)
+    ItemStackNew extends Object declared in method <ItemStackOld,ItemStackNew>fix(Type<ItemStackOld>,Type<ItemStackNew>,OpticFinder<?>)
+    ItemStackOld extends Object declared in method <ItemStackOld,ItemStackNew>fix(Type<ItemStackOld>,Type<ItemStackNew>,OpticFinder<?>)
+/home/matt/Documents/Repos/Mattcraft/net/minecraft/util/datafix/fixes/OptionsKeyTranslationFix.java:34: error: incompatible types: Map<Dynamic,CAP#1> cannot be converted to Map<? extends Dynamic<?>,? extends Dynamic<?>>
+                                        }).collect(Collectors.toMap(Pair::getFirst, Pair::getSecond))))
+                                                  ^
+  where CAP#1 is a fresh type-variable:
+    CAP#1 extends Dynamic from capture of ? extends Dynamic
+/home/matt/Documents/Repos/Mattcraft/net/minecraft/util/datafix/fixes/LevelDataGeneratorOptionsFix.java:194: error: cannot find symbol
+                                                                .map(entryx -> Pair.of(dynamicOps.createString((String)entryx.getKey()), dynamicOps.createString((String)entryx.getValue())))
+                                                                                                                             ^
+  symbol:   method getKey()
+  location: variable entryx of type Object
+/home/matt/Documents/Repos/Mattcraft/net/minecraft/util/datafix/fixes/LevelDataGeneratorOptionsFix.java:194: error: cannot find symbol
+                                                                .map(entryx -> Pair.of(dynamicOps.createString((String)entryx.getKey()), dynamicOps.createString((String)entryx.getValue())))
+                                                                                                                                                                               ^
+  symbol:   method getValue()
+  location: variable entryx of type Object
+/home/matt/Documents/Repos/Mattcraft/net/minecraft/util/datafix/fixes/LevelDataGeneratorOptionsFix.java:195: error: incompatible types: cannot infer type-variable(s) T,K,U
+                                                                .collect(Collectors.toMap(Pair::getFirst, Pair::getSecond))
+                                                                                         ^
+    (argument mismatch; invalid method reference
+      method getFirst in class Pair<F,S> cannot be applied to given types
+        required: no arguments
+        found:    Object
+        reason: actual and formal argument lists differ in length)
+  where T,K,U,F,S are type-variables:
+    T extends Object declared in method <T,K,U>toMap(Function<? super T,? extends K>,Function<? super T,? extends U>)
+    K extends Object declared in method <T,K,U>toMap(Function<? super T,? extends K>,Function<? super T,? extends U>)
+    U extends Object declared in method <T,K,U>toMap(Function<? super T,? extends K>,Function<? super T,? extends U>)
+    F extends Object declared in class Pair
+    S extends Object declared in class Pair
+/home/matt/Documents/Repos/Mattcraft/net/minecraft/util/datafix/fixes/ChunkToProtochunkFix.java:70: error: incompatible types: List<ShortArrayList> cannot be converted to List<ShortList>
+                                                List<ShortList> list = (List<ShortList>)IntStream.range(0, 16).mapToObj(i -> new ShortArrayList()).collect(Collectors.toList());
+                                                                                                                                                          ^
+/home/matt/Documents/Repos/Mattcraft/net/minecraft/util/datafix/fixes/LevelUUIDFix.java:48: error: incompatible types: cannot infer type-variable(s) R
+                return dynamic.update("Players", dynamic2 -> dynamic.createList(dynamic2.asStream().map(dynamicxx -> (Dynamic)createUUIDFromML(dynamicxx).orElseGet(() -> {
+                                                                                                       ^
+    (argument mismatch; incompatible parameter types in lambda expression)
+  where R,T are type-variables:
+    R extends Object declared in method <R>map(Function<? super T,? extends R>)
+    T extends Object declared in interface Stream
+/home/matt/Documents/Repos/Mattcraft/net/minecraft/util/datafix/fixes/BlockEntityUUIDFix.java:26: error: incompatible types: Dynamic<CAP#1> cannot be converted to Dynamic<CAP#2>
+                        .orElse(dynamic);
+                                ^
+  where CAP#1,CAP#2 are fresh type-variables:
+    CAP#1 extends Object from capture of ?
+    CAP#2 extends Object from capture of ?
+/home/matt/Documents/Repos/Mattcraft/net/minecraft/util/datafix/fixes/StructuresBecomeConfiguredFix.java:224: error: incompatible types: Object cannot be converted to String
+                                ((List)entry.getKey()).forEach(string -> builder.put(string, (String)entry.getValue()));
+                                                                                     ^
+/home/matt/Documents/Repos/Mattcraft/net/minecraft/util/datafix/DataFixers.java:1117: error: incompatible types: bad return type in method reference
+                                schema164, "Change cat variant type", References.ENTITY, "minecraft:cat", "CatType", Util.make(new Int2ObjectOpenHashMap(), int2ObjectOpenHashMap -> {
+                                                                                                                     ^
+    Object cannot be converted to String
+/home/matt/Documents/Repos/Mattcraft/net/minecraft/util/datafix/DataFixers.java:1154: error: incompatible types: bad return type in method reference
+                                schema165, "Change frog variant type", References.ENTITY, "minecraft:frog", "Variant", Util.make(new Int2ObjectOpenHashMap(), int2ObjectOpenHashMap -> {
+                                                                                                                       ^
+    Object cannot be converted to String
+/home/matt/Documents/Repos/Mattcraft/net/minecraft/util/profiling/FilledProfileResults.java:51: error: cannot find symbol
+                        Comparator.comparingLong(counterCollector -> counterCollector.totalValue)
+                                                                                     ^
+  symbol:   variable totalValue
+  location: variable counterCollector of type Object
+/home/matt/Documents/Repos/Mattcraft/net/minecraft/util/profiling/FilledProfileResults.java:53: error: incompatible types: Comparator<Entry<Object,Object>> cannot be converted to Comparator<Entry<String,CounterCollector>>
+                .reversed();
+                         ^
+/home/matt/Documents/Repos/Mattcraft/net/minecraft/util/profiling/jfr/stats/FileIOStat.java:26: error: cannot find symbol
+                                .map(entry -> Pair.of((String)entry.getKey(), (Long)entry.getValue()))
+                                                                   ^
+  symbol:   method getKey()
+  location: variable entry of type Object
+/home/matt/Documents/Repos/Mattcraft/net/minecraft/util/profiling/jfr/stats/FileIOStat.java:26: error: cannot find symbol
+                                .map(entry -> Pair.of((String)entry.getKey(), (Long)entry.getValue()))
+                                                                                         ^
+  symbol:   method getValue()
+  location: variable entry of type Object
 Note: Some input files use or override a deprecated API.
 Note: Recompile with -Xlint:deprecation for details.
 Note: Some input files use unchecked or unsafe operations.
@@ -608,7 +618,7 @@ Note: Recompile with -Xlint:unchecked for details.
 Note: Some messages have been simplified; recompile with -Xdiags:verbose to get full output
 100 errors
 4 warnings
-only showing the first 100 errors, of 229 total; use -Xmaxerrs if you would like to see more
+only showing the first 100 errors, of 184 total; use -Xmaxerrs if you would like to see more
 
 > Task :compileJava FAILED
 
@@ -622,7 +632,7 @@ Execution failed for task ':compileJava'.
 > Run with --info option to get more log output.
 > Run with --scan to get full insights.
 
-BUILD FAILED in 26s
+BUILD FAILED in 17s
 1 actionable task: 1 executed
 matt@HungLoDE:~/Documents/Repos/Mattcraft$
 
