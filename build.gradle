@@ -296,11 +296,11 @@ tasks.register('runClient', JavaExec) {
         file('run/assets').mkdirs()
         file('run/resourcepacks').mkdirs()
         
-        // Copy assets from libraries/assets to run/assets for dev environment
-        def librariesAssetsDir = file('libraries/assets')
-        if (librariesAssetsDir.exists() && librariesAssetsDir.isDirectory()) {
+        // Copy assets from src/main/resources/assets to run/assets for dev environment
+        def resourcesAssetsDir = file('src/main/resources/assets')
+        if (resourcesAssetsDir.exists() && resourcesAssetsDir.isDirectory()) {
             copy {
-                from librariesAssetsDir
+                from resourcesAssetsDir
                 into file('run/assets')
             }
         }
@@ -428,16 +428,16 @@ tasks.register('clientDist') {
             into "${distDir}/resources"
         }
         
-        // Copy assets from libraries/assets directory
+        // Copy assets from src/main/resources/assets directory
         // This is where Minecraft assets (sounds, textures, etc.) are stored
-        // Assets should be in the standard Minecraft structure: indexes/, objects/
-        def librariesAssetsDir = file('libraries/assets')
-        if (librariesAssetsDir.exists() && librariesAssetsDir.isDirectory()) {
+        // Assets should be in the standard Minecraft structure: indexes/, objects/, files/
+        def resourcesAssetsDir = file('src/main/resources/assets')
+        if (resourcesAssetsDir.exists() && resourcesAssetsDir.isDirectory()) {
             copy {
-                from librariesAssetsDir
+                from resourcesAssetsDir
                 into "${distDir}/run/assets"
             }
-            println "Copied assets from ${librariesAssetsDir.absolutePath}"
+            println "Copied assets from ${resourcesAssetsDir.absolutePath}"
         }
         
         // Build classpath string for launch scripts
