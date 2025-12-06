@@ -1,9 +1,21 @@
 #!/bin/bash
 # MattMC Client Launcher
 
-cd "$(dirname "$0")"
+# Get the directory containing this script (should be project root in distribution)
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+cd "$SCRIPT_DIR"
 
-java -Xmx2G -Xms512M \
+# Use bundled JDK if available, otherwise use system java
+BUNDLED_JAVA="${SCRIPT_DIR}/run/jdk-21/bin/java"
+if [[ -x "$BUNDLED_JAVA" ]]; then
+    JAVA_CMD="$BUNDLED_JAVA"
+    echo "Using bundled JDK"
+else
+    JAVA_CMD="java"
+    echo "Using system Java"
+fi
+
+"$JAVA_CMD" -Xmx2G -Xms512M \
     -XX:+UseG1GC \
     -XX:+ParallelRefProcEnabled \
     -XX:MaxGCPauseMillis=200 \

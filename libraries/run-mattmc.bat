@@ -1,9 +1,21 @@
 @echo off
 REM MattMC Client Launcher
 
+REM Get the directory containing this script (should be project root in distribution)
 cd /d "%~dp0"
+set SCRIPT_DIR=%CD%
 
-java -Xmx2G -Xms512M ^
+REM Use bundled JDK if available, otherwise use system java
+set BUNDLED_JAVA=%SCRIPT_DIR%\run\jdk-21\bin\java.exe
+if exist "%BUNDLED_JAVA%" (
+    set JAVA_CMD=%BUNDLED_JAVA%
+    echo Using bundled JDK
+) else (
+    set JAVA_CMD=java
+    echo Using system Java
+)
+
+"%JAVA_CMD%" -Xmx2G -Xms512M ^
     -XX:+UseG1GC ^
     -XX:+ParallelRefProcEnabled ^
     -XX:MaxGCPauseMillis=200 ^
