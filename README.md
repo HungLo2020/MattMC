@@ -19,7 +19,7 @@ This repository contains a complete, decompiled source code port of Minecraft Ja
 - **Bundled Runtime**: Optional bundled JDK for consistent execution environments
 
 ### 🎯 No Bullshit
-- **Full Source Access**: Over 6,100 Java source files available for inspection and modification
+- **Full Source Access**: Thousands of Java source files available for inspection and modification
 - **Transparent Build Process**: Clear Gradle configuration with documented tasks
 - **No Proprietary Launchers**: Direct execution via standard Java tooling
 - **Offline Capable**: Run and develop without forced authentication or telemetry
@@ -138,7 +138,7 @@ MattMC/
 ├── gradle/               # Gradle wrapper files
 ├── libraries/            # Bundled JDK and launch scripts
 ├── com/                  # Mojang source files (blaze3d, realmsclient, etc.)
-├── net/minecraft/        # Main Minecraft source code (~6,100 files)
+├── net/minecraft/        # Main Minecraft source code (thousands of files)
 │   ├── client/           # Client-specific code
 │   │   ├── main/Main.java # Client entry point
 │   │   ├── renderer/     # Rendering engine
