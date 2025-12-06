@@ -32,7 +32,7 @@ public class ExplorationMapFunction extends LootItemConditionalFunction {
 	public static final boolean DEFAULT_SKIP_EXISTING = true;
 	public static final MapCodec<ExplorationMapFunction> CODEC = RecordCodecBuilder.mapCodec(
 		instance -> commonFields(instance)
-			.<TagKey<Structure>, Holder<MapDecorationType>, byte, int, boolean>and(
+			.<TagKey<Structure>, Holder<MapDecorationType>, Byte, Integer, Boolean>and(
 				instance.group(
 					TagKey.codec(Registries.STRUCTURE)
 						.optionalFieldOf("destination", DEFAULT_DESTINATION)

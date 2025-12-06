@@ -16,6 +16,7 @@ import net.minecraft.network.codec.ByteBufCodecs;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.util.ExtraCodecs;
 import net.minecraft.util.ProblemReporter;
+import net.minecraft.core.Holder;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.pattern.BlockInWorld;

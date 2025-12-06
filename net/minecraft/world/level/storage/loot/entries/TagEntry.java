@@ -20,7 +20,7 @@ public class TagEntry extends LootPoolSingletonContainer {
 		instance -> instance.group(
 				TagKey.codec(Registries.ITEM).fieldOf("name").forGetter(tagEntry -> tagEntry.tag), Codec.BOOL.fieldOf("expand").forGetter(tagEntry -> tagEntry.expand)
 			)
-			.<int, int, List<LootItemCondition>, List<LootItemFunction>>and(singletonFields(instance))
+			.<Integer, Integer, List<LootItemCondition>, List<LootItemFunction>>and(singletonFields(instance))
 			.apply(instance, TagEntry::new)
 	);
 	private final TagKey<Item> tag;

@@ -27,7 +27,7 @@ public class EnchantedCountIncreaseFunction extends LootItemConditionalFunction 
 	public static final int NO_LIMIT = 0;
 	public static final MapCodec<EnchantedCountIncreaseFunction> CODEC = RecordCodecBuilder.mapCodec(
 		instance -> commonFields(instance)
-			.<Holder<Enchantment>, NumberProvider, int>and(
+			.<Holder<Enchantment>, NumberProvider, Integer>and(
 				instance.group(
 					Enchantment.CODEC.fieldOf("enchantment").forGetter(enchantedCountIncreaseFunction -> enchantedCountIncreaseFunction.enchantment),
 					NumberProviders.CODEC.fieldOf("count").forGetter(enchantedCountIncreaseFunction -> enchantedCountIncreaseFunction.value),

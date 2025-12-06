@@ -15,7 +15,7 @@ import net.minecraft.world.level.storage.loot.predicates.LootItemCondition;
 public class LootItem extends LootPoolSingletonContainer {
 	public static final MapCodec<LootItem> CODEC = RecordCodecBuilder.mapCodec(
 		instance -> instance.group(Item.CODEC.fieldOf("name").forGetter(lootItem -> lootItem.item))
-			.<int, int, List<LootItemCondition>, List<LootItemFunction>>and(singletonFields(instance))
+			.<Integer, Integer, List<LootItemCondition>, List<LootItemFunction>>and(singletonFields(instance))
 			.apply(instance, LootItem::new)
 	);
 	private final Holder<Item> item;

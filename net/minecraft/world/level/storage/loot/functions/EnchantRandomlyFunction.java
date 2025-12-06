@@ -28,7 +28,7 @@ public class EnchantRandomlyFunction extends LootItemConditionalFunction {
 	private static final Logger LOGGER = LogUtils.getLogger();
 	public static final MapCodec<EnchantRandomlyFunction> CODEC = RecordCodecBuilder.mapCodec(
 		instance -> commonFields(instance)
-			.<Optional<HolderSet<Enchantment>>, boolean>and(
+			.<Optional<HolderSet<Enchantment>>, Boolean>and(
 				instance.group(
 					RegistryCodecs.homogeneousList(Registries.ENCHANTMENT).optionalFieldOf("options").forGetter(enchantRandomlyFunction -> enchantRandomlyFunction.options),
 					Codec.BOOL.optionalFieldOf("only_compatible", true).forGetter(enchantRandomlyFunction -> enchantRandomlyFunction.onlyCompatible)
