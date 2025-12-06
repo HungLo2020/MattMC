@@ -55,7 +55,7 @@ public class GoAndGiveItemsToTarget<E extends LivingEntity & InventoryCarrier> e
 	@Override
 	protected void start(ServerLevel serverLevel, E livingEntity, long l) {
 		((Optional<PositionTracker>)this.targetPositionGetter.apply(livingEntity))
-			.ifPresent((PositionTracker positionTracker) -> BehaviorUtils.setWalkAndLookTargetMemories(livingEntity, positionTracker, this.speedModifier, 3));
+			.ifPresent(positionTracker -> BehaviorUtils.setWalkAndLookTargetMemories(livingEntity, positionTracker, this.speedModifier, 3));
 	}
 
 	@Override

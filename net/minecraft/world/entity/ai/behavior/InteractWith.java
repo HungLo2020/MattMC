@@ -16,6 +16,7 @@ public class InteractWith {
 		return of(entityType, i, livingEntity -> true, livingEntity -> true, memoryModuleType, f, j);
 	}
 
+	@SuppressWarnings("unchecked")
 	public static <E extends LivingEntity, T extends LivingEntity> BehaviorControl<E> of(
 		EntityType<? extends T> entityType, int i, Predicate<E> predicate, Predicate<T> predicate2, MemoryModuleType<T> memoryModuleType, float f, int j
 	) {

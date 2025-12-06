@@ -11,12 +11,17 @@ import net.minecraft.util.StringRepresentable;
 import net.minecraft.world.level.GameRules;
 
 public class GameRulesService {
+	@SuppressWarnings("unchecked")
+	private static <T extends GameRules.Value<T>> T getRuleUnchecked(MinecraftApi minecraftApi, GameRules.Key<?> key) {
+		return (T)minecraftApi.gameRuleService().getRule((GameRules.Key<T>)(GameRules.Key<?>)key);
+	}
+
 	public static List<GameRulesService.TypedRule> get(MinecraftApi minecraftApi) {
 		List<? extends GameRules.Key<?>> list = minecraftApi.gameRuleService().getAvailableGameRules().map(Entry::getKey).toList();
 		List<GameRulesService.TypedRule> list2 = new ArrayList();
 
 		for (GameRules.Key<?> key : list) {
-			GameRules.Value<?> value = minecraftApi.gameRuleService().getRule((GameRules.Key<GameRules.Value<?>>)key);
+			GameRules.Value<?> value = getRuleUnchecked(minecraftApi, key);
 			list2.add(getTypedRule(minecraftApi, key.getId(), value));
 		}
 
