@@ -15,6 +15,10 @@ run/
 logs/
 crash-reports/
 
+# Minecraft assets (large files that should not be in version control)
+# Place your Minecraft assets in the 'assets' folder - they will be copied to the distribution
+assets/
+
 # OS
 .DS_Store
 Thumbs.db

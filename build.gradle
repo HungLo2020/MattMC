@@ -418,6 +418,18 @@ tasks.register('clientDist') {
             into "${distDir}/resources"
         }
         
+        // Copy assets from project assets directory if it exists
+        // This is where Minecraft assets (sounds, textures, etc.) should be placed
+        // Assets should be in the standard Minecraft structure: assets/indexes/, assets/objects/
+        def projectAssetsDir = file('assets')
+        if (projectAssetsDir.exists() && projectAssetsDir.isDirectory()) {
+            copy {
+                from projectAssetsDir
+                into "${distDir}/run/assets"
+            }
+            println "Copied assets from ${projectAssetsDir.absolutePath}"
+        }
+        
         // Build classpath string for launch scripts
         def jarName = tasks.jar.archiveFileName.get()
         def classpathLinux = "lib/${jarName}:lib/" + configurations.runtimeClasspath.files.collect { it.name }.join(':lib/')
