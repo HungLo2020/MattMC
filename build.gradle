@@ -240,16 +240,16 @@ def configureBundledJdk(JavaExec task) {
     def bundledJdkDir = file('run/jdk-21')
     def bundledJavaExe = new File(bundledJdkDir, 'bin/java')
     
-    // Don't use javaLauncher property - rely on executable only
-    // This avoids toolchain conflicts
-    task.javaLauncher = null
-    
     // Configure the task to use bundled JDK executable
+    // Set executable directly in task configuration to use it instead of toolchain
+    task.executable = bundledJavaExe.absolutePath
+    
+    // Verify bundled JDK exists before running
     task.doFirst {
-        if (bundledJavaExe.exists()) {
-            executable bundledJavaExe.absolutePath
-            println "Using bundled JDK from: ${bundledJdkDir.absolutePath}"
+        if (!bundledJavaExe.exists()) {
+            throw new GradleException("Bundled JDK not found at ${bundledJdkDir.absolutePath}. Run './gradlew copyJdkToRun' first.")
         }
+        println "Using bundled JDK from: ${bundledJdkDir.absolutePath}"
     }
 }
 
