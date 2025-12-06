@@ -378,9 +378,9 @@ tasks.register('copyJdkToRun') {
     def srcJdkDir = file('libraries/jdk-21')
     def destJdkDir = file('run/jdk-21')
     
-    // Declare inputs/outputs unconditionally
+    // Declare inputs only - not outputs to avoid Gradle detecting
+    // implicit dependencies with compileJava task
     inputs.dir(srcJdkDir).skipWhenEmpty()
-    outputs.dir destJdkDir
     
     // Only run if source JDK exists
     onlyIf { srcJdkDir.exists() }
