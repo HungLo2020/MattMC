@@ -35,11 +35,11 @@ public class SlideDownBlockTrigger extends SimpleCriterionTrigger<SlideDownBlock
 			.validate(SlideDownBlockTrigger.TriggerInstance::validate);
 
 		private static DataResult<SlideDownBlockTrigger.TriggerInstance> validate(SlideDownBlockTrigger.TriggerInstance triggerInstance) {
-			return (DataResult<SlideDownBlockTrigger.TriggerInstance>)triggerInstance.block
-				.flatMap(
+			return triggerInstance.block
+				.<DataResult<SlideDownBlockTrigger.TriggerInstance>>flatMap(
 					holder -> triggerInstance.state
 						.flatMap(statePropertiesPredicate -> statePropertiesPredicate.checkState(((Block)holder.value()).getStateDefinition()))
-						.map(string -> DataResult.error(() -> "Block" + holder + " has no property " + string))
+						.map(string -> DataResult.<SlideDownBlockTrigger.TriggerInstance>error(() -> "Block" + holder + " has no property " + string))
 				)
 				.orElseGet(() -> DataResult.success(triggerInstance));
 		}

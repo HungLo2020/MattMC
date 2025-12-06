@@ -982,9 +982,9 @@ public class ExecuteCommand {
 			Entity entity = commandSourceStack.getEntity();
 			return (Collection<CommandSourceStack>)(entity == null
 				? List.of()
-				: (Collection)((Optional)function.apply(entity))
-					.filter(entityx -> !entityx.isRemoved())
-					.map(entityx -> List.of(commandSourceStack.withEntity(entityx)))
+				: (Collection)function.apply(entity)
+					.filter((Entity entityx) -> !entityx.isRemoved())
+					.map((Entity entityx) -> List.of(commandSourceStack.withEntity(entityx)))
 					.orElse(List.of()));
 		};
 	}
@@ -993,7 +993,7 @@ public class ExecuteCommand {
 		return commandContext -> {
 			CommandSourceStack commandSourceStack = commandContext.getSource();
 			Entity entity = commandSourceStack.getEntity();
-			return entity == null ? List.of() : ((Stream)function.apply(entity)).filter(entityx -> !entityx.isRemoved()).map(commandSourceStack::withEntity).toList();
+			return entity == null ? List.of() : function.apply(entity).filter(entityx -> !entityx.isRemoved()).map(commandSourceStack::withEntity).toList();
 		};
 	}
 

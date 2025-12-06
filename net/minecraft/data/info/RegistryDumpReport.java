@@ -36,7 +36,9 @@ public class RegistryDumpReport implements DataProvider {
 			jsonObject.addProperty("default", resourceLocation.toString());
 		}
 
-		int i = BuiltInRegistries.REGISTRY.getId(registry);
+		@SuppressWarnings("unchecked")
+		Registry<Registry<?>> builtinRegistry = (Registry<Registry<?>>)(Object)BuiltInRegistries.REGISTRY;
+		int i = builtinRegistry.getId((Registry<?>)registry);
 		jsonObject.addProperty("protocol_id", i);
 		JsonObject jsonObject2 = new JsonObject();
 		registry.listElements().forEach(reference -> {

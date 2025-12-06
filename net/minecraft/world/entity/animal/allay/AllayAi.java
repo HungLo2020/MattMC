@@ -14,6 +14,7 @@ import net.minecraft.util.valueproviders.UniformInt;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.ai.Brain;
 import net.minecraft.world.entity.ai.behavior.AnimalPanic;
+import net.minecraft.world.entity.ai.behavior.BehaviorControl;
 import net.minecraft.world.entity.ai.behavior.BlockPosTracker;
 import net.minecraft.world.entity.ai.behavior.CountDownCooldownTicks;
 import net.minecraft.world.entity.ai.behavior.DoNothing;
@@ -61,7 +62,7 @@ public class AllayAi {
 		brain.addActivity(
 			Activity.CORE,
 			0,
-			ImmutableList.of(
+			ImmutableList.<BehaviorControl<? super Allay>>of(
 				new Swim<>(0.8F),
 				new AnimalPanic(2.5F),
 				new LookAtTargetSink(45, 90),

@@ -30,8 +30,9 @@ public class LinearPalette<T> implements Palette<T> {
 		this.size = j;
 	}
 
+	@SuppressWarnings("unchecked")
 	public static <A> Palette<A> create(int i, List<A> list) {
-		return new LinearPalette(i, (List<T>)list);
+		return new LinearPalette(i, (List<A>)list);
 	}
 
 	@Override

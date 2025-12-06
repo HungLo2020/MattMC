@@ -71,11 +71,12 @@ public class SpawnPlacements {
 		return data == null ? Heightmap.Types.MOTION_BLOCKING_NO_LEAVES : data.heightMap;
 	}
 
+	@SuppressWarnings("unchecked")
 	public static <T extends Entity> boolean checkSpawnRules(
 		EntityType<T> entityType, ServerLevelAccessor serverLevelAccessor, EntitySpawnReason entitySpawnReason, BlockPos blockPos, RandomSource randomSource
 	) {
 		SpawnPlacements.Data data = (SpawnPlacements.Data)DATA_BY_TYPE.get(entityType);
-		return data == null || data.predicate.test(entityType, serverLevelAccessor, entitySpawnReason, blockPos, randomSource);
+		return data == null || ((SpawnPlacements.SpawnPredicate<T>)data.predicate).test(entityType, serverLevelAccessor, entitySpawnReason, blockPos, randomSource);
 	}
 
 	static {

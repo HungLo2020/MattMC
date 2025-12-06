@@ -13,6 +13,7 @@ import net.minecraft.world.entity.ai.Brain;
 import net.minecraft.world.entity.ai.behavior.AnimalMakeLove;
 import net.minecraft.world.entity.ai.behavior.AnimalPanic;
 import net.minecraft.world.entity.ai.behavior.BabyFollowAdult;
+import net.minecraft.world.entity.ai.behavior.BehaviorControl;
 import net.minecraft.world.entity.ai.behavior.CountDownCooldownTicks;
 import net.minecraft.world.entity.ai.behavior.DoNothing;
 import net.minecraft.world.entity.ai.behavior.FollowTemptation;
@@ -80,7 +81,7 @@ public class GoatAi {
 		brain.addActivity(
 			Activity.CORE,
 			0,
-			ImmutableList.of(
+			ImmutableList.<BehaviorControl<? super Goat>>of(
 				new Swim<>(0.8F),
 				new AnimalPanic(2.0F),
 				new LookAtTargetSink(45, 90),

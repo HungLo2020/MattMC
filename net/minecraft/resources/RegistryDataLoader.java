@@ -236,9 +236,9 @@ public class RegistryDataLoader {
 					entry -> ((ResourceKey)entry.getKey()).registry(), Collectors.toMap(entry -> ((ResourceKey)entry.getKey()).location(), Entry::getValue)
 				)
 			);
-		map2.entrySet().stream().sorted(Entry.comparingByKey()).forEach(entry -> {
+		map2.entrySet().stream().sorted(Entry.comparingByKey(Comparator.comparing(key -> key.toString()))).forEach(entry -> {
 			printWriter.printf("> Errors in registry %s:%n", entry.getKey());
-			((Map<?, ?>)entry.getValue()).entrySet().stream().sorted(Entry.comparingByKey()).forEach(entryx -> {
+			((Map<?, ?>)entry.getValue()).entrySet().stream().sorted(Entry.comparingByKey(Comparator.comparing(key -> key.toString()))).forEach(entryx -> {
 				printWriter.printf(">> Errors in element %s:%n", ((Entry<?, ?>)entryx).getKey());
 				((Exception)((Entry<?, ?>)entryx).getValue()).printStackTrace(printWriter);
 			});

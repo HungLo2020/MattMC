@@ -63,7 +63,7 @@ public class TestFinder implements TestInstanceFinder, TestPosFinder {
 		private static <Q> UnaryOperator<Supplier<Stream<Q>>> createCopies(int i) {
 			return supplier -> {
 				List<Q> list = new LinkedList();
-				List<Q> list2 = ((Stream)supplier.get()).toList();
+				List<Q> list2 = supplier.get().toList();
 
 				for (int j = 0; j < i; j++) {
 					list.addAll(list2);
@@ -74,10 +74,16 @@ public class TestFinder implements TestInstanceFinder, TestPosFinder {
 		}
 
 		private TestFinder build(CommandSourceStack commandSourceStack, TestInstanceFinder testInstanceFinder, TestPosFinder testPosFinder) {
+			@SuppressWarnings("unchecked")
+			Supplier<Stream<Holder.Reference<GameTestInstance>>> testSupplier = 
+				(Supplier<Stream<Holder.Reference<GameTestInstance>>>)this.testFinderWrapper.apply(testInstanceFinder::findTests);
+			@SuppressWarnings("unchecked")
+			Supplier<Stream<BlockPos>> posSupplier = 
+				(Supplier<Stream<BlockPos>>)this.structureBlockPosFinderWrapper.apply(testPosFinder::findTestPos);
 			return new TestFinder(
 				commandSourceStack,
-				((Supplier)this.testFinderWrapper.apply(testInstanceFinder::findTests))::get,
-				((Supplier)this.structureBlockPosFinderWrapper.apply(testPosFinder::findTestPos))::get
+				testSupplier::get,
+				posSupplier::get
 			);
 		}
 

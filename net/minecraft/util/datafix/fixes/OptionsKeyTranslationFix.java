@@ -14,6 +14,7 @@ public class OptionsKeyTranslationFix extends DataFix {
 		super(schema, bl);
 	}
 
+	@SuppressWarnings("unchecked")
 	@Override
 	public TypeRewriteRule makeRule() {
 		return this.fixTypeEverywhereTyped(
@@ -21,19 +22,22 @@ public class OptionsKeyTranslationFix extends DataFix {
 			this.getInputSchema().getType(References.OPTIONS),
 			typed -> typed.update(
 				DSL.remainderFinder(),
-				dynamic -> (Dynamic)dynamic.getMapValues()
-					.map(map -> dynamic.createMap((Map<? extends Dynamic<?>, ? extends Dynamic<?>>)map.entrySet().stream().map(entry -> {
-						if (((Dynamic)entry.getKey()).asString("").startsWith("key_")) {
-							String string = ((Dynamic)entry.getValue()).asString("");
-							if (!string.startsWith("key.mouse") && !string.startsWith("scancode.")) {
-								return Pair.of((Dynamic)entry.getKey(), dynamic.createString("key.keyboard." + string.substring("key.".length())));
+				dynamic -> {
+					Dynamic<?> result = dynamic.getMapValues()
+						.map(map -> dynamic.createMap((Map<? extends Dynamic<?>, ? extends Dynamic<?>>)map.entrySet().stream().map(entry -> {
+							if (((Dynamic)entry.getKey()).asString("").startsWith("key_")) {
+								String string = ((Dynamic)entry.getValue()).asString("");
+								if (!string.startsWith("key.mouse") && !string.startsWith("scancode.")) {
+									return (Pair<Dynamic<?>, Dynamic<?>>)Pair.of((Dynamic<?>)entry.getKey(), (Dynamic<?>)dynamic.createString("key.keyboard." + string.substring("key.".length())));
+								}
 							}
-						}
 
-						return Pair.of((Dynamic)entry.getKey(), (Dynamic)entry.getValue());
-					}).collect(Collectors.toMap(Pair::getFirst, Pair::getSecond))))
-					.result()
-					.orElse(dynamic)
+							return (Pair<Dynamic<?>, Dynamic<?>>)Pair.of((Dynamic<?>)entry.getKey(), (Dynamic<?>)entry.getValue());
+						}).collect(Collectors.toMap((Pair<Dynamic<?>, Dynamic<?>> p) -> p.getFirst(), (Pair<Dynamic<?>, Dynamic<?>> p) -> p.getSecond()))))
+						.result()
+						.orElse(null);
+					return result != null ? result : dynamic;
+				}
 			)
 		);
 	}

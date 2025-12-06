@@ -43,7 +43,7 @@ public class BanlistService {
 			)
 			.toList();
 
-		for (Optional<BanlistService.UserBan> optional : (List)Util.sequence(list2).join()) {
+		for (Optional<BanlistService.UserBan> optional : Util.<Optional<BanlistService.UserBan>>sequence(list2).join()) {
 			if (!optional.isEmpty()) {
 				BanlistService.UserBan userBan = (BanlistService.UserBan)optional.get();
 				minecraftApi.banListService().addUserBan(userBan.toBanEntry(), clientInfo);
@@ -67,7 +67,7 @@ public class BanlistService {
 			.map(playerDto -> minecraftApi.playerListService().getUser(playerDto.id(), playerDto.name()))
 			.toList();
 
-		for (Optional<NameAndId> optional : (List)Util.sequence(list2).join()) {
+		for (Optional<NameAndId> optional : Util.<Optional<NameAndId>>sequence(list2).join()) {
 			if (!optional.isEmpty()) {
 				minecraftApi.banListService().removeUserBan((NameAndId)optional.get(), clientInfo);
 			}
@@ -84,10 +84,10 @@ public class BanlistService {
 					.thenApply(optional -> optional.map(userBanDto::toUserBan))
 			)
 			.toList();
-		Set<BanlistService.UserBan> set = (Set<BanlistService.UserBan>)((List)Util.sequence(list2).join())
+		Set<BanlistService.UserBan> set = Util.<Optional<BanlistService.UserBan>>sequence(list2).join()
 			.stream()
 			.filter(Optional::isPresent)
-			.map(Optional::get)
+			.map(opt -> opt.get())
 			.collect(Collectors.toSet());
 		Set<BanlistService.UserBan> set2 = (Set<BanlistService.UserBan>)minecraftApi.banListService()
 			.getUserBanEntries()

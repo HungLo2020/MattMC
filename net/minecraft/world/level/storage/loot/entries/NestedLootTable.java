@@ -20,7 +20,7 @@ import net.minecraft.world.level.storage.loot.predicates.LootItemCondition;
 public class NestedLootTable extends LootPoolSingletonContainer {
 	public static final MapCodec<NestedLootTable> CODEC = RecordCodecBuilder.mapCodec(
 		instance -> instance.group(Codec.either(LootTable.KEY_CODEC, LootTable.DIRECT_CODEC).fieldOf("value").forGetter(nestedLootTable -> nestedLootTable.contents))
-			.<int, int, List<LootItemCondition>, List<LootItemFunction>>and(singletonFields(instance))
+			.<Integer, Integer, List<LootItemCondition>, List<LootItemFunction>>and(singletonFields(instance))
 			.apply(instance, NestedLootTable::new)
 	);
 	public static final ProblemReporter.PathElement INLINE_LOOT_TABLE_PATH_ELEMENT = new ProblemReporter.PathElement() {

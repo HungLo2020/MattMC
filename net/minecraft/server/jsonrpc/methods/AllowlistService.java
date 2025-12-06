@@ -27,7 +27,7 @@ public class AllowlistService {
 			.map(playerDto -> minecraftApi.playerListService().getUser(playerDto.id(), playerDto.name()))
 			.toList();
 
-		for (Optional<NameAndId> optional : (List)Util.sequence(list2).join()) {
+		for (Optional<NameAndId> optional : Util.<Optional<NameAndId>>sequence(list2).join()) {
 			optional.ifPresent(nameAndId -> minecraftApi.allowListService().add(new UserWhiteListEntry(nameAndId), clientInfo));
 		}
 
@@ -44,7 +44,7 @@ public class AllowlistService {
 			.map(playerDto -> minecraftApi.playerListService().getUser(playerDto.id(), playerDto.name()))
 			.toList();
 
-		for (Optional<NameAndId> optional : (List)Util.sequence(list2).join()) {
+		for (Optional<NameAndId> optional : Util.<Optional<NameAndId>>sequence(list2).join()) {
 			optional.ifPresent(nameAndId -> minecraftApi.allowListService().remove(nameAndId, clientInfo));
 		}
 
@@ -56,8 +56,8 @@ public class AllowlistService {
 		List<CompletableFuture<Optional<NameAndId>>> list2 = list.stream()
 			.map(playerDto -> minecraftApi.playerListService().getUser(playerDto.id(), playerDto.name()))
 			.toList();
-		Set<NameAndId> set = (Set<NameAndId>)((List)Util.sequence(list2).join()).stream().filter(Optional::isPresent).map(Optional::get).collect(Collectors.toSet());
-		Set<NameAndId> set2 = (Set<NameAndId>)minecraftApi.allowListService().getEntries().stream().map(StoredUserEntry::getUser).collect(Collectors.toSet());
+		Set<NameAndId> set = Util.<Optional<NameAndId>>sequence(list2).join().stream().filter(Optional::isPresent).map(opt -> opt.get()).collect(Collectors.toSet());
+		Set<NameAndId> set2 = minecraftApi.allowListService().getEntries().stream().map(entry -> entry.getUser()).collect(Collectors.toSet());
 		set2.stream().filter(nameAndId -> !set.contains(nameAndId)).forEach(nameAndId -> minecraftApi.allowListService().remove(nameAndId, clientInfo));
 		set.stream()
 			.filter(nameAndId -> !set2.contains(nameAndId))

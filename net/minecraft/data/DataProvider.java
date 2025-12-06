@@ -40,7 +40,7 @@ public interface DataProvider {
 	String getName();
 
 	static <T> CompletableFuture<?> saveAll(CachedOutput cachedOutput, Codec<T> codec, PackOutput.PathProvider pathProvider, Map<ResourceLocation, T> map) {
-		return saveAll(cachedOutput, codec, pathProvider::json, (Map<T, T>)map);
+		return saveAll(cachedOutput, codec, pathProvider::json, map);
 	}
 
 	static <T, E> CompletableFuture<?> saveAll(CachedOutput cachedOutput, Codec<E> codec, Function<T, Path> function, Map<T, E> map) {

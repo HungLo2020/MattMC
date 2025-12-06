@@ -101,7 +101,7 @@ public class ServerLoginPacketListenerImpl implements ServerLoginPacketListener,
 	}
 
 	private boolean isPlayerAlreadyInWorld(GameProfile gameProfile) {
-		return this.server.getPlayerList().getPlayer(gameProfile.id()) != null;
+		return this.server.getPlayerList().getPlayer(gameProfile.getId()) != null;
 	}
 
 	@Override
@@ -120,7 +120,7 @@ public class ServerLoginPacketListenerImpl implements ServerLoginPacketListener,
 		Validate.validState(StringUtil.isValidPlayerName(serverboundHelloPacket.name()), "Invalid characters in username");
 		this.requestedUsername = serverboundHelloPacket.name();
 		GameProfile gameProfile = this.server.getSingleplayerProfile();
-		if (gameProfile != null && this.requestedUsername.equalsIgnoreCase(gameProfile.name())) {
+		if (gameProfile != null && this.requestedUsername.equalsIgnoreCase(gameProfile.getName())) {
 			this.startClientVerification(gameProfile);
 		} else {
 			if (this.server.usesAuthentication() && !this.connection.isMemoryConnection()) {
@@ -151,7 +151,7 @@ public class ServerLoginPacketListenerImpl implements ServerLoginPacketListener,
 					);
 			}
 
-			boolean bl = playerList.disconnectAllPlayersWithProfile(gameProfile.id());
+			boolean bl = playerList.disconnectAllPlayersWithProfile(gameProfile.getId());
 			if (bl) {
 				this.state = ServerLoginPacketListenerImpl.State.WAITING_FOR_DUPE_DISCONNECT;
 			} else {
@@ -194,7 +194,7 @@ public class ServerLoginPacketListenerImpl implements ServerLoginPacketListener,
 					ProfileResult profileResult = ServerLoginPacketListenerImpl.this.server.services().sessionService().hasJoinedServer(stringx, string, this.getAddress());
 					if (profileResult != null) {
 						GameProfile gameProfile = profileResult.profile();
-						ServerLoginPacketListenerImpl.LOGGER.info("UUID of player {} is {}", gameProfile.name(), gameProfile.id());
+						ServerLoginPacketListenerImpl.LOGGER.info("UUID of player {} is {}", gameProfile.getName(), gameProfile.getId());
 						ServerLoginPacketListenerImpl.this.startClientVerification(gameProfile);
 					} else if (ServerLoginPacketListenerImpl.this.server.isSingleplayer()) {
 						ServerLoginPacketListenerImpl.LOGGER.warn("Failed to verify username but will let them in anyway!");

@@ -13,7 +13,7 @@ import net.minecraft.world.level.storage.loot.predicates.LootItemCondition;
 public class DynamicLoot extends LootPoolSingletonContainer {
 	public static final MapCodec<DynamicLoot> CODEC = RecordCodecBuilder.mapCodec(
 		instance -> instance.group(ResourceLocation.CODEC.fieldOf("name").forGetter(dynamicLoot -> dynamicLoot.name))
-			.<int, int, List<LootItemCondition>, List<LootItemFunction>>and(singletonFields(instance))
+			.<Integer, Integer, List<LootItemCondition>, List<LootItemFunction>>and(singletonFields(instance))
 			.apply(instance, DynamicLoot::new)
 	);
 	private final ResourceLocation name;

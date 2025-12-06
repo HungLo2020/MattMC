@@ -29,7 +29,7 @@ public class VariantSelector {
 				Property<?> property = stateDefinition.getProperty(string3);
 				if (property != null && iterator.hasNext()) {
 					String string4 = (String)iterator.next();
-					Comparable<?> comparable = getValueHelper((Property<Comparable<?>>)property, string4);
+					Comparable<?> comparable = getValueHelperRaw(property, string4);
 					if (comparable == null) {
 						throw new RuntimeException("Unknown value: '" + string4 + "' for blockstate property: '" + string3 + "' " + property.getPossibleValues());
 					}
@@ -50,6 +50,12 @@ public class VariantSelector {
 
 			return true;
 		};
+	}
+
+	@Nullable
+	@SuppressWarnings("unchecked")
+	private static <T extends Comparable<T>> T getValueHelperRaw(Property<?> property, String string) {
+		return getValueHelper((Property<T>)property, string);
 	}
 
 	@Nullable

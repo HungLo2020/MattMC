@@ -170,14 +170,14 @@ public class PiglinAi {
 		brain.addActivityAndRemoveMemoryWhenStopped(
 			Activity.FIGHT,
 			10,
-			ImmutableList.of(
+			ImmutableList.<BehaviorControl<? super Piglin>>of(
 				StopAttackingIfTargetInvalid.create((serverLevel, livingEntity) -> !isNearestValidAttackTarget(serverLevel, piglin, livingEntity)),
 				BehaviorBuilder.triggerIf(PiglinAi::hasCrossbow, BackUpIfTooClose.create(5, 0.75F)),
 				SetWalkTargetFromAttackTargetIfTargetOutOfReach.create(1.0F),
 				MeleeAttack.create(20),
 				new CrossbowAttack(),
 				RememberIfHoglinWasKilled.create(),
-				EraseMemoryIf.create(PiglinAi::isNearZombified, MemoryModuleType.ATTACK_TARGET)
+				EraseMemoryIf.<Piglin>create(PiglinAi::isNearZombified, MemoryModuleType.ATTACK_TARGET)
 			),
 			MemoryModuleType.ATTACK_TARGET
 		);
@@ -187,13 +187,13 @@ public class PiglinAi {
 		brain.addActivityAndRemoveMemoryWhenStopped(
 			Activity.CELEBRATE,
 			10,
-			ImmutableList.of(
+			ImmutableList.<BehaviorControl<? super Piglin>>of(
 				avoidRepellent(),
 				SetEntityLookTarget.create(PiglinAi::isPlayerHoldingLovedItem, 14.0F),
 				StartAttacking.<Piglin>create((serverLevel, piglin) -> piglin.isAdult(), PiglinAi::findNearestValidAttackTarget),
-				BehaviorBuilder.triggerIf(piglin -> !piglin.isDancing(), GoToTargetLocation.create(MemoryModuleType.CELEBRATE_LOCATION, 2, 1.0F)),
-				BehaviorBuilder.triggerIf(Piglin::isDancing, GoToTargetLocation.create(MemoryModuleType.CELEBRATE_LOCATION, 4, 0.6F)),
-				new RunOne<LivingEntity>(
+				BehaviorBuilder.<Piglin>triggerIf(piglin -> !piglin.isDancing(), GoToTargetLocation.create(MemoryModuleType.CELEBRATE_LOCATION, 2, 1.0F)),
+				BehaviorBuilder.<Piglin>triggerIf(Piglin::isDancing, GoToTargetLocation.create(MemoryModuleType.CELEBRATE_LOCATION, 4, 0.6F)),
+				new RunOne<>(
 					ImmutableList.of(
 						Pair.of(SetEntityLookTarget.create(EntityType.PIGLIN, 8.0F), 1), Pair.of(RandomStroll.stroll(0.6F, 2, 1), 1), Pair.of(new DoNothing(10, 20), 1)
 					)
@@ -220,11 +220,11 @@ public class PiglinAi {
 		brain.addActivityAndRemoveMemoryWhenStopped(
 			Activity.AVOID,
 			10,
-			ImmutableList.of(
+			ImmutableList.<BehaviorControl<? super Piglin>>of(
 				SetWalkTargetAwayFrom.entity(MemoryModuleType.AVOID_TARGET, 1.0F, 12, true),
 				createIdleLookBehaviors(),
 				createIdleMovementBehaviors(),
-				EraseMemoryIf.<PathfinderMob>create(PiglinAi::wantsToStopFleeing, MemoryModuleType.AVOID_TARGET)
+				EraseMemoryIf.<Piglin>create(PiglinAi::wantsToStopFleeing, MemoryModuleType.AVOID_TARGET)
 			),
 			MemoryModuleType.AVOID_TARGET
 		);
@@ -234,7 +234,7 @@ public class PiglinAi {
 		brain.addActivityAndRemoveMemoryWhenStopped(
 			Activity.RIDE,
 			10,
-			ImmutableList.of(
+			ImmutableList.<BehaviorControl<? super Piglin>>of(
 				Mount.create(0.8F),
 				SetEntityLookTarget.create(PiglinAi::isPlayerHoldingLovedItem, 8.0F),
 				BehaviorBuilder.sequence(
@@ -242,11 +242,11 @@ public class PiglinAi {
 					TriggerGate.triggerOneShuffled(
 						ImmutableList.<Pair<? extends Trigger<? super LivingEntity>, Integer>>builder()
 							.addAll(createLookBehaviors())
-							.add(Pair.of(BehaviorBuilder.triggerIf((Predicate<? super LivingEntity>)(piglin -> true)), 1))
+							.add(Pair.<Trigger<? super LivingEntity>, Integer>of(BehaviorBuilder.<LivingEntity>triggerIf(entity -> true), 1))
 							.build()
 					)
 				),
-				DismountOrSkipMounting.<LivingEntity>create(8, PiglinAi::wantsToStopRiding)
+				DismountOrSkipMounting.<Piglin>create(8, PiglinAi::wantsToStopRiding)
 			),
 			MemoryModuleType.RIDE_TARGET
 		);

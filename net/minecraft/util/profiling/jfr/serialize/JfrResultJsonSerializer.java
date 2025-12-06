@@ -89,9 +89,9 @@ public class JfrResultJsonSerializer {
 		TimedStatSummary<StructureGenStat> timedStatSummary = TimedStatSummary.summary(list);
 		JsonArray jsonArray = new JsonArray();
 		jsonObject.add("structure", jsonArray);
-		((Map)list.stream().collect(Collectors.groupingBy(StructureGenStat::structureName)))
+		((Map<String, List<StructureGenStat>>)list.stream().collect(Collectors.groupingBy(StructureGenStat::structureName)))
 			.forEach(
-				(string, listx) -> {
+				(String string, List<StructureGenStat> listx) -> {
 					JsonObject jsonObject2 = new JsonObject();
 					jsonArray.add(jsonObject2);
 					jsonObject2.addProperty("name", string);

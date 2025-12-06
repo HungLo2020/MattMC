@@ -301,8 +301,8 @@ public class PresetFlatWorldScreen extends Screen {
 
 			public Entry(final Holder<FlatLevelGeneratorPreset> holder) {
 				this.preset = (FlatLevelGeneratorPreset)holder.value();
-				this.name = (Component)holder.unwrapKey()
-					.map(resourceKey -> Component.translatable(resourceKey.location().toLanguageKey("flat_world_preset")))
+				this.name = holder.unwrapKey()
+					.map(resourceKey -> (Component)Component.translatable(resourceKey.location().toLanguageKey("flat_world_preset")))
 					.orElse(PresetFlatWorldScreen.UNKNOWN_PRESET);
 			}
 

@@ -20,11 +20,12 @@ public class EntityVariantFix extends NamedEntityFix {
 		this.idConversions = intFunction;
 	}
 
+	@SuppressWarnings("unchecked")
 	private static <T> Dynamic<T> updateAndRename(Dynamic<T> dynamic, String string, String string2, Function<Dynamic<T>, Dynamic<T>> function) {
 		return dynamic.map(object -> {
 			DynamicOps<T> dynamicOps = dynamic.getOps();
-			Function<T, T> function2 = objectx -> ((Dynamic)function.apply(new Dynamic<>(dynamicOps, (T)objectx))).getValue();
-			return dynamicOps.get((T)object, string).map(object2 -> dynamicOps.set((T)object, string2, (T)function2.apply(object2))).result().orElse(object);
+			Function<T, T> function2 = objectx -> ((Dynamic<T>)function.apply(new Dynamic<>(dynamicOps, (T)objectx))).getValue();
+			return dynamicOps.get((T)object, string).map(object2 -> dynamicOps.set((T)object, string2, (T)function2.apply((T)object2))).result().orElse((T)object);
 		});
 	}
 

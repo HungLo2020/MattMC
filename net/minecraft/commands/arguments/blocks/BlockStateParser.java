@@ -488,8 +488,8 @@ public class BlockStateParser {
 	private <T extends Comparable<T>> void setValue(Property<T> property, String string, int i) throws CommandSyntaxException {
 		Optional<T> optional = property.getValue(string);
 		if (optional.isPresent()) {
-			this.state = this.state.setValue(property, (Comparable)optional.get());
-			this.properties.put(property, (Comparable)optional.get());
+			this.state = this.state.setValue(property, optional.get());
+			this.properties.put(property, optional.get());
 		} else {
 			this.reader.setCursor(i);
 			throw ERROR_INVALID_VALUE.createWithContext(this.reader, this.id.toString(), property.getName(), string);

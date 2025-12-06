@@ -102,7 +102,7 @@ public class EntityUUIDFix extends AbstractUUIDFix {
 	private static Dynamic<?> updateFox(Dynamic<?> dynamic) {
 		Optional<Dynamic<?>> optional = dynamic.get("TrustedUUIDs")
 			.result()
-			.map(dynamic2 -> dynamic.createList(dynamic2.asStream().map(dynamicxx -> (Dynamic)createUUIDFromML(dynamicxx).orElseGet(() -> {
+			.map(dynamic2 -> dynamic.createList(dynamic2.asStream().map((Dynamic<?> dynamicxx) -> (Dynamic<?>)createUUIDFromML(dynamicxx).orElseGet(() -> {
 				LOGGER.warn("Trusted contained invalid data.");
 				return dynamicxx;
 			}))));
@@ -136,7 +136,7 @@ public class EntityUUIDFix extends AbstractUUIDFix {
 						dynamicxx -> dynamicxx.update(
 							"Modifiers",
 							dynamic2x -> dynamicxx.createList(
-								dynamic2x.asStream().map(dynamicxxxx -> (Dynamic)replaceUUIDLeastMost(dynamicxxxx, "UUID", "UUID").orElse(dynamicxxxx))
+								dynamic2x.asStream().map((Dynamic<?> dynamicxxxx) -> (Dynamic<?>)replaceUUIDLeastMost(dynamicxxxx, "UUID", "UUID").orElse(dynamicxxxx))
 							)
 						)
 					)

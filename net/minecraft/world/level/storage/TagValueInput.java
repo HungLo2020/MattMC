@@ -388,10 +388,11 @@ public class TagValueInput implements ValueInput {
 		}
 
 		@Override
+		@SuppressWarnings("unchecked")
 		public Stream<T> stream() {
-			return Streams.mapWithIndex(this.list.stream(), (tag, l) -> {
+			return (Stream<T>)Streams.mapWithIndex(this.list.stream(), (tag, l) -> {
 				return switch (this.codec.parse(this.context.ops(), tag)) {
-					case Success<T> success -> (Object)success.value();
+					case Success<T> success -> success.value();
 					case Error<T> error -> {
 						this.reportIndexUnwrapProblem((int)l, tag, error);
 						yield error.partialValue().orElse(null);

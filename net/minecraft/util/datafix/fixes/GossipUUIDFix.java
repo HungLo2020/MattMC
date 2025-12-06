@@ -20,8 +20,8 @@ public class GossipUUIDFix extends NamedEntityFix {
 				dynamicx -> DataFixUtils.orElse(
 					dynamicx.asStreamOpt()
 						.result()
-						.map(stream -> stream.map(dynamicxx -> (Dynamic)AbstractUUIDFix.replaceUUIDLeastMost(dynamicxx, "Target", "Target").orElse(dynamicxx)))
-						.map(dynamicx::createList),
+						.map(stream -> stream.map((Dynamic<?> dynamicxx) -> (Dynamic<?>)AbstractUUIDFix.replaceUUIDLeastMost(dynamicxx, "Target", "Target").orElse(dynamicxx)))
+						.map(stream -> dynamicx.createList(stream)),
 					dynamicx
 				)
 			)

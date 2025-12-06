@@ -67,7 +67,7 @@ public interface ChunkResult<T> {
 
 		@Override
 		public <E extends Throwable> T orElseThrow(Supplier<E> supplier) throws E {
-			throw (Throwable)supplier.get();
+			throw supplier.get();
 		}
 	}
 

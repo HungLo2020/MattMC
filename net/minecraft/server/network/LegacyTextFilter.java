@@ -92,7 +92,7 @@ public class LegacyTextFilter extends ServerTextFilter {
 						jsonObjectx.addProperty("category", string3);
 						jsonObjectx.addProperty("subcategory", string4);
       jsonObjectx.addProperty("user_id", net.minecraft.util.AuthlibCompat.id(gameProfile).toString());
-						jsonObjectx.addProperty("user_display_name", gameProfile.name());
+						jsonObjectx.addProperty("user_display_name", gameProfile.getName());
 						jsonObjectx.addProperty("text", string4x);
 						jsonObjectx.addProperty("language", "*");
 						return jsonObjectx;

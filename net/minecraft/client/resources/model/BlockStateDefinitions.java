@@ -26,7 +26,7 @@ public class BlockStateDefinitions {
 	);
 
 	private static StateDefinition<Block, BlockState> createItemFrameFakeState() {
-		return new Builder(Blocks.AIR).add(new Property[]{BlockStateProperties.MAP}).create(Block::defaultBlockState, BlockState::new);
+		return new Builder<Block, BlockState>(Blocks.AIR).add(new Property[]{BlockStateProperties.MAP}).create(block -> block.defaultBlockState(), BlockState::new);
 	}
 
 	public static BlockState getItemFrameFakeState(boolean bl, boolean bl2) {

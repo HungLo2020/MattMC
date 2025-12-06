@@ -33,6 +33,7 @@ public class SuggestionProviders {
 		)
 	);
 
+	@SuppressWarnings("unchecked")
 	public static <S extends SharedSuggestionProvider> SuggestionProvider<S> register(
 		ResourceLocation resourceLocation, SuggestionProvider<SharedSuggestionProvider> suggestionProvider
 	) {
@@ -42,7 +43,7 @@ public class SuggestionProviders {
 		if (suggestionProvider2 != null) {
 			throw new IllegalArgumentException("A command suggestion provider is already registered with the name '" + resourceLocation + "'");
 		} else {
-			return new SuggestionProviders.RegisteredSuggestion(resourceLocation, suggestionProvider);
+			return (SuggestionProvider<S>)new SuggestionProviders.RegisteredSuggestion(resourceLocation, suggestionProvider);
 		}
 	}
 

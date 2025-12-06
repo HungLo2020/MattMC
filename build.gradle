@@ -320,7 +320,9 @@ runServerGui.dependsOn acceptEula
 tasks.withType(JavaCompile).configureEach {
     options.encoding = 'UTF-8'
     options.release = 21
-    options.compilerArgs += ['-Xlint:-deprecation', '-Xlint:-unchecked']
+    options.fork = true
+    options.forkOptions.memoryMaximumSize = "8g"
+    options.compilerArgs += ['-Xlint:-deprecation', '-Xlint:-unchecked', '-Xdiags:verbose']
 }
 
 // Create a fat jar with all dependencies

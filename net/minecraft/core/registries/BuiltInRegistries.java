@@ -347,13 +347,14 @@ public class BuiltInRegistries {
 		return internalRegister(resourceKey, new DefaultedMappedRegistry<>(string, resourceKey, Lifecycle.stable(), true), registryBootstrap);
 	}
 
+	@SuppressWarnings("unchecked")
 	private static <T, R extends WritableRegistry<T>> R internalRegister(
 		ResourceKey<? extends Registry<T>> resourceKey, R writableRegistry, BuiltInRegistries.RegistryBootstrap<T> registryBootstrap
 	) {
 		Bootstrap.checkBootstrapCalled(() -> "registry " + resourceKey.location());
 		ResourceLocation resourceLocation = resourceKey.location();
 		LOADERS.put(resourceLocation, (Supplier)() -> registryBootstrap.run(writableRegistry));
-		WRITABLE_REGISTRY.register((ResourceKey<WritableRegistry<?>>)resourceKey, writableRegistry, RegistrationInfo.BUILT_IN);
+		WRITABLE_REGISTRY.register((ResourceKey<WritableRegistry<?>>)(ResourceKey)resourceKey, writableRegistry, RegistrationInfo.BUILT_IN);
 		return writableRegistry;
 	}
 

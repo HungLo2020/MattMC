@@ -253,9 +253,9 @@ public class GameRules {
 			.comapFlatMap(
 				string -> (DataResult<GameRules.Key<T>>)GAME_RULE_TYPES.entrySet()
 					.stream()
-					.filter(entry -> ((GameRules.Type)entry.getValue()).valueClass == class_)
-					.map(entry -> (GameRules.Key<T>)entry.getKey())
-					.filter(key -> key.getId().equals(string))
+					.filter(entry -> ((GameRules.Type<?>)entry.getValue()).valueClass == class_)
+					.<GameRules.Key<T>>map(entry -> (GameRules.Key<T>)entry.getKey())
+					.filter((GameRules.Key<T> key) -> key.getId().equals(string))
 					.findFirst()
 					.map(DataResult::success)
 					.orElseGet(() -> DataResult.error(() -> "Invalid game rule ID for type: " + string)),

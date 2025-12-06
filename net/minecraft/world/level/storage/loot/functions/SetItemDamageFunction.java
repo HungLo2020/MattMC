@@ -19,7 +19,7 @@ public class SetItemDamageFunction extends LootItemConditionalFunction {
 	private static final Logger LOGGER = LogUtils.getLogger();
 	public static final MapCodec<SetItemDamageFunction> CODEC = RecordCodecBuilder.mapCodec(
 		instance -> commonFields(instance)
-			.<NumberProvider, boolean>and(
+			.<NumberProvider, Boolean>and(
 				instance.group(
 					NumberProviders.CODEC.fieldOf("damage").forGetter(setItemDamageFunction -> setItemDamageFunction.damage),
 					Codec.BOOL.fieldOf("add").orElse(false).forGetter(setItemDamageFunction -> setItemDamageFunction.add)

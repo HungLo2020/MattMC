@@ -44,8 +44,8 @@ public class PlaceholderLookupProvider implements HolderGetter.Provider {
 						.map(RegistryOps.RegistryInfo::fromRegistryLookup)
 						.or(
 							() -> Optional.of(
-								new RegistryOps.RegistryInfo(
-									PlaceholderLookupProvider.this.lookup.castAsOwner(), PlaceholderLookupProvider.this.lookup.castAsLookup(), Lifecycle.experimental()
+								new RegistryOps.RegistryInfo<T>(
+									PlaceholderLookupProvider.this.lookup.<T>castAsOwner(), PlaceholderLookupProvider.this.lookup.<T>castAsLookup(), Lifecycle.experimental()
 								)
 							)
 						);
@@ -98,12 +98,14 @@ public class PlaceholderLookupProvider implements HolderGetter.Provider {
 			return (HolderSet.Named<Object>)PlaceholderLookupProvider.this.holderSets.computeIfAbsent(tagKey, tagKeyx -> HolderSet.emptyNamed(this, tagKeyx));
 		}
 
+		@SuppressWarnings("unchecked")
 		public <T> HolderGetter<T> castAsLookup() {
-			return this;
+			return (HolderGetter<T>)this;
 		}
 
+		@SuppressWarnings("unchecked")
 		public <T> HolderOwner<T> castAsOwner() {
-			return this;
+			return (HolderOwner<T>)this;
 		}
 	}
 }

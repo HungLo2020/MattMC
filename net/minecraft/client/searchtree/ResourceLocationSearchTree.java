@@ -32,7 +32,7 @@ public interface ResourceLocationSearchTree<T> {
 			final SuffixArray<T> suffixArray2 = new SuffixArray<>();
 
 			for (T object : list) {
-				((Stream)function.apply(object)).forEach(resourceLocation -> {
+				function.apply(object).forEach(resourceLocation -> {
 					suffixArray.add(object, resourceLocation.getNamespace().toLowerCase(Locale.ROOT));
 					suffixArray2.add(object, resourceLocation.getPath().toLowerCase(Locale.ROOT));
 				});

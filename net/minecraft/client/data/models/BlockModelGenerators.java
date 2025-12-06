@@ -265,7 +265,8 @@ public class BlockModelGenerators {
 	}
 
 	public static MultiVariant variants(net.minecraft.client.renderer.block.model.Variant... variants) {
-		return new MultiVariant(WeightedList.of(Arrays.stream(variants).map(variant -> new Weighted(variant, 1)).toList()));
+		List<Weighted<net.minecraft.client.renderer.block.model.Variant>> weightedList = Arrays.stream(variants).map(variant -> new Weighted<>(variant, 1)).toList();
+		return new MultiVariant(WeightedList.of(weightedList));
 	}
 
 	public static MultiVariant plainVariant(ResourceLocation resourceLocation) {

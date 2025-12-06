@@ -142,7 +142,7 @@ public final class NbtUtils {
 	) {
 		Optional<T> optional = compoundTag.getString(string).flatMap(property::getValue);
 		if (optional.isPresent()) {
-			return stateHolder.setValue(property, (Comparable)optional.get());
+			return stateHolder.setValue(property, optional.get());
 		} else {
 			LOGGER.warn("Unable to read property: {} with value: {} for blockstate: {}", string, compoundTag.get(string), compoundTag2);
 			return stateHolder;
@@ -434,7 +434,7 @@ public final class NbtUtils {
 	@VisibleForTesting
 	static CompoundTag unpackStructureTemplate(CompoundTag compoundTag) {
 		ListTag listTag = compoundTag.getListOrEmpty("palette");
-		Map<String, Tag> map = (Map<String, Tag>)listTag.stream()
+		Map<String, CompoundTag> map = listTag.stream()
 			.flatMap(tag -> tag.asString().stream())
 			.collect(ImmutableMap.toImmutableMap(Function.identity(), NbtUtils::unpackBlockState));
 		Optional<ListTag> optional = compoundTag.getList("palettes");

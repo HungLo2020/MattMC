@@ -59,7 +59,7 @@ public class AccountProfileKeyPairManager implements ProfileKeyPairManager {
 	@Override
 	public boolean shouldRefreshKeyPair() {
 		return this.keyPair.isDone() && Instant.now().isAfter(this.nextProfileKeyRefreshTime)
-			? (Boolean)((Optional)this.keyPair.join()).map(ProfileKeyPair::dueRefresh).orElse(true)
+			? this.keyPair.join().map(pkp -> pkp.dueRefresh()).orElse(true)
 			: false;
 	}
 

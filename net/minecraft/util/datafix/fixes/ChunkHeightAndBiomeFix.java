@@ -219,7 +219,8 @@ public class ChunkHeightAndBiomeFix extends DataFix {
 		} else if (is != null && is.length == 1024) {
 			for (int j = 0; j < 16; j++) {
 				int k = j - i;
-				dynamics[k] = makeBiomeContainer(dynamic, jx -> getOldBiome(is, j * 64 + jx));
+				final int jFinal = j;
+				dynamics[k] = makeBiomeContainer(dynamic, jx -> getOldBiome(is, jFinal * 64 + jx));
 			}
 
 			if (bl) {

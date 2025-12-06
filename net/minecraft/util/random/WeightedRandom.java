@@ -26,7 +26,7 @@ public class WeightedRandom {
 
 	public static <T> Optional<T> getRandomItem(RandomSource randomSource, List<T> list, int i, ToIntFunction<T> toIntFunction) {
 		if (i < 0) {
-			throw (IllegalArgumentException)Util.pauseInIde((T)(new IllegalArgumentException("Negative total weight in getRandomItem")));
+			throw (IllegalArgumentException)Util.pauseInIde(new IllegalArgumentException("Negative total weight in getRandomItem"));
 		} else if (i == 0) {
 			return Optional.empty();
 		} else {
