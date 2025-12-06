@@ -129,7 +129,7 @@ public class ChunkProtoTickListFix extends DataFix {
 			Supplier<ChunkProtoTickListFix.PoorMansPalettedContainer> supplier = int2ObjectMap.get(l);
 			Stream<? extends Dynamic<?>> stream2 = ((Dynamic)list.get(k))
 				.asStream()
-				.mapToInt(dynamicx -> dynamicx.asShort((short)-1))
+				.mapToInt((Dynamic<?> dynamicx) -> dynamicx.asShort((short)-1))
 				.filter(ix -> ix > 0)
 				.mapToObj(lx -> this.createTick(dynamic, supplier, i, l, j, lx, function));
 			stream = Stream.concat(stream, stream2);

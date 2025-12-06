@@ -20,10 +20,10 @@ public record FileIOStat(Duration duration, @Nullable String path, long bytes) {
 			((Map)list.stream()
 					.filter(fileIOStat -> fileIOStat.path != null)
 					.collect(Collectors.groupingBy(fileIOStat -> fileIOStat.path, Collectors.summingLong(fileIOStat -> fileIOStat.bytes))))
-				.entrySet()
+					.entrySet()
 				.stream()
-				.sorted(Entry.comparingByValue().reversed())
-				.map(entry -> Pair.of((String)entry.getKey(), (Long)entry.getValue()))
+				.sorted(Entry.<String, Long>comparingByValue().reversed())
+				.map((Entry<String, Long> entry) -> Pair.of(entry.getKey(), entry.getValue()))
 				.limit(10L)
 				.toList()
 		);
