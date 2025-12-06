@@ -23,3 +23,6 @@ Thumbs.db
 # Misc
 *.log
 *.tmp
+
+# JDK (too large to commit)
+libraries/jdk-21/
