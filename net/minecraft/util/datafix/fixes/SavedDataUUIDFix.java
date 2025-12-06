@@ -31,7 +31,7 @@ public class SavedDataUUIDFix extends AbstractUUIDFix {
 									dynamicxxx -> dynamicxxx.update(
 										"HeroesOfTheVillage",
 										dynamicxxxx -> dynamicxxxx.createList(
-											dynamicxxxx.asStream().map(dynamicxxxxx -> (Dynamic)createUUIDFromLongs(dynamicxxxxx, "UUIDMost", "UUIDLeast").orElseGet(() -> {
+											dynamicxxxx.asStream().map((Dynamic<?> dynamicxxxxx) -> (Dynamic<?>)createUUIDFromLongs(dynamicxxxxx, "UUIDMost", "UUIDLeast").orElseGet(() -> {
 												LOGGER.warn("HeroesOfTheVillage contained invalid UUIDs.");
 												return dynamicxxxxx;
 											}))

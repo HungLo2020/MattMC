@@ -18,9 +18,9 @@ public class BlockEntityUUIDFix extends AbstractUUIDFix {
 	}
 
 	private Dynamic<?> updateSkull(Dynamic<?> dynamic) {
-		return (Dynamic<?>)dynamic.get("Owner")
+		return dynamic.get("Owner")
 			.get()
-			.map(dynamicx -> (Dynamic)replaceUUIDString(dynamicx, "Id", "Id").orElse(dynamicx))
+			.map((Dynamic<?> dynamicx) -> (Dynamic<?>)replaceUUIDString(dynamicx, "Id", "Id").orElse(dynamicx))
 			.map(dynamic2 -> dynamic.remove("Owner").set("SkullOwner", dynamic2))
 			.result()
 			.orElse(dynamic);

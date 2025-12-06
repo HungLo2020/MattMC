@@ -45,7 +45,7 @@ public class LevelUUIDFix extends AbstractUUIDFix {
 	}
 
 	private Dynamic<?> updateCustomBossEvent(Dynamic<?> dynamic) {
-		return dynamic.update("Players", dynamic2 -> dynamic.createList(dynamic2.asStream().map(dynamicxx -> (Dynamic)createUUIDFromML(dynamicxx).orElseGet(() -> {
+		return dynamic.update("Players", dynamic2 -> dynamic.createList(dynamic2.asStream().map((Dynamic<?> dynamicxx) -> (Dynamic<?>)createUUIDFromML(dynamicxx).orElseGet(() -> {
 			LOGGER.warn("CustomBossEvents contains invalid UUIDs.");
 			return dynamicxx;
 		}))));

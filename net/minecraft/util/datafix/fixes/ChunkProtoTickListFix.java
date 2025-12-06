@@ -127,7 +127,7 @@ public class ChunkProtoTickListFix extends DataFix {
 		for (int k = 0; k < list.size(); k++) {
 			int l = k + b;
 			Supplier<ChunkProtoTickListFix.PoorMansPalettedContainer> supplier = int2ObjectMap.get(l);
-			Stream<? extends Dynamic<?>> stream2 = ((Dynamic)list.get(k))
+			Stream<? extends Dynamic<?>> stream2 = list.get(k)
 				.asStream()
 				.mapToInt((Dynamic<?> dynamicx) -> dynamicx.asShort((short)-1))
 				.filter(ix -> ix > 0)

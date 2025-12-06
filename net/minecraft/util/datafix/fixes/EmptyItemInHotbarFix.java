@@ -24,7 +24,7 @@ public class EmptyItemInHotbarFix extends DataFix {
 		);
 		return this.fixTypeEverywhereTyped(
 				"EmptyItemInHotbarFix", this.getInputSchema().getType(References.HOTBAR), typed -> typed.update(opticFinder, pair -> pair.mapSecond(pairx -> {
-				Optional<String> optional = ((Either)pairx.getFirst()).left().map((Pair<?, ?> p) -> (String)p.getSecond());
+				Optional<String> optional = ((Either<Pair<String, String>, Unit>)pairx.getFirst()).left().map(p -> p.getSecond());
 				Dynamic<?> dynamic = (Dynamic<?>)((Pair)pairx.getSecond()).getSecond();
 				boolean bl = optional.isEmpty() || ((String)optional.get()).equals("minecraft:air");
 				boolean bl2 = dynamic.get("Count").asInt(0) <= 0;
