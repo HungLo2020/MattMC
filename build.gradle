@@ -24,13 +24,6 @@ java {
     }
 }
 
-// Disable auto-detection of Java installations to avoid warnings
-// about missing Java at system paths
-tasks.withType(JavaCompile).configureEach {
-    // Don't use toolchain auto-detection
-    options.forkOptions.javaHome = null
-}
-
 repositories {
     mavenCentral()
     // Minecraft libraries (primary source for Mojang dependencies)
@@ -252,8 +245,8 @@ def configureBundledJdk(JavaExec task) {
         if (bundledJavaExe.exists()) {
             // Override the executable property
             task.executable = bundledJavaExe.absolutePath
-            // Ensure we don't use the toolchain launcher
-            task.javaLauncher.set(provider { null })
+            // Disable the toolchain launcher to allow manual executable override
+            task.javaLauncher.set(null)
             println "Using bundled JDK from: ${bundledJdkDir.absolutePath}"
         }
     }
