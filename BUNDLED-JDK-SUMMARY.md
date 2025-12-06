@@ -165,6 +165,22 @@ To update the JDK version:
 2. Update `JDK_VERSION` and `JDK_BUILD` variables
 3. Run: `rm -rf libraries/jdk-21 && ./gradlew downloadJdk`
 
+## Troubleshooting
+
+### Gradle Toolchain Conflict
+
+If you see an error like "Toolchain from executable property does not match toolchain from javaLauncher property":
+- This has been fixed in the latest version
+- The fix explicitly disables the toolchain launcher for runtime tasks
+- Update to the latest version of build.gradle
+
+### Other Issues
+
+Run the verification script to check your setup:
+```bash
+bash libraries/verify-jdk-setup.sh
+```
+
 ## Questions?
 
 See:

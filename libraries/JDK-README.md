@@ -79,3 +79,13 @@ The JDK is **not committed to the git repository** because it's too large (~200M
 ## Distribution
 
 When building distributions (`clientDist` or `clientDistZip`), the bundled JDK is automatically included in the package, ensuring users don't need to install Java separately.
+
+## Technical Details
+
+### Gradle Toolchain Integration
+
+The project uses Gradle's Java toolchain for compilation, but runtime tasks (runClient, runServer, etc.) explicitly use the bundled JDK by:
+1. Setting the `executable` property to the bundled JDK path
+2. Disabling the toolchain launcher with `javaLauncher.set(provider { null })`
+
+This ensures the bundled JDK is always used at runtime without conflicting with Gradle's toolchain system.
