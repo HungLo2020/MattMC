@@ -76,33 +76,40 @@ public class BeaconRenderer<T extends BlockEntity & BeaconBeamOwner> implements 
 	public static void submitBeaconBeam(
 		PoseStack poseStack, SubmitNodeCollector submitNodeCollector, ResourceLocation resourceLocation, float f, float g, int i, int j, int k, float h, float l
 	) {
-		int m = i + j;
+		final int iFinal = i;
+		final int jFinal = j;
+		final int kFinal = k;
+		final float fFinal = f;
+		final float hFinal = h;
+		final float lFinal = l;
+		int m = iFinal + jFinal;
+		final int mFinal = m;
 		poseStack.pushPose();
 		poseStack.translate(0.5, 0.0, 0.5);
-		float n = j < 0 ? g : -g;
+		float n = jFinal < 0 ? g : -g;
 		float o = Mth.frac(n * 0.2F - Mth.floor(n * 0.1F));
 		poseStack.pushPose();
 		poseStack.mulPose(Axis.YP.rotationDegrees(g * 2.25F - 45.0F));
-		float t1 = -h;
-		float w = -h;
-		float z1 = -1.0F + o;
-		float aa1 = j * f * (0.5F / h) + z1;
+		final float t1 = -hFinal;
+		final float w1 = -hFinal;
+		final float z1 = -1.0F + o;
+		final float aa1 = jFinal * fFinal * (0.5F / hFinal) + z1;
 		submitNodeCollector.submitCustomGeometry(
 			poseStack,
 			RenderType.beaconBeam(resourceLocation, false),
-			(pose, vertexConsumer) -> renderPart(pose, vertexConsumer, k, i, m, 0.0F, h, h, 0.0F, t1, 0.0F, 0.0F, w, 0.0F, 1.0F, aa1, z1)
+			(pose, vertexConsumer) -> renderPart(pose, vertexConsumer, kFinal, iFinal, mFinal, 0.0F, hFinal, hFinal, 0.0F, t1, 0.0F, 0.0F, w1, 0.0F, 1.0F, aa1, z1)
 		);
 		poseStack.popPose();
-		float p2 = -l;
-		float q2 = -l;
-		float s2 = -l;
-		float t2 = -l;
-		float z2 = -1.0F + o;
-		float aa2 = j * f + z2;
+		final float p2 = -lFinal;
+		final float q2 = -lFinal;
+		final float s2 = -lFinal;
+		final float t2 = -lFinal;
+		final float z2 = -1.0F + o;
+		final float aa2 = jFinal * fFinal + z2;
 		submitNodeCollector.submitCustomGeometry(
 			poseStack,
 			RenderType.beaconBeam(resourceLocation, true),
-			(pose, vertexConsumer) -> renderPart(pose, vertexConsumer, ARGB.color(32, k), i, m, p2, q2, l, s2, t2, l, l, l, 0.0F, 1.0F, aa2, z2)
+			(pose, vertexConsumer) -> renderPart(pose, vertexConsumer, ARGB.color(32, kFinal), iFinal, mFinal, p2, q2, lFinal, s2, t2, lFinal, lFinal, lFinal, 0.0F, 1.0F, aa2, z2)
 		);
 		poseStack.popPose();
 	}

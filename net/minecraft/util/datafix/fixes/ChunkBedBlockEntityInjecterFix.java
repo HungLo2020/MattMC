@@ -39,12 +39,14 @@ public class ChunkBedBlockEntityInjecterFix extends DataFix {
 		OpticFinder<?> opticFinder = DSL.fieldFinder("Level", type);
 		OpticFinder<List<TE>> opticFinder2 = DSL.fieldFinder("TileEntities", listType);
 		int i = 416;
+		Type inputType = this.getInputSchema().findChoiceType(References.BLOCK_ENTITY);
+		Type outputType = this.getOutputSchema().findChoiceType(References.BLOCK_ENTITY);
 		return TypeRewriteRule.seq(
 			this.fixTypeEverywhere(
 				"InjectBedBlockEntityType",
-				(Type)this.getInputSchema().findChoiceType(References.BLOCK_ENTITY),
-				(Type)this.getOutputSchema().findChoiceType(References.BLOCK_ENTITY),
-				dynamicOps -> pair -> pair
+				inputType,
+				outputType,
+				dynamicOps -> (Function)(pair -> pair)
 			),
 			this.fixTypeEverywhereTyped(
 				"BedBlockEntityInjecter",
