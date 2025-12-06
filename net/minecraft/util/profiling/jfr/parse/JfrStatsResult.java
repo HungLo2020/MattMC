@@ -46,8 +46,8 @@ public record JfrStatsResult(
 			.collect(Collectors.groupingBy(ChunkGenStat::status));
 		return map.entrySet()
 			.stream()
-			.map(entry -> Pair.of((ChunkStatus)entry.getKey(), TimedStatSummary.summary((List)entry.getValue())))
-			.sorted(Comparator.comparing(pair -> ((TimedStatSummary)pair.getSecond()).totalDuration()).reversed())
+			.map((java.util.Map.Entry<ChunkStatus, List<ChunkGenStat>> entry) -> Pair.of(entry.getKey(), TimedStatSummary.summary(entry.getValue())))
+			.sorted(Comparator.comparing((Pair<ChunkStatus, TimedStatSummary<ChunkGenStat>> pair) -> pair.getSecond().totalDuration()).reversed())
 			.toList();
 	}
 

@@ -37,7 +37,7 @@ public class YieldJobSite {
 							if (optional.isEmpty()) {
 								return true;
 							} else {
-								instance.<List>get(memoryAccessor3)
+								instance.<List<LivingEntity>>get(memoryAccessor3)
 									.stream()
 									.filter(livingEntity -> livingEntity instanceof Villager && livingEntity != villager)
 									.map(livingEntity -> (Villager)livingEntity)

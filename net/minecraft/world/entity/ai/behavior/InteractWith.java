@@ -20,7 +20,7 @@ public class InteractWith {
 		EntityType<? extends T> entityType, int i, Predicate<E> predicate, Predicate<T> predicate2, MemoryModuleType<T> memoryModuleType, float f, int j
 	) {
 		int k = i * i;
-		Predicate<LivingEntity> predicate3 = livingEntity -> entityType.equals(livingEntity.getType()) && predicate2.test(livingEntity);
+		Predicate<LivingEntity> predicate3 = livingEntity -> entityType.equals(livingEntity.getType()) && predicate2.test((T)livingEntity);
 		return BehaviorBuilder.create(
 			instance -> instance.group(
 					instance.registered(memoryModuleType),
@@ -32,12 +32,12 @@ public class InteractWith {
 					instance,
 					(memoryAccessor, memoryAccessor2, memoryAccessor3, memoryAccessor4) -> (serverLevel, livingEntity, l) -> {
 						NearestVisibleLivingEntities nearestVisibleLivingEntities = instance.get(memoryAccessor4);
-						if (predicate.test(livingEntity) && nearestVisibleLivingEntities.contains(predicate3)) {
+						if (predicate.test((E)livingEntity) && nearestVisibleLivingEntities.contains(predicate3)) {
 							Optional<LivingEntity> optional = nearestVisibleLivingEntities.findClosest(
 								livingEntity2 -> livingEntity2.distanceToSqr(livingEntity) <= k && predicate3.test(livingEntity2)
 							);
 							optional.ifPresent(livingEntityx -> {
-								memoryAccessor.set(livingEntityx);
+								memoryAccessor.set((T)livingEntityx);
 								memoryAccessor2.set(new EntityTracker(livingEntityx, true));
 								memoryAccessor3.set(new WalkTarget(new EntityTracker(livingEntityx, false), f, j));
 							});

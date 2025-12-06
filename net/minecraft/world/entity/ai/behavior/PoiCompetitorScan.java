@@ -15,14 +15,14 @@ public class PoiCompetitorScan {
 	public static BehaviorControl<Villager> create() {
 		return BehaviorBuilder.create(
 			instance -> instance.group(instance.present(MemoryModuleType.JOB_SITE), instance.present(MemoryModuleType.NEAREST_LIVING_ENTITIES))
-				.apply(
+					.apply(
 					instance,
 					(memoryAccessor, memoryAccessor2) -> (serverLevel, villager, l) -> {
 						GlobalPos globalPos = instance.get(memoryAccessor);
 						serverLevel.getPoiManager()
 							.getType(globalPos.pos())
 							.ifPresent(
-								holder -> instance.<List>get(memoryAccessor2)
+								holder -> instance.<List<LivingEntity>>get(memoryAccessor2)
 									.stream()
 									.filter(livingEntity -> livingEntity instanceof Villager && livingEntity != villager)
 									.map(livingEntity -> (Villager)livingEntity)
