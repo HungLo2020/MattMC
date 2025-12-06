@@ -6,7 +6,9 @@
 
 set -e
 
-DOWNLOADS_DIR="/home/matt/Downloads"
+# Downloads directory - defaults to matt's home on Kubuntu
+# Override with: DOWNLOADS_DIR=/path/to/dir ./RunExport.sh
+DOWNLOADS_DIR="${DOWNLOADS_DIR:-/home/matt/Downloads}"
 PROJECT_NAME="Mattcraft"
 
 echo "========================================="
