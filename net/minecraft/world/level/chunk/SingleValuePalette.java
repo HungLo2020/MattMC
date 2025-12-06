@@ -19,8 +19,9 @@ public class SingleValuePalette<T> implements Palette<T> {
 		}
 	}
 
+	@SuppressWarnings("unchecked")
 	public static <A> Palette<A> create(int i, List<A> list) {
-		return new SingleValuePalette((List<T>)list);
+		return new SingleValuePalette((List<A>)list);
 	}
 
 	@Override

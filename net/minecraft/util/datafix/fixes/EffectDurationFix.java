@@ -33,8 +33,8 @@ public class EffectDurationFix extends DataFix {
 				if (typed.getOptional(opticFinder).filter(pair -> POTION_ITEMS.contains(pair.getSecond())).isPresent()) {
 					Optional<? extends Typed<?>> optional = typed.getOptionalTyped(opticFinder2);
 					if (optional.isPresent()) {
-						Dynamic<?> dynamic = ((Typed)optional.get()).get(DSL.remainderFinder());
-						Typed<?> typed2 = ((Typed)optional.get()).set(DSL.remainderFinder(), dynamic.update("CustomPotionEffects", this::fix));
+						Dynamic<?> dynamic = (Dynamic<?>)((Typed<?>)optional.get()).get(DSL.remainderFinder());
+						Typed<?> typed2 = ((Typed<?>)optional.get()).set(DSL.remainderFinder(), dynamic.update("CustomPotionEffects", this::fix));
 						return typed.set(opticFinder2, typed2);
 					}
 				}

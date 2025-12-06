@@ -133,6 +133,7 @@ public class OptionsKeyLwjgl3Fix extends DataFix {
 		super(schema, bl);
 	}
 
+	@SuppressWarnings("unchecked")
 	@Override
 	public TypeRewriteRule makeRule() {
 		return this.fixTypeEverywhereTyped(
@@ -157,15 +158,15 @@ public class OptionsKeyLwjgl3Fix extends DataFix {
 									string = "key.mouse." + (j + 1);
 								}
 
-								return Pair.of((Dynamic)entry.getKey(), ((Dynamic)entry.getValue()).createString(string));
+								return (Pair<Dynamic<?>, Dynamic<?>>)Pair.of((Dynamic<?>)entry.getKey(), (Dynamic<?>)((Dynamic)entry.getValue()).createString(string));
 							} else {
 								String string2 = MAP.getOrDefault(i, "key.unknown");
-								return Pair.of((Dynamic)entry.getKey(), ((Dynamic)entry.getValue()).createString(string2));
+								return (Pair<Dynamic<?>, Dynamic<?>>)Pair.of((Dynamic<?>)entry.getKey(), (Dynamic<?>)((Dynamic)entry.getValue()).createString(string2));
 							}
-							} else {
-								return Pair.of((Dynamic<?>)entry.getKey(), (Dynamic<?>)entry.getValue());
+						} else {
+							return (Pair<Dynamic<?>, Dynamic<?>>)Pair.of((Dynamic<?>)entry.getKey(), (Dynamic<?>)entry.getValue());
 						}
-					}).<Pair<Dynamic<?>, Dynamic<?>>>map(p -> p).collect(Collectors.toMap(Pair::getFirst, Pair::getSecond))))
+					}).collect(Collectors.toMap(Pair::getFirst, Pair::getSecond))))
 					.result()
 					.orElse(dynamic)
 			)
