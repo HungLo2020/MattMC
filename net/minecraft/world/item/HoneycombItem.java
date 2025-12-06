@@ -88,7 +88,7 @@ public class HoneycombItem extends Item implements SignApplicator {
 		Level level = useOnContext.getLevel();
 		BlockPos blockPos = useOnContext.getClickedPos();
 		BlockState blockState = level.getBlockState(blockPos);
-		return (InteractionResult)getWaxed(blockState).map(blockState2 -> {
+		return getWaxed(blockState).<InteractionResult>map(blockState2 -> {
 			Player player = useOnContext.getPlayer();
 			ItemStack itemStack = useOnContext.getItemInHand();
 			if (player instanceof ServerPlayer serverPlayer) {

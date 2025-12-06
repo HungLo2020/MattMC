@@ -44,7 +44,7 @@ public class ChunkBedBlockEntityInjecterFix extends DataFix {
 				"InjectBedBlockEntityType",
 				this.getInputSchema().findChoiceType(References.BLOCK_ENTITY),
 				this.getOutputSchema().findChoiceType(References.BLOCK_ENTITY),
-				dynamicOps -> pair -> pair
+				dynamicOps -> (Pair<String, ?> pair) -> pair
 			),
 			this.fixTypeEverywhereTyped(
 				"BedBlockEntityInjecter",

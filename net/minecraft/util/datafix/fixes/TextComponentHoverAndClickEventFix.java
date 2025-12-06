@@ -52,17 +52,25 @@ public class TextComponentHoverAndClickEventFix extends DataFix {
 				"TextComponentHoverAndClickEventFix",
 				type4,
 				type2,
-				dynamicOps -> (Pair<String, Either<Either<String, List<C1>>, Pair<Either<List<C1>, Unit>, Pair<Either<C1, Unit>, Pair<Either<H, Unit>, Dynamic<?>>>>>> pair) -> {
+				dynamicOps -> pair -> {
 					@SuppressWarnings("unchecked")
-					boolean bl = ((Either<Either<String, List<C1>>, Pair<Either<List<C1>, Unit>, Pair<Either<C1, Unit>, Pair<Either<H, Unit>, Dynamic<?>>>>>)pair.getSecond()).<Boolean>map(either -> false, (Pair<Either<List<C1>, Unit>, Pair<Either<C1, Unit>, Pair<Either<H, Unit>, Dynamic<?>>>> pairx) -> {
-						Pair<Either<H, Unit>, Dynamic<?>> pair2 = pairx.getSecond().getSecond();
-						boolean blx = pair2.getFirst().left().isPresent();
-						boolean bl2 = pair2.getSecond().get("clickEvent").result().isPresent();
-						return blx || bl2;
-					});
-					return !bl
-						? pair
-						: Util.writeAndReadTypedOrThrow(ExtraDataFixUtils.cast(type5, pair, dynamicOps), type2, TextComponentHoverAndClickEventFix::fixTextComponent).getValue();
+					Either<Either<String, List<C1>>, Pair<Either<List<C1>, Unit>, Pair<Either<C1, Unit>, Pair<Either<H, Unit>, Dynamic<?>>>>> second = 
+						(Either<Either<String, List<C1>>, Pair<Either<List<C1>, Unit>, Pair<Either<C1, Unit>, Pair<Either<H, Unit>, Dynamic<?>>>>>) pair.getSecond();
+					boolean bl = second.<Boolean>map(
+						either -> false, 
+						pairx -> {
+							Pair<Either<H, Unit>, Dynamic<?>> pair2 = pairx.getSecond().getSecond();
+							boolean blx = pair2.getFirst().left().isPresent();
+							boolean bl2 = pair2.getSecond().get("clickEvent").result().isPresent();
+							return blx || bl2;
+						}
+					);
+					if (!bl) {
+						@SuppressWarnings("unchecked")
+						C2 result = (C2) pair;
+						return result;
+					}
+					return Util.writeAndReadTypedOrThrow(ExtraDataFixUtils.cast(type5, pair, dynamicOps), type2, TextComponentHoverAndClickEventFix::fixTextComponent).getValue();
 				}
 			);
 		}

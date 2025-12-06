@@ -19,12 +19,13 @@ public class BlockEntityUUIDFix extends AbstractUUIDFix {
 
 	@SuppressWarnings("unchecked")
 	private Dynamic<?> updateSkull(Dynamic<?> dynamic) {
-		return dynamic.get("Owner")
+		Dynamic<?> result = dynamic.get("Owner")
 			.get()
 			.map((Dynamic<?> dynamicx) -> replaceUUIDString(dynamicx, "Id", "Id").orElse(dynamicx))
 			.map(dynamic2 -> dynamic.remove("Owner").set("SkullOwner", dynamic2))
 			.result()
-			.orElse(dynamic);
+			.orElse(null);
+		return result != null ? result : dynamic;
 	}
 
 	private Dynamic<?> updateConduit(Dynamic<?> dynamic) {

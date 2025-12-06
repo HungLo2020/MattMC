@@ -29,7 +29,10 @@ public record ComponentContents<T>(DataComponentType<T> componentType) implement
 			"component",
 			(SelectItemModel.UnbakedSwitch unbakedSwitch) -> ((ComponentContents<?>)unbakedSwitch.property()).componentType,
 			dataComponentType -> SelectItemModelProperty.Type.createCasesFieldCodec(dataComponentType.codecOrThrow())
-				.xmap(list -> new SelectItemModel.UnbakedSwitch<>(new ComponentContents<>(dataComponentType), list), (SelectItemModel.UnbakedSwitch s) -> s.cases())
+				.xmap(list -> {
+					SelectItemModel.UnbakedSwitch result = new SelectItemModel.UnbakedSwitch(new ComponentContents(dataComponentType), list);
+					return result;
+				}, (SelectItemModel.UnbakedSwitch s) -> s.cases())
 		);
 		return new SelectItemModelProperty.Type<>(mapCodec);
 	}
