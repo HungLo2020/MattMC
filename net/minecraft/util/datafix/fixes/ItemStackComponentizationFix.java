@@ -363,19 +363,28 @@ public class ItemStackComponentizationFix extends DataFix {
 	}
 
 	private static void fixBlockStatePredicates(
-		ItemStackComponentizationFix.ItemStackData itemStackData, Dynamic<?> dynamic, String string, String string2, boolean bl
+			ItemStackComponentizationFix.ItemStackData itemStackData,
+			Dynamic<?> dynamic,
+			String string,
+			String string2,
+			boolean bl
 	) {
 		Optional<? extends Dynamic<?>> optional = itemStackData.removeTag(string).result();
 		if (!optional.isEmpty()) {
-		Dynamic<?> dynamic2 = dynamic.emptyMap()
-				.set(
-					"predicates",
-					dynamic.createList(
-						((Dynamic)optional.get())
-							.asStream()
-							.map((Dynamic<?> dynamicx) -> DataFixUtils.orElse(dynamicx.asString().map(stringx -> fixBlockStatePredicate(dynamicx, stringx)).result(), dynamicx))
-					)
-				);
+			Dynamic<?> dynamic2 = dynamic.emptyMap()
+					.set(
+							"predicates",
+							dynamic.createList(
+									((Dynamic<?>) optional.get())
+											.asStream()
+											.map(dynamicx -> DataFixUtils.orElse(
+													dynamicx.asString()
+															.map(stringx -> fixBlockStatePredicate(dynamicx, stringx))
+															.result(),
+													dynamicx
+											))
+							)
+					);
 			if (bl) {
 				dynamic2 = dynamic2.set("show_in_tooltip", dynamic.createBoolean(false));
 			}
