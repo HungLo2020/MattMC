@@ -135,7 +135,7 @@ public class SocialInteractionsPlayerList extends ContainerObjectSelectionList<P
 	}
 
 	private void sortPlayerEntries() {
-		this.players.sort(Comparator.comparing(playerEntry -> {
+		this.players.sort(Comparator.<PlayerEntry, Integer>comparing(playerEntry -> {
 			if (this.minecraft.isLocalPlayer(playerEntry.getPlayerId())) {
 				return 0;
 			} else if (this.minecraft.getReportingContext().hasDraftReportFor(playerEntry.getPlayerId())) {
@@ -145,7 +145,7 @@ public class SocialInteractionsPlayerList extends ContainerObjectSelectionList<P
 			} else {
 				return playerEntry.hasRecentMessages() ? 2 : 3;
 			}
-		}).thenComparing(playerEntry -> {
+		}).thenComparing((PlayerEntry playerEntry) -> {
 			if (!playerEntry.getPlayerName().isBlank()) {
 				int i = playerEntry.getPlayerName().codePointAt(0);
 				if (i == 95 || i >= 97 && i <= 122 || i >= 65 && i <= 90 || i >= 48 && i <= 57) {

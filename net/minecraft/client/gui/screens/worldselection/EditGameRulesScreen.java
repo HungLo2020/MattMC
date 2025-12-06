@@ -293,7 +293,7 @@ public class EditGameRulesScreen extends Screen {
 						((Map)entry.getValue())
 							.entrySet()
 							.stream()
-							.sorted(java.util.Map.Entry.comparingByKey(Comparator.comparing(Key::getId)))
+							.sorted(java.util.Map.Entry.comparingByKey(Comparator.comparing((GameRules.Key<?> key) -> key.getId())))
 							.forEach(entryx -> this.addEntry((EditGameRulesScreen.RuleEntry)entryx.getValue()));
 					}
 				);

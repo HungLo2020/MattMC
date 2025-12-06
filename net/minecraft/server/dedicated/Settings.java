@@ -124,7 +124,7 @@ public abstract class Settings<T extends Settings<T>> {
 	private static <V extends Number> Function<String, V> wrapNumberDeserializer(Function<String, V> function) {
 		return string -> {
 			try {
-				return (Number)function.apply(string);
+				return function.apply(string);
 			} catch (NumberFormatException var3) {
 				return null;
 			}

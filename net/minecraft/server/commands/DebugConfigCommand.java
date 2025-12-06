@@ -71,7 +71,7 @@ public class DebugConfigCommand {
 
 		for (Connection connection : minecraftServer.getConnection().getConnections()) {
 			if (connection.getPacketListener() instanceof ServerConfigurationPacketListenerImpl serverConfigurationPacketListenerImpl) {
-				set.add(serverConfigurationPacketListenerImpl.getOwner().id().toString());
+				set.add(serverConfigurationPacketListenerImpl.getOwner().getId().toString());
 			}
 		}
 
