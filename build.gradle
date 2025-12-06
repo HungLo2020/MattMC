@@ -420,76 +420,24 @@ tasks.register('clientDist') {
         
         // Build classpath string for launch scripts
         def jarName = tasks.jar.archiveFileName.get()
-        def depJars = configurations.runtimeClasspath.files.collect { it.name }.join(':')
         def classpathLinux = "lib/${jarName}:lib/" + configurations.runtimeClasspath.files.collect { it.name }.join(':lib/')
         def classpathWindows = "lib\\${jarName};lib\\" + configurations.runtimeClasspath.files.collect { it.name }.join(';lib\\')
         
-        // Create launch script for Linux
-        def launchScript = file("${distDir}/run-mattmc.sh")
-        launchScript.text = """#!/bin/bash
-# MattMC Client Launcher
-
-cd "\$(dirname "\$0")"
-
-java -Xmx2G -Xms512M \\
-    -XX:+UseG1GC \\
-    -XX:+ParallelRefProcEnabled \\
-    -XX:MaxGCPauseMillis=200 \\
-    -XX:+UnlockExperimentalVMOptions \\
-    -XX:+DisableExplicitGC \\
-    -XX:G1NewSizePercent=30 \\
-    -XX:G1MaxNewSizePercent=40 \\
-    -XX:G1HeapRegionSize=8M \\
-    -XX:G1ReservePercent=20 \\
-    -XX:G1HeapWastePercent=5 \\
-    -XX:G1MixedGCCountTarget=4 \\
-    -XX:InitiatingHeapOccupancyPercent=15 \\
-    -XX:G1MixedGCLiveThresholdPercent=90 \\
-    -XX:G1RSetUpdatingPauseTimePercent=5 \\
-    -XX:SurvivorRatio=32 \\
-    -XX:+PerfDisableSharedMem \\
-    -XX:MaxTenuringThreshold=1 \\
-    -cp "${classpathLinux}" \\
-    net.minecraft.client.main.Main \\
-    --version ${version} \\
-    --accessToken 0 \\
-    --gameDir run \\
-    --assetsDir run/assets
-"""
-        launchScript.setExecutable(true)
+        // Copy and process launch scripts from libraries directory
+        // Linux script
+        def linuxScriptTemplate = file('libraries/run-mattmc.sh').text
+        def linuxScript = file("${distDir}/run-mattmc.sh")
+        linuxScript.text = linuxScriptTemplate
+            .replace('@CLASSPATH_LINUX@', classpathLinux)
+            .replace('@VERSION@', version)
+        linuxScript.setExecutable(true)
         
-        // Create launch script for Windows
-        def launchScriptWin = file("${distDir}/run-mattmc.bat")
-        launchScriptWin.text = """@echo off
-REM MattMC Client Launcher
-
-cd /d "%~dp0"
-
-java -Xmx2G -Xms512M ^
-    -XX:+UseG1GC ^
-    -XX:+ParallelRefProcEnabled ^
-    -XX:MaxGCPauseMillis=200 ^
-    -XX:+UnlockExperimentalVMOptions ^
-    -XX:+DisableExplicitGC ^
-    -XX:G1NewSizePercent=30 ^
-    -XX:G1MaxNewSizePercent=40 ^
-    -XX:G1HeapRegionSize=8M ^
-    -XX:G1ReservePercent=20 ^
-    -XX:G1HeapWastePercent=5 ^
-    -XX:G1MixedGCCountTarget=4 ^
-    -XX:InitiatingHeapOccupancyPercent=15 ^
-    -XX:G1MixedGCLiveThresholdPercent=90 ^
-    -XX:G1RSetUpdatingPauseTimePercent=5 ^
-    -XX:SurvivorRatio=32 ^
-    -XX:+PerfDisableSharedMem ^
-    -XX:MaxTenuringThreshold=1 ^
-    -cp "${classpathWindows}" ^
-    net.minecraft.client.main.Main ^
-    --version ${version} ^
-    --accessToken 0 ^
-    --gameDir run ^
-    --assetsDir run\\assets
-"""
+        // Windows script
+        def windowsScriptTemplate = file('libraries/run-mattmc.bat').text
+        def windowsScript = file("${distDir}/run-mattmc.bat")
+        windowsScript.text = windowsScriptTemplate
+            .replace('@CLASSPATH_WINDOWS@', classpathWindows)
+            .replace('@VERSION@', version)
     }
 }
 
