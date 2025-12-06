@@ -26,4 +26,5 @@ java -Xmx2G -Xms512M \
     --version @VERSION@ \
     --accessToken 0 \
     --gameDir run \
-    --assetsDir run/assets
+    --assetsDir run/assets \
+    --assetIndex @ASSET_INDEX@
