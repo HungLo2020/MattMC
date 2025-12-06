@@ -241,7 +241,7 @@ public class StatsCounterFix extends DataFix {
 			Map<Dynamic<?>, Dynamic<?>> map = Maps.<Dynamic<?>, Dynamic<?>>newHashMap();
 			Optional<? extends Map<? extends Dynamic<?>, ? extends Dynamic<?>>> optional = dynamic.getMapValues().result();
 			if (optional.isPresent()) {
-				for (Entry<? extends Dynamic<?>, ? extends Dynamic<?>> entry : ((Map)optional.get()).entrySet()) {
+				for (Entry<? extends Dynamic<?>, ? extends Dynamic<?>> entry : optional.get().entrySet()) {
 					if (((Dynamic)entry.getValue()).asNumber().result().isPresent()) {
 						String string = ((Dynamic)entry.getKey()).asString("");
 						StatsCounterFix.StatType statType = unpackLegacyKey(string);

@@ -221,7 +221,7 @@ public class StructuresBecomeConfiguredFix extends DataFix {
 			Builder<String, String> builder = ImmutableMap.builder();
 
 			for (Entry<List<String>, String> entry : map.entrySet()) {
-				((List)entry.getKey()).forEach(string -> builder.put(string, (String)entry.getValue()));
+				entry.getKey().forEach(string -> builder.put(string, (String)entry.getValue()));
 			}
 
 			return builder.build();

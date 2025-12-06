@@ -185,18 +185,18 @@ public class LevelDataGeneratorOptionsFix extends DataFix {
 			(Map<T, T>)map.entrySet()
 				.stream()
 				.map(
-					entry -> Pair.of(
+						entry -> Pair.of(
 						dynamicOps.createString(((String)entry.getKey()).toLowerCase(Locale.ROOT)),
 						dynamicOps.createMap(
-							(Map<T, T>)((Map)entry.getValue())
+							(Map<T, T>)((Map<String, String>)entry.getValue())
 								.entrySet()
 								.stream()
-								.map(entryx -> Pair.of(dynamicOps.createString((String)entryx.getKey()), dynamicOps.createString((String)entryx.getValue())))
-								.collect(Collectors.toMap(Pair::getFirst, Pair::getSecond))
+								.map((Entry<String, String> entryx) -> Pair.of(dynamicOps.createString(entryx.getKey()), dynamicOps.createString(entryx.getValue())))
+								.collect(Collectors.toMap(p -> p.getFirst(), p -> p.getSecond()))
 						)
 					)
 				)
-				.collect(Collectors.toMap(Pair::getFirst, Pair::getSecond))
+				.collect(Collectors.toMap(p -> p.getFirst(), p -> p.getSecond()))
 		);
 		return new Dynamic<>(
 			dynamicOps,

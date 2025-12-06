@@ -162,10 +162,10 @@ public class OptionsKeyLwjgl3Fix extends DataFix {
 								String string2 = MAP.getOrDefault(i, "key.unknown");
 								return Pair.of((Dynamic)entry.getKey(), ((Dynamic)entry.getValue()).createString(string2));
 							}
-						} else {
-							return Pair.of((Dynamic)entry.getKey(), (Dynamic)entry.getValue());
+							} else {
+							return Pair.of((Dynamic<?>)entry.getKey(), (Dynamic<?>)entry.getValue());
 						}
-					}).collect(Collectors.toMap(Pair::getFirst, Pair::getSecond))))
+					}).<Map<? extends Dynamic<?>, ? extends Dynamic<?>>>collect(Collectors.toMap(p -> p.getFirst(), p -> p.getSecond()))))
 					.result()
 					.orElse(dynamic)
 			)

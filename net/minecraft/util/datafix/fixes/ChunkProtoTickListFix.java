@@ -171,7 +171,7 @@ public class ChunkProtoTickListFix extends DataFix {
 		int o = l >>> 8 & 15;
 		String string = (String)function.apply(supplier != null ? ((ChunkProtoTickListFix.PoorMansPalettedContainer)supplier.get()).get(m, n, o) : null);
 		return dynamic.createMap(
-			ImmutableMap.builder()
+			ImmutableMap.<Dynamic<?>, Dynamic<?>>builder()
 				.put(dynamic.createString("i"), dynamic.createString(string))
 				.put(dynamic.createString("x"), dynamic.createInt(i * 16 + m))
 				.put(dynamic.createString("y"), dynamic.createInt(j * 16 + n))
