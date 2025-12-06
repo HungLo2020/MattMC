@@ -344,3 +344,132 @@ tasks.register('fatJar', Jar) {
     
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
 }
+
+// Task to create a client fat jar with all dependencies
+tasks.register('clientFatJar', Jar) {
+    group = 'build'
+    description = 'Creates a fat JAR with all dependencies for the client'
+    archiveBaseName = 'Mattcraft-Client'
+    archiveClassifier = 'all'
+    
+    from sourceSets.main.output
+    
+    dependsOn configurations.runtimeClasspath
+    from {
+        configurations.runtimeClasspath.findAll { it.name.endsWith('jar') }.collect { zipTree(it) }
+    }
+    
+    manifest {
+        attributes 'Main-Class': 'net.minecraft.client.main.Main'
+    }
+    
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+}
+
+// Task to create a runnable client distribution
+tasks.register('clientDist', Copy) {
+    group = 'distribution'
+    description = 'Creates a runnable client distribution'
+    
+    dependsOn 'clientFatJar'
+    
+    def distDir = "${buildDir}/client-dist/Mattcraft"
+    
+    // Copy the fat jar
+    from(tasks.named('clientFatJar')) {
+        into 'lib'
+    }
+    
+    // Copy resources
+    from('src/main/resources') {
+        into 'resources'
+    }
+    
+    into distDir
+    
+    doLast {
+        // Create run directory structure
+        file("${distDir}/run").mkdirs()
+        file("${distDir}/run/assets").mkdirs()
+        file("${distDir}/run/resourcepacks").mkdirs()
+        
+        // Create launch script for Linux
+        def launchScript = file("${distDir}/run-mattcraft.sh")
+        launchScript.text = '''#!/bin/bash
+# Mattcraft Client Launcher
+
+cd "$(dirname "$0")"
+
+java -Xmx2G -Xms512M \\
+    -XX:+UseG1GC \\
+    -XX:+ParallelRefProcEnabled \\
+    -XX:MaxGCPauseMillis=200 \\
+    -XX:+UnlockExperimentalVMOptions \\
+    -XX:+DisableExplicitGC \\
+    -XX:G1NewSizePercent=30 \\
+    -XX:G1MaxNewSizePercent=40 \\
+    -XX:G1HeapRegionSize=8M \\
+    -XX:G1ReservePercent=20 \\
+    -XX:G1HeapWastePercent=5 \\
+    -XX:G1MixedGCCountTarget=4 \\
+    -XX:InitiatingHeapOccupancyPercent=15 \\
+    -XX:G1MixedGCLiveThresholdPercent=90 \\
+    -XX:G1RSetUpdatingPauseTimePercent=5 \\
+    -XX:SurvivorRatio=32 \\
+    -XX:+PerfDisableSharedMem \\
+    -XX:MaxTenuringThreshold=1 \\
+    -jar lib/Mattcraft-Client-''' + version + '''-all.jar \\
+    --version ''' + version + ''' \\
+    --accessToken 0 \\
+    --gameDir run \\
+    --assetsDir run/assets
+'''
+        launchScript.setExecutable(true)
+        
+        // Create launch script for Windows
+        def launchScriptWin = file("${distDir}/run-mattcraft.bat")
+        launchScriptWin.text = '''@echo off
+REM Mattcraft Client Launcher
+
+cd /d "%~dp0"
+
+java -Xmx2G -Xms512M ^
+    -XX:+UseG1GC ^
+    -XX:+ParallelRefProcEnabled ^
+    -XX:MaxGCPauseMillis=200 ^
+    -XX:+UnlockExperimentalVMOptions ^
+    -XX:+DisableExplicitGC ^
+    -XX:G1NewSizePercent=30 ^
+    -XX:G1MaxNewSizePercent=40 ^
+    -XX:G1HeapRegionSize=8M ^
+    -XX:G1ReservePercent=20 ^
+    -XX:G1HeapWastePercent=5 ^
+    -XX:G1MixedGCCountTarget=4 ^
+    -XX:InitiatingHeapOccupancyPercent=15 ^
+    -XX:G1MixedGCLiveThresholdPercent=90 ^
+    -XX:G1RSetUpdatingPauseTimePercent=5 ^
+    -XX:SurvivorRatio=32 ^
+    -XX:+PerfDisableSharedMem ^
+    -XX:MaxTenuringThreshold=1 ^
+    -jar lib\\Mattcraft-Client-''' + version + '''-all.jar ^
+    --version ''' + version + ''' ^
+    --accessToken 0 ^
+    --gameDir run ^
+    --assetsDir run\\assets
+'''
+    }
+}
+
+// Task to create a zip of the client distribution
+tasks.register('clientDistZip', Zip) {
+    group = 'distribution'
+    description = 'Creates a zip of the runnable client distribution'
+    
+    dependsOn 'clientDist'
+    
+    archiveBaseName = 'Mattcraft-Client'
+    
+    from "${buildDir}/client-dist"
+    
+    destinationDirectory = file("${buildDir}/distributions")
+}
