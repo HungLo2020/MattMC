@@ -24,6 +24,13 @@ java {
     }
 }
 
+// Disable auto-detection of Java installations to avoid warnings
+// about missing Java at system paths
+tasks.withType(JavaCompile).configureEach {
+    // Don't use toolchain auto-detection
+    options.forkOptions.javaHome = null
+}
+
 repositories {
     mavenCentral()
     // Minecraft libraries (primary source for Mojang dependencies)
@@ -235,6 +242,23 @@ def clientJvmArgs = [
     '-Dorg.lwjgl.util.Debug=true'
 ]
 
+// Helper method to configure JavaExec tasks to use bundled JDK
+// This is called during task execution, not configuration, to avoid implicit dependencies
+def configureBundledJdk(JavaExec task) {
+    task.doFirst {
+        def bundledJdkDir = file('run/jdk-21')
+        def bundledJavaExe = new File(bundledJdkDir, 'bin/java')
+        
+        if (bundledJavaExe.exists()) {
+            // Override the executable property
+            task.executable = bundledJavaExe.absolutePath
+            // Ensure we don't use the toolchain launcher
+            task.javaLauncher.set(provider { null })
+            println "Using bundled JDK from: ${bundledJdkDir.absolutePath}"
+        }
+    }
+}
+
 // Task to run the dedicated server (no GUI - headless mode)
 tasks.register('runServer', JavaExec) {
     group = 'minecraft'
@@ -249,25 +273,14 @@ tasks.register('runServer', JavaExec) {
     jvmArgs = serverJvmArgs
     args = ['--nogui']
     
-    // Configure to use bundled JDK if available
-    def bundledJdkDir = file('run/jdk-21')
-    def bundledJavaExe = new File(bundledJdkDir, 'bin/java')
-    if (bundledJavaExe.exists()) {
-        // Override the executable property
-        executable bundledJavaExe.absolutePath
-        // Ensure we don't use the toolchain launcher
-        javaLauncher.set(provider { null })
-    }
-    
     doFirst {
         workingDir.mkdirs()
-        
-        if (bundledJavaExe.exists()) {
-            println "Using bundled JDK from: ${bundledJdkDir.absolutePath}"
-        }
     }
     
     standardInput = System.in
+    
+    // Configure to use bundled JDK
+    configureBundledJdk(it)
 }
 
 // Task to run the dedicated server with GUI
@@ -284,25 +297,14 @@ tasks.register('runServerGui', JavaExec) {
     jvmArgs = serverJvmArgs
     // No --nogui argument means GUI will be shown
     
-    // Configure to use bundled JDK if available
-    def bundledJdkDir = file('run/jdk-21')
-    def bundledJavaExe = new File(bundledJdkDir, 'bin/java')
-    if (bundledJavaExe.exists()) {
-        // Override the executable property
-        executable bundledJavaExe.absolutePath
-        // Ensure we don't use the toolchain launcher
-        javaLauncher.set(provider { null })
-    }
-    
     doFirst {
         workingDir.mkdirs()
-        
-        if (bundledJavaExe.exists()) {
-            println "Using bundled JDK from: ${bundledJdkDir.absolutePath}"
-        }
     }
     
     standardInput = System.in
+    
+    // Configure to use bundled JDK
+    configureBundledJdk(it)
 }
 
 // Task to run the Minecraft client
@@ -327,16 +329,6 @@ tasks.register('runClient', JavaExec) {
         '--assetIndex', '27'
     ]
     
-    // Configure to use bundled JDK if available
-    def bundledJdkDir = file('run/jdk-21')
-    def bundledJavaExe = new File(bundledJdkDir, 'bin/java')
-    if (bundledJavaExe.exists()) {
-        // Override the executable property
-        executable bundledJavaExe.absolutePath
-        // Ensure we don't use the toolchain launcher
-        javaLauncher.set(provider { null })
-    }
-    
     doFirst {
         workingDir.mkdirs()
         file('run/assets').mkdirs()
@@ -350,13 +342,12 @@ tasks.register('runClient', JavaExec) {
                 into file('run/assets')
             }
         }
-        
-        if (bundledJavaExe.exists()) {
-            println "Using bundled JDK from: ${bundledJdkDir.absolutePath}"
-        }
     }
     
     standardInput = System.in
+    
+    // Configure to use bundled JDK
+    configureBundledJdk(it)
 }
 
 // Task to download bundled JDK if not present
