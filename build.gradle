@@ -332,8 +332,12 @@ tasks.register('fatJar', Jar) {
     archiveClassifier = 'all'
     zip64 = true
     
+    dependsOn 'classes'
+    
+    // Include project classes FIRST so they take precedence with EXCLUDE strategy
     from sourceSets.main.output
     
+    // Then include dependency JARs (duplicates will be excluded)
     dependsOn configurations.runtimeClasspath
     from {
         configurations.runtimeClasspath.findAll { it.name.endsWith('jar') }.collect { zipTree(it) }
@@ -344,6 +348,9 @@ tasks.register('fatJar', Jar) {
     }
     
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+    
+    // Exclude META-INF signatures from dependencies to avoid security exceptions
+    exclude 'META-INF/*.RSA', 'META-INF/*.SF', 'META-INF/*.DSA'
 }
 
 // Task to create a client fat jar with all dependencies
@@ -355,8 +362,11 @@ tasks.register('clientFatJar', Jar) {
     zip64 = true
     
     dependsOn 'classes'
+    
+    // Include project classes FIRST so they take precedence with EXCLUDE strategy
     from sourceSets.main.output
     
+    // Then include dependency JARs (duplicates will be excluded)
     dependsOn configurations.runtimeClasspath
     from {
         configurations.runtimeClasspath.findAll { it.name.endsWith('jar') }.collect { zipTree(it) }
@@ -367,6 +377,9 @@ tasks.register('clientFatJar', Jar) {
     }
     
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+    
+    // Exclude META-INF signatures from dependencies to avoid security exceptions
+    exclude 'META-INF/*.RSA', 'META-INF/*.SF', 'META-INF/*.DSA'
 }
 
 // Task to create a runnable client distribution
