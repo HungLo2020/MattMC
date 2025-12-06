@@ -1,56 +1,64 @@
 matt@HungLoDE:~/Documents/Repos/Mattcraft$ ./gradlew build
-Path for java installation '/usr/lib/jvm/openjdk-17' (Common Linux Locations) does not contain a java executable
-Path for java installation '/usr/lib/jvm/openjdk-21' (Common Linux Locations) does not contain a java executable
-/home/matt/Documents/Repos/Mattcraft/net/minecraft/util/datafix/fixes/FixProjectileStoredItem.java:47: error: incompatible types: Type<T> cannot be converted to Type<CAP#1>
-                return typed -> typed.updateTyped(opticFinder, type2, typedx -> subFixer.fix(typedx, type2));
-                                                                                                     ^
-  where T is a type-variable:
-    T extends Object declared in method <T>fixChoiceCap(String,SubFixer<?>,Type<?>,Type<T>)
+/home/matt/Documents/Repos/Mattcraft/net/minecraft/util/datafix/fixes/ChunkBedBlockEntityInjecterFix.java:82: error: incompatible types: Object cannot be converted to TE
+                                                                                                .getFirst()
+                                                                                                         ^
+  where TE is a type-variable:
+    TE extends Object declared in method <TE>cap(Type<?>,ListType<TE>)
+/home/matt/Documents/Repos/Mattcraft/net/minecraft/util/datafix/fixes/EntitySpawnerItemVariantComponentFix.java:35: error: no suitable method found for updateTyped(OpticFinder<CAP#1>,EntitySpaw[...]ucket)
+                                        case "minecraft:salmon_bucket" -> typed.updateTyped(opticFinder2, EntitySpawnerItemVariantComponentFix::fixSalmonBucket);
+                                                                               ^
+    method Typed.<FT#1>updateTyped(OpticFinder<FT#1>,Function<Typed<?>,Typed<?>>) is not applicable
+      (cannot infer type-variable(s) FT#1
+        (argument mismatch; incompatible parameter types in method reference))
+    method Typed.<FT#2,FR>updateTyped(OpticFinder<FT#2>,Type<FR>,Function<Typed<?>,Typed<?>>) is not applicable
+      (cannot infer type-variable(s) FT#2,FR
+        (actual and formal argument lists differ in length))
+  where FT#1,FT#2,FR are type-variables:
+    FT#1 extends Object declared in method <FT#1>updateTyped(OpticFinder<FT#1>,Function<Typed<?>,Typed<?>>)
+    FT#2 extends Object declared in method <FT#2,FR>updateTyped(OpticFinder<FT#2>,Type<FR>,Function<Typed<?>,Typed<?>>)
+    FR extends Object declared in method <FT#2,FR>updateTyped(OpticFinder<FT#2>,Type<FR>,Function<Typed<?>,Typed<?>>)
   where CAP#1 is a fresh type-variable:
     CAP#1 extends Object from capture of ?
-/home/matt/Documents/Repos/Mattcraft/net/minecraft/util/datafix/fixes/EffectDurationFix.java:36: error: incompatible types: Object cannot be converted to Dynamic<?>
-                                                Dynamic<?> dynamic = ((Typed)optional.get()).get(DSL.remainderFinder());
-                                                                                                ^
-/home/matt/Documents/Repos/Mattcraft/net/minecraft/util/datafix/fixes/OptionsKeyLwjgl3Fix.java:168: error: incompatible types: bad return type in lambda expression
-                                        }).<Pair<Dynamic<?>, Dynamic<?>>>map(p -> p).collect(Collectors.toMap(Pair::getFirst, Pair::getSecond))))
-                                                                                  ^
-    Pair<CAP#1,CAP#2> cannot be converted to Pair<Dynamic<?>,Dynamic<?>>
-  where CAP#1,CAP#2 are fresh type-variables:
-    CAP#1 extends Dynamic from capture of ? extends Dynamic
-    CAP#2 extends Dynamic from capture of ? extends Dynamic
-/home/matt/Documents/Repos/Mattcraft/net/minecraft/util/datafix/fixes/OptionsKeyLwjgl3Fix.java:168: error: incompatible types: cannot infer type-variable(s) T,K,U
-                                        }).<Pair<Dynamic<?>, Dynamic<?>>>map(p -> p).collect(Collectors.toMap(Pair::getFirst, Pair::getSecond))))
-                                                                                                             ^
-    (argument mismatch; invalid method reference
-      method getFirst in class Pair<F,S> cannot be applied to given types
-        required: no arguments
-        found:    Object
-        reason: actual and formal argument lists differ in length)
-  where T,K,U,F,S are type-variables:
-    T extends Object declared in method <T,K,U>toMap(Function<? super T,? extends K>,Function<? super T,? extends U>)
-    K extends Object declared in method <T,K,U>toMap(Function<? super T,? extends K>,Function<? super T,? extends U>)
-    U extends Object declared in method <T,K,U>toMap(Function<? super T,? extends K>,Function<? super T,? extends U>)
-    F extends Object declared in class Pair
-    S extends Object declared in class Pair
-/home/matt/Documents/Repos/Mattcraft/net/minecraft/util/datafix/fixes/OptionsKeyLwjgl3Fix.java:170: error: incompatible types: Dynamic<CAP#1> cannot be converted to Dynamic<CAP#2>
+/home/matt/Documents/Repos/Mattcraft/net/minecraft/util/datafix/fixes/EntitySpawnerItemVariantComponentFix.java:36: error: no suitable method found for updateTyped(OpticFinder<CAP#1>,EntitySpaw[...]ucket)
+                                        case "minecraft:axolotl_bucket" -> typed.updateTyped(opticFinder2, EntitySpawnerItemVariantComponentFix::fixAxolotlBucket);
+                                                                                ^
+    method Typed.<FT#1>updateTyped(OpticFinder<FT#1>,Function<Typed<?>,Typed<?>>) is not applicable
+      (cannot infer type-variable(s) FT#1
+        (argument mismatch; incompatible parameter types in method reference))
+    method Typed.<FT#2,FR>updateTyped(OpticFinder<FT#2>,Type<FR>,Function<Typed<?>,Typed<?>>) is not applicable
+      (cannot infer type-variable(s) FT#2,FR
+        (actual and formal argument lists differ in length))
+  where FT#1,FT#2,FR are type-variables:
+    FT#1 extends Object declared in method <FT#1>updateTyped(OpticFinder<FT#1>,Function<Typed<?>,Typed<?>>)
+    FT#2 extends Object declared in method <FT#2,FR>updateTyped(OpticFinder<FT#2>,Type<FR>,Function<Typed<?>,Typed<?>>)
+    FR extends Object declared in method <FT#2,FR>updateTyped(OpticFinder<FT#2>,Type<FR>,Function<Typed<?>,Typed<?>>)
+  where CAP#1 is a fresh type-variable:
+    CAP#1 extends Object from capture of ?
+/home/matt/Documents/Repos/Mattcraft/net/minecraft/util/datafix/fixes/EntitySpawnerItemVariantComponentFix.java:37: error: no suitable method found for updateTyped(OpticFinder<CAP#1>,EntitySpaw[...]ucket)
+                                        case "minecraft:tropical_fish_bucket" -> typed.updateTyped(opticFinder2, EntitySpawnerItemVariantComponentFix::fixTropicalFishBucket);
+                                                                                      ^
+    method Typed.<FT#1>updateTyped(OpticFinder<FT#1>,Function<Typed<?>,Typed<?>>) is not applicable
+      (cannot infer type-variable(s) FT#1
+        (argument mismatch; incompatible parameter types in method reference))
+    method Typed.<FT#2,FR>updateTyped(OpticFinder<FT#2>,Type<FR>,Function<Typed<?>,Typed<?>>) is not applicable
+      (cannot infer type-variable(s) FT#2,FR
+        (actual and formal argument lists differ in length))
+  where FT#1,FT#2,FR are type-variables:
+    FT#1 extends Object declared in method <FT#1>updateTyped(OpticFinder<FT#1>,Function<Typed<?>,Typed<?>>)
+    FT#2 extends Object declared in method <FT#2,FR>updateTyped(OpticFinder<FT#2>,Type<FR>,Function<Typed<?>,Typed<?>>)
+    FR extends Object declared in method <FT#2,FR>updateTyped(OpticFinder<FT#2>,Type<FR>,Function<Typed<?>,Typed<?>>)
+  where CAP#1 is a fresh type-variable:
+    CAP#1 extends Object from capture of ?
+Path for java installation '/usr/lib/jvm/openjdk-21' (Common Linux Locations) does not contain a java executable
+Path for java installation '/usr/lib/jvm/openjdk-17' (Common Linux Locations) does not contain a java executable
+/home/matt/Documents/Repos/Mattcraft/net/minecraft/util/datafix/fixes/OptionsKeyLwjgl3Fix.java:171: error: incompatible types: Dynamic<CAP#1> cannot be converted to Dynamic<CAP#2>
                                         .orElse(dynamic)
                                                 ^
   where CAP#1,CAP#2 are fresh type-variables:
     CAP#1 extends Object from capture of ?
     CAP#2 extends Object from capture of ?
-/home/matt/Documents/Repos/Mattcraft/net/minecraft/util/datafix/fixes/EntityEquipmentToArmorAndHandFix.java:75: error: incompatible types: ItemStackOld cannot be converted to ItemStackNew
-                                                                        list2.set(i - 1, list.get(i));
-                                                                                                 ^
-  where ItemStackOld,ItemStackNew are type-variables:
-    ItemStackOld extends Object declared in method <ItemStackOld,ItemStackNew>cap(Type<ItemStackOld>,Type<ItemStackNew>)
-    ItemStackNew extends Object declared in method <ItemStackOld,ItemStackNew>cap(Type<ItemStackOld>,Type<ItemStackNew>)
 error: incompatible types: incompatible parameter types in lambda expression
-/home/matt/Documents/Repos/Mattcraft/net/minecraft/util/datafix/fixes/BlockEntitySignDoubleSidedEditableTextFix.java:38: error: incompatible types: List<Dynamic> cannot be converted to List<Dynamic<T>>
-                List<Dynamic<T>> list = getLines(dynamic, "Text").map(optional -> (Dynamic)optional.orElse(dynamic2)).toList();
-                                                                                                                            ^
-  where T is a type-variable:
-    T extends Object declared in method <T>fixFrontTextTag(Dynamic<T>)
-/home/matt/Documents/Repos/Mattcraft/net/minecraft/util/datafix/fixes/EquipmentFormatFix.java:65: error: incompatible types: inference variable F has incompatible bounds
+/home/matt/Documents/Repos/Mattcraft/net/minecraft/util/datafix/fixes/EquipmentFormatFix.java:66: error: incompatible types: inference variable F has incompatible bounds
                         return this.fixTypeEverywhere(
                                                      ^
     equality constraints: Either<ItemStackNew,Unit>
@@ -60,59 +68,227 @@ error: incompatible types: incompatible parameter types in lambda expression
     S extends Object declared in method <F,S>of(F,S)
     ItemStackNew extends Object declared in method <ItemStackOld,ItemStackNew>fix(Type<ItemStackOld>,Type<ItemStackNew>,OpticFinder<?>)
     ItemStackOld extends Object declared in method <ItemStackOld,ItemStackNew>fix(Type<ItemStackOld>,Type<ItemStackNew>,OpticFinder<?>)
-/home/matt/Documents/Repos/Mattcraft/net/minecraft/util/datafix/fixes/OptionsKeyTranslationFix.java:34: error: incompatible types: bad return type in lambda expression
-                                        }).<Pair<Dynamic<?>, Dynamic<?>>>map(p -> p).collect(Collectors.toMap(Pair::getFirst, Pair::getSecond))))
-                                                                                  ^
-    Pair<CAP#1,CAP#2> cannot be converted to Pair<Dynamic<?>,Dynamic<?>>
-  where CAP#1,CAP#2 are fresh type-variables:
-    CAP#1 extends Dynamic from capture of ? extends Dynamic
-    CAP#2 extends Dynamic<? extends Object> from capture of ? extends Dynamic<? extends Object>
-/home/matt/Documents/Repos/Mattcraft/net/minecraft/util/datafix/fixes/OptionsKeyTranslationFix.java:34: error: incompatible types: cannot infer type-variable(s) T,K,U
-                                        }).<Pair<Dynamic<?>, Dynamic<?>>>map(p -> p).collect(Collectors.toMap(Pair::getFirst, Pair::getSecond))))
-                                                                                                             ^
-    (argument mismatch; invalid method reference
-      method getFirst in class Pair<F,S> cannot be applied to given types
-        required: no arguments
-        found:    Object
-        reason: actual and formal argument lists differ in length)
-  where T,K,U,F,S are type-variables:
-    T extends Object declared in method <T,K,U>toMap(Function<? super T,? extends K>,Function<? super T,? extends U>)
-    K extends Object declared in method <T,K,U>toMap(Function<? super T,? extends K>,Function<? super T,? extends U>)
-    U extends Object declared in method <T,K,U>toMap(Function<? super T,? extends K>,Function<? super T,? extends U>)
-    F extends Object declared in class Pair
-    S extends Object declared in class Pair
-/home/matt/Documents/Repos/Mattcraft/net/minecraft/util/datafix/fixes/OptionsKeyTranslationFix.java:36: error: incompatible types: Dynamic<CAP#1> cannot be converted to Dynamic<CAP#2>
+/home/matt/Documents/Repos/Mattcraft/net/minecraft/util/datafix/fixes/OptionsKeyTranslationFix.java:37: error: incompatible types: Dynamic<CAP#1> cannot be converted to Dynamic<CAP#2>
                                         .orElse(dynamic)
                                                 ^
   where CAP#1,CAP#2 are fresh type-variables:
     CAP#1 extends Object from capture of ?
     CAP#2 extends Object from capture of ?
-/home/matt/Documents/Repos/Mattcraft/net/minecraft/util/datafix/fixes/BlockEntityUUIDFix.java:26: error: incompatible types: Dynamic<CAP#1> cannot be converted to Dynamic<CAP#2>
+/home/matt/Documents/Repos/Mattcraft/net/minecraft/util/datafix/fixes/BlockEntityUUIDFix.java:27: error: incompatible types: Dynamic<CAP#1> cannot be converted to Dynamic<CAP#2>
                         .orElse(dynamic);
                                 ^
   where CAP#1,CAP#2 are fresh type-variables:
     CAP#1 extends Object from capture of ?
     CAP#2 extends Object from capture of ?
-/home/matt/Documents/Repos/Mattcraft/net/minecraft/util/datafix/DataFixers.java:1117: error: incompatible types: bad return type in method reference
-                                schema164, "Change cat variant type", References.ENTITY, "minecraft:cat", "CatType", Util.make(new Int2ObjectOpenHashMap(), int2ObjectOpenHashMap -> {
-                                                                                                                     ^
-    Object cannot be converted to String
-/home/matt/Documents/Repos/Mattcraft/net/minecraft/util/datafix/DataFixers.java:1154: error: incompatible types: bad return type in method reference
-                                schema165, "Change frog variant type", References.ENTITY, "minecraft:frog", "Variant", Util.make(new Int2ObjectOpenHashMap(), int2ObjectOpenHashMap -> {
-                                                                                                                       ^
-    Object cannot be converted to String
-/home/matt/Documents/Repos/Mattcraft/net/minecraft/world/item/AdventureModePredicate.java:120: error: cannot find symbol
+/home/matt/Documents/Repos/Mattcraft/net/minecraft/world/item/AdventureModePredicate.java:121: error: incompatible types: incompatible parameter types in lambda expression
                         .map((Holder<Block> holder) -> ((Block)holder.value()).getName().withStyle(ChatFormatting.DARK_GRAY))
-                              ^
-  symbol:   class Holder
-  location: class AdventureModePredicate
-/home/matt/Documents/Repos/Mattcraft/net/minecraft/world/item/HoneycombItem.java:109: error: cannot find symbol
-                }).orElse(InteractionResult.PASS_TO_DEFAULT_BLOCK_INTERACTION);
+                                                                                                  ^
+/home/matt/Documents/Repos/Mattcraft/net/minecraft/world/item/HoneycombItem.java:109: error: incompatible types: Pass cannot be converted to Success
+                }).orElse(InteractionResult.PASS);
                                            ^
-  symbol:   variable PASS_TO_DEFAULT_BLOCK_INTERACTION
-  location: interface InteractionResult
-/home/matt/Documents/Repos/Mattcraft/net/minecraft/world/item/enchantment/EnchantmentEffectComponents.java:117: error: no suitable method found for register(Registry<DataComponentType<?>>,String,DataComponentType)
-                return Registry.register(
+/home/matt/Documents/Repos/Mattcraft/net/minecraft/world/item/component/DebugStickState.java:21: error: incompatible types: bad return type in method reference
+                .xmap(map -> new DebugStickState((Map<Holder<Block>, Property<?>>)(Map<?, ?>)map), DebugStickState::properties);
+                                                                                                   ^
+    Map<Holder<Block>,Property<?>> cannot be converted to Map<Holder<Block>,Property<CAP#1>>
+  where CAP#1 is a fresh type-variable:
+    CAP#1 extends Comparable<CAP#1> from capture of ?
+/home/matt/Documents/Repos/Mattcraft/net/minecraft/world/entity/monster/piglin/PiglinAi.java:173: error: incompatible types: ImmutableList<BehaviorControl> cannot be converted to ImmutableList<? extends BehaviorControl<? super Piglin>>
+                        ImmutableList.of(
+                                        ^
+/home/matt/Documents/Repos/Mattcraft/net/minecraft/world/entity/monster/piglin/PiglinAi.java:245: error: no suitable method found for add(Pair<OneShot<Piglin>,Integer>)
+                                                        .add(Pair.of(BehaviorBuilder.<Piglin>triggerIf(piglin -> true), 1))
+                                                        ^
+    method Builder.add(Pair<? extends Trigger<? super LivingEntity>,Integer>) is not applicable
+      (argument mismatch; inference variable F has incompatible bounds
+          upper bounds: Trigger<? super LivingEntity>,Object
+          lower bounds: OneShot<Piglin>)
+    method Builder.add(Pair<? extends Trigger<? super LivingEntity>,Integer>...) is not applicable
+      (varargs mismatch; inference variable F has incompatible bounds
+          upper bounds: Trigger<? super LivingEntity>,Object
+          lower bounds: OneShot<Piglin>)
+  where F,S are type-variables:
+    F extends Object declared in method <F,S>of(F,S)
+    S extends Object declared in method <F,S>of(F,S)
+/home/matt/Documents/Repos/Mattcraft/net/minecraft/world/level/storage/loot/predicates/LootItemBlockStatePropertyCondition.java:31: error: incompatible types: DataResult<Object> cannot be converted to DataResult<LootItemBlockStatePropertyCondition>
+                        .map(string -> (DataResult<LootItemBlockStatePropertyCondition>)DataResult.error(() -> "Block " + lootItemBlockStatePropertyCondition.block() + " has no property" + string))
+                                                                                                        ^
+/home/matt/Documents/Repos/Mattcraft/net/minecraft/world/level/storage/loot/functions/SetNameFunction.java:60: error: incompatible types: Set<ContextKey<CAP#1>> cannot be converted to Set<ContextKey<?>>
+                return (Set<ContextKey<?>>)this.resolutionContext.map(entityTarget -> Set.of(entityTarget.getParam())).orElse(Set.of());
+                                                                                                                             ^
+  where CAP#1 is a fresh type-variable:
+    CAP#1 extends Entity from capture of ? extends Entity
+/home/matt/Documents/Repos/Mattcraft/net/minecraft/world/level/storage/loot/functions/SetContainerLootTable.java:22: error: no suitable method found for and(P3<Mu<SetContainerLootTable>,ResourceKey<LootTable>,Long,Holder<BlockEntityType<?>>>)
+                        .<ResourceKey<LootTable>, long, Holder<BlockEntityType<?>>>and(
+                        ^
+    method P1.<T2#1>and(App<Mu<SetContainerLootTable>,T2#1>) is not applicable
+      (wrong number of type arguments; required 1)
+    method P1.<T2#2,T3#1>and(P2<Mu<SetContainerLootTable>,T2#2,T3#1>) is not applicable
+      (wrong number of type arguments; required 2)
+    method P1.<T2#3,T3#2,T4#1>and(P3<Mu<SetContainerLootTable>,T2#3,T3#2,T4#1>) is not applicable
+      (explicit type argument long does not conform to declared bound(s) Object)
+    method P1.<T2#4,T3#3,T4#2,T5#1>and(P4<Mu<SetContainerLootTable>,T2#4,T3#3,T4#2,T5#1>) is not applicable
+      (wrong number of type arguments; required 4)
+    method P1.<T2#5,T3#4,T4#3,T5#2,T6#1>and(P5<Mu<SetContainerLootTable>,T2#5,T3#4,T4#3,T5#2,T6#1>) is not applicable
+      (wrong number of type arguments; required 5)
+    method P1.<T2#6,T3#5,T4#4,T5#3,T6#2,T7#1>and(P6<Mu<SetContainerLootTable>,T2#6,T3#5,T4#4,T5#3,T6#2,T7#1>) is not applicable
+      (wrong number of type arguments; required 6)
+    method P1.<T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8>and(P7<Mu<SetContainerLootTable>,T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8>) is not applicable
+      (wrong number of type arguments; required 7)
+  where T2#1,F,T1,T2#2,T3#1,T2#3,T3#2,T4#1,T2#4,T3#3,T4#2,T5#1,T2#5,T3#4,T4#3,T5#2,T6#1,T2#6,T3#5,T4#4,T5#3,T6#2,T7#1,T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8 are type-variables:
+    T2#1 extends Object declared in method <T2#1>and(App<F,T2#1>)
+    F extends K1 declared in class P1
+    T1 extends Object declared in class P1
+    T2#2 extends Object declared in method <T2#2,T3#1>and(P2<F,T2#2,T3#1>)
+    T3#1 extends Object declared in method <T2#2,T3#1>and(P2<F,T2#2,T3#1>)
+    T2#3 extends Object declared in method <T2#3,T3#2,T4#1>and(P3<F,T2#3,T3#2,T4#1>)
+    T3#2 extends Object declared in method <T2#3,T3#2,T4#1>and(P3<F,T2#3,T3#2,T4#1>)
+    T4#1 extends Object declared in method <T2#3,T3#2,T4#1>and(P3<F,T2#3,T3#2,T4#1>)
+    T2#4 extends Object declared in method <T2#4,T3#3,T4#2,T5#1>and(P4<F,T2#4,T3#3,T4#2,T5#1>)
+    T3#3 extends Object declared in method <T2#4,T3#3,T4#2,T5#1>and(P4<F,T2#4,T3#3,T4#2,T5#1>)
+    T4#2 extends Object declared in method <T2#4,T3#3,T4#2,T5#1>and(P4<F,T2#4,T3#3,T4#2,T5#1>)
+    T5#1 extends Object declared in method <T2#4,T3#3,T4#2,T5#1>and(P4<F,T2#4,T3#3,T4#2,T5#1>)
+    T2#5 extends Object declared in method <T2#5,T3#4,T4#3,T5#2,T6#1>and(P5<F,T2#5,T3#4,T4#3,T5#2,T6#1>)
+    T3#4 extends Object declared in method <T2#5,T3#4,T4#3,T5#2,T6#1>and(P5<F,T2#5,T3#4,T4#3,T5#2,T6#1>)
+    T4#3 extends Object declared in method <T2#5,T3#4,T4#3,T5#2,T6#1>and(P5<F,T2#5,T3#4,T4#3,T5#2,T6#1>)
+    T5#2 extends Object declared in method <T2#5,T3#4,T4#3,T5#2,T6#1>and(P5<F,T2#5,T3#4,T4#3,T5#2,T6#1>)
+    T6#1 extends Object declared in method <T2#5,T3#4,T4#3,T5#2,T6#1>and(P5<F,T2#5,T3#4,T4#3,T5#2,T6#1>)
+    T2#6 extends Object declared in method <T2#6,T3#5,T4#4,T5#3,T6#2,T7#1>and(P6<F,T2#6,T3#5,T4#4,T5#3,T6#2,T7#1>)
+    T3#5 extends Object declared in method <T2#6,T3#5,T4#4,T5#3,T6#2,T7#1>and(P6<F,T2#6,T3#5,T4#4,T5#3,T6#2,T7#1>)
+    T4#4 extends Object declared in method <T2#6,T3#5,T4#4,T5#3,T6#2,T7#1>and(P6<F,T2#6,T3#5,T4#4,T5#3,T6#2,T7#1>)
+    T5#3 extends Object declared in method <T2#6,T3#5,T4#4,T5#3,T6#2,T7#1>and(P6<F,T2#6,T3#5,T4#4,T5#3,T6#2,T7#1>)
+    T6#2 extends Object declared in method <T2#6,T3#5,T4#4,T5#3,T6#2,T7#1>and(P6<F,T2#6,T3#5,T4#4,T5#3,T6#2,T7#1>)
+    T7#1 extends Object declared in method <T2#6,T3#5,T4#4,T5#3,T6#2,T7#1>and(P6<F,T2#6,T3#5,T4#4,T5#3,T6#2,T7#1>)
+    T2#7 extends Object declared in method <T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8>and(P7<F,T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8>)
+    T3#6 extends Object declared in method <T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8>and(P7<F,T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8>)
+    T4#5 extends Object declared in method <T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8>and(P7<F,T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8>)
+    T5#4 extends Object declared in method <T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8>and(P7<F,T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8>)
+    T6#3 extends Object declared in method <T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8>and(P7<F,T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8>)
+    T7#2 extends Object declared in method <T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8>and(P7<F,T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8>)
+    T8 extends Object declared in method <T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8>and(P7<F,T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8>)
+/home/matt/Documents/Repos/Mattcraft/net/minecraft/world/level/storage/loot/functions/SetContainerLootTable.java:22: error: unexpected type
+                        .<ResourceKey<LootTable>, long, Holder<BlockEntityType<?>>>and(
+                                                  ^
+  required: reference
+  found:    long
+/home/matt/Documents/Repos/Mattcraft/net/minecraft/world/level/storage/loot/functions/SetLoreFunction.java:50: error: incompatible types: Set<ContextKey<CAP#1>> cannot be converted to Set<ContextKey<?>>
+                return (Set<ContextKey<?>>)this.resolutionContext.map(entityTarget -> Set.of(entityTarget.getParam())).orElseGet(Set::of);
+                                                                                                                                ^
+  where CAP#1 is a fresh type-variable:
+    CAP#1 extends Entity from capture of ? extends Entity
+/home/matt/Documents/Repos/Mattcraft/net/minecraft/world/level/storage/loot/functions/SetBannerPatternFunction.java:19: error: no suitable method found for and(P2<Mu<SetBannerPatternFunction>,BannerPatternLayers,Boolean>)
+                        .<BannerPatternLayers, boolean>and(
+                        ^
+    method P1.<T2#1>and(App<Mu<SetBannerPatternFunction>,T2#1>) is not applicable
+      (wrong number of type arguments; required 1)
+    method P1.<T2#2,T3#1>and(P2<Mu<SetBannerPatternFunction>,T2#2,T3#1>) is not applicable
+      (explicit type argument boolean does not conform to declared bound(s) Object)
+    method P1.<T2#3,T3#2,T4#1>and(P3<Mu<SetBannerPatternFunction>,T2#3,T3#2,T4#1>) is not applicable
+      (wrong number of type arguments; required 3)
+    method P1.<T2#4,T3#3,T4#2,T5#1>and(P4<Mu<SetBannerPatternFunction>,T2#4,T3#3,T4#2,T5#1>) is not applicable
+      (wrong number of type arguments; required 4)
+    method P1.<T2#5,T3#4,T4#3,T5#2,T6#1>and(P5<Mu<SetBannerPatternFunction>,T2#5,T3#4,T4#3,T5#2,T6#1>) is not applicable
+      (wrong number of type arguments; required 5)
+    method P1.<T2#6,T3#5,T4#4,T5#3,T6#2,T7#1>and(P6<Mu<SetBannerPatternFunction>,T2#6,T3#5,T4#4,T5#3,T6#2,T7#1>) is not applicable
+      (wrong number of type arguments; required 6)
+    method P1.<T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8>and(P7<Mu<SetBannerPatternFunction>,T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8>) is not applicable
+      (wrong number of type arguments; required 7)
+  where T2#1,F,T1,T2#2,T3#1,T2#3,T3#2,T4#1,T2#4,T3#3,T4#2,T5#1,T2#5,T3#4,T4#3,T5#2,T6#1,T2#6,T3#5,T4#4,T5#3,T6#2,T7#1,T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8 are type-variables:
+    T2#1 extends Object declared in method <T2#1>and(App<F,T2#1>)
+    F extends K1 declared in class P1
+    T1 extends Object declared in class P1
+    T2#2 extends Object declared in method <T2#2,T3#1>and(P2<F,T2#2,T3#1>)
+    T3#1 extends Object declared in method <T2#2,T3#1>and(P2<F,T2#2,T3#1>)
+    T2#3 extends Object declared in method <T2#3,T3#2,T4#1>and(P3<F,T2#3,T3#2,T4#1>)
+    T3#2 extends Object declared in method <T2#3,T3#2,T4#1>and(P3<F,T2#3,T3#2,T4#1>)
+    T4#1 extends Object declared in method <T2#3,T3#2,T4#1>and(P3<F,T2#3,T3#2,T4#1>)
+    T2#4 extends Object declared in method <T2#4,T3#3,T4#2,T5#1>and(P4<F,T2#4,T3#3,T4#2,T5#1>)
+    T3#3 extends Object declared in method <T2#4,T3#3,T4#2,T5#1>and(P4<F,T2#4,T3#3,T4#2,T5#1>)
+    T4#2 extends Object declared in method <T2#4,T3#3,T4#2,T5#1>and(P4<F,T2#4,T3#3,T4#2,T5#1>)
+    T5#1 extends Object declared in method <T2#4,T3#3,T4#2,T5#1>and(P4<F,T2#4,T3#3,T4#2,T5#1>)
+    T2#5 extends Object declared in method <T2#5,T3#4,T4#3,T5#2,T6#1>and(P5<F,T2#5,T3#4,T4#3,T5#2,T6#1>)
+    T3#4 extends Object declared in method <T2#5,T3#4,T4#3,T5#2,T6#1>and(P5<F,T2#5,T3#4,T4#3,T5#2,T6#1>)
+    T4#3 extends Object declared in method <T2#5,T3#4,T4#3,T5#2,T6#1>and(P5<F,T2#5,T3#4,T4#3,T5#2,T6#1>)
+    T5#2 extends Object declared in method <T2#5,T3#4,T4#3,T5#2,T6#1>and(P5<F,T2#5,T3#4,T4#3,T5#2,T6#1>)
+    T6#1 extends Object declared in method <T2#5,T3#4,T4#3,T5#2,T6#1>and(P5<F,T2#5,T3#4,T4#3,T5#2,T6#1>)
+    T2#6 extends Object declared in method <T2#6,T3#5,T4#4,T5#3,T6#2,T7#1>and(P6<F,T2#6,T3#5,T4#4,T5#3,T6#2,T7#1>)
+    T3#5 extends Object declared in method <T2#6,T3#5,T4#4,T5#3,T6#2,T7#1>and(P6<F,T2#6,T3#5,T4#4,T5#3,T6#2,T7#1>)
+    T4#4 extends Object declared in method <T2#6,T3#5,T4#4,T5#3,T6#2,T7#1>and(P6<F,T2#6,T3#5,T4#4,T5#3,T6#2,T7#1>)
+    T5#3 extends Object declared in method <T2#6,T3#5,T4#4,T5#3,T6#2,T7#1>and(P6<F,T2#6,T3#5,T4#4,T5#3,T6#2,T7#1>)
+    T6#2 extends Object declared in method <T2#6,T3#5,T4#4,T5#3,T6#2,T7#1>and(P6<F,T2#6,T3#5,T4#4,T5#3,T6#2,T7#1>)
+    T7#1 extends Object declared in method <T2#6,T3#5,T4#4,T5#3,T6#2,T7#1>and(P6<F,T2#6,T3#5,T4#4,T5#3,T6#2,T7#1>)
+    T2#7 extends Object declared in method <T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8>and(P7<F,T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8>)
+    T3#6 extends Object declared in method <T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8>and(P7<F,T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8>)
+    T4#5 extends Object declared in method <T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8>and(P7<F,T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8>)
+    T5#4 extends Object declared in method <T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8>and(P7<F,T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8>)
+    T6#3 extends Object declared in method <T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8>and(P7<F,T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8>)
+    T7#2 extends Object declared in method <T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8>and(P7<F,T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8>)
+    T8 extends Object declared in method <T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8>and(P7<F,T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8>)
+/home/matt/Documents/Repos/Mattcraft/net/minecraft/world/level/storage/loot/functions/SetBannerPatternFunction.java:19: error: unexpected type
+                        .<BannerPatternLayers, boolean>and(
+                                               ^
+  required: reference
+  found:    boolean
+/home/matt/Documents/Repos/Mattcraft/net/minecraft/world/level/storage/loot/functions/CopyComponentsFunction.java:75: error: method getTyped in interface DataComponentGetter cannot be applied to given types;
+                                                        TypedDataComponent<?> typedDataComponent = dataComponentGetter.getTyped(dataComponentType);
+                                                                                                                      ^
+  required: DataComponentType<T>
+  found:    Object
+  reason: cannot infer type-variable(s) T
+    (argument mismatch; Object cannot be converted to DataComponentType<T>)
+  where T is a type-variable:
+    T extends Object declared in method <T>getTyped(DataComponentType<T>)
+/home/matt/Documents/Repos/Mattcraft/net/minecraft/world/level/storage/loot/functions/SetCustomModelDataFunction.java:24: error: no suitable method found for withAlternative(Codec<NumberProvider>,Codec<Integer>,ConstantValue::new)
+        private static final Codec<NumberProvider> COLOR_PROVIDER_CODEC = Codec.withAlternative(NumberProviders.CODEC, ExtraCodecs.RGB_COLOR_CODEC, ConstantValue::new);
+                                                                               ^
+    method Codec.<T#1>withAlternative(Codec<T#1>,Codec<? extends T#1>) is not applicable
+      (cannot infer type-variable(s) T#1
+        (actual and formal argument lists differ in length))
+    method Codec.<T#2,U>withAlternative(Codec<T#2>,Codec<U>,Function<U,T#2>) is not applicable
+      (inference variable U has incompatible bounds
+        equality constraints: Integer
+        upper bounds: Float,Object)
+  where T#1,T#2,U are type-variables:
+    T#1 extends Object declared in method <T#1>withAlternative(Codec<T#1>,Codec<? extends T#1>)
+    T#2 extends Object declared in method <T#2,U>withAlternative(Codec<T#2>,Codec<U>,Function<U,T#2>)
+    U extends Object declared in method <T#2,U>withAlternative(Codec<T#2>,Codec<U>,Function<U,T#2>)
+/home/matt/Documents/Repos/Mattcraft/net/minecraft/world/level/storage/loot/functions/SetCustomModelDataFunction.java:85: error: incompatible types: List<E> cannot be converted to List<T>
+                }).orElse(list);
+                          ^
+  where E,T are type-variables:
+    E extends Object declared in method <T,E>apply(Optional<StandAlone<T>>,List<E>,Function<T,E>)
+    T extends Object declared in method <T,E>apply(Optional<StandAlone<T>>,List<E>,Function<T,E>)
+/home/matt/Documents/Repos/Mattcraft/net/minecraft/core/registries/BuiltInRegistries.java:356: error: incompatible types: ResourceKey<CAP#1> cannot be converted to ResourceKey<WritableRegistry<?>>
+                WRITABLE_REGISTRY.register((ResourceKey<WritableRegistry<?>>)resourceKey, writableRegistry, RegistrationInfo.BUILT_IN);
+                                                                             ^
+  where T,R are type-variables:
+    T extends Object declared in method <T,R>internalRegister(ResourceKey<? extends Registry<T>>,R,RegistryBootstrap<T>)
+    R extends WritableRegistry<T> declared in method <T,R>internalRegister(ResourceKey<? extends Registry<T>>,R,RegistryBootstrap<T>)
+  where CAP#1 is a fresh type-variable:
+    CAP#1 extends Registry<T> from capture of ? extends Registry<T>
+/home/matt/Documents/Repos/Mattcraft/net/minecraft/core/MappedRegistry.java:93: error: method pauseInIde in class Util cannot be applied to given types;
+                        throw (IllegalStateException)Util.pauseInIde((T)(new IllegalStateException("Adding duplicate key '" + resourceKey + "' to registry")));
+                                                         ^
+  required: T#1
+  found:    T#2
+  reason: inference variable T#1 has incompatible bounds
+    upper bounds: Throwable
+    lower bounds: T#2
+  where T#1,T#2 are type-variables:
+    T#1 extends Throwable declared in method <T#1>pauseInIde(T#1)
+    T#2 extends Object declared in class MappedRegistry
+/home/matt/Documents/Repos/Mattcraft/net/minecraft/core/MappedRegistry.java:95: error: method pauseInIde in class Util cannot be applied to given types;
+                        throw (IllegalStateException)Util.pauseInIde((T)(new IllegalStateException("Adding duplicate value '" + object + "' to registry")));
+                                                         ^
+  required: T#1
+  found:    T#2
+  reason: inference variable T#1 has incompatible bounds
+    upper bounds: Throwable
+    lower bounds: T#2
+  where T#1,T#2 are type-variables:
+    T#1 extends Throwable declared in method <T#1>pauseInIde(T#1)
+    T#2 extends Object declared in class MappedRegistry
+/home/matt/Documents/Repos/Mattcraft/net/minecraft/core/component/DataComponents.java:395: error: no suitable method found for register(Registry<DataComponentType<?>>,String,DataComponentType)
+                return Registry.register(BuiltInRegistries.DATA_COMPONENT_TYPE, string, ((DataComponentType.Builder)unaryOperator.apply(DataComponentType.builder())).build());
                                ^
     method Registry.<T#1>register(Registry<? super T#1>,String,T#1) is not applicable
       (cannot infer type-variable(s) T#1
@@ -129,727 +305,27 @@ error: incompatible types: incompatible parameter types in lambda expression
     T#2 extends V#1 declared in method <V#1,T#2>register(Registry<V#1>,ResourceLocation,T#2)
     V#2 extends Object declared in method <V#2,T#3>register(Registry<V#2>,ResourceKey<V#2>,T#3)
     T#3 extends V#2 declared in method <V#2,T#3>register(Registry<V#2>,ResourceKey<V#2>,T#3)
-/home/matt/Documents/Repos/Mattcraft/net/minecraft/world/item/component/DebugStickState.java:20: error: incompatible types: invalid constructor reference
-                .xmap(DebugStickState::new, DebugStickState::properties);
-                      ^
-    incompatible types: Map<Holder<Block>,Property<CAP#1>> cannot be converted to Map<Holder<Block>,Property<?>>
-  where CAP#1 is a fresh type-variable:
-    CAP#1 extends Comparable<CAP#1> from capture of ?
-/home/matt/Documents/Repos/Mattcraft/net/minecraft/world/entity/animal/HappyGhastAi.java:70: error: incompatible types: ImmutableList<Behavior> cannot be converted to ImmutableList<? extends BehaviorControl<? super HappyGhast>>
-                        ImmutableList.of(
-                                        ^
-/home/matt/Documents/Repos/Mattcraft/net/minecraft/world/entity/animal/allay/AllayAi.java:64: error: incompatible types: ImmutableList<Behavior> cannot be converted to ImmutableList<? extends BehaviorControl<? super Allay>>
-                        ImmutableList.of(
-                                        ^
-/home/matt/Documents/Repos/Mattcraft/net/minecraft/world/entity/animal/goat/GoatAi.java:83: error: incompatible types: ImmutableList<Behavior> cannot be converted to ImmutableList<? extends BehaviorControl<? super Goat>>
-                        ImmutableList.of(
-                                        ^
-/home/matt/Documents/Repos/Mattcraft/net/minecraft/world/entity/monster/creaking/CreakingAi.java:52: error: incompatible types: LivingEntity cannot be converted to Mob
-                                return creaking.canMove() && super.checkExtraStartConditions(serverLevel, (LivingEntity)creaking);
-                                                                                                          ^
-/home/matt/Documents/Repos/Mattcraft/net/minecraft/world/entity/monster/hoglin/HoglinAi.java:115: error: incompatible types: invalid method reference
-                                EraseMemoryIf.<PathfinderMob>create(HoglinAi::wantsToStopFleeing, MemoryModuleType.AVOID_TARGET)
-                                                                    ^
-    incompatible types: PathfinderMob cannot be converted to Hoglin
-/home/matt/Documents/Repos/Mattcraft/net/minecraft/world/entity/monster/piglin/PiglinAi.java:173: error: incompatible types: ImmutableList<BehaviorControl> cannot be converted to ImmutableList<? extends BehaviorControl<? super Piglin>>
-                        ImmutableList.of(
-                                        ^
-/home/matt/Documents/Repos/Mattcraft/net/minecraft/world/entity/monster/piglin/PiglinAi.java:196: error: incompatible types: inference variable F has incompatible bounds
-                                new RunOne<LivingEntity>(
-                                ^
-    upper bounds: BehaviorControl<? super LivingEntity>,Object
-    lower bounds: BehaviorControl<PathfinderMob>
-  where F,S are type-variables:
-    F extends Object declared in method <F,S>of(F,S)
-    S extends Object declared in method <F,S>of(F,S)
-/home/matt/Documents/Repos/Mattcraft/net/minecraft/world/entity/monster/piglin/PiglinAi.java:194: error: cannot find symbol
-                                BehaviorBuilder.triggerIf(piglin -> !piglin.isDancing(), GoToTargetLocation.create(MemoryModuleType.CELEBRATE_LOCATION, 2, 1.0F)),
-                                                                           ^
-  symbol:   method isDancing()
-  location: variable piglin of type Mob
-/home/matt/Documents/Repos/Mattcraft/net/minecraft/world/entity/monster/piglin/PiglinAi.java:227: error: incompatible types: invalid method reference
-                                EraseMemoryIf.<PathfinderMob>create(PiglinAi::wantsToStopFleeing, MemoryModuleType.AVOID_TARGET)
-                                                                    ^
-    incompatible types: PathfinderMob cannot be converted to Piglin
-/home/matt/Documents/Repos/Mattcraft/net/minecraft/world/entity/monster/piglin/PiglinAi.java:249: error: incompatible types: invalid method reference
-                                DismountOrSkipMounting.<LivingEntity>create(8, PiglinAi::wantsToStopRiding)
-                                                                               ^
-    incompatible types: LivingEntity cannot be converted to Piglin
-/home/matt/Documents/Repos/Mattcraft/net/minecraft/world/entity/monster/piglin/PiglinAi.java:245: error: no suitable method found for triggerIf(Predicate<CAP#1>)
-                                                        .add(Pair.of(BehaviorBuilder.triggerIf((Predicate<? super LivingEntity>)(piglin -> true)), 1))
-                                                                                    ^
-    method BehaviorBuilder.<E#1>triggerIf(Predicate<E#1>,OneShot<? super E#1>) is not applicable
-      (cannot infer type-variable(s) E#1
-        (actual and formal argument lists differ in length))
-    method BehaviorBuilder.<E#2>triggerIf(Predicate<E#2>) is not applicable
-      (inference variable E#2 has incompatible bounds
-        equality constraints: CAP#1
-        upper bounds: LivingEntity)
-    method BehaviorBuilder.<E#3>triggerIf(BiPredicate<ServerLevel,E#3>) is not applicable
-      (cannot infer type-variable(s) E#3
-        (argument mismatch; Predicate<CAP#1> cannot be converted to BiPredicate<ServerLevel,E#3>))
-  where E#1,E#2,E#3 are type-variables:
-    E#1 extends LivingEntity declared in method <E#1>triggerIf(Predicate<E#1>,OneShot<? super E#1>)
-    E#2 extends LivingEntity declared in method <E#2>triggerIf(Predicate<E#2>)
-    E#3 extends LivingEntity declared in method <E#3>triggerIf(BiPredicate<ServerLevel,E#3>)
-  where CAP#1 is a fresh type-variable:
-    CAP#1 extends Object super: LivingEntity from capture of ? super LivingEntity
-/home/matt/Documents/Repos/Mattcraft/net/minecraft/world/entity/SpawnPlacements.java:78: error: incompatible types: EntityType<T> cannot be converted to EntityType<CAP#1>
-                return data == null || data.predicate.test(entityType, serverLevelAccessor, entitySpawnReason, blockPos, randomSource);
-                                                           ^
+/home/matt/Documents/Repos/Mattcraft/net/minecraft/core/component/predicates/JukeboxPlayablePredicate.java:34: error: incompatible types: Object cannot be converted to Holder<JukeboxSong>
+                        for (Holder<JukeboxSong> holder : (HolderSet)this.song.get()) {
+                                                          ^
+/home/matt/Documents/Repos/Mattcraft/net/minecraft/network/chat/ComponentUtils.java:73: error: incompatible types: Comparable cannot be converted to T
+                        return (Component)function.apply((Comparable)collection.iterator().next());
+                                                         ^
   where T is a type-variable:
-    T extends Entity declared in method <T>checkSpawnRules(EntityType<T>,ServerLevelAccessor,EntitySpawnReason,BlockPos,RandomSource)
-  where CAP#1 is a fresh type-variable:
-    CAP#1 extends Entity from capture of ?
-/home/matt/Documents/Repos/Mattcraft/net/minecraft/world/level/block/BeehiveBlock.java:318: error: Comparable cannot be inherited with different arguments: <> and <java.lang.Integer>
-                        itemStack.set(DataComponents.BLOCK_STATE, BlockItemStateProperties.EMPTY.with(HONEY_LEVEL, (Integer & Comparable)blockState.getValue(HONEY_LEVEL)));
-                                                                                                                   ^
-/home/matt/Documents/Repos/Mattcraft/net/minecraft/world/level/block/CreakingHeartBlock.java:63: error: type argument T#1 is not within bounds of type-variable T#2
-                        return blockState.getValue((Property<T>)STATE) != CreakingHeartState.UPROOTED
-                                                             ^
-  where T#1,T#2 are type-variables:
-    T#1 extends BlockEntity declared in method <T#1>getTicker(Level,BlockState,BlockEntityType<T#1>)
-    T#2 extends Comparable<T#2> declared in class Property
-/home/matt/Documents/Repos/Mattcraft/net/minecraft/world/level/block/CreakingHeartBlock.java:63: error: incompatible types: EnumProperty<CreakingHeartState> cannot be converted to Property<T>
-                        return blockState.getValue((Property<T>)STATE) != CreakingHeartState.UPROOTED
-                                                                ^
-  where T is a type-variable:
-    T extends BlockEntity declared in method <T>getTicker(Level,BlockState,BlockEntityType<T>)
-/home/matt/Documents/Repos/Mattcraft/net/minecraft/world/level/chunk/HashMapPalette.java:30: error: non-static type variable T cannot be referenced from a static context
-                return new HashMapPalette(i, (List<T>)list);
-                                                   ^
-/home/matt/Documents/Repos/Mattcraft/net/minecraft/world/level/chunk/SingleValuePalette.java:23: error: non-static type variable T cannot be referenced from a static context
-                return new SingleValuePalette((List<T>)list);
-                                                    ^
-/home/matt/Documents/Repos/Mattcraft/net/minecraft/world/level/chunk/LinearPalette.java:34: error: non-static type variable T cannot be referenced from a static context
-                return new LinearPalette(i, (List<T>)list);
-                                                  ^
-/home/matt/Documents/Repos/Mattcraft/net/minecraft/world/level/storage/TagValueInput.java:401: error: incompatible types: Stream<Object> cannot be converted to Stream<T>
-                        }).filter(Objects::nonNull);
-                                 ^
-  where T is a type-variable:
-    T extends Object declared in class TypedListWrapper
-/home/matt/Documents/Repos/Mattcraft/net/minecraft/world/level/storage/loot/predicates/LootItemBlockStatePropertyCondition.java:31: error: incompatible types: DataResult<Object> cannot be converted to DataResult<LootItemBlockStatePropertyCondition>
-                        .orElse(DataResult.success(lootItemBlockStatePropertyCondition));
-                               ^
-/home/matt/Documents/Repos/Mattcraft/net/minecraft/world/level/storage/loot/entries/LootItem.java:18: error: no suitable method found for and(P4<Mu<LootItem>,Integer,Integer,List<LootItemCondition>,List<LootItemFunction>>)
-                        .<int, int, List<LootItemCondition>, List<LootItemFunction>>and(singletonFields(instance))
-                        ^
-    method P1.<T2#1>and(App<Mu<LootItem>,T2#1>) is not applicable
-      (wrong number of type arguments; required 1)
-    method P1.<T2#2,T3#1>and(P2<Mu<LootItem>,T2#2,T3#1>) is not applicable
-      (wrong number of type arguments; required 2)
-    method P1.<T2#3,T3#2,T4#1>and(P3<Mu<LootItem>,T2#3,T3#2,T4#1>) is not applicable
-      (wrong number of type arguments; required 3)
-    method P1.<T2#4,T3#3,T4#2,T5#1>and(P4<Mu<LootItem>,T2#4,T3#3,T4#2,T5#1>) is not applicable
-      (explicit type argument int does not conform to declared bound(s) Object)
-    method P1.<T2#5,T3#4,T4#3,T5#2,T6#1>and(P5<Mu<LootItem>,T2#5,T3#4,T4#3,T5#2,T6#1>) is not applicable
-      (wrong number of type arguments; required 5)
-    method P1.<T2#6,T3#5,T4#4,T5#3,T6#2,T7#1>and(P6<Mu<LootItem>,T2#6,T3#5,T4#4,T5#3,T6#2,T7#1>) is not applicable
-      (wrong number of type arguments; required 6)
-    method P1.<T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8>and(P7<Mu<LootItem>,T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8>) is not applicable
-      (wrong number of type arguments; required 7)
-  where T2#1,F,T1,T2#2,T3#1,T2#3,T3#2,T4#1,T2#4,T3#3,T4#2,T5#1,T2#5,T3#4,T4#3,T5#2,T6#1,T2#6,T3#5,T4#4,T5#3,T6#2,T7#1,T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8 are type-variables:
-    T2#1 extends Object declared in method <T2#1>and(App<F,T2#1>)
-    F extends K1 declared in class P1
-    T1 extends Object declared in class P1
-    T2#2 extends Object declared in method <T2#2,T3#1>and(P2<F,T2#2,T3#1>)
-    T3#1 extends Object declared in method <T2#2,T3#1>and(P2<F,T2#2,T3#1>)
-    T2#3 extends Object declared in method <T2#3,T3#2,T4#1>and(P3<F,T2#3,T3#2,T4#1>)
-    T3#2 extends Object declared in method <T2#3,T3#2,T4#1>and(P3<F,T2#3,T3#2,T4#1>)
-    T4#1 extends Object declared in method <T2#3,T3#2,T4#1>and(P3<F,T2#3,T3#2,T4#1>)
-    T2#4 extends Object declared in method <T2#4,T3#3,T4#2,T5#1>and(P4<F,T2#4,T3#3,T4#2,T5#1>)
-    T3#3 extends Object declared in method <T2#4,T3#3,T4#2,T5#1>and(P4<F,T2#4,T3#3,T4#2,T5#1>)
-    T4#2 extends Object declared in method <T2#4,T3#3,T4#2,T5#1>and(P4<F,T2#4,T3#3,T4#2,T5#1>)
-    T5#1 extends Object declared in method <T2#4,T3#3,T4#2,T5#1>and(P4<F,T2#4,T3#3,T4#2,T5#1>)
-    T2#5 extends Object declared in method <T2#5,T3#4,T4#3,T5#2,T6#1>and(P5<F,T2#5,T3#4,T4#3,T5#2,T6#1>)
-    T3#4 extends Object declared in method <T2#5,T3#4,T4#3,T5#2,T6#1>and(P5<F,T2#5,T3#4,T4#3,T5#2,T6#1>)
-    T4#3 extends Object declared in method <T2#5,T3#4,T4#3,T5#2,T6#1>and(P5<F,T2#5,T3#4,T4#3,T5#2,T6#1>)
-    T5#2 extends Object declared in method <T2#5,T3#4,T4#3,T5#2,T6#1>and(P5<F,T2#5,T3#4,T4#3,T5#2,T6#1>)
-    T6#1 extends Object declared in method <T2#5,T3#4,T4#3,T5#2,T6#1>and(P5<F,T2#5,T3#4,T4#3,T5#2,T6#1>)
-    T2#6 extends Object declared in method <T2#6,T3#5,T4#4,T5#3,T6#2,T7#1>and(P6<F,T2#6,T3#5,T4#4,T5#3,T6#2,T7#1>)
-    T3#5 extends Object declared in method <T2#6,T3#5,T4#4,T5#3,T6#2,T7#1>and(P6<F,T2#6,T3#5,T4#4,T5#3,T6#2,T7#1>)
-    T4#4 extends Object declared in method <T2#6,T3#5,T4#4,T5#3,T6#2,T7#1>and(P6<F,T2#6,T3#5,T4#4,T5#3,T6#2,T7#1>)
-    T5#3 extends Object declared in method <T2#6,T3#5,T4#4,T5#3,T6#2,T7#1>and(P6<F,T2#6,T3#5,T4#4,T5#3,T6#2,T7#1>)
-    T6#2 extends Object declared in method <T2#6,T3#5,T4#4,T5#3,T6#2,T7#1>and(P6<F,T2#6,T3#5,T4#4,T5#3,T6#2,T7#1>)
-    T7#1 extends Object declared in method <T2#6,T3#5,T4#4,T5#3,T6#2,T7#1>and(P6<F,T2#6,T3#5,T4#4,T5#3,T6#2,T7#1>)
-    T2#7 extends Object declared in method <T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8>and(P7<F,T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8>)
-    T3#6 extends Object declared in method <T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8>and(P7<F,T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8>)
-    T4#5 extends Object declared in method <T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8>and(P7<F,T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8>)
-    T5#4 extends Object declared in method <T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8>and(P7<F,T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8>)
-    T6#3 extends Object declared in method <T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8>and(P7<F,T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8>)
-    T7#2 extends Object declared in method <T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8>and(P7<F,T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8>)
-    T8 extends Object declared in method <T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8>and(P7<F,T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8>)
-/home/matt/Documents/Repos/Mattcraft/net/minecraft/world/level/storage/loot/entries/LootItem.java:18: error: unexpected type
-                        .<int, int, List<LootItemCondition>, List<LootItemFunction>>and(singletonFields(instance))
-                          ^
-  required: reference
-  found:    int
-/home/matt/Documents/Repos/Mattcraft/net/minecraft/world/level/storage/loot/entries/LootItem.java:18: error: unexpected type
-                        .<int, int, List<LootItemCondition>, List<LootItemFunction>>and(singletonFields(instance))
-                               ^
-  required: reference
-  found:    int
-/home/matt/Documents/Repos/Mattcraft/net/minecraft/world/level/storage/loot/entries/TagEntry.java:23: error: no suitable method found for and(P4<Mu<TagEntry>,Integer,Integer,List<LootItemCondition>,List<LootItemFunction>>)
-                        .<int, int, List<LootItemCondition>, List<LootItemFunction>>and(singletonFields(instance))
-                        ^
-    method P2.<T3#1>and(App<Mu<TagEntry>,T3#1>) is not applicable
-      (wrong number of type arguments; required 1)
-    method P2.<T3#2,T4#1>and(P2<Mu<TagEntry>,T3#2,T4#1>) is not applicable
-      (wrong number of type arguments; required 2)
-    method P2.<T3#3,T4#2,T5#1>and(P3<Mu<TagEntry>,T3#3,T4#2,T5#1>) is not applicable
-      (wrong number of type arguments; required 3)
-    method P2.<T3#4,T4#3,T5#2,T6#1>and(P4<Mu<TagEntry>,T3#4,T4#3,T5#2,T6#1>) is not applicable
-      (explicit type argument int does not conform to declared bound(s) Object)
-    method P2.<T3#5,T4#4,T5#3,T6#2,T7#1>and(P5<Mu<TagEntry>,T3#5,T4#4,T5#3,T6#2,T7#1>) is not applicable
-      (wrong number of type arguments; required 5)
-    method P2.<T3#6,T4#5,T5#4,T6#3,T7#2,T8>and(P6<Mu<TagEntry>,T3#6,T4#5,T5#4,T6#3,T7#2,T8>) is not applicable
-      (wrong number of type arguments; required 6)
-  where T3#1,F,T1,T2,T3#2,T4#1,T3#3,T4#2,T5#1,T3#4,T4#3,T5#2,T6#1,T3#5,T4#4,T5#3,T6#2,T7#1,T3#6,T4#5,T5#4,T6#3,T7#2,T8 are type-variables:
-    T3#1 extends Object declared in method <T3#1>and(App<F,T3#1>)
-    F extends K1 declared in class P2
-    T1 extends Object declared in class P2
-    T2 extends Object declared in class P2
-    T3#2 extends Object declared in method <T3#2,T4#1>and(P2<F,T3#2,T4#1>)
-    T4#1 extends Object declared in method <T3#2,T4#1>and(P2<F,T3#2,T4#1>)
-    T3#3 extends Object declared in method <T3#3,T4#2,T5#1>and(P3<F,T3#3,T4#2,T5#1>)
-    T4#2 extends Object declared in method <T3#3,T4#2,T5#1>and(P3<F,T3#3,T4#2,T5#1>)
-    T5#1 extends Object declared in method <T3#3,T4#2,T5#1>and(P3<F,T3#3,T4#2,T5#1>)
-    T3#4 extends Object declared in method <T3#4,T4#3,T5#2,T6#1>and(P4<F,T3#4,T4#3,T5#2,T6#1>)
-    T4#3 extends Object declared in method <T3#4,T4#3,T5#2,T6#1>and(P4<F,T3#4,T4#3,T5#2,T6#1>)
-    T5#2 extends Object declared in method <T3#4,T4#3,T5#2,T6#1>and(P4<F,T3#4,T4#3,T5#2,T6#1>)
-    T6#1 extends Object declared in method <T3#4,T4#3,T5#2,T6#1>and(P4<F,T3#4,T4#3,T5#2,T6#1>)
-    T3#5 extends Object declared in method <T3#5,T4#4,T5#3,T6#2,T7#1>and(P5<F,T3#5,T4#4,T5#3,T6#2,T7#1>)
-    T4#4 extends Object declared in method <T3#5,T4#4,T5#3,T6#2,T7#1>and(P5<F,T3#5,T4#4,T5#3,T6#2,T7#1>)
-    T5#3 extends Object declared in method <T3#5,T4#4,T5#3,T6#2,T7#1>and(P5<F,T3#5,T4#4,T5#3,T6#2,T7#1>)
-    T6#2 extends Object declared in method <T3#5,T4#4,T5#3,T6#2,T7#1>and(P5<F,T3#5,T4#4,T5#3,T6#2,T7#1>)
-    T7#1 extends Object declared in method <T3#5,T4#4,T5#3,T6#2,T7#1>and(P5<F,T3#5,T4#4,T5#3,T6#2,T7#1>)
-    T3#6 extends Object declared in method <T3#6,T4#5,T5#4,T6#3,T7#2,T8>and(P6<F,T3#6,T4#5,T5#4,T6#3,T7#2,T8>)
-    T4#5 extends Object declared in method <T3#6,T4#5,T5#4,T6#3,T7#2,T8>and(P6<F,T3#6,T4#5,T5#4,T6#3,T7#2,T8>)
-    T5#4 extends Object declared in method <T3#6,T4#5,T5#4,T6#3,T7#2,T8>and(P6<F,T3#6,T4#5,T5#4,T6#3,T7#2,T8>)
-    T6#3 extends Object declared in method <T3#6,T4#5,T5#4,T6#3,T7#2,T8>and(P6<F,T3#6,T4#5,T5#4,T6#3,T7#2,T8>)
-    T7#2 extends Object declared in method <T3#6,T4#5,T5#4,T6#3,T7#2,T8>and(P6<F,T3#6,T4#5,T5#4,T6#3,T7#2,T8>)
-    T8 extends Object declared in method <T3#6,T4#5,T5#4,T6#3,T7#2,T8>and(P6<F,T3#6,T4#5,T5#4,T6#3,T7#2,T8>)
-/home/matt/Documents/Repos/Mattcraft/net/minecraft/world/level/storage/loot/entries/TagEntry.java:23: error: unexpected type
-                        .<int, int, List<LootItemCondition>, List<LootItemFunction>>and(singletonFields(instance))
-                          ^
-  required: reference
-  found:    int
-/home/matt/Documents/Repos/Mattcraft/net/minecraft/world/level/storage/loot/entries/TagEntry.java:23: error: unexpected type
-                        .<int, int, List<LootItemCondition>, List<LootItemFunction>>and(singletonFields(instance))
-                               ^
-  required: reference
-  found:    int
-/home/matt/Documents/Repos/Mattcraft/net/minecraft/world/level/storage/loot/entries/DynamicLoot.java:16: error: no suitable method found for and(P4<Mu<DynamicLoot>,Integer,Integer,List<LootItemCondition>,List<LootItemFunction>>)
-                        .<int, int, List<LootItemCondition>, List<LootItemFunction>>and(singletonFields(instance))
-                        ^
-    method P1.<T2#1>and(App<Mu<DynamicLoot>,T2#1>) is not applicable
-      (wrong number of type arguments; required 1)
-    method P1.<T2#2,T3#1>and(P2<Mu<DynamicLoot>,T2#2,T3#1>) is not applicable
-      (wrong number of type arguments; required 2)
-    method P1.<T2#3,T3#2,T4#1>and(P3<Mu<DynamicLoot>,T2#3,T3#2,T4#1>) is not applicable
-      (wrong number of type arguments; required 3)
-    method P1.<T2#4,T3#3,T4#2,T5#1>and(P4<Mu<DynamicLoot>,T2#4,T3#3,T4#2,T5#1>) is not applicable
-      (explicit type argument int does not conform to declared bound(s) Object)
-    method P1.<T2#5,T3#4,T4#3,T5#2,T6#1>and(P5<Mu<DynamicLoot>,T2#5,T3#4,T4#3,T5#2,T6#1>) is not applicable
-      (wrong number of type arguments; required 5)
-    method P1.<T2#6,T3#5,T4#4,T5#3,T6#2,T7#1>and(P6<Mu<DynamicLoot>,T2#6,T3#5,T4#4,T5#3,T6#2,T7#1>) is not applicable
-      (wrong number of type arguments; required 6)
-    method P1.<T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8>and(P7<Mu<DynamicLoot>,T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8>) is not applicable
-      (wrong number of type arguments; required 7)
-  where T2#1,F,T1,T2#2,T3#1,T2#3,T3#2,T4#1,T2#4,T3#3,T4#2,T5#1,T2#5,T3#4,T4#3,T5#2,T6#1,T2#6,T3#5,T4#4,T5#3,T6#2,T7#1,T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8 are type-variables:
-    T2#1 extends Object declared in method <T2#1>and(App<F,T2#1>)
-    F extends K1 declared in class P1
-    T1 extends Object declared in class P1
-    T2#2 extends Object declared in method <T2#2,T3#1>and(P2<F,T2#2,T3#1>)
-    T3#1 extends Object declared in method <T2#2,T3#1>and(P2<F,T2#2,T3#1>)
-    T2#3 extends Object declared in method <T2#3,T3#2,T4#1>and(P3<F,T2#3,T3#2,T4#1>)
-    T3#2 extends Object declared in method <T2#3,T3#2,T4#1>and(P3<F,T2#3,T3#2,T4#1>)
-    T4#1 extends Object declared in method <T2#3,T3#2,T4#1>and(P3<F,T2#3,T3#2,T4#1>)
-    T2#4 extends Object declared in method <T2#4,T3#3,T4#2,T5#1>and(P4<F,T2#4,T3#3,T4#2,T5#1>)
-    T3#3 extends Object declared in method <T2#4,T3#3,T4#2,T5#1>and(P4<F,T2#4,T3#3,T4#2,T5#1>)
-    T4#2 extends Object declared in method <T2#4,T3#3,T4#2,T5#1>and(P4<F,T2#4,T3#3,T4#2,T5#1>)
-    T5#1 extends Object declared in method <T2#4,T3#3,T4#2,T5#1>and(P4<F,T2#4,T3#3,T4#2,T5#1>)
-    T2#5 extends Object declared in method <T2#5,T3#4,T4#3,T5#2,T6#1>and(P5<F,T2#5,T3#4,T4#3,T5#2,T6#1>)
-    T3#4 extends Object declared in method <T2#5,T3#4,T4#3,T5#2,T6#1>and(P5<F,T2#5,T3#4,T4#3,T5#2,T6#1>)
-    T4#3 extends Object declared in method <T2#5,T3#4,T4#3,T5#2,T6#1>and(P5<F,T2#5,T3#4,T4#3,T5#2,T6#1>)
-    T5#2 extends Object declared in method <T2#5,T3#4,T4#3,T5#2,T6#1>and(P5<F,T2#5,T3#4,T4#3,T5#2,T6#1>)
-    T6#1 extends Object declared in method <T2#5,T3#4,T4#3,T5#2,T6#1>and(P5<F,T2#5,T3#4,T4#3,T5#2,T6#1>)
-    T2#6 extends Object declared in method <T2#6,T3#5,T4#4,T5#3,T6#2,T7#1>and(P6<F,T2#6,T3#5,T4#4,T5#3,T6#2,T7#1>)
-    T3#5 extends Object declared in method <T2#6,T3#5,T4#4,T5#3,T6#2,T7#1>and(P6<F,T2#6,T3#5,T4#4,T5#3,T6#2,T7#1>)
-    T4#4 extends Object declared in method <T2#6,T3#5,T4#4,T5#3,T6#2,T7#1>and(P6<F,T2#6,T3#5,T4#4,T5#3,T6#2,T7#1>)
-    T5#3 extends Object declared in method <T2#6,T3#5,T4#4,T5#3,T6#2,T7#1>and(P6<F,T2#6,T3#5,T4#4,T5#3,T6#2,T7#1>)
-    T6#2 extends Object declared in method <T2#6,T3#5,T4#4,T5#3,T6#2,T7#1>and(P6<F,T2#6,T3#5,T4#4,T5#3,T6#2,T7#1>)
-    T7#1 extends Object declared in method <T2#6,T3#5,T4#4,T5#3,T6#2,T7#1>and(P6<F,T2#6,T3#5,T4#4,T5#3,T6#2,T7#1>)
-    T2#7 extends Object declared in method <T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8>and(P7<F,T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8>)
-    T3#6 extends Object declared in method <T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8>and(P7<F,T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8>)
-    T4#5 extends Object declared in method <T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8>and(P7<F,T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8>)
-    T5#4 extends Object declared in method <T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8>and(P7<F,T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8>)
-    T6#3 extends Object declared in method <T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8>and(P7<F,T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8>)
-    T7#2 extends Object declared in method <T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8>and(P7<F,T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8>)
-    T8 extends Object declared in method <T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8>and(P7<F,T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8>)
-/home/matt/Documents/Repos/Mattcraft/net/minecraft/world/level/storage/loot/entries/DynamicLoot.java:16: error: unexpected type
-                        .<int, int, List<LootItemCondition>, List<LootItemFunction>>and(singletonFields(instance))
-                          ^
-  required: reference
-  found:    int
-/home/matt/Documents/Repos/Mattcraft/net/minecraft/world/level/storage/loot/entries/DynamicLoot.java:16: error: unexpected type
-                        .<int, int, List<LootItemCondition>, List<LootItemFunction>>and(singletonFields(instance))
-                               ^
-  required: reference
-  found:    int
-/home/matt/Documents/Repos/Mattcraft/net/minecraft/world/level/storage/loot/entries/NestedLootTable.java:23: error: no suitable method found for and(P4<Mu<NestedLootTable>,Integer,Integer,List<LootItemCondition>,List<LootItemFunction>>)
-                        .<int, int, List<LootItemCondition>, List<LootItemFunction>>and(singletonFields(instance))
-                        ^
-    method P1.<T2#1>and(App<Mu<NestedLootTable>,T2#1>) is not applicable
-      (wrong number of type arguments; required 1)
-    method P1.<T2#2,T3#1>and(P2<Mu<NestedLootTable>,T2#2,T3#1>) is not applicable
-      (wrong number of type arguments; required 2)
-    method P1.<T2#3,T3#2,T4#1>and(P3<Mu<NestedLootTable>,T2#3,T3#2,T4#1>) is not applicable
-      (wrong number of type arguments; required 3)
-    method P1.<T2#4,T3#3,T4#2,T5#1>and(P4<Mu<NestedLootTable>,T2#4,T3#3,T4#2,T5#1>) is not applicable
-      (explicit type argument int does not conform to declared bound(s) Object)
-    method P1.<T2#5,T3#4,T4#3,T5#2,T6#1>and(P5<Mu<NestedLootTable>,T2#5,T3#4,T4#3,T5#2,T6#1>) is not applicable
-      (wrong number of type arguments; required 5)
-    method P1.<T2#6,T3#5,T4#4,T5#3,T6#2,T7#1>and(P6<Mu<NestedLootTable>,T2#6,T3#5,T4#4,T5#3,T6#2,T7#1>) is not applicable
-      (wrong number of type arguments; required 6)
-    method P1.<T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8>and(P7<Mu<NestedLootTable>,T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8>) is not applicable
-      (wrong number of type arguments; required 7)
-  where T2#1,F,T1,T2#2,T3#1,T2#3,T3#2,T4#1,T2#4,T3#3,T4#2,T5#1,T2#5,T3#4,T4#3,T5#2,T6#1,T2#6,T3#5,T4#4,T5#3,T6#2,T7#1,T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8 are type-variables:
-    T2#1 extends Object declared in method <T2#1>and(App<F,T2#1>)
-    F extends K1 declared in class P1
-    T1 extends Object declared in class P1
-    T2#2 extends Object declared in method <T2#2,T3#1>and(P2<F,T2#2,T3#1>)
-    T3#1 extends Object declared in method <T2#2,T3#1>and(P2<F,T2#2,T3#1>)
-    T2#3 extends Object declared in method <T2#3,T3#2,T4#1>and(P3<F,T2#3,T3#2,T4#1>)
-    T3#2 extends Object declared in method <T2#3,T3#2,T4#1>and(P3<F,T2#3,T3#2,T4#1>)
-    T4#1 extends Object declared in method <T2#3,T3#2,T4#1>and(P3<F,T2#3,T3#2,T4#1>)
-    T2#4 extends Object declared in method <T2#4,T3#3,T4#2,T5#1>and(P4<F,T2#4,T3#3,T4#2,T5#1>)
-    T3#3 extends Object declared in method <T2#4,T3#3,T4#2,T5#1>and(P4<F,T2#4,T3#3,T4#2,T5#1>)
-    T4#2 extends Object declared in method <T2#4,T3#3,T4#2,T5#1>and(P4<F,T2#4,T3#3,T4#2,T5#1>)
-    T5#1 extends Object declared in method <T2#4,T3#3,T4#2,T5#1>and(P4<F,T2#4,T3#3,T4#2,T5#1>)
-    T2#5 extends Object declared in method <T2#5,T3#4,T4#3,T5#2,T6#1>and(P5<F,T2#5,T3#4,T4#3,T5#2,T6#1>)
-    T3#4 extends Object declared in method <T2#5,T3#4,T4#3,T5#2,T6#1>and(P5<F,T2#5,T3#4,T4#3,T5#2,T6#1>)
-    T4#3 extends Object declared in method <T2#5,T3#4,T4#3,T5#2,T6#1>and(P5<F,T2#5,T3#4,T4#3,T5#2,T6#1>)
-    T5#2 extends Object declared in method <T2#5,T3#4,T4#3,T5#2,T6#1>and(P5<F,T2#5,T3#4,T4#3,T5#2,T6#1>)
-    T6#1 extends Object declared in method <T2#5,T3#4,T4#3,T5#2,T6#1>and(P5<F,T2#5,T3#4,T4#3,T5#2,T6#1>)
-    T2#6 extends Object declared in method <T2#6,T3#5,T4#4,T5#3,T6#2,T7#1>and(P6<F,T2#6,T3#5,T4#4,T5#3,T6#2,T7#1>)
-    T3#5 extends Object declared in method <T2#6,T3#5,T4#4,T5#3,T6#2,T7#1>and(P6<F,T2#6,T3#5,T4#4,T5#3,T6#2,T7#1>)
-    T4#4 extends Object declared in method <T2#6,T3#5,T4#4,T5#3,T6#2,T7#1>and(P6<F,T2#6,T3#5,T4#4,T5#3,T6#2,T7#1>)
-    T5#3 extends Object declared in method <T2#6,T3#5,T4#4,T5#3,T6#2,T7#1>and(P6<F,T2#6,T3#5,T4#4,T5#3,T6#2,T7#1>)
-    T6#2 extends Object declared in method <T2#6,T3#5,T4#4,T5#3,T6#2,T7#1>and(P6<F,T2#6,T3#5,T4#4,T5#3,T6#2,T7#1>)
-    T7#1 extends Object declared in method <T2#6,T3#5,T4#4,T5#3,T6#2,T7#1>and(P6<F,T2#6,T3#5,T4#4,T5#3,T6#2,T7#1>)
-    T2#7 extends Object declared in method <T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8>and(P7<F,T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8>)
-    T3#6 extends Object declared in method <T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8>and(P7<F,T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8>)
-    T4#5 extends Object declared in method <T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8>and(P7<F,T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8>)
-    T5#4 extends Object declared in method <T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8>and(P7<F,T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8>)
-    T6#3 extends Object declared in method <T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8>and(P7<F,T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8>)
-    T7#2 extends Object declared in method <T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8>and(P7<F,T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8>)
-    T8 extends Object declared in method <T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8>and(P7<F,T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8>)
-/home/matt/Documents/Repos/Mattcraft/net/minecraft/world/level/storage/loot/entries/NestedLootTable.java:23: error: unexpected type
-                        .<int, int, List<LootItemCondition>, List<LootItemFunction>>and(singletonFields(instance))
-                          ^
-  required: reference
-  found:    int
-/home/matt/Documents/Repos/Mattcraft/net/minecraft/world/level/storage/loot/entries/NestedLootTable.java:23: error: unexpected type
-                        .<int, int, List<LootItemCondition>, List<LootItemFunction>>and(singletonFields(instance))
-                               ^
-  required: reference
-  found:    int
-/home/matt/Documents/Repos/Mattcraft/net/minecraft/world/level/storage/loot/functions/EnchantedCountIncreaseFunction.java:30: error: no suitable method found for and(P3<Mu<EnchantedCountIncreaseFunction>,Holder<Enchantment>,NumberProvider,Integer>)
-                        .<Holder<Enchantment>, NumberProvider, int>and(
-                        ^
-    method P1.<T2#1>and(App<Mu<EnchantedCountIncreaseFunction>,T2#1>) is not applicable
-      (wrong number of type arguments; required 1)
-    method P1.<T2#2,T3#1>and(P2<Mu<EnchantedCountIncreaseFunction>,T2#2,T3#1>) is not applicable
-      (wrong number of type arguments; required 2)
-    method P1.<T2#3,T3#2,T4#1>and(P3<Mu<EnchantedCountIncreaseFunction>,T2#3,T3#2,T4#1>) is not applicable
-      (explicit type argument int does not conform to declared bound(s) Object)
-    method P1.<T2#4,T3#3,T4#2,T5#1>and(P4<Mu<EnchantedCountIncreaseFunction>,T2#4,T3#3,T4#2,T5#1>) is not applicable
-      (wrong number of type arguments; required 4)
-    method P1.<T2#5,T3#4,T4#3,T5#2,T6#1>and(P5<Mu<EnchantedCountIncreaseFunction>,T2#5,T3#4,T4#3,T5#2,T6#1>) is not applicable
-      (wrong number of type arguments; required 5)
-    method P1.<T2#6,T3#5,T4#4,T5#3,T6#2,T7#1>and(P6<Mu<EnchantedCountIncreaseFunction>,T2#6,T3#5,T4#4,T5#3,T6#2,T7#1>) is not applicable
-      (wrong number of type arguments; required 6)
-    method P1.<T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8>and(P7<Mu<EnchantedCountIncreaseFunction>,T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8>) is not applicable
-      (wrong number of type arguments; required 7)
-  where T2#1,F,T1,T2#2,T3#1,T2#3,T3#2,T4#1,T2#4,T3#3,T4#2,T5#1,T2#5,T3#4,T4#3,T5#2,T6#1,T2#6,T3#5,T4#4,T5#3,T6#2,T7#1,T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8 are type-variables:
-    T2#1 extends Object declared in method <T2#1>and(App<F,T2#1>)
-    F extends K1 declared in class P1
-    T1 extends Object declared in class P1
-    T2#2 extends Object declared in method <T2#2,T3#1>and(P2<F,T2#2,T3#1>)
-    T3#1 extends Object declared in method <T2#2,T3#1>and(P2<F,T2#2,T3#1>)
-    T2#3 extends Object declared in method <T2#3,T3#2,T4#1>and(P3<F,T2#3,T3#2,T4#1>)
-    T3#2 extends Object declared in method <T2#3,T3#2,T4#1>and(P3<F,T2#3,T3#2,T4#1>)
-    T4#1 extends Object declared in method <T2#3,T3#2,T4#1>and(P3<F,T2#3,T3#2,T4#1>)
-    T2#4 extends Object declared in method <T2#4,T3#3,T4#2,T5#1>and(P4<F,T2#4,T3#3,T4#2,T5#1>)
-    T3#3 extends Object declared in method <T2#4,T3#3,T4#2,T5#1>and(P4<F,T2#4,T3#3,T4#2,T5#1>)
-    T4#2 extends Object declared in method <T2#4,T3#3,T4#2,T5#1>and(P4<F,T2#4,T3#3,T4#2,T5#1>)
-    T5#1 extends Object declared in method <T2#4,T3#3,T4#2,T5#1>and(P4<F,T2#4,T3#3,T4#2,T5#1>)
-    T2#5 extends Object declared in method <T2#5,T3#4,T4#3,T5#2,T6#1>and(P5<F,T2#5,T3#4,T4#3,T5#2,T6#1>)
-    T3#4 extends Object declared in method <T2#5,T3#4,T4#3,T5#2,T6#1>and(P5<F,T2#5,T3#4,T4#3,T5#2,T6#1>)
-    T4#3 extends Object declared in method <T2#5,T3#4,T4#3,T5#2,T6#1>and(P5<F,T2#5,T3#4,T4#3,T5#2,T6#1>)
-    T5#2 extends Object declared in method <T2#5,T3#4,T4#3,T5#2,T6#1>and(P5<F,T2#5,T3#4,T4#3,T5#2,T6#1>)
-    T6#1 extends Object declared in method <T2#5,T3#4,T4#3,T5#2,T6#1>and(P5<F,T2#5,T3#4,T4#3,T5#2,T6#1>)
-    T2#6 extends Object declared in method <T2#6,T3#5,T4#4,T5#3,T6#2,T7#1>and(P6<F,T2#6,T3#5,T4#4,T5#3,T6#2,T7#1>)
-    T3#5 extends Object declared in method <T2#6,T3#5,T4#4,T5#3,T6#2,T7#1>and(P6<F,T2#6,T3#5,T4#4,T5#3,T6#2,T7#1>)
-    T4#4 extends Object declared in method <T2#6,T3#5,T4#4,T5#3,T6#2,T7#1>and(P6<F,T2#6,T3#5,T4#4,T5#3,T6#2,T7#1>)
-    T5#3 extends Object declared in method <T2#6,T3#5,T4#4,T5#3,T6#2,T7#1>and(P6<F,T2#6,T3#5,T4#4,T5#3,T6#2,T7#1>)
-    T6#2 extends Object declared in method <T2#6,T3#5,T4#4,T5#3,T6#2,T7#1>and(P6<F,T2#6,T3#5,T4#4,T5#3,T6#2,T7#1>)
-    T7#1 extends Object declared in method <T2#6,T3#5,T4#4,T5#3,T6#2,T7#1>and(P6<F,T2#6,T3#5,T4#4,T5#3,T6#2,T7#1>)
-    T2#7 extends Object declared in method <T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8>and(P7<F,T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8>)
-    T3#6 extends Object declared in method <T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8>and(P7<F,T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8>)
-    T4#5 extends Object declared in method <T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8>and(P7<F,T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8>)
-    T5#4 extends Object declared in method <T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8>and(P7<F,T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8>)
-    T6#3 extends Object declared in method <T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8>and(P7<F,T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8>)
-    T7#2 extends Object declared in method <T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8>and(P7<F,T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8>)
-    T8 extends Object declared in method <T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8>and(P7<F,T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8>)
-/home/matt/Documents/Repos/Mattcraft/net/minecraft/world/level/storage/loot/functions/EnchantedCountIncreaseFunction.java:30: error: unexpected type
-                        .<Holder<Enchantment>, NumberProvider, int>and(
-                                                               ^
-  required: reference
-  found:    int
-/home/matt/Documents/Repos/Mattcraft/net/minecraft/world/level/storage/loot/functions/ExplorationMapFunction.java:35: error: no suitable method found for and(P5<Mu<ExplorationMapFunction>,TagKey<Structure>,Holder<MapDecorationType>,Byte,Integer,Boolean>)
-                        .<TagKey<Structure>, Holder<MapDecorationType>, byte, int, boolean>and(
-                        ^
-    method P1.<T2#1>and(App<Mu<ExplorationMapFunction>,T2#1>) is not applicable
-      (wrong number of type arguments; required 1)
-    method P1.<T2#2,T3#1>and(P2<Mu<ExplorationMapFunction>,T2#2,T3#1>) is not applicable
-      (wrong number of type arguments; required 2)
-    method P1.<T2#3,T3#2,T4#1>and(P3<Mu<ExplorationMapFunction>,T2#3,T3#2,T4#1>) is not applicable
-      (wrong number of type arguments; required 3)
-    method P1.<T2#4,T3#3,T4#2,T5#1>and(P4<Mu<ExplorationMapFunction>,T2#4,T3#3,T4#2,T5#1>) is not applicable
-      (wrong number of type arguments; required 4)
-    method P1.<T2#5,T3#4,T4#3,T5#2,T6#1>and(P5<Mu<ExplorationMapFunction>,T2#5,T3#4,T4#3,T5#2,T6#1>) is not applicable
-      (explicit type argument byte does not conform to declared bound(s) Object)
-    method P1.<T2#6,T3#5,T4#4,T5#3,T6#2,T7#1>and(P6<Mu<ExplorationMapFunction>,T2#6,T3#5,T4#4,T5#3,T6#2,T7#1>) is not applicable
-      (wrong number of type arguments; required 6)
-    method P1.<T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8>and(P7<Mu<ExplorationMapFunction>,T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8>) is not applicable
-      (wrong number of type arguments; required 7)
-  where T2#1,F,T1,T2#2,T3#1,T2#3,T3#2,T4#1,T2#4,T3#3,T4#2,T5#1,T2#5,T3#4,T4#3,T5#2,T6#1,T2#6,T3#5,T4#4,T5#3,T6#2,T7#1,T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8 are type-variables:
-    T2#1 extends Object declared in method <T2#1>and(App<F,T2#1>)
-    F extends K1 declared in class P1
-    T1 extends Object declared in class P1
-    T2#2 extends Object declared in method <T2#2,T3#1>and(P2<F,T2#2,T3#1>)
-    T3#1 extends Object declared in method <T2#2,T3#1>and(P2<F,T2#2,T3#1>)
-    T2#3 extends Object declared in method <T2#3,T3#2,T4#1>and(P3<F,T2#3,T3#2,T4#1>)
-    T3#2 extends Object declared in method <T2#3,T3#2,T4#1>and(P3<F,T2#3,T3#2,T4#1>)
-    T4#1 extends Object declared in method <T2#3,T3#2,T4#1>and(P3<F,T2#3,T3#2,T4#1>)
-    T2#4 extends Object declared in method <T2#4,T3#3,T4#2,T5#1>and(P4<F,T2#4,T3#3,T4#2,T5#1>)
-    T3#3 extends Object declared in method <T2#4,T3#3,T4#2,T5#1>and(P4<F,T2#4,T3#3,T4#2,T5#1>)
-    T4#2 extends Object declared in method <T2#4,T3#3,T4#2,T5#1>and(P4<F,T2#4,T3#3,T4#2,T5#1>)
-    T5#1 extends Object declared in method <T2#4,T3#3,T4#2,T5#1>and(P4<F,T2#4,T3#3,T4#2,T5#1>)
-    T2#5 extends Object declared in method <T2#5,T3#4,T4#3,T5#2,T6#1>and(P5<F,T2#5,T3#4,T4#3,T5#2,T6#1>)
-    T3#4 extends Object declared in method <T2#5,T3#4,T4#3,T5#2,T6#1>and(P5<F,T2#5,T3#4,T4#3,T5#2,T6#1>)
-    T4#3 extends Object declared in method <T2#5,T3#4,T4#3,T5#2,T6#1>and(P5<F,T2#5,T3#4,T4#3,T5#2,T6#1>)
-    T5#2 extends Object declared in method <T2#5,T3#4,T4#3,T5#2,T6#1>and(P5<F,T2#5,T3#4,T4#3,T5#2,T6#1>)
-    T6#1 extends Object declared in method <T2#5,T3#4,T4#3,T5#2,T6#1>and(P5<F,T2#5,T3#4,T4#3,T5#2,T6#1>)
-    T2#6 extends Object declared in method <T2#6,T3#5,T4#4,T5#3,T6#2,T7#1>and(P6<F,T2#6,T3#5,T4#4,T5#3,T6#2,T7#1>)
-    T3#5 extends Object declared in method <T2#6,T3#5,T4#4,T5#3,T6#2,T7#1>and(P6<F,T2#6,T3#5,T4#4,T5#3,T6#2,T7#1>)
-    T4#4 extends Object declared in method <T2#6,T3#5,T4#4,T5#3,T6#2,T7#1>and(P6<F,T2#6,T3#5,T4#4,T5#3,T6#2,T7#1>)
-    T5#3 extends Object declared in method <T2#6,T3#5,T4#4,T5#3,T6#2,T7#1>and(P6<F,T2#6,T3#5,T4#4,T5#3,T6#2,T7#1>)
-    T6#2 extends Object declared in method <T2#6,T3#5,T4#4,T5#3,T6#2,T7#1>and(P6<F,T2#6,T3#5,T4#4,T5#3,T6#2,T7#1>)
-    T7#1 extends Object declared in method <T2#6,T3#5,T4#4,T5#3,T6#2,T7#1>and(P6<F,T2#6,T3#5,T4#4,T5#3,T6#2,T7#1>)
-    T2#7 extends Object declared in method <T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8>and(P7<F,T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8>)
-    T3#6 extends Object declared in method <T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8>and(P7<F,T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8>)
-    T4#5 extends Object declared in method <T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8>and(P7<F,T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8>)
-    T5#4 extends Object declared in method <T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8>and(P7<F,T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8>)
-    T6#3 extends Object declared in method <T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8>and(P7<F,T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8>)
-    T7#2 extends Object declared in method <T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8>and(P7<F,T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8>)
-    T8 extends Object declared in method <T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8>and(P7<F,T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8>)
-/home/matt/Documents/Repos/Mattcraft/net/minecraft/world/level/storage/loot/functions/ExplorationMapFunction.java:35: error: unexpected type
-                        .<TagKey<Structure>, Holder<MapDecorationType>, byte, int, boolean>and(
-                                                                        ^
-  required: reference
-  found:    byte
-/home/matt/Documents/Repos/Mattcraft/net/minecraft/world/level/storage/loot/functions/ExplorationMapFunction.java:35: error: unexpected type
-                        .<TagKey<Structure>, Holder<MapDecorationType>, byte, int, boolean>and(
-                                                                              ^
-  required: reference
-  found:    int
-/home/matt/Documents/Repos/Mattcraft/net/minecraft/world/level/storage/loot/functions/ExplorationMapFunction.java:35: error: unexpected type
-                        .<TagKey<Structure>, Holder<MapDecorationType>, byte, int, boolean>and(
-                                                                                   ^
-  required: reference
-  found:    boolean
-/home/matt/Documents/Repos/Mattcraft/net/minecraft/world/level/storage/loot/functions/SetItemCountFunction.java:18: error: no suitable method found for and(P2<Mu<SetItemCountFunction>,NumberProvider,Boolean>)
-                        .<NumberProvider, boolean>and(
-                        ^
-    method P1.<T2#1>and(App<Mu<SetItemCountFunction>,T2#1>) is not applicable
-      (wrong number of type arguments; required 1)
-    method P1.<T2#2,T3#1>and(P2<Mu<SetItemCountFunction>,T2#2,T3#1>) is not applicable
-      (explicit type argument boolean does not conform to declared bound(s) Object)
-    method P1.<T2#3,T3#2,T4#1>and(P3<Mu<SetItemCountFunction>,T2#3,T3#2,T4#1>) is not applicable
-      (wrong number of type arguments; required 3)
-    method P1.<T2#4,T3#3,T4#2,T5#1>and(P4<Mu<SetItemCountFunction>,T2#4,T3#3,T4#2,T5#1>) is not applicable
-      (wrong number of type arguments; required 4)
-    method P1.<T2#5,T3#4,T4#3,T5#2,T6#1>and(P5<Mu<SetItemCountFunction>,T2#5,T3#4,T4#3,T5#2,T6#1>) is not applicable
-      (wrong number of type arguments; required 5)
-    method P1.<T2#6,T3#5,T4#4,T5#3,T6#2,T7#1>and(P6<Mu<SetItemCountFunction>,T2#6,T3#5,T4#4,T5#3,T6#2,T7#1>) is not applicable
-      (wrong number of type arguments; required 6)
-    method P1.<T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8>and(P7<Mu<SetItemCountFunction>,T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8>) is not applicable
-      (wrong number of type arguments; required 7)
-  where T2#1,F,T1,T2#2,T3#1,T2#3,T3#2,T4#1,T2#4,T3#3,T4#2,T5#1,T2#5,T3#4,T4#3,T5#2,T6#1,T2#6,T3#5,T4#4,T5#3,T6#2,T7#1,T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8 are type-variables:
-    T2#1 extends Object declared in method <T2#1>and(App<F,T2#1>)
-    F extends K1 declared in class P1
-    T1 extends Object declared in class P1
-    T2#2 extends Object declared in method <T2#2,T3#1>and(P2<F,T2#2,T3#1>)
-    T3#1 extends Object declared in method <T2#2,T3#1>and(P2<F,T2#2,T3#1>)
-    T2#3 extends Object declared in method <T2#3,T3#2,T4#1>and(P3<F,T2#3,T3#2,T4#1>)
-    T3#2 extends Object declared in method <T2#3,T3#2,T4#1>and(P3<F,T2#3,T3#2,T4#1>)
-    T4#1 extends Object declared in method <T2#3,T3#2,T4#1>and(P3<F,T2#3,T3#2,T4#1>)
-    T2#4 extends Object declared in method <T2#4,T3#3,T4#2,T5#1>and(P4<F,T2#4,T3#3,T4#2,T5#1>)
-    T3#3 extends Object declared in method <T2#4,T3#3,T4#2,T5#1>and(P4<F,T2#4,T3#3,T4#2,T5#1>)
-    T4#2 extends Object declared in method <T2#4,T3#3,T4#2,T5#1>and(P4<F,T2#4,T3#3,T4#2,T5#1>)
-    T5#1 extends Object declared in method <T2#4,T3#3,T4#2,T5#1>and(P4<F,T2#4,T3#3,T4#2,T5#1>)
-    T2#5 extends Object declared in method <T2#5,T3#4,T4#3,T5#2,T6#1>and(P5<F,T2#5,T3#4,T4#3,T5#2,T6#1>)
-    T3#4 extends Object declared in method <T2#5,T3#4,T4#3,T5#2,T6#1>and(P5<F,T2#5,T3#4,T4#3,T5#2,T6#1>)
-    T4#3 extends Object declared in method <T2#5,T3#4,T4#3,T5#2,T6#1>and(P5<F,T2#5,T3#4,T4#3,T5#2,T6#1>)
-    T5#2 extends Object declared in method <T2#5,T3#4,T4#3,T5#2,T6#1>and(P5<F,T2#5,T3#4,T4#3,T5#2,T6#1>)
-    T6#1 extends Object declared in method <T2#5,T3#4,T4#3,T5#2,T6#1>and(P5<F,T2#5,T3#4,T4#3,T5#2,T6#1>)
-    T2#6 extends Object declared in method <T2#6,T3#5,T4#4,T5#3,T6#2,T7#1>and(P6<F,T2#6,T3#5,T4#4,T5#3,T6#2,T7#1>)
-    T3#5 extends Object declared in method <T2#6,T3#5,T4#4,T5#3,T6#2,T7#1>and(P6<F,T2#6,T3#5,T4#4,T5#3,T6#2,T7#1>)
-    T4#4 extends Object declared in method <T2#6,T3#5,T4#4,T5#3,T6#2,T7#1>and(P6<F,T2#6,T3#5,T4#4,T5#3,T6#2,T7#1>)
-    T5#3 extends Object declared in method <T2#6,T3#5,T4#4,T5#3,T6#2,T7#1>and(P6<F,T2#6,T3#5,T4#4,T5#3,T6#2,T7#1>)
-    T6#2 extends Object declared in method <T2#6,T3#5,T4#4,T5#3,T6#2,T7#1>and(P6<F,T2#6,T3#5,T4#4,T5#3,T6#2,T7#1>)
-    T7#1 extends Object declared in method <T2#6,T3#5,T4#4,T5#3,T6#2,T7#1>and(P6<F,T2#6,T3#5,T4#4,T5#3,T6#2,T7#1>)
-    T2#7 extends Object declared in method <T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8>and(P7<F,T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8>)
-    T3#6 extends Object declared in method <T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8>and(P7<F,T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8>)
-    T4#5 extends Object declared in method <T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8>and(P7<F,T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8>)
-    T5#4 extends Object declared in method <T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8>and(P7<F,T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8>)
-    T6#3 extends Object declared in method <T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8>and(P7<F,T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8>)
-    T7#2 extends Object declared in method <T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8>and(P7<F,T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8>)
-    T8 extends Object declared in method <T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8>and(P7<F,T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8>)
-/home/matt/Documents/Repos/Mattcraft/net/minecraft/world/level/storage/loot/functions/SetItemCountFunction.java:18: error: unexpected type
-                        .<NumberProvider, boolean>and(
-                                          ^
-  required: reference
-  found:    boolean
-/home/matt/Documents/Repos/Mattcraft/net/minecraft/world/level/storage/loot/functions/EnchantRandomlyFunction.java:31: error: no suitable method found for and(P2<Mu<EnchantRandomlyFunction>,Optional<HolderSet<Enchantment>>,Boolean>)
-                        .<Optional<HolderSet<Enchantment>>, boolean>and(
-                        ^
-    method P1.<T2#1>and(App<Mu<EnchantRandomlyFunction>,T2#1>) is not applicable
-      (wrong number of type arguments; required 1)
-    method P1.<T2#2,T3#1>and(P2<Mu<EnchantRandomlyFunction>,T2#2,T3#1>) is not applicable
-      (explicit type argument boolean does not conform to declared bound(s) Object)
-    method P1.<T2#3,T3#2,T4#1>and(P3<Mu<EnchantRandomlyFunction>,T2#3,T3#2,T4#1>) is not applicable
-      (wrong number of type arguments; required 3)
-    method P1.<T2#4,T3#3,T4#2,T5#1>and(P4<Mu<EnchantRandomlyFunction>,T2#4,T3#3,T4#2,T5#1>) is not applicable
-      (wrong number of type arguments; required 4)
-    method P1.<T2#5,T3#4,T4#3,T5#2,T6#1>and(P5<Mu<EnchantRandomlyFunction>,T2#5,T3#4,T4#3,T5#2,T6#1>) is not applicable
-      (wrong number of type arguments; required 5)
-    method P1.<T2#6,T3#5,T4#4,T5#3,T6#2,T7#1>and(P6<Mu<EnchantRandomlyFunction>,T2#6,T3#5,T4#4,T5#3,T6#2,T7#1>) is not applicable
-      (wrong number of type arguments; required 6)
-    method P1.<T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8>and(P7<Mu<EnchantRandomlyFunction>,T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8>) is not applicable
-      (wrong number of type arguments; required 7)
-  where T2#1,F,T1,T2#2,T3#1,T2#3,T3#2,T4#1,T2#4,T3#3,T4#2,T5#1,T2#5,T3#4,T4#3,T5#2,T6#1,T2#6,T3#5,T4#4,T5#3,T6#2,T7#1,T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8 are type-variables:
-    T2#1 extends Object declared in method <T2#1>and(App<F,T2#1>)
-    F extends K1 declared in class P1
-    T1 extends Object declared in class P1
-    T2#2 extends Object declared in method <T2#2,T3#1>and(P2<F,T2#2,T3#1>)
-    T3#1 extends Object declared in method <T2#2,T3#1>and(P2<F,T2#2,T3#1>)
-    T2#3 extends Object declared in method <T2#3,T3#2,T4#1>and(P3<F,T2#3,T3#2,T4#1>)
-    T3#2 extends Object declared in method <T2#3,T3#2,T4#1>and(P3<F,T2#3,T3#2,T4#1>)
-    T4#1 extends Object declared in method <T2#3,T3#2,T4#1>and(P3<F,T2#3,T3#2,T4#1>)
-    T2#4 extends Object declared in method <T2#4,T3#3,T4#2,T5#1>and(P4<F,T2#4,T3#3,T4#2,T5#1>)
-    T3#3 extends Object declared in method <T2#4,T3#3,T4#2,T5#1>and(P4<F,T2#4,T3#3,T4#2,T5#1>)
-    T4#2 extends Object declared in method <T2#4,T3#3,T4#2,T5#1>and(P4<F,T2#4,T3#3,T4#2,T5#1>)
-    T5#1 extends Object declared in method <T2#4,T3#3,T4#2,T5#1>and(P4<F,T2#4,T3#3,T4#2,T5#1>)
-    T2#5 extends Object declared in method <T2#5,T3#4,T4#3,T5#2,T6#1>and(P5<F,T2#5,T3#4,T4#3,T5#2,T6#1>)
-    T3#4 extends Object declared in method <T2#5,T3#4,T4#3,T5#2,T6#1>and(P5<F,T2#5,T3#4,T4#3,T5#2,T6#1>)
-    T4#3 extends Object declared in method <T2#5,T3#4,T4#3,T5#2,T6#1>and(P5<F,T2#5,T3#4,T4#3,T5#2,T6#1>)
-    T5#2 extends Object declared in method <T2#5,T3#4,T4#3,T5#2,T6#1>and(P5<F,T2#5,T3#4,T4#3,T5#2,T6#1>)
-    T6#1 extends Object declared in method <T2#5,T3#4,T4#3,T5#2,T6#1>and(P5<F,T2#5,T3#4,T4#3,T5#2,T6#1>)
-    T2#6 extends Object declared in method <T2#6,T3#5,T4#4,T5#3,T6#2,T7#1>and(P6<F,T2#6,T3#5,T4#4,T5#3,T6#2,T7#1>)
-    T3#5 extends Object declared in method <T2#6,T3#5,T4#4,T5#3,T6#2,T7#1>and(P6<F,T2#6,T3#5,T4#4,T5#3,T6#2,T7#1>)
-    T4#4 extends Object declared in method <T2#6,T3#5,T4#4,T5#3,T6#2,T7#1>and(P6<F,T2#6,T3#5,T4#4,T5#3,T6#2,T7#1>)
-    T5#3 extends Object declared in method <T2#6,T3#5,T4#4,T5#3,T6#2,T7#1>and(P6<F,T2#6,T3#5,T4#4,T5#3,T6#2,T7#1>)
-    T6#2 extends Object declared in method <T2#6,T3#5,T4#4,T5#3,T6#2,T7#1>and(P6<F,T2#6,T3#5,T4#4,T5#3,T6#2,T7#1>)
-    T7#1 extends Object declared in method <T2#6,T3#5,T4#4,T5#3,T6#2,T7#1>and(P6<F,T2#6,T3#5,T4#4,T5#3,T6#2,T7#1>)
-    T2#7 extends Object declared in method <T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8>and(P7<F,T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8>)
-    T3#6 extends Object declared in method <T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8>and(P7<F,T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8>)
-    T4#5 extends Object declared in method <T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8>and(P7<F,T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8>)
-    T5#4 extends Object declared in method <T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8>and(P7<F,T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8>)
-    T6#3 extends Object declared in method <T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8>and(P7<F,T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8>)
-    T7#2 extends Object declared in method <T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8>and(P7<F,T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8>)
-    T8 extends Object declared in method <T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8>and(P7<F,T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8>)
-/home/matt/Documents/Repos/Mattcraft/net/minecraft/world/level/storage/loot/functions/EnchantRandomlyFunction.java:31: error: unexpected type
-                        .<Optional<HolderSet<Enchantment>>, boolean>and(
-                                                            ^
-  required: reference
-  found:    boolean
-/home/matt/Documents/Repos/Mattcraft/net/minecraft/world/level/storage/loot/functions/EnchantRandomlyFunction.java:61: error: cannot find symbol
-                        .filter(holder -> !bl2 || ((Enchantment)holder.value()).canEnchant(itemStack));
-                                                                      ^
-  symbol:   method value()
-  location: variable holder of type Object
-/home/matt/Documents/Repos/Mattcraft/net/minecraft/world/level/storage/loot/functions/SetEnchantmentsFunction.java:26: error: no suitable method found for and(P2<Mu<SetEnchantmentsFunction>,Map<Holder<Enchantment>,NumberProvider>,Boolean>)
-                        .<Map<Holder<Enchantment>, NumberProvider>, boolean>and(
-                        ^
-    method P1.<T2#1>and(App<Mu<SetEnchantmentsFunction>,T2#1>) is not applicable
-      (wrong number of type arguments; required 1)
-    method P1.<T2#2,T3#1>and(P2<Mu<SetEnchantmentsFunction>,T2#2,T3#1>) is not applicable
-      (explicit type argument boolean does not conform to declared bound(s) Object)
-    method P1.<T2#3,T3#2,T4#1>and(P3<Mu<SetEnchantmentsFunction>,T2#3,T3#2,T4#1>) is not applicable
-      (wrong number of type arguments; required 3)
-    method P1.<T2#4,T3#3,T4#2,T5#1>and(P4<Mu<SetEnchantmentsFunction>,T2#4,T3#3,T4#2,T5#1>) is not applicable
-      (wrong number of type arguments; required 4)
-    method P1.<T2#5,T3#4,T4#3,T5#2,T6#1>and(P5<Mu<SetEnchantmentsFunction>,T2#5,T3#4,T4#3,T5#2,T6#1>) is not applicable
-      (wrong number of type arguments; required 5)
-    method P1.<T2#6,T3#5,T4#4,T5#3,T6#2,T7#1>and(P6<Mu<SetEnchantmentsFunction>,T2#6,T3#5,T4#4,T5#3,T6#2,T7#1>) is not applicable
-      (wrong number of type arguments; required 6)
-    method P1.<T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8>and(P7<Mu<SetEnchantmentsFunction>,T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8>) is not applicable
-      (wrong number of type arguments; required 7)
-  where T2#1,F,T1,T2#2,T3#1,T2#3,T3#2,T4#1,T2#4,T3#3,T4#2,T5#1,T2#5,T3#4,T4#3,T5#2,T6#1,T2#6,T3#5,T4#4,T5#3,T6#2,T7#1,T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8 are type-variables:
-    T2#1 extends Object declared in method <T2#1>and(App<F,T2#1>)
-    F extends K1 declared in class P1
-    T1 extends Object declared in class P1
-    T2#2 extends Object declared in method <T2#2,T3#1>and(P2<F,T2#2,T3#1>)
-    T3#1 extends Object declared in method <T2#2,T3#1>and(P2<F,T2#2,T3#1>)
-    T2#3 extends Object declared in method <T2#3,T3#2,T4#1>and(P3<F,T2#3,T3#2,T4#1>)
-    T3#2 extends Object declared in method <T2#3,T3#2,T4#1>and(P3<F,T2#3,T3#2,T4#1>)
-    T4#1 extends Object declared in method <T2#3,T3#2,T4#1>and(P3<F,T2#3,T3#2,T4#1>)
-    T2#4 extends Object declared in method <T2#4,T3#3,T4#2,T5#1>and(P4<F,T2#4,T3#3,T4#2,T5#1>)
-    T3#3 extends Object declared in method <T2#4,T3#3,T4#2,T5#1>and(P4<F,T2#4,T3#3,T4#2,T5#1>)
-    T4#2 extends Object declared in method <T2#4,T3#3,T4#2,T5#1>and(P4<F,T2#4,T3#3,T4#2,T5#1>)
-    T5#1 extends Object declared in method <T2#4,T3#3,T4#2,T5#1>and(P4<F,T2#4,T3#3,T4#2,T5#1>)
-    T2#5 extends Object declared in method <T2#5,T3#4,T4#3,T5#2,T6#1>and(P5<F,T2#5,T3#4,T4#3,T5#2,T6#1>)
-    T3#4 extends Object declared in method <T2#5,T3#4,T4#3,T5#2,T6#1>and(P5<F,T2#5,T3#4,T4#3,T5#2,T6#1>)
-    T4#3 extends Object declared in method <T2#5,T3#4,T4#3,T5#2,T6#1>and(P5<F,T2#5,T3#4,T4#3,T5#2,T6#1>)
-    T5#2 extends Object declared in method <T2#5,T3#4,T4#3,T5#2,T6#1>and(P5<F,T2#5,T3#4,T4#3,T5#2,T6#1>)
-    T6#1 extends Object declared in method <T2#5,T3#4,T4#3,T5#2,T6#1>and(P5<F,T2#5,T3#4,T4#3,T5#2,T6#1>)
-    T2#6 extends Object declared in method <T2#6,T3#5,T4#4,T5#3,T6#2,T7#1>and(P6<F,T2#6,T3#5,T4#4,T5#3,T6#2,T7#1>)
-    T3#5 extends Object declared in method <T2#6,T3#5,T4#4,T5#3,T6#2,T7#1>and(P6<F,T2#6,T3#5,T4#4,T5#3,T6#2,T7#1>)
-    T4#4 extends Object declared in method <T2#6,T3#5,T4#4,T5#3,T6#2,T7#1>and(P6<F,T2#6,T3#5,T4#4,T5#3,T6#2,T7#1>)
-    T5#3 extends Object declared in method <T2#6,T3#5,T4#4,T5#3,T6#2,T7#1>and(P6<F,T2#6,T3#5,T4#4,T5#3,T6#2,T7#1>)
-    T6#2 extends Object declared in method <T2#6,T3#5,T4#4,T5#3,T6#2,T7#1>and(P6<F,T2#6,T3#5,T4#4,T5#3,T6#2,T7#1>)
-    T7#1 extends Object declared in method <T2#6,T3#5,T4#4,T5#3,T6#2,T7#1>and(P6<F,T2#6,T3#5,T4#4,T5#3,T6#2,T7#1>)
-    T2#7 extends Object declared in method <T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8>and(P7<F,T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8>)
-    T3#6 extends Object declared in method <T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8>and(P7<F,T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8>)
-    T4#5 extends Object declared in method <T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8>and(P7<F,T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8>)
-    T5#4 extends Object declared in method <T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8>and(P7<F,T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8>)
-    T6#3 extends Object declared in method <T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8>and(P7<F,T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8>)
-    T7#2 extends Object declared in method <T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8>and(P7<F,T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8>)
-    T8 extends Object declared in method <T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8>and(P7<F,T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8>)
-/home/matt/Documents/Repos/Mattcraft/net/minecraft/world/level/storage/loot/functions/SetEnchantmentsFunction.java:26: error: unexpected type
-                        .<Map<Holder<Enchantment>, NumberProvider>, boolean>and(
-                                                                    ^
-  required: reference
-  found:    boolean
-/home/matt/Documents/Repos/Mattcraft/net/minecraft/world/level/storage/loot/functions/SetItemDamageFunction.java:22: error: no suitable method found for and(P2<Mu<SetItemDamageFunction>,NumberProvider,Boolean>)
-                        .<NumberProvider, boolean>and(
-                        ^
-    method P1.<T2#1>and(App<Mu<SetItemDamageFunction>,T2#1>) is not applicable
-      (wrong number of type arguments; required 1)
-    method P1.<T2#2,T3#1>and(P2<Mu<SetItemDamageFunction>,T2#2,T3#1>) is not applicable
-      (explicit type argument boolean does not conform to declared bound(s) Object)
-    method P1.<T2#3,T3#2,T4#1>and(P3<Mu<SetItemDamageFunction>,T2#3,T3#2,T4#1>) is not applicable
-      (wrong number of type arguments; required 3)
-    method P1.<T2#4,T3#3,T4#2,T5#1>and(P4<Mu<SetItemDamageFunction>,T2#4,T3#3,T4#2,T5#1>) is not applicable
-      (wrong number of type arguments; required 4)
-    method P1.<T2#5,T3#4,T4#3,T5#2,T6#1>and(P5<Mu<SetItemDamageFunction>,T2#5,T3#4,T4#3,T5#2,T6#1>) is not applicable
-      (wrong number of type arguments; required 5)
-    method P1.<T2#6,T3#5,T4#4,T5#3,T6#2,T7#1>and(P6<Mu<SetItemDamageFunction>,T2#6,T3#5,T4#4,T5#3,T6#2,T7#1>) is not applicable
-      (wrong number of type arguments; required 6)
-    method P1.<T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8>and(P7<Mu<SetItemDamageFunction>,T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8>) is not applicable
-      (wrong number of type arguments; required 7)
-  where T2#1,F,T1,T2#2,T3#1,T2#3,T3#2,T4#1,T2#4,T3#3,T4#2,T5#1,T2#5,T3#4,T4#3,T5#2,T6#1,T2#6,T3#5,T4#4,T5#3,T6#2,T7#1,T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8 are type-variables:
-    T2#1 extends Object declared in method <T2#1>and(App<F,T2#1>)
-    F extends K1 declared in class P1
-    T1 extends Object declared in class P1
-    T2#2 extends Object declared in method <T2#2,T3#1>and(P2<F,T2#2,T3#1>)
-    T3#1 extends Object declared in method <T2#2,T3#1>and(P2<F,T2#2,T3#1>)
-    T2#3 extends Object declared in method <T2#3,T3#2,T4#1>and(P3<F,T2#3,T3#2,T4#1>)
-    T3#2 extends Object declared in method <T2#3,T3#2,T4#1>and(P3<F,T2#3,T3#2,T4#1>)
-    T4#1 extends Object declared in method <T2#3,T3#2,T4#1>and(P3<F,T2#3,T3#2,T4#1>)
-    T2#4 extends Object declared in method <T2#4,T3#3,T4#2,T5#1>and(P4<F,T2#4,T3#3,T4#2,T5#1>)
-    T3#3 extends Object declared in method <T2#4,T3#3,T4#2,T5#1>and(P4<F,T2#4,T3#3,T4#2,T5#1>)
-    T4#2 extends Object declared in method <T2#4,T3#3,T4#2,T5#1>and(P4<F,T2#4,T3#3,T4#2,T5#1>)
-    T5#1 extends Object declared in method <T2#4,T3#3,T4#2,T5#1>and(P4<F,T2#4,T3#3,T4#2,T5#1>)
-    T2#5 extends Object declared in method <T2#5,T3#4,T4#3,T5#2,T6#1>and(P5<F,T2#5,T3#4,T4#3,T5#2,T6#1>)
-    T3#4 extends Object declared in method <T2#5,T3#4,T4#3,T5#2,T6#1>and(P5<F,T2#5,T3#4,T4#3,T5#2,T6#1>)
-    T4#3 extends Object declared in method <T2#5,T3#4,T4#3,T5#2,T6#1>and(P5<F,T2#5,T3#4,T4#3,T5#2,T6#1>)
-    T5#2 extends Object declared in method <T2#5,T3#4,T4#3,T5#2,T6#1>and(P5<F,T2#5,T3#4,T4#3,T5#2,T6#1>)
-    T6#1 extends Object declared in method <T2#5,T3#4,T4#3,T5#2,T6#1>and(P5<F,T2#5,T3#4,T4#3,T5#2,T6#1>)
-    T2#6 extends Object declared in method <T2#6,T3#5,T4#4,T5#3,T6#2,T7#1>and(P6<F,T2#6,T3#5,T4#4,T5#3,T6#2,T7#1>)
-    T3#5 extends Object declared in method <T2#6,T3#5,T4#4,T5#3,T6#2,T7#1>and(P6<F,T2#6,T3#5,T4#4,T5#3,T6#2,T7#1>)
-    T4#4 extends Object declared in method <T2#6,T3#5,T4#4,T5#3,T6#2,T7#1>and(P6<F,T2#6,T3#5,T4#4,T5#3,T6#2,T7#1>)
-    T5#3 extends Object declared in method <T2#6,T3#5,T4#4,T5#3,T6#2,T7#1>and(P6<F,T2#6,T3#5,T4#4,T5#3,T6#2,T7#1>)
-    T6#2 extends Object declared in method <T2#6,T3#5,T4#4,T5#3,T6#2,T7#1>and(P6<F,T2#6,T3#5,T4#4,T5#3,T6#2,T7#1>)
-    T7#1 extends Object declared in method <T2#6,T3#5,T4#4,T5#3,T6#2,T7#1>and(P6<F,T2#6,T3#5,T4#4,T5#3,T6#2,T7#1>)
-    T2#7 extends Object declared in method <T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8>and(P7<F,T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8>)
-    T3#6 extends Object declared in method <T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8>and(P7<F,T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8>)
-    T4#5 extends Object declared in method <T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8>and(P7<F,T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8>)
-    T5#4 extends Object declared in method <T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8>and(P7<F,T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8>)
-    T6#3 extends Object declared in method <T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8>and(P7<F,T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8>)
-    T7#2 extends Object declared in method <T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8>and(P7<F,T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8>)
-    T8 extends Object declared in method <T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8>and(P7<F,T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8>)
-/home/matt/Documents/Repos/Mattcraft/net/minecraft/world/level/storage/loot/functions/SetItemDamageFunction.java:22: error: unexpected type
-                        .<NumberProvider, boolean>and(
-                                          ^
-  required: reference
-  found:    boolean
-/home/matt/Documents/Repos/Mattcraft/net/minecraft/world/level/storage/loot/functions/SetAttributesFunction.java:31: error: no suitable method found for and(P2<Mu<SetAttributesFunction>,List<Modifier>,Boolean>)
-                        .<List<SetAttributesFunction.Modifier>, boolean>and(
-                        ^
-    method P1.<T2#1>and(App<Mu<SetAttributesFunction>,T2#1>) is not applicable
-      (wrong number of type arguments; required 1)
-    method P1.<T2#2,T3#1>and(P2<Mu<SetAttributesFunction>,T2#2,T3#1>) is not applicable
-      (explicit type argument boolean does not conform to declared bound(s) Object)
-    method P1.<T2#3,T3#2,T4#1>and(P3<Mu<SetAttributesFunction>,T2#3,T3#2,T4#1>) is not applicable
-      (wrong number of type arguments; required 3)
-    method P1.<T2#4,T3#3,T4#2,T5#1>and(P4<Mu<SetAttributesFunction>,T2#4,T3#3,T4#2,T5#1>) is not applicable
-      (wrong number of type arguments; required 4)
-    method P1.<T2#5,T3#4,T4#3,T5#2,T6#1>and(P5<Mu<SetAttributesFunction>,T2#5,T3#4,T4#3,T5#2,T6#1>) is not applicable
-      (wrong number of type arguments; required 5)
-    method P1.<T2#6,T3#5,T4#4,T5#3,T6#2,T7#1>and(P6<Mu<SetAttributesFunction>,T2#6,T3#5,T4#4,T5#3,T6#2,T7#1>) is not applicable
-      (wrong number of type arguments; required 6)
-    method P1.<T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8>and(P7<Mu<SetAttributesFunction>,T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8>) is not applicable
-      (wrong number of type arguments; required 7)
-  where T2#1,F,T1,T2#2,T3#1,T2#3,T3#2,T4#1,T2#4,T3#3,T4#2,T5#1,T2#5,T3#4,T4#3,T5#2,T6#1,T2#6,T3#5,T4#4,T5#3,T6#2,T7#1,T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8 are type-variables:
-    T2#1 extends Object declared in method <T2#1>and(App<F,T2#1>)
-    F extends K1 declared in class P1
-    T1 extends Object declared in class P1
-    T2#2 extends Object declared in method <T2#2,T3#1>and(P2<F,T2#2,T3#1>)
-    T3#1 extends Object declared in method <T2#2,T3#1>and(P2<F,T2#2,T3#1>)
-    T2#3 extends Object declared in method <T2#3,T3#2,T4#1>and(P3<F,T2#3,T3#2,T4#1>)
-    T3#2 extends Object declared in method <T2#3,T3#2,T4#1>and(P3<F,T2#3,T3#2,T4#1>)
-    T4#1 extends Object declared in method <T2#3,T3#2,T4#1>and(P3<F,T2#3,T3#2,T4#1>)
-    T2#4 extends Object declared in method <T2#4,T3#3,T4#2,T5#1>and(P4<F,T2#4,T3#3,T4#2,T5#1>)
-    T3#3 extends Object declared in method <T2#4,T3#3,T4#2,T5#1>and(P4<F,T2#4,T3#3,T4#2,T5#1>)
-    T4#2 extends Object declared in method <T2#4,T3#3,T4#2,T5#1>and(P4<F,T2#4,T3#3,T4#2,T5#1>)
-    T5#1 extends Object declared in method <T2#4,T3#3,T4#2,T5#1>and(P4<F,T2#4,T3#3,T4#2,T5#1>)
-    T2#5 extends Object declared in method <T2#5,T3#4,T4#3,T5#2,T6#1>and(P5<F,T2#5,T3#4,T4#3,T5#2,T6#1>)
-    T3#4 extends Object declared in method <T2#5,T3#4,T4#3,T5#2,T6#1>and(P5<F,T2#5,T3#4,T4#3,T5#2,T6#1>)
-    T4#3 extends Object declared in method <T2#5,T3#4,T4#3,T5#2,T6#1>and(P5<F,T2#5,T3#4,T4#3,T5#2,T6#1>)
-    T5#2 extends Object declared in method <T2#5,T3#4,T4#3,T5#2,T6#1>and(P5<F,T2#5,T3#4,T4#3,T5#2,T6#1>)
-    T6#1 extends Object declared in method <T2#5,T3#4,T4#3,T5#2,T6#1>and(P5<F,T2#5,T3#4,T4#3,T5#2,T6#1>)
-    T2#6 extends Object declared in method <T2#6,T3#5,T4#4,T5#3,T6#2,T7#1>and(P6<F,T2#6,T3#5,T4#4,T5#3,T6#2,T7#1>)
-    T3#5 extends Object declared in method <T2#6,T3#5,T4#4,T5#3,T6#2,T7#1>and(P6<F,T2#6,T3#5,T4#4,T5#3,T6#2,T7#1>)
-    T4#4 extends Object declared in method <T2#6,T3#5,T4#4,T5#3,T6#2,T7#1>and(P6<F,T2#6,T3#5,T4#4,T5#3,T6#2,T7#1>)
-    T5#3 extends Object declared in method <T2#6,T3#5,T4#4,T5#3,T6#2,T7#1>and(P6<F,T2#6,T3#5,T4#4,T5#3,T6#2,T7#1>)
-    T6#2 extends Object declared in method <T2#6,T3#5,T4#4,T5#3,T6#2,T7#1>and(P6<F,T2#6,T3#5,T4#4,T5#3,T6#2,T7#1>)
-    T7#1 extends Object declared in method <T2#6,T3#5,T4#4,T5#3,T6#2,T7#1>and(P6<F,T2#6,T3#5,T4#4,T5#3,T6#2,T7#1>)
-    T2#7 extends Object declared in method <T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8>and(P7<F,T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8>)
-    T3#6 extends Object declared in method <T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8>and(P7<F,T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8>)
-    T4#5 extends Object declared in method <T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8>and(P7<F,T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8>)
-    T5#4 extends Object declared in method <T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8>and(P7<F,T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8>)
-    T6#3 extends Object declared in method <T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8>and(P7<F,T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8>)
-    T7#2 extends Object declared in method <T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8>and(P7<F,T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8>)
-    T8 extends Object declared in method <T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8>and(P7<F,T2#7,T3#6,T4#5,T5#4,T6#3,T7#2,T8>)
-/home/matt/Documents/Repos/Mattcraft/net/minecraft/world/level/storage/loot/functions/SetAttributesFunction.java:31: error: unexpected type
-                        .<List<SetAttributesFunction.Modifier>, boolean>and(
-                                                                ^
-  required: reference
-  found:    boolean
+    T extends Comparable<T> declared in method <T>formatAndSortList(Collection<T>,Function<T,Component>)
+/home/matt/Documents/Repos/Mattcraft/net/minecraft/network/syncher/EntityDataSerializers.java:93: error: incompatible types: inference variable V has incompatible equality constraints EntityReference<LivingEntity>,EntityReference<UniquelyIdentifyable>
+        public static final EntityDataSerializer<Optional<EntityReference<LivingEntity>>> OPTIONAL_LIVING_ENTITY_REFERENCE = EntityDataSerializer.forValueType(
+                                                                                                                                                              ^
+  where V,B are type-variables:
+    V extends Object declared in method <B,V>optional(StreamCodec<? super B,V>)
+    B extends ByteBuf declared in method <B,V>optional(StreamCodec<? super B,V>)
 Note: Some input files use or override a deprecated API.
 Note: Recompile with -Xlint:deprecation for details.
 Note: Some input files use unchecked or unsafe operations.
 Note: Recompile with -Xlint:unchecked for details.
 Note: Some messages have been simplified; recompile with -Xdiags:verbose to get full output
-100 errors
+59 errors
 4 warnings
-only showing the first 100 errors, of 116 total; use -Xmaxerrs if you would like to see more
 > Task :compileJava FAILED
 
 FAILURE: Build failed with an exception.
@@ -862,7 +338,7 @@ Execution failed for task ':compileJava'.
 > Run with --info option to get more log output.
 > Run with --scan to get full insights.
 
-BUILD FAILED in 37s
+BUILD FAILED in 47s
 1 actionable task: 1 executed
 matt@HungLoDE:~/Documents/Repos/Mattcraft$
 
