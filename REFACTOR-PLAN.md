@@ -242,7 +242,7 @@ String result = sb.toString();
 
 // After
 } catch (IOException e) {
-    LOGGER.error("Failed to rename file from {} to {}: {}", 
+    Util.LOGGER.error("Failed to rename file from {} to {}: {}", 
         sourcePath, targetPath, e.getMessage(), e);
 }
 ```
