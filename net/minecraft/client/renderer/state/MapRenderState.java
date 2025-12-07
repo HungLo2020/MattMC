@@ -2,22 +2,21 @@ package net.minecraft.client.renderer.state;
 
 import java.util.ArrayList;
 import java.util.List;
-import net.fabricmc.api.EnvType;
-import net.fabricmc.api.Environment;
-import net.fabricmc.fabric.api.client.rendering.v1.FabricRenderState;
+import net.minecraft.api.EnvType;
+import net.minecraft.api.Environment;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import org.jetbrains.annotations.Nullable;
 
 @Environment(EnvType.CLIENT)
-public class MapRenderState implements FabricRenderState {
+public class MapRenderState {
 	@Nullable
 	public ResourceLocation texture;
 	public final List<MapRenderState.MapDecorationRenderState> decorations = new ArrayList();
 
 	@Environment(EnvType.CLIENT)
-	public static class MapDecorationRenderState implements FabricRenderState {
+	public static class MapDecorationRenderState {
 		@Nullable
 		public TextureAtlasSprite atlasSprite;
 		public byte x;

@@ -1,8 +1,7 @@
 package net.minecraft.client.renderer.blockentity.state;
 
-import net.fabricmc.api.EnvType;
-import net.fabricmc.api.Environment;
-import net.fabricmc.fabric.api.client.rendering.v1.FabricRenderState;
+import net.minecraft.api.EnvType;
+import net.minecraft.api.Environment;
 import net.minecraft.CrashReportCategory;
 import net.minecraft.client.renderer.LevelRenderer;
 import net.minecraft.client.renderer.feature.ModelFeatureRenderer;
@@ -14,7 +13,7 @@ import net.minecraft.world.level.block.state.BlockState;
 import org.jetbrains.annotations.Nullable;
 
 @Environment(EnvType.CLIENT)
-public class BlockEntityRenderState implements FabricRenderState {
+public class BlockEntityRenderState {
 	public BlockPos blockPos = BlockPos.ZERO;
 	public BlockState blockState = Blocks.AIR.defaultBlockState();
 	public BlockEntityType<?> blockEntityType = BlockEntityType.TEST_BLOCK;

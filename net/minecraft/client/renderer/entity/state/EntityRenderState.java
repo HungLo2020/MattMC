@@ -3,9 +3,8 @@ package net.minecraft.client.renderer.entity.state;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
-import net.fabricmc.api.EnvType;
-import net.fabricmc.api.Environment;
-import net.fabricmc.fabric.api.client.rendering.v1.FabricRenderState;
+import net.minecraft.api.EnvType;
+import net.minecraft.api.Environment;
 import net.minecraft.CrashReportCategory;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.EntityType;
@@ -14,7 +13,7 @@ import net.minecraft.world.phys.shapes.VoxelShape;
 import org.jetbrains.annotations.Nullable;
 
 @Environment(EnvType.CLIENT)
-public class EntityRenderState implements FabricRenderState {
+public class EntityRenderState {
 	public static final int NO_OUTLINE = 0;
 	public EntityType<?> entityType;
 	public double x;

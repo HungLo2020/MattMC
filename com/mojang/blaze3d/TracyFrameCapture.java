@@ -11,8 +11,8 @@ import com.mojang.blaze3d.textures.GpuTextureView;
 import com.mojang.blaze3d.textures.TextureFormat;
 import com.mojang.jtracy.TracyClient;
 import java.util.OptionalInt;
-import net.fabricmc.api.EnvType;
-import net.fabricmc.api.Environment;
+import net.minecraft.api.EnvType;
+import net.minecraft.api.Environment;
 import net.minecraft.client.renderer.RenderPipelines;
 
 @Environment(EnvType.CLIENT)

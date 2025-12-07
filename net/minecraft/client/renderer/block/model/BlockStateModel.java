@@ -8,9 +8,8 @@ import com.mojang.serialization.codecs.RecordCodecBuilder;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import java.util.ArrayList;
 import java.util.List;
-import net.fabricmc.api.EnvType;
-import net.fabricmc.api.Environment;
-import net.fabricmc.fabric.api.renderer.v1.model.FabricBlockStateModel;
+import net.minecraft.api.EnvType;
+import net.minecraft.api.Environment;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
 import net.minecraft.client.resources.model.ModelBaker;
 import net.minecraft.client.resources.model.ResolvableModel;
@@ -22,7 +21,7 @@ import net.minecraft.util.random.WeightedList;
 import net.minecraft.world.level.block.state.BlockState;
 
 @Environment(EnvType.CLIENT)
-public interface BlockStateModel extends FabricBlockStateModel {
+public interface BlockStateModel {
 	void collectParts(RandomSource randomSource, List<BlockModelPart> list);
 
 	default List<BlockModelPart> collectParts(RandomSource randomSource) {

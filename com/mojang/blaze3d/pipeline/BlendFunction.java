@@ -3,8 +3,8 @@ package com.mojang.blaze3d.pipeline;
 import com.mojang.blaze3d.DontObfuscate;
 import com.mojang.blaze3d.platform.DestFactor;
 import com.mojang.blaze3d.platform.SourceFactor;
-import net.fabricmc.api.EnvType;
-import net.fabricmc.api.Environment;
+import net.minecraft.api.EnvType;
+import net.minecraft.api.Environment;
 
 @Environment(EnvType.CLIENT)
 @DontObfuscate

@@ -1536,7 +1536,7 @@ public class EntityType<T extends Entity> implements FeatureElement, EntityTypeT
 		return OP_ONLY_CUSTOM_DATA.contains(this);
 	}
 
-	public static class Builder<T extends Entity> implements net.fabricmc.fabric.api.object.builder.v1.entity.FabricEntityType.Builder<T> {
+	public static class Builder<T extends Entity> {
 		private final EntityType.EntityFactory<T> factory;
 		private final MobCategory category;
 		private ImmutableSet<Block> immuneTo = ImmutableSet.of();

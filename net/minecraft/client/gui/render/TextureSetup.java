@@ -1,8 +1,8 @@
 package net.minecraft.client.gui.render;
 
 import com.mojang.blaze3d.textures.GpuTextureView;
-import net.fabricmc.api.EnvType;
-import net.fabricmc.api.Environment;
+import net.minecraft.api.EnvType;
+import net.minecraft.api.Environment;
 import net.minecraft.SharedConstants;
 import net.minecraft.client.Minecraft;
 import org.jetbrains.annotations.Nullable;

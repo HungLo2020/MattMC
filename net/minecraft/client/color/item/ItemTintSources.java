@@ -2,8 +2,8 @@ package net.minecraft.client.color.item;
 
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.MapCodec;
-import net.fabricmc.api.EnvType;
-import net.fabricmc.api.Environment;
+import net.minecraft.api.EnvType;
+import net.minecraft.api.Environment;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.ExtraCodecs.LateBoundIdMapper;
 

@@ -1,7 +1,7 @@
 package net.minecraft.client.renderer.state;
 
-import net.fabricmc.api.EnvType;
-import net.fabricmc.api.Environment;
+import net.minecraft.api.EnvType;
+import net.minecraft.api.Environment;
 import net.minecraft.client.renderer.SubmitNodeCollector;
 
 @Environment(EnvType.CLIENT)

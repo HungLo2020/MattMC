@@ -6,10 +6,8 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
-import net.fabricmc.api.EnvType;
-import net.fabricmc.api.Environment;
-import net.fabricmc.fabric.api.client.rendering.v1.FabricRenderState;
-import net.fabricmc.fabric.api.renderer.v1.render.FabricLayerRenderState;
+import net.minecraft.api.EnvType;
+import net.minecraft.api.Environment;
 import net.minecraft.client.renderer.RenderType;
 import net.minecraft.client.renderer.SubmitNodeCollector;
 import net.minecraft.client.renderer.block.model.BakedQuad;
@@ -26,7 +24,7 @@ import org.joml.Vector3f;
 import org.joml.Vector3fc;
 
 @Environment(EnvType.CLIENT)
-public class ItemStackRenderState implements FabricRenderState {
+public class ItemStackRenderState {
 	ItemDisplayContext displayContext = ItemDisplayContext.NONE;
 	private int activeLayerCount;
 	private boolean animated;
@@ -145,7 +143,7 @@ public class ItemStackRenderState implements FabricRenderState {
 	}
 
 	@Environment(EnvType.CLIENT)
-	public class LayerRenderState implements FabricLayerRenderState, FabricRenderState {
+	public class LayerRenderState {
 		private static final Vector3f[] NO_EXTENTS = new Vector3f[0];
 		public static final Supplier<Vector3f[]> NO_EXTENTS_SUPPLIER = () -> NO_EXTENTS;
 		private final List<BakedQuad> quads = new ArrayList();

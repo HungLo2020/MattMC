@@ -1,7 +1,7 @@
 package net.minecraft.client.data.models.blockstates;
 
-import net.fabricmc.api.EnvType;
-import net.fabricmc.api.Environment;
+import net.minecraft.api.EnvType;
+import net.minecraft.api.Environment;
 import net.minecraft.client.renderer.block.model.BlockModelDefinition;
 import net.minecraft.world.level.block.Block;
 

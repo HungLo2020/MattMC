@@ -11,9 +11,8 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 import java.util.function.Function;
 import java.util.stream.Collectors;
-import net.fabricmc.api.EnvType;
-import net.fabricmc.api.Environment;
-import net.fabricmc.fabric.api.renderer.v1.sprite.FabricStitchResult;
+import net.minecraft.api.EnvType;
+import net.minecraft.api.Environment;
 import net.minecraft.CrashReport;
 import net.minecraft.CrashReportCategory;
 import net.minecraft.ReportedException;
@@ -162,7 +161,7 @@ public class SpriteLoader {
 	@Environment(EnvType.CLIENT)
 	public record Preparations(
 		int width, int height, int mipLevel, TextureAtlasSprite missing, Map<ResourceLocation, TextureAtlasSprite> regions, CompletableFuture<Void> readyForUpload
-	) implements FabricStitchResult {
+	) {
 		@Nullable
 		public TextureAtlasSprite getSprite(ResourceLocation resourceLocation) {
 			return (TextureAtlasSprite)this.regions.get(resourceLocation);

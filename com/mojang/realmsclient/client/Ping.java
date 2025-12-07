@@ -7,8 +7,8 @@ import java.net.Socket;
 import java.net.SocketAddress;
 import java.util.Comparator;
 import java.util.List;
-import net.fabricmc.api.EnvType;
-import net.fabricmc.api.Environment;
+import net.minecraft.api.EnvType;
+import net.minecraft.api.Environment;
 import net.minecraft.Util;
 import org.apache.commons.io.IOUtils;
 

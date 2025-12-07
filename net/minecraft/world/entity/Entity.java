@@ -28,7 +28,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BiConsumer;
 import java.util.function.Predicate;
 import java.util.stream.Stream;
-import net.fabricmc.fabric.api.attachment.v1.AttachmentTarget;
 import net.minecraft.BlockUtil;
 import net.minecraft.CrashReport;
 import net.minecraft.CrashReportCategory;
@@ -158,8 +157,7 @@ public abstract class Entity
 	ItemOwner,
 	EntityAccess,
 	ScoreHolder,
-	DataComponentGetter,
-	AttachmentTarget {
+	DataComponentGetter {
 	private static final Logger LOGGER = LogUtils.getLogger();
 	public static final String TAG_ID = "id";
 	public static final String TAG_UUID = "UUID";

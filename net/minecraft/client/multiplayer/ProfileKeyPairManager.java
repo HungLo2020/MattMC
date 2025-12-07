@@ -4,8 +4,8 @@ import com.mojang.authlib.minecraft.UserApiService;
 import java.nio.file.Path;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
-import net.fabricmc.api.EnvType;
-import net.fabricmc.api.Environment;
+import net.minecraft.api.EnvType;
+import net.minecraft.api.Environment;
 import net.minecraft.client.User;
 import net.minecraft.world.entity.player.ProfileKeyPair;
 

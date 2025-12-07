@@ -19,7 +19,6 @@ import java.util.function.BiConsumer;
 import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
-import net.fabricmc.fabric.api.attachment.v1.AttachmentTarget;
 import net.minecraft.CrashReport;
 import net.minecraft.CrashReportCategory;
 import net.minecraft.CrashReportDetail;
@@ -59,7 +58,7 @@ import net.minecraft.world.ticks.TickContainerAccess;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 
-public abstract class ChunkAccess implements BiomeManager.NoiseBiomeSource, LightChunk, StructureAccess, AttachmentTarget {
+public abstract class ChunkAccess implements BiomeManager.NoiseBiomeSource, LightChunk, StructureAccess {
 	public static final int NO_FILLED_SECTION = -1;
 	private static final Logger LOGGER = LogUtils.getLogger();
 	private static final LongSet EMPTY_REFERENCE_SET = new LongOpenHashSet();

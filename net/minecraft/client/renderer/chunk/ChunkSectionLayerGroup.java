@@ -2,8 +2,8 @@ package net.minecraft.client.renderer.chunk;
 
 import com.mojang.blaze3d.pipeline.RenderTarget;
 import java.util.Locale;
-import net.fabricmc.api.EnvType;
-import net.fabricmc.api.Environment;
+import net.minecraft.api.EnvType;
+import net.minecraft.api.Environment;
 import net.minecraft.client.Minecraft;
 
 @Environment(EnvType.CLIENT)

@@ -2,8 +2,8 @@ package net.minecraft.client.renderer.texture.atlas.sources;
 
 import com.mojang.serialization.MapCodec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
-import net.fabricmc.api.EnvType;
-import net.fabricmc.api.Environment;
+import net.minecraft.api.EnvType;
+import net.minecraft.api.Environment;
 import net.minecraft.client.renderer.texture.atlas.SpriteSource;
 import net.minecraft.server.packs.resources.ResourceManager;
 import net.minecraft.util.ResourceLocationPattern;

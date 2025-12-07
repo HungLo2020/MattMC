@@ -20,9 +20,8 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.Executor;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
-import net.fabricmc.api.EnvType;
-import net.fabricmc.api.Environment;
-import net.fabricmc.fabric.api.client.model.loading.v1.FabricBakedModelManager;
+import net.minecraft.api.EnvType;
+import net.minecraft.api.Environment;
 import net.minecraft.Util;
 import net.minecraft.client.color.block.BlockColors;
 import net.minecraft.client.model.geom.EntityModelSet;
@@ -55,7 +54,7 @@ import net.minecraft.world.level.material.FluidState;
 import org.slf4j.Logger;
 
 @Environment(EnvType.CLIENT)
-public class ModelManager implements PreparableReloadListener, FabricBakedModelManager {
+public class ModelManager implements PreparableReloadListener {
 	private static final Logger LOGGER = LogUtils.getLogger();
 	private static final FileToIdConverter MODEL_LISTER = FileToIdConverter.json("models");
 	private Map<ResourceLocation, ItemModel> bakedItemStackModels = Map.of();

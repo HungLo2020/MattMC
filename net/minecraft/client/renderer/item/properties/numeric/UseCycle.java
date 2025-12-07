@@ -2,8 +2,8 @@ package net.minecraft.client.renderer.item.properties.numeric;
 
 import com.mojang.serialization.MapCodec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
-import net.fabricmc.api.EnvType;
-import net.fabricmc.api.Environment;
+import net.minecraft.api.EnvType;
+import net.minecraft.api.Environment;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.util.ExtraCodecs;
 import net.minecraft.world.entity.ItemOwner;

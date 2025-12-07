@@ -2,8 +2,8 @@ package com.mojang.blaze3d;
 
 import com.mojang.jtracy.TracyClient;
 import com.mojang.logging.LogListeners;
-import net.fabricmc.api.EnvType;
-import net.fabricmc.api.Environment;
+import net.minecraft.api.EnvType;
+import net.minecraft.api.Environment;
 import org.slf4j.event.Level;
 
 @Environment(EnvType.CLIENT)

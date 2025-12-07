@@ -5,9 +5,8 @@ import com.mojang.blaze3d.vertex.VertexConsumer;
 import it.unimi.dsi.fastutil.longs.Long2FloatLinkedOpenHashMap;
 import it.unimi.dsi.fastutil.longs.Long2IntLinkedOpenHashMap;
 import java.util.List;
-import net.fabricmc.api.EnvType;
-import net.fabricmc.api.Environment;
-import net.fabricmc.fabric.api.renderer.v1.render.FabricBlockModelRenderer;
+import net.minecraft.api.EnvType;
+import net.minecraft.api.Environment;
 import net.minecraft.CrashReport;
 import net.minecraft.CrashReportCategory;
 import net.minecraft.ReportedException;
@@ -29,7 +28,7 @@ import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
 
 @Environment(EnvType.CLIENT)
-public class ModelBlockRenderer implements FabricBlockModelRenderer {
+public class ModelBlockRenderer {
 	private static final Direction[] DIRECTIONS = Direction.values();
 	private final BlockColors blockColors;
 	private static final int CACHE_SIZE = 100;

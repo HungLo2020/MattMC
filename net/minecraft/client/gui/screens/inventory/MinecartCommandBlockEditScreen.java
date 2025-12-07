@@ -1,7 +1,7 @@
 package net.minecraft.client.gui.screens.inventory;
 
-import net.fabricmc.api.EnvType;
-import net.fabricmc.api.Environment;
+import net.minecraft.api.EnvType;
+import net.minecraft.api.Environment;
 import net.minecraft.network.protocol.game.ServerboundSetCommandMinecartPacket;
 import net.minecraft.world.entity.vehicle.MinecartCommandBlock.MinecartCommandBase;
 import net.minecraft.world.level.BaseCommandBlock;

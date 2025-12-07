@@ -1,7 +1,7 @@
 package net.minecraft.client.renderer.block.model;
 
-import net.fabricmc.api.EnvType;
-import net.fabricmc.api.Environment;
+import net.minecraft.api.EnvType;
+import net.minecraft.api.Environment;
 import net.minecraft.core.Direction.Axis;
 import org.joml.Vector3f;
 

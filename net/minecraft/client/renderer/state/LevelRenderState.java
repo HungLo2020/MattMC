@@ -2,15 +2,14 @@ package net.minecraft.client.renderer.state;
 
 import java.util.ArrayList;
 import java.util.List;
-import net.fabricmc.api.EnvType;
-import net.fabricmc.api.Environment;
-import net.fabricmc.fabric.api.client.rendering.v1.FabricRenderState;
+import net.minecraft.api.EnvType;
+import net.minecraft.api.Environment;
 import net.minecraft.client.renderer.blockentity.state.BlockEntityRenderState;
 import net.minecraft.client.renderer.entity.state.EntityRenderState;
 import org.jetbrains.annotations.Nullable;
 
 @Environment(EnvType.CLIENT)
-public class LevelRenderState implements FabricRenderState {
+public class LevelRenderState {
 	public CameraRenderState cameraRenderState = new CameraRenderState();
 	public final List<EntityRenderState> entityRenderStates = new ArrayList();
 	public final List<BlockEntityRenderState> blockEntityRenderStates = new ArrayList();

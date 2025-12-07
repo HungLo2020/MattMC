@@ -11,7 +11,6 @@ import java.util.Set;
 import java.util.Map.Entry;
 import java.util.function.BiConsumer;
 import java.util.stream.Collectors;
-import net.fabricmc.fabric.api.datagen.v1.loot.FabricEntityLootTableGenerator;
 import net.minecraft.advancements.critereon.DamageSourcePredicate;
 import net.minecraft.advancements.critereon.DataComponentMatchers;
 import net.minecraft.advancements.critereon.EnchantmentPredicate;
@@ -46,7 +45,7 @@ import net.minecraft.world.level.storage.loot.predicates.DamageSourceCondition;
 import net.minecraft.world.level.storage.loot.predicates.LootItemCondition;
 import net.minecraft.world.level.storage.loot.predicates.LootItemEntityPropertyCondition;
 
-public abstract class EntityLootSubProvider implements LootTableSubProvider, FabricEntityLootTableGenerator {
+public abstract class EntityLootSubProvider implements LootTableSubProvider {
 	protected final HolderLookup.Provider registries;
 	private final FeatureFlagSet allowed;
 	private final FeatureFlagSet required;

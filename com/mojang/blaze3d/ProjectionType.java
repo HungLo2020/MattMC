@@ -1,8 +1,8 @@
 package com.mojang.blaze3d;
 
 import com.mojang.blaze3d.vertex.VertexSorting;
-import net.fabricmc.api.EnvType;
-import net.fabricmc.api.Environment;
+import net.minecraft.api.EnvType;
+import net.minecraft.api.Environment;
 import org.joml.Matrix4f;
 
 @Environment(EnvType.CLIENT)

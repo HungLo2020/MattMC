@@ -2,8 +2,8 @@ package net.minecraft.client.renderer.texture;
 
 import com.mojang.blaze3d.textures.GpuTexture;
 import com.mojang.blaze3d.vertex.VertexConsumer;
-import net.fabricmc.api.EnvType;
-import net.fabricmc.api.Environment;
+import net.minecraft.api.EnvType;
+import net.minecraft.api.Environment;
 import net.minecraft.client.renderer.SpriteCoordinateExpander;
 import net.minecraft.resources.ResourceLocation;
 import org.jetbrains.annotations.Nullable;

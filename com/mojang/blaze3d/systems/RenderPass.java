@@ -9,8 +9,8 @@ import com.mojang.blaze3d.vertex.VertexFormat;
 import java.util.Collection;
 import java.util.function.BiConsumer;
 import java.util.function.Supplier;
-import net.fabricmc.api.EnvType;
-import net.fabricmc.api.Environment;
+import net.minecraft.api.EnvType;
+import net.minecraft.api.Environment;
 import org.jetbrains.annotations.Nullable;
 
 @Environment(EnvType.CLIENT)

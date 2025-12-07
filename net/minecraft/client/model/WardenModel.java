@@ -1,8 +1,8 @@
 package net.minecraft.client.model;
 
 import java.util.Set;
-import net.fabricmc.api.EnvType;
-import net.fabricmc.api.Environment;
+import net.minecraft.api.EnvType;
+import net.minecraft.api.Environment;
 import net.minecraft.client.animation.KeyframeAnimation;
 import net.minecraft.client.animation.definitions.WardenAnimation;
 import net.minecraft.client.model.geom.ModelPart;

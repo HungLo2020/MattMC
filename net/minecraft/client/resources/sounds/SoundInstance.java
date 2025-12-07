@@ -1,8 +1,7 @@
 package net.minecraft.client.resources.sounds;
 
-import net.fabricmc.api.EnvType;
-import net.fabricmc.api.Environment;
-import net.fabricmc.fabric.api.client.sound.v1.FabricSoundInstance;
+import net.minecraft.api.EnvType;
+import net.minecraft.api.Environment;
 import net.minecraft.client.sounds.SoundManager;
 import net.minecraft.client.sounds.WeighedSoundEvents;
 import net.minecraft.resources.ResourceLocation;
@@ -11,7 +10,7 @@ import net.minecraft.util.RandomSource;
 import org.jetbrains.annotations.Nullable;
 
 @Environment(EnvType.CLIENT)
-public interface SoundInstance extends FabricSoundInstance {
+public interface SoundInstance {
 	ResourceLocation getLocation();
 
 	@Nullable

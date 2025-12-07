@@ -3,8 +3,8 @@ package net.minecraft.client.multiplayer.resolver;
 import com.google.common.net.HostAndPort;
 import com.mojang.logging.LogUtils;
 import java.net.IDN;
-import net.fabricmc.api.EnvType;
-import net.fabricmc.api.Environment;
+import net.minecraft.api.EnvType;
+import net.minecraft.api.Environment;
 import org.slf4j.Logger;
 
 @Environment(EnvType.CLIENT)

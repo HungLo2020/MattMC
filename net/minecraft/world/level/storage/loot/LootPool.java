@@ -8,7 +8,6 @@ import java.util.List;
 import java.util.function.BiFunction;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
-import net.fabricmc.fabric.api.loot.v3.FabricLootPoolBuilder;
 import net.minecraft.Util;
 import net.minecraft.util.Mth;
 import net.minecraft.util.ProblemReporter;
@@ -123,7 +122,7 @@ public class LootPool {
 		return new LootPool.Builder();
 	}
 
-	public static class Builder implements FunctionUserBuilder<LootPool.Builder>, ConditionUserBuilder<LootPool.Builder>, FabricLootPoolBuilder {
+	public static class Builder implements FunctionUserBuilder<LootPool.Builder>, ConditionUserBuilder<LootPool.Builder> {
 		private final ImmutableList.Builder<LootPoolEntryContainer> entries = ImmutableList.builder();
 		private final ImmutableList.Builder<LootItemCondition> conditions = ImmutableList.builder();
 		private final ImmutableList.Builder<LootItemFunction> functions = ImmutableList.builder();

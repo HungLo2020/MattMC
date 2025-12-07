@@ -2,8 +2,8 @@ package com.mojang.blaze3d.platform;
 
 import java.io.File;
 import java.time.Duration;
-import net.fabricmc.api.EnvType;
-import net.fabricmc.api.Environment;
+import net.minecraft.api.EnvType;
+import net.minecraft.api.Environment;
 import net.minecraft.CrashReport;
 import net.minecraft.client.Minecraft;
 import net.minecraft.server.dedicated.ServerWatchdog;

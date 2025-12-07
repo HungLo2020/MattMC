@@ -2,8 +2,8 @@ package net.minecraft.client.gui.spectator;
 
 import com.google.common.collect.Lists;
 import java.util.List;
-import net.fabricmc.api.EnvType;
-import net.fabricmc.api.Environment;
+import net.minecraft.api.EnvType;
+import net.minecraft.api.Environment;
 import net.minecraft.client.gui.spectator.categories.TeleportToPlayerMenuCategory;
 import net.minecraft.client.gui.spectator.categories.TeleportToTeamMenuCategory;
 import net.minecraft.network.chat.Component;

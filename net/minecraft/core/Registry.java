@@ -13,7 +13,6 @@ import java.util.Set;
 import java.util.Map.Entry;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
-import net.fabricmc.fabric.api.event.registry.FabricRegistry;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.tags.TagKey;
@@ -22,7 +21,7 @@ import net.minecraft.util.ExtraCodecs;
 import net.minecraft.util.RandomSource;
 import org.jetbrains.annotations.Nullable;
 
-public interface Registry<T> extends Keyable, HolderLookup.RegistryLookup<T>, IdMap<T>, FabricRegistry {
+public interface Registry<T> extends Keyable, HolderLookup.RegistryLookup<T>, IdMap<T> {
 	@Override
 	ResourceKey<? extends Registry<T>> key();
 

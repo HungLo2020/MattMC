@@ -7,7 +7,6 @@ import java.util.function.BiFunction;
 import java.util.function.Function;
 import java.util.function.Supplier;
 import java.util.stream.Stream;
-import net.fabricmc.fabric.api.blockview.v2.FabricBlockView;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.Vec3i;
@@ -22,7 +21,7 @@ import net.minecraft.world.phys.Vec3;
 import net.minecraft.world.phys.shapes.VoxelShape;
 import org.jetbrains.annotations.Nullable;
 
-public interface BlockGetter extends LevelHeightAccessor, FabricBlockView {
+public interface BlockGetter extends LevelHeightAccessor {
 	@Nullable
 	BlockEntity getBlockEntity(BlockPos blockPos);
 

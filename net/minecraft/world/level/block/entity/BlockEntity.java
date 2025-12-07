@@ -4,8 +4,6 @@ import com.mojang.logging.LogUtils;
 import com.mojang.serialization.Codec;
 import java.util.HashSet;
 import java.util.Set;
-import net.fabricmc.fabric.api.attachment.v1.AttachmentTarget;
-import net.fabricmc.fabric.api.blockview.v2.RenderDataBlockEntity;
 import net.minecraft.CrashReportCategory;
 import net.minecraft.CrashReportDetail;
 import net.minecraft.core.BlockPos;
@@ -39,7 +37,7 @@ import net.minecraft.world.level.storage.ValueOutput;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 
-public abstract class BlockEntity implements DebugValueSource, RenderDataBlockEntity, AttachmentTarget {
+public abstract class BlockEntity implements DebugValueSource {
 	private static final Codec<BlockEntityType<?>> TYPE_CODEC = BuiltInRegistries.BLOCK_ENTITY_TYPE.byNameCodec();
 	private static final Logger LOGGER = LogUtils.getLogger();
 	private final BlockEntityType<?> type;

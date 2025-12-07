@@ -1,8 +1,8 @@
 package com.mojang.blaze3d.platform.cursor;
 
 import com.mojang.blaze3d.platform.Window;
-import net.fabricmc.api.EnvType;
-import net.fabricmc.api.Environment;
+import net.minecraft.api.EnvType;
+import net.minecraft.api.Environment;
 import org.lwjgl.glfw.GLFW;
 
 @Environment(EnvType.CLIENT)

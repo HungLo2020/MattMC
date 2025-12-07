@@ -4,10 +4,9 @@ import com.mojang.serialization.Codec;
 import com.mojang.serialization.MapCodec;
 import java.util.Optional;
 import java.util.stream.Stream;
-import net.fabricmc.fabric.api.serialization.v1.view.FabricReadView;
 import net.minecraft.core.HolderLookup;
 
-public interface ValueInput extends FabricReadView {
+public interface ValueInput {
 	<T> Optional<T> read(String string, Codec<T> codec);
 
 	@Deprecated

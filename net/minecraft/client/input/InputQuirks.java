@@ -1,7 +1,7 @@
 package net.minecraft.client.input;
 
-import net.fabricmc.api.EnvType;
-import net.fabricmc.api.Environment;
+import net.minecraft.api.EnvType;
+import net.minecraft.api.Environment;
 import net.minecraft.Util;
 import net.minecraft.Util.OS;
 

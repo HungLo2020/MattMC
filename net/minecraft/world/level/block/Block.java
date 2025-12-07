@@ -17,7 +17,6 @@ import java.util.function.IntFunction;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
-import net.fabricmc.fabric.api.block.v1.FabricBlock;
 import net.minecraft.SharedConstants;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -71,7 +70,7 @@ import net.minecraft.world.phys.shapes.VoxelShape;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 
-public class Block extends BlockBehaviour implements ItemLike, FabricBlock {
+public class Block extends BlockBehaviour implements ItemLike {
 	public static final MapCodec<Block> CODEC = simpleCodec(Block::new);
 	private static final Logger LOGGER = LogUtils.getLogger();
 	private final Holder.Reference<Block> builtInRegistryHolder = BuiltInRegistries.BLOCK.createIntrusiveHolder(this);
