@@ -13,19 +13,24 @@ The `ChunkPerformanceTest` provides comprehensive benchmarks to measure the perf
 ./RunChunkPerformanceTest.sh
 ```
 
+If you encounter compilation errors, try with a clean build:
+```bash
+./RunChunkPerformanceTest.sh --clean
+```
+
 ### Option 2: Using Gradle directly
 ```bash
 ./gradlew runChunkPerformanceTest
 ```
 
+### Option 3: Force clean build
+```bash
+./gradlew clean classes compileTestJava runChunkPerformanceTest
+```
+
 **Note:** If you want to compile and run in one command, use `&&` not `$$`:
 ```bash
 ./gradlew build && ./gradlew runChunkPerformanceTest
-```
-
-### Option 3: Without daemon (for CI/automation)
-```bash
-./gradlew runChunkPerformanceTest --no-daemon
 ```
 
 ## Requirements
@@ -119,26 +124,36 @@ The tests use the following configuration:
 
 If you see errors like "cannot find symbol: class SharedConstants" or "package net.minecraft.core does not exist":
 
-**Root Cause:** The test classes can't find the compiled main classes. This typically happens when test compilation runs before main compilation.
+**Root Cause:** The test classes can't find the compiled main classes. This can happen due to stale build cache or Gradle state issues.
 
-**Solution 1 - Use the convenience script (Recommended):**
+**Solution 1 - Clean build with the convenience script (Recommended):**
+```bash
+./RunChunkPerformanceTest.sh --clean
+```
+The `--clean` flag forces a fresh build, clearing any stale state.
+
+**Solution 2 - Manual clean and rebuild:**
+```bash
+./gradlew clean
+./gradlew classes compileTestJava runChunkPerformanceTest
+```
+
+**Solution 3 - Just use the script (may work if build state is fine):**
 ```bash
 ./RunChunkPerformanceTest.sh
 ```
-The script now explicitly compiles main sources first, then test sources, then runs tests.
 
-**Solution 2 - Manual compilation order:**
+**Solution 4 - Stop Gradle daemon and retry:**
 ```bash
-# Compile in explicit order
-./gradlew classes
-./gradlew compileTestJava
-./gradlew runChunkPerformanceTest
+./gradlew --stop
+./RunChunkPerformanceTest.sh
 ```
 
-**Solution 3 - Clean and rebuild:**
-```bash
-./gradlew clean classes compileTestJava runChunkPerformanceTest
-```
+**Why this happens:**
+- Gradle's incremental compilation can sometimes get confused about dependencies
+- The Gradle daemon might have stale cached state
+- Build output directories might have inconsistent state
+- A clean build usually resolves these issues
 
 **Additional checks:**
 
@@ -152,6 +167,12 @@ The script now explicitly compiles main sources first, then test sources, then r
    - This is a Gradle warning about broken symlinks
    - It's usually safe to ignore if you have a working Java 21 installation
    - Gradle will find a working JDK automatically
+
+3. Check Gradle version:
+   ```bash
+   ./gradlew --version
+   ```
+   Should be version 8.5 or compatible with Java 21
 
 ### Command Syntax Error
 

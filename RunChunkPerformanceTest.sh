@@ -8,6 +8,13 @@ echo "Building and running chunk performance tests..."
 echo "This will compile main sources, test sources, and run the performance benchmarks."
 echo ""
 
+# Check if --clean flag is provided
+if [ "$1" = "--clean" ] || [ "$1" = "-c" ]; then
+    echo "Cleaning build directory first..."
+    ./gradlew clean
+    echo ""
+fi
+
 # Use a single Gradle invocation to ensure proper task dependency resolution
 # The runChunkPerformanceTest task already depends on classes and compileTestJava,
 # but we'll make it explicit to ensure proper order
@@ -16,3 +23,6 @@ echo "Compiling and running tests..."
 
 echo ""
 echo "Performance tests completed!"
+echo ""
+echo "If you encountered compilation errors, try running with --clean flag:"
+echo "  ./RunChunkPerformanceTest.sh --clean"
