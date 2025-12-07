@@ -190,14 +190,26 @@ public class GameRenderer implements Projector, AutoCloseable {
 		return new CubeMap(ResourceLocation.withDefaultNamespace(path));
 	}
 
-	public void reloadPanorama(PanoramaTheme theme) {
-		if (this.cubeMap != null) {
-			this.cubeMap.close();
-		}
-		this.cubeMap = this.createCubeMap(theme);
-		this.panorama = new PanoramaRenderer(this.cubeMap);
+	public synchronized void reloadPanorama(PanoramaTheme theme) {
+		// Store old resources to close after creating new ones
+		CubeMap oldCubeMap = this.cubeMap;
+		
+		// Create new panorama resources
+		CubeMap newCubeMap = this.createCubeMap(theme);
+		PanoramaRenderer newPanorama = new PanoramaRenderer(newCubeMap);
+		
+		// Register textures for new panorama
 		if (this.minecraft != null && this.minecraft.getTextureManager() != null) {
-			this.cubeMap.registerTextures(this.minecraft.getTextureManager());
+			newCubeMap.registerTextures(this.minecraft.getTextureManager());
+		}
+		
+		// Atomically swap to new panorama
+		this.cubeMap = newCubeMap;
+		this.panorama = newPanorama;
+		
+		// Close old resources after swap
+		if (oldCubeMap != null) {
+			oldCubeMap.close();
 		}
 	}
 
@@ -937,7 +949,7 @@ public class GameRenderer implements Projector, AutoCloseable {
 		}
 	}
 
-	public PanoramaRenderer getPanorama() {
+	public synchronized PanoramaRenderer getPanorama() {
 		return this.panorama;
 	}
 }
