@@ -1,4 +1,4 @@
-package net.minecraft.world.level.chunk.storage.performance;
+package net.minecraft.world.level.chunk.storage;
 
 import com.mojang.datafixers.DataFixer;
 import com.mojang.logging.LogUtils;

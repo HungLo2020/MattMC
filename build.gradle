@@ -648,10 +648,27 @@ sourceSets {
         compileClasspath += sourceSets.main.output
         runtimeClasspath += sourceSets.main.output
     }
+    
+    // Separate source set for performance tests (isolated from regular tests)
+    performance {
+        java {
+            srcDirs = ['src/test/performance']
+        }
+        // Performance tests need main classes and dependencies
+        compileClasspath += sourceSets.main.output + configurations.runtimeClasspath
+        runtimeClasspath += sourceSets.main.output + configurations.runtimeClasspath
+    }
 }
 
 // Configure the existing compileTestJava task
 tasks.named('compileTestJava') {
+    // Explicitly depend on main compilation
+    dependsOn 'compileJava'
+    options.encoding = 'UTF-8'
+}
+
+// Configure performance test compilation
+tasks.named('compilePerformanceJava') {
     // Explicitly depend on main compilation
     dependsOn 'compileJava'
     options.encoding = 'UTF-8'
@@ -662,10 +679,10 @@ tasks.register('runChunkPerformanceTest', JavaExec) {
     group = 'verification'
     description = 'Runs chunk save/load performance benchmark tests'
     
-    dependsOn 'compileTestJava', 'classes'
+    dependsOn 'compilePerformanceJava', 'classes'
     
-    classpath = sourceSets.test.runtimeClasspath
-    mainClass = 'net.minecraft.world.level.chunk.storage.performance.ChunkPerformanceTest'
+    classpath = sourceSets.performance.runtimeClasspath
+    mainClass = 'net.minecraft.world.level.chunk.storage.ChunkPerformanceTest'
     
     // Use Java 21 for execution
     javaLauncher = javaToolchains.launcherFor {
