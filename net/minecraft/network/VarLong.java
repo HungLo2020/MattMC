@@ -6,21 +6,20 @@ public class VarLong {
 	private static final int MAX_VARLONG_SIZE = 10;
 	private static final int DATA_BITS_MASK = 127;
 	private static final int CONTINUATION_BIT_MASK = 128;
-	private static final int MAX_VARLONG_LENGTH = 10;
 	private static final int DATA_BITS_PER_BYTE = 7;
 
 	public static int getByteSize(long l) {
-		for (int i = 1; i < 10; i++) {
-			if ((l & -1L << i * 7) == 0L) {
+		for (int i = 1; i < MAX_VARLONG_SIZE; i++) {
+			if ((l & -1L << i * DATA_BITS_PER_BYTE) == 0L) {
 				return i;
 			}
 		}
 
-		return 10;
+		return MAX_VARLONG_SIZE;
 	}
 
 	public static boolean hasContinuationBit(byte b) {
-		return (b & 128) == 128;
+		return (b & CONTINUATION_BIT_MASK) == CONTINUATION_BIT_MASK;
 	}
 
 	public static long read(ByteBuf byteBuf) {
@@ -30,8 +29,8 @@ public class VarLong {
 		byte b;
 		do {
 			b = byteBuf.readByte();
-			l |= (long)(b & DATA_BITS_MASK) << i++ * 7;
-			if (i > MAX_VARLONG_LENGTH) {
+			l |= (long)(b & DATA_BITS_MASK) << i++ * DATA_BITS_PER_BYTE;
+			if (i > MAX_VARLONG_SIZE) {
 				throw new RuntimeException("VarLong too big");
 			}
 		} while (hasContinuationBit(b));
@@ -41,8 +40,8 @@ public class VarLong {
 
 	public static ByteBuf write(ByteBuf byteBuf, long l) {
 		while ((l & -128L) != 0L) {
-			byteBuf.writeByte((int)(l & 127L) | 128);
-			l >>>= 7;
+			byteBuf.writeByte((int)(l & (long)DATA_BITS_MASK) | CONTINUATION_BIT_MASK);
+			l >>>= DATA_BITS_PER_BYTE;
 		}
 
 		byteBuf.writeByte((int)l);
