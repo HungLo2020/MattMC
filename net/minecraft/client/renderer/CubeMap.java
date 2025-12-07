@@ -109,7 +109,7 @@ public class CubeMap implements AutoCloseable {
 	}
 
 	public void registerTextures(TextureManager textureManager) {
-		textureManager.register(this.location, new CubeMapTexture(this.location));
+		textureManager.registerAndLoad(this.location, new CubeMapTexture(this.location));
 	}
 
 	public void close() {
