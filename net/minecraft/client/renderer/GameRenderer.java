@@ -138,6 +138,9 @@ public class GameRenderer implements Projector, AutoCloseable {
 	@Nullable
 	private ResourceLocation postEffectId;
 	private boolean effectActive;
+	@Nullable
+	private ResourceLocation darkModeEffectId;
+	private boolean darkModeActive;
 	private final Camera mainCamera = new Camera();
 	private final Lighting lighting = new Lighting();
 	private final GlobalSettingsUniform globalSettingsUniform = new GlobalSettingsUniform();
@@ -229,6 +232,19 @@ public class GameRenderer implements Projector, AutoCloseable {
 	public void loadPostEffect(ResourceLocation resourceLocation) {
 		this.postEffectId = resourceLocation;
 		this.effectActive = true;
+	}
+
+	public void setDarkMode(boolean enabled) {
+		this.darkModeActive = enabled;
+		if (enabled) {
+			this.darkModeEffectId = ResourceLocation.withDefaultNamespace("dark_mode");
+		} else {
+			this.darkModeEffectId = null;
+		}
+	}
+
+	public boolean isDarkModeActive() {
+		return this.darkModeActive;
 	}
 
 	public void checkEntityPostEffect(@Nullable Entity entity) {
@@ -643,6 +659,16 @@ public class GameRenderer implements Projector, AutoCloseable {
 			this.guiRenderer.render(this.fogRenderer.getBuffer(FogRenderer.FogMode.NONE));
 			this.guiRenderer.incrementFrameNumber();
 			profilerFiller.pop();
+			
+			// Apply dark mode post-processing after all rendering
+			if (this.darkModeEffectId != null && this.darkModeActive) {
+				RenderSystem.resetTextureMatrix();
+				PostChain postChain = this.minecraft.getShaderManager().getPostChain(this.darkModeEffectId, LevelTargetBundle.MAIN_TARGETS);
+				if (postChain != null) {
+					postChain.process(this.minecraft.getMainRenderTarget(), this.resourcePool);
+				}
+			}
+			
 			guiGraphics.applyCursor(this.minecraft.getWindow());
 			this.submitNodeStorage.endFrame();
 			this.featureRenderDispatcher.endFrame();

@@ -298,11 +298,9 @@ public class Options {
 		OptionInstance.cachedConstantTooltip(DARK_MODE_TOOLTIP),
 		true,
 		boolean_ -> {
-			GameRenderer gameRenderer = Minecraft.getInstance().gameRenderer;
-			if (boolean_) {
-				gameRenderer.loadPostEffect(ResourceLocation.withDefaultNamespace("dark_mode"));
-			} else {
-				gameRenderer.clearPostEffect();
+			Minecraft minecraft = Minecraft.getInstance();
+			if (minecraft != null && minecraft.gameRenderer != null) {
+				minecraft.gameRenderer.setDarkMode(boolean_);
 			}
 		}
 	);
@@ -1499,6 +1497,11 @@ public class Options {
 			);
 			compoundTag2.getString("fullscreenResolution").ifPresent(string -> this.fullscreenVideoModeString = string);
 			KeyMapping.resetMapping();
+			
+			// Apply dark mode setting after loading
+			if (this.minecraft.gameRenderer != null) {
+				this.minecraft.gameRenderer.setDarkMode(this.darkMode.get());
+			}
 		} catch (Exception var7) {
 			LOGGER.error("Failed to load options", (Throwable)var7);
 		}
