@@ -1,8 +1,8 @@
 package com.mojang.blaze3d.shaders;
 
 import com.mojang.blaze3d.DontObfuscate;
-import net.fabricmc.api.EnvType;
-import net.fabricmc.api.Environment;
+import net.minecraft.api.EnvType;
+import net.minecraft.api.Environment;
 import net.minecraft.resources.FileToIdConverter;
 import net.minecraft.resources.ResourceLocation;
 import org.jetbrains.annotations.Nullable;

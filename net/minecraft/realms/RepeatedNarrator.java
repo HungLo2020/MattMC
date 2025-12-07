@@ -3,8 +3,8 @@ package net.minecraft.realms;
 import com.google.common.util.concurrent.RateLimiter;
 import java.time.Duration;
 import java.util.concurrent.atomic.AtomicReference;
-import net.fabricmc.api.EnvType;
-import net.fabricmc.api.Environment;
+import net.minecraft.api.EnvType;
+import net.minecraft.api.Environment;
 import net.minecraft.client.GameNarrator;
 import net.minecraft.network.chat.Component;
 

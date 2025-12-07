@@ -1,7 +1,7 @@
 package net.minecraft.client.renderer.blockentity.state;
 
-import net.fabricmc.api.EnvType;
-import net.fabricmc.api.Environment;
+import net.minecraft.api.EnvType;
+import net.minecraft.api.Environment;
 import net.minecraft.world.level.block.entity.BoundingBoxRenderable.Mode;
 import net.minecraft.world.level.block.entity.BoundingBoxRenderable.RenderableBox;
 import org.jetbrains.annotations.Nullable;

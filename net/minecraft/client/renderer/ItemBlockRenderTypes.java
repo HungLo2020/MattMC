@@ -2,8 +2,8 @@ package net.minecraft.client.renderer;
 
 import com.google.common.collect.Maps;
 import java.util.Map;
-import net.fabricmc.api.EnvType;
-import net.fabricmc.api.Environment;
+import net.minecraft.api.EnvType;
+import net.minecraft.api.Environment;
 import net.minecraft.Util;
 import net.minecraft.client.renderer.chunk.ChunkSectionLayer;
 import net.minecraft.world.item.BlockItem;

@@ -18,7 +18,6 @@ import java.util.function.Consumer;
 import java.util.function.Predicate;
 import java.util.function.UnaryOperator;
 import java.util.stream.Stream;
-import net.fabricmc.fabric.api.item.v1.FabricItemStack;
 import net.minecraft.ChatFormatting;
 import net.minecraft.advancements.CriteriaTriggers;
 import net.minecraft.core.BlockPos;
@@ -97,7 +96,7 @@ import org.apache.commons.lang3.mutable.MutableBoolean;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 
-public final class ItemStack implements DataComponentHolder, FabricItemStack {
+public final class ItemStack implements DataComponentHolder {
 	private static final List<Component> OP_NBT_WARNING = List.of(
 		Component.translatable("item.op_warning.line1").withStyle(ChatFormatting.RED, ChatFormatting.BOLD),
 		Component.translatable("item.op_warning.line2").withStyle(ChatFormatting.RED),

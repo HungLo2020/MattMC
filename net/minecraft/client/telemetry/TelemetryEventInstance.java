@@ -3,8 +3,8 @@ package net.minecraft.client.telemetry;
 import com.mojang.authlib.minecraft.TelemetryEvent;
 import com.mojang.authlib.minecraft.TelemetrySession;
 import com.mojang.serialization.Codec;
-import net.fabricmc.api.EnvType;
-import net.fabricmc.api.Environment;
+import net.minecraft.api.EnvType;
+import net.minecraft.api.Environment;
 
 @Environment(EnvType.CLIENT)
 public record TelemetryEventInstance(TelemetryEventType type, TelemetryPropertyMap properties) {

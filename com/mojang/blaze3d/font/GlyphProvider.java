@@ -1,8 +1,8 @@
 package com.mojang.blaze3d.font;
 
 import it.unimi.dsi.fastutil.ints.IntSet;
-import net.fabricmc.api.EnvType;
-import net.fabricmc.api.Environment;
+import net.minecraft.api.EnvType;
+import net.minecraft.api.Environment;
 import net.minecraft.client.gui.font.FontOption;
 import org.jetbrains.annotations.Nullable;
 

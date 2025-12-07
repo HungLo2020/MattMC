@@ -3,8 +3,8 @@ package net.minecraft.client.multiplayer.chat;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.MapCodec;
 import java.util.function.Supplier;
-import net.fabricmc.api.EnvType;
-import net.fabricmc.api.Environment;
+import net.minecraft.api.EnvType;
+import net.minecraft.api.Environment;
 import net.minecraft.util.StringRepresentable;
 
 @Environment(EnvType.CLIENT)

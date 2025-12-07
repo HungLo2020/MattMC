@@ -1,7 +1,7 @@
 package com.mojang.blaze3d.systems;
 
-import net.fabricmc.api.EnvType;
-import net.fabricmc.api.Environment;
+import net.minecraft.api.EnvType;
+import net.minecraft.api.Environment;
 import org.lwjgl.opengl.ARBTimerQuery;
 import org.lwjgl.opengl.GL32C;
 

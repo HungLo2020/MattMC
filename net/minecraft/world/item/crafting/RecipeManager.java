@@ -18,7 +18,6 @@ import java.util.SortedMap;
 import java.util.TreeMap;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
-import net.fabricmc.fabric.api.recipe.v1.FabricServerRecipeManager;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.resources.FileToIdConverter;
@@ -38,7 +37,7 @@ import net.minecraft.world.level.Level;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 
-public class RecipeManager extends SimplePreparableReloadListener<RecipeMap> implements RecipeAccess, FabricServerRecipeManager {
+public class RecipeManager extends SimplePreparableReloadListener<RecipeMap> implements RecipeAccess {
 	private static final Logger LOGGER = LogUtils.getLogger();
 	private static final Map<ResourceKey<RecipePropertySet>, RecipeManager.IngredientExtractor> RECIPE_PROPERTY_SETS = Map.of(
 		RecipePropertySet.SMITHING_ADDITION,

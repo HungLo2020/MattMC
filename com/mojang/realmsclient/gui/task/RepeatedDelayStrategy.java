@@ -1,8 +1,8 @@
 package com.mojang.realmsclient.gui.task;
 
 import com.mojang.logging.LogUtils;
-import net.fabricmc.api.EnvType;
-import net.fabricmc.api.Environment;
+import net.minecraft.api.EnvType;
+import net.minecraft.api.Environment;
 import org.slf4j.Logger;
 
 @Environment(EnvType.CLIENT)

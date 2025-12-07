@@ -1,7 +1,7 @@
 package net.minecraft.client;
 
-import net.fabricmc.api.EnvType;
-import net.fabricmc.api.Environment;
+import net.minecraft.api.EnvType;
+import net.minecraft.api.Environment;
 import net.minecraft.client.color.item.ItemTintSources;
 import net.minecraft.client.gui.screens.dialog.DialogScreens;
 import net.minecraft.client.gui.screens.dialog.body.DialogBodyHandlers;

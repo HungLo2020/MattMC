@@ -3,7 +3,6 @@ package net.minecraft.world.item.alchemy;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
-import net.fabricmc.fabric.api.registry.FabricBrewingRecipeRegistryBuilder;
 import net.minecraft.core.Holder;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.core.registries.BuiltInRegistries;
@@ -191,7 +190,7 @@ public class PotionBrewing {
 		builder.addMix(Potions.SLOW_FALLING, Items.REDSTONE, Potions.LONG_SLOW_FALLING);
 	}
 
-	public static class Builder implements FabricBrewingRecipeRegistryBuilder {
+	public static class Builder {
 		private final List<Ingredient> containers = new ArrayList();
 		private final List<PotionBrewing.Mix<Potion>> potionMixes = new ArrayList();
 		private final List<PotionBrewing.Mix<Item>> containerMixes = new ArrayList();

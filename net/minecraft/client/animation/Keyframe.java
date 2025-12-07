@@ -1,7 +1,7 @@
 package net.minecraft.client.animation;
 
-import net.fabricmc.api.EnvType;
-import net.fabricmc.api.Environment;
+import net.minecraft.api.EnvType;
+import net.minecraft.api.Environment;
 import org.joml.Vector3fc;
 
 @Environment(EnvType.CLIENT)

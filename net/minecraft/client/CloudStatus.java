@@ -1,8 +1,8 @@
 package net.minecraft.client;
 
 import com.mojang.serialization.Codec;
-import net.fabricmc.api.EnvType;
-import net.fabricmc.api.Environment;
+import net.minecraft.api.EnvType;
+import net.minecraft.api.Environment;
 import net.minecraft.util.OptionEnum;
 import net.minecraft.util.StringRepresentable;
 

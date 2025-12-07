@@ -2,13 +2,12 @@ package net.minecraft.client.renderer.state;
 
 import java.util.ArrayList;
 import java.util.List;
-import net.fabricmc.api.EnvType;
-import net.fabricmc.api.Environment;
-import net.fabricmc.fabric.api.client.rendering.v1.FabricRenderState;
+import net.minecraft.api.EnvType;
+import net.minecraft.api.Environment;
 import net.minecraft.client.renderer.WeatherEffectRenderer;
 
 @Environment(EnvType.CLIENT)
-public class WeatherRenderState implements FabricRenderState {
+public class WeatherRenderState {
 	public final List<WeatherEffectRenderer.ColumnInstance> rainColumns = new ArrayList();
 	public final List<WeatherEffectRenderer.ColumnInstance> snowColumns = new ArrayList();
 	public float intensity;

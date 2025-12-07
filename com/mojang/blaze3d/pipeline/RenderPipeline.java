@@ -13,9 +13,8 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import java.util.Map.Entry;
-import net.fabricmc.api.EnvType;
-import net.fabricmc.api.Environment;
-import net.fabricmc.fabric.api.client.rendering.v1.FabricRenderPipeline;
+import net.minecraft.api.EnvType;
+import net.minecraft.api.Environment;
 import net.minecraft.SharedConstants;
 import net.minecraft.client.renderer.ShaderDefines;
 import net.minecraft.resources.ResourceLocation;
@@ -23,7 +22,7 @@ import org.jetbrains.annotations.Nullable;
 
 @Environment(EnvType.CLIENT)
 @DontObfuscate
-public class RenderPipeline implements FabricRenderPipeline {
+public class RenderPipeline {
 	private final ResourceLocation location;
 	private final ResourceLocation vertexShader;
 	private final ResourceLocation fragmentShader;
@@ -187,7 +186,7 @@ public class RenderPipeline implements FabricRenderPipeline {
 
 	@Environment(EnvType.CLIENT)
 	@DontObfuscate
-	public static class Builder implements net.fabricmc.fabric.api.client.rendering.v1.FabricRenderPipeline.Builder {
+	public static class Builder {
 		private static int nextPipelineSortKey;
 		private Optional<ResourceLocation> location = Optional.empty();
 		private Optional<ResourceLocation> fragmentShader = Optional.empty();
@@ -514,7 +513,7 @@ public class RenderPipeline implements FabricRenderPipeline {
 		Optional<LogicOp> colorLogic,
 		Optional<VertexFormat> vertexFormat,
 		Optional<VertexFormat.Mode> vertexFormatMode
-	) implements net.fabricmc.fabric.api.client.rendering.v1.FabricRenderPipeline.Snippet {
+	) {
 	}
 
 	@Environment(EnvType.CLIENT)

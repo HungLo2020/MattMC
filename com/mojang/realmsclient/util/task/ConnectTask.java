@@ -2,8 +2,8 @@ package com.mojang.realmsclient.util.task;
 
 import com.mojang.realmsclient.dto.RealmsJoinInformation;
 import com.mojang.realmsclient.dto.RealmsServer;
-import net.fabricmc.api.EnvType;
-import net.fabricmc.api.Environment;
+import net.minecraft.api.EnvType;
+import net.minecraft.api.Environment;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.multiplayer.resolver.ServerAddress;

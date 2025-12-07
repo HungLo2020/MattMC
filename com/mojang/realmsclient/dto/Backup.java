@@ -8,8 +8,8 @@ import com.mojang.realmsclient.util.JsonUtils;
 import java.util.Date;
 import java.util.Map;
 import java.util.Map.Entry;
-import net.fabricmc.api.EnvType;
-import net.fabricmc.api.Environment;
+import net.minecraft.api.EnvType;
+import net.minecraft.api.Environment;
 import org.slf4j.Logger;
 
 @Environment(EnvType.CLIENT)

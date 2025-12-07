@@ -5,9 +5,8 @@ import com.mojang.blaze3d.vertex.VertexConsumer;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Supplier;
-import net.fabricmc.api.EnvType;
-import net.fabricmc.api.Environment;
-import net.fabricmc.fabric.api.renderer.v1.render.FabricBlockRenderManager;
+import net.minecraft.api.EnvType;
+import net.minecraft.api.Environment;
 import net.minecraft.CrashReport;
 import net.minecraft.CrashReportCategory;
 import net.minecraft.ReportedException;
@@ -29,7 +28,7 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.material.FluidState;
 
 @Environment(EnvType.CLIENT)
-public class BlockRenderDispatcher implements ResourceManagerReloadListener, FabricBlockRenderManager {
+public class BlockRenderDispatcher implements ResourceManagerReloadListener {
 	private final BlockModelShaper blockModelShaper;
 	private final MaterialSet materials;
 	private final ModelBlockRenderer modelRenderer;

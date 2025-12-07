@@ -1,8 +1,8 @@
 package net.minecraft.client.gui.narration;
 
 import com.google.common.collect.ImmutableList;
-import net.fabricmc.api.EnvType;
-import net.fabricmc.api.Environment;
+import net.minecraft.api.EnvType;
+import net.minecraft.api.Environment;
 import net.minecraft.network.chat.Component;
 
 @Environment(EnvType.CLIENT)

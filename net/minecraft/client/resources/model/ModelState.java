@@ -1,8 +1,8 @@
 package net.minecraft.client.resources.model;
 
 import com.mojang.math.Transformation;
-import net.fabricmc.api.EnvType;
-import net.fabricmc.api.Environment;
+import net.minecraft.api.EnvType;
+import net.minecraft.api.Environment;
 import net.minecraft.core.Direction;
 import org.joml.Matrix4f;
 import org.joml.Matrix4fc;

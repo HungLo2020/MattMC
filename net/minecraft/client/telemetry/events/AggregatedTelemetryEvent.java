@@ -2,8 +2,8 @@ package net.minecraft.client.telemetry.events;
 
 import java.time.Duration;
 import java.time.Instant;
-import net.fabricmc.api.EnvType;
-import net.fabricmc.api.Environment;
+import net.minecraft.api.EnvType;
+import net.minecraft.api.Environment;
 import net.minecraft.client.telemetry.TelemetryEventSender;
 import org.jetbrains.annotations.Nullable;
 

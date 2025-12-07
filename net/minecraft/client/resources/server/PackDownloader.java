@@ -3,8 +3,8 @@ package net.minecraft.client.resources.server;
 import java.util.Map;
 import java.util.UUID;
 import java.util.function.Consumer;
-import net.fabricmc.api.EnvType;
-import net.fabricmc.api.Environment;
+import net.minecraft.api.EnvType;
+import net.minecraft.api.Environment;
 import net.minecraft.server.packs.DownloadQueue.BatchResult;
 import net.minecraft.server.packs.DownloadQueue.DownloadRequest;
 

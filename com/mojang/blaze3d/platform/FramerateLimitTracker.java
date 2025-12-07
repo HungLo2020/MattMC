@@ -1,7 +1,7 @@
 package com.mojang.blaze3d.platform;
 
-import net.fabricmc.api.EnvType;
-import net.fabricmc.api.Environment;
+import net.minecraft.api.EnvType;
+import net.minecraft.api.Environment;
 import net.minecraft.Util;
 import net.minecraft.client.InactivityFpsLimit;
 import net.minecraft.client.Minecraft;

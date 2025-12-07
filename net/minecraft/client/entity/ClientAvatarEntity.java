@@ -1,7 +1,7 @@
 package net.minecraft.client.entity;
 
-import net.fabricmc.api.EnvType;
-import net.fabricmc.api.Environment;
+import net.minecraft.api.EnvType;
+import net.minecraft.api.Environment;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.animal.Parrot.Variant;
 import net.minecraft.world.entity.player.PlayerSkin;

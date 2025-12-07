@@ -2,8 +2,8 @@ package net.minecraft.client.resources.metadata.animation;
 
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
-import net.fabricmc.api.EnvType;
-import net.fabricmc.api.Environment;
+import net.minecraft.api.EnvType;
+import net.minecraft.api.Environment;
 import net.minecraft.server.packs.metadata.MetadataSectionType;
 import net.minecraft.util.StringRepresentable;
 

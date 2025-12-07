@@ -2,8 +2,8 @@ package net.minecraft.client.renderer.item;
 
 import java.util.ArrayList;
 import java.util.List;
-import net.fabricmc.api.EnvType;
-import net.fabricmc.api.Environment;
+import net.minecraft.api.EnvType;
+import net.minecraft.api.Environment;
 
 @Environment(EnvType.CLIENT)
 public class TrackingItemStackRenderState extends ItemStackRenderState {

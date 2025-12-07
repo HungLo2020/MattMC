@@ -2,8 +2,8 @@ package com.mojang.blaze3d.platform;
 
 import com.google.common.base.Charsets;
 import java.nio.ByteBuffer;
-import net.fabricmc.api.EnvType;
-import net.fabricmc.api.Environment;
+import net.minecraft.api.EnvType;
+import net.minecraft.api.Environment;
 import net.minecraft.util.StringDecomposer;
 import org.lwjgl.BufferUtils;
 import org.lwjgl.glfw.GLFW;

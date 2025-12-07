@@ -64,10 +64,6 @@ repositories {
                 includeGroup 'net.minecraftforge'
             }
         }
-        // Fabric Maven for Fabric API
-        maven {
-            url 'https://maven.fabricmc.net/'
-        }
     }
     
     // Add bundled dependencies as a flat directory repository
@@ -196,27 +192,8 @@ dependencies {
     runtimeOnly "org.lwjgl:lwjgl-freetype::${lwjglNatives}"
     runtimeOnly "org.lwjgl:lwjgl-jemalloc::${lwjglNatives}"
     
-    // Fabric Loader (for annotations like @Environment and @EnvType)
-    if (useBundledDeps) {
-        // Bundled Fabric loader and its transitive dependencies
-        implementation files('libraries/deps/fabric-loader-0.16.9.jar')
-        implementation files('libraries/deps/tiny-mappings-parser-0.3.0+build.17.jar')
-        implementation files('libraries/deps/sponge-mixin-0.15.3+mixin.0.8.7.jar')
-        implementation files('libraries/deps/tiny-remapper-0.10.3.jar')
-        implementation files('libraries/deps/access-widener-2.1.0.jar')
-        implementation files('libraries/deps/mapping-io-0.6.1.jar')
-        // ASM dependencies (needed by Fabric/Mixin)
-        implementation files('libraries/deps/asm-9.7.1.jar')
-        implementation files('libraries/deps/asm-analysis-9.7.1.jar')
-        implementation files('libraries/deps/asm-commons-9.7.1.jar')
-        implementation files('libraries/deps/asm-tree-9.7.1.jar')
-        implementation files('libraries/deps/asm-util-9.7.1.jar')
-    } else {
-        implementation 'net.fabricmc:fabric-loader:0.16.9'
-    }
-    
-    // Note: Fabric API stub interfaces are included in the source tree under net/fabricmc/fabric/api/
-    // These are empty interfaces that satisfy the compilation requirements
+    // Note: @Environment and @EnvType annotations are now provided by custom implementation
+    // in the net.minecraft.api package (replaced Fabric dependency)
 }
 
 sourceSets {

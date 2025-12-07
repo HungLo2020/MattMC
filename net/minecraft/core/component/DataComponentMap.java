@@ -17,7 +17,6 @@ import java.util.Spliterators;
 import java.util.function.Predicate;
 import java.util.stream.Stream;
 import java.util.stream.StreamSupport;
-import net.fabricmc.fabric.api.item.v1.FabricComponentMapBuilder;
 import org.jetbrains.annotations.Nullable;
 
 public interface DataComponentMap extends Iterable<TypedDataComponent<?>>, DataComponentGetter {
@@ -120,7 +119,7 @@ public interface DataComponentMap extends Iterable<TypedDataComponent<?>>, DataC
 		};
 	}
 
-	public static class Builder implements FabricComponentMapBuilder {
+	public static class Builder {
 		private final Reference2ObjectMap<DataComponentType<?>, Object> map = new Reference2ObjectArrayMap<>();
 
 		Builder() {

@@ -2,8 +2,8 @@ package net.minecraft.client.resources;
 
 import com.mojang.authlib.GameProfile;
 import java.util.UUID;
-import net.fabricmc.api.EnvType;
-import net.fabricmc.api.Environment;
+import net.minecraft.api.EnvType;
+import net.minecraft.api.Environment;
 import net.minecraft.core.ClientAsset.ResourceTexture;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.player.PlayerModelType;

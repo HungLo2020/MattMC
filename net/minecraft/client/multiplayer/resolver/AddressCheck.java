@@ -6,8 +6,8 @@ import com.mojang.blocklist.BlockListSupplier;
 import java.util.Objects;
 import java.util.ServiceLoader;
 import java.util.function.Predicate;
-import net.fabricmc.api.EnvType;
-import net.fabricmc.api.Environment;
+import net.minecraft.api.EnvType;
+import net.minecraft.api.Environment;
 
 @Environment(EnvType.CLIENT)
 public interface AddressCheck {

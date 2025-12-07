@@ -1,7 +1,7 @@
 package com.mojang.blaze3d.audio;
 
-import net.fabricmc.api.EnvType;
-import net.fabricmc.api.Environment;
+import net.minecraft.api.EnvType;
+import net.minecraft.api.Environment;
 import net.minecraft.world.phys.Vec3;
 import org.lwjgl.openal.AL10;
 
