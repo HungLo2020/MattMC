@@ -29,8 +29,8 @@ public class VarLong {
 		byte b;
 		do {
 			b = byteBuf.readByte();
-			l |= (long)(b & 127) << i++ * 7;
-			if (i > 10) {
+			l |= (long)(b & DATA_BITS_MASK) << i++ * DATA_BITS_PER_BYTE;
+			if (i > MAX_VARLONG_SIZE) {
 				throw new RuntimeException("VarLong too big");
 			}
 		} while (hasContinuationBit(b));
