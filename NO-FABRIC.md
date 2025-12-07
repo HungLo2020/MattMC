@@ -32,7 +32,7 @@ The good news: **Fabric is NOT used for any runtime functionality**. It's purely
 
 ### Background: Decompilation Process
 
-This project is a **decompiled version of Minecraft 1.21.10**. During decompilation, tools like Fabric's decompiler (which uses Fernflower or similar) add annotations and interface implementations to help organize and understand the code:
+This project is a **decompiled version of Minecraft 1.21.10**. During decompilation, tools commonly used in the Fabric ecosystem (such as Fernflower, CFR, or Procyon) add annotations and interface implementations to help organize and understand the code:
 
 - **Client vs Server Separation**: The `@Environment` annotation marks code that only exists in the client or server
 - **API Boundaries**: Fabric API stub interfaces mark extension points where Fabric mods could hook in
@@ -420,9 +420,15 @@ for file in "${!files_to_interfaces[@]}"; do
     interface="${files_to_interfaces[$file]}"
     echo "Processing $file - removing $interface"
     
-    # Remove 'implements InterfaceName' or ', InterfaceName'
-    sed -i "s/ implements $interface//g" "$file"
-    sed -i "s/, $interface//g" "$file"
+    # Remove 'implements InterfaceName' handling multiple cases:
+    # - 'implements InterfaceName' alone
+    # - 'implements InterfaceName, OtherInterface'
+    # - 'implements OtherInterface, InterfaceName'
+    # - ', InterfaceName' in a list
+    sed -i "s/implements $interface,/implements/g" "$file"  # First in list
+    sed -i "s/, $interface,/,/g" "$file"                     # Middle of list
+    sed -i "s/, $interface / /g" "$file"                     # End of list with space
+    sed -i "s/ implements $interface / /g" "$file"           # Only interface
     
     # Remove the import statement
     sed -i "/import net\.fabricmc\.fabric\.api.*$interface;/d" "$file"
@@ -1006,7 +1012,8 @@ error: cannot find symbol FabricSomeInterface
 **Detection**:
 ```bash
 # After making all changes, search for ANY remaining Fabric references
-grep -r "net\.fabricmc" --include="*.java" . | grep -v "net/minecraft/api"
+# Exclude our custom annotations by filtering out lines with imports of net.minecraft.api
+grep -r "net\.fabricmc" --include="*.java" . | grep -v "import net\.minecraft\.api"
 
 # Should return zero results
 ```
@@ -1394,6 +1401,6 @@ The custom annotations serve the exact same documentation purpose as Fabric's an
 ---
 
 **Document Version**: 1.0  
-**Last Updated**: 2024-12-07  
+**Last Updated**: December 2025  
 **Author**: Analysis of MattMC Fabric Dependencies  
 **Project**: MattMC - Minecraft 1.21.10 Vanilla Port
