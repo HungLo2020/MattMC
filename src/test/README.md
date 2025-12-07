@@ -23,6 +23,46 @@ This directory contains all tests for the MattMC project.
 ./gradlew testAll
 ```
 
+### Running a Single Test
+
+You can run a specific test class or test method using the `--tests` flag:
+
+```bash
+# Run a specific test class
+./gradlew performanceTest --tests "ChunkOperationsPerformanceTest"
+
+# Run a specific test method
+./gradlew performanceTest --tests "ChunkOperationsPerformanceTest.testBlockPosCreation1Chunk"
+
+# Run all tests in a package
+./gradlew test --tests "net.minecraft.util.*"
+
+# Run with full class path
+./gradlew performanceTest --tests "net.minecraft.world.level.chunk.ChunkOperationsPerformanceTest"
+```
+
+**Example: Running the chunk performance test**
+
+To run just the chunk operations performance tests:
+```bash
+./gradlew performanceTest --tests "ChunkOperationsPerformanceTest"
+```
+
+To run a specific chunk test (e.g., the 128 chunks BlockPos creation test):
+```bash
+./gradlew performanceTest --tests "ChunkOperationsPerformanceTest.testBlockPosCreation128Chunks"
+```
+
+Output will show:
+```
+> Task :performanceTest
+
+Chunk Operations Performance Tests > should measure BlockPos creation for 128 chunks worth of blocks STANDARD_OUT
+    BlockPos creation (128 chunks): 72.15 ms total (0.56 ms/chunk, 1,774 chunks/sec, 29,067,800 items/sec)
+
+Chunk Operations Performance Tests > should measure BlockPos creation for 128 chunks worth of blocks PASSED
+```
+
 ## Documentation
 
 For complete documentation on the testing infrastructure, see:
