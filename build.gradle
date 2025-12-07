@@ -592,8 +592,13 @@ tasks.register('clientDist') {
         // Process each script file in the packaging directory
         def packagingDir = file('packaging')
         packagingDir.eachFile { scriptFile ->
+            // Only process regular files, skip directories
+            if (scriptFile.isDirectory()) {
+                return
+            }
+            
             if (scriptFile.name.endsWith('.sh')) {
-                // Linux script
+                // Linux script - process template placeholders
                 def linuxScriptTemplate = scriptFile.text
                 def linuxScript = file("${distDir}/${scriptFile.name}")
                 linuxScript.text = linuxScriptTemplate
@@ -602,7 +607,7 @@ tasks.register('clientDist') {
                     .replace('@ASSET_INDEX@', assetIndex)
                 linuxScript.setExecutable(true)
             } else if (scriptFile.name.endsWith('.bat')) {
-                // Windows script
+                // Windows script - process template placeholders
                 def windowsScriptTemplate = scriptFile.text
                 def windowsScript = file("${distDir}/${scriptFile.name}")
                 windowsScript.text = windowsScriptTemplate
@@ -610,7 +615,7 @@ tasks.register('clientDist') {
                     .replace('@VERSION@', version)
                     .replace('@ASSET_INDEX@', assetIndex)
             } else {
-                // Copy any other files as-is
+                // Copy any other files as-is (e.g., README, documentation)
                 copy {
                     from scriptFile
                     into distDir
