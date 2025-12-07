@@ -4,8 +4,8 @@ import net.minecraft.util.ARGB;
 
 public class DarkModeColorTransform {
 	// Dark mode parameters (tunable for best look)
-	private static final float BRIGHTNESS_REDUCTION = 0.25f;  // Reduce brightness to 25%
-	private static final int BACKGROUND_DARKEN = 0x80;       // Darken backgrounds significantly
+	private static final float BRIGHTNESS_REDUCTION = 0.45f;  // Reduce brightness to 45% (less dark)
+	private static final int BACKGROUND_DARKEN = 0x40;       // Darken backgrounds moderately
 	
 	/**
 	 * Transform a color for dark mode while preserving alpha channel

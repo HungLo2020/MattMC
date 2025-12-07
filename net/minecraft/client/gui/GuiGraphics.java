@@ -558,7 +558,8 @@ public class GuiGraphics {
 	}
 
 	public void blit(RenderPipeline renderPipeline, ResourceLocation resourceLocation, int i, int j, float f, float g, int k, int l, int m, int n, int o, int p) {
-		this.blit(renderPipeline, resourceLocation, i, j, f, g, k, l, m, n, o, p, -1);
+		int color = DarkModeColorTransform.transformColor(-1, isDarkModeEnabled());
+		this.blit(renderPipeline, resourceLocation, i, j, f, g, k, l, m, n, o, p, color);
 	}
 
 	public void blit(
