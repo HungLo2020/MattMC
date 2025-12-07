@@ -263,6 +263,18 @@ public class Options {
 	private final OptionInstance<Double> panoramaSpeed = new OptionInstance<>(
 		"options.accessibility.panorama_speed", OptionInstance.noTooltip(), Options::percentValueLabel, OptionInstance.UnitDouble.INSTANCE, 1.0, double_ -> {}
 	);
+	private final OptionInstance<PanoramaTheme> panoramaTheme = new OptionInstance<>(
+		"options.panoramaTheme",
+		OptionInstance.noTooltip(),
+		OptionInstance.forOptionEnum(),
+		new OptionInstance.Enum<>(Arrays.asList(PanoramaTheme.values()), PanoramaTheme.CODEC),
+		PanoramaTheme.AQUATIC,
+		panoramaTheme -> {
+			if (this.minecraft != null && this.minecraft.gameRenderer != null) {
+				this.minecraft.gameRenderer.reloadPanorama(panoramaTheme);
+			}
+		}
+	);
 	private static final Component ACCESSIBILITY_TOOLTIP_CONTRAST_MODE = Component.translatable("options.accessibility.high_contrast.tooltip");
 	private final OptionInstance<Boolean> highContrast = OptionInstance.createBoolean(
 		"options.accessibility.high_contrast", OptionInstance.cachedConstantTooltip(ACCESSIBILITY_TOOLTIP_CONTRAST_MODE), false, boolean_ -> {
@@ -894,6 +906,10 @@ public class Options {
 		return this.panoramaSpeed;
 	}
 
+	public OptionInstance<PanoramaTheme> panoramaTheme() {
+		return this.panoramaTheme;
+	}
+
 	public OptionInstance<Boolean> highContrast() {
 		return this.highContrast;
 	}
@@ -1336,6 +1352,7 @@ public class Options {
 		fieldAccess.process("onlyShowSecureChat", this.onlyShowSecureChat);
 		fieldAccess.process("saveChatDrafts", this.saveChatDrafts);
 		fieldAccess.process("panoramaScrollSpeed", this.panoramaSpeed);
+		fieldAccess.process("panoramaTheme", this.panoramaTheme);
 		fieldAccess.process("telemetryOptInExtra", this.telemetryOptInExtra);
 		this.onboardAccessibility = fieldAccess.process("onboardAccessibility", this.onboardAccessibility);
 		fieldAccess.process("menuBackgroundBlurriness", this.menuBackgroundBlurriness);

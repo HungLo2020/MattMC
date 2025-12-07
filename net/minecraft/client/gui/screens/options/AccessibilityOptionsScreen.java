@@ -45,6 +45,7 @@ public class AccessibilityOptionsScreen extends OptionsSubScreen {
 			options.hideLightningFlash(),
 			options.darkMojangStudiosBackground(),
 			options.panoramaSpeed(),
+			options.panoramaTheme(),
 			options.hideSplashTexts(),
 			options.narratorHotkey(),
 			options.rotateWithMinecart(),

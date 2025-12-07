@@ -31,6 +31,7 @@ import net.minecraft.client.Camera;
 import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.Options;
+import net.minecraft.client.PanoramaTheme;
 import net.minecraft.client.Screenshot;
 import net.minecraft.client.entity.ClientAvatarState;
 import net.minecraft.client.gui.GuiGraphics;
@@ -126,8 +127,8 @@ public class GameRenderer implements Projector, AutoCloseable {
 	private final LightTexture lightTexture;
 	private final OverlayTexture overlayTexture = new OverlayTexture();
 	private boolean panoramicMode;
-	protected final CubeMap cubeMap = new CubeMap(ResourceLocation.withDefaultNamespace("textures/gui/title/background/panorama"));
-	protected final PanoramaRenderer panorama = new PanoramaRenderer(this.cubeMap);
+	protected CubeMap cubeMap;
+	protected PanoramaRenderer panorama;
 	private final CrossFrameResourcePool resourcePool = new CrossFrameResourcePool(3);
 	private final FogRenderer fogRenderer = new FogRenderer();
 	private final GuiRenderer guiRenderer;
@@ -180,6 +181,24 @@ public class GameRenderer implements Projector, AutoCloseable {
 			)
 		);
 		this.screenEffectRenderer = new ScreenEffectRenderer(minecraft, atlasManager, bufferSource);
+		this.cubeMap = this.createCubeMap(minecraft.options.panoramaTheme().get());
+		this.panorama = new PanoramaRenderer(this.cubeMap);
+	}
+
+	private CubeMap createCubeMap(PanoramaTheme theme) {
+		String path = "textures/gui/title/background/" + theme.getPath() + "/panorama";
+		return new CubeMap(ResourceLocation.withDefaultNamespace(path));
+	}
+
+	public void reloadPanorama(PanoramaTheme theme) {
+		if (this.cubeMap != null) {
+			this.cubeMap.close();
+		}
+		this.cubeMap = this.createCubeMap(theme);
+		this.panorama = new PanoramaRenderer(this.cubeMap);
+		if (this.minecraft != null && this.minecraft.getTextureManager() != null) {
+			this.cubeMap.registerTextures(this.minecraft.getTextureManager());
+		}
 	}
 
 	public void close() {
