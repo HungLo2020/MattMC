@@ -26,3 +26,15 @@ Thumbs.db
 
 # JDK (too large to commit)
 libraries/jdk-21/
+
+# Test outputs and reports
+build/test-results/
+build/reports/tests/
+.test-data/
+
+# JMH generated files
+jmh-result.json
+jmh-result.txt
+
+# Test coverage
+.jacoco/
