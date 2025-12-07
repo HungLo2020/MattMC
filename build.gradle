@@ -638,3 +638,56 @@ tasks.register('clientDistZip', Zip) {
     
     destinationDirectory = file("${buildDir}/distributions")
 }
+
+// Configure test source sets
+sourceSets {
+    test {
+        java {
+            srcDirs = ['src/test/java']
+        }
+        compileClasspath += sourceSets.main.output
+        runtimeClasspath += sourceSets.main.output
+    }
+}
+
+// Configure the existing compileTestJava task
+tasks.named('compileTestJava') {
+    options.encoding = 'UTF-8'
+}
+
+// Task to run chunk performance tests
+tasks.register('runChunkPerformanceTest', JavaExec) {
+    group = 'verification'
+    description = 'Runs chunk save/load performance benchmark tests'
+    
+    dependsOn 'compileTestJava', 'classes'
+    
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'net.minecraft.world.level.chunk.storage.performance.ChunkPerformanceTest'
+    
+    // Use Java 21 for execution
+    javaLauncher = javaToolchains.launcherFor {
+        languageVersion = JavaLanguageVersion.of(21)
+    }
+    
+    // Set JVM arguments for optimal performance testing
+    jvmArgs = [
+        '-Xms2G',
+        '-Xmx4G',
+        '-XX:+UseG1GC',
+        '-XX:+DisableExplicitGC',
+        '-XX:+AlwaysPreTouch',
+        '-XX:+UnlockExperimentalVMOptions',
+        '-XX:G1NewSizePercent=20',
+        '-XX:G1ReservePercent=20',
+        '-XX:MaxGCPauseMillis=50',
+        '-XX:G1HeapRegionSize=32M'
+    ]
+    
+    // Ensure clean environment
+    systemProperty 'java.io.tmpdir', file("${buildDir}/tmp").absolutePath
+    
+    doFirst {
+        file("${buildDir}/tmp").mkdirs()
+    }
+}
