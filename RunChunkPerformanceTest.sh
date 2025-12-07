@@ -5,25 +5,14 @@
 set -e
 
 echo "Building and running chunk performance tests..."
-echo "This will:"
-echo "  1. Compile the main source code"
-echo "  2. Compile the test code"
-echo "  3. Run the chunk save/load performance benchmarks"
+echo "This will compile main sources, test sources, and run the performance benchmarks."
 echo ""
 
-# First ensure main classes are compiled
-echo "Step 1: Compiling main source code..."
-./gradlew classes --no-daemon
-
-# Then compile test classes
-echo ""
-echo "Step 2: Compiling test code..."
-./gradlew compileTestJava --no-daemon
-
-# Finally run the tests
-echo ""
-echo "Step 3: Running performance tests..."
-./gradlew runChunkPerformanceTest --no-daemon
+# Use a single Gradle invocation to ensure proper task dependency resolution
+# The runChunkPerformanceTest task already depends on classes and compileTestJava,
+# but we'll make it explicit to ensure proper order
+echo "Compiling and running tests..."
+./gradlew classes compileTestJava runChunkPerformanceTest
 
 echo ""
 echo "Performance tests completed!"
