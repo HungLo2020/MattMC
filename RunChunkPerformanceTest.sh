@@ -10,8 +10,8 @@ echo ""
 
 # Check if --clean flag is provided
 if [ "$1" = "--clean" ] || [ "$1" = "-c" ]; then
-    echo "Cleaning build directory first..."
-    ./gradlew clean
+    echo "Cleaning build directory and cache..."
+    ./gradlew clean --no-build-cache
     echo ""
 fi
 
@@ -25,8 +25,9 @@ fi
 
 # Use a single Gradle invocation with explicit task ordering
 # Force compileJava to run first, then compileTestJava, then the test runner
+# Disable build cache to avoid FROM-CACHE issues where cached classes aren't found
 echo "Compiling and running tests..."
-./gradlew compileJava compileTestJava runChunkPerformanceTest $DEBUG_FLAG
+./gradlew compileJava compileTestJava runChunkPerformanceTest --no-build-cache $DEBUG_FLAG
 
 echo ""
 echo "Performance tests completed!"
