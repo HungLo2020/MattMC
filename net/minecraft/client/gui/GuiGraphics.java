@@ -108,6 +108,10 @@ public class GuiGraphics {
 		this.guiRenderState = guiRenderState;
 	}
 
+	private boolean isDarkModeEnabled() {
+		return this.minecraft.options.darkMode().get();
+	}
+
 	public GuiGraphics(Minecraft minecraft, GuiRenderState guiRenderState) {
 		this(minecraft, new Matrix3x2fStack(16), guiRenderState);
 	}
@@ -174,7 +178,8 @@ public class GuiGraphics {
 	}
 
 	public void fill(int i, int j, int k, int l, int m) {
-		this.fill(RenderPipelines.GUI, i, j, k, l, m);
+		int color = DarkModeColorTransform.transformBackgroundColor(m, isDarkModeEnabled());
+		this.fill(RenderPipelines.GUI, i, j, k, l, color);
 	}
 
 	public void fill(RenderPipeline renderPipeline, int i, int j, int k, int l, int m) {
@@ -244,7 +249,8 @@ public class GuiGraphics {
 
 	public void drawString(Font font, FormattedCharSequence formattedCharSequence, int i, int j, int k, boolean bl) {
 		if (ARGB.alpha(k) != 0) {
-			this.guiRenderState.submitText(new GuiTextRenderState(font, formattedCharSequence, new Matrix3x2f(this.pose), i, j, k, 0, bl, this.scissorStack.peek()));
+			int color = DarkModeColorTransform.transformTextColor(k, isDarkModeEnabled());
+			this.guiRenderState.submitText(new GuiTextRenderState(font, formattedCharSequence, new Matrix3x2f(this.pose), i, j, color, 0, bl, this.scissorStack.peek()));
 		}
 	}
 
@@ -294,17 +300,18 @@ public class GuiGraphics {
 	}
 
 	public void blitSprite(RenderPipeline renderPipeline, ResourceLocation resourceLocation, int i, int j, int k, int l, int m) {
+		int color = DarkModeColorTransform.transformColor(m, isDarkModeEnabled());
 		TextureAtlasSprite textureAtlasSprite = this.guiSprites.getSprite(resourceLocation);
 		GuiSpriteScaling guiSpriteScaling = getSpriteScaling(textureAtlasSprite);
 		switch (guiSpriteScaling) {
 			case GuiSpriteScaling.Stretch stretch:
-				this.blitSprite(renderPipeline, textureAtlasSprite, i, j, k, l, m);
+				this.blitSprite(renderPipeline, textureAtlasSprite, i, j, k, l, color);
 				break;
 			case GuiSpriteScaling.Tile tile:
-				this.blitTiledSprite(renderPipeline, textureAtlasSprite, i, j, k, l, 0, 0, tile.width(), tile.height(), tile.width(), tile.height(), m);
+				this.blitTiledSprite(renderPipeline, textureAtlasSprite, i, j, k, l, 0, 0, tile.width(), tile.height(), tile.width(), tile.height(), color);
 				break;
 			case GuiSpriteScaling.NineSlice nineSlice:
-				this.blitNineSlicedSprite(renderPipeline, textureAtlasSprite, nineSlice, i, j, k, l, m);
+				this.blitNineSlicedSprite(renderPipeline, textureAtlasSprite, nineSlice, i, j, k, l, color);
 				break;
 			default:
 		}

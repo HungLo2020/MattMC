@@ -46,10 +46,8 @@ import net.minecraft.Util.OS;
 import net.minecraft.client.gui.components.ChatComponent;
 import net.minecraft.client.gui.components.Tooltip;
 import net.minecraft.client.input.InputQuirks;
-import net.minecraft.client.renderer.GameRenderer;
 import net.minecraft.client.renderer.GpuWarnlistManager;
 import net.minecraft.client.resources.sounds.SimpleSoundInstance;
-import net.minecraft.resources.ResourceLocation;
 import net.minecraft.client.sounds.MusicManager;
 import net.minecraft.client.sounds.SoundEngine;
 import net.minecraft.client.sounds.SoundManager;
@@ -298,10 +296,7 @@ public class Options {
 		OptionInstance.cachedConstantTooltip(DARK_MODE_TOOLTIP),
 		true,
 		boolean_ -> {
-			Minecraft minecraft = Minecraft.getInstance();
-			if (minecraft != null && minecraft.gameRenderer != null) {
-				minecraft.gameRenderer.setDarkMode(boolean_);
-			}
+			// Trigger UI refresh when toggled (color transform happens in GuiGraphics)
 		}
 	);
 	@Nullable
@@ -1497,11 +1492,6 @@ public class Options {
 			);
 			compoundTag2.getString("fullscreenResolution").ifPresent(string -> this.fullscreenVideoModeString = string);
 			KeyMapping.resetMapping();
-			
-			// Apply dark mode setting after loading
-			if (this.minecraft.gameRenderer != null) {
-				this.minecraft.gameRenderer.setDarkMode(this.darkMode.get());
-			}
 		} catch (Exception var7) {
 			LOGGER.error("Failed to load options", (Throwable)var7);
 		}
