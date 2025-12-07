@@ -22,6 +22,7 @@ import org.slf4j.Logger;
 public class CrashReport {
 	private static final Logger LOGGER = LogUtils.getLogger();
 	private static final DateTimeFormatter DATE_TIME_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss", Locale.ROOT);
+	private static final int SEPARATOR_LINE_LENGTH = 87;
 	private final String title;
 	private final Throwable exception;
 	private final List<CrashReportCategory> details = Lists.<CrashReportCategory>newArrayList();
@@ -118,7 +119,7 @@ public class CrashReport {
 		stringBuilder.append(this.getExceptionMessage());
 		stringBuilder.append("\n\nA detailed walkthrough of the error, its code path and all known details is as follows:\n");
 
-		for (int i = 0; i < 87; i++) {
+		for (int i = 0; i < SEPARATOR_LINE_LENGTH; i++) {
 			stringBuilder.append("-");
 		}
 

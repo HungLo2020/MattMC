@@ -25,6 +25,7 @@ import org.jetbrains.annotations.Nullable;
 
 public class MessageArgument implements SignedArgument<MessageArgument.Message> {
 	private static final Collection<String> EXAMPLES = Arrays.asList("Hello world!", "foo", "@e", "Hello @p :)");
+	private static final int MAX_MESSAGE_LENGTH = 256;
 	static final Dynamic2CommandExceptionType TOO_LONG = new Dynamic2CommandExceptionType(
 		(object, object2) -> Component.translatableEscape("argument.message.too_long", object, object2)
 	);
@@ -119,8 +120,8 @@ public class MessageArgument implements SignedArgument<MessageArgument.Message> 
 		}
 
 		public static MessageArgument.Message parseText(StringReader stringReader, boolean bl) throws CommandSyntaxException {
-			if (stringReader.getRemainingLength() > 256) {
-				throw MessageArgument.TOO_LONG.create(stringReader.getRemainingLength(), 256);
+			if (stringReader.getRemainingLength() > MAX_MESSAGE_LENGTH) {
+				throw MessageArgument.TOO_LONG.create(stringReader.getRemainingLength(), MAX_MESSAGE_LENGTH);
 			} else {
 				String string = stringReader.getRemaining();
 				if (!bl) {
