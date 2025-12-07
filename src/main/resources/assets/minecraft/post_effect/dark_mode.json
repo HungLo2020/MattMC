@@ -28,12 +28,12 @@
                     {
                         "name": "Brightness",
                         "type": "float",
-                        "value": 0.9
+                        "value": 0.5
                     },
                     {
                         "name": "Contrast",
                         "type": "float",
-                        "value": 1.1
+                        "value": 1.0
                     }
                 ]
             }

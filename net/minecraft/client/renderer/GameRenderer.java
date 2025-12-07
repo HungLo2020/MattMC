@@ -238,8 +238,10 @@ public class GameRenderer implements Projector, AutoCloseable {
 		this.darkModeActive = enabled;
 		if (enabled) {
 			this.darkModeEffectId = ResourceLocation.withDefaultNamespace("dark_mode");
+			LOGGER.info("Dark mode enabled: {}", this.darkModeEffectId);
 		} else {
 			this.darkModeEffectId = null;
+			LOGGER.info("Dark mode disabled");
 		}
 	}
 
@@ -666,6 +668,8 @@ public class GameRenderer implements Projector, AutoCloseable {
 				PostChain postChain = this.minecraft.getShaderManager().getPostChain(this.darkModeEffectId, LevelTargetBundle.MAIN_TARGETS);
 				if (postChain != null) {
 					postChain.process(this.minecraft.getMainRenderTarget(), this.resourcePool);
+				} else {
+					LOGGER.warn("Dark mode PostChain is null for: {}", this.darkModeEffectId);
 				}
 			}
 			
