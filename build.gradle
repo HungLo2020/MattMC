@@ -290,6 +290,9 @@ tasks.register('runServer', JavaExec) {
     
     dependsOn 'classes', 'copyJdkToRun'
     
+    // Explicitly declare dependency on the classes output to ensure proper task ordering
+    inputs.files(sourceSets.main.output.classesDirs)
+    
     classpath = sourceSets.main.runtimeClasspath
     mainClass = 'net.minecraft.server.Main'
     
@@ -313,6 +316,9 @@ tasks.register('runServerGui', JavaExec) {
     description = 'Runs the Minecraft dedicated server with GUI'
     
     dependsOn 'classes', 'copyJdkToRun'
+    
+    // Explicitly declare dependency on the classes output to ensure proper task ordering
+    inputs.files(sourceSets.main.output.classesDirs)
     
     classpath = sourceSets.main.runtimeClasspath
     mainClass = 'net.minecraft.server.Main'
@@ -338,6 +344,9 @@ tasks.register('runClient', JavaExec) {
     
     dependsOn 'classes', 'copyJdkToRun'
     
+    // Explicitly declare dependency on the classes output to ensure proper task ordering
+    inputs.files(sourceSets.main.output.classesDirs)
+    
     classpath = sourceSets.main.runtimeClasspath
     mainClass = 'net.minecraft.client.main.Main'
     
@@ -354,6 +363,30 @@ tasks.register('runClient', JavaExec) {
     ]
     
     doFirst {
+        // Sanity check: verify that the main class file exists before trying to run
+        def mainClassFile = file('build/classes/java/main/net/minecraft/client/main/Main.class')
+        if (!mainClassFile.exists()) {
+            throw new GradleException(
+                "\n" +
+                "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n" +
+                "ERROR: Main class file not found!\n" +
+                "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n" +
+                "\n" +
+                "Expected file: ${mainClassFile.absolutePath}\n" +
+                "\n" +
+                "This usually indicates a Gradle build cache issue.\n" +
+                "\n" +
+                "To fix this, please run:\n" +
+                "  ./gradlew clean build --no-build-cache\n" +
+                "\n" +
+                "If the problem persists, try clearing your Gradle cache:\n" +
+                "  rm -rf ~/.gradle/caches/\n" +
+                "  ./gradlew clean build\n" +
+                "\n" +
+                "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+            )
+        }
+        
         workingDir.mkdirs()
         file('run/assets').mkdirs()
         file('run/resourcepacks').mkdirs()
