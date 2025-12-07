@@ -15,14 +15,22 @@ if [ "$1" = "--clean" ] || [ "$1" = "-c" ]; then
     echo ""
 fi
 
-# Use a single Gradle invocation to ensure proper task dependency resolution
-# The runChunkPerformanceTest task already depends on classes and compileTestJava,
-# but we'll make it explicit to ensure proper order
+# Check for --debug flag for troubleshooting
+DEBUG_FLAG=""
+if [ "$1" = "--debug" ] || [ "$2" = "--debug" ]; then
+    DEBUG_FLAG="--info"
+    echo "Running in debug mode with detailed output..."
+    echo ""
+fi
+
+# Use a single Gradle invocation with explicit task ordering
+# Force compileJava to run first, then compileTestJava, then the test runner
 echo "Compiling and running tests..."
-./gradlew classes compileTestJava runChunkPerformanceTest
+./gradlew compileJava compileTestJava runChunkPerformanceTest $DEBUG_FLAG
 
 echo ""
 echo "Performance tests completed!"
 echo ""
-echo "If you encountered compilation errors, try running with --clean flag:"
+echo "If you encountered compilation errors, try:"
 echo "  ./RunChunkPerformanceTest.sh --clean"
+echo "  ./RunChunkPerformanceTest.sh --clean --debug  (for detailed output)"
