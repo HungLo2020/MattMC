@@ -196,8 +196,6 @@ public abstract class MinecraftServer extends ReentrantBlockableEventLoop<TickTa
 	private static final int MAX_STATUS_PLAYER_SAMPLE = 12;
 	public static final int SPAWN_POSITION_SEARCH_RADIUS = 5;
 	private static final int AUTOSAVE_INTERVAL = 6000;
-	private static final int TICKS_PER_SECOND = 20;
-	private static final int TICK_TIME_HISTORY_SIZE = 100;
 	private static final int MIMINUM_AUTOSAVE_TICKS = 100;
 	private static final int MAX_TICK_LATENCY = 3;
 	public static final int ABSOLUTE_MAX_WORLD_SIZE = 29999984;
@@ -981,7 +979,7 @@ public abstract class MinecraftServer extends ReentrantBlockableEventLoop<TickTa
 
 	public void tickServer(BooleanSupplier booleanSupplier) {
 		long l = Util.getNanos();
-		int i = this.pauseWhenEmptySeconds() * TICKS_PER_SECOND;
+		int i = this.pauseWhenEmptySeconds() * 20;
 		if (i > 0) {
 			if (this.playerList.getPlayerCount() == 0 && !this.tickRateManager.isSprinting()) {
 				this.emptyTicks++;
@@ -1016,7 +1014,7 @@ public abstract class MinecraftServer extends ReentrantBlockableEventLoop<TickTa
 		ProfilerFiller profilerFiller = Profiler.get();
 		profilerFiller.push("tallying");
 		long m = Util.getNanos() - l;
-		int j = this.tickCount % TICK_TIME_HISTORY_SIZE;
+		int j = this.tickCount % 100;
 		this.aggregatedTickTimesNanos = this.aggregatedTickTimesNanos - this.tickTimesNanos[j];
 		this.aggregatedTickTimesNanos += m;
 		this.tickTimesNanos[j] = m;
@@ -1106,7 +1104,7 @@ public abstract class MinecraftServer extends ReentrantBlockableEventLoop<TickTa
 
 		for (ServerLevel serverLevel : this.getAllLevels()) {
 			profilerFiller.push((Supplier<String>)(() -> serverLevel + " " + serverLevel.dimension().location()));
-			if (this.tickCount % TICKS_PER_SECOND == 0) {
+			if (this.tickCount % 20 == 0) {
 				profilerFiller.push("timeSync");
 				this.synchronizeTime(serverLevel);
 				profilerFiller.pop();

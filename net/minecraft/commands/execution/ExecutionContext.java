@@ -70,10 +70,8 @@ public class ExecutionContext<T> implements AutoCloseable {
 		this.commandQueue.clear();
 	}
 
-	private static final int MAX_COMMAND_QUEUE_SIZE = 10000000;
-
 	public void queueNext(CommandQueueEntry<T> commandQueueEntry) {
-		if (this.newTopCommands.size() + this.commandQueue.size() > MAX_COMMAND_QUEUE_SIZE) {
+		if (this.newTopCommands.size() + this.commandQueue.size() > 10000000) {
 			this.handleQueueOverflow();
 		}
 

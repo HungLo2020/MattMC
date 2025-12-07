@@ -82,7 +82,6 @@ public class Connection extends SimpleChannelInboundHandler<Packet<?>> {
 		() -> new DefaultEventLoopGroup(0, new ThreadFactoryBuilder().setNameFormat("Netty Local Client IO #%d").setDaemon(true).build())
 	);
 	private static final ProtocolInfo<ServerHandshakePacketListener> INITIAL_PROTOCOL = HandshakeProtocols.SERVERBOUND;
-	private static final int TICKS_PER_SECOND = 20;
 	private final PacketFlow receiving;
 	private volatile boolean sendLoginDisconnect = true;
 	private final Queue<Consumer<Connection>> pendingActions = Queues.<Consumer<Connection>>newConcurrentLinkedQueue();
@@ -382,7 +381,7 @@ public class Connection extends SimpleChannelInboundHandler<Packet<?>> {
 			this.channel.flush();
 		}
 
-		if (this.tickCount++ % TICKS_PER_SECOND == 0) {
+		if (this.tickCount++ % 20 == 0) {
 			this.tickSecond();
 		}
 

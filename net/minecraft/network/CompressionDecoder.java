@@ -33,8 +33,8 @@ public class CompressionDecoder extends ByteToMessageDecoder {
 					throw new DecoderException("Badly compressed packet - size of " + i + " is below server threshold of " + this.threshold);
 				}
 
-				if (i > MAXIMUM_UNCOMPRESSED_LENGTH) {
-					throw new DecoderException("Badly compressed packet - size of " + i + " is larger than protocol maximum of " + MAXIMUM_UNCOMPRESSED_LENGTH);
+				if (i > 8388608) {
+					throw new DecoderException("Badly compressed packet - size of " + i + " is larger than protocol maximum of 8388608");
 				}
 			}
 

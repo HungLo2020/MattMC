@@ -24,11 +24,11 @@ public record ClientboundCustomQueryPacket(int transactionId, CustomQueryPayload
 
 	private static DiscardedQueryPayload readUnknownPayload(ResourceLocation resourceLocation, FriendlyByteBuf friendlyByteBuf) {
 		int i = friendlyByteBuf.readableBytes();
-		if (i >= 0 && i <= MAX_PAYLOAD_SIZE) {
+		if (i >= 0 && i <= 1048576) {
 			friendlyByteBuf.skipBytes(i);
 			return new DiscardedQueryPayload(resourceLocation);
 		} else {
-			throw new IllegalArgumentException("Payload may not be larger than " + MAX_PAYLOAD_SIZE + " bytes");
+			throw new IllegalArgumentException("Payload may not be larger than 1048576 bytes");
 		}
 	}
 

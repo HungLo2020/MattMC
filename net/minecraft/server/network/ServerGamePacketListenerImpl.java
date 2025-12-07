@@ -223,9 +223,6 @@ public class ServerGamePacketListenerImpl
 	private static final Component CHAT_VALIDATION_FAILED = Component.translatable("multiplayer.disconnect.chat_validation_failed");
 	private static final Component INVALID_COMMAND_SIGNATURE = Component.translatable("chat.disabled.invalid_command_signature").withStyle(ChatFormatting.RED);
 	private static final int MAX_COMMAND_SUGGESTIONS = 1000;
-	private static final double MAX_INTERACTION_DISTANCE_SQUARED = 100.0;
-	private static final double VEHICLE_MOVEMENT_THRESHOLD = 0.0625;
-	private static final int TELEPORT_TIMEOUT_TICKS = 20;
 	public ServerPlayer player;
 	public final PlayerChunkSender chunkSender;
 	private int tickCount;
@@ -450,7 +447,7 @@ public class ServerGamePacketListenerImpl
 				double n = i - this.vehicleFirstGoodZ;
 				double o = entity.getDeltaMovement().lengthSqr();
 				double p = l * l + m * m + n * n;
-				if (p - o > MAX_INTERACTION_DISTANCE_SQUARED && !this.isSingleplayerOwner()) {
+				if (p - o > 100.0 && !this.isSingleplayerOwner()) {
 					LOGGER.warn("{} (vehicle of {}) moved too quickly! {},{},{}", entity.getPlainTextName(), this.player.getPlainTextName(), l, m, n);
 					this.send(ClientboundMoveVehiclePacket.fromEntity(entity));
 					return;
@@ -1087,7 +1084,7 @@ public class ServerGamePacketListenerImpl
 								n = h - this.player.getZ();
 								p = l * l + m * m + n * n;
 								boolean bl4 = false;
-								if (!this.player.isChangingDimension() && p > VEHICLE_MOVEMENT_THRESHOLD && !this.player.isSleeping() && !this.player.isCreative() && !this.player.isSpectator()) {
+								if (!this.player.isChangingDimension() && p > 0.0625 && !this.player.isSleeping() && !this.player.isCreative() && !this.player.isSpectator()) {
 									bl4 = true;
 									LOGGER.warn("{} moved wrongly!", this.player.getPlainTextName());
 								}
@@ -1153,7 +1150,7 @@ public class ServerGamePacketListenerImpl
 
 	private boolean updateAwaitingTeleport() {
 		if (this.awaitingPositionFromClient != null) {
-			if (this.tickCount - this.awaitingTeleportTime > TELEPORT_TIMEOUT_TICKS) {
+			if (this.tickCount - this.awaitingTeleportTime > 20) {
 				this.awaitingTeleportTime = this.tickCount;
 				this.teleport(
 					this.awaitingPositionFromClient.x, this.awaitingPositionFromClient.y, this.awaitingPositionFromClient.z, this.player.getYRot(), this.player.getXRot()

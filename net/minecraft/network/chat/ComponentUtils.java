@@ -19,7 +19,6 @@ public class ComponentUtils {
 	public static final String DEFAULT_SEPARATOR_TEXT = ", ";
 	public static final Component DEFAULT_SEPARATOR = Component.literal(", ").withStyle(ChatFormatting.GRAY);
 	public static final Component DEFAULT_NO_STYLE_SEPARATOR = Component.literal(", ");
-	private static final int MAX_RECURSION_DEPTH = 100;
 
 	public static MutableComponent mergeStyles(MutableComponent mutableComponent, Style style) {
 		if (style.isEmpty()) {
@@ -41,7 +40,7 @@ public class ComponentUtils {
 	}
 
 	public static MutableComponent updateForEntity(@Nullable CommandSourceStack commandSourceStack, Component component, @Nullable Entity entity, int i) throws CommandSyntaxException {
-		if (i > MAX_RECURSION_DEPTH) {
+		if (i > 100) {
 			return component.copy();
 		} else {
 			MutableComponent mutableComponent = component.getContents().resolve(commandSourceStack, entity, i + 1);

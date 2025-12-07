@@ -84,12 +84,9 @@ public interface CommandFunction<T> {
 		return functionBuilder.build(resourceLocation);
 	}
 
-	static final int MAX_COMMAND_LENGTH = 2000000;
-	static final int ERROR_PREVIEW_LENGTH = 512;
-
 	static void checkCommandLineLength(CharSequence charSequence) {
-		if (charSequence.length() > MAX_COMMAND_LENGTH) {
-			CharSequence charSequence2 = charSequence.subSequence(0, Math.min(ERROR_PREVIEW_LENGTH, MAX_COMMAND_LENGTH));
+		if (charSequence.length() > 2000000) {
+			CharSequence charSequence2 = charSequence.subSequence(0, Math.min(512, 2000000));
 			throw new IllegalStateException("Command too long: " + charSequence.length() + " characters, contents: " + charSequence2 + "...");
 		}
 	}

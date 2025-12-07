@@ -28,7 +28,7 @@ public class ClientboundLevelChunkPacketData {
 	private static final StreamCodec<ByteBuf, Map<Heightmap.Types, long[]>> HEIGHTMAPS_STREAM_CODEC = ByteBufCodecs.map(
 		i -> new EnumMap(Heightmap.Types.class), Heightmap.Types.STREAM_CODEC, ByteBufCodecs.LONG_ARRAY
 	);
-	private static final int MAX_CHUNK_PACKET_SIZE = 2097152;
+	private static final int TWO_MEGABYTES = 2097152;
 	private final Map<Heightmap.Types, long[]> heightmaps;
 	private final byte[] buffer;
 	private final List<ClientboundLevelChunkPacketData.BlockEntityInfo> blockEntitiesData;
@@ -50,7 +50,7 @@ public class ClientboundLevelChunkPacketData {
 	public ClientboundLevelChunkPacketData(RegistryFriendlyByteBuf registryFriendlyByteBuf, int i, int j) {
 		this.heightmaps = HEIGHTMAPS_STREAM_CODEC.decode(registryFriendlyByteBuf);
 		int k = registryFriendlyByteBuf.readVarInt();
-		if (k > MAX_CHUNK_PACKET_SIZE) {
+		if (k > 2097152) {
 			throw new RuntimeException("Chunk Packet trying to allocate too much memory on read.");
 		} else {
 			this.buffer = new byte[k];

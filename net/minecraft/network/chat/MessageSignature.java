@@ -14,16 +14,15 @@ import org.jetbrains.annotations.Nullable;
 
 public record MessageSignature(byte[] bytes) {
 	public static final Codec<MessageSignature> CODEC = ExtraCodecs.BASE64_STRING.xmap(MessageSignature::new, MessageSignature::bytes);
-	public static final int SIGNATURE_BYTE_LENGTH = 256;
-	public static final int BYTES = SIGNATURE_BYTE_LENGTH;
+	public static final int BYTES = 256;
 
 	public MessageSignature(byte[] bytes) {
-		Preconditions.checkState(bytes.length == SIGNATURE_BYTE_LENGTH, "Invalid message signature size");
+		Preconditions.checkState(bytes.length == 256, "Invalid message signature size");
 		this.bytes = bytes;
 	}
 
 	public static MessageSignature read(FriendlyByteBuf friendlyByteBuf) {
-		byte[] bs = new byte[SIGNATURE_BYTE_LENGTH];
+		byte[] bs = new byte[256];
 		friendlyByteBuf.readBytes(bs);
 		return new MessageSignature(bs);
 	}

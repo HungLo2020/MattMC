@@ -6,7 +6,6 @@ public class VarLong {
 	private static final int MAX_VARLONG_SIZE = 10;
 	private static final int DATA_BITS_MASK = 127;
 	private static final int CONTINUATION_BIT_MASK = 128;
-	private static final int MAX_VARLONG_LENGTH = 10;
 	private static final int DATA_BITS_PER_BYTE = 7;
 
 	public static int getByteSize(long l) {
@@ -30,8 +29,8 @@ public class VarLong {
 		byte b;
 		do {
 			b = byteBuf.readByte();
-			l |= (long)(b & DATA_BITS_MASK) << i++ * 7;
-			if (i > MAX_VARLONG_LENGTH) {
+			l |= (long)(b & 127) << i++ * 7;
+			if (i > 10) {
 				throw new RuntimeException("VarLong too big");
 			}
 		} while (hasContinuationBit(b));
