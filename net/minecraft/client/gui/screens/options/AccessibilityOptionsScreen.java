@@ -26,6 +26,7 @@ public class AccessibilityOptionsScreen extends OptionsSubScreen {
 		return new OptionInstance[]{
 			options.narrator(),
 			options.showSubtitles(),
+			options.darkMode(),
 			options.highContrast(),
 			options.menuBackgroundBlurriness(),
 			options.textBackgroundOpacity(),

@@ -290,6 +290,15 @@ public class Options {
 		),
 		true
 	);
+	private static final Component DARK_MODE_TOOLTIP = Component.translatable("options.darkMode.tooltip");
+	private final OptionInstance<Boolean> darkMode = OptionInstance.createBoolean(
+		"options.darkMode",
+		OptionInstance.cachedConstantTooltip(DARK_MODE_TOOLTIP),
+		true,
+		boolean_ -> {
+			// Trigger UI refresh when toggled (color transform happens in GuiGraphics)
+		}
+	);
 	@Nullable
 	public String fullscreenVideoModeString;
 	public boolean hideServerAddress;
@@ -897,6 +906,10 @@ public class Options {
 		return this.narratorHotkey;
 	}
 
+	public OptionInstance<Boolean> darkMode() {
+		return this.darkMode;
+	}
+
 	public OptionInstance<HumanoidArm> mainHand() {
 		return this.mainHand;
 	}
@@ -1285,6 +1298,7 @@ public class Options {
 		fieldAccess.process("highContrast", this.highContrast);
 		fieldAccess.process("highContrastBlockOutline", this.highContrastBlockOutline);
 		fieldAccess.process("narratorHotkey", this.narratorHotkey);
+		fieldAccess.process("darkMode", this.darkMode);
 		this.resourcePacks = fieldAccess.process("resourcePacks", this.resourcePacks, Options::readListOfStrings, GSON::toJson);
 		this.incompatibleResourcePacks = fieldAccess.process("incompatibleResourcePacks", this.incompatibleResourcePacks, Options::readListOfStrings, GSON::toJson);
 		this.lastMpIp = fieldAccess.process("lastServer", this.lastMpIp);
