@@ -652,6 +652,8 @@ sourceSets {
 
 // Configure the existing compileTestJava task
 tasks.named('compileTestJava') {
+    // Explicitly depend on main compilation
+    dependsOn 'compileJava'
     options.encoding = 'UTF-8'
 }
 

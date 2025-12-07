@@ -11,7 +11,18 @@ echo "  2. Compile the test code"
 echo "  3. Run the chunk save/load performance benchmarks"
 echo ""
 
-# Run the Gradle task
+# First ensure main classes are compiled
+echo "Step 1: Compiling main source code..."
+./gradlew classes --no-daemon
+
+# Then compile test classes
+echo ""
+echo "Step 2: Compiling test code..."
+./gradlew compileTestJava --no-daemon
+
+# Finally run the tests
+echo ""
+echo "Step 3: Running performance tests..."
 ./gradlew runChunkPerformanceTest --no-daemon
 
 echo ""

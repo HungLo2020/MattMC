@@ -117,22 +117,41 @@ The tests use the following configuration:
 
 ### Build Errors
 
-If you see errors like "cannot find symbol: class SharedConstants":
+If you see errors like "cannot find symbol: class SharedConstants" or "package net.minecraft.core does not exist":
 
-1. Ensure you're using Java 21:
+**Root Cause:** The test classes can't find the compiled main classes. This typically happens when test compilation runs before main compilation.
+
+**Solution 1 - Use the convenience script (Recommended):**
+```bash
+./RunChunkPerformanceTest.sh
+```
+The script now explicitly compiles main sources first, then test sources, then runs tests.
+
+**Solution 2 - Manual compilation order:**
+```bash
+# Compile in explicit order
+./gradlew classes
+./gradlew compileTestJava
+./gradlew runChunkPerformanceTest
+```
+
+**Solution 3 - Clean and rebuild:**
+```bash
+./gradlew clean classes compileTestJava runChunkPerformanceTest
+```
+
+**Additional checks:**
+
+1. Verify Java 21 is installed:
    ```bash
    java -version
    ```
+   Should show version 21 or higher.
 
-2. Clean and rebuild:
-   ```bash
-   ./gradlew clean compileTestJava
-   ```
-
-3. Check that main sources compiled first:
-   ```bash
-   ./gradlew classes compileTestJava
-   ```
+2. If you see "Path for java installation ... does not contain a java executable":
+   - This is a Gradle warning about broken symlinks
+   - It's usually safe to ignore if you have a working Java 21 installation
+   - Gradle will find a working JDK automatically
 
 ### Command Syntax Error
 
