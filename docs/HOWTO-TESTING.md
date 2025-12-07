@@ -215,6 +215,25 @@ await()
 
 ## Writing Tests
 
+### Naming Conventions
+
+**IMPORTANT**: Test classes must follow specific naming conventions to be properly categorized:
+
+- **Unit/Integration Tests**: Must end with `Test.java` (e.g., `MthTest.java`, `NetworkTest.java`)
+  - Placed in `src/test/misc/` directory
+  - Run with `./gradlew test` task
+  - Excluded from `performanceTest` task
+
+- **Performance Tests**: Must end with `PerformanceTest.java` or `Benchmark.java` (e.g., `MthPerformanceTest.java`, `BlockPosBenchmark.java`)
+  - Placed in `src/test/performance/` directory
+  - Run with `./gradlew performanceTest` task
+  - Excluded from regular `test` task
+
+The naming convention is used by Gradle to filter which tests run in each task:
+- Regular `test` task excludes `*PerformanceTest.class` and `*Benchmark.class`
+- `performanceTest` task includes only `*PerformanceTest.class` and `*Benchmark.class`
+- `testAll` task runs everything
+
 ### Unit Test Example
 
 Unit tests should mirror the package structure of the code being tested and use the naming convention `[ClassName]Test.java`:
@@ -320,6 +339,49 @@ public class BlockPosBenchmark {
     }
 }
 ```
+
+**Note**: JMH benchmarks like the one above are compiled but won't run with the `performanceTest` Gradle task. They're meant to be run directly via their `main()` method or with dedicated JMH runners. For performance tests that run with `./gradlew performanceTest`, use JUnit-based performance tests (see below).
+
+### JUnit Performance Test Example
+
+For simple performance measurements that integrate with the Gradle test tasks, use JUnit with timing:
+
+```java
+package net.minecraft.util;
+
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.DisplayName;
+
+/**
+ * JUnit-based performance test.
+ * Note: Must end with "PerformanceTest" to be included in performanceTest task.
+ */
+@DisplayName("Mth Performance Tests")
+class MthPerformanceTest {
+    
+    private static final int ITERATIONS = 100_000;
+    
+    @Test
+    @DisplayName("should perform clamp operations quickly")
+    void testClampPerformance() {
+        long startTime = System.nanoTime();
+        
+        for (int i = 0; i < ITERATIONS; i++) {
+            Mth.clamp(i, 0, 1000);
+        }
+        
+        long duration = System.nanoTime() - startTime;
+        double avgNanos = duration / (double) ITERATIONS;
+        
+        System.out.printf("Clamp: %,d iterations in %.2f ms (avg: %.2f ns/op)%n",
+            ITERATIONS, duration / 1_000_000.0, avgNanos);
+    }
+}
+```
+
+**When to use each approach:**
+- **JMH** (`*Benchmark.java`): For accurate microbenchmarks, statistical analysis, and comparing implementations
+- **JUnit Performance Tests** (`*PerformanceTest.java`): For simple timing measurements and regression detection in CI
 
 ### Parameterized Test Example
 
@@ -554,10 +616,13 @@ Use the Gradle Tasks view (Window → Show View → Gradle Tasks):
    void testClampNegativeValue() { ... }
    ```
 
-3. **Follow naming conventions**:
-   - Unit tests: `[ClassName]Test.java`
-   - Integration tests: `[Feature]IntegrationTest.java`
-   - Benchmarks: `[Feature]Benchmark.java`
+3. **Follow naming conventions** (REQUIRED):
+   - Unit tests: `[ClassName]Test.java` - runs with `./gradlew test`
+   - Integration tests: `[Feature]IntegrationTest.java` - runs with `./gradlew test`
+   - JUnit Performance tests: `[Feature]PerformanceTest.java` - runs with `./gradlew performanceTest`
+   - JMH Benchmarks: `[Feature]Benchmark.java` - included in `performanceTest` filter but must be run via main()
+   
+   The naming convention determines which Gradle task will execute the test.
 
 ### Test Structure
 

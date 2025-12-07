@@ -799,26 +799,43 @@ test {
     maxHeapSize = "2g"
     
     // Exclude performance tests from regular test runs
-    exclude '**/performance/**'
+    // Performance tests are identified by naming convention: *PerformanceTest or *Benchmark
+    exclude '**/*PerformanceTest.class'
+    exclude '**/*Benchmark.class'
 }
 
 // Separate task for performance tests
 tasks.register('performanceTest', Test) {
     group = 'verification'
-    description = 'Runs performance tests and benchmarks'
+    description = 'Runs performance tests and benchmarks (tests ending with "PerformanceTest" or "Benchmark")'
     
-    useJUnitPlatform {
-        includeTags 'performance'
-    }
+    // Use the test source set (same as regular test task)
+    testClassesDirs = sourceSets.test.output.classesDirs
+    classpath = sourceSets.test.runtimeClasspath
+    
+    useJUnitPlatform()
     
     testLogging {
         events "passed", "skipped", "failed"
         exceptionFormat "full"
         showStandardStreams = true  // Show stdout for performance metrics
+        
+        // Show summary after test execution
+        afterSuite { desc, result ->
+            if (!desc.parent) {
+                println "\nPerformance Test Results: ${result.resultType}"
+                println "Tests run: ${result.testCount}, " +
+                        "Passed: ${result.successfulTestCount}, " +
+                        "Failed: ${result.failedTestCount}, " +
+                        "Skipped: ${result.skippedTestCount}"
+            }
+        }
     }
     
-    // Include only performance tests
-    include '**/performance/**'
+    // Include performance tests by naming convention
+    // Tests ending with "PerformanceTest" or "Benchmark" are considered performance tests
+    include '**/*PerformanceTest.class'
+    include '**/*Benchmark.class'
     
     // More memory for performance tests
     maxHeapSize = "4g"
@@ -829,12 +846,27 @@ tasks.register('testAll', Test) {
     group = 'verification'
     description = 'Runs all tests including performance tests'
     
+    // Use the test source set (same as regular test task)
+    testClassesDirs = sourceSets.test.output.classesDirs
+    classpath = sourceSets.test.runtimeClasspath
+    
     useJUnitPlatform()
     
     testLogging {
         events "passed", "skipped", "failed"
         exceptionFormat "full"
         showStandardStreams = true
+        
+        // Show summary after test execution
+        afterSuite { desc, result ->
+            if (!desc.parent) {
+                println "\nAll Tests Results: ${result.resultType}"
+                println "Tests run: ${result.testCount}, " +
+                        "Passed: ${result.successfulTestCount}, " +
+                        "Failed: ${result.failedTestCount}, " +
+                        "Skipped: ${result.skippedTestCount}"
+            }
+        }
     }
     
     maxHeapSize = "4g"
