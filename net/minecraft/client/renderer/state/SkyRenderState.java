@@ -1,12 +1,11 @@
 package net.minecraft.client.renderer.state;
 
-import net.fabricmc.api.EnvType;
-import net.fabricmc.api.Environment;
-import net.fabricmc.fabric.api.client.rendering.v1.FabricRenderState;
+import net.minecraft.api.EnvType;
+import net.minecraft.api.Environment;
 import net.minecraft.client.renderer.DimensionSpecialEffects;
 
 @Environment(EnvType.CLIENT)
-public class SkyRenderState implements FabricRenderState {
+public class SkyRenderState {
 	public DimensionSpecialEffects.SkyType skyType = DimensionSpecialEffects.SkyType.NONE;
 	public boolean isSunriseOrSunset;
 	public boolean shouldRenderDarkDisc;

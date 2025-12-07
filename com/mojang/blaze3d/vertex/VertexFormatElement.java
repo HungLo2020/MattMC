@@ -4,8 +4,8 @@ import com.mojang.blaze3d.DontObfuscate;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Stream;
-import net.fabricmc.api.EnvType;
-import net.fabricmc.api.Environment;
+import net.minecraft.api.EnvType;
+import net.minecraft.api.Environment;
 import org.jetbrains.annotations.Nullable;
 
 @Environment(EnvType.CLIENT)

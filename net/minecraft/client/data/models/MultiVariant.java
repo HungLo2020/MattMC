@@ -1,8 +1,8 @@
 package net.minecraft.client.data.models;
 
 import java.util.List;
-import net.fabricmc.api.EnvType;
-import net.fabricmc.api.Environment;
+import net.minecraft.api.EnvType;
+import net.minecraft.api.Environment;
 import net.minecraft.client.renderer.block.model.BlockStateModel;
 import net.minecraft.client.renderer.block.model.SingleVariant;
 import net.minecraft.client.renderer.block.model.Variant;

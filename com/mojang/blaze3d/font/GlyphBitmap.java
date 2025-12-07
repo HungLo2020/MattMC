@@ -1,8 +1,8 @@
 package com.mojang.blaze3d.font;
 
 import com.mojang.blaze3d.textures.GpuTexture;
-import net.fabricmc.api.EnvType;
-import net.fabricmc.api.Environment;
+import net.minecraft.api.EnvType;
+import net.minecraft.api.Environment;
 
 @Environment(EnvType.CLIENT)
 public interface GlyphBitmap {

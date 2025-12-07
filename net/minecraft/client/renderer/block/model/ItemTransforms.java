@@ -6,8 +6,8 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParseException;
 import java.lang.reflect.Type;
-import net.fabricmc.api.EnvType;
-import net.fabricmc.api.Environment;
+import net.minecraft.api.EnvType;
+import net.minecraft.api.Environment;
 import net.minecraft.world.item.ItemDisplayContext;
 
 @Environment(EnvType.CLIENT)

@@ -9,8 +9,8 @@ import com.mojang.blaze3d.textures.GpuTexture;
 import com.mojang.blaze3d.textures.GpuTextureView;
 import com.mojang.blaze3d.textures.TextureFormat;
 import java.util.OptionalInt;
-import net.fabricmc.api.EnvType;
-import net.fabricmc.api.Environment;
+import net.minecraft.api.EnvType;
+import net.minecraft.api.Environment;
 import net.minecraft.client.renderer.RenderPipelines;
 import org.jetbrains.annotations.Nullable;
 

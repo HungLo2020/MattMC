@@ -6,8 +6,8 @@ import com.mojang.util.UndashedUuid;
 import java.util.Date;
 import java.util.UUID;
 import java.util.function.Function;
-import net.fabricmc.api.EnvType;
-import net.fabricmc.api.Environment;
+import net.minecraft.api.EnvType;
+import net.minecraft.api.Environment;
 import org.jetbrains.annotations.Nullable;
 
 @Environment(EnvType.CLIENT)

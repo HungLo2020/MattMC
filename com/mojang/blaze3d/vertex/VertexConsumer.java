@@ -2,8 +2,8 @@ package com.mojang.blaze3d.vertex;
 
 import java.nio.ByteBuffer;
 import java.nio.IntBuffer;
-import net.fabricmc.api.EnvType;
-import net.fabricmc.api.Environment;
+import net.minecraft.api.EnvType;
+import net.minecraft.api.Environment;
 import net.minecraft.client.renderer.LightTexture;
 import net.minecraft.client.renderer.block.model.BakedQuad;
 import net.minecraft.util.ARGB;

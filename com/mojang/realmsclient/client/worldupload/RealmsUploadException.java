@@ -1,7 +1,7 @@
 package com.mojang.realmsclient.client.worldupload;
 
-import net.fabricmc.api.EnvType;
-import net.fabricmc.api.Environment;
+import net.minecraft.api.EnvType;
+import net.minecraft.api.Environment;
 import net.minecraft.network.chat.Component;
 import org.jetbrains.annotations.Nullable;
 

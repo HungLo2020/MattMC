@@ -1,8 +1,8 @@
 package com.mojang.blaze3d.vertex;
 
 import java.util.function.Consumer;
-import net.fabricmc.api.EnvType;
-import net.fabricmc.api.Environment;
+import net.minecraft.api.EnvType;
+import net.minecraft.api.Environment;
 
 @Environment(EnvType.CLIENT)
 public class VertexMultiConsumer {

@@ -2,8 +2,8 @@ package com.mojang.blaze3d.vertex;
 
 import com.google.common.primitives.Floats;
 import it.unimi.dsi.fastutil.ints.IntArrays;
-import net.fabricmc.api.EnvType;
-import net.fabricmc.api.Environment;
+import net.minecraft.api.EnvType;
+import net.minecraft.api.Environment;
 import org.joml.Vector3f;
 import org.joml.Vector3fc;
 

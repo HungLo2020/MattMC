@@ -2,8 +2,8 @@ package net.minecraft.client.data.models.model;
 
 import java.util.Optional;
 import java.util.stream.IntStream;
-import net.fabricmc.api.EnvType;
-import net.fabricmc.api.Environment;
+import net.minecraft.api.EnvType;
+import net.minecraft.api.Environment;
 import net.minecraft.resources.ResourceLocation;
 
 @Environment(EnvType.CLIENT)

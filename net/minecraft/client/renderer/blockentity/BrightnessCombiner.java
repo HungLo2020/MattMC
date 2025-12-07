@@ -1,8 +1,8 @@
 package net.minecraft.client.renderer.blockentity;
 
 import it.unimi.dsi.fastutil.ints.Int2IntFunction;
-import net.fabricmc.api.EnvType;
-import net.fabricmc.api.Environment;
+import net.minecraft.api.EnvType;
+import net.minecraft.api.Environment;
 import net.minecraft.client.renderer.LevelRenderer;
 import net.minecraft.client.renderer.LightTexture;
 import net.minecraft.world.level.block.DoubleBlockCombiner.Combiner;

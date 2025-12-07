@@ -17,7 +17,6 @@ import java.util.function.BiFunction;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.function.Predicate;
-import net.fabricmc.fabric.api.command.v2.FabricEntitySelectorReader;
 import net.minecraft.advancements.critereon.MinMaxBounds;
 import net.minecraft.commands.PermissionSource;
 import net.minecraft.commands.arguments.selector.options.EntitySelectorOptions;
@@ -31,7 +30,7 @@ import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 import org.jetbrains.annotations.Nullable;
 
-public class EntitySelectorParser implements FabricEntitySelectorReader {
+public class EntitySelectorParser {
 	public static final char SYNTAX_SELECTOR_START = '@';
 	private static final char SYNTAX_OPTIONS_START = '[';
 	private static final char SYNTAX_OPTIONS_END = ']';

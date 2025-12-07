@@ -8,7 +8,6 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Queue;
 import java.util.concurrent.ConcurrentLinkedQueue;
-import net.fabricmc.fabric.api.networking.v1.FabricServerConfigurationNetworkHandler;
 import net.minecraft.core.LayeredRegistryAccess;
 import net.minecraft.network.Connection;
 import net.minecraft.network.DisconnectionDetails;
@@ -46,8 +45,7 @@ import org.slf4j.Logger;
 public class ServerConfigurationPacketListenerImpl
 	extends ServerCommonPacketListenerImpl
 	implements ServerConfigurationPacketListener,
-	TickablePacketListener,
-	FabricServerConfigurationNetworkHandler {
+	TickablePacketListener {
 	private static final Logger LOGGER = LogUtils.getLogger();
 	private static final Component DISCONNECT_REASON_INVALID_DATA = Component.translatable("multiplayer.disconnect.invalid_player_data");
 	private static final Component DISCONNECT_REASON_CONFIGURATION_ERROR = Component.translatable("multiplayer.disconnect.configuration_error");

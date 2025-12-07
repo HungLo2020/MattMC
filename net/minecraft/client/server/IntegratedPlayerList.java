@@ -2,8 +2,8 @@ package net.minecraft.client.server;
 
 import com.mojang.logging.LogUtils;
 import java.net.SocketAddress;
-import net.fabricmc.api.EnvType;
-import net.fabricmc.api.Environment;
+import net.minecraft.api.EnvType;
+import net.minecraft.api.Environment;
 import net.minecraft.core.LayeredRegistryAccess;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;

@@ -8,8 +8,8 @@ import java.io.InputStream;
 import java.util.Base64;
 import java.util.Locale;
 import java.util.Optional;
-import net.fabricmc.api.EnvType;
-import net.fabricmc.api.Environment;
+import net.minecraft.api.EnvType;
+import net.minecraft.api.Environment;
 import net.minecraft.server.packs.resources.IoSupplier;
 import org.lwjgl.glfw.GLFWNativeCocoa;
 

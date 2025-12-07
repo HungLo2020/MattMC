@@ -2,8 +2,8 @@ package com.mojang.realmsclient.gui.screens;
 
 import com.mojang.logging.LogUtils;
 import com.mojang.realmsclient.util.task.RealmCreationTask;
-import net.fabricmc.api.EnvType;
-import net.fabricmc.api.Environment;
+import net.minecraft.api.EnvType;
+import net.minecraft.api.Environment;
 import net.minecraft.client.gui.components.AbstractWidget;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;

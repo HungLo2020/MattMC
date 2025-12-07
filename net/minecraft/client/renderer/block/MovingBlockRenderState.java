@@ -1,8 +1,7 @@
 package net.minecraft.client.renderer.block;
 
-import net.fabricmc.api.EnvType;
-import net.fabricmc.api.Environment;
-import net.fabricmc.fabric.api.client.rendering.v1.FabricRenderState;
+import net.minecraft.api.EnvType;
+import net.minecraft.api.Environment;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.Holder;
@@ -18,7 +17,7 @@ import net.minecraft.world.level.material.FluidState;
 import org.jetbrains.annotations.Nullable;
 
 @Environment(EnvType.CLIENT)
-public class MovingBlockRenderState implements BlockAndTintGetter, FabricRenderState {
+public class MovingBlockRenderState implements BlockAndTintGetter {
 	public BlockPos randomSeedPos = BlockPos.ZERO;
 	public BlockPos blockPos = BlockPos.ZERO;
 	public BlockState blockState = Blocks.AIR.defaultBlockState();

@@ -1,7 +1,7 @@
 package net.minecraft.client.gui;
 
-import net.fabricmc.api.EnvType;
-import net.fabricmc.api.Environment;
+import net.minecraft.api.EnvType;
+import net.minecraft.api.Environment;
 import net.minecraft.client.gui.font.glyphs.BakedGlyph;
 import net.minecraft.util.RandomSource;
 

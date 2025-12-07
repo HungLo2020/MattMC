@@ -4,8 +4,8 @@ import com.google.common.collect.Lists;
 import com.google.gson.JsonElement;
 import com.mojang.logging.LogUtils;
 import java.util.List;
-import net.fabricmc.api.EnvType;
-import net.fabricmc.api.Environment;
+import net.minecraft.api.EnvType;
+import net.minecraft.api.Environment;
 import net.minecraft.util.LenientJsonParser;
 import org.slf4j.Logger;
 

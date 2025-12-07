@@ -2,7 +2,6 @@ package net.minecraft.core.particles;
 
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.MapCodec;
-import net.fabricmc.fabric.api.particle.v1.FabricBlockStateParticleEffect;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.ByteBufCodecs;
@@ -10,7 +9,7 @@ import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
 
-public class BlockParticleOption implements ParticleOptions, FabricBlockStateParticleEffect {
+public class BlockParticleOption implements ParticleOptions {
 	private static final Codec<BlockState> BLOCK_STATE_CODEC = Codec.withAlternative(
 		BlockState.CODEC, BuiltInRegistries.BLOCK.byNameCodec(), Block::defaultBlockState
 	);

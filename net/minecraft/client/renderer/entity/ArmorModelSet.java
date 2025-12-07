@@ -2,8 +2,8 @@ package net.minecraft.client.renderer.entity;
 
 import com.google.common.collect.ImmutableMap.Builder;
 import java.util.function.Function;
-import net.fabricmc.api.EnvType;
-import net.fabricmc.api.Environment;
+import net.minecraft.api.EnvType;
+import net.minecraft.api.Environment;
 import net.minecraft.client.model.HumanoidModel;
 import net.minecraft.client.model.geom.EntityModelSet;
 import net.minecraft.client.model.geom.ModelLayerLocation;

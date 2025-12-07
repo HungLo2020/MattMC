@@ -4,12 +4,11 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.function.Function;
 import java.util.stream.Stream;
-import net.fabricmc.fabric.api.datagen.v1.provider.FabricProvidedTagBuilder;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.tags.TagBuilder;
 import net.minecraft.tags.TagKey;
 
-public interface TagAppender<E, T> extends FabricProvidedTagBuilder<E, T> {
+public interface TagAppender<E, T> {
 	TagAppender<E, T> add(E object);
 
 	default TagAppender<E, T> add(E... objects) {

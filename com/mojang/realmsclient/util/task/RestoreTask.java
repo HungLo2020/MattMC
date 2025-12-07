@@ -7,8 +7,8 @@ import com.mojang.realmsclient.exception.RealmsServiceException;
 import com.mojang.realmsclient.exception.RetryCallException;
 import com.mojang.realmsclient.gui.screens.RealmsGenericErrorScreen;
 import com.mojang.realmsclient.gui.screens.configuration.RealmsConfigureWorldScreen;
-import net.fabricmc.api.EnvType;
-import net.fabricmc.api.Environment;
+import net.minecraft.api.EnvType;
+import net.minecraft.api.Environment;
 import net.minecraft.network.chat.Component;
 import org.slf4j.Logger;
 

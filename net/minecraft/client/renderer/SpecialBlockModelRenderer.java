@@ -2,8 +2,8 @@ package net.minecraft.client.renderer;
 
 import com.mojang.blaze3d.vertex.PoseStack;
 import java.util.Map;
-import net.fabricmc.api.EnvType;
-import net.fabricmc.api.Environment;
+import net.minecraft.api.EnvType;
+import net.minecraft.api.Environment;
 import net.minecraft.client.renderer.special.SpecialModelRenderer;
 import net.minecraft.client.renderer.special.SpecialModelRenderers;
 import net.minecraft.world.item.ItemDisplayContext;

@@ -3,8 +3,8 @@ package net.minecraft.client;
 import com.mojang.util.UndashedUuid;
 import java.util.Optional;
 import java.util.UUID;
-import net.fabricmc.api.EnvType;
-import net.fabricmc.api.Environment;
+import net.minecraft.api.EnvType;
+import net.minecraft.api.Environment;
 
 @Environment(EnvType.CLIENT)
 public class User {

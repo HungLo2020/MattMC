@@ -2,7 +2,6 @@ package net.minecraft.world.level.block.entity;
 
 import com.mojang.logging.LogUtils;
 import java.util.Set;
-import net.fabricmc.fabric.api.object.builder.v1.block.entity.FabricBlockEntityType;
 import net.minecraft.Util;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Holder;
@@ -19,7 +18,7 @@ import net.minecraft.world.level.block.state.BlockState;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 
-public class BlockEntityType<T extends BlockEntity> implements FabricBlockEntityType {
+public class BlockEntityType<T extends BlockEntity> {
 	private static final Logger LOGGER = LogUtils.getLogger();
 	public static final BlockEntityType<FurnaceBlockEntity> FURNACE = register("furnace", FurnaceBlockEntity::new, Blocks.FURNACE);
 	public static final BlockEntityType<ChestBlockEntity> CHEST = register(

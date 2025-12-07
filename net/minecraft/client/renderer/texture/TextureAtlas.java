@@ -15,9 +15,8 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Map.Entry;
-import net.fabricmc.api.EnvType;
-import net.fabricmc.api.Environment;
-import net.fabricmc.fabric.api.renderer.v1.sprite.FabricSpriteAtlasTexture;
+import net.minecraft.api.EnvType;
+import net.minecraft.api.Environment;
 import net.minecraft.CrashReport;
 import net.minecraft.CrashReportCategory;
 import net.minecraft.ReportedException;
@@ -27,7 +26,7 @@ import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 
 @Environment(EnvType.CLIENT)
-public class TextureAtlas extends AbstractTexture implements Dumpable, Tickable, FabricSpriteAtlasTexture {
+public class TextureAtlas extends AbstractTexture implements Dumpable, Tickable {
 	private static final Logger LOGGER = LogUtils.getLogger();
 	@Deprecated
 	public static final ResourceLocation LOCATION_BLOCKS = ResourceLocation.withDefaultNamespace("textures/atlas/blocks.png");

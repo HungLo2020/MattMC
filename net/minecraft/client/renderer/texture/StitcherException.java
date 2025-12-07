@@ -2,8 +2,8 @@ package net.minecraft.client.renderer.texture;
 
 import java.util.Collection;
 import java.util.Locale;
-import net.fabricmc.api.EnvType;
-import net.fabricmc.api.Environment;
+import net.minecraft.api.EnvType;
+import net.minecraft.api.Environment;
 
 @Environment(EnvType.CLIENT)
 public class StitcherException extends RuntimeException {

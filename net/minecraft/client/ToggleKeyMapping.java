@@ -2,8 +2,8 @@ package net.minecraft.client;
 
 import com.mojang.blaze3d.platform.InputConstants;
 import java.util.function.BooleanSupplier;
-import net.fabricmc.api.EnvType;
-import net.fabricmc.api.Environment;
+import net.minecraft.api.EnvType;
+import net.minecraft.api.Environment;
 
 @Environment(EnvType.CLIENT)
 public class ToggleKeyMapping extends KeyMapping {

@@ -1,8 +1,8 @@
 package net.minecraft.client.resources.server;
 
 import java.util.UUID;
-import net.fabricmc.api.EnvType;
-import net.fabricmc.api.Environment;
+import net.minecraft.api.EnvType;
+import net.minecraft.api.Environment;
 
 @Environment(EnvType.CLIENT)
 public interface PackLoadFeedback {

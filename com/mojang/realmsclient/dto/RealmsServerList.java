@@ -4,8 +4,8 @@ import com.google.gson.annotations.SerializedName;
 import com.mojang.logging.LogUtils;
 import java.util.ArrayList;
 import java.util.List;
-import net.fabricmc.api.EnvType;
-import net.fabricmc.api.Environment;
+import net.minecraft.api.EnvType;
+import net.minecraft.api.Environment;
 import org.slf4j.Logger;
 
 @Environment(EnvType.CLIENT)

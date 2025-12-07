@@ -12,8 +12,8 @@ import com.mojang.realmsclient.util.RealmsPersistence;
 import java.time.Duration;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
-import net.fabricmc.api.EnvType;
-import net.fabricmc.api.Environment;
+import net.minecraft.api.EnvType;
+import net.minecraft.api.Environment;
 import net.minecraft.Util;
 
 @Environment(EnvType.CLIENT)

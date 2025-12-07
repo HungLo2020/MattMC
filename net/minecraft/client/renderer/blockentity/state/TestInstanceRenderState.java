@@ -2,8 +2,8 @@ package net.minecraft.client.renderer.blockentity.state;
 
 import java.util.ArrayList;
 import java.util.List;
-import net.fabricmc.api.EnvType;
-import net.fabricmc.api.Environment;
+import net.minecraft.api.EnvType;
+import net.minecraft.api.Environment;
 import net.minecraft.world.level.block.entity.TestInstanceBlockEntity.ErrorMarker;
 
 @Environment(EnvType.CLIENT)

@@ -3,8 +3,8 @@ package com.mojang.realmsclient.dto;
 import com.google.gson.annotations.SerializedName;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
-import net.fabricmc.api.EnvType;
-import net.fabricmc.api.Environment;
+import net.minecraft.api.EnvType;
+import net.minecraft.api.Environment;
 
 @Environment(EnvType.CLIENT)
 public abstract class ValueObject {

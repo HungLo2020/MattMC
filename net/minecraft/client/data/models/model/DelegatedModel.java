@@ -2,8 +2,8 @@ package net.minecraft.client.data.models.model;
 
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
-import net.fabricmc.api.EnvType;
-import net.fabricmc.api.Environment;
+import net.minecraft.api.EnvType;
+import net.minecraft.api.Environment;
 import net.minecraft.resources.ResourceLocation;
 
 @Environment(EnvType.CLIENT)

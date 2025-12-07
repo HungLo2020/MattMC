@@ -1,7 +1,7 @@
 package net.minecraft.client.input;
 
-import net.fabricmc.api.EnvType;
-import net.fabricmc.api.Environment;
+import net.minecraft.api.EnvType;
+import net.minecraft.api.Environment;
 
 @Environment(EnvType.CLIENT)
 public record KeyEvent(int key, int scancode, int modifiers) implements InputWithModifiers {

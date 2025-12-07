@@ -1,7 +1,7 @@
 package net.minecraft.client.renderer.entity;
 
-import net.fabricmc.api.EnvType;
-import net.fabricmc.api.Environment;
+import net.minecraft.api.EnvType;
+import net.minecraft.api.Environment;
 import net.minecraft.client.model.CamelModel;
 import net.minecraft.client.model.CamelSaddleModel;
 import net.minecraft.client.model.geom.ModelLayers;

@@ -3,8 +3,8 @@ package net.minecraft.client.renderer.chunk;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import java.util.List;
 import java.util.ListIterator;
-import net.fabricmc.api.EnvType;
-import net.fabricmc.api.Environment;
+import net.minecraft.api.EnvType;
+import net.minecraft.api.Environment;
 import net.minecraft.world.phys.Vec3;
 import org.jetbrains.annotations.Nullable;
 

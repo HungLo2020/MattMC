@@ -9,8 +9,8 @@ import it.unimi.dsi.fastutil.objects.Object2ObjectSortedMaps;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.SequencedMap;
-import net.fabricmc.api.EnvType;
-import net.fabricmc.api.Environment;
+import net.minecraft.api.EnvType;
+import net.minecraft.api.Environment;
 import org.jetbrains.annotations.Nullable;
 
 @Environment(EnvType.CLIENT)

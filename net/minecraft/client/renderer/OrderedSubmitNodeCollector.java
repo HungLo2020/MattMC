@@ -2,9 +2,8 @@ package net.minecraft.client.renderer;
 
 import com.mojang.blaze3d.vertex.PoseStack;
 import java.util.List;
-import net.fabricmc.api.EnvType;
-import net.fabricmc.api.Environment;
-import net.fabricmc.fabric.api.renderer.v1.render.FabricRenderCommandQueue;
+import net.minecraft.api.EnvType;
+import net.minecraft.api.Environment;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.model.Model;
 import net.minecraft.client.model.geom.ModelPart;
@@ -26,7 +25,7 @@ import org.jetbrains.annotations.Nullable;
 import org.joml.Quaternionf;
 
 @Environment(EnvType.CLIENT)
-public interface OrderedSubmitNodeCollector extends FabricRenderCommandQueue {
+public interface OrderedSubmitNodeCollector {
 	void submitHitbox(PoseStack poseStack, EntityRenderState entityRenderState, HitboxesRenderState hitboxesRenderState);
 
 	void submitShadow(PoseStack poseStack, float f, List<EntityRenderState.ShadowPiece> list);

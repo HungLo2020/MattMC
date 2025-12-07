@@ -1,8 +1,8 @@
 package net.minecraft.client.gui.navigation;
 
 import it.unimi.dsi.fastutil.ints.IntComparator;
-import net.fabricmc.api.EnvType;
-import net.fabricmc.api.Environment;
+import net.minecraft.api.EnvType;
+import net.minecraft.api.Environment;
 
 @Environment(EnvType.CLIENT)
 public enum ScreenDirection {

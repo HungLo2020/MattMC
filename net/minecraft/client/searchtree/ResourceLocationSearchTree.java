@@ -4,8 +4,8 @@ import java.util.List;
 import java.util.Locale;
 import java.util.function.Function;
 import java.util.stream.Stream;
-import net.fabricmc.api.EnvType;
-import net.fabricmc.api.Environment;
+import net.minecraft.api.EnvType;
+import net.minecraft.api.Environment;
 import net.minecraft.resources.ResourceLocation;
 
 @Environment(EnvType.CLIENT)

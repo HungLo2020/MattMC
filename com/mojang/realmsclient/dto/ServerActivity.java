@@ -2,8 +2,8 @@ package com.mojang.realmsclient.dto;
 
 import com.google.gson.JsonObject;
 import com.mojang.realmsclient.util.JsonUtils;
-import net.fabricmc.api.EnvType;
-import net.fabricmc.api.Environment;
+import net.minecraft.api.EnvType;
+import net.minecraft.api.Environment;
 import org.jetbrains.annotations.Nullable;
 
 @Environment(EnvType.CLIENT)

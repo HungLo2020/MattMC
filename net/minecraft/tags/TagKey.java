@@ -6,13 +6,12 @@ import com.mojang.serialization.Codec;
 import com.mojang.serialization.DataResult;
 import io.netty.buffer.ByteBuf;
 import java.util.Optional;
-import net.fabricmc.fabric.api.tag.FabricTagKey;
 import net.minecraft.core.Registry;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
 
-public record TagKey<T>(ResourceKey<? extends Registry<T>> registry, ResourceLocation location) implements FabricTagKey {
+public record TagKey<T>(ResourceKey<? extends Registry<T>> registry, ResourceLocation location) {
 	private static final Interner<TagKey<?>> VALUES = Interners.newWeakInterner();
 
 	@Deprecated

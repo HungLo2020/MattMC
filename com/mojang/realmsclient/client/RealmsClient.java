@@ -47,7 +47,7 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
-import net.fabricmc.api.EnvType;
+import net.minecraft.api.EnvType;
 import net.minecraft.SharedConstants;
 import net.minecraft.Util;
 import net.minecraft.client.Minecraft;
@@ -55,7 +55,7 @@ import net.minecraft.util.LenientJsonParser;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 
-@net.fabricmc.api.Environment(EnvType.CLIENT)
+@net.minecraft.api.Environment(EnvType.CLIENT)
 public class RealmsClient {
 	public static final RealmsClient.Environment ENVIRONMENT = (RealmsClient.Environment)Optional.ofNullable(System.getenv("realms.environment"))
 		.or(() -> Optional.ofNullable(System.getProperty("realms.environment")))
@@ -529,14 +529,14 @@ public class RealmsClient {
 		}
 	}
 
-	@net.fabricmc.api.Environment(EnvType.CLIENT)
+	@net.minecraft.api.Environment(EnvType.CLIENT)
 	public static enum CompatibleVersionResponse {
 		COMPATIBLE,
 		OUTDATED,
 		OTHER;
 	}
 
-	@net.fabricmc.api.Environment(EnvType.CLIENT)
+	@net.minecraft.api.Environment(EnvType.CLIENT)
 	public static enum Environment {
 		PRODUCTION("pc.realms.minecraft.net", "java.frontendlegacy.realms.minecraft-services.net", "https"),
 		STAGE("pc-stage.realms.minecraft.net", "java.frontendlegacy.stage-c2a40e62.realms.minecraft-services.net", "https"),

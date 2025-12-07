@@ -12,8 +12,8 @@ import it.unimi.dsi.fastutil.floats.FloatConsumer;
 import java.io.IOException;
 import java.io.InputStream;
 import javax.sound.sampled.AudioFormat;
-import net.fabricmc.api.EnvType;
-import net.fabricmc.api.Environment;
+import net.minecraft.api.EnvType;
+import net.minecraft.api.Environment;
 import org.jetbrains.annotations.Nullable;
 
 @Environment(EnvType.CLIENT)

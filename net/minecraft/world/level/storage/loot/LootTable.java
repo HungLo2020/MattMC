@@ -11,7 +11,6 @@ import java.util.List;
 import java.util.Optional;
 import java.util.function.BiFunction;
 import java.util.function.Consumer;
-import net.fabricmc.fabric.api.loot.v3.FabricLootTableBuilder;
 import net.minecraft.Util;
 import net.minecraft.core.Holder;
 import net.minecraft.core.registries.Registries;
@@ -219,7 +218,7 @@ public class LootTable {
 		return new LootTable.Builder();
 	}
 
-	public static class Builder implements FunctionUserBuilder<LootTable.Builder>, FabricLootTableBuilder {
+	public static class Builder implements FunctionUserBuilder<LootTable.Builder> {
 		private final ImmutableList.Builder<LootPool> pools = ImmutableList.builder();
 		private final ImmutableList.Builder<LootItemFunction> functions = ImmutableList.builder();
 		private ContextKeySet paramSet = LootTable.DEFAULT_PARAM_SET;

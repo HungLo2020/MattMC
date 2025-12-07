@@ -9,7 +9,6 @@ import java.util.Set;
 import java.util.function.BiConsumer;
 import java.util.function.Function;
 import java.util.stream.IntStream;
-import net.fabricmc.fabric.api.datagen.v1.loot.FabricBlockLootTableGenerator;
 import net.minecraft.advancements.critereon.BlockPredicate;
 import net.minecraft.advancements.critereon.DataComponentMatchers;
 import net.minecraft.advancements.critereon.EnchantmentPredicate;
@@ -77,7 +76,7 @@ import net.minecraft.world.level.storage.loot.providers.number.ConstantValue;
 import net.minecraft.world.level.storage.loot.providers.number.NumberProvider;
 import net.minecraft.world.level.storage.loot.providers.number.UniformGenerator;
 
-public abstract class BlockLootSubProvider implements LootTableSubProvider, FabricBlockLootTableGenerator {
+public abstract class BlockLootSubProvider implements LootTableSubProvider {
 	protected final HolderLookup.Provider registries;
 	protected final Set<Item> explosionResistant;
 	protected final FeatureFlagSet enabledFeatures;

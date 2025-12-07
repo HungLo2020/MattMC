@@ -3,8 +3,8 @@ package net.minecraft.client.gui.font.providers;
 import com.mojang.blaze3d.font.SpaceProvider;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.MapCodec;
-import net.fabricmc.api.EnvType;
-import net.fabricmc.api.Environment;
+import net.minecraft.api.EnvType;
+import net.minecraft.api.Environment;
 import net.minecraft.util.StringRepresentable;
 
 @Environment(EnvType.CLIENT)

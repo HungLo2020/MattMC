@@ -2,8 +2,8 @@ package net.minecraft.client.gui.screens.dialog;
 
 import java.util.Optional;
 import java.util.stream.Stream;
-import net.fabricmc.api.EnvType;
-import net.fabricmc.api.Environment;
+import net.minecraft.api.EnvType;
+import net.minecraft.api.Environment;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.ClickEvent.OpenUrl;
 import net.minecraft.server.ServerLinks.Entry;

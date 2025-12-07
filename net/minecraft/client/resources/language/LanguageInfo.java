@@ -2,8 +2,8 @@ package net.minecraft.client.resources.language;
 
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
-import net.fabricmc.api.EnvType;
-import net.fabricmc.api.Environment;
+import net.minecraft.api.EnvType;
+import net.minecraft.api.Environment;
 import net.minecraft.network.chat.Component;
 import net.minecraft.util.ExtraCodecs;
 

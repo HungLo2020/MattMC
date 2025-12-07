@@ -3,8 +3,8 @@ package com.mojang.blaze3d.audio;
 import java.nio.ByteBuffer;
 import java.util.OptionalInt;
 import javax.sound.sampled.AudioFormat;
-import net.fabricmc.api.EnvType;
-import net.fabricmc.api.Environment;
+import net.minecraft.api.EnvType;
+import net.minecraft.api.Environment;
 import org.jetbrains.annotations.Nullable;
 import org.lwjgl.openal.AL10;
 

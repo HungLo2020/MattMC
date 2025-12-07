@@ -3,13 +3,12 @@ package net.minecraft.client.renderer.state;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.List;
-import net.fabricmc.api.EnvType;
-import net.fabricmc.api.Environment;
-import net.fabricmc.fabric.api.client.rendering.v1.FabricRenderState;
+import net.minecraft.api.EnvType;
+import net.minecraft.api.Environment;
 import net.minecraft.core.Direction;
 
 @Environment(EnvType.CLIENT)
-public class WorldBorderRenderState implements FabricRenderState {
+public class WorldBorderRenderState {
 	public double minX;
 	public double maxX;
 	public double minZ;

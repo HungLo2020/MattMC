@@ -1,8 +1,8 @@
 package net.minecraft.client.gui.screens.worldselection;
 
 import java.nio.file.Path;
-import net.fabricmc.api.EnvType;
-import net.fabricmc.api.Environment;
+import net.minecraft.api.EnvType;
+import net.minecraft.api.Environment;
 import net.minecraft.core.LayeredRegistryAccess;
 import net.minecraft.server.RegistryLayer;
 import net.minecraft.world.level.storage.PrimaryLevelData;

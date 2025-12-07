@@ -2,8 +2,8 @@ package net.minecraft.client.resources.metadata.language;
 
 import com.mojang.serialization.Codec;
 import java.util.Map;
-import net.fabricmc.api.EnvType;
-import net.fabricmc.api.Environment;
+import net.minecraft.api.EnvType;
+import net.minecraft.api.Environment;
 import net.minecraft.client.resources.language.LanguageInfo;
 import net.minecraft.server.packs.metadata.MetadataSectionType;
 

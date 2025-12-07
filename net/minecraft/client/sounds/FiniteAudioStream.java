@@ -2,8 +2,8 @@ package net.minecraft.client.sounds;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import net.fabricmc.api.EnvType;
-import net.fabricmc.api.Environment;
+import net.minecraft.api.EnvType;
+import net.minecraft.api.Environment;
 
 @Environment(EnvType.CLIENT)
 public interface FiniteAudioStream extends AudioStream {

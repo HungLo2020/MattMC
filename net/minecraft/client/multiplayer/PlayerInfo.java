@@ -2,8 +2,8 @@ package net.minecraft.client.multiplayer;
 
 import com.mojang.authlib.GameProfile;
 import java.util.function.Supplier;
-import net.fabricmc.api.EnvType;
-import net.fabricmc.api.Environment;
+import net.minecraft.api.EnvType;
+import net.minecraft.api.Environment;
 import net.minecraft.client.Minecraft;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.RemoteChatSession;

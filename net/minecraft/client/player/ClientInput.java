@@ -1,7 +1,7 @@
 package net.minecraft.client.player;
 
-import net.fabricmc.api.EnvType;
-import net.fabricmc.api.Environment;
+import net.minecraft.api.EnvType;
+import net.minecraft.api.Environment;
 import net.minecraft.world.entity.player.Input;
 import net.minecraft.world.phys.Vec2;
 

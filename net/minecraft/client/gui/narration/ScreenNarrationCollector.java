@@ -4,8 +4,8 @@ import com.google.common.collect.Maps;
 import java.util.Comparator;
 import java.util.Map;
 import java.util.function.Consumer;
-import net.fabricmc.api.EnvType;
-import net.fabricmc.api.Environment;
+import net.minecraft.api.EnvType;
+import net.minecraft.api.Environment;
 
 @Environment(EnvType.CLIENT)
 public class ScreenNarrationCollector {

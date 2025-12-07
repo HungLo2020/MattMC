@@ -10,9 +10,8 @@ import java.util.Locale;
 import java.util.Objects;
 import java.util.Set;
 import java.util.function.Predicate;
-import net.fabricmc.api.EnvType;
-import net.fabricmc.api.Environment;
-import net.fabricmc.fabric.api.client.itemgroup.v1.FabricCreativeInventoryScreen;
+import net.minecraft.api.EnvType;
+import net.minecraft.api.Environment;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.HotbarManager;
 import net.minecraft.client.Minecraft;
@@ -60,7 +59,7 @@ import net.minecraft.world.item.TooltipFlag.Default;
 import org.jetbrains.annotations.Nullable;
 
 @Environment(EnvType.CLIENT)
-public class CreativeModeInventoryScreen extends AbstractContainerScreen<CreativeModeInventoryScreen.ItemPickerMenu> implements FabricCreativeInventoryScreen {
+public class CreativeModeInventoryScreen extends AbstractContainerScreen<CreativeModeInventoryScreen.ItemPickerMenu> {
 	private static final ResourceLocation SCROLLER_SPRITE = ResourceLocation.withDefaultNamespace("container/creative_inventory/scroller");
 	private static final ResourceLocation SCROLLER_DISABLED_SPRITE = ResourceLocation.withDefaultNamespace("container/creative_inventory/scroller_disabled");
 	private static final ResourceLocation[] UNSELECTED_TOP_TABS = new ResourceLocation[]{

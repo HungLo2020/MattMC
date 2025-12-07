@@ -8,8 +8,8 @@ import java.io.InputStream;
 import java.nio.file.Path;
 import java.util.function.BooleanSupplier;
 import java.util.zip.GZIPOutputStream;
-import net.fabricmc.api.EnvType;
-import net.fabricmc.api.Environment;
+import net.minecraft.api.EnvType;
+import net.minecraft.api.Environment;
 import org.apache.commons.compress.archivers.tar.TarArchiveEntry;
 import org.apache.commons.compress.archivers.tar.TarArchiveOutputStream;
 

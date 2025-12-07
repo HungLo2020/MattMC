@@ -9,8 +9,6 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.function.Consumer;
-import net.fabricmc.fabric.api.item.v1.FabricItem;
-import net.fabricmc.fabric.api.item.v1.FabricItem.Settings;
 import net.minecraft.SharedConstants;
 import net.minecraft.Util;
 import net.minecraft.core.BlockPos;
@@ -88,7 +86,7 @@ import net.minecraft.world.phys.Vec3;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 
-public class Item implements FeatureElement, ItemLike, FabricItem {
+public class Item implements FeatureElement, ItemLike {
 	public static final Codec<Holder<Item>> CODEC = BuiltInRegistries.ITEM
 		.holderByNameCodec()
 		.validate(holder -> holder.is(Items.AIR.builtInRegistryHolder()) ? DataResult.error(() -> "Item must not be minecraft:air") : DataResult.success(holder));
@@ -353,7 +351,7 @@ public class Item implements FeatureElement, ItemLike, FabricItem {
 		return false;
 	}
 
-	public static class Properties implements Settings {
+	public static class Properties {
 		private static final DependantName<Item, String> BLOCK_DESCRIPTION_ID = resourceKey -> Util.makeDescriptionId("block", resourceKey.location());
 		private static final DependantName<Item, String> ITEM_DESCRIPTION_ID = resourceKey -> Util.makeDescriptionId("item", resourceKey.location());
 		private final DataComponentMap.Builder components = DataComponentMap.builder().addAll(DataComponents.COMMON_ITEM_COMPONENTS);

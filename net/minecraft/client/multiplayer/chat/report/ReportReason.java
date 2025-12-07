@@ -2,8 +2,8 @@ package net.minecraft.client.multiplayer.chat.report;
 
 import java.util.List;
 import java.util.Locale;
-import net.fabricmc.api.EnvType;
-import net.fabricmc.api.Environment;
+import net.minecraft.api.EnvType;
+import net.minecraft.api.Environment;
 import net.minecraft.network.chat.Component;
 
 @Environment(EnvType.CLIENT)

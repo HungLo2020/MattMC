@@ -2,10 +2,9 @@ package net.minecraft.world.level.storage;
 
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.MapCodec;
-import net.fabricmc.fabric.api.serialization.v1.view.FabricWriteView;
 import org.jetbrains.annotations.Nullable;
 
-public interface ValueOutput extends FabricWriteView {
+public interface ValueOutput {
 	<T> void store(String string, Codec<T> codec, T object);
 
 	<T> void storeNullable(String string, Codec<T> codec, @Nullable T object);

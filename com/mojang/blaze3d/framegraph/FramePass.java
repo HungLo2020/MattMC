@@ -2,8 +2,8 @@ package com.mojang.blaze3d.framegraph;
 
 import com.mojang.blaze3d.resource.ResourceDescriptor;
 import com.mojang.blaze3d.resource.ResourceHandle;
-import net.fabricmc.api.EnvType;
-import net.fabricmc.api.Environment;
+import net.minecraft.api.EnvType;
+import net.minecraft.api.Environment;
 
 @Environment(EnvType.CLIENT)
 public interface FramePass {

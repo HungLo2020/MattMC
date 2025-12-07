@@ -2,8 +2,8 @@ package net.minecraft.client.sounds;
 
 import com.google.common.collect.Lists;
 import java.util.List;
-import net.fabricmc.api.EnvType;
-import net.fabricmc.api.Environment;
+import net.minecraft.api.EnvType;
+import net.minecraft.api.Environment;
 import net.minecraft.ChatFormatting;
 import net.minecraft.SharedConstants;
 import net.minecraft.client.resources.sounds.Sound;

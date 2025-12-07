@@ -1,7 +1,7 @@
 package net.minecraft.client.data.models;
 
-import net.fabricmc.api.EnvType;
-import net.fabricmc.api.Environment;
+import net.minecraft.api.EnvType;
+import net.minecraft.api.Environment;
 import net.minecraft.client.renderer.item.ItemModel;
 import net.minecraft.world.item.Item;
 
