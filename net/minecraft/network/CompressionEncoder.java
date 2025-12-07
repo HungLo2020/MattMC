@@ -7,7 +7,8 @@ import java.util.zip.Deflater;
 
 public class CompressionEncoder extends MessageToByteEncoder<ByteBuf> {
 	public static final int MAXIMUM_UNCOMPRESSED_LENGTH = 8388608;
-	private final byte[] encodeBuf = new byte[8192];
+	private static final int ENCODE_BUFFER_SIZE = 8192;
+	private final byte[] encodeBuf = new byte[ENCODE_BUFFER_SIZE];
 	private final Deflater deflater;
 	private int threshold;
 
