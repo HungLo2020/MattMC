@@ -198,9 +198,9 @@ public class GameRenderer implements Projector, AutoCloseable {
 		CubeMap newCubeMap = this.createCubeMap(theme);
 		PanoramaRenderer newPanorama = new PanoramaRenderer(newCubeMap);
 		
-		// Register textures for new panorama
+		// Register and load textures for new panorama
 		if (this.minecraft != null && this.minecraft.getTextureManager() != null) {
-			newCubeMap.registerTextures(this.minecraft.getTextureManager());
+			newCubeMap.registerAndLoadTextures(this.minecraft.getTextureManager());
 		}
 		
 		// Atomically swap to new panorama
