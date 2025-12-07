@@ -7,6 +7,7 @@ import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.LongArrayTag;
 import net.minecraft.server.Bootstrap;
 import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.chunk.PalettedContainer;
@@ -443,7 +444,7 @@ class ChunkOperationsPerformanceTest {
         Random random = new Random(12345);
         
         // Create strategy for block states
-        Strategy<BlockState> strategy = Strategy.createForBlockStates(net.minecraft.world.level.block.Block.BLOCK_STATE_REGISTRY);
+        Strategy<BlockState> strategy = Strategy.createForBlockStates(Block.BLOCK_STATE_REGISTRY);
         
         // Create one PalettedContainer per section
         for (int section = 0; section < sectionCount; section++) {
@@ -482,7 +483,7 @@ class ChunkOperationsPerformanceTest {
         Random random = new Random(12345);
         
         // Create strategy for block states
-        Strategy<BlockState> strategy = Strategy.createForBlockStates(net.minecraft.world.level.block.Block.BLOCK_STATE_REGISTRY);
+        Strategy<BlockState> strategy = Strategy.createForBlockStates(Block.BLOCK_STATE_REGISTRY);
         
         for (int chunk = 0; chunk < chunkCount; chunk++) {
             for (int section = 0; section < SECTION_COUNT; section++) {
@@ -516,7 +517,7 @@ class ChunkOperationsPerformanceTest {
         long startTime = System.nanoTime();
         
         Random random = new Random(12345);
-        Strategy<BlockState> strategy = Strategy.createForBlockStates(net.minecraft.world.level.block.Block.BLOCK_STATE_REGISTRY);
+        Strategy<BlockState> strategy = Strategy.createForBlockStates(Block.BLOCK_STATE_REGISTRY);
         
         // Process blocks section by section (as done in real chunk operations)
         // Keep sections in list to simulate real memory patterns
@@ -585,7 +586,7 @@ class ChunkOperationsPerformanceTest {
         long startTime = System.nanoTime();
         
         Random random = new Random(12345);
-        Strategy<BlockState> strategy = Strategy.createForBlockStates(net.minecraft.world.level.block.Block.BLOCK_STATE_REGISTRY);
+        Strategy<BlockState> strategy = Strategy.createForBlockStates(Block.BLOCK_STATE_REGISTRY);
         
         // Create all sections with PalettedContainers
         // Keep sections in list to simulate real chunk memory usage
