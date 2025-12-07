@@ -185,22 +185,25 @@ public class Util {
 		return Mth.clamp(Runtime.getRuntime().availableProcessors() - 1, 1, getMaxThreads());
 	}
 
+	private static final int MIN_BACKGROUND_THREADS = 1;
+	private static final int MAX_BACKGROUND_THREADS = 255;
+
 	private static int getMaxThreads() {
 		String string = System.getProperty("max.bg.threads");
 		if (string != null) {
 			try {
 				int i = Integer.parseInt(string);
-				if (i >= 1 && i <= 255) {
+				if (i >= MIN_BACKGROUND_THREADS && i <= MAX_BACKGROUND_THREADS) {
 					return i;
 				}
 
-				LOGGER.error("Wrong {} property value '{}'. Should be an integer value between 1 and {}.", "max.bg.threads", string, 255);
+				LOGGER.error("Wrong {} property value '{}'. Should be an integer value between 1 and {}.", "max.bg.threads", string, MAX_BACKGROUND_THREADS);
 			} catch (NumberFormatException var2) {
-				LOGGER.error("Could not parse {} property value '{}'. Should be an integer value between 1 and {}.", "max.bg.threads", string, 255);
+				LOGGER.error("Could not parse {} property value '{}'. Should be an integer value between 1 and {}.", "max.bg.threads", string, MAX_BACKGROUND_THREADS);
 			}
 		}
 
-		return 255;
+		return MAX_BACKGROUND_THREADS;
 	}
 
 	public static TracingExecutor backgroundExecutor() {
@@ -798,14 +801,16 @@ public class Util {
 		safeReplaceOrMoveFile(path, path2, path3, false);
 	}
 
+	private static final int FILE_OPERATION_MAX_RETRIES = 10;
+
 	public static boolean safeReplaceOrMoveFile(Path path, Path path2, Path path3, boolean bl) {
 		if (Files.exists(path, new LinkOption[0])
-			&& !runWithRetries(10, "create backup " + path3, createDeleter(path3), createRenamer(path, path3), createFileCreatedCheck(path3))) {
+			&& !runWithRetries(FILE_OPERATION_MAX_RETRIES, "create backup " + path3, createDeleter(path3), createRenamer(path, path3), createFileCreatedCheck(path3))) {
 			return false;
-		} else if (!runWithRetries(10, "remove old " + path, createDeleter(path), createFileDeletedCheck(path))) {
+		} else if (!runWithRetries(FILE_OPERATION_MAX_RETRIES, "remove old " + path, createDeleter(path), createFileDeletedCheck(path))) {
 			return false;
-		} else if (!runWithRetries(10, "replace " + path + " with " + path2, createRenamer(path2, path), createFileCreatedCheck(path)) && !bl) {
-			runWithRetries(10, "restore " + path + " from " + path3, createRenamer(path3, path), createFileCreatedCheck(path));
+		} else if (!runWithRetries(FILE_OPERATION_MAX_RETRIES, "replace " + path + " with " + path2, createRenamer(path2, path), createFileCreatedCheck(path)) && !bl) {
+			runWithRetries(FILE_OPERATION_MAX_RETRIES, "restore " + path + " from " + path3, createRenamer(path3, path), createFileCreatedCheck(path));
 			return false;
 		} else {
 			return true;

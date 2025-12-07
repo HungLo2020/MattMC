@@ -158,6 +158,7 @@ public class Commands {
 	public static final int LEVEL_GAMEMASTERS = 2;
 	public static final int LEVEL_ADMINS = 3;
 	public static final int LEVEL_OWNERS = 4;
+	private static final int ERROR_CONTEXT_CHARS = 10;
 	private static final ClientboundCommandsPacket.NodeInspector<CommandSourceStack> COMMAND_NODE_INSPECTOR = new ClientboundCommandsPacket.NodeInspector<CommandSourceStack>() {
 		@Nullable
 		@Override
@@ -359,11 +360,11 @@ public class Commands {
 				MutableComponent mutableComponent = Component.empty()
 					.withStyle(ChatFormatting.GRAY)
 					.withStyle(style -> style.withClickEvent(new ClickEvent.SuggestCommand("/" + string)));
-				if (i > 10) {
+				if (i > ERROR_CONTEXT_CHARS) {
 					mutableComponent.append(CommonComponents.ELLIPSIS);
 				}
 
-				mutableComponent.append(var7.getInput().substring(Math.max(0, i - 10), i));
+				mutableComponent.append(var7.getInput().substring(Math.max(0, i - ERROR_CONTEXT_CHARS), i));
 				if (i < var7.getInput().length()) {
 					Component component = Component.literal(var7.getInput().substring(i)).withStyle(ChatFormatting.RED, ChatFormatting.UNDERLINE);
 					mutableComponent.append(component);
