@@ -288,7 +288,7 @@ tasks.register('runServer', JavaExec) {
     group = 'minecraft'
     description = 'Runs the Minecraft dedicated server (no GUI)'
     
-    dependsOn 'copyJdkToRun'
+    dependsOn 'classes', 'copyJdkToRun'
     
     classpath = sourceSets.main.runtimeClasspath
     mainClass = 'net.minecraft.server.Main'
@@ -312,7 +312,7 @@ tasks.register('runServerGui', JavaExec) {
     group = 'minecraft'
     description = 'Runs the Minecraft dedicated server with GUI'
     
-    dependsOn 'copyJdkToRun'
+    dependsOn 'classes', 'copyJdkToRun'
     
     classpath = sourceSets.main.runtimeClasspath
     mainClass = 'net.minecraft.server.Main'
@@ -336,7 +336,7 @@ tasks.register('runClient', JavaExec) {
     group = 'minecraft'
     description = 'Runs the Minecraft client'
     
-    dependsOn 'copyJdkToRun'
+    dependsOn 'classes', 'copyJdkToRun'
     
     classpath = sourceSets.main.runtimeClasspath
     mainClass = 'net.minecraft.client.main.Main'
