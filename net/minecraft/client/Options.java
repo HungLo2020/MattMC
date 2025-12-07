@@ -46,8 +46,10 @@ import net.minecraft.Util.OS;
 import net.minecraft.client.gui.components.ChatComponent;
 import net.minecraft.client.gui.components.Tooltip;
 import net.minecraft.client.input.InputQuirks;
+import net.minecraft.client.renderer.GameRenderer;
 import net.minecraft.client.renderer.GpuWarnlistManager;
 import net.minecraft.client.resources.sounds.SimpleSoundInstance;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.client.sounds.MusicManager;
 import net.minecraft.client.sounds.SoundEngine;
 import net.minecraft.client.sounds.SoundManager;
@@ -289,6 +291,20 @@ public class Options {
 				: Component.translatable("options.accessibility.narrator_hotkey.tooltip")
 		),
 		true
+	);
+	private static final Component DARK_MODE_TOOLTIP = Component.translatable("options.darkMode.tooltip");
+	private final OptionInstance<Boolean> darkMode = OptionInstance.createBoolean(
+		"options.darkMode",
+		OptionInstance.cachedConstantTooltip(DARK_MODE_TOOLTIP),
+		true,
+		boolean_ -> {
+			GameRenderer gameRenderer = Minecraft.getInstance().gameRenderer;
+			if (boolean_) {
+				gameRenderer.loadPostEffect(ResourceLocation.withDefaultNamespace("dark_mode"));
+			} else {
+				gameRenderer.clearPostEffect();
+			}
+		}
 	);
 	@Nullable
 	public String fullscreenVideoModeString;
@@ -897,6 +913,10 @@ public class Options {
 		return this.narratorHotkey;
 	}
 
+	public OptionInstance<Boolean> darkMode() {
+		return this.darkMode;
+	}
+
 	public OptionInstance<HumanoidArm> mainHand() {
 		return this.mainHand;
 	}
@@ -1285,6 +1305,7 @@ public class Options {
 		fieldAccess.process("highContrast", this.highContrast);
 		fieldAccess.process("highContrastBlockOutline", this.highContrastBlockOutline);
 		fieldAccess.process("narratorHotkey", this.narratorHotkey);
+		fieldAccess.process("darkMode", this.darkMode);
 		this.resourcePacks = fieldAccess.process("resourcePacks", this.resourcePacks, Options::readListOfStrings, GSON::toJson);
 		this.incompatibleResourcePacks = fieldAccess.process("incompatibleResourcePacks", this.incompatibleResourcePacks, Options::readListOfStrings, GSON::toJson);
 		this.lastMpIp = fieldAccess.process("lastServer", this.lastMpIp);

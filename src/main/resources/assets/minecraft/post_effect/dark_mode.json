@@ -1,0 +1,62 @@
+{
+    "targets": {
+        "swap": {}
+    },
+    "passes": [
+        {
+            "vertex_shader": "minecraft:core/screenquad",
+            "fragment_shader": "minecraft:post/dark_mode",
+            "inputs": [
+                {
+                    "sampler_name": "In",
+                    "target": "minecraft:main"
+                }
+            ],
+            "output": "swap",
+            "uniforms": {
+                "DarkModeConfig": [
+                    {
+                        "name": "Intensity",
+                        "type": "float",
+                        "value": 1.0
+                    },
+                    {
+                        "name": "HueShift",
+                        "type": "float",
+                        "value": 0.0
+                    },
+                    {
+                        "name": "Brightness",
+                        "type": "float",
+                        "value": 0.9
+                    },
+                    {
+                        "name": "Contrast",
+                        "type": "float",
+                        "value": 1.1
+                    }
+                ]
+            }
+        },
+        {
+            "vertex_shader": "minecraft:core/screenquad",
+            "fragment_shader": "minecraft:post/blit",
+            "inputs": [
+                {
+                    "sampler_name": "In",
+                    "target": "swap"
+                }
+            ],
+            "uniforms": {
+                "BlitConfig": [
+                    {
+                        "name": "ColorModulate",
+                        "type": "vec4",
+                        "value": [ 1.0, 1.0, 1.0, 1.0 ]
+                    }
+                ]
+            },
+            "output": "minecraft:main"
+        }
+    ]
+}

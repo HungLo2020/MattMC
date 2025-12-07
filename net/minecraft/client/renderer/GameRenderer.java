@@ -226,6 +226,11 @@ public class GameRenderer implements Projector, AutoCloseable {
 		this.effectActive = !this.effectActive;
 	}
 
+	public void loadPostEffect(ResourceLocation resourceLocation) {
+		this.postEffectId = resourceLocation;
+		this.effectActive = true;
+	}
+
 	public void checkEntityPostEffect(@Nullable Entity entity) {
 		switch (entity) {
 			case Creeper creeper:
