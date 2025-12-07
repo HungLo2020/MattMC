@@ -588,23 +588,40 @@ tasks.register('clientDist') {
         // Asset index - this should match the index file in assets/indexes/<assetIndex>.json
         def assetIndex = '27'
         
-        // Copy and process launch scripts from libraries directory
-        // Linux script
-        def linuxScriptTemplate = file('libraries/run-mattmc.sh').text
-        def linuxScript = file("${distDir}/run-mattmc.sh")
-        linuxScript.text = linuxScriptTemplate
-            .replace('@CLASSPATH_LINUX@', classpathLinux)
-            .replace('@VERSION@', version)
-            .replace('@ASSET_INDEX@', assetIndex)
-        linuxScript.setExecutable(true)
-        
-        // Windows script
-        def windowsScriptTemplate = file('libraries/run-mattmc.bat').text
-        def windowsScript = file("${distDir}/run-mattmc.bat")
-        windowsScript.text = windowsScriptTemplate
-            .replace('@CLASSPATH_WINDOWS@', classpathWindows)
-            .replace('@VERSION@', version)
-            .replace('@ASSET_INDEX@', assetIndex)
+        // Copy and process launch scripts from packaging directory
+        // Process each script file in the packaging directory
+        def packagingDir = file('packaging')
+        packagingDir.eachFile { scriptFile ->
+            // Only process regular files, skip directories
+            if (scriptFile.isDirectory()) {
+                return
+            }
+            
+            if (scriptFile.name.endsWith('.sh')) {
+                // Linux script - process template placeholders
+                def linuxScriptTemplate = scriptFile.text
+                def linuxScript = file("${distDir}/${scriptFile.name}")
+                linuxScript.text = linuxScriptTemplate
+                    .replace('@CLASSPATH_LINUX@', classpathLinux)
+                    .replace('@VERSION@', version)
+                    .replace('@ASSET_INDEX@', assetIndex)
+                linuxScript.setExecutable(true)
+            } else if (scriptFile.name.endsWith('.bat')) {
+                // Windows script - process template placeholders
+                def windowsScriptTemplate = scriptFile.text
+                def windowsScript = file("${distDir}/${scriptFile.name}")
+                windowsScript.text = windowsScriptTemplate
+                    .replace('@CLASSPATH_WINDOWS@', classpathWindows)
+                    .replace('@VERSION@', version)
+                    .replace('@ASSET_INDEX@', assetIndex)
+            } else {
+                // Copy any other files as-is (e.g., README, documentation)
+                copy {
+                    from scriptFile
+                    into distDir
+                }
+            }
+        }
     }
 }
 
