@@ -2,18 +2,15 @@ package net.minecraft.world.level.chunk;
 
 import net.minecraft.SharedConstants;
 import net.minecraft.core.BlockPos;
-import net.minecraft.core.Holder;
-import net.minecraft.core.registries.Registries;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.LongArrayTag;
 import net.minecraft.server.Bootstrap;
 import net.minecraft.world.level.ChunkPos;
-import net.minecraft.world.level.biome.Biome;
-import net.minecraft.world.level.biome.Biomes;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.level.levelgen.Heightmap;
+import net.minecraft.world.level.chunk.PalettedContainer;
+import net.minecraft.world.level.chunk.Strategy;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.DisplayName;
@@ -269,9 +266,14 @@ class ChunkOperationsPerformanceTest {
             
             // Simulate varied palette (5-15 different block types per section)
             int paletteSize = 5 + random.nextInt(11);
+            String[] blockTypes = {"minecraft:stone", "minecraft:air", "minecraft:deepslate", 
+                                   "minecraft:dirt", "minecraft:grass_block", "minecraft:coal_ore",
+                                   "minecraft:iron_ore", "minecraft:water", "minecraft:gravel",
+                                   "minecraft:andesite", "minecraft:diorite", "minecraft:granite",
+                                   "minecraft:diamond_ore", "minecraft:gold_ore", "minecraft:obsidian"};
             for (int p = 0; p < paletteSize; p++) {
                 CompoundTag blockTag = new CompoundTag();
-                blockTag.putString("Name", "minecraft:stone"); // Simplified
+                blockTag.putString("Name", blockTypes[p % blockTypes.length]);
                 paletteTag.add(blockTag);
             }
             blockStatesTag.put("palette", paletteTag);
@@ -290,9 +292,19 @@ class ChunkOperationsPerformanceTest {
             // Add biome data (4x4x4 = 64 biomes per section)
             CompoundTag biomesTag = new CompoundTag();
             ListTag biomePaletteTag = new ListTag();
-            CompoundTag biomeEntry = new CompoundTag();
-            biomeEntry.putString("Name", "minecraft:plains");
-            biomePaletteTag.add(biomeEntry);
+            
+            // Varied biomes based on section height
+            String[] biomeTypes = i < 0 ? 
+                new String[]{"minecraft:deep_dark", "minecraft:dripstone_caves"} :
+                i < 10 ? 
+                new String[]{"minecraft:plains", "minecraft:forest", "minecraft:river"} :
+                new String[]{"minecraft:plains", "minecraft:mountains"};
+            
+            for (String biomeType : biomeTypes) {
+                CompoundTag biomeEntry = new CompoundTag();
+                biomeEntry.putString("Name", biomeType);
+                biomePaletteTag.add(biomeEntry);
+            }
             biomesTag.put("palette", biomePaletteTag);
             sectionTag.put("biomes", biomesTag);
             
@@ -322,12 +334,14 @@ class ChunkOperationsPerformanceTest {
         }
         tag.put("Heightmaps", heightmaps);
         
-        // Add block entities (simulate 2-5 per chunk)
+        // Add block entities (simulate 2-5 per chunk with varied types)
         ListTag blockEntities = new ListTag();
         int blockEntityCount = 2 + random.nextInt(4);
+        String[] blockEntityTypes = {"minecraft:chest", "minecraft:furnace", "minecraft:sign", 
+                                      "minecraft:barrel", "minecraft:hopper"};
         for (int be = 0; be < blockEntityCount; be++) {
             CompoundTag beTag = new CompoundTag();
-            beTag.putString("id", "minecraft:chest");
+            beTag.putString("id", blockEntityTypes[be % blockEntityTypes.length]);
             beTag.putInt("x", chunkX * CHUNK_SIZE + random.nextInt(CHUNK_SIZE));
             beTag.putInt("y", random.nextInt(WORLD_HEIGHT) + MIN_Y);
             beTag.putInt("z", chunkZ * CHUNK_SIZE + random.nextInt(CHUNK_SIZE));
@@ -424,6 +438,7 @@ class ChunkOperationsPerformanceTest {
         int sectionCount = SECTION_COUNT;
         long startTime = System.nanoTime();
         
+        // Keep containers in list to simulate real memory patterns and prevent premature GC during test
         List<PalettedContainer<BlockState>> containers = new ArrayList<>(sectionCount);
         Random random = new Random(12345);
         
@@ -462,6 +477,7 @@ class ChunkOperationsPerformanceTest {
         int totalSections = chunkCount * SECTION_COUNT;
         long startTime = System.nanoTime();
         
+        // Keep containers in list to simulate real memory patterns and prevent premature GC during test
         List<PalettedContainer<BlockState>> containers = new ArrayList<>(totalSections);
         Random random = new Random(12345);
         
@@ -503,6 +519,7 @@ class ChunkOperationsPerformanceTest {
         Strategy<BlockState> strategy = Strategy.createForBlockStates(net.minecraft.world.level.block.Block.BLOCK_STATE_REGISTRY);
         
         // Process blocks section by section (as done in real chunk operations)
+        // Keep sections in list to simulate real memory patterns
         List<PalettedContainer<BlockState>> sections = new ArrayList<>(sectionCount);
         
         for (int s = 0; s < sectionCount; s++) {
@@ -571,6 +588,7 @@ class ChunkOperationsPerformanceTest {
         Strategy<BlockState> strategy = Strategy.createForBlockStates(net.minecraft.world.level.block.Block.BLOCK_STATE_REGISTRY);
         
         // Create all sections with PalettedContainers
+        // Keep sections in list to simulate real chunk memory usage
         List<PalettedContainer<BlockState>> sections = new ArrayList<>(SECTION_COUNT);
         for (int s = 0; s < SECTION_COUNT; s++) {
             PalettedContainer<BlockState> container = new PalettedContainer<>(
