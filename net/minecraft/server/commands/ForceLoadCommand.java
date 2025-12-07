@@ -20,6 +20,7 @@ import net.minecraft.world.level.Level;
 
 public class ForceLoadCommand {
 	private static final int MAX_CHUNK_LIMIT = 256;
+	private static final int WORLD_BOUNDARY = 30000000;
 	private static final Dynamic2CommandExceptionType ERROR_TOO_MANY_CHUNKS = new Dynamic2CommandExceptionType(
 		(object, object2) -> Component.translatableEscape("commands.forceload.toobig", object, object2)
 	);
@@ -138,7 +139,7 @@ public class ForceLoadCommand {
 		int j = Math.min(columnPos.z(), columnPos2.z());
 		int k = Math.max(columnPos.x(), columnPos2.x());
 		int l = Math.max(columnPos.z(), columnPos2.z());
-		if (i >= -30000000 && j >= -30000000 && k < 30000000 && l < 30000000) {
+		if (i >= -WORLD_BOUNDARY && j >= -WORLD_BOUNDARY && k < WORLD_BOUNDARY && l < WORLD_BOUNDARY) {
 			int m = SectionPos.blockToSectionCoord(i);
 			int n = SectionPos.blockToSectionCoord(j);
 			int o = SectionPos.blockToSectionCoord(k);

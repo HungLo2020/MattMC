@@ -17,38 +17,64 @@ def lwjglNatives = System.getProperty('os.name').toLowerCase().contains('mac')
             : 'natives-linux'
 
 java {
+    // Keep toolchain configuration for compilation
+    // But we'll override at runtime for JavaExec tasks
     toolchain {
         languageVersion = JavaLanguageVersion.of(21)
     }
 }
 
+// Check if bundled dependencies are available
+def bundledDepsDir = file('libraries/deps')
+def useBundledDeps = bundledDepsDir.exists() && bundledDepsDir.isDirectory()
+
+if (useBundledDeps) {
+    println "✓ Using bundled dependencies from libraries/deps/"
+    println "  Run './libraries/download-dependencies.sh' to update bundled dependencies"
+}
+
 repositories {
+    // Always include Maven Central (for most dependencies)
     mavenCentral()
-    // Minecraft libraries (primary source for Mojang dependencies)
-    maven { 
-        url 'https://libraries.minecraft.net'
-        content {
-            includeGroup 'com.mojang'
+    
+    // Only add remote repositories if bundled dependencies are NOT available
+    if (!useBundledDeps) {
+        println "⚠ Bundled dependencies not found. Using remote repositories."
+        println "  Run './libraries/download-dependencies.sh' to download dependencies for offline builds."
+        
+        // Minecraft libraries (primary source for Mojang dependencies)
+        maven { 
+            url 'https://libraries.minecraft.net'
+            content {
+                includeGroup 'com.mojang'
+            }
+        }
+        // JitPack for open-source Mojang libraries
+        maven { 
+            url 'https://jitpack.io'
+            content {
+                includeGroup 'com.github.Mojang'
+            }
+        }
+        // Forge mirrors for Mojang libraries
+        maven { 
+            url 'https://maven.minecraftforge.net/'
+            content {
+                includeGroup 'com.mojang'
+                includeGroup 'net.minecraftforge'
+            }
+        }
+        // Fabric Maven for Fabric API
+        maven {
+            url 'https://maven.fabricmc.net/'
         }
     }
-    // JitPack for open-source Mojang libraries
-    maven { 
-        url 'https://jitpack.io'
-        content {
-            includeGroup 'com.github.Mojang'
+    
+    // Add bundled dependencies as a flat directory repository
+    if (useBundledDeps) {
+        flatDir {
+            dirs bundledDepsDir
         }
-    }
-    // Forge mirrors for Mojang libraries
-    maven { 
-        url 'https://maven.minecraftforge.net/'
-        content {
-            includeGroup 'com.mojang'
-            includeGroup 'net.minecraftforge'
-        }
-    }
-    // Fabric Maven for Fabric API
-    maven {
-        url 'https://maven.fabricmc.net/'
     }
 }
 
@@ -69,15 +95,28 @@ configurations.all {
 
 // Minecraft 1.21.10 dependencies
 dependencies {
-    // Mojang libraries
-    implementation 'com.mojang:brigadier:1.3.10'
-    implementation 'com.mojang:datafixerupper:8.0.16'
-    implementation 'com.mojang:authlib:6.0.55'
-    implementation 'com.mojang:logging:1.2.7'
-    implementation 'com.mojang:jtracy:1.0.29'
-    implementation 'com.mojang:blocklist:1.0.10'
-    implementation 'com.mojang:patchy:2.2.10'
-    implementation 'com.mojang:text2speech:1.17.9'
+    // Mojang libraries - use bundled JARs if available, otherwise use Maven coordinates
+    if (useBundledDeps) {
+        // Bundled Mojang libraries from libraries/deps/
+        implementation files('libraries/deps/brigadier-1.3.10.jar')
+        implementation files('libraries/deps/datafixerupper-8.0.16.jar')
+        implementation files('libraries/deps/authlib-6.0.55.jar')
+        implementation files('libraries/deps/logging-1.2.7.jar')
+        implementation files('libraries/deps/jtracy-1.0.29.jar')
+        implementation files('libraries/deps/blocklist-1.0.10.jar')
+        implementation files('libraries/deps/patchy-2.2.10.jar')
+        implementation files('libraries/deps/text2speech-1.17.9.jar')
+    } else {
+        // Remote Mojang libraries
+        implementation 'com.mojang:brigadier:1.3.10'
+        implementation 'com.mojang:datafixerupper:8.0.16'
+        implementation 'com.mojang:authlib:6.0.55'
+        implementation 'com.mojang:logging:1.2.7'
+        implementation 'com.mojang:jtracy:1.0.29'
+        implementation 'com.mojang:blocklist:1.0.10'
+        implementation 'com.mojang:patchy:2.2.10'
+        implementation 'com.mojang:text2speech:1.17.9'
+    }
     
     // Google libraries
     implementation 'com.google.guava:guava:32.1.2-jre'
@@ -158,7 +197,23 @@ dependencies {
     runtimeOnly "org.lwjgl:lwjgl-jemalloc::${lwjglNatives}"
     
     // Fabric Loader (for annotations like @Environment and @EnvType)
-    implementation 'net.fabricmc:fabric-loader:0.16.9'
+    if (useBundledDeps) {
+        // Bundled Fabric loader and its transitive dependencies
+        implementation files('libraries/deps/fabric-loader-0.16.9.jar')
+        implementation files('libraries/deps/tiny-mappings-parser-0.3.0+build.17.jar')
+        implementation files('libraries/deps/sponge-mixin-0.15.3+mixin.0.8.7.jar')
+        implementation files('libraries/deps/tiny-remapper-0.10.3.jar')
+        implementation files('libraries/deps/access-widener-2.1.0.jar')
+        implementation files('libraries/deps/mapping-io-0.6.1.jar')
+        // ASM dependencies (needed by Fabric/Mixin)
+        implementation files('libraries/deps/asm-9.7.1.jar')
+        implementation files('libraries/deps/asm-analysis-9.7.1.jar')
+        implementation files('libraries/deps/asm-commons-9.7.1.jar')
+        implementation files('libraries/deps/asm-tree-9.7.1.jar')
+        implementation files('libraries/deps/asm-util-9.7.1.jar')
+    } else {
+        implementation 'net.fabricmc:fabric-loader:0.16.9'
+    }
     
     // Note: Fabric API stub interfaces are included in the source tree under net/fabricmc/fabric/api/
     // These are empty interfaces that satisfy the compilation requirements
@@ -233,10 +288,30 @@ def clientJvmArgs = [
     '-Dorg.lwjgl.util.Debug=true'
 ]
 
+// Helper method to configure JavaExec tasks to use bundled JDK
+def configureBundledJdk(JavaExec task) {
+    def bundledJdkDir = file('run/jdk-21')
+    def bundledJavaExe = new File(bundledJdkDir, 'bin/java')
+    
+    // Configure the task to use bundled JDK executable
+    // Set executable directly in task configuration to use it instead of toolchain
+    task.executable = bundledJavaExe.absolutePath
+    
+    // Verify bundled JDK exists before running
+    task.doFirst {
+        if (!bundledJavaExe.exists()) {
+            throw new GradleException("Bundled JDK not found at ${bundledJdkDir.absolutePath}. Run './gradlew copyJdkToRun' first.")
+        }
+        println "Using bundled JDK from: ${bundledJdkDir.absolutePath}"
+    }
+}
+
 // Task to run the dedicated server (no GUI - headless mode)
 tasks.register('runServer', JavaExec) {
     group = 'minecraft'
     description = 'Runs the Minecraft dedicated server (no GUI)'
+    
+    dependsOn 'copyJdkToRun'
     
     classpath = sourceSets.main.runtimeClasspath
     mainClass = 'net.minecraft.server.Main'
@@ -250,12 +325,17 @@ tasks.register('runServer', JavaExec) {
     }
     
     standardInput = System.in
+    
+    // Configure to use bundled JDK
+    configureBundledJdk(it)
 }
 
 // Task to run the dedicated server with GUI
 tasks.register('runServerGui', JavaExec) {
     group = 'minecraft'
     description = 'Runs the Minecraft dedicated server with GUI'
+    
+    dependsOn 'copyJdkToRun'
     
     classpath = sourceSets.main.runtimeClasspath
     mainClass = 'net.minecraft.server.Main'
@@ -269,12 +349,17 @@ tasks.register('runServerGui', JavaExec) {
     }
     
     standardInput = System.in
+    
+    // Configure to use bundled JDK
+    configureBundledJdk(it)
 }
 
 // Task to run the Minecraft client
 tasks.register('runClient', JavaExec) {
     group = 'minecraft'
     description = 'Runs the Minecraft client'
+    
+    dependsOn 'copyJdkToRun'
     
     classpath = sourceSets.main.runtimeClasspath
     mainClass = 'net.minecraft.client.main.Main'
@@ -287,16 +372,93 @@ tasks.register('runClient', JavaExec) {
         '--version', '1.21.10',
         '--accessToken', '0',
         '--gameDir', file('run').absolutePath,
-        '--assetsDir', file('run/assets').absolutePath
+        '--assetsDir', file('run/assets').absolutePath,
+        '--assetIndex', '27'
     ]
     
     doFirst {
         workingDir.mkdirs()
         file('run/assets').mkdirs()
         file('run/resourcepacks').mkdirs()
+        
+        // Copy assets from src/main/resources/assets to run/assets for dev environment
+        def resourcesAssetsDir = file('src/main/resources/assets')
+        if (resourcesAssetsDir.exists() && resourcesAssetsDir.isDirectory()) {
+            copy {
+                from resourcesAssetsDir
+                into file('run/assets')
+            }
+        }
     }
     
     standardInput = System.in
+    
+    // Configure to use bundled JDK
+    configureBundledJdk(it)
+}
+
+// Task to download bundled JDK if not present
+tasks.register('downloadJdk', Exec) {
+    group = 'minecraft'
+    description = 'Downloads Temurin OpenJDK 21 if not already present (Linux only)'
+    
+    def jdkDir = file('libraries/jdk-21')
+    def javaExe = new File(jdkDir, 'bin/java')
+    def isLinux = System.getProperty('os.name').toLowerCase().contains('linux')
+    
+    // Only run if JDK doesn't exist and OS is Linux
+    onlyIf { 
+        !javaExe.exists() && isLinux
+    }
+    
+    workingDir = file('.')
+    commandLine 'bash', 'libraries/download-jdk.sh'
+    
+    doFirst {
+        if (!isLinux) {
+            println "⚠️  Automatic JDK download is only available on Linux."
+            println "   For Windows/macOS, please see: libraries/JDK-README.md"
+        }
+    }
+}
+
+// Task to copy JDK to run directory
+tasks.register('copyJdkToRun') {
+    group = 'minecraft'
+    description = 'Copies bundled JDK to run directory'
+    
+    dependsOn 'downloadJdk'
+    
+    def srcJdkDir = file('libraries/jdk-21')
+    def destJdkDir = file('run/jdk-21')
+    
+    // Declare inputs only - not outputs to avoid Gradle detecting
+    // implicit dependencies with compileJava task
+    inputs.dir(srcJdkDir).skipWhenEmpty()
+    
+    // Only run if source JDK exists
+    onlyIf { srcJdkDir.exists() }
+    
+    doLast {
+        if (!srcJdkDir.exists()) {
+            println "⚠️  JDK not found at ${srcJdkDir}."
+            println "   For automatic download (Linux): ./gradlew downloadJdk"
+            println "   For manual setup: see libraries/JDK-README.md"
+            return
+        }
+        
+        // Delete existing JDK directory to avoid permission issues with existing files
+        if (destJdkDir.exists()) {
+            delete destJdkDir
+        }
+        
+        println "📂 Copying JDK to run directory..."
+        copy {
+            from srcJdkDir
+            into destJdkDir
+        }
+        println "✅ JDK copied to ${destJdkDir}"
+    }
 }
 
 // Task to create eula.txt
@@ -330,9 +492,14 @@ tasks.register('fatJar', Jar) {
     group = 'build'
     description = 'Creates a fat JAR with all dependencies'
     archiveClassifier = 'all'
+    zip64 = true
     
+    dependsOn 'classes'
+    
+    // Include project classes FIRST so they take precedence with EXCLUDE strategy
     from sourceSets.main.output
     
+    // Then include dependency JARs (duplicates will be excluded)
     dependsOn configurations.runtimeClasspath
     from {
         configurations.runtimeClasspath.findAll { it.name.endsWith('jar') }.collect { zipTree(it) }
@@ -343,4 +510,137 @@ tasks.register('fatJar', Jar) {
     }
     
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+    
+    // Exclude META-INF signatures from dependencies to avoid security exceptions
+    exclude 'META-INF/*.RSA', 'META-INF/*.SF', 'META-INF/*.DSA'
+}
+
+// Task to create a client fat jar with all dependencies
+tasks.register('clientFatJar', Jar) {
+    group = 'build'
+    description = 'Creates a fat JAR with all dependencies for the client'
+    archiveBaseName = 'MattMC-Client'
+    archiveClassifier = 'all'
+    zip64 = true
+    
+    dependsOn 'classes'
+    
+    // Include project classes FIRST so they take precedence with EXCLUDE strategy
+    from sourceSets.main.output
+    
+    // Then include dependency JARs (duplicates will be excluded)
+    dependsOn configurations.runtimeClasspath
+    from {
+        configurations.runtimeClasspath.findAll { it.name.endsWith('jar') }.collect { zipTree(it) }
+    }
+    
+    manifest {
+        attributes 'Main-Class': 'net.minecraft.client.main.Main'
+    }
+    
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+    
+    // Exclude META-INF signatures from dependencies to avoid security exceptions
+    exclude 'META-INF/*.RSA', 'META-INF/*.SF', 'META-INF/*.DSA'
+}
+
+// Task to create a runnable client distribution using classpath (more reliable than fat JAR)
+tasks.register('clientDist') {
+    group = 'distribution'
+    description = 'Creates a runnable client distribution'
+    
+    dependsOn 'jar', 'classes', 'downloadJdk'
+    
+    def distDir = "${buildDir}/client-dist/MattMC"
+    
+    outputs.dir distDir
+    
+    doLast {
+        // Create directory structure
+        file("${distDir}/lib").mkdirs()
+        file("${distDir}/run").mkdirs()
+        file("${distDir}/run/assets").mkdirs()
+        file("${distDir}/run/resourcepacks").mkdirs()
+        
+        // Copy project JAR
+        copy {
+            from tasks.jar.archiveFile
+            into "${distDir}/lib"
+        }
+        
+        // Copy all dependency JARs
+        copy {
+            from configurations.runtimeClasspath
+            into "${distDir}/lib"
+        }
+        
+        // Copy resources
+        copy {
+            from 'src/main/resources'
+            into "${distDir}/resources"
+        }
+        
+        // Copy bundled JDK to distribution
+        def srcJdkDir = file('libraries/jdk-21')
+        if (srcJdkDir.exists()) {
+            println "📂 Copying bundled JDK to distribution..."
+            copy {
+                from srcJdkDir
+                into "${distDir}/run/jdk-21"
+            }
+            println "✅ JDK copied to distribution"
+        }
+        
+        // Copy assets from src/main/resources/assets directory
+        // This is where Minecraft assets (sounds, textures, etc.) are stored
+        // Assets should be in the standard Minecraft structure: indexes/, objects/, files/
+        def resourcesAssetsDir = file('src/main/resources/assets')
+        if (resourcesAssetsDir.exists() && resourcesAssetsDir.isDirectory()) {
+            copy {
+                from resourcesAssetsDir
+                into "${distDir}/run/assets"
+            }
+            println "Copied assets from ${resourcesAssetsDir.absolutePath}"
+        }
+        
+        // Build classpath string for launch scripts
+        def jarName = tasks.jar.archiveFileName.get()
+        def classpathLinux = "lib/${jarName}:lib/" + configurations.runtimeClasspath.files.collect { it.name }.join(':lib/')
+        def classpathWindows = "lib\\${jarName};lib\\" + configurations.runtimeClasspath.files.collect { it.name }.join(';lib\\')
+        
+        // Asset index - this should match the index file in assets/indexes/<assetIndex>.json
+        def assetIndex = '27'
+        
+        // Copy and process launch scripts from libraries directory
+        // Linux script
+        def linuxScriptTemplate = file('libraries/run-mattmc.sh').text
+        def linuxScript = file("${distDir}/run-mattmc.sh")
+        linuxScript.text = linuxScriptTemplate
+            .replace('@CLASSPATH_LINUX@', classpathLinux)
+            .replace('@VERSION@', version)
+            .replace('@ASSET_INDEX@', assetIndex)
+        linuxScript.setExecutable(true)
+        
+        // Windows script
+        def windowsScriptTemplate = file('libraries/run-mattmc.bat').text
+        def windowsScript = file("${distDir}/run-mattmc.bat")
+        windowsScript.text = windowsScriptTemplate
+            .replace('@CLASSPATH_WINDOWS@', classpathWindows)
+            .replace('@VERSION@', version)
+            .replace('@ASSET_INDEX@', assetIndex)
+    }
+}
+
+// Task to create a zip of the client distribution
+tasks.register('clientDistZip', Zip) {
+    group = 'distribution'
+    description = 'Creates a zip of the runnable client distribution'
+    
+    dependsOn 'clientDist'
+    
+    archiveBaseName = 'MattMC-Client'
+    
+    from "${buildDir}/client-dist"
+    
+    destinationDirectory = file("${buildDir}/distributions")
 }

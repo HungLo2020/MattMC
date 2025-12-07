@@ -39,6 +39,7 @@ public class EntitySelectorParser implements FabricEntitySelectorReader {
 	private static final char SYNTAX_OPTIONS_SEPARATOR = ',';
 	public static final char SYNTAX_NOT = '!';
 	public static final char SYNTAX_TAG = '#';
+	private static final int MAX_PLAYER_NAME_LENGTH = 16;
 	private static final char SELECTOR_NEAREST_PLAYER = 'p';
 	private static final char SELECTOR_ALL_PLAYERS = 'a';
 	private static final char SELECTOR_RANDOM_PLAYERS = 'r';
@@ -278,7 +279,7 @@ public class EntitySelectorParser implements FabricEntitySelectorReader {
 			this.entityUUID = UUID.fromString(string);
 			this.includesEntities = true;
 		} catch (IllegalArgumentException var4) {
-			if (string.isEmpty() || string.length() > 16) {
+			if (string.isEmpty() || string.length() > MAX_PLAYER_NAME_LENGTH) {
 				this.reader.setCursor(i);
 				throw ERROR_INVALID_NAME_OR_UUID.createWithContext(this.reader);
 			}

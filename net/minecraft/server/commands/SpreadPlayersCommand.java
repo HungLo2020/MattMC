@@ -33,6 +33,7 @@ import net.minecraft.world.scores.Team;
 
 public class SpreadPlayersCommand {
 	private static final int MAX_ITERATION_COUNT = 10000;
+	private static final int MAX_SPREAD_ITERATIONS = MAX_ITERATION_COUNT;
 	private static final Dynamic4CommandExceptionType ERROR_FAILED_TO_SPREAD_TEAMS = new Dynamic4CommandExceptionType(
 		(object, object2, object3, object4) -> Component.translatableEscape("commands.spreadplayers.failed.teams", object, object2, object3, object4)
 	);
@@ -156,7 +157,7 @@ public class SpreadPlayersCommand {
 		double j = Float.MAX_VALUE;
 
 		int k;
-		for (k = 0; k < 10000 && bl2; k++) {
+		for (k = 0; k < MAX_SPREAD_ITERATIONS && bl2; k++) {
 			bl2 = false;
 			j = Float.MAX_VALUE;
 
@@ -211,7 +212,7 @@ public class SpreadPlayersCommand {
 			j = 0.0;
 		}
 
-		if (k >= 10000) {
+		if (k >= MAX_SPREAD_ITERATIONS) {
 			if (bl) {
 				throw ERROR_FAILED_TO_SPREAD_TEAMS.create(positions.length, vec2.x, vec2.y, String.format(Locale.ROOT, "%.2f", j));
 			} else {

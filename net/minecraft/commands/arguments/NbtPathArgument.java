@@ -50,6 +50,8 @@ public class NbtPathArgument implements ArgumentType<NbtPathArgument.NbtPath> {
 	private static final char KEY_MATCH_END = '}';
 	private static final char QUOTED_KEY_START = '"';
 	private static final char SINGLE_QUOTED_KEY_START = '\'';
+	private static final int COMPOUND_TAG_START = 123;
+	private static final int MAX_NBT_DEPTH = 512;
 
 	public static NbtPathArgument nbtPath() {
 		return new NbtPathArgument();
@@ -89,11 +91,11 @@ public class NbtPathArgument implements ArgumentType<NbtPathArgument.NbtPath> {
 			case '[' -> {
 				stringReader.skip();
 				int i = stringReader.peek();
-				if (i == 123) {
+				if (i == COMPOUND_TAG_START) {
 					CompoundTag compoundTag2 = TagParser.parseCompoundAsArgument(stringReader);
 					stringReader.expect(']');
 					yield new NbtPathArgument.MatchElementNode(compoundTag2);
-				} else if (i == 93) {
+				} else if (i == INDEX_MATCH_END) {
 					stringReader.skip();
 					yield NbtPathArgument.AllElementsNode.INSTANCE;
 				} else {
@@ -606,7 +608,7 @@ public class NbtPathArgument implements ArgumentType<NbtPathArgument.NbtPath> {
 		}
 
 		public static boolean isTooDeep(Tag tag, int i) {
-			if (i >= 512) {
+			if (i >= MAX_NBT_DEPTH) {
 				return true;
 			} else {
 				if (tag instanceof CompoundTag compoundTag) {

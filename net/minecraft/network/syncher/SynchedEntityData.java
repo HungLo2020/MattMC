@@ -38,8 +38,8 @@ public class SynchedEntityData {
 		}
 
 		int i = ID_REGISTRY.define(class_);
-		if (i > 254) {
-			throw new IllegalArgumentException("Data value id is too big with " + i + "! (Max is 254)");
+		if (i > MAX_ID_VALUE) {
+			throw new IllegalArgumentException("Data value id is too big with " + i + "! (Max is " + MAX_ID_VALUE + ")");
 		} else {
 			return entityDataSerializer.createAccessor(i);
 		}
