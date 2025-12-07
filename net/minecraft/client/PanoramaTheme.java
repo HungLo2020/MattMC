@@ -35,13 +35,8 @@ public enum PanoramaTheme implements OptionEnum, StringRepresentable {
 	}
 
 	public String getPath() {
-		// Convert serialized name to directory name format
-		// "aquatic" -> "Aquatic", "copper_age" -> "CopperAge"
-		if (this == AQUATIC) {
-			return "Aquatic";
-		} else if (this == COPPER_AGE) {
-			return "CopperAge";
-		}
+		// Return lowercase path matching directory structure
+		// ResourceLocation requires lowercase paths
 		return this.serializeName;
 	}
 }
