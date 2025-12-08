@@ -316,6 +316,42 @@ def configureBundledJdk(JavaExec task) {
     }
 }
 
+/**
+ * Helper method to verify that a main class file exists before running a JavaExec task.
+ * This helps detect build cache corruption issues early with a helpful error message.
+ * 
+ * @param classFileName The path to the class file (e.g., 'net/minecraft/server/Main.class')
+ * @param errorContext A description for error messages (e.g., 'Server main class' or 'Client main class')
+ */
+def verifyMainClassExists(String classFileName, String errorContext) {
+    def mainClassFile = sourceSets.main.output.classesDirs.files.collect { 
+        new File(it, classFileName) 
+    }.find { it.exists() }
+    
+    if (mainClassFile == null) {
+        throw new GradleException(
+            "\n" +
+            "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n" +
+            "ERROR: ${errorContext} file not found!\n" +
+            "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n" +
+            "\n" +
+            "Expected: ${classFileName} in one of:\n" +
+            sourceSets.main.output.classesDirs.files.collect { "  - ${it.absolutePath}" }.join("\n") + "\n" +
+            "\n" +
+            "This usually indicates a Gradle build cache issue.\n" +
+            "\n" +
+            "To fix this, please run:\n" +
+            "  ./gradlew clean build --no-build-cache\n" +
+            "\n" +
+            "If the problem persists, try clearing your Gradle cache:\n" +
+            "  rm -rf ~/.gradle/caches/\n" +
+            "  ./gradlew clean build\n" +
+            "\n" +
+            "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        )
+    }
+}
+
 // Task to run the dedicated server (no GUI - headless mode)
 tasks.register('runServer', JavaExec) {
     group = 'minecraft'
@@ -334,35 +370,7 @@ tasks.register('runServer', JavaExec) {
     args = ['--nogui']
     
     doFirst {
-        // Sanity check: verify that the server main class file exists before trying to run
-        def classFileName = 'net/minecraft/server/Main.class'
-        def mainClassFile = sourceSets.main.output.classesDirs.files.collect { 
-            new File(it, classFileName) 
-        }.find { it.exists() }
-        
-        if (mainClassFile == null) {
-            throw new GradleException(
-                "\n" +
-                "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n" +
-                "ERROR: Server main class file not found!\n" +
-                "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n" +
-                "\n" +
-                "Expected: ${classFileName} in one of:\n" +
-                sourceSets.main.output.classesDirs.files.collect { "  - ${it.absolutePath}" }.join("\n") + "\n" +
-                "\n" +
-                "This usually indicates a Gradle build cache issue.\n" +
-                "\n" +
-                "To fix this, please run:\n" +
-                "  ./gradlew clean build --no-build-cache\n" +
-                "\n" +
-                "If the problem persists, try clearing your Gradle cache:\n" +
-                "  rm -rf ~/.gradle/caches/\n" +
-                "  ./gradlew clean build\n" +
-                "\n" +
-                "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-            )
-        }
-        
+        verifyMainClassExists('net/minecraft/server/Main.class', 'Server main class')
         workingDir.mkdirs()
     }
     
@@ -390,35 +398,7 @@ tasks.register('runServerGui', JavaExec) {
     // No --nogui argument means GUI will be shown
     
     doFirst {
-        // Sanity check: verify that the server main class file exists before trying to run
-        def classFileName = 'net/minecraft/server/Main.class'
-        def mainClassFile = sourceSets.main.output.classesDirs.files.collect { 
-            new File(it, classFileName) 
-        }.find { it.exists() }
-        
-        if (mainClassFile == null) {
-            throw new GradleException(
-                "\n" +
-                "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n" +
-                "ERROR: Server main class file not found!\n" +
-                "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n" +
-                "\n" +
-                "Expected: ${classFileName} in one of:\n" +
-                sourceSets.main.output.classesDirs.files.collect { "  - ${it.absolutePath}" }.join("\n") + "\n" +
-                "\n" +
-                "This usually indicates a Gradle build cache issue.\n" +
-                "\n" +
-                "To fix this, please run:\n" +
-                "  ./gradlew clean build --no-build-cache\n" +
-                "\n" +
-                "If the problem persists, try clearing your Gradle cache:\n" +
-                "  rm -rf ~/.gradle/caches/\n" +
-                "  ./gradlew clean build\n" +
-                "\n" +
-                "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-            )
-        }
-        
+        verifyMainClassExists('net/minecraft/server/Main.class', 'Server main class')
         workingDir.mkdirs()
     }
     
@@ -454,36 +434,7 @@ tasks.register('runClient', JavaExec) {
     ]
     
     doFirst {
-        // Sanity check: verify that the main class file exists before trying to run
-        // This helps detect build cache corruption issues early with a helpful error message
-        def classFileName = 'net/minecraft/client/main/Main.class'
-        def mainClassFile = sourceSets.main.output.classesDirs.files.collect { 
-            new File(it, classFileName) 
-        }.find { it.exists() }
-        
-        if (mainClassFile == null) {
-            throw new GradleException(
-                "\n" +
-                "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n" +
-                "ERROR: Main class file not found!\n" +
-                "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n" +
-                "\n" +
-                "Expected: ${classFileName} in one of:\n" +
-                sourceSets.main.output.classesDirs.files.collect { "  - ${it.absolutePath}" }.join("\n") + "\n" +
-                "\n" +
-                "This usually indicates a Gradle build cache issue.\n" +
-                "\n" +
-                "To fix this, please run:\n" +
-                "  ./gradlew clean build --no-build-cache\n" +
-                "\n" +
-                "If the problem persists, try clearing your Gradle cache:\n" +
-                "  rm -rf ~/.gradle/caches/\n" +
-                "  ./gradlew clean build\n" +
-                "\n" +
-                "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-            )
-        }
-        
+        verifyMainClassExists('net/minecraft/client/main/Main.class', 'Client main class')
         workingDir.mkdirs()
         file('run/assets').mkdirs()
         file('run/resourcepacks').mkdirs()
