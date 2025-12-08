@@ -1,6 +1,6 @@
 package net.minecraft.client.resources;
 
-import com.mojang.authlib.GameProfile;
+import net.minecraft.server.profile.PlayerProfile;
 import java.util.UUID;
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
@@ -44,7 +44,7 @@ public class DefaultPlayerSkin {
 		return DEFAULT_SKINS[Math.floorMod(uUID.hashCode(), DEFAULT_SKINS.length)];
 	}
 
-	public static PlayerSkin get(GameProfile gameProfile) {
+	public static PlayerSkin get(PlayerProfile playerProfile) {
 		return get(gameProfile.getId());
 	}
 

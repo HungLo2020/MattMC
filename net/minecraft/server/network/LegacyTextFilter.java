@@ -2,7 +2,7 @@ package net.minecraft.server.network;
 
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
-import com.mojang.authlib.GameProfile;
+import net.minecraft.server.profile.PlayerProfile;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.HttpURLConnection;
@@ -111,7 +111,7 @@ public class LegacyTextFilter extends ServerTextFilter {
 	}
 
 	@Override
-	public TextFilter createContext(GameProfile gameProfile) {
+	public TextFilter createContext(PlayerProfile playerProfile) {
 		return new ServerTextFilter.PlayerContext(gameProfile) {
 			@Override
 			public void join() {
@@ -125,7 +125,7 @@ public class LegacyTextFilter extends ServerTextFilter {
 		};
 	}
 
-	void processJoinOrLeave(GameProfile gameProfile, URL uRL, LegacyTextFilter.JoinOrLeaveEncoder joinOrLeaveEncoder, Executor executor) {
+	void processJoinOrLeave(PlayerProfile playerProfile, URL uRL, LegacyTextFilter.JoinOrLeaveEncoder joinOrLeaveEncoder, Executor executor) {
 		executor.execute(() -> {
 			JsonObject jsonObject = joinOrLeaveEncoder.encode(gameProfile);
 
@@ -184,6 +184,6 @@ public class LegacyTextFilter extends ServerTextFilter {
 
 	@FunctionalInterface
 	interface JoinOrLeaveEncoder {
-		JsonObject encode(GameProfile gameProfile);
+		JsonObject encode(PlayerProfile playerProfile);
 	}
 }

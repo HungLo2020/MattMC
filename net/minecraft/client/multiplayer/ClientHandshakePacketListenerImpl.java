@@ -1,6 +1,6 @@
 package net.minecraft.client.multiplayer;
 
-import com.mojang.authlib.GameProfile;
+import net.minecraft.server.profile.PlayerProfile;
 import com.mojang.authlib.exceptions.AuthenticationException;
 import com.mojang.authlib.exceptions.AuthenticationUnavailableException;
 import com.mojang.authlib.exceptions.ForcedUsernameChangeException;
@@ -176,7 +176,7 @@ public class ClientHandshakePacketListenerImpl implements ClientLoginPacketListe
 
 	public void handleLoginFinished(ClientboundLoginFinishedPacket clientboundLoginFinishedPacket) {
 		this.switchState(ClientHandshakePacketListenerImpl.State.JOINING);
-		GameProfile gameProfile = clientboundLoginFinishedPacket.gameProfile();
+		PlayerProfile playerProfile = clientboundLoginFinishedPacket.gameProfile();
 		this.connection
 			.setupInboundProtocol(
 				ConfigurationProtocols.CLIENTBOUND,

@@ -1,6 +1,6 @@
 package net.minecraft.gametest.framework;
 
-import com.mojang.authlib.GameProfile;
+import net.minecraft.server.profile.PlayerProfile;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import com.mojang.datafixers.util.Either;
 import io.netty.channel.embedded.EmbeddedChannel;

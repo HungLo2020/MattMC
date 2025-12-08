@@ -1,6 +1,6 @@
 package net.minecraft.client.multiplayer.chat;
 
-import com.mojang.authlib.GameProfile;
+import net.minecraft.server.profile.PlayerProfile;
 import com.mojang.serialization.MapCodec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 import java.time.Instant;
@@ -19,7 +19,7 @@ import net.minecraft.util.ExtraCodecs;
 
 @Environment(EnvType.CLIENT)
 public interface LoggedChatMessage extends LoggedChatEvent {
-	static LoggedChatMessage.Player player(GameProfile gameProfile, PlayerChatMessage playerChatMessage, ChatTrustLevel chatTrustLevel) {
+	static LoggedChatMessage.Player player(PlayerProfile playerProfile, PlayerChatMessage playerChatMessage, ChatTrustLevel chatTrustLevel) {
 		return new LoggedChatMessage.Player(gameProfile, playerChatMessage, chatTrustLevel);
 	}
 
@@ -36,7 +36,7 @@ public interface LoggedChatMessage extends LoggedChatEvent {
 	boolean canReport(UUID uUID);
 
 	@Environment(EnvType.CLIENT)
-	public record Player(GameProfile profile, PlayerChatMessage message, ChatTrustLevel trustLevel) implements LoggedChatMessage {
+	public record Player(PlayerProfile profile, PlayerChatMessage message, ChatTrustLevel trustLevel) implements LoggedChatMessage {
 		public static final MapCodec<LoggedChatMessage.Player> CODEC = RecordCodecBuilder.mapCodec(
 			instance -> instance.group(
 					ExtraCodecs.AUTHLIB_GAME_PROFILE.fieldOf("profile").forGetter(LoggedChatMessage.Player::profile),

@@ -1,6 +1,6 @@
 package net.minecraft.client.multiplayer;
 
-import com.mojang.authlib.GameProfile;
+import net.minecraft.server.profile.PlayerProfile;
 import java.util.function.Supplier;
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
@@ -16,7 +16,7 @@ import org.jetbrains.annotations.Nullable;
 
 @Environment(EnvType.CLIENT)
 public class PlayerInfo {
-	private final GameProfile profile;
+	private final PlayerProfile profile;
 	@Nullable
 	private Supplier<PlayerSkin> skinLookup;
 	private GameType gameMode = GameType.DEFAULT_MODE;
@@ -29,18 +29,18 @@ public class PlayerInfo {
 	private SignedMessageValidator messageValidator;
 	private int tabListOrder;
 
-	public PlayerInfo(GameProfile gameProfile, boolean bl) {
+	public PlayerInfo(PlayerProfile playerProfile, boolean bl) {
 		this.profile = gameProfile;
 		this.messageValidator = fallbackMessageValidator(bl);
 	}
 
-	private static Supplier<PlayerSkin> createSkinLookup(GameProfile gameProfile) {
+	private static Supplier<PlayerSkin> createSkinLookup(PlayerProfile playerProfile) {
 		Minecraft minecraft = Minecraft.getInstance();
 		boolean bl = !minecraft.isLocalPlayer(gameProfile.getId());
 		return minecraft.getSkinManager().createLookup(gameProfile, bl);
 	}
 
-	public GameProfile getProfile() {
+	public PlayerProfile getProfile() {
 		return this.profile;
 	}
 

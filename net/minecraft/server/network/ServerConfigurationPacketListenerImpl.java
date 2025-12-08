@@ -1,6 +1,6 @@
 package net.minecraft.server.network;
 
-import com.mojang.authlib.GameProfile;
+import net.minecraft.server.profile.PlayerProfile;
 import com.mojang.logging.LogUtils;
 import java.util.List;
 import java.util.Locale;
@@ -49,7 +49,7 @@ public class ServerConfigurationPacketListenerImpl
 	private static final Logger LOGGER = LogUtils.getLogger();
 	private static final Component DISCONNECT_REASON_INVALID_DATA = Component.translatable("multiplayer.disconnect.invalid_player_data");
 	private static final Component DISCONNECT_REASON_CONFIGURATION_ERROR = Component.translatable("multiplayer.disconnect.configuration_error");
-	private final GameProfile gameProfile;
+	private final PlayerProfile playerProfile;
 	private final Queue<ConfigurationTask> configurationTasks = new ConcurrentLinkedQueue();
 	@Nullable
 	private ConfigurationTask currentTask;
@@ -66,7 +66,7 @@ public class ServerConfigurationPacketListenerImpl
 	}
 
 	@Override
-	protected GameProfile playerProfile() {
+	protected PlayerProfile playerProfile() {
 		return this.gameProfile;
 	}
 

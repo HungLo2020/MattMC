@@ -1,6 +1,6 @@
 package net.minecraft.client.gui.components;
 
-import com.mojang.authlib.GameProfile;
+import net.minecraft.server.profile.PlayerProfile;
 import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -199,7 +199,7 @@ public class PlayerTabOverlay {
 			if (x < list.size()) {
 				PlayerInfo playerInfo2 = (PlayerInfo)list.get(x);
 				PlayerTabOverlay.ScoreDisplayEntry scoreDisplayEntry = (PlayerTabOverlay.ScoreDisplayEntry)list2.get(x);
-				GameProfile gameProfile = playerInfo2.getProfile();
+				PlayerProfile playerProfile = playerInfo2.getProfile();
 				if (bl) {
 					Player player = this.minecraft.level.getPlayerByUUID(gameProfile.getId());
 					boolean bl2 = player != null && AvatarRenderer.isPlayerUpsideDown(player);

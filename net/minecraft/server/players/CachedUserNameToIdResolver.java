@@ -9,7 +9,7 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParseException;
-import com.mojang.authlib.GameProfile;
+import net.minecraft.server.profile.PlayerProfile;
 import com.mojang.authlib.GameProfileRepository;
 import com.mojang.authlib.ProfileLookupCallback;
 import com.mojang.logging.LogUtils;
@@ -68,7 +68,7 @@ public class CachedUserNameToIdResolver implements UserNameToIdResolver {
 			final GameProfile[] foundProfile = {null};
 			gameProfileRepository.findProfilesByNames(new String[]{string}, new ProfileLookupCallback() {
 				@Override
-				public void onProfileLookupSucceeded(GameProfile profile) {
+				public void onProfileLookupSucceeded(PlayerProfile profile) {
 					foundProfile[0] = profile;
 				}
 

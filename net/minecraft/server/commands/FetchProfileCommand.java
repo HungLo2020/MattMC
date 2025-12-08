@@ -1,6 +1,6 @@
 package net.minecraft.server.commands;
 
-import com.mojang.authlib.GameProfile;
+import net.minecraft.server.profile.PlayerProfile;
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import java.util.List;
@@ -45,7 +45,7 @@ public class FetchProfileCommand {
 		);
 	}
 
-	private static void reportResolvedProfile(CommandSourceStack commandSourceStack, GameProfile gameProfile, String string, Component component) {
+	private static void reportResolvedProfile(CommandSourceStack commandSourceStack, PlayerProfile playerProfile, String string, Component component) {
 		ResolvableProfile resolvableProfile = ResolvableProfile.createResolved(gameProfile);
 		ResolvableProfile.CODEC
 			.encodeStart(NbtOps.INSTANCE, resolvableProfile)
@@ -92,7 +92,7 @@ public class FetchProfileCommand {
 			.execute(
 				() -> {
 					Component component = Component.literal(string);
-					Optional<GameProfile> optional = profileResolver.fetchByName(string);
+					Optional<PlayerProfile> optional = profileResolver.fetchByName(string);
 					minecraftServer.execute(
 						() -> optional.ifPresentOrElse(
 							gameProfile -> reportResolvedProfile(commandSourceStack, gameProfile, "commands.fetchprofile.name.success", component),
@@ -111,7 +111,7 @@ public class FetchProfileCommand {
 			.execute(
 				() -> {
 					Component component = Component.translationArg(uUID);
-					Optional<GameProfile> optional = profileResolver.fetchById(uUID);
+					Optional<PlayerProfile> optional = profileResolver.fetchById(uUID);
 					minecraftServer.execute(
 						() -> optional.ifPresentOrElse(
 							gameProfile -> reportResolvedProfile(commandSourceStack, gameProfile, "commands.fetchprofile.id.success", component),

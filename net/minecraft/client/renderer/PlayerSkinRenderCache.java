@@ -3,7 +3,7 @@ package net.minecraft.client.renderer;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
-import com.mojang.authlib.GameProfile;
+import net.minecraft.server.profile.PlayerProfile;
 import com.mojang.blaze3d.textures.GpuTextureView;
 import java.time.Duration;
 import java.util.Optional;
@@ -44,7 +44,7 @@ public class PlayerSkinRenderCache {
 		.expireAfterAccess(CACHE_DURATION)
 		.build(new CacheLoader<ResolvableProfile, PlayerSkinRenderCache.RenderInfo>() {
 			public PlayerSkinRenderCache.RenderInfo load(ResolvableProfile resolvableProfile) {
-				GameProfile gameProfile = resolvableProfile.partialProfile();
+				PlayerProfile playerProfile = resolvableProfile.partialProfile();
 				return PlayerSkinRenderCache.this.new RenderInfo(gameProfile, DefaultPlayerSkin.get(gameProfile), resolvableProfile.skinPatch());
 			}
 		});
@@ -86,7 +86,7 @@ public class PlayerSkinRenderCache {
 
 	@Environment(EnvType.CLIENT)
 	public final class RenderInfo {
-		private final GameProfile gameProfile;
+		private final PlayerProfile playerProfile;
 		private final PlayerSkin playerSkin;
 		@Nullable
 		private RenderType itemRenderType;
@@ -95,12 +95,12 @@ public class PlayerSkinRenderCache {
 		@Nullable
 		private GlyphRenderTypes glyphRenderTypes;
 
-		public RenderInfo(final GameProfile gameProfile, final PlayerSkin playerSkin, final Patch patch) {
+		public RenderInfo(final PlayerProfile playerProfile, final PlayerSkin playerSkin, final Patch patch) {
 			this.gameProfile = gameProfile;
 			this.playerSkin = playerSkin.with(patch);
 		}
 
-		public GameProfile gameProfile() {
+		public PlayerProfile playerProfile() {
 			return this.gameProfile;
 		}
 

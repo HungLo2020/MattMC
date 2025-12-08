@@ -2,7 +2,7 @@ package net.minecraft.server.network;
 
 import com.google.common.collect.Lists;
 import com.google.common.primitives.Floats;
-import com.mojang.authlib.GameProfile;
+import net.minecraft.server.profile.PlayerProfile;
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.ParseResults;
 import com.mojang.brigadier.StringReader;
@@ -377,7 +377,7 @@ public class ServerGamePacketListenerImpl
 	}
 
 	@Override
-	protected GameProfile playerProfile() {
+	protected PlayerProfile playerProfile() {
 		return this.player.getGameProfile();
 	}
 

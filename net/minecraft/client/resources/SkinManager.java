@@ -4,12 +4,12 @@ import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
 import com.google.common.hash.Hashing;
-import com.mojang.authlib.GameProfile;
+import net.minecraft.server.profile.PlayerProfile;
 import com.mojang.authlib.SignatureState;
 import com.mojang.authlib.minecraft.MinecraftProfileTexture;
 import com.mojang.authlib.minecraft.MinecraftProfileTextures;
 import com.mojang.authlib.minecraft.MinecraftProfileTexture.Type;
-import com.mojang.authlib.properties.Property;
+import net.minecraft.server.profile.ProfileProperty;
 import com.mojang.logging.LogUtils;
 import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
 import java.nio.file.Path;
@@ -55,7 +55,7 @@ public class SkinManager {
 				new CacheLoader<SkinManager.CacheKey, CompletableFuture<Optional<PlayerSkin>>>() {
 					public CompletableFuture<Optional<PlayerSkin>> load(SkinManager.CacheKey cacheKey) {
 						return CompletableFuture.supplyAsync(() -> {
-								Property property = cacheKey.packedTextures();
+								ProfileProperty property = cacheKey.packedTextures();
 								if (property == null) {
 									return MinecraftProfileTextures.EMPTY;
 								} else {
@@ -80,7 +80,7 @@ public class SkinManager {
 			);
 	}
 
-	public Supplier<PlayerSkin> createLookup(GameProfile gameProfile, boolean bl) {
+	public Supplier<PlayerSkin> createLookup(PlayerProfile playerProfile, boolean bl) {
 		CompletableFuture<Optional<PlayerSkin>> completableFuture = this.get(gameProfile);
 		PlayerSkin playerSkin = DefaultPlayerSkin.get(gameProfile);
 		if (SharedConstants.DEBUG_DEFAULT_SKIN_OVERRIDE) {
@@ -96,12 +96,12 @@ public class SkinManager {
 		}
 	}
 
-	public CompletableFuture<Optional<PlayerSkin>> get(GameProfile gameProfile) {
+	public CompletableFuture<Optional<PlayerSkin>> get(PlayerProfile playerProfile) {
 		if (SharedConstants.DEBUG_DEFAULT_SKIN_OVERRIDE) {
 			PlayerSkin playerSkin = DefaultPlayerSkin.get(gameProfile);
 			return CompletableFuture.completedFuture(Optional.of(playerSkin));
 		} else {
-			Property property = this.services.sessionService().getPackedTextures(gameProfile);
+			ProfileProperty property = this.services.sessionService().getPackedTextures(gameProfile);
 			return this.skinCache.getUnchecked(new SkinManager.CacheKey(gameProfile.getId(), property));
 		}
 	}
@@ -140,7 +140,7 @@ public class SkinManager {
 	}
 
 	@Environment(EnvType.CLIENT)
-	record CacheKey(UUID profileId, @Nullable Property packedTextures) {
+	record CacheKey(UUID profileId, @Nullable ProfileProperty packedTextures) {
 	}
 
 	@Environment(EnvType.CLIENT)

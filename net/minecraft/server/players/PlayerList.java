@@ -3,7 +3,7 @@ package net.minecraft.server.players;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
-import com.mojang.authlib.GameProfile;
+import net.minecraft.server.profile.PlayerProfile;
 import com.mojang.logging.LogUtils;
 import java.io.File;
 import java.net.SocketAddress;
@@ -756,7 +756,7 @@ public abstract class PlayerList {
 	}
 
 	public ServerStatsCounter getPlayerStats(Player player) {
-		GameProfile gameProfile = player.getGameProfile();
+		PlayerProfile playerProfile = player.getGameProfile();
 		UUID uUID = gameProfile.getId();
 		ServerStatsCounter serverStatsCounter = (ServerStatsCounter)this.stats.get(uUID);
 		if (serverStatsCounter == null) {

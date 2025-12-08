@@ -5,7 +5,7 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
 import com.google.gson.internal.Streams;
 import com.google.gson.stream.JsonWriter;
-import com.mojang.authlib.GameProfile;
+import net.minecraft.server.profile.PlayerProfile;
 import com.mojang.logging.LogUtils;
 import java.io.IOException;
 import java.io.InputStream;
@@ -87,7 +87,7 @@ public abstract class ServerTextFilter implements AutoCloseable {
 	}
 
 	protected CompletableFuture<FilteredText> requestMessageProcessing(
-		GameProfile gameProfile, String string, ServerTextFilter.IgnoreStrategy ignoreStrategy, Executor executor
+		PlayerProfile playerProfile, String string, ServerTextFilter.IgnoreStrategy ignoreStrategy, Executor executor
 	) {
 		return string.isEmpty() ? CompletableFuture.completedFuture(FilteredText.EMPTY) : CompletableFuture.supplyAsync(() -> {
 			JsonObject jsonObject = this.chatEncoder.encode(gameProfile, string);
@@ -234,7 +234,7 @@ public abstract class ServerTextFilter implements AutoCloseable {
 		return httpURLConnection;
 	}
 
-	public TextFilter createContext(GameProfile gameProfile) {
+	public TextFilter createContext(PlayerProfile playerProfile) {
 		return new ServerTextFilter.PlayerContext(gameProfile);
 	}
 
@@ -260,14 +260,14 @@ public abstract class ServerTextFilter implements AutoCloseable {
 
 	@FunctionalInterface
 	protected interface MessageEncoder {
-		JsonObject encode(GameProfile gameProfile, String string);
+		JsonObject encode(PlayerProfile playerProfile, String string);
 	}
 
 	protected class PlayerContext implements TextFilter {
-		protected final GameProfile profile;
+		protected final PlayerProfile profile;
 		protected final Executor streamExecutor;
 
-		protected PlayerContext(final GameProfile gameProfile) {
+		protected PlayerContext(final PlayerProfile playerProfile) {
 			this.profile = gameProfile;
 			ConsecutiveExecutor consecutiveExecutor = new ConsecutiveExecutor(ServerTextFilter.this.workerPool, "chat stream for " + gameProfile.getName());
 			this.streamExecutor = consecutiveExecutor::schedule;

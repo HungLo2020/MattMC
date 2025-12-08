@@ -2,7 +2,7 @@ package net.minecraft.client;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
-import com.mojang.authlib.GameProfile;
+import net.minecraft.server.profile.PlayerProfile;
 import com.mojang.authlib.exceptions.AuthenticationException;
 import com.mojang.authlib.minecraft.BanDetails;
 import com.mojang.authlib.minecraft.UserApiService;
@@ -749,7 +749,7 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 
 		ProfileResult profileResult = (ProfileResult)this.profileFuture.join();
 		if (profileResult != null) {
-			GameProfile gameProfile = profileResult.profile();
+			PlayerProfile playerProfile = profileResult.profile();
 			Set<ProfileActionType> set = profileResult.actions();
 			if (set.contains(ProfileActionType.FORCED_NAME_CHANGE)) {
 				list.add((Function<Runnable, Screen>)(Runnable runnable) -> BanNoticeScreens.createNameBan(gameProfile.getName(), runnable));
@@ -2390,7 +2390,7 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 		return this.user;
 	}
 
-	public GameProfile getGameProfile() {
+	public PlayerProfile getGameProfile() {
 		ProfileResult profileResult = (ProfileResult)this.profileFuture.join();
 		return profileResult != null ? profileResult.profile() : new GameProfile(this.user.getProfileId(), this.user.getName());
 	}

@@ -1,6 +1,6 @@
 package net.minecraft.server.commands;
 
-import com.mojang.authlib.GameProfile;
+import net.minecraft.server.profile.PlayerProfile;
 import com.mojang.brigadier.CommandDispatcher;
 import java.util.HashSet;
 import java.util.Set;
@@ -79,7 +79,7 @@ public class DebugConfigCommand {
 	}
 
 	private static int config(CommandSourceStack commandSourceStack, ServerPlayer serverPlayer) {
-		GameProfile gameProfile = serverPlayer.getGameProfile();
+		PlayerProfile playerProfile = serverPlayer.getGameProfile();
 		serverPlayer.connection.switchToConfig();
 		commandSourceStack.sendSuccess(() -> Component.literal("Switched player " + gameProfile.getName() + "(" + gameProfile.getId() + ") to config mode"), false);
 		return 1;

@@ -3,7 +3,7 @@ package net.minecraft.server.players;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.io.Files;
-import com.mojang.authlib.GameProfile;
+import net.minecraft.server.profile.PlayerProfile;
 import com.mojang.authlib.ProfileLookupCallback;
 import com.mojang.authlib.yggdrasil.ProfileNotFoundException;
 import com.mojang.logging.LogUtils;
@@ -76,7 +76,7 @@ public class OldUsersConverter {
 				readOldListFormat(OLD_USERBANLIST, map);
 				ProfileLookupCallback profileLookupCallback = new ProfileLookupCallback() {
 					@Override
-					public void onProfileLookupSucceeded(GameProfile gameProfile) {
+					public void onProfileLookupSucceeded(PlayerProfile playerProfile) {
 						NameAndId nameAndId = new NameAndId(gameProfile.getId(), gameProfile.getName());
 						minecraftServer.services().nameToIdCache().add(nameAndId);
 						String[] strings = (String[])map.get(nameAndId.name().toLowerCase(Locale.ROOT));
@@ -167,7 +167,7 @@ public class OldUsersConverter {
 				List<String> list = Files.readLines(OLD_OPLIST, StandardCharsets.UTF_8);
 				ProfileLookupCallback profileLookupCallback = new ProfileLookupCallback() {
 					@Override
-					public void onProfileLookupSucceeded(GameProfile gameProfile) {
+					public void onProfileLookupSucceeded(PlayerProfile playerProfile) {
 						NameAndId nameAndId = new NameAndId(gameProfile.getId(), gameProfile.getName());
 						minecraftServer.services().nameToIdCache().add(nameAndId);
 						serverOpList.add(new ServerOpListEntry(nameAndId, minecraftServer.operatorUserPermissionLevel(), false));
@@ -212,7 +212,7 @@ public class OldUsersConverter {
 				List<String> list = Files.readLines(OLD_WHITELIST, StandardCharsets.UTF_8);
 				ProfileLookupCallback profileLookupCallback = new ProfileLookupCallback() {
 					@Override
-					public void onProfileLookupSucceeded(GameProfile gameProfile) {
+					public void onProfileLookupSucceeded(PlayerProfile playerProfile) {
 						NameAndId nameAndId = new NameAndId(gameProfile.getId(), gameProfile.getName());
 						minecraftServer.services().nameToIdCache().add(nameAndId);
 						userWhiteList.add(new UserWhiteListEntry(nameAndId));
@@ -252,7 +252,7 @@ public class OldUsersConverter {
 				final List<NameAndId> list = new ArrayList();
 				ProfileLookupCallback profileLookupCallback = new ProfileLookupCallback() {
 					@Override
-					public void onProfileLookupSucceeded(GameProfile gameProfile) {
+					public void onProfileLookupSucceeded(PlayerProfile playerProfile) {
 						NameAndId nameAndId = new NameAndId(gameProfile.getId(), gameProfile.getName());
 						minecraftServer.services().nameToIdCache().add(nameAndId);
 						list.add(nameAndId);
@@ -299,7 +299,7 @@ public class OldUsersConverter {
 				final String[] strings = (String[])list.toArray(new String[list.size()]);
 				ProfileLookupCallback profileLookupCallback = new ProfileLookupCallback() {
 					@Override
-					public void onProfileLookupSucceeded(GameProfile gameProfile) {
+					public void onProfileLookupSucceeded(PlayerProfile playerProfile) {
 						NameAndId nameAndId = new NameAndId(gameProfile.getId(), gameProfile.getName());
 						dedicatedServer.services().nameToIdCache().add(nameAndId);
 						this.movePlayerFile(file2, this.getFileNameForProfile(gameProfile.getName()), gameProfile.getId().toString());

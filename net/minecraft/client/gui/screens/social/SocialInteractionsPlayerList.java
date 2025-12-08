@@ -2,7 +2,7 @@ package net.minecraft.client.gui.screens.social;
 
 import com.google.common.base.Strings;
 import com.google.common.collect.Lists;
-import com.mojang.authlib.GameProfile;
+import net.minecraft.server.profile.PlayerProfile;
 import it.unimi.dsi.fastutil.objects.Object2ObjectLinkedOpenHashMap;
 import java.util.Collection;
 import java.util.Comparator;

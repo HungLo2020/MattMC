@@ -1,6 +1,6 @@
 package net.minecraft.client.multiplayer;
 
-import com.mojang.authlib.GameProfile;
+import net.minecraft.server.profile.PlayerProfile;
 import com.mojang.logging.LogUtils;
 import java.util.List;
 import java.util.function.Function;
@@ -45,7 +45,7 @@ public class ClientConfigurationPacketListenerImpl extends ClientCommonPacketLis
 	static final Logger LOGGER = LogUtils.getLogger();
 	public static final Component DISCONNECTED_MESSAGE = Component.translatable("multiplayer.disconnect.code_of_conduct");
 	private final LevelLoadTracker levelLoadTracker;
-	private final GameProfile localGameProfile;
+	private final PlayerProfile localGameProfile;
 	private FeatureFlagSet enabledFeatures;
 	private final Frozen receivedRegistries;
 	private final RegistryDataCollector registryDataCollector = new RegistryDataCollector();
@@ -58,7 +58,7 @@ public class ClientConfigurationPacketListenerImpl extends ClientCommonPacketLis
 	public ClientConfigurationPacketListenerImpl(Minecraft minecraft, Connection connection, CommonListenerCookie commonListenerCookie) {
 		super(minecraft, connection, commonListenerCookie);
 		this.levelLoadTracker = commonListenerCookie.levelLoadTracker();
-		this.localGameProfile = commonListenerCookie.localGameProfile();
+		this.localPlayerProfile = commonListenerCookie.localGameProfile();
 		this.receivedRegistries = commonListenerCookie.receivedRegistries();
 		this.enabledFeatures = commonListenerCookie.enabledFeatures();
 		this.chatState = commonListenerCookie.chatState();
