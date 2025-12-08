@@ -25,7 +25,10 @@ public interface UserApiService {
 		}
 	};
 
-	UserProperties OFFLINE_PROPERTIES = new UserProperties(Set.of(), Set.of());
+	UserProperties OFFLINE_PROPERTIES = new UserProperties(
+		Set.of(UserFlag.SERVERS_ALLOWED, UserFlag.CHAT_ALLOWED, UserFlag.REALMS_ALLOWED), 
+		Set.of()
+	);
 
 	UserProperties fetchProperties();
 
