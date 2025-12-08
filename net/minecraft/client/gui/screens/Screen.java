@@ -17,12 +17,12 @@ import net.minecraft.CrashReportCategory;
 import net.minecraft.SharedConstants;
 import net.minecraft.Util;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.NarratorStatus;
+
 import net.minecraft.client.gui.ComponentPath;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.AbstractWidget;
-import net.minecraft.client.gui.components.CycleButton;
+
 import net.minecraft.client.gui.components.Renderable;
 import net.minecraft.client.gui.components.TabOrderedElement;
 import net.minecraft.client.gui.components.events.AbstractContainerEventHandler;
@@ -60,7 +60,7 @@ import org.slf4j.Logger;
 @Environment(EnvType.CLIENT)
 public abstract class Screen extends AbstractContainerEventHandler implements Renderable {
 	private static final Logger LOGGER = LogUtils.getLogger();
-	private static final Component USAGE_NARRATION = Component.translatable("narrator.screen.usage");
+
 	public static final ResourceLocation MENU_BACKGROUND = ResourceLocation.withDefaultNamespace("textures/gui/menu_background.png");
 	public static final ResourceLocation HEADER_SEPARATOR = ResourceLocation.withDefaultNamespace("textures/gui/header_separator.png");
 	public static final ResourceLocation FOOTER_SEPARATOR = ResourceLocation.withDefaultNamespace("textures/gui/footer_separator.png");
@@ -78,18 +78,7 @@ public abstract class Screen extends AbstractContainerEventHandler implements Re
 	public int height;
 	private final List<Renderable> renderables = Lists.<Renderable>newArrayList();
 	protected Font font;
-	private static final long NARRATE_SUPPRESS_AFTER_INIT_TIME = TimeUnit.SECONDS.toMillis(2L);
-	private static final long NARRATE_DELAY_NARRATOR_ENABLED = NARRATE_SUPPRESS_AFTER_INIT_TIME;
-	private static final long NARRATE_DELAY_MOUSE_MOVE = 750L;
-	private static final long NARRATE_DELAY_MOUSE_ACTION = 200L;
-	private static final long NARRATE_DELAY_KEYBOARD_ACTION = 200L;
 	private final ScreenNarrationCollector narrationState = new ScreenNarrationCollector();
-	private long narrationSuppressTime = Long.MIN_VALUE;
-	private long nextNarrationTime = Long.MAX_VALUE;
-	@Nullable
-	protected CycleButton<NarratorStatus> narratorButton;
-	@Nullable
-	private NarratableEntry lastNarratable;
 	protected final Executor screenExecutor = runnable -> this.minecraft.execute(() -> {
 		if (this.minecraft.screen == this) {
 			runnable.run();
@@ -394,12 +383,6 @@ public abstract class Screen extends AbstractContainerEventHandler implements Re
 		}
 
 		this.initialized = true;
-		this.triggerImmediateNarration(false);
-		if (minecraft.getLastInputType().isKeyboard()) {
-			this.setNarrationSuppressTime(Long.MAX_VALUE);
-		} else {
-			this.suppressNarration(NARRATE_SUPPRESS_AFTER_INIT_TIME);
-		}
 	}
 
 	protected void rebuildWidgets() {
@@ -582,79 +565,28 @@ public abstract class Screen extends AbstractContainerEventHandler implements Re
 	}
 
 	protected boolean shouldNarrateNavigation() {
-		return true;
+		return false;
 	}
 
 	protected void updateNarrationState(NarrationElementOutput narrationElementOutput) {
-		narrationElementOutput.add(NarratedElementType.TITLE, this.getNarrationMessage());
-		if (this.shouldNarrateNavigation()) {
-			narrationElementOutput.add(NarratedElementType.USAGE, USAGE_NARRATION);
-		}
-
-		this.updateNarratedWidget(narrationElementOutput);
+		// Narration disabled
 	}
 
 	protected void updateNarratedWidget(NarrationElementOutput narrationElementOutput) {
-		List<? extends NarratableEntry> list = this.narratables
-			.stream()
-			.flatMap(narratableEntry -> narratableEntry.getNarratables().stream())
-			.filter(NarratableEntry::isActive)
-			.sorted(Comparator.comparingInt(TabOrderedElement::getTabOrderGroup))
-			.toList();
-		Screen.NarratableSearchResult narratableSearchResult = findNarratableWidget(list, this.lastNarratable);
-		if (narratableSearchResult != null) {
-			if (narratableSearchResult.priority.isTerminal()) {
-				this.lastNarratable = narratableSearchResult.entry;
-			}
-
-			if (list.size() > 1) {
-				narrationElementOutput.add(
-					NarratedElementType.POSITION, Component.translatable("narrator.position.screen", new Object[]{narratableSearchResult.index + 1, list.size()})
-				);
-				if (narratableSearchResult.priority == NarratableEntry.NarrationPriority.FOCUSED) {
-					narrationElementOutput.add(NarratedElementType.USAGE, this.getUsageNarration());
-				}
-			}
-
-			narratableSearchResult.entry.updateNarration(narrationElementOutput.nest());
-		}
+		// Narration disabled
 	}
 
 	protected Component getUsageNarration() {
-		return Component.translatable("narration.component_list.usage");
+		return Component.empty();
 	}
 
 	@Nullable
 	public static Screen.NarratableSearchResult findNarratableWidget(List<? extends NarratableEntry> list, @Nullable NarratableEntry narratableEntry) {
-		Screen.NarratableSearchResult narratableSearchResult = null;
-		Screen.NarratableSearchResult narratableSearchResult2 = null;
-		int i = 0;
-
-		for (int j = list.size(); i < j; i++) {
-			NarratableEntry narratableEntry2 = (NarratableEntry)list.get(i);
-			NarratableEntry.NarrationPriority narrationPriority = narratableEntry2.narrationPriority();
-			if (narrationPriority.isTerminal()) {
-				if (narratableEntry2 != narratableEntry) {
-					return new Screen.NarratableSearchResult(narratableEntry2, i, narrationPriority);
-				}
-
-				narratableSearchResult2 = new Screen.NarratableSearchResult(narratableEntry2, i, narrationPriority);
-			} else if (narrationPriority.compareTo(narratableSearchResult != null ? narratableSearchResult.priority : NarratableEntry.NarrationPriority.NONE) > 0) {
-				narratableSearchResult = new Screen.NarratableSearchResult(narratableEntry2, i, narrationPriority);
-			}
-		}
-
-		return narratableSearchResult != null ? narratableSearchResult : narratableSearchResult2;
+		return null;
 	}
 
 	public void updateNarratorStatus(boolean bl) {
-		if (bl) {
-			this.scheduleNarration(NARRATE_DELAY_NARRATOR_ENABLED, false);
-		}
-
-		if (this.narratorButton != null) {
-			this.narratorButton.setValue(this.minecraft.options.narrator().get());
-		}
+		// Narration disabled
 	}
 
 	public Font getFont() {

@@ -172,7 +172,7 @@ public class ChatListener {
 	}
 
 	private void narrateChatMessage(Bound bound, Component component) {
-		this.minecraft.getNarrator().sayChatQueued(bound.decorateNarration(component));
+		// Narration removed
 	}
 
 	private ChatTrustLevel evaluateTrustLevel(PlayerChatMessage playerChatMessage, Component component, Instant instant) {
@@ -191,11 +191,9 @@ public class ChatListener {
 		if (!this.minecraft.options.hideMatchedNames().get() || !this.minecraft.isBlocked(this.guessChatUUID(component))) {
 			if (bl) {
 				this.minecraft.gui.setOverlayMessage(component, false);
-				this.minecraft.getNarrator().saySystemQueued(component);
 			} else {
 				this.minecraft.gui.getChat().addMessage(component);
 				this.logSystemMessage(component, Instant.now());
-				this.minecraft.getNarrator().saySystemChatQueued(component);
 			}
 		}
 	}

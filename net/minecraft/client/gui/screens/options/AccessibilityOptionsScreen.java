@@ -24,7 +24,6 @@ public class AccessibilityOptionsScreen extends OptionsSubScreen {
 
 	private static OptionInstance<?>[] options(Options options) {
 		return new OptionInstance[]{
-			options.narrator(),
 			options.showSubtitles(),
 			options.darkMode(),
 			options.highContrast(),
@@ -46,7 +45,6 @@ public class AccessibilityOptionsScreen extends OptionsSubScreen {
 			options.darkMojangStudiosBackground(),
 			options.panoramaSpeed(),
 			options.hideSplashTexts(),
-			options.narratorHotkey(),
 			options.rotateWithMinecart(),
 			options.highContrastBlockOutline()
 		};
@@ -75,10 +73,8 @@ public class AccessibilityOptionsScreen extends OptionsSubScreen {
 	protected void addOptions() {
 		OptionInstance<?>[] optionInstances = options(this.options);
 		Button button = Button.builder(OptionsScreen.CONTROLS, buttonx -> this.minecraft.setScreen(new ControlsScreen(this, this.options))).build();
-		OptionInstance<?> optionInstance = optionInstances[0];
-		this.list.addSmall(optionInstance.createButton(this.options), button);
-		this.list
-			.addSmall((OptionInstance<?>[])Arrays.stream(optionInstances).filter(optionInstance2 -> optionInstance2 != optionInstance).toArray(OptionInstance[]::new));
+		this.list.addSmall(button);
+		this.list.addSmall(optionInstances);
 	}
 
 	@Override
@@ -90,10 +86,7 @@ public class AccessibilityOptionsScreen extends OptionsSubScreen {
 		linearLayout.addChild(Button.builder(CommonComponents.GUI_DONE, button -> this.minecraft.setScreen(this.lastScreen)).build());
 	}
 
-	@Override
-	protected boolean panoramaShouldSpin() {
-		return !(this.lastScreen instanceof AccessibilityOnboardingScreen);
-	}
+
 
 	private boolean isMinecartOptionEnabled() {
 		return this.minecraft.level != null && this.minecraft.level.enabledFeatures().contains(FeatureFlags.MINECART_IMPROVEMENTS);

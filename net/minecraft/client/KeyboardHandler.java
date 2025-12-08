@@ -490,15 +490,6 @@ public class KeyboardHandler {
 			if (i != 0) {
 				boolean bl2 = screen == null || !(screen.getFocused() instanceof EditBox) || !((EditBox)screen.getFocused()).canConsumeInput();
 				if (bl2) {
-					if (keyEvent.hasControlDown() && keyEvent.key() == 66 && this.minecraft.getNarrator().isActive() && this.minecraft.options.narratorHotkey().get()) {
-						boolean bl3 = this.minecraft.options.narrator().get() == NarratorStatus.OFF;
-						this.minecraft.options.narrator().set(NarratorStatus.byId(this.minecraft.options.narrator().get().getId() + 1));
-						this.minecraft.options.save();
-						if (screen != null) {
-							screen.updateNarratorStatus(bl3);
-						}
-					}
-
 					LocalPlayer var17 = this.minecraft.player;
 				}
 			}
