@@ -1900,7 +1900,7 @@ public class ClientPacketListener extends ClientCommonPacketListenerImpl impleme
 		PacketUtils.ensureRunningOnSameThread(clientboundPlayerInfoUpdatePacket, this, this.minecraft.packetProcessor());
 
 		for (net.minecraft.network.protocol.game.ClientboundPlayerInfoUpdatePacket.Entry entry : clientboundPlayerInfoUpdatePacket.newEntries()) {
-			PlayerInfo playerInfo = new PlayerInfo((PlayerProfile)Objects.requireNonNull(entry.playerProfile()), this.enforcesSecureChat());
+			PlayerInfo playerInfo = new PlayerInfo((PlayerProfile)Objects.requireNonNull(entry.profile()), this.enforcesSecureChat());
 			if (this.playerInfoMap.putIfAbsent(entry.profileId(), playerInfo) == null) {
 				this.minecraft.getPlayerSocialManager().addPlayer(playerInfo);
 			}

@@ -110,7 +110,7 @@ public class ClientboundPlayerInfoUpdatePacket implements Packet<ClientGamePacke
 			PlayerProfile gp = new PlayerProfile(entryBuilder.profileId, string, propertyMap);
 			entryBuilder.profile = gp;
 		}, (registryFriendlyByteBuf, entry) -> {
-			PlayerProfile playerProfile = (PlayerProfile)Objects.requireNonNull(entry.playerProfile());
+			PlayerProfile playerProfile = (PlayerProfile)Objects.requireNonNull(entry.profile());
 			ByteBufCodecs.PLAYER_NAME.encode(registryFriendlyByteBuf, playerProfile.name());
 			ByteBufCodecs.GAME_PROFILE_PROPERTIES.encode(registryFriendlyByteBuf, playerProfile.properties());
 		}),
