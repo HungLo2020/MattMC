@@ -1,5 +1,7 @@
 package net.minecraft.client.gui.narration;
 
+import java.util.Collection;
+import java.util.List;
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
 
@@ -12,6 +14,14 @@ public interface NarratableEntry {
 
 	default void updateNarration(NarrationElementOutput narrationElementOutput) {
 		// Narration disabled
+	}
+
+	default boolean isActive() {
+		return true;
+	}
+
+	default Collection<? extends NarratableEntry> getNarratables() {
+		return List.of(this);
 	}
 
 	@Environment(EnvType.CLIENT)

@@ -142,7 +142,6 @@ public class KeyboardHandler {
 
 	private void showDebugChat(Component component) {
 		this.minecraft.gui.getChat().addMessage(component);
-		this.minecraft.getNarrator().saySystemQueued(component);
 	}
 
 	private static Component decorateDebugComponent(ChatFormatting chatFormatting, Component component) {

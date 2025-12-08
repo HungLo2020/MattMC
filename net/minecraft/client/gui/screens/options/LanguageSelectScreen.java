@@ -9,7 +9,6 @@ import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.ObjectSelectionList;
 import net.minecraft.client.gui.components.StringWidget;
 import net.minecraft.client.gui.layouts.LinearLayout;
-import net.minecraft.client.gui.screens.AccessibilityOnboardingScreen;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.input.KeyEvent;
 import net.minecraft.client.input.MouseButtonEvent;
@@ -69,10 +68,7 @@ public class LanguageSelectScreen extends OptionsSubScreen {
 		this.minecraft.setScreen(this.lastScreen);
 	}
 
-	@Override
-	protected boolean panoramaShouldSpin() {
-		return !(this.lastScreen instanceof AccessibilityOnboardingScreen);
-	}
+
 
 	@Environment(EnvType.CLIENT)
 	class LanguageSelectionList extends ObjectSelectionList<LanguageSelectScreen.LanguageSelectionList.Entry> {

@@ -9,7 +9,7 @@ import net.minecraft.network.chat.Component;
  */
 @Environment(EnvType.CLIENT)
 public interface NarrationElementOutput {
-	void add(NarratedElementType narratedElementType, Component component);
+	void add(NarratedElementType narratedElementType, Component... components);
 
 	NarrationElementOutput nest();
 }

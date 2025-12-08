@@ -16,7 +16,7 @@ public class ScreenNarrationCollector {
 	public NarrationElementOutput nest() {
 		return new NarrationElementOutput() {
 			@Override
-			public void add(NarratedElementType narratedElementType, Component component) {
+			public void add(NarratedElementType narratedElementType, Component... components) {
 				// Narration disabled
 			}
 

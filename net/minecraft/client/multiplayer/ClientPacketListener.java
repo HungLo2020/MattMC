@@ -1130,7 +1130,6 @@ public class ClientPacketListener extends ClientCommonPacketListenerImpl impleme
 
 							Component component = Component.translatable("mount.onboard", new Object[]{this.minecraft.options.keyShift.getTranslatedKeyMessage()});
 							this.minecraft.gui.setOverlayMessage(component, false);
-							this.minecraft.getNarrator().saySystemNow(component);
 						}
 					}
 				}
@@ -1534,7 +1533,6 @@ public class ClientPacketListener extends ClientCommonPacketListenerImpl impleme
 
 			if (component != null) {
 				this.minecraft.gui.getChat().addMessage(component);
-				this.minecraft.getNarrator().saySystemQueued(component);
 			}
 		} else if (type == ClientboundGameEventPacket.PLAY_ARROW_HIT_SOUND) {
 			this.level.playSound(player, player.getX(), player.getEyeY(), player.getZ(), SoundEvents.ARROW_HIT_PLAYER, SoundSource.PLAYERS, 0.18F, 0.45F);

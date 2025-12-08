@@ -89,7 +89,6 @@ public class PlayerTabOverlay {
 			this.visible = bl;
 			if (bl) {
 				Component component = ComponentUtils.formatList(this.getPlayerInfos(), Component.literal(", "), this::getNameForDisplay);
-				this.minecraft.getNarrator().saySystemNow(Component.translatable("multiplayer.player.list.narration", new Object[]{component}));
 			}
 		}
 	}

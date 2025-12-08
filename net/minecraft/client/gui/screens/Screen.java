@@ -509,59 +509,28 @@ public abstract class Screen extends AbstractContainerEventHandler implements Re
 	public void onFilesDrop(List<Path> list) {
 	}
 
-	private void scheduleNarration(long l, boolean bl) {
-		this.nextNarrationTime = Util.getMillis() + l;
-		if (bl) {
-			this.narrationSuppressTime = Long.MIN_VALUE;
-		}
-	}
-
-	private void suppressNarration(long l) {
-		this.setNarrationSuppressTime(Util.getMillis() + l);
-	}
-
-	private void setNarrationSuppressTime(long l) {
-		this.narrationSuppressTime = l;
+	public void scheduleNarration(long l, boolean bl) {
+		// Narration disabled
 	}
 
 	public void afterMouseMove() {
-		this.scheduleNarration(750L, false);
+		// Narration disabled
 	}
 
 	public void afterMouseAction() {
-		this.scheduleNarration(200L, true);
+		// Narration disabled
 	}
 
 	public void afterKeyboardAction() {
-		this.scheduleNarration(200L, true);
-	}
-
-	private boolean shouldRunNarration() {
-		return SharedConstants.DEBUG_UI_NARRATION || this.minecraft.getNarrator().isActive();
+		// Narration disabled
 	}
 
 	public void handleDelayedNarration() {
-		if (this.shouldRunNarration()) {
-			long l = Util.getMillis();
-			if (l > this.nextNarrationTime && l > this.narrationSuppressTime) {
-				this.runNarration(true);
-				this.nextNarrationTime = Long.MAX_VALUE;
-			}
-		}
+		// Narration disabled
 	}
 
 	public void triggerImmediateNarration(boolean bl) {
-		if (this.shouldRunNarration()) {
-			this.runNarration(bl);
-		}
-	}
-
-	private void runNarration(boolean bl) {
-		this.narrationState.update(this::updateNarrationState);
-		String string = this.narrationState.collectNarrationText(!bl);
-		if (!string.isEmpty()) {
-			this.minecraft.getNarrator().saySystemNow(string);
-		}
+		// Narration disabled
 	}
 
 	protected boolean shouldNarrateNavigation() {

@@ -1102,7 +1102,6 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 			} else {
 				Component component = chatStatus.getMessage();
 				this.gui.setOverlayMessage(component, false);
-				this.narrator.saySystemNow(component);
 				this.gui.setChatDisabledByPlayerShown(chatStatus == Minecraft.ChatStatus.DISABLED_BY_PROFILE);
 			}
 		} else {

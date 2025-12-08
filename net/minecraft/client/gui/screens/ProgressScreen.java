@@ -2,7 +2,6 @@ package net.minecraft.client.gui.screens;
 
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
-import net.minecraft.client.GameNarrator;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.network.chat.Component;
 import net.minecraft.util.ProgressListener;
@@ -19,7 +18,7 @@ public class ProgressScreen extends Screen implements ProgressListener {
 	private final boolean clearScreenAfterStop;
 
 	public ProgressScreen(boolean bl) {
-		super(GameNarrator.NO_TITLE);
+		super(Component.empty());
 		this.clearScreenAfterStop = bl;
 	}
 

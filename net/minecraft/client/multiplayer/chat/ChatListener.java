@@ -123,7 +123,6 @@ public class ChatListener {
 			} else {
 				Component component = bound.decorate(CHAT_VALIDATION_ERROR);
 				this.minecraft.gui.getChat().addMessage(component, null, GuiMessageTag.chatError());
-				this.minecraft.getNarrator().saySystemChatQueued(bound.decorateNarration(CHAT_VALIDATION_ERROR));
 				this.previousMessageTime = Util.getMillis();
 				return true;
 			}

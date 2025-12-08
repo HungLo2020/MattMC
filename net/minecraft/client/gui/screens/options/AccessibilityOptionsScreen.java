@@ -9,7 +9,6 @@ import net.minecraft.client.gui.components.AbstractWidget;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.Tooltip;
 import net.minecraft.client.gui.layouts.LinearLayout;
-import net.minecraft.client.gui.screens.AccessibilityOnboardingScreen;
 import net.minecraft.client.gui.screens.ConfirmLinkScreen;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.screens.options.controls.ControlsScreen;
@@ -73,7 +72,7 @@ public class AccessibilityOptionsScreen extends OptionsSubScreen {
 	protected void addOptions() {
 		OptionInstance<?>[] optionInstances = options(this.options);
 		Button button = Button.builder(OptionsScreen.CONTROLS, buttonx -> this.minecraft.setScreen(new ControlsScreen(this, this.options))).build();
-		this.list.addSmall(button);
+		this.list.addSmall(button, null);
 		this.list.addSmall(optionInstances);
 	}
 

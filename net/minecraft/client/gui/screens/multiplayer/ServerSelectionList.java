@@ -129,7 +129,6 @@ public class ServerSelectionList extends ObjectSelectionList<ServerSelectionList
 			int l = this.getRowTop(k);
 			int m = this.getRowBottom(k);
 			if (m >= this.getY() && l <= this.getBottom()) {
-				this.minecraft.getNarrator().saySystemQueued(Component.translatable("multiplayer.lan.server_found", new Object[]{networkServerEntry.getServerNarration()}));
 			}
 		}
 	}

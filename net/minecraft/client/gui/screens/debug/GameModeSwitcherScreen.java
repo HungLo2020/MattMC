@@ -6,7 +6,6 @@ import java.util.List;
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
 import net.minecraft.ChatFormatting;
-import net.minecraft.client.GameNarrator;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.AbstractWidget;
@@ -46,7 +45,7 @@ public class GameModeSwitcherScreen extends Screen {
 	private final List<GameModeSwitcherScreen.GameModeSlot> slots = Lists.<GameModeSwitcherScreen.GameModeSlot>newArrayList();
 
 	public GameModeSwitcherScreen() {
-		super(GameNarrator.NO_TITLE);
+		super(Component.empty());
 		this.previousHovered = GameModeSwitcherScreen.GameModeIcon.getFromGameType(this.getDefaultSelected());
 		this.currentlyHovered = this.previousHovered;
 	}
