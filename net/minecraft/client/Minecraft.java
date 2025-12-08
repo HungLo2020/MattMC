@@ -2093,8 +2093,6 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 		TitleScreen titleScreen = new TitleScreen();
 		if (bl) {
 			this.setScreen(titleScreen);
-		} else if (serverData != null && serverData.isRealm()) {
-			this.setScreen(new RealmsMainScreen(titleScreen));
 		} else {
 			this.setScreen(new JoinMultiplayerScreen(titleScreen));
 		}
@@ -2784,10 +2782,6 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 
 	public ReportingContext getReportingContext() {
 		return this.reportingContext;
-	}
-
-	public RealmsDataFetcher realmsDataFetcher() {
-		return this.realmsDataFetcher;
 	}
 
 	public QuickPlayLog quickPlayLog() {
