@@ -92,7 +92,7 @@ public class OfflineUserNameToIdResolver implements UserNameToIdResolver {
 		}
 
 		try (Reader reader = Files.newBufferedReader(this.cacheFile.toPath(), StandardCharsets.UTF_8)) {
-			JsonArray jsonArray = GsonHelper.fromJson(reader, JsonArray.class);
+			JsonArray jsonArray = GsonHelper.fromJson(new com.google.gson.Gson(), reader, JsonArray.class);
 			
 			if (jsonArray != null) {
 				for (JsonElement element : jsonArray) {

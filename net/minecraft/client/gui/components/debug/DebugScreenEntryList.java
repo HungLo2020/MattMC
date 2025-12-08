@@ -56,9 +56,9 @@ public class DebugScreenEntryList {
 			DebugScreenEntryList.SerializedOptions serializedOptions = dataResult.getOrThrow(
 				stringx -> new IOException("Could not parse debug profile JSON: " + stringx)
 			);
-			if (serializedOptions.playerProfile().isPresent()) {
-				this.loadProfile((DebugScreenProfile)serializedOptions.playerProfile().get());
-			} else {
+			if (serializedOptions.profile().isPresent()) {
+				this.loadProfile((DebugScreenProfile)serializedOptions.profile().get());
+			} else{
 				this.allStatuses = new HashMap();
 				if (serializedOptions.custom().isPresent()) {
 					this.allStatuses.putAll((Map)serializedOptions.custom().get());

@@ -58,7 +58,7 @@ public class ClientConfigurationPacketListenerImpl extends ClientCommonPacketLis
 	public ClientConfigurationPacketListenerImpl(Minecraft minecraft, Connection connection, CommonListenerCookie commonListenerCookie) {
 		super(minecraft, connection, commonListenerCookie);
 		this.levelLoadTracker = commonListenerCookie.levelLoadTracker();
-		this.localPlayerProfile = commonListenerCookie.localGameProfile();
+		this.localGameProfile = commonListenerCookie.localGameProfile();
 		this.receivedRegistries = commonListenerCookie.receivedRegistries();
 		this.enabledFeatures = commonListenerCookie.enabledFeatures();
 		this.chatState = commonListenerCookie.chatState();

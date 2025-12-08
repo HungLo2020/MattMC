@@ -70,7 +70,7 @@ public class GameTestServer extends MinecraftServer {
 	private static final int PROGRESS_REPORT_INTERVAL = 20;
 	private static final int TEST_POSITION_RANGE = 14999992;
 	private static final Services NO_SERVICES = new Services(
-		null, ServicesKeySet.EMPTY, null, new GameTestServer.MockUserNameToIdResolver(), new GameTestServer.MockProfileResolver()
+		new GameTestServer.MockUserNameToIdResolver(), new GameTestServer.MockProfileResolver()
 	);
 	private static final FeatureFlagSet ENABLED_FEATURES = FeatureFlags.REGISTRY
 		.allFlags()

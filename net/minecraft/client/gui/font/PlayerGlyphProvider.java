@@ -29,7 +29,7 @@ public class PlayerGlyphProvider {
 		.expireAfterAccess(PlayerSkinRenderCache.CACHE_DURATION)
 		.build(new CacheLoader<PlayerSprite, GlyphSource>() {
 			public GlyphSource load(PlayerSprite playerSprite) {
-				final Supplier<PlayerSkinRenderCache.RenderInfo> supplier = PlayerGlyphProvider.this.playerSkinRenderCache.createLookup(playerSprite.playerProfile());
+				final Supplier<PlayerSkinRenderCache.RenderInfo> supplier = PlayerGlyphProvider.this.playerSkinRenderCache.createLookup(playerSprite.profile());
 				final boolean bl = playerSprite.hat();
 				return new SingleSpriteSource(new BakedGlyph() {
 					@Override

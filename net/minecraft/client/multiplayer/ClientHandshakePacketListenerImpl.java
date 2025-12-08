@@ -158,20 +158,8 @@ public class ClientHandshakePacketListenerImpl implements ClientLoginPacketListe
 
 	@Nullable
 	private Component authenticateServer(String string) {
-		try {
-			this.minecraft.services().sessionService().joinServer(this.minecraft.getUser().getProfileId(), this.minecraft.getUser().getAccessToken(), string);
-			return null;
-		} catch (AuthenticationUnavailableException var3) {
-			return Component.translatable("disconnect.loginFailedInfo", new Object[]{Component.translatable("disconnect.loginFailedInfo.serversUnavailable")});
-		} catch (InvalidCredentialsException var4) {
-			return Component.translatable("disconnect.loginFailedInfo", new Object[]{Component.translatable("disconnect.loginFailedInfo.invalidSession")});
-		} catch (InsufficientPrivilegesException var5) {
-			return Component.translatable("disconnect.loginFailedInfo", new Object[]{Component.translatable("disconnect.loginFailedInfo.insufficientPrivileges")});
-		} catch (ForcedUsernameChangeException | UserBannedException var6) {
-			return Component.translatable("disconnect.loginFailedInfo", new Object[]{Component.translatable("disconnect.loginFailedInfo.userBanned")});
-		} catch (AuthenticationException var7) {
-			return Component.translatable("disconnect.loginFailedInfo", new Object[]{var7.getMessage()});
-		}
+		// Offline mode - no server authentication
+		return null;
 	}
 
 	public void handleLoginFinished(ClientboundLoginFinishedPacket clientboundLoginFinishedPacket) {

@@ -46,7 +46,8 @@ public class PlayerSocialManager {
 
 	public void startOnlineMode() {
 		this.onlineMode = true;
-		this.pendingBlockListRefresh = this.pendingBlockListRefresh.thenRunAsync(this.service::refreshBlockList, Util.ioPool());
+		// Offline mode - no block list refresh needed
+		this.pendingBlockListRefresh = this.pendingBlockListRefresh.thenRunAsync(() -> {}, Util.ioPool());
 	}
 
 	public void stopOnlineMode() {

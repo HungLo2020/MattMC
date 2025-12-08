@@ -25,7 +25,7 @@ public class ClientActivePlayersTooltip implements ClientTooltipComponent {
 	}
 
 	private static String getName(PlayerSkinRenderCache.RenderInfo renderInfo) {
-		return renderInfo.playerProfile().getName();
+		return renderInfo.playerProfile().name();
 	}
 
 	@Override

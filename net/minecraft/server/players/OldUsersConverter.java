@@ -52,7 +52,10 @@ public class OldUsersConverter {
 	private static void lookupPlayers(MinecraftServer minecraftServer, Collection<String> collection, ProfileLookupCallback profileLookupCallback) {
 		String[] strings = (String[])collection.stream().filter(stringx -> !StringUtil.isNullOrEmpty(stringx)).toArray(String[]::new);
 		if (minecraftServer.usesAuthentication()) {
-			minecraftServer.services().profileRepository().findProfilesByNames(strings, profileLookupCallback);
+			// Offline mode - no profile repository, just use offline profiles
+			for (String string : strings) {
+				profileLookupCallback.onProfileLookupSucceeded(new PlayerProfile(UUIDUtil.createOfflinePlayerUUID(string), string));
+			}
 		} else {
 			for (String string : strings) {
 				profileLookupCallback.onProfileLookupSucceeded(new PlayerProfile(UUIDUtil.createOfflinePlayerUUID(string), string));

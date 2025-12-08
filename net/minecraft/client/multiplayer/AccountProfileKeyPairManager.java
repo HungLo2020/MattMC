@@ -75,7 +75,7 @@ public class AccountProfileKeyPairManager implements ProfileKeyPairManager {
 					ProfileKeyPair profileKeyPair = this.fetchProfileKeyPair(this.userApiService);
 					this.writeProfileKeyPair(profileKeyPair);
 					return Optional.ofNullable(profileKeyPair);
-				} catch (CryptException | MinecraftClientException | IOException var3) {
+				} catch (CryptException | IOException var3) {
 					LOGGER.error("Failed to retrieve profile key pair", (Throwable)var3);
 					this.writeProfileKeyPair(null);
 					return optional;
@@ -141,33 +141,12 @@ public class AccountProfileKeyPairManager implements ProfileKeyPairManager {
 
 	@Nullable
 	private ProfileKeyPair fetchProfileKeyPair(UserApiService userApiService) throws CryptException, IOException {
-		KeyPairResponse keyPairResponse = userApiService.getKeyPair();
-		if (keyPairResponse != null) {
-			Data data = parsePublicKey(keyPairResponse);
-			return new ProfileKeyPair(
-				Crypt.stringToPemRsaPrivateKey(keyPairResponse.keyPair().privateKey()), new ProfilePublicKey(data), Instant.parse(keyPairResponse.refreshedAfter())
-			);
-		} else {
-			return null;
-		}
+		// Offline mode - no key pairs
+		return null;
 	}
 
 	private static Data parsePublicKey(KeyPairResponse keyPairResponse) throws CryptException {
-		KeyPair keyPair = keyPairResponse.keyPair();
-		if (keyPair != null
-			&& !Strings.isNullOrEmpty(keyPair.publicKey())
-			&& keyPairResponse.publicKeySignature() != null
-			&& keyPairResponse.publicKeySignature().array().length != 0) {
-			try {
-				Instant instant = Instant.parse(keyPairResponse.expiresAt());
-				PublicKey publicKey = Crypt.stringToRsaPublicKey(keyPair.publicKey());
-				ByteBuffer byteBuffer = keyPairResponse.publicKeySignature();
-				return new Data(instant, publicKey, byteBuffer.array());
-			} catch (IllegalArgumentException | DateTimeException var5) {
-				throw new CryptException(var5);
-			}
-		} else {
-			throw new CryptException(new MissingException("Missing public key"));
-		}
+		// Offline mode - no public key parsing needed
+		throw new CryptException(new InsecurePublicKeyException.MissingException("Missing public key"));
 	}
 }

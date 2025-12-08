@@ -61,12 +61,12 @@ public interface LoggedChatMessage extends LoggedChatEvent {
 		public Component toNarrationComponent() {
 			Component component = this.toContentComponent();
 			Component component2 = this.getTimeComponent();
-			return Component.translatable("gui.chatSelection.message.narrate", new Object[]{this.profile.getName(), component, component2});
+			return Component.translatable("gui.chatSelection.message.narrate", new Object[]{this.profile.name(), component, component2});
 		}
 
 		public Component toHeadingComponent() {
 			Component component = this.getTimeComponent();
-			return Component.translatable("gui.chatSelection.heading", new Object[]{this.profile.getName(), component});
+			return Component.translatable("gui.chatSelection.heading", new Object[]{this.profile.name(), component});
 		}
 
 		private Component getTimeComponent() {
@@ -80,7 +80,7 @@ public interface LoggedChatMessage extends LoggedChatEvent {
 		}
 
 		public UUID profileId() {
-			return this.profile.getId();
+			return this.profile.id();
 		}
 
 		@Override
