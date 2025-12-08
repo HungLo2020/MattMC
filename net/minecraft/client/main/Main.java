@@ -36,8 +36,6 @@ import net.minecraft.client.ClientBootstrap;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.User;
 import net.minecraft.client.server.IntegratedServer;
-import net.minecraft.client.telemetry.TelemetryProperty;
-import net.minecraft.client.telemetry.events.GameLoadTimesEvent;
 import net.minecraft.core.UUIDUtil;
 import net.minecraft.obfuscate.DontObfuscate;
 import net.minecraft.server.Bootstrap;
@@ -87,7 +85,7 @@ public class Main {
 	 * <ol>
 	 *   <li>Parse command-line arguments using JOptSimple</li>
 	 *   <li>Bootstrap the game (register blocks, items, etc.)</li>
-	 *   <li>Initialize telemetry and profiling if enabled</li>
+	 *   <li>Initialize profiling if enabled</li>
 	 *   <li>Configure user authentication (offline or online)</li>
 	 *   <li>Create and launch the Minecraft instance</li>
 	 * </ol>
@@ -148,10 +146,6 @@ public class Main {
 				TracyBootstrap.setup();
 			}
 
-			Stopwatch stopwatch = Stopwatch.createStarted(Ticker.systemTicker());
-			Stopwatch stopwatch2 = Stopwatch.createStarted(Ticker.systemTicker());
-			GameLoadTimesEvent.INSTANCE.beginStep(TelemetryProperty.LOAD_TIME_TOTAL_TIME_MS, stopwatch);
-			GameLoadTimesEvent.INSTANCE.beginStep(TelemetryProperty.LOAD_TIME_PRE_WINDOW_MS, stopwatch2);
 			SharedConstants.tryDetectVersion();
 			TracyClient.reportAppInfo("Minecraft Java Edition " + SharedConstants.getCurrentVersion().name());
 			CompletableFuture<?> completableFuture = DataFixers.optimize(DataFixTypes.TYPES_FOR_LEVEL_LIST);
@@ -160,7 +154,6 @@ public class Main {
 			string2 = "Bootstrap";
 			Bootstrap.bootStrap();
 			ClientBootstrap.bootstrap();
-			GameLoadTimesEvent.INSTANCE.setBootstrapTime(Bootstrap.bootstrapDuration.get());
 			Bootstrap.validate();
 			string2 = "Argument parsing";
 			List<String> list = optionSet.valuesOf(optionSpec29);

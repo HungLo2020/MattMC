@@ -432,7 +432,7 @@ public class ClientPacketListener extends ClientCommonPacketListenerImpl impleme
 				.getOrThrow(string -> new IllegalArgumentException("Failed to hash " + typedDataComponent + ": " + string)))
 			.asInt();
 		this.enabledFeatures = commonListenerCookie.enabledFeatures();
-		this.advancements = new ClientAdvancements(minecraft, this.telemetryManager);
+		this.advancements = new ClientAdvancements(minecraft);
 		this.suggestionsProvider = new ClientSuggestionProvider(this, minecraft, true);
 		this.restrictedSuggestionsProvider = new ClientSuggestionProvider(this, minecraft, false);
 		this.pingDebugMonitor = new PingDebugMonitor(this, minecraft.getDebugOverlay().getPingLogger());
@@ -453,7 +453,6 @@ public class ClientPacketListener extends ClientCommonPacketListenerImpl impleme
 	public void close() {
 		this.closed = true;
 		this.clearLevel();
-		this.telemetryManager.onDisconnect();
 	}
 
 	public void clearLevel() {
@@ -539,7 +538,6 @@ public class ClientPacketListener extends ClientCommonPacketListenerImpl impleme
 			this.prepareKeyPair();
 		}
 
-		this.telemetryManager.onPlayerInfoReceived(commonPlayerSpawnInfo.gameType(), clientboundLoginPacket.hardcore());
 		this.minecraft.quickPlayLog().log(this.minecraft);
 		this.serverEnforcesSecureChat = clientboundLoginPacket.enforcesSecureChat();
 		if (this.serverData != null && !this.seenInsecureChatWarning && !this.enforcesSecureChat()) {
@@ -931,7 +929,6 @@ public class ClientPacketListener extends ClientCommonPacketListenerImpl impleme
 					new CommonListenerCookie(
 						new LevelLoadTracker(),
 						this.localGameProfile,
-						this.telemetryManager,
 						this.registryAccess,
 						this.enabledFeatures,
 						this.serverBrand,
@@ -1102,7 +1099,6 @@ public class ClientPacketListener extends ClientCommonPacketListenerImpl impleme
 	public void handleSetTime(ClientboundSetTimePacket clientboundSetTimePacket) {
 		PacketUtils.ensureRunningOnSameThread(clientboundSetTimePacket, this, this.minecraft.packetProcessor());
 		this.level.setTimeFromServer(clientboundSetTimePacket.gameTime(), clientboundSetTimePacket.dayTime(), clientboundSetTimePacket.tickDayTime());
-		this.telemetryManager.setTime(clientboundSetTimePacket.gameTime());
 	}
 
 	public void handleSetSpawn(ClientboundSetDefaultSpawnPositionPacket clientboundSetDefaultSpawnPositionPacket) {
@@ -2656,7 +2652,6 @@ public class ClientPacketListener extends ClientCommonPacketListenerImpl impleme
 			this.debugSubscriber.tick(this.level.getGameTime());
 		}
 
-		this.telemetryManager.tick();
 		if (this.levelLoadTracker != null) {
 			this.levelLoadTracker.tickClientLoad();
 			if (this.levelLoadTracker.isLevelReady()) {

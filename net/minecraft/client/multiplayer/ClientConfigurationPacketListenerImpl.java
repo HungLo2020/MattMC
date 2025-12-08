@@ -171,7 +171,6 @@ public class ClientConfigurationPacketListenerImpl extends ClientCommonPacketLis
 					new CommonListenerCookie(
 						this.levelLoadTracker,
 						this.localGameProfile,
-						this.telemetryManager,
 						frozen,
 						this.enabledFeatures,
 						this.serverBrand,

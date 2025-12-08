@@ -7,7 +7,6 @@ import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
 import net.minecraft.client.gui.components.ChatComponent;
 import net.minecraft.client.gui.screens.Screen;
-import net.minecraft.client.telemetry.WorldSessionTelemetryManager;
 import net.minecraft.core.RegistryAccess.Frozen;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.ServerLinks;
@@ -18,7 +17,6 @@ import org.jetbrains.annotations.Nullable;
 public record CommonListenerCookie(
 	LevelLoadTracker levelLoadTracker,
 	GameProfile localGameProfile,
-	WorldSessionTelemetryManager telemetryManager,
 	Frozen receivedRegistries,
 	FeatureFlagSet enabledFeatures,
 	@Nullable String serverBrand,
