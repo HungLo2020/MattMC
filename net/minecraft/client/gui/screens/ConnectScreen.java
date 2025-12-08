@@ -9,7 +9,6 @@ import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
 import net.minecraft.DefaultUncaughtExceptionHandler;
 import net.minecraft.Util;
-import net.minecraft.client.GameNarrator;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
@@ -52,7 +51,7 @@ public class ConnectScreen extends Screen {
 	final Component connectFailedTitle;
 
 	private ConnectScreen(Screen screen, Component component) {
-		super(GameNarrator.NO_TITLE);
+		super(Component.empty());
 		this.parent = screen;
 		this.connectFailedTitle = component;
 	}
@@ -236,7 +235,6 @@ public class ConnectScreen extends Screen {
 		long l = Util.getMillis();
 		if (l - this.lastNarration > 2000L) {
 			this.lastNarration = l;
-			this.minecraft.getNarrator().saySystemNow(Component.translatable("narrator.joining"));
 		}
 
 		guiGraphics.drawCenteredString(this.font, this.status, this.width / 2, this.height / 2 - 50, -1);

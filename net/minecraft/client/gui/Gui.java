@@ -1171,7 +1171,6 @@ public class Gui {
 	public void setNowPlaying(Component component) {
 		Component component2 = Component.translatable("record.nowPlaying", new Object[]{component});
 		this.setOverlayMessage(component2, true);
-		this.minecraft.getNarrator().saySystemNow(component2);
 	}
 
 	public void setOverlayMessage(Component component, boolean bl) {

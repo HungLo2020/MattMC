@@ -25,7 +25,6 @@ public class ChatOptionsScreen extends OptionsSubScreen {
 			options.chatWidth(),
 			options.chatHeightFocused(),
 			options.chatHeightUnfocused(),
-			options.narrator(),
 			options.autoSuggestions(),
 			options.hideMatchedNames(),
 			options.reducedDebugInfo(),

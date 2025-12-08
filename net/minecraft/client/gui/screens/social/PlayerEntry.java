@@ -190,7 +190,6 @@ public class PlayerEntry extends ContainerObjectSelectionList.Entry<PlayerEntry>
 	private void onHiddenOrShown(boolean bl, Component component) {
 		this.updateHideAndShowButton(bl);
 		this.minecraft.gui.getChat().addMessage(component);
-		this.minecraft.getNarrator().saySystemNow(component);
 	}
 
 	private void updateHideAndShowButton(boolean bl) {

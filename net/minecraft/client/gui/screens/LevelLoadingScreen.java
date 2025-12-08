@@ -6,7 +6,6 @@ import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
 import net.minecraft.SharedConstants;
 import net.minecraft.Util;
-import net.minecraft.client.GameNarrator;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.narration.NarratedElementType;
@@ -54,7 +53,7 @@ public class LevelLoadingScreen extends Screen {
 	});
 
 	public LevelLoadingScreen(LevelLoadTracker levelLoadTracker, LevelLoadingScreen.Reason reason) {
-		super(GameNarrator.NO_TITLE);
+		super(Component.empty());
 		this.loadTracker = levelLoadTracker;
 		this.reason = reason;
 	}
@@ -177,7 +176,6 @@ public class LevelLoadingScreen extends Screen {
 
 	@Override
 	public void onClose() {
-		this.minecraft.getNarrator().saySystemNow(READY_TO_PLAY_TEXT);
 		super.onClose();
 	}
 

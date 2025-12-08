@@ -8,7 +8,6 @@ import java.util.stream.Collectors;
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
 import net.minecraft.ChatFormatting;
-import net.minecraft.client.GameNarrator;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.AbstractWidget;
@@ -203,16 +202,7 @@ public class SocialInteractionsScreen extends Screen {
 				this.socialInteractionsPlayerList.updatePlayerList(set2, this.socialInteractionsPlayerList.scrollAmount(), false);
 		}
 
-		GameNarrator gameNarrator = this.minecraft.getNarrator();
-		if (!this.searchBox.getValue().isEmpty() && this.socialInteractionsPlayerList.isEmpty() && !this.searchBox.isFocused()) {
-			gameNarrator.saySystemNow(EMPTY_SEARCH);
-		} else if (bl) {
-			if (page == SocialInteractionsScreen.Page.HIDDEN) {
-				gameNarrator.saySystemNow(EMPTY_HIDDEN);
-			} else if (page == SocialInteractionsScreen.Page.BLOCKED) {
-				gameNarrator.saySystemNow(EMPTY_BLOCKED);
-			}
-		}
+		// Narration removed
 	}
 
 	@Override

@@ -80,7 +80,7 @@ import net.minecraft.client.gui.components.toasts.ToastManager;
 import net.minecraft.client.gui.components.toasts.TutorialToast;
 import net.minecraft.client.gui.font.FontManager;
 import net.minecraft.client.gui.font.providers.FreeTypeUtil;
-import net.minecraft.client.gui.screens.AccessibilityOnboardingScreen;
+
 import net.minecraft.client.gui.screens.BanNoticeScreens;
 import net.minecraft.client.gui.screens.ChatScreen;
 import net.minecraft.client.gui.screens.ConfirmLinkScreen;
@@ -384,7 +384,6 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 	private double gpuUtilization;
 	@Nullable
 	private TimerQuery.FrameProfile currentFrameProfile;
-	private final GameNarrator narrator;
 	private final ChatListener chatListener;
 	private final CommandHistory commandHistory;
 	private final DirectoryValidator directoryValidator;
@@ -649,8 +648,6 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 		this.profileKeyPairManager = this.offlineDeveloperMode
 			? ProfileKeyPairManager.EMPTY_KEY_MANAGER
 			: ProfileKeyPairManager.create(this.userApiService, this.user, path);
-		this.narrator = new GameNarrator(this);
-		this.narrator.checkStatus(this.options.narrator().get() != NarratorStatus.OFF);
 		this.chatListener = new ChatListener(this);
 		this.chatListener.setMessageDelay(this.options.chatDelay().get());
 		TitleScreen.registerTextures(this.textureManager);
@@ -738,10 +735,6 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 
 	private boolean addInitialScreens(List<Function<Runnable, Screen>> list) {
 		boolean bl = false;
-		if (this.options.onboardAccessibility || SharedConstants.DEBUG_FORCE_ONBOARDING_SCREEN) {
-			list.add((Function<Runnable, Screen>)(Runnable runnable) -> new AccessibilityOnboardingScreen(this.options, runnable));
-			bl = true;
-		}
 
 		BanDetails banDetails = this.multiplayerBan();
 		if (banDetails != null) {
@@ -1109,7 +1102,6 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 			} else {
 				Component component = chatStatus.getMessage();
 				this.gui.setOverlayMessage(component, false);
-				this.narrator.saySystemNow(component);
 				this.gui.setChatDisabledByPlayerShown(chatStatus == Minecraft.ChatStatus.DISABLED_BY_PROFILE);
 			}
 		} else {
@@ -1175,11 +1167,6 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 	public void destroy() {
 		try {
 			LOGGER.info("Stopping!");
-
-			try {
-				this.narrator.destroy();
-			} catch (Throwable var7) {
-			}
 
 			try {
 				if (this.level != null) {
@@ -1885,7 +1872,6 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 		while (this.options.keySocialInteractions.consumeClick()) {
 			if (!this.isMultiplayerServer() && !SharedConstants.DEBUG_SOCIAL_INTERACTIONS) {
 				this.player.displayClientMessage(SOCIAL_INTERACTIONS_NOT_AVAILABLE, true);
-				this.narrator.saySystemNow(SOCIAL_INTERACTIONS_NOT_AVAILABLE);
 			} else {
 				if (this.socialInteractionsToast != null) {
 					this.socialInteractionsToast.hide();
@@ -2103,7 +2089,6 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 		this.singleplayerServer = null;
 		this.gameRenderer.resetData();
 		this.gameMode = null;
-		this.narrator.clear();
 		this.clientLevelTeardownInProgress = true;
 
 		try {
@@ -2150,7 +2135,6 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 
 		this.gameRenderer.resetData();
 		this.gameMode = null;
-		this.narrator.clear();
 		this.clientLevelTeardownInProgress = true;
 
 		try {
@@ -2730,10 +2714,6 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 
 	public void setLastInputType(InputType inputType) {
 		this.lastInputType = inputType;
-	}
-
-	public GameNarrator getNarrator() {
-		return this.narrator;
 	}
 
 	public ChatListener getChatListener() {
