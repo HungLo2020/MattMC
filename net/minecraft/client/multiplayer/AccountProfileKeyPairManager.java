@@ -2,6 +2,9 @@ package net.minecraft.client.multiplayer;
 
 import com.google.common.base.Strings;
 import net.minecraft.client.auth.UserApiService;
+import net.minecraft.client.auth.KeyPairResponse;
+import net.minecraft.client.auth.MinecraftClientException;
+import net.minecraft.client.auth.InsecurePublicKeyException;
 import com.mojang.logging.LogUtils;
 import com.mojang.serialization.JsonOps;
 import java.io.BufferedReader;
