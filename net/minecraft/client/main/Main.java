@@ -49,8 +49,51 @@ import org.apache.commons.lang3.StringEscapeUtils;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 
+/**
+ * Main entry point for the Minecraft client application.
+ * <p>
+ * This class handles command-line argument parsing, client initialization, and launching
+ * the main game window. It supports various launch configurations including:
+ * </p>
+ * <ul>
+ *   <li>Demo mode</li>
+ *   <li>Offline/developer mode</li>
+ *   <li>Quick play (singleplayer, multiplayer, realms)</li>
+ *   <li>Performance profiling (JFR, Tracy)</li>
+ *   <li>Custom window dimensions</li>
+ *   <li>Proxy configuration</li>
+ * </ul>
+ * 
+ * <p><strong>Typical Launch Arguments:</strong></p>
+ * <pre>
+ * --version 1.21.10
+ * --accessToken 0
+ * --gameDir /path/to/game
+ * --assetsDir /path/to/assets
+ * --assetIndex 27
+ * </pre>
+ * 
+ * @see net.minecraft.client.Minecraft Main game class after initialization
+ * @see GameConfig Configuration object passed to Minecraft instance
+ */
 @Environment(EnvType.CLIENT)
 public class Main {
+	/**
+	 * Main entry point for the Minecraft client.
+	 * <p>
+	 * Parses command-line arguments, initializes the game, and launches the client window.
+	 * This method performs the following steps:
+	 * </p>
+	 * <ol>
+	 *   <li>Parse command-line arguments using JOptSimple</li>
+	 *   <li>Bootstrap the game (register blocks, items, etc.)</li>
+	 *   <li>Initialize telemetry and profiling if enabled</li>
+	 *   <li>Configure user authentication (offline or online)</li>
+	 *   <li>Create and launch the Minecraft instance</li>
+	 * </ol>
+	 * 
+	 * @param strings Command-line arguments passed to the application
+	 */
 	@DontObfuscate
 	public static void main(String[] strings) {
 		OptionParser optionParser = new OptionParser();

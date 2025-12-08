@@ -263,6 +263,19 @@ public class Options {
 	private final OptionInstance<Double> panoramaSpeed = new OptionInstance<>(
 		"options.accessibility.panorama_speed", OptionInstance.noTooltip(), Options::percentValueLabel, OptionInstance.UnitDouble.INSTANCE, 1.0, double_ -> {}
 	);
+	/**
+	 * Custom option for selecting the main menu panorama theme.
+	 * <p>
+	 * Allows players to choose between different 360-degree skybox backgrounds for the main menu.
+	 * When changed, automatically triggers a panorama reload via {@link net.minecraft.client.renderer.GameRenderer#reloadPanorama(PanoramaTheme)}.
+	 * </p>
+	 * <p>
+	 * This is a MattMC custom feature not present in vanilla Minecraft.
+	 * </p>
+	 * 
+	 * @see PanoramaTheme Available theme options
+	 * @see net.minecraft.client.renderer.GameRenderer#reloadPanorama(PanoramaTheme)
+	 */
 	private final OptionInstance<PanoramaTheme> panoramaTheme = new OptionInstance<>(
 		"options.panoramaTheme",
 		OptionInstance.noTooltip(),
@@ -303,6 +316,21 @@ public class Options {
 		true
 	);
 	private static final Component DARK_MODE_TOOLTIP = Component.translatable("options.darkMode.tooltip");
+	
+	/**
+	 * Custom option for enabling dark mode in UI elements.
+	 * <p>
+	 * When enabled, applies color transformations to UI elements to create a dark theme.
+	 * The actual color transformation is handled in {@link net.minecraft.client.gui.GuiGraphics}
+	 * during rendering.
+	 * </p>
+	 * <p>
+	 * This is a MattMC custom feature not present in vanilla Minecraft.
+	 * Default value is {@code true} (dark mode enabled by default).
+	 * </p>
+	 * 
+	 * @see net.minecraft.client.gui.GuiGraphics Color rendering with dark mode support
+	 */
 	private final OptionInstance<Boolean> darkMode = OptionInstance.createBoolean(
 		"options.darkMode",
 		OptionInstance.cachedConstantTooltip(DARK_MODE_TOOLTIP),
@@ -906,6 +934,15 @@ public class Options {
 		return this.panoramaSpeed;
 	}
 
+	/**
+	 * Gets the panorama theme option.
+	 * <p>
+	 * This is a MattMC custom option for selecting main menu background themes.
+	 * </p>
+	 * 
+	 * @return The panorama theme option instance
+	 * @see PanoramaTheme Available themes
+	 */
 	public OptionInstance<PanoramaTheme> panoramaTheme() {
 		return this.panoramaTheme;
 	}
@@ -922,6 +959,16 @@ public class Options {
 		return this.narratorHotkey;
 	}
 
+	/**
+	 * Gets the dark mode option.
+	 * <p>
+	 * This is a MattMC custom option for enabling dark theme in UI elements.
+	 * When enabled, UI colors are transformed to darker variants for better readability
+	 * in low-light conditions.
+	 * </p>
+	 * 
+	 * @return The dark mode option instance
+	 */
 	public OptionInstance<Boolean> darkMode() {
 		return this.darkMode;
 	}
