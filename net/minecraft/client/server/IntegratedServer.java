@@ -251,7 +251,7 @@ public class IntegratedServer extends MinecraftServer {
 	}
 
 		public boolean isSingleplayerOwner(NameAndId nameAndId) {
-		return this.getSingleplayerProfile() != null && nameAndId.name().equalsIgnoreCase(this.getSingleplayerProfile().getName());
+		return this.getSingleplayerProfile() != null && nameAndId.name().equalsIgnoreCase(this.getSingleplayerProfile().name());
 	}
 
 	public int getScaledTrackingDistance(int i) {

@@ -425,7 +425,7 @@ public class ClientPacketListener extends ClientCommonPacketListenerImpl impleme
 
 	public ClientPacketListener(Minecraft minecraft, Connection connection, CommonListenerCookie commonListenerCookie) {
 		super(minecraft, connection, commonListenerCookie);
-		this.localPlayerProfile = commonListenerCookie.localGameProfile();
+		this.localGameProfile = commonListenerCookie.localGameProfile();
 		this.registryAccess = commonListenerCookie.receivedRegistries();
 		RegistryOps<HashCode> registryOps = this.registryAccess.createSerializationContext(HashOps.CRC32C_INSTANCE);
 		this.decoratedHashOpsGenerator = typedDataComponent -> ((HashCode)typedDataComponent.encodeValue(registryOps)
@@ -2457,7 +2457,7 @@ public class ClientPacketListener extends ClientCommonPacketListenerImpl impleme
 	@Nullable
 	public PlayerInfo getPlayerInfo(String string) {
 		for (PlayerInfo playerInfo : this.playerInfoMap.values()) {
-			if (playerInfo.getProfile().getName().equals(string)) {
+			if (playerInfo.getProfile().name().equals(string)) {
 				return playerInfo;
 			}
 		}
@@ -2472,7 +2472,7 @@ public class ClientPacketListener extends ClientCommonPacketListenerImpl impleme
 	@Nullable
 	public PlayerInfo getPlayerInfoIgnoreCase(String string) {
 		for (PlayerInfo playerInfo : this.playerInfoMap.values()) {
-			if (playerInfo.getProfile().getName().equalsIgnoreCase(string)) {
+			if (playerInfo.getProfile().name().equalsIgnoreCase(string)) {
 				return playerInfo;
 			}
 		}
@@ -2671,10 +2671,10 @@ public class ClientPacketListener extends ClientCommonPacketListenerImpl impleme
 	}
 
 	private void setKeyPair(ProfileKeyPair profileKeyPair) {
-		if (this.minecraft.isLocalPlayer(this.localGameProfile.getId())) {
+		if (this.minecraft.isLocalPlayer(this.localGameProfile.id())) {
 			if (this.chatSession == null || !this.chatSession.keyPair().equals(profileKeyPair)) {
 				this.chatSession = LocalChatSession.create(profileKeyPair);
-				this.signedMessageEncoder = this.chatSession.createMessageEncoder(this.localGameProfile.getId());
+				this.signedMessageEncoder = this.chatSession.createMessageEncoder(this.localGameProfile.id());
 				this.send(new ServerboundChatSessionUpdatePacket(this.chatSession.asRemote().asData()));
 			}
 		}
