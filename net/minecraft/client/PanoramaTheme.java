@@ -9,7 +9,12 @@ import net.minecraft.util.StringRepresentable;
 @Environment(EnvType.CLIENT)
 public enum PanoramaTheme implements OptionEnum, StringRepresentable {
 	AQUATIC(0, "aquatic", "options.panoramaTheme.aquatic"),
-	COPPER_AGE(1, "copper_age", "options.panoramaTheme.copperAge");
+	CAVES(1, "caves", "options.panoramaTheme.caves"),
+	COPPER_AGE(2, "copper_age", "options.panoramaTheme.copperAge"),
+	NETHER(3, "nether", "options.panoramaTheme.nether"),
+	RELEASE(4, "release", "options.panoramaTheme.release"),
+	SPRING_TO_LIFE(5, "spring_to_life", "options.panoramaTheme.springToLife"),
+	TRICKY_TRIALS(6, "tricky_trials", "options.panoramaTheme.trickyTrials");
 
 	public static final Codec<PanoramaTheme> CODEC = StringRepresentable.fromEnum(PanoramaTheme::values);
 	private final int id;
