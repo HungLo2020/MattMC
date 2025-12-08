@@ -2375,7 +2375,11 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 
 	public PlayerProfile getGameProfile() {
 		// Offline mode - create profile from local user info
-		return new PlayerProfile(this.user.getProfileId(), this.user.getName());
+		// Use custom username if set, otherwise fall back to default user name
+		String username = this.options.customUsername != null && !this.options.customUsername.isEmpty() 
+			? this.options.customUsername 
+			: this.user.getName();
+		return new PlayerProfile(this.user.getProfileId(), username);
 	}
 
 	public Proxy getProxy() {

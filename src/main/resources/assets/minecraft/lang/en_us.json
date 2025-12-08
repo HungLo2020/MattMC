@@ -4940,6 +4940,7 @@
   "manageServer.resourcePack.enabled": "Enabled",
   "manageServer.resourcePack.prompt": "Prompt",
   "menu.customize": "Customize",
+  "menu.customize.username": "Username",
   "menu.customize.skin": "Player Skin",
   "menu.customize.skin.description": "Select your player skin",
   "menu.customize.reloadSkins": "Reload Skins",
