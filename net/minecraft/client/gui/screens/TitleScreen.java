@@ -21,7 +21,6 @@ import net.minecraft.client.gui.components.toasts.SystemToast;
 import net.minecraft.client.gui.screens.multiplayer.JoinMultiplayerScreen;
 import net.minecraft.client.gui.screens.multiplayer.SafetyScreen;
 import net.minecraft.client.gui.screens.options.AccessibilityOptionsScreen;
-import net.minecraft.client.gui.screens.options.LanguageSelectScreen;
 import net.minecraft.client.gui.screens.options.OptionsScreen;
 import net.minecraft.client.gui.screens.worldselection.CreateWorldScreen;
 import net.minecraft.client.gui.screens.worldselection.SelectWorldScreen;
@@ -104,14 +103,7 @@ public class TitleScreen extends Screen {
 		}
 
 		l = this.createTestWorldButton(l, 24);
-		SpriteIconButton spriteIconButton = this.addRenderableWidget(
-			CommonButtons.language(
-				20, button -> this.minecraft.setScreen(new LanguageSelectScreen(this, this.minecraft.options, this.minecraft.getLanguageManager())), true
-			)
-		);
-		int var10001 = this.width / 2 - 124;
 		l += 36;
-		spriteIconButton.setPosition(var10001, l);
 		this.addRenderableWidget(
 			Button.builder(Component.translatable("menu.options"), button -> this.minecraft.setScreen(new OptionsScreen(this, this.minecraft.options)))
 				.bounds(this.width / 2 - 100, l, 98, 20)
