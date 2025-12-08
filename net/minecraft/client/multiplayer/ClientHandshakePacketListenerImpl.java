@@ -209,11 +209,7 @@ public class ClientHandshakePacketListenerImpl implements ClientLoginPacketListe
 
 	public void onDisconnect(DisconnectionDetails disconnectionDetails) {
 		Component component = this.wasTransferredTo ? CommonComponents.TRANSFER_CONNECT_FAILED : CommonComponents.CONNECT_FAILED;
-		if (this.serverData != null && this.serverData.isRealm()) {
-			this.minecraft.setScreen(new DisconnectedScreen(this.parent, component, disconnectionDetails.reason(), CommonComponents.GUI_BACK));
-		} else {
-			this.minecraft.setScreen(new DisconnectedScreen(this.parent, component, disconnectionDetails));
-		}
+		this.minecraft.setScreen(new DisconnectedScreen(this.parent, component, disconnectionDetails));
 	}
 
 	public boolean isAcceptingMessages() {

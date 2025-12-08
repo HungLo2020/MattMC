@@ -363,9 +363,7 @@ public abstract class ClientCommonPacketListenerImpl implements ClientCommonPack
 		Screen screen = (Screen)Objects.requireNonNullElseGet(
 			this.postDisconnectScreen, () -> (Screen)(this.serverData != null ? new JoinMultiplayerScreen(new TitleScreen()) : new TitleScreen())
 		);
-		return this.serverData != null && this.serverData.isRealm()
-			? new DisconnectedScreen(screen, GENERIC_DISCONNECT_MESSAGE, disconnectionDetails, CommonComponents.GUI_BACK)
-			: new DisconnectedScreen(screen, GENERIC_DISCONNECT_MESSAGE, disconnectionDetails);
+		return new DisconnectedScreen(screen, GENERIC_DISCONNECT_MESSAGE, disconnectionDetails);
 	}
 
 	@Nullable
