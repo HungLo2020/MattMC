@@ -320,6 +320,7 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 	private final UserApiService userApiService;
 	private final CompletableFuture<UserProperties> userPropertiesFuture;
 	private final SkinManager skinManager;
+	private final net.minecraft.client.resources.SkinLoader skinLoader;
 	private final AtlasManager atlasManager;
 	private final ModelManager modelManager;
 	private final BlockRenderDispatcher blockRenderer;
@@ -499,6 +500,7 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 		this.resourceManager.registerReloadListener(this.shaderManager);
 		SkinTextureDownloader skinTextureDownloader = new SkinTextureDownloader(this.proxy, this.textureManager, this);
 		this.skinManager = new SkinManager(file.toPath().resolve("skins"), this.services, skinTextureDownloader, this);
+		this.skinLoader = new net.minecraft.client.resources.SkinLoader(path);
 		this.levelSource = new LevelStorageSource(path.resolve("saves"), path.resolve("backups"), this.directoryValidator, this.fixerUpper);
 		this.commandHistory = new CommandHistory(path);
 		this.musicManager = new MusicManager(this);
@@ -2459,6 +2461,10 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 
 	public SkinManager getSkinManager() {
 		return this.skinManager;
+	}
+
+	public net.minecraft.client.resources.SkinLoader getSkinLoader() {
+		return this.skinLoader;
 	}
 
 	@Nullable

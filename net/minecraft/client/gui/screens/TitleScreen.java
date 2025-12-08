@@ -144,6 +144,11 @@ public class TitleScreen extends Screen {
 			Screen screen = (Screen)(this.minecraft.options.skipMultiplayerWarning ? new JoinMultiplayerScreen(this) : new SafetyScreen(this));
 			this.minecraft.setScreen(screen);
 		}).bounds(this.width / 2 - 100, i = i + j, 200, 20).tooltip(tooltip).build()).active = bl;
+		this.addRenderableWidget(
+			Button.builder(Component.translatable("menu.customize"), button -> this.minecraft.setScreen(new CustomizeScreen(this)))
+				.bounds(this.width / 2 - 100, i = i + j, 200, 20)
+				.build()
+		);
 		return i;
 	}
 
