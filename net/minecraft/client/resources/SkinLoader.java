@@ -75,7 +75,7 @@ public class SkinLoader {
 		loadCustomSkins();
 		
 		LOGGER.info("Loaded {} skins ({} custom)", availableSkins.size(), 
-			availableSkins.stream().filter(s -> !s.isBuiltin()).count());
+			availableSkins.stream().filter(s -> !s.builtin()).count());
 	}
 	
 	private void loadCustomSkins() {
