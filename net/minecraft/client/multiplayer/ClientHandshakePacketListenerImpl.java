@@ -1,6 +1,12 @@
 package net.minecraft.client.multiplayer;
 
 import net.minecraft.server.profile.PlayerProfile;
+import net.minecraft.client.auth.AuthenticationException;
+import net.minecraft.client.auth.AuthenticationUnavailableException;
+import net.minecraft.client.auth.InvalidCredentialsException;
+import net.minecraft.client.auth.InsufficientPrivilegesException;
+import net.minecraft.client.auth.ForcedUsernameChangeException;
+import net.minecraft.client.auth.UserBannedException;
 import com.mojang.logging.LogUtils;
 import java.math.BigInteger;
 import java.security.PublicKey;
