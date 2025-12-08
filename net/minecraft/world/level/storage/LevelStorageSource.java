@@ -549,7 +549,7 @@ public class LevelStorageSource {
 
 		public void deleteLevel() throws IOException {
 			this.checkLock();
-			final Path path = this.levelDirectory.lockFile();
+			final Path lockFilePath = this.levelDirectory.lockFile();
 			LevelStorageSource.LOGGER.info("Deleting level {}", this.levelId);
 
 			for (int i = 1; i <= 5; i++) {
@@ -558,7 +558,7 @@ public class LevelStorageSource {
 				try {
 					Files.walkFileTree(this.levelDirectory.path(), new SimpleFileVisitor<Path>() {
 						public FileVisitResult visitFile(Path path, BasicFileAttributes basicFileAttributes) throws IOException {
-							if (!path.equals(path)) {
+							if (!path.equals(lockFilePath)) {
 								LevelStorageSource.LOGGER.debug("Deleting {}", path);
 								Files.delete(path);
 							}
