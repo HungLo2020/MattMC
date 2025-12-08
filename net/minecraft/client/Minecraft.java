@@ -30,9 +30,6 @@ import com.mojang.datafixers.DataFixer;
 import com.mojang.jtracy.DiscontinuousFrame;
 import com.mojang.jtracy.TracyClient;
 import com.mojang.logging.LogUtils;
-import com.mojang.realmsclient.RealmsMainScreen;
-import com.mojang.realmsclient.client.RealmsClient;
-import com.mojang.realmsclient.gui.RealmsDataFetcher;
 import java.io.File;
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -340,7 +337,6 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 	private final BlockEntityRenderDispatcher blockEntityRenderDispatcher;
 	private final ClientTelemetryManager telemetryManager;
 	private final ProfileKeyPairManager profileKeyPairManager;
-	private final RealmsDataFetcher realmsDataFetcher;
 	private final QuickPlayLog quickPlayLog;
 	private final Services services;
 	private final PlayerSkinRenderCache playerSkinRenderCache;
@@ -624,8 +620,6 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 		this.resourceManager.registerReloadListener(this.gpuWarnlistManager);
 		this.resourceManager.registerReloadListener(this.regionalCompliancies);
 		this.gui = new Gui(this);
-		RealmsClient realmsClient = RealmsClient.getOrCreate(this);
-		this.realmsDataFetcher = new RealmsDataFetcher(realmsClient);
 		RenderSystem.setErrorCallback(this::onFullscreenError);
 		if (this.mainRenderTarget.width != this.window.getWidth() || this.mainRenderTarget.height != this.window.getHeight()) {
 			StringBuilder stringBuilder = new StringBuilder(
@@ -680,7 +674,7 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 		ReloadInstance reloadInstance = this.resourceManager
 			.createReload(Util.backgroundExecutor().forName("resourceLoad"), this, RESOURCE_RELOAD_INITIAL_TASK, list2);
 		GameLoadTimesEvent.INSTANCE.beginStep(TelemetryProperty.LOAD_TIME_LOADING_OVERLAY_MS);
-		Minecraft.GameLoadCookie gameLoadCookie = new Minecraft.GameLoadCookie(realmsClient, gameConfig.quickPlay);
+		Minecraft.GameLoadCookie gameLoadCookie = new Minecraft.GameLoadCookie(gameConfig.quickPlay);
 		this.setOverlay(
 			new LoadingOverlay(this, reloadInstance, optional -> Util.ifElse(optional, throwable -> this.rollbackResourcePacks(throwable, gameLoadCookie), () -> {
 				if (SharedConstants.IS_RUNNING_IN_IDE) {
@@ -744,7 +738,7 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 		boolean bl = this.addInitialScreens(list);
 		Runnable runnable = () -> {
 			if (gameLoadCookie != null && gameLoadCookie.quickPlayData.isEnabled()) {
-				QuickPlay.connect(this, gameLoadCookie.quickPlayData.variant(), gameLoadCookie.realmsClient());
+				QuickPlay.connect(this, gameLoadCookie.quickPlayData.variant());
 			} else {
 				this.setScreen(new TitleScreen(true, new LogoRenderer(bl)));
 			}
@@ -818,8 +812,6 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 			ServerData serverData = this.getCurrentServer();
 			if (this.singleplayerServer != null && !this.singleplayerServer.isPublished()) {
 				stringBuilder.append(I18n.get("title.singleplayer"));
-			} else if (serverData != null && serverData.isRealm()) {
-				stringBuilder.append(I18n.get("title.multiplayer.realms"));
 			} else if (this.singleplayerServer == null && (serverData == null || !serverData.isLan())) {
 				stringBuilder.append(I18n.get("title.multiplayer.other"));
 			} else {
@@ -2249,10 +2241,6 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 		return this.allowsMultiplayer && this.userProperties().flag(UserFlag.SERVERS_ALLOWED) && this.multiplayerBan() == null && !this.isNameBanned();
 	}
 
-	public boolean allowsRealms() {
-		return this.userProperties().flag(UserFlag.REALMS_ALLOWED) && this.multiplayerBan() == null;
-	}
-
 	@Nullable
 	public BanDetails multiplayerBan() {
 		return (BanDetails)this.userProperties().bannedScopes().get("MULTIPLAYER");
@@ -2890,6 +2878,6 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 	}
 
 	@Environment(EnvType.CLIENT)
-	record GameLoadCookie(RealmsClient realmsClient, GameConfig.QuickPlayData quickPlayData) {
+	record GameLoadCookie(GameConfig.QuickPlayData quickPlayData) {
 	}
 }
