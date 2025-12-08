@@ -4,7 +4,7 @@ import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import com.google.common.hash.HashCode;
-import com.mojang.authlib.GameProfile;
+import net.minecraft.server.profile.PlayerProfile;
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.ParseResults;
 import com.mojang.brigadier.arguments.ArgumentType;
@@ -379,7 +379,7 @@ public class ClientPacketListener extends ClientCommonPacketListenerImpl impleme
 			return argumentBuilder;
 		}
 	};
-	private final GameProfile localGameProfile;
+	private final PlayerProfile localGameProfile;
 	private ClientLevel level;
 	private ClientLevel.ClientLevelData levelData;
 	private final Map<UUID, PlayerInfo> playerInfoMap = Maps.<UUID, PlayerInfo>newHashMap();
@@ -1900,7 +1900,7 @@ public class ClientPacketListener extends ClientCommonPacketListenerImpl impleme
 		PacketUtils.ensureRunningOnSameThread(clientboundPlayerInfoUpdatePacket, this, this.minecraft.packetProcessor());
 
 		for (net.minecraft.network.protocol.game.ClientboundPlayerInfoUpdatePacket.Entry entry : clientboundPlayerInfoUpdatePacket.newEntries()) {
-			PlayerInfo playerInfo = new PlayerInfo((GameProfile)Objects.requireNonNull(entry.profile()), this.enforcesSecureChat());
+			PlayerInfo playerInfo = new PlayerInfo((PlayerProfile)Objects.requireNonNull(entry.profile()), this.enforcesSecureChat());
 			if (this.playerInfoMap.putIfAbsent(entry.profileId(), playerInfo) == null) {
 				this.minecraft.getPlayerSocialManager().addPlayer(playerInfo);
 			}
@@ -1956,19 +1956,19 @@ public class ClientPacketListener extends ClientCommonPacketListenerImpl impleme
 	}
 
 	private void initializeChatSession(net.minecraft.network.protocol.game.ClientboundPlayerInfoUpdatePacket.Entry entry, PlayerInfo playerInfo) {
-		GameProfile gameProfile = playerInfo.getProfile();
+		PlayerProfile playerProfile = playerInfo.getProfile();
 		SignatureValidator signatureValidator = this.minecraft.services().profileKeySignatureValidator();
 		if (signatureValidator == null) {
-			LOGGER.warn("Ignoring chat session from {} due to missing Services public key", gameProfile.getName());
+			LOGGER.warn("Ignoring chat session from {} due to missing Services public key", playerProfile.name());
 			playerInfo.clearChatSession(this.enforcesSecureChat());
 		} else {
 			Data data = entry.chatSession();
 			if (data != null) {
 				try {
-					RemoteChatSession remoteChatSession = data.validate(gameProfile, signatureValidator);
+					RemoteChatSession remoteChatSession = data.validate(playerProfile, signatureValidator);
 					playerInfo.setChatSession(remoteChatSession);
 				} catch (ValidationException var7) {
-					LOGGER.error("Failed to validate profile key for player: '{}'", gameProfile.getName(), var7);
+					LOGGER.error("Failed to validate profile key for player: '{}'", playerProfile.name(), var7);
 					playerInfo.clearChatSession(this.enforcesSecureChat());
 				}
 			} else {
@@ -2457,7 +2457,7 @@ public class ClientPacketListener extends ClientCommonPacketListenerImpl impleme
 	@Nullable
 	public PlayerInfo getPlayerInfo(String string) {
 		for (PlayerInfo playerInfo : this.playerInfoMap.values()) {
-			if (playerInfo.getProfile().getName().equals(string)) {
+			if (playerInfo.getProfile().name().equals(string)) {
 				return playerInfo;
 			}
 		}
@@ -2472,7 +2472,7 @@ public class ClientPacketListener extends ClientCommonPacketListenerImpl impleme
 	@Nullable
 	public PlayerInfo getPlayerInfoIgnoreCase(String string) {
 		for (PlayerInfo playerInfo : this.playerInfoMap.values()) {
-			if (playerInfo.getProfile().getName().equalsIgnoreCase(string)) {
+			if (playerInfo.getProfile().name().equalsIgnoreCase(string)) {
 				return playerInfo;
 			}
 		}
@@ -2480,7 +2480,7 @@ public class ClientPacketListener extends ClientCommonPacketListenerImpl impleme
 		return null;
 	}
 
-	public GameProfile getLocalGameProfile() {
+	public PlayerProfile getLocalGameProfile() {
 		return this.localGameProfile;
 	}
 
@@ -2671,10 +2671,10 @@ public class ClientPacketListener extends ClientCommonPacketListenerImpl impleme
 	}
 
 	private void setKeyPair(ProfileKeyPair profileKeyPair) {
-		if (this.minecraft.isLocalPlayer(this.localGameProfile.getId())) {
+		if (this.minecraft.isLocalPlayer(this.localGameProfile.id())) {
 			if (this.chatSession == null || !this.chatSession.keyPair().equals(profileKeyPair)) {
 				this.chatSession = LocalChatSession.create(profileKeyPair);
-				this.signedMessageEncoder = this.chatSession.createMessageEncoder(this.localGameProfile.getId());
+				this.signedMessageEncoder = this.chatSession.createMessageEncoder(this.localGameProfile.id());
 				this.send(new ServerboundChatSessionUpdatePacket(this.chatSession.asRemote().asData()));
 			}
 		}

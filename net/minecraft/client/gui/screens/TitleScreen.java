@@ -1,6 +1,6 @@
 package net.minecraft.client.gui.screens;
 
-import com.mojang.authlib.minecraft.BanDetails;
+import net.minecraft.client.auth.BanDetails;
 import com.mojang.logging.LogUtils;
 import java.io.IOException;
 import java.util.Objects;

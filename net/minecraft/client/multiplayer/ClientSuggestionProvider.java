@@ -55,7 +55,7 @@ public class ClientSuggestionProvider implements PermissionSource, SharedSuggest
 		List<String> list = Lists.<String>newArrayList();
 
 		for (PlayerInfo playerInfo : this.connection.getOnlinePlayers()) {
-			list.add(playerInfo.getProfile().getName());
+			list.add(playerInfo.getProfile().name());
 		}
 
 		return list;

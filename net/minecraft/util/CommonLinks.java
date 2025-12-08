@@ -1,6 +1,6 @@
 package net.minecraft.util;
 
-import com.mojang.util.UndashedUuid;
+import net.minecraft.util.UndashedUuid;
 import java.net.URI;
 import java.util.UUID;
 import org.jetbrains.annotations.Nullable;

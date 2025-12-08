@@ -19,7 +19,7 @@ public class PlayerListComponent extends JList<String> {
 			Vector<String> vector = new Vector();
 
 			for (int i = 0; i < this.server.getPlayerList().getPlayers().size(); i++) {
-    vector.add(net.minecraft.util.AuthlibCompat.name(((ServerPlayer)this.server.getPlayerList().getPlayers().get(i)).getGameProfile()));
+    vector.add(((ServerPlayer)this.server.getPlayerList().getPlayers().get(i)).getGameProfile().name());
 			}
 
 			this.setListData(vector);

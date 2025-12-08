@@ -1,6 +1,6 @@
 package net.minecraft.client.multiplayer;
 
-import com.mojang.authlib.GameProfile;
+import net.minecraft.server.profile.PlayerProfile;
 import java.util.Map;
 import java.util.UUID;
 import net.minecraft.api.EnvType;
@@ -16,7 +16,7 @@ import org.jetbrains.annotations.Nullable;
 @Environment(EnvType.CLIENT)
 public record CommonListenerCookie(
 	LevelLoadTracker levelLoadTracker,
-	GameProfile localGameProfile,
+	PlayerProfile localGameProfile,
 	Frozen receivedRegistries,
 	FeatureFlagSet enabledFeatures,
 	@Nullable String serverBrand,

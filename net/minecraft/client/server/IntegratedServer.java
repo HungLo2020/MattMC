@@ -2,7 +2,7 @@ package net.minecraft.client.server;
 
 import com.google.common.base.MoreObjects;
 import com.google.common.collect.Lists;
-import com.mojang.authlib.GameProfile;
+import net.minecraft.server.profile.PlayerProfile;
 import com.mojang.logging.LogUtils;
 import java.io.IOException;
 import java.nio.file.Path;
@@ -79,9 +79,9 @@ public class IntegratedServer extends MinecraftServer {
 		this.setUsesAuthentication(true);
 		this.initializeKeyPair();
 		this.loadLevel();
-		GameProfile gameProfile = this.getSingleplayerProfile();
+		PlayerProfile playerProfile = this.getSingleplayerProfile();
 		String string = this.getWorldData().getLevelName();
-			this.setMotd(gameProfile != null ? gameProfile.getName() + " - " + string : string);
+			this.setMotd(playerProfile != null ? playerProfile.name() + " - " + string : string);
 		return true;
 	}
 
@@ -251,7 +251,7 @@ public class IntegratedServer extends MinecraftServer {
 	}
 
 		public boolean isSingleplayerOwner(NameAndId nameAndId) {
-		return this.getSingleplayerProfile() != null && nameAndId.name().equalsIgnoreCase(this.getSingleplayerProfile().getName());
+		return this.getSingleplayerProfile() != null && nameAndId.name().equalsIgnoreCase(this.getSingleplayerProfile().name());
 	}
 
 	public int getScaledTrackingDistance(int i) {

@@ -1,6 +1,6 @@
 package net.minecraft.server.network;
 
-import com.mojang.authlib.GameProfile;
+import net.minecraft.server.profile.PlayerProfile;
 import com.mojang.logging.LogUtils;
 import io.netty.channel.ChannelFutureListener;
 import net.minecraft.CrashReport;
@@ -106,7 +106,7 @@ public abstract class ServerCommonPacketListenerImpl implements ServerCommonPack
 	public void handleResourcePackResponse(ServerboundResourcePackPacket serverboundResourcePackPacket) {
 		PacketUtils.ensureRunningOnSameThread(serverboundResourcePackPacket, this, this.server.packetProcessor());
 		if (serverboundResourcePackPacket.action() == ServerboundResourcePackPacket.Action.DECLINED && this.server.isResourcePackRequired()) {
-   LOGGER.info("Disconnecting {} due to resource pack {} rejection", net.minecraft.util.AuthlibCompat.name(this.playerProfile()), serverboundResourcePackPacket.id());
+   LOGGER.info("Disconnecting {} due to resource pack {} rejection", this.playerProfile().name(), serverboundResourcePackPacket.id());
 			this.disconnect(Component.translatable("multiplayer.requiredTexturePrompt.disconnect"));
 		}
 	}
@@ -190,10 +190,10 @@ public abstract class ServerCommonPacketListenerImpl implements ServerCommonPack
 		return this.server.isSingleplayerOwner(new NameAndId(this.playerProfile()));
 	}
 
-	protected abstract GameProfile playerProfile();
+	protected abstract PlayerProfile playerProfile();
 
 	@VisibleForDebug
-	public GameProfile getOwner() {
+	public PlayerProfile getOwner() {
 		return this.playerProfile();
 	}
 

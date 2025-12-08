@@ -1,6 +1,6 @@
 package net.minecraft.server.commands;
 
-import com.mojang.authlib.GameProfile;
+import net.minecraft.server.profile.PlayerProfile;
 import com.mojang.brigadier.CommandDispatcher;
 import java.util.HashSet;
 import java.util.Set;
@@ -71,7 +71,7 @@ public class DebugConfigCommand {
 
 		for (Connection connection : minecraftServer.getConnection().getConnections()) {
 			if (connection.getPacketListener() instanceof ServerConfigurationPacketListenerImpl serverConfigurationPacketListenerImpl) {
-				set.add(serverConfigurationPacketListenerImpl.getOwner().getId().toString());
+				set.add(serverConfigurationPacketListenerImpl.getOwner().id().toString());
 			}
 		}
 
@@ -79,9 +79,9 @@ public class DebugConfigCommand {
 	}
 
 	private static int config(CommandSourceStack commandSourceStack, ServerPlayer serverPlayer) {
-		GameProfile gameProfile = serverPlayer.getGameProfile();
+		PlayerProfile playerProfile = serverPlayer.getGameProfile();
 		serverPlayer.connection.switchToConfig();
-		commandSourceStack.sendSuccess(() -> Component.literal("Switched player " + gameProfile.getName() + "(" + gameProfile.getId() + ") to config mode"), false);
+		commandSourceStack.sendSuccess(() -> Component.literal("Switched player " + playerProfile.name() + "(" + playerProfile.id() + ") to config mode"), false);
 		return 1;
 	}
 
@@ -89,7 +89,7 @@ public class DebugConfigCommand {
 	private static ServerConfigurationPacketListenerImpl findConfigPlayer(MinecraftServer minecraftServer, UUID uUID) {
 		for (Connection connection : minecraftServer.getConnection().getConnections()) {
 			if (connection.getPacketListener() instanceof ServerConfigurationPacketListenerImpl serverConfigurationPacketListenerImpl
-				&& serverConfigurationPacketListenerImpl.getOwner().getId().equals(uUID)) {
+				&& serverConfigurationPacketListenerImpl.getOwner().id().equals(uUID)) {
 				return serverConfigurationPacketListenerImpl;
 			}
 		}

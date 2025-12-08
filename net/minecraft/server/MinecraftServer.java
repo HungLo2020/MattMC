@@ -6,7 +6,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
-import com.mojang.authlib.GameProfile;
+import net.minecraft.server.profile.PlayerProfile;
 import com.mojang.datafixers.DataFixer;
 import com.mojang.jtracy.DiscontinuousFrame;
 import com.mojang.jtracy.TracyClient;
@@ -242,7 +242,7 @@ public abstract class MinecraftServer extends ReentrantBlockableEventLoop<TickTa
 	@Nullable
 	private KeyPair keyPair;
 	@Nullable
-	private GameProfile singleplayerProfile;
+	private PlayerProfile singleplayerProfile;
 	private volatile boolean isReady;
 	private long lastOverloadWarningNanos;
 	protected final Services services;
@@ -1288,12 +1288,12 @@ public abstract class MinecraftServer extends ReentrantBlockableEventLoop<TickTa
 	}
 
 	@Nullable
-	public GameProfile getSingleplayerProfile() {
+	public PlayerProfile getSingleplayerProfile() {
 		return this.singleplayerProfile;
 	}
 
-	public void setSingleplayerProfile(@Nullable GameProfile gameProfile) {
-		this.singleplayerProfile = gameProfile;
+	public void setSingleplayerProfile(@Nullable PlayerProfile playerProfile) {
+		this.singleplayerProfile = playerProfile;
 	}
 
 	public boolean isSingleplayer() {

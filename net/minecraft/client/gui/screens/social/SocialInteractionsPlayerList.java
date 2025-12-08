@@ -2,7 +2,7 @@ package net.minecraft.client.gui.screens.social;
 
 import com.google.common.base.Strings;
 import com.google.common.collect.Lists;
-import com.mojang.authlib.GameProfile;
+import net.minecraft.server.profile.PlayerProfile;
 import it.unimi.dsi.fastutil.objects.Object2ObjectLinkedOpenHashMap;
 import java.util.Collection;
 import java.util.Comparator;
@@ -83,7 +83,7 @@ public class SocialInteractionsPlayerList extends ContainerObjectSelectionList<P
 
 	private PlayerEntry makePlayerEntry(UUID uUID, PlayerInfo playerInfo) {
 		return new PlayerEntry(
-			this.minecraft, this.socialInteractionsScreen, uUID, playerInfo.getProfile().getName(), playerInfo::getSkin, playerInfo.hasVerifiableChat()
+			this.minecraft, this.socialInteractionsScreen, uUID, playerInfo.getProfile().name(), playerInfo::getSkin, playerInfo.hasVerifiableChat()
 		);
 	}
 
@@ -137,7 +137,7 @@ public class SocialInteractionsPlayerList extends ContainerObjectSelectionList<P
 	}
 
 	public void addPlayer(PlayerInfo playerInfo, SocialInteractionsScreen.Page page) {
-		UUID uUID = playerInfo.getProfile().getId();
+		UUID uUID = playerInfo.getProfile().id();
 
 		for (PlayerEntry playerEntry : this.players) {
 			if (playerEntry.getPlayerId().equals(uUID)) {
@@ -147,10 +147,10 @@ public class SocialInteractionsPlayerList extends ContainerObjectSelectionList<P
 		}
 
 		if ((page == SocialInteractionsScreen.Page.ALL || this.minecraft.getPlayerSocialManager().shouldHideMessageFrom(uUID))
-			&& (Strings.isNullOrEmpty(this.filter) || playerInfo.getProfile().getName().toLowerCase(Locale.ROOT).contains(this.filter))) {
+			&& (Strings.isNullOrEmpty(this.filter) || playerInfo.getProfile().name().toLowerCase(Locale.ROOT).contains(this.filter))) {
 			boolean bl = playerInfo.hasVerifiableChat();
 			PlayerEntry playerEntryx = new PlayerEntry(
-				this.minecraft, this.socialInteractionsScreen, playerInfo.getProfile().getId(), playerInfo.getProfile().getName(), playerInfo::getSkin, bl
+				this.minecraft, this.socialInteractionsScreen, playerInfo.getProfile().id(), playerInfo.getProfile().name(), playerInfo::getSkin, bl
 			);
 			this.addEntry(playerEntryx);
 			this.players.add(playerEntryx);

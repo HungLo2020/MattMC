@@ -1,7 +1,7 @@
 package net.minecraft.world.item.component;
 
-import com.mojang.authlib.GameProfile;
-import com.mojang.authlib.properties.PropertyMap;
+import net.minecraft.server.profile.PlayerProfile;
+import net.minecraft.server.profile.ProfilePropertyMap;
 import com.mojang.datafixers.util.Either;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.MapCodec;
@@ -40,12 +40,12 @@ public abstract sealed class ResolvableProfile implements TooltipProvider permit
 		ResolvableProfile::skinPatch,
 		ResolvableProfile::create
 	);
-	protected final GameProfile partialProfile;
+	protected final PlayerProfile partialProfile;
 	protected final PlayerSkin.Patch skinPatch;
 
-	private static ResolvableProfile create(Either<GameProfile, ResolvableProfile.Partial> either, PlayerSkin.Patch patch) {
+	private static ResolvableProfile create(Either<PlayerProfile, ResolvableProfile.Partial> either, PlayerSkin.Patch patch) {
 		return either.map(
-			gameProfile -> new ResolvableProfile.Static(Either.left(gameProfile), patch),
+			playerProfile -> new ResolvableProfile.Static(Either.left(playerProfile), patch),
 			partial -> (ResolvableProfile)(partial.properties.isEmpty() && partial.id.isPresent() != partial.name.isPresent()
 				? (ResolvableProfile)partial.name
 					.map(string -> new ResolvableProfile.Dynamic(Either.left(string), patch))
@@ -54,8 +54,8 @@ public abstract sealed class ResolvableProfile implements TooltipProvider permit
 		);
 	}
 
-	public static ResolvableProfile createResolved(GameProfile gameProfile) {
-		return new ResolvableProfile.Static(Either.left(gameProfile), PlayerSkin.Patch.EMPTY);
+	public static ResolvableProfile createResolved(PlayerProfile playerProfile) {
+		return new ResolvableProfile.Static(Either.left(playerProfile), PlayerSkin.Patch.EMPTY);
 	}
 
 	public static ResolvableProfile createUnresolved(String string) {
@@ -66,16 +66,16 @@ public abstract sealed class ResolvableProfile implements TooltipProvider permit
 		return new ResolvableProfile.Dynamic(Either.right(uUID), PlayerSkin.Patch.EMPTY);
 	}
 
-	protected abstract Either<GameProfile, ResolvableProfile.Partial> unpack();
+	protected abstract Either<PlayerProfile, ResolvableProfile.Partial> unpack();
 
-	protected ResolvableProfile(GameProfile gameProfile, PlayerSkin.Patch patch) {
-		this.partialProfile = gameProfile;
+	protected ResolvableProfile(PlayerProfile playerProfile, PlayerSkin.Patch patch) {
+		this.partialProfile = playerProfile;
 		this.skinPatch = patch;
 	}
 
-	public abstract CompletableFuture<GameProfile> resolveProfile(ProfileResolver profileResolver);
+	public abstract CompletableFuture<PlayerProfile> resolveProfile(ProfileResolver profileResolver);
 
-	public GameProfile partialProfile() {
+	public PlayerProfile partialProfile() {
 		return this.partialProfile;
 	}
 
@@ -83,11 +83,10 @@ public abstract sealed class ResolvableProfile implements TooltipProvider permit
 		return this.skinPatch;
 	}
 
-	static GameProfile createPartialProfile(Optional<String> optional, Optional<UUID> optional2, PropertyMap propertyMap) {
+	static PlayerProfile createPartialProfile(Optional<String> optional, Optional<UUID> optional2, ProfilePropertyMap propertyMap) {
 		String string = (String)optional.orElse("");
 		UUID uUID = (UUID)optional2.orElseGet(() -> (UUID)optional.map(UUIDUtil::createOfflinePlayerUUID).orElse(Util.NIL_UUID));
-		GameProfile profile = new GameProfile(uUID, string);
-		profile.getProperties().putAll(propertyMap);
+		PlayerProfile profile = new PlayerProfile(uUID, string, propertyMap);
 		return profile;
 	}
 
@@ -98,7 +97,7 @@ public abstract sealed class ResolvableProfile implements TooltipProvider permit
 		private final Either<String, UUID> nameOrId;
 
 		Dynamic(Either<String, UUID> either, PlayerSkin.Patch patch) {
-			super(ResolvableProfile.createPartialProfile(either.left(), either.right(), new PropertyMap()), patch);
+			super(ResolvableProfile.createPartialProfile(either.left(), either.right(), new ProfilePropertyMap()), patch);
 			this.nameOrId = either;
 		}
 
@@ -118,13 +117,13 @@ public abstract sealed class ResolvableProfile implements TooltipProvider permit
 		}
 
 		@Override
-		protected Either<GameProfile, ResolvableProfile.Partial> unpack() {
-			return Either.right(new ResolvableProfile.Partial(this.nameOrId.left(), this.nameOrId.right(), new PropertyMap()));
+		protected Either<PlayerProfile, ResolvableProfile.Partial> unpack() {
+			return Either.right(new ResolvableProfile.Partial(this.nameOrId.left(), this.nameOrId.right(), new ProfilePropertyMap()));
 		}
 
 		@Override
-		public CompletableFuture<GameProfile> resolveProfile(ProfileResolver profileResolver) {
-			return CompletableFuture.supplyAsync(() -> (GameProfile)profileResolver.fetchByNameOrId(this.nameOrId).orElse(this.partialProfile), Util.nonCriticalIoPool());
+		public CompletableFuture<PlayerProfile> resolveProfile(ProfileResolver profileResolver) {
+			return CompletableFuture.supplyAsync(() -> (PlayerProfile)profileResolver.fetchByNameOrId(this.nameOrId).orElse(this.partialProfile), Util.nonCriticalIoPool());
 		}
 
 		@Override
@@ -133,13 +132,13 @@ public abstract sealed class ResolvableProfile implements TooltipProvider permit
 		}
 	}
 
-	protected record Partial(Optional<String> name, Optional<UUID> id, PropertyMap properties) {
-		public static final ResolvableProfile.Partial EMPTY = new ResolvableProfile.Partial(Optional.empty(), Optional.empty(), new PropertyMap());
+	protected record Partial(Optional<String> name, Optional<UUID> id, ProfilePropertyMap properties) {
+		public static final ResolvableProfile.Partial EMPTY = new ResolvableProfile.Partial(Optional.empty(), Optional.empty(), new ProfilePropertyMap());
 		static final MapCodec<ResolvableProfile.Partial> MAP_CODEC = RecordCodecBuilder.mapCodec(
 			instance -> instance.group(
 					ExtraCodecs.PLAYER_NAME.optionalFieldOf("name").forGetter(ResolvableProfile.Partial::name),
 					UUIDUtil.CODEC.optionalFieldOf("id").forGetter(ResolvableProfile.Partial::id),
-					ExtraCodecs.PROPERTY_MAP.optionalFieldOf("properties", new PropertyMap()).forGetter(ResolvableProfile.Partial::properties)
+					ExtraCodecs.PROPERTY_MAP.optionalFieldOf("properties", new ProfilePropertyMap()).forGetter(ResolvableProfile.Partial::properties)
 				)
 				.apply(instance, ResolvableProfile.Partial::new)
 		);
@@ -153,33 +152,33 @@ public abstract sealed class ResolvableProfile implements TooltipProvider permit
 			ResolvableProfile.Partial::new
 		);
 
-		private GameProfile createProfile() {
+		private PlayerProfile createProfile() {
 			return ResolvableProfile.createPartialProfile(this.name, this.id, this.properties);
 		}
 	}
 
 	public static final class Static extends ResolvableProfile {
 		public static final ResolvableProfile.Static EMPTY = new ResolvableProfile.Static(Either.right(ResolvableProfile.Partial.EMPTY), PlayerSkin.Patch.EMPTY);
-		private final Either<GameProfile, ResolvableProfile.Partial> contents;
+		private final Either<PlayerProfile, ResolvableProfile.Partial> contents;
 
-		Static(Either<GameProfile, ResolvableProfile.Partial> either, PlayerSkin.Patch patch) {
-			super(either.map(gameProfile -> gameProfile, ResolvableProfile.Partial::createProfile), patch);
+		Static(Either<PlayerProfile, ResolvableProfile.Partial> either, PlayerSkin.Patch patch) {
+			super(either.map(playerProfile -> playerProfile, ResolvableProfile.Partial::createProfile), patch);
 			this.contents = either;
 		}
 
 		@Override
-		public CompletableFuture<GameProfile> resolveProfile(ProfileResolver profileResolver) {
+		public CompletableFuture<PlayerProfile> resolveProfile(ProfileResolver profileResolver) {
 			return CompletableFuture.completedFuture(this.partialProfile);
 		}
 
 		@Override
-		protected Either<GameProfile, ResolvableProfile.Partial> unpack() {
+		protected Either<PlayerProfile, ResolvableProfile.Partial> unpack() {
 			return this.contents;
 		}
 
 		@Override
 		public Optional<String> name() {
-			return this.contents.map(gameProfile -> Optional.of(gameProfile.getName()), partial -> partial.name);
+			return this.contents.map(playerProfile -> Optional.of(playerProfile.name()), partial -> partial.name);
 		}
 
 		public boolean equals(Object object) {

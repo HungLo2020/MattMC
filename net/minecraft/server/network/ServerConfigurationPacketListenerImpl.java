@@ -1,6 +1,6 @@
 package net.minecraft.server.network;
 
-import com.mojang.authlib.GameProfile;
+import net.minecraft.server.profile.PlayerProfile;
 import com.mojang.logging.LogUtils;
 import java.util.List;
 import java.util.Locale;
@@ -49,7 +49,7 @@ public class ServerConfigurationPacketListenerImpl
 	private static final Logger LOGGER = LogUtils.getLogger();
 	private static final Component DISCONNECT_REASON_INVALID_DATA = Component.translatable("multiplayer.disconnect.invalid_player_data");
 	private static final Component DISCONNECT_REASON_CONFIGURATION_ERROR = Component.translatable("multiplayer.disconnect.configuration_error");
-	private final GameProfile gameProfile;
+	private final PlayerProfile playerProfile;
 	private final Queue<ConfigurationTask> configurationTasks = new ConcurrentLinkedQueue();
 	@Nullable
 	private ConfigurationTask currentTask;
@@ -61,18 +61,18 @@ public class ServerConfigurationPacketListenerImpl
 
 	public ServerConfigurationPacketListenerImpl(MinecraftServer minecraftServer, Connection connection, CommonListenerCookie commonListenerCookie) {
 		super(minecraftServer, connection, commonListenerCookie);
-		this.gameProfile = commonListenerCookie.gameProfile();
+		this.playerProfile = commonListenerCookie.playerProfile();
 		this.clientInformation = commonListenerCookie.clientInformation();
 	}
 
 	@Override
-	protected GameProfile playerProfile() {
-		return this.gameProfile;
+	protected PlayerProfile playerProfile() {
+		return this.playerProfile;
 	}
 
 	@Override
 	public void onDisconnect(DisconnectionDetails disconnectionDetails) {
-		LOGGER.info("{} ({}) lost connection: {}", this.gameProfile.getName(), this.gameProfile.getId(), disconnectionDetails.reason().getString());
+		LOGGER.info("{} ({}) lost connection: {}", this.playerProfile.name(), this.playerProfile.id(), disconnectionDetails.reason().getString());
 		if (this.prepareSpawnTask != null) {
 			this.prepareSpawnTask.close();
 			this.prepareSpawnTask = null;
@@ -103,7 +103,7 @@ public class ServerConfigurationPacketListenerImpl
 	}
 
 	public void returnToWorld() {
-		this.prepareSpawnTask = new PrepareSpawnTask(this.server, new NameAndId(this.gameProfile));
+		this.prepareSpawnTask = new PrepareSpawnTask(this.server, new NameAndId(this.playerProfile));
 		this.configurationTasks.add(this.prepareSpawnTask);
 		this.configurationTasks.add(new JoinWorldTask());
 		this.startNextTask();
@@ -168,12 +168,12 @@ public class ServerConfigurationPacketListenerImpl
 
 		try {
 			PlayerList playerList = this.server.getPlayerList();
-			if (playerList.getPlayer(this.gameProfile.getId()) != null) {
+			if (playerList.getPlayer(this.playerProfile.id()) != null) {
 				this.disconnect(PlayerList.DUPLICATE_LOGIN_DISCONNECT_MESSAGE);
 				return;
 			}
 
-			Component component = playerList.canPlayerLogin(this.connection.getRemoteAddress(), new NameAndId(this.gameProfile));
+			Component component = playerList.canPlayerLogin(this.connection.getRemoteAddress(), new NameAndId(this.playerProfile));
 			if (component != null) {
 				this.disconnect(component);
 				return;

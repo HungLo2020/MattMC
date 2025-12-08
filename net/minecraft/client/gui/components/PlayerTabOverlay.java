@@ -1,6 +1,6 @@
 package net.minecraft.client.gui.components;
 
-import com.mojang.authlib.GameProfile;
+import net.minecraft.server.profile.PlayerProfile;
 import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -57,7 +57,7 @@ public class PlayerTabOverlay {
 	private static final Comparator<PlayerInfo> PLAYER_COMPARATOR = Comparator.<PlayerInfo>comparingInt(playerInfo -> -playerInfo.getTabListOrder())
 		.thenComparingInt(playerInfo -> playerInfo.getGameMode() == GameType.SPECTATOR ? 1 : 0)
 		.thenComparing(playerInfo -> (String)Optionull.mapOrDefault(playerInfo.getTeam(), PlayerTeam::getName, ""))
-		.thenComparing(playerInfo -> playerInfo.getProfile().getName(), String::compareToIgnoreCase);
+		.thenComparing(playerInfo -> playerInfo.getProfile().name(), String::compareToIgnoreCase);
 	public static final int MAX_ROWS_PER_COL = 20;
 	private final Minecraft minecraft;
 	private final Gui gui;
@@ -76,7 +76,7 @@ public class PlayerTabOverlay {
 	public Component getNameForDisplay(PlayerInfo playerInfo) {
 		return playerInfo.getTabListDisplayName() != null
 			? this.decorateName(playerInfo, playerInfo.getTabListDisplayName().copy())
-			: this.decorateName(playerInfo, PlayerTeam.formatNameForTeam(playerInfo.getTeam(), Component.literal(playerInfo.getProfile().getName())));
+			: this.decorateName(playerInfo, PlayerTeam.formatNameForTeam(playerInfo.getTeam(), Component.literal(playerInfo.getProfile().name())));
 	}
 
 	private Component decorateName(PlayerInfo playerInfo, MutableComponent mutableComponent) {
@@ -129,7 +129,7 @@ public class PlayerTabOverlay {
 		}
 
 		if (!this.healthStates.isEmpty()) {
-			Set<UUID> set = list.stream().map(playerInfo -> playerInfo.getProfile().getId()).collect(Collectors.toSet());
+			Set<UUID> set = list.stream().map(playerInfo -> playerInfo.getProfile().id()).collect(Collectors.toSet());
 			this.healthStates.keySet().removeIf(uUID -> !set.contains(uUID));
 		}
 
@@ -199,9 +199,9 @@ public class PlayerTabOverlay {
 			if (x < list.size()) {
 				PlayerInfo playerInfo2 = (PlayerInfo)list.get(x);
 				PlayerTabOverlay.ScoreDisplayEntry scoreDisplayEntry = (PlayerTabOverlay.ScoreDisplayEntry)list2.get(x);
-				GameProfile gameProfile = playerInfo2.getProfile();
+				PlayerProfile playerProfile = playerInfo2.getProfile();
 				if (bl) {
-					Player player = this.minecraft.level.getPlayerByUUID(gameProfile.getId());
+					Player player = this.minecraft.level.getPlayerByUUID(playerProfile.id());
 					boolean bl2 = player != null && AvatarRenderer.isPlayerUpsideDown(player);
 					PlayerFaceRenderer.draw(guiGraphics, playerInfo2.getSkin().body().texturePath(), z, aa, 8, playerInfo2.showHat(), bl2, -1);
 					z += 9;
@@ -212,7 +212,7 @@ public class PlayerTabOverlay {
 					int ab = z + k + 1;
 					int ac = ab + r;
 					if (ac - ab > 5) {
-						this.renderTablistScore(objective, aa, scoreDisplayEntry, ab, ac, gameProfile.getId(), guiGraphics);
+						this.renderTablistScore(objective, aa, scoreDisplayEntry, ab, ac, playerProfile.id(), guiGraphics);
 					}
 				}
 

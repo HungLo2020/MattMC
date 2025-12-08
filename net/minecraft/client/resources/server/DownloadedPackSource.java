@@ -5,7 +5,7 @@ import com.google.common.hash.HashCode;
 import com.google.common.hash.HashFunction;
 import com.google.common.hash.Hashing;
 import com.mojang.logging.LogUtils;
-import com.mojang.util.UndashedUuid;
+import net.minecraft.util.UndashedUuid;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.net.Proxy;

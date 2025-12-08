@@ -2,8 +2,8 @@ package net.minecraft.client.gui.screens.social;
 
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
-import com.mojang.authlib.GameProfile;
-import com.mojang.authlib.minecraft.UserApiService;
+import net.minecraft.server.profile.PlayerProfile;
+import net.minecraft.client.auth.UserApiService;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -46,7 +46,8 @@ public class PlayerSocialManager {
 
 	public void startOnlineMode() {
 		this.onlineMode = true;
-		this.pendingBlockListRefresh = this.pendingBlockListRefresh.thenRunAsync(this.service::refreshBlockList, Util.ioPool());
+		// Offline mode - no block list refresh needed
+		this.pendingBlockListRefresh = this.pendingBlockListRefresh.thenRunAsync(() -> {}, Util.ioPool());
 	}
 
 	public void stopOnlineMode() {
@@ -71,8 +72,8 @@ public class PlayerSocialManager {
 	}
 
 	public void addPlayer(PlayerInfo playerInfo) {
-		GameProfile gameProfile = playerInfo.getProfile();
-			this.discoveredNamesToUUID.put(gameProfile.getName(), gameProfile.getId());
+		PlayerProfile playerProfile = playerInfo.getProfile();
+			this.discoveredNamesToUUID.put(playerProfile.name(), playerProfile.id());
 		if (this.minecraft.screen instanceof SocialInteractionsScreen socialInteractionsScreen) {
 			socialInteractionsScreen.onAddPlayer(playerInfo);
 		}

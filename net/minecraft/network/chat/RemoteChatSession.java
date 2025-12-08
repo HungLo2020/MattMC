@@ -1,6 +1,6 @@
 package net.minecraft.network.chat;
 
-import com.mojang.authlib.GameProfile;
+import net.minecraft.server.profile.PlayerProfile;
 import java.time.Duration;
 import java.util.UUID;
 import net.minecraft.network.FriendlyByteBuf;
@@ -34,8 +34,8 @@ public record RemoteChatSession(UUID sessionId, ProfilePublicKey profilePublicKe
 			data.profilePublicKey.write(friendlyByteBuf);
 		}
 
-		public RemoteChatSession validate(GameProfile gameProfile, SignatureValidator signatureValidator) throws ProfilePublicKey.ValidationException {
-   return new RemoteChatSession(this.sessionId, ProfilePublicKey.createValidated(signatureValidator, net.minecraft.util.AuthlibCompat.id(gameProfile), this.profilePublicKey));
+		public RemoteChatSession validate(PlayerProfile playerProfile, SignatureValidator signatureValidator) throws ProfilePublicKey.ValidationException {
+   return new RemoteChatSession(this.sessionId, ProfilePublicKey.createValidated(signatureValidator, playerProfile.id(), this.profilePublicKey));
 		}
 	}
 }

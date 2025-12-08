@@ -1,7 +1,7 @@
 package net.minecraft.client.multiplayer.chat;
 
 import com.google.common.collect.Queues;
-import com.mojang.authlib.GameProfile;
+import net.minecraft.server.profile.PlayerProfile;
 import java.time.Instant;
 import java.util.Deque;
 import java.util.UUID;
@@ -95,13 +95,13 @@ public class ChatListener {
 		}
 	}
 
-	public void handlePlayerChatMessage(PlayerChatMessage playerChatMessage, GameProfile gameProfile, Bound bound) {
+	public void handlePlayerChatMessage(PlayerChatMessage playerChatMessage, PlayerProfile playerProfile, Bound bound) {
 		boolean bl = this.minecraft.options.onlyShowSecureChat().get();
 		PlayerChatMessage playerChatMessage2 = bl ? playerChatMessage.removeUnsignedContent() : playerChatMessage;
 		Component component = bound.decorate(playerChatMessage2.decoratedContent());
 		Instant instant = Instant.now();
 		this.handleMessage(playerChatMessage.signature(), () -> {
-			boolean bl2 = this.showMessageToPlayer(bound, playerChatMessage, component, gameProfile, bl, instant);
+			boolean bl2 = this.showMessageToPlayer(bound, playerChatMessage, component, playerProfile, bl, instant);
 			ClientPacketListener clientPacketListener = this.minecraft.getConnection();
 			if (clientPacketListener != null && playerChatMessage.signature() != null) {
 				clientPacketListener.markMessageAsProcessed(playerChatMessage.signature(), bl2);
@@ -142,7 +142,7 @@ public class ChatListener {
 	}
 
 	private boolean showMessageToPlayer(
-		Bound bound, PlayerChatMessage playerChatMessage, Component component, GameProfile gameProfile, boolean bl, Instant instant
+		Bound bound, PlayerChatMessage playerChatMessage, Component component, PlayerProfile playerProfile, boolean bl, Instant instant
 	) {
 		ChatTrustLevel chatTrustLevel = this.evaluateTrustLevel(playerChatMessage, component, instant);
 		if (bl && chatTrustLevel.isNotSecure()) {
@@ -162,7 +162,7 @@ public class ChatListener {
 				}
 			}
 
-			this.logPlayerMessage(playerChatMessage, gameProfile, chatTrustLevel);
+			this.logPlayerMessage(playerChatMessage, playerProfile, chatTrustLevel);
 			this.previousMessageTime = Util.getMillis();
 			return true;
 		} else {
@@ -178,7 +178,7 @@ public class ChatListener {
 		return this.isSenderLocalPlayer(playerChatMessage.sender()) ? ChatTrustLevel.SECURE : ChatTrustLevel.evaluate(playerChatMessage, component, instant);
 	}
 
-	private void logPlayerMessage(PlayerChatMessage playerChatMessage, GameProfile gameProfile, ChatTrustLevel chatTrustLevel) {
+	private void logPlayerMessage(PlayerChatMessage playerChatMessage, PlayerProfile playerProfile, ChatTrustLevel chatTrustLevel) {
 		// Chat logging removed - no longer needed without chat reporting
 	}
 
@@ -205,7 +205,7 @@ public class ChatListener {
 
 	private boolean isSenderLocalPlayer(UUID uUID) {
 		if (this.minecraft.isLocalServer() && this.minecraft.player != null) {
-			UUID uUID2 = this.minecraft.player.getGameProfile().getId();
+			UUID uUID2 = this.minecraft.player.getGameProfile().id();
 			return uUID2.equals(uUID);
 		} else {
 			return false;

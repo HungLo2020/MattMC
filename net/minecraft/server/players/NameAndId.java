@@ -1,7 +1,7 @@
 package net.minecraft.server.players;
 
 import com.google.gson.JsonObject;
-import com.mojang.authlib.GameProfile;
+import net.minecraft.server.profile.PlayerProfile;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 import java.util.UUID;
@@ -14,8 +14,8 @@ public record NameAndId(UUID id, String name) {
 			.apply(instance, NameAndId::new)
 	);
 
-	public NameAndId(GameProfile gameProfile) {
-		this(gameProfile.getId(), gameProfile.getName());
+	public NameAndId(PlayerProfile playerProfile) {
+		this(playerProfile.id(), playerProfile.name());
 	}
 
 	// Note: Yggdrasil response type may not be on classpath in all configurations; prefer explicit factory methods instead.

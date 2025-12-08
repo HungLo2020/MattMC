@@ -1,8 +1,7 @@
 package net.minecraft.gametest.framework;
 
 import com.google.common.base.Stopwatch;
-import com.mojang.authlib.GameProfile;
-import com.mojang.authlib.yggdrasil.ServicesKeySet;
+import net.minecraft.server.profile.PlayerProfile;
 import com.mojang.brigadier.StringReader;
 import com.mojang.logging.LogUtils;
 import com.mojang.serialization.Lifecycle;
@@ -71,7 +70,7 @@ public class GameTestServer extends MinecraftServer {
 	private static final int PROGRESS_REPORT_INTERVAL = 20;
 	private static final int TEST_POSITION_RANGE = 14999992;
 	private static final Services NO_SERVICES = new Services(
-		null, ServicesKeySet.EMPTY, null, new GameTestServer.MockUserNameToIdResolver(), new GameTestServer.MockProfileResolver()
+		new GameTestServer.MockUserNameToIdResolver(), new GameTestServer.MockProfileResolver()
 	);
 	private static final FeatureFlagSet ENABLED_FEATURES = FeatureFlags.REGISTRY
 		.allFlags()
@@ -362,12 +361,12 @@ public class GameTestServer extends MinecraftServer {
 
 	static class MockProfileResolver implements ProfileResolver {
 		@Override
-		public Optional<GameProfile> fetchByName(String string) {
+		public Optional<PlayerProfile> fetchByName(String string) {
 			return Optional.empty();
 		}
 
 		@Override
-		public Optional<GameProfile> fetchById(UUID uUID) {
+		public Optional<PlayerProfile> fetchById(UUID uUID) {
 			return Optional.empty();
 		}
 	}
