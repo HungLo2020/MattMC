@@ -7,7 +7,7 @@ import com.mojang.blaze3d.platform.DisplayData;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.jtracy.TracyClient;
 import com.mojang.logging.LogUtils;
-import com.mojang.util.UndashedUuid;
+import net.minecraft.util.UndashedUuid;
 import java.io.File;
 import java.net.Authenticator;
 import java.net.InetSocketAddress;

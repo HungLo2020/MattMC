@@ -1,11 +1,7 @@
 package net.minecraft.client.multiplayer;
 
 import com.google.common.base.Strings;
-import com.mojang.authlib.exceptions.MinecraftClientException;
 import net.minecraft.client.auth.UserApiService;
-import com.mojang.authlib.minecraft.InsecurePublicKeyException.MissingException;
-import com.mojang.authlib.yggdrasil.response.KeyPairResponse;
-import com.mojang.authlib.yggdrasil.response.KeyPairResponse.KeyPair;
 import com.mojang.logging.LogUtils;
 import com.mojang.serialization.JsonOps;
 import java.io.BufferedReader;

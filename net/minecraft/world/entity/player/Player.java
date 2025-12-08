@@ -1576,7 +1576,7 @@ public abstract class Player extends Avatar implements ContainerUser {
 
 	@Override
 	public Component getDisplayName() {
-		MutableComponent mutableComponent = PlayerTeam.formatNameForTeam(this.getTeam(), this.name());
+		MutableComponent mutableComponent = PlayerTeam.formatNameForTeam(this.getTeam(), Component.literal(this.playerProfile.name()));
 		return this.decorateDisplayNameComponent(mutableComponent);
 	}
 
@@ -1667,7 +1667,7 @@ public abstract class Player extends Avatar implements ContainerUser {
 	}
 
 	protected static OptionalInt convertParrotVariant(Optional<Parrot.Variant> optional) {
-		return (OptionalInt)optional.map(variant -> OptionalInt.of(variant.id())).orElse(OptionalInt.empty());
+		return (OptionalInt)optional.map(variant -> OptionalInt.of(variant.getId())).orElse(OptionalInt.empty());
 	}
 
 	private static Optional<Parrot.Variant> convertParrotVariant(OptionalInt optionalInt) {
@@ -1924,7 +1924,7 @@ public abstract class Player extends Avatar implements ContainerUser {
 	public String debugInfo() {
 		return MoreObjects.toStringHelper(this)
 			.add("name", this.getPlainTextName())
-			.add("id", this.id())
+			.add("id", this.getUUID())
 			.add("pos", this.position())
 			.add("mode", this.gameMode())
 			.add("permission", this.getPermissionLevel())

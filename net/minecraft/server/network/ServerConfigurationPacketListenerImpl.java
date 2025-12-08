@@ -61,13 +61,13 @@ public class ServerConfigurationPacketListenerImpl
 
 	public ServerConfigurationPacketListenerImpl(MinecraftServer minecraftServer, Connection connection, CommonListenerCookie commonListenerCookie) {
 		super(minecraftServer, connection, commonListenerCookie);
-		this.gameProfile = commonListenerCookie.gameProfile();
+		this.playerProfile = commonListenerCookie.playerProfile();
 		this.clientInformation = commonListenerCookie.clientInformation();
 	}
 
 	@Override
 	protected PlayerProfile playerProfile() {
-		return this.gameProfile;
+		return this.playerProfile;
 	}
 
 	@Override
@@ -103,7 +103,7 @@ public class ServerConfigurationPacketListenerImpl
 	}
 
 	public void returnToWorld() {
-		this.prepareSpawnTask = new PrepareSpawnTask(this.server, new NameAndId(this.gameProfile));
+		this.prepareSpawnTask = new PrepareSpawnTask(this.server, new NameAndId(this.playerProfile));
 		this.configurationTasks.add(this.prepareSpawnTask);
 		this.configurationTasks.add(new JoinWorldTask());
 		this.startNextTask();
@@ -173,7 +173,7 @@ public class ServerConfigurationPacketListenerImpl
 				return;
 			}
 
-			Component component = playerList.canPlayerLogin(this.connection.getRemoteAddress(), new NameAndId(this.gameProfile));
+			Component component = playerList.canPlayerLogin(this.connection.getRemoteAddress(), new NameAndId(this.playerProfile));
 			if (component != null) {
 				this.disconnect(component);
 				return;

@@ -1,16 +1,16 @@
 package net.minecraft.util;
 
-import com.mojang.authlib.yggdrasil.ServicesKeyInfo;
-import com.mojang.authlib.yggdrasil.ServicesKeySet;
-import com.mojang.authlib.yggdrasil.ServicesKeyType;
 import com.mojang.logging.LogUtils;
 import java.security.PublicKey;
 import java.security.Signature;
 import java.security.SignatureException;
-import java.util.Collection;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 
+/**
+ * Signature validator for cryptographic verification.
+ * Simplified for offline mode - no Mojang services key validation.
+ */
 public interface SignatureValidator {
 	SignatureValidator NO_VALIDATION = (signatureUpdater, bs) -> true;
 	Logger LOGGER = LogUtils.getLogger();
@@ -37,20 +37,5 @@ public interface SignatureValidator {
 				return false;
 			}
 		};
-	}
-
-	@Nullable
-	static SignatureValidator from(ServicesKeySet servicesKeySet, ServicesKeyType servicesKeyType) {
-		Collection<ServicesKeyInfo> collection = servicesKeySet.keys(servicesKeyType);
-		return collection.isEmpty() ? null : (signatureUpdater, bs) -> collection.stream().anyMatch(servicesKeyInfo -> {
-			Signature signature = servicesKeyInfo.signature();
-
-			try {
-				return verifySignature(signatureUpdater, bs, signature);
-			} catch (SignatureException var5) {
-				LOGGER.error("Failed to verify Services signature", (Throwable)var5);
-				return false;
-			}
-		});
 	}
 }

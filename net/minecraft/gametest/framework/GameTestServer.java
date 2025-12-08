@@ -2,7 +2,6 @@ package net.minecraft.gametest.framework;
 
 import com.google.common.base.Stopwatch;
 import net.minecraft.server.profile.PlayerProfile;
-import com.mojang.authlib.yggdrasil.ServicesKeySet;
 import com.mojang.brigadier.StringReader;
 import com.mojang.logging.LogUtils;
 import com.mojang.serialization.Lifecycle;
