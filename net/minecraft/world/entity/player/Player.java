@@ -182,7 +182,7 @@ public abstract class Player extends Avatar implements ContainerUser {
 	public Player(Level level, PlayerProfile playerProfile) {
 		super(EntityType.PLAYER, level);
 		this.setUUID(playerProfile.id());
-		this.playerProfile = gameProfile;
+		this.playerProfile = playerProfile;
 		this.inventory = new Inventory(this, this.equipment);
 		this.inventoryMenu = new InventoryMenu(this.inventory, !level.isClientSide(), this);
 		this.containerMenu = this.inventoryMenu;

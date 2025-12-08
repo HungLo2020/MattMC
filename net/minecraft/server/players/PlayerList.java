@@ -194,7 +194,7 @@ public abstract class PlayerList {
 		this.updateEntireScoreboard(serverLevel.getScoreboard(), serverPlayer);
 		this.server.invalidateStatus();
 		MutableComponent mutableComponent;
-		if (serverPlayer.getGameProfile().getName().equalsIgnoreCase(string)) {
+		if (serverPlayer.getGameProfile().name().equalsIgnoreCase(string)) {
 			mutableComponent = Component.translatable("multiplayer.player.joined", serverPlayer.getDisplayName());
 		} else {
 			mutableComponent = Component.translatable("multiplayer.player.joined.renamed", serverPlayer.getDisplayName(), string);
@@ -516,7 +516,7 @@ public abstract class PlayerList {
 		String[] strings = new String[this.players.size()];
 
 		for (int i = 0; i < this.players.size(); i++) {
-			strings[i] = ((ServerPlayer)this.players.get(i)).getGameProfile().getName();
+			strings[i] = ((ServerPlayer)this.players.get(i)).getGameProfile().name();
 		}
 
 		return strings;
@@ -589,7 +589,7 @@ public abstract class PlayerList {
 
 		for (int j = 0; j < i; j++) {
 			ServerPlayer serverPlayer = (ServerPlayer)this.players.get(j);
-			if (serverPlayer.getGameProfile().getName().equalsIgnoreCase(string)) {
+			if (serverPlayer.getGameProfile().name().equalsIgnoreCase(string)) {
 				return serverPlayer;
 			}
 		}
@@ -757,13 +757,13 @@ public abstract class PlayerList {
 
 	public ServerStatsCounter getPlayerStats(Player player) {
 		PlayerProfile playerProfile = player.getGameProfile();
-		UUID uUID = gameProfile.getId();
+		UUID uUID = gameProfile.id();
 		ServerStatsCounter serverStatsCounter = (ServerStatsCounter)this.stats.get(uUID);
 		if (serverStatsCounter == null) {
 			File file = this.server.getWorldPath(LevelResource.PLAYER_STATS_DIR).toFile();
 			File file2 = new File(file, uUID + ".json");
 			if (!file2.exists()) {
-				File file3 = new File(file, gameProfile.getName() + ".json");
+				File file3 = new File(file, gameProfile.name() + ".json");
 				Path path = file3.toPath();
 				if (FileUtil.isPathNormalized(path) && FileUtil.isPathPortable(path) && path.startsWith(file.getPath()) && file3.isFile()) {
 					file3.renameTo(file2);
@@ -824,7 +824,7 @@ public abstract class PlayerList {
 	@Nullable
 	public ServerPlayer getPlayer(String string) {
 		for (ServerPlayer serverPlayer : this.players) {
-			if (serverPlayer.getGameProfile().getName().equalsIgnoreCase(string)) {
+			if (serverPlayer.getGameProfile().name().equalsIgnoreCase(string)) {
 				return serverPlayer;
 			}
 		}

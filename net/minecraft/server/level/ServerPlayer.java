@@ -373,7 +373,7 @@ public class ServerPlayer extends Player {
 	public boolean wonGame;
 
 	public ServerPlayer(MinecraftServer minecraftServer, ServerLevel serverLevel, PlayerProfile playerProfile, ClientInformation clientInformation) {
-		super(serverLevel, gameProfile);
+		super(serverLevel, playerProfile);
 		this.server = minecraftServer;
 		this.textFilter = minecraftServer.createTextFilterForPlayer(this);
 		this.gameMode = minecraftServer.createGameModeForPlayer(this);

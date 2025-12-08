@@ -2392,7 +2392,7 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 
 	public PlayerProfile getGameProfile() {
 		ProfileResult profileResult = (ProfileResult)this.profileFuture.join();
-		return profileResult != null ? profileResult.profile() : new GameProfile(this.user.getProfileId(), this.user.getName());
+		return profileResult != null ? profileResult.profile() : new PlayerProfile(this.user.getProfileId(), this.user.getName());
 	}
 
 	public Proxy getProxy() {

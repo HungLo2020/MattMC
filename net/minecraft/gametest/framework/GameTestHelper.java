@@ -305,7 +305,7 @@ public class GameTestHelper {
 	}
 
 	public Player makeMockPlayer(GameType gameType) {
-		return new Player(this.getLevel(), new GameProfile(UUID.randomUUID(), "test-mock-player")) {
+		return new Player(this.getLevel(), new PlayerProfile(UUID.randomUUID(), "test-mock-player")) {
 			@NotNull
 			@Override
 			public GameType gameMode() {
@@ -323,9 +323,9 @@ public class GameTestHelper {
 		forRemoval = true
 	)
 	public ServerPlayer makeMockServerPlayerInLevel() {
-		CommonListenerCookie commonListenerCookie = CommonListenerCookie.createInitial(new GameProfile(UUID.randomUUID(), "test-mock-player"), false);
+		CommonListenerCookie commonListenerCookie = CommonListenerCookie.createInitial(new PlayerProfile(UUID.randomUUID(), "test-mock-player"), false);
 		ServerPlayer serverPlayer = new ServerPlayer(
-			this.getLevel().getServer(), this.getLevel(), commonListenerCookie.gameProfile(), commonListenerCookie.clientInformation()
+			this.getLevel().getServer(), this.getLevel(), commonListenerCookie.playerProfile(), commonListenerCookie.clientInformation()
 		) {
 			@Override
 			public GameType gameMode() {

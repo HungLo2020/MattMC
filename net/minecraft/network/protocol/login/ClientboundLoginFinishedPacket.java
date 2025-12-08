@@ -9,7 +9,7 @@ import net.minecraft.network.protocol.PacketType;
 
 public record ClientboundLoginFinishedPacket(PlayerProfile playerProfile) implements Packet<ClientLoginPacketListener> {
 	public static final StreamCodec<ByteBuf, ClientboundLoginFinishedPacket> STREAM_CODEC = StreamCodec.composite(
-		ByteBufCodecs.GAME_PROFILE, ClientboundLoginFinishedPacket::gameProfile, ClientboundLoginFinishedPacket::new
+		ByteBufCodecs.GAME_PROFILE, ClientboundLoginFinishedPacket::playerProfile, ClientboundLoginFinishedPacket::new
 	);
 
 	@Override

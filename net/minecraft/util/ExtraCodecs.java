@@ -192,7 +192,7 @@ public class ExtraCodecs {
 	);
 	public static final Codec<ProfilePropertyMap> PROPERTY_MAP = Codec.either(Codec.unboundedMap(Codec.STRING, Codec.STRING.listOf()), PROPERTY.listOf())
 		.xmap(either -> {
-			ProfileProfilePropertyMap mapOut = new ProfilePropertyMap();
+			ProfilePropertyMap mapOut = new ProfilePropertyMap();
 			either.ifLeft(map -> map.forEach((string, list) -> {
 				for (String string2 : list) {
 					mapOut.put(string, new ProfileProperty(string, string2));
@@ -512,13 +512,12 @@ public class ExtraCodecs {
 	private static MapCodec<PlayerProfile> gameProfileCodec(Codec<UUID> codec) {
 		return RecordCodecBuilder.mapCodec(
 			instance -> instance.group(
-					codec.fieldOf("id").forGetter(GameProfile::getId),
-					PLAYER_NAME.fieldOf("name").forGetter(GameProfile::getName),
-					PROPERTY_MAP.optionalFieldOf("properties", new PropertyMap()).forGetter(GameProfile::getProperties)
+					codec.fieldOf("id").forGetter(PlayerProfile::id),
+					PLAYER_NAME.fieldOf("name").forGetter(PlayerProfile::name),
+					PROPERTY_MAP.optionalFieldOf("properties", new ProfilePropertyMap()).forGetter(PlayerProfile::properties)
 				)
 				.apply(instance, (uuid, name, props) -> {
-					PlayerProfile gp = new GameProfile(uuid, name);
-					gp.getProperties().putAll(props);
+					PlayerProfile gp = new PlayerProfile(uuid, name, props);
 					return gp;
 				})
 		);

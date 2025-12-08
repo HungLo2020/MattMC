@@ -28,7 +28,7 @@ public class OpCommand {
 									playerList.getPlayers()
 										.stream()
 										.filter(serverPlayer -> !playerList.isOp(serverPlayer.nameAndId()))
-    						.map(serverPlayer -> net.minecraft.util.AuthlibCompat.name(serverPlayer.getGameProfile())),
+    						.map(serverPlayer -> serverPlayer.getGameProfile().name()),
 									suggestionsBuilder
 								);
 							}

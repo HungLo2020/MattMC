@@ -107,13 +107,12 @@ public class ClientboundPlayerInfoUpdatePacket implements Packet<ClientGamePacke
 		ADD_PLAYER((entryBuilder, registryFriendlyByteBuf) -> {
 			String string = ByteBufCodecs.PLAYER_NAME.decode(registryFriendlyByteBuf);
 			ProfilePropertyMap propertyMap = ByteBufCodecs.GAME_PROFILE_PROPERTIES.decode(registryFriendlyByteBuf);
-			PlayerProfile gp = new GameProfile(entryBuilder.profileId, string);
-			gp.getProperties().putAll(propertyMap);
+			PlayerProfile gp = new PlayerProfile(entryBuilder.profileId, string, propertyMap);
 			entryBuilder.profile = gp;
 		}, (registryFriendlyByteBuf, entry) -> {
 			PlayerProfile playerProfile = (PlayerProfile)Objects.requireNonNull(entry.profile());
-			ByteBufCodecs.PLAYER_NAME.encode(registryFriendlyByteBuf, gameProfile.getName());
-			ByteBufCodecs.GAME_PROFILE_PROPERTIES.encode(registryFriendlyByteBuf, gameProfile.getProperties());
+			ByteBufCodecs.PLAYER_NAME.encode(registryFriendlyByteBuf, playerProfile.name());
+			ByteBufCodecs.GAME_PROFILE_PROPERTIES.encode(registryFriendlyByteBuf, playerProfile.properties());
 		}),
 		INITIALIZE_CHAT(
 			(entryBuilder, registryFriendlyByteBuf) -> entryBuilder.chatSession = registryFriendlyByteBuf.readNullable(RemoteChatSession.Data::read),

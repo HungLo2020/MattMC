@@ -55,7 +55,7 @@ public class OldUsersConverter {
 			minecraftServer.services().profileRepository().findProfilesByNames(strings, profileLookupCallback);
 		} else {
 			for (String string : strings) {
-				profileLookupCallback.onProfileLookupSucceeded(new GameProfile(UUIDUtil.createOfflinePlayerUUID(string), string));
+				profileLookupCallback.onProfileLookupSucceeded(new PlayerProfile(UUIDUtil.createOfflinePlayerUUID(string), string));
 			}
 		}
 	}
