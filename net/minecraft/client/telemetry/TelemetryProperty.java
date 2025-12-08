@@ -174,7 +174,6 @@ public record TelemetryProperty<T>(String id, String exportKey, Codec<T> codec, 
 
 	@Environment(EnvType.CLIENT)
 	public static enum ServerType implements StringRepresentable {
-		REALM("realm"),
 		LOCAL("local"),
 		OTHER("server");
 

@@ -34,12 +34,7 @@ public class WorldLoadEvent {
 	}
 
 	private TelemetryProperty.ServerType getServerType() {
-		ServerData serverData = Minecraft.getInstance().getCurrentServer();
-		if (serverData != null && serverData.isRealm()) {
-			return TelemetryProperty.ServerType.REALM;
-		} else {
-			return Minecraft.getInstance().hasSingleplayerServer() ? TelemetryProperty.ServerType.LOCAL : TelemetryProperty.ServerType.OTHER;
-		}
+		return Minecraft.getInstance().hasSingleplayerServer() ? TelemetryProperty.ServerType.LOCAL : TelemetryProperty.ServerType.OTHER;
 	}
 
 	public boolean send(TelemetryEventSender telemetryEventSender) {
