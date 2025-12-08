@@ -144,9 +144,7 @@ public class SocialInteractionsScreen extends Screen {
 
 	@Override
 	public void added() {
-		if (this.socialInteractionsPlayerList != null) {
-			this.socialInteractionsPlayerList.refreshHasDraftReport();
-		}
+		// Draft report refresh removed with chat reporting system
 	}
 
 	@Override

@@ -19,8 +19,6 @@ import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.ContainerObjectSelectionList;
 import net.minecraft.client.multiplayer.ClientPacketListener;
 import net.minecraft.client.multiplayer.PlayerInfo;
-import net.minecraft.client.multiplayer.chat.ChatLog;
-import net.minecraft.client.multiplayer.chat.LoggedChatMessage;
 import org.jetbrains.annotations.Nullable;
 
 @Environment(EnvType.CLIENT)
@@ -90,60 +88,17 @@ public class SocialInteractionsPlayerList extends ContainerObjectSelectionList<P
 	}
 
 	private void updatePlayersFromChatLog(Map<UUID, PlayerEntry> map, boolean bl) {
-		Map<UUID, GameProfile> map2 = collectProfilesFromChatLog(this.minecraft.getReportingContext().chatLog());
-		map2.forEach(
-			(uUID, gameProfile) -> {
-				PlayerEntry playerEntry;
-				if (bl) {
-					playerEntry = (PlayerEntry)map.computeIfAbsent(
-						uUID,
-						uUIDx -> {
-							PlayerEntry playerEntryx = new PlayerEntry(
-								this.minecraft,
-								this.socialInteractionsScreen,
-								gameProfile.getId(),
-								gameProfile.getName(),
-								this.minecraft.getSkinManager().createLookup(gameProfile, true),
-								true
-							);
-							playerEntryx.setRemoved(true);
-							return playerEntryx;
-						}
-					);
-				} else {
-					playerEntry = (PlayerEntry)map.get(uUID);
-					if (playerEntry == null) {
-						return;
-					}
-				}
-
-				playerEntry.setHasRecentMessages(true);
-			}
-		);
-	}
-
-	private static Map<UUID, GameProfile> collectProfilesFromChatLog(ChatLog chatLog) {
-		Map<UUID, GameProfile> map = new Object2ObjectLinkedOpenHashMap<>();
-
-		for (int i = chatLog.end(); i >= chatLog.start(); i--) {
-			if (chatLog.lookup(i) instanceof LoggedChatMessage.Player player && player.message().hasSignature()) {
-				map.put(player.profileId(), player.profile());
-			}
-		}
-
-		return map;
+		// Chat log functionality removed with chat reporting system
 	}
 
 	private void sortPlayerEntries() {
 		this.players.sort(Comparator.<PlayerEntry, Integer>comparing(playerEntry -> {
 			if (this.minecraft.isLocalPlayer(playerEntry.getPlayerId())) {
 				return 0;
-			} else if (this.minecraft.getReportingContext().hasDraftReportFor(playerEntry.getPlayerId())) {
-				return 1;
 			} else if (playerEntry.getPlayerId().version() == 2) {
-				return 4;
+				return 3;
 			} else {
-				return playerEntry.hasRecentMessages() ? 2 : 3;
+				return playerEntry.hasRecentMessages() ? 1 : 2;
 			}
 		}).thenComparing((PlayerEntry playerEntry) -> {
 			if (!playerEntry.getPlayerName().isBlank()) {
@@ -209,9 +164,5 @@ public class SocialInteractionsPlayerList extends ContainerObjectSelectionList<P
 				return;
 			}
 		}
-	}
-
-	public void refreshHasDraftReport() {
-		this.players.forEach(playerEntry -> playerEntry.refreshHasDraftReport(this.minecraft.getReportingContext()));
 	}
 }

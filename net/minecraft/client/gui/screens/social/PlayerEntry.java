@@ -21,8 +21,7 @@ import net.minecraft.client.gui.components.Tooltip;
 import net.minecraft.client.gui.components.WidgetSprites;
 import net.minecraft.client.gui.components.events.GuiEventListener;
 import net.minecraft.client.gui.narration.NarratableEntry;
-import net.minecraft.client.gui.screens.reporting.ReportPlayerScreen;
-import net.minecraft.client.multiplayer.chat.report.ReportingContext;
+
 import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.network.chat.CommonComponents;
 import net.minecraft.network.chat.Component;
@@ -34,13 +33,7 @@ import org.jetbrains.annotations.Nullable;
 
 @Environment(EnvType.CLIENT)
 public class PlayerEntry extends ContainerObjectSelectionList.Entry<PlayerEntry> {
-	private static final ResourceLocation DRAFT_REPORT_SPRITE = ResourceLocation.withDefaultNamespace("icon/draft_report");
 	private static final Duration TOOLTIP_DELAY = Duration.ofMillis(500L);
-	private static final WidgetSprites REPORT_BUTTON_SPRITES = new WidgetSprites(
-		ResourceLocation.withDefaultNamespace("social_interactions/report_button"),
-		ResourceLocation.withDefaultNamespace("social_interactions/report_button_disabled"),
-		ResourceLocation.withDefaultNamespace("social_interactions/report_button_highlighted")
-	);
 	private static final WidgetSprites MUTE_BUTTON_SPRITES = new WidgetSprites(
 		ResourceLocation.withDefaultNamespace("social_interactions/mute_button"),
 		ResourceLocation.withDefaultNamespace("social_interactions/mute_button_highlighted")
@@ -56,25 +49,18 @@ public class PlayerEntry extends ContainerObjectSelectionList.Entry<PlayerEntry>
 	private final Supplier<PlayerSkin> skinGetter;
 	private boolean isRemoved;
 	private boolean hasRecentMessages;
-	private final boolean reportingEnabled;
-	private boolean hasDraftReport;
-	private final boolean chatReportable;
 	@Nullable
 	private Button hideButton;
 	@Nullable
 	private Button showButton;
-	@Nullable
-	private Button reportButton;
 	private float tooltipHoverTime;
 	private static final Component HIDDEN = Component.translatable("gui.socialInteractions.status_hidden").withStyle(ChatFormatting.ITALIC);
 	private static final Component BLOCKED = Component.translatable("gui.socialInteractions.status_blocked").withStyle(ChatFormatting.ITALIC);
 	private static final Component OFFLINE = Component.translatable("gui.socialInteractions.status_offline").withStyle(ChatFormatting.ITALIC);
 	private static final Component HIDDEN_OFFLINE = Component.translatable("gui.socialInteractions.status_hidden_offline").withStyle(ChatFormatting.ITALIC);
 	private static final Component BLOCKED_OFFLINE = Component.translatable("gui.socialInteractions.status_blocked_offline").withStyle(ChatFormatting.ITALIC);
-	private static final Component REPORT_DISABLED_TOOLTIP = Component.translatable("gui.socialInteractions.tooltip.report.disabled");
 	private static final Component HIDE_TEXT_TOOLTIP = Component.translatable("gui.socialInteractions.tooltip.hide");
 	private static final Component SHOW_TEXT_TOOLTIP = Component.translatable("gui.socialInteractions.tooltip.show");
-	private static final Component REPORT_PLAYER_TOOLTIP = Component.translatable("gui.socialInteractions.tooltip.report");
 	private static final int SKIN_SIZE = 24;
 	private static final int PADDING = 4;
 	public static final int SKIN_SHADE = ARGB.color(190, 0, 0, 0);
@@ -89,10 +75,6 @@ public class PlayerEntry extends ContainerObjectSelectionList.Entry<PlayerEntry>
 		this.id = uUID;
 		this.playerName = string;
 		this.skinGetter = supplier;
-		ReportingContext reportingContext = minecraft.getReportingContext();
-		this.reportingEnabled = reportingContext.sender().isEnabled();
-		this.chatReportable = bl;
-		this.refreshHasDraftReport(reportingContext);
 		Component component = Component.translatable("gui.socialInteractions.narration.hide", new Object[]{string});
 		Component component2 = Component.translatable("gui.socialInteractions.narration.show", new Object[]{string});
 		PlayerSocialManager playerSocialManager = minecraft.getPlayerSocialManager();
@@ -101,25 +83,6 @@ public class PlayerEntry extends ContainerObjectSelectionList.Entry<PlayerEntry>
 		if (!SharedConstants.DEBUG_SOCIAL_INTERACTIONS && (!bl3 || !bl2 || playerSocialManager.isBlocked(uUID))) {
 			this.children = ImmutableList.of();
 		} else {
-			this.reportButton = new ImageButton(
-				0,
-				0,
-				20,
-				20,
-				REPORT_BUTTON_SPRITES,
-				button -> reportingContext.draftReportHandled(
-					minecraft, socialInteractionsScreen, () -> minecraft.setScreen(new ReportPlayerScreen(socialInteractionsScreen, reportingContext, this)), false
-				),
-				Component.translatable("gui.socialInteractions.report")
-			) {
-				@Override
-				protected MutableComponent createNarrationMessage() {
-					return PlayerEntry.this.getEntryNarationMessage(super.createNarrationMessage());
-				}
-			};
-			this.reportButton.active = this.reportingEnabled;
-			this.reportButton.setTooltip(this.createReportButtonTooltip());
-			this.reportButton.setTooltipDelay(TOOLTIP_DELAY);
 			this.hideButton = new ImageButton(0, 0, 20, 20, MUTE_BUTTON_SPRITES, button -> {
 				playerSocialManager.hidePlayer(uUID);
 				this.onHiddenOrShown(true, Component.translatable("gui.socialInteractions.hidden_in_chat", new Object[]{string}));
@@ -144,20 +107,11 @@ public class PlayerEntry extends ContainerObjectSelectionList.Entry<PlayerEntry>
 			this.showButton.setTooltipDelay(TOOLTIP_DELAY);
 			this.children = new ArrayList();
 			this.children.add(this.hideButton);
-			this.children.add(this.reportButton);
 			this.updateHideAndShowButton(playerSocialManager.isHidden(this.id));
 		}
 	}
 
-	public void refreshHasDraftReport(ReportingContext reportingContext) {
-		this.hasDraftReport = reportingContext.hasDraftReportFor(this.id);
-	}
 
-	private Tooltip createReportButtonTooltip() {
-		return !this.reportingEnabled
-			? Tooltip.create(REPORT_DISABLED_TOOLTIP)
-			: Tooltip.create(REPORT_PLAYER_TOOLTIP, Component.translatable("gui.socialInteractions.narration.report", new Object[]{this.playerName}));
-	}
 
 	@Override
 	public void renderContent(GuiGraphics guiGraphics, int i, int j, boolean bl, float f) {
@@ -181,24 +135,17 @@ public class PlayerEntry extends ContainerObjectSelectionList.Entry<PlayerEntry>
 			guiGraphics.fill(k, l, k + 24, l + 24, SKIN_SHADE);
 		}
 
-		if (this.hideButton != null && this.showButton != null && this.reportButton != null) {
+		if (this.hideButton != null && this.showButton != null) {
 			float g = this.tooltipHoverTime;
-			this.hideButton.setX(this.getContentX() + (this.getContentWidth() - this.hideButton.getWidth() - 4) - 20 - 4);
+			this.hideButton.setX(this.getContentX() + (this.getContentWidth() - this.hideButton.getWidth() - 4));
 			this.hideButton.setY(this.getContentY() + (this.getContentHeight() - this.hideButton.getHeight()) / 2);
 			this.hideButton.render(guiGraphics, i, j, f);
-			this.showButton.setX(this.getContentX() + (this.getContentWidth() - this.showButton.getWidth() - 4) - 20 - 4);
+			this.showButton.setX(this.getContentX() + (this.getContentWidth() - this.showButton.getWidth() - 4));
 			this.showButton.setY(this.getContentY() + (this.getContentHeight() - this.showButton.getHeight()) / 2);
 			this.showButton.render(guiGraphics, i, j, f);
-			this.reportButton.setX(this.getContentX() + (this.getContentWidth() - this.showButton.getWidth() - 4));
-			this.reportButton.setY(this.getContentY() + (this.getContentHeight() - this.showButton.getHeight()) / 2);
-			this.reportButton.render(guiGraphics, i, j, f);
 			if (g == this.tooltipHoverTime) {
 				this.tooltipHoverTime = 0.0F;
 			}
-		}
-
-		if (this.hasDraftReport && this.reportButton != null) {
-			guiGraphics.blitSprite(RenderPipelines.GUI_TEXTURED, DRAFT_REPORT_SPRITE, this.reportButton.getX() + 5, this.reportButton.getY() + 1, 15, 15);
 		}
 	}
 
@@ -238,10 +185,6 @@ public class PlayerEntry extends ContainerObjectSelectionList.Entry<PlayerEntry>
 
 	public boolean hasRecentMessages() {
 		return this.hasRecentMessages;
-	}
-
-	public boolean isChatReportable() {
-		return this.chatReportable;
 	}
 
 	private void onHiddenOrShown(boolean bl, Component component) {
