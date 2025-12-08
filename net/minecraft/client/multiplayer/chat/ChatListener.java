@@ -180,13 +180,11 @@ public class ChatListener {
 	}
 
 	private void logPlayerMessage(PlayerChatMessage playerChatMessage, GameProfile gameProfile, ChatTrustLevel chatTrustLevel) {
-		ChatLog chatLog = this.minecraft.getReportingContext().chatLog();
-		chatLog.push(LoggedChatMessage.player(gameProfile, playerChatMessage, chatTrustLevel));
+		// Chat logging removed - no longer needed without chat reporting
 	}
 
 	private void logSystemMessage(Component component, Instant instant) {
-		ChatLog chatLog = this.minecraft.getReportingContext().chatLog();
-		chatLog.push(LoggedChatMessage.system(component, instant));
+		// Chat logging removed - no longer needed without chat reporting
 	}
 
 	public void handleSystemMessage(Component component, boolean bl) {

@@ -87,7 +87,6 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.bossevents.CustomBossEvents;
 import net.minecraft.server.level.ChunkLoadCounter;
 import net.minecraft.server.level.ChunkMap;
-import net.minecraft.server.level.DemoMode;
 import net.minecraft.server.level.PlayerSpawnFinder;
 import net.minecraft.server.level.ServerChunkCache;
 import net.minecraft.server.level.ServerLevel;
@@ -244,7 +243,6 @@ public abstract class MinecraftServer extends ReentrantBlockableEventLoop<TickTa
 	private KeyPair keyPair;
 	@Nullable
 	private GameProfile singleplayerProfile;
-	private boolean isDemo;
 	private volatile boolean isReady;
 	private long lastOverloadWarningNanos;
 	protected final Services services;
@@ -1346,14 +1344,6 @@ public abstract class MinecraftServer extends ReentrantBlockableEventLoop<TickTa
 			&& this.getGameRules().getBoolean(GameRules.RULE_SPAWN_MONSTERS);
 	}
 
-	public boolean isDemo() {
-		return this.isDemo;
-	}
-
-	public void setDemo(boolean bl) {
-		this.isDemo = bl;
-	}
-
 	public Map<String, String> getCodeOfConducts() {
 		return Map.of();
 	}
@@ -2122,7 +2112,7 @@ public abstract class MinecraftServer extends ReentrantBlockableEventLoop<TickTa
 	}
 
 	public ServerPlayerGameMode createGameModeForPlayer(ServerPlayer serverPlayer) {
-		return (ServerPlayerGameMode)(this.isDemo() ? new DemoMode(serverPlayer) : new ServerPlayerGameMode(serverPlayer));
+		return new ServerPlayerGameMode(serverPlayer);
 	}
 
 	@Nullable

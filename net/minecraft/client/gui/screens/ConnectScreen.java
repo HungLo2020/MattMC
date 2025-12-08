@@ -17,7 +17,6 @@ import net.minecraft.client.multiplayer.ClientHandshakePacketListenerImpl;
 import net.minecraft.client.multiplayer.LevelLoadTracker;
 import net.minecraft.client.multiplayer.ServerData;
 import net.minecraft.client.multiplayer.TransferState;
-import net.minecraft.client.multiplayer.chat.report.ReportEnvironment;
 import net.minecraft.client.multiplayer.resolver.ResolvedServerAddress;
 import net.minecraft.client.multiplayer.resolver.ServerAddress;
 import net.minecraft.client.multiplayer.resolver.ServerNameResolver;
@@ -80,7 +79,6 @@ public class ConnectScreen extends Screen {
 
 			minecraft.disconnectWithProgressScreen();
 			minecraft.prepareForMultiplayer();
-			minecraft.updateReportEnvironment(ReportEnvironment.thirdParty(serverData.ip));
 			minecraft.quickPlayLog().setWorldData(QuickPlayLog.Type.MULTIPLAYER, serverData.ip, serverData.name);
 			minecraft.setScreen(connectScreen);
 			connectScreen.connect(minecraft, serverAddress, serverData, transferState);

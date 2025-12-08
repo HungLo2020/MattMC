@@ -269,7 +269,6 @@ public class Main {
 						threadx, levelStorageAccess, packRepository, worldStem, dedicatedServerSettings, DataFixers.getDataFixer(), services
 					);
 					dedicatedServerx.setPort(optionSet.valueOf(optionSpec12));
-					dedicatedServerx.setDemo(optionSet.has(optionSpec3));
 					dedicatedServerx.setId(optionSet.valueOf(optionSpec13));
 					boolean blx = !optionSet.has(optionSpec) && !optionSet.valuesOf(optionSpec16).contains("nogui");
 					if (blx && !GraphicsEnvironment.isHeadless()) {

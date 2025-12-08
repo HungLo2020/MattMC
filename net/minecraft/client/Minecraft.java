@@ -115,8 +115,6 @@ import net.minecraft.client.multiplayer.MultiPlayerGameMode;
 import net.minecraft.client.multiplayer.ProfileKeyPairManager;
 import net.minecraft.client.multiplayer.ServerData;
 import net.minecraft.client.multiplayer.chat.ChatListener;
-import net.minecraft.client.multiplayer.chat.report.ReportEnvironment;
-import net.minecraft.client.multiplayer.chat.report.ReportingContext;
 import net.minecraft.client.particle.ParticleEngine;
 import net.minecraft.client.particle.ParticleResources;
 import net.minecraft.client.player.LocalPlayer;
@@ -302,7 +300,6 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 	private final Proxy proxy;
 	private final boolean offlineDeveloperMode;
 	private final LevelStorageSource levelSource;
-	private final boolean demo;
 	private final boolean allowsMultiplayer;
 	private final boolean allowsChat;
 	private final ReloadableResourceManager resourceManager;
@@ -389,7 +386,6 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 	private TimerQuery.FrameProfile currentFrameProfile;
 	private final GameNarrator narrator;
 	private final ChatListener chatListener;
-	private ReportingContext reportingContext;
 	private final CommandHistory commandHistory;
 	private final DirectoryValidator directoryValidator;
 	private boolean gameLoadFinished;
@@ -437,7 +433,6 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 		}, Util.nonCriticalIoPool());
 		LOGGER.info("Setting user: {}", this.user.getName());
 		LOGGER.debug("(Session ID is {})", this.user.getSessionId());
-		this.demo = gameConfig.game.demo;
 		this.allowsMultiplayer = !gameConfig.game.disableMultiplayer;
 		this.allowsChat = !gameConfig.game.disableChat;
 		this.singleplayerServer = null;
@@ -658,7 +653,6 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 		this.narrator.checkStatus(this.options.narrator().get() != NarratorStatus.OFF);
 		this.chatListener = new ChatListener(this);
 		this.chatListener.setMessageDelay(this.options.chatDelay().get());
-		this.reportingContext = ReportingContext.create(ReportEnvironment.local(), this.userApiService);
 		TitleScreen.registerTextures(this.textureManager);
 		LoadingOverlay.registerTextures(this.textureManager);
 		this.gameRenderer.getPanorama().registerTextures(this.textureManager);
@@ -2019,7 +2013,6 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 			);
 			levelLoadTracker.setServerChunkStatusView(this.singleplayerServer.createChunkLoadStatusView(i));
 			this.isLocalServer = true;
-			this.updateReportEnvironment(ReportEnvironment.local());
 			this.quickPlayLog.setWorldData(QuickPlayLog.Type.SINGLEPLAYER, levelStorageAccess.getLevelId(), worldStem.worldData().getLevelName());
 		} catch (Throwable var15) {
 			CrashReport crashReport = CrashReport.forThrowable(var15, "Starting integrated server");
@@ -2239,7 +2232,7 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 	}
 
 	public final boolean isDemo() {
-		return this.demo;
+		return false;
 	}
 
 	public final boolean canSwitchGameMode() {
@@ -2380,12 +2373,6 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 
 	public CompletableFuture<Void> delayTextureReload() {
 		return this.submit(() -> this.reloadResourcePacks()).thenCompose(completableFuture -> completableFuture);
-	}
-
-	public void updateReportEnvironment(ReportEnvironment reportEnvironment) {
-		if (!this.reportingContext.matches(reportEnvironment)) {
-			this.reportingContext = ReportingContext.create(reportEnvironment, this.userApiService);
-		}
 	}
 
 	@Nullable
@@ -2751,10 +2738,6 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 
 	public ChatListener getChatListener() {
 		return this.chatListener;
-	}
-
-	public ReportingContext getReportingContext() {
-		return this.reportingContext;
 	}
 
 	public QuickPlayLog quickPlayLog() {

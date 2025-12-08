@@ -39,7 +39,6 @@ import org.jetbrains.annotations.Nullable;
 
 @Environment(EnvType.CLIENT)
 public class PauseScreen extends Screen {
-	private static final ResourceLocation DRAFT_REPORT_SPRITE = ResourceLocation.withDefaultNamespace("icon/draft_report");
 	private static final int COLUMNS = 2;
 	private static final int MENU_PADDING_TOP = 50;
 	private static final int BUTTON_PADDING = 4;
@@ -109,9 +108,7 @@ public class PauseScreen extends Screen {
 					CommonComponents.disconnectButtonLabel(this.minecraft.isLocalServer()),
 					button -> {
 						button.active = false;
-						this.minecraft
-							.getReportingContext()
-							.draftReportHandled(this.minecraft, this, () -> this.minecraft.disconnectFromWorld(ClientLevel.DEFAULT_QUIT_MESSAGE), true);
+						this.minecraft.disconnectFromWorld(ClientLevel.DEFAULT_QUIT_MESSAGE);
 					}
 				)
 				.width(204)
@@ -174,16 +171,7 @@ public class PauseScreen extends Screen {
 			NowPlayingToast.renderToast(guiGraphics, this.font);
 		}
 
-		if (this.showPauseMenu && this.minecraft != null && this.minecraft.getReportingContext().hasDraftReport() && this.disconnectButton != null) {
-			guiGraphics.blitSprite(
-				RenderPipelines.GUI_TEXTURED,
-				DRAFT_REPORT_SPRITE,
-				this.disconnectButton.getX() + this.disconnectButton.getWidth() - 17,
-				this.disconnectButton.getY() + 3,
-				15,
-				15
-			);
-		}
+
 	}
 
 	@Override
