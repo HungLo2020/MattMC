@@ -1,5 +1,6 @@
 package net.minecraft.client.gui.narration;
 
+import java.util.function.Consumer;
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
 import net.minecraft.network.chat.Component;
@@ -9,7 +10,7 @@ import net.minecraft.network.chat.Component;
  */
 @Environment(EnvType.CLIENT)
 public class ScreenNarrationCollector {
-	public void update(Runnable runnable) {
+	public void update(Consumer<NarrationElementOutput> consumer) {
 		// Narration disabled
 	}
 
