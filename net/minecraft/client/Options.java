@@ -665,26 +665,6 @@ public class Options {
 		70,
 		integer -> Minecraft.getInstance().levelRenderer.needsUpdate()
 	);
-	private static final Component TELEMETRY_TOOLTIP = Component.translatable(
-		"options.telemetry.button.tooltip",
-		new Object[]{Component.translatable("options.telemetry.state.minimal"), Component.translatable("options.telemetry.state.all")}
-	);
-	private final OptionInstance<Boolean> telemetryOptInExtra = OptionInstance.createBoolean(
-		"options.telemetry.button",
-		OptionInstance.cachedConstantTooltip(TELEMETRY_TOOLTIP),
-		(component, boolean_) -> {
-			Minecraft minecraftx = Minecraft.getInstance();
-			if (!minecraftx.allowsTelemetry()) {
-				return Component.translatable("options.telemetry.state.none");
-			} else {
-				return boolean_ && minecraftx.extraTelemetryAvailable()
-					? Component.translatable("options.telemetry.state.all")
-					: Component.translatable("options.telemetry.state.minimal");
-			}
-		},
-		false,
-		boolean_ -> {}
-	);
 	private static final Component ACCESSIBILITY_TOOLTIP_SCREEN_EFFECT = Component.translatable("options.screenEffectScale.tooltip");
 	private final OptionInstance<Double> screenEffectScale = new OptionInstance<>(
 		"options.screenEffectScale",
@@ -1202,10 +1182,6 @@ public class Options {
 		return this.fov;
 	}
 
-	public OptionInstance<Boolean> telemetryOptInExtra() {
-		return this.telemetryOptInExtra;
-	}
-
 	public OptionInstance<Double> screenEffectScale() {
 		return this.screenEffectScale;
 	}
@@ -1400,7 +1376,6 @@ public class Options {
 		fieldAccess.process("saveChatDrafts", this.saveChatDrafts);
 		fieldAccess.process("panoramaScrollSpeed", this.panoramaSpeed);
 		fieldAccess.process("panoramaTheme", this.panoramaTheme);
-		fieldAccess.process("telemetryOptInExtra", this.telemetryOptInExtra);
 		this.onboardAccessibility = fieldAccess.process("onboardAccessibility", this.onboardAccessibility);
 		fieldAccess.process("menuBackgroundBlurriness", this.menuBackgroundBlurriness);
 		this.startedCleanly = fieldAccess.process("startedCleanly", this.startedCleanly);

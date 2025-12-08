@@ -186,7 +186,6 @@ public class ClientHandshakePacketListenerImpl implements ClientLoginPacketListe
 					new CommonListenerCookie(
 						this.levelLoadTracker,
 						gameProfile,
-						this.minecraft.getTelemetryManager().createWorldSessionManager(this.newWorld, this.worldLoadDuration, this.minigameName),
 						ClientRegistryLayer.createRegistryAccess().compositeAccess(),
 						FeatureFlags.DEFAULT_FLAGS,
 						null,

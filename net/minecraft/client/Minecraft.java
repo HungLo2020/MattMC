@@ -161,9 +161,6 @@ import net.minecraft.client.server.IntegratedServer;
 import net.minecraft.client.sounds.MusicInfo;
 import net.minecraft.client.sounds.MusicManager;
 import net.minecraft.client.sounds.SoundManager;
-import net.minecraft.client.telemetry.ClientTelemetryManager;
-import net.minecraft.client.telemetry.TelemetryProperty;
-import net.minecraft.client.telemetry.events.GameLoadTimesEvent;
 import net.minecraft.client.tutorial.Tutorial;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -335,7 +332,6 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 	private final Tutorial tutorial;
 	private final PlayerSocialManager playerSocialManager;
 	private final BlockEntityRenderDispatcher blockEntityRenderDispatcher;
-	private final ClientTelemetryManager telemetryManager;
 	private final ProfileKeyPairManager profileKeyPairManager;
 	private final QuickPlayLog quickPlayLog;
 	private final Services services;
@@ -483,7 +479,6 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 				}
 			}
 		});
-		GameLoadTimesEvent.INSTANCE.endStep(TelemetryProperty.LOAD_TIME_PRE_WINDOW_MS);
 
 		try {
 			this.window.setIcon(this.vanillaPackResources, SharedConstants.getCurrentVersion().stable() ? IconSet.RELEASE : IconSet.SNAPSHOT);
@@ -656,7 +651,6 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 		this.window.setDefaultErrorCallback();
 		this.resizeDisplay();
 		this.gameRenderer.preloadUiShader(this.vanillaPackResources.asProvider());
-		this.telemetryManager = new ClientTelemetryManager(this, this.userApiService, this.user);
 		this.profileKeyPairManager = this.offlineDeveloperMode
 			? ProfileKeyPairManager.EMPTY_KEY_MANAGER
 			: ProfileKeyPairManager.create(this.userApiService, this.user, path);
@@ -673,7 +667,6 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 		this.reloadStateTracker.startReload(ResourceLoadStateTracker.ReloadReason.INITIAL, list2);
 		ReloadInstance reloadInstance = this.resourceManager
 			.createReload(Util.backgroundExecutor().forName("resourceLoad"), this, RESOURCE_RELOAD_INITIAL_TASK, list2);
-		GameLoadTimesEvent.INSTANCE.beginStep(TelemetryProperty.LOAD_TIME_LOADING_OVERLAY_MS);
 		Minecraft.GameLoadCookie gameLoadCookie = new Minecraft.GameLoadCookie(gameConfig.quickPlay);
 		this.setOverlay(
 			new LoadingOverlay(this, reloadInstance, optional -> Util.ifElse(optional, throwable -> this.rollbackResourcePacks(throwable, gameLoadCookie), () -> {
@@ -721,9 +714,6 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 
 	private void onGameLoadFinished(@Nullable Minecraft.GameLoadCookie gameLoadCookie) {
 		Runnable runnable = this.buildInitialScreens(gameLoadCookie);
-		GameLoadTimesEvent.INSTANCE.endStep(TelemetryProperty.LOAD_TIME_LOADING_OVERLAY_MS);
-		GameLoadTimesEvent.INSTANCE.endStep(TelemetryProperty.LOAD_TIME_TOTAL_TIME_MS);
-		GameLoadTimesEvent.INSTANCE.send(this.telemetryManager.getOutsideSessionSender());
 		runnable.run();
 		this.options.startedCleanly = true;
 		this.options.save();
@@ -1225,7 +1215,6 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 		}
 
 		try {
-			this.telemetryManager.close();
 			this.regionalCompliancies.close();
 			this.atlasManager.close();
 			this.fontManager.close();
@@ -2002,10 +1991,6 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 		});
 	}
 
-	public ClientTelemetryManager getTelemetryManager() {
-		return this.telemetryManager;
-	}
-
 	public double getGpuUtilization() {
 		return this.gpuUtilization;
 	}
@@ -2221,18 +2206,6 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 
 	private UserProperties userProperties() {
 		return (UserProperties)this.userPropertiesFuture.join();
-	}
-
-	public boolean telemetryOptInExtra() {
-		return this.extraTelemetryAvailable() && this.options.telemetryOptInExtra().get();
-	}
-
-	public boolean extraTelemetryAvailable() {
-		return this.allowsTelemetry() && this.userProperties().flag(UserFlag.OPTIONAL_TELEMETRY_AVAILABLE);
-	}
-
-	public boolean allowsTelemetry() {
-		return SharedConstants.IS_RUNNING_IN_IDE && !SharedConstants.DEBUG_FORCE_TELEMETRY ? false : this.userProperties().flag(UserFlag.TELEMETRY_ENABLED);
 	}
 
 	public boolean allowsMultiplayer() {
