@@ -36,7 +36,7 @@ public class PlayerInfo {
 
 	private static Supplier<PlayerSkin> createSkinLookup(PlayerProfile playerProfile) {
 		Minecraft minecraft = Minecraft.getInstance();
-		boolean bl = !minecraft.isLocalPlayer(gameProfile.getId());
+		boolean bl = !minecraft.isLocalPlayer(playerProfile.id());
 		return minecraft.getSkinManager().createLookup(gameProfile, bl);
 	}
 

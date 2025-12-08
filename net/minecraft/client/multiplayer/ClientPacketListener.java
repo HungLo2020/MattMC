@@ -1959,7 +1959,7 @@ public class ClientPacketListener extends ClientCommonPacketListenerImpl impleme
 		PlayerProfile playerProfile = playerInfo.getProfile();
 		SignatureValidator signatureValidator = this.minecraft.services().profileKeySignatureValidator();
 		if (signatureValidator == null) {
-			LOGGER.warn("Ignoring chat session from {} due to missing Services public key", gameProfile.getName());
+			LOGGER.warn("Ignoring chat session from {} due to missing Services public key", playerProfile.name());
 			playerInfo.clearChatSession(this.enforcesSecureChat());
 		} else {
 			Data data = entry.chatSession();
@@ -1968,7 +1968,7 @@ public class ClientPacketListener extends ClientCommonPacketListenerImpl impleme
 					RemoteChatSession remoteChatSession = data.validate(gameProfile, signatureValidator);
 					playerInfo.setChatSession(remoteChatSession);
 				} catch (ValidationException var7) {
-					LOGGER.error("Failed to validate profile key for player: '{}'", gameProfile.getName(), var7);
+					LOGGER.error("Failed to validate profile key for player: '{}'", playerProfile.name(), var7);
 					playerInfo.clearChatSession(this.enforcesSecureChat());
 				}
 			} else {

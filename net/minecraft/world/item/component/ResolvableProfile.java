@@ -178,7 +178,7 @@ public abstract sealed class ResolvableProfile implements TooltipProvider permit
 
 		@Override
 		public Optional<String> name() {
-			return this.contents.map(gameProfile -> Optional.of(gameProfile.getName()), partial -> partial.name);
+			return this.contents.map(gameProfile -> Optional.of(playerProfile.name()), partial -> partial.name);
 		}
 
 		public boolean equals(Object object) {

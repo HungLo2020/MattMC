@@ -67,8 +67,8 @@ public class LegacyTextFilter extends ServerTextFilter {
 					JsonObject jsonObjectx = new JsonObject();
 					jsonObjectx.addProperty("server", string3);
 					jsonObjectx.addProperty("room", string4);
-					jsonObjectx.addProperty("user_id", gameProfile.getId().toString());
-					jsonObjectx.addProperty("user_display_name", gameProfile.getName());
+					jsonObjectx.addProperty("user_id", playerProfile.id().toString());
+					jsonObjectx.addProperty("user_display_name", playerProfile.name());
 					return jsonObjectx;
 				};
 				ServerTextFilter.MessageEncoder messageEncoder;
@@ -78,8 +78,8 @@ public class LegacyTextFilter extends ServerTextFilter {
 						jsonObjectx.addProperty("rule", i);
 						jsonObjectx.addProperty("server", string3);
 						jsonObjectx.addProperty("room", string4);
-      jsonObjectx.addProperty("player", gameProfile.getId().toString());
-      jsonObjectx.addProperty("player_display_name", gameProfile.name());
+      jsonObjectx.addProperty("player", playerProfile.id().toString());
+      jsonObjectx.addProperty("player_display_name", playerProfile.name());
 						jsonObjectx.addProperty("text", string3x);
 						jsonObjectx.addProperty("language", "*");
 						return jsonObjectx;
@@ -91,8 +91,8 @@ public class LegacyTextFilter extends ServerTextFilter {
 						jsonObjectx.addProperty("rule_id", string6);
 						jsonObjectx.addProperty("category", string3);
 						jsonObjectx.addProperty("subcategory", string4);
-      jsonObjectx.addProperty("user_id", gameProfile.id().toString());
-						jsonObjectx.addProperty("user_display_name", gameProfile.getName());
+      jsonObjectx.addProperty("user_id", playerProfile.id().toString());
+						jsonObjectx.addProperty("user_display_name", playerProfile.name());
 						jsonObjectx.addProperty("text", string4x);
 						jsonObjectx.addProperty("language", "*");
 						return jsonObjectx;

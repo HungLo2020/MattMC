@@ -5,9 +5,9 @@ import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
 import com.google.common.hash.Hashing;
 import net.minecraft.server.profile.PlayerProfile;
-import com.mojang.authlib.SignatureState;
+import net.minecraft.client.auth.SignatureState;
 import com.mojang.authlib.minecraft.MinecraftProfileTexture;
-import com.mojang.authlib.minecraft.MinecraftProfileTextures;
+import net.minecraft.client.auth.MinecraftProfileTextures;
 import com.mojang.authlib.minecraft.MinecraftProfileTexture.Type;
 import net.minecraft.server.profile.ProfileProperty;
 import com.mojang.logging.LogUtils;
@@ -102,7 +102,7 @@ public class SkinManager {
 			return CompletableFuture.completedFuture(Optional.of(playerSkin));
 		} else {
 			ProfileProperty property = this.services.sessionService().getPackedTextures(gameProfile);
-			return this.skinCache.getUnchecked(new SkinManager.CacheKey(gameProfile.getId(), property));
+			return this.skinCache.getUnchecked(new SkinManager.CacheKey(playerProfile.id(), property));
 		}
 	}
 

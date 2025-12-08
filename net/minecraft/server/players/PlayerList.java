@@ -757,13 +757,13 @@ public abstract class PlayerList {
 
 	public ServerStatsCounter getPlayerStats(Player player) {
 		PlayerProfile playerProfile = player.getGameProfile();
-		UUID uUID = gameProfile.id();
+		UUID uUID = playerProfile.id();
 		ServerStatsCounter serverStatsCounter = (ServerStatsCounter)this.stats.get(uUID);
 		if (serverStatsCounter == null) {
 			File file = this.server.getWorldPath(LevelResource.PLAYER_STATS_DIR).toFile();
 			File file2 = new File(file, uUID + ".json");
 			if (!file2.exists()) {
-				File file3 = new File(file, gameProfile.name() + ".json");
+				File file3 = new File(file, playerProfile.name() + ".json");
 				Path path = file3.toPath();
 				if (FileUtil.isPathNormalized(path) && FileUtil.isPathPortable(path) && path.startsWith(file.getPath()) && file3.isFile()) {
 					file3.renameTo(file2);

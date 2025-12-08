@@ -3,7 +3,7 @@ package net.minecraft.client.gui.screens.social;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import net.minecraft.server.profile.PlayerProfile;
-import com.mojang.authlib.minecraft.UserApiService;
+import net.minecraft.client.auth.UserApiService;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -72,7 +72,7 @@ public class PlayerSocialManager {
 
 	public void addPlayer(PlayerInfo playerInfo) {
 		PlayerProfile playerProfile = playerInfo.getProfile();
-			this.discoveredNamesToUUID.put(gameProfile.getName(), gameProfile.getId());
+			this.discoveredNamesToUUID.put(playerProfile.name(), playerProfile.id());
 		if (this.minecraft.screen instanceof SocialInteractionsScreen socialInteractionsScreen) {
 			socialInteractionsScreen.onAddPlayer(playerInfo);
 		}

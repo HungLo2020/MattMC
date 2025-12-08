@@ -201,7 +201,7 @@ public class PlayerTabOverlay {
 				PlayerTabOverlay.ScoreDisplayEntry scoreDisplayEntry = (PlayerTabOverlay.ScoreDisplayEntry)list2.get(x);
 				PlayerProfile playerProfile = playerInfo2.getProfile();
 				if (bl) {
-					Player player = this.minecraft.level.getPlayerByUUID(gameProfile.getId());
+					Player player = this.minecraft.level.getPlayerByUUID(playerProfile.id());
 					boolean bl2 = player != null && AvatarRenderer.isPlayerUpsideDown(player);
 					PlayerFaceRenderer.draw(guiGraphics, playerInfo2.getSkin().body().texturePath(), z, aa, 8, playerInfo2.showHat(), bl2, -1);
 					z += 9;
@@ -212,7 +212,7 @@ public class PlayerTabOverlay {
 					int ab = z + k + 1;
 					int ac = ab + r;
 					if (ac - ab > 5) {
-						this.renderTablistScore(objective, aa, scoreDisplayEntry, ab, ac, gameProfile.getId(), guiGraphics);
+						this.renderTablistScore(objective, aa, scoreDisplayEntry, ab, ac, playerProfile.id(), guiGraphics);
 					}
 				}
 

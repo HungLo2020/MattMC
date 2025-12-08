@@ -81,7 +81,7 @@ public class DebugConfigCommand {
 	private static int config(CommandSourceStack commandSourceStack, ServerPlayer serverPlayer) {
 		PlayerProfile playerProfile = serverPlayer.getGameProfile();
 		serverPlayer.connection.switchToConfig();
-		commandSourceStack.sendSuccess(() -> Component.literal("Switched player " + gameProfile.getName() + "(" + gameProfile.getId() + ") to config mode"), false);
+		commandSourceStack.sendSuccess(() -> Component.literal("Switched player " + playerProfile.name() + "(" + playerProfile.id() + ") to config mode"), false);
 		return 1;
 	}
 

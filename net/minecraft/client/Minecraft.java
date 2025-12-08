@@ -3,14 +3,14 @@ package net.minecraft.client;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
 import net.minecraft.server.profile.PlayerProfile;
-import com.mojang.authlib.exceptions.AuthenticationException;
-import com.mojang.authlib.minecraft.BanDetails;
-import com.mojang.authlib.minecraft.UserApiService;
-import com.mojang.authlib.minecraft.UserApiService.UserFlag;
-import com.mojang.authlib.minecraft.UserApiService.UserProperties;
-import com.mojang.authlib.yggdrasil.ProfileActionType;
-import com.mojang.authlib.yggdrasil.ProfileResult;
-import com.mojang.authlib.yggdrasil.YggdrasilAuthenticationService;
+
+import net.minecraft.client.auth.BanDetails;
+import net.minecraft.client.auth.UserApiService;
+import net.minecraft.client.auth.UserApiService.UserFlag;
+import net.minecraft.client.auth.UserApiService.UserProperties;
+import net.minecraft.client.auth.ProfileResult.ProfileActionType;
+import net.minecraft.client.auth.ProfileResult;
+
 import com.mojang.blaze3d.TracyFrameCapture;
 import com.mojang.blaze3d.pipeline.MainTarget;
 import com.mojang.blaze3d.pipeline.RenderTarget;
@@ -414,22 +414,13 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 		this.vanillaPackResources = clientPackSource.getVanillaPack();
 		this.proxy = gameConfig.user.proxy;
 		this.offlineDeveloperMode = gameConfig.game.offlineDeveloperMode;
-		// YggdrasilAuthenticationService.createOffline doesn't exist in public API, use regular constructor
-		YggdrasilAuthenticationService yggdrasilAuthenticationService = new YggdrasilAuthenticationService(this.proxy);
-		this.services = Services.create(yggdrasilAuthenticationService, this.gameDirectory);
+		// Offline mode - no Yggdrasil authentication
+		this.services = Services.createOffline(this.gameDirectory);
 		this.user = gameConfig.user.user;
-		this.profileFuture = this.offlineDeveloperMode
-			? CompletableFuture.completedFuture(null)
-			: CompletableFuture.supplyAsync(() -> this.services.sessionService().fetchProfile(this.user.getProfileId(), true), Util.nonCriticalIoPool());
-		this.userApiService = this.createUserApiService(yggdrasilAuthenticationService, gameConfig);
-		this.userPropertiesFuture = CompletableFuture.supplyAsync(() -> {
-			try {
-				return this.userApiService.fetchProperties();
-			} catch (AuthenticationException var2x) {
-				LOGGER.error("Failed to fetch user properties", (Throwable)var2x);
-				return UserApiService.OFFLINE_PROPERTIES;
-			}
-		}, Util.nonCriticalIoPool());
+		// Always offline - no profile fetching from Mojang
+		this.profileFuture = CompletableFuture.completedFuture(null);
+		this.userApiService = UserApiService.OFFLINE;
+		this.userPropertiesFuture = CompletableFuture.completedFuture(UserApiService.OFFLINE_PROPERTIES);
 		LOGGER.info("Setting user: {}", this.user.getName());
 		LOGGER.debug("(Session ID is {})", this.user.getSessionId());
 		this.allowsMultiplayer = !gameConfig.game.disableMultiplayer;
@@ -747,18 +738,9 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 			}, banDetails));
 		}
 
+		// Offline mode - no profile action checks needed
 		ProfileResult profileResult = (ProfileResult)this.profileFuture.join();
-		if (profileResult != null) {
-			PlayerProfile playerProfile = profileResult.profile();
-			Set<ProfileActionType> set = profileResult.actions();
-			if (set.contains(ProfileActionType.FORCED_NAME_CHANGE)) {
-				list.add((Function<Runnable, Screen>)(Runnable runnable) -> BanNoticeScreens.createNameBan(gameProfile.getName(), runnable));
-			}
-
-			if (set.contains(ProfileActionType.USING_BANNED_SKIN)) {
-				list.add(BanNoticeScreens::createSkinBan);
-			}
-		}
+		// Profile result is always null in offline mode
 
 		return bl;
 	}
@@ -799,10 +781,9 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 		return stringBuilder.toString();
 	}
 
-	private UserApiService createUserApiService(YggdrasilAuthenticationService yggdrasilAuthenticationService, GameConfig gameConfig) {
-		return gameConfig.game.offlineDeveloperMode
-			? UserApiService.OFFLINE
-			: yggdrasilAuthenticationService.createUserApiService(gameConfig.user.user.getAccessToken());
+	private UserApiService createUserApiService(GameConfig gameConfig) {
+		// Always offline mode
+		return UserApiService.OFFLINE;
 	}
 
 	public boolean isOfflineDeveloperMode() {
@@ -2391,8 +2372,8 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 	}
 
 	public PlayerProfile getGameProfile() {
-		ProfileResult profileResult = (ProfileResult)this.profileFuture.join();
-		return profileResult != null ? profileResult.profile() : new PlayerProfile(this.user.getProfileId(), this.user.getName());
+		// Offline mode - create profile from local user info
+		return new PlayerProfile(this.user.getProfileId(), this.user.getName());
 	}
 
 	public Proxy getProxy() {

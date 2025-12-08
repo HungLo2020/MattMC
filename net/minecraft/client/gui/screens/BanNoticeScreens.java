@@ -1,6 +1,6 @@
 package net.minecraft.client.gui.screens;
 
-import com.mojang.authlib.minecraft.BanDetails;
+import net.minecraft.client.auth.BanDetails;
 import it.unimi.dsi.fastutil.booleans.BooleanConsumer;
 import java.net.URI;
 import java.time.Duration;
