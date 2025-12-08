@@ -179,7 +179,7 @@ public class ClientHandshakePacketListenerImpl implements ClientLoginPacketListe
 					this.connection,
 					new CommonListenerCookie(
 						this.levelLoadTracker,
-						gameProfile,
+						playerProfile,
 						ClientRegistryLayer.createRegistryAccess().compositeAccess(),
 						FeatureFlags.DEFAULT_FLAGS,
 						null,

@@ -213,25 +213,25 @@ public interface ByteBufCodecs {
 		private static final int MAX_PROPERTY_SIGNATURE_LENGTH = 1024;
 		private static final int MAX_PROPERTIES = 16;
 
-		public ProfileProfilePropertyMap decode(ByteBuf byteBuf) {
+		public ProfilePropertyMap decode(ByteBuf byteBuf) {
 			int i = ByteBufCodecs.readCount(byteBuf, 16);
-			ProfileProfilePropertyMap map = new ProfilePropertyMap();
+			ProfilePropertyMap map = new ProfilePropertyMap();
 
 			for (int j = 0; j < i; j++) {
 				String string = Utf8String.read(byteBuf, 64);
 				String string2 = Utf8String.read(byteBuf, 32767);
 				String string3 = FriendlyByteBuf.readNullable(byteBuf, byteBufx -> Utf8String.read(byteBufx, 1024));
-				ProfileProfileProperty property = new ProfileProperty(string, string2, string3);
+				ProfileProperty property = new ProfileProperty(string, string2, string3);
 				map.put(property.name(), property);
 			}
 
 			return map;
 		}
 
-		public void encode(ByteBuf byteBuf, ProfileProfilePropertyMap propertyMap) {
+		public void encode(ByteBuf byteBuf, ProfilePropertyMap propertyMap) {
 			ByteBufCodecs.writeCount(byteBuf, propertyMap.size(), 16);
 
-			for (ProfileProfileProperty property : propertyMap.values()) {
+			for (ProfileProperty property : propertyMap.values()) {
 				Utf8String.write(byteBuf, property.name(), 64);
 				Utf8String.write(byteBuf, property.value(), 32767);
 				FriendlyByteBuf.writeNullable(byteBuf, property.signature(), (byteBufx, string) -> Utf8String.write(byteBufx, string, 1024));
@@ -244,7 +244,7 @@ public interface ByteBufCodecs {
 		public PlayerProfile decode(ByteBuf byteBuf) {
 			UUID id = UUIDUtil.STREAM_CODEC.decode(byteBuf);
 			String name = PLAYER_NAME.decode(byteBuf);
-			ProfileProfilePropertyMap props = GAME_PROFILE_PROPERTIES.decode(byteBuf);
+			ProfilePropertyMap props = GAME_PROFILE_PROPERTIES.decode(byteBuf);
 			return new PlayerProfile(id, name, props);
 		}
 		@Override

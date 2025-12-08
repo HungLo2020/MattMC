@@ -46,7 +46,7 @@ public class FetchProfileCommand {
 	}
 
 	private static void reportResolvedProfile(CommandSourceStack commandSourceStack, PlayerProfile playerProfile, String string, Component component) {
-		ResolvableProfile resolvableProfile = ResolvableProfile.createResolved(gameProfile);
+		ResolvableProfile resolvableProfile = ResolvableProfile.createResolved(playerProfile);
 		ResolvableProfile.CODEC
 			.encodeStart(NbtOps.INSTANCE, resolvableProfile)
 			.ifSuccess(
@@ -95,7 +95,7 @@ public class FetchProfileCommand {
 					Optional<PlayerProfile> optional = profileResolver.fetchByName(string);
 					minecraftServer.execute(
 						() -> optional.ifPresentOrElse(
-							gameProfile -> reportResolvedProfile(commandSourceStack, gameProfile, "commands.fetchprofile.name.success", component),
+							playerProfile -> reportResolvedProfile(commandSourceStack, playerProfile, "commands.fetchprofile.name.success", component),
 							() -> commandSourceStack.sendFailure(Component.translatable("commands.fetchprofile.name.failure", component))
 						)
 					);
@@ -114,7 +114,7 @@ public class FetchProfileCommand {
 					Optional<PlayerProfile> optional = profileResolver.fetchById(uUID);
 					minecraftServer.execute(
 						() -> optional.ifPresentOrElse(
-							gameProfile -> reportResolvedProfile(commandSourceStack, gameProfile, "commands.fetchprofile.id.success", component),
+							playerProfile -> reportResolvedProfile(commandSourceStack, playerProfile, "commands.fetchprofile.id.success", component),
 							() -> commandSourceStack.sendFailure(Component.translatable("commands.fetchprofile.id.failure", component))
 						)
 					);

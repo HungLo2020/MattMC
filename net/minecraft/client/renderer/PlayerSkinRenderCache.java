@@ -33,9 +33,9 @@ public class PlayerSkinRenderCache {
 				public CompletableFuture<Optional<PlayerSkinRenderCache.RenderInfo>> load(ResolvableProfile resolvableProfile) {
 					return resolvableProfile.resolveProfile(PlayerSkinRenderCache.this.profileResolver)
 						.thenCompose(
-							gameProfile -> PlayerSkinRenderCache.this.skinManager
-								.get(gameProfile)
-								.thenApply(optional -> optional.map(playerSkin -> PlayerSkinRenderCache.this.new RenderInfo(gameProfile, playerSkin, resolvableProfile.skinPatch())))
+							playerProfile -> PlayerSkinRenderCache.this.skinManager
+								.get(playerProfile)
+								.thenApply(optional -> optional.map(playerSkin -> PlayerSkinRenderCache.this.new RenderInfo(playerProfile, playerSkin, resolvableProfile.skinPatch())))
 						);
 				}
 			}
@@ -45,7 +45,7 @@ public class PlayerSkinRenderCache {
 		.build(new CacheLoader<ResolvableProfile, PlayerSkinRenderCache.RenderInfo>() {
 			public PlayerSkinRenderCache.RenderInfo load(ResolvableProfile resolvableProfile) {
 				PlayerProfile playerProfile = resolvableProfile.partialProfile();
-				return PlayerSkinRenderCache.this.new RenderInfo(gameProfile, DefaultPlayerSkin.get(gameProfile), resolvableProfile.skinPatch());
+				return PlayerSkinRenderCache.this.new RenderInfo(playerProfile, DefaultPlayerSkin.get(playerProfile), resolvableProfile.skinPatch());
 			}
 		});
 	final TextureManager textureManager;
@@ -96,12 +96,12 @@ public class PlayerSkinRenderCache {
 		private GlyphRenderTypes glyphRenderTypes;
 
 		public RenderInfo(final PlayerProfile playerProfile, final PlayerSkin playerSkin, final Patch patch) {
-			this.gameProfile = gameProfile;
+			this.playerProfile = playerProfile;
 			this.playerSkin = playerSkin.with(patch);
 		}
 
 		public PlayerProfile playerProfile() {
-			return this.gameProfile;
+			return this.playerProfile;
 		}
 
 		public PlayerSkin playerSkin() {
@@ -135,13 +135,13 @@ public class PlayerSkinRenderCache {
 		public boolean equals(Object object) {
 			return this == object
 				|| object instanceof PlayerSkinRenderCache.RenderInfo renderInfo
-					&& this.gameProfile.equals(renderInfo.gameProfile)
+					&& this.playerProfile.equals(renderInfo.playerProfile)
 					&& this.playerSkin.equals(renderInfo.playerSkin);
 		}
 
 		public int hashCode() {
 			int i = 1;
-			i = 31 * i + this.gameProfile.hashCode();
+			i = 31 * i + this.playerProfile.hashCode();
 			return 31 * i + this.playerSkin.hashCode();
 		}
 	}

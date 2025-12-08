@@ -30,14 +30,14 @@ public class PlayerInfo {
 	private int tabListOrder;
 
 	public PlayerInfo(PlayerProfile playerProfile, boolean bl) {
-		this.profile = gameProfile;
+		this.profile = playerProfile;
 		this.messageValidator = fallbackMessageValidator(bl);
 	}
 
 	private static Supplier<PlayerSkin> createSkinLookup(PlayerProfile playerProfile) {
 		Minecraft minecraft = Minecraft.getInstance();
 		boolean bl = !minecraft.isLocalPlayer(playerProfile.id());
-		return minecraft.getSkinManager().createLookup(gameProfile, bl);
+		return minecraft.getSkinManager().createLookup(playerProfile, bl);
 	}
 
 	public PlayerProfile getProfile() {

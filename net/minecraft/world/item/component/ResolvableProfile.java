@@ -45,7 +45,7 @@ public abstract sealed class ResolvableProfile implements TooltipProvider permit
 
 	private static ResolvableProfile create(Either<PlayerProfile, ResolvableProfile.Partial> either, PlayerSkin.Patch patch) {
 		return either.map(
-			gameProfile -> new ResolvableProfile.Static(Either.left(gameProfile), patch),
+			playerProfile -> new ResolvableProfile.Static(Either.left(playerProfile), patch),
 			partial -> (ResolvableProfile)(partial.properties.isEmpty() && partial.id.isPresent() != partial.name.isPresent()
 				? (ResolvableProfile)partial.name
 					.map(string -> new ResolvableProfile.Dynamic(Either.left(string), patch))
@@ -162,7 +162,7 @@ public abstract sealed class ResolvableProfile implements TooltipProvider permit
 		private final Either<PlayerProfile, ResolvableProfile.Partial> contents;
 
 		Static(Either<PlayerProfile, ResolvableProfile.Partial> either, PlayerSkin.Patch patch) {
-			super(either.map(gameProfile -> gameProfile, ResolvableProfile.Partial::createProfile), patch);
+			super(either.map(playerProfile -> playerProfile, ResolvableProfile.Partial::createProfile), patch);
 			this.contents = either;
 		}
 

@@ -33,7 +33,7 @@ public abstract class AbstractClientPlayer extends Player implements ClientAvata
 	private final ClientAvatarState clientAvatarState = new ClientAvatarState();
 
 	public AbstractClientPlayer(ClientLevel clientLevel, PlayerProfile playerProfile) {
-		super(clientLevel, gameProfile);
+		super(clientLevel, playerProfile);
 		this.showExtraEars = "deadmau5".equals(this.getGameProfile().getName());
 	}
 

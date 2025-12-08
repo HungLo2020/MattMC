@@ -90,7 +90,7 @@ public abstract class ServerTextFilter implements AutoCloseable {
 		PlayerProfile playerProfile, String string, ServerTextFilter.IgnoreStrategy ignoreStrategy, Executor executor
 	) {
 		return string.isEmpty() ? CompletableFuture.completedFuture(FilteredText.EMPTY) : CompletableFuture.supplyAsync(() -> {
-			JsonObject jsonObject = this.chatEncoder.encode(gameProfile, string);
+			JsonObject jsonObject = this.chatEncoder.encode(playerProfile, string);
 
 			try {
 				JsonObject jsonObject2 = this.processRequestResponse(jsonObject, this.chatEndpoint);
@@ -235,7 +235,7 @@ public abstract class ServerTextFilter implements AutoCloseable {
 	}
 
 	public TextFilter createContext(PlayerProfile playerProfile) {
-		return new ServerTextFilter.PlayerContext(gameProfile);
+		return new ServerTextFilter.PlayerContext(playerProfile);
 	}
 
 	@FunctionalInterface
@@ -268,7 +268,7 @@ public abstract class ServerTextFilter implements AutoCloseable {
 		protected final Executor streamExecutor;
 
 		protected PlayerContext(final PlayerProfile playerProfile) {
-			this.profile = gameProfile;
+			this.profile = playerProfile;
 			ConsecutiveExecutor consecutiveExecutor = new ConsecutiveExecutor(ServerTextFilter.this.workerPool, "chat stream for " + playerProfile.name());
 			this.streamExecutor = consecutiveExecutor::schedule;
 		}

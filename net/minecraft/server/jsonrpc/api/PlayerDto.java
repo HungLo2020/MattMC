@@ -28,6 +28,6 @@ public record PlayerDto(Optional<UUID> id, Optional<String> name) {
 
 	public static PlayerDto from(ServerPlayer serverPlayer) {
 		PlayerProfile playerProfile = serverPlayer.getGameProfile();
-		return from(gameProfile);
+		return from(playerProfile);
 	}
 }

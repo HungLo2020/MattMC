@@ -63,7 +63,7 @@ public class LegacyTextFilter extends ServerTextFilter {
 				URL uRL = uRI.resolve("/" + string5).toURL();
 				URL uRL2 = getEndpoint(uRI, jsonObject2, "join", "v1/join");
 				URL uRL3 = getEndpoint(uRI, jsonObject2, "leave", "v1/leave");
-				LegacyTextFilter.JoinOrLeaveEncoder joinOrLeaveEncoder = gameProfile -> {
+				LegacyTextFilter.JoinOrLeaveEncoder joinOrLeaveEncoder = playerProfile -> {
 					JsonObject jsonObjectx = new JsonObject();
 					jsonObjectx.addProperty("server", string3);
 					jsonObjectx.addProperty("room", string4);
@@ -73,7 +73,7 @@ public class LegacyTextFilter extends ServerTextFilter {
 				};
 				ServerTextFilter.MessageEncoder messageEncoder;
 				if (bl) {
-					messageEncoder = (gameProfile, string3x) -> {
+					messageEncoder = (playerProfile, string3x) -> {
 						JsonObject jsonObjectx = new JsonObject();
 						jsonObjectx.addProperty("rule", i);
 						jsonObjectx.addProperty("server", string3);
@@ -86,7 +86,7 @@ public class LegacyTextFilter extends ServerTextFilter {
 					};
 				} else {
 					String string6 = String.valueOf(i);
-					messageEncoder = (gameProfile, string4x) -> {
+					messageEncoder = (playerProfile, string4x) -> {
 						JsonObject jsonObjectx = new JsonObject();
 						jsonObjectx.addProperty("rule_id", string6);
 						jsonObjectx.addProperty("category", string3);
@@ -112,7 +112,7 @@ public class LegacyTextFilter extends ServerTextFilter {
 
 	@Override
 	public TextFilter createContext(PlayerProfile playerProfile) {
-		return new ServerTextFilter.PlayerContext(gameProfile) {
+		return new ServerTextFilter.PlayerContext(playerProfile) {
 			@Override
 			public void join() {
 				LegacyTextFilter.this.processJoinOrLeave(this.profile, LegacyTextFilter.this.joinEndpoint, LegacyTextFilter.this.joinEncoder, this.streamExecutor);
@@ -127,12 +127,12 @@ public class LegacyTextFilter extends ServerTextFilter {
 
 	void processJoinOrLeave(PlayerProfile playerProfile, URL uRL, LegacyTextFilter.JoinOrLeaveEncoder joinOrLeaveEncoder, Executor executor) {
 		executor.execute(() -> {
-			JsonObject jsonObject = joinOrLeaveEncoder.encode(gameProfile);
+			JsonObject jsonObject = joinOrLeaveEncoder.encode(playerProfile);
 
 			try {
 				this.processRequest(jsonObject, uRL);
 			} catch (Exception var6) {
-				LOGGER.warn("Failed to send join/leave packet to {} for player {}", uRL, gameProfile, var6);
+				LOGGER.warn("Failed to send join/leave packet to {} for player {}", uRL, playerProfile, var6);
 			}
 		});
 	}

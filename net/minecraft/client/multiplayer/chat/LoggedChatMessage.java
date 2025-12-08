@@ -20,7 +20,7 @@ import net.minecraft.util.ExtraCodecs;
 @Environment(EnvType.CLIENT)
 public interface LoggedChatMessage extends LoggedChatEvent {
 	static LoggedChatMessage.Player player(PlayerProfile playerProfile, PlayerChatMessage playerChatMessage, ChatTrustLevel chatTrustLevel) {
-		return new LoggedChatMessage.Player(gameProfile, playerChatMessage, chatTrustLevel);
+		return new LoggedChatMessage.Player(playerProfile, playerChatMessage, chatTrustLevel);
 	}
 
 	static LoggedChatMessage.System system(Component component, Instant instant) {

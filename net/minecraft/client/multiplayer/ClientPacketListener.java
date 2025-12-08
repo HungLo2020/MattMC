@@ -1965,7 +1965,7 @@ public class ClientPacketListener extends ClientCommonPacketListenerImpl impleme
 			Data data = entry.chatSession();
 			if (data != null) {
 				try {
-					RemoteChatSession remoteChatSession = data.validate(gameProfile, signatureValidator);
+					RemoteChatSession remoteChatSession = data.validate(playerProfile, signatureValidator);
 					playerInfo.setChatSession(remoteChatSession);
 				} catch (ValidationException var7) {
 					LOGGER.error("Failed to validate profile key for player: '{}'", playerProfile.name(), var7);

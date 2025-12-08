@@ -71,7 +71,7 @@ public class PlayerSafetyServiceTextFilter extends ServerTextFilter {
 			throw new RuntimeException(var26);
 		}
 
-		ServerTextFilter.MessageEncoder messageEncoder = (gameProfile, string3x) -> {
+		ServerTextFilter.MessageEncoder messageEncoder = (playerProfile, string3x) -> {
 			JsonObject jsonObjectx = new JsonObject();
 			jsonObjectx.addProperty("userId", playerProfile.id().toString());
 			jsonObjectx.addProperty("userDisplayName", playerProfile.name());

@@ -81,7 +81,7 @@ public class IntegratedServer extends MinecraftServer {
 		this.loadLevel();
 		PlayerProfile playerProfile = this.getSingleplayerProfile();
 		String string = this.getWorldData().getLevelName();
-			this.setMotd(gameProfile != null ? playerProfile.name() + " - " + string : string);
+			this.setMotd(playerProfile != null ? playerProfile.name() + " - " + string : string);
 		return true;
 	}
 

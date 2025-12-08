@@ -101,7 +101,7 @@ public class ChatListener {
 		Component component = bound.decorate(playerChatMessage2.decoratedContent());
 		Instant instant = Instant.now();
 		this.handleMessage(playerChatMessage.signature(), () -> {
-			boolean bl2 = this.showMessageToPlayer(bound, playerChatMessage, component, gameProfile, bl, instant);
+			boolean bl2 = this.showMessageToPlayer(bound, playerChatMessage, component, playerProfile, bl, instant);
 			ClientPacketListener clientPacketListener = this.minecraft.getConnection();
 			if (clientPacketListener != null && playerChatMessage.signature() != null) {
 				clientPacketListener.markMessageAsProcessed(playerChatMessage.signature(), bl2);
@@ -162,7 +162,7 @@ public class ChatListener {
 				}
 			}
 
-			this.logPlayerMessage(playerChatMessage, gameProfile, chatTrustLevel);
+			this.logPlayerMessage(playerChatMessage, playerProfile, chatTrustLevel);
 			this.previousMessageTime = Util.getMillis();
 			return true;
 		} else {

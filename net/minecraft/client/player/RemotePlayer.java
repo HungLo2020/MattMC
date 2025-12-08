@@ -16,7 +16,7 @@ public class RemotePlayer extends AbstractClientPlayer {
 	private int lerpDeltaMovementSteps;
 
 	public RemotePlayer(ClientLevel clientLevel, PlayerProfile playerProfile) {
-		super(clientLevel, gameProfile);
+		super(clientLevel, playerProfile);
 		this.noPhysics = true;
 	}
 
