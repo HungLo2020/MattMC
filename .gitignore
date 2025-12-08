@@ -38,3 +38,4 @@ jmh-result.txt
 
 # Test coverage
 .jacoco/
+/Task

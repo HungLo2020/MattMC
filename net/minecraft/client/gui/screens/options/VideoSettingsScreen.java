@@ -58,6 +58,7 @@ public class VideoSettingsScreen extends OptionsSubScreen {
 			options.glintSpeed(),
 			options.glintStrength(),
 			options.menuBackgroundBlurriness(),
+			options.panoramaTheme(),
 			options.bobView(),
 			options.cloudRange()
 		};

@@ -31,6 +31,7 @@ import net.minecraft.client.Camera;
 import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.Options;
+import net.minecraft.client.PanoramaTheme;
 import net.minecraft.client.Screenshot;
 import net.minecraft.client.entity.ClientAvatarState;
 import net.minecraft.client.gui.GuiGraphics;
@@ -126,8 +127,8 @@ public class GameRenderer implements Projector, AutoCloseable {
 	private final LightTexture lightTexture;
 	private final OverlayTexture overlayTexture = new OverlayTexture();
 	private boolean panoramicMode;
-	protected final CubeMap cubeMap = new CubeMap(ResourceLocation.withDefaultNamespace("textures/gui/title/background/panorama"));
-	protected final PanoramaRenderer panorama = new PanoramaRenderer(this.cubeMap);
+	protected CubeMap cubeMap;
+	protected PanoramaRenderer panorama;
 	private final CrossFrameResourcePool resourcePool = new CrossFrameResourcePool(3);
 	private final FogRenderer fogRenderer = new FogRenderer();
 	private final GuiRenderer guiRenderer;
@@ -180,6 +181,36 @@ public class GameRenderer implements Projector, AutoCloseable {
 			)
 		);
 		this.screenEffectRenderer = new ScreenEffectRenderer(minecraft, atlasManager, bufferSource);
+		this.cubeMap = this.createCubeMap(minecraft.options.panoramaTheme().get());
+		this.panorama = new PanoramaRenderer(this.cubeMap);
+	}
+
+	private CubeMap createCubeMap(PanoramaTheme theme) {
+		String path = "textures/gui/title/background/" + theme.getPath() + "/panorama";
+		return new CubeMap(ResourceLocation.withDefaultNamespace(path));
+	}
+
+	public synchronized void reloadPanorama(PanoramaTheme theme) {
+		// Store old resources to close after creating new ones
+		CubeMap oldCubeMap = this.cubeMap;
+		
+		// Create new panorama resources
+		CubeMap newCubeMap = this.createCubeMap(theme);
+		PanoramaRenderer newPanorama = new PanoramaRenderer(newCubeMap);
+		
+		// Register and load textures for new panorama
+		if (this.minecraft != null && this.minecraft.getTextureManager() != null) {
+			newCubeMap.registerAndLoadTextures(this.minecraft.getTextureManager());
+		}
+		
+		// Atomically swap to new panorama
+		this.cubeMap = newCubeMap;
+		this.panorama = newPanorama;
+		
+		// Close old resources after swap
+		if (oldCubeMap != null) {
+			oldCubeMap.close();
+		}
 	}
 
 	public void close() {
@@ -918,7 +949,7 @@ public class GameRenderer implements Projector, AutoCloseable {
 		}
 	}
 
-	public PanoramaRenderer getPanorama() {
+	public synchronized PanoramaRenderer getPanorama() {
 		return this.panorama;
 	}
 }
