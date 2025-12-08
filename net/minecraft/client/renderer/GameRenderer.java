@@ -186,8 +186,8 @@ public class GameRenderer implements Projector, AutoCloseable {
 	}
 
 	private CubeMap createCubeMap(PanoramaTheme theme) {
-		String path = "minecraft/textures/gui/title/background/" + theme.getPath() + "/panorama";
-		return new CubeMap(ResourceLocation.fromNamespaceAndPath("files", path));
+		String path = "textures/gui/title/background/" + theme.getPath() + "/panorama";
+		return new CubeMap(ResourceLocation.withDefaultNamespace(path));
 	}
 
 	public synchronized void reloadPanorama(PanoramaTheme theme) {
