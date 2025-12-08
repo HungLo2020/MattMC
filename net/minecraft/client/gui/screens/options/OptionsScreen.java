@@ -37,7 +37,6 @@ public class OptionsScreen extends Screen {
 	private static final Component SOUNDS = Component.translatable("options.sounds");
 	private static final Component VIDEO = Component.translatable("options.video");
 	public static final Component CONTROLS = Component.translatable("options.controls");
-	private static final Component LANGUAGE = Component.translatable("options.language");
 	private static final Component CHAT = Component.translatable("options.chat");
 	private static final Component RESOURCEPACK = Component.translatable("options.resourcepack");
 	private static final Component ACCESSIBILITY = Component.translatable("options.accessibility");
@@ -71,7 +70,6 @@ public class OptionsScreen extends Screen {
 		rowHelper.addChild(this.openScreenButton(SOUNDS, () -> new SoundOptionsScreen(this, this.options)));
 		rowHelper.addChild(this.openScreenButton(VIDEO, () -> new VideoSettingsScreen(this, this.minecraft, this.options)));
 		rowHelper.addChild(this.openScreenButton(CONTROLS, () -> new ControlsScreen(this, this.options)));
-		rowHelper.addChild(this.openScreenButton(LANGUAGE, () -> new LanguageSelectScreen(this, this.options, this.minecraft.getLanguageManager())));
 		rowHelper.addChild(this.openScreenButton(CHAT, () -> new ChatOptionsScreen(this, this.options)));
 		rowHelper.addChild(
 			this.openScreenButton(

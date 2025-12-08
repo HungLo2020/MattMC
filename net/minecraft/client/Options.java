@@ -1341,7 +1341,8 @@ public class Options {
 		this.resourcePacks = fieldAccess.process("resourcePacks", this.resourcePacks, Options::readListOfStrings, GSON::toJson);
 		this.incompatibleResourcePacks = fieldAccess.process("incompatibleResourcePacks", this.incompatibleResourcePacks, Options::readListOfStrings, GSON::toJson);
 		this.lastMpIp = fieldAccess.process("lastServer", this.lastMpIp);
-		this.languageCode = fieldAccess.process("lang", this.languageCode);
+		fieldAccess.process("lang", this.languageCode);
+		this.languageCode = "en_us";
 		fieldAccess.process("chatVisibility", this.chatVisibility);
 		fieldAccess.process("chatOpacity", this.chatOpacity);
 		fieldAccess.process("chatLineSpacing", this.chatLineSpacing);
