@@ -88,8 +88,28 @@ public class PlayerInfo {
 	}
 
 	public PlayerSkin getSkin() {
-		// First check if there's a custom skin in the client cache
 		Minecraft minecraft = Minecraft.getInstance();
+		
+		// If this is the local player, apply their selected skin from options
+		if (minecraft.isLocalPlayer(this.profile.id())) {
+			try {
+				String selectedSkin = minecraft.options.selectedSkin;
+				net.minecraft.client.resources.SkinLoader skinLoader = minecraft.getSkinLoader();
+				net.minecraft.client.resources.SkinLoader.SkinEntry skinEntry = skinLoader.getSkinByName(selectedSkin);
+				
+				if (skinEntry == null) {
+					skinEntry = skinLoader.getDefaultSkin();
+				}
+				
+				if (skinEntry != null) {
+					return skinEntry.toPlayerSkin();
+				}
+			} catch (Exception e) {
+				// Fall through to default behavior on error
+			}
+		}
+		
+		// Check if there's a custom skin in the client cache (for other players in multiplayer)
 		ClientPacketListener connection = minecraft.getConnection();
 		if (connection != null) {
 			ClientSkinCache skinCache = connection.getClientSkinCache();
