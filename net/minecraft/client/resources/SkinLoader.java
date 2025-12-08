@@ -28,13 +28,12 @@ public class SkinLoader {
 	private static final Logger LOGGER = LogUtils.getLogger();
 	
 	// Built-in skin names from resources
-	private static final String[] BUILTIN_SKINS_WIDE = {
+	private static final String[] BUILTIN_SKIN_NAMES = {
 		"steve", "alex", "ari", "efe", "kai", "makena", "noor", "sunny", "zuri", "hunglo"
 	};
 	
-	private static final String[] BUILTIN_SKINS_SLIM = {
-		"steve", "alex", "ari", "efe", "kai", "makena", "noor", "sunny", "zuri", "hunglo"
-	};
+	private static final String DEFAULT_SKIN_NAME = "steve (Wide)";
+	private static final String CUSTOM_SUFFIX = " (Custom)";
 	
 	private final Path skinsDirectory;
 	private final List<SkinEntry> availableSkins = new ArrayList<>();
@@ -60,13 +59,13 @@ public class SkinLoader {
 		availableSkins.clear();
 		
 		// Load built-in wide skins
-		for (String skinName : BUILTIN_SKINS_WIDE) {
+		for (String skinName : BUILTIN_SKIN_NAMES) {
 			ResourceLocation location = ResourceLocation.withDefaultNamespace("entity/player/wide/" + skinName);
 			availableSkins.add(new SkinEntry(skinName + " (Wide)", location, PlayerModelType.WIDE, true));
 		}
 		
 		// Load built-in slim skins
-		for (String skinName : BUILTIN_SKINS_SLIM) {
+		for (String skinName : BUILTIN_SKIN_NAMES) {
 			ResourceLocation location = ResourceLocation.withDefaultNamespace("entity/player/slim/" + skinName);
 			availableSkins.add(new SkinEntry(skinName + " (Slim)", location, PlayerModelType.SLIM, true));
 		}
@@ -114,7 +113,7 @@ public class SkinLoader {
 				// Determine model type (we default to wide for custom skins)
 				PlayerModelType modelType = PlayerModelType.WIDE;
 				
-				availableSkins.add(new SkinEntry(skinName + " (Custom)", location, modelType, false));
+				availableSkins.add(new SkinEntry(skinName + CUSTOM_SUFFIX, location, modelType, false));
 				LOGGER.info("Loaded custom skin: {}", skinName);
 			} else {
 				LOGGER.warn("Invalid skin dimensions for {}: {}x{} (expected 64x64 or 64x32)", 
@@ -141,9 +140,9 @@ public class SkinLoader {
 	}
 	
 	public SkinEntry getDefaultSkin() {
-		// Return "steve (Wide)" as default
+		// Return default skin
 		return availableSkins.stream()
-			.filter(skin -> skin.displayName().equals("steve (Wide)"))
+			.filter(skin -> skin.displayName().equals(DEFAULT_SKIN_NAME))
 			.findFirst()
 			.orElse(availableSkins.isEmpty() ? null : availableSkins.get(0));
 	}
@@ -157,7 +156,12 @@ public class SkinLoader {
 	 */
 	public record SkinEntry(String displayName, ResourceLocation location, PlayerModelType modelType, boolean builtin) {
 		public PlayerSkin toPlayerSkin() {
+			// The final boolean parameter indicates this is a secure/verified skin
 			return new PlayerSkin(new ResourceTexture(location), null, null, modelType, true);
 		}
+	}
+	
+	public static String getCustomSuffix() {
+		return CUSTOM_SUFFIX;
 	}
 }

@@ -47,7 +47,8 @@ public class ClientSkinCache {
 			
 			// Create a dynamic texture and register it
 			ResourceLocation textureLocation = ResourceLocation.fromNamespaceAndPath("player_skins", playerId.toString());
-			DynamicTexture dynamicTexture = new DynamicTexture(() -> "player_skin_" + playerId, nativeImage);
+			String textureLabel = "player_skin_" + playerId;
+			DynamicTexture dynamicTexture = new DynamicTexture(() -> textureLabel, nativeImage);
 			
 			// Register the texture with the texture manager
 			this.minecraft.execute(() -> {

@@ -24,6 +24,7 @@ import net.minecraft.client.gui.screens.options.AccessibilityOptionsScreen;
 import net.minecraft.client.gui.screens.options.OptionsScreen;
 import net.minecraft.client.gui.screens.worldselection.CreateWorldScreen;
 import net.minecraft.client.gui.screens.worldselection.SelectWorldScreen;
+import net.minecraft.client.gui.screens.CustomizeScreen;
 import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.client.renderer.PanoramaRenderer;
 import net.minecraft.client.renderer.texture.TextureManager;

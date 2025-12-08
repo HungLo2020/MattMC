@@ -2033,8 +2033,9 @@ public class ClientPacketListener extends ClientCommonPacketListenerImpl impleme
 				stream = this.minecraft.getResourceManager().getResourceOrThrow(location).open();
 			} else {
 				// Custom skin from skins directory
+				String customSuffix = net.minecraft.client.resources.SkinLoader.getCustomSuffix();
 				java.nio.file.Path skinPath = this.minecraft.getSkinLoader().getSkinsDirectory()
-					.resolve(skinEntry.displayName().replace(" (Custom)", "") + ".png");
+					.resolve(skinEntry.displayName().replace(customSuffix, "") + ".png");
 				if (java.nio.file.Files.exists(skinPath)) {
 					stream = java.nio.file.Files.newInputStream(skinPath);
 				} else {

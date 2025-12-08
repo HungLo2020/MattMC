@@ -215,14 +215,16 @@ public abstract class PlayerList {
 		// Send all existing player skins to the new player
 		net.minecraft.server.players.PlayerSkinCache skinCache = this.server.getPlayerSkinCache();
 		for (ServerPlayer existingPlayer : this.players) {
-			if (!existingPlayer.getUUID().equals(serverPlayer.getUUID()) && skinCache.hasSkin(existingPlayer.getUUID())) {
+			if (!existingPlayer.getUUID().equals(serverPlayer.getUUID())) {
 				net.minecraft.server.players.PlayerSkinCache.CachedSkin skin = skinCache.getSkin(existingPlayer.getUUID());
-				serverPlayer.connection.send(new net.minecraft.network.protocol.game.ClientboundPlayerSkinPacket(
-					existingPlayer.getUUID(),
-					skin.skinName(),
-					skin.skinData(),
-					skin.isSlimModel()
-				));
+				if (skin != null) {
+					serverPlayer.connection.send(new net.minecraft.network.protocol.game.ClientboundPlayerSkinPacket(
+						existingPlayer.getUUID(),
+						skin.skinName(),
+						skin.skinData(),
+						skin.isSlimModel()
+					));
+				}
 			}
 		}
 		
