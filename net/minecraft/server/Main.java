@@ -1,6 +1,6 @@
 package net.minecraft.server;
 
-import com.mojang.authlib.yggdrasil.YggdrasilAuthenticationService;
+
 import com.mojang.datafixers.DataFixer;
 import com.mojang.logging.LogUtils;
 import com.mojang.serialization.Dynamic;
@@ -9,7 +9,7 @@ import java.awt.GraphicsEnvironment;
 import java.io.File;
 import java.io.IOException;
 import java.io.UncheckedIOException;
-import java.net.Proxy;
+
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -174,7 +174,7 @@ public class Main {
 			}
 
 			File file = new File(optionSet.valueOf(optionSpec10));
-			Services services = Services.create(new YggdrasilAuthenticationService(Proxy.NO_PROXY), file);
+			Services services = Services.createOffline(file);
 			String string = (String)Optional.ofNullable(optionSet.valueOf(optionSpec11)).orElse(dedicatedServerSettings.getProperties().levelName);
 			LevelStorageSource levelStorageSource = LevelStorageSource.createDefault(file.toPath());
 			LevelStorageSource.LevelStorageAccess levelStorageAccess = levelStorageSource.validateAndCreateAccess(string);
