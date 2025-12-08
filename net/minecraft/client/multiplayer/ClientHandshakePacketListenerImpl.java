@@ -170,7 +170,7 @@ public class ClientHandshakePacketListenerImpl implements ClientLoginPacketListe
 
 	public void handleLoginFinished(ClientboundLoginFinishedPacket clientboundLoginFinishedPacket) {
 		this.switchState(ClientHandshakePacketListenerImpl.State.JOINING);
-		PlayerProfile playerProfile = clientboundLoginFinishedPacket.gameProfile();
+		PlayerProfile playerProfile = clientboundLoginFinishedPacket.playerProfile();
 		this.connection
 			.setupInboundProtocol(
 				ConfigurationProtocols.CLIENTBOUND,

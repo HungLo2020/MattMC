@@ -20,7 +20,7 @@ public class OpCommand {
 			Commands.literal("op")
 				.requires(Commands.hasPermission(3))
 				.then(
-					Commands.argument("targets", GameProfileArgument.gameProfile())
+					Commands.argument("targets", GameProfileArgument.playerProfile())
 						.suggests(
 							(commandContext, suggestionsBuilder) -> {
 								PlayerList playerList = commandContext.getSource().getServer().getPlayerList();
