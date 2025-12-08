@@ -1925,6 +1925,33 @@ public class ServerGamePacketListenerImpl
 	}
 
 	@Override
+	public void handlePlayerSkin(net.minecraft.network.protocol.game.ServerboundPlayerSkinPacket packet) {
+		PacketUtils.ensureRunningOnSameThread(packet, this, this.player.level());
+		
+		// Get or create the server's player skin cache
+		net.minecraft.server.players.PlayerSkinCache skinCache = this.server.getPlayerSkinCache();
+		
+		// Cache the player's skin
+		skinCache.cacheSkin(this.player.getUUID(), packet.skinName(), packet.skinData(), packet.isSlimModel());
+		
+		// Broadcast the skin to all other players
+		net.minecraft.network.protocol.game.ClientboundPlayerSkinPacket broadcastPacket = 
+			new net.minecraft.network.protocol.game.ClientboundPlayerSkinPacket(
+				this.player.getUUID(), 
+				packet.skinName(), 
+				packet.skinData(), 
+				packet.isSlimModel()
+			);
+		
+		// Send to all players except the sender
+		for (net.minecraft.server.level.ServerPlayer otherPlayer : this.server.getPlayerList().getPlayers()) {
+			if (!otherPlayer.getUUID().equals(this.player.getUUID())) {
+				otherPlayer.connection.send(broadcastPacket);
+			}
+		}
+	}
+
+	@Override
 	public void handleClientInformation(ServerboundClientInformationPacket serverboundClientInformationPacket) {
 		PacketUtils.ensureRunningOnSameThread(serverboundClientInformationPacket, this, this.player.level());
 		boolean bl = this.player.isModelPartShown(PlayerModelPart.HAT);

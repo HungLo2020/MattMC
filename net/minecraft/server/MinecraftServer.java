@@ -272,6 +272,7 @@ public abstract class MinecraftServer extends ReentrantBlockableEventLoop<TickTa
 	private final StructureTemplateManager structureTemplateManager;
 	private final ServerTickRateManager tickRateManager;
 	private final ServerDebugSubscribers debugSubscribers = new ServerDebugSubscribers(this);
+	private final net.minecraft.server.players.PlayerSkinCache playerSkinCache = new net.minecraft.server.players.PlayerSkinCache();
 	protected final WorldData worldData;
 	private LevelData.RespawnData effectiveRespawnData = LevelData.RespawnData.DEFAULT;
 	private final PotionBrewing potionBrewing;
@@ -1409,6 +1410,10 @@ public abstract class MinecraftServer extends ReentrantBlockableEventLoop<TickTa
 
 	public PlayerList getPlayerList() {
 		return this.playerList;
+	}
+
+	public net.minecraft.server.players.PlayerSkinCache getPlayerSkinCache() {
+		return this.playerSkinCache;
 	}
 
 	public void setPlayerList(PlayerList playerList) {

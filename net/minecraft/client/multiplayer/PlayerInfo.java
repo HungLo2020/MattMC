@@ -18,7 +18,7 @@ import org.jetbrains.annotations.Nullable;
 public class PlayerInfo {
 	private final PlayerProfile profile;
 	@Nullable
-	private Supplier<PlayerSkin> skinLookup;
+	Supplier<PlayerSkin> skinLookup; // Package-private for ClientPacketListener access
 	private GameType gameMode = GameType.DEFAULT_MODE;
 	private int latency;
 	@Nullable
@@ -88,6 +88,20 @@ public class PlayerInfo {
 	}
 
 	public PlayerSkin getSkin() {
+		// First check if there's a custom skin in the client cache
+		Minecraft minecraft = Minecraft.getInstance();
+		ClientPacketListener connection = minecraft.getConnection();
+		if (connection != null) {
+			ClientSkinCache skinCache = connection.getClientSkinCache();
+			if (skinCache != null && skinCache.hasSkin(this.profile.id())) {
+				PlayerSkin cachedSkin = skinCache.getSkin(this.profile.id());
+				if (cachedSkin != null) {
+					return cachedSkin;
+				}
+			}
+		}
+		
+		// Fall back to default skin lookup
 		if (this.skinLookup == null) {
 			this.skinLookup = createSkinLookup(this.profile);
 		}

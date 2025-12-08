@@ -211,6 +211,21 @@ public abstract class PlayerList {
 		this.players.add(serverPlayer);
 		this.playersByUUID.put(serverPlayer.getUUID(), serverPlayer);
 		this.broadcastAll(ClientboundPlayerInfoUpdatePacket.createPlayerInitializing(List.of(serverPlayer)));
+		
+		// Send all existing player skins to the new player
+		net.minecraft.server.players.PlayerSkinCache skinCache = this.server.getPlayerSkinCache();
+		for (ServerPlayer existingPlayer : this.players) {
+			if (!existingPlayer.getUUID().equals(serverPlayer.getUUID()) && skinCache.hasSkin(existingPlayer.getUUID())) {
+				net.minecraft.server.players.PlayerSkinCache.CachedSkin skin = skinCache.getSkin(existingPlayer.getUUID());
+				serverPlayer.connection.send(new net.minecraft.network.protocol.game.ClientboundPlayerSkinPacket(
+					existingPlayer.getUUID(),
+					skin.skinName(),
+					skin.skinData(),
+					skin.isSlimModel()
+				));
+			}
+		}
+		
 		this.sendLevelInfo(serverPlayer, serverLevel);
 		serverLevel.addNewPlayer(serverPlayer);
 		this.server.getCustomBossEvents().onPlayerConnect(serverPlayer);
@@ -331,6 +346,13 @@ public abstract class PlayerList {
 		}
 
 		this.broadcastAll(new ClientboundPlayerInfoRemovePacket(List.of(serverPlayer.getUUID())));
+		
+		// Remove player's skin from cache and notify all clients
+		net.minecraft.server.players.PlayerSkinCache skinCache = this.server.getPlayerSkinCache();
+		if (skinCache.hasSkin(serverPlayer.getUUID())) {
+			skinCache.removeSkin(serverPlayer.getUUID());
+			this.broadcastAll(new net.minecraft.network.protocol.game.ClientboundRemovePlayerSkinPacket(serverPlayer.getUUID()));
+		}
 	}
 
 	@Nullable
