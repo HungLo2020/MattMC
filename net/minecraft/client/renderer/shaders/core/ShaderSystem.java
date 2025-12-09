@@ -1,5 +1,7 @@
 package net.minecraft.client.renderer.shaders.core;
 
+import net.minecraft.client.renderer.shaders.pack.ShaderPackRepository;
+import net.minecraft.server.packs.resources.ResourceManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -18,6 +20,7 @@ public class ShaderSystem {
 	private boolean initialized = false;
 	private ShaderConfig config;
 	private Path gameDirectory;
+	private ShaderPackRepository repository;
 	
 	private ShaderSystem() {
 		// Private constructor for singleton pattern
@@ -79,5 +82,33 @@ public class ShaderSystem {
 	 */
 	public Path getGameDirectory() {
 		return gameDirectory;
+	}
+	
+	/**
+	 * Called when the ResourceManager is ready to scan for shader packs.
+	 * This matches Iris's pattern of loading shader packs after resources are available.
+	 * 
+	 * Reference: frnsrc/Iris-1.21.9/.../Iris.java - loadShaderpack() method
+	 * 
+	 * @param resourceManager The resource manager to use for scanning
+	 */
+	public void onResourceManagerReady(ResourceManager resourceManager) {
+		LOGGER.info("Initializing shader pack repository");
+		this.repository = new ShaderPackRepository(resourceManager);
+		this.repository.scanForPacks();
+		
+		if (repository.hasShaderPacks()) {
+			LOGGER.info("Shader packs available: {}", String.join(", ", repository.getAvailablePacks()));
+		} else {
+			LOGGER.info("No shader packs found in resources");
+		}
+	}
+	
+	/**
+	 * Gets the shader pack repository.
+	 * @return The shader pack repository, or null if not yet initialized
+	 */
+	public ShaderPackRepository getRepository() {
+		return repository;
 	}
 }

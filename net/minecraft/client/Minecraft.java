@@ -698,6 +698,14 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 	private void onResourceLoadFinished(@Nullable Minecraft.GameLoadCookie gameLoadCookie) {
 		if (!this.gameLoadFinished) {
 			this.gameLoadFinished = true;
+			
+			// Initialize shader pack repository after resources are loaded
+			// This matches IRIS pattern: resources must be available before scanning for packs
+			if (net.minecraft.client.renderer.shaders.core.ShaderSystem.getInstance().isInitialized()) {
+				net.minecraft.client.renderer.shaders.core.ShaderSystem.getInstance()
+					.onResourceManagerReady(this.resourceManager);
+			}
+			
 			this.onGameLoadFinished(gameLoadCookie);
 		}
 	}

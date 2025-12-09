@@ -4,7 +4,7 @@ This document tracks progress through the 30-step IRIS shader integration plan.
 
 ## Overall Progress
 
-**Current Status:** Step 1 of 30 Complete (3.3%)
+**Current Status:** Step 3 of 30 Complete (10.0%)
 
 **Last Updated:** December 9, 2024
 
@@ -36,26 +36,77 @@ This document tracks progress through the 30-step IRIS shader integration plan.
 
 **Commit:** 87c01e6f - "Complete Step 1: Core Shader System Infrastructure"
 
+### ✅ Step 2: Implement Shader Configuration System (COMPLETE)
+
+**Date Completed:** December 9, 2024
+
+**Implementation Summary:**
+- Verified ShaderConfig with JSON persistence (implemented in Step 1)
+- Confirmed configuration loading/saving functionality
+- Validated pack-specific option management
+- Tested configuration persistence across restarts
+- All 21 tests passing including 9 configuration-specific tests
+
+**Key Features:**
+- JSON-based config file (`shader-config.json`)
+- Auto-save on all configuration changes
+- Shader enabled/disabled state
+- Selected pack name storage
+- Pack-specific options map (key-value pairs)
+
+**Test Results:** 21/21 passing ✅
+
+**Documentation:** `docs/SHADER-IMPLEMENTATION-STEP-2.md`
+
+**Note:** Step 2 was largely completed during Step 1, as the requirements matched the initial implementation
+
+### ✅ Step 3: Create Shader Pack Repository with ResourceManager (COMPLETE)
+
+**Date Completed:** December 9, 2024
+
+**Implementation Summary:**
+- Implemented ShaderPackSource interface for shader pack abstraction
+- Created ResourceShaderPackSource for reading from ResourceManager
+- Implemented ShaderPackRepository for pack discovery via shaders.properties
+- Integrated repository into ShaderSystem with onResourceManagerReady hook
+- Added Minecraft.java hook for repository initialization after resource loading
+- Created test shader pack in resources
+- Developed 12 new comprehensive tests (all passing)
+
+**Key Files:**
+- `net/minecraft/client/renderer/shaders/pack/ShaderPackSource.java`
+- `net/minecraft/client/renderer/shaders/pack/ResourceShaderPackSource.java`
+- `net/minecraft/client/renderer/shaders/pack/ShaderPackRepository.java`
+- 4 test files with 12 unit/integration tests
+- Test shader pack: `assets/minecraft/shaders/test_shader/shaders.properties`
+
+**Test Results:** 33/33 passing (21 from Steps 1-2, 12 new) ✅
+
+**Documentation:** `docs/SHADER-IMPLEMENTATION-STEP-3.md`
+
+**IRIS Reference:** Based on ShaderpackDirectoryManager pattern, adapted for ResourceManager
+
 ## In Progress Steps
 
-### 🔄 Step 2: Implement Shader Configuration System (NEXT)
+### 🔄 Step 4: Implement Shader Properties Parser (NEXT)
 
-**Status:** Not started
+**Status:** Ready to start
 
 **Planned Work:**
-- Enhance ShaderConfig with additional features (some work done in Step 1)
-- Add pack-specific configuration management
-- Test configuration across game restarts
+- Create ShaderProperties class for parsing shaders.properties
+- Parse shadow resolution, sun path rotation, boolean flags
+- Extract configuration values
+- Test property parsing with test shader pack
 
-**Dependencies:** None (Step 1 complete)
+**Dependencies:** Steps 1-3 complete ✅
 
 **Estimated Completion:** TBD
 
 ## Upcoming Steps
 
 ### Step 3: Create Shader Pack Repository with ResourceManager
-**Status:** Not started
-**Dependencies:** Steps 1-2
+**Status:** Complete ✅
+**Dependencies:** Steps 1-2 complete ✅
 
 ### Step 4: Implement Shader Properties Parser
 **Status:** Not started
@@ -67,10 +118,10 @@ This document tracks progress through the 30-step IRIS shader integration plan.
 
 ## Phase Breakdown
 
-### Foundation (Steps 1-5): 20% Complete
+### Foundation (Steps 1-5): 60% Complete
 - ✅ Step 1: Core Infrastructure
-- ⬜ Step 2: Configuration System
-- ⬜ Step 3: Pack Repository
+- ✅ Step 2: Configuration System
+- ✅ Step 3: Pack Repository
 - ⬜ Step 4: Properties Parser
 - ⬜ Step 5: Pipeline Manager
 
@@ -112,13 +163,13 @@ This document tracks progress through the 30-step IRIS shader integration plan.
 ## Key Metrics
 
 - **Total Steps:** 30
-- **Steps Complete:** 1
+- **Steps Complete:** 3
 - **Steps In Progress:** 0
-- **Steps Remaining:** 29
-- **Overall Progress:** 3.3%
-- **Tests Written:** 21
-- **Tests Passing:** 21 (100%)
-- **Lines of Code Added:** ~950+
+- **Steps Remaining:** 27
+- **Overall Progress:** 10.0%
+- **Tests Written:** 33
+- **Tests Passing:** 33 (100%)
+- **Lines of Code Added:** ~1,400+
 
 ## Architecture Decisions Log
 
@@ -138,6 +189,10 @@ This document tracks progress through the 30-step IRIS shader integration plan.
 
 - **Step 1 Start:** December 9, 2024
 - **Step 1 Complete:** December 9, 2024 (same day)
+- **Step 2 Verification:** December 9, 2024 (verified/documented)
+- **Step 2 Complete:** December 9, 2024 (same day)
+- **Step 3 Implementation:** December 9, 2024 (same day)
+- **Step 3 Complete:** December 9, 2024 (same day)
 - **Expected Completion (30 steps):** 20-24 weeks from start
 
 ## Notes
