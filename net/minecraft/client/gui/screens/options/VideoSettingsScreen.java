@@ -76,6 +76,20 @@ public class VideoSettingsScreen extends OptionsSubScreen {
 	}
 
 	@Override
+	protected void addFooter() {
+		// Add shader pack button in addition to Done button
+		this.layout.addToFooter(
+			net.minecraft.client.gui.components.Button.builder(
+				Component.literal("Shaders..."), 
+				button -> this.minecraft.setScreen(new net.minecraft.client.gui.screens.shader.ShaderPackSelectionScreen(this))
+			).width(98).build()
+		);
+		this.layout.addToFooter(
+			net.minecraft.client.gui.components.Button.builder(CommonComponents.GUI_DONE, button -> this.onClose()).width(98).build()
+		);
+	}
+
+	@Override
 	protected void addOptions() {
 		int i = -1;
 		Window window = this.minecraft.getWindow();
