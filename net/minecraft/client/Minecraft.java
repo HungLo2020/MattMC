@@ -735,15 +735,11 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 				this.execute(() -> {
 					this.shaderPackRepository.setActivePack(pack);
 					
-					// Initialize shader rendering pipeline
-					try {
-						net.minecraft.client.renderer.shader.ShaderRenderPipeline pipeline = 
-							new net.minecraft.client.renderer.shader.ShaderRenderPipeline(pack);
-						pipeline.initialize(this.window.getWidth(), this.window.getHeight());
-						LOGGER.info("Loaded and activated shader pack: {} with rendering pipeline", packName);
-					} catch (Exception e) {
-						LOGGER.error("Failed to initialize shader rendering pipeline for pack: {}", packName, e);
-					}
+					// Setup shader rendering pipeline via integration
+					net.minecraft.client.renderer.shader.ShaderRenderIntegration.setupShaderPipeline(
+						pack, this.window.getWidth(), this.window.getHeight()
+					);
+					LOGGER.info("Loaded and activated shader pack: {}", packName);
 				});
 			} else {
 				LOGGER.error("Failed to load shader pack: {}", packName);
@@ -1234,6 +1230,12 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 		}
 
 		try {
+			// Cleanup shader pipeline before other resources
+			try {
+				net.minecraft.client.renderer.shader.ShaderRenderIntegration.closeShaderPipeline();
+			} catch (Throwable var6) {
+			}
+			
 			this.regionalCompliancies.close();
 			this.atlasManager.close();
 			this.fontManager.close();
@@ -1431,6 +1433,11 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 		renderTarget.resize(this.window.getWidth(), this.window.getHeight());
 		this.gameRenderer.resize(this.window.getWidth(), this.window.getHeight());
 		this.mouseHandler.setIgnoreFirstMove();
+		
+		// Resize shader pipeline if active
+		net.minecraft.client.renderer.shader.ShaderRenderIntegration.resizeShaderPipeline(
+			this.window.getWidth(), this.window.getHeight()
+		);
 	}
 
 	@Override
