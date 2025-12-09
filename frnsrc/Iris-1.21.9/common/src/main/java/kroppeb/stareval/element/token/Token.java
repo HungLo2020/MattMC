@@ -1,0 +1,8 @@
+package frnsrc.Iris;
+
+import kroppeb.stareval.element.Element;
+
+public abstract class Token implements Element {
+	@Override
+	public abstract String toString();
+}
