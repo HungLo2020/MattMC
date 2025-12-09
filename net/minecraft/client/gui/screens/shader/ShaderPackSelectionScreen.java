@@ -126,7 +126,8 @@ public class ShaderPackSelectionScreen extends Screen {
      */
     class ShaderPackList extends ObjectSelectionList<ShaderPackEntry> {
         public ShaderPackList(Minecraft minecraft, int width, int height, int y, int bottom) {
-            super(minecraft, width, height - bottom - y, y, 36);
+            super(minecraft, width, height, y, 36);
+            this.setRenderHeader(false, 0);
         }
         
         public int addEntry(ShaderPackEntry entry) {
@@ -136,6 +137,11 @@ public class ShaderPackSelectionScreen extends Screen {
         @Override
         public int getRowWidth() {
             return 300;
+        }
+        
+        @Override
+        protected int getScrollbarPosition() {
+            return this.getRight() - 6;
         }
     }
     
@@ -152,18 +158,32 @@ public class ShaderPackSelectionScreen extends Screen {
         }
         
         @Override
-        public void renderContent(GuiGraphics guiGraphics, int index, int top, boolean isHovered, float partialTick) {
+        public void renderContent(GuiGraphics guiGraphics, int mouseX, int mouseY, boolean isHovered, float partialTick) {
             String name = metadata != null ? metadata.name() : "None (Vanilla)";
-            int x = this.getContentX();
-            int y = this.getContentY();
-            guiGraphics.drawString(ShaderPackSelectionScreen.this.font, name, x, y + 2, 16777215);
+            
+            // Draw the shader pack name
+            guiGraphics.drawString(
+                ShaderPackSelectionScreen.this.font, 
+                name, 
+                this.getX() + 5, 
+                this.getY() + 5, 
+                16777215,
+                false
+            );
             
             // Show if this is the currently active pack
             String currentPack = ShaderPackSelectionScreen.this.minecraft.options.shaderPack;
-            boolean isActive = (metadata == null && currentPack.isEmpty()) || 
+            boolean isActive = (metadata == null && (currentPack == null || currentPack.isEmpty())) || 
                               (metadata != null && metadata.name().equals(currentPack));
             if (isActive) {
-                guiGraphics.drawString(ShaderPackSelectionScreen.this.font, "[Active]", x, y + 14, 0x55FF55);
+                guiGraphics.drawString(
+                    ShaderPackSelectionScreen.this.font, 
+                    "[Active]", 
+                    this.getX() + 5, 
+                    this.getY() + 18, 
+                    0x55FF55,
+                    false
+                );
             }
         }
         
