@@ -430,6 +430,12 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 		KeybindResolver.setKeyResolver(KeyMapping::createNameSupplier);
 		this.fixerUpper = DataFixers.getDataFixer();
 		this.gameThread = Thread.currentThread();
+		
+		// Initialize shader system early (before Options)
+		// This matches Iris's onEarlyInitialize pattern
+		net.minecraft.client.renderer.shaders.core.ShaderSystem.getInstance()
+			.earlyInitialize(this.gameDirectory.toPath());
+		
 		this.options = new Options(this, this.gameDirectory);
 		this.debugEntries = new DebugScreenEntryList(this.gameDirectory);
 		this.toastManager = new ToastManager(this, this.options);
