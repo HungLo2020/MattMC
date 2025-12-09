@@ -45,6 +45,17 @@ public class ShaderRenderPipeline implements AutoCloseable {
      */
     public void initialize(int width, int height) {
         try {
+            LOGGER.info("Initializing shader render pipeline for: {}", 
+                ShaderDebugHelper.getShaderPackSummary(shaderPack));
+            
+            // Log diagnostic information
+            ShaderDebugHelper.logShaderPackInfo(shaderPack);
+            
+            // Validate shader pack
+            if (!ShaderDebugHelper.validateShaderPack(shaderPack)) {
+                LOGGER.warn("Shader pack validation warnings detected");
+            }
+            
             // Initialize G-buffers
             gBufferManager.initialize(width, height);
             
@@ -56,7 +67,7 @@ public class ShaderRenderPipeline implements AutoCloseable {
             compileShaderPrograms();
             
             initialized = true;
-            LOGGER.info("Shader render pipeline initialized for pack: {}", shaderPack.getName());
+            LOGGER.info("Shader render pipeline initialized successfully");
         } catch (Exception e) {
             LOGGER.error("Failed to initialize shader render pipeline", e);
             close();
