@@ -4,7 +4,7 @@ This document tracks progress through the 30-step IRIS shader integration plan.
 
 ## Overall Progress
 
-**Current Status:** Step 6 of 30 Complete (20%)
+**Current Status:** Step 8 of 30 Complete (26.7%)
 
 **Last Updated:** December 9, 2024
 
@@ -289,3 +289,57 @@ This document tracks progress through the 30-step IRIS shader integration plan.
 - Using extensive testing framework to validate each step
 - Documenting everything for easier progress tracking
 - Each step is foundational for subsequent steps
+
+### ✅ Step 8: Implement Shader Option Discovery (COMPLETE)
+
+**Date Completed:** December 9, 2024
+
+**Implementation Summary:**
+- Implemented OptionType enum (DEFINE/CONST)
+- Created BaseOption abstract class
+- Implemented BooleanOption for boolean shader options
+- Implemented StringOption with allowed values parsing
+- Created OptionLocation for tracking option sources
+- Implemented OptionSet with builder pattern
+- Created ShaderPackOptions for orchestration
+- Integrated into ShaderPackPipeline
+- Developed 18 new comprehensive tests (all passing)
+
+**Key Files:**
+- `net/minecraft/client/renderer/shaders/option/OptionType.java`
+- `net/minecraft/client/renderer/shaders/option/BaseOption.java`
+- `net/minecraft/client/renderer/shaders/option/BooleanOption.java`
+- `net/minecraft/client/renderer/shaders/option/StringOption.java`
+- `net/minecraft/client/renderer/shaders/option/OptionLocation.java`
+- `net/minecraft/client/renderer/shaders/option/OptionSet.java`
+- `net/minecraft/client/renderer/shaders/option/ShaderPackOptions.java`
+- 6 test files with 18 unit tests
+
+**Test Results:** 156/156 total passing (138 from Steps 1-7 + 18 new) ✅
+
+**IRIS References:**
+- `frnsrc/Iris-1.21.9/.../option/OptionType.java` - Exact copy
+- `frnsrc/Iris-1.21.9/.../option/BaseOption.java` - Exact copy
+- `frnsrc/Iris-1.21.9/.../option/BooleanOption.java` - Exact copy
+- `frnsrc/Iris-1.21.9/.../option/StringOption.java` - Exact copy
+- `frnsrc/Iris-1.21.9/.../option/OptionLocation.java` - Exact copy
+- `frnsrc/Iris-1.21.9/.../option/OptionSet.java` - Based on IRIS pattern
+- `frnsrc/Iris-1.21.9/.../option/ShaderPackOptions.java` - Based on IRIS pattern
+
+**Documentation:** `docs/SHADER-IMPLEMENTATION-STEP-8.md`
+
+**Architecture Notes:**
+- Foundational implementation following IRIS exactly
+- Room for future enhancement with OptionAnnotatedSource (566-line GLSL parser)
+- ParsedString tokenizer can be added for full IRIS compatibility
+- Current implementation provides core data structures and API
+
+## Overall Progress Summary
+
+**Phases Complete:**
+- ✅ Foundation Phase (Steps 1-5): 100% COMPLETE
+- 🔄 Loading System Phase (Steps 6-10): 60% COMPLETE (3 of 5 steps)
+
+**Steps Complete:** 8 of 30 (26.7%)
+
+**Next Step:** Step 9 - Create Dimension-Specific Configurations

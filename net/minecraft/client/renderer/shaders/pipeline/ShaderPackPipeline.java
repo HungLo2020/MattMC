@@ -1,6 +1,7 @@
 package net.minecraft.client.renderer.shaders.pipeline;
 
 import net.minecraft.client.renderer.shaders.helpers.OptionalBoolean;
+import net.minecraft.client.renderer.shaders.option.ShaderPackOptions;
 import net.minecraft.client.renderer.shaders.pack.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -23,6 +24,7 @@ public class ShaderPackPipeline implements WorldRenderingPipeline {
 	private final String dimension;
 	private final ShaderProperties shaderProperties;
 	private final ShaderSourceProvider sourceProvider;
+	private final ShaderPackOptions shaderPackOptions;
 	private WorldRenderingPhase currentPhase = WorldRenderingPhase.NONE;
 	
 	/**
@@ -58,6 +60,12 @@ public class ShaderPackPipeline implements WorldRenderingPipeline {
 		LOGGER.debug("Found {} starting shader files for pack: {}", startingPaths.size(), packName);
 		
 		this.sourceProvider = new ShaderSourceProvider(packSource, startingPaths);
+		
+		// Create shader pack options (Step 8)
+		// For now, this creates an empty option set
+		// Full option discovery from GLSL will be implemented in future enhancements
+		this.shaderPackOptions = new ShaderPackOptions();
+		LOGGER.debug("Initialized shader pack options for pack: {}", packName);
 		
 		LOGGER.info("Created shader pipeline for pack: {} in dimension: {}", packName, dimension);
 	}
@@ -158,5 +166,13 @@ public class ShaderPackPipeline implements WorldRenderingPipeline {
 	 */
 	public ShaderSourceProvider getSourceProvider() {
 		return sourceProvider;
+	}
+	
+	/**
+	 * Gets the shader pack options.
+	 * @return The shader pack options
+	 */
+	public ShaderPackOptions getShaderPackOptions() {
+		return shaderPackOptions;
 	}
 }
