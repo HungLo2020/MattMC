@@ -34,7 +34,7 @@ public class ShaderPackSelectionScreen extends Screen {
     protected void init() {
         // Create shader pack list
         this.shaderList = new ShaderPackList(this.minecraft, this.width, this.height, 32, 64);
-        this.addWidget(this.shaderList);
+        this.addRenderableWidget(this.shaderList);
         
         // Populate with available shader packs
         ShaderPackRepository repository = this.minecraft.getShaderPackRepository();
@@ -81,7 +81,6 @@ public class ShaderPackSelectionScreen extends Screen {
     @Override
     public void render(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
         super.render(guiGraphics, mouseX, mouseY, partialTick);
-        this.shaderList.render(guiGraphics, mouseX, mouseY, partialTick);
         guiGraphics.drawCenteredString(this.font, this.title, this.width / 2, 8, 16777215);
         
         // Draw description of selected pack
