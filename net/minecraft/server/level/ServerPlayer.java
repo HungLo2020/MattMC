@@ -5,7 +5,7 @@ import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
 import com.google.common.hash.HashCode;
 import com.google.common.net.InetAddresses;
-import com.mojang.authlib.GameProfile;
+import net.minecraft.server.profile.PlayerProfile;
 import com.mojang.datafixers.util.Either;
 import com.mojang.logging.LogUtils;
 import com.mojang.serialization.Codec;
@@ -372,8 +372,8 @@ public class ServerPlayer extends Player {
 	private int containerCounter;
 	public boolean wonGame;
 
-	public ServerPlayer(MinecraftServer minecraftServer, ServerLevel serverLevel, GameProfile gameProfile, ClientInformation clientInformation) {
-		super(serverLevel, gameProfile);
+	public ServerPlayer(MinecraftServer minecraftServer, ServerLevel serverLevel, PlayerProfile playerProfile, ClientInformation clientInformation) {
+		super(serverLevel, playerProfile);
 		this.server = minecraftServer;
 		this.textFilter = minecraftServer.createTextFilterForPlayer(this);
 		this.gameMode = minecraftServer.createGameModeForPlayer(this);

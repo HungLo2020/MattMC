@@ -14,7 +14,6 @@ import java.util.List;
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
 import net.minecraft.ChatFormatting;
-import net.minecraft.client.GameNarrator;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.LogoRenderer;
@@ -61,7 +60,7 @@ public class WinScreen extends Screen {
 	private final LogoRenderer logoRenderer = new LogoRenderer(false);
 
 	public WinScreen(boolean bl, Runnable runnable) {
-		super(GameNarrator.NO_TITLE);
+		super(Component.empty());
 		this.poem = bl;
 		this.onFinished = runnable;
 		if (!bl) {

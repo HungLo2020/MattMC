@@ -4,7 +4,7 @@ import com.google.common.base.MoreObjects;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
 import com.google.common.math.IntMath;
-import com.mojang.authlib.GameProfile;
+import net.minecraft.server.profile.PlayerProfile;
 import com.mojang.datafixers.util.Either;
 import java.util.Collection;
 import java.util.List;
@@ -164,7 +164,7 @@ public abstract class Player extends Avatar implements ContainerUser {
 	protected int enchantmentSeed = 0;
 	protected final float defaultFlySpeed = 0.02F;
 	private int lastLevelUpTime;
-	private final GameProfile gameProfile;
+	private final PlayerProfile playerProfile;
 	private boolean reducedDebugInfo;
 	private ItemStack lastItemInMainHand = ItemStack.EMPTY;
 	private final ItemCooldowns cooldowns = this.createItemCooldowns();
@@ -179,10 +179,10 @@ public abstract class Player extends Avatar implements ContainerUser {
 	private boolean ignoreFallDamageFromCurrentImpulse = false;
 	private int currentImpulseContextResetGraceTime = 0;
 
-	public Player(Level level, GameProfile gameProfile) {
+	public Player(Level level, PlayerProfile playerProfile) {
 		super(EntityType.PLAYER, level);
-		this.setUUID(gameProfile.getId());
-		this.gameProfile = gameProfile;
+		this.setUUID(playerProfile.id());
+		this.playerProfile = playerProfile;
 		this.inventory = new Inventory(this, this.equipment);
 		this.inventoryMenu = new InventoryMenu(this.inventory, !level.isClientSide(), this);
 		this.containerMenu = this.inventoryMenu;
@@ -633,7 +633,7 @@ public abstract class Player extends Avatar implements ContainerUser {
 	@Override
 	protected void readAdditionalSaveData(ValueInput valueInput) {
 		super.readAdditionalSaveData(valueInput);
-		this.setUUID(this.gameProfile.getId());
+		this.setUUID(this.playerProfile.id());
 		this.inventory.load(valueInput.listOrEmpty("Inventory", ItemStackWithSlot.CODEC));
 		this.inventory.setSelectedSlot(valueInput.getIntOr("SelectedItemSlot", 0));
 		this.sleepCounter = valueInput.getShortOr("SleepTimer", (short)0);
@@ -1163,12 +1163,12 @@ public abstract class Player extends Avatar implements ContainerUser {
 		return !this.level().isClientSide() || this.isLocalPlayer();
 	}
 
-	public GameProfile getGameProfile() {
-		return this.gameProfile;
+	public PlayerProfile getGameProfile() {
+		return this.playerProfile;
 	}
 
 	public NameAndId nameAndId() {
-		return new NameAndId(this.gameProfile);
+		return new NameAndId(this.playerProfile);
 	}
 
 	public Inventory getInventory() {
@@ -1526,12 +1526,12 @@ public abstract class Player extends Avatar implements ContainerUser {
 
 	@Override
 	public Component getName() {
-		return Component.literal(this.gameProfile.getName());
+		return Component.literal(this.playerProfile.name());
 	}
 
 	@Override
 	public String getPlainTextName() {
-		return this.gameProfile.getName();
+		return this.playerProfile.name();
 	}
 
 	public PlayerEnderChestContainer getEnderChestInventory() {
@@ -1576,12 +1576,12 @@ public abstract class Player extends Avatar implements ContainerUser {
 
 	@Override
 	public Component getDisplayName() {
-		MutableComponent mutableComponent = PlayerTeam.formatNameForTeam(this.getTeam(), this.getName());
+		MutableComponent mutableComponent = PlayerTeam.formatNameForTeam(this.getTeam(), Component.literal(this.playerProfile.name()));
 		return this.decorateDisplayNameComponent(mutableComponent);
 	}
 
 	private MutableComponent decorateDisplayNameComponent(MutableComponent mutableComponent) {
-		String string = this.getGameProfile().getName();
+		String string = this.getGameProfile().name();
 		return mutableComponent.withStyle(
 			style -> style.withClickEvent(new ClickEvent.SuggestCommand("/tell " + string + " ")).withHoverEvent(this.createHoverEvent()).withInsertion(string)
 		);
@@ -1589,7 +1589,7 @@ public abstract class Player extends Avatar implements ContainerUser {
 
 	@Override
 	public String getScoreboardName() {
-		return this.getGameProfile().getName();
+		return this.getGameProfile().name();
 	}
 
 	@Override
@@ -1924,7 +1924,7 @@ public abstract class Player extends Avatar implements ContainerUser {
 	public String debugInfo() {
 		return MoreObjects.toStringHelper(this)
 			.add("name", this.getPlainTextName())
-			.add("id", this.getId())
+			.add("id", this.getUUID())
 			.add("pos", this.position())
 			.add("mode", this.gameMode())
 			.add("permission", this.getPermissionLevel())

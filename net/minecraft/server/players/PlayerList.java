@@ -3,7 +3,7 @@ package net.minecraft.server.players;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
-import com.mojang.authlib.GameProfile;
+import net.minecraft.server.profile.PlayerProfile;
 import com.mojang.logging.LogUtils;
 import java.io.File;
 import java.net.SocketAddress;
@@ -194,7 +194,7 @@ public abstract class PlayerList {
 		this.updateEntireScoreboard(serverLevel.getScoreboard(), serverPlayer);
 		this.server.invalidateStatus();
 		MutableComponent mutableComponent;
-		if (serverPlayer.getGameProfile().getName().equalsIgnoreCase(string)) {
+		if (serverPlayer.getGameProfile().name().equalsIgnoreCase(string)) {
 			mutableComponent = Component.translatable("multiplayer.player.joined", serverPlayer.getDisplayName());
 		} else {
 			mutableComponent = Component.translatable("multiplayer.player.joined.renamed", serverPlayer.getDisplayName(), string);
@@ -211,6 +211,23 @@ public abstract class PlayerList {
 		this.players.add(serverPlayer);
 		this.playersByUUID.put(serverPlayer.getUUID(), serverPlayer);
 		this.broadcastAll(ClientboundPlayerInfoUpdatePacket.createPlayerInitializing(List.of(serverPlayer)));
+		
+		// Send all existing player skins to the new player
+		net.minecraft.server.players.PlayerSkinCache skinCache = this.server.getPlayerSkinCache();
+		for (ServerPlayer existingPlayer : this.players) {
+			if (!existingPlayer.getUUID().equals(serverPlayer.getUUID())) {
+				net.minecraft.server.players.PlayerSkinCache.CachedSkin skin = skinCache.getSkin(existingPlayer.getUUID());
+				if (skin != null) {
+					serverPlayer.connection.send(new net.minecraft.network.protocol.game.ClientboundPlayerSkinPacket(
+						existingPlayer.getUUID(),
+						skin.skinName(),
+						skin.skinData(),
+						skin.isSlimModel()
+					));
+				}
+			}
+		}
+		
 		this.sendLevelInfo(serverPlayer, serverLevel);
 		serverLevel.addNewPlayer(serverPlayer);
 		this.server.getCustomBossEvents().onPlayerConnect(serverPlayer);
@@ -331,6 +348,13 @@ public abstract class PlayerList {
 		}
 
 		this.broadcastAll(new ClientboundPlayerInfoRemovePacket(List.of(serverPlayer.getUUID())));
+		
+		// Remove player's skin from cache and notify all clients
+		net.minecraft.server.players.PlayerSkinCache skinCache = this.server.getPlayerSkinCache();
+		if (skinCache.hasSkin(serverPlayer.getUUID())) {
+			skinCache.removeSkin(serverPlayer.getUUID());
+			this.broadcastAll(new net.minecraft.network.protocol.game.ClientboundRemovePlayerSkinPacket(serverPlayer.getUUID()));
+		}
 	}
 
 	@Nullable
@@ -516,7 +540,7 @@ public abstract class PlayerList {
 		String[] strings = new String[this.players.size()];
 
 		for (int i = 0; i < this.players.size(); i++) {
-			strings[i] = ((ServerPlayer)this.players.get(i)).getGameProfile().getName();
+			strings[i] = ((ServerPlayer)this.players.get(i)).getGameProfile().name();
 		}
 
 		return strings;
@@ -589,7 +613,7 @@ public abstract class PlayerList {
 
 		for (int j = 0; j < i; j++) {
 			ServerPlayer serverPlayer = (ServerPlayer)this.players.get(j);
-			if (serverPlayer.getGameProfile().getName().equalsIgnoreCase(string)) {
+			if (serverPlayer.getGameProfile().name().equalsIgnoreCase(string)) {
 				return serverPlayer;
 			}
 		}
@@ -756,14 +780,14 @@ public abstract class PlayerList {
 	}
 
 	public ServerStatsCounter getPlayerStats(Player player) {
-		GameProfile gameProfile = player.getGameProfile();
-		UUID uUID = gameProfile.getId();
+		PlayerProfile playerProfile = player.getGameProfile();
+		UUID uUID = playerProfile.id();
 		ServerStatsCounter serverStatsCounter = (ServerStatsCounter)this.stats.get(uUID);
 		if (serverStatsCounter == null) {
 			File file = this.server.getWorldPath(LevelResource.PLAYER_STATS_DIR).toFile();
 			File file2 = new File(file, uUID + ".json");
 			if (!file2.exists()) {
-				File file3 = new File(file, gameProfile.getName() + ".json");
+				File file3 = new File(file, playerProfile.name() + ".json");
 				Path path = file3.toPath();
 				if (FileUtil.isPathNormalized(path) && FileUtil.isPathPortable(path) && path.startsWith(file.getPath()) && file3.isFile()) {
 					file3.renameTo(file2);
@@ -824,7 +848,7 @@ public abstract class PlayerList {
 	@Nullable
 	public ServerPlayer getPlayer(String string) {
 		for (ServerPlayer serverPlayer : this.players) {
-			if (serverPlayer.getGameProfile().getName().equalsIgnoreCase(string)) {
+			if (serverPlayer.getGameProfile().name().equalsIgnoreCase(string)) {
 				return serverPlayer;
 			}
 		}

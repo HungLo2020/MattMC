@@ -7,7 +7,7 @@ import com.mojang.blaze3d.platform.DisplayData;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.jtracy.TracyClient;
 import com.mojang.logging.LogUtils;
-import com.mojang.util.UndashedUuid;
+import net.minecraft.util.UndashedUuid;
 import java.io.File;
 import java.net.Authenticator;
 import java.net.InetSocketAddress;
@@ -36,8 +36,6 @@ import net.minecraft.client.ClientBootstrap;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.User;
 import net.minecraft.client.server.IntegratedServer;
-import net.minecraft.client.telemetry.TelemetryProperty;
-import net.minecraft.client.telemetry.events.GameLoadTimesEvent;
 import net.minecraft.core.UUIDUtil;
 import net.minecraft.obfuscate.DontObfuscate;
 import net.minecraft.server.Bootstrap;
@@ -49,8 +47,51 @@ import org.apache.commons.lang3.StringEscapeUtils;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 
+/**
+ * Main entry point for the Minecraft client application.
+ * <p>
+ * This class handles command-line argument parsing, client initialization, and launching
+ * the main game window. It supports various launch configurations including:
+ * </p>
+ * <ul>
+ *   <li>Demo mode</li>
+ *   <li>Offline/developer mode</li>
+ *   <li>Quick play (singleplayer, multiplayer, realms)</li>
+ *   <li>Performance profiling (JFR, Tracy)</li>
+ *   <li>Custom window dimensions</li>
+ *   <li>Proxy configuration</li>
+ * </ul>
+ * 
+ * <p><strong>Typical Launch Arguments:</strong></p>
+ * <pre>
+ * --version 1.21.10
+ * --accessToken 0
+ * --gameDir /path/to/game
+ * --assetsDir /path/to/assets
+ * --assetIndex 27
+ * </pre>
+ * 
+ * @see net.minecraft.client.Minecraft Main game class after initialization
+ * @see GameConfig Configuration object passed to Minecraft instance
+ */
 @Environment(EnvType.CLIENT)
 public class Main {
+	/**
+	 * Main entry point for the Minecraft client.
+	 * <p>
+	 * Parses command-line arguments, initializes the game, and launches the client window.
+	 * This method performs the following steps:
+	 * </p>
+	 * <ol>
+	 *   <li>Parse command-line arguments using JOptSimple</li>
+	 *   <li>Bootstrap the game (register blocks, items, etc.)</li>
+	 *   <li>Initialize profiling if enabled</li>
+	 *   <li>Configure user authentication (offline or online)</li>
+	 *   <li>Create and launch the Minecraft instance</li>
+	 * </ol>
+	 * 
+	 * @param strings Command-line arguments passed to the application
+	 */
 	@DontObfuscate
 	public static void main(String[] strings) {
 		OptionParser optionParser = new OptionParser();
@@ -105,10 +146,6 @@ public class Main {
 				TracyBootstrap.setup();
 			}
 
-			Stopwatch stopwatch = Stopwatch.createStarted(Ticker.systemTicker());
-			Stopwatch stopwatch2 = Stopwatch.createStarted(Ticker.systemTicker());
-			GameLoadTimesEvent.INSTANCE.beginStep(TelemetryProperty.LOAD_TIME_TOTAL_TIME_MS, stopwatch);
-			GameLoadTimesEvent.INSTANCE.beginStep(TelemetryProperty.LOAD_TIME_PRE_WINDOW_MS, stopwatch2);
 			SharedConstants.tryDetectVersion();
 			TracyClient.reportAppInfo("Minecraft Java Edition " + SharedConstants.getCurrentVersion().name());
 			CompletableFuture<?> completableFuture = DataFixers.optimize(DataFixTypes.TYPES_FOR_LEVEL_LIST);
@@ -117,7 +154,6 @@ public class Main {
 			string2 = "Bootstrap";
 			Bootstrap.bootStrap();
 			ClientBootstrap.bootstrap();
-			GameLoadTimesEvent.INSTANCE.setBootstrapTime(Bootstrap.bootstrapDuration.get());
 			Bootstrap.validate();
 			string2 = "Argument parsing";
 			List<String> list = optionSet.valuesOf(optionSpec29);

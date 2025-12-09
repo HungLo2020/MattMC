@@ -20,7 +20,7 @@ public class OpCommand {
 			Commands.literal("op")
 				.requires(Commands.hasPermission(3))
 				.then(
-					Commands.argument("targets", GameProfileArgument.gameProfile())
+					Commands.argument("targets", GameProfileArgument.playerProfile())
 						.suggests(
 							(commandContext, suggestionsBuilder) -> {
 								PlayerList playerList = commandContext.getSource().getServer().getPlayerList();
@@ -28,7 +28,7 @@ public class OpCommand {
 									playerList.getPlayers()
 										.stream()
 										.filter(serverPlayer -> !playerList.isOp(serverPlayer.nameAndId()))
-    						.map(serverPlayer -> net.minecraft.util.AuthlibCompat.name(serverPlayer.getGameProfile())),
+    						.map(serverPlayer -> serverPlayer.getGameProfile().name()),
 									suggestionsBuilder
 								);
 							}

@@ -76,16 +76,9 @@ repositories {
 
 configurations.all {
     resolutionStrategy {
-        force 'com.mojang:authlib:6.0.55'
+        // force 'com.mojang:authlib:6.0.55' // REMOVED - using custom PlayerProfile system
         force 'com.mojang:brigadier:1.3.10'
         force 'com.mojang:datafixerupper:8.0.16'
-        // Disallow older Authlib versions pulled transitively
-        eachDependency { details ->
-            if (details.requested.group == 'com.mojang' && details.requested.name == 'authlib' && details.requested.version != '6.0.55') {
-                details.useVersion '6.0.55'
-                details.because 'Align with Minecraft 1.21.10 sources that use GameProfile.id()/name() accessors'
-            }
-        }
     }
 }
 
@@ -93,20 +86,20 @@ configurations.all {
 dependencies {
     // Mojang libraries - use bundled JARs if available, otherwise use Maven coordinates
     if (useBundledDeps) {
-        // Bundled Mojang libraries from libraries/deps/
+        // Bundled Mojang libraries from libraries/deps/ (authlib removed - using custom PlayerProfile)
         implementation files('libraries/deps/brigadier-1.3.10.jar')
         implementation files('libraries/deps/datafixerupper-8.0.16.jar')
-        implementation files('libraries/deps/authlib-6.0.55.jar')
+        // implementation files('libraries/deps/authlib-6.0.55.jar') // REMOVED - custom PlayerProfile system
         implementation files('libraries/deps/logging-1.2.7.jar')
         implementation files('libraries/deps/jtracy-1.0.29.jar')
         implementation files('libraries/deps/blocklist-1.0.10.jar')
         implementation files('libraries/deps/patchy-2.2.10.jar')
         implementation files('libraries/deps/text2speech-1.17.9.jar')
     } else {
-        // Remote Mojang libraries
+        // Remote Mojang libraries (authlib removed - using custom PlayerProfile)
         implementation 'com.mojang:brigadier:1.3.10'
         implementation 'com.mojang:datafixerupper:8.0.16'
-        implementation 'com.mojang:authlib:6.0.55'
+        // implementation 'com.mojang:authlib:6.0.55' // REMOVED - custom PlayerProfile system
         implementation 'com.mojang:logging:1.2.7'
         implementation 'com.mojang:jtracy:1.0.29'
         implementation 'com.mojang:blocklist:1.0.10'
@@ -194,6 +187,28 @@ dependencies {
     
     // Note: @Environment and @EnvType annotations are now provided by custom implementation
     // in the net.minecraft.api package (replaced Fabric dependency)
+    
+    // ===== TESTING DEPENDENCIES =====
+    // Testing dependencies - only available in test scope, excluded from production builds
+    
+    // JUnit 5 (Jupiter) - Core testing framework
+    testImplementation 'org.junit.jupiter:junit-jupiter-api:5.10.1'
+    testImplementation 'org.junit.jupiter:junit-jupiter-params:5.10.1'
+    testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.10.1'
+    
+    // AssertJ - Fluent assertions library
+    testImplementation 'org.assertj:assertj-core:3.25.1'
+    
+    // Mockito - Mocking framework
+    testImplementation 'org.mockito:mockito-core:5.8.0'
+    testImplementation 'org.mockito:mockito-junit-jupiter:5.8.0'
+    
+    // JMH - Java Microbenchmark Harness for performance testing
+    testImplementation 'org.openjdk.jmh:jmh-core:1.37'
+    testAnnotationProcessor 'org.openjdk.jmh:jmh-generator-annprocess:1.37'
+    
+    // Awaitility - Async testing utilities
+    testImplementation 'org.awaitility:awaitility:4.2.0'
 }
 
 sourceSets {
@@ -206,9 +221,22 @@ sourceSets {
             exclude '.idea/**'
             // Exclude bundled Mojang sources that shadow Maven dependencies
             exclude 'com/mojang/authlib/**'
+            // Exclude test sources from main source set
+            exclude 'src/test/**'
+            // Exclude foreign reference source code (for reference only, not for building)
+            exclude 'frnsrc/**'
         }
         resources {
             srcDirs = ['src/main/resources']
+        }
+    }
+    
+    test {
+        java {
+            srcDirs = ['src/test']
+        }
+        resources {
+            srcDirs = ['src/test/resources']
         }
     }
 }
@@ -283,12 +311,51 @@ def configureBundledJdk(JavaExec task) {
     }
 }
 
+/**
+ * Helper method to verify that a main class file exists before running a JavaExec task.
+ * This helps detect build cache corruption issues early with a helpful error message.
+ * 
+ * @param classFileName The path to the class file (e.g., 'net/minecraft/server/Main.class')
+ * @param errorContext A description for error messages (e.g., 'Server main class' or 'Client main class')
+ */
+def verifyMainClassExists(String classFileName, String errorContext) {
+    def mainClassFile = sourceSets.main.output.classesDirs.files.collect { 
+        new File(it, classFileName) 
+    }.find { it.exists() }
+    
+    if (mainClassFile == null) {
+        throw new GradleException(
+            "\n" +
+            "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n" +
+            "ERROR: ${errorContext} file not found!\n" +
+            "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n" +
+            "\n" +
+            "Expected: ${classFileName} in one of:\n" +
+            sourceSets.main.output.classesDirs.files.collect { "  - ${it.absolutePath}" }.join("\n") + "\n" +
+            "\n" +
+            "This usually indicates a Gradle build cache issue.\n" +
+            "\n" +
+            "To fix this, please run:\n" +
+            "  ./gradlew clean build --no-build-cache\n" +
+            "\n" +
+            "If the problem persists, try clearing your Gradle cache:\n" +
+            "  rm -rf ~/.gradle/caches/\n" +
+            "  ./gradlew clean build\n" +
+            "\n" +
+            "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        )
+    }
+}
+
 // Task to run the dedicated server (no GUI - headless mode)
 tasks.register('runServer', JavaExec) {
     group = 'minecraft'
     description = 'Runs the Minecraft dedicated server (no GUI)'
     
-    dependsOn 'copyJdkToRun'
+    dependsOn 'classes', 'copyJdkToRun'
+    
+    // Explicitly declare dependency on the classes output to ensure proper task ordering
+    inputs.files(sourceSets.main.output.classesDirs)
     
     classpath = sourceSets.main.runtimeClasspath
     mainClass = 'net.minecraft.server.Main'
@@ -298,6 +365,7 @@ tasks.register('runServer', JavaExec) {
     args = ['--nogui']
     
     doFirst {
+        verifyMainClassExists('net/minecraft/server/Main.class', 'Server main class')
         workingDir.mkdirs()
     }
     
@@ -312,7 +380,10 @@ tasks.register('runServerGui', JavaExec) {
     group = 'minecraft'
     description = 'Runs the Minecraft dedicated server with GUI'
     
-    dependsOn 'copyJdkToRun'
+    dependsOn 'classes', 'copyJdkToRun'
+    
+    // Explicitly declare dependency on the classes output to ensure proper task ordering
+    inputs.files(sourceSets.main.output.classesDirs)
     
     classpath = sourceSets.main.runtimeClasspath
     mainClass = 'net.minecraft.server.Main'
@@ -322,6 +393,7 @@ tasks.register('runServerGui', JavaExec) {
     // No --nogui argument means GUI will be shown
     
     doFirst {
+        verifyMainClassExists('net/minecraft/server/Main.class', 'Server main class')
         workingDir.mkdirs()
     }
     
@@ -336,7 +408,10 @@ tasks.register('runClient', JavaExec) {
     group = 'minecraft'
     description = 'Runs the Minecraft client'
     
-    dependsOn 'copyJdkToRun'
+    dependsOn 'classes', 'copyJdkToRun'
+    
+    // Explicitly declare dependency on the classes output to ensure proper task ordering
+    inputs.files(sourceSets.main.output.classesDirs)
     
     classpath = sourceSets.main.runtimeClasspath
     mainClass = 'net.minecraft.client.main.Main'
@@ -354,6 +429,7 @@ tasks.register('runClient', JavaExec) {
     ]
     
     doFirst {
+        verifyMainClassExists('net/minecraft/client/main/Main.class', 'Client main class')
         workingDir.mkdirs()
         file('run/assets').mkdirs()
         file('run/resourcepacks').mkdirs()
@@ -638,3 +714,121 @@ tasks.register('clientDistZip', Zip) {
     
     destinationDirectory = file("${buildDir}/distributions")
 }
+
+// ===== TESTING CONFIGURATION =====
+
+// Configure JUnit 5 test platform for standard tests
+test {
+    useJUnitPlatform()
+    
+    // Configure test output
+    testLogging {
+        events "passed", "skipped", "failed"
+        exceptionFormat "full"
+        showStandardStreams = false
+        showCauses = true
+        showStackTraces = true
+        
+        // Show summary after test execution
+        afterSuite { desc, result ->
+            if (!desc.parent) {
+                println "\nTest Results: ${result.resultType}"
+                println "Tests run: ${result.testCount}, " +
+                        "Passed: ${result.successfulTestCount}, " +
+                        "Failed: ${result.failedTestCount}, " +
+                        "Skipped: ${result.skippedTestCount}"
+            }
+        }
+    }
+    
+    // Set max heap for tests
+    maxHeapSize = "2g"
+    
+    // Exclude performance tests from regular test runs
+    // Performance tests are identified by naming convention: *PerformanceTest or *Benchmark
+    exclude '**/*PerformanceTest.class'
+    exclude '**/*Benchmark.class'
+}
+
+// Separate task for performance tests
+tasks.register('performanceTest', Test) {
+    group = 'verification'
+    description = 'Runs performance tests and benchmarks (tests ending with "PerformanceTest" or "Benchmark")'
+    
+    // Use the test source set (same as regular test task)
+    testClassesDirs = sourceSets.test.output.classesDirs
+    classpath = sourceSets.test.runtimeClasspath
+    
+    useJUnitPlatform()
+    
+    testLogging {
+        events "passed", "skipped", "failed"
+        exceptionFormat "full"
+        showStandardStreams = true  // Show stdout for performance metrics
+        
+        // Show summary after test execution
+        afterSuite { desc, result ->
+            if (!desc.parent) {
+                println "\nPerformance Test Results: ${result.resultType}"
+                println "Tests run: ${result.testCount}, " +
+                        "Passed: ${result.successfulTestCount}, " +
+                        "Failed: ${result.failedTestCount}, " +
+                        "Skipped: ${result.skippedTestCount}"
+            }
+        }
+    }
+    
+    // Include performance tests by naming convention
+    // Tests ending with "PerformanceTest" or "Benchmark" are considered performance tests
+    include '**/*PerformanceTest.class'
+    include '**/*Benchmark.class'
+    
+    // More memory for performance tests
+    maxHeapSize = "4g"
+}
+
+// Task to run all tests (both misc and performance)
+tasks.register('testAll', Test) {
+    group = 'verification'
+    description = 'Runs all tests including performance tests'
+    
+    // Use the test source set (same as regular test task)
+    testClassesDirs = sourceSets.test.output.classesDirs
+    classpath = sourceSets.test.runtimeClasspath
+    
+    useJUnitPlatform()
+    
+    testLogging {
+        events "passed", "skipped", "failed"
+        exceptionFormat "full"
+        showStandardStreams = true
+        
+        // Show summary after test execution
+        afterSuite { desc, result ->
+            if (!desc.parent) {
+                println "\nAll Tests Results: ${result.resultType}"
+                println "Tests run: ${result.testCount}, " +
+                        "Passed: ${result.successfulTestCount}, " +
+                        "Failed: ${result.failedTestCount}, " +
+                        "Skipped: ${result.skippedTestCount}"
+            }
+        }
+    }
+    
+    maxHeapSize = "4g"
+}
+
+// Verify that production builds only use main source set (exclude tests)
+// This ensures tests are never included in distributions
+fatJar {
+    // Explicitly use only main source set output
+    from sourceSets.main.output
+}
+
+clientFatJar {
+    // Explicitly use only main source set output
+    from sourceSets.main.output
+}
+
+// The clientDist task already uses only runtimeClasspath and main source set,
+// but we verify this is maintained for future modifications

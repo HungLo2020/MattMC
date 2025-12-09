@@ -1,6 +1,6 @@
 package net.minecraft.client;
 
-import com.mojang.util.UndashedUuid;
+import net.minecraft.util.UndashedUuid;
 import java.util.Optional;
 import java.util.UUID;
 import net.minecraft.api.EnvType;

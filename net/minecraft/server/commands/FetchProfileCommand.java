@@ -1,6 +1,6 @@
 package net.minecraft.server.commands;
 
-import com.mojang.authlib.GameProfile;
+import net.minecraft.server.profile.PlayerProfile;
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.arguments.StringArgumentType;
 import java.util.List;
@@ -45,8 +45,8 @@ public class FetchProfileCommand {
 		);
 	}
 
-	private static void reportResolvedProfile(CommandSourceStack commandSourceStack, GameProfile gameProfile, String string, Component component) {
-		ResolvableProfile resolvableProfile = ResolvableProfile.createResolved(gameProfile);
+	private static void reportResolvedProfile(CommandSourceStack commandSourceStack, PlayerProfile playerProfile, String string, Component component) {
+		ResolvableProfile resolvableProfile = ResolvableProfile.createResolved(playerProfile);
 		ResolvableProfile.CODEC
 			.encodeStart(NbtOps.INSTANCE, resolvableProfile)
 			.ifSuccess(
@@ -92,10 +92,10 @@ public class FetchProfileCommand {
 			.execute(
 				() -> {
 					Component component = Component.literal(string);
-					Optional<GameProfile> optional = profileResolver.fetchByName(string);
+					Optional<PlayerProfile> optional = profileResolver.fetchByName(string);
 					minecraftServer.execute(
 						() -> optional.ifPresentOrElse(
-							gameProfile -> reportResolvedProfile(commandSourceStack, gameProfile, "commands.fetchprofile.name.success", component),
+							playerProfile -> reportResolvedProfile(commandSourceStack, playerProfile, "commands.fetchprofile.name.success", component),
 							() -> commandSourceStack.sendFailure(Component.translatable("commands.fetchprofile.name.failure", component))
 						)
 					);
@@ -111,10 +111,10 @@ public class FetchProfileCommand {
 			.execute(
 				() -> {
 					Component component = Component.translationArg(uUID);
-					Optional<GameProfile> optional = profileResolver.fetchById(uUID);
+					Optional<PlayerProfile> optional = profileResolver.fetchById(uUID);
 					minecraftServer.execute(
 						() -> optional.ifPresentOrElse(
-							gameProfile -> reportResolvedProfile(commandSourceStack, gameProfile, "commands.fetchprofile.id.success", component),
+							playerProfile -> reportResolvedProfile(commandSourceStack, playerProfile, "commands.fetchprofile.id.success", component),
 							() -> commandSourceStack.sendFailure(Component.translatable("commands.fetchprofile.id.failure", component))
 						)
 					);

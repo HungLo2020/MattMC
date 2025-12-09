@@ -1,6 +1,6 @@
 package net.minecraft.client.gui.screens;
 
-import com.mojang.authlib.minecraft.BanDetails;
+import net.minecraft.client.auth.BanDetails;
 import it.unimi.dsi.fastutil.booleans.BooleanConsumer;
 import java.net.URI;
 import java.time.Duration;
@@ -9,7 +9,6 @@ import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
 import net.minecraft.ChatFormatting;
 import net.minecraft.Util;
-import net.minecraft.client.multiplayer.chat.report.BanReason;
 import net.minecraft.network.chat.CommonComponents;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.ComponentUtils;
@@ -80,11 +79,8 @@ public class BanNoticeScreens {
 		String string2 = banDetails.reasonMessage();
 		if (StringUtils.isNumeric(string)) {
 			int i = Integer.parseInt(string);
-			BanReason banReason = BanReason.byId(i);
 			Component component;
-			if (banReason != null) {
-				component = ComponentUtils.mergeStyles(banReason.title().copy(), Style.EMPTY.withBold(true));
-			} else if (string2 != null) {
+			if (string2 != null) {
 				component = Component.translatable("gui.banned.description.reason_id_message", new Object[]{i, string2}).withStyle(ChatFormatting.BOLD);
 			} else {
 				component = Component.translatable("gui.banned.description.reason_id", new Object[]{i}).withStyle(ChatFormatting.BOLD);

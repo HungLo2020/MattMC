@@ -112,6 +112,10 @@ public class CubeMap implements AutoCloseable {
 		textureManager.register(this.location, new CubeMapTexture(this.location));
 	}
 
+	public void registerAndLoadTextures(TextureManager textureManager) {
+		textureManager.registerAndLoad(this.location, new CubeMapTexture(this.location));
+	}
+
 	public void close() {
 		this.vertexBuffer.close();
 		this.projectionMatrixUbo.close();

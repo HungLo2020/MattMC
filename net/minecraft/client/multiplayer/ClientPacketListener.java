@@ -4,7 +4,7 @@ import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
 import com.google.common.hash.HashCode;
-import com.mojang.authlib.GameProfile;
+import net.minecraft.server.profile.PlayerProfile;
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.ParseResults;
 import com.mojang.brigadier.arguments.ArgumentType;
@@ -379,11 +379,12 @@ public class ClientPacketListener extends ClientCommonPacketListenerImpl impleme
 			return argumentBuilder;
 		}
 	};
-	private final GameProfile localGameProfile;
+	private final PlayerProfile localGameProfile;
 	private ClientLevel level;
 	private ClientLevel.ClientLevelData levelData;
 	private final Map<UUID, PlayerInfo> playerInfoMap = Maps.<UUID, PlayerInfo>newHashMap();
 	private final Set<PlayerInfo> listedPlayers = new ReferenceOpenHashSet<>();
+	private final ClientSkinCache clientSkinCache;
 	private final ClientAdvancements advancements;
 	private final ClientSuggestionProvider suggestionsProvider;
 	private final ClientSuggestionProvider restrictedSuggestionsProvider;
@@ -425,6 +426,7 @@ public class ClientPacketListener extends ClientCommonPacketListenerImpl impleme
 
 	public ClientPacketListener(Minecraft minecraft, Connection connection, CommonListenerCookie commonListenerCookie) {
 		super(minecraft, connection, commonListenerCookie);
+		this.clientSkinCache = new ClientSkinCache(minecraft);
 		this.localGameProfile = commonListenerCookie.localGameProfile();
 		this.registryAccess = commonListenerCookie.receivedRegistries();
 		RegistryOps<HashCode> registryOps = this.registryAccess.createSerializationContext(HashOps.CRC32C_INSTANCE);
@@ -432,7 +434,7 @@ public class ClientPacketListener extends ClientCommonPacketListenerImpl impleme
 				.getOrThrow(string -> new IllegalArgumentException("Failed to hash " + typedDataComponent + ": " + string)))
 			.asInt();
 		this.enabledFeatures = commonListenerCookie.enabledFeatures();
-		this.advancements = new ClientAdvancements(minecraft, this.telemetryManager);
+		this.advancements = new ClientAdvancements(minecraft);
 		this.suggestionsProvider = new ClientSuggestionProvider(this, minecraft, true);
 		this.restrictedSuggestionsProvider = new ClientSuggestionProvider(this, minecraft, false);
 		this.pingDebugMonitor = new PingDebugMonitor(this, minecraft.getDebugOverlay().getPingLogger());
@@ -453,7 +455,6 @@ public class ClientPacketListener extends ClientCommonPacketListenerImpl impleme
 	public void close() {
 		this.closed = true;
 		this.clearLevel();
-		this.telemetryManager.onDisconnect();
 	}
 
 	public void clearLevel() {
@@ -535,11 +536,13 @@ public class ClientPacketListener extends ClientCommonPacketListenerImpl impleme
 		this.nextChatIndex = 0;
 		this.lastSeenMessages = new LastSeenMessagesTracker(20);
 		this.messageSignatureCache = MessageSignatureCache.createDefault();
+		// Send the player's selected skin to the server
+		this.sendPlayerSkin();
+		
 		if (this.connection.isEncrypted()) {
 			this.prepareKeyPair();
 		}
 
-		this.telemetryManager.onPlayerInfoReceived(commonPlayerSpawnInfo.gameType(), clientboundLoginPacket.hardcore());
 		this.minecraft.quickPlayLog().log(this.minecraft);
 		this.serverEnforcesSecureChat = clientboundLoginPacket.enforcesSecureChat();
 		if (this.serverData != null && !this.seenInsecureChatWarning && !this.enforcesSecureChat()) {
@@ -931,7 +934,6 @@ public class ClientPacketListener extends ClientCommonPacketListenerImpl impleme
 					new CommonListenerCookie(
 						new LevelLoadTracker(),
 						this.localGameProfile,
-						this.telemetryManager,
 						this.registryAccess,
 						this.enabledFeatures,
 						this.serverBrand,
@@ -1102,7 +1104,6 @@ public class ClientPacketListener extends ClientCommonPacketListenerImpl impleme
 	public void handleSetTime(ClientboundSetTimePacket clientboundSetTimePacket) {
 		PacketUtils.ensureRunningOnSameThread(clientboundSetTimePacket, this, this.minecraft.packetProcessor());
 		this.level.setTimeFromServer(clientboundSetTimePacket.gameTime(), clientboundSetTimePacket.dayTime(), clientboundSetTimePacket.tickDayTime());
-		this.telemetryManager.setTime(clientboundSetTimePacket.gameTime());
 	}
 
 	public void handleSetSpawn(ClientboundSetDefaultSpawnPositionPacket clientboundSetDefaultSpawnPositionPacket) {
@@ -1134,7 +1135,6 @@ public class ClientPacketListener extends ClientCommonPacketListenerImpl impleme
 
 							Component component = Component.translatable("mount.onboard", new Object[]{this.minecraft.options.keyShift.getTranslatedKeyMessage()});
 							this.minecraft.gui.setOverlayMessage(component, false);
-							this.minecraft.getNarrator().saySystemNow(component);
 						}
 					}
 				}
@@ -1538,7 +1538,6 @@ public class ClientPacketListener extends ClientCommonPacketListenerImpl impleme
 
 			if (component != null) {
 				this.minecraft.gui.getChat().addMessage(component);
-				this.minecraft.getNarrator().saySystemQueued(component);
 			}
 		} else if (type == ClientboundGameEventPacket.PLAY_ARROW_HIT_SOUND) {
 			this.level.playSound(player, player.getX(), player.getEyeY(), player.getZ(), SoundEvents.ARROW_HIT_PLAYER, SoundSource.PLAYERS, 0.18F, 0.45F);
@@ -1906,7 +1905,7 @@ public class ClientPacketListener extends ClientCommonPacketListenerImpl impleme
 		PacketUtils.ensureRunningOnSameThread(clientboundPlayerInfoUpdatePacket, this, this.minecraft.packetProcessor());
 
 		for (net.minecraft.network.protocol.game.ClientboundPlayerInfoUpdatePacket.Entry entry : clientboundPlayerInfoUpdatePacket.newEntries()) {
-			PlayerInfo playerInfo = new PlayerInfo((GameProfile)Objects.requireNonNull(entry.profile()), this.enforcesSecureChat());
+			PlayerInfo playerInfo = new PlayerInfo((PlayerProfile)Objects.requireNonNull(entry.profile()), this.enforcesSecureChat());
 			if (this.playerInfoMap.putIfAbsent(entry.profileId(), playerInfo) == null) {
 				this.minecraft.getPlayerSocialManager().addPlayer(playerInfo);
 			}
@@ -1961,20 +1960,114 @@ public class ClientPacketListener extends ClientCommonPacketListenerImpl impleme
 		}
 	}
 
+	@Override
+	public void handlePlayerSkin(net.minecraft.network.protocol.game.ClientboundPlayerSkinPacket packet) {
+		PacketUtils.ensureRunningOnSameThread(packet, this, this.minecraft.packetProcessor());
+		
+		// Cache the received skin
+		this.clientSkinCache.cacheSkin(packet.playerId(), packet.skinName(), packet.skinData(), packet.isSlimModel());
+		
+		// Update PlayerInfo to use the new skin
+		PlayerInfo playerInfo = this.playerInfoMap.get(packet.playerId());
+		if (playerInfo != null) {
+			// Force refresh the skin lookup by clearing it
+			// The skin will be fetched from our cache next time it's needed
+			playerInfo.skinLookup = null;
+		}
+	}
+
+	@Override
+	public void handleRemovePlayerSkin(net.minecraft.network.protocol.game.ClientboundRemovePlayerSkinPacket packet) {
+		PacketUtils.ensureRunningOnSameThread(packet, this, this.minecraft.packetProcessor());
+		
+		// Remove the cached skin
+		this.clientSkinCache.removeSkin(packet.playerId());
+	}
+
+	/**
+	 * Send the player's selected skin to the server.
+	 */
+	private void sendPlayerSkin() {
+		try {
+			// Get the selected skin name from options
+			String selectedSkin = this.minecraft.options.selectedSkin;
+			net.minecraft.client.resources.SkinLoader skinLoader = this.minecraft.getSkinLoader();
+			net.minecraft.client.resources.SkinLoader.SkinEntry skinEntry = skinLoader.getSkinByName(selectedSkin);
+			
+			if (skinEntry == null) {
+				LOGGER.warn("Could not find selected skin: {}, using default", selectedSkin);
+				skinEntry = skinLoader.getDefaultSkin();
+			}
+			
+			if (skinEntry != null) {
+				// Load the skin texture data
+				byte[] skinData = loadSkinTextureData(skinEntry);
+				if (skinData != null) {
+					boolean isSlim = skinEntry.modelType() == net.minecraft.world.entity.player.PlayerModelType.SLIM;
+					
+					// Send the skin to the server
+					this.send(new net.minecraft.network.protocol.game.ServerboundPlayerSkinPacket(
+						skinEntry.displayName(),
+						skinData,
+						isSlim
+					));
+					
+					LOGGER.info("Sent player skin to server: {}", skinEntry.displayName());
+				}
+			}
+		} catch (Exception e) {
+			LOGGER.error("Failed to send player skin to server", e);
+		}
+	}
+
+	/**
+	 * Load skin texture data as byte array.
+	 */
+	private byte[] loadSkinTextureData(net.minecraft.client.resources.SkinLoader.SkinEntry skinEntry) {
+		try {
+			net.minecraft.resources.ResourceLocation location = skinEntry.location();
+			java.io.InputStream stream;
+			
+			if (skinEntry.builtin()) {
+				// Built-in skin from resources
+				stream = this.minecraft.getResourceManager().getResourceOrThrow(location).open();
+			} else {
+				// Custom skin from skins directory
+				String customSuffix = net.minecraft.client.resources.SkinLoader.getCustomSuffix();
+				java.nio.file.Path skinPath = this.minecraft.getSkinLoader().getSkinsDirectory()
+					.resolve(skinEntry.displayName().replace(customSuffix, "") + ".png");
+				if (java.nio.file.Files.exists(skinPath)) {
+					stream = java.nio.file.Files.newInputStream(skinPath);
+				} else {
+					LOGGER.warn("Custom skin file not found: {}", skinPath);
+					return null;
+				}
+			}
+			
+			// Read all bytes from the stream
+			byte[] data = stream.readAllBytes();
+			stream.close();
+			return data;
+		} catch (Exception e) {
+			LOGGER.error("Failed to load skin texture data", e);
+			return null;
+		}
+	}
+
 	private void initializeChatSession(net.minecraft.network.protocol.game.ClientboundPlayerInfoUpdatePacket.Entry entry, PlayerInfo playerInfo) {
-		GameProfile gameProfile = playerInfo.getProfile();
+		PlayerProfile playerProfile = playerInfo.getProfile();
 		SignatureValidator signatureValidator = this.minecraft.services().profileKeySignatureValidator();
 		if (signatureValidator == null) {
-			LOGGER.warn("Ignoring chat session from {} due to missing Services public key", gameProfile.getName());
+			LOGGER.warn("Ignoring chat session from {} due to missing Services public key", playerProfile.name());
 			playerInfo.clearChatSession(this.enforcesSecureChat());
 		} else {
 			Data data = entry.chatSession();
 			if (data != null) {
 				try {
-					RemoteChatSession remoteChatSession = data.validate(gameProfile, signatureValidator);
+					RemoteChatSession remoteChatSession = data.validate(playerProfile, signatureValidator);
 					playerInfo.setChatSession(remoteChatSession);
 				} catch (ValidationException var7) {
-					LOGGER.error("Failed to validate profile key for player: '{}'", gameProfile.getName(), var7);
+					LOGGER.error("Failed to validate profile key for player: '{}'", playerProfile.name(), var7);
 					playerInfo.clearChatSession(this.enforcesSecureChat());
 				}
 			} else {
@@ -2460,10 +2553,14 @@ public class ClientPacketListener extends ClientCommonPacketListenerImpl impleme
 		return (PlayerInfo)this.playerInfoMap.get(uUID);
 	}
 
+	public ClientSkinCache getClientSkinCache() {
+		return this.clientSkinCache;
+	}
+
 	@Nullable
 	public PlayerInfo getPlayerInfo(String string) {
 		for (PlayerInfo playerInfo : this.playerInfoMap.values()) {
-			if (playerInfo.getProfile().getName().equals(string)) {
+			if (playerInfo.getProfile().name().equals(string)) {
 				return playerInfo;
 			}
 		}
@@ -2478,7 +2575,7 @@ public class ClientPacketListener extends ClientCommonPacketListenerImpl impleme
 	@Nullable
 	public PlayerInfo getPlayerInfoIgnoreCase(String string) {
 		for (PlayerInfo playerInfo : this.playerInfoMap.values()) {
-			if (playerInfo.getProfile().getName().equalsIgnoreCase(string)) {
+			if (playerInfo.getProfile().name().equalsIgnoreCase(string)) {
 				return playerInfo;
 			}
 		}
@@ -2486,7 +2583,7 @@ public class ClientPacketListener extends ClientCommonPacketListenerImpl impleme
 		return null;
 	}
 
-	public GameProfile getLocalGameProfile() {
+	public PlayerProfile getLocalGameProfile() {
 		return this.localGameProfile;
 	}
 
@@ -2656,7 +2753,6 @@ public class ClientPacketListener extends ClientCommonPacketListenerImpl impleme
 			this.debugSubscriber.tick(this.level.getGameTime());
 		}
 
-		this.telemetryManager.tick();
 		if (this.levelLoadTracker != null) {
 			this.levelLoadTracker.tickClientLoad();
 			if (this.levelLoadTracker.isLevelReady()) {
@@ -2678,10 +2774,10 @@ public class ClientPacketListener extends ClientCommonPacketListenerImpl impleme
 	}
 
 	private void setKeyPair(ProfileKeyPair profileKeyPair) {
-		if (this.minecraft.isLocalPlayer(this.localGameProfile.getId())) {
+		if (this.minecraft.isLocalPlayer(this.localGameProfile.id())) {
 			if (this.chatSession == null || !this.chatSession.keyPair().equals(profileKeyPair)) {
 				this.chatSession = LocalChatSession.create(profileKeyPair);
-				this.signedMessageEncoder = this.chatSession.createMessageEncoder(this.localGameProfile.getId());
+				this.signedMessageEncoder = this.chatSession.createMessageEncoder(this.localGameProfile.id());
 				this.send(new ServerboundChatSessionUpdatePacket(this.chatSession.asRemote().asData()));
 			}
 		}

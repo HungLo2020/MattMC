@@ -58,7 +58,7 @@ public class DebugScreenEntryList {
 			);
 			if (serializedOptions.profile().isPresent()) {
 				this.loadProfile((DebugScreenProfile)serializedOptions.profile().get());
-			} else {
+			} else{
 				this.allStatuses = new HashMap();
 				if (serializedOptions.custom().isPresent()) {
 					this.allStatuses.putAll((Map)serializedOptions.custom().get());

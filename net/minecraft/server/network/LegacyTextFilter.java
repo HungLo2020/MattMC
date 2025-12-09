@@ -2,7 +2,7 @@ package net.minecraft.server.network;
 
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
-import com.mojang.authlib.GameProfile;
+import net.minecraft.server.profile.PlayerProfile;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.HttpURLConnection;
@@ -63,36 +63,36 @@ public class LegacyTextFilter extends ServerTextFilter {
 				URL uRL = uRI.resolve("/" + string5).toURL();
 				URL uRL2 = getEndpoint(uRI, jsonObject2, "join", "v1/join");
 				URL uRL3 = getEndpoint(uRI, jsonObject2, "leave", "v1/leave");
-				LegacyTextFilter.JoinOrLeaveEncoder joinOrLeaveEncoder = gameProfile -> {
+				LegacyTextFilter.JoinOrLeaveEncoder joinOrLeaveEncoder = playerProfile -> {
 					JsonObject jsonObjectx = new JsonObject();
 					jsonObjectx.addProperty("server", string3);
 					jsonObjectx.addProperty("room", string4);
-					jsonObjectx.addProperty("user_id", gameProfile.getId().toString());
-					jsonObjectx.addProperty("user_display_name", gameProfile.getName());
+					jsonObjectx.addProperty("user_id", playerProfile.id().toString());
+					jsonObjectx.addProperty("user_display_name", playerProfile.name());
 					return jsonObjectx;
 				};
 				ServerTextFilter.MessageEncoder messageEncoder;
 				if (bl) {
-					messageEncoder = (gameProfile, string3x) -> {
+					messageEncoder = (playerProfile, string3x) -> {
 						JsonObject jsonObjectx = new JsonObject();
 						jsonObjectx.addProperty("rule", i);
 						jsonObjectx.addProperty("server", string3);
 						jsonObjectx.addProperty("room", string4);
-      jsonObjectx.addProperty("player", gameProfile.getId().toString());
-      jsonObjectx.addProperty("player_display_name", net.minecraft.util.AuthlibCompat.name(gameProfile));
+      jsonObjectx.addProperty("player", playerProfile.id().toString());
+      jsonObjectx.addProperty("player_display_name", playerProfile.name());
 						jsonObjectx.addProperty("text", string3x);
 						jsonObjectx.addProperty("language", "*");
 						return jsonObjectx;
 					};
 				} else {
 					String string6 = String.valueOf(i);
-					messageEncoder = (gameProfile, string4x) -> {
+					messageEncoder = (playerProfile, string4x) -> {
 						JsonObject jsonObjectx = new JsonObject();
 						jsonObjectx.addProperty("rule_id", string6);
 						jsonObjectx.addProperty("category", string3);
 						jsonObjectx.addProperty("subcategory", string4);
-      jsonObjectx.addProperty("user_id", net.minecraft.util.AuthlibCompat.id(gameProfile).toString());
-						jsonObjectx.addProperty("user_display_name", gameProfile.getName());
+      jsonObjectx.addProperty("user_id", playerProfile.id().toString());
+						jsonObjectx.addProperty("user_display_name", playerProfile.name());
 						jsonObjectx.addProperty("text", string4x);
 						jsonObjectx.addProperty("language", "*");
 						return jsonObjectx;
@@ -111,8 +111,8 @@ public class LegacyTextFilter extends ServerTextFilter {
 	}
 
 	@Override
-	public TextFilter createContext(GameProfile gameProfile) {
-		return new ServerTextFilter.PlayerContext(gameProfile) {
+	public TextFilter createContext(PlayerProfile playerProfile) {
+		return new ServerTextFilter.PlayerContext(playerProfile) {
 			@Override
 			public void join() {
 				LegacyTextFilter.this.processJoinOrLeave(this.profile, LegacyTextFilter.this.joinEndpoint, LegacyTextFilter.this.joinEncoder, this.streamExecutor);
@@ -125,14 +125,14 @@ public class LegacyTextFilter extends ServerTextFilter {
 		};
 	}
 
-	void processJoinOrLeave(GameProfile gameProfile, URL uRL, LegacyTextFilter.JoinOrLeaveEncoder joinOrLeaveEncoder, Executor executor) {
+	void processJoinOrLeave(PlayerProfile playerProfile, URL uRL, LegacyTextFilter.JoinOrLeaveEncoder joinOrLeaveEncoder, Executor executor) {
 		executor.execute(() -> {
-			JsonObject jsonObject = joinOrLeaveEncoder.encode(gameProfile);
+			JsonObject jsonObject = joinOrLeaveEncoder.encode(playerProfile);
 
 			try {
 				this.processRequest(jsonObject, uRL);
 			} catch (Exception var6) {
-				LOGGER.warn("Failed to send join/leave packet to {} for player {}", uRL, gameProfile, var6);
+				LOGGER.warn("Failed to send join/leave packet to {} for player {}", uRL, playerProfile, var6);
 			}
 		});
 	}
@@ -184,6 +184,6 @@ public class LegacyTextFilter extends ServerTextFilter {
 
 	@FunctionalInterface
 	interface JoinOrLeaveEncoder {
-		JsonObject encode(GameProfile gameProfile);
+		JsonObject encode(PlayerProfile playerProfile);
 	}
 }

@@ -1,6 +1,6 @@
 package net.minecraft.server.jsonrpc.api;
 
-import com.mojang.authlib.GameProfile;
+import net.minecraft.server.profile.PlayerProfile;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.MapCodec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
@@ -18,8 +18,8 @@ public record PlayerDto(Optional<UUID> id, Optional<String> name) {
 			.apply(instance, PlayerDto::new)
 	);
 
-	public static PlayerDto from(GameProfile gameProfile) {
-		return new PlayerDto(Optional.of(gameProfile.getId()), Optional.of(gameProfile.getName()));
+	public static PlayerDto from(PlayerProfile playerProfile) {
+		return new PlayerDto(Optional.of(playerProfile.id()), Optional.of(playerProfile.name()));
 	}
 
 	public static PlayerDto from(NameAndId nameAndId) {
@@ -27,7 +27,7 @@ public record PlayerDto(Optional<UUID> id, Optional<String> name) {
 	}
 
 	public static PlayerDto from(ServerPlayer serverPlayer) {
-		GameProfile gameProfile = serverPlayer.getGameProfile();
-		return from(gameProfile);
+		PlayerProfile playerProfile = serverPlayer.getGameProfile();
+		return from(playerProfile);
 	}
 }

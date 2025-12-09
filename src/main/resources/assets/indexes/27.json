@@ -21898,7 +21898,7 @@
     "minecraft/textures/gui/title/background/panorama_overlay.png": {
       "hash": "9dd32387135eefa7ab95996d52a5ca4cec8a3b30",
       "size": 86,
-      "path": "files/minecraft/textures/gui/title/background/panorama_overlay.png"
+      "path": "minecraft/textures/gui/title/background/panorama_overlay.png"
     },
     "pack.mcmeta": {
       "hash": "95bbb94f69d2ba6087d8279a621ae80b2e522f17",

@@ -2,7 +2,6 @@ package net.minecraft.client.gui.screens.inventory;
 
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
-import net.minecraft.client.GameNarrator;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.AbstractSliderButton;
@@ -48,7 +47,7 @@ public class JigsawBlockEditScreen extends Screen {
 	private JointType joint;
 
 	public JigsawBlockEditScreen(JigsawBlockEntity jigsawBlockEntity) {
-		super(GameNarrator.NO_TITLE);
+		super(Component.empty());
 		this.jigsawEntity = jigsawBlockEntity;
 	}
 

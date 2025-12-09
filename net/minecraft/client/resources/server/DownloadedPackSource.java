@@ -5,8 +5,7 @@ import com.google.common.hash.HashCode;
 import com.google.common.hash.HashFunction;
 import com.google.common.hash.Hashing;
 import com.mojang.logging.LogUtils;
-import com.mojang.realmsclient.Unit;
-import com.mojang.util.UndashedUuid;
+import net.minecraft.util.UndashedUuid;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.net.Proxy;
@@ -124,10 +123,20 @@ public class DownloadedPackSource implements AutoCloseable {
 				if (this.totalBytes.isPresent()) {
 					this.message = Component.translatable("download.pack.progress.percent", new Object[]{l * 100L / this.totalBytes.getAsLong()});
 				} else {
-					this.message = Component.translatable("download.pack.progress.bytes", new Object[]{Unit.humanReadable(l)});
+					this.message = Component.translatable("download.pack.progress.bytes", new Object[]{humanReadableBytes(l)});
 				}
 
 				this.updateToast();
+			}
+
+			private static String humanReadableBytes(long bytes) {
+				if (bytes < 1024L) {
+					return bytes + " B";
+				} else {
+					int exp = (int)(Math.log(bytes) / Math.log(1024.0));
+					String prefix = "KMGTPE".charAt(exp - 1) + "";
+					return String.format(java.util.Locale.ROOT, "%.1f %sB", bytes / Math.pow(1024.0, exp), prefix);
+				}
 			}
 
 			public void requestStart() {

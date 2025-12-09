@@ -1,8 +1,8 @@
 package net.minecraft.network.protocol.game;
 
 import com.google.common.base.MoreObjects;
-import com.mojang.authlib.GameProfile;
-import com.mojang.authlib.properties.PropertyMap;
+import net.minecraft.server.profile.PlayerProfile;
+import net.minecraft.server.profile.ProfilePropertyMap;
 import java.util.Collection;
 import java.util.EnumSet;
 import java.util.List;
@@ -106,14 +106,13 @@ public class ClientboundPlayerInfoUpdatePacket implements Packet<ClientGamePacke
 	public static enum Action {
 		ADD_PLAYER((entryBuilder, registryFriendlyByteBuf) -> {
 			String string = ByteBufCodecs.PLAYER_NAME.decode(registryFriendlyByteBuf);
-			PropertyMap propertyMap = ByteBufCodecs.GAME_PROFILE_PROPERTIES.decode(registryFriendlyByteBuf);
-			GameProfile gp = new GameProfile(entryBuilder.profileId, string);
-			gp.getProperties().putAll(propertyMap);
+			ProfilePropertyMap propertyMap = ByteBufCodecs.GAME_PROFILE_PROPERTIES.decode(registryFriendlyByteBuf);
+			PlayerProfile gp = new PlayerProfile(entryBuilder.profileId, string, propertyMap);
 			entryBuilder.profile = gp;
 		}, (registryFriendlyByteBuf, entry) -> {
-			GameProfile gameProfile = (GameProfile)Objects.requireNonNull(entry.profile());
-			ByteBufCodecs.PLAYER_NAME.encode(registryFriendlyByteBuf, gameProfile.getName());
-			ByteBufCodecs.GAME_PROFILE_PROPERTIES.encode(registryFriendlyByteBuf, gameProfile.getProperties());
+			PlayerProfile playerProfile = (PlayerProfile)Objects.requireNonNull(entry.profile());
+			ByteBufCodecs.PLAYER_NAME.encode(registryFriendlyByteBuf, playerProfile.name());
+			ByteBufCodecs.GAME_PROFILE_PROPERTIES.encode(registryFriendlyByteBuf, playerProfile.properties());
 		}),
 		INITIALIZE_CHAT(
 			(entryBuilder, registryFriendlyByteBuf) -> entryBuilder.chatSession = registryFriendlyByteBuf.readNullable(RemoteChatSession.Data::read),
@@ -165,7 +164,7 @@ public class ClientboundPlayerInfoUpdatePacket implements Packet<ClientGamePacke
 
 	public record Entry(
 		UUID profileId,
-		@Nullable GameProfile profile,
+		@Nullable PlayerProfile profile,
 		boolean listed,
 		int latency,
 		GameType gameMode,
@@ -193,7 +192,7 @@ public class ClientboundPlayerInfoUpdatePacket implements Packet<ClientGamePacke
 	static class EntryBuilder {
 		final UUID profileId;
 		@Nullable
-		GameProfile profile;
+		PlayerProfile profile;
 		boolean listed;
 		int latency;
 		GameType gameMode = GameType.DEFAULT_MODE;

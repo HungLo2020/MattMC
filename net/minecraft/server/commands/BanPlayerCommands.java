@@ -23,7 +23,7 @@ public class BanPlayerCommands {
 			Commands.literal("ban")
 				.requires(Commands.hasPermission(3))
 				.then(
-					Commands.argument("targets", GameProfileArgument.gameProfile())
+					Commands.argument("targets", GameProfileArgument.playerProfile())
 						.executes(commandContext -> banPlayers(commandContext.getSource(), GameProfileArgument.getGameProfiles(commandContext, "targets"), null))
 						.then(
 							Commands.argument("reason", MessageArgument.message())

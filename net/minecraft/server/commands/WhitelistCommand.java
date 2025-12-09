@@ -37,7 +37,7 @@ public class WhitelistCommand {
 				.then(
 					Commands.literal("add")
 						.then(
-							Commands.argument("targets", GameProfileArgument.gameProfile())
+							Commands.argument("targets", GameProfileArgument.playerProfile())
 								.suggests(
 									(commandContext, suggestionsBuilder) -> {
 										PlayerList playerList = commandContext.getSource().getServer().getPlayerList();
@@ -57,7 +57,7 @@ public class WhitelistCommand {
 				.then(
 					Commands.literal("remove")
 						.then(
-							Commands.argument("targets", GameProfileArgument.gameProfile())
+							Commands.argument("targets", GameProfileArgument.playerProfile())
 								.suggests(
 									(commandContext, suggestionsBuilder) -> SharedSuggestionProvider.suggest(
 										commandContext.getSource().getServer().getPlayerList().getWhiteListNames(), suggestionsBuilder

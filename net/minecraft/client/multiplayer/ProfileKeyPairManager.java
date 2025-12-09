@@ -1,6 +1,6 @@
 package net.minecraft.client.multiplayer;
 
-import com.mojang.authlib.minecraft.UserApiService;
+import net.minecraft.client.auth.UserApiService;
 import java.nio.file.Path;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;

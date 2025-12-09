@@ -1,7 +1,7 @@
 package net.minecraft.client.multiplayer.chat;
 
 import com.google.common.collect.Queues;
-import com.mojang.authlib.GameProfile;
+import net.minecraft.server.profile.PlayerProfile;
 import java.time.Instant;
 import java.util.Deque;
 import java.util.UUID;
@@ -95,13 +95,13 @@ public class ChatListener {
 		}
 	}
 
-	public void handlePlayerChatMessage(PlayerChatMessage playerChatMessage, GameProfile gameProfile, Bound bound) {
+	public void handlePlayerChatMessage(PlayerChatMessage playerChatMessage, PlayerProfile playerProfile, Bound bound) {
 		boolean bl = this.minecraft.options.onlyShowSecureChat().get();
 		PlayerChatMessage playerChatMessage2 = bl ? playerChatMessage.removeUnsignedContent() : playerChatMessage;
 		Component component = bound.decorate(playerChatMessage2.decoratedContent());
 		Instant instant = Instant.now();
 		this.handleMessage(playerChatMessage.signature(), () -> {
-			boolean bl2 = this.showMessageToPlayer(bound, playerChatMessage, component, gameProfile, bl, instant);
+			boolean bl2 = this.showMessageToPlayer(bound, playerChatMessage, component, playerProfile, bl, instant);
 			ClientPacketListener clientPacketListener = this.minecraft.getConnection();
 			if (clientPacketListener != null && playerChatMessage.signature() != null) {
 				clientPacketListener.markMessageAsProcessed(playerChatMessage.signature(), bl2);
@@ -123,7 +123,6 @@ public class ChatListener {
 			} else {
 				Component component = bound.decorate(CHAT_VALIDATION_ERROR);
 				this.minecraft.gui.getChat().addMessage(component, null, GuiMessageTag.chatError());
-				this.minecraft.getNarrator().saySystemChatQueued(bound.decorateNarration(CHAT_VALIDATION_ERROR));
 				this.previousMessageTime = Util.getMillis();
 				return true;
 			}
@@ -143,7 +142,7 @@ public class ChatListener {
 	}
 
 	private boolean showMessageToPlayer(
-		Bound bound, PlayerChatMessage playerChatMessage, Component component, GameProfile gameProfile, boolean bl, Instant instant
+		Bound bound, PlayerChatMessage playerChatMessage, Component component, PlayerProfile playerProfile, boolean bl, Instant instant
 	) {
 		ChatTrustLevel chatTrustLevel = this.evaluateTrustLevel(playerChatMessage, component, instant);
 		if (bl && chatTrustLevel.isNotSecure()) {
@@ -163,7 +162,7 @@ public class ChatListener {
 				}
 			}
 
-			this.logPlayerMessage(playerChatMessage, gameProfile, chatTrustLevel);
+			this.logPlayerMessage(playerChatMessage, playerProfile, chatTrustLevel);
 			this.previousMessageTime = Util.getMillis();
 			return true;
 		} else {
@@ -172,32 +171,28 @@ public class ChatListener {
 	}
 
 	private void narrateChatMessage(Bound bound, Component component) {
-		this.minecraft.getNarrator().sayChatQueued(bound.decorateNarration(component));
+		// Narration removed
 	}
 
 	private ChatTrustLevel evaluateTrustLevel(PlayerChatMessage playerChatMessage, Component component, Instant instant) {
 		return this.isSenderLocalPlayer(playerChatMessage.sender()) ? ChatTrustLevel.SECURE : ChatTrustLevel.evaluate(playerChatMessage, component, instant);
 	}
 
-	private void logPlayerMessage(PlayerChatMessage playerChatMessage, GameProfile gameProfile, ChatTrustLevel chatTrustLevel) {
-		ChatLog chatLog = this.minecraft.getReportingContext().chatLog();
-		chatLog.push(LoggedChatMessage.player(gameProfile, playerChatMessage, chatTrustLevel));
+	private void logPlayerMessage(PlayerChatMessage playerChatMessage, PlayerProfile playerProfile, ChatTrustLevel chatTrustLevel) {
+		// Chat logging removed - no longer needed without chat reporting
 	}
 
 	private void logSystemMessage(Component component, Instant instant) {
-		ChatLog chatLog = this.minecraft.getReportingContext().chatLog();
-		chatLog.push(LoggedChatMessage.system(component, instant));
+		// Chat logging removed - no longer needed without chat reporting
 	}
 
 	public void handleSystemMessage(Component component, boolean bl) {
 		if (!this.minecraft.options.hideMatchedNames().get() || !this.minecraft.isBlocked(this.guessChatUUID(component))) {
 			if (bl) {
 				this.minecraft.gui.setOverlayMessage(component, false);
-				this.minecraft.getNarrator().saySystemQueued(component);
 			} else {
 				this.minecraft.gui.getChat().addMessage(component);
 				this.logSystemMessage(component, Instant.now());
-				this.minecraft.getNarrator().saySystemChatQueued(component);
 			}
 		}
 	}
@@ -210,7 +205,7 @@ public class ChatListener {
 
 	private boolean isSenderLocalPlayer(UUID uUID) {
 		if (this.minecraft.isLocalServer() && this.minecraft.player != null) {
-			UUID uUID2 = this.minecraft.player.getGameProfile().getId();
+			UUID uUID2 = this.minecraft.player.getGameProfile().id();
 			return uUID2.equals(uUID);
 		} else {
 			return false;

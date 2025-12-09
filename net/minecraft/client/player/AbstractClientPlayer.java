@@ -1,6 +1,6 @@
 package net.minecraft.client.player;
 
-import com.mojang.authlib.GameProfile;
+import net.minecraft.server.profile.PlayerProfile;
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
 import net.minecraft.client.Minecraft;
@@ -32,9 +32,9 @@ public abstract class AbstractClientPlayer extends Player implements ClientAvata
 	private final boolean showExtraEars;
 	private final ClientAvatarState clientAvatarState = new ClientAvatarState();
 
-	public AbstractClientPlayer(ClientLevel clientLevel, GameProfile gameProfile) {
-		super(clientLevel, gameProfile);
-		this.showExtraEars = "deadmau5".equals(this.getGameProfile().getName());
+	public AbstractClientPlayer(ClientLevel clientLevel, PlayerProfile playerProfile) {
+		super(clientLevel, playerProfile);
+		this.showExtraEars = "deadmau5".equals(this.getGameProfile().name());
 	}
 
 	@Nullable

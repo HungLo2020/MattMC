@@ -14,7 +14,6 @@ import net.minecraft.advancements.AdvancementTree;
 import net.minecraft.advancements.DisplayInfo;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.components.toasts.AdvancementToast;
-import net.minecraft.client.telemetry.WorldSessionTelemetryManager;
 import net.minecraft.network.protocol.game.ClientboundUpdateAdvancementsPacket;
 import net.minecraft.network.protocol.game.ServerboundSeenAdvancementsPacket;
 import net.minecraft.resources.ResourceLocation;
@@ -25,7 +24,6 @@ import org.slf4j.Logger;
 public class ClientAdvancements {
 	private static final Logger LOGGER = LogUtils.getLogger();
 	private final Minecraft minecraft;
-	private final WorldSessionTelemetryManager telemetryManager;
 	private final AdvancementTree tree = new AdvancementTree();
 	private final Map<AdvancementHolder, AdvancementProgress> progress = new Object2ObjectOpenHashMap<>();
 	@Nullable
@@ -33,9 +31,8 @@ public class ClientAdvancements {
 	@Nullable
 	private AdvancementHolder selectedTab;
 
-	public ClientAdvancements(Minecraft minecraft, WorldSessionTelemetryManager worldSessionTelemetryManager) {
+	public ClientAdvancements(Minecraft minecraft) {
 		this.minecraft = minecraft;
-		this.telemetryManager = worldSessionTelemetryManager;
 	}
 
 	public void update(ClientboundUpdateAdvancementsPacket clientboundUpdateAdvancementsPacket) {
@@ -58,10 +55,6 @@ public class ClientAdvancements {
 				}
 
 				if (!clientboundUpdateAdvancementsPacket.shouldReset() && advancementProgress.isDone()) {
-					if (this.minecraft.level != null) {
-						this.telemetryManager.onAdvancementDone(this.minecraft.level, advancementNode.holder());
-					}
-
 					Optional<DisplayInfo> optional = advancementNode.advancement().display();
 					if (clientboundUpdateAdvancementsPacket.shouldShowAdvancements() && optional.isPresent() && ((DisplayInfo)optional.get()).shouldShowToast()) {
 						this.minecraft.getToastManager().addToast(new AdvancementToast(advancementNode.holder()));

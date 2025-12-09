@@ -1,6 +1,6 @@
 package net.minecraft.client.player;
 
-import com.mojang.authlib.GameProfile;
+import net.minecraft.server.profile.PlayerProfile;
 import java.util.Optional;
 import java.util.UUID;
 import net.minecraft.api.EnvType;
@@ -20,7 +20,7 @@ public class LocalPlayerResolver implements ProfileResolver {
 		this.parentResolver = profileResolver;
 	}
 
-	public Optional<GameProfile> fetchByName(String string) {
+	public Optional<PlayerProfile> fetchByName(String string) {
 		ClientPacketListener clientPacketListener = this.minecraft.getConnection();
 		if (clientPacketListener != null) {
 			PlayerInfo playerInfo = clientPacketListener.getPlayerInfoIgnoreCase(string);
@@ -32,7 +32,7 @@ public class LocalPlayerResolver implements ProfileResolver {
 		return this.parentResolver.fetchByName(string);
 	}
 
-	public Optional<GameProfile> fetchById(UUID uUID) {
+	public Optional<PlayerProfile> fetchById(UUID uUID) {
 		ClientPacketListener clientPacketListener = this.minecraft.getConnection();
 		if (clientPacketListener != null) {
 			PlayerInfo playerInfo = clientPacketListener.getPlayerInfo(uUID);

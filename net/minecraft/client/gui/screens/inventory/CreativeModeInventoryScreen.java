@@ -834,7 +834,6 @@ public class CreativeModeInventoryScreen extends AbstractContainerScreen<Creativ
 			Component component2 = minecraft.options.keyLoadHotbarActivator.getTranslatedKeyMessage();
 			Component component3 = Component.translatable("inventory.hotbarSaved", new Object[]{component2, component});
 			minecraft.gui.setOverlayMessage(component3, false);
-			minecraft.getNarrator().saySystemNow(component3);
 			hotbarManager.save();
 		}
 	}

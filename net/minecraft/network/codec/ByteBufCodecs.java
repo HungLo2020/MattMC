@@ -6,9 +6,9 @@ import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonSyntaxException;
-import com.mojang.authlib.GameProfile;
-import com.mojang.authlib.properties.Property;
-import com.mojang.authlib.properties.PropertyMap;
+import net.minecraft.server.profile.PlayerProfile;
+import net.minecraft.server.profile.ProfileProperty;
+import net.minecraft.server.profile.ProfilePropertyMap;
 import java.util.UUID;
 import com.mojang.datafixers.util.Either;
 import com.mojang.serialization.Codec;
@@ -207,31 +207,31 @@ public interface ByteBufCodecs {
 			FriendlyByteBuf.writeContainerId(byteBuf, integer);
 		}
 	};
-	StreamCodec<ByteBuf, PropertyMap> GAME_PROFILE_PROPERTIES = new StreamCodec<ByteBuf, PropertyMap>() {
+	StreamCodec<ByteBuf, ProfilePropertyMap> GAME_PROFILE_PROPERTIES = new StreamCodec<ByteBuf, ProfilePropertyMap>() {
 		private static final int MAX_PROPERTY_NAME_LENGTH = 64;
 		private static final int MAX_PROPERTY_VALUE_LENGTH = 32767;
 		private static final int MAX_PROPERTY_SIGNATURE_LENGTH = 1024;
 		private static final int MAX_PROPERTIES = 16;
 
-		public PropertyMap decode(ByteBuf byteBuf) {
+		public ProfilePropertyMap decode(ByteBuf byteBuf) {
 			int i = ByteBufCodecs.readCount(byteBuf, 16);
-			PropertyMap map = new PropertyMap();
+			ProfilePropertyMap map = new ProfilePropertyMap();
 
 			for (int j = 0; j < i; j++) {
 				String string = Utf8String.read(byteBuf, 64);
 				String string2 = Utf8String.read(byteBuf, 32767);
 				String string3 = FriendlyByteBuf.readNullable(byteBuf, byteBufx -> Utf8String.read(byteBufx, 1024));
-				Property property = new Property(string, string2, string3);
+				ProfileProperty property = new ProfileProperty(string, string2, string3);
 				map.put(property.name(), property);
 			}
 
 			return map;
 		}
 
-		public void encode(ByteBuf byteBuf, PropertyMap propertyMap) {
+		public void encode(ByteBuf byteBuf, ProfilePropertyMap propertyMap) {
 			ByteBufCodecs.writeCount(byteBuf, propertyMap.size(), 16);
 
-			for (Property property : propertyMap.values()) {
+			for (ProfileProperty property : propertyMap.values()) {
 				Utf8String.write(byteBuf, property.name(), 64);
 				Utf8String.write(byteBuf, property.value(), 32767);
 				FriendlyByteBuf.writeNullable(byteBuf, property.signature(), (byteBufx, string) -> Utf8String.write(byteBufx, string, 1024));
@@ -239,21 +239,19 @@ public interface ByteBufCodecs {
 		}
 	};
 	StreamCodec<ByteBuf, String> PLAYER_NAME = stringUtf8(16);
-	StreamCodec<ByteBuf, GameProfile> GAME_PROFILE = new StreamCodec<ByteBuf, GameProfile>() {
+	StreamCodec<ByteBuf, PlayerProfile> GAME_PROFILE = new StreamCodec<ByteBuf, PlayerProfile>() {
 		@Override
-		public GameProfile decode(ByteBuf byteBuf) {
+		public PlayerProfile decode(ByteBuf byteBuf) {
 			UUID id = UUIDUtil.STREAM_CODEC.decode(byteBuf);
 			String name = PLAYER_NAME.decode(byteBuf);
-			PropertyMap props = GAME_PROFILE_PROPERTIES.decode(byteBuf);
-			GameProfile gp = new GameProfile(id, name);
-			gp.getProperties().putAll(props);
-			return gp;
+			ProfilePropertyMap props = GAME_PROFILE_PROPERTIES.decode(byteBuf);
+			return new PlayerProfile(id, name, props);
 		}
 		@Override
-		public void encode(ByteBuf byteBuf, GameProfile gp) {
-			UUIDUtil.STREAM_CODEC.encode(byteBuf, net.minecraft.util.AuthlibCompat.id(gp));
-			PLAYER_NAME.encode(byteBuf, net.minecraft.util.AuthlibCompat.name(gp));
-			GAME_PROFILE_PROPERTIES.encode(byteBuf, gp.getProperties());
+		public void encode(ByteBuf byteBuf, PlayerProfile profile) {
+			UUIDUtil.STREAM_CODEC.encode(byteBuf, profile.id());
+			PLAYER_NAME.encode(byteBuf, profile.name());
+			GAME_PROFILE_PROPERTIES.encode(byteBuf, profile.properties());
 		}
 	};
 	StreamCodec<ByteBuf, Integer> RGB_COLOR = new StreamCodec<ByteBuf, Integer>() {

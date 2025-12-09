@@ -1,9 +1,7 @@
 package net.minecraft.client.gui.screens;
 
-import com.mojang.authlib.minecraft.BanDetails;
+import net.minecraft.client.auth.BanDetails;
 import com.mojang.logging.LogUtils;
-import com.mojang.realmsclient.RealmsMainScreen;
-import com.mojang.realmsclient.gui.screens.RealmsNotificationsScreen;
 import java.io.IOException;
 import java.util.Objects;
 import net.minecraft.api.EnvType;
@@ -23,10 +21,10 @@ import net.minecraft.client.gui.components.toasts.SystemToast;
 import net.minecraft.client.gui.screens.multiplayer.JoinMultiplayerScreen;
 import net.minecraft.client.gui.screens.multiplayer.SafetyScreen;
 import net.minecraft.client.gui.screens.options.AccessibilityOptionsScreen;
-import net.minecraft.client.gui.screens.options.LanguageSelectScreen;
 import net.minecraft.client.gui.screens.options.OptionsScreen;
 import net.minecraft.client.gui.screens.worldselection.CreateWorldScreen;
 import net.minecraft.client.gui.screens.worldselection.SelectWorldScreen;
+import net.minecraft.client.gui.screens.CustomizeScreen;
 import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.client.renderer.PanoramaRenderer;
 import net.minecraft.client.renderer.texture.TextureManager;
@@ -51,8 +49,6 @@ public class TitleScreen extends Screen {
 	private static final String DEMO_LEVEL_ID = "Demo_World";
 	@Nullable
 	private SplashRenderer splash;
-	@Nullable
-	private RealmsNotificationsScreen realmsNotificationsScreen;
 	private boolean fading;
 	private long fadeInStart;
 	private final LogoRenderer logoRenderer;
@@ -71,15 +67,8 @@ public class TitleScreen extends Screen {
 		this.logoRenderer = (LogoRenderer)Objects.requireNonNullElseGet(logoRenderer, () -> new LogoRenderer(false));
 	}
 
-	private boolean realmsNotificationsEnabled() {
-		return this.realmsNotificationsScreen != null;
-	}
-
 	@Override
 	public void tick() {
-		if (this.realmsNotificationsEnabled()) {
-			this.realmsNotificationsScreen.tick();
-		}
 	}
 
 	public static void registerTextures(TextureManager textureManager) {
@@ -115,14 +104,7 @@ public class TitleScreen extends Screen {
 		}
 
 		l = this.createTestWorldButton(l, 24);
-		SpriteIconButton spriteIconButton = this.addRenderableWidget(
-			CommonButtons.language(
-				20, button -> this.minecraft.setScreen(new LanguageSelectScreen(this, this.minecraft.options, this.minecraft.getLanguageManager())), true
-			)
-		);
-		int var10001 = this.width / 2 - 124;
 		l += 36;
-		spriteIconButton.setPosition(var10001, l);
 		this.addRenderableWidget(
 			Button.builder(Component.translatable("menu.options"), button -> this.minecraft.setScreen(new OptionsScreen(this, this.minecraft.options)))
 				.bounds(this.width / 2 - 100, l, 98, 20)
@@ -136,13 +118,6 @@ public class TitleScreen extends Screen {
 		this.addRenderableWidget(
 			new PlainTextButton(j, this.height - 10, i, 10, COPYRIGHT_TEXT, button -> this.minecraft.setScreen(new CreditsAndAttributionScreen(this)), this.font)
 		);
-		if (this.realmsNotificationsScreen == null) {
-			this.realmsNotificationsScreen = new RealmsNotificationsScreen();
-		}
-
-		if (this.realmsNotificationsEnabled()) {
-			this.realmsNotificationsScreen.init(this.minecraft, this.width, this.height);
-		}
 	}
 
 	private int createTestWorldButton(int i, int j) {
@@ -166,18 +141,15 @@ public class TitleScreen extends Screen {
 		Component component = this.getMultiplayerDisabledReason();
 		boolean bl = component == null;
 		Tooltip tooltip = component != null ? Tooltip.create(component) : null;
-		int var6;
 		this.addRenderableWidget(Button.builder(Component.translatable("menu.multiplayer"), button -> {
 			Screen screen = (Screen)(this.minecraft.options.skipMultiplayerWarning ? new JoinMultiplayerScreen(this) : new SafetyScreen(this));
 			this.minecraft.setScreen(screen);
-		}).bounds(this.width / 2 - 100, var6 = i + j, 200, 20).tooltip(tooltip).build()).active = bl;
+		}).bounds(this.width / 2 - 100, i = i + j, 200, 20).tooltip(tooltip).build()).active = bl;
 		this.addRenderableWidget(
-				Button.builder(Component.translatable("menu.online"), button -> this.minecraft.setScreen(new RealmsMainScreen(this)))
-					.bounds(this.width / 2 - 100, i = var6 + j, 200, 20)
-					.tooltip(tooltip)
-					.build()
-			)
-			.active = bl;
+			Button.builder(Component.translatable("menu.customize"), button -> this.minecraft.setScreen(new CustomizeScreen(this)))
+				.bounds(this.width / 2 - 100, i = i + j, 200, 20)
+				.build()
+		);
 		return i;
 	}
 
@@ -337,9 +309,6 @@ public class TitleScreen extends Screen {
 		}
 
 		guiGraphics.drawString(this.font, string, 2, this.height - 10, ARGB.color(g, -1));
-		if (this.realmsNotificationsEnabled() && g >= 1.0F) {
-			this.realmsNotificationsScreen.render(guiGraphics, i, j, f);
-		}
 	}
 
 	@Override
@@ -348,24 +317,16 @@ public class TitleScreen extends Screen {
 
 	@Override
 	public boolean mouseClicked(MouseButtonEvent mouseButtonEvent, boolean bl) {
-		return super.mouseClicked(mouseButtonEvent, bl)
-			? true
-			: this.realmsNotificationsEnabled() && this.realmsNotificationsScreen.mouseClicked(mouseButtonEvent, bl);
+		return super.mouseClicked(mouseButtonEvent, bl);
 	}
 
 	@Override
 	public void removed() {
-		if (this.realmsNotificationsScreen != null) {
-			this.realmsNotificationsScreen.removed();
-		}
 	}
 
 	@Override
 	public void added() {
 		super.added();
-		if (this.realmsNotificationsScreen != null) {
-			this.realmsNotificationsScreen.added();
-		}
 	}
 
 	private void confirmDemo(boolean bl) {

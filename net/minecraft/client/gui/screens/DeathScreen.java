@@ -20,7 +20,6 @@ import org.jetbrains.annotations.Nullable;
 
 @Environment(EnvType.CLIENT)
 public class DeathScreen extends Screen {
-	private static final ResourceLocation DRAFT_REPORT_SPRITE = ResourceLocation.withDefaultNamespace("icon/draft_report");
 	private int delayTicker;
 	private final Component causeOfDeath;
 	private final boolean hardcore;
@@ -47,7 +46,7 @@ public class DeathScreen extends Screen {
 		this.exitToTitleButton = this.addRenderableWidget(
 			Button.builder(
 					Component.translatable("deathScreen.titleScreen"),
-					button -> this.minecraft.getReportingContext().draftReportHandled(this.minecraft, this, this::handleExitToTitleScreen, true)
+					button -> this.handleExitToTitleScreen()
 				)
 				.bounds(this.width / 2 - 100, this.height / 4 + 96, 200, 20)
 				.build()
@@ -113,16 +112,7 @@ public class DeathScreen extends Screen {
 			guiGraphics.renderComponentHoverEffect(this.font, style, i, j);
 		}
 
-		if (this.exitToTitleButton != null && this.minecraft.getReportingContext().hasDraftReport()) {
-			guiGraphics.blitSprite(
-				RenderPipelines.GUI_TEXTURED,
-				DRAFT_REPORT_SPRITE,
-				this.exitToTitleButton.getX() + this.exitToTitleButton.getWidth() - 17,
-				this.exitToTitleButton.getY() + 3,
-				15,
-				15
-			);
-		}
+
 	}
 
 	@Override

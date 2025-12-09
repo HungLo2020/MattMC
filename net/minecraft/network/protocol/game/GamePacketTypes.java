@@ -203,6 +203,9 @@ public class GamePacketTypes {
 	public static final PacketType<ClientboundTickingStepPacket> CLIENTBOUND_TICKING_STEP = createClientbound("ticking_step");
 	public static final PacketType<ClientboundSetCursorItemPacket> CLIENTBOUND_SET_CURSOR_ITEM = createClientbound("set_cursor_item");
 	public static final PacketType<ClientboundSetPlayerInventoryPacket> CLIENTBOUND_SET_PLAYER_INVENTORY = createClientbound("set_player_inventory");
+	public static final PacketType<ClientboundPlayerSkinPacket> CLIENTBOUND_PLAYER_SKIN = createClientbound("player_skin");
+	public static final PacketType<ClientboundRemovePlayerSkinPacket> CLIENTBOUND_REMOVE_PLAYER_SKIN = createClientbound("remove_player_skin");
+	public static final PacketType<ServerboundPlayerSkinPacket> SERVERBOUND_PLAYER_SKIN = createServerbound("player_skin");
 
 	private static <T extends Packet<ClientGamePacketListener>> PacketType<T> createClientbound(String string) {
 		return new PacketType<>(PacketFlow.CLIENTBOUND, ResourceLocation.withDefaultNamespace(string));
