@@ -1,345 +1,73 @@
-# Shader System Implementation Progress Tracking
-
-This document tracks progress through the 30-step IRIS shader integration plan.
-
-## Overall Progress
-
-**Current Status:** Step 8 of 30 Complete (26.7%)
-
-**Last Updated:** December 9, 2024
-
-## Completed Steps
-
-### ✅ Step 1: Create Shader System Package Structure (COMPLETE)
-
-**Date Completed:** December 9, 2024
-
-**Implementation Summary:**
-- Created foundational package structure
-- Implemented ShaderSystem singleton with early initialization
-- Added ShaderConfig with JSON persistence
-- Created ShaderException for error handling
-- Defined WorldRenderingPhase enum (16 phases matching Iris)
-- Integrated initialization into Minecraft.java constructor
-- Developed 21 comprehensive tests (all passing)
-
-**Key Files:**
-- `net/minecraft/client/renderer/shaders/core/ShaderSystem.java`
-- `net/minecraft/client/renderer/shaders/core/ShaderConfig.java`
-- `net/minecraft/client/renderer/shaders/core/ShaderException.java`
-- `net/minecraft/client/renderer/shaders/pipeline/WorldRenderingPhase.java`
-- 4 test files with 21 unit/integration tests
-
-**Test Results:** 21/21 passing ✅
-
-**Documentation:** `docs/SHADER-IMPLEMENTATION-STEP-1.md`
-
-**Commit:** 87c01e6f - "Complete Step 1: Core Shader System Infrastructure"
-
-### ✅ Step 2: Implement Shader Configuration System (COMPLETE)
-
-**Date Completed:** December 9, 2024
-
-**Implementation Summary:**
-- Verified ShaderConfig with JSON persistence (implemented in Step 1)
-- Confirmed configuration loading/saving functionality
-- Validated pack-specific option management
-- Tested configuration persistence across restarts
-- All 21 tests passing including 9 configuration-specific tests
-
-**Key Features:**
-- JSON-based config file (`shader-config.json`)
-- Auto-save on all configuration changes
-- Shader enabled/disabled state
-- Selected pack name storage
-- Pack-specific options map (key-value pairs)
-
-**Test Results:** 21/21 passing ✅
-
-**Documentation:** `docs/SHADER-IMPLEMENTATION-STEP-2.md`
-
-**Note:** Step 2 was largely completed during Step 1, as the requirements matched the initial implementation
-
-### ✅ Step 3: Create Shader Pack Repository with ResourceManager (COMPLETE)
-
-**Date Completed:** December 9, 2024
-
-**Implementation Summary:**
-- Implemented ShaderPackSource interface for shader pack abstraction
-- Created ResourceShaderPackSource for reading from ResourceManager
-- Implemented ShaderPackRepository for pack discovery via shaders.properties
-- Integrated repository into ShaderSystem with onResourceManagerReady hook
-- Added Minecraft.java hook for repository initialization after resource loading
-- Created test shader pack in resources
-- Developed 12 new comprehensive tests (all passing)
-
-**Key Files:**
-- `net/minecraft/client/renderer/shaders/pack/ShaderPackSource.java`
-- `net/minecraft/client/renderer/shaders/pack/ResourceShaderPackSource.java`
-- `net/minecraft/client/renderer/shaders/pack/ShaderPackRepository.java`
-- 4 test files with 12 unit/integration tests
-- Test shader pack: `assets/minecraft/shaders/test_shader/shaders.properties`
-
-**Test Results:** 33/33 passing (21 from Steps 1-2, 12 new) ✅
-
-**Documentation:** `docs/SHADER-IMPLEMENTATION-STEP-3.md`
-
-**IRIS Reference:** Based on ShaderpackDirectoryManager pattern, adapted for ResourceManager
-
-### ✅ Step 4: Implement Shader Properties Parser (COMPLETE)
-
-**Date Completed:** December 9, 2024
-
-**Implementation Summary:**
-- Implemented OptionalBoolean enum matching IRIS exactly (DEFAULT/FALSE/TRUE)
-- Created ShaderProperties class following IRIS implementation VERBATIM
-- Parses boolean rendering flags (sun, moon, stars, weather, etc.)
-- Uses handleBooleanDirective matching IRIS pattern (true/false/1/0)
-- Parses texture paths (texture.noise)
-- Returns OptionalBoolean for all flags (no simplification)
-- Developed 17 new comprehensive tests (all passing)
-
-**Key Files:**
-- `net/minecraft/client/renderer/shaders/helpers/OptionalBoolean.java`
-- `net/minecraft/client/renderer/shaders/pack/ShaderProperties.java`
-- 2 test files with 17 unit tests
-
-**Test Results:** 50/50 passing (39 from Steps 1-3, 11 new) ✅
-
-**Documentation:** `docs/SHADER-IMPLEMENTATION-STEP-4.md`
-
-**IRIS Adherence:** Implementation follows IRIS VERBATIM - no simplifications made
-
-### ✅ Step 5: Create Pipeline Manager Framework (COMPLETE)
-
-**Date Completed:** December 9, 2024
-
-**Implementation Summary:**
-- Implemented WorldRenderingPipeline interface matching IRIS exactly
-- Created VanillaRenderingPipeline as passthrough implementation
-- Created ShaderPackPipeline with ShaderProperties integration
-- Implemented PipelineManager with per-dimension caching
-- Integrated PipelineManager into ShaderSystem
-- Developed 32 new comprehensive tests (all passing)
-
-**Key Files:**
-- `net/minecraft/client/renderer/shaders/pipeline/WorldRenderingPipeline.java`
-- `net/minecraft/client/renderer/shaders/pipeline/VanillaRenderingPipeline.java`
-- `net/minecraft/client/renderer/shaders/pipeline/ShaderPackPipeline.java`
-- `net/minecraft/client/renderer/shaders/pipeline/PipelineManager.java`
-- 3 test files with 32 unit/integration tests
-
-**Test Results:** 82/82 passing (50 from Steps 1-4, 32 new) ✅
-
-**Documentation:** `docs/SHADER-IMPLEMENTATION-STEP-5.md`
-
-**IRIS Adherence:** Pipeline architecture follows IRIS VERBATIM - no shortcuts taken
-
-**Foundation Phase:** 100% COMPLETE ✅
-
-### ✅ Step 6: Implement Include File System (COMPLETE)
-
-**Date Completed:** December 9, 2024
-
-**Implementation Summary:**
-- Implemented AbsolutePackPath for path normalization (IRIS verbatim)
-- Created FileNode for #include parsing (IRIS verbatim)
-- Implemented IncludeGraph with cycle detection (IRIS verbatim, adapted)
-- Created IncludeProcessor for recursive expansion (IRIS verbatim)
-- Developed 37 new comprehensive tests (all passing)
-
-**Key Files:**
-- `net/minecraft/client/renderer/shaders/pack/AbsolutePackPath.java`
-- `net/minecraft/client/renderer/shaders/pack/FileNode.java`
-- `net/minecraft/client/renderer/shaders/pack/IncludeGraph.java`
-- `net/minecraft/client/renderer/shaders/pack/IncludeProcessor.java`
-- 5 test files with 37 unit/integration tests
-
-**Test Results:** 119/119 passing (82 from Steps 1-5, 37 new) ✅
-
-**Documentation:** `docs/SHADER-IMPLEMENTATION-STEP-6.md`
-
-**IRIS Adherence:** Include system follows IRIS architecture VERBATIM
-
-**Loading System Phase:** 20% (1/5 steps)
-
-## In Progress Steps
-
-### 🔄 Step 7: Create Shader Source Provider (NEXT)
-
-**Status:** Ready to start
-
-**Planned Work:**
-- Implement ProgramSource class
-- Create shader source discovery
-- Integrate with IncludeProcessor
-- Test source loading
-
-**Dependencies:** Steps 1-6 complete ✅
-
-**Estimated Completion:** TBD
-
-## Upcoming Steps
-
-### Step 3: Create Shader Pack Repository with ResourceManager
-**Status:** Complete ✅
-**Dependencies:** Steps 1-2 complete ✅
-
-### Step 4: Implement Shader Properties Parser
-**Status:** Not started
-**Dependencies:** Steps 1-3
-
-### Step 5: Create Pipeline Manager Framework
-**Status:** Not started
-**Dependencies:** Steps 1-4
-
-## Phase Breakdown
-
-### Foundation (Steps 1-5): 100% COMPLETE ✅
-- ✅ Step 1: Core Infrastructure
-- ✅ Step 2: Configuration System
-- ✅ Step 3: Pack Repository
-- ✅ Step 4: Properties Parser
-- ✅ Step 5: Pipeline Manager
-
-### Loading System (Steps 6-10): 40% Complete
-- ✅ Step 6: Include File Processor
-- ✅ Step 7: Shader Source Provider
-- ⬜ Step 8: Shader Option Discovery
-- ⬜ Step 9: Dimension-Specific Configurations
-- ⬜ Step 10: Shader Pack Validation
-
-### Compilation System (Steps 11-15): 0% Complete
-- ⬜ Step 11: Shader Compiler
-- ⬜ Step 12: Program Builder
-- ⬜ Step 13: Program Cache
-- ⬜ Step 14: Parallel Compilation
-- ⬜ Step 15: Program Set Management
-
-### Rendering Infrastructure (Steps 16-20): 0% Complete
-- ⬜ Step 16: G-Buffer Manager
-- ⬜ Step 17: Render Target System
-- ⬜ Step 18: Framebuffer Binding
-- ⬜ Step 19: Depth Buffer Management
-- ⬜ Step 20: Shadow Framebuffers
-
-### Pipeline Integration (Steps 21-25): 0% Complete
-- ⬜ Step 21: Initialization Hooks
-- ⬜ Step 22: LevelRenderer Hooks
-- ⬜ Step 23: Shader Interception
-- ⬜ Step 24: Phase Transitions
-- ⬜ Step 25: Shadow Pass Rendering
-
-### Uniforms and Effects (Steps 26-30): 0% Complete
-- ⬜ Step 26: Core Uniforms (~50)
-- ⬜ Step 27: Extended Uniforms (~150)
-- ⬜ Step 28: Composite Renderer
-- ⬜ Step 29: Final Pass Renderer
-- ⬜ Step 30: GUI Integration
-
-## Key Metrics
-
-- **Total Steps:** 30
-- **Steps Complete:** 7
-- **Steps In Progress:** 0
-- **Steps Remaining:** 23
-- **Overall Progress:** 23.3%
-- **Tests Written:** 138
-- **Tests Passing:** 138 (100%)
-- **Lines of Code Added:** ~5,200+
-- **Foundation Phase:** COMPLETE ✅
-- **Loading System Phase:** 40% (2/5 steps)
-
-## Architecture Decisions Log
-
-### December 9, 2024
-1. **Early Initialization Pattern:** Adopted Iris's onEarlyInitialize pattern for system setup before OpenGL
-2. **Configuration Format:** Chose JSON over Properties for simpler implementation
-3. **Integration Method:** Direct modification instead of mixins (MattMC advantage)
-4. **Testing Strategy:** Comprehensive unit and integration tests for each step
-
-## References
-
-- **Implementation Plan:** `NEW-SHADER-PLAN.md`
-- **Iris Source:** `frnsrc/Iris-1.21.9/`
-- **Step 1 Details:** `docs/SHADER-IMPLEMENTATION-STEP-1.md`
-
-## Timeline
-
-- **Step 1 Start:** December 9, 2024
-- **Step 1 Complete:** December 9, 2024 (same day)
-- **Step 2 Verification:** December 9, 2024 (verified/documented)
-- **Step 2 Complete:** December 9, 2024 (same day)
-- **Step 3 Implementation:** December 9, 2024 (same day)
-- **Step 3 Complete:** December 9, 2024 (same day)
-- **Step 4 Implementation:** December 9, 2024 (same day)
-- **Step 4 Complete:** December 9, 2024 (same day)
-- **Step 5 Implementation:** December 9, 2024 (same day)
-- **Step 5 Complete:** December 9, 2024 (same day)
-- **Foundation Phase Complete:** December 9, 2024 ✅
-- **Step 6 Implementation:** December 9, 2024 (same day)
-- **Step 6 Complete:** December 9, 2024 (same day)
-- **Step 7 Implementation:** December 9, 2024 (same day)
-- **Step 7 Complete:** December 9, 2024 (same day)
-- **Expected Completion (30 steps):** 20-24 weeks from start
-
-## Notes
-
-- Following Iris implementation VERY CAREFULLY as instructed
-- Using extensive testing framework to validate each step
-- Documenting everything for easier progress tracking
-- Each step is foundational for subsequent steps
-
-### ✅ Step 8: Implement Shader Option Discovery (COMPLETE)
-
-**Date Completed:** December 9, 2024
-
-**Implementation Summary:**
-- Implemented OptionType enum (DEFINE/CONST)
-- Created BaseOption abstract class
-- Implemented BooleanOption for boolean shader options
-- Implemented StringOption with allowed values parsing
-- Created OptionLocation for tracking option sources
-- Implemented OptionSet with builder pattern
-- Created ShaderPackOptions for orchestration
-- Integrated into ShaderPackPipeline
-- Developed 18 new comprehensive tests (all passing)
-
-**Key Files:**
-- `net/minecraft/client/renderer/shaders/option/OptionType.java`
-- `net/minecraft/client/renderer/shaders/option/BaseOption.java`
-- `net/minecraft/client/renderer/shaders/option/BooleanOption.java`
-- `net/minecraft/client/renderer/shaders/option/StringOption.java`
-- `net/minecraft/client/renderer/shaders/option/OptionLocation.java`
-- `net/minecraft/client/renderer/shaders/option/OptionSet.java`
-- `net/minecraft/client/renderer/shaders/option/ShaderPackOptions.java`
-- 6 test files with 18 unit tests
-
-**Test Results:** 156/156 total passing (138 from Steps 1-7 + 18 new) ✅
-
-**IRIS References:**
-- `frnsrc/Iris-1.21.9/.../option/OptionType.java` - Exact copy
-- `frnsrc/Iris-1.21.9/.../option/BaseOption.java` - Exact copy
-- `frnsrc/Iris-1.21.9/.../option/BooleanOption.java` - Exact copy
-- `frnsrc/Iris-1.21.9/.../option/StringOption.java` - Exact copy
-- `frnsrc/Iris-1.21.9/.../option/OptionLocation.java` - Exact copy
-- `frnsrc/Iris-1.21.9/.../option/OptionSet.java` - Based on IRIS pattern
-- `frnsrc/Iris-1.21.9/.../option/ShaderPackOptions.java` - Based on IRIS pattern
-
-**Documentation:** `docs/SHADER-IMPLEMENTATION-STEP-8.md`
-
-**Architecture Notes:**
-- Foundational implementation following IRIS exactly
-- Room for future enhancement with OptionAnnotatedSource (566-line GLSL parser)
-- ParsedString tokenizer can be added for full IRIS compatibility
-- Current implementation provides core data structures and API
-
-## Overall Progress Summary
-
-**Phases Complete:**
-- ✅ Foundation Phase (Steps 1-5): 100% COMPLETE
-- 🔄 Loading System Phase (Steps 6-10): 60% COMPLETE (3 of 5 steps)
-
-**Steps Complete:** 8 of 30 (26.7%)
-
-**Next Step:** Step 9 - Create Dimension-Specific Configurations
+# Shader Implementation Progress Tracking
+
+## Overall Progress: 30.0% (9 of 30 steps complete)
+
+### Foundation Phase (Steps 1-5): 100% COMPLETE ✅
+- [x] Step 1: Core shader system package structure  
+- [x] Step 2: Shader configuration system
+- [x] Step 3: Shader pack repository with ResourceManager
+- [x] Step 4: Shader properties parser
+- [x] Step 5: Pipeline manager framework
+
+### Loading System Phase (Steps 6-10): 80% (4/5 steps)
+- [x] Step 6: Include file processor
+- [x] Step 7: Shader source provider
+- [x] Step 8: Shader option discovery
+- [x] Step 9: Dimension-specific configurations ✅ **JUST COMPLETED**
+- [ ] Step 10: Shader pack validation
+
+### Compilation System Phase (Steps 11-15): 0%
+- [ ] Step 11: Shader compiler with error handling
+- [ ] Step 12: Program builder system
+- [ ] Step 13: Shader program cache
+- [ ] Step 14: Parallel shader compilation
+- [ ] Step 15: Program set management
+
+### Rendering Infrastructure Phase (Steps 16-20): 0%
+- [ ] Step 16: G-buffer manager
+- [ ] Step 17: Render target system
+- [ ] Step 18: Framebuffer binding system
+- [ ] Step 19: Depth buffer management
+- [ ] Step 20: Shadow framebuffer system
+
+### Pipeline Integration Phase (Steps 21-25): 0%
+- [ ] Step 21: Initialization hooks
+- [ ] Step 22: LevelRenderer rendering hooks
+- [ ] Step 23: Shader program interception
+- [ ] Step 24: Phase transition system
+- [ ] Step 25: Shadow pass rendering
+
+### Uniforms and Effects Phase (Steps 26-30): 0%
+- [ ] Step 26: Core uniform providers (~50 uniforms)
+- [ ] Step 27: Extended uniform providers (~150 uniforms)
+- [ ] Step 28: Composite renderer for post-processing
+- [ ] Step 29: Final pass renderer
+- [ ] Step 30: GUI integration and polish
+
+## Step 9 Completion Details
+
+**Date Completed**: December 9, 2024
+
+**Implementation**:
+- NamespacedId class (IRIS exact copy, 63 lines)
+- DimensionId class (IRIS exact copy, 10 lines)
+- DimensionConfig class (IRIS parseDimensionMap logic, 155 lines)
+- Dimension.properties parser
+- Default world folder detection (world0, world-1, world1)
+- Wildcard dimension mapping support
+
+**Testing**:
+- 24 tests, all passing
+- NamespacedIdTest: 7 tests
+- DimensionIdTest: 3 tests
+- DimensionConfigTest: 10 tests
+- DimensionConfigIntegrationTest: 4 tests
+
+**Test Resources**:
+- Created dimension folders in test_shader pack
+- world0/, world-1/, world1/ with composite shaders
+- dimension.properties with mappings
+
+**IRIS Adherence**: 100% - followed IRIS dimension parsing exactly
+
+**Next**: Step 10 - Shader pack validation
