@@ -35,6 +35,8 @@ public class ShaderPassExecutor {
     private final CameraUniforms cameraUniforms;
     private final Minecraft minecraft;
     private final FullScreenQuad fullScreenQuad;
+    private final ShaderRenderBridge renderBridge;
+    private float partialTick = 1.0f;
     
     public ShaderPassExecutor(ShaderPack shaderPack, 
                              GBufferManager gBufferManager,
@@ -50,6 +52,7 @@ public class ShaderPassExecutor {
         this.cameraUniforms = cameraUniforms;
         this.minecraft = Minecraft.getInstance();
         this.fullScreenQuad = new FullScreenQuad();
+        this.renderBridge = new ShaderRenderBridge(minecraft);
     }
     
     /**
@@ -70,6 +73,20 @@ public class ShaderPassExecutor {
      * Executes the complete shader rendering pipeline.
      */
     public void executeRenderPipeline(Camera camera, Matrix4f viewMatrix, Matrix4f projectionMatrix) {
+        executeRenderPipeline(camera, viewMatrix, projectionMatrix, 1.0f);
+    }
+    
+    /**
+     * Executes the complete shader rendering pipeline with partial tick.
+     */
+    public void executeRenderPipeline(Camera camera, Matrix4f viewMatrix, Matrix4f projectionMatrix, float partialTick) {
+        this.partialTick = partialTick;
+        
+        // Check if rendering is ready
+        if (!renderBridge.isReady()) {
+            return;
+        }
+        
         // Update all uniforms before rendering
         updateUniforms(camera, viewMatrix, projectionMatrix);
         
@@ -182,13 +199,13 @@ public class ShaderPassExecutor {
         // Clear all buffers
         GL11.glClear(GL11.GL_COLOR_BUFFER_BIT | GL11.GL_DEPTH_BUFFER_BIT);
         
-        // Render different geometry types with corresponding shaders
-        renderTerrainToGBuffer();
-        renderWaterToGBuffer();
-        renderEntitiesToGBuffer();
-        renderSkyToGBuffer();
-        renderWeatherToGBuffer();
-        renderParticlesToGBuffer();
+        // Render different geometry types with actual rendering
+        renderTerrainToGBuffer(camera);
+        renderWaterToGBuffer(camera);
+        renderEntitiesToGBuffer(camera);
+        renderSkyToGBuffer(camera);
+        renderWeatherToGBuffer(camera);
+        renderParticlesToGBuffer(camera);
         
         gBufferManager.unbind();
         
@@ -198,7 +215,7 @@ public class ShaderPassExecutor {
     /**
      * Renders terrain geometry to G-buffer.
      */
-    private void renderTerrainToGBuffer() {
+    private void renderTerrainToGBuffer(Camera camera) {
         CompiledShaderProgram terrainProgram = shaderPack.getCompiledProgram(ShaderProgramType.GBUFFERS_TERRAIN);
         if (terrainProgram == null) {
             // Fall back to basic
@@ -206,88 +223,63 @@ public class ShaderPassExecutor {
         }
         
         if (terrainProgram != null) {
-            terrainProgram.bind();
-            uniformManager.setProgram(terrainProgram);
-            
-            // TODO: Render terrain chunks
-            // This requires access to the section/chunk rendering system
-            
-            CompiledShaderProgram.unbind();
+            // Use render bridge to render terrain chunks through shader
+            renderBridge.renderTerrain(terrainProgram, uniformManager, camera);
         }
     }
     
     /**
      * Renders water geometry to G-buffer.
      */
-    private void renderWaterToGBuffer() {
+    private void renderWaterToGBuffer(Camera camera) {
         CompiledShaderProgram waterProgram = shaderPack.getCompiledProgram(ShaderProgramType.GBUFFERS_WATER);
         if (waterProgram != null) {
-            waterProgram.bind();
-            uniformManager.setProgram(waterProgram);
-            
-            // TODO: Render water blocks
-            
-            CompiledShaderProgram.unbind();
+            // Use render bridge to render water through shader
+            renderBridge.renderWater(waterProgram, uniformManager, camera);
         }
     }
     
     /**
      * Renders entities to G-buffer.
      */
-    private void renderEntitiesToGBuffer() {
+    private void renderEntitiesToGBuffer(Camera camera) {
         CompiledShaderProgram entitiesProgram = shaderPack.getCompiledProgram(ShaderProgramType.GBUFFERS_ENTITIES);
         if (entitiesProgram != null) {
-            entitiesProgram.bind();
-            uniformManager.setProgram(entitiesProgram);
-            
-            // TODO: Render entities
-            
-            CompiledShaderProgram.unbind();
+            // Use render bridge to render entities through shader
+            renderBridge.renderEntities(entitiesProgram, uniformManager, camera, partialTick);
         }
     }
     
     /**
      * Renders sky to G-buffer.
      */
-    private void renderSkyToGBuffer() {
+    private void renderSkyToGBuffer(Camera camera) {
         CompiledShaderProgram skyProgram = shaderPack.getCompiledProgram(ShaderProgramType.GBUFFERS_SKYBASIC);
         if (skyProgram != null) {
-            skyProgram.bind();
-            uniformManager.setProgram(skyProgram);
-            
-            // TODO: Render sky
-            
-            CompiledShaderProgram.unbind();
+            // Use render bridge to render sky through shader
+            renderBridge.renderSky(skyProgram, uniformManager, camera);
         }
     }
     
     /**
      * Renders weather effects to G-buffer.
      */
-    private void renderWeatherToGBuffer() {
+    private void renderWeatherToGBuffer(Camera camera) {
         CompiledShaderProgram weatherProgram = shaderPack.getCompiledProgram(ShaderProgramType.GBUFFERS_WEATHER);
         if (weatherProgram != null) {
-            weatherProgram.bind();
-            uniformManager.setProgram(weatherProgram);
-            
-            // TODO: Render rain/snow
-            
-            CompiledShaderProgram.unbind();
+            // Use render bridge to render weather through shader
+            renderBridge.renderWeather(weatherProgram, uniformManager, camera, partialTick);
         }
     }
     
     /**
      * Renders particles to G-buffer.
      */
-    private void renderParticlesToGBuffer() {
+    private void renderParticlesToGBuffer(Camera camera) {
         CompiledShaderProgram particlesProgram = shaderPack.getCompiledProgram(ShaderProgramType.GBUFFERS_PARTICLES);
         if (particlesProgram != null) {
-            particlesProgram.bind();
-            uniformManager.setProgram(particlesProgram);
-            
-            // TODO: Render particles
-            
-            CompiledShaderProgram.unbind();
+            // Use render bridge to render particles through shader
+            renderBridge.renderParticles(particlesProgram, uniformManager, camera, partialTick);
         }
     }
     
