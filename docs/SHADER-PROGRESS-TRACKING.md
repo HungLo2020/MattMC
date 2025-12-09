@@ -4,7 +4,7 @@ This document tracks progress through the 30-step IRIS shader integration plan.
 
 ## Overall Progress
 
-**Current Status:** Step 1 of 30 Complete (3.3%)
+**Current Status:** Step 2 of 30 Complete (6.7%)
 
 **Last Updated:** December 9, 2024
 
@@ -36,26 +36,51 @@ This document tracks progress through the 30-step IRIS shader integration plan.
 
 **Commit:** 87c01e6f - "Complete Step 1: Core Shader System Infrastructure"
 
+### ✅ Step 2: Implement Shader Configuration System (COMPLETE)
+
+**Date Completed:** December 9, 2024
+
+**Implementation Summary:**
+- Verified ShaderConfig with JSON persistence (implemented in Step 1)
+- Confirmed configuration loading/saving functionality
+- Validated pack-specific option management
+- Tested configuration persistence across restarts
+- All 21 tests passing including 9 configuration-specific tests
+
+**Key Features:**
+- JSON-based config file (`shader-config.json`)
+- Auto-save on all configuration changes
+- Shader enabled/disabled state
+- Selected pack name storage
+- Pack-specific options map (key-value pairs)
+
+**Test Results:** 21/21 passing ✅
+
+**Documentation:** `docs/SHADER-IMPLEMENTATION-STEP-2.md`
+
+**Note:** Step 2 was largely completed during Step 1, as the requirements matched the initial implementation
+
 ## In Progress Steps
 
-### 🔄 Step 2: Implement Shader Configuration System (NEXT)
+### 🔄 Step 3: Create Shader Pack Repository with ResourceManager (NEXT)
 
 **Status:** Not started
 
 **Planned Work:**
-- Enhance ShaderConfig with additional features (some work done in Step 1)
-- Add pack-specific configuration management
-- Test configuration across game restarts
+- Implement ShaderPackSource interface
+- Create ResourceShaderPackSource for baked-in packs
+- Implement ShaderPackRepository for pack discovery
+- Test pack scanning from resources
 
-**Dependencies:** None (Step 1 complete)
+**Dependencies:** Steps 1-2 complete
 
 **Estimated Completion:** TBD
 
 ## Upcoming Steps
 
 ### Step 3: Create Shader Pack Repository with ResourceManager
-**Status:** Not started
-**Dependencies:** Steps 1-2
+**Status:** Ready to start
+**Dependencies:** Steps 1-2 complete ✅
 
 ### Step 4: Implement Shader Properties Parser
 **Status:** Not started
@@ -67,9 +92,9 @@ This document tracks progress through the 30-step IRIS shader integration plan.
 
 ## Phase Breakdown
 
-### Foundation (Steps 1-5): 20% Complete
+### Foundation (Steps 1-5): 40% Complete
 - ✅ Step 1: Core Infrastructure
-- ⬜ Step 2: Configuration System
+- ✅ Step 2: Configuration System
 - ⬜ Step 3: Pack Repository
 - ⬜ Step 4: Properties Parser
 - ⬜ Step 5: Pipeline Manager
@@ -112,10 +137,10 @@ This document tracks progress through the 30-step IRIS shader integration plan.
 ## Key Metrics
 
 - **Total Steps:** 30
-- **Steps Complete:** 1
+- **Steps Complete:** 2
 - **Steps In Progress:** 0
-- **Steps Remaining:** 29
-- **Overall Progress:** 3.3%
+- **Steps Remaining:** 28
+- **Overall Progress:** 6.7%
 - **Tests Written:** 21
 - **Tests Passing:** 21 (100%)
 - **Lines of Code Added:** ~950+
@@ -138,6 +163,8 @@ This document tracks progress through the 30-step IRIS shader integration plan.
 
 - **Step 1 Start:** December 9, 2024
 - **Step 1 Complete:** December 9, 2024 (same day)
+- **Step 2 Verification:** December 9, 2024 (verified/documented)
+- **Step 2 Complete:** December 9, 2024 (same day)
 - **Expected Completion (30 steps):** 20-24 weeks from start
 
 ## Notes
