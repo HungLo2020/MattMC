@@ -127,7 +127,6 @@ public class ShaderPackSelectionScreen extends Screen {
     class ShaderPackList extends ObjectSelectionList<ShaderPackEntry> {
         public ShaderPackList(Minecraft minecraft, int width, int height, int y, int bottom) {
             super(minecraft, width, height, y, 36);
-            this.setRenderHeader(false, 0);
         }
         
         public int addEntry(ShaderPackEntry entry) {
@@ -137,11 +136,6 @@ public class ShaderPackSelectionScreen extends Screen {
         @Override
         public int getRowWidth() {
             return 300;
-        }
-        
-        @Override
-        protected int getScrollbarPosition() {
-            return this.getRight() - 6;
         }
     }
     
