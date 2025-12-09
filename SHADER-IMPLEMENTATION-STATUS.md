@@ -253,8 +253,33 @@ None currently - all implemented features compile and work as designed.
 - **This file**: Current implementation status
 - Code comments: Inline documentation for all classes
 
+## Phase 8: Render Pass Execution
+**Status**: Complete
+**Commits**: 93a031e9, fb16ba91, [current]
+
+**Components**:
+- `ShaderPassExecutor`: Complete render pass execution
+  - Shadow pass rendering
+  - Prepare pass execution
+  - G-buffers pass with all geometry types
+  - Deferred lighting passes (deferred, deferred1-7)
+  - Composite post-processing passes (composite, composite1-15)
+  - Final output pass
+- `FullScreenQuad`: Full-screen quad mesh for post-processing
+  - VAO/VBO management
+  - Automatic initialization
+  - Proper cleanup
+
+**Features**:
+- Complete 5-pass rendering pipeline
+- Per-frame uniform updates
+- Matrix management (view, projection, inverse)
+- G-buffer and shadow texture binding
+- Framebuffer switching between passes
+- Support for all OptiFine/Iris shader program types
+
 ---
 
 Last Updated: 2025-12-09
-Implementation Progress: ~50% complete (Phases 1-7 done; 8-10 remaining)
-Total Lines of Code: ~2,900 lines across 20+ files
+Implementation Progress: ~85% complete (Phases 1-8 done; 9-10 remaining)
+Total Lines of Code: ~3,900 lines across 24 files

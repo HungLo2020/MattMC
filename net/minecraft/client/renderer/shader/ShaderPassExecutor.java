@@ -34,6 +34,7 @@ public class ShaderPassExecutor {
     private final WorldStateUniforms worldStateUniforms;
     private final CameraUniforms cameraUniforms;
     private final Minecraft minecraft;
+    private final FullScreenQuad fullScreenQuad;
     
     public ShaderPassExecutor(ShaderPack shaderPack, 
                              GBufferManager gBufferManager,
@@ -48,6 +49,21 @@ public class ShaderPassExecutor {
         this.worldStateUniforms = worldStateUniforms;
         this.cameraUniforms = cameraUniforms;
         this.minecraft = Minecraft.getInstance();
+        this.fullScreenQuad = new FullScreenQuad();
+    }
+    
+    /**
+     * Initializes the pass executor.
+     */
+    public void initialize() {
+        fullScreenQuad.initialize();
+    }
+    
+    /**
+     * Closes and cleans up resources.
+     */
+    public void close() {
+        fullScreenQuad.close();
     }
     
     /**
@@ -384,10 +400,6 @@ public class ShaderPassExecutor {
      * Renders a full-screen quad for post-processing.
      */
     private void renderFullScreenQuad() {
-        // TODO: Implement full-screen quad rendering
-        // This typically involves rendering two triangles covering the screen
-        // For now, this is a placeholder that would be called in the actual implementation
-        
-        LOGGER.debug("Rendering full-screen quad (placeholder)");
+        fullScreenQuad.render();
     }
 }

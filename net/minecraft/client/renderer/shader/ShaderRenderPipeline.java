@@ -78,6 +78,7 @@ public class ShaderRenderPipeline implements AutoCloseable {
                 worldStateUniforms,
                 cameraUniforms
             );
+            this.passExecutor.initialize();
             
             initialized = true;
             LOGGER.info("Shader render pipeline initialized successfully");
@@ -205,6 +206,9 @@ public class ShaderRenderPipeline implements AutoCloseable {
     
     @Override
     public void close() {
+        if (passExecutor != null) {
+            passExecutor.close();
+        }
         gBufferManager.close();
         shadowMapManager.close();
         initialized = false;
