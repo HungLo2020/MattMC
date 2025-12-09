@@ -1,24 +1,115 @@
-# Comprehensive Shader Compatibility Implementation Plan for MattMC
-## Full OptiFine/Iris-Compatible Shader System Integration
+# Comprehensive Shader System Implementation Plan for MattMC
+## Baked-In Shader Architecture with OptiFine/Iris-Style Rendering
 
 ---
 
 ## Executive Summary
 
-This document outlines a complete, in-depth implementation plan to add **full shader pack compatibility** to the MattMC Minecraft client, enabling users to drop shader packs like **Complimentary Reimagined** into a `shaderpacks` folder and select/use them in-game with complete feature parity to OptiFine and Iris shader loaders.
+This document outlines a complete, in-depth implementation plan to add **advanced shader rendering capabilities** to the MattMC Minecraft client (a fork of Minecraft Java 1.21.10). Unlike traditional shader loaders like OptiFine and Iris, MattMC uses a **compile-time baked-in approach** where shader packs are bundled directly into the game JAR during compilation.
 
-The implementation will transform MattMC from using vanilla Minecraft's basic shader system (core shaders for basic rendering + post-processing effects) into a comprehensive shader mod architecture that supports the advanced OptiFine/Iris shader pack format, including:
-- Deferred rendering pipeline with G-buffers
+### Key Architectural Differences from OptiFine/Iris
+
+**MattMC's Approach:**
+- Shaders are **baked into the JAR** at compile time from `src/main/resources/assets/minecraft/shaders/`
+- Each shader pack is stored as an **unzipped directory** in the resources folder
+- Shader packs are **dynamically discovered** at runtime (not hardcoded)
+- No runtime shader pack loading or `shaderpacks/` folder needed in the finished game
+- Shader selection happens in-game, but all available shaders ship with the game
+
+**This differs from:**
+- **Vanilla Minecraft**: Uses only basic core shaders for fixed rendering pipeline, no deferred rendering or advanced effects
+- **OptiFine/Iris**: Load shader packs dynamically from a `shaderpacks/` folder as ZIP files, allowing users to add/remove packs without recompiling
+
+### Technical Capabilities
+
+The implementation will transform MattMC from using vanilla Minecraft's basic shader system into a comprehensive shader architecture that supports OptiFine/Iris-style rendering features, including:
+- Deferred rendering pipeline with G-buffers (multiple render targets)
 - Shadow mapping with cascaded shadow maps
-- Custom uniforms for world/player state
-- Dynamic shader pack loading and hot-swapping
-- Per-pack configuration and user options
-- Advanced post-processing effects
-- Full compatibility with existing shader packs
+- Custom uniforms for world/player state (~200+ uniforms)
+- In-game shader pack selection and configuration
+- Per-pack configuration options
+- Advanced post-processing effects (bloom, DOF, motion blur, etc.)
+- Full rendering compatibility with OptiFine/Iris shader pack structure
 
-**Target Compatibility**: Complimentary Reimagined r5.6.1+ and other major shader packs (BSL, Sildurs, SEUS PTGI, Vanilla Plus, etc.)
+**Target Compatibility**: Shader packs designed for OptiFine/Iris (Complimentary Reimagined r5.6.1+, BSL, Sildurs, SEUS PTGI, Vanilla Plus, etc.) can be adapted to MattMC's baked-in format by placing them unzipped in the resources directory.
 
 **Estimated Implementation Scope**: ~15,000-25,000 lines of new code across 80-120 new classes plus modifications to existing rendering pipeline.
+
+---
+
+## How to Add Shader Packs to MattMC
+
+Since MattMC uses a baked-in shader system, shader packs must be added to the source code before compilation:
+
+### Step-by-Step Guide
+
+1. **Obtain a shader pack** (e.g., Complimentary Reimagined, BSL Shaders)
+   - Download from CurseForge, Modrinth, or shader pack website
+   - Usually comes as a ZIP file
+
+2. **Unzip the shader pack**
+   - Extract the contents to a temporary folder
+   - Verify it contains a `shaders/` directory with `.vsh` and `.fsh` files
+
+3. **Copy to MattMC resources**
+   ```bash
+   # Create a directory for the shader pack
+   mkdir -p src/main/resources/assets/minecraft/shaders/complementary_reimagined
+   
+   # Copy the shader pack contents
+   cp -r /path/to/extracted/shader/* src/main/resources/assets/minecraft/shaders/complementary_reimagined/
+   ```
+
+4. **Verify structure**
+   ```
+   src/main/resources/assets/minecraft/shaders/
+   └── complementary_reimagined/
+       ├── shaders/
+       │   ├── gbuffers_terrain.fsh
+       │   ├── gbuffers_terrain.vsh
+       │   ├── composite.fsh
+       │   └── ... (all shader files)
+       ├── textures/ (optional)
+       └── pack.mcmeta (optional)
+   ```
+
+5. **Recompile the game**
+   ```bash
+   ./gradlew build
+   ```
+
+6. **Launch and select**
+   - Start MattMC
+   - Go to Video Settings → Shaders
+   - Your shader pack will be listed automatically (dynamically discovered)
+   - Select it and enjoy!
+
+### Important Notes
+
+- ✅ **No code changes required** - the system dynamically discovers shader packs
+- ✅ **Multiple packs supported** - add as many as you want to the shaders directory
+- ✅ **Automatic discovery** - all directories in `assets/minecraft/shaders/` (except core, post, include) are scanned
+- ❌ **Requires recompilation** - users cannot add packs at runtime
+- ⚠️ **JAR size increases** - each shader pack adds to the final JAR size
+
+### Example Structure with Multiple Packs
+
+```
+src/main/resources/assets/minecraft/shaders/
+├── core/                          # Vanilla core shaders (don't modify)
+├── post/                          # Vanilla post-processing (don't modify)
+├── include/                       # Vanilla includes (don't modify)
+├── complementary_reimagined/      # Custom shader pack 1
+│   └── shaders/
+│       ├── gbuffers_*.fsh
+│       └── ...
+├── bsl_shaders/                   # Custom shader pack 2
+│   └── shaders/
+│       └── ...
+└── vanilla_plus/                  # Custom shader pack 3
+    └── shaders/
+        └── ...
+```
 
 ---
 
@@ -48,7 +139,7 @@ The implementation will transform MattMC from using vanilla Minecraft's basic sh
 
 ### Existing Shader Infrastructure in MattMC
 
-Based on analysis of the MattMC codebase (Minecraft 1.21.10), the current shader system includes:
+Based on analysis of the MattMC codebase (Minecraft Java 1.21.10 fork), the current shader system includes:
 
 #### 1. **Core Shader System** (`net.minecraft.client.renderer.ShaderManager`)
 - **Purpose**: Manages vanilla Minecraft's built-in shaders for basic rendering
@@ -102,13 +193,13 @@ Based on analysis of the MattMC codebase (Minecraft 1.21.10), the current shader
   - No G-buffer architecture
   - No multiple render target (MRT) support for deferred rendering
 
-### Gap Analysis: What's Missing for Full Shader Pack Support
+### Gap Analysis: What's Missing for Advanced Shader Support
 
-To achieve full compatibility with OptiFine/Iris shader packs like Complimentary Reimagined, MattMC needs:
+To achieve OptiFine/Iris-style rendering capabilities with MattMC's baked-in architecture, the following features need to be implemented:
 
 | Feature | Current State | Required State |
 |---------|---------------|----------------|
-| **Shader Pack Loading** | None | Dynamic loading from `shaderpacks/` folder |
+| **Shader Pack Discovery** | None | Dynamic discovery of shader packs from `assets/minecraft/shaders/` at runtime |
 | **G-Buffers** | Single color + depth buffer | Multiple color attachments (8+) for deferred data |
 | **Shadow Mapping** | None | Shadow pass with depth textures, cascaded shadow maps |
 | **Gbuffers Programs** | Fixed core shaders | Dynamic gbuffers_* programs per geometry type |
@@ -118,20 +209,23 @@ To achieve full compatibility with OptiFine/Iris shader packs like Complimentary
 | **Custom Textures** | None | Custom texture loading per shader pack |
 | **Dimension-Specific Shaders** | None | Per-dimension shader programs |
 | **Block/Entity ID Buffers** | None | Entity and block ID encoding for advanced effects |
-| **Dynamic Shader Switching** | Compile-time only | Runtime shader pack selection |
+| **Dynamic Shader Switching** | Compile-time only | Runtime shader pack selection (from baked-in options) |
 | **Shader Options Menu** | None | In-game UI for per-pack settings |
+
+**Note**: Unlike OptiFine/Iris, MattMC shaders are **discovered at runtime but bundled at compile time**. The game scans `assets/minecraft/shaders/` for shader pack directories and makes them available for in-game selection, but all shaders ship with the compiled JAR.
 
 ---
 
 ## Shader Pack Architecture Deep Dive
 
-### Understanding OptiFine/Iris Shader Pack Format
+### Understanding OptiFine/Iris Shader Pack Format (Adapted for MattMC)
 
-A shader pack (like Complimentary Reimagined) is a ZIP file with the following structure:
+In OptiFine/Iris, shader packs are ZIP files placed in a `shaderpacks/` folder. In MattMC, shader packs use the same internal structure but are **unzipped and stored directly in the resources directory** at `src/main/resources/assets/minecraft/shaders/`. Each shader pack is a subdirectory with the following structure:
 
 ```
-ComplementaryReimagined_r5.6.1.zip
-├── shaders/
+src/main/resources/assets/minecraft/shaders/
+├── complementary_reimagined/     # Shader pack directory (unzipped)
+│   ├── shaders/
 │   ├── gbuffers_basic.fsh              # Geometry pass shaders
 │   ├── gbuffers_basic.vsh
 │   ├── gbuffers_terrain.fsh
@@ -200,19 +294,41 @@ ComplementaryReimagined_r5.6.1.zip
 │   │   ├── shadowDistortion.glsl
 │   │   ├── atmospherics.glsl
 │   │   └── ...
-│   └── world-1/                        # Dimension-specific shaders
-│       └── composite.fsh
-├── textures/                           # Custom textures
-│   ├── noise.png
-│   ├── waterNormal.png
-│   ├── clouds.png
-│   └── ...
-└── pack.mcmeta                         # Pack metadata (optional)
+│   │   └── world-1/                        # Dimension-specific shaders
+│   │       └── composite.fsh
+│   ├── textures/                           # Custom textures
+│   │   ├── noise.png
+│   │   ├── waterNormal.png
+│   │   ├── clouds.png
+│   │   └── ...
+│   └── pack.mcmeta                         # Pack metadata (optional)
+│
+├── bsl_shaders/                      # Another shader pack
+│   ├── shaders/
+│   │   ├── gbuffers_terrain.fsh
+│   │   └── ...
+│   └── pack.mcmeta
+│
+└── vanilla_plus/                     # Another shader pack
+    ├── shaders/
+    └── ...
+
+# Vanilla Minecraft shaders remain in their original locations:
+# src/main/resources/assets/minecraft/shaders/core/     - Vanilla core shaders
+# src/main/resources/assets/minecraft/shaders/post/     - Vanilla post-processing
+# src/main/resources/assets/minecraft/shaders/include/  - Vanilla includes
 ```
+
+**Key Differences from OptiFine/Iris:**
+- **Storage**: Unzipped directories in resources, not ZIP files in a runtime folder
+- **Discovery**: Dynamically scanned from `assets/minecraft/shaders/` at game startup
+- **Bundling**: All shader packs ship with the compiled game JAR (baked-in)
+- **Modification**: To add/modify shaders, you must edit resources and recompile the game
+- **No Runtime Loading**: Users cannot add shader packs without recompiling
 
 ### Rendering Pipeline Flow
 
-The OptiFine/Iris shader pack rendering pipeline operates in distinct stages:
+The shader pack rendering pipeline (inspired by OptiFine/Iris) operates in distinct stages:
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -363,6 +479,27 @@ uniform int blockEntityId;             // Block entity ID
 
 ## Technical Requirements
 
+### MattMC Shader Architecture Principles
+
+**Baked-In Design Philosophy:**
+1. **Compile-Time Integration**: Shaders are compiled into the game JAR, not loaded at runtime
+2. **Dynamic Discovery**: The game scans `assets/minecraft/shaders/` to find available shader packs (not hardcoded)
+3. **Resource-Based Loading**: Uses Minecraft's `ResourceManager` for shader access (same as textures, sounds, etc.)
+4. **In-Game Selection**: Players can switch between baked-in shaders via video settings
+5. **No User-Added Packs**: Users cannot add new shader packs without recompiling the game
+
+**Advantages of This Approach:**
+- ✅ **No Runtime File I/O**: Faster shader loading (already in JAR)
+- ✅ **Guaranteed Availability**: All shaders tested and verified before distribution
+- ✅ **Simplified Distribution**: Single JAR contains everything
+- ✅ **Better Security**: No arbitrary shader code loaded from user filesystem
+- ✅ **Consistent Behavior**: No shader pack compatibility issues across installations
+
+**Trade-offs:**
+- ❌ **No User Customization**: Players can't add their own shader packs
+- ❌ **Requires Recompilation**: Adding shaders requires rebuilding the game
+- ⚠️ **Larger JAR Size**: All shaders included in distribution
+
 ### Minimum System Requirements
 - **OpenGL**: 4.3+ (for compute shaders in advanced packs)
 - **GLSL Version**: 330 core minimum, 420+ recommended
@@ -443,16 +580,16 @@ uniform int blockEntityId;             // Block entity ID
 │                                                                           │
 │  ┌─────────────────────────────────────────────────────────────────┐   │
 │  │                   Shader Pack Repository                         │   │
-│  │  - Scans shaderpacks/ folder                                     │   │
-│  │  - Loads available packs                                         │   │
+│  │  - Scans assets/minecraft/shaders/ in JAR resources             │   │
+│  │  - Dynamically discovers available shader packs                 │   │
 │  │  - Provides pack selection API                                   │   │
 │  └──────────────────────────┬───────────────────────────────────────┘   │
 │                             ↓                                             │
 │  ┌─────────────────────────────────────────────────────────────────┐   │
 │  │                    Shader Pack Loader                            │   │
-│  │  - Unzips/reads shader pack files                               │   │
+│  │  - Loads shaders from ResourceManager (JAR resources)           │   │
 │  │  - Parses shaders.properties                                     │   │
-│  │  - Loads GLSL shader files                                       │   │
+│  │  - Loads GLSL shader files via ResourceLocation                 │   │
 │  │  - Processes #include directives                                 │   │
 │  │  - Handles dimension-specific overrides                          │   │
 │  └──────────────────────────┬───────────────────────────────────────┘   │
@@ -577,7 +714,7 @@ net/minecraft/client/renderer/shader/
 
 ### 1.2 Shader Pack Repository
 
-**Purpose**: Discover and manage available shader packs.
+**Purpose**: Discover and manage baked-in shader packs from the resources directory.
 
 **Implementation**:
 
@@ -586,45 +723,64 @@ package net.minecraft.client.renderer.shader.pack;
 
 public class ShaderPackRepository {
     private static final Logger LOGGER = LogUtils.getLogger();
-    private static final String SHADER_PACKS_DIR = "shaderpacks";
+    private static final String SHADER_PACKS_RESOURCE_PATH = "assets/minecraft/shaders";
     
-    private final Path shaderPacksDirectory;
+    private final ResourceManager resourceManager;
     private final List<ShaderPackMetadata> availablePacks;
     private ShaderPack activePack;
     
-    public ShaderPackRepository(Path gameDirectory) {
-        this.shaderPacksDirectory = gameDirectory.resolve(SHADER_PACKS_DIR);
+    public ShaderPackRepository(ResourceManager resourceManager) {
+        this.resourceManager = resourceManager;
         this.availablePacks = new ArrayList<>();
-        ensureDirectoryExists();
     }
     
     public void scanForPacks() {
         availablePacks.clear();
         
-        try (DirectoryStream<Path> stream = Files.newDirectoryStream(shaderPacksDirectory)) {
-            for (Path path : stream) {
-                if (isValidShaderPack(path)) {
-                    ShaderPackMetadata metadata = loadMetadata(path);
-                    if (metadata != null) {
-                        availablePacks.add(metadata);
-                    }
-                }
+        // Scan for shader pack directories in resources
+        // Each directory in assets/minecraft/shaders/ (except core, post, include) is a shader pack
+        Map<ResourceLocation, Resource> shaderResources = resourceManager.listResources(
+            "shaders", 
+            location -> !location.getPath().contains("/core/") 
+                     && !location.getPath().contains("/post/")
+                     && !location.getPath().contains("/include/")
+        );
+        
+        // Group resources by shader pack directory
+        Set<String> shaderPackNames = new HashSet<>();
+        for (ResourceLocation location : shaderResources.keySet()) {
+            String[] pathParts = location.getPath().split("/");
+            if (pathParts.length > 2 && pathParts[0].equals("shaders")) {
+                shaderPackNames.add(pathParts[1]); // Extract shader pack directory name
             }
-        } catch (IOException e) {
-            LOGGER.error("Failed to scan shader packs directory", e);
         }
         
-        LOGGER.info("Found {} shader packs", availablePacks.size());
+        // Load metadata for each discovered shader pack
+        for (String packName : shaderPackNames) {
+            ShaderPackMetadata metadata = loadMetadata(packName);
+            if (metadata != null) {
+                availablePacks.add(metadata);
+            }
+        }
+        
+        LOGGER.info("Found {} baked-in shader packs", availablePacks.size());
     }
     
-    private boolean isValidShaderPack(Path path) {
-        // Check if it's a ZIP file or directory with shaders/ folder
-        if (Files.isDirectory(path)) {
-            return Files.exists(path.resolve("shaders"));
-        } else if (path.toString().endsWith(".zip")) {
-            return true; // Will validate contents during load
-        }
-        return false;
+    private ShaderPackMetadata loadMetadata(String packName) {
+        // Try to load pack.mcmeta for this shader pack
+        ResourceLocation packMetaLocation = ResourceLocation.withDefaultNamespace(
+            "shaders/" + packName + "/pack.mcmeta"
+        );
+        
+        // If no metadata, create basic metadata from directory name
+        return new ShaderPackMetadata(
+            packName,
+            "Shader Pack: " + packName,
+            "Unknown",
+            "1.0",
+            packName,
+            true // isResource = true (from JAR resources)
+        );
     }
     
     public List<ShaderPackMetadata> getAvailablePacks() {
@@ -634,7 +790,7 @@ public class ShaderPackRepository {
     public CompletableFuture<ShaderPack> loadShaderPack(ShaderPackMetadata metadata) {
         return CompletableFuture.supplyAsync(() -> {
             try {
-                ShaderPackLoader loader = new ShaderPackLoader(metadata.path());
+                ShaderPackLoader loader = new ShaderPackLoader(resourceManager, metadata.resourcePath());
                 return loader.load();
             } catch (Exception e) {
                 LOGGER.error("Failed to load shader pack: {}", metadata.name(), e);
@@ -656,6 +812,12 @@ public class ShaderPackRepository {
 }
 ```
 
+**Key Changes from OptiFine/Iris:**
+- Scans `ResourceManager` instead of filesystem directories
+- No ZIP file handling needed - shaders are already unzipped in resources
+- All shader packs are discovered from the JAR's embedded resources
+- No need to create or manage a runtime `shaderpacks/` folder
+
 ### 1.3 Shader Pack Metadata
 
 ```java
@@ -664,35 +826,80 @@ public record ShaderPackMetadata(
     String description,
     String author,
     String version,
-    Path path,
-    boolean isDirectory
+    String resourcePath,  // Resource path within JAR, e.g., "complementary_reimagined"
+    boolean isResource    // Always true for MattMC (baked into JAR)
 ) {
-    public static ShaderPackMetadata fromPath(Path path) {
-        // Read pack.mcmeta or shaders.properties for metadata
-        // Fallback to filename if no metadata available
+    public static ShaderPackMetadata fromResource(ResourceManager resourceManager, String packName) {
+        // Try to read pack.mcmeta from resources
+        ResourceLocation metaLocation = ResourceLocation.withDefaultNamespace(
+            "shaders/" + packName + "/pack.mcmeta"
+        );
+        
+        // Parse metadata or use defaults
+        return new ShaderPackMetadata(
+            packName,
+            "Shader Pack: " + packName,
+            "Unknown",
+            "1.0",
+            packName,
+            true
+        );
     }
 }
 ```
 
-### 1.4 File System Abstraction
+### 1.4 Resource-Based Shader Loading
 
-**Purpose**: Handle both ZIP files and directory-based shader packs uniformly.
+**Purpose**: Load shader files from JAR resources instead of filesystem.
 
 ```java
-public interface ShaderPackFileSystem extends AutoCloseable {
-    InputStream openFile(String path) throws IOException;
-    boolean fileExists(String path);
-    List<String> listFiles(String directory);
+public class ResourceShaderPackAccessor {
+    private final ResourceManager resourceManager;
+    private final String packBasePath;
     
-    static ShaderPackFileSystem open(Path packPath) throws IOException {
-        if (Files.isDirectory(packPath)) {
-            return new DirectoryShaderPackFileSystem(packPath);
-        } else {
-            return new ZipShaderPackFileSystem(packPath);
+    public ResourceShaderPackAccessor(ResourceManager resourceManager, String packName) {
+        this.resourceManager = resourceManager;
+        this.packBasePath = "shaders/" + packName;
+    }
+    
+    public InputStream openFile(String relativePath) throws IOException {
+        ResourceLocation location = ResourceLocation.withDefaultNamespace(
+            packBasePath + "/" + relativePath
+        );
+        
+        Optional<Resource> resource = resourceManager.getResource(location);
+        if (resource.isEmpty()) {
+            throw new FileNotFoundException("Shader resource not found: " + location);
         }
+        
+        return resource.get().open();
+    }
+    
+    public boolean fileExists(String relativePath) {
+        ResourceLocation location = ResourceLocation.withDefaultNamespace(
+            packBasePath + "/" + relativePath
+        );
+        return resourceManager.getResource(location).isPresent();
+    }
+    
+    public List<String> listFiles(String directory) {
+        // List all resources under the specified directory
+        Map<ResourceLocation, Resource> resources = resourceManager.listResources(
+            packBasePath + "/" + directory,
+            loc -> true
+        );
+        return resources.keySet().stream()
+            .map(ResourceLocation::getPath)
+            .collect(Collectors.toList());
     }
 }
 ```
+
+**Key Changes from OptiFine/Iris:**
+- No filesystem or ZIP handling - uses Minecraft's `ResourceManager`
+- All shaders accessed via `ResourceLocation` (same as game assets)
+- Leverages existing resource loading infrastructure
+- No need for separate file system abstraction layer
 
 ### 1.5 Options Integration
 
@@ -727,7 +934,7 @@ case "shaderPack":
 
 ## Phase 2: Shader Pack Loading System
 
-**Goal**: Implement shader pack file parsing and GLSL shader loading.
+**Goal**: Implement resource-based shader pack parsing and GLSL shader loading from JAR resources.
 
 **Duration**: 2-3 weeks
 
@@ -735,19 +942,23 @@ case "shaderPack":
 
 ```java
 public class ShaderPackLoader {
-    private final ShaderPackFileSystem fileSystem;
+    private final ResourceShaderPackAccessor resourceAccessor;
     private final Map<String, String> shaderSources = new HashMap<>();
     private ShaderProperties properties;
     
+    public ShaderPackLoader(ResourceManager resourceManager, String packName) {
+        this.resourceAccessor = new ResourceShaderPackAccessor(resourceManager, packName);
+    }
+    
     public ShaderPack load() throws IOException {
-        // 1. Load shaders.properties
+        // 1. Load shaders.properties from resources
         properties = loadShaderProperties();
         
-        // 2. Discover all shader program files
+        // 2. Dynamically discover all shader program files from resources
         Map<ShaderProgramType, ShaderProgramSource> programs = discoverPrograms();
         
-        // 3. Load custom textures
-        Map<String, Path> customTextures = loadCustomTextures();
+        // 3. Load custom textures from resources
+        Map<String, ResourceLocation> customTextures = loadCustomTextures();
         
         // 4. Parse block.properties and entity.properties
         BlockMappings blockMappings = loadBlockMappings();
@@ -760,50 +971,74 @@ public class ShaderPackLoader {
     private Map<ShaderProgramType, ShaderProgramSource> discoverPrograms() {
         Map<ShaderProgramType, ShaderProgramSource> programs = new EnumMap<>(ShaderProgramType.class);
         
-        // Scan for gbuffers_* programs
-        for (GBuffersProgram type : GBuffersProgram.values()) {
-            String vshPath = "shaders/" + type.getName() + ".vsh";
-            String fshPath = "shaders/" + type.getName() + ".fsh";
-            
-            if (fileSystem.fileExists(vshPath) || fileSystem.fileExists(fshPath)) {
-                String vertexSource = loadShaderSource(vshPath);
-                String fragmentSource = loadShaderSource(fshPath);
-                programs.put(type, new ShaderProgramSource(vertexSource, fragmentSource));
+        // Dynamically scan for gbuffers_* programs (not hardcoded)
+        List<String> shaderFiles = resourceAccessor.listFiles("shaders");
+        Set<String> programNames = new HashSet<>();
+        
+        // Extract unique program names from .vsh and .fsh files
+        for (String file : shaderFiles) {
+            if (file.endsWith(".vsh") || file.endsWith(".fsh")) {
+                String programName = file.substring(0, file.lastIndexOf('.'));
+                programNames.add(programName);
             }
         }
         
-        // Scan for composite programs (composite, composite1-15)
-        // Scan for deferred programs (deferred, deferred1-15)
-        // Scan for shadow, prepare, final programs
+        // Load each discovered program
+        for (String programName : programNames) {
+            String vshPath = "shaders/" + programName + ".vsh";
+            String fshPath = "shaders/" + programName + ".fsh";
+            
+            String vertexSource = loadShaderSource(vshPath);
+            String fragmentSource = loadShaderSource(fshPath);
+            
+            if (vertexSource != null || fragmentSource != null) {
+                ShaderProgramType type = ShaderProgramType.fromName(programName);
+                if (type != null) {
+                    programs.put(type, new ShaderProgramSource(vertexSource, fragmentSource));
+                }
+            }
+        }
         
+        LOGGER.info("Discovered {} shader programs in pack", programs.size());
         return programs;
     }
     
-    private String loadShaderSource(String path) throws IOException {
-        if (!fileSystem.fileExists(path)) {
+    private String loadShaderSource(String path) {
+        if (!resourceAccessor.fileExists(path)) {
             return null;
         }
         
-        try (InputStream is = fileSystem.openFile(path);
+        try (InputStream is = resourceAccessor.openFile(path);
              BufferedReader reader = new BufferedReader(new InputStreamReader(is))) {
             
             StringBuilder source = new StringBuilder();
             String line;
             while ((line = reader.readLine()) != null) {
-                // Process #include directives
+                // Process #include directives (supports both relative and absolute)
                 if (line.trim().startsWith("#include")) {
                     String includePath = parseIncludePath(line);
                     String includedSource = loadShaderSource(includePath);
-                    source.append(includedSource).append("\n");
+                    if (includedSource != null) {
+                        source.append(includedSource).append("\n");
+                    }
                 } else {
                     source.append(line).append("\n");
                 }
             }
             return source.toString();
+        } catch (IOException e) {
+            LOGGER.error("Failed to load shader source: {}", path, e);
+            return null;
         }
     }
 }
 ```
+
+**Key Changes from OptiFine/Iris:**
+- Loads from `ResourceManager` instead of filesystem/ZIP
+- **Dynamic discovery**: Scans resource listings to find all shaders (not hardcoded)
+- Custom textures referenced as `ResourceLocation` instead of file paths
+- No ZIP extraction or temporary files needed
 
 ### 2.2 Shader Properties Parser
 
@@ -1972,42 +2207,79 @@ Month 6-7: Polish & Compatibility
 
 ## Conclusion
 
-This comprehensive plan outlines the full implementation of OptiFine/Iris-compatible shader system for MattMC. The implementation is substantial but achievable in 5-7 months with dedicated development effort.
+This comprehensive plan outlines the implementation of an OptiFine/Iris-style shader rendering system for MattMC with a unique **baked-in architecture**. The implementation is substantial but achievable in 5-7 months with dedicated development effort.
 
 ### Key Success Factors:
 
 1. **Incremental Approach**: Build and test each phase independently
-2. **Early Validation**: Test with real shader packs early and often
-3. **Performance Focus**: Profile and optimize throughout development
-4. **Community Testing**: Engage beta testers for broad compatibility testing
-5. **Documentation**: Maintain clear architecture documentation
-6. **Fallback Support**: Always maintain working vanilla rendering path
+2. **Resource-Based Design**: Leverage Minecraft's existing ResourceManager infrastructure
+3. **Dynamic Discovery**: Implement non-hardcoded shader pack detection
+4. **Early Validation**: Test with adapted shader packs early and often
+5. **Performance Focus**: Profile and optimize throughout development
+6. **Documentation**: Maintain clear architecture documentation
+7. **Fallback Support**: Always maintain working vanilla rendering path
 
 ### Expected Outcome:
 
-Upon completion, MattMC users will be able to:
-- Drop Complimentary Reimagined (and other shader packs) into `shaderpacks/` folder
-- Select shader packs from in-game video settings
-- Configure shader-specific options through dedicated UI
-- Experience fully-featured shader rendering with performance comparable to OptiFine/Iris
-- Switch between shader packs without restarting the game
-- Use shaders across all dimensions (Overworld, Nether, End)
+Upon completion, MattMC will feature:
+- **Multiple baked-in shader packs** bundled with the game (Complimentary Reimagined, BSL, etc.)
+- **In-game shader selection** from video settings menu
+- **Shader-specific configuration** through dedicated UI
+- **Full deferred rendering pipeline** with G-buffers, shadows, and advanced effects
+- **Dynamic shader discovery** from resources directory (not hardcoded)
+- **Runtime shader switching** between baked-in options without restarting
+- **Full dimension support** (Overworld, Nether, End)
+- **Performance comparable to OptiFine/Iris** for the bundled shader packs
+
+### Key Architectural Differences:
+
+**MattMC's Baked-In Approach:**
+- ✅ Shaders compiled into JAR from `src/main/resources/assets/minecraft/shaders/`
+- ✅ Each shader pack is an unzipped directory in resources
+- ✅ Dynamic runtime discovery (scans resources, not hardcoded)
+- ✅ In-game selection between bundled options
+- ❌ No user-added shader packs (requires recompilation)
+
+**vs. OptiFine/Iris:**
+- Loads shader packs from `shaderpacks/` folder as ZIP files
+- Users can add/remove packs without recompiling
+- Runtime file I/O required
+
+**vs. Vanilla Minecraft:**
+- Only basic fixed-pipeline shaders
+- No deferred rendering, G-buffers, or advanced effects
+- No user-selectable shaders
 
 ### Post-Implementation:
 
 After the initial release, ongoing work will include:
-- Expanding compatibility with more shader packs
-- Performance optimizations based on user feedback
-- Bug fixes and stability improvements
-- Potential advanced features (compute shaders, ray tracing integration)
-- Community-contributed shader pack optimizations
+- **Adding more bundled shader packs** to the resources directory
+- **Performance optimizations** based on profiling and user feedback
+- **Bug fixes and stability improvements**
+- **Enhanced shader options** and configuration capabilities
+- **Potential advanced features** (compute shaders, ray tracing hooks)
+- **Documentation for shader pack authors** on adapting packs for MattMC's baked-in format
+
+### Adding New Shader Packs:
+
+For developers wanting to add shader packs to MattMC:
+
+1. **Obtain shader pack** (e.g., Complimentary Reimagined ZIP)
+2. **Unzip into resources**: `src/main/resources/assets/minecraft/shaders/pack_name/`
+3. **Verify structure**: Must contain `shaders/` subdirectory with .vsh/.fsh files
+4. **Recompile game**: `./gradlew build`
+5. **Shader automatically discovered**: Game scans resources at startup
+
+No code changes needed - the system dynamically discovers all shader packs in the resources directory.
 
 ---
 
-**End of Shader Compatibility Implementation Plan**
+**End of MattMC Shader Implementation Plan**
 
-*Document Version: 1.0*  
-*Date: December 2025*  
-*Project: MattMC Shader System*  
-*Target Version: MattMC 1.21.10+*
+*Document Version: 2.0*  
+*Date: December 2024*  
+*Project: MattMC Baked-In Shader System*  
+*Target Version: MattMC 1.21.10+ (Minecraft Java 1.21.10 Fork)*
+
+**Note**: This is a living document that may be updated as the implementation progresses and new insights are gained.
 
