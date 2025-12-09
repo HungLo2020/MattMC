@@ -1,6 +1,7 @@
 package net.minecraft.client.renderer.shaders.core;
 
 import net.minecraft.client.renderer.shaders.pack.ShaderPackRepository;
+import net.minecraft.client.renderer.shaders.pipeline.PipelineManager;
 import net.minecraft.server.packs.resources.ResourceManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -21,6 +22,7 @@ public class ShaderSystem {
 	private ShaderConfig config;
 	private Path gameDirectory;
 	private ShaderPackRepository repository;
+	private PipelineManager pipelineManager;
 	
 	private ShaderSystem() {
 		// Private constructor for singleton pattern
@@ -102,6 +104,10 @@ public class ShaderSystem {
 		} else {
 			LOGGER.info("No shader packs found in resources");
 		}
+		
+		// Initialize pipeline manager - matches IRIS pattern
+		this.pipelineManager = new PipelineManager();
+		LOGGER.info("Pipeline manager initialized");
 	}
 	
 	/**
@@ -110,5 +116,13 @@ public class ShaderSystem {
 	 */
 	public ShaderPackRepository getRepository() {
 		return repository;
+	}
+	
+	/**
+	 * Gets the pipeline manager.
+	 * @return The pipeline manager, or null if not yet initialized
+	 */
+	public PipelineManager getPipelineManager() {
+		return pipelineManager;
 	}
 }
