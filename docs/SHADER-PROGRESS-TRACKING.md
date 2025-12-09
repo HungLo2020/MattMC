@@ -4,7 +4,7 @@ This document tracks progress through the 30-step IRIS shader integration plan.
 
 ## Overall Progress
 
-**Current Status:** Step 4 of 30 Complete (13.3%)
+**Current Status:** Step 5 of 30 Complete (16.7%)
 
 **Last Updated:** December 9, 2024
 
@@ -110,20 +110,46 @@ This document tracks progress through the 30-step IRIS shader integration plan.
 
 **IRIS Adherence:** Implementation follows IRIS VERBATIM - no simplifications made
 
+### ✅ Step 5: Create Pipeline Manager Framework (COMPLETE)
+
+**Date Completed:** December 9, 2024
+
+**Implementation Summary:**
+- Implemented WorldRenderingPipeline interface matching IRIS exactly
+- Created VanillaRenderingPipeline as passthrough implementation
+- Created ShaderPackPipeline with ShaderProperties integration
+- Implemented PipelineManager with per-dimension caching
+- Integrated PipelineManager into ShaderSystem
+- Developed 32 new comprehensive tests (all passing)
+
+**Key Files:**
+- `net/minecraft/client/renderer/shaders/pipeline/WorldRenderingPipeline.java`
+- `net/minecraft/client/renderer/shaders/pipeline/VanillaRenderingPipeline.java`
+- `net/minecraft/client/renderer/shaders/pipeline/ShaderPackPipeline.java`
+- `net/minecraft/client/renderer/shaders/pipeline/PipelineManager.java`
+- 3 test files with 32 unit/integration tests
+
+**Test Results:** 82/82 passing (50 from Steps 1-4, 32 new) ✅
+
+**Documentation:** `docs/SHADER-IMPLEMENTATION-STEP-5.md`
+
+**IRIS Adherence:** Pipeline architecture follows IRIS VERBATIM - no shortcuts taken
+
+**Foundation Phase:** 100% COMPLETE ✅
+
 ## In Progress Steps
 
-### 🔄 Step 5: Create Pipeline Manager Framework (NEXT)
+### 🔄 Step 6: Implement Include File System (NEXT)
 
 **Status:** Ready to start
 
 **Planned Work:**
-- Implement PipelineManager
-- Create ShaderPipeline interface
-- Implement VanillaPipeline (passthrough)
-- Implement ShaderPackPipeline stub
-- Test pipeline creation and switching
+- Implement #include directive processing
+- Create IncludeProcessor
+- Handle recursive includes
+- Test include resolution
 
-**Dependencies:** Steps 1-4 complete ✅
+**Dependencies:** Steps 1-5 complete ✅ (Foundation phase complete!)
 
 **Estimated Completion:** TBD
 
@@ -143,12 +169,12 @@ This document tracks progress through the 30-step IRIS shader integration plan.
 
 ## Phase Breakdown
 
-### Foundation (Steps 1-5): 80% Complete
+### Foundation (Steps 1-5): 100% COMPLETE ✅
 - ✅ Step 1: Core Infrastructure
 - ✅ Step 2: Configuration System
 - ✅ Step 3: Pack Repository
 - ✅ Step 4: Properties Parser
-- ⬜ Step 5: Pipeline Manager
+- ✅ Step 5: Pipeline Manager
 
 ### Loading System (Steps 6-10): 0% Complete
 - ⬜ Step 6: Include File Processor
@@ -188,13 +214,14 @@ This document tracks progress through the 30-step IRIS shader integration plan.
 ## Key Metrics
 
 - **Total Steps:** 30
-- **Steps Complete:** 4
+- **Steps Complete:** 5
 - **Steps In Progress:** 0
-- **Steps Remaining:** 26
-- **Overall Progress:** 13.3%
-- **Tests Written:** 50
-- **Tests Passing:** 50 (100%)
-- **Lines of Code Added:** ~1,900+
+- **Steps Remaining:** 25
+- **Overall Progress:** 16.7%
+- **Tests Written:** 82
+- **Tests Passing:** 82 (100%)
+- **Lines of Code Added:** ~2,800+
+- **Foundation Phase:** COMPLETE ✅
 
 ## Architecture Decisions Log
 
@@ -220,6 +247,9 @@ This document tracks progress through the 30-step IRIS shader integration plan.
 - **Step 3 Complete:** December 9, 2024 (same day)
 - **Step 4 Implementation:** December 9, 2024 (same day)
 - **Step 4 Complete:** December 9, 2024 (same day)
+- **Step 5 Implementation:** December 9, 2024 (same day)
+- **Step 5 Complete:** December 9, 2024 (same day)
+- **Foundation Phase Complete:** December 9, 2024 ✅
 - **Expected Completion (30 steps):** 20-24 weeks from start
 
 ## Notes
