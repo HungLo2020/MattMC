@@ -36,7 +36,7 @@ public class ShaderPassExecutor {
     private final Minecraft minecraft;
     private final FullScreenQuad fullScreenQuad;
     private final ShaderRenderBridge renderBridge;
-    private float partialTick = 1.0f;
+    private float partialTick; // Set per-frame in executeRenderPipeline
     
     public ShaderPassExecutor(ShaderPack shaderPack, 
                              GBufferManager gBufferManager,

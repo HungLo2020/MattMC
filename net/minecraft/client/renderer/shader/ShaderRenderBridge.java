@@ -74,7 +74,8 @@ public class ShaderRenderBridge {
             // In actual implementation, this would interface with the chunk rendering system
             // For now, we set up state for shaders to access terrain data
         } catch (Exception e) {
-            // Silently fail to avoid spam
+            // Log at trace level to avoid spam while still allowing debugging
+            LOGGER.trace("Terrain layer {} not available for rendering", renderType, e);
         }
     }
     
@@ -90,8 +91,9 @@ public class ShaderRenderBridge {
             program.bind();
             uniformManager.setProgram(program);
             
-            // Render translucent blocks (including water)
-            // Use tripwire render type as it's similar to translucent
+            // NOTE: Water rendering requires integration with Minecraft's translucent water system
+            // Using tripwire render type as a temporary substitute that shares similar properties
+            // TODO: Implement proper water-specific rendering when deeper LevelRenderer integration is available
             renderTerrainLayer(RenderType.tripwire(), camera);
             
             CompiledShaderProgram.unbind();
@@ -124,10 +126,12 @@ public class ShaderRenderBridge {
                     double e = entity.getY() - cameraPos.y;
                     double f = entity.getZ() - cameraPos.z;
                     
-                    // Simple entity rendering - actual rendering would require more setup
-                    // This is a placeholder for geometry rendering integration
+                    // NOTE: Entity rendering through shaders requires deep integration with EntityRenderDispatcher
+                    // The position offsets (d, e, f) are calculated for use with render dispatcher
+                    // TODO: Complete entity rendering integration when EntityRenderDispatcher API is fully accessible
+                    // This is a framework placeholder that sets up the correct state for shader-based entity rendering
                 } catch (Exception ex) {
-                    // Continue rendering other entities
+                    LOGGER.trace("Failed to prepare entity {} for shader rendering", entity.getType(), ex);
                 }
             }
             
@@ -137,6 +141,8 @@ public class ShaderRenderBridge {
         }
     }
     
+    private static final double MAX_ENTITY_RENDER_DISTANCE_SQUARED = 256.0 * 256.0; // 256 blocks squared
+    
     /**
      * Checks if an entity should be rendered.
      */
@@ -145,8 +151,8 @@ public class ShaderRenderBridge {
         Vec3 cameraPos = camera.getPosition();
         double distance = entity.distanceToSqr(cameraPos);
         
-        // Render entities within reasonable distance (256 blocks)
-        return distance < 256.0 * 256.0;
+        // Render entities within reasonable distance
+        return distance < MAX_ENTITY_RENDER_DISTANCE_SQUARED;
     }
     
     /**
