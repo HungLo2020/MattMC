@@ -3,6 +3,7 @@ package net.minecraft.client.renderer.shader;
 import com.mojang.logging.LogUtils;
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
+import net.minecraft.client.Camera;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.shader.gbuffer.GBufferManager;
 import net.minecraft.client.renderer.shader.pack.ShaderPack;
@@ -13,6 +14,7 @@ import net.minecraft.client.renderer.shader.shadow.ShadowMapManager;
 import net.minecraft.client.renderer.shader.uniform.CameraUniforms;
 import net.minecraft.client.renderer.shader.uniform.UniformManager;
 import net.minecraft.client.renderer.shader.uniform.WorldStateUniforms;
+import org.joml.Matrix4f;
 import org.slf4j.Logger;
 
 /**
@@ -29,6 +31,7 @@ public class ShaderRenderPipeline implements AutoCloseable {
     private final UniformManager uniformManager;
     private final WorldStateUniforms worldStateUniforms;
     private final CameraUniforms cameraUniforms;
+    private ShaderPassExecutor passExecutor;
     private boolean initialized = false;
     
     public ShaderRenderPipeline(ShaderPack shaderPack) {
@@ -65,6 +68,16 @@ public class ShaderRenderPipeline implements AutoCloseable {
             
             // Compile shader programs that exist in the pack
             compileShaderPrograms();
+            
+            // Initialize pass executor
+            this.passExecutor = new ShaderPassExecutor(
+                shaderPack,
+                gBufferManager,
+                shadowMapManager,
+                uniformManager,
+                worldStateUniforms,
+                cameraUniforms
+            );
             
             initialized = true;
             LOGGER.info("Shader render pipeline initialized successfully");
@@ -111,23 +124,32 @@ public class ShaderRenderPipeline implements AutoCloseable {
     }
     
     /**
-     * Executes the rendering pipeline.
-     * This is a placeholder - full implementation requires integration with LevelRenderer.
+     * Executes the complete rendering pipeline.
+     * 
+     * @param camera The game camera
+     * @param viewMatrix The view transformation matrix
+     * @param projectionMatrix The projection matrix
      */
-    public void render() {
-        if (!initialized) {
+    public void render(Camera camera, Matrix4f viewMatrix, Matrix4f projectionMatrix) {
+        if (!initialized || passExecutor == null) {
             return;
         }
         
-        // Placeholder for actual rendering
-        // In a full implementation, this would:
-        // 1. Execute shadow pass
-        // 2. Execute G-buffers pass (render world geometry)
-        // 3. Execute deferred pass (lighting)
-        // 4. Execute composite passes (post-processing)
-        // 5. Execute final pass (output to screen)
+        LOGGER.debug("Executing shader render pipeline for pack: {}", shaderPack.getName());
         
-        LOGGER.debug("Shader pipeline render called for pack: {}", shaderPack.getName());
+        try {
+            // Execute the complete render pass sequence
+            passExecutor.executeRenderPipeline(camera, viewMatrix, projectionMatrix);
+        } catch (Exception e) {
+            LOGGER.error("Error executing shader render pipeline", e);
+        }
+    }
+    
+    /**
+     * Gets the pass executor for direct access if needed.
+     */
+    public ShaderPassExecutor getPassExecutor() {
+        return passExecutor;
     }
     
     /**
