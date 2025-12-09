@@ -641,6 +641,7 @@ public class Options {
 	private CameraType cameraType = CameraType.FIRST_PERSON;
 	public String lastMpIp = "";
 	public String selectedSkin = "steve (Wide)";
+	public String shaderPack = "";  // Empty string = no shader pack (vanilla rendering)
 	public boolean smoothCamera;
 	private final OptionInstance<Integer> fov = new OptionInstance<>(
 		"options.fov",
@@ -1308,6 +1309,7 @@ public class Options {
 		this.incompatibleResourcePacks = fieldAccess.process("incompatibleResourcePacks", this.incompatibleResourcePacks, Options::readListOfStrings, GSON::toJson);
 		this.lastMpIp = fieldAccess.process("lastServer", this.lastMpIp);
 		this.selectedSkin = fieldAccess.process("selectedSkin", this.selectedSkin);
+		this.shaderPack = fieldAccess.process("shaderPack", this.shaderPack);
 		fieldAccess.process("lang", this.languageCode);
 		this.languageCode = "en_us";
 		fieldAccess.process("chatVisibility", this.chatVisibility);

@@ -271,6 +271,7 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 	private final CompletableFuture<ProfileResult> profileFuture;
 	private final TextureManager textureManager;
 	private final ShaderManager shaderManager;
+	private net.minecraft.client.renderer.shader.pack.ShaderPackRepository shaderPackRepository;
 	private final DataFixer fixerUpper;
 	private final VirtualScreen virtualScreen;
 	private final Window window;
@@ -498,6 +499,7 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 		this.resourceManager.registerReloadListener(this.textureManager);
 		this.shaderManager = new ShaderManager(this.textureManager, this::triggerResourcePackRecovery);
 		this.resourceManager.registerReloadListener(this.shaderManager);
+		this.shaderPackRepository = new net.minecraft.client.renderer.shader.pack.ShaderPackRepository(this.resourceManager);
 		SkinTextureDownloader skinTextureDownloader = new SkinTextureDownloader(this.proxy, this.textureManager, this);
 		this.skinManager = new SkinManager(file.toPath().resolve("skins"), this.services, skinTextureDownloader, this);
 		this.skinLoader = new net.minecraft.client.resources.SkinLoader(path);
@@ -692,8 +694,52 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 	private void onResourceLoadFinished(@Nullable Minecraft.GameLoadCookie gameLoadCookie) {
 		if (!this.gameLoadFinished) {
 			this.gameLoadFinished = true;
+			this.initializeShaderPacks();
 			this.onGameLoadFinished(gameLoadCookie);
 		}
+	}
+
+	private void initializeShaderPacks() {
+		if (this.shaderPackRepository != null) {
+			this.shaderPackRepository.scanForPacks();
+			// Load the shader pack specified in options, if any
+			if (!this.options.shaderPack.isEmpty()) {
+				this.loadShaderPack(this.options.shaderPack);
+			}
+		}
+	}
+
+	public void loadShaderPack(String packName) {
+		if (this.shaderPackRepository == null) {
+			return;
+		}
+		
+		// Find the shader pack by name
+		net.minecraft.client.renderer.shader.pack.ShaderPackMetadata metadata = null;
+		for (net.minecraft.client.renderer.shader.pack.ShaderPackMetadata pack : this.shaderPackRepository.getAvailablePacks()) {
+			if (pack.name().equals(packName)) {
+				metadata = pack;
+				break;
+			}
+		}
+		
+		if (metadata == null) {
+			LOGGER.warn("Shader pack '{}' not found, disabling shaders", packName);
+			this.shaderPackRepository.setActivePack(null);
+			return;
+		}
+		
+		// Load the shader pack asynchronously
+		this.shaderPackRepository.loadShaderPack(metadata).thenAccept(pack -> {
+			if (pack != null) {
+				this.execute(() -> {
+					this.shaderPackRepository.setActivePack(pack);
+					LOGGER.info("Loaded and activated shader pack: {}", packName);
+				});
+			} else {
+				LOGGER.error("Failed to load shader pack: {}", packName);
+			}
+		});
 	}
 
 	private void onGameLoadFinished(@Nullable Minecraft.GameLoadCookie gameLoadCookie) {
@@ -2388,6 +2434,10 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 
 	public ShaderManager getShaderManager() {
 		return this.shaderManager;
+	}
+
+	public net.minecraft.client.renderer.shader.pack.ShaderPackRepository getShaderPackRepository() {
+		return this.shaderPackRepository;
 	}
 
 	public ResourceManager getResourceManager() {
