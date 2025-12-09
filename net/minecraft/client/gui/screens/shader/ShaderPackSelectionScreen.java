@@ -80,6 +80,7 @@ public class ShaderPackSelectionScreen extends Screen {
     
     @Override
     public void render(GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
+        this.shaderList.render(guiGraphics, mouseX, mouseY, partialTick);
         super.render(guiGraphics, mouseX, mouseY, partialTick);
         guiGraphics.drawCenteredString(this.font, this.title, this.width / 2, 8, 16777215);
         
