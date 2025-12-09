@@ -223,6 +223,8 @@ sourceSets {
             exclude 'com/mojang/authlib/**'
             // Exclude test sources from main source set
             exclude 'src/test/**'
+            // Exclude reference source code (for documentation only)
+            exclude 'frnsrc/**'
         }
         resources {
             srcDirs = ['src/main/resources']

@@ -75,19 +75,34 @@ public class ShaderPackLoader {
      * Dynamically discovers all shader program files in the shader pack.
      */
     private void discoverShaderPrograms() {
-        // List all shader files under the pack's shaders/ directory
-        // Support both .vsh/.fsh extensions and .glsl extension (Iris/OptiFine format)
+        // List all shader files under the pack's shaders/program/ directory
+        // Iris/OptiFine shader packs store actual shader files in shaders/program/ subdirectory
         Map<ResourceLocation, Resource> resources = resourceManager.listResources(
-            packBasePath + "/shaders",
+            packBasePath + "/shaders/program",
             location -> {
                 String path = location.getPath();
                 // Accept .vsh, .fsh, and .glsl files
-                // Exclude world-specific directories (world0/, world-1/, etc.)
                 boolean isShaderFile = path.endsWith(".vsh") || path.endsWith(".fsh") || path.endsWith(".glsl");
-                boolean inWorldDir = path.contains("/world0/") || path.contains("/world-1/") || path.contains("/world1/");
-                return isShaderFile && !inWorldDir;
+                return isShaderFile;
             }
         );
+        
+        // Also check the base shaders/ directory for simpler shader packs
+        Map<ResourceLocation, Resource> baseResources = resourceManager.listResources(
+            packBasePath + "/shaders",
+            location -> {
+                String path = location.getPath();
+                // Accept .vsh, .fsh files in base directory
+                // Exclude subdirectories (program/, world0/, lib/, etc.)
+                boolean isShaderFile = path.endsWith(".vsh") || path.endsWith(".fsh");
+                String relativePath = path.substring((packBasePath + "/shaders/").length());
+                boolean inSubdir = relativePath.contains("/");
+                return isShaderFile && !inSubdir;
+            }
+        );
+        
+        // Merge both resource maps
+        resources.putAll(baseResources);
         
         // Group shader files by program name
         Set<String> programNames = new HashSet<>();
@@ -122,24 +137,25 @@ public class ShaderPackLoader {
      * Supports both .vsh/.fsh format and Iris/OptiFine .glsl format.
      */
     private void loadShaderProgram(String programName) throws IOException {
-        // Try .vsh/.fsh first (standard format)
-        String vshPath = packBasePath + "/shaders/" + programName + ".vsh";
-        String fshPath = packBasePath + "/shaders/" + programName + ".fsh";
+        // Try Iris/OptiFine .glsl format in program/ subdirectory first (most common)
+        String glslPath = packBasePath + "/shaders/program/" + programName + ".glsl";
+        String glslSource = loadShaderFile(glslPath);
         
-        String vertexSource = loadShaderFile(vshPath);
-        String fragmentSource = loadShaderFile(fshPath);
+        String vertexSource = null;
+        String fragmentSource = null;
         
-        // If not found, try Iris/OptiFine .glsl format in program/ subdirectory
-        if (vertexSource == null && fragmentSource == null) {
-            String glslPath = packBasePath + "/shaders/program/" + programName + ".glsl";
-            String glslSource = loadShaderFile(glslPath);
+        if (glslSource != null) {
+            // In Iris/OptiFine format, .glsl files contain both vertex and fragment shaders
+            // separated by directives. For now, use the same source for both.
+            vertexSource = glslSource;
+            fragmentSource = glslSource;
+        } else {
+            // Try .vsh/.fsh format (simpler shader packs like test_shaders)
+            String vshPath = packBasePath + "/shaders/" + programName + ".vsh";
+            String fshPath = packBasePath + "/shaders/" + programName + ".fsh";
             
-            if (glslSource != null) {
-                // In Iris/OptiFine format, .glsl files contain both vertex and fragment shaders
-                // separated by directives. For now, use the same source for both.
-                vertexSource = glslSource;
-                fragmentSource = glslSource;
-            }
+            vertexSource = loadShaderFile(vshPath);
+            fragmentSource = loadShaderFile(fshPath);
         }
         
         if (vertexSource != null) {
