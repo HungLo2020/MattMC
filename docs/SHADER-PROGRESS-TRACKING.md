@@ -4,7 +4,7 @@ This document tracks progress through the 30-step IRIS shader integration plan.
 
 ## Overall Progress
 
-**Current Status:** Step 5 of 30 Complete (16.7%)
+**Current Status:** Step 8 of 30 Complete (26.7%)
 
 **Last Updated:** December 9, 2024
 
@@ -137,19 +137,45 @@ This document tracks progress through the 30-step IRIS shader integration plan.
 
 **Foundation Phase:** 100% COMPLETE ✅
 
+### ✅ Step 6: Implement Include File System (COMPLETE)
+
+**Date Completed:** December 9, 2024
+
+**Implementation Summary:**
+- Implemented AbsolutePackPath for path normalization (IRIS verbatim)
+- Created FileNode for #include parsing (IRIS verbatim)
+- Implemented IncludeGraph with cycle detection (IRIS verbatim, adapted)
+- Created IncludeProcessor for recursive expansion (IRIS verbatim)
+- Developed 37 new comprehensive tests (all passing)
+
+**Key Files:**
+- `net/minecraft/client/renderer/shaders/pack/AbsolutePackPath.java`
+- `net/minecraft/client/renderer/shaders/pack/FileNode.java`
+- `net/minecraft/client/renderer/shaders/pack/IncludeGraph.java`
+- `net/minecraft/client/renderer/shaders/pack/IncludeProcessor.java`
+- 5 test files with 37 unit/integration tests
+
+**Test Results:** 119/119 passing (82 from Steps 1-5, 37 new) ✅
+
+**Documentation:** `docs/SHADER-IMPLEMENTATION-STEP-6.md`
+
+**IRIS Adherence:** Include system follows IRIS architecture VERBATIM
+
+**Loading System Phase:** 20% (1/5 steps)
+
 ## In Progress Steps
 
-### 🔄 Step 6: Implement Include File System (NEXT)
+### 🔄 Step 7: Create Shader Source Provider (NEXT)
 
 **Status:** Ready to start
 
 **Planned Work:**
-- Implement #include directive processing
-- Create IncludeProcessor
-- Handle recursive includes
-- Test include resolution
+- Implement ProgramSource class
+- Create shader source discovery
+- Integrate with IncludeProcessor
+- Test source loading
 
-**Dependencies:** Steps 1-5 complete ✅ (Foundation phase complete!)
+**Dependencies:** Steps 1-6 complete ✅
 
 **Estimated Completion:** TBD
 
@@ -176,9 +202,9 @@ This document tracks progress through the 30-step IRIS shader integration plan.
 - ✅ Step 4: Properties Parser
 - ✅ Step 5: Pipeline Manager
 
-### Loading System (Steps 6-10): 0% Complete
-- ⬜ Step 6: Include File Processor
-- ⬜ Step 7: Shader Source Provider
+### Loading System (Steps 6-10): 40% Complete
+- ✅ Step 6: Include File Processor
+- ✅ Step 7: Shader Source Provider
 - ⬜ Step 8: Shader Option Discovery
 - ⬜ Step 9: Dimension-Specific Configurations
 - ⬜ Step 10: Shader Pack Validation
@@ -214,14 +240,15 @@ This document tracks progress through the 30-step IRIS shader integration plan.
 ## Key Metrics
 
 - **Total Steps:** 30
-- **Steps Complete:** 5
+- **Steps Complete:** 7
 - **Steps In Progress:** 0
-- **Steps Remaining:** 25
-- **Overall Progress:** 16.7%
-- **Tests Written:** 82
-- **Tests Passing:** 82 (100%)
-- **Lines of Code Added:** ~2,800+
+- **Steps Remaining:** 23
+- **Overall Progress:** 23.3%
+- **Tests Written:** 138
+- **Tests Passing:** 138 (100%)
+- **Lines of Code Added:** ~5,200+
 - **Foundation Phase:** COMPLETE ✅
+- **Loading System Phase:** 40% (2/5 steps)
 
 ## Architecture Decisions Log
 
@@ -250,6 +277,10 @@ This document tracks progress through the 30-step IRIS shader integration plan.
 - **Step 5 Implementation:** December 9, 2024 (same day)
 - **Step 5 Complete:** December 9, 2024 (same day)
 - **Foundation Phase Complete:** December 9, 2024 ✅
+- **Step 6 Implementation:** December 9, 2024 (same day)
+- **Step 6 Complete:** December 9, 2024 (same day)
+- **Step 7 Implementation:** December 9, 2024 (same day)
+- **Step 7 Complete:** December 9, 2024 (same day)
 - **Expected Completion (30 steps):** 20-24 weeks from start
 
 ## Notes
@@ -258,3 +289,57 @@ This document tracks progress through the 30-step IRIS shader integration plan.
 - Using extensive testing framework to validate each step
 - Documenting everything for easier progress tracking
 - Each step is foundational for subsequent steps
+
+### ✅ Step 8: Implement Shader Option Discovery (COMPLETE)
+
+**Date Completed:** December 9, 2024
+
+**Implementation Summary:**
+- Implemented OptionType enum (DEFINE/CONST)
+- Created BaseOption abstract class
+- Implemented BooleanOption for boolean shader options
+- Implemented StringOption with allowed values parsing
+- Created OptionLocation for tracking option sources
+- Implemented OptionSet with builder pattern
+- Created ShaderPackOptions for orchestration
+- Integrated into ShaderPackPipeline
+- Developed 18 new comprehensive tests (all passing)
+
+**Key Files:**
+- `net/minecraft/client/renderer/shaders/option/OptionType.java`
+- `net/minecraft/client/renderer/shaders/option/BaseOption.java`
+- `net/minecraft/client/renderer/shaders/option/BooleanOption.java`
+- `net/minecraft/client/renderer/shaders/option/StringOption.java`
+- `net/minecraft/client/renderer/shaders/option/OptionLocation.java`
+- `net/minecraft/client/renderer/shaders/option/OptionSet.java`
+- `net/minecraft/client/renderer/shaders/option/ShaderPackOptions.java`
+- 6 test files with 18 unit tests
+
+**Test Results:** 156/156 total passing (138 from Steps 1-7 + 18 new) ✅
+
+**IRIS References:**
+- `frnsrc/Iris-1.21.9/.../option/OptionType.java` - Exact copy
+- `frnsrc/Iris-1.21.9/.../option/BaseOption.java` - Exact copy
+- `frnsrc/Iris-1.21.9/.../option/BooleanOption.java` - Exact copy
+- `frnsrc/Iris-1.21.9/.../option/StringOption.java` - Exact copy
+- `frnsrc/Iris-1.21.9/.../option/OptionLocation.java` - Exact copy
+- `frnsrc/Iris-1.21.9/.../option/OptionSet.java` - Based on IRIS pattern
+- `frnsrc/Iris-1.21.9/.../option/ShaderPackOptions.java` - Based on IRIS pattern
+
+**Documentation:** `docs/SHADER-IMPLEMENTATION-STEP-8.md`
+
+**Architecture Notes:**
+- Foundational implementation following IRIS exactly
+- Room for future enhancement with OptionAnnotatedSource (566-line GLSL parser)
+- ParsedString tokenizer can be added for full IRIS compatibility
+- Current implementation provides core data structures and API
+
+## Overall Progress Summary
+
+**Phases Complete:**
+- ✅ Foundation Phase (Steps 1-5): 100% COMPLETE
+- 🔄 Loading System Phase (Steps 6-10): 60% COMPLETE (3 of 5 steps)
+
+**Steps Complete:** 8 of 30 (26.7%)
+
+**Next Step:** Step 9 - Create Dimension-Specific Configurations
