@@ -9,7 +9,10 @@ import net.minecraft.client.renderer.shader.pack.ShaderPack;
 import net.minecraft.client.renderer.shader.program.CompiledShaderProgram;
 import net.minecraft.client.renderer.shader.program.ShaderCompiler;
 import net.minecraft.client.renderer.shader.program.ShaderProgramType;
+import net.minecraft.client.renderer.shader.shadow.ShadowMapManager;
+import net.minecraft.client.renderer.shader.uniform.CameraUniforms;
 import net.minecraft.client.renderer.shader.uniform.UniformManager;
+import net.minecraft.client.renderer.shader.uniform.WorldStateUniforms;
 import org.slf4j.Logger;
 
 /**
@@ -22,13 +25,19 @@ public class ShaderRenderPipeline implements AutoCloseable {
     
     private final ShaderPack shaderPack;
     private final GBufferManager gBufferManager;
+    private final ShadowMapManager shadowMapManager;
     private final UniformManager uniformManager;
+    private final WorldStateUniforms worldStateUniforms;
+    private final CameraUniforms cameraUniforms;
     private boolean initialized = false;
     
     public ShaderRenderPipeline(ShaderPack shaderPack) {
         this.shaderPack = shaderPack;
         this.gBufferManager = new GBufferManager();
+        this.shadowMapManager = new ShadowMapManager();
         this.uniformManager = new UniformManager();
+        this.worldStateUniforms = new WorldStateUniforms(Minecraft.getInstance());
+        this.cameraUniforms = new CameraUniforms(Minecraft.getInstance());
     }
     
     /**
@@ -38,6 +47,10 @@ public class ShaderRenderPipeline implements AutoCloseable {
         try {
             // Initialize G-buffers
             gBufferManager.initialize(width, height);
+            
+            // Initialize shadow maps
+            int shadowMapSize = shaderPack.getProperties().getInt("shadowMapSize", 2048);
+            shadowMapManager.initialize(shadowMapSize);
             
             // Compile shader programs that exist in the pack
             compileShaderPrograms();
@@ -130,6 +143,27 @@ public class ShaderRenderPipeline implements AutoCloseable {
     }
     
     /**
+     * Gets the shadow map manager.
+     */
+    public ShadowMapManager getShadowMapManager() {
+        return shadowMapManager;
+    }
+    
+    /**
+     * Gets the world state uniforms provider.
+     */
+    public WorldStateUniforms getWorldStateUniforms() {
+        return worldStateUniforms;
+    }
+    
+    /**
+     * Gets the camera uniforms provider.
+     */
+    public CameraUniforms getCameraUniforms() {
+        return cameraUniforms;
+    }
+    
+    /**
      * Checks if the pipeline is initialized.
      */
     public boolean isInitialized() {
@@ -139,6 +173,7 @@ public class ShaderRenderPipeline implements AutoCloseable {
     @Override
     public void close() {
         gBufferManager.close();
+        shadowMapManager.close();
         initialized = false;
         LOGGER.info("Shader render pipeline closed for pack: {}", shaderPack.getName());
     }
