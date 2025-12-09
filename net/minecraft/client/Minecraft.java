@@ -734,7 +734,16 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 			if (pack != null) {
 				this.execute(() -> {
 					this.shaderPackRepository.setActivePack(pack);
-					LOGGER.info("Loaded and activated shader pack: {}", packName);
+					
+					// Initialize shader rendering pipeline
+					try {
+						net.minecraft.client.renderer.shader.ShaderRenderPipeline pipeline = 
+							new net.minecraft.client.renderer.shader.ShaderRenderPipeline(pack);
+						pipeline.initialize(this.window.getWidth(), this.window.getHeight());
+						LOGGER.info("Loaded and activated shader pack: {} with rendering pipeline", packName);
+					} catch (Exception e) {
+						LOGGER.error("Failed to initialize shader rendering pipeline for pack: {}", packName, e);
+					}
 				});
 			} else {
 				LOGGER.error("Failed to load shader pack: {}", packName);
