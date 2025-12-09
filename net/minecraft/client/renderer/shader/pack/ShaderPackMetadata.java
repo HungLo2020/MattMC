@@ -35,9 +35,21 @@ public record ShaderPackMetadata(
      */
     private static String formatName(String packName) {
         // Convert snake_case or kebab-case to Title Case
-        return packName.replace('_', ' ')
-                      .replace('-', ' ')
-                      .replaceAll("\\b(\\w)", match -> match.toUpperCase());
+        String spaced = packName.replace('_', ' ').replace('-', ' ');
+        StringBuilder result = new StringBuilder();
+        boolean capitalizeNext = true;
+        for (char c : spaced.toCharArray()) {
+            if (Character.isWhitespace(c)) {
+                capitalizeNext = true;
+                result.append(c);
+            } else if (capitalizeNext) {
+                result.append(Character.toUpperCase(c));
+                capitalizeNext = false;
+            } else {
+                result.append(c);
+            }
+        }
+        return result.toString();
     }
     
     /**

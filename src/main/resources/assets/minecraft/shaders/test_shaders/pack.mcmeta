@@ -1,0 +1,9 @@
+{
+  "pack": {
+    "description": "Test Shader Pack for MattMC",
+    "pack_format": 1,
+    "name": "Test Shaders",
+    "author": "MattMC",
+    "version": "1.0.0"
+  }
+}
