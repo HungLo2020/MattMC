@@ -78,7 +78,6 @@ class ShaderPackValidatorTest {
 		ShaderPackSource source = mock(ShaderPackSource.class);
 		when(source.getName()).thenReturn("empty_shaders_pack");
 		when(source.listFiles("shaders")).thenReturn(List.of("random.txt"));
-		when(source.fileExists("shaders.properties")).thenReturn(true);
 		when(source.fileExists(anyString())).thenReturn(false);
 		when(source.fileExists("shaders.properties")).thenReturn(true);
 		when(source.readFile("shaders.properties")).thenReturn(Optional.of(""));
