@@ -1,12 +1,12 @@
 package net.minecraft.client.renderer.shaders.pipeline;
 
 import net.minecraft.client.renderer.shaders.helpers.OptionalBoolean;
-import net.minecraft.client.renderer.shaders.pack.ShaderPackSource;
-import net.minecraft.client.renderer.shaders.pack.ShaderProperties;
+import net.minecraft.client.renderer.shaders.pack.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.util.List;
 
 /**
  * Shader pack rendering pipeline - represents rendering with a loaded shader pack.
@@ -22,6 +22,7 @@ public class ShaderPackPipeline implements WorldRenderingPipeline {
 	private final String packName;
 	private final String dimension;
 	private final ShaderProperties shaderProperties;
+	private final ShaderSourceProvider sourceProvider;
 	private WorldRenderingPhase currentPhase = WorldRenderingPhase.NONE;
 	
 	/**
@@ -44,6 +45,19 @@ public class ShaderPackPipeline implements WorldRenderingPipeline {
 			props = ShaderProperties.empty();
 		}
 		this.shaderProperties = props;
+		
+		// Create shader source provider (Step 7)
+		// Find starting paths in the shaders/ directory
+		List<String> candidates = ShaderPackSourceNames.getPotentialStarts();
+		List<AbsolutePackPath> startingPaths = ShaderPackSourceNames.findPresentSources(
+			packSource, 
+			"/shaders/", 
+			candidates
+		);
+		
+		LOGGER.debug("Found {} starting shader files for pack: {}", startingPaths.size(), packName);
+		
+		this.sourceProvider = new ShaderSourceProvider(packSource, startingPaths);
 		
 		LOGGER.info("Created shader pipeline for pack: {} in dimension: {}", packName, dimension);
 	}
@@ -136,5 +150,13 @@ public class ShaderPackPipeline implements WorldRenderingPipeline {
 	 */
 	public String getDimension() {
 		return dimension;
+	}
+	
+	/**
+	 * Gets the shader source provider.
+	 * @return The source provider
+	 */
+	public ShaderSourceProvider getSourceProvider() {
+		return sourceProvider;
 	}
 }
