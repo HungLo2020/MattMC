@@ -1,59 +1,79 @@
 package net.minecraft.client.renderer.shaders.option;
 
-import java.util.Collections;
+import com.google.common.collect.ImmutableMap;
 import java.util.HashMap;
 import java.util.Map;
 
 /**
- * A set of discovered shader options.
- * Based on IRIS 1.21.9 OptionSet pattern.
+ * IRIS 1.21.9 OptionSet with Merged option support
  */
 public class OptionSet {
-	private final Map<String, BooleanOption> booleanOptions;
-	private final Map<String, StringOption> stringOptions;
+private final ImmutableMap<String, MergedBooleanOption> booleanOptions;
+private final ImmutableMap<String, MergedStringOption> stringOptions;
 
-	private OptionSet(Builder builder) {
-		this.booleanOptions = Collections.unmodifiableMap(new HashMap<>(builder.booleanOptions));
-		this.stringOptions = Collections.unmodifiableMap(new HashMap<>(builder.stringOptions));
-	}
+private OptionSet(ImmutableMap<String, MergedBooleanOption> booleanOptions,
+  ImmutableMap<String, MergedStringOption> stringOptions) {
+this.booleanOptions = booleanOptions;
+this.stringOptions = stringOptions;
+}
 
-	public static Builder builder() {
+public ImmutableMap<String, MergedBooleanOption> getBooleanOptions() {
+return booleanOptions;
+}
+
+public ImmutableMap<String, MergedStringOption> getStringOptions() {
+return stringOptions;
+}
+
+public static Builder builder() {
 		return new Builder();
 	}
 
-	public Map<String, BooleanOption> getBooleanOptions() {
-		return this.booleanOptions;
-	}
+public static class Builder {
+private final Map<String, MergedBooleanOption> booleanOptions = new HashMap<>();
+private final Map<String, MergedStringOption> stringOptions = new HashMap<>();
 
-	public Map<String, StringOption> getStringOptions() {
-		return this.stringOptions;
-	}
+public void addBooleanOption(OptionLocation location, BooleanOption option) {
+MergedBooleanOption existing = booleanOptions.get(option.getName());
+MergedBooleanOption newOption = new MergedBooleanOption(location, option);
 
-	public boolean isBooleanOption(String name) {
-		return booleanOptions.containsKey(name);
-	}
+if (existing != null) {
+MergedBooleanOption merged = existing.merge(newOption);
+if (merged == null) {
+// Conflict - ignore ambiguous option
+booleanOptions.remove(option.getName());
+System.err.println("Warning: Ambiguous boolean option " + option.getName());
+return;
+}
+booleanOptions.put(option.getName(), merged);
+} else {
+booleanOptions.put(option.getName(), newOption);
+}
+}
 
-	public static class Builder {
-		private final Map<String, BooleanOption> booleanOptions;
-		private final Map<String, StringOption> stringOptions;
+public void addStringOption(OptionLocation location, StringOption option) {
+MergedStringOption existing = stringOptions.get(option.getName());
+MergedStringOption newOption = new MergedStringOption(location, option);
 
-		public Builder() {
-			this.booleanOptions = new HashMap<>();
-			this.stringOptions = new HashMap<>();
-		}
+if (existing != null) {
+MergedStringOption merged = existing.merge(newOption);
+if (merged == null) {
+// Conflict - ignore ambiguous option
+stringOptions.remove(option.getName());
+System.err.println("Warning: Ambiguous string option " + option.getName());
+return;
+}
+stringOptions.put(option.getName(), merged);
+} else {
+stringOptions.put(option.getName(), newOption);
+}
+}
 
-		public Builder addBooleanOption(BooleanOption option) {
-			booleanOptions.put(option.getName(), option);
-			return this;
-		}
-
-		public Builder addStringOption(StringOption option) {
-			stringOptions.put(option.getName(), option);
-			return this;
-		}
-
-		public OptionSet build() {
-			return new OptionSet(this);
-		}
-	}
+public OptionSet build() {
+return new OptionSet(
+ImmutableMap.copyOf(booleanOptions),
+ImmutableMap.copyOf(stringOptions)
+);
+}
+}
 }
