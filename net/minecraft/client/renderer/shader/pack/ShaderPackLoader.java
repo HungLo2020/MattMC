@@ -76,11 +76,16 @@ public class ShaderPackLoader {
      */
     private void discoverShaderPrograms() {
         // List all shader files under the pack's shaders/ directory
+        // Support both .vsh/.fsh extensions and .glsl extension (Iris/OptiFine format)
         Map<ResourceLocation, Resource> resources = resourceManager.listResources(
             packBasePath + "/shaders",
             location -> {
                 String path = location.getPath();
-                return path.endsWith(".vsh") || path.endsWith(".fsh");
+                // Accept .vsh, .fsh, and .glsl files
+                // Exclude world-specific directories (world0/, world-1/, etc.)
+                boolean isShaderFile = path.endsWith(".vsh") || path.endsWith(".fsh") || path.endsWith(".glsl");
+                boolean inWorldDir = path.contains("/world0/") || path.contains("/world-1/") || path.contains("/world1/");
+                return isShaderFile && !inWorldDir;
             }
         );
         
@@ -89,13 +94,16 @@ public class ShaderPackLoader {
         for (ResourceLocation location : resources.keySet()) {
             String path = location.getPath();
             // Extract program name from path
-            // Path format: "shaders/pack_name/shaders/program_name.vsh"
+            // Path format: "shaders/pack_name/shaders/program_name.vsh" or "shaders/pack_name/shaders/program/program_name.glsl"
             String[] parts = path.split("/");
             if (parts.length >= 3) {
                 String fileName = parts[parts.length - 1];
                 // Remove extension to get program name
-                String programName = fileName.substring(0, fileName.lastIndexOf('.'));
-                programNames.add(programName);
+                int dotIndex = fileName.lastIndexOf('.');
+                if (dotIndex > 0) {
+                    String programName = fileName.substring(0, dotIndex);
+                    programNames.add(programName);
+                }
             }
         }
         
@@ -104,20 +112,35 @@ public class ShaderPackLoader {
             try {
                 loadShaderProgram(programName);
             } catch (IOException e) {
-                LOGGER.warn("Failed to load shader program '{}': {}", programName, e.getMessage());
+                LOGGER.debug("Failed to load shader program '{}': {}", programName, e.getMessage());
             }
         }
     }
     
     /**
      * Loads a single shader program (vertex and/or fragment shader).
+     * Supports both .vsh/.fsh format and Iris/OptiFine .glsl format.
      */
     private void loadShaderProgram(String programName) throws IOException {
+        // Try .vsh/.fsh first (standard format)
         String vshPath = packBasePath + "/shaders/" + programName + ".vsh";
         String fshPath = packBasePath + "/shaders/" + programName + ".fsh";
         
         String vertexSource = loadShaderFile(vshPath);
         String fragmentSource = loadShaderFile(fshPath);
+        
+        // If not found, try Iris/OptiFine .glsl format in program/ subdirectory
+        if (vertexSource == null && fragmentSource == null) {
+            String glslPath = packBasePath + "/shaders/program/" + programName + ".glsl";
+            String glslSource = loadShaderFile(glslPath);
+            
+            if (glslSource != null) {
+                // In Iris/OptiFine format, .glsl files contain both vertex and fragment shaders
+                // separated by directives. For now, use the same source for both.
+                vertexSource = glslSource;
+                fragmentSource = glslSource;
+            }
+        }
         
         if (vertexSource != null) {
             vertexSources.put(programName, vertexSource);
