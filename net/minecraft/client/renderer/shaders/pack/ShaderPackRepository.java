@@ -111,4 +111,24 @@ public class ShaderPackRepository {
 	public boolean hasShaderPacks() {
 		return !availablePacks.isEmpty();
 	}
+	
+	/**
+	 * Validates a shader pack.
+	 * 
+	 * Following IRIS validation pattern from Iris.java isValidShaderpack().
+	 * This checks that the pack has required structure and files.
+	 * 
+	 * @param packName The name of the shader pack to validate
+	 * @return Validation result with errors and warnings
+	 */
+	public ShaderPackValidator.ValidationResult validatePack(String packName) {
+		ShaderPackSource source = getPackSource(packName);
+		if (source == null) {
+			List<String> errors = new ArrayList<>();
+			errors.add("Shader pack not found: " + packName);
+			return new ShaderPackValidator.ValidationResult(false, errors, new ArrayList<>());
+		}
+		
+		return ShaderPackValidator.validate(source);
+	}
 }
