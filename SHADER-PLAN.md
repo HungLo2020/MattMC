@@ -37,6 +37,425 @@ The implementation will transform MattMC from using vanilla Minecraft's basic sh
 
 ---
 
+## Iris Mod In-Depth Research Analysis
+
+This section contains comprehensive research into the Iris shader mod architecture (version 1.21.9, 668 Java files) to inform MattMC's shader system implementation.
+
+### Iris Architecture Overview
+
+Iris is a high-performance shader mod that provides OptiFine shader pack compatibility while offering superior performance through modern OpenGL techniques and Sodium integration. The reference implementation in `frnsrc/Iris-1.21.9/` demonstrates a sophisticated architecture that MattMC can adapt for its baked-in approach.
+
+### Core Components
+
+#### 1. Entry Point and Initialization (`Iris.java`)
+
+**Initialization Flow:**
+1. `onEarlyInitialize()` - First initialization before RenderSystem available
+2. `onRenderSystemInit()` - Called after OpenGL context is ready
+3. `onLoadingComplete()` - Final initialization on title screen display
+
+**Key Insight:** Iris carefully stages initialization to ensure OpenGL is available before shader compilation.
+
+#### 2. Shader Pack Structure (`shaderpack/ShaderPack.java`)
+
+The `ShaderPack` class is the core data structure representing a loaded shader pack (~700 lines). It handles:
+
+- **Properties Parsing**: Reads `shaders.properties` for pack configuration
+- **Dimension Support**: Processes `dimension.properties` for world-specific shaders (Overworld, Nether, End)
+- **Include Graph**: Builds dependency tree of all shader files via `IncludeGraph`
+- **Options System**: Dynamic shader options and profiles
+- **Source Provider**: Interface for shader compilation to access processed GLSL code
+
+**Directory Structure (Iris expects):**
+```
+shaderpack/
+├── shaders/              # GLSL shader files
+│   ├── gbuffers_*.vsh/.fsh    # Geometry passes
+│   ├── shadow.vsh/.fsh        # Shadow rendering
+│   ├── composite*.fsh         # Post-processing
+│   ├── final.fsh              # Final output
+│   └── lib/                   # Include files
+├── shaders.properties    # Main configuration
+├── dimension.properties  # Per-dimension settings
+├── lang/                 # Translations
+└── textures/             # Custom textures
+```
+
+#### 3. Pipeline Architecture
+
+##### IrisRenderingPipeline (`pipeline/IrisRenderingPipeline.java`)
+The heart of shader rendering (~1,500 lines), implementing `WorldRenderingPipeline`:
+
+**Key Components:**
+- `RenderTargets` - Manages G-buffers (colortex0-15, depthtex, shadowtex)
+- `ShadowRenderer` - Shadow map rendering system
+- `CompositeRenderer` - Multi-pass post-processing
+- `FinalPassRenderer` - Final screen output
+- `CustomTextureManager` - Shader pack custom textures
+- `ShaderStorageBufferHolder` - SSBO management for compute shaders
+
+**Rendering Phases:**
+```java
+NONE → SKY → SHADOW → SETUP → 
+TERRAIN_SOLID → TERRAIN_CUTOUT → TERRAIN_CUTOUT_MIPPED → 
+TRANSLUCENT_TERRAIN → PARTICLES → ENTITIES → 
+BLOCK_ENTITIES → HAND → COMPOSITE
+```
+
+#### 4. Shader Program Organization
+
+##### Program Types (`shaderpack/programs/ProgramSet.java`)
+
+**Geometry Passes (gbuffers_*):**
+- `gbuffers_terrain` - Terrain rendering (blocks)
+- `gbuffers_water` - Water/fluid rendering
+- `gbuffers_textured` - Textured geometry
+- `gbuffers_entities` - Entity rendering
+- `gbuffers_hand` - First-person hand/held items
+- `gbuffers_skybasic`, `gbuffers_skytextured` - Sky rendering
+
+**Shadow Passes (shadow):**
+- Same structure as gbuffers but render to shadow map from light's perspective
+
+**Post-Processing Passes:**
+- `composite*` - Deferred rendering composites (multiple passes possible: composite, composite1, composite2...)
+- `deferred*` - Deferred lighting passes
+- `prepare*` - Pre-render preparation
+- `final` - Final screen output pass
+
+**Compute Shaders:**
+- `setup*` - Pre-render compute operations
+- `begin*` - Per-frame initialization compute
+
+#### 5. Uniform System (~200+ Uniforms)
+
+The uniform system (`uniforms/`) provides shader-accessible data:
+
+**Categories:**
+- **Time**: `frameTimeCounter`, `worldTime`, `sunAngle`, `moonAngle`
+- **Camera**: `cameraPosition`, `gbufferProjection`, `gbufferModelView`, `gbufferProjectionInverse`
+- **World**: `fogColor`, `skyColor`, `rainStrength`, `wetness`, `biomeTemperature`, `biomePrecipitation`
+- **Player**: `eyeBrightnessSmooth`, `entityColor`, `heldItemId`, `heldBlockLightValue`
+- **System**: `viewWidth`, `viewHeight`, `aspectRatio`, `frameCounter`, `frameTime`
+- **Lighting**: `shadowLightPosition`, `shadowModelView`, `shadowProjection`
+- **Matrices**: All transformation matrices (model, view, projection, inverse, transpose)
+
+**Implementation Pattern:**
+```java
+public interface CommonUniforms {
+    void addDynamicUniforms(UniformHolder holder, FrameUpdateNotifier updateNotifier);
+    void addStaticUniforms(UniformHolder holder);
+}
+```
+
+#### 6. Render Target System
+
+##### RenderTargets (`targets/RenderTargets.java`)
+
+**G-Buffer Structure:**
+- `colortex0-15` - 16 available color textures for shader data
+- `depthtex0` - Hardware depth buffer copy
+- `depthtex1` - Terrain-only depth (no transparents)
+- `depthtex2` - Translucent depth
+- `shadowtex0`, `shadowtex1` - Shadow maps
+- `shadowcolor0`, `shadowcolor1` - Shadow color buffers
+- `noisetex` - Noise texture for dithering/randomness
+
+**Configuration via shaders.properties:**
+```properties
+# Example render target configuration
+colortex0 = RGBA16F
+colortex1 = RGB16
+depthtex0 = DEPTH_COMPONENT32F
+shadowMapResolution = 2048
+```
+
+#### 7. Include Processing System
+
+##### IncludeGraph (`shaderpack/include/IncludeGraph.java`)
+
+**Features:**
+- Resolves `#include` directives in GLSL files
+- Builds dependency graph with cycle detection
+- Preprocessor handles `#ifdef`, `#ifndef`, `#define`, `#undef`
+- Supports nested includes
+- Caches processed files for performance
+
+**Example Usage in Shader:**
+```glsl
+#include "/lib/settings.glsl"
+#include "/lib/common.glsl"
+```
+
+#### 8. Mixin Integration Strategy
+
+Iris uses Mixin extensively to hook into Minecraft's rendering pipeline without modifying vanilla code:
+
+**Key Injection Points:**
+- `LevelRenderer` - World rendering control
+- `GameRenderer` - Camera and view management
+- `RenderType` - Geometry batching and render states
+- `PostChain` - Post-processing pipeline
+- `Framebuffer` - Framebuffer operations
+
+**Sodium Compatibility (`compat/sodium/mixin/`):**
+- Specialized mixins for Sodium mod integration
+- Vertex format compatibility
+- Chunk rendering integration
+- Ensures Iris + Sodium work together
+
+#### 9. Vertex Format Extensions
+
+##### Extended Attributes (`vertices/IrisVertexFormats.java`)
+
+Iris adds custom vertex attributes that shaders can use:
+
+- `mc_Entity` - Entity/block ID for material detection
+- `mc_midTexCoord` - Texture coordinate center for sprite detection
+- `at_tangent` - Tangent vector for normal mapping
+- Block metadata and flags
+
+**Why This Matters:** OptiFine/Iris shader packs expect these attributes to be available for advanced effects like PBR (physically-based rendering).
+
+#### 10. Shadow Rendering System
+
+##### ShadowRenderer (`shadows/ShadowRenderer.java`)
+
+**Features:**
+- Renders scene from light's perspective
+- Creates shadow map textures (configurable resolution)
+- Supports cascaded shadow maps for quality
+- Culling optimization for shadow geometry
+- Configurable shadow distance
+
+**Configuration:**
+```properties
+shadowMapResolution = 2048    # Shadow texture size
+shadowDistance = 128.0         # Render distance for shadows
+shadowIntervalSize = 2.0       # Cascade sizing
+```
+
+#### 11. Shader Pack Options System
+
+##### Dynamic Options (`shaderpack/option/`)
+
+**Features:**
+- Boolean toggles (ON/OFF)
+- Numeric sliders (range-based values)
+- Dropdown selections (multiple choices)
+- Profile system (preset configurations)
+- Conditional options (dependencies)
+
+**Defined in Shader Files:**
+```glsl
+// In shader source code
+const int shadowMapResolution = 2048; // [1024 2048 4096 8192]
+const float sunPathRotation = 0.0;    // [-60.0 -30.0 0.0 30.0 60.0]
+#define WAVING_GRASS // Toggle feature
+```
+
+**Parsed and Presented in UI:**
+Iris GUI dynamically builds options menu based on what shaders define.
+
+#### 12. Loading Flow
+
+**Iris Shader Pack Loading:**
+```
+User Selection in GUI
+    ↓
+ShaderpackDirectoryManager.scanForPacks() (filesystem scan)
+    ↓
+ShaderPack(path) constructor
+    ↓
+IncludeGraph.build() - Parse all files, resolve includes
+    ↓
+ShaderPackOptions.parse() - Read options from shader comments
+    ↓
+ShaderProperties.parse() - Read shaders.properties
+    ↓
+ProgramSet.create() - Compile GLSL to OpenGL programs
+    ↓
+IrisRenderingPipeline(programSet) - Build rendering pipeline
+    ↓
+Pipeline activated for rendering
+```
+
+#### 13. Rendering Loop Integration
+
+**How Iris Intercepts Minecraft Rendering:**
+```
+Minecraft.renderFrame()
+    ↓
+GameRenderer.render()
+    ↓
+LevelRenderer.renderLevel()
+    ↓
+[Iris Mixin Hook] pipeline.beginWorldRendering()
+    ↓
+pipeline.renderShadows() (if shadow pass enabled)
+    │   └─> Render geometry to shadow FBO using shadow programs
+    ↓
+[Phase: TERRAIN_SOLID] 
+    │   └─> Use gbuffers_terrain for terrain
+    ↓
+[Phase: TRANSLUCENT_TERRAIN]
+    │   └─> Use gbuffers_water for water/translucents
+    ↓
+[Phase: ENTITIES]
+    │   └─> Use gbuffers_entities for mobs/players
+    ↓
+[Phase: HAND]
+    │   └─> Use gbuffers_hand for first-person hand
+    ↓
+pipeline.finalizeWorldRendering()
+    ↓
+[Phase: COMPOSITE] Run composite passes
+    │   └─> composite.fsh, composite1.fsh, ... (post-processing)
+    ↓
+[Phase: FINAL] Run final pass
+    │   └─> final.fsh (output to screen)
+    ↓
+Result displayed to player
+```
+
+### Critical Differences: Iris vs. MattMC Baked-In
+
+#### Iris (Runtime Loading):
+1. **Discovery**: Filesystem scan of `shaderpacks/` folder
+2. **Format**: ZIP files extracted to temp directory during load
+3. **Loading**: Fully dynamic - users add/remove packs without recompiling game
+4. **I/O**: Continuous file system access during loading phase
+5. **Storage**: External files, not embedded in JAR
+6. **Management**: `ShaderpackDirectoryManager` handles filesystem operations
+
+#### MattMC (Baked-In Approach):
+1. **Discovery**: ResourceManager scan of JAR resources at runtime
+2. **Format**: Unzipped directories in `src/main/resources/assets/minecraft/shaders/`
+3. **Loading**: Dynamic discovery but fixed set at compile-time
+4. **I/O**: ResourceManager API (no temp files, no extraction)
+5. **Storage**: Compiled directly into JAR
+6. **Management**: Custom `ShaderPackRepository` using ResourceManager
+
+### Adaptation Strategy for MattMC
+
+#### What to Keep from Iris:
+1. **Pipeline Architecture** - Phase-based rendering (proven pattern)
+2. **Program Organization** - gbuffers, shadow, composite, final structure
+3. **Uniform System** - The ~200+ uniforms that shader packs expect
+4. **Render Targets** - colortex0-15, depthtex, shadowtex structure
+5. **Include Processing** - GLSL `#include` directive support
+6. **Properties Parsing** - shaders.properties, dimension.properties format
+7. **Options System** - Dynamic shader options and profiles
+8. **Vertex Attributes** - Extended attributes like mc_Entity, at_tangent
+
+#### What to Change for Baked-In:
+1. **Discovery Mechanism**: 
+   - **Iris**: `Files.walk(shaderpacksDir)` filesystem traversal
+   - **MattMC**: `ResourceManager.listResources("assets/minecraft/shaders/")` scan
+   
+2. **Pack Loading**:
+   - **Iris**: ZIP extraction, filesystem `Files.readAllBytes()`
+   - **MattMC**: `ResourceManager.getResource()` for direct access
+   
+3. **ZIP Handling**:
+   - **Iris**: Needs `ZipFileSystem` and temp directory extraction
+   - **MattMC**: Already unzipped in resources, no extraction needed
+   
+4. **Path Resolution**:
+   - **Iris**: `Path` objects pointing to filesystem
+   - **MattMC**: `ResourceLocation` objects pointing to JAR resources
+   
+5. **Caching**:
+   - **Iris**: Caches on filesystem between runs
+   - **MattMC**: No need - resources are in JAR, always available
+
+#### Critical Implementation Insights
+
+**1. G-Buffer Usage Pattern:**
+```
+colortex0: Main color output (what vanilla would render)
+colortex1: Normals (for lighting calculations)
+colortex2: Specular/Roughness (for PBR)
+colortex3: Lightmaps (for custom lighting)
+colortex4+: Pack-specific usage (varies by shader)
+```
+
+**2. Shadow Map Technique:**
+- Render scene from sun/moon direction into shadow FBO
+- Store depth in shadowtex0, optional color in shadowcolor0
+- During main pass, sample shadow map to determine if pixel is in shadow
+- Advanced: Cascaded shadow maps for better quality at varying distances
+
+**3. Composite Pass Chaining:**
+```
+gbuffers passes write to colortex0-N
+    ↓
+composite.fsh reads colortex0-N, writes to different colortex
+    ↓
+composite1.fsh reads previous outputs, writes to more colortex
+    ↓
+composite2.fsh (if exists) continues processing
+    ↓
+final.fsh reads all, writes directly to screen framebuffer
+```
+
+**4. Uniform Update Timing:**
+- **Static uniforms**: Set once during shader program init
+- **Per-frame uniforms**: Updated every frame (time, camera position)
+- **Per-render-type uniforms**: Updated when switching programs (entity ID, block ID)
+- **Lazy uniforms**: Only updated when value changes (world time, rain strength)
+
+**5. Mixin Insertion Points:**
+
+Iris carefully chooses where to inject code:
+- `LevelRenderer.renderLevel()` - Start/end of world rendering
+- `RenderType.end()` - After each render type batch completes
+- `GameRenderer.renderLevel()` - Composite and final passes
+- Vertex format setup - Add extended attributes
+
+For MattMC: We have direct code access, so no mixins needed - but we can implement at the same logical points.
+
+### Key Files to Study in Detail
+
+When implementing MattMC's shader system, these Iris files provide the best reference:
+
+1. **ShaderPack.java** - Core pack representation and loading
+2. **IrisRenderingPipeline.java** - Complete rendering implementation
+3. **ProgramSet.java** - Shader program organization
+4. **RenderTargets.java** - G-buffer management
+5. **ShaderProperties.java** - Properties file parsing
+6. **IncludeProcessor.java** - GLSL include handling
+7. **CommonUniforms.java** - Uniform value providers
+8. **ShadowRenderer.java** - Shadow map rendering
+9. **CompositeRenderer.java** - Post-processing passes
+
+### Performance Considerations from Iris
+
+**Optimizations Iris Uses:**
+1. **Parallel shader compilation** - Uses GL_KHR_parallel_shader_compile when available
+2. **Program caching** - Caches compiled programs between runs
+3. **Smart uniform updates** - Only updates uniforms that changed
+4. **Framebuffer reuse** - Recycles FBOs between frames
+5. **Texture pooling** - Reuses texture objects
+6. **Lazy initialization** - Delays heavy operations until needed
+7. **Sodium integration** - Leverages Sodium's chunk rendering optimizations
+
+**MattMC Should Adopt:**
+- Parallel compilation support
+- Efficient uniform update system
+- FBO/texture reuse patterns
+- Lazy initialization where applicable
+
+### Conclusion of Iris Research
+
+Iris represents approximately 25,000 lines of carefully architected shader rendering code. Its architecture is battle-tested with thousands of users and dozens of shader packs. The key insight is its phase-based rendering pipeline that intercepts Minecraft's rendering at strategic points, redirects output to G-buffers, and processes those buffers through multiple post-processing passes.
+
+For MattMC's baked-in approach, the core rendering architecture can remain very similar to Iris, but the loading mechanism must be adapted to use Minecraft's ResourceManager system instead of filesystem I/O. The shader pack structure, program organization, uniform system, and G-buffer layout should closely follow Iris's patterns to maximize compatibility with existing OptiFine/Iris shader packs.
+
+**Reference Location:** Complete Iris 1.21.9 source code is available in `frnsrc/Iris-1.21.9/` for detailed study during implementation.
+
+---
+
 ## How to Add Shader Packs to MattMC
 
 Since MattMC uses a baked-in shader system, shader packs must be added to the source code before compilation:
