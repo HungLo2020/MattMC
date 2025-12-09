@@ -4,7 +4,7 @@ This document tracks progress through the 30-step IRIS shader integration plan.
 
 ## Overall Progress
 
-**Current Status:** Step 5 of 30 Complete (16.7%)
+**Current Status:** Step 6 of 30 Complete (20%)
 
 **Last Updated:** December 9, 2024
 
@@ -137,19 +137,45 @@ This document tracks progress through the 30-step IRIS shader integration plan.
 
 **Foundation Phase:** 100% COMPLETE ✅
 
+### ✅ Step 6: Implement Include File System (COMPLETE)
+
+**Date Completed:** December 9, 2024
+
+**Implementation Summary:**
+- Implemented AbsolutePackPath for path normalization (IRIS verbatim)
+- Created FileNode for #include parsing (IRIS verbatim)
+- Implemented IncludeGraph with cycle detection (IRIS verbatim, adapted)
+- Created IncludeProcessor for recursive expansion (IRIS verbatim)
+- Developed 37 new comprehensive tests (all passing)
+
+**Key Files:**
+- `net/minecraft/client/renderer/shaders/pack/AbsolutePackPath.java`
+- `net/minecraft/client/renderer/shaders/pack/FileNode.java`
+- `net/minecraft/client/renderer/shaders/pack/IncludeGraph.java`
+- `net/minecraft/client/renderer/shaders/pack/IncludeProcessor.java`
+- 5 test files with 37 unit/integration tests
+
+**Test Results:** 119/119 passing (82 from Steps 1-5, 37 new) ✅
+
+**Documentation:** `docs/SHADER-IMPLEMENTATION-STEP-6.md`
+
+**IRIS Adherence:** Include system follows IRIS architecture VERBATIM
+
+**Loading System Phase:** 20% (1/5 steps)
+
 ## In Progress Steps
 
-### 🔄 Step 6: Implement Include File System (NEXT)
+### 🔄 Step 7: Create Shader Source Provider (NEXT)
 
 **Status:** Ready to start
 
 **Planned Work:**
-- Implement #include directive processing
-- Create IncludeProcessor
-- Handle recursive includes
-- Test include resolution
+- Implement ProgramSource class
+- Create shader source discovery
+- Integrate with IncludeProcessor
+- Test source loading
 
-**Dependencies:** Steps 1-5 complete ✅ (Foundation phase complete!)
+**Dependencies:** Steps 1-6 complete ✅
 
 **Estimated Completion:** TBD
 
@@ -214,14 +240,15 @@ This document tracks progress through the 30-step IRIS shader integration plan.
 ## Key Metrics
 
 - **Total Steps:** 30
-- **Steps Complete:** 5
+- **Steps Complete:** 6
 - **Steps In Progress:** 0
-- **Steps Remaining:** 25
-- **Overall Progress:** 16.7%
-- **Tests Written:** 82
-- **Tests Passing:** 82 (100%)
-- **Lines of Code Added:** ~2,800+
+- **Steps Remaining:** 24
+- **Overall Progress:** 20%
+- **Tests Written:** 119
+- **Tests Passing:** 119 (100%)
+- **Lines of Code Added:** ~4,400+
 - **Foundation Phase:** COMPLETE ✅
+- **Loading System Phase:** 20% (1/5 steps)
 
 ## Architecture Decisions Log
 
@@ -250,6 +277,8 @@ This document tracks progress through the 30-step IRIS shader integration plan.
 - **Step 5 Implementation:** December 9, 2024 (same day)
 - **Step 5 Complete:** December 9, 2024 (same day)
 - **Foundation Phase Complete:** December 9, 2024 ✅
+- **Step 6 Implementation:** December 9, 2024 (same day)
+- **Step 6 Complete:** December 9, 2024 (same day)
 - **Expected Completion (30 steps):** 20-24 weeks from start
 
 ## Notes
