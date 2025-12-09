@@ -572,6 +572,7 @@ public class LevelStorageSource {
 							} else {
 								if (path.equals(LevelStorageAccess.this.levelDirectory.path())) {
 									LevelStorageAccess.this.lock.close();
+									Files.deleteIfExists(lockFilePath);
 									Files.deleteIfExists(path);
 								} else {
 									Files.delete(path);
