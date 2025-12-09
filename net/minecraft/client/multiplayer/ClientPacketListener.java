@@ -384,6 +384,7 @@ public class ClientPacketListener extends ClientCommonPacketListenerImpl impleme
 	private ClientLevel.ClientLevelData levelData;
 	private final Map<UUID, PlayerInfo> playerInfoMap = Maps.<UUID, PlayerInfo>newHashMap();
 	private final Set<PlayerInfo> listedPlayers = new ReferenceOpenHashSet<>();
+	private final ClientSkinCache clientSkinCache;
 	private final ClientAdvancements advancements;
 	private final ClientSuggestionProvider suggestionsProvider;
 	private final ClientSuggestionProvider restrictedSuggestionsProvider;
@@ -425,6 +426,7 @@ public class ClientPacketListener extends ClientCommonPacketListenerImpl impleme
 
 	public ClientPacketListener(Minecraft minecraft, Connection connection, CommonListenerCookie commonListenerCookie) {
 		super(minecraft, connection, commonListenerCookie);
+		this.clientSkinCache = new ClientSkinCache(minecraft);
 		this.localGameProfile = commonListenerCookie.localGameProfile();
 		this.registryAccess = commonListenerCookie.receivedRegistries();
 		RegistryOps<HashCode> registryOps = this.registryAccess.createSerializationContext(HashOps.CRC32C_INSTANCE);
@@ -534,6 +536,9 @@ public class ClientPacketListener extends ClientCommonPacketListenerImpl impleme
 		this.nextChatIndex = 0;
 		this.lastSeenMessages = new LastSeenMessagesTracker(20);
 		this.messageSignatureCache = MessageSignatureCache.createDefault();
+		// Send the player's selected skin to the server
+		this.sendPlayerSkin();
+		
 		if (this.connection.isEncrypted()) {
 			this.prepareKeyPair();
 		}
@@ -1955,6 +1960,100 @@ public class ClientPacketListener extends ClientCommonPacketListenerImpl impleme
 		}
 	}
 
+	@Override
+	public void handlePlayerSkin(net.minecraft.network.protocol.game.ClientboundPlayerSkinPacket packet) {
+		PacketUtils.ensureRunningOnSameThread(packet, this, this.minecraft.packetProcessor());
+		
+		// Cache the received skin
+		this.clientSkinCache.cacheSkin(packet.playerId(), packet.skinName(), packet.skinData(), packet.isSlimModel());
+		
+		// Update PlayerInfo to use the new skin
+		PlayerInfo playerInfo = this.playerInfoMap.get(packet.playerId());
+		if (playerInfo != null) {
+			// Force refresh the skin lookup by clearing it
+			// The skin will be fetched from our cache next time it's needed
+			playerInfo.skinLookup = null;
+		}
+	}
+
+	@Override
+	public void handleRemovePlayerSkin(net.minecraft.network.protocol.game.ClientboundRemovePlayerSkinPacket packet) {
+		PacketUtils.ensureRunningOnSameThread(packet, this, this.minecraft.packetProcessor());
+		
+		// Remove the cached skin
+		this.clientSkinCache.removeSkin(packet.playerId());
+	}
+
+	/**
+	 * Send the player's selected skin to the server.
+	 */
+	private void sendPlayerSkin() {
+		try {
+			// Get the selected skin name from options
+			String selectedSkin = this.minecraft.options.selectedSkin;
+			net.minecraft.client.resources.SkinLoader skinLoader = this.minecraft.getSkinLoader();
+			net.minecraft.client.resources.SkinLoader.SkinEntry skinEntry = skinLoader.getSkinByName(selectedSkin);
+			
+			if (skinEntry == null) {
+				LOGGER.warn("Could not find selected skin: {}, using default", selectedSkin);
+				skinEntry = skinLoader.getDefaultSkin();
+			}
+			
+			if (skinEntry != null) {
+				// Load the skin texture data
+				byte[] skinData = loadSkinTextureData(skinEntry);
+				if (skinData != null) {
+					boolean isSlim = skinEntry.modelType() == net.minecraft.world.entity.player.PlayerModelType.SLIM;
+					
+					// Send the skin to the server
+					this.send(new net.minecraft.network.protocol.game.ServerboundPlayerSkinPacket(
+						skinEntry.displayName(),
+						skinData,
+						isSlim
+					));
+					
+					LOGGER.info("Sent player skin to server: {}", skinEntry.displayName());
+				}
+			}
+		} catch (Exception e) {
+			LOGGER.error("Failed to send player skin to server", e);
+		}
+	}
+
+	/**
+	 * Load skin texture data as byte array.
+	 */
+	private byte[] loadSkinTextureData(net.minecraft.client.resources.SkinLoader.SkinEntry skinEntry) {
+		try {
+			net.minecraft.resources.ResourceLocation location = skinEntry.location();
+			java.io.InputStream stream;
+			
+			if (skinEntry.builtin()) {
+				// Built-in skin from resources
+				stream = this.minecraft.getResourceManager().getResourceOrThrow(location).open();
+			} else {
+				// Custom skin from skins directory
+				String customSuffix = net.minecraft.client.resources.SkinLoader.getCustomSuffix();
+				java.nio.file.Path skinPath = this.minecraft.getSkinLoader().getSkinsDirectory()
+					.resolve(skinEntry.displayName().replace(customSuffix, "") + ".png");
+				if (java.nio.file.Files.exists(skinPath)) {
+					stream = java.nio.file.Files.newInputStream(skinPath);
+				} else {
+					LOGGER.warn("Custom skin file not found: {}", skinPath);
+					return null;
+				}
+			}
+			
+			// Read all bytes from the stream
+			byte[] data = stream.readAllBytes();
+			stream.close();
+			return data;
+		} catch (Exception e) {
+			LOGGER.error("Failed to load skin texture data", e);
+			return null;
+		}
+	}
+
 	private void initializeChatSession(net.minecraft.network.protocol.game.ClientboundPlayerInfoUpdatePacket.Entry entry, PlayerInfo playerInfo) {
 		PlayerProfile playerProfile = playerInfo.getProfile();
 		SignatureValidator signatureValidator = this.minecraft.services().profileKeySignatureValidator();
@@ -2452,6 +2551,10 @@ public class ClientPacketListener extends ClientCommonPacketListenerImpl impleme
 	@Nullable
 	public PlayerInfo getPlayerInfo(UUID uUID) {
 		return (PlayerInfo)this.playerInfoMap.get(uUID);
+	}
+
+	public ClientSkinCache getClientSkinCache() {
+		return this.clientSkinCache;
 	}
 
 	@Nullable

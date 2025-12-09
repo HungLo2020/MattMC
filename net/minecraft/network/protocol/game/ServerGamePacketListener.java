@@ -42,6 +42,8 @@ public interface ServerGamePacketListener extends ServerCommonPacketListener, Se
 
 	void handlePlayerInput(ServerboundPlayerInputPacket serverboundPlayerInputPacket);
 
+	void handlePlayerSkin(ServerboundPlayerSkinPacket serverboundPlayerSkinPacket);
+
 	void handleSetCarriedItem(ServerboundSetCarriedItemPacket serverboundSetCarriedItemPacket);
 
 	void handleSetCreativeModeSlot(ServerboundSetCreativeModeSlotPacket serverboundSetCreativeModeSlotPacket);

@@ -24,6 +24,7 @@ import net.minecraft.client.gui.screens.options.AccessibilityOptionsScreen;
 import net.minecraft.client.gui.screens.options.OptionsScreen;
 import net.minecraft.client.gui.screens.worldselection.CreateWorldScreen;
 import net.minecraft.client.gui.screens.worldselection.SelectWorldScreen;
+import net.minecraft.client.gui.screens.CustomizeScreen;
 import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.client.renderer.PanoramaRenderer;
 import net.minecraft.client.renderer.texture.TextureManager;
@@ -144,6 +145,11 @@ public class TitleScreen extends Screen {
 			Screen screen = (Screen)(this.minecraft.options.skipMultiplayerWarning ? new JoinMultiplayerScreen(this) : new SafetyScreen(this));
 			this.minecraft.setScreen(screen);
 		}).bounds(this.width / 2 - 100, i = i + j, 200, 20).tooltip(tooltip).build()).active = bl;
+		this.addRenderableWidget(
+			Button.builder(Component.translatable("menu.customize"), button -> this.minecraft.setScreen(new CustomizeScreen(this)))
+				.bounds(this.width / 2 - 100, i = i + j, 200, 20)
+				.build()
+		);
 		return i;
 	}
 
