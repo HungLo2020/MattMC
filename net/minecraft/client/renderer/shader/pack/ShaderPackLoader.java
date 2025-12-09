@@ -25,7 +25,8 @@ public class ShaderPackLoader {
     private final ResourceManager resourceManager;
     private final String packName;
     private final String packBasePath;
-    private final Map<String, String> shaderSources = new HashMap<>();
+    private final Map<String, String> vertexSources = new HashMap<>();
+    private final Map<String, String> fragmentSources = new HashMap<>();
     
     public ShaderPackLoader(ResourceManager resourceManager, String packName) {
         this.resourceManager = resourceManager;
@@ -42,10 +43,32 @@ public class ShaderPackLoader {
         // Discover all shader programs
         discoverShaderPrograms();
         
-        LOGGER.info("Loaded {} shader programs from pack '{}'", shaderSources.size(), packName);
+        // Load shader properties if present
+        net.minecraft.client.renderer.shader.config.ShaderProperties properties = loadProperties();
+        
+        LOGGER.info("Loaded {} shader programs from pack '{}'", vertexSources.size(), packName);
         
         ShaderPackMetadata metadata = ShaderPackMetadata.createDefault(packName);
-        return new ShaderPack(packName, metadata, shaderSources);
+        return new ShaderPack(packName, metadata, vertexSources, fragmentSources, properties);
+    }
+    
+    /**
+     * Loads shader properties from shaders.properties file.
+     */
+    private net.minecraft.client.renderer.shader.config.ShaderProperties loadProperties() {
+        try {
+            String propertiesPath = packBasePath + "/shaders.properties";
+            String source = loadShaderFile(propertiesPath);
+            if (source != null) {
+                java.io.ByteArrayInputStream bais = new java.io.ByteArrayInputStream(source.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+                net.minecraft.client.renderer.shader.config.ShaderPropertiesParser parser = 
+                    new net.minecraft.client.renderer.shader.config.ShaderPropertiesParser();
+                return parser.parse(bais);
+            }
+        } catch (IOException e) {
+            LOGGER.debug("No shaders.properties found for pack '{}', using defaults", packName);
+        }
+        return new net.minecraft.client.renderer.shader.config.ShaderProperties(new HashMap<>());
     }
     
     /**
@@ -96,13 +119,14 @@ public class ShaderPackLoader {
         String vertexSource = loadShaderFile(vshPath);
         String fragmentSource = loadShaderFile(fshPath);
         
+        if (vertexSource != null) {
+            vertexSources.put(programName, vertexSource);
+        }
+        if (fragmentSource != null) {
+            fragmentSources.put(programName, fragmentSource);
+        }
+        
         if (vertexSource != null || fragmentSource != null) {
-            // Store combined source (for now, simple concatenation)
-            // TODO: Implement proper shader program compilation
-            String combined = (vertexSource != null ? vertexSource : "") + 
-                            "\n// === Fragment Shader ===\n" +
-                            (fragmentSource != null ? fragmentSource : "");
-            shaderSources.put(programName, combined);
             LOGGER.debug("Loaded shader program: {}", programName);
         }
     }
