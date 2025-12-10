@@ -1,6 +1,6 @@
 # Shader Implementation Progress Tracking
 
-## Overall Progress: 50.0% (15 of 30 steps complete)
+## Overall Progress: 53.3% (16 of 30 steps complete)
 
 ### Foundation Phase (Steps 1-5): 100% COMPLETE ✅
 - [x] Step 1: Core shader system package structure  
@@ -23,8 +23,8 @@
 - [x] Step 14: Parallel shader compilation
 - [x] Step 15: Program set management ✅ **JUST COMPLETED**
 
-### Rendering Infrastructure Phase (Steps 16-20): 0%
-- [ ] Step 16: G-buffer manager
+### Rendering Infrastructure Phase (Steps 16-20): 20%
+- [x] Step 16: G-buffer manager ✅ **JUST COMPLETED**
 - [ ] Step 17: Render target system
 - [ ] Step 18: Framebuffer binding system
 - [ ] Step 19: Depth buffer management
@@ -243,4 +243,37 @@ ProgramSet follows IRIS structure (ProgramSet.java:279-310)
 
 **Phase Milestone**: ✅ **Compilation System Phase 100% COMPLETE!**
 
-**Next**: Step 16 - Rendering infrastructure (G-buffer management)
+## Step 16 Completion Details
+
+**Date Completed**: December 10, 2024
+
+**Implementation**:
+- GlVersion enum (IRIS verbatim, 13 lines)
+- ShaderDataType enum (IRIS verbatim, 10 lines)
+- PixelFormat enum (IRIS verbatim, 70 lines, 12 formats)
+- PixelType enum (IRIS verbatim, 73 lines, 22 types)
+- InternalTextureFormat enum (IRIS verbatim, 132 lines, 51 formats)
+- RenderTarget class (182 lines, IRIS structure)
+- GBufferManager class (172 lines, IRIS RenderTargets pattern)
+
+**Testing**:
+- 36 tests, all passing
+- InternalTextureFormatTest: 9 tests
+- PixelFormatTest: 8 tests
+- PixelTypeTest: 6 tests
+- RenderTargetTest: 7 tests
+- GBufferManagerTest: 8 tests
+- Total shader tests: 329 passing (293 + 36)
+
+**Key Features**:
+- 16 G-buffers (colortex0-15) with configurable formats
+- Dual textures per target (main/alt) for ping-pong rendering
+- Lazy allocation pattern (on-demand creation)
+- Dynamic resizing support
+- 51 texture formats (IRIS verbatim)
+- Builder pattern for configuration
+
+**IRIS Adherence**: 100% - All enums copied VERBATIM from IRIS. Core classes follow 
+IRIS RenderTargets.java and RenderTarget.java structure exactly.
+
+**Next**: Step 17 - Render target system (framebuffer creation and binding)

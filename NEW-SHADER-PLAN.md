@@ -49,7 +49,7 @@ This document provides a **30-step implementation plan** to achieve **100% ident
 - [x] Step 15: Create program set management
 
 ### Rendering Infrastructure (Steps 16-20): G-Buffers and Framebuffers
-- [ ] Step 16: Create G-buffer manager
+- [x] Step 16: Create G-buffer manager
 - [ ] Step 17: Implement render target system
 - [ ] Step 18: Create framebuffer binding system
 - [ ] Step 19: Implement depth buffer management
