@@ -51,7 +51,7 @@ This document provides a **30-step implementation plan** to achieve **100% ident
 ### Rendering Infrastructure (Steps 16-20): G-Buffers and Framebuffers
 - [x] Step 16: Create G-buffer manager
 - [x] Step 17: Implement render target system
-- [ ] Step 18: Create framebuffer binding system
+- [x] Step 18: Create framebuffer binding system
 - [ ] Step 19: Implement depth buffer management
 - [ ] Step 20: Create shadow framebuffer system
 
