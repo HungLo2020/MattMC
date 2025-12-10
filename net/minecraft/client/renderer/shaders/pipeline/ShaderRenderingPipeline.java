@@ -1,7 +1,6 @@
 package net.minecraft.client.renderer.shaders.pipeline;
 
-import net.minecraft.client.renderer.shaders.cache.ProgramCache;
-import net.minecraft.client.renderer.shaders.hooks.WorldRenderingPhase;
+import net.minecraft.client.renderer.shaders.program.ProgramCache;
 
 /**
  * Represents a shader rendering pipeline that can be activated and used for world rendering.

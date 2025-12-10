@@ -1,7 +1,7 @@
 package net.minecraft.client.renderer.shaders.interception;
 
 import com.mojang.blaze3d.pipeline.RenderPipeline;
-import net.minecraft.client.renderer.shaders.gl.program.Program;
+import net.minecraft.client.renderer.shaders.program.Program;
 import net.minecraft.client.renderer.shaders.pipeline.ShaderRenderingPipeline;
 import net.minecraft.client.renderer.shaders.programs.ShaderKey;
 import org.jetbrains.annotations.Nullable;
@@ -32,7 +32,7 @@ public class ProgramInterceptor {
         ShaderKey shaderKey = ShaderPipelineMapper.getPipeline(pipeline, renderPipeline);
 
         if (shaderKey != null) {
-            Program program = pipeline.getShaderMap().getShader(shaderKey);
+            Program program = pipeline.getShaderMap().get(shaderKey.name());
             if (program != null) {
                 return program;
             }

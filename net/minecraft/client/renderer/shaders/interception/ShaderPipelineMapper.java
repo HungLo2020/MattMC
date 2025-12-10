@@ -1,7 +1,6 @@
 package net.minecraft.client.renderer.shaders.interception;
 
 import com.mojang.blaze3d.pipeline.RenderPipeline;
-import it.unimi.dsi.fastutil.Function;
 import it.unimi.dsi.fastutil.objects.Object2ObjectArrayMap;
 import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.client.renderer.shaders.pipeline.ShaderRenderingPipeline;
@@ -12,6 +11,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.Map;
+import java.util.function.Function;
 
 /**
  * Maps Minecraft's RenderPipeline to shader pack ShaderKeys.
