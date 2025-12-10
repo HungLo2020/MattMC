@@ -32,9 +32,37 @@ public class RenderingHooks {
      */
     public static void onWorldRenderStart() {
         if (activePipeline != null) {
+            // Render shadows before main world rendering
+            renderShadows();
+            
             phaseTracker.beginWorldRendering();
             pipelineState.activate(activePipeline);
             activePipeline.beginWorldRendering();
+        }
+    }
+    
+    /**
+     * Renders shadow maps before main world rendering.
+     * IRIS: ShadowRenderer.renderShadows() pattern
+     */
+    private static void renderShadows() {
+        if (activePipeline == null) {
+            return;
+        }
+        
+        net.minecraft.client.renderer.shaders.shadows.ShadowRenderer shadowRenderer = 
+            activePipeline.getShadowRenderer();
+        
+        if (shadowRenderer != null && shadowRenderer.areShadowsEnabled()) {
+            // Begin shadow rendering
+            shadowRenderer.beginShadowRender(0.0f);  // Sun angle would come from world
+            
+            // Shadow pass rendering happens through normal rendering callbacks
+            // with the shadow state active
+            shadowRenderer.renderShadowPass();
+            
+            // End shadow rendering and run composites
+            shadowRenderer.endShadowRender();
         }
     }
     

@@ -154,5 +154,10 @@ public class ShaderSystemLifecycleTest {
         public net.minecraft.client.renderer.shaders.program.ProgramCache getShaderMap() {
             return new net.minecraft.client.renderer.shaders.program.ProgramCache();
         }
+        
+        @Override
+        public net.minecraft.client.renderer.shaders.shadows.ShadowRenderer getShadowRenderer() {
+            return null;
+        }
     }
 }

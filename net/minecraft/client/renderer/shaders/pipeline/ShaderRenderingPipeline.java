@@ -98,4 +98,12 @@ public interface ShaderRenderingPipeline {
      * @return the program cache containing compiled shader programs
      */
     ProgramCache getShaderMap();
+    
+    /**
+     * Get the shadow renderer for this pipeline.
+     * Returns null if shadows are not supported or disabled.
+     * 
+     * @return the shadow renderer, or null if not available
+     */
+    net.minecraft.client.renderer.shaders.shadows.ShadowRenderer getShadowRenderer();
 }

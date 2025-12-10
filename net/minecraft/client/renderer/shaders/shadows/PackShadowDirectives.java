@@ -145,4 +145,66 @@ public class PackShadowDirectives {
             this.nearest = nearest;
         }
     }
+    
+    // Helper methods for shadow rendering
+    
+    /**
+     * Gets the shadow angle offset.
+     * @return shadow angle in radians
+     */
+    public float getShadowAngle() {
+        return 0.0f;  // Default, could be configured from shader pack
+    }
+    
+    /**
+     * Gets the distance render multiplier for shadow culling.
+     * @return distance multiplier
+     */
+    public float getDistanceRenderMul() {
+        return 1.0f;  // Default 1.0x distance
+    }
+    
+    /**
+     * Gets the number of shadow composite passes.
+     * @return number of composite passes (0-8)
+     */
+    public int getCompositePasses() {
+        return 0;  // No composite passes by default
+    }
+    
+    /**
+     * Gets the number of shadow color samplers.
+     * @return number of color samplers
+     */
+    public int getColorSamplersCount() {
+        return colorSamplingSettings.size();
+    }
+    
+    /**
+     * Checks if mipmaps should be generated for shadow maps.
+     * @return true if mipmaps should be generated
+     */
+    public boolean shouldGenerateMipmaps() {
+        // Check if any depth texture has mipmaps enabled
+        for (DepthSamplingSettings settings : depthSamplingSettings) {
+            if (settings.getMipmap()) {
+                return true;
+            }
+        }
+        return false;
+    }
+    
+    /**
+     * Checks if hardware filtering should be used.
+     * @return true if hardware filtering is enabled
+     */
+    public boolean shouldUseHardwareFiltering() {
+        // Check if any depth texture has hardware filtering
+        for (DepthSamplingSettings settings : depthSamplingSettings) {
+            if (settings.getHardwareFiltering()) {
+                return true;
+            }
+        }
+        return false;
+    }
 }

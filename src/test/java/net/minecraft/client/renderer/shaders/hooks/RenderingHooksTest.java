@@ -217,6 +217,11 @@ public class RenderingHooksTest {
             return new net.minecraft.client.renderer.shaders.program.ProgramCache();
         }
         
+        @Override
+        public net.minecraft.client.renderer.shaders.shadows.ShadowRenderer getShadowRenderer() {
+            return null;  // No shadow renderer in mock
+        }
+        
         public boolean isBeginWorldRenderingCalled() { return beginWorldRenderingCalled; }
         public boolean isFinishWorldRenderingCalled() { return finishWorldRenderingCalled; }
         public boolean isBeginTerrainRenderingCalled() { return beginTerrainRenderingCalled; }
