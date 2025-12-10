@@ -320,4 +320,77 @@ public class ShadowRenderTargets {
     public IntList getBuffersToBeCleared() {
         return buffersToBeCleared;
     }
+    
+    // Additional helper methods for shadow rendering
+    
+    /**
+     * Gets the main shadow framebuffer for rendering.
+     * @return shadow framebuffer
+     */
+    public GlFramebuffer getShadowFramebuffer() {
+        return depthSourceFb;
+    }
+    
+    /**
+     * Gets the shadow composite framebuffer.
+     * @return composite framebuffer, or null if no composites
+     */
+    public GlFramebuffer getShadowCompositeFramebuffer() {
+        // Return the main framebuffer for composite passes
+        return depthSourceFb;
+    }
+    
+    /**
+     * Gets depth texture 0 (shadowtex0) ID.
+     * @return OpenGL texture ID
+     */
+    public int getDepthTexture0() {
+        return mainDepth != null ? mainDepth.getTextureId() : 0;
+    }
+    
+    /**
+     * Gets depth texture 1 (shadowtex1) ID.
+     * @return OpenGL texture ID
+     */
+    public int getDepthTexture1() {
+        return noTranslucents != null ? noTranslucents.getTextureId() : 0;
+    }
+    
+    /**
+     * Gets a shadow color texture ID.
+     * @param index color buffer index (0-7)
+     * @return OpenGL texture ID
+     */
+    public int getColorTexture(int index) {
+        if (index >= 0 && index < targets.length && targets[index] != null) {
+            return targets[index].getMainTexture();
+        }
+        return 0;
+    }
+    
+    /**
+     * Generates mipmaps for all shadow textures.
+     */
+    public void generateMipmaps() {
+        // Generate mipmaps for depth textures if needed
+        if (mainDepth != null && mipped[0]) {
+            GL11.glBindTexture(GL11.GL_TEXTURE_2D, mainDepth.getTextureId());
+            GL30.glGenerateMipmap(GL11.GL_TEXTURE_2D);
+        }
+        
+        if (noTranslucents != null && mipped[1]) {
+            GL11.glBindTexture(GL11.GL_TEXTURE_2D, noTranslucents.getTextureId());
+            GL30.glGenerateMipmap(GL11.GL_TEXTURE_2D);
+        }
+        
+        // Generate mipmaps for color textures
+        for (int i = 0; i < size; i++) {
+            if (targets[i] != null && mipped[i]) {
+                GL11.glBindTexture(GL11.GL_TEXTURE_2D, targets[i].getMainTexture());
+                GL30.glGenerateMipmap(GL11.GL_TEXTURE_2D);
+            }
+        }
+        
+        GL11.glBindTexture(GL11.GL_TEXTURE_2D, 0);
+    }
 }

@@ -46,8 +46,8 @@ public class PhaseTrackerTest {
         tracker.setPhase(WorldRenderingPhase.TERRAIN_SOLID);
         assertEquals(WorldRenderingPhase.TERRAIN_SOLID, tracker.getCurrentPhase());
         
-        tracker.setPhase(WorldRenderingPhase.TRANSLUCENT_TERRAIN);
-        assertEquals(WorldRenderingPhase.TRANSLUCENT_TERRAIN, tracker.getCurrentPhase());
+        tracker.setPhase(WorldRenderingPhase.TERRAIN_TRANSLUCENT);
+        assertEquals(WorldRenderingPhase.TERRAIN_TRANSLUCENT, tracker.getCurrentPhase());
     }
     
     @Test
@@ -75,8 +75,8 @@ public class PhaseTrackerTest {
         tracker.setPhase(WorldRenderingPhase.TERRAIN_SOLID);
         assertEquals(WorldRenderingPhase.TERRAIN_SOLID, tracker.getCurrentPhase());
         
-        tracker.setPhase(WorldRenderingPhase.TRANSLUCENT_TERRAIN);
-        assertEquals(WorldRenderingPhase.TRANSLUCENT_TERRAIN, tracker.getCurrentPhase());
+        tracker.setPhase(WorldRenderingPhase.TERRAIN_TRANSLUCENT);
+        assertEquals(WorldRenderingPhase.TERRAIN_TRANSLUCENT, tracker.getCurrentPhase());
         
         tracker.setPhase(WorldRenderingPhase.NONE);
         assertEquals(WorldRenderingPhase.NONE, tracker.getCurrentPhase());

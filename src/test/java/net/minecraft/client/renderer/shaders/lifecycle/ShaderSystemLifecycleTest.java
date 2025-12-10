@@ -88,6 +88,8 @@ public class ShaderSystemLifecycleTest {
         private boolean active = true;
         boolean beginCalled = false;
         boolean finishCalled = false;
+        private net.minecraft.client.renderer.shaders.pipeline.WorldRenderingPhase phase = 
+            net.minecraft.client.renderer.shaders.pipeline.WorldRenderingPhase.NONE;
         
         void setActive(boolean active) {
             this.active = active;
@@ -99,7 +101,34 @@ public class ShaderSystemLifecycleTest {
         }
         
         @Override
+        public void beginTerrainRendering() {
+        }
+        
+        @Override
+        public void endTerrainRendering() {
+        }
+        
+        @Override
+        public void beginTranslucentRendering() {
+        }
+        
+        @Override
+        public void endTranslucentRendering() {
+        }
+        
+        @Override
+        public net.minecraft.client.renderer.shaders.pipeline.WorldRenderingPhase getPhase() {
+            return phase;
+        }
+        
+        @Override
         public void setPhase(net.minecraft.client.renderer.shaders.pipeline.WorldRenderingPhase phase) {
+            this.phase = phase;
+        }
+        
+        @Override
+        public void setOverridePhase(net.minecraft.client.renderer.shaders.pipeline.WorldRenderingPhase phase) {
+            this.phase = phase;
         }
         
         @Override
@@ -114,6 +143,21 @@ public class ShaderSystemLifecycleTest {
         @Override
         public boolean isActive() {
             return active;
+        }
+        
+        @Override
+        public boolean shouldOverrideShaders() {
+            return true;
+        }
+        
+        @Override
+        public net.minecraft.client.renderer.shaders.program.ProgramCache getShaderMap() {
+            return new net.minecraft.client.renderer.shaders.program.ProgramCache();
+        }
+        
+        @Override
+        public net.minecraft.client.renderer.shaders.shadows.ShadowRenderer getShadowRenderer() {
+            return null;
         }
     }
 }

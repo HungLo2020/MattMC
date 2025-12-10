@@ -49,8 +49,8 @@ public class ShaderRenderingPipelineTest {
         pipeline.setPhase(WorldRenderingPhase.TERRAIN_SOLID);
         assertEquals(WorldRenderingPhase.TERRAIN_SOLID, pipeline.lastPhase);
         
-        pipeline.setPhase(WorldRenderingPhase.FINAL);
-        assertEquals(WorldRenderingPhase.FINAL, pipeline.lastPhase);
+        pipeline.setPhase(WorldRenderingPhase.HAND_TRANSLUCENT);
+        assertEquals(WorldRenderingPhase.HAND_TRANSLUCENT, pipeline.lastPhase);
     }
     
     // Mock implementation for testing
@@ -71,7 +71,33 @@ public class ShaderRenderingPipelineTest {
         }
         
         @Override
+        public void beginTerrainRendering() {
+        }
+        
+        @Override
+        public void endTerrainRendering() {
+        }
+        
+        @Override
+        public void beginTranslucentRendering() {
+        }
+        
+        @Override
+        public void endTranslucentRendering() {
+        }
+        
+        @Override
+        public WorldRenderingPhase getPhase() {
+            return lastPhase != null ? lastPhase : WorldRenderingPhase.NONE;
+        }
+        
+        @Override
         public void setPhase(WorldRenderingPhase phase) {
+            lastPhase = phase;
+        }
+        
+        @Override
+        public void setOverridePhase(WorldRenderingPhase phase) {
             lastPhase = phase;
         }
         
@@ -88,6 +114,21 @@ public class ShaderRenderingPipelineTest {
         @Override
         public boolean isActive() {
             return active;
+        }
+        
+        @Override
+        public boolean shouldOverrideShaders() {
+            return true;
+        }
+        
+        @Override
+        public net.minecraft.client.renderer.shaders.program.ProgramCache getShaderMap() {
+            return new net.minecraft.client.renderer.shaders.program.ProgramCache();
+        }
+        
+        @Override
+        public net.minecraft.client.renderer.shaders.shadows.ShadowRenderer getShadowRenderer() {
+            return null;
         }
     }
 }
