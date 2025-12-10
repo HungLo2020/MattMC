@@ -15,6 +15,30 @@ public interface ShaderRenderingPipeline {
     void beginWorldRendering();
     
     /**
+     * Called before terrain rendering begins.
+     * Sets up framebuffers and programs for opaque terrain rendering.
+     */
+    void beginTerrainRendering();
+    
+    /**
+     * Called after terrain rendering ends.
+     * Performs any cleanup needed after terrain pass.
+     */
+    void endTerrainRendering();
+    
+    /**
+     * Called before translucent rendering begins.
+     * Sets up framebuffers and programs for translucent rendering.
+     */
+    void beginTranslucentRendering();
+    
+    /**
+     * Called after translucent rendering ends.
+     * Performs any cleanup needed after translucent pass.
+     */
+    void endTranslucentRendering();
+    
+    /**
      * Transitions to a specific rendering phase.
      * 
      * @param phase The rendering phase to transition to
