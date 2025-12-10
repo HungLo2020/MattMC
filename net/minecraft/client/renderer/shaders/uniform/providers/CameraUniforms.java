@@ -78,7 +78,7 @@ public class CameraUniforms {
 		);
 	}
 
-	static class CameraPositionTracker {
+	public static class CameraPositionTracker {
 		/**
 		 * Value range of cameraPosition. We want this to be small enough that precision is maintained when we convert
 		 * from a double to a float, but big enough that shifts happen infrequently, since each shift corresponds with
@@ -93,7 +93,7 @@ public class CameraUniforms {
 		private Vector3d previousCameraPositionUnshifted = new Vector3d();
 		private Vector3d currentCameraPositionUnshifted = new Vector3d();
 
-		CameraPositionTracker(FrameUpdateNotifier notifier) {
+		public CameraPositionTracker(FrameUpdateNotifier notifier) {
 			notifier.addListener(this::update);
 		}
 
