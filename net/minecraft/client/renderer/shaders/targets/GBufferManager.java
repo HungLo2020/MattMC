@@ -1,6 +1,7 @@
 package net.minecraft.client.renderer.shaders.targets;
 
 import net.minecraft.client.renderer.shaders.framebuffer.GlFramebuffer;
+import net.minecraft.client.renderer.shaders.texture.DepthBufferFormat;
 import net.minecraft.client.renderer.shaders.texture.InternalTextureFormat;
 import org.lwjgl.opengl.GL30;
 import org.slf4j.Logger;
@@ -25,6 +26,10 @@ public class GBufferManager {
     private int cachedWidth;
     private int cachedHeight;
     private boolean destroyed;
+    
+    // Depth buffer management (IRIS pattern)
+    private DepthTexture[] depthTextures;  // depthtex0, depthtex1, depthtex2
+    private DepthBufferFormat depthFormat;
 
     public GBufferManager(int width, int height, Map<Integer, RenderTargetSettings> settings) {
         this.targets = new RenderTarget[MAX_RENDER_TARGETS];
@@ -32,6 +37,8 @@ public class GBufferManager {
         this.cachedWidth = width;
         this.cachedHeight = height;
         this.destroyed = false;
+        this.depthTextures = new DepthTexture[3];  // depthtex0, depthtex1, depthtex2
+        this.depthFormat = DepthBufferFormat.DEPTH24;  // Default format
         
         LOGGER.info("Created GBufferManager ({}x{}) with {} configured targets", 
             width, height, settings.size());
@@ -115,6 +122,9 @@ public class GBufferManager {
                 }
             }
             
+            // Resize depth textures
+            resizeDepthTextures(newWidth, newHeight);
+            
             LOGGER.info("Resized G-buffers to {}x{}", newWidth, newHeight);
         }
         
@@ -160,6 +170,9 @@ public class GBufferManager {
             }
         }
         
+        // Destroy depth textures
+        destroyDepthTextures();
+        
         LOGGER.info("Destroyed GBufferManager");
     }
 
@@ -202,6 +215,73 @@ public class GBufferManager {
         framebuffer.drawBuffers(drawBuffers);
 
         return framebuffer;
+    }
+
+    /**
+     * Creates or gets a depth texture.
+     * Following IRIS depth buffer management pattern.
+     * 
+     * @param index Depth texture index (0, 1, or 2) for depthtex0, depthtex1, depthtex2
+     * @return The depth texture
+     */
+    public DepthTexture getOrCreateDepthTexture(int index) {
+        if (destroyed) {
+            throw new IllegalStateException("Attempted to use destroyed GBufferManager");
+        }
+        
+        if (index < 0 || index >= 3) {
+            throw new IllegalArgumentException("Depth texture index out of range: " + index);
+        }
+        
+        if (depthTextures[index] == null) {
+            String name = "depthtex" + index;
+            depthTextures[index] = new DepthTexture(name, cachedWidth, cachedHeight, depthFormat);
+            LOGGER.debug("Created depth texture {} ({}x{}, format: {})", 
+                name, cachedWidth, cachedHeight, depthFormat);
+        }
+        
+        return depthTextures[index];
+    }
+    
+    /**
+     * Gets the current depth buffer format.
+     */
+    public DepthBufferFormat getDepthFormat() {
+        return depthFormat;
+    }
+    
+    /**
+     * Sets the depth buffer format and recreates depth textures.
+     */
+    public void setDepthFormat(DepthBufferFormat format) {
+        if (this.depthFormat != format) {
+            this.depthFormat = format;
+            // Recreate depth textures with new format
+            destroyDepthTextures();
+        }
+    }
+    
+    /**
+     * Resizes depth textures.
+     */
+    private void resizeDepthTextures(int newWidth, int newHeight) {
+        for (int i = 0; i < depthTextures.length; i++) {
+            if (depthTextures[i] != null) {
+                depthTextures[i].resize(newWidth, newHeight, depthFormat);
+            }
+        }
+    }
+    
+    /**
+     * Destroys depth textures.
+     */
+    private void destroyDepthTextures() {
+        for (int i = 0; i < depthTextures.length; i++) {
+            if (depthTextures[i] != null) {
+                depthTextures[i].destroy();
+                depthTextures[i] = null;
+            }
+        }
     }
 
     /**
