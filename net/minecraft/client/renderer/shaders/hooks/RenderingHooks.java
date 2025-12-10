@@ -78,7 +78,7 @@ public class RenderingHooks {
      */
     public static void onBeginTranslucentRendering() {
         if (activePipeline != null) {
-            phaseTracker.setPhase(WorldRenderingPhase.TRANSLUCENT_TERRAIN);
+            phaseTracker.setPhase(WorldRenderingPhase.TERRAIN_TRANSLUCENT);
             activePipeline.beginTranslucentRendering();
         }
     }

@@ -41,11 +41,28 @@ public interface ShaderRenderingPipeline {
     void endTranslucentRendering();
     
     /**
+     * Gets the current rendering phase.
+     * IRIS VERBATIM: WorldRenderingPipeline.getPhase()
+     * 
+     * @return the current rendering phase
+     */
+    WorldRenderingPhase getPhase();
+    
+    /**
      * Transitions to a specific rendering phase.
+     * IRIS VERBATIM: WorldRenderingPipeline.setPhase()
      * 
      * @param phase The rendering phase to transition to
      */
     void setPhase(WorldRenderingPhase phase);
+    
+    /**
+     * Override the current rendering phase temporarily.
+     * IRIS VERBATIM: WorldRenderingPipeline.setOverridePhase()
+     * 
+     * @param phase The rendering phase to override with
+     */
+    void setOverridePhase(WorldRenderingPhase phase);
     
     /**
      * Finalizes the current frame and executes composite/final passes.

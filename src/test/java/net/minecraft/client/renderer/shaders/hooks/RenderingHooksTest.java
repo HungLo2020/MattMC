@@ -70,7 +70,7 @@ public class RenderingHooksTest {
         
         RenderingHooks.onBeginTranslucentRendering();
         assertTrue(mockPipeline.isBeginTranslucentRenderingCalled());
-        assertEquals(WorldRenderingPhase.TRANSLUCENT_TERRAIN, 
+        assertEquals(WorldRenderingPhase.TERRAIN_TRANSLUCENT, 
             RenderingHooks.getPhaseTracker().getCurrentPhase());
         
         RenderingHooks.onEndTranslucentRendering();
@@ -151,6 +151,7 @@ public class RenderingHooksTest {
         private boolean endTerrainRenderingCalled = false;
         private boolean beginTranslucentRenderingCalled = false;
         private boolean endTranslucentRenderingCalled = false;
+        private WorldRenderingPhase phase = WorldRenderingPhase.NONE;
         
         @Override
         public void beginWorldRendering() {
@@ -180,6 +181,40 @@ public class RenderingHooksTest {
         @Override
         public void endTranslucentRendering() {
             endTranslucentRenderingCalled = true;
+        }
+        
+        @Override
+        public WorldRenderingPhase getPhase() {
+            return phase;
+        }
+        
+        @Override
+        public void setPhase(WorldRenderingPhase phase) {
+            this.phase = phase;
+        }
+        
+        @Override
+        public void setOverridePhase(WorldRenderingPhase phase) {
+            this.phase = phase;
+        }
+        
+        @Override
+        public void destroy() {
+        }
+        
+        @Override
+        public boolean isActive() {
+            return true;
+        }
+        
+        @Override
+        public boolean shouldOverrideShaders() {
+            return true;
+        }
+        
+        @Override
+        public net.minecraft.client.renderer.shaders.program.ProgramCache getShaderMap() {
+            return new net.minecraft.client.renderer.shaders.program.ProgramCache();
         }
         
         public boolean isBeginWorldRenderingCalled() { return beginWorldRenderingCalled; }
