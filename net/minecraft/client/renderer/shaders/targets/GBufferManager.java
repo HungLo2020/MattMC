@@ -1,6 +1,8 @@
 package net.minecraft.client.renderer.shaders.targets;
 
+import net.minecraft.client.renderer.shaders.framebuffer.GlFramebuffer;
 import net.minecraft.client.renderer.shaders.texture.InternalTextureFormat;
+import org.lwjgl.opengl.GL30;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -163,6 +165,43 @@ public class GBufferManager {
 
     public boolean isDestroyed() {
         return destroyed;
+    }
+
+    /**
+     * Creates a framebuffer for clearing the specified buffers.
+     * Following IRIS RenderTargets.createClearFramebuffer() pattern.
+     * 
+     * @param main If true, use main textures; if false, use alternate textures
+     * @param bufferIndices Indices of buffers to attach (e.g., 0, 1, 2 for colortex0-2)
+     * @return Configured framebuffer ready for clearing
+     */
+    public GlFramebuffer createClearFramebuffer(boolean main, int[] bufferIndices) {
+        if (destroyed) {
+            throw new IllegalStateException("Attempted to use destroyed GBufferManager");
+        }
+
+        GlFramebuffer framebuffer = new GlFramebuffer();
+
+        // Attach each buffer as a color attachment
+        for (int i = 0; i < bufferIndices.length; i++) {
+            int bufferIndex = bufferIndices[i];
+            RenderTarget target = getOrCreate(bufferIndex);
+            
+            // Choose main or alternate texture based on parameter
+            int texture = main ? target.getMainTexture() : target.getAltTexture();
+            
+            // Attach to framebuffer
+            framebuffer.addColorAttachment(i, texture);
+        }
+
+        // Configure draw buffers
+        int[] drawBuffers = new int[bufferIndices.length];
+        for (int i = 0; i < bufferIndices.length; i++) {
+            drawBuffers[i] = GL30.GL_COLOR_ATTACHMENT0 + i;
+        }
+        framebuffer.drawBuffers(drawBuffers);
+
+        return framebuffer;
     }
 
     /**
