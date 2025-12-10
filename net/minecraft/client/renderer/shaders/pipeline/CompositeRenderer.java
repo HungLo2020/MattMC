@@ -182,30 +182,32 @@ public class CompositeRenderer {
 	}
 	
 	/**
-	 * Sets up mipmapping for render target buffers.
+	 * Sets up mipmapping for a render target.
 	 * Generates mipmaps and configures texture filtering.
 	 * 
 	 * IRIS Source: CompositeRenderer.java:222-246
-	 * IRIS Adherence: Structure matches IRIS, implementation deferred
+	 * IRIS Adherence: 100% - Complete implementation with all GL calls
 	 * 
-	 * @param pass The pass containing buffers to mipmap
+	 * @param target The render target to setup mipmapping for
+	 * @param readFromAlt Whether to read from the alt texture (vs main)
 	 */
-	private void setupMipmapping(Pass pass) {
-		// TODO: Implement when RenderTargets manager exists
-		// IRIS Implementation:
-		// 1. Get RenderTarget for each buffer index
-		// 2. Determine main vs alt texture based on pass.stageReadsFromAlt
-		// 3. Bind texture and generate mipmaps with glGenerateMipmap
-		// 4. Set texture filter (GL_LINEAR_MIPMAP_LINEAR for floats, GL_NEAREST_MIPMAP_NEAREST for integers)
+	private static void setupMipmapping(RenderTarget target, boolean readFromAlt) {
+		if (target == null) return;
 		
-		// For now, this is stubbed until we have full RenderTargets infrastructure
-		for (int index : pass.mipmappedBuffers) {
-			// Structure in place for future implementation
-			// When implemented, this will:
-			// - Get the appropriate texture ID from RenderTarget
-			// - Generate mipmaps with GL30C.glGenerateMipmap(GL_TEXTURE_2D)
-			// - Set appropriate texture filtering
-		}
+		int texture = readFromAlt ? target.getAltTexture() : target.getMainTexture();
+		
+		// Bind and generate mipmaps
+		// IRIS: IrisRenderSystem.generateMipmaps(texture, GL_TEXTURE_2D);
+		GlStateManager._bindTexture(texture);
+		GL30C.glGenerateMipmap(GL11.GL_TEXTURE_2D);
+		
+		// Setup texture filtering based on format
+		// Integer formats use NEAREST, float formats use LINEAR
+		int filter = target.getInternalFormat().getPixelFormat().isInteger()
+			? GL11.GL_NEAREST_MIPMAP_NEAREST
+			: GL11.GL_LINEAR_MIPMAP_LINEAR;
+		
+		GL11.glTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MIN_FILTER, filter);
 	}
 
 	/**
