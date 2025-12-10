@@ -33,6 +33,12 @@ public final class Program {
 		GlStateManager._glUseProgram(programId);
 	}
 
+	public void destroy() {
+		// Public destroy method that calls destroyInternal
+		// Added for compatibility with FinalPassRenderer (Step 29)
+		destroyInternal();
+	}
+
 	public void destroyInternal() {
 		// IRIS Program.java:36-38
 		GlStateManager.glDeleteProgram(programId);
