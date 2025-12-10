@@ -63,25 +63,25 @@ class ShaderCompilerStructureTest {
 	}
 	
 	@Test
-	void testProgramBuilderExists() {
-		// Verify ProgramBuilder class exists
+	void testProgramLinkerExists() {
+		// Verify ProgramLinker class exists
 		assertThatCode(() -> {
-			Class.forName("net.minecraft.client.renderer.shaders.program.ProgramBuilder");
+			Class.forName("net.minecraft.client.renderer.shaders.program.ProgramLinker");
 		}).doesNotThrowAnyException();
 	}
 	
 	@Test
-	void testProgramBuilderHasCreateMethod() throws Exception {
+	void testProgramLinkerHasCreateMethod() throws Exception {
 		// Verify create method matches IRIS's ProgramCreator.create()
-		Class<?> clazz = ProgramBuilder.class;
+		Class<?> clazz = ProgramLinker.class;
 		
 		assertThat(clazz.getMethod("create", String.class, ShaderCompiler[].class)).isNotNull();
 	}
 	
 	@Test
-	void testProgramBuilderHasDeleteMethod() throws Exception {
+	void testProgramLinkerHasDeleteMethod() throws Exception {
 		// Verify deleteProgram method exists
-		Class<?> clazz = ProgramBuilder.class;
+		Class<?> clazz = ProgramLinker.class;
 		
 		assertThat(clazz.getMethod("deleteProgram", int.class)).isNotNull();
 	}
