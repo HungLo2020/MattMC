@@ -48,17 +48,14 @@ public void init(ShaderPackScreen screen, NavigationController navigation) {
 
 public abstract void render(GuiGraphics guiGraphics, int mouseX, int mouseY, float tickDelta, boolean hovered);
 
-@Override
 public boolean mouseClicked(double mouseX, double mouseY, int button) {
 return false;
 }
 
-@Override
 public boolean mouseReleased(double mouseX, double mouseY, int button) {
 return false;
 }
 
-@Override
 public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
 return false;
 }
