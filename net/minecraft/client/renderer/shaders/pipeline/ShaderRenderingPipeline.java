@@ -1,5 +1,8 @@
 package net.minecraft.client.renderer.shaders.pipeline;
 
+import net.minecraft.client.renderer.shaders.cache.ProgramCache;
+import net.minecraft.client.renderer.shaders.hooks.WorldRenderingPhase;
+
 /**
  * Represents a shader rendering pipeline that can be activated and used for world rendering.
  * 
@@ -63,4 +66,20 @@ public interface ShaderRenderingPipeline {
      * @return true if the pipeline is active, false otherwise
      */
     boolean isActive();
+    
+    /**
+     * Check if this pipeline should override vanilla shaders.
+     * Returns true for shader pack pipelines, false for vanilla rendering.
+     * 
+     * @return true if shaders should be overridden
+     */
+    boolean shouldOverrideShaders();
+    
+    /**
+     * Get the shader map (program cache) for this pipeline.
+     * Used by the interceptor to look up shader programs by key.
+     * 
+     * @return the program cache containing compiled shader programs
+     */
+    ProgramCache getShaderMap();
 }
