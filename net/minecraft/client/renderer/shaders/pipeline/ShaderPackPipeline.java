@@ -1134,4 +1134,23 @@ public class ShaderPackPipeline implements WorldRenderingPipeline {
 	public ShadowRenderTargets getShadowRenderTargets() {
 		return shadowRenderTargets;
 	}
+	
+	/**
+	 * Gets a compiled program by name.
+	 * Used by the shader interception system to replace vanilla shaders with shader pack shaders.
+	 * 
+	 * @param programName The name of the program (e.g., "gbuffers_terrain")
+	 * @return The compiled program, or null if not found
+	 */
+	public Program getProgram(String programName) {
+		return programs.get(programName);
+	}
+	
+	/**
+	 * Gets all compiled programs.
+	 * @return A map of program names to compiled programs
+	 */
+	public Map<String, Program> getPrograms() {
+		return programs;
+	}
 }

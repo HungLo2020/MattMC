@@ -131,6 +131,16 @@ public class PipelineManager {
 	}
 	
 	/**
+	 * Gets the current pipeline.
+	 * Alias for getPipelineNullable() for compatibility.
+	 * 
+	 * @return The current pipeline, or null
+	 */
+	public WorldRenderingPipeline getCurrentPipeline() {
+		return pipeline;
+	}
+	
+	/**
 	 * Destroys all pipelines.
 	 * 
 	 * WARNING: This is EXTREMELY DANGEROUS per IRIS documentation!
