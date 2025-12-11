@@ -59,8 +59,4 @@ public class MatrixUniform extends Uniform {
 			GL46C.glUniformMatrix4fv(location, false, buffer);
 		}
 	}
-	
-	private void updateValue(Object ignored) {
-		updateValue();
-	}
 }

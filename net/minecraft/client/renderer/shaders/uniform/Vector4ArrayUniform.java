@@ -50,8 +50,4 @@ public class Vector4ArrayUniform extends Uniform {
 			GL32C.glUniform4f(location, cachedValue[0], cachedValue[1], cachedValue[2], cachedValue[3]);
 		}
 	}
-	
-	private void updateValue(Object ignored) {
-		updateValue();
-	}
 }
