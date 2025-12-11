@@ -411,7 +411,9 @@ public class GlDevice implements GpuDevice {
 		// Follow the fallback chain until we find a program that exists
 		net.minecraft.client.renderer.shaders.loading.ProgramId currentId = programId;
 		while (currentId != null) {
-			String programName = buildProgramName(currentId);
+			// ProgramId.getSourceName() already returns the full program name
+			// (e.g., "gbuffers_terrain_solid", "gbuffers_terrain", etc.)
+			String programName = currentId.getSourceName();
 			
 			// Check if this program exists in the shader pack
 			if (pipeline.getProgram(programName) != null) {
@@ -424,19 +426,7 @@ public class GlDevice implements GpuDevice {
 		
 		// No program found in fallback chain - return the original name
 		// This will result in a null program, handled by caller
-		return buildProgramName(programId);
-	}
-	
-	/**
-	 * Builds the program name from a ProgramId.
-	 */
-	private static String buildProgramName(net.minecraft.client.renderer.shaders.loading.ProgramId programId) {
-		String prefix = programId.getGroup().getBaseName();
-		String sourceName = programId.getSourceName();
-		if (sourceName == null || sourceName.isEmpty()) {
-			return prefix;
-		}
-		return prefix + "_" + sourceName;
+		return programId.getSourceName();
 	}
 
 	protected GlShaderModule getOrCompileShader(
