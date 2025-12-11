@@ -132,15 +132,23 @@ public class IrisElementRow {
 	}
 
 	public boolean mouseClicked(double mouseX, double mouseY, int button) {
-		return getHovered(mouseX, mouseY).map(element -> element.mouseClicked(mouseX, mouseY, button)).orElse(false);
+		// Convert to MouseButtonEvent for compatibility
+		net.minecraft.client.input.MouseButtonInfo buttonInfo = new net.minecraft.client.input.MouseButtonInfo(button, 0);
+		net.minecraft.client.input.MouseButtonEvent event = new net.minecraft.client.input.MouseButtonEvent(mouseX, mouseY, buttonInfo);
+		return getHovered(mouseX, mouseY).map(element -> element.mouseClicked(event, false)).orElse(false);
 	}
 
 	public boolean mouseReleased(double mouseX, double mouseY, int button) {
-		return getHovered(mouseX, mouseY).map(element -> element.mouseReleased(mouseX, mouseY, button)).orElse(false);
+		// Convert to MouseButtonEvent for compatibility
+		net.minecraft.client.input.MouseButtonInfo buttonInfo = new net.minecraft.client.input.MouseButtonInfo(button, 0);
+		net.minecraft.client.input.MouseButtonEvent event = new net.minecraft.client.input.MouseButtonEvent(mouseX, mouseY, buttonInfo);
+		return getHovered(mouseX, mouseY).map(element -> element.mouseReleased(event)).orElse(false);
 	}
 
 	public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
-		return getFocused().map(element -> element.keyPressed(keyCode, scanCode, modifiers)).orElse(false);
+		// Convert to KeyEvent for compatibility
+		net.minecraft.client.input.KeyEvent event = new net.minecraft.client.input.KeyEvent(keyCode, scanCode, modifiers);
+		return getFocused().map(element -> element.keyPressed(event)).orElse(false);
 	}
 
 	public List<? extends GuiEventListener> children() {
@@ -200,12 +208,12 @@ public class IrisElementRow {
 		}
 
 		@Override
-		public boolean mouseClicked(double mouseX, double mouseY, int button) {
+		public boolean mouseClicked(net.minecraft.client.input.MouseButtonEvent event, boolean bl) {
 			if (this.disabled) {
 				return false;
 			}
 
-			if (button == GLFW.GLFW_MOUSE_BUTTON_1) {
+			if (event.buttonInfo().button() == GLFW.GLFW_MOUSE_BUTTON_1) {
 				return this.onClick.apply((T) this);
 			}
 
@@ -213,9 +221,9 @@ public class IrisElementRow {
 		}
 
 		@Override
-		public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+		public boolean keyPressed(net.minecraft.client.input.KeyEvent event) {
 			// Check for Enter or Space key (confirmation keys)
-			if (keyCode == GLFW.GLFW_KEY_ENTER || keyCode == GLFW.GLFW_KEY_KP_ENTER || keyCode == GLFW.GLFW_KEY_SPACE) {
+			if (event.key() == GLFW.GLFW_KEY_ENTER || event.key() == GLFW.GLFW_KEY_KP_ENTER || event.key() == GLFW.GLFW_KEY_SPACE) {
 				return this.onClick.apply((T) this);
 			}
 			return false;
