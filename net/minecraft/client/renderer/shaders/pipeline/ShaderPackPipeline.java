@@ -1,5 +1,6 @@
 package net.minecraft.client.renderer.shaders.pipeline;
 
+import com.google.common.collect.ImmutableList;
 import it.unimi.dsi.fastutil.objects.Object2ObjectMap;
 import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
 import net.minecraft.client.Minecraft;
@@ -7,11 +8,14 @@ import net.minecraft.client.Camera;
 import net.minecraft.client.renderer.shaders.framebuffer.GlFramebuffer;
 import net.minecraft.client.renderer.shaders.gl.FullScreenQuadRenderer;
 import net.minecraft.client.renderer.shaders.helpers.OptionalBoolean;
+import net.minecraft.client.renderer.shaders.helpers.StringPair;
 import net.minecraft.client.renderer.shaders.helpers.Tri;
 import net.minecraft.client.renderer.shaders.option.ShaderPackOptions;
 import net.minecraft.client.renderer.shaders.pack.*;
 import net.minecraft.client.renderer.shaders.pipeline.transform.PatchShaderType;
 import net.minecraft.client.renderer.shaders.pipeline.transform.TransformPatcher;
+import net.minecraft.client.renderer.shaders.preprocessor.JcppProcessor;
+import net.minecraft.client.renderer.shaders.preprocessor.StandardMacros;
 import net.minecraft.client.renderer.shaders.program.Program;
 import net.minecraft.client.renderer.shaders.program.ProgramBuilder;
 import net.minecraft.client.renderer.shaders.program.ProgramSource;
@@ -272,7 +276,8 @@ public class ShaderPackPipeline implements WorldRenderingPipeline {
 	 * Attempts to compile a shader program from the pack.
 	 * Returns null if the program doesn't exist or fails to compile.
 	 * 
-	 * Uses TransformPatcher to transform deprecated GLSL constructs to GLSL 330 Core
+	 * Uses JcppProcessor to preprocess #define/#ifdef directives, then
+	 * TransformPatcher to transform deprecated GLSL constructs to GLSL 330 Core
 	 * profile compatible code - following IRIS pattern exactly.
 	 * 
 	 * @param programName The program name (e.g., "gbuffers_terrain")
@@ -298,20 +303,34 @@ public class ShaderPackPipeline implements WorldRenderingPipeline {
 				programName, vertexSource.length(), fragmentSource.length(), 
 				geometrySource != null ? geometrySource.length() : 0);
 			
+			// Get standard environment defines for preprocessing
+			ImmutableList<StringPair> environmentDefines = StandardMacros.createStandardEnvironmentDefines();
+			
+			// Step 1: Preprocess shader sources with JCPP to handle #define, #ifdef, #include, etc.
+			// This MUST be done before passing to TransformPatcher
+			String preprocessedVertex = JcppProcessor.glslPreprocessSource(vertexSource, environmentDefines);
+			String preprocessedFragment = JcppProcessor.glslPreprocessSource(fragmentSource, environmentDefines);
+			String preprocessedGeometry = geometrySource != null 
+				? JcppProcessor.glslPreprocessSource(geometrySource, environmentDefines) 
+				: null;
+			
+			LOGGER.debug("Preprocessed program: {} (vsh={} chars, fsh={} chars)", 
+				programName, preprocessedVertex.length(), preprocessedFragment.length());
+			
 			// Determine the texture stage based on program name
 			TextureStage textureStage = determineTextureStage(programName);
 			
 			// Create empty texture map (will be populated with actual texture bindings in future)
 			Object2ObjectMap<Tri<String, TextureType, TextureStage>, String> textureMap = new Object2ObjectOpenHashMap<>();
 			
-			// Transform shader sources using TransformPatcher
+			// Step 2: Transform shader sources using TransformPatcher
 			// This handles deprecated GLSL constructs (gl_TextureMatrix, gl_Vertex, gl_Color, etc.)
 			// and converts them to GLSL 330 Core profile compatible code
 			Map<PatchShaderType, String> transformed = TransformPatcher.patchComposite(
 				programName,
-				vertexSource,
-				geometrySource,
-				fragmentSource,
+				preprocessedVertex,
+				preprocessedGeometry,
+				preprocessedFragment,
 				textureStage,
 				textureMap
 			);
