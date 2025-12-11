@@ -98,6 +98,7 @@ import org.joml.Quaternionf;
 import org.joml.Vector3f;
 import org.joml.Vector4f;
 import org.slf4j.Logger;
+import net.minecraft.client.renderer.shaders.uniform.providers.SystemTimeUniforms;
 
 @Environment(EnvType.CLIENT)
 public class GameRenderer implements Projector, AutoCloseable {
@@ -570,6 +571,10 @@ public class GameRenderer implements Projector, AutoCloseable {
 	}
 
 	public void render(DeltaTracker deltaTracker, boolean bl) {
+		// Update shader system timers for UI transitions (like Iris button alpha smoothing)
+		SystemTimeUniforms.COUNTER.beginFrame();
+		SystemTimeUniforms.TIMER.beginFrame(Util.getNanos());
+		
 		if (!this.minecraft.isWindowActive()
 			&& this.minecraft.options.pauseOnLostFocus
 			&& (!this.minecraft.options.touchscreen().get() || !this.minecraft.mouseHandler.isRightPressed())) {
