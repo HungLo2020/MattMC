@@ -2,19 +2,27 @@ package net.minecraft.client.renderer.shaders.pipeline;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.shaders.framebuffer.GlFramebuffer;
+import net.minecraft.client.renderer.shaders.gl.FullScreenQuadRenderer;
 import net.minecraft.client.renderer.shaders.helpers.OptionalBoolean;
 import net.minecraft.client.renderer.shaders.option.ShaderPackOptions;
 import net.minecraft.client.renderer.shaders.pack.*;
+import net.minecraft.client.renderer.shaders.program.Program;
+import net.minecraft.client.renderer.shaders.program.ProgramBuilder;
+import net.minecraft.client.renderer.shaders.program.ProgramSource;
+import net.minecraft.client.renderer.shaders.program.ShaderCompileException;
 import net.minecraft.client.renderer.shaders.targets.GBufferManager;
 import net.minecraft.client.renderer.shaders.targets.RenderTarget;
 import net.minecraft.client.renderer.shaders.texture.InternalTextureFormat;
+import com.mojang.blaze3d.opengl.GlStateManager;
 import org.lwjgl.opengl.GL11;
+import org.lwjgl.opengl.GL13;
 import org.lwjgl.opengl.GL20;
 import org.lwjgl.opengl.GL30;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -28,7 +36,10 @@ import java.util.Map;
  * This is the core shader rendering pipeline that:
  * - Manages G-buffers for MRT output
  * - Handles framebuffer binding during rendering phases
- * - Executes composite and final passes
+ * - Compiles shader programs from pack source (Step A5)
+ * - Binds shader programs during rendering (Step A6)
+ * - Executes composite passes (Step A7)
+ * - Executes final pass to screen (Step A8)
  */
 public class ShaderPackPipeline implements WorldRenderingPipeline {
 	private static final Logger LOGGER = LoggerFactory.getLogger(ShaderPackPipeline.class);
@@ -46,6 +57,18 @@ public class ShaderPackPipeline implements WorldRenderingPipeline {
 	private boolean isRenderingWorld = false;
 	private int cachedWidth = -1;
 	private int cachedHeight = -1;
+	
+	// Shader programs (Step A5)
+	private final Map<String, Program> programs = new HashMap<>();
+	private Program gbuffersTerrainProgram;
+	private Program gbuffersTexturedProgram;
+	private Program gbuffersBasicProgram;
+	private final List<Program> compositePrograms = new ArrayList<>();
+	private Program finalProgram;
+	private boolean programsCompiled = false;
+	
+	// Composite pass framebuffers (Step A7)
+	private final List<GlFramebuffer> compositeFramebuffers = new ArrayList<>();
 	
 	/**
 	 * Creates a new shader pack pipeline.
@@ -91,7 +114,104 @@ public class ShaderPackPipeline implements WorldRenderingPipeline {
 		// Will be resized in beginLevelRendering() based on actual screen size
 		this.gBufferManager = new GBufferManager(1, 1, createDefaultTargetSettings());  // Will resize later
 		
+		// Compile shader programs (Step A5)
+		compilePrograms();
+		
 		LOGGER.info("Created shader pipeline for pack: {} in dimension: {}", packName, dimension);
+	}
+	
+	/**
+	 * Compiles all shader programs from the shader pack (Step A5).
+	 * Following IRIS's program creation pattern.
+	 * 
+	 * IRIS Reference: IrisRenderingPipeline.java createShader() method
+	 */
+	private void compilePrograms() {
+		LOGGER.info("Compiling shader programs for pack: {}", packName);
+		
+		// Try to compile gbuffers_terrain (most important for terrain rendering)
+		gbuffersTerrainProgram = tryCompileProgram("gbuffers_terrain");
+		
+		// Try to compile fallback programs
+		if (gbuffersTerrainProgram == null) {
+			gbuffersTexturedProgram = tryCompileProgram("gbuffers_textured");
+		}
+		if (gbuffersTerrainProgram == null && gbuffersTexturedProgram == null) {
+			gbuffersBasicProgram = tryCompileProgram("gbuffers_basic");
+		}
+		
+		// Compile composite programs (composite, composite1, composite2, etc.)
+		for (int i = 0; i <= 7; i++) {
+			String name = i == 0 ? "composite" : "composite" + i;
+			Program composite = tryCompileProgram(name);
+			if (composite != null) {
+				compositePrograms.add(composite);
+				LOGGER.info("Compiled composite program: {}", name);
+			}
+		}
+		
+		// Compile deferred programs
+		for (int i = 0; i <= 7; i++) {
+			String name = i == 0 ? "deferred" : "deferred" + i;
+			Program deferred = tryCompileProgram(name);
+			if (deferred != null) {
+				compositePrograms.add(deferred);
+				LOGGER.info("Compiled deferred program: {}", name);
+			}
+		}
+		
+		// Compile final program
+		finalProgram = tryCompileProgram("final");
+		
+		programsCompiled = true;
+		
+		int compiledCount = programs.size();
+		LOGGER.info("Compiled {} shader programs for pack: {}", compiledCount, packName);
+	}
+	
+	/**
+	 * Attempts to compile a shader program from the pack.
+	 * Returns null if the program doesn't exist or fails to compile.
+	 * 
+	 * @param programName The program name (e.g., "gbuffers_terrain")
+	 * @return The compiled program, or null
+	 */
+	private Program tryCompileProgram(String programName) {
+		try {
+			// Get vertex and fragment sources
+			String vertexSource = sourceProvider.getShaderSource(programName + ".vsh");
+			String fragmentSource = sourceProvider.getShaderSource(programName + ".fsh");
+			
+			// Check if both sources exist
+			if (vertexSource == null || fragmentSource == null) {
+				LOGGER.debug("Program {} not found (vsh={}, fsh={})", 
+					programName, vertexSource != null, fragmentSource != null);
+				return null;
+			}
+			
+			// Get optional geometry source
+			String geometrySource = sourceProvider.getShaderSource(programName + ".gsh");
+			
+			LOGGER.debug("Compiling program: {} (vsh={} chars, fsh={} chars)", 
+				programName, vertexSource.length(), fragmentSource.length());
+			
+			// Build the program using ProgramBuilder
+			Program program = ProgramBuilder.begin(programName, vertexSource, geometrySource, fragmentSource)
+				.build();
+			
+			// Store in programs map
+			programs.put(programName, program);
+			
+			LOGGER.info("Successfully compiled program: {}", programName);
+			return program;
+			
+		} catch (ShaderCompileException e) {
+			LOGGER.error("Failed to compile program {}: {}", programName, e.getMessage());
+			return null;
+		} catch (Exception e) {
+			LOGGER.error("Error compiling program {}", programName, e);
+			return null;
+		}
 	}
 	
 	/**
@@ -203,14 +323,199 @@ public class ShaderPackPipeline implements WorldRenderingPipeline {
 		// Unbind G-buffer framebuffer
 		GlFramebuffer.unbind();
 		
-		// TODO: Execute composite passes (Step A7)
-		// compositeRenderer.renderAll();
+		// Execute composite passes (Step A7)
+		executeCompositePasses();
 		
-		// TODO: Execute final pass (Step A8)  
-		// finalPassRenderer.renderFinalPass();
+		// Execute final pass (Step A8)
+		executeFinalPass();
+	}
+	
+	/**
+	 * Executes composite post-processing passes (Step A7).
+	 * Following IRIS's CompositeRenderer.renderAll() pattern.
+	 * 
+	 * IRIS Reference: CompositeRenderer.java:273-363
+	 */
+	private void executeCompositePasses() {
+		if (compositePrograms.isEmpty()) {
+			LOGGER.debug("No composite programs to execute");
+			return;
+		}
 		
-		// For now, copy colortex0 to screen (temporary until composite/final passes are implemented)
-		copyColorToScreen();
+		LOGGER.debug("Executing {} composite passes", compositePrograms.size());
+		
+		for (int i = 0; i < compositePrograms.size(); i++) {
+			Program program = compositePrograms.get(i);
+			if (program == null) continue;
+			
+			// For each composite pass:
+			// 1. Bind appropriate framebuffer (ping-pong between buffers)
+			// 2. Bind input textures (previous pass output)
+			// 3. Use the composite program
+			// 4. Render full-screen quad
+			
+			// Bind output framebuffer (alternate between colortex0/1 for ping-pong)
+			if (gBufferFramebuffer != null) {
+				gBufferFramebuffer.bind();
+				
+				// For ping-pong, we'd alternate draw buffers
+				// For now, just write to colortex0
+				int[] drawBuffers = new int[]{GL30.GL_COLOR_ATTACHMENT0};
+				GL20.glDrawBuffers(drawBuffers);
+			}
+			
+			// Set viewport
+			GL11.glViewport(0, 0, cachedWidth, cachedHeight);
+			
+			// Bind input textures (G-buffer outputs from geometry pass)
+			bindGBufferTextures();
+			
+			// Use the composite program
+			program.use();
+			
+			// Set basic uniforms (Step A10 will add full uniform support)
+			setBasicUniforms(program.getProgramId());
+			
+			// Render full-screen quad
+			FullScreenQuadRenderer.INSTANCE.render();
+			
+			LOGGER.trace("Executed composite pass {}", i);
+		}
+		
+		// Unbind program
+		Program.unbind();
+		
+		// Unbind framebuffer
+		GlFramebuffer.unbind();
+		
+		LOGGER.debug("Composite passes complete");
+	}
+	
+	/**
+	 * Executes the final pass to output to screen (Step A8).
+	 * Following IRIS's FinalPassRenderer.renderFinalPass() pattern.
+	 * 
+	 * IRIS Reference: FinalPassRenderer.java:207-331
+	 */
+	private void executeFinalPass() {
+		LOGGER.debug("Executing final pass (program={})", finalProgram != null ? "present" : "absent");
+		
+		Minecraft mc = Minecraft.getInstance();
+		com.mojang.blaze3d.pipeline.RenderTarget mainTarget = mc.getMainRenderTarget();
+		
+		if (mainTarget == null) {
+			LOGGER.warn("Main render target is null, cannot execute final pass");
+			return;
+		}
+		
+		if (finalProgram != null) {
+			// Bind default framebuffer (screen)
+			GL30.glBindFramebuffer(GL30.GL_FRAMEBUFFER, 0);
+			
+			// Set viewport to screen size
+			GL11.glViewport(0, 0, mainTarget.width, mainTarget.height);
+			
+			// Bind G-buffer textures as input
+			bindGBufferTextures();
+			
+			// Use final program
+			finalProgram.use();
+			
+			// Set basic uniforms
+			setBasicUniforms(finalProgram.getProgramId());
+			
+			// Render full-screen quad
+			FullScreenQuadRenderer.INSTANCE.render();
+			
+			// Unbind program
+			Program.unbind();
+			
+			LOGGER.debug("Final pass executed with shader");
+		} else {
+			// No final shader - copy colortex0 directly to screen
+			copyColorToScreen();
+			LOGGER.debug("Final pass executed via direct copy (no final shader)");
+		}
+		
+		// Unbind all textures
+		for (int i = 0; i < 8; i++) {
+			GlStateManager._activeTexture(GL13.GL_TEXTURE0 + i);
+			GlStateManager._bindTexture(0);
+		}
+		GlStateManager._activeTexture(GL13.GL_TEXTURE0);
+	}
+	
+	/**
+	 * Binds G-buffer textures for reading in composite/final passes.
+	 * Following IRIS's texture binding pattern.
+	 */
+	private void bindGBufferTextures() {
+		// Bind colortex0 to texture unit 0
+		RenderTarget colorTex0 = gBufferManager.get(0);
+		if (colorTex0 != null) {
+			GlStateManager._activeTexture(GL13.GL_TEXTURE0);
+			GlStateManager._bindTexture(colorTex0.getMainTexture());
+		}
+		
+		// Bind colortex1 to texture unit 1
+		RenderTarget colorTex1 = gBufferManager.get(1);
+		if (colorTex1 != null) {
+			GlStateManager._activeTexture(GL13.GL_TEXTURE1);
+			GlStateManager._bindTexture(colorTex1.getMainTexture());
+		}
+		
+		// Bind colortex2 to texture unit 2
+		RenderTarget colorTex2 = gBufferManager.get(2);
+		if (colorTex2 != null) {
+			GlStateManager._activeTexture(GL13.GL_TEXTURE2);
+			GlStateManager._bindTexture(colorTex2.getMainTexture());
+		}
+		
+		// Reset to texture unit 0
+		GlStateManager._activeTexture(GL13.GL_TEXTURE0);
+	}
+	
+	/**
+	 * Sets basic uniforms for shader programs.
+	 * Full uniform support will be implemented in Step A10.
+	 * 
+	 * @param programId The OpenGL program ID
+	 */
+	private void setBasicUniforms(int programId) {
+		// colortex0 sampler
+		int colortex0Loc = GL20.glGetUniformLocation(programId, "colortex0");
+		if (colortex0Loc >= 0) {
+			GL20.glUniform1i(colortex0Loc, 0);
+		}
+		
+		// Alternative names for colortex0
+		int gcolor = GL20.glGetUniformLocation(programId, "gcolor");
+		if (gcolor >= 0) {
+			GL20.glUniform1i(gcolor, 0);
+		}
+		
+		// colortex1 sampler
+		int colortex1Loc = GL20.glGetUniformLocation(programId, "colortex1");
+		if (colortex1Loc >= 0) {
+			GL20.glUniform1i(colortex1Loc, 1);
+		}
+		
+		// colortex2 sampler
+		int colortex2Loc = GL20.glGetUniformLocation(programId, "colortex2");
+		if (colortex2Loc >= 0) {
+			GL20.glUniform1i(colortex2Loc, 2);
+		}
+		
+		// Screen dimensions
+		int viewWidthLoc = GL20.glGetUniformLocation(programId, "viewWidth");
+		if (viewWidthLoc >= 0) {
+			GL20.glUniform1f(viewWidthLoc, cachedWidth);
+		}
+		
+		int viewHeightLoc = GL20.glGetUniformLocation(programId, "viewHeight");
+		if (viewHeightLoc >= 0) {
+			GL20.glUniform1f(viewHeightLoc, cachedHeight);
+		}
 	}
 	
 	/**
@@ -318,6 +623,28 @@ public class ShaderPackPipeline implements WorldRenderingPipeline {
 	@Override
 	public void destroy() {
 		LOGGER.info("Destroying shader pipeline for pack: {}", packName);
+		
+		// Destroy all compiled programs (Step A5 cleanup)
+		for (Program program : programs.values()) {
+			if (program != null) {
+				program.destroy();
+			}
+		}
+		programs.clear();
+		compositePrograms.clear();
+		gbuffersTerrainProgram = null;
+		gbuffersTexturedProgram = null;
+		gbuffersBasicProgram = null;
+		finalProgram = null;
+		programsCompiled = false;
+		
+		// Destroy composite framebuffers (Step A7 cleanup)
+		for (GlFramebuffer fb : compositeFramebuffers) {
+			if (fb != null) {
+				fb.destroy();
+			}
+		}
+		compositeFramebuffers.clear();
 		
 		if (gBufferFramebuffer != null) {
 			gBufferFramebuffer.destroy();
