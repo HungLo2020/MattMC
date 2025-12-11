@@ -25,7 +25,8 @@ import net.minecraft.sounds.SoundEvents;
  * IRIS VERBATIM - Adapted from Iris 1.21.9 for MattMC package structure
  */
 public final class GuiUtil {
-	public static final ResourceLocation IRIS_WIDGETS_TEX = ResourceLocation.fromNamespaceAndPath("iris", "textures/gui/widgets.png");
+	// Use minecraft namespace for direct integration - texture at assets/minecraft/textures/gui/iris/widgets.png
+	public static final ResourceLocation IRIS_WIDGETS_TEX = ResourceLocation.withDefaultNamespace("textures/gui/iris/widgets.png");
 	private static final Component ELLIPSIS = Component.literal("...");
 
 	private GuiUtil() {
