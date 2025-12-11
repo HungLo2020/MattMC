@@ -5,6 +5,7 @@ import com.google.common.collect.Lists;
 import com.mojang.blaze3d.platform.Monitor;
 import com.mojang.blaze3d.platform.VideoMode;
 import com.mojang.blaze3d.platform.Window;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import net.minecraft.api.EnvType;
@@ -15,10 +16,14 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.OptionInstance;
 import net.minecraft.client.Options;
 import net.minecraft.client.gui.components.AbstractWidget;
+import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.CycleButton;
+import net.minecraft.client.gui.components.Tooltip;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.client.renderer.GpuWarnlistManager;
+import net.minecraft.client.renderer.shaders.gui.option.IrisVideoSettings;
+import net.minecraft.client.renderer.shaders.gui.screen.ShaderPackScreen;
 import net.minecraft.network.chat.CommonComponents;
 import net.minecraft.network.chat.Component;
 
@@ -30,38 +35,53 @@ public class VideoSettingsScreen extends OptionsSubScreen {
 	private static final Component WARNING_TITLE = Component.translatable("options.graphics.warning.title").withStyle(ChatFormatting.RED);
 	private static final Component BUTTON_ACCEPT = Component.translatable("options.graphics.warning.accept");
 	private static final Component BUTTON_CANCEL = Component.translatable("options.graphics.warning.cancel");
+	private static final int SHADER_PACK_BUTTON_WIDTH = 150;
 	private final GpuWarnlistManager gpuWarnlistManager;
 	private final int oldMipmaps;
 
-	private static OptionInstance<?>[] options(Options options) {
-		return new OptionInstance[]{
-			options.graphicsMode(),
-			options.renderDistance(),
-			options.prioritizeChunkUpdates(),
-			options.simulationDistance(),
-			options.ambientOcclusion(),
-			options.framerateLimit(),
-			options.enableVsync(),
-			options.inactivityFpsLimit(),
-			options.guiScale(),
-			options.attackIndicator(),
-			options.gamma(),
-			options.cloudStatus(),
-			options.fullscreen(),
-			options.particles(),
-			options.mipmapLevels(),
-			options.entityShadows(),
-			options.screenEffectScale(),
-			options.entityDistanceScaling(),
-			options.fovEffectScale(),
-			options.showAutosaveIndicator(),
-			options.glintSpeed(),
-			options.glintStrength(),
-			options.menuBackgroundBlurriness(),
-			options.panoramaTheme(),
-			options.bobView(),
-			options.cloudRange()
-		};
+	private OptionInstance<?>[] options() {
+		List<OptionInstance<?>> optionsList = new ArrayList<>(
+			List.of(
+				this.options.graphicsMode(),
+				this.options.renderDistance(),
+				this.options.prioritizeChunkUpdates(),
+				this.options.simulationDistance(),
+				this.options.ambientOcclusion(),
+				this.options.framerateLimit(),
+				this.options.enableVsync(),
+				this.options.inactivityFpsLimit(),
+				this.options.guiScale(),
+				this.options.attackIndicator(),
+				this.options.gamma(),
+				this.options.cloudStatus(),
+				this.options.fullscreen(),
+				this.options.particles(),
+				this.options.mipmapLevels(),
+				this.options.entityShadows(),
+				this.options.screenEffectScale(),
+				this.options.entityDistanceScaling(),
+				this.options.fovEffectScale(),
+				this.options.showAutosaveIndicator(),
+				this.options.glintSpeed(),
+				this.options.glintStrength(),
+				this.options.menuBackgroundBlurriness(),
+				this.options.panoramaTheme(),
+				this.options.bobView(),
+				this.options.cloudRange()
+			)
+		);
+		optionsList.add(IrisVideoSettings.RENDER_DISTANCE);
+		return optionsList.toArray(new OptionInstance[0]);
+	}
+
+	private Button createShaderPackButton() {
+		return Button.builder(
+				Component.translatable("options.iris.shaderPackSelection"),
+				button -> this.minecraft.setScreen(new ShaderPackScreen(this))
+			)
+			.tooltip(Tooltip.create(Component.translatable("options.iris.shaderPackSelection.title")))
+			.width(SHADER_PACK_BUTTON_WIDTH)
+			.build();
 	}
 
 	public VideoSettingsScreen(Screen screen, Minecraft minecraft, Options options) {
@@ -119,7 +139,8 @@ public class VideoSettingsScreen extends OptionsSubScreen {
 		);
 		this.list.addBig(optionInstance);
 		this.list.addBig(this.options.biomeBlendRadius());
-		this.list.addSmall(options(this.options));
+		this.list.addSmall(this.options());
+		this.list.addSmall(this.createShaderPackButton(), null);
 	}
 
 	@Override
