@@ -75,6 +75,7 @@ public class ShaderPackPipeline implements WorldRenderingPipeline {
 	private GBufferManager gBufferManager;
 	private GlFramebuffer gBufferFramebuffer;
 	private boolean isRenderingWorld = false;
+	private boolean isBeforeTranslucent = true;
 	private int cachedWidth = -1;
 	private int cachedHeight = -1;
 	
@@ -1139,6 +1140,22 @@ public class ShaderPackPipeline implements WorldRenderingPipeline {
 	 */
 	public boolean isRenderingWorld() {
 		return isRenderingWorld;
+	}
+
+	/**
+	 * Checks if we are before the translucent rendering phase.
+	 * @return true if before translucent rendering
+	 */
+	public boolean isBeforeTranslucent() {
+		return isBeforeTranslucent;
+	}
+
+	/**
+	 * Sets whether we are before the translucent rendering phase.
+	 * @param beforeTranslucent true if before translucent rendering
+	 */
+	public void setBeforeTranslucent(boolean beforeTranslucent) {
+		this.isBeforeTranslucent = beforeTranslucent;
 	}
 	
 	/**
