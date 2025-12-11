@@ -334,24 +334,19 @@ public class GlDevice implements GpuDevice {
 	/**
 	 * Get or compile a render pipeline.
 	 * 
-	 * IRIS INTEGRATION: This method intercepts vanilla shader requests and replaces them
-	 * with shader pack programs when a shader pack is active and shouldOverrideShaders() is true.
+	 * Currently uses vanilla pipeline compilation.
 	 * 
-	 * This follows the IRIS pattern from MixinShaderManager_Overrides.java:redirectIrisProgram()
+	 * TODO: IRIS INTEGRATION - Implement shader pack program interception following
+	 * the IRIS pattern from MixinShaderManager_Overrides.java:redirectIrisProgram().
+	 * This requires implementing ExtendedShader with proper Iris uniform binding:
+	 * - CommonUniforms.addDynamicUniforms()
+	 * - BuiltinReplacementUniforms.addBuiltinReplacementUniforms()
+	 * - VanillaUniforms.addVanillaUniforms()
+	 * - Custom sampler binding through addGbufferOrShadowSamplers()
+	 * - Iris-specific vertex attributes (mc_Entity, mc_midTexCoord, at_tangent)
 	 */
 	protected GlRenderPipeline getOrCompilePipeline(RenderPipeline renderPipeline) {
-		// === IRIS SHADER PACK INTERCEPTION ===
-		// NOTE: Full shader interception requires ExtendedShader with custom uniform binding
-		// (CommonUniforms, BuiltinReplacementUniforms, VanillaUniforms, custom samplers, etc.)
-		// 
-		// For now, we compile shader pack programs for composite/deferred/final post-processing
-		// but don't intercept gbuffers rendering as it requires the full Iris uniform system.
-		// 
-		// TODO: Implement ExtendedShader following Iris ShaderCreator pattern
-		// TODO: Add proper uniform binding for gbuffers programs
-		// TODO: Bind Iris-specific attributes (mc_Entity, mc_midTexCoord, at_tangent, etc.)
-		
-		// Fall back to vanilla pipeline compilation
+		// Vanilla pipeline compilation
 		return (GlRenderPipeline)this.pipelineCache
 			.computeIfAbsent(renderPipeline, renderPipeline2 -> this.compilePipeline(renderPipeline, this.defaultShaderSource));
 	}
