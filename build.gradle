@@ -188,6 +188,17 @@ dependencies {
     // Note: @Environment and @EnvType annotations are now provided by custom implementation
     // in the net.minecraft.api package (replaced Fabric dependency)
     
+    // ===== IRIS SHADER COMPATIBILITY =====
+    // GLSL-Transformer - AST-based GLSL shader transformation library (required for Iris shader compatibility)
+    // Reference: https://github.com/douira/glsl-transformer
+    implementation 'io.github.douira:glsl-transformer:3.0.0-pre3'
+    
+    // ANTLR Runtime - Parser runtime required by glsl-transformer
+    implementation 'org.antlr:antlr4-runtime:4.13.1'
+    
+    // JCPP - C/GLSL preprocessor for #define, #ifdef, #include processing
+    implementation 'org.anarres:jcpp:1.4.14'
+    
     // ===== TESTING DEPENDENCIES =====
     // Testing dependencies - only available in test scope, excluded from production builds
     
