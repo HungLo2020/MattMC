@@ -251,9 +251,9 @@ public class ShaderPackPipeline implements WorldRenderingPipeline {
 	 */
 	private Program tryCompileProgram(String programName) {
 		try {
-			// Get vertex and fragment sources
-			String vertexSource = sourceProvider.getShaderSource(programName + ".vsh");
-			String fragmentSource = sourceProvider.getShaderSource(programName + ".fsh");
+			// Get vertex and fragment sources with dimension awareness
+			String vertexSource = sourceProvider.getShaderSource(programName + ".vsh", dimension);
+			String fragmentSource = sourceProvider.getShaderSource(programName + ".fsh", dimension);
 			
 			// Check if both sources exist
 			if (vertexSource == null || fragmentSource == null) {
@@ -263,7 +263,7 @@ public class ShaderPackPipeline implements WorldRenderingPipeline {
 			}
 			
 			// Get optional geometry source
-			String geometrySource = sourceProvider.getShaderSource(programName + ".gsh");
+			String geometrySource = sourceProvider.getShaderSource(programName + ".gsh", dimension);
 			
 			LOGGER.debug("Compiling program: {} (vsh={} chars, fsh={} chars)", 
 				programName, vertexSource.length(), fragmentSource.length());
