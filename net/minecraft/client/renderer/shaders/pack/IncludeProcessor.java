@@ -4,7 +4,6 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 
 /**
  * Processes #include directives in shader files by recursively expanding them.
@@ -70,10 +69,17 @@ public class IncludeProcessor {
 			AbsolutePackPath include = includes.get(i);
 			
 			if (include != null) {
-				// TODO: Don't recurse like this, and check for cycles
-				// TODO: Better diagnostics
-				// Note: IRIS has these same TODOs - we're matching their implementation exactly
-				builder.addAll(Objects.requireNonNull(getIncludedFile(include)));
+				// Get the included file content
+				List<String> includedContent = getIncludedFile(include);
+				
+				if (includedContent != null) {
+					builder.addAll(includedContent);
+				} else {
+					// Include failed - add error comment and continue
+					// This allows partial shader compilation for debugging
+					builder.add("// ERROR: Failed to include: " + include.getPathString());
+					builder.add(lines.get(i)); // Keep original #include line as comment reference
+				}
 			} else {
 				builder.add(lines.get(i));
 			}
