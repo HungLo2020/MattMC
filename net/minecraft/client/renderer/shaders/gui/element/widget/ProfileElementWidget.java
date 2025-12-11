@@ -14,7 +14,7 @@ import java.util.Optional;
  * Matches Iris ProfileElementWidget pattern.
  */
 public class ProfileElementWidget extends BaseOptionElementWidget<OptionMenuProfileElement> {
-	private static final Component PROFILE_LABEL = Component.translatable("options.iris.profile");
+	private static final net.minecraft.network.chat.MutableComponent PROFILE_LABEL = Component.translatable("options.iris.profile");
 
 	public ProfileElementWidget(OptionMenuProfileElement element) {
 		super(element);

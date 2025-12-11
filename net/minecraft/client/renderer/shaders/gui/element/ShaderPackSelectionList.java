@@ -29,7 +29,7 @@ import java.nio.file.WatchKey;
 import java.nio.file.WatchService;
 import java.util.List;
 
-public class ShaderPackSelectionList extends IrisObjectSelectionList<ShaderPackSelectionList.BaseEntry> {
+public class ShaderPackSelectionList extends AbstractSelectionList<ShaderPackSelectionList.BaseEntry> {
 	private static final Component PACK_LIST_LABEL = Component.translatable("pack.iris.list.label").withStyle(ChatFormatting.ITALIC, ChatFormatting.GRAY);
 	private static final ResourceLocation MENU_LIST_BACKGROUND = ResourceLocation.withDefaultNamespace("textures/gui/menu_background.png");
 	private final ShaderPackScreen screen;
@@ -41,7 +41,7 @@ public class ShaderPackSelectionList extends IrisObjectSelectionList<ShaderPackS
 	private ShaderPackEntry applied = null;
 
 	public ShaderPackSelectionList(ShaderPackScreen screen, Minecraft client, int width, int height, int top, int bottom, int left, int right) {
-		super(client, width, bottom, top + 4, bottom, left, right, 20);
+		super(client, width, height, top + 4, 20);
 		WatchKey key1;
 		WatchService watcher1;
 
@@ -109,8 +109,24 @@ public class ShaderPackSelectionList extends IrisObjectSelectionList<ShaderPackS
 	}
 
 	@Override
+	protected int scrollBarX() {
+		// Position the scrollbar at the rightmost edge of the screen.
+		// By default, the scrollbar is positioned moderately offset from the center.
+		return width - 6;
+	}
+
+	public void select(int entry) {
+		setSelected(this.children().get(entry));
+	}
+
+	@Override
+	public void updateWidgetNarration(net.minecraft.client.gui.narration.NarrationElementOutput narrationElementOutput) {
+		// Empty implementation - matches IRIS exactly
+	}
+
+	@Override
 	protected void renderListBackground(GuiGraphics guiGraphics) {
-		float transition = screen.getListTransitionProgress();
+		float transition = screen.listTransition.getAsFloat();
 		if (transition < 0.02f) return;
 
 		guiGraphics.blit(
@@ -125,7 +141,7 @@ public class ShaderPackSelectionList extends IrisObjectSelectionList<ShaderPackS
 
 	@Override
 	protected void renderListSeparators(GuiGraphics guiGraphics) {
-		float transition = screen.getListTransitionProgress();
+		float transition = screen.listTransition.getAsFloat();
 		if (transition < 0.02f) return;
 
 		int col = (int)(transition * 255.0f) << 24 | 0xFFFFFF;
@@ -139,7 +155,7 @@ public class ShaderPackSelectionList extends IrisObjectSelectionList<ShaderPackS
 	}
 
 	@Override
-	protected int getRowTop(int index) {
+	public int getRowTop(int index) {
 		return super.getRowTop(index) + 2;
 	}
 
@@ -257,11 +273,6 @@ public class ShaderPackSelectionList extends IrisObjectSelectionList<ShaderPackS
 			int entryHeight = getContentHeight();
 			guiGraphics.drawCenteredString(Minecraft.getInstance().font, label, (x + entryWidth / 2) - 2, y + (entryHeight - 11) / 2, 0xFFC2C2C2);
 		}
-
-		@Override
-		public Component getNarration() {
-			return label;
-		}
 	}
 
 	public static class TopButtonRowEntry extends BaseEntry {
@@ -330,11 +341,6 @@ public class ShaderPackSelectionList extends IrisObjectSelectionList<ShaderPackS
 			return (!isFocused()) ? ComponentPath.leaf(this) : null;
 		}
 
-		@Override
-		public Component getNarration() {
-			return getEnableDisableLabel();
-		}
-
 		public boolean isFocused() {
 			return this.list.getFocused() == this;
 		}
@@ -384,11 +390,6 @@ public class ShaderPackSelectionList extends IrisObjectSelectionList<ShaderPackS
 			}
 
 			return false;
-		}
-
-		@Override
-		public Component getNarration() {
-			return label;
 		}
 	}
 
