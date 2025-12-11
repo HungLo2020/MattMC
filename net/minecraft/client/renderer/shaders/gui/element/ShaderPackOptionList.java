@@ -195,13 +195,13 @@ public class ShaderPackOptionList extends IrisContainerObjectSelectionList<Shade
 		}
 
 		@Override
-		public boolean mouseClicked(double mouseX, double mouseY, int button) {
-			return this.widgets.get(getHoveredWidget((int) mouseX)).mouseClicked(event, bl2);
+		public boolean mouseClicked(net.minecraft.client.input.MouseButtonEvent event, boolean bl) {
+			return this.widgets.get(getHoveredWidget((int) event.x())).mouseClicked(event, bl);
 		}
 
 		@Override
-		public boolean mouseReleased(double mouseX, double mouseY, int button) {
-			return this.widgets.get(getHoveredWidget((int) mouseX)).mouseReleased(event);
+		public boolean mouseReleased(net.minecraft.client.input.MouseButtonEvent event) {
+			return this.widgets.get(getHoveredWidget((int) event.x())).mouseReleased(event);
 		}
 
 		@Override
@@ -325,15 +325,15 @@ public class ShaderPackOptionList extends IrisContainerObjectSelectionList<Shade
 		}
 
 		@Override
-		public boolean mouseClicked(double mouseX, double mouseY, int button) {
-			boolean backButtonResult = backButton != null && backButton.mouseClicked(event, bl2);
-			boolean utilButtonResult = utilityButtons.mouseClicked(event, bl2);
+		public boolean mouseClicked(net.minecraft.client.input.MouseButtonEvent event, boolean bl) {
+			boolean backButtonResult = backButton != null && backButton.mouseClicked(event, bl);
+			boolean utilButtonResult = utilityButtons.mouseClicked(event, bl);
 
 			return backButtonResult || utilButtonResult;
 		}
 
 		@Override
-		public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+		public boolean keyPressed(net.minecraft.client.input.KeyEvent event) {
 			if (backButton != null && backButton.keyPressed(event)) {
 				return true;
 			}
