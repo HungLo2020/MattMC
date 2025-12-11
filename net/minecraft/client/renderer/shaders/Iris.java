@@ -244,7 +244,10 @@ public class Iris {
 			for (int i = 0; i < original.length; i++) {
 				// check if it's a section sign
 				if (original[i] == '§') {
-					i++;
+					// Skip the next character (format code) if it exists
+					if (i + 1 < original.length) {
+						i++;
+					}
 				} else {
 					cleaned[c++] = original[i];
 				}
@@ -302,17 +305,18 @@ public class Iris {
 		public void copyPackIntoDirectory(String fileName, Path pack) throws java.io.IOException {
 			Path target = root.resolve(fileName);
 
-			// Copy the pack file into the shaderpacks folder
-			Files.copy(pack, target);
-
-			// Handle directories - need to copy contents
+			// Handle directories - need to copy entire directory tree
 			if (Files.isDirectory(pack)) {
-				// Copy all subdirectories first
+				// Create the target directory first
+				Files.createDirectories(target);
+				
+				// Copy all subdirectories
 				try (Stream<Path> stream = Files.walk(pack)) {
 					for (Path p : stream.filter(Files::isDirectory).toList()) {
 						Path folder = pack.relativize(p);
-						if (!Files.exists(target.resolve(folder))) {
-							Files.createDirectory(target.resolve(folder));
+						Path targetFolder = target.resolve(folder);
+						if (!Files.exists(targetFolder)) {
+							Files.createDirectories(targetFolder);
 						}
 					}
 				}
@@ -324,6 +328,9 @@ public class Iris {
 						Files.copy(p, target.resolve(file));
 					}
 				}
+			} else {
+				// Copy the pack file (zip) into the shaderpacks folder
+				Files.copy(pack, target);
 			}
 		}
 	}
