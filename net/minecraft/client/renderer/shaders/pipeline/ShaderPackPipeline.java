@@ -112,15 +112,35 @@ public class ShaderPackPipeline implements WorldRenderingPipeline {
 		this.shaderProperties = props;
 		
 		// Create shader source provider (Step 7)
-		// Find starting paths in the shaders/ directory
+		// Find starting paths in the shaders/ directory AND dimension directories
+		// Following IRIS pattern - search world0, world-1, world1 directories
 		List<String> candidates = ShaderPackSourceNames.getPotentialStarts();
-		List<AbsolutePackPath> startingPaths = ShaderPackSourceNames.findPresentSources(
+		List<AbsolutePackPath> startingPaths = new ArrayList<>();
+		
+		// Search base shaders directory
+		startingPaths.addAll(ShaderPackSourceNames.findPresentSources(
 			packSource, 
 			"/shaders/", 
 			candidates
-		);
+		));
 		
-		LOGGER.debug("Found {} starting shader files for pack: {}", startingPaths.size(), packName);
+		// Search dimension-specific directories (IRIS pattern from ShaderPack.java)
+		String[] dimensionDirs = {"world0", "world-1", "world1"};
+		for (String dimDir : dimensionDirs) {
+			if (packSource.fileExists("shaders/" + dimDir)) {
+				List<AbsolutePackPath> dimPaths = ShaderPackSourceNames.findPresentSources(
+					packSource, 
+					"/shaders/" + dimDir + "/", 
+					candidates
+				);
+				startingPaths.addAll(dimPaths);
+				if (!dimPaths.isEmpty()) {
+					LOGGER.debug("Found {} shader files in dimension directory: {}", dimPaths.size(), dimDir);
+				}
+			}
+		}
+		
+		LOGGER.info("Found {} starting shader files for pack: {}", startingPaths.size(), packName);
 		
 		this.sourceProvider = new ShaderSourceProvider(packSource, startingPaths);
 		
