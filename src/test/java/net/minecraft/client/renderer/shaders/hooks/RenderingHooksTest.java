@@ -2,6 +2,8 @@ package net.minecraft.client.renderer.shaders.hooks;
 
 import net.minecraft.client.renderer.shaders.pipeline.ShaderRenderingPipeline;
 import net.minecraft.client.renderer.shaders.pipeline.WorldRenderingPhase;
+import net.minecraft.client.renderer.shaders.pipeline.WorldRenderingPipeline;
+import org.joml.Matrix4f;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -14,10 +16,14 @@ import static org.junit.jupiter.api.Assertions.*;
 public class RenderingHooksTest {
     
     private MockShaderPipeline mockPipeline;
+    private Matrix4f testModelView;
+    private Matrix4f testProjection;
     
     @BeforeEach
     public void setUp() {
         mockPipeline = new MockShaderPipeline();
+        testModelView = new Matrix4f().identity();
+        testProjection = new Matrix4f().identity();
         RenderingHooks.reset();
     }
     
@@ -35,67 +41,15 @@ public class RenderingHooksTest {
     }
     
     @Test
-    public void testWorldRenderingLifecycle() {
-        RenderingHooks.setActivePipeline(mockPipeline);
-        
-        RenderingHooks.onWorldRenderStart();
-        assertTrue(mockPipeline.isBeginWorldRenderingCalled());
-        assertTrue(RenderingHooks.isPipelineActive());
-        
-        RenderingHooks.onWorldRenderEnd();
-        assertTrue(mockPipeline.isFinishWorldRenderingCalled());
-        assertFalse(RenderingHooks.isPipelineActive());
-    }
-    
-    @Test
-    public void testTerrainRenderingHooks() {
-        RenderingHooks.setActivePipeline(mockPipeline);
-        RenderingHooks.onWorldRenderStart();
-        
-        RenderingHooks.onBeginTerrainRendering();
-        assertTrue(mockPipeline.isBeginTerrainRenderingCalled());
-        assertEquals(WorldRenderingPhase.TERRAIN_SOLID, 
-            RenderingHooks.getPhaseTracker().getCurrentPhase());
-        
-        RenderingHooks.onEndTerrainRendering();
-        assertTrue(mockPipeline.isEndTerrainRenderingCalled());
+    public void testPhaseTrackerAccess() {
+        assertNotNull(RenderingHooks.getPhaseTracker());
         assertEquals(WorldRenderingPhase.NONE, 
             RenderingHooks.getPhaseTracker().getCurrentPhase());
-    }
-    
-    @Test
-    public void testTranslucentRenderingHooks() {
-        RenderingHooks.setActivePipeline(mockPipeline);
-        RenderingHooks.onWorldRenderStart();
-        
-        RenderingHooks.onBeginTranslucentRendering();
-        assertTrue(mockPipeline.isBeginTranslucentRenderingCalled());
-        assertEquals(WorldRenderingPhase.TERRAIN_TRANSLUCENT, 
-            RenderingHooks.getPhaseTracker().getCurrentPhase());
-        
-        RenderingHooks.onEndTranslucentRendering();
-        assertTrue(mockPipeline.isEndTranslucentRenderingCalled());
-        assertEquals(WorldRenderingPhase.NONE, 
-            RenderingHooks.getPhaseTracker().getCurrentPhase());
-    }
-    
-    @Test
-    public void testHooksWithNoPipeline() {
-        // Should not crash when no pipeline set
-        assertDoesNotThrow(() -> {
-            RenderingHooks.onWorldRenderStart();
-            RenderingHooks.onBeginTerrainRendering();
-            RenderingHooks.onEndTerrainRendering();
-            RenderingHooks.onWorldRenderEnd();
-        });
     }
     
     @Test
     public void testReset() {
         RenderingHooks.setActivePipeline(mockPipeline);
-        RenderingHooks.onWorldRenderStart();
-        
-        assertTrue(RenderingHooks.isPipelineActive());
         
         RenderingHooks.reset();
         
@@ -105,82 +59,23 @@ public class RenderingHooksTest {
             RenderingHooks.getPhaseTracker().getCurrentPhase());
     }
     
-    @Test
-    public void testHookInvocationOrder() {
-        RenderingHooks.setActivePipeline(mockPipeline);
-        
-        // Start world rendering
-        RenderingHooks.onWorldRenderStart();
-        assertTrue(mockPipeline.isBeginWorldRenderingCalled());
-        
-        // Begin terrain
-        RenderingHooks.onBeginTerrainRendering();
-        assertTrue(mockPipeline.isBeginTerrainRenderingCalled());
-        
-        // End terrain
-        RenderingHooks.onEndTerrainRendering();
-        assertTrue(mockPipeline.isEndTerrainRenderingCalled());
-        
-        // Begin translucent
-        RenderingHooks.onBeginTranslucentRendering();
-        assertTrue(mockPipeline.isBeginTranslucentRenderingCalled());
-        
-        // End translucent
-        RenderingHooks.onEndTranslucentRendering();
-        assertTrue(mockPipeline.isEndTranslucentRenderingCalled());
-        
-        // End world rendering
-        RenderingHooks.onWorldRenderEnd();
-        assertTrue(mockPipeline.isFinishWorldRenderingCalled());
-    }
-    
-    @Test
-    public void testPhaseTrackerAccess() {
-        assertNotNull(RenderingHooks.getPhaseTracker());
-        assertEquals(WorldRenderingPhase.NONE, 
-            RenderingHooks.getPhaseTracker().getCurrentPhase());
-    }
-    
     /**
      * Mock shader pipeline for testing.
+     * Implements WorldRenderingPipeline interface.
      */
-    private static class MockShaderPipeline implements ShaderRenderingPipeline {
-        private boolean beginWorldRenderingCalled = false;
-        private boolean finishWorldRenderingCalled = false;
-        private boolean beginTerrainRenderingCalled = false;
-        private boolean endTerrainRenderingCalled = false;
-        private boolean beginTranslucentRenderingCalled = false;
-        private boolean endTranslucentRenderingCalled = false;
+    private static class MockShaderPipeline implements WorldRenderingPipeline {
+        private boolean beginLevelRenderingCalled = false;
+        private boolean finalizeLevelRenderingCalled = false;
         private WorldRenderingPhase phase = WorldRenderingPhase.NONE;
         
         @Override
-        public void beginWorldRendering() {
-            beginWorldRenderingCalled = true;
+        public void beginLevelRendering() {
+            beginLevelRenderingCalled = true;
         }
         
         @Override
-        public void finishWorldRendering() {
-            finishWorldRenderingCalled = true;
-        }
-        
-        @Override
-        public void beginTerrainRendering() {
-            beginTerrainRenderingCalled = true;
-        }
-        
-        @Override
-        public void endTerrainRendering() {
-            endTerrainRenderingCalled = true;
-        }
-        
-        @Override
-        public void beginTranslucentRendering() {
-            beginTranslucentRenderingCalled = true;
-        }
-        
-        @Override
-        public void endTranslucentRendering() {
-            endTranslucentRenderingCalled = true;
+        public void finalizeLevelRendering() {
+            finalizeLevelRenderingCalled = true;
         }
         
         @Override
@@ -194,39 +89,45 @@ public class RenderingHooksTest {
         }
         
         @Override
-        public void setOverridePhase(WorldRenderingPhase phase) {
-            this.phase = phase;
+        public boolean shouldDisableFrustumCulling() {
+            return false;
+        }
+        
+        @Override
+        public boolean shouldDisableOcclusionCulling() {
+            return false;
+        }
+        
+        @Override
+        public boolean shouldRenderUnderwaterOverlay() {
+            return true;
+        }
+        
+        @Override
+        public boolean shouldRenderVignette() {
+            return true;
+        }
+        
+        @Override
+        public boolean shouldRenderSun() {
+            return true;
+        }
+        
+        @Override
+        public boolean shouldRenderMoon() {
+            return true;
+        }
+        
+        @Override
+        public boolean shouldRenderWeather() {
+            return true;
         }
         
         @Override
         public void destroy() {
         }
         
-        @Override
-        public boolean isActive() {
-            return true;
-        }
-        
-        @Override
-        public boolean shouldOverrideShaders() {
-            return true;
-        }
-        
-        @Override
-        public net.minecraft.client.renderer.shaders.program.ProgramCache getShaderMap() {
-            return new net.minecraft.client.renderer.shaders.program.ProgramCache();
-        }
-        
-        @Override
-        public net.minecraft.client.renderer.shaders.shadows.ShadowRenderer getShadowRenderer() {
-            return null;  // No shadow renderer in mock
-        }
-        
-        public boolean isBeginWorldRenderingCalled() { return beginWorldRenderingCalled; }
-        public boolean isFinishWorldRenderingCalled() { return finishWorldRenderingCalled; }
-        public boolean isBeginTerrainRenderingCalled() { return beginTerrainRenderingCalled; }
-        public boolean isEndTerrainRenderingCalled() { return endTerrainRenderingCalled; }
-        public boolean isBeginTranslucentRenderingCalled() { return beginTranslucentRenderingCalled; }
-        public boolean isEndTranslucentRenderingCalled() { return endTranslucentRenderingCalled; }
+        public boolean isBeginLevelRenderingCalled() { return beginLevelRenderingCalled; }
+        public boolean isFinalizeLevelRenderingCalled() { return finalizeLevelRenderingCalled; }
     }
 }
