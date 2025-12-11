@@ -1,6 +1,7 @@
 package net.minecraft.client.renderer.shaders.pipeline;
 
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.Camera;
 import net.minecraft.client.renderer.shaders.framebuffer.GlFramebuffer;
 import net.minecraft.client.renderer.shaders.gl.FullScreenQuadRenderer;
 import net.minecraft.client.renderer.shaders.helpers.OptionalBoolean;
@@ -10,10 +11,18 @@ import net.minecraft.client.renderer.shaders.program.Program;
 import net.minecraft.client.renderer.shaders.program.ProgramBuilder;
 import net.minecraft.client.renderer.shaders.program.ProgramSource;
 import net.minecraft.client.renderer.shaders.program.ShaderCompileException;
+import net.minecraft.client.renderer.shaders.shadows.PackShadowDirectives;
+import net.minecraft.client.renderer.shaders.shadows.ShadowRenderer;
+import net.minecraft.client.renderer.shaders.shadows.ShadowRenderTargets;
 import net.minecraft.client.renderer.shaders.targets.GBufferManager;
 import net.minecraft.client.renderer.shaders.targets.RenderTarget;
 import net.minecraft.client.renderer.shaders.texture.InternalTextureFormat;
+import net.minecraft.client.renderer.shaders.uniform.providers.CapturedRenderingState;
+import net.minecraft.client.renderer.shaders.uniform.providers.SystemTimeUniforms;
 import com.mojang.blaze3d.opengl.GlStateManager;
+import org.joml.Matrix4f;
+import org.joml.Matrix4fc;
+import org.joml.Vector3d;
 import org.lwjgl.opengl.GL11;
 import org.lwjgl.opengl.GL13;
 import org.lwjgl.opengl.GL20;
@@ -63,10 +72,23 @@ public class ShaderPackPipeline implements WorldRenderingPipeline {
 	private Program gbuffersTerrainProgram;
 	private Program gbuffersTexturedProgram;
 	private Program gbuffersBasicProgram;
+	private Program shadowProgram;  // Shadow pass terrain program
 	private final List<Program> deferredPrograms = new ArrayList<>();  // Run before translucent
 	private final List<Program> compositePrograms = new ArrayList<>(); // Run after translucent
 	private Program finalProgram;
 	private boolean programsCompiled = false;
+	
+	// Shadow rendering (Step A9)
+	private ShadowRenderer shadowRenderer;
+	private ShadowRenderTargets shadowRenderTargets;
+	private PackShadowDirectives shadowDirectives;
+	private boolean shadowsEnabled = false;
+	
+	// Cached uniform values (Step A10)
+	private Matrix4f cachedModelViewMatrix = new Matrix4f();
+	private Matrix4f cachedProjectionMatrix = new Matrix4f();
+	private Matrix4f cachedShadowModelViewMatrix = new Matrix4f();
+	private Matrix4f cachedShadowProjectionMatrix = new Matrix4f();
 	
 	/**
 	 * Creates a new shader pack pipeline.
@@ -112,10 +134,45 @@ public class ShaderPackPipeline implements WorldRenderingPipeline {
 		// Will be resized in beginLevelRendering() based on actual screen size
 		this.gBufferManager = new GBufferManager(1, 1, createDefaultTargetSettings());  // Will resize later
 		
+		// Initialize shadow rendering (Step A9)
+		initializeShadowRendering();
+		
 		// Compile shader programs (Step A5)
 		compilePrograms();
 		
 		LOGGER.info("Created shader pipeline for pack: {} in dimension: {}", packName, dimension);
+	}
+	
+	/**
+	 * Initializes shadow rendering resources (Step A9).
+	 * Following IRIS's shadow initialization pattern.
+	 * 
+	 * IRIS Reference: IrisRenderingPipeline.java constructor
+	 */
+	private void initializeShadowRendering() {
+		// Load shadow directives from shader properties
+		this.shadowDirectives = new PackShadowDirectives();
+		
+		// Check if shadows are enabled (distance > 0)
+		if (shadowDirectives.getDistance() > 0.0f) {
+			try {
+				// Create shadow render targets
+				int resolution = shadowDirectives.getResolution();
+				this.shadowRenderTargets = new ShadowRenderTargets(resolution, shadowDirectives);
+				
+				// Create shadow renderer
+				this.shadowRenderer = new ShadowRenderer(shadowDirectives, shadowRenderTargets);
+				this.shadowsEnabled = true;
+				
+				LOGGER.info("Initialized shadow rendering at {}x{} resolution", resolution, resolution);
+			} catch (Exception e) {
+				LOGGER.error("Failed to initialize shadow rendering", e);
+				this.shadowsEnabled = false;
+			}
+		} else {
+			this.shadowsEnabled = false;
+			LOGGER.debug("Shadows disabled (distance = 0)");
+		}
 	}
 	
 	/**
@@ -162,6 +219,20 @@ public class ShaderPackPipeline implements WorldRenderingPipeline {
 		
 		// Compile final program
 		finalProgram = tryCompileProgram("final");
+		
+		// Compile shadow program (Step A9)
+		// IRIS: shadow pass uses shadow.vsh/fsh or falls back to gbuffers
+		if (shadowsEnabled) {
+			shadowProgram = tryCompileProgram("shadow");
+			if (shadowProgram == null) {
+				shadowProgram = tryCompileProgram("shadow_solid");
+			}
+			if (shadowProgram != null) {
+				LOGGER.info("Compiled shadow program");
+			} else {
+				LOGGER.debug("No shadow program found, shadows will use depth-only rendering");
+			}
+		}
 		
 		programsCompiled = true;
 		
@@ -238,6 +309,15 @@ public class ShaderPackPipeline implements WorldRenderingPipeline {
 		
 		LOGGER.debug("Begin level rendering with shader pack: {}", packName);
 		
+		// Capture matrices for uniforms (Step A10)
+		captureRenderingState();
+		
+		// Render shadow pass first (Step A9)
+		// IRIS pattern: shadows rendered before main geometry
+		if (shadowsEnabled && shadowRenderer != null) {
+			renderShadowPass();
+		}
+		
 		// Get current window dimensions
 		Minecraft mc = Minecraft.getInstance();
 		com.mojang.blaze3d.pipeline.RenderTarget mainTarget = mc.getMainRenderTarget();
@@ -281,6 +361,58 @@ public class ShaderPackPipeline implements WorldRenderingPipeline {
 		} else {
 			LOGGER.warn("G-buffer framebuffer not initialized, using default framebuffer");
 		}
+	}
+	
+	/**
+	 * Captures the current rendering state for uniforms (Step A10).
+	 * Following IRIS's CapturedRenderingState pattern.
+	 */
+	private void captureRenderingState() {
+		// Get matrices from CapturedRenderingState
+		Matrix4fc modelView = CapturedRenderingState.INSTANCE.getGbufferModelView();
+		Matrix4fc projection = CapturedRenderingState.INSTANCE.getGbufferProjection();
+		
+		if (modelView != null) {
+			cachedModelViewMatrix.set(modelView);
+		}
+		if (projection != null) {
+			cachedProjectionMatrix.set(projection);
+		}
+		
+		// Get shadow matrices if available
+		if (shadowRenderer != null) {
+			cachedShadowModelViewMatrix.set(shadowRenderer.getShadowModelViewMatrix());
+			cachedShadowProjectionMatrix.set(shadowRenderer.getShadowProjectionMatrix());
+		}
+	}
+	
+	/**
+	 * Renders the shadow pass before main geometry (Step A9).
+	 * Following IRIS's ShadowRenderer.renderShadows() pattern.
+	 * 
+	 * IRIS Reference: ShadowRenderer.java:renderShadows()
+	 */
+	private void renderShadowPass() {
+		LOGGER.debug("Rendering shadow pass");
+		
+		// Update shadow direction based on sun/moon position
+		Minecraft mc = Minecraft.getInstance();
+		if (mc.level != null) {
+			float celestialAngle = mc.level.getTimeOfDay(CapturedRenderingState.INSTANCE.getTickDelta());
+			shadowRenderer.updateShadowDirection(celestialAngle);
+		}
+		
+		// Begin shadow rendering
+		shadowRenderer.beginShadowRender(0.0f);
+		
+		// The actual shadow geometry rendering happens through the normal
+		// rendering pipeline - the shadow framebuffer is bound and geometry
+		// is rendered with shadow shaders. For now, we just set up and tear down.
+		
+		// End shadow rendering
+		shadowRenderer.endShadowRender();
+		
+		LOGGER.debug("Shadow pass complete");
 	}
 	
 	/**
@@ -498,12 +630,15 @@ public class ShaderPackPipeline implements WorldRenderingPipeline {
 	}
 	
 	/**
-	 * Sets basic uniforms for shader programs.
-	 * Full uniform support will be implemented in Step A10.
+	 * Sets all uniforms for shader programs (Step A10).
+	 * Full uniform support following IRIS pattern.
+	 * 
+	 * IRIS Reference: Uniforms package, all provider classes
 	 * 
 	 * @param programId The OpenGL program ID
 	 */
 	private void setBasicUniforms(int programId) {
+		// === Sampler uniforms ===
 		// colortex0 sampler
 		int colortex0Loc = GL20.glGetUniformLocation(programId, "colortex0");
 		if (colortex0Loc >= 0) {
@@ -528,15 +663,147 @@ public class ShaderPackPipeline implements WorldRenderingPipeline {
 			GL20.glUniform1i(colortex2Loc, 2);
 		}
 		
-		// Screen dimensions (cast to float for glUniform1f)
-		int viewWidthLoc = GL20.glGetUniformLocation(programId, "viewWidth");
-		if (viewWidthLoc >= 0) {
-			GL20.glUniform1f(viewWidthLoc, (float) cachedWidth);
+		// gnormal, gaux1, gaux2, gaux3, gaux4 (alternative sampler names)
+		setUniform1i(programId, "gnormal", 1);
+		setUniform1i(programId, "gaux1", 2);
+		setUniform1i(programId, "colortex3", 3);
+		setUniform1i(programId, "colortex4", 4);
+		setUniform1i(programId, "colortex5", 5);
+		setUniform1i(programId, "colortex6", 6);
+		setUniform1i(programId, "colortex7", 7);
+		
+		// Depth textures
+		setUniform1i(programId, "depthtex0", 8);
+		setUniform1i(programId, "depthtex1", 9);
+		setUniform1i(programId, "depthtex2", 10);
+		setUniform1i(programId, "gdepth", 8);
+		
+		// Shadow textures (if shadows are enabled)
+		if (shadowsEnabled) {
+			setUniform1i(programId, "shadowtex0", 11);
+			setUniform1i(programId, "shadowtex1", 12);
+			setUniform1i(programId, "shadowcolor0", 13);
+			setUniform1i(programId, "shadowcolor1", 14);
+			setUniform1i(programId, "shadow", 11);
 		}
 		
-		int viewHeightLoc = GL20.glGetUniformLocation(programId, "viewHeight");
-		if (viewHeightLoc >= 0) {
-			GL20.glUniform1f(viewHeightLoc, (float) cachedHeight);
+		// Noise texture
+		setUniform1i(programId, "noisetex", 15);
+		
+		// === View/Screen uniforms (ViewportUniforms) ===
+		setUniform1f(programId, "viewWidth", (float) cachedWidth);
+		setUniform1f(programId, "viewHeight", (float) cachedHeight);
+		setUniform1f(programId, "aspectRatio", (float) cachedWidth / (float) cachedHeight);
+		
+		// === Matrix uniforms (MatrixUniforms) ===
+		setUniformMatrix4f(programId, "gbufferModelView", cachedModelViewMatrix);
+		setUniformMatrix4f(programId, "gbufferProjection", cachedProjectionMatrix);
+		
+		// Inverse matrices
+		Matrix4f modelViewInverse = new Matrix4f(cachedModelViewMatrix).invert();
+		Matrix4f projectionInverse = new Matrix4f(cachedProjectionMatrix).invert();
+		setUniformMatrix4f(programId, "gbufferModelViewInverse", modelViewInverse);
+		setUniformMatrix4f(programId, "gbufferProjectionInverse", projectionInverse);
+		
+		// Shadow matrices (if shadows are enabled)
+		if (shadowsEnabled && shadowRenderer != null) {
+			setUniformMatrix4f(programId, "shadowModelView", cachedShadowModelViewMatrix);
+			setUniformMatrix4f(programId, "shadowProjection", cachedShadowProjectionMatrix);
+			
+			Matrix4f shadowModelViewInverse = new Matrix4f(cachedShadowModelViewMatrix).invert();
+			Matrix4f shadowProjectionInverse = new Matrix4f(cachedShadowProjectionMatrix).invert();
+			setUniformMatrix4f(programId, "shadowModelViewInverse", shadowModelViewInverse);
+			setUniformMatrix4f(programId, "shadowProjectionInverse", shadowProjectionInverse);
+		}
+		
+		// === Time uniforms (SystemTimeUniforms, WorldTimeUniforms) ===
+		float frameTimeCounter = SystemTimeUniforms.TIMER.getAsFloat();
+		setUniform1f(programId, "frameTimeCounter", frameTimeCounter);
+		
+		// Frame counter
+		setUniform1i(programId, "frameCounter", (int) SystemTimeUniforms.COUNTER.get());
+		
+		Minecraft mc = Minecraft.getInstance();
+		if (mc.level != null) {
+			// World time uniforms
+			long worldTime = mc.level.getDayTime();
+			setUniform1i(programId, "worldTime", (int) (worldTime % 24000));
+			setUniform1i(programId, "worldDay", (int) (worldTime / 24000));
+			
+			// Sun/moon angle
+			float sunAngle = mc.level.getTimeOfDay(CapturedRenderingState.INSTANCE.getTickDelta());
+			setUniform1f(programId, "sunAngle", sunAngle);
+			
+			// Moon phase
+			setUniform1i(programId, "moonPhase", mc.level.getMoonPhase());
+			
+			// Rain/weather
+			float rainStrength = mc.level.getRainLevel(CapturedRenderingState.INSTANCE.getTickDelta());
+			setUniform1f(programId, "rainStrength", rainStrength);
+			setUniform1f(programId, "wetness", rainStrength);  // Alias
+		}
+		
+		// === Camera uniforms (CameraUniforms) ===
+		Camera camera = mc.gameRenderer.getMainCamera();
+		if (camera != null) {
+			org.joml.Vector3d cameraPos = new org.joml.Vector3d(
+				camera.getPosition().x,
+				camera.getPosition().y,
+				camera.getPosition().z
+			);
+			setUniform3f(programId, "cameraPosition", (float) cameraPos.x, (float) cameraPos.y, (float) cameraPos.z);
+			
+			// Previous camera position (for motion blur, etc.)
+			setUniform3f(programId, "previousCameraPosition", (float) cameraPos.x, (float) cameraPos.y, (float) cameraPos.z);
+		}
+		
+		// === Near/far planes ===
+		setUniform1f(programId, "near", 0.05f);  // Minecraft default near plane
+		setUniform1f(programId, "far", (float) (mc.options.getEffectiveRenderDistance() * 16));
+		
+		// === FOG uniforms (FogUniforms) ===
+		Vector3d fogColor = CapturedRenderingState.INSTANCE.getFogColor();
+		setUniform3f(programId, "fogColor", (float) fogColor.x, (float) fogColor.y, (float) fogColor.z);
+		setUniform1f(programId, "fogDensity", CapturedRenderingState.INSTANCE.getFogDensity());
+		
+		// === Constants ===
+		setUniform1f(programId, "pi", (float) Math.PI);
+		setUniform1f(programId, "TAU", (float) (Math.PI * 2.0));
+		setUniform1f(programId, "E", (float) Math.E);
+		setUniform1f(programId, "GOLDEN_RATIO", 1.6180339887f);
+		
+		// === Screen brightness (gamma) ===
+		setUniform1f(programId, "screenBrightness", mc.options.gamma().get().floatValue());
+	}
+	
+	// Helper methods for setting uniforms
+	private void setUniform1i(int programId, String name, int value) {
+		int loc = GL20.glGetUniformLocation(programId, name);
+		if (loc >= 0) {
+			GL20.glUniform1i(loc, value);
+		}
+	}
+	
+	private void setUniform1f(int programId, String name, float value) {
+		int loc = GL20.glGetUniformLocation(programId, name);
+		if (loc >= 0) {
+			GL20.glUniform1f(loc, value);
+		}
+	}
+	
+	private void setUniform3f(int programId, String name, float x, float y, float z) {
+		int loc = GL20.glGetUniformLocation(programId, name);
+		if (loc >= 0) {
+			GL20.glUniform3f(loc, x, y, z);
+		}
+	}
+	
+	private void setUniformMatrix4f(int programId, String name, Matrix4f matrix) {
+		int loc = GL20.glGetUniformLocation(programId, name);
+		if (loc >= 0) {
+			float[] values = new float[16];
+			matrix.get(values);
+			GL20.glUniformMatrix4fv(loc, false, values);
 		}
 	}
 	
@@ -661,6 +928,21 @@ public class ShaderPackPipeline implements WorldRenderingPipeline {
 		finalProgram = null;
 		programsCompiled = false;
 		
+		// Destroy shadow resources (Step A9 cleanup)
+		if (shadowProgram != null) {
+			shadowProgram.destroy();
+			shadowProgram = null;
+		}
+		if (shadowRenderer != null) {
+			shadowRenderer.destroy();
+			shadowRenderer = null;
+		}
+		if (shadowRenderTargets != null) {
+			shadowRenderTargets.destroy();
+			shadowRenderTargets = null;
+		}
+		shadowsEnabled = false;
+		
 		if (gBufferFramebuffer != null) {
 			gBufferFramebuffer.destroy();
 			gBufferFramebuffer = null;
@@ -710,5 +992,37 @@ public class ShaderPackPipeline implements WorldRenderingPipeline {
 	 */
 	public boolean isRenderingWorld() {
 		return isRenderingWorld;
+	}
+	
+	/**
+	 * Gets the shadow renderer.
+	 * @return The shadow renderer, or null if shadows are disabled
+	 */
+	public ShadowRenderer getShadowRenderer() {
+		return shadowRenderer;
+	}
+	
+	/**
+	 * Checks if shadows are enabled.
+	 * @return true if shadows are enabled
+	 */
+	public boolean areShadowsEnabled() {
+		return shadowsEnabled;
+	}
+	
+	/**
+	 * Gets the G-buffer manager.
+	 * @return The G-buffer manager
+	 */
+	public GBufferManager getGBufferManager() {
+		return gBufferManager;
+	}
+	
+	/**
+	 * Gets the shadow render targets.
+	 * @return The shadow render targets, or null if shadows are disabled
+	 */
+	public ShadowRenderTargets getShadowRenderTargets() {
+		return shadowRenderTargets;
 	}
 }
