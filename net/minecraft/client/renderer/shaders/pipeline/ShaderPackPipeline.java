@@ -89,6 +89,18 @@ public class ShaderPackPipeline implements WorldRenderingPipeline {
 		
 		// Initialize G-buffer manager with default settings
 		// Will be resized in beginLevelRendering() based on actual screen size
+		this.gBufferManager = new GBufferManager(1, 1, createDefaultTargetSettings());  // Will resize later
+		
+		LOGGER.info("Created shader pipeline for pack: {} in dimension: {}", packName, dimension);
+	}
+	
+	/**
+	 * Creates the default G-buffer target settings.
+	 * Extracted to eliminate code duplication.
+	 * 
+	 * @return Map of render target settings
+	 */
+	private static Map<Integer, GBufferManager.RenderTargetSettings> createDefaultTargetSettings() {
 		Map<Integer, GBufferManager.RenderTargetSettings> targetSettings = new HashMap<>();
 		// Default colortex0 with RGBA8 format
 		targetSettings.put(0, new GBufferManager.RenderTargetSettings(InternalTextureFormat.RGBA8));
@@ -96,10 +108,7 @@ public class ShaderPackPipeline implements WorldRenderingPipeline {
 		targetSettings.put(1, new GBufferManager.RenderTargetSettings(InternalTextureFormat.RGBA16F));
 		// colortex2 for specular/PBR data (common shader pack pattern)
 		targetSettings.put(2, new GBufferManager.RenderTargetSettings(InternalTextureFormat.RGBA8));
-		
-		this.gBufferManager = new GBufferManager(1, 1, targetSettings);  // Will resize later
-		
-		LOGGER.info("Created shader pipeline for pack: {} in dimension: {}", packName, dimension);
+		return targetSettings;
 	}
 	
 	@Override
@@ -124,12 +133,7 @@ public class ShaderPackPipeline implements WorldRenderingPipeline {
 				gBufferManager.destroy();
 			}
 			
-			Map<Integer, GBufferManager.RenderTargetSettings> targetSettings = new HashMap<>();
-			targetSettings.put(0, new GBufferManager.RenderTargetSettings(InternalTextureFormat.RGBA8));
-			targetSettings.put(1, new GBufferManager.RenderTargetSettings(InternalTextureFormat.RGBA16F));
-			targetSettings.put(2, new GBufferManager.RenderTargetSettings(InternalTextureFormat.RGBA8));
-			
-			gBufferManager = new GBufferManager(width, height, targetSettings);
+			gBufferManager = new GBufferManager(width, height, createDefaultTargetSettings());
 			
 			// Create G-buffer framebuffer
 			createGBufferFramebuffer();
@@ -240,11 +244,12 @@ public class ShaderPackPipeline implements WorldRenderingPipeline {
 			GL30.glBindFramebuffer(GL30.GL_DRAW_FRAMEBUFFER, 0);
 			
 			// Blit (copy) from G-buffer to main framebuffer
+			// Use GL_LINEAR for better visual quality during scaling
 			GL30.glBlitFramebuffer(
 				0, 0, cachedWidth, cachedHeight,      // Source rectangle
 				0, 0, mainTarget.width, mainTarget.height,  // Destination rectangle
 				GL11.GL_COLOR_BUFFER_BIT,                    // Copy color only
-				GL11.GL_NEAREST                              // Nearest neighbor filtering
+				GL11.GL_LINEAR                               // Linear filtering for scaling
 			);
 			
 			// Unbind framebuffers
