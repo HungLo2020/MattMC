@@ -116,7 +116,11 @@ public class FileSystemShaderPackSource implements ShaderPackSource {
 	@Override
 	public boolean fileExists(String relativePath) {
 		Path filePath = shaderPackPath.resolve(relativePath);
-		return Files.exists(filePath);
+		boolean exists = Files.exists(filePath);
+		if (!exists && relativePath.contains("world0")) {
+			LOGGER.debug("File check: {} -> {} = {}", relativePath, filePath, exists);
+		}
+		return exists;
 	}
 	
 	@Override

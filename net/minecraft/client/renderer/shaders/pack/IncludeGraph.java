@@ -51,7 +51,19 @@ public class IncludeGraph {
 				// AbsolutePackPath starts with "/", resource paths don't
 				String resourcePath = next.getPathString().substring(1);
 				
+				// Try reading the file directly first
 				Optional<String> content = packSource.readFile(resourcePath);
+				
+				// If not found and path doesn't start with "shaders/", try with "shaders/" prefix
+				// This handles #include "/program/..." which should resolve to "shaders/program/..."
+				if (content.isEmpty() && !resourcePath.startsWith("shaders/")) {
+					String shadersPath = "shaders/" + resourcePath;
+					content = packSource.readFile(shadersPath);
+					if (content.isPresent()) {
+						LOGGER.debug("Resolved {} to {}", resourcePath, shadersPath);
+					}
+				}
+				
 				if (content.isEmpty()) {
 					throw new IOException("File not found: " + resourcePath);
 				}
