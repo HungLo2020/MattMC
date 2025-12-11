@@ -353,6 +353,27 @@ public class IrisRenderSystem {
 		}
 	}
 	
+	// ============ Blend Methods ============
+
+	public static void disableBufferBlend(int buffer) {
+		RenderSystem.assertOnRenderThread();
+		GL32C.glDisablei(GL32C.GL_BLEND, buffer);
+	}
+
+	public static void enableBufferBlend(int buffer) {
+		RenderSystem.assertOnRenderThread();
+		GL32C.glEnablei(GL32C.GL_BLEND, buffer);
+	}
+
+	public static void blendFuncSeparatei(int buffer, int srcRGB, int dstRGB, int srcAlpha, int dstAlpha) {
+		RenderSystem.assertOnRenderThread();
+		if (GL.getCapabilities().GL_ARB_draw_buffers_blend) {
+			org.lwjgl.opengl.ARBDrawBuffersBlend.glBlendFuncSeparateiARB(buffer, srcRGB, dstRGB, srcAlpha, dstAlpha);
+		} else if (GL.getCapabilities().OpenGL40) {
+			org.lwjgl.opengl.GL40C.glBlendFuncSeparatei(buffer, srcRGB, dstRGB, srcAlpha, dstAlpha);
+		}
+	}
+	
 	// ============ Image Methods ============
 
 	public static int getMaxImageUnits() {

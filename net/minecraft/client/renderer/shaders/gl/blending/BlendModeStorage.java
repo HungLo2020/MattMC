@@ -39,6 +39,22 @@ public class BlendModeStorage {
 		blendLocked = true;
 	}
 
+	public static void overrideBufferBlend(int index, BlendMode override) {
+		if (!blendLocked) {
+			originalBlendEnable = true;
+			originalBlend = new BlendMode(770, 771, 1, 0);
+		}
+
+		if (override == null) {
+			net.minecraft.client.renderer.shaders.gl.IrisRenderSystem.disableBufferBlend(index);
+		} else {
+			net.minecraft.client.renderer.shaders.gl.IrisRenderSystem.enableBufferBlend(index);
+			net.minecraft.client.renderer.shaders.gl.IrisRenderSystem.blendFuncSeparatei(index, override.srcRgb(), override.dstRgb(), override.srcAlpha(), override.dstAlpha());
+		}
+
+		blendLocked = true;
+	}
+
 	public static void deferBlendModeToggle(boolean enabled) {
 		originalBlendEnable = enabled;
 	}
