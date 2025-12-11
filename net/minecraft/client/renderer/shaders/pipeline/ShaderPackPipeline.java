@@ -63,12 +63,10 @@ public class ShaderPackPipeline implements WorldRenderingPipeline {
 	private Program gbuffersTerrainProgram;
 	private Program gbuffersTexturedProgram;
 	private Program gbuffersBasicProgram;
-	private final List<Program> compositePrograms = new ArrayList<>();
+	private final List<Program> deferredPrograms = new ArrayList<>();  // Run before translucent
+	private final List<Program> compositePrograms = new ArrayList<>(); // Run after translucent
 	private Program finalProgram;
 	private boolean programsCompiled = false;
-	
-	// Composite pass framebuffers (Step A7)
-	private final List<GlFramebuffer> compositeFramebuffers = new ArrayList<>();
 	
 	/**
 	 * Creates a new shader pack pipeline.
@@ -140,7 +138,19 @@ public class ShaderPackPipeline implements WorldRenderingPipeline {
 			gbuffersBasicProgram = tryCompileProgram("gbuffers_basic");
 		}
 		
-		// Compile composite programs (composite, composite1, composite2, etc.)
+		// Compile deferred programs (run before translucent rendering)
+		// IRIS: deferred passes run after opaque geometry but before translucent
+		for (int i = 0; i <= 7; i++) {
+			String name = i == 0 ? "deferred" : "deferred" + i;
+			Program deferred = tryCompileProgram(name);
+			if (deferred != null) {
+				deferredPrograms.add(deferred);
+				LOGGER.info("Compiled deferred program: {}", name);
+			}
+		}
+		
+		// Compile composite programs (run after translucent rendering)
+		// IRIS: composite passes run after all geometry
 		for (int i = 0; i <= 7; i++) {
 			String name = i == 0 ? "composite" : "composite" + i;
 			Program composite = tryCompileProgram(name);
@@ -150,23 +160,14 @@ public class ShaderPackPipeline implements WorldRenderingPipeline {
 			}
 		}
 		
-		// Compile deferred programs
-		for (int i = 0; i <= 7; i++) {
-			String name = i == 0 ? "deferred" : "deferred" + i;
-			Program deferred = tryCompileProgram(name);
-			if (deferred != null) {
-				compositePrograms.add(deferred);
-				LOGGER.info("Compiled deferred program: {}", name);
-			}
-		}
-		
 		// Compile final program
 		finalProgram = tryCompileProgram("final");
 		
 		programsCompiled = true;
 		
 		int compiledCount = programs.size();
-		LOGGER.info("Compiled {} shader programs for pack: {}", compiledCount, packName);
+		LOGGER.info("Compiled {} shader programs for pack: {} ({} deferred, {} composite)", 
+			compiledCount, packName, deferredPrograms.size(), compositePrograms.size());
 	}
 	
 	/**
@@ -332,54 +333,29 @@ public class ShaderPackPipeline implements WorldRenderingPipeline {
 	
 	/**
 	 * Executes composite post-processing passes (Step A7).
+	 * This runs both deferred and composite passes in order.
 	 * Following IRIS's CompositeRenderer.renderAll() pattern.
 	 * 
 	 * IRIS Reference: CompositeRenderer.java:273-363
 	 */
 	private void executeCompositePasses() {
-		if (compositePrograms.isEmpty()) {
-			LOGGER.debug("No composite programs to execute");
+		int totalPasses = deferredPrograms.size() + compositePrograms.size();
+		if (totalPasses == 0) {
+			LOGGER.debug("No composite/deferred programs to execute");
 			return;
 		}
 		
-		LOGGER.debug("Executing {} composite passes", compositePrograms.size());
+		LOGGER.debug("Executing {} deferred + {} composite passes", 
+			deferredPrograms.size(), compositePrograms.size());
 		
+		// Execute deferred passes first (before translucent)
+		for (int i = 0; i < deferredPrograms.size(); i++) {
+			executePostProcessPass(deferredPrograms.get(i), "deferred", i);
+		}
+		
+		// Execute composite passes (after translucent)
 		for (int i = 0; i < compositePrograms.size(); i++) {
-			Program program = compositePrograms.get(i);
-			if (program == null) continue;
-			
-			// For each composite pass:
-			// 1. Bind appropriate framebuffer (ping-pong between buffers)
-			// 2. Bind input textures (previous pass output)
-			// 3. Use the composite program
-			// 4. Render full-screen quad
-			
-			// Bind output framebuffer (alternate between colortex0/1 for ping-pong)
-			if (gBufferFramebuffer != null) {
-				gBufferFramebuffer.bind();
-				
-				// For ping-pong, we'd alternate draw buffers
-				// For now, just write to colortex0
-				int[] drawBuffers = new int[]{GL30.GL_COLOR_ATTACHMENT0};
-				GL20.glDrawBuffers(drawBuffers);
-			}
-			
-			// Set viewport
-			GL11.glViewport(0, 0, cachedWidth, cachedHeight);
-			
-			// Bind input textures (G-buffer outputs from geometry pass)
-			bindGBufferTextures();
-			
-			// Use the composite program
-			program.use();
-			
-			// Set basic uniforms (Step A10 will add full uniform support)
-			setBasicUniforms(program.getProgramId());
-			
-			// Render full-screen quad
-			FullScreenQuadRenderer.INSTANCE.render();
-			
-			LOGGER.trace("Executed composite pass {}", i);
+			executePostProcessPass(compositePrograms.get(i), "composite", i);
 		}
 		
 		// Unbind program
@@ -387,6 +363,52 @@ public class ShaderPackPipeline implements WorldRenderingPipeline {
 		
 		// Unbind framebuffer
 		GlFramebuffer.unbind();
+		
+		LOGGER.debug("Post-processing passes complete");
+	}
+	
+	/**
+	 * Executes a single post-processing pass (composite or deferred).
+	 * 
+	 * @param program The shader program to use
+	 * @param type Pass type ("composite" or "deferred") for logging
+	 * @param index Pass index for logging
+	 */
+	private void executePostProcessPass(Program program, String type, int index) {
+		if (program == null) return;
+		
+		// For each pass:
+		// 1. Bind appropriate framebuffer (ping-pong between buffers)
+		// 2. Bind input textures (previous pass output)
+		// 3. Use the program
+		// 4. Render full-screen quad
+		
+		// Bind output framebuffer (alternate between colortex0/1 for ping-pong)
+		if (gBufferFramebuffer != null) {
+			gBufferFramebuffer.bind();
+			
+			// For ping-pong, we'd alternate draw buffers
+			// For now, just write to colortex0
+			int[] drawBuffers = new int[]{GL30.GL_COLOR_ATTACHMENT0};
+			GL20.glDrawBuffers(drawBuffers);
+		}
+		
+		// Set viewport
+		GL11.glViewport(0, 0, cachedWidth, cachedHeight);
+		
+		// Bind input textures (G-buffer outputs from geometry pass)
+		bindGBufferTextures();
+		
+		// Use the program
+		program.use();
+		
+		// Set basic uniforms (Step A10 will add full uniform support)
+		setBasicUniforms(program.getProgramId());
+		
+		// Render full-screen quad
+		FullScreenQuadRenderer.INSTANCE.render();
+		
+		LOGGER.trace("Executed {} pass {}", type, index);
 		
 		LOGGER.debug("Composite passes complete");
 	}
@@ -506,15 +528,15 @@ public class ShaderPackPipeline implements WorldRenderingPipeline {
 			GL20.glUniform1i(colortex2Loc, 2);
 		}
 		
-		// Screen dimensions
+		// Screen dimensions (cast to float for glUniform1f)
 		int viewWidthLoc = GL20.glGetUniformLocation(programId, "viewWidth");
 		if (viewWidthLoc >= 0) {
-			GL20.glUniform1f(viewWidthLoc, cachedWidth);
+			GL20.glUniform1f(viewWidthLoc, (float) cachedWidth);
 		}
 		
 		int viewHeightLoc = GL20.glGetUniformLocation(programId, "viewHeight");
 		if (viewHeightLoc >= 0) {
-			GL20.glUniform1f(viewHeightLoc, cachedHeight);
+			GL20.glUniform1f(viewHeightLoc, (float) cachedHeight);
 		}
 	}
 	
@@ -631,20 +653,13 @@ public class ShaderPackPipeline implements WorldRenderingPipeline {
 			}
 		}
 		programs.clear();
+		deferredPrograms.clear();
 		compositePrograms.clear();
 		gbuffersTerrainProgram = null;
 		gbuffersTexturedProgram = null;
 		gbuffersBasicProgram = null;
 		finalProgram = null;
 		programsCompiled = false;
-		
-		// Destroy composite framebuffers (Step A7 cleanup)
-		for (GlFramebuffer fb : compositeFramebuffers) {
-			if (fb != null) {
-				fb.destroy();
-			}
-		}
-		compositeFramebuffers.clear();
 		
 		if (gBufferFramebuffer != null) {
 			gBufferFramebuffer.destroy();
