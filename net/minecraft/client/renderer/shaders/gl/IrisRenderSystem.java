@@ -60,7 +60,8 @@ public class IrisRenderSystem {
 		supportsCompute = GL.getCapabilities().glDispatchCompute != 0;
 		supportsTesselation = GL.getCapabilities().GL_ARB_tessellation_shader || GL.getCapabilities().OpenGL40;
 
-		int maxUnits = SamplerLimits.get().getMaxTextureUnits();
+		// Limit sampler arrays to a reasonable size to prevent excessive memory allocation
+		int maxUnits = Math.min(SamplerLimits.get().getMaxTextureUnits(), 128);
 		samplers = new int[maxUnits];
 		emptyArray = new int[maxUnits];
 		

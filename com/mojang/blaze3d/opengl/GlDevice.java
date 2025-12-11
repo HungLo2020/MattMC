@@ -53,6 +53,7 @@ public class GlDevice implements GpuDevice {
 	private final DirectStateAccess directStateAccess;
 	private final BiFunction<ResourceLocation, ShaderType, String> defaultShaderSource;
 	private final Map<RenderPipeline, GlRenderPipeline> pipelineCache = new IdentityHashMap();
+	private final Map<RenderPipeline, GlRenderPipeline> shaderPackPipelineCache = new IdentityHashMap(); // Cache for shader pack intercepted pipelines
 	private final Map<GlDevice.ShaderCompilationKey, GlShaderModule> shaderCache = new HashMap();
 	private final VertexArrayCache vertexArrayCache;
 	private final BufferStorage bufferStorage;
@@ -352,6 +353,16 @@ public class GlDevice implements GpuDevice {
 				net.minecraft.client.renderer.shaders.IrisShaders.getActivePipeline();
 			
 			if (shaderPipeline != null && shaderPipeline.isRenderingWorld()) {
+				// Check cache first for performance
+				GlRenderPipeline cached = shaderPackPipelineCache.get(renderPipeline);
+				if (cached != null) {
+					// Setup state for cached shader (uniforms need to be updated each frame)
+					if (cached.program() instanceof net.minecraft.client.renderer.shaders.programs.ExtendedShader extendedShader) {
+						extendedShader.iris$setupState();
+					}
+					return cached;
+				}
+				
 				// Try to find a matching ExtendedShader from the shader pack
 				String programName = getShaderProgramName(renderPipeline);
 				if (programName != null) {
@@ -365,8 +376,10 @@ public class GlDevice implements GpuDevice {
 						// Setup shader state before returning
 						extendedShader.iris$setupState();
 						
-						// Return a pipeline wrapping the ExtendedShader
-						return new GlRenderPipeline(renderPipeline, extendedShader);
+						// Cache and return a pipeline wrapping the ExtendedShader
+						GlRenderPipeline interceptedPipeline = new GlRenderPipeline(renderPipeline, extendedShader);
+						shaderPackPipelineCache.put(renderPipeline, interceptedPipeline);
+						return interceptedPipeline;
 					}
 				}
 			}

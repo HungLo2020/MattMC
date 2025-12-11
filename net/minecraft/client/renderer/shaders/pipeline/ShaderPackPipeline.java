@@ -413,7 +413,7 @@ public class ShaderPackPipeline implements WorldRenderingPipeline {
 					extendedShaders.put(programName, extendedShader);
 					LOGGER.info("Created ExtendedShader for: {}", programName);
 				} catch (Exception e) {
-					LOGGER.warn("Failed to create ExtendedShader for {}: {}", programName, e.getMessage());
+					LOGGER.warn("Failed to create ExtendedShader for {} during shader pack compilation", programName, e);
 				}
 			}
 			
