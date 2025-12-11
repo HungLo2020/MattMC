@@ -8,7 +8,7 @@ import net.minecraft.client.renderer.shaders.gui.NavigationController;
 import net.minecraft.client.renderer.shaders.gui.OldImageButton;
 import net.minecraft.client.renderer.shaders.gui.element.ShaderPackOptionList;
 import net.minecraft.client.renderer.shaders.gui.element.ShaderPackSelectionList;
-import net.minecraft.client.renderer.shaders.gui.element.screen.IrisButton;
+import net.minecraft.client.renderer.shaders.gui.IrisButton;
 import net.minecraft.client.renderer.shaders.gui.element.widget.AbstractElementWidget;
 import net.minecraft.client.renderer.shaders.gui.element.widget.CommentedElementWidget;
 import net.minecraft.client.renderer.shaders.mixin.GameRendererAccessor;
