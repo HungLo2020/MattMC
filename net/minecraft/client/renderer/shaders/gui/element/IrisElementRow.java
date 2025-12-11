@@ -138,6 +138,11 @@ public class IrisElementRow {
 		return getHovered(mouseX, mouseY).map(element -> element.mouseClicked(event, false)).orElse(false);
 	}
 
+	// Overloaded method for new event-based API
+	public boolean mouseClicked(net.minecraft.client.input.MouseButtonEvent event, boolean bl) {
+		return getHovered(event.x(), event.y()).map(element -> element.mouseClicked(event, bl)).orElse(false);
+	}
+
 	public boolean mouseReleased(double mouseX, double mouseY, int button) {
 		// Convert to MouseButtonEvent for compatibility
 		net.minecraft.client.input.MouseButtonInfo buttonInfo = new net.minecraft.client.input.MouseButtonInfo(button, 0);
@@ -145,9 +150,19 @@ public class IrisElementRow {
 		return getHovered(mouseX, mouseY).map(element -> element.mouseReleased(event)).orElse(false);
 	}
 
+	// Overloaded method for new event-based API
+	public boolean mouseReleased(net.minecraft.client.input.MouseButtonEvent event) {
+		return getHovered(event.x(), event.y()).map(element -> element.mouseReleased(event)).orElse(false);
+	}
+
 	public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
 		// Convert to KeyEvent for compatibility
 		net.minecraft.client.input.KeyEvent event = new net.minecraft.client.input.KeyEvent(keyCode, scanCode, modifiers);
+		return getFocused().map(element -> element.keyPressed(event)).orElse(false);
+	}
+
+	// Overloaded method for new event-based API
+	public boolean keyPressed(net.minecraft.client.input.KeyEvent event) {
 		return getFocused().map(element -> element.keyPressed(event)).orElse(false);
 	}
 

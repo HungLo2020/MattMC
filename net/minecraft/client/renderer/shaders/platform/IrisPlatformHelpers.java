@@ -5,11 +5,17 @@ package net.minecraft.client.renderer.shaders.platform;
  * Full implementation requires platform detection system
  */
 public class IrisPlatformHelpers {
-	public static boolean isDevelopmentEnvironment() {
+	private static final IrisPlatformHelpers INSTANCE = new IrisPlatformHelpers();
+
+	public static IrisPlatformHelpers getInstance() {
+		return INSTANCE;
+	}
+
+	public boolean isDevelopmentEnvironment() {
 		return false;
 	}
 	
-	public static String getPlatformName() {
+	public String getPlatformName() {
 		return "Unknown";
 	}
 }

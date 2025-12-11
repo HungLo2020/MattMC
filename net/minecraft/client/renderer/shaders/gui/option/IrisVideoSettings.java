@@ -19,10 +19,13 @@ public class IrisVideoSettings {
 	public static ColorSpace colorSpace = ColorSpace.SRGB;
 	
 	// Stub option instance - will be properly implemented when pipeline is ready
-	public static final OptionInstance<Integer> RENDER_DISTANCE = OptionInstance.createInt(
+	public static final OptionInstance<Integer> RENDER_DISTANCE = new OptionInstance<>(
 		"options.iris.shadowDistance",
-		0,
-		32,
+		OptionInstance.noTooltip(),
+		(component, value) -> Component.translatable("options.generic_value",
+			Component.translatable("options.iris.shadowDistance"),
+			Component.translatable("options.chunks", value)),
+		new OptionInstance.IntRange(0, 32),
 		shadowDistance,
 		integer -> {
 			shadowDistance = integer;

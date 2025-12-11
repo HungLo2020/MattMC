@@ -13,14 +13,17 @@ import java.util.Optional;
  * Full implementation will be added when shader pack loading is implemented.
  */
 public class Iris {
+	public static final String MODNAME = "Iris";
 	public static final Logger logger = LoggerFactory.getLogger("Iris");
 
 	private static final IrisConfig irisConfig = new IrisConfig();
 	private static final ShaderpacksDirectoryManager shaderpacksDirectoryManager = new ShaderpacksDirectoryManager();
+	private static final UpdateChecker updateChecker = new UpdateChecker();
 	private static ShaderPack currentPack = null;
 	private static String currentPackName = null;
 	private static boolean fallback = false;
 	private static boolean resetShaderPackOptions = false;
+	private static final java.util.Map<String, String> shaderPackOptionQueue = new java.util.HashMap<>();
 
 	public static IrisConfig getIrisConfig() {
 		return irisConfig;
@@ -68,11 +71,47 @@ public class Iris {
 	}
 
 	/**
+	 * Gets the Iris version string.
+	 */
+	public static String getVersion() {
+		return "1.8.0"; // Stub version
+	}
+
+	/**
+	 * Gets the update checker instance.
+	 */
+	public static UpdateChecker getUpdateChecker() {
+		return updateChecker;
+	}
+
+	/**
+	 * Checks if a path is a valid shader pack.
+	 */
+	public static boolean isValidShaderpack(Path path) {
+		// Stub - will be implemented with pack validation
+		return false;
+	}
+
+	/**
 	 * Stub method for getting shader pack option queue.
-	 * Returns empty map for now.
+	 * Returns the option queue.
 	 */
 	public static java.util.Map<String, String> getShaderPackOptionQueue() {
-		return new java.util.HashMap<>();
+		return shaderPackOptionQueue;
+	}
+
+	/**
+	 * Clears the shader pack option queue.
+	 */
+	public static void clearShaderPackOptionQueue() {
+		shaderPackOptionQueue.clear();
+	}
+
+	/**
+	 * Queues shader pack options from properties.
+	 */
+	public static void queueShaderPackOptionsFromProperties(java.util.Properties properties) {
+		// Stub - will be implemented when option system is added
 	}
 
 	/**
@@ -83,11 +122,38 @@ public class Iris {
 	}
 
 	/**
+	 * Returns whether shader pack options should be reset on next reload.
+	 */
+	public static boolean shouldResetShaderPackOptionsOnNextReload() {
+		return resetShaderPackOptions;
+	}
+
+	/**
 	 * Stub method for getting pipeline manager.
 	 * Returns null for now.
 	 */
 	public static Object getPipelineManager() {
 		return null;
+	}
+
+	/**
+	 * Sets debug mode.
+	 */
+	public static void setDebug(boolean debug) {
+		// Stub - will be implemented when debug system is added
+	}
+
+	/**
+	 * Stub for UpdateChecker
+	 */
+	public static class UpdateChecker {
+		public Optional<String> getUpdateMessage() {
+			return Optional.empty();
+		}
+
+		public Optional<java.net.URI> getUpdateLink() {
+			return Optional.empty();
+		}
 	}
 
 	/**
@@ -113,7 +179,11 @@ public class Iris {
 			this.currentShaderPackName = name;
 		}
 
-		public void save() {
+		public void setUnknown(boolean unknown) throws java.io.IOException {
+			// Stub - will be implemented later
+		}
+
+		public void save() throws java.io.IOException {
 			// Stub - configuration saving will be implemented later
 		}
 	}
@@ -130,6 +200,10 @@ public class Iris {
 		public java.net.URI getDirectoryUri() {
 			// Return local directory URI
 			return getShaderpacksDirectory().toUri();
+		}
+
+		public void copyPackIntoDirectory(String fileName, Path pack) throws java.io.IOException {
+			// Stub - will be implemented when pack management is added
 		}
 	}
 }
