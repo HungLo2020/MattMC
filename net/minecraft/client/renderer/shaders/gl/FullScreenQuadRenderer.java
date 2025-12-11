@@ -5,6 +5,7 @@ import com.mojang.blaze3d.vertex.DefaultVertexFormat;
 import com.mojang.blaze3d.vertex.MeshData;
 import com.mojang.blaze3d.vertex.Tesselator;
 import com.mojang.blaze3d.vertex.VertexFormat;
+import org.lwjgl.opengl.GL11;
 import org.lwjgl.opengl.GL15C;
 import org.lwjgl.opengl.GL30C;
 
@@ -16,6 +17,9 @@ import org.lwjgl.opengl.GL30C;
  * - Position: (0,0,0) to (1,1,0) in normalized device coordinates
  * - Texture: (0,0) to (1,1) UV coordinates
  * 
+ * NOTE: Uses GL_TRIANGLES (not GL_QUADS) because GL_QUADS is NOT supported
+ * in OpenGL 3.3 Core Profile. The quad is rendered as two triangles.
+ * 
  * IRIS Source: frnsrc/Iris-1.21.9/.../pathways/FullScreenQuadRenderer.java
  * IRIS Adherence: 100% - Structure matches IRIS exactly, adapted for MattMC's buffer system
  */
@@ -23,6 +27,7 @@ public class FullScreenQuadRenderer {
 	public static final FullScreenQuadRenderer INSTANCE = new FullScreenQuadRenderer();
 
 	private int vbo;
+	private int vao;
 	private int vertexCount;
 	private boolean initialized;
 
@@ -40,38 +45,50 @@ public class FullScreenQuadRenderer {
 			return;
 		}
 		try {
-			// Create a full-screen quad with positions and texture coordinates
+			// Create a full-screen quad as two triangles with positions and texture coordinates
 			// Quad vertices in normalized device coordinates (0,0) to (1,1)
-			Tesselator tesselator = Tesselator.getInstance();
-			BufferBuilder bufferBuilder = tesselator.begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_TEX);
+			// Using GL_TRIANGLES because GL_QUADS is NOT supported in OpenGL 3.3 Core Profile
 			
-			// Bottom-left
-			bufferBuilder.addVertex(0.0F, 0.0F, 0.0F).setUv(0.0F, 0.0F);
-			// Bottom-right
-			bufferBuilder.addVertex(1.0F, 0.0F, 0.0F).setUv(1.0F, 0.0F);
-			// Top-right
-			bufferBuilder.addVertex(1.0F, 1.0F, 0.0F).setUv(1.0F, 1.0F);
-			// Top-left
-			bufferBuilder.addVertex(0.0F, 1.0F, 0.0F).setUv(0.0F, 1.0F);
+			// 6 vertices for 2 triangles:
+			// Triangle 1: bottom-left, bottom-right, top-right
+			// Triangle 2: bottom-left, top-right, top-left
+			float[] vertices = {
+				// Triangle 1
+				// Position (x, y, z)      Texcoord (u, v)
+				0.0f, 0.0f, 0.0f,          0.0f, 0.0f,  // Bottom-left
+				1.0f, 0.0f, 0.0f,          1.0f, 0.0f,  // Bottom-right
+				1.0f, 1.0f, 0.0f,          1.0f, 1.0f,  // Top-right
+				
+				// Triangle 2
+				0.0f, 0.0f, 0.0f,          0.0f, 0.0f,  // Bottom-left
+				1.0f, 1.0f, 0.0f,          1.0f, 1.0f,  // Top-right
+				0.0f, 1.0f, 0.0f,          0.0f, 1.0f   // Top-left
+			};
 			
-			MeshData meshData = bufferBuilder.build();
+			// 6 vertices (two triangles)
+			this.vertexCount = 6;
 			
-			if (meshData == null) {
-				throw new IllegalStateException("Failed to build full-screen quad mesh");
-			}
-
+			// Create VAO
+			this.vao = GL30C.glGenVertexArrays();
+			GL30C.glBindVertexArray(this.vao);
+			
 			// Create and upload VBO
 			this.vbo = GL15C.glGenBuffers();
 			GL15C.glBindBuffer(GL15C.GL_ARRAY_BUFFER, this.vbo);
-			GL15C.glBufferData(GL15C.GL_ARRAY_BUFFER, meshData.vertexBuffer(), GL15C.GL_STATIC_DRAW);
+			GL15C.glBufferData(GL15C.GL_ARRAY_BUFFER, vertices, GL15C.GL_STATIC_DRAW);
+			
+			// Setup vertex attributes
+			// Position attribute (vec3) at location 0
+			GL30C.glEnableVertexAttribArray(0);
+			GL30C.glVertexAttribPointer(0, 3, GL11.GL_FLOAT, false, 20, 0);
+			
+			// Texture coordinate attribute (vec2) at location 1
+			GL30C.glEnableVertexAttribArray(1);
+			GL30C.glVertexAttribPointer(1, 2, GL11.GL_FLOAT, false, 20, 12);
+			
+			// Unbind
+			GL30C.glBindVertexArray(0);
 			GL15C.glBindBuffer(GL15C.GL_ARRAY_BUFFER, 0);
-			
-			// 4 vertices (one quad)
-			this.vertexCount = 4;
-			
-			// Clean up
-			meshData.close();
-			tesselator.clear();
 			
 			this.initialized = true;
 		} catch (Exception e) {
@@ -79,7 +96,8 @@ public class FullScreenQuadRenderer {
 			// This is acceptable - it will be retried when actually needed
 			this.initialized = false;
 			this.vbo = 0;
-			this.vertexCount = 4; // Default value even if init fails
+			this.vao = 0;
+			this.vertexCount = 6; // Default value even if init fails
 		}
 	}
 
@@ -95,56 +113,49 @@ public class FullScreenQuadRenderer {
 
 	/**
 	 * Returns the number of vertices in the quad.
-	 * @return Vertex count (always 4 for a quad)
+	 * @return Vertex count (6 for two triangles forming a quad)
 	 */
 	public int getVertexCount() {
 		return vertexCount;
 	}
 
 	/**
-	 * Binds the quad VBO for rendering.
-	 * Call this before setting up vertex attributes and drawing.
+	 * Binds the quad VAO for rendering.
+	 * Call this before drawing.
 	 */
 	public void bindQuad() {
 		ensureInitialized();
-		GL15C.glBindBuffer(GL15C.GL_ARRAY_BUFFER, vbo);
+		GL30C.glBindVertexArray(vao);
 	}
 
 	/**
 	 * Renders the full-screen quad.
-	 * Assumes vertex attributes are already configured.
+	 * Uses GL_TRIANGLES (Core Profile compatible).
 	 */
 	public void render() {
 		ensureInitialized();
-		bindQuad();
+		GL30C.glBindVertexArray(vao);
 		
-		// Enable vertex attributes (position at 0, texcoord at 1)
-		GL30C.glEnableVertexAttribArray(0);
-		GL30C.glEnableVertexAttribArray(1);
+		// Draw the quad as two triangles (Core Profile compatible)
+		GL11.glDrawArrays(GL11.GL_TRIANGLES, 0, vertexCount);
 		
-		// Position attribute (vec3)
-		GL30C.glVertexAttribPointer(0, 3, GL15C.GL_FLOAT, false, 20, 0);
-		// Texture coordinate attribute (vec2)
-		GL30C.glVertexAttribPointer(1, 2, GL15C.GL_FLOAT, false, 20, 12);
-		
-		// Draw the quad
-		GL15C.glDrawArrays(GL15C.GL_QUADS, 0, vertexCount);
-		
-		// Disable vertex attributes
-		GL30C.glDisableVertexAttribArray(0);
-		GL30C.glDisableVertexAttribArray(1);
-		
-		// Unbind VBO
-		GL15C.glBindBuffer(GL15C.GL_ARRAY_BUFFER, 0);
+		// Unbind VAO
+		GL30C.glBindVertexArray(0);
 	}
 
 	/**
-	 * Cleanup method - destroys the VBO.
+	 * Cleanup method - destroys the VBO and VAO.
 	 * Should be called when shutting down.
 	 */
 	public void destroy() {
 		if (vbo != 0) {
 			GL15C.glDeleteBuffers(vbo);
+			vbo = 0;
 		}
+		if (vao != 0) {
+			GL30C.glDeleteVertexArrays(vao);
+			vao = 0;
+		}
+		initialized = false;
 	}
 }
