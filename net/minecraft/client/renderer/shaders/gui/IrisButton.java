@@ -1,8 +1,8 @@
-package net.minecraft.client.renderer.shaders.gui.element.screen;
+package net.minecraft.client.renderer.shaders.gui;
 
 import com.mojang.blaze3d.opengl.GlStateManager;
 import com.mojang.blaze3d.systems.RenderSystem;
-import net.minecraft.client.renderer.shaders.gl.uniform.FloatSupplier;
+import net.minecraft.client.renderer.shaders.uniform.FloatSupplier;
 import net.minecraft.client.renderer.shaders.gui.GuiUtil;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;

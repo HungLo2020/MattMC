@@ -29,7 +29,7 @@ import java.nio.file.WatchKey;
 import java.nio.file.WatchService;
 import java.util.List;
 
-public class ShaderPackSelectionList extends IrisObjectSelectionList<ShaderPackSelectionList.BaseEntry> {
+public class ShaderPackSelectionList extends AbstractSelectionList<ShaderPackSelectionList.BaseEntry> {
 	private static final Component PACK_LIST_LABEL = Component.translatable("pack.iris.list.label").withStyle(ChatFormatting.ITALIC, ChatFormatting.GRAY);
 	private static final ResourceLocation MENU_LIST_BACKGROUND = ResourceLocation.withDefaultNamespace("textures/gui/menu_background.png");
 	private final ShaderPackScreen screen;
@@ -41,7 +41,7 @@ public class ShaderPackSelectionList extends IrisObjectSelectionList<ShaderPackS
 	private ShaderPackEntry applied = null;
 
 	public ShaderPackSelectionList(ShaderPackScreen screen, Minecraft client, int width, int height, int top, int bottom, int left, int right) {
-		super(client, width, bottom, top + 4, bottom, left, right, 20);
+		super(client, width, height, top + 4, 20);
 		WatchKey key1;
 		WatchService watcher1;
 
@@ -73,13 +73,13 @@ public class ShaderPackSelectionList extends IrisObjectSelectionList<ShaderPackS
 	}
 
 	@Override
-	public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+	public boolean keyPressed(net.minecraft.client.input.KeyEvent event) {
 		// Check for up arrow key
-		if (keyCode == GLFW.GLFW_KEY_UP) {
+		if (event.key() == GLFW.GLFW_KEY_UP) {
 			if (getFocused() == this.children().get(0)) return true;
 		}
 
-		return super.keyPressed(keyCode, scanCode, modifiers);
+		return super.keyPressed(event);
 	}
 
 	@Override
@@ -109,14 +109,31 @@ public class ShaderPackSelectionList extends IrisObjectSelectionList<ShaderPackS
 	}
 
 	@Override
+	protected int scrollBarX() {
+		// Position the scrollbar at the rightmost edge of the screen.
+		// By default, the scrollbar is positioned moderately offset from the center.
+		return width - 6;
+	}
+
+	public void select(int entry) {
+		setSelected(this.children().get(entry));
+	}
+
+	@Override
+	public void updateWidgetNarration(net.minecraft.client.gui.narration.NarrationElementOutput narrationElementOutput) {
+		// Empty implementation - matches IRIS exactly
+	}
+
+	@Override
 	protected void renderListBackground(GuiGraphics guiGraphics) {
-		float transition = screen.getListTransitionProgress();
+		float transition = screen.listTransition.getAsFloat();
 		if (transition < 0.02f) return;
 
 		guiGraphics.blit(
+			net.minecraft.client.renderer.RenderPipelines.GUI_TEXTURED,
 			MENU_LIST_BACKGROUND,
 			this.getX(), this.getY(), 
-			(float)this.getRight(), (float)(this.getBottom() + (int)this.getScrollAmount()), 
+			(float)this.getRight(), (float)(this.getBottom() + (int)this.scrollAmount()), 
 			this.getWidth(), this.getHeight(), 
 			32, 32
 		);
@@ -124,12 +141,12 @@ public class ShaderPackSelectionList extends IrisObjectSelectionList<ShaderPackS
 
 	@Override
 	protected void renderListSeparators(GuiGraphics guiGraphics) {
-		float transition = screen.getListTransitionProgress();
+		float transition = screen.listTransition.getAsFloat();
 		if (transition < 0.02f) return;
 
 		int col = (int)(transition * 255.0f) << 24 | 0xFFFFFF;
-		guiGraphics.blit(CreateWorldScreen.HEADER_SEPARATOR, this.getX(), this.getY() - 2, 0.0F, 0.0F, this.getWidth(), 2, 32, 2);
-		guiGraphics.blit(CreateWorldScreen.FOOTER_SEPARATOR, this.getX(), this.getBottom(), 0.0F, 0.0F, this.getWidth(), 2, 32, 2);
+		guiGraphics.blit(net.minecraft.client.renderer.RenderPipelines.GUI_TEXTURED, CreateWorldScreen.HEADER_SEPARATOR, this.getX(), this.getY() - 2, 0.0F, 0.0F, this.getWidth(), 2, 32, 2, col);
+		guiGraphics.blit(net.minecraft.client.renderer.RenderPipelines.GUI_TEXTURED, CreateWorldScreen.FOOTER_SEPARATOR, this.getX(), this.getBottom(), 0.0F, 0.0F, this.getWidth(), 2, 32, 2, col);
 	}
 
 	@Override
@@ -138,7 +155,7 @@ public class ShaderPackSelectionList extends IrisObjectSelectionList<ShaderPackS
 	}
 
 	@Override
-	protected int getRowTop(int index) {
+	public int getRowTop(int index) {
 		return super.getRowTop(index) + 2;
 	}
 
@@ -249,13 +266,12 @@ public class ShaderPackSelectionList extends IrisObjectSelectionList<ShaderPackS
 		}
 
 		@Override
-		public void render(GuiGraphics guiGraphics, int index, int y, int x, int entryWidth, int entryHeight, int mouseX, int mouseY, boolean hovered, float tickDelta) {
+		public void renderContent(GuiGraphics guiGraphics, int mouseX, int mouseY, boolean isHovered, float tickDelta) {
+			int x = getContentX();
+			int y = getContentY();
+			int entryWidth = getContentWidth();
+			int entryHeight = getContentHeight();
 			guiGraphics.drawCenteredString(Minecraft.getInstance().font, label, (x + entryWidth / 2) - 2, y + (entryHeight - 11) / 2, 0xFFC2C2C2);
-		}
-
-		@Override
-		public Component getNarration() {
-			return label;
 		}
 	}
 
@@ -280,9 +296,13 @@ public class ShaderPackSelectionList extends IrisObjectSelectionList<ShaderPackS
 		}
 
 		@Override
-		public void render(GuiGraphics guiGraphics, int index, int y, int x, int entryWidth, int entryHeight, int mouseX, int mouseY, boolean hovered, float tickDelta) {
+		public void renderContent(GuiGraphics guiGraphics, int mouseX, int mouseY, boolean isHovered, float tickDelta) {
+			int x = getContentX();
+			int y = getContentY();
+			int entryWidth = getContentWidth();
+			int entryHeight = getContentHeight();
 			GuiUtil.bindIrisWidgetsTexture();
-			GuiUtil.drawButton(guiGraphics, x - 2, y - 2, entryWidth, entryHeight + 2, hovered, !allowEnableShadersButton);
+			GuiUtil.drawButton(guiGraphics, x - 2, y - 2, entryWidth, entryHeight + 2, isHovered, !allowEnableShadersButton);
 			guiGraphics.drawCenteredString(Minecraft.getInstance().font, getEnableDisableLabel(), (x + entryWidth / 2) - 2, y + (entryHeight - 11) / 2, 0xFFFFFFFF);
 		}
 
@@ -291,8 +311,8 @@ public class ShaderPackSelectionList extends IrisObjectSelectionList<ShaderPackS
 		}
 
 		@Override
-		public boolean mouseClicked(double mouseX, double mouseY, int button) {
-			if (this.allowEnableShadersButton) {
+		public boolean mouseClicked(net.minecraft.client.input.MouseButtonEvent event, boolean bl) {
+			if (this.allowEnableShadersButton && event.buttonInfo().button() == GLFW.GLFW_MOUSE_BUTTON_1) {
 				setShadersEnabled(!this.shadersEnabled);
 				GuiUtil.playButtonClickSound();
 				return true;
@@ -302,9 +322,9 @@ public class ShaderPackSelectionList extends IrisObjectSelectionList<ShaderPackS
 		}
 
 		@Override
-		public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+		public boolean keyPressed(net.minecraft.client.input.KeyEvent event) {
 			// Check for Enter or Space key
-			if (keyCode == GLFW.GLFW_KEY_ENTER || keyCode == GLFW.GLFW_KEY_KP_ENTER || keyCode == GLFW.GLFW_KEY_SPACE) {
+			if (event.key() == GLFW.GLFW_KEY_ENTER || event.key() == GLFW.GLFW_KEY_KP_ENTER || event.key() == GLFW.GLFW_KEY_SPACE) {
 				if (this.allowEnableShadersButton) {
 					setShadersEnabled(!this.shadersEnabled);
 					GuiUtil.playButtonClickSound();
@@ -319,11 +339,6 @@ public class ShaderPackSelectionList extends IrisObjectSelectionList<ShaderPackS
 		@Override
 		public ComponentPath nextFocusPath(FocusNavigationEvent focusNavigationEvent) {
 			return (!isFocused()) ? ComponentPath.leaf(this) : null;
-		}
-
-		@Override
-		public Component getNarration() {
-			return getEnableDisableLabel();
 		}
 
 		public boolean isFocused() {
@@ -342,15 +357,19 @@ public class ShaderPackSelectionList extends IrisObjectSelectionList<ShaderPackS
 		}
 
 		@Override
-		public void render(GuiGraphics guiGraphics, int index, int y, int x, int entryWidth, int entryHeight, int mouseX, int mouseY, boolean hovered, float tickDelta) {
+		public void renderContent(GuiGraphics guiGraphics, int mouseX, int mouseY, boolean isHovered, float tickDelta) {
+			int x = getContentX();
+			int y = getContentY();
+			int entryWidth = getContentWidth();
+			int entryHeight = getContentHeight();
 			GuiUtil.bindIrisWidgetsTexture();
-			GuiUtil.drawButton(guiGraphics, x - 2, y - 2, entryWidth, entryHeight + 2, hovered, !allowPressButton);
+			GuiUtil.drawButton(guiGraphics, x - 2, y - 2, entryWidth, entryHeight + 2, isHovered, !allowPressButton);
 			guiGraphics.drawCenteredString(Minecraft.getInstance().font, label, (x + entryWidth / 2) - 2, y + (entryHeight - 11) / 2, 0xFFFFFFFF);
 		}
 
 		@Override
-		public boolean mouseClicked(double mouseX, double mouseY, int button) {
-			if (this.allowPressButton) {
+		public boolean mouseClicked(net.minecraft.client.input.MouseButtonEvent event, boolean bl) {
+			if (this.allowPressButton && event.buttonInfo().button() == GLFW.GLFW_MOUSE_BUTTON_1) {
 				GuiUtil.playButtonClickSound();
 				onClick.run();
 				return false;
@@ -360,9 +379,9 @@ public class ShaderPackSelectionList extends IrisObjectSelectionList<ShaderPackS
 		}
 
 		@Override
-		public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+		public boolean keyPressed(net.minecraft.client.input.KeyEvent event) {
 			// Check for Enter or Space key
-			if (keyCode == GLFW.GLFW_KEY_ENTER || keyCode == GLFW.GLFW_KEY_KP_ENTER || keyCode == GLFW.GLFW_KEY_SPACE) {
+			if (event.key() == GLFW.GLFW_KEY_ENTER || event.key() == GLFW.GLFW_KEY_KP_ENTER || event.key() == GLFW.GLFW_KEY_SPACE) {
 				if (this.allowPressButton) {
 					GuiUtil.playButtonClickSound();
 					onClick.run();
@@ -371,11 +390,6 @@ public class ShaderPackSelectionList extends IrisObjectSelectionList<ShaderPackS
 			}
 
 			return false;
-		}
-
-		@Override
-		public Component getNarration() {
-			return label;
 		}
 	}
 
@@ -410,15 +424,19 @@ public class ShaderPackSelectionList extends IrisObjectSelectionList<ShaderPackS
 		}
 
 		@Override
-		public void render(GuiGraphics guiGraphics, int entryIndex, int y, int x, int entryWidth, int entryHeight, int mouseX, int mouseY, boolean hovered, float tickDelta) {
+		public void renderContent(GuiGraphics guiGraphics, int mouseX, int mouseY, boolean isHovered, float tickDelta) {
+			int x = getContentX();
+			int y = getContentY();
+			int entryWidth = getContentWidth();
+			int entryHeight = getContentHeight();
 			this.bounds = new ScreenRectangle(x, y, entryWidth, entryHeight);
 			Font font = Minecraft.getInstance().font;
 			int color = 0xFFFFFFFF;
 			String name = packName;
 
-			if (hovered) {
+			if (isHovered) {
 				GuiUtil.bindIrisWidgetsTexture();
-				GuiUtil.drawButton(guiGraphics, x - 2, y - 2, entryWidth + 4, entryHeight + 4, hovered, false);
+				GuiUtil.drawButton(guiGraphics, x - 2, y - 2, entryWidth + 4, entryHeight + 4, isHovered, false);
 			}
 
 			boolean shadersEnabled = list.getTopButtonRow().shadersEnabled;
@@ -445,9 +463,9 @@ public class ShaderPackSelectionList extends IrisObjectSelectionList<ShaderPackS
 		}
 
 		@Override
-		public boolean mouseClicked(double mouseX, double mouseY, int button) {
+		public boolean mouseClicked(net.minecraft.client.input.MouseButtonEvent event, boolean bl) {
 			// Only do anything on left-click
-			if (button != 0) {
+			if (event.buttonInfo().button() != GLFW.GLFW_MOUSE_BUTTON_1) {
 				return false;
 			}
 
@@ -455,9 +473,9 @@ public class ShaderPackSelectionList extends IrisObjectSelectionList<ShaderPackS
 		}
 
 		@Override
-		public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+		public boolean keyPressed(net.minecraft.client.input.KeyEvent event) {
 			// Check for Enter or Space key
-			if (keyCode == GLFW.GLFW_KEY_ENTER || keyCode == GLFW.GLFW_KEY_KP_ENTER || keyCode == GLFW.GLFW_KEY_SPACE) {
+			if (event.key() == GLFW.GLFW_KEY_ENTER || event.key() == GLFW.GLFW_KEY_KP_ENTER || event.key() == GLFW.GLFW_KEY_SPACE) {
 				return doThing();
 			}
 
@@ -491,11 +509,6 @@ public class ShaderPackSelectionList extends IrisObjectSelectionList<ShaderPackS
 		@Override
 		public ComponentPath nextFocusPath(FocusNavigationEvent focusNavigationEvent) {
 			return (!isFocused()) ? ComponentPath.leaf(this) : null;
-		}
-
-		@Override
-		public Component getNarration() {
-			return Component.literal(packName);
 		}
 
 		public boolean isFocused() {

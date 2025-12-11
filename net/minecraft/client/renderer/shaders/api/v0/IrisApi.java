@@ -16,4 +16,17 @@ public class IrisApi {
 	public String getCurrentPackName() {
 		return null;
 	}
+
+	public Config getConfig() {
+		return new Config();
+	}
+
+	/**
+	 * Stub Config class
+	 */
+	public static class Config {
+		public void setShadersEnabledAndApply(boolean enabled) {
+			// Stub - will be implemented with API system
+		}
+	}
 }

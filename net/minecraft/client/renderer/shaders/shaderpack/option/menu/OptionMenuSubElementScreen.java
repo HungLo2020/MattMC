@@ -1,9 +1,14 @@
 package net.minecraft.client.renderer.shaders.shaderpack.option.menu;
 
 /**
- * Stub interface for sub option menu screen element
+ * Stub class for sub option menu screen element
  * Full implementation requires shader pack option parsing system
+ * Matches Iris OptionMenuSubElementScreen pattern with screenId field
  */
-public interface OptionMenuSubElementScreen extends OptionMenuElementScreen {
-	// Marker interface for sub-screen element
+public class OptionMenuSubElementScreen implements OptionMenuElementScreen {
+	public final String screenId;
+	
+	public OptionMenuSubElementScreen(String screenId) {
+		this.screenId = screenId;
+	}
 }

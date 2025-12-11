@@ -225,19 +225,19 @@ public class ShaderPackScreen extends Screen implements HudHideable {
 	}
 
 	@Override
-	public boolean mouseClicked(double mouseX, double mouseY, int button) {
+	public boolean mouseClicked(MouseButtonEvent event, boolean bl) {
 		int widthValue = this.font.width("New update available!");
-		double x = mouseX;
-		double y = mouseY;
+		double x = event.x();
+		double y = event.y();
 		if (this.updateComponent != null && x < widthValue && y > (this.height - 10) && y < this.height) {
-			this.minecraft.setScreen(new ConfirmLinkScreen(bl -> {
-				if (bl) {
+			this.minecraft.setScreen(new ConfirmLinkScreen(bl2 -> {
+				if (bl2) {
 					Iris.getUpdateChecker().getUpdateLink().ifPresent(Util.getPlatform()::openUri);
 				}
 				this.minecraft.setScreen(this);
 			}, Iris.getUpdateChecker().getUpdateLink().map(URI::toString).orElse(""), true));
 		}
-		return super.mouseClicked(event, bl2);
+		return super.mouseClicked(event, bl);
 	}
 
 	@Override
@@ -369,7 +369,7 @@ public class ShaderPackScreen extends Screen implements HudHideable {
 					Component.translatable("options.iris.shaderPackList")
 					: Component.translatable("options.iris.shaderPackSettings")
 			);
-			this.screenSwitchButton.active = optionMenuOpen || (shaderPackList.getTopButtonRow().shadersEnabled && Iris.getCurrentPack().map(p -> !p.getMenuContainer().mainScreen.elements.isEmpty()).orElse(true));
+			this.screenSwitchButton.active = optionMenuOpen || (shaderPackList.getTopButtonRow().shadersEnabled && Iris.getCurrentPack().map(p -> !p.getMenuContainer().mainScreen.getElements().isEmpty()).orElse(true));
 		}
 	}
 	private static final ResourceLocation BLUR_POST_CHAIN_ID = ResourceLocation.withDefaultNamespace("blur");
@@ -390,7 +390,7 @@ public class ShaderPackScreen extends Screen implements HudHideable {
 	}
 
 	@Override
-	public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+	public boolean keyPressed(KeyEvent event) {
 		if (event.isEscape()) {
 			if (this.guiHidden) {
 				this.guiHidden = false;
@@ -424,7 +424,7 @@ public class ShaderPackScreen extends Screen implements HudHideable {
 			this.init();
 
 			this.setFocused(null);
-		} else if (keyCode == GLFW.GLFW_KEY_F1 && this.showHideButton != null) {
+		} else if (event.key() == GLFW.GLFW_KEY_F1 && this.showHideButton != null) {
 			this.guiHidden = !guiHidden;
 			this.init();
 		}
