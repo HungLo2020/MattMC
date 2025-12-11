@@ -158,11 +158,52 @@ public class Iris {
 	}
 
 	/**
-	 * Stub method for getting pipeline manager.
-	 * Returns null for now.
+	 * Gets the pipeline manager from ShaderSystem.
+	 * @return The pipeline manager, or null if not initialized
 	 */
 	public static Object getPipelineManager() {
-		return null;
+		net.minecraft.client.renderer.shaders.core.ShaderSystem system = 
+			net.minecraft.client.renderer.shaders.core.ShaderSystem.getInstance();
+		return system.isInitialized() ? system.getPipelineManager() : null;
+	}
+	
+	/**
+	 * Reloads the shader pack configuration and triggers pipeline recreation.
+	 * This is the main method called when applying shader changes.
+	 * Matches IRIS's reload() pattern.
+	 * 
+	 * @throws IOException if config save fails
+	 */
+	public static void reload() throws IOException {
+		logger.info("Reloading shader configuration");
+		
+		// Save the Iris config
+		irisConfig.save();
+		
+		// Sync to ShaderSystem
+		net.minecraft.client.renderer.shaders.core.ShaderSystem system = 
+			net.minecraft.client.renderer.shaders.core.ShaderSystem.getInstance();
+		
+		if (system.isInitialized() && system.getConfig() != null) {
+			// Sync Iris config to ShaderSystem config
+			system.getConfig().setShadersEnabled(irisConfig.areShadersEnabled());
+			String packName = irisConfig.getShaderPackName().orElse(null);
+			if (packName != null) {
+				system.getConfig().setSelectedPack(packName);
+			}
+			
+			// Update currentPackName for consistency
+			currentPackName = packName;
+			
+			// Reload pipelines
+			if (system.getPipelineManager() != null) {
+				logger.info("Reloading shader pipelines");
+				system.getPipelineManager().reloadPipelines();
+			}
+			
+			logger.info("Shader reload complete - enabled={}, pack={}", 
+				irisConfig.areShadersEnabled(), packName);
+		}
 	}
 
 	/**
