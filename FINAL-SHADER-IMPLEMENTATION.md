@@ -66,7 +66,7 @@ Each step below is designed to be completable in one AI session (~1-2 hours).
 import net.minecraft.client.renderer.shaders.hooks.RenderingHooks;
 ```
 
-2. Find `renderLevel()` method (line ~430) and add at the START (after `float f = deltaTracker...`):
+2. Find the `renderLevel()` method (search for `public void renderLevel(`) and add at the START (after `float f = deltaTracker...`):
 ```java
 // Shader system hooks - begin world rendering
 RenderingHooks.onWorldRenderStart();
@@ -212,6 +212,11 @@ public void finalizeLevelRendering() {
 private void copyColorToScreen() {
     Minecraft mc = Minecraft.getInstance();
     RenderTarget mainTarget = mc.getMainRenderTarget();
+    
+    if (mainTarget == null) {
+        LOGGER.warn("Main render target is null, cannot copy to screen");
+        return;
+    }
     
     // Bind screen framebuffer
     mainTarget.bindWrite(true);
