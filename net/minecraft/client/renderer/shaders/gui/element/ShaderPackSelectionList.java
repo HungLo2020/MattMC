@@ -1,0 +1,505 @@
+package net.minecraft.client.renderer.shaders.gui.element;
+
+import net.minecraft.ChatFormatting;
+import net.minecraft.Util;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.ComponentPath;
+import net.minecraft.client.gui.Font;
+import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.components.AbstractSelectionList;
+import net.minecraft.client.gui.navigation.FocusNavigationEvent;
+import net.minecraft.client.gui.navigation.ScreenRectangle;
+import net.minecraft.client.gui.screens.ConfirmLinkScreen;
+import net.minecraft.client.gui.screens.worldselection.CreateWorldScreen;
+import net.minecraft.client.renderer.RenderType;
+import net.minecraft.client.renderer.shaders.Iris;
+import net.minecraft.client.renderer.shaders.gui.GuiUtil;
+import net.minecraft.client.renderer.shaders.gui.screen.ShaderPackScreen;
+import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.MutableComponent;
+import net.minecraft.resources.ResourceLocation;
+import org.jetbrains.annotations.Nullable;
+import org.lwjgl.glfw.GLFW;
+
+import java.io.IOException;
+import java.nio.file.FileSystems;
+import java.nio.file.StandardWatchEventKinds;
+import java.nio.file.WatchEvent;
+import java.nio.file.WatchKey;
+import java.nio.file.WatchService;
+import java.util.List;
+
+public class ShaderPackSelectionList extends IrisObjectSelectionList<ShaderPackSelectionList.BaseEntry> {
+	private static final Component PACK_LIST_LABEL = Component.translatable("pack.iris.list.label").withStyle(ChatFormatting.ITALIC, ChatFormatting.GRAY);
+	private static final ResourceLocation MENU_LIST_BACKGROUND = ResourceLocation.withDefaultNamespace("textures/gui/menu_background.png");
+	private final ShaderPackScreen screen;
+	private final TopButtonRowEntry topButtonRow;
+	private final WatchService watcher;
+	private final WatchKey key;
+	private final PinnedEntry downloadButton;
+	private boolean keyValid;
+	private ShaderPackEntry applied = null;
+
+	public ShaderPackSelectionList(ShaderPackScreen screen, Minecraft client, int width, int height, int top, int bottom, int left, int right) {
+		super(client, width, bottom, top + 4, bottom, left, right, 20);
+		WatchKey key1;
+		WatchService watcher1;
+
+		this.screen = screen;
+		this.topButtonRow = new TopButtonRowEntry(this, Iris.getIrisConfig().areShadersEnabled());
+		this.downloadButton = new PinnedEntry(Component.literal("Download Shaders"), () -> this.minecraft.setScreen(new ConfirmLinkScreen(bl -> {
+			if (bl) {
+				Util.getPlatform().openUri("https://modrinth.com/shaders");
+			}
+			this.minecraft.setScreen(this.screen);
+		}, "https://modrinth.com/shaders", true)), this);
+		try {
+			watcher1 = FileSystems.getDefault().newWatchService();
+			key1 = Iris.getShaderpacksDirectory().register(watcher1,
+				StandardWatchEventKinds.ENTRY_CREATE,
+				StandardWatchEventKinds.ENTRY_MODIFY,
+				StandardWatchEventKinds.ENTRY_DELETE);
+			keyValid = true;
+		} catch (IOException e) {
+			Iris.logger.error("Couldn't register file watcher!", e);
+			watcher1 = null;
+			key1 = null;
+			keyValid = false;
+		}
+
+		this.key = key1;
+		this.watcher = watcher1;
+		refresh();
+	}
+
+	@Override
+	public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+		// Check for up arrow key
+		if (keyCode == GLFW.GLFW_KEY_UP) {
+			if (getFocused() == this.children().get(0)) return true;
+		}
+
+		return super.keyPressed(keyCode, scanCode, modifiers);
+	}
+
+	@Override
+	public void renderWidget(GuiGraphics guiGraphics, int mouseX, int mouseY, float tickDelta) {
+		if (keyValid) {
+			for (WatchEvent<?> event : key.pollEvents()) {
+				if (event.kind() == StandardWatchEventKinds.OVERFLOW) continue;
+
+				refresh();
+				break;
+			}
+
+			keyValid = key.reset();
+		}
+
+		super.renderWidget(guiGraphics, mouseX, mouseY, tickDelta);
+	}
+
+	public void close() throws IOException {
+		if (key != null) {
+			key.cancel();
+		}
+
+		if (watcher != null) {
+			watcher.close();
+		}
+	}
+
+	@Override
+	protected void renderListBackground(GuiGraphics guiGraphics) {
+		float transition = screen.getListTransitionProgress();
+		if (transition < 0.02f) return;
+
+		guiGraphics.blit(
+			MENU_LIST_BACKGROUND,
+			this.getX(), this.getY(), 
+			(float)this.getRight(), (float)(this.getBottom() + (int)this.getScrollAmount()), 
+			this.getWidth(), this.getHeight(), 
+			32, 32
+		);
+	}
+
+	@Override
+	protected void renderListSeparators(GuiGraphics guiGraphics) {
+		float transition = screen.getListTransitionProgress();
+		if (transition < 0.02f) return;
+
+		int col = (int)(transition * 255.0f) << 24 | 0xFFFFFF;
+		guiGraphics.blit(CreateWorldScreen.HEADER_SEPARATOR, this.getX(), this.getY() - 2, 0.0F, 0.0F, this.getWidth(), 2, 32, 2);
+		guiGraphics.blit(CreateWorldScreen.FOOTER_SEPARATOR, this.getX(), this.getBottom(), 0.0F, 0.0F, this.getWidth(), 2, 32, 2);
+	}
+
+	@Override
+	public int getRowWidth() {
+		return Math.min(308, width - 50);
+	}
+
+	@Override
+	protected int getRowTop(int index) {
+		return super.getRowTop(index) + 2;
+	}
+
+	public void refresh() {
+		this.clearEntries();
+
+		List<String> names;
+
+		try {
+			names = Iris.getShaderpacksDirectoryManager().enumerate();
+		} catch (Throwable e) {
+			Iris.logger.error("Error reading files while constructing selection UI", e);
+
+			// Not translating this since it's going to be seen very rarely,
+			// We're just trying to get more information on a seemingly untraceable bug:
+			// - https://github.com/IrisShaders/Iris/issues/785
+			this.addLabelEntries(
+				Component.empty(),
+				Component.literal("There was an error reading your shaderpacks directory")
+					.withStyle(ChatFormatting.RED, ChatFormatting.BOLD),
+				Component.empty(),
+				Component.literal("Check your logs for more information."),
+				Component.literal("Please file an issue report including a log file."),
+				Component.literal("If you are able to identify the file causing this, " +
+					"please include it in your report as well."),
+				Component.literal("Note that this might be an issue with folder " +
+					"permissions; ensure those are correct first.")
+			);
+
+			return;
+		}
+
+		this.addEntry(topButtonRow);
+
+		if (names.isEmpty()) {
+			this.addEntry(downloadButton);
+		}
+
+		// Only allow the enable/disable shaders button if the user has
+		// added a shader pack. Otherwise, the button will be disabled.
+		topButtonRow.allowEnableShadersButton = !names.isEmpty();
+
+		int index = 0;
+
+		for (String name : names) {
+			index++;
+			addPackEntry(index, name);
+		}
+
+		this.addLabelEntries(PACK_LIST_LABEL);
+	}
+
+	public void addPackEntry(int index, String name) {
+		ShaderPackEntry entry = new ShaderPackEntry(index, this, name);
+
+		Iris.getIrisConfig().getShaderPackName().ifPresent(currentPackName -> {
+			if (name.equals(currentPackName)) {
+				setSelected(entry);
+				setFocused(entry);
+				centerScrollOn(entry);
+				setApplied(entry);
+			}
+		});
+
+		this.addEntry(entry);
+	}
+
+	public void addLabelEntries(Component... lines) {
+		for (Component text : lines) {
+			this.addEntry(new LabelEntry(text));
+		}
+	}
+
+	public void select(String name) {
+		for (int i = 0; i < getItemCount(); i++) {
+			BaseEntry entry = this.children().get(i);
+
+			if (entry instanceof ShaderPackEntry && ((ShaderPackEntry) entry).packName.equals(name)) {
+				setSelected(entry);
+
+				return;
+			}
+		}
+	}
+
+	public ShaderPackEntry getApplied() {
+		return this.applied;
+	}
+
+	public void setApplied(ShaderPackEntry entry) {
+		this.applied = entry;
+	}
+
+	public TopButtonRowEntry getTopButtonRow() {
+		return topButtonRow;
+	}
+
+	public static abstract class BaseEntry extends AbstractSelectionList.Entry<BaseEntry> {
+		protected BaseEntry() {
+		}
+	}
+
+	public static class LabelEntry extends BaseEntry {
+		private final Component label;
+
+		public LabelEntry(Component label) {
+			this.label = label;
+		}
+
+		@Override
+		public void render(GuiGraphics guiGraphics, int index, int y, int x, int entryWidth, int entryHeight, int mouseX, int mouseY, boolean hovered, float tickDelta) {
+			guiGraphics.drawCenteredString(Minecraft.getInstance().font, label, (x + entryWidth / 2) - 2, y + (entryHeight - 11) / 2, 0xFFC2C2C2);
+		}
+
+		@Override
+		public Component getNarration() {
+			return label;
+		}
+	}
+
+	public static class TopButtonRowEntry extends BaseEntry {
+		private static final Component NONE_PRESENT_LABEL = Component.translatable("options.iris.shaders.nonePresent").withStyle(ChatFormatting.GRAY);
+		private static final Component SHADERS_DISABLED_LABEL = Component.translatable("options.iris.shaders.disabled");
+		private static final Component SHADERS_ENABLED_LABEL = Component.translatable("options.iris.shaders.enabled");
+
+		private final ShaderPackSelectionList list;
+
+		public boolean allowEnableShadersButton = true;
+		public boolean shadersEnabled;
+
+		public TopButtonRowEntry(ShaderPackSelectionList list, boolean shadersEnabled) {
+			this.list = list;
+			this.shadersEnabled = shadersEnabled;
+		}
+
+		public void setShadersEnabled(boolean shadersEnabled) {
+			this.shadersEnabled = shadersEnabled;
+			this.list.screen.refreshScreenSwitchButton();
+		}
+
+		@Override
+		public void render(GuiGraphics guiGraphics, int index, int y, int x, int entryWidth, int entryHeight, int mouseX, int mouseY, boolean hovered, float tickDelta) {
+			GuiUtil.bindIrisWidgetsTexture();
+			GuiUtil.drawButton(guiGraphics, x - 2, y - 2, entryWidth, entryHeight + 2, hovered, !allowEnableShadersButton);
+			guiGraphics.drawCenteredString(Minecraft.getInstance().font, getEnableDisableLabel(), (x + entryWidth / 2) - 2, y + (entryHeight - 11) / 2, 0xFFFFFFFF);
+		}
+
+		private Component getEnableDisableLabel() {
+			return this.allowEnableShadersButton ? this.shadersEnabled ? SHADERS_ENABLED_LABEL : SHADERS_DISABLED_LABEL : NONE_PRESENT_LABEL;
+		}
+
+		@Override
+		public boolean mouseClicked(double mouseX, double mouseY, int button) {
+			if (this.allowEnableShadersButton) {
+				setShadersEnabled(!this.shadersEnabled);
+				GuiUtil.playButtonClickSound();
+				return true;
+			}
+
+			return false;
+		}
+
+		@Override
+		public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+			// Check for Enter or Space key
+			if (keyCode == GLFW.GLFW_KEY_ENTER || keyCode == GLFW.GLFW_KEY_KP_ENTER || keyCode == GLFW.GLFW_KEY_SPACE) {
+				if (this.allowEnableShadersButton) {
+					setShadersEnabled(!this.shadersEnabled);
+					GuiUtil.playButtonClickSound();
+					return true;
+				}
+			}
+
+			return false;
+		}
+
+		@Nullable
+		@Override
+		public ComponentPath nextFocusPath(FocusNavigationEvent focusNavigationEvent) {
+			return (!isFocused()) ? ComponentPath.leaf(this) : null;
+		}
+
+		@Override
+		public Component getNarration() {
+			return getEnableDisableLabel();
+		}
+
+		public boolean isFocused() {
+			return this.list.getFocused() == this;
+		}
+	}
+
+	private static class PinnedEntry extends BaseEntry {
+		public final boolean allowPressButton = true;
+		private final Component label;
+		private final Runnable onClick;
+
+		public PinnedEntry(Component label, Runnable onClick, ShaderPackSelectionList list) {
+			this.label = label;
+			this.onClick = onClick;
+		}
+
+		@Override
+		public void render(GuiGraphics guiGraphics, int index, int y, int x, int entryWidth, int entryHeight, int mouseX, int mouseY, boolean hovered, float tickDelta) {
+			GuiUtil.bindIrisWidgetsTexture();
+			GuiUtil.drawButton(guiGraphics, x - 2, y - 2, entryWidth, entryHeight + 2, hovered, !allowPressButton);
+			guiGraphics.drawCenteredString(Minecraft.getInstance().font, label, (x + entryWidth / 2) - 2, y + (entryHeight - 11) / 2, 0xFFFFFFFF);
+		}
+
+		@Override
+		public boolean mouseClicked(double mouseX, double mouseY, int button) {
+			if (this.allowPressButton) {
+				GuiUtil.playButtonClickSound();
+				onClick.run();
+				return false;
+			}
+
+			return false;
+		}
+
+		@Override
+		public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+			// Check for Enter or Space key
+			if (keyCode == GLFW.GLFW_KEY_ENTER || keyCode == GLFW.GLFW_KEY_KP_ENTER || keyCode == GLFW.GLFW_KEY_SPACE) {
+				if (this.allowPressButton) {
+					GuiUtil.playButtonClickSound();
+					onClick.run();
+					return false;
+				}
+			}
+
+			return false;
+		}
+
+		@Override
+		public Component getNarration() {
+			return label;
+		}
+	}
+
+	public class ShaderPackEntry extends BaseEntry {
+		private final String packName;
+		private final ShaderPackSelectionList list;
+		private final int index;
+		private ScreenRectangle bounds;
+
+		public ShaderPackEntry(int index, ShaderPackSelectionList list, String packName) {
+			this.bounds = ScreenRectangle.empty();
+			this.packName = packName;
+			this.list = list;
+			this.index = index;
+		}
+
+		@Override
+		public ScreenRectangle getRectangle() {
+			return bounds;
+		}
+
+		public boolean isApplied() {
+			return list.getApplied() == this;
+		}
+
+		public boolean isSelected() {
+			return list.getSelected() == this;
+		}
+
+		public String getPackName() {
+			return packName;
+		}
+
+		@Override
+		public void render(GuiGraphics guiGraphics, int entryIndex, int y, int x, int entryWidth, int entryHeight, int mouseX, int mouseY, boolean hovered, float tickDelta) {
+			this.bounds = new ScreenRectangle(x, y, entryWidth, entryHeight);
+			Font font = Minecraft.getInstance().font;
+			int color = 0xFFFFFFFF;
+			String name = packName;
+
+			if (hovered) {
+				GuiUtil.bindIrisWidgetsTexture();
+				GuiUtil.drawButton(guiGraphics, x - 2, y - 2, entryWidth + 4, entryHeight + 4, hovered, false);
+			}
+
+			boolean shadersEnabled = list.getTopButtonRow().shadersEnabled;
+
+			if (font.width(Component.literal(name).withStyle(ChatFormatting.BOLD)) > this.list.getRowWidth() - 3) {
+				name = font.plainSubstrByWidth(name, this.list.getRowWidth() - 8) + "...";
+			}
+
+			MutableComponent text = Component.literal(name);
+
+			if (this.isMouseOver(mouseX, mouseY)) {
+				text = text.withStyle(ChatFormatting.BOLD);
+			}
+
+			if (shadersEnabled && this.isApplied()) {
+				color = 0xFFFFF263;
+			}
+
+			if (!shadersEnabled && !this.isMouseOver(mouseX, mouseY)) {
+				color = 0xFFA2A2A2;
+			}
+
+			guiGraphics.drawCenteredString(font, text, (x + entryWidth / 2) - 2, y + (entryHeight - 11) / 2, color);
+		}
+
+		@Override
+		public boolean mouseClicked(double mouseX, double mouseY, int button) {
+			// Only do anything on left-click
+			if (button != 0) {
+				return false;
+			}
+
+			return doThing();
+		}
+
+		@Override
+		public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+			// Check for Enter or Space key
+			if (keyCode == GLFW.GLFW_KEY_ENTER || keyCode == GLFW.GLFW_KEY_KP_ENTER || keyCode == GLFW.GLFW_KEY_SPACE) {
+				return doThing();
+			}
+
+			return false;
+		}
+
+		private boolean doThing() {
+			boolean didAnything = false;
+
+			// UX: If shaders are disabled, then clicking a shader in the list will also
+			//     enable shaders on apply. Previously, it was not possible to select
+			//     a pack when shaders were disabled, but this was a source of confusion
+			//     - people did not realize that they needed to enable shaders before
+			//     selecting a shader pack.
+			if (!list.getTopButtonRow().shadersEnabled) {
+				list.getTopButtonRow().setShadersEnabled(true);
+				didAnything = true;
+			}
+
+			if (!this.isSelected()) {
+				this.list.select(this.index);
+				didAnything = true;
+			}
+
+			ShaderPackSelectionList.this.screen.setFocused(ShaderPackSelectionList.this.screen.getBottomRowOption());
+
+			return didAnything;
+		}
+
+		@Nullable
+		@Override
+		public ComponentPath nextFocusPath(FocusNavigationEvent focusNavigationEvent) {
+			return (!isFocused()) ? ComponentPath.leaf(this) : null;
+		}
+
+		@Override
+		public Component getNarration() {
+			return Component.literal(packName);
+		}
+
+		public boolean isFocused() {
+			return this.list.getFocused() == this;
+		}
+	}
+}
