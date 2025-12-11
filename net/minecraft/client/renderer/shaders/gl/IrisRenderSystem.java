@@ -180,10 +180,22 @@ public class IrisRenderSystem {
 	
 	// ============ Sampler Methods ============
 
+	public static int genSampler() {
+		return GL33C.glGenSamplers();
+	}
+
+	public static void destroySampler(int sampler) {
+		GL33C.glDeleteSamplers(sampler);
+	}
+
 	public static void bindSampler(int unit, int sampler) {
 		if (!initialized) return;
 		GL33C.glBindSampler(unit, sampler);
 		samplers[unit] = sampler;
+	}
+
+	public static void bindSamplerToUnit(int unit, int sampler) {
+		bindSampler(unit, sampler);
 	}
 
 	public static void unbindAllSamplers() {
