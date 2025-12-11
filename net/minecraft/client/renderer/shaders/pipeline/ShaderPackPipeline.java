@@ -158,7 +158,8 @@ public class ShaderPackPipeline implements WorldRenderingPipeline {
 			try {
 				// Create shadow render targets
 				int resolution = shadowDirectives.getResolution();
-				this.shadowRenderTargets = new ShadowRenderTargets(resolution, shadowDirectives);
+				// Pass false for higherShadowcolor to use OptiFine limit (2 shadow color buffers)
+				this.shadowRenderTargets = new ShadowRenderTargets(resolution, shadowDirectives, false);
 				
 				// Create shadow renderer
 				this.shadowRenderer = new ShadowRenderer(shadowDirectives, shadowRenderTargets);
@@ -717,11 +718,11 @@ public class ShaderPackPipeline implements WorldRenderingPipeline {
 		}
 		
 		// === Time uniforms (SystemTimeUniforms, WorldTimeUniforms) ===
-		float frameTimeCounter = SystemTimeUniforms.TIMER.getAsFloat();
+		float frameTimeCounter = SystemTimeUniforms.TIMER.getFrameTimeCounter();
 		setUniform1f(programId, "frameTimeCounter", frameTimeCounter);
 		
 		// Frame counter
-		setUniform1i(programId, "frameCounter", (int) SystemTimeUniforms.COUNTER.get());
+		setUniform1i(programId, "frameCounter", SystemTimeUniforms.COUNTER.getAsInt());
 		
 		Minecraft mc = Minecraft.getInstance();
 		if (mc.level != null) {
