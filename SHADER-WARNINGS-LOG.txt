@@ -1,5 +1,5 @@
-matt@HungLoDE:~/Documents/Repos/MattMC$ /bin/bash /home/matt/Documents/Repos/MattMC/RunDev.sh
-Starting a Gradle Daemon, 2 stopped Daemons could not be reused, use --status for details
+att@HungLoDE:~/Documents/Repos/MattMC$ /bin/bash /home/matt/Documents/Repos/MattMC/RunDev.sh
+Starting a Gradle Daemon, 1 busy and 2 stopped Daemons could not be reused, use --status for details
 
 > Configure project :
 ✓ Using bundled dependencies from libraries/deps/
@@ -8,8 +8,23 @@ Path for java installation '/usr/lib/jvm/openjdk-21' (Common Linux Locations) do
 Path for java installation '/usr/lib/jvm/openjdk-17' (Common Linux Locations) does not contain a java executable
 
 > Task :compileJava
-Note: /home/matt/Documents/Repos/MattMC/net/minecraft/client/renderer/shaders/pipeline/ShaderPackPipeline.java uses or overrides a deprecated API.
+/home/matt/Documents/Repos/MattMC/net/minecraft/world/level/block/entity/TheEndGatewayBlockEntity.java:228: warning: [removal] getHighestSectionPosition() in ChunkAccess has been deprecated and marked for removal
+                int i = levelChunk.getHighestSectionPosition() + 16 - 1;
+                                  ^
+/home/matt/Documents/Repos/MattMC/net/minecraft/world/level/levelgen/Heightmap.java:48: warning: [removal] getHighestSectionPosition() in ChunkAccess has been deprecated and marked for removal
+                        int j = chunkAccess.getHighestSectionPosition() + 16;
+                                           ^
+/home/matt/Documents/Repos/MattMC/net/minecraft/world/level/levelgen/placement/NoiseBasedCountPlacement.java:35: warning: [removal] BIOME_INFO_NOISE in Biome has been deprecated and marked for removal
+                double d = Biome.BIOME_INFO_NOISE.getValue(blockPos.getX() / this.noiseFactor, blockPos.getZ() / this.noiseFactor, false);
+                                ^
+/home/matt/Documents/Repos/MattMC/net/minecraft/world/level/levelgen/placement/NoiseThresholdCountPlacement.java:35: warning: [removal] BIOME_INFO_NOISE in Biome has been deprecated and marked for removal
+                double d = Biome.BIOME_INFO_NOISE.getValue(blockPos.getX() / 200.0, blockPos.getZ() / 200.0, false);
+                                ^
+Note: Some input files use or override a deprecated API.
 Note: Recompile with -Xlint:deprecation for details.
+Note: Some input files use unchecked or unsafe operations.
+Note: Recompile with -Xlint:unchecked for details.
+4 warnings
 
 > Task :copyJdkToRun
 📂 Copying JDK to run directory...
@@ -17,13 +32,13 @@ Note: Recompile with -Xlint:deprecation for details.
 
 > Task :runClient
 Using bundled JDK from: /home/matt/Documents/Repos/MattMC/run/jdk-21
-[11:39:49] [Datafixer Bootstrap/INFO]: 278 Datafixer optimizations took 185 milliseconds
-[11:39:51] [main/WARN]: Missing translation key for rename: gui.abuseReport.reason.generic
-[11:39:51] [main/WARN]: Missing translation key for rename: gui.abuseReport.reason.generic.description
-[11:39:51] [Render thread/INFO]: Setting user: Player670
-[11:39:51] [Render thread/INFO]: Initializing MattMC Shader System
-[11:39:51] [Render thread/INFO]: Loaded shader configuration
-[11:39:51] [Render thread/INFO]: Shader System initialized successfully - Shaders: true, Pack: ComplementaryHungLoIfied.zip
+[12:21:13] [Datafixer Bootstrap/INFO]: 278 Datafixer optimizations took 182 milliseconds
+[12:21:15] [main/WARN]: Missing translation key for rename: gui.abuseReport.reason.generic
+[12:21:15] [main/WARN]: Missing translation key for rename: gui.abuseReport.reason.generic.description
+[12:21:15] [Render thread/INFO]: Setting user: Player909
+[12:21:15] [Render thread/INFO]: Initializing MattMC Shader System
+[12:21:15] [Render thread/INFO]: Loaded shader configuration
+[12:21:15] [Render thread/INFO]: Shader System initialized successfully - Shaders: true, Pack: ComplementaryHungLoIfied.zip
 [LWJGL] Version: 3.3.3+5
          OS: Linux v6.14.0-36-generic
         JRE: Linux amd64 21.0.5
@@ -34,7 +49,7 @@ Using bundled JDK from: /home/matt/Documents/Repos/MattMC/run/jdk-21
 [LWJGL] Loading library: glfw
         Module: org.lwjgl.glfw
         Loaded from org.lwjgl.librarypath: /tmp/lwjgl_matt/3.3.3+5/x64/libglfw.so
-[11:39:51] [Render thread/INFO]: Backend library: LWJGL version 3.3.3+5
+[12:21:15] [Render thread/INFO]: Backend library: LWJGL version 3.3.3+5
 [LWJGL] Loading library: jemalloc
         Module: org.lwjgl.jemalloc
         Loaded from org.lwjgl.librarypath: /tmp/lwjgl_matt/3.3.3+5/x64/libjemalloc.so
@@ -53,18 +68,18 @@ Using bundled JDK from: /home/matt/Documents/Repos/MattMC/run/jdk-21
 [LWJGL] Java 9 text decoding enabled
         Loaded from system paths: /lib/x86_64-linux-gnu/libGLX.so.0
 [LWJGL] Java 10 multiplyHigh enabled
-[11:39:52] [Render thread/INFO]: Using optional rendering extensions: GL_ARB_buffer_storage, GL_KHR_debug, GL_ARB_vertex_attrib_binding, GL_ARB_direct_state_access
-[11:39:52] [Render thread/INFO]: Loaded 20 skins (0 custom)
+[12:21:15] [Render thread/INFO]: Using optional rendering extensions: GL_ARB_buffer_storage, GL_KHR_debug, GL_ARB_vertex_attrib_binding, GL_ARB_direct_state_access
+[12:21:15] [Render thread/INFO]: Loaded 20 skins (0 custom)
 [LWJGL] Loading library: openal
         Module: org.lwjgl.openal
         Loaded from org.lwjgl.librarypath: /tmp/lwjgl_matt/3.3.3+5/x64/libopenal.so
 [LWJGL] [ALC] ALC_SOFT_reopen_device was reported as available but an entry point is missing.
 [LWJGL] Java 16 memcpy enabled
-[11:39:52] [Render thread/INFO]: Reloading ResourceManager: vanilla
-[11:39:52] [Worker-Main-12/INFO]: Found unifont_pua-16.0.03.hex, loading
-[11:39:52] [Worker-Main-14/INFO]: Found unifont_all_no_pua-16.0.03.hex, loading
-[11:39:52] [Worker-Main-17/INFO]: Found unifont_jp_patch-16.0.03.hex, loading
-[11:39:52] [Render thread/WARN]: Failed to load translations for en_us from pack vanilla
+[12:21:16] [Render thread/INFO]: Reloading ResourceManager: vanilla
+[12:21:16] [Worker-Main-16/INFO]: Found unifont_all_no_pua-16.0.03.hex, loading
+[12:21:16] [Worker-Main-18/INFO]: Found unifont_pua-16.0.03.hex, loading
+[12:21:16] [Worker-Main-17/INFO]: Found unifont_jp_patch-16.0.03.hex, loading
+[12:21:16] [Render thread/WARN]: Failed to load translations for en_us from pack vanilla
 java.nio.file.NoSuchFileException: /home/matt/Documents/Repos/MattMC/run/assets/files/realms/lang/en_us.json
         at java.base/sun.nio.fs.UnixException.translateToIOException(UnixException.java:92) ~[?:?]
         at java.base/sun.nio.fs.UnixException.rethrowAsIOException(UnixException.java:106) ~[?:?]
@@ -92,46 +107,46 @@ java.nio.file.NoSuchFileException: /home/matt/Documents/Repos/MattMC/run/assets/
         at net.minecraft.client.Minecraft.runTick(Minecraft.java:1240) [main/:?]
         at net.minecraft.client.Minecraft.run(Minecraft.java:883) [main/:?]
         at net.minecraft.client.main.Main.main(Main.java:258) [main/:?]
-[11:39:52] [Render thread/WARN]: Missing translation key for rename: gui.abuseReport.reason.generic
-[11:39:52] [Render thread/WARN]: Missing translation key for rename: gui.abuseReport.reason.generic.description
-[11:39:52] [Render thread/INFO]: OpenAL initialized on device HT-S350
-[11:39:52] [Render thread/INFO]: Sound engine started
-[11:39:52] [Render thread/INFO]: Created: 512x256x0 minecraft:textures/atlas/particles.png-atlas
-[11:39:52] [Render thread/INFO]: Created: 128x64x0 minecraft:textures/atlas/decorated_pot.png-atlas
-[11:39:52] [Render thread/INFO]: Created: 2048x1024x0 minecraft:textures/atlas/armor_trims.png-atlas
-[11:39:52] [Render thread/INFO]: Created: 512x256x0 minecraft:textures/atlas/paintings.png-atlas
-[11:39:52] [Render thread/INFO]: Created: 512x512x0 minecraft:textures/atlas/shield_patterns.png-atlas
-[11:39:52] [Render thread/INFO]: Created: 1024x512x4 minecraft:textures/atlas/blocks.png-atlas
-[11:39:52] [Render thread/INFO]: Created: 512x256x0 minecraft:textures/atlas/chest.png-atlas
-[11:39:52] [Render thread/INFO]: Created: 512x512x0 minecraft:textures/atlas/banner_patterns.png-atlas
-[11:39:52] [Render thread/INFO]: Created: 512x256x0 minecraft:textures/atlas/beds.png-atlas
-[11:39:52] [Render thread/INFO]: Created: 1024x512x0 minecraft:textures/atlas/gui.png-atlas
-[11:39:52] [Render thread/INFO]: Created: 64x64x0 minecraft:textures/atlas/map_decorations.png-atlas
-[11:39:52] [Render thread/INFO]: Created: 256x256x0 minecraft:textures/atlas/signs.png-atlas
-[11:39:52] [Render thread/INFO]: Created: 512x256x0 minecraft:textures/atlas/shulker_boxes.png-atlas
-[11:39:53] [Render thread/INFO]: Initializing shader pack repository
-[11:39:53] [Render thread/INFO]: Scanning for shader packs in resources...
-[11:39:53] [Render thread/INFO]: Found 1 shader pack(s): test_shader
-[11:39:53] [Render thread/INFO]: Shader packs available: test_shader
-[11:39:53] [Render thread/INFO]: Pipeline manager initialized
-[11:39:59] [Render thread/INFO]: setShadersEnabledAndApply called with enabled=true
-[11:39:59] [Render thread/INFO]: Saved shader configuration
-[11:39:59] [Render thread/INFO]: Saved shader configuration
-[11:39:59] [Render thread/INFO]: Synced shader config to ShaderSystem - enabled=true, pack=ComplementaryHungLoIfied.zip
-[11:39:59] [Render thread/INFO]: Reloading shader pipelines
-[11:39:59] [Render thread/INFO]: Reloading all pipelines
-[11:40:03] [Render thread/INFO]: Loaded 1461 recipes
-[11:40:03] [Render thread/INFO]: Loaded 1574 advancements
-[11:40:03] [Server thread/INFO]: Starting integrated minecraft server version 1.21.10
-[11:40:03] [Server thread/INFO]: Generating keypair
-[11:40:03] [Server thread/INFO]: Loading 0 persistent chunks...
-[11:40:03] [Server thread/INFO]: Preparing spawn area: 16%
-[11:40:04] [Server thread/INFO]: Loading 49 chunks for player spawn...
-[11:40:04] [Server thread/INFO]: Preparing spawn area: 100%
-[11:40:04] [Server thread/INFO]: Time elapsed: 519 ms
-[11:40:04] [Server thread/INFO]: Player670[local:E:a7f241d8] logged in with entity id 68 at (-140.5, 81.5010594297298, 385.5)
-[11:40:04] [Server thread/INFO]: Player670 joined the game
-[11:40:04] [Render thread/ERROR]: Failed to load skin texture data
+[12:21:16] [Render thread/WARN]: Missing translation key for rename: gui.abuseReport.reason.generic
+[12:21:16] [Render thread/WARN]: Missing translation key for rename: gui.abuseReport.reason.generic.description
+[12:21:16] [Render thread/INFO]: OpenAL initialized on device HT-S350
+[12:21:16] [Render thread/INFO]: Sound engine started
+[12:21:16] [Render thread/INFO]: Created: 512x256x0 minecraft:textures/atlas/particles.png-atlas
+[12:21:16] [Render thread/INFO]: Created: 128x64x0 minecraft:textures/atlas/decorated_pot.png-atlas
+[12:21:16] [Render thread/INFO]: Created: 2048x1024x0 minecraft:textures/atlas/armor_trims.png-atlas
+[12:21:16] [Render thread/INFO]: Created: 512x256x0 minecraft:textures/atlas/paintings.png-atlas
+[12:21:16] [Render thread/INFO]: Created: 512x512x0 minecraft:textures/atlas/shield_patterns.png-atlas
+[12:21:16] [Render thread/INFO]: Created: 1024x512x4 minecraft:textures/atlas/blocks.png-atlas
+[12:21:16] [Render thread/INFO]: Created: 512x256x0 minecraft:textures/atlas/chest.png-atlas
+[12:21:16] [Render thread/INFO]: Created: 512x512x0 minecraft:textures/atlas/banner_patterns.png-atlas
+[12:21:16] [Render thread/INFO]: Created: 512x256x0 minecraft:textures/atlas/beds.png-atlas
+[12:21:16] [Render thread/INFO]: Created: 1024x512x0 minecraft:textures/atlas/gui.png-atlas
+[12:21:16] [Render thread/INFO]: Created: 64x64x0 minecraft:textures/atlas/map_decorations.png-atlas
+[12:21:16] [Render thread/INFO]: Created: 256x256x0 minecraft:textures/atlas/signs.png-atlas
+[12:21:16] [Render thread/INFO]: Created: 512x256x0 minecraft:textures/atlas/shulker_boxes.png-atlas
+[12:21:16] [Render thread/INFO]: Initializing shader pack repository
+[12:21:16] [Render thread/INFO]: Scanning for shader packs in resources...
+[12:21:16] [Render thread/INFO]: Found 1 shader pack(s): test_shader
+[12:21:16] [Render thread/INFO]: Shader packs available: test_shader
+[12:21:16] [Render thread/INFO]: Pipeline manager initialized
+[12:21:28] [Render thread/INFO]: setShadersEnabledAndApply called with enabled=true
+[12:21:28] [Render thread/INFO]: Saved shader configuration
+[12:21:28] [Render thread/INFO]: Saved shader configuration
+[12:21:28] [Render thread/INFO]: Synced shader config to ShaderSystem - enabled=true, pack=ComplementaryHungLoIfied.zip
+[12:21:28] [Render thread/INFO]: Reloading shader pipelines
+[12:21:28] [Render thread/INFO]: Reloading all pipelines
+[12:21:40] [Render thread/INFO]: Loaded 1461 recipes
+[12:21:40] [Render thread/INFO]: Loaded 1574 advancements
+[12:21:40] [Server thread/INFO]: Starting integrated minecraft server version 1.21.10
+[12:21:40] [Server thread/INFO]: Generating keypair
+[12:21:41] [Server thread/INFO]: Loading 0 persistent chunks...
+[12:21:41] [Server thread/INFO]: Preparing spawn area: 16%
+[12:21:41] [Server thread/INFO]: Loading 49 chunks for player spawn...
+[12:21:41] [Server thread/INFO]: Preparing spawn area: 94%
+[12:21:41] [Server thread/INFO]: Time elapsed: 564 ms
+[12:21:41] [Server thread/INFO]: Player909[local:E:d97bccfd] logged in with entity id 68 at (-140.5, 81.5010594297298, 385.5)
+[12:21:41] [Server thread/INFO]: Player909 joined the game
+[12:21:41] [Render thread/ERROR]: Failed to load skin texture data
 java.io.FileNotFoundException: minecraft:entity/player/wide/steve
         at net.minecraft.server.packs.resources.ResourceProvider.lambda$getResourceOrThrow$1(ResourceProvider.java:18) ~[main/:?]
         at java.base/java.util.Optional.orElseThrow(Optional.java:403) ~[?:?]
@@ -146,282 +161,132 @@ java.io.FileNotFoundException: minecraft:entity/player/wide/steve
         at net.minecraft.client.Minecraft.runTick(Minecraft.java:1238) [main/:?]
         at net.minecraft.client.Minecraft.run(Minecraft.java:883) [main/:?]
         at net.minecraft.client.main.Main.main(Main.java:258) [main/:?]
-[11:40:04] [Render thread/WARN]: Ignoring chat session from Player670 due to missing Services public key
-[11:40:04] [Render thread/INFO]: Creating pipeline for dimension minecraft:overworld
-[11:40:04] [Render thread/INFO]: Loaded shader pack source: ComplementaryHungLoIfied.zip from /ComplementaryHungLoIfied
-[11:40:04] [Render thread/INFO]: Creating shader pack pipeline for external pack: ComplementaryHungLoIfied.zip in dimension: minecraft:overworld
-[11:40:04] [Render thread/INFO]: No shaders.properties found for pack: ComplementaryHungLoIfied.zip, using defaults
-[11:40:04] [Render thread/INFO]: Found 52 shader files in dimension directory: world0
-[11:40:04] [Render thread/INFO]: Found 52 shader files in dimension directory: world-1
-[11:40:04] [Server thread/INFO]: Changing view distance to 12, from 10
-[11:40:04] [Render thread/INFO]: Found 52 shader files in dimension directory: world1
-[11:40:04] [Render thread/INFO]: Found 156 starting shader files for pack: ComplementaryHungLoIfied.zip
-[11:40:04] [Render thread/INFO]: Creating ShaderSourceProvider for pack: ComplementaryHungLoIfied.zip with 156 starting paths
-[11:40:04] [Server thread/INFO]: Changing simulation distance to 12, from 0
-[11:40:04] [Render thread/INFO]: Include graph built with 307 nodes
-[11:40:04] [Render thread/INFO]: ShaderSourceProvider created successfully
-[11:40:04] [Render thread/INFO]: Created GBufferManager (1x1) with 3 configured targets
-[11:40:04] [Render thread/INFO]: Initialized shadow rendering at 1024x1024 resolution
-[11:40:04] [Render thread/INFO]: Compiling shader programs for pack: ComplementaryHungLoIfied.zip
-[11:40:04] [Render thread/WARN]: Failed to get included file: /shaders/world0/gbuffers_terrain.gsh (graph has 307 nodes)
-[11:40:04] [Render thread/WARN]: Failed to get included file: /shaders/gbuffers_terrain.gsh (graph has 307 nodes)
-[11:40:04] [Render thread/WARN]: Shader compilation log for gbuffers_terrain.vsh: 0(807) : error C7533: global variable gl_TextureMatrix is deprecated after version 120
-0(807) : error C7533: global variable gl_MultiTexCoord1 is deprecated after version 120
-0(8079) : error C7555: 'attribute' is deprecated, use 'in/out' instead
-0(8080) : error C7555: 'attribute' is deprecated, use 'in/out' instead
-0(8536) : error C7533: global variable gl_MultiTexCoord0 is deprecated after version 120
-0(8621) : error C7533: global variable gl_Color is deprecated after version 120
-0(8625) : error C7533: global variable gl_NormalMatrix is deprecated after version 120
-0(8625) : error C7533: global variable gl_Normal is deprecated after version 120
-0(8643) : error C7533: global variable gl_ModelViewMatrix is deprecated after version 120
-0(8643) : error C7533: global variable gl_Vertex is deprecated after version 120
-0(8647) : error C7533: global variable gl_ProjectionMatrix is deprecated after version 120
+[12:21:41] [Render thread/WARN]: Ignoring chat session from Player909 due to missing Services public key
+[12:21:41] [Render thread/INFO]: Creating pipeline for dimension minecraft:overworld
+[12:21:41] [Render thread/INFO]: Loaded shader pack source: ComplementaryHungLoIfied.zip from /ComplementaryHungLoIfied
+[12:21:41] [Render thread/INFO]: Creating shader pack pipeline for external pack: ComplementaryHungLoIfied.zip in dimension: minecraft:overworld
+[12:21:41] [Render thread/INFO]: No shaders.properties found for pack: ComplementaryHungLoIfied.zip, using defaults
+[12:21:41] [Server thread/INFO]: Changing view distance to 12, from 10
+[12:21:41] [Render thread/INFO]: Found 52 shader files in dimension directory: world0
+[12:21:41] [Server thread/INFO]: Changing simulation distance to 12, from 0
+[12:21:41] [Render thread/INFO]: Found 52 shader files in dimension directory: world-1
+[12:21:41] [Render thread/INFO]: Found 52 shader files in dimension directory: world1
+[12:21:41] [Render thread/INFO]: Found 156 starting shader files for pack: ComplementaryHungLoIfied.zip
+[12:21:41] [Render thread/INFO]: Creating ShaderSourceProvider for pack: ComplementaryHungLoIfied.zip with 156 starting paths
+[12:21:41] [Render thread/INFO]: Include graph built with 307 nodes
+[12:21:41] [Render thread/INFO]: ShaderSourceProvider created successfully
+[12:21:41] [Render thread/INFO]: Created GBufferManager (1x1) with 3 configured targets
+[12:21:41] [Render thread/INFO]: Initialized shadow rendering at 1024x1024 resolution
+[12:21:41] [Render thread/INFO]: Compiling shader programs for pack: ComplementaryHungLoIfied.zip
+[12:21:41] [Render thread/WARN]: Failed to get included file: /shaders/world0/gbuffers_terrain.gsh (graph has 307 nodes)
+[12:21:41] [Render thread/WARN]: Failed to get included file: /shaders/gbuffers_terrain.gsh (graph has 307 nodes)
+[12:21:41] [Render thread/ERROR]: Failed to compile program gbuffers_terrain: gbuffers_terrain: java.lang.IllegalArgumentException: Unparsed preprocessor directives such as '#define' may not be present at this stage of shader processing!
+[12:21:41] [Render thread/WARN]: Failed to get included file: /shaders/world0/gbuffers_textured.gsh (graph has 307 nodes)
+[12:21:41] [Render thread/WARN]: Failed to get included file: /shaders/gbuffers_textured.gsh (graph has 307 nodes)
+[12:21:41] [Render thread/ERROR]: Failed to compile program gbuffers_textured: gbuffers_textured: java.lang.IllegalArgumentException: Unparsed preprocessor directives such as '#define' may not be present at this stage of shader processing!
+[12:21:41] [Render thread/WARN]: Failed to get included file: /shaders/world0/gbuffers_basic.gsh (graph has 307 nodes)
+[12:21:41] [Render thread/WARN]: Failed to get included file: /shaders/gbuffers_basic.gsh (graph has 307 nodes)
+[12:21:41] [Render thread/ERROR]: Failed to compile program gbuffers_basic: gbuffers_basic: java.lang.IllegalArgumentException: Unparsed preprocessor directives such as '#define' may not be present at this stage of shader processing!
+[12:21:41] [Render thread/WARN]: Failed to get included file: /shaders/world0/deferred.vsh (graph has 307 nodes)
+[12:21:41] [Render thread/WARN]: Failed to get included file: /shaders/deferred.vsh (graph has 307 nodes)
+[12:21:41] [Render thread/WARN]: Failed to get included file: /shaders/world0/deferred.fsh (graph has 307 nodes)
+[12:21:41] [Render thread/WARN]: Failed to get included file: /shaders/deferred.fsh (graph has 307 nodes)
+[12:21:41] [Render thread/WARN]: Failed to get included file: /shaders/world0/deferred1.gsh (graph has 307 nodes)
+[12:21:41] [Render thread/WARN]: Failed to get included file: /shaders/deferred1.gsh (graph has 307 nodes)
+[12:21:41] [Render thread/ERROR]: Failed to compile program deferred1: deferred1: java.lang.IllegalArgumentException: Unparsed preprocessor directives such as '#define' may not be present at this stage of shader processing!
+[12:21:41] [Render thread/WARN]: Failed to get included file: /shaders/world0/deferred2.vsh (graph has 307 nodes)
+[12:21:41] [Render thread/WARN]: Failed to get included file: /shaders/deferred2.vsh (graph has 307 nodes)
+[12:21:41] [Render thread/WARN]: Failed to get included file: /shaders/world0/deferred2.fsh (graph has 307 nodes)
+[12:21:41] [Render thread/WARN]: Failed to get included file: /shaders/deferred2.fsh (graph has 307 nodes)
+[12:21:41] [Render thread/WARN]: Failed to get included file: /shaders/world0/deferred3.vsh (graph has 307 nodes)
+[12:21:41] [Render thread/WARN]: Failed to get included file: /shaders/deferred3.vsh (graph has 307 nodes)
+[12:21:41] [Render thread/WARN]: Failed to get included file: /shaders/world0/deferred3.fsh (graph has 307 nodes)
+[12:21:41] [Render thread/WARN]: Failed to get included file: /shaders/deferred3.fsh (graph has 307 nodes)
+[12:21:41] [Render thread/WARN]: Failed to get included file: /shaders/world0/deferred4.vsh (graph has 307 nodes)
+[12:21:41] [Render thread/WARN]: Failed to get included file: /shaders/deferred4.vsh (graph has 307 nodes)
+[12:21:41] [Render thread/WARN]: Failed to get included file: /shaders/world0/deferred4.fsh (graph has 307 nodes)
+[12:21:41] [Render thread/WARN]: Failed to get included file: /shaders/deferred4.fsh (graph has 307 nodes)
+[12:21:41] [Render thread/WARN]: Failed to get included file: /shaders/world0/deferred5.vsh (graph has 307 nodes)
+[12:21:41] [Render thread/WARN]: Failed to get included file: /shaders/deferred5.vsh (graph has 307 nodes)
+[12:21:41] [Render thread/WARN]: Failed to get included file: /shaders/world0/deferred5.fsh (graph has 307 nodes)
+[12:21:41] [Render thread/WARN]: Failed to get included file: /shaders/deferred5.fsh (graph has 307 nodes)
+[12:21:41] [Render thread/WARN]: Failed to get included file: /shaders/world0/deferred6.vsh (graph has 307 nodes)
+[12:21:41] [Render thread/WARN]: Failed to get included file: /shaders/deferred6.vsh (graph has 307 nodes)
+[12:21:41] [Render thread/WARN]: Failed to get included file: /shaders/world0/deferred6.fsh (graph has 307 nodes)
+[12:21:41] [Render thread/WARN]: Failed to get included file: /shaders/deferred6.fsh (graph has 307 nodes)
+[12:21:41] [Render thread/WARN]: Failed to get included file: /shaders/world0/deferred7.vsh (graph has 307 nodes)
+[12:21:41] [Render thread/WARN]: Failed to get included file: /shaders/deferred7.vsh (graph has 307 nodes)
+[12:21:41] [Render thread/WARN]: Failed to get included file: /shaders/world0/deferred7.fsh (graph has 307 nodes)
+[12:21:41] [Render thread/WARN]: Failed to get included file: /shaders/deferred7.fsh (graph has 307 nodes)
+[12:21:41] [Render thread/WARN]: Failed to get included file: /shaders/world0/composite.gsh (graph has 307 nodes)
+[12:21:41] [Render thread/WARN]: Failed to get included file: /shaders/composite.gsh (graph has 307 nodes)
+[12:21:41] [Render thread/ERROR]: Failed to compile program composite: composite: java.lang.IllegalArgumentException: Unparsed preprocessor directives such as '#define' may not be present at this stage of shader processing!
+[12:21:41] [Render thread/WARN]: Failed to get included file: /shaders/world0/composite1.vsh (graph has 307 nodes)
+[12:21:41] [Render thread/WARN]: Failed to get included file: /shaders/composite1.vsh (graph has 307 nodes)
+[12:21:41] [Render thread/WARN]: Failed to get included file: /shaders/world0/composite1.fsh (graph has 307 nodes)
+[12:21:41] [Render thread/WARN]: Failed to get included file: /shaders/composite1.fsh (graph has 307 nodes)
+[12:21:41] [Render thread/WARN]: Failed to get included file: /shaders/world0/composite2.gsh (graph has 307 nodes)
+[12:21:41] [Render thread/WARN]: Failed to get included file: /shaders/composite2.gsh (graph has 307 nodes)
+[12:21:41] [Render thread/ERROR]: Failed to compile program composite2: composite2: java.lang.IllegalArgumentException: Unparsed preprocessor directives such as '#define' may not be present at this stage of shader processing!
+[12:21:41] [Render thread/WARN]: Failed to get included file: /shaders/world0/composite3.gsh (graph has 307 nodes)
+[12:21:41] [Render thread/WARN]: Failed to get included file: /shaders/composite3.gsh (graph has 307 nodes)
+[12:21:41] [Render thread/ERROR]: Failed to compile program composite3: composite3: java.lang.IllegalArgumentException: Unparsed preprocessor directives such as '#define' may not be present at this stage of shader processing!
+[12:21:41] [Render thread/WARN]: Failed to get included file: /shaders/world0/composite4.gsh (graph has 307 nodes)
+[12:21:41] [Render thread/WARN]: Failed to get included file: /shaders/composite4.gsh (graph has 307 nodes)
+[12:21:41] [Render thread/ERROR]: Failed to compile program composite4: composite4: java.lang.IllegalArgumentException: Unparsed preprocessor directives such as '#define' may not be present at this stage of shader processing!
+[12:21:41] [Render thread/WARN]: Failed to get included file: /shaders/world0/composite5.gsh (graph has 307 nodes)
+[12:21:41] [Render thread/WARN]: Failed to get included file: /shaders/composite5.gsh (graph has 307 nodes)
+[12:21:41] [Render thread/ERROR]: Failed to compile program composite5: composite5: java.lang.IllegalArgumentException: Unparsed preprocessor directives such as '#define' may not be present at this stage of shader processing!
+[12:21:41] [Render thread/WARN]: Failed to get included file: /shaders/world0/composite6.gsh (graph has 307 nodes)
+[12:21:41] [Render thread/WARN]: Failed to get included file: /shaders/composite6.gsh (graph has 307 nodes)
+[12:21:41] [Render thread/ERROR]: Failed to compile program composite6: composite6: java.lang.IllegalArgumentException: Unparsed preprocessor directives such as '#define' may not be present at this stage of shader processing!
+[12:21:41] [Render thread/WARN]: Failed to get included file: /shaders/world0/composite7.gsh (graph has 307 nodes)
+[12:21:41] [Render thread/WARN]: Failed to get included file: /shaders/composite7.gsh (graph has 307 nodes)
+[12:21:41] [Render thread/ERROR]: Failed to compile program composite7: composite7: java.lang.IllegalArgumentException: Unparsed preprocessor directives such as '#define' may not be present at this stage of shader processing!
+[12:21:41] [Render thread/WARN]: Failed to get included file: /shaders/world0/final.gsh (graph has 307 nodes)
+[12:21:41] [Render thread/WARN]: Failed to get included file: /shaders/final.gsh (graph has 307 nodes)
+[12:21:41] [Render thread/ERROR]: Failed to compile program final: final: java.lang.IllegalArgumentException: Unparsed preprocessor directives such as '#define' may not be present at this stage of shader processing!
+[12:21:41] [Render thread/WARN]: Failed to get included file: /shaders/world0/shadow.gsh (graph has 307 nodes)
+[12:21:41] [Render thread/WARN]: Failed to get included file: /shaders/shadow.gsh (graph has 307 nodes)
+[12:21:41] [Render thread/ERROR]: Failed to compile program shadow: shadow: java.lang.IllegalArgumentException: Unparsed preprocessor directives such as '#define' may not be present at this stage of shader processing!
+[12:21:41] [Render thread/WARN]: Failed to get included file: /shaders/world0/shadow_solid.vsh (graph has 307 nodes)
+[12:21:41] [Render thread/WARN]: Failed to get included file: /shaders/shadow_solid.vsh (graph has 307 nodes)
+[12:21:41] [Render thread/WARN]: Failed to get included file: /shaders/world0/shadow_solid.fsh (graph has 307 nodes)
+[12:21:41] [Render thread/WARN]: Failed to get included file: /shaders/shadow_solid.fsh (graph has 307 nodes)
+[12:21:42] [Render thread/INFO]: Compiled 0 shader programs for pack: ComplementaryHungLoIfied.zip (0 deferred, 0 composite)
+[12:21:42] [Render thread/INFO]: Created shader pipeline for pack: ComplementaryHungLoIfied.zip in dimension: minecraft:overworld
+[12:21:42] [Render thread/INFO]: Destroyed GBufferManager
+[12:21:42] [Render thread/INFO]: Created GBufferManager (1920x1080) with 3 configured targets
+[12:21:42] [Render thread/INFO]: Resized G-buffers to 1920x1080
+[12:21:42] [Render thread/INFO]: Resizing Dynamic Transforms UBO, capacity limit of 2 reached during a single frame. New capacity will be 4.
+[12:21:42] [Render thread/INFO]: Resizing Dynamic Transforms UBO, capacity limit of 4 reached during a single frame. New capacity will be 8.
+[12:21:42] [Render thread/INFO]: Loaded 2 advancements
+[12:21:42] [Render thread/INFO]: Resizing Dynamic Transforms UBO, capacity limit of 8 reached during a single frame. New capacity will be 16.
+[12:21:42] [Render thread/INFO]: Resizing Dynamic Transforms UBO, capacity limit of 16 reached during a single frame. New capacity will be 32.
+[12:21:42] [Render thread/INFO]: Resizing Dynamic Transforms UBO, capacity limit of 32 reached during a single frame. New capacity will be 64.
+[12:21:42] [Render thread/INFO]: Resizing Dynamic Transforms UBO, capacity limit of 64 reached during a single frame. New capacity will be 128.
+[12:21:42] [Render thread/INFO]: Resizing Dynamic Transforms UBO, capacity limit of 128 reached during a single frame. New capacity will be 256.
+[12:21:42] [Render thread/INFO]: Resizing Dynamic Transforms UBO, capacity limit of 256 reached during a single frame. New capacity will be 512.
+[12:21:42] [Render thread/INFO]: Resizing Dynamic Transforms UBO, capacity limit of 512 reached during a single frame. New capacity will be 1024.
+[12:21:44] [Server thread/INFO]: Saving and pausing game...
+[12:21:44] [Server thread/INFO]: Saving chunks for level 'ServerLevel[New World]'/minecraft:overworld
+[12:21:44] [Server thread/INFO]: Saving chunks for level 'ServerLevel[New World]'/minecraft:the_end
+[12:21:44] [Server thread/INFO]: Saving chunks for level 'ServerLevel[New World]'/minecraft:the_nether
+[12:21:46] [Server thread/INFO]: Player909 lost connection: Disconnected
+[12:21:46] [Server thread/INFO]: Player909 left the game
+[12:21:46] [Server thread/INFO]: Stopping singleplayer server as player logged out
+[12:21:47] [Server thread/INFO]: Stopping server
+[12:21:47] [Server thread/INFO]: Saving players
+[12:21:47] [Server thread/INFO]: Saving worlds
+[12:21:47] [Server thread/INFO]: Saving chunks for level 'ServerLevel[New World]'/minecraft:overworld
+[12:21:47] [Server thread/INFO]: Saving chunks for level 'ServerLevel[New World]'/minecraft:the_end
+[12:21:47] [Server thread/INFO]: Saving chunks for level 'ServerLevel[New World]'/minecraft:the_nether
+[12:21:47] [Server thread/INFO]: ThreadedAnvilChunkStorage (New World (2)): All chunks are saved
+[12:21:47] [Server thread/INFO]: ThreadedAnvilChunkStorage (DIM1): All chunks are saved
+[12:21:47] [Server thread/INFO]: ThreadedAnvilChunkStorage (DIM-1): All chunks are saved
+[12:21:47] [Server thread/INFO]: ThreadedAnvilChunkStorage: All dimensions are saved
+[12:21:49] [Render thread/INFO]: Stopping!
 
-[11:40:04] [Render thread/ERROR]: Failed to compile program gbuffers_terrain: gbuffers_terrain.vsh: gbuffers_terrain.vsh: 0(807) : error C7533: global variable gl_TextureMatrix is deprecated after version 120
-0(807) : error C7533: global variable gl_MultiTexCoord1 is deprecated after version 120
-0(8079) : error C7555: 'attribute' is deprecated, use 'in/out' instead
-0(8080) : error C7555: 'attribute' is deprecated, use 'in/out' instead
-0(8536) : error C7533: global variable gl_MultiTexCoord0 is deprecated after version 120
-0(8621) : error C7533: global variable gl_Color is deprecated after version 120
-0(8625) : error C7533: global variable gl_NormalMatrix is deprecated after version 120
-0(8625) : error C7533: global variable gl_Normal is deprecated after version 120
-0(8643) : error C7533: global variable gl_ModelViewMatrix is deprecated after version 120
-0(8643) : error C7533: global variable gl_Vertex is deprecated after version 120
-0(8647) : error C7533: global variable gl_ProjectionMatrix is deprecated after version 120
-
-[11:40:04] [Render thread/WARN]: Failed to get included file: /shaders/world0/gbuffers_textured.gsh (graph has 307 nodes)
-[11:40:04] [Render thread/WARN]: Failed to get included file: /shaders/gbuffers_textured.gsh (graph has 307 nodes)
-[11:40:04] [Render thread/WARN]: Shader compilation log for gbuffers_textured.vsh: 0(807) : error C7533: global variable gl_TextureMatrix is deprecated after version 120
-0(807) : error C7533: global variable gl_MultiTexCoord1 is deprecated after version 120
-0(3947) : error C7533: global function ftransform is deprecated after version 120
-0(3949) : error C7533: global variable gl_MultiTexCoord0 is deprecated after version 120
-0(3952) : error C7533: global variable gl_Color is deprecated after version 120
-0(3954) : error C7533: global variable gl_NormalMatrix is deprecated after version 120
-0(3954) : error C7533: global variable gl_Normal is deprecated after version 120
-
-[11:40:04] [Render thread/ERROR]: Failed to compile program gbuffers_textured: gbuffers_textured.vsh: gbuffers_textured.vsh: 0(807) : error C7533: global variable gl_TextureMatrix is deprecated after version 120
-0(807) : error C7533: global variable gl_MultiTexCoord1 is deprecated after version 120
-0(3947) : error C7533: global function ftransform is deprecated after version 120
-0(3949) : error C7533: global variable gl_MultiTexCoord0 is deprecated after version 120
-0(3952) : error C7533: global variable gl_Color is deprecated after version 120
-0(3954) : error C7533: global variable gl_NormalMatrix is deprecated after version 120
-0(3954) : error C7533: global variable gl_Normal is deprecated after version 120
-
-[11:40:04] [Render thread/WARN]: Failed to get included file: /shaders/world0/gbuffers_basic.gsh (graph has 307 nodes)
-[11:40:04] [Render thread/WARN]: Failed to get included file: /shaders/gbuffers_basic.gsh (graph has 307 nodes)
-[11:40:04] [Render thread/WARN]: Shader compilation log for gbuffers_basic.vsh: 0(807) : error C7533: global variable gl_TextureMatrix is deprecated after version 120
-0(807) : error C7533: global variable gl_MultiTexCoord1 is deprecated after version 120
-0(3053) : error C7533: global function ftransform is deprecated after version 120
-0(3078) : error C7533: global variable gl_Color is deprecated after version 120
-0(3080) : error C7533: global variable gl_NormalMatrix is deprecated after version 120
-0(3080) : error C7533: global variable gl_Normal is deprecated after version 120
-
-[11:40:04] [Render thread/ERROR]: Failed to compile program gbuffers_basic: gbuffers_basic.vsh: gbuffers_basic.vsh: 0(807) : error C7533: global variable gl_TextureMatrix is deprecated after version 120
-0(807) : error C7533: global variable gl_MultiTexCoord1 is deprecated after version 120
-0(3053) : error C7533: global function ftransform is deprecated after version 120
-0(3078) : error C7533: global variable gl_Color is deprecated after version 120
-0(3080) : error C7533: global variable gl_NormalMatrix is deprecated after version 120
-0(3080) : error C7533: global variable gl_Normal is deprecated after version 120
-
-[11:40:04] [Render thread/WARN]: Failed to get included file: /shaders/world0/deferred.vsh (graph has 307 nodes)
-[11:40:04] [Render thread/WARN]: Failed to get included file: /shaders/deferred.vsh (graph has 307 nodes)
-[11:40:04] [Render thread/WARN]: Failed to get included file: /shaders/world0/deferred.fsh (graph has 307 nodes)
-[11:40:04] [Render thread/WARN]: Failed to get included file: /shaders/deferred.fsh (graph has 307 nodes)
-[11:40:04] [Render thread/WARN]: Failed to get included file: /shaders/world0/deferred1.gsh (graph has 307 nodes)
-[11:40:04] [Render thread/WARN]: Failed to get included file: /shaders/deferred1.gsh (graph has 307 nodes)
-[11:40:04] [Render thread/WARN]: Shader compilation log for deferred1.vsh: 0(807) : error C7533: global variable gl_TextureMatrix is deprecated after version 120
-0(807) : error C7533: global variable gl_MultiTexCoord1 is deprecated after version 120
-0(5001) : error C7533: global function ftransform is deprecated after version 120
-0(5002) : error C7533: global variable gl_MultiTexCoord0 is deprecated after version 120
-
-[11:40:04] [Render thread/ERROR]: Failed to compile program deferred1: deferred1.vsh: deferred1.vsh: 0(807) : error C7533: global variable gl_TextureMatrix is deprecated after version 120
-0(807) : error C7533: global variable gl_MultiTexCoord1 is deprecated after version 120
-0(5001) : error C7533: global function ftransform is deprecated after version 120
-0(5002) : error C7533: global variable gl_MultiTexCoord0 is deprecated after version 120
-
-[11:40:04] [Render thread/WARN]: Failed to get included file: /shaders/world0/deferred2.vsh (graph has 307 nodes)
-[11:40:04] [Render thread/WARN]: Failed to get included file: /shaders/deferred2.vsh (graph has 307 nodes)
-[11:40:04] [Render thread/WARN]: Failed to get included file: /shaders/world0/deferred2.fsh (graph has 307 nodes)
-[11:40:04] [Render thread/WARN]: Failed to get included file: /shaders/deferred2.fsh (graph has 307 nodes)
-[11:40:04] [Render thread/WARN]: Failed to get included file: /shaders/world0/deferred3.vsh (graph has 307 nodes)
-[11:40:04] [Render thread/WARN]: Failed to get included file: /shaders/deferred3.vsh (graph has 307 nodes)
-[11:40:04] [Render thread/WARN]: Failed to get included file: /shaders/world0/deferred3.fsh (graph has 307 nodes)
-[11:40:04] [Render thread/WARN]: Failed to get included file: /shaders/deferred3.fsh (graph has 307 nodes)
-[11:40:04] [Render thread/WARN]: Failed to get included file: /shaders/world0/deferred4.vsh (graph has 307 nodes)
-[11:40:04] [Render thread/WARN]: Failed to get included file: /shaders/deferred4.vsh (graph has 307 nodes)
-[11:40:04] [Render thread/WARN]: Failed to get included file: /shaders/world0/deferred4.fsh (graph has 307 nodes)
-[11:40:04] [Render thread/WARN]: Failed to get included file: /shaders/deferred4.fsh (graph has 307 nodes)
-[11:40:04] [Render thread/WARN]: Failed to get included file: /shaders/world0/deferred5.vsh (graph has 307 nodes)
-[11:40:04] [Render thread/WARN]: Failed to get included file: /shaders/deferred5.vsh (graph has 307 nodes)
-[11:40:04] [Render thread/WARN]: Failed to get included file: /shaders/world0/deferred5.fsh (graph has 307 nodes)
-[11:40:04] [Render thread/WARN]: Failed to get included file: /shaders/deferred5.fsh (graph has 307 nodes)
-[11:40:04] [Render thread/WARN]: Failed to get included file: /shaders/world0/deferred6.vsh (graph has 307 nodes)
-[11:40:04] [Render thread/WARN]: Failed to get included file: /shaders/deferred6.vsh (graph has 307 nodes)
-[11:40:04] [Render thread/WARN]: Failed to get included file: /shaders/world0/deferred6.fsh (graph has 307 nodes)
-[11:40:04] [Render thread/WARN]: Failed to get included file: /shaders/deferred6.fsh (graph has 307 nodes)
-[11:40:04] [Render thread/WARN]: Failed to get included file: /shaders/world0/deferred7.vsh (graph has 307 nodes)
-[11:40:04] [Render thread/WARN]: Failed to get included file: /shaders/deferred7.vsh (graph has 307 nodes)
-[11:40:04] [Render thread/WARN]: Failed to get included file: /shaders/world0/deferred7.fsh (graph has 307 nodes)
-[11:40:04] [Render thread/WARN]: Failed to get included file: /shaders/deferred7.fsh (graph has 307 nodes)
-[11:40:04] [Render thread/WARN]: Failed to get included file: /shaders/world0/composite.gsh (graph has 307 nodes)
-[11:40:04] [Render thread/WARN]: Failed to get included file: /shaders/composite.gsh (graph has 307 nodes)
-[11:40:04] [Render thread/WARN]: Shader compilation log for composite.vsh: 0(807) : error C7533: global variable gl_TextureMatrix is deprecated after version 120
-0(807) : error C7533: global variable gl_MultiTexCoord1 is deprecated after version 120
-0(3026) : error C7533: global function ftransform is deprecated after version 120
-0(3028) : error C7533: global variable gl_MultiTexCoord0 is deprecated after version 120
-
-[11:40:04] [Render thread/ERROR]: Failed to compile program composite: composite.vsh: composite.vsh: 0(807) : error C7533: global variable gl_TextureMatrix is deprecated after version 120
-0(807) : error C7533: global variable gl_MultiTexCoord1 is deprecated after version 120
-0(3026) : error C7533: global function ftransform is deprecated after version 120
-0(3028) : error C7533: global variable gl_MultiTexCoord0 is deprecated after version 120
-
-[11:40:04] [Render thread/WARN]: Failed to get included file: /shaders/world0/composite1.vsh (graph has 307 nodes)
-[11:40:04] [Render thread/WARN]: Failed to get included file: /shaders/composite1.vsh (graph has 307 nodes)
-[11:40:04] [Render thread/WARN]: Failed to get included file: /shaders/world0/composite1.fsh (graph has 307 nodes)
-[11:40:04] [Render thread/WARN]: Failed to get included file: /shaders/composite1.fsh (graph has 307 nodes)
-[11:40:04] [Render thread/WARN]: Failed to get included file: /shaders/world0/composite2.gsh (graph has 307 nodes)
-[11:40:04] [Render thread/WARN]: Failed to get included file: /shaders/composite2.gsh (graph has 307 nodes)
-[11:40:04] [Render thread/WARN]: Shader compilation log for composite2.vsh: 0(807) : error C7533: global variable gl_TextureMatrix is deprecated after version 120
-0(807) : error C7533: global variable gl_MultiTexCoord1 is deprecated after version 120
-0(1705) : error C7533: global function ftransform is deprecated after version 120
-
-[11:40:04] [Render thread/ERROR]: Failed to compile program composite2: composite2.vsh: composite2.vsh: 0(807) : error C7533: global variable gl_TextureMatrix is deprecated after version 120
-0(807) : error C7533: global variable gl_MultiTexCoord1 is deprecated after version 120
-0(1705) : error C7533: global function ftransform is deprecated after version 120
-
-[11:40:04] [Render thread/WARN]: Failed to get included file: /shaders/world0/composite3.gsh (graph has 307 nodes)
-[11:40:04] [Render thread/WARN]: Failed to get included file: /shaders/composite3.gsh (graph has 307 nodes)
-[11:40:04] [Render thread/WARN]: Shader compilation log for composite3.vsh: 0(807) : error C7533: global variable gl_TextureMatrix is deprecated after version 120
-0(807) : error C7533: global variable gl_MultiTexCoord1 is deprecated after version 120
-0(1743) : error C7533: global function ftransform is deprecated after version 120
-
-[11:40:04] [Render thread/ERROR]: Failed to compile program composite3: composite3.vsh: composite3.vsh: 0(807) : error C7533: global variable gl_TextureMatrix is deprecated after version 120
-0(807) : error C7533: global variable gl_MultiTexCoord1 is deprecated after version 120
-0(1743) : error C7533: global function ftransform is deprecated after version 120
-
-[11:40:04] [Render thread/WARN]: Failed to get included file: /shaders/world0/composite4.gsh (graph has 307 nodes)
-[11:40:04] [Render thread/WARN]: Failed to get included file: /shaders/composite4.gsh (graph has 307 nodes)
-[11:40:04] [Render thread/WARN]: Shader compilation log for composite4.vsh: 0(807) : error C7533: global variable gl_TextureMatrix is deprecated after version 120
-0(807) : error C7533: global variable gl_MultiTexCoord1 is deprecated after version 120
-0(1526) : error C7555: 'varying' is deprecated, use 'in/out' instead
-0(1608) : error C7533: global variable gl_MultiTexCoord0 is deprecated after version 120
-0(1610) : error C7533: global function ftransform is deprecated after version 120
-
-[11:40:04] [Render thread/ERROR]: Failed to compile program composite4: composite4.vsh: composite4.vsh: 0(807) : error C7533: global variable gl_TextureMatrix is deprecated after version 120
-0(807) : error C7533: global variable gl_MultiTexCoord1 is deprecated after version 120
-0(1526) : error C7555: 'varying' is deprecated, use 'in/out' instead
-0(1608) : error C7533: global variable gl_MultiTexCoord0 is deprecated after version 120
-0(1610) : error C7533: global function ftransform is deprecated after version 120
-
-[11:40:04] [Render thread/WARN]: Failed to get included file: /shaders/world0/composite5.gsh (graph has 307 nodes)
-[11:40:04] [Render thread/WARN]: Failed to get included file: /shaders/composite5.gsh (graph has 307 nodes)
-[11:40:04] [Render thread/WARN]: Shader compilation log for composite5.vsh: 0(807) : error C7533: global variable gl_TextureMatrix is deprecated after version 120
-0(807) : error C7533: global variable gl_MultiTexCoord1 is deprecated after version 120
-0(1908) : error C7533: global function ftransform is deprecated after version 120
-0(1910) : error C7533: global variable gl_MultiTexCoord0 is deprecated after version 120
-
-[11:40:04] [Render thread/ERROR]: Failed to compile program composite5: composite5.vsh: composite5.vsh: 0(807) : error C7533: global variable gl_TextureMatrix is deprecated after version 120
-0(807) : error C7533: global variable gl_MultiTexCoord1 is deprecated after version 120
-0(1908) : error C7533: global function ftransform is deprecated after version 120
-0(1910) : error C7533: global variable gl_MultiTexCoord0 is deprecated after version 120
-
-[11:40:04] [Render thread/WARN]: Failed to get included file: /shaders/world0/composite6.gsh (graph has 307 nodes)
-[11:40:04] [Render thread/WARN]: Failed to get included file: /shaders/composite6.gsh (graph has 307 nodes)
-[11:40:04] [Render thread/WARN]: Shader compilation log for composite6.vsh: 0(807) : error C7533: global variable gl_TextureMatrix is deprecated after version 120
-0(807) : error C7533: global variable gl_MultiTexCoord1 is deprecated after version 120
-0(1776) : error C7533: global function ftransform is deprecated after version 120
-0(1778) : error C7533: global variable gl_MultiTexCoord0 is deprecated after version 120
-
-[11:40:04] [Render thread/ERROR]: Failed to compile program composite6: composite6.vsh: composite6.vsh: 0(807) : error C7533: global variable gl_TextureMatrix is deprecated after version 120
-0(807) : error C7533: global variable gl_MultiTexCoord1 is deprecated after version 120
-0(1776) : error C7533: global function ftransform is deprecated after version 120
-0(1778) : error C7533: global variable gl_MultiTexCoord0 is deprecated after version 120
-
-[11:40:04] [Render thread/WARN]: Failed to get included file: /shaders/world0/composite7.gsh (graph has 307 nodes)
-[11:40:04] [Render thread/WARN]: Failed to get included file: /shaders/composite7.gsh (graph has 307 nodes)
-[11:40:04] [Render thread/WARN]: Shader compilation log for composite7.vsh: 0(807) : error C7533: global variable gl_TextureMatrix is deprecated after version 120
-0(807) : error C7533: global variable gl_MultiTexCoord1 is deprecated after version 120
-0(1720) : error C7533: global function ftransform is deprecated after version 120
-0(1722) : error C7533: global variable gl_MultiTexCoord0 is deprecated after version 120
-
-[11:40:04] [Render thread/ERROR]: Failed to compile program composite7: composite7.vsh: composite7.vsh: 0(807) : error C7533: global variable gl_TextureMatrix is deprecated after version 120
-0(807) : error C7533: global variable gl_MultiTexCoord1 is deprecated after version 120
-0(1720) : error C7533: global function ftransform is deprecated after version 120
-0(1722) : error C7533: global variable gl_MultiTexCoord0 is deprecated after version 120
-
-[11:40:04] [Render thread/WARN]: Failed to get included file: /shaders/world0/final.gsh (graph has 307 nodes)
-[11:40:04] [Render thread/WARN]: Failed to get included file: /shaders/final.gsh (graph has 307 nodes)
-[11:40:04] [Render thread/WARN]: Shader compilation log for final.vsh: 0(807) : error C7533: global variable gl_TextureMatrix is deprecated after version 120
-0(807) : error C7533: global variable gl_MultiTexCoord1 is deprecated after version 120
-0(2290) : error C7533: global function ftransform is deprecated after version 120
-0(2291) : error C7533: global variable gl_MultiTexCoord0 is deprecated after version 120
-
-[11:40:04] [Render thread/ERROR]: Failed to compile program final: final.vsh: final.vsh: 0(807) : error C7533: global variable gl_TextureMatrix is deprecated after version 120
-0(807) : error C7533: global variable gl_MultiTexCoord1 is deprecated after version 120
-0(2290) : error C7533: global function ftransform is deprecated after version 120
-0(2291) : error C7533: global variable gl_MultiTexCoord0 is deprecated after version 120
-
-[11:40:04] [Render thread/WARN]: Failed to get included file: /shaders/world0/shadow.gsh (graph has 307 nodes)
-[11:40:04] [Render thread/WARN]: Failed to get included file: /shaders/shadow.gsh (graph has 307 nodes)
-[11:40:04] [Render thread/WARN]: Shader compilation log for shadow.vsh: 0(807) : error C7533: global variable gl_TextureMatrix is deprecated after version 120
-0(807) : error C7533: global variable gl_MultiTexCoord1 is deprecated after version 120
-0(1856) : error C7555: 'attribute' is deprecated, use 'in/out' instead
-0(1859) : error C7555: 'attribute' is deprecated, use 'in/out' instead
-0(2331) : error C7533: global variable gl_MultiTexCoord0 is deprecated after version 120
-0(2778) : error C7533: global variable gl_Color is deprecated after version 120
-0(2783) : error C7533: global function ftransform is deprecated after version 120
-0(2803) : error C7533: global variable gl_NormalMatrix is deprecated after version 120
-0(2803) : error C7533: global variable gl_Normal is deprecated after version 120
-
-[11:40:04] [Render thread/ERROR]: Failed to compile program shadow: shadow.vsh: shadow.vsh: 0(807) : error C7533: global variable gl_TextureMatrix is deprecated after version 120
-0(807) : error C7533: global variable gl_MultiTexCoord1 is deprecated after version 120
-0(1856) : error C7555: 'attribute' is deprecated, use 'in/out' instead
-0(1859) : error C7555: 'attribute' is deprecated, use 'in/out' instead
-0(2331) : error C7533: global variable gl_MultiTexCoord0 is deprecated after version 120
-0(2778) : error C7533: global variable gl_Color is deprecated after version 120
-0(2783) : error C7533: global function ftransform is deprecated after version 120
-0(2803) : error C7533: global variable gl_NormalMatrix is deprecated after version 120
-0(2803) : error C7533: global variable gl_Normal is deprecated after version 120
-
-[11:40:04] [Render thread/WARN]: Failed to get included file: /shaders/world0/shadow_solid.vsh (graph has 307 nodes)
-[11:40:04] [Render thread/WARN]: Failed to get included file: /shaders/shadow_solid.vsh (graph has 307 nodes)
-[11:40:04] [Render thread/WARN]: Failed to get included file: /shaders/world0/shadow_solid.fsh (graph has 307 nodes)
-[11:40:04] [Render thread/WARN]: Failed to get included file: /shaders/shadow_solid.fsh (graph has 307 nodes)
-[11:40:04] [Render thread/INFO]: Compiled 0 shader programs for pack: ComplementaryHungLoIfied.zip (0 deferred, 0 composite)
-[11:40:04] [Render thread/INFO]: Created shader pipeline for pack: ComplementaryHungLoIfied.zip in dimension: minecraft:overworld
-[11:40:04] [Render thread/INFO]: Destroyed GBufferManager
-[11:40:04] [Render thread/INFO]: Created GBufferManager (1920x1080) with 3 configured targets
-[11:40:04] [Render thread/INFO]: Resized G-buffers to 1920x1080
-[11:40:04] [Render thread/INFO]: Resizing Dynamic Transforms UBO, capacity limit of 2 reached during a single frame. New capacity will be 4.
-[11:40:04] [Render thread/INFO]: Resizing Dynamic Transforms UBO, capacity limit of 4 reached during a single frame. New capacity will be 8.
-[11:40:04] [Render thread/INFO]: Loaded 2 advancements
-[11:40:05] [Render thread/INFO]: Resizing Dynamic Transforms UBO, capacity limit of 8 reached during a single frame. New capacity will be 16.
-[11:40:05] [Render thread/INFO]: Resizing Dynamic Transforms UBO, capacity limit of 16 reached during a single frame. New capacity will be 64.
-[11:40:05] [Render thread/INFO]: Resizing Dynamic Transforms UBO, capacity limit of 64 reached during a single frame. New capacity will be 128.
-[11:40:05] [Render thread/INFO]: Resizing Dynamic Transforms UBO, capacity limit of 128 reached during a single frame. New capacity will be 256.
-[11:40:05] [Render thread/INFO]: Resizing Dynamic Transforms UBO, capacity limit of 256 reached during a single frame. New capacity will be 512.
-[11:40:05] [Server thread/INFO]: Saving and pausing game...
-[11:40:05] [Server thread/INFO]: Saving chunks for level 'ServerLevel[New World]'/minecraft:overworld
-[11:40:05] [Server thread/INFO]: Saving chunks for level 'ServerLevel[New World]'/minecraft:the_nether
-[11:40:05] [Server thread/INFO]: Saving chunks for level 'ServerLevel[New World]'/minecraft:the_end
-[11:40:06] [Server thread/INFO]: Player670 lost connection: Disconnected
-[11:40:06] [Server thread/INFO]: Player670 left the game
-[11:40:06] [Server thread/INFO]: Stopping singleplayer server as player logged out
-[11:40:06] [Server thread/INFO]: Stopping server
-[11:40:06] [Server thread/INFO]: Saving players
-[11:40:06] [Server thread/INFO]: Saving worlds
-[11:40:06] [Server thread/INFO]: Saving chunks for level 'ServerLevel[New World]'/minecraft:overworld
-[11:40:07] [Server thread/INFO]: Saving chunks for level 'ServerLevel[New World]'/minecraft:the_nether
-[11:40:07] [Server thread/INFO]: Saving chunks for level 'ServerLevel[New World]'/minecraft:the_end
-[11:40:07] [Server thread/INFO]: ThreadedAnvilChunkStorage (New World (2)): All chunks are saved
-[11:40:07] [Server thread/INFO]: ThreadedAnvilChunkStorage (DIM-1): All chunks are saved
-[11:40:07] [Server thread/INFO]: ThreadedAnvilChunkStorage (DIM1): All chunks are saved
-[11:40:07] [Server thread/INFO]: ThreadedAnvilChunkStorage: All dimensions are saved
-[11:40:07] [Render thread/INFO]: Stopping!
-
-BUILD SUCCESSFUL in 29s
+BUILD SUCCESSFUL in 1m 4s
 4 actionable tasks: 3 executed, 1 up-to-date
 matt@HungLoDE:~/Documents/Repos/MattMC$
-
-
-
