@@ -37,10 +37,19 @@ public class StandardMacros {
 		defines.add(new StringPair(key, value));
 	}
 
+	// Cached environment defines - lazily initialized on first use
+	private static volatile ImmutableList<StringPair> cachedDefines = null;
+
 	/**
 	 * Creates the standard environment defines for shader preprocessing.
+	 * Results are cached for performance.
 	 */
 	public static ImmutableList<StringPair> createStandardEnvironmentDefines() {
+		// Return cached version if available
+		if (cachedDefines != null) {
+			return cachedDefines;
+		}
+		
 		ArrayList<StringPair> standardDefines = new ArrayList<>();
 
 		// Minecraft version (1.21.10 -> 12110)
@@ -123,7 +132,9 @@ public class StandardMacros {
 			// GL not yet initialized, skip extensions
 		}
 
-		return ImmutableList.copyOf(standardDefines);
+		// Cache and return
+		cachedDefines = ImmutableList.copyOf(standardDefines);
+		return cachedDefines;
 	}
 
 	/**
