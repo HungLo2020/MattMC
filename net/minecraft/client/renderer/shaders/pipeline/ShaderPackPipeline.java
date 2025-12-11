@@ -215,16 +215,54 @@ public class ShaderPackPipeline implements WorldRenderingPipeline {
 	private void compilePrograms() {
 		LOGGER.info("Compiling shader programs for pack: {}", packName);
 		
-		// Try to compile gbuffers_terrain (most important for terrain rendering)
-		gbuffersTerrainProgram = tryCompileProgram("gbuffers_terrain");
+		// Compile ALL gbuffers programs that exist in the shader pack
+		// Following IRIS pattern: compile all available programs, fallback handled at runtime
+		String[] gbuffersPrograms = {
+			"gbuffers_basic",
+			"gbuffers_line",
+			"gbuffers_textured",
+			"gbuffers_textured_lit",
+			"gbuffers_skybasic",
+			"gbuffers_skytextured",
+			"gbuffers_clouds",
+			"gbuffers_terrain",
+			"gbuffers_terrain_solid",
+			"gbuffers_terrain_cutout",
+			"gbuffers_damagedblock",
+			"gbuffers_block",
+			"gbuffers_block_translucent",
+			"gbuffers_beaconbeam",
+			"gbuffers_item",
+			"gbuffers_entities",
+			"gbuffers_entities_translucent",
+			"gbuffers_lightning",
+			"gbuffers_particles",
+			"gbuffers_particles_translucent",
+			"gbuffers_entities_glowing",
+			"gbuffers_armor_glint",
+			"gbuffers_spidereyes",
+			"gbuffers_hand",
+			"gbuffers_hand_water",
+			"gbuffers_weather",
+			"gbuffers_water"
+		};
 		
-		// Try to compile fallback programs
-		if (gbuffersTerrainProgram == null) {
-			gbuffersTexturedProgram = tryCompileProgram("gbuffers_textured");
+		int gbuffersCompiled = 0;
+		for (String programName : gbuffersPrograms) {
+			Program program = tryCompileProgram(programName);
+			if (program != null) {
+				gbuffersCompiled++;
+				// Store reference to key programs
+				if ("gbuffers_terrain".equals(programName)) {
+					gbuffersTerrainProgram = program;
+				} else if ("gbuffers_textured".equals(programName)) {
+					gbuffersTexturedProgram = program;
+				} else if ("gbuffers_basic".equals(programName)) {
+					gbuffersBasicProgram = program;
+				}
+			}
 		}
-		if (gbuffersTerrainProgram == null && gbuffersTexturedProgram == null) {
-			gbuffersBasicProgram = tryCompileProgram("gbuffers_basic");
-		}
+		LOGGER.info("Compiled {} gbuffers programs", gbuffersCompiled);
 		
 		// Compile deferred programs (run before translucent rendering)
 		// IRIS: deferred passes run after opaque geometry but before translucent
@@ -268,8 +306,8 @@ public class ShaderPackPipeline implements WorldRenderingPipeline {
 		programsCompiled = true;
 		
 		int compiledCount = programs.size();
-		LOGGER.info("Compiled {} shader programs for pack: {} ({} deferred, {} composite)", 
-			compiledCount, packName, deferredPrograms.size(), compositePrograms.size());
+		LOGGER.info("Compiled {} shader programs for pack: {} ({} gbuffers, {} deferred, {} composite)", 
+			compiledCount, packName, gbuffersCompiled, deferredPrograms.size(), compositePrograms.size());
 	}
 	
 	/**
