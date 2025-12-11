@@ -346,9 +346,85 @@ public class GlDevice implements GpuDevice {
 	 * - Iris-specific vertex attributes (mc_Entity, mc_midTexCoord, at_tangent)
 	 */
 	protected GlRenderPipeline getOrCompilePipeline(RenderPipeline renderPipeline) {
+		// Check if we should intercept this pipeline with shader pack shaders
+		if (net.minecraft.client.renderer.shaders.IrisShaders.isEnabled()) {
+			net.minecraft.client.renderer.shaders.pipeline.ShaderPackPipeline shaderPipeline = 
+				net.minecraft.client.renderer.shaders.IrisShaders.getActivePipeline();
+			
+			if (shaderPipeline != null && shaderPipeline.isRenderingWorld()) {
+				// Try to find a matching ExtendedShader from the shader pack
+				String programName = getShaderProgramName(renderPipeline);
+				if (programName != null) {
+					net.minecraft.client.renderer.shaders.programs.ExtendedShader extendedShader = 
+						shaderPipeline.getExtendedShader(programName);
+					
+					if (extendedShader != null) {
+						LOGGER.debug("Shader interception: {} -> {} (program ID: {})", 
+							renderPipeline.getLocation(), programName, extendedShader.getProgramId());
+						
+						// Setup shader state before returning
+						extendedShader.iris$setupState();
+						
+						// Return a pipeline wrapping the ExtendedShader
+						return new GlRenderPipeline(renderPipeline, extendedShader);
+					}
+				}
+			}
+		}
+		
 		// Vanilla pipeline compilation
 		return (GlRenderPipeline)this.pipelineCache
 			.computeIfAbsent(renderPipeline, renderPipeline2 -> this.compilePipeline(renderPipeline, this.defaultShaderSource));
+	}
+
+	/**
+	 * Maps a vanilla RenderPipeline to a shader pack program name.
+	 * Follows the Iris program fallback chain.
+	 */
+	private String getShaderProgramName(RenderPipeline pipeline) {
+		String location = pipeline.getLocation().toString();
+		
+		// Map common vanilla pipelines to gbuffers programs
+		if (location.contains("terrain") || location.contains("solid") || location.contains("cutout")) {
+			return findFirstAvailableProgram("gbuffers_terrain_solid", "gbuffers_terrain", "gbuffers_textured");
+		}
+		if (location.contains("entity") || location.contains("translucent")) {
+			return findFirstAvailableProgram("gbuffers_entities", "gbuffers_textured_lit", "gbuffers_textured");
+		}
+		if (location.contains("particle")) {
+			return findFirstAvailableProgram("gbuffers_particles", "gbuffers_textured");
+		}
+		if (location.contains("clouds")) {
+			return findFirstAvailableProgram("gbuffers_clouds", "gbuffers_textured");
+		}
+		if (location.contains("sky")) {
+			return findFirstAvailableProgram("gbuffers_skybasic", "gbuffers_basic");
+		}
+		if (location.contains("hand")) {
+			return findFirstAvailableProgram("gbuffers_hand", "gbuffers_textured_lit", "gbuffers_textured");
+		}
+		if (location.contains("block")) {
+			return findFirstAvailableProgram("gbuffers_block", "gbuffers_terrain");
+		}
+		
+		return null;
+	}
+
+	/**
+	 * Finds the first available program from the fallback chain.
+	 */
+	private String findFirstAvailableProgram(String... programNames) {
+		net.minecraft.client.renderer.shaders.pipeline.ShaderPackPipeline shaderPipeline = 
+			net.minecraft.client.renderer.shaders.IrisShaders.getActivePipeline();
+		
+		if (shaderPipeline == null) return null;
+		
+		for (String name : programNames) {
+			if (shaderPipeline.getExtendedShader(name) != null) {
+				return name;
+			}
+		}
+		return null;
 	}
 	
 	protected GlShaderModule getOrCompileShader(

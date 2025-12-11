@@ -81,6 +81,7 @@ public class ShaderPackPipeline implements WorldRenderingPipeline {
 	
 	// Shader programs (Step A5)
 	private final Map<String, Program> programs = new HashMap<>();
+	private final Map<String, net.minecraft.client.renderer.shaders.programs.ExtendedShader> extendedShaders = new HashMap<>();
 	private Program gbuffersTerrainProgram;
 	private Program gbuffersTexturedProgram;
 	private Program gbuffersBasicProgram;
@@ -398,6 +399,23 @@ public class ShaderPackPipeline implements WorldRenderingPipeline {
 			
 			// Store in programs map
 			programs.put(programName, program);
+			
+			// For gbuffers programs, also create ExtendedShader for proper uniform binding
+			if (programName.startsWith("gbuffers_")) {
+				try {
+					net.minecraft.client.renderer.shaders.programs.ExtendedShader extendedShader = 
+						net.minecraft.client.renderer.shaders.programs.ShaderCreator.createBasic(
+							programName,
+							transformedVertex,
+							transformedFragment,
+							this
+						);
+					extendedShaders.put(programName, extendedShader);
+					LOGGER.info("Created ExtendedShader for: {}", programName);
+				} catch (Exception e) {
+					LOGGER.warn("Failed to create ExtendedShader for {}: {}", programName, e.getMessage());
+				}
+			}
 			
 			LOGGER.info("Successfully compiled program: {}", programName);
 			return program;
@@ -1199,6 +1217,25 @@ public class ShaderPackPipeline implements WorldRenderingPipeline {
 	 */
 	public Program getProgram(String programName) {
 		return programs.get(programName);
+	}
+
+	/**
+	 * Gets an ExtendedShader by program name.
+	 * ExtendedShaders have proper Iris-compatible uniform bindings.
+	 * 
+	 * @param programName The name of the program (e.g., "gbuffers_terrain")
+	 * @return The ExtendedShader, or null if not found
+	 */
+	public net.minecraft.client.renderer.shaders.programs.ExtendedShader getExtendedShader(String programName) {
+		return extendedShaders.get(programName);
+	}
+
+	/**
+	 * Gets all ExtendedShaders.
+	 * @return A map of program names to ExtendedShaders
+	 */
+	public Map<String, net.minecraft.client.renderer.shaders.programs.ExtendedShader> getExtendedShaders() {
+		return extendedShaders;
 	}
 	
 	/**
