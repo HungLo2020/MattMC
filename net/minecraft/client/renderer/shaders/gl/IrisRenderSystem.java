@@ -353,6 +353,23 @@ public class IrisRenderSystem {
 		}
 	}
 	
+	// ============ Image Methods ============
+
+	public static int getMaxImageUnits() {
+		if (GL.getCapabilities().OpenGL42 || GL.getCapabilities().GL_ARB_shader_image_load_store) {
+			return GL32C.glGetInteger(org.lwjgl.opengl.GL42C.GL_MAX_IMAGE_UNITS);
+		}
+		return 0;
+	}
+
+	public static void bindImageTexture(int unit, int texture, int level, boolean layered, int layer, int access, int format) {
+		if (GL.getCapabilities().OpenGL42) {
+			org.lwjgl.opengl.GL42C.glBindImageTexture(unit, texture, level, layered, layer, access, format);
+		} else if (GL.getCapabilities().GL_ARB_shader_image_load_store) {
+			org.lwjgl.opengl.ARBShaderImageLoadStore.glBindImageTexture(unit, texture, level, layered, layer, access, format);
+		}
+	}
+	
 	// ============ DSA Interface ============
 
 	public interface DSAAccess {
