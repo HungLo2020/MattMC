@@ -136,7 +136,8 @@ public class CompositeRenderer {
 			
 			// Generate mipmaps for buffers that need them
 			if (pass.mipmappedBuffers != null && !pass.mipmappedBuffers.isEmpty()) {
-				setupMipmapping(pass);
+				// TODO: setupMipmapping(pass.framebuffer, false);
+				// Requires buffer iteration and mipmap generation per buffer
 			}
 			
 			// Bind framebuffer for this pass

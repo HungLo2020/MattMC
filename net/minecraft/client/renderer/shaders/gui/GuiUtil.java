@@ -39,7 +39,8 @@ return Minecraft.getInstance();
  * used for succeeding draw calls.
  */
 public static void bindIrisWidgetsTexture() {
-RenderSystem.setShaderTexture(0, IRIS_WIDGETS_TEX);
+	// TODO: RenderSystem.setShaderTexture(0, IRIS_WIDGETS_TEX);
+	// Texture binding handled by GuiGraphics.blit() calls
 }
 
 /**
@@ -63,9 +64,7 @@ int halfHeight = height / 2;
 // V offset for which button texture to use
 int vOffset = disabled ? 46 : hovered ? 86 : 66;
 
-// Sets RenderSystem to use solid white as the tint color for blend mode, and enables blend mode
-RenderSystem.enableBlend();
-RenderSystem.setShader(GameRenderer::getPositionTexShader);
+// GuiGraphics.blit() handles blend mode and shader setup automatically
 
 // Top left section
 guiGraphics.blit(IRIS_WIDGETS_TEX, x, y, 0, vOffset, halfWidth, halfHeight, 256, 256);
@@ -192,9 +191,7 @@ this.height = height;
  * @param y The y position to draw the icon at (top)
  */
 public void draw(GuiGraphics guiGraphics, int x, int y) {
-// Sets RenderSystem to use solid white as the tint color for blend mode, and enables blend mode
-RenderSystem.enableBlend();
-RenderSystem.setShader(GameRenderer::getPositionTexShader);
+// GuiGraphics.blit() handles blend mode and shader setup automatically
 
 // Draw the texture to the screen
 guiGraphics.blit(IRIS_WIDGETS_TEX, x, y, u, v, width, height, 256, 256);
