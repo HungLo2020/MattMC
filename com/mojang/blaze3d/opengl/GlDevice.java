@@ -27,12 +27,6 @@ import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
 import net.minecraft.client.renderer.ShaderDefines;
 import net.minecraft.client.renderer.ShaderManager;
-import net.minecraft.client.renderer.shaders.core.ShaderSystem;
-import net.minecraft.client.renderer.shaders.pipeline.WorldRenderingPipeline;
-import net.minecraft.client.renderer.shaders.pipeline.ShaderPackPipeline;
-import net.minecraft.client.renderer.shaders.interception.ShaderPipelineMapper;
-import net.minecraft.client.renderer.shaders.programs.ShaderKey;
-import net.minecraft.client.renderer.shaders.program.Program;
 import net.minecraft.resources.ResourceLocation;
 import org.apache.commons.lang3.StringUtils;
 import org.jetbrains.annotations.Nullable;
@@ -347,88 +341,21 @@ public class GlDevice implements GpuDevice {
 	 */
 	protected GlRenderPipeline getOrCompilePipeline(RenderPipeline renderPipeline) {
 		// === IRIS SHADER PACK INTERCEPTION ===
-		// Check if we should override shaders with shader pack programs
-		ShaderSystem shaderSystem = ShaderSystem.getInstance();
-		if (shaderSystem != null && shaderSystem.isInitialized() && shaderSystem.areShadersEnabled()) {
-			Object pipelineObj = shaderSystem.getActivePipeline();
-			
-			if (pipelineObj instanceof ShaderPackPipeline shaderPackPipeline) {
-				boolean isRendering = shaderPackPipeline.isRenderingWorld();
-				
-				if (isRendering) {
-					// Look up the shader pack program for this vanilla pipeline
-					ShaderKey shaderKey = ShaderPipelineMapper.getPipeline(null, renderPipeline);
-					
-					if (shaderKey != null) {
-						// Get the actual program name from ProgramId, following fallback chain
-						// ShaderKey maps to a ProgramId which has the source name (e.g., "terrain")
-						// We need to prepend the program group prefix (e.g., "gbuffers_" for Gbuffers group)
-						// If the specific program doesn't exist (e.g., gbuffers_terrain_solid),
-						// we fall back to parent programs (e.g., gbuffers_terrain)
-						String programName = getShaderProgramName(shaderKey, shaderPackPipeline);
-						
-						// Get the compiled program from the shader pack pipeline
-						Program program = shaderPackPipeline.getProgram(programName);
-						
-						if (program != null && program.getProgramId() > 0) {
-							// Create a GlRenderPipeline that uses the shader pack program
-							// The shader pack program is already compiled and linked
-							GlProgram glProgram = new GlProgram(program.getProgramId(), renderPipeline.getLocation().toString());
-							glProgram.setupUniforms(renderPipeline.getUniforms(), renderPipeline.getSamplers());
-							LOGGER.debug("Shader interception: {} -> {} (program ID: {})", 
-								renderPipeline.getLocation(), programName, program.getProgramId());
-							return new GlRenderPipeline(renderPipeline, glProgram);
-						} else {
-							// Program not found - log once per program name
-							LOGGER.debug("Shader pack program not found: {} (requested by {})", 
-								programName, renderPipeline.getLocation());
-						}
-					} else {
-						// No shader key mapping for this vanilla pipeline
-						LOGGER.trace("No ShaderKey mapping for vanilla pipeline: {}", renderPipeline.getLocation());
-					}
-				}
-			}
-		}
+		// NOTE: Full shader interception requires ExtendedShader with custom uniform binding
+		// (CommonUniforms, BuiltinReplacementUniforms, VanillaUniforms, custom samplers, etc.)
+		// 
+		// For now, we compile shader pack programs for composite/deferred/final post-processing
+		// but don't intercept gbuffers rendering as it requires the full Iris uniform system.
+		// 
+		// TODO: Implement ExtendedShader following Iris ShaderCreator pattern
+		// TODO: Add proper uniform binding for gbuffers programs
+		// TODO: Bind Iris-specific attributes (mc_Entity, mc_midTexCoord, at_tangent, etc.)
 		
 		// Fall back to vanilla pipeline compilation
 		return (GlRenderPipeline)this.pipelineCache
 			.computeIfAbsent(renderPipeline, renderPipeline2 -> this.compilePipeline(renderPipeline, this.defaultShaderSource));
 	}
 	
-	/**
-	 * Converts a ShaderKey to the actual shader program name used in shader packs.
-	 * Maps enum names like TERRAIN_SOLID to program names like "gbuffers_terrain".
-	 * 
-	 * This method follows the IRIS fallback chain pattern - if a specific program
-	 * (e.g., gbuffers_terrain_solid) doesn't exist, it falls back to parent programs
-	 * (e.g., gbuffers_terrain) until a match is found.
-	 */
-	private static String getShaderProgramName(ShaderKey shaderKey, ShaderPackPipeline pipeline) {
-		// Get the ProgramId from the ShaderKey
-		net.minecraft.client.renderer.shaders.loading.ProgramId programId = shaderKey.getProgram();
-		
-		// Follow the fallback chain until we find a program that exists
-		net.minecraft.client.renderer.shaders.loading.ProgramId currentId = programId;
-		while (currentId != null) {
-			// ProgramId.getSourceName() already returns the full program name
-			// (e.g., "gbuffers_terrain_solid", "gbuffers_terrain", etc.)
-			String programName = currentId.getSourceName();
-			
-			// Check if this program exists in the shader pack
-			if (pipeline.getProgram(programName) != null) {
-				return programName;
-			}
-			
-			// Try the fallback
-			currentId = currentId.getFallback().orElse(null);
-		}
-		
-		// No program found in fallback chain - return the original name
-		// This will result in a null program, handled by caller
-		return programId.getSourceName();
-	}
-
 	protected GlShaderModule getOrCompileShader(
 		ResourceLocation resourceLocation, ShaderType shaderType, ShaderDefines shaderDefines, BiFunction<ResourceLocation, ShaderType, String> biFunction
 	) {
