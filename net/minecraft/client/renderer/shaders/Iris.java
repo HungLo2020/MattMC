@@ -4,9 +4,16 @@ import net.minecraft.client.renderer.shaders.shaderpack.ShaderPack;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.IOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 /**
  * Stub for Iris main class - minimal implementation for GUI compilation.
@@ -17,7 +24,7 @@ public class Iris {
 	public static final Logger logger = LoggerFactory.getLogger("Iris");
 
 	private static final IrisConfig irisConfig = new IrisConfig();
-	private static final ShaderpacksDirectoryManager shaderpacksDirectoryManager = new ShaderpacksDirectoryManager();
+	private static ShaderpacksDirectoryManager shaderpacksDirectoryManager;
 	private static final UpdateChecker updateChecker = new UpdateChecker();
 	private static ShaderPack currentPack = null;
 	private static String currentPackName = null;
@@ -30,11 +37,14 @@ public class Iris {
 	}
 
 	public static Path getShaderpacksDirectory() {
-		// Default shaderpacks directory in .minecraft/shaderpacks
+		// Default shaderpacks directory in run/shaderpacks (relative to working directory)
 		return Paths.get("shaderpacks");
 	}
 
 	public static ShaderpacksDirectoryManager getShaderpacksDirectoryManager() {
+		if (shaderpacksDirectoryManager == null) {
+			shaderpacksDirectoryManager = new ShaderpacksDirectoryManager(getShaderpacksDirectory());
+		}
 		return shaderpacksDirectoryManager;
 	}
 
@@ -85,11 +95,30 @@ public class Iris {
 	}
 
 	/**
-	 * Checks if a path is a valid shader pack.
+	 * Checks if a path is valid to show in the pack list.
+	 * Shows directories and zip files.
 	 */
-	public static boolean isValidShaderpack(Path path) {
-		// Stub - will be implemented with pack validation
-		return false;
+	public static boolean isValidToShowPack(Path pack) {
+		return Files.isDirectory(pack) || pack.toString().endsWith(".zip");
+	}
+
+	/**
+	 * Checks if a path is a valid shader pack.
+	 * A valid shader pack is either:
+	 * - A directory containing a "shaders" subdirectory
+	 * - A zip file (assumed to contain shader pack structure)
+	 */
+	public static boolean isValidShaderpack(Path pack) {
+		if (Files.isDirectory(pack)) {
+			// Don't allow the shaderpacks directory itself to be identified as a shader pack
+			if (pack.equals(getShaderpacksDirectory())) {
+				return false;
+			}
+			// Check if the directory contains a "shaders" folder
+			return Files.exists(pack.resolve("shaders"));
+		}
+		// Accept zip files as shader packs
+		return pack.toString().endsWith(".zip");
 	}
 
 	/**
@@ -162,6 +191,7 @@ public class Iris {
 	public static class IrisConfig {
 		private boolean shadersEnabled = true;
 		private String currentShaderPackName = null;
+		private boolean debugOptionsEnabled = false;
 
 		public boolean areShadersEnabled() {
 			return shadersEnabled;
@@ -183,27 +213,125 @@ public class Iris {
 			// Stub - will be implemented later
 		}
 
+		public boolean areDebugOptionsEnabled() {
+			return debugOptionsEnabled;
+		}
+
 		public void save() throws java.io.IOException {
 			// Stub - configuration saving will be implemented later
 		}
 	}
 
 	/**
-	 * Stub for ShaderpacksDirectoryManager - manages shader pack enumeration
+	 * Manages the shaderpacks directory - enumerating and copying shader packs.
+	 * Based on Iris ShaderpackDirectoryManager.
 	 */
 	public static class ShaderpacksDirectoryManager {
-		public java.util.List<String> enumerate() {
-			// Return empty list for now - will be implemented with actual pack loading
-			return new java.util.ArrayList<>();
+		private final Path root;
+
+		public ShaderpacksDirectoryManager(Path root) {
+			this.root = root;
+		}
+
+		/**
+		 * Remove section-sign based chat formatting from a String (used for sorting).
+		 */
+		private static String removeFormatting(String formatted) {
+			char[] original = formatted.toCharArray();
+			char[] cleaned = new char[original.length];
+			int c = 0;
+
+			for (int i = 0; i < original.length; i++) {
+				// check if it's a section sign
+				if (original[i] == '§') {
+					// Skip the next character (format code) if it exists
+					if (i + 1 < original.length) {
+						i++;
+					}
+				} else {
+					cleaned[c++] = original[i];
+				}
+			}
+
+			return new String(cleaned, 0, c);
+		}
+
+		/**
+		 * Enumerate all shader packs in the directory.
+		 * Returns a sorted list of shader pack names (file/directory names).
+		 */
+		public List<String> enumerate() throws IOException {
+			// Create the directory if it doesn't exist
+			if (!Files.exists(root)) {
+				Files.createDirectories(root);
+				return new ArrayList<>();
+			}
+
+			if (!Files.isDirectory(root)) {
+				logger.error("Shaderpacks directory exists but is not a directory: {}", root);
+				return new ArrayList<>();
+			}
+
+			// Case-insensitive sorting for intuitive user experience
+			// Also ignore chat formatting characters when sorting
+			boolean debug = irisConfig.areDebugOptionsEnabled();
+
+			Comparator<String> baseComparator = String.CASE_INSENSITIVE_ORDER.thenComparing(Comparator.naturalOrder());
+			Comparator<Path> comparator = (a, b) -> {
+				// In debug mode, show unzipped packs above zipped ones
+				if (debug) {
+					if (Files.isDirectory(a)) {
+						if (!Files.isDirectory(b)) return -1;
+					} else if (Files.isDirectory(b)) {
+						if (!Files.isDirectory(a)) return 1;
+					}
+				}
+
+				return baseComparator.compare(removeFormatting(a.getFileName().toString()), removeFormatting(b.getFileName().toString()));
+			};
+
+			try (Stream<Path> list = Files.list(root)) {
+				return list.filter(Iris::isValidToShowPack)
+					.sorted(comparator)
+					.map(path -> path.getFileName().toString())
+					.collect(Collectors.toList());
+			}
 		}
 
 		public java.net.URI getDirectoryUri() {
-			// Return local directory URI
-			return getShaderpacksDirectory().toUri();
+			return root.toUri();
 		}
 
 		public void copyPackIntoDirectory(String fileName, Path pack) throws java.io.IOException {
-			// Stub - will be implemented when pack management is added
+			Path target = root.resolve(fileName);
+
+			// Handle directories - need to copy entire directory tree
+			if (Files.isDirectory(pack)) {
+				// Create the target directory first
+				Files.createDirectories(target);
+				
+				// Copy all subdirectories
+				try (Stream<Path> stream = Files.walk(pack)) {
+					for (Path p : stream.filter(Files::isDirectory).toList()) {
+						Path folder = pack.relativize(p);
+						Path targetFolder = target.resolve(folder);
+						if (!Files.exists(targetFolder)) {
+							Files.createDirectories(targetFolder);
+						}
+					}
+				}
+
+				// Copy all files
+				try (Stream<Path> stream = Files.walk(pack)) {
+					for (Path p : stream.filter(file -> !Files.isDirectory(file)).collect(Collectors.toSet())) {
+						Path file = pack.relativize(p);
+						Files.copy(p, target.resolve(file));
+					}
+				}
+			} else {
+				// Copy the pack file (zip) into the shaderpacks folder
+				Files.copy(pack, target);
+			}
 		}
 	}
 }

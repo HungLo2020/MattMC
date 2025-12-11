@@ -41,7 +41,8 @@ public class ShaderPackSelectionList extends AbstractSelectionList<ShaderPackSel
 	private ShaderPackEntry applied = null;
 
 	public ShaderPackSelectionList(ShaderPackScreen screen, Minecraft client, int width, int height, int top, int bottom, int left, int right) {
-		super(client, width, height, top + 4, 20);
+		// Use (bottom - top) as the list height so it doesn't overlap with buttons below
+		super(client, width, bottom - top, top + 4, 20);
 		WatchKey key1;
 		WatchService watcher1;
 

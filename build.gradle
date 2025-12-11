@@ -433,6 +433,7 @@ tasks.register('runClient', JavaExec) {
         workingDir.mkdirs()
         file('run/assets').mkdirs()
         file('run/resourcepacks').mkdirs()
+        file('run/shaderpacks').mkdirs()
         
         // Copy assets from src/main/resources/assets to run/assets for dev environment
         def resourcesAssetsDir = file('src/main/resources/assets')
@@ -440,6 +441,15 @@ tasks.register('runClient', JavaExec) {
             copy {
                 from resourcesAssetsDir
                 into file('run/assets')
+            }
+        }
+        
+        // Copy shaderpacks from src/main/resources/shaderpacks to run/shaderpacks for dev environment
+        def shaderpacksDir = file('src/main/resources/shaderpacks')
+        if (shaderpacksDir.exists() && shaderpacksDir.isDirectory()) {
+            copy {
+                from shaderpacksDir
+                into file('run/shaderpacks')
             }
         }
     }
@@ -654,6 +664,18 @@ tasks.register('clientDist') {
                 into "${distDir}/run/assets"
             }
             println "Copied assets from ${resourcesAssetsDir.absolutePath}"
+        }
+        
+        // Copy shaderpacks to run/shaderpacks directory
+        // These are shader packs bundled with the distribution
+        def shaderpacksDir = file('src/main/resources/shaderpacks')
+        if (shaderpacksDir.exists() && shaderpacksDir.isDirectory()) {
+            file("${distDir}/run/shaderpacks").mkdirs()
+            copy {
+                from shaderpacksDir
+                into "${distDir}/run/shaderpacks"
+            }
+            println "Copied shaderpacks from ${shaderpacksDir.absolutePath}"
         }
         
         // Build classpath string for launch scripts
