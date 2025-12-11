@@ -511,11 +511,6 @@ public class ShaderPackSelectionList extends AbstractSelectionList<ShaderPackSel
 			return (!isFocused()) ? ComponentPath.leaf(this) : null;
 		}
 
-		@Override
-		public Component getNarration() {
-			return Component.literal(packName);
-		}
-
 		public boolean isFocused() {
 			return this.list.getFocused() == this;
 		}

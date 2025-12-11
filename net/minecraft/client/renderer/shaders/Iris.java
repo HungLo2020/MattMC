@@ -68,6 +68,29 @@ public class Iris {
 	}
 
 	/**
+	 * Stub method for getting shader pack option queue.
+	 * Returns empty map for now.
+	 */
+	public static java.util.Map<String, String> getShaderPackOptionQueue() {
+		return new java.util.HashMap<>();
+	}
+
+	/**
+	 * Stub method for queueing shader pack options from a profile.
+	 */
+	public static void queueShaderPackOptionsFromProfile(Object profile) {
+		// Stub - will be implemented when profile system is added
+	}
+
+	/**
+	 * Stub method for getting pipeline manager.
+	 * Returns null for now.
+	 */
+	public static Object getPipelineManager() {
+		return null;
+	}
+
+	/**
 	 * Stub for IrisConfig - tracks shader pack configuration
 	 */
 	public static class IrisConfig {
@@ -89,6 +112,10 @@ public class Iris {
 		public void setShaderPackName(String name) {
 			this.currentShaderPackName = name;
 		}
+
+		public void save() {
+			// Stub - configuration saving will be implemented later
+		}
 	}
 
 	/**
@@ -98,6 +125,11 @@ public class Iris {
 		public java.util.List<String> enumerate() {
 			// Return empty list for now - will be implemented with actual pack loading
 			return new java.util.ArrayList<>();
+		}
+
+		public java.net.URI getDirectoryUri() {
+			// Return local directory URI
+			return getShaderpacksDirectory().toUri();
 		}
 	}
 }
