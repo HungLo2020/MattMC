@@ -1,10 +1,14 @@
 package net.minecraft.client.renderer.shaders.pipeline;
 
+import net.minecraft.client.renderer.shaders.Iris;
 import net.minecraft.client.renderer.shaders.core.ShaderSystem;
+import net.minecraft.client.renderer.shaders.pack.FileSystemShaderPackSource;
 import net.minecraft.client.renderer.shaders.pack.ShaderPackSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.IOException;
+import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -23,6 +27,8 @@ public class PipelineManager {
 	// Per-dimension pipeline caching - matches IRIS pattern
 	private final Map<String, WorldRenderingPipeline> pipelinesPerDimension = new HashMap<>();
 	private WorldRenderingPipeline pipeline = new VanillaRenderingPipeline();
+	// Track the current file system source for cleanup
+	private FileSystemShaderPackSource currentPackSource = null;
 	
 	/**
 	 * Prepares a pipeline for the given dimension.
@@ -52,25 +58,61 @@ public class PipelineManager {
 	/**
 	 * Creates a new pipeline for the given dimension.
 	 * Determines whether to create a vanilla or shader pack pipeline.
+	 * Loads shader packs from the shaderpacks directory (following Iris pattern).
 	 * 
 	 * @param dimension The dimension ID
 	 * @return A new WorldRenderingPipeline
 	 */
 	private WorldRenderingPipeline createPipeline(String dimension) {
 		// Check if shaders are enabled - matches IRIS pattern
-		if (ShaderSystem.getInstance().getConfig().areShadersEnabled()) {
-			String packName = ShaderSystem.getInstance().getConfig().getSelectedPack();
+		// First check the Iris config (which is what the GUI sets)
+		boolean shadersEnabled = Iris.getIrisConfig().areShadersEnabled();
+		String packName = Iris.getIrisConfig().getShaderPackName().orElse(null);
+		
+		// Also check ShaderSystem config as a fallback
+		if (!shadersEnabled && ShaderSystem.getInstance().isInitialized()) {
+			var systemConfig = ShaderSystem.getInstance().getConfig();
+			if (systemConfig != null) {
+				shadersEnabled = systemConfig.areShadersEnabled();
+				if (packName == null) {
+					packName = systemConfig.getSelectedPack();
+				}
+			}
+		}
+		
+		if (shadersEnabled && packName != null) {
+			// Try to load from the shaderpacks directory (external packs)
+			Path shaderpacksDir = Iris.getShaderpacksDirectory();
+			Path packPath = shaderpacksDir.resolve(packName);
 			
-			if (packName != null && ShaderSystem.getInstance().getRepository() != null) {
+			if (Iris.isValidShaderpack(packPath)) {
+				try {
+					// Clean up any previous pack source
+					if (currentPackSource != null) {
+						currentPackSource.close();
+					}
+					
+					currentPackSource = new FileSystemShaderPackSource(packName, packPath);
+					LOGGER.info("Creating shader pack pipeline for external pack: {} in dimension: {}", packName, dimension);
+					return new ShaderPackPipeline(packName, dimension, currentPackSource);
+				} catch (IOException e) {
+					LOGGER.error("Failed to load shader pack '{}' from file system", packName, e);
+				}
+			} else {
+				LOGGER.warn("Shader pack '{}' is not valid at path: {}", packName, packPath);
+			}
+			
+			// Try ShaderSystem repository as fallback (for resource-based packs)
+			if (ShaderSystem.getInstance().getRepository() != null) {
 				ShaderPackSource packSource = ShaderSystem.getInstance().getRepository().getPackSource(packName);
 				
 				if (packSource != null) {
-					LOGGER.info("Creating shader pack pipeline for pack: {} in dimension: {}", packName, dimension);
+					LOGGER.info("Creating shader pack pipeline for resource pack: {} in dimension: {}", packName, dimension);
 					return new ShaderPackPipeline(packName, dimension, packSource);
-				} else {
-					LOGGER.warn("Shader pack '{}' not found, falling back to vanilla", packName);
 				}
 			}
+			
+			LOGGER.warn("Shader pack '{}' not found, falling back to vanilla", packName);
 		}
 		
 		// Fall back to vanilla pipeline - matches IRIS pattern
@@ -105,6 +147,12 @@ public class PipelineManager {
 		
 		pipelinesPerDimension.clear();
 		pipeline = null;
+		
+		// Clean up file system source
+		if (currentPackSource != null) {
+			currentPackSource.close();
+			currentPackSource = null;
+		}
 	}
 	
 	/**
