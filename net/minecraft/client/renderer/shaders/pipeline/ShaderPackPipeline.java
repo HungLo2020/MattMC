@@ -1,12 +1,17 @@
 package net.minecraft.client.renderer.shaders.pipeline;
 
+import it.unimi.dsi.fastutil.objects.Object2ObjectMap;
+import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.Camera;
 import net.minecraft.client.renderer.shaders.framebuffer.GlFramebuffer;
 import net.minecraft.client.renderer.shaders.gl.FullScreenQuadRenderer;
 import net.minecraft.client.renderer.shaders.helpers.OptionalBoolean;
+import net.minecraft.client.renderer.shaders.helpers.Tri;
 import net.minecraft.client.renderer.shaders.option.ShaderPackOptions;
 import net.minecraft.client.renderer.shaders.pack.*;
+import net.minecraft.client.renderer.shaders.pipeline.transform.PatchShaderType;
+import net.minecraft.client.renderer.shaders.pipeline.transform.TransformPatcher;
 import net.minecraft.client.renderer.shaders.program.Program;
 import net.minecraft.client.renderer.shaders.program.ProgramBuilder;
 import net.minecraft.client.renderer.shaders.program.ProgramSource;
@@ -17,6 +22,8 @@ import net.minecraft.client.renderer.shaders.shadows.ShadowRenderTargets;
 import net.minecraft.client.renderer.shaders.targets.GBufferManager;
 import net.minecraft.client.renderer.shaders.targets.RenderTarget;
 import net.minecraft.client.renderer.shaders.texture.InternalTextureFormat;
+import net.minecraft.client.renderer.shaders.texture.TextureStage;
+import net.minecraft.client.renderer.shaders.texture.TextureType;
 import net.minecraft.client.renderer.shaders.uniform.providers.CapturedRenderingState;
 import net.minecraft.client.renderer.shaders.uniform.providers.SystemTimeUniforms;
 import com.mojang.blaze3d.opengl.GlStateManager;
@@ -265,6 +272,9 @@ public class ShaderPackPipeline implements WorldRenderingPipeline {
 	 * Attempts to compile a shader program from the pack.
 	 * Returns null if the program doesn't exist or fails to compile.
 	 * 
+	 * Uses TransformPatcher to transform deprecated GLSL constructs to GLSL 330 Core
+	 * profile compatible code - following IRIS pattern exactly.
+	 * 
 	 * @param programName The program name (e.g., "gbuffers_terrain")
 	 * @return The compiled program, or null
 	 */
@@ -284,11 +294,48 @@ public class ShaderPackPipeline implements WorldRenderingPipeline {
 			// Get optional geometry source
 			String geometrySource = sourceProvider.getShaderSource(programName + ".gsh", dimension);
 			
-			LOGGER.debug("Compiling program: {} (vsh={} chars, fsh={} chars)", 
-				programName, vertexSource.length(), fragmentSource.length());
+			LOGGER.debug("Compiling program: {} (vsh={} chars, fsh={} chars, gsh={} chars)", 
+				programName, vertexSource.length(), fragmentSource.length(), 
+				geometrySource != null ? geometrySource.length() : 0);
 			
-			// Build the program using ProgramBuilder
-			Program program = ProgramBuilder.begin(programName, vertexSource, geometrySource, fragmentSource)
+			// Determine the texture stage based on program name
+			TextureStage textureStage = determineTextureStage(programName);
+			
+			// Create empty texture map (will be populated with actual texture bindings in future)
+			Object2ObjectMap<Tri<String, TextureType, TextureStage>, String> textureMap = new Object2ObjectOpenHashMap<>();
+			
+			// Transform shader sources using TransformPatcher
+			// This handles deprecated GLSL constructs (gl_TextureMatrix, gl_Vertex, gl_Color, etc.)
+			// and converts them to GLSL 330 Core profile compatible code
+			Map<PatchShaderType, String> transformed = TransformPatcher.patchComposite(
+				programName,
+				vertexSource,
+				geometrySource,
+				fragmentSource,
+				textureStage,
+				textureMap
+			);
+			
+			if (transformed == null) {
+				LOGGER.warn("TransformPatcher returned null for program: {}", programName);
+				return null;
+			}
+			
+			// Get transformed sources
+			String transformedVertex = transformed.get(PatchShaderType.VERTEX);
+			String transformedFragment = transformed.get(PatchShaderType.FRAGMENT);
+			String transformedGeometry = transformed.get(PatchShaderType.GEOMETRY);
+			
+			if (transformedVertex == null || transformedFragment == null) {
+				LOGGER.warn("Transformation produced null shaders for program: {}", programName);
+				return null;
+			}
+			
+			LOGGER.debug("Transformed program: {} (vsh={} chars, fsh={} chars)", 
+				programName, transformedVertex.length(), transformedFragment.length());
+			
+			// Build the program using ProgramBuilder with transformed sources
+			Program program = ProgramBuilder.begin(programName, transformedVertex, transformedGeometry, transformedFragment)
 				.build();
 			
 			// Store in programs map
@@ -303,6 +350,29 @@ public class ShaderPackPipeline implements WorldRenderingPipeline {
 		} catch (Exception e) {
 			LOGGER.error("Error compiling program {}", programName, e);
 			return null;
+		}
+	}
+	
+	/**
+	 * Determines the texture stage based on program name.
+	 * Following IRIS's program categorization pattern.
+	 */
+	private TextureStage determineTextureStage(String programName) {
+		if (programName.startsWith("composite") || programName.equals("final")) {
+			return TextureStage.COMPOSITE_AND_FINAL;
+		} else if (programName.startsWith("deferred")) {
+			return TextureStage.DEFERRED;
+		} else if (programName.startsWith("prepare")) {
+			return TextureStage.PREPARE;
+		} else if (programName.startsWith("shadowcomp")) {
+			return TextureStage.SHADOWCOMP;
+		} else if (programName.startsWith("begin")) {
+			return TextureStage.BEGIN;
+		} else if (programName.startsWith("setup")) {
+			return TextureStage.SETUP;
+		} else {
+			// gbuffers_*, shadow, etc.
+			return TextureStage.GBUFFERS_AND_SHADOW;
 		}
 	}
 	

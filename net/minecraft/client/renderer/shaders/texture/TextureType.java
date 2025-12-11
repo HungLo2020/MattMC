@@ -1,8 +1,8 @@
 package net.minecraft.client.renderer.shaders.texture;
 
+import org.lwjgl.opengl.ARBTextureRectangle;
 import org.lwjgl.opengl.GL11;
 import org.lwjgl.opengl.GL12;
-import org.lwjgl.opengl.GL30C;
 
 import java.nio.ByteBuffer;
 import java.util.Optional;
@@ -17,7 +17,7 @@ public enum TextureType {
 	TEXTURE_1D(GL11.GL_TEXTURE_1D),
 	TEXTURE_2D(GL11.GL_TEXTURE_2D),
 	TEXTURE_3D(GL12.GL_TEXTURE_3D),
-	TEXTURE_RECTANGLE(GL30C.GL_TEXTURE_RECTANGLE);
+	TEXTURE_RECTANGLE(ARBTextureRectangle.GL_TEXTURE_RECTANGLE_ARB);
 
 	private final int glType;
 
