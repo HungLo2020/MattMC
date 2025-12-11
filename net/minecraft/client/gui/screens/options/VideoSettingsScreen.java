@@ -19,6 +19,8 @@ import net.minecraft.client.gui.components.CycleButton;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.client.renderer.GpuWarnlistManager;
+import net.minecraft.client.renderer.shaders.gui.option.IrisVideoSettings;
+import net.minecraft.client.renderer.shaders.gui.screen.ShaderPackScreen;
 import net.minecraft.network.chat.CommonComponents;
 import net.minecraft.network.chat.Component;
 
@@ -33,35 +35,47 @@ public class VideoSettingsScreen extends OptionsSubScreen {
 	private final GpuWarnlistManager gpuWarnlistManager;
 	private final int oldMipmaps;
 
-	private static OptionInstance<?>[] options(Options options) {
-		return new OptionInstance[]{
-			options.graphicsMode(),
-			options.renderDistance(),
-			options.prioritizeChunkUpdates(),
-			options.simulationDistance(),
-			options.ambientOcclusion(),
-			options.framerateLimit(),
-			options.enableVsync(),
-			options.inactivityFpsLimit(),
-			options.guiScale(),
-			options.attackIndicator(),
-			options.gamma(),
-			options.cloudStatus(),
-			options.fullscreen(),
-			options.particles(),
-			options.mipmapLevels(),
-			options.entityShadows(),
-			options.screenEffectScale(),
-			options.entityDistanceScaling(),
-			options.fovEffectScale(),
-			options.showAutosaveIndicator(),
-			options.glintSpeed(),
-			options.glintStrength(),
-			options.menuBackgroundBlurriness(),
-			options.panoramaTheme(),
-			options.bobView(),
-			options.cloudRange()
+	private OptionInstance<?>[] options() {
+		OptionInstance<?>[] optionsList = new OptionInstance[]{
+			this.options.graphicsMode(),
+			this.options.renderDistance(),
+			this.options.prioritizeChunkUpdates(),
+			this.options.simulationDistance(),
+			this.options.ambientOcclusion(),
+			this.options.framerateLimit(),
+			this.options.enableVsync(),
+			this.options.inactivityFpsLimit(),
+			this.options.guiScale(),
+			this.options.attackIndicator(),
+			this.options.gamma(),
+			this.options.cloudStatus(),
+			this.options.fullscreen(),
+			this.options.particles(),
+			this.options.mipmapLevels(),
+			this.options.entityShadows(),
+			this.options.screenEffectScale(),
+			this.options.entityDistanceScaling(),
+			this.options.fovEffectScale(),
+			this.options.showAutosaveIndicator(),
+			this.options.glintSpeed(),
+			this.options.glintStrength(),
+			this.options.menuBackgroundBlurriness(),
+			this.options.panoramaTheme(),
+			this.options.bobView(),
+			this.options.cloudRange()
 		};
+		OptionInstance<?>[] irisOptions = new OptionInstance[optionsList.length + 2];
+		System.arraycopy(optionsList, 0, irisOptions, 0, optionsList.length);
+		irisOptions[irisOptions.length - 2] = new OptionInstance<>(
+			"options.iris.shaderPackSelection",
+			OptionInstance.cachedConstantTooltip(Component.empty()),
+			(component, object) -> Component.empty(),
+			OptionInstance.BOOLEAN_VALUES,
+			true,
+			boolean_ -> this.minecraft.setScreen(new ShaderPackScreen(this))
+		);
+		irisOptions[irisOptions.length - 1] = IrisVideoSettings.RENDER_DISTANCE;
+		return irisOptions;
 	}
 
 	public VideoSettingsScreen(Screen screen, Minecraft minecraft, Options options) {
@@ -119,7 +133,7 @@ public class VideoSettingsScreen extends OptionsSubScreen {
 		);
 		this.list.addBig(optionInstance);
 		this.list.addBig(this.options.biomeBlendRadius());
-		this.list.addSmall(options(this.options));
+		this.list.addSmall(this.options());
 	}
 
 	@Override
