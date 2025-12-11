@@ -36,10 +36,19 @@ public class ShaderSourceProvider {
 		this.packSource = packSource;
 		this.sourceCache = new HashMap<>();
 		
-		LOGGER.info("Creating ShaderSourceProvider for pack: {}", packSource.getName());
+		LOGGER.info("Creating ShaderSourceProvider for pack: {} with {} starting paths", 
+			packSource.getName(), startingPaths.size());
+		
+		// Log starting paths for debugging
+		for (AbsolutePackPath path : startingPaths) {
+			LOGGER.debug("Starting path: {}", path.getPathString());
+		}
 		
 		// Build include graph (matches IRIS pattern)
 		this.includeGraph = new IncludeGraph(packSource, startingPaths);
+		
+		// Log graph size
+		LOGGER.info("Include graph built with {} nodes", includeGraph.getNodes().size());
 		
 		// Check for failures
 		if (!includeGraph.getFailures().isEmpty()) {
@@ -59,7 +68,15 @@ public class ShaderSourceProvider {
 			List<String> lines = includeProcessor.getIncludedFile(path);
 			
 			if (lines == null) {
-				LOGGER.warn("Failed to get included file: {}", pathString);
+				LOGGER.warn("Failed to get included file: {} (graph has {} nodes)", 
+					pathString, includeGraph.getNodes().size());
+				// Log available paths at debug level for troubleshooting
+				if (LOGGER.isDebugEnabled()) {
+					LOGGER.debug("Available paths in graph:");
+					for (AbsolutePackPath p : includeGraph.getNodes().keySet()) {
+						LOGGER.debug("  - {}", p.getPathString());
+					}
+				}
 				return null;
 			}
 			
@@ -84,44 +101,99 @@ public class ShaderSourceProvider {
 	
 	/**
 	 * Gets the processed source code for a shader file.
+	 * Tries dimension-specific paths first, then falls back to base shaders directory.
 	 * 
 	 * @param shaderPath The path to the shader file (e.g., "gbuffers_terrain.fsh")
 	 * @return The processed source code, or null if not found
 	 */
 	public String getShaderSource(String shaderPath) {
+		return getShaderSource(shaderPath, null);
+	}
+	
+	/**
+	 * Gets the processed source code for a shader file with dimension awareness.
+	 * Tries dimension-specific paths first, then falls back to base shaders directory.
+	 * 
+	 * IRIS pattern: Shader packs can have dimension-specific folders:
+	 * - world0 for overworld
+	 * - world-1 for nether  
+	 * - world1 for end
+	 * 
+	 * @param shaderPath The path to the shader file (e.g., "gbuffers_terrain.fsh")
+	 * @param dimensionId The dimension ID (e.g., "minecraft:overworld") or null
+	 * @return The processed source code, or null if not found
+	 */
+	public String getShaderSource(String shaderPath, String dimensionId) {
+		// Build cache key with dimension
+		String cacheKey = dimensionId != null ? dimensionId + ":" + shaderPath : shaderPath;
+		
 		// Check cache first
-		if (sourceCache.containsKey(shaderPath)) {
-			LOGGER.debug("Returning cached source for: {}", shaderPath);
-			return sourceCache.get(shaderPath);
+		if (sourceCache.containsKey(cacheKey)) {
+			LOGGER.debug("Returning cached source for: {}", cacheKey);
+			return sourceCache.get(cacheKey);
 		}
 		
-		// Ensure path starts with "/" for AbsolutePackPath
-		String fullPath = shaderPath.startsWith("/") ? 
-			shaderPath : "/" + shaderPath;
+		// Get the dimension folder name
+		String dimensionFolder = getDimensionFolder(dimensionId);
 		
-		// Ensure path starts with "/shaders/" 
-		if (!fullPath.startsWith("/shaders/")) {
-			fullPath = "/shaders" + fullPath;
+		// Try dimension-specific path first
+		if (dimensionFolder != null) {
+			String dimensionPath = "/shaders/" + dimensionFolder + "/" + shaderPath;
+			LOGGER.debug("Trying dimension-specific path: {}", dimensionPath);
+			
+			String source = loadShaderFromPath(dimensionPath);
+			if (source != null) {
+				sourceCache.put(cacheKey, source);
+				LOGGER.debug("Loaded dimension-specific shader: {} ({} chars)", dimensionPath, source.length());
+				return source;
+			}
 		}
 		
-		LOGGER.debug("Loading shader source: {}", fullPath);
+		// Fall back to base shaders directory
+		String basePath = "/shaders/" + shaderPath;
+		LOGGER.debug("Trying base path: {}", basePath);
 		
+		String source = loadShaderFromPath(basePath);
+		if (source != null) {
+			sourceCache.put(cacheKey, source);
+			LOGGER.debug("Loaded base shader: {} ({} chars)", basePath, source.length());
+			return source;
+		}
+		
+		LOGGER.debug("Shader not found: {} (tried dimension={}, base)", shaderPath, dimensionFolder);
+		return null;
+	}
+	
+	/**
+	 * Gets the dimension folder name for a given dimension ID.
+	 * IRIS pattern: maps dimension registry names to folder names.
+	 */
+	private String getDimensionFolder(String dimensionId) {
+		if (dimensionId == null) {
+			return "world0"; // Default to overworld
+		}
+		
+		return switch (dimensionId) {
+			case "minecraft:overworld" -> "world0";
+			case "minecraft:the_nether" -> "world-1";
+			case "minecraft:the_end" -> "world1";
+			default -> {
+				// Custom dimensions - extract the last part of the ID
+				// e.g., "mymod:custom_dim" -> null (use base shaders)
+				yield null;
+			}
+		};
+	}
+	
+	/**
+	 * Loads shader source from a specific path.
+	 */
+	private String loadShaderFromPath(String fullPath) {
 		try {
 			AbsolutePackPath path = AbsolutePackPath.fromAbsolutePath(fullPath);
-			String source = sourceProvider.apply(path);
-			
-			if (source != null) {
-				// Cache the result
-				sourceCache.put(shaderPath, source);
-				LOGGER.debug("Loaded and cached shader source: {} ({} chars)", 
-					shaderPath, source.length());
-				return source;
-			} else {
-				LOGGER.warn("Source provider returned null for: {}", fullPath);
-				return null;
-			}
+			return sourceProvider.apply(path);
 		} catch (Exception e) {
-			LOGGER.error("Failed to load shader source: {}", shaderPath, e);
+			LOGGER.debug("Failed to load shader from path {}: {}", fullPath, e.getMessage());
 			return null;
 		}
 	}

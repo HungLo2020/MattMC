@@ -1,6 +1,6 @@
 package net.minecraft.client.renderer.shaders.hooks;
 
-import net.minecraft.client.renderer.shaders.pipeline.ShaderRenderingPipeline;
+import net.minecraft.client.renderer.shaders.pipeline.WorldRenderingPipeline;
 
 /**
  * Tracks pipeline activation state.
@@ -8,12 +8,12 @@ import net.minecraft.client.renderer.shaders.pipeline.ShaderRenderingPipeline;
  */
 public class PipelineState {
     private boolean isActive = false;
-    private ShaderRenderingPipeline activePipeline = null;
+    private WorldRenderingPipeline activePipeline = null;
     
     /**
      * Activates the pipeline.
      */
-    public void activate(ShaderRenderingPipeline pipeline) {
+    public void activate(WorldRenderingPipeline pipeline) {
         if (pipeline == null) {
             throw new IllegalArgumentException("Pipeline cannot be null");
         }
@@ -39,7 +39,7 @@ public class PipelineState {
     /**
      * Gets the active pipeline.
      */
-    public ShaderRenderingPipeline getActivePipeline() {
+    public WorldRenderingPipeline getActivePipeline() {
         return activePipeline;
     }
     

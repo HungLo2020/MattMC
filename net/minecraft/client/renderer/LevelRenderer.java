@@ -99,6 +99,7 @@ import net.minecraft.world.phys.Vec3;
 import net.minecraft.world.phys.HitResult.Type;
 import net.minecraft.world.phys.shapes.CollisionContext;
 import net.minecraft.world.phys.shapes.VoxelShape;
+import net.minecraft.client.renderer.shaders.hooks.RenderingHooks;
 import org.jetbrains.annotations.Nullable;
 import org.joml.Matrix4f;
 import org.joml.Matrix4fStack;
@@ -440,6 +441,10 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 		boolean bl2
 	) {
 		float f = deltaTracker.getGameTimeDeltaPartialTick(false);
+		
+		// Shader system hooks - begin world rendering (IRIS pattern: MixinLevelRenderer HEAD injection)
+		RenderingHooks.onWorldRenderStart(matrix4f, matrix4f2, f);
+		
 		this.levelRenderState.reset();
 		this.blockEntityRenderDispatcher.prepare(camera);
 		this.entityRenderDispatcher.prepare(camera, this.minecraft.crosshairPickEntity);
@@ -547,6 +552,10 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 			}
 		});
 		this.targets.clear();
+		
+		// Shader system hooks - end world rendering (IRIS pattern: MixinLevelRenderer popMatrix injection)
+		RenderingHooks.onWorldRenderEnd();
+		
 		matrix4fStack.popMatrix();
 		profilerFiller.pop();
 	}
@@ -590,8 +599,16 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 			double e = vec3.y();
 			double f = vec3.z();
 			profilerFiller.push("terrain");
+			
+			// Shader system hooks - begin terrain rendering (IRIS pattern)
+			RenderingHooks.onBeginTerrainRendering();
+			
 			ChunkSectionsToRender chunkSectionsToRender = this.prepareChunkRenders(matrix4f, d, e, f);
 			chunkSectionsToRender.renderGroup(ChunkSectionLayerGroup.OPAQUE);
+			
+			// Shader system hooks - end terrain rendering (IRIS pattern)
+			RenderingHooks.onEndTerrainRendering();
+			
 			this.minecraft.gameRenderer.getLighting().setupFor(Lighting.Entry.LEVEL);
 			if (resourceHandle3 != null) {
 				resourceHandle3.get().copyDepthFrom(this.minecraft.getMainRenderTarget());
@@ -654,9 +671,17 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 			}
 
 			profilerFiller.push("translucent");
+			
+			// Shader system hooks - begin translucent rendering (IRIS pattern)
+			RenderingHooks.onBeginTranslucentRendering();
+			
 			chunkSectionsToRender.renderGroup(ChunkSectionLayerGroup.TRANSLUCENT);
 			profilerFiller.popPush("string");
 			chunkSectionsToRender.renderGroup(ChunkSectionLayerGroup.TRIPWIRE);
+			
+			// Shader system hooks - end translucent rendering (IRIS pattern)
+			RenderingHooks.onEndTranslucentRendering();
+			
 			if (bl) {
 				this.renderBlockOutline(bufferSource, poseStack, true, levelRenderState);
 			}

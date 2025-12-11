@@ -1,7 +1,14 @@
 package net.minecraft.client.renderer.shaders.hooks;
 
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.renderer.shaders.core.ShaderSystem;
+import net.minecraft.client.renderer.shaders.pipeline.PipelineManager;
 import net.minecraft.client.renderer.shaders.pipeline.ShaderRenderingPipeline;
+import net.minecraft.client.renderer.shaders.pipeline.VanillaRenderingPipeline;
 import net.minecraft.client.renderer.shaders.pipeline.WorldRenderingPhase;
+import net.minecraft.client.renderer.shaders.pipeline.WorldRenderingPipeline;
+import net.minecraft.client.renderer.shaders.uniform.providers.CapturedRenderingState;
+import org.joml.Matrix4f;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -22,23 +29,60 @@ import org.slf4j.LoggerFactory;
 public class RenderingHooks {
     private static final Logger LOGGER = LoggerFactory.getLogger(RenderingHooks.class);
     
-    private static ShaderRenderingPipeline activePipeline = null;
+    private static WorldRenderingPipeline activePipeline = null;
     private static final PhaseTracker phaseTracker = new PhaseTracker();
     private static final PipelineState pipelineState = new PipelineState();
     
     /**
      * Called at the start of world rendering.
      * IRIS: MixinLevelRenderer renderLevel() HEAD injection
+     * 
+     * @param modelView The model-view matrix
+     * @param projection The projection matrix
+     * @param tickDelta The tick delta (partial tick)
      */
-    public static void onWorldRenderStart() {
-        if (activePipeline != null) {
-            // Render shadows before main world rendering
-            renderShadows();
+    public static void onWorldRenderStart(Matrix4f modelView, Matrix4f projection, float tickDelta) {
+        // Capture rendering state for uniforms (IRIS pattern)
+        CapturedRenderingState.INSTANCE.setGbufferModelView(modelView);
+        CapturedRenderingState.INSTANCE.setGbufferProjection(projection);
+        CapturedRenderingState.INSTANCE.setTickDelta(tickDelta);
+        
+        // Get pipeline from PipelineManager (IRIS pattern: Iris.getPipelineManager().preparePipeline())
+        ShaderSystem system = ShaderSystem.getInstance();
+        
+        if (system.isInitialized() && system.getPipelineManager() != null) {
+            String currentDimension = getCurrentDimension();
+            WorldRenderingPipeline pipeline = system.getPipelineManager().preparePipeline(currentDimension);
             
-            phaseTracker.beginWorldRendering();
-            pipelineState.activate(activePipeline);
-            activePipeline.beginWorldRendering();
+            if (pipeline != null && !(pipeline instanceof VanillaRenderingPipeline)) {
+                activePipeline = pipeline;
+                
+                // Begin level rendering (IRIS pattern)
+                pipeline.beginLevelRendering();
+                pipeline.setPhase(WorldRenderingPhase.NONE);
+                
+                phaseTracker.beginWorldRendering();
+                pipelineState.activate(pipeline);
+                
+                LOGGER.debug("Shader pipeline activated for rendering in dimension: {}", currentDimension);
+            } else {
+                activePipeline = null;
+            }
+        } else {
+            activePipeline = null;
         }
+    }
+    
+    /**
+     * Gets the current dimension ID.
+     * IRIS: Iris.getCurrentDimension() pattern
+     */
+    private static String getCurrentDimension() {
+        Minecraft mc = Minecraft.getInstance();
+        if (mc.level != null) {
+            return mc.level.dimension().location().toString();
+        }
+        return "minecraft:overworld";
     }
     
     /**
@@ -50,19 +94,22 @@ public class RenderingHooks {
             return;
         }
         
-        net.minecraft.client.renderer.shaders.shadows.ShadowRenderer shadowRenderer = 
-            activePipeline.getShadowRenderer();
-        
-        if (shadowRenderer != null && shadowRenderer.areShadowsEnabled()) {
-            // Begin shadow rendering
-            shadowRenderer.beginShadowRender(0.0f);  // Sun angle would come from world
+        // Cast to ShaderRenderingPipeline to access shadow renderer
+        if (activePipeline instanceof ShaderRenderingPipeline shaderPipeline) {
+            net.minecraft.client.renderer.shaders.shadows.ShadowRenderer shadowRenderer = 
+                shaderPipeline.getShadowRenderer();
             
-            // Shadow pass rendering happens through normal rendering callbacks
-            // with the shadow state active
-            shadowRenderer.renderShadowPass();
-            
-            // End shadow rendering and run composites
-            shadowRenderer.endShadowRender();
+            if (shadowRenderer != null && shadowRenderer.areShadowsEnabled()) {
+                // Begin shadow rendering
+                shadowRenderer.beginShadowRender(0.0f);  // Sun angle would come from world
+                
+                // Shadow pass rendering happens through normal rendering callbacks
+                // with the shadow state active
+                shadowRenderer.renderShadowPass();
+                
+                // End shadow rendering and run composites
+                shadowRenderer.endShadowRender();
+            }
         }
     }
     
@@ -72,9 +119,16 @@ public class RenderingHooks {
      */
     public static void onWorldRenderEnd() {
         if (activePipeline != null) {
-            activePipeline.finishWorldRendering();
+            // Finalize level rendering (IRIS pattern)
+            activePipeline.finalizeLevelRendering();
+            
             pipelineState.deactivate();
             phaseTracker.endWorldRendering();
+            
+            LOGGER.debug("Shader pipeline finalized for rendering");
+            
+            // Clear active pipeline after frame is done
+            activePipeline = null;
         }
     }
     
@@ -85,7 +139,12 @@ public class RenderingHooks {
     public static void onBeginTerrainRendering() {
         if (activePipeline != null) {
             phaseTracker.setPhase(WorldRenderingPhase.TERRAIN_SOLID);
-            activePipeline.beginTerrainRendering();
+            activePipeline.setPhase(WorldRenderingPhase.TERRAIN_SOLID);
+            
+            // Cast to ShaderRenderingPipeline to call terrain methods
+            if (activePipeline instanceof ShaderRenderingPipeline shaderPipeline) {
+                shaderPipeline.beginTerrainRendering();
+            }
         }
     }
     
@@ -95,8 +154,13 @@ public class RenderingHooks {
      */
     public static void onEndTerrainRendering() {
         if (activePipeline != null) {
-            activePipeline.endTerrainRendering();
+            // Cast to ShaderRenderingPipeline to call terrain methods
+            if (activePipeline instanceof ShaderRenderingPipeline shaderPipeline) {
+                shaderPipeline.endTerrainRendering();
+            }
+            
             phaseTracker.setPhase(WorldRenderingPhase.NONE);
+            activePipeline.setPhase(WorldRenderingPhase.NONE);
         }
     }
     
@@ -107,7 +171,12 @@ public class RenderingHooks {
     public static void onBeginTranslucentRendering() {
         if (activePipeline != null) {
             phaseTracker.setPhase(WorldRenderingPhase.TERRAIN_TRANSLUCENT);
-            activePipeline.beginTranslucentRendering();
+            activePipeline.setPhase(WorldRenderingPhase.TERRAIN_TRANSLUCENT);
+            
+            // Cast to ShaderRenderingPipeline to call translucent methods
+            if (activePipeline instanceof ShaderRenderingPipeline shaderPipeline) {
+                shaderPipeline.beginTranslucentRendering();
+            }
         }
     }
     
@@ -117,8 +186,13 @@ public class RenderingHooks {
      */
     public static void onEndTranslucentRendering() {
         if (activePipeline != null) {
-            activePipeline.endTranslucentRendering();
+            // Cast to ShaderRenderingPipeline to call translucent methods
+            if (activePipeline instanceof ShaderRenderingPipeline shaderPipeline) {
+                shaderPipeline.endTranslucentRendering();
+            }
+            
             phaseTracker.setPhase(WorldRenderingPhase.NONE);
+            activePipeline.setPhase(WorldRenderingPhase.NONE);
         }
     }
     
@@ -126,7 +200,7 @@ public class RenderingHooks {
      * Sets the active shader pipeline.
      * Called by ShaderSystemLifecycle during initialization.
      */
-    public static void setActivePipeline(ShaderRenderingPipeline pipeline) {
+    public static void setActivePipeline(WorldRenderingPipeline pipeline) {
         activePipeline = pipeline;
         LOGGER.debug("Active shader pipeline set: {}", pipeline != null ? "enabled" : "disabled");
     }
@@ -134,7 +208,7 @@ public class RenderingHooks {
     /**
      * Gets the active shader pipeline.
      */
-    public static ShaderRenderingPipeline getActivePipeline() {
+    public static WorldRenderingPipeline getActivePipeline() {
         return activePipeline;
     }
     

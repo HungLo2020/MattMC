@@ -44,26 +44,30 @@ public class FileSystemShaderPackSource implements ShaderPackSource {
 		}
 		
 		if (Files.isDirectory(packRoot)) {
-			// Directory-based pack - use the shaders subdirectory
-			this.shaderPackPath = packRoot.resolve("shaders");
+			// Directory-based pack - use the pack root as base
+			// The caller will request paths like "shaders/gbuffers_terrain.vsh"
+			this.shaderPackPath = packRoot;
 			this.zipFileSystem = null;
 			
-			if (!Files.exists(this.shaderPackPath)) {
+			// Verify the pack has a shaders directory
+			if (!Files.exists(packRoot.resolve("shaders"))) {
 				throw new IOException("Shader pack lacks 'shaders' directory: " + packRoot);
 			}
 		} else if (packRoot.toString().endsWith(".zip")) {
 			// ZIP-based pack - open the zip file system
 			this.zipFileSystem = FileSystems.newFileSystem(packRoot);
 			
-			// Find the shaders directory inside the zip
+			// Use the zip root as base, the caller will request paths like "shaders/gbuffers_terrain.vsh"
 			Path shadersDir = this.zipFileSystem.getPath("/shaders");
 			if (Files.exists(shadersDir)) {
-				this.shaderPackPath = shadersDir;
+				// Use the zip root, not the shaders directory
+				this.shaderPackPath = this.zipFileSystem.getPath("/");
 			} else {
-				// Some packs have the shaders in a subdirectory
+				// Some packs have the shaders in a subdirectory (e.g., PackName/shaders/)
 				Path altPath = findShadersDirectory(this.zipFileSystem.getPath("/"));
 				if (altPath != null) {
-					this.shaderPackPath = altPath;
+					// Use the parent of shaders directory as the pack root
+					this.shaderPackPath = altPath.getParent();
 				} else {
 					this.zipFileSystem.close();
 					throw new IOException("Shader pack lacks 'shaders' directory: " + packRoot);
