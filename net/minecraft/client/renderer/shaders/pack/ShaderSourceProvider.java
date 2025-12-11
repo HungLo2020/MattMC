@@ -36,10 +36,19 @@ public class ShaderSourceProvider {
 		this.packSource = packSource;
 		this.sourceCache = new HashMap<>();
 		
-		LOGGER.info("Creating ShaderSourceProvider for pack: {}", packSource.getName());
+		LOGGER.info("Creating ShaderSourceProvider for pack: {} with {} starting paths", 
+			packSource.getName(), startingPaths.size());
+		
+		// Log starting paths for debugging
+		for (AbsolutePackPath path : startingPaths) {
+			LOGGER.debug("Starting path: {}", path.getPathString());
+		}
 		
 		// Build include graph (matches IRIS pattern)
 		this.includeGraph = new IncludeGraph(packSource, startingPaths);
+		
+		// Log graph size
+		LOGGER.info("Include graph built with {} nodes", includeGraph.getNodes().size());
 		
 		// Check for failures
 		if (!includeGraph.getFailures().isEmpty()) {
@@ -59,7 +68,15 @@ public class ShaderSourceProvider {
 			List<String> lines = includeProcessor.getIncludedFile(path);
 			
 			if (lines == null) {
-				LOGGER.warn("Failed to get included file: {}", pathString);
+				LOGGER.warn("Failed to get included file: {} (graph has {} nodes)", 
+					pathString, includeGraph.getNodes().size());
+				// Log available paths at debug level for troubleshooting
+				if (LOGGER.isDebugEnabled()) {
+					LOGGER.debug("Available paths in graph:");
+					for (AbsolutePackPath p : includeGraph.getNodes().keySet()) {
+						LOGGER.debug("  - {}", p.getPathString());
+					}
+				}
 				return null;
 			}
 			

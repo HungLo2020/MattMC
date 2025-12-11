@@ -125,18 +125,17 @@ public class ShaderPackPipeline implements WorldRenderingPipeline {
 		));
 		
 		// Search dimension-specific directories (IRIS pattern from ShaderPack.java)
+		// Try all possible dimension directories - findPresentSources will only return files that exist
 		String[] dimensionDirs = {"world0", "world-1", "world1"};
 		for (String dimDir : dimensionDirs) {
-			if (packSource.fileExists("shaders/" + dimDir)) {
-				List<AbsolutePackPath> dimPaths = ShaderPackSourceNames.findPresentSources(
-					packSource, 
-					"/shaders/" + dimDir + "/", 
-					candidates
-				);
-				startingPaths.addAll(dimPaths);
-				if (!dimPaths.isEmpty()) {
-					LOGGER.debug("Found {} shader files in dimension directory: {}", dimPaths.size(), dimDir);
-				}
+			List<AbsolutePackPath> dimPaths = ShaderPackSourceNames.findPresentSources(
+				packSource, 
+				"/shaders/" + dimDir + "/", 
+				candidates
+			);
+			startingPaths.addAll(dimPaths);
+			if (!dimPaths.isEmpty()) {
+				LOGGER.info("Found {} shader files in dimension directory: {}", dimPaths.size(), dimDir);
 			}
 		}
 		

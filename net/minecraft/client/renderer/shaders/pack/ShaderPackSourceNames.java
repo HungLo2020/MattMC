@@ -1,5 +1,8 @@
 package net.minecraft.client.renderer.shaders.pack;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.util.ArrayList;
 import java.util.List;
 
@@ -119,13 +122,18 @@ public class ShaderPackSourceNames {
 			directory = directory + "/";
 		}
 		
+		Logger logger = LoggerFactory.getLogger(ShaderPackSourceNames.class);
+		logger.debug("Searching for shaders in directory: {}", directory);
+		
 		for (String candidate : candidates) {
 			String fullPath = directory + candidate;
 			
 			// Remove leading / for fileExists check
 			String checkPath = fullPath.startsWith("/") ? fullPath.substring(1) : fullPath;
 			
-			if (packSource.fileExists(checkPath)) {
+			boolean exists = packSource.fileExists(checkPath);
+			if (exists) {
+				logger.debug("Found shader file: {}", checkPath);
 				try {
 					found.add(AbsolutePackPath.fromAbsolutePath(fullPath));
 				} catch (Exception e) {
@@ -134,6 +142,7 @@ public class ShaderPackSourceNames {
 			}
 		}
 		
+		logger.debug("Found {} files in {}", found.size(), directory);
 		return found;
 	}
 }
