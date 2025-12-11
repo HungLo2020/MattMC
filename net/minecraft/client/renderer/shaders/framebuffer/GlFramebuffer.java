@@ -128,6 +128,41 @@ public class GlFramebuffer extends GlResource {
         return GL30.glCheckFramebufferStatus(GL30C.GL_FRAMEBUFFER);
     }
 
+    /**
+     * Checks if the framebuffer is complete.
+     * @return true if framebuffer is complete
+     */
+    public boolean isComplete() {
+        return getStatus() == GL30C.GL_FRAMEBUFFER_COMPLETE;
+    }
+
+    /**
+     * Creates and attaches a depth renderbuffer.
+     * @param width Width of the depth buffer
+     * @param height Height of the depth buffer
+     */
+    public void addDepthAttachment(int width, int height) {
+        int fb = getGlId();
+        
+        // Create depth renderbuffer
+        int depthRb = GL30.glGenRenderbuffers();
+        GL30.glBindRenderbuffer(GL30C.GL_RENDERBUFFER, depthRb);
+        GL30.glRenderbufferStorage(GL30C.GL_RENDERBUFFER, GL30C.GL_DEPTH_COMPONENT24, width, height);
+        
+        // Attach to framebuffer
+        GlStateManager._glBindFramebuffer(GL30C.GL_FRAMEBUFFER, fb);
+        GL30.glFramebufferRenderbuffer(GL30C.GL_FRAMEBUFFER, GL30C.GL_DEPTH_ATTACHMENT, GL30C.GL_RENDERBUFFER, depthRb);
+        
+        this.hasDepthAttachment = true;
+    }
+
+    /**
+     * Unbinds any framebuffer (binds the default framebuffer 0).
+     */
+    public static void unbind() {
+        GlStateManager._glBindFramebuffer(GL30C.GL_FRAMEBUFFER, 0);
+    }
+
     public int getId() {
         return getGlId();
     }
