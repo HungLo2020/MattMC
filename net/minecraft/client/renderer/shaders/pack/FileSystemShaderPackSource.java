@@ -82,16 +82,13 @@ public class FileSystemShaderPackSource implements ShaderPackSource {
 	 */
 	private Path findShadersDirectory(Path root) throws IOException {
 		try (Stream<Path> stream = Files.list(root)) {
-			for (Path entry : stream.toList()) {
-				if (Files.isDirectory(entry)) {
-					Path shadersInEntry = entry.resolve("shaders");
-					if (Files.exists(shadersInEntry) && Files.isDirectory(shadersInEntry)) {
-						return shadersInEntry;
-					}
-				}
-			}
+			return stream
+				.filter(Files::isDirectory)
+				.map(entry -> entry.resolve("shaders"))
+				.filter(shadersDir -> Files.exists(shadersDir) && Files.isDirectory(shadersDir))
+				.findFirst()
+				.orElse(null);
 		}
-		return null;
 	}
 	
 	@Override
@@ -126,13 +123,11 @@ public class FileSystemShaderPackSource implements ShaderPackSource {
 			return new ArrayList<>();
 		}
 		
-		List<String> files = new ArrayList<>();
 		try (Stream<Path> stream = Files.list(dirPath)) {
-			for (Path entry : stream.toList()) {
-				files.add(entry.getFileName().toString());
-			}
+			return stream
+				.map(entry -> entry.getFileName().toString())
+				.collect(java.util.stream.Collectors.toList());
 		}
-		return files;
 	}
 	
 	/**
