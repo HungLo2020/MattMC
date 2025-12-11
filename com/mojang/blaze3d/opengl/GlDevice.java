@@ -352,25 +352,40 @@ public class GlDevice implements GpuDevice {
 		if (shaderSystem != null && shaderSystem.isInitialized() && shaderSystem.areShadersEnabled()) {
 			Object pipelineObj = shaderSystem.getActivePipeline();
 			
-			if (pipelineObj instanceof ShaderPackPipeline shaderPackPipeline && shaderPackPipeline.isRenderingWorld()) {
-				// Look up the shader pack program for this vanilla pipeline
-				ShaderKey shaderKey = ShaderPipelineMapper.getPipeline(null, renderPipeline);
+			if (pipelineObj instanceof ShaderPackPipeline shaderPackPipeline) {
+				boolean isRendering = shaderPackPipeline.isRenderingWorld();
 				
-				if (shaderKey != null) {
-					// Get the actual program name from ProgramId
-					// ShaderKey maps to a ProgramId which has the source name (e.g., "terrain")
-					// We need to prepend the program group prefix (e.g., "gbuffers_" for Gbuffers group)
-					String programName = getShaderProgramName(shaderKey);
+				if (isRendering) {
+					// Look up the shader pack program for this vanilla pipeline
+					ShaderKey shaderKey = ShaderPipelineMapper.getPipeline(null, renderPipeline);
 					
-					// Get the compiled program from the shader pack pipeline
-					Program program = shaderPackPipeline.getProgram(programName);
-					
-					if (program != null && program.getProgramId() > 0) {
-						// Create a GlRenderPipeline that uses the shader pack program
-						// The shader pack program is already compiled and linked
-						GlProgram glProgram = new GlProgram(program.getProgramId(), renderPipeline.getLocation().toString());
-						glProgram.setupUniforms(renderPipeline.getUniforms(), renderPipeline.getSamplers());
-						return new GlRenderPipeline(renderPipeline, glProgram);
+					if (shaderKey != null) {
+						// Get the actual program name from ProgramId, following fallback chain
+						// ShaderKey maps to a ProgramId which has the source name (e.g., "terrain")
+						// We need to prepend the program group prefix (e.g., "gbuffers_" for Gbuffers group)
+						// If the specific program doesn't exist (e.g., gbuffers_terrain_solid),
+						// we fall back to parent programs (e.g., gbuffers_terrain)
+						String programName = getShaderProgramName(shaderKey, shaderPackPipeline);
+						
+						// Get the compiled program from the shader pack pipeline
+						Program program = shaderPackPipeline.getProgram(programName);
+						
+						if (program != null && program.getProgramId() > 0) {
+							// Create a GlRenderPipeline that uses the shader pack program
+							// The shader pack program is already compiled and linked
+							GlProgram glProgram = new GlProgram(program.getProgramId(), renderPipeline.getLocation().toString());
+							glProgram.setupUniforms(renderPipeline.getUniforms(), renderPipeline.getSamplers());
+							LOGGER.debug("Shader interception: {} -> {} (program ID: {})", 
+								renderPipeline.getLocation(), programName, program.getProgramId());
+							return new GlRenderPipeline(renderPipeline, glProgram);
+						} else {
+							// Program not found - log once per program name
+							LOGGER.debug("Shader pack program not found: {} (requested by {})", 
+								programName, renderPipeline.getLocation());
+						}
+					} else {
+						// No shader key mapping for this vanilla pipeline
+						LOGGER.trace("No ShaderKey mapping for vanilla pipeline: {}", renderPipeline.getLocation());
 					}
 				}
 			}
@@ -384,14 +399,39 @@ public class GlDevice implements GpuDevice {
 	/**
 	 * Converts a ShaderKey to the actual shader program name used in shader packs.
 	 * Maps enum names like TERRAIN_SOLID to program names like "gbuffers_terrain".
+	 * 
+	 * This method follows the IRIS fallback chain pattern - if a specific program
+	 * (e.g., gbuffers_terrain_solid) doesn't exist, it falls back to parent programs
+	 * (e.g., gbuffers_terrain) until a match is found.
 	 */
-	private static String getShaderProgramName(ShaderKey shaderKey) {
+	private static String getShaderProgramName(ShaderKey shaderKey, ShaderPackPipeline pipeline) {
 		// Get the ProgramId from the ShaderKey
 		net.minecraft.client.renderer.shaders.loading.ProgramId programId = shaderKey.getProgram();
 		
-		// Get the base name from the program group
-		String prefix = programId.getGroup().getBaseName();
+		// Follow the fallback chain until we find a program that exists
+		net.minecraft.client.renderer.shaders.loading.ProgramId currentId = programId;
+		while (currentId != null) {
+			String programName = buildProgramName(currentId);
+			
+			// Check if this program exists in the shader pack
+			if (pipeline.getProgram(programName) != null) {
+				return programName;
+			}
+			
+			// Try the fallback
+			currentId = currentId.getFallback().orElse(null);
+		}
 		
+		// No program found in fallback chain - return the original name
+		// This will result in a null program, handled by caller
+		return buildProgramName(programId);
+	}
+	
+	/**
+	 * Builds the program name from a ProgramId.
+	 */
+	private static String buildProgramName(net.minecraft.client.renderer.shaders.loading.ProgramId programId) {
+		String prefix = programId.getGroup().getBaseName();
 		String sourceName = programId.getSourceName();
 		if (sourceName == null || sourceName.isEmpty()) {
 			return prefix;
