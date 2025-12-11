@@ -23,10 +23,13 @@ public class IrisApi {
 	
 	public boolean isShaderPackInUse() {
 		ShaderSystem system = ShaderSystem.getInstance();
-		return system.isInitialized() && 
-			   system.getConfig() != null && 
-			   system.getConfig().areShadersEnabled() &&
-			   system.getConfig().getSelectedPack() != null;
+		if (!system.isInitialized()) {
+			return false;
+		}
+		var config = system.getConfig();
+		return config != null && 
+			   config.areShadersEnabled() &&
+			   config.getSelectedPack() != null;
 	}
 	
 	public String getCurrentPackName() {
@@ -49,14 +52,16 @@ public class IrisApi {
 			
 			// Then sync to ShaderSystem for actual rendering
 			ShaderSystem system = ShaderSystem.getInstance();
-			if (system.isInitialized() && system.getConfig() != null) {
+			var systemConfig = system.isInitialized() ? system.getConfig() : null;
+			
+			if (systemConfig != null) {
 				// Get the selected pack from Iris config
 				String packName = Iris.getIrisConfig().getShaderPackName().orElse(null);
 				
 				// Sync to ShaderSystem config
-				system.getConfig().setShadersEnabled(enabled);
+				systemConfig.setShadersEnabled(enabled);
 				if (packName != null) {
-					system.getConfig().setSelectedPack(packName);
+					systemConfig.setSelectedPack(packName);
 				}
 				
 				LOGGER.info("Synced shader config to ShaderSystem - enabled={}, pack={}", enabled, packName);

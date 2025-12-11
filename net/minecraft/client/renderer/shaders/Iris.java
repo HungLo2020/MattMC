@@ -184,12 +184,14 @@ public class Iris {
 		net.minecraft.client.renderer.shaders.core.ShaderSystem system = 
 			net.minecraft.client.renderer.shaders.core.ShaderSystem.getInstance();
 		
-		if (system.isInitialized() && system.getConfig() != null) {
+		var systemConfig = system.isInitialized() ? system.getConfig() : null;
+		
+		if (systemConfig != null) {
 			// Sync Iris config to ShaderSystem config
-			system.getConfig().setShadersEnabled(irisConfig.areShadersEnabled());
+			systemConfig.setShadersEnabled(irisConfig.areShadersEnabled());
 			String packName = irisConfig.getShaderPackName().orElse(null);
 			if (packName != null) {
-				system.getConfig().setSelectedPack(packName);
+				systemConfig.setSelectedPack(packName);
 			}
 			
 			// Update currentPackName for consistency
