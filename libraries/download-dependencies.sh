@@ -166,6 +166,44 @@ download_jar "${FABRIC_BASE}/org/ow2/asm/asm-util/9.9/asm-util-9.9.jar" "asm-uti
 
 echo ""
 
+# ============================================================================
+# FABRIC API DEPENDENCIES
+# Required for Sodium and Iris mod compilation
+# ============================================================================
+
+echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+echo -e "${BLUE}  Downloading Fabric API Modules (for Sodium/Iris)${NC}"
+echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+
+# Fabric API version compatible with Minecraft 1.21.10
+FABRIC_API_VERSION="0.135.0+1.21.10"
+
+# fabric-renderer-api-v1 - Rendering API used by Sodium
+download_jar "${FABRIC_BASE}/net/fabricmc/fabric-api/fabric-renderer-api-v1/${FABRIC_API_VERSION}/fabric-renderer-api-v1-${FABRIC_API_VERSION}.jar" "fabric-renderer-api-v1-${FABRIC_API_VERSION}.jar"
+
+# fabric-block-view-api-v2 - Block view API used by Sodium
+download_jar "${FABRIC_BASE}/net/fabricmc/fabric-api/fabric-block-view-api-v2/${FABRIC_API_VERSION}/fabric-block-view-api-v2-${FABRIC_API_VERSION}.jar" "fabric-block-view-api-v2-${FABRIC_API_VERSION}.jar"
+
+# fabric-rendering-fluids-v1 - Fluid rendering used by Sodium
+download_jar "${FABRIC_BASE}/net/fabricmc/fabric-api/fabric-rendering-fluids-v1/${FABRIC_API_VERSION}/fabric-rendering-fluids-v1-${FABRIC_API_VERSION}.jar" "fabric-rendering-fluids-v1-${FABRIC_API_VERSION}.jar"
+
+# fabric-resource-loader-v0 - Resource loading used by Sodium
+download_jar "${FABRIC_BASE}/net/fabricmc/fabric-api/fabric-resource-loader-v0/${FABRIC_API_VERSION}/fabric-resource-loader-v0-${FABRIC_API_VERSION}.jar" "fabric-resource-loader-v0-${FABRIC_API_VERSION}.jar"
+
+# fabric-api-base - Base API module
+download_jar "${FABRIC_BASE}/net/fabricmc/fabric-api/fabric-api-base/${FABRIC_API_VERSION}/fabric-api-base-${FABRIC_API_VERSION}.jar" "fabric-api-base-${FABRIC_API_VERSION}.jar"
+
+# fabric-key-binding-api-v1 - Keybinding API used by Iris
+download_jar "${FABRIC_BASE}/net/fabricmc/fabric-api/fabric-key-binding-api-v1/${FABRIC_API_VERSION}/fabric-key-binding-api-v1-${FABRIC_API_VERSION}.jar" "fabric-key-binding-api-v1-${FABRIC_API_VERSION}.jar"
+
+# fabric-lifecycle-events-v1 - Lifecycle events
+download_jar "${FABRIC_BASE}/net/fabricmc/fabric-api/fabric-lifecycle-events-v1/${FABRIC_API_VERSION}/fabric-lifecycle-events-v1-${FABRIC_API_VERSION}.jar" "fabric-lifecycle-events-v1-${FABRIC_API_VERSION}.jar"
+
+# fabric-rendering-v1 - Rendering utils
+download_jar "${FABRIC_BASE}/net/fabricmc/fabric-api/fabric-rendering-v1/${FABRIC_API_VERSION}/fabric-rendering-v1-${FABRIC_API_VERSION}.jar" "fabric-rendering-v1-${FABRIC_API_VERSION}.jar"
+
+echo ""
+
 # Summary
 echo -e "${GREEN}╔════════════════════════════════════════════════════════════════╗${NC}"
 echo -e "${GREEN}║  ✓ Download Complete!                                         ║${NC}"
