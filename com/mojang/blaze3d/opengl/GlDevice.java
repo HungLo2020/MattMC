@@ -340,11 +340,21 @@ public class GlDevice implements GpuDevice {
 	 */
 	protected GlRenderPipeline getOrCompilePipeline(RenderPipeline renderPipeline) {
 		// Check if we should intercept this pipeline with shader pack shaders
-		if (net.minecraft.client.renderer.shaders.IrisShaders.isEnabled()) {
+		boolean irisEnabled = net.minecraft.client.renderer.shaders.IrisShaders.isEnabled();
+		if (irisEnabled) {
 			net.minecraft.client.renderer.shaders.pipeline.ShaderPackPipeline shaderPipeline = 
 				net.minecraft.client.renderer.shaders.IrisShaders.getActivePipeline();
 			
-			if (shaderPipeline != null && shaderPipeline.isRenderingWorld()) {
+			boolean isRendering = shaderPipeline != null && shaderPipeline.isRenderingWorld();
+			
+			// Debug logging for first call per pipeline
+			if (shaderPipeline != null && !shaderPackPipelineCache.containsKey(renderPipeline)) {
+				LOGGER.info("Pipeline check: {} - isEnabled={}, shaderPipeline={}, isRenderingWorld={}", 
+					renderPipeline.getLocation(), irisEnabled, shaderPipeline != null, 
+					shaderPipeline != null ? shaderPipeline.isRenderingWorld() : "N/A");
+			}
+			
+			if (isRendering) {
 				// Check cache first for performance
 				GlRenderPipeline cached = shaderPackPipelineCache.get(renderPipeline);
 				if (cached != null) {
@@ -360,20 +370,32 @@ public class GlDevice implements GpuDevice {
 					net.minecraft.client.renderer.shaders.pipeline.IrisPipelines.getPipeline(shaderPipeline, renderPipeline);
 				
 				if (shaderKey != null) {
-					// Get the program name from the ShaderKey's ProgramId
+					// Get the program from the ShaderKey and follow fallback chain
 					net.minecraft.client.renderer.shaders.loading.ProgramId programId = shaderKey.getProgram();
 					if (programId == null) {
 						LOGGER.warn("ShaderKey {} has null ProgramId", shaderKey);
 					} else {
-						String programName = programId.getSourceName();
+						// Follow the fallback chain to find an available program (IRIS pattern)
+						net.minecraft.client.renderer.shaders.programs.ExtendedShader extendedShader = null;
+						String foundProgramName = null;
+						net.minecraft.client.renderer.shaders.loading.ProgramId currentId = programId;
 						
-						// Try to find the ExtendedShader
-						net.minecraft.client.renderer.shaders.programs.ExtendedShader extendedShader = 
-							shaderPipeline.getExtendedShader(programName);
+						while (currentId != null) {
+							String programName = currentId.getSourceName();
+							extendedShader = shaderPipeline.getExtendedShader(programName);
+							
+							if (extendedShader != null) {
+								foundProgramName = programName;
+								break;
+							}
+							
+							// Try the fallback
+							currentId = currentId.getFallback().orElse(null);
+						}
 						
 						if (extendedShader != null) {
-							LOGGER.debug("Shader interception: {} -> {} (ShaderKey: {}, program ID: {})", 
-								renderPipeline.getLocation(), programName, shaderKey, extendedShader.getProgramId());
+							LOGGER.info("Shader interception: {} -> {} (ShaderKey: {}, program ID: {})", 
+								renderPipeline.getLocation(), foundProgramName, shaderKey, extendedShader.getProgramId());
 							
 							// Setup shader state before returning
 							extendedShader.iris$setupState();
@@ -383,7 +405,8 @@ public class GlDevice implements GpuDevice {
 							shaderPackPipelineCache.put(renderPipeline, interceptedPipeline);
 							return interceptedPipeline;
 						} else {
-							LOGGER.debug("No ExtendedShader found for program: {} (ShaderKey: {})", programName, shaderKey);
+							LOGGER.debug("No ExtendedShader found in fallback chain for: {} (ShaderKey: {})", 
+								programId.getSourceName(), shaderKey);
 						}
 					}
 				}
