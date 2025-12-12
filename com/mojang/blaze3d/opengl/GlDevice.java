@@ -350,10 +350,10 @@ public class GlDevice implements GpuDevice {
 			boolean hasPipelineMapping = shaderPipeline != null && 
 				net.minecraft.client.renderer.shaders.pipeline.IrisPipelines.hasPipeline(renderPipeline);
 			
-			// Debug logging for first call per pipeline (log less frequently)
+			// Debug logging for first call per pipeline (only logs once per pipeline)
 			if (shaderPipeline != null && !shaderPackPipelineCache.containsKey(renderPipeline) && 
 				!this.pipelineCache.containsKey(renderPipeline)) {
-				LOGGER.info("Pipeline check: {} - isEnabled={}, shaderPipeline={}, hasPipelineMapping={}, isRenderingWorld={}", 
+				LOGGER.debug("Pipeline check: {} - isEnabled={}, shaderPipeline={}, hasPipelineMapping={}, isRenderingWorld={}", 
 					renderPipeline.getLocation(), irisEnabled, shaderPipeline != null, hasPipelineMapping,
 					shaderPipeline.isRenderingWorld());
 			}
@@ -399,7 +399,7 @@ public class GlDevice implements GpuDevice {
 						}
 						
 						if (extendedShader != null) {
-							LOGGER.info("Shader interception: {} -> {} (ShaderKey: {}, program ID: {})", 
+							LOGGER.debug("Shader interception: {} -> {} (ShaderKey: {}, program ID: {})", 
 								renderPipeline.getLocation(), foundProgramName, shaderKey, extendedShader.getProgramId());
 							
 							// CRITICAL: Setup vanilla uniforms so the rendering system can bind UBOs/samplers
