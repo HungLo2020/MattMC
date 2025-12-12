@@ -30,6 +30,9 @@ import net.minecraft.client.renderer.shaders.texture.TextureStage;
 import net.minecraft.client.renderer.shaders.texture.TextureType;
 import net.minecraft.client.renderer.shaders.uniform.providers.CapturedRenderingState;
 import net.minecraft.client.renderer.shaders.uniform.providers.SystemTimeUniforms;
+import net.minecraft.client.renderer.shaders.programs.ShaderKey;
+import net.minecraft.client.renderer.shaders.programs.ShaderMap;
+import net.minecraft.client.renderer.shaders.loading.ProgramId;
 import com.mojang.blaze3d.opengl.GlStateManager;
 import org.joml.Matrix4f;
 import org.joml.Matrix4fc;
@@ -102,6 +105,9 @@ public class ShaderPackPipeline implements WorldRenderingPipeline {
 	private Matrix4f cachedProjectionMatrix = new Matrix4f();
 	private Matrix4f cachedShadowModelViewMatrix = new Matrix4f();
 	private Matrix4f cachedShadowProjectionMatrix = new Matrix4f();
+	
+	// ShaderMap for ShaderKey -> GlProgram mapping (IRIS pattern)
+	private final net.minecraft.client.renderer.shaders.programs.ShaderMap shaderMap = new net.minecraft.client.renderer.shaders.programs.ShaderMap();
 	
 	/**
 	 * Creates a new shader pack pipeline.
@@ -306,6 +312,9 @@ public class ShaderPackPipeline implements WorldRenderingPipeline {
 		}
 		
 		programsCompiled = true;
+		
+		// Build ShaderMap from ExtendedShaders for ShaderKey -> program lookup
+		buildShaderMap();
 		
 		int compiledCount = programs.size();
 		LOGGER.info("Compiled {} shader programs for pack: {} ({} gbuffers, {} deferred, {} composite)", 
@@ -1241,5 +1250,55 @@ public class ShaderPackPipeline implements WorldRenderingPipeline {
 	 */
 	public Map<String, Program> getPrograms() {
 		return programs;
+	}
+	
+	/**
+	 * Gets the ShaderMap for ShaderKey -> GlProgram lookup.
+	 * Used by GlDevice shader interception.
+	 */
+	public ShaderMap getShaderMap() {
+		return shaderMap;
+	}
+	
+	/**
+	 * Whether this pipeline should override vanilla shaders.
+	 * Returns true when shader programs are compiled and the pipeline is active.
+	 */
+	public boolean shouldOverrideShaders() {
+		return programsCompiled && !extendedShaders.isEmpty();
+	}
+	
+	/**
+	 * Builds the ShaderMap from ExtendedShaders.
+	 * Maps each ShaderKey to its corresponding ExtendedShader by following the ProgramId fallback chain.
+	 */
+	private void buildShaderMap() {
+		LOGGER.info("Building ShaderMap from {} ExtendedShaders", extendedShaders.size());
+		
+		for (ShaderKey shaderKey : ShaderKey.values()) {
+			ProgramId programId = shaderKey.getProgram();
+			if (programId == null) continue;
+			
+			// Follow the fallback chain to find an available ExtendedShader
+			ProgramId currentId = programId;
+			net.minecraft.client.renderer.shaders.programs.ExtendedShader shader = null;
+			
+			while (currentId != null && shader == null) {
+				String programName = currentId.getSourceName();
+				shader = extendedShaders.get(programName);
+				
+				if (shader == null) {
+					// Try fallback
+					currentId = currentId.getFallback();
+				}
+			}
+			
+			if (shader != null) {
+				shaderMap.put(shaderKey, shader);
+				LOGGER.debug("Mapped ShaderKey {} -> {}", shaderKey, shader.getDebugLabel());
+			}
+		}
+		
+		LOGGER.info("ShaderMap built with {} mappings", shaderMap.size());
 	}
 }

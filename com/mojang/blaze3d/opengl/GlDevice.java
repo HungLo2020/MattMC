@@ -339,20 +339,42 @@ public class GlDevice implements GpuDevice {
 	 * Iris-compatible uniforms (gbufferModelView, gbufferProjection, sunPosition, etc.)
 	 * while vanilla RenderPipeline uses vanilla uniforms (ModelViewMat, ProjMat).
 	 * 
-	 * To properly implement shader pack rendering, we need to:
-	 * 1. Port Iris's IrisUniformData system that translates vanilla matrices to Iris names
-	 * 2. Implement proper UBO binding for Iris-style uniforms
-	 * 3. Implement the complete Iris rendering pipeline with G-buffer management
+	 * The uniform translation layer is now implemented via:
+	 * - ExtendedShader with ProgramUniforms (gbufferModelView, gbufferProjection, etc.)
+	 * - CapturedRenderingState to capture matrices from vanilla rendering
+	 * - iris$setupState() to bind uniforms before rendering
 	 * 
-	 * For now, vanilla shaders are used while shader packs compile in the background.
-	 * 
-	 * TODO: Implement Iris-compatible uniform translation layer following:
-	 * - net.irisshaders.iris.uniforms (uniform providers)
-	 * - net.irisshaders.iris.pipeline (rendering integration)
-	 * - MixinShaderManager_Overrides.redirectIrisProgram()
+	 * Following IRIS MixinShaderManager_Overrides.redirectIrisProgram() pattern.
 	 */
 	protected GlRenderPipeline getOrCompilePipeline(RenderPipeline renderPipeline) {
-		// Vanilla pipeline compilation (shader interception disabled until uniform translation is implemented)
+		// Try shader pack interception first (IRIS pattern)
+		net.minecraft.client.renderer.shaders.pipeline.ShaderPackPipeline shaderPipeline = 
+			net.minecraft.client.renderer.shaders.IrisShaders.getActivePipeline();
+		
+		if (shaderPipeline != null && shaderPipeline.shouldOverrideShaders()) {
+			// Get ShaderKey from IrisPipelines mapping
+			net.minecraft.client.renderer.shaders.programs.ShaderKey shaderKey = 
+				net.minecraft.client.renderer.shaders.pipeline.IrisPipelines.getPipeline(shaderPipeline, renderPipeline);
+			
+			if (shaderKey != null) {
+				// Get the shader from ShaderMap
+				com.mojang.blaze3d.opengl.GlProgram program = shaderPipeline.getShaderMap().getShader(shaderKey);
+				
+				if (program != null) {
+					// Call iris$setupState() to bind Iris-compatible uniforms
+					if (program instanceof net.minecraft.client.renderer.shaders.programs.IrisProgram irisProgram) {
+						irisProgram.iris$setupState();
+					}
+					
+					// Return a new GlRenderPipeline wrapping the shader pack program
+					// Cache this to avoid creating new objects every frame
+					return (GlRenderPipeline)this.shaderPackPipelineCache
+						.computeIfAbsent(renderPipeline, rp -> new GlRenderPipeline(rp, program));
+				}
+			}
+		}
+		
+		// Fallback to vanilla pipeline compilation
 		return (GlRenderPipeline)this.pipelineCache
 			.computeIfAbsent(renderPipeline, renderPipeline2 -> this.compilePipeline(renderPipeline, this.defaultShaderSource));
 	}
