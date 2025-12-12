@@ -256,15 +256,10 @@ dependencies {
         // Tiny Mappings Parser - legacy mapping parser
         implementation files('libraries/deps/tiny-mappings-parser-0.3.0+build.17.jar')
         
-        // ===== FABRIC API DEPENDENCIES (for Sodium/Iris) =====
-        implementation files('libraries/deps/fabric-renderer-api-v1-0.135.0+1.21.10.jar')
-        implementation files('libraries/deps/fabric-block-view-api-v2-0.135.0+1.21.10.jar')
-        implementation files('libraries/deps/fabric-rendering-fluids-v1-0.135.0+1.21.10.jar')
-        implementation files('libraries/deps/fabric-resource-loader-v0-0.135.0+1.21.10.jar')
-        implementation files('libraries/deps/fabric-api-base-0.135.0+1.21.10.jar')
-        implementation files('libraries/deps/fabric-key-binding-api-v1-0.135.0+1.21.10.jar')
-        implementation files('libraries/deps/fabric-lifecycle-events-v1-0.135.0+1.21.10.jar')
-        implementation files('libraries/deps/fabric-rendering-v1-0.135.0+1.21.10.jar')
+        // ===== FABRIC API MODULES (for Sodium/Iris) =====
+        // These are the individual module JARs extracted from fabric-api-0.135.0+1.21.10.jar
+        // Use fileTree to include all Fabric API module JARs
+        implementation fileTree(dir: 'libraries/deps', include: 'fabric-*.jar')
     } else {
         // Remote Fabric Loader dependencies
         // ASM - bytecode manipulation (required by Fabric Loader)

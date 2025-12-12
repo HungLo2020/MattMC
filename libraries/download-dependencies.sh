@@ -172,35 +172,30 @@ echo ""
 # ============================================================================
 
 echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-echo -e "${BLUE}  Downloading Fabric API Modules (for Sodium/Iris)${NC}"
+echo -e "${BLUE}  Downloading Fabric API (for Sodium/Iris)${NC}"
 echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 
 # Fabric API version compatible with Minecraft 1.21.10
+# The Fabric API JAR contains nested JARs in META-INF/jars/ that need to be extracted
 FABRIC_API_VERSION="0.135.0+1.21.10"
 
-# fabric-renderer-api-v1 - Rendering API used by Sodium
-download_jar "${FABRIC_BASE}/net/fabricmc/fabric-api/fabric-renderer-api-v1/${FABRIC_API_VERSION}/fabric-renderer-api-v1-${FABRIC_API_VERSION}.jar" "fabric-renderer-api-v1-${FABRIC_API_VERSION}.jar"
+# Download the full Fabric API JAR
+download_jar "${FABRIC_BASE}/net/fabricmc/fabric-api/fabric-api/${FABRIC_API_VERSION}/fabric-api-${FABRIC_API_VERSION}.jar" "fabric-api-${FABRIC_API_VERSION}.jar"
 
-# fabric-block-view-api-v2 - Block view API used by Sodium
-download_jar "${FABRIC_BASE}/net/fabricmc/fabric-api/fabric-block-view-api-v2/${FABRIC_API_VERSION}/fabric-block-view-api-v2-${FABRIC_API_VERSION}.jar" "fabric-block-view-api-v2-${FABRIC_API_VERSION}.jar"
-
-# fabric-rendering-fluids-v1 - Fluid rendering used by Sodium
-download_jar "${FABRIC_BASE}/net/fabricmc/fabric-api/fabric-rendering-fluids-v1/${FABRIC_API_VERSION}/fabric-rendering-fluids-v1-${FABRIC_API_VERSION}.jar" "fabric-rendering-fluids-v1-${FABRIC_API_VERSION}.jar"
-
-# fabric-resource-loader-v0 - Resource loading used by Sodium
-download_jar "${FABRIC_BASE}/net/fabricmc/fabric-api/fabric-resource-loader-v0/${FABRIC_API_VERSION}/fabric-resource-loader-v0-${FABRIC_API_VERSION}.jar" "fabric-resource-loader-v0-${FABRIC_API_VERSION}.jar"
-
-# fabric-api-base - Base API module
-download_jar "${FABRIC_BASE}/net/fabricmc/fabric-api/fabric-api-base/${FABRIC_API_VERSION}/fabric-api-base-${FABRIC_API_VERSION}.jar" "fabric-api-base-${FABRIC_API_VERSION}.jar"
-
-# fabric-key-binding-api-v1 - Keybinding API used by Iris
-download_jar "${FABRIC_BASE}/net/fabricmc/fabric-api/fabric-key-binding-api-v1/${FABRIC_API_VERSION}/fabric-key-binding-api-v1-${FABRIC_API_VERSION}.jar" "fabric-key-binding-api-v1-${FABRIC_API_VERSION}.jar"
-
-# fabric-lifecycle-events-v1 - Lifecycle events
-download_jar "${FABRIC_BASE}/net/fabricmc/fabric-api/fabric-lifecycle-events-v1/${FABRIC_API_VERSION}/fabric-lifecycle-events-v1-${FABRIC_API_VERSION}.jar" "fabric-lifecycle-events-v1-${FABRIC_API_VERSION}.jar"
-
-# fabric-rendering-v1 - Rendering utils
-download_jar "${FABRIC_BASE}/net/fabricmc/fabric-api/fabric-rendering-v1/${FABRIC_API_VERSION}/fabric-rendering-v1-${FABRIC_API_VERSION}.jar" "fabric-rendering-v1-${FABRIC_API_VERSION}.jar"
+# Extract nested module JARs from Fabric API (they're in META-INF/jars/)
+echo -e "   ${YELLOW}📦${NC} Extracting Fabric API modules..."
+cd "${DEPS_DIR}"
+if [ -f "fabric-api-${FABRIC_API_VERSION}.jar" ]; then
+    # Extract nested JARs
+    unzip -o -q "fabric-api-${FABRIC_API_VERSION}.jar" "META-INF/jars/*.jar" 2>/dev/null || true
+    # Move them to deps root
+    if [ -d "META-INF/jars" ]; then
+        mv META-INF/jars/*.jar . 2>/dev/null || true
+        rm -rf META-INF
+        echo -e "   ${GREEN}✓${NC} Fabric API modules extracted"
+    fi
+fi
+cd - > /dev/null
 
 echo ""
 
