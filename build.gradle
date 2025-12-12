@@ -302,7 +302,7 @@ dependencies {
     // ANTLR - Parser generator for shader language
     implementation 'org.antlr:antlr4-runtime:4.13.1'
     // GLSL Transformer - GLSL shader transformation library
-    implementation 'io.github.douira:glsl-transformer:2.0.1'
+    implementation 'io.github.douira:glsl-transformer:3.0.0-pre3'
     
     // ===== TESTING DEPENDENCIES =====
     // Testing dependencies - only available in test scope, excluded from production builds
@@ -469,6 +469,7 @@ sourceSets.sodium.runtimeClasspath += sourceSets.main.output
 sourceSets.iris.compileClasspath += sourceSets.fabricLoader.output
 sourceSets.iris.compileClasspath += sourceSets.main.output
 sourceSets.iris.compileClasspath += sourceSets.sodium.output
+sourceSets.iris.compileClasspath += files("${irisDir}/DHApi.jar")
 sourceSets.iris.runtimeClasspath += sourceSets.fabricLoader.output
 sourceSets.iris.runtimeClasspath += sourceSets.main.output
 sourceSets.iris.runtimeClasspath += sourceSets.sodium.output

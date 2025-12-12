@@ -595,7 +595,7 @@ public class GlStateManager {
 	}
 
 	@Environment(EnvType.CLIENT)
-	static class TextureState {
+	public static class TextureState {
 		public int binding;
 	}
 }

@@ -98,4 +98,8 @@ public abstract class GpuTexture implements AutoCloseable {
 	public void iris$markMipmapNonLinear() {
 		// No-op by default
 	}
+	
+	public void iris$copyStateTo(GpuTexture other) {
+		// No-op by default - Iris mixin implementation
+	}
 }

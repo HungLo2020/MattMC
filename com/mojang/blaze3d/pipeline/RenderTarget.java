@@ -154,4 +154,9 @@ public abstract class RenderTarget {
 	public GpuTextureView getDepthTextureView() {
 		return this.depthTextureView;
 	}
+	
+	// Iris compatibility method
+	public void iris$bindFramebuffer() {
+		// Stub for Iris compatibility - actual binding handled by Iris mixin
+	}
 }

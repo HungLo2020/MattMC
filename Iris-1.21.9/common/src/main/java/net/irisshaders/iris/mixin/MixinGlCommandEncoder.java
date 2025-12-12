@@ -18,6 +18,7 @@ import net.irisshaders.iris.pipeline.programs.ExtendedShader;
 import net.irisshaders.iris.pipeline.programs.IrisProgram;
 import net.irisshaders.iris.shadows.ShadowRenderingState;
 import net.irisshaders.iris.vertices.ImmediateState;
+import net.irisshaders.iris.mixinterface.CustomPass;
 import org.jetbrains.annotations.Nullable;
 import org.lwjgl.opengl.GL46C;
 import org.spongepowered.asm.mixin.Mixin;
@@ -120,7 +121,7 @@ public class MixinGlCommandEncoder {
 
 			cir.setReturnValue(true);
 
-			glRenderPass.iris$getCustomPass().setupState();
+			((CustomPass)glRenderPass.iris$getCustomPass()).setupState();
 
 			RenderPipeline renderPipeline = glRenderPass.pipeline.info();
 
