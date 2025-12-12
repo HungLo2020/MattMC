@@ -474,7 +474,7 @@ public class ShaderPackPipeline implements WorldRenderingPipeline {
 	public void beginLevelRendering() {
 		isRenderingWorld = true;
 		
-		LOGGER.debug("Begin level rendering with shader pack: {}", packName);
+		LOGGER.info("Begin level rendering with shader pack: {} - isRenderingWorld set to true", packName);
 		
 		// Capture matrices for uniforms (Step A10)
 		captureRenderingState();
