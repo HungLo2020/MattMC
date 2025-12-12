@@ -42,16 +42,27 @@ public final class FluidRenderHandlerRegistry {
     private final Map<Fluid, FluidRenderHandler> handlers = new IdentityHashMap<>();
     private final Map<Fluid, FluidRenderHandler> modHandlers = new IdentityHashMap<>();
     private final Map<Block, Boolean> transparencyForOverlay = new IdentityHashMap<>();
-    
-    // Initialize with default handlers for water and lava
-    {
-        handlers.put(Fluids.WATER, WaterRenderHandler.INSTANCE);
-        handlers.put(Fluids.FLOWING_WATER, WaterRenderHandler.INSTANCE);
-        handlers.put(Fluids.LAVA, LavaRenderHandler.INSTANCE);
-        handlers.put(Fluids.FLOWING_LAVA, LavaRenderHandler.INSTANCE);
-    }
+    private volatile boolean initialized = false;
     
     private FluidRenderHandlerRegistry() { }
+    
+    /**
+     * Ensures default handlers are registered. Called lazily to avoid class loading issues.
+     */
+    private void ensureInitialized() {
+        if (!initialized) {
+            synchronized (this) {
+                if (!initialized) {
+                    // Register default handlers for vanilla fluids
+                    handlers.put(Fluids.WATER, WaterRenderHandler.INSTANCE);
+                    handlers.put(Fluids.FLOWING_WATER, WaterRenderHandler.INSTANCE);
+                    handlers.put(Fluids.LAVA, LavaRenderHandler.INSTANCE);
+                    handlers.put(Fluids.FLOWING_LAVA, LavaRenderHandler.INSTANCE);
+                    initialized = true;
+                }
+            }
+        }
+    }
     
     /**
      * Gets the singleton instance.
@@ -64,6 +75,7 @@ public final class FluidRenderHandlerRegistry {
      * Registers a render handler for a fluid.
      */
     public void register(Fluid fluid, FluidRenderHandler handler) {
+        ensureInitialized();
         handlers.put(fluid, handler);
         modHandlers.put(fluid, handler);
     }
@@ -73,6 +85,7 @@ public final class FluidRenderHandlerRegistry {
      */
     @Nullable
     public FluidRenderHandler get(Fluid fluid) {
+        ensureInitialized();
         return handlers.get(fluid);
     }
     
@@ -81,6 +94,7 @@ public final class FluidRenderHandlerRegistry {
      */
     @Nullable
     public FluidRenderHandler getOverride(Fluid fluid) {
+        ensureInitialized();
         return modHandlers.get(fluid);
     }
     
@@ -106,6 +120,7 @@ public final class FluidRenderHandlerRegistry {
      * Called when the fluid renderer reloads textures.
      */
     public void onFluidRendererReload(LiquidBlockRenderer renderer, TextureAtlasSprite[] waterSprites, TextureAtlasSprite[] lavaSprites, TextureAtlasSprite waterOverlay) {
+        ensureInitialized();
         WaterRenderHandler.INSTANCE.updateSprites(waterSprites, waterOverlay);
         LavaRenderHandler.INSTANCE.updateSprites(lavaSprites);
         
