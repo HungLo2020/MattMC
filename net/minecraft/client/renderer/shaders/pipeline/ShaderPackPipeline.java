@@ -403,6 +403,7 @@ public class ShaderPackPipeline implements WorldRenderingPipeline {
 			// For gbuffers programs, also create ExtendedShader for proper uniform binding
 			if (programName.startsWith("gbuffers_")) {
 				try {
+					LOGGER.debug("Creating ExtendedShader for: {}", programName);
 					net.minecraft.client.renderer.shaders.programs.ExtendedShader extendedShader = 
 						net.minecraft.client.renderer.shaders.programs.ShaderCreator.createBasic(
 							programName,
@@ -411,9 +412,9 @@ public class ShaderPackPipeline implements WorldRenderingPipeline {
 							this
 						);
 					extendedShaders.put(programName, extendedShader);
-					LOGGER.info("Created ExtendedShader for: {}", programName);
+					LOGGER.info("Created ExtendedShader for: {} (program ID: {})", programName, extendedShader.getProgramId());
 				} catch (Exception e) {
-					LOGGER.warn("Failed to create ExtendedShader for {} during shader pack compilation", programName, e);
+					LOGGER.error("Failed to create ExtendedShader for {} during shader pack compilation: {}", programName, e.getMessage(), e);
 				}
 			}
 			
