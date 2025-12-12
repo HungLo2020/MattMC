@@ -166,6 +166,9 @@ download_jar "${FABRIC_BASE}/org/ow2/asm/asm-util/9.9/asm-util-9.9.jar" "asm-uti
 
 echo ""
 
+# Note: Fabric API is not downloaded as JARs because they use intermediary mappings.
+# Instead, we use Mojang-mapped stub interfaces in src/main/java/net/fabricmc/fabric/api/
+
 # Summary
 echo -e "${GREEN}╔════════════════════════════════════════════════════════════════╗${NC}"
 echo -e "${GREEN}║  ✓ Download Complete!                                         ║${NC}"

@@ -85,7 +85,7 @@ public class PoseStack {
 	public static final class Pose {
 		private final Matrix4f pose = new Matrix4f();
 		private final Matrix3f normal = new Matrix3f();
-		private boolean trustedNormals = true;
+		public boolean trustedNormals = true;
 
 		private void computeNormalMatrix() {
 			this.normal.set(this.pose).invert().transpose();

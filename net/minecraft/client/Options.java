@@ -1759,7 +1759,7 @@ public class Options {
 	}
 
 	@Environment(EnvType.CLIENT)
-	interface FieldAccess extends Options.OptionAccess {
+	public interface FieldAccess extends Options.OptionAccess {
 		int process(String string, int i);
 
 		boolean process(String string, boolean bl);

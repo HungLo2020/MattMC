@@ -353,4 +353,13 @@ public abstract class BlockEntity implements DebugValueSource {
 			return this.blockEntity.getNameForReporting() + "@" + this.blockEntity.getBlockPos();
 		}
 	}
+
+	/**
+	 * Gets render data associated with this block entity (Fabric API extension).
+	 * @return null by default, implementations can override
+	 */
+	@Nullable
+	public Object getRenderData() {
+		return null;
+	}
 }
