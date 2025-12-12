@@ -18,7 +18,7 @@ def lwjglNatives = System.getProperty('os.name').toLowerCase().contains('mac')
 
 // Fabric Loader version (update this when upgrading Fabric Loader source)
 def fabricLoaderVersion = '0.18.2'
-def fabricLoaderDir = "frnsrc/fabric-loader-${fabricLoaderVersion}"
+def fabricLoaderDir = "fabric-loader-${fabricLoaderVersion}"
 
 java {
     // Keep toolchain configuration for compilation
@@ -299,16 +299,21 @@ dependencies {
 sourceSets {
     main {
         java {
-            srcDirs = [
-                '.',
-                // Fabric Loader source code (version controlled by fabricLoaderDir variable)
-                "${fabricLoaderDir}/src/main/java",
-                "${fabricLoaderDir}/src/main/legacyJava",
-                // Java 17+ version of MRJ classes (takes precedence over Java 8 versions)
-                "${fabricLoaderDir}/src/java17/java",
-                "${fabricLoaderDir}/minecraft/src/main/java",
-                "${fabricLoaderDir}/minecraft/src/main/legacyJava"
-            ]
+            // Main project source
+            srcDir '.'
+            
+            // Fabric Loader source code (version controlled by fabricLoaderDir variable)
+            // Note: We exclude mrj package from main java dir and include java17 version instead
+            srcDir "${fabricLoaderDir}/src/main/java"
+            srcDir "${fabricLoaderDir}/src/main/legacyJava"
+            srcDir "${fabricLoaderDir}/minecraft/src/main/java"
+            srcDir "${fabricLoaderDir}/minecraft/src/main/legacyJava"
+            
+            // Java 17+ version of MRJ classes - these take precedence
+            // We need to include these but exclude the Java 8 versions from src/main/java
+            srcDir "${fabricLoaderDir}/src/java17/java"
+            
+            // Global excludes
             exclude 'gradle/**'
             exclude 'build/**'
             exclude '.git/**'
@@ -317,23 +322,16 @@ sourceSets {
             exclude 'com/mojang/authlib/**'
             // Exclude test sources from main source set
             exclude 'src/test/**'
-            // Exclude other frnsrc directories (Iris, Sodium, etc. - reference only)
-            exclude 'frnsrc/Iris-*/**'
-            exclude 'frnsrc/sodium-*/**'
-            exclude 'frnsrc/Complementary*/**'
-            exclude 'frnsrc/*.zip'
-            exclude 'frnsrc/*.md'
-            exclude 'frnsrc/nothingburger'
-            // Exclude Fabric Loader test files and build files (using fabricLoaderDir pattern)
-            exclude 'frnsrc/fabric-loader-*/src/test/**'
-            exclude 'frnsrc/fabric-loader-*/.git/**'
-            exclude 'frnsrc/fabric-loader-*/.github/**'
-            exclude 'frnsrc/fabric-loader-*/build/**'
-            exclude 'frnsrc/fabric-loader-*/junit/**'
-            exclude 'frnsrc/fabric-loader-*/minecraft/minecraft-test/**'
-            exclude 'frnsrc/fabric-loader-*/minecraft/src/test/**'
-            // Exclude Java 8 MRJ classes (using Java 17 versions instead)
-            exclude 'frnsrc/fabric-loader-*/src/main/java/net/fabricmc/loader/impl/mrj/**'
+            // Exclude frnsrc directory entirely (reference-only code: Iris, Sodium, etc.)
+            exclude 'frnsrc/**'
+            // Exclude Fabric Loader test files and build files
+            exclude 'fabric-loader-*/src/test/**'
+            exclude 'fabric-loader-*/.git/**'
+            exclude 'fabric-loader-*/.github/**'
+            exclude 'fabric-loader-*/build/**'
+            exclude 'fabric-loader-*/junit/**'
+            exclude 'fabric-loader-*/minecraft/minecraft-test/**'
+            exclude 'fabric-loader-*/minecraft/src/test/**'
         }
         resources {
             srcDirs = [

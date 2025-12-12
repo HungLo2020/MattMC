@@ -98,7 +98,7 @@ MattMC includes the Fabric Loader source code integrated directly into the proje
 - Direct integration with Minecraft classes
 - No external fabric-loader.jar dependency at runtime
 
-The Fabric Loader source is located at `frnsrc/fabric-loader-0.18.2/` and is compiled as part of the main project.
+The Fabric Loader source is located at `fabric-loader-0.18.2/` and is compiled as part of the main project.
 
 ## Updating Dependencies
 
@@ -169,4 +169,4 @@ This solution provides the best balance of simplicity and effectiveness for Matt
 - The download script is versioned and can be committed
 - All dependencies from Maven Central are still fetched normally (they're accessible in most environments)
 - Only blocked repositories' artifacts are bundled
-- The Fabric Loader source at `frnsrc/fabric-loader-0.18.2/` is editable and compiled with the project
+- The Fabric Loader source at `fabric-loader-0.18.2/` is editable and compiled with the project
