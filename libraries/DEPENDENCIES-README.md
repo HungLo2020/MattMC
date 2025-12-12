@@ -27,7 +27,7 @@ cd libraries
 ./download-dependencies.sh
 ```
 
-This downloads 9 direct dependencies + their transitive dependencies (~20 JARs total):
+This downloads all required dependencies (~30+ JARs total):
 
 **Mojang Libraries:**
 - brigadier-1.3.10.jar
@@ -38,11 +38,23 @@ This downloads 9 direct dependencies + their transitive dependencies (~20 JARs t
 - blocklist-1.0.10.jar
 - patchy-2.2.10.jar
 - text2speech-1.17.9.jar
+- launchwrapper-1.12.jar
 
-**Fabric Dependencies:**
-- fabric-loader-0.16.9.jar
-- tiny-mappings-parser, sponge-mixin, tiny-remapper, access-widener, mapping-io
-- ASM libraries (9.7.1)
+**Fabric Loader Dependencies (for integrated Fabric source):**
+- sponge-mixin-0.16.5+mixin.0.8.7.jar (org.spongepowered.asm.* - bytecode transformation)
+- tiny-remapper-0.11.2.jar (net.fabricmc.tinyremapper.* - class remapping)
+- class-tweaker-0.2.jar (net.fabricmc.classtweaker.* - access modification)
+- mapping-io-0.7.1.jar (net.fabricmc.mappingio.* - mapping I/O)
+- mixinextras-fabric-0.5.0.jar (com.llamalad7.mixinextras.* - mixin extensions)
+- access-widener-2.1.0.jar (access widening)
+- tiny-mappings-parser-0.3.0+build.17.jar (legacy mapping parser)
+
+**ASM Libraries (bytecode manipulation, required by Mixin):**
+- asm-9.9.jar
+- asm-analysis-9.9.jar
+- asm-commons-9.9.jar
+- asm-tree-9.9.jar
+- asm-util-9.9.jar
 
 ### Step 2: Transfer to Restricted Environment (if needed)
 
@@ -79,6 +91,15 @@ This provides seamless fallback:
 - **Development machines** can use remote repos normally
 - **Restricted environments** use bundled dependencies after running the script
 
+## Integrated Fabric Loader
+
+MattMC includes the Fabric Loader source code integrated directly into the project for:
+- Editable mod loading functionality
+- Direct integration with Minecraft classes
+- No external fabric-loader.jar dependency at runtime
+
+The Fabric Loader source is located at `fabric-loader-0.18.2/` and is compiled as part of the main project.
+
 ## Updating Dependencies
 
 If dependency versions change in `build.gradle`:
@@ -97,13 +118,16 @@ libraries/
     ├── brigadier-1.3.10.jar
     ├── datafixerupper-8.0.16.jar
     ├── authlib-6.0.55.jar
-    ├── fabric-loader-0.16.9.jar
+    ├── sponge-mixin-0.16.5+mixin.0.8.7.jar
+    ├── tiny-remapper-0.11.2.jar
+    ├── class-tweaker-0.2.jar
+    ├── mapping-io-0.7.1.jar
     └── ... (more JARs)
 ```
 
 ## Troubleshooting
 
-### "Cannot reach libraries.minecraft.net"
+### "Cannot reach libraries.minecraft.net" or "Cannot reach maven.fabricmc.net"
 
 The script requires unrestricted internet access. Run it on a different machine and transfer the `deps/` directory.
 
@@ -118,6 +142,15 @@ ls -la libraries/deps/*.jar
 ### Missing transitive dependencies
 
 If you get compilation errors about missing classes, a transitive dependency may be missing. Check the error message for the missing JAR and add it to `download-dependencies.sh`.
+
+### Fabric Loader compilation errors
+
+If Fabric Loader source fails to compile, ensure all Fabric dependencies are downloaded:
+- sponge-mixin (provides org.spongepowered.asm.*)
+- tiny-remapper (provides net.fabricmc.tinyremapper.*)
+- class-tweaker (provides net.fabricmc.classtweaker.*)
+- mapping-io (provides net.fabricmc.mappingio.*)
+- launchwrapper (provides net.minecraft.launchwrapper.*)
 
 ## Comparison with Other Solutions
 
@@ -136,3 +169,4 @@ This solution provides the best balance of simplicity and effectiveness for Matt
 - The download script is versioned and can be committed
 - All dependencies from Maven Central are still fetched normally (they're accessible in most environments)
 - Only blocked repositories' artifacts are bundled
+- The Fabric Loader source at `fabric-loader-0.18.2/` is editable and compiled with the project

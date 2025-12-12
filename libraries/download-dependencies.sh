@@ -104,38 +104,65 @@ download_jar "${MOJANG_BASE}/com/mojang/text2speech/1.17.9/text2speech-1.17.9.ja
 
 echo ""
 
-# Download Fabric loader from maven.fabricmc.net
+# ============================================================================
+# FABRIC LOADER DEPENDENCIES
+# These are required to compile and run the integrated Fabric Loader source
+# ============================================================================
+
 echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-echo -e "${BLUE}  Downloading Fabric Dependencies (1 dependency)${NC}"
+echo -e "${BLUE}  Downloading Fabric Loader Core Dependencies${NC}"
 echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 
 FABRIC_BASE="https://maven.fabricmc.net"
 
-download_jar "${FABRIC_BASE}/net/fabricmc/fabric-loader/0.16.9/fabric-loader-0.16.9.jar" "fabric-loader-0.16.9.jar"
+# Sponge Mixin - bytecode transformation framework (required by Fabric Loader)
+# Provides: org.spongepowered.asm.* packages
+download_jar "${FABRIC_BASE}/net/fabricmc/sponge-mixin/0.16.5+mixin.0.8.7/sponge-mixin-0.16.5+mixin.0.8.7.jar" "sponge-mixin-0.16.5+mixin.0.8.7.jar"
+
+# Tiny Remapper - class/method/field remapping (required by Fabric Loader)
+# Provides: net.fabricmc.tinyremapper.* packages
+download_jar "${FABRIC_BASE}/net/fabricmc/tiny-remapper/0.11.2/tiny-remapper-0.11.2.jar" "tiny-remapper-0.11.2.jar"
+
+# Class Tweaker - class access modification (required by Fabric Loader)
+# Provides: net.fabricmc.classtweaker.* packages
+download_jar "${FABRIC_BASE}/net/fabricmc/class-tweaker/0.2/class-tweaker-0.2.jar" "class-tweaker-0.2.jar"
+
+# Mapping IO - mapping file I/O (required by Fabric Loader)
+# Provides: net.fabricmc.mappingio.* packages
+download_jar "${FABRIC_BASE}/net/fabricmc/mapping-io/0.7.1/mapping-io-0.7.1.jar" "mapping-io-0.7.1.jar"
+
+# MixinExtras - additional Mixin functionality (optional but commonly used)
+# Provides: com.llamalad7.mixinextras.* packages
+download_jar "${FABRIC_BASE}/io/github/llamalad7/mixinextras-fabric/0.5.0/mixinextras-fabric-0.5.0.jar" "mixinextras-fabric-0.5.0.jar"
+
+# Launchwrapper - legacy launch wrapper (required for some Fabric Loader components)
+# Provides: net.minecraft.launchwrapper.* packages
+download_jar "${MOJANG_BASE}/net/minecraft/launchwrapper/1.12/launchwrapper-1.12.jar" "launchwrapper-1.12.jar"
+
+# Access Widener - access modification (required by Fabric Loader)
+download_jar "${FABRIC_BASE}/net/fabricmc/access-widener/2.1.0/access-widener-2.1.0.jar" "access-widener-2.1.0.jar"
+
+# Tiny Mappings Parser - legacy mapping parser
+download_jar "${FABRIC_BASE}/net/fabricmc/tiny-mappings-parser/0.3.0+build.17/tiny-mappings-parser-0.3.0+build.17.jar" "tiny-mappings-parser-0.3.0+build.17.jar"
 
 echo ""
 
-# Download transitive dependencies (additional JARs needed by the main dependencies)
+# ============================================================================
+# ASM DEPENDENCIES
+# Bytecode manipulation library used by Fabric Loader and Mixin
+# ============================================================================
+
 echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-echo -e "${BLUE}  Downloading Transitive Dependencies${NC}"
+echo -e "${BLUE}  Downloading ASM Dependencies (from Fabric Maven)${NC}"
 echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 
-# Authlib transitive dependencies
-download_jar "${MOJANG_BASE}/com/mojang/authlib/6.0.55/authlib-6.0.55.jar" "authlib-6.0.55.jar"
-
-# Fabric loader transitive dependencies
-download_jar "${FABRIC_BASE}/net/fabricmc/tiny-mappings-parser/0.3.0+build.17/tiny-mappings-parser-0.3.0+build.17.jar" "tiny-mappings-parser-0.3.0+build.17.jar"
-download_jar "${FABRIC_BASE}/net/fabricmc/sponge-mixin/0.15.3+mixin.0.8.7/sponge-mixin-0.15.3+mixin.0.8.7.jar" "sponge-mixin-0.15.3+mixin.0.8.7.jar"
-download_jar "${FABRIC_BASE}/net/fabricmc/tiny-remapper/0.10.3/tiny-remapper-0.10.3.jar" "tiny-remapper-0.10.3.jar"
-download_jar "${FABRIC_BASE}/net/fabricmc/access-widener/2.1.0/access-widener-2.1.0.jar" "access-widener-2.1.0.jar"
-download_jar "${FABRIC_BASE}/net/fabricmc/mapping-io/0.6.1/mapping-io-0.6.1.jar" "mapping-io-0.6.1.jar"
-
-# ASM dependencies (used by Fabric)
-download_jar "https://repo1.maven.org/maven2/org/ow2/asm/asm/9.7.1/asm-9.7.1.jar" "asm-9.7.1.jar"
-download_jar "https://repo1.maven.org/maven2/org/ow2/asm/asm-analysis/9.7.1/asm-analysis-9.7.1.jar" "asm-analysis-9.7.1.jar"
-download_jar "https://repo1.maven.org/maven2/org/ow2/asm/asm-commons/9.7.1/asm-commons-9.7.1.jar" "asm-commons-9.7.1.jar"
-download_jar "https://repo1.maven.org/maven2/org/ow2/asm/asm-tree/9.7.1/asm-tree-9.7.1.jar" "asm-tree-9.7.1.jar"
-download_jar "https://repo1.maven.org/maven2/org/ow2/asm/asm-util/9.7.1/asm-util-9.7.1.jar" "asm-util-9.7.1.jar"
+# ASM 9.9 (version required by Fabric Loader 0.18.2)
+# Note: Fabric hosts ASM on their Maven to ensure version consistency
+download_jar "${FABRIC_BASE}/org/ow2/asm/asm/9.9/asm-9.9.jar" "asm-9.9.jar"
+download_jar "${FABRIC_BASE}/org/ow2/asm/asm-analysis/9.9/asm-analysis-9.9.jar" "asm-analysis-9.9.jar"
+download_jar "${FABRIC_BASE}/org/ow2/asm/asm-commons/9.9/asm-commons-9.9.jar" "asm-commons-9.9.jar"
+download_jar "${FABRIC_BASE}/org/ow2/asm/asm-tree/9.9/asm-tree-9.9.jar" "asm-tree-9.9.jar"
+download_jar "${FABRIC_BASE}/org/ow2/asm/asm-util/9.9/asm-util-9.9.jar" "asm-util-9.9.jar"
 
 echo ""
 
