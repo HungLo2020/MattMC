@@ -119,7 +119,7 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 	private final Minecraft minecraft;
 	private final EntityRenderDispatcher entityRenderDispatcher;
 	private final BlockEntityRenderDispatcher blockEntityRenderDispatcher;
-	private final RenderBuffers renderBuffers;
+	private RenderBuffers renderBuffers; // Non-final to allow Iris shadow rendering to swap buffers
 	private final SkyRenderer skyRenderer = new SkyRenderer();
 	private final CloudRenderer cloudRenderer = new CloudRenderer();
 	private final WorldBorderRenderer worldBorderRenderer = new WorldBorderRenderer();
