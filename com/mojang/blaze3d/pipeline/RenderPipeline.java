@@ -6,6 +6,7 @@ import com.mojang.blaze3d.platform.LogicOp;
 import com.mojang.blaze3d.platform.PolygonMode;
 import com.mojang.blaze3d.shaders.UniformType;
 import com.mojang.blaze3d.textures.TextureFormat;
+import com.mojang.blaze3d.vertex.DefaultVertexFormat;
 import com.mojang.blaze3d.vertex.VertexFormat;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -17,6 +18,9 @@ import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
 import net.minecraft.SharedConstants;
 import net.minecraft.client.renderer.ShaderDefines;
+import net.minecraft.client.renderer.shaders.IrisShaders;
+import net.minecraft.client.renderer.shaders.vertices.ImmediateState;
+import net.minecraft.client.renderer.shaders.vertices.IrisVertexFormats;
 import net.minecraft.resources.ResourceLocation;
 import org.jetbrains.annotations.Nullable;
 
@@ -142,7 +146,27 @@ public class RenderPipeline {
 		return this.location;
 	}
 
+	/**
+	 * Gets the vertex format for this pipeline.
+	 * 
+	 * IRIS Pattern: MixinRenderPipeline.iris$change()
+	 * When shader pack is active and rendering the level with extended vertex formats,
+	 * return the IRIS-extended format instead of vanilla format.
+	 * 
+	 * This ensures that when chunks ARE RENDERED, the RenderPipeline tells the renderer
+	 * to expect the same extended format that chunks were COMPILED with.
+	 */
 	public VertexFormat getVertexFormat() {
+		// IRIS pattern: If shader pack active and rendering level with extended format
+		if (IrisShaders.isEnabled() && ImmediateState.renderWithExtendedVertexFormat && ImmediateState.isRenderingLevel) {
+			if (this.vertexFormat == DefaultVertexFormat.BLOCK) {
+				return IrisVertexFormats.TERRAIN;
+			} else if (this.vertexFormat == DefaultVertexFormat.POSITION_COLOR_TEX_LIGHTMAP) {
+				return IrisVertexFormats.GLYPH;
+			} else if (this.vertexFormat == DefaultVertexFormat.NEW_ENTITY) {
+				return IrisVertexFormats.ENTITY;
+			}
+		}
 		return this.vertexFormat;
 	}
 

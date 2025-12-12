@@ -77,26 +77,32 @@ public class BufferBuilder implements VertexConsumer, BlockSensitiveBufferBuilde
 	/**
 	 * Extends the vertex format for IRIS shader pack compatibility.
 	 * VERBATIM from IRIS: MixinBufferBuilder.iris$extendFormat()
+	 * 
+	 * KEY DIFFERENCE FROM IRIS: We also check isCompilingChunks for worker threads
+	 * because we're not using Sodium (which has its own terrain vertex format system).
 	 */
 	private VertexFormat extendFormat(VertexFormat format) {
 		extending = false;
 		injectNormalAndUV1 = false;
 
-		// Skip extension if explicitly disabled or shaders not active
-		if (ImmediateState.skipExtension.get() || !IrisShaders.isEnabled()) {
+		// Skip extension if explicitly disabled
+		if (ImmediateState.skipExtension.get()) {
+			return format;
+		}
+		
+		// Check if a shader pack is active (IRIS pattern: Iris.isPackInUseQuick())
+		// This is a simple check if shaders are enabled - NOT shouldOverrideShaders()
+		if (!IrisShaders.isEnabled()) {
 			return format;
 		}
 		
 		// Check if we should extend format:
-		// 1. Rendering level on render thread (ImmediateState.isRenderingLevel)
-		// 2. Compiling chunks on worker thread (ImmediateState.isCompilingChunks)
+		// 1. Rendering level on render thread (ImmediateState.isRenderingLevel) - IRIS pattern
+		// 2. Compiling chunks on worker thread (ImmediateState.isCompilingChunks) - our addition
+		// 
+		// IRIS only checks isRenderingLevel because it uses Sodium for terrain.
+		// We check both because we're extending vanilla chunk compilation.
 		if (!ImmediateState.shouldExtendFormat()) {
-			return format;
-		}
-		
-		// Also check if shader interception is actually active
-		net.minecraft.client.renderer.shaders.pipeline.ShaderPackPipeline activePipeline = IrisShaders.getActivePipeline();
-		if (activePipeline == null || !activePipeline.shouldOverrideShaders()) {
 			return format;
 		}
 

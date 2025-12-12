@@ -22,8 +22,20 @@ public class ImmediateState {
 	 * Thread-local flag indicating chunk compilation is in progress.
 	 * Used to enable vertex format extension on worker threads during chunk compilation.
 	 * This allows terrain chunks to use extended vertex formats when shaders are active.
+	 * 
+	 * NOTE: IRIS doesn't have this - it uses Sodium for terrain. We need this for vanilla
+	 * chunk compilation.
 	 */
 	public static final ThreadLocal<Boolean> isCompilingChunks = ThreadLocal.withInitial(() -> false);
+	
+	/**
+	 * Whether to render with extended vertex format.
+	 * VERBATIM from IRIS: Controls whether RenderPipeline.getVertexFormat() returns extended formats.
+	 * 
+	 * Default is TRUE (always use extended format when conditions are met).
+	 * Only set to false temporarily during non-level batch rendering.
+	 */
+	public static boolean renderWithExtendedVertexFormat = true;
 	
 	/**
 	 * Sets rendering level state.
