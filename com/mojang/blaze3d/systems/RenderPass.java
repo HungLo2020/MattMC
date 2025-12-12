@@ -69,4 +69,13 @@ public interface RenderPass extends AutoCloseable {
 	public interface UniformUploader {
 		void upload(String string, GpuBufferSlice gpuBufferSlice);
 	}
+	
+	// Iris compatibility methods
+	default void iris$setCustomPass(Object pass) {
+		// No-op by default - Iris mixin implementation
+	}
+	
+	default Object iris$getCustomPass() {
+		return null;
+	}
 }

@@ -1,6 +1,6 @@
 package net.minecraft.client.multiplayer;
 
-import com.mojang.authlib.GameProfile;
+import net.minecraft.server.profile.PlayerProfile;
 import java.util.function.Supplier;
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
@@ -16,9 +16,9 @@ import org.jetbrains.annotations.Nullable;
 
 @Environment(EnvType.CLIENT)
 public class PlayerInfo {
-	private final GameProfile profile;
+	private final PlayerProfile profile;
 	@Nullable
-	private Supplier<PlayerSkin> skinLookup;
+	Supplier<PlayerSkin> skinLookup; // Package-private for ClientPacketListener access
 	private GameType gameMode = GameType.DEFAULT_MODE;
 	private int latency;
 	@Nullable
@@ -29,18 +29,18 @@ public class PlayerInfo {
 	private SignedMessageValidator messageValidator;
 	private int tabListOrder;
 
-	public PlayerInfo(GameProfile gameProfile, boolean bl) {
-		this.profile = gameProfile;
+	public PlayerInfo(PlayerProfile playerProfile, boolean bl) {
+		this.profile = playerProfile;
 		this.messageValidator = fallbackMessageValidator(bl);
 	}
 
-	private static Supplier<PlayerSkin> createSkinLookup(GameProfile gameProfile) {
+	private static Supplier<PlayerSkin> createSkinLookup(PlayerProfile playerProfile) {
 		Minecraft minecraft = Minecraft.getInstance();
-		boolean bl = !minecraft.isLocalPlayer(gameProfile.getId());
-		return minecraft.getSkinManager().createLookup(gameProfile, bl);
+		boolean bl = !minecraft.isLocalPlayer(playerProfile.id());
+		return minecraft.getSkinManager().createLookup(playerProfile, bl);
 	}
 
-	public GameProfile getProfile() {
+	public PlayerProfile getProfile() {
 		return this.profile;
 	}
 
@@ -88,6 +88,40 @@ public class PlayerInfo {
 	}
 
 	public PlayerSkin getSkin() {
+		Minecraft minecraft = Minecraft.getInstance();
+		
+		// If this is the local player, apply their selected skin from options
+		if (minecraft.isLocalPlayer(this.profile.id())) {
+			try {
+				String selectedSkin = minecraft.options.selectedSkin;
+				net.minecraft.client.resources.SkinLoader skinLoader = minecraft.getSkinLoader();
+				net.minecraft.client.resources.SkinLoader.SkinEntry skinEntry = skinLoader.getSkinByName(selectedSkin);
+				
+				if (skinEntry == null) {
+					skinEntry = skinLoader.getDefaultSkin();
+				}
+				
+				if (skinEntry != null) {
+					return skinEntry.toPlayerSkin();
+				}
+			} catch (Exception e) {
+				// Fall through to default behavior on error
+			}
+		}
+		
+		// Check if there's a custom skin in the client cache (for other players in multiplayer)
+		ClientPacketListener connection = minecraft.getConnection();
+		if (connection != null) {
+			ClientSkinCache skinCache = connection.getClientSkinCache();
+			if (skinCache != null && skinCache.hasSkin(this.profile.id())) {
+				PlayerSkin cachedSkin = skinCache.getSkin(this.profile.id());
+				if (cachedSkin != null) {
+					return cachedSkin;
+				}
+			}
+		}
+		
+		// Fall back to default skin lookup
 		if (this.skinLookup == null) {
 			this.skinLookup = createSkinLookup(this.profile);
 		}
@@ -97,7 +131,7 @@ public class PlayerInfo {
 
 	@Nullable
 	public PlayerTeam getTeam() {
-		return Minecraft.getInstance().level.getScoreboard().getPlayersTeam(this.getProfile().getName());
+		return Minecraft.getInstance().level.getScoreboard().getPlayersTeam(this.getProfile().name());
 	}
 
 	public void setTabListDisplayName(@Nullable Component component) {

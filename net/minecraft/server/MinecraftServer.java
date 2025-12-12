@@ -6,7 +6,7 @@ import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.google.common.collect.Sets;
-import com.mojang.authlib.GameProfile;
+import net.minecraft.server.profile.PlayerProfile;
 import com.mojang.datafixers.DataFixer;
 import com.mojang.jtracy.DiscontinuousFrame;
 import com.mojang.jtracy.TracyClient;
@@ -87,7 +87,6 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.bossevents.CustomBossEvents;
 import net.minecraft.server.level.ChunkLoadCounter;
 import net.minecraft.server.level.ChunkMap;
-import net.minecraft.server.level.DemoMode;
 import net.minecraft.server.level.PlayerSpawnFinder;
 import net.minecraft.server.level.ServerChunkCache;
 import net.minecraft.server.level.ServerLevel;
@@ -243,8 +242,7 @@ public abstract class MinecraftServer extends ReentrantBlockableEventLoop<TickTa
 	@Nullable
 	private KeyPair keyPair;
 	@Nullable
-	private GameProfile singleplayerProfile;
-	private boolean isDemo;
+	private PlayerProfile singleplayerProfile;
 	private volatile boolean isReady;
 	private long lastOverloadWarningNanos;
 	protected final Services services;
@@ -274,6 +272,7 @@ public abstract class MinecraftServer extends ReentrantBlockableEventLoop<TickTa
 	private final StructureTemplateManager structureTemplateManager;
 	private final ServerTickRateManager tickRateManager;
 	private final ServerDebugSubscribers debugSubscribers = new ServerDebugSubscribers(this);
+	private final net.minecraft.server.players.PlayerSkinCache playerSkinCache = new net.minecraft.server.players.PlayerSkinCache();
 	protected final WorldData worldData;
 	private LevelData.RespawnData effectiveRespawnData = LevelData.RespawnData.DEFAULT;
 	private final PotionBrewing potionBrewing;
@@ -1290,12 +1289,12 @@ public abstract class MinecraftServer extends ReentrantBlockableEventLoop<TickTa
 	}
 
 	@Nullable
-	public GameProfile getSingleplayerProfile() {
+	public PlayerProfile getSingleplayerProfile() {
 		return this.singleplayerProfile;
 	}
 
-	public void setSingleplayerProfile(@Nullable GameProfile gameProfile) {
-		this.singleplayerProfile = gameProfile;
+	public void setSingleplayerProfile(@Nullable PlayerProfile playerProfile) {
+		this.singleplayerProfile = playerProfile;
 	}
 
 	public boolean isSingleplayer() {
@@ -1344,14 +1343,6 @@ public abstract class MinecraftServer extends ReentrantBlockableEventLoop<TickTa
 		return this.worldData.getDifficulty() != Difficulty.PEACEFUL
 			&& this.getGameRules().getBoolean(GameRules.RULE_DOMOBSPAWNING)
 			&& this.getGameRules().getBoolean(GameRules.RULE_SPAWN_MONSTERS);
-	}
-
-	public boolean isDemo() {
-		return this.isDemo;
-	}
-
-	public void setDemo(boolean bl) {
-		this.isDemo = bl;
 	}
 
 	public Map<String, String> getCodeOfConducts() {
@@ -1419,6 +1410,10 @@ public abstract class MinecraftServer extends ReentrantBlockableEventLoop<TickTa
 
 	public PlayerList getPlayerList() {
 		return this.playerList;
+	}
+
+	public net.minecraft.server.players.PlayerSkinCache getPlayerSkinCache() {
+		return this.playerSkinCache;
 	}
 
 	public void setPlayerList(PlayerList playerList) {
@@ -2122,7 +2117,7 @@ public abstract class MinecraftServer extends ReentrantBlockableEventLoop<TickTa
 	}
 
 	public ServerPlayerGameMode createGameModeForPlayer(ServerPlayer serverPlayer) {
-		return (ServerPlayerGameMode)(this.isDemo() ? new DemoMode(serverPlayer) : new ServerPlayerGameMode(serverPlayer));
+		return new ServerPlayerGameMode(serverPlayer);
 	}
 
 	@Nullable

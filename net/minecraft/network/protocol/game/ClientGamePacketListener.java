@@ -94,6 +94,10 @@ public interface ClientGamePacketListener extends ClientCommonPacketListener, Cl
 
 	void handlePlayerInfoUpdate(ClientboundPlayerInfoUpdatePacket clientboundPlayerInfoUpdatePacket);
 
+	void handlePlayerSkin(ClientboundPlayerSkinPacket clientboundPlayerSkinPacket);
+
+	void handleRemovePlayerSkin(ClientboundRemovePlayerSkinPacket clientboundRemovePlayerSkinPacket);
+
 	void handleRemoveEntities(ClientboundRemoveEntitiesPacket clientboundRemoveEntitiesPacket);
 
 	void handleRemoveMobEffect(ClientboundRemoveMobEffectPacket clientboundRemoveMobEffectPacket);

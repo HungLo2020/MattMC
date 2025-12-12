@@ -20,7 +20,7 @@ public class DeOpCommands {
 			Commands.literal("deop")
 				.requires(Commands.hasPermission(3))
 				.then(
-					Commands.argument("targets", GameProfileArgument.gameProfile())
+					Commands.argument("targets", GameProfileArgument.playerProfile())
 						.suggests(
 							(commandContext, suggestionsBuilder) -> SharedSuggestionProvider.suggest(
 								commandContext.getSource().getServer().getPlayerList().getOpNames(), suggestionsBuilder

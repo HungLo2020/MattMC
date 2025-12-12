@@ -25,14 +25,14 @@ public class GlRenderPass implements RenderPass {
 	private final boolean hasDepthTexture;
 	private boolean closed;
 	@Nullable
-	protected GlRenderPipeline pipeline;
+	public GlRenderPipeline pipeline;
 	protected final GpuBuffer[] vertexBuffers = new GpuBuffer[1];
 	@Nullable
 	protected GpuBuffer indexBuffer;
 	protected VertexFormat.IndexType indexType = VertexFormat.IndexType.INT;
 	private final ScissorState scissorState = new ScissorState();
 	protected final HashMap<String, GpuBufferSlice> uniforms = new HashMap();
-	protected final HashMap<String, GpuTextureView> samplers = new HashMap();
+	public final HashMap<String, GpuTextureView> samplers = new HashMap();
 	protected final Set<String> dirtyUniforms = new HashSet();
 	protected int pushedDebugGroups;
 
@@ -193,5 +193,16 @@ public class GlRenderPass implements RenderPass {
 			this.closed = true;
 			this.encoder.finishRenderPass();
 		}
+	}
+	
+	// Iris compatibility
+	private Object irisCustomPass;
+	
+	public void iris$setCustomPass(Object pass) {
+		this.irisCustomPass = pass;
+	}
+	
+	public Object iris$getCustomPass() {
+		return this.irisCustomPass;
 	}
 }

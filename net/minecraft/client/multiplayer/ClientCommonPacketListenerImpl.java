@@ -38,7 +38,6 @@ import net.minecraft.client.gui.screens.dialog.WaitingForResponseScreen;
 import net.minecraft.client.gui.screens.multiplayer.JoinMultiplayerScreen;
 import net.minecraft.client.multiplayer.resolver.ServerAddress;
 import net.minecraft.client.resources.server.DownloadedPackSource;
-import net.minecraft.client.telemetry.WorldSessionTelemetryManager;
 import net.minecraft.core.Holder;
 import net.minecraft.nbt.Tag;
 import net.minecraft.network.Connection;
@@ -91,7 +90,6 @@ public abstract class ClientCommonPacketListenerImpl implements ClientCommonPack
 	protected final ServerData serverData;
 	@Nullable
 	protected String serverBrand;
-	protected final WorldSessionTelemetryManager telemetryManager;
 	@Nullable
 	protected final Screen postDisconnectScreen;
 	protected boolean isTransferring;
@@ -107,7 +105,6 @@ public abstract class ClientCommonPacketListenerImpl implements ClientCommonPack
 		this.connection = connection;
 		this.serverData = commonListenerCookie.serverData();
 		this.serverBrand = commonListenerCookie.serverBrand();
-		this.telemetryManager = commonListenerCookie.telemetryManager();
 		this.postDisconnectScreen = commonListenerCookie.postDisconnectScreen();
 		this.serverCookies = commonListenerCookie.serverCookies();
 		this.customReportDetails = commonListenerCookie.customReportDetails();
@@ -164,7 +161,6 @@ public abstract class ClientCommonPacketListenerImpl implements ClientCommonPack
 			PacketUtils.ensureRunningOnSameThread(clientboundCustomPayloadPacket, this, this.minecraft.packetProcessor());
 			if (customPacketPayload instanceof BrandPayload brandPayload) {
 				this.serverBrand = brandPayload.brand();
-				this.telemetryManager.onServerBrandReceived(brandPayload.brand());
 			} else {
 				this.handleCustomPayload(customPacketPayload);
 			}
@@ -344,7 +340,6 @@ public abstract class ClientCommonPacketListenerImpl implements ClientCommonPack
 	}
 
 	public void onDisconnect(DisconnectionDetails disconnectionDetails) {
-		this.telemetryManager.onDisconnect();
 		this.minecraft.disconnect(this.createDisconnectScreen(disconnectionDetails), this.isTransferring);
 		LOGGER.warn("Client disconnected with reason: {}", disconnectionDetails.reason().getString());
 	}
@@ -363,9 +358,7 @@ public abstract class ClientCommonPacketListenerImpl implements ClientCommonPack
 		Screen screen = (Screen)Objects.requireNonNullElseGet(
 			this.postDisconnectScreen, () -> (Screen)(this.serverData != null ? new JoinMultiplayerScreen(new TitleScreen()) : new TitleScreen())
 		);
-		return this.serverData != null && this.serverData.isRealm()
-			? new DisconnectedScreen(screen, GENERIC_DISCONNECT_MESSAGE, disconnectionDetails, CommonComponents.GUI_BACK)
-			: new DisconnectedScreen(screen, GENERIC_DISCONNECT_MESSAGE, disconnectionDetails);
+		return new DisconnectedScreen(screen, GENERIC_DISCONNECT_MESSAGE, disconnectionDetails);
 	}
 
 	@Nullable

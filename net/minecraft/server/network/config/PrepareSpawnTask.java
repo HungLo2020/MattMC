@@ -173,7 +173,7 @@ public class PrepareSpawnTask implements ConfigurationTask {
 			ChunkPos chunkPos = new ChunkPos(BlockPos.containing(this.spawnPosition));
 			this.spawnLevel.waitForEntities(chunkPos, 3);
 			ServerPlayer serverPlayer = new ServerPlayer(
-				PrepareSpawnTask.this.server, this.spawnLevel, commonListenerCookie.gameProfile(), commonListenerCookie.clientInformation()
+				PrepareSpawnTask.this.server, this.spawnLevel, commonListenerCookie.playerProfile(), commonListenerCookie.clientInformation()
 			);
 
 			ServerPlayer var7;

@@ -1,6 +1,6 @@
 package net.minecraft.client.multiplayer.chat;
 
-import com.mojang.authlib.GameProfile;
+import net.minecraft.server.profile.PlayerProfile;
 import com.mojang.serialization.MapCodec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 import java.time.Instant;
@@ -19,8 +19,8 @@ import net.minecraft.util.ExtraCodecs;
 
 @Environment(EnvType.CLIENT)
 public interface LoggedChatMessage extends LoggedChatEvent {
-	static LoggedChatMessage.Player player(GameProfile gameProfile, PlayerChatMessage playerChatMessage, ChatTrustLevel chatTrustLevel) {
-		return new LoggedChatMessage.Player(gameProfile, playerChatMessage, chatTrustLevel);
+	static LoggedChatMessage.Player player(PlayerProfile playerProfile, PlayerChatMessage playerChatMessage, ChatTrustLevel chatTrustLevel) {
+		return new LoggedChatMessage.Player(playerProfile, playerChatMessage, chatTrustLevel);
 	}
 
 	static LoggedChatMessage.System system(Component component, Instant instant) {
@@ -36,7 +36,7 @@ public interface LoggedChatMessage extends LoggedChatEvent {
 	boolean canReport(UUID uUID);
 
 	@Environment(EnvType.CLIENT)
-	public record Player(GameProfile profile, PlayerChatMessage message, ChatTrustLevel trustLevel) implements LoggedChatMessage {
+	public record Player(PlayerProfile profile, PlayerChatMessage message, ChatTrustLevel trustLevel) implements LoggedChatMessage {
 		public static final MapCodec<LoggedChatMessage.Player> CODEC = RecordCodecBuilder.mapCodec(
 			instance -> instance.group(
 					ExtraCodecs.AUTHLIB_GAME_PROFILE.fieldOf("profile").forGetter(LoggedChatMessage.Player::profile),
@@ -61,12 +61,12 @@ public interface LoggedChatMessage extends LoggedChatEvent {
 		public Component toNarrationComponent() {
 			Component component = this.toContentComponent();
 			Component component2 = this.getTimeComponent();
-			return Component.translatable("gui.chatSelection.message.narrate", new Object[]{this.profile.getName(), component, component2});
+			return Component.translatable("gui.chatSelection.message.narrate", new Object[]{this.profile.name(), component, component2});
 		}
 
 		public Component toHeadingComponent() {
 			Component component = this.getTimeComponent();
-			return Component.translatable("gui.chatSelection.heading", new Object[]{this.profile.getName(), component});
+			return Component.translatable("gui.chatSelection.heading", new Object[]{this.profile.name(), component});
 		}
 
 		private Component getTimeComponent() {
@@ -80,7 +80,7 @@ public interface LoggedChatMessage extends LoggedChatEvent {
 		}
 
 		public UUID profileId() {
-			return this.profile.getId();
+			return this.profile.id();
 		}
 
 		@Override

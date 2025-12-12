@@ -263,6 +263,31 @@ public class Options {
 	private final OptionInstance<Double> panoramaSpeed = new OptionInstance<>(
 		"options.accessibility.panorama_speed", OptionInstance.noTooltip(), Options::percentValueLabel, OptionInstance.UnitDouble.INSTANCE, 1.0, double_ -> {}
 	);
+	/**
+	 * Custom option for selecting the main menu panorama theme.
+	 * <p>
+	 * Allows players to choose between different 360-degree skybox backgrounds for the main menu.
+	 * When changed, automatically triggers a panorama reload via {@link net.minecraft.client.renderer.GameRenderer#reloadPanorama(PanoramaTheme)}.
+	 * </p>
+	 * <p>
+	 * This is a MattMC custom feature not present in vanilla Minecraft.
+	 * </p>
+	 * 
+	 * @see PanoramaTheme Available theme options
+	 * @see net.minecraft.client.renderer.GameRenderer#reloadPanorama(PanoramaTheme)
+	 */
+	private final OptionInstance<PanoramaTheme> panoramaTheme = new OptionInstance<>(
+		"options.panoramaTheme",
+		OptionInstance.noTooltip(),
+		OptionInstance.forOptionEnum(),
+		new OptionInstance.Enum<>(Arrays.asList(PanoramaTheme.values()), PanoramaTheme.CODEC),
+		PanoramaTheme.AQUATIC,
+		panoramaTheme -> {
+			if (this.minecraft != null && this.minecraft.gameRenderer != null) {
+				this.minecraft.gameRenderer.reloadPanorama(panoramaTheme);
+			}
+		}
+	);
 	private static final Component ACCESSIBILITY_TOOLTIP_CONTRAST_MODE = Component.translatable("options.accessibility.high_contrast.tooltip");
 	private final OptionInstance<Boolean> highContrast = OptionInstance.createBoolean(
 		"options.accessibility.high_contrast", OptionInstance.cachedConstantTooltip(ACCESSIBILITY_TOOLTIP_CONTRAST_MODE), false, boolean_ -> {
@@ -281,14 +306,29 @@ public class Options {
 	private final OptionInstance<Boolean> highContrastBlockOutline = OptionInstance.createBoolean(
 		"options.accessibility.high_contrast_block_outline", OptionInstance.cachedConstantTooltip(HIGH_CONTRAST_BLOCK_OUTLINE_TOOLTIP), false
 	);
-	private final OptionInstance<Boolean> narratorHotkey = OptionInstance.createBoolean(
-		"options.accessibility.narrator_hotkey",
-		OptionInstance.cachedConstantTooltip(
-			InputQuirks.REPLACE_CTRL_KEY_WITH_CMD_KEY
-				? Component.translatable("options.accessibility.narrator_hotkey.mac.tooltip")
-				: Component.translatable("options.accessibility.narrator_hotkey.tooltip")
-		),
-		true
+	private static final Component DARK_MODE_TOOLTIP = Component.translatable("options.darkMode.tooltip");
+	
+	/**
+	 * Custom option for enabling dark mode in UI elements.
+	 * <p>
+	 * When enabled, applies color transformations to UI elements to create a dark theme.
+	 * The actual color transformation is handled in {@link net.minecraft.client.gui.GuiGraphics}
+	 * during rendering.
+	 * </p>
+	 * <p>
+	 * This is a MattMC custom feature not present in vanilla Minecraft.
+	 * Default value is {@code true} (dark mode enabled by default).
+	 * </p>
+	 * 
+	 * @see net.minecraft.client.gui.GuiGraphics Color rendering with dark mode support
+	 */
+	private final OptionInstance<Boolean> darkMode = OptionInstance.createBoolean(
+		"options.darkMode",
+		OptionInstance.cachedConstantTooltip(DARK_MODE_TOOLTIP),
+		true,
+		boolean_ -> {
+			// Trigger UI refresh when toggled (color transform happens in GuiGraphics)
+		}
 	);
 	@Nullable
 	public String fullscreenVideoModeString;
@@ -528,8 +568,8 @@ public class Options {
 	public final KeyMapping keyDown = new KeyMapping("key.back", 83, KeyMapping.Category.MOVEMENT);
 	public final KeyMapping keyRight = new KeyMapping("key.right", 68, KeyMapping.Category.MOVEMENT);
 	public final KeyMapping keyJump = new KeyMapping("key.jump", 32, KeyMapping.Category.MOVEMENT);
-	public final KeyMapping keyShift = new ToggleKeyMapping("key.sneak", 340, KeyMapping.Category.MOVEMENT, this.toggleCrouch::get, true);
-	public final KeyMapping keySprint = new ToggleKeyMapping("key.sprint", 341, KeyMapping.Category.MOVEMENT, this.toggleSprint::get, true);
+	public final KeyMapping keyShift = new ToggleKeyMapping("key.sneak", 341, KeyMapping.Category.MOVEMENT, this.toggleCrouch::get, true);
+	public final KeyMapping keySprint = new ToggleKeyMapping("key.sprint", 340, KeyMapping.Category.MOVEMENT, this.toggleSprint::get, true);
 	public final KeyMapping keyInventory = new KeyMapping("key.inventory", 69, KeyMapping.Category.INVENTORY);
 	public final KeyMapping keySwapOffhand = new KeyMapping("key.swapOffhand", 70, KeyMapping.Category.INVENTORY);
 	public final KeyMapping keyDrop = new KeyMapping("key.drop", 81, KeyMapping.Category.INVENTORY);
@@ -600,6 +640,7 @@ public class Options {
 	public boolean hideGui;
 	private CameraType cameraType = CameraType.FIRST_PERSON;
 	public String lastMpIp = "";
+	public String selectedSkin = "steve (Wide)";
 	public boolean smoothCamera;
 	private final OptionInstance<Integer> fov = new OptionInstance<>(
 		"options.fov",
@@ -615,26 +656,6 @@ public class Options {
 		Codec.DOUBLE.xmap(double_ -> (int)(double_ * 40.0 + 70.0), integer -> (integer.intValue() - 70.0) / 40.0),
 		70,
 		integer -> Minecraft.getInstance().levelRenderer.needsUpdate()
-	);
-	private static final Component TELEMETRY_TOOLTIP = Component.translatable(
-		"options.telemetry.button.tooltip",
-		new Object[]{Component.translatable("options.telemetry.state.minimal"), Component.translatable("options.telemetry.state.all")}
-	);
-	private final OptionInstance<Boolean> telemetryOptInExtra = OptionInstance.createBoolean(
-		"options.telemetry.button",
-		OptionInstance.cachedConstantTooltip(TELEMETRY_TOOLTIP),
-		(component, boolean_) -> {
-			Minecraft minecraftx = Minecraft.getInstance();
-			if (!minecraftx.allowsTelemetry()) {
-				return Component.translatable("options.telemetry.state.none");
-			} else {
-				return boolean_ && minecraftx.extraTelemetryAvailable()
-					? Component.translatable("options.telemetry.state.all")
-					: Component.translatable("options.telemetry.state.minimal");
-			}
-		},
-		false,
-		boolean_ -> {}
 	);
 	private static final Component ACCESSIBILITY_TOOLTIP_SCREEN_EFFECT = Component.translatable("options.screenEffectScale.tooltip");
 	private final OptionInstance<Double> screenEffectScale = new OptionInstance<>(
@@ -722,16 +743,6 @@ public class Options {
 		ParticleStatus.ALL,
 		particleStatus -> {}
 	);
-	private final OptionInstance<NarratorStatus> narrator = new OptionInstance<>(
-		"options.narrator",
-		OptionInstance.noTooltip(),
-		(component, narratorStatus) -> (Component)(this.minecraft.getNarrator().isActive()
-			? narratorStatus.getName()
-			: Component.translatable("options.narrator.notavailable")),
-		new OptionInstance.Enum<>(Arrays.asList(NarratorStatus.values()), Codec.INT.xmap(NarratorStatus::byId, NarratorStatus::getId)),
-		NarratorStatus.OFF,
-		narratorStatus -> this.minecraft.getNarrator().updateNarratorStatus(narratorStatus)
-	);
 	public String languageCode = "en_us";
 	private final OptionInstance<String> soundDevice = new OptionInstance<>(
 		"options.audioDevice",
@@ -757,7 +768,6 @@ public class Options {
 			soundManager.play(SimpleSoundInstance.forUI(SoundEvents.UI_BUTTON_CLICK, 1.0F));
 		}
 	);
-	public boolean onboardAccessibility = true;
 	private static final Component MUSIC_FREQUENCY_TOOLTIP = Component.translatable("options.music_frequency.tooltip");
 	private final OptionInstance<MusicManager.MusicFrequency> musicFrequency = new OptionInstance<>(
 		"options.music_frequency",
@@ -885,6 +895,19 @@ public class Options {
 		return this.panoramaSpeed;
 	}
 
+	/**
+	 * Gets the panorama theme option.
+	 * <p>
+	 * This is a MattMC custom option for selecting main menu background themes.
+	 * </p>
+	 * 
+	 * @return The panorama theme option instance
+	 * @see PanoramaTheme Available themes
+	 */
+	public OptionInstance<PanoramaTheme> panoramaTheme() {
+		return this.panoramaTheme;
+	}
+
 	public OptionInstance<Boolean> highContrast() {
 		return this.highContrast;
 	}
@@ -893,8 +916,18 @@ public class Options {
 		return this.highContrastBlockOutline;
 	}
 
-	public OptionInstance<Boolean> narratorHotkey() {
-		return this.narratorHotkey;
+	/**
+	 * Gets the dark mode option.
+	 * <p>
+	 * This is a MattMC custom option for enabling dark theme in UI elements.
+	 * When enabled, UI colors are transformed to darker variants for better readability
+	 * in low-light conditions.
+	 * </p>
+	 * 
+	 * @return The dark mode option instance
+	 */
+	public OptionInstance<Boolean> darkMode() {
+		return this.darkMode;
 	}
 
 	public OptionInstance<HumanoidArm> mainHand() {
@@ -1126,10 +1159,6 @@ public class Options {
 		return this.fov;
 	}
 
-	public OptionInstance<Boolean> telemetryOptInExtra() {
-		return this.telemetryOptInExtra;
-	}
-
 	public OptionInstance<Double> screenEffectScale() {
 		return this.screenEffectScale;
 	}
@@ -1166,17 +1195,8 @@ public class Options {
 		return this.particles;
 	}
 
-	public OptionInstance<NarratorStatus> narrator() {
-		return this.narrator;
-	}
-
 	public OptionInstance<String> soundDevice() {
 		return this.soundDevice;
-	}
-
-	public void onboardingAccessibilityFinished() {
-		this.onboardAccessibility = false;
-		this.save();
 	}
 
 	public OptionInstance<MusicManager.MusicFrequency> musicFrequency() {
@@ -1244,7 +1264,6 @@ public class Options {
 		optionAccess.process("maxFps", this.framerateLimit);
 		optionAccess.process("inactivityFpsLimit", this.inactivityFpsLimit);
 		optionAccess.process("mipmapLevels", this.mipmapLevels);
-		optionAccess.process("narrator", this.narrator);
 		optionAccess.process("particles", this.particles);
 		optionAccess.process("reducedDebugInfo", this.reducedDebugInfo);
 		optionAccess.process("renderClouds", this.cloudStatus);
@@ -1284,11 +1303,13 @@ public class Options {
 		fieldAccess.process("damageTiltStrength", this.damageTiltStrength);
 		fieldAccess.process("highContrast", this.highContrast);
 		fieldAccess.process("highContrastBlockOutline", this.highContrastBlockOutline);
-		fieldAccess.process("narratorHotkey", this.narratorHotkey);
+		fieldAccess.process("darkMode", this.darkMode);
 		this.resourcePacks = fieldAccess.process("resourcePacks", this.resourcePacks, Options::readListOfStrings, GSON::toJson);
 		this.incompatibleResourcePacks = fieldAccess.process("incompatibleResourcePacks", this.incompatibleResourcePacks, Options::readListOfStrings, GSON::toJson);
 		this.lastMpIp = fieldAccess.process("lastServer", this.lastMpIp);
-		this.languageCode = fieldAccess.process("lang", this.languageCode);
+		this.selectedSkin = fieldAccess.process("selectedSkin", this.selectedSkin);
+		fieldAccess.process("lang", this.languageCode);
+		this.languageCode = "en_us";
 		fieldAccess.process("chatVisibility", this.chatVisibility);
 		fieldAccess.process("chatOpacity", this.chatOpacity);
 		fieldAccess.process("chatLineSpacing", this.chatLineSpacing);
@@ -1322,8 +1343,7 @@ public class Options {
 		fieldAccess.process("onlyShowSecureChat", this.onlyShowSecureChat);
 		fieldAccess.process("saveChatDrafts", this.saveChatDrafts);
 		fieldAccess.process("panoramaScrollSpeed", this.panoramaSpeed);
-		fieldAccess.process("telemetryOptInExtra", this.telemetryOptInExtra);
-		this.onboardAccessibility = fieldAccess.process("onboardAccessibility", this.onboardAccessibility);
+		fieldAccess.process("panoramaTheme", this.panoramaTheme);
 		fieldAccess.process("menuBackgroundBlurriness", this.menuBackgroundBlurriness);
 		this.startedCleanly = fieldAccess.process("startedCleanly", this.startedCleanly);
 		fieldAccess.process("showNowPlayingToast", this.showNowPlayingToast);
@@ -1739,7 +1759,7 @@ public class Options {
 	}
 
 	@Environment(EnvType.CLIENT)
-	interface FieldAccess extends Options.OptionAccess {
+	public interface FieldAccess extends Options.OptionAccess {
 		int process(String string, int i);
 
 		boolean process(String string, boolean bl);

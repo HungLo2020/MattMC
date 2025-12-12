@@ -1,6 +1,6 @@
 package net.minecraft.client.player;
 
-import com.mojang.authlib.GameProfile;
+import net.minecraft.server.profile.PlayerProfile;
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
 import net.minecraft.client.multiplayer.ClientLevel;
@@ -15,8 +15,8 @@ public class RemotePlayer extends AbstractClientPlayer {
 	private Vec3 lerpDeltaMovement = Vec3.ZERO;
 	private int lerpDeltaMovementSteps;
 
-	public RemotePlayer(ClientLevel clientLevel, GameProfile gameProfile) {
-		super(clientLevel, gameProfile);
+	public RemotePlayer(ClientLevel clientLevel, PlayerProfile playerProfile) {
+		super(clientLevel, playerProfile);
 		this.noPhysics = true;
 	}
 

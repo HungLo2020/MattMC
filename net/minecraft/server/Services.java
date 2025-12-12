@@ -1,40 +1,39 @@
 package net.minecraft.server;
 
-import com.mojang.authlib.GameProfileRepository;
-import com.mojang.authlib.minecraft.MinecraftSessionService;
-import com.mojang.authlib.yggdrasil.ServicesKeySet;
-import com.mojang.authlib.yggdrasil.ServicesKeyType;
-import com.mojang.authlib.yggdrasil.YggdrasilAuthenticationService;
 import java.io.File;
-import net.minecraft.server.players.CachedUserNameToIdResolver;
 import net.minecraft.server.players.ProfileResolver;
 import net.minecraft.server.players.UserNameToIdResolver;
+import net.minecraft.server.players.OfflineUserNameToIdResolver;
 import net.minecraft.util.SignatureValidator;
 import org.jetbrains.annotations.Nullable;
 
+/**
+ * Simplified services record without Mojang authentication dependencies.
+ * Operates in offline mode only.
+ */
 public record Services(
-	MinecraftSessionService sessionService,
-	ServicesKeySet servicesKeySet,
-	GameProfileRepository profileRepository,
 	UserNameToIdResolver nameToIdCache,
 	ProfileResolver profileResolver
 ) {
 	private static final String USERID_CACHE_FILE = "usercache.json";
 
-	public static Services create(YggdrasilAuthenticationService yggdrasilAuthenticationService, File file) {
-		MinecraftSessionService minecraftSessionService = yggdrasilAuthenticationService.createMinecraftSessionService();
-		GameProfileRepository gameProfileRepository = yggdrasilAuthenticationService.createProfileRepository();
-		UserNameToIdResolver userNameToIdResolver = new CachedUserNameToIdResolver(gameProfileRepository, new File(file, "usercache.json"));
-		ProfileResolver profileResolver = new ProfileResolver.Cached(minecraftSessionService, userNameToIdResolver);
-		return new Services(minecraftSessionService, yggdrasilAuthenticationService.getServicesKeySet(), gameProfileRepository, userNameToIdResolver, profileResolver);
+	/**
+	 * Creates offline-only services with local profile resolution.
+	 */
+	public static Services createOffline(File file) {
+		UserNameToIdResolver userNameToIdResolver = new OfflineUserNameToIdResolver(new File(file, "usercache.json"));
+		ProfileResolver profileResolver = new ProfileResolver.Offline(userNameToIdResolver);
+		return new Services(userNameToIdResolver, profileResolver);
 	}
 
 	@Nullable
 	public SignatureValidator profileKeySignatureValidator() {
-		return SignatureValidator.from(this.servicesKeySet, ServicesKeyType.PROFILE_KEY);
+		// No key validation in offline mode
+		return null;
 	}
 
 	public boolean canValidateProfileKeys() {
-		return !this.servicesKeySet.keys(ServicesKeyType.PROFILE_KEY).isEmpty();
+		// No profile key validation in offline mode
+		return false;
 	}
 }

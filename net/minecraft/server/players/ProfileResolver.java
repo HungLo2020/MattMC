@@ -3,55 +3,63 @@ package net.minecraft.server.players;
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.CacheLoader;
 import com.google.common.cache.LoadingCache;
-import com.mojang.authlib.GameProfile;
-import com.mojang.authlib.minecraft.MinecraftSessionService;
-import com.mojang.authlib.yggdrasil.ProfileResult;
 import com.mojang.datafixers.util.Either;
 import java.time.Duration;
 import java.util.Optional;
 import java.util.UUID;
+import net.minecraft.core.UUIDUtil;
+import net.minecraft.server.profile.PlayerProfile;
 import net.minecraft.util.StringUtil;
 
+/**
+ * Interface for resolving player profiles.
+ */
 public interface ProfileResolver {
-	Optional<GameProfile> fetchByName(String string);
+	Optional<PlayerProfile> fetchByName(String string);
 
-	Optional<GameProfile> fetchById(UUID uUID);
+	Optional<PlayerProfile> fetchById(UUID uUID);
 
-	default Optional<GameProfile> fetchByNameOrId(Either<String, UUID> either) {
+	default Optional<PlayerProfile> fetchByNameOrId(Either<String, UUID> either) {
 		return either.map(this::fetchByName, this::fetchById);
 	}
 
-	public static class Cached implements ProfileResolver {
-		private final LoadingCache<String, Optional<GameProfile>> profileCacheByName;
-		final LoadingCache<UUID, Optional<GameProfile>> profileCacheById;
+	/**
+	 * Offline implementation of ProfileResolver that creates profiles locally.
+	 */
+	public static class Offline implements ProfileResolver {
+		private final LoadingCache<String, Optional<PlayerProfile>> profileCacheByName;
+		private final LoadingCache<UUID, Optional<PlayerProfile>> profileCacheById;
 
-		public Cached(MinecraftSessionService minecraftSessionService, UserNameToIdResolver userNameToIdResolver) {
+		public Offline(UserNameToIdResolver userNameToIdResolver) {
 			this.profileCacheById = CacheBuilder.newBuilder()
 				.expireAfterAccess(Duration.ofMinutes(10L))
 				.maximumSize(256L)
-				.build(new CacheLoader<UUID, Optional<GameProfile>>() {
-					public Optional<GameProfile> load(UUID uUID) {
-						ProfileResult profileResult = minecraftSessionService.fetchProfile(uUID, true);
-						return Optional.ofNullable(profileResult).map(ProfileResult::profile);
+				.build(new CacheLoader<UUID, Optional<PlayerProfile>>() {
+					public Optional<PlayerProfile> load(UUID uUID) {
+						// Look up from cache first
+						return userNameToIdResolver.get(uUID).map(nameAndId -> 
+							new PlayerProfile(nameAndId.id(), nameAndId.name())
+						);
 					}
 				});
 			this.profileCacheByName = CacheBuilder.newBuilder()
 				.expireAfterAccess(Duration.ofMinutes(10L))
 				.maximumSize(256L)
-				.build(new CacheLoader<String, Optional<GameProfile>>() {
-					public Optional<GameProfile> load(String string) {
-						return userNameToIdResolver.get(string).flatMap(nameAndId -> Cached.this.profileCacheById.getUnchecked(nameAndId.id()));
+				.build(new CacheLoader<String, Optional<PlayerProfile>>() {
+					public Optional<PlayerProfile> load(String string) {
+						return userNameToIdResolver.get(string)
+							.flatMap(nameAndId -> Offline.this.profileCacheById.getUnchecked(nameAndId.id()));
 					}
 				});
 		}
 
 		@Override
-		public Optional<GameProfile> fetchByName(String string) {
+		public Optional<PlayerProfile> fetchByName(String string) {
 			return StringUtil.isValidPlayerName(string) ? this.profileCacheByName.getUnchecked(string) : Optional.empty();
 		}
 
 		@Override
-		public Optional<GameProfile> fetchById(UUID uUID) {
+		public Optional<PlayerProfile> fetchById(UUID uUID) {
 			return this.profileCacheById.getUnchecked(uUID);
 		}
 	}

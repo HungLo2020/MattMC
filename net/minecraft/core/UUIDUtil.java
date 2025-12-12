@@ -2,12 +2,12 @@ package net.minecraft.core;
 
 import com.google.common.collect.Lists;
 import com.google.common.collect.Sets;
-import com.mojang.authlib.GameProfile;
+import net.minecraft.server.profile.PlayerProfile;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.DataResult;
 import com.mojang.serialization.Dynamic;
 import com.mojang.serialization.Lifecycle;
-import com.mojang.util.UndashedUuid;
+import net.minecraft.util.UndashedUuid;
 import io.netty.buffer.ByteBuf;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
@@ -87,8 +87,8 @@ public final class UUIDUtil {
 		return UUID.nameUUIDFromBytes(("OfflinePlayer:" + string).getBytes(StandardCharsets.UTF_8));
 	}
 
-	public static GameProfile createOfflineProfile(String string) {
+	public static PlayerProfile createOfflineProfile(String string) {
 		UUID uUID = createOfflinePlayerUUID(string);
-		return new GameProfile(uUID, string);
+		return new PlayerProfile(uUID, string);
 	}
 }

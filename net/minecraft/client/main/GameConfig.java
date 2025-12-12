@@ -99,7 +99,7 @@ public class GameConfig {
 	public record QuickPlayRealmsData(String realmId) implements GameConfig.QuickPlayVariant {
 		@Override
 		public boolean isEnabled() {
-			return !StringUtil.isBlank(this.realmId);
+			return false; // Realms support removed
 		}
 	}
 

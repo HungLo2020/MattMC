@@ -1,6 +1,6 @@
 package net.minecraft.server;
 
-import com.mojang.authlib.yggdrasil.YggdrasilAuthenticationService;
+
 import com.mojang.datafixers.DataFixer;
 import com.mojang.logging.LogUtils;
 import com.mojang.serialization.Dynamic;
@@ -9,7 +9,7 @@ import java.awt.GraphicsEnvironment;
 import java.io.File;
 import java.io.IOException;
 import java.io.UncheckedIOException;
-import java.net.Proxy;
+
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -59,9 +59,60 @@ import net.minecraft.world.level.storage.WorldData;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 
+/**
+ * Main entry point for the Minecraft dedicated server application.
+ * <p>
+ * This class handles command-line argument parsing, server initialization, and launching
+ * the dedicated server. It supports various server configurations including:
+ * </p>
+ * <ul>
+ *   <li>Headless mode (--nogui) for running without server GUI</li>
+ *   <li>Demo mode for testing</li>
+ *   <li>World upgrade and maintenance operations</li>
+ *   <li>Safe mode (vanilla datapack only)</li>
+ *   <li>JFR profiling for performance analysis</li>
+ *   <li>Custom port and world selection</li>
+ * </ul>
+ * 
+ * <p><strong>Common Launch Arguments:</strong></p>
+ * <pre>
+ * --nogui          Run without server GUI
+ * --port 25565     Set server port (default: 25565)
+ * --world myworld  Select world folder
+ * --universe .     Set server directory
+ * </pre>
+ * 
+ * <p><strong>Maintenance Operations:</strong></p>
+ * <pre>
+ * --initSettings    Create default server.properties and eula.txt, then exit
+ * --forceUpgrade    Upgrade world to current version
+ * --eraseCache      Clear cached data
+ * --safeMode        Load with vanilla datapack only
+ * </pre>
+ * 
+ * @see net.minecraft.server.dedicated.DedicatedServer Main server class after initialization
+ * @see net.minecraft.server.dedicated.DedicatedServerProperties Server configuration
+ */
 public class Main {
 	private static final Logger LOGGER = LogUtils.getLogger();
 
+	/**
+	 * Main entry point for the Minecraft dedicated server.
+	 * <p>
+	 * Parses command-line arguments, initializes the server, and starts accepting connections.
+	 * This method performs the following steps:
+	 * </p>
+	 * <ol>
+	 *   <li>Parse command-line arguments using JOptSimple</li>
+	 *   <li>Detect game version and bootstrap registries</li>
+	 *   <li>Load or create server.properties configuration</li>
+	 *   <li>Handle maintenance operations (upgrade, init, etc.) if requested</li>
+	 *   <li>Create and start the DedicatedServer instance</li>
+	 *   <li>Set up shutdown hooks for graceful server shutdown</li>
+	 * </ol>
+	 * 
+	 * @param strings Command-line arguments passed to the application
+	 */
 	@SuppressForbidden(
 		reason = "System.out needed before bootstrap"
 	)
@@ -123,7 +174,7 @@ public class Main {
 			}
 
 			File file = new File(optionSet.valueOf(optionSpec10));
-			Services services = Services.create(new YggdrasilAuthenticationService(Proxy.NO_PROXY), file);
+			Services services = Services.createOffline(file);
 			String string = (String)Optional.ofNullable(optionSet.valueOf(optionSpec11)).orElse(dedicatedServerSettings.getProperties().levelName);
 			LevelStorageSource levelStorageSource = LevelStorageSource.createDefault(file.toPath());
 			LevelStorageSource.LevelStorageAccess levelStorageAccess = levelStorageSource.validateAndCreateAccess(string);
@@ -218,7 +269,6 @@ public class Main {
 						threadx, levelStorageAccess, packRepository, worldStem, dedicatedServerSettings, DataFixers.getDataFixer(), services
 					);
 					dedicatedServerx.setPort(optionSet.valueOf(optionSpec12));
-					dedicatedServerx.setDemo(optionSet.has(optionSpec3));
 					dedicatedServerx.setId(optionSet.valueOf(optionSpec13));
 					boolean blx = !optionSet.has(optionSpec) && !optionSet.valuesOf(optionSpec16).contains("nogui");
 					if (blx && !GraphicsEnvironment.isHeadless()) {

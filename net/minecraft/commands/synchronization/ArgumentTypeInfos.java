@@ -87,7 +87,7 @@ public class ArgumentTypeInfos {
 		register(registry, "brigadier:long", LongArgumentType.class, new LongArgumentInfo());
 		register(registry, "brigadier:string", StringArgumentType.class, new StringArgumentSerializer());
 		register(registry, "entity", EntityArgument.class, new EntityArgument.Info());
-		register(registry, "game_profile", GameProfileArgument.class, SingletonArgumentInfo.contextFree(GameProfileArgument::gameProfile));
+		register(registry, "game_profile", GameProfileArgument.class, SingletonArgumentInfo.contextFree(GameProfileArgument::playerProfile));
 		register(registry, "block_pos", BlockPosArgument.class, SingletonArgumentInfo.contextFree(BlockPosArgument::blockPos));
 		register(registry, "column_pos", ColumnPosArgument.class, SingletonArgumentInfo.contextFree(ColumnPosArgument::columnPos));
 		register(registry, "vec3", Vec3Argument.class, SingletonArgumentInfo.contextFree(Vec3Argument::vec3));

@@ -308,6 +308,6 @@ public class AvatarRenderer<AvatarlikeEntity extends Avatar & ClientAvatarEntity
 	}
 
 	public static boolean isPlayerUpsideDown(Player player) {
-  return isUpsideDownName(net.minecraft.util.AuthlibCompat.name(player.getGameProfile()));
+  return isUpsideDownName(player.getGameProfile().name());
 	}
 }

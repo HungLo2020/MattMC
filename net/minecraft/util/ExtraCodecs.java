@@ -8,9 +8,9 @@ import com.google.common.collect.ImmutableMultimap;
 import com.google.common.collect.ImmutableMultimap.Builder;
 import com.google.common.primitives.UnsignedBytes;
 import com.google.gson.JsonElement;
-import com.mojang.authlib.GameProfile;
-import com.mojang.authlib.properties.Property;
-import com.mojang.authlib.properties.PropertyMap;
+import net.minecraft.server.profile.PlayerProfile;
+import net.minecraft.server.profile.ProfileProperty;
+import net.minecraft.server.profile.ProfilePropertyMap;
 import com.mojang.datafixers.util.Either;
 import com.mojang.datafixers.util.Pair;
 import com.mojang.serialization.Codec;
@@ -182,23 +182,23 @@ public class ExtraCodecs {
 		: Optional.empty();
 	public static final Codec<BitSet> BIT_SET = Codec.LONG_STREAM
 		.xmap(longStream -> BitSet.valueOf(longStream.toArray()), bitSet -> Arrays.stream(bitSet.toLongArray()));
-	private static final Codec<Property> PROPERTY = RecordCodecBuilder.create(
+	private static final Codec<ProfileProperty> PROPERTY = RecordCodecBuilder.create(
 		instance -> instance.group(
-				Codec.STRING.fieldOf("name").forGetter(Property::name),
-				Codec.STRING.fieldOf("value").forGetter(Property::value),
+				Codec.STRING.fieldOf("name").forGetter(ProfileProperty::name),
+				Codec.STRING.fieldOf("value").forGetter(ProfileProperty::value),
 				Codec.STRING.lenientOptionalFieldOf("signature").forGetter(property -> Optional.ofNullable(property.signature()))
 			)
-			.apply(instance, (string, string2, optional) -> new Property(string, string2, (String)optional.orElse(null)))
+			.apply(instance, (string, string2, optional) -> new ProfileProperty(string, string2, (String)optional.orElse(null)))
 	);
-	public static final Codec<PropertyMap> PROPERTY_MAP = Codec.either(Codec.unboundedMap(Codec.STRING, Codec.STRING.listOf()), PROPERTY.listOf())
+	public static final Codec<ProfilePropertyMap> PROPERTY_MAP = Codec.either(Codec.unboundedMap(Codec.STRING, Codec.STRING.listOf()), PROPERTY.listOf())
 		.xmap(either -> {
-			PropertyMap mapOut = new PropertyMap();
+			ProfilePropertyMap mapOut = new ProfilePropertyMap();
 			either.ifLeft(map -> map.forEach((string, list) -> {
 				for (String string2 : list) {
-					mapOut.put(string, new Property(string, string2));
+					mapOut.put(string, new ProfileProperty(string, string2));
 				}
 			})).ifRight(list -> {
-				for (Property property : list) {
+				for (ProfileProperty property : list) {
 					mapOut.put(property.name(), property);
 				}
 			});
@@ -210,8 +210,8 @@ public class ExtraCodecs {
 				? DataResult.success(string)
 				: DataResult.error(() -> "Player name contained disallowed characters: '" + string + "'")
 		);
-	public static final Codec<GameProfile> AUTHLIB_GAME_PROFILE = gameProfileCodec(UUIDUtil.AUTHLIB_CODEC).codec();
-	public static final MapCodec<GameProfile> STORED_GAME_PROFILE = gameProfileCodec(UUIDUtil.CODEC);
+	public static final Codec<PlayerProfile> AUTHLIB_GAME_PROFILE = gameProfileCodec(UUIDUtil.AUTHLIB_CODEC).codec();
+	public static final MapCodec<PlayerProfile> STORED_GAME_PROFILE = gameProfileCodec(UUIDUtil.CODEC);
 	public static final Codec<String> NON_EMPTY_STRING = Codec.STRING
 		.validate(string -> string.isEmpty() ? DataResult.error(() -> "Expected non-empty string") : DataResult.success(string));
 	public static final Codec<Integer> CODEPOINT = Codec.STRING.comapFlatMap(string -> {
@@ -509,16 +509,15 @@ public class ExtraCodecs {
 		return mapCodec.xmap(toOptionalLong, fromOptionalLong);
 	}
 
-	private static MapCodec<GameProfile> gameProfileCodec(Codec<UUID> codec) {
+	private static MapCodec<PlayerProfile> gameProfileCodec(Codec<UUID> codec) {
 		return RecordCodecBuilder.mapCodec(
 			instance -> instance.group(
-					codec.fieldOf("id").forGetter(GameProfile::getId),
-					PLAYER_NAME.fieldOf("name").forGetter(GameProfile::getName),
-					PROPERTY_MAP.optionalFieldOf("properties", new PropertyMap()).forGetter(GameProfile::getProperties)
+					codec.fieldOf("id").forGetter(PlayerProfile::id),
+					PLAYER_NAME.fieldOf("name").forGetter(PlayerProfile::name),
+					PROPERTY_MAP.optionalFieldOf("properties", new ProfilePropertyMap()).forGetter(PlayerProfile::properties)
 				)
 				.apply(instance, (uuid, name, props) -> {
-					GameProfile gp = new GameProfile(uuid, name);
-					gp.getProperties().putAll(props);
+					PlayerProfile gp = new PlayerProfile(uuid, name, props);
 					return gp;
 				})
 		);

@@ -34,7 +34,7 @@ import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 
 @Environment(EnvType.CLIENT)
-public final class OptionInstance<T> {
+public class OptionInstance<T> {
 	private static final Logger LOGGER = LogUtils.getLogger();
 	public static final OptionInstance.Enum<Boolean> BOOLEAN_VALUES = new OptionInstance.Enum<>(ImmutableList.of(Boolean.TRUE, Boolean.FALSE), Codec.BOOL);
 	public static final OptionInstance.CaptionBasedToString<Boolean> BOOLEAN_TO_STRING = (component, boolean_) -> boolean_
@@ -489,7 +489,7 @@ public final class OptionInstance<T> {
 	}
 
 	@Environment(EnvType.CLIENT)
-	interface ValueSet<T> {
+	public interface ValueSet<T> {
 		Function<OptionInstance<T>, AbstractWidget> createButton(
 			OptionInstance.TooltipSupplier<T> tooltipSupplier, Options options, int i, int j, int k, Consumer<T> consumer
 		);

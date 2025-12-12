@@ -1,6 +1,6 @@
 package net.minecraft.world.scores;
 
-import com.mojang.authlib.GameProfile;
+import net.minecraft.server.profile.PlayerProfile;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.HoverEvent;
 import org.jetbrains.annotations.Nullable;
@@ -47,8 +47,8 @@ public interface ScoreHolder {
 		}
 	}
 
-	static ScoreHolder fromGameProfile(GameProfile gameProfile) {
-		final String string = gameProfile.getName();
+	static ScoreHolder fromGameProfile(PlayerProfile playerProfile) {
+		final String string = playerProfile.name();
 		return new ScoreHolder() {
 			@Override
 			public String getScoreboardName() {

@@ -16,6 +16,18 @@ def lwjglNatives = System.getProperty('os.name').toLowerCase().contains('mac')
             ? 'natives-linux-arm64' 
             : 'natives-linux'
 
+// Fabric Loader version (update this when upgrading Fabric Loader source)
+def fabricLoaderVersion = '0.18.2'
+def fabricLoaderDir = "fabric-loader-${fabricLoaderVersion}"
+
+// Sodium version (update this when upgrading Sodium source)
+def sodiumVersion = '0.7.2'
+def sodiumDir = 'sodium-1.21.9'
+
+// Iris version (update this when upgrading Iris source)
+def irisVersion = '1.9.6'
+def irisDir = 'Iris-1.21.9'
+
 java {
     // Keep toolchain configuration for compilation
     // But we'll override at runtime for JavaExec tasks
@@ -42,23 +54,30 @@ repositories {
         println "⚠ Bundled dependencies not found. Using remote repositories."
         println "  Run './libraries/download-dependencies.sh' to download dependencies for offline builds."
         
+        // Fabric Maven repository (for Fabric Loader dependencies)
+        maven {
+            name = 'Fabric'
+            url = 'https://maven.fabricmc.net/'
+        }
+        
         // Minecraft libraries (primary source for Mojang dependencies)
         maven { 
-            url 'https://libraries.minecraft.net'
+            url = 'https://libraries.minecraft.net'
             content {
                 includeGroup 'com.mojang'
+                includeGroup 'net.minecraft'
             }
         }
         // JitPack for open-source Mojang libraries
         maven { 
-            url 'https://jitpack.io'
+            url = 'https://jitpack.io'
             content {
                 includeGroup 'com.github.Mojang'
             }
         }
         // Forge mirrors for Mojang libraries
         maven { 
-            url 'https://maven.minecraftforge.net/'
+            url = 'https://maven.minecraftforge.net/'
             content {
                 includeGroup 'com.mojang'
                 includeGroup 'net.minecraftforge'
@@ -76,37 +95,42 @@ repositories {
 
 configurations.all {
     resolutionStrategy {
-        force 'com.mojang:authlib:6.0.55'
+        // force 'com.mojang:authlib:6.0.55' // REMOVED - using custom PlayerProfile system
         force 'com.mojang:brigadier:1.3.10'
         force 'com.mojang:datafixerupper:8.0.16'
-        // Disallow older Authlib versions pulled transitively
-        eachDependency { details ->
-            if (details.requested.group == 'com.mojang' && details.requested.name == 'authlib' && details.requested.version != '6.0.55') {
-                details.useVersion '6.0.55'
-                details.because 'Align with Minecraft 1.21.10 sources that use GameProfile.id()/name() accessors'
-            }
-        }
+        // Force ASM 9.9 for Fabric Loader compatibility (avoid duplicate classes)
+        force 'org.ow2.asm:asm:9.9'
+        force 'org.ow2.asm:asm-analysis:9.9'
+        force 'org.ow2.asm:asm-commons:9.9'
+        force 'org.ow2.asm:asm-tree:9.9'
+        force 'org.ow2.asm:asm-util:9.9'
     }
+}
+
+// Exclude transitive ASM from dependencies that bring in older versions
+// This prevents conflicts with Fabric Loader's ASM 9.9 requirement
+configurations.runtimeClasspath {
+    exclude group: 'org.ow2.asm'
 }
 
 // Minecraft 1.21.10 dependencies
 dependencies {
     // Mojang libraries - use bundled JARs if available, otherwise use Maven coordinates
     if (useBundledDeps) {
-        // Bundled Mojang libraries from libraries/deps/
+        // Bundled Mojang libraries from libraries/deps/ (authlib removed - using custom PlayerProfile)
         implementation files('libraries/deps/brigadier-1.3.10.jar')
         implementation files('libraries/deps/datafixerupper-8.0.16.jar')
-        implementation files('libraries/deps/authlib-6.0.55.jar')
+        // implementation files('libraries/deps/authlib-6.0.55.jar') // REMOVED - custom PlayerProfile system
         implementation files('libraries/deps/logging-1.2.7.jar')
         implementation files('libraries/deps/jtracy-1.0.29.jar')
         implementation files('libraries/deps/blocklist-1.0.10.jar')
         implementation files('libraries/deps/patchy-2.2.10.jar')
         implementation files('libraries/deps/text2speech-1.17.9.jar')
     } else {
-        // Remote Mojang libraries
+        // Remote Mojang libraries (authlib removed - using custom PlayerProfile)
         implementation 'com.mojang:brigadier:1.3.10'
         implementation 'com.mojang:datafixerupper:8.0.16'
-        implementation 'com.mojang:authlib:6.0.55'
+        // implementation 'com.mojang:authlib:6.0.55' // REMOVED - custom PlayerProfile system
         implementation 'com.mojang:logging:1.2.7'
         implementation 'com.mojang:jtracy:1.0.29'
         implementation 'com.mojang:blocklist:1.0.10'
@@ -194,28 +218,441 @@ dependencies {
     
     // Note: @Environment and @EnvType annotations are now provided by custom implementation
     // in the net.minecraft.api package (replaced Fabric dependency)
+    
+    // ===== FABRIC LOADER DEPENDENCIES =====
+    // Required for Fabric mod loading functionality
+    // These are loaded from libraries/deps/ if available, otherwise from remote repositories
+    
+    if (useBundledDeps) {
+        // Bundled Fabric Loader dependencies from libraries/deps/
+        // ASM - bytecode manipulation (required by Fabric Loader)
+        implementation files('libraries/deps/asm-9.9.jar')
+        implementation files('libraries/deps/asm-analysis-9.9.jar')
+        implementation files('libraries/deps/asm-commons-9.9.jar')
+        implementation files('libraries/deps/asm-tree-9.9.jar')
+        implementation files('libraries/deps/asm-util-9.9.jar')
+        
+        // Mixin - runtime bytecode transformation (required by Fabric Loader)
+        implementation files('libraries/deps/sponge-mixin-0.16.5+mixin.0.8.7.jar')
+        
+        // Tiny Remapper - class/method/field remapping
+        implementation files('libraries/deps/tiny-remapper-0.11.2.jar')
+        
+        // Class Tweaker - class access modification
+        implementation files('libraries/deps/class-tweaker-0.2.jar')
+        
+        // Mapping IO - mapping file I/O
+        implementation files('libraries/deps/mapping-io-0.7.1.jar')
+        
+        // MixinExtras - additional Mixin functionality
+        implementation files('libraries/deps/mixinextras-fabric-0.5.0.jar')
+        
+        // Launchwrapper - legacy launch wrapper
+        implementation files('libraries/deps/launchwrapper-1.12.jar')
+        
+        // Access Widener - access modification
+        implementation files('libraries/deps/access-widener-2.1.0.jar')
+        
+        // Tiny Mappings Parser - legacy mapping parser
+        implementation files('libraries/deps/tiny-mappings-parser-0.3.0+build.17.jar')
+        
+        // Note: Fabric API stubs are in src/main/java/net/fabricmc/fabric/api/
+        // No external Fabric API JARs needed - using Mojang-mapped stubs
+    } else {
+        // Remote Fabric Loader dependencies
+        // ASM - bytecode manipulation (required by Fabric Loader)
+        implementation 'org.ow2.asm:asm:9.9'
+        implementation 'org.ow2.asm:asm-analysis:9.9'
+        implementation 'org.ow2.asm:asm-commons:9.9'
+        implementation 'org.ow2.asm:asm-tree:9.9'
+        implementation 'org.ow2.asm:asm-util:9.9'
+        
+        // Mixin - runtime bytecode transformation (requires Fabric Maven)
+        implementation 'net.fabricmc:sponge-mixin:0.16.5+mixin.0.8.7'
+        
+        // Tiny Remapper - class/method/field remapping (requires Fabric Maven)
+        implementation 'net.fabricmc:tiny-remapper:0.11.2'
+        
+        // Class Tweaker - class access modification (requires Fabric Maven)
+        implementation 'net.fabricmc:class-tweaker:0.2'
+        
+        // Mapping IO - mapping file I/O (requires Fabric Maven)
+        implementation 'net.fabricmc:mapping-io:0.7.1'
+        
+        // MixinExtras - additional Mixin functionality (requires Fabric Maven)
+        implementation 'io.github.llamalad7:mixinextras-fabric:0.5.0'
+        
+        // Launchwrapper - legacy launch wrapper (requires Minecraft Libraries)
+        implementation 'net.minecraft:launchwrapper:1.12'
+        
+        // Access Widener - access modification (requires Fabric Maven)
+        implementation 'net.fabricmc:access-widener:2.1.0'
+        
+        // Tiny Mappings Parser - legacy mapping parser (requires Fabric Maven)
+        implementation 'net.fabricmc:tiny-mappings-parser:0.3.0+build.17'
+    }
+    
+    // Fabric implementation dependencies (available on Maven Central)
+    implementation 'org.ow2.sat4j:org.ow2.sat4j.core:2.3.6'
+    implementation 'org.ow2.sat4j:org.ow2.sat4j.pb:2.3.6'
+    
+    // ===== IRIS DEPENDENCIES =====
+    // JCPP - C preprocessor for shader parsing
+    implementation 'org.anarres:jcpp:1.4.14'
+    // ANTLR - Parser generator for shader language
+    implementation 'org.antlr:antlr4-runtime:4.13.1'
+    // GLSL Transformer - GLSL shader transformation library
+    implementation 'io.github.douira:glsl-transformer:3.0.0-pre3'
+    
+    // ===== TESTING DEPENDENCIES =====
+    // Testing dependencies - only available in test scope, excluded from production builds
+    
+    // JUnit 5 (Jupiter) - Core testing framework
+    testImplementation 'org.junit.jupiter:junit-jupiter-api:5.10.1'
+    testImplementation 'org.junit.jupiter:junit-jupiter-params:5.10.1'
+    testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.10.1'
+    
+    // AssertJ - Fluent assertions library
+    testImplementation 'org.assertj:assertj-core:3.25.1'
+    
+    // Mockito - Mocking framework
+    testImplementation 'org.mockito:mockito-core:5.8.0'
+    testImplementation 'org.mockito:mockito-junit-jupiter:5.8.0'
+    
+    // JMH - Java Microbenchmark Harness for performance testing
+    testImplementation 'org.openjdk.jmh:jmh-core:1.37'
+    testAnnotationProcessor 'org.openjdk.jmh:jmh-generator-annprocess:1.37'
+    
+    // Awaitility - Async testing utilities
+    testImplementation 'org.awaitility:awaitility:4.2.0'
 }
 
+// ============================================================================
+// SOURCE SETS CONFIGURATION
+// ============================================================================
+// We use separate source sets to compile Fabric Loader and Minecraft into
+// separate JARs. This is required because Fabric Loader's Knot launcher
+// needs to detect game JARs separately from itself.
+// ============================================================================
+
 sourceSets {
+    // Fabric Loader source set - compiled to a separate JAR
+    fabricLoader {
+        java {
+            srcDirs = [
+                "${fabricLoaderDir}/src/main/java",
+                "${fabricLoaderDir}/src/main/legacyJava",
+                "${fabricLoaderDir}/src/java17/java",
+                "${fabricLoaderDir}/minecraft/src/main/java",
+                "${fabricLoaderDir}/minecraft/src/main/legacyJava"
+            ]
+        }
+        resources {
+            srcDirs = [
+                "${fabricLoaderDir}/src/main/resources",
+                "${fabricLoaderDir}/minecraft/src/main/resources"
+            ]
+        }
+    }
+    
+    // Sodium source set - compiled to a separate mod JAR
+    sodium {
+        java {
+            srcDirs = [
+                "${sodiumDir}/common/src/main/java",
+                "${sodiumDir}/common/src/api/java",
+                "${sodiumDir}/common/src/boot/java",
+                "${sodiumDir}/fabric/src/main/java"
+            ]
+        }
+        resources {
+            srcDirs = [
+                "${sodiumDir}/common/src/main/resources",
+                "${sodiumDir}/fabric/src/main/resources"
+            ]
+        }
+    }
+    
+    // Iris source set - compiled to a separate mod JAR
+    iris {
+        java {
+            srcDirs = [
+                "${irisDir}/common/src/main/java",
+                "${irisDir}/common/src/api/java",
+                "${irisDir}/fabric/src/main/java"
+            ]
+        }
+        resources {
+            srcDirs = [
+                "${irisDir}/common/src/main/resources",
+                "${irisDir}/fabric/src/main/resources"
+            ]
+        }
+    }
+    
+    // Main source set - Minecraft and project code (compiled to game JAR)
     main {
         java {
-            srcDirs = ['.']
+            srcDir '.'
+            
+            // Global excludes
             exclude 'gradle/**'
             exclude 'build/**'
             exclude '.git/**'
             exclude '.idea/**'
             // Exclude bundled Mojang sources that shadow Maven dependencies
             exclude 'com/mojang/authlib/**'
+            // Exclude test sources from main source set
+            exclude 'src/test/**'
+            // Exclude frnsrc directory entirely (reference-only code)
+            exclude 'frnsrc/**'
+            // Exclude Fabric Loader source (compiled separately)
+            exclude 'fabric-loader-*/**'
+            // Exclude Fabric API source (compiled separately)
+            exclude 'fabric-api-*/**'
+            // Exclude Sodium source (compiled separately)
+            exclude 'sodium-*/**'
+            // Exclude Iris source (compiled separately)
+            exclude 'Iris-*/**'
         }
         resources {
-            srcDirs = ['src/main/resources']
+            srcDirs = [
+                'src/main/resources'
+            ]
+        }
+        // Main depends on fabricLoader classes for compilation
+        compileClasspath += sourceSets.fabricLoader.output
+        runtimeClasspath += sourceSets.fabricLoader.output
+    }
+    
+    test {
+        java {
+            srcDirs = ['src/test']
+        }
+        resources {
+            srcDirs = ['src/test/resources']
         }
     }
 }
 
+// ============================================================================
+// FABRIC LOADER DEPENDENCIES
+// ============================================================================
+// The fabricLoader source set needs the same dependencies as main
+// Configure the fabricLoader configurations to extend from implementation
+// ============================================================================
+
+configurations {
+    fabricLoaderImplementation.extendsFrom implementation
+    fabricLoaderCompileOnly.extendsFrom compileOnly
+    fabricLoaderRuntimeOnly.extendsFrom runtimeOnly
+    
+    // Sodium configurations extend from implementation + fabricLoader
+    sodiumImplementation.extendsFrom implementation
+    sodiumCompileOnly.extendsFrom compileOnly
+    sodiumRuntimeOnly.extendsFrom runtimeOnly
+    
+    // Iris configurations extend from implementation + fabricLoader + sodium
+    irisImplementation.extendsFrom implementation
+    irisCompileOnly.extendsFrom compileOnly
+    irisRuntimeOnly.extendsFrom runtimeOnly
+}
+
+// Sodium depends on Fabric Loader and Minecraft
+// Fabric API stub interfaces are in src/main/java/net/fabricmc/fabric/api/
+sourceSets.sodium.compileClasspath += sourceSets.fabricLoader.output
+sourceSets.sodium.compileClasspath += sourceSets.main.output
+sourceSets.sodium.runtimeClasspath += sourceSets.fabricLoader.output
+sourceSets.sodium.runtimeClasspath += sourceSets.main.output
+
+// Iris depends on Fabric Loader, Minecraft, and Sodium
+sourceSets.iris.compileClasspath += sourceSets.fabricLoader.output
+sourceSets.iris.compileClasspath += sourceSets.main.output
+sourceSets.iris.compileClasspath += sourceSets.sodium.output
+sourceSets.iris.compileClasspath += files("${irisDir}/DHApi.jar")
+sourceSets.iris.runtimeClasspath += sourceSets.fabricLoader.output
+sourceSets.iris.runtimeClasspath += sourceSets.main.output
+sourceSets.iris.runtimeClasspath += sourceSets.sodium.output
+
+// ============================================================================
+// FABRIC LOADER JAR TASK
+// ============================================================================
+// Create a separate JAR for Fabric Loader so Knot can detect it separately
+// ============================================================================
+
+// Process Fabric Loader resources with version substitution
+tasks.named('processFabricLoaderResources') {
+    // Replace ${version} placeholder with actual version
+    filesMatching('fabric.mod.json') {
+        expand 'version': fabricLoaderVersion
+    }
+}
+
+tasks.register('fabricLoaderJar', Jar) {
+    group = 'build'
+    description = 'Assembles the Fabric Loader JAR'
+    
+    archiveBaseName = 'fabric-loader'
+    archiveVersion = fabricLoaderVersion
+    
+    from sourceSets.fabricLoader.output
+    
+    destinationDirectory = file("${buildDir}/libs")
+    
+    // Ensure the JAR has proper manifest
+    manifest {
+        attributes(
+            'Implementation-Title': 'Fabric Loader',
+            'Implementation-Version': fabricLoaderVersion,
+            'Main-Class': 'net.fabricmc.loader.impl.launch.knot.KnotClient'
+        )
+    }
+}
+
+// ============================================================================
+// MINECRAFT GAME JAR TASK
+// ============================================================================
+// Create the game JAR containing Minecraft classes
+// ============================================================================
+
+tasks.register('gameJar', Jar) {
+    group = 'build'
+    description = 'Assembles the Minecraft game JAR'
+    
+    dependsOn 'classes'
+    
+    archiveBaseName = 'minecraft'
+    archiveVersion = version
+    
+    from sourceSets.main.output
+    
+    destinationDirectory = file("${buildDir}/libs")
+}
+
+// Ensure fabricLoaderJar depends on compilation
+tasks.named('fabricLoaderJar') {
+    dependsOn 'compileFabricLoaderJava', 'processFabricLoaderResources'
+}
+
+// ============================================================================
+// SODIUM MOD JAR TASK
+// ============================================================================
+// Create the Sodium mod JAR to be loaded by Fabric Loader
+// ============================================================================
+
+// Process Sodium resources with version substitution
+tasks.named('processSodiumResources') {
+    filesMatching('fabric.mod.json') {
+        expand 'version': sodiumVersion
+    }
+}
+
+tasks.register('sodiumJar', Jar) {
+    group = 'build'
+    description = 'Assembles the Sodium mod JAR'
+    
+    dependsOn 'compileSodiumJava', 'processSodiumResources'
+    
+    archiveBaseName = 'sodium'
+    archiveVersion = sodiumVersion
+    archiveClassifier = 'mc1.21.10'
+    
+    from sourceSets.sodium.output
+    
+    destinationDirectory = file("${buildDir}/mods")
+    
+    manifest {
+        attributes(
+            'Implementation-Title': 'Sodium',
+            'Implementation-Version': sodiumVersion
+        )
+    }
+}
+
+// ============================================================================
+// IRIS MOD JAR TASK
+// ============================================================================
+// Create the Iris mod JAR to be loaded by Fabric Loader
+// ============================================================================
+
+// Process Iris resources with version substitution
+tasks.named('processIrisResources') {
+    filesMatching('fabric.mod.json') {
+        expand 'version': irisVersion
+    }
+}
+
+tasks.register('irisJar', Jar) {
+    group = 'build'
+    description = 'Assembles the Iris mod JAR'
+    
+    dependsOn 'compileIrisJava', 'processIrisResources'
+    
+    archiveBaseName = 'iris'
+    archiveVersion = irisVersion
+    archiveClassifier = 'mc1.21.10'
+    
+    from sourceSets.iris.output
+    
+    destinationDirectory = file("${buildDir}/mods")
+    
+    manifest {
+        attributes(
+            'Implementation-Title': 'Iris',
+            'Implementation-Version': irisVersion
+        )
+    }
+}
+
+// ============================================================================
+// SHADER PACK ZIP TASK
+// ============================================================================
+// Creates a zip of the shader pack from src/main/resources/shaders
+// This is done at runtime so the shader source code can be edited
+// ============================================================================
+
+tasks.register('shaderPackZip', Zip) {
+    group = 'build'
+    description = 'Creates a zip of the ComplementaryHungLoIfied shader pack'
+    
+    // Always regenerate the zip to pick up any shader changes
+    outputs.upToDateWhen { false }
+    
+    archiveBaseName = 'ComplementaryHungLoIfied'
+    archiveVersion = ''
+    archiveClassifier = ''
+    
+    from 'src/main/resources/shaders/ComplementaryHungLoIfied'
+    
+    destinationDirectory = file("${buildDir}/shaderpacks")
+}
+
+// ============================================================================
+// JAR CONFIGURATION
+// ============================================================================
+// The main JAR includes both Fabric Loader and Minecraft for distribution
+// ============================================================================
+
+jar {
+    // Include both source sets in the main JAR for distribution
+    from sourceSets.fabricLoader.output
+    from sourceSets.main.output
+    
+    manifest {
+        attributes(
+            'Main-Class': 'net.fabricmc.loader.impl.launch.knot.KnotClient',
+            'Implementation-Title': 'MattMC',
+            'Implementation-Version': version
+        )
+    }
+    
+    // Exclude duplicate META-INF/services - merge them instead
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+}
+
 // Server run configuration
 application {
-    mainClass = 'net.minecraft.server.Main'
+    mainClass = 'net.fabricmc.loader.impl.launch.knot.KnotClient'
 }
 
 // Common JVM arguments for server tasks
@@ -283,12 +720,51 @@ def configureBundledJdk(JavaExec task) {
     }
 }
 
+/**
+ * Helper method to verify that a main class file exists before running a JavaExec task.
+ * This helps detect build cache corruption issues early with a helpful error message.
+ * 
+ * @param classFileName The path to the class file (e.g., 'net/minecraft/server/Main.class')
+ * @param errorContext A description for error messages (e.g., 'Server main class' or 'Client main class')
+ */
+def verifyMainClassExists(String classFileName, String errorContext) {
+    def mainClassFile = sourceSets.main.output.classesDirs.files.collect { 
+        new File(it, classFileName) 
+    }.find { it.exists() }
+    
+    if (mainClassFile == null) {
+        throw new GradleException(
+            "\n" +
+            "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n" +
+            "ERROR: ${errorContext} file not found!\n" +
+            "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n" +
+            "\n" +
+            "Expected: ${classFileName} in one of:\n" +
+            sourceSets.main.output.classesDirs.files.collect { "  - ${it.absolutePath}" }.join("\n") + "\n" +
+            "\n" +
+            "This usually indicates a Gradle build cache issue.\n" +
+            "\n" +
+            "To fix this, please run:\n" +
+            "  ./gradlew clean build --no-build-cache\n" +
+            "\n" +
+            "If the problem persists, try clearing your Gradle cache:\n" +
+            "  rm -rf ~/.gradle/caches/\n" +
+            "  ./gradlew clean build\n" +
+            "\n" +
+            "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+        )
+    }
+}
+
 // Task to run the dedicated server (no GUI - headless mode)
 tasks.register('runServer', JavaExec) {
     group = 'minecraft'
     description = 'Runs the Minecraft dedicated server (no GUI)'
     
-    dependsOn 'copyJdkToRun'
+    dependsOn 'classes', 'copyJdkToRun'
+    
+    // Explicitly declare dependency on the classes output to ensure proper task ordering
+    inputs.files(sourceSets.main.output.classesDirs)
     
     classpath = sourceSets.main.runtimeClasspath
     mainClass = 'net.minecraft.server.Main'
@@ -298,6 +774,7 @@ tasks.register('runServer', JavaExec) {
     args = ['--nogui']
     
     doFirst {
+        verifyMainClassExists('net/minecraft/server/Main.class', 'Server main class')
         workingDir.mkdirs()
     }
     
@@ -312,7 +789,10 @@ tasks.register('runServerGui', JavaExec) {
     group = 'minecraft'
     description = 'Runs the Minecraft dedicated server with GUI'
     
-    dependsOn 'copyJdkToRun'
+    dependsOn 'classes', 'copyJdkToRun'
+    
+    // Explicitly declare dependency on the classes output to ensure proper task ordering
+    inputs.files(sourceSets.main.output.classesDirs)
     
     classpath = sourceSets.main.runtimeClasspath
     mainClass = 'net.minecraft.server.Main'
@@ -322,6 +802,7 @@ tasks.register('runServerGui', JavaExec) {
     // No --nogui argument means GUI will be shown
     
     doFirst {
+        verifyMainClassExists('net/minecraft/server/Main.class', 'Server main class')
         workingDir.mkdirs()
     }
     
@@ -331,12 +812,101 @@ tasks.register('runServerGui', JavaExec) {
     configureBundledJdk(it)
 }
 
-// Task to run the Minecraft client
+// Task to run the Minecraft client through Fabric Loader (Knot)
 tasks.register('runClient', JavaExec) {
     group = 'minecraft'
-    description = 'Runs the Minecraft client'
+    description = 'Runs the Minecraft client with Fabric Loader'
     
-    dependsOn 'copyJdkToRun'
+    dependsOn 'fabricLoaderJar', 'gameJar', 'sodiumJar', 'irisJar', 'copyJdkToRun', 'shaderPackZip'
+    
+    // Use the separate JARs so Fabric Loader can detect the game JAR properly
+    // The order matters: Fabric Loader JAR first, then Game JAR, then dependencies
+    def fabricLoaderJarFile = file("${buildDir}/libs/fabric-loader-${fabricLoaderVersion}.jar")
+    def gameJarFile = file("${buildDir}/libs/minecraft-${version}.jar")
+    
+    classpath = files(fabricLoaderJarFile, gameJarFile) + 
+                configurations.runtimeClasspath
+    
+    // Use Fabric Loader's KnotClient as the entry point
+    mainClass = 'net.fabricmc.loader.impl.launch.knot.KnotClient'
+    
+    workingDir = file('run')
+    jvmArgs = clientJvmArgs + [
+        // Fabric Loader options
+        '-Dfabric.development=true',
+        // Tell Fabric Loader where the game JAR is
+        "-Dfabric.gameJarPath.client=${gameJarFile.absolutePath}"
+    ]
+    
+    // Required client arguments - these get passed through Knot to Minecraft
+    args = [
+        '--version', '1.21.10',
+        '--accessToken', '0',
+        '--gameDir', file('run').absolutePath,
+        '--assetsDir', file('run/assets').absolutePath,
+        '--assetIndex', '27'
+    ]
+    
+    doFirst {
+        // Verify JARs exist
+        if (!fabricLoaderJarFile.exists()) {
+            throw new GradleException("Fabric Loader JAR not found: ${fabricLoaderJarFile}")
+        }
+        if (!gameJarFile.exists()) {
+            throw new GradleException("Game JAR not found: ${gameJarFile}")
+        }
+        
+        workingDir.mkdirs()
+        file('run/assets').mkdirs()
+        file('run/resourcepacks').mkdirs()
+        // Clear and recreate mods folder to remove stale/old mod JARs
+        def modsDir = file('run/mods')
+        if (modsDir.exists()) {
+            modsDir.deleteDir()
+        }
+        modsDir.mkdirs()
+        
+        // Copy Sodium and Iris mod JARs to mods folder
+        copy {
+            from file("${buildDir}/mods")
+            into modsDir
+            include '*.jar'
+        }
+        
+        // Copy assets from src/main/resources/assets to run/assets for dev environment
+        def resourcesAssetsDir = file('src/main/resources/assets')
+        if (resourcesAssetsDir.exists() && resourcesAssetsDir.isDirectory()) {
+            copy {
+                from resourcesAssetsDir
+                into file('run/assets')
+            }
+        }
+        
+        // Create shaderpacks directory and copy shader pack zip
+        def shaderpacksDir = file('run/shaderpacks')
+        shaderpacksDir.mkdirs()
+        copy {
+            from file("${buildDir}/shaderpacks")
+            into shaderpacksDir
+            include '*.zip'
+        }
+    }
+    
+    standardInput = System.in
+    
+    // Configure to use bundled JDK
+    configureBundledJdk(it)
+}
+
+// Task to run the Minecraft client WITHOUT Fabric Loader (vanilla mode)
+tasks.register('runClientVanilla', JavaExec) {
+    group = 'minecraft'
+    description = 'Runs the Minecraft client without Fabric Loader (vanilla mode)'
+    
+    dependsOn 'classes', 'copyJdkToRun'
+    
+    // Explicitly declare dependency on the classes output to ensure proper task ordering
+    inputs.files(sourceSets.main.output.classesDirs)
     
     classpath = sourceSets.main.runtimeClasspath
     mainClass = 'net.minecraft.client.main.Main'
@@ -354,6 +924,7 @@ tasks.register('runClient', JavaExec) {
     ]
     
     doFirst {
+        verifyMainClassExists('net/minecraft/client/main/Main.class', 'Client main class')
         workingDir.mkdirs()
         file('run/assets').mkdirs()
         file('run/resourcepacks').mkdirs()
@@ -526,7 +1097,7 @@ tasks.register('clientDist') {
     group = 'distribution'
     description = 'Creates a runnable client distribution'
     
-    dependsOn 'jar', 'classes', 'downloadJdk'
+    dependsOn 'jar', 'classes', 'downloadJdk', 'shaderPackZip'
     
     def distDir = "${buildDir}/client-dist/MattMC"
     
@@ -538,6 +1109,7 @@ tasks.register('clientDist') {
         file("${distDir}/run").mkdirs()
         file("${distDir}/run/assets").mkdirs()
         file("${distDir}/run/resourcepacks").mkdirs()
+        file("${distDir}/run/shaderpacks").mkdirs()
         
         // Copy project JAR
         copy {
@@ -579,6 +1151,14 @@ tasks.register('clientDist') {
             }
             println "Copied assets from ${resourcesAssetsDir.absolutePath}"
         }
+        
+        // Copy shader pack zip to shaderpacks directory
+        copy {
+            from file("${buildDir}/shaderpacks")
+            into "${distDir}/run/shaderpacks"
+            include '*.zip'
+        }
+        println "Copied shader pack to ${distDir}/run/shaderpacks"
         
         // Build classpath string for launch scripts
         def jarName = tasks.jar.archiveFileName.get()
@@ -638,3 +1218,121 @@ tasks.register('clientDistZip', Zip) {
     
     destinationDirectory = file("${buildDir}/distributions")
 }
+
+// ===== TESTING CONFIGURATION =====
+
+// Configure JUnit 5 test platform for standard tests
+test {
+    useJUnitPlatform()
+    
+    // Configure test output
+    testLogging {
+        events "passed", "skipped", "failed"
+        exceptionFormat "full"
+        showStandardStreams = false
+        showCauses = true
+        showStackTraces = true
+        
+        // Show summary after test execution
+        afterSuite { desc, result ->
+            if (!desc.parent) {
+                println "\nTest Results: ${result.resultType}"
+                println "Tests run: ${result.testCount}, " +
+                        "Passed: ${result.successfulTestCount}, " +
+                        "Failed: ${result.failedTestCount}, " +
+                        "Skipped: ${result.skippedTestCount}"
+            }
+        }
+    }
+    
+    // Set max heap for tests
+    maxHeapSize = "2g"
+    
+    // Exclude performance tests from regular test runs
+    // Performance tests are identified by naming convention: *PerformanceTest or *Benchmark
+    exclude '**/*PerformanceTest.class'
+    exclude '**/*Benchmark.class'
+}
+
+// Separate task for performance tests
+tasks.register('performanceTest', Test) {
+    group = 'verification'
+    description = 'Runs performance tests and benchmarks (tests ending with "PerformanceTest" or "Benchmark")'
+    
+    // Use the test source set (same as regular test task)
+    testClassesDirs = sourceSets.test.output.classesDirs
+    classpath = sourceSets.test.runtimeClasspath
+    
+    useJUnitPlatform()
+    
+    testLogging {
+        events "passed", "skipped", "failed"
+        exceptionFormat "full"
+        showStandardStreams = true  // Show stdout for performance metrics
+        
+        // Show summary after test execution
+        afterSuite { desc, result ->
+            if (!desc.parent) {
+                println "\nPerformance Test Results: ${result.resultType}"
+                println "Tests run: ${result.testCount}, " +
+                        "Passed: ${result.successfulTestCount}, " +
+                        "Failed: ${result.failedTestCount}, " +
+                        "Skipped: ${result.skippedTestCount}"
+            }
+        }
+    }
+    
+    // Include performance tests by naming convention
+    // Tests ending with "PerformanceTest" or "Benchmark" are considered performance tests
+    include '**/*PerformanceTest.class'
+    include '**/*Benchmark.class'
+    
+    // More memory for performance tests
+    maxHeapSize = "4g"
+}
+
+// Task to run all tests (both misc and performance)
+tasks.register('testAll', Test) {
+    group = 'verification'
+    description = 'Runs all tests including performance tests'
+    
+    // Use the test source set (same as regular test task)
+    testClassesDirs = sourceSets.test.output.classesDirs
+    classpath = sourceSets.test.runtimeClasspath
+    
+    useJUnitPlatform()
+    
+    testLogging {
+        events "passed", "skipped", "failed"
+        exceptionFormat "full"
+        showStandardStreams = true
+        
+        // Show summary after test execution
+        afterSuite { desc, result ->
+            if (!desc.parent) {
+                println "\nAll Tests Results: ${result.resultType}"
+                println "Tests run: ${result.testCount}, " +
+                        "Passed: ${result.successfulTestCount}, " +
+                        "Failed: ${result.failedTestCount}, " +
+                        "Skipped: ${result.skippedTestCount}"
+            }
+        }
+    }
+    
+    maxHeapSize = "4g"
+}
+
+// Verify that production builds only use main source set (exclude tests)
+// This ensures tests are never included in distributions
+fatJar {
+    // Explicitly use only main source set output
+    from sourceSets.main.output
+}
+
+clientFatJar {
+    // Explicitly use only main source set output
+    from sourceSets.main.output
+}
+
+// The clientDist task already uses only runtimeClasspath and main source set,
+// but we verify this is maintained for future modifications

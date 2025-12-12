@@ -107,8 +107,19 @@ public class RenderSystem {
 		return Thread.currentThread() == renderThread;
 	}
 
+	public static boolean isInInit() {
+		// During initialization, we're on the main thread before the render thread is set
+		return renderThread == null || Thread.currentThread() == renderThread;
+	}
+
 	public static void assertOnRenderThread() {
 		if (!isOnRenderThread()) {
+			throw constructThreadException();
+		}
+	}
+
+	public static void assertOnRenderThreadOrInit() {
+		if (!isOnRenderThread() && !isInInit()) {
 			throw constructThreadException();
 		}
 	}

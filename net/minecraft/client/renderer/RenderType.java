@@ -1016,7 +1016,7 @@ public abstract class RenderType extends RenderStateShard {
 	@Environment(EnvType.CLIENT)
 	public static final class CompositeState {
 		final RenderStateShard.EmptyTextureStateShard textureState;
-		final RenderStateShard.OutputStateShard outputState;
+		public final RenderStateShard.OutputStateShard outputState;
 		final RenderType.OutlineProperty outlineProperty;
 		final ImmutableList<RenderStateShard> states;
 
@@ -1121,5 +1121,14 @@ public abstract class RenderType extends RenderStateShard {
 		public String toString() {
 			return this.name;
 		}
+	}
+	
+	// Iris compatibility methods
+	public RenderPipeline iris$getPipeline() {
+		return null;
+	}
+	
+	public RenderTarget iris$getRenderTarget() {
+		return null;
 	}
 }

@@ -312,7 +312,7 @@ public class PalettedContainer<T> implements PaletteResize<T>, PalettedContainer
 		void accept(T object, int i);
 	}
 
-	record Data<T>(Configuration configuration, BitStorage storage, Palette<T> palette) {
+	public record Data<T>(Configuration configuration, BitStorage storage, Palette<T> palette) {
 
 		public void copyFrom(Palette<T> palette, BitStorage bitStorage) {
 			PaletteResize<T> paletteResize = PaletteResize.noResizeExpected();

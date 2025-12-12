@@ -62,7 +62,6 @@ public class ShareToLanScreen extends Screen {
 			}
 
 			this.minecraft.gui.getChat().addMessage(component);
-			this.minecraft.getNarrator().saySystemQueued(component);
 			this.minecraft.updateTitle();
 		}).bounds(this.width / 2 - 155, this.height - 28, 150, 20).build();
 		this.portEdit = new EditBox(this.font, this.width / 2 - 75, 160, 150, 20, Component.translatable("lanServer.port"));

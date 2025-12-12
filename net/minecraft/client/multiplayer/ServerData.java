@@ -89,10 +89,6 @@ public class ServerData {
 		return this.type == ServerData.Type.LAN;
 	}
 
-	public boolean isRealm() {
-		return this.type == ServerData.Type.REALM;
-	}
-
 	public ServerData.Type type() {
 		return this.type;
 	}
@@ -183,7 +179,6 @@ public class ServerData {
 	@Environment(EnvType.CLIENT)
 	public static enum Type {
 		LAN,
-		REALM,
 		OTHER;
 	}
 }

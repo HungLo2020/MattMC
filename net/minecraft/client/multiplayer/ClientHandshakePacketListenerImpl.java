@@ -1,12 +1,12 @@
 package net.minecraft.client.multiplayer;
 
-import com.mojang.authlib.GameProfile;
-import com.mojang.authlib.exceptions.AuthenticationException;
-import com.mojang.authlib.exceptions.AuthenticationUnavailableException;
-import com.mojang.authlib.exceptions.ForcedUsernameChangeException;
-import com.mojang.authlib.exceptions.InsufficientPrivilegesException;
-import com.mojang.authlib.exceptions.InvalidCredentialsException;
-import com.mojang.authlib.exceptions.UserBannedException;
+import net.minecraft.server.profile.PlayerProfile;
+import net.minecraft.client.auth.AuthenticationException;
+import net.minecraft.client.auth.AuthenticationUnavailableException;
+import net.minecraft.client.auth.InvalidCredentialsException;
+import net.minecraft.client.auth.InsufficientPrivilegesException;
+import net.minecraft.client.auth.ForcedUsernameChangeException;
+import net.minecraft.client.auth.UserBannedException;
 import com.mojang.logging.LogUtils;
 import java.math.BigInteger;
 import java.security.PublicKey;
@@ -158,25 +158,13 @@ public class ClientHandshakePacketListenerImpl implements ClientLoginPacketListe
 
 	@Nullable
 	private Component authenticateServer(String string) {
-		try {
-			this.minecraft.services().sessionService().joinServer(this.minecraft.getUser().getProfileId(), this.minecraft.getUser().getAccessToken(), string);
-			return null;
-		} catch (AuthenticationUnavailableException var3) {
-			return Component.translatable("disconnect.loginFailedInfo", new Object[]{Component.translatable("disconnect.loginFailedInfo.serversUnavailable")});
-		} catch (InvalidCredentialsException var4) {
-			return Component.translatable("disconnect.loginFailedInfo", new Object[]{Component.translatable("disconnect.loginFailedInfo.invalidSession")});
-		} catch (InsufficientPrivilegesException var5) {
-			return Component.translatable("disconnect.loginFailedInfo", new Object[]{Component.translatable("disconnect.loginFailedInfo.insufficientPrivileges")});
-		} catch (ForcedUsernameChangeException | UserBannedException var6) {
-			return Component.translatable("disconnect.loginFailedInfo", new Object[]{Component.translatable("disconnect.loginFailedInfo.userBanned")});
-		} catch (AuthenticationException var7) {
-			return Component.translatable("disconnect.loginFailedInfo", new Object[]{var7.getMessage()});
-		}
+		// Offline mode - no server authentication
+		return null;
 	}
 
 	public void handleLoginFinished(ClientboundLoginFinishedPacket clientboundLoginFinishedPacket) {
 		this.switchState(ClientHandshakePacketListenerImpl.State.JOINING);
-		GameProfile gameProfile = clientboundLoginFinishedPacket.gameProfile();
+		PlayerProfile playerProfile = clientboundLoginFinishedPacket.playerProfile();
 		this.connection
 			.setupInboundProtocol(
 				ConfigurationProtocols.CLIENTBOUND,
@@ -185,8 +173,7 @@ public class ClientHandshakePacketListenerImpl implements ClientLoginPacketListe
 					this.connection,
 					new CommonListenerCookie(
 						this.levelLoadTracker,
-						gameProfile,
-						this.minecraft.getTelemetryManager().createWorldSessionManager(this.newWorld, this.worldLoadDuration, this.minigameName),
+						playerProfile,
 						ClientRegistryLayer.createRegistryAccess().compositeAccess(),
 						FeatureFlags.DEFAULT_FLAGS,
 						null,
@@ -209,11 +196,7 @@ public class ClientHandshakePacketListenerImpl implements ClientLoginPacketListe
 
 	public void onDisconnect(DisconnectionDetails disconnectionDetails) {
 		Component component = this.wasTransferredTo ? CommonComponents.TRANSFER_CONNECT_FAILED : CommonComponents.CONNECT_FAILED;
-		if (this.serverData != null && this.serverData.isRealm()) {
-			this.minecraft.setScreen(new DisconnectedScreen(this.parent, component, disconnectionDetails.reason(), CommonComponents.GUI_BACK));
-		} else {
-			this.minecraft.setScreen(new DisconnectedScreen(this.parent, component, disconnectionDetails));
-		}
+		this.minecraft.setScreen(new DisconnectedScreen(this.parent, component, disconnectionDetails));
 	}
 
 	public boolean isAcceptingMessages() {

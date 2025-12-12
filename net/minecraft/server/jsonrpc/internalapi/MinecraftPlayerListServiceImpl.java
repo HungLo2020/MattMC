@@ -37,7 +37,8 @@ public class MinecraftPlayerListServiceImpl implements MinecraftPlayerListServic
 
 	@Override
 	public Optional<NameAndId> fetchUserById(UUID uUID) {
-		return Optional.ofNullable(this.server.services().sessionService().fetchProfile(uUID, true)).map(profileResult -> new NameAndId(profileResult.profile()));
+		// Offline mode - no session service, return empty
+		return Optional.empty();
 	}
 
 	@Override

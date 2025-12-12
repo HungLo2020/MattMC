@@ -451,7 +451,7 @@ public abstract class AbstractSelectionList<E extends AbstractSelectionList.Entr
 	}
 
 	@Environment(EnvType.CLIENT)
-	protected abstract static class Entry<E extends AbstractSelectionList.Entry<E>> implements GuiEventListener, LayoutElement {
+	public abstract static class Entry<E extends AbstractSelectionList.Entry<E>> implements GuiEventListener, LayoutElement {
 		public static final int CONTENT_PADDING = 2;
 		private int x = 0;
 		private int y = 0;
