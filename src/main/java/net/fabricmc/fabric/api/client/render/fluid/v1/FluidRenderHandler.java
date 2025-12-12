@@ -16,6 +16,7 @@
 
 package net.fabricmc.fabric.api.client.render.fluid.v1;
 
+import net.minecraft.client.renderer.texture.TextureAtlas;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.BlockAndTintGetter;
@@ -38,5 +39,13 @@ public interface FluidRenderHandler {
      */
     default int getFluidColor(@Nullable BlockAndTintGetter view, @Nullable BlockPos pos, FluidState state) {
         return -1; // White/no tint
+    }
+    
+    /**
+     * Called when textures are reloaded.
+     * Override to reload any custom sprites from the texture atlas.
+     */
+    default void reloadTextures(TextureAtlas textureAtlas) {
+        // Default implementation does nothing
     }
 }

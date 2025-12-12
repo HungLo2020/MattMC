@@ -39,6 +39,10 @@ public class LiquidBlockRenderer {
 		this.waterIcons[0] = blockModelShaper.getBlockModel(Blocks.WATER.defaultBlockState()).particleIcon();
 		this.waterIcons[1] = materialSet.get(ModelBakery.WATER_FLOW);
 		this.waterOverlay = materialSet.get(ModelBakery.WATER_OVERLAY);
+		
+		// Notify Fabric API's FluidRenderHandlerRegistry of sprite updates
+		net.fabricmc.fabric.api.client.render.fluid.v1.FluidRenderHandlerRegistry.INSTANCE.onFluidRendererReload(
+			this, this.waterIcons, this.lavaIcons, this.waterOverlay);
 	}
 
 	private static boolean isNeighborSameFluid(FluidState fluidState, FluidState fluidState2) {

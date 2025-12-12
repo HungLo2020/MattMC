@@ -16,11 +16,22 @@
 
 package net.fabricmc.fabric.api.client.render.fluid.v1;
 
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.renderer.BiomeColors;
+import net.minecraft.client.renderer.block.LiquidBlockRenderer;
+import net.minecraft.client.renderer.texture.TextureAtlas;
+import net.minecraft.client.renderer.texture.TextureAtlasSprite;
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.level.BlockAndTintGetter;
 import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.HalfTransparentBlock;
+import net.minecraft.world.level.block.LeavesBlock;
 import net.minecraft.world.level.material.Fluid;
+import net.minecraft.world.level.material.FluidState;
+import net.minecraft.world.level.material.Fluids;
 import org.jetbrains.annotations.Nullable;
 
-import java.util.HashMap;
+import java.util.IdentityHashMap;
 import java.util.Map;
 
 /**
@@ -28,8 +39,17 @@ import java.util.Map;
  */
 public final class FluidRenderHandlerRegistry {
     public static final FluidRenderHandlerRegistry INSTANCE = new FluidRenderHandlerRegistry();
-    private final Map<Fluid, FluidRenderHandler> handlers = new HashMap<>();
-    private final Map<Fluid, FluidRenderHandler> overrides = new HashMap<>();
+    private final Map<Fluid, FluidRenderHandler> handlers = new IdentityHashMap<>();
+    private final Map<Fluid, FluidRenderHandler> modHandlers = new IdentityHashMap<>();
+    private final Map<Block, Boolean> transparencyForOverlay = new IdentityHashMap<>();
+    
+    // Initialize with default handlers for water and lava
+    {
+        handlers.put(Fluids.WATER, WaterRenderHandler.INSTANCE);
+        handlers.put(Fluids.FLOWING_WATER, WaterRenderHandler.INSTANCE);
+        handlers.put(Fluids.LAVA, LavaRenderHandler.INSTANCE);
+        handlers.put(Fluids.FLOWING_LAVA, LavaRenderHandler.INSTANCE);
+    }
     
     private FluidRenderHandlerRegistry() { }
     
@@ -45,13 +65,7 @@ public final class FluidRenderHandlerRegistry {
      */
     public void register(Fluid fluid, FluidRenderHandler handler) {
         handlers.put(fluid, handler);
-    }
-    
-    /**
-     * Sets an override handler for a fluid.
-     */
-    public void setOverride(Fluid fluid, FluidRenderHandler handler) {
-        overrides.put(fluid, handler);
+        modHandlers.put(fluid, handler);
     }
     
     /**
@@ -59,8 +73,7 @@ public final class FluidRenderHandlerRegistry {
      */
     @Nullable
     public FluidRenderHandler get(Fluid fluid) {
-        FluidRenderHandler override = overrides.get(fluid);
-        return override != null ? override : handlers.get(fluid);
+        return handlers.get(fluid);
     }
     
     /**
@@ -68,14 +81,92 @@ public final class FluidRenderHandlerRegistry {
      */
     @Nullable
     public FluidRenderHandler getOverride(Fluid fluid) {
-        return overrides.get(fluid);
+        return modHandlers.get(fluid);
+    }
+    
+    /**
+     * Sets the transparency of a block for fluid overlay rendering.
+     */
+    public void setBlockTransparency(Block block, boolean transparent) {
+        transparencyForOverlay.put(block, transparent);
     }
     
     /**
      * Checks if a block is transparent for fluid rendering purposes.
      */
     public boolean isBlockTransparent(Block block) {
-        // By default, assume non-solid blocks are transparent
-        return !block.defaultBlockState().canOcclude();
+        Boolean override = transparencyForOverlay.get(block);
+        if (override != null) {
+            return override;
+        }
+        return block instanceof HalfTransparentBlock || block instanceof LeavesBlock;
+    }
+    
+    /**
+     * Called when the fluid renderer reloads textures.
+     */
+    public void onFluidRendererReload(LiquidBlockRenderer renderer, TextureAtlasSprite[] waterSprites, TextureAtlasSprite[] lavaSprites, TextureAtlasSprite waterOverlay) {
+        WaterRenderHandler.INSTANCE.updateSprites(waterSprites, waterOverlay);
+        LavaRenderHandler.INSTANCE.updateSprites(lavaSprites);
+        
+        TextureAtlas texture = Minecraft.getInstance()
+                .getAtlasManager()
+                .getAtlasOrThrow(net.minecraft.data.AtlasIds.BLOCKS);
+        
+        for (FluidRenderHandler handler : handlers.values()) {
+            handler.reloadTextures(texture);
+        }
+    }
+    
+    /**
+     * Handler for water rendering.
+     */
+    private static class WaterRenderHandler implements FluidRenderHandler {
+        public static final WaterRenderHandler INSTANCE = new WaterRenderHandler();
+        
+        /**
+         * The water color of the Ocean biome.
+         */
+        private static final int DEFAULT_WATER_COLOR = 0x3f76e4;
+        
+        private final TextureAtlasSprite[] sprites = new TextureAtlasSprite[3];
+        
+        @Override
+        public TextureAtlasSprite[] getFluidSprites(@Nullable BlockAndTintGetter view, @Nullable BlockPos pos, FluidState state) {
+            return sprites;
+        }
+        
+        @Override
+        public int getFluidColor(@Nullable BlockAndTintGetter view, @Nullable BlockPos pos, FluidState state) {
+            if (view != null && pos != null) {
+                return BiomeColors.getAverageWaterColor(view, pos);
+            } else {
+                return DEFAULT_WATER_COLOR;
+            }
+        }
+        
+        public void updateSprites(TextureAtlasSprite[] waterSprites, TextureAtlasSprite waterOverlay) {
+            sprites[0] = waterSprites[0];
+            sprites[1] = waterSprites[1];
+            sprites[2] = waterOverlay;
+        }
+    }
+    
+    /**
+     * Handler for lava rendering.
+     */
+    private static class LavaRenderHandler implements FluidRenderHandler {
+        public static final LavaRenderHandler INSTANCE = new LavaRenderHandler();
+        
+        private TextureAtlasSprite[] sprites;
+        
+        @Override
+        public TextureAtlasSprite[] getFluidSprites(@Nullable BlockAndTintGetter view, @Nullable BlockPos pos, FluidState state) {
+            return sprites;
+        }
+        
+        public void updateSprites(TextureAtlasSprite[] lavaSprites) {
+            sprites = lavaSprites;
+        }
     }
 }
