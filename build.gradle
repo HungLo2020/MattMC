@@ -18,15 +18,15 @@ def lwjglNatives = System.getProperty('os.name').toLowerCase().contains('mac')
 
 // Fabric Loader version (update this when upgrading Fabric Loader source)
 def fabricLoaderVersion = '0.18.2'
-def fabricLoaderDir = "fabric-loader-${fabricLoaderVersion}"
+def fabricLoaderDir = "modules/fabric-loader-${fabricLoaderVersion}"
 
 // Sodium version (update this when upgrading Sodium source)
 def sodiumVersion = '0.7.2'
-def sodiumDir = 'sodium-1.21.9'
+def sodiumDir = 'modules/sodium-1.21.9'
 
 // Iris version (update this when upgrading Iris source)
 def irisVersion = '1.9.6'
-def irisDir = 'Iris-1.21.9'
+def irisDir = 'modules/Iris-1.21.9'
 
 java {
     // Keep toolchain configuration for compilation
@@ -406,14 +406,8 @@ sourceSets {
             exclude 'src/test/**'
             // Exclude frnsrc directory entirely (reference-only code)
             exclude 'frnsrc/**'
-            // Exclude Fabric Loader source (compiled separately)
-            exclude 'fabric-loader-*/**'
-            // Exclude Fabric API source (compiled separately)
-            exclude 'fabric-api-*/**'
-            // Exclude Sodium source (compiled separately)
-            exclude 'sodium-*/**'
-            // Exclude Iris source (compiled separately)
-            exclude 'Iris-*/**'
+            // Exclude modules directory (compiled separately)
+            exclude 'modules/**'
         }
         resources {
             srcDirs = [
