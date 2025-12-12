@@ -202,11 +202,17 @@ public class ExtendedShader extends GlProgram implements IrisProgram {
 		}
 
 		// Bind the appropriate framebuffer
+		// Get framebuffers from parent at runtime (they may not exist during shader creation)
 		if (parent != null) {
-			if (parent.isBeforeTranslucent() && writingToBeforeTranslucent != null) {
-				writingToBeforeTranslucent.bind();
-			} else if (writingToAfterTranslucent != null) {
-				writingToAfterTranslucent.bind();
+			GlFramebuffer beforeTranslucent = writingToBeforeTranslucent != null ? 
+				writingToBeforeTranslucent : parent.getWritingToBeforeTranslucent();
+			GlFramebuffer afterTranslucent = writingToAfterTranslucent != null ? 
+				writingToAfterTranslucent : parent.getWritingToAfterTranslucent();
+			
+			if (parent.isBeforeTranslucent() && beforeTranslucent != null) {
+				beforeTranslucent.bind();
+			} else if (afterTranslucent != null) {
+				afterTranslucent.bind();
 			}
 		}
 	}

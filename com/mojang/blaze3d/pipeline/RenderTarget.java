@@ -154,4 +154,19 @@ public abstract class RenderTarget {
 	public GpuTextureView getDepthTextureView() {
 		return this.depthTextureView;
 	}
+	
+	/**
+	 * Binds the framebuffer for this render target.
+	 * Following IRIS's RenderTargetInterface.iris$bindFramebuffer() pattern.
+	 * 
+	 * IRIS Reference: MixinRenderTarget.java line 60-62
+	 */
+	public void iris$bindFramebuffer() {
+		if (this.colorTexture != null) {
+			com.mojang.blaze3d.opengl.GlTexture glTexture = (com.mojang.blaze3d.opengl.GlTexture) this.colorTexture;
+			com.mojang.blaze3d.opengl.GlDevice device = (com.mojang.blaze3d.opengl.GlDevice) RenderSystem.getDevice();
+			int fbo = glTexture.getFbo(device.directStateAccess(), this.depthTexture);
+			com.mojang.blaze3d.opengl.GlStateManager._glBindFramebuffer(com.mojang.blaze3d.opengl.GlConst.GL_FRAMEBUFFER, fbo);
+		}
+	}
 }

@@ -78,7 +78,10 @@ public class ShaderPackPipeline implements WorldRenderingPipeline {
 	// G-buffer management (Step A3)
 	private GBufferManager gBufferManager;
 	private GlFramebuffer gBufferFramebuffer;
+	private GlFramebuffer writingToBeforeTranslucent;  // Framebuffer for opaque geometry
+	private GlFramebuffer writingToAfterTranslucent;   // Framebuffer for translucent geometry
 	private boolean isRenderingWorld = false;
+	private boolean isMainBound = false;  // Following IRIS pattern exactly
 	private boolean isBeforeTranslucent = true;
 	private int cachedWidth = -1;
 	private int cachedHeight = -1;
@@ -511,24 +514,18 @@ public class ShaderPackPipeline implements WorldRenderingPipeline {
 			
 			gBufferManager = new GBufferManager(width, height, createDefaultTargetSettings());
 			
-			// Create G-buffer framebuffer
-			createGBufferFramebuffer();
+			// Create G-buffer framebuffers (both before and after translucent)
+			createGBufferFramebuffers();
 			
 			LOGGER.info("Resized G-buffers to {}x{}", width, height);
 		}
 		
-		// NOTE: We do NOT bind our G-buffer framebuffer here.
-		// Minecraft's frame graph manages framebuffer bindings.
-		// The shader pack shaders will be applied when geometry is rendered,
-		// writing directly to Minecraft's render targets.
-		// 
-		// For full deferred rendering with G-buffers, we would need to:
-		// 1. Intercept framebuffer bindings via mixins
-		// 2. Replace Minecraft's framebuffer with our G-buffer
-		// 3. This is a more complex change for a future implementation.
-		//
-		// For now, shader pack shaders will apply effects directly in the
-		// gbuffers pass without deferred lighting (forward rendering mode).
+		// Following IRIS pattern: bind the main render target and set isMainBound = true
+		// This signals that shader interception should be active
+		// IRIS Reference: IrisRenderingPipeline.java lines 980-981
+		mainTarget.iris$bindFramebuffer();
+		isMainBound = true;
+		isBeforeTranslucent = true;
 	}
 	
 	/**
@@ -584,14 +581,24 @@ public class ShaderPackPipeline implements WorldRenderingPipeline {
 	}
 	
 	/**
-	 * Creates the G-buffer framebuffer with MRT attachments.
+	 * Creates G-buffer framebuffers for before and after translucent rendering.
 	 * Following IRIS RenderTargets.createGbufferFramebuffer() pattern.
+	 * 
+	 * IRIS Reference: RenderTargets.java createFramebuffer() method
 	 */
-	private void createGBufferFramebuffer() {
+	private void createGBufferFramebuffers() {
+		// Destroy old framebuffers
 		if (gBufferFramebuffer != null) {
 			gBufferFramebuffer.destroy();
 		}
+		if (writingToBeforeTranslucent != null) {
+			writingToBeforeTranslucent.destroy();
+		}
+		if (writingToAfterTranslucent != null) {
+			writingToAfterTranslucent.destroy();
+		}
 		
+		// Create main G-buffer framebuffer
 		gBufferFramebuffer = new GlFramebuffer();
 		
 		// Attach color textures for MRT
@@ -602,34 +609,49 @@ public class ShaderPackPipeline implements WorldRenderingPipeline {
 		gBufferFramebuffer.addColorAttachment(0, colorTex0.getMainTexture());
 		gBufferFramebuffer.addColorAttachment(1, colorTex1.getMainTexture());
 		gBufferFramebuffer.addColorAttachment(2, colorTex2.getMainTexture());
-		
-		// Attach depth texture from colortex0's depth or create separate
-		// For now, we'll use a simple depth renderbuffer
 		gBufferFramebuffer.addDepthAttachment(cachedWidth, cachedHeight);
+		
+		// For simplicity, use the same framebuffer for before and after translucent
+		// In a full implementation, these would use different draw buffers
+		// following the BufferFlipper ping-pong pattern from IRIS
+		writingToBeforeTranslucent = gBufferFramebuffer;
+		writingToAfterTranslucent = gBufferFramebuffer;
 		
 		// Check framebuffer completeness
 		if (!gBufferFramebuffer.isComplete()) {
 			LOGGER.error("G-buffer framebuffer is not complete!");
 		} else {
-			LOGGER.debug("G-buffer framebuffer created successfully");
+			LOGGER.debug("G-buffer framebuffers created successfully");
 		}
+	}
+	
+	/**
+	 * Gets the framebuffer for before-translucent rendering.
+	 * Used by ExtendedShader to bind the correct framebuffer.
+	 */
+	public GlFramebuffer getWritingToBeforeTranslucent() {
+		return writingToBeforeTranslucent;
+	}
+	
+	/**
+	 * Gets the framebuffer for after-translucent rendering.
+	 * Used by ExtendedShader to bind the correct framebuffer.
+	 */
+	public GlFramebuffer getWritingToAfterTranslucent() {
+		return writingToAfterTranslucent;
 	}
 	
 	@Override
 	public void finalizeLevelRendering() {
-		// NOTE: Since we're not using G-buffer framebuffers for now (forward rendering mode),
-		// we skip composite and final passes. The shader pack shaders applied during geometry
-		// rendering are writing directly to Minecraft's render targets.
-		//
-		// For full deferred rendering with composite/final passes, we would need to:
-		// 1. Actually use the G-buffer framebuffer during geometry rendering
-		// 2. Run composite passes that read from G-buffers
-		// 3. Run final pass to output to screen
-		//
-		// This is disabled for now to prevent the white screen issue.
+		// Following IRIS pattern for cleanup
+		// IRIS Reference: IrisRenderingPipeline.java finalizeLevelRendering()
 		
-		// Set isRenderingWorld to false - this stops shader interception
+		// Reset state flags
+		isMainBound = false;
 		isRenderingWorld = false;
+		
+		// Unbind any custom framebuffers and restore default
+		GlFramebuffer.unbind();
 	}
 	
 	/**
@@ -1259,23 +1281,24 @@ public class ShaderPackPipeline implements WorldRenderingPipeline {
 	
 	/**
 	 * Whether this pipeline should override vanilla shaders.
+	 * Following IRIS's IrisRenderingPipeline.shouldOverrideShaders() pattern EXACTLY.
+	 * 
 	 * Returns true when:
-	 * 1. We are currently rendering the world (between beginLevelRendering/finalizeLevelRendering)
-	 * 2. Shader programs have been compiled
-	 * 3. ExtendedShaders are available in the shader map
+	 * 1. isRenderingWorld - We are currently rendering the world (between beginLevelRendering/finalizeLevelRendering)
+	 * 2. isMainBound - The main framebuffer is bound (after initial setup)
 	 * 
-	 * Following IRIS's IrisRenderingPipeline.shouldOverrideShaders() pattern:
-	 * return isRenderingWorld && isMainBound;
-	 * 
-	 * TODO: Currently DISABLED because shader interception causes white screen.
-	 * The shader pack programs expect Iris-compatible uniforms and samplers,
-	 * but the vanilla rendering pipeline binds vanilla uniforms/samplers.
-	 * Full Iris-style mixin-based interception is needed to make this work.
+	 * IRIS Reference: IrisRenderingPipeline.java line 1243
 	 */
 	public boolean shouldOverrideShaders() {
-		// TEMPORARILY DISABLED - shader interception not yet working correctly
-		// When enabled: return isRenderingWorld && programsCompiled && !extendedShaders.isEmpty();
-		return false;
+		return isRenderingWorld && isMainBound;
+	}
+	
+	/**
+	 * Sets whether the main framebuffer is bound.
+	 * Following IRIS pattern.
+	 */
+	public void setIsMainBound(boolean bound) {
+		this.isMainBound = bound;
 	}
 	
 	/**

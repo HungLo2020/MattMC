@@ -71,14 +71,19 @@ public class ShaderCreator {
 		// Create list of buffer blend overrides (empty for now)
 		List<BufferBlendOverride> overrides = new ArrayList<>();
 		
+		// Get framebuffers from parent pipeline - following IRIS pattern
+		// IRIS Reference: ShaderCreator.java passes framebuffers from RenderTargets
+		GlFramebuffer writingToBeforeTranslucent = parent != null ? parent.getWritingToBeforeTranslucent() : null;
+		GlFramebuffer writingToAfterTranslucent = parent != null ? parent.getWritingToAfterTranslucent() : null;
+		
 		// Create the ExtendedShader with uniform and sampler setup
 		return new ExtendedShader(
 			programId,
 			name,
 			vertexFormat,
 			false, // usesTessellation
-			null,  // writingToBeforeTranslucent (to be set by pipeline)
-			null,  // writingToAfterTranslucent (to be set by pipeline)
+			writingToBeforeTranslucent,
+			writingToAfterTranslucent,
 			blendModeOverride,
 			alphaTest,
 			// Uniform creator
