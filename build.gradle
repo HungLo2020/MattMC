@@ -836,12 +836,17 @@ tasks.register('runClient', JavaExec) {
         workingDir.mkdirs()
         file('run/assets').mkdirs()
         file('run/resourcepacks').mkdirs()
-        file('run/mods').mkdirs()  // Create mods folder for Fabric
+        // Clear and recreate mods folder to remove stale/old mod JARs
+        def modsDir = file('run/mods')
+        if (modsDir.exists()) {
+            modsDir.deleteDir()
+        }
+        modsDir.mkdirs()
         
         // Copy Sodium and Iris mod JARs to mods folder
         copy {
             from file("${buildDir}/mods")
-            into file('run/mods')
+            into modsDir
             include '*.jar'
         }
         
