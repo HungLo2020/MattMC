@@ -717,6 +717,7 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 			RenderSystem.setShaderFog(gpuBufferSlice);
 			MultiBufferSource.BufferSource bufferSource = this.renderBuffers.bufferSource();
 			this.weatherEffectRenderer.render(bufferSource, vec3, this.levelRenderState.weatherRenderState);
+			iris$renderWorldBorderBody();
 			this.worldBorderRenderer.render(this.levelRenderState.worldBorderRenderState, vec3, i, f);
 			bufferSource.endBatch();
 		});
@@ -1450,5 +1451,10 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 	
 	public void iris$createWeatherBody() {
 		// This method is injected into by Iris mixins for weather type creation
+	}
+	
+	public void iris$renderWorldBorderBody() {
+		// This method is injected into by Iris mixins for world border rendering phase changes
+		// The actual world border rendering happens in addWeatherPass lambda
 	}
 }
