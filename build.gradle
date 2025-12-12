@@ -16,6 +16,10 @@ def lwjglNatives = System.getProperty('os.name').toLowerCase().contains('mac')
             ? 'natives-linux-arm64' 
             : 'natives-linux'
 
+// Fabric Loader version (update this when upgrading Fabric Loader source)
+def fabricLoaderVersion = '0.18.2'
+def fabricLoaderDir = "frnsrc/fabric-loader-${fabricLoaderVersion}"
+
 java {
     // Keep toolchain configuration for compilation
     // But we'll override at runtime for JavaExec tasks
@@ -297,13 +301,13 @@ sourceSets {
         java {
             srcDirs = [
                 '.',
-                // Fabric Loader source code
-                'frnsrc/fabric-loader-0.18.2/src/main/java',
-                'frnsrc/fabric-loader-0.18.2/src/main/legacyJava',
+                // Fabric Loader source code (version controlled by fabricLoaderDir variable)
+                "${fabricLoaderDir}/src/main/java",
+                "${fabricLoaderDir}/src/main/legacyJava",
                 // Java 17+ version of MRJ classes (takes precedence over Java 8 versions)
-                'frnsrc/fabric-loader-0.18.2/src/java17/java',
-                'frnsrc/fabric-loader-0.18.2/minecraft/src/main/java',
-                'frnsrc/fabric-loader-0.18.2/minecraft/src/main/legacyJava'
+                "${fabricLoaderDir}/src/java17/java",
+                "${fabricLoaderDir}/minecraft/src/main/java",
+                "${fabricLoaderDir}/minecraft/src/main/legacyJava"
             ]
             exclude 'gradle/**'
             exclude 'build/**'
@@ -320,22 +324,22 @@ sourceSets {
             exclude 'frnsrc/*.zip'
             exclude 'frnsrc/*.md'
             exclude 'frnsrc/nothingburger'
-            // Exclude Fabric Loader test files and build files
-            exclude 'frnsrc/fabric-loader-0.18.2/src/test/**'
-            exclude 'frnsrc/fabric-loader-0.18.2/.git/**'
-            exclude 'frnsrc/fabric-loader-0.18.2/.github/**'
-            exclude 'frnsrc/fabric-loader-0.18.2/build/**'
-            exclude 'frnsrc/fabric-loader-0.18.2/junit/**'
-            exclude 'frnsrc/fabric-loader-0.18.2/minecraft/minecraft-test/**'
-            exclude 'frnsrc/fabric-loader-0.18.2/minecraft/src/test/**'
+            // Exclude Fabric Loader test files and build files (using fabricLoaderDir pattern)
+            exclude 'frnsrc/fabric-loader-*/src/test/**'
+            exclude 'frnsrc/fabric-loader-*/.git/**'
+            exclude 'frnsrc/fabric-loader-*/.github/**'
+            exclude 'frnsrc/fabric-loader-*/build/**'
+            exclude 'frnsrc/fabric-loader-*/junit/**'
+            exclude 'frnsrc/fabric-loader-*/minecraft/minecraft-test/**'
+            exclude 'frnsrc/fabric-loader-*/minecraft/src/test/**'
             // Exclude Java 8 MRJ classes (using Java 17 versions instead)
-            exclude 'frnsrc/fabric-loader-0.18.2/src/main/java/net/fabricmc/loader/impl/mrj/**'
+            exclude 'frnsrc/fabric-loader-*/src/main/java/net/fabricmc/loader/impl/mrj/**'
         }
         resources {
             srcDirs = [
                 'src/main/resources',
                 // Fabric Loader resources
-                'frnsrc/fabric-loader-0.18.2/src/main/resources'
+                "${fabricLoaderDir}/src/main/resources"
             ]
         }
     }
