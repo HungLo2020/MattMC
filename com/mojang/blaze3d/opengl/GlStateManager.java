@@ -518,7 +518,7 @@ public class GlStateManager {
 	}
 
 	@Environment(EnvType.CLIENT)
-	static class BlendState {
+	public static class BlendState {
 		public final GlStateManager.BooleanState mode = new GlStateManager.BooleanState(3042);
 		public int srcRgb = 1;
 		public int dstRgb = 0;
@@ -527,7 +527,7 @@ public class GlStateManager {
 	}
 
 	@Environment(EnvType.CLIENT)
-	static class BooleanState {
+	public static class BooleanState {
 		private final int state;
 		private boolean enabled;
 
@@ -563,7 +563,7 @@ public class GlStateManager {
 	}
 
 	@Environment(EnvType.CLIENT)
-	static class ColorMask {
+	public static class ColorMask {
 		public boolean red = true;
 		public boolean green = true;
 		public boolean blue = true;
@@ -576,7 +576,7 @@ public class GlStateManager {
 	}
 
 	@Environment(EnvType.CLIENT)
-	static class DepthState {
+	public static class DepthState {
 		public final GlStateManager.BooleanState mode = new GlStateManager.BooleanState(2929);
 		public boolean mask = true;
 		public int func = 513;
