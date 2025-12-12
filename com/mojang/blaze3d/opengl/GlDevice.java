@@ -351,6 +351,17 @@ public class GlDevice implements GpuDevice {
 		net.minecraft.client.renderer.shaders.pipeline.ShaderPackPipeline shaderPipeline = 
 			net.minecraft.client.renderer.shaders.IrisShaders.getActivePipeline();
 		
+		// Debug logging for first few frames to diagnose interception issues
+		boolean debugLogging = false; // Set to true for debugging
+		if (debugLogging) {
+			if (shaderPipeline != null) {
+				LOGGER.info("Shader interception check: pipeline={}, shouldOverride={}", 
+					shaderPipeline.getShaderPackName(), shaderPipeline.shouldOverrideShaders());
+			} else {
+				LOGGER.info("Shader interception check: pipeline=null");
+			}
+		}
+		
 		if (shaderPipeline != null && shaderPipeline.shouldOverrideShaders()) {
 			// Get ShaderKey from IrisPipelines mapping
 			net.minecraft.client.renderer.shaders.programs.ShaderKey shaderKey = 
@@ -370,7 +381,17 @@ public class GlDevice implements GpuDevice {
 					// Cache this to avoid creating new objects every frame
 					return this.shaderPackPipelineCache
 						.computeIfAbsent(renderPipeline, rp -> new GlRenderPipeline(rp, program));
+				} else {
+					LOGGER.debug("No program in ShaderMap for ShaderKey: {}", shaderKey);
 				}
+			} else {
+				LOGGER.debug("No ShaderKey mapping for RenderPipeline: {}", renderPipeline.getLocation());
+			}
+		} else {
+			if (shaderPipeline == null) {
+				LOGGER.trace("No active shader pipeline");
+			} else {
+				LOGGER.trace("shouldOverrideShaders is false");
 			}
 		}
 		
