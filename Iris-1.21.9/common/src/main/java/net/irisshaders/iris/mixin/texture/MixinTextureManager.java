@@ -1,6 +1,5 @@
 package net.irisshaders.iris.mixin.texture;
 
-import net.irisshaders.iris.pbr.format.TextureFormatLoader;
 import net.irisshaders.iris.pbr.texture.PBRTextureManager;
 import net.minecraft.client.renderer.texture.TextureManager;
 import net.minecraft.server.packs.resources.ResourceManager;
@@ -10,11 +9,10 @@ import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 import java.nio.file.Path;
-import java.util.List;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.Executor;
 
 @Mixin(TextureManager.class)
 public class MixinTextureManager {
@@ -22,13 +20,11 @@ public class MixinTextureManager {
 	@Final
 	private ResourceManager resourceManager;
 
-	@SuppressWarnings("UnresolvedMixinReference")
-	@Inject(method = {
-		"method_65880",
-		"lambda$reload$3"
-	}, at = @At("TAIL"), require = 1)
-	private static void iris$onTailReloadLambda(List list, Void void_, CallbackInfo ci) {
-		// NOTE: Cannot access resourceManager from static context - using Minecraft.getInstance() instead
+	// MattMC: The lambda$reload$X method targeting is fragile. Instead we use a broader approach.
+	// This injects at the end of the reload method to clear PBR textures when textures are reloaded.
+	// Note: reload returns CompletableFuture<Void>, so we need CallbackInfoReturnable
+	@Inject(method = "reload", at = @At("RETURN"))
+	private void iris$onReloadReturn(CallbackInfoReturnable<CompletableFuture<Void>> cir) {
 		PBRTextureManager.INSTANCE.clear();
 	}
 

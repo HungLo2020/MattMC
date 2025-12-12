@@ -42,7 +42,7 @@ public class MixinLevelRenderer_Sky {
 	 * <p>When updating Sodium to new releases of the game, please check for new
 	 * ways the fog can be reduced in {@link FogRenderer#setupFog}.</p>
 	 */
-	@Inject(method = { "method_62215", NeoLambdas.NEO_RENDER_SKY }, require = 1, at = @At("HEAD"), cancellable = true)
+	@Inject(method = NeoLambdas.NEO_RENDER_SKY, require = 1, at = @At("HEAD"), cancellable = true)
 	private void preRenderSky(CallbackInfo ci) {
 		if (Iris.getCurrentPack().isEmpty()) {
 			Camera camera = Minecraft.getInstance().gameRenderer.getMainCamera();

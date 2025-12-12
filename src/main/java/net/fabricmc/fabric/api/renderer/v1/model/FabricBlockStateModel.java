@@ -17,7 +17,6 @@
 package net.fabricmc.fabric.api.renderer.v1.model;
 
 import net.fabricmc.fabric.api.renderer.v1.mesh.QuadEmitter;
-import net.minecraft.client.renderer.block.model.BlockStateModel;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.util.RandomSource;
@@ -29,8 +28,10 @@ import java.util.function.Predicate;
 
 /**
  * Fabric extension interface for BlockStateModel to support enhanced rendering.
+ * This interface is applied to BlockStateModel via mixin, NOT via inheritance
+ * to avoid ClassCircularityError during class loading.
  */
-public interface FabricBlockStateModel extends BlockStateModel {
+public interface FabricBlockStateModel {
     /**
      * Emits quads from this model to the given emitter.
      */
