@@ -605,6 +605,29 @@ tasks.register('irisJar', Jar) {
 }
 
 // ============================================================================
+// SHADER PACK ZIP TASK
+// ============================================================================
+// Creates a zip of the shader pack from src/main/resources/shaders
+// This is done at runtime so the shader source code can be edited
+// ============================================================================
+
+tasks.register('shaderPackZip', Zip) {
+    group = 'build'
+    description = 'Creates a zip of the ComplementaryHungLoIfied shader pack'
+    
+    // Always regenerate the zip to pick up any shader changes
+    outputs.upToDateWhen { false }
+    
+    archiveBaseName = 'ComplementaryHungLoIfied'
+    archiveVersion = ''
+    archiveClassifier = ''
+    
+    from 'src/main/resources/shaders/ComplementaryHungLoIfied'
+    
+    destinationDirectory = file("${buildDir}/shaderpacks")
+}
+
+// ============================================================================
 // JAR CONFIGURATION
 // ============================================================================
 // The main JAR includes both Fabric Loader and Minecraft for distribution
@@ -794,7 +817,7 @@ tasks.register('runClient', JavaExec) {
     group = 'minecraft'
     description = 'Runs the Minecraft client with Fabric Loader'
     
-    dependsOn 'fabricLoaderJar', 'gameJar', 'sodiumJar', 'irisJar', 'copyJdkToRun'
+    dependsOn 'fabricLoaderJar', 'gameJar', 'sodiumJar', 'irisJar', 'copyJdkToRun', 'shaderPackZip'
     
     // Use the separate JARs so Fabric Loader can detect the game JAR properly
     // The order matters: Fabric Loader JAR first, then Game JAR, then dependencies
@@ -857,6 +880,15 @@ tasks.register('runClient', JavaExec) {
                 from resourcesAssetsDir
                 into file('run/assets')
             }
+        }
+        
+        // Create shaderpacks directory and copy shader pack zip
+        def shaderpacksDir = file('run/shaderpacks')
+        shaderpacksDir.mkdirs()
+        copy {
+            from file("${buildDir}/shaderpacks")
+            into shaderpacksDir
+            include '*.zip'
         }
     }
     
@@ -1065,7 +1097,7 @@ tasks.register('clientDist') {
     group = 'distribution'
     description = 'Creates a runnable client distribution'
     
-    dependsOn 'jar', 'classes', 'downloadJdk'
+    dependsOn 'jar', 'classes', 'downloadJdk', 'shaderPackZip'
     
     def distDir = "${buildDir}/client-dist/MattMC"
     
@@ -1077,6 +1109,7 @@ tasks.register('clientDist') {
         file("${distDir}/run").mkdirs()
         file("${distDir}/run/assets").mkdirs()
         file("${distDir}/run/resourcepacks").mkdirs()
+        file("${distDir}/run/shaderpacks").mkdirs()
         
         // Copy project JAR
         copy {
@@ -1118,6 +1151,14 @@ tasks.register('clientDist') {
             }
             println "Copied assets from ${resourcesAssetsDir.absolutePath}"
         }
+        
+        // Copy shader pack zip to shaderpacks directory
+        copy {
+            from file("${buildDir}/shaderpacks")
+            into "${distDir}/run/shaderpacks"
+            include '*.zip'
+        }
+        println "Copied shader pack to ${distDir}/run/shaderpacks"
         
         // Build classpath string for launch scripts
         def jarName = tasks.jar.archiveFileName.get()
