@@ -166,38 +166,8 @@ download_jar "${FABRIC_BASE}/org/ow2/asm/asm-util/9.9/asm-util-9.9.jar" "asm-uti
 
 echo ""
 
-# ============================================================================
-# FABRIC API DEPENDENCIES
-# Required for Sodium and Iris mod compilation
-# ============================================================================
-
-echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-echo -e "${BLUE}  Downloading Fabric API (for Sodium/Iris)${NC}"
-echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-
-# Fabric API version compatible with Minecraft 1.21.10
-# The Fabric API JAR contains nested JARs in META-INF/jars/ that need to be extracted
-FABRIC_API_VERSION="0.135.0+1.21.10"
-
-# Download the full Fabric API JAR
-download_jar "${FABRIC_BASE}/net/fabricmc/fabric-api/fabric-api/${FABRIC_API_VERSION}/fabric-api-${FABRIC_API_VERSION}.jar" "fabric-api-${FABRIC_API_VERSION}.jar"
-
-# Extract nested module JARs from Fabric API (they're in META-INF/jars/)
-echo -e "   ${YELLOW}📦${NC} Extracting Fabric API modules..."
-cd "${DEPS_DIR}"
-if [ -f "fabric-api-${FABRIC_API_VERSION}.jar" ]; then
-    # Extract nested JARs
-    unzip -o -q "fabric-api-${FABRIC_API_VERSION}.jar" "META-INF/jars/*.jar" 2>/dev/null || true
-    # Move them to deps root
-    if [ -d "META-INF/jars" ]; then
-        mv META-INF/jars/*.jar . 2>/dev/null || true
-        rm -rf META-INF
-        echo -e "   ${GREEN}✓${NC} Fabric API modules extracted"
-    fi
-fi
-cd - > /dev/null
-
-echo ""
+# Note: Fabric API is not downloaded as JARs because they use intermediary mappings.
+# Instead, we use Mojang-mapped stub interfaces in src/main/java/net/fabricmc/fabric/api/
 
 # Summary
 echo -e "${GREEN}╔════════════════════════════════════════════════════════════════╗${NC}"

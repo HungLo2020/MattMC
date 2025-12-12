@@ -256,10 +256,8 @@ dependencies {
         // Tiny Mappings Parser - legacy mapping parser
         implementation files('libraries/deps/tiny-mappings-parser-0.3.0+build.17.jar')
         
-        // ===== FABRIC API MODULES (for Sodium/Iris) =====
-        // These are the individual module JARs extracted from fabric-api-0.135.0+1.21.10.jar
-        // Use fileTree to include all Fabric API module JARs
-        implementation fileTree(dir: 'libraries/deps', include: 'fabric-*.jar')
+        // Note: Fabric API stubs are in src/main/java/net/fabricmc/fabric/api/
+        // No external Fabric API JARs needed - using Mojang-mapped stubs
     } else {
         // Remote Fabric Loader dependencies
         // ASM - bytecode manipulation (required by Fabric Loader)
@@ -401,6 +399,8 @@ sourceSets {
             exclude 'frnsrc/**'
             // Exclude Fabric Loader source (compiled separately)
             exclude 'fabric-loader-*/**'
+            // Exclude Fabric API source (compiled separately)
+            exclude 'fabric-api-*/**'
             // Exclude Sodium source (compiled separately)
             exclude 'sodium-*/**'
             // Exclude Iris source (compiled separately)
@@ -450,6 +450,7 @@ configurations {
 }
 
 // Sodium depends on Fabric Loader and Minecraft
+// Fabric API stub interfaces are in src/main/java/net/fabricmc/fabric/api/
 sourceSets.sodium.compileClasspath += sourceSets.fabricLoader.output
 sourceSets.sodium.compileClasspath += sourceSets.main.output
 sourceSets.sodium.runtimeClasspath += sourceSets.fabricLoader.output
