@@ -1266,9 +1266,16 @@ public class ShaderPackPipeline implements WorldRenderingPipeline {
 	 * 
 	 * Following IRIS's IrisRenderingPipeline.shouldOverrideShaders() pattern:
 	 * return isRenderingWorld && isMainBound;
+	 * 
+	 * TODO: Currently DISABLED because shader interception causes white screen.
+	 * The shader pack programs expect Iris-compatible uniforms and samplers,
+	 * but the vanilla rendering pipeline binds vanilla uniforms/samplers.
+	 * Full Iris-style mixin-based interception is needed to make this work.
 	 */
 	public boolean shouldOverrideShaders() {
-		return isRenderingWorld && programsCompiled && !extendedShaders.isEmpty();
+		// TEMPORARILY DISABLED - shader interception not yet working correctly
+		// When enabled: return isRenderingWorld && programsCompiled && !extendedShaders.isEmpty();
+		return false;
 	}
 	
 	/**
