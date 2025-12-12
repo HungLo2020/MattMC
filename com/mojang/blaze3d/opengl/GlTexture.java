@@ -88,6 +88,11 @@ public class GlTexture extends GpuTexture {
 	}
 
 	@Override
+	public int iris$getGlId() {
+		return this.id;
+	}
+
+	@Override
 	public void setAddressMode(AddressMode addressMode, AddressMode addressMode2) {
 		super.setAddressMode(addressMode, addressMode2);
 		this.modesDirty = true;

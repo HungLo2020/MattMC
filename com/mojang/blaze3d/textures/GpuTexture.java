@@ -89,4 +89,13 @@ public abstract class GpuTexture implements AutoCloseable {
 	public abstract void close();
 
 	public abstract boolean isClosed();
+
+	// Iris compatibility methods
+	public int iris$getGlId() {
+		return 0; // Subclasses should override
+	}
+
+	public void iris$markMipmapNonLinear() {
+		// No-op by default
+	}
 }
