@@ -34,8 +34,12 @@ public final class FluidRendering {
     public static void render(FluidRenderHandler handler, BlockAndTintGetter world, BlockPos pos, 
                               VertexConsumer vertexConsumer, BlockState blockState, FluidState fluidState, 
                               DefaultRenderer defaultRenderer) {
-        // Stub implementation - actual rendering would invoke handler.renderFluid
-        // For now, just invoke the default renderer
+        if (handler == null) {
+            // Handler should never be null at this point - this indicates a registry initialization issue
+            throw new IllegalStateException("FluidRenderHandler is null for fluid: " + fluidState.getType() + 
+                ". This may indicate that FluidRenderHandlerRegistry was not properly initialized.");
+        }
+        // Invoke the default renderer which will use the handler
         defaultRenderer.render(handler, world, pos, vertexConsumer, blockState, fluidState);
     }
 
