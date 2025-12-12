@@ -335,94 +335,24 @@ public class GlDevice implements GpuDevice {
 	/**
 	 * Get or compile a render pipeline.
 	 * 
-	 * Uses shader pack program interception following the IRIS pattern from
-	 * MixinShaderManager_Overrides.java:redirectIrisProgram().
+	 * NOTE: Shader pack interception is currently DISABLED because shader packs expect
+	 * Iris-compatible uniforms (gbufferModelView, gbufferProjection, sunPosition, etc.)
+	 * while vanilla RenderPipeline uses vanilla uniforms (ModelViewMat, ProjMat).
+	 * 
+	 * To properly implement shader pack rendering, we need to:
+	 * 1. Port Iris's IrisUniformData system that translates vanilla matrices to Iris names
+	 * 2. Implement proper UBO binding for Iris-style uniforms
+	 * 3. Implement the complete Iris rendering pipeline with G-buffer management
+	 * 
+	 * For now, vanilla shaders are used while shader packs compile in the background.
+	 * 
+	 * TODO: Implement Iris-compatible uniform translation layer following:
+	 * - net.irisshaders.iris.uniforms (uniform providers)
+	 * - net.irisshaders.iris.pipeline (rendering integration)
+	 * - MixinShaderManager_Overrides.redirectIrisProgram()
 	 */
 	protected GlRenderPipeline getOrCompilePipeline(RenderPipeline renderPipeline) {
-		// Check if we should intercept this pipeline with shader pack shaders
-		boolean irisEnabled = net.minecraft.client.renderer.shaders.IrisShaders.isEnabled();
-		if (irisEnabled) {
-			net.minecraft.client.renderer.shaders.pipeline.ShaderPackPipeline shaderPipeline = 
-				net.minecraft.client.renderer.shaders.IrisShaders.getActivePipeline();
-			
-			// Check if this pipeline has a shader pack mapping (simpler than isRenderingWorld check)
-			// This allows shader interception to work regardless of world rendering phase
-			boolean hasPipelineMapping = shaderPipeline != null && 
-				net.minecraft.client.renderer.shaders.pipeline.IrisPipelines.hasPipeline(renderPipeline);
-			
-			// Debug logging for first call per pipeline (only logs once per pipeline)
-			if (shaderPipeline != null && !shaderPackPipelineCache.containsKey(renderPipeline) && 
-				!this.pipelineCache.containsKey(renderPipeline)) {
-				LOGGER.debug("Pipeline check: {} - isEnabled={}, shaderPipeline={}, hasPipelineMapping={}, isRenderingWorld={}", 
-					renderPipeline.getLocation(), irisEnabled, shaderPipeline != null, hasPipelineMapping,
-					shaderPipeline.isRenderingWorld());
-			}
-			
-			// Intercept if the pipeline has a shader mapping
-			if (hasPipelineMapping) {
-				// Check cache first for performance
-				GlRenderPipeline cached = shaderPackPipelineCache.get(renderPipeline);
-				if (cached != null) {
-					// Setup state for cached shader (uniforms need to be updated each frame)
-					if (cached.program() instanceof net.minecraft.client.renderer.shaders.programs.ExtendedShader extendedShader) {
-						extendedShader.iris$setupState();
-					}
-					return cached;
-				}
-				
-				// Use IrisPipelines to get the ShaderKey for this pipeline
-				net.minecraft.client.renderer.shaders.programs.ShaderKey shaderKey = 
-					net.minecraft.client.renderer.shaders.pipeline.IrisPipelines.getPipeline(shaderPipeline, renderPipeline);
-				
-				if (shaderKey != null) {
-					// Get the program from the ShaderKey and follow fallback chain
-					net.minecraft.client.renderer.shaders.loading.ProgramId programId = shaderKey.getProgram();
-					if (programId == null) {
-						LOGGER.warn("ShaderKey {} has null ProgramId", shaderKey);
-					} else {
-						// Follow the fallback chain to find an available program (IRIS pattern)
-						net.minecraft.client.renderer.shaders.programs.ExtendedShader extendedShader = null;
-						String foundProgramName = null;
-						net.minecraft.client.renderer.shaders.loading.ProgramId currentId = programId;
-						
-						while (currentId != null) {
-							String programName = currentId.getSourceName();
-							extendedShader = shaderPipeline.getExtendedShader(programName);
-							
-							if (extendedShader != null) {
-								foundProgramName = programName;
-								break;
-							}
-							
-							// Try the fallback
-							currentId = currentId.getFallback().orElse(null);
-						}
-						
-						if (extendedShader != null) {
-							LOGGER.debug("Shader interception: {} -> {} (ShaderKey: {}, program ID: {})", 
-								renderPipeline.getLocation(), foundProgramName, shaderKey, extendedShader.getProgramId());
-							
-							// CRITICAL: Setup vanilla uniforms so the rendering system can bind UBOs/samplers
-							// This allows vanilla uniform data (matrices, fog, etc.) to flow through
-							extendedShader.setupUniforms(renderPipeline.getUniforms(), renderPipeline.getSamplers());
-							
-							// Setup Iris shader state (custom uniforms, samplers, images)
-							extendedShader.iris$setupState();
-							
-							// Cache and return a pipeline wrapping the ExtendedShader
-							GlRenderPipeline interceptedPipeline = new GlRenderPipeline(renderPipeline, extendedShader);
-							shaderPackPipelineCache.put(renderPipeline, interceptedPipeline);
-							return interceptedPipeline;
-						} else {
-							LOGGER.debug("No ExtendedShader found in fallback chain for: {} (ShaderKey: {})", 
-								programId.getSourceName(), shaderKey);
-						}
-					}
-				}
-			}
-		}
-		
-		// Vanilla pipeline compilation
+		// Vanilla pipeline compilation (shader interception disabled until uniform translation is implemented)
 		return (GlRenderPipeline)this.pipelineCache
 			.computeIfAbsent(renderPipeline, renderPipeline2 -> this.compilePipeline(renderPipeline, this.defaultShaderSource));
 	}
