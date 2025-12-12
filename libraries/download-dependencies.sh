@@ -185,14 +185,25 @@ DH_CORE_DIR="${DH_DIR}/coreSubProjects"
 if [ -d "${DH_CORE_DIR}" ] && [ -f "${DH_CORE_DIR}/LICENSE.txt" ]; then
     echo -e "   ${GREEN}✓${NC} Distant Horizons coreSubProjects (already exists)"
 else
+    # Remove any existing gitlink/submodule reference
+    if [ -e "${DH_CORE_DIR}" ]; then
+        echo -e "   ${YELLOW}⚠${NC} Removing existing gitlink/submodule reference..."
+        rm -rf "${DH_CORE_DIR}"
+    fi
+    
     echo -e "   ${YELLOW}⬇${NC} Cloning coreSubProjects from GitLab..."
     if git clone --depth 1 https://gitlab.com/jeseibel/distant-horizons-core.git "${DH_CORE_DIR}" 2>/dev/null; then
+        # Remove the .git directory so it's just source files, not a submodule
+        rm -rf "${DH_CORE_DIR}/.git"
         echo -e "   ${GREEN}✓${NC} Distant Horizons coreSubProjects"
+        echo -e "   ${YELLOW}Note:${NC} Remember to commit the coreSubProjects folder to the repo"
     else
         echo -e "   ${RED}✗${NC} Failed to clone coreSubProjects"
         echo -e "   ${YELLOW}⚠${NC} Please manually clone the repository:"
         echo -e "   ${YELLOW}   cd modules/distant-horizons-2.3.4b${NC}"
-        echo -e "   ${YELLOW}   git clone https://gitlab.com/jeseibel/distant-horizons-core.git coreSubProjects${NC}"
+        echo -e "   ${YELLOW}   rm -rf coreSubProjects${NC}"
+        echo -e "   ${YELLOW}   git clone --depth 1 https://gitlab.com/jeseibel/distant-horizons-core.git coreSubProjects${NC}"
+        echo -e "   ${YELLOW}   rm -rf coreSubProjects/.git${NC}"
     fi
 fi
 
