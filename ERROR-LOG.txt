@@ -10,91 +10,31 @@ Path for java installation '/usr/lib/jvm/openjdk-21' (Common Linux Locations) do
 📂 Copying JDK to run directory...
 ✅ JDK copied to /home/matt/Documents/Repos/MattMC/run/jdk-21
 
-> Task :compileFabricLoaderJava
-/home/matt/Documents/Repos/MattMC/fabric-loader-0.18.2/minecraft/src/main/java/net/fabricmc/loader/impl/game/minecraft/applet/AppletLauncher.java:42: warning: [removal] Applet in java.applet has been deprecated and marked for removal
-public class AppletLauncher extends Applet implements AppletStub {
-                                    ^
-/home/matt/Documents/Repos/MattMC/fabric-loader-0.18.2/minecraft/src/main/java/net/fabricmc/loader/impl/game/minecraft/applet/AppletLauncher.java:42: warning: [removal] AppletStub in java.applet has been deprecated and marked for removal
-public class AppletLauncher extends Applet implements AppletStub {
-                                                      ^
-/home/matt/Documents/Repos/MattMC/fabric-loader-0.18.2/minecraft/src/main/java/net/fabricmc/loader/impl/game/minecraft/applet/AppletLauncher.java:46: warning: [removal] Applet in java.applet has been deprecated and marked for removal
-        private Applet mcApplet;
-                ^
-/home/matt/Documents/Repos/MattMC/fabric-loader-0.18.2/minecraft/src/main/java/net/fabricmc/loader/impl/game/minecraft/applet/AppletLauncher.java:66: warning: [removal] Applet in java.applet has been deprecated and marked for removal
-                        mcApplet = (Applet) FabricLauncherBase.getLauncher()
-                                    ^
-/home/matt/Documents/Repos/MattMC/fabric-loader-0.18.2/minecraft/src/main/java/net/fabricmc/loader/impl/game/minecraft/applet/AppletLauncher.java:88: warning: [removal] Applet in java.applet has been deprecated and marked for removal
-        public void replace(Applet applet) {
-                            ^
-Note: Some input files use or override a deprecated API.
-Note: Recompile with -Xlint:deprecation for details.
-5 warnings
-
-> Task :compileJava
-/home/matt/Documents/Repos/MattMC/net/minecraft/world/level/block/entity/TheEndGatewayBlockEntity.java:228: warning: [removal] getHighestSectionPosition() in ChunkAccess has been deprecated and marked for removal
-                int i = levelChunk.getHighestSectionPosition() + 16 - 1;
-                                  ^
-/home/matt/Documents/Repos/MattMC/net/minecraft/world/level/levelgen/Heightmap.java:48: warning: [removal] getHighestSectionPosition() in ChunkAccess has been deprecated and marked for removal
-                        int j = chunkAccess.getHighestSectionPosition() + 16;
-                                           ^
-/home/matt/Documents/Repos/MattMC/net/minecraft/world/level/levelgen/placement/NoiseBasedCountPlacement.java:35: warning: [removal] BIOME_INFO_NOISE in Biome has been deprecated and marked for removal
-                double d = Biome.BIOME_INFO_NOISE.getValue(blockPos.getX() / this.noiseFactor, blockPos.getZ() / this.noiseFactor, false);
-                                ^
-/home/matt/Documents/Repos/MattMC/net/minecraft/world/level/levelgen/placement/NoiseThresholdCountPlacement.java:35: warning: [removal] BIOME_INFO_NOISE in Biome has been deprecated and marked for removal
-                double d = Biome.BIOME_INFO_NOISE.getValue(blockPos.getX() / 200.0, blockPos.getZ() / 200.0, false);
-                                ^
-Note: Some input files use or override a deprecated API.
-Note: Recompile with -Xlint:deprecation for details.
-Note: Some input files use unchecked or unsafe operations.
-Note: Recompile with -Xlint:unchecked for details.
-4 warnings
-
-> Task :compileSodiumJava
-Note: Some input files use or override a deprecated API.
-Note: Recompile with -Xlint:deprecation for details.
-Note: Some input files use unchecked or unsafe operations.
-Note: Recompile with -Xlint:unchecked for details.
-
-> Task :compileIrisJava
-Note: Some input files use or override a deprecated API.
-Note: Recompile with -Xlint:deprecation for details.
-
 > Task :runClient
 Using bundled JDK from: /home/matt/Documents/Repos/MattMC/run/jdk-21
-[09:51:37] [main/INFO]: Loading Minecraft 1.21.10 with Fabric Loader 0.18.2
-[09:51:37] [main/INFO]: Mappings not present!
-[09:51:37] [main/INFO]: Loading 19 mods:
-        - fabricloader 0.18.2
-        - iris 1.9.6+mc1.21.9
-           |-- fabric-api-base 1.0.0+14b92d8987
-           |-- fabric-key-binding-api-v1 1.1.1+b3ba9c4887
-           |-- io_github_douira_glsl-transformer 3.0.0-pre3
-           |-- org_anarres_jcpp 1.4.14
-           \-- org_antlr_antlr4-runtime 4.13.1
-        - java 21
-        - minecraft 1.21.10
-        - mixinextras 0.5.0
-        - sodium 0.7.2+mc1.21.10
-           |-- fabric-block-view-api-v2 1.0.34+e4fd1b926f
-           |-- fabric-lifecycle-events-v1 2.6.9+33df5e6e6f
-           |-- fabric-renderer-api-v1 7.1.2+328a75ba6f
-           |-- fabric-rendering-fluids-v1 3.1.38+86b3ae576f
-           |-- fabric-rendering-v1 16.0.2+91152d886f
-           |-- fabric-resource-loader-v0 3.2.3+3388a3b26f
-           |-- fabric-resource-loader-v1 1.0.3+8cc86c156f
-           \-- fabric-transitive-access-wideners-v1 6.5.3+41eb43436f
-[09:51:37] [main/WARN]: Runtime mod remapping disabled due to no fabric.remapClasspathFile being specified. You may need to update loom.
-[09:51:37] [main/ERROR]: Uncaught exception in thread "main"
-java.lang.RuntimeException: Failed to read classTweaker file from mod iris
-        at net.fabricmc.loader.impl.FabricLoaderImpl.loadClassTweakers(FabricLoaderImpl.java:534) ~[fabric-loader-0.18.2.jar:0.18.2]
-        at net.fabricmc.loader.impl.launch.knot.Knot.init(Knot.java:145) ~[fabric-loader-0.18.2.jar:0.18.2]
-        at net.fabricmc.loader.impl.launch.knot.Knot.launch(Knot.java:66) ~[fabric-loader-0.18.2.jar:0.18.2]
-        at net.fabricmc.loader.impl.launch.knot.KnotClient.main(KnotClient.java:23) ~[fabric-loader-0.18.2.jar:0.18.2]
-Caused by: net.fabricmc.classtweaker.reader.ClassTweakerFormatException: Namespace (intermediary) does not match current runtime namespace (official)
-        at net.fabricmc.classtweaker.reader.ClassTweakerReaderImpl.error(ClassTweakerReaderImpl.java:305) ~[class-tweaker-0.2.jar:?]
-        at net.fabricmc.classtweaker.reader.ClassTweakerReaderImpl.read(ClassTweakerReaderImpl.java:93) ~[class-tweaker-0.2.jar:?]
-        at net.fabricmc.loader.impl.FabricLoaderImpl.loadClassTweakers(FabricLoaderImpl.java:532) ~[fabric-loader-0.18.2.jar:0.18.2]
-        ... 3 more
+[10:03:02] [main/INFO]: Loading Minecraft 1.21.10 with Fabric Loader 0.18.2
+[10:03:02] [main/INFO]: Mappings not present!
+[10:03:02] [main/WARN]: Mod resolution failed
+[10:03:02] [main/INFO]: Immediate reason: [HARD_DEP iris 1.9.6 {depends sodium @ [0.7.x]}, HARD_DEP_NO_CANDIDATE sodium 0.7.2 {depends fabric-block-view-api-v2 @ [*]}, ROOT_FORCELOAD_SINGLE iris 1.9.6]
+[10:03:02] [main/INFO]: Reason: [HARD_DEP sodium 0.7.2 {depends fabric-block-view-api-v2 @ [*]}, HARD_DEP sodium 0.7.2 {depends fabric-renderer-api-v1 @ [*]}, HARD_DEP sodium 0.7.2 {depends fabric-rendering-fluids-v1 @ [>=2.0.0]}, HARD_DEP sodium 0.7.2 {depends fabric-resource-loader-v0 @ [*]}]
+[10:03:02] [main/INFO]: Fix: add [add:fabric-block-view-api-v2 1 ([(-∞,∞)]), add:fabric-renderer-api-v1 1 ([(-∞,∞)]), add:fabric-rendering-fluids-v1 2.0.0 ([[2.0.0,∞)]), add:fabric-resource-loader-v0 1 ([(-∞,∞)])], remove [], replace []
+[10:03:02] [main/ERROR]: Incompatible mods found!
+net.fabricmc.loader.impl.FormattedException: Some of your mods are incompatible with the game or each other!
+A potential solution has been determined, this may resolve your problem:
+         - Install fabric-block-view-api-v2, any version.
+         - Install fabric-renderer-api-v1, any version.
+         - Install fabric-rendering-fluids-v1, version 2.0.0 or later.
+         - Install fabric-resource-loader-v0, any version.
+More details:
+         - Mod 'Sodium' (sodium) 0.7.2 requires any version of fabric-block-view-api-v2, which is missing!
+         - Mod 'Sodium' (sodium) 0.7.2 requires any version of fabric-renderer-api-v1, which is missing!
+         - Mod 'Sodium' (sodium) 0.7.2 requires version 2.0.0 or later of fabric-rendering-fluids-v1, which is missing!
+         - Mod 'Sodium' (sodium) 0.7.2 requires any version of fabric-resource-loader-v0, which is missing!
+        at net.fabricmc.loader.impl.FormattedException.ofLocalized(FormattedException.java:51) ~[fabric-loader-0.18.2.jar:0.18.2]
+        at net.fabricmc.loader.impl.FabricLoaderImpl.load(FabricLoaderImpl.java:202) ~[fabric-loader-0.18.2.jar:0.18.2]
+        at net.fabricmc.loader.impl.launch.knot.Knot.init(Knot.java:142) ~[fabric-loader-0.18.2.jar:0.18.2]
+        at net.fabricmc.loader.impl.launch.knot.Knot.launch(Knot.java:66) [fabric-loader-0.18.2.jar:0.18.2]
+        at net.fabricmc.loader.impl.launch.knot.KnotClient.main(KnotClient.java:23) [fabric-loader-0.18.2.jar:0.18.2]
 
 > Task :runClient FAILED
 
@@ -110,8 +50,8 @@ Execution failed for task ':runClient'.
 > Run with --scan to get full insights.
 > Get more help at https://help.gradle.org.
 
-BUILD FAILED in 43s
-14 actionable tasks: 11 executed, 3 up-to-date
+BUILD FAILED in 11s
+14 actionable tasks: 2 executed, 12 up-to-date
 matt@HungLoDE:~/Documents/Repos/MattMC$
 
 
