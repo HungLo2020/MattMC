@@ -1,12 +1,21 @@
 package net.minecraft.client.renderer.shaders.pipeline;
 
+import com.google.common.collect.ImmutableList;
+import it.unimi.dsi.fastutil.objects.Object2ObjectMap;
+import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.Camera;
 import net.minecraft.client.renderer.shaders.framebuffer.GlFramebuffer;
 import net.minecraft.client.renderer.shaders.gl.FullScreenQuadRenderer;
 import net.minecraft.client.renderer.shaders.helpers.OptionalBoolean;
+import net.minecraft.client.renderer.shaders.helpers.StringPair;
+import net.minecraft.client.renderer.shaders.helpers.Tri;
 import net.minecraft.client.renderer.shaders.option.ShaderPackOptions;
 import net.minecraft.client.renderer.shaders.pack.*;
+import net.minecraft.client.renderer.shaders.pipeline.transform.PatchShaderType;
+import net.minecraft.client.renderer.shaders.pipeline.transform.TransformPatcher;
+import net.minecraft.client.renderer.shaders.preprocessor.JcppProcessor;
+import net.minecraft.client.renderer.shaders.preprocessor.StandardMacros;
 import net.minecraft.client.renderer.shaders.program.Program;
 import net.minecraft.client.renderer.shaders.program.ProgramBuilder;
 import net.minecraft.client.renderer.shaders.program.ProgramSource;
@@ -17,8 +26,14 @@ import net.minecraft.client.renderer.shaders.shadows.ShadowRenderTargets;
 import net.minecraft.client.renderer.shaders.targets.GBufferManager;
 import net.minecraft.client.renderer.shaders.targets.RenderTarget;
 import net.minecraft.client.renderer.shaders.texture.InternalTextureFormat;
+import net.minecraft.client.renderer.shaders.texture.TextureStage;
+import net.minecraft.client.renderer.shaders.texture.TextureType;
 import net.minecraft.client.renderer.shaders.uniform.providers.CapturedRenderingState;
 import net.minecraft.client.renderer.shaders.uniform.providers.SystemTimeUniforms;
+import net.minecraft.client.renderer.shaders.programs.ExtendedShader;
+import net.minecraft.client.renderer.shaders.programs.ShaderKey;
+import net.minecraft.client.renderer.shaders.programs.ShaderMap;
+import net.minecraft.client.renderer.shaders.loading.ProgramId;
 import com.mojang.blaze3d.opengl.GlStateManager;
 import org.joml.Matrix4f;
 import org.joml.Matrix4fc;
@@ -64,11 +79,13 @@ public class ShaderPackPipeline implements WorldRenderingPipeline {
 	private GBufferManager gBufferManager;
 	private GlFramebuffer gBufferFramebuffer;
 	private boolean isRenderingWorld = false;
+	private boolean isBeforeTranslucent = true;
 	private int cachedWidth = -1;
 	private int cachedHeight = -1;
 	
 	// Shader programs (Step A5)
 	private final Map<String, Program> programs = new HashMap<>();
+	private final Map<String, net.minecraft.client.renderer.shaders.programs.ExtendedShader> extendedShaders = new HashMap<>();
 	private Program gbuffersTerrainProgram;
 	private Program gbuffersTexturedProgram;
 	private Program gbuffersBasicProgram;
@@ -89,6 +106,9 @@ public class ShaderPackPipeline implements WorldRenderingPipeline {
 	private Matrix4f cachedProjectionMatrix = new Matrix4f();
 	private Matrix4f cachedShadowModelViewMatrix = new Matrix4f();
 	private Matrix4f cachedShadowProjectionMatrix = new Matrix4f();
+	
+	// ShaderMap for ShaderKey -> GlProgram mapping (IRIS pattern)
+	private final ShaderMap shaderMap = new ShaderMap();
 	
 	/**
 	 * Creates a new shader pack pipeline.
@@ -204,16 +224,54 @@ public class ShaderPackPipeline implements WorldRenderingPipeline {
 	private void compilePrograms() {
 		LOGGER.info("Compiling shader programs for pack: {}", packName);
 		
-		// Try to compile gbuffers_terrain (most important for terrain rendering)
-		gbuffersTerrainProgram = tryCompileProgram("gbuffers_terrain");
+		// Compile ALL gbuffers programs that exist in the shader pack
+		// Following IRIS pattern: compile all available programs, fallback handled at runtime
+		String[] gbuffersPrograms = {
+			"gbuffers_basic",
+			"gbuffers_line",
+			"gbuffers_textured",
+			"gbuffers_textured_lit",
+			"gbuffers_skybasic",
+			"gbuffers_skytextured",
+			"gbuffers_clouds",
+			"gbuffers_terrain",
+			"gbuffers_terrain_solid",
+			"gbuffers_terrain_cutout",
+			"gbuffers_damagedblock",
+			"gbuffers_block",
+			"gbuffers_block_translucent",
+			"gbuffers_beaconbeam",
+			"gbuffers_item",
+			"gbuffers_entities",
+			"gbuffers_entities_translucent",
+			"gbuffers_lightning",
+			"gbuffers_particles",
+			"gbuffers_particles_translucent",
+			"gbuffers_entities_glowing",
+			"gbuffers_armor_glint",
+			"gbuffers_spidereyes",
+			"gbuffers_hand",
+			"gbuffers_hand_water",
+			"gbuffers_weather",
+			"gbuffers_water"
+		};
 		
-		// Try to compile fallback programs
-		if (gbuffersTerrainProgram == null) {
-			gbuffersTexturedProgram = tryCompileProgram("gbuffers_textured");
+		int gbuffersCompiled = 0;
+		for (String programName : gbuffersPrograms) {
+			Program program = tryCompileProgram(programName);
+			if (program != null) {
+				gbuffersCompiled++;
+				// Store reference to key programs
+				if ("gbuffers_terrain".equals(programName)) {
+					gbuffersTerrainProgram = program;
+				} else if ("gbuffers_textured".equals(programName)) {
+					gbuffersTexturedProgram = program;
+				} else if ("gbuffers_basic".equals(programName)) {
+					gbuffersBasicProgram = program;
+				}
+			}
 		}
-		if (gbuffersTerrainProgram == null && gbuffersTexturedProgram == null) {
-			gbuffersBasicProgram = tryCompileProgram("gbuffers_basic");
-		}
+		LOGGER.info("Compiled {} gbuffers programs", gbuffersCompiled);
 		
 		// Compile deferred programs (run before translucent rendering)
 		// IRIS: deferred passes run after opaque geometry but before translucent
@@ -256,14 +314,21 @@ public class ShaderPackPipeline implements WorldRenderingPipeline {
 		
 		programsCompiled = true;
 		
+		// Build ShaderMap from ExtendedShaders for ShaderKey -> program lookup
+		buildShaderMap();
+		
 		int compiledCount = programs.size();
-		LOGGER.info("Compiled {} shader programs for pack: {} ({} deferred, {} composite)", 
-			compiledCount, packName, deferredPrograms.size(), compositePrograms.size());
+		LOGGER.info("Compiled {} shader programs for pack: {} ({} gbuffers, {} deferred, {} composite)", 
+			compiledCount, packName, gbuffersCompiled, deferredPrograms.size(), compositePrograms.size());
 	}
 	
 	/**
 	 * Attempts to compile a shader program from the pack.
 	 * Returns null if the program doesn't exist or fails to compile.
+	 * 
+	 * Uses JcppProcessor to preprocess #define/#ifdef directives, then
+	 * TransformPatcher to transform deprecated GLSL constructs to GLSL 330 Core
+	 * profile compatible code - following IRIS pattern exactly.
 	 * 
 	 * @param programName The program name (e.g., "gbuffers_terrain")
 	 * @return The compiled program, or null
@@ -284,15 +349,84 @@ public class ShaderPackPipeline implements WorldRenderingPipeline {
 			// Get optional geometry source
 			String geometrySource = sourceProvider.getShaderSource(programName + ".gsh", dimension);
 			
-			LOGGER.debug("Compiling program: {} (vsh={} chars, fsh={} chars)", 
-				programName, vertexSource.length(), fragmentSource.length());
+			LOGGER.debug("Compiling program: {} (vsh={} chars, fsh={} chars, gsh={} chars)", 
+				programName, vertexSource.length(), fragmentSource.length(), 
+				geometrySource != null ? geometrySource.length() : 0);
 			
-			// Build the program using ProgramBuilder
-			Program program = ProgramBuilder.begin(programName, vertexSource, geometrySource, fragmentSource)
+			// Get standard environment defines for preprocessing
+			ImmutableList<StringPair> environmentDefines = StandardMacros.createStandardEnvironmentDefines();
+			
+			// Step 1: Preprocess shader sources with JCPP to handle #define, #ifdef, #include, etc.
+			// This MUST be done before passing to TransformPatcher
+			String preprocessedVertex = JcppProcessor.glslPreprocessSource(vertexSource, environmentDefines);
+			String preprocessedFragment = JcppProcessor.glslPreprocessSource(fragmentSource, environmentDefines);
+			String preprocessedGeometry = geometrySource != null 
+				? JcppProcessor.glslPreprocessSource(geometrySource, environmentDefines) 
+				: null;
+			
+			LOGGER.debug("Preprocessed program: {} (vsh={} chars, fsh={} chars)", 
+				programName, preprocessedVertex.length(), preprocessedFragment.length());
+			
+			// Determine the texture stage based on program name
+			TextureStage textureStage = determineTextureStage(programName);
+			
+			// Create empty texture map (will be populated with actual texture bindings in future)
+			Object2ObjectMap<Tri<String, TextureType, TextureStage>, String> textureMap = new Object2ObjectOpenHashMap<>();
+			
+			// Step 2: Transform shader sources using TransformPatcher
+			// This handles deprecated GLSL constructs (gl_TextureMatrix, gl_Vertex, gl_Color, etc.)
+			// and converts them to GLSL 330 Core profile compatible code
+			Map<PatchShaderType, String> transformed = TransformPatcher.patchComposite(
+				programName,
+				preprocessedVertex,
+				preprocessedGeometry,
+				preprocessedFragment,
+				textureStage,
+				textureMap
+			);
+			
+			if (transformed == null) {
+				LOGGER.warn("TransformPatcher returned null for program: {}", programName);
+				return null;
+			}
+			
+			// Get transformed sources
+			String transformedVertex = transformed.get(PatchShaderType.VERTEX);
+			String transformedFragment = transformed.get(PatchShaderType.FRAGMENT);
+			String transformedGeometry = transformed.get(PatchShaderType.GEOMETRY);
+			
+			if (transformedVertex == null || transformedFragment == null) {
+				LOGGER.warn("Transformation produced null shaders for program: {}", programName);
+				return null;
+			}
+			
+			LOGGER.debug("Transformed program: {} (vsh={} chars, fsh={} chars)", 
+				programName, transformedVertex.length(), transformedFragment.length());
+			
+			// Build the program using ProgramBuilder with transformed sources
+			Program program = ProgramBuilder.begin(programName, transformedVertex, transformedGeometry, transformedFragment)
 				.build();
 			
 			// Store in programs map
 			programs.put(programName, program);
+			
+			// For gbuffers programs, also create ExtendedShader for proper uniform binding
+			if (programName.startsWith("gbuffers_")) {
+				try {
+					LOGGER.debug("Creating ExtendedShader for: {}", programName);
+					net.minecraft.client.renderer.shaders.programs.ExtendedShader extendedShader = 
+						net.minecraft.client.renderer.shaders.programs.ShaderCreator.createBasic(
+							programName,
+							transformedVertex,
+							transformedFragment,
+							this
+						);
+					extendedShaders.put(programName, extendedShader);
+					LOGGER.info("Created ExtendedShader for: {} (program ID: {})", programName, extendedShader.getProgramId());
+				} catch (Exception e) {
+					LOGGER.error("Failed to create ExtendedShader for {} during shader pack compilation: {}", programName, e.getMessage(), e);
+				}
+			}
 			
 			LOGGER.info("Successfully compiled program: {}", programName);
 			return program;
@@ -303,6 +437,29 @@ public class ShaderPackPipeline implements WorldRenderingPipeline {
 		} catch (Exception e) {
 			LOGGER.error("Error compiling program {}", programName, e);
 			return null;
+		}
+	}
+	
+	/**
+	 * Determines the texture stage based on program name.
+	 * Following IRIS's program categorization pattern.
+	 */
+	private TextureStage determineTextureStage(String programName) {
+		if (programName.startsWith("composite") || programName.equals("final")) {
+			return TextureStage.COMPOSITE_AND_FINAL;
+		} else if (programName.startsWith("deferred")) {
+			return TextureStage.DEFERRED;
+		} else if (programName.startsWith("prepare")) {
+			return TextureStage.PREPARE;
+		} else if (programName.startsWith("shadowcomp")) {
+			return TextureStage.SHADOWCOMP;
+		} else if (programName.startsWith("begin")) {
+			return TextureStage.BEGIN;
+		} else if (programName.startsWith("setup")) {
+			return TextureStage.SETUP;
+		} else {
+			// gbuffers_*, shadow, etc.
+			return TextureStage.GBUFFERS_AND_SHADOW;
 		}
 	}
 	
@@ -326,8 +483,6 @@ public class ShaderPackPipeline implements WorldRenderingPipeline {
 	@Override
 	public void beginLevelRendering() {
 		isRenderingWorld = true;
-		
-		LOGGER.debug("Begin level rendering with shader pack: {}", packName);
 		
 		// Capture matrices for uniforms (Step A10)
 		captureRenderingState();
@@ -469,8 +624,6 @@ public class ShaderPackPipeline implements WorldRenderingPipeline {
 	
 	@Override
 	public void finalizeLevelRendering() {
-		LOGGER.debug("Finalize level rendering with shader pack: {}", packName);
-		
 		isRenderingWorld = false;
 		
 		// Unbind G-buffer framebuffer
@@ -1013,6 +1166,22 @@ public class ShaderPackPipeline implements WorldRenderingPipeline {
 	public boolean isRenderingWorld() {
 		return isRenderingWorld;
 	}
+
+	/**
+	 * Checks if we are before the translucent rendering phase.
+	 * @return true if before translucent rendering
+	 */
+	public boolean isBeforeTranslucent() {
+		return isBeforeTranslucent;
+	}
+
+	/**
+	 * Sets whether we are before the translucent rendering phase.
+	 * @param beforeTranslucent true if before translucent rendering
+	 */
+	public void setBeforeTranslucent(boolean beforeTranslucent) {
+		this.isBeforeTranslucent = beforeTranslucent;
+	}
 	
 	/**
 	 * Gets the shadow renderer.
@@ -1044,5 +1213,93 @@ public class ShaderPackPipeline implements WorldRenderingPipeline {
 	 */
 	public ShadowRenderTargets getShadowRenderTargets() {
 		return shadowRenderTargets;
+	}
+	
+	/**
+	 * Gets a compiled program by name.
+	 * Used by the shader interception system to replace vanilla shaders with shader pack shaders.
+	 * 
+	 * @param programName The name of the program (e.g., "gbuffers_terrain")
+	 * @return The compiled program, or null if not found
+	 */
+	public Program getProgram(String programName) {
+		return programs.get(programName);
+	}
+
+	/**
+	 * Gets an ExtendedShader by program name.
+	 * ExtendedShaders have proper Iris-compatible uniform bindings.
+	 * 
+	 * @param programName The name of the program (e.g., "gbuffers_terrain")
+	 * @return The ExtendedShader, or null if not found
+	 */
+	public net.minecraft.client.renderer.shaders.programs.ExtendedShader getExtendedShader(String programName) {
+		return extendedShaders.get(programName);
+	}
+
+	/**
+	 * Gets all ExtendedShaders.
+	 * @return A map of program names to ExtendedShaders
+	 */
+	public Map<String, net.minecraft.client.renderer.shaders.programs.ExtendedShader> getExtendedShaders() {
+		return extendedShaders;
+	}
+	
+	/**
+	 * Gets all compiled programs.
+	 * @return A map of program names to compiled programs
+	 */
+	public Map<String, Program> getPrograms() {
+		return programs;
+	}
+	
+	/**
+	 * Gets the ShaderMap for ShaderKey -> GlProgram lookup.
+	 * Used by GlDevice shader interception.
+	 */
+	public ShaderMap getShaderMap() {
+		return shaderMap;
+	}
+	
+	/**
+	 * Whether this pipeline should override vanilla shaders.
+	 * Returns true when shader programs are compiled and the pipeline is active.
+	 */
+	public boolean shouldOverrideShaders() {
+		return programsCompiled && !extendedShaders.isEmpty();
+	}
+	
+	/**
+	 * Builds the ShaderMap from ExtendedShaders.
+	 * Maps each ShaderKey to its corresponding ExtendedShader by following the ProgramId fallback chain.
+	 */
+	private void buildShaderMap() {
+		LOGGER.info("Building ShaderMap from {} ExtendedShaders", extendedShaders.size());
+		
+		for (ShaderKey shaderKey : ShaderKey.values()) {
+			ProgramId programId = shaderKey.getProgram();
+			if (programId == null) continue;
+			
+			// Follow the fallback chain to find an available ExtendedShader
+			ProgramId currentId = programId;
+			ExtendedShader shader = null;
+			
+			while (currentId != null && shader == null) {
+				String programName = currentId.getSourceName();
+				shader = extendedShaders.get(programName);
+				
+				if (shader == null) {
+					// Try fallback
+					currentId = currentId.getFallback().orElse(null);
+				}
+			}
+			
+			if (shader != null) {
+				shaderMap.put(shaderKey, shader);
+				LOGGER.debug("Mapped ShaderKey {} -> {}", shaderKey, shader.getDebugLabel());
+			}
+		}
+		
+		LOGGER.info("ShaderMap built with {} mappings", shaderMap.size());
 	}
 }

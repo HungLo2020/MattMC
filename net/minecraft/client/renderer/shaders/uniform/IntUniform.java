@@ -49,8 +49,4 @@ public class IntUniform extends Uniform {
 			GL32C.glUniform1i(location, newValue);
 		}
 	}
-	
-	private void updateValue(Object ignored) {
-		updateValue();
-	}
 }

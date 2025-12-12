@@ -54,8 +54,4 @@ public class Vector2Uniform extends Uniform {
 			GL32C.glUniform2f(this.location, newValue.x, newValue.y);
 		}
 	}
-	
-	private void updateValue(Object ignored) {
-		updateValue();
-	}
 }

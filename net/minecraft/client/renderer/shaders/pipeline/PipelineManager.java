@@ -23,12 +23,40 @@ import java.util.Map;
  */
 public class PipelineManager {
 	private static final Logger LOGGER = LoggerFactory.getLogger(PipelineManager.class);
+	private static PipelineManager INSTANCE;
 	
 	// Per-dimension pipeline caching - matches IRIS pattern
 	private final Map<String, WorldRenderingPipeline> pipelinesPerDimension = new HashMap<>();
 	private WorldRenderingPipeline pipeline = new VanillaRenderingPipeline();
 	// Track the current file system source for cleanup
 	private FileSystemShaderPackSource currentPackSource = null;
+
+	/**
+	 * Gets the singleton instance of PipelineManager.
+	 * @return The PipelineManager instance
+	 */
+	public static PipelineManager getInstance() {
+		if (INSTANCE == null) {
+			INSTANCE = new PipelineManager();
+		}
+		return INSTANCE;
+	}
+
+	/**
+	 * Gets the currently active pipeline.
+	 * @return The active pipeline
+	 */
+	public WorldRenderingPipeline getActivePipeline() {
+		return pipeline;
+	}
+
+	/**
+	 * Checks if there's an active shader pack pipeline (not vanilla).
+	 * @return true if a shader pack pipeline is active
+	 */
+	public boolean hasActiveShaderPipeline() {
+		return pipeline instanceof ShaderPackPipeline;
+	}
 	
 	/**
 	 * Prepares a pipeline for the given dimension.
@@ -127,6 +155,16 @@ public class PipelineManager {
 	 * @return The current pipeline, or null
 	 */
 	public WorldRenderingPipeline getPipelineNullable() {
+		return pipeline;
+	}
+	
+	/**
+	 * Gets the current pipeline.
+	 * Alias for getPipelineNullable() for compatibility.
+	 * 
+	 * @return The current pipeline, or null
+	 */
+	public WorldRenderingPipeline getCurrentPipeline() {
 		return pipeline;
 	}
 	

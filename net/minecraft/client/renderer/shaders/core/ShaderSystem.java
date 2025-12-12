@@ -105,8 +105,8 @@ public class ShaderSystem {
 			LOGGER.info("No shader packs found in resources");
 		}
 		
-		// Initialize pipeline manager - matches IRIS pattern
-		this.pipelineManager = new PipelineManager();
+		// Initialize pipeline manager - use singleton to avoid duplication
+		this.pipelineManager = PipelineManager.getInstance();
 		LOGGER.info("Pipeline manager initialized");
 	}
 	
@@ -124,5 +124,26 @@ public class ShaderSystem {
 	 */
 	public PipelineManager getPipelineManager() {
 		return pipelineManager;
+	}
+	
+	/**
+	 * Checks if shaders are currently enabled.
+	 * @return true if shaders are enabled in configuration, false otherwise
+	 */
+	public boolean areShadersEnabled() {
+		return config != null && config.areShadersEnabled();
+	}
+	
+	/**
+	 * Gets the currently active rendering pipeline.
+	 * Returns the pipeline for the current dimension if a shader pack is active.
+	 * 
+	 * @return The active pipeline, or null if none is active
+	 */
+	public Object getActivePipeline() {
+		if (pipelineManager != null) {
+			return pipelineManager.getCurrentPipeline();
+		}
+		return null;
 	}
 }

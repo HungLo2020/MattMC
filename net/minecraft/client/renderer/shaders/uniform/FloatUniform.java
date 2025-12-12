@@ -11,8 +11,6 @@ import org.lwjgl.opengl.GL32C;
  * 
  * COPIED VERBATIM from IRIS's FloatUniform.java
  * Reference: frnsrc/Iris-1.21.9/.../gl/uniform/FloatUniform.java
- * 
- * Step 26 of NEW-SHADER-PLAN.md
  */
 public class FloatUniform extends Uniform {
 	private final FloatSupplier value;
@@ -46,9 +44,5 @@ public class FloatUniform extends Uniform {
 			RenderSystem.assertOnRenderThread();
 			GL32C.glUniform1f(location, newValue);
 		}
-	}
-	
-	private void updateValue(Object ignored) {
-		updateValue();
 	}
 }

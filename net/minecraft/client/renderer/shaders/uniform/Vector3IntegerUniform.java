@@ -53,8 +53,4 @@ public class Vector3IntegerUniform extends Uniform {
 			GL32C.glUniform3i(location, cachedValue.x(), cachedValue.y(), cachedValue.z());
 		}
 	}
-	
-	private void updateValue(Object ignored) {
-		updateValue();
-	}
 }

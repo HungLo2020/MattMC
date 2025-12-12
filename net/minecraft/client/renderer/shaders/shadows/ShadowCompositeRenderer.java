@@ -1,5 +1,6 @@
 package net.minecraft.client.renderer.shaders.shadows;
 import net.minecraft.client.renderer.shaders.framebuffer.GlFramebuffer;
+import net.minecraft.client.renderer.shaders.gl.FullScreenQuadRenderer;
 import org.lwjgl.opengl.GL11;
 import org.lwjgl.opengl.GL13;
 import org.lwjgl.opengl.GL14;
@@ -134,28 +135,12 @@ public class ShadowCompositeRenderer {
     
     /**
      * Renders a fullscreen quad for composite pass.
+     * Uses FullScreenQuadRenderer which is OpenGL 3.3 Core Profile compatible.
      */
     private void renderFullscreenQuad() {
-        // Begin immediate mode rendering (legacy OpenGL for simplicity)
-        GL11.glBegin(GL11.GL_QUADS);
-        
-        // Bottom-left
-        GL11.glTexCoord2f(0.0f, 0.0f);
-        GL11.glVertex2f(-1.0f, -1.0f);
-        
-        // Bottom-right
-        GL11.glTexCoord2f(1.0f, 0.0f);
-        GL11.glVertex2f(1.0f, -1.0f);
-        
-        // Top-right
-        GL11.glTexCoord2f(1.0f, 1.0f);
-        GL11.glVertex2f(1.0f, 1.0f);
-        
-        // Top-left
-        GL11.glTexCoord2f(0.0f, 1.0f);
-        GL11.glVertex2f(-1.0f, 1.0f);
-        
-        GL11.glEnd();
+        // Use FullScreenQuadRenderer which uses GL_TRIANGLES (Core Profile compatible)
+        // instead of immediate mode which is NOT supported in Core Profile
+        FullScreenQuadRenderer.INSTANCE.render();
     }
     
     /**

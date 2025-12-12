@@ -53,6 +53,7 @@ public class GlDevice implements GpuDevice {
 	private final DirectStateAccess directStateAccess;
 	private final BiFunction<ResourceLocation, ShaderType, String> defaultShaderSource;
 	private final Map<RenderPipeline, GlRenderPipeline> pipelineCache = new IdentityHashMap();
+	private final Map<RenderPipeline, GlRenderPipeline> shaderPackPipelineCache = new IdentityHashMap(); // Cache for shader pack intercepted pipelines
 	private final Map<GlDevice.ShaderCompilationKey, GlShaderModule> shaderCache = new HashMap();
 	private final VertexArrayCache vertexArrayCache;
 	private final BufferStorage bufferStorage;
@@ -331,11 +332,124 @@ public class GlDevice implements GpuDevice {
 		return this.directStateAccess;
 	}
 
+	/**
+	 * Get or compile a render pipeline.
+	 * 
+	 * NOTE: Shader pack interception is currently DISABLED because shader packs expect
+	 * Iris-compatible uniforms (gbufferModelView, gbufferProjection, sunPosition, etc.)
+	 * while vanilla RenderPipeline uses vanilla uniforms (ModelViewMat, ProjMat).
+	 * 
+	 * The uniform translation layer is now implemented via:
+	 * - ExtendedShader with ProgramUniforms (gbufferModelView, gbufferProjection, etc.)
+	 * - CapturedRenderingState to capture matrices from vanilla rendering
+	 * - iris$setupState() to bind uniforms before rendering
+	 * 
+	 * Following IRIS MixinShaderManager_Overrides.redirectIrisProgram() pattern.
+	 */
 	protected GlRenderPipeline getOrCompilePipeline(RenderPipeline renderPipeline) {
-		return (GlRenderPipeline)this.pipelineCache
+		// Try shader pack interception first (IRIS pattern)
+		net.minecraft.client.renderer.shaders.pipeline.ShaderPackPipeline shaderPipeline = 
+			net.minecraft.client.renderer.shaders.IrisShaders.getActivePipeline();
+		
+		// Debug logging for first few frames to diagnose interception issues
+		boolean debugLogging = false; // Set to true for debugging
+		if (debugLogging) {
+			if (shaderPipeline != null) {
+				LOGGER.info("Shader interception check: pipeline={}, shouldOverride={}", 
+					shaderPipeline.getShaderPackName(), shaderPipeline.shouldOverrideShaders());
+			} else {
+				LOGGER.info("Shader interception check: pipeline=null");
+			}
+		}
+		
+		if (shaderPipeline != null && shaderPipeline.shouldOverrideShaders()) {
+			// Get ShaderKey from IrisPipelines mapping
+			net.minecraft.client.renderer.shaders.programs.ShaderKey shaderKey = 
+				net.minecraft.client.renderer.shaders.pipeline.IrisPipelines.getPipeline(shaderPipeline, renderPipeline);
+			
+			if (shaderKey != null) {
+				// Get the shader from ShaderMap
+				GlProgram program = shaderPipeline.getShaderMap().getShader(shaderKey);
+				
+				if (program != null) {
+					// Call iris$setupState() to bind Iris-compatible uniforms
+					if (program instanceof net.minecraft.client.renderer.shaders.programs.IrisProgram irisProgram) {
+						irisProgram.iris$setupState();
+					}
+					
+					// Return a new GlRenderPipeline wrapping the shader pack program
+					// Cache this to avoid creating new objects every frame
+					return this.shaderPackPipelineCache
+						.computeIfAbsent(renderPipeline, rp -> new GlRenderPipeline(rp, program));
+				} else {
+					LOGGER.debug("No program in ShaderMap for ShaderKey: {}", shaderKey);
+				}
+			} else {
+				LOGGER.debug("No ShaderKey mapping for RenderPipeline: {}", renderPipeline.getLocation());
+			}
+		} else {
+			if (shaderPipeline == null) {
+				LOGGER.trace("No active shader pipeline");
+			} else {
+				LOGGER.trace("shouldOverrideShaders is false");
+			}
+		}
+		
+		// Fallback to vanilla pipeline compilation
+		return this.pipelineCache
 			.computeIfAbsent(renderPipeline, renderPipeline2 -> this.compilePipeline(renderPipeline, this.defaultShaderSource));
 	}
 
+	/**
+	 * Maps a vanilla RenderPipeline to a shader pack program name.
+	 * Follows the Iris program fallback chain.
+	 */
+	private String getShaderProgramName(RenderPipeline pipeline) {
+		String location = pipeline.getLocation().toString();
+		
+		// Map common vanilla pipelines to gbuffers programs
+		if (location.contains("terrain") || location.contains("solid") || location.contains("cutout")) {
+			return findFirstAvailableProgram("gbuffers_terrain_solid", "gbuffers_terrain", "gbuffers_textured");
+		}
+		if (location.contains("entity") || location.contains("translucent")) {
+			return findFirstAvailableProgram("gbuffers_entities", "gbuffers_textured_lit", "gbuffers_textured");
+		}
+		if (location.contains("particle")) {
+			return findFirstAvailableProgram("gbuffers_particles", "gbuffers_textured");
+		}
+		if (location.contains("clouds")) {
+			return findFirstAvailableProgram("gbuffers_clouds", "gbuffers_textured");
+		}
+		if (location.contains("sky")) {
+			return findFirstAvailableProgram("gbuffers_skybasic", "gbuffers_basic");
+		}
+		if (location.contains("hand")) {
+			return findFirstAvailableProgram("gbuffers_hand", "gbuffers_textured_lit", "gbuffers_textured");
+		}
+		if (location.contains("block")) {
+			return findFirstAvailableProgram("gbuffers_block", "gbuffers_terrain");
+		}
+		
+		return null;
+	}
+
+	/**
+	 * Finds the first available program from the fallback chain.
+	 */
+	private String findFirstAvailableProgram(String... programNames) {
+		net.minecraft.client.renderer.shaders.pipeline.ShaderPackPipeline shaderPipeline = 
+			net.minecraft.client.renderer.shaders.IrisShaders.getActivePipeline();
+		
+		if (shaderPipeline == null) return null;
+		
+		for (String name : programNames) {
+			if (shaderPipeline.getExtendedShader(name) != null) {
+				return name;
+			}
+		}
+		return null;
+	}
+	
 	protected GlShaderModule getOrCompileShader(
 		ResourceLocation resourceLocation, ShaderType shaderType, ShaderDefines shaderDefines, BiFunction<ResourceLocation, ShaderType, String> biFunction
 	) {

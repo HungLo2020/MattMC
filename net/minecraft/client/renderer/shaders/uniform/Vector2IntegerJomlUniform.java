@@ -50,8 +50,4 @@ public class Vector2IntegerJomlUniform extends Uniform {
 			GL32C.glUniform2i(this.location, newValue.x, newValue.y);
 		}
 	}
-	
-	private void updateValue(Object ignored) {
-		updateValue();
-	}
 }

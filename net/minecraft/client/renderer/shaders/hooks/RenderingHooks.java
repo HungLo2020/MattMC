@@ -63,8 +63,6 @@ public class RenderingHooks {
                 
                 phaseTracker.beginWorldRendering();
                 pipelineState.activate(pipeline);
-                
-                LOGGER.debug("Shader pipeline activated for rendering in dimension: {}", currentDimension);
             } else {
                 activePipeline = null;
             }
