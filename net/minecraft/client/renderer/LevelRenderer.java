@@ -592,7 +592,7 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 			double f = vec3.z();
 			profilerFiller.push("terrain");
 			ChunkSectionsToRender chunkSectionsToRender = this.prepareChunkRenders(matrix4f, d, e, f);
-			chunkSectionsToRender.renderGroup(ChunkSectionLayerGroup.OPAQUE);
+			iris$renderTerrainGroup(chunkSectionsToRender, ChunkSectionLayerGroup.OPAQUE);
 			this.minecraft.gameRenderer.getLighting().setupFor(Lighting.Entry.LEVEL);
 			if (resourceHandle3 != null) {
 				resourceHandle3.get().copyDepthFrom(this.minecraft.getMainRenderTarget());
@@ -611,7 +611,7 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 			profilerFiller.popPush("submitBlockEntities");
 			this.submitBlockEntities(poseStack, levelRenderState, this.submitNodeStorage);
 			profilerFiller.popPush("renderFeatures");
-			this.featureRenderDispatcher.renderAllFeatures();
+			iris$renderAllFeaturesMain();
 			bufferSource.endLastBatch();
 			this.checkPoseStack(poseStack);
 			bufferSource.endBatch(RenderType.solid());
@@ -658,9 +658,9 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 			}
 
 			profilerFiller.push("translucent");
-			chunkSectionsToRender.renderGroup(ChunkSectionLayerGroup.TRANSLUCENT);
+			iris$renderTerrainGroup(chunkSectionsToRender, ChunkSectionLayerGroup.TRANSLUCENT);
 			profilerFiller.popPush("string");
-			chunkSectionsToRender.renderGroup(ChunkSectionLayerGroup.TRIPWIRE);
+			iris$renderTerrainGroup(chunkSectionsToRender, ChunkSectionLayerGroup.TRIPWIRE);
 			if (bl) {
 				this.renderBlockOutline(bufferSource, poseStack, true, levelRenderState);
 			}
@@ -688,8 +688,8 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 				resourceHandle2.get().copyDepthFrom(resourceHandle.get());
 			}
 
-			this.particlesRenderState.submit(this.submitNodeStorage, this.levelRenderState.cameraRenderState);
-			this.featureRenderDispatcher.renderAllFeatures();
+			iris$submitParticles();
+			iris$renderAllFeaturesParticles();
 			this.particlesRenderState.reset();
 		});
 	}
@@ -1474,5 +1474,25 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 	public void iris$beginTranslucents() {
 		// This method is injected into by Iris mixins for translucent rendering phase changes
 		// The actual translucent rendering happens in addMainPass lambda
+	}
+	
+	// Wrapper method for terrain chunk rendering - allows Iris mixins to intercept
+	public void iris$renderTerrainGroup(ChunkSectionsToRender chunkSectionsToRender, ChunkSectionLayerGroup group) {
+		chunkSectionsToRender.renderGroup(group);
+	}
+	
+	// Wrapper method for feature rendering in main pass - allows Iris mixins to intercept
+	public void iris$renderAllFeaturesMain() {
+		this.featureRenderDispatcher.renderAllFeatures();
+	}
+	
+	// Wrapper method for particle submission - allows Iris mixins to intercept
+	public void iris$submitParticles() {
+		this.particlesRenderState.submit(this.submitNodeStorage, this.levelRenderState.cameraRenderState);
+	}
+	
+	// Wrapper method for feature rendering in particles pass - allows Iris mixins to intercept
+	public void iris$renderAllFeaturesParticles() {
+		this.featureRenderDispatcher.renderAllFeatures();
 	}
 }

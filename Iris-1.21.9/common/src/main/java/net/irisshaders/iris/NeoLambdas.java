@@ -12,4 +12,8 @@ public class NeoLambdas {
 	public static final String NEO_BEGIN_DEBUG_RENDER = "iris$beginDebugRender";
 	public static final String NEO_END_DEBUG_RENDER = "iris$endDebugRender";
 	public static final String NEO_BEGIN_TRANSLUCENTS = "iris$beginTranslucents";
+	public static final String NEO_RENDER_TERRAIN_GROUP = "iris$renderTerrainGroup";
+	public static final String NEO_RENDER_ALL_FEATURES_MAIN = "iris$renderAllFeaturesMain";
+	public static final String NEO_SUBMIT_PARTICLES = "iris$submitParticles";
+	public static final String NEO_RENDER_ALL_FEATURES_PARTICLES = "iris$renderAllFeaturesParticles";
 }

@@ -41,7 +41,7 @@ public class MixinLevelRenderer_SkipRendering {
 		}
 	}
 
-	@WrapWithCondition(method = "addMainPass", require = 0, at = @At(value = "INVOKE", target = "Lnet/minecraft/client/renderer/chunk/ChunkSectionsToRender;renderGroup(Lnet/minecraft/client/renderer/chunk/ChunkSectionLayerGroup;)V"))
+	@WrapWithCondition(method = NeoLambdas.NEO_RENDER_TERRAIN_GROUP, require = 1, at = @At(value = "INVOKE", target = "Lnet/minecraft/client/renderer/chunk/ChunkSectionsToRender;renderGroup(Lnet/minecraft/client/renderer/chunk/ChunkSectionLayerGroup;)V"))
 	private boolean skipRenderChunks(ChunkSectionsToRender instance, ChunkSectionLayerGroup chunkSectionLayerGroup) {
 		if (Iris.getPipelineManager().getPipelineNullable() instanceof IrisRenderingPipeline pipeline) {
 			return !pipeline.skipAllRendering();

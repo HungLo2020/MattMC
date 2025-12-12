@@ -68,7 +68,7 @@ public class MixinLevelRenderer {
 		}
 	}
 
-	@WrapOperation(method = "addMainPass", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/renderer/feature/FeatureRenderDispatcher;renderAllFeatures()V"), require = 0)
+	@WrapOperation(method = NeoLambdas.NEO_RENDER_ALL_FEATURES_MAIN, at = @At(value = "INVOKE", target = "Lnet/minecraft/client/renderer/feature/FeatureRenderDispatcher;renderAllFeatures()V"), require = 1)
 	private void iris$renderMainParticles(FeatureRenderDispatcher instance, Operation<Void> original) {
 		ParticleRenderingSettings settings = getRenderingSettings();
 
@@ -99,7 +99,7 @@ public class MixinLevelRenderer {
 		}
 	}
 
-	@Redirect(method = "addParticlesPass", require = 0, at = @At(value = "INVOKE", target = "Lnet/minecraft/client/renderer/state/ParticlesRenderState;submit(Lnet/minecraft/client/renderer/SubmitNodeStorage;Lnet/minecraft/client/renderer/state/CameraRenderState;)V"))
+	@Redirect(method = NeoLambdas.NEO_SUBMIT_PARTICLES, require = 1, at = @At(value = "INVOKE", target = "Lnet/minecraft/client/renderer/state/ParticlesRenderState;submit(Lnet/minecraft/client/renderer/SubmitNodeStorage;Lnet/minecraft/client/renderer/state/CameraRenderState;)V"))
 	private void iris$redirectToAvoidItemPickupParticles(ParticlesRenderState instance, SubmitNodeStorage submitNodeStorage, CameraRenderState cameraRenderState) {
 		ParticleRenderingSettings settings = getRenderingSettings();
 
@@ -110,7 +110,7 @@ public class MixinLevelRenderer {
 		}
 	}
 
-	@WrapOperation(method = "addParticlesPass", require = 0, at = @At(value = "INVOKE", target = "Lnet/minecraft/client/renderer/feature/FeatureRenderDispatcher;renderAllFeatures()V"))
+	@WrapOperation(method = NeoLambdas.NEO_RENDER_ALL_FEATURES_PARTICLES, require = 1, at = @At(value = "INVOKE", target = "Lnet/minecraft/client/renderer/feature/FeatureRenderDispatcher;renderAllFeatures()V"))
 	private void iris$renderTranslucentParticles(FeatureRenderDispatcher instance, Operation<Void> original) {
 		ParticleRenderingSettings settings = getRenderingSettings();
 
