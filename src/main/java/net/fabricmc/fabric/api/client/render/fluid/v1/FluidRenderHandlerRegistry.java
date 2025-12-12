@@ -102,6 +102,7 @@ public final class FluidRenderHandlerRegistry {
      * Sets the transparency of a block for fluid overlay rendering.
      */
     public void setBlockTransparency(Block block, boolean transparent) {
+        ensureInitialized();
         transparencyForOverlay.put(block, transparent);
     }
     
@@ -109,6 +110,7 @@ public final class FluidRenderHandlerRegistry {
      * Checks if a block is transparent for fluid rendering purposes.
      */
     public boolean isBlockTransparent(Block block) {
+        ensureInitialized();
         Boolean override = transparencyForOverlay.get(block);
         if (override != null) {
             return override;
