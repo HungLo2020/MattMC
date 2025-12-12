@@ -105,8 +105,8 @@ public class ShaderSystem {
 			LOGGER.info("No shader packs found in resources");
 		}
 		
-		// Initialize pipeline manager - matches IRIS pattern
-		this.pipelineManager = new PipelineManager();
+		// Initialize pipeline manager - use singleton to avoid duplication
+		this.pipelineManager = PipelineManager.getInstance();
 		LOGGER.info("Pipeline manager initialized");
 	}
 	
