@@ -9,4 +9,7 @@ public class NeoLambdas {
 	public static final String NEO_PARTICLE = "iris$renderParticlesPassBody";
 	public static final String NEO_WEATHER_TYPE = "iris$createWeatherBody";
 	public static final String NEO_RENDER_WORLD_BORDER = "iris$renderWorldBorderBody";
+	public static final String NEO_BEGIN_DEBUG_RENDER = "iris$beginDebugRender";
+	public static final String NEO_END_DEBUG_RENDER = "iris$endDebugRender";
+	public static final String NEO_BEGIN_TRANSLUCENTS = "iris$beginTranslucents";
 }

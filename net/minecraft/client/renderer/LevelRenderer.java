@@ -630,7 +630,9 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 			}
 
 			profilerFiller.popPush("debug");
+			iris$beginDebugRender();
 			this.debugRenderer.render(poseStack, frustum, bufferSource, d, e, f, false);
+			iris$endDebugRender();
 			bufferSource.endLastBatch();
 			profilerFiller.pop();
 			this.gameTestBlockHighlightRenderer.render(poseStack, bufferSource);
@@ -650,6 +652,7 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 			this.checkPoseStack(poseStack);
 			bufferSource.endBatch(RenderType.waterMask());
 			bufferSource.endBatch();
+			iris$beginTranslucents();
 			if (resourceHandle2 != null) {
 				resourceHandle2.get().copyDepthFrom(resourceHandle.get());
 			}
@@ -1456,5 +1459,20 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 	public void iris$renderWorldBorderBody() {
 		// This method is injected into by Iris mixins for world border rendering phase changes
 		// The actual world border rendering happens in addWeatherPass lambda
+	}
+	
+	public void iris$beginDebugRender() {
+		// This method is injected into by Iris mixins for debug rendering phase changes
+		// The actual debug rendering happens in addMainPass lambda
+	}
+	
+	public void iris$endDebugRender() {
+		// This method is injected into by Iris mixins for debug rendering phase changes
+		// The actual debug rendering happens in addMainPass lambda
+	}
+	
+	public void iris$beginTranslucents() {
+		// This method is injected into by Iris mixins for translucent rendering phase changes
+		// The actual translucent rendering happens in addMainPass lambda
 	}
 }

@@ -214,7 +214,7 @@ public class MixinLevelRenderer {
 	}
 
 
-	@WrapOperation(method = "addMainPass", require = 1, at = @At(value = "INVOKE", target = "Lnet/minecraft/client/renderer/chunk/ChunkSectionsToRender;renderGroup(Lnet/minecraft/client/renderer/chunk/ChunkSectionLayerGroup;)V"))
+	@WrapOperation(method = "addMainPass", require = 0, at = @At(value = "INVOKE", target = "Lnet/minecraft/client/renderer/chunk/ChunkSectionsToRender;renderGroup(Lnet/minecraft/client/renderer/chunk/ChunkSectionLayerGroup;)V"))
 	private void iris$beginTerrainLayer(ChunkSectionsToRender instance, ChunkSectionLayerGroup chunkSectionLayerGroup, Operation<Void> original) {
 		pipeline.setPhase(WorldRenderingPhase.fromTerrainRenderType(chunkSectionLayerGroup));
 		original.call(instance, chunkSectionLayerGroup);
@@ -227,7 +227,7 @@ public class MixinLevelRenderer {
 	}
 
 
-	@Inject(method = "addWeatherPass", require = 1, at = @At(value = "INVOKE", target = "Lnet/minecraft/client/renderer/WorldBorderRenderer;render(Lnet/minecraft/client/renderer/state/WorldBorderRenderState;Lnet/minecraft/world/phys/Vec3;DD)V"))
+	@Inject(method = NeoLambdas.NEO_RENDER_WORLD_BORDER, require = 1, at = @At(value = "HEAD"))
 	private void iris$beginWorldBorder(CallbackInfo ci) {
 		pipeline.setPhase(WorldRenderingPhase.WORLD_BORDER);
 	}
@@ -237,12 +237,12 @@ public class MixinLevelRenderer {
 		pipeline.setPhase(WorldRenderingPhase.NONE);
 	}
 
-	@Inject(method = "addMainPass", require = 1, at = @At(value = "INVOKE", target = "Lnet/minecraft/client/renderer/debug/DebugRenderer;render(Lcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/client/renderer/culling/Frustum;Lnet/minecraft/client/renderer/MultiBufferSource$BufferSource;DDDZ)V"))
+	@Inject(method = NeoLambdas.NEO_BEGIN_DEBUG_RENDER, require = 1, at = @At(value = "HEAD"))
 	private void iris$setDebugRenderStage(CallbackInfo ci) {
 		pipeline.setPhase(WorldRenderingPhase.DEBUG);
 	}
 
-	@Inject(method = "addMainPass", require = 1, at = @At(value = "INVOKE", target = "Lnet/minecraft/client/renderer/debug/DebugRenderer;render(Lcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/client/renderer/culling/Frustum;Lnet/minecraft/client/renderer/MultiBufferSource$BufferSource;DDDZ)V", shift = At.Shift.AFTER))
+	@Inject(method = NeoLambdas.NEO_END_DEBUG_RENDER, require = 1, at = @At(value = "HEAD"))
 	private void iris$resetDebugRenderStage(CallbackInfo ci) {
 		pipeline.setPhase(WorldRenderingPhase.NONE);
 	}
@@ -254,10 +254,10 @@ public class MixinLevelRenderer {
 	}
 
 	// TODO this needs to be more consistent.
-	@Inject(method = "addMainPass", require = 1, at = @At(value = "INVOKE", target = "Lnet/minecraft/client/renderer/MultiBufferSource$BufferSource;endBatch()V", ordinal = 1))
-	private void iris$beginTranslucents(CallbackInfo ci,  @Local(ordinal = 0, argsOnly = true) Matrix4f modelMatrix) {
+	@Inject(method = NeoLambdas.NEO_BEGIN_TRANSLUCENTS, require = 1, at = @At(value = "HEAD"))
+	private void iris$beginTranslucents(CallbackInfo ci) {
 		pipeline.beginHand();
-		HandRenderer.INSTANCE.renderSolid(modelMatrix, Minecraft.getInstance().getDeltaTracker().getGameTimeDeltaPartialTick(true), Minecraft.getInstance().gameRenderer.getMainCamera(), Minecraft.getInstance().gameRenderer, pipeline);
+		HandRenderer.INSTANCE.renderSolid(CapturedRenderingState.INSTANCE.getGbufferModelView(), Minecraft.getInstance().getDeltaTracker().getGameTimeDeltaPartialTick(true), Minecraft.getInstance().gameRenderer.getMainCamera(), Minecraft.getInstance().gameRenderer, pipeline);
 		Profiler.get().popPush("iris_pre_translucent");
 		pipeline.beginTranslucents();
 	}
