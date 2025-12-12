@@ -335,29 +335,55 @@ public class GlDevice implements GpuDevice {
 	/**
 	 * Get or compile a render pipeline.
 	 * 
-	 * Currently uses vanilla pipeline compilation.
-	 * 
-	 * TODO: IRIS INTEGRATION - Implement shader pack program interception following
-	 * the IRIS pattern from MixinShaderManager_Overrides.java:redirectIrisProgram().
-	 * This requires implementing ExtendedShader with proper Iris uniform binding:
-	 * - CommonUniforms.addDynamicUniforms()
-	 * - BuiltinReplacementUniforms.addBuiltinReplacementUniforms()
-	 * - VanillaUniforms.addVanillaUniforms()
-	 * - Custom sampler binding through addGbufferOrShadowSamplers()
-	 * - Iris-specific vertex attributes (mc_Entity, mc_midTexCoord, at_tangent)
+	 * Uses shader pack program interception following the IRIS pattern from
+	 * MixinShaderManager_Overrides.java:redirectIrisProgram().
 	 */
 	protected GlRenderPipeline getOrCompilePipeline(RenderPipeline renderPipeline) {
-		// TODO: SHADER INTERCEPTION TEMPORARILY DISABLED
-		// The shader interception was causing terrain to not render because:
-		// 1. ExtendedShader creation may be failing
-		// 2. Uniform binding mismatches between vanilla and shader pack
-		// 
-		// To enable shader interception, we need:
-		// 1. A complete ShaderKey -> Program mapping (like Iris's IrisPipelines)
-		// 2. Proper ShaderMap implementation
-		// 3. ExtendedShader that properly handles all uniforms
-		//
-		// For now, use vanilla rendering while we debug and fix these issues.
+		// Check if we should intercept this pipeline with shader pack shaders
+		if (net.minecraft.client.renderer.shaders.IrisShaders.isEnabled()) {
+			net.minecraft.client.renderer.shaders.pipeline.ShaderPackPipeline shaderPipeline = 
+				net.minecraft.client.renderer.shaders.IrisShaders.getActivePipeline();
+			
+			if (shaderPipeline != null && shaderPipeline.isRenderingWorld()) {
+				// Check cache first for performance
+				GlRenderPipeline cached = shaderPackPipelineCache.get(renderPipeline);
+				if (cached != null) {
+					// Setup state for cached shader (uniforms need to be updated each frame)
+					if (cached.program() instanceof net.minecraft.client.renderer.shaders.programs.ExtendedShader extendedShader) {
+						extendedShader.iris$setupState();
+					}
+					return cached;
+				}
+				
+				// Use IrisPipelines to get the ShaderKey for this pipeline
+				net.minecraft.client.renderer.shaders.programs.ShaderKey shaderKey = 
+					net.minecraft.client.renderer.shaders.pipeline.IrisPipelines.getPipeline(shaderPipeline, renderPipeline);
+				
+				if (shaderKey != null) {
+					// Get the program name from the ShaderKey's ProgramId
+					String programName = shaderKey.getProgram().getSourceName();
+					
+					// Try to find the ExtendedShader
+					net.minecraft.client.renderer.shaders.programs.ExtendedShader extendedShader = 
+						shaderPipeline.getExtendedShader(programName);
+					
+					if (extendedShader != null) {
+						LOGGER.debug("Shader interception: {} -> {} (ShaderKey: {}, program ID: {})", 
+							renderPipeline.getLocation(), programName, shaderKey, extendedShader.getProgramId());
+						
+						// Setup shader state before returning
+						extendedShader.iris$setupState();
+						
+						// Cache and return a pipeline wrapping the ExtendedShader
+						GlRenderPipeline interceptedPipeline = new GlRenderPipeline(renderPipeline, extendedShader);
+						shaderPackPipelineCache.put(renderPipeline, interceptedPipeline);
+						return interceptedPipeline;
+					} else {
+						LOGGER.debug("No ExtendedShader found for program: {} (ShaderKey: {})", programName, shaderKey);
+					}
+				}
+			}
+		}
 		
 		// Vanilla pipeline compilation
 		return (GlRenderPipeline)this.pipelineCache
