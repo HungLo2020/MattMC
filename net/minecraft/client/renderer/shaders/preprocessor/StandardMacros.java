@@ -131,6 +131,33 @@ public class StandardMacros {
 		} catch (Exception ignored) {
 			// GL not yet initialized, skip extensions
 		}
+		
+		// MC_RENDER_STAGE_* defines (from WorldRenderingPhase enum)
+		// These are used by shader packs to detect what is being rendered
+		define(standardDefines, "MC_RENDER_STAGE_NONE", "0");
+		define(standardDefines, "MC_RENDER_STAGE_SKY", "1");
+		define(standardDefines, "MC_RENDER_STAGE_SUNSET", "2");
+		define(standardDefines, "MC_RENDER_STAGE_CUSTOM_SKY", "3");
+		define(standardDefines, "MC_RENDER_STAGE_SUN", "4");
+		define(standardDefines, "MC_RENDER_STAGE_MOON", "5");
+		define(standardDefines, "MC_RENDER_STAGE_STARS", "6");
+		define(standardDefines, "MC_RENDER_STAGE_VOID", "7");
+		define(standardDefines, "MC_RENDER_STAGE_TERRAIN_SOLID", "8");
+		define(standardDefines, "MC_RENDER_STAGE_TERRAIN_CUTOUT_MIPPED", "9");
+		define(standardDefines, "MC_RENDER_STAGE_TERRAIN_CUTOUT", "10");
+		define(standardDefines, "MC_RENDER_STAGE_ENTITIES", "11");
+		define(standardDefines, "MC_RENDER_STAGE_BLOCK_ENTITIES", "12");
+		define(standardDefines, "MC_RENDER_STAGE_DESTROY", "13");
+		define(standardDefines, "MC_RENDER_STAGE_OUTLINE", "14");
+		define(standardDefines, "MC_RENDER_STAGE_DEBUG", "15");
+		define(standardDefines, "MC_RENDER_STAGE_HAND_SOLID", "16");
+		define(standardDefines, "MC_RENDER_STAGE_TERRAIN_TRANSLUCENT", "17");
+		define(standardDefines, "MC_RENDER_STAGE_TRIPWIRE", "18");
+		define(standardDefines, "MC_RENDER_STAGE_PARTICLES", "19");
+		define(standardDefines, "MC_RENDER_STAGE_CLOUDS", "20");
+		define(standardDefines, "MC_RENDER_STAGE_RAIN_SNOW", "21");
+		define(standardDefines, "MC_RENDER_STAGE_WORLD_BORDER", "22");
+		define(standardDefines, "MC_RENDER_STAGE_HAND_TRANSLUCENT", "23");
 
 		// Cache and return
 		cachedDefines = ImmutableList.copyOf(standardDefines);
