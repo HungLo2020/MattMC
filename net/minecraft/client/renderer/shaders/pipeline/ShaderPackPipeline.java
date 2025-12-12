@@ -1290,7 +1290,7 @@ public class ShaderPackPipeline implements WorldRenderingPipeline {
 				
 				if (shader == null) {
 					// Try fallback
-					currentId = currentId.getFallback();
+					currentId = currentId.getFallback().orElse(null);
 				}
 			}
 			
