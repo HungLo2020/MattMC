@@ -10,40 +10,56 @@ Path for java installation '/usr/lib/jvm/openjdk-17' (Common Linux Locations) do
 📂 Copying JDK to run directory...
 ✅ JDK copied to /home/matt/Documents/Repos/MattMC/run/jdk-21
 
+> Task :compileJava
+Note: Some input files use or override a deprecated API.
+Note: Recompile with -Xlint:deprecation for details.
+Note: Some input files use unchecked or unsafe operations.
+Note: Recompile with -Xlint:unchecked for details.
+
+> Task :compileSodiumJava
+Note: Some input files use or override a deprecated API.
+Note: Recompile with -Xlint:deprecation for details.
+Note: /home/matt/Documents/Repos/MattMC/sodium-1.21.9/common/src/main/java/net/caffeinemc/mods/sodium/mixin/features/render/entity/cull/EntityRendererMixin.java uses unchecked or unsafe operations.
+Note: Recompile with -Xlint:unchecked for details.
+
+> Task :compileIrisJava
+Note: Some input files use or override a deprecated API.
+Note: Recompile with -Xlint:deprecation for details.
+
 > Task :runClient
 Using bundled JDK from: /home/matt/Documents/Repos/MattMC/run/jdk-21
-[11:35:08] [main/INFO]: Loading Minecraft 1.21.10 with Fabric Loader 0.18.2
-[11:35:08] [main/INFO]: Mappings not present!
-[11:35:08] [main/INFO]: Loading 6 mods:
+[12:13:34] [main/INFO]: Loading Minecraft 1.21.10 with Fabric Loader 0.18.2
+[12:13:34] [main/INFO]: Mappings not present!
+[12:13:34] [main/INFO]: Loading 6 mods:
         - fabricloader 0.18.2
         - iris 1.9.6
         - java 21
         - minecraft 1.21.10
         - mixinextras 0.5.0
         - sodium 0.7.2
-[11:35:08] [main/WARN]: Runtime mod remapping disabled due to no fabric.remapClasspathFile being specified. You may need to update loom.
-[11:35:08] [main/INFO]: SpongePowered MIXIN Subsystem Version=0.8.7 Source=file:/home/matt/Documents/Repos/MattMC/libraries/deps/sponge-mixin-0.16.5+mixin.0.8.7.jar Service=Knot/Fabric Env=CLIENT
-[11:35:08] [main/INFO]: Compatibility level set to JAVA_17
-[11:35:08] [main/INFO]: Loaded configuration file for Sodium: 42 options available, 1 override(s) found
-[11:35:08] [main/WARN]: Reference map 'iris.refmap.json' for mixins.iris.json could not be read. If this is a development environment you can ignore this message
-[11:35:08] [main/WARN]: Reference map 'iris-fabric.refmap.json' for mixins.iris.fabric.json could not be read. If this is a development environment you can ignore this message
-[11:35:08] [main/WARN]: Reference map 'iris.refmap.json' for mixins.iris.fantastic.json could not be read. If this is a development environment you can ignore this message
-[11:35:08] [main/WARN]: Reference map 'iris.refmap.json' for mixins.iris.vertexformat.json could not be read. If this is a development environment you can ignore this message
-[11:35:08] [main/WARN]: Reference map 'iris.refmap.json' for mixins.iris.bettermipmaps.json could not be read. If this is a development environment you can ignore this message
-[11:35:08] [main/WARN]: Reference map 'iris.refmap.json' for mixins.iris.compat.sodium.json could not be read. If this is a development environment you can ignore this message
-[11:35:08] [main/WARN]: Reference map 'iris.refmap.json' for mixins.iris.fixes.maxfpscrash.json could not be read. If this is a development environment you can ignore this message
-[11:35:08] [main/WARN]: Force-disabling mixin 'features.render.world.sky.FogRendererMixin' as rule 'mixin.features.render.world.sky' (added by mods [iris]) disables it and children
-[11:35:08] [main/WARN]: Force-disabling mixin 'features.render.world.sky.ClientLevelMixin' as rule 'mixin.features.render.world.sky' (added by mods [iris]) disables it and children
-[11:35:08] [main/WARN]: Force-disabling mixin 'features.render.world.sky.LevelRendererMixin' as rule 'mixin.features.render.world.sky' (added by mods [iris]) disables it and children
-[11:35:08] [main/INFO]: Searching for graphics cards...
-[11:35:08] [main/INFO]: Found graphics adapter: LinuxPciAdapterInfo[vendor=NVIDIA, name=GA102 [GeForce RTX 3080 Ti], pciVendorId=0x10de, pciDeviceId=0x2208]
-[11:35:08] [main/WARN]: Sodium has applied one or more workarounds to prevent crashes or other issues on your system: [NVIDIA_THREADED_OPTIMIZATIONS_BROKEN]
-[11:35:08] [main/WARN]: This is not necessarily an issue, but it may result in certain features or optimizations being disabled. You can sometimes fix these issues by upgrading your graphics driver.
-[11:35:09] [main/INFO]: Initializing MixinExtras via com.llamalad7.mixinextras.service.MixinExtrasServiceImpl(version=0.5.0).
-[11:35:09] [Datafixer Bootstrap/INFO]: 278 Datafixer optimizations took 206 milliseconds
-[11:35:11] [main/WARN]: Missing translation key for rename: gui.abuseReport.reason.generic
-[11:35:11] [main/WARN]: Missing translation key for rename: gui.abuseReport.reason.generic.description
-[11:35:11] [Render thread/INFO]: Setting user: Player887
+[12:13:34] [main/WARN]: Runtime mod remapping disabled due to no fabric.remapClasspathFile being specified. You may need to update loom.
+[12:13:34] [main/INFO]: SpongePowered MIXIN Subsystem Version=0.8.7 Source=file:/home/matt/Documents/Repos/MattMC/libraries/deps/sponge-mixin-0.16.5+mixin.0.8.7.jar Service=Knot/Fabric Env=CLIENT
+[12:13:34] [main/INFO]: Compatibility level set to JAVA_17
+[12:13:34] [main/INFO]: Loaded configuration file for Sodium: 42 options available, 1 override(s) found
+[12:13:34] [main/WARN]: Reference map 'iris.refmap.json' for mixins.iris.json could not be read. If this is a development environment you can ignore this message
+[12:13:34] [main/WARN]: Reference map 'iris-fabric.refmap.json' for mixins.iris.fabric.json could not be read. If this is a development environment you can ignore this message
+[12:13:34] [main/WARN]: Reference map 'iris.refmap.json' for mixins.iris.fantastic.json could not be read. If this is a development environment you can ignore this message
+[12:13:34] [main/WARN]: Reference map 'iris.refmap.json' for mixins.iris.vertexformat.json could not be read. If this is a development environment you can ignore this message
+[12:13:34] [main/WARN]: Reference map 'iris.refmap.json' for mixins.iris.bettermipmaps.json could not be read. If this is a development environment you can ignore this message
+[12:13:34] [main/WARN]: Reference map 'iris.refmap.json' for mixins.iris.compat.sodium.json could not be read. If this is a development environment you can ignore this message
+[12:13:34] [main/WARN]: Reference map 'iris.refmap.json' for mixins.iris.fixes.maxfpscrash.json could not be read. If this is a development environment you can ignore this message
+[12:13:34] [main/WARN]: Force-disabling mixin 'features.render.world.sky.FogRendererMixin' as rule 'mixin.features.render.world.sky' (added by mods [iris]) disables it and children
+[12:13:34] [main/WARN]: Force-disabling mixin 'features.render.world.sky.ClientLevelMixin' as rule 'mixin.features.render.world.sky' (added by mods [iris]) disables it and children
+[12:13:34] [main/WARN]: Force-disabling mixin 'features.render.world.sky.LevelRendererMixin' as rule 'mixin.features.render.world.sky' (added by mods [iris]) disables it and children
+[12:13:34] [main/INFO]: Searching for graphics cards...
+[12:13:34] [main/INFO]: Found graphics adapter: LinuxPciAdapterInfo[vendor=NVIDIA, name=GA102 [GeForce RTX 3080 Ti], pciVendorId=0x10de, pciDeviceId=0x2208]
+[12:13:34] [main/WARN]: Sodium has applied one or more workarounds to prevent crashes or other issues on your system: [NVIDIA_THREADED_OPTIMIZATIONS_BROKEN]
+[12:13:34] [main/WARN]: This is not necessarily an issue, but it may result in certain features or optimizations being disabled. You can sometimes fix these issues by upgrading your graphics driver.
+[12:13:35] [main/INFO]: Initializing MixinExtras via com.llamalad7.mixinextras.service.MixinExtrasServiceImpl(version=0.5.0).
+[12:13:35] [Datafixer Bootstrap/INFO]: 278 Datafixer optimizations took 226 milliseconds
+[12:13:37] [main/WARN]: Missing translation key for rename: gui.abuseReport.reason.generic
+[12:13:37] [main/WARN]: Missing translation key for rename: gui.abuseReport.reason.generic.description
+[12:13:37] [Render thread/INFO]: Setting user: Player715
 [LWJGL] Version: 3.3.3-snapshot
          OS: Linux v6.14.0-36-generic
         JRE: Linux amd64 21.0.5
@@ -54,15 +70,15 @@ Using bundled JDK from: /home/matt/Documents/Repos/MattMC/run/jdk-21
 [LWJGL] Loading library: glfw
         Module: org.lwjgl.glfw
         Loaded from org.lwjgl.librarypath: /tmp/lwjgl_matt/3.3.3-snapshot/x64/libglfw.so
-[11:35:11] [Render thread/INFO]: Backend library: LWJGL version 3.3.3-snapshot
-[11:35:11] [Render thread/WARN]: Detected unexpected shutdown during last game startup: resetting fullscreen mode
+[12:13:37] [Render thread/INFO]: Backend library: LWJGL version 3.3.3-snapshot
+[12:13:37] [Render thread/WARN]: Detected unexpected shutdown during last game startup: resetting fullscreen mode
 [LWJGL] Loading library: jemalloc
         Module: org.lwjgl.jemalloc
         Loaded from org.lwjgl.librarypath: /tmp/lwjgl_matt/3.3.3-snapshot/x64/libjemalloc.so
 [LWJGL] MemoryUtil allocator: JEmallocAllocator
 [LWJGL] Java 9 check intrinsics enabled
 [LWJGL] Closure Registry: ConcurrentHashMap
-[11:35:11] [Render thread/INFO]: Modifying process environment to apply workarounds for the NVIDIA graphics driver...
+[12:13:37] [Render thread/INFO]: Modifying process environment to apply workarounds for the NVIDIA graphics driver...
 [LWJGL] Loading JNI library: lwjgl_stb
         Module: org.lwjgl.stb
         Loaded from org.lwjgl.librarypath: /tmp/lwjgl_matt/3.3.3-snapshot/x64/liblwjgl_stb.so
@@ -75,58 +91,112 @@ Using bundled JDK from: /home/matt/Documents/Repos/MattMC/run/jdk-21
 [LWJGL] Java 9 text decoding enabled
         Loaded from system paths: /lib/x86_64-linux-gnu/libGLX.so.0
 [LWJGL] Java 10 multiplyHigh enabled
-[11:35:12] [ForkJoinPool.commonPool-worker-1/WARN]: [Iris Update Check] This version doesn't have an update index, skipping.
-[11:35:12] [Render thread/INFO]: OpenGL Vendor: NVIDIA Corporation
-[11:35:12] [Render thread/INFO]: OpenGL Renderer: NVIDIA GeForce RTX 3080 Ti/PCIe/SSE2
-[11:35:12] [Render thread/INFO]: OpenGL Version: 3.3.0 NVIDIA 580.95.05
-[11:35:12] [Render thread/INFO]: Modifying OpenGL context to apply workarounds for the NVIDIA graphics driver...
-[11:35:12] [Render thread/INFO]: Debug functionality is disabled.
-[11:35:12] [Render thread/INFO]: ARB_direct_state_access detected, enabling DSA.
-[11:35:12] [Render thread/INFO]: Shaders are disabled because no valid shaderpack is selected
-[11:35:12] [Render thread/INFO]: Using optional rendering extensions: GL_ARB_buffer_storage, GL_KHR_debug, GL_ARB_vertex_attrib_binding, GL_ARB_direct_state_access
-[11:35:12] [Render thread/INFO]: Created skins directory at: /home/matt/Documents/Repos/MattMC/run/skins
-[11:35:12] [Render thread/INFO]: Loaded 20 skins (0 custom)
+[12:13:38] [ForkJoinPool.commonPool-worker-1/WARN]: [Iris Update Check] This version doesn't have an update index, skipping.
+[12:13:38] [Render thread/INFO]: OpenGL Vendor: NVIDIA Corporation
+[12:13:38] [Render thread/INFO]: OpenGL Renderer: NVIDIA GeForce RTX 3080 Ti/PCIe/SSE2
+[12:13:38] [Render thread/INFO]: OpenGL Version: 3.3.0 NVIDIA 580.95.05
+[12:13:38] [Render thread/INFO]: Modifying OpenGL context to apply workarounds for the NVIDIA graphics driver...
+[12:13:38] [Render thread/INFO]: Debug functionality is disabled.
+[12:13:38] [Render thread/INFO]: ARB_direct_state_access detected, enabling DSA.
+[12:13:38] [Render thread/INFO]: Shaders are disabled because no valid shaderpack is selected
+[12:13:38] [Render thread/INFO]: Using optional rendering extensions: GL_ARB_buffer_storage, GL_KHR_debug, GL_ARB_vertex_attrib_binding, GL_ARB_direct_state_access
+[12:13:38] [Render thread/INFO]: Loaded 20 skins (0 custom)
 [LWJGL] Loading library: openal
         Module: org.lwjgl.openal
         Loaded from org.lwjgl.librarypath: /tmp/lwjgl_matt/3.3.3-snapshot/x64/libopenal.so
 [LWJGL] [ALC] ALC_SOFT_reopen_device was reported as available but an entry point is missing.
-[11:35:12] [Render thread/INFO]: Hardware information:
-[11:35:12] [Render thread/INFO]: CPU: 20x 12th Gen Intel(R) Core(TM) i7-12700K
-[11:35:12] [Render thread/INFO]: GPU: NVIDIA GeForce RTX 3080 Ti/PCIe/SSE2 (Supports OpenGL 3.3.0 NVIDIA 580.95.05)
-[11:35:12] [Render thread/INFO]: OS: Linux (6.14.0-36-generic)
+[12:13:38] [Render thread/INFO]: Hardware information:
+[12:13:38] [Render thread/INFO]: CPU: 20x 12th Gen Intel(R) Core(TM) i7-12700K
+[12:13:38] [Render thread/INFO]: GPU: NVIDIA GeForce RTX 3080 Ti/PCIe/SSE2 (Supports OpenGL 3.3.0 NVIDIA 580.95.05)
+[12:13:38] [Render thread/INFO]: OS: Linux (6.14.0-36-generic)
+[LWJGL] Java 16 memcpy enabled
+[12:13:38] [Render thread/INFO]: Reloading ResourceManager: vanilla
+[12:13:38] [Worker-Main-17/INFO]: Found unifont_all_no_pua-16.0.03.hex, loading
+[12:13:38] [Worker-Main-18/INFO]: Found unifont_pua-16.0.03.hex, loading
+[12:13:38] [Worker-Main-4/INFO]: Found unifont_jp_patch-16.0.03.hex, loading
+[12:13:39] [Render thread/ERROR]: Unreported exception thrown!
+java.util.concurrent.CompletionException: java.lang.ClassCircularityError: net/minecraft/client/renderer/block/model/BlockModelPart
+        at java.base/java.util.concurrent.CompletableFuture.encodeThrowable(CompletableFuture.java:315) ~[?:?]
+        at java.base/java.util.concurrent.CompletableFuture.completeThrowable(CompletableFuture.java:320) ~[?:?]
+        at java.base/java.util.concurrent.CompletableFuture$AsyncSupply.run(CompletableFuture.java:1770) ~[?:?]
+        at knot/net.minecraft.server.packs.resources.SimpleReloadInstance.lambda$prepareTasks$0(SimpleReloadInstance.java:64) ~[minecraft-1.21.10.jar:?]
+        at java.base/java.util.concurrent.ForkJoinTask$RunnableExecuteAction.exec(ForkJoinTask.java:1423) ~[?:?]
+        at java.base/java.util.concurrent.ForkJoinTask.doExec(ForkJoinTask.java:387) ~[?:?]
+        at java.base/java.util.concurrent.ForkJoinPool$WorkQueue.topLevelExec(ForkJoinPool.java:1312) ~[?:?]
+        at java.base/java.util.concurrent.ForkJoinPool.scan(ForkJoinPool.java:1843) ~[?:?]
+        at java.base/java.util.concurrent.ForkJoinPool.runWorker(ForkJoinPool.java:1808) ~[?:?]
+        at java.base/java.util.concurrent.ForkJoinWorkerThread.run(ForkJoinWorkerThread.java:188) ~[?:?]
+Caused by: java.lang.ClassCircularityError: net/minecraft/client/renderer/block/model/BlockModelPart
+        at java.base/java.lang.ClassLoader.defineClass1(Native Method) ~[?:?]
+        at java.base/java.lang.ClassLoader.defineClass(ClassLoader.java:1027) ~[?:?]
+        at java.base/java.security.SecureClassLoader.defineClass(SecureClassLoader.java:150) ~[?:?]
+        at net.fabricmc.loader.impl.launch.knot.KnotClassLoader.defineClassFwd(KnotClassLoader.java:165) ~[fabric-loader-0.18.2.jar:0.18.2]
+        at net.fabricmc.loader.impl.launch.knot.KnotClassDelegate.tryLoadClass(KnotClassDelegate.java:368) ~[fabric-loader-0.18.2.jar:0.18.2]
+        at net.fabricmc.loader.impl.launch.knot.KnotClassDelegate.loadClass(KnotClassDelegate.java:231) ~[fabric-loader-0.18.2.jar:0.18.2]
+        at net.fabricmc.loader.impl.launch.knot.KnotClassLoader.loadClass(KnotClassLoader.java:119) ~[fabric-loader-0.18.2.jar:0.18.2]
+        at java.base/java.lang.ClassLoader.loadClass(ClassLoader.java:526) ~[?:?]
+        at java.base/java.lang.ClassLoader.defineClass1(Native Method) ~[?:?]
+        at java.base/java.lang.ClassLoader.defineClass(ClassLoader.java:1027) ~[?:?]
+        at java.base/java.security.SecureClassLoader.defineClass(SecureClassLoader.java:150) ~[?:?]
+        at net.fabricmc.loader.impl.launch.knot.KnotClassLoader.defineClassFwd(KnotClassLoader.java:165) ~[fabric-loader-0.18.2.jar:0.18.2]
+        at net.fabricmc.loader.impl.launch.knot.KnotClassDelegate.tryLoadClass(KnotClassDelegate.java:368) ~[fabric-loader-0.18.2.jar:0.18.2]
+        at net.fabricmc.loader.impl.launch.knot.KnotClassDelegate.loadClass(KnotClassDelegate.java:231) ~[fabric-loader-0.18.2.jar:0.18.2]
+        at net.fabricmc.loader.impl.launch.knot.KnotClassLoader.loadClass(KnotClassLoader.java:119) ~[fabric-loader-0.18.2.jar:0.18.2]
+        at java.base/java.lang.ClassLoader.loadClass(ClassLoader.java:526) ~[?:?]
+        at knot/net.minecraft.client.renderer.block.model.BlockStateModel$Unbaked.lambda$static$0(BlockStateModel.java:67) ~[minecraft-1.21.10.jar:?]
+        at knot/com.mojang.serialization.codecs.RecordCodecBuilder.create(RecordCodecBuilder.java:72) ~[datafixerupper-8.0.16.jar:?]
+        at knot/net.minecraft.client.renderer.block.model.BlockStateModel$Unbaked.<clinit>(BlockStateModel.java:66) ~[minecraft-1.21.10.jar:?]
+        at knot/net.minecraft.client.renderer.block.model.BlockModelDefinition$SimpleModelSelectors.<clinit>(BlockModelDefinition.java:82) ~[minecraft-1.21.10.jar:?]
+        at knot/net.minecraft.client.renderer.block.model.BlockModelDefinition.lambda$static$0(BlockModelDefinition.java:33) ~[minecraft-1.21.10.jar:?]
+        at knot/com.mojang.serialization.codecs.RecordCodecBuilder.create(RecordCodecBuilder.java:72) ~[datafixerupper-8.0.16.jar:?]
+        at knot/net.minecraft.client.renderer.block.model.BlockModelDefinition.<clinit>(BlockModelDefinition.java:32) ~[minecraft-1.21.10.jar:?]
+        at knot/net.minecraft.client.resources.model.BlockStateModelLoader.lambda$loadBlockStates$1(BlockStateModelLoader.java:58) ~[minecraft-1.21.10.jar:?]
+        at java.base/java.util.concurrent.CompletableFuture$AsyncSupply.run(CompletableFuture.java:1768) ~[?:?]
+        ... 7 more
 ---- Minecraft Crash Report ----
-// I bet Cylons wouldn't have this problem.
+// Oops.
 
-Time: 2025-12-12 11:35:13
-Description: Initializing game
+Time: 2025-12-12 12:13:39
+Description: Unexpected error
 
-java.lang.RuntimeException: Mixin transformation of net.minecraft.client.renderer.LevelRenderer failed
-        at net.fabricmc.loader.impl.launch.knot.KnotClassDelegate.getPostMixinClassByteArray(KnotClassDelegate.java:440)
-        at net.fabricmc.loader.impl.launch.knot.KnotClassDelegate.tryLoadClass(KnotClassDelegate.java:336)
+java.util.concurrent.CompletionException: java.lang.ClassCircularityError: net/minecraft/client/renderer/block/model/BlockModelPart
+        at java.base/java.util.concurrent.CompletableFuture.encodeThrowable(CompletableFuture.java:315)
+        at java.base/java.util.concurrent.CompletableFuture.completeThrowable(CompletableFuture.java:320)
+        at java.base/java.util.concurrent.CompletableFuture$AsyncSupply.run(CompletableFuture.java:1770)
+        at knot//net.minecraft.server.packs.resources.SimpleReloadInstance.lambda$prepareTasks$0(SimpleReloadInstance.java:64)
+        at java.base/java.util.concurrent.ForkJoinTask$RunnableExecuteAction.exec(ForkJoinTask.java:1423)
+        at java.base/java.util.concurrent.ForkJoinTask.doExec(ForkJoinTask.java:387)
+        at java.base/java.util.concurrent.ForkJoinPool$WorkQueue.topLevelExec(ForkJoinPool.java:1312)
+        at java.base/java.util.concurrent.ForkJoinPool.scan(ForkJoinPool.java:1843)
+        at java.base/java.util.concurrent.ForkJoinPool.runWorker(ForkJoinPool.java:1808)
+        at java.base/java.util.concurrent.ForkJoinWorkerThread.run(ForkJoinWorkerThread.java:188)
+Caused by: java.lang.ClassCircularityError: net/minecraft/client/renderer/block/model/BlockModelPart
+        at java.base/java.lang.ClassLoader.defineClass1(Native Method)
+        at java.base/java.lang.ClassLoader.defineClass(ClassLoader.java:1027)
+        at java.base/java.security.SecureClassLoader.defineClass(SecureClassLoader.java:150)
+        at net.fabricmc.loader.impl.launch.knot.KnotClassLoader.defineClassFwd(KnotClassLoader.java:165)
+        at net.fabricmc.loader.impl.launch.knot.KnotClassDelegate.tryLoadClass(KnotClassDelegate.java:368)
         at net.fabricmc.loader.impl.launch.knot.KnotClassDelegate.loadClass(KnotClassDelegate.java:231)
         at net.fabricmc.loader.impl.launch.knot.KnotClassLoader.loadClass(KnotClassLoader.java:119)
         at java.base/java.lang.ClassLoader.loadClass(ClassLoader.java:526)
-        at knot//net.minecraft.client.Minecraft.<init>(Minecraft.java:591)
-        at knot//net.minecraft.client.main.Main.main(Main.java:243)
-        at net.fabricmc.loader.impl.game.minecraft.MinecraftGameProvider.launch(MinecraftGameProvider.java:536)
-        at net.fabricmc.loader.impl.launch.knot.Knot.launch(Knot.java:72)
-        at net.fabricmc.loader.impl.launch.knot.KnotClient.main(KnotClient.java:23)
-Caused by: org.spongepowered.asm.mixin.transformer.throwables.MixinTransformerError: An unexpected critical error was encountered
-        at org.spongepowered.asm.mixin.transformer.MixinProcessor.applyMixins(MixinProcessor.java:381)
-        at org.spongepowered.asm.mixin.transformer.MixinTransformer.transformClass(MixinTransformer.java:237)
-        at org.spongepowered.asm.mixin.transformer.MixinTransformer.transformClassBytes(MixinTransformer.java:202)
-        at net.fabricmc.loader.impl.launch.knot.KnotClassDelegate.getPostMixinClassByteArray(KnotClassDelegate.java:435)
-        ... 9 more
-Caused by: org.spongepowered.asm.mixin.injection.throwables.InjectionError: Critical injection failure: Callback method iris$beginWorldBorder(Lorg/spongepowered/asm/mixin/injection/callback/CallbackInfo;)V in mixins.iris.json:MixinLevelRenderer from mod iris failed injection check, (0/1) succeeded. Scanned 0 target(s). No refMap loaded.
-        at org.spongepowered.asm.mixin.injection.struct.InjectionInfo.postInject(InjectionInfo.java:531)
-        at org.spongepowered.asm.mixin.transformer.MixinTargetContext.applyInjections(MixinTargetContext.java:1490)
-        at org.spongepowered.asm.mixin.transformer.MixinApplicatorStandard.applyInjections(MixinApplicatorStandard.java:752)
-        at org.spongepowered.asm.mixin.transformer.MixinApplicatorStandard.applyMixin(MixinApplicatorStandard.java:330)
-        at org.spongepowered.asm.mixin.transformer.MixinApplicatorStandard.apply(MixinApplicatorStandard.java:246)
-        at org.spongepowered.asm.mixin.transformer.TargetClassContext.apply(TargetClassContext.java:437)
-        at org.spongepowered.asm.mixin.transformer.TargetClassContext.applyMixins(TargetClassContext.java:418)
-        at org.spongepowered.asm.mixin.transformer.MixinProcessor.applyMixins(MixinProcessor.java:352)
-        ... 12 more
+        at java.base/java.lang.ClassLoader.defineClass1(Native Method)
+        at java.base/java.lang.ClassLoader.defineClass(ClassLoader.java:1027)
+        at java.base/java.security.SecureClassLoader.defineClass(SecureClassLoader.java:150)
+        at net.fabricmc.loader.impl.launch.knot.KnotClassLoader.defineClassFwd(KnotClassLoader.java:165)
+        at net.fabricmc.loader.impl.launch.knot.KnotClassDelegate.tryLoadClass(KnotClassDelegate.java:368)
+        at net.fabricmc.loader.impl.launch.knot.KnotClassDelegate.loadClass(KnotClassDelegate.java:231)
+        at net.fabricmc.loader.impl.launch.knot.KnotClassLoader.loadClass(KnotClassLoader.java:119)
+        at java.base/java.lang.ClassLoader.loadClass(ClassLoader.java:526)
+        at knot//net.minecraft.client.renderer.block.model.BlockStateModel$Unbaked.lambda$static$0(BlockStateModel.java:67)
+        at knot//com.mojang.serialization.codecs.RecordCodecBuilder.create(RecordCodecBuilder.java:72)
+        at knot//net.minecraft.client.renderer.block.model.BlockStateModel$Unbaked.<clinit>(BlockStateModel.java:66)
+        at knot//net.minecraft.client.renderer.block.model.BlockModelDefinition$SimpleModelSelectors.<clinit>(BlockModelDefinition.java:82)
+        at knot//net.minecraft.client.renderer.block.model.BlockModelDefinition.lambda$static$0(BlockModelDefinition.java:33)
+        at knot//com.mojang.serialization.codecs.RecordCodecBuilder.create(RecordCodecBuilder.java:72)
+        at knot//net.minecraft.client.renderer.block.model.BlockModelDefinition.<clinit>(BlockModelDefinition.java:32)
+        at knot//net.minecraft.client.resources.model.BlockStateModelLoader.lambda$loadBlockStates$1(BlockStateModelLoader.java:58)
+        at java.base/java.util.concurrent.CompletableFuture$AsyncSupply.run(CompletableFuture.java:1768)
+        ... 7 more
 
 
 A detailed walkthrough of the error, its code path and all known details is as follows:
@@ -135,21 +205,31 @@ A detailed walkthrough of the error, its code path and all known details is as f
 -- Head --
 Thread: Render thread
 Stacktrace:
-        at net.fabricmc.loader.impl.launch.knot.KnotClassDelegate.getPostMixinClassByteArray(KnotClassDelegate.java:440)
-        at net.fabricmc.loader.impl.launch.knot.KnotClassDelegate.tryLoadClass(KnotClassDelegate.java:336)
-        at net.fabricmc.loader.impl.launch.knot.KnotClassDelegate.loadClass(KnotClassDelegate.java:231)
-        at net.fabricmc.loader.impl.launch.knot.KnotClassLoader.loadClass(KnotClassLoader.java:119)
-        at java.base/java.lang.ClassLoader.loadClass(ClassLoader.java:526)
-        at knot//net.minecraft.client.Minecraft.<init>(Minecraft.java:591)
+        at java.base/java.util.concurrent.CompletableFuture.encodeThrowable(CompletableFuture.java:315)
+        at java.base/java.util.concurrent.CompletableFuture.completeThrowable(CompletableFuture.java:320)
+        at java.base/java.util.concurrent.CompletableFuture$AsyncSupply.run(CompletableFuture.java:1770)
 
--- Initialization --
+-- Uptime --
 Details:
-        Modules:
+        JVM uptime: 5.502s
+        Wall uptime: 1.882s
+        High-res time: 1.686s
+        Client ticks: 16 ticks / 0.800s
 Stacktrace:
-        at knot//net.minecraft.client.main.Main.main(Main.java:243)
+        at knot//net.minecraft.client.Minecraft.fillReport(Minecraft.java:2250)
+        at knot//net.minecraft.client.Minecraft.emergencySaveAndCrash(Minecraft.java:947)
+        at knot//net.minecraft.client.Minecraft.run(Minecraft.java:906)
+        at knot//net.minecraft.client.main.Main.main(Main.java:258)
         at net.fabricmc.loader.impl.game.minecraft.MinecraftGameProvider.launch(MinecraftGameProvider.java:536)
         at net.fabricmc.loader.impl.launch.knot.Knot.launch(Knot.java:72)
         at net.fabricmc.loader.impl.launch.knot.KnotClient.main(KnotClient.java:23)
+
+-- Last reload --
+Details:
+        Reload number: 1
+        Reload reason: initial
+        Finished: No
+        Packs: vanilla
 
 -- System Details --
 Details:
@@ -158,7 +238,7 @@ Details:
         Operating System: Linux (amd64) version 6.14.0-36-generic
         Java Version: 21.0.5, Eclipse Adoptium
         Java VM Version: OpenJDK 64-Bit Server VM (mixed mode, sharing), Eclipse Adoptium
-        Memory: 212735512 bytes (202 MiB) / 536870912 bytes (512 MiB) up to 2147483648 bytes (2048 MiB)
+        Memory: 307557432 bytes (293 MiB) / 536870912 bytes (512 MiB) up to 2147483648 bytes (2048 MiB)
         CPUs: 20
         Processor Vendor: GenuineIntel
         Processor Name: 12th Gen Intel(R) Core(TM) i7-12700K
@@ -174,32 +254,36 @@ Details:
         Graphics card #0 deviceId: 0x2208
         Graphics card #0 versionInfo: unknown
         Virtual memory max (MiB): 32300.84
-        Virtual memory used (MiB): 17114.97
+        Virtual memory used (MiB): 17427.91
         Swap memory total (MiB): 16384.00
-        Swap memory used (MiB): 3679.70
+        Swap memory used (MiB): 3679.52
         Space in storage for jna.tmpdir (MiB): <path not set>
         Space in storage for org.lwjgl.system.SharedLibraryExtractPath (MiB): <path not set>
         Space in storage for io.netty.native.workdir (MiB): <path not set>
         Space in storage for java.io.tmpdir (MiB): available: 15843.66, total: 15916.84
-        Space in storage for workdir (MiB): available: 294933.13, total: 937500.69
+        Space in storage for workdir (MiB): available: 294944.56, total: 937500.69
         JVM Flags: 19 total; -XX:+UseG1GC -XX:+ParallelRefProcEnabled -XX:MaxGCPauseMillis=200 -XX:+UnlockExperimentalVMOptions -XX:+DisableExplicitGC -XX:G1NewSizePercent=30 -XX:G1MaxNewSizePercent=40 -XX:G1HeapRegionSize=8M -XX:G1ReservePercent=20 -XX:G1HeapWastePercent=5 -XX:G1MixedGCCountTarget=4 -XX:InitiatingHeapOccupancyPercent=15 -XX:G1MixedGCLiveThresholdPercent=90 -XX:G1RSetUpdatingPauseTimePercent=5 -XX:SurvivorRatio=32 -XX:+PerfDisableSharedMem -XX:MaxTenuringThreshold=1 -Xms512M -Xmx2G
         Debug Flags: 0 total;
         Loaded Shaderpack: (off)
         Launched Version: 1.21.10
         Backend library: LWJGL version 3.3.3-snapshot
         Backend API: NVIDIA GeForce RTX 3080 Ti/PCIe/SSE2 GL version 3.3.0 NVIDIA 580.95.05, NVIDIA Corporation
-        Window size: <not initialized>
+        Window size: 854x480
         GFLW Platform: x11
         Render Extensions: GL_ARB_buffer_storage, GL_KHR_debug, GL_ARB_vertex_attrib_binding, GL_ARB_direct_state_access
         GL debug messages:
         Is Modded: Definitely; Client brand changed to 'fabric'
-        Universe: 404
+        Universe: 400921fb54442d18
         Type: Client (map_client.txt)
+        Graphics mode: fancy
+        Render Distance: 12/12 chunks
+        Resource Packs: vanilla
+        Current Language: en_us
         Locale: en_US
         System encoding: UTF-8
         File encoding: UTF-8
         CPU: 20x 12th Gen Intel(R) Core(TM) i7-12700K
-#@!@# Game crashed! Crash report saved to: #@!@# /home/matt/Documents/Repos/MattMC/run/crash-reports/crash-2025-12-12_11.35.13-client.txt
+#@!@# Game crashed! Crash report saved to: #@!@# /home/matt/Documents/Repos/MattMC/run/crash-reports/crash-2025-12-12_12.13.39-client.txt
 
 > Task :runClient FAILED
 
@@ -215,8 +299,8 @@ Execution failed for task ':runClient'.
 > Run with --scan to get full insights.
 > Get more help at https://help.gradle.org.
 
-BUILD FAILED in 7s
-14 actionable tasks: 4 executed, 10 up-to-date
+BUILD FAILED in 22s
+14 actionable tasks: 7 executed, 7 up-to-date
 matt@HungLoDE:~/Documents/Repos/MattMC$
 
 
