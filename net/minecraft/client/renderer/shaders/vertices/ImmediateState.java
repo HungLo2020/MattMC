@@ -19,10 +19,40 @@ public class ImmediateState {
 	public static final ThreadLocal<Boolean> skipExtension = ThreadLocal.withInitial(() -> false);
 	
 	/**
+	 * Thread-local flag indicating chunk compilation is in progress.
+	 * Used to enable vertex format extension on worker threads during chunk compilation.
+	 * This allows terrain chunks to use extended vertex formats when shaders are active.
+	 */
+	public static final ThreadLocal<Boolean> isCompilingChunks = ThreadLocal.withInitial(() -> false);
+	
+	/**
+	 * Whether extended vertex format should be used for rendering.
+	 * IRIS Pattern: Use for RenderPipeline vertex format extension.
+	 */
+	public static boolean renderWithExtendedVertexFormat = false;
+	
+	/**
 	 * Sets rendering level state.
 	 */
 	public static void setRenderingLevel(boolean rendering) {
 		isRenderingLevel = rendering;
+	}
+	
+	/**
+	 * Sets chunk compilation state for current thread.
+	 */
+	public static void setCompilingChunks(boolean compiling) {
+		isCompilingChunks.set(compiling);
+	}
+	
+	/**
+	 * Checks if vertex format extension should be applied.
+	 * Returns true if either:
+	 * 1. Rendering level on render thread (isRenderingLevel)
+	 * 2. Compiling chunks on worker thread (isCompilingChunks)
+	 */
+	public static boolean shouldExtendFormat() {
+		return isRenderingLevel || isCompilingChunks.get();
 	}
 	
 	/**

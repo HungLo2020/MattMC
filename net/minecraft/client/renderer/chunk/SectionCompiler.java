@@ -44,6 +44,21 @@ public class SectionCompiler {
 	public SectionCompiler.Results compile(
 		SectionPos sectionPos, RenderSectionRegion renderSectionRegion, VertexSorting vertexSorting, SectionBufferBuilderPack sectionBufferBuilderPack
 	) {
+		// Enable vertex format extension for chunk compilation (IRIS pattern)
+		// This allows terrain to use extended vertex formats when shaders are active
+		net.minecraft.client.renderer.shaders.vertices.ImmediateState.setCompilingChunks(true);
+		
+		try {
+			return compileInternal(sectionPos, renderSectionRegion, vertexSorting, sectionBufferBuilderPack);
+		} finally {
+			// Always disable on exit
+			net.minecraft.client.renderer.shaders.vertices.ImmediateState.setCompilingChunks(false);
+		}
+	}
+	
+	private SectionCompiler.Results compileInternal(
+		SectionPos sectionPos, RenderSectionRegion renderSectionRegion, VertexSorting vertexSorting, SectionBufferBuilderPack sectionBufferBuilderPack
+	) {
 		SectionCompiler.Results results = new SectionCompiler.Results();
 		BlockPos blockPos = sectionPos.origin();
 		BlockPos blockPos2 = blockPos.offset(15, 15, 15);

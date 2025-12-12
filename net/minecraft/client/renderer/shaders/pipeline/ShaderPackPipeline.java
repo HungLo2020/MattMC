@@ -1288,22 +1288,16 @@ public class ShaderPackPipeline implements WorldRenderingPipeline {
 	
 	/**
 	 * Whether this pipeline should override vanilla shaders.
-	 * Following IRIS's IrisRenderingPipeline.shouldOverrideShaders() pattern.
+	 * Following IRIS's IrisRenderingPipeline.shouldOverrideShaders() pattern EXACTLY.
 	 * 
-	 * NOTE: Currently DISABLED because vertex format extension doesn't work during
-	 * chunk compilation (happens on worker threads) and IRIS relies on Sodium for
-	 * terrain vertex formats. Without Sodium-style terrain rendering, shader pack
-	 * terrain shaders receive incorrect vertex data and render black.
+	 * Returns true when:
+	 * 1. isRenderingWorld - We are currently rendering the world (between beginLevelRendering/finalizeLevelRendering)
+	 * 2. isMainBound - The main framebuffer is bound (after initial setup)
 	 * 
-	 * When full Sodium-style terrain rendering is implemented:
-	 * return isRenderingWorld && isMainBound;
+	 * IRIS Reference: IrisRenderingPipeline.java line 1243
 	 */
 	public boolean shouldOverrideShaders() {
-		// DISABLED: Shader interception requires Sodium-style terrain rendering
-		// which uses a completely separate vertex format/encoding system.
-		// Vanilla chunk compilation happens on worker threads where
-		// ImmediateState.isRenderingLevel isn't set.
-		return false;
+		return isRenderingWorld && isMainBound;
 	}
 	
 	/**

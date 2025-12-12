@@ -82,14 +82,19 @@ public class BufferBuilder implements VertexConsumer, BlockSensitiveBufferBuilde
 		extending = false;
 		injectNormalAndUV1 = false;
 
-		// Skip extension if not rendering level or shaders not active
-		if (ImmediateState.skipExtension.get() || !ImmediateState.isRenderingLevel || !IrisShaders.isEnabled()) {
+		// Skip extension if explicitly disabled or shaders not active
+		if (ImmediateState.skipExtension.get() || !IrisShaders.isEnabled()) {
 			return format;
 		}
 		
-		// CRITICAL: Only extend vertex format if shader interception is actually active
-		// Otherwise we create TERRAIN format vertices but vanilla shaders expect BLOCK format
-		// This causes black triangular artifacts due to vertex stride/attribute mismatch
+		// Check if we should extend format:
+		// 1. Rendering level on render thread (ImmediateState.isRenderingLevel)
+		// 2. Compiling chunks on worker thread (ImmediateState.isCompilingChunks)
+		if (!ImmediateState.shouldExtendFormat()) {
+			return format;
+		}
+		
+		// Also check if shader interception is actually active
 		net.minecraft.client.renderer.shaders.pipeline.ShaderPackPipeline activePipeline = IrisShaders.getActivePipeline();
 		if (activePipeline == null || !activePipeline.shouldOverrideShaders()) {
 			return format;
