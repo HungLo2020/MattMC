@@ -29,7 +29,21 @@ import net.minecraft.world.level.block.state.BlockState;
 public interface FabricBlockModelRenderer {
     
     /**
-     * Renders a block model with full context using the Fabric Renderer.
+     * Instance method for rendering a block model with full context.
+     * This is meant to be added to ModelBlockRenderer via mixin.
+     */
+    default void render(BlockAndTintGetter blockView, BlockStateModel model, BlockState state, 
+                        BlockPos pos, PoseStack matrices, BlockVertexConsumerProvider vertexConsumers, 
+                        boolean cull, long seed, int overlay) {
+        // Default implementation delegates to Renderer
+        Renderer renderer = Renderer.get();
+        if (renderer != null) {
+            renderer.render(null, blockView, model, state, pos, matrices, vertexConsumers, cull, seed, overlay);
+        }
+    }
+    
+    /**
+     * Static helper method for rendering a block model with full context using the Fabric Renderer.
      */
     static void render(PoseStack.Pose matrices, BlockVertexConsumerProvider vertexConsumers, 
                        BlockStateModel model, float red, float green, float blue, 

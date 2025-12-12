@@ -65,7 +65,22 @@ public interface QuadView {
     @Nullable Vector3f copyNormal(int vertexIndex, @Nullable Vector3f target);
     
     int tag();
-    void copyTo(MutableQuadView target);
+    int tintIndex();
+    
+    /**
+     * Copies this quad's data to the target mutable quad view.
+     * Default implementation does nothing - subclasses should override.
+     */
+    default void copyTo(MutableQuadView target) {
+        // Default implementation - subclasses should override
+    }
+    
+    /**
+     * Converts this quad to vanilla format and copies to the target array.
+     */
+    default void toVanilla(int[] target, int targetIndex) {
+        // Default implementation - subclasses should override
+    }
     
     default @Nullable TextureAtlasSprite sprite() {
         return null;

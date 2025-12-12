@@ -24,6 +24,11 @@ import java.util.function.Consumer;
 public interface MeshView {
     
     /**
+     * Returns the number of quads in this mesh.
+     */
+    int size();
+    
+    /**
      * Iterates over all quads in this mesh, passing each to the consumer.
      */
     void forEach(Consumer<? super QuadView> consumer);

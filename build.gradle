@@ -296,6 +296,14 @@ dependencies {
     implementation 'org.ow2.sat4j:org.ow2.sat4j.core:2.3.6'
     implementation 'org.ow2.sat4j:org.ow2.sat4j.pb:2.3.6'
     
+    // ===== IRIS DEPENDENCIES =====
+    // JCPP - C preprocessor for shader parsing
+    implementation 'org.anarres:jcpp:1.4.14'
+    // ANTLR - Parser generator for shader language
+    implementation 'org.antlr:antlr4-runtime:4.13.1'
+    // GLSL Transformer - GLSL shader transformation library
+    implementation 'io.github.douira:glsl-transformer:2.0.1'
+    
     // ===== TESTING DEPENDENCIES =====
     // Testing dependencies - only available in test scope, excluded from production builds
     

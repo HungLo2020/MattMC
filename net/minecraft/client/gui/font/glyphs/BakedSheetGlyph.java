@@ -153,7 +153,7 @@ public class BakedSheetGlyph implements BakedGlyph, EffectGlyph {
 	}
 
 	@Environment(EnvType.CLIENT)
-	record EffectInstance(BakedSheetGlyph glyph, float x0, float y0, float x1, float y1, float depth, int color, int shadowColor, float shadowOffset)
+	public record EffectInstance(BakedSheetGlyph glyph, float x0, float y0, float x1, float y1, float depth, int color, int shadowColor, float shadowOffset)
 		implements TextRenderable {
 
 		@Override

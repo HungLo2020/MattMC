@@ -105,9 +105,21 @@ public interface MutableQuadView extends QuadView {
     
     MutableQuadView tag(int tag);
     
+    MutableQuadView tintIndex(int tintIndex);
+    
     MutableQuadView copyFrom(QuadView quad);
     
     MutableQuadView fromVanilla(int[] quadData, int startIndex);
+    
+    /**
+     * Push a transform onto the transform stack.
+     */
+    void pushTransform(QuadTransform transform);
+    
+    /**
+     * Pop a transform from the transform stack.
+     */
+    void popTransform();
     
     default MutableQuadView sprite(TextureAtlasSprite sprite) {
         return this;
