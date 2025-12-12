@@ -18,13 +18,13 @@ Note: Recompile with -Xlint:unchecked for details.
 
 > Task :runClient
 Using bundled JDK from: /home/matt/Documents/Repos/MattMC/run/jdk-21
-[19:56:41] [Datafixer Bootstrap/INFO]: 278 Datafixer optimizations took 149 milliseconds
-[19:56:42] [main/WARN]: Missing translation key for rename: gui.abuseReport.reason.generic
-[19:56:42] [main/WARN]: Missing translation key for rename: gui.abuseReport.reason.generic.description
-[19:56:43] [Render thread/INFO]: Setting user: Player615
-[19:56:43] [Render thread/INFO]: Initializing MattMC Shader System
-[19:56:43] [Render thread/INFO]: Loaded shader configuration
-[19:56:43] [Render thread/INFO]: Shader System initialized successfully - Shaders: true, Pack: ComplementaryHungLoIfied.zip
+[20:34:01] [Datafixer Bootstrap/INFO]: 278 Datafixer optimizations took 203 milliseconds
+[20:34:03] [main/WARN]: Missing translation key for rename: gui.abuseReport.reason.generic
+[20:34:03] [main/WARN]: Missing translation key for rename: gui.abuseReport.reason.generic.description
+[20:34:03] [Render thread/INFO]: Setting user: Player784
+[20:34:03] [Render thread/INFO]: Initializing MattMC Shader System
+[20:34:03] [Render thread/INFO]: Loaded shader configuration
+[20:34:03] [Render thread/INFO]: Shader System initialized successfully - Shaders: true, Pack: ComplementaryHungLoIfied.zip
 [LWJGL] Version: 3.3.3+5
          OS: Linux v6.14.0-36-generic
         JRE: Linux amd64 21.0.5
@@ -35,7 +35,7 @@ Using bundled JDK from: /home/matt/Documents/Repos/MattMC/run/jdk-21
 [LWJGL] Loading library: glfw
         Module: org.lwjgl.glfw
         Loaded from org.lwjgl.librarypath: /tmp/lwjgl_matt/3.3.3+5/x64/libglfw.so
-[19:56:43] [Render thread/INFO]: Backend library: LWJGL version 3.3.3+5
+[20:34:03] [Render thread/INFO]: Backend library: LWJGL version 3.3.3+5
 [LWJGL] Loading library: jemalloc
         Module: org.lwjgl.jemalloc
         Loaded from org.lwjgl.librarypath: /tmp/lwjgl_matt/3.3.3+5/x64/libjemalloc.so
@@ -54,18 +54,18 @@ Using bundled JDK from: /home/matt/Documents/Repos/MattMC/run/jdk-21
 [LWJGL] Java 9 text decoding enabled
         Loaded from system paths: /lib/x86_64-linux-gnu/libGLX.so.0
 [LWJGL] Java 10 multiplyHigh enabled
-[19:56:43] [Render thread/INFO]: Using optional rendering extensions: GL_ARB_buffer_storage, GL_KHR_debug, GL_ARB_vertex_attrib_binding, GL_ARB_direct_state_access
-[19:56:43] [Render thread/INFO]: Loaded 20 skins (0 custom)
+[20:34:04] [Render thread/INFO]: Using optional rendering extensions: GL_ARB_buffer_storage, GL_KHR_debug, GL_ARB_vertex_attrib_binding, GL_ARB_direct_state_access
+[20:34:04] [Render thread/INFO]: Loaded 20 skins (0 custom)
 [LWJGL] Loading library: openal
         Module: org.lwjgl.openal
         Loaded from org.lwjgl.librarypath: /tmp/lwjgl_matt/3.3.3+5/x64/libopenal.so
 [LWJGL] [ALC] ALC_SOFT_reopen_device was reported as available but an entry point is missing.
 [LWJGL] Java 16 memcpy enabled
-[19:56:43] [Render thread/INFO]: Reloading ResourceManager: vanilla
-[19:56:43] [Worker-Main-17/INFO]: Found unifont_jp_patch-16.0.03.hex, loading
-[19:56:43] [Worker-Main-16/INFO]: Found unifont_pua-16.0.03.hex, loading
-[19:56:43] [Worker-Main-14/INFO]: Found unifont_all_no_pua-16.0.03.hex, loading
-[19:56:44] [Render thread/WARN]: Failed to load translations for en_us from pack vanilla
+[20:34:04] [Render thread/INFO]: Reloading ResourceManager: vanilla
+[20:34:04] [Worker-Main-14/INFO]: Found unifont_all_no_pua-16.0.03.hex, loading
+[20:34:04] [Worker-Main-4/INFO]: Found unifont_pua-16.0.03.hex, loading
+[20:34:04] [Worker-Main-1/INFO]: Found unifont_jp_patch-16.0.03.hex, loading
+[20:34:04] [Render thread/WARN]: Failed to load translations for en_us from pack vanilla
 java.nio.file.NoSuchFileException: /home/matt/Documents/Repos/MattMC/run/assets/files/realms/lang/en_us.json
         at java.base/sun.nio.fs.UnixException.translateToIOException(UnixException.java:92) ~[?:?]
         at java.base/sun.nio.fs.UnixException.rethrowAsIOException(UnixException.java:106) ~[?:?]
@@ -93,46 +93,47 @@ java.nio.file.NoSuchFileException: /home/matt/Documents/Repos/MattMC/run/assets/
         at net.minecraft.client.Minecraft.runTick(Minecraft.java:1240) [main/:?]
         at net.minecraft.client.Minecraft.run(Minecraft.java:883) [main/:?]
         at net.minecraft.client.main.Main.main(Main.java:258) [main/:?]
-[19:56:44] [Render thread/WARN]: Missing translation key for rename: gui.abuseReport.reason.generic
-[19:56:44] [Render thread/WARN]: Missing translation key for rename: gui.abuseReport.reason.generic.description
-[19:56:44] [Render thread/INFO]: OpenAL initialized on device HT-S350
-[19:56:44] [Render thread/INFO]: Sound engine started
-[19:56:44] [Render thread/INFO]: Created: 512x256x0 minecraft:textures/atlas/particles.png-atlas
-[19:56:44] [Render thread/INFO]: Created: 128x64x0 minecraft:textures/atlas/decorated_pot.png-atlas
-[19:56:44] [Render thread/INFO]: Created: 2048x1024x0 minecraft:textures/atlas/armor_trims.png-atlas
-[19:56:44] [Render thread/INFO]: Created: 512x256x0 minecraft:textures/atlas/paintings.png-atlas
-[19:56:44] [Render thread/INFO]: Created: 512x512x0 minecraft:textures/atlas/shield_patterns.png-atlas
-[19:56:44] [Render thread/INFO]: Created: 1024x512x4 minecraft:textures/atlas/blocks.png-atlas
-[19:56:44] [Render thread/INFO]: Created: 512x256x0 minecraft:textures/atlas/chest.png-atlas
-[19:56:44] [Render thread/INFO]: Created: 512x512x0 minecraft:textures/atlas/banner_patterns.png-atlas
-[19:56:44] [Render thread/INFO]: Created: 512x256x0 minecraft:textures/atlas/beds.png-atlas
-[19:56:44] [Render thread/INFO]: Created: 1024x512x0 minecraft:textures/atlas/gui.png-atlas
-[19:56:44] [Render thread/INFO]: Created: 64x64x0 minecraft:textures/atlas/map_decorations.png-atlas
-[19:56:44] [Render thread/INFO]: Created: 256x256x0 minecraft:textures/atlas/signs.png-atlas
-[19:56:44] [Render thread/INFO]: Created: 512x256x0 minecraft:textures/atlas/shulker_boxes.png-atlas
-[19:56:44] [Render thread/INFO]: Initializing shader pack repository
-[19:56:44] [Render thread/INFO]: Scanning for shader packs in resources...
-[19:56:44] [Render thread/INFO]: Found 1 shader pack(s): test_shader
-[19:56:44] [Render thread/INFO]: Shader packs available: test_shader
-[19:56:44] [Render thread/INFO]: Pipeline manager initialized
-[19:56:55] [Render thread/INFO]: setShadersEnabledAndApply called with enabled=true
-[19:56:55] [Render thread/INFO]: Saved shader configuration
-[19:56:55] [Render thread/INFO]: Saved shader configuration
-[19:56:55] [Render thread/INFO]: Synced shader config to ShaderSystem - enabled=true, pack=ComplementaryHungLoIfied.zip
-[19:56:55] [Render thread/INFO]: Reloading shader pipelines
-[19:56:55] [Render thread/INFO]: Reloading all pipelines
-[19:57:02] [Render thread/INFO]: Loaded 1461 recipes
-[19:57:02] [Render thread/INFO]: Loaded 1574 advancements
-[19:57:02] [Server thread/INFO]: Starting integrated minecraft server version 1.21.10
-[19:57:02] [Server thread/INFO]: Generating keypair
-[19:57:02] [Server thread/INFO]: Loading 0 persistent chunks...
-[19:57:03] [Server thread/INFO]: Loading 49 chunks for player spawn...
-[19:57:03] [Server thread/INFO]: Preparing spawn area: 16%
-[19:57:03] [Server thread/INFO]: Preparing spawn area: 16%
-[19:57:03] [Server thread/INFO]: Time elapsed: 591 ms
-[19:57:03] [Server thread/INFO]: Player615[local:E:29bb3bbe] logged in with entity id 88 at (-214.69999998807907, 79.20830992967616, 224.69999998807907)
-[19:57:03] [Server thread/INFO]: Player615 joined the game
-[19:57:03] [Render thread/ERROR]: Failed to load skin texture data
+[20:34:04] [Render thread/WARN]: Missing translation key for rename: gui.abuseReport.reason.generic
+[20:34:04] [Render thread/WARN]: Missing translation key for rename: gui.abuseReport.reason.generic.description
+[20:34:04] [Render thread/INFO]: OpenAL initialized on device HT-S350
+[20:34:04] [Render thread/INFO]: Sound engine started
+[20:34:04] [Render thread/INFO]: Created: 512x256x0 minecraft:textures/atlas/particles.png-atlas
+[20:34:04] [Render thread/INFO]: Created: 128x64x0 minecraft:textures/atlas/decorated_pot.png-atlas
+[20:34:04] [Render thread/INFO]: Created: 2048x1024x0 minecraft:textures/atlas/armor_trims.png-atlas
+[20:34:04] [Render thread/INFO]: Created: 512x256x0 minecraft:textures/atlas/paintings.png-atlas
+[20:34:04] [Render thread/INFO]: Created: 512x512x0 minecraft:textures/atlas/shield_patterns.png-atlas
+[20:34:04] [Render thread/INFO]: Created: 1024x512x4 minecraft:textures/atlas/blocks.png-atlas
+[20:34:04] [Render thread/INFO]: Created: 512x256x0 minecraft:textures/atlas/chest.png-atlas
+[20:34:04] [Render thread/INFO]: Created: 512x512x0 minecraft:textures/atlas/banner_patterns.png-atlas
+[20:34:04] [Render thread/INFO]: Created: 512x256x0 minecraft:textures/atlas/beds.png-atlas
+[20:34:04] [Render thread/INFO]: Created: 1024x512x0 minecraft:textures/atlas/gui.png-atlas
+[20:34:04] [Render thread/INFO]: Created: 64x64x0 minecraft:textures/atlas/map_decorations.png-atlas
+[20:34:04] [Render thread/INFO]: Created: 256x256x0 minecraft:textures/atlas/signs.png-atlas
+[20:34:04] [Render thread/INFO]: Created: 512x256x0 minecraft:textures/atlas/shulker_boxes.png-atlas
+[20:34:05] [Render thread/INFO]: Initializing shader pack repository
+[20:34:05] [Render thread/INFO]: Scanning for shader packs in resources...
+[20:34:05] [Render thread/INFO]: Found 1 shader pack(s): test_shader
+[20:34:05] [Render thread/INFO]: Shader packs available: test_shader
+[20:34:05] [Render thread/INFO]: Pipeline manager initialized
+[20:34:11] [Render thread/INFO]: setShadersEnabledAndApply called with enabled=true
+[20:34:11] [Render thread/INFO]: Saved shader configuration
+[20:34:11] [Render thread/INFO]: Saved shader configuration
+[20:34:11] [Render thread/INFO]: Synced shader config to ShaderSystem - enabled=true, pack=ComplementaryHungLoIfied.zip
+[20:34:11] [Render thread/INFO]: Reloading shader pipelines
+[20:34:11] [Render thread/INFO]: Reloading all pipelines
+[20:34:14] [Render thread/INFO]: Resizing Dynamic Transforms UBO, capacity limit of 2 reached during a single frame. New capacity will be 4.
+[20:34:14] [Render thread/INFO]: Loaded 1461 recipes
+[20:34:14] [Render thread/INFO]: Loaded 1574 advancements
+[20:34:14] [Server thread/INFO]: Starting integrated minecraft server version 1.21.10
+[20:34:14] [Server thread/INFO]: Generating keypair
+[20:34:14] [Server thread/INFO]: Loading 0 persistent chunks...
+[20:34:14] [Server thread/INFO]: Preparing spawn area: 16%
+[20:34:15] [Server thread/INFO]: Loading 49 chunks for player spawn...
+[20:34:15] [Server thread/INFO]: Preparing spawn area: 16%
+[20:34:15] [Server thread/INFO]: Time elapsed: 672 ms
+[20:34:15] [Server thread/INFO]: Player784[local:E:0039b0f2] logged in with entity id 90 at (-216.82466845864727, 79.20830992967616, 226.90704089702893)
+[20:34:15] [Server thread/INFO]: Player784 joined the game
+[20:34:15] [Render thread/ERROR]: Failed to load skin texture data
 java.io.FileNotFoundException: minecraft:entity/player/wide/steve
         at net.minecraft.server.packs.resources.ResourceProvider.lambda$getResourceOrThrow$1(ResourceProvider.java:18) ~[main/:?]
         at java.base/java.util.Optional.orElseThrow(Optional.java:403) ~[?:?]
@@ -147,288 +148,288 @@ java.io.FileNotFoundException: minecraft:entity/player/wide/steve
         at net.minecraft.client.Minecraft.runTick(Minecraft.java:1238) [main/:?]
         at net.minecraft.client.Minecraft.run(Minecraft.java:883) [main/:?]
         at net.minecraft.client.main.Main.main(Main.java:258) [main/:?]
-[19:57:03] [Render thread/WARN]: Ignoring chat session from Player615 due to missing Services public key
-[19:57:03] [Render thread/INFO]: Creating pipeline for dimension minecraft:overworld
-[19:57:03] [Render thread/INFO]: Loaded shader pack source: ComplementaryHungLoIfied.zip from /ComplementaryHungLoIfied
-[19:57:03] [Render thread/INFO]: Creating shader pack pipeline for external pack: ComplementaryHungLoIfied.zip in dimension: minecraft:overworld
-[19:57:03] [Server thread/INFO]: Changing view distance to 12, from 10
-[19:57:03] [Server thread/INFO]: Changing simulation distance to 12, from 0
-[19:57:03] [Render thread/INFO]: No shaders.properties found for pack: ComplementaryHungLoIfied.zip, using defaults
-[19:57:03] [Render thread/INFO]: Found 52 shader files in dimension directory: world0
-[19:57:03] [Render thread/INFO]: Found 52 shader files in dimension directory: world-1
-[19:57:03] [Render thread/INFO]: Found 52 shader files in dimension directory: world1
-[19:57:03] [Render thread/INFO]: Found 156 starting shader files for pack: ComplementaryHungLoIfied.zip
-[19:57:03] [Render thread/INFO]: Creating ShaderSourceProvider for pack: ComplementaryHungLoIfied.zip with 156 starting paths
-[19:57:03] [Render thread/INFO]: Include graph built with 307 nodes
-[19:57:03] [Render thread/INFO]: ShaderSourceProvider created successfully
-[19:57:03] [Render thread/INFO]: Created GBufferManager (1x1) with 3 configured targets
-[19:57:03] [Render thread/INFO]: Initialized shadow rendering at 1024x1024 resolution
-[19:57:03] [Render thread/INFO]: Compiling shader programs for pack: ComplementaryHungLoIfied.zip
-[19:57:03] [Render thread/WARN]: Failed to get included file: /shaders/world0/gbuffers_basic.gsh (graph has 307 nodes)
-[19:57:03] [Render thread/WARN]: Failed to get included file: /shaders/gbuffers_basic.gsh (graph has 307 nodes)
-[19:57:04] [Render thread/WARN]: gbuffers_basic shader program does not use utb CloudFaces defined in the pipeline. This might be a bug.
-[19:57:04] [Render thread/WARN]: gbuffers_basic shader program does not use sampler Sampler0 defined in the pipeline. This might be a bug.
-[19:57:04] [Render thread/WARN]: gbuffers_basic shader program does not use sampler Sampler2 defined in the pipeline. This might be a bug.
-[19:57:04] [Render thread/INFO]: Created ExtendedShader for: gbuffers_basic (program ID: 184)
-[19:57:04] [Render thread/INFO]: Successfully compiled program: gbuffers_basic
-[19:57:04] [Render thread/WARN]: Failed to get included file: /shaders/world0/gbuffers_line.vsh (graph has 307 nodes)
-[19:57:04] [Render thread/WARN]: Failed to get included file: /shaders/gbuffers_line.vsh (graph has 307 nodes)
-[19:57:04] [Render thread/WARN]: Failed to get included file: /shaders/world0/gbuffers_line.fsh (graph has 307 nodes)
-[19:57:04] [Render thread/WARN]: Failed to get included file: /shaders/gbuffers_line.fsh (graph has 307 nodes)
-[19:57:04] [Render thread/WARN]: Failed to get included file: /shaders/world0/gbuffers_textured.gsh (graph has 307 nodes)
-[19:57:04] [Render thread/WARN]: Failed to get included file: /shaders/gbuffers_textured.gsh (graph has 307 nodes)
-[19:57:04] [Render thread/WARN]: gbuffers_textured shader program does not use utb CloudFaces defined in the pipeline. This might be a bug.
-[19:57:04] [Render thread/WARN]: gbuffers_textured shader program does not use sampler Sampler0 defined in the pipeline. This might be a bug.
-[19:57:04] [Render thread/WARN]: gbuffers_textured shader program does not use sampler Sampler2 defined in the pipeline. This might be a bug.
-[19:57:04] [Render thread/INFO]: Created ExtendedShader for: gbuffers_textured (program ID: 185)
-[19:57:04] [Render thread/INFO]: Successfully compiled program: gbuffers_textured
-[19:57:04] [Render thread/WARN]: Failed to get included file: /shaders/world0/gbuffers_textured_lit.vsh (graph has 307 nodes)
-[19:57:04] [Render thread/WARN]: Failed to get included file: /shaders/gbuffers_textured_lit.vsh (graph has 307 nodes)
-[19:57:04] [Render thread/WARN]: Failed to get included file: /shaders/world0/gbuffers_textured_lit.fsh (graph has 307 nodes)
-[19:57:04] [Render thread/WARN]: Failed to get included file: /shaders/gbuffers_textured_lit.fsh (graph has 307 nodes)
-[19:57:04] [Render thread/WARN]: Failed to get included file: /shaders/world0/gbuffers_skybasic.gsh (graph has 307 nodes)
-[19:57:04] [Render thread/WARN]: Failed to get included file: /shaders/gbuffers_skybasic.gsh (graph has 307 nodes)
-[19:57:04] [Render thread/WARN]: gbuffers_skybasic shader program does not use utb CloudFaces defined in the pipeline. This might be a bug.
-[19:57:04] [Render thread/WARN]: gbuffers_skybasic shader program does not use sampler Sampler0 defined in the pipeline. This might be a bug.
-[19:57:04] [Render thread/WARN]: gbuffers_skybasic shader program does not use sampler Sampler2 defined in the pipeline. This might be a bug.
-[19:57:04] [Render thread/INFO]: Created ExtendedShader for: gbuffers_skybasic (program ID: 187)
-[19:57:04] [Render thread/INFO]: Successfully compiled program: gbuffers_skybasic
-[19:57:04] [Render thread/WARN]: Failed to get included file: /shaders/world0/gbuffers_skytextured.gsh (graph has 307 nodes)
-[19:57:04] [Render thread/WARN]: Failed to get included file: /shaders/gbuffers_skytextured.gsh (graph has 307 nodes)
-[19:57:04] [Render thread/WARN]: gbuffers_skytextured shader program does not use utb CloudFaces defined in the pipeline. This might be a bug.
-[19:57:04] [Render thread/WARN]: gbuffers_skytextured shader program does not use sampler Sampler0 defined in the pipeline. This might be a bug.
-[19:57:04] [Render thread/WARN]: gbuffers_skytextured shader program does not use sampler Sampler2 defined in the pipeline. This might be a bug.
-[19:57:04] [Render thread/INFO]: Created ExtendedShader for: gbuffers_skytextured (program ID: 189)
-[19:57:04] [Render thread/INFO]: Successfully compiled program: gbuffers_skytextured
-[19:57:04] [Render thread/WARN]: Failed to get included file: /shaders/world0/gbuffers_clouds.gsh (graph has 307 nodes)
-[19:57:04] [Render thread/WARN]: Failed to get included file: /shaders/gbuffers_clouds.gsh (graph has 307 nodes)
-[19:57:04] [Render thread/WARN]: gbuffers_clouds shader program does not use utb CloudFaces defined in the pipeline. This might be a bug.
-[19:57:04] [Render thread/WARN]: gbuffers_clouds shader program does not use sampler Sampler0 defined in the pipeline. This might be a bug.
-[19:57:04] [Render thread/WARN]: gbuffers_clouds shader program does not use sampler Sampler2 defined in the pipeline. This might be a bug.
-[19:57:04] [Render thread/INFO]: Created ExtendedShader for: gbuffers_clouds (program ID: 191)
-[19:57:04] [Render thread/INFO]: Successfully compiled program: gbuffers_clouds
-[19:57:04] [Render thread/WARN]: Failed to get included file: /shaders/world0/gbuffers_terrain.gsh (graph has 307 nodes)
-[19:57:04] [Render thread/WARN]: Failed to get included file: /shaders/gbuffers_terrain.gsh (graph has 307 nodes)
-[19:57:04] [Render thread/WARN]: gbuffers_terrain shader program does not use utb CloudFaces defined in the pipeline. This might be a bug.
-[19:57:04] [Render thread/WARN]: gbuffers_terrain shader program does not use sampler Sampler0 defined in the pipeline. This might be a bug.
-[19:57:04] [Render thread/WARN]: gbuffers_terrain shader program does not use sampler Sampler2 defined in the pipeline. This might be a bug.
-[19:57:04] [Render thread/INFO]: Created ExtendedShader for: gbuffers_terrain (program ID: 193)
-[19:57:04] [Render thread/INFO]: Successfully compiled program: gbuffers_terrain
-[19:57:04] [Render thread/WARN]: Failed to get included file: /shaders/world0/gbuffers_terrain_solid.vsh (graph has 307 nodes)
-[19:57:04] [Render thread/WARN]: Failed to get included file: /shaders/gbuffers_terrain_solid.vsh (graph has 307 nodes)
-[19:57:04] [Render thread/WARN]: Failed to get included file: /shaders/world0/gbuffers_terrain_solid.fsh (graph has 307 nodes)
-[19:57:04] [Render thread/WARN]: Failed to get included file: /shaders/gbuffers_terrain_solid.fsh (graph has 307 nodes)
-[19:57:04] [Render thread/WARN]: Failed to get included file: /shaders/world0/gbuffers_terrain_cutout.vsh (graph has 307 nodes)
-[19:57:04] [Render thread/WARN]: Failed to get included file: /shaders/gbuffers_terrain_cutout.vsh (graph has 307 nodes)
-[19:57:04] [Render thread/WARN]: Failed to get included file: /shaders/world0/gbuffers_terrain_cutout.fsh (graph has 307 nodes)
-[19:57:04] [Render thread/WARN]: Failed to get included file: /shaders/gbuffers_terrain_cutout.fsh (graph has 307 nodes)
-[19:57:04] [Render thread/WARN]: Failed to get included file: /shaders/world0/gbuffers_damagedblock.gsh (graph has 307 nodes)
-[19:57:04] [Render thread/WARN]: Failed to get included file: /shaders/gbuffers_damagedblock.gsh (graph has 307 nodes)
-[19:57:04] [Render thread/WARN]: gbuffers_damagedblock shader program does not use utb CloudFaces defined in the pipeline. This might be a bug.
-[19:57:04] [Render thread/WARN]: gbuffers_damagedblock shader program does not use sampler Sampler0 defined in the pipeline. This might be a bug.
-[19:57:04] [Render thread/WARN]: gbuffers_damagedblock shader program does not use sampler Sampler2 defined in the pipeline. This might be a bug.
-[19:57:04] [Render thread/INFO]: Created ExtendedShader for: gbuffers_damagedblock (program ID: 195)
-[19:57:04] [Render thread/INFO]: Successfully compiled program: gbuffers_damagedblock
-[19:57:04] [Render thread/WARN]: Failed to get included file: /shaders/world0/gbuffers_block.gsh (graph has 307 nodes)
-[19:57:04] [Render thread/WARN]: Failed to get included file: /shaders/gbuffers_block.gsh (graph has 307 nodes)
-[19:57:04] [Render thread/WARN]: gbuffers_block shader program does not use utb CloudFaces defined in the pipeline. This might be a bug.
-[19:57:04] [Render thread/WARN]: gbuffers_block shader program does not use sampler Sampler0 defined in the pipeline. This might be a bug.
-[19:57:04] [Render thread/WARN]: gbuffers_block shader program does not use sampler Sampler2 defined in the pipeline. This might be a bug.
-[19:57:04] [Render thread/INFO]: Created ExtendedShader for: gbuffers_block (program ID: 197)
-[19:57:04] [Render thread/INFO]: Successfully compiled program: gbuffers_block
-[19:57:04] [Render thread/WARN]: Failed to get included file: /shaders/world0/gbuffers_block_translucent.vsh (graph has 307 nodes)
-[19:57:04] [Render thread/WARN]: Failed to get included file: /shaders/gbuffers_block_translucent.vsh (graph has 307 nodes)
-[19:57:04] [Render thread/WARN]: Failed to get included file: /shaders/world0/gbuffers_block_translucent.fsh (graph has 307 nodes)
-[19:57:04] [Render thread/WARN]: Failed to get included file: /shaders/gbuffers_block_translucent.fsh (graph has 307 nodes)
-[19:57:04] [Render thread/WARN]: Failed to get included file: /shaders/world0/gbuffers_beaconbeam.gsh (graph has 307 nodes)
-[19:57:04] [Render thread/WARN]: Failed to get included file: /shaders/gbuffers_beaconbeam.gsh (graph has 307 nodes)
-[19:57:04] [Render thread/WARN]: gbuffers_beaconbeam shader program does not use utb CloudFaces defined in the pipeline. This might be a bug.
-[19:57:04] [Render thread/WARN]: gbuffers_beaconbeam shader program does not use sampler Sampler0 defined in the pipeline. This might be a bug.
-[19:57:04] [Render thread/WARN]: gbuffers_beaconbeam shader program does not use sampler Sampler2 defined in the pipeline. This might be a bug.
-[19:57:04] [Render thread/INFO]: Created ExtendedShader for: gbuffers_beaconbeam (program ID: 199)
-[19:57:04] [Render thread/INFO]: Successfully compiled program: gbuffers_beaconbeam
-[19:57:04] [Render thread/WARN]: Failed to get included file: /shaders/world0/gbuffers_item.vsh (graph has 307 nodes)
-[19:57:04] [Render thread/WARN]: Failed to get included file: /shaders/gbuffers_item.vsh (graph has 307 nodes)
-[19:57:04] [Render thread/WARN]: Failed to get included file: /shaders/world0/gbuffers_item.fsh (graph has 307 nodes)
-[19:57:04] [Render thread/WARN]: Failed to get included file: /shaders/gbuffers_item.fsh (graph has 307 nodes)
-[19:57:04] [Render thread/WARN]: Failed to get included file: /shaders/world0/gbuffers_entities.gsh (graph has 307 nodes)
-[19:57:04] [Render thread/WARN]: Failed to get included file: /shaders/gbuffers_entities.gsh (graph has 307 nodes)
-[19:57:04] [Render thread/WARN]: gbuffers_entities shader program does not use utb CloudFaces defined in the pipeline. This might be a bug.
-[19:57:04] [Render thread/WARN]: gbuffers_entities shader program does not use sampler Sampler0 defined in the pipeline. This might be a bug.
-[19:57:04] [Render thread/WARN]: gbuffers_entities shader program does not use sampler Sampler2 defined in the pipeline. This might be a bug.
-[19:57:04] [Render thread/INFO]: Created ExtendedShader for: gbuffers_entities (program ID: 201)
-[19:57:04] [Render thread/INFO]: Successfully compiled program: gbuffers_entities
-[19:57:04] [Render thread/WARN]: Failed to get included file: /shaders/world0/gbuffers_entities_translucent.vsh (graph has 307 nodes)
-[19:57:04] [Render thread/WARN]: Failed to get included file: /shaders/gbuffers_entities_translucent.vsh (graph has 307 nodes)
-[19:57:04] [Render thread/WARN]: Failed to get included file: /shaders/world0/gbuffers_entities_translucent.fsh (graph has 307 nodes)
-[19:57:04] [Render thread/WARN]: Failed to get included file: /shaders/gbuffers_entities_translucent.fsh (graph has 307 nodes)
-[19:57:04] [Render thread/WARN]: Failed to get included file: /shaders/world0/gbuffers_lightning.vsh (graph has 307 nodes)
-[19:57:04] [Render thread/WARN]: Failed to get included file: /shaders/gbuffers_lightning.vsh (graph has 307 nodes)
-[19:57:04] [Render thread/WARN]: Failed to get included file: /shaders/world0/gbuffers_lightning.fsh (graph has 307 nodes)
-[19:57:04] [Render thread/WARN]: Failed to get included file: /shaders/gbuffers_lightning.fsh (graph has 307 nodes)
-[19:57:04] [Render thread/WARN]: Failed to get included file: /shaders/world0/gbuffers_particles.vsh (graph has 307 nodes)
-[19:57:04] [Render thread/WARN]: Failed to get included file: /shaders/gbuffers_particles.vsh (graph has 307 nodes)
-[19:57:04] [Render thread/WARN]: Failed to get included file: /shaders/world0/gbuffers_particles.fsh (graph has 307 nodes)
-[19:57:04] [Render thread/WARN]: Failed to get included file: /shaders/gbuffers_particles.fsh (graph has 307 nodes)
-[19:57:04] [Render thread/WARN]: Failed to get included file: /shaders/world0/gbuffers_particles_translucent.vsh (graph has 307 nodes)
-[19:57:04] [Render thread/WARN]: Failed to get included file: /shaders/gbuffers_particles_translucent.vsh (graph has 307 nodes)
-[19:57:04] [Render thread/WARN]: Failed to get included file: /shaders/world0/gbuffers_particles_translucent.fsh (graph has 307 nodes)
-[19:57:04] [Render thread/WARN]: Failed to get included file: /shaders/gbuffers_particles_translucent.fsh (graph has 307 nodes)
-[19:57:04] [Render thread/WARN]: Failed to get included file: /shaders/world0/gbuffers_entities_glowing.gsh (graph has 307 nodes)
-[19:57:04] [Render thread/WARN]: Failed to get included file: /shaders/gbuffers_entities_glowing.gsh (graph has 307 nodes)
-[19:57:04] [Render thread/WARN]: gbuffers_entities_glowing shader program does not use utb CloudFaces defined in the pipeline. This might be a bug.
-[19:57:04] [Render thread/WARN]: gbuffers_entities_glowing shader program does not use sampler Sampler0 defined in the pipeline. This might be a bug.
-[19:57:04] [Render thread/WARN]: gbuffers_entities_glowing shader program does not use sampler Sampler2 defined in the pipeline. This might be a bug.
-[19:57:04] [Render thread/INFO]: Created ExtendedShader for: gbuffers_entities_glowing (program ID: 203)
-[19:57:04] [Render thread/INFO]: Successfully compiled program: gbuffers_entities_glowing
-[19:57:04] [Render thread/WARN]: Failed to get included file: /shaders/world0/gbuffers_armor_glint.gsh (graph has 307 nodes)
-[19:57:04] [Render thread/WARN]: Failed to get included file: /shaders/gbuffers_armor_glint.gsh (graph has 307 nodes)
-[19:57:04] [Render thread/WARN]: gbuffers_armor_glint shader program does not use utb CloudFaces defined in the pipeline. This might be a bug.
-[19:57:04] [Render thread/WARN]: gbuffers_armor_glint shader program does not use sampler Sampler0 defined in the pipeline. This might be a bug.
-[19:57:04] [Render thread/WARN]: gbuffers_armor_glint shader program does not use sampler Sampler2 defined in the pipeline. This might be a bug.
-[19:57:04] [Render thread/INFO]: Created ExtendedShader for: gbuffers_armor_glint (program ID: 205)
-[19:57:04] [Render thread/INFO]: Successfully compiled program: gbuffers_armor_glint
-[19:57:04] [Render thread/WARN]: Failed to get included file: /shaders/world0/gbuffers_spidereyes.gsh (graph has 307 nodes)
-[19:57:04] [Render thread/WARN]: Failed to get included file: /shaders/gbuffers_spidereyes.gsh (graph has 307 nodes)
-[19:57:04] [Render thread/WARN]: gbuffers_spidereyes shader program does not use utb CloudFaces defined in the pipeline. This might be a bug.
-[19:57:04] [Render thread/WARN]: gbuffers_spidereyes shader program does not use sampler Sampler0 defined in the pipeline. This might be a bug.
-[19:57:04] [Render thread/WARN]: gbuffers_spidereyes shader program does not use sampler Sampler2 defined in the pipeline. This might be a bug.
-[19:57:04] [Render thread/INFO]: Created ExtendedShader for: gbuffers_spidereyes (program ID: 207)
-[19:57:04] [Render thread/INFO]: Successfully compiled program: gbuffers_spidereyes
-[19:57:04] [Render thread/WARN]: Failed to get included file: /shaders/world0/gbuffers_hand.gsh (graph has 307 nodes)
-[19:57:04] [Render thread/WARN]: Failed to get included file: /shaders/gbuffers_hand.gsh (graph has 307 nodes)
-[19:57:04] [Render thread/WARN]: gbuffers_hand shader program does not use utb CloudFaces defined in the pipeline. This might be a bug.
-[19:57:04] [Render thread/WARN]: gbuffers_hand shader program does not use sampler Sampler0 defined in the pipeline. This might be a bug.
-[19:57:04] [Render thread/WARN]: gbuffers_hand shader program does not use sampler Sampler2 defined in the pipeline. This might be a bug.
-[19:57:04] [Render thread/INFO]: Created ExtendedShader for: gbuffers_hand (program ID: 209)
-[19:57:04] [Render thread/INFO]: Successfully compiled program: gbuffers_hand
-[19:57:04] [Render thread/WARN]: Failed to get included file: /shaders/world0/gbuffers_hand_water.vsh (graph has 307 nodes)
-[19:57:04] [Render thread/WARN]: Failed to get included file: /shaders/gbuffers_hand_water.vsh (graph has 307 nodes)
-[19:57:04] [Render thread/WARN]: Failed to get included file: /shaders/world0/gbuffers_hand_water.fsh (graph has 307 nodes)
-[19:57:04] [Render thread/WARN]: Failed to get included file: /shaders/gbuffers_hand_water.fsh (graph has 307 nodes)
-[19:57:04] [Render thread/WARN]: Failed to get included file: /shaders/world0/gbuffers_weather.gsh (graph has 307 nodes)
-[19:57:04] [Render thread/WARN]: Failed to get included file: /shaders/gbuffers_weather.gsh (graph has 307 nodes)
-[19:57:04] [Render thread/WARN]: gbuffers_weather shader program does not use utb CloudFaces defined in the pipeline. This might be a bug.
-[19:57:04] [Render thread/WARN]: gbuffers_weather shader program does not use sampler Sampler0 defined in the pipeline. This might be a bug.
-[19:57:04] [Render thread/WARN]: gbuffers_weather shader program does not use sampler Sampler2 defined in the pipeline. This might be a bug.
-[19:57:04] [Render thread/INFO]: Created ExtendedShader for: gbuffers_weather (program ID: 211)
-[19:57:04] [Render thread/INFO]: Successfully compiled program: gbuffers_weather
-[19:57:04] [Render thread/WARN]: Failed to get included file: /shaders/world0/gbuffers_water.gsh (graph has 307 nodes)
-[19:57:04] [Render thread/WARN]: Failed to get included file: /shaders/gbuffers_water.gsh (graph has 307 nodes)
-[19:57:04] [Render thread/WARN]: gbuffers_water shader program does not use utb CloudFaces defined in the pipeline. This might be a bug.
-[19:57:04] [Render thread/WARN]: gbuffers_water shader program does not use sampler Sampler0 defined in the pipeline. This might be a bug.
-[19:57:04] [Render thread/WARN]: gbuffers_water shader program does not use sampler Sampler2 defined in the pipeline. This might be a bug.
-[19:57:04] [Render thread/INFO]: Created ExtendedShader for: gbuffers_water (program ID: 213)
-[19:57:04] [Render thread/INFO]: Successfully compiled program: gbuffers_water
-[19:57:04] [Render thread/INFO]: Compiled 16 gbuffers programs
-[19:57:04] [Render thread/WARN]: Failed to get included file: /shaders/world0/deferred.vsh (graph has 307 nodes)
-[19:57:04] [Render thread/WARN]: Failed to get included file: /shaders/deferred.vsh (graph has 307 nodes)
-[19:57:04] [Render thread/WARN]: Failed to get included file: /shaders/world0/deferred.fsh (graph has 307 nodes)
-[19:57:04] [Render thread/WARN]: Failed to get included file: /shaders/deferred.fsh (graph has 307 nodes)
-[19:57:04] [Render thread/WARN]: Failed to get included file: /shaders/world0/deferred1.gsh (graph has 307 nodes)
-[19:57:04] [Render thread/WARN]: Failed to get included file: /shaders/deferred1.gsh (graph has 307 nodes)
-[19:57:04] [Render thread/INFO]: Successfully compiled program: deferred1
-[19:57:04] [Render thread/INFO]: Compiled deferred program: deferred1
-[19:57:04] [Render thread/WARN]: Failed to get included file: /shaders/world0/deferred2.vsh (graph has 307 nodes)
-[19:57:04] [Render thread/WARN]: Failed to get included file: /shaders/deferred2.vsh (graph has 307 nodes)
-[19:57:04] [Render thread/WARN]: Failed to get included file: /shaders/world0/deferred2.fsh (graph has 307 nodes)
-[19:57:04] [Render thread/WARN]: Failed to get included file: /shaders/deferred2.fsh (graph has 307 nodes)
-[19:57:04] [Render thread/WARN]: Failed to get included file: /shaders/world0/deferred3.vsh (graph has 307 nodes)
-[19:57:04] [Render thread/WARN]: Failed to get included file: /shaders/deferred3.vsh (graph has 307 nodes)
-[19:57:04] [Render thread/WARN]: Failed to get included file: /shaders/world0/deferred3.fsh (graph has 307 nodes)
-[19:57:04] [Render thread/WARN]: Failed to get included file: /shaders/deferred3.fsh (graph has 307 nodes)
-[19:57:04] [Render thread/WARN]: Failed to get included file: /shaders/world0/deferred4.vsh (graph has 307 nodes)
-[19:57:04] [Render thread/WARN]: Failed to get included file: /shaders/deferred4.vsh (graph has 307 nodes)
-[19:57:04] [Render thread/WARN]: Failed to get included file: /shaders/world0/deferred4.fsh (graph has 307 nodes)
-[19:57:04] [Render thread/WARN]: Failed to get included file: /shaders/deferred4.fsh (graph has 307 nodes)
-[19:57:04] [Render thread/WARN]: Failed to get included file: /shaders/world0/deferred5.vsh (graph has 307 nodes)
-[19:57:04] [Render thread/WARN]: Failed to get included file: /shaders/deferred5.vsh (graph has 307 nodes)
-[19:57:04] [Render thread/WARN]: Failed to get included file: /shaders/world0/deferred5.fsh (graph has 307 nodes)
-[19:57:04] [Render thread/WARN]: Failed to get included file: /shaders/deferred5.fsh (graph has 307 nodes)
-[19:57:04] [Render thread/WARN]: Failed to get included file: /shaders/world0/deferred6.vsh (graph has 307 nodes)
-[19:57:04] [Render thread/WARN]: Failed to get included file: /shaders/deferred6.vsh (graph has 307 nodes)
-[19:57:04] [Render thread/WARN]: Failed to get included file: /shaders/world0/deferred6.fsh (graph has 307 nodes)
-[19:57:04] [Render thread/WARN]: Failed to get included file: /shaders/deferred6.fsh (graph has 307 nodes)
-[19:57:04] [Render thread/WARN]: Failed to get included file: /shaders/world0/deferred7.vsh (graph has 307 nodes)
-[19:57:04] [Render thread/WARN]: Failed to get included file: /shaders/deferred7.vsh (graph has 307 nodes)
-[19:57:04] [Render thread/WARN]: Failed to get included file: /shaders/world0/deferred7.fsh (graph has 307 nodes)
-[19:57:04] [Render thread/WARN]: Failed to get included file: /shaders/deferred7.fsh (graph has 307 nodes)
-[19:57:04] [Render thread/WARN]: Failed to get included file: /shaders/world0/composite.gsh (graph has 307 nodes)
-[19:57:04] [Render thread/WARN]: Failed to get included file: /shaders/composite.gsh (graph has 307 nodes)
-[19:57:04] [Render thread/INFO]: Successfully compiled program: composite
-[19:57:04] [Render thread/INFO]: Compiled composite program: composite
-[19:57:04] [Render thread/WARN]: Failed to get included file: /shaders/world0/composite1.vsh (graph has 307 nodes)
-[19:57:04] [Render thread/WARN]: Failed to get included file: /shaders/composite1.vsh (graph has 307 nodes)
-[19:57:04] [Render thread/WARN]: Failed to get included file: /shaders/world0/composite1.fsh (graph has 307 nodes)
-[19:57:04] [Render thread/WARN]: Failed to get included file: /shaders/composite1.fsh (graph has 307 nodes)
-[19:57:04] [Render thread/WARN]: Failed to get included file: /shaders/world0/composite2.gsh (graph has 307 nodes)
-[19:57:04] [Render thread/WARN]: Failed to get included file: /shaders/composite2.gsh (graph has 307 nodes)
-[19:57:05] [Render thread/INFO]: Successfully compiled program: composite2
-[19:57:05] [Render thread/INFO]: Compiled composite program: composite2
-[19:57:05] [Render thread/WARN]: Failed to get included file: /shaders/world0/composite3.gsh (graph has 307 nodes)
-[19:57:05] [Render thread/WARN]: Failed to get included file: /shaders/composite3.gsh (graph has 307 nodes)
-[19:57:05] [Render thread/INFO]: Successfully compiled program: composite3
-[19:57:05] [Render thread/INFO]: Compiled composite program: composite3
-[19:57:05] [Render thread/WARN]: Failed to get included file: /shaders/world0/composite4.gsh (graph has 307 nodes)
-[19:57:05] [Render thread/WARN]: Failed to get included file: /shaders/composite4.gsh (graph has 307 nodes)
-[19:57:05] [Render thread/INFO]: Successfully compiled program: composite4
-[19:57:05] [Render thread/INFO]: Compiled composite program: composite4
-[19:57:05] [Render thread/WARN]: Failed to get included file: /shaders/world0/composite5.gsh (graph has 307 nodes)
-[19:57:05] [Render thread/WARN]: Failed to get included file: /shaders/composite5.gsh (graph has 307 nodes)
-[19:57:05] [Render thread/INFO]: Successfully compiled program: composite5
-[19:57:05] [Render thread/INFO]: Compiled composite program: composite5
-[19:57:05] [Render thread/WARN]: Failed to get included file: /shaders/world0/composite6.gsh (graph has 307 nodes)
-[19:57:05] [Render thread/WARN]: Failed to get included file: /shaders/composite6.gsh (graph has 307 nodes)
-[19:57:05] [Render thread/INFO]: Successfully compiled program: composite6
-[19:57:05] [Render thread/INFO]: Compiled composite program: composite6
-[19:57:05] [Render thread/WARN]: Failed to get included file: /shaders/world0/composite7.gsh (graph has 307 nodes)
-[19:57:05] [Render thread/WARN]: Failed to get included file: /shaders/composite7.gsh (graph has 307 nodes)
-[19:57:05] [Render thread/INFO]: Successfully compiled program: composite7
-[19:57:05] [Render thread/INFO]: Compiled composite program: composite7
-[19:57:05] [Render thread/WARN]: Failed to get included file: /shaders/world0/final.gsh (graph has 307 nodes)
-[19:57:05] [Render thread/WARN]: Failed to get included file: /shaders/final.gsh (graph has 307 nodes)
-[19:57:05] [Render thread/INFO]: Successfully compiled program: final
-[19:57:05] [Render thread/WARN]: Failed to get included file: /shaders/world0/shadow.gsh (graph has 307 nodes)
-[19:57:05] [Render thread/WARN]: Failed to get included file: /shaders/shadow.gsh (graph has 307 nodes)
-[19:57:05] [Render thread/INFO]: Successfully compiled program: shadow
-[19:57:05] [Render thread/INFO]: Compiled shadow program
-[19:57:05] [Render thread/INFO]: Building ShaderMap from 16 ExtendedShaders
-[19:57:05] [Render thread/INFO]: ShaderMap built with 52 mappings
-[19:57:05] [Render thread/INFO]: Compiled 26 shader programs for pack: ComplementaryHungLoIfied.zip (16 gbuffers, 1 deferred, 7 composite)
-[19:57:05] [Render thread/INFO]: Created shader pipeline for pack: ComplementaryHungLoIfied.zip in dimension: minecraft:overworld
-[19:57:05] [Render thread/INFO]: Destroyed GBufferManager
-[19:57:05] [Render thread/INFO]: Created GBufferManager (1920x1080) with 3 configured targets
-[19:57:05] [Render thread/INFO]: Resized G-buffers to 1920x1080
-[19:57:05] [Render thread/INFO]: Resizing Dynamic Transforms UBO, capacity limit of 2 reached during a single frame. New capacity will be 4.
-[19:57:05] [Render thread/INFO]: Resizing Dynamic Transforms UBO, capacity limit of 4 reached during a single frame. New capacity will be 8.
-[19:57:05] [Render thread/INFO]: Loaded 2 advancements
-[19:57:05] [Render thread/INFO]: Resizing Dynamic Transforms UBO, capacity limit of 8 reached during a single frame. New capacity will be 16.
-[19:57:05] [Render thread/INFO]: Resizing Dynamic Transforms UBO, capacity limit of 16 reached during a single frame. New capacity will be 64.
-[19:57:05] [Render thread/INFO]: Resizing Dynamic Transforms UBO, capacity limit of 64 reached during a single frame. New capacity will be 128.
-[19:57:05] [Render thread/INFO]: Resizing Dynamic Transforms UBO, capacity limit of 128 reached during a single frame. New capacity will be 256.
-[19:57:05] [Render thread/INFO]: Resizing Dynamic Transforms UBO, capacity limit of 256 reached during a single frame. New capacity will be 512.
-[19:57:05] [Render thread/INFO]: Resizing Dynamic Transforms UBO, capacity limit of 512 reached during a single frame. New capacity will be 1024.
-[19:57:05] [Render thread/INFO]: Resizing Dynamic Transforms UBO, capacity limit of 1024 reached during a single frame. New capacity will be 2048.
-[19:57:14] [Server thread/INFO]: Saving and pausing game...
-[19:57:14] [Server thread/INFO]: Saving chunks for level 'ServerLevel[New World]'/minecraft:overworld
-[19:57:14] [Server thread/INFO]: Saving chunks for level 'ServerLevel[New World]'/minecraft:the_nether
-[19:57:14] [Server thread/INFO]: Saving chunks for level 'ServerLevel[New World]'/minecraft:the_end
-[19:57:15] [Server thread/INFO]: Player615 lost connection: Disconnected
-[19:57:15] [Server thread/INFO]: Player615 left the game
-[19:57:15] [Server thread/INFO]: Stopping singleplayer server as player logged out
-[19:57:15] [Server thread/INFO]: Stopping server
-[19:57:15] [Server thread/INFO]: Saving players
-[19:57:15] [Server thread/INFO]: Saving worlds
-[19:57:15] [Server thread/INFO]: Saving chunks for level 'ServerLevel[New World]'/minecraft:overworld
-[19:57:15] [Server thread/INFO]: Saving chunks for level 'ServerLevel[New World]'/minecraft:the_nether
-[19:57:15] [Server thread/INFO]: Saving chunks for level 'ServerLevel[New World]'/minecraft:the_end
-[19:57:15] [Server thread/INFO]: ThreadedAnvilChunkStorage (New World (3)): All chunks are saved
-[19:57:15] [Server thread/INFO]: ThreadedAnvilChunkStorage (DIM-1): All chunks are saved
-[19:57:15] [Server thread/INFO]: ThreadedAnvilChunkStorage (DIM1): All chunks are saved
-[19:57:15] [Server thread/INFO]: ThreadedAnvilChunkStorage: All dimensions are saved
-[19:57:15] [Render thread/INFO]: Stopping!
+[20:34:15] [Render thread/WARN]: Ignoring chat session from Player784 due to missing Services public key
+[20:34:15] [Render thread/INFO]: Creating pipeline for dimension minecraft:overworld
+[20:34:15] [Render thread/INFO]: Loaded shader pack source: ComplementaryHungLoIfied.zip from /ComplementaryHungLoIfied
+[20:34:15] [Render thread/INFO]: Creating shader pack pipeline for external pack: ComplementaryHungLoIfied.zip in dimension: minecraft:overworld
+[20:34:15] [Render thread/INFO]: No shaders.properties found for pack: ComplementaryHungLoIfied.zip, using defaults
+[20:34:15] [Server thread/INFO]: Changing view distance to 12, from 10
+[20:34:15] [Render thread/INFO]: Found 52 shader files in dimension directory: world0
+[20:34:15] [Server thread/INFO]: Changing simulation distance to 12, from 0
+[20:34:15] [Render thread/INFO]: Found 52 shader files in dimension directory: world-1
+[20:34:15] [Render thread/INFO]: Found 52 shader files in dimension directory: world1
+[20:34:15] [Render thread/INFO]: Found 156 starting shader files for pack: ComplementaryHungLoIfied.zip
+[20:34:15] [Render thread/INFO]: Creating ShaderSourceProvider for pack: ComplementaryHungLoIfied.zip with 156 starting paths
+[20:34:15] [Render thread/INFO]: Include graph built with 307 nodes
+[20:34:15] [Render thread/INFO]: ShaderSourceProvider created successfully
+[20:34:15] [Render thread/INFO]: Created GBufferManager (1x1) with 3 configured targets
+[20:34:15] [Render thread/INFO]: Initialized shadow rendering at 1024x1024 resolution
+[20:34:15] [Render thread/INFO]: Compiling shader programs for pack: ComplementaryHungLoIfied.zip
+[20:34:15] [Render thread/WARN]: Failed to get included file: /shaders/world0/gbuffers_basic.gsh (graph has 307 nodes)
+[20:34:15] [Render thread/WARN]: Failed to get included file: /shaders/gbuffers_basic.gsh (graph has 307 nodes)
+[20:34:16] [Render thread/WARN]: gbuffers_basic shader program does not use utb CloudFaces defined in the pipeline. This might be a bug.
+[20:34:16] [Render thread/WARN]: gbuffers_basic shader program does not use sampler Sampler0 defined in the pipeline. This might be a bug.
+[20:34:16] [Render thread/WARN]: gbuffers_basic shader program does not use sampler Sampler2 defined in the pipeline. This might be a bug.
+[20:34:16] [Render thread/INFO]: Created ExtendedShader for: gbuffers_basic (program ID: 184)
+[20:34:16] [Render thread/INFO]: Successfully compiled program: gbuffers_basic
+[20:34:16] [Render thread/WARN]: Failed to get included file: /shaders/world0/gbuffers_line.vsh (graph has 307 nodes)
+[20:34:16] [Render thread/WARN]: Failed to get included file: /shaders/gbuffers_line.vsh (graph has 307 nodes)
+[20:34:16] [Render thread/WARN]: Failed to get included file: /shaders/world0/gbuffers_line.fsh (graph has 307 nodes)
+[20:34:16] [Render thread/WARN]: Failed to get included file: /shaders/gbuffers_line.fsh (graph has 307 nodes)
+[20:34:16] [Render thread/WARN]: Failed to get included file: /shaders/world0/gbuffers_textured.gsh (graph has 307 nodes)
+[20:34:16] [Render thread/WARN]: Failed to get included file: /shaders/gbuffers_textured.gsh (graph has 307 nodes)
+[20:34:16] [Render thread/WARN]: gbuffers_textured shader program does not use utb CloudFaces defined in the pipeline. This might be a bug.
+[20:34:16] [Render thread/WARN]: gbuffers_textured shader program does not use sampler Sampler0 defined in the pipeline. This might be a bug.
+[20:34:16] [Render thread/WARN]: gbuffers_textured shader program does not use sampler Sampler2 defined in the pipeline. This might be a bug.
+[20:34:16] [Render thread/INFO]: Created ExtendedShader for: gbuffers_textured (program ID: 185)
+[20:34:16] [Render thread/INFO]: Successfully compiled program: gbuffers_textured
+[20:34:16] [Render thread/WARN]: Failed to get included file: /shaders/world0/gbuffers_textured_lit.vsh (graph has 307 nodes)
+[20:34:16] [Render thread/WARN]: Failed to get included file: /shaders/gbuffers_textured_lit.vsh (graph has 307 nodes)
+[20:34:16] [Render thread/WARN]: Failed to get included file: /shaders/world0/gbuffers_textured_lit.fsh (graph has 307 nodes)
+[20:34:16] [Render thread/WARN]: Failed to get included file: /shaders/gbuffers_textured_lit.fsh (graph has 307 nodes)
+[20:34:16] [Render thread/WARN]: Failed to get included file: /shaders/world0/gbuffers_skybasic.gsh (graph has 307 nodes)
+[20:34:16] [Render thread/WARN]: Failed to get included file: /shaders/gbuffers_skybasic.gsh (graph has 307 nodes)
+[20:34:16] [Render thread/WARN]: gbuffers_skybasic shader program does not use utb CloudFaces defined in the pipeline. This might be a bug.
+[20:34:16] [Render thread/WARN]: gbuffers_skybasic shader program does not use sampler Sampler0 defined in the pipeline. This might be a bug.
+[20:34:16] [Render thread/WARN]: gbuffers_skybasic shader program does not use sampler Sampler2 defined in the pipeline. This might be a bug.
+[20:34:16] [Render thread/INFO]: Created ExtendedShader for: gbuffers_skybasic (program ID: 187)
+[20:34:16] [Render thread/INFO]: Successfully compiled program: gbuffers_skybasic
+[20:34:16] [Render thread/WARN]: Failed to get included file: /shaders/world0/gbuffers_skytextured.gsh (graph has 307 nodes)
+[20:34:16] [Render thread/WARN]: Failed to get included file: /shaders/gbuffers_skytextured.gsh (graph has 307 nodes)
+[20:34:16] [Render thread/WARN]: gbuffers_skytextured shader program does not use utb CloudFaces defined in the pipeline. This might be a bug.
+[20:34:16] [Render thread/WARN]: gbuffers_skytextured shader program does not use sampler Sampler0 defined in the pipeline. This might be a bug.
+[20:34:16] [Render thread/WARN]: gbuffers_skytextured shader program does not use sampler Sampler2 defined in the pipeline. This might be a bug.
+[20:34:16] [Render thread/INFO]: Created ExtendedShader for: gbuffers_skytextured (program ID: 189)
+[20:34:16] [Render thread/INFO]: Successfully compiled program: gbuffers_skytextured
+[20:34:16] [Render thread/WARN]: Failed to get included file: /shaders/world0/gbuffers_clouds.gsh (graph has 307 nodes)
+[20:34:16] [Render thread/WARN]: Failed to get included file: /shaders/gbuffers_clouds.gsh (graph has 307 nodes)
+[20:34:16] [Render thread/WARN]: gbuffers_clouds shader program does not use utb CloudFaces defined in the pipeline. This might be a bug.
+[20:34:16] [Render thread/WARN]: gbuffers_clouds shader program does not use sampler Sampler0 defined in the pipeline. This might be a bug.
+[20:34:16] [Render thread/WARN]: gbuffers_clouds shader program does not use sampler Sampler2 defined in the pipeline. This might be a bug.
+[20:34:16] [Render thread/INFO]: Created ExtendedShader for: gbuffers_clouds (program ID: 191)
+[20:34:16] [Render thread/INFO]: Successfully compiled program: gbuffers_clouds
+[20:34:16] [Render thread/WARN]: Failed to get included file: /shaders/world0/gbuffers_terrain.gsh (graph has 307 nodes)
+[20:34:16] [Render thread/WARN]: Failed to get included file: /shaders/gbuffers_terrain.gsh (graph has 307 nodes)
+[20:34:16] [Render thread/WARN]: gbuffers_terrain shader program does not use utb CloudFaces defined in the pipeline. This might be a bug.
+[20:34:16] [Render thread/WARN]: gbuffers_terrain shader program does not use sampler Sampler0 defined in the pipeline. This might be a bug.
+[20:34:16] [Render thread/WARN]: gbuffers_terrain shader program does not use sampler Sampler2 defined in the pipeline. This might be a bug.
+[20:34:16] [Render thread/INFO]: Created ExtendedShader for: gbuffers_terrain (program ID: 193)
+[20:34:16] [Render thread/INFO]: Successfully compiled program: gbuffers_terrain
+[20:34:16] [Render thread/WARN]: Failed to get included file: /shaders/world0/gbuffers_terrain_solid.vsh (graph has 307 nodes)
+[20:34:16] [Render thread/WARN]: Failed to get included file: /shaders/gbuffers_terrain_solid.vsh (graph has 307 nodes)
+[20:34:16] [Render thread/WARN]: Failed to get included file: /shaders/world0/gbuffers_terrain_solid.fsh (graph has 307 nodes)
+[20:34:16] [Render thread/WARN]: Failed to get included file: /shaders/gbuffers_terrain_solid.fsh (graph has 307 nodes)
+[20:34:16] [Render thread/WARN]: Failed to get included file: /shaders/world0/gbuffers_terrain_cutout.vsh (graph has 307 nodes)
+[20:34:16] [Render thread/WARN]: Failed to get included file: /shaders/gbuffers_terrain_cutout.vsh (graph has 307 nodes)
+[20:34:16] [Render thread/WARN]: Failed to get included file: /shaders/world0/gbuffers_terrain_cutout.fsh (graph has 307 nodes)
+[20:34:16] [Render thread/WARN]: Failed to get included file: /shaders/gbuffers_terrain_cutout.fsh (graph has 307 nodes)
+[20:34:16] [Render thread/WARN]: Failed to get included file: /shaders/world0/gbuffers_damagedblock.gsh (graph has 307 nodes)
+[20:34:16] [Render thread/WARN]: Failed to get included file: /shaders/gbuffers_damagedblock.gsh (graph has 307 nodes)
+[20:34:16] [Render thread/WARN]: gbuffers_damagedblock shader program does not use utb CloudFaces defined in the pipeline. This might be a bug.
+[20:34:16] [Render thread/WARN]: gbuffers_damagedblock shader program does not use sampler Sampler0 defined in the pipeline. This might be a bug.
+[20:34:16] [Render thread/WARN]: gbuffers_damagedblock shader program does not use sampler Sampler2 defined in the pipeline. This might be a bug.
+[20:34:16] [Render thread/INFO]: Created ExtendedShader for: gbuffers_damagedblock (program ID: 195)
+[20:34:16] [Render thread/INFO]: Successfully compiled program: gbuffers_damagedblock
+[20:34:16] [Render thread/WARN]: Failed to get included file: /shaders/world0/gbuffers_block.gsh (graph has 307 nodes)
+[20:34:16] [Render thread/WARN]: Failed to get included file: /shaders/gbuffers_block.gsh (graph has 307 nodes)
+[20:34:16] [Render thread/WARN]: gbuffers_block shader program does not use utb CloudFaces defined in the pipeline. This might be a bug.
+[20:34:16] [Render thread/WARN]: gbuffers_block shader program does not use sampler Sampler0 defined in the pipeline. This might be a bug.
+[20:34:16] [Render thread/WARN]: gbuffers_block shader program does not use sampler Sampler2 defined in the pipeline. This might be a bug.
+[20:34:16] [Render thread/INFO]: Created ExtendedShader for: gbuffers_block (program ID: 197)
+[20:34:16] [Render thread/INFO]: Successfully compiled program: gbuffers_block
+[20:34:16] [Render thread/WARN]: Failed to get included file: /shaders/world0/gbuffers_block_translucent.vsh (graph has 307 nodes)
+[20:34:16] [Render thread/WARN]: Failed to get included file: /shaders/gbuffers_block_translucent.vsh (graph has 307 nodes)
+[20:34:16] [Render thread/WARN]: Failed to get included file: /shaders/world0/gbuffers_block_translucent.fsh (graph has 307 nodes)
+[20:34:16] [Render thread/WARN]: Failed to get included file: /shaders/gbuffers_block_translucent.fsh (graph has 307 nodes)
+[20:34:16] [Render thread/WARN]: Failed to get included file: /shaders/world0/gbuffers_beaconbeam.gsh (graph has 307 nodes)
+[20:34:16] [Render thread/WARN]: Failed to get included file: /shaders/gbuffers_beaconbeam.gsh (graph has 307 nodes)
+[20:34:16] [Render thread/WARN]: gbuffers_beaconbeam shader program does not use utb CloudFaces defined in the pipeline. This might be a bug.
+[20:34:16] [Render thread/WARN]: gbuffers_beaconbeam shader program does not use sampler Sampler0 defined in the pipeline. This might be a bug.
+[20:34:16] [Render thread/WARN]: gbuffers_beaconbeam shader program does not use sampler Sampler2 defined in the pipeline. This might be a bug.
+[20:34:16] [Render thread/INFO]: Created ExtendedShader for: gbuffers_beaconbeam (program ID: 199)
+[20:34:16] [Render thread/INFO]: Successfully compiled program: gbuffers_beaconbeam
+[20:34:16] [Render thread/WARN]: Failed to get included file: /shaders/world0/gbuffers_item.vsh (graph has 307 nodes)
+[20:34:16] [Render thread/WARN]: Failed to get included file: /shaders/gbuffers_item.vsh (graph has 307 nodes)
+[20:34:16] [Render thread/WARN]: Failed to get included file: /shaders/world0/gbuffers_item.fsh (graph has 307 nodes)
+[20:34:16] [Render thread/WARN]: Failed to get included file: /shaders/gbuffers_item.fsh (graph has 307 nodes)
+[20:34:16] [Render thread/WARN]: Failed to get included file: /shaders/world0/gbuffers_entities.gsh (graph has 307 nodes)
+[20:34:16] [Render thread/WARN]: Failed to get included file: /shaders/gbuffers_entities.gsh (graph has 307 nodes)
+[20:34:16] [Render thread/WARN]: gbuffers_entities shader program does not use utb CloudFaces defined in the pipeline. This might be a bug.
+[20:34:16] [Render thread/WARN]: gbuffers_entities shader program does not use sampler Sampler0 defined in the pipeline. This might be a bug.
+[20:34:16] [Render thread/WARN]: gbuffers_entities shader program does not use sampler Sampler2 defined in the pipeline. This might be a bug.
+[20:34:16] [Render thread/INFO]: Created ExtendedShader for: gbuffers_entities (program ID: 201)
+[20:34:16] [Render thread/INFO]: Successfully compiled program: gbuffers_entities
+[20:34:16] [Render thread/WARN]: Failed to get included file: /shaders/world0/gbuffers_entities_translucent.vsh (graph has 307 nodes)
+[20:34:16] [Render thread/WARN]: Failed to get included file: /shaders/gbuffers_entities_translucent.vsh (graph has 307 nodes)
+[20:34:16] [Render thread/WARN]: Failed to get included file: /shaders/world0/gbuffers_entities_translucent.fsh (graph has 307 nodes)
+[20:34:16] [Render thread/WARN]: Failed to get included file: /shaders/gbuffers_entities_translucent.fsh (graph has 307 nodes)
+[20:34:16] [Render thread/WARN]: Failed to get included file: /shaders/world0/gbuffers_lightning.vsh (graph has 307 nodes)
+[20:34:16] [Render thread/WARN]: Failed to get included file: /shaders/gbuffers_lightning.vsh (graph has 307 nodes)
+[20:34:16] [Render thread/WARN]: Failed to get included file: /shaders/world0/gbuffers_lightning.fsh (graph has 307 nodes)
+[20:34:16] [Render thread/WARN]: Failed to get included file: /shaders/gbuffers_lightning.fsh (graph has 307 nodes)
+[20:34:16] [Render thread/WARN]: Failed to get included file: /shaders/world0/gbuffers_particles.vsh (graph has 307 nodes)
+[20:34:16] [Render thread/WARN]: Failed to get included file: /shaders/gbuffers_particles.vsh (graph has 307 nodes)
+[20:34:16] [Render thread/WARN]: Failed to get included file: /shaders/world0/gbuffers_particles.fsh (graph has 307 nodes)
+[20:34:16] [Render thread/WARN]: Failed to get included file: /shaders/gbuffers_particles.fsh (graph has 307 nodes)
+[20:34:16] [Render thread/WARN]: Failed to get included file: /shaders/world0/gbuffers_particles_translucent.vsh (graph has 307 nodes)
+[20:34:16] [Render thread/WARN]: Failed to get included file: /shaders/gbuffers_particles_translucent.vsh (graph has 307 nodes)
+[20:34:16] [Render thread/WARN]: Failed to get included file: /shaders/world0/gbuffers_particles_translucent.fsh (graph has 307 nodes)
+[20:34:16] [Render thread/WARN]: Failed to get included file: /shaders/gbuffers_particles_translucent.fsh (graph has 307 nodes)
+[20:34:16] [Render thread/WARN]: Failed to get included file: /shaders/world0/gbuffers_entities_glowing.gsh (graph has 307 nodes)
+[20:34:16] [Render thread/WARN]: Failed to get included file: /shaders/gbuffers_entities_glowing.gsh (graph has 307 nodes)
+[20:34:16] [Render thread/WARN]: gbuffers_entities_glowing shader program does not use utb CloudFaces defined in the pipeline. This might be a bug.
+[20:34:16] [Render thread/WARN]: gbuffers_entities_glowing shader program does not use sampler Sampler0 defined in the pipeline. This might be a bug.
+[20:34:16] [Render thread/WARN]: gbuffers_entities_glowing shader program does not use sampler Sampler2 defined in the pipeline. This might be a bug.
+[20:34:16] [Render thread/INFO]: Created ExtendedShader for: gbuffers_entities_glowing (program ID: 203)
+[20:34:16] [Render thread/INFO]: Successfully compiled program: gbuffers_entities_glowing
+[20:34:16] [Render thread/WARN]: Failed to get included file: /shaders/world0/gbuffers_armor_glint.gsh (graph has 307 nodes)
+[20:34:16] [Render thread/WARN]: Failed to get included file: /shaders/gbuffers_armor_glint.gsh (graph has 307 nodes)
+[20:34:16] [Render thread/WARN]: gbuffers_armor_glint shader program does not use utb CloudFaces defined in the pipeline. This might be a bug.
+[20:34:16] [Render thread/WARN]: gbuffers_armor_glint shader program does not use sampler Sampler0 defined in the pipeline. This might be a bug.
+[20:34:16] [Render thread/WARN]: gbuffers_armor_glint shader program does not use sampler Sampler2 defined in the pipeline. This might be a bug.
+[20:34:16] [Render thread/INFO]: Created ExtendedShader for: gbuffers_armor_glint (program ID: 205)
+[20:34:16] [Render thread/INFO]: Successfully compiled program: gbuffers_armor_glint
+[20:34:16] [Render thread/WARN]: Failed to get included file: /shaders/world0/gbuffers_spidereyes.gsh (graph has 307 nodes)
+[20:34:16] [Render thread/WARN]: Failed to get included file: /shaders/gbuffers_spidereyes.gsh (graph has 307 nodes)
+[20:34:16] [Render thread/WARN]: gbuffers_spidereyes shader program does not use utb CloudFaces defined in the pipeline. This might be a bug.
+[20:34:16] [Render thread/WARN]: gbuffers_spidereyes shader program does not use sampler Sampler0 defined in the pipeline. This might be a bug.
+[20:34:16] [Render thread/WARN]: gbuffers_spidereyes shader program does not use sampler Sampler2 defined in the pipeline. This might be a bug.
+[20:34:16] [Render thread/INFO]: Created ExtendedShader for: gbuffers_spidereyes (program ID: 207)
+[20:34:16] [Render thread/INFO]: Successfully compiled program: gbuffers_spidereyes
+[20:34:16] [Render thread/WARN]: Failed to get included file: /shaders/world0/gbuffers_hand.gsh (graph has 307 nodes)
+[20:34:16] [Render thread/WARN]: Failed to get included file: /shaders/gbuffers_hand.gsh (graph has 307 nodes)
+[20:34:16] [Render thread/WARN]: gbuffers_hand shader program does not use utb CloudFaces defined in the pipeline. This might be a bug.
+[20:34:16] [Render thread/WARN]: gbuffers_hand shader program does not use sampler Sampler0 defined in the pipeline. This might be a bug.
+[20:34:16] [Render thread/WARN]: gbuffers_hand shader program does not use sampler Sampler2 defined in the pipeline. This might be a bug.
+[20:34:16] [Render thread/INFO]: Created ExtendedShader for: gbuffers_hand (program ID: 209)
+[20:34:16] [Render thread/INFO]: Successfully compiled program: gbuffers_hand
+[20:34:16] [Render thread/WARN]: Failed to get included file: /shaders/world0/gbuffers_hand_water.vsh (graph has 307 nodes)
+[20:34:16] [Render thread/WARN]: Failed to get included file: /shaders/gbuffers_hand_water.vsh (graph has 307 nodes)
+[20:34:16] [Render thread/WARN]: Failed to get included file: /shaders/world0/gbuffers_hand_water.fsh (graph has 307 nodes)
+[20:34:16] [Render thread/WARN]: Failed to get included file: /shaders/gbuffers_hand_water.fsh (graph has 307 nodes)
+[20:34:16] [Render thread/WARN]: Failed to get included file: /shaders/world0/gbuffers_weather.gsh (graph has 307 nodes)
+[20:34:16] [Render thread/WARN]: Failed to get included file: /shaders/gbuffers_weather.gsh (graph has 307 nodes)
+[20:34:16] [Render thread/WARN]: gbuffers_weather shader program does not use utb CloudFaces defined in the pipeline. This might be a bug.
+[20:34:16] [Render thread/WARN]: gbuffers_weather shader program does not use sampler Sampler0 defined in the pipeline. This might be a bug.
+[20:34:16] [Render thread/WARN]: gbuffers_weather shader program does not use sampler Sampler2 defined in the pipeline. This might be a bug.
+[20:34:16] [Render thread/INFO]: Created ExtendedShader for: gbuffers_weather (program ID: 211)
+[20:34:16] [Render thread/INFO]: Successfully compiled program: gbuffers_weather
+[20:34:16] [Render thread/WARN]: Failed to get included file: /shaders/world0/gbuffers_water.gsh (graph has 307 nodes)
+[20:34:16] [Render thread/WARN]: Failed to get included file: /shaders/gbuffers_water.gsh (graph has 307 nodes)
+[20:34:16] [Render thread/WARN]: gbuffers_water shader program does not use utb CloudFaces defined in the pipeline. This might be a bug.
+[20:34:16] [Render thread/WARN]: gbuffers_water shader program does not use sampler Sampler0 defined in the pipeline. This might be a bug.
+[20:34:16] [Render thread/WARN]: gbuffers_water shader program does not use sampler Sampler2 defined in the pipeline. This might be a bug.
+[20:34:16] [Render thread/INFO]: Created ExtendedShader for: gbuffers_water (program ID: 213)
+[20:34:16] [Render thread/INFO]: Successfully compiled program: gbuffers_water
+[20:34:16] [Render thread/INFO]: Compiled 16 gbuffers programs
+[20:34:16] [Render thread/WARN]: Failed to get included file: /shaders/world0/deferred.vsh (graph has 307 nodes)
+[20:34:16] [Render thread/WARN]: Failed to get included file: /shaders/deferred.vsh (graph has 307 nodes)
+[20:34:16] [Render thread/WARN]: Failed to get included file: /shaders/world0/deferred.fsh (graph has 307 nodes)
+[20:34:16] [Render thread/WARN]: Failed to get included file: /shaders/deferred.fsh (graph has 307 nodes)
+[20:34:16] [Render thread/WARN]: Failed to get included file: /shaders/world0/deferred1.gsh (graph has 307 nodes)
+[20:34:16] [Render thread/WARN]: Failed to get included file: /shaders/deferred1.gsh (graph has 307 nodes)
+[20:34:16] [Render thread/INFO]: Successfully compiled program: deferred1
+[20:34:16] [Render thread/INFO]: Compiled deferred program: deferred1
+[20:34:16] [Render thread/WARN]: Failed to get included file: /shaders/world0/deferred2.vsh (graph has 307 nodes)
+[20:34:16] [Render thread/WARN]: Failed to get included file: /shaders/deferred2.vsh (graph has 307 nodes)
+[20:34:16] [Render thread/WARN]: Failed to get included file: /shaders/world0/deferred2.fsh (graph has 307 nodes)
+[20:34:16] [Render thread/WARN]: Failed to get included file: /shaders/deferred2.fsh (graph has 307 nodes)
+[20:34:16] [Render thread/WARN]: Failed to get included file: /shaders/world0/deferred3.vsh (graph has 307 nodes)
+[20:34:16] [Render thread/WARN]: Failed to get included file: /shaders/deferred3.vsh (graph has 307 nodes)
+[20:34:16] [Render thread/WARN]: Failed to get included file: /shaders/world0/deferred3.fsh (graph has 307 nodes)
+[20:34:16] [Render thread/WARN]: Failed to get included file: /shaders/deferred3.fsh (graph has 307 nodes)
+[20:34:16] [Render thread/WARN]: Failed to get included file: /shaders/world0/deferred4.vsh (graph has 307 nodes)
+[20:34:16] [Render thread/WARN]: Failed to get included file: /shaders/deferred4.vsh (graph has 307 nodes)
+[20:34:16] [Render thread/WARN]: Failed to get included file: /shaders/world0/deferred4.fsh (graph has 307 nodes)
+[20:34:16] [Render thread/WARN]: Failed to get included file: /shaders/deferred4.fsh (graph has 307 nodes)
+[20:34:16] [Render thread/WARN]: Failed to get included file: /shaders/world0/deferred5.vsh (graph has 307 nodes)
+[20:34:16] [Render thread/WARN]: Failed to get included file: /shaders/deferred5.vsh (graph has 307 nodes)
+[20:34:16] [Render thread/WARN]: Failed to get included file: /shaders/world0/deferred5.fsh (graph has 307 nodes)
+[20:34:16] [Render thread/WARN]: Failed to get included file: /shaders/deferred5.fsh (graph has 307 nodes)
+[20:34:16] [Render thread/WARN]: Failed to get included file: /shaders/world0/deferred6.vsh (graph has 307 nodes)
+[20:34:16] [Render thread/WARN]: Failed to get included file: /shaders/deferred6.vsh (graph has 307 nodes)
+[20:34:16] [Render thread/WARN]: Failed to get included file: /shaders/world0/deferred6.fsh (graph has 307 nodes)
+[20:34:16] [Render thread/WARN]: Failed to get included file: /shaders/deferred6.fsh (graph has 307 nodes)
+[20:34:16] [Render thread/WARN]: Failed to get included file: /shaders/world0/deferred7.vsh (graph has 307 nodes)
+[20:34:16] [Render thread/WARN]: Failed to get included file: /shaders/deferred7.vsh (graph has 307 nodes)
+[20:34:16] [Render thread/WARN]: Failed to get included file: /shaders/world0/deferred7.fsh (graph has 307 nodes)
+[20:34:16] [Render thread/WARN]: Failed to get included file: /shaders/deferred7.fsh (graph has 307 nodes)
+[20:34:16] [Render thread/WARN]: Failed to get included file: /shaders/world0/composite.gsh (graph has 307 nodes)
+[20:34:16] [Render thread/WARN]: Failed to get included file: /shaders/composite.gsh (graph has 307 nodes)
+[20:34:16] [Render thread/INFO]: Successfully compiled program: composite
+[20:34:16] [Render thread/INFO]: Compiled composite program: composite
+[20:34:16] [Render thread/WARN]: Failed to get included file: /shaders/world0/composite1.vsh (graph has 307 nodes)
+[20:34:16] [Render thread/WARN]: Failed to get included file: /shaders/composite1.vsh (graph has 307 nodes)
+[20:34:16] [Render thread/WARN]: Failed to get included file: /shaders/world0/composite1.fsh (graph has 307 nodes)
+[20:34:16] [Render thread/WARN]: Failed to get included file: /shaders/composite1.fsh (graph has 307 nodes)
+[20:34:16] [Render thread/WARN]: Failed to get included file: /shaders/world0/composite2.gsh (graph has 307 nodes)
+[20:34:16] [Render thread/WARN]: Failed to get included file: /shaders/composite2.gsh (graph has 307 nodes)
+[20:34:16] [Render thread/INFO]: Successfully compiled program: composite2
+[20:34:16] [Render thread/INFO]: Compiled composite program: composite2
+[20:34:16] [Render thread/WARN]: Failed to get included file: /shaders/world0/composite3.gsh (graph has 307 nodes)
+[20:34:16] [Render thread/WARN]: Failed to get included file: /shaders/composite3.gsh (graph has 307 nodes)
+[20:34:16] [Render thread/INFO]: Successfully compiled program: composite3
+[20:34:16] [Render thread/INFO]: Compiled composite program: composite3
+[20:34:16] [Render thread/WARN]: Failed to get included file: /shaders/world0/composite4.gsh (graph has 307 nodes)
+[20:34:16] [Render thread/WARN]: Failed to get included file: /shaders/composite4.gsh (graph has 307 nodes)
+[20:34:17] [Render thread/INFO]: Successfully compiled program: composite4
+[20:34:17] [Render thread/INFO]: Compiled composite program: composite4
+[20:34:17] [Render thread/WARN]: Failed to get included file: /shaders/world0/composite5.gsh (graph has 307 nodes)
+[20:34:17] [Render thread/WARN]: Failed to get included file: /shaders/composite5.gsh (graph has 307 nodes)
+[20:34:17] [Render thread/INFO]: Successfully compiled program: composite5
+[20:34:17] [Render thread/INFO]: Compiled composite program: composite5
+[20:34:17] [Render thread/WARN]: Failed to get included file: /shaders/world0/composite6.gsh (graph has 307 nodes)
+[20:34:17] [Render thread/WARN]: Failed to get included file: /shaders/composite6.gsh (graph has 307 nodes)
+[20:34:17] [Render thread/INFO]: Successfully compiled program: composite6
+[20:34:17] [Render thread/INFO]: Compiled composite program: composite6
+[20:34:17] [Render thread/WARN]: Failed to get included file: /shaders/world0/composite7.gsh (graph has 307 nodes)
+[20:34:17] [Render thread/WARN]: Failed to get included file: /shaders/composite7.gsh (graph has 307 nodes)
+[20:34:17] [Render thread/INFO]: Successfully compiled program: composite7
+[20:34:17] [Render thread/INFO]: Compiled composite program: composite7
+[20:34:17] [Render thread/WARN]: Failed to get included file: /shaders/world0/final.gsh (graph has 307 nodes)
+[20:34:17] [Render thread/WARN]: Failed to get included file: /shaders/final.gsh (graph has 307 nodes)
+[20:34:17] [Render thread/INFO]: Successfully compiled program: final
+[20:34:17] [Render thread/WARN]: Failed to get included file: /shaders/world0/shadow.gsh (graph has 307 nodes)
+[20:34:17] [Render thread/WARN]: Failed to get included file: /shaders/shadow.gsh (graph has 307 nodes)
+[20:34:17] [Render thread/INFO]: Successfully compiled program: shadow
+[20:34:17] [Render thread/INFO]: Compiled shadow program
+[20:34:17] [Render thread/INFO]: Building ShaderMap from 16 ExtendedShaders
+[20:34:17] [Render thread/INFO]: ShaderMap built with 52 mappings
+[20:34:17] [Render thread/INFO]: Compiled 26 shader programs for pack: ComplementaryHungLoIfied.zip (16 gbuffers, 1 deferred, 7 composite)
+[20:34:17] [Render thread/INFO]: Created shader pipeline for pack: ComplementaryHungLoIfied.zip in dimension: minecraft:overworld
+[20:34:17] [Render thread/INFO]: Destroyed GBufferManager
+[20:34:17] [Render thread/INFO]: Created GBufferManager (1920x1080) with 3 configured targets
+[20:34:17] [Render thread/INFO]: Resized G-buffers to 1920x1080
+[20:34:17] [Render thread/INFO]: Resizing Dynamic Transforms UBO, capacity limit of 4 reached during a single frame. New capacity will be 8.
+[20:34:17] [Render thread/INFO]: Loaded 2 advancements
+[20:34:17] [Render thread/INFO]: Resizing Dynamic Transforms UBO, capacity limit of 8 reached during a single frame. New capacity will be 16.
+[20:34:17] [Render thread/INFO]: Resizing Dynamic Transforms UBO, capacity limit of 16 reached during a single frame. New capacity will be 32.
+[20:34:17] [Render thread/INFO]: Resizing Dynamic Transforms UBO, capacity limit of 32 reached during a single frame. New capacity will be 256.
+[20:34:17] [Render thread/INFO]: Resizing Dynamic Transforms UBO, capacity limit of 256 reached during a single frame. New capacity will be 512.
+[20:34:17] [Render thread/INFO]: Resizing Dynamic Transforms UBO, capacity limit of 512 reached during a single frame. New capacity will be 1024.
+[20:34:18] [Render thread/INFO]: Resizing Dynamic Transforms UBO, capacity limit of 1024 reached during a single frame. New capacity will be 2048.
+[20:34:27] [Server thread/INFO]: [Player784: Set the time to 1000]
+[20:34:27] [Render thread/INFO]: [System] [CHAT] Set the time to 1000
+[20:34:30] [Server thread/INFO]: Saving and pausing game...
+[20:34:30] [Server thread/INFO]: Saving chunks for level 'ServerLevel[New World]'/minecraft:overworld
+[20:34:30] [Server thread/INFO]: Saving chunks for level 'ServerLevel[New World]'/minecraft:the_nether
+[20:34:30] [Server thread/INFO]: Saving chunks for level 'ServerLevel[New World]'/minecraft:the_end
+[20:34:31] [Server thread/INFO]: Player784 lost connection: Disconnected
+[20:34:31] [Server thread/INFO]: Player784 left the game
+[20:34:31] [Server thread/INFO]: Stopping singleplayer server as player logged out
+[20:34:31] [Server thread/INFO]: Stopping server
+[20:34:31] [Server thread/INFO]: Saving players
+[20:34:31] [Server thread/INFO]: Saving worlds
+[20:34:31] [Server thread/INFO]: Saving chunks for level 'ServerLevel[New World]'/minecraft:overworld
+[20:34:31] [Server thread/INFO]: Saving chunks for level 'ServerLevel[New World]'/minecraft:the_nether
+[20:34:31] [Server thread/INFO]: Saving chunks for level 'ServerLevel[New World]'/minecraft:the_end
+[20:34:31] [Server thread/INFO]: ThreadedAnvilChunkStorage (New World (3)): All chunks are saved
+[20:34:31] [Server thread/INFO]: ThreadedAnvilChunkStorage (DIM-1): All chunks are saved
+[20:34:31] [Server thread/INFO]: ThreadedAnvilChunkStorage (DIM1): All chunks are saved
+[20:34:31] [Server thread/INFO]: ThreadedAnvilChunkStorage: All dimensions are saved
+[20:34:31] [Render thread/INFO]: Stopping!
 
-BUILD SUCCESSFUL in 42s
+BUILD SUCCESSFUL in 37s
 4 actionable tasks: 3 executed, 1 up-to-date
 matt@HungLoDE:~/Documents/Repos/MattMC$
 
