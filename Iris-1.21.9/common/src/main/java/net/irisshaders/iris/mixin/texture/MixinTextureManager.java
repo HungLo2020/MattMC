@@ -9,8 +9,10 @@ import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 import java.nio.file.Path;
+import java.util.concurrent.CompletableFuture;
 
 @Mixin(TextureManager.class)
 public class MixinTextureManager {
@@ -20,8 +22,9 @@ public class MixinTextureManager {
 
 	// MattMC: The lambda$reload$X method targeting is fragile. Instead we use a broader approach.
 	// This injects at the end of the reload method to clear PBR textures when textures are reloaded.
+	// Note: reload returns CompletableFuture<Void>, so we need CallbackInfoReturnable
 	@Inject(method = "reload", at = @At("RETURN"))
-	private void iris$onReloadReturn(CallbackInfo ci) {
+	private void iris$onReloadReturn(CallbackInfoReturnable<CompletableFuture<Void>> cir) {
 		PBRTextureManager.INSTANCE.clear();
 	}
 
