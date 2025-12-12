@@ -517,25 +517,18 @@ public class ShaderPackPipeline implements WorldRenderingPipeline {
 			LOGGER.info("Resized G-buffers to {}x{}", width, height);
 		}
 		
-		// Bind G-buffer framebuffer for MRT output (IRIS pattern)
-		if (gBufferFramebuffer != null) {
-			gBufferFramebuffer.bind();
-			
-			// Set draw buffers for MRT (Multiple Render Targets)
-			// This tells OpenGL to write to multiple color attachments
-			int[] drawBuffers = new int[]{
-				GL30.GL_COLOR_ATTACHMENT0,  // colortex0
-				GL30.GL_COLOR_ATTACHMENT1,  // colortex1  
-				GL30.GL_COLOR_ATTACHMENT2   // colortex2
-			};
-			GL20.glDrawBuffers(drawBuffers);
-			
-			// Clear all buffers
-			GL11.glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
-			GL11.glClear(GL11.GL_COLOR_BUFFER_BIT | GL11.GL_DEPTH_BUFFER_BIT);
-		} else {
-			LOGGER.warn("G-buffer framebuffer not initialized, using default framebuffer");
-		}
+		// NOTE: We do NOT bind our G-buffer framebuffer here.
+		// Minecraft's frame graph manages framebuffer bindings.
+		// The shader pack shaders will be applied when geometry is rendered,
+		// writing directly to Minecraft's render targets.
+		// 
+		// For full deferred rendering with G-buffers, we would need to:
+		// 1. Intercept framebuffer bindings via mixins
+		// 2. Replace Minecraft's framebuffer with our G-buffer
+		// 3. This is a more complex change for a future implementation.
+		//
+		// For now, shader pack shaders will apply effects directly in the
+		// gbuffers pass without deferred lighting (forward rendering mode).
 	}
 	
 	/**
@@ -624,16 +617,19 @@ public class ShaderPackPipeline implements WorldRenderingPipeline {
 	
 	@Override
 	public void finalizeLevelRendering() {
+		// NOTE: Since we're not using G-buffer framebuffers for now (forward rendering mode),
+		// we skip composite and final passes. The shader pack shaders applied during geometry
+		// rendering are writing directly to Minecraft's render targets.
+		//
+		// For full deferred rendering with composite/final passes, we would need to:
+		// 1. Actually use the G-buffer framebuffer during geometry rendering
+		// 2. Run composite passes that read from G-buffers
+		// 3. Run final pass to output to screen
+		//
+		// This is disabled for now to prevent the white screen issue.
+		
+		// Set isRenderingWorld to false - this stops shader interception
 		isRenderingWorld = false;
-		
-		// Unbind G-buffer framebuffer
-		GlFramebuffer.unbind();
-		
-		// Execute composite passes (Step A7)
-		executeCompositePasses();
-		
-		// Execute final pass (Step A8)
-		executeFinalPass();
 	}
 	
 	/**
@@ -1263,10 +1259,16 @@ public class ShaderPackPipeline implements WorldRenderingPipeline {
 	
 	/**
 	 * Whether this pipeline should override vanilla shaders.
-	 * Returns true when shader programs are compiled and the pipeline is active.
+	 * Returns true when:
+	 * 1. We are currently rendering the world (between beginLevelRendering/finalizeLevelRendering)
+	 * 2. Shader programs have been compiled
+	 * 3. ExtendedShaders are available in the shader map
+	 * 
+	 * Following IRIS's IrisRenderingPipeline.shouldOverrideShaders() pattern:
+	 * return isRenderingWorld && isMainBound;
 	 */
 	public boolean shouldOverrideShaders() {
-		return programsCompiled && !extendedShaders.isEmpty();
+		return isRenderingWorld && programsCompiled && !extendedShaders.isEmpty();
 	}
 	
 	/**

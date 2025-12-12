@@ -351,14 +351,12 @@ public class GlDevice implements GpuDevice {
 		net.minecraft.client.renderer.shaders.pipeline.ShaderPackPipeline shaderPipeline = 
 			net.minecraft.client.renderer.shaders.IrisShaders.getActivePipeline();
 		
-		// Debug logging for first few frames to diagnose interception issues
-		boolean debugLogging = false; // Set to true for debugging
-		if (debugLogging) {
-			if (shaderPipeline != null) {
-				LOGGER.info("Shader interception check: pipeline={}, shouldOverride={}", 
-					shaderPipeline.getShaderPackName(), shaderPipeline.shouldOverrideShaders());
-			} else {
-				LOGGER.info("Shader interception check: pipeline=null");
+		// Debug logging to diagnose interception issues
+		// TODO: Remove after debugging is complete
+		if (shaderPipeline != null) {
+			boolean shouldOverride = shaderPipeline.shouldOverrideShaders();
+			if (shouldOverride) {
+				LOGGER.debug("Shader interception ACTIVE for: {}", renderPipeline.getLocation());
 			}
 		}
 		
@@ -377,15 +375,17 @@ public class GlDevice implements GpuDevice {
 						irisProgram.iris$setupState();
 					}
 					
+					LOGGER.debug("Using shader pack program for {} -> {}", renderPipeline.getLocation(), shaderKey);
+					
 					// Return a new GlRenderPipeline wrapping the shader pack program
 					// Cache this to avoid creating new objects every frame
 					return this.shaderPackPipelineCache
 						.computeIfAbsent(renderPipeline, rp -> new GlRenderPipeline(rp, program));
 				} else {
-					LOGGER.debug("No program in ShaderMap for ShaderKey: {}", shaderKey);
+					LOGGER.warn("No program in ShaderMap for ShaderKey: {} (pipeline: {})", shaderKey, renderPipeline.getLocation());
 				}
 			} else {
-				LOGGER.debug("No ShaderKey mapping for RenderPipeline: {}", renderPipeline.getLocation());
+				LOGGER.warn("No ShaderKey mapping for RenderPipeline: {}", renderPipeline.getLocation());
 			}
 		} else {
 			if (shaderPipeline == null) {
