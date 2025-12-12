@@ -28,6 +28,10 @@ def sodiumDir = 'modules/sodium-1.21.9'
 def irisVersion = '1.9.6'
 def irisDir = 'modules/Iris-1.21.9'
 
+// Distant Horizons version (update this when upgrading DH source)
+def dhVersion = '2.3.4-b'
+def dhDir = 'modules/distant-horizons-2.3.4b'
+
 java {
     // Keep toolchain configuration for compilation
     // But we'll override at runtime for JavaExec tasks
@@ -304,6 +308,16 @@ dependencies {
     // GLSL Transformer - GLSL shader transformation library
     implementation 'io.github.douira:glsl-transformer:3.0.0-pre3'
     
+    // ===== DISTANT HORIZONS DEPENDENCIES =====
+    // NightConfig - TOML and JSON configuration library
+    implementation 'com.electronwill.night-config:toml:3.6.6'
+    implementation 'com.electronwill.night-config:json:3.6.6'
+    implementation 'com.electronwill.night-config:core:3.6.6'
+    // SQLite JDBC - Database driver for LOD storage
+    implementation 'org.xerial:sqlite-jdbc:3.47.2.0'
+    // XZ compression library
+    implementation 'org.tukaani:xz:1.9'
+    
     // ===== TESTING DEPENDENCIES =====
     // Testing dependencies - only available in test scope, excluded from production builds
     
@@ -390,6 +404,26 @@ sourceSets {
         }
     }
     
+    // Distant Horizons source set - compiled to a separate mod JAR
+    distantHorizons {
+        java {
+            srcDirs = [
+                "${dhDir}/coreSubProjects/core/src/main/java",
+                "${dhDir}/coreSubProjects/api/src/main/java",
+                "${dhDir}/common/src/main/java",
+                "${dhDir}/fabric/src/main/java"
+            ]
+        }
+        resources {
+            srcDirs = [
+                "${dhDir}/coreSubProjects/core/src/main/resources",
+                "${dhDir}/coreSubProjects/api/src/main/resources",
+                "${dhDir}/common/src/main/resources",
+                "${dhDir}/fabric/src/main/resources"
+            ]
+        }
+    }
+    
     // Main source set - Minecraft and project code (compiled to game JAR)
     main {
         java {
@@ -450,6 +484,11 @@ configurations {
     irisImplementation.extendsFrom implementation
     irisCompileOnly.extendsFrom compileOnly
     irisRuntimeOnly.extendsFrom runtimeOnly
+    
+    // Distant Horizons configurations extend from implementation + fabricLoader
+    distantHorizonsImplementation.extendsFrom implementation
+    distantHorizonsCompileOnly.extendsFrom compileOnly
+    distantHorizonsRuntimeOnly.extendsFrom runtimeOnly
 }
 
 // Sodium depends on Fabric Loader and Minecraft
@@ -467,6 +506,26 @@ sourceSets.iris.compileClasspath += files("${irisDir}/DHApi.jar")
 sourceSets.iris.runtimeClasspath += sourceSets.fabricLoader.output
 sourceSets.iris.runtimeClasspath += sourceSets.main.output
 sourceSets.iris.runtimeClasspath += sourceSets.sodium.output
+
+// Distant Horizons depends on Fabric Loader and Minecraft
+sourceSets.distantHorizons.compileClasspath += sourceSets.fabricLoader.output
+sourceSets.distantHorizons.compileClasspath += sourceSets.main.output
+sourceSets.distantHorizons.runtimeClasspath += sourceSets.fabricLoader.output
+sourceSets.distantHorizons.runtimeClasspath += sourceSets.main.output
+
+// Add Manifold preprocessor for Distant Horizons compilation
+dependencies {
+    distantHorizonsAnnotationProcessor 'systems.manifold:manifold-preprocessor:2025.1.20'
+}
+
+// Configure Manifold preprocessor for Distant Horizons compilation
+tasks.named('compileDistantHorizonsJava') {
+    // Add Manifold preprocessor compiler arguments
+    // The Manifold preprocessor processes #if/#elif/#else/#endif directives
+    options.compilerArgs += [
+        '-Xplugin:Manifold'
+    ]
+}
 
 // ============================================================================
 // FABRIC LOADER JAR TASK
@@ -594,6 +653,61 @@ tasks.register('irisJar', Jar) {
         attributes(
             'Implementation-Title': 'Iris',
             'Implementation-Version': irisVersion
+        )
+    }
+}
+
+// ============================================================================
+// DISTANT HORIZONS MOD JAR TASK
+// ============================================================================
+// Create the Distant Horizons mod JAR to be loaded by Fabric Loader
+// ============================================================================
+
+// Process Distant Horizons resources with version substitution
+tasks.named('processDistantHorizonsResources') {
+    filesMatching('fabric.mod.json') {
+        expand(
+            'version': dhVersion,
+            'mod_name': 'Distant Horizons',
+            'description': 'LOD rendering mod for Minecraft',
+            'authors': '["James Seibel", "Leonardo Amato", "Cola", "coolGi", "Ran", "Leetom", "pshsh"]',
+            'homepage': 'https://modrinth.com/mod/distanthorizons',
+            'source': 'https://gitlab.com/jeseibel/distant-horizons',
+            'issues': 'https://gitlab.com/jeseibel/distant-horizons/-/issues',
+            'discord': 'https://discord.gg/xAB8G4cENx',
+            'compatible_minecraft_versions': '["1.21.10", "1.21.8", "1.21.4"]',
+            'java_version': '21',
+            'fabric_incompatibility_list': '{ }',
+            'fabric_recommend_list': '{}'
+        )
+    }
+    filesMatching('build_info.json') {
+        expand(
+            'info_git_commit': 'unknown',
+            'info_git_branch': 'unknown',
+            'info_build_source': 'MattMC'
+        )
+    }
+}
+
+tasks.register('distantHorizonsJar', Jar) {
+    group = 'build'
+    description = 'Assembles the Distant Horizons mod JAR'
+    
+    dependsOn 'compileDistantHorizonsJava', 'processDistantHorizonsResources'
+    
+    archiveBaseName = 'distanthorizons'
+    archiveVersion = dhVersion
+    archiveClassifier = 'mc1.21.10'
+    
+    from sourceSets.distantHorizons.output
+    
+    destinationDirectory = file("${buildDir}/mods")
+    
+    manifest {
+        attributes(
+            'Implementation-Title': 'Distant Horizons',
+            'Implementation-Version': dhVersion
         )
     }
 }
@@ -811,7 +925,7 @@ tasks.register('runClient', JavaExec) {
     group = 'minecraft'
     description = 'Runs the Minecraft client with Fabric Loader'
     
-    dependsOn 'fabricLoaderJar', 'gameJar', 'sodiumJar', 'irisJar', 'copyJdkToRun', 'shaderPackZip'
+    dependsOn 'fabricLoaderJar', 'gameJar', 'sodiumJar', 'irisJar', 'distantHorizonsJar', 'copyJdkToRun', 'shaderPackZip'
     
     // Use the separate JARs so Fabric Loader can detect the game JAR properly
     // The order matters: Fabric Loader JAR first, then Game JAR, then dependencies
