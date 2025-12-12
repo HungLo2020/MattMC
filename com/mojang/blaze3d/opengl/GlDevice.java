@@ -345,16 +345,21 @@ public class GlDevice implements GpuDevice {
 			net.minecraft.client.renderer.shaders.pipeline.ShaderPackPipeline shaderPipeline = 
 				net.minecraft.client.renderer.shaders.IrisShaders.getActivePipeline();
 			
-			boolean isRendering = shaderPipeline != null && shaderPipeline.isRenderingWorld();
+			// Check if this pipeline has a shader pack mapping (simpler than isRenderingWorld check)
+			// This allows shader interception to work regardless of world rendering phase
+			boolean hasPipelineMapping = shaderPipeline != null && 
+				net.minecraft.client.renderer.shaders.pipeline.IrisPipelines.hasPipeline(renderPipeline);
 			
-			// Debug logging for first call per pipeline
-			if (shaderPipeline != null && !shaderPackPipelineCache.containsKey(renderPipeline)) {
-				LOGGER.info("Pipeline check: {} - isEnabled={}, shaderPipeline={}, isRenderingWorld={}", 
-					renderPipeline.getLocation(), irisEnabled, shaderPipeline != null, 
-					shaderPipeline != null ? shaderPipeline.isRenderingWorld() : "N/A");
+			// Debug logging for first call per pipeline (log less frequently)
+			if (shaderPipeline != null && !shaderPackPipelineCache.containsKey(renderPipeline) && 
+				!this.pipelineCache.containsKey(renderPipeline)) {
+				LOGGER.info("Pipeline check: {} - isEnabled={}, shaderPipeline={}, hasPipelineMapping={}, isRenderingWorld={}", 
+					renderPipeline.getLocation(), irisEnabled, shaderPipeline != null, hasPipelineMapping,
+					shaderPipeline.isRenderingWorld());
 			}
 			
-			if (isRendering) {
+			// Intercept if the pipeline has a shader mapping
+			if (hasPipelineMapping) {
 				// Check cache first for performance
 				GlRenderPipeline cached = shaderPackPipelineCache.get(renderPipeline);
 				if (cached != null) {
