@@ -50,16 +50,9 @@ public class RenderingHooks {
         // Get pipeline from PipelineManager (IRIS pattern: Iris.getPipelineManager().preparePipeline())
         ShaderSystem system = ShaderSystem.getInstance();
         
-        LOGGER.info("onWorldRenderStart called - initialized={}, pipelineManager={}", 
-            system.isInitialized(), system.getPipelineManager() != null);
-        
         if (system.isInitialized() && system.getPipelineManager() != null) {
             String currentDimension = getCurrentDimension();
             WorldRenderingPipeline pipeline = system.getPipelineManager().preparePipeline(currentDimension);
-            
-            LOGGER.info("Pipeline obtained: type={}, isVanilla={}", 
-                pipeline != null ? pipeline.getClass().getSimpleName() : "null",
-                pipeline instanceof VanillaRenderingPipeline);
             
             if (pipeline != null && !(pipeline instanceof VanillaRenderingPipeline)) {
                 activePipeline = pipeline;
@@ -68,15 +61,8 @@ public class RenderingHooks {
                 pipeline.beginLevelRendering();
                 pipeline.setPhase(WorldRenderingPhase.NONE);
                 
-                // Verify isRenderingWorld is set correctly
-                if (pipeline instanceof net.minecraft.client.renderer.shaders.pipeline.ShaderPackPipeline shaderPack) {
-                    LOGGER.info("beginLevelRendering called - isRenderingWorld now = {}", shaderPack.isRenderingWorld());
-                }
-                
                 phaseTracker.beginWorldRendering();
                 pipelineState.activate(pipeline);
-                
-                LOGGER.info("Shader pipeline activated for rendering in dimension: {}", currentDimension);
             } else {
                 activePipeline = null;
             }

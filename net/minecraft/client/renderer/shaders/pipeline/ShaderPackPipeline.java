@@ -474,8 +474,6 @@ public class ShaderPackPipeline implements WorldRenderingPipeline {
 	public void beginLevelRendering() {
 		isRenderingWorld = true;
 		
-		LOGGER.info("Begin level rendering with shader pack: {} - isRenderingWorld set to true", packName);
-		
 		// Capture matrices for uniforms (Step A10)
 		captureRenderingState();
 		
@@ -616,8 +614,6 @@ public class ShaderPackPipeline implements WorldRenderingPipeline {
 	
 	@Override
 	public void finalizeLevelRendering() {
-		LOGGER.info("Finalize level rendering with shader pack: {} - isRenderingWorld set to false", packName);
-		
 		isRenderingWorld = false;
 		
 		// Unbind G-buffer framebuffer
