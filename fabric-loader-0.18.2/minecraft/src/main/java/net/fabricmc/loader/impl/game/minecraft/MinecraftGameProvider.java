@@ -20,6 +20,7 @@ import java.io.IOException;
 import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.MethodType;
+import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
@@ -213,6 +214,27 @@ public class MinecraftGameProvider implements GameProvider {
 			}
 
 			envGameJar = classifier.getOrigin(envGameLib);
+			
+			// MATTMC MODIFICATION: Handle integrated source mode where Fabric Loader and Minecraft
+			// are compiled to the same output directory. In this case, the classifier won't find
+			// Minecraft because the build output is marked as a system library (Fabric Loader).
+			// We check if Minecraft classes exist in the Fabric Loader's code source.
+			if (envGameJar == null) {
+				Path loaderCodeSource = net.fabricmc.loader.impl.util.UrlUtil.LOADER_CODE_SOURCE;
+				if (loaderCodeSource != null && Files.isDirectory(loaderCodeSource)) {
+					// Check if Minecraft client/server main class exists in the loader's directory
+					String mainClassPath = envType == EnvType.CLIENT 
+						? "net/minecraft/client/main/Main.class"
+						: "net/minecraft/server/Main.class";
+					Path mainClass = loaderCodeSource.resolve(mainClassPath);
+					if (Files.exists(mainClass)) {
+						Log.info(LogCategory.GAME_PROVIDER, "Detected integrated source mode - using Fabric Loader code source as game jar");
+						envGameJar = loaderCodeSource;
+						entrypoint = mainClassPath.substring(0, mainClassPath.length() - 6).replace('/', '.');
+					}
+				}
+			}
+			
 			if (envGameJar == null) return false;
 
 			commonGameJar = classifier.getOrigin(McLibrary.MC_COMMON);

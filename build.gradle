@@ -90,7 +90,19 @@ configurations.all {
         // force 'com.mojang:authlib:6.0.55' // REMOVED - using custom PlayerProfile system
         force 'com.mojang:brigadier:1.3.10'
         force 'com.mojang:datafixerupper:8.0.16'
+        // Force ASM 9.9 for Fabric Loader compatibility (avoid duplicate classes)
+        force 'org.ow2.asm:asm:9.9'
+        force 'org.ow2.asm:asm-analysis:9.9'
+        force 'org.ow2.asm:asm-commons:9.9'
+        force 'org.ow2.asm:asm-tree:9.9'
+        force 'org.ow2.asm:asm-util:9.9'
     }
+}
+
+// Exclude transitive ASM from dependencies that bring in older versions
+// This prevents conflicts with Fabric Loader's ASM 9.9 requirement
+configurations.runtimeClasspath {
+    exclude group: 'org.ow2.asm'
 }
 
 // Minecraft 1.21.10 dependencies
@@ -296,22 +308,38 @@ dependencies {
     testImplementation 'org.awaitility:awaitility:4.2.0'
 }
 
+// ============================================================================
+// SOURCE SETS CONFIGURATION
+// ============================================================================
+// We use separate source sets to compile Fabric Loader and Minecraft into
+// separate JARs. This is required because Fabric Loader's Knot launcher
+// needs to detect game JARs separately from itself.
+// ============================================================================
+
 sourceSets {
+    // Fabric Loader source set - compiled to a separate JAR
+    fabricLoader {
+        java {
+            srcDirs = [
+                "${fabricLoaderDir}/src/main/java",
+                "${fabricLoaderDir}/src/main/legacyJava",
+                "${fabricLoaderDir}/src/java17/java",
+                "${fabricLoaderDir}/minecraft/src/main/java",
+                "${fabricLoaderDir}/minecraft/src/main/legacyJava"
+            ]
+        }
+        resources {
+            srcDirs = [
+                "${fabricLoaderDir}/src/main/resources",
+                "${fabricLoaderDir}/minecraft/src/main/resources"
+            ]
+        }
+    }
+    
+    // Main source set - Minecraft and project code (compiled to game JAR)
     main {
         java {
-            // Main project source
             srcDir '.'
-            
-            // Fabric Loader source code (version controlled by fabricLoaderDir variable)
-            // Note: We exclude mrj package from main java dir and include java17 version instead
-            srcDir "${fabricLoaderDir}/src/main/java"
-            srcDir "${fabricLoaderDir}/src/main/legacyJava"
-            srcDir "${fabricLoaderDir}/minecraft/src/main/java"
-            srcDir "${fabricLoaderDir}/minecraft/src/main/legacyJava"
-            
-            // Java 17+ version of MRJ classes - these take precedence
-            // We need to include these but exclude the Java 8 versions from src/main/java
-            srcDir "${fabricLoaderDir}/src/java17/java"
             
             // Global excludes
             exclude 'gradle/**'
@@ -324,22 +352,17 @@ sourceSets {
             exclude 'src/test/**'
             // Exclude frnsrc directory entirely (reference-only code: Iris, Sodium, etc.)
             exclude 'frnsrc/**'
-            // Exclude Fabric Loader test files and build files
-            exclude 'fabric-loader-*/src/test/**'
-            exclude 'fabric-loader-*/.git/**'
-            exclude 'fabric-loader-*/.github/**'
-            exclude 'fabric-loader-*/build/**'
-            exclude 'fabric-loader-*/junit/**'
-            exclude 'fabric-loader-*/minecraft/minecraft-test/**'
-            exclude 'fabric-loader-*/minecraft/src/test/**'
+            // Exclude Fabric Loader source (compiled separately)
+            exclude 'fabric-loader-*/**'
         }
         resources {
             srcDirs = [
-                'src/main/resources',
-                // Fabric Loader resources
-                "${fabricLoaderDir}/src/main/resources"
+                'src/main/resources'
             ]
         }
+        // Main depends on fabricLoader classes for compilation
+        compileClasspath += sourceSets.fabricLoader.output
+        runtimeClasspath += sourceSets.fabricLoader.output
     }
     
     test {
@@ -352,9 +375,105 @@ sourceSets {
     }
 }
 
+// ============================================================================
+// FABRIC LOADER DEPENDENCIES
+// ============================================================================
+// The fabricLoader source set needs the same dependencies as main
+// Configure the fabricLoader configurations to extend from implementation
+// ============================================================================
+
+configurations {
+    fabricLoaderImplementation.extendsFrom implementation
+    fabricLoaderCompileOnly.extendsFrom compileOnly
+    fabricLoaderRuntimeOnly.extendsFrom runtimeOnly
+}
+
+// ============================================================================
+// FABRIC LOADER JAR TASK
+// ============================================================================
+// Create a separate JAR for Fabric Loader so Knot can detect it separately
+// ============================================================================
+
+// Process Fabric Loader resources with version substitution
+tasks.named('processFabricLoaderResources') {
+    // Replace ${version} placeholder with actual version
+    filesMatching('fabric.mod.json') {
+        expand 'version': fabricLoaderVersion
+    }
+}
+
+tasks.register('fabricLoaderJar', Jar) {
+    group = 'build'
+    description = 'Assembles the Fabric Loader JAR'
+    
+    archiveBaseName = 'fabric-loader'
+    archiveVersion = fabricLoaderVersion
+    
+    from sourceSets.fabricLoader.output
+    
+    destinationDirectory = file("${buildDir}/libs")
+    
+    // Ensure the JAR has proper manifest
+    manifest {
+        attributes(
+            'Implementation-Title': 'Fabric Loader',
+            'Implementation-Version': fabricLoaderVersion,
+            'Main-Class': 'net.fabricmc.loader.impl.launch.knot.KnotClient'
+        )
+    }
+}
+
+// ============================================================================
+// MINECRAFT GAME JAR TASK
+// ============================================================================
+// Create the game JAR containing Minecraft classes
+// ============================================================================
+
+tasks.register('gameJar', Jar) {
+    group = 'build'
+    description = 'Assembles the Minecraft game JAR'
+    
+    dependsOn 'classes'
+    
+    archiveBaseName = 'minecraft'
+    archiveVersion = version
+    
+    from sourceSets.main.output
+    
+    destinationDirectory = file("${buildDir}/libs")
+}
+
+// Ensure fabricLoaderJar depends on compilation
+tasks.named('fabricLoaderJar') {
+    dependsOn 'compileFabricLoaderJava', 'processFabricLoaderResources'
+}
+
+// ============================================================================
+// JAR CONFIGURATION
+// ============================================================================
+// The main JAR includes both Fabric Loader and Minecraft for distribution
+// ============================================================================
+
+jar {
+    // Include both source sets in the main JAR for distribution
+    from sourceSets.fabricLoader.output
+    from sourceSets.main.output
+    
+    manifest {
+        attributes(
+            'Main-Class': 'net.fabricmc.loader.impl.launch.knot.KnotClient',
+            'Implementation-Title': 'MattMC',
+            'Implementation-Version': version
+        )
+    }
+    
+    // Exclude duplicate META-INF/services - merge them instead
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+}
+
 // Server run configuration
 application {
-    mainClass = 'net.minecraft.server.Main'
+    mainClass = 'net.fabricmc.loader.impl.launch.knot.KnotClient'
 }
 
 // Common JVM arguments for server tasks
@@ -514,10 +633,75 @@ tasks.register('runServerGui', JavaExec) {
     configureBundledJdk(it)
 }
 
-// Task to run the Minecraft client
+// Task to run the Minecraft client through Fabric Loader (Knot)
 tasks.register('runClient', JavaExec) {
     group = 'minecraft'
-    description = 'Runs the Minecraft client'
+    description = 'Runs the Minecraft client with Fabric Loader'
+    
+    dependsOn 'fabricLoaderJar', 'gameJar', 'copyJdkToRun'
+    
+    // Use the separate JARs so Fabric Loader can detect the game JAR properly
+    // The order matters: Fabric Loader JAR first, then Game JAR, then dependencies
+    def fabricLoaderJarFile = file("${buildDir}/libs/fabric-loader-${fabricLoaderVersion}.jar")
+    def gameJarFile = file("${buildDir}/libs/minecraft-${version}.jar")
+    
+    classpath = files(fabricLoaderJarFile, gameJarFile) + 
+                configurations.runtimeClasspath
+    
+    // Use Fabric Loader's KnotClient as the entry point
+    mainClass = 'net.fabricmc.loader.impl.launch.knot.KnotClient'
+    
+    workingDir = file('run')
+    jvmArgs = clientJvmArgs + [
+        // Fabric Loader options
+        '-Dfabric.development=true',
+        // Tell Fabric Loader where the game JAR is
+        "-Dfabric.gameJarPath.client=${gameJarFile.absolutePath}"
+    ]
+    
+    // Required client arguments - these get passed through Knot to Minecraft
+    args = [
+        '--version', '1.21.10',
+        '--accessToken', '0',
+        '--gameDir', file('run').absolutePath,
+        '--assetsDir', file('run/assets').absolutePath,
+        '--assetIndex', '27'
+    ]
+    
+    doFirst {
+        // Verify JARs exist
+        if (!fabricLoaderJarFile.exists()) {
+            throw new GradleException("Fabric Loader JAR not found: ${fabricLoaderJarFile}")
+        }
+        if (!gameJarFile.exists()) {
+            throw new GradleException("Game JAR not found: ${gameJarFile}")
+        }
+        
+        workingDir.mkdirs()
+        file('run/assets').mkdirs()
+        file('run/resourcepacks').mkdirs()
+        file('run/mods').mkdirs()  // Create mods folder for Fabric
+        
+        // Copy assets from src/main/resources/assets to run/assets for dev environment
+        def resourcesAssetsDir = file('src/main/resources/assets')
+        if (resourcesAssetsDir.exists() && resourcesAssetsDir.isDirectory()) {
+            copy {
+                from resourcesAssetsDir
+                into file('run/assets')
+            }
+        }
+    }
+    
+    standardInput = System.in
+    
+    // Configure to use bundled JDK
+    configureBundledJdk(it)
+}
+
+// Task to run the Minecraft client WITHOUT Fabric Loader (vanilla mode)
+tasks.register('runClientVanilla', JavaExec) {
+    group = 'minecraft'
+    description = 'Runs the Minecraft client without Fabric Loader (vanilla mode)'
     
     dependsOn 'classes', 'copyJdkToRun'
     
