@@ -358,7 +358,7 @@ public class GlDevice implements GpuDevice {
 			
 			if (shaderKey != null) {
 				// Get the shader from ShaderMap
-				com.mojang.blaze3d.opengl.GlProgram program = shaderPipeline.getShaderMap().getShader(shaderKey);
+				GlProgram program = shaderPipeline.getShaderMap().getShader(shaderKey);
 				
 				if (program != null) {
 					// Call iris$setupState() to bind Iris-compatible uniforms
@@ -368,14 +368,14 @@ public class GlDevice implements GpuDevice {
 					
 					// Return a new GlRenderPipeline wrapping the shader pack program
 					// Cache this to avoid creating new objects every frame
-					return (GlRenderPipeline)this.shaderPackPipelineCache
+					return this.shaderPackPipelineCache
 						.computeIfAbsent(renderPipeline, rp -> new GlRenderPipeline(rp, program));
 				}
 			}
 		}
 		
 		// Fallback to vanilla pipeline compilation
-		return (GlRenderPipeline)this.pipelineCache
+		return this.pipelineCache
 			.computeIfAbsent(renderPipeline, renderPipeline2 -> this.compilePipeline(renderPipeline, this.defaultShaderSource));
 	}
 

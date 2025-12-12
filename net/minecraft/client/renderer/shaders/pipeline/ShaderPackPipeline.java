@@ -30,6 +30,7 @@ import net.minecraft.client.renderer.shaders.texture.TextureStage;
 import net.minecraft.client.renderer.shaders.texture.TextureType;
 import net.minecraft.client.renderer.shaders.uniform.providers.CapturedRenderingState;
 import net.minecraft.client.renderer.shaders.uniform.providers.SystemTimeUniforms;
+import net.minecraft.client.renderer.shaders.programs.ExtendedShader;
 import net.minecraft.client.renderer.shaders.programs.ShaderKey;
 import net.minecraft.client.renderer.shaders.programs.ShaderMap;
 import net.minecraft.client.renderer.shaders.loading.ProgramId;
@@ -107,7 +108,7 @@ public class ShaderPackPipeline implements WorldRenderingPipeline {
 	private Matrix4f cachedShadowProjectionMatrix = new Matrix4f();
 	
 	// ShaderMap for ShaderKey -> GlProgram mapping (IRIS pattern)
-	private final net.minecraft.client.renderer.shaders.programs.ShaderMap shaderMap = new net.minecraft.client.renderer.shaders.programs.ShaderMap();
+	private final ShaderMap shaderMap = new ShaderMap();
 	
 	/**
 	 * Creates a new shader pack pipeline.
@@ -1281,7 +1282,7 @@ public class ShaderPackPipeline implements WorldRenderingPipeline {
 			
 			// Follow the fallback chain to find an available ExtendedShader
 			ProgramId currentId = programId;
-			net.minecraft.client.renderer.shaders.programs.ExtendedShader shader = null;
+			ExtendedShader shader = null;
 			
 			while (currentId != null && shader == null) {
 				String programName = currentId.getSourceName();
