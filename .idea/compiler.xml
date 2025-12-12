@@ -12,10 +12,23 @@
         </processorPath>
         <module name="MattMC.test" />
       </profile>
+      <profile name="Gradle Imported" enabled="true">
+        <outputRelativeToContentRoot value="true" />
+        <processorPath useClasspath="false">
+          <entry name="$USER_HOME$/.gradle/caches/modules-2/files-2.1/systems.manifold/manifold-preprocessor/2025.1.20/252c9a2265510d9afaad7964fab076083353a9f4/manifold-preprocessor-2025.1.20.jar" />
+          <entry name="$USER_HOME$/.gradle/caches/modules-2/files-2.1/systems.manifold/manifold/2025.1.20/2a47735a55758fcce0114e75147420befd343f0e/manifold-2025.1.20.jar" />
+          <entry name="$USER_HOME$/.gradle/caches/modules-2/files-2.1/systems.manifold/manifold-rt/2025.1.20/5d895ed421bb82bb189f04485722c7f6c31e58c2/manifold-rt-2025.1.20.jar" />
+          <entry name="$USER_HOME$/.gradle/caches/modules-2/files-2.1/systems.manifold/manifold-util/2025.1.20/ce46ae596cf06147a0a5d0016ce6f02ca230c3c9/manifold-util-2025.1.20.jar" />
+        </processorPath>
+        <module name="MattMC.distantHorizons" />
+      </profile>
     </annotationProcessing>
     <bytecodeTargetLevel target="21" />
   </component>
   <component name="JavacSettings">
     <option name="ADDITIONAL_OPTIONS_STRING" value="-Xlint:-deprecation -Xlint:-unchecked" />
+    <option name="ADDITIONAL_OPTIONS_OVERRIDE">
+      <module name="MattMC.distantHorizons" options="-Xplugin:Manifold -Xlint:-deprecation -Xlint:-unchecked" />
+    </option>
   </component>
 </project>
