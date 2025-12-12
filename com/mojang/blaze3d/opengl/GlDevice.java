@@ -361,25 +361,30 @@ public class GlDevice implements GpuDevice {
 				
 				if (shaderKey != null) {
 					// Get the program name from the ShaderKey's ProgramId
-					String programName = shaderKey.getProgram().getSourceName();
-					
-					// Try to find the ExtendedShader
-					net.minecraft.client.renderer.shaders.programs.ExtendedShader extendedShader = 
-						shaderPipeline.getExtendedShader(programName);
-					
-					if (extendedShader != null) {
-						LOGGER.debug("Shader interception: {} -> {} (ShaderKey: {}, program ID: {})", 
-							renderPipeline.getLocation(), programName, shaderKey, extendedShader.getProgramId());
-						
-						// Setup shader state before returning
-						extendedShader.iris$setupState();
-						
-						// Cache and return a pipeline wrapping the ExtendedShader
-						GlRenderPipeline interceptedPipeline = new GlRenderPipeline(renderPipeline, extendedShader);
-						shaderPackPipelineCache.put(renderPipeline, interceptedPipeline);
-						return interceptedPipeline;
+					net.minecraft.client.renderer.shaders.loading.ProgramId programId = shaderKey.getProgram();
+					if (programId == null) {
+						LOGGER.warn("ShaderKey {} has null ProgramId", shaderKey);
 					} else {
-						LOGGER.debug("No ExtendedShader found for program: {} (ShaderKey: {})", programName, shaderKey);
+						String programName = programId.getSourceName();
+						
+						// Try to find the ExtendedShader
+						net.minecraft.client.renderer.shaders.programs.ExtendedShader extendedShader = 
+							shaderPipeline.getExtendedShader(programName);
+						
+						if (extendedShader != null) {
+							LOGGER.debug("Shader interception: {} -> {} (ShaderKey: {}, program ID: {})", 
+								renderPipeline.getLocation(), programName, shaderKey, extendedShader.getProgramId());
+							
+							// Setup shader state before returning
+							extendedShader.iris$setupState();
+							
+							// Cache and return a pipeline wrapping the ExtendedShader
+							GlRenderPipeline interceptedPipeline = new GlRenderPipeline(renderPipeline, extendedShader);
+							shaderPackPipelineCache.put(renderPipeline, interceptedPipeline);
+							return interceptedPipeline;
+						} else {
+							LOGGER.debug("No ExtendedShader found for program: {} (ShaderKey: {})", programName, shaderKey);
+						}
 					}
 				}
 			}

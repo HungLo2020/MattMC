@@ -4,7 +4,6 @@
 package net.minecraft.client.renderer.shaders.programs;
 
 import com.mojang.blaze3d.opengl.GlProgram;
-import com.mojang.blaze3d.opengl.GlStateManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -83,12 +82,7 @@ public class ShaderMap {
 			GlProgram shader = shaders[i];
 			if (shader != null) {
 				try {
-					if (shader instanceof ExtendedShader extendedShader) {
-						// ExtendedShader has its own cleanup
-						GlStateManager.glDeleteProgram(extendedShader.getProgramId());
-					} else {
-						shader.close();
-					}
+					shader.close();
 				} catch (Exception e) {
 					LOGGER.error("Error destroying shader {}: {}", ShaderKey.values()[i], e.getMessage());
 				}
