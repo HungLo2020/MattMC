@@ -622,7 +622,7 @@ tasks.register('shaderPackZip', Zip) {
     archiveVersion = ''
     archiveClassifier = ''
     
-    from 'src/main/resources/shaders'
+    from 'src/main/resources/shaders/ComplementaryHungLoIfied'
     
     destinationDirectory = file("${buildDir}/shaderpacks")
 }
