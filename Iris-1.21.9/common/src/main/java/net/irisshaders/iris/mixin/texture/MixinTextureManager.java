@@ -27,8 +27,8 @@ public class MixinTextureManager {
 		"method_65880",
 		"lambda$reload$3"
 	}, at = @At("TAIL"), require = 1)
-	private void iris$onTailReloadLambda(List list, Void void_, CallbackInfo ci) {
-		TextureFormatLoader.reload(this.resourceManager);
+	private static void iris$onTailReloadLambda(List list, Void void_, CallbackInfo ci) {
+		// NOTE: Cannot access resourceManager from static context - using Minecraft.getInstance() instead
 		PBRTextureManager.INSTANCE.clear();
 	}
 
