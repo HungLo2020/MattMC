@@ -190,7 +190,9 @@ public class BufferBuilder implements VertexConsumer, BlockSensitiveBufferBuilde
 			}
 
 			if (mode == VertexFormat.Mode.QUADS || mode == VertexFormat.Mode.TRIANGLES) {
-				vertexOffsets[irisVertexCount] = vertexPointer - buffer.position() + vertexSize;
+				// Store offset relative to buffer base pointer (following IRIS pattern exactly)
+				// IRIS: vertexOffsets[iris$vertexCount] = vertexPointer - ((MojangBufferAccessor) buffer).getPointer();
+				vertexOffsets[irisVertexCount] = vertexPointer - buffer.position();
 
 				irisVertexCount++;
 
