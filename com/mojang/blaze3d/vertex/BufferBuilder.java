@@ -76,7 +76,7 @@ public class BufferBuilder implements VertexConsumer, BlockSensitiveBufferBuilde
 	
 	/**
 	 * Extends the vertex format for IRIS shader pack compatibility.
-	 * VERBATIM from IRIS: MixinBufferBuilder.iris$extendFormat()
+	 * Following IRIS: MixinBufferBuilder.iris$extendFormat()
 	 * 
 	 * KEY DIFFERENCE FROM IRIS: We also check isCompilingChunks for worker threads
 	 * because we're not using Sodium (which has its own terrain vertex format system).
@@ -90,8 +90,9 @@ public class BufferBuilder implements VertexConsumer, BlockSensitiveBufferBuilde
 			return format;
 		}
 		
-		// Check if a shader pack is active (IRIS pattern: Iris.isPackInUseQuick())
-		// This is a simple check if shaders are enabled - NOT shouldOverrideShaders()
+		// Check if a shader pack is active
+		// IRIS equivalent: Iris.isPackInUseQuick() returns pipeline instanceof IrisRenderingPipeline
+		// Our equivalent: IrisShaders.isEnabled() returns shadersEnabled && hasActiveShaderPipeline()
 		if (!IrisShaders.isEnabled()) {
 			return format;
 		}
