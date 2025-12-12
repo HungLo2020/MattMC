@@ -1,0 +1,31 @@
+{
+  "required": true,
+  "package": "net.fabricmc.fabric.mixin.content.registry",
+  "compatibilityLevel": "JAVA_21",
+  "mixins": [
+    "AbstractBlockAbstractBlockStateMixin",
+    "AbstractBlockAccessor",
+    "AxeItemAccessor",
+    "AxeItemMixin",
+    "BrewingRecipeRegistryBuilderMixin",
+    "FarmerWorkTaskAccessor",
+    "FireBlockMixin",
+    "FuelRegistryMixin",
+    "GiveGiftsToHeroTaskAccessor",
+    "GiveGiftsToHeroTaskMixin",
+    "HoeItemAccessor",
+    "HoneycombItemMixin",
+    "LandPathNodeMakerMixin",
+    "OxidizableMixin",
+    "PathContextMixin",
+    "ShovelItemAccessor",
+    "VillagerEntityAccessor",
+    "VillagerEntityMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  },
+  "overwrites": {
+    "requireAnnotations": true
+  }
+}

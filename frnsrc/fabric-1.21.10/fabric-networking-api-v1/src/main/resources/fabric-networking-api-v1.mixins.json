@@ -1,0 +1,37 @@
+{
+  "required": true,
+  "package": "net.fabricmc.fabric.mixin.networking",
+  "compatibilityLevel": "JAVA_21",
+  "mixins": [
+    "BundlePacketMixin",
+    "ClientConnectionMixin",
+    "CommandManagerMixin",
+    "CustomPayloadC2SPacketMixin",
+    "CustomPayloadPacketCodecMixin",
+    "CustomPayloadS2CPacketMixin",
+    "DebugConfigCommandMixin",
+    "EncoderHandlerMixin",
+    "EntityTrackerEntryMixin",
+    "LoginQueryRequestS2CPacketMixin",
+    "LoginQueryResponseC2SPacketMixin",
+    "PacketCodecDispatcherMixin",
+    "PlayerManagerMixin",
+    "RegistryByteBufMixin",
+    "ServerCommonNetworkHandlerMixin",
+    "ServerConfigurationNetworkHandlerMixin",
+    "ServerLoginNetworkHandlerMixin",
+    "ServerPlayNetworkHandlerMixin",
+    "accessor.DecoderHandlerAccessor",
+    "accessor.EncoderHandlerAccessor",
+    "accessor.EntityTrackerAccessor",
+    "accessor.ServerChunkLoadingManagerAccessor",
+    "accessor.ServerCommonNetworkHandlerAccessor",
+    "accessor.ServerLoginNetworkHandlerAccessor"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  },
+  "overwrites": {
+    "requireAnnotations": true
+  }
+}
