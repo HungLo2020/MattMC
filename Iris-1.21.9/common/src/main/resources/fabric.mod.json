@@ -28,7 +28,6 @@
     "mixins.iris.compat.dh.json",
     "mixins.iris.fixes.maxfpscrash.json"
   ],
-  "accessWidener": "iris.accesswidener",
   "depends": {
     "fabricloader": ">=0.12.3",
     "minecraft": [

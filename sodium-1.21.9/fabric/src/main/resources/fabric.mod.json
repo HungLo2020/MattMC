@@ -65,7 +65,6 @@
       }
     }
   },
-  "accessWidener" : "sodium-fabric.accesswidener",
   "mixins" : [
     "sodium-common.mixins.json",
     "sodium-fabric.mixins.json"
