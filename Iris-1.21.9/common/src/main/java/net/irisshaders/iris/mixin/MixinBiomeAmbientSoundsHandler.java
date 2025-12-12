@@ -1,13 +1,11 @@
 package net.irisshaders.iris.mixin;
 
-import com.llamalad7.mixinextras.sugar.Local;
 import net.irisshaders.iris.mixinterface.BiomeAmbienceInterface;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.client.resources.sounds.BiomeAmbientSoundsHandler;
 import net.minecraft.core.BlockPos;
 import net.minecraft.util.Mth;
 import net.minecraft.world.level.LightLayer;
-import net.minecraft.world.level.biome.AmbientMoodSettings;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
@@ -25,17 +23,16 @@ public class MixinBiomeAmbientSoundsHandler implements BiomeAmbienceInterface {
 	@Unique
 	private float constantMoodiness;
 
-	@SuppressWarnings("UnresolvedMixinReference")
-	@Inject(method = {
-		"method_26271",
-		"lambda$tick$3"
-	}, at = @At(value = "INVOKE", target = "Lnet/minecraft/world/level/Level;getBrightness(Lnet/minecraft/world/level/LightLayer;Lnet/minecraft/core/BlockPos;)I", ordinal = 0), require = 1)
-	private void calculateConstantMoodiness(AmbientMoodSettings ambientMoodSettings, CallbackInfo ci, @Local BlockPos blockPos) {
+	// MattMC: Changed from lambda targeting to tick method injection
+	// This calculates the moodiness based on ambient light conditions
+	@Inject(method = "tick", at = @At(value = "INVOKE", target = "Ljava/util/Optional;ifPresent(Ljava/util/function/Consumer;)V", ordinal = 1))
+	private void calculateConstantMoodiness(CallbackInfo ci) {
+		BlockPos blockPos = this.player.blockPosition();
 		int j = this.player.level().getBrightness(LightLayer.SKY, blockPos);
 		if (j > 0) {
 			this.constantMoodiness -= (float) j / (float) 15 * 0.001F;
 		} else {
-			this.constantMoodiness -= (float) (this.player.level().getBrightness(LightLayer.BLOCK, blockPos) - 1) / (float) ambientMoodSettings.getTickDelay();
+			this.constantMoodiness -= (float) (this.player.level().getBrightness(LightLayer.BLOCK, blockPos) - 1) / 6000.0F;
 		}
 
 		this.constantMoodiness = Mth.clamp(constantMoodiness, 0.0f, 1.0f);

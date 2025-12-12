@@ -584,6 +584,7 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 		ResourceHandle<RenderTarget> resourceHandle3 = this.targets.itemEntity;
 		ResourceHandle<RenderTarget> resourceHandle4 = this.targets.entityOutline;
 		framePass.executes(() -> {
+			iris$renderMainPassBody();
 			RenderSystem.setShaderFog(gpuBufferSlice);
 			Vec3 vec3 = levelRenderState.cameraRenderState.pos;
 			double d = vec3.x();
@@ -678,6 +679,7 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 		ResourceHandle<RenderTarget> resourceHandle = this.targets.main;
 		ResourceHandle<RenderTarget> resourceHandle2 = this.targets.particles;
 		framePass.executes(() -> {
+			iris$renderParticlesPassBody();
 			RenderSystem.setShaderFog(gpuBufferSlice);
 			if (resourceHandle2 != null) {
 				resourceHandle2.get().copyDepthFrom(resourceHandle.get());
@@ -697,7 +699,7 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 			this.targets.main = framePass.readsAndWrites(this.targets.main);
 		}
 
-		framePass.executes(() -> this.cloudRenderer.render(i, cloudStatus, g, vec3, f));
+		framePass.executes(() -> { iris$renderCloudsPassBody(); this.cloudRenderer.render(i, cloudStatus, g, vec3, f); });
 	}
 
 	private void addWeatherPass(FrameGraphBuilder frameGraphBuilder, Vec3 vec3, GpuBufferSlice gpuBufferSlice) {
@@ -711,6 +713,7 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 		}
 
 		framePass.executes(() -> {
+			iris$renderWeatherPassBody();
 			RenderSystem.setShaderFog(gpuBufferSlice);
 			MultiBufferSource.BufferSource bufferSource = this.renderBuffers.bufferSource();
 			this.weatherEffectRenderer.render(bufferSource, vec3, this.levelRenderState.weatherRenderState);
@@ -1097,6 +1100,7 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 				this.targets.main = framePass.readsAndWrites(this.targets.main);
 				framePass.executes(
 					() -> {
+						iris$renderSkyPassBody();
 						RenderSystem.setShaderFog(gpuBufferSlice);
 						if (skyRenderState.skyType == DimensionSpecialEffects.SkyType.END) {
 							this.skyRenderer.renderEndSky();
@@ -1414,5 +1418,37 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 		};
 
 		int packedBrightness(BlockAndTintGetter blockAndTintGetter, BlockPos blockPos);
+	}
+
+	// Iris compatibility: Named methods for mixin injection (replacing lambda targets)
+	// These are called from the lambda bodies to provide stable mixin targets
+	
+	public void iris$renderSkyPassBody() {
+		// This method is injected into by Iris mixins for sky rendering phase changes
+		// The actual sky rendering happens in addSkyPass lambda
+	}
+	
+	public void iris$renderMainPassBody() {
+		// This method is injected into by Iris mixins for main pass phase changes
+		// The actual main pass rendering happens in addMainPass lambda
+	}
+	
+	public void iris$renderWeatherPassBody() {
+		// This method is injected into by Iris mixins for weather rendering phase changes
+		// The actual weather rendering happens in addWeatherPass lambda
+	}
+	
+	public void iris$renderCloudsPassBody() {
+		// This method is injected into by Iris mixins for clouds rendering phase changes
+		// The actual clouds rendering happens in addCloudsPass lambda
+	}
+	
+	public void iris$renderParticlesPassBody() {
+		// This method is injected into by Iris mixins for particles rendering phase changes
+		// The actual particles rendering happens in addParticlesPass lambda
+	}
+	
+	public void iris$createWeatherBody() {
+		// This method is injected into by Iris mixins for weather type creation
 	}
 }

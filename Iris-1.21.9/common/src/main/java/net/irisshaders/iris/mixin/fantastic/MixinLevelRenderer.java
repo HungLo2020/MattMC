@@ -68,7 +68,7 @@ public class MixinLevelRenderer {
 		}
 	}
 
-	@WrapOperation(method = { "method_62214", NeoLambdas.NEO_RENDER_MAIN_PASS }, at = @At(value = "INVOKE", target = "Lnet/minecraft/client/renderer/feature/FeatureRenderDispatcher;renderAllFeatures()V"), require = 1)
+	@WrapOperation(method = "addMainPass", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/renderer/feature/FeatureRenderDispatcher;renderAllFeatures()V"), require = 1)
 	private void iris$renderMainParticles(FeatureRenderDispatcher instance, Operation<Void> original) {
 		ParticleRenderingSettings settings = getRenderingSettings();
 
@@ -99,7 +99,7 @@ public class MixinLevelRenderer {
 		}
 	}
 
-	@Redirect(method = { "method_62213", NeoLambdas.NEO_PARTICLE }, require = 1, at = @At(value = "INVOKE", target = "Lnet/minecraft/client/renderer/state/ParticlesRenderState;submit(Lnet/minecraft/client/renderer/SubmitNodeStorage;Lnet/minecraft/client/renderer/state/CameraRenderState;)V"))
+	@Redirect(method = "addParticlesPass", require = 1, at = @At(value = "INVOKE", target = "Lnet/minecraft/client/renderer/state/ParticlesRenderState;submit(Lnet/minecraft/client/renderer/SubmitNodeStorage;Lnet/minecraft/client/renderer/state/CameraRenderState;)V"))
 	private void iris$redirectToAvoidItemPickupParticles(ParticlesRenderState instance, SubmitNodeStorage submitNodeStorage, CameraRenderState cameraRenderState) {
 		ParticleRenderingSettings settings = getRenderingSettings();
 
@@ -110,7 +110,7 @@ public class MixinLevelRenderer {
 		}
 	}
 
-	@WrapOperation(method = { "method_62213", NeoLambdas.NEO_PARTICLE }, require = 1, at = @At(value = "INVOKE", target = "Lnet/minecraft/client/renderer/feature/FeatureRenderDispatcher;renderAllFeatures()V"))
+	@WrapOperation(method = "addParticlesPass", require = 1, at = @At(value = "INVOKE", target = "Lnet/minecraft/client/renderer/feature/FeatureRenderDispatcher;renderAllFeatures()V"))
 	private void iris$renderTranslucentParticles(FeatureRenderDispatcher instance, Operation<Void> original) {
 		ParticleRenderingSettings settings = getRenderingSettings();
 
