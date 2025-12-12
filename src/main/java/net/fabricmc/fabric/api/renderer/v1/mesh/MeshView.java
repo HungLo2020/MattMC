@@ -26,5 +26,10 @@ public interface MeshView {
     /**
      * Iterates over all quads in this mesh, passing each to the consumer.
      */
-    void forEach(Consumer<QuadView> consumer);
+    void forEach(Consumer<? super QuadView> consumer);
+    
+    /**
+     * Outputs all quads from this mesh to the given emitter.
+     */
+    void outputTo(QuadEmitter emitter);
 }

@@ -353,6 +353,7 @@ sourceSets {
             srcDirs = [
                 "${sodiumDir}/common/src/main/java",
                 "${sodiumDir}/common/src/api/java",
+                "${sodiumDir}/common/src/boot/java",
                 "${sodiumDir}/fabric/src/main/java"
             ]
         }

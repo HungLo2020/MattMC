@@ -16,11 +16,21 @@
 
 package net.fabricmc.fabric.api.renderer.v1.model;
 
+import net.fabricmc.fabric.api.renderer.v1.mesh.QuadEmitter;
 import net.minecraft.client.renderer.block.model.BlockModelPart;
+import net.minecraft.core.Direction;
+import org.jetbrains.annotations.Nullable;
+
+import java.util.function.Predicate;
 
 /**
  * Fabric extension interface for BlockModelPart to support enhanced rendering.
  */
 public interface FabricBlockModelPart extends BlockModelPart {
-    // Extension interface - actual implementation is in the block model
+    /**
+     * Emits quads from this model part to the given emitter.
+     */
+    default void emitQuads(QuadEmitter emitter, Predicate<@Nullable Direction> cullTest) {
+        // Default implementation does nothing - mixins will override
+    }
 }

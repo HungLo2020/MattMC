@@ -16,6 +16,7 @@
 
 package net.fabricmc.fabric.api.client.render.fluid.v1;
 
+import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.material.Fluid;
 import org.jetbrains.annotations.Nullable;
 
@@ -26,8 +27,9 @@ import java.util.Map;
  * Registry for custom fluid render handlers.
  */
 public final class FluidRenderHandlerRegistry {
-    private static final FluidRenderHandlerRegistry INSTANCE = new FluidRenderHandlerRegistry();
+    public static final FluidRenderHandlerRegistry INSTANCE = new FluidRenderHandlerRegistry();
     private final Map<Fluid, FluidRenderHandler> handlers = new HashMap<>();
+    private final Map<Fluid, FluidRenderHandler> overrides = new HashMap<>();
     
     private FluidRenderHandlerRegistry() { }
     
@@ -46,10 +48,34 @@ public final class FluidRenderHandlerRegistry {
     }
     
     /**
+     * Sets an override handler for a fluid.
+     */
+    public void setOverride(Fluid fluid, FluidRenderHandler handler) {
+        overrides.put(fluid, handler);
+    }
+    
+    /**
      * Gets the render handler for a fluid.
      */
     @Nullable
     public FluidRenderHandler get(Fluid fluid) {
-        return handlers.get(fluid);
+        FluidRenderHandler override = overrides.get(fluid);
+        return override != null ? override : handlers.get(fluid);
+    }
+    
+    /**
+     * Gets the override handler for a fluid if one exists.
+     */
+    @Nullable
+    public FluidRenderHandler getOverride(Fluid fluid) {
+        return overrides.get(fluid);
+    }
+    
+    /**
+     * Checks if a block is transparent for fluid rendering purposes.
+     */
+    public boolean isBlockTransparent(Block block) {
+        // By default, assume non-solid blocks are transparent
+        return !block.defaultBlockState().canOcclude();
     }
 }

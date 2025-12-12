@@ -32,7 +32,7 @@ public final class RenderLayerHelper {
      * Creates a BlockVertexConsumerProvider that delegates to a MultiBufferSource.
      */
     public static BlockVertexConsumerProvider entityDelegate(MultiBufferSource multiBufferSource) {
-        return (layer, renderType) -> multiBufferSource.getBuffer(renderType);
+        return layer -> multiBufferSource.getBuffer(getEntityBlockLayer(layer));
     }
     
     /**
@@ -46,7 +46,7 @@ public final class RenderLayerHelper {
             case SOLID -> RenderType.solid();
             case CUTOUT -> RenderType.cutout();
             case CUTOUT_MIPPED -> RenderType.cutoutMipped();
-            case TRANSLUCENT -> RenderType.translucent();
+            case TRANSLUCENT, TRIPWIRE -> RenderType.translucentMovingBlock();
         };
     }
 }

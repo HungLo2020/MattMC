@@ -336,7 +336,7 @@ public class CloudRenderer extends SimplePreparableReloadListener<Optional<Cloud
 	}
 
 	@Environment(EnvType.CLIENT)
-	static enum RelativeCameraPos {
+	public static enum RelativeCameraPos {
 		ABOVE_CLOUDS,
 		INSIDE_CLOUDS,
 		BELOW_CLOUDS;

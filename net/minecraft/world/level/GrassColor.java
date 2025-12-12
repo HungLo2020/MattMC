@@ -1,7 +1,7 @@
 package net.minecraft.world.level;
 
 public class GrassColor {
-	private static int[] pixels = new int[65536];
+	public static int[] pixels = new int[65536];
 
 	public static void init(int[] is) {
 		pixels = is;

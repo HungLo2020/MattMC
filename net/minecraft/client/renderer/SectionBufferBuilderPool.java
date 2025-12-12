@@ -16,7 +16,7 @@ public class SectionBufferBuilderPool {
 	private final Queue<SectionBufferBuilderPack> freeBuffers;
 	private volatile int freeBufferCount;
 
-	private SectionBufferBuilderPool(List<SectionBufferBuilderPack> list) {
+	protected SectionBufferBuilderPool(List<SectionBufferBuilderPack> list) {
 		this.freeBuffers = Queues.<SectionBufferBuilderPack>newArrayDeque(list);
 		this.freeBufferCount = this.freeBuffers.size();
 	}

@@ -25,6 +25,9 @@ import org.jetbrains.annotations.Nullable;
 public final class ModelHelper {
     private static final Direction[] DIRECTIONS = Direction.values();
     
+    /** Face ID for null/non-culled face (the 7th face, index 6). */
+    public static final int NULL_FACE_ID = DIRECTIONS.length;
+    
     private ModelHelper() { }
     
     /**
