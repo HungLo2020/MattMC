@@ -347,43 +347,17 @@ public class GlDevice implements GpuDevice {
 	 * - Iris-specific vertex attributes (mc_Entity, mc_midTexCoord, at_tangent)
 	 */
 	protected GlRenderPipeline getOrCompilePipeline(RenderPipeline renderPipeline) {
-		// Check if we should intercept this pipeline with shader pack shaders
-		if (net.minecraft.client.renderer.shaders.IrisShaders.isEnabled()) {
-			net.minecraft.client.renderer.shaders.pipeline.ShaderPackPipeline shaderPipeline = 
-				net.minecraft.client.renderer.shaders.IrisShaders.getActivePipeline();
-			
-			if (shaderPipeline != null && shaderPipeline.isRenderingWorld()) {
-				// Check cache first for performance
-				GlRenderPipeline cached = shaderPackPipelineCache.get(renderPipeline);
-				if (cached != null) {
-					// Setup state for cached shader (uniforms need to be updated each frame)
-					if (cached.program() instanceof net.minecraft.client.renderer.shaders.programs.ExtendedShader extendedShader) {
-						extendedShader.iris$setupState();
-					}
-					return cached;
-				}
-				
-				// Try to find a matching ExtendedShader from the shader pack
-				String programName = getShaderProgramName(renderPipeline);
-				if (programName != null) {
-					net.minecraft.client.renderer.shaders.programs.ExtendedShader extendedShader = 
-						shaderPipeline.getExtendedShader(programName);
-					
-					if (extendedShader != null) {
-						LOGGER.debug("Shader interception: {} -> {} (program ID: {})", 
-							renderPipeline.getLocation(), programName, extendedShader.getProgramId());
-						
-						// Setup shader state before returning
-						extendedShader.iris$setupState();
-						
-						// Cache and return a pipeline wrapping the ExtendedShader
-						GlRenderPipeline interceptedPipeline = new GlRenderPipeline(renderPipeline, extendedShader);
-						shaderPackPipelineCache.put(renderPipeline, interceptedPipeline);
-						return interceptedPipeline;
-					}
-				}
-			}
-		}
+		// TODO: SHADER INTERCEPTION TEMPORARILY DISABLED
+		// The shader interception was causing terrain to not render because:
+		// 1. ExtendedShader creation may be failing
+		// 2. Uniform binding mismatches between vanilla and shader pack
+		// 
+		// To enable shader interception, we need:
+		// 1. A complete ShaderKey -> Program mapping (like Iris's IrisPipelines)
+		// 2. Proper ShaderMap implementation
+		// 3. ExtendedShader that properly handles all uniforms
+		//
+		// For now, use vanilla rendering while we debug and fix these issues.
 		
 		// Vanilla pipeline compilation
 		return (GlRenderPipeline)this.pipelineCache
