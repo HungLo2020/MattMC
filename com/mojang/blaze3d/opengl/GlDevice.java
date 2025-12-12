@@ -402,7 +402,11 @@ public class GlDevice implements GpuDevice {
 							LOGGER.info("Shader interception: {} -> {} (ShaderKey: {}, program ID: {})", 
 								renderPipeline.getLocation(), foundProgramName, shaderKey, extendedShader.getProgramId());
 							
-							// Setup shader state before returning
+							// CRITICAL: Setup vanilla uniforms so the rendering system can bind UBOs/samplers
+							// This allows vanilla uniform data (matrices, fog, etc.) to flow through
+							extendedShader.setupUniforms(renderPipeline.getUniforms(), renderPipeline.getSamplers());
+							
+							// Setup Iris shader state (custom uniforms, samplers, images)
 							extendedShader.iris$setupState();
 							
 							// Cache and return a pipeline wrapping the ExtendedShader
