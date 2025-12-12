@@ -587,16 +587,14 @@ public class ShaderPackPipeline implements WorldRenderingPipeline {
 	 * IRIS Reference: RenderTargets.java createFramebuffer() method
 	 */
 	private void createGBufferFramebuffers() {
-		// Destroy old framebuffers
+		// Destroy old framebuffers (only destroy gBufferFramebuffer since the others reference it)
 		if (gBufferFramebuffer != null) {
 			gBufferFramebuffer.destroy();
+			gBufferFramebuffer = null;
 		}
-		if (writingToBeforeTranslucent != null) {
-			writingToBeforeTranslucent.destroy();
-		}
-		if (writingToAfterTranslucent != null) {
-			writingToAfterTranslucent.destroy();
-		}
+		// Clear references (they pointed to the same object)
+		writingToBeforeTranslucent = null;
+		writingToAfterTranslucent = null;
 		
 		// Create main G-buffer framebuffer
 		gBufferFramebuffer = new GlFramebuffer();
@@ -614,6 +612,7 @@ public class ShaderPackPipeline implements WorldRenderingPipeline {
 		// For simplicity, use the same framebuffer for before and after translucent
 		// In a full implementation, these would use different draw buffers
 		// following the BufferFlipper ping-pong pattern from IRIS
+		// NOTE: Both variables reference the same framebuffer instance intentionally
 		writingToBeforeTranslucent = gBufferFramebuffer;
 		writingToAfterTranslucent = gBufferFramebuffer;
 		
