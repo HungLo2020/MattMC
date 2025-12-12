@@ -46,7 +46,7 @@ public class ItemPickupParticleGroup extends ParticleGroup<ItemPickupParticle> {
 	}
 
 	@Environment(EnvType.CLIENT)
-	record State(List<ItemPickupParticleGroup.ParticleInstance> instances) implements ParticleGroupRenderState {
+	public record State(List<ItemPickupParticleGroup.ParticleInstance> instances) implements ParticleGroupRenderState {
 		@Override
 		public void submit(SubmitNodeCollector submitNodeCollector, CameraRenderState cameraRenderState) {
 			PoseStack poseStack = new PoseStack();

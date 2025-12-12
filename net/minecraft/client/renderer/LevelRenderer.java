@@ -119,7 +119,7 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 	private final Minecraft minecraft;
 	private final EntityRenderDispatcher entityRenderDispatcher;
 	private final BlockEntityRenderDispatcher blockEntityRenderDispatcher;
-	private final RenderBuffers renderBuffers;
+	private RenderBuffers renderBuffers; // Non-final to allow Iris shadow rendering to swap buffers
 	private final SkyRenderer skyRenderer = new SkyRenderer();
 	private final CloudRenderer cloudRenderer = new CloudRenderer();
 	private final WorldBorderRenderer worldBorderRenderer = new WorldBorderRenderer();
@@ -584,6 +584,7 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 		ResourceHandle<RenderTarget> resourceHandle3 = this.targets.itemEntity;
 		ResourceHandle<RenderTarget> resourceHandle4 = this.targets.entityOutline;
 		framePass.executes(() -> {
+			iris$renderMainPassBody();
 			RenderSystem.setShaderFog(gpuBufferSlice);
 			Vec3 vec3 = levelRenderState.cameraRenderState.pos;
 			double d = vec3.x();
@@ -591,7 +592,7 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 			double f = vec3.z();
 			profilerFiller.push("terrain");
 			ChunkSectionsToRender chunkSectionsToRender = this.prepareChunkRenders(matrix4f, d, e, f);
-			chunkSectionsToRender.renderGroup(ChunkSectionLayerGroup.OPAQUE);
+			iris$renderTerrainGroup(chunkSectionsToRender, ChunkSectionLayerGroup.OPAQUE);
 			this.minecraft.gameRenderer.getLighting().setupFor(Lighting.Entry.LEVEL);
 			if (resourceHandle3 != null) {
 				resourceHandle3.get().copyDepthFrom(this.minecraft.getMainRenderTarget());
@@ -610,7 +611,7 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 			profilerFiller.popPush("submitBlockEntities");
 			this.submitBlockEntities(poseStack, levelRenderState, this.submitNodeStorage);
 			profilerFiller.popPush("renderFeatures");
-			this.featureRenderDispatcher.renderAllFeatures();
+			iris$renderAllFeaturesMain();
 			bufferSource.endLastBatch();
 			this.checkPoseStack(poseStack);
 			bufferSource.endBatch(RenderType.solid());
@@ -629,7 +630,9 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 			}
 
 			profilerFiller.popPush("debug");
+			iris$beginDebugRender();
 			this.debugRenderer.render(poseStack, frustum, bufferSource, d, e, f, false);
+			iris$endDebugRender();
 			bufferSource.endLastBatch();
 			profilerFiller.pop();
 			this.gameTestBlockHighlightRenderer.render(poseStack, bufferSource);
@@ -649,14 +652,15 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 			this.checkPoseStack(poseStack);
 			bufferSource.endBatch(RenderType.waterMask());
 			bufferSource.endBatch();
+			iris$beginTranslucents();
 			if (resourceHandle2 != null) {
 				resourceHandle2.get().copyDepthFrom(resourceHandle.get());
 			}
 
 			profilerFiller.push("translucent");
-			chunkSectionsToRender.renderGroup(ChunkSectionLayerGroup.TRANSLUCENT);
+			iris$renderTerrainGroup(chunkSectionsToRender, ChunkSectionLayerGroup.TRANSLUCENT);
 			profilerFiller.popPush("string");
-			chunkSectionsToRender.renderGroup(ChunkSectionLayerGroup.TRIPWIRE);
+			iris$renderTerrainGroup(chunkSectionsToRender, ChunkSectionLayerGroup.TRIPWIRE);
 			if (bl) {
 				this.renderBlockOutline(bufferSource, poseStack, true, levelRenderState);
 			}
@@ -678,13 +682,14 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 		ResourceHandle<RenderTarget> resourceHandle = this.targets.main;
 		ResourceHandle<RenderTarget> resourceHandle2 = this.targets.particles;
 		framePass.executes(() -> {
+			iris$renderParticlesPassBody();
 			RenderSystem.setShaderFog(gpuBufferSlice);
 			if (resourceHandle2 != null) {
 				resourceHandle2.get().copyDepthFrom(resourceHandle.get());
 			}
 
-			this.particlesRenderState.submit(this.submitNodeStorage, this.levelRenderState.cameraRenderState);
-			this.featureRenderDispatcher.renderAllFeatures();
+			iris$submitParticles();
+			iris$renderAllFeaturesParticles();
 			this.particlesRenderState.reset();
 		});
 	}
@@ -697,7 +702,7 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 			this.targets.main = framePass.readsAndWrites(this.targets.main);
 		}
 
-		framePass.executes(() -> this.cloudRenderer.render(i, cloudStatus, g, vec3, f));
+		framePass.executes(() -> { iris$renderCloudsPassBody(); this.cloudRenderer.render(i, cloudStatus, g, vec3, f); });
 	}
 
 	private void addWeatherPass(FrameGraphBuilder frameGraphBuilder, Vec3 vec3, GpuBufferSlice gpuBufferSlice) {
@@ -711,9 +716,11 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 		}
 
 		framePass.executes(() -> {
+			iris$renderWeatherPassBody();
 			RenderSystem.setShaderFog(gpuBufferSlice);
 			MultiBufferSource.BufferSource bufferSource = this.renderBuffers.bufferSource();
 			this.weatherEffectRenderer.render(bufferSource, vec3, this.levelRenderState.weatherRenderState);
+			iris$renderWorldBorderBody();
 			this.worldBorderRenderer.render(this.levelRenderState.worldBorderRenderState, vec3, i, f);
 			bufferSource.endBatch();
 		});
@@ -1097,6 +1104,7 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 				this.targets.main = framePass.readsAndWrites(this.targets.main);
 				framePass.executes(
 					() -> {
+						iris$renderSkyPassBody();
 						RenderSystem.setShaderFog(gpuBufferSlice);
 						if (skyRenderState.skyType == DimensionSpecialEffects.SkyType.END) {
 							this.skyRenderer.renderEndSky();
@@ -1414,5 +1422,77 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 		};
 
 		int packedBrightness(BlockAndTintGetter blockAndTintGetter, BlockPos blockPos);
+	}
+
+	// Iris compatibility: Named methods for mixin injection (replacing lambda targets)
+	// These are called from the lambda bodies to provide stable mixin targets
+	
+	public void iris$renderSkyPassBody() {
+		// This method is injected into by Iris mixins for sky rendering phase changes
+		// The actual sky rendering happens in addSkyPass lambda
+	}
+	
+	public void iris$renderMainPassBody() {
+		// This method is injected into by Iris mixins for main pass phase changes
+		// The actual main pass rendering happens in addMainPass lambda
+	}
+	
+	public void iris$renderWeatherPassBody() {
+		// This method is injected into by Iris mixins for weather rendering phase changes
+		// The actual weather rendering happens in addWeatherPass lambda
+	}
+	
+	public void iris$renderCloudsPassBody() {
+		// This method is injected into by Iris mixins for clouds rendering phase changes
+		// The actual clouds rendering happens in addCloudsPass lambda
+	}
+	
+	public void iris$renderParticlesPassBody() {
+		// This method is injected into by Iris mixins for particles rendering phase changes
+		// The actual particles rendering happens in addParticlesPass lambda
+	}
+	
+	public void iris$createWeatherBody() {
+		// This method is injected into by Iris mixins for weather type creation
+	}
+	
+	public void iris$renderWorldBorderBody() {
+		// This method is injected into by Iris mixins for world border rendering phase changes
+		// The actual world border rendering happens in addWeatherPass lambda
+	}
+	
+	public void iris$beginDebugRender() {
+		// This method is injected into by Iris mixins for debug rendering phase changes
+		// The actual debug rendering happens in addMainPass lambda
+	}
+	
+	public void iris$endDebugRender() {
+		// This method is injected into by Iris mixins for debug rendering phase changes
+		// The actual debug rendering happens in addMainPass lambda
+	}
+	
+	public void iris$beginTranslucents() {
+		// This method is injected into by Iris mixins for translucent rendering phase changes
+		// The actual translucent rendering happens in addMainPass lambda
+	}
+	
+	// Wrapper method for terrain chunk rendering - allows Iris mixins to intercept
+	public void iris$renderTerrainGroup(ChunkSectionsToRender chunkSectionsToRender, ChunkSectionLayerGroup group) {
+		chunkSectionsToRender.renderGroup(group);
+	}
+	
+	// Wrapper method for feature rendering in main pass - allows Iris mixins to intercept
+	public void iris$renderAllFeaturesMain() {
+		this.featureRenderDispatcher.renderAllFeatures();
+	}
+	
+	// Wrapper method for particle submission - allows Iris mixins to intercept
+	public void iris$submitParticles() {
+		this.particlesRenderState.submit(this.submitNodeStorage, this.levelRenderState.cameraRenderState);
+	}
+	
+	// Wrapper method for feature rendering in particles pass - allows Iris mixins to intercept
+	public void iris$renderAllFeaturesParticles() {
+		this.featureRenderDispatcher.renderAllFeatures();
 	}
 }

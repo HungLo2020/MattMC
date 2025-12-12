@@ -212,8 +212,8 @@ public class SpriteContents implements Stitcher.Entry, AutoCloseable {
 	}
 
 	@Environment(EnvType.CLIENT)
-	class AnimatedTexture {
-		final List<SpriteContents.FrameInfo> frames;
+	public class AnimatedTexture {
+		public final List<SpriteContents.FrameInfo> frames;
 		private final int frameRowSize;
 		private final boolean interpolateFrames;
 
@@ -251,11 +251,11 @@ public class SpriteContents implements Stitcher.Entry, AutoCloseable {
 	}
 
 	@Environment(EnvType.CLIENT)
-	record FrameInfo(int index, int time) {
+	public record FrameInfo(int index, int time) {
 	}
 
 	@Environment(EnvType.CLIENT)
-	final class InterpolationData implements AutoCloseable {
+	public final class InterpolationData implements AutoCloseable {
 		private final NativeImage[] activeFrame = new NativeImage[SpriteContents.this.byMipLevel.length];
 
 		InterpolationData() {
@@ -316,12 +316,12 @@ public class SpriteContents implements Stitcher.Entry, AutoCloseable {
 	}
 
 	@Environment(EnvType.CLIENT)
-	class Ticker implements SpriteTicker {
-		int frame;
-		int subFrame;
-		final SpriteContents.AnimatedTexture animationInfo;
+	public class Ticker implements SpriteTicker {
+		public int frame;
+		public int subFrame;
+		public final SpriteContents.AnimatedTexture animationInfo;
 		@Nullable
-		private final SpriteContents.InterpolationData interpolationData;
+		public final SpriteContents.InterpolationData interpolationData;
 
 		Ticker(final SpriteContents.AnimatedTexture animatedTexture, @Nullable final SpriteContents.InterpolationData interpolationData) {
 			this.animationInfo = animatedTexture;

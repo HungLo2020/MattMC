@@ -405,7 +405,7 @@ public class SectionRenderDispatcher {
 		}
 
 		@Environment(EnvType.CLIENT)
-		class RebuildTask extends SectionRenderDispatcher.RenderSection.CompileTask {
+		public class RebuildTask extends SectionRenderDispatcher.RenderSection.CompileTask {
 			protected final RenderSectionRegion region;
 
 			public RebuildTask(final RenderSectionRegion renderSectionRegion, final boolean bl) {
