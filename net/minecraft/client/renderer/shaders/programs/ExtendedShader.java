@@ -201,20 +201,30 @@ public class ExtendedShader extends GlProgram implements IrisProgram {
 			bufferBlendOverrides.forEach(BufferBlendOverride::apply);
 		}
 
-		// Bind the appropriate framebuffer
-		// Get framebuffers from parent at runtime (they may not exist during shader creation)
-		if (parent != null) {
-			GlFramebuffer beforeTranslucent = writingToBeforeTranslucent != null ? 
-				writingToBeforeTranslucent : parent.getWritingToBeforeTranslucent();
-			GlFramebuffer afterTranslucent = writingToAfterTranslucent != null ? 
-				writingToAfterTranslucent : parent.getWritingToAfterTranslucent();
-			
-			if (parent.isBeforeTranslucent() && beforeTranslucent != null) {
-				beforeTranslucent.bind();
-			} else if (afterTranslucent != null) {
-				afterTranslucent.bind();
-			}
-		}
+		// NOTE: G-buffer framebuffer binding is disabled because composite/final passes
+		// are not yet implemented. Without those passes, rendering to G-buffers would
+		// result in nothing visible on screen.
+		// 
+		// For now, let shaders render directly to Minecraft's main render target.
+		// This provides immediate visual effects from shader packs (gbuffers coloring,
+		// lighting modifications) without full deferred rendering pipeline.
+		//
+		// TODO: Enable G-buffer binding once CompositeRenderer and FinalPassRenderer
+		// are fully implemented with proper passes.
+		// 
+		// When enabled, this code would bind the appropriate framebuffer:
+		// if (parent != null) {
+		//     GlFramebuffer beforeTranslucent = writingToBeforeTranslucent != null ? 
+		//         writingToBeforeTranslucent : parent.getWritingToBeforeTranslucent();
+		//     GlFramebuffer afterTranslucent = writingToAfterTranslucent != null ? 
+		//         writingToAfterTranslucent : parent.getWritingToAfterTranslucent();
+		//     
+		//     if (parent.isBeforeTranslucent() && beforeTranslucent != null) {
+		//         beforeTranslucent.bind();
+		//     } else if (afterTranslucent != null) {
+		//         afterTranslucent.bind();
+		//     }
+		// }
 	}
 
 	public boolean hasActiveImages() {

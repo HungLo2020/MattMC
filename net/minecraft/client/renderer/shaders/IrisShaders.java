@@ -41,8 +41,8 @@ public class IrisShaders {
 	 */
 	public static ShaderPackPipeline getActivePipeline() {
 		WorldRenderingPipeline pipeline = PipelineManager.getInstance().getActivePipeline();
-		if (pipeline instanceof ShaderPackPipeline) {
-			return (ShaderPackPipeline) pipeline;
+		if (pipeline instanceof ShaderPackPipeline shaderPipeline) {
+			return shaderPipeline;
 		}
 		return null;
 	}

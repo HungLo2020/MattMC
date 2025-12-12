@@ -351,43 +351,36 @@ public class GlDevice implements GpuDevice {
 		net.minecraft.client.renderer.shaders.pipeline.ShaderPackPipeline shaderPipeline = 
 			net.minecraft.client.renderer.shaders.IrisShaders.getActivePipeline();
 		
-		// Debug logging for shader interception (only logs when interception is active)
-		if (shaderPipeline != null && shaderPipeline.shouldOverrideShaders()) {
-			LOGGER.debug("Shader interception ACTIVE for: {}", renderPipeline.getLocation());
-		}
-		
-		if (shaderPipeline != null && shaderPipeline.shouldOverrideShaders()) {
-			// Get ShaderKey from IrisPipelines mapping
-			net.minecraft.client.renderer.shaders.programs.ShaderKey shaderKey = 
-				net.minecraft.client.renderer.shaders.pipeline.IrisPipelines.getPipeline(shaderPipeline, renderPipeline);
-			
-			if (shaderKey != null) {
-				// Get the shader from ShaderMap
-				GlProgram program = shaderPipeline.getShaderMap().getShader(shaderKey);
+		// Check shader interception conditions
+		if (shaderPipeline != null) {
+			boolean shouldOverride = shaderPipeline.shouldOverrideShaders();
+			if (shouldOverride) {
+				// Get ShaderKey from IrisPipelines mapping
+				net.minecraft.client.renderer.shaders.programs.ShaderKey shaderKey = 
+					net.minecraft.client.renderer.shaders.pipeline.IrisPipelines.getPipeline(shaderPipeline, renderPipeline);
 				
-				if (program != null) {
-					// Call iris$setupState() to bind Iris-compatible uniforms
-					if (program instanceof net.minecraft.client.renderer.shaders.programs.IrisProgram irisProgram) {
-						irisProgram.iris$setupState();
+				if (shaderKey != null) {
+					// Get the shader from ShaderMap
+					GlProgram program = shaderPipeline.getShaderMap().getShader(shaderKey);
+					
+					if (program != null) {
+						// Call iris$setupState() to bind Iris-compatible uniforms
+						if (program instanceof net.minecraft.client.renderer.shaders.programs.IrisProgram irisProgram) {
+							irisProgram.iris$setupState();
+						}
+						
+						LOGGER.debug("Using shader pack program for {} -> {}", renderPipeline.getLocation(), shaderKey);
+						
+						// Return a new GlRenderPipeline wrapping the shader pack program
+						// Cache this to avoid creating new objects every frame
+						return this.shaderPackPipelineCache
+							.computeIfAbsent(renderPipeline, rp -> new GlRenderPipeline(rp, program));
+					} else {
+						LOGGER.debug("No program in ShaderMap for ShaderKey: {} (pipeline: {})", shaderKey, renderPipeline.getLocation());
 					}
-					
-					LOGGER.debug("Using shader pack program for {} -> {}", renderPipeline.getLocation(), shaderKey);
-					
-					// Return a new GlRenderPipeline wrapping the shader pack program
-					// Cache this to avoid creating new objects every frame
-					return this.shaderPackPipelineCache
-						.computeIfAbsent(renderPipeline, rp -> new GlRenderPipeline(rp, program));
 				} else {
-					LOGGER.debug("No program in ShaderMap for ShaderKey: {} (pipeline: {})", shaderKey, renderPipeline.getLocation());
+					LOGGER.trace("No ShaderKey mapping for RenderPipeline: {}", renderPipeline.getLocation());
 				}
-			} else {
-				LOGGER.debug("No ShaderKey mapping for RenderPipeline: {}", renderPipeline.getLocation());
-			}
-		} else {
-			if (shaderPipeline == null) {
-				LOGGER.trace("No active shader pipeline");
-			} else {
-				LOGGER.trace("shouldOverrideShaders is false");
 			}
 		}
 		
