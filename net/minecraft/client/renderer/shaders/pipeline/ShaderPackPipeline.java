@@ -616,7 +616,7 @@ public class ShaderPackPipeline implements WorldRenderingPipeline {
 	
 	@Override
 	public void finalizeLevelRendering() {
-		LOGGER.debug("Finalize level rendering with shader pack: {}", packName);
+		LOGGER.info("Finalize level rendering with shader pack: {} - isRenderingWorld set to false", packName);
 		
 		isRenderingWorld = false;
 		
