@@ -16,8 +16,8 @@ public interface BlockModelPartMixin extends FabricBlockModelPart {
     default void emitQuads(QuadEmitter emitter, Predicate<@Nullable Direction> cullTest) {
         if (emitter instanceof AbstractBlockRenderContext.BlockEmitter be) {
             be.emitPart((BlockModelPart) this, cullTest);
-        } else {
-            FabricBlockModelPart.super.emitQuads(emitter, cullTest);
         }
+        // If not a BlockEmitter, do nothing - no super call needed since interface
+        // provides default implementation
     }
 }
