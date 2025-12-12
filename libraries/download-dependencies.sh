@@ -61,7 +61,7 @@ download_jar() {
 echo -e "${YELLOW}🔍 Checking connectivity to required repositories...${NC}"
 REPO_ACCESSIBLE=true
 
-for repo in "libraries.minecraft.net" "maven.fabricmc.net"; do
+for repo in "libraries.minecraft.net" "maven.fabricmc.net" "gitlab.com"; do
     if ! curl -s -I "https://${repo}" --connect-timeout 5 --max-time 10 > /dev/null 2>&1; then
         echo -e "   ${RED}✗${NC} Cannot reach ${repo}"
         REPO_ACCESSIBLE=false
@@ -78,6 +78,7 @@ if [ "$REPO_ACCESSIBLE" = false ]; then
     echo -e "${RED}║  internet access to download dependencies from:               ║${NC}"
     echo -e "${RED}║  - libraries.minecraft.net                                    ║${NC}"
     echo -e "${RED}║  - maven.fabricmc.net                                         ║${NC}"
+    echo -e "${RED}║  - gitlab.com (for Distant Horizons core)                     ║${NC}"
     echo -e "${RED}╚════════════════════════════════════════════════════════════════╝${NC}"
     exit 1
 fi
