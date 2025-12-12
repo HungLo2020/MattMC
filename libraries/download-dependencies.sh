@@ -169,6 +169,58 @@ echo ""
 # Note: Fabric API is not downloaded as JARs because they use intermediary mappings.
 # Instead, we use Mojang-mapped stub interfaces in src/main/java/net/fabricmc/fabric/api/
 
+# ============================================================================
+# DISTANT HORIZONS CORE SUBMODULE
+# Downloads the coreSubProjects git submodule required for DH compilation
+# ============================================================================
+
+echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+echo -e "${BLUE}  Downloading Distant Horizons Core Submodule${NC}"
+echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+
+DH_DIR="${SCRIPT_DIR}/../modules/distant-horizons-2.3.4b"
+DH_CORE_DIR="${DH_DIR}/coreSubProjects"
+
+if [ -d "${DH_CORE_DIR}" ] && [ -f "${DH_CORE_DIR}/LICENSE.txt" ]; then
+    echo -e "   ${GREEN}✓${NC} Distant Horizons coreSubProjects (already exists)"
+else
+    echo -e "   ${YELLOW}⬇${NC} Cloning coreSubProjects from GitLab..."
+    if git clone --depth 1 https://gitlab.com/jeseibel/distant-horizons-core.git "${DH_CORE_DIR}" 2>/dev/null; then
+        echo -e "   ${GREEN}✓${NC} Distant Horizons coreSubProjects"
+    else
+        echo -e "   ${RED}✗${NC} Failed to clone coreSubProjects"
+        echo -e "   ${YELLOW}⚠${NC} Please manually clone the repository:"
+        echo -e "   ${YELLOW}   cd modules/distant-horizons-2.3.4b${NC}"
+        echo -e "   ${YELLOW}   git clone https://gitlab.com/jeseibel/distant-horizons-core.git coreSubProjects${NC}"
+    fi
+fi
+
+echo ""
+
+# ============================================================================
+# DISTANT HORIZONS DEPENDENCIES
+# Additional dependencies required by Distant Horizons
+# ============================================================================
+
+echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+echo -e "${BLUE}  Downloading Distant Horizons Dependencies${NC}"
+echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+
+MAVEN_CENTRAL="https://repo1.maven.org/maven2"
+
+# NightConfig - TOML and JSON configuration library (required by DH)
+download_jar "${MAVEN_CENTRAL}/com/electronwill/night-config/toml/3.6.6/toml-3.6.6.jar" "nightconfig-toml-3.6.6.jar"
+download_jar "${MAVEN_CENTRAL}/com/electronwill/night-config/json/3.6.6/json-3.6.6.jar" "nightconfig-json-3.6.6.jar"
+download_jar "${MAVEN_CENTRAL}/com/electronwill/night-config/core/3.6.6/core-3.6.6.jar" "nightconfig-core-3.6.6.jar"
+
+# SQLite JDBC - Database driver (required by DH for LOD storage)
+download_jar "${MAVEN_CENTRAL}/org/xerial/sqlite-jdbc/3.47.2.0/sqlite-jdbc-3.47.2.0.jar" "sqlite-jdbc-3.47.2.0.jar"
+
+# XZ compression library (required by DH)
+download_jar "${MAVEN_CENTRAL}/org/tukaani/xz/1.9/xz-1.9.jar" "xz-1.9.jar"
+
+echo ""
+
 # Summary
 echo -e "${GREEN}╔════════════════════════════════════════════════════════════════╗${NC}"
 echo -e "${GREEN}║  ✓ Download Complete!                                         ║${NC}"
