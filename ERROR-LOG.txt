@@ -1,0 +1,64 @@
+matt@HungLoDE:~/Documents/Repos/MattMC$ /bin/bash /home/matt/Documents/Repos/MattMC/RunDev.sh
+
+> Configure project :
+✓ Using bundled dependencies from libraries/deps/
+  Run './libraries/download-dependencies.sh' to update bundled dependencies
+Path for java installation '/usr/lib/jvm/openjdk-17' (Common Linux Locations) does not contain a java executable
+Path for java installation '/usr/lib/jvm/openjdk-21' (Common Linux Locations) does not contain a java executable
+
+> Task :compileJava
+/home/matt/Documents/Repos/MattMC/frnsrc/fabric-loader-0.18.2/src/main/java/net/fabricmc/loader/impl/mrj/AbstractSecureClassLoader.java:21: error: duplicate class: net.fabricmc.loader.impl.mrj.AbstractSecureClassLoader
+public abstract class AbstractSecureClassLoader extends SecureClassLoader {
+                ^
+/home/matt/Documents/Repos/MattMC/net/minecraft/world/level/block/entity/TheEndGatewayBlockEntity.java:228: warning: [removal] getHighestSectionPosition() in ChunkAccess has been deprecated and marked for removal
+                int i = levelChunk.getHighestSectionPosition() + 16 - 1;
+                                  ^
+/home/matt/Documents/Repos/MattMC/net/minecraft/world/level/levelgen/Heightmap.java:48: warning: [removal] getHighestSectionPosition() in ChunkAccess has been deprecated and marked for removal
+                        int j = chunkAccess.getHighestSectionPosition() + 16;
+                                           ^
+/home/matt/Documents/Repos/MattMC/net/minecraft/world/level/levelgen/placement/NoiseBasedCountPlacement.java:35: warning: [removal] BIOME_INFO_NOISE in Biome has been deprecated and marked for removal
+                double d = Biome.BIOME_INFO_NOISE.getValue(blockPos.getX() / this.noiseFactor, blockPos.getZ() / this.noiseFactor, false);
+                                ^
+/home/matt/Documents/Repos/MattMC/net/minecraft/world/level/levelgen/placement/NoiseThresholdCountPlacement.java:35: warning: [removal] BIOME_INFO_NOISE in Biome has been deprecated and marked for removal
+                double d = Biome.BIOME_INFO_NOISE.getValue(blockPos.getX() / 200.0, blockPos.getZ() / 200.0, false);
+                                ^
+/home/matt/Documents/Repos/MattMC/frnsrc/fabric-loader-0.18.2/minecraft/src/main/java/net/fabricmc/loader/impl/game/minecraft/applet/AppletLauncher.java:42: warning: [removal] Applet in java.applet has been deprecated and marked for removal
+public class AppletLauncher extends Applet implements AppletStub {
+                                    ^
+/home/matt/Documents/Repos/MattMC/frnsrc/fabric-loader-0.18.2/minecraft/src/main/java/net/fabricmc/loader/impl/game/minecraft/applet/AppletLauncher.java:42: warning: [removal] AppletStub in java.applet has been deprecated and marked for removal
+public class AppletLauncher extends Applet implements AppletStub {
+                                                      ^
+/home/matt/Documents/Repos/MattMC/frnsrc/fabric-loader-0.18.2/minecraft/src/main/java/net/fabricmc/loader/impl/game/minecraft/applet/AppletLauncher.java:46: warning: [removal] Applet in java.applet has been deprecated and marked for removal
+        private Applet mcApplet;
+                ^
+/home/matt/Documents/Repos/MattMC/frnsrc/fabric-loader-0.18.2/minecraft/src/main/java/net/fabricmc/loader/impl/game/minecraft/applet/AppletLauncher.java:66: warning: [removal] Applet in java.applet has been deprecated and marked for removal
+                        mcApplet = (Applet) FabricLauncherBase.getLauncher()
+                                    ^
+/home/matt/Documents/Repos/MattMC/frnsrc/fabric-loader-0.18.2/minecraft/src/main/java/net/fabricmc/loader/impl/game/minecraft/applet/AppletLauncher.java:88: warning: [removal] Applet in java.applet has been deprecated and marked for removal
+        public void replace(Applet applet) {
+                            ^
+Note: Some input files use or override a deprecated API.
+Note: Recompile with -Xlint:deprecation for details.
+Note: Some input files use unchecked or unsafe operations.
+Note: Recompile with -Xlint:unchecked for details.
+1 error
+9 warnings
+
+> Task :compileJava FAILED
+
+FAILURE: Build failed with an exception.
+
+* What went wrong:
+Execution failed for task ':compileJava'.
+> Compilation failed; see the compiler error output for details.
+
+* Try:
+> Run with --info option to get more log output.
+> Run with --scan to get full insights.
+
+BUILD FAILED in 9s
+1 actionable task: 1 executed
+matt@HungLoDE:~/Documents/Repos/MattMC$
+
+
+
