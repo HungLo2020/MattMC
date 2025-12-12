@@ -487,6 +487,10 @@ public class ShaderPackPipeline implements WorldRenderingPipeline {
 	public void beginLevelRendering() {
 		isRenderingWorld = true;
 		
+		// Enable IRIS vertex format extension for terrain rendering
+		// IRIS pattern: ImmediateState.isRenderingLevel = true
+		net.minecraft.client.renderer.shaders.vertices.ImmediateState.setRenderingLevel(true);
+		
 		// Capture matrices for uniforms (Step A10)
 		captureRenderingState();
 		
@@ -648,6 +652,10 @@ public class ShaderPackPipeline implements WorldRenderingPipeline {
 		// Reset state flags
 		isMainBound = false;
 		isRenderingWorld = false;
+		
+		// Disable IRIS vertex format extension
+		// IRIS pattern: ImmediateState.isRenderingLevel = false
+		net.minecraft.client.renderer.shaders.vertices.ImmediateState.setRenderingLevel(false);
 		
 		// Unbind any custom framebuffers and restore default
 		GlFramebuffer.unbind();
@@ -1280,22 +1288,16 @@ public class ShaderPackPipeline implements WorldRenderingPipeline {
 	
 	/**
 	 * Whether this pipeline should override vanilla shaders.
-	 * Following IRIS's IrisRenderingPipeline.shouldOverrideShaders() pattern.
+	 * Following IRIS's IrisRenderingPipeline.shouldOverrideShaders() pattern EXACTLY.
 	 * 
-	 * NOTE: Currently DISABLED because shader packs expect Iris-compatible vertex
-	 * formats (with at_tangent, mc_Entity, at_midBlock, etc.) but vanilla Minecraft
-	 * sends standard vertex formats. Without vertex format translation (like IRIS's
-	 * Sodium integration), shader interception causes terrain/entities to not render.
+	 * Returns true when:
+	 * 1. isRenderingWorld - We are currently rendering the world (between beginLevelRendering/finalizeLevelRendering)
+	 * 2. isMainBound - The main framebuffer is bound (after initial setup)
 	 * 
-	 * The shaders compile and are ready, but cannot be used until:
-	 * 1. Vertex format translation layer is implemented
-	 * 2. Or Sodium-style terrain rendering with custom vertex formats is added
-	 * 
-	 * When enabled, this would return: isRenderingWorld && isMainBound;
+	 * IRIS Reference: IrisRenderingPipeline.java line 1243
 	 */
 	public boolean shouldOverrideShaders() {
-		// DISABLED: Shader interception breaks rendering without vertex format translation
-		return false;
+		return isRenderingWorld && isMainBound;
 	}
 	
 	/**

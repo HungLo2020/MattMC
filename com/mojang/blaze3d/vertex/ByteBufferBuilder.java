@@ -145,6 +145,14 @@ public class ByteBufferBuilder implements AutoCloseable {
 			throw new IllegalStateException("Buffer has been freed");
 		}
 	}
+	
+	/**
+	 * Returns the current position/base pointer of the buffer.
+	 * Used by IRIS vertex format extension for calculating vertex offsets.
+	 */
+	public long position() {
+		return this.pointer;
+	}
 
 	@Environment(EnvType.CLIENT)
 	public class Result implements AutoCloseable {
