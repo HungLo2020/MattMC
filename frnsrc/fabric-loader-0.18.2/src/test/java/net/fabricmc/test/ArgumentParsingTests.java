@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package frnsrc.fabric;
+package net.fabricmc.test;
 
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;

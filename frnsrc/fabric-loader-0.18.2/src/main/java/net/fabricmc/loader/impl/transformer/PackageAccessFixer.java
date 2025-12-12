@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package frnsrc.fabric;
+package net.fabricmc.loader.impl.transformer;
 
 import org.objectweb.asm.ClassVisitor;
 import org.objectweb.asm.FieldVisitor;

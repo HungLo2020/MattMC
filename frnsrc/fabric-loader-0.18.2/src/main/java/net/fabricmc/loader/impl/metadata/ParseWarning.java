@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package frnsrc.fabric;
+package net.fabricmc.loader.impl.metadata;
 
 final class ParseWarning {
 	private final int line;

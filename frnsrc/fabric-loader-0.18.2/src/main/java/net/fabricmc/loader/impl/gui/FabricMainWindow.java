@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package frnsrc.fabric;
+package net.fabricmc.loader.impl.gui;
 
 import java.awt.BorderLayout;
 import java.awt.Component;

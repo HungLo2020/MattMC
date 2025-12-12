@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package frnsrc.fabric;
+package net.fabricmc.loader.util;
 
 import java.net.URL;
 import java.nio.file.Path;

@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package frnsrc.fabric;
+package net.fabricmc.api;
 
 /**
  * A mod initializer ran only on {@link EnvType#CLIENT}.

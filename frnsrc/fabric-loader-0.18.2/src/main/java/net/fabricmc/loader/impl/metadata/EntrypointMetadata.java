@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package frnsrc.fabric;
+package net.fabricmc.loader.impl.metadata;
 
 @SuppressWarnings("deprecation")
 public interface EntrypointMetadata extends net.fabricmc.loader.metadata.EntrypointMetadata {

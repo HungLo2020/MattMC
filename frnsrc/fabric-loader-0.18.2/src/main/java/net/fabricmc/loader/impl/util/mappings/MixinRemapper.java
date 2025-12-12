@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package frnsrc.fabric;
+package net.fabricmc.loader.impl.util.mappings;
 
 import org.spongepowered.asm.mixin.extensibility.IRemapper;
 

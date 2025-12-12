@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package frnsrc.fabric;
+package net.fabricmc.loader.impl.discovery;
 
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;

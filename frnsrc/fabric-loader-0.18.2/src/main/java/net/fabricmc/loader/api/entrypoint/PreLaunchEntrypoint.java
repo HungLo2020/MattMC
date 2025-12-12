@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package frnsrc.fabric;
+package net.fabricmc.loader.api.entrypoint;
 
 /**
  * Entrypoint getting invoked just before launching the game.

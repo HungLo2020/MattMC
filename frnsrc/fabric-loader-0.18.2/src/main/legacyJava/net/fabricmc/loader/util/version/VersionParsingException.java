@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package frnsrc.fabric;
+package net.fabricmc.loader.util.version;
 
 /** @deprecated Replaced by {@link net.fabricmc.loader.api.VersionParsingException} */
 @SuppressWarnings("serial")

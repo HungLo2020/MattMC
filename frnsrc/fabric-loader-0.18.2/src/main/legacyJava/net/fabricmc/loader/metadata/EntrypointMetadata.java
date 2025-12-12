@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package frnsrc.fabric;
+package net.fabricmc.loader.metadata;
 
 /**
  * @deprecated Internal API, do not use

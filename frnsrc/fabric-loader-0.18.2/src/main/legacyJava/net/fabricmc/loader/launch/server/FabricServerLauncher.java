@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package frnsrc.fabric;
+package net.fabricmc.loader.launch.server;
 
 /**
  * @deprecated Use {@link net.fabricmc.loader.impl.launch.server.FabricServerLauncher} instead

@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package frnsrc.fabric;
+package net.fabricmc.loader.api.metadata.version;
 
 import java.util.Collection;
 import java.util.function.Predicate;

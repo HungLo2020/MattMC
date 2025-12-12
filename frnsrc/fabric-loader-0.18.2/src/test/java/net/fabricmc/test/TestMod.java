@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package frnsrc.fabric;
+package net.fabricmc.test;
 
 import java.util.LinkedHashSet;
 import java.util.Set;

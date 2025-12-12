@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package frnsrc.fabric;
+package net.fabricmc.loader.impl.game;
 
 import java.io.BufferedReader;
 import java.io.File;

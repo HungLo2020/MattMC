@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package frnsrc.fabric;
+package net.fabricmc.loader.impl.util;
 
 public final class StringUtil {
 	public static String capitalize(String s) {

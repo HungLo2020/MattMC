@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package frnsrc.fabric;
+package net.fabricmc.loader.api.metadata;
 
 import java.util.Collections;
 import java.util.Map;

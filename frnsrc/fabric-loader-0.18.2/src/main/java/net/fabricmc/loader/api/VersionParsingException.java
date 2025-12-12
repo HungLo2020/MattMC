@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package frnsrc.fabric;
+package net.fabricmc.loader.api;
 
 @SuppressWarnings({ "deprecation", "serial" }) //Extending the deprecated one for backwards compatibility
 public class VersionParsingException extends net.fabricmc.loader.util.version.VersionParsingException {

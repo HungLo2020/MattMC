@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package frnsrc.fabric;
+package net.fabricmc.loader.impl.util.version;
 
 import java.util.Arrays;
 import java.util.Objects;

@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package frnsrc.fabric;
+package net.fabricmc.loader.api;
 
 /**
  * An exception that occurs during a {@link LanguageAdapter}'s object creation.

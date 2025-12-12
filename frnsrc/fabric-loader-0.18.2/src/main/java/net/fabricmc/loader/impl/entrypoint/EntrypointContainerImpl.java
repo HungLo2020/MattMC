@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package frnsrc.fabric;
+package net.fabricmc.loader.impl.entrypoint;
 
 import net.fabricmc.loader.api.EntrypointException;
 import net.fabricmc.loader.api.ModContainer;

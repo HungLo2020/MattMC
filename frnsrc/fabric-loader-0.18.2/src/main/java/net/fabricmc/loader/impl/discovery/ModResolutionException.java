@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package frnsrc.fabric;
+package net.fabricmc.loader.impl.discovery;
 
 @SuppressWarnings("serial")
 public class ModResolutionException extends Exception {

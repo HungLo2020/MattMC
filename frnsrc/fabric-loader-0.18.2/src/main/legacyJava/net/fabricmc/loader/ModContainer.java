@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package frnsrc.fabric;
+package net.fabricmc.loader;
 
 import java.net.MalformedURLException;
 import java.net.URL;

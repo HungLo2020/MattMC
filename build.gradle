@@ -42,23 +42,30 @@ repositories {
         println "⚠ Bundled dependencies not found. Using remote repositories."
         println "  Run './libraries/download-dependencies.sh' to download dependencies for offline builds."
         
+        // Fabric Maven repository (for Fabric Loader dependencies)
+        maven {
+            name = 'Fabric'
+            url = 'https://maven.fabricmc.net/'
+        }
+        
         // Minecraft libraries (primary source for Mojang dependencies)
         maven { 
-            url 'https://libraries.minecraft.net'
+            url = 'https://libraries.minecraft.net'
             content {
                 includeGroup 'com.mojang'
+                includeGroup 'net.minecraft'
             }
         }
         // JitPack for open-source Mojang libraries
         maven { 
-            url 'https://jitpack.io'
+            url = 'https://jitpack.io'
             content {
                 includeGroup 'com.github.Mojang'
             }
         }
         // Forge mirrors for Mojang libraries
         maven { 
-            url 'https://maven.minecraftforge.net/'
+            url = 'https://maven.minecraftforge.net/'
             content {
                 includeGroup 'com.mojang'
                 includeGroup 'net.minecraftforge'
@@ -188,6 +195,80 @@ dependencies {
     // Note: @Environment and @EnvType annotations are now provided by custom implementation
     // in the net.minecraft.api package (replaced Fabric dependency)
     
+    // ===== FABRIC LOADER DEPENDENCIES =====
+    // Required for Fabric mod loading functionality
+    // These are loaded from libraries/deps/ if available, otherwise from remote repositories
+    
+    if (useBundledDeps) {
+        // Bundled Fabric Loader dependencies from libraries/deps/
+        // ASM - bytecode manipulation (required by Fabric Loader)
+        implementation files('libraries/deps/asm-9.9.jar')
+        implementation files('libraries/deps/asm-analysis-9.9.jar')
+        implementation files('libraries/deps/asm-commons-9.9.jar')
+        implementation files('libraries/deps/asm-tree-9.9.jar')
+        implementation files('libraries/deps/asm-util-9.9.jar')
+        
+        // Mixin - runtime bytecode transformation (required by Fabric Loader)
+        implementation files('libraries/deps/sponge-mixin-0.16.5+mixin.0.8.7.jar')
+        
+        // Tiny Remapper - class/method/field remapping
+        implementation files('libraries/deps/tiny-remapper-0.11.2.jar')
+        
+        // Class Tweaker - class access modification
+        implementation files('libraries/deps/class-tweaker-0.2.jar')
+        
+        // Mapping IO - mapping file I/O
+        implementation files('libraries/deps/mapping-io-0.7.1.jar')
+        
+        // MixinExtras - additional Mixin functionality
+        implementation files('libraries/deps/mixinextras-fabric-0.5.0.jar')
+        
+        // Launchwrapper - legacy launch wrapper
+        implementation files('libraries/deps/launchwrapper-1.12.jar')
+        
+        // Access Widener - access modification
+        implementation files('libraries/deps/access-widener-2.1.0.jar')
+        
+        // Tiny Mappings Parser - legacy mapping parser
+        implementation files('libraries/deps/tiny-mappings-parser-0.3.0+build.17.jar')
+    } else {
+        // Remote Fabric Loader dependencies
+        // ASM - bytecode manipulation (required by Fabric Loader)
+        implementation 'org.ow2.asm:asm:9.9'
+        implementation 'org.ow2.asm:asm-analysis:9.9'
+        implementation 'org.ow2.asm:asm-commons:9.9'
+        implementation 'org.ow2.asm:asm-tree:9.9'
+        implementation 'org.ow2.asm:asm-util:9.9'
+        
+        // Mixin - runtime bytecode transformation (requires Fabric Maven)
+        implementation 'net.fabricmc:sponge-mixin:0.16.5+mixin.0.8.7'
+        
+        // Tiny Remapper - class/method/field remapping (requires Fabric Maven)
+        implementation 'net.fabricmc:tiny-remapper:0.11.2'
+        
+        // Class Tweaker - class access modification (requires Fabric Maven)
+        implementation 'net.fabricmc:class-tweaker:0.2'
+        
+        // Mapping IO - mapping file I/O (requires Fabric Maven)
+        implementation 'net.fabricmc:mapping-io:0.7.1'
+        
+        // MixinExtras - additional Mixin functionality (requires Fabric Maven)
+        implementation 'io.github.llamalad7:mixinextras-fabric:0.5.0'
+        
+        // Launchwrapper - legacy launch wrapper (requires Minecraft Libraries)
+        implementation 'net.minecraft:launchwrapper:1.12'
+        
+        // Access Widener - access modification (requires Fabric Maven)
+        implementation 'net.fabricmc:access-widener:2.1.0'
+        
+        // Tiny Mappings Parser - legacy mapping parser (requires Fabric Maven)
+        implementation 'net.fabricmc:tiny-mappings-parser:0.3.0+build.17'
+    }
+    
+    // Fabric implementation dependencies (available on Maven Central)
+    implementation 'org.ow2.sat4j:org.ow2.sat4j.core:2.3.6'
+    implementation 'org.ow2.sat4j:org.ow2.sat4j.pb:2.3.6'
+    
     // ===== TESTING DEPENDENCIES =====
     // Testing dependencies - only available in test scope, excluded from production builds
     
@@ -214,7 +295,16 @@ dependencies {
 sourceSets {
     main {
         java {
-            srcDirs = ['.']
+            srcDirs = [
+                '.',
+                // Fabric Loader source code
+                'frnsrc/fabric-loader-0.18.2/src/main/java',
+                'frnsrc/fabric-loader-0.18.2/src/main/legacyJava',
+                // Java 17+ version of MRJ classes (takes precedence over Java 8 versions)
+                'frnsrc/fabric-loader-0.18.2/src/java17/java',
+                'frnsrc/fabric-loader-0.18.2/minecraft/src/main/java',
+                'frnsrc/fabric-loader-0.18.2/minecraft/src/main/legacyJava'
+            ]
             exclude 'gradle/**'
             exclude 'build/**'
             exclude '.git/**'
@@ -223,11 +313,30 @@ sourceSets {
             exclude 'com/mojang/authlib/**'
             // Exclude test sources from main source set
             exclude 'src/test/**'
-            // Exclude foreign reference source code (for reference only, not for building)
-            exclude 'frnsrc/**'
+            // Exclude other frnsrc directories (Iris, Sodium, etc. - reference only)
+            exclude 'frnsrc/Iris-*/**'
+            exclude 'frnsrc/sodium-*/**'
+            exclude 'frnsrc/Complementary*/**'
+            exclude 'frnsrc/*.zip'
+            exclude 'frnsrc/*.md'
+            exclude 'frnsrc/nothingburger'
+            // Exclude Fabric Loader test files and build files
+            exclude 'frnsrc/fabric-loader-0.18.2/src/test/**'
+            exclude 'frnsrc/fabric-loader-0.18.2/.git/**'
+            exclude 'frnsrc/fabric-loader-0.18.2/.github/**'
+            exclude 'frnsrc/fabric-loader-0.18.2/build/**'
+            exclude 'frnsrc/fabric-loader-0.18.2/junit/**'
+            exclude 'frnsrc/fabric-loader-0.18.2/minecraft/minecraft-test/**'
+            exclude 'frnsrc/fabric-loader-0.18.2/minecraft/src/test/**'
+            // Exclude Java 8 MRJ classes (using Java 17 versions instead)
+            exclude 'frnsrc/fabric-loader-0.18.2/src/main/java/net/fabricmc/loader/impl/mrj/**'
         }
         resources {
-            srcDirs = ['src/main/resources']
+            srcDirs = [
+                'src/main/resources',
+                // Fabric Loader resources
+                'frnsrc/fabric-loader-0.18.2/src/main/resources'
+            ]
         }
     }
     

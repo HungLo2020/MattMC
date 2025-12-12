@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package frnsrc.fabric;
+package net.fabricmc.loader.impl.game.patch;
 
 import java.io.IOException;
 import java.io.InputStream;

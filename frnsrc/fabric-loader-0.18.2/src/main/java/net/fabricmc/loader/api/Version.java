@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package frnsrc.fabric;
+package net.fabricmc.loader.api;
 
 import net.fabricmc.loader.api.metadata.ModMetadata;
 import net.fabricmc.loader.impl.util.version.VersionParser;

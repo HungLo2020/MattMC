@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package frnsrc.fabric;
+package net.fabricmc.loader.api.metadata;
 
 import java.nio.file.Path;
 import java.util.List;

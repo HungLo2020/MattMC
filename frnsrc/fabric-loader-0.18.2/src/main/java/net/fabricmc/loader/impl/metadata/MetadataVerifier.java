@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package frnsrc.fabric;
+package net.fabricmc.loader.impl.metadata;
 
 import java.io.PrintWriter;
 import java.io.StringWriter;

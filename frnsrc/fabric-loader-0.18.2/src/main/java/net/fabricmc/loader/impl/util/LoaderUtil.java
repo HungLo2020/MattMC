@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package frnsrc.fabric;
+package net.fabricmc.loader.impl.util;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
