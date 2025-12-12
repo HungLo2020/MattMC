@@ -26,12 +26,6 @@ public class ImmediateState {
 	public static final ThreadLocal<Boolean> isCompilingChunks = ThreadLocal.withInitial(() -> false);
 	
 	/**
-	 * Whether extended vertex format should be used for rendering.
-	 * IRIS Pattern: Use for RenderPipeline vertex format extension.
-	 */
-	public static boolean renderWithExtendedVertexFormat = false;
-	
-	/**
 	 * Sets rendering level state.
 	 */
 	public static void setRenderingLevel(boolean rendering) {
