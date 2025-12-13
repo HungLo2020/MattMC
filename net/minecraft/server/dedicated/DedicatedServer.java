@@ -26,6 +26,7 @@ import java.util.Optional;
 import java.util.function.BooleanSupplier;
 import java.util.function.Supplier;
 import java.util.stream.Stream;
+import net.fabricmc.loader.api.FabricLoader;
 import net.minecraft.DefaultUncaughtExceptionHandler;
 import net.minecraft.DefaultUncaughtExceptionHandlerWithName;
 import net.minecraft.SharedConstants;
@@ -180,6 +181,9 @@ public class DedicatedServer extends MinecraftServer implements ServerInterface 
 
 	@Override
 	public boolean initServer() throws IOException {
+		// Initialize Fabric server mods before server initialization
+		FabricLoader.getInstance().initializeServerMods();
+		
 		int i = this.getProperties().managementServerPort;
 		if (this.getProperties().managementServerEnabled) {
 			String string = this.settings.getProperties().managementServerSecret;
