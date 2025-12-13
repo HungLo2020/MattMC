@@ -578,7 +578,20 @@ tasks.named('processSodiumResources') {
 // Process Distant Horizons resources with version substitution
 tasks.named('processDistantHorizonsResources') {
     filesMatching('fabric.mod.json') {
-        expand 'version': dhVersion
+        expand(
+            'version': dhVersion,
+            'mod_name': 'Distant Horizons',
+            'description': 'LOD rendering mod for Minecraft',
+            'authors': '["James Seibel", "Leonardo Amato", "Cola", "coolGi", "Ran", "Leetom", "pshsh"]',
+            'homepage': 'https://modrinth.com/mod/distanthorizons',
+            'source': 'https://gitlab.com/jeseibel/distant-horizons',
+            'issues': 'https://gitlab.com/jeseibel/distant-horizons/-/issues',
+            'discord': 'https://discord.gg/xAB8G4cENx',
+            'compatible_minecraft_versions': '["1.21.10", "1.21.8", "1.21.4"]',
+            'java_version': '21',
+            'fabric_incompatibility_list': '[]',
+            'fabric_recommend_list': '[]'
+        )
     }
 }
 
