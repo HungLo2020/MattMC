@@ -1541,12 +1541,10 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 		private final PoseStack poseStack;
 		private final float tickDelta;
 		private final Camera camera;
-		private final Matrix4f combinedMVP;
 		private static final Matrix4f IDENTITY_MATRIX = new Matrix4f().identity();
 		
 		public WorldRenderContextImpl(ClientLevel level, Matrix4f combinedMVP, float tickDelta, Camera camera) {
 			this.level = level;
-			this.combinedMVP = combinedMVP;
 			this.tickDelta = tickDelta;
 			this.camera = camera;
 			
@@ -1572,11 +1570,13 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 		
 		@Override
 		public long limitTime() {
+			// Not used by Distant Horizons - stub implementation
 			return 0;
 		}
 		
 		@Override
 		public boolean blockOutlines() {
+			// Not used by Distant Horizons - stub implementation
 			return true;
 		}
 		
