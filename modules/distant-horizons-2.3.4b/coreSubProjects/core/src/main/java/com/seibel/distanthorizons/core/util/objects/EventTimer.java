@@ -3,6 +3,9 @@
  */
 package com.seibel.distanthorizons.core.util.objects;
 
+import java.util.ArrayList;
+import java.util.List;
+
 /**
  * Compatibility class for old wrapper code that expects EventTimer.
  * Provides basic timing functionality.
@@ -12,6 +15,7 @@ public class EventTimer
     private long startTime;
     private long endTime;
     private final String name;
+    public final List<Event> events = new ArrayList<>();
     
     public EventTimer(String name)
     {
@@ -37,14 +41,23 @@ public class EventTimer
     public void nextEvent(String eventName)
     {
         // Mark the end of current event and start of next
-        this.endTime = System.nanoTime();
-        // Could log the transition but for compatibility just update time
-        this.startTime = System.nanoTime();
+        long now = System.nanoTime();
+        events.add(new Event(eventName, now - startTime));
+        this.startTime = now;
     }
     
     public long getElapsedNanos()
     {
         return endTime - startTime;
+    }
+    
+    public long getTotalTimeNs()
+    {
+        long total = 0;
+        for (Event e : events) {
+            total += e.timeNs;
+        }
+        return total;
     }
     
     public long getElapsedMillis()
@@ -61,5 +74,17 @@ public class EventTimer
     public String toString()
     {
         return name + ": " + getElapsedMillis() + "ms";
+    }
+    
+    public static class Event
+    {
+        public final String name;
+        public final long timeNs;
+        
+        public Event(String name, long timeNs)
+        {
+            this.name = name;
+            this.timeNs = timeNs;
+        }
     }
 }

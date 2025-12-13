@@ -132,6 +132,9 @@ public class ServerLevelWrapper implements IServerLevelWrapper
 	public String getDimensionName() { return this.level.dimension().location().toString(); }
 	
 	@Override
+	public String getKeyedLevelDimensionName() { return this.getDimensionName(); }
+	
+	@Override
 	public long getHashedSeed() { return this.level.getBiomeManager().biomeZoomSeed; }
 	
 	@Override
