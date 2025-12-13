@@ -7,7 +7,7 @@ import net.minecraft.Util;
 
 @Environment(EnvType.CLIENT)
 public class LinearLayout implements Layout {
-	private final GridLayout wrapped;
+	public final GridLayout wrapped;
 	private final LinearLayout.Orientation orientation;
 	private int nextChildIndex = 0;
 

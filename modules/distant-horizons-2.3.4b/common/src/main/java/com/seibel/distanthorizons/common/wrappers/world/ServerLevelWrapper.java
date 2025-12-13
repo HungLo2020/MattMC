@@ -211,9 +211,13 @@ public class ServerLevelWrapper implements IServerLevelWrapper
 	
 	
 	@Override
-	public void setParentLevel(IDhLevel parentLevel) { this.parentDhLevel = parentLevel; }
+	public void setDhLevel(IDhLevel parentLevel) { this.parentDhLevel = parentLevel; }
+	// Compatibility alias
+	public void setParentLevel(IDhLevel parentLevel) { this.setDhLevel(parentLevel); }
 	
 	@Override
+	public IDhLevel getDhLevel() { return this.parentDhLevel; }
+	
 	public IDhApiCustomRenderRegister getRenderRegister()
 	{
 		if (this.parentDhLevel == null)
@@ -224,7 +228,6 @@ public class ServerLevelWrapper implements IServerLevelWrapper
 		return this.parentDhLevel.getGenericRenderer();
 	}
 	
-	@Override
 	public File getDhSaveFolder()
 	{
 		if (this.parentDhLevel == null)
