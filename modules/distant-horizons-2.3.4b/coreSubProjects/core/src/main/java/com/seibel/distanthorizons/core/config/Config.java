@@ -1412,6 +1412,12 @@ public class Config
 		{
 			public static ConfigUIComment lodBuildingHeader = new ConfigUIComment.Builder().setParentConfigClass(LodBuilding.class).build();
 			
+			// Compatibility entry for wrapper code
+			public static ConfigEntry<Boolean> pullLightingForPregeneratedChunks = new ConfigEntry.Builder<Boolean>()
+					.set(true)
+					.comment("Pull lighting for pregenerated chunks")
+					.build();
+			
 			public static ConfigEntry<Boolean> disableUnchangedChunkCheck = new ConfigEntry.Builder<Boolean>()
 					.set(false)
 					// enabling this can be quite detrimental to performance,
