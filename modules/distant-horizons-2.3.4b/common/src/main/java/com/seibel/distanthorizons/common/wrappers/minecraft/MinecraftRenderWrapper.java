@@ -266,7 +266,6 @@ public class MinecraftRenderWrapper implements IMinecraftRenderWrapper
 		#endif
 	}
 	
-	@Override
 	public int getScreenWidth()
 	{
 		// alternate ways of getting the window's resolution,
@@ -290,7 +289,6 @@ public class MinecraftRenderWrapper implements IMinecraftRenderWrapper
 		}
 		return width;
 	}
-	@Override
 	public int getScreenHeight()
 	{
 		int height = MC.getWindow().getHeight();
@@ -323,7 +321,6 @@ public class MinecraftRenderWrapper implements IMinecraftRenderWrapper
 		#endif
 	}
 	
-	@Override
 	public int getTargetFrameBuffer()
 	{
 		// used so we can access the framebuffer shaders end up rendering to
@@ -403,13 +400,11 @@ public class MinecraftRenderWrapper implements IMinecraftRenderWrapper
 		#endif
 	}
 	
-	@Override
 	public int getTargetFrameBufferViewportWidth()
 	{
 		return this.getRenderTarget().viewWidth;
 	}
 	
-	@Override
 	public int getTargetFrameBufferViewportHeight()
 	{
 		return this.getRenderTarget().viewHeight;
@@ -469,6 +464,29 @@ public class MinecraftRenderWrapper implements IMinecraftRenderWrapper
 			case DOWN: return 0.5f;
 			default: return 0.7f;
 		}
+	}
+	
+	@Override
+	public int getTargetFramebufferViewportWidth()
+	{
+		return MC.getWindow().getWidth();
+	}
+	
+	@Override
+	public int getTargetFramebufferViewportHeight()
+	{
+		return MC.getWindow().getHeight();
+	}
+	
+	@Override
+	public int getTargetFramebuffer()
+	{
+		// used so we can access the framebuffer shaders end up rendering to
+		if (AbstractOptifineAccessor.optifinePresent())
+		{
+			return this.finalLevelFrameBufferId;
+		}
+		return 0; // 0 is the ID for the default frame buffer
 	}
 	
 }
