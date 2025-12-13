@@ -1423,6 +1423,11 @@ public class Config
 					.comment("Assume pre-existing chunks are finished")
 					.build();
 			
+			public static ConfigEntry<Boolean> recalculateChunkHeightmaps = new ConfigEntry.Builder<Boolean>()
+					.set(false)
+					.comment("Recalculate chunk heightmaps")
+					.build();
+			
 			public static ConfigEntry<Boolean> disableUnchangedChunkCheck = new ConfigEntry.Builder<Boolean>()
 					.set(false)
 					// enabling this can be quite detrimental to performance,
