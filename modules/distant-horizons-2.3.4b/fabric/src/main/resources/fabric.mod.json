@@ -19,8 +19,6 @@
     "license": "LGPL-3",
     "icon": "assets/distanthorizons/icon.png",
     
-    "accessWidener": "distanthorizons.accesswidener",
-    
     "environment": "*",
     "entrypoints": {
         "client": [
@@ -40,9 +38,6 @@
     
     "depends": {
         "fabricloader": "*",
-        "fabric-api-base": "*",
-        "fabric-lifecycle-events-v1": "*",
-        "fabric-resource-loader-v0": "*",
         "minecraft": $compatible_minecraft_versions,
         "java": ">=${java_version}"
     },
