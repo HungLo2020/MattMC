@@ -18,37 +18,67 @@ package net.caffeinemc.mods.sodium.mixin.features.render.frapi;
 
 import java.util.function.Consumer;
 
-import com.llamalad7.mixinextras.sugar.Local;
-import com.llamalad7.mixinextras.sugar.Share;
-import com.llamalad7.mixinextras.sugar.ref.LocalRef;
+import com.mojang.blaze3d.vertex.PoseStack;
 import net.caffeinemc.mods.sodium.client.render.frapi.mesh.MutableMeshImpl;
 import net.caffeinemc.mods.sodium.client.render.frapi.render.AccessLayerRenderState;
 import net.caffeinemc.mods.sodium.client.render.frapi.render.QuadToPosPipe;
 import net.minecraft.client.renderer.item.ItemStackRenderState;
+import net.minecraft.world.item.ItemDisplayContext;
 import org.joml.Matrix4f;
 import org.joml.Vector3f;
 import org.joml.Vector3fc;
 import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 @Mixin(ItemStackRenderState.class)
 abstract class ItemRenderStateMixin {
-    @Inject(method = "visitExtents(Ljava/util/function/Consumer;)V", at = @At(value = "INVOKE", target = "Lcom/mojang/blaze3d/vertex/PoseStack$Pose;setIdentity()V", shift = At.Shift.BEFORE))
-    private void afterLayerLoad(Consumer<Vector3fc> posConsumer, CallbackInfo ci, @Local(ordinal = 0) Vector3f vec, @Local ItemStackRenderState.LayerRenderState layer, @Local Matrix4f matrix, @Share("pipe") LocalRef<QuadToPosPipe> pipeRef) {
-        MutableMeshImpl mutableMesh = ((AccessLayerRenderState) layer).fabric_getMutableMesh();
+    @Shadow
+    ItemDisplayContext displayContext;
 
-        if (mutableMesh.size() > 0) {
-            QuadToPosPipe pipe = pipeRef.get();
+    @Shadow
+    private int activeLayerCount;
 
-            if (pipe == null) {
-                pipe = new QuadToPosPipe(posConsumer, vec);
-                pipeRef.set(pipe);
+    @Shadow
+    private ItemStackRenderState.LayerRenderState[] layers;
+
+    /**
+     * Injects custom FRAPI mesh rendering into visitExtents.
+     * Rewritten to avoid @Local captures that fail on MC 1.21.10.
+     */
+    @Inject(method = "visitExtents(Ljava/util/function/Consumer;)V", at = @At("HEAD"), cancellable = true)
+    private void sodium$visitExtentsWithFRAPI(Consumer<Vector3fc> posConsumer, CallbackInfo ci) {
+        // Replicate the original visitExtents logic with FRAPI mesh support
+        Vector3f vec = new Vector3f();
+        PoseStack.Pose pose = new PoseStack.Pose();
+        QuadToPosPipe pipe = null;
+
+        for (int i = 0; i < this.activeLayerCount; i++) {
+            ItemStackRenderState.LayerRenderState layer = this.layers[i];
+            layer.transform.apply(this.displayContext.leftHand(), pose);
+            Matrix4f matrix = pose.pose();
+            Vector3f[] extents = (Vector3f[]) layer.extents.get();
+
+            // Process original extents
+            for (Vector3f extent : extents) {
+                posConsumer.accept(vec.set(extent).mulPosition(matrix));
             }
-            pipe.matrix = matrix;
-            // Use the mutable version here as it does not use a ThreadLocal or cursor stack
-            mutableMesh.forEachMutable(pipe);
+
+            // Process FRAPI mesh extents
+            MutableMeshImpl mutableMesh = ((AccessLayerRenderState) layer).fabric_getMutableMesh();
+            if (mutableMesh.size() > 0) {
+                if (pipe == null) {
+                    pipe = new QuadToPosPipe(posConsumer, vec);
+                }
+                pipe.matrix = matrix;
+                mutableMesh.forEachMutable(pipe);
+            }
+
+            pose.setIdentity();
         }
+
+        ci.cancel();
     }
 }
