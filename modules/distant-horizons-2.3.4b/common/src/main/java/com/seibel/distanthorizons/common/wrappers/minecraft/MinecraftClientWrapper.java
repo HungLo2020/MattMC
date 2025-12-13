@@ -375,4 +375,16 @@ public class MinecraftClientWrapper implements IMinecraftClientWrapper, IMinecra
 		}
 	}
 	
+	@Override
+	public void disableVanillaClouds()
+	{
+		// Stub - clouds are handled elsewhere in this modpack
+	}
+	
+	@Override
+	public void disableVanillaChunkFadeIn()
+	{
+		// Stub - chunk fade-in is handled elsewhere in this modpack
+	}
+	
 }
