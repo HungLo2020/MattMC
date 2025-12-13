@@ -41,6 +41,7 @@ import com.seibel.distanthorizons.fabric.wrappers.modAccessor.SodiumAccessor;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientChunkEvents;
+import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientWorldEvents;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.fabricmc.fabric.api.client.rendering.v1.WorldRenderEvents;
@@ -122,6 +123,27 @@ public class FabricClientProxy implements AbstractModInitializer.IEventProxy
 		//=============//
 		
 		ClientTickEvents.START_CLIENT_TICK.register((client) -> { ClientApi.INSTANCE.clientTickEvent(); });
+		
+		
+		
+		//==============//
+		// world events //
+		//==============//
+		
+		// ClientWorldLoadEvent - for client-side level registration
+		ClientWorldEvents.WORLD_LOAD.register((client, world) ->
+		{
+			ClientApi.INSTANCE.clientLevelLoadEvent(ClientLevelWrapper.getWrapper(world, true));
+		});
+		
+		// ClientWorldUnloadEvent
+		ClientWorldEvents.WORLD_UNLOAD.register((client, world) ->
+		{
+			if (world != null)
+			{
+				ClientApi.INSTANCE.clientLevelUnloadEvent(ClientLevelWrapper.getWrapper(world));
+			}
+		});
 		
 		
 		
