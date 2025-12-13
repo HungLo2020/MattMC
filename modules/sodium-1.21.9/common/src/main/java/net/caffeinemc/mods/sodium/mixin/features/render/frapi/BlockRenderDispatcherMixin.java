@@ -10,6 +10,7 @@ import net.fabricmc.fabric.api.renderer.v1.render.FabricBlockModelRenderer;
 import net.fabricmc.fabric.api.renderer.v1.render.RenderLayerHelper;
 import net.minecraft.client.color.block.BlockColors;
 import net.minecraft.client.renderer.MultiBufferSource;
+import net.minecraft.client.renderer.block.BlockModelShaper;
 import net.minecraft.client.renderer.block.BlockRenderDispatcher;
 import net.minecraft.client.renderer.block.ModelBlockRenderer;
 import net.minecraft.client.renderer.block.model.BlockStateModel;
@@ -35,10 +36,17 @@ public class BlockRenderDispatcherMixin {
     @Final
     private ModelBlockRenderer modelRenderer;
 
-    @Inject(method = "renderBreakingTexture", at = @At(value = "INVOKE_ASSIGN", target = "Lnet/minecraft/client/renderer/block/BlockModelShaper;getBlockModel(Lnet/minecraft/world/level/block/state/BlockState;)Lnet/minecraft/client/renderer/block/model/BlockStateModel;", shift = At.Shift.AFTER), cancellable = true)
-    private void afterGetModel(BlockState blockState, BlockPos blockPos, BlockAndTintGetter world, PoseStack matrixStack, VertexConsumer vertexConsumer, CallbackInfo ci, @Local BlockStateModel model) {
-        ((FabricBlockModelRenderer) modelRenderer).render(world, model, blockState, blockPos, matrixStack, layer -> vertexConsumer, true, blockState.getSeed(blockPos), OverlayTexture.NO_OVERLAY);
-        ci.cancel();
+    @Shadow
+    @Final
+    private BlockModelShaper blockModelShaper;
+
+    @Inject(method = "renderBreakingTexture", at = @At("HEAD"), cancellable = true)
+    private void afterGetModel(BlockState blockState, BlockPos blockPos, BlockAndTintGetter world, PoseStack matrixStack, VertexConsumer vertexConsumer, CallbackInfo ci) {
+        if (blockState.getRenderShape() == net.minecraft.world.level.block.RenderShape.MODEL) {
+            BlockStateModel model = this.blockModelShaper.getBlockModel(blockState);
+            ((FabricBlockModelRenderer) modelRenderer).render(world, model, blockState, blockPos, matrixStack, layer -> vertexConsumer, true, blockState.getSeed(blockPos), OverlayTexture.NO_OVERLAY);
+            ci.cancel();
+        }
     }
 
     @Group(name = "sodium$proxy", min = 1, max = 1)

@@ -1,6 +1,8 @@
 package net.irisshaders.iris.mixin.entity_render_context;
 
-import com.llamalad7.mixinextras.sugar.Local;
+import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
+import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
+import com.mojang.blaze3d.vertex.VertexConsumer;
 import net.irisshaders.iris.mixinterface.ModelStorage;
 import net.irisshaders.iris.uniforms.CapturedRenderingState;
 import net.minecraft.client.renderer.MultiBufferSource;
@@ -18,15 +20,25 @@ import java.util.List;
 import java.util.Map;
 
 @Mixin(ModelFeatureRenderer.class)
-public class MixinModelFeatureRenderer {
-	@Inject(method = "renderTranslucents", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/renderer/SubmitNodeStorage$TranslucentModelSubmit;modelSubmit()Lnet/minecraft/client/renderer/SubmitNodeStorage$ModelSubmit;"))
-	private void iris$set(MultiBufferSource.BufferSource bufferSource, OutlineBufferSource outlineBufferSource, List<SubmitNodeStorage.TranslucentModelSubmit<?>> list, MultiBufferSource.BufferSource bufferSource2, CallbackInfo ci, @Local SubmitNodeStorage.TranslucentModelSubmit<?> modelSubmit) {
-		((ModelStorage) (Object) modelSubmit.modelSubmit()).iris$set();
+public abstract class MixinModelFeatureRenderer {
+	/**
+	 * Wrap renderModel calls in renderTranslucents to capture the modelSubmit.
+	 * This avoids @Local capture issues on MC 1.21.10.
+	 */
+	@WrapOperation(method = "renderTranslucents", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/renderer/feature/ModelFeatureRenderer;renderModel(Lnet/minecraft/client/renderer/SubmitNodeStorage$ModelSubmit;Lnet/minecraft/client/renderer/RenderType;Lcom/mojang/blaze3d/vertex/VertexConsumer;Lnet/minecraft/client/renderer/OutlineBufferSource;Lnet/minecraft/client/renderer/MultiBufferSource$BufferSource;)V"))
+	private void iris$wrapRenderModelTranslucents(ModelFeatureRenderer instance, SubmitNodeStorage.ModelSubmit<?> modelSubmit, RenderType renderType, VertexConsumer vertexConsumer, OutlineBufferSource outlineBufferSource, MultiBufferSource.BufferSource bufferSource, Operation<Void> original) {
+		((ModelStorage) (Object) modelSubmit).iris$set();
+		original.call(instance, modelSubmit, renderType, vertexConsumer, outlineBufferSource, bufferSource);
 	}
 
-	@Inject(method = "renderBatch", at = @At(value = "INVOKE", target = "Ljava/util/Map$Entry;getKey()Ljava/lang/Object;", ordinal = 1))
-	private void iris$set2(MultiBufferSource.BufferSource bufferSource, OutlineBufferSource outlineBufferSource, Map<RenderType, List<SubmitNodeStorage.ModelSubmit<?>>> map, MultiBufferSource.BufferSource bufferSource2, CallbackInfo ci, @Local SubmitNodeStorage.ModelSubmit<?> modelSubmit) {
+	/**
+	 * Wrap renderModel calls in renderBatch to capture the modelSubmit.
+	 * This avoids @Local capture issues on MC 1.21.10.
+	 */
+	@WrapOperation(method = "renderBatch", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/renderer/feature/ModelFeatureRenderer;renderModel(Lnet/minecraft/client/renderer/SubmitNodeStorage$ModelSubmit;Lnet/minecraft/client/renderer/RenderType;Lcom/mojang/blaze3d/vertex/VertexConsumer;Lnet/minecraft/client/renderer/OutlineBufferSource;Lnet/minecraft/client/renderer/MultiBufferSource$BufferSource;)V"))
+	private void iris$wrapRenderModelBatch(ModelFeatureRenderer instance, SubmitNodeStorage.ModelSubmit<?> modelSubmit, RenderType renderType, VertexConsumer vertexConsumer, OutlineBufferSource outlineBufferSource, MultiBufferSource.BufferSource bufferSource, Operation<Void> original) {
 		((ModelStorage) (Object) modelSubmit).iris$set();
+		original.call(instance, modelSubmit, renderType, vertexConsumer, outlineBufferSource, bufferSource);
 	}
 
 	@Inject(method = "render", at = @At("RETURN"))

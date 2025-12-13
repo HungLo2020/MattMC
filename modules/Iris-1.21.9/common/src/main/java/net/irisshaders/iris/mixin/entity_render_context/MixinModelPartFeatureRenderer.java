@@ -1,6 +1,5 @@
 package net.irisshaders.iris.mixin.entity_render_context;
 
-import com.llamalad7.mixinextras.sugar.Local;
 import net.irisshaders.iris.mixinterface.ModelStorage;
 import net.irisshaders.iris.uniforms.CapturedRenderingState;
 import net.minecraft.client.renderer.MultiBufferSource;
@@ -11,13 +10,19 @@ import net.minecraft.client.renderer.feature.ModelPartFeatureRenderer;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
+import org.spongepowered.asm.mixin.injection.ModifyVariable;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 @Mixin(ModelPartFeatureRenderer.class)
 public class MixinModelPartFeatureRenderer {
-	@Inject(method = "render", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/model/geom/ModelPart;render(Lcom/mojang/blaze3d/vertex/PoseStack;Lcom/mojang/blaze3d/vertex/VertexConsumer;III)V"))
-	private void iris$set(SubmitNodeCollection submitNodeCollection, MultiBufferSource.BufferSource bufferSource, OutlineBufferSource outlineBufferSource, MultiBufferSource.BufferSource bufferSource2, CallbackInfo ci, @Local SubmitNodeStorage.ModelPartSubmit modelSubmit) {
-		((ModelStorage) (Object) modelSubmit).iris$set();
+	/**
+	 * Capture and process each modelPartSubmit as the loop iterates.
+	 * ModifyVariable captures the variable when it's assigned (at the start of each loop iteration).
+	 */
+	@ModifyVariable(method = "render", at = @At(value = "STORE"), ordinal = 0)
+	private SubmitNodeStorage.ModelPartSubmit iris$captureModelPartSubmit(SubmitNodeStorage.ModelPartSubmit modelPartSubmit) {
+		((ModelStorage) (Object) modelPartSubmit).iris$set();
+		return modelPartSubmit;
 	}
 
 	@Inject(method = "render", at = @At("RETURN"))

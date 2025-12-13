@@ -2,7 +2,6 @@ package net.irisshaders.iris.mixin.fantastic;
 
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
-import com.llamalad7.mixinextras.sugar.Local;
 import com.mojang.blaze3d.buffers.GpuBufferSlice;
 import com.mojang.blaze3d.framegraph.FrameGraphBuilder;
 import com.mojang.blaze3d.framegraph.FramePass;
@@ -32,6 +31,7 @@ import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
+import org.spongepowered.asm.mixin.injection.ModifyVariable;
 import org.spongepowered.asm.mixin.injection.Redirect;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
@@ -57,13 +57,26 @@ public class MixinLevelRenderer {
 	@Final
 	private LevelRenderState levelRenderState;
 
+	@Unique
+	private FramePass iris$currentFramePass;
+
+	/**
+	 * Capture the FramePass when it's stored to use later.
+	 * This avoids @Local capture issues on MC 1.21.10.
+	 */
+	@ModifyVariable(method = "addMainPass", at = @At(value = "STORE"), ordinal = 0)
+	private FramePass iris$captureFramePass(FramePass framePass) {
+		this.iris$currentFramePass = framePass;
+		return framePass;
+	}
+
 	@Inject(method = "addMainPass", at = @At(value = "FIELD", target = "Lnet/minecraft/client/renderer/state/LevelRenderState;haveGlowingEntities:Z"))
-	private void iris$addParticleTarget(FrameGraphBuilder frameGraphBuilder, Frustum frustum, Matrix4f matrix4f, GpuBufferSlice gpuBufferSlice, boolean bl, LevelRenderState levelRenderState, DeltaTracker deltaTracker, ProfilerFiller profilerFiller, CallbackInfo ci, @Local FramePass framePass) {
+	private void iris$addParticleTarget(FrameGraphBuilder frameGraphBuilder, Frustum frustum, Matrix4f matrix4f, GpuBufferSlice gpuBufferSlice, boolean bl, LevelRenderState levelRenderState, DeltaTracker deltaTracker, ProfilerFiller profilerFiller, CallbackInfo ci) {
 		ParticleRenderingSettings settings = getRenderingSettings();
 
 		if (settings == ParticleRenderingSettings.BEFORE) {
-			if (this.targets.particles != null) {
-				this.targets.particles = framePass.readsAndWrites(this.targets.particles);
+			if (this.targets.particles != null && this.iris$currentFramePass != null) {
+				this.targets.particles = this.iris$currentFramePass.readsAndWrites(this.targets.particles);
 			}
 		}
 	}

@@ -1,20 +1,18 @@
 package net.irisshaders.iris.mixin.entity_render_context;
 
-import com.llamalad7.mixinextras.sugar.Local;
 import net.irisshaders.iris.layer.GbufferPrograms;
 import net.irisshaders.iris.mixinterface.ModelStorage;
 import net.irisshaders.iris.uniforms.CapturedRenderingState;
 import net.irisshaders.iris.vertices.ImmediateState;
 import net.minecraft.client.renderer.MultiBufferSource;
-import net.minecraft.client.renderer.OutlineBufferSource;
 import net.minecraft.client.renderer.SubmitNodeCollection;
 import net.minecraft.client.renderer.SubmitNodeStorage;
-import net.minecraft.client.renderer.feature.ModelPartFeatureRenderer;
 import net.minecraft.client.renderer.feature.TextFeatureRenderer;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
+import org.spongepowered.asm.mixin.injection.ModifyVariable;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 @Mixin(TextFeatureRenderer.class)
@@ -22,8 +20,12 @@ public class MixinTextFeatureRenderer {
 	@Unique
 	private boolean hasBE = false;
 
-	@Inject(method = "render", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/renderer/SubmitNodeStorage$TextSubmit;outlineColor()I", ordinal = 0))
-	private void iris$set(SubmitNodeCollection submitNodeCollection, MultiBufferSource.BufferSource bufferSource, CallbackInfo ci, @Local SubmitNodeStorage.TextSubmit modelSubmit) {
+	/**
+	 * Capture and process each textSubmit as the loop iterates.
+	 * ModifyVariable captures the variable when it's assigned (at the start of each loop iteration).
+	 */
+	@ModifyVariable(method = "render", at = @At(value = "STORE"), ordinal = 0)
+	private SubmitNodeStorage.TextSubmit iris$captureTextSubmit(SubmitNodeStorage.TextSubmit modelSubmit) {
 		((ModelStorage) (Object) modelSubmit).iris$set();
 		if (((ModelStorage) (Object) modelSubmit).iris$wasBE()) {
 			hasBE = true;
@@ -32,6 +34,7 @@ public class MixinTextFeatureRenderer {
 			hasBE = false;
 			ImmediateState.isRenderingBEs = false;
 		}
+		return modelSubmit;
 	}
 
 	@Inject(method = "render", at = @At("RETURN"))

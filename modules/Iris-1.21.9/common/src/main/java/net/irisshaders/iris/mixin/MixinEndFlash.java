@@ -1,6 +1,5 @@
 package net.irisshaders.iris.mixin;
 
-import com.llamalad7.mixinextras.sugar.Local;
 import net.irisshaders.iris.Iris;
 import net.minecraft.client.renderer.EndFlashState;
 import net.minecraft.util.Mth;
@@ -24,14 +23,11 @@ public class MixinEndFlash {
 
 	private static final float ABOVE_HORIZON_EPS = 1.0F; // degrees above horizon
 
-	// Working on it...
+	// Working on it... - This method is currently disabled
+	// The @Local annotations have been removed to prevent crashes on MC 1.21.10
+	// If this needs to be re-enabled, use @ModifyVariable or @Inject at HEAD with field access
 	//@Inject(method = "calculateFlashParameters", at = @At(value = "INVOKE", target = "Lnet/minecraft/util/Mth;randomBetween(Lnet/minecraft/util/RandomSource;FF)F", ordinal = 0), cancellable = true)
-	private void iris$calculateNewAngles(long l, CallbackInfo ci, @Local(ordinal = 1) long m, @Local RandomSource randomSource) {
-		if (Iris.getCurrentPack().isPresent()) {
-			ci.cancel();
-			this.xAngle = -Mth.randomBetween(randomSource, ABOVE_HORIZON_EPS, 60.0F); // [-60, -1]
-			this.yAngle = Mth.randomBetween(randomSource, -180.0F, 180.0F);
-			this.flashSeed = m;
-		}
-	}
+	//private void iris$calculateNewAngles(long l, CallbackInfo ci) {
+	//	// Implementation would need to recreate the RandomSource from the flash seed
+	//}
 }

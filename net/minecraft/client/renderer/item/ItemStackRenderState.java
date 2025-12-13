@@ -25,13 +25,13 @@ import org.joml.Vector3fc;
 
 @Environment(EnvType.CLIENT)
 public class ItemStackRenderState {
-	ItemDisplayContext displayContext = ItemDisplayContext.NONE;
-	private int activeLayerCount;
+	public ItemDisplayContext displayContext = ItemDisplayContext.NONE;
+	public int activeLayerCount;
 	private boolean animated;
 	private boolean oversizedInGui;
 	@Nullable
 	private AABB cachedModelBoundingBox;
-	private ItemStackRenderState.LayerRenderState[] layers = new ItemStackRenderState.LayerRenderState[]{new ItemStackRenderState.LayerRenderState()};
+	public ItemStackRenderState.LayerRenderState[] layers = new ItemStackRenderState.LayerRenderState[]{new ItemStackRenderState.LayerRenderState()};
 
 	public void ensureCapacity(int i) {
 		int j = this.layers.length;
@@ -150,7 +150,7 @@ public class ItemStackRenderState {
 		boolean usesBlockLight;
 		@Nullable
 		TextureAtlasSprite particleIcon;
-		ItemTransform transform = ItemTransform.NO_TRANSFORM;
+		public ItemTransform transform = ItemTransform.NO_TRANSFORM;
 		@Nullable
 		private RenderType renderType;
 		private ItemStackRenderState.FoilType foilType = ItemStackRenderState.FoilType.NONE;
@@ -159,7 +159,7 @@ public class ItemStackRenderState {
 		private SpecialModelRenderer<Object> specialRenderer;
 		@Nullable
 		private Object argumentForSpecialRendering;
-		Supplier<Vector3f[]> extents = NO_EXTENTS_SUPPLIER;
+		public Supplier<Vector3f[]> extents = NO_EXTENTS_SUPPLIER;
 
 		public void clear() {
 			this.quads.clear();

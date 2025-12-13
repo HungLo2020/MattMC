@@ -2,7 +2,6 @@ package net.irisshaders.iris.mixin;
 
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
-import com.llamalad7.mixinextras.sugar.Local;
 import com.mojang.blaze3d.buffers.GpuBufferSlice;
 import com.mojang.blaze3d.framegraph.FrameGraphBuilder;
 import com.mojang.blaze3d.framegraph.FramePass;
@@ -95,6 +94,12 @@ public class MixinLevelRenderer {
 	@Unique
 	private boolean disableFrustumCulling;
 
+	@Unique
+	private FrameGraphBuilder iris$frameGraphBuilder;
+
+	@Unique
+	private FramePass iris$clearPass;
+
 	@Inject(method = "prepareCullFrustum", at = @At("HEAD"), cancellable = true)
 	private void iris$disableFrustum(Matrix4f matrix4f, Matrix4f matrix4f2, Vec3 vec3, CallbackInfoReturnable<Frustum> cir) {
 		if (this.disableFrustumCulling) {
@@ -136,16 +141,47 @@ public class MixinLevelRenderer {
 	// At this point we've ensured that Minecraft's main framebuffer is cleared.
 	// This is important or else very odd issues will happen with shaders that have a final pass that doesn't write to
 	// all pixels.
+
+	/**
+	 * Capture the FrameGraphBuilder when it's stored.
+	 * This avoids @Local capture issues on MC 1.21.10.
+	 */
+	@ModifyVariable(method = "renderLevel", at = @At(value = "STORE"), ordinal = 0)
+	private FrameGraphBuilder iris$captureFrameGraphBuilder(FrameGraphBuilder frameGraphBuilder) {
+		this.iris$frameGraphBuilder = frameGraphBuilder;
+		return frameGraphBuilder;
+	}
+
+	/**
+	 * Capture the first FramePass (clearPass) when it's stored.
+	 * This avoids @Local capture issues on MC 1.21.10.
+	 */
+	@ModifyVariable(method = "renderLevel", at = @At(value = "STORE"), ordinal = 0)
+	private FramePass iris$captureClearPass(FramePass framePass) {
+		if (this.iris$clearPass == null) {
+			this.iris$clearPass = framePass;
+		}
+		return framePass;
+	}
+
 	@Inject(method = "renderLevel", at = @At(value = "INVOKE", target = "Lcom/mojang/blaze3d/framegraph/FramePass;executes(Ljava/lang/Runnable;)V", ordinal = 0, shift = At.Shift.AFTER))
-	private void iris$beginLevelRender(GraphicsResourceAllocator graphicsResourceAllocator, DeltaTracker deltaTracker, boolean bl, Camera camera, Matrix4f matrix4f, Matrix4f matrix4f2, Matrix4f matrix4f3, GpuBufferSlice gpuBufferSlice, Vector4f vector4f, boolean bl2, CallbackInfo ci, @Local FrameGraphBuilder frameGraphBuilder, @Local(ordinal = 0) FramePass clearPass) {
-		FramePass framePass = frameGraphBuilder.addPass("iris_setup");
+	private void iris$beginLevelRender(GraphicsResourceAllocator graphicsResourceAllocator, DeltaTracker deltaTracker, boolean bl, Camera camera, Matrix4f matrix4f, Matrix4f matrix4f2, Matrix4f matrix4f3, GpuBufferSlice gpuBufferSlice, Vector4f vector4f, boolean bl2, CallbackInfo ci) {
+		if (this.iris$frameGraphBuilder == null || this.iris$clearPass == null) return;
+
+		FramePass framePass = this.iris$frameGraphBuilder.addPass("iris_setup");
 		this.targets.main = framePass.readsAndWrites(this.targets.main);
-		framePass.requires(clearPass);
+		framePass.requires(this.iris$clearPass);
 		framePass.executes(() -> {
 			GpuBufferSlice params = RenderSystem.getShaderFog();
 			pipeline.onBeginClear();
 			RenderSystem.setShaderFog(params);
 		});
+	}
+
+	@Inject(method = "renderLevel", at = @At("RETURN"))
+	private void iris$clearCapturedLocals(GraphicsResourceAllocator graphicsResourceAllocator, DeltaTracker deltaTracker, boolean bl, Camera camera, Matrix4f matrix4f, Matrix4f matrix4f2, Matrix4f matrix4f3, GpuBufferSlice gpuBufferSlice, Vector4f vector4f, boolean bl2, CallbackInfo ci) {
+		this.iris$frameGraphBuilder = null;
+		this.iris$clearPass = null;
 	}
 
 

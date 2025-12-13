@@ -58,7 +58,10 @@ public class StandardMacros {
 		define(standardDefines, "IRIS_TAG_SUPPORT", "2");
 
 
-		if (IrisPlatformHelpers.getInstance().isModLoaded("distanthorizons") && DHCompat.hasRenderingEnabled()) {
+		// Always define DISTANT_HORIZONS if the mod is loaded, regardless of whether rendering
+		// is currently enabled. This ensures shader packs compile correctly. The hasRenderingEnabled()
+		// check can return false during initial shader pack loading before DH configs are initialized.
+		if (IrisPlatformHelpers.getInstance().isModLoaded("distanthorizons")) {
 			define(standardDefines, "DISTANT_HORIZONS");
 		}
 

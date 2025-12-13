@@ -1,6 +1,5 @@
 package net.irisshaders.iris.compat.sodium.mixin;
 
-import com.llamalad7.mixinextras.sugar.Local;
 import com.mojang.blaze3d.opengl.GlDevice;
 import com.mojang.blaze3d.opengl.GlStateManager;
 import com.mojang.blaze3d.opengl.GlTexture;
@@ -19,8 +18,10 @@ import net.irisshaders.iris.pipeline.WorldRenderingPipeline;
 import net.irisshaders.iris.shadows.ShadowRenderingState;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
+import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
+import org.spongepowered.asm.mixin.injection.ModifyVariable;
 import org.spongepowered.asm.mixin.injection.Redirect;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
@@ -28,6 +29,9 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 public abstract class MixinShaderChunkRenderer {
 	@Shadow
 	protected abstract GlProgram<ChunkShaderInterface> compileProgram(ChunkShaderOptions options);
+
+	@Unique
+	private RenderTarget iris$capturedRenderTarget;
 
 	@Inject(method = "begin", at = @At("HEAD"))
 	private void iris$resetState(TerrainRenderPass pass, FogParameters parameters, CallbackInfo ci) {
@@ -37,8 +41,18 @@ public abstract class MixinShaderChunkRenderer {
 	@Redirect(method = "begin", at = @At(value = "INVOKE", target = "Lcom/mojang/blaze3d/opengl/GlStateManager;_glBindFramebuffer(II)V"))
 	private void bindFramebufferLater(int p_412624_, int p_412635_) {}
 
+	/**
+	 * Capture the RenderTarget when it's stored to use in the redirect.
+	 * This avoids @Local capture issues on MC 1.21.10.
+	 */
+	@ModifyVariable(method = "begin", at = @At(value = "STORE"), ordinal = 0)
+	private RenderTarget iris$captureRenderTarget(RenderTarget target) {
+		this.iris$capturedRenderTarget = target;
+		return target;
+	}
+
 	@Redirect(method = "begin", at = @At(value = "INVOKE", target = "Lnet/caffeinemc/mods/sodium/client/render/chunk/ShaderChunkRenderer;compileProgram(Lnet/caffeinemc/mods/sodium/client/render/chunk/shader/ChunkShaderOptions;)Lnet/caffeinemc/mods/sodium/client/gl/shader/GlProgram;"))
-	private GlProgram<ChunkShaderInterface> redirectIrisProgram(ShaderChunkRenderer instance, ChunkShaderOptions options, TerrainRenderPass pass, @Local RenderTarget target) {
+	private GlProgram<ChunkShaderInterface> redirectIrisProgram(ShaderChunkRenderer instance, ChunkShaderOptions options, TerrainRenderPass pass) {
 		WorldRenderingPipeline pipeline = Iris.getPipelineManager().getPipelineNullable();
 
 		GlProgram<ChunkShaderInterface> program = null;
@@ -49,7 +63,10 @@ public abstract class MixinShaderChunkRenderer {
 		}
 
 		if (program == null) {
-			GlStateManager._glBindFramebuffer(36160, ((GlTexture)target.getColorTexture()).getFbo(((GlDevice) RenderSystem.getDevice()).directStateAccess(), target.getDepthTexture()));
+			RenderTarget target = this.iris$capturedRenderTarget;
+			if (target != null) {
+				GlStateManager._glBindFramebuffer(36160, ((GlTexture)target.getColorTexture()).getFbo(((GlDevice) RenderSystem.getDevice()).directStateAccess(), target.getDepthTexture()));
+			}
 			return this.compileProgram(options);
 		}
 
