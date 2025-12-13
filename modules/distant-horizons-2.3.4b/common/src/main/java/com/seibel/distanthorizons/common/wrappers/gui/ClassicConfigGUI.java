@@ -652,19 +652,19 @@ public class ClassicConfigGUI
 			return new ButtonEntry(button, text, resetButton, indexButton);
 		}
 		
+		#if MC_VER < MC_1_20_1
 		@Override
-        #if MC_VER < MC_1_20_1
 		public void render(PoseStack matrices, int index, int y, int x, int entryWidth, int entryHeight, int mouseX, int mouseY, boolean hovered, float tickDelta)
-        #elif MC_VER < MC_1_21_8
-		public void render(GuiGraphics matrices, int index, int y, int x, int entryWidth, int entryHeight, int mouseX, int mouseY, boolean hovered, float tickDelta)
-		#endif
-		#if MC_VER < MC_1_21_8
 		{
 			renderInternal(matrices, y, 0, 0, hovered, tickDelta);
 		}
-		#endif
-		
-		#if MC_VER >= MC_1_21_8
+        #elif MC_VER < MC_1_21_8
+		@Override
+		public void render(GuiGraphics matrices, int index, int y, int x, int entryWidth, int entryHeight, int mouseX, int mouseY, boolean hovered, float tickDelta)
+		{
+			renderInternal(matrices, y, 0, 0, hovered, tickDelta);
+		}
+		#else
 		@Override
 		public void renderContent(GuiGraphics matrices, int i, int j, boolean hovered, float tickDelta)
 		{

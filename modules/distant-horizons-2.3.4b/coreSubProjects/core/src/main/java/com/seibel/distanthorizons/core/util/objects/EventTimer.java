@@ -29,6 +29,14 @@ public class EventTimer
         this.endTime = System.nanoTime();
     }
     
+    public void nextEvent(String eventName)
+    {
+        // Mark the end of current event and start of next
+        this.endTime = System.nanoTime();
+        // Could log the transition but for compatibility just update time
+        this.startTime = System.nanoTime();
+    }
+    
     public long getElapsedNanos()
     {
         return endTime - startTime;
