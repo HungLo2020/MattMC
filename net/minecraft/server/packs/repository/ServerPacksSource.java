@@ -48,7 +48,7 @@ public class ServerPacksSource extends BuiltInPackSource {
 	public static VanillaPackResources createVanillaPackSource() {
 		return new VanillaPackResourcesBuilder()
 			.setMetadata(BUILT_IN_METADATA)
-			.exposeNamespace("minecraft")
+			.exposeNamespace("minecraft", "distanthorizons", "iris", "sodium")
 			.applyDevelopmentConfig()
 			.pushJarResources()
 			.build(VANILLA_PACK_INFO);
