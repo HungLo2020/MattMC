@@ -71,7 +71,6 @@ public class ServerPlayerWrapper implements IServerPlayerWrapper
 		return new Vec3d(position.x, position.y, position.z);
 	}
 	
-	@Override
 	public int getViewDistance() 
 	{
 		#if MC_VER < MC_1_21_6
@@ -81,7 +80,6 @@ public class ServerPlayerWrapper implements IServerPlayerWrapper
 		#endif
 	}
 	
-	@Override
 	public SocketAddress getRemoteAddress()
 	{
 		#if MC_VER >= MC_1_19_4
