@@ -347,7 +347,7 @@ public final class BatchGenerationEnvironment extends AbstractBatchGenerationEnv
 	{
 		// Create and queue a generation event
 		GenerationEvent genEvent = new GenerationEvent(
-				new DhChunkPos(minX, minZ), genSize, generatorMode, targetStep, resultConsumer);
+				new DhChunkPos(minX, minZ), genSize, this, generatorMode, targetStep, resultConsumer);
 		this.generationEventList.add(genEvent);
 		
 		return CompletableFuture.runAsync(() -> {

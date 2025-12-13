@@ -3,8 +3,8 @@
  */
 package com.seibel.distanthorizons.core.logging;
 
-import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import java.util.function.Supplier;
 
 /**
  * Compatibility class for old wrapper code that expects ConfigBasedLogger.
@@ -13,27 +13,38 @@ import org.apache.logging.log4j.Logger;
 public class ConfigBasedLogger
 {
     private final Logger logger;
+    private final Supplier<Boolean> enabledSupplier;
+    
+    public ConfigBasedLogger(Logger logger, Supplier<Boolean> enabledSupplier)
+    {
+        this.logger = logger;
+        this.enabledSupplier = enabledSupplier;
+    }
     
     public ConfigBasedLogger(String name)
     {
-        this.logger = LogManager.getLogger(name);
+        this.logger = org.apache.logging.log4j.LogManager.getLogger(name);
+        this.enabledSupplier = () -> true;
     }
     
     public ConfigBasedLogger()
     {
-        this.logger = LogManager.getLogger();
+        this.logger = org.apache.logging.log4j.LogManager.getLogger();
+        this.enabledSupplier = () -> true;
     }
     
-    public void trace(String message, Object... args) { logger.trace(message, args); }
-    public void debug(String message, Object... args) { logger.debug(message, args); }
-    public void info(String message, Object... args) { logger.info(message, args); }
-    public void warn(String message, Object... args) { logger.warn(message, args); }
-    public void error(String message, Object... args) { logger.error(message, args); }
-    public void error(String message, Throwable t) { logger.error(message, t); }
+    private boolean isEnabled() { return enabledSupplier.get(); }
     
-    public boolean isTraceEnabled() { return logger.isTraceEnabled(); }
-    public boolean isDebugEnabled() { return logger.isDebugEnabled(); }
-    public boolean isInfoEnabled() { return logger.isInfoEnabled(); }
-    public boolean isWarnEnabled() { return logger.isWarnEnabled(); }
-    public boolean isErrorEnabled() { return logger.isErrorEnabled(); }
+    public void trace(String message, Object... args) { if (isEnabled()) logger.trace(message, args); }
+    public void debug(String message, Object... args) { if (isEnabled()) logger.debug(message, args); }
+    public void info(String message, Object... args) { if (isEnabled()) logger.info(message, args); }
+    public void warn(String message, Object... args) { if (isEnabled()) logger.warn(message, args); }
+    public void error(String message, Object... args) { if (isEnabled()) logger.error(message, args); }
+    public void error(String message, Throwable t) { if (isEnabled()) logger.error(message, t); }
+    
+    public boolean isTraceEnabled() { return isEnabled() && logger.isTraceEnabled(); }
+    public boolean isDebugEnabled() { return isEnabled() && logger.isDebugEnabled(); }
+    public boolean isInfoEnabled() { return isEnabled() && logger.isInfoEnabled(); }
+    public boolean isWarnEnabled() { return isEnabled() && logger.isWarnEnabled(); }
+    public boolean isErrorEnabled() { return isEnabled() && logger.isErrorEnabled(); }
 }

@@ -3,11 +3,17 @@
  */
 package com.seibel.distanthorizons.core.wrapperInterfaces.worldGeneration;
 
+import com.seibel.distanthorizons.core.wrapperInterfaces.world.IDhServerLevel;
+
 /**
  * Compatibility alias for the old AbstractBatchGenerationEnvironmentWrapper class name.
  * The new API uses IBatchGeneratorEnvironmentWrapper.
  */
 public abstract class AbstractBatchGenerationEnvironmentWrapper implements IBatchGeneratorEnvironmentWrapper
 {
-    // This is an abstract adapter class that bridges the old API to the new interface
+    protected final IDhServerLevel serverLevel;
+    
+    protected AbstractBatchGenerationEnvironmentWrapper(IDhServerLevel serverLevel) {
+        this.serverLevel = serverLevel;
+    }
 }
