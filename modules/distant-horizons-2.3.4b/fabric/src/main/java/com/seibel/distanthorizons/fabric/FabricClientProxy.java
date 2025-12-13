@@ -102,6 +102,12 @@ public class FabricClientProxy implements AbstractModInitializer.IEventProxy
 	{
 		LOGGER.info("Registering Fabric Client Events");
 		
+		final java.util.function.Consumer<WorldRenderEvents.WorldRenderContext> updateRenderState = (renderContext) -> {
+			ClientApi.RENDER_STATE.mcModelViewMatrix = McObjectConverter.Convert(renderContext.matrixStack().last().pose());
+			ClientApi.RENDER_STATE.mcProjectionMatrix = McObjectConverter.Convert(renderContext.projectionMatrix());
+			ClientApi.RENDER_STATE.frameTime = renderContext.tickDelta();
+			ClientApi.RENDER_STATE.clientLevelWrapper = ClientLevelWrapper.getWrapper(renderContext.world());
+		};
 		
 		//========================//
 		// register mod accessors //
@@ -219,6 +225,7 @@ public class FabricClientProxy implements AbstractModInitializer.IEventProxy
 
 		WorldRenderEvents.AFTER_SETUP.register((renderContext) ->
 		{
+			updateRenderState.accept(renderContext);
 			// Store render state for DH to use
 			// New API uses parameterless methods that get state internally
 			this.clientApi.renderLods();
@@ -228,6 +235,7 @@ public class FabricClientProxy implements AbstractModInitializer.IEventProxy
 		// TODO add to forge and neo
 		WorldRenderEvents.AFTER_ENTITIES.register((renderContext) ->
 		{
+			updateRenderState.accept(renderContext);
 			// New API uses parameterless methods
 			this.clientApi.renderFadeOpaque();
 		});
@@ -235,6 +243,7 @@ public class FabricClientProxy implements AbstractModInitializer.IEventProxy
 		// TODO add to forge and neo
 		WorldRenderEvents.AFTER_TRANSLUCENT.register((renderContext) ->
 		{
+			updateRenderState.accept(renderContext);
 			#if MC_VER < MC_1_21_6
 			// rendered in MixinLevelRenderer
 			#else

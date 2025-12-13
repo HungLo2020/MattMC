@@ -1478,6 +1478,10 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 	
 	// Wrapper method for terrain chunk rendering - allows Iris mixins to intercept
 	public void iris$renderTerrainGroup(ChunkSectionsToRender chunkSectionsToRender, ChunkSectionLayerGroup group) {
+		if (chunkSectionsToRender == null) {
+			return;
+		}
+
 		chunkSectionsToRender.renderGroup(group);
 	}
 	
