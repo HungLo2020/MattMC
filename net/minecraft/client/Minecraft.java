@@ -2,7 +2,7 @@ package net.minecraft.client;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
-import net.fabricmc.loader.api.FabricLoader;
+import net.minecraft.fabric.ModInitializationManager;
 import net.minecraft.server.profile.PlayerProfile;
 
 import net.minecraft.client.auth.BanDetails;
@@ -401,7 +401,7 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 		instance = this;
 		
 		// Initialize Fabric client mods before anything else
-		FabricLoader.getInstance().initializeClientMods();
+		ModInitializationManager.getInstance().initializeClientMods();
 		
 		this.clientStartTimeMs = System.currentTimeMillis();
 		this.gameDirectory = gameConfig.location.gameDirectory;

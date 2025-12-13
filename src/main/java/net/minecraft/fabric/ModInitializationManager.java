@@ -1,4 +1,4 @@
-package net.fabricmc.loader.api;
+package net.minecraft.fabric;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -10,11 +10,11 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * Fabric Loader stub for loading and initializing Fabric mods
+ * Manages Fabric mod initialization using Java ServiceLoader
  */
-public class FabricLoader {
-    private static final Logger LOGGER = LoggerFactory.getLogger(FabricLoader.class);
-    private static final FabricLoader INSTANCE = new FabricLoader();
+public class ModInitializationManager {
+    private static final Logger LOGGER = LoggerFactory.getLogger(ModInitializationManager.class);
+    private static final ModInitializationManager INSTANCE = new ModInitializationManager();
     
     private final List<ModInitializer> commonInitializers = new ArrayList<>();
     private final List<ClientModInitializer> clientInitializers = new ArrayList<>();
@@ -24,12 +24,12 @@ public class FabricLoader {
     private boolean clientInitialized = false;
     private boolean serverInitialized = false;
     
-    private FabricLoader() {
+    private ModInitializationManager() {
         // Load mod initializers via ServiceLoader
         loadInitializers();
     }
     
-    public static FabricLoader getInstance() {
+    public static ModInitializationManager getInstance() {
         return INSTANCE;
     }
     
