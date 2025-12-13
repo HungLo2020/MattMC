@@ -542,9 +542,9 @@ tasks.named('compileDistantHorizonsJava') {
 
 // Configure main processResources to handle duplicate mod resources
 // When including mod resources from DH/Iris/Sodium, there may be overlapping files
+// EXCLUDE keeps the first file encountered (main project resources take priority over mod resources)
 tasks.named('processResources') {
-    duplicatesStrategy = DuplicatesStrategy.INCLUDE
-    // Prefer the first file encountered (main project resources take priority)
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
 }
 
 // ============================================================================
