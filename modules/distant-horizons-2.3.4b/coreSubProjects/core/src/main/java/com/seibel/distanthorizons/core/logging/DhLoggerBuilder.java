@@ -120,20 +120,5 @@ public class DhLoggerBuilder
 	}
 	
 	
-	//=============================//
-	// static convenience methods  //
-	//=============================//
-	
-	/** Static convenience method for backwards compatibility */
-	public static org.apache.logging.log4j.Logger getLogger()
-	{
-		return org.apache.logging.log4j.LogManager.getLogger(getCallingClassName());
-	}
-	
-	/** Static convenience method for backwards compatibility */
-	public static org.apache.logging.log4j.Logger getLogger(String name)
-	{
-		return org.apache.logging.log4j.LogManager.getLogger(name);
-	}
 	
 }
