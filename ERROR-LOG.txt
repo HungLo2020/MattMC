@@ -1,10 +1,11 @@
 matt@HungLoDE:~/Documents/Repos/MattMC$ /bin/bash /home/matt/Documents/Repos/MattMC/RunDev.sh
+Starting a Gradle Daemon, 4 stopped Daemons could not be reused, use --status for details
 
 > Configure project :
 ✓ Using bundled dependencies from libraries/deps/
   Run './libraries/download-dependencies.sh' to update bundled dependencies
-Path for java installation '/usr/lib/jvm/openjdk-21' (Common Linux Locations) does not contain a java executable
 Path for java installation '/usr/lib/jvm/openjdk-17' (Common Linux Locations) does not contain a java executable
+Path for java installation '/usr/lib/jvm/openjdk-21' (Common Linux Locations) does not contain a java executable
 
 > Task :copyJdkToRun
 📂 Copying JDK to run directory...
@@ -12,37 +13,49 @@ Path for java installation '/usr/lib/jvm/openjdk-17' (Common Linux Locations) do
 
 > Task :runClient
 Using bundled JDK from: /home/matt/Documents/Repos/MattMC/run/jdk-21
-[15:37:09] [main/INFO]: Loading Minecraft 1.21.10 with Fabric Loader 0.18.2
-[15:37:09] [main/INFO]: Mappings not present!
-[15:37:09] [ForkJoinPool-1-worker-1/WARN]: Mod iris uses the version ${version} which isn't compatible with Loader's extended semantic version format (Could not parse version number component '${version}'!), SemVer is recommended for reliably evaluating dependencies and prioritizing newer version
-[15:37:09] [main/INFO]: Loading 5 mods:
+[15:47:52] [main/INFO]: Loading Minecraft 1.21.10 with Fabric Loader 0.18.2
+[15:47:52] [main/INFO]: Mappings not present!
+[15:47:52] [ForkJoinPool-1-worker-1/WARN]: Mod iris uses the version ${version} which isn't compatible with Loader's extended semantic version format (Could not parse version number component '${version}'!), SemVer is recommended for reliably evaluating dependencies and prioritizing newer version
+[15:47:52] [main/INFO]: Loading 5 mods:
         - distanthorizons 2.3.4-b
         - iris 1.9.6
         - java 21
         - minecraft 1.21.10
         - sodium 0.7.2
-[15:37:09] [main/WARN]: Runtime mod remapping disabled due to no fabric.remapClasspathFile being specified. You may need to update loom.
-[15:37:09] [main/INFO]: SpongePowered MIXIN Subsystem Version=0.8.7 Source=file:/home/matt/Documents/Repos/MattMC/libraries/deps/sponge-mixin-0.16.5+mixin.0.8.7.jar Service=Knot/Fabric Env=CLIENT
-[15:37:09] [main/INFO]: Compatibility level set to JAVA_17
-[15:37:09] [main/WARN]: Reference map 'iris.refmap.json' for mixins.iris.json could not be read. If this is a development environment you can ignore this message
-[15:37:09] [main/WARN]: Reference map 'iris-fabric.refmap.json' for mixins.iris.fabric.json could not be read. If this is a development environment you can ignore this message
-[15:37:09] [main/WARN]: Reference map 'iris.refmap.json' for mixins.iris.fantastic.json could not be read. If this is a development environment you can ignore this message
-[15:37:09] [main/WARN]: Reference map 'iris.refmap.json' for mixins.iris.vertexformat.json could not be read. If this is a development environment you can ignore this message
-[15:37:09] [main/WARN]: Reference map 'iris.refmap.json' for mixins.iris.bettermipmaps.json could not be read. If this is a development environment you can ignore this message
-[15:37:09] [main/WARN]: Reference map 'iris.refmap.json' for mixins.iris.compat.sodium.json could not be read. If this is a development environment you can ignore this message
-[15:37:09] [main/WARN]: Reference map 'iris.refmap.json' for mixins.iris.fixes.maxfpscrash.json could not be read. If this is a development environment you can ignore this message
-[15:37:09] [main/INFO]: Loaded configuration file for Sodium: 42 options available, 1 override(s) found
-[15:37:09] [main/WARN]: Force-disabling mixin 'features.render.world.sky.FogRendererMixin' as rule 'mixin.features.render.world.sky' (added by mods [iris]) disables it and children
-[15:37:09] [main/WARN]: Force-disabling mixin 'features.render.world.sky.ClientLevelMixin' as rule 'mixin.features.render.world.sky' (added by mods [iris]) disables it and children
-[15:37:09] [main/WARN]: Force-disabling mixin 'features.render.world.sky.LevelRendererMixin' as rule 'mixin.features.render.world.sky' (added by mods [iris]) disables it and children
-[15:37:09] [main/INFO]: Searching for graphics cards...
-[15:37:09] [main/INFO]: Found graphics adapter: LinuxPciAdapterInfo[vendor=NVIDIA, name=GA102 [GeForce RTX 3080 Ti], pciVendorId=0x10de, pciDeviceId=0x2208]
-[15:37:09] [main/WARN]: Sodium has applied one or more workarounds to prevent crashes or other issues on your system: [NVIDIA_THREADED_OPTIMIZATIONS_BROKEN]
-[15:37:09] [main/WARN]: This is not necessarily an issue, but it may result in certain features or optimizations being disabled. You can sometimes fix these issues by upgrading your graphics driver.
-[15:37:10] [Datafixer Bootstrap/INFO]: 278 Datafixer optimizations took 170 milliseconds
-[15:37:12] [main/WARN]: Missing translation key for rename: gui.abuseReport.reason.generic
-[15:37:12] [main/WARN]: Missing translation key for rename: gui.abuseReport.reason.generic.description
-[15:37:12] [Render thread/INFO]: Setting user: Player826
+[15:47:52] [main/WARN]: Runtime mod remapping disabled due to no fabric.remapClasspathFile being specified. You may need to update loom.
+[15:47:52] [main/INFO]: SpongePowered MIXIN Subsystem Version=0.8.7 Source=file:/home/matt/Documents/Repos/MattMC/libraries/deps/sponge-mixin-0.16.5+mixin.0.8.7.jar Service=Knot/Fabric Env=CLIENT
+[15:47:52] [main/INFO]: Compatibility level set to JAVA_17
+[15:47:52] [main/INFO]: Loaded configuration file for Sodium: 42 options available, 1 override(s) found
+[15:47:52] [main/WARN]: Reference map 'iris.refmap.json' for mixins.iris.json could not be read. If this is a development environment you can ignore this message
+[15:47:52] [main/WARN]: Reference map 'iris-fabric.refmap.json' for mixins.iris.fabric.json could not be read. If this is a development environment you can ignore this message
+[15:47:52] [main/WARN]: Reference map 'iris.refmap.json' for mixins.iris.fantastic.json could not be read. If this is a development environment you can ignore this message
+[15:47:52] [main/WARN]: Reference map 'iris.refmap.json' for mixins.iris.vertexformat.json could not be read. If this is a development environment you can ignore this message
+[15:47:52] [main/WARN]: Reference map 'iris.refmap.json' for mixins.iris.bettermipmaps.json could not be read. If this is a development environment you can ignore this message
+[15:47:52] [main/WARN]: Reference map 'iris.refmap.json' for mixins.iris.compat.sodium.json could not be read. If this is a development environment you can ignore this message
+[15:47:52] [main/WARN]: Reference map 'iris.refmap.json' for mixins.iris.fixes.maxfpscrash.json could not be read. If this is a development environment you can ignore this message
+[15:47:52] [main/WARN]: Force-disabling mixin 'features.render.world.sky.FogRendererMixin' as rule 'mixin.features.render.world.sky' (added by mods [iris]) disables it and children
+[15:47:52] [main/WARN]: Force-disabling mixin 'features.render.world.sky.ClientLevelMixin' as rule 'mixin.features.render.world.sky' (added by mods [iris]) disables it and children
+[15:47:52] [main/WARN]: Force-disabling mixin 'features.render.world.sky.LevelRendererMixin' as rule 'mixin.features.render.world.sky' (added by mods [iris]) disables it and children
+[15:47:52] [main/INFO]: Searching for graphics cards...
+[15:47:52] [main/INFO]: Found graphics adapter: LinuxPciAdapterInfo[vendor=NVIDIA, name=GA102 [GeForce RTX 3080 Ti], pciVendorId=0x10de, pciDeviceId=0x2208]
+[15:47:52] [main/WARN]: Sodium has applied one or more workarounds to prevent crashes or other issues on your system: [NVIDIA_THREADED_OPTIMIZATIONS_BROKEN]
+[15:47:52] [main/WARN]: This is not necessarily an issue, but it may result in certain features or optimizations being disabled. You can sometimes fix these issues by upgrading your graphics driver.
+[15:47:53] [Datafixer Bootstrap/INFO]: 278 Datafixer optimizations took 193 milliseconds
+[15:47:54] [main/WARN]: Missing translation key for rename: gui.abuseReport.reason.generic
+[15:47:54] [main/WARN]: Missing translation key for rename: gui.abuseReport.reason.generic.description
+[15:47:55] [Render thread/INFO]: Setting user: Player500
+[15:47:55] [Render thread/INFO]: Initializing Distant Horizons client, firing DhApiBeforeDhInitEvent...
+[15:47:55] [Render thread/INFO]: Distant Horizons, Version: 2.3.7-b-dev
+[15:47:55] [Render thread/INFO]: DH Branch: unknown
+[15:47:55] [Render thread/INFO]: DH Commit: unknown
+[15:47:55] [Render thread/INFO]: DH Jar Build Source: MattMC
+[15:47:55] [Render thread/INFO]: Registering Fabric Client Events
+[15:47:55] [Render thread/INFO]: Registering Fabric Server Events
+[15:47:55] [Render thread/INFO]: Registered mod compatibility accessor for: [Sodium-Fabric].
+[15:47:55] [Render thread/INFO]: Registered mod compatibility accessor for: [iris].
+[15:47:55] [Render thread/INFO]: Initialising config for [DistantHorizons]
+[15:47:55] [Render thread/INFO]: [DistantHorizons] Config initialised
+[15:47:55] [Render thread/INFO]: Distant Horizons client Initialized.
 [LWJGL] Version: 3.3.3-snapshot
          OS: Linux v6.14.0-36-generic
         JRE: Linux amd64 21.0.5
@@ -53,139 +66,1594 @@ Using bundled JDK from: /home/matt/Documents/Repos/MattMC/run/jdk-21
 [LWJGL] Loading library: glfw
         Module: org.lwjgl.glfw
         Loaded from org.lwjgl.librarypath: /tmp/lwjgl_matt/3.3.3-snapshot/x64/libglfw.so
-[15:37:12] [Render thread/WARN]: Failed to get system info for Render Extensions
-java.lang.IllegalStateException: Can't getDevice() before it was initialized
-        at knot/com.mojang.blaze3d.systems.RenderSystem.getDevice(RenderSystem.java:354) ~[minecraft-1.21.10.jar:?]
-        at knot/net.minecraft.client.Minecraft.lambda$fillSystemReport$42(Minecraft.java:2316) ~[minecraft-1.21.10.jar:?]
-        at knot/net.minecraft.SystemReport.setDetail(SystemReport.java:77) [minecraft-1.21.10.jar:?]
-        at knot/net.minecraft.client.Minecraft.fillSystemReport(Minecraft.java:2316) [minecraft-1.21.10.jar:?]
-        at knot/net.minecraft.client.Minecraft.fillReport(Minecraft.java:2289) [minecraft-1.21.10.jar:?]
-        at knot/net.minecraft.client.main.Main.main(Main.java:252) [minecraft-1.21.10.jar:?]
+[15:47:55] [Render thread/INFO]: Queuing DH event binding...
+[15:47:55] [Render thread/INFO]: Backend library: LWJGL version 3.3.3-snapshot
+[LWJGL] Loading library: jemalloc
+        Module: org.lwjgl.jemalloc
+        Loaded from org.lwjgl.librarypath: /tmp/lwjgl_matt/3.3.3-snapshot/x64/libjemalloc.so
+[LWJGL] MemoryUtil allocator: JEmallocAllocator
+[LWJGL] Java 9 check intrinsics enabled
+[LWJGL] Closure Registry: ConcurrentHashMap
+[15:47:55] [Render thread/INFO]: Modifying process environment to apply workarounds for the NVIDIA graphics driver...
+[LWJGL] Loading JNI library: lwjgl_stb
+        Module: org.lwjgl.stb
+        Loaded from org.lwjgl.librarypath: /tmp/lwjgl_matt/3.3.3-snapshot/x64/liblwjgl_stb.so
+[LWJGL] Loading JNI library: lwjgl_opengl
+        Module: org.lwjgl.opengl
+        Loaded from org.lwjgl.librarypath: /tmp/lwjgl_matt/3.3.3-snapshot/x64/liblwjgl_opengl.so
+[LWJGL] Loading library: libGLX.so.0
+        Module: org.lwjgl.opengl
+        libGLX.so.0 not found in org.lwjgl.librarypath=/tmp/lwjgl_matt/3.3.3-snapshot/x64
+[LWJGL] Java 9 text decoding enabled
+        Loaded from system paths: /lib/x86_64-linux-gnu/libGLX.so.0
+[LWJGL] Java 10 multiplyHigh enabled
+[15:47:55] [ForkJoinPool.commonPool-worker-1/WARN]: [Iris Update Check] This version doesn't have an update index, skipping.
+[15:47:56] [Render thread/INFO]: OpenGL Vendor: NVIDIA Corporation
+[15:47:56] [Render thread/INFO]: OpenGL Renderer: NVIDIA GeForce RTX 3080 Ti/PCIe/SSE2
+[15:47:56] [Render thread/INFO]: OpenGL Version: 3.3.0 NVIDIA 580.95.05
+[15:47:56] [Render thread/INFO]: Modifying OpenGL context to apply workarounds for the NVIDIA graphics driver...
+[15:47:56] [Render thread/INFO]: Debug functionality is disabled.
+[15:47:56] [Render thread/INFO]: ARB_direct_state_access detected, enabling DSA.
+[15:47:56] [Render thread/INFO]: Using optional rendering extensions: GL_ARB_buffer_storage, GL_KHR_debug, GL_ARB_vertex_attrib_binding, GL_ARB_direct_state_access
+[15:47:56] [Render thread/INFO]: Loaded 20 skins (0 custom)
+[LWJGL] Loading library: openal
+        Module: org.lwjgl.openal
+        Loaded from org.lwjgl.librarypath: /tmp/lwjgl_matt/3.3.3-snapshot/x64/libopenal.so
+[LWJGL] [ALC] ALC_SOFT_reopen_device was reported as available but an entry point is missing.
+[15:47:56] [Render thread/INFO]: Hardware information:
+[15:47:56] [Render thread/INFO]: CPU: 20x 12th Gen Intel(R) Core(TM) i7-12700K
+[15:47:56] [Render thread/INFO]: GPU: NVIDIA GeForce RTX 3080 Ti/PCIe/SSE2 (Supports OpenGL 3.3.0 NVIDIA 580.95.05)
+[15:47:56] [Render thread/INFO]: OS: Linux (6.14.0-36-generic)
+[LWJGL] Java 16 memcpy enabled
+[15:47:56] [Render thread/INFO]: Reloading ResourceManager: vanilla
+[15:47:56] [Render thread/WARN]: Method overwrite conflict for sodium$beforeGenerateMipLevels in sodium-common.mixins.json:features.textures.scan.SpriteContentsMixin from mod sodium, previously written by net.caffeinemc.mods.sodium.mixin.features.textures.mipmaps.SpriteContentsMixin. Skipping method.
+[15:47:56] [Worker-Main-15/INFO]: Found unifont_pua-16.0.03.hex, loading
+[15:47:56] [Worker-Main-10/INFO]: Found unifont_all_no_pua-16.0.03.hex, loading
+[15:47:56] [Worker-Main-18/INFO]: Found unifont_jp_patch-16.0.03.hex, loading
+[15:47:56] [Render thread/WARN]: Failed to load translations for en_us from pack vanilla
+java.nio.file.NoSuchFileException: /home/matt/Documents/Repos/MattMC/run/assets/files/realms/lang/en_us.json
+        at java.base/sun.nio.fs.UnixException.translateToIOException(UnixException.java:92) ~[?:?]
+        at java.base/sun.nio.fs.UnixException.rethrowAsIOException(UnixException.java:106) ~[?:?]
+        at java.base/sun.nio.fs.UnixException.rethrowAsIOException(UnixException.java:111) ~[?:?]
+        at java.base/sun.nio.fs.UnixFileSystemProvider.newByteChannel(UnixFileSystemProvider.java:261) ~[?:?]
+        at java.base/java.nio.file.Files.newByteChannel(Files.java:379) ~[?:?]
+        at knot/net.minecraft.server.packs.linkfs.LinkFSProvider.newByteChannel(LinkFSProvider.java:61) ~[minecraft-1.21.10.jar:?]
+        at java.base/java.nio.file.Files.newByteChannel(Files.java:379) ~[?:?]
+        at java.base/java.nio.file.Files.newByteChannel(Files.java:431) ~[?:?]
+        at java.base/java.nio.file.spi.FileSystemProvider.newInputStream(FileSystemProvider.java:420) ~[?:?]
+        at java.base/java.nio.file.Files.newInputStream(Files.java:159) ~[?:?]
+        at knot/net.minecraft.server.packs.resources.IoSupplier.lambda$create$0(IoSupplier.java:13) ~[minecraft-1.21.10.jar:?]
+        at knot/net.minecraft.server.packs.resources.Resource.open(Resource.java:46) ~[minecraft-1.21.10.jar:?]
+        at knot/net.minecraft.client.resources.language.ClientLanguage.appendFrom(ClientLanguage.java:55) ~[minecraft-1.21.10.jar:?]
+        at knot/net.minecraft.client.resources.language.ClientLanguage.loadFrom(ClientLanguage.java:41) ~[minecraft-1.21.10.jar:?]
+        at knot/net.minecraft.client.resources.language.LanguageManager.onResourceManagerReload(LanguageManager.java:65) ~[minecraft-1.21.10.jar:?]
+        at knot/net.minecraft.server.packs.resources.ResourceManagerReloadListener.lambda$reload$0(ResourceManagerReloadListener.java:18) ~[minecraft-1.21.10.jar:?]
+        at java.base/java.util.concurrent.CompletableFuture$UniRun.tryFire(CompletableFuture.java:787) ~[?:?]
+        at java.base/java.util.concurrent.CompletableFuture$Completion.run(CompletableFuture.java:482) ~[?:?]
+        at knot/net.minecraft.server.packs.resources.SimpleReloadInstance.lambda$prepareTasks$2(SimpleReloadInstance.java:71) ~[minecraft-1.21.10.jar:?]
+        at knot/net.minecraft.util.thread.BlockableEventLoop.doRunTask(BlockableEventLoop.java:150) [minecraft-1.21.10.jar:?]
+        at knot/net.minecraft.util.thread.ReentrantBlockableEventLoop.doRunTask(ReentrantBlockableEventLoop.java:24) [minecraft-1.21.10.jar:?]
+        at knot/net.minecraft.util.thread.BlockableEventLoop.pollTask(BlockableEventLoop.java:124) [minecraft-1.21.10.jar:?]
+        at knot/net.minecraft.util.thread.BlockableEventLoop.runAllTasks(BlockableEventLoop.java:109) [minecraft-1.21.10.jar:?]
+        at knot/net.minecraft.client.Minecraft.runTick(Minecraft.java:1228) [minecraft-1.21.10.jar:?]
+        at knot/net.minecraft.client.Minecraft.run(Minecraft.java:871) [minecraft-1.21.10.jar:?]
+        at knot/net.minecraft.client.main.Main.main(Main.java:258) [minecraft-1.21.10.jar:?]
         at net.fabricmc.loader.impl.game.minecraft.MinecraftGameProvider.launch(MinecraftGameProvider.java:536) [fabric-loader-0.18.2.jar:0.18.2]
         at net.fabricmc.loader.impl.launch.knot.Knot.launch(Knot.java:72) [fabric-loader-0.18.2.jar:0.18.2]
         at net.fabricmc.loader.impl.launch.knot.KnotClient.main(KnotClient.java:23) [fabric-loader-0.18.2.jar:0.18.2]
----- Minecraft Crash Report ----
-// I let you down. Sorry :(
+[15:47:56] [Render thread/WARN]: Missing translation key for rename: gui.abuseReport.reason.generic
+[15:47:56] [Render thread/WARN]: Missing translation key for rename: gui.abuseReport.reason.generic.description
+[15:47:56] [Render thread/INFO]: OpenAL initialized on device HT-S350
+[15:47:56] [Render thread/INFO]: Sound engine started
+[15:47:56] [Render thread/INFO]: Created: 512x256x0 minecraft:textures/atlas/particles.png-atlas
+[15:47:56] [Render thread/INFO]: Created: 128x64x0 minecraft:textures/atlas/decorated_pot.png-atlas
+[15:47:56] [Render thread/INFO]: Created: 2048x1024x0 minecraft:textures/atlas/armor_trims.png-atlas
+[15:47:56] [Render thread/INFO]: Created: 512x256x0 minecraft:textures/atlas/paintings.png-atlas
+[15:47:56] [Render thread/INFO]: Created: 512x512x0 minecraft:textures/atlas/shield_patterns.png-atlas
+[15:47:56] [Render thread/INFO]: Created: 1024x512x4 minecraft:textures/atlas/blocks.png-atlas
+[15:47:56] [Render thread/INFO]: Created: 512x256x0 minecraft:textures/atlas/chest.png-atlas
+[15:47:56] [Render thread/INFO]: Created: 512x512x0 minecraft:textures/atlas/banner_patterns.png-atlas
+[15:47:56] [Render thread/INFO]: Created: 512x256x0 minecraft:textures/atlas/beds.png-atlas
+[15:47:56] [Render thread/INFO]: Created: 1024x512x0 minecraft:textures/atlas/gui.png-atlas
+[15:47:56] [Render thread/INFO]: Created: 64x64x0 minecraft:textures/atlas/map_decorations.png-atlas
+[15:47:56] [Render thread/INFO]: Created: 256x256x0 minecraft:textures/atlas/signs.png-atlas
+[15:47:56] [Render thread/INFO]: Created: 512x256x0 minecraft:textures/atlas/shulker_boxes.png-atlas
+[15:47:57] [Render thread/INFO]: Checking for Distant Horizons update
+[15:47:57] [Render thread/WARN]: Latest pipeline was found for branch [main], but we are on branch [unknown].
+[15:47:57] [Render thread/INFO]: Creating pipeline for dimension minecraft:overworld
+[15:47:58] [DH-ApplyConfigPresetTimer/INFO]: changing preset to: [BALANCED].
+[15:47:58] [DH-ApplyConfigPresetTimer/INFO]: changing preset to: [MEDIUM].
+[15:47:58] [DH-ApplyConfigPresetTimer/INFO]: preset active: [BALANCED].
+[15:47:58] [DH-ApplyConfigPresetTimer/INFO]: preset active: [MEDIUM].
+[15:48:00] [Render thread/INFO]: Loaded 1461 recipes
+[15:48:00] [Render thread/INFO]: Loaded 1574 advancements
+[15:48:01] [Server thread/INFO]: Server World loading with (dedicated?:false)
+[15:48:01] [Server thread/INFO]: Started DhWorld of type CLIENT_SERVER
+[15:48:01] [Server thread/INFO]: Starting integrated minecraft server version 1.21.10
+[15:48:01] [Server thread/INFO]: Generating keypair
+[15:48:01] [Server thread/INFO]: Server Level Wrapped{ServerLevel[New World]@minecraft:overworld} loading
+[15:48:01] [DH-Full Data Migration Thread[0]/INFO]: Attempting to migrate data sources for: [minecraft:overworld]-[/home/matt/Documents/Repos/MattMC/run/saves/New World/data]...
+[15:48:01] [DH-Full Data Migration Thread[0]/INFO]: Found [0] data sources that need migration.
+[15:48:01] [DH-Full Data Migration Thread[0]/INFO]: No migration necessary.
+[15:48:01] [Server thread/INFO]: Started DhClientServerLevel for [Wrapped{ServerLevel[New World]@minecraft:overworld}] at [[LocalSaveStructure@(/home/matt/Documents/Repos/MattMC/run/saves/New World/data)]].
+[15:48:01] [Server thread/INFO]: Server Level Wrapped{ServerLevel[New World]@minecraft:the_end} loading
+[15:48:01] [DH-Full Data Migration Thread[0]/INFO]: Attempting to migrate data sources for: [minecraft:the_end]-[/home/matt/Documents/Repos/MattMC/run/saves/New World/DIM1/data]...
+[15:48:01] [Server thread/INFO]: Started DhClientServerLevel for [Wrapped{ServerLevel[New World]@minecraft:the_end}] at [[LocalSaveStructure@(/home/matt/Documents/Repos/MattMC/run/saves/New World/DIM1/data;/home/matt/Documents/Repos/MattMC/run/saves/New World/data)]].
+[15:48:01] [DH-Full Data Migration Thread[0]/INFO]: Found [0] data sources that need migration.
+[15:48:01] [DH-Full Data Migration Thread[0]/INFO]: No migration necessary.
+[15:48:01] [Server thread/INFO]: Server Level Wrapped{ServerLevel[New World]@minecraft:the_nether} loading
+[15:48:01] [DH-Full Data Migration Thread[0]/INFO]: Attempting to migrate data sources for: [minecraft:the_nether]-[/home/matt/Documents/Repos/MattMC/run/saves/New World/DIM-1/data]...
+[15:48:01] [DH-Full Data Migration Thread[0]/INFO]: Found [0] data sources that need migration.
+[15:48:01] [DH-Full Data Migration Thread[0]/INFO]: No migration necessary.
+[15:48:01] [Server thread/INFO]: Started DhClientServerLevel for [Wrapped{ServerLevel[New World]@minecraft:the_nether}] at [[LocalSaveStructure@(/home/matt/Documents/Repos/MattMC/run/saves/New World/DIM1/data;/home/matt/Documents/Repos/MattMC/run/saves/New World/data;/home/matt/Documents/Repos/MattMC/run/saves/New World/DIM-1/data)]].
+[15:48:01] [Server thread/INFO]: Loading 0 persistent chunks...
+[15:48:01] [Server thread/INFO]: Preparing spawn area: 16%
+[15:48:01] [Server thread/INFO]: Loading 49 chunks for player spawn...
+[15:48:01] [Server thread/INFO]: Preparing spawn area: 100%
+[15:48:01] [Server thread/INFO]: Time elapsed: 517 ms
+[15:48:02] [Server thread/INFO]: Player500[local:E:6fb7868d] logged in with entity id 76 at (-29.87219002089382, 127.37603487915197, 120.2417630730917)
+[15:48:02] [Render thread/INFO]: Reloading pipeline on dimension change: minecraft:overworld => minecraft:overworld
+[15:48:02] [Server thread/INFO]: Player500 joined the game
+[15:48:02] [Render thread/INFO]: Destroying pipeline minecraft:overworld
+[15:48:02] [Render thread/INFO]: Creating pipeline for dimension minecraft:overworld
+[15:48:02] [Render thread/INFO]: Loading client level [Wrapped{ClientLevel@dmamb227j9c6e@minecraft:overworld}]-[dmamb227j9c6e@minecraft:overworld].
+[15:48:02] [Render thread/INFO]: Loaded [0] waiting chunk wrappers.
+[15:48:02] [Server thread/INFO]: Changing view distance to 8, from 10
+[15:48:02] [Server thread/INFO]: Changing simulation distance to 12, from 0
+[15:48:02] [Render thread/INFO]: Started 10 worker threads
+[15:48:02] [Render thread/INFO]: Loading client level [Wrapped{ClientLevel@dmamb227j9c6e@minecraft:overworld}]-[dmamb227j9c6e@minecraft:overworld].
+[15:48:02] [Render thread/INFO]: Loaded [0] waiting chunk wrappers.
+[15:48:02] [Render thread/ERROR]: Failed to load skin texture data
+java.io.FileNotFoundException: minecraft:entity/player/wide/steve
+        at knot/net.minecraft.server.packs.resources.ResourceProvider.lambda$getResourceOrThrow$1(ResourceProvider.java:18) ~[minecraft-1.21.10.jar:?]
+        at java.base/java.util.Optional.orElseThrow(Optional.java:403) ~[?:?]
+        at knot/net.minecraft.server.packs.resources.ResourceProvider.getResourceOrThrow(ResourceProvider.java:18) ~[minecraft-1.21.10.jar:?]
+        at knot/net.minecraft.client.multiplayer.ClientPacketListener.loadSkinTextureData(ClientPacketListener.java:2033) [minecraft-1.21.10.jar:?]
+        at knot/net.minecraft.client.multiplayer.ClientPacketListener.sendPlayerSkin(ClientPacketListener.java:2004) [minecraft-1.21.10.jar:?]
+        at knot/net.minecraft.client.multiplayer.ClientPacketListener.handleLogin(ClientPacketListener.java:540) [minecraft-1.21.10.jar:?]
+        at knot/net.minecraft.network.protocol.game.ClientboundLoginPacket.handle(ClientboundLoginPacket.java:67) [minecraft-1.21.10.jar:?]
+        at knot/net.minecraft.network.protocol.game.ClientboundLoginPacket.handle(ClientboundLoginPacket.java:14) [minecraft-1.21.10.jar:?]
+        at knot/net.minecraft.network.PacketProcessor$ListenerAndPacket.handle(PacketProcessor.java:50) [minecraft-1.21.10.jar:?]
+        at knot/net.minecraft.network.PacketProcessor.processQueuedPackets(PacketProcessor.java:37) [minecraft-1.21.10.jar:?]
+        at knot/net.minecraft.client.Minecraft.runTick(Minecraft.java:1226) [minecraft-1.21.10.jar:?]
+        at knot/net.minecraft.client.Minecraft.run(Minecraft.java:871) [minecraft-1.21.10.jar:?]
+        at knot/net.minecraft.client.main.Main.main(Main.java:258) [minecraft-1.21.10.jar:?]
+        at net.fabricmc.loader.impl.game.minecraft.MinecraftGameProvider.launch(MinecraftGameProvider.java:536) [fabric-loader-0.18.2.jar:0.18.2]
+        at net.fabricmc.loader.impl.launch.knot.Knot.launch(Knot.java:72) [fabric-loader-0.18.2.jar:0.18.2]
+        at net.fabricmc.loader.impl.launch.knot.KnotClient.main(KnotClient.java:23) [fabric-loader-0.18.2.jar:0.18.2]
+[15:48:02] [Render thread/INFO]: Loading client level [Wrapped{ClientLevel@dmamb227j9c6e@minecraft:overworld}]-[dmamb227j9c6e@minecraft:overworld].
+[15:48:02] [Render thread/INFO]: Loaded [0] waiting chunk wrappers.
+[15:48:02] [Render thread/WARN]: Ignoring chat session from Player500 due to missing Services public key
+[15:48:02] [Render thread/INFO]: Loaded 2 advancements
+[15:48:02] [Render thread/INFO]: Resizing Dynamic Transforms UBO, capacity limit of 2 reached during a single frame. New capacity will be 4.
+[15:48:02] [Render thread/INFO]: [System] [CHAT] §2Distant Horizons: nightly/unstable build, version: [2.3.7-b-dev].§r\nIssues may occur with this version.\nHere be dragons!\n
+[15:48:02] [Render thread/INFO]: Creating GLProxy... If this is the last message you see there must have been an OpenGL error.
+[15:48:02] [Render thread/INFO]: [System] [CHAT] [Distant Horizons] §f§l§uINFO:§r Creating GLProxy... If this is the last message you see there must have been an OpenGL error.
+[15:48:02] [Render thread/INFO]: Lod Render OpenGL version [3.3.0 NVIDIA 580.95.05].
+[15:48:02] [Render thread/INFO]: [System] [CHAT] [Distant Horizons] §f§l§uINFO:§r Lod Render OpenGL version [3.3.0 NVIDIA 580.95.05].
+[15:48:02] [Render thread/INFO]: minecraftGlCapabilities:
+Your OpenGL support:
+openGL version 3.2+: [true] <- REQUIRED
+Vertex Attribute Buffer Binding: [true] <- optional improvement
+Buffer Storage: [true] <- optional improvement
 
-Time: 2025-12-13 15:37:12
-Description: Initializing game
+[15:48:02] [Render thread/INFO]: [System] [CHAT] [Distant Horizons] §f§l§uINFO:§r minecraftGlCapabilities:\nYour OpenGL support:\nopenGL version 3.2+: [true] <- REQUIRED\nVertex Attribute Buffer Binding: [true] <- optional improvement\nBuffer Storage: [true] <- optional improvement\n
+[LWJGL] [GL] Using KHR_debug for error logging.
+[LWJGL] [GL] Warning: A non-debug context may not produce any debug output.
+[15:48:02] [Render thread/INFO]: GPU Vendor [NVIDIA CORPORATION] with OS [Linux], Preferred upload method is [BUFFER_STORAGE].
+[15:48:02] [Render thread/INFO]: [System] [CHAT] [Distant Horizons] §f§l§uINFO:§r GPU Vendor [NVIDIA CORPORATION] with OS [Linux], Preferred upload method is [BUFFER_STORAGE].
+[15:48:02] [Render thread/INFO]: GLProxy creation successful. OpenGL smiles upon you this day.
+[15:48:02] [Render thread/INFO]: [System] [CHAT] [Distant Horizons] §f§l§uINFO:§r GLProxy creation successful. OpenGL smiles upon you this day.
+[15:48:02] [Render thread/INFO]: Setting up renderer
+[15:48:02] [Render thread/INFO]: Loading shader with type: [35633]
+[15:48:02] [Render thread/INFO]: [System] [CHAT] [Distant Horizons] §f§l§uINFO:§r Loading shader with type: [35633]
+[15:48:02] [Render thread/INFO]: Source:
+[#version 150 core
 
-java.lang.RuntimeException: Could not execute entrypoint stage 'client' due to errors, provided by 'distanthorizons' at 'com.seibel.distanthorizons.fabric.FabricMain'!
-        at net.fabricmc.loader.impl.FabricLoaderImpl.lambda$invokeEntrypoints$2(FabricLoaderImpl.java:409)
-        at net.fabricmc.loader.impl.util.ExceptionUtil.gatherExceptions(ExceptionUtil.java:33)
-        at net.fabricmc.loader.impl.FabricLoaderImpl.invokeEntrypoints(FabricLoaderImpl.java:407)
-        at net.fabricmc.loader.impl.game.minecraft.Hooks.startClient(Hooks.java:53)
-        at knot//net.minecraft.client.Minecraft.<init>(Minecraft.java:435)
-        at knot//net.minecraft.client.main.Main.main(Main.java:243)
-        at net.fabricmc.loader.impl.game.minecraft.MinecraftGameProvider.launch(MinecraftGameProvider.java:536)
-        at net.fabricmc.loader.impl.launch.knot.Knot.launch(Knot.java:72)
-        at net.fabricmc.loader.impl.launch.knot.KnotClient.main(KnotClient.java:23)
-        Suppressed: net.fabricmc.loader.api.EntrypointException: Exception while loading entries for entrypoint 'client' provided by 'sodium'
-                at net.fabricmc.loader.impl.entrypoint.EntrypointContainerImpl.getEntrypoint(EntrypointContainerImpl.java:56)
-                at net.fabricmc.loader.impl.FabricLoaderImpl.invokeEntrypoints(FabricLoaderImpl.java:405)
-                ... 6 more
-        Caused by: net.fabricmc.loader.api.LanguageAdapterException: Class net.caffeinemc.mods.sodium.fabric.SodiumFabricMod cannot be cast to net.fabricmc.api.ClientModInitializer!
-                at net.fabricmc.loader.impl.util.DefaultLanguageAdapter.create(DefaultLanguageAdapter.java:63)
-                at net.fabricmc.loader.impl.entrypoint.EntrypointStorage$NewEntry.getOrCreate(EntrypointStorage.java:124)
-                at net.fabricmc.loader.impl.entrypoint.EntrypointContainerImpl.getEntrypoint(EntrypointContainerImpl.java:53)
-                ... 7 more
-Caused by: net.fabricmc.loader.api.EntrypointException: Exception while loading entries for entrypoint 'client' provided by 'distanthorizons'
-        at net.fabricmc.loader.impl.entrypoint.EntrypointContainerImpl.getEntrypoint(EntrypointContainerImpl.java:56)
-        at net.fabricmc.loader.impl.FabricLoaderImpl.invokeEntrypoints(FabricLoaderImpl.java:405)
-        ... 6 more
-Caused by: net.fabricmc.loader.api.LanguageAdapterException: Class com.seibel.distanthorizons.fabric.FabricMain cannot be cast to net.fabricmc.api.ClientModInitializer!
-        at net.fabricmc.loader.impl.util.DefaultLanguageAdapter.create(DefaultLanguageAdapter.java:63)
-        at net.fabricmc.loader.impl.entrypoint.EntrypointStorage$NewEntry.getOrCreate(EntrypointStorage.java:124)
-        at net.fabricmc.loader.impl.entrypoint.EntrypointContainerImpl.getEntrypoint(EntrypointContainerImpl.java:53)
-        ... 7 more
+in uvec4 vPosition;
+out vec4 vPos;
+in vec4 color;
+
+out vec4 vertexColor;
+out vec3 vertexWorldPos;
+out float vertexYPos;
+
+uniform bool uWhiteWorld;
+
+uniform mat4 uCombinedMatrix;
+uniform vec3 uModelOffset;
+uniform float uWorldYOffset;
+
+uniform int uWorldSkyLight;
+uniform sampler2D uLightMap;
+uniform float uMircoOffset;
 
 
-A detailed walkthrough of the error, its code path and all known details is as follows:
----------------------------------------------------------------------------------------
+/**
+ * TODO in the future this and curve.vert should be merged together to prevent inconsistencies between the two
+ *
+ * Vertex Shader
+ *
+ * author: James Seibel
+ * updated: TomTheFurry
+ * updated: coolGi
+ * version: 2023-6-25
+ */
+void main()
+{
+    vPos = vPosition; // This is so it can be passed to the fragment shader
 
--- Head --
-Thread: Render thread
-Stacktrace:
-        at net.fabricmc.loader.impl.FabricLoaderImpl.lambda$invokeEntrypoints$2(FabricLoaderImpl.java:409)
-        at net.fabricmc.loader.impl.util.ExceptionUtil.gatherExceptions(ExceptionUtil.java:33)
-        at net.fabricmc.loader.impl.FabricLoaderImpl.invokeEntrypoints(FabricLoaderImpl.java:407)
-        at net.fabricmc.loader.impl.game.minecraft.Hooks.startClient(Hooks.java:53)
-        at knot//net.minecraft.client.Minecraft.<init>(Minecraft.java:435)
+    vertexWorldPos = vPosition.xyz + uModelOffset;
 
--- Initialization --
-Details:
-        Modules:
-Stacktrace:
-        at knot//net.minecraft.client.main.Main.main(Main.java:243)
-        at net.fabricmc.loader.impl.game.minecraft.MinecraftGameProvider.launch(MinecraftGameProvider.java:536)
-        at net.fabricmc.loader.impl.launch.knot.Knot.launch(Knot.java:72)
-        at net.fabricmc.loader.impl.launch.knot.KnotClient.main(KnotClient.java:23)
+    vertexYPos = vPosition.y + uWorldYOffset;
 
--- System Details --
-Details:
-        Minecraft Version: 1.21.10
-        Minecraft Version ID: 1.21.10
-        Operating System: Linux (amd64) version 6.14.0-36-generic
-        Java Version: 21.0.5, Eclipse Adoptium
-        Java VM Version: OpenJDK 64-Bit Server VM (mixed mode, sharing), Eclipse Adoptium
-        Memory: 244986896 bytes (233 MiB) / 536870912 bytes (512 MiB) up to 2147483648 bytes (2048 MiB)
-        CPUs: 20
-        Processor Vendor: GenuineIntel
-        Processor Name: 12th Gen Intel(R) Core(TM) i7-12700K
-        Identifier: Intel64 Family 6 Model 151 Stepping 2
-        Microarchitecture: Alder Lake
-        Frequency (GHz): 5.10
-        Number of physical packages: 1
-        Number of physical CPUs: 12
-        Number of logical CPUs: 20
-        Graphics card #0 name: GA102 [GeForce RTX 3080 Ti]
-        Graphics card #0 vendor: NVIDIA Corporation (0x10de)
-        Graphics card #0 VRAM (MiB): 16416.00
-        Graphics card #0 deviceId: 0x2208
-        Graphics card #0 versionInfo: unknown
-        Virtual memory max (MiB): 32300.84
-        Virtual memory used (MiB): 21357.94
-        Swap memory total (MiB): 16384.00
-        Swap memory used (MiB): 4419.73
-        Space in storage for jna.tmpdir (MiB): <path not set>
-        Space in storage for org.lwjgl.system.SharedLibraryExtractPath (MiB): <path not set>
-        Space in storage for io.netty.native.workdir (MiB): <path not set>
-        Space in storage for java.io.tmpdir (MiB): available: 15833.40, total: 15916.84
-        Space in storage for workdir (MiB): available: 292732.63, total: 937500.69
-        JVM Flags: 19 total; -XX:+UseG1GC -XX:+ParallelRefProcEnabled -XX:MaxGCPauseMillis=200 -XX:+UnlockExperimentalVMOptions -XX:+DisableExplicitGC -XX:G1NewSizePercent=30 -XX:G1MaxNewSizePercent=40 -XX:G1HeapRegionSize=8M -XX:G1ReservePercent=20 -XX:G1HeapWastePercent=5 -XX:G1MixedGCCountTarget=4 -XX:InitiatingHeapOccupancyPercent=15 -XX:G1MixedGCLiveThresholdPercent=90 -XX:G1RSetUpdatingPauseTimePercent=5 -XX:SurvivorRatio=32 -XX:+PerfDisableSharedMem -XX:MaxTenuringThreshold=1 -Xms512M -Xmx2G
-        Debug Flags: 0 total;
-        Launched Version: 1.21.10
-        Backend library: LWJGL version 3.3.3-snapshot
-        Backend API: Unknown
-        Window size: <not initialized>
-        GFLW Platform: <error>
-        Render Extensions: ERR
-        GL debug messages: <no renderer available>
-        Is Modded: Definitely; Client brand changed to 'fabric'
-        Universe: 404
-        Type: Client (map_client.txt)
-        Locale: en_US
-        System encoding: UTF-8
-        File encoding: UTF-8
-        CPU: 20x 12th Gen Intel(R) Core(TM) i7-12700K
-#@!@# Game crashed! Crash report saved to: #@!@# /home/matt/Documents/Repos/MattMC/run/crash-reports/crash-2025-12-13_15.37.12-client.txt
+    uint meta = vPosition.a;
 
-> Task :runClient FAILED
+    uint mirco = (meta & 0xFF00u) >> 8u; // mirco offset which is a xyz 2bit value
+    // 0b00 = no offset
+    // 0b01 = positive offset
+    // 0b11 = negative offset
+    // format is: 0b00zzyyxx
+    float mx = (mirco & 1u)!=0u ? uMircoOffset : 0.0;
+    mx = (mirco & 2u)!=0u ? -mx : mx;
+    float my = (mirco & 4u)!=0u ? uMircoOffset : 0.0;
+    my = (mirco & 8u)!=0u ? -my : my;
+    float mz = (mirco & 16u)!=0u ? uMircoOffset : 0.0;
+    mz = (mirco & 32u)!=0u ? -mz : mz;
 
-FAILURE: Build failed with an exception.
+    uint lights = meta & 0xFFu;
 
-* What went wrong:
-Execution failed for task ':runClient'.
-> Process 'command '/home/matt/Documents/Repos/MattMC/run/jdk-21/bin/java'' finished with non-zero exit value 255
+        float light2 = (mod(float(lights), 16.0)+0.5) / 16.0;
+        float light = (float(lights/16u)+0.5) / 16.0;
+        vertexColor = vec4(texture(uLightMap, vec2(light, light2)).xyz, 1.0);
 
-* Try:
-> Run with --stacktrace option to get the stack trace.
-> Run with --info or --debug option to get more log output.
-> Run with --scan to get full insights.
-> Get more help at https://help.gradle.org.
+    if (!uWhiteWorld)
+    {
+        vertexColor *= color;
+    }
 
-BUILD FAILED in 14s
-18 actionable tasks: 11 executed, 3 from cache, 4 up-to-date
+    gl_Position = uCombinedMatrix * vec4(vertexWorldPos + vec3(mx, 0, mz), 1.0);
+}
+]
+[15:48:02] [Render thread/INFO]: [System] [CHAT] [Distant Horizons] §7§l§uDEBUG:§r Source: \n[#version 150 core\n\nin uvec4 vPosition;\nout vec4 vPos;\nin vec4 color;\n\nout vec4 vertexColor;\nout vec3 vertexWorldPos;\nout float vertexYPos;\n\nuniform bool uWhiteWorld;\n\nuniform mat4 uCombinedMatrix;\nuniform vec3 uModelOffset;\nuniform float uWorldYOffset;\n\nuniform int uWorldSkyLight;\nuniform sampler2D uLightMap;\nuniform float uMircoOffset;\n\n\n/** \n * TODO in the future this and curve.vert should be merged together to prevent inconsistencies between the two\n *\n * Vertex Shader\n * \n * author: James Seibel\n * updated: TomTheFurry\n * updated: coolGi\n * version: 2023-6-25\n */\nvoid main()\n{\n    vPos = vPosition; // This is so it can be passed to the fragment shader\n\n    vertexWorldPos = vPosition.xyz + uModelOffset;\n\n    vertexYPos = vPosition.y + uWorldYOffset;\n\n    uint meta = vPosition.a;\n\n    uint mirco = (meta & 0xFF00u) >> 8u; // mirco offset which is a xyz 2bit value\n    // 0b00 = no offset\n    // 0b01 = positive offset\n    // 0b11 = negative offset\n    // format is: 0b00zzyyxx\n    float mx = (mirco & 1u)!=0u ? uMircoOffset : 0.0;\n    mx = (mirco & 2u)!=0u ? -mx : mx;\n    float my = (mirco & 4u)!=0u ? uMircoOffset : 0.0;\n    my = (mirco & 8u)!=0u ? -my : my;\n    float mz = (mirco & 16u)!=0u ? uMircoOffset : 0.0;\n    mz = (mirco & 32u)!=0u ? -mz : mz;\n\n    uint lights = meta & 0xFFu;\n\n     float light2 = (mod(float(lights), 16.0)+0.5) / 16.0;\n float light = (float(lights/16u)+0.5) / 16.0;\n vertexColor = vec4(texture(uLightMap, vec2(light, light2)).xyz, 1.0);\n    \n    if (!uWhiteWorld)\n    {\n        vertexColor *= color;\n    }\n\n    gl_Position = uCombinedMatrix * vec4(vertexWorldPos + vec3(mx, 0, mz), 1.0);\n}\n]
+[15:48:02] [Render thread/INFO]: Shader loaded sucessfully.
+[15:48:02] [Render thread/INFO]: [System] [CHAT] [Distant Horizons] §f§l§uINFO:§r Shader loaded sucessfully.
+[15:48:02] [Render thread/INFO]: Loading shader with type: [35632]
+[15:48:02] [Render thread/INFO]: [System] [CHAT] [Distant Horizons] §f§l§uINFO:§r Loading shader with type: [35632]
+[15:48:02] [Render thread/INFO]: Source:
+[#version 150
+
+in vec4 vertexColor;
+in vec3 vertexWorldPos;
+in vec4 vPos;
+in vec4 gl_FragCoord;
+
+out vec4 fragColor;
+
+
+// Fade/Clip Uniforms
+uniform float uClipDistance = 0.0;
+
+// Noise Uniforms
+uniform bool uNoiseEnabled;
+uniform int uNoiseSteps;
+uniform float uNoiseIntensity;
+uniform int uNoiseDropoff;
+uniform bool uDitherDhRendering;
+
+
+// The random functions for diffrent dimentions
+float rand(float co) { return fract(sin(co*(91.3458)) * 47453.5453); }
+float rand(vec2 co) { return fract(sin(dot(co.xy ,vec2(12.9898,78.233))) * 43758.5453); }
+float rand(vec3 co) { return rand(co.xy + rand(co.z)); }
+
+// Puts steps in a float
+// EG. setting stepSize to 4 then this would be the result of this function
+// In:  0.0, 0.1, 0.2, 0.3,  0.4,  0.5, 0.6, ..., 1.1, 1.2, 1.3
+// Out: 0.0, 0.0, 0.0, 0.25, 0.25, 0.5, 0.5, ..., 1.0, 1.0, 1.25
+vec3 quantize(vec3 val, int stepSize)
+{
+    return floor(val * stepSize) / stepSize;
+}
+
+void applyNoise(inout vec4 fragColor, const in float viewDist)
+{
+    vec3 vertexNormal = normalize(cross(dFdy(vPos.xyz), dFdx(vPos.xyz)));
+    // This bit of code is required to fix the vertex position problem cus of floats in the verted world position varuable
+    vec3 fixedVPos = vPos.xyz + vertexNormal * 0.001;
+
+    float noiseAmplification = uNoiseIntensity * 0.01;
+    float lum = (fragColor.r + fragColor.g + fragColor.b) / 3.0;
+    noiseAmplification = (1.0 - pow(lum * 2.0 - 1.0, 2.0)) * noiseAmplification; // Lessen the effect on depending on how dark the object is, equasion for this is -(2x-1)^{2}+1
+    noiseAmplification *= fragColor.a; // The effect would lessen on transparent objects
+
+    // Random value for each position
+    float randomValue = rand(quantize(fixedVPos, uNoiseSteps))
+    * 2.0 * noiseAmplification - noiseAmplification;
+
+    // Modifies the color
+    // A value of 0 on the randomValue will result in the original color, while a value of 1 will result in a fully bright color
+    vec3 newCol = fragColor.rgb + (1.0 - fragColor.rgb) * randomValue;
+    newCol = clamp(newCol, 0.0, 1.0);
+
+    if (uNoiseDropoff != 0) {
+        float distF = min(viewDist / uNoiseDropoff, 1.0);
+        newCol = mix(newCol, fragColor.rgb, distF); // The further away it gets, the less noise gets applied
+    }
+
+    fragColor.rgb = newCol;
+}
+
+/** returns a normalized value between 0.0 and 1.0 */
+float bayerMatrix4x4(vec2 st)
+{
+    int x = int(mod(st.x, 4.0));
+    int y = int(mod(st.y, 4.0));
+
+    // Flattened 4x4 Bayer matrix
+    float bayer4x4[16] = float[16](
+        0.0,  8.0,  2.0, 10.0,
+        12.0,  4.0, 14.0,  6.0,
+        3.0, 11.0,  1.0,  9.0,
+        15.0,  7.0, 13.0,  5.0
+    );
+
+    // Calculate the 1D index from the 2D coordinates
+    int index = y * 4 + x;
+
+    // Return the Bayer value normalized between 0.0 and 1.0
+    return bayer4x4[index] / 16.0;
+}
+
+
+
+void main()
+{
+    fragColor = vertexColor;
+
+    float viewDist = length(vertexWorldPos);
+
+    if (uDitherDhRendering)
+    {
+        // Dither out the fragment based on distance and noise.
+        // Dithering is used since it works for both opaque and transparent rendering
+
+        // noise increases as the distance increases
+        // the fragCoord is used since it is stable and small so the dithering is cleaner
+        float worldNoise = bayerMatrix4x4(gl_FragCoord.xy);
+        // minor fudge factor to make sure all pixels fade out
+        // if not included 1 in 16 pixels would never fade away
+        worldNoise += 0.001;
+
+        float fadeStep = smoothstep(uClipDistance, uClipDistance * 1.5, viewDist);
+        if (fadeStep <= worldNoise)
+        {
+            discard;
+        }
+    }
+    else
+    {
+        if (viewDist < uClipDistance && uClipDistance > 0.0)
+        {
+            discard;
+        }
+    }
+
+    if (uNoiseEnabled)
+    {
+        applyNoise(fragColor, viewDist);
+    }
+}
+]
+[15:48:02] [Render thread/INFO]: [System] [CHAT] [Distant Horizons] §7§l§uDEBUG:§r Source: \n[#version 150\n\nin vec4 vertexColor;\nin vec3 vertexWorldPos;\nin vec4 vPos;\nin vec4 gl_FragCoord;\n\nout vec4 fragColor;\n\n\n// Fade/Clip Uniforms\nuniform float uClipDistance = 0.0;\n\n// Noise Uniforms\nuniform bool uNoiseEnabled;\nuniform int uNoiseSteps;\nuniform float uNoiseIntensity;\nuniform int uNoiseDropoff;\nuniform bool uDitherDhRendering;\n\n\n// The random functions for diffrent dimentions\nfloat rand(float co) { return fract(sin(co*(91.3458)) * 47453.5453); }\nfloat rand(vec2 co) { return fract(sin(dot(co.xy ,vec2(12.9898,78.233))) * 43758.5453); }\nfloat rand(vec3 co) { return rand(co.xy + rand(co.z)); }\n\n// Puts steps in a float\n// EG. setting stepSize to 4 then this would be the result of this function\n// In:  0.0, 0.1, 0.2, 0.3,  0.4,  0.5, 0.6, ..., 1.1, 1.2, 1.3\n// Out: 0.0, 0.0, 0.0, 0.25, 0.25, 0.5, 0.5, ..., 1.0, 1.0, 1.25\nvec3 quantize(vec3 val, int stepSize) \n{\n    return floor(val * stepSize) / stepSize;\n}\n\nvoid applyNoise(inout vec4 fragColor, const in float viewDist) \n{\n    vec3 vertexNormal = normalize(cross(dFdy(vPos.xyz), dFdx(vPos.xyz)));\n    // This bit of code is required to fix the vertex position problem cus of floats in the verted world position varuable\n    vec3 fixedVPos = vPos.xyz + vertexNormal * 0.001;\n\n    float noiseAmplification = uNoiseIntensity * 0.01;\n    float lum = (fragColor.r + fragColor.g + fragColor.b) / 3.0;\n    noiseAmplification = (1.0 - pow(lum * 2.0 - 1.0, 2.0)) * noiseAmplification; // Lessen the effect on depending on how dark the object is, equasion for this is -(2x-1)^{2}+1\n    noiseAmplification *= fragColor.a; // The effect would lessen on transparent objects\n\n    // Random value for each position\n    float randomValue = rand(quantize(fixedVPos, uNoiseSteps))\n    * 2.0 * noiseAmplification - noiseAmplification;\n\n    // Modifies the color\n    // A value of 0 on the randomValue will result in the original color, while a value of 1 will result in a fully bright color\n    vec3 newCol = fragColor.rgb + (1.0 - fragColor.rgb) * randomValue;\n    newCol = clamp(newCol, 0.0, 1.0);\n\n    if (uNoiseDropoff != 0) {\n        float distF = min(viewDist / uNoiseDropoff, 1.0);\n        newCol = mix(newCol, fragColor.rgb, distF); // The further away it gets, the less noise gets applied\n    }\n\n    fragColor.rgb = newCol;\n}\n\n/** returns a normalized value between 0.0 and 1.0 */\nfloat bayerMatrix4x4(vec2 st) \n{\n    int x = int(mod(st.x, 4.0));\n    int y = int(mod(st.y, 4.0));\n\n    // Flattened 4x4 Bayer matrix\n    float bayer4x4[16] = float[16](\n        0.0,  8.0,  2.0, 10.0,\n        12.0,  4.0, 14.0,  6.0,\n        3.0, 11.0,  1.0,  9.0,\n        15.0,  7.0, 13.0,  5.0\n    );\n\n    // Calculate the 1D index from the 2D coordinates\n    int index = y * 4 + x;\n\n    // Return the Bayer value normalized between 0.0 and 1.0\n    return bayer4x4[index] / 16.0;\n}\n\n\n\nvoid main()\n{\n    fragColor = vertexColor;\n    \n    float viewDist = length(vertexWorldPos);\n    \n    if (uDitherDhRendering)\n    {\n        // Dither out the fragment based on distance and noise.\n        // Dithering is used since it works for both opaque and transparent rendering\n\n        // noise increases as the distance increases\n        // the fragCoord is used since it is stable and small so the dithering is cleaner\n        float worldNoise = bayerMatrix4x4(gl_FragCoord.xy);\n        // minor fudge factor to make sure all pixels fade out\n        // if not included 1 in 16 pixels would never fade away\n        worldNoise += 0.001;\n        \n        float fadeStep = smoothstep(uClipDistance, uClipDistance * 1.5, viewDist);\n        if (fadeStep <= worldNoise)\n        {\n            discard;\n        }\n    }\n    else\n    {\n        if (viewDist < uClipDistance && uClipDistance > 0.0)\n        {\n            discard;\n        }\n    }\n    \n    if (uNoiseEnabled)\n    {\n        applyNoise(fragColor, viewDist);\n    }\n}\n]
+[15:48:02] [Render thread/INFO]: Shader loaded sucessfully.
+[15:48:02] [Render thread/INFO]: [System] [CHAT] [Distant Horizons] §f§l§uINFO:§r Shader loaded sucessfully.
+[15:48:02] [Render thread/INFO]: Vertex Attribute (GL43+) completed. It contains 1 binding points and a stride size of 16
+[15:48:02] [Render thread/INFO]: [System] [CHAT] [Distant Horizons] §f§l§uINFO:§r Vertex Attribute (GL43+) completed. It contains 1 binding points and a stride size of 16
+[15:48:02] [Render thread/INFO]: Renderer setup complete
+[15:48:02] [Render thread/INFO]: Loading shader with type: [35633]
+[15:48:02] [Render thread/INFO]: [System] [CHAT] [Distant Horizons] §f§l§uINFO:§r Loading shader with type: [35633]
+[15:48:02] [Render thread/INFO]: Source:
+[#version 330 core
+
+layout (location = 1) in vec4 aColor;
+layout (location = 2) in vec3 aScale;
+layout (location = 3) in ivec3 aTranslateChunk;
+layout (location = 4) in vec3 aTranslateSubChunk;
+layout (location = 5) in int aMaterial;
+
+uniform ivec3 uOffsetChunk;
+uniform vec3 uOffsetSubChunk;
+uniform ivec3 uCameraPosChunk;
+uniform vec3 uCameraPosSubChunk;
+
+uniform mat4 uProjectionMvm;
+uniform int uSkyLight;
+uniform int uBlockLight;
+uniform sampler2D uLightMap;
+
+uniform float uNorthShading;
+uniform float uSouthShading;
+uniform float uEastShading;
+uniform float uWestShading;
+uniform float uTopShading;
+uniform float uBottomShading;
+
+
+in vec3 vPosition;
+
+out vec4 fColor;
+
+void main()
+{
+    // aTranslate - moves the vertex to the boxGroup's relative position
+    // uOffset - moves the vertex to the boxGroup's world position
+    // uCameraPos - moves the vertex into camera space
+    vec3 trans = (aTranslateChunk + uOffsetChunk - uCameraPosChunk) * 16.0f;
+    // separate float and int values are to fix percission loss at extreme distances from the origin (IE 10,000,000+)
+    // luckily large translate values minus large cameraPos generally equal values that cleanly fit in a float
+    trans += (aTranslateSubChunk + uOffsetSubChunk - uCameraPosSubChunk);
+
+    // combination translation and scaling matrix
+    mat4 transform = mat4(
+        aScale.x, 0.0,      0.0,      0.0,
+        0.0,      aScale.y, 0.0,      0.0,
+        0.0,      0.0,      aScale.z, 0.0,
+        trans.x,  trans.y,  trans.z,  1.0
+    );
+
+    gl_Position = uProjectionMvm * transform * vec4(vPosition, 1.0);
+
+    float blockLight = (float(uBlockLight)+0.5) / 16.0;
+    float skyLight = (float(uSkyLight)+0.5) / 16.0;
+    vec4 lightColor = vec4(texture(uLightMap, vec2(blockLight, skyLight)).xyz, 1.0);
+
+
+    fColor = lightColor * aColor;
+
+    // apply directional shading
+    if (gl_VertexID >= 0 && gl_VertexID < 4) { fColor.rgb *= uNorthShading; }
+    else if (gl_VertexID >= 4 && gl_VertexID < 8) { fColor.rgb *= uSouthShading; }
+    else if (gl_VertexID >= 8 && gl_VertexID < 12) { fColor.rgb *= uWestShading; }
+    else if (gl_VertexID >= 12 && gl_VertexID < 16) { fColor.rgb *= uEastShading; }
+    else if (gl_VertexID >= 16 && gl_VertexID < 20) { fColor.rgb *= uBottomShading; }
+    else if (gl_VertexID >= 20 && gl_VertexID < 24) { fColor.rgb *= uTopShading; }
+
+}
+]
+[15:48:02] [Render thread/INFO]: [System] [CHAT] [Distant Horizons] §7§l§uDEBUG:§r Source: \n[#version 330 core\n\nlayout (location = 1) in vec4 aColor;\nlayout (location = 2) in vec3 aScale;\nlayout (location = 3) in ivec3 aTranslateChunk;\nlayout (location = 4) in vec3 aTranslateSubChunk;\nlayout (location = 5) in int aMaterial;\n\nuniform ivec3 uOffsetChunk;\nuniform vec3 uOffsetSubChunk;\nuniform ivec3 uCameraPosChunk;\nuniform vec3 uCameraPosSubChunk;\n\nuniform mat4 uProjectionMvm;\nuniform int uSkyLight;\nuniform int uBlockLight;\nuniform sampler2D uLightMap;\n\nuniform float uNorthShading;\nuniform float uSouthShading;\nuniform float uEastShading;\nuniform float uWestShading;\nuniform float uTopShading;\nuniform float uBottomShading;\n\n\nin vec3 vPosition;\n\nout vec4 fColor;\n\nvoid main()\n{\n    // aTranslate - moves the vertex to the boxGroup's relative position\n    // uOffset - moves the vertex to the boxGroup's world position\n    // uCameraPos - moves the vertex into camera space\n    vec3 trans = (aTranslateChunk + uOffsetChunk - uCameraPosChunk) * 16.0f;\n    // separate float and int values are to fix percission loss at extreme distances from the origin (IE 10,000,000+)\n    // luckily large translate values minus large cameraPos generally equal values that cleanly fit in a float\n    trans += (aTranslateSubChunk + uOffsetSubChunk - uCameraPosSubChunk);\n    \n    // combination translation and scaling matrix\n    mat4 transform = mat4(\n        aScale.x, 0.0,      0.0,      0.0,\n        0.0,      aScale.y, 0.0,      0.0,\n        0.0,      0.0,      aScale.z, 0.0,\n        trans.x,  trans.y,  trans.z,  1.0\n    );\n    \n    gl_Position = uProjectionMvm * transform * vec4(vPosition, 1.0);\n\n    float blockLight = (float(uBlockLight)+0.5) / 16.0;\n    float skyLight = (float(uSkyLight)+0.5) / 16.0;\n    vec4 lightColor = vec4(texture(uLightMap, vec2(blockLight, skyLight)).xyz, 1.0);\n    \n    \n    fColor = lightColor * aColor;\n    \n    // apply directional shading\n    if (gl_VertexID >= 0 && gl_VertexID < 4) { fColor.rgb *= uNorthShading; }\n    else if (gl_VertexID >= 4 && gl_VertexID < 8) { fColor.rgb *= uSouthShading; }\n    else if (gl_VertexID >= 8 && gl_VertexID < 12) { fColor.rgb *= uWestShading; }\n    else if (gl_VertexID >= 12 && gl_VertexID < 16) { fColor.rgb *= uEastShading; }\n    else if (gl_VertexID >= 16 && gl_VertexID < 20) { fColor.rgb *= uBottomShading; }\n    else if (gl_VertexID >= 20 && gl_VertexID < 24) { fColor.rgb *= uTopShading; }\n    \n}\n]
+[15:48:02] [Render thread/INFO]: Shader loaded sucessfully.
+[15:48:02] [Render thread/INFO]: [System] [CHAT] [Distant Horizons] §f§l§uINFO:§r Shader loaded sucessfully.
+[15:48:02] [Render thread/INFO]: Loading shader with type: [35632]
+[15:48:02] [Render thread/INFO]: [System] [CHAT] [Distant Horizons] §f§l§uINFO:§r Loading shader with type: [35632]
+[15:48:02] [Render thread/INFO]: Source:
+[#version 150 core
+
+in vec4 fColor;
+
+out vec4 fragColor;
+
+void main()
+{
+    fragColor = fColor;
+}
+]
+[15:48:02] [Render thread/INFO]: [System] [CHAT] [Distant Horizons] §7§l§uDEBUG:§r Source: \n[#version 150 core\n\nin vec4 fColor;\n\nout vec4 fragColor;\n\nvoid main()\n{\n    fragColor = fColor;\n}\n]
+[15:48:02] [Render thread/INFO]: Shader loaded sucessfully.
+[15:48:02] [Render thread/INFO]: [System] [CHAT] [Distant Horizons] §f§l§uINFO:§r Shader loaded sucessfully.
+[15:48:02] [Render thread/INFO]: Vertex Attribute (GL43+) completed. It contains 1 binding points and a stride size of 12
+[15:48:02] [Render thread/INFO]: [System] [CHAT] [Distant Horizons] §f§l§uINFO:§r Vertex Attribute (GL43+) completed. It contains 1 binding points and a stride size of 12
+[15:48:02] [Render thread/INFO]: Loading shader with type: [35633]
+[15:48:02] [Render thread/INFO]: [System] [CHAT] [Distant Horizons] §f§l§uINFO:§r Loading shader with type: [35633]
+[15:48:02] [Render thread/INFO]: Source:
+[#version 150 core
+
+uniform mat4 uTransform;
+uniform vec4 uColor;
+uniform int uSkyLight;
+uniform int uBlockLight;
+uniform sampler2D uLightMap;
+
+uniform float uNorthShading;
+uniform float uSouthShading;
+uniform float uEastShading;
+uniform float uWestShading;
+uniform float uTopShading;
+uniform float uBottomShading;
+
+
+in vec3 vPosition;
+
+out vec4 fColor;
+
+void main()
+{
+    gl_Position = uTransform * vec4(vPosition, 1.0);
+
+
+    float blockLight = (float(uBlockLight)+0.5) / 16.0;
+    float skyLight = (float(uSkyLight)+0.5) / 16.0;
+    vec4 lightColor = vec4(texture(uLightMap, vec2(blockLight, skyLight)).xyz, 1.0);
+
+
+    fColor = lightColor * uColor;
+
+    // apply directional shading
+    if (gl_VertexID >= 0 && gl_VertexID < 4) { fColor.rgb *= uNorthShading; }
+    else if (gl_VertexID >= 4 && gl_VertexID < 8) { fColor.rgb *= uSouthShading; }
+    else if (gl_VertexID >= 8 && gl_VertexID < 12) { fColor.rgb *= uWestShading; }
+    else if (gl_VertexID >= 12 && gl_VertexID < 16) { fColor.rgb *= uEastShading; }
+    else if (gl_VertexID >= 16 && gl_VertexID < 20) { fColor.rgb *= uBottomShading; }
+    else if (gl_VertexID >= 20 && gl_VertexID < 24) { fColor.rgb *= uTopShading; }
+
+}
+]
+[15:48:02] [Render thread/INFO]: [System] [CHAT] [Distant Horizons] §7§l§uDEBUG:§r Source: \n[#version 150 core\n\nuniform mat4 uTransform;\nuniform vec4 uColor;\nuniform int uSkyLight;\nuniform int uBlockLight;\nuniform sampler2D uLightMap;\n\nuniform float uNorthShading;\nuniform float uSouthShading;\nuniform float uEastShading;\nuniform float uWestShading;\nuniform float uTopShading;\nuniform float uBottomShading;\n\n\nin vec3 vPosition;\n\nout vec4 fColor;\n\nvoid main()\n{\n    gl_Position = uTransform * vec4(vPosition, 1.0);\n    \n    \n    float blockLight = (float(uBlockLight)+0.5) / 16.0;\n    float skyLight = (float(uSkyLight)+0.5) / 16.0;\n    vec4 lightColor = vec4(texture(uLightMap, vec2(blockLight, skyLight)).xyz, 1.0);\n    \n    \n    fColor = lightColor * uColor;\n    \n    // apply directional shading\n    if (gl_VertexID >= 0 && gl_VertexID < 4) { fColor.rgb *= uNorthShading; }\n    else if (gl_VertexID >= 4 && gl_VertexID < 8) { fColor.rgb *= uSouthShading; }\n    else if (gl_VertexID >= 8 && gl_VertexID < 12) { fColor.rgb *= uWestShading; }\n    else if (gl_VertexID >= 12 && gl_VertexID < 16) { fColor.rgb *= uEastShading; }\n    else if (gl_VertexID >= 16 && gl_VertexID < 20) { fColor.rgb *= uBottomShading; }\n    else if (gl_VertexID >= 20 && gl_VertexID < 24) { fColor.rgb *= uTopShading; }\n\n}\n]
+[15:48:02] [Render thread/INFO]: Shader loaded sucessfully.
+[15:48:02] [Render thread/INFO]: [System] [CHAT] [Distant Horizons] §f§l§uINFO:§r Shader loaded sucessfully.
+[15:48:02] [Render thread/INFO]: Loading shader with type: [35632]
+[15:48:02] [Render thread/INFO]: [System] [CHAT] [Distant Horizons] §f§l§uINFO:§r Loading shader with type: [35632]
+[15:48:02] [Render thread/INFO]: Source:
+[#version 150 core
+
+in vec4 fColor;
+
+out vec4 fragColor;
+
+void main()
+{
+    fragColor = fColor;
+}
+]
+[15:48:02] [Render thread/INFO]: [System] [CHAT] [Distant Horizons] §7§l§uDEBUG:§r Source: \n[#version 150 core\n\nin vec4 fColor;\n\nout vec4 fragColor;\n\nvoid main()\n{\n    fragColor = fColor;\n}\n]
+[15:48:02] [Render thread/INFO]: Shader loaded sucessfully.
+[15:48:02] [Render thread/INFO]: [System] [CHAT] [Distant Horizons] §f§l§uINFO:§r Shader loaded sucessfully.
+[15:48:02] [Render thread/INFO]: Vertex Attribute (GL43+) completed. It contains 1 binding points and a stride size of 12
+[15:48:02] [Render thread/INFO]: [System] [CHAT] [Distant Horizons] §f§l§uINFO:§r Vertex Attribute (GL43+) completed. It contains 1 binding points and a stride size of 12
+[15:48:02] [Render thread/INFO]: Loading shader with type: [35633]
+[15:48:02] [Render thread/INFO]: [System] [CHAT] [Distant Horizons] §f§l§uINFO:§r Loading shader with type: [35633]
+[15:48:02] [Render thread/INFO]: Source:
+[#version 150 core
+
+in vec2 vPosition;
+
+out vec2 TexCoord;
+
+/**
+ * This is specifically used by application shaders.
+ * IE post process or pixel transfer shaders, anything that is rendered using a single rectangle.
+ *
+ * TODO rename this shader to better denote the above message.
+ */
+void main()
+{
+    gl_Position = vec4(vPosition, 1.0, 1.0);
+    TexCoord = vPosition.xy * 0.5 + 0.5;
+}
+]
+[15:48:02] [Render thread/INFO]: [System] [CHAT] [Distant Horizons] §7§l§uDEBUG:§r Source: \n[#version 150 core\n\nin vec2 vPosition;\n\nout vec2 TexCoord;\n\n/** \n * This is specifically used by application shaders.\n * IE post process or pixel transfer shaders, anything that is rendered using a single rectangle.\n *\n * TODO rename this shader to better denote the above message.\n */\nvoid main()\n{\n    gl_Position = vec4(vPosition, 1.0, 1.0);\n    TexCoord = vPosition.xy * 0.5 + 0.5;\n}\n]
+[15:48:02] [Render thread/INFO]: Shader loaded sucessfully.
+[15:48:02] [Render thread/INFO]: [System] [CHAT] [Distant Horizons] §f§l§uINFO:§r Shader loaded sucessfully.
+[15:48:02] [Render thread/INFO]: Loading shader with type: [35632]
+[15:48:02] [Render thread/INFO]: [System] [CHAT] [Distant Horizons] §f§l§uINFO:§r Loading shader with type: [35632]
+[15:48:02] [Render thread/INFO]: Source:
+[#version 150 core
+#extension GL_ARB_derivative_control : enable
+
+#define SAMPLE_MAX 64
+
+#define saturate(x) (clamp((x), 0.0, 1.0))
+
+in vec2 TexCoord;
+
+out vec4 fragColor;
+
+uniform sampler2D uDepthMap;
+uniform int uSampleCount;
+uniform float uRadius;
+uniform float uStrength;
+uniform float uMinLight;
+uniform float uBias;
+uniform mat4 uInvProj;
+uniform mat4 uProj;
+
+const float EPSILON = 1.e-6;
+const float GOLDEN_ANGLE = 2.39996323;
+const vec3 MAGIC = vec3(0.06711056, 0.00583715, 52.9829189);
+const float PI = 3.1415926538;
+const float TAU = PI * 2.0;
+
+
+vec3 unproject(vec4 pos)
+{
+    return pos.xyz / pos.w;
+}
+
+float InterleavedGradientNoise(const in vec2 pixel)
+{
+    float x = dot(pixel, MAGIC.xy);
+    return fract(MAGIC.z * fract(x));
+}
+
+vec3 calcViewPosition(const in vec3 clipPos)
+{
+    vec4 viewPos = uInvProj * vec4(clipPos * 2.0 - 1.0, 1.0);
+    return viewPos.xyz / viewPos.w;
+}
+
+float GetSpiralOcclusion(const in vec2 uv, const in vec3 viewPos, const in vec3 viewNormal)
+{
+    float dither = InterleavedGradientNoise(gl_FragCoord.xy);
+    float rotatePhase = dither * TAU;
+    float rStep = uRadius / uSampleCount;
+
+    vec2 offset;
+
+    float ao = 0.0;
+    int sampleCount = 0;
+    float radius = rStep;
+    for (int i = 0; i < clamp(uSampleCount, 1, SAMPLE_MAX); i++) {
+        vec2 offset = vec2(
+            sin(rotatePhase),
+            cos(rotatePhase)
+        ) * radius;
+
+        radius += rStep;
+        rotatePhase += GOLDEN_ANGLE;
+
+        vec3 sampleViewPos = viewPos + vec3(offset, -0.1);
+        vec3 sampleClipPos = unproject(uProj * vec4(sampleViewPos, 1.0)) * 0.5 + 0.5;
+        sampleClipPos = saturate(sampleClipPos);
+
+        float sampleClipDepth = textureLod(uDepthMap, sampleClipPos.xy, 0.0).r;
+        if (sampleClipDepth >= 1.0 - EPSILON) continue;
+
+        sampleClipPos.z = sampleClipDepth;
+        sampleViewPos = unproject(uInvProj * vec4(sampleClipPos * 2.0 - 1.0, 1.0));
+
+        vec3 diff = sampleViewPos - viewPos;
+        float sampleDist = length(diff);
+        vec3 sampleNormal = diff / sampleDist;
+
+        float sampleNoLm = max(dot(viewNormal, sampleNormal) - uBias, 0.0);
+        float aoF = 1.0 - saturate(sampleDist / uRadius);
+        ao += sampleNoLm * aoF;
+        sampleCount++;
+    }
+
+    ao /= max(sampleCount, 1);
+    ao = smoothstep(0.0, uStrength, ao);
+
+    return ao * (1.0 - uMinLight);
+}
+
+
+void main()
+{
+    float fragmentDepth = textureLod(uDepthMap, TexCoord, 0).r;
+    float occlusion = 0.0;
+
+    // Do not apply to sky
+    if (fragmentDepth < 1.0)
+    {
+        vec3 viewPos = calcViewPosition(vec3(TexCoord, fragmentDepth));
+
+        #ifdef GL_ARB_derivative_control
+        // Get higher precision derivatives when available
+        vec3 viewNormal = cross(dFdxFine(viewPos.xyz), dFdyFine(viewPos.xyz));
+        #else
+        vec3 viewNormal = cross(dFdx(viewPos.xyz), dFdy(viewPos.xyz));
+        #endif
+
+        viewNormal = normalize(viewNormal);
+
+        occlusion = GetSpiralOcclusion(TexCoord, viewPos, viewNormal);
+    }
+
+    fragColor = vec4(vec3(1.0 - occlusion), 1.0);
+}
+]
+[15:48:02] [Render thread/INFO]: [System] [CHAT] [Distant Horizons] §7§l§uDEBUG:§r Source: \n[#version 150 core\n#extension GL_ARB_derivative_control : enable\n\n#define SAMPLE_MAX 64\n\n#define saturate(x) (clamp((x), 0.0, 1.0))\n\nin vec2 TexCoord;\n\nout vec4 fragColor;\n\nuniform sampler2D uDepthMap;\nuniform int uSampleCount;\nuniform float uRadius;\nuniform float uStrength;\nuniform float uMinLight;\nuniform float uBias;\nuniform mat4 uInvProj;\nuniform mat4 uProj;\n\nconst float EPSILON = 1.e-6;\nconst float GOLDEN_ANGLE = 2.39996323;\nconst vec3 MAGIC = vec3(0.06711056, 0.00583715, 52.9829189);\nconst float PI = 3.1415926538;\nconst float TAU = PI * 2.0;\n\n\nvec3 unproject(vec4 pos) \n{\n    return pos.xyz / pos.w;\n}\n\nfloat InterleavedGradientNoise(const in vec2 pixel) \n{\n    float x = dot(pixel, MAGIC.xy);\n    return fract(MAGIC.z * fract(x));\n}\n\nvec3 calcViewPosition(const in vec3 clipPos) \n{\n    vec4 viewPos = uInvProj * vec4(clipPos * 2.0 - 1.0, 1.0);\n    return viewPos.xyz / viewPos.w;\n}\n\nfloat GetSpiralOcclusion(const in vec2 uv, const in vec3 viewPos, const in vec3 viewNormal) \n{\n    float dither = InterleavedGradientNoise(gl_FragCoord.xy);\n    float rotatePhase = dither * TAU;\n    float rStep = uRadius / uSampleCount;\n\n    vec2 offset;\n\n    float ao = 0.0;\n    int sampleCount = 0;\n    float radius = rStep;\n    for (int i = 0; i < clamp(uSampleCount, 1, SAMPLE_MAX); i++) {\n        vec2 offset = vec2(\n            sin(rotatePhase),\n            cos(rotatePhase)\n        ) * radius;\n        \n        radius += rStep;\n        rotatePhase += GOLDEN_ANGLE;\n\n        vec3 sampleViewPos = viewPos + vec3(offset, -0.1);\n        vec3 sampleClipPos = unproject(uProj * vec4(sampleViewPos, 1.0)) * 0.5 + 0.5;\n        sampleClipPos = saturate(sampleClipPos);\n\n        float sampleClipDepth = textureLod(uDepthMap, sampleClipPos.xy, 0.0).r;\n        if (sampleClipDepth >= 1.0 - EPSILON) continue;\n\n        sampleClipPos.z = sampleClipDepth;\n        sampleViewPos = unproject(uInvProj * vec4(sampleClipPos * 2.0 - 1.0, 1.0));\n\n        vec3 diff = sampleViewPos - viewPos;\n        float sampleDist = length(diff);\n        vec3 sampleNormal = diff / sampleDist;\n\n        float sampleNoLm = max(dot(viewNormal, sampleNormal) - uBias, 0.0);\n        float aoF = 1.0 - saturate(sampleDist / uRadius);\n        ao += sampleNoLm * aoF;\n        sampleCount++;\n    }\n\n    ao /= max(sampleCount, 1);\n    ao = smoothstep(0.0, uStrength, ao);\n\n    return ao * (1.0 - uMinLight);\n}\n\n\nvoid main() \n{\n    float fragmentDepth = textureLod(uDepthMap, TexCoord, 0).r;\n    float occlusion = 0.0;\n    \n    // Do not apply to sky\n    if (fragmentDepth < 1.0) \n    {\n        vec3 viewPos = calcViewPosition(vec3(TexCoord, fragmentDepth));\n        \n        #ifdef GL_ARB_derivative_control\n        // Get higher precision derivatives when available\n        vec3 viewNormal = cross(dFdxFine(viewPos.xyz), dFdyFine(viewPos.xyz));\n        #else\n        vec3 viewNormal = cross(dFdx(viewPos.xyz), dFdy(viewPos.xyz));\n        #endif\n\n        viewNormal = normalize(viewNormal);\n\n        occlusion = GetSpiralOcclusion(TexCoord, viewPos, viewNormal);\n    }\n    \n    fragColor = vec4(vec3(1.0 - occlusion), 1.0);\n}\n]
+[15:48:02] [Render thread/INFO]: Shader loaded sucessfully.
+[15:48:02] [Render thread/INFO]: [System] [CHAT] [Distant Horizons] §f§l§uINFO:§r Shader loaded sucessfully.
+[15:48:02] [Render thread/INFO]: Loading shader with type: [35633]
+[15:48:02] [Render thread/INFO]: [System] [CHAT] [Distant Horizons] §f§l§uINFO:§r Loading shader with type: [35633]
+[15:48:02] [Render thread/INFO]: Source:
+[#version 150 core
+
+in vec2 vPosition;
+
+out vec2 TexCoord;
+
+/**
+ * This is specifically used by application shaders.
+ * IE post process or pixel transfer shaders, anything that is rendered using a single rectangle.
+ *
+ * TODO rename this shader to better denote the above message.
+ */
+void main()
+{
+    gl_Position = vec4(vPosition, 1.0, 1.0);
+    TexCoord = vPosition.xy * 0.5 + 0.5;
+}
+]
+[15:48:02] [Render thread/INFO]: [System] [CHAT] [Distant Horizons] §7§l§uDEBUG:§r Source: \n[#version 150 core\n\nin vec2 vPosition;\n\nout vec2 TexCoord;\n\n/** \n * This is specifically used by application shaders.\n * IE post process or pixel transfer shaders, anything that is rendered using a single rectangle.\n *\n * TODO rename this shader to better denote the above message.\n */\nvoid main()\n{\n    gl_Position = vec4(vPosition, 1.0, 1.0);\n    TexCoord = vPosition.xy * 0.5 + 0.5;\n}\n]
+[15:48:02] [Render thread/INFO]: Shader loaded sucessfully.
+[15:48:02] [Render thread/INFO]: [System] [CHAT] [Distant Horizons] §f§l§uINFO:§r Shader loaded sucessfully.
+[15:48:02] [Render thread/INFO]: Loading shader with type: [35632]
+[15:48:02] [Render thread/INFO]: [System] [CHAT] [Distant Horizons] §f§l§uINFO:§r Loading shader with type: [35632]
+[15:48:02] [Render thread/INFO]: Source:
+[#version 150 core
+
+in vec2 TexCoord;
+
+out vec4 fragColor;
+
+uniform sampler2D gSSAOMap;
+uniform sampler2D gDepthMap;
+uniform vec2 gViewSize;
+uniform int gBlurRadius;
+uniform float gNear;
+uniform float gFar;
+
+
+float linearizeDepth(const in float depth) {
+    return (gNear * gFar) / (depth * (gNear - gFar) + gFar);
+}
+
+float Gaussian(const in float sigma, const in float x) {
+    return exp(-(x*x) / (2.0 * (sigma*sigma)));
+}
+
+float BilateralGaussianBlur(const in vec2 texcoord, const in float linearDepth, const in float g_sigmaV) {
+    float g_sigmaX = 1.6;
+    float g_sigmaY = 1.6;
+
+    int radius = clamp(gBlurRadius, 1, 3);
+
+    vec2 pixelSize = 1.0 / gViewSize;
+
+    float accum = 0.0;
+    float total = 0.0;
+    for (int iy = -radius; iy <= radius; iy++) {
+        float fy = Gaussian(g_sigmaY, iy);
+
+        for (int ix = -radius; ix <= radius; ix++) {
+            float fx = Gaussian(g_sigmaX, ix);
+
+            vec2 sampleTex = texcoord + ivec2(ix, iy) * pixelSize;
+            float sampleValue = textureLod(gSSAOMap, sampleTex, 0).r;
+            float sampleDepth = textureLod(gDepthMap, sampleTex, 0).r;
+            float sampleLinearDepth = linearizeDepth(sampleDepth);
+
+            float depthDiff = abs(sampleLinearDepth - linearDepth);
+            float fv = Gaussian(g_sigmaV, depthDiff);
+
+            float weight = fx*fy*fv;
+            accum += weight * sampleValue;
+            total += weight;
+        }
+    }
+
+    if (total <= 1.e-4) return 1.0;
+    return accum / total;
+}
+
+
+void main()
+{
+    fragColor = vec4(1.0);
+
+    float fragmentDepth = textureLod(gDepthMap, TexCoord, 0).r;
+
+    // a fragment depth of "1" means the fragment wasn't drawn to,
+    // we only want to apply SSAO to LODs, not to the sky outside the LODs
+    if (fragmentDepth < 1)
+    {
+        if (gBlurRadius > 0)
+        {
+            float fragmentDepthLinear = linearizeDepth(fragmentDepth);
+            fragColor.a = BilateralGaussianBlur(TexCoord, fragmentDepthLinear, 1.6);
+        }
+        else
+        {
+            fragColor.a = texelFetch(gSSAOMap, ivec2(gl_FragCoord.xy), 0).r;
+        }
+    }
+}
+]
+[15:48:02] [Render thread/INFO]: [System] [CHAT] [Distant Horizons] §7§l§uDEBUG:§r Source: \n[#version 150 core\n\nin vec2 TexCoord;\n\nout vec4 fragColor;\n\nuniform sampler2D gSSAOMap;\nuniform sampler2D gDepthMap;\nuniform vec2 gViewSize;\nuniform int gBlurRadius;\nuniform float gNear;\nuniform float gFar;\n\n\nfloat linearizeDepth(const in float depth) {\n    return (gNear * gFar) / (depth * (gNear - gFar) + gFar);\n}\n\nfloat Gaussian(const in float sigma, const in float x) {\n    return exp(-(x*x) / (2.0 * (sigma*sigma)));\n}\n\nfloat BilateralGaussianBlur(const in vec2 texcoord, const in float linearDepth, const in float g_sigmaV) {\n    float g_sigmaX = 1.6;\n    float g_sigmaY = 1.6;\n\n    int radius = clamp(gBlurRadius, 1, 3);\n    \n    vec2 pixelSize = 1.0 / gViewSize;\n\n    float accum = 0.0;\n    float total = 0.0;\n    for (int iy = -radius; iy <= radius; iy++) {\n        float fy = Gaussian(g_sigmaY, iy);\n\n        for (int ix = -radius; ix <= radius; ix++) {\n            float fx = Gaussian(g_sigmaX, ix);\n\n            vec2 sampleTex = texcoord + ivec2(ix, iy) * pixelSize;\n            float sampleValue = textureLod(gSSAOMap, sampleTex, 0).r;\n            float sampleDepth = textureLod(gDepthMap, sampleTex, 0).r;\n            float sampleLinearDepth = linearizeDepth(sampleDepth);\n\n            float depthDiff = abs(sampleLinearDepth - linearDepth);\n            float fv = Gaussian(g_sigmaV, depthDiff);\n\n            float weight = fx*fy*fv;\n            accum += weight * sampleValue;\n            total += weight;\n        }\n    }\n\n    if (total <= 1.e-4) return 1.0;\n    return accum / total;\n}\n\n\nvoid main()\n{\n    fragColor = vec4(1.0);\n    \n    float fragmentDepth = textureLod(gDepthMap, TexCoord, 0).r;\n\n    // a fragment depth of "1" means the fragment wasn't drawn to,\n    // we only want to apply SSAO to LODs, not to the sky outside the LODs\n    if (fragmentDepth < 1) \n    {\n        if (gBlurRadius > 0) \n        {\n            float fragmentDepthLinear = linearizeDepth(fragmentDepth);\n            fragColor.a = BilateralGaussianBlur(TexCoord, fragmentDepthLinear, 1.6);\n        }\n        else \n        {\n            fragColor.a = texelFetch(gSSAOMap, ivec2(gl_FragCoord.xy), 0).r;\n        }\n    }\n}\n]
+[15:48:02] [Render thread/INFO]: Shader loaded sucessfully.
+[15:48:02] [Render thread/INFO]: [System] [CHAT] [Distant Horizons] §f§l§uINFO:§r Shader loaded sucessfully.
+[15:48:02] [Render thread/INFO]: Vertex Attribute (GL43+) completed. It contains 1 binding points and a stride size of 8
+[15:48:02] [Render thread/INFO]: [System] [CHAT] [Distant Horizons] §f§l§uINFO:§r Vertex Attribute (GL43+) completed. It contains 1 binding points and a stride size of 8
+[15:48:02] [Render thread/INFO]: Loading shader with type: [35633]
+[15:48:02] [Render thread/INFO]: [System] [CHAT] [Distant Horizons] §f§l§uINFO:§r Loading shader with type: [35633]
+[15:48:02] [Render thread/INFO]: Source:
+[#version 150 core
+
+in vec2 vPosition;
+
+out vec2 TexCoord;
+
+/**
+ * This is specifically used by application shaders.
+ * IE post process or pixel transfer shaders, anything that is rendered using a single rectangle.
+ *
+ * TODO rename this shader to better denote the above message.
+ */
+void main()
+{
+    gl_Position = vec4(vPosition, 1.0, 1.0);
+    TexCoord = vPosition.xy * 0.5 + 0.5;
+}
+]
+[15:48:02] [Render thread/INFO]: [System] [CHAT] [Distant Horizons] §7§l§uDEBUG:§r Source: \n[#version 150 core\n\nin vec2 vPosition;\n\nout vec2 TexCoord;\n\n/** \n * This is specifically used by application shaders.\n * IE post process or pixel transfer shaders, anything that is rendered using a single rectangle.\n *\n * TODO rename this shader to better denote the above message.\n */\nvoid main()\n{\n    gl_Position = vec4(vPosition, 1.0, 1.0);\n    TexCoord = vPosition.xy * 0.5 + 0.5;\n}\n]
+[15:48:02] [Render thread/INFO]: Shader loaded sucessfully.
+[15:48:02] [Render thread/INFO]: [System] [CHAT] [Distant Horizons] §f§l§uINFO:§r Shader loaded sucessfully.
+[15:48:02] [Render thread/INFO]: Loading shader with type: [35632]
+[15:48:02] [Render thread/INFO]: [System] [CHAT] [Distant Horizons] §f§l§uINFO:§r Loading shader with type: [35632]
+[15:48:02] [Render thread/INFO]: Source:
+[#version 150 core
+
+in vec2 TexCoord;
+
+out vec4 fragColor;
+
+// inverted model view matrix and projection matrix
+uniform mat4 uDhInvMvmProj;
+
+uniform sampler2D uDhDepthTexture;
+uniform sampler2D uMcColorTexture;
+uniform sampler2D uDhColorTexture;
+
+uniform float uStartFadeBlockDistance;
+uniform float uEndFadeBlockDistance;
+
+
+
+vec3 calcViewPosition(float fragmentDepth, mat4 invMvmProj)
+{
+    // normalized device coordinates
+    vec4 ndc = vec4(TexCoord.xy, fragmentDepth, 1.0);
+    ndc.xyz = ndc.xyz * 2.0 - 1.0;
+
+    vec4 eyeCoord = invMvmProj * ndc;
+    return eyeCoord.xyz / eyeCoord.w;
+}
+
+/**
+ * Used to fade out vanilla chunks so the transition
+ * between DH and vanilla is smoother.
+ */
+void main()
+{
+    // includes both the vanilla chunks as well as DH
+    vec4 combinedMcDhColor = texture(uMcColorTexture, TexCoord);
+    // just the DH render pass
+    vec4 dhColor = texture(uDhColorTexture, TexCoord);
+
+
+
+    // the DH texture will have white if nothing was written to that pixel.
+    // TODO replace with a depth texture check, this feels janky
+    if (dhColor == vec4(1))
+    {
+        // if not done vanilla clouds will render incorrectly at night
+        dhColor = combinedMcDhColor;
+    }
+
+
+    float dhFragmentDepth = texture(uDhDepthTexture, TexCoord).r;
+    vec3 dhVertexWorldPos = calcViewPosition(dhFragmentDepth, uDhInvMvmProj);
+    float dhFragmentDistance = length(dhVertexWorldPos.xzy);
+
+
+    float startFade = uEndFadeBlockDistance;
+    float endFade = uStartFadeBlockDistance;
+
+    // Smoothly transition between combinedMcDhColor and uDhColorTexture
+    // as the depth increases from the camera
+    float fadeStep = smoothstep(startFade, endFade, dhFragmentDistance);
+    fragColor = mix(combinedMcDhColor, dhColor, fadeStep);
+    fragColor.a = 1.0; // TODO is setting the alpha needed?
+
+}
+
+]
+[15:48:02] [Render thread/INFO]: [System] [CHAT] [Distant Horizons] §7§l§uDEBUG:§r Source: \n[#version 150 core\n\nin vec2 TexCoord;\n\nout vec4 fragColor;\n\n// inverted model view matrix and projection matrix\nuniform mat4 uDhInvMvmProj;\n\nuniform sampler2D uDhDepthTexture;\nuniform sampler2D uMcColorTexture;\nuniform sampler2D uDhColorTexture;\n\nuniform float uStartFadeBlockDistance;\nuniform float uEndFadeBlockDistance;\n\n\n\nvec3 calcViewPosition(float fragmentDepth, mat4 invMvmProj) \n{\n    // normalized device coordinates\n    vec4 ndc = vec4(TexCoord.xy, fragmentDepth, 1.0);\n    ndc.xyz = ndc.xyz * 2.0 - 1.0;\n\n    vec4 eyeCoord = invMvmProj * ndc;\n    return eyeCoord.xyz / eyeCoord.w;\n}\n\n/**\n * Used to fade out vanilla chunks so the transition\n * between DH and vanilla is smoother.\n */\nvoid main() \n{\n    // includes both the vanilla chunks as well as DH\n    vec4 combinedMcDhColor = texture(uMcColorTexture, TexCoord);\n    // just the DH render pass\n    vec4 dhColor = texture(uDhColorTexture, TexCoord);\n    \n    \n    \n    // the DH texture will have white if nothing was written to that pixel.\n    // TODO replace with a depth texture check, this feels janky\n    if (dhColor == vec4(1))\n    {\n        // if not done vanilla clouds will render incorrectly at night\n        dhColor = combinedMcDhColor;\n    }\n    \n    \n    float dhFragmentDepth = texture(uDhDepthTexture, TexCoord).r;\n    vec3 dhVertexWorldPos = calcViewPosition(dhFragmentDepth, uDhInvMvmProj);\n    float dhFragmentDistance = length(dhVertexWorldPos.xzy);\n    \n    \n    float startFade = uEndFadeBlockDistance;\n    float endFade = uStartFadeBlockDistance;\n    \n    // Smoothly transition between combinedMcDhColor and uDhColorTexture\n    // as the depth increases from the camera\n    float fadeStep = smoothstep(startFade, endFade, dhFragmentDistance);\n    fragColor = mix(combinedMcDhColor, dhColor, fadeStep);\n    fragColor.a = 1.0; // TODO is setting the alpha needed?\n    \n}\n\n]
+[15:48:02] [Render thread/INFO]: Shader loaded sucessfully.
+[15:48:02] [Render thread/INFO]: [System] [CHAT] [Distant Horizons] §f§l§uINFO:§r Shader loaded sucessfully.
+[15:48:02] [Render thread/INFO]: Loading shader with type: [35633]
+[15:48:02] [Render thread/INFO]: [System] [CHAT] [Distant Horizons] §f§l§uINFO:§r Loading shader with type: [35633]
+[15:48:02] [Render thread/INFO]: Source:
+[#version 150 core
+
+in vec2 vPosition;
+
+out vec2 TexCoord;
+
+/**
+ * This is specifically used by application shaders.
+ * IE post process or pixel transfer shaders, anything that is rendered using a single rectangle.
+ *
+ * TODO rename this shader to better denote the above message.
+ */
+void main()
+{
+    gl_Position = vec4(vPosition, 1.0, 1.0);
+    TexCoord = vPosition.xy * 0.5 + 0.5;
+}
+]
+[15:48:02] [Render thread/INFO]: [System] [CHAT] [Distant Horizons] §7§l§uDEBUG:§r Source: \n[#version 150 core\n\nin vec2 vPosition;\n\nout vec2 TexCoord;\n\n/** \n * This is specifically used by application shaders.\n * IE post process or pixel transfer shaders, anything that is rendered using a single rectangle.\n *\n * TODO rename this shader to better denote the above message.\n */\nvoid main()\n{\n    gl_Position = vec4(vPosition, 1.0, 1.0);\n    TexCoord = vPosition.xy * 0.5 + 0.5;\n}\n]
+[15:48:02] [Render thread/INFO]: Shader loaded sucessfully.
+[15:48:02] [Render thread/INFO]: [System] [CHAT] [Distant Horizons] §f§l§uINFO:§r Shader loaded sucessfully.
+[15:48:02] [Render thread/INFO]: Loading shader with type: [35632]
+[15:48:02] [Render thread/INFO]: [System] [CHAT] [Distant Horizons] §f§l§uINFO:§r Loading shader with type: [35632]
+[15:48:02] [Render thread/INFO]: Source:
+[#version 150 core
+
+in vec2 TexCoord;
+
+out vec4 fragColor;
+
+uniform sampler2D uFadeColorTextureUniform;
+
+
+
+void main()
+{
+    fragColor = texture(uFadeColorTextureUniform, TexCoord);
+}
+]
+[15:48:02] [Render thread/INFO]: [System] [CHAT] [Distant Horizons] §7§l§uDEBUG:§r Source: \n[#version 150 core\n\nin vec2 TexCoord;\n\nout vec4 fragColor;\n\nuniform sampler2D uFadeColorTextureUniform;\n\n\n\nvoid main()\n{\n    fragColor = texture(uFadeColorTextureUniform, TexCoord);\n}\n]
+[15:48:02] [Render thread/INFO]: Shader loaded sucessfully.
+[15:48:02] [Render thread/INFO]: [System] [CHAT] [Distant Horizons] §f§l§uINFO:§r Shader loaded sucessfully.
+[15:48:02] [Render thread/INFO]: Loading shader with type: [35633]
+[15:48:02] [Render thread/INFO]: [System] [CHAT] [Distant Horizons] §f§l§uINFO:§r Loading shader with type: [35633]
+[15:48:02] [Render thread/INFO]: Source:
+[#version 150 core
+
+in vec2 vPosition;
+
+out vec2 TexCoord;
+
+/**
+ * This is specifically used by application shaders.
+ * IE post process or pixel transfer shaders, anything that is rendered using a single rectangle.
+ *
+ * TODO rename this shader to better denote the above message.
+ */
+void main()
+{
+    gl_Position = vec4(vPosition, 1.0, 1.0);
+    TexCoord = vPosition.xy * 0.5 + 0.5;
+}
+]
+[15:48:02] [Render thread/INFO]: [System] [CHAT] [Distant Horizons] §7§l§uDEBUG:§r Source: \n[#version 150 core\n\nin vec2 vPosition;\n\nout vec2 TexCoord;\n\n/** \n * This is specifically used by application shaders.\n * IE post process or pixel transfer shaders, anything that is rendered using a single rectangle.\n *\n * TODO rename this shader to better denote the above message.\n */\nvoid main()\n{\n    gl_Position = vec4(vPosition, 1.0, 1.0);\n    TexCoord = vPosition.xy * 0.5 + 0.5;\n}\n]
+[15:48:02] [Render thread/INFO]: Shader loaded sucessfully.
+[15:48:02] [Render thread/INFO]: [System] [CHAT] [Distant Horizons] §f§l§uINFO:§r Shader loaded sucessfully.
+[15:48:02] [Render thread/INFO]: Loading shader with type: [35632]
+[15:48:02] [Render thread/INFO]: [System] [CHAT] [Distant Horizons] §f§l§uINFO:§r Loading shader with type: [35632]
+[15:48:02] [Render thread/INFO]: Source:
+[#version 150 core
+
+in vec2 TexCoord;
+
+out vec4 fragColor;
+
+
+
+uniform sampler2D uDepthMap;
+// inverted model view matrix and projection matrix
+uniform mat4 uInvMvmProj;
+
+// fog uniforms
+uniform vec4 uFogColor;
+uniform float uFogScale;
+uniform float uFogVerticalScale;
+uniform int uFullFogMode;
+uniform int uFogFalloffType;
+
+// fog config
+uniform float uFarFogStart;
+uniform float uFarFogLength;
+uniform float uFarFogMin;
+uniform float uFarFogRange;
+uniform float uFarFogDensity;
+
+// height fog config
+uniform float uHeightFogStart;
+uniform float uHeightFogLength;
+uniform float uHeightFogMin;
+uniform float uHeightFogRange;
+uniform float uHeightFogDensity;
+
+
+uniform bool uHeightFogEnabled;
+uniform int uHeightFogFalloffType;
+uniform bool uHeightBasedOnCamera;
+uniform float uHeightFogBaseHeight;
+uniform bool uHeightFogAppliesUp;
+uniform bool uHeightFogAppliesDown;
+uniform bool uUseSphericalFog;
+uniform int uHeightFogMixingMode;
+uniform float uCameraBlockYPos;
+
+
+
+const vec3 MAGIC = vec3(0.06711056, 0.00583715, 52.9829189);
+
+
+
+//====================//
+// method definitions //
+//====================//
+
+float InterleavedGradientNoise(const in vec2 pixel);
+vec3 calcViewPosition(float fragmentDepth);
+
+float getFarFogThickness(float dist);
+float getHeightFogThickness(float dist);
+float calculateHeightFogDepth(float worldYPos);
+float mixFogThickness(float far, float height);
+
+
+
+//======//
+// main //
+//======//
+
+/**
+ * Fragment shader for fog.
+ * This should be run last so it applies above other affects like Ambient Occlusioning
+ */
+void main()
+{
+    float fragmentDepth = texture(uDepthMap, TexCoord).r;
+    fragColor = vec4(uFogColor.rgb, 0.0);
+
+    // a fragment depth of "1" means the fragment wasn't drawn to,
+    // we only want to apply Fog to LODs, not to the sky outside the LODs
+    if (fragmentDepth < 1.0)
+    {
+        int fogMode = uFullFogMode;
+        if (fogMode == 0)
+        {
+            // render fog based on distance from the camera
+            vec3 vertexWorldPos = calcViewPosition(fragmentDepth);
+
+            float horizontalWorldDistance = length(vertexWorldPos.xz) * uFogScale;
+            float worldDistance = length(vertexWorldPos.xyz) * uFogScale;
+            float activeDistance = uUseSphericalFog ? worldDistance : horizontalWorldDistance;
+
+
+            // far fog
+            float farFogThickness = getFarFogThickness(activeDistance);
+
+            // height fog
+            float heightFogDepth = calculateHeightFogDepth(vertexWorldPos.y);
+            float heightFogThickness = getHeightFogThickness(heightFogDepth);
+
+            // combined fog
+            float mixedFogThickness = mixFogThickness(farFogThickness, heightFogThickness);
+            fragColor.a = clamp(mixedFogThickness, 0.0, 1.0);
+
+            // test
+            //fragColor.a = heightFogThickness;
+
+            // dither fog (to smooth out aliasing)
+            //float dither = InterleavedGradientNoise(gl_FragCoord.xy) - 0.5;
+            //fragColor.a += dither / 255.0;
+        }
+        else if (fogMode == 1)
+        {
+            // render everything with the fog color
+            fragColor.a = 1.0;
+        }
+        else
+        {
+            // test code.
+
+            // this can be fired by manually changing the fullFogMode to a (normally)
+            // invalid value (like 7). By having a separate if statement defined by
+            // a uniform we don't have to worry about GLSL optimizing away different
+            // options when testing, causing a bunch of headaches if we just want to render the screen red.
+
+            float depthValue = textureLod(uDepthMap, TexCoord, 0).r;
+            fragColor.rgb = vec3(depthValue); // Convert depth value to grayscale color
+            fragColor.a = 1.0;
+        }
+    }
+}
+
+
+//
+// methods //
+//
+
+float InterleavedGradientNoise(const in vec2 pixel)
+{
+    float x = dot(pixel, MAGIC.xy);
+    return fract(MAGIC.z * fract(x));
+}
+
+vec3 calcViewPosition(float fragmentDepth)
+{
+    vec4 ndc = vec4(TexCoord.xy, fragmentDepth, 1.0);
+    ndc.xyz = ndc.xyz * 2.0 - 1.0;
+
+    vec4 eyeCoord = uInvMvmProj * ndc;
+    return eyeCoord.xyz / eyeCoord.w;
+}
+
+
+
+float linearFog(float worldDist, float fogStart, float fogLength, float fogMin, float fogRange)
+{
+    worldDist = (worldDist - fogStart) / fogLength;
+    worldDist = clamp(worldDist, 0.0, 1.0);
+    return fogMin + fogRange * worldDist;
+}
+
+float exponentialFog(float x, float fogStart, float fogLength,
+float fogMin, float fogRange, float fogDensity)
+{
+    x = max((x-fogStart)/fogLength, 0.0) * fogDensity;
+    return fogMin + fogRange - fogRange/exp(x);
+}
+
+float exponentialSquaredFog(float x, float fogStart, float fogLength,
+float fogMin, float fogRange, float fogDensity)
+{
+    x = max((x-fogStart)/fogLength, 0.0) * fogDensity;
+    return fogMin + fogRange - fogRange/exp(x*x);
+}
+
+
+
+//
+// generated methods //
+//
+
+float getFarFogThickness(float dist)
+{
+    if (uFogFalloffType == 0) // LINEAR
+    {
+        return linearFog(dist, uFarFogStart, uFarFogLength, uFarFogMin, uFarFogRange);
+    }
+    else if (uFogFalloffType == 1) // EXPONENTIAL
+    {
+        return exponentialFog(dist, uFarFogStart, uFarFogLength, uFarFogMin, uFarFogRange, uFarFogDensity);
+    }
+    else // EXPONENTIAL_SQUARED
+    {
+        return exponentialSquaredFog(dist, uFarFogStart, uFarFogLength, uFarFogMin, uFarFogRange, uFarFogDensity);
+    }
+}
+
+float getHeightFogThickness(float dist)
+{
+    if (!uHeightFogEnabled)
+    {
+        return 0.0;
+    }
+
+    if (uHeightFogFalloffType == 0) // LINEAR
+    {
+        return linearFog(dist, uHeightFogStart, uHeightFogLength, uHeightFogMin, uHeightFogRange);
+    }
+    else if (uHeightFogFalloffType == 1) // EXPONENTIAL
+    {
+        return exponentialFog(dist, uHeightFogStart, uHeightFogLength, uHeightFogMin, uHeightFogRange, uHeightFogDensity);
+    }
+    else // EXPONENTIAL_SQUARED
+    {
+        return exponentialSquaredFog(dist, uHeightFogStart, uHeightFogLength, uHeightFogMin, uHeightFogRange, uHeightFogDensity);
+    }
+}
+
+/** 1 = full fog, 0 = no fog */
+float calculateHeightFogDepth(float worldYPos)
+{
+    // worldYPos -65 - 384
+
+
+    //worldYPos = worldYPos * -1; // negative, fog below height; positive, fog above height
+    //return worldYPos * uFogVerticalScale; // "* uFogVerticalScale" is done to convert world position to a percent of the world height;
+
+    if (!uHeightFogEnabled)
+    {
+        // ignore the height
+        return 0.0;
+    }
+
+
+    if (!uHeightBasedOnCamera)
+    {
+        worldYPos -= (uHeightFogBaseHeight - uCameraBlockYPos);
+    }
+
+
+    if (uHeightFogAppliesDown && uHeightFogAppliesUp)
+    {
+        // TODO this aint right
+        return abs(worldYPos) * uFogVerticalScale;
+    }
+    else if (uHeightFogAppliesDown)
+    {
+        // apploy fog below given height
+        return -worldYPos * uFogVerticalScale;
+    }
+    else if (uHeightFogAppliesUp)
+    {
+        // apply fog above given height
+        return worldYPos * uFogVerticalScale;
+    }
+    else
+    {
+        // shouldn't happen,
+        return 0.0;
+    }
+
+}
+
+float mixFogThickness(float far, float height)
+{
+    switch (uHeightFogMixingMode)
+    {
+        case 0: // BASIC
+        case 1: // IGNORE_HEIGHT
+        return far;
+
+        case 2: // MAX
+        return max(far, height);
+
+        case 3: // ADDITION
+        return (far + height);
+
+        case 4: // MULTIPLY
+        return far * height;
+
+        case 5: // INVERSE_MULTIPLY
+        return (1.0 - (1.0-far)*(1.0-height));
+
+        case 6: // LIMITED_ADDITION
+        return (far + max(far, height));
+
+        case 7: // MULTIPLY_ADDITION
+        return (far + far*height);
+
+        case 8: // INVERSE_MULTIPLY_ADDITION
+        return (far + 1.0 - (1.0-far)*(1.0-height));
+
+        case 9: // AVERAGE
+        return (far*0.5 + height*0.5);
+    }
+
+    // shouldn't happen, but default to BASIC / IGNORE_HEIGHT
+    // if an invalid option is selected
+    return far;
+}
+
+
+
+]
+[15:48:02] [Render thread/INFO]: [System] [CHAT] [Distant Horizons] §7§l§uDEBUG:§r Source: \n[#version 150 core\n\nin vec2 TexCoord;\n\nout vec4 fragColor;\n\n\n\nuniform sampler2D uDepthMap;\n// inverted model view matrix and projection matrix\nuniform mat4 uInvMvmProj;\n\n// fog uniforms\nuniform vec4 uFogColor;\nuniform float uFogScale;\nuniform float uFogVerticalScale;\nuniform int uFullFogMode;\nuniform int uFogFalloffType;\n\n// fog config\nuniform float uFarFogStart;\nuniform float uFarFogLength;\nuniform float uFarFogMin;\nuniform float uFarFogRange;\nuniform float uFarFogDensity;\n\n// height fog config\nuniform float uHeightFogStart;\nuniform float uHeightFogLength;\nuniform float uHeightFogMin;\nuniform float uHeightFogRange;\nuniform float uHeightFogDensity;\n\n\nuniform bool uHeightFogEnabled;\nuniform int uHeightFogFalloffType;\nuniform bool uHeightBasedOnCamera;\nuniform float uHeightFogBaseHeight;\nuniform bool uHeightFogAppliesUp;\nuniform bool uHeightFogAppliesDown;\nuniform bool uUseSphericalFog;\nuniform int uHeightFogMixingMode;\nuniform float uCameraBlockYPos;\n\n\n\nconst vec3 MAGIC = vec3(0.06711056, 0.00583715, 52.9829189);\n\n\n\n//====================//\n// method definitions //\n//====================//\n\nfloat InterleavedGradientNoise(const in vec2 pixel);\nvec3 calcViewPosition(float fragmentDepth);\n\nfloat getFarFogThickness(float dist);\nfloat getHeightFogThickness(float dist);\nfloat calculateHeightFogDepth(float worldYPos);\nfloat mixFogThickness(float far, float height);\n\n\n\n//======//\n// main //\n//======//\n\n/**\n * Fragment shader for fog.\n * This should be run last so it applies above other affects like Ambient Occlusioning\n */\nvoid main()\n{\n    float fragmentDepth = texture(uDepthMap, TexCoord).r;\n    fragColor = vec4(uFogColor.rgb, 0.0);\n\n    // a fragment depth of "1" means the fragment wasn't drawn to,\n    // we only want to apply Fog to LODs, not to the sky outside the LODs\n    if (fragmentDepth < 1.0)\n    {\n        int fogMode = uFullFogMode;\n        if (fogMode == 0)\n        {\n            // render fog based on distance from the camera\n            vec3 vertexWorldPos = calcViewPosition(fragmentDepth);\n\n            float horizontalWorldDistance = length(vertexWorldPos.xz) * uFogScale;\n            float worldDistance = length(vertexWorldPos.xyz) * uFogScale;\n            float activeDistance = uUseSphericalFog ? worldDistance : horizontalWorldDistance;\n\n\n            // far fog\n            float farFogThickness = getFarFogThickness(activeDistance);\n\n            // height fog\n            float heightFogDepth = calculateHeightFogDepth(vertexWorldPos.y);\n            float heightFogThickness = getHeightFogThickness(heightFogDepth);\n\n            // combined fog\n            float mixedFogThickness = mixFogThickness(farFogThickness, heightFogThickness);\n            fragColor.a = clamp(mixedFogThickness, 0.0, 1.0);\n\n            // test\n            //fragColor.a = heightFogThickness;\n\n            // dither fog (to smooth out aliasing)\n            //float dither = InterleavedGradientNoise(gl_FragCoord.xy) - 0.5;\n            //fragColor.a += dither / 255.0;\n        }\n        else if (fogMode == 1)\n        {\n            // render everything with the fog color\n            fragColor.a = 1.0;\n        }\n        else\n        {\n            // test code.\n\n            // this can be fired by manually changing the fullFogMode to a (normally)\n            // invalid value (like 7). By having a separate if statement defined by\n            // a uniform we don't have to worry about GLSL optimizing away different\n            // options when testing, causing a bunch of headaches if we just want to render the screen red.\n\n            float depthValue = textureLod(uDepthMap, TexCoord, 0).r;\n            fragColor.rgb = vec3(depthValue); // Convert depth value to grayscale color\n            fragColor.a = 1.0;\n        }\n    }\n}\n\n\n//\n// methods //\n//\n\nfloat InterleavedGradientNoise(const in vec2 pixel)\n{\n    float x = dot(pixel, MAGIC.xy);\n    return fract(MAGIC.z * fract(x));\n}\n\nvec3 calcViewPosition(float fragmentDepth)\n{\n    vec4 ndc = vec4(TexCoord.xy, fragmentDepth, 1.0);\n    ndc.xyz = ndc.xyz * 2.0 - 1.0;\n\n    vec4 eyeCoord = uInvMvmProj * ndc;\n    return eyeCoord.xyz / eyeCoord.w;\n}\n\n\n\nfloat linearFog(float worldDist, float fogStart, float fogLength, float fogMin, float fogRange)\n{\n    worldDist = (worldDist - fogStart) / fogLength;\n    worldDist = clamp(worldDist, 0.0, 1.0);\n    return fogMin + fogRange * worldDist;\n}\n\nfloat exponentialFog(float x, float fogStart, float fogLength,\nfloat fogMin, float fogRange, float fogDensity)\n{\n    x = max((x-fogStart)/fogLength, 0.0) * fogDensity;\n    return fogMin + fogRange - fogRange/exp(x);\n}\n\nfloat exponentialSquaredFog(float x, float fogStart, float fogLength,\nfloat fogMin, float fogRange, float fogDensity)\n{\n    x = max((x-fogStart)/fogLength, 0.0) * fogDensity;\n    return fogMin + fogRange - fogRange/exp(x*x);\n}\n\n\n\n//\n// generated methods //\n// \n\nfloat getFarFogThickness(float dist)\n{\n    if (uFogFalloffType == 0) // LINEAR\n    {\n        return linearFog(dist, uFarFogStart, uFarFogLength, uFarFogMin, uFarFogRange);\n    }\n    else if (uFogFalloffType == 1) // EXPONENTIAL\n    {\n        return exponentialFog(dist, uFarFogStart, uFarFogLength, uFarFogMin, uFarFogRange, uFarFogDensity);\n    }\n    else // EXPONENTIAL_SQUARED\n    {\n        return exponentialSquaredFog(dist, uFarFogStart, uFarFogLength, uFarFogMin, uFarFogRange, uFarFogDensity);\n    }\n}\n\nfloat getHeightFogThickness(float dist)\n{\n    if (!uHeightFogEnabled)\n    {\n        return 0.0;\n    }\n\n    if (uHeightFogFalloffType == 0) // LINEAR\n    {\n        return linearFog(dist, uHeightFogStart, uHeightFogLength, uHeightFogMin, uHeightFogRange);\n    }\n    else if (uHeightFogFalloffType == 1) // EXPONENTIAL\n    {\n        return exponentialFog(dist, uHeightFogStart, uHeightFogLength, uHeightFogMin, uHeightFogRange, uHeightFogDensity);\n    }\n    else // EXPONENTIAL_SQUARED\n    {\n        return exponentialSquaredFog(dist, uHeightFogStart, uHeightFogLength, uHeightFogMin, uHeightFogRange, uHeightFogDensity);\n    }\n}\n\n/** 1 = full fog, 0 = no fog */\nfloat calculateHeightFogDepth(float worldYPos)\n{\n    // worldYPos -65 - 384\n\n\n    //worldYPos = worldYPos * -1; // negative, fog below height; positive, fog above height\n    //return worldYPos * uFogVerticalScale; // "* uFogVerticalScale" is done to convert world position to a percent of the world height;\n\n    if (!uHeightFogEnabled)\n    {\n        // ignore the height\n        return 0.0;\n    }\n\n\n    if (!uHeightBasedOnCamera)\n    {\n        worldYPos -= (uHeightFogBaseHeight - uCameraBlockYPos);\n    }\n\n\n    if (uHeightFogAppliesDown && uHeightFogAppliesUp)\n    {\n        // TODO this aint right\n        return abs(worldYPos) * uFogVerticalScale;\n    }\n    else if (uHeightFogAppliesDown)\n    {\n        // apploy fog below given height\n        return -worldYPos * uFogVerticalScale;\n    }\n    else if (uHeightFogAppliesUp)\n    {\n        // apply fog above given height\n        return worldYPos * uFogVerticalScale;\n    }\n    else\n    {\n        // shouldn't happen,\n        return 0.0;\n    }\n\n}\n\nfloat mixFogThickness(float far, float height)\n{\n    switch (uHeightFogMixingMode)\n    {\n        case 0: // BASIC\n        case 1: // IGNORE_HEIGHT \n        return far;\n\n        case 2: // MAX\n        return max(far, height);\n\n        case 3: // ADDITION\n        return (far + height);\n\n        case 4: // MULTIPLY\n        return far * height;\n\n        case 5: // INVERSE_MULTIPLY\n        return (1.0 - (1.0-far)*(1.0-height));\n\n        case 6: // LIMITED_ADDITION\n        return (far + max(far, height));\n\n        case 7: // MULTIPLY_ADDITION\n        return (far + far*height);\n\n        case 8: // INVERSE_MULTIPLY_ADDITION\n        return (far + 1.0 - (1.0-far)*(1.0-height));\n\n        case 9: // AVERAGE\n        return (far*0.5 + height*0.5);\n    }\n\n    // shouldn't happen, but default to BASIC / IGNORE_HEIGHT\n    // if an invalid option is selected\n    return far;\n}\n\n\n\n]
+[15:48:02] [Render thread/INFO]: Shader loaded sucessfully.
+[15:48:02] [Render thread/INFO]: [System] [CHAT] [Distant Horizons] §f§l§uINFO:§r Shader loaded sucessfully.
+[15:48:02] [Render thread/INFO]: Loading shader with type: [35633]
+[15:48:02] [Render thread/INFO]: [System] [CHAT] [Distant Horizons] §f§l§uINFO:§r Loading shader with type: [35633]
+[15:48:02] [Render thread/INFO]: Source:
+[#version 150 core
+
+in vec2 vPosition;
+
+out vec2 TexCoord;
+
+/**
+ * This is specifically used by application shaders.
+ * IE post process or pixel transfer shaders, anything that is rendered using a single rectangle.
+ *
+ * TODO rename this shader to better denote the above message.
+ */
+void main()
+{
+    gl_Position = vec4(vPosition, 1.0, 1.0);
+    TexCoord = vPosition.xy * 0.5 + 0.5;
+}
+]
+[15:48:02] [Render thread/INFO]: [System] [CHAT] [Distant Horizons] §7§l§uDEBUG:§r Source: \n[#version 150 core\n\nin vec2 vPosition;\n\nout vec2 TexCoord;\n\n/** \n * This is specifically used by application shaders.\n * IE post process or pixel transfer shaders, anything that is rendered using a single rectangle.\n *\n * TODO rename this shader to better denote the above message.\n */\nvoid main()\n{\n    gl_Position = vec4(vPosition, 1.0, 1.0);\n    TexCoord = vPosition.xy * 0.5 + 0.5;\n}\n]
+[15:48:02] [Render thread/INFO]: Shader loaded sucessfully.
+[15:48:02] [Render thread/INFO]: [System] [CHAT] [Distant Horizons] §f§l§uINFO:§r Shader loaded sucessfully.
+[15:48:02] [Render thread/INFO]: Loading shader with type: [35632]
+[15:48:02] [Render thread/INFO]: [System] [CHAT] [Distant Horizons] §f§l§uINFO:§r Loading shader with type: [35632]
+[15:48:02] [Render thread/INFO]: Source:
+[#version 150 core
+
+in vec2 TexCoord;
+
+out vec4 fragColor;
+
+uniform sampler2D uColorTexture;
+uniform sampler2D uDepthTexture;
+
+
+/**
+ * Fog application shader
+ *
+ * This merges the rendered fog onto DH's rendered LODs
+ */
+void main()
+{
+    fragColor = vec4(0.0);
+
+    // a fragment depth of "1" means the fragment wasn't drawn to,
+    // only update fragments that were drawn to
+    float fragmentDepth = textureLod(uDepthTexture, TexCoord, 0).r;
+    if (fragmentDepth != 1)
+    {
+        fragColor = texture(uColorTexture, TexCoord);
+    }
+}
+]
+[15:48:02] [Render thread/INFO]: [System] [CHAT] [Distant Horizons] §7§l§uDEBUG:§r Source: \n[#version 150 core\n\nin vec2 TexCoord;\n\nout vec4 fragColor;\n\nuniform sampler2D uColorTexture;\nuniform sampler2D uDepthTexture;\n\n\n/** \n * Fog application shader\n *\n * This merges the rendered fog onto DH's rendered LODs\n */\nvoid main()\n{\n    fragColor = vec4(0.0);\n\n    // a fragment depth of "1" means the fragment wasn't drawn to,\n    // only update fragments that were drawn to\n    float fragmentDepth = textureLod(uDepthTexture, TexCoord, 0).r;\n    if (fragmentDepth != 1)\n    {\n        fragColor = texture(uColorTexture, TexCoord);\n    }\n}\n]
+[15:48:02] [Render thread/INFO]: Shader loaded sucessfully.
+[15:48:02] [Render thread/INFO]: [System] [CHAT] [Distant Horizons] §f§l§uINFO:§r Shader loaded sucessfully.
+[15:48:02] [Render thread/INFO]: Loading shader with type: [35633]
+[15:48:02] [Render thread/INFO]: [System] [CHAT] [Distant Horizons] §f§l§uINFO:§r Loading shader with type: [35633]
+[15:48:02] [Render thread/INFO]: Source:
+[#version 150 core
+
+in vec2 vPosition;
+
+out vec2 TexCoord;
+
+/**
+ * This is specifically used by application shaders.
+ * IE post process or pixel transfer shaders, anything that is rendered using a single rectangle.
+ *
+ * TODO rename this shader to better denote the above message.
+ */
+void main()
+{
+    gl_Position = vec4(vPosition, 1.0, 1.0);
+    TexCoord = vPosition.xy * 0.5 + 0.5;
+}
+]
+[15:48:02] [Render thread/INFO]: [System] [CHAT] [Distant Horizons] §7§l§uDEBUG:§r Source: \n[#version 150 core\n\nin vec2 vPosition;\n\nout vec2 TexCoord;\n\n/** \n * This is specifically used by application shaders.\n * IE post process or pixel transfer shaders, anything that is rendered using a single rectangle.\n *\n * TODO rename this shader to better denote the above message.\n */\nvoid main()\n{\n    gl_Position = vec4(vPosition, 1.0, 1.0);\n    TexCoord = vPosition.xy * 0.5 + 0.5;\n}\n]
+[15:48:02] [Render thread/INFO]: Shader loaded sucessfully.
+[15:48:02] [Render thread/INFO]: [System] [CHAT] [Distant Horizons] §f§l§uINFO:§r Shader loaded sucessfully.
+[15:48:02] [Render thread/INFO]: Loading shader with type: [35632]
+[15:48:02] [Render thread/INFO]: [System] [CHAT] [Distant Horizons] §f§l§uINFO:§r Loading shader with type: [35632]
+[15:48:02] [Render thread/INFO]: Source:
+[#version 150 core
+
+in vec2 TexCoord;
+
+out vec4 fragColor;
+
+uniform sampler2D gDhColorTexture;
+uniform sampler2D gDhDepthTexture;
+
+
+/**
+ * LOD application shader
+ *
+ * This merges the rendered LODs into Minecraft's texture/FBO
+ */
+void main()
+{
+    fragColor = vec4(0.0);
+
+    // a fragment depth of "1" means the fragment wasn't drawn to,
+    // only update fragments that were drawn to
+    float fragmentDepth = texture(gDhDepthTexture, TexCoord).r;
+    if (fragmentDepth != 1)
+    {
+        fragColor = texture(gDhColorTexture, TexCoord);
+    }
+    else
+    {
+        // use the original MC texture if no LODs were drawn to this fragment
+        discard;
+    }
+}
+
+]
+[15:48:02] [Render thread/INFO]: [System] [CHAT] [Distant Horizons] §7§l§uDEBUG:§r Source: \n[#version 150 core\n\nin vec2 TexCoord;\n\nout vec4 fragColor;\n\nuniform sampler2D gDhColorTexture;\nuniform sampler2D gDhDepthTexture;\n\n\n/** \n * LOD application shader\n *\n * This merges the rendered LODs into Minecraft's texture/FBO   \n */\nvoid main()\n{\n    fragColor = vec4(0.0);\n    \n    // a fragment depth of "1" means the fragment wasn't drawn to,\n    // only update fragments that were drawn to\n    float fragmentDepth = texture(gDhDepthTexture, TexCoord).r;\n    if (fragmentDepth != 1)\n    {\n        fragColor = texture(gDhColorTexture, TexCoord);\n    }\n    else\n    {\n        // use the original MC texture if no LODs were drawn to this fragment\n        discard;\n    }\n}\n\n]
+[15:48:02] [Render thread/INFO]: Shader loaded sucessfully.
+[15:48:02] [Render thread/INFO]: [System] [CHAT] [Distant Horizons] §f§l§uINFO:§r Shader loaded sucessfully.
+[15:48:02] [Render thread/INFO]: Loading shader with type: [35633]
+[15:48:02] [Render thread/INFO]: [System] [CHAT] [Distant Horizons] §f§l§uINFO:§r Loading shader with type: [35633]
+[15:48:02] [Render thread/INFO]: Source:
+[#version 150 core
+
+in vec2 vPosition;
+
+out vec2 TexCoord;
+
+/**
+ * This is specifically used by application shaders.
+ * IE post process or pixel transfer shaders, anything that is rendered using a single rectangle.
+ *
+ * TODO rename this shader to better denote the above message.
+ */
+void main()
+{
+    gl_Position = vec4(vPosition, 1.0, 1.0);
+    TexCoord = vPosition.xy * 0.5 + 0.5;
+}
+]
+[15:48:02] [Render thread/INFO]: [System] [CHAT] [Distant Horizons] §7§l§uDEBUG:§r Source: \n[#version 150 core\n\nin vec2 vPosition;\n\nout vec2 TexCoord;\n\n/** \n * This is specifically used by application shaders.\n * IE post process or pixel transfer shaders, anything that is rendered using a single rectangle.\n *\n * TODO rename this shader to better denote the above message.\n */\nvoid main()\n{\n    gl_Position = vec4(vPosition, 1.0, 1.0);\n    TexCoord = vPosition.xy * 0.5 + 0.5;\n}\n]
+[15:48:02] [Render thread/INFO]: Shader loaded sucessfully.
+[15:48:02] [Render thread/INFO]: [System] [CHAT] [Distant Horizons] §f§l§uINFO:§r Shader loaded sucessfully.
+[15:48:02] [Render thread/INFO]: Loading shader with type: [35632]
+[15:48:02] [Render thread/INFO]: [System] [CHAT] [Distant Horizons] §f§l§uINFO:§r Loading shader with type: [35632]
+[15:48:02] [Render thread/INFO]: Source:
+[#version 150 core
+
+in vec2 TexCoord;
+
+out vec4 fragColor;
+
+// inverted model view matrix and projection matrix
+uniform mat4 uDhInvMvmProj;
+uniform mat4 uMcInvMvmProj;
+
+uniform sampler2D uMcDepthTexture;
+uniform sampler2D uDhDepthTexture;
+uniform sampler2D uCombinedMcDhColorTexture;
+uniform sampler2D uDhColorTexture;
+
+uniform float uStartFadeBlockDistance;
+uniform float uEndFadeBlockDistance;
+uniform float uMaxLevelHeight;
+
+uniform bool uOnlyRenderLods;
+
+
+
+vec3 calcViewPosition(float fragmentDepth, mat4 invMvmProj)
+{
+    // normalized device coordinates
+    vec4 ndc = vec4(TexCoord.xy, fragmentDepth, 1.0);
+    ndc.xyz = ndc.xyz * 2.0 - 1.0;
+
+    vec4 eyeCoord = invMvmProj * ndc;
+    return eyeCoord.xyz / eyeCoord.w;
+}
+
+/**
+ * Used to fade out vanilla chunks so the transition
+ * between DH and vanilla is smoother.
+ */
+void main()
+{
+    // includes both the vanilla chunks as well as DH
+    vec4 combinedMcDhColor = texture(uCombinedMcDhColorTexture, TexCoord);
+    // just the DH render pass
+    vec4 dhColor = texture(uDhColorTexture, TexCoord);
+
+    // completely remove the MC render pass to only show LODs
+    // useful for debugging/troubleshooting, but doesn't improve performance since MC is still rendering
+    if (uOnlyRenderLods)
+    {
+        fragColor = dhColor;
+        return;
+    }
+
+
+    // the DH texture will have white if nothing was written to that pixel.
+    // TODO replace with a depth texture check, this feels janky
+    if (dhColor == vec4(1))
+    {
+        // if not done vanilla clouds will render incorrectly at night
+        dhColor = combinedMcDhColor;
+    }
+
+    float mcFragmentDepth = texture(uMcDepthTexture, TexCoord).r;
+    float dhFragmentDepth = texture(uDhDepthTexture, TexCoord).r;
+    vec3 dhVertexWorldPos = calcViewPosition(dhFragmentDepth, uDhInvMvmProj);
+
+        // this is a work around to prevent MC clouds rendering behind DH clouds
+    if (dhVertexWorldPos.y > uMaxLevelHeight)
+    {
+        fragColor = vec4(combinedMcDhColor.rgb, 0.0);
+    }
+    // a fragment depth of "1" means the fragment wasn't drawn to,
+    // we only want to fade vanilla rendered objects, not to the sky or LODs
+    else if (mcFragmentDepth < 1.0)
+    {
+        // fade based on distance from the camera
+        vec3 mcVertexWorldPos = calcViewPosition(mcFragmentDepth, uMcInvMvmProj);
+        float mcFragmentDistance = length(mcVertexWorldPos.xzy);
+
+
+        // Smoothly transition between combinedMcDhColor and uDhColorTexture
+        // as the depth increases from the camera
+        float fadeStep = smoothstep(uStartFadeBlockDistance, uEndFadeBlockDistance, mcFragmentDistance);
+        fragColor = mix(combinedMcDhColor, dhColor, fadeStep);
+        fragColor.a = 1.0; // TODO is setting the alpha needed?
+    }
+    else
+    {
+        fragColor = vec4(combinedMcDhColor.rgb, 0.0);
+    }
+}
+
+]
+[15:48:02] [Render thread/INFO]: [System] [CHAT] [Distant Horizons] §7§l§uDEBUG:§r Source: \n[#version 150 core\n\nin vec2 TexCoord;\n\nout vec4 fragColor;\n\n// inverted model view matrix and projection matrix\nuniform mat4 uDhInvMvmProj;\nuniform mat4 uMcInvMvmProj;\n\nuniform sampler2D uMcDepthTexture;\nuniform sampler2D uDhDepthTexture;\nuniform sampler2D uCombinedMcDhColorTexture;\nuniform sampler2D uDhColorTexture;\n\nuniform float uStartFadeBlockDistance;\nuniform float uEndFadeBlockDistance;\nuniform float uMaxLevelHeight;\n\nuniform bool uOnlyRenderLods;\n\n\n\nvec3 calcViewPosition(float fragmentDepth, mat4 invMvmProj) \n{\n    // normalized device coordinates\n    vec4 ndc = vec4(TexCoord.xy, fragmentDepth, 1.0);\n    ndc.xyz = ndc.xyz * 2.0 - 1.0;\n\n    vec4 eyeCoord = invMvmProj * ndc;\n    return eyeCoord.xyz / eyeCoord.w;\n}\n\n/**\n * Used to fade out vanilla chunks so the transition\n * between DH and vanilla is smoother.\n */\nvoid main() \n{\n    // includes both the vanilla chunks as well as DH\n    vec4 combinedMcDhColor = texture(uCombinedMcDhColorTexture, TexCoord);\n    // just the DH render pass\n    vec4 dhColor = texture(uDhColorTexture, TexCoord);\n    \n    // completely remove the MC render pass to only show LODs\n    // useful for debugging/troubleshooting, but doesn't improve performance since MC is still rendering\n    if (uOnlyRenderLods)\n    {\n        fragColor = dhColor;\n        return;\n    }\n    \n    \n    // the DH texture will have white if nothing was written to that pixel.\n    // TODO replace with a depth texture check, this feels janky\n    if (dhColor == vec4(1))\n    {\n        // if not done vanilla clouds will render incorrectly at night\n        dhColor = combinedMcDhColor;\n    }\n    \n    float mcFragmentDepth = texture(uMcDepthTexture, TexCoord).r;\n    float dhFragmentDepth = texture(uDhDepthTexture, TexCoord).r;\n    vec3 dhVertexWorldPos = calcViewPosition(dhFragmentDepth, uDhInvMvmProj);\n    \n // this is a work around to prevent MC clouds rendering behind DH clouds\n    if (dhVertexWorldPos.y > uMaxLevelHeight)\n    {\n        fragColor = vec4(combinedMcDhColor.rgb, 0.0);\n    }\n    // a fragment depth of "1" means the fragment wasn't drawn to,\n    // we only want to fade vanilla rendered objects, not to the sky or LODs\n    else if (mcFragmentDepth < 1.0) \n    {\n        // fade based on distance from the camera\n        vec3 mcVertexWorldPos = calcViewPosition(mcFragmentDepth, uMcInvMvmProj);\n        float mcFragmentDistance = length(mcVertexWorldPos.xzy);\n        \n        \n        // Smoothly transition between combinedMcDhColor and uDhColorTexture\n        // as the depth increases from the camera\n        float fadeStep = smoothstep(uStartFadeBlockDistance, uEndFadeBlockDistance, mcFragmentDistance);\n        fragColor = mix(combinedMcDhColor, dhColor, fadeStep);\n        fragColor.a = 1.0; // TODO is setting the alpha needed?\n    }\n    else\n    {\n        fragColor = vec4(combinedMcDhColor.rgb, 0.0);\n    }\n}\n\n]
+[15:48:02] [Render thread/INFO]: Shader loaded sucessfully.
+[15:48:02] [Render thread/INFO]: [System] [CHAT] [Distant Horizons] §f§l§uINFO:§r Shader loaded sucessfully.
+[15:48:02] [Render thread/INFO]: Resizing Dynamic Transforms UBO, capacity limit of 4 reached during a single frame. New capacity will be 8.
+[15:48:04] [Server thread/INFO]: Saving and pausing game...
+[15:48:04] [Server thread/INFO]: Saving chunks for level 'ServerLevel[New World]'/minecraft:overworld
+[15:48:04] [Server thread/INFO]: Saving chunks for level 'ServerLevel[New World]'/minecraft:the_end
+[15:48:04] [Server thread/INFO]: Saving chunks for level 'ServerLevel[New World]'/minecraft:the_nether
+[15:48:06] [Render thread/INFO]: [System] [CHAT] §6Distant Horizons: Low memory detected.§r \nStuttering or low FPS may occur. \nPlease increase Minecraft's available memory to 4 GB or more. \nThis warning can be disabled in DH's config under Advanced -> Logging. \n
+[15:48:09] [Server thread/INFO]: Saving and pausing game...
+[15:48:09] [Server thread/INFO]: Saving chunks for level 'ServerLevel[New World]'/minecraft:overworld
+[15:48:09] [Server thread/INFO]: Saving chunks for level 'ServerLevel[New World]'/minecraft:the_end
+[15:48:09] [Server thread/INFO]: Saving chunks for level 'ServerLevel[New World]'/minecraft:the_nether
+[15:48:09] [Render thread/INFO]: Client on ClientOnly mode disconnecting.
+[15:48:09] [level shutdown/INFO]: Shutting down ClientRenderState
+[15:48:09] [level shutdown/INFO]: Shutting down LodQuadTree...
+[15:48:09] [level shutdown/INFO]: Closing [GeneratedFullDataSourceProvider] for level: [minecraft:the_end].
+[15:48:09] [level shutdown/INFO]: Closing [GeneratedFullDataSourceProvider] for level: [minecraft:the_nether].
+[15:48:09] [level shutdown/INFO]: Closed DHLevel for [Wrapped{ServerLevel[New World]@minecraft:the_nether}].
+[15:48:09] [level shutdown/INFO]: Closed DHLevel for [Wrapped{ServerLevel[New World]@minecraft:the_end}].
+[15:48:09] [level shutdown/INFO]: Finished shutting down LodQuadTree
+[15:48:09] [level shutdown/INFO]: Closing [GeneratedFullDataSourceProvider] for level: [minecraft:the_nether].
+[15:48:09] [level shutdown/INFO]: Closing [GeneratedFullDataSourceProvider] for level: [minecraft:overworld].
+[15:48:09] [level shutdown/INFO]: Closing [GeneratedFullDataSourceProvider] for level: [minecraft:the_end].
+[15:48:09] [level shutdown/INFO]: Closed DHLevel for [Wrapped{ServerLevel[New World]@minecraft:overworld}].
+[15:48:09] [level shutdown/INFO]: Closing [GeneratedFullDataSourceProvider] for level: [minecraft:overworld].
+[15:48:09] [level shutdown/INFO]: Closed DhClientServerLevel for Wrapped{ServerLevel[New World]@minecraft:the_nether}
+[15:48:09] [level shutdown/INFO]: Closed DhClientServerLevel for Wrapped{ServerLevel[New World]@minecraft:the_end}
+[15:48:09] [level shutdown/INFO]: Closed DhClientServerLevel for Wrapped{ServerLevel[New World]@minecraft:overworld}
+[15:48:09] [Render thread/INFO]: Closed DhWorld of type CLIENT_SERVER
+[15:48:09] [level shutdown/INFO]: Closing [GeneratedFullDataSourceProvider] for level: [minecraft:overworld].
+[15:48:09] [level shutdown/INFO]: Closed DHLevel for [Wrapped{ServerLevel[New World]@minecraft:overworld}].
+[15:48:09] [level shutdown/INFO]: Closing [GeneratedFullDataSourceProvider] for level: [minecraft:the_end].
+[15:48:09] [level shutdown/INFO]: Closing [GeneratedFullDataSourceProvider] for level: [minecraft:overworld].
+[15:48:09] [level shutdown/INFO]: Closed DhClientServerLevel for Wrapped{ServerLevel[New World]@minecraft:overworld}
+[15:48:09] [level shutdown/INFO]: Closed DHLevel for [Wrapped{ServerLevel[New World]@minecraft:the_end}].
+[15:48:09] [level shutdown/INFO]: Closing [GeneratedFullDataSourceProvider] for level: [minecraft:the_end].
+[15:48:09] [level shutdown/INFO]: Closed DhClientServerLevel for Wrapped{ServerLevel[New World]@minecraft:the_end}
+[15:48:09] [level shutdown/INFO]: Closing [GeneratedFullDataSourceProvider] for level: [minecraft:the_nether].
+[15:48:09] [level shutdown/INFO]: Closed DHLevel for [Wrapped{ServerLevel[New World]@minecraft:the_nether}].
+[15:48:09] [level shutdown/INFO]: Closing [GeneratedFullDataSourceProvider] for level: [minecraft:the_nether].
+[15:48:09] [level shutdown/INFO]: Closed DhClientServerLevel for Wrapped{ServerLevel[New World]@minecraft:the_nether}
+[15:48:09] [Render thread/INFO]: Closed DhWorld of type CLIENT_SERVER
+[15:48:09] [Render thread/INFO]: Shutting down PriorityTaskPicker thread pool...
+[15:48:09] [Render thread/INFO]: Closing all [3] database connections...
+[15:48:09] [Render thread/INFO]: Closing database connection: [jdbc:sqlite:/home/matt/Documents/Repos/MattMC/run/saves/New World/DIM1/data/DistantHorizons.sqlite]
+[15:48:09] [Render thread/INFO]: Closing database connection: [jdbc:sqlite:/home/matt/Documents/Repos/MattMC/run/saves/New World/data/DistantHorizons.sqlite]
+[15:48:09] [Render thread/INFO]: Closing database connection: [jdbc:sqlite:/home/matt/Documents/Repos/MattMC/run/saves/New World/DIM-1/data/DistantHorizons.sqlite]
+[15:48:09] [Server thread/INFO]: Player500 lost connection: Disconnected
+[15:48:09] [Server thread/INFO]: Player500 left the game
+[15:48:09] [Server thread/INFO]: Stopping singleplayer server as player logged out
+[15:48:09] [Server thread/INFO]: Stopping server
+[15:48:09] [Server thread/INFO]: Saving players
+[15:48:09] [Server thread/INFO]: Saving worlds
+[15:48:09] [Server thread/INFO]: Saving chunks for level 'ServerLevel[New World]'/minecraft:overworld
+[15:48:09] [Server thread/INFO]: Saving chunks for level 'ServerLevel[New World]'/minecraft:the_end
+[15:48:09] [Server thread/INFO]: Saving chunks for level 'ServerLevel[New World]'/minecraft:the_nether
+[15:48:10] [Server thread/INFO]: ThreadedAnvilChunkStorage (New World): All chunks are saved
+[15:48:10] [Server thread/INFO]: ThreadedAnvilChunkStorage (DIM1): All chunks are saved
+[15:48:10] [Server thread/INFO]: ThreadedAnvilChunkStorage (DIM-1): All chunks are saved
+[15:48:10] [Server thread/INFO]: ThreadedAnvilChunkStorage: All dimensions are saved
+[15:48:10] [Server thread/INFO]: Server Level Wrapped{ServerLevel[New World]@minecraft:overworld} unloading
+[15:48:10] [Server thread/INFO]: Server Level Wrapped{ServerLevel[New World]@minecraft:the_end} unloading
+[15:48:10] [Server thread/INFO]: Server Level Wrapped{ServerLevel[New World]@minecraft:the_nether} unloading
+[15:48:10] [Server thread/INFO]: Server World null unloading
+[15:48:10] [Render thread/INFO]: Unloading client level [ClientLevelWrapper]-[dmamb227j9c6e@minecraft:overworld].
+[15:48:10] [Render thread/INFO]: Stopping worker threads
+[15:48:10] [Render thread/INFO]: Stopping!
+
+BUILD SUCCESSFUL in 37s
+18 actionable tasks: 6 executed, 4 from cache, 8 up-to-date
 matt@HungLoDE:~/Documents/Repos/MattMC$
 
 
