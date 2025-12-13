@@ -667,9 +667,11 @@ public class ClassicConfigGUI
 		}
 		#else
 		@Override
-		public void renderContent(GuiGraphics matrices, int i, int j, boolean hovered, float tickDelta)
+		public void renderContent(GuiGraphics matrices, int mouseX, int mouseY, boolean hovered, float tickDelta)
 		{
-			renderInternal(matrices, j, i, 0, hovered, tickDelta);
+			// In MC 1.21.8+, renderContent receives mouseX/mouseY, not the row y position
+			// We need to use this.getY() to get the entry's actual y position
+			renderInternal(matrices, this.getY(), mouseX, mouseY, hovered, tickDelta);
 		}
 		#endif
 		

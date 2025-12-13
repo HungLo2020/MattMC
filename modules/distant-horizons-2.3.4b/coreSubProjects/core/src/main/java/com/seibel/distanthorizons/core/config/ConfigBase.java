@@ -5,8 +5,7 @@
 package com.seibel.distanthorizons.core.config;
 
 import com.seibel.distanthorizons.core.config.types.AbstractConfigType;
-import java.lang.reflect.Field;
-import java.lang.reflect.Modifier;
+import com.seibel.distanthorizons.core.config.types.AbstractConfigBase;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -21,7 +20,12 @@ public class ConfigBase
     public final String modID;
     public final String modName;
     
-    public final List<AbstractConfigType<?, ?>> entries = new ArrayList<>();
+    /**
+     * Returns the config entries from ConfigHandler.
+     * This is a view that delegates to ConfigHandler.INSTANCE.configBaseList
+     * to ensure entries have proper category/name initialized.
+     */
+    public final List<AbstractConfigType<?, ?>> entries = new EntriesListView();
     public ConfigFile configFileINSTANCE;
     
     public ConfigBase(String modId, String modName, Class<?> configClass, int configFileVersion) {
@@ -29,32 +33,47 @@ public class ConfigBase
         this.modName = modName;
         this.configFileINSTANCE = new ConfigFile(modId);
         
-        // Scan the config class to collect all AbstractConfigType entries
-        collectConfigEntries(configClass, entries);
+        // Initialize the config system properly through ConfigHandler
+        // This sets category and name on all config entries
+        ConfigHandler.tryRunFirstTimeSetup();
     }
     
     /**
-     * Recursively scans a class and its inner classes for AbstractConfigType fields
+     * A view list that delegates to ConfigHandler.INSTANCE.configBaseList
+     * filtering only for AbstractConfigType entries.
      */
-    private static void collectConfigEntries(Class<?> clazz, List<AbstractConfigType<?, ?>> entries) {
-        // Scan all static fields of this class
-        for (Field field : clazz.getDeclaredFields()) {
-            if (Modifier.isStatic(field.getModifiers())) {
-                try {
-                    field.setAccessible(true);
-                    Object value = field.get(null);
-                    if (value instanceof AbstractConfigType<?, ?>) {
-                        entries.add((AbstractConfigType<?, ?>) value);
-                    }
-                } catch (IllegalAccessException | SecurityException e) {
-                    // These exceptions are expected for some fields - ignore silently
-                }
-            }
+    private static class EntriesListView extends ArrayList<AbstractConfigType<?, ?>> {
+        @Override
+        public int size() {
+            return (int) ConfigHandler.INSTANCE.configBaseList.stream()
+                .filter(e -> e instanceof AbstractConfigType)
+                .count();
         }
         
-        // Recursively scan inner classes
-        for (Class<?> innerClass : clazz.getDeclaredClasses()) {
-            collectConfigEntries(innerClass, entries);
+        @Override
+        public AbstractConfigType<?, ?> get(int index) {
+            int i = 0;
+            for (AbstractConfigBase<?> entry : ConfigHandler.INSTANCE.configBaseList) {
+                if (entry instanceof AbstractConfigType) {
+                    if (i == index) {
+                        return (AbstractConfigType<?, ?>) entry;
+                    }
+                    i++;
+                }
+            }
+            throw new IndexOutOfBoundsException("Index: " + index);
+        }
+        
+        @Override
+        @SuppressWarnings("unchecked")
+        public java.util.Iterator<AbstractConfigType<?, ?>> iterator() {
+            List<AbstractConfigType<?, ?>> list = new ArrayList<>();
+            for (AbstractConfigBase<?> entry : ConfigHandler.INSTANCE.configBaseList) {
+                if (entry instanceof AbstractConfigType) {
+                    list.add((AbstractConfigType<?, ?>) entry);
+                }
+            }
+            return list.iterator();
         }
     }
     
@@ -76,11 +95,11 @@ public class ConfigBase
         }
         
         public void saveToFile() {
-            // Delegate to new config system - stub for compatibility
+            ConfigHandler.INSTANCE.configFileHandler.saveToFile();
         }
         
         public void loadFromFile() {
-            // Delegate to new config system - stub for compatibility
+            ConfigHandler.INSTANCE.configFileHandler.loadFromFile();
         }
     }
 }
