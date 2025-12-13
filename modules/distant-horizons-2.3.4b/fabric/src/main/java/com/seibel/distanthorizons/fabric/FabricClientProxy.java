@@ -219,6 +219,10 @@ public class FabricClientProxy implements AbstractModInitializer.IEventProxy
 
 		WorldRenderEvents.AFTER_SETUP.register((renderContext) ->
 		{
+			ClientApi.RENDER_STATE.mcModelViewMatrix = McObjectConverter.Convert(renderContext.matrixStack().last().pose());
+			ClientApi.RENDER_STATE.mcProjectionMatrix = McObjectConverter.Convert(renderContext.projectionMatrix());
+			ClientApi.RENDER_STATE.frameTime = renderContext.tickDelta();
+			ClientApi.RENDER_STATE.clientLevelWrapper = ClientLevelWrapper.getWrapper(renderContext.world());
 			// Store render state for DH to use
 			// New API uses parameterless methods that get state internally
 			this.clientApi.renderLods();
