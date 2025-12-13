@@ -737,12 +737,13 @@ public abstract class MinecraftServer extends ReentrantBlockableEventLoop<TickTa
 
 	protected void runServer() {
 		try {
+			// Fire Fabric ServerLifecycleEvents.SERVER_STARTING for Distant Horizons
+			// MUST fire BEFORE initServer() so DH world is created before levels are loaded
+			ServerLifecycleEvents.SERVER_STARTING.invoker().onServerStarting(this);
+			
 			if (!this.initServer()) {
 				throw new IllegalStateException("Failed to initialize server");
 			}
-			
-			// Fire Fabric ServerLifecycleEvents.SERVER_STARTING for Distant Horizons
-			ServerLifecycleEvents.SERVER_STARTING.invoker().onServerStarting(this);
 
 			this.nextTickTimeNanos = Util.getNanos();
 			this.statusIcon = (ServerStatus.Favicon)this.loadStatusIcon().orElse(null);
