@@ -29,6 +29,11 @@ public class EventTimer
         this.endTime = System.nanoTime();
     }
     
+    public void complete()
+    {
+        stop();
+    }
+    
     public void nextEvent(String eventName)
     {
         // Mark the end of current event and start of next

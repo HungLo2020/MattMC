@@ -39,9 +39,13 @@ public class ConfigBasedSpamLogger
     
     private boolean isEnabled() { return enabledSupplier.get(); }
     
+    public boolean canMaybeLog() { return isEnabled(); }
+    
     public void trace(String message, Object... args) { if (isEnabled()) logger.trace(message, args); }
     public void debug(String message, Object... args) { if (isEnabled()) logger.debug(message, args); }
+    public void debugInc(String message, Object... args) { if (isEnabled()) logger.debug(message, args); }
     public void info(String message, Object... args) { if (isEnabled()) logger.info(message, args); }
+    public void infoInc(String message, Object... args) { if (isEnabled()) logger.info(message, args); }
     public void warn(String message, Object... args) { if (isEnabled()) logger.warn(message, args); }
     public void error(String message, Object... args) { if (isEnabled()) logger.error(message, args); }
     public void error(String message, Throwable t) { if (isEnabled()) logger.error(message, t); }
