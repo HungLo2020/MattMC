@@ -1412,10 +1412,15 @@ public class Config
 		{
 			public static ConfigUIComment lodBuildingHeader = new ConfigUIComment.Builder().setParentConfigClass(LodBuilding.class).build();
 			
-			// Compatibility entry for wrapper code
+			// Compatibility entries for wrapper code
 			public static ConfigEntry<Boolean> pullLightingForPregeneratedChunks = new ConfigEntry.Builder<Boolean>()
 					.set(true)
 					.comment("Pull lighting for pregenerated chunks")
+					.build();
+			
+			public static ConfigEntry<Boolean> assumePreExistingChunksAreFinished = new ConfigEntry.Builder<Boolean>()
+					.set(true)
+					.comment("Assume pre-existing chunks are finished")
 					.build();
 			
 			public static ConfigEntry<Boolean> disableUnchangedChunkCheck = new ConfigEntry.Builder<Boolean>()

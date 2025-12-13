@@ -20,7 +20,7 @@ public final class RegionFileStorage implements AutoCloseable {
 	private static final int MAX_CACHE_SIZE = 256;
 	public final Long2ObjectLinkedOpenHashMap<RegionFile> regionCache = new Long2ObjectLinkedOpenHashMap<>();
 	private final RegionStorageInfo info;
-	private final Path folder;
+	public final Path folder;
 	private final boolean sync;
 
 	RegionFileStorage(RegionStorageInfo regionStorageInfo, Path path, boolean bl) {
