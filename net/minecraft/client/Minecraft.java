@@ -399,10 +399,6 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 	public Minecraft(GameConfig gameConfig) {
 		super("Client");
 		instance = this;
-		
-		// Initialize Fabric client mods before anything else
-		ModInitializationManager.getInstance().initializeClientMods();
-		
 		this.clientStartTimeMs = System.currentTimeMillis();
 		this.gameDirectory = gameConfig.location.gameDirectory;
 		File file = gameConfig.location.assetDirectory;
@@ -438,6 +434,9 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 		this.fixerUpper = DataFixers.getDataFixer();
 		this.gameThread = Thread.currentThread();
 		this.options = new Options(this, this.gameDirectory);
+		
+		// Initialize Fabric client mods after basic initialization (gameDirectory must be set)
+		ModInitializationManager.getInstance().initializeClientMods();
 		this.debugEntries = new DebugScreenEntryList(this.gameDirectory);
 		this.toastManager = new ToastManager(this, this.options);
 		boolean bl = this.options.startedCleanly;
