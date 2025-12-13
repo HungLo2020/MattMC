@@ -1,25 +1,26 @@
 /*
  * Compatibility shim for AbstractConfigType
+ * Makes it extend AbstractConfigBase to maintain compatibility with old wrapper code
  */
 package com.seibel.distanthorizons.core.config.types;
 
+import com.seibel.distanthorizons.core.config.types.enums.EConfigEntryAppearance;
+
 /**
  * Compatibility class for old wrapper code that expects AbstractConfigType.
- * The new API uses different config type classes.
+ * This extends AbstractConfigBase to provide type compatibility.
  */
-public abstract class AbstractConfigType<T, SELF extends AbstractConfigType<T, SELF>>
+public class AbstractConfigType<T, SELF extends AbstractConfigType<T, SELF>> extends AbstractConfigBase<T>
 {
-    protected T value;
-    protected String name;
-    protected String comment;
+    // The SELF parameter is ignored but kept for signature compatibility
     
-    public T get() { return value; }
-    public void set(T value) { this.value = value; }
-    public String getName() { return name; }
-    public String getComment() { return comment; }
+    public AbstractConfigType() {
+        super(EConfigEntryAppearance.ALL, null);
+    }
     
-    // GUI-related methods
+    // Convenience methods for old API compatibility
+    public String getComment() { return ""; }
     public boolean shouldShowInGui() { return true; }
-    public String getDisplayName() { return name; }
-    public String getTranslationKey() { return name; }
+    public String getDisplayName() { return this.name; }
+    public String getTranslationKey() { return this.name; }
 }
