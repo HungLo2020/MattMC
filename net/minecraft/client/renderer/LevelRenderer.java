@@ -106,6 +106,7 @@ import org.joml.Matrix4fc;
 import org.joml.Vector3f;
 import org.joml.Vector4f;
 import org.slf4j.Logger;
+import net.fabricmc.fabric.api.client.rendering.v1.WorldRenderEvents;
 
 @Environment(EnvType.CLIENT)
 public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseable {
@@ -583,6 +584,11 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 		ResourceHandle<RenderTarget> resourceHandle2 = this.targets.translucent;
 		ResourceHandle<RenderTarget> resourceHandle3 = this.targets.itemEntity;
 		ResourceHandle<RenderTarget> resourceHandle4 = this.targets.entityOutline;
+		
+		// Capture variables for WorldRenderContext - need to get them outside the lambda
+		final Camera renderCamera = this.minecraft.gameRenderer.getMainCamera();
+		final float tickDeltaValue = deltaTracker.getGameTimeDeltaPartialTick(false);
+		
 		framePass.executes(() -> {
 			iris$renderMainPassBody();
 			RenderSystem.setShaderFog(gpuBufferSlice);
@@ -594,6 +600,14 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 			ChunkSectionsToRender chunkSectionsToRender = this.prepareChunkRenders(matrix4f, d, e, f);
 			iris$renderTerrainGroup(chunkSectionsToRender, ChunkSectionLayerGroup.OPAQUE);
 			this.minecraft.gameRenderer.getLighting().setupFor(Lighting.Entry.LEVEL);
+			
+			// Fire AFTER_SETUP event for Distant Horizons after terrain setup
+			PoseStack setupPoseStack = new PoseStack();
+			WorldRenderEvents.WorldRenderContext afterSetupContext = new WorldRenderContextImpl(
+				this.level, setupPoseStack, tickDeltaValue, renderCamera, matrix4f
+			);
+			WorldRenderEvents.AFTER_SETUP.invoker().afterSetup(afterSetupContext);
+			
 			if (resourceHandle3 != null) {
 				resourceHandle3.get().copyDepthFrom(this.minecraft.getMainRenderTarget());
 			}
@@ -638,6 +652,13 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 			this.gameTestBlockHighlightRenderer.render(poseStack, bufferSource);
 			bufferSource.endLastBatch();
 			this.checkPoseStack(poseStack);
+			
+			// Fire AFTER_ENTITIES event for Distant Horizons after entity rendering
+			WorldRenderEvents.WorldRenderContext afterEntitiesContext = new WorldRenderContextImpl(
+				this.level, poseStack, tickDeltaValue, renderCamera, matrix4f
+			);
+			WorldRenderEvents.AFTER_ENTITIES.invoker().afterEntities(afterEntitiesContext);
+			
 			bufferSource.endBatch(Sheets.translucentItemSheet());
 			bufferSource.endBatch(Sheets.bannerSheet());
 			bufferSource.endBatch(Sheets.shieldSheet());
@@ -667,6 +688,12 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 
 			bufferSource.endBatch();
 			profilerFiller.pop();
+			
+			// Fire AFTER_TRANSLUCENT event for Distant Horizons after translucent rendering
+			WorldRenderEvents.WorldRenderContext afterTranslucentContext = new WorldRenderContextImpl(
+				this.level, poseStack, tickDeltaValue, renderCamera, matrix4f
+			);
+			WorldRenderEvents.AFTER_TRANSLUCENT.invoker().afterTranslucent(afterTranslucentContext);
 		});
 	}
 
@@ -1498,5 +1525,59 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 	// Wrapper method for feature rendering in particles pass - allows Iris mixins to intercept
 	public void iris$renderAllFeaturesParticles() {
 		this.featureRenderDispatcher.renderAllFeatures();
+	}
+	
+	/**
+	 * WorldRenderContext implementation for Fabric API events used by Distant Horizons
+	 */
+	private static class WorldRenderContextImpl implements net.fabricmc.fabric.api.client.rendering.v1.WorldRenderEvents.WorldRenderContext {
+		private final ClientLevel level;
+		private final PoseStack poseStack;
+		private final float tickDelta;
+		private final Camera camera;
+		private final Matrix4f projectionMatrix;
+		
+		public WorldRenderContextImpl(ClientLevel level, PoseStack poseStack, float tickDelta, Camera camera, Matrix4f projectionMatrix) {
+			this.level = level;
+			this.poseStack = poseStack;
+			this.tickDelta = tickDelta;
+			this.camera = camera;
+			this.projectionMatrix = projectionMatrix;
+		}
+		
+		@Override
+		public ClientLevel world() {
+			return this.level;
+		}
+		
+		@Override
+		public PoseStack matrixStack() {
+			return this.poseStack;
+		}
+		
+		@Override
+		public float tickDelta() {
+			return this.tickDelta;
+		}
+		
+		@Override
+		public long limitTime() {
+			return 0;
+		}
+		
+		@Override
+		public boolean blockOutlines() {
+			return true;
+		}
+		
+		@Override
+		public Camera camera() {
+			return this.camera;
+		}
+		
+		@Override
+		public Matrix4f projectionMatrix() {
+			return this.projectionMatrix;
+		}
 	}
 }
