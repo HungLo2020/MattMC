@@ -18,6 +18,7 @@ import java.util.regex.Pattern;
 import com.seibel.distanthorizons.api.enums.config.DisallowSelectingViaConfigGui;
 import com.seibel.distanthorizons.core.config.Config;
 import com.seibel.distanthorizons.core.config.ConfigBase;
+import com.seibel.distanthorizons.core.config.gui.IConfigGuiInfo;
 import com.seibel.distanthorizons.core.config.types.*;
 import com.seibel.distanthorizons.common.wrappers.gui.updater.ChangelogScreen;
 
@@ -104,7 +105,7 @@ public class ClassicConfigGUI
 	/**
 	 * The terribly coded old stuff
 	 */
-	public static class EntryInfo
+	public static class EntryInfo implements IConfigGuiInfo
 	{
 		Object widget;
 		Map.Entry<EditBox, Component> error;

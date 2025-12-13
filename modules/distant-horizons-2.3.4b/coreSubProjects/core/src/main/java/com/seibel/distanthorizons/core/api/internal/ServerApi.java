@@ -76,6 +76,12 @@ public class ServerApi
 		}
 	}
 	
+	/** Called every server tick */
+	public void serverTickEvent()
+	{
+		// No-op for now - server tick events are not currently processed
+	}
+	
 	
 	
 	//==============//

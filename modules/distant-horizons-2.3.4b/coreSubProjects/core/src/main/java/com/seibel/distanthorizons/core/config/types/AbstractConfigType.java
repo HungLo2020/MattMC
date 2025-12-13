@@ -22,4 +22,9 @@ public abstract class AbstractConfigType<T, SELF extends AbstractConfigType<T, S
     public boolean shouldShowInGui() { return true; }
     public String getDisplayName() { return this.name; }
     public String getTranslationKey() { return this.name; }
+    
+    /** Returns the full name including category prefix */
+    public String getNameWCategory() {
+        return (this.category == null || this.category.isEmpty()) ? this.name : this.category + "." + this.name;
+    }
 }

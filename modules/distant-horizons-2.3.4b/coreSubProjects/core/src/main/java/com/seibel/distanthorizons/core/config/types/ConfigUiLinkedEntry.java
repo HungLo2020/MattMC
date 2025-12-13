@@ -27,13 +27,13 @@ import com.seibel.distanthorizons.core.config.types.enums.EConfigEntryAppearance
  *
  * @author coolGi
  */
-public class ConfigUiLinkedEntry extends AbstractConfigType<AbstractConfigBase<?>, ConfigUiLinkedEntry>
+public class ConfigUiLinkedEntry extends AbstractConfigType<AbstractConfigType<?, ?>, ConfigUiLinkedEntry>
 {
 	//=============//
 	// constructor //
 	//=============//
 	
-	public ConfigUiLinkedEntry(AbstractConfigBase<?> value)
+	public ConfigUiLinkedEntry(AbstractConfigType<?, ?> value)
 	{ super(EConfigEntryAppearance.ONLY_IN_GUI, value); }
 	
 	
@@ -48,7 +48,7 @@ public class ConfigUiLinkedEntry extends AbstractConfigType<AbstractConfigBase<?
 	
 	/** Value shouldn't be changed after creation */
 	@Override
-	public void set(AbstractConfigBase<?> newValue) { }
+	public void set(AbstractConfigType<?, ?> newValue) { }
 	
 	
 	
@@ -56,7 +56,7 @@ public class ConfigUiLinkedEntry extends AbstractConfigType<AbstractConfigBase<?
 	// builder //
 	//=========//
 	
-	public static class Builder extends AbstractConfigBase.Builder<AbstractConfigBase<?>, Builder>
+	public static class Builder extends AbstractConfigBase.Builder<AbstractConfigType<?, ?>, Builder>
 	{
 		/** Appearance shouldn't be changed */
 		@Override

@@ -219,92 +219,30 @@ public class FabricClientProxy implements AbstractModInitializer.IEventProxy
 
 		WorldRenderEvents.AFTER_SETUP.register((renderContext) ->
 		{
-			Mat4f projectionMatrix = McObjectConverter.Convert(renderContext.projectionMatrix());
-			
-			Mat4f modelViewMatrix;
-			#if MC_VER < MC_1_20_6
-			modelViewMatrix = McObjectConverter.Convert(renderContext.matrixStack().last().pose());
-			#else
-			modelViewMatrix = McObjectConverter.Convert(renderContext.positionMatrix());
-			#endif
-			
-			
-			//LOGGER.info("\n\n" +
-			//		"Level Render\n" +
-			//		"Mc MVM: \n" + modelViewMatrix.toString() + "\n" +
-			//		"Mc Proj: \n" + projectionMatrix.toString()
-			//);
-			
-			
-			this.clientApi.renderLods(ClientLevelWrapper.getWrapper(renderContext.world()),
-					modelViewMatrix,
-					projectionMatrix,
-					#if MC_VER < MC_1_21_1
-					renderContext.tickDelta()
-					#else
-					renderContext.tickCounter().getGameTimeDeltaTicks()
-					#endif
-					);
+			// Store render state for DH to use
+			// New API uses parameterless methods that get state internally
+			this.clientApi.renderLods();
 		});
 		
 		
 		// TODO add to forge and neo
 		WorldRenderEvents.AFTER_ENTITIES.register((renderContext) ->
 		{
-			Mat4f projectionMatrix = McObjectConverter.Convert(renderContext.projectionMatrix());
-			
-			Mat4f modelViewMatrix;
-			#if MC_VER < MC_1_20_6
-			modelViewMatrix = McObjectConverter.Convert(renderContext.matrixStack().last().pose());
-			#else
-			modelViewMatrix = McObjectConverter.Convert(renderContext.positionMatrix());
-			#endif
-			
-			this.clientApi.renderFadeOpaque(
-					modelViewMatrix,
-					projectionMatrix,
-					#if MC_VER < MC_1_21_1
-					renderContext.tickDelta(),
-					#else
-					renderContext.tickCounter().getGameTimeDeltaTicks(),
-					#endif
-					ClientLevelWrapper.getWrapper(renderContext.world())
-			);
+			// New API uses parameterless methods
+			this.clientApi.renderFadeOpaque();
 		});
 		
 		// TODO add to forge and neo
 		WorldRenderEvents.AFTER_TRANSLUCENT.register((renderContext) ->
 		{
-			Mat4f projectionMatrix = McObjectConverter.Convert(renderContext.projectionMatrix());
-			
-			Mat4f modelViewMatrix;
-			#if MC_VER < MC_1_20_6
-			modelViewMatrix = McObjectConverter.Convert(renderContext.matrixStack().last().pose());
-			#else
-			modelViewMatrix = McObjectConverter.Convert(renderContext.positionMatrix());
-			#endif
-			
-			
 			#if MC_VER < MC_1_21_6
 			// rendered in MixinLevelRenderer
 			#else
-			ClientApi.INSTANCE.renderDeferredLodsForShaders(ClientLevelWrapper.getWrapper(renderContext.world()),
-					ClientApi.RENDER_STATE.mcModelViewMatrix,
-					ClientApi.RENDER_STATE.mcProjectionMatrix,
-					ClientApi.RENDER_STATE.frameTime
-			);
+			ClientApi.INSTANCE.renderDeferredLodsForShaders();
 			#endif
 			
-			this.clientApi.renderFade(
-					modelViewMatrix,
-					projectionMatrix,
-					#if MC_VER < MC_1_21_1
-					renderContext.tickDelta(),
-					#else
-					renderContext.tickCounter().getGameTimeDeltaTicks(),
-					#endif
-					ClientLevelWrapper.getWrapper(renderContext.world())
-			);
+			// New API uses parameterless methods - renderFade is now renderFadeTransparent
+			this.clientApi.renderFadeTransparent();
 		});
 		
 		
@@ -355,7 +293,7 @@ public class FabricClientProxy implements AbstractModInitializer.IEventProxy
 		// Check all keys we need
 		for (int keyCode = GLFW.GLFW_KEY_A; keyCode <= GLFW.GLFW_KEY_Z; keyCode++)
 		{
-			if (InputConstants.isKeyDown(Minecraft.getInstance().getWindow().getWindow(), keyCode))
+			if (InputConstants.isKeyDown(Minecraft.getInstance().getWindow(), keyCode))
 			{
 				currentKeyDown.add(keyCode);
 			}
@@ -363,7 +301,7 @@ public class FabricClientProxy implements AbstractModInitializer.IEventProxy
 		
 		for (int keyCode : KEY_TO_CHECK_FOR)
 		{
-			if (InputConstants.isKeyDown(Minecraft.getInstance().getWindow().getWindow(), keyCode))
+			if (InputConstants.isKeyDown(Minecraft.getInstance().getWindow(), keyCode))
 			{
 				currentKeyDown.add(keyCode);
 			}

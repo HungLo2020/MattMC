@@ -414,6 +414,11 @@ public final class Window implements AutoCloseable {
 		return this.handle;
 	}
 
+	/** Alias for handle() - for DH compatibility */
+	public long getWindow() {
+		return this.handle;
+	}
+
 	public boolean isFullscreen() {
 		return this.fullscreen;
 	}
