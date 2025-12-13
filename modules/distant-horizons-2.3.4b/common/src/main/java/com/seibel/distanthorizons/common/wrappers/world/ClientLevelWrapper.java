@@ -7,6 +7,7 @@ import com.seibel.distanthorizons.common.wrappers.block.BiomeWrapper;
 import com.seibel.distanthorizons.common.wrappers.block.BlockStateWrapper;
 import com.seibel.distanthorizons.common.wrappers.block.ClientBlockStateColorCache;
 import com.seibel.distanthorizons.common.wrappers.chunk.ChunkWrapper;
+import com.seibel.distanthorizons.core.dataObjects.fullData.sources.FullDataSourceV2;
 import com.seibel.distanthorizons.core.dependencyInjection.SingletonInjector;
 import com.seibel.distanthorizons.core.level.*;
 import com.seibel.distanthorizons.core.level.IServerKeyedClientLevel;
@@ -175,7 +176,7 @@ public class ClientLevelWrapper implements IClientLevelWrapper
 	//====================//
 	
 	@Override
-	public int getBlockColor(DhBlockPos pos, IBiomeWrapper biome, IBlockStateWrapper blockWrapper)
+	public int getBlockColor(DhBlockPos pos, IBiomeWrapper biome, FullDataSourceV2 fullDataSource, IBlockStateWrapper blockWrapper)
 	{
 		ClientBlockStateColorCache blockColorCache = this.blockCache.computeIfAbsent(
 				((BlockStateWrapper) blockWrapper).blockState,
@@ -204,13 +205,12 @@ public class ClientLevelWrapper implements IClientLevelWrapper
 			}
 		}
 		
-		return this.getBlockColor(DhBlockPos.ZERO,BiomeWrapper.EMPTY_WRAPPER, this.dirtBlockWrapper);
+		return this.getBlockColor(DhBlockPos.ZERO,BiomeWrapper.EMPTY_WRAPPER, null, this.dirtBlockWrapper);
 	}
 	
 	@Override 
 	public void clearBlockColorCache() { this.blockCache.clear(); }
 	
-	@Override
 	public IBiomeWrapper getPlainsBiomeWrapper()
 	{
 		if (this.plainsBiomeWrapper == null)
@@ -286,21 +286,17 @@ public class ClientLevelWrapper implements IClientLevelWrapper
 		return new ChunkWrapper(chunk, this);
 	}
 	
-	@Override
 	public boolean hasChunkLoaded(int chunkX, int chunkZ)
 	{
 		ChunkSource source = this.level.getChunkSource();
 		return source.hasChunk(chunkX, chunkZ);
 	}
 	
-	@Override
 	public IBlockStateWrapper getBlockState(DhBlockPos pos)
 	{ return BlockStateWrapper.fromBlockState(this.level.getBlockState(McObjectConverter.Convert(pos)), this); }
 	
-	@Override
 	public IBiomeWrapper getBiome(DhBlockPos pos) { return BiomeWrapper.getBiomeWrapper(this.level.getBiome(McObjectConverter.Convert(pos)), this); }
 	
-	@Override
 	public ClientLevel getWrappedMcObject() { return this.level; }
 	
 	@Override
@@ -328,10 +324,8 @@ public class ClientLevelWrapper implements IClientLevelWrapper
 	// generic rendering //
 	//===================//
 	
-	@Override
 	public void setParentLevel(IDhLevel parentLevel) { this.parentDhLevel = parentLevel; }
 	
-	@Override 
 	public IDhApiCustomRenderRegister getRenderRegister()
 	{
 		if (this.parentDhLevel == null)
@@ -369,6 +363,19 @@ public class ClientLevelWrapper implements IClientLevelWrapper
 		}
 		
 		return "Wrapped{" + this.level.toString() + "@" + this.getDhIdentifier() + "}";
+	}
+	
+	@Override
+	public IDhLevel getDhLevel()
+	{
+		// Return null as DH level is managed by the core system
+		return null;
+	}
+	
+	@Override
+	public void setDhLevel(IDhLevel parentLevel)
+	{
+		// Stub - DH level is managed by the core system
 	}
 	
 }

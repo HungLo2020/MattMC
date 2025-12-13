@@ -286,6 +286,7 @@ public final class BatchGenerationEnvironment extends AbstractBatchGenerationEnv
 		return future.join();
 	}
 	
+	@Override
 	public void updateAllFutures()
 	{
 		if (this.unknownExceptionCount > 0)
@@ -329,6 +330,33 @@ public final class BatchGenerationEnvironment extends AbstractBatchGenerationEnv
 			this.unknownExceptionCount = 0;
 			Config.Common.WorldGenerator.enableDistantGeneration.set(false);
 		}
+	}
+	
+	@Override
+	public void close()
+	{
+		// Clean up resources
+		this.generationEventList.clear();
+	}
+	
+	@Override
+	public CompletableFuture<Void> queueGenEvent(
+			int minX, int minZ, int genSize,
+			EDhApiDistantGeneratorMode generatorMode, EDhApiWorldGenerationStep targetStep,
+			ExecutorService worldGeneratorThreadPool, Consumer<IChunkWrapper> resultConsumer)
+	{
+		// Create and queue a generation event
+		GenerationEvent genEvent = new GenerationEvent(
+				new DhChunkPos(minX, minZ), genSize, generatorMode, targetStep, resultConsumer);
+		this.generationEventList.add(genEvent);
+		
+		return CompletableFuture.runAsync(() -> {
+			try {
+				this.generateLodFromListAsync(genEvent, worldGeneratorThreadPool).join();
+			} catch (Exception e) {
+				EVENT_LOGGER.error("Error in queueGenEvent", e);
+			}
+		}, worldGeneratorThreadPool);
 	}
 	
 	

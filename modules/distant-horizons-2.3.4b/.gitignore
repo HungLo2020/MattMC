@@ -34,7 +34,8 @@ relocate_natives/apple-codesign/
 *.bak
 
 # file genearated via MC version switching using preprocessor
-build.properties
+# NOTE: Keep build.properties for MattMC integration - it's not auto-generated here
+# build.properties
 
 # Sqlite databases
 *.sqlite

@@ -1,0 +1,237 @@
+/*
+ *    This file is part of the Distant Horizons mod
+ *    licensed under the GNU LGPL v3 License.
+ *
+ *    Copyright (C) 2020 James Seibel
+ *
+ *    This program is free software: you can redistribute it and/or modify
+ *    it under the terms of the GNU Lesser General Public License as published by
+ *    the Free Software Foundation, version 3.
+ *
+ *    This program is distributed in the hope that it will be useful,
+ *    but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *    GNU Lesser General Public License for more details.
+ *
+ *    You should have received a copy of the GNU Lesser General Public License
+ *    along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
+package com.seibel.distanthorizons.core.dataObjects.render;
+
+import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
+import com.seibel.distanthorizons.core.pooling.AbstractPhantomArrayList;
+import com.seibel.distanthorizons.core.pooling.PhantomArrayListPool;
+import com.seibel.distanthorizons.core.pos.DhSectionPos;
+import com.seibel.distanthorizons.core.dataObjects.render.columnViews.ColumnArrayView;
+import com.seibel.distanthorizons.core.dataObjects.render.columnViews.ColumnQuadView;
+import com.seibel.distanthorizons.core.util.ColorUtil;
+import com.seibel.distanthorizons.core.util.RenderDataPointUtil;
+import it.unimi.dsi.fastutil.longs.LongArrayList;
+import com.seibel.distanthorizons.core.logging.DhLogger;
+
+/**
+ * Stores the render data used to generate OpenGL buffers.
+ *
+ * @see RenderDataPointUtil
+ */
+public class ColumnRenderSource extends AbstractPhantomArrayList
+{
+	private static final DhLogger LOGGER = new DhLoggerBuilder().build();
+	
+	/** measured in data columns */
+	public static final int WIDTH = 64;
+	
+	public static final PhantomArrayListPool ARRAY_LIST_POOL = new PhantomArrayListPool("Render Source");
+	
+	
+	
+	/** will be zero if an empty data source was created */
+	public int verticalDataCount;
+	public long pos;
+	public int yOffset;
+	
+	public final LongArrayList renderDataContainer;
+	
+	public final DebugSourceFlag[] debugSourceFlags;
+	
+	private boolean isEmpty = true;
+	
+	
+	
+	//==============//
+	// constructors //
+	//==============//
+	
+	public static ColumnRenderSource createEmpty(long pos, int maxVerticalSize, int yOffset)
+	{ return new ColumnRenderSource(pos, maxVerticalSize, yOffset); }
+	/**
+	 * Creates an empty ColumnRenderSource.
+	 *
+	 * @param pos the relative position of the container
+	 * @param maxVerticalSize the maximum vertical size of the container
+	 */
+	private ColumnRenderSource(long pos, int maxVerticalSize, int yOffset)
+	{
+		super(ARRAY_LIST_POOL, 0, 0, 1);
+		
+		this.pos = pos;
+		this.yOffset = yOffset;
+		
+		this.verticalDataCount = maxVerticalSize;
+		
+		this.renderDataContainer = this.pooledArraysCheckout.getLongArray(0, WIDTH * WIDTH * this.verticalDataCount);
+		
+		this.debugSourceFlags = new DebugSourceFlag[WIDTH * WIDTH];
+	}
+	
+	
+	
+	//========================//
+	// datapoint manipulation //
+	//========================//
+	
+	public long getDataPoint(int posX, int posZ, int verticalIndex) { return this.renderDataContainer.getLong(posX * WIDTH * this.verticalDataCount + posZ * this.verticalDataCount + verticalIndex); }
+	
+	public ColumnArrayView getVerticalDataPointView(int posX, int posZ)
+	{
+		int offset = posX * WIDTH * this.verticalDataCount + posZ * this.verticalDataCount;
+		
+		// don't allow returning views that are outside this render source's bounds
+		if (offset >= this.renderDataContainer.size())
+		{
+			return null;
+		}
+		else if (posX < 0 || posX >= WIDTH
+				|| posZ < 0 || posZ >= WIDTH)
+		{
+			return null;
+		}
+		
+		return new ColumnArrayView(this.renderDataContainer, this.verticalDataCount,
+				offset, this.verticalDataCount);
+	}
+	
+	public ColumnQuadView getFullQuadView() { return this.getQuadViewOverRange(0, 0, WIDTH, WIDTH); }
+	public ColumnQuadView getQuadViewOverRange(int quadX, int quadZ, int quadXSize, int quadZSize) { return new ColumnQuadView(this.renderDataContainer, WIDTH, this.verticalDataCount, quadX, quadZ, quadXSize, quadZSize); }
+	
+	
+	
+	//=====================//
+	// data helper methods //
+	//=====================//
+	
+	public Long getPos() { return this.pos; }
+	public Long getKey() { return this.pos; }
+	
+	public byte getDataDetailLevel() { return (byte) (DhSectionPos.getDetailLevel(this.pos) - DhSectionPos.SECTION_MINIMUM_DETAIL_LEVEL); }
+	
+	public boolean isEmpty() { return this.isEmpty; }
+	public void markNotEmpty() { this.isEmpty = false; }
+	
+	/** can be used when debugging */
+	public boolean hasNonVoidDataPoints()
+	{
+		if (this.isEmpty)
+		{
+			return false;
+		}
+		
+		
+		for (int x = 0; x < WIDTH; x++)
+		{
+			for (int z = 0; z < WIDTH; z++)
+			{
+				ColumnArrayView columnArrayView = this.getVerticalDataPointView(x,z);
+				for (int i = 0; i < columnArrayView.size; i++)
+				{
+					long dataPoint = columnArrayView.get(i);
+					if (!RenderDataPointUtil.hasZeroHeight(dataPoint))
+					{
+						return true;
+					}
+				}
+			}
+		}
+		
+		return false;
+	}
+	
+	
+	
+	//=======//
+	// debug //
+	//=======//
+	
+	/** Sets the debug flag for the given area */
+	public void fillDebugFlag(int xStart, int zStart, int xWidth, int zWidth, DebugSourceFlag flag)
+	{
+		for (int x = xStart; x < xStart + xWidth; x++)
+		{
+			for (int z = zStart; z < zStart + zWidth; z++)
+			{
+				this.debugSourceFlags[x * WIDTH + z] = flag;
+			}
+		}
+	}
+	
+	public DebugSourceFlag debugGetFlag(int ox, int oz) { return this.debugSourceFlags[ox * WIDTH + oz]; }
+	
+	
+	
+	//==============//
+	// base methods //
+	//==============//
+	
+	@Override
+	public String toString()
+	{
+		String LINE_DELIMITER = "\n";
+		String DATA_DELIMITER = " ";
+		String SUBDATA_DELIMITER = ",";
+		StringBuilder stringBuilder = new StringBuilder();
+		
+		stringBuilder.append(DhSectionPos.toString(this.pos));
+		stringBuilder.append(LINE_DELIMITER);
+		
+		int size = 1;
+		for (int z = 0; z < size; z++)
+		{
+			for (int x = 0; x < size; x++)
+			{
+				for (int y = 0; y < this.verticalDataCount; y++)
+				{
+					//Converting the dataToHex
+					stringBuilder.append(Long.toHexString(this.getDataPoint(x, z, y)));
+					if (y != this.verticalDataCount - 1)
+						stringBuilder.append(SUBDATA_DELIMITER);
+				}
+				
+				if (x != size - 1)
+					stringBuilder.append(DATA_DELIMITER);
+			}
+			
+			if (z != size - 1)
+				stringBuilder.append(LINE_DELIMITER);
+		}
+		return stringBuilder.toString();
+	}
+	
+	
+	
+	//==============//
+	// helper enums //
+	//==============//
+	
+	public enum DebugSourceFlag
+	{
+		FULL(ColorUtil.BLUE),
+		DIRECT(ColorUtil.WHITE),
+		FILE(ColorUtil.BROWN);
+		
+		public final int color;
+		
+		DebugSourceFlag(int color) { this.color = color; }
+	}
+	
+}

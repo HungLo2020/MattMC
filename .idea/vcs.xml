@@ -2,5 +2,6 @@
 <project version="4">
   <component name="VcsDirectoryMappings">
     <mapping directory="$PROJECT_DIR$" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/modules/distant-horizons-2.3.4b/coreSubProjects" vcs="Git" />
   </component>
 </project>
