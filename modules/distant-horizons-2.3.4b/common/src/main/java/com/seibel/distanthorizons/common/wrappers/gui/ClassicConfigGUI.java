@@ -18,6 +18,7 @@ import java.util.regex.Pattern;
 import com.seibel.distanthorizons.api.enums.config.DisallowSelectingViaConfigGui;
 import com.seibel.distanthorizons.core.config.Config;
 import com.seibel.distanthorizons.core.config.ConfigBase;
+import com.seibel.distanthorizons.core.config.gui.IConfigGuiInfo;
 import com.seibel.distanthorizons.core.config.types.*;
 import com.seibel.distanthorizons.common.wrappers.gui.updater.ChangelogScreen;
 
@@ -104,7 +105,7 @@ public class ClassicConfigGUI
 	/**
 	 * The terribly coded old stuff
 	 */
-	public static class EntryInfo
+	public static class EntryInfo implements IConfigGuiInfo
 	{
 		Object widget;
 		Map.Entry<EditBox, Component> error;
@@ -652,12 +653,27 @@ public class ClassicConfigGUI
 			return new ButtonEntry(button, text, resetButton, indexButton);
 		}
 		
+		#if MC_VER < MC_1_20_1
 		@Override
-        #if MC_VER < MC_1_20_1
 		public void render(PoseStack matrices, int index, int y, int x, int entryWidth, int entryHeight, int mouseX, int mouseY, boolean hovered, float tickDelta)
-        #else
+		{
+			renderInternal(matrices, y, 0, 0, hovered, tickDelta);
+		}
+        #elif MC_VER < MC_1_21_8
+		@Override
 		public void render(GuiGraphics matrices, int index, int y, int x, int entryWidth, int entryHeight, int mouseX, int mouseY, boolean hovered, float tickDelta)
+		{
+			renderInternal(matrices, y, 0, 0, hovered, tickDelta);
+		}
+		#else
+		@Override
+		public void renderContent(GuiGraphics matrices, int i, int j, boolean hovered, float tickDelta)
+		{
+			renderInternal(matrices, j, i, 0, hovered, tickDelta);
+		}
 		#endif
+		
+		private void renderInternal(GuiGraphics matrices, int y, int mouseX, int mouseY, boolean hovered, float tickDelta)
 		{
 			if (button != null)
 			{

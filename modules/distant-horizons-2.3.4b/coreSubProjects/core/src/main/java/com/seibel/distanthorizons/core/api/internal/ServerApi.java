@@ -76,6 +76,16 @@ public class ServerApi
 		}
 	}
 	
+	/** 
+	 * Called every server tick.
+	 * TODO: Implement tick processing when needed for server-side LOD updates.
+	 * Currently a no-op as server tick events are not actively processed by DH.
+	 */
+	public void serverTickEvent()
+	{
+		// No-op for now - server tick events are not currently processed
+	}
+	
 	
 	
 	//==============//

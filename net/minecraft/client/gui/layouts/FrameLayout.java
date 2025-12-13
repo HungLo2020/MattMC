@@ -11,7 +11,7 @@ import net.minecraft.util.Mth;
 
 @Environment(EnvType.CLIENT)
 public class FrameLayout extends AbstractLayout {
-	private final List<FrameLayout.ChildContainer> children = new ArrayList();
+	public final List<FrameLayout.ChildContainer> children = new ArrayList();
 	private int minWidth;
 	private int minHeight;
 	private final LayoutSettings defaultChildLayoutSettings = LayoutSettings.defaults().align(0.5F, 0.5F);
@@ -112,8 +112,8 @@ public class FrameLayout extends AbstractLayout {
 	}
 
 	@Environment(EnvType.CLIENT)
-	static class ChildContainer extends AbstractLayout.AbstractChildWrapper {
-		protected ChildContainer(LayoutElement layoutElement, LayoutSettings layoutSettings) {
+	public static class ChildContainer extends AbstractLayout.AbstractChildWrapper {
+		public ChildContainer(LayoutElement layoutElement, LayoutSettings layoutSettings) {
 			super(layoutElement, layoutSettings);
 		}
 	}

@@ -113,7 +113,6 @@ public class ServerLevelWrapper implements IServerLevelWrapper
 		#endif
 	}
 	
-	@Override
 	public String getWorldFolderName()
 	{
 		// Need specifically overworld since it's the only dimension that is stored in a server root folder
@@ -130,6 +129,9 @@ public class ServerLevelWrapper implements IServerLevelWrapper
 
 	@Override
 	public String getDimensionName() { return this.level.dimension().location().toString(); }
+	
+	@Override
+	public String getKeyedLevelDimensionName() { return this.getDimensionName(); }
 	
 	@Override
 	public long getHashedSeed() { return this.level.getBiomeManager().biomeZoomSeed; }
@@ -180,7 +182,6 @@ public class ServerLevelWrapper implements IServerLevelWrapper
 		return new ChunkWrapper(chunk, this);
 	}
 	
-	@Override
 	public boolean hasChunkLoaded(int chunkX, int chunkZ)
 	{
 		// world.hasChunk(chunkX, chunkZ); THIS DOES NOT WORK FOR CLIENT LEVEL CAUSE MOJANG ALWAYS RETURN TRUE FOR THAT!
@@ -188,19 +189,16 @@ public class ServerLevelWrapper implements IServerLevelWrapper
 		return source.hasChunk(chunkX, chunkZ);
 	}
 	
-	@Override
 	public IBlockStateWrapper getBlockState(DhBlockPos pos)
 	{
 		return BlockStateWrapper.fromBlockState(this.level.getBlockState(McObjectConverter.Convert(pos)), this);
 	}
 	
-	@Override
 	public IBiomeWrapper getBiome(DhBlockPos pos)
 	{
 		return BiomeWrapper.getBiomeWrapper(this.level.getBiome(McObjectConverter.Convert(pos)), this);
 	}
 	
-	@Override
 	public ServerLevel getWrappedMcObject() { return this.level; }
 	
 	@Override
@@ -208,9 +206,13 @@ public class ServerLevelWrapper implements IServerLevelWrapper
 	
 	
 	@Override
-	public void setParentLevel(IDhLevel parentLevel) { this.parentDhLevel = parentLevel; }
+	public void setDhLevel(IDhLevel parentLevel) { this.parentDhLevel = parentLevel; }
+	// Compatibility alias
+	public void setParentLevel(IDhLevel parentLevel) { this.setDhLevel(parentLevel); }
 	
 	@Override
+	public IDhLevel getDhLevel() { return this.parentDhLevel; }
+	
 	public IDhApiCustomRenderRegister getRenderRegister()
 	{
 		if (this.parentDhLevel == null)
@@ -221,7 +223,6 @@ public class ServerLevelWrapper implements IServerLevelWrapper
 		return this.parentDhLevel.getGenericRenderer();
 	}
 	
-	@Override
 	public File getDhSaveFolder()
 	{
 		if (this.parentDhLevel == null)

@@ -10,49 +10,16 @@ Path for java installation '/usr/lib/jvm/openjdk-17' (Common Linux Locations) do
 📂 Copying JDK to run directory...
 ✅ JDK copied to /home/matt/Documents/Repos/MattMC/run/jdk-21
 
-> Task :compileFabricLoaderJava
-/home/matt/Documents/Repos/MattMC/modules/fabric-loader-0.18.2/minecraft/src/main/java/net/fabricmc/loader/impl/game/minecraft/applet/AppletLauncher.java:42: warning: [removal] Applet in java.applet has been deprecated and marked for removal
-public class AppletLauncher extends Applet implements AppletStub {
-                                    ^
-/home/matt/Documents/Repos/MattMC/modules/fabric-loader-0.18.2/minecraft/src/main/java/net/fabricmc/loader/impl/game/minecraft/applet/AppletLauncher.java:42: warning: [removal] AppletStub in java.applet has been deprecated and marked for removal
-public class AppletLauncher extends Applet implements AppletStub {
-                                                      ^
-/home/matt/Documents/Repos/MattMC/modules/fabric-loader-0.18.2/minecraft/src/main/java/net/fabricmc/loader/impl/game/minecraft/applet/AppletLauncher.java:46: warning: [removal] Applet in java.applet has been deprecated and marked for removal
-        private Applet mcApplet;
-                ^
-/home/matt/Documents/Repos/MattMC/modules/fabric-loader-0.18.2/minecraft/src/main/java/net/fabricmc/loader/impl/game/minecraft/applet/AppletLauncher.java:66: warning: [removal] Applet in java.applet has been deprecated and marked for removal
-                        mcApplet = (Applet) FabricLauncherBase.getLauncher()
-                                    ^
-/home/matt/Documents/Repos/MattMC/modules/fabric-loader-0.18.2/minecraft/src/main/java/net/fabricmc/loader/impl/game/minecraft/applet/AppletLauncher.java:88: warning: [removal] Applet in java.applet has been deprecated and marked for removal
-        public void replace(Applet applet) {
-                            ^
-Note: Some input files use or override a deprecated API.
-Note: Recompile with -Xlint:deprecation for details.
-5 warnings
-
 > Task :compileJava
-/home/matt/Documents/Repos/MattMC/net/minecraft/world/level/levelgen/Heightmap.java:48: warning: [removal] getHighestSectionPosition() in ChunkAccess has been deprecated and marked for removal
-                        int j = chunkAccess.getHighestSectionPosition() + 16;
-                                           ^
-/home/matt/Documents/Repos/MattMC/net/minecraft/world/level/levelgen/placement/NoiseBasedCountPlacement.java:35: warning: [removal] BIOME_INFO_NOISE in Biome has been deprecated and marked for removal
-                double d = Biome.BIOME_INFO_NOISE.getValue(blockPos.getX() / this.noiseFactor, blockPos.getZ() / this.noiseFactor, false);
-                                ^
-/home/matt/Documents/Repos/MattMC/net/minecraft/world/level/levelgen/placement/NoiseThresholdCountPlacement.java:35: warning: [removal] BIOME_INFO_NOISE in Biome has been deprecated and marked for removal
-                double d = Biome.BIOME_INFO_NOISE.getValue(blockPos.getX() / 200.0, blockPos.getZ() / 200.0, false);
-                                ^
-/home/matt/Documents/Repos/MattMC/net/minecraft/world/level/block/entity/TheEndGatewayBlockEntity.java:228: warning: [removal] getHighestSectionPosition() in ChunkAccess has been deprecated and marked for removal
-                int i = levelChunk.getHighestSectionPosition() + 16 - 1;
-                                  ^
 Note: Some input files use or override a deprecated API.
 Note: Recompile with -Xlint:deprecation for details.
 Note: Some input files use unchecked or unsafe operations.
 Note: Recompile with -Xlint:unchecked for details.
-4 warnings
 
 > Task :compileSodiumJava
 Note: Some input files use or override a deprecated API.
 Note: Recompile with -Xlint:deprecation for details.
-Note: Some input files use unchecked or unsafe operations.
+Note: /home/matt/Documents/Repos/MattMC/modules/sodium-1.21.9/common/src/main/java/net/caffeinemc/mods/sodium/mixin/features/render/entity/cull/EntityRendererMixin.java uses unchecked or unsafe operations.
 Note: Recompile with -Xlint:unchecked for details.
 
 > Task :compileIrisJava
@@ -60,470 +27,51 @@ Note: Some input files use or override a deprecated API.
 Note: Recompile with -Xlint:deprecation for details.
 
 > Task :compileDistantHorizonsJava
-/home/matt/Documents/Repos/MattMC/modules/distant-horizons-2.3.4b/common/src/main/java/com/seibel/distanthorizons/common/wrappers/minecraft/MinecraftRenderWrapper.java:288: error: cannot find symbol
-                        width *= OPTIFINE_ACCESSOR.getRenderResolutionMultiplier();
-                                                  ^
-  symbol:   method getRenderResolutionMultiplier()
-  location: variable OPTIFINE_ACCESSOR of type IOptifineAccessor
-/home/matt/Documents/Repos/MattMC/modules/distant-horizons-2.3.4b/common/src/main/java/com/seibel/distanthorizons/common/wrappers/minecraft/MinecraftRenderWrapper.java:297: error: cannot find symbol
-                        height *= OPTIFINE_ACCESSOR.getRenderResolutionMultiplier();
-                                                   ^
-  symbol:   method getRenderResolutionMultiplier()
-  location: variable OPTIFINE_ACCESSOR of type IOptifineAccessor
-/home/matt/Documents/Repos/MattMC/modules/distant-horizons-2.3.4b/common/src/main/java/com/seibel/distanthorizons/common/wrappers/minecraft/MinecraftRenderWrapper.java:405: error: cannot find symbol
-                return this.getRenderTarget().viewWidth;
-                                             ^
-  symbol:   variable viewWidth
-  location: class RenderTarget
-/home/matt/Documents/Repos/MattMC/modules/distant-horizons-2.3.4b/common/src/main/java/com/seibel/distanthorizons/common/wrappers/minecraft/MinecraftRenderWrapper.java:410: error: cannot find symbol
-                return this.getRenderTarget().viewHeight;
-                                             ^
-  symbol:   variable viewHeight
-  location: class RenderTarget
-/home/matt/Documents/Repos/MattMC/modules/distant-horizons-2.3.4b/common/src/main/java/com/seibel/distanthorizons/common/wrappers/chunk/ChunkWrapper.java:118: error: cannot find symbol
-                if (Config.Common.LodBuilding.recalculateChunkHeightmaps.get())
-                                             ^
-  symbol:   variable recalculateChunkHeightmaps
-  location: class LodBuilding
-/home/matt/Documents/Repos/MattMC/modules/distant-horizons-2.3.4b/common/src/main/java/com/seibel/distanthorizons/common/wrappers/worldGeneration/BatchGenerationEnvironment.java:107: error: no suitable constructor found for ConfigBasedSpamLogger(Logger,()->Config[...]get(),int)
-                        new ConfigBasedSpamLogger(LogManager.getLogger("LodWorldGen"),
-                        ^
-    constructor ConfigBasedSpamLogger.ConfigBasedSpamLogger(String) is not applicable
-      (actual and formal argument lists differ in length)
-    constructor ConfigBasedSpamLogger.ConfigBasedSpamLogger() is not applicable
-      (actual and formal argument lists differ in length)
-/home/matt/Documents/Repos/MattMC/modules/distant-horizons-2.3.4b/common/src/main/java/com/seibel/distanthorizons/common/wrappers/worldGeneration/BatchGenerationEnvironment.java:108: error: cannot find symbol
-                                        () -> Config.Common.Logging.logWorldGenPerformance.get(), 1);
-                                                                   ^
-  symbol:   variable logWorldGenPerformance
-  location: class Logging
-/home/matt/Documents/Repos/MattMC/modules/distant-horizons-2.3.4b/common/src/main/java/com/seibel/distanthorizons/common/wrappers/worldGeneration/BatchGenerationEnvironment.java:110: error: no suitable constructor found for ConfigBasedLogger(Logger,()->Config[...]get())
-                        new ConfigBasedLogger(LogManager.getLogger("LodWorldGen"),
-                        ^
-    constructor ConfigBasedLogger.ConfigBasedLogger(String) is not applicable
-      (actual and formal argument lists differ in length)
-    constructor ConfigBasedLogger.ConfigBasedLogger() is not applicable
-      (actual and formal argument lists differ in length)
-/home/matt/Documents/Repos/MattMC/modules/distant-horizons-2.3.4b/common/src/main/java/com/seibel/distanthorizons/common/wrappers/worldGeneration/BatchGenerationEnvironment.java:111: error: cannot find symbol
-                                        () -> Config.Common.Logging.logWorldGenEvent.get());
-                                                                   ^
-  symbol:   variable logWorldGenEvent
-  location: class Logging
-/home/matt/Documents/Repos/MattMC/modules/distant-horizons-2.3.4b/common/src/main/java/com/seibel/distanthorizons/common/wrappers/worldGeneration/BatchGenerationEnvironment.java:113: error: no suitable constructor found for ConfigBasedLogger(Logger,()->Config[...]get())
-                        new ConfigBasedLogger(LogManager.getLogger("LodWorldGen"),
-                        ^
-    constructor ConfigBasedLogger.ConfigBasedLogger(String) is not applicable
-      (actual and formal argument lists differ in length)
-    constructor ConfigBasedLogger.ConfigBasedLogger() is not applicable
-      (actual and formal argument lists differ in length)
-/home/matt/Documents/Repos/MattMC/modules/distant-horizons-2.3.4b/common/src/main/java/com/seibel/distanthorizons/common/wrappers/worldGeneration/BatchGenerationEnvironment.java:114: error: cannot find symbol
-                                        () -> Config.Common.Logging.logWorldGenLoadEvent.get());
-                                                                   ^
-  symbol:   variable logWorldGenLoadEvent
-  location: class Logging
-/home/matt/Documents/Repos/MattMC/modules/distant-horizons-2.3.4b/common/src/main/java/com/seibel/distanthorizons/common/wrappers/worldGeneration/BatchGenerationEnvironment.java:119: error: cannot find symbol
-        private static final TicketType DH_SERVER_GEN_TICKET = new TicketType(/* timeout, 0 = disabled*/0L, /* persist */ false, TicketType.TicketUse.LOADING);
-                                                                                                                                           ^
-  symbol:   variable TicketUse
-  location: class TicketType
-/home/matt/Documents/Repos/MattMC/modules/distant-horizons-2.3.4b/common/src/main/java/com/seibel/distanthorizons/common/wrappers/worldGeneration/BatchGenerationEnvironment.java:217: error: constructor AbstractBatchGenerationEnvironmentWrapper in class AbstractBatchGenerationEnvironmentWrapper cannot be applied to given types;
-                super(serverlevel);
-                ^
-  required: no arguments
-  found:    IDhServerLevel
-  reason: actual and formal argument lists differ in length
-/home/matt/Documents/Repos/MattMC/modules/distant-horizons-2.3.4b/common/src/main/java/com/seibel/distanthorizons/common/wrappers/worldGeneration/BatchGenerationEnvironment.java:313: error: method assertNotReach in class LodUtil cannot be applied to given types;
-                                                LodUtil.assertNotReach();
-                                                       ^
-  required: String
-  found:    no arguments
-  reason: actual and formal argument lists differ in length
-/home/matt/Documents/Repos/MattMC/modules/distant-horizons-2.3.4b/common/src/main/java/com/seibel/distanthorizons/common/wrappers/worldGeneration/BatchGenerationEnvironment.java:349: error: constructor GenerationEvent in class GenerationEvent cannot be applied to given types;
-                GenerationEvent genEvent = new GenerationEvent(
-                                           ^
-  required: DhChunkPos,int,BatchGenerationEnvironment,EDhApiDistantGeneratorMode,EDhApiWorldGenerationStep,Consumer<IChunkWrapper>
-  found:    DhChunkPos,int,EDhApiDistantGeneratorMode,EDhApiWorldGenerationStep,Consumer<IChunkWrapper>
-  reason: actual and formal argument lists differ in length
-/home/matt/Documents/Repos/MattMC/modules/distant-horizons-2.3.4b/common/src/main/java/com/seibel/distanthorizons/common/wrappers/worldGeneration/BatchGenerationEnvironment.java:527: error: cannot find symbol
-                                                genEvent.timer.nextEvent("cleanup");
-                                                              ^
-  symbol:   method nextEvent(String)
-  location: variable timer of type EventTimer
-/home/matt/Documents/Repos/MattMC/modules/distant-horizons-2.3.4b/common/src/main/java/com/seibel/distanthorizons/common/wrappers/worldGeneration/BatchGenerationEnvironment.java:531: error: cannot find symbol
-                                genEvent.timer.nextEvent("cleanup");
-                                              ^
-  symbol:   method nextEvent(String)
-  location: variable timer of type EventTimer
-/home/matt/Documents/Repos/MattMC/modules/distant-horizons-2.3.4b/common/src/main/java/com/seibel/distanthorizons/common/wrappers/worldGeneration/BatchGenerationEnvironment.java:548: error: cannot find symbol
-                                genEvent.timer.complete();
-                                              ^
-  symbol:   method complete()
-  location: variable timer of type EventTimer
-/home/matt/Documents/Repos/MattMC/modules/distant-horizons-2.3.4b/common/src/main/java/com/seibel/distanthorizons/common/wrappers/worldGeneration/BatchGenerationEnvironment.java:550: error: cannot find symbol
-                                if (PREF_LOGGER.canMaybeLog())
-                                               ^
-  symbol:   method canMaybeLog()
-  location: variable PREF_LOGGER of type ConfigBasedSpamLogger
-/home/matt/Documents/Repos/MattMC/modules/distant-horizons-2.3.4b/common/src/main/java/com/seibel/distanthorizons/common/wrappers/worldGeneration/BatchGenerationEnvironment.java:553: error: cannot find symbol
-                                        PREF_LOGGER.debugInc(genEvent.timer.toString());
-                                                   ^
-  symbol:   method debugInc(String)
-  location: variable PREF_LOGGER of type ConfigBasedSpamLogger
-/home/matt/Documents/Repos/MattMC/modules/distant-horizons-2.3.4b/common/src/main/java/com/seibel/distanthorizons/common/wrappers/worldGeneration/BatchGenerationEnvironment.java:591: error: cannot find symbol
-                                if (Config.Common.LodBuilding.pullLightingForPregeneratedChunks.get())
-                                                             ^
-  symbol:   variable pullLightingForPregeneratedChunks
-  location: class LodBuilding
-/home/matt/Documents/Repos/MattMC/modules/distant-horizons-2.3.4b/common/src/main/java/com/seibel/distanthorizons/common/wrappers/worldGeneration/BatchGenerationEnvironment.java:634: error: worker has private access in ChunkStorage
-                        IOWorker ioWorker = level.getChunkSource().chunkMap.worker;
-                                                                           ^
-/home/matt/Documents/Repos/MattMC/modules/distant-horizons-2.3.4b/common/src/main/java/com/seibel/distanthorizons/common/wrappers/worldGeneration/BatchGenerationEnvironment.java:641: error: storage has private access in IOWorker
-                        if (!this.pullExistingChunkUsingMcAsyncMethod && ioWorker.storage != null)
-                                                                                 ^
-/home/matt/Documents/Repos/MattMC/modules/distant-horizons-2.3.4b/common/src/main/java/com/seibel/distanthorizons/common/wrappers/worldGeneration/BatchGenerationEnvironment.java:645: error: worker has private access in ChunkStorage
-                                        RegionFileStorage storage = this.params.level.getChunkSource().chunkMap.worker.storage;
-                                                                                                               ^
-/home/matt/Documents/Repos/MattMC/modules/distant-horizons-2.3.4b/common/src/main/java/com/seibel/distanthorizons/common/wrappers/worldGeneration/BatchGenerationEnvironment.java:645: error: storage has private access in IOWorker
-                                        RegionFileStorage storage = this.params.level.getChunkSource().chunkMap.worker.storage;
-                                                                                                                      ^
-/home/matt/Documents/Repos/MattMC/modules/distant-horizons-2.3.4b/common/src/main/java/com/seibel/distanthorizons/common/wrappers/worldGeneration/BatchGenerationEnvironment.java:727: error: cannot find symbol
-                                        if (Config.Common.LodBuilding.assumePreExistingChunksAreFinished.get())
-                                                                     ^
-  symbol:   variable assumePreExistingChunksAreFinished
-  location: class LodBuilding
-/home/matt/Documents/Repos/MattMC/modules/distant-horizons-2.3.4b/common/src/main/java/com/seibel/distanthorizons/common/wrappers/worldGeneration/BatchGenerationEnvironment.java:767: error: incompatible types: no instance(s) of type variable(s) E exist so that Registry<E> conforms to PalettedContainerFactory
-                return new ProtoChunk(chunkPos, UpgradeData.EMPTY, level, level.registryAccess().lookupOrThrow(Registries.BIOME), null);
-                       ^
-  where E is a type-variable:
-    E extends Object declared in method <E>lookupOrThrow(ResourceKey<? extends Registry<? extends E>>)
-/home/matt/Documents/Repos/MattMC/modules/distant-horizons-2.3.4b/common/src/main/java/com/seibel/distanthorizons/common/wrappers/worldGeneration/BatchGenerationEnvironment.java:775: error: cannot find symbol
-                genEvent.timer.nextEvent("requestFromServer");
-                              ^
-  symbol:   method nextEvent(String)
-  location: variable timer of type EventTimer
-/home/matt/Documents/Repos/MattMC/modules/distant-horizons-2.3.4b/common/src/main/java/com/seibel/distanthorizons/common/wrappers/worldGeneration/BatchGenerationEnvironment.java:821: error: cannot find symbol
-                                        genEvent.timer.nextEvent("light");
-                                                      ^
-  symbol:   method nextEvent(String)
-  location: variable timer of type EventTimer
-/home/matt/Documents/Repos/MattMC/modules/distant-horizons-2.3.4b/common/src/main/java/com/seibel/distanthorizons/common/wrappers/worldGeneration/BatchGenerationEnvironment.java:838: error: cannot find symbol
-                                        genEvent.timer.nextEvent("cleanup");
-                                                      ^
-  symbol:   method nextEvent(String)
-  location: variable timer of type EventTimer
-/home/matt/Documents/Repos/MattMC/modules/distant-horizons-2.3.4b/common/src/main/java/com/seibel/distanthorizons/common/wrappers/worldGeneration/BatchGenerationEnvironment.java:856: error: cannot find symbol
-                                        genEvent.timer.complete();
-                                                      ^
-  symbol:   method complete()
-  location: variable timer of type EventTimer
-/home/matt/Documents/Repos/MattMC/modules/distant-horizons-2.3.4b/common/src/main/java/com/seibel/distanthorizons/common/wrappers/worldGeneration/BatchGenerationEnvironment.java:858: error: cannot find symbol
-                                        if (PREF_LOGGER.canMaybeLog())
-                                                       ^
-  symbol:   method canMaybeLog()
-  location: variable PREF_LOGGER of type ConfigBasedSpamLogger
-/home/matt/Documents/Repos/MattMC/modules/distant-horizons-2.3.4b/common/src/main/java/com/seibel/distanthorizons/common/wrappers/worldGeneration/BatchGenerationEnvironment.java:861: error: cannot find symbol
-                                                PREF_LOGGER.debugInc(genEvent.timer.toString());
-                                                           ^
-  symbol:   method debugInc(String)
-  location: variable PREF_LOGGER of type ConfigBasedSpamLogger
-/home/matt/Documents/Repos/MattMC/modules/distant-horizons-2.3.4b/common/src/main/java/com/seibel/distanthorizons/common/wrappers/worldGeneration/BatchGenerationEnvironment.java:936: error: mainThreadExecutor has private access in ChunkMap
-                }, level.getChunkSource().chunkMap.mainThreadExecutor).thenCompose(Function.identity());
-                                                  ^
-/home/matt/Documents/Repos/MattMC/modules/distant-horizons-2.3.4b/common/src/main/java/com/seibel/distanthorizons/common/wrappers/worldGeneration/BatchGenerationEnvironment.java:918: error: distanceManager has private access in ServerChunkCache
-                        level.getChunkSource().distanceManager.runAllUpdates(level.getChunkSource().chunkMap); // probably not the most optimal to run updates here, but fast enough
-                                              ^
-/home/matt/Documents/Repos/MattMC/modules/distant-horizons-2.3.4b/common/src/main/java/com/seibel/distanthorizons/common/wrappers/worldGeneration/BatchGenerationEnvironment.java:941: error: mainThreadExecutor has private access in ChunkMap
-                level.getChunkSource().chunkMap.mainThreadExecutor.execute(() ->
-                                               ^
-/home/matt/Documents/Repos/MattMC/modules/distant-horizons-2.3.4b/common/src/main/java/com/seibel/distanthorizons/common/wrappers/worldGeneration/BatchGenerationEnvironment.java:961: error: method tick in class ChunkMap cannot be applied to given types;
-                                level.getChunkSource().chunkMap.tick(() -> false);
-                                                               ^
-  required: BooleanSupplier
-  found:    ()->false
-  reason: tick(BooleanSupplier) has protected access in ChunkMap
-/home/matt/Documents/Repos/MattMC/modules/distant-horizons-2.3.4b/common/src/main/java/com/seibel/distanthorizons/common/wrappers/worldGeneration/BatchGenerationEnvironment.java:963: error: entityManager has private access in ServerLevel
-                                level.entityManager.tick();
-                                     ^
-/home/matt/Documents/Repos/MattMC/modules/distant-horizons-2.3.4b/common/src/main/java/com/seibel/distanthorizons/common/wrappers/worldGeneration/BatchGenerationEnvironment.java:1002: error: cannot find symbol
-                        genEvent.timer.nextEvent("structStart");
-                                      ^
-  symbol:   method nextEvent(String)
-  location: variable timer of type EventTimer
-/home/matt/Documents/Repos/MattMC/modules/distant-horizons-2.3.4b/common/src/main/java/com/seibel/distanthorizons/common/wrappers/worldGeneration/BatchGenerationEnvironment.java:1011: error: cannot find symbol
-                        genEvent.timer.nextEvent("structRef");
-                                      ^
-  symbol:   method nextEvent(String)
-  location: variable timer of type EventTimer
-/home/matt/Documents/Repos/MattMC/modules/distant-horizons-2.3.4b/common/src/main/java/com/seibel/distanthorizons/common/wrappers/worldGeneration/BatchGenerationEnvironment.java:1020: error: cannot find symbol
-                        genEvent.timer.nextEvent("biome");
-                                      ^
-  symbol:   method nextEvent(String)
-  location: variable timer of type EventTimer
-/home/matt/Documents/Repos/MattMC/modules/distant-horizons-2.3.4b/common/src/main/java/com/seibel/distanthorizons/common/wrappers/worldGeneration/BatchGenerationEnvironment.java:1029: error: cannot find symbol
-                        genEvent.timer.nextEvent("noise");
-                                      ^
-  symbol:   method nextEvent(String)
-  location: variable timer of type EventTimer
-/home/matt/Documents/Repos/MattMC/modules/distant-horizons-2.3.4b/common/src/main/java/com/seibel/distanthorizons/common/wrappers/worldGeneration/BatchGenerationEnvironment.java:1038: error: cannot find symbol
-                        genEvent.timer.nextEvent("surface");
-                                      ^
-  symbol:   method nextEvent(String)
-  location: variable timer of type EventTimer
-/home/matt/Documents/Repos/MattMC/modules/distant-horizons-2.3.4b/common/src/main/java/com/seibel/distanthorizons/common/wrappers/worldGeneration/BatchGenerationEnvironment.java:1047: error: cannot find symbol
-                        genEvent.timer.nextEvent("carver");
-                                      ^
-  symbol:   method nextEvent(String)
-  location: variable timer of type EventTimer
-/home/matt/Documents/Repos/MattMC/modules/distant-horizons-2.3.4b/common/src/main/java/com/seibel/distanthorizons/common/wrappers/worldGeneration/BatchGenerationEnvironment.java:1055: error: cannot find symbol
-                        genEvent.timer.nextEvent("feature");
-                                      ^
-  symbol:   method nextEvent(String)
-  location: variable timer of type EventTimer
-/home/matt/Documents/Repos/MattMC/modules/distant-horizons-2.3.4b/common/src/main/java/com/seibel/distanthorizons/common/wrappers/worldGeneration/BatchGenerationEnvironment.java:1062: error: cannot find symbol
-                        genEvent.timer.nextEvent("light");
-                                      ^
-  symbol:   method nextEvent(String)
-  location: variable timer of type EventTimer
-/home/matt/Documents/Repos/MattMC/modules/distant-horizons-2.3.4b/common/src/main/java/com/seibel/distanthorizons/common/wrappers/worldGeneration/BatchGenerationEnvironment.java:1113: error: method does not override or implement a method from a supertype
-        @Override
-        ^
-/home/matt/Documents/Repos/MattMC/modules/distant-horizons-2.3.4b/common/src/main/java/com/seibel/distanthorizons/common/wrappers/worldGeneration/BatchGenerationEnvironment.java:1116: error: method does not override or implement a method from a supertype
-        @Override
-        ^
-/home/matt/Documents/Repos/MattMC/modules/distant-horizons-2.3.4b/common/src/main/java/com/seibel/distanthorizons/common/wrappers/worldGeneration/BatchGenerationEnvironment.java:1147: error: method does not override or implement a method from a supertype
-        @Override
-        ^
-/home/matt/Documents/Repos/MattMC/modules/distant-horizons-2.3.4b/common/src/main/java/com/seibel/distanthorizons/common/wrappers/worldGeneration/BatchGenerationEnvironment.java:1292: error: cannot find symbol
-                        for (EventTimer.Event e : event.events)
-                                                       ^
-  symbol:   variable events
-  location: variable event of type EventTimer
-/home/matt/Documents/Repos/MattMC/modules/distant-horizons-2.3.4b/common/src/main/java/com/seibel/distanthorizons/common/wrappers/worldGeneration/BatchGenerationEnvironment.java:1292: error: cannot find symbol
-                        for (EventTimer.Event e : event.events)
-                                       ^
-  symbol:   class Event
-  location: class EventTimer
-/home/matt/Documents/Repos/MattMC/modules/distant-horizons-2.3.4b/common/src/main/java/com/seibel/distanthorizons/common/wrappers/worldGeneration/BatchGenerationEnvironment.java:1299: error: cannot find symbol
-                        times.get(0).add(event.getTotalTimeNs());
-                                              ^
-  symbol:   method getTotalTimeNs()
-  location: variable event of type EventTimer
-/home/matt/Documents/Repos/MattMC/modules/distant-horizons-2.3.4b/common/src/main/java/com/seibel/distanthorizons/common/wrappers/worldGeneration/mimicObject/RegionFileStorageExternalCache.java:100: error: regionCache has private access in RegionFileStorage
-                                rFile = this.storage.regionCache.getOrDefault(posLong, null);
-                                                    ^
-/home/matt/Documents/Repos/MattMC/modules/distant-horizons-2.3.4b/common/src/main/java/com/seibel/distanthorizons/common/wrappers/worldGeneration/mimicObject/RegionFileStorageExternalCache.java:165: error: folder has private access in RegionFileStorage
-                storageFolderPath = this.storage.folder;
-                                                ^
-/home/matt/Documents/Repos/MattMC/modules/distant-horizons-2.3.4b/common/src/main/java/com/seibel/distanthorizons/common/wrappers/worldGeneration/mimicObject/ChunkLoader.java:98: error: cannot find symbol
-        private static final Codec<PalettedContainer<BlockState>> BLOCK_STATE_CODEC = PalettedContainer.codecRW(Block.BLOCK_STATE_REGISTRY, BlockState.CODEC, PalettedContainer.Strategy.SECTION_STATES, Blocks.AIR.defaultBlockState());
-                                                                                                                                                                               ^
-  symbol:   variable Strategy
-  location: class PalettedContainer
-/home/matt/Documents/Repos/MattMC/modules/distant-horizons-2.3.4b/common/src/main/java/com/seibel/distanthorizons/common/wrappers/worldGeneration/mimicObject/ChunkLoader.java:281: error: cannot find symbol
-                                biomes.asHolderIdMap(), biomes.holderByNameCodec(), PalettedContainer.Strategy.SECTION_BIOMES, biomes.getOrThrow(Biomes.PLAINS));
-                                                                                                     ^
-  symbol:   variable Strategy
-  location: class PalettedContainer
-/home/matt/Documents/Repos/MattMC/modules/distant-horizons-2.3.4b/common/src/main/java/com/seibel/distanthorizons/common/wrappers/worldGeneration/mimicObject/ChunkLoader.java:351: error: cannot find symbol
-                                                blockStateContainer = new PalettedContainer<BlockState>(Block.BLOCK_STATE_REGISTRY, Blocks.AIR.defaultBlockState(), PalettedContainer.Strategy.SECTION_STATES);
-                                                                                                                                                                                     ^
-  symbol:   variable Strategy
-  location: class PalettedContainer
-/home/matt/Documents/Repos/MattMC/modules/distant-horizons-2.3.4b/common/src/main/java/com/seibel/distanthorizons/common/wrappers/worldGeneration/mimicObject/ChunkLoader.java:389: error: cannot find symbol
-                                                                PalettedContainer.Strategy.SECTION_BIOMES);
-                                                                                 ^
-  symbol:   variable Strategy
-  location: class PalettedContainer
-/home/matt/Documents/Repos/MattMC/modules/distant-horizons-2.3.4b/common/src/main/java/com/seibel/distanthorizons/common/wrappers/misc/ServerPlayerWrapper.java:74: error: method does not override or implement a method from a supertype
-        @Override
-        ^
-/home/matt/Documents/Repos/MattMC/modules/distant-horizons-2.3.4b/common/src/main/java/com/seibel/distanthorizons/common/wrappers/misc/ServerPlayerWrapper.java:84: error: method does not override or implement a method from a supertype
-        @Override
-        ^
-/home/matt/Documents/Repos/MattMC/modules/distant-horizons-2.3.4b/common/src/main/java/com/seibel/distanthorizons/common/wrappers/world/ServerLevelWrapper.java:62: error: ServerLevelWrapper is not abstract and does not override abstract method getKeyedLevelDimensionName() in IServerLevelWrapper
-public class ServerLevelWrapper implements IServerLevelWrapper
-       ^
-/home/matt/Documents/Repos/MattMC/modules/distant-horizons-2.3.4b/common/src/main/java/com/seibel/distanthorizons/common/wrappers/world/ServerLevelWrapper.java:112: error: dataFolder has private access in DimensionDataStorage
-                return this.level.getChunkSource().getDataStorage().dataFolder.toFile();
-                                                                   ^
-/home/matt/Documents/Repos/MattMC/modules/distant-horizons-2.3.4b/common/src/main/java/com/seibel/distanthorizons/common/wrappers/world/ServerLevelWrapper.java:116: error: method does not override or implement a method from a supertype
-        @Override
-        ^
-/home/matt/Documents/Repos/MattMC/modules/distant-horizons-2.3.4b/common/src/main/java/com/seibel/distanthorizons/common/wrappers/world/ServerLevelWrapper.java:122: error: dataFolder has private access in DimensionDataStorage
-                return this.level.getServer().getLevel(Level.OVERWORLD).getChunkSource().getDataStorage().dataFolder.getParent().getFileName().toString();
-                                                                                                         ^
-/home/matt/Documents/Repos/MattMC/modules/distant-horizons-2.3.4b/common/src/main/java/com/seibel/distanthorizons/common/wrappers/world/ServerLevelWrapper.java:183: error: method does not override or implement a method from a supertype
-        @Override
-        ^
-/home/matt/Documents/Repos/MattMC/modules/distant-horizons-2.3.4b/common/src/main/java/com/seibel/distanthorizons/common/wrappers/world/ServerLevelWrapper.java:191: error: method does not override or implement a method from a supertype
-        @Override
-        ^
-/home/matt/Documents/Repos/MattMC/modules/distant-horizons-2.3.4b/common/src/main/java/com/seibel/distanthorizons/common/wrappers/world/ServerLevelWrapper.java:197: error: method does not override or implement a method from a supertype
-        @Override
-        ^
-/home/matt/Documents/Repos/MattMC/modules/distant-horizons-2.3.4b/common/src/main/java/com/seibel/distanthorizons/common/wrappers/world/ServerLevelWrapper.java:210: error: method does not override or implement a method from a supertype
-        @Override
-        ^
-/home/matt/Documents/Repos/MattMC/modules/distant-horizons-2.3.4b/common/src/main/java/com/seibel/distanthorizons/common/wrappers/gui/ClassicConfigGUI.java:121: error: cannot find symbol
-                ((EntryInfo) info.guiValue).widget = (BiFunction<EditBox, Button, Predicate<String>>) (editBox, button) -> stringValue ->
-                                 ^
-  symbol:   variable guiValue
-  location: variable info of type AbstractConfigType
-/home/matt/Documents/Repos/MattMC/modules/distant-horizons-2.3.4b/common/src/main/java/com/seibel/distanthorizons/common/wrappers/gui/ClassicConfigGUI.java:132: error: cannot find symbol
-                        Number value = info.typeIsFloatingPointNumber() ? 0.0 : 0; // different default values are needed so implicit casting works correctly (if not done casting from 0 (an int) to a double will cause an exception)
-                                           ^
-  symbol:   method typeIsFloatingPointNumber()
-  location: variable info of type AbstractConfigType
-/home/matt/Documents/Repos/MattMC/modules/distant-horizons-2.3.4b/common/src/main/java/com/seibel/distanthorizons/common/wrappers/gui/ClassicConfigGUI.java:133: error: cannot find symbol
-                        ((EntryInfo) info.guiValue).error = null;
-                                         ^
-  symbol:   variable guiValue
-  location: variable info of type AbstractConfigType
-/home/matt/Documents/Repos/MattMC/modules/distant-horizons-2.3.4b/common/src/main/java/com/seibel/distanthorizons/common/wrappers/gui/ClassicConfigGUI.java:145: error: incompatible types: AbstractConfigType cannot be converted to ConfigEntry
-                                byte isValid = ((ConfigEntry) info).isValid(value);
-                                                              ^
-/home/matt/Documents/Repos/MattMC/modules/distant-horizons-2.3.4b/common/src/main/java/com/seibel/distanthorizons/common/wrappers/gui/ClassicConfigGUI.java:149: error: cannot find symbol
-                                                ((EntryInfo) info.guiValue).error = null;
-                                                                 ^
-  symbol:   variable guiValue
-  location: variable info of type AbstractConfigType
-/home/matt/Documents/Repos/MattMC/modules/distant-horizons-2.3.4b/common/src/main/java/com/seibel/distanthorizons/common/wrappers/gui/ClassicConfigGUI.java:152: error: cannot find symbol
-                                                ((EntryInfo) info.guiValue).error = new AbstractMap.SimpleEntry<>(editBox, TextOrTranslatable("§cMinimum length is " + ((ConfigEntry) info).getMin()));
-                                                                 ^
-  symbol:   variable guiValue
-  location: variable info of type AbstractConfigType
-/home/matt/Documents/Repos/MattMC/modules/distant-horizons-2.3.4b/common/src/main/java/com/seibel/distanthorizons/common/wrappers/gui/ClassicConfigGUI.java:152: error: incompatible types: AbstractConfigType cannot be converted to ConfigEntry
-                                                ((EntryInfo) info.guiValue).error = new AbstractMap.SimpleEntry<>(editBox, TextOrTranslatable("§cMinimum length is " + ((ConfigEntry) info).getMin()));
-                                                                                                                                                                                      ^
-/home/matt/Documents/Repos/MattMC/modules/distant-horizons-2.3.4b/common/src/main/java/com/seibel/distanthorizons/common/wrappers/gui/ClassicConfigGUI.java:155: error: cannot find symbol
-                                                ((EntryInfo) info.guiValue).error = new AbstractMap.SimpleEntry<>(editBox, TextOrTranslatable("§cMaximum length is " + ((ConfigEntry) info).getMax()));
-                                                                 ^
-  symbol:   variable guiValue
-  location: variable info of type AbstractConfigType
-/home/matt/Documents/Repos/MattMC/modules/distant-horizons-2.3.4b/common/src/main/java/com/seibel/distanthorizons/common/wrappers/gui/ClassicConfigGUI.java:155: error: incompatible types: AbstractConfigType cannot be converted to ConfigEntry
-                                                ((EntryInfo) info.guiValue).error = new AbstractMap.SimpleEntry<>(editBox, TextOrTranslatable("§cMaximum length is " + ((ConfigEntry) info).getMax()));
-                                                                                                                                                                                      ^
-/home/matt/Documents/Repos/MattMC/modules/distant-horizons-2.3.4b/common/src/main/java/com/seibel/distanthorizons/common/wrappers/gui/ClassicConfigGUI.java:158: error: cannot find symbol
-                                                ((EntryInfo) info.guiValue).error = new AbstractMap.SimpleEntry<>(editBox, TextOrTranslatable("§cValue is invalid"));
-                                                                 ^
-  symbol:   variable guiValue
-  location: variable info of type AbstractConfigType
-/home/matt/Documents/Repos/MattMC/modules/distant-horizons-2.3.4b/common/src/main/java/com/seibel/distanthorizons/common/wrappers/gui/ClassicConfigGUI.java:163: error: cannot find symbol
-                        ((EntryInfo) info.guiValue).tempValue = stringValue;
-                                         ^
-  symbol:   variable guiValue
-  location: variable info of type AbstractConfigType
-/home/matt/Documents/Repos/MattMC/modules/distant-horizons-2.3.4b/common/src/main/java/com/seibel/distanthorizons/common/wrappers/gui/ClassicConfigGUI.java:164: error: incompatible types: AbstractConfigType cannot be converted to ConfigEntry
-                        editBox.setTextColor(((ConfigEntry) info).isValid(value) == 0 ? 0xFFFFFFFF : 0xFFFF7777); // white and red
-                                                            ^
-/home/matt/Documents/Repos/MattMC/modules/distant-horizons-2.3.4b/common/src/main/java/com/seibel/distanthorizons/common/wrappers/gui/ClassicConfigGUI.java:168: error: cannot find symbol
-                        if (info.getType() == String.class
-                                ^
-  symbol:   method getType()
-  location: variable info of type AbstractConfigType
-/home/matt/Documents/Repos/MattMC/modules/distant-horizons-2.3.4b/common/src/main/java/com/seibel/distanthorizons/common/wrappers/gui/ClassicConfigGUI.java:169: error: cannot find symbol
-                                || info.getType() == List.class)
-                                       ^
-  symbol:   method getType()
-  location: variable info of type AbstractConfigType
-/home/matt/Documents/Repos/MattMC/modules/distant-horizons-2.3.4b/common/src/main/java/com/seibel/distanthorizons/common/wrappers/gui/ClassicConfigGUI.java:171: error: incompatible types: AbstractConfigType cannot be converted to ConfigEntry
-                                ((ConfigEntry) info).uiSetWithoutSaving(stringValue);
-                                               ^
-/home/matt/Documents/Repos/MattMC/modules/distant-horizons-2.3.4b/common/src/main/java/com/seibel/distanthorizons/common/wrappers/gui/ClassicConfigGUI.java:173: error: incompatible types: AbstractConfigType cannot be converted to ConfigEntry
-                        else if (((ConfigEntry) info).isValid(value) == 0)
-                                                ^
-/home/matt/Documents/Repos/MattMC/modules/distant-horizons-2.3.4b/common/src/main/java/com/seibel/distanthorizons/common/wrappers/gui/ClassicConfigGUI.java:177: error: incompatible types: AbstractConfigType cannot be converted to ConfigEntry
-                                        ((ConfigEntry) info).uiSetWithoutSaving(value);
-                                                       ^
-/home/matt/Documents/Repos/MattMC/modules/distant-horizons-2.3.4b/common/src/main/java/com/seibel/distanthorizons/common/wrappers/gui/ClassicConfigGUI.java:181: error: incompatible types: AbstractConfigType cannot be converted to ConfigEntry
-                                        ((ConfigEntry) info).uiSetWithoutSaving(value != null ? value.intValue() : 0);
-                                                       ^
-/home/matt/Documents/Repos/MattMC/modules/distant-horizons-2.3.4b/common/src/main/java/com/seibel/distanthorizons/common/wrappers/gui/ClassicConfigGUI.java:209: error: cannot find symbol
-                                        I18n.exists(configBase.modID + ".config" + (category.isEmpty() ? "." + category : "") + ".title") ?
-                                                              ^
-  symbol:   variable modID
-  location: variable configBase of type ConfigBase
-/home/matt/Documents/Repos/MattMC/modules/distant-horizons-2.3.4b/common/src/main/java/com/seibel/distanthorizons/common/wrappers/gui/ClassicConfigGUI.java:210: error: cannot find symbol
-                                                        configBase.modID + ".config.title" :
-                                                                  ^
-  symbol:   variable modID
-  location: variable configBase of type ConfigBase
-/home/matt/Documents/Repos/MattMC/modules/distant-horizons-2.3.4b/common/src/main/java/com/seibel/distanthorizons/common/wrappers/gui/ClassicConfigGUI.java:211: error: cannot find symbol
-                                                        configBase.modID + ".config" + (category.isEmpty() ? "" : "." + category) + ".title")
-                                                                  ^
-  symbol:   variable modID
-  location: variable configBase of type ConfigBase
-/home/matt/Documents/Repos/MattMC/modules/distant-horizons-2.3.4b/common/src/main/java/com/seibel/distanthorizons/common/wrappers/gui/ClassicConfigGUI.java:216: error: cannot find symbol
-                        this.translationPrefix = configBase.modID + ".config.";
-                                                           ^
-  symbol:   variable modID
-  location: variable configBase of type ConfigBase
-/home/matt/Documents/Repos/MattMC/modules/distant-horizons-2.3.4b/common/src/main/java/com/seibel/distanthorizons/common/wrappers/gui/ClassicConfigGUI.java:311: error: incompatible types: Object cannot be converted to AbstractConfigType
-                        for (AbstractConfigType info : ConfigBase.INSTANCE.entries)
-                                                                          ^
-/home/matt/Documents/Repos/MattMC/modules/distant-horizons-2.3.4b/common/src/main/java/com/seibel/distanthorizons/common/wrappers/gui/ClassicConfigGUI.java:315: error: cannot find symbol
-                                        if (info.getCategory().matches(this.category) && info.getAppearance().showInGui)
-                                                ^
-  symbol:   method getCategory()
-  location: variable info of type AbstractConfigType
-/home/matt/Documents/Repos/MattMC/modules/distant-horizons-2.3.4b/common/src/main/java/com/seibel/distanthorizons/common/wrappers/gui/ClassicConfigGUI.java:315: error: cannot find symbol
-                                        if (info.getCategory().matches(this.category) && info.getAppearance().showInGui)
-                                                                                             ^
-  symbol:   method getAppearance()
-  location: variable info of type AbstractConfigType
-/home/matt/Documents/Repos/MattMC/modules/distant-horizons-2.3.4b/common/src/main/java/com/seibel/distanthorizons/common/wrappers/gui/ClassicConfigGUI.java:323: error: cannot find symbol
-                                                message += " with the value [" + info.get() + "] with type [" + info.getType() + "]";
-                                                                                                                    ^
-  symbol:   method getType()
-  location: variable info of type AbstractConfigType
-/home/matt/Documents/Repos/MattMC/modules/distant-horizons-2.3.4b/common/src/main/java/com/seibel/distanthorizons/common/wrappers/gui/ClassicConfigGUI.java:339: error: cannot find symbol
-                        Component name = Translatable(this.translationPrefix + info.getNameWCategory());
-                                                                                   ^
-  symbol:   method getNameWCategory()
-  location: variable info of type AbstractConfigType
-/home/matt/Documents/Repos/MattMC/modules/distant-horizons-2.3.4b/common/src/main/java/com/seibel/distanthorizons/common/wrappers/gui/ClassicConfigGUI.java:345: error: incompatible types: AbstractConfigType cannot be converted to ConfigEntry
-                                        ((ConfigEntry) info).uiSetWithoutSaving(((ConfigEntry) info).getDefaultValue());
-                                                       ^
-/home/matt/Documents/Repos/MattMC/modules/distant-horizons-2.3.4b/common/src/main/java/com/seibel/distanthorizons/common/wrappers/gui/ClassicConfigGUI.java:345: error: incompatible types: AbstractConfigType cannot be converted to ConfigEntry
-                                        ((ConfigEntry) info).uiSetWithoutSaving(((ConfigEntry) info).getDefaultValue());
-                                                                                               ^
-/home/matt/Documents/Repos/MattMC/modules/distant-horizons-2.3.4b/common/src/main/java/com/seibel/distanthorizons/common/wrappers/gui/ClassicConfigGUI.java:346: error: cannot find symbol
-                                        ((EntryInfo) info.guiValue).index = 0;
-                                                         ^
-  symbol:   variable guiValue
-  location: variable info of type AbstractConfigType
-/home/matt/Documents/Repos/MattMC/modules/distant-horizons-2.3.4b/common/src/main/java/com/seibel/distanthorizons/common/wrappers/gui/ClassicConfigGUI.java:357: error: cannot find symbol
-                                if (((EntryInfo) info.guiValue).widget instanceof Map.Entry)
-                                                     ^
-  symbol:   variable guiValue
-  location: variable info of type AbstractConfigType
-/home/matt/Documents/Repos/MattMC/modules/distant-horizons-2.3.4b/common/src/main/java/com/seibel/distanthorizons/common/wrappers/gui/ClassicConfigGUI.java:359: error: cannot find symbol
-                                        Map.Entry<Button.OnPress, Function<Object, Component>> widget = (Map.Entry<Button.OnPress, Function<Object, Component>>) ((EntryInfo) info.guiValue).widget;
-                                                                                                                                                                                  ^
-  symbol:   variable guiValue
-  location: variable info of type AbstractConfigType
 Note: Some input files use or override a deprecated API.
 Note: Recompile with -Xlint:deprecation for details.
 Note: Some input files use unchecked or unsafe operations.
 Note: Recompile with -Xlint:unchecked for details.
-Note: Some messages have been simplified; recompile with -Xdiags:verbose to get full output
-100 errors
-only showing the first 100 errors, of 157 total; use -Xmaxerrs if you would like to see more
 
-> Task :compileDistantHorizonsJava FAILED
+> Task :runClient
+Using bundled JDK from: /home/matt/Documents/Repos/MattMC/run/jdk-21
+[19:34:35] [main/INFO]: Loading Minecraft 1.21.10 with Fabric Loader 0.18.2
+[19:34:35] [main/INFO]: Mappings not present!
+[19:34:35] [main/WARN]: Mod resolution failed
+[19:34:35] [main/INFO]: Immediate reason: [HARD_DEP_NO_CANDIDATE distanthorizons 2.3.4-b {depends fabric-api-base @ [*]}, ROOT_FORCELOAD_SINGLE distanthorizons 2.3.4-b]
+[19:34:35] [main/INFO]: Reason: [HARD_DEP distanthorizons 2.3.4-b {depends fabric-api-base @ [*]}, HARD_DEP distanthorizons 2.3.4-b {depends fabric-lifecycle-events-v1 @ [*]}, HARD_DEP distanthorizons 2.3.4-b {depends fabric-resource-loader-v0 @ [*]}]
+[19:34:35] [main/INFO]: Fix: add [add:fabric-api-base 1 ([(-∞,∞)]), add:fabric-lifecycle-events-v1 1 ([(-∞,∞)]), add:fabric-resource-loader-v0 1 ([(-∞,∞)])], remove [], replace []
+[19:34:35] [main/ERROR]: Incompatible mods found!
+net.fabricmc.loader.impl.FormattedException: Some of your mods are incompatible with the game or each other!
+A potential solution has been determined, this may resolve your problem:
+         - Install fabric-api-base, any version.
+         - Install fabric-lifecycle-events-v1, any version.
+         - Install fabric-resource-loader-v0, any version.
+More details:
+         - Mod 'Distant Horizons' (distanthorizons) 2.3.4-b requires any version of fabric-api-base, which is missing!
+         - Mod 'Distant Horizons' (distanthorizons) 2.3.4-b requires any version of fabric-lifecycle-events-v1, which is missing!
+         - Mod 'Distant Horizons' (distanthorizons) 2.3.4-b requires any version of fabric-resource-loader-v0, which is missing!
+        at net.fabricmc.loader.impl.FormattedException.ofLocalized(FormattedException.java:51) ~[fabric-loader-0.18.2.jar:0.18.2]
+        at net.fabricmc.loader.impl.FabricLoaderImpl.load(FabricLoaderImpl.java:202) ~[fabric-loader-0.18.2.jar:0.18.2]
+        at net.fabricmc.loader.impl.launch.knot.Knot.init(Knot.java:142) ~[fabric-loader-0.18.2.jar:0.18.2]
+        at net.fabricmc.loader.impl.launch.knot.Knot.launch(Knot.java:66) [fabric-loader-0.18.2.jar:0.18.2]
+        at net.fabricmc.loader.impl.launch.knot.KnotClient.main(KnotClient.java:23) [fabric-loader-0.18.2.jar:0.18.2]
+
+> Task :runClient FAILED
 
 FAILURE: Build failed with an exception.
 
 * What went wrong:
-Execution failed for task ':compileDistantHorizonsJava'.
-> Compilation failed; see the compiler error output for details.
+Execution failed for task ':runClient'.
+> Process 'command '/home/matt/Documents/Repos/MattMC/run/jdk-21/bin/java'' finished with non-zero exit value 1
 
 * Try:
-> Run with --info option to get more log output.
+> Run with --stacktrace option to get the stack trace.
+> Run with --info or --debug option to get more log output.
 > Run with --scan to get full insights.
+> Get more help at https://help.gradle.org.
 
 BUILD FAILED in 29s
-10 actionable tasks: 6 executed, 4 up-to-date
+18 actionable tasks: 10 executed, 8 up-to-date
 matt@HungLoDE:~/Documents/Repos/MattMC$
 
 

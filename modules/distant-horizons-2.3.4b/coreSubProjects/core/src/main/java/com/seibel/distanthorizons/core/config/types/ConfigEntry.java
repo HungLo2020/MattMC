@@ -38,7 +38,8 @@ import java.util.function.Consumer;
  *
  * @author coolGi
  */
-public class ConfigEntry<T> extends AbstractConfigBase<T>
+@SuppressWarnings("rawtypes")
+public class ConfigEntry<T> extends AbstractConfigType<T, ConfigEntry<T>>
 {
 	private final String comment;
 	private T min;
@@ -99,6 +100,35 @@ public class ConfigEntry<T> extends AbstractConfigBase<T>
 	public void setMin(T newMin) { this.min = newMin; }
 	public T getMax() { return this.max; }
 	public void setMax(T newMax) { this.max = newMax; }
+	
+	/**
+	 * Validates a value against min/max constraints.
+	 * @return 0 if valid, -1 if below min, 1 if above max, 2 if invalid type
+	 */
+	@SuppressWarnings("unchecked")
+	public byte isValid(Object value) {
+		if (value == null) return 2;
+		try {
+			if (this.min != null && this.max != null) {
+				if (value instanceof Number && this.min instanceof Number) {
+					double val = ((Number) value).doubleValue();
+					double minVal = ((Number) this.min).doubleValue();
+					double maxVal = ((Number) this.max).doubleValue();
+					if (val < minVal) return -1;
+					if (val > maxVal) return 1;
+				} else if (value instanceof String && this.min instanceof Number) {
+					int len = ((String) value).length();
+					int minLen = ((Number) this.min).intValue();
+					int maxLen = ((Number) this.max).intValue();
+					if (len < minLen) return -1;
+					if (len > maxLen) return 1;
+				}
+			}
+			return 0;
+		} catch (Exception e) {
+			return 2;
+		}
+	}
 	
 	
 	

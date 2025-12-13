@@ -23,6 +23,7 @@ package com.seibel.distanthorizons.common.wrappers.worldGeneration;
 import com.google.common.collect.ImmutableMap;
 import com.seibel.distanthorizons.api.enums.worldGeneration.EDhApiDistantGeneratorMode;
 import com.seibel.distanthorizons.api.enums.worldGeneration.EDhApiWorldGenerationStep;
+import net.minecraft.world.level.chunk.PalettedContainerFactory;
 import com.seibel.distanthorizons.common.wrappers.world.ServerLevelWrapper;
 import com.seibel.distanthorizons.common.wrappers.worldGeneration.mimicObject.*;
 import com.seibel.distanthorizons.core.dependencyInjection.SingletonInjector;
@@ -116,7 +117,7 @@ public final class BatchGenerationEnvironment extends AbstractBatchGenerationEnv
 	#if MC_VER < MC_1_21_5
 	private static final TicketType<ChunkPos> DH_SERVER_GEN_TICKET = TicketType.create("dh_server_gen_ticket", Comparator.comparingLong(ChunkPos::toLong));
 	#else
-	private static final TicketType DH_SERVER_GEN_TICKET = new TicketType(/* timeout, 0 = disabled*/0L, /* persist */ false, TicketType.TicketUse.LOADING);
+	private static final TicketType DH_SERVER_GEN_TICKET = new TicketType(/* timeout, 0 = disabled*/0L, /* flags: loading */ TicketType.FLAG_LOADING);
 	#endif
 	
 	private static final IModChecker MOD_CHECKER = SingletonInjector.INSTANCE.get(IModChecker.class);
@@ -347,7 +348,7 @@ public final class BatchGenerationEnvironment extends AbstractBatchGenerationEnv
 	{
 		// Create and queue a generation event
 		GenerationEvent genEvent = new GenerationEvent(
-				new DhChunkPos(minX, minZ), genSize, generatorMode, targetStep, resultConsumer);
+				new DhChunkPos(minX, minZ), genSize, this, generatorMode, targetStep, resultConsumer);
 		this.generationEventList.add(genEvent);
 		
 		return CompletableFuture.runAsync(() -> {
@@ -764,7 +765,7 @@ public final class BatchGenerationEnvironment extends AbstractBatchGenerationEnv
 		#elif MC_VER < MC_1_21_3
 		return new ProtoChunk(chunkPos, UpgradeData.EMPTY, level, level.registryAccess().registryOrThrow(Registries.BIOME), null);
 		#else
-		return new ProtoChunk(chunkPos, UpgradeData.EMPTY, level, level.registryAccess().lookupOrThrow(Registries.BIOME), null);
+		return new ProtoChunk(chunkPos, UpgradeData.EMPTY, level, PalettedContainerFactory.create(level.registryAccess()), null);
 		#endif
 	}
 	
@@ -1110,10 +1111,8 @@ public final class BatchGenerationEnvironment extends AbstractBatchGenerationEnv
 	private static <T> ArrayGridList<T> GetCutoutFrom(ArrayGridList<T> total, EDhApiWorldGenerationStep step) { return GetCutoutFrom(total, 0); }
 	
 	
-	@Override
 	public int getEventCount() { return this.generationEventList.size(); }
 	
-	@Override
 	public void stop()
 	{
 		EVENT_LOGGER.info(BatchGenerationEnvironment.class.getSimpleName() + " shutting down...");
@@ -1144,7 +1143,6 @@ public final class BatchGenerationEnvironment extends AbstractBatchGenerationEnv
 		EVENT_LOGGER.info(BatchGenerationEnvironment.class.getSimpleName() + " shutdown complete.");
 	}
 	
-	@Override
 	public CompletableFuture<Void> generateChunks(
 			int minX, int minZ, int genSize, 
 			EDhApiDistantGeneratorMode generatorMode, EDhApiWorldGenerationStep targetStep,

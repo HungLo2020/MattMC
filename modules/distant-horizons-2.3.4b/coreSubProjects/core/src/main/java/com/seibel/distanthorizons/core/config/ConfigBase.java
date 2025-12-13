@@ -4,6 +4,7 @@
  */
 package com.seibel.distanthorizons.core.config;
 
+import com.seibel.distanthorizons.core.config.types.AbstractConfigType;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -15,11 +16,16 @@ public class ConfigBase
 {
     public static ConfigBase INSTANCE;
     
-    public final List<Object> entries = new ArrayList<>();
+    public final String modID;
+    public final String modName;
+    
+    @SuppressWarnings("rawtypes")
+    public final List<AbstractConfigType> entries = new ArrayList<>();
     public ConfigFile configFileINSTANCE;
     
     public ConfigBase(String modId, String modName, Class<?> configClass, int configFileVersion) {
-        // Initialize with empty list - entries will be populated by the new Config system
+        this.modID = modId;
+        this.modName = modName;
         this.configFileINSTANCE = new ConfigFile(modId);
     }
     

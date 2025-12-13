@@ -1412,6 +1412,22 @@ public class Config
 		{
 			public static ConfigUIComment lodBuildingHeader = new ConfigUIComment.Builder().setParentConfigClass(LodBuilding.class).build();
 			
+			// Compatibility entries for wrapper code
+			public static ConfigEntry<Boolean> pullLightingForPregeneratedChunks = new ConfigEntry.Builder<Boolean>()
+					.set(true)
+					.comment("Pull lighting for pregenerated chunks")
+					.build();
+			
+			public static ConfigEntry<Boolean> assumePreExistingChunksAreFinished = new ConfigEntry.Builder<Boolean>()
+					.set(true)
+					.comment("Assume pre-existing chunks are finished")
+					.build();
+			
+			public static ConfigEntry<Boolean> recalculateChunkHeightmaps = new ConfigEntry.Builder<Boolean>()
+					.set(false)
+					.comment("Recalculate chunk heightmaps")
+					.build();
+			
 			public static ConfigEntry<Boolean> disableUnchangedChunkCheck = new ConfigEntry.Builder<Boolean>()
 					.set(false)
 					// enabling this can be quite detrimental to performance,
@@ -1550,6 +1566,24 @@ public class Config
 					.build();
 			
 			public static ConfigUISpacer globalLoggingSpacer = new ConfigUISpacer.Builder().build();
+			
+			// Compatibility entries for wrapper code
+			public static ConfigEntry<Boolean> logWorldGenPerformance = new ConfigEntry.Builder<Boolean>()
+					.set(false)
+					.comment("Log world generation performance")
+					.build();
+			public static ConfigEntry<Boolean> logWorldGenEvent = new ConfigEntry.Builder<Boolean>()
+					.set(false)
+					.comment("Log world generation events")
+					.build();
+			public static ConfigEntry<Boolean> logNetworkEvent = new ConfigEntry.Builder<Boolean>()
+					.set(false)
+					.comment("Log network events")
+					.build();
+			public static ConfigEntry<Boolean> logWorldGenLoadEvent = new ConfigEntry.Builder<Boolean>()
+					.set(false)
+					.comment("Log world generation load events")
+					.build();
 			
 			
 			public static ConfigEntry<EDhApiLoggerLevel> logWorldGenEventToFile = new ConfigEntry.Builder<EDhApiLoggerLevel>()

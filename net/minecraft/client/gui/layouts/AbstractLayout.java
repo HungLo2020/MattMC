@@ -57,7 +57,7 @@ public abstract class AbstractLayout implements Layout {
 	}
 
 	@Environment(EnvType.CLIENT)
-	protected abstract static class AbstractChildWrapper {
+	public abstract static class AbstractChildWrapper {
 		public final LayoutElement child;
 		public final LayoutSettings.LayoutSettingsImpl layoutSettings;
 

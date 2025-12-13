@@ -281,21 +281,13 @@ public class MinecraftRenderWrapper implements IMinecraftRenderWrapper
 		
 		
 		int width = MC.getWindow().getWidth();
-		if (OPTIFINE_ACCESSOR != null)
-		{
-			// TODO remove comment after testing:
-			// this should fix the issue where different optifine render resolutions screw up the LOD rendering
-			width *= OPTIFINE_ACCESSOR.getRenderResolutionMultiplier();
-		}
+		// Optifine render resolution multiplier support removed in new API
 		return width;
 	}
 	public int getScreenHeight()
 	{
 		int height = MC.getWindow().getHeight();
-		if (OPTIFINE_ACCESSOR != null)
-		{
-			height *= OPTIFINE_ACCESSOR.getRenderResolutionMultiplier();
-		}
+		// Optifine render resolution multiplier support removed in new API
 		return height;
 	}
 	
@@ -402,12 +394,12 @@ public class MinecraftRenderWrapper implements IMinecraftRenderWrapper
 	
 	public int getTargetFrameBufferViewportWidth()
 	{
-		return this.getRenderTarget().viewWidth;
+		return this.getRenderTarget().width;
 	}
 	
 	public int getTargetFrameBufferViewportHeight()
 	{
-		return this.getRenderTarget().viewHeight;
+		return this.getRenderTarget().height;
 	}
 	
 	@Override

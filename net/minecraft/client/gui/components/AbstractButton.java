@@ -17,7 +17,7 @@ import net.minecraft.util.ARGB;
 @Environment(EnvType.CLIENT)
 public abstract class AbstractButton extends AbstractWidget {
 	protected static final int TEXT_MARGIN = 2;
-	private static final WidgetSprites SPRITES = new WidgetSprites(
+	protected static final WidgetSprites SPRITES = new WidgetSprites(
 		ResourceLocation.withDefaultNamespace("widget/button"),
 		ResourceLocation.withDefaultNamespace("widget/button_disabled"),
 		ResourceLocation.withDefaultNamespace("widget/button_highlighted")

@@ -180,6 +180,10 @@ public class LodUtil
 	{
 		throw new AssertFailureException("Assert Not Reach failed:\n " + message);
 	}
+	public static void assertNotReach()
+	{
+		throw new AssertFailureException("Assert Not Reach failed");
+	}
 	
 	
 	

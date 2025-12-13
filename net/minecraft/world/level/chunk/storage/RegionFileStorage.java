@@ -18,9 +18,9 @@ import org.jetbrains.annotations.Nullable;
 public final class RegionFileStorage implements AutoCloseable {
 	public static final String ANVIL_EXTENSION = ".mca";
 	private static final int MAX_CACHE_SIZE = 256;
-	private final Long2ObjectLinkedOpenHashMap<RegionFile> regionCache = new Long2ObjectLinkedOpenHashMap<>();
+	public final Long2ObjectLinkedOpenHashMap<RegionFile> regionCache = new Long2ObjectLinkedOpenHashMap<>();
 	private final RegionStorageInfo info;
-	private final Path folder;
+	public final Path folder;
 	private final boolean sync;
 
 	RegionFileStorage(RegionStorageInfo regionStorageInfo, Path path, boolean bl) {
