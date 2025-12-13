@@ -252,6 +252,8 @@ import org.apache.commons.io.FileUtils;
 import org.jetbrains.annotations.Nullable;
 import org.lwjgl.util.tinyfd.TinyFileDialogs;
 import org.slf4j.Logger;
+import com.seibel.distanthorizons.core.api.internal.ClientApi;
+import com.seibel.distanthorizons.common.wrappers.world.ClientLevelWrapper;
 
 @Environment(EnvType.CLIENT)
 public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements WindowEventHandler {
@@ -2163,6 +2165,11 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 		this.particleEngine.setLevel(clientLevel);
 		this.gameRenderer.setLevel(clientLevel);
 		this.updateTitle();
+		
+		// Fire Distant Horizons client level load event
+		if (clientLevel != null) {
+			ClientApi.INSTANCE.clientLevelLoadEvent(ClientLevelWrapper.getWrapper(clientLevel, true));
+		}
 	}
 
 	private UserProperties userProperties() {
