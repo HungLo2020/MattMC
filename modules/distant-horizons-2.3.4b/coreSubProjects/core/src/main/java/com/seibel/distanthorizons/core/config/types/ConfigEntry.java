@@ -38,7 +38,8 @@ import java.util.function.Consumer;
  *
  * @author coolGi
  */
-public class ConfigEntry<T> extends AbstractConfigBase<T>
+@SuppressWarnings("rawtypes")
+public class ConfigEntry<T> extends AbstractConfigType<T, ConfigEntry<T>>
 {
 	private final String comment;
 	private T min;

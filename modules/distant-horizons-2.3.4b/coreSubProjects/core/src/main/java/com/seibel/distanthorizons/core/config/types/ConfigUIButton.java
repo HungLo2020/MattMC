@@ -21,7 +21,7 @@ package com.seibel.distanthorizons.core.config.types;
 
 import com.seibel.distanthorizons.core.config.types.enums.EConfigEntryAppearance;
 
-public class ConfigUIButton extends AbstractConfigBase<Runnable>
+public class ConfigUIButton extends AbstractConfigType<Runnable, ConfigUIButton>
 {
 	//=============//
 	// constructor //

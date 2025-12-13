@@ -13,22 +13,13 @@ import com.seibel.distanthorizons.core.config.types.enums.EConfigEntryAppearance
  */
 public abstract class AbstractConfigType<T, SELF extends AbstractConfigType<T, SELF>> extends AbstractConfigBase<T>
 {
-    // The SELF parameter is kept for signature compatibility with old API
-    
     protected AbstractConfigType(EConfigEntryAppearance appearance, T defaultValue) {
         super(appearance, defaultValue);
     }
     
-    // Additional methods expected by old wrapper code
+    // Methods expected by old wrapper code - subclasses implement
     public String getComment() { return ""; }
     public boolean shouldShowInGui() { return true; }
     public String getDisplayName() { return this.name; }
     public String getTranslationKey() { return this.name; }
-    
-    // Methods that ConfigEntry provides - abstract here for override
-    public abstract byte isValid(Object value);
-    public abstract Object getMin();
-    public abstract Object getMax();
-    public abstract void uiSetWithoutSaving(Object value);
-    public abstract Class<?> getType();
 }

@@ -27,7 +27,7 @@ import com.seibel.distanthorizons.core.config.types.enums.EConfigEntryAppearance
  *
  * @author coolGi
  */
-public class ConfigCategory extends AbstractConfigBase<Class<?>>
+public class ConfigCategory extends AbstractConfigType<Class<?>, ConfigCategory>
 {
 	/** 
 	 * Defines where this category points to. <br>
