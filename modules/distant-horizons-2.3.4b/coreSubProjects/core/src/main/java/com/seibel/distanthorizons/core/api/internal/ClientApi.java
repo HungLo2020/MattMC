@@ -467,6 +467,7 @@ public class ClientApi
 		if (validationMessage != null)
 		{
 			this.lastRenderParamValidationMessage = validationMessage;
+			LOGGER.warn("DH render skipped: {}", validationMessage);
 			return;
 		}
 		else
