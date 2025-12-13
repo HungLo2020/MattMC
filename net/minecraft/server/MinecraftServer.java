@@ -181,6 +181,7 @@ import net.minecraft.world.phys.Vec3;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
+import net.fabricmc.fabric.api.event.lifecycle.v1.ServerWorldEvents;
 
 public abstract class MinecraftServer extends ReentrantBlockableEventLoop<TickTask> implements ServerInfo, CommandSource, ChunkIOErrorReporter {
 	private static final Logger LOGGER = LogUtils.getLogger();
@@ -411,6 +412,10 @@ public abstract class MinecraftServer extends ReentrantBlockableEventLoop<TickTa
 		LevelStem levelStem = registry.getValue(LevelStem.OVERWORLD);
 		ServerLevel serverLevel = new ServerLevel(this, this.executor, this.storageSource, serverLevelData, Level.OVERWORLD, levelStem, bl, m, list, true, null);
 		this.levels.put(Level.OVERWORLD, serverLevel);
+		
+		// Fire Fabric ServerWorldEvents.LOAD for Distant Horizons level initialization
+		ServerWorldEvents.LOAD.invoker().onWorldLoad(this, serverLevel);
+		
 		DimensionDataStorage dimensionDataStorage = serverLevel.getDataStorage();
 		this.readScoreboard(dimensionDataStorage);
 		this.commandStorage = new CommandStorage(dimensionDataStorage);
@@ -454,6 +459,9 @@ public abstract class MinecraftServer extends ReentrantBlockableEventLoop<TickTa
 					this, this.executor, this.storageSource, derivedLevelData, resourceKey2, (LevelStem)entry.getValue(), bl, m, ImmutableList.of(), false, randomSequences
 				);
 				this.levels.put(resourceKey2, serverLevel2);
+				
+				// Fire Fabric ServerWorldEvents.LOAD for Distant Horizons level initialization
+				ServerWorldEvents.LOAD.invoker().onWorldLoad(this, serverLevel2);
 			} else {
 				serverLevel2 = serverLevel;
 			}
@@ -682,6 +690,9 @@ public abstract class MinecraftServer extends ReentrantBlockableEventLoop<TickTa
 			if (serverLevelx != null) {
 				try {
 					serverLevelx.close();
+					
+					// Fire Fabric ServerWorldEvents.UNLOAD for Distant Horizons level cleanup
+					ServerWorldEvents.UNLOAD.invoker().onWorldUnload(this, serverLevelx);
 				} catch (IOException var5) {
 					LOGGER.error("Exception closing the level", (Throwable)var5);
 				}
