@@ -10,71 +10,49 @@ Path for java installation '/usr/lib/jvm/openjdk-17' (Common Linux Locations) do
 📂 Copying JDK to run directory...
 ✅ JDK copied to /home/matt/Documents/Repos/MattMC/run/jdk-21
 
-> Task :compileJava
-Note: Some input files use or override a deprecated API.
-Note: Recompile with -Xlint:deprecation for details.
-Note: Some input files use unchecked or unsafe operations.
-Note: Recompile with -Xlint:unchecked for details.
-
-> Task :compileSodiumJava
-Note: Some input files use or override a deprecated API.
-Note: Recompile with -Xlint:deprecation for details.
-Note: /home/matt/Documents/Repos/MattMC/modules/sodium-1.21.9/common/src/main/java/net/caffeinemc/mods/sodium/mixin/features/render/entity/cull/EntityRendererMixin.java uses unchecked or unsafe operations.
-Note: Recompile with -Xlint:unchecked for details.
-
-> Task :compileIrisJava
-Note: Some input files use or override a deprecated API.
-Note: Recompile with -Xlint:deprecation for details.
-
-> Task :compileDistantHorizonsJava
-Note: Some input files use or override a deprecated API.
-Note: Recompile with -Xlint:deprecation for details.
-Note: Some input files use unchecked or unsafe operations.
-Note: Recompile with -Xlint:unchecked for details.
-
 > Task :runClient
 Using bundled JDK from: /home/matt/Documents/Repos/MattMC/run/jdk-21
-[09:32:10] [main/INFO]: Loading Minecraft 1.21.10 with Fabric Loader 0.18.2
-[09:32:10] [main/INFO]: Mappings not present!
-[09:32:10] [ForkJoinPool-1-worker-1/WARN]: Mod iris uses the version ${version} which isn't compatible with Loader's extended semantic version format (Could not parse version number component '${version}'!), SemVer is recommended for reliably evaluating dependencies and prioritizing newer version
-[09:32:10] [main/INFO]: Loading 5 mods:
+[09:39:27] [main/INFO]: Loading Minecraft 1.21.10 with Fabric Loader 0.18.2
+[09:39:27] [main/INFO]: Mappings not present!
+[09:39:27] [ForkJoinPool-1-worker-1/WARN]: Mod iris uses the version ${version} which isn't compatible with Loader's extended semantic version format (Could not parse version number component '${version}'!), SemVer is recommended for reliably evaluating dependencies and prioritizing newer version
+[09:39:27] [main/INFO]: Loading 5 mods:
         - distanthorizons 2.3.4-b
         - iris 1.9.6
         - java 21
         - minecraft 1.21.10
         - sodium 0.7.2
-[09:32:10] [main/WARN]: Runtime mod remapping disabled due to no fabric.remapClasspathFile being specified. You may need to update loom.
-[09:32:10] [main/INFO]: SpongePowered MIXIN Subsystem Version=0.8.7 Source=file:/home/matt/Documents/Repos/MattMC/libraries/deps/sponge-mixin-0.16.5+mixin.0.8.7.jar Service=Knot/Fabric Env=CLIENT
-[09:32:10] [main/INFO]: Compatibility level set to JAVA_17
-[09:32:10] [main/INFO]: Loaded configuration file for Sodium: 42 options available, 1 override(s) found
-[09:32:10] [main/WARN]: Reference map 'iris.refmap.json' for mixins.iris.json could not be read. If this is a development environment you can ignore this message
-[09:32:10] [main/WARN]: Reference map 'iris-fabric.refmap.json' for mixins.iris.fabric.json could not be read. If this is a development environment you can ignore this message
-[09:32:10] [main/WARN]: Reference map 'iris.refmap.json' for mixins.iris.fantastic.json could not be read. If this is a development environment you can ignore this message
-[09:32:10] [main/WARN]: Reference map 'iris.refmap.json' for mixins.iris.vertexformat.json could not be read. If this is a development environment you can ignore this message
-[09:32:10] [main/WARN]: Reference map 'iris.refmap.json' for mixins.iris.bettermipmaps.json could not be read. If this is a development environment you can ignore this message
-[09:32:10] [main/WARN]: Reference map 'iris.refmap.json' for mixins.iris.compat.sodium.json could not be read. If this is a development environment you can ignore this message
-[09:32:10] [main/WARN]: Reference map 'iris.refmap.json' for mixins.iris.fixes.maxfpscrash.json could not be read. If this is a development environment you can ignore this message
-[09:32:10] [main/WARN]: Force-disabling mixin 'features.render.world.sky.FogRendererMixin' as rule 'mixin.features.render.world.sky' (added by mods [iris]) disables it and children
-[09:32:10] [main/WARN]: Force-disabling mixin 'features.render.world.sky.ClientLevelMixin' as rule 'mixin.features.render.world.sky' (added by mods [iris]) disables it and children
-[09:32:10] [main/WARN]: Force-disabling mixin 'features.render.world.sky.LevelRendererMixin' as rule 'mixin.features.render.world.sky' (added by mods [iris]) disables it and children
-[09:32:10] [main/INFO]: Searching for graphics cards...
-[09:32:10] [main/INFO]: Found graphics adapter: LinuxPciAdapterInfo[vendor=NVIDIA, name=GA102 [GeForce RTX 3080 Ti], pciVendorId=0x10de, pciDeviceId=0x2208]
-[09:32:10] [main/WARN]: Sodium has applied one or more workarounds to prevent crashes or other issues on your system: [NVIDIA_THREADED_OPTIMIZATIONS_BROKEN]
-[09:32:10] [main/WARN]: This is not necessarily an issue, but it may result in certain features or optimizations being disabled. You can sometimes fix these issues by upgrading your graphics driver.
-[09:32:11] [Datafixer Bootstrap/INFO]: 278 Datafixer optimizations took 169 milliseconds
-[09:32:13] [main/WARN]: Missing translation key for rename: gui.abuseReport.reason.generic
-[09:32:13] [main/WARN]: Missing translation key for rename: gui.abuseReport.reason.generic.description
-[09:32:13] [Render thread/INFO]: Setting user: Player674
-[09:32:13] [Render thread/INFO]: Initializing Distant Horizons client, firing DhApiBeforeDhInitEvent...
-[09:32:13] [Render thread/INFO]: Distant Horizons, Version: 2.3.7-b-dev
-[09:32:13] [Render thread/INFO]: DH Branch: unknown
-[09:32:13] [Render thread/INFO]: DH Commit: unknown
-[09:32:13] [Render thread/INFO]: DH Jar Build Source: MattMC
-[09:32:13] [Render thread/INFO]: Registering Fabric Client Events
-[09:32:13] [Render thread/INFO]: Registering Fabric Server Events
-[09:32:13] [Render thread/INFO]: Registered mod compatibility accessor for: [Sodium-Fabric].
-[09:32:13] [Render thread/INFO]: Registered mod compatibility accessor for: [iris].
-[09:32:13] [Render thread/INFO]: Distant Horizons client Initialized.
+[09:39:27] [main/WARN]: Runtime mod remapping disabled due to no fabric.remapClasspathFile being specified. You may need to update loom.
+[09:39:27] [main/INFO]: SpongePowered MIXIN Subsystem Version=0.8.7 Source=file:/home/matt/Documents/Repos/MattMC/libraries/deps/sponge-mixin-0.16.5+mixin.0.8.7.jar Service=Knot/Fabric Env=CLIENT
+[09:39:27] [main/INFO]: Compatibility level set to JAVA_17
+[09:39:27] [main/WARN]: Reference map 'iris.refmap.json' for mixins.iris.json could not be read. If this is a development environment you can ignore this message
+[09:39:27] [main/WARN]: Reference map 'iris-fabric.refmap.json' for mixins.iris.fabric.json could not be read. If this is a development environment you can ignore this message
+[09:39:27] [main/WARN]: Reference map 'iris.refmap.json' for mixins.iris.fantastic.json could not be read. If this is a development environment you can ignore this message
+[09:39:27] [main/WARN]: Reference map 'iris.refmap.json' for mixins.iris.vertexformat.json could not be read. If this is a development environment you can ignore this message
+[09:39:27] [main/WARN]: Reference map 'iris.refmap.json' for mixins.iris.bettermipmaps.json could not be read. If this is a development environment you can ignore this message
+[09:39:27] [main/WARN]: Reference map 'iris.refmap.json' for mixins.iris.compat.sodium.json could not be read. If this is a development environment you can ignore this message
+[09:39:27] [main/WARN]: Reference map 'iris.refmap.json' for mixins.iris.fixes.maxfpscrash.json could not be read. If this is a development environment you can ignore this message
+[09:39:27] [main/INFO]: Loaded configuration file for Sodium: 42 options available, 1 override(s) found
+[09:39:27] [main/WARN]: Force-disabling mixin 'features.render.world.sky.FogRendererMixin' as rule 'mixin.features.render.world.sky' (added by mods [iris]) disables it and children
+[09:39:27] [main/WARN]: Force-disabling mixin 'features.render.world.sky.ClientLevelMixin' as rule 'mixin.features.render.world.sky' (added by mods [iris]) disables it and children
+[09:39:27] [main/WARN]: Force-disabling mixin 'features.render.world.sky.LevelRendererMixin' as rule 'mixin.features.render.world.sky' (added by mods [iris]) disables it and children
+[09:39:27] [main/INFO]: Searching for graphics cards...
+[09:39:27] [main/INFO]: Found graphics adapter: LinuxPciAdapterInfo[vendor=NVIDIA, name=GA102 [GeForce RTX 3080 Ti], pciVendorId=0x10de, pciDeviceId=0x2208]
+[09:39:27] [main/WARN]: Sodium has applied one or more workarounds to prevent crashes or other issues on your system: [NVIDIA_THREADED_OPTIMIZATIONS_BROKEN]
+[09:39:27] [main/WARN]: This is not necessarily an issue, but it may result in certain features or optimizations being disabled. You can sometimes fix these issues by upgrading your graphics driver.
+[09:39:28] [Datafixer Bootstrap/INFO]: 278 Datafixer optimizations took 199 milliseconds
+[09:39:30] [main/WARN]: Missing translation key for rename: gui.abuseReport.reason.generic
+[09:39:30] [main/WARN]: Missing translation key for rename: gui.abuseReport.reason.generic.description
+[09:39:30] [Render thread/INFO]: Setting user: Player961
+[09:39:30] [Render thread/INFO]: Initializing Distant Horizons client, firing DhApiBeforeDhInitEvent...
+[09:39:30] [Render thread/INFO]: Distant Horizons, Version: 2.3.7-b-dev
+[09:39:30] [Render thread/INFO]: DH Branch: unknown
+[09:39:30] [Render thread/INFO]: DH Commit: unknown
+[09:39:30] [Render thread/INFO]: DH Jar Build Source: MattMC
+[09:39:30] [Render thread/INFO]: Registering Fabric Client Events
+[09:39:30] [Render thread/INFO]: Registering Fabric Server Events
+[09:39:30] [Render thread/INFO]: Registered mod compatibility accessor for: [Sodium-Fabric].
+[09:39:30] [Render thread/INFO]: Registered mod compatibility accessor for: [iris].
+[09:39:31] [Render thread/INFO]: Distant Horizons client Initialized.
 [LWJGL] Version: 3.3.3-snapshot
          OS: Linux v6.14.0-36-generic
         JRE: Linux amd64 21.0.5
@@ -85,16 +63,16 @@ Using bundled JDK from: /home/matt/Documents/Repos/MattMC/run/jdk-21
 [LWJGL] Loading library: glfw
         Module: org.lwjgl.glfw
         Loaded from org.lwjgl.librarypath: /tmp/lwjgl_matt/3.3.3-snapshot/x64/libglfw.so
-[09:32:13] [Render thread/INFO]: Queuing DH event binding...
-[09:32:13] [Render thread/INFO]: Backend library: LWJGL version 3.3.3-snapshot
-[09:32:13] [Render thread/WARN]: Detected unexpected shutdown during last game startup: resetting fullscreen mode
+[09:39:31] [Render thread/INFO]: Queuing DH event binding...
+[09:39:31] [Render thread/INFO]: Backend library: LWJGL version 3.3.3-snapshot
+[09:39:31] [Render thread/WARN]: Detected unexpected shutdown during last game startup: resetting fullscreen mode
 [LWJGL] Loading library: jemalloc
         Module: org.lwjgl.jemalloc
         Loaded from org.lwjgl.librarypath: /tmp/lwjgl_matt/3.3.3-snapshot/x64/libjemalloc.so
 [LWJGL] MemoryUtil allocator: JEmallocAllocator
 [LWJGL] Java 9 check intrinsics enabled
 [LWJGL] Closure Registry: ConcurrentHashMap
-[09:32:13] [Render thread/INFO]: Modifying process environment to apply workarounds for the NVIDIA graphics driver...
+[09:39:31] [Render thread/INFO]: Modifying process environment to apply workarounds for the NVIDIA graphics driver...
 [LWJGL] Loading JNI library: lwjgl_stb
         Module: org.lwjgl.stb
         Loaded from org.lwjgl.librarypath: /tmp/lwjgl_matt/3.3.3-snapshot/x64/liblwjgl_stb.so
@@ -107,21 +85,21 @@ Using bundled JDK from: /home/matt/Documents/Repos/MattMC/run/jdk-21
 [LWJGL] Java 9 text decoding enabled
         Loaded from system paths: /lib/x86_64-linux-gnu/libGLX.so.0
 [LWJGL] Java 10 multiplyHigh enabled
-[09:32:14] [ForkJoinPool.commonPool-worker-1/WARN]: [Iris Update Check] This version doesn't have an update index, skipping.
-[09:32:14] [Render thread/INFO]: OpenGL Vendor: NVIDIA Corporation
-[09:32:14] [Render thread/INFO]: OpenGL Renderer: NVIDIA GeForce RTX 3080 Ti/PCIe/SSE2
-[09:32:14] [Render thread/INFO]: OpenGL Version: 3.3.0 NVIDIA 580.95.05
-[09:32:14] [Render thread/INFO]: Modifying OpenGL context to apply workarounds for the NVIDIA graphics driver...
-[09:32:14] [Render thread/INFO]: Debug functionality is disabled.
-[09:32:14] [Render thread/INFO]: ARB_direct_state_access detected, enabling DSA.
-[09:32:14] [Render thread/INFO]: Using optional rendering extensions: GL_ARB_buffer_storage, GL_KHR_debug, GL_ARB_vertex_attrib_binding, GL_ARB_direct_state_access
-[09:32:14] [Render thread/INFO]: Loaded 20 skins (0 custom)
+[09:39:31] [ForkJoinPool.commonPool-worker-1/WARN]: [Iris Update Check] This version doesn't have an update index, skipping.
+[09:39:31] [Render thread/INFO]: Debug functionality is disabled.
+[09:39:31] [Render thread/INFO]: ARB_direct_state_access detected, enabling DSA.
+[09:39:31] [Render thread/INFO]: OpenGL Vendor: NVIDIA Corporation
+[09:39:31] [Render thread/INFO]: OpenGL Renderer: NVIDIA GeForce RTX 3080 Ti/PCIe/SSE2
+[09:39:31] [Render thread/INFO]: OpenGL Version: 3.3.0 NVIDIA 580.95.05
+[09:39:31] [Render thread/INFO]: Modifying OpenGL context to apply workarounds for the NVIDIA graphics driver...
+[09:39:31] [Render thread/INFO]: Using optional rendering extensions: GL_ARB_buffer_storage, GL_KHR_debug, GL_ARB_vertex_attrib_binding, GL_ARB_direct_state_access
+[09:39:31] [Render thread/INFO]: Loaded 20 skins (0 custom)
 [LWJGL] Loading library: openal
         Module: org.lwjgl.openal
         Loaded from org.lwjgl.librarypath: /tmp/lwjgl_matt/3.3.3-snapshot/x64/libopenal.so
 [LWJGL] [ALC] ALC_SOFT_reopen_device was reported as available but an entry point is missing.
-[09:32:14] [Render thread/ERROR]: Mixin apply for mod iris failed mixins.iris.json:entity_render_context.ItemStackStateLayerMixin from mod iris -> net.minecraft.client.renderer.item.ItemStackRenderState$LayerRenderState: org.spongepowered.asm.mixin.injection.throwables.InvalidInjectionException Invalid descriptor on mixins.iris.json:entity_render_context.ItemStackStateLayerMixin from mod iris->@Inject::onRender(Lcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/client/renderer/SubmitNodeCollector;IIILorg/spongepowered/asm/mixin/injection/callback/CallbackInfo;Lcom/llamalad7/mixinextras/sugar/ref/LocalIntRef;)V! Expected (Lcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/client/renderer/SubmitNodeCollector;IIILorg/spongepowered/asm/mixin/injection/callback/CallbackInfo;)V but found (Lcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/client/renderer/SubmitNodeCollector;IIILorg/spongepowered/asm/mixin/injection/callback/CallbackInfo;Lcom/llamalad7/mixinextras/sugar/ref/LocalIntRef;)V [INJECT_APPLY Applicator Phase -> mixins.iris.json:entity_render_context.ItemStackStateLayerMixin from mod iris -> Apply Injections ->  -> Inject -> mixins.iris.json:entity_render_context.ItemStackStateLayerMixin from mod iris->@Inject::onRender(Lcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/client/renderer/SubmitNodeCollector;IIILorg/spongepowered/asm/mixin/injection/callback/CallbackInfo;Lcom/llamalad7/mixinextras/sugar/ref/LocalIntRef;)V]
-org.spongepowered.asm.mixin.injection.throwables.InvalidInjectionException: Invalid descriptor on mixins.iris.json:entity_render_context.ItemStackStateLayerMixin from mod iris->@Inject::onRender(Lcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/client/renderer/SubmitNodeCollector;IIILorg/spongepowered/asm/mixin/injection/callback/CallbackInfo;Lcom/llamalad7/mixinextras/sugar/ref/LocalIntRef;)V! Expected (Lcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/client/renderer/SubmitNodeCollector;IIILorg/spongepowered/asm/mixin/injection/callback/CallbackInfo;)V but found (Lcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/client/renderer/SubmitNodeCollector;IIILorg/spongepowered/asm/mixin/injection/callback/CallbackInfo;Lcom/llamalad7/mixinextras/sugar/ref/LocalIntRef;)V [INJECT_APPLY Applicator Phase -> mixins.iris.json:entity_render_context.ItemStackStateLayerMixin from mod iris -> Apply Injections ->  -> Inject -> mixins.iris.json:entity_render_context.ItemStackStateLayerMixin from mod iris->@Inject::onRender(Lcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/client/renderer/SubmitNodeCollector;IIILorg/spongepowered/asm/mixin/injection/callback/CallbackInfo;Lcom/llamalad7/mixinextras/sugar/ref/LocalIntRef;)V]
+[09:39:31] [Render thread/ERROR]: Mixin apply for mod sodium failed sodium-common.mixins.json:core.render.world.FogRendererMixin from mod sodium -> net.minecraft.client.renderer.fog.FogRenderer: org.spongepowered.asm.mixin.injection.throwables.InvalidInjectionException Invalid descriptor on sodium-common.mixins.json:core.render.world.FogRendererMixin from mod sodium->@Inject::sodium$storeFogParameters(Lnet/minecraft/client/Camera;IZLnet/minecraft/client/DeltaTracker;FLnet/minecraft/client/multiplayer/ClientLevel;Lorg/spongepowered/asm/mixin/injection/callback/CallbackInfoReturnable;Lnet/minecraft/client/renderer/fog/FogData;Lorg/joml/Vector4f;)V! Expected (Lnet/minecraft/client/Camera;IZLnet/minecraft/client/DeltaTracker;FLnet/minecraft/client/multiplayer/ClientLevel;Lorg/spongepowered/asm/mixin/injection/callback/CallbackInfoReturnable;)V but found (Lnet/minecraft/client/Camera;IZLnet/minecraft/client/DeltaTracker;FLnet/minecraft/client/multiplayer/ClientLevel;Lorg/spongepowered/asm/mixin/injection/callback/CallbackInfoReturnable;Lnet/minecraft/client/renderer/fog/FogData;Lorg/joml/Vector4f;)V [INJECT_APPLY Applicator Phase -> sodium-common.mixins.json:core.render.world.FogRendererMixin from mod sodium -> Apply Injections ->  -> Inject -> sodium-common.mixins.json:core.render.world.FogRendererMixin from mod sodium->@Inject::sodium$storeFogParameters(Lnet/minecraft/client/Camera;IZLnet/minecraft/client/DeltaTracker;FLnet/minecraft/client/multiplayer/ClientLevel;Lorg/spongepowered/asm/mixin/injection/callback/CallbackInfoReturnable;Lnet/minecraft/client/renderer/fog/FogData;Lorg/joml/Vector4f;)V]
+org.spongepowered.asm.mixin.injection.throwables.InvalidInjectionException: Invalid descriptor on sodium-common.mixins.json:core.render.world.FogRendererMixin from mod sodium->@Inject::sodium$storeFogParameters(Lnet/minecraft/client/Camera;IZLnet/minecraft/client/DeltaTracker;FLnet/minecraft/client/multiplayer/ClientLevel;Lorg/spongepowered/asm/mixin/injection/callback/CallbackInfoReturnable;Lnet/minecraft/client/renderer/fog/FogData;Lorg/joml/Vector4f;)V! Expected (Lnet/minecraft/client/Camera;IZLnet/minecraft/client/DeltaTracker;FLnet/minecraft/client/multiplayer/ClientLevel;Lorg/spongepowered/asm/mixin/injection/callback/CallbackInfoReturnable;)V but found (Lnet/minecraft/client/Camera;IZLnet/minecraft/client/DeltaTracker;FLnet/minecraft/client/multiplayer/ClientLevel;Lorg/spongepowered/asm/mixin/injection/callback/CallbackInfoReturnable;Lnet/minecraft/client/renderer/fog/FogData;Lorg/joml/Vector4f;)V [INJECT_APPLY Applicator Phase -> sodium-common.mixins.json:core.render.world.FogRendererMixin from mod sodium -> Apply Injections ->  -> Inject -> sodium-common.mixins.json:core.render.world.FogRendererMixin from mod sodium->@Inject::sodium$storeFogParameters(Lnet/minecraft/client/Camera;IZLnet/minecraft/client/DeltaTracker;FLnet/minecraft/client/multiplayer/ClientLevel;Lorg/spongepowered/asm/mixin/injection/callback/CallbackInfoReturnable;Lnet/minecraft/client/renderer/fog/FogData;Lorg/joml/Vector4f;)V]
         at org.spongepowered.asm.mixin.injection.callback.CallbackInjector.inject(CallbackInjector.java:560) ~[sponge-mixin-0.16.5+mixin.0.8.7.jar:0.16.5+mixin.0.8.7]
         at org.spongepowered.asm.mixin.injection.callback.CallbackInjector.inject(CallbackInjector.java:490) ~[sponge-mixin-0.16.5+mixin.0.8.7.jar:0.16.5+mixin.0.8.7]
         at org.spongepowered.asm.mixin.injection.code.Injector.inject(Injector.java:284) ~[sponge-mixin-0.16.5+mixin.0.8.7.jar:0.16.5+mixin.0.8.7]
@@ -140,34 +118,26 @@ org.spongepowered.asm.mixin.injection.throwables.InvalidInjectionException: Inva
         at net.fabricmc.loader.impl.launch.knot.KnotClassDelegate.loadClass(KnotClassDelegate.java:231) [fabric-loader-0.18.2.jar:0.18.2]
         at net.fabricmc.loader.impl.launch.knot.KnotClassLoader.loadClass(KnotClassLoader.java:119) [fabric-loader-0.18.2.jar:0.18.2]
         at java.base/java.lang.ClassLoader.loadClass(ClassLoader.java:526) [?:?]
-        at knot/net.minecraft.client.renderer.item.ItemStackRenderState.<init>(ItemStackRenderState.java:34) [minecraft-1.21.10.jar:?]
-        at knot/net.minecraft.client.particle.BreakingItemParticle$ItemParticleProvider.<init>(BreakingItemParticle.java:77) [minecraft-1.21.10.jar:?]
-        at knot/net.minecraft.client.particle.BreakingItemParticle$Provider.<init>(BreakingItemParticle.java:87) [minecraft-1.21.10.jar:?]
-        at knot/net.minecraft.client.particle.ParticleResources.registerProviders(ParticleResources.java:112) [minecraft-1.21.10.jar:?]
-        at knot/net.minecraft.client.particle.ParticleResources.<init>(ParticleResources.java:54) [minecraft-1.21.10.jar:?]
-        at knot/net.minecraft.client.Minecraft.<init>(Minecraft.java:585) [minecraft-1.21.10.jar:?]
+        at knot/net.minecraft.client.renderer.GameRenderer.<init>(GameRenderer.java:133) [minecraft-1.21.10.jar:?]
+        at knot/net.minecraft.client.Minecraft.<init>(Minecraft.java:591) [minecraft-1.21.10.jar:?]
         at knot/net.minecraft.client.main.Main.main(Main.java:243) [minecraft-1.21.10.jar:?]
         at net.fabricmc.loader.impl.game.minecraft.MinecraftGameProvider.launch(MinecraftGameProvider.java:536) [fabric-loader-0.18.2.jar:0.18.2]
         at net.fabricmc.loader.impl.launch.knot.Knot.launch(Knot.java:72) [fabric-loader-0.18.2.jar:0.18.2]
         at net.fabricmc.loader.impl.launch.knot.KnotClient.main(KnotClient.java:23) [fabric-loader-0.18.2.jar:0.18.2]
 ---- Minecraft Crash Report ----
-// Would you like a cupcake?
+// My bad.
 
-Time: 2025-12-13 09:32:14
+Time: 2025-12-13 09:39:32
 Description: Initializing game
 
-java.lang.RuntimeException: Mixin transformation of net.minecraft.client.renderer.item.ItemStackRenderState$LayerRenderState failed
+java.lang.RuntimeException: Mixin transformation of net.minecraft.client.renderer.fog.FogRenderer failed
         at net.fabricmc.loader.impl.launch.knot.KnotClassDelegate.getPostMixinClassByteArray(KnotClassDelegate.java:440)
         at net.fabricmc.loader.impl.launch.knot.KnotClassDelegate.tryLoadClass(KnotClassDelegate.java:336)
         at net.fabricmc.loader.impl.launch.knot.KnotClassDelegate.loadClass(KnotClassDelegate.java:231)
         at net.fabricmc.loader.impl.launch.knot.KnotClassLoader.loadClass(KnotClassLoader.java:119)
         at java.base/java.lang.ClassLoader.loadClass(ClassLoader.java:526)
-        at knot//net.minecraft.client.renderer.item.ItemStackRenderState.<init>(ItemStackRenderState.java:34)
-        at knot//net.minecraft.client.particle.BreakingItemParticle$ItemParticleProvider.<init>(BreakingItemParticle.java:77)
-        at knot//net.minecraft.client.particle.BreakingItemParticle$Provider.<init>(BreakingItemParticle.java:87)
-        at knot//net.minecraft.client.particle.ParticleResources.registerProviders(ParticleResources.java:112)
-        at knot//net.minecraft.client.particle.ParticleResources.<init>(ParticleResources.java:54)
-        at knot//net.minecraft.client.Minecraft.<init>(Minecraft.java:585)
+        at knot//net.minecraft.client.renderer.GameRenderer.<init>(GameRenderer.java:133)
+        at knot//net.minecraft.client.Minecraft.<init>(Minecraft.java:591)
         at knot//net.minecraft.client.main.Main.main(Main.java:243)
         at net.fabricmc.loader.impl.game.minecraft.MinecraftGameProvider.launch(MinecraftGameProvider.java:536)
         at net.fabricmc.loader.impl.launch.knot.Knot.launch(Knot.java:72)
@@ -177,13 +147,13 @@ Caused by: org.spongepowered.asm.mixin.transformer.throwables.MixinTransformerEr
         at org.spongepowered.asm.mixin.transformer.MixinTransformer.transformClass(MixinTransformer.java:237)
         at org.spongepowered.asm.mixin.transformer.MixinTransformer.transformClassBytes(MixinTransformer.java:202)
         at net.fabricmc.loader.impl.launch.knot.KnotClassDelegate.getPostMixinClassByteArray(KnotClassDelegate.java:435)
-        ... 14 more
-Caused by: org.spongepowered.asm.mixin.throwables.MixinApplyError: Mixin [mixins.iris.json:entity_render_context.ItemStackStateLayerMixin from mod iris] from phase [DEFAULT] in config [mixins.iris.json] FAILED during APPLY
+        ... 10 more
+Caused by: org.spongepowered.asm.mixin.throwables.MixinApplyError: Mixin [sodium-common.mixins.json:core.render.world.FogRendererMixin from mod sodium] from phase [DEFAULT] in config [sodium-common.mixins.json] FAILED during APPLY
         at org.spongepowered.asm.mixin.transformer.MixinProcessor.handleMixinError(MixinProcessor.java:686)
         at org.spongepowered.asm.mixin.transformer.MixinProcessor.handleMixinApplyError(MixinProcessor.java:637)
         at org.spongepowered.asm.mixin.transformer.MixinProcessor.applyMixins(MixinProcessor.java:368)
-        ... 17 more
-Caused by: org.spongepowered.asm.mixin.injection.throwables.InvalidInjectionException: Invalid descriptor on mixins.iris.json:entity_render_context.ItemStackStateLayerMixin from mod iris->@Inject::onRender(Lcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/client/renderer/SubmitNodeCollector;IIILorg/spongepowered/asm/mixin/injection/callback/CallbackInfo;Lcom/llamalad7/mixinextras/sugar/ref/LocalIntRef;)V! Expected (Lcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/client/renderer/SubmitNodeCollector;IIILorg/spongepowered/asm/mixin/injection/callback/CallbackInfo;)V but found (Lcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/client/renderer/SubmitNodeCollector;IIILorg/spongepowered/asm/mixin/injection/callback/CallbackInfo;Lcom/llamalad7/mixinextras/sugar/ref/LocalIntRef;)V [INJECT_APPLY Applicator Phase -> mixins.iris.json:entity_render_context.ItemStackStateLayerMixin from mod iris -> Apply Injections ->  -> Inject -> mixins.iris.json:entity_render_context.ItemStackStateLayerMixin from mod iris->@Inject::onRender(Lcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/client/renderer/SubmitNodeCollector;IIILorg/spongepowered/asm/mixin/injection/callback/CallbackInfo;Lcom/llamalad7/mixinextras/sugar/ref/LocalIntRef;)V]
+        ... 13 more
+Caused by: org.spongepowered.asm.mixin.injection.throwables.InvalidInjectionException: Invalid descriptor on sodium-common.mixins.json:core.render.world.FogRendererMixin from mod sodium->@Inject::sodium$storeFogParameters(Lnet/minecraft/client/Camera;IZLnet/minecraft/client/DeltaTracker;FLnet/minecraft/client/multiplayer/ClientLevel;Lorg/spongepowered/asm/mixin/injection/callback/CallbackInfoReturnable;Lnet/minecraft/client/renderer/fog/FogData;Lorg/joml/Vector4f;)V! Expected (Lnet/minecraft/client/Camera;IZLnet/minecraft/client/DeltaTracker;FLnet/minecraft/client/multiplayer/ClientLevel;Lorg/spongepowered/asm/mixin/injection/callback/CallbackInfoReturnable;)V but found (Lnet/minecraft/client/Camera;IZLnet/minecraft/client/DeltaTracker;FLnet/minecraft/client/multiplayer/ClientLevel;Lorg/spongepowered/asm/mixin/injection/callback/CallbackInfoReturnable;Lnet/minecraft/client/renderer/fog/FogData;Lorg/joml/Vector4f;)V [INJECT_APPLY Applicator Phase -> sodium-common.mixins.json:core.render.world.FogRendererMixin from mod sodium -> Apply Injections ->  -> Inject -> sodium-common.mixins.json:core.render.world.FogRendererMixin from mod sodium->@Inject::sodium$storeFogParameters(Lnet/minecraft/client/Camera;IZLnet/minecraft/client/DeltaTracker;FLnet/minecraft/client/multiplayer/ClientLevel;Lorg/spongepowered/asm/mixin/injection/callback/CallbackInfoReturnable;Lnet/minecraft/client/renderer/fog/FogData;Lorg/joml/Vector4f;)V]
         at org.spongepowered.asm.mixin.injection.callback.CallbackInjector.inject(CallbackInjector.java:560)
         at org.spongepowered.asm.mixin.injection.callback.CallbackInjector.inject(CallbackInjector.java:490)
         at org.spongepowered.asm.mixin.injection.code.Injector.inject(Injector.java:284)
@@ -195,7 +165,7 @@ Caused by: org.spongepowered.asm.mixin.injection.throwables.InvalidInjectionExce
         at org.spongepowered.asm.mixin.transformer.TargetClassContext.apply(TargetClassContext.java:437)
         at org.spongepowered.asm.mixin.transformer.TargetClassContext.applyMixins(TargetClassContext.java:418)
         at org.spongepowered.asm.mixin.transformer.MixinProcessor.applyMixins(MixinProcessor.java:352)
-        ... 17 more
+        ... 13 more
 
 
 A detailed walkthrough of the error, its code path and all known details is as follows:
@@ -209,12 +179,8 @@ Stacktrace:
         at net.fabricmc.loader.impl.launch.knot.KnotClassDelegate.loadClass(KnotClassDelegate.java:231)
         at net.fabricmc.loader.impl.launch.knot.KnotClassLoader.loadClass(KnotClassLoader.java:119)
         at java.base/java.lang.ClassLoader.loadClass(ClassLoader.java:526)
-        at knot//net.minecraft.client.renderer.item.ItemStackRenderState.<init>(ItemStackRenderState.java:34)
-        at knot//net.minecraft.client.particle.BreakingItemParticle$ItemParticleProvider.<init>(BreakingItemParticle.java:77)
-        at knot//net.minecraft.client.particle.BreakingItemParticle$Provider.<init>(BreakingItemParticle.java:87)
-        at knot//net.minecraft.client.particle.ParticleResources.registerProviders(ParticleResources.java:112)
-        at knot//net.minecraft.client.particle.ParticleResources.<init>(ParticleResources.java:54)
-        at knot//net.minecraft.client.Minecraft.<init>(Minecraft.java:585)
+        at knot//net.minecraft.client.renderer.GameRenderer.<init>(GameRenderer.java:133)
+        at knot//net.minecraft.client.Minecraft.<init>(Minecraft.java:591)
 
 -- Initialization --
 Details:
@@ -232,7 +198,7 @@ Details:
         Operating System: Linux (amd64) version 6.14.0-36-generic
         Java Version: 21.0.5, Eclipse Adoptium
         Java VM Version: OpenJDK 64-Bit Server VM (mixed mode, sharing), Eclipse Adoptium
-        Memory: 236498752 bytes (225 MiB) / 536870912 bytes (512 MiB) up to 2147483648 bytes (2048 MiB)
+        Memory: 229397096 bytes (218 MiB) / 536870912 bytes (512 MiB) up to 2147483648 bytes (2048 MiB)
         CPUs: 20
         Processor Vendor: GenuineIntel
         Processor Name: 12th Gen Intel(R) Core(TM) i7-12700K
@@ -248,14 +214,14 @@ Details:
         Graphics card #0 deviceId: 0x2208
         Graphics card #0 versionInfo: unknown
         Virtual memory max (MiB): 32300.84
-        Virtual memory used (MiB): 19747.80
+        Virtual memory used (MiB): 19695.03
         Swap memory total (MiB): 16384.00
-        Swap memory used (MiB): 3785.36
+        Swap memory used (MiB): 3785.26
         Space in storage for jna.tmpdir (MiB): <path not set>
         Space in storage for org.lwjgl.system.SharedLibraryExtractPath (MiB): <path not set>
         Space in storage for io.netty.native.workdir (MiB): <path not set>
         Space in storage for java.io.tmpdir (MiB): available: 15832.41, total: 15916.84
-        Space in storage for workdir (MiB): available: 294174.09, total: 937500.69
+        Space in storage for workdir (MiB): available: 294319.50, total: 937500.69
         JVM Flags: 19 total; -XX:+UseG1GC -XX:+ParallelRefProcEnabled -XX:MaxGCPauseMillis=200 -XX:+UnlockExperimentalVMOptions -XX:+DisableExplicitGC -XX:G1NewSizePercent=30 -XX:G1MaxNewSizePercent=40 -XX:G1HeapRegionSize=8M -XX:G1ReservePercent=20 -XX:G1HeapWastePercent=5 -XX:G1MixedGCCountTarget=4 -XX:InitiatingHeapOccupancyPercent=15 -XX:G1MixedGCLiveThresholdPercent=90 -XX:G1RSetUpdatingPauseTimePercent=5 -XX:SurvivorRatio=32 -XX:+PerfDisableSharedMem -XX:MaxTenuringThreshold=1 -Xms512M -Xmx2G
         Debug Flags: 0 total;
         Launched Version: 1.21.10
@@ -272,7 +238,7 @@ Details:
         System encoding: UTF-8
         File encoding: UTF-8
         CPU: 20x 12th Gen Intel(R) Core(TM) i7-12700K
-#@!@# Game crashed! Crash report saved to: #@!@# /home/matt/Documents/Repos/MattMC/run/crash-reports/crash-2025-12-13_09.32.14-client.txt
+#@!@# Game crashed! Crash report saved to: #@!@# /home/matt/Documents/Repos/MattMC/run/crash-reports/crash-2025-12-13_09.39.32-client.txt
 
 > Task :runClient FAILED
 
@@ -288,8 +254,8 @@ Execution failed for task ':runClient'.
 > Run with --scan to get full insights.
 > Get more help at https://help.gradle.org.
 
-BUILD FAILED in 21s
-18 actionable tasks: 9 executed, 9 up-to-date
+BUILD FAILED in 7s
+18 actionable tasks: 5 executed, 13 up-to-date
 matt@HungLoDE:~/Documents/Repos/MattMC$
 
 
