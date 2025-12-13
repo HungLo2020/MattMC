@@ -596,15 +596,16 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 			double d = vec3.x();
 			double e = vec3.y();
 			double f = vec3.z();
+			
 			profilerFiller.push("terrain");
 			ChunkSectionsToRender chunkSectionsToRender = this.prepareChunkRenders(matrix4f, d, e, f);
 			iris$renderTerrainGroup(chunkSectionsToRender, ChunkSectionLayerGroup.OPAQUE);
 			this.minecraft.gameRenderer.getLighting().setupFor(Lighting.Entry.LEVEL);
 			
 			// Fire AFTER_SETUP event for Distant Horizons after terrain setup
-			PoseStack setupPoseStack = new PoseStack();
+			// In MC 1.21.6+, matrix4f is the combined model-view-projection matrix
 			WorldRenderEvents.WorldRenderContext afterSetupContext = new WorldRenderContextImpl(
-				this.level, setupPoseStack, tickDeltaValue, renderCamera, matrix4f
+				this.level, matrix4f, tickDeltaValue, renderCamera
 			);
 			WorldRenderEvents.AFTER_SETUP.invoker().afterSetup(afterSetupContext);
 			
@@ -655,7 +656,7 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 			
 			// Fire AFTER_ENTITIES event for Distant Horizons after entity rendering
 			WorldRenderEvents.WorldRenderContext afterEntitiesContext = new WorldRenderContextImpl(
-				this.level, poseStack, tickDeltaValue, renderCamera, matrix4f
+				this.level, matrix4f, tickDeltaValue, renderCamera
 			);
 			WorldRenderEvents.AFTER_ENTITIES.invoker().afterEntities(afterEntitiesContext);
 			
@@ -691,7 +692,7 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 			
 			// Fire AFTER_TRANSLUCENT event for Distant Horizons after translucent rendering
 			WorldRenderEvents.WorldRenderContext afterTranslucentContext = new WorldRenderContextImpl(
-				this.level, poseStack, tickDeltaValue, renderCamera, matrix4f
+				this.level, matrix4f, tickDeltaValue, renderCamera
 			);
 			WorldRenderEvents.AFTER_TRANSLUCENT.invoker().afterTranslucent(afterTranslucentContext);
 		});
@@ -1528,21 +1529,30 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 	}
 	
 	/**
-	 * WorldRenderContext implementation for Fabric API events used by Distant Horizons
+	 * WorldRenderContext implementation for Fabric API events used by Distant Horizons.
+	 * 
+	 * For MC 1.21.6+, Minecraft combines the model-view and projection matrices into a single matrix.
+	 * To maintain compatibility with Distant Horizons expectations:
+	 * - The PoseStack contains the combined model-view-projection matrix
+	 * - The projection matrix is identity
 	 */
 	private static class WorldRenderContextImpl implements net.fabricmc.fabric.api.client.rendering.v1.WorldRenderEvents.WorldRenderContext {
 		private final ClientLevel level;
 		private final PoseStack poseStack;
 		private final float tickDelta;
 		private final Camera camera;
-		private final Matrix4f projectionMatrix;
+		private final Matrix4f combinedMVP;
+		private static final Matrix4f IDENTITY_MATRIX = new Matrix4f().identity();
 		
-		public WorldRenderContextImpl(ClientLevel level, PoseStack poseStack, float tickDelta, Camera camera, Matrix4f projectionMatrix) {
+		public WorldRenderContextImpl(ClientLevel level, Matrix4f combinedMVP, float tickDelta, Camera camera) {
 			this.level = level;
-			this.poseStack = poseStack;
+			this.combinedMVP = combinedMVP;
 			this.tickDelta = tickDelta;
 			this.camera = camera;
-			this.projectionMatrix = projectionMatrix;
+			
+			// Create PoseStack with the combined MVP matrix for MC 1.21.6+
+			this.poseStack = new PoseStack();
+			this.poseStack.last().pose().set(combinedMVP);
 		}
 		
 		@Override
@@ -1577,7 +1587,8 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 		
 		@Override
 		public Matrix4f projectionMatrix() {
-			return this.projectionMatrix;
+			// In MC 1.21.6+, the projection matrix is identity since MVP is combined
+			return IDENTITY_MATRIX;
 		}
 	}
 }
