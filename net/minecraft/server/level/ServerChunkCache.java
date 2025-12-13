@@ -57,7 +57,7 @@ import org.slf4j.Logger;
 
 public class ServerChunkCache extends ChunkSource {
 	private static final Logger LOGGER = LogUtils.getLogger();
-	private final DistanceManager distanceManager;
+	public final DistanceManager distanceManager;
 	private final ServerLevel level;
 	final Thread mainThread;
 	final ThreadedLevelLightEngine lightEngine;
