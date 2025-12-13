@@ -1576,6 +1576,10 @@ public class Config
 					.set(false)
 					.comment("Log world generation events")
 					.build();
+			public static ConfigEntry<Boolean> logNetworkEvent = new ConfigEntry.Builder<Boolean>()
+					.set(false)
+					.comment("Log network events")
+					.build();
 			public static ConfigEntry<Boolean> logWorldGenLoadEvent = new ConfigEntry.Builder<Boolean>()
 					.set(false)
 					.comment("Log world generation load events")

@@ -152,6 +152,10 @@ public class SharedApi
 	@Nullable
 	public static IDhServerWorld tryGetDhServerWorld() { return (currentWorld instanceof IDhServerWorld) ? (IDhServerWorld) currentWorld : null; }
 	
+	/** Compatibility alias for getIDhServerWorld */
+	@Nullable
+	public static IDhServerWorld getIDhServerWorld() { return tryGetDhServerWorld(); }
+	
 	
 	
 	//==============//
