@@ -23,7 +23,7 @@ Note: Recompile with -Xlint:unchecked for details.
 > Task :compileSodiumJava
 Note: Some input files use or override a deprecated API.
 Note: Recompile with -Xlint:deprecation for details.
-Note: Some input files use unchecked or unsafe operations.
+Note: /home/matt/Documents/Repos/MattMC/modules/sodium-1.21.9/common/src/main/java/net/caffeinemc/mods/sodium/mixin/features/render/entity/cull/EntityRendererMixin.java uses unchecked or unsafe operations.
 Note: Recompile with -Xlint:unchecked for details.
 
 > Task :compileIrisJava
@@ -36,20 +36,172 @@ Note: Recompile with -Xlint:deprecation for details.
 Note: Some input files use unchecked or unsafe operations.
 Note: Recompile with -Xlint:unchecked for details.
 
-> Task :runClient FAILED
+> Task :runClient
 Using bundled JDK from: /home/matt/Documents/Repos/MattMC/run/jdk-21
-Exception in thread "main" java.lang.ExceptionInInitializerError
+[15:27:34] [main/INFO]: Loading Minecraft 1.21.10 with Fabric Loader 0.18.2
+[15:27:34] [main/INFO]: Mappings not present!
+[15:27:34] [ForkJoinPool-1-worker-1/WARN]: Mod iris uses the version ${version} which isn't compatible with Loader's extended semantic version format (Could not parse version number component '${version}'!), SemVer is recommended for reliably evaluating dependencies and prioritizing newer version
+[15:27:34] [main/INFO]: Loading 5 mods:
+        - distanthorizons 2.3.4-b
+        - iris 1.9.6
+        - java 21
+        - minecraft 1.21.10
+        - sodium 0.7.2
+[15:27:34] [main/WARN]: Runtime mod remapping disabled due to no fabric.remapClasspathFile being specified. You may need to update loom.
+[15:27:34] [main/INFO]: SpongePowered MIXIN Subsystem Version=0.8.7 Source=file:/home/matt/Documents/Repos/MattMC/libraries/deps/sponge-mixin-0.16.5+mixin.0.8.7.jar Service=Knot/Fabric Env=CLIENT
+[15:27:34] [main/INFO]: Compatibility level set to JAVA_17
+[15:27:34] [main/WARN]: Reference map 'iris.refmap.json' for mixins.iris.json could not be read. If this is a development environment you can ignore this message
+[15:27:34] [main/WARN]: Reference map 'iris-fabric.refmap.json' for mixins.iris.fabric.json could not be read. If this is a development environment you can ignore this message
+[15:27:34] [main/WARN]: Reference map 'iris.refmap.json' for mixins.iris.fantastic.json could not be read. If this is a development environment you can ignore this message
+[15:27:34] [main/WARN]: Reference map 'iris.refmap.json' for mixins.iris.vertexformat.json could not be read. If this is a development environment you can ignore this message
+[15:27:34] [main/WARN]: Reference map 'iris.refmap.json' for mixins.iris.bettermipmaps.json could not be read. If this is a development environment you can ignore this message
+[15:27:34] [main/WARN]: Reference map 'iris.refmap.json' for mixins.iris.compat.sodium.json could not be read. If this is a development environment you can ignore this message
+[15:27:34] [main/WARN]: Reference map 'iris.refmap.json' for mixins.iris.fixes.maxfpscrash.json could not be read. If this is a development environment you can ignore this message
+[15:27:35] [main/INFO]: Loaded configuration file for Sodium: 42 options available, 1 override(s) found
+[15:27:35] [main/WARN]: Force-disabling mixin 'features.render.world.sky.FogRendererMixin' as rule 'mixin.features.render.world.sky' (added by mods [iris]) disables it and children
+[15:27:35] [main/WARN]: Force-disabling mixin 'features.render.world.sky.ClientLevelMixin' as rule 'mixin.features.render.world.sky' (added by mods [iris]) disables it and children
+[15:27:35] [main/WARN]: Force-disabling mixin 'features.render.world.sky.LevelRendererMixin' as rule 'mixin.features.render.world.sky' (added by mods [iris]) disables it and children
+[15:27:35] [main/INFO]: Searching for graphics cards...
+[15:27:35] [main/INFO]: Found graphics adapter: LinuxPciAdapterInfo[vendor=NVIDIA, name=GA102 [GeForce RTX 3080 Ti], pciVendorId=0x10de, pciDeviceId=0x2208]
+[15:27:35] [main/WARN]: Sodium has applied one or more workarounds to prevent crashes or other issues on your system: [NVIDIA_THREADED_OPTIMIZATIONS_BROKEN]
+[15:27:35] [main/WARN]: This is not necessarily an issue, but it may result in certain features or optimizations being disabled. You can sometimes fix these issues by upgrading your graphics driver.
+[15:27:35] [Datafixer Bootstrap/INFO]: 278 Datafixer optimizations took 183 milliseconds
+[15:27:37] [main/WARN]: Missing translation key for rename: gui.abuseReport.reason.generic
+[15:27:37] [main/WARN]: Missing translation key for rename: gui.abuseReport.reason.generic.description
+[15:27:37] [Render thread/INFO]: Loaded Fabric client mod initializer: com.seibel.distanthorizons.fabric.FabricMain
+[15:27:37] [Render thread/INFO]: Loaded Fabric server mod initializer: com.seibel.distanthorizons.fabric.FabricMain
+[15:27:37] [Render thread/INFO]: Initializing 0 Fabric common mod(s)
+[15:27:37] [Render thread/INFO]: Initializing 1 Fabric client mod(s)
+[15:27:37] [Render thread/INFO]: Initializing Distant Horizons client, firing DhApiBeforeDhInitEvent...
+[15:27:37] [Render thread/INFO]: Distant Horizons, Version: 2.3.7-b-dev
+[15:27:37] [Render thread/INFO]: DH Branch: unknown
+[15:27:37] [Render thread/INFO]: DH Commit: unknown
+[15:27:37] [Render thread/INFO]: DH Jar Build Source: MattMC
+[15:27:37] [Render thread/INFO]: Registering Fabric Client Events
+[15:27:37] [Render thread/INFO]: Registering Fabric Server Events
+[15:27:37] [Render thread/INFO]: Registered mod compatibility accessor for: [Sodium-Fabric].
+[15:27:37] [Render thread/INFO]: Registered mod compatibility accessor for: [iris].
+[LWJGL] Version: 3.3.3-snapshot
+         OS: Linux v6.14.0-36-generic
+        JRE: Linux amd64 21.0.5
+        JVM: OpenJDK 64-Bit Server VM v21.0.5+11-LTS by Eclipse Adoptium
+[LWJGL] Loading JNI library: lwjgl
+        Module: org.lwjgl
+        Loaded from org.lwjgl.librarypath: /tmp/lwjgl_matt/3.3.3-snapshot/x64/liblwjgl.so
+[LWJGL] Loading library: glfw
+        Module: org.lwjgl.glfw
+        Loaded from org.lwjgl.librarypath: /tmp/lwjgl_matt/3.3.3-snapshot/x64/libglfw.so
+[15:27:38] [Render thread/WARN]: Failed to get system info for Render Extensions
+java.lang.IllegalStateException: Can't getDevice() before it was initialized
+        at knot/com.mojang.blaze3d.systems.RenderSystem.getDevice(RenderSystem.java:354) ~[minecraft-1.21.10.jar:?]
+        at knot/net.minecraft.client.Minecraft.lambda$fillSystemReport$42(Minecraft.java:2317) ~[minecraft-1.21.10.jar:?]
+        at knot/net.minecraft.SystemReport.setDetail(SystemReport.java:77) [minecraft-1.21.10.jar:?]
+        at knot/net.minecraft.client.Minecraft.fillSystemReport(Minecraft.java:2317) [minecraft-1.21.10.jar:?]
+        at knot/net.minecraft.client.Minecraft.fillReport(Minecraft.java:2290) [minecraft-1.21.10.jar:?]
+        at knot/net.minecraft.client.main.Main.main(Main.java:252) [minecraft-1.21.10.jar:?]
+        at net.fabricmc.loader.impl.game.minecraft.MinecraftGameProvider.launch(MinecraftGameProvider.java:536) [fabric-loader-0.18.2.jar:0.18.2]
+        at net.fabricmc.loader.impl.launch.knot.Knot.launch(Knot.java:72) [fabric-loader-0.18.2.jar:0.18.2]
+        at net.fabricmc.loader.impl.launch.knot.KnotClient.main(KnotClient.java:23) [fabric-loader-0.18.2.jar:0.18.2]
+---- Minecraft Crash Report ----
+// Surprise! Haha. Well, this is awkward.
+
+Time: 2025-12-13 15:27:38
+Description: Initializing game
+
+java.lang.ExceptionInInitializerError
+        at knot//com.seibel.distanthorizons.core.config.ConfigBase.<init>(ConfigBase.java:38)
+        at knot//com.seibel.distanthorizons.common.AbstractModInitializer.initConfig(AbstractModInitializer.java:164)
+        at knot//com.seibel.distanthorizons.common.AbstractModInitializer.onInitializeClient(AbstractModInitializer.java:81)
+        at knot//net.minecraft.fabric.ModInitializationManager.initializeClientMods(ModInitializationManager.java:84)
+        at knot//net.minecraft.client.Minecraft.<init>(Minecraft.java:404)
+        at knot//net.minecraft.client.main.Main.main(Main.java:243)
+        at net.fabricmc.loader.impl.game.minecraft.MinecraftGameProvider.launch(MinecraftGameProvider.java:536)
+        at net.fabricmc.loader.impl.launch.knot.Knot.launch(Knot.java:72)
         at net.fabricmc.loader.impl.launch.knot.KnotClient.main(KnotClient.java:23)
-Caused by: java.lang.IllegalStateException: duplicate fabric loader classes found on classpath: jar:file:/home/matt/Documents/Repos/MattMC/build/libs/fabric-loader-0.18.2.jar!/net/fabricmc/loader/api/FabricLoader.class, jar:file:/home/matt/Documents/Repos/MattMC/build/libs/minecraft-1.21.10.jar!/net/fabricmc/loader/api/FabricLoader.class
-        at net.fabricmc.loader.impl.util.LoaderUtil.verifyClasspath(LoaderUtil.java:75)
-        at net.fabricmc.loader.impl.launch.knot.Knot.<clinit>(Knot.java:330)
-        ... 1 more
+Caused by: java.lang.NullPointerException: Cannot invoke "java.io.File.toPath()" because the return value of "com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftSharedWrapper.getInstallationDirectory()" is null
+        at knot//com.seibel.distanthorizons.core.config.ConfigHandler.getConfigPath(ConfigHandler.java:135)
+        at knot//com.seibel.distanthorizons.core.config.ConfigHandler.<init>(ConfigHandler.java:93)
+        at knot//com.seibel.distanthorizons.core.config.ConfigHandler.<clinit>(ConfigHandler.java:91)
+        ... 9 more
+
+
+A detailed walkthrough of the error, its code path and all known details is as follows:
+---------------------------------------------------------------------------------------
+
+-- Head --
+Thread: Render thread
+Stacktrace:
+        at knot//com.seibel.distanthorizons.core.config.ConfigBase.<init>(ConfigBase.java:38)
+        at knot//com.seibel.distanthorizons.common.AbstractModInitializer.initConfig(AbstractModInitializer.java:164)
+        at knot//com.seibel.distanthorizons.common.AbstractModInitializer.onInitializeClient(AbstractModInitializer.java:81)
+        at knot//net.minecraft.fabric.ModInitializationManager.initializeClientMods(ModInitializationManager.java:84)
+        at knot//net.minecraft.client.Minecraft.<init>(Minecraft.java:404)
+
+-- Initialization --
+Details:
+        Modules:
+Stacktrace:
+        at knot//net.minecraft.client.main.Main.main(Main.java:243)
+        at net.fabricmc.loader.impl.game.minecraft.MinecraftGameProvider.launch(MinecraftGameProvider.java:536)
+        at net.fabricmc.loader.impl.launch.knot.Knot.launch(Knot.java:72)
+        at net.fabricmc.loader.impl.launch.knot.KnotClient.main(KnotClient.java:23)
+
+-- System Details --
+Details:
+        Minecraft Version: 1.21.10
+        Minecraft Version ID: 1.21.10
+        Operating System: Linux (amd64) version 6.14.0-36-generic
+        Java Version: 21.0.5, Eclipse Adoptium
+        Java VM Version: OpenJDK 64-Bit Server VM (mixed mode, sharing), Eclipse Adoptium
+        Memory: 247290456 bytes (235 MiB) / 536870912 bytes (512 MiB) up to 2147483648 bytes (2048 MiB)
+        CPUs: 20
+        Processor Vendor: GenuineIntel
+        Processor Name: 12th Gen Intel(R) Core(TM) i7-12700K
+        Identifier: Intel64 Family 6 Model 151 Stepping 2
+        Microarchitecture: Alder Lake
+        Frequency (GHz): 5.10
+        Number of physical packages: 1
+        Number of physical CPUs: 12
+        Number of logical CPUs: 20
+        Graphics card #0 name: GA102 [GeForce RTX 3080 Ti]
+        Graphics card #0 vendor: NVIDIA Corporation (0x10de)
+        Graphics card #0 VRAM (MiB): 16416.00
+        Graphics card #0 deviceId: 0x2208
+        Graphics card #0 versionInfo: unknown
+        Virtual memory max (MiB): 32300.84
+        Virtual memory used (MiB): 21311.29
+        Swap memory total (MiB): 16384.00
+        Swap memory used (MiB): 4420.66
+        Space in storage for jna.tmpdir (MiB): <path not set>
+        Space in storage for org.lwjgl.system.SharedLibraryExtractPath (MiB): <path not set>
+        Space in storage for io.netty.native.workdir (MiB): <path not set>
+        Space in storage for java.io.tmpdir (MiB): available: 15832.38, total: 15916.84
+        Space in storage for workdir (MiB): available: 292723.47, total: 937500.69
+        JVM Flags: 19 total; -XX:+UseG1GC -XX:+ParallelRefProcEnabled -XX:MaxGCPauseMillis=200 -XX:+UnlockExperimentalVMOptions -XX:+DisableExplicitGC -XX:G1NewSizePercent=30 -XX:G1MaxNewSizePercent=40 -XX:G1HeapRegionSize=8M -XX:G1ReservePercent=20 -XX:G1HeapWastePercent=5 -XX:G1MixedGCCountTarget=4 -XX:InitiatingHeapOccupancyPercent=15 -XX:G1MixedGCLiveThresholdPercent=90 -XX:G1RSetUpdatingPauseTimePercent=5 -XX:SurvivorRatio=32 -XX:+PerfDisableSharedMem -XX:MaxTenuringThreshold=1 -Xms512M -Xmx2G
+        Debug Flags: 0 total;
+        Launched Version: 1.21.10
+        Backend library: LWJGL version 3.3.3-snapshot
+        Backend API: Unknown
+        Window size: <not initialized>
+        GFLW Platform: <error>
+        Render Extensions: ERR
+        GL debug messages: <no renderer available>
+        Is Modded: Definitely; Client brand changed to 'fabric'
+        Universe: 404
+        Type: Client (map_client.txt)
+        Locale: en_US
+        System encoding: UTF-8
+        File encoding: UTF-8
+        CPU: 20x 12th Gen Intel(R) Core(TM) i7-12700K
+#@!@# Game crashed! Crash report saved to: #@!@# /home/matt/Documents/Repos/MattMC/run/crash-reports/crash-2025-12-13_15.27.38-client.txt
+
+> Task :runClient FAILED
 
 FAILURE: Build failed with an exception.
 
 * What went wrong:
 Execution failed for task ':runClient'.
-> Process 'command '/home/matt/Documents/Repos/MattMC/run/jdk-21/bin/java'' finished with non-zero exit value 1
+> Process 'command '/home/matt/Documents/Repos/MattMC/run/jdk-21/bin/java'' finished with non-zero exit value 255
 
 * Try:
 > Run with --stacktrace option to get the stack trace.
@@ -57,8 +209,8 @@ Execution failed for task ':runClient'.
 > Run with --scan to get full insights.
 > Get more help at https://help.gradle.org.
 
-BUILD FAILED in 21s
-18 actionable tasks: 10 executed, 8 up-to-date
+BUILD FAILED in 23s
+18 actionable tasks: 8 executed, 10 up-to-date
 matt@HungLoDE:~/Documents/Repos/MattMC$
 
 
