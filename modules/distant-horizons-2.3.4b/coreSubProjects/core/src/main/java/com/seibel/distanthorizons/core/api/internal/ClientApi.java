@@ -387,6 +387,13 @@ public class ClientApi
 	
 	private void renderLodLayer(boolean renderingDeferredLayer)
 	{
+		if (RENDER_STATE.clientLevelWrapper == null || RENDER_STATE.mcModelViewMatrix == null || RENDER_STATE.mcProjectionMatrix == null)
+		{
+			LOGGER.warn("DH render skipped: render state incomplete (level={}, mvm={}, proj={})",
+				RENDER_STATE.clientLevelWrapper, RENDER_STATE.mcModelViewMatrix, RENDER_STATE.mcProjectionMatrix);
+			return;
+		}
+
 		//=========//
 		// logging //
 		//=========//
