@@ -2,7 +2,6 @@ package net.minecraft.client;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Lists;
-import net.minecraft.fabric.ModInitializationManager;
 import net.minecraft.server.profile.PlayerProfile;
 
 import net.minecraft.client.auth.BanDetails;
@@ -434,9 +433,6 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 		this.fixerUpper = DataFixers.getDataFixer();
 		this.gameThread = Thread.currentThread();
 		this.options = new Options(this, this.gameDirectory);
-		
-		// Initialize Fabric client mods after basic initialization (gameDirectory must be set)
-		ModInitializationManager.getInstance().initializeClientMods();
 		this.debugEntries = new DebugScreenEntryList(this.gameDirectory);
 		this.toastManager = new ToastManager(this, this.options);
 		boolean bl = this.options.startedCleanly;
