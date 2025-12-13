@@ -211,7 +211,6 @@ public class ClientLevelWrapper implements IClientLevelWrapper
 	@Override 
 	public void clearBlockColorCache() { this.blockCache.clear(); }
 	
-	@Override
 	public IBiomeWrapper getPlainsBiomeWrapper()
 	{
 		if (this.plainsBiomeWrapper == null)
@@ -287,21 +286,17 @@ public class ClientLevelWrapper implements IClientLevelWrapper
 		return new ChunkWrapper(chunk, this);
 	}
 	
-	@Override
 	public boolean hasChunkLoaded(int chunkX, int chunkZ)
 	{
 		ChunkSource source = this.level.getChunkSource();
 		return source.hasChunk(chunkX, chunkZ);
 	}
 	
-	@Override
 	public IBlockStateWrapper getBlockState(DhBlockPos pos)
 	{ return BlockStateWrapper.fromBlockState(this.level.getBlockState(McObjectConverter.Convert(pos)), this); }
 	
-	@Override
 	public IBiomeWrapper getBiome(DhBlockPos pos) { return BiomeWrapper.getBiomeWrapper(this.level.getBiome(McObjectConverter.Convert(pos)), this); }
 	
-	@Override
 	public ClientLevel getWrappedMcObject() { return this.level; }
 	
 	@Override
@@ -329,10 +324,8 @@ public class ClientLevelWrapper implements IClientLevelWrapper
 	// generic rendering //
 	//===================//
 	
-	@Override
 	public void setParentLevel(IDhLevel parentLevel) { this.parentDhLevel = parentLevel; }
 	
-	@Override 
 	public IDhApiCustomRenderRegister getRenderRegister()
 	{
 		if (this.parentDhLevel == null)
