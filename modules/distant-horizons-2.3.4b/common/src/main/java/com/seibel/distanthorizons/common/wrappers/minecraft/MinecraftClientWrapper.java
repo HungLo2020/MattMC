@@ -106,7 +106,6 @@ public class MinecraftClientWrapper implements IMinecraftClientWrapper, IMinecra
 	 * <p>
 	 * This doesn't affect OpenGL objects in any way.
 	 */
-	@Override
 	public void clearFrameObjectCache() { this.lightMap = null; }
 	
 	
@@ -115,7 +114,6 @@ public class MinecraftClientWrapper implements IMinecraftClientWrapper, IMinecra
 	// method wrappers //
 	//=================//
 	
-	@Override
 	public float getShade(EDhDirection lodDirection)
 	{
 		EDhApiLodShading lodShading = Config.Client.Advanced.Graphics.Quality.lodShading.get();
@@ -205,10 +203,8 @@ public class MinecraftClientWrapper implements IMinecraftClientWrapper, IMinecra
 	@Override
 	public boolean playerExists() { return MINECRAFT.player != null; }
 	
-	@Override
 	public UUID getPlayerUUID() { return this.getPlayer().getUUID(); }
 	
-	@Override
 	public String getUsername() { return MINECRAFT.getUser().getName(); }
 	
 	@Override
@@ -281,7 +277,6 @@ public class MinecraftClientWrapper implements IMinecraftClientWrapper, IMinecra
 	}
 	
 	/** Returns all worlds available to the server */
-	@Override
 	public ArrayList<ILevelWrapper> getAllServerWorlds()
 	{
 		ArrayList<ILevelWrapper> worlds = new ArrayList<ILevelWrapper>();
@@ -358,10 +353,8 @@ public class MinecraftClientWrapper implements IMinecraftClientWrapper, IMinecra
 	@Override
 	public File getInstallationDirectory() { return MINECRAFT.gameDirectory; }
 	
-	@Override
 	public void executeOnRenderThread(Runnable runnable) { MINECRAFT.execute(runnable); }
 	
-	@Override
 	public int getPlayerCount()
 	{
 		// can be null if the server hasn't finished booting up yet
