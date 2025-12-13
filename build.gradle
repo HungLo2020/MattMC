@@ -451,7 +451,12 @@ sourceSets {
         }
         resources {
             srcDirs = [
-                'src/main/resources'
+                'src/main/resources',
+                // Include mod resources so they're available in dev environment
+                // In production, these would be loaded from mod JARs by Fabric API
+                "${dhDir}/coreSubProjects/core/src/main/resources",
+                "${irisDir}/common/src/main/resources",
+                "${sodiumDir}/common/src/main/resources"
             ]
         }
         // Main depends on fabricLoader classes for compilation
@@ -533,6 +538,13 @@ tasks.named('compileDistantHorizonsJava') {
     options.compilerArgs += [
         '-Xplugin:Manifold'
     ]
+}
+
+// Configure main processResources to handle duplicate mod resources
+// When including mod resources from DH/Iris/Sodium, there may be overlapping files
+tasks.named('processResources') {
+    duplicatesStrategy = DuplicatesStrategy.INCLUDE
+    // Prefer the first file encountered (main project resources take priority)
 }
 
 // ============================================================================
