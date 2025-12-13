@@ -21,8 +21,7 @@ public class ConfigBase
     public final String modID;
     public final String modName;
     
-    @SuppressWarnings("rawtypes")
-    public final List<AbstractConfigType> entries = new ArrayList<>();
+    public final List<AbstractConfigType<?, ?>> entries = new ArrayList<>();
     public ConfigFile configFileINSTANCE;
     
     public ConfigBase(String modId, String modName, Class<?> configClass, int configFileVersion) {
@@ -37,19 +36,18 @@ public class ConfigBase
     /**
      * Recursively scans a class and its inner classes for AbstractConfigType fields
      */
-    @SuppressWarnings("rawtypes")
-    private static void collectConfigEntries(Class<?> clazz, List<AbstractConfigType> entries) {
+    private static void collectConfigEntries(Class<?> clazz, List<AbstractConfigType<?, ?>> entries) {
         // Scan all static fields of this class
         for (Field field : clazz.getDeclaredFields()) {
             if (Modifier.isStatic(field.getModifiers())) {
                 try {
                     field.setAccessible(true);
                     Object value = field.get(null);
-                    if (value instanceof AbstractConfigType) {
-                        entries.add((AbstractConfigType) value);
+                    if (value instanceof AbstractConfigType<?, ?>) {
+                        entries.add((AbstractConfigType<?, ?>) value);
                     }
-                } catch (Exception e) {
-                    // Ignore inaccessible fields
+                } catch (IllegalAccessException | SecurityException e) {
+                    // These exceptions are expected for some fields - ignore silently
                 }
             }
         }
