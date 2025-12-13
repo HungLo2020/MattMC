@@ -265,11 +265,17 @@ public class ChangelogScreen extends DhScreen
 		{
 			GuiComponent.drawString(matrices, textRenderer, text, 12, y + 5, 0xFFFFFF);
 		}
-		#else
+		#elif MC_VER < MC_1_21_8
 		@Override
 		public void render(GuiGraphics matrices, int index, int y, int x, int entryWidth, int entryHeight, int mouseX, int mouseY, boolean hovered, float tickDelta)
 		{
 			matrices.drawString(textRenderer, this.text, 12, y + 5, 0xFFFFFF);
+		}
+		#else
+		@Override
+		public void renderContent(GuiGraphics matrices, int i, int j, boolean hovered, float tickDelta)
+		{
+			matrices.drawString(textRenderer, this.text, 12, j + 5, 0xFFFFFFFF);
 		}
         #endif
 		

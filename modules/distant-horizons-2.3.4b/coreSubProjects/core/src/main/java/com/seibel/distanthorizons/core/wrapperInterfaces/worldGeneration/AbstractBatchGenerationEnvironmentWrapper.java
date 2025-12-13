@@ -3,7 +3,7 @@
  */
 package com.seibel.distanthorizons.core.wrapperInterfaces.worldGeneration;
 
-import com.seibel.distanthorizons.core.wrapperInterfaces.world.IDhServerLevel;
+import com.seibel.distanthorizons.core.level.IDhServerLevel;
 
 /**
  * Compatibility alias for the old AbstractBatchGenerationEnvironmentWrapper class name.

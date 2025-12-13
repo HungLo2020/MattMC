@@ -1551,6 +1551,20 @@ public class Config
 			
 			public static ConfigUISpacer globalLoggingSpacer = new ConfigUISpacer.Builder().build();
 			
+			// Compatibility entries for wrapper code
+			public static ConfigEntry<Boolean> logWorldGenPerformance = new ConfigEntry.Builder<Boolean>()
+					.set(false)
+					.comment("Log world generation performance")
+					.build();
+			public static ConfigEntry<Boolean> logWorldGenEvent = new ConfigEntry.Builder<Boolean>()
+					.set(false)
+					.comment("Log world generation events")
+					.build();
+			public static ConfigEntry<Boolean> logWorldGenLoadEvent = new ConfigEntry.Builder<Boolean>()
+					.set(false)
+					.comment("Log world generation load events")
+					.build();
+			
 			
 			public static ConfigEntry<EDhApiLoggerLevel> logWorldGenEventToFile = new ConfigEntry.Builder<EDhApiLoggerLevel>()
 					.setChatCommandName("logging.logWorldGenEvent")

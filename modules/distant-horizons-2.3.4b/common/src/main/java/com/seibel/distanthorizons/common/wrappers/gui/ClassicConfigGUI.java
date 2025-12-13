@@ -655,9 +655,24 @@ public class ClassicConfigGUI
 		@Override
         #if MC_VER < MC_1_20_1
 		public void render(PoseStack matrices, int index, int y, int x, int entryWidth, int entryHeight, int mouseX, int mouseY, boolean hovered, float tickDelta)
-        #else
+        #elif MC_VER < MC_1_21_8
 		public void render(GuiGraphics matrices, int index, int y, int x, int entryWidth, int entryHeight, int mouseX, int mouseY, boolean hovered, float tickDelta)
 		#endif
+		#if MC_VER < MC_1_21_8
+		{
+			renderInternal(matrices, y, 0, 0, hovered, tickDelta);
+		}
+		#endif
+		
+		#if MC_VER >= MC_1_21_8
+		@Override
+		public void renderContent(GuiGraphics matrices, int i, int j, boolean hovered, float tickDelta)
+		{
+			renderInternal(matrices, j, i, 0, hovered, tickDelta);
+		}
+		#endif
+		
+		private void renderInternal(GuiGraphics matrices, int y, int mouseX, int mouseY, boolean hovered, float tickDelta)
 		{
 			if (button != null)
 			{

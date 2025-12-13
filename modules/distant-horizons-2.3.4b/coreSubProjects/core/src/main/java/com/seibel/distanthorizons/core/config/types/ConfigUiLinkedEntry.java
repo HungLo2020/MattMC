@@ -27,7 +27,7 @@ import com.seibel.distanthorizons.core.config.types.enums.EConfigEntryAppearance
  *
  * @author coolGi
  */
-public class ConfigUiLinkedEntry extends AbstractConfigBase<AbstractConfigBase<?>>
+public class ConfigUiLinkedEntry extends AbstractConfigType<AbstractConfigBase<?>, ConfigUiLinkedEntry>
 {
 	//=============//
 	// constructor //
