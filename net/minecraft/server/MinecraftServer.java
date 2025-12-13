@@ -180,6 +180,7 @@ import net.minecraft.world.phys.Vec2;
 import net.minecraft.world.phys.Vec3;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
+import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
 
 public abstract class MinecraftServer extends ReentrantBlockableEventLoop<TickTask> implements ServerInfo, CommandSource, ChunkIOErrorReporter {
 	private static final Logger LOGGER = LogUtils.getLogger();
@@ -695,6 +696,9 @@ public abstract class MinecraftServer extends ReentrantBlockableEventLoop<TickTa
 		} catch (IOException var4) {
 			LOGGER.error("Failed to unlock level {}", this.storageSource.getLevelId(), var4);
 		}
+		
+		// Fire Fabric ServerLifecycleEvents.SERVER_STOPPED for Distant Horizons
+		ServerLifecycleEvents.SERVER_STOPPED.invoker().onServerStopped(this);
 	}
 
 	public String getLocalIp() {
@@ -725,6 +729,9 @@ public abstract class MinecraftServer extends ReentrantBlockableEventLoop<TickTa
 			if (!this.initServer()) {
 				throw new IllegalStateException("Failed to initialize server");
 			}
+			
+			// Fire Fabric ServerLifecycleEvents.SERVER_STARTING for Distant Horizons
+			ServerLifecycleEvents.SERVER_STARTING.invoker().onServerStarting(this);
 
 			this.nextTickTimeNanos = Util.getNanos();
 			this.statusIcon = (ServerStatus.Favicon)this.loadStatusIcon().orElse(null);
