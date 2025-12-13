@@ -372,4 +372,11 @@ public class ClientLevelWrapper implements IClientLevelWrapper
 		return "Wrapped{" + this.level.toString() + "@" + this.getDhIdentifier() + "}";
 	}
 	
+	@Override
+	public IDhLevel getDhLevel()
+	{
+		// Return null as DH level is managed by the core system
+		return null;
+	}
+	
 }

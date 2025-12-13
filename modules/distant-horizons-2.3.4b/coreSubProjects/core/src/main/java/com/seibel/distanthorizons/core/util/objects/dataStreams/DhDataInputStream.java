@@ -62,7 +62,16 @@ public class DhDataInputStream extends DataInputStream
 		ByteArrayInputStream byteArrayInputStream;
 		if (compressionMode == EDhApiDataCompressionMode.Z_STD_BLOCK)
 		{
-			byteArrayInputStream = new ByteArrayInputStream(Zstd.decompress(byteArray));
+			// Get the decompressed size from the frame header and decompress
+			long decompressedSize = Zstd.decompressedSize(byteArray);
+			if (decompressedSize <= 0) {
+				// If size unknown, use streaming decompression fallback
+				byteArrayInputStream = new ByteArrayInputStream(byteArray);
+			} else {
+				byte[] decompressed = new byte[(int) decompressedSize];
+				Zstd.decompress(decompressed, byteArray);
+				byteArrayInputStream = new ByteArrayInputStream(decompressed);
+			}
 		}
 		else
 		{
