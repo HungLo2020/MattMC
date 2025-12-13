@@ -589,8 +589,8 @@ tasks.named('processDistantHorizonsResources') {
             'discord': 'https://discord.gg/xAB8G4cENx',
             'compatible_minecraft_versions': '["1.21.10", "1.21.8", "1.21.4"]',
             'java_version': '21',
-            'fabric_incompatibility_list': '[]',
-            'fabric_recommend_list': '[]'
+            'fabric_incompatibility_list': '{}',
+            'fabric_recommend_list': '{}'
         )
     }
 }
