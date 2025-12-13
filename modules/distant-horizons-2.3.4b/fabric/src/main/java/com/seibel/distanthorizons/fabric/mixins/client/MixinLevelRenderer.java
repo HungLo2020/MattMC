@@ -117,9 +117,10 @@ public class MixinLevelRenderer
 	    ClientApi.RENDER_STATE.mcProjectionMatrix.setIdentity();
 		#endif
 	    
-		// TODO move this into a common place
-		#if MC_VER < MC_1_21_1
-		ClientApi.RENDER_STATE.frameTime = Minecraft.getInstance().getFrameTime();
+	    ClientApi.RENDER_STATE.clientLevelWrapper = ClientLevelWrapper.getWrapper(this.level);
+	    // TODO move this into a common place
+	    #if MC_VER < MC_1_21_1
+	    ClientApi.RENDER_STATE.frameTime = Minecraft.getInstance().getFrameTime();
 		#elif MC_VER < MC_1_21_3
 		ClientApi.RENDER_STATE.frameTime = Minecraft.getInstance().getTimer().getRealtimeDeltaTicks();
 		#else
