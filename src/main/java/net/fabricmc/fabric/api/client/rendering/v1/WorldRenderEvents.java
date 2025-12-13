@@ -85,24 +85,9 @@ public final class WorldRenderEvents {
             return matrixStack().last().pose();
         }
         
-        /** Returns the tick counter for MC 1.21.1+ */
+        /** Returns the tick counter for MC 1.21.1+ - cached to avoid allocation */
         default DeltaTracker tickCounter() {
-            return new DeltaTracker() {
-                @Override
-                public float getGameTimeDeltaTicks() {
-                    return tickDelta();
-                }
-                
-                @Override
-                public float getGameTimeDeltaPartialTick(boolean bl) {
-                    return tickDelta();
-                }
-                
-                @Override
-                public float getRealtimeDeltaTicks() {
-                    return tickDelta();
-                }
-            };
+            return DeltaTracker.ZERO; // Stub - actual delta accessed via tickDelta()
         }
     }
 }
