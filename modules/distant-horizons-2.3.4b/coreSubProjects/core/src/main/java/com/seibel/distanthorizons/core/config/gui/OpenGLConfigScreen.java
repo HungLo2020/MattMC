@@ -1,13 +1,21 @@
 /*
- * Compatibility shim - OpenGLConfigScreen is an alias for ConfigScreen
+ * Compatibility shim - OpenGLConfigScreen extends AbstractScreen
  */
 package com.seibel.distanthorizons.core.config.gui;
 
 /**
- * Compatibility alias for the old OpenGLConfigScreen class name.
- * The new API uses ConfigScreen.
+ * Compatibility class for the old OpenGLConfigScreen class name.
+ * Extends AbstractScreen to work with MinecraftScreen.getScreen().
  */
-public class OpenGLConfigScreen extends ConfigScreen
+public class OpenGLConfigScreen extends AbstractScreen
 {
-    // This is an alias that extends ConfigScreen for backwards compatibility
+    @Override
+    public void init() {
+        // Stub implementation
+    }
+    
+    @Override
+    public void render(float delta) {
+        // Stub implementation
+    }
 }
