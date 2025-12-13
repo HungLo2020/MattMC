@@ -10,20 +10,49 @@ Path for java installation '/usr/lib/jvm/openjdk-17' (Common Linux Locations) do
 📂 Copying JDK to run directory...
 ✅ JDK copied to /home/matt/Documents/Repos/MattMC/run/jdk-21
 
-> Task :compileDistantHorizonsJava
-Note: Some input files use or override a deprecated API.
-Note: Recompile with -Xlint:deprecation for details.
-Note: Some input files use unchecked or unsafe operations.
-Note: Recompile with -Xlint:unchecked for details.
+> Task :runClient
+Using bundled JDK from: /home/matt/Documents/Repos/MattMC/run/jdk-21
+[13:09:17] [main/INFO]: Loading Minecraft 1.21.10 with Fabric Loader 0.18.2
+[13:09:17] [main/INFO]: Mappings not present!
+[13:09:17] [ForkJoinPool-1-worker-1/WARN]: Mod iris uses the version ${version} which isn't compatible with Loader's extended semantic version format (Could not parse version number component '${version}'!), SemVer is recommended for reliably evaluating dependencies and prioritizing newer version
+[13:09:17] [main/ERROR]: Incompatible mods found!
+net.fabricmc.loader.impl.FormattedException: net.fabricmc.loader.impl.discovery.ModResolutionException: Mod discovery failed!
+        at net.fabricmc.loader.impl.FormattedException.ofLocalized(FormattedException.java:63) ~[fabric-loader-0.18.2.jar:0.18.2]
+        at net.fabricmc.loader.impl.FabricLoaderImpl.load(FabricLoaderImpl.java:204) ~[fabric-loader-0.18.2.jar:0.18.2]
+        at net.fabricmc.loader.impl.launch.knot.Knot.init(Knot.java:142) ~[fabric-loader-0.18.2.jar:0.18.2]
+        at net.fabricmc.loader.impl.launch.knot.Knot.launch(Knot.java:66) [fabric-loader-0.18.2.jar:0.18.2]
+        at net.fabricmc.loader.impl.launch.knot.KnotClient.main(KnotClient.java:23) [fabric-loader-0.18.2.jar:0.18.2]
+Caused by: net.fabricmc.loader.impl.discovery.ModResolutionException: Mod discovery failed!
+        at net.fabricmc.loader.impl.discovery.ModDiscoverer.lambda$discoverMods$1(ModDiscoverer.java:155) ~[fabric-loader-0.18.2.jar:0.18.2]
+        at net.fabricmc.loader.impl.util.ExceptionUtil.gatherExceptions(ExceptionUtil.java:33) ~[fabric-loader-0.18.2.jar:0.18.2]
+        at net.fabricmc.loader.impl.discovery.ModDiscoverer.discoverMods(ModDiscoverer.java:155) ~[fabric-loader-0.18.2.jar:0.18.2]
+        at net.fabricmc.loader.impl.FabricLoaderImpl.setup(FabricLoaderImpl.java:222) ~[fabric-loader-0.18.2.jar:0.18.2]
+        at net.fabricmc.loader.impl.FabricLoaderImpl.load(FabricLoaderImpl.java:199) ~[fabric-loader-0.18.2.jar:0.18.2]
+        ... 3 more
+Caused by: net.fabricmc.loader.impl.metadata.ParseMetadataException: Error reading fabric.mod.json file for mod at /home/matt/Documents/Repos/MattMC/run/mods/distanthorizons-2.3.4-b-mc1.21.10.jar: Dependency container must be an object! Error was located at:  at line 55 column 16 path $.breaks
+        at net.fabricmc.loader.impl.metadata.V1ModMetadataParser.readDependenciesContainer(V1ModMetadataParser.java:438) ~[fabric-loader-0.18.2.jar:0.18.2]
+        at net.fabricmc.loader.impl.metadata.V1ModMetadataParser.parse(V1ModMetadataParser.java:163) ~[fabric-loader-0.18.2.jar:0.18.2]
+        at net.fabricmc.loader.impl.metadata.ModMetadataParser.readModMetadata(ModMetadataParser.java:141) ~[fabric-loader-0.18.2.jar:0.18.2]
+        at net.fabricmc.loader.impl.metadata.ModMetadataParser.readModMetadata(ModMetadataParser.java:104) ~[fabric-loader-0.18.2.jar:0.18.2]
+        at net.fabricmc.loader.impl.metadata.ModMetadataParser.parseMetadata(ModMetadataParser.java:44) ~[fabric-loader-0.18.2.jar:0.18.2]
+        at net.fabricmc.loader.impl.discovery.ModDiscoverer$ModScanTask.parseMetadata(ModDiscoverer.java:510) ~[fabric-loader-0.18.2.jar:0.18.2]
+        at net.fabricmc.loader.impl.discovery.ModDiscoverer$ModScanTask.computeJarFile(ModDiscoverer.java:332) ~[fabric-loader-0.18.2.jar:0.18.2]
+        at net.fabricmc.loader.impl.discovery.ModDiscoverer$ModScanTask.compute(ModDiscoverer.java:290) ~[fabric-loader-0.18.2.jar:0.18.2]
+        at net.fabricmc.loader.impl.discovery.ModDiscoverer$ModScanTask.compute(ModDiscoverer.java:249) ~[fabric-loader-0.18.2.jar:0.18.2]
+        at java.base/java.util.concurrent.RecursiveTask.exec(RecursiveTask.java:110) ~[?:?]
+        at java.base/java.util.concurrent.ForkJoinTask.doExec(ForkJoinTask.java:387) ~[?:?]
+        at java.base/java.util.concurrent.ForkJoinPool$WorkQueue.topLevelExec(ForkJoinPool.java:1312) ~[?:?]
+        at java.base/java.util.concurrent.ForkJoinPool.scan(ForkJoinPool.java:1843) ~[?:?]
+        at java.base/java.util.concurrent.ForkJoinPool.runWorker(ForkJoinPool.java:1808) ~[?:?]
+        at java.base/java.util.concurrent.ForkJoinWorkerThread.run(ForkJoinWorkerThread.java:188) ~[?:?]
 
-> Task :processDistantHorizonsResources FAILED
+> Task :runClient FAILED
 
 FAILURE: Build failed with an exception.
 
 * What went wrong:
-Execution failed for task ':processDistantHorizonsResources'.
-> Could not copy file '/home/matt/Documents/Repos/MattMC/modules/distant-horizons-2.3.4b/fabric/src/main/resources/fabric.mod.json' to '/home/matt/Documents/Repos/MattMC/build/resources/distantHorizons/fabric.mod.json'.
-   > Missing property (mod_name) for Groovy template expansion. Defined keys [version].
+Execution failed for task ':runClient'.
+> Process 'command '/home/matt/Documents/Repos/MattMC/run/jdk-21/bin/java'' finished with non-zero exit value 1
 
 * Try:
 > Run with --stacktrace option to get the stack trace.
@@ -31,8 +60,9 @@ Execution failed for task ':processDistantHorizonsResources'.
 > Run with --scan to get full insights.
 > Get more help at https://help.gradle.org.
 
-BUILD FAILED in 5s
-11 actionable tasks: 7 executed, 4 from cache
+BUILD FAILED in 28s
+18 actionable tasks: 9 executed, 9 up-to-date
 matt@HungLoDE:~/Documents/Repos/MattMC$
+
 
 
