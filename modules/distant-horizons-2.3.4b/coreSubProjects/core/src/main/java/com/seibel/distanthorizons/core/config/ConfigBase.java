@@ -5,6 +5,8 @@
 package com.seibel.distanthorizons.core.config;
 
 import com.seibel.distanthorizons.core.config.types.AbstractConfigType;
+import java.lang.reflect.Field;
+import java.lang.reflect.Modifier;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -27,6 +29,35 @@ public class ConfigBase
         this.modID = modId;
         this.modName = modName;
         this.configFileINSTANCE = new ConfigFile(modId);
+        
+        // Scan the config class to collect all AbstractConfigType entries
+        collectConfigEntries(configClass, entries);
+    }
+    
+    /**
+     * Recursively scans a class and its inner classes for AbstractConfigType fields
+     */
+    @SuppressWarnings("rawtypes")
+    private static void collectConfigEntries(Class<?> clazz, List<AbstractConfigType> entries) {
+        // Scan all static fields of this class
+        for (Field field : clazz.getDeclaredFields()) {
+            if (Modifier.isStatic(field.getModifiers())) {
+                try {
+                    field.setAccessible(true);
+                    Object value = field.get(null);
+                    if (value instanceof AbstractConfigType) {
+                        entries.add((AbstractConfigType) value);
+                    }
+                } catch (Exception e) {
+                    // Ignore inaccessible fields
+                }
+            }
+        }
+        
+        // Recursively scan inner classes
+        for (Class<?> innerClass : clazz.getDeclaredClasses()) {
+            collectConfigEntries(innerClass, entries);
+        }
     }
     
     /**
