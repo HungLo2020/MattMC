@@ -209,6 +209,8 @@ dependencies {
     implementation 'org.lwjgl:lwjgl-tinyfd'
     implementation 'org.lwjgl:lwjgl-freetype'
     implementation 'org.lwjgl:lwjgl-jemalloc'
+    // JAWT for Distant Horizons embedded frame support
+    implementation 'org.lwjgl:lwjgl-jawt'
     
     // LWJGL natives
     runtimeOnly "org.lwjgl:lwjgl::${lwjglNatives}"
@@ -317,6 +319,10 @@ dependencies {
     implementation 'org.xerial:sqlite-jdbc:3.47.2.0'
     // XZ compression library
     implementation 'org.tukaani:xz:1.9'
+    // Zstandard compression library (required by DH core)
+    implementation 'com.github.luben:zstd-jni:1.5.6-4'
+    // LZ4 compression library (required by DH)
+    implementation 'org.lz4:lz4-java:1.8.0'
     
     // ===== TESTING DEPENDENCIES =====
     // Testing dependencies - only available in test scope, excluded from production builds
@@ -507,11 +513,13 @@ sourceSets.iris.runtimeClasspath += sourceSets.fabricLoader.output
 sourceSets.iris.runtimeClasspath += sourceSets.main.output
 sourceSets.iris.runtimeClasspath += sourceSets.sodium.output
 
-// Distant Horizons depends on Fabric Loader and Minecraft
+// Distant Horizons depends on Fabric Loader, Minecraft, and Iris (for integration)
 sourceSets.distantHorizons.compileClasspath += sourceSets.fabricLoader.output
 sourceSets.distantHorizons.compileClasspath += sourceSets.main.output
+sourceSets.distantHorizons.compileClasspath += sourceSets.iris.output
 sourceSets.distantHorizons.runtimeClasspath += sourceSets.fabricLoader.output
 sourceSets.distantHorizons.runtimeClasspath += sourceSets.main.output
+sourceSets.distantHorizons.runtimeClasspath += sourceSets.iris.output
 
 // Add Manifold preprocessor for Distant Horizons compilation
 dependencies {

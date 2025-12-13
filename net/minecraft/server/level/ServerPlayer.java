@@ -228,6 +228,12 @@ public class ServerPlayer extends Player {
 	public ServerGamePacketListenerImpl connection;
 	private final MinecraftServer server;
 	public final ServerPlayerGameMode gameMode;
+	
+	// Added for Distant Horizons
+	public MinecraftServer getServer() {
+		return this.server;
+	}
+	
 	private final PlayerAdvancements advancements;
 	private final ServerStatsCounter stats;
 	private float lastRecordedHealthAndAbsorption = Float.MIN_VALUE;

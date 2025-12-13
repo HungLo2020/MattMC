@@ -13,7 +13,8 @@ public class BiomeManager {
 	private static final int ZOOM = 4;
 	private static final int ZOOM_MASK = 3;
 	private final BiomeManager.NoiseBiomeSource noiseBiomeSource;
-	private final long biomeZoomSeed;
+	// Made accessible for Distant Horizons
+	public final long biomeZoomSeed;
 
 	public BiomeManager(BiomeManager.NoiseBiomeSource noiseBiomeSource, long l) {
 		this.noiseBiomeSource = noiseBiomeSource;
