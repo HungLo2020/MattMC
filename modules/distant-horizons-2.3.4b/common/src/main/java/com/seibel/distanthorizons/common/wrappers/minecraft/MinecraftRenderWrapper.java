@@ -28,6 +28,7 @@ import com.mojang.blaze3d.platform.NativeImage;
 import com.seibel.distanthorizons.common.wrappers.WrapperFactory;
 import com.seibel.distanthorizons.common.wrappers.misc.LightMapWrapper;
 import com.seibel.distanthorizons.core.dependencyInjection.ModAccessorInjector;
+import com.seibel.distanthorizons.core.enums.EDhDirection;
 
 import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
 import com.seibel.distanthorizons.core.util.ColorUtil;
@@ -457,6 +458,17 @@ public class MinecraftRenderWrapper implements IMinecraftRenderWrapper
 
 		LightMapWrapper wrapper = this.lightmapByDimensionType.computeIfAbsent(dimensionType, (dimType) -> new LightMapWrapper());
 		wrapper.setLightmapId(tetxureId);
+	}
+	
+	@Override
+	public float getShade(EDhDirection lodDirection)
+	{
+		// Return a sensible default - 1.0 for top, 0.5 for bottom, 0.7 for sides
+		switch (lodDirection) {
+			case UP: return 1.0f;
+			case DOWN: return 0.5f;
+			default: return 0.7f;
+		}
 	}
 	
 }

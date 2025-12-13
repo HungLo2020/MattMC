@@ -379,4 +379,10 @@ public class ClientLevelWrapper implements IClientLevelWrapper
 		return null;
 	}
 	
+	@Override
+	public void setDhLevel(IDhLevel parentLevel)
+	{
+		// Stub - DH level is managed by the core system
+	}
+	
 }
