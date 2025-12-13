@@ -106,6 +106,7 @@ import org.joml.Matrix4fc;
 import org.joml.Vector3f;
 import org.joml.Vector4f;
 import org.slf4j.Logger;
+import net.fabricmc.fabric.api.client.rendering.v1.WorldRenderEvents;
 
 @Environment(EnvType.CLIENT)
 public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseable {
@@ -583,6 +584,11 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 		ResourceHandle<RenderTarget> resourceHandle2 = this.targets.translucent;
 		ResourceHandle<RenderTarget> resourceHandle3 = this.targets.itemEntity;
 		ResourceHandle<RenderTarget> resourceHandle4 = this.targets.entityOutline;
+		
+		// Capture variables for WorldRenderContext - need to get them outside the lambda
+		final Camera renderCamera = this.minecraft.gameRenderer.getMainCamera();
+		final float tickDeltaValue = deltaTracker.getGameTimeDeltaPartialTick(false);
+		
 		framePass.executes(() -> {
 			iris$renderMainPassBody();
 			RenderSystem.setShaderFog(gpuBufferSlice);
@@ -590,10 +596,19 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 			double d = vec3.x();
 			double e = vec3.y();
 			double f = vec3.z();
+			
 			profilerFiller.push("terrain");
 			ChunkSectionsToRender chunkSectionsToRender = this.prepareChunkRenders(matrix4f, d, e, f);
 			iris$renderTerrainGroup(chunkSectionsToRender, ChunkSectionLayerGroup.OPAQUE);
 			this.minecraft.gameRenderer.getLighting().setupFor(Lighting.Entry.LEVEL);
+			
+			// Fire AFTER_SETUP event for Distant Horizons after terrain setup
+			// In MC 1.21.6+, matrix4f is the combined model-view-projection matrix
+			WorldRenderEvents.WorldRenderContext afterSetupContext = new WorldRenderContextImpl(
+				this.level, matrix4f, tickDeltaValue, renderCamera
+			);
+			WorldRenderEvents.AFTER_SETUP.invoker().afterSetup(afterSetupContext);
+			
 			if (resourceHandle3 != null) {
 				resourceHandle3.get().copyDepthFrom(this.minecraft.getMainRenderTarget());
 			}
@@ -638,6 +653,13 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 			this.gameTestBlockHighlightRenderer.render(poseStack, bufferSource);
 			bufferSource.endLastBatch();
 			this.checkPoseStack(poseStack);
+			
+			// Fire AFTER_ENTITIES event for Distant Horizons after entity rendering
+			WorldRenderEvents.WorldRenderContext afterEntitiesContext = new WorldRenderContextImpl(
+				this.level, matrix4f, tickDeltaValue, renderCamera
+			);
+			WorldRenderEvents.AFTER_ENTITIES.invoker().afterEntities(afterEntitiesContext);
+			
 			bufferSource.endBatch(Sheets.translucentItemSheet());
 			bufferSource.endBatch(Sheets.bannerSheet());
 			bufferSource.endBatch(Sheets.shieldSheet());
@@ -667,6 +689,12 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 
 			bufferSource.endBatch();
 			profilerFiller.pop();
+			
+			// Fire AFTER_TRANSLUCENT event for Distant Horizons after translucent rendering
+			WorldRenderEvents.WorldRenderContext afterTranslucentContext = new WorldRenderContextImpl(
+				this.level, matrix4f, tickDeltaValue, renderCamera
+			);
+			WorldRenderEvents.AFTER_TRANSLUCENT.invoker().afterTranslucent(afterTranslucentContext);
 		});
 	}
 
@@ -1498,5 +1526,69 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 	// Wrapper method for feature rendering in particles pass - allows Iris mixins to intercept
 	public void iris$renderAllFeaturesParticles() {
 		this.featureRenderDispatcher.renderAllFeatures();
+	}
+	
+	/**
+	 * WorldRenderContext implementation for Fabric API events used by Distant Horizons.
+	 * 
+	 * For MC 1.21.6+, Minecraft combines the model-view and projection matrices into a single matrix.
+	 * To maintain compatibility with Distant Horizons expectations:
+	 * - The PoseStack contains the combined model-view-projection matrix
+	 * - The projection matrix is identity
+	 */
+	private static class WorldRenderContextImpl implements net.fabricmc.fabric.api.client.rendering.v1.WorldRenderEvents.WorldRenderContext {
+		private final ClientLevel level;
+		private final PoseStack poseStack;
+		private final float tickDelta;
+		private final Camera camera;
+		private static final Matrix4f IDENTITY_MATRIX = new Matrix4f().identity();
+		
+		public WorldRenderContextImpl(ClientLevel level, Matrix4f combinedMVP, float tickDelta, Camera camera) {
+			this.level = level;
+			this.tickDelta = tickDelta;
+			this.camera = camera;
+			
+			// Create PoseStack with the combined MVP matrix for MC 1.21.6+
+			this.poseStack = new PoseStack();
+			this.poseStack.last().pose().set(combinedMVP);
+		}
+		
+		@Override
+		public ClientLevel world() {
+			return this.level;
+		}
+		
+		@Override
+		public PoseStack matrixStack() {
+			return this.poseStack;
+		}
+		
+		@Override
+		public float tickDelta() {
+			return this.tickDelta;
+		}
+		
+		@Override
+		public long limitTime() {
+			// Not used by Distant Horizons - stub implementation
+			return 0;
+		}
+		
+		@Override
+		public boolean blockOutlines() {
+			// Not used by Distant Horizons - stub implementation
+			return true;
+		}
+		
+		@Override
+		public Camera camera() {
+			return this.camera;
+		}
+		
+		@Override
+		public Matrix4f projectionMatrix() {
+			// In MC 1.21.6+, the projection matrix is identity since MVP is combined
+			return IDENTITY_MATRIX;
+		}
 	}
 }

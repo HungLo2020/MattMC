@@ -148,6 +148,7 @@ import net.minecraft.world.flag.FeatureFlags;
 import net.minecraft.world.level.GameRules;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
+import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
 
 public class Commands {
 	public static final String COMMAND_PREFIX = "/";
@@ -288,6 +289,11 @@ public class Commands {
 		if (commandSelection.includeIntegrated) {
 			PublishCommand.register(this.dispatcher);
 		}
+
+		// Fire Fabric CommandRegistrationCallback for mod command registration (e.g., Distant Horizons)
+		System.out.println("[MattMC] Firing CommandRegistrationCallback.EVENT with dispatcher=" + this.dispatcher + ", commandSelection=" + commandSelection);
+		CommandRegistrationCallback.EVENT.invoker().register(this.dispatcher, commandBuildContext, commandSelection);
+		System.out.println("[MattMC] CommandRegistrationCallback.EVENT fired successfully");
 
 		this.dispatcher.setConsumer(ExecutionCommandSource.resultConsumer());
 	}

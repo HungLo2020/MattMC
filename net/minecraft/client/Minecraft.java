@@ -252,6 +252,7 @@ import org.apache.commons.io.FileUtils;
 import org.jetbrains.annotations.Nullable;
 import org.lwjgl.util.tinyfd.TinyFileDialogs;
 import org.slf4j.Logger;
+import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientWorldEvents;
 
 @Environment(EnvType.CLIENT)
 public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements WindowEventHandler {
@@ -2156,6 +2157,9 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 	}
 
 	private void updateLevelInEngines(@Nullable ClientLevel clientLevel) {
+		// Track previous level for Fabric API ClientWorldEvents
+		ClientLevel previousLevel = this.level;
+		
 		this.soundManager.stop();
 		this.setCameraEntity(null);
 		this.pendingConnection = null;
@@ -2163,6 +2167,15 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 		this.particleEngine.setLevel(clientLevel);
 		this.gameRenderer.setLevel(clientLevel);
 		this.updateTitle();
+		
+		// Fire Fabric API ClientWorldEvents for mods like Distant Horizons
+		if (previousLevel != null && clientLevel != previousLevel) {
+			ClientWorldEvents.WORLD_UNLOAD.invoker().onWorldUnload(this, previousLevel);
+		}
+		
+		if (clientLevel != null) {
+			ClientWorldEvents.WORLD_LOAD.invoker().onWorldLoad(this, clientLevel);
+		}
 	}
 
 	private UserProperties userProperties() {
