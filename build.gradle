@@ -561,6 +561,27 @@ tasks.named('processFabricLoaderResources') {
     }
 }
 
+// Process Iris resources with version substitution
+tasks.named('processIrisResources') {
+    filesMatching('fabric.mod.json') {
+        expand 'version': irisVersion
+    }
+}
+
+// Process Sodium resources with version substitution
+tasks.named('processSodiumResources') {
+    filesMatching('fabric.mod.json') {
+        expand 'version': sodiumVersion
+    }
+}
+
+// Process Distant Horizons resources with version substitution
+tasks.named('processDistantHorizonsResources') {
+    filesMatching('fabric.mod.json') {
+        expand 'version': dhVersion
+    }
+}
+
 tasks.register('fabricLoaderJar', Jar) {
     group = 'build'
     description = 'Assembles the Fabric Loader JAR'
