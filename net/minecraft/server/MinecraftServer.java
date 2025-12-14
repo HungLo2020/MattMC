@@ -747,11 +747,18 @@ public abstract class MinecraftServer extends ReentrantBlockableEventLoop<TickTa
 			
 			// Fire CommandRegistrationCallback AFTER server is initialized so mods can register commands
 			// This must happen on the server thread after DH has initialized
-			net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback.EVENT.invoker().register(
-				this.getCommands().getDispatcher(),
-				this.getCommands().getBuildContext(),
-				this.getCommands().getCommandSelection()
-			);
+			try {
+				LOGGER.info("Firing CommandRegistrationCallback.EVENT with {} registered listeners", 
+					net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback.EVENT.getInvoker() != null ? "some" : "no");
+				net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback.EVENT.invoker().register(
+					this.getCommands().getDispatcher(),
+					this.getCommands().getBuildContext(),
+					this.getCommands().getCommandSelection()
+				);
+				LOGGER.info("CommandRegistrationCallback.EVENT fired successfully");
+			} catch (Exception e) {
+				LOGGER.error("Failed to fire CommandRegistrationCallback.EVENT", e);
+			}
 
 			this.nextTickTimeNanos = Util.getNanos();
 			this.statusIcon = (ServerStatus.Favicon)this.loadStatusIcon().orElse(null);
