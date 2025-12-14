@@ -1536,17 +1536,40 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 	 * - The PoseStack contains the combined model-view-projection matrix
 	 * - The projection matrix is identity
 	 */
+	/**
+	 * WorldRenderContext implementation for MC 1.21.6+
+	 * - The PoseStack contains the combined model-view-projection matrix
+	 * - The projection matrix is identity
+	 */
 	private static class WorldRenderContextImpl implements net.fabricmc.fabric.api.client.rendering.v1.WorldRenderEvents.WorldRenderContext {
 		private final ClientLevel level;
 		private final PoseStack poseStack;
 		private final float tickDelta;
 		private final Camera camera;
+		private final DeltaTracker deltaTracker;
 		private static final Matrix4f IDENTITY_MATRIX = new Matrix4f().identity();
 		
 		public WorldRenderContextImpl(ClientLevel level, Matrix4f combinedMVP, float tickDelta, Camera camera) {
 			this.level = level;
 			this.tickDelta = tickDelta;
 			this.camera = camera;
+			// Create a simple DeltaTracker that returns the tick delta value
+			this.deltaTracker = new DeltaTracker() {
+				@Override
+				public float getGameTimeDeltaTicks() {
+					return tickDelta;
+				}
+				
+				@Override
+				public float getGameTimeDeltaPartialTick(boolean bl) {
+					return tickDelta;
+				}
+				
+				@Override
+				public float getRealtimeDeltaTicks() {
+					return tickDelta;
+				}
+			};
 			
 			// Create PoseStack with the combined MVP matrix for MC 1.21.6+
 			this.poseStack = new PoseStack();
@@ -1589,6 +1612,11 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 		public Matrix4f projectionMatrix() {
 			// In MC 1.21.6+, the projection matrix is identity since MVP is combined
 			return IDENTITY_MATRIX;
+		}
+		
+		// MC 1.21.1+ adds tickCounter() method needed by Distant Horizons
+		public DeltaTracker tickCounter() {
+			return this.deltaTracker;
 		}
 	}
 }
