@@ -188,7 +188,7 @@ public class FogRenderer implements AutoCloseable {
 			
 			// Get DH config and wrapper
 			Class<?> configClass = Class.forName("com.seibel.distanthorizons.core.config.Config");
-			Object clientConfig = configClass.getField("Client").get(null);
+			Object clientConfig = configClass.getField("client").get(null);
 			Object advancedConfig = clientConfig.getClass().getField("Advanced").get(clientConfig);
 			Object graphicsConfig = advancedConfig.getClass().getField("Graphics").get(advancedConfig);
 			Object fogConfig = graphicsConfig.getClass().getField("Fog").get(graphicsConfig);
