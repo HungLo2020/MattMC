@@ -620,6 +620,8 @@ public class LodRenderer
 	
 	private void renderLodPass(IDhApiShaderProgram shaderProgram, RenderBufferHandler lodBufferHandler, RenderParams renderEventParam, boolean opaquePass)
 	{
+		System.out.println("[LOD-RENDERER-PASS] renderLodPass(4-param) called, opaquePass=" + opaquePass); // TODO: Remove after debugging
+		
 		//=======================//
 		// debug wireframe setup //
 		//=======================//
@@ -668,8 +670,11 @@ public class LodRenderer
 		
 		
 		SortedArraySet<LodBufferContainer> lodBufferContainer = lodBufferHandler.getColumnRenderBuffers();
+		System.out.println("[LOD-RENDERER-PASS] lodBufferContainer=" + (lodBufferContainer == null ? "null" : "size=" + lodBufferContainer.size())); // TODO: Remove after debugging
 		if (lodBufferContainer != null)
 		{
+			int totalVBOs = 0;
+			int renderedVBOs = 0;
 			for (int lodIndex = 0; lodIndex < lodBufferContainer.size(); lodIndex++)
 			{
 				LodBufferContainer bufferContainer = lodBufferContainer.get(lodIndex);
@@ -684,11 +689,14 @@ public class LodRenderer
 						continue;
 					}
 					
-					if (vbo.getVertexCount() == 0)
+					totalVBOs++;
+					int vertexCount = vbo.getVertexCount();
+					if (vertexCount == 0)
 					{
 						continue;
 					}
 					
+					renderedVBOs++;
 					vbo.bind();
 					shaderProgram.bindVertexBuffer(vbo.getId());
 					GL32.glDrawElements(
@@ -698,6 +706,7 @@ public class LodRenderer
 					vbo.unbind();
 				}
 			}
+			System.out.println("[LOD-RENDERER-PASS] Rendering complete: totalVBOs=" + totalVBOs + ", renderedVBOs=" + renderedVBOs); // TODO: Remove after debugging
 		}
 		
 		
