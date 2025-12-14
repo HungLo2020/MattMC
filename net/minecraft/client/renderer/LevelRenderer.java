@@ -607,7 +607,14 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 			WorldRenderEvents.WorldRenderContext afterSetupContext = new WorldRenderContextImpl(
 				this.level, matrix4f, tickDeltaValue, renderCamera
 			);
-			WorldRenderEvents.AFTER_SETUP.invoker().afterSetup(afterSetupContext);
+			try {
+				System.out.println("[DEBUG] Firing AFTER_SETUP event");
+				WorldRenderEvents.AFTER_SETUP.invoker().afterSetup(afterSetupContext);
+				System.out.println("[DEBUG] AFTER_SETUP event completed");
+			} catch (Exception ex) {
+				System.err.println("[ERROR] Exception in AFTER_SETUP event: " + ex.getMessage());
+				ex.printStackTrace();
+			}
 			
 			if (resourceHandle3 != null) {
 				resourceHandle3.get().copyDepthFrom(this.minecraft.getMainRenderTarget());
@@ -655,10 +662,17 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 			this.checkPoseStack(poseStack);
 			
 			// Fire AFTER_ENTITIES event for Distant Horizons after entity rendering
-			WorldRenderEvents.WorldRenderContext afterEntitiesContext = new WorldRenderContextImpl(
-				this.level, matrix4f, tickDeltaValue, renderCamera
-			);
-			WorldRenderEvents.AFTER_ENTITIES.invoker().afterEntities(afterEntitiesContext);
+			try {
+				System.out.println("[DEBUG] Firing AFTER_ENTITIES event");
+				WorldRenderEvents.WorldRenderContext afterEntitiesContext = new WorldRenderContextImpl(
+					this.level, matrix4f, tickDeltaValue, renderCamera
+				);
+				WorldRenderEvents.AFTER_ENTITIES.invoker().afterEntities(afterEntitiesContext);
+				System.out.println("[DEBUG] AFTER_ENTITIES event completed");
+			} catch (Exception ex) {
+				System.err.println("[ERROR] Exception in AFTER_ENTITIES event: " + ex.getMessage());
+				ex.printStackTrace();
+			}
 			
 			bufferSource.endBatch(Sheets.translucentItemSheet());
 			bufferSource.endBatch(Sheets.bannerSheet());
@@ -691,10 +705,17 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 			profilerFiller.pop();
 			
 			// Fire AFTER_TRANSLUCENT event for Distant Horizons after translucent rendering
-			WorldRenderEvents.WorldRenderContext afterTranslucentContext = new WorldRenderContextImpl(
-				this.level, matrix4f, tickDeltaValue, renderCamera
-			);
-			WorldRenderEvents.AFTER_TRANSLUCENT.invoker().afterTranslucent(afterTranslucentContext);
+			try {
+				System.out.println("[DEBUG] Firing AFTER_TRANSLUCENT event");
+				WorldRenderEvents.WorldRenderContext afterTranslucentContext = new WorldRenderContextImpl(
+					this.level, matrix4f, tickDeltaValue, renderCamera
+				);
+				WorldRenderEvents.AFTER_TRANSLUCENT.invoker().afterTranslucent(afterTranslucentContext);
+				System.out.println("[DEBUG] AFTER_TRANSLUCENT event completed");
+			} catch (Exception ex) {
+				System.err.println("[ERROR] Exception in AFTER_TRANSLUCENT event: " + ex.getMessage());
+				ex.printStackTrace();
+			}
 		});
 	}
 
