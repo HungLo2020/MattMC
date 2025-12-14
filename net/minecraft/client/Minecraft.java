@@ -1683,6 +1683,14 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 	}
 
 	public void tick() {
+		// TODO: Remove after debugging - Fire Fabric ClientTickEvents.START_CLIENT_TICK
+		try {
+			net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents.START_CLIENT_TICK.invoker().onStartTick(this);
+		} catch (Exception e) {
+			System.err.println("[ClientTickEvents] Error firing START_CLIENT_TICK: " + e.getMessage());
+			e.printStackTrace();
+		}
+		
 		this.clientTickCount++;
 		if (this.level != null && !this.pause) {
 			this.level.tickRateManager().tick();
@@ -1815,6 +1823,14 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 		profilerFiller.popPush("keyboard");
 		this.keyboardHandler.tick();
 		profilerFiller.pop();
+		
+		// TODO: Remove after debugging - Fire Fabric ClientTickEvents.END_CLIENT_TICK
+		try {
+			net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents.END_CLIENT_TICK.invoker().onEndTick(this);
+		} catch (Exception e) {
+			System.err.println("[ClientTickEvents] Error firing END_CLIENT_TICK: " + e.getMessage());
+			e.printStackTrace();
+		}
 	}
 
 	private boolean isLevelRunningNormally() {
