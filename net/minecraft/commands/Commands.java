@@ -290,11 +290,6 @@ public class Commands {
 			PublishCommand.register(this.dispatcher);
 		}
 
-		// Fire Fabric CommandRegistrationCallback for mod command registration (e.g., Distant Horizons)
-		System.out.println("[MattMC] Firing CommandRegistrationCallback.EVENT with dispatcher=" + this.dispatcher + ", commandSelection=" + commandSelection);
-		CommandRegistrationCallback.EVENT.invoker().register(this.dispatcher, commandBuildContext, commandSelection);
-		System.out.println("[MattMC] CommandRegistrationCallback.EVENT fired successfully");
-
 		this.dispatcher.setConsumer(ExecutionCommandSource.resultConsumer());
 	}
 

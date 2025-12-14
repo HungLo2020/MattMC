@@ -744,6 +744,14 @@ public abstract class MinecraftServer extends ReentrantBlockableEventLoop<TickTa
 			if (!this.initServer()) {
 				throw new IllegalStateException("Failed to initialize server");
 			}
+			
+			// Fire CommandRegistrationCallback AFTER server is initialized so mods can register commands
+			// This must happen on the server thread after DH has initialized
+			net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback.EVENT.invoker().register(
+				this.getCommands().getDispatcher(),
+				this.getCommands().getBuildContext(),
+				this.getCommands().getCommandSelection()
+			);
 
 			this.nextTickTimeNanos = Util.getNanos();
 			this.statusIcon = (ServerStatus.Favicon)this.loadStatusIcon().orElse(null);
