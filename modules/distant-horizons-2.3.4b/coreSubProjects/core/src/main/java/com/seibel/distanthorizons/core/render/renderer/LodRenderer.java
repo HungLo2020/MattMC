@@ -697,6 +697,18 @@ public class LodRenderer
 					}
 					
 					renderedVBOs++;
+					
+					// TODO: Remove after debugging - log OpenGL state before draw
+					if (renderedVBOs == 1) {
+						System.out.println("[LOD-GL-STATE] OpenGL state before first draw:");
+						System.out.println("  Depth test enabled: " + GL32.glIsEnabled(GL32.GL_DEPTH_TEST));
+						System.out.println("  Depth func: " + GL32.glGetInteger(GL32.GL_DEPTH_FUNC));
+						System.out.println("  Blend enabled: " + GL32.glIsEnabled(GL32.GL_BLEND));
+						System.out.println("  Cull face enabled: " + GL32.glIsEnabled(GL32.GL_CULL_FACE));
+						System.out.println("  Current shader program: " + GL32.glGetInteger(GL32.GL_CURRENT_PROGRAM));
+						System.out.println("  Vertex array binding: " + GL32.glGetInteger(GL32.GL_VERTEX_ARRAY_BINDING));
+					}
+					
 					vbo.bind();
 					shaderProgram.bindVertexBuffer(vbo.getId());
 					GL32.glDrawElements(
