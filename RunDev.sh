@@ -1,6 +1,12 @@
 #!/bin/bash
 
 # RunDev.sh - Development script to run the Minecraft client
-# Simply runs the Gradle runClient task for development
+# Clears ERROR-LOG.txt and writes all output from Gradle to it
 
-./gradlew runClient
+LOG_FILE="ERROR-LOG.txt"
+
+# Truncate the log file (create it if it doesn't exist)
+: > "$LOG_FILE"
+
+# Run Gradle and pipe all output (stdout + stderr) into the log file
+./gradlew runClient 2>&1 | tee "$LOG_FILE"
