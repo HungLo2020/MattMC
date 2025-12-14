@@ -186,13 +186,16 @@ public class FogRenderer implements AutoCloseable {
 			boolean cameraNotInFluid = fogType == FogType.NONE;
 			boolean isSpecialFog = (entity instanceof LivingEntity) && ((LivingEntity) entity).hasEffect(MobEffects.BLINDNESS);
 			
-			// Get DH config and wrapper
+			// Get DH config - navigate through nested static classes
+			// Config.client is a ConfigCategory wrapping Client class
 			Class<?> configClass = Class.forName("com.seibel.distanthorizons.core.config.Config");
-			Object clientConfig = configClass.getField("client").get(null);
-			Object advancedConfig = clientConfig.getClass().getField("Advanced").get(clientConfig);
-			Object graphicsConfig = advancedConfig.getClass().getField("Graphics").get(advancedConfig);
-			Object fogConfig = graphicsConfig.getClass().getField("Fog").get(graphicsConfig);
-			Object enableVanillaFogOption = fogConfig.getClass().getField("enableVanillaFog").get(fogConfig);
+			Class<?> clientClass = Class.forName("com.seibel.distanthorizons.core.config.Config$Client");
+			Class<?> advancedClass = Class.forName("com.seibel.distanthorizons.core.config.Config$Client$Advanced");
+			Class<?> graphicsClass = Class.forName("com.seibel.distanthorizons.core.config.Config$Client$Advanced$Graphics");
+			Class<?> fogClass = Class.forName("com.seibel.distanthorizons.core.config.Config$Client$Advanced$Graphics$Fog");
+			
+			// Access the enableVanillaFog config entry
+			Object enableVanillaFogOption = fogClass.getField("enableVanillaFog").get(null);
 			boolean enableVanillaFog = (Boolean) enableVanillaFogOption.getClass().getMethod("get").invoke(enableVanillaFogOption);
 			
 			Class<?> singletonInjectorClass = Class.forName("com.seibel.distanthorizons.core.dependencyInjection.SingletonInjector");
