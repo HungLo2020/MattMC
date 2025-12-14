@@ -178,8 +178,9 @@ public class FogRenderer implements AutoCloseable {
 		float j = Mth.clamp(h / 10.0F, 4.0F, 64.0F);
 		fogData.renderDistanceStart = h - j;
 		fogData.renderDistanceEnd = h;
-		
-		// TODO: Remove after debugging - DH fog override (replicates MixinFogRenderer)
+
+		// TODO: Remove after debugging - DH fog override (replicates MixinFogRenderer @WrapOperation)
+		// Must be done RIGHT BEFORE updateBuffer, not after fog values are set above
 		try {
 			// Check if we should cancel vanilla fog for DH
 			boolean cameraNotInFluid = fogType == FogType.NONE;
@@ -204,6 +205,7 @@ public class FogRenderer implements AutoCloseable {
 			
 			if (cancelFog) {
 				// Disable vanilla fog by setting to very large values (same as DH mixin)
+				// These values will be sent to the GPU via updateBuffer below
 				float veryLargeValue = 420694206942069.F;
 				float evenLargerValue = 42069420694206942069.F;
 				
@@ -218,8 +220,9 @@ public class FogRenderer implements AutoCloseable {
 			// DH not loaded, skip fog override
 		} catch (Exception e) {
 			System.err.println("[DH-FOG] Error overriding fog: " + e.getMessage());
+			e.printStackTrace();
 		}
-
+		
 		try (GpuBuffer.MappedView mappedView = RenderSystem.getDevice().createCommandEncoder().mapBuffer(this.regularBuffer.currentBuffer(), false, true)) {
 			this.updateBuffer(
 				mappedView.data(),
