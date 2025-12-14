@@ -45,7 +45,7 @@ public class RenderUtil
 	/**
 	 * create and return a new projection matrix based on MC's modelView and projection matrices
 	 *
-	 * @param mcProjMat Minecraft's current projection matrix
+	 * @param mcProjMat Minecraft's current projection matrix (may be identity in MC 1.21.6+)
 	 */
 	public static Mat4f createLodProjectionMatrix(Mat4f mcProjMat, float partialTicks)
 	{
@@ -65,8 +65,23 @@ public class RenderUtil
 		
 		// Create a copy of the current matrix, so it won't be modified.
 		Mat4f lodProj = mcProjMat.copy();
-		// Set new far and near clip plane values.
-		lodProj.setClipPlanes(nearClipDist, farClipDist);
+		
+		// Check if projection matrix is identity (MC 1.21.6+ provides identity projection)
+		// In this case, the modelview matrix already contains the combined MVP
+		boolean isIdentity = lodProj.m00 == 1.0f && lodProj.m11 == 1.0f && lodProj.m22 == 1.0f && lodProj.m33 == 1.0f
+			&& lodProj.m01 == 0.0f && lodProj.m02 == 0.0f && lodProj.m03 == 0.0f
+			&& lodProj.m10 == 0.0f && lodProj.m12 == 0.0f && lodProj.m13 == 0.0f
+			&& lodProj.m20 == 0.0f && lodProj.m21 == 0.0f && lodProj.m23 == 0.0f
+			&& lodProj.m30 == 0.0f && lodProj.m31 == 0.0f && lodProj.m32 == 0.0f;
+		
+		if (!isIdentity)
+		{
+			// Set new far and near clip plane values for pre-1.21.6 versions
+			lodProj.setClipPlanes(nearClipDist, farClipDist);
+		}
+		// else: For MC 1.21.6+, projection is identity, so just return the identity matrix
+		// The actual projection is already baked into the modelview matrix
+		
 		return lodProj;
 	}
 	
