@@ -183,10 +183,11 @@ public class FogRenderer implements AutoCloseable {
 		// Must be done RIGHT BEFORE updateBuffer, not after fog values are set above
 		// TODO: DH fog override - remove debug logging after testing
 		try {
-			System.out.println("[DH-FOG] Attempting fog override..."); // TODO: Remove after debugging
+			System.out.println("[DH-FOG] Attempting fog override, fogType=" + fogType); // TODO: Remove after debugging
 			
-			// Check if we should cancel vanilla fog for DH
-			boolean cameraNotInFluid = fogType == FogType.NONE;
+			// DH's mixin checks if FogType is WATER, LAVA, or POWDER_SNOW - if so, special fog applies
+			// If FogType is NONE, ATMOSPHERIC, or DIMENSION_OR_BOSS, then vanilla fog applies and we should override it
+			boolean isFluidFog = (fogType == FogType.WATER || fogType == FogType.LAVA || fogType == FogType.POWDER_SNOW);
 			boolean isSpecialFog = (entity instanceof LivingEntity) && ((LivingEntity) entity).hasEffect(MobEffects.BLINDNESS);
 			
 			// Get DH config - navigate through nested static classes
@@ -208,8 +209,9 @@ public class FogRenderer implements AutoCloseable {
 			Object renderWrapper = singletonInjectorClass.getMethod("get", Class.class).invoke(singletonInstance, renderWrapperClass);
 			boolean isFogStateSpecial = (Boolean) renderWrapperClass.getMethod("isFogStateSpecial").invoke(renderWrapper);
 			
-			boolean cancelFog = !isSpecialFog && cameraNotInFluid && !isFogStateSpecial && !enableVanillaFog;
-			System.out.println("[DH-FOG] cancelFog conditions: cameraNotInFluid=" + cameraNotInFluid + ", !isSpecialFog=" + !isSpecialFog + ", !isFogStateSpecial=" + !isFogStateSpecial + ", !enableVanillaFog=" + !enableVanillaFog + " => cancelFog=" + cancelFog); // TODO: Remove after debugging
+			// Cancel fog if: NOT special fog AND NOT fluid fog AND NOT special fog state AND vanilla fog disabled in config
+			boolean cancelFog = !isSpecialFog && !isFluidFog && !isFogStateSpecial && !enableVanillaFog;
+			System.out.println("[DH-FOG] cancelFog conditions: !isFluidFog=" + !isFluidFog + ", !isSpecialFog=" + !isSpecialFog + ", !isFogStateSpecial=" + !isFogStateSpecial + ", !enableVanillaFog=" + !enableVanillaFog + " => cancelFog=" + cancelFog); // TODO: Remove after debugging
 			
 			if (cancelFog) {
 				// Disable vanilla fog by setting to very large values (same as DH mixin)
