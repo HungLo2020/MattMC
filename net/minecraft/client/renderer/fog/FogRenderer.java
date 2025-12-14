@@ -178,6 +178,47 @@ public class FogRenderer implements AutoCloseable {
 		float j = Mth.clamp(h / 10.0F, 4.0F, 64.0F);
 		fogData.renderDistanceStart = h - j;
 		fogData.renderDistanceEnd = h;
+		
+		// TODO: Remove after debugging - DH fog override (replicates MixinFogRenderer)
+		try {
+			// Check if we should cancel vanilla fog for DH
+			boolean cameraNotInFluid = fogType == FogType.NONE;
+			boolean isSpecialFog = (entity instanceof LivingEntity) && ((LivingEntity) entity).hasEffect(MobEffects.BLINDNESS);
+			
+			// Get DH config and wrapper
+			Class<?> configClass = Class.forName("com.seibel.distanthorizons.core.config.Config");
+			Object clientConfig = configClass.getField("Client").get(null);
+			Object advancedConfig = clientConfig.getClass().getField("Advanced").get(clientConfig);
+			Object graphicsConfig = advancedConfig.getClass().getField("Graphics").get(advancedConfig);
+			Object fogConfig = graphicsConfig.getClass().getField("Fog").get(graphicsConfig);
+			Object enableVanillaFogOption = fogConfig.getClass().getField("enableVanillaFog").get(fogConfig);
+			boolean enableVanillaFog = (Boolean) enableVanillaFogOption.getClass().getMethod("get").invoke(enableVanillaFogOption);
+			
+			Class<?> singletonInjectorClass = Class.forName("com.seibel.distanthorizons.core.dependencyInjection.SingletonInjector");
+			Object singletonInstance = singletonInjectorClass.getField("INSTANCE").get(null);
+			Class<?> renderWrapperClass = Class.forName("com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftRenderWrapper");
+			Object renderWrapper = singletonInjectorClass.getMethod("get", Class.class).invoke(singletonInstance, renderWrapperClass);
+			boolean isFogStateSpecial = (Boolean) renderWrapperClass.getMethod("isFogStateSpecial").invoke(renderWrapper);
+			
+			boolean cancelFog = !isSpecialFog && cameraNotInFluid && !isFogStateSpecial && !enableVanillaFog;
+			
+			if (cancelFog) {
+				// Disable vanilla fog by setting to very large values (same as DH mixin)
+				float veryLargeValue = 420694206942069.F;
+				float evenLargerValue = 42069420694206942069.F;
+				
+				fogData.environmentalStart = veryLargeValue;
+				fogData.environmentalEnd = evenLargerValue;
+				fogData.renderDistanceStart = veryLargeValue;
+				fogData.renderDistanceEnd = evenLargerValue;
+				
+				System.out.println("[DH-FOG] Vanilla fog disabled for DH LOD rendering");
+			}
+		} catch (ClassNotFoundException e) {
+			// DH not loaded, skip fog override
+		} catch (Exception e) {
+			System.err.println("[DH-FOG] Error overriding fog: " + e.getMessage());
+		}
 
 		try (GpuBuffer.MappedView mappedView = RenderSystem.getDevice().createCommandEncoder().mapBuffer(this.regularBuffer.currentBuffer(), false, true)) {
 			this.updateBuffer(
