@@ -1,0 +1,40 @@
+{
+  "required": true,
+  "package": "net.fabricmc.fabric.mixin.renderer",
+  "compatibilityLevel": "JAVA_21",
+  "client": [
+    "client.block.model.BlockModelPartMixin",
+    "client.block.model.BlockStateModelMixin",
+    "client.block.model.GeometryBakedModelMixin",
+    "client.block.model.MultipartBlockStateModelMultipartBakedModelAccessor",
+    "client.block.model.MultipartBlockStateModelMixin",
+    "client.block.model.SimpleBlockStateModelMixin",
+    "client.block.model.WeightedBlockStateModelMixin",
+    "client.block.particle.BlockDustParticleMixin",
+    "client.block.particle.BlockMarkerParticleMixin",
+    "client.block.particle.BlockModelsMixin",
+    "client.block.particle.InGameOverlayRendererMixin",
+    "client.block.render.BatchingRenderCommandQueueMixin",
+    "client.block.render.BlockModelRendererMixin",
+    "client.block.render.BlockRenderManagerMixin",
+    "client.block.render.FallingBlockCommandRendererMixin",
+    "client.block.render.ItemFrameEntityRendererMixin",
+    "client.block.render.MooshroomMushroomFeatureRendererMixin",
+    "client.block.render.OrderedRenderCommandQueueImplMixin",
+    "client.block.render.RenderCommandQueueMixin",
+    "client.block.render.SnowGolemPumpkinFeatureRendererMixin",
+    "client.item.BasicItemModelMixin",
+    "client.item.BasicItemModelUnbakedMixin",
+    "client.item.ItemRenderStateLayerRenderStateMixin",
+    "client.sprite.BakedModelManager1Mixin",
+    "client.sprite.ErrorCollectingSpriteGetterMixin",
+    "client.sprite.SpriteAtlasTextureMixin",
+    "client.sprite.SpriteLoaderStitchResultMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  },
+  "overwrites": {
+    "requireAnnotations": true
+  }
+}

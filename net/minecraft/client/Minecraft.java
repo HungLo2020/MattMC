@@ -252,6 +252,7 @@ import org.apache.commons.io.FileUtils;
 import org.jetbrains.annotations.Nullable;
 import org.lwjgl.util.tinyfd.TinyFileDialogs;
 import org.slf4j.Logger;
+import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientWorldEvents;
 
 @Environment(EnvType.CLIENT)
 public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements WindowEventHandler {
@@ -1682,6 +1683,14 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 	}
 
 	public void tick() {
+		// TODO: Remove after debugging - Fire Fabric ClientTickEvents.START_CLIENT_TICK
+		try {
+			net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents.START_CLIENT_TICK.invoker().onStartTick(this);
+		} catch (Exception e) {
+			System.err.println("[ClientTickEvents] Error firing START_CLIENT_TICK: " + e.getMessage());
+			e.printStackTrace();
+		}
+		
 		this.clientTickCount++;
 		if (this.level != null && !this.pause) {
 			this.level.tickRateManager().tick();
@@ -1814,6 +1823,14 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 		profilerFiller.popPush("keyboard");
 		this.keyboardHandler.tick();
 		profilerFiller.pop();
+		
+		// TODO: Remove after debugging - Fire Fabric ClientTickEvents.END_CLIENT_TICK
+		try {
+			net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents.END_CLIENT_TICK.invoker().onEndTick(this);
+		} catch (Exception e) {
+			System.err.println("[ClientTickEvents] Error firing END_CLIENT_TICK: " + e.getMessage());
+			e.printStackTrace();
+		}
 	}
 
 	private boolean isLevelRunningNormally() {
@@ -2156,6 +2173,9 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 	}
 
 	private void updateLevelInEngines(@Nullable ClientLevel clientLevel) {
+		// Track previous level for Fabric API ClientWorldEvents
+		ClientLevel previousLevel = this.level;
+		
 		this.soundManager.stop();
 		this.setCameraEntity(null);
 		this.pendingConnection = null;
@@ -2163,6 +2183,15 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 		this.particleEngine.setLevel(clientLevel);
 		this.gameRenderer.setLevel(clientLevel);
 		this.updateTitle();
+		
+		// Fire Fabric API ClientWorldEvents for mods like Distant Horizons
+		if (previousLevel != null && clientLevel != previousLevel) {
+			ClientWorldEvents.WORLD_UNLOAD.invoker().onWorldUnload(this, previousLevel);
+		}
+		
+		if (clientLevel != null) {
+			ClientWorldEvents.WORLD_LOAD.invoker().onWorldLoad(this, clientLevel);
+		}
 	}
 
 	private UserProperties userProperties() {

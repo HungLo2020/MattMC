@@ -106,6 +106,7 @@ import org.joml.Matrix4fc;
 import org.joml.Vector3f;
 import org.joml.Vector4f;
 import org.slf4j.Logger;
+import net.fabricmc.fabric.api.client.rendering.v1.WorldRenderEvents;
 
 @Environment(EnvType.CLIENT)
 public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseable {
@@ -116,6 +117,7 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 	public static final int HALF_SECTION_SIZE = 8;
 	public static final int NEARBY_SECTION_DISTANCE_IN_BLOCKS = 32;
 	private static final int MINIMUM_TRANSPARENT_SORT_COUNT = 15;
+	private static boolean dhRenderStateErrorLogged = false; // Flag to prevent spam logging DH RENDER_STATE errors
 	private final Minecraft minecraft;
 	private final EntityRenderDispatcher entityRenderDispatcher;
 	private final BlockEntityRenderDispatcher blockEntityRenderDispatcher;
@@ -583,6 +585,11 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 		ResourceHandle<RenderTarget> resourceHandle2 = this.targets.translucent;
 		ResourceHandle<RenderTarget> resourceHandle3 = this.targets.itemEntity;
 		ResourceHandle<RenderTarget> resourceHandle4 = this.targets.entityOutline;
+		
+		// Capture variables for WorldRenderContext - need to get them outside the lambda
+		final Camera renderCamera = this.minecraft.gameRenderer.getMainCamera();
+		final float tickDeltaValue = deltaTracker.getGameTimeDeltaPartialTick(false);
+		
 		framePass.executes(() -> {
 			iris$renderMainPassBody();
 			RenderSystem.setShaderFog(gpuBufferSlice);
@@ -590,10 +597,76 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 			double d = vec3.x();
 			double e = vec3.y();
 			double f = vec3.z();
+			
 			profilerFiller.push("terrain");
 			ChunkSectionsToRender chunkSectionsToRender = this.prepareChunkRenders(matrix4f, d, e, f);
 			iris$renderTerrainGroup(chunkSectionsToRender, ChunkSectionLayerGroup.OPAQUE);
 			this.minecraft.gameRenderer.getLighting().setupFor(Lighting.Entry.LEVEL);
+			
+			// Set Distant Horizons RENDER_STATE for MC 1.21.6+
+			// IMPORTANT: This must be done BEFORE WorldRenderEvents fire, not in prepareChunkRenders()
+			// because Sodium's @Overwrite replaces prepareChunkRenders() entirely!
+			// MC combined the model view and projection matrices into matrix4f
+			// Use reflection to avoid compile-time dependency on DH classes
+			System.out.println("[DEBUG-RENDERSTATE] ABOUT TO SET RENDER_STATE (after terrain, before events)"); // TODO: Remove after debugging
+			try {
+				System.out.println("[DEBUG-RENDERSTATE] Attempting to set DH RENDER_STATE"); // TODO: Remove after debugging
+				Class<?> clientApiClass = Class.forName("com.seibel.distanthorizons.core.api.internal.ClientApi");
+				System.out.println("[DEBUG-RENDERSTATE] Found ClientApi class"); // TODO: Remove after debugging
+				Object renderState = clientApiClass.getField("RENDER_STATE").get(null);
+				System.out.println("[DEBUG-RENDERSTATE] Got RENDER_STATE: " + renderState); // TODO: Remove after debugging
+				Class<?> renderStateClass = renderState.getClass();
+				
+				// Convert matrix4fc to DH's Mat4f
+				Class<?> converterClass = Class.forName("com.seibel.distanthorizons.common.wrappers.McObjectConverter");
+				java.lang.reflect.Method convertMethod = converterClass.getMethod("Convert", org.joml.Matrix4fc.class);
+				Object dhModelViewMatrix = convertMethod.invoke(null, matrix4f);
+				System.out.println("[DEBUG-RENDERSTATE] Converted model-view matrix"); // TODO: Remove after debugging
+				
+				// Create identity projection matrix
+				Class<?> mat4fClass = Class.forName("com.seibel.distanthorizons.core.util.math.Mat4f");
+				Object dhProjectionMatrix = mat4fClass.getDeclaredConstructor().newInstance();
+				mat4fClass.getMethod("setIdentity").invoke(dhProjectionMatrix);
+				System.out.println("[DEBUG-RENDERSTATE] Created identity projection matrix"); // TODO: Remove after debugging
+				
+				// Get client level wrapper
+				Class<?> wrapperClass = Class.forName("com.seibel.distanthorizons.common.wrappers.world.ClientLevelWrapper");
+				java.lang.reflect.Method getWrapperMethod = wrapperClass.getMethod("getWrapper", net.minecraft.client.multiplayer.ClientLevel.class);
+				Object clientLevelWrapper = getWrapperMethod.invoke(null, this.level);
+				System.out.println("[DEBUG-RENDERSTATE] Got client level wrapper: " + clientLevelWrapper); // TODO: Remove after debugging
+				
+				// Get frame time
+				float frameTime = Minecraft.getInstance().deltaTracker.getRealtimeDeltaTicks();
+				System.out.println("[DEBUG-RENDERSTATE] Frame time: " + frameTime); // TODO: Remove after debugging
+				
+				// Set RENDER_STATE fields
+				renderStateClass.getField("mcModelViewMatrix").set(renderState, dhModelViewMatrix);
+				renderStateClass.getField("mcProjectionMatrix").set(renderState, dhProjectionMatrix);
+				renderStateClass.getField("clientLevelWrapper").set(renderState, clientLevelWrapper);
+				renderStateClass.getField("frameTime").setFloat(renderState, frameTime);
+				System.out.println("[DEBUG-RENDERSTATE] Successfully set all RENDER_STATE fields"); // TODO: Remove after debugging
+			} catch (Exception ex) {
+				if (!dhRenderStateErrorLogged) {
+					System.err.println("[ERROR] Failed to set DH RENDER_STATE: " + ex.getMessage()); // TODO: Remove after debugging
+					ex.printStackTrace(); // TODO: Remove after debugging
+					dhRenderStateErrorLogged = true;
+				}
+			}
+			
+			// Fire AFTER_SETUP event for Distant Horizons after terrain setup
+			// In MC 1.21.6+, matrix4f is the combined model-view-projection matrix
+			WorldRenderEvents.WorldRenderContext afterSetupContext = new WorldRenderContextImpl(
+				this.level, matrix4f, tickDeltaValue, renderCamera
+			);
+			try {
+				System.out.println("[DEBUG] Firing AFTER_SETUP event");
+				WorldRenderEvents.AFTER_SETUP.invoker().afterSetup(afterSetupContext);
+				System.out.println("[DEBUG] AFTER_SETUP event completed");
+			} catch (Exception ex) {
+				System.err.println("[ERROR] Exception in AFTER_SETUP event: " + ex.getMessage());
+				ex.printStackTrace();
+			}
+			
 			if (resourceHandle3 != null) {
 				resourceHandle3.get().copyDepthFrom(this.minecraft.getMainRenderTarget());
 			}
@@ -638,6 +711,20 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 			this.gameTestBlockHighlightRenderer.render(poseStack, bufferSource);
 			bufferSource.endLastBatch();
 			this.checkPoseStack(poseStack);
+			
+			// Fire AFTER_ENTITIES event for Distant Horizons after entity rendering
+			try {
+				System.out.println("[DEBUG] Firing AFTER_ENTITIES event");
+				WorldRenderEvents.WorldRenderContext afterEntitiesContext = new WorldRenderContextImpl(
+					this.level, matrix4f, tickDeltaValue, renderCamera
+				);
+				WorldRenderEvents.AFTER_ENTITIES.invoker().afterEntities(afterEntitiesContext);
+				System.out.println("[DEBUG] AFTER_ENTITIES event completed");
+			} catch (Exception ex) {
+				System.err.println("[ERROR] Exception in AFTER_ENTITIES event: " + ex.getMessage());
+				ex.printStackTrace();
+			}
+			
 			bufferSource.endBatch(Sheets.translucentItemSheet());
 			bufferSource.endBatch(Sheets.bannerSheet());
 			bufferSource.endBatch(Sheets.shieldSheet());
@@ -667,6 +754,19 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 
 			bufferSource.endBatch();
 			profilerFiller.pop();
+			
+			// Fire AFTER_TRANSLUCENT event for Distant Horizons after translucent rendering
+			try {
+				System.out.println("[DEBUG] Firing AFTER_TRANSLUCENT event");
+				WorldRenderEvents.WorldRenderContext afterTranslucentContext = new WorldRenderContextImpl(
+					this.level, matrix4f, tickDeltaValue, renderCamera
+				);
+				WorldRenderEvents.AFTER_TRANSLUCENT.invoker().afterTranslucent(afterTranslucentContext);
+				System.out.println("[DEBUG] AFTER_TRANSLUCENT event completed");
+			} catch (Exception ex) {
+				System.err.println("[ERROR] Exception in AFTER_TRANSLUCENT event: " + ex.getMessage());
+				ex.printStackTrace();
+			}
 		});
 	}
 
@@ -989,6 +1089,56 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 	}
 
 	private ChunkSectionsToRender prepareChunkRenders(Matrix4fc matrix4fc, double d, double e, double f) {
+		System.out.println("[DEBUG-RENDERSTATE] prepareChunkRenders() METHOD CALLED!"); // TODO: Remove after debugging
+		// Set Distant Horizons RENDER_STATE for MC 1.21.6+
+		// MC combined the model view and projection matrices into matrix4fc
+		// Use reflection to avoid compile-time dependency on DH classes
+		try {
+			System.out.println("[DEBUG-RENDERSTATE] Attempting to set DH RENDER_STATE"); // TODO: Remove after debugging
+			Class<?> clientApiClass = Class.forName("com.seibel.distanthorizons.core.api.internal.ClientApi");
+			System.out.println("[DEBUG-RENDERSTATE] Found ClientApi class"); // TODO: Remove after debugging
+			Object renderState = clientApiClass.getField("RENDER_STATE").get(null);
+			System.out.println("[DEBUG-RENDERSTATE] Got RENDER_STATE: " + renderState); // TODO: Remove after debugging
+			Class<?> renderStateClass = renderState.getClass();
+			
+			// Convert matrix4fc to DH's Mat4f
+			Class<?> converterClass = Class.forName("com.seibel.distanthorizons.common.wrappers.McObjectConverter");
+			java.lang.reflect.Method convertMethod = converterClass.getMethod("Convert", org.joml.Matrix4fc.class);
+			Object dhModelViewMatrix = convertMethod.invoke(null, matrix4fc);
+			System.out.println("[DEBUG-RENDERSTATE] Converted model-view matrix"); // TODO: Remove after debugging
+			
+			// Create identity projection matrix
+			Class<?> mat4fClass = Class.forName("com.seibel.distanthorizons.core.util.math.Mat4f");
+			Object dhProjectionMatrix = mat4fClass.getDeclaredConstructor().newInstance();
+			mat4fClass.getMethod("setIdentity").invoke(dhProjectionMatrix);
+			System.out.println("[DEBUG-RENDERSTATE] Created identity projection matrix"); // TODO: Remove after debugging
+			
+			// Get client level wrapper
+			Class<?> wrapperClass = Class.forName("com.seibel.distanthorizons.common.wrappers.world.ClientLevelWrapper");
+			java.lang.reflect.Method getWrapperMethod = wrapperClass.getMethod("getWrapper", net.minecraft.client.multiplayer.ClientLevel.class);
+			Object clientLevelWrapper = getWrapperMethod.invoke(null, this.level);
+			System.out.println("[DEBUG-RENDERSTATE] Got client level wrapper: " + clientLevelWrapper); // TODO: Remove after debugging
+			
+			// Get frame time
+			float frameTime = Minecraft.getInstance().deltaTracker.getRealtimeDeltaTicks();
+			System.out.println("[DEBUG-RENDERSTATE] Frame time: " + frameTime); // TODO: Remove after debugging
+			
+			// Set RENDER_STATE fields
+			renderStateClass.getField("mcModelViewMatrix").set(renderState, dhModelViewMatrix);
+			renderStateClass.getField("mcProjectionMatrix").set(renderState, dhProjectionMatrix);
+			renderStateClass.getField("clientLevelWrapper").set(renderState, clientLevelWrapper);
+			renderStateClass.getField("frameTime").setFloat(renderState, frameTime);
+			System.out.println("[DEBUG-RENDERSTATE] Successfully set all RENDER_STATE fields"); // TODO: Remove after debugging
+		} catch (Exception ex) {
+			// DH not loaded or error - silently ignore
+			// Only log on first error to avoid spam
+			if (!dhRenderStateErrorLogged) {
+				System.err.println("[LevelRenderer] Could not set DH RENDER_STATE (DH may not be loaded): " + ex.getMessage());
+				ex.printStackTrace(); // TODO: Remove after debugging - show full stack trace
+				dhRenderStateErrorLogged = true;
+			}
+		}
+		
 		ObjectListIterator<SectionRenderDispatcher.RenderSection> objectListIterator = this.visibleSections.listIterator(0);
 		EnumMap<ChunkSectionLayer, List<RenderPass.Draw<GpuBufferSlice[]>>> enumMap = new EnumMap(ChunkSectionLayer.class);
 		int i = 0;
@@ -1498,5 +1648,97 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 	// Wrapper method for feature rendering in particles pass - allows Iris mixins to intercept
 	public void iris$renderAllFeaturesParticles() {
 		this.featureRenderDispatcher.renderAllFeatures();
+	}
+	
+	/**
+	 * WorldRenderContext implementation for Fabric API events used by Distant Horizons.
+	 * 
+	 * For MC 1.21.6+, Minecraft combines the model-view and projection matrices into a single matrix.
+	 * To maintain compatibility with Distant Horizons expectations:
+	 * - The PoseStack contains the combined model-view-projection matrix
+	 * - The projection matrix is identity
+	 */
+	/**
+	 * WorldRenderContext implementation for MC 1.21.6+
+	 * - The PoseStack contains the combined model-view-projection matrix
+	 * - The projection matrix is identity
+	 */
+	private static class WorldRenderContextImpl implements net.fabricmc.fabric.api.client.rendering.v1.WorldRenderEvents.WorldRenderContext {
+		private final ClientLevel level;
+		private final PoseStack poseStack;
+		private final float tickDelta;
+		private final Camera camera;
+		private final DeltaTracker deltaTracker;
+		private static final Matrix4f IDENTITY_MATRIX = new Matrix4f().identity();
+		
+		public WorldRenderContextImpl(ClientLevel level, Matrix4f combinedMVP, float tickDelta, Camera camera) {
+			this.level = level;
+			this.tickDelta = tickDelta;
+			this.camera = camera;
+			// Create a simple DeltaTracker that returns the tick delta value
+			this.deltaTracker = new DeltaTracker() {
+				@Override
+				public float getGameTimeDeltaTicks() {
+					return tickDelta;
+				}
+				
+				@Override
+				public float getGameTimeDeltaPartialTick(boolean bl) {
+					return tickDelta;
+				}
+				
+				@Override
+				public float getRealtimeDeltaTicks() {
+					return tickDelta;
+				}
+			};
+			
+			// Create PoseStack with the combined MVP matrix for MC 1.21.6+
+			this.poseStack = new PoseStack();
+			this.poseStack.last().pose().set(combinedMVP);
+		}
+		
+		@Override
+		public ClientLevel world() {
+			return this.level;
+		}
+		
+		@Override
+		public PoseStack matrixStack() {
+			return this.poseStack;
+		}
+		
+		@Override
+		public float tickDelta() {
+			return this.tickDelta;
+		}
+		
+		@Override
+		public long limitTime() {
+			// Not used by Distant Horizons - stub implementation
+			return 0;
+		}
+		
+		@Override
+		public boolean blockOutlines() {
+			// Not used by Distant Horizons - stub implementation
+			return true;
+		}
+		
+		@Override
+		public Camera camera() {
+			return this.camera;
+		}
+		
+		@Override
+		public Matrix4f projectionMatrix() {
+			// In MC 1.21.6+, the projection matrix is identity since MVP is combined
+			return IDENTITY_MATRIX;
+		}
+		
+		// MC 1.21.1+ adds tickCounter() method needed by Distant Horizons
+		public DeltaTracker tickCounter() {
+			return this.deltaTracker;
+		}
 	}
 }

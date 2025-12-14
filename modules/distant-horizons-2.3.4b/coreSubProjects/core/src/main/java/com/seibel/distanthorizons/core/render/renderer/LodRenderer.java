@@ -123,7 +123,12 @@ public class LodRenderer
 	 * otherwise it will only render opaque LODs.
 	 */
 	public void render(RenderParams renderParams, IProfilerWrapper profiler)
-	{  this.renderLodPass(renderParams, profiler, false);  }
+	{  
+		// TODO: Remove after debugging
+		System.out.println("[LOD-RENDERER] render() called, renderBufferHandler=" + renderParams.renderBufferHandler + ", lightmap=" + renderParams.lightmap);
+		this.renderLodPass(renderParams, profiler, false);  
+		System.out.println("[LOD-RENDERER] render() completed");
+	}
 	
 	/**
 	 * This method is designed for Iris to be able 
@@ -136,6 +141,9 @@ public class LodRenderer
 	
 	private void renderLodPass(RenderParams renderParams, IProfilerWrapper profiler, boolean runningDeferredPass)
 	{
+		// TODO: Remove after debugging
+		System.out.println("[LOD-RENDERER] renderLodPass() called, deferred=" + runningDeferredPass);
+		
 		//====================//
 		// validate rendering //
 		//====================//
@@ -144,6 +152,7 @@ public class LodRenderer
 		if (runningDeferredPass 
 			&& !deferTransparentRendering)
 		{
+			System.out.println("[LOD-RENDERER] Early return: deferred pass but no defer transparent rendering");
 			return;
 		}
 		boolean firstPass = !runningDeferredPass;
@@ -151,12 +160,16 @@ public class LodRenderer
 		// RenderParams parameter validation should be done before this
 		if (!renderParams.validationRun)
 		{
+			System.out.println("[LOD-RENDERER] ERROR: Validation not run!"); // TODO: Remove after debugging
 			throw new IllegalArgumentException("Render parameters validation");
 		}
 		
 		RenderBufferHandler renderBufferHandler = renderParams.renderBufferHandler;
 		GenericObjectRenderer genericRenderer = renderParams.genericRenderer;
 		ILightMapWrapper lightmap = renderParams.lightmap;
+		
+		// TODO: Remove after debugging
+		System.out.println("[LOD-RENDERER] renderBufferHandler=" + renderBufferHandler + ", lightmap=" + lightmap);
 		
 		
 		
@@ -169,12 +182,15 @@ public class LodRenderer
 		
 		if (!this.renderObjectsCreated)
 		{
+			System.out.println("[LOD-RENDERER] Creating render objects..."); // TODO: Remove after debugging
 			boolean setupSuccess = this.createRenderObjects();
 			if (!setupSuccess)
 			{
 				// shouldn't normally happen, but just in case
+				System.out.println("[LOD-RENDERER] ERROR: Failed to create render objects!"); // TODO: Remove after debugging
 				return;
 			}
+			System.out.println("[LOD-RENDERER] Render objects created successfully"); // TODO: Remove after debugging
 			
 			// only do this once, that way they can still be reverted if desired
 			if (Config.Client.Advanced.Graphics.overrideVanillaGraphicsSettings.get())
@@ -195,7 +211,9 @@ public class LodRenderer
 		{
 			// we only need to sort/cull the LODs during the first frame 
 			profiler.popPush("LOD build render list");
+			System.out.println("[LOD-RENDERER] Building render list..."); // TODO: Remove after debugging
 			renderBufferHandler.buildRenderList(renderParams);
+			System.out.println("[LOD-RENDERER] Render list built"); // TODO: Remove after debugging
 		}
 		
 		IDhApiShaderProgram lodShaderProgram = this.lodRenderProgram;
@@ -602,6 +620,8 @@ public class LodRenderer
 	
 	private void renderLodPass(IDhApiShaderProgram shaderProgram, RenderBufferHandler lodBufferHandler, RenderParams renderEventParam, boolean opaquePass)
 	{
+		System.out.println("[LOD-RENDERER-PASS] renderLodPass(4-param) called, opaquePass=" + opaquePass); // TODO: Remove after debugging
+		
 		//=======================//
 		// debug wireframe setup //
 		//=======================//
@@ -650,8 +670,11 @@ public class LodRenderer
 		
 		
 		SortedArraySet<LodBufferContainer> lodBufferContainer = lodBufferHandler.getColumnRenderBuffers();
+		System.out.println("[LOD-RENDERER-PASS] lodBufferContainer=" + (lodBufferContainer == null ? "null" : "size=" + lodBufferContainer.size())); // TODO: Remove after debugging
 		if (lodBufferContainer != null)
 		{
+			int totalVBOs = 0;
+			int renderedVBOs = 0;
 			for (int lodIndex = 0; lodIndex < lodBufferContainer.size(); lodIndex++)
 			{
 				LodBufferContainer bufferContainer = lodBufferContainer.get(lodIndex);
@@ -666,11 +689,14 @@ public class LodRenderer
 						continue;
 					}
 					
-					if (vbo.getVertexCount() == 0)
+					totalVBOs++;
+					int vertexCount = vbo.getVertexCount();
+					if (vertexCount == 0)
 					{
 						continue;
 					}
 					
+					renderedVBOs++;
 					vbo.bind();
 					shaderProgram.bindVertexBuffer(vbo.getId());
 					GL32.glDrawElements(
@@ -680,6 +706,7 @@ public class LodRenderer
 					vbo.unbind();
 				}
 			}
+			System.out.println("[LOD-RENDERER-PASS] Rendering complete: totalVBOs=" + totalVBOs + ", renderedVBOs=" + renderedVBOs); // TODO: Remove after debugging
 		}
 		
 		

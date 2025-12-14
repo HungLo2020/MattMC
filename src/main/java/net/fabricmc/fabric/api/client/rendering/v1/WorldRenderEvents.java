@@ -18,20 +18,41 @@ public final class WorldRenderEvents {
     });
     
     public static final Event<AfterSetup> AFTER_SETUP = Event.create(AfterSetup.class, callbacks -> context -> {
+        System.out.println("[WorldRenderEvents] AFTER_SETUP invoker called with " + callbacks.length + " callbacks");
         for (AfterSetup callback : callbacks) {
-            callback.afterSetup(context);
+            try {
+                System.out.println("[WorldRenderEvents] Calling AFTER_SETUP callback: world=" + context.world() + ", camera=" + context.camera()); // TODO: Remove after debugging
+                System.out.println("[WorldRenderEvents] Context tickDelta=" + context.tickDelta() + ", projectionMatrix=" + context.projectionMatrix()); // TODO: Remove after debugging
+                callback.afterSetup(context);
+                System.out.println("[WorldRenderEvents] AFTER_SETUP callback completed successfully"); // TODO: Remove after debugging
+            } catch (Exception e) {
+                System.err.println("[WorldRenderEvents] Error in AFTER_SETUP callback: " + e.getMessage());
+                e.printStackTrace();
+            }
         }
     });
     
     public static final Event<AfterEntities> AFTER_ENTITIES = Event.create(AfterEntities.class, callbacks -> context -> {
+        System.out.println("[WorldRenderEvents] AFTER_ENTITIES invoker called with " + callbacks.length + " callbacks");
         for (AfterEntities callback : callbacks) {
-            callback.afterEntities(context);
+            try {
+                callback.afterEntities(context);
+            } catch (Exception e) {
+                System.err.println("[WorldRenderEvents] Error in AFTER_ENTITIES callback: " + e.getMessage());
+                e.printStackTrace();
+            }
         }
     });
     
     public static final Event<AfterTranslucent> AFTER_TRANSLUCENT = Event.create(AfterTranslucent.class, callbacks -> context -> {
+        System.out.println("[WorldRenderEvents] AFTER_TRANSLUCENT invoker called with " + callbacks.length + " callbacks");
         for (AfterTranslucent callback : callbacks) {
-            callback.afterTranslucent(context);
+            try {
+                callback.afterTranslucent(context);
+            } catch (Exception e) {
+                System.err.println("[WorldRenderEvents] Error in AFTER_TRANSLUCENT callback: " + e.getMessage());
+                e.printStackTrace();
+            }
         }
     });
     
@@ -85,9 +106,27 @@ public final class WorldRenderEvents {
             return matrixStack().last().pose();
         }
         
-        /** Returns the tick counter for MC 1.21.1+ - cached to avoid allocation */
+        /** Returns the tick counter for MC 1.21.1+ */
         default DeltaTracker tickCounter() {
-            return DeltaTracker.ZERO; // Stub - actual delta accessed via tickDelta()
+            // Default implementation that returns tickDelta()
+            // Implementations should override this with a proper DeltaTracker
+            final float delta = tickDelta();
+            return new DeltaTracker() {
+                @Override
+                public float getGameTimeDeltaTicks() {
+                    return delta;
+                }
+                
+                @Override
+                public float getGameTimeDeltaPartialTick(boolean bl) {
+                    return delta;
+                }
+                
+                @Override
+                public float getRealtimeDeltaTicks() {
+                    return delta;
+                }
+            };
         }
     }
 }

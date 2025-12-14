@@ -91,6 +91,7 @@ public class LightTexture implements AutoCloseable {
 	}
 
 	public void updateLightTexture(float f) {
+		System.out.println("[DH-LIGHTMAP-DEBUG] updateLightTexture() called, flag=" + this.updateLightTexture); // TODO: Remove after debugging
 		if (this.updateLightTexture) {
 			this.updateLightTexture = false;
 			ProfilerFiller profilerFiller = Profiler.get();
@@ -169,6 +170,45 @@ public class LightTexture implements AutoCloseable {
 
 				this.ubo.rotate();
 				profilerFiller.pop();
+				
+				// DH Integration: Register lightmap for Distant Horizons rendering
+				// This replicates what DH's MixinLightTexture would do if it could apply to decompiled source
+				// TODO: Remove after debugging
+				System.out.println("[DH-LIGHTMAP] Attempting to register lightmap..."); // TODO: Remove after debugging
+				try {
+					System.out.println("[DH-LIGHTMAP] Looking for SingletonInjector class..."); // TODO: Remove after debugging
+					Class<?> minecraftClientWrapperClass = Class.forName("com.seibel.distanthorizons.core.dependencyInjection.SingletonInjector");
+					Object singletonInjector = minecraftClientWrapperClass.getField("INSTANCE").get(null);
+					java.lang.reflect.Method getMethod = singletonInjector.getClass().getMethod("get", Class.class);
+					
+					Class<?> iMinecraftClientWrapperInterface = Class.forName("com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftClientWrapper");
+					Object mcWrapper = getMethod.invoke(singletonInjector, iMinecraftClientWrapperInterface);
+					
+					if (mcWrapper != null) {
+						java.lang.reflect.Method getWrappedClientLevelMethod = mcWrapper.getClass().getMethod("getWrappedClientLevel");
+						Object clientLevelWrapper = getWrappedClientLevelMethod.invoke(mcWrapper);
+						
+						if (clientLevelWrapper != null) {
+							Class<?> minecraftRenderWrapperClass = Class.forName("com.seibel.distanthorizons.common.wrappers.minecraft.MinecraftRenderWrapper");
+							Object renderWrapper = minecraftRenderWrapperClass.getField("INSTANCE").get(null);
+							
+							// Get the lightmap texture ID - in MC 1.21.10+ it's from GpuTexture
+							java.lang.reflect.Method glIdMethod = this.texture.getClass().getMethod("glId");
+							int lightmapTextureId = (int) glIdMethod.invoke(this.texture);
+							
+							java.lang.reflect.Method setLightmapIdMethod = renderWrapper.getClass().getMethod("setLightmapId", int.class, Class.forName("com.seibel.distanthorizons.core.wrapperInterfaces.world.IClientLevelWrapper"));
+							setLightmapIdMethod.invoke(renderWrapper, lightmapTextureId, clientLevelWrapper);
+							
+							System.out.println("[DH-LIGHTMAP] Successfully registered lightmap texture ID " + lightmapTextureId + " for level " + clientLevelWrapper); // TODO: Remove after debugging
+						}
+					}
+				} catch (ClassNotFoundException e) {
+					// DH not loaded, ignore
+					System.out.println("[DH-LIGHTMAP] DH not loaded (ClassNotFoundException): " + e.getMessage()); // TODO: Remove after debugging
+				} catch (Exception e) {
+					System.err.println("[DH-LIGHTMAP] Error setting lightmap: " + e.getMessage());
+					e.printStackTrace();
+				}
 			}
 		}
 	}

@@ -1,0 +1,17 @@
+{
+  "required": true,
+  "package": "net.fabricmc.fabric.mixin.object.builder.client",
+  "compatibilityLevel": "JAVA_21",
+  "client": [
+    "EntityModelLayersMixin",
+    "HangingSignEditScreenMixin",
+    "TexturedRenderLayersMixin",
+    "WoodTypeMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  },
+  "overwrites": {
+    "requireAnnotations": true
+  }
+}

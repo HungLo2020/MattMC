@@ -179,6 +179,63 @@ public class FogRenderer implements AutoCloseable {
 		fogData.renderDistanceStart = h - j;
 		fogData.renderDistanceEnd = h;
 
+		// TODO: Remove after debugging - DH fog override (replicates MixinFogRenderer @WrapOperation)
+		// Must be done RIGHT BEFORE updateBuffer, not after fog values are set above
+		// TODO: DH fog override - remove debug logging after testing
+		try {
+			System.out.println("[DH-FOG] Attempting fog override, fogType=" + fogType); // TODO: Remove after debugging
+			
+			// DH's mixin checks if FogType is WATER, LAVA, or POWDER_SNOW - if so, special fog applies
+			// If FogType is NONE, ATMOSPHERIC, or DIMENSION_OR_BOSS, then vanilla fog applies and we should override it
+			boolean isFluidFog = (fogType == FogType.WATER || fogType == FogType.LAVA || fogType == FogType.POWDER_SNOW);
+			boolean isSpecialFog = (entity instanceof LivingEntity) && ((LivingEntity) entity).hasEffect(MobEffects.BLINDNESS);
+			
+			// Get DH config - navigate through nested static classes
+			Class<?> configClass = Class.forName("com.seibel.distanthorizons.core.config.Config");
+			Class<?> clientClass = Class.forName("com.seibel.distanthorizons.core.config.Config$Client");
+			Class<?> advancedClass = Class.forName("com.seibel.distanthorizons.core.config.Config$Client$Advanced");
+			Class<?> graphicsClass = Class.forName("com.seibel.distanthorizons.core.config.Config$Client$Advanced$Graphics");
+			Class<?> fogClass = Class.forName("com.seibel.distanthorizons.core.config.Config$Client$Advanced$Graphics$Fog");
+			System.out.println("[DH-FOG] Loaded Config$Client$Advanced$Graphics$Fog class"); // TODO: Remove after debugging
+			
+			// Access the enableVanillaFog config entry
+			Object enableVanillaFogOption = fogClass.getField("enableVanillaFog").get(null);
+			boolean enableVanillaFog = (Boolean) enableVanillaFogOption.getClass().getMethod("get").invoke(enableVanillaFogOption);
+			System.out.println("[DH-FOG] enableVanillaFog config value: " + enableVanillaFog); // TODO: Remove after debugging
+			
+			Class<?> singletonInjectorClass = Class.forName("com.seibel.distanthorizons.core.dependencyInjection.SingletonInjector");
+			Object singletonInstance = singletonInjectorClass.getField("INSTANCE").get(null);
+			Class<?> renderWrapperClass = Class.forName("com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftRenderWrapper");
+			Object renderWrapper = singletonInjectorClass.getMethod("get", Class.class).invoke(singletonInstance, renderWrapperClass);
+			boolean isFogStateSpecial = (Boolean) renderWrapperClass.getMethod("isFogStateSpecial").invoke(renderWrapper);
+			
+			// Cancel fog if: NOT special fog AND NOT fluid fog AND NOT special fog state AND vanilla fog disabled in config
+			boolean cancelFog = !isSpecialFog && !isFluidFog && !isFogStateSpecial && !enableVanillaFog;
+			System.out.println("[DH-FOG] cancelFog conditions: !isFluidFog=" + !isFluidFog + ", !isSpecialFog=" + !isSpecialFog + ", !isFogStateSpecial=" + !isFogStateSpecial + ", !enableVanillaFog=" + !enableVanillaFog + " => cancelFog=" + cancelFog); // TODO: Remove after debugging
+			
+			if (cancelFog) {
+				// Disable vanilla fog by setting to very large values (same as DH mixin)
+				// These values will be sent to the GPU via updateBuffer below
+				float veryLargeValue = 420694206942069.F;
+				float evenLargerValue = 42069420694206942069.F;
+				
+				fogData.environmentalStart = veryLargeValue;
+				fogData.environmentalEnd = evenLargerValue;
+				fogData.renderDistanceStart = veryLargeValue;
+				fogData.renderDistanceEnd = evenLargerValue;
+				
+				System.out.println("[DH-FOG] Vanilla fog disabled for DH LOD rendering, set distances to: " + evenLargerValue); // TODO: Remove after debugging
+			} else {
+				System.out.println("[DH-FOG] Fog override skipped (conditions not met)"); // TODO: Remove after debugging
+			}
+		} catch (ClassNotFoundException e) {
+			// DH not loaded, skip fog override
+			System.out.println("[DH-FOG] DH not loaded (ClassNotFoundException), skipping fog override"); // TODO: Remove after debugging
+		} catch (Exception e) {
+			System.err.println("[DH-FOG] Error overriding fog: " + e.getClass().getSimpleName() + ": " + e.getMessage());
+			e.printStackTrace();
+		}
+		
 		try (GpuBuffer.MappedView mappedView = RenderSystem.getDevice().createCommandEncoder().mapBuffer(this.regularBuffer.currentBuffer(), false, true)) {
 			this.updateBuffer(
 				mappedView.data(),
