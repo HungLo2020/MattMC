@@ -117,6 +117,7 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 	public static final int HALF_SECTION_SIZE = 8;
 	public static final int NEARBY_SECTION_DISTANCE_IN_BLOCKS = 32;
 	private static final int MINIMUM_TRANSPARENT_SORT_COUNT = 15;
+	private static boolean dhRenderStateErrorLogged = false; // Flag to prevent spam logging DH RENDER_STATE errors
 	private final Minecraft minecraft;
 	private final EntityRenderDispatcher entityRenderDispatcher;
 	private final BlockEntityRenderDispatcher blockEntityRenderDispatcher;
@@ -1038,6 +1039,46 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 	}
 
 	private ChunkSectionsToRender prepareChunkRenders(Matrix4fc matrix4fc, double d, double e, double f) {
+		// Set Distant Horizons RENDER_STATE for MC 1.21.6+
+		// MC combined the model view and projection matrices into matrix4fc
+		// Use reflection to avoid compile-time dependency on DH classes
+		try {
+			Class<?> clientApiClass = Class.forName("com.seibel.distanthorizons.core.api.internal.ClientApi");
+			Object renderState = clientApiClass.getField("RENDER_STATE").get(null);
+			Class<?> renderStateClass = renderState.getClass();
+			
+			// Convert matrix4fc to DH's Mat4f
+			Class<?> converterClass = Class.forName("com.seibel.distanthorizons.common.wrappers.McObjectConverter");
+			java.lang.reflect.Method convertMethod = converterClass.getMethod("Convert", org.joml.Matrix4fc.class);
+			Object dhModelViewMatrix = convertMethod.invoke(null, matrix4fc);
+			
+			// Create identity projection matrix
+			Class<?> mat4fClass = Class.forName("com.seibel.distanthorizons.core.util.math.Mat4f");
+			Object dhProjectionMatrix = mat4fClass.getDeclaredConstructor().newInstance();
+			mat4fClass.getMethod("setIdentity").invoke(dhProjectionMatrix);
+			
+			// Get client level wrapper
+			Class<?> wrapperClass = Class.forName("com.seibel.distanthorizons.common.wrappers.world.ClientLevelWrapper");
+			java.lang.reflect.Method getWrapperMethod = wrapperClass.getMethod("getWrapper", net.minecraft.client.multiplayer.ClientLevel.class);
+			Object clientLevelWrapper = getWrapperMethod.invoke(null, this.level);
+			
+			// Get frame time
+			float frameTime = Minecraft.getInstance().deltaTracker.getRealtimeDeltaTicks();
+			
+			// Set RENDER_STATE fields
+			renderStateClass.getField("mcModelViewMatrix").set(renderState, dhModelViewMatrix);
+			renderStateClass.getField("mcProjectionMatrix").set(renderState, dhProjectionMatrix);
+			renderStateClass.getField("clientLevelWrapper").set(renderState, clientLevelWrapper);
+			renderStateClass.getField("frameTime").setFloat(renderState, frameTime);
+		} catch (Exception ex) {
+			// DH not loaded or error - silently ignore
+			// Only log on first error to avoid spam
+			if (!dhRenderStateErrorLogged) {
+				System.err.println("[LevelRenderer] Could not set DH RENDER_STATE (DH may not be loaded): " + ex.getMessage());
+				dhRenderStateErrorLogged = true;
+			}
+		}
+		
 		ObjectListIterator<SectionRenderDispatcher.RenderSection> objectListIterator = this.visibleSections.listIterator(0);
 		EnumMap<ChunkSectionLayer, List<RenderPass.Draw<GpuBufferSlice[]>>> enumMap = new EnumMap(ChunkSectionLayer.class);
 		int i = 0;
