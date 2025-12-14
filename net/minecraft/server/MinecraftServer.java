@@ -739,7 +739,13 @@ public abstract class MinecraftServer extends ReentrantBlockableEventLoop<TickTa
 		try {
 			// Call Fabric Loader to initialize server-side mods (including Distant Horizons)
 			// This must happen BEFORE any events are fired so mods can register their event listeners
-			net.fabricmc.loader.impl.game.minecraft.Hooks.startServer(this.getServerDirectory().toFile(), this);
+			try {
+				LOGGER.info("Calling Hooks.startServer() to initialize server-side mods");
+				net.fabricmc.loader.impl.game.minecraft.Hooks.startServer(this.getServerDirectory().toFile(), this);
+				LOGGER.info("Hooks.startServer() completed successfully");
+			} catch (Exception e) {
+				LOGGER.error("Failed to call Hooks.startServer()", e);
+			}
 			
 			// Fire Fabric ServerLifecycleEvents.SERVER_STARTING for Distant Horizons
 			// MUST fire BEFORE initServer() so DH world is created before levels are loaded
