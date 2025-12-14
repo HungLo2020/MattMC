@@ -91,6 +91,7 @@ public class LightTexture implements AutoCloseable {
 	}
 
 	public void updateLightTexture(float f) {
+		System.out.println("[DH-LIGHTMAP-DEBUG] updateLightTexture() called, flag=" + this.updateLightTexture); // TODO: Remove after debugging
 		if (this.updateLightTexture) {
 			this.updateLightTexture = false;
 			ProfilerFiller profilerFiller = Profiler.get();
