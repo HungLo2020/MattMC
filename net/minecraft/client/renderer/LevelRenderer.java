@@ -1039,6 +1039,7 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 	}
 
 	private ChunkSectionsToRender prepareChunkRenders(Matrix4fc matrix4fc, double d, double e, double f) {
+		System.out.println("[DEBUG-RENDERSTATE] prepareChunkRenders() METHOD CALLED!"); // TODO: Remove after debugging
 		// Set Distant Horizons RENDER_STATE for MC 1.21.6+
 		// MC combined the model view and projection matrices into matrix4fc
 		// Use reflection to avoid compile-time dependency on DH classes
