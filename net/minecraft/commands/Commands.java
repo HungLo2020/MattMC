@@ -179,8 +179,12 @@ public class Commands {
 		}
 	};
 	private final CommandDispatcher<CommandSourceStack> dispatcher = new CommandDispatcher<>();
+	private final CommandBuildContext buildContext;
+	private final Commands.CommandSelection commandSelection;
 
 	public Commands(Commands.CommandSelection commandSelection, CommandBuildContext commandBuildContext) {
+		this.buildContext = commandBuildContext;
+		this.commandSelection = commandSelection;
 		AdvancementCommands.register(this.dispatcher);
 		AttributeCommand.register(this.dispatcher, commandBuildContext);
 		ExecuteCommand.register(this.dispatcher, commandBuildContext);
@@ -446,6 +450,14 @@ public class Commands {
 
 	public CommandDispatcher<CommandSourceStack> getDispatcher() {
 		return this.dispatcher;
+	}
+	
+	public CommandBuildContext getBuildContext() {
+		return this.buildContext;
+	}
+	
+	public Commands.CommandSelection getCommandSelection() {
+		return this.commandSelection;
 	}
 
 	public static <S> void validateParseResults(ParseResults<S> parseResults) throws CommandSyntaxException {
