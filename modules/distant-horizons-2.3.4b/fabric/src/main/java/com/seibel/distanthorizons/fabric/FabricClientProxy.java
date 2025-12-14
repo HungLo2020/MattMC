@@ -248,9 +248,16 @@ public class FabricClientProxy implements AbstractModInitializer.IEventProxy
 		WorldRenderEvents.AFTER_SETUP.register((renderContext) ->
 		{
 			updateRenderState.accept(renderContext);
+			// TODO: Remove after debugging
+			System.out.println("[DH-DEBUG] RENDER_STATE after update: level=" + ClientApi.RENDER_STATE.clientLevelWrapper + 
+				", mvm=" + ClientApi.RENDER_STATE.mcModelViewMatrix + 
+				", proj=" + ClientApi.RENDER_STATE.mcProjectionMatrix +
+				", frameTime=" + ClientApi.RENDER_STATE.frameTime);
 			// Store render state for DH to use
 			// New API uses parameterless methods that get state internally
+			System.out.println("[DH-DEBUG] About to call renderLods()"); // TODO: Remove after debugging
 			this.clientApi.renderLods();
+			System.out.println("[DH-DEBUG] renderLods() completed"); // TODO: Remove after debugging
 		});
 		
 		
