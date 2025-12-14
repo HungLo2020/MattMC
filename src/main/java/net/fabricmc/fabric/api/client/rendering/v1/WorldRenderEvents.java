@@ -18,20 +18,38 @@ public final class WorldRenderEvents {
     });
     
     public static final Event<AfterSetup> AFTER_SETUP = Event.create(AfterSetup.class, callbacks -> context -> {
+        System.out.println("[WorldRenderEvents] AFTER_SETUP invoker called with " + callbacks.length + " callbacks");
         for (AfterSetup callback : callbacks) {
-            callback.afterSetup(context);
+            try {
+                callback.afterSetup(context);
+            } catch (Exception e) {
+                System.err.println("[WorldRenderEvents] Error in AFTER_SETUP callback: " + e.getMessage());
+                e.printStackTrace();
+            }
         }
     });
     
     public static final Event<AfterEntities> AFTER_ENTITIES = Event.create(AfterEntities.class, callbacks -> context -> {
+        System.out.println("[WorldRenderEvents] AFTER_ENTITIES invoker called with " + callbacks.length + " callbacks");
         for (AfterEntities callback : callbacks) {
-            callback.afterEntities(context);
+            try {
+                callback.afterEntities(context);
+            } catch (Exception e) {
+                System.err.println("[WorldRenderEvents] Error in AFTER_ENTITIES callback: " + e.getMessage());
+                e.printStackTrace();
+            }
         }
     });
     
     public static final Event<AfterTranslucent> AFTER_TRANSLUCENT = Event.create(AfterTranslucent.class, callbacks -> context -> {
+        System.out.println("[WorldRenderEvents] AFTER_TRANSLUCENT invoker called with " + callbacks.length + " callbacks");
         for (AfterTranslucent callback : callbacks) {
-            callback.afterTranslucent(context);
+            try {
+                callback.afterTranslucent(context);
+            } catch (Exception e) {
+                System.err.println("[WorldRenderEvents] Error in AFTER_TRANSLUCENT callback: " + e.getMessage());
+                e.printStackTrace();
+            }
         }
     });
     
