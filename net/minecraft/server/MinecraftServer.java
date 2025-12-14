@@ -737,18 +737,6 @@ public abstract class MinecraftServer extends ReentrantBlockableEventLoop<TickTa
 
 	protected void runServer() {
 		try {
-			// Initialize server-side mods (including Distant Horizons) by invoking server entrypoints
-			// This MUST happen BEFORE any events fire so mods can register their event listeners
-			try {
-				LOGGER.info("Invoking server mod initializers");
-				net.fabricmc.loader.impl.FabricLoaderImpl.INSTANCE.invokeEntrypoints("server", 
-					net.fabricmc.api.DedicatedServerModInitializer.class, 
-					net.fabricmc.api.DedicatedServerModInitializer::onInitializeServer);
-				LOGGER.info("Server mod initializers completed");
-			} catch (Exception e) {
-				LOGGER.error("Failed to invoke server mod initializers", e);
-			}
-			
 			// Fire Fabric ServerLifecycleEvents.SERVER_STARTING for Distant Horizons
 			// MUST fire BEFORE initServer() so DH world is created before levels are loaded
 			ServerLifecycleEvents.SERVER_STARTING.invoker().onServerStarting(this);
