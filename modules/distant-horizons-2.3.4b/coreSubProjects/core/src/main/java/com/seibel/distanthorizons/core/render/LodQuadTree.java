@@ -175,6 +175,9 @@ public class LodQuadTree extends QuadTree<LodRenderSection> implements IDebugRen
 	}
 	private void updateAllRenderSections(DhBlockPos2D playerPos)
 	{
+		// TODO: Remove after debugging
+		System.out.println("[QUADTREE] updateAllRenderSections called, player at " + playerPos);
+		
 		if (Config.Client.Advanced.Debugging.DebugWireframe.showQuadTreeRenderStatus.get())
 		{
 			try
@@ -213,6 +216,8 @@ public class LodQuadTree extends QuadTree<LodRenderSection> implements IDebugRen
 			this.recursivelyUpdateRenderSectionNode(playerPos, rootNode, rootNode, rootNode.sectionPos, false, nodesNeedingRetrieval, nodesNeedingLoading);
 		}
 		
+		// TODO: Remove after debugging
+		System.out.println("[QUADTREE] Nodes needing: retrieval=" + nodesNeedingRetrieval.size() + ", loading=" + nodesNeedingLoading.size());
 		
 		// queue full data retrieval (world gen) requests if needed
 		if (nodesNeedingRetrieval.size() != 0
@@ -439,6 +444,13 @@ public class LodQuadTree extends QuadTree<LodRenderSection> implements IDebugRen
 	{
 		Long pos;
 		HashSet<Long> positionsToRequeue = new HashSet<>();
+		// TODO: Remove after debugging
+		int sectionsToReload = this.sectionsToReload.size();
+		if (sectionsToReload > 0)
+		{
+			System.out.println("[QUADTREE] reloadQueuedSections: " + sectionsToReload + " sections to reload");
+		}
+		
 		while ((pos = this.sectionsToReload.poll()) != null)
 		{
 			if (positionsToRequeue.contains(pos))
@@ -477,6 +489,9 @@ public class LodQuadTree extends QuadTree<LodRenderSection> implements IDebugRen
 	}
 	private void loadQueuedSections(DhBlockPos2D playerPos, HashSet<LodRenderSection> nodesNeedingLoading)
 	{
+		// TODO: Remove after debugging
+		System.out.println("[QUADTREE] loadQueuedSections: " + nodesNeedingLoading.size() + " sections to load");
+		
 		ArrayList<LodRenderSection> loadSectionList = new ArrayList<>(nodesNeedingLoading);
 		loadSectionList.sort((a, b) ->
 		{
@@ -490,7 +505,13 @@ public class LodQuadTree extends QuadTree<LodRenderSection> implements IDebugRen
 			LodRenderSection renderSection = loadSectionList.get(i);
 			if (!renderSection.gpuUploadInProgress() && renderSection.bufferContainer == null)
 			{
-				renderSection.uploadRenderDataToGpuAsync();
+				// TODO: Remove after debugging
+				System.out.println("[QUADTREE] Triggering upload for section at pos " + DhSectionPos.toString(renderSection.pos));
+				boolean started = renderSection.uploadRenderDataToGpuAsync();
+				if (!started)
+				{
+					System.out.println("[QUADTREE] Upload failed to start for section " + DhSectionPos.toString(renderSection.pos));
+				}
 			}
 		}
 	}
