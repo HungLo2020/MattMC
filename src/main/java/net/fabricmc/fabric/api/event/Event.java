@@ -30,6 +30,7 @@ public class Event<T> {
     
     @SuppressWarnings("unchecked")
     public void register(T listener) {
+        System.out.println("[Event] Registering listener for " + type.getSimpleName() + " (total listeners: " + (listeners.size() + 1) + ")");
         listeners.add(listener);
         invoker = invokerFactory.apply(listeners.toArray((T[]) Array.newInstance(type, 0)));
     }
