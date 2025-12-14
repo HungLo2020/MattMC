@@ -83,6 +83,13 @@ public abstract class AbstractModInitializer
 		
 		LOGGER.info(ModInfo.READABLE_NAME + " client Initialized.");
 		
+		// Subscribe to command registration for integrated servers (singleplayer)
+		this.subscribeRegisterCommandsEvent(dispatcher -> 
+		{
+			this.commandInitializer = new CommandInitializer(dispatcher);
+			this.commandInitializer.initCommands();
+		});
+		
 		this.subscribeClientStartedEvent(this::postInit);
 	}
 	
@@ -107,7 +114,12 @@ public abstract class AbstractModInitializer
 		
 		LOGGER.info(ModInfo.READABLE_NAME + " server Initialized, adding event subscribers...");
 		
-		this.subscribeRegisterCommandsEvent(dispatcher -> { this.commandInitializer = new CommandInitializer(dispatcher); });
+		// Subscribe to command registration for dedicated servers
+		this.subscribeRegisterCommandsEvent(dispatcher -> 
+		{
+			this.commandInitializer = new CommandInitializer(dispatcher);
+			this.commandInitializer.initCommands();
+		});
 		
 		this.subscribeServerStartingEvent(server -> 
 		{
@@ -115,7 +127,6 @@ public abstract class AbstractModInitializer
 			
 			this.initConfig();
 			this.postInit();
-			this.commandInitializer.initCommands();
 			
 			this.checkForUpdates();
 			
