@@ -403,7 +403,14 @@ public class MinecraftRenderWrapper implements IMinecraftRenderWrapper
 	}
 	
 	@Override
-	public ILightMapWrapper getLightmapWrapper(ILevelWrapper level) { return this.lightmapByDimensionType.get(level.getDimensionType()); }
+	public ILightMapWrapper getLightmapWrapper(ILevelWrapper level) 
+	{ 
+		IDimensionTypeWrapper dimType = level.getDimensionType();
+		ILightMapWrapper result = this.lightmapByDimensionType.get(dimType);
+		// TODO: Remove after debugging
+		System.out.println("[DH-LIGHTMAP-GET] Looking up lightmap for dimension " + dimType + ", result: " + result + ", map size: " + this.lightmapByDimensionType.size());
+		return result;
+	}
 	
 	@Override
 	public boolean isFogStateSpecial()
@@ -442,9 +449,17 @@ public class MinecraftRenderWrapper implements IMinecraftRenderWrapper
 		// object for the same MC level and/or the same hash,
 		// so this will have to do for now
 		IDimensionTypeWrapper dimensionType = level.getDimensionType();
+		
+		// TODO: Remove after debugging
+		System.out.println("[DH-LIGHTMAP-SET] Setting lightmap ID " + tetxureId + " for dimension " + dimensionType);
+		System.out.println("[DH-LIGHTMAP-SET] Map size before: " + this.lightmapByDimensionType.size());
 
 		LightMapWrapper wrapper = this.lightmapByDimensionType.computeIfAbsent(dimensionType, (dimType) -> new LightMapWrapper());
 		wrapper.setLightmapId(tetxureId);
+		
+		// TODO: Remove after debugging
+		System.out.println("[DH-LIGHTMAP-SET] Map size after: " + this.lightmapByDimensionType.size());
+		System.out.println("[DH-LIGHTMAP-SET] Wrapper set successfully");
 	}
 	
 	@Override
