@@ -166,18 +166,21 @@ public class LodRenderSection implements IDebugRenderable, AutoCloseable
 		{
 			// it's possible to try uploading buffers before the GLProxy has been initialized
 			// which would cause the system to crash
+			System.out.println("[UPLOAD-DEBUG] Upload failed: GLProxy not initialized");
 			return false;
 		}
 		
 		if (this.getAndBuildRenderDataFuture != null)
 		{
 			// don't accidentally queue multiple uploads at the same time
+			System.out.println("[UPLOAD-DEBUG] Upload failed: already in progress (future != null)");
 			return false;
 		}
 		
 		PriorityTaskPicker.Executor executor = ThreadPoolUtil.getRenderLoadingExecutor();
 		if (executor == null || executor.isTerminated())
 		{
+			System.out.println("[UPLOAD-DEBUG] Upload failed: executor is " + (executor == null ? "null" : "terminated"));
 			return false;
 		}
 		
@@ -185,9 +188,12 @@ public class LodRenderSection implements IDebugRenderable, AutoCloseable
 		// this means the closer (higher priority) tasks will load first.
 		// This also prevents issues where the nearby tasks are canceled due to
 		// LOD detail level changing, and having holes in the world
-		if (this.uploadTaskCountRef.getAndIncrement() > executor.getPoolSize())
+		int currentCount = this.uploadTaskCountRef.get();
+		int poolSize = executor.getPoolSize();
+		if (this.uploadTaskCountRef.getAndIncrement() > poolSize)
 		{
 			this.uploadTaskCountRef.decrementAndGet();
+			System.out.println("[UPLOAD-DEBUG] Upload failed: counter exceeded pool size (counter=" + currentCount + ", poolSize=" + poolSize + ")");
 			return false;
 		}
 		
@@ -199,6 +205,7 @@ public class LodRenderSection implements IDebugRenderable, AutoCloseable
 			{
 				// this has to fire are the end of every added future, otherwise we'll lock up and nothing will load
 				this.uploadTaskCountRef.decrementAndGet(); // TODO there is an issue where this variable isn't decremented properly, preventing LODs from loading in, or loading much slower
+				System.out.println("[UPLOAD-DEBUG] Upload completed, counter decremented to: " + this.uploadTaskCountRef.get());
 				return null; 
 			});
 			
@@ -214,10 +221,12 @@ public class LodRenderSection implements IDebugRenderable, AutoCloseable
 							// Complete the future whether success or failure to ensure the handle callback runs
 							if (throwable != null)
 							{
+								System.out.println("[UPLOAD-DEBUG] Upload inner future failed with exception: " + throwable.getMessage());
 								future.completeExceptionally(throwable);
 							}
 							else
 							{
+								System.out.println("[UPLOAD-DEBUG] Upload inner future completed successfully");
 								future.complete(null);
 							}
 							// the task is done, we don't need to track these anymore
@@ -228,6 +237,7 @@ public class LodRenderSection implements IDebugRenderable, AutoCloseable
 				catch (Exception e)
 				{
 					// Ensure future is completed even if getAndRefreshRenderingBeacons or other operations throw
+					System.out.println("[UPLOAD-DEBUG] Upload runnable threw exception: " + e.getMessage());
 					future.completeExceptionally(e);
 					this.getAndBuildRenderDataFuture = null;
 					this.getAndBuildRenderDataRunnable = null;
@@ -235,6 +245,7 @@ public class LodRenderSection implements IDebugRenderable, AutoCloseable
 			};
 			executor.execute(this.getAndBuildRenderDataRunnable);
 			
+			System.out.println("[UPLOAD-DEBUG] Upload started successfully, counter is now: " + this.uploadTaskCountRef.get());
 			return true;
 		}
 		catch (RejectedExecutionException ignore)
@@ -243,6 +254,7 @@ public class LodRenderSection implements IDebugRenderable, AutoCloseable
 			this.getAndBuildRenderDataFuture = null;
 			this.getAndBuildRenderDataRunnable = null;
 			
+			System.out.println("[UPLOAD-DEBUG] Upload failed: RejectedExecutionException");
 			/* the thread pool was probably shut down because it's size is being changed, just wait a sec and it should be back */
 			return false;
 		}
