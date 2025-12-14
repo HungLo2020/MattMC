@@ -842,7 +842,7 @@ def serverJvmArgs = [
 
 // Common JVM arguments for client tasks
 def clientJvmArgs = [
-    '-Xmx2G',
+    '-Xmx4G',
     '-Xms512M',
     '-XX:+UseG1GC',
     '-XX:+ParallelRefProcEnabled',
@@ -861,6 +861,7 @@ def clientJvmArgs = [
     '-XX:SurvivorRatio=32',
     '-XX:+PerfDisableSharedMem',
     '-XX:MaxTenuringThreshold=1',
+    '-Dmixin.debug.export=true',
     '-Dorg.lwjgl.util.Debug=true'
 ]
 
