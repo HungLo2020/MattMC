@@ -1043,38 +1043,47 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 		// MC combined the model view and projection matrices into matrix4fc
 		// Use reflection to avoid compile-time dependency on DH classes
 		try {
+			System.out.println("[DEBUG-RENDERSTATE] Attempting to set DH RENDER_STATE"); // TODO: Remove after debugging
 			Class<?> clientApiClass = Class.forName("com.seibel.distanthorizons.core.api.internal.ClientApi");
+			System.out.println("[DEBUG-RENDERSTATE] Found ClientApi class"); // TODO: Remove after debugging
 			Object renderState = clientApiClass.getField("RENDER_STATE").get(null);
+			System.out.println("[DEBUG-RENDERSTATE] Got RENDER_STATE: " + renderState); // TODO: Remove after debugging
 			Class<?> renderStateClass = renderState.getClass();
 			
 			// Convert matrix4fc to DH's Mat4f
 			Class<?> converterClass = Class.forName("com.seibel.distanthorizons.common.wrappers.McObjectConverter");
 			java.lang.reflect.Method convertMethod = converterClass.getMethod("Convert", org.joml.Matrix4fc.class);
 			Object dhModelViewMatrix = convertMethod.invoke(null, matrix4fc);
+			System.out.println("[DEBUG-RENDERSTATE] Converted model-view matrix"); // TODO: Remove after debugging
 			
 			// Create identity projection matrix
 			Class<?> mat4fClass = Class.forName("com.seibel.distanthorizons.core.util.math.Mat4f");
 			Object dhProjectionMatrix = mat4fClass.getDeclaredConstructor().newInstance();
 			mat4fClass.getMethod("setIdentity").invoke(dhProjectionMatrix);
+			System.out.println("[DEBUG-RENDERSTATE] Created identity projection matrix"); // TODO: Remove after debugging
 			
 			// Get client level wrapper
 			Class<?> wrapperClass = Class.forName("com.seibel.distanthorizons.common.wrappers.world.ClientLevelWrapper");
 			java.lang.reflect.Method getWrapperMethod = wrapperClass.getMethod("getWrapper", net.minecraft.client.multiplayer.ClientLevel.class);
 			Object clientLevelWrapper = getWrapperMethod.invoke(null, this.level);
+			System.out.println("[DEBUG-RENDERSTATE] Got client level wrapper: " + clientLevelWrapper); // TODO: Remove after debugging
 			
 			// Get frame time
 			float frameTime = Minecraft.getInstance().deltaTracker.getRealtimeDeltaTicks();
+			System.out.println("[DEBUG-RENDERSTATE] Frame time: " + frameTime); // TODO: Remove after debugging
 			
 			// Set RENDER_STATE fields
 			renderStateClass.getField("mcModelViewMatrix").set(renderState, dhModelViewMatrix);
 			renderStateClass.getField("mcProjectionMatrix").set(renderState, dhProjectionMatrix);
 			renderStateClass.getField("clientLevelWrapper").set(renderState, clientLevelWrapper);
 			renderStateClass.getField("frameTime").setFloat(renderState, frameTime);
+			System.out.println("[DEBUG-RENDERSTATE] Successfully set all RENDER_STATE fields"); // TODO: Remove after debugging
 		} catch (Exception ex) {
 			// DH not loaded or error - silently ignore
 			// Only log on first error to avoid spam
 			if (!dhRenderStateErrorLogged) {
 				System.err.println("[LevelRenderer] Could not set DH RENDER_STATE (DH may not be loaded): " + ex.getMessage());
+				ex.printStackTrace(); // TODO: Remove after debugging - show full stack trace
 				dhRenderStateErrorLogged = true;
 			}
 		}

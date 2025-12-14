@@ -21,9 +21,10 @@ public final class WorldRenderEvents {
         System.out.println("[WorldRenderEvents] AFTER_SETUP invoker called with " + callbacks.length + " callbacks");
         for (AfterSetup callback : callbacks) {
             try {
-                System.out.println("[WorldRenderEvents] Calling AFTER_SETUP callback: world=" + context.world() + ", camera=" + context.camera());
+                System.out.println("[WorldRenderEvents] Calling AFTER_SETUP callback: world=" + context.world() + ", camera=" + context.camera()); // TODO: Remove after debugging
+                System.out.println("[WorldRenderEvents] Context tickDelta=" + context.tickDelta() + ", projectionMatrix=" + context.projectionMatrix()); // TODO: Remove after debugging
                 callback.afterSetup(context);
-                System.out.println("[WorldRenderEvents] AFTER_SETUP callback completed successfully");
+                System.out.println("[WorldRenderEvents] AFTER_SETUP callback completed successfully"); // TODO: Remove after debugging
             } catch (Exception e) {
                 System.err.println("[WorldRenderEvents] Error in AFTER_SETUP callback: " + e.getMessage());
                 e.printStackTrace();
