@@ -181,22 +181,26 @@ public class FogRenderer implements AutoCloseable {
 
 		// TODO: Remove after debugging - DH fog override (replicates MixinFogRenderer @WrapOperation)
 		// Must be done RIGHT BEFORE updateBuffer, not after fog values are set above
+		// TODO: DH fog override - remove debug logging after testing
 		try {
+			System.out.println("[DH-FOG] Attempting fog override..."); // TODO: Remove after debugging
+			
 			// Check if we should cancel vanilla fog for DH
 			boolean cameraNotInFluid = fogType == FogType.NONE;
 			boolean isSpecialFog = (entity instanceof LivingEntity) && ((LivingEntity) entity).hasEffect(MobEffects.BLINDNESS);
 			
 			// Get DH config - navigate through nested static classes
-			// Config.client is a ConfigCategory wrapping Client class
 			Class<?> configClass = Class.forName("com.seibel.distanthorizons.core.config.Config");
 			Class<?> clientClass = Class.forName("com.seibel.distanthorizons.core.config.Config$Client");
 			Class<?> advancedClass = Class.forName("com.seibel.distanthorizons.core.config.Config$Client$Advanced");
 			Class<?> graphicsClass = Class.forName("com.seibel.distanthorizons.core.config.Config$Client$Advanced$Graphics");
 			Class<?> fogClass = Class.forName("com.seibel.distanthorizons.core.config.Config$Client$Advanced$Graphics$Fog");
+			System.out.println("[DH-FOG] Loaded Config$Client$Advanced$Graphics$Fog class"); // TODO: Remove after debugging
 			
 			// Access the enableVanillaFog config entry
 			Object enableVanillaFogOption = fogClass.getField("enableVanillaFog").get(null);
 			boolean enableVanillaFog = (Boolean) enableVanillaFogOption.getClass().getMethod("get").invoke(enableVanillaFogOption);
+			System.out.println("[DH-FOG] enableVanillaFog config value: " + enableVanillaFog); // TODO: Remove after debugging
 			
 			Class<?> singletonInjectorClass = Class.forName("com.seibel.distanthorizons.core.dependencyInjection.SingletonInjector");
 			Object singletonInstance = singletonInjectorClass.getField("INSTANCE").get(null);
@@ -205,6 +209,7 @@ public class FogRenderer implements AutoCloseable {
 			boolean isFogStateSpecial = (Boolean) renderWrapperClass.getMethod("isFogStateSpecial").invoke(renderWrapper);
 			
 			boolean cancelFog = !isSpecialFog && cameraNotInFluid && !isFogStateSpecial && !enableVanillaFog;
+			System.out.println("[DH-FOG] cancelFog conditions: cameraNotInFluid=" + cameraNotInFluid + ", !isSpecialFog=" + !isSpecialFog + ", !isFogStateSpecial=" + !isFogStateSpecial + ", !enableVanillaFog=" + !enableVanillaFog + " => cancelFog=" + cancelFog); // TODO: Remove after debugging
 			
 			if (cancelFog) {
 				// Disable vanilla fog by setting to very large values (same as DH mixin)
@@ -217,12 +222,15 @@ public class FogRenderer implements AutoCloseable {
 				fogData.renderDistanceStart = veryLargeValue;
 				fogData.renderDistanceEnd = evenLargerValue;
 				
-				System.out.println("[DH-FOG] Vanilla fog disabled for DH LOD rendering");
+				System.out.println("[DH-FOG] Vanilla fog disabled for DH LOD rendering, set distances to: " + evenLargerValue); // TODO: Remove after debugging
+			} else {
+				System.out.println("[DH-FOG] Fog override skipped (conditions not met)"); // TODO: Remove after debugging
 			}
 		} catch (ClassNotFoundException e) {
 			// DH not loaded, skip fog override
+			System.out.println("[DH-FOG] DH not loaded (ClassNotFoundException), skipping fog override"); // TODO: Remove after debugging
 		} catch (Exception e) {
-			System.err.println("[DH-FOG] Error overriding fog: " + e.getMessage());
+			System.err.println("[DH-FOG] Error overriding fog: " + e.getClass().getSimpleName() + ": " + e.getMessage());
 			e.printStackTrace();
 		}
 		
