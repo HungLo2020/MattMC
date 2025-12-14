@@ -173,7 +173,9 @@ public class LightTexture implements AutoCloseable {
 				// DH Integration: Register lightmap for Distant Horizons rendering
 				// This replicates what DH's MixinLightTexture would do if it could apply to decompiled source
 				// TODO: Remove after debugging
+				System.out.println("[DH-LIGHTMAP] Attempting to register lightmap..."); // TODO: Remove after debugging
 				try {
+					System.out.println("[DH-LIGHTMAP] Looking for SingletonInjector class..."); // TODO: Remove after debugging
 					Class<?> minecraftClientWrapperClass = Class.forName("com.seibel.distanthorizons.core.dependencyInjection.SingletonInjector");
 					Object singletonInjector = minecraftClientWrapperClass.getField("INSTANCE").get(null);
 					java.lang.reflect.Method getMethod = singletonInjector.getClass().getMethod("get", Class.class);
@@ -201,6 +203,7 @@ public class LightTexture implements AutoCloseable {
 					}
 				} catch (ClassNotFoundException e) {
 					// DH not loaded, ignore
+					System.out.println("[DH-LIGHTMAP] DH not loaded (ClassNotFoundException): " + e.getMessage()); // TODO: Remove after debugging
 				} catch (Exception e) {
 					System.err.println("[DH-LIGHTMAP] Error setting lightmap: " + e.getMessage());
 					e.printStackTrace();
