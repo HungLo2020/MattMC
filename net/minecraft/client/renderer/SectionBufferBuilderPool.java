@@ -16,7 +16,10 @@ public class SectionBufferBuilderPool {
 	private final Queue<SectionBufferBuilderPack> freeBuffers;
 	private volatile int freeBufferCount;
 
-	protected SectionBufferBuilderPool(List<SectionBufferBuilderPack> list) {
+	/**
+	 * @PublicAPI Exposed for advanced rendering systems (Sodium chunk rendering)
+	 */
+	public SectionBufferBuilderPool(List<SectionBufferBuilderPack> list) {
 		this.freeBuffers = Queues.<SectionBufferBuilderPack>newArrayDeque(list);
 		this.freeBufferCount = this.freeBuffers.size();
 	}

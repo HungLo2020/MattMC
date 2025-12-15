@@ -16,174 +16,156 @@
 
 package net.fabricmc.fabric.api.client.render.fluid.v1;
 
-import net.minecraft.client.Minecraft;
-import net.minecraft.client.renderer.BiomeColors;
+import net.minecraft.client.renderer.FluidRendererRegistry;
 import net.minecraft.client.renderer.block.LiquidBlockRenderer;
-import net.minecraft.client.renderer.texture.TextureAtlas;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
-import net.minecraft.core.BlockPos;
-import net.minecraft.world.level.BlockAndTintGetter;
 import net.minecraft.world.level.block.Block;
-import net.minecraft.world.level.block.HalfTransparentBlock;
-import net.minecraft.world.level.block.LeavesBlock;
 import net.minecraft.world.level.material.Fluid;
-import net.minecraft.world.level.material.FluidState;
-import net.minecraft.world.level.material.Fluids;
 import org.jetbrains.annotations.Nullable;
-
-import java.util.IdentityHashMap;
-import java.util.Map;
 
 /**
  * Registry for custom fluid render handlers.
+ * 
+ * @deprecated Use {@link FluidRendererRegistry} instead. This is a compatibility layer that
+ * delegates to the native Minecraft API. Part of Step 3 of the deep integration plan.
  */
+@Deprecated
 public final class FluidRenderHandlerRegistry {
     public static final FluidRenderHandlerRegistry INSTANCE = new FluidRenderHandlerRegistry();
-    private final Map<Fluid, FluidRenderHandler> handlers = new IdentityHashMap<>();
-    private final Map<Fluid, FluidRenderHandler> modHandlers = new IdentityHashMap<>();
-    private final Map<Block, Boolean> transparencyForOverlay = new IdentityHashMap<>();
-    private volatile boolean initialized = false;
     
     private FluidRenderHandlerRegistry() { }
     
     /**
-     * Ensures default handlers are registered. Called lazily to avoid class loading issues.
-     */
-    private void ensureInitialized() {
-        if (!initialized) {
-            synchronized (this) {
-                if (!initialized) {
-                    // Register default handlers for vanilla fluids
-                    handlers.put(Fluids.WATER, WaterRenderHandler.INSTANCE);
-                    handlers.put(Fluids.FLOWING_WATER, WaterRenderHandler.INSTANCE);
-                    handlers.put(Fluids.LAVA, LavaRenderHandler.INSTANCE);
-                    handlers.put(Fluids.FLOWING_LAVA, LavaRenderHandler.INSTANCE);
-                    initialized = true;
-                }
-            }
-        }
-    }
-    
-    /**
      * Gets the singleton instance.
+     * 
+     * @deprecated Use {@link FluidRendererRegistry#getInstance()} instead.
      */
+    @Deprecated
     public static FluidRenderHandlerRegistry getInstance() {
         return INSTANCE;
     }
     
     /**
      * Registers a render handler for a fluid.
+     * 
+     * @deprecated Use {@link FluidRendererRegistry#register(Fluid, FluidRendererRegistry.FluidRenderHandler)} instead.
      */
+    @Deprecated
     public void register(Fluid fluid, FluidRenderHandler handler) {
-        ensureInitialized();
-        handlers.put(fluid, handler);
-        modHandlers.put(fluid, handler);
+        // Wrap the Fabric API handler to work with the native API
+        FluidRendererRegistry.getInstance().register(fluid, new FluidRenderHandlerAdapter(handler));
     }
     
     /**
      * Gets the render handler for a fluid.
+     * 
+     * @deprecated Use {@link FluidRendererRegistry#get(Fluid)} instead.
      */
+    @Deprecated
     @Nullable
     public FluidRenderHandler get(Fluid fluid) {
-        ensureInitialized();
-        return handlers.get(fluid);
+        FluidRendererRegistry.FluidRenderHandler nativeHandler = FluidRendererRegistry.getInstance().get(fluid);
+        if (nativeHandler instanceof FluidRenderHandlerAdapter) {
+            return ((FluidRenderHandlerAdapter) nativeHandler).fabricHandler;
+        }
+        // Wrap native handler for compatibility
+        return nativeHandler != null ? new NativeHandlerWrapper(nativeHandler) : null;
     }
     
     /**
      * Gets the override handler for a fluid if one exists.
+     * 
+     * @deprecated Use {@link FluidRendererRegistry#getOverride(Fluid)} instead.
      */
+    @Deprecated
     @Nullable
     public FluidRenderHandler getOverride(Fluid fluid) {
-        ensureInitialized();
-        return modHandlers.get(fluid);
+        FluidRendererRegistry.FluidRenderHandler nativeHandler = FluidRendererRegistry.getInstance().getOverride(fluid);
+        if (nativeHandler instanceof FluidRenderHandlerAdapter) {
+            return ((FluidRenderHandlerAdapter) nativeHandler).fabricHandler;
+        }
+        return nativeHandler != null ? new NativeHandlerWrapper(nativeHandler) : null;
     }
     
     /**
      * Sets the transparency of a block for fluid overlay rendering.
+     * 
+     * @deprecated Use {@link FluidRendererRegistry#setBlockTransparency(Block, boolean)} instead.
      */
+    @Deprecated
     public void setBlockTransparency(Block block, boolean transparent) {
-        ensureInitialized();
-        transparencyForOverlay.put(block, transparent);
+        FluidRendererRegistry.getInstance().setBlockTransparency(block, transparent);
     }
     
     /**
      * Checks if a block is transparent for fluid rendering purposes.
+     * 
+     * @deprecated Use {@link FluidRendererRegistry#isBlockTransparent(Block)} instead.
      */
+    @Deprecated
     public boolean isBlockTransparent(Block block) {
-        ensureInitialized();
-        Boolean override = transparencyForOverlay.get(block);
-        if (override != null) {
-            return override;
-        }
-        return block instanceof HalfTransparentBlock || block instanceof LeavesBlock;
+        return FluidRendererRegistry.getInstance().isBlockTransparent(block);
     }
     
     /**
      * Called when the fluid renderer reloads textures.
+     * 
+     * @deprecated Use {@link FluidRendererRegistry#onFluidRendererReload(LiquidBlockRenderer, TextureAtlasSprite[], TextureAtlasSprite[], TextureAtlasSprite)} instead.
      */
+    @Deprecated
     public void onFluidRendererReload(LiquidBlockRenderer renderer, TextureAtlasSprite[] waterSprites, TextureAtlasSprite[] lavaSprites, TextureAtlasSprite waterOverlay) {
-        ensureInitialized();
-        WaterRenderHandler.INSTANCE.updateSprites(waterSprites, waterOverlay);
-        LavaRenderHandler.INSTANCE.updateSprites(lavaSprites);
+        FluidRendererRegistry.getInstance().onFluidRendererReload(renderer, waterSprites, lavaSprites, waterOverlay);
+    }
+    
+    /**
+     * Adapter to wrap Fabric API handler for use with native API.
+     */
+    private static class FluidRenderHandlerAdapter implements FluidRendererRegistry.FluidRenderHandler {
+        private final FluidRenderHandler fabricHandler;
         
-        TextureAtlas texture = Minecraft.getInstance()
-                .getAtlasManager()
-                .getAtlasOrThrow(net.minecraft.data.AtlasIds.BLOCKS);
+        FluidRenderHandlerAdapter(FluidRenderHandler fabricHandler) {
+            this.fabricHandler = fabricHandler;
+        }
         
-        for (FluidRenderHandler handler : handlers.values()) {
-            handler.reloadTextures(texture);
+        @Override
+        public TextureAtlasSprite[] getFluidSprites(net.minecraft.world.level.BlockAndTintGetter view, net.minecraft.core.BlockPos pos, net.minecraft.world.level.material.FluidState state) {
+            return fabricHandler.getFluidSprites(view, pos, state);
+        }
+        
+        @Override
+        public int getFluidColor(net.minecraft.world.level.BlockAndTintGetter view, net.minecraft.core.BlockPos pos, net.minecraft.world.level.material.FluidState state) {
+            return fabricHandler.getFluidColor(view, pos, state);
+        }
+        
+        @Override
+        public void reloadTextures(net.minecraft.client.renderer.texture.TextureAtlas textureAtlas) {
+            fabricHandler.reloadTextures(textureAtlas);
         }
     }
     
     /**
-     * Handler for water rendering.
+     * Wrapper to adapt native handler for Fabric API compatibility.
      */
-    private static class WaterRenderHandler implements FluidRenderHandler {
-        public static final WaterRenderHandler INSTANCE = new WaterRenderHandler();
+    private static class NativeHandlerWrapper implements FluidRenderHandler {
+        private final FluidRendererRegistry.FluidRenderHandler nativeHandler;
         
-        /**
-         * The water color of the Ocean biome.
-         */
-        private static final int DEFAULT_WATER_COLOR = 0x3f76e4;
-        
-        private final TextureAtlasSprite[] sprites = new TextureAtlasSprite[3];
-        
-        @Override
-        public TextureAtlasSprite[] getFluidSprites(@Nullable BlockAndTintGetter view, @Nullable BlockPos pos, FluidState state) {
-            return sprites;
+        NativeHandlerWrapper(FluidRendererRegistry.FluidRenderHandler nativeHandler) {
+            this.nativeHandler = nativeHandler;
         }
         
         @Override
-        public int getFluidColor(@Nullable BlockAndTintGetter view, @Nullable BlockPos pos, FluidState state) {
-            if (view != null && pos != null) {
-                return BiomeColors.getAverageWaterColor(view, pos);
-            } else {
-                return DEFAULT_WATER_COLOR;
-            }
+        public TextureAtlasSprite[] getFluidSprites(net.minecraft.world.level.BlockAndTintGetter view, net.minecraft.core.BlockPos pos, net.minecraft.world.level.material.FluidState state) {
+            return nativeHandler.getFluidSprites(view, pos, state);
         }
-        
-        public void updateSprites(TextureAtlasSprite[] waterSprites, TextureAtlasSprite waterOverlay) {
-            sprites[0] = waterSprites[0];
-            sprites[1] = waterSprites[1];
-            sprites[2] = waterOverlay;
-        }
-    }
-    
-    /**
-     * Handler for lava rendering.
-     */
-    private static class LavaRenderHandler implements FluidRenderHandler {
-        public static final LavaRenderHandler INSTANCE = new LavaRenderHandler();
-        
-        private TextureAtlasSprite[] sprites;
         
         @Override
-        public TextureAtlasSprite[] getFluidSprites(@Nullable BlockAndTintGetter view, @Nullable BlockPos pos, FluidState state) {
-            return sprites;
+        public int getFluidColor(net.minecraft.world.level.BlockAndTintGetter view, net.minecraft.core.BlockPos pos, net.minecraft.world.level.material.FluidState state) {
+            return nativeHandler.getFluidColor(view, pos, state);
         }
         
-        public void updateSprites(TextureAtlasSprite[] lavaSprites) {
-            sprites = lavaSprites;
+        @Override
+        public void reloadTextures(net.minecraft.client.renderer.texture.TextureAtlas textureAtlas) {
+            nativeHandler.reloadTextures(textureAtlas);
         }
     }
 }

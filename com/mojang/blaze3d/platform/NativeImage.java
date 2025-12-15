@@ -47,7 +47,10 @@ public final class NativeImage implements AutoCloseable {
 	private final int width;
 	private final int height;
 	private final boolean useStbFree;
-	private long pixels;
+	/**
+	 * @PublicAPI Exposed for advanced rendering systems (Iris framebuffer access)
+	 */
+	public long pixels;
 	private final long size;
 
 	public NativeImage(int i, int j, boolean bl) {

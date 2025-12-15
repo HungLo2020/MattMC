@@ -49,6 +49,7 @@ import net.fabricmc.loader.api.entrypoint.EntrypointContainer;
 import net.fabricmc.loader.impl.discovery.ArgumentModCandidateFinder;
 import net.fabricmc.loader.impl.discovery.ClasspathModCandidateFinder;
 import net.fabricmc.loader.impl.discovery.DirectoryModCandidateFinder;
+import net.fabricmc.loader.impl.discovery.InternalMods;
 import net.fabricmc.loader.impl.discovery.ModCandidateImpl;
 import net.fabricmc.loader.impl.discovery.ModDiscoverer;
 import net.fabricmc.loader.impl.discovery.ModResolutionException;
@@ -213,13 +214,34 @@ public final class FabricLoaderImpl extends net.fabricmc.loader.FabricLoader {
 
 		// discover mods
 
-		ModDiscoverer discoverer = new ModDiscoverer(versionOverrides, depOverrides);
-		discoverer.addCandidateFinder(new ClasspathModCandidateFinder());
-		discoverer.addCandidateFinder(new DirectoryModCandidateFinder(getModsDirectory0(), remapRegularMods));
-		discoverer.addCandidateFinder(new ArgumentModCandidateFinder(remapRegularMods));
-
 		Map<String, Set<ModCandidateImpl>> envDisabledMods = new HashMap<>();
-		modCandidates = discoverer.discoverMods(this, envDisabledMods);
+		ModDiscoverer discoverer;
+		
+		// Check if we should skip dynamic mod discovery and use hardcoded internal mods
+		if (SystemProperties.isSet(SystemProperties.SKIP_MOD_DISCOVERY)) {
+			Log.info(LogCategory.DISCOVERY, "Skipping dynamic mod discovery, using hardcoded internal mods (Sodium, Iris)");
+			
+			// Get hardcoded internal mods (Sodium and Iris)
+			List<ModCandidateImpl> internalMods = InternalMods.getAll(versionOverrides, depOverrides);
+			
+			// Also discover classpath mods (like Fabric API stubs)
+			discoverer = new ModDiscoverer(versionOverrides, depOverrides);
+			discoverer.addCandidateFinder(new ClasspathModCandidateFinder());
+			List<ModCandidateImpl> classpathMods = discoverer.discoverMods(this, envDisabledMods);
+			
+			// Combine internal mods with classpath mods
+			modCandidates = new ArrayList<>();
+			modCandidates.addAll(classpathMods);
+			modCandidates.addAll(internalMods);
+		} else {
+			// Original dynamic mod discovery path
+			discoverer = new ModDiscoverer(versionOverrides, depOverrides);
+			discoverer.addCandidateFinder(new ClasspathModCandidateFinder());
+			discoverer.addCandidateFinder(new DirectoryModCandidateFinder(getModsDirectory0(), remapRegularMods));
+			discoverer.addCandidateFinder(new ArgumentModCandidateFinder(remapRegularMods));
+
+			modCandidates = discoverer.discoverMods(this, envDisabledMods);
+		}
 
 		// dump version and dependency overrides info
 

@@ -827,6 +827,8 @@ tasks.register('runClient', JavaExec) {
     jvmArgs = clientJvmArgs + [
         // Fabric Loader options
         '-Dfabric.development=true',
+        // Skip dynamic mod discovery and use hardcoded internal mods (Step 2 of deep integration)
+        '-Dfabric.skipModDiscovery=true',
         // Tell Fabric Loader where the game JAR is
         "-Dfabric.gameJarPath.client=${gameJarFile.absolutePath}"
     ]

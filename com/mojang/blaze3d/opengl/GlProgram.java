@@ -24,10 +24,16 @@ public class GlProgram implements AutoCloseable {
 	private static final Logger LOGGER = LogUtils.getLogger();
 	public static Set<String> BUILT_IN_UNIFORMS = Sets.<String>newHashSet("Projection", "Lighting", "Fog", "Globals");
 	public static GlProgram INVALID_PROGRAM = new GlProgram(-1, "invalid");
-	private final Map<String, Uniform> uniformsByName = new HashMap();
+	/**
+	 * @PublicAPI Exposed for advanced rendering systems (Iris shader uniforms)
+	 */
+	public final Map<String, Uniform> uniformsByName = new HashMap();
 	private final int programId;
 	private final String debugLabel;
 
+	/**
+	 * @PublicAPI Exposed for advanced rendering systems (Iris shader programs)
+	 */
 	public GlProgram(int i, String string) {
 		this.programId = i;
 		this.debugLabel = string;
