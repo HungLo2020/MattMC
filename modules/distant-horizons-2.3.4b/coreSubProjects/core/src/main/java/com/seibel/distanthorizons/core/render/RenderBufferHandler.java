@@ -122,6 +122,9 @@ public class RenderBufferHandler implements AutoCloseable
 		// clear the old list so we can start fresh
 		this.loadedNearToFarBuffers.clear();
 		
+		// TODO: Remove after debugging
+		System.out.println("[RENDERBUFFER-DEBUG] buildRenderList() called, lodQuadTree=" + this.lodQuadTree);
+		
 		
 		
 		//====================================//
@@ -230,9 +233,16 @@ public class RenderBufferHandler implements AutoCloseable
 			}
 		});
 		
+		// TODO: Remove after debugging
+		int nodeCount = 0;
+		int sectionCount = 0;
+		int bufferCount = 0;
+		int disabledCount = 0;
+		
 		while (nodeIterator.hasNext())
 		{
 			QuadNode<LodRenderSection> node = nodeIterator.next();
+			nodeCount++;
 			
 			long sectionPos = node.sectionPos;
 			LodRenderSection renderSection = node.value;
@@ -240,18 +250,28 @@ public class RenderBufferHandler implements AutoCloseable
 			{
 				continue;
 			}
+			sectionCount++;
 			
 			
 			
 			try
 			{
 				LodBufferContainer bufferContainer = renderSection.bufferContainer;
-				if (bufferContainer == null 
-					|| !renderSection.getRenderingEnabled())
+				if (bufferContainer == null)
 				{
+					// TODO: Remove after debugging
+					System.out.println("[RENDERBUFFER-DEBUG] Section at " + DhSectionPos.toString(sectionPos) + " has null bufferContainer");
+					continue;
+				}
+				if (!renderSection.getRenderingEnabled())
+				{
+					// TODO: Remove after debugging
+					System.out.println("[RENDERBUFFER-DEBUG] Section at " + DhSectionPos.toString(sectionPos) + " has rendering disabled");
+					disabledCount++;
 					continue;
 				}
 				
+				bufferCount++;
 				this.loadedNearToFarBuffers.add(bufferContainer);
 			}
 			catch (Exception e)
@@ -259,6 +279,10 @@ public class RenderBufferHandler implements AutoCloseable
 				LOGGER.error("Error updating QuadTree render source at [" + DhSectionPos.toString(renderSection.pos) + "], error: ["+e.getMessage()+"].", e);
 			}
 		}
+		
+		// TODO: Remove after debugging
+		System.out.println("[RENDERBUFFER-DEBUG] buildRenderList() complete: nodeCount=" + nodeCount + ", sectionCount=" + sectionCount + 
+			", bufferCount=" + bufferCount + ", disabledCount=" + disabledCount + ", finalSize=" + this.loadedNearToFarBuffers.size());
 		
 		if (isShadowPass)
 		{
