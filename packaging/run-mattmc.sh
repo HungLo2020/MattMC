@@ -15,6 +15,9 @@ else
     echo "Using system Java"
 fi
 
+# Path to the combined MattMC JAR (contains both Fabric Loader and Minecraft)
+GAME_JAR="${SCRIPT_DIR}/lib/MattMC-@VERSION@.jar"
+
 "$JAVA_CMD" -Xmx2G -Xms512M \
     -XX:+UseG1GC \
     -XX:+ParallelRefProcEnabled \
@@ -33,6 +36,7 @@ fi
     -XX:SurvivorRatio=32 \
     -XX:+PerfDisableSharedMem \
     -XX:MaxTenuringThreshold=1 \
+    -Dfabric.gameJarPath.client="${GAME_JAR}" \
     -cp "@CLASSPATH_LINUX@" \
     net.fabricmc.loader.impl.launch.knot.KnotClient \
     --version @VERSION@ \
