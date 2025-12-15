@@ -16,6 +16,7 @@
 
 package net.fabricmc.fabric.api.client.render.fluid.v1;
 
+import net.minecraft.client.renderer.FluidRendererRegistry;
 import net.minecraft.client.renderer.texture.TextureAtlas;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
 import net.minecraft.core.BlockPos;
@@ -25,7 +26,11 @@ import org.jetbrains.annotations.Nullable;
 
 /**
  * Interface for custom fluid rendering.
+ * 
+ * @deprecated Use {@link FluidRendererRegistry.FluidRenderHandler} instead. This is a compatibility
+ * layer. Part of Step 3 of the deep integration plan.
  */
+@Deprecated
 public interface FluidRenderHandler {
     
     /**

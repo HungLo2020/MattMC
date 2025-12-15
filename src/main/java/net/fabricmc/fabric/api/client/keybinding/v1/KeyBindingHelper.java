@@ -17,31 +17,38 @@
 package net.fabricmc.fabric.api.client.keybinding.v1;
 
 import net.minecraft.client.KeyMapping;
+import net.minecraft.client.KeyBindingRegistry;
 
-import java.util.ArrayList;
 import java.util.List;
 
 /**
  * Helper for registering key bindings.
+ * 
+ * @deprecated Use {@link KeyBindingRegistry} instead. This is a compatibility layer that
+ * delegates to the native Minecraft API. Part of Step 3 of the deep integration plan.
  */
+@Deprecated
 public final class KeyBindingHelper {
-    private static final List<KeyMapping> REGISTERED_BINDINGS = new ArrayList<>();
-    
     private KeyBindingHelper() { }
     
     /**
      * Registers a key binding and returns it.
      * The binding will be added to Minecraft's key mapping list on game initialization.
+     * 
+     * @deprecated Use {@link KeyBindingRegistry#registerKeyBinding(KeyMapping)} instead.
      */
+    @Deprecated
     public static KeyMapping registerKeyBinding(KeyMapping keyMapping) {
-        REGISTERED_BINDINGS.add(keyMapping);
-        return keyMapping;
+        return KeyBindingRegistry.registerKeyBinding(keyMapping);
     }
     
     /**
      * Gets all registered key bindings.
+     * 
+     * @deprecated Use {@link KeyBindingRegistry#getRegisteredBindings()} instead.
      */
+    @Deprecated
     public static List<KeyMapping> getRegisteredBindings() {
-        return REGISTERED_BINDINGS;
+        return KeyBindingRegistry.getRegisteredBindings();
     }
 }
