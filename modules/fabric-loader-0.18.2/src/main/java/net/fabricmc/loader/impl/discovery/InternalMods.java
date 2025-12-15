@@ -71,25 +71,25 @@ public final class InternalMods {
 	}
 	
 	/**
-	 * Create ModCandidate for a mod from its JAR in build/mods/.
+	 * Create ModCandidate for a mod from its JAR in mods/.
 	 */
 	private static ModCandidateImpl createModCandidate(String modId, VersionOverrides versionOverrides, DependencyOverrides depOverrides) {
 		try {
-			// Look for mod JAR in build/mods/
-			Path buildModsDir = Paths.get("build", "mods");
-			if (!Files.exists(buildModsDir)) {
-				Log.warn(LogCategory.DISCOVERY, "build/mods/ directory not found, " + modId + " not loaded as internal mod");
+			// Look for mod JAR in mods/ directory (relative to working directory, which is 'run' during development)
+			Path modsDir = Paths.get("mods");
+			if (!Files.exists(modsDir)) {
+				Log.warn(LogCategory.DISCOVERY, "mods/ directory not found, " + modId + " not loaded as internal mod");
 				return null;
 			}
 			
 			// Find mod JAR
-			Path modJar = Files.list(buildModsDir)
+			Path modJar = Files.list(modsDir)
 				.filter(p -> p.getFileName().toString().startsWith(modId + "-") && p.getFileName().toString().endsWith(".jar"))
 				.findFirst()
 				.orElse(null);
 			
 			if (modJar == null || !Files.exists(modJar)) {
-				Log.warn(LogCategory.DISCOVERY, modId + " JAR not found in build/mods/, not loaded as internal mod");
+				Log.warn(LogCategory.DISCOVERY, modId + " JAR not found in mods/, not loaded as internal mod");
 				return null;
 			}
 			
