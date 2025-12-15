@@ -1493,8 +1493,10 @@ public class Options {
 	}
 
 	public void load() {
+		LOGGER.info("[Options Load] Starting options load from: {}", this.optionsFile.getAbsolutePath());
 		try {
 			if (!this.optionsFile.exists()) {
+				LOGGER.info("[Options Load] options.txt does not exist, using defaults");
 				return;
 			}
 
@@ -1559,11 +1561,20 @@ public class Options {
 					public <T> void process(String string, OptionInstance<T> optionInstance) {
 						String string2 = this.getValue(string);
 						if (string2 != null) {
+							// DEBUG: Log when loading enableShaders
+							if (string.equals("enableShaders")) {
+								Options.LOGGER.info("[Options Load] Loading enableShaders from options.txt: raw value = '{}'", string2);
+							}
 							JsonElement jsonElement = LenientJsonParser.parse(string2.isEmpty() ? "\"\"" : string2);
 							optionInstance.codec()
 								.parse(JsonOps.INSTANCE, jsonElement)
 								.ifError(error -> Options.LOGGER.error("Error parsing option value {} for option {}: {}", string2, optionInstance, error.message()))
-								.ifSuccess(optionInstance::set);
+								.ifSuccess(value -> {
+									if (string.equals("enableShaders")) {
+										Options.LOGGER.info("[Options Load] Parsed enableShaders value: {}", value);
+									}
+									optionInstance.set(value);
+								});
 						}
 					}
 
@@ -1590,11 +1601,19 @@ public class Options {
 					@Override
 					public String process(String string, String string2) {
 						String value = this.getValue(string);
+						// DEBUG: Log when loading shaderPackName
+						if (string.equals("shaderPackName")) {
+							Options.LOGGER.info("[Options Load] Loading shaderPackName from options.txt: raw value = '{}', default = '{}'", value, string2);
+						}
 						// Return null if empty string, otherwise return loaded value or default
 						if (value != null && value.isEmpty()) {
 							return null;
 						}
-						return MoreObjects.firstNonNull(value, string2);
+						String result = MoreObjects.firstNonNull(value, string2);
+						if (string.equals("shaderPackName")) {
+							Options.LOGGER.info("[Options Load] Final shaderPackName value: '{}'", result);
+						}
+						return result;
 					}
 
 					@Override
@@ -1668,6 +1687,11 @@ public class Options {
 								.encodeStart(JsonOps.INSTANCE, optionInstance.get())
 								.ifError(error -> Options.LOGGER.error("Error saving option {}: {}", optionInstance, error.message()))
 								.ifSuccess(jsonElement -> {
+									// DEBUG: Log when saving enableShaders
+									if (string.equals("enableShaders")) {
+										Options.LOGGER.info("[Options Save] Saving enableShaders: value = {}, json = {}", 
+											optionInstance.get(), Options.GSON.toJson(jsonElement));
+									}
 									this.writePrefix(string);
 									printWriter.println(Options.GSON.toJson(jsonElement));
 								});
@@ -1689,6 +1713,10 @@ public class Options {
 
 						@Override
 						public String process(String string, String string2) {
+							// DEBUG: Log when saving shaderPackName
+							if (string.equals("shaderPackName")) {
+								Options.LOGGER.info("[Options Save] Saving shaderPackName: value = '{}'", string2);
+							}
 							this.writePrefix(string);
 							printWriter.println(string2 != null ? string2 : "");
 							return string2;
@@ -1724,6 +1752,7 @@ public class Options {
 			}
 
 			printWriter.close();
+			LOGGER.info("[Options Save] Completed options save successfully");
 		} catch (Exception var6) {
 			LOGGER.error("Failed to save options", (Throwable)var6);
 		}
