@@ -215,7 +215,9 @@ public class IrisConfig {
 			Iris.logger.error("Shadow distance setting reset; value is invalid.");
 			IrisVideoSettings.shadowDistance = 32;
 			IrisVideoSettings.colorSpace = ColorSpace.SRGB;
-			save();
+			// Step 5: Do NOT call save() here - it would overwrite shader pack name with null during initialization
+			// Config is loaded from mc.options via syncFromMinecraftOptions(), not from iris.properties
+			// save();
 		}
 
 		if (shaderPackName != null) {
