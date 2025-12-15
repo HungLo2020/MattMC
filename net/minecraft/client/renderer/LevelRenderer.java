@@ -668,8 +668,8 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 			try {
 				Matrix4f posMatrix = afterSetupContext.positionMatrix();
 				System.out.println(posMatrix);
-			} catch (Exception e) {
-				System.out.println("[MATRIX-DEBUG] ERROR calling positionMatrix(): " + e.getMessage());
+			} catch (Exception matrixEx) {
+				System.out.println("[MATRIX-DEBUG] ERROR calling positionMatrix(): " + matrixEx.getMessage());
 			}
 			System.out.println("[MATRIX-DEBUG] projectionMatrix():");
 			System.out.println(afterSetupContext.projectionMatrix());
