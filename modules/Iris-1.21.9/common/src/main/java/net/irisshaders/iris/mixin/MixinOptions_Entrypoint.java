@@ -24,10 +24,11 @@ public class MixinOptions_Entrypoint {
 		new Iris().onEarlyInitialize();
 	}
 	
-	@Inject(method = "<init>", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/Options;<init>(Lnet/minecraft/client/Minecraft;Ljava/io/File;)V", shift = At.Shift.AFTER))
+	@Inject(method = "<init>", at = @At(value = "FIELD", target = "Lnet/minecraft/client/Minecraft;options:Lnet/minecraft/client/Options;", shift = At.Shift.AFTER))
 	private void iris$afterOptionsLoaded(CallbackInfo ci) {
-		// Options constructor has completed, sync IrisConfig from loaded values
+		// Options field has been assigned, sync IrisConfig from loaded values
+		Minecraft minecraft = (Minecraft)(Object)this;
 		Iris.logger.info("[Mixin] iris$afterOptionsLoaded triggered - calling Iris.syncConfigFromOptions()");
-		Iris.syncConfigFromOptions();
+		Iris.syncConfigFromOptions(minecraft.options);
 	}
 }
