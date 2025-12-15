@@ -463,7 +463,6 @@ sourceSets.sodium.runtimeClasspath += sourceSets.main.output
 sourceSets.iris.compileClasspath += sourceSets.fabricLoader.output
 sourceSets.iris.compileClasspath += sourceSets.main.output
 sourceSets.iris.compileClasspath += sourceSets.sodium.output
-sourceSets.iris.compileClasspath += files("${irisDir}/DHApi.jar")
 sourceSets.iris.runtimeClasspath += sourceSets.fabricLoader.output
 sourceSets.iris.runtimeClasspath += sourceSets.main.output
 sourceSets.iris.runtimeClasspath += sourceSets.sodium.output
