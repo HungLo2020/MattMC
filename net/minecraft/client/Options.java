@@ -1589,7 +1589,12 @@ public class Options {
 
 					@Override
 					public String process(String string, String string2) {
-						return MoreObjects.firstNonNull(this.getValue(string), string2);
+						String value = this.getValue(string);
+						// Return null if empty string, otherwise return loaded value or default
+						if (value != null && value.isEmpty()) {
+							return null;
+						}
+						return MoreObjects.firstNonNull(value, string2);
 					}
 
 					@Override
@@ -1685,7 +1690,7 @@ public class Options {
 						@Override
 						public String process(String string, String string2) {
 							this.writePrefix(string);
-							printWriter.println(string2);
+							printWriter.println(string2 != null ? string2 : "");
 							return string2;
 						}
 
