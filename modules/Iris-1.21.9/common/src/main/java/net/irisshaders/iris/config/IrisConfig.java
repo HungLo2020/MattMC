@@ -70,20 +70,21 @@ public class IrisConfig {
 	 */
 	public void initialize() throws IOException {
 		// Step 5: Configuration now unified in Minecraft Options - do not create separate files
-		// Load from Minecraft Options instead
-		loadFromMinecraftOptions();
+		// Values are already loaded from options.txt via Options.load()
+		// Just sync local fields with Options
+		syncFromMinecraftOptions();
 		// Note: No longer saving to iris.properties - all config in options.txt
 	}
 	
 	/**
-	 * Loads configuration from Minecraft's Options system (Step 5: Configuration Unification).
-	 * Replaces loading from iris.properties file.
+	 * Syncs local fields from Minecraft's Options system (Step 5: Configuration Unification).
+	 * Options.load() has already loaded values from options.txt, we just sync them.
 	 */
-	private void loadFromMinecraftOptions() {
+	private void syncFromMinecraftOptions() {
 		try {
 			net.minecraft.client.Minecraft mc = net.minecraft.client.Minecraft.getInstance();
 			if (mc != null && mc.options != null) {
-				// Read from unified Options
+				// Sync from unified Options (already loaded from options.txt)
 				this.shaderPackName = mc.options.shaderPackName;
 				this.enableShaders = mc.options.enableShaders().get();
 			}

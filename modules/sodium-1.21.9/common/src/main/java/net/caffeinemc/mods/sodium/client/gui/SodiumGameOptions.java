@@ -124,23 +124,24 @@ public class SodiumGameOptions {
 
     public static SodiumGameOptions loadFromDisk() {
         // Step 5: Configuration now unified in Minecraft Options - do not create separate files
-        // Load from Minecraft Options instead
+        // Values are already loaded from options.txt via Options.load()
+        // Just sync local fields with Options
         SodiumGameOptions config = new SodiumGameOptions();
-        loadFromMinecraftOptions(config);
+        syncFromMinecraftOptions(config);
         
-        // Note: No longer saving to sodium-options.json - all config in options.txt
+        // Note: No longer loading from sodium-options.json - all config in options.txt
         return config;
     }
     
     /**
-     * Loads configuration from Minecraft's Options system (Step 5: Configuration Unification).
-     * Replaces loading from sodium-options.json file.
+     * Syncs configuration from Minecraft's Options system (Step 5: Configuration Unification).
+     * Options.load() has already loaded values from options.txt, we just sync them.
      */
-    private static void loadFromMinecraftOptions(SodiumGameOptions config) {
+    private static void syncFromMinecraftOptions(SodiumGameOptions config) {
         try {
             net.minecraft.client.Minecraft mc = net.minecraft.client.Minecraft.getInstance();
             if (mc != null && mc.options != null) {
-                // Read from unified Options
+                // Sync from unified Options (already loaded from options.txt)
                 config.performance.chunkBuilderThreads = mc.options.chunkBuilderThreads().get();
                 config.performance.animateOnlyVisibleTextures = mc.options.animateOnlyVisibleTextures().get();
                 config.performance.useEntityCulling = mc.options.useEntityCulling().get();
