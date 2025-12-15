@@ -84,11 +84,20 @@ public class IrisConfig {
 		try {
 			net.minecraft.client.Minecraft mc = net.minecraft.client.Minecraft.getInstance();
 			if (mc != null && mc.options != null) {
+				// DEBUG: Log what we're loading
+				Iris.logger.info("[Config Load] mc.options values: shaderPackName='{}', enableShaders={}", 
+					mc.options.shaderPackName, mc.options.enableShaders().get());
+				
 				// Sync from unified Options (already loaded from options.txt)
 				this.shaderPackName = mc.options.shaderPackName;
 				this.enableShaders = mc.options.enableShaders().get();
+				
+				// DEBUG: Log what we loaded
+				Iris.logger.info("[Config Load] IrisConfig fields after sync: shaderPackName='{}', enableShaders={}", 
+					this.shaderPackName, this.enableShaders);
 			}
 		} catch (Exception e) {
+			Iris.logger.error("[Config Load] Exception while syncing from Minecraft options", e);
 			// Fallback to defaults if Options not available
 			this.shaderPackName = null;
 			this.enableShaders = true;
@@ -234,11 +243,22 @@ public class IrisConfig {
 				// Write to unified Options
 				mc.options.shaderPackName = this.shaderPackName;
 				mc.options.enableShaders().set(this.enableShaders);
+				
+				// DEBUG: Log what we're saving
+				Iris.logger.info("[Config Save] Writing shaderPackName='{}', enableShaders={}", 
+					this.shaderPackName, this.enableShaders);
+				Iris.logger.info("[Config Save] mc.options values BEFORE save: shaderPackName='{}', enableShaders={}", 
+					mc.options.shaderPackName, mc.options.enableShaders().get());
+				
 				// Trigger save to options.txt
 				mc.options.save();
+				
+				// DEBUG: Verify values after save
+				Iris.logger.info("[Config Save] mc.options values AFTER save: shaderPackName='{}', enableShaders={}", 
+					mc.options.shaderPackName, mc.options.enableShaders().get());
 			}
 		} catch (Exception e) {
-			// Silently fail if Options not available
+			Iris.logger.error("[Config Save] Exception while saving to Minecraft options", e);
 		}
 	}
 
