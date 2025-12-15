@@ -37,6 +37,7 @@ set GAME_JAR=%SCRIPT_DIR%\lib\minecraft-@VERSION@.jar
     -XX:+PerfDisableSharedMem ^
     -XX:MaxTenuringThreshold=1 ^
     -Dfabric.gameJarPath.client="%GAME_JAR%" ^
+    -Dfabric.development=true ^
     -cp "@CLASSPATH_WINDOWS@" ^
     net.fabricmc.loader.impl.launch.knot.KnotClient ^
     --version @VERSION@ ^
