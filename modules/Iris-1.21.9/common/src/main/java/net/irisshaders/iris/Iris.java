@@ -809,13 +809,14 @@ public class Iris {
 	/**
 	 * Syncs IrisConfig from Minecraft Options after Options has been loaded.
 	 * Called via mixin after Options constructor completes.
+	 * @param options The Options instance to sync from
 	 */
-	public static void syncConfigFromOptions() {
-		logger.info("[Iris Sync] syncConfigFromOptions() called");
+	public static void syncConfigFromOptions(net.minecraft.client.Options options) {
+		logger.info("[Iris Sync] syncConfigFromOptions() called with options");
 		if (irisConfig != null) {
 			try {
-				logger.info("[Iris Sync] Calling irisConfig.initialize() to sync from loaded Options");
-				irisConfig.initialize();
+				logger.info("[Iris Sync] Calling irisConfig.initializeFromOptions() to sync from loaded Options");
+				irisConfig.initializeFromOptions(options);
 				logger.info("[Iris Sync] Sync completed successfully");
 			} catch (IOException e) {
 				logger.error("[Iris Sync] Failed to sync Iris configuration from Options", e);
