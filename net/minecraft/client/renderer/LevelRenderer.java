@@ -623,11 +623,10 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 				Object dhModelViewMatrix = convertMethod.invoke(null, matrix4f);
 				System.out.println("[DEBUG-RENDERSTATE] Converted model-view matrix"); // TODO: Remove after debugging
 				
-				// Create identity projection matrix
-				Class<?> mat4fClass = Class.forName("com.seibel.distanthorizons.core.util.math.Mat4f");
-				Object dhProjectionMatrix = mat4fClass.getDeclaredConstructor().newInstance();
-				mat4fClass.getMethod("setIdentity").invoke(dhProjectionMatrix);
-				System.out.println("[DEBUG-RENDERSTATE] Created identity projection matrix"); // TODO: Remove after debugging
+				// Get actual projection matrix from RenderSystem (NOT identity!)
+				Matrix4f mcProjectionMatrix = RenderSystem.getProjectionMatrix();
+				Object dhProjectionMatrix = convertMethod.invoke(null, mcProjectionMatrix);
+				System.out.println("[DEBUG-RENDERSTATE] Converted projection matrix from RenderSystem"); // TODO: Remove after debugging
 				
 				// Get client level wrapper
 				Class<?> wrapperClass = Class.forName("com.seibel.distanthorizons.common.wrappers.world.ClientLevelWrapper");
