@@ -808,4 +808,18 @@ public class Iris {
 
 		initialized = true;
 	}
+	
+	/**
+	 * Syncs IrisConfig from Minecraft Options after Options has been loaded.
+	 * Called via mixin after Options constructor completes.
+	 */
+	public static void syncConfigFromOptions() {
+		if (irisConfig != null) {
+			try {
+				irisConfig.initialize();
+			} catch (IOException e) {
+				logger.error("Failed to sync Iris configuration from Options", e);
+			}
+		}
+	}
 }
