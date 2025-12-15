@@ -138,10 +138,12 @@ public class LodBufferContainer implements AutoCloseable
 				this.uploadFuture.complete(this);
 				this.uploadFuture = null;
 			}
-			catch (InterruptedException ignore) 
+			catch (InterruptedException e) 
 			{
-				System.out.println("[BUFFER-UPLOAD] InterruptedException caught for " + this.minCornerBlockPos + ", buffersUploaded=" + this.buffersUploaded);
-				this.uploadFuture.complete(this);
+				System.out.println("[BUFFER-UPLOAD] InterruptedException caught for " + this.minCornerBlockPos + ", buffersUploaded=" + this.buffersUploaded + " - completing exceptionally to allow retry");
+				// Complete exceptionally so the upload can be retried later
+				// This prevents null buffer containers from being set
+				this.uploadFuture.completeExceptionally(e);
 				this.uploadFuture = null;
 			}
 			catch (Exception e)
