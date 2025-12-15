@@ -15,9 +15,6 @@ if exist "%BUNDLED_JAVA%" (
     echo Using system Java
 )
 
-REM Set game JAR path
-set GAME_JAR_PATH=%SCRIPT_DIR%\lib\minecraft-@VERSION@.jar
-
 "%JAVA_CMD%" -Xmx2G -Xms512M ^
     -XX:+UseG1GC ^
     -XX:+ParallelRefProcEnabled ^
@@ -36,7 +33,6 @@ set GAME_JAR_PATH=%SCRIPT_DIR%\lib\minecraft-@VERSION@.jar
     -XX:SurvivorRatio=32 ^
     -XX:+PerfDisableSharedMem ^
     -XX:MaxTenuringThreshold=1 ^
-    -Dfabric.gameJarPath.client="%GAME_JAR_PATH%" ^
     -cp "@CLASSPATH_WINDOWS@" ^
     net.fabricmc.loader.impl.launch.knot.KnotClient ^
     --version @VERSION@ ^

@@ -15,9 +15,6 @@ else
     echo "Using system Java"
 fi
 
-# Get absolute path for gameJarPath
-GAME_JAR_PATH="${SCRIPT_DIR}/lib/minecraft-@VERSION@.jar"
-
 "$JAVA_CMD" -Xmx2G -Xms512M \
     -XX:+UseG1GC \
     -XX:+ParallelRefProcEnabled \
@@ -36,7 +33,6 @@ GAME_JAR_PATH="${SCRIPT_DIR}/lib/minecraft-@VERSION@.jar"
     -XX:SurvivorRatio=32 \
     -XX:+PerfDisableSharedMem \
     -XX:MaxTenuringThreshold=1 \
-    -Dfabric.gameJarPath.client="${GAME_JAR_PATH}" \
     -cp "@CLASSPATH_LINUX@" \
     net.fabricmc.loader.impl.launch.knot.KnotClient \
     --version @VERSION@ \
