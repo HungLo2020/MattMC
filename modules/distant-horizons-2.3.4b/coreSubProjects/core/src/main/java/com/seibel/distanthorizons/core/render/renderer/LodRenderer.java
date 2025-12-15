@@ -328,13 +328,21 @@ public class LodRenderer
 			// Apply to the MC Framebuffer //
 			//=============================//
 			
+			System.out.println("[LOD-RENDERER] About to apply LODs to MC framebuffer, usingMcFramebuffer=" + this.usingMcFramebuffer);
 			boolean cancelApplyShader = ApiEventInjector.INSTANCE.fireAllEvents(DhApiBeforeApplyShaderRenderEvent.class, renderParams);
+			System.out.println("[LOD-RENDERER] cancelApplyShader=" + cancelApplyShader);
 			if (!cancelApplyShader)
 			{
 				profiler.popPush("LOD Apply");
 				
 				// Copy the LOD framebuffer to Minecraft's framebuffer
+				System.out.println("[LOD-RENDERER] Calling DhApplyShader.render()");
 				DhApplyShader.INSTANCE.render(renderParams.partialTicks);
+				System.out.println("[LOD-RENDERER] DhApplyShader.render() completed");
+			}
+			else
+			{
+				System.out.println("[LOD-RENDERER] Apply shader was CANCELLED by event!");
 			}
 		}
 		else
