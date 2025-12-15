@@ -69,9 +69,40 @@ public class IrisConfig {
 	 * @throws IOException file exceptions
 	 */
 	public void initialize() throws IOException {
-		load();
-		if (!Files.exists(propertiesPath)) {
-			save();
+		// Step 5: Configuration now unified in Minecraft Options - do not create separate files
+		// Values are already loaded from options.txt via Options.load()
+		// Just sync local fields with Options
+		syncFromMinecraftOptions();
+		// Note: No longer saving to iris.properties - all config in options.txt
+	}
+	
+	/**
+	 * Syncs local fields from Minecraft's Options system (Step 5: Configuration Unification).
+	 * Options.load() has already loaded values from options.txt, we just sync them.
+	 */
+	private void syncFromMinecraftOptions() {
+		try {
+			net.minecraft.client.Minecraft mc = net.minecraft.client.Minecraft.getInstance();
+			if (mc != null && mc.options != null) {
+				// DEBUG: Log what we're loading
+				Iris.logger.info("[Config Load] BEFORE sync - IrisConfig.shaderPackName='{}', IrisConfig.enableShaders={}", 
+					this.shaderPackName, this.enableShaders);
+				Iris.logger.info("[Config Load] mc.options values: shaderPackName='{}', enableShaders={}", 
+					mc.options.shaderPackName, mc.options.enableShaders().get());
+				
+				// Sync from unified Options (already loaded from options.txt)
+				this.shaderPackName = mc.options.shaderPackName;
+				this.enableShaders = mc.options.enableShaders().get();
+				
+				// DEBUG: Log what we loaded
+				Iris.logger.info("[Config Load] AFTER sync - IrisConfig.shaderPackName='{}', IrisConfig.enableShaders={}", 
+					this.shaderPackName, this.enableShaders);
+			}
+		} catch (Exception e) {
+			Iris.logger.error("[Config Load] Exception while syncing from Minecraft options", e);
+			// Fallback to defaults if Options not available
+			this.shaderPackName = null;
+			this.enableShaders = true;
 		}
 	}
 
@@ -97,10 +128,13 @@ public class IrisConfig {
 	 * Sets the name of the current shaderpack
 	 */
 	public void setShaderPackName(String name) {
+		Iris.logger.info("[ShaderPack] setShaderPackName called with: '{}'", name);
 		if (name == null || name.equals("(internal)") || name.isEmpty()) {
 			this.shaderPackName = null;
+			Iris.logger.info("[ShaderPack] Set to null (was internal or empty)");
 		} else {
 			this.shaderPackName = name;
+			Iris.logger.info("[ShaderPack] Set to: '{}'", name);
 		}
 	}
 
@@ -181,7 +215,9 @@ public class IrisConfig {
 			Iris.logger.error("Shadow distance setting reset; value is invalid.");
 			IrisVideoSettings.shadowDistance = 32;
 			IrisVideoSettings.colorSpace = ColorSpace.SRGB;
-			save();
+			// Step 5: Do NOT call save() here - it would overwrite shader pack name with null during initialization
+			// Config is loaded from mc.options via syncFromMinecraftOptions(), not from iris.properties
+			// save();
 		}
 
 		if (shaderPackName != null) {
@@ -197,17 +233,39 @@ public class IrisConfig {
 	 * @throws IOException file exceptions
 	 */
 	public void save() throws IOException {
-		Properties properties = new Properties();
-		properties.setProperty("shaderPack", getShaderPackName().orElse(""));
-		properties.setProperty("enableShaders", enableShaders ? "true" : "false");
-		properties.setProperty("allowUnknownShaders", allowUnknownShaders ? "true" : "false");
-		properties.setProperty("enableDebugOptions", enableDebugOptions ? "true" : "false");
-		properties.setProperty("disableUpdateMessage", disableUpdateMessage ? "true" : "false");
-		properties.setProperty("maxShadowRenderDistance", String.valueOf(IrisVideoSettings.shadowDistance));
-		properties.setProperty("colorSpace", IrisVideoSettings.colorSpace.name());
-		// NB: This uses ISO-8859-1 with unicode escapes as the encoding
-		try (OutputStream os = Files.newOutputStream(propertiesPath)) {
-			properties.store(os, COMMENT);
+		// Step 5: Configuration now unified in Minecraft Options - do not create separate files
+		// Save to Minecraft Options instead
+		saveToMinecraftOptions();
+		// Note: No longer saving to iris.properties - all config in options.txt
+	}
+	
+	/**
+	 * Saves configuration to Minecraft's Options system (Step 5: Configuration Unification).
+	 * Replaces saving to iris.properties file.
+	 */
+	private void saveToMinecraftOptions() {
+		try {
+			net.minecraft.client.Minecraft mc = net.minecraft.client.Minecraft.getInstance();
+			if (mc != null && mc.options != null) {
+				// Write to unified Options
+				mc.options.shaderPackName = this.shaderPackName;
+				mc.options.enableShaders().set(this.enableShaders);
+				
+				// DEBUG: Log what we're saving
+				Iris.logger.info("[Config Save] Writing shaderPackName='{}', enableShaders={}", 
+					this.shaderPackName, this.enableShaders);
+				Iris.logger.info("[Config Save] mc.options values BEFORE save: shaderPackName='{}', enableShaders={}", 
+					mc.options.shaderPackName, mc.options.enableShaders().get());
+				
+				// Trigger save to options.txt
+				mc.options.save();
+				
+				// DEBUG: Verify values after save
+				Iris.logger.info("[Config Save] mc.options values AFTER save: shaderPackName='{}', enableShaders={}", 
+					mc.options.shaderPackName, mc.options.enableShaders().get());
+			}
+		} catch (Exception e) {
+			Iris.logger.error("[Config Save] Exception while saving to Minecraft options", e);
 		}
 	}
 

@@ -790,6 +790,83 @@ public class Options {
 	public boolean syncWrites;
 	public boolean startedCleanly = true;
 
+	// ========== Advanced Rendering Options (Step 5: Sodium Integration) ==========
+	
+	/**
+	 * Shader pack name (Iris integration).
+	 * Null or empty means no shader pack is active.
+	 */
+	public String shaderPackName = null;
+	
+	/**
+	 * Whether shaders are enabled (Iris integration).
+	 */
+	private final OptionInstance<Boolean> enableShaders = OptionInstance.createBoolean(
+		"options.iris.enableShaders", true, boolean_ -> {}
+	);
+	
+	/**
+	 * Number of chunk builder threads (Sodium integration).
+	 * 0 means automatic based on CPU cores.
+	 */
+	private final OptionInstance<Integer> chunkBuilderThreads = new OptionInstance<>(
+		"options.sodium.chunkBuilderThreads",
+		OptionInstance.noTooltip(),
+		(component, integer) -> integer == 0 
+			? Component.translatable("options.sodium.chunkBuilderThreads.auto")
+			: genericValueLabel(component, integer),
+		new OptionInstance.IntRange(0, Runtime.getRuntime().availableProcessors()),
+		0,
+		integer -> {}
+	);
+	
+	/**
+	 * Whether to animate only visible textures (Sodium integration).
+	 */
+	private final OptionInstance<Boolean> animateOnlyVisibleTextures = OptionInstance.createBoolean(
+		"options.sodium.animateOnlyVisibleTextures", true, boolean_ -> {}
+	);
+	
+	/**
+	 * Whether to use entity culling (Sodium integration).
+	 */
+	private final OptionInstance<Boolean> useEntityCulling = OptionInstance.createBoolean(
+		"options.sodium.useEntityCulling", true, boolean_ -> {}
+	);
+	
+	/**
+	 * Whether to use fog occlusion (Sodium integration).
+	 */
+	private final OptionInstance<Boolean> useFogOcclusion = OptionInstance.createBoolean(
+		"options.sodium.useFogOcclusion", true, boolean_ -> {}
+	);
+	
+	/**
+	 * Whether to use block face culling (Sodium integration).
+	 */
+	private final OptionInstance<Boolean> useBlockFaceCulling = OptionInstance.createBoolean(
+		"options.sodium.useBlockFaceCulling", true, boolean_ -> {}
+	);
+	
+	/**
+	 * Whether to use advanced staging buffers (Sodium integration).
+	 */
+	private final OptionInstance<Boolean> useAdvancedStagingBuffers = OptionInstance.createBoolean(
+		"options.sodium.useAdvancedStagingBuffers", true, boolean_ -> {}
+	);
+	
+	/**
+	 * CPU render-ahead limit (Sodium integration).
+	 */
+	private final OptionInstance<Integer> cpuRenderAheadLimit = new OptionInstance<>(
+		"options.sodium.cpuRenderAheadLimit",
+		OptionInstance.noTooltip(),
+		Options::genericValueLabel,
+		new OptionInstance.IntRange(0, 9),
+		3,
+		integer -> {}
+	);
+
 	public OptionInstance<Boolean> darkMojangStudiosBackground() {
 		return this.darkMojangStudiosBackground;
 	}
@@ -1207,6 +1284,40 @@ public class Options {
 		return this.showNowPlayingToast;
 	}
 
+	// ========== Advanced Rendering Options Getters (Step 5) ==========
+	
+	public OptionInstance<Boolean> enableShaders() {
+		return this.enableShaders;
+	}
+	
+	public OptionInstance<Integer> chunkBuilderThreads() {
+		return this.chunkBuilderThreads;
+	}
+	
+	public OptionInstance<Boolean> animateOnlyVisibleTextures() {
+		return this.animateOnlyVisibleTextures;
+	}
+	
+	public OptionInstance<Boolean> useEntityCulling() {
+		return this.useEntityCulling;
+	}
+	
+	public OptionInstance<Boolean> useFogOcclusion() {
+		return this.useFogOcclusion;
+	}
+	
+	public OptionInstance<Boolean> useBlockFaceCulling() {
+		return this.useBlockFaceCulling;
+	}
+	
+	public OptionInstance<Boolean> useAdvancedStagingBuffers() {
+		return this.useAdvancedStagingBuffers;
+	}
+	
+	public OptionInstance<Integer> cpuRenderAheadLimit() {
+		return this.cpuRenderAheadLimit;
+	}
+
 	public Options(Minecraft minecraft, File file) {
 		this.minecraft = minecraft;
 		this.optionsFile = new File(file, "options.txt");
@@ -1348,6 +1459,17 @@ public class Options {
 		this.startedCleanly = fieldAccess.process("startedCleanly", this.startedCleanly);
 		fieldAccess.process("showNowPlayingToast", this.showNowPlayingToast);
 		fieldAccess.process("musicFrequency", this.musicFrequency);
+		
+		// Advanced Rendering Options (Step 5: Sodium/Iris Integration)
+		this.shaderPackName = fieldAccess.process("shaderPackName", this.shaderPackName);
+		fieldAccess.process("enableShaders", this.enableShaders);
+		fieldAccess.process("chunkBuilderThreads", this.chunkBuilderThreads);
+		fieldAccess.process("animateOnlyVisibleTextures", this.animateOnlyVisibleTextures);
+		fieldAccess.process("useEntityCulling", this.useEntityCulling);
+		fieldAccess.process("useFogOcclusion", this.useFogOcclusion);
+		fieldAccess.process("useBlockFaceCulling", this.useBlockFaceCulling);
+		fieldAccess.process("useAdvancedStagingBuffers", this.useAdvancedStagingBuffers);
+		fieldAccess.process("cpuRenderAheadLimit", this.cpuRenderAheadLimit);
 
 		for (KeyMapping keyMapping : this.keyMappings) {
 			String string = keyMapping.saveString();
@@ -1371,8 +1493,10 @@ public class Options {
 	}
 
 	public void load() {
+		LOGGER.info("[Options Load] Starting options load from: {}", this.optionsFile.getAbsolutePath());
 		try {
 			if (!this.optionsFile.exists()) {
+				LOGGER.info("[Options Load] options.txt does not exist, using defaults");
 				return;
 			}
 
@@ -1437,11 +1561,20 @@ public class Options {
 					public <T> void process(String string, OptionInstance<T> optionInstance) {
 						String string2 = this.getValue(string);
 						if (string2 != null) {
+							// DEBUG: Log when loading enableShaders
+							if (string.equals("enableShaders")) {
+								Options.LOGGER.info("[Options Load] Loading enableShaders from options.txt: raw value = '{}'", string2);
+							}
 							JsonElement jsonElement = LenientJsonParser.parse(string2.isEmpty() ? "\"\"" : string2);
 							optionInstance.codec()
 								.parse(JsonOps.INSTANCE, jsonElement)
 								.ifError(error -> Options.LOGGER.error("Error parsing option value {} for option {}: {}", string2, optionInstance, error.message()))
-								.ifSuccess(optionInstance::set);
+								.ifSuccess(value -> {
+									if (string.equals("enableShaders")) {
+										Options.LOGGER.info("[Options Load] Parsed enableShaders value: {}", value);
+									}
+									optionInstance.set(value);
+								});
 						}
 					}
 
@@ -1467,7 +1600,20 @@ public class Options {
 
 					@Override
 					public String process(String string, String string2) {
-						return MoreObjects.firstNonNull(this.getValue(string), string2);
+						String value = this.getValue(string);
+						// DEBUG: Log when loading shaderPackName
+						if (string.equals("shaderPackName")) {
+							Options.LOGGER.info("[Options Load] Loading shaderPackName from options.txt: raw value = '{}', default = '{}'", value, string2);
+						}
+						// Return null if empty string, otherwise return loaded value or default
+						if (value != null && value.isEmpty()) {
+							return null;
+						}
+						String result = MoreObjects.firstNonNull(value, string2);
+						if (string.equals("shaderPackName")) {
+							Options.LOGGER.info("[Options Load] Final shaderPackName value: '{}'", result);
+						}
+						return result;
 					}
 
 					@Override
@@ -1541,6 +1687,11 @@ public class Options {
 								.encodeStart(JsonOps.INSTANCE, optionInstance.get())
 								.ifError(error -> Options.LOGGER.error("Error saving option {}: {}", optionInstance, error.message()))
 								.ifSuccess(jsonElement -> {
+									// DEBUG: Log when saving enableShaders
+									if (string.equals("enableShaders")) {
+										Options.LOGGER.info("[Options Save] Saving enableShaders: value = {}, json = {}", 
+											optionInstance.get(), Options.GSON.toJson(jsonElement));
+									}
 									this.writePrefix(string);
 									printWriter.println(Options.GSON.toJson(jsonElement));
 								});
@@ -1562,8 +1713,12 @@ public class Options {
 
 						@Override
 						public String process(String string, String string2) {
+							// DEBUG: Log when saving shaderPackName
+							if (string.equals("shaderPackName")) {
+								Options.LOGGER.info("[Options Save] Saving shaderPackName: value = '{}'", string2);
+							}
 							this.writePrefix(string);
-							printWriter.println(string2);
+							printWriter.println(string2 != null ? string2 : "");
 							return string2;
 						}
 
@@ -1597,6 +1752,7 @@ public class Options {
 			}
 
 			printWriter.close();
+			LOGGER.info("[Options Save] Completed options save successfully");
 		} catch (Exception var6) {
 			LOGGER.error("Failed to save options", (Throwable)var6);
 		}

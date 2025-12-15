@@ -123,26 +123,36 @@ public class SodiumGameOptions {
             .create();
 
     public static SodiumGameOptions loadFromDisk() {
-        Path path = getConfigPath();
-        SodiumGameOptions config;
-
-        if (Files.exists(path)) {
-            try (FileReader reader = new FileReader(path.toFile())) {
-                config = GSON.fromJson(reader, SodiumGameOptions.class);
-            } catch (IOException e) {
-                throw new RuntimeException("Could not parse config", e);
-            }
-        } else {
-            config = new SodiumGameOptions();
-        }
-
-        try {
-            writeToDisk(config);
-        } catch (IOException e) {
-            throw new RuntimeException("Couldn't update config file", e);
-        }
-
+        // Step 5: Configuration now unified in Minecraft Options - do not create separate files
+        // Values are already loaded from options.txt via Options.load()
+        // Just sync local fields with Options
+        SodiumGameOptions config = new SodiumGameOptions();
+        syncFromMinecraftOptions(config);
+        
+        // Note: No longer loading from sodium-options.json - all config in options.txt
         return config;
+    }
+    
+    /**
+     * Syncs configuration from Minecraft's Options system (Step 5: Configuration Unification).
+     * Options.load() has already loaded values from options.txt, we just sync them.
+     */
+    private static void syncFromMinecraftOptions(SodiumGameOptions config) {
+        try {
+            net.minecraft.client.Minecraft mc = net.minecraft.client.Minecraft.getInstance();
+            if (mc != null && mc.options != null) {
+                // Sync from unified Options (already loaded from options.txt)
+                config.performance.chunkBuilderThreads = mc.options.chunkBuilderThreads().get();
+                config.performance.animateOnlyVisibleTextures = mc.options.animateOnlyVisibleTextures().get();
+                config.performance.useEntityCulling = mc.options.useEntityCulling().get();
+                config.performance.useFogOcclusion = mc.options.useFogOcclusion().get();
+                config.performance.useBlockFaceCulling = mc.options.useBlockFaceCulling().get();
+                config.advanced.useAdvancedStagingBuffers = mc.options.useAdvancedStagingBuffers().get();
+                config.advanced.cpuRenderAheadLimit = mc.options.cpuRenderAheadLimit().get();
+            }
+        } catch (Exception e) {
+            // Fallback to defaults if Options not available (already initialized)
+        }
     }
 
     private static Path getConfigPath() {
@@ -151,20 +161,34 @@ public class SodiumGameOptions {
     }
 
     public static void writeToDisk(SodiumGameOptions config) throws IOException {
-        if (config.isReadOnly()) {
-            throw new IllegalStateException("Config file is read-only");
+        // Step 5: Configuration now unified in Minecraft Options - do not create separate files
+        // Save to Minecraft Options instead
+        saveToMinecraftOptions(config);
+        // Note: No longer saving to sodium-options.json - all config in options.txt
+    }
+    
+    /**
+     * Saves configuration to Minecraft's Options system (Step 5: Configuration Unification).
+     * Replaces saving to sodium-options.json file.
+     */
+    private static void saveToMinecraftOptions(SodiumGameOptions config) {
+        try {
+            net.minecraft.client.Minecraft mc = net.minecraft.client.Minecraft.getInstance();
+            if (mc != null && mc.options != null) {
+                // Write to unified Options
+                mc.options.chunkBuilderThreads().set(config.performance.chunkBuilderThreads);
+                mc.options.animateOnlyVisibleTextures().set(config.performance.animateOnlyVisibleTextures);
+                mc.options.useEntityCulling().set(config.performance.useEntityCulling);
+                mc.options.useFogOcclusion().set(config.performance.useFogOcclusion);
+                mc.options.useBlockFaceCulling().set(config.performance.useBlockFaceCulling);
+                mc.options.useAdvancedStagingBuffers().set(config.advanced.useAdvancedStagingBuffers);
+                mc.options.cpuRenderAheadLimit().set(config.advanced.cpuRenderAheadLimit);
+                // Trigger save to options.txt
+                mc.options.save();
+            }
+        } catch (Exception e) {
+            // Silently fail if Options not available
         }
-
-        Path path = getConfigPath();
-        Path dir = path.getParent();
-
-        if (!Files.exists(dir)) {
-            Files.createDirectories(dir);
-        } else if (!Files.isDirectory(dir)) {
-            throw new IOException("Not a directory: " + dir);
-        }
-
-        FileUtil.writeTextRobustly(GSON.toJson(config), path);
     }
 
     public boolean isReadOnly() {

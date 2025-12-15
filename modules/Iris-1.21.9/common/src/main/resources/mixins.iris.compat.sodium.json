@@ -22,7 +22,6 @@
     "MixinRenderSectionManagerShadow",
     "MixinShaderChunkRenderer",
     "MixinSodiumGameOptionPages",
-    "MixinSodiumGameOptions",
     "MixinSodiumOptionsGUI",
     "MixinSodiumWorldRenderer"
   ],

@@ -2,8 +2,8 @@
 > Configure project :
 ✓ Using bundled dependencies from libraries/deps/
   Run './libraries/download-dependencies.sh' to update bundled dependencies
-Path for java installation '/usr/lib/jvm/openjdk-17' (Common Linux Locations) does not contain a java executable
 Path for java installation '/usr/lib/jvm/openjdk-21' (Common Linux Locations) does not contain a java executable
+Path for java installation '/usr/lib/jvm/openjdk-17' (Common Linux Locations) does not contain a java executable
 
 > Task :downloadJdk SKIPPED
 
@@ -15,14 +15,10 @@ Path for java installation '/usr/lib/jvm/openjdk-21' (Common Linux Locations) do
 > Task :processFabricLoaderResources UP-TO-DATE
 > Task :fabricLoaderClasses UP-TO-DATE
 > Task :fabricLoaderJar UP-TO-DATE
-
-> Task :compileJava
-Note: /home/matt/Documents/Repos/MattMC/net/minecraft/client/Minecraft.java uses unchecked or unsafe operations.
-Note: Recompile with -Xlint:unchecked for details.
-
-> Task :processResources
-> Task :classes
-> Task :gameJar
+> Task :compileJava UP-TO-DATE
+> Task :processResources UP-TO-DATE
+> Task :classes UP-TO-DATE
+> Task :gameJar UP-TO-DATE
 > Task :compileSodiumJava UP-TO-DATE
 > Task :processSodiumResources UP-TO-DATE
 > Task :sodiumClasses UP-TO-DATE
@@ -35,36 +31,39 @@ Note: Recompile with -Xlint:unchecked for details.
 
 > Task :runClient
 Using bundled JDK from: /home/matt/Documents/Repos/MattMC/run/jdk-21
-[08:36:35] [main/INFO]: Loading Minecraft 1.21.10 with Fabric Loader 0.18.2
-[08:36:35] [main/INFO]: Mappings not present!
-[08:36:35] [main/INFO]: Loading 6 mods:
+[13:34:17] [main/INFO]: Loading Minecraft 1.21.10 with Fabric Loader 0.18.2
+[13:34:17] [main/INFO]: Mappings not present!
+[13:34:17] [main/INFO]: Skipping dynamic mod discovery, using hardcoded internal mods (Sodium, Iris)
+[13:34:17] [main/INFO]: Registered internal mod: Sodium
+[13:34:17] [main/INFO]: Registered internal mod: Iris
+[13:34:17] [main/INFO]: Loading 6 mods:
 	- fabricloader 0.18.2
 	- iris 1.9.6
 	- java 21
 	- minecraft 1.21.10
 	- mixinextras 0.5.0
 	- sodium 0.7.2
-[08:36:35] [main/WARN]: Runtime mod remapping disabled due to no fabric.remapClasspathFile being specified. You may need to update loom.
-[08:36:35] [main/INFO]: SpongePowered MIXIN Subsystem Version=0.8.7 Source=file:/home/matt/Documents/Repos/MattMC/libraries/deps/sponge-mixin-0.16.5+mixin.0.8.7.jar Service=Knot/Fabric Env=CLIENT
-[08:36:35] [main/INFO]: Compatibility level set to JAVA_17
-[08:36:35] [main/WARN]: Reference map 'iris.refmap.json' for mixins.iris.json could not be read. If this is a development environment you can ignore this message
-[08:36:35] [main/WARN]: Reference map 'iris-fabric.refmap.json' for mixins.iris.fabric.json could not be read. If this is a development environment you can ignore this message
-[08:36:35] [main/WARN]: Reference map 'iris.refmap.json' for mixins.iris.fantastic.json could not be read. If this is a development environment you can ignore this message
-[08:36:35] [main/WARN]: Reference map 'iris.refmap.json' for mixins.iris.vertexformat.json could not be read. If this is a development environment you can ignore this message
-[08:36:35] [main/WARN]: Reference map 'iris.refmap.json' for mixins.iris.bettermipmaps.json could not be read. If this is a development environment you can ignore this message
-[08:36:35] [main/WARN]: Reference map 'iris.refmap.json' for mixins.iris.compat.sodium.json could not be read. If this is a development environment you can ignore this message
-[08:36:35] [main/WARN]: Reference map 'iris.refmap.json' for mixins.iris.fixes.maxfpscrash.json could not be read. If this is a development environment you can ignore this message
-[08:36:35] [main/INFO]: Loaded configuration file for Sodium: 42 options available, 1 override(s) found
-[08:36:35] [main/WARN]: Force-disabling mixin 'features.render.world.sky.FogRendererMixin' as rule 'mixin.features.render.world.sky' (added by mods [iris]) disables it and children
-[08:36:35] [main/WARN]: Force-disabling mixin 'features.render.world.sky.ClientLevelMixin' as rule 'mixin.features.render.world.sky' (added by mods [iris]) disables it and children
-[08:36:35] [main/WARN]: Force-disabling mixin 'features.render.world.sky.LevelRendererMixin' as rule 'mixin.features.render.world.sky' (added by mods [iris]) disables it and children
-[08:36:35] [main/INFO]: Searching for graphics cards...
-[08:36:35] [main/INFO]: Found graphics adapter: LinuxPciAdapterInfo[vendor=NVIDIA, name=GA102 [GeForce RTX 3080 Ti], pciVendorId=0x10de, pciDeviceId=0x2208]
-[08:36:35] [main/WARN]: Sodium has applied one or more workarounds to prevent crashes or other issues on your system: [NVIDIA_THREADED_OPTIMIZATIONS_BROKEN]
-[08:36:35] [main/WARN]: This is not necessarily an issue, but it may result in certain features or optimizations being disabled. You can sometimes fix these issues by upgrading your graphics driver.
-[08:36:36] [main/INFO]: Initializing MixinExtras via com.llamalad7.mixinextras.service.MixinExtrasServiceImpl(version=0.5.0).
-[08:36:36] [Datafixer Bootstrap/INFO]: 278 Datafixer optimizations took 231 milliseconds
-[08:36:38] [Render thread/INFO]: Setting user: Player814
+[13:34:17] [main/WARN]: Runtime mod remapping disabled due to no fabric.remapClasspathFile being specified. You may need to update loom.
+[13:34:17] [main/INFO]: SpongePowered MIXIN Subsystem Version=0.8.7 Source=file:/home/matt/Documents/Repos/MattMC/libraries/deps/sponge-mixin-0.16.5+mixin.0.8.7.jar Service=Knot/Fabric Env=CLIENT
+[13:34:17] [main/INFO]: Compatibility level set to JAVA_17
+[13:34:17] [main/INFO]: Loaded configuration file for Sodium: 42 options available, 1 override(s) found
+[13:34:17] [main/WARN]: Reference map 'iris.refmap.json' for mixins.iris.json could not be read. If this is a development environment you can ignore this message
+[13:34:17] [main/WARN]: Reference map 'iris-fabric.refmap.json' for mixins.iris.fabric.json could not be read. If this is a development environment you can ignore this message
+[13:34:17] [main/WARN]: Reference map 'iris.refmap.json' for mixins.iris.fantastic.json could not be read. If this is a development environment you can ignore this message
+[13:34:17] [main/WARN]: Reference map 'iris.refmap.json' for mixins.iris.vertexformat.json could not be read. If this is a development environment you can ignore this message
+[13:34:17] [main/WARN]: Reference map 'iris.refmap.json' for mixins.iris.bettermipmaps.json could not be read. If this is a development environment you can ignore this message
+[13:34:17] [main/WARN]: Reference map 'iris.refmap.json' for mixins.iris.compat.sodium.json could not be read. If this is a development environment you can ignore this message
+[13:34:17] [main/WARN]: Reference map 'iris.refmap.json' for mixins.iris.fixes.maxfpscrash.json could not be read. If this is a development environment you can ignore this message
+[13:34:17] [main/WARN]: Force-disabling mixin 'features.render.world.sky.FogRendererMixin' as rule 'mixin.features.render.world.sky' (added by mods [iris]) disables it and children
+[13:34:17] [main/WARN]: Force-disabling mixin 'features.render.world.sky.ClientLevelMixin' as rule 'mixin.features.render.world.sky' (added by mods [iris]) disables it and children
+[13:34:17] [main/WARN]: Force-disabling mixin 'features.render.world.sky.LevelRendererMixin' as rule 'mixin.features.render.world.sky' (added by mods [iris]) disables it and children
+[13:34:17] [main/INFO]: Searching for graphics cards...
+[13:34:17] [main/INFO]: Found graphics adapter: LinuxPciAdapterInfo[vendor=NVIDIA, name=GA102 [GeForce RTX 3080 Ti], pciVendorId=0x10de, pciDeviceId=0x2208]
+[13:34:17] [main/WARN]: Sodium has applied one or more workarounds to prevent crashes or other issues on your system: [NVIDIA_THREADED_OPTIMIZATIONS_BROKEN]
+[13:34:17] [main/WARN]: This is not necessarily an issue, but it may result in certain features or optimizations being disabled. You can sometimes fix these issues by upgrading your graphics driver.
+[13:34:18] [main/INFO]: Initializing MixinExtras via com.llamalad7.mixinextras.service.MixinExtrasServiceImpl(version=0.5.0).
+[13:34:18] [Datafixer Bootstrap/INFO]: 278 Datafixer optimizations took 229 milliseconds
+[13:34:20] [Render thread/INFO]: Setting user: Player673
 [LWJGL] Version: 3.3.3-snapshot
 	 OS: Linux v6.14.0-36-generic
 	JRE: Linux amd64 21.0.5
@@ -75,14 +74,27 @@ Using bundled JDK from: /home/matt/Documents/Repos/MattMC/run/jdk-21
 [LWJGL] Loading library: glfw
 	Module: org.lwjgl.glfw
 	Loaded from org.lwjgl.librarypath: /tmp/lwjgl_matt/3.3.3-snapshot/x64/libglfw.so
-[08:36:38] [Render thread/INFO]: Backend library: LWJGL version 3.3.3-snapshot
+[13:34:20] [Render thread/INFO]: [Options Load] Starting options load from: /home/matt/Documents/Repos/MattMC/run/options.txt
+[13:34:20] [Render thread/INFO]: [Options Load] Loading shaderPackName from options.txt: raw value = 'ComplementaryHungLoIfied.zip', default = 'null'
+[13:34:20] [Render thread/INFO]: [Options Load] Final shaderPackName value: 'ComplementaryHungLoIfied.zip'
+[13:34:20] [Render thread/INFO]: [Options Load] Loading enableShaders from options.txt: raw value = 'true'
+[13:34:20] [Render thread/INFO]: [Options Load] Parsed enableShaders value: true
+[13:34:20] [Render thread/INFO]: [Mixin] iris$afterOptionsLoaded triggered - calling Iris.syncConfigFromOptions()
+[13:34:20] [Render thread/INFO]: [Iris Sync] syncConfigFromOptions() called
+[13:34:20] [Render thread/INFO]: [Iris Sync] Calling irisConfig.initialize() to sync from loaded Options
+[13:34:20] [Render thread/INFO]: [Iris Sync] Sync completed successfully
+[13:34:20] [Render thread/INFO]: [Options Save] Saving shaderPackName: value = 'ComplementaryHungLoIfied.zip'
+[13:34:20] [Render thread/INFO]: [Options Save] Saving enableShaders: value = true, json = true
+[13:34:20] [Render thread/INFO]: [Options Save] Completed options save successfully
+[13:34:20] [Render thread/INFO]: Backend library: LWJGL version 3.3.3-snapshot
 [LWJGL] Loading library: jemalloc
 	Module: org.lwjgl.jemalloc
 	Loaded from org.lwjgl.librarypath: /tmp/lwjgl_matt/3.3.3-snapshot/x64/libjemalloc.so
 [LWJGL] MemoryUtil allocator: JEmallocAllocator
 [LWJGL] Java 9 check intrinsics enabled
 [LWJGL] Closure Registry: ConcurrentHashMap
-[08:36:38] [Render thread/INFO]: Modifying process environment to apply workarounds for the NVIDIA graphics driver...
+[13:34:20] [Render thread/INFO]: Modifying process environment to apply workarounds for the NVIDIA graphics driver...
+[13:34:20] [ForkJoinPool.commonPool-worker-1/WARN]: [Iris Update Check] This version doesn't have an update index, skipping.
 [LWJGL] Loading JNI library: lwjgl_stb
 	Module: org.lwjgl.stb
 	Loaded from org.lwjgl.librarypath: /tmp/lwjgl_matt/3.3.3-snapshot/x64/liblwjgl_stb.so
@@ -95,113 +107,77 @@ Using bundled JDK from: /home/matt/Documents/Repos/MattMC/run/jdk-21
 [LWJGL] Java 9 text decoding enabled
 	Loaded from system paths: /lib/x86_64-linux-gnu/libGLX.so.0
 [LWJGL] Java 10 multiplyHigh enabled
-[08:36:39] [ForkJoinPool.commonPool-worker-1/WARN]: [Iris Update Check] This version doesn't have an update index, skipping.
-[08:36:39] [Render thread/INFO]: Debug functionality is disabled.
-[08:36:39] [Render thread/INFO]: ARB_direct_state_access detected, enabling DSA.
-[08:36:39] [Render thread/INFO]: Profile: VERYHIGH (+1 option changed by user)
-[08:36:39] [Render thread/INFO]: Using shaderpack: ComplementaryHungLoIfied.zip
-[08:36:39] [Render thread/INFO]: OpenGL Vendor: NVIDIA Corporation
-[08:36:39] [Render thread/INFO]: OpenGL Renderer: NVIDIA GeForce RTX 3080 Ti/PCIe/SSE2
-[08:36:39] [Render thread/INFO]: OpenGL Version: 3.3.0 NVIDIA 580.95.05
-[08:36:39] [Render thread/INFO]: Modifying OpenGL context to apply workarounds for the NVIDIA graphics driver...
-[08:36:39] [Render thread/INFO]: Using optional rendering extensions: GL_ARB_buffer_storage, GL_KHR_debug, GL_ARB_vertex_attrib_binding, GL_ARB_direct_state_access
-[08:36:39] [Render thread/INFO]: Loaded 20 skins (0 custom)
+[13:34:21] [Render thread/INFO]: OpenGL Vendor: NVIDIA Corporation
+[13:34:21] [Render thread/INFO]: OpenGL Renderer: NVIDIA GeForce RTX 3080 Ti/PCIe/SSE2
+[13:34:21] [Render thread/INFO]: OpenGL Version: 3.3.0 NVIDIA 580.95.05
+[13:34:21] [Render thread/INFO]: Modifying OpenGL context to apply workarounds for the NVIDIA graphics driver...
+[13:34:21] [Render thread/INFO]: Debug functionality is disabled.
+[13:34:21] [Render thread/INFO]: ARB_direct_state_access detected, enabling DSA.
+[13:34:21] [Render thread/INFO]: Shaders are disabled because no valid shaderpack is selected
+[13:34:21] [Render thread/INFO]: Using optional rendering extensions: GL_ARB_buffer_storage, GL_KHR_debug, GL_ARB_vertex_attrib_binding, GL_ARB_direct_state_access
+[13:34:21] [Render thread/INFO]: Loaded 20 skins (0 custom)
 [LWJGL] Loading library: openal
 	Module: org.lwjgl.openal
 	Loaded from org.lwjgl.librarypath: /tmp/lwjgl_matt/3.3.3-snapshot/x64/libopenal.so
 [LWJGL] [ALC] ALC_SOFT_reopen_device was reported as available but an entry point is missing.
-[08:36:40] [Render thread/INFO]: Hardware information:
-[08:36:40] [Render thread/INFO]: CPU: 20x 12th Gen Intel(R) Core(TM) i7-12700K
-[08:36:40] [Render thread/INFO]: GPU: NVIDIA GeForce RTX 3080 Ti/PCIe/SSE2 (Supports OpenGL 3.3.0 NVIDIA 580.95.05)
-[08:36:40] [Render thread/INFO]: OS: Linux (6.14.0-36-generic)
+[13:34:21] [Render thread/INFO]: Hardware information:
+[13:34:21] [Render thread/INFO]: CPU: 20x 12th Gen Intel(R) Core(TM) i7-12700K
+[13:34:21] [Render thread/INFO]: GPU: NVIDIA GeForce RTX 3080 Ti/PCIe/SSE2 (Supports OpenGL 3.3.0 NVIDIA 580.95.05)
+[13:34:21] [Render thread/INFO]: OS: Linux (6.14.0-36-generic)
 [LWJGL] Java 16 memcpy enabled
-[08:36:40] [Render thread/INFO]: Reloading ResourceManager: vanilla
-[08:36:40] [Worker-Main-18/INFO]: Found unifont_all_no_pua-16.0.03.hex, loading
-[08:36:40] [Worker-Main-19/INFO]: Found unifont_pua-16.0.03.hex, loading
-[08:36:40] [Worker-Main-12/INFO]: Found unifont_jp_patch-16.0.03.hex, loading
-[08:36:40] [Render thread/INFO]: OpenAL initialized on device HT-S350
-[08:36:40] [Render thread/INFO]: Sound engine started
-[08:36:40] [Render thread/INFO]: Created: 512x256x0 minecraft:textures/atlas/particles.png-atlas
-[08:36:40] [Render thread/INFO]: Created: 128x64x0 minecraft:textures/atlas/decorated_pot.png-atlas
-[08:36:40] [Render thread/INFO]: Created: 2048x1024x0 minecraft:textures/atlas/armor_trims.png-atlas
-[08:36:40] [Render thread/INFO]: Created: 512x256x0 minecraft:textures/atlas/paintings.png-atlas
-[08:36:40] [Render thread/INFO]: Created: 512x512x0 minecraft:textures/atlas/shield_patterns.png-atlas
-[08:36:40] [Render thread/INFO]: Created: 1024x512x4 minecraft:textures/atlas/blocks.png-atlas
-[08:36:40] [Render thread/INFO]: Created: 512x256x0 minecraft:textures/atlas/chest.png-atlas
-[08:36:40] [Render thread/INFO]: Created: 512x512x0 minecraft:textures/atlas/banner_patterns.png-atlas
-[08:36:40] [Render thread/INFO]: Created: 512x256x0 minecraft:textures/atlas/beds.png-atlas
-[08:36:40] [Render thread/INFO]: Created: 1024x512x0 minecraft:textures/atlas/gui.png-atlas
-[08:36:40] [Render thread/INFO]: Created: 64x64x0 minecraft:textures/atlas/map_decorations.png-atlas
-[08:36:40] [Render thread/INFO]: Created: 256x256x0 minecraft:textures/atlas/signs.png-atlas
-[08:36:40] [Render thread/INFO]: Created: 512x256x0 minecraft:textures/atlas/shulker_boxes.png-atlas
-[08:36:41] [Render thread/INFO]: Creating pipeline for dimension minecraft:overworld
-[08:36:49] [Render thread/INFO]: Loaded 1461 recipes
-[08:36:49] [Render thread/INFO]: Loaded 1574 advancements
-[08:36:49] [Server thread/INFO]: Starting integrated minecraft server version 1.21.10
-[08:36:49] [Server thread/INFO]: Generating keypair
-[08:36:49] [Server thread/INFO]: Loading 0 persistent chunks...
-[08:36:49] [Server thread/INFO]: Loading 49 chunks for player spawn...
-[08:36:49] [Server thread/INFO]: Preparing spawn area: 16%
-[08:36:49] [Server thread/INFO]: Preparing spawn area: 16%
-[08:36:50] [Server thread/INFO]: Time elapsed: 611 ms
-[08:36:50] [Server thread/INFO]: Player814[local:E:6e7b9d25] logged in with entity id 45 at (-121.8479826439469, 93.00063554902955, 546.5507565528605)
-[08:36:50] [Server thread/INFO]: Player814 joined the game
-[08:36:50] [Render thread/INFO]: Reloading pipeline on dimension change: minecraft:overworld => minecraft:overworld
-[08:36:50] [Render thread/INFO]: Destroying pipeline minecraft:overworld
-[08:36:50] [Render thread/INFO]: Creating pipeline for dimension minecraft:overworld
-[08:36:50] [Server thread/INFO]: Changing view distance to 18, from 10
-[08:36:50] [Server thread/INFO]: Changing simulation distance to 12, from 0
-[08:36:50] [Render thread/INFO]: Started 10 worker threads
-[08:36:50] [Render thread/ERROR]: Failed to load skin texture data
-java.io.FileNotFoundException: minecraft:entity/player/wide/steve
-	at knot/net.minecraft.server.packs.resources.ResourceProvider.lambda$getResourceOrThrow$1(ResourceProvider.java:18) ~[minecraft-1.21.10.jar:?]
-	at java.base/java.util.Optional.orElseThrow(Optional.java:403) ~[?:?]
-	at knot/net.minecraft.server.packs.resources.ResourceProvider.getResourceOrThrow(ResourceProvider.java:18) ~[minecraft-1.21.10.jar:?]
-	at knot/net.minecraft.client.multiplayer.ClientPacketListener.loadSkinTextureData(ClientPacketListener.java:2033) [minecraft-1.21.10.jar:?]
-	at knot/net.minecraft.client.multiplayer.ClientPacketListener.sendPlayerSkin(ClientPacketListener.java:2004) [minecraft-1.21.10.jar:?]
-	at knot/net.minecraft.client.multiplayer.ClientPacketListener.handleLogin(ClientPacketListener.java:540) [minecraft-1.21.10.jar:?]
-	at knot/net.minecraft.network.protocol.game.ClientboundLoginPacket.handle(ClientboundLoginPacket.java:67) [minecraft-1.21.10.jar:?]
-	at knot/net.minecraft.network.protocol.game.ClientboundLoginPacket.handle(ClientboundLoginPacket.java:14) [minecraft-1.21.10.jar:?]
-	at knot/net.minecraft.network.PacketProcessor$ListenerAndPacket.handle(PacketProcessor.java:50) [minecraft-1.21.10.jar:?]
-	at knot/net.minecraft.network.PacketProcessor.processQueuedPackets(PacketProcessor.java:37) [minecraft-1.21.10.jar:?]
-	at knot/net.minecraft.client.Minecraft.runTick(Minecraft.java:1224) [minecraft-1.21.10.jar:?]
-	at knot/net.minecraft.client.Minecraft.run(Minecraft.java:869) [minecraft-1.21.10.jar:?]
-	at knot/net.minecraft.client.main.Main.main(Main.java:258) [minecraft-1.21.10.jar:?]
-	at net.fabricmc.loader.impl.game.minecraft.MinecraftGameProvider.launch(MinecraftGameProvider.java:536) [fabric-loader-0.18.2.jar:0.18.2]
-	at net.fabricmc.loader.impl.launch.knot.Knot.launch(Knot.java:72) [fabric-loader-0.18.2.jar:0.18.2]
-	at net.fabricmc.loader.impl.launch.knot.KnotClient.main(KnotClient.java:23) [fabric-loader-0.18.2.jar:0.18.2]
-[08:36:50] [Render thread/WARN]: Ignoring chat session from Player814 due to missing Services public key
-[08:36:50] [Render thread/INFO]: Loaded 2 advancements
-[08:36:50] [Render thread/WARN]: Error while parsing the block ID map entry for "block.10104":
-[08:36:50] [Render thread/WARN]: - The block minecraft:stone_slab has no property with the name variant, ignoring!
-[08:36:50] [Render thread/WARN]: Error while parsing the block ID map entry for "block.10944":
-[08:36:50] [Render thread/WARN]: - The block minecraft:creaking_heart has no property with the name active, ignoring!
-[08:36:50] [Render thread/WARN]: Error while parsing the block ID map entry for "block.10948":
-[08:36:50] [Render thread/WARN]: - The block minecraft:creaking_heart has no property with the name active, ignoring!
-[08:36:50] [Render thread/INFO]: Stopping worker threads
-[08:36:50] [Render thread/INFO]: Started 10 worker threads
-[08:36:50] [Render thread/INFO]: Resizing Dynamic Transforms UBO, capacity limit of 2 reached during a single frame. New capacity will be 4.
-[08:36:50] [Render thread/INFO]: Resizing Dynamic Transforms UBO, capacity limit of 4 reached during a single frame. New capacity will be 8.
-[08:36:51] [Render thread/INFO]: Resizing Dynamic Transforms UBO, capacity limit of 8 reached during a single frame. New capacity will be 16.
-[08:36:53] [Server thread/INFO]: Saving and pausing game...
-[08:36:53] [Server thread/INFO]: Saving chunks for level 'ServerLevel[New World]'/minecraft:overworld
-[08:36:53] [Server thread/INFO]: Saving chunks for level 'ServerLevel[New World]'/minecraft:the_end
-[08:36:53] [Server thread/INFO]: Saving chunks for level 'ServerLevel[New World]'/minecraft:the_nether
-[08:36:55] [Server thread/INFO]: Player814 lost connection: Disconnected
-[08:36:55] [Server thread/INFO]: Player814 left the game
-[08:36:55] [Server thread/INFO]: Stopping singleplayer server as player logged out
-[08:36:55] [Server thread/INFO]: Stopping server
-[08:36:55] [Server thread/INFO]: Saving players
-[08:36:55] [Server thread/INFO]: Saving worlds
-[08:36:55] [Server thread/INFO]: Saving chunks for level 'ServerLevel[New World]'/minecraft:overworld
-[08:36:55] [Server thread/INFO]: Saving chunks for level 'ServerLevel[New World]'/minecraft:the_end
-[08:36:55] [Server thread/INFO]: Saving chunks for level 'ServerLevel[New World]'/minecraft:the_nether
-[08:36:55] [Server thread/INFO]: ThreadedAnvilChunkStorage (New World): All chunks are saved
-[08:36:55] [Server thread/INFO]: ThreadedAnvilChunkStorage (DIM1): All chunks are saved
-[08:36:55] [Server thread/INFO]: ThreadedAnvilChunkStorage (DIM-1): All chunks are saved
-[08:36:55] [Server thread/INFO]: ThreadedAnvilChunkStorage: All dimensions are saved
-[08:36:55] [Render thread/INFO]: Stopping worker threads
-[08:36:56] [Render thread/INFO]: Stopping!
+[13:34:21] [Render thread/INFO]: Reloading ResourceManager: vanilla
+[13:34:21] [Worker-Main-19/INFO]: Found unifont_pua-16.0.03.hex, loading
+[13:34:21] [Worker-Main-12/INFO]: Found unifont_all_no_pua-16.0.03.hex, loading
+[13:34:21] [Worker-Main-11/INFO]: Found unifont_jp_patch-16.0.03.hex, loading
+[13:34:22] [Render thread/INFO]: OpenAL initialized on device HT-S350
+[13:34:22] [Render thread/INFO]: Sound engine started
+[13:34:22] [Render thread/INFO]: Created: 512x256x0 minecraft:textures/atlas/particles.png-atlas
+[13:34:22] [Render thread/INFO]: Created: 128x64x0 minecraft:textures/atlas/decorated_pot.png-atlas
+[13:34:22] [Render thread/INFO]: Created: 2048x1024x0 minecraft:textures/atlas/armor_trims.png-atlas
+[13:34:22] [Render thread/INFO]: Created: 512x256x0 minecraft:textures/atlas/paintings.png-atlas
+[13:34:22] [Render thread/INFO]: Created: 512x512x0 minecraft:textures/atlas/shield_patterns.png-atlas
+[13:34:22] [Render thread/INFO]: Created: 1024x512x4 minecraft:textures/atlas/blocks.png-atlas
+[13:34:22] [Render thread/INFO]: Created: 512x256x0 minecraft:textures/atlas/chest.png-atlas
+[13:34:22] [Render thread/INFO]: Created: 512x512x0 minecraft:textures/atlas/banner_patterns.png-atlas
+[13:34:22] [Render thread/INFO]: Created: 512x256x0 minecraft:textures/atlas/beds.png-atlas
+[13:34:22] [Render thread/INFO]: Created: 1024x512x0 minecraft:textures/atlas/gui.png-atlas
+[13:34:22] [Render thread/INFO]: Created: 64x64x0 minecraft:textures/atlas/map_decorations.png-atlas
+[13:34:22] [Render thread/INFO]: Created: 256x256x0 minecraft:textures/atlas/signs.png-atlas
+[13:34:22] [Render thread/INFO]: Created: 512x256x0 minecraft:textures/atlas/shulker_boxes.png-atlas
+[13:34:22] [Render thread/INFO]: Creating pipeline for dimension minecraft:overworld
+[13:34:22] [Render thread/INFO]: [Options Save] Saving shaderPackName: value = 'ComplementaryHungLoIfied.zip'
+[13:34:22] [Render thread/INFO]: [Options Save] Saving enableShaders: value = true, json = true
+[13:34:22] [Render thread/INFO]: [Options Save] Completed options save successfully
+[13:34:29] [Render thread/INFO]: [Options Save] Saving shaderPackName: value = 'ComplementaryHungLoIfied.zip'
+[13:34:29] [Render thread/INFO]: [Options Save] Saving enableShaders: value = true, json = true
+[13:34:29] [Render thread/INFO]: [Options Save] Completed options save successfully
+[13:34:30] [Render thread/INFO]: [Options Save] Saving shaderPackName: value = 'ComplementaryHungLoIfied.zip'
+[13:34:30] [Render thread/INFO]: [Options Save] Saving enableShaders: value = true, json = true
+[13:34:30] [Render thread/INFO]: [Options Save] Completed options save successfully
+[13:34:30] [Render thread/INFO]: [Options Save] Saving shaderPackName: value = 'ComplementaryHungLoIfied.zip'
+[13:34:30] [Render thread/INFO]: [Options Save] Saving enableShaders: value = true, json = true
+[13:34:30] [Render thread/INFO]: [Options Save] Completed options save successfully
+[13:34:35] [Render thread/INFO]: [ShaderPack] setShaderPackName called with: 'ComplementaryHungLoIfied.zip'
+[13:34:35] [Render thread/INFO]: [ShaderPack] Set to: 'ComplementaryHungLoIfied.zip'
+[13:34:35] [Render thread/INFO]: [Config Save] Writing shaderPackName='ComplementaryHungLoIfied.zip', enableShaders=true
+[13:34:35] [Render thread/INFO]: [Config Save] mc.options values BEFORE save: shaderPackName='ComplementaryHungLoIfied.zip', enableShaders=true
+[13:34:35] [Render thread/INFO]: [Options Save] Saving shaderPackName: value = 'ComplementaryHungLoIfied.zip'
+[13:34:35] [Render thread/INFO]: [Options Save] Saving enableShaders: value = true, json = true
+[13:34:35] [Render thread/INFO]: [Options Save] Completed options save successfully
+[13:34:35] [Render thread/INFO]: [Config Save] mc.options values AFTER save: shaderPackName='ComplementaryHungLoIfied.zip', enableShaders=true
+[13:34:35] [Render thread/INFO]: [Config Load] BEFORE sync - IrisConfig.shaderPackName='ComplementaryHungLoIfied.zip', IrisConfig.enableShaders=true
+[13:34:35] [Render thread/INFO]: [Config Load] mc.options values: shaderPackName='ComplementaryHungLoIfied.zip', enableShaders=true
+[13:34:35] [Render thread/INFO]: [Config Load] AFTER sync - IrisConfig.shaderPackName='ComplementaryHungLoIfied.zip', IrisConfig.enableShaders=true
+[13:34:35] [Render thread/INFO]: Destroying pipeline minecraft:overworld
+[13:34:35] [Render thread/INFO]: Profile: HIGH (+0 options changed by user)
+[13:34:36] [Render thread/INFO]: Using shaderpack: ComplementaryHungLoIfied.zip
+[13:34:38] [Render thread/INFO]: [Options Save] Saving shaderPackName: value = 'ComplementaryHungLoIfied.zip'
+[13:34:38] [Render thread/INFO]: [Options Save] Saving enableShaders: value = true, json = true
+[13:34:38] [Render thread/INFO]: [Options Save] Completed options save successfully
+[13:34:39] [Render thread/INFO]: [Options Save] Saving shaderPackName: value = 'ComplementaryHungLoIfied.zip'
+[13:34:39] [Render thread/INFO]: [Options Save] Saving enableShaders: value = true, json = true
+[13:34:39] [Render thread/INFO]: [Options Save] Completed options save successfully
+[13:34:40] [Render thread/INFO]: Stopping!
 
-BUILD SUCCESSFUL in 39s
-15 actionable tasks: 6 executed, 9 up-to-date
+BUILD SUCCESSFUL in 25s
+15 actionable tasks: 3 executed, 12 up-to-date

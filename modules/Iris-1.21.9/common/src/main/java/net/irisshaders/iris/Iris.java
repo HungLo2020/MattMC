@@ -412,12 +412,9 @@ public class Iris {
 	}
 
 	public static void setDebug(boolean enable) {
-		try {
-			irisConfig.setDebugEnabled(enable);
-			irisConfig.save();
-		} catch (IOException e) {
-			Iris.logger.fatal("Failed to save config!", e);
-		}
+		irisConfig.setDebugEnabled(enable);
+		// Step 5: Do NOT save here during initialization - it would overwrite shader pack name with null
+		// Save only happens when user explicitly changes settings via GUI
 
 		int success;
 		if (enable) {
@@ -807,5 +804,24 @@ public class Iris {
 		updateChecker.checkForUpdates(irisConfig);
 
 		initialized = true;
+	}
+	
+	/**
+	 * Syncs IrisConfig from Minecraft Options after Options has been loaded.
+	 * Called via mixin after Options constructor completes.
+	 */
+	public static void syncConfigFromOptions() {
+		logger.info("[Iris Sync] syncConfigFromOptions() called");
+		if (irisConfig != null) {
+			try {
+				logger.info("[Iris Sync] Calling irisConfig.initialize() to sync from loaded Options");
+				irisConfig.initialize();
+				logger.info("[Iris Sync] Sync completed successfully");
+			} catch (IOException e) {
+				logger.error("[Iris Sync] Failed to sync Iris configuration from Options", e);
+			}
+		} else {
+			logger.warn("[Iris Sync] irisConfig is null, cannot sync");
+		}
 	}
 }
