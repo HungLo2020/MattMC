@@ -1090,7 +1090,7 @@ tasks.register('clientDist') {
     group = 'distribution'
     description = 'Creates a runnable client distribution'
     
-    dependsOn 'jar', 'classes', 'downloadJdk', 'shaderPackZip'
+    dependsOn 'jar', 'classes', 'downloadJdk', 'shaderPackZip', 'fabricLoaderJar', 'gameJar', 'sodiumJar', 'irisJar'
     
     def distDir = "${buildDir}/client-dist/MattMC"
     
@@ -1103,6 +1103,7 @@ tasks.register('clientDist') {
         file("${distDir}/run/assets").mkdirs()
         file("${distDir}/run/resourcepacks").mkdirs()
         file("${distDir}/run/shaderpacks").mkdirs()
+        file("${distDir}/run/mods").mkdirs()
         
         // Copy project JAR
         copy {
@@ -1153,10 +1154,34 @@ tasks.register('clientDist') {
         }
         println "Copied shader pack to ${distDir}/run/shaderpacks"
         
+        // Copy Fabric Loader JAR to lib directory
+        copy {
+            from file("${buildDir}/libs/fabric-loader-${fabricLoaderVersion}.jar")
+            into "${distDir}/lib"
+        }
+        println "Copied Fabric Loader JAR to ${distDir}/lib"
+        
+        // Copy Game JAR to lib directory
+        copy {
+            from file("${buildDir}/libs/minecraft-${version}.jar")
+            into "${distDir}/lib"
+        }
+        println "Copied Game JAR to ${distDir}/lib"
+        
+        // Copy mod JARs (Sodium, Iris) to run/mods directory
+        copy {
+            from file("${buildDir}/mods")
+            into "${distDir}/run/mods"
+            include '*.jar'
+        }
+        println "Copied mod JARs to ${distDir}/run/mods"
+        
         // Build classpath string for launch scripts
-        def jarName = tasks.jar.archiveFileName.get()
-        def classpathLinux = "lib/${jarName}:lib/" + configurations.runtimeClasspath.files.collect { it.name }.join(':lib/')
-        def classpathWindows = "lib\\${jarName};lib\\" + configurations.runtimeClasspath.files.collect { it.name }.join(';lib\\')
+        // Fabric Loader JAR first, then Game JAR, then dependencies (same order as runClient)
+        def fabricLoaderJarName = "fabric-loader-${fabricLoaderVersion}.jar"
+        def gameJarName = "minecraft-${version}.jar"
+        def classpathLinux = "lib/${fabricLoaderJarName}:lib/${gameJarName}:lib/" + configurations.runtimeClasspath.files.collect { it.name }.join(':lib/')
+        def classpathWindows = "lib\\${fabricLoaderJarName};lib\\${gameJarName};lib\\" + configurations.runtimeClasspath.files.collect { it.name }.join(';lib\\')
         
         // Asset index - this should match the index file in assets/indexes/<assetIndex>.json
         def assetIndex = '27'
