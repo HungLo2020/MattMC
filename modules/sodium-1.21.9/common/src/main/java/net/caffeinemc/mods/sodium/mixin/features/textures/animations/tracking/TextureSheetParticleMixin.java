@@ -1,7 +1,7 @@
 package net.caffeinemc.mods.sodium.mixin.features.textures.animations.tracking;
 
 import com.mojang.blaze3d.vertex.VertexConsumer;
-import net.caffeinemc.mods.sodium.api.texture.SpriteUtil;
+import net.minecraft.client.renderer.advanced.texture.SpriteUtil;
 import net.minecraft.client.Camera;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.particle.SingleQuadParticle;

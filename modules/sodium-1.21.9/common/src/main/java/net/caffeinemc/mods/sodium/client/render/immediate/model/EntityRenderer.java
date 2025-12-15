@@ -1,9 +1,9 @@
 package net.caffeinemc.mods.sodium.client.render.immediate.model;
 
 import com.mojang.blaze3d.vertex.PoseStack;
-import net.caffeinemc.mods.sodium.api.math.MatrixHelper;
-import net.caffeinemc.mods.sodium.api.vertex.buffer.VertexBufferWriter;
-import net.caffeinemc.mods.sodium.api.vertex.format.common.EntityVertex;
+import net.minecraft.client.renderer.advanced.math.MatrixHelper;
+import net.minecraft.client.renderer.advanced.vertex.buffer.VertexBufferWriter;
+import net.minecraft.client.renderer.advanced.vertex.format.common.EntityVertex;
 import net.caffeinemc.mods.sodium.client.util.Int2;
 import net.minecraft.core.Direction;
 import org.joml.Matrix3f;

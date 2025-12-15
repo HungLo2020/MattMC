@@ -1,9 +1,9 @@
 package net.irisshaders.iris.vertices.sodium;
 
-import net.caffeinemc.mods.sodium.api.memory.MemoryIntrinsics;
-import net.caffeinemc.mods.sodium.api.util.NormI8;
-import net.caffeinemc.mods.sodium.api.vertex.format.common.EntityVertex;
-import net.caffeinemc.mods.sodium.api.vertex.serializer.VertexSerializer;
+import net.minecraft.client.renderer.advanced.memory.MemoryIntrinsics;
+import net.minecraft.client.renderer.advanced.util.NormI8;
+import net.minecraft.client.renderer.advanced.vertex.format.common.EntityVertex;
+import net.minecraft.client.renderer.advanced.vertex.serializer.VertexSerializer;
 import net.irisshaders.iris.uniforms.CapturedRenderingState;
 import net.irisshaders.iris.vertices.IrisVertexFormats;
 import net.irisshaders.iris.vertices.NormalHelper;

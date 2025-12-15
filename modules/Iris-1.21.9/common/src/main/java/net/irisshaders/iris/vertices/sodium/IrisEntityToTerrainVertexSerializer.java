@@ -1,6 +1,6 @@
 package net.irisshaders.iris.vertices.sodium;
 
-import net.caffeinemc.mods.sodium.api.vertex.serializer.VertexSerializer;
+import net.minecraft.client.renderer.advanced.vertex.serializer.VertexSerializer;
 import net.irisshaders.iris.vertices.IrisVertexFormats;
 import org.lwjgl.system.MemoryUtil;
 

@@ -18,9 +18,9 @@ package net.caffeinemc.mods.sodium.client.render.frapi.render;
 
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
-import net.caffeinemc.mods.sodium.api.texture.SpriteUtil;
-import net.caffeinemc.mods.sodium.api.util.ColorARGB;
-import net.caffeinemc.mods.sodium.api.util.ColorMixer;
+import net.minecraft.client.renderer.advanced.texture.SpriteUtil;
+import net.minecraft.client.renderer.advanced.util.ColorARGB;
+import net.minecraft.client.renderer.advanced.util.ColorMixer;
 import net.caffeinemc.mods.sodium.client.model.light.LightMode;
 import net.caffeinemc.mods.sodium.client.model.light.LightPipelineProvider;
 import net.caffeinemc.mods.sodium.client.model.light.data.SingleBlockLightDataCache;

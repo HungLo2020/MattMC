@@ -18,8 +18,8 @@ package net.caffeinemc.mods.sodium.client.render.frapi.render;
 
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
-import net.caffeinemc.mods.sodium.api.texture.SpriteUtil;
-import net.caffeinemc.mods.sodium.api.vertex.buffer.VertexBufferWriter;
+import net.minecraft.client.renderer.advanced.texture.SpriteUtil;
+import net.minecraft.client.renderer.advanced.vertex.buffer.VertexBufferWriter;
 import net.caffeinemc.mods.sodium.client.render.frapi.helper.ColorHelper;
 import net.caffeinemc.mods.sodium.client.render.frapi.mesh.MutableQuadViewImpl;
 import net.caffeinemc.mods.sodium.client.render.immediate.model.BakedModelEncoder;

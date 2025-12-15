@@ -3,7 +3,7 @@ package net.caffeinemc.mods.sodium.mixin.core.render.immediate.consumer;
 
 import com.mojang.blaze3d.vertex.VertexFormat;
 import com.mojang.blaze3d.vertex.VertexConsumer;
-import net.caffeinemc.mods.sodium.api.vertex.buffer.VertexBufferWriter;
+import net.minecraft.client.renderer.advanced.vertex.buffer.VertexBufferWriter;
 import org.lwjgl.system.MemoryStack;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;

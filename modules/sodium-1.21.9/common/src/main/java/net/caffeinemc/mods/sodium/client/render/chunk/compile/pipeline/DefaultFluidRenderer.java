@@ -1,8 +1,8 @@
 package net.caffeinemc.mods.sodium.client.render.chunk.compile.pipeline;
 
 
-import net.caffeinemc.mods.sodium.api.util.ColorARGB;
-import net.caffeinemc.mods.sodium.api.util.NormI8;
+import net.minecraft.client.renderer.advanced.util.ColorARGB;
+import net.minecraft.client.renderer.advanced.util.NormI8;
 import net.caffeinemc.mods.sodium.client.model.color.ColorProvider;
 import net.caffeinemc.mods.sodium.client.model.light.LightMode;
 import net.caffeinemc.mods.sodium.client.model.light.LightPipeline;
