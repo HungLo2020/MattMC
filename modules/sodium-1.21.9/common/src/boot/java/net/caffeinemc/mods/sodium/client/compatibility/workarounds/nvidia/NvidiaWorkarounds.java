@@ -31,8 +31,6 @@ public class NvidiaWorkarounds {
     // So we require that an up-to-date graphics driver is installed so that our workarounds can disable the Threaded
     // Optimizations driver hack.
     public static @Nullable WindowsFileVersion findNvidiaDriverMatchingBug1486() {
-        // The Linux driver has two separate branches which have overlapping version numbers, despite also having
-        // different feature sets. As a result, we can't reliably determine which Linux drivers are broken...
         if (OsUtils.getOs() != OperatingSystem.WIN) {
             return null;
         }
@@ -55,6 +53,138 @@ public class NvidiaWorkarounds {
             }
         }
 
+        return null;
+    }
+
+    /**
+     * Detects if NVIDIA threaded optimizations workaround is needed on Linux.
+     * The issue affects drivers before 536.23. We use version 536 as the threshold
+     * since Linux and Windows drivers are generally aligned in their major versions.
+     * 
+     * @return true if the workaround should be applied, false if driver is new enough
+     */
+    public static boolean isLinuxNvidiaThreadedOptimizationsWorkaroundNeeded() {
+        if (OsUtils.getOs() != OperatingSystem.LINUX) {
+            return false;
+        }
+
+        var driverVersion = getLinuxNvidiaDriverVersion();
+        if (driverVersion == null) {
+            // If we can't determine the driver version, apply the workaround to be safe
+            LOGGER.warn("Unable to determine NVIDIA driver version on Linux. Applying threaded optimizations workaround as a precaution.");
+            return true;
+        }
+
+        LOGGER.info("Detected NVIDIA Linux driver version: {}", driverVersion);
+
+        // Parse major version from the driver string (e.g., "560.35.03" -> 560)
+        try {
+            var parts = driverVersion.split("\\.");
+            if (parts.length > 0) {
+                int majorVersion = Integer.parseInt(parts[0]);
+                
+                // The fix was introduced in version 536.23
+                // We use 536 as the threshold since the issue affects all drivers before this
+                if (majorVersion >= 536) {
+                    LOGGER.info("NVIDIA driver version {} is new enough to not require threaded optimizations workaround", driverVersion);
+                    return false;
+                } else {
+                    LOGGER.warn("NVIDIA driver version {} is older than 536 and may have threaded optimizations issues", driverVersion);
+                    return true;
+                }
+            }
+        } catch (NumberFormatException e) {
+            LOGGER.warn("Failed to parse NVIDIA driver version: {}", driverVersion, e);
+        }
+
+        // If parsing failed, apply the workaround to be safe
+        return true;
+    }
+
+    /**
+     * Attempts to retrieve the NVIDIA driver version on Linux from various sources.
+     * 
+     * @return the driver version string (e.g., "560.35.03"), or null if not found
+     */
+    private static @Nullable String getLinuxNvidiaDriverVersion() {
+        // Method 1: Try /proc/driver/nvidia/version
+        var procVersion = getDriverVersionFromProc();
+        if (procVersion != null) {
+            return procVersion;
+        }
+
+        // Method 2: Try nvidia-smi command
+        var smiVersion = getDriverVersionFromNvidiaSmi();
+        if (smiVersion != null) {
+            return smiVersion;
+        }
+
+        // Method 3: Try modinfo command
+        var modinfoVersion = getDriverVersionFromModinfo();
+        if (modinfoVersion != null) {
+            return modinfoVersion;
+        }
+
+        return null;
+    }
+
+    private static @Nullable String getDriverVersionFromProc() {
+        try {
+            var versionFile = java.nio.file.Path.of("/proc/driver/nvidia/version");
+            if (java.nio.file.Files.exists(versionFile)) {
+                var content = java.nio.file.Files.readString(versionFile);
+                // Format: "NVRM version: NVIDIA UNIX x86_64 Kernel Module  560.35.03  Tue Oct  1 16:14:14 UTC 2024"
+                // Extract version using regex
+                var matcher = java.util.regex.Pattern.compile("(\\d+\\.\\d+(?:\\.\\d+)?)").matcher(content);
+                if (matcher.find()) {
+                    return matcher.group(1);
+                }
+            }
+        } catch (Exception e) {
+            LOGGER.debug("Failed to read NVIDIA driver version from /proc/driver/nvidia/version", e);
+        }
+        return null;
+    }
+
+    private static @Nullable String getDriverVersionFromNvidiaSmi() {
+        try {
+            var process = Runtime.getRuntime().exec(new String[]{"nvidia-smi", "--query-gpu=driver_version", "--format=csv,noheader"});
+            var result = process.waitFor();
+            
+            if (result == 0) {
+                try (var reader = new java.io.BufferedReader(new java.io.InputStreamReader(process.getInputStream()))) {
+                    var version = reader.readLine();
+                    if (version != null && !version.trim().isEmpty()) {
+                        return version.trim();
+                    }
+                }
+            }
+        } catch (Exception e) {
+            LOGGER.debug("Failed to get NVIDIA driver version from nvidia-smi", e);
+        }
+        return null;
+    }
+
+    private static @Nullable String getDriverVersionFromModinfo() {
+        try {
+            var process = Runtime.getRuntime().exec(new String[]{"modinfo", "nvidia"});
+            var result = process.waitFor();
+            
+            if (result == 0) {
+                try (var reader = new java.io.BufferedReader(new java.io.InputStreamReader(process.getInputStream()))) {
+                    String line;
+                    while ((line = reader.readLine()) != null) {
+                        if (line.startsWith("version:")) {
+                            var version = line.substring("version:".length()).trim();
+                            // modinfo returns version in format "560.35.03" or similar
+                            return version;
+                        }
+                    }
+                }
+            }
+        } catch (Exception e) {
+            LOGGER.debug("Failed to get NVIDIA driver version from modinfo", e);
+        }
         return null;
     }
 
