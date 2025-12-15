@@ -15,10 +15,6 @@ uniform sampler2D gDhDepthTexture;
  */
 void main()
 {
-    // TEMPORARY DEBUG: Always show LOD color to test if depth check is the issue
-    fragColor = texture(gDhColorTexture, TexCoord);
-    
-    /* ORIGINAL CODE - temporarily disabled for debugging
     fragColor = vec4(0.0);
     
     // a fragment depth of "1" means the fragment wasn't drawn to,
@@ -33,6 +29,5 @@ void main()
         // use the original MC texture if no LODs were drawn to this fragment
         discard;
     }
-    */
 }
 
