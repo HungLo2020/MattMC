@@ -85,6 +85,8 @@ public class IrisConfig {
 			net.minecraft.client.Minecraft mc = net.minecraft.client.Minecraft.getInstance();
 			if (mc != null && mc.options != null) {
 				// DEBUG: Log what we're loading
+				Iris.logger.info("[Config Load] BEFORE sync - IrisConfig.shaderPackName='{}', IrisConfig.enableShaders={}", 
+					this.shaderPackName, this.enableShaders);
 				Iris.logger.info("[Config Load] mc.options values: shaderPackName='{}', enableShaders={}", 
 					mc.options.shaderPackName, mc.options.enableShaders().get());
 				
@@ -93,7 +95,7 @@ public class IrisConfig {
 				this.enableShaders = mc.options.enableShaders().get();
 				
 				// DEBUG: Log what we loaded
-				Iris.logger.info("[Config Load] IrisConfig fields after sync: shaderPackName='{}', enableShaders={}", 
+				Iris.logger.info("[Config Load] AFTER sync - IrisConfig.shaderPackName='{}', IrisConfig.enableShaders={}", 
 					this.shaderPackName, this.enableShaders);
 			}
 		} catch (Exception e) {
@@ -126,10 +128,13 @@ public class IrisConfig {
 	 * Sets the name of the current shaderpack
 	 */
 	public void setShaderPackName(String name) {
+		Iris.logger.info("[ShaderPack] setShaderPackName called with: '{}'", name);
 		if (name == null || name.equals("(internal)") || name.isEmpty()) {
 			this.shaderPackName = null;
+			Iris.logger.info("[ShaderPack] Set to null (was internal or empty)");
 		} else {
 			this.shaderPackName = name;
+			Iris.logger.info("[ShaderPack] Set to: '{}'", name);
 		}
 	}
 
