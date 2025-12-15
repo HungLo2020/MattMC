@@ -414,7 +414,9 @@ public class Iris {
 	public static void setDebug(boolean enable) {
 		try {
 			irisConfig.setDebugEnabled(enable);
-			irisConfig.save();
+			// Step 5: Do NOT save here during initialization - it would overwrite shader pack name with null
+			// Save only happens when user explicitly changes settings via GUI
+			// irisConfig.save();
 		} catch (IOException e) {
 			Iris.logger.fatal("Failed to save config!", e);
 		}
