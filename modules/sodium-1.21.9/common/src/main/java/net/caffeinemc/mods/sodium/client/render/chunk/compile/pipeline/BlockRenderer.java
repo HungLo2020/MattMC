@@ -1,8 +1,8 @@
 package net.caffeinemc.mods.sodium.client.render.chunk.compile.pipeline;
 
-import net.caffeinemc.mods.sodium.api.util.ColorABGR;
-import net.caffeinemc.mods.sodium.api.util.ColorARGB;
-import net.caffeinemc.mods.sodium.api.util.ColorMixer;
+import net.minecraft.client.renderer.advanced.util.ColorABGR;
+import net.minecraft.client.renderer.advanced.util.ColorARGB;
+import net.minecraft.client.renderer.advanced.util.ColorMixer;
 import net.caffeinemc.mods.sodium.client.compatibility.workarounds.Workarounds;
 import net.caffeinemc.mods.sodium.client.model.color.ColorProvider;
 import net.caffeinemc.mods.sodium.client.model.color.ColorProviderRegistry;

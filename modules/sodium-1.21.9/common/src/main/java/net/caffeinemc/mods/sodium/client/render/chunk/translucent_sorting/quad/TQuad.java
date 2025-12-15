@@ -8,7 +8,7 @@ import org.joml.Vector3f;
 import org.joml.Vector3fc;
 
 import net.caffeinemc.mods.sodium.client.model.quad.properties.ModelQuadFacing;
-import net.caffeinemc.mods.sodium.api.util.NormI8;
+import net.minecraft.client.renderer.advanced.util.NormI8;
 
 /**
  * Represents a quad for the purposes of translucency sorting. Called TQuad to

@@ -3,7 +3,7 @@ package net.caffeinemc.mods.sodium.mixin.features.textures.scan;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import com.mojang.blaze3d.platform.NativeImage;
-import net.caffeinemc.mods.sodium.api.util.ColorABGR;
+import net.minecraft.client.renderer.advanced.util.ColorABGR;
 import net.caffeinemc.mods.sodium.client.render.chunk.compile.pipeline.SpriteContentsExtension;
 import net.caffeinemc.mods.sodium.client.util.NativeImageHelper;
 import net.minecraft.client.renderer.texture.SpriteContents;

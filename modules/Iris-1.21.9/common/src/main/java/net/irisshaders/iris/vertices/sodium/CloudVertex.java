@@ -1,9 +1,9 @@
 package net.irisshaders.iris.vertices.sodium;
 
-import net.caffeinemc.mods.sodium.api.math.MatrixHelper;
-import net.caffeinemc.mods.sodium.api.vertex.attributes.common.ColorAttribute;
-import net.caffeinemc.mods.sodium.api.vertex.attributes.common.NormalAttribute;
-import net.caffeinemc.mods.sodium.api.vertex.attributes.common.PositionAttribute;
+import net.minecraft.client.renderer.advanced.math.MatrixHelper;
+import net.minecraft.client.renderer.advanced.vertex.attributes.common.ColorAttribute;
+import net.minecraft.client.renderer.advanced.vertex.attributes.common.NormalAttribute;
+import net.minecraft.client.renderer.advanced.vertex.attributes.common.PositionAttribute;
 import org.joml.Matrix4f;
 
 public final class CloudVertex {

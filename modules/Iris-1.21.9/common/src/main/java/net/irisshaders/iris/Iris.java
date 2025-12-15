@@ -6,7 +6,7 @@ import com.mojang.blaze3d.opengl.GlDevice;
 import com.mojang.blaze3d.platform.InputConstants;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.DefaultVertexFormat;
-import net.caffeinemc.mods.sodium.api.vertex.serializer.VertexSerializerRegistry;
+import net.minecraft.client.renderer.advanced.vertex.serializer.VertexSerializerRegistry;
 import net.irisshaders.iris.compat.dh.DHCompat;
 import net.irisshaders.iris.config.IrisConfig;
 import net.irisshaders.iris.gl.GLDebug;

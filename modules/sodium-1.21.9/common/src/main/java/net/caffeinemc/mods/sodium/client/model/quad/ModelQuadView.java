@@ -1,7 +1,7 @@
 package net.caffeinemc.mods.sodium.client.model.quad;
 
 import net.caffeinemc.mods.sodium.client.model.quad.properties.ModelQuadFlags;
-import net.caffeinemc.mods.sodium.api.util.NormI8;
+import net.minecraft.client.renderer.advanced.util.NormI8;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
 import net.minecraft.core.Direction;
 

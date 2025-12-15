@@ -3,10 +3,10 @@ package net.caffeinemc.mods.sodium.client.render.vertex.serializers;
 import com.mojang.blaze3d.vertex.VertexFormat;
 import it.unimi.dsi.fastutil.longs.Long2ReferenceMap;
 import it.unimi.dsi.fastutil.longs.Long2ReferenceOpenHashMap;
-import net.caffeinemc.mods.sodium.api.vertex.format.VertexFormatExtensions;
+import net.minecraft.client.renderer.advanced.vertex.format.VertexFormatExtensions;
 import net.caffeinemc.mods.sodium.client.render.vertex.serializers.generated.VertexSerializerFactory;
-import net.caffeinemc.mods.sodium.api.vertex.serializer.VertexSerializer;
-import net.caffeinemc.mods.sodium.api.vertex.serializer.VertexSerializerRegistry;
+import net.minecraft.client.renderer.advanced.vertex.serializer.VertexSerializer;
+import net.minecraft.client.renderer.advanced.vertex.serializer.VertexSerializerRegistry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

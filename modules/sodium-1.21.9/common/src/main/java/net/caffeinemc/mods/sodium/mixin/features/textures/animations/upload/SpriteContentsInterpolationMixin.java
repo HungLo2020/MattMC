@@ -3,7 +3,7 @@ package net.caffeinemc.mods.sodium.mixin.features.textures.animations.upload;
 import com.mojang.blaze3d.textures.GpuTexture;
 import net.caffeinemc.mods.sodium.client.util.NativeImageHelper;
 import net.caffeinemc.mods.sodium.mixin.features.textures.SpriteContentsInvoker;
-import net.caffeinemc.mods.sodium.api.util.ColorMixer;
+import net.minecraft.client.renderer.advanced.util.ColorMixer;
 import net.minecraft.client.renderer.texture.SpriteContents;
 import org.lwjgl.system.MemoryUtil;
 import org.spongepowered.asm.mixin.*;

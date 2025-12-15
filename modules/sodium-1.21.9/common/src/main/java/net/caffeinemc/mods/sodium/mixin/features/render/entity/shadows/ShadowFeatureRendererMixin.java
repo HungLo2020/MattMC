@@ -1,17 +1,17 @@
 package net.caffeinemc.mods.sodium.mixin.features.render.entity.shadows;
 
 import com.mojang.blaze3d.vertex.VertexConsumer;
-import net.caffeinemc.mods.sodium.api.util.NormI8;
+import net.minecraft.client.renderer.advanced.util.NormI8;
 import net.caffeinemc.mods.sodium.client.render.vertex.VertexConsumerUtils;
-import net.caffeinemc.mods.sodium.api.vertex.buffer.VertexBufferWriter;
-import net.caffeinemc.mods.sodium.api.vertex.format.common.EntityVertex;
+import net.minecraft.client.renderer.advanced.vertex.buffer.VertexBufferWriter;
+import net.minecraft.client.renderer.advanced.vertex.format.common.EntityVertex;
 import net.minecraft.client.renderer.*;
 import net.minecraft.client.renderer.entity.state.EntityRenderState;
 import net.minecraft.client.renderer.feature.ShadowFeatureRenderer;
 import net.minecraft.client.renderer.texture.OverlayTexture;
 import net.minecraft.world.phys.AABB;
-import net.caffeinemc.mods.sodium.api.util.ColorABGR;
-import net.caffeinemc.mods.sodium.api.math.MatrixHelper;
+import net.minecraft.client.renderer.advanced.util.ColorABGR;
+import net.minecraft.client.renderer.advanced.math.MatrixHelper;
 import org.joml.Matrix4f;
 import org.lwjgl.system.MemoryStack;
 import org.spongepowered.asm.mixin.Final;

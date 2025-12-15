@@ -1,6 +1,6 @@
 package net.caffeinemc.mods.sodium.client.render.chunk;
 
-import net.caffeinemc.mods.sodium.api.blockentity.BlockEntityRenderPredicate;
+import net.minecraft.client.renderer.advanced.blockentity.BlockEntityRenderPredicate;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.BlockGetter;
 import net.minecraft.world.level.block.entity.BlockEntity;
