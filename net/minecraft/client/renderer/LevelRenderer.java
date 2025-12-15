@@ -1669,12 +1669,14 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 		private final float tickDelta;
 		private final Camera camera;
 		private final DeltaTracker deltaTracker;
+		private final Matrix4f combinedMVP;
 		private static final Matrix4f IDENTITY_MATRIX = new Matrix4f().identity();
 		
 		public WorldRenderContextImpl(ClientLevel level, Matrix4f combinedMVP, float tickDelta, Camera camera) {
 			this.level = level;
 			this.tickDelta = tickDelta;
 			this.camera = camera;
+			this.combinedMVP = combinedMVP;
 			// Create a simple DeltaTracker that returns the tick delta value
 			this.deltaTracker = new DeltaTracker() {
 				@Override
@@ -1734,6 +1736,11 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 		public Matrix4f projectionMatrix() {
 			// In MC 1.21.6+, the projection matrix is identity since MVP is combined
 			return IDENTITY_MATRIX;
+		}
+		
+		// MC 1.20.6+ adds positionMatrix() method - returns the combined MVP directly
+		public Matrix4f positionMatrix() {
+			return this.combinedMVP;
 		}
 		
 		// MC 1.21.1+ adds tickCounter() method needed by Distant Horizons
