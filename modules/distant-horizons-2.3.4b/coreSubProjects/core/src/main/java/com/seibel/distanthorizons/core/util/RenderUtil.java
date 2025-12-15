@@ -68,11 +68,14 @@ public class RenderUtil
 		
 		// Check if projection matrix is identity (MC 1.21.6+ provides identity projection)
 		// In this case, the modelview matrix already contains the combined MVP
-		boolean isIdentity = lodProj.m00 == 1.0f && lodProj.m11 == 1.0f && lodProj.m22 == 1.0f && lodProj.m33 == 1.0f
-			&& lodProj.m01 == 0.0f && lodProj.m02 == 0.0f && lodProj.m03 == 0.0f
-			&& lodProj.m10 == 0.0f && lodProj.m12 == 0.0f && lodProj.m13 == 0.0f
-			&& lodProj.m20 == 0.0f && lodProj.m21 == 0.0f && lodProj.m23 == 0.0f
-			&& lodProj.m30 == 0.0f && lodProj.m31 == 0.0f && lodProj.m32 == 0.0f;
+		// Use small epsilon for floating point comparison
+		final float EPSILON = 0.0001f;
+		boolean isIdentity = Math.abs(lodProj.m00 - 1.0f) < EPSILON && Math.abs(lodProj.m11 - 1.0f) < EPSILON 
+			&& Math.abs(lodProj.m22 - 1.0f) < EPSILON && Math.abs(lodProj.m33 - 1.0f) < EPSILON
+			&& Math.abs(lodProj.m01) < EPSILON && Math.abs(lodProj.m02) < EPSILON && Math.abs(lodProj.m03) < EPSILON
+			&& Math.abs(lodProj.m10) < EPSILON && Math.abs(lodProj.m12) < EPSILON && Math.abs(lodProj.m13) < EPSILON
+			&& Math.abs(lodProj.m20) < EPSILON && Math.abs(lodProj.m21) < EPSILON && Math.abs(lodProj.m23) < EPSILON
+			&& Math.abs(lodProj.m30) < EPSILON && Math.abs(lodProj.m31) < EPSILON && Math.abs(lodProj.m32) < EPSILON;
 		
 		if (!isIdentity)
 		{
