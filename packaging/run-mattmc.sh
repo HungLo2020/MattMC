@@ -15,8 +15,8 @@ else
     echo "Using system Java"
 fi
 
-# Path to the combined MattMC JAR (contains both Fabric Loader and Minecraft)
-GAME_JAR="${SCRIPT_DIR}/lib/MattMC-@VERSION@.jar"
+# Path to the Minecraft game JAR for Fabric Loader
+GAME_JAR="${SCRIPT_DIR}/lib/minecraft-@VERSION@.jar"
 
 "$JAVA_CMD" -Xmx2G -Xms512M \
     -XX:+UseG1GC \

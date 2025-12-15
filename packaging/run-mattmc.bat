@@ -15,8 +15,8 @@ if exist "%BUNDLED_JAVA%" (
     echo Using system Java
 )
 
-REM Path to the combined MattMC JAR (contains both Fabric Loader and Minecraft)
-set GAME_JAR=%SCRIPT_DIR%\lib\MattMC-@VERSION@.jar
+REM Path to the Minecraft game JAR for Fabric Loader
+set GAME_JAR=%SCRIPT_DIR%\lib\minecraft-@VERSION@.jar
 
 "%JAVA_CMD%" -Xmx2G -Xms512M ^
     -XX:+UseG1GC ^
