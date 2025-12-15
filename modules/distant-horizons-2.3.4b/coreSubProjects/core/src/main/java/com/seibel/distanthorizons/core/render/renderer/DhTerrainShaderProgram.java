@@ -183,12 +183,14 @@ public class DhTerrainShaderProgram extends ShaderProgram implements IDhApiShade
 		{
 			// MC 1.21.6+: modelview already contains combined MVP, use it directly
 			combinedMatrix = new Mat4f(renderParameters.dhModelViewMatrix);
+			System.out.println("[SHADER-DEBUG] Using identity projection, combinedMatrix from modelview");
 		}
 		else
 		{
 			// Pre-1.21.6: multiply projection × modelview to get combined matrix
 			combinedMatrix = new Mat4f(renderParameters.dhProjectionMatrix);
 			combinedMatrix.multiply(renderParameters.dhModelViewMatrix);
+			System.out.println("[SHADER-DEBUG] Using non-identity projection, multiplying proj×modelview");
 		}
 		
 		super.bind();

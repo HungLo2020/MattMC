@@ -286,8 +286,7 @@ public class LodRenderer
 			{
 				profiler.popPush("LOD Fog");
 				
-				Mat4f combinedMatrix = new Mat4f(renderParams.dhProjectionMatrix);
-				combinedMatrix.multiply(renderParams.dhModelViewMatrix);
+				Mat4f combinedMatrix = this.createCombinedMatrix(renderParams);
 				
 				FogRenderer.INSTANCE.render(combinedMatrix, renderParams.partialTicks);
 			}
@@ -302,8 +301,7 @@ public class LodRenderer
 			{
 				profiler.popPush("Debug wireframes");
 				
-				Mat4f combinedMatrix = new Mat4f(renderParams.dhProjectionMatrix);
-				combinedMatrix.multiply(renderParams.dhModelViewMatrix);
+				Mat4f combinedMatrix = this.createCombinedMatrix(renderParams);
 				
 				// Note: this can be very slow if a lot of boxes are being rendered 
 				DebugRenderer.INSTANCE.render(combinedMatrix);
@@ -361,8 +359,7 @@ public class LodRenderer
 				{
 					profiler.popPush("LOD Fog");
 					
-					Mat4f combinedMatrix = new Mat4f(renderParams.dhProjectionMatrix);
-					combinedMatrix.multiply(renderParams.dhModelViewMatrix);
+					Mat4f combinedMatrix = this.createCombinedMatrix(renderParams);
 					
 					FogRenderer.INSTANCE.render(combinedMatrix, renderParams.partialTicks);
 				}
@@ -768,5 +765,34 @@ public class LodRenderer
 	public int getActiveDepthTextureId() { return this.activeDepthTextureId; }
 	
 	
+	/**
+	 * Helper method to create combined MVP matrix, handling MC 1.21.6+ identity projection.
+	 * In MC 1.21.6+, projection is identity and modelview contains the combined MVP.
+	 * In earlier versions, we need to multiply projection × modelview.
+	 */
+	private Mat4f createCombinedMatrix(DhApiRenderParam renderParams)
+	{
+		final float EPSILON = 0.0001f;
+		Mat4f projMatrix = new Mat4f(renderParams.dhProjectionMatrix);
+		boolean isIdentity = Math.abs(projMatrix.m00 - 1.0f) < EPSILON && Math.abs(projMatrix.m11 - 1.0f) < EPSILON 
+			&& Math.abs(projMatrix.m22 - 1.0f) < EPSILON && Math.abs(projMatrix.m33 - 1.0f) < EPSILON
+			&& Math.abs(projMatrix.m01) < EPSILON && Math.abs(projMatrix.m02) < EPSILON && Math.abs(projMatrix.m03) < EPSILON
+			&& Math.abs(projMatrix.m10) < EPSILON && Math.abs(projMatrix.m12) < EPSILON && Math.abs(projMatrix.m13) < EPSILON
+			&& Math.abs(projMatrix.m20) < EPSILON && Math.abs(projMatrix.m21) < EPSILON && Math.abs(projMatrix.m23) < EPSILON
+			&& Math.abs(projMatrix.m30) < EPSILON && Math.abs(projMatrix.m31) < EPSILON && Math.abs(projMatrix.m32) < EPSILON;
+		
+		if (isIdentity)
+		{
+			// MC 1.21.6+: modelview already contains combined MVP
+			return new Mat4f(renderParams.dhModelViewMatrix);
+		}
+		else
+		{
+			// Pre-1.21.6: multiply projection × modelview
+			Mat4f combinedMatrix = new Mat4f(renderParams.dhProjectionMatrix);
+			combinedMatrix.multiply(renderParams.dhModelViewMatrix);
+			return combinedMatrix;
+		}
+	}
 	
 }
