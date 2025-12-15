@@ -69,9 +69,28 @@ public class IrisConfig {
 	 * @throws IOException file exceptions
 	 */
 	public void initialize() throws IOException {
-		load();
-		if (!Files.exists(propertiesPath)) {
-			save();
+		// Step 5: Configuration now unified in Minecraft Options - do not create separate files
+		// Load from Minecraft Options instead
+		loadFromMinecraftOptions();
+		// Note: No longer saving to iris.properties - all config in options.txt
+	}
+	
+	/**
+	 * Loads configuration from Minecraft's Options system (Step 5: Configuration Unification).
+	 * Replaces loading from iris.properties file.
+	 */
+	private void loadFromMinecraftOptions() {
+		try {
+			net.minecraft.client.Minecraft mc = net.minecraft.client.Minecraft.getInstance();
+			if (mc != null && mc.options != null) {
+				// Read from unified Options
+				this.shaderPackName = mc.options.shaderPackName;
+				this.enableShaders = mc.options.enableShaders().get();
+			}
+		} catch (Exception e) {
+			// Fallback to defaults if Options not available
+			this.shaderPackName = null;
+			this.enableShaders = true;
 		}
 	}
 
@@ -197,17 +216,28 @@ public class IrisConfig {
 	 * @throws IOException file exceptions
 	 */
 	public void save() throws IOException {
-		Properties properties = new Properties();
-		properties.setProperty("shaderPack", getShaderPackName().orElse(""));
-		properties.setProperty("enableShaders", enableShaders ? "true" : "false");
-		properties.setProperty("allowUnknownShaders", allowUnknownShaders ? "true" : "false");
-		properties.setProperty("enableDebugOptions", enableDebugOptions ? "true" : "false");
-		properties.setProperty("disableUpdateMessage", disableUpdateMessage ? "true" : "false");
-		properties.setProperty("maxShadowRenderDistance", String.valueOf(IrisVideoSettings.shadowDistance));
-		properties.setProperty("colorSpace", IrisVideoSettings.colorSpace.name());
-		// NB: This uses ISO-8859-1 with unicode escapes as the encoding
-		try (OutputStream os = Files.newOutputStream(propertiesPath)) {
-			properties.store(os, COMMENT);
+		// Step 5: Configuration now unified in Minecraft Options - do not create separate files
+		// Save to Minecraft Options instead
+		saveToMinecraftOptions();
+		// Note: No longer saving to iris.properties - all config in options.txt
+	}
+	
+	/**
+	 * Saves configuration to Minecraft's Options system (Step 5: Configuration Unification).
+	 * Replaces saving to iris.properties file.
+	 */
+	private void saveToMinecraftOptions() {
+		try {
+			net.minecraft.client.Minecraft mc = net.minecraft.client.Minecraft.getInstance();
+			if (mc != null && mc.options != null) {
+				// Write to unified Options
+				mc.options.shaderPackName = this.shaderPackName;
+				mc.options.enableShaders().set(this.enableShaders);
+				// Trigger save to options.txt
+				mc.options.save();
+			}
+		} catch (Exception e) {
+			// Silently fail if Options not available
 		}
 	}
 

@@ -1620,47 +1620,9 @@ public class Options {
 			);
 			compoundTag2.getString("fullscreenResolution").ifPresent(string -> this.fullscreenVideoModeString = string);
 			KeyMapping.resetMapping();
-			
-			// Step 5: Migrate Sodium and Iris configuration if not already present
-			this.migrateAdvancedRenderingConfig();
 		} catch (Exception var7) {
 			LOGGER.error("Failed to load options", (Throwable)var7);
 		}
-	}
-	
-	/**
-	 * Migrates Sodium and Iris configuration files to native Options.
-	 * Part of Step 5 of the deep integration plan.
-	 */
-	private void migrateAdvancedRenderingConfig() {
-		// Only migrate if shader pack name is not already set
-		if (this.shaderPackName == null || this.shaderPackName.isEmpty()) {
-			try {
-				// Try to migrate Iris config
-				File irisPropertiesFile = new File(this.minecraft.gameDirectory, "config/iris.properties");
-				if (irisPropertiesFile.exists()) {
-					java.util.Properties irisProps = new java.util.Properties();
-					try (java.io.FileInputStream fis = new java.io.FileInputStream(irisPropertiesFile)) {
-						irisProps.load(fis);
-						String shaderPack = irisProps.getProperty("shaderPack");
-						if (shaderPack != null && !shaderPack.isEmpty() && !shaderPack.equals("(internal)")) {
-							this.shaderPackName = shaderPack;
-							LOGGER.info("Migrated shader pack from iris.properties: {}", shaderPack);
-						}
-						String enableShaders = irisProps.getProperty("enableShaders");
-						if (enableShaders != null) {
-							this.enableShaders.set(Boolean.parseBoolean(enableShaders));
-							LOGGER.info("Migrated enableShaders from iris.properties: {}", enableShaders);
-						}
-					}
-				}
-			} catch (Exception e) {
-				LOGGER.warn("Failed to migrate Iris config", e);
-			}
-		}
-		
-		// Note: Sodium config migration could be added here if needed
-		// For now, using default values is sufficient as they match Sodium's defaults
 	}
 
 	static boolean isTrue(String string) {
