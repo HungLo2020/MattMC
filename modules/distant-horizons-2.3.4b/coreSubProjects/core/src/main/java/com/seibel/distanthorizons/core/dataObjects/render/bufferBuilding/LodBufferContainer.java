@@ -115,6 +115,7 @@ public class LodBufferContainer implements AutoCloseable
 				if (Thread.interrupted() 
 					|| this.uploadFuture.isCancelled())
 				{
+					System.out.println("[BUFFER-UPLOAD] Upload interrupted or cancelled for " + this.minCornerBlockPos);
 					throw new InterruptedException();
 				}
 				
@@ -125,12 +126,15 @@ public class LodBufferContainer implements AutoCloseable
 				uploadBuffersDirect(this.vbosTransparent, transparentBuffers, gpuUploadMethod);
 				this.buffersUploaded = true;
 				
+				System.out.println("[BUFFER-UPLOAD] Upload completed successfully for " + this.minCornerBlockPos + ", buffersUploaded=true");
+				
 				// success
 				this.uploadFuture.complete(this);
 				this.uploadFuture = null;
 			}
 			catch (InterruptedException ignore) 
 			{
+				System.out.println("[BUFFER-UPLOAD] InterruptedException caught for " + this.minCornerBlockPos + ", buffersUploaded=" + this.buffersUploaded);
 				this.uploadFuture.complete(this);
 				this.uploadFuture = null;
 			}
