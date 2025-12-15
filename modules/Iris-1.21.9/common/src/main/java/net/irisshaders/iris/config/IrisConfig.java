@@ -92,6 +92,26 @@ public class IrisConfig {
 	}
 	
 	/**
+	 * Syncs local fields from Minecraft's Options system (Step 5: Configuration Unification).
+	 * Options.load() has already loaded values from options.txt, we just sync them.
+	 */
+	private void syncFromMinecraftOptions() {
+		try {
+			net.minecraft.client.Minecraft mc = net.minecraft.client.Minecraft.getInstance();
+			if (mc != null && mc.options != null) {
+				syncFromOptions(mc.options);
+			} else {
+				Iris.logger.warn("[Config Load] Minecraft or Options not available, skipping sync");
+			}
+		} catch (Exception e) {
+			Iris.logger.error("[Config Load] Exception while getting Minecraft.getInstance()", e);
+			// Fallback to defaults if Options not available
+			this.shaderPackName = null;
+			this.enableShaders = true;
+		}
+	}
+	
+	/**
 	 * Syncs local fields from a specific Options instance (Step 5: Configuration Unification).
 	 * @param options The Options instance to sync from
 	 */
@@ -119,36 +139,6 @@ public class IrisConfig {
 			}
 		} catch (Exception e) {
 			Iris.logger.error("[Config Load] Exception while syncing from Options", e);
-			// Fallback to defaults if Options not available
-			this.shaderPackName = null;
-			this.enableShaders = true;
-		}
-	}
-	
-	/**
-	 * Syncs local fields from Minecraft's Options system (Step 5: Configuration Unification).
-	 * Options.load() has already loaded values from options.txt, we just sync them.
-	 */
-	private void syncFromMinecraftOptions() {
-		try {
-			net.minecraft.client.Minecraft mc = net.minecraft.client.Minecraft.getInstance();
-			if (mc != null && mc.options != null) {
-				// DEBUG: Log what we're loading
-				Iris.logger.info("[Config Load] BEFORE sync - IrisConfig.shaderPackName='{}', IrisConfig.enableShaders={}", 
-					this.shaderPackName, this.enableShaders);
-				Iris.logger.info("[Config Load] mc.options values: shaderPackName='{}', enableShaders={}", 
-					mc.options.shaderPackName, mc.options.enableShaders().get());
-				
-				// Sync from unified Options (already loaded from options.txt)
-				this.shaderPackName = mc.options.shaderPackName;
-				this.enableShaders = mc.options.enableShaders().get();
-				
-				// DEBUG: Log what we loaded
-				Iris.logger.info("[Config Load] AFTER sync - IrisConfig.shaderPackName='{}', IrisConfig.enableShaders={}", 
-					this.shaderPackName, this.enableShaders);
-			}
-		} catch (Exception e) {
-			Iris.logger.error("[Config Load] Exception while syncing from Minecraft options", e);
 			// Fallback to defaults if Options not available
 			this.shaderPackName = null;
 			this.enableShaders = true;
