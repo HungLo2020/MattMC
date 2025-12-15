@@ -84,11 +84,14 @@ public class LodBufferContainer implements AutoCloseable
 	/** Should be run on a DH thread. */
 	public synchronized CompletableFuture<LodBufferContainer> makeAndUploadBuffersAsync(LodQuadBuilder builder)
 	{
+		System.out.println("[BUFFER-UPLOAD] makeAndUploadBuffersAsync() called for " + this.minCornerBlockPos);
+		
 		// separate variable to prevent race condition when checking null
 		CompletableFuture<LodBufferContainer> future = this.uploadFuture;
 		if (future != null)
 		{
 			// upload already in process
+			System.out.println("[BUFFER-UPLOAD] Upload already in process for " + this.minCornerBlockPos);
 			return future;
 		}
 		
@@ -102,10 +105,13 @@ public class LodBufferContainer implements AutoCloseable
 		ArrayList<ByteBuffer> opaqueBuffers = builder.makeOpaqueVertexBuffers();
 		ArrayList<ByteBuffer> transparentBuffers = builder.makeTransparentVertexBuffers();
 		
+		System.out.println("[BUFFER-UPLOAD] Made buffers for " + this.minCornerBlockPos + ": opaque=" + opaqueBuffers.size() + ", transparent=" + transparentBuffers.size());
+		
 		this.vbos = resizeBuffer(this.vbos, opaqueBuffers.size());
 		this.vbosTransparent = resizeBuffer(this.vbosTransparent, transparentBuffers.size());
 		
 		
+		System.out.println("[BUFFER-UPLOAD] About to queue upload to render thread for " + this.minCornerBlockPos);
 		// upload on MC's render thread
 		GLProxy.getInstance().queueRunningOnRenderThread(() ->
 		{
