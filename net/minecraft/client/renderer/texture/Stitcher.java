@@ -121,8 +121,12 @@ public class Stitcher<T extends Stitcher.Entry> {
 		ResourceLocation name();
 	}
 
+
+	/**
+	 * @PublicAPI Exposed for advanced rendering systems (Sodium texture atlas)
+	 */
 	@Environment(EnvType.CLIENT)
-	record Holder<T extends Stitcher.Entry>(T entry, int width, int height) {
+	public record Holder<T extends Stitcher.Entry>(T entry, int width, int height) {
 
 		public Holder(T entry, int i) {
 			this(entry, Stitcher.smallestFittingMinTexel(entry.width(), i), Stitcher.smallestFittingMinTexel(entry.height(), i));
