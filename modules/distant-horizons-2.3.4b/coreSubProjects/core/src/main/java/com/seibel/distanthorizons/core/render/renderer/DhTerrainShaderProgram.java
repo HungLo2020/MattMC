@@ -166,8 +166,30 @@ public class DhTerrainShaderProgram extends ShaderProgram implements IDhApiShade
 	@Override
 	public void fillUniformData(DhApiRenderParam renderParameters)
 	{
-		Mat4f combinedMatrix = new Mat4f(renderParameters.dhProjectionMatrix);
-		combinedMatrix.multiply(renderParameters.dhModelViewMatrix);
+		Mat4f combinedMatrix;
+		
+		// Check if projection matrix is identity (MC 1.21.6+)
+		// In that case, the modelview already contains the combined MVP
+		final float EPSILON = 0.0001f;
+		Mat4f projMatrix = new Mat4f(renderParameters.dhProjectionMatrix);
+		boolean isIdentity = Math.abs(projMatrix.m00 - 1.0f) < EPSILON && Math.abs(projMatrix.m11 - 1.0f) < EPSILON 
+			&& Math.abs(projMatrix.m22 - 1.0f) < EPSILON && Math.abs(projMatrix.m33 - 1.0f) < EPSILON
+			&& Math.abs(projMatrix.m01) < EPSILON && Math.abs(projMatrix.m02) < EPSILON && Math.abs(projMatrix.m03) < EPSILON
+			&& Math.abs(projMatrix.m10) < EPSILON && Math.abs(projMatrix.m12) < EPSILON && Math.abs(projMatrix.m13) < EPSILON
+			&& Math.abs(projMatrix.m20) < EPSILON && Math.abs(projMatrix.m21) < EPSILON && Math.abs(projMatrix.m23) < EPSILON
+			&& Math.abs(projMatrix.m30) < EPSILON && Math.abs(projMatrix.m31) < EPSILON && Math.abs(projMatrix.m32) < EPSILON;
+		
+		if (isIdentity)
+		{
+			// MC 1.21.6+: modelview already contains combined MVP, use it directly
+			combinedMatrix = new Mat4f(renderParameters.dhModelViewMatrix);
+		}
+		else
+		{
+			// Pre-1.21.6: multiply projection × modelview to get combined matrix
+			combinedMatrix = new Mat4f(renderParameters.dhProjectionMatrix);
+			combinedMatrix.multiply(renderParameters.dhModelViewMatrix);
+		}
 		
 		super.bind();
 
