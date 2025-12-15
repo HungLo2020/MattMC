@@ -507,12 +507,16 @@ public class ClientApi
 			
 			if (!renderingDeferredLayer)
 			{
+				System.out.println("[CLIENTAPI-DEBUG] rendererMode=" + Config.Client.Advanced.Debugging.rendererMode.get()); // TODO: Remove after debugging
 				if (Config.Client.Advanced.Debugging.rendererMode.get() == EDhApiRendererMode.DEFAULT)
 				{
 					boolean renderingCancelledForThisFrame = ApiEventInjector.INSTANCE.fireAllEvents(DhApiBeforeRenderEvent.class, renderParams);
+					System.out.println("[CLIENTAPI-DEBUG] renderingCancelledForThisFrame=" + renderingCancelledForThisFrame); // TODO: Remove after debugging
 					if (!renderingCancelledForThisFrame)
 					{
+						System.out.println("[CLIENTAPI-DEBUG] About to call LodRenderer.INSTANCE.render()"); // TODO: Remove after debugging
 						LodRenderer.INSTANCE.render(renderParams, profiler);
+						System.out.println("[CLIENTAPI-DEBUG] LodRenderer.INSTANCE.render() completed"); // TODO: Remove after debugging
 					}
 					
 					if (!DhApi.Delayed.renderProxy.getDeferTransparentRendering())
@@ -522,6 +526,7 @@ public class ClientApi
 				}
 				else if (Config.Client.Advanced.Debugging.rendererMode.get() == EDhApiRendererMode.DEBUG)
 				{
+					System.out.println("[CLIENTAPI-DEBUG] Using DEBUG renderer mode"); // TODO: Remove after debugging
 					profiler.push("Render Debug");
 					ClientApi.TEST_RENDERER.render();
 					profiler.pop();
