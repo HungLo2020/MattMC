@@ -74,6 +74,7 @@ public class DhApplyShader extends AbstractShaderRenderer
 	@Override
 	protected void onRender()
 	{
+		System.out.println("[DH-APPLY] onRender() called, mcRendersToFrameBuffer=" + MC_RENDER.mcRendersToFrameBuffer());
 		if (MC_RENDER.mcRendersToFrameBuffer())
 		{
 			this.renderToFrameBuffer();
@@ -82,13 +83,17 @@ public class DhApplyShader extends AbstractShaderRenderer
 		{
 			this.renderToMcTexture();
 		}
+		System.out.println("[DH-APPLY] onRender() completed");
 	}
 	// TODO merge duplicate code between these to render methods
 	private void renderToFrameBuffer()
 	{
+		System.out.println("[DH-APPLY] renderToFrameBuffer() called");
 		int targetFrameBuffer = MC_RENDER.getTargetFramebuffer();
+		System.out.println("[DH-APPLY] targetFrameBuffer=" + targetFrameBuffer);
 		if (targetFrameBuffer == -1)
 		{
+			System.out.println("[DH-APPLY] targetFrameBuffer is -1, returning early!");
 			return;
 		}
 		
@@ -120,6 +125,7 @@ public class DhApplyShader extends AbstractShaderRenderer
 		
 		ScreenQuad.INSTANCE.render();
 		
+		System.out.println("[DH-APPLY] ScreenQuad.render() completed, LODs should now be visible!");
 		
 		// restore everything, except at this point the MC framebuffer should now be used instead
 		state.restore();
@@ -128,21 +134,28 @@ public class DhApplyShader extends AbstractShaderRenderer
 	}
 	private void renderToMcTexture()
 	{
+		System.out.println("[DH-APPLY] renderToMcTexture() called");
 		int targetColorTextureId = MC_RENDER.getColorTextureId();
+		System.out.println("[DH-APPLY] targetColorTextureId=" + targetColorTextureId);
 		if (targetColorTextureId == -1)
 		{
+			System.out.println("[DH-APPLY] targetColorTextureId is -1, returning early!");
 			return;
 		}
 		
 		int dhFrameBufferId = LodRenderer.INSTANCE.getActiveFramebufferId();
+		System.out.println("[DH-APPLY] dhFrameBufferId=" + dhFrameBufferId);
 		if (dhFrameBufferId == -1)
 		{
+			System.out.println("[DH-APPLY] dhFrameBufferId is -1, returning early!");
 			return;
 		}
 		
 		int mcFrameBufferId = MC_RENDER.getTargetFramebuffer();
+		System.out.println("[DH-APPLY] mcFrameBufferId=" + mcFrameBufferId);
 		if (mcFrameBufferId == -1)
 		{
+			System.out.println("[DH-APPLY] mcFrameBufferId is -1, returning early!");
 			return;
 		}
 		
@@ -179,6 +192,7 @@ public class DhApplyShader extends AbstractShaderRenderer
 		
 		ScreenQuad.INSTANCE.render();
 		
+		System.out.println("[DH-APPLY] ScreenQuad.render() completed, LODs should now be visible!");
 		
 		// restore everything, except at this point the MC framebuffer should now be used instead
 		state.restore();
