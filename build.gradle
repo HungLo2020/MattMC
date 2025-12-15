@@ -891,6 +891,102 @@ tasks.register('runClient', JavaExec) {
     configureBundledJdk(it)
 }
 
+// Task to run the Minecraft client in headless mode (no GUI window)
+tasks.register('runClientHeadless', JavaExec) {
+    group = 'minecraft'
+    description = 'Runs the Minecraft client with Fabric Loader in headless mode (no GUI)'
+    
+    dependsOn 'fabricLoaderJar', 'gameJar', 'sodiumJar', 'irisJar', 'copyJdkToRun', 'shaderPackZip'
+    
+    // Use the separate JARs so Fabric Loader can detect the game JAR properly
+    // The order matters: Fabric Loader JAR first, then Game JAR, then dependencies
+    def fabricLoaderJarFile = file("${buildDir}/libs/fabric-loader-${fabricLoaderVersion}.jar")
+    def gameJarFile = file("${buildDir}/libs/minecraft-${version}.jar")
+    
+    classpath = files(fabricLoaderJarFile, gameJarFile) + 
+                configurations.runtimeClasspath
+    
+    // Use Fabric Loader's KnotClient as the entry point
+    mainClass = 'net.fabricmc.loader.impl.launch.knot.KnotClient'
+    
+    workingDir = file('run')
+    
+    // Headless-specific JVM arguments
+    jvmArgs = clientJvmArgs + [
+        // Fabric Loader options
+        '-Dfabric.development=true',
+        // Tell Fabric Loader where the game JAR is
+        "-Dfabric.gameJarPath.client=${gameJarFile.absolutePath}",
+        // Enable headless mode - prevents GUI windows from opening
+        '-Djava.awt.headless=true',
+        '-Dorg.lwjgl.system.headless=true',
+        // Disable any progress windows
+        '-Dfml.earlyprogresswindow=false'
+    ]
+    
+    // Required client arguments - these get passed through Knot to Minecraft
+    // Note: width and height are omitted as they're not needed in headless mode
+    args = [
+        '--version', '1.21.10',
+        '--accessToken', '0',
+        '--gameDir', file('run').absolutePath,
+        '--assetsDir', file('run/assets').absolutePath,
+        '--assetIndex', '27'
+    ]
+    
+    doFirst {
+        // Verify JARs exist
+        if (!fabricLoaderJarFile.exists()) {
+            throw new GradleException("Fabric Loader JAR not found: ${fabricLoaderJarFile}")
+        }
+        if (!gameJarFile.exists()) {
+            throw new GradleException("Game JAR not found: ${gameJarFile}")
+        }
+        
+        workingDir.mkdirs()
+        file('run/assets').mkdirs()
+        file('run/resourcepacks').mkdirs()
+        // Clear and recreate mods folder to remove stale/old mod JARs
+        def modsDir = file('run/mods')
+        if (modsDir.exists()) {
+            modsDir.deleteDir()
+        }
+        modsDir.mkdirs()
+        
+        // Copy Sodium and Iris mod JARs to mods folder
+        copy {
+            from file("${buildDir}/mods")
+            into modsDir
+            include '*.jar'
+        }
+        
+        // Copy assets from src/main/resources/assets to run/assets for dev environment
+        def resourcesAssetsDir = file('src/main/resources/assets')
+        if (resourcesAssetsDir.exists() && resourcesAssetsDir.isDirectory()) {
+            copy {
+                from resourcesAssetsDir
+                into file('run/assets')
+            }
+        }
+        
+        // Create shaderpacks directory and copy shader pack zip
+        def shaderpacksDir = file('run/shaderpacks')
+        shaderpacksDir.mkdirs()
+        copy {
+            from file("${buildDir}/shaderpacks")
+            into shaderpacksDir
+            include '*.zip'
+        }
+        
+        println "Starting Minecraft client in HEADLESS mode (no GUI window will open)"
+    }
+    
+    standardInput = System.in
+    
+    // Configure to use bundled JDK
+    configureBundledJdk(it)
+}
+
 // Task to run the Minecraft client WITHOUT Fabric Loader (vanilla mode)
 tasks.register('runClientVanilla', JavaExec) {
     group = 'minecraft'
