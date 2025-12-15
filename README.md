@@ -68,6 +68,8 @@ Before building and running, ensure you have:
 
 ## Running the Client
 
+### Standard Mode (With GUI)
+
 ```bash
 ./gradlew runClient
 ```
@@ -75,6 +77,18 @@ Before building and running, ensure you have:
 The client will:
 - Create a `run/` directory for game files
 - Launch with offline mode (no authentication required)
+- Open a game window
+
+### Headless Mode (No GUI)
+
+```bash
+./gradlew runClientHeadless
+```
+
+The headless client will:
+- Run without opening a GUI window
+- Useful for testing, automation, or server-side rendering tasks
+- Uses the same configuration as the standard client
 
 **Note:** You will need game assets (textures, sounds, etc.) in the `run/assets` directory for full functionality.
 
