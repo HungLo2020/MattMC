@@ -814,12 +814,17 @@ public class Iris {
 	 * Called via mixin after Options constructor completes.
 	 */
 	public static void syncConfigFromOptions() {
+		logger.info("[Iris Sync] syncConfigFromOptions() called");
 		if (irisConfig != null) {
 			try {
+				logger.info("[Iris Sync] Calling irisConfig.initialize() to sync from loaded Options");
 				irisConfig.initialize();
+				logger.info("[Iris Sync] Sync completed successfully");
 			} catch (IOException e) {
-				logger.error("Failed to sync Iris configuration from Options", e);
+				logger.error("[Iris Sync] Failed to sync Iris configuration from Options", e);
 			}
+		} else {
+			logger.warn("[Iris Sync] irisConfig is null, cannot sync");
 		}
 	}
 }

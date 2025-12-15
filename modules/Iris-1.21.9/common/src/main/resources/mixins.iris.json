@@ -51,7 +51,6 @@
     "MixinMinecraft_PipelineManagement",
     "MixinModelViewBobbing",
     "MixinOptions_Entrypoint",
-    "MixinOptions_LoadedSync",
     "MixinParticleEngine",
     "MixinShaderManager_Overrides",
     "MixinQuickPlayDev",
