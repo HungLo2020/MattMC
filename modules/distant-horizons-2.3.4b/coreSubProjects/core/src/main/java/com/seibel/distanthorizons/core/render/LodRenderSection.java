@@ -399,18 +399,26 @@ public class LodRenderSection implements IDebugRenderable, AutoCloseable
 		}
 		
 		this.bufferUploadFuture = ColumnRenderBufferBuilder.uploadBuffersAsync(this.level, this.pos, lodQuadBuilder);
-		this.bufferUploadFuture.thenAccept((buffer) ->
+		this.bufferUploadFuture.whenComplete((buffer, throwable) ->
 		{
-			// needed to clean up the old data
-			LodBufferContainer previousContainer = this.bufferContainer;
-			
-			// upload complete
-			this.bufferContainer = buffer.buffersUploaded ? buffer : null;
-			this.getAndBuildRenderDataFuture = null;
-			
-			if (previousContainer != null)
+			if (throwable == null && buffer != null)
 			{
-				previousContainer.close();
+				// needed to clean up the old data
+				LodBufferContainer previousContainer = this.bufferContainer;
+				
+				// upload complete
+				this.bufferContainer = buffer.buffersUploaded ? buffer : null;
+				this.getAndBuildRenderDataFuture = null;
+				
+				if (previousContainer != null)
+				{
+					previousContainer.close();
+				}
+			}
+			else
+			{
+				// Upload failed or was interrupted - will be retried
+				this.getAndBuildRenderDataFuture = null;
 			}
 		});
 	}
