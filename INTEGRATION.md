@@ -428,34 +428,53 @@ public Frustum capturedFrustum;
 
 **Objective**: Merge Sodium and Iris configuration into Minecraft's native `Options` system.
 
+**Current Status**: ~60% COMPLETE
+
 **Actions**:
-1. Analyze Sodium's config structure (`sodium-options.json`):
+1. ✅ **DONE**: Analyze Sodium's config structure (`sodium-options.json`):
    - Chunk rendering options
    - Performance settings
    - Advanced graphics toggles
-2. Analyze Iris's config structure (`iris.properties`):
+2. ✅ **DONE**: Analyze Iris's config structure (`iris.properties`):
    - Shader pack selection
    - Shader-specific settings
-3. Add new option categories to `Options.java`:
-   - `OptionInstance<?>[] advancedRenderingOptions`
-   - `OptionInstance<?>[] shaderOptions`
-4. Create migration logic: read old config files, populate `Options`, save to `options.txt`
-5. Keep old config files readable but deprecated
+3. ⚠️ **PARTIAL**: Add new option categories to `Options.java`:
+   - ✅ Individual options added (shaderPackName, enableShaders, chunkBuilderThreads, etc.)
+   - ✅ Getter methods created (lines 1287-1319 in Options.java)
+   - ✅ Integrated into processOptions() for save/load (lines 1463-1472)
+   - ❌ MISSING: `OptionInstance<?>[] advancedRenderingOptions` array
+   - ❌ MISSING: `OptionInstance<?>[] shaderOptions` array
+4. ❌ **NOT DONE**: Create migration logic: read old config files, populate `Options`, save to `options.txt`
+   - ❌ No migration FROM iris.properties TO options.txt
+   - ❌ No migration FROM sodium-options.json TO options.txt
+   - ❌ No first-time detection logic
+5. ❌ **NOT DONE**: Keep old config files readable but deprecated
+   - ❌ Old files not read on first launch
+   - ❌ Would lose user settings on upgrade
 
 **Integration Points**:
-- Sodium's `SodiumGameOptions` → `Options.advancedRenderingOptions`
-- Iris's `IrisConfig` → `Options.shaderOptions`
-- Merge options screens into vanilla Video Settings
+- ✅ Sodium's `SodiumGameOptions` → syncs with individual Options fields
+- ✅ Iris's `IrisConfig` → syncs with individual Options fields
+- ❌ Merge options screens into vanilla Video Settings (NOT STARTED)
 
-**Why This Step**:
-- Centralizes all configuration in one place
-- Simplifies user experience (one options file)
-- Prepares for UI integration
+**What Works**:
+- ✅ New installations: Options save/load correctly to options.txt
+- ✅ Sodium/Iris read from and write to Options
+- ✅ Shader pack persistence FIXED (commits 3960dfeb, 47407862)
 
-**Zero Regression Strategy**:
-- Migration logic preserves existing settings
-- Old config files still read on first run
-- Users see no change in behavior, just file consolidation
+**What's Missing**:
+- ❌ Migration logic for existing users
+- ❌ Option arrays as originally specified
+- ❌ UI integration with vanilla Video Settings
+- ❌ Backward compatibility with old config files
+
+**Critical Issue**: Users upgrading from old system would LOSE their Sodium/Iris settings because no migration logic exists to read iris.properties or sodium-options.json.
+
+**Next Steps to Complete**:
+1. Add migration logic in Options constructor to detect and read old config files
+2. Implement OptionInstance arrays if needed for UI organization
+3. Create "Advanced..." button in Video Settings screen
+4. Test upgrade path preserves settings
 
 ---
 
