@@ -790,6 +790,83 @@ public class Options {
 	public boolean syncWrites;
 	public boolean startedCleanly = true;
 
+	// ========== Advanced Rendering Options (Step 5: Sodium Integration) ==========
+	
+	/**
+	 * Shader pack name (Iris integration).
+	 * Null or empty means no shader pack is active.
+	 */
+	public String shaderPackName = null;
+	
+	/**
+	 * Whether shaders are enabled (Iris integration).
+	 */
+	private final OptionInstance<Boolean> enableShaders = OptionInstance.createBoolean(
+		"options.iris.enableShaders", true, boolean_ -> {}
+	);
+	
+	/**
+	 * Number of chunk builder threads (Sodium integration).
+	 * 0 means automatic based on CPU cores.
+	 */
+	private final OptionInstance<Integer> chunkBuilderThreads = new OptionInstance<>(
+		"options.sodium.chunkBuilderThreads",
+		OptionInstance.noTooltip(),
+		(component, integer) -> integer == 0 
+			? Component.translatable("options.sodium.chunkBuilderThreads.auto")
+			: genericValueLabel(component, integer),
+		new OptionInstance.IntRange(0, Runtime.getRuntime().availableProcessors()),
+		0,
+		integer -> {}
+	);
+	
+	/**
+	 * Whether to animate only visible textures (Sodium integration).
+	 */
+	private final OptionInstance<Boolean> animateOnlyVisibleTextures = OptionInstance.createBoolean(
+		"options.sodium.animateOnlyVisibleTextures", true, boolean_ -> {}
+	);
+	
+	/**
+	 * Whether to use entity culling (Sodium integration).
+	 */
+	private final OptionInstance<Boolean> useEntityCulling = OptionInstance.createBoolean(
+		"options.sodium.useEntityCulling", true, boolean_ -> {}
+	);
+	
+	/**
+	 * Whether to use fog occlusion (Sodium integration).
+	 */
+	private final OptionInstance<Boolean> useFogOcclusion = OptionInstance.createBoolean(
+		"options.sodium.useFogOcclusion", true, boolean_ -> {}
+	);
+	
+	/**
+	 * Whether to use block face culling (Sodium integration).
+	 */
+	private final OptionInstance<Boolean> useBlockFaceCulling = OptionInstance.createBoolean(
+		"options.sodium.useBlockFaceCulling", true, boolean_ -> {}
+	);
+	
+	/**
+	 * Whether to use advanced staging buffers (Sodium integration).
+	 */
+	private final OptionInstance<Boolean> useAdvancedStagingBuffers = OptionInstance.createBoolean(
+		"options.sodium.useAdvancedStagingBuffers", true, boolean_ -> {}
+	);
+	
+	/**
+	 * CPU render-ahead limit (Sodium integration).
+	 */
+	private final OptionInstance<Integer> cpuRenderAheadLimit = new OptionInstance<>(
+		"options.sodium.cpuRenderAheadLimit",
+		OptionInstance.noTooltip(),
+		Options::genericValueLabel,
+		new OptionInstance.IntRange(0, 9),
+		3,
+		integer -> {}
+	);
+
 	public OptionInstance<Boolean> darkMojangStudiosBackground() {
 		return this.darkMojangStudiosBackground;
 	}
@@ -1207,6 +1284,40 @@ public class Options {
 		return this.showNowPlayingToast;
 	}
 
+	// ========== Advanced Rendering Options Getters (Step 5) ==========
+	
+	public OptionInstance<Boolean> enableShaders() {
+		return this.enableShaders;
+	}
+	
+	public OptionInstance<Integer> chunkBuilderThreads() {
+		return this.chunkBuilderThreads;
+	}
+	
+	public OptionInstance<Boolean> animateOnlyVisibleTextures() {
+		return this.animateOnlyVisibleTextures;
+	}
+	
+	public OptionInstance<Boolean> useEntityCulling() {
+		return this.useEntityCulling;
+	}
+	
+	public OptionInstance<Boolean> useFogOcclusion() {
+		return this.useFogOcclusion;
+	}
+	
+	public OptionInstance<Boolean> useBlockFaceCulling() {
+		return this.useBlockFaceCulling;
+	}
+	
+	public OptionInstance<Boolean> useAdvancedStagingBuffers() {
+		return this.useAdvancedStagingBuffers;
+	}
+	
+	public OptionInstance<Integer> cpuRenderAheadLimit() {
+		return this.cpuRenderAheadLimit;
+	}
+
 	public Options(Minecraft minecraft, File file) {
 		this.minecraft = minecraft;
 		this.optionsFile = new File(file, "options.txt");
@@ -1348,6 +1459,17 @@ public class Options {
 		this.startedCleanly = fieldAccess.process("startedCleanly", this.startedCleanly);
 		fieldAccess.process("showNowPlayingToast", this.showNowPlayingToast);
 		fieldAccess.process("musicFrequency", this.musicFrequency);
+		
+		// Advanced Rendering Options (Step 5: Sodium/Iris Integration)
+		this.shaderPackName = fieldAccess.process("shaderPackName", this.shaderPackName);
+		fieldAccess.process("enableShaders", this.enableShaders);
+		fieldAccess.process("chunkBuilderThreads", this.chunkBuilderThreads);
+		fieldAccess.process("animateOnlyVisibleTextures", this.animateOnlyVisibleTextures);
+		fieldAccess.process("useEntityCulling", this.useEntityCulling);
+		fieldAccess.process("useFogOcclusion", this.useFogOcclusion);
+		fieldAccess.process("useBlockFaceCulling", this.useBlockFaceCulling);
+		fieldAccess.process("useAdvancedStagingBuffers", this.useAdvancedStagingBuffers);
+		fieldAccess.process("cpuRenderAheadLimit", this.cpuRenderAheadLimit);
 
 		for (KeyMapping keyMapping : this.keyMappings) {
 			String string = keyMapping.saveString();
@@ -1498,9 +1620,47 @@ public class Options {
 			);
 			compoundTag2.getString("fullscreenResolution").ifPresent(string -> this.fullscreenVideoModeString = string);
 			KeyMapping.resetMapping();
+			
+			// Step 5: Migrate Sodium and Iris configuration if not already present
+			this.migrateAdvancedRenderingConfig();
 		} catch (Exception var7) {
 			LOGGER.error("Failed to load options", (Throwable)var7);
 		}
+	}
+	
+	/**
+	 * Migrates Sodium and Iris configuration files to native Options.
+	 * Part of Step 5 of the deep integration plan.
+	 */
+	private void migrateAdvancedRenderingConfig() {
+		// Only migrate if shader pack name is not already set
+		if (this.shaderPackName == null || this.shaderPackName.isEmpty()) {
+			try {
+				// Try to migrate Iris config
+				File irisPropertiesFile = new File(this.minecraft.gameDirectory, "config/iris.properties");
+				if (irisPropertiesFile.exists()) {
+					java.util.Properties irisProps = new java.util.Properties();
+					try (java.io.FileInputStream fis = new java.io.FileInputStream(irisPropertiesFile)) {
+						irisProps.load(fis);
+						String shaderPack = irisProps.getProperty("shaderPack");
+						if (shaderPack != null && !shaderPack.isEmpty() && !shaderPack.equals("(internal)")) {
+							this.shaderPackName = shaderPack;
+							LOGGER.info("Migrated shader pack from iris.properties: {}", shaderPack);
+						}
+						String enableShaders = irisProps.getProperty("enableShaders");
+						if (enableShaders != null) {
+							this.enableShaders.set(Boolean.parseBoolean(enableShaders));
+							LOGGER.info("Migrated enableShaders from iris.properties: {}", enableShaders);
+						}
+					}
+				}
+			} catch (Exception e) {
+				LOGGER.warn("Failed to migrate Iris config", e);
+			}
+		}
+		
+		// Note: Sodium config migration could be added here if needed
+		// For now, using default values is sufficient as they match Sodium's defaults
 	}
 
 	static boolean isTrue(String string) {
