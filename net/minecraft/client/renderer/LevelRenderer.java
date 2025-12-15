@@ -603,6 +603,9 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 			iris$renderTerrainGroup(chunkSectionsToRender, ChunkSectionLayerGroup.OPAQUE);
 			this.minecraft.gameRenderer.getLighting().setupFor(Lighting.Entry.LEVEL);
 			
+			// Get projection matrix early for RENDER_STATE
+			Matrix4f projectionMatrix = this.minecraft.gameRenderer.getProjectionMatrix(tickDeltaValue);
+			
 			// Set Distant Horizons RENDER_STATE for MC 1.21.6+
 			// IMPORTANT: This must be done BEFORE WorldRenderEvents fire, not in prepareChunkRenders()
 			// because Sodium's @Overwrite replaces prepareChunkRenders() entirely!
@@ -623,10 +626,10 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 				Object dhModelViewMatrix = convertMethod.invoke(null, matrix4f);
 				System.out.println("[DEBUG-RENDERSTATE] Converted model-view matrix"); // TODO: Remove after debugging
 				
-				// Get actual projection matrix from RenderSystem (NOT identity!)
-				Matrix4f mcProjectionMatrix = RenderSystem.getProjectionMatrix();
-				Object dhProjectionMatrix = convertMethod.invoke(null, mcProjectionMatrix);
-				System.out.println("[DEBUG-RENDERSTATE] Converted projection matrix from RenderSystem"); // TODO: Remove after debugging
+				// Get actual projection matrix from context (passed through WorldRenderContextImpl)
+				// DH will get this from renderContext.projectionMatrix() in FabricClientProxy
+				Object dhProjectionMatrix = convertMethod.invoke(null, projectionMatrix);
+				System.out.println("[DEBUG-RENDERSTATE] Converted projection matrix"); // TODO: Remove after debugging
 				
 				// Get client level wrapper
 				Class<?> wrapperClass = Class.forName("com.seibel.distanthorizons.common.wrappers.world.ClientLevelWrapper");
@@ -653,13 +656,15 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 			}
 			
 			// Fire AFTER_SETUP event for Distant Horizons after terrain setup
+			// projection matrix already retrieved above for RENDER_STATE
+			
 			// In MC 1.21.6+, matrix4f is the combined model-view-projection matrix
 			System.out.println("[MATRIX-DEBUG] ========== AFTER_SETUP EVENT ==========");
 			System.out.println("[MATRIX-DEBUG] Combined MVP matrix4f from RenderSystem:");
 			System.out.println(matrix4f);
 			
 			WorldRenderEvents.WorldRenderContext afterSetupContext = new WorldRenderContextImpl(
-				this.level, matrix4f, tickDeltaValue, renderCamera
+				this.level, matrix4f, projectionMatrix, tickDeltaValue, renderCamera
 			);
 			
 			System.out.println("[MATRIX-DEBUG] WorldRenderContext created");
@@ -732,8 +737,9 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 			// Fire AFTER_ENTITIES event for Distant Horizons after entity rendering
 			try {
 				System.out.println("[DEBUG] Firing AFTER_ENTITIES event");
+				Matrix4f projectionMatrix2 = this.minecraft.gameRenderer.getProjectionMatrix(tickDeltaValue);
 				WorldRenderEvents.WorldRenderContext afterEntitiesContext = new WorldRenderContextImpl(
-					this.level, matrix4f, tickDeltaValue, renderCamera
+					this.level, matrix4f, projectionMatrix2, tickDeltaValue, renderCamera
 				);
 				WorldRenderEvents.AFTER_ENTITIES.invoker().afterEntities(afterEntitiesContext);
 				System.out.println("[DEBUG] AFTER_ENTITIES event completed");
@@ -775,8 +781,9 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 			// Fire AFTER_TRANSLUCENT event for Distant Horizons after translucent rendering
 			try {
 				System.out.println("[DEBUG] Firing AFTER_TRANSLUCENT event");
+				Matrix4f projectionMatrix3 = this.minecraft.gameRenderer.getProjectionMatrix(tickDeltaValue);
 				WorldRenderEvents.WorldRenderContext afterTranslucentContext = new WorldRenderContextImpl(
-					this.level, matrix4f, tickDeltaValue, renderCamera
+					this.level, matrix4f, projectionMatrix3, tickDeltaValue, renderCamera
 				);
 				WorldRenderEvents.AFTER_TRANSLUCENT.invoker().afterTranslucent(afterTranslucentContext);
 				System.out.println("[DEBUG] AFTER_TRANSLUCENT event completed");
@@ -1687,13 +1694,14 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 		private final Camera camera;
 		private final DeltaTracker deltaTracker;
 		private final Matrix4f combinedMVP;
-		private static final Matrix4f IDENTITY_MATRIX = new Matrix4f().identity();
+		private final Matrix4f projectionMat;
 		
-		public WorldRenderContextImpl(ClientLevel level, Matrix4f combinedMVP, float tickDelta, Camera camera) {
+		public WorldRenderContextImpl(ClientLevel level, Matrix4f combinedMVP, Matrix4f projectionMatrix, float tickDelta, Camera camera) {
 			this.level = level;
 			this.tickDelta = tickDelta;
 			this.camera = camera;
 			this.combinedMVP = combinedMVP;
+			this.projectionMat = projectionMatrix;
 			// Create a simple DeltaTracker that returns the tick delta value
 			this.deltaTracker = new DeltaTracker() {
 				@Override
@@ -1751,8 +1759,8 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 		
 		@Override
 		public Matrix4f projectionMatrix() {
-			// In MC 1.21.6+, the projection matrix is identity since MVP is combined
-			return IDENTITY_MATRIX;
+			// Return the actual projection matrix
+			return this.projectionMat;
 		}
 		
 		// MC 1.20.6+ adds positionMatrix() method - returns the combined MVP directly
