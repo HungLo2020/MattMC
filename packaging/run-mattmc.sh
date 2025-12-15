@@ -15,6 +15,9 @@ else
     echo "Using system Java"
 fi
 
+# Path to the Minecraft game JAR for Fabric Loader
+GAME_JAR="${SCRIPT_DIR}/lib/minecraft-@VERSION@.jar"
+
 "$JAVA_CMD" -Xmx2G -Xms512M \
     -XX:+UseG1GC \
     -XX:+ParallelRefProcEnabled \
@@ -33,8 +36,10 @@ fi
     -XX:SurvivorRatio=32 \
     -XX:+PerfDisableSharedMem \
     -XX:MaxTenuringThreshold=1 \
+    -Dfabric.gameJarPath.client="${GAME_JAR}" \
+    -Dfabric.development=true \
     -cp "@CLASSPATH_LINUX@" \
-    net.minecraft.client.main.Main \
+    net.fabricmc.loader.impl.launch.knot.KnotClient \
     --version @VERSION@ \
     --accessToken 0 \
     --gameDir run \
