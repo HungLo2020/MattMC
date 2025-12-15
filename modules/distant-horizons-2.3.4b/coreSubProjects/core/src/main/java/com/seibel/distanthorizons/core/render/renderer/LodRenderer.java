@@ -703,14 +703,42 @@ public class LodRenderer
 					
 					renderedVBOs++;
 					int drawCount = (vbo.getVertexCount() / 4) * 6;
-					System.out.println("[LOD-RENDERER-PASS] Drawing VBO " + vboIndex + ": vertexCount=" + vertexCount + ", drawCount=" + drawCount + ", vboId=" + vbo.getId());
+					System.out.println("[LOD-RENDERER-PASS] ========== Drawing VBO " + vboIndex + " ==========");
+					System.out.println("[LOD-RENDERER-PASS] vertexCount=" + vertexCount + ", drawCount=" + drawCount + ", vboId=" + vbo.getId());
+					
+					// Check GL state before drawing
+					System.out.println("[GL-STATE] Depth test enabled: " + GL32.glIsEnabled(GL32.GL_DEPTH_TEST));
+					System.out.println("[GL-STATE] Depth func: " + GL32.glGetInteger(GL32.GL_DEPTH_FUNC));
+					System.out.println("[GL-STATE] Depth mask: " + GL32.glGetBoolean(GL32.GL_DEPTH_WRITEMASK));
+					System.out.println("[GL-STATE] Blend enabled: " + GL32.glIsEnabled(GL32.GL_BLEND));
+					System.out.println("[GL-STATE] Cull face enabled: " + GL32.glIsEnabled(GL32.GL_CULL_FACE));
+					System.out.println("[GL-STATE] Current program: " + GL32.glGetInteger(GL32.GL_CURRENT_PROGRAM));
+					int[] viewport = new int[4];
+					GL32.glGetIntegerv(GL32.GL_VIEWPORT, viewport);
+					System.out.println("[GL-STATE] Viewport: x=" + viewport[0] + ", y=" + viewport[1] + ", width=" + viewport[2] + ", height=" + viewport[3]);
+					
 					vbo.bind();
+					System.out.println("[LOD-RENDERER-PASS] VBO bound");
 					shaderProgram.bindVertexBuffer(vbo.getId());
+					System.out.println("[LOD-RENDERER-PASS] Vertex buffer bound to shader, calling glDrawElements...");
 					GL32.glDrawElements(
 							GL32.GL_TRIANGLES,
 							drawCount,
 							this.quadIBO.getType(), 0);
+					
+					// Check for GL errors after draw
+					int glError = GL32.glGetError();
+					if (glError != GL32.GL_NO_ERROR)
+					{
+						System.out.println("[GL-ERROR] glDrawElements failed with error code: " + glError);
+					}
+					else
+					{
+						System.out.println("[LOD-RENDERER-PASS] glDrawElements completed successfully");
+					}
+					
 					vbo.unbind();
+					System.out.println("[LOD-RENDERER-PASS] VBO unbound");
 				}
 			}
 			System.out.println("[LOD-RENDERER-PASS] Rendering complete: totalVBOs=" + totalVBOs + ", renderedVBOs=" + renderedVBOs); // TODO: Remove after debugging

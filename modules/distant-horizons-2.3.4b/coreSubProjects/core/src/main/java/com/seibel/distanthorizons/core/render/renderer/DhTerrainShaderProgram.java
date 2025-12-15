@@ -166,6 +166,10 @@ public class DhTerrainShaderProgram extends ShaderProgram implements IDhApiShade
 	@Override
 	public void fillUniformData(DhApiRenderParam renderParameters)
 	{
+		System.out.println("[SHADER-DEBUG] ========== fillUniformData START ==========");
+		System.out.println("[SHADER-DEBUG] dhProjectionMatrix=\n" + renderParameters.dhProjectionMatrix);
+		System.out.println("[SHADER-DEBUG] dhModelViewMatrix=\n" + renderParameters.dhModelViewMatrix);
+		
 		Mat4f combinedMatrix;
 		
 		// Check if projection matrix is identity (MC 1.21.6+)
@@ -179,26 +183,37 @@ public class DhTerrainShaderProgram extends ShaderProgram implements IDhApiShade
 			&& Math.abs(projMatrix.m20) < EPSILON && Math.abs(projMatrix.m21) < EPSILON && Math.abs(projMatrix.m23) < EPSILON
 			&& Math.abs(projMatrix.m30) < EPSILON && Math.abs(projMatrix.m31) < EPSILON && Math.abs(projMatrix.m32) < EPSILON;
 		
+		System.out.println("[SHADER-DEBUG] isIdentity=" + isIdentity);
+		
 		if (isIdentity)
 		{
 			// MC 1.21.6+: modelview already contains combined MVP, use it directly
 			combinedMatrix = new Mat4f(renderParameters.dhModelViewMatrix);
+			System.out.println("[SHADER-DEBUG] Using modelview as combinedMatrix (MC 1.21.6+)");
 		}
 		else
 		{
 			// Pre-1.21.6: multiply projection × modelview to get combined matrix
 			combinedMatrix = new Mat4f(renderParameters.dhProjectionMatrix);
 			combinedMatrix.multiply(renderParameters.dhModelViewMatrix);
+			System.out.println("[SHADER-DEBUG] Computed combinedMatrix = projection × modelview");
 		}
+		
+		System.out.println("[SHADER-DEBUG] Final combinedMatrix=\n" + combinedMatrix);
+		System.out.println("[SHADER-DEBUG] uCombinedMatrix location=" + this.uCombinedMatrix);
 		
 		super.bind();
 
 		// uniforms
+		System.out.println("[SHADER-DEBUG] Setting uCombinedMatrix uniform...");
 		this.setUniform(this.uCombinedMatrix, combinedMatrix);
+		System.out.println("[SHADER-DEBUG] Setting uMircoOffset=0.01f");
 		this.setUniform(this.uMircoOffset, 0.01f); // 0.01 block offset
 		
 		// setUniform(skyLightUniform, skyLight);
+		System.out.println("[SHADER-DEBUG] Setting uLightMap=0");
 		this.setUniform(this.uLightMap, 0); // TODO this should probably be passed in
+		System.out.println("[SHADER-DEBUG] ========== fillUniformData END ==========");
 		
 		if (this.uWorldYOffset != -1) this.setUniform(this.uWorldYOffset, (float) renderParameters.worldYOffset);
 		

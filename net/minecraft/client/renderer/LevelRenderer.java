@@ -655,9 +655,27 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 			
 			// Fire AFTER_SETUP event for Distant Horizons after terrain setup
 			// In MC 1.21.6+, matrix4f is the combined model-view-projection matrix
+			System.out.println("[MATRIX-DEBUG] ========== AFTER_SETUP EVENT ==========");
+			System.out.println("[MATRIX-DEBUG] Combined MVP matrix4f from RenderSystem:");
+			System.out.println(matrix4f);
+			
 			WorldRenderEvents.WorldRenderContext afterSetupContext = new WorldRenderContextImpl(
 				this.level, matrix4f, tickDeltaValue, renderCamera
 			);
+			
+			System.out.println("[MATRIX-DEBUG] WorldRenderContext created");
+			System.out.println("[MATRIX-DEBUG] positionMatrix():");
+			try {
+				Matrix4f posMatrix = afterSetupContext.positionMatrix();
+				System.out.println(posMatrix);
+			} catch (Exception e) {
+				System.out.println("[MATRIX-DEBUG] ERROR calling positionMatrix(): " + e.getMessage());
+			}
+			System.out.println("[MATRIX-DEBUG] projectionMatrix():");
+			System.out.println(afterSetupContext.projectionMatrix());
+			System.out.println("[MATRIX-DEBUG] matrixStack().last().pose():");
+			System.out.println(afterSetupContext.matrixStack().last().pose());
+			
 			try {
 				System.out.println("[DEBUG] Firing AFTER_SETUP event");
 				WorldRenderEvents.AFTER_SETUP.invoker().afterSetup(afterSetupContext);
