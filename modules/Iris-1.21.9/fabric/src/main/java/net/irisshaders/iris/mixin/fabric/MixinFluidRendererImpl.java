@@ -1,7 +1,7 @@
 package net.irisshaders.iris.mixin.fabric;
 
 import net.minecraft.client.renderer.chunk.advanced.compile.pipeline.DefaultFluidRenderer;
-import net.caffeinemc.mods.sodium.fabric.render.FluidRendererImpl;
+import net.minecraft.client.renderer.sodium.fabric.render.FluidRendererImpl;
 import net.irisshaders.iris.vertices.sodium.terrain.VertexEncoderInterface;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
