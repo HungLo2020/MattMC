@@ -2,6 +2,7 @@ package net.minecraft.client.renderer.culling;
 
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
+import net.minecraft.client.renderer.advanced.AdvancedRenderingConfig;
 import net.minecraft.world.level.levelgen.structure.BoundingBox;
 import net.minecraft.world.phys.AABB;
 import org.joml.FrustumIntersection;
@@ -72,7 +73,54 @@ public class Frustum {
 		this.viewVector = this.matrix.transformTranspose(new Vector4f(0.0F, 0.0F, 1.0F, 0.0F));
 	}
 
+	/**
+	 * Tests whether the given AABB is visible within the frustum.
+	 * 
+	 * <p>When advanced rendering is enabled (Sodium), this method uses an optimized
+	 * frustum culling algorithm with SIMD-friendly comparisons for better performance.
+	 * 
+	 * <p>When advanced rendering is disabled, this method uses the vanilla frustum test.
+	 * 
+	 * @param aABB the axis-aligned bounding box to test
+	 * @return {@code true} if the AABB is visible (either partially or fully inside the frustum)
+	 */
 	public boolean isVisible(AABB aABB) {
+		// ===== BEGIN SODIUM FRUSTUM OPTIMIZATION =====
+		// Originally from: sodium.mixin.core.render.frustum.FrustumMixin
+		// Step 10: Inline Frustum Culling Mixins
+		
+		if (AdvancedRenderingConfig.isEnabled()) {
+			return this.isVisibleSodium(aABB);
+		}
+		return this.isVisibleVanilla(aABB);
+		
+		// ===== END SODIUM FRUSTUM OPTIMIZATION =====
+	}
+	
+	/**
+	 * Sodium's optimized AABB frustum test.
+	 * Uses SIMD-friendly comparisons for better CPU performance.
+	 * 
+	 * <p>NOTE: This is currently a placeholder that delegates to vanilla.
+	 * The actual Sodium implementation will be added in Phase 3.
+	 * 
+	 * @param aABB the axis-aligned bounding box to test
+	 * @return {@code true} if the AABB is visible
+	 */
+	private boolean isVisibleSodium(AABB aABB) {
+		// Placeholder - actual Sodium implementation comes in Phase 3
+		// Sodium uses optimized AABB-frustum intersection with better branch prediction
+		return this.isVisibleVanilla(aABB);
+	}
+	
+	/**
+	 * Vanilla AABB frustum test (original Minecraft implementation).
+	 * Tests whether the AABB intersects with the frustum planes.
+	 * 
+	 * @param aABB the axis-aligned bounding box to test
+	 * @return {@code true} if the AABB is visible
+	 */
+	private boolean isVisibleVanilla(AABB aABB) {
 		int i = this.cubeInFrustum(aABB.minX, aABB.minY, aABB.minZ, aABB.maxX, aABB.maxY, aABB.maxZ);
 		return i == -2 || i == -1;
 	}

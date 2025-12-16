@@ -532,7 +532,9 @@ These steps inline the most critical Sodium mixins, creating the foundation for 
 
 ---
 
-#### **Step 9: Inline Vertex Format Mixins**
+#### **Step 9: Inline Vertex Format Mixins** ✅ COMPLETE
+
+**Status**: ✅ **COMPLETED** - Vertex format caching implemented, build successful
 
 **Objective**: Integrate Sodium's enhanced vertex format handling.
 
@@ -582,9 +584,21 @@ These steps inline the most critical Sodium mixins, creating the foundation for 
 - ✅ Build successful
 - ✅ Zero functional changes
 
+**Implementation Details**:
+- Modified `com/mojang/blaze3d/vertex/VertexFormat.java`:
+  - Added `sodiumCachedStride` field for caching vertex size
+  - Modified `getVertexSize()` to use Sodium caching when enabled
+  - Caching only activated when `AdvancedRenderingConfig.isEnabled()` returns true
+  - Vanilla path preserved (no caching when advanced rendering disabled)
+  - Added comprehensive JavaDoc documentation
+- Build verified: BUILD SUCCESSFUL in 2m 28s
+- Zero functional changes (flag defaults to false)
+
 ---
 
-#### **Step 10: Inline Frustum Culling Mixins**
+#### **Step 10: Inline Frustum Culling Mixins** ✅ COMPLETE
+
+**Status**: ✅ **COMPLETED** - Frustum culling abstraction implemented, build successful
 
 **Objective**: Integrate Sodium's optimized frustum culling.
 
@@ -623,6 +637,24 @@ These steps inline the most critical Sodium mixins, creating the foundation for 
 - Build compiles successfully
 - Frustum culling works correctly
 - No behavior changes
+
+**Completion Criteria**:
+- ✅ Frustum culling abstraction added
+- ✅ Vanilla path preserved
+- ✅ Sodium path stubbed
+- ✅ Build successful
+- ✅ Zero functional changes
+
+**Implementation Details**:
+- Modified `net/minecraft/client/renderer/culling/Frustum.java`:
+  - Modified `isVisible(AABB)` to check `AdvancedRenderingConfig.isEnabled()`
+  - Created `isVisibleSodium(AABB)` stub (delegates to vanilla until Phase 3)
+  - Created `isVisibleVanilla(AABB)` preserving original frustum test logic
+  - Added comprehensive JavaDoc documentation explaining both paths
+  - Placeholder notes for Phase 3 Sodium implementation
+- Build verified: BUILD SUCCESSFUL in 2m 28s
+- Zero functional changes (Sodium path delegates to vanilla)
+
 
 **Completion Criteria**:
 - ✅ Frustum culling abstraction added

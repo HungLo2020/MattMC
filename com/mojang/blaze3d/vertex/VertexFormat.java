@@ -16,6 +16,7 @@ import java.util.List;
 import java.util.function.Supplier;
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
+import net.minecraft.client.renderer.advanced.AdvancedRenderingConfig;
 import org.jetbrains.annotations.Nullable;
 
 @Environment(EnvType.CLIENT)
@@ -31,6 +32,19 @@ public class VertexFormat {
 	private GpuBuffer immediateDrawVertexBuffer;
 	@Nullable
 	private GpuBuffer immediateDrawIndexBuffer;
+	
+	// ===== BEGIN SODIUM VERTEX FORMAT INTEGRATION =====
+	// Originally from: sodium.mixin.core.render.VertexFormatMixin
+	// Step 9: Inline Vertex Format Mixins
+	
+	/**
+	 * Cached stride calculation for Sodium optimization.
+	 * When advanced rendering is enabled, Sodium caches the calculated vertex size
+	 * to avoid redundant computations on every access.
+	 * Set to -1 when not yet calculated.
+	 */
+	private int sodiumCachedStride = -1;
+	// ===== END SODIUM VERTEX FORMAT INTEGRATION =====
 
 	VertexFormat(List<VertexFormatElement> list, List<String> list2, IntList intList, int i) {
 		this.elements = list;
@@ -53,8 +67,33 @@ public class VertexFormat {
 		return "VertexFormat" + this.names;
 	}
 
+	/**
+	 * Returns the vertex size (stride) in bytes.
+	 * 
+	 * <p>When advanced rendering is enabled (Sodium), this method uses a cached value
+	 * to avoid redundant accesses to the {@code vertexSize} field. The caching provides
+	 * a minor performance optimization for hot-path vertex processing.
+	 * 
+	 * <p>When advanced rendering is disabled, this method returns the vertex size directly
+	 * using the vanilla implementation.
+	 * 
+	 * @return the vertex size in bytes
+	 */
 	public int getVertexSize() {
-		return this.vertexSize;
+		// Sodium optimization: use cached stride if available
+		if (AdvancedRenderingConfig.isEnabled() && this.sodiumCachedStride != -1) {
+			return this.sodiumCachedStride;
+		}
+		
+		// Get vertex size (vanilla path or first access)
+		int stride = this.vertexSize;
+		
+		// Cache for Sodium path
+		if (AdvancedRenderingConfig.isEnabled()) {
+			this.sodiumCachedStride = stride;
+		}
+		
+		return stride;
 	}
 
 	public List<VertexFormatElement> getElements() {
