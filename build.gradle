@@ -20,10 +20,6 @@ def lwjglNatives = System.getProperty('os.name').toLowerCase().contains('mac')
 def fabricLoaderVersion = '0.18.2'
 def fabricLoaderDir = "modules/fabric-loader-${fabricLoaderVersion}"
 
-// Sodium version (update this when upgrading Sodium source)
-def sodiumVersion = '0.7.2'
-def sodiumDir = 'modules/sodium-1.21.9'
-
 // Iris version (update this when upgrading Iris source)
 def irisVersion = '1.9.6'
 def irisDir = 'modules/Iris-1.21.9'
