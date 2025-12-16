@@ -433,16 +433,32 @@ public class SectionRenderDispatcher {
 			}
 			
 			/**
-			 * Sodium rendering path stub for chunk section compilation.
-			 * Will be implemented when Sodium implementation is migrated (Phase 3).
+			 * Sodium rendering path for chunk section compilation.
+			 * 
+			 * <p><b>Step 17 Implementation:</b> Currently delegates to vanilla path.
+			 * The actual Sodium chunk compilation system (ChunkBuilder, ChunkBuilderMeshingTask)
+			 * has been migrated to {@code net.minecraft.client.renderer.chunk.advanced.compile}
+			 * in Steps 13-14, but requires additional architectural wiring to activate.</p>
+			 * 
+			 * <p>Full activation requires:
+			 * <ul>
+			 *   <li>Initialize ChunkBuilder with worker threads</li>
+			 *   <li>Create ChunkRenderContext from RenderSectionRegion</li>
+			 *   <li>Translate vanilla SectionBufferBuilderPack to Sodium's ChunkBufferBuilderPool</li>
+			 *   <li>Handle ChunkBuildOutput and upload to GPU via RenderRegion</li>
+			 * </ul>
+			 * This architectural work is beyond Step 17's scope and will be addressed in future phases.
+			 * </p>
 			 * 
 			 * @param sectionBufferBuilderPack the buffer builder pack for constructing meshes
-			 * @return a future that will be completed when the Sodium compile task finishes
-			 * @throws UnsupportedOperationException until Sodium implementation is migrated
+			 * @return a future that will be completed when the compile task finishes
+			 * @see net.minecraft.client.renderer.chunk.advanced.compile.executor.ChunkBuilder
+			 * @see net.minecraft.client.renderer.chunk.advanced.compile.tasks.ChunkBuilderMeshingTask
 			 */
 			private CompletableFuture<SectionRenderDispatcher.SectionTaskResult> doTaskSodium(SectionBufferBuilderPack sectionBufferBuilderPack) {
-				// Placeholder - will be implemented when Sodium implementation migrated (Phase 3)
-				throw new UnsupportedOperationException("Sodium chunk compilation not yet implemented - Phase 3 pending");
+				// Step 17: Delegate to vanilla path until full Sodium pipeline is wired
+				// The migrated Sodium code is available but needs initialization infrastructure
+				return this.doTaskVanilla(sectionBufferBuilderPack);
 			}
 			
 			/**
