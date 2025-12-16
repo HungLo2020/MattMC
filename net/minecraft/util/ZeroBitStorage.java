@@ -62,4 +62,22 @@ public class ZeroBitStorage implements BitStorage {
 	public BitStorage copy() {
 		return this;
 	}
+
+	// ===== BEGIN SODIUM ACCESSOR INTEGRATION =====
+	// Originally from: sodium.mixin.core.world.chunk.ZeroBitStorageMixin
+	// Step 5: Inline Chunk Rendering Mixins - Part 1 (Accessor Creation)
+	
+	/**
+	 * Sodium accessor: Unpacks all values from this storage using the provided palette.
+	 * Since this is a zero-bit storage, all values are the same (palette index 0).
+	 * 
+	 * @param out The output array to fill with unpacked values
+	 * @param palette The palette to use for value lookup
+	 * @param <T> The type of values in the palette
+	 */
+	public <T> void sodium$unpack(T[] out, net.minecraft.world.level.chunk.Palette<T> palette) {
+		T value = palette.valueFor(0);
+		Arrays.fill(out, 0, this.size, value);
+	}
+	// ===== END SODIUM ACCESSOR INTEGRATION =====
 }
