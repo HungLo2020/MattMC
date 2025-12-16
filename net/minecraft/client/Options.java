@@ -866,6 +866,15 @@ public class Options {
 		3,
 		integer -> {}
 	);
+	
+	/**
+	 * Whether to enable advanced rendering features (Step 7-8 integration).
+	 * Controls switchable rendering path between vanilla and Sodium-optimized implementations.
+	 * Default is false to preserve vanilla behavior.
+	 */
+	private final OptionInstance<Boolean> enableAdvancedRendering = OptionInstance.createBoolean(
+		"options.advanced.enableAdvancedRendering", false, boolean_ -> {}
+	);
 
 	public OptionInstance<Boolean> darkMojangStudiosBackground() {
 		return this.darkMojangStudiosBackground;
@@ -1317,6 +1326,10 @@ public class Options {
 	public OptionInstance<Integer> cpuRenderAheadLimit() {
 		return this.cpuRenderAheadLimit;
 	}
+	
+	public OptionInstance<Boolean> enableAdvancedRendering() {
+		return this.enableAdvancedRendering;
+	}
 
 	public Options(Minecraft minecraft, File file) {
 		this.minecraft = minecraft;
@@ -1470,6 +1483,7 @@ public class Options {
 		fieldAccess.process("useBlockFaceCulling", this.useBlockFaceCulling);
 		fieldAccess.process("useAdvancedStagingBuffers", this.useAdvancedStagingBuffers);
 		fieldAccess.process("cpuRenderAheadLimit", this.cpuRenderAheadLimit);
+		fieldAccess.process("enableAdvancedRendering", this.enableAdvancedRendering);
 
 		for (KeyMapping keyMapping : this.keyMappings) {
 			String string = keyMapping.saveString();
