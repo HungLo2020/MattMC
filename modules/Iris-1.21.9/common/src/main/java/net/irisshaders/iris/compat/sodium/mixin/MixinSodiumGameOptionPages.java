@@ -1,6 +1,6 @@
 package net.irisshaders.iris.compat.sodium.mixin;
 
-import net.caffeinemc.mods.sodium.client.gui.SodiumGameOptionPages;
+import net.minecraft.client.renderer.sodium.gui.SodiumGameOptionPages;
 import net.minecraft.client.renderer.sodium.gui.options.Option;
 import net.minecraft.client.renderer.sodium.gui.options.OptionFlag;
 import net.minecraft.client.renderer.sodium.gui.options.OptionGroup;

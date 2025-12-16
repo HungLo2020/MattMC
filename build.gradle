@@ -355,24 +355,6 @@ sourceSets {
         }
     }
     
-    // Sodium source set - compiled to a separate mod JAR
-    sodium {
-        java {
-            srcDirs = [
-                "${sodiumDir}/common/src/main/java",
-                "${sodiumDir}/common/src/api/java",
-                "${sodiumDir}/common/src/boot/java",
-                "${sodiumDir}/fabric/src/main/java"
-            ]
-        }
-        resources {
-            srcDirs = [
-                "${sodiumDir}/common/src/main/resources",
-                "${sodiumDir}/fabric/src/main/resources"
-            ]
-        }
-    }
-    
     // Iris source set - compiled to a separate mod JAR
     iris {
         java {
@@ -441,31 +423,17 @@ configurations {
     fabricLoaderCompileOnly.extendsFrom compileOnly
     fabricLoaderRuntimeOnly.extendsFrom runtimeOnly
     
-    // Sodium configurations extend from implementation + fabricLoader
-    sodiumImplementation.extendsFrom implementation
-    sodiumCompileOnly.extendsFrom compileOnly
-    sodiumRuntimeOnly.extendsFrom runtimeOnly
-    
-    // Iris configurations extend from implementation + fabricLoader + sodium
+    // Iris configurations extend from implementation + fabricLoader
     irisImplementation.extendsFrom implementation
     irisCompileOnly.extendsFrom compileOnly
     irisRuntimeOnly.extendsFrom runtimeOnly
 }
 
-// Sodium depends on Fabric Loader and Minecraft
-// Fabric API stub interfaces are in src/main/java/net/fabricmc/fabric/api/
-sourceSets.sodium.compileClasspath += sourceSets.fabricLoader.output
-sourceSets.sodium.compileClasspath += sourceSets.main.output
-sourceSets.sodium.runtimeClasspath += sourceSets.fabricLoader.output
-sourceSets.sodium.runtimeClasspath += sourceSets.main.output
-
-// Iris depends on Fabric Loader, Minecraft, and Sodium
+// Iris depends on Fabric Loader and Minecraft (Sodium is now integrated into main)
 sourceSets.iris.compileClasspath += sourceSets.fabricLoader.output
 sourceSets.iris.compileClasspath += sourceSets.main.output
-sourceSets.iris.compileClasspath += sourceSets.sodium.output
 sourceSets.iris.runtimeClasspath += sourceSets.fabricLoader.output
 sourceSets.iris.runtimeClasspath += sourceSets.main.output
-sourceSets.iris.runtimeClasspath += sourceSets.sodium.output
 
 // ============================================================================
 // FABRIC LOADER JAR TASK
@@ -525,41 +493,6 @@ tasks.register('gameJar', Jar) {
 // Ensure fabricLoaderJar depends on compilation
 tasks.named('fabricLoaderJar') {
     dependsOn 'compileFabricLoaderJava', 'processFabricLoaderResources'
-}
-
-// ============================================================================
-// SODIUM MOD JAR TASK
-// ============================================================================
-// Create the Sodium mod JAR to be loaded by Fabric Loader
-// ============================================================================
-
-// Process Sodium resources with version substitution
-tasks.named('processSodiumResources') {
-    filesMatching('fabric.mod.json') {
-        expand 'version': sodiumVersion
-    }
-}
-
-tasks.register('sodiumJar', Jar) {
-    group = 'build'
-    description = 'Assembles the Sodium mod JAR'
-    
-    dependsOn 'compileSodiumJava', 'processSodiumResources'
-    
-    archiveBaseName = 'sodium'
-    archiveVersion = sodiumVersion
-    archiveClassifier = 'mc1.21.10'
-    
-    from sourceSets.sodium.output
-    
-    destinationDirectory = file("${buildDir}/mods")
-    
-    manifest {
-        attributes(
-            'Implementation-Title': 'Sodium',
-            'Implementation-Version': sodiumVersion
-        )
-    }
 }
 
 // ============================================================================
@@ -810,7 +743,7 @@ tasks.register('runClient', JavaExec) {
     group = 'minecraft'
     description = 'Runs the Minecraft client with Fabric Loader'
     
-    dependsOn 'fabricLoaderJar', 'gameJar', 'sodiumJar', 'irisJar', 'copyJdkToRun', 'shaderPackZip'
+    dependsOn 'fabricLoaderJar', 'gameJar', 'irisJar', 'copyJdkToRun', 'shaderPackZip'
     
     // Use the separate JARs so Fabric Loader can detect the game JAR properly
     // The order matters: Fabric Loader JAR first, then Game JAR, then dependencies
@@ -861,7 +794,7 @@ tasks.register('runClient', JavaExec) {
         }
         modsDir.mkdirs()
         
-        // Copy Sodium and Iris mod JARs to mods folder
+        // Copy Iris mod JAR to mods folder
         copy {
             from file("${buildDir}/mods")
             into modsDir
@@ -1092,7 +1025,7 @@ tasks.register('clientDist') {
     group = 'distribution'
     description = 'Creates a runnable client distribution'
     
-    dependsOn 'jar', 'classes', 'downloadJdk', 'shaderPackZip', 'fabricLoaderJar', 'gameJar', 'sodiumJar', 'irisJar'
+    dependsOn 'jar', 'classes', 'downloadJdk', 'shaderPackZip', 'fabricLoaderJar', 'gameJar', 'irisJar'
     
     def distDir = "${buildDir}/client-dist/MattMC"
     
@@ -1164,7 +1097,7 @@ tasks.register('clientDist') {
         }
         println "Copied shader pack to ${distDir}/run/shaderpacks"
         
-        // Copy mod JARs (Sodium, Iris) to run/mods directory
+        // Copy mod JARs (Iris) to run/mods directory
         copy {
             from file("${buildDir}/mods")
             into "${distDir}/run/mods"
