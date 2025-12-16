@@ -160,6 +160,12 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 	private final LevelRenderState levelRenderState;
 	private final SubmitNodeStorage submitNodeStorage;
 	private final FeatureRenderDispatcher featureRenderDispatcher;
+	
+	// ===== BEGIN ADVANCED RENDERING INTEGRATION (STEP7-8PLAN Step 3) =====
+	private net.minecraft.client.renderer.advanced.chunk.ChunkRenderer vanillaChunkRenderer;
+	private net.minecraft.client.renderer.advanced.chunk.ChunkRenderer sodiumChunkRenderer;
+	private net.minecraft.client.renderer.advanced.chunk.ChunkRenderer activeChunkRenderer;
+	// ===== END ADVANCED RENDERING INTEGRATION =====
 
 	public LevelRenderer(
 		Minecraft minecraft,
@@ -176,7 +182,55 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 		this.submitNodeStorage = featureRenderDispatcher.getSubmitNodeStorage();
 		this.levelRenderState = levelRenderState;
 		this.featureRenderDispatcher = featureRenderDispatcher;
+		
+		// ===== BEGIN ADVANCED RENDERING INTEGRATION (STEP7-8PLAN Step 3) =====
+		// Initialize rendering paths
+		this.vanillaChunkRenderer = new net.minecraft.client.renderer.advanced.chunk.VanillaChunkRenderer(this);
+		this.sodiumChunkRenderer = new net.minecraft.client.renderer.advanced.chunk.SodiumChunkRenderer(); // Not used yet
+		this.activeChunkRenderer = this.vanillaChunkRenderer; // Default to vanilla
+		// ===== END ADVANCED RENDERING INTEGRATION =====
 	}
+	
+	// ===== BEGIN ADVANCED RENDERING INTEGRATION (STEP7-8PLAN Steps 3-4) =====
+	/**
+	 * Selects the appropriate rendering path based on configuration.
+	 * 
+	 * <p>This method determines whether to use vanilla or Sodium chunk rendering
+	 * based on the {@link net.minecraft.client.renderer.advanced.AdvancedRenderingConfig} settings.
+	 * It includes logging to track rendering path switches for debugging and telemetry.</p>
+	 * 
+	 * @since Step 7-8 Integration Step 3
+	 */
+	private void selectRenderingPath() {
+		boolean shouldUseAdvanced = net.minecraft.client.renderer.advanced.AdvancedRenderingConfig.isEnabled();
+		
+		if (shouldUseAdvanced && this.activeChunkRenderer != this.sodiumChunkRenderer) {
+			LOGGER.info("Switching to Sodium chunk renderer");
+			this.activeChunkRenderer = this.sodiumChunkRenderer;
+		} else if (!shouldUseAdvanced && this.activeChunkRenderer != this.vanillaChunkRenderer) {
+			LOGGER.info("Switching to vanilla chunk renderer");
+			this.activeChunkRenderer = this.vanillaChunkRenderer;
+		}
+	}
+	
+	/**
+	 * Validates that the correct rendering path is active.
+	 * 
+	 * <p>This assertion-based validation ensures that the rendering path matches
+	 * the configuration state. Used for debugging and development builds.</p>
+	 * 
+	 * @since Step 7-8 Integration Step 4
+	 */
+	private void validateRenderingPath() {
+		if (net.minecraft.client.renderer.advanced.AdvancedRenderingConfig.isEnabled()) {
+			assert this.activeChunkRenderer == this.sodiumChunkRenderer 
+				: "Advanced rendering enabled but not using Sodium renderer";
+		} else {
+			assert this.activeChunkRenderer == this.vanillaChunkRenderer
+				: "Advanced rendering disabled but not using vanilla renderer";
+		}
+	}
+	// ===== END ADVANCED RENDERING INTEGRATION =====
 
 	public void close() {
 		if (this.entityOutlineTarget != null) {
@@ -341,7 +395,43 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 			: "E: " + this.levelRenderState.entityRenderStates.size() + "/" + this.level.getEntityCount() + ", SD: " + this.level.getServerSimulationDistance();
 	}
 
+	// ===== BEGIN ADVANCED RENDERING INTEGRATION (STEP7-8PLAN Step 3) =====
+	/**
+	 * Culls terrain sections based on camera frustum.
+	 * 
+	 * <p>This method selects the appropriate rendering path (vanilla or Sodium)
+	 * and delegates terrain culling to the active renderer. The actual vanilla
+	 * implementation is preserved in {@link #cullTerrainVanilla(Camera, Frustum, boolean)}.</p>
+	 * 
+	 * @param camera the camera for frustum culling
+	 * @param frustum the view frustum
+	 * @param bl spectator mode flag
+	 * @since Step 7-8 Integration Step 3
+	 */
 	private void cullTerrain(Camera camera, Frustum frustum, boolean bl) {
+		selectRenderingPath();
+		validateRenderingPath();
+		
+		// For now, always use vanilla path since Sodium path is not yet implemented
+		// This will be replaced with: activeChunkRenderer.renderChunks(camera, frustum, bl);
+		// once proper integration is complete in Phase 2
+		cullTerrainVanilla(camera, frustum, bl);
+	}
+	
+	/**
+	 * Vanilla terrain culling implementation.
+	 * 
+	 * <p>This is the original Minecraft terrain culling logic, preserved during
+	 * Sodium integration. It handles frustum culling, camera repositioning, and
+	 * section occlusion graph updates.</p>
+	 * 
+	 * @param camera the camera for frustum culling
+	 * @param frustum the view frustum
+	 * @param bl spectator mode flag
+	 * @since Step 7-8 Integration Step 3 (renamed from cullTerrain)
+	 */
+	private void cullTerrainVanilla(Camera camera, Frustum frustum, boolean bl) {
+		// ===== END ADVANCED RENDERING INTEGRATION =====
 		Vec3 vec3 = camera.getPosition();
 		if (this.minecraft.options.getEffectiveRenderDistance() != this.lastViewDistance) {
 			this.allChanged();

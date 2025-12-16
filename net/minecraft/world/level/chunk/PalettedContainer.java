@@ -337,4 +337,89 @@ public class PalettedContainer<T> implements PaletteResize<T>, PalettedContainer
 			return new PalettedContainer.Data<>(this.configuration, this.storage.copy(), this.palette.copy());
 		}
 	}
+
+	// ===== BEGIN SODIUM ACCESSOR INTEGRATION =====
+	// Originally from: sodium.mixin.core.world.chunk.PalettedContainerMixin
+	// Step 5: Inline Chunk Rendering Mixins - Part 1 (Accessor Creation)
+	
+	/**
+	 * Sodium accessor: Unpacks all values from this container into the provided array.
+	 * Used by Sodium for efficient block state extraction during chunk rendering.
+	 * 
+	 * @param values The array to fill with unpacked values (must match strategy entry count)
+	 */
+	public void sodium$unpack(T[] values) {
+		var strategy = java.util.Objects.requireNonNull(this.strategy);
+
+		if (values.length != strategy.entryCount()) {
+			throw new IllegalArgumentException("Array is wrong size");
+		}
+
+		var data = java.util.Objects.requireNonNull(this.data, "PalettedContainer must have data");
+
+		var storage = data.storage();
+		var palette = data.palette();
+
+		// Delegate to BitStorage's unpack method
+		if (storage instanceof SimpleBitStorage) {
+			((SimpleBitStorage) storage).sodium$unpack(values, palette);
+		} else if (storage instanceof ZeroBitStorage) {
+			((ZeroBitStorage) storage).sodium$unpack(values, palette);
+		} else {
+			// Fallback for unknown storage types
+			for (int i = 0; i < values.length; i++) {
+				int paletteIndex = storage.get(i);
+				values[i] = palette.valueFor(paletteIndex);
+			}
+		}
+	}
+
+	/**
+	 * Sodium accessor: Unpacks values from a sub-region of this container.
+	 * Used by Sodium for partial chunk updates.
+	 * 
+	 * @param values The array to fill with unpacked values
+	 * @param minX Minimum X coordinate (inclusive)
+	 * @param minY Minimum Y coordinate (inclusive)
+	 * @param minZ Minimum Z coordinate (inclusive)
+	 * @param maxX Maximum X coordinate (inclusive)
+	 * @param maxY Maximum Y coordinate (inclusive)
+	 * @param maxZ Maximum Z coordinate (inclusive)
+	 */
+	public void sodium$unpack(T[] values, int minX, int minY, int minZ, int maxX, int maxY, int maxZ) {
+		var strategy = java.util.Objects.requireNonNull(this.strategy);
+
+		if (values.length != strategy.entryCount()) {
+			throw new IllegalArgumentException("Array is wrong size");
+		}
+
+		var data = java.util.Objects.requireNonNull(this.data, "PalettedContainer must have data");
+
+		var storage = data.storage();
+		var palette = data.palette();
+
+		for (int y = minY; y <= maxY; y++) {
+			for (int z = minZ; z <= maxZ; z++) {
+				for (int x = minX; x <= maxX; x++) {
+					int localBlockIndex = strategy.getIndex(x, y, z);
+
+					int paletteIndex = storage.get(localBlockIndex);
+					var paletteValue = palette.valueFor(paletteIndex);
+
+					values[localBlockIndex] = paletteValue;
+				}
+			}
+		}
+	}
+
+	/**
+	 * Sodium accessor: Creates a copy of this container as a read-only view.
+	 * Used by Sodium for snapshot-based rendering.
+	 * 
+	 * @return A copy of this container
+	 */
+	public PalettedContainerRO<T> sodium$copy() {
+		return this.copy();
+	}
+	// ===== END SODIUM ACCESSOR INTEGRATION =====
 }

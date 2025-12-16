@@ -362,6 +362,37 @@ public class SimpleBitStorage implements BitStorage {
 		return new SimpleBitStorage(this.bits, this.size, (long[])this.data.clone());
 	}
 
+	// ===== BEGIN SODIUM ACCESSOR INTEGRATION =====
+	// Originally from: sodium.mixin.core.world.chunk.SimpleBitStorageMixin
+	// Step 5: Inline Chunk Rendering Mixins - Part 1 (Accessor Creation)
+	
+	/**
+	 * Sodium accessor: Unpacks all values from this storage using the provided palette.
+	 * This is an optimized version used by Sodium for efficient chunk data extraction.
+	 * 
+	 * @param out The output array to fill with unpacked values
+	 * @param palette The palette to use for value lookup
+	 * @param <T> The type of values in the palette
+	 */
+	public <T> void sodium$unpack(T[] out, net.minecraft.world.level.chunk.Palette<T> palette) {
+		int idx = 0;
+
+		for (long word : this.data) {
+			long l = word;
+
+			for (int j = 0; j < this.valuesPerLong; ++j) {
+				out[idx] = java.util.Objects.requireNonNull(palette.valueFor((int) (l & this.mask)),
+						"Palette does not contain entry for value in storage");
+				l >>= this.bits;
+
+				if (++idx >= this.size) {
+					return;
+				}
+			}
+		}
+	}
+	// ===== END SODIUM ACCESSOR INTEGRATION =====
+
 	public static class InitializationException extends RuntimeException {
 		InitializationException(String string) {
 			super(string);

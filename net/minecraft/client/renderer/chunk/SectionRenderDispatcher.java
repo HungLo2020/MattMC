@@ -418,8 +418,41 @@ public class SectionRenderDispatcher {
 				return "rend_chk_rebuild";
 			}
 
+			// ===== BEGIN SODIUM INTEGRATION =====
+			// STEP7-8PLAN Step 6: Rendering path selection injection point
+			// Originally from: sodium.mixin.core.render.world.RenderSectionMixin
+			
 			@Override
 			public CompletableFuture<SectionRenderDispatcher.SectionTaskResult> doTask(SectionBufferBuilderPack sectionBufferBuilderPack) {
+				// Check if advanced rendering (Sodium) is enabled
+				if (net.minecraft.client.renderer.advanced.AdvancedRenderingConfig.isEnabled()) {
+					return this.doTaskSodium(sectionBufferBuilderPack);
+				}
+				// Default to vanilla path
+				return this.doTaskVanilla(sectionBufferBuilderPack);
+			}
+			
+			/**
+			 * Sodium rendering path stub for chunk section compilation.
+			 * Will be implemented when Sodium implementation is migrated (Phase 3).
+			 * 
+			 * @param sectionBufferBuilderPack the buffer builder pack for constructing meshes
+			 * @return a future that will be completed when the Sodium compile task finishes
+			 * @throws UnsupportedOperationException until Sodium implementation is migrated
+			 */
+			private CompletableFuture<SectionRenderDispatcher.SectionTaskResult> doTaskSodium(SectionBufferBuilderPack sectionBufferBuilderPack) {
+				// Placeholder - will be implemented when Sodium implementation migrated (Phase 3)
+				throw new UnsupportedOperationException("Sodium chunk compilation not yet implemented - Phase 3 pending");
+			}
+			
+			/**
+			 * Vanilla rendering path for chunk section compilation.
+			 * Preserved original Minecraft chunk compilation logic.
+			 * 
+			 * @param sectionBufferBuilderPack the buffer builder pack for constructing meshes
+			 * @return a future that will be completed when the vanilla compile task finishes
+			 */
+			private CompletableFuture<SectionRenderDispatcher.SectionTaskResult> doTaskVanilla(SectionBufferBuilderPack sectionBufferBuilderPack) {
 				if (this.isCancelled.get()) {
 					return CompletableFuture.completedFuture(SectionRenderDispatcher.SectionTaskResult.CANCELLED);
 				} else {
@@ -474,6 +507,7 @@ public class SectionRenderDispatcher {
 					}
 				}
 			}
+			// ===== END SODIUM INTEGRATION =====
 
 			@Override
 			public void cancel() {
