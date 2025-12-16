@@ -14,7 +14,7 @@ public class SodiumWorkarounds implements GraphicsBootstrapper {
 
     @Override
     public void bootstrap(String[] arguments) {
-        PreLaunchChecks.checkEnvironment();
+        net.minecraft.client.renderer.sodium.compatibility.checks.PreLaunchChecks.checkEnvironment();
         GraphicsAdapterProbe.findAdapters();
         Workarounds.init();
 

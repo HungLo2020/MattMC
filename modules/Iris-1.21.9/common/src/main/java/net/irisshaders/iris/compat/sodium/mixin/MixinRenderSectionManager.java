@@ -1,6 +1,6 @@
 package net.irisshaders.iris.compat.sodium.mixin;
 
-import net.caffeinemc.mods.sodium.client.gui.SodiumGameOptions;
+import net.minecraft.client.renderer.sodium.gui.SodiumGameOptions;
 import net.minecraft.client.renderer.chunk.advanced.RenderSectionManager;
 import net.minecraft.client.renderer.chunk.advanced.vertex.format.ChunkVertexType;
 import net.irisshaders.iris.Iris;

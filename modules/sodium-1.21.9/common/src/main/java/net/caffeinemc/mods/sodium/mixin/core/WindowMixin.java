@@ -3,7 +3,7 @@ package net.caffeinemc.mods.sodium.mixin.core;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import com.mojang.blaze3d.platform.Window;
-import net.caffeinemc.mods.sodium.client.platform.NativeWindowHandle;
+import net.minecraft.client.renderer.sodium.platform.NativeWindowHandle;
 import net.minecraft.client.renderer.sodium.SodiumClientMod;
 import net.minecraft.client.renderer.sodium.compatibility.workarounds.Workarounds;
 import net.minecraft.client.renderer.sodium.services.PlatformRuntimeInformation;
@@ -15,7 +15,7 @@ import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
 
 @Mixin(Window.class)
-public abstract class WindowMixin implements NativeWindowHandle {
+public abstract class WindowMixin implements net.minecraft.client.renderer.sodium.platform.NativeWindowHandle {
     @Shadow
     public abstract long handle();
 

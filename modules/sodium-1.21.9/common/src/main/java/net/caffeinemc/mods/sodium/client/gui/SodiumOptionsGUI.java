@@ -2,8 +2,9 @@ package net.caffeinemc.mods.sodium.client.gui;
 
 import net.minecraft.client.renderer.sodium.SodiumClientMod;
 import net.minecraft.client.renderer.sodium.data.fingerprint.HashedFingerprint;
-import net.caffeinemc.mods.sodium.client.console.Console;
-import net.caffeinemc.mods.sodium.client.console.message.MessageLevel;
+import net.minecraft.client.renderer.sodium.console.Console;
+import net.minecraft.client.renderer.sodium.console.message.MessageLevel;
+import net.minecraft.client.renderer.sodium.gui.SodiumGameOptions;
 import net.minecraft.client.renderer.sodium.gui.options.*;
 import net.minecraft.client.renderer.sodium.gui.options.control.Control;
 import net.minecraft.client.renderer.sodium.gui.options.control.ControlElement;

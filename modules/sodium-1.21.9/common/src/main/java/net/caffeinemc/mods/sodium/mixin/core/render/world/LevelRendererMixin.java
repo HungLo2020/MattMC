@@ -8,7 +8,7 @@ import com.mojang.blaze3d.systems.RenderPass;
 import com.mojang.blaze3d.vertex.PoseStack;
 import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
 import net.minecraft.client.renderer.gl.advanced.device.RenderDevice;
-import net.caffeinemc.mods.sodium.client.render.SodiumWorldRenderer;
+import net.minecraft.client.renderer.sodium.render.SodiumWorldRenderer;
 import net.minecraft.client.renderer.chunk.advanced.ChunkRenderMatrices;
 import net.minecraft.client.renderer.sodium.render.viewport.ViewportProvider;
 import net.minecraft.client.renderer.sodium.services.PlatformLevelRenderHooks;

@@ -8,7 +8,7 @@ import net.fabricmc.loader.api.entrypoint.PreLaunchEntrypoint;
 public class SodiumPreLaunch implements PreLaunchEntrypoint {
     @Override
     public void onPreLaunch() {
-        PreLaunchChecks.checkEnvironment();
+        net.minecraft.client.renderer.sodium.compatibility.checks.PreLaunchChecks.checkEnvironment();
         GraphicsAdapterProbe.findAdapters();
         Workarounds.init();
     }

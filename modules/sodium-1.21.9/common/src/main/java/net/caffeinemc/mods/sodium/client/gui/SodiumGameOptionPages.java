@@ -9,6 +9,7 @@ import com.mojang.blaze3d.systems.RenderSystem;
 import net.minecraft.client.renderer.sodium.SodiumClientMod;
 import net.minecraft.client.renderer.sodium.compatibility.environment.OsUtils;
 import net.minecraft.client.renderer.sodium.compatibility.workarounds.Workarounds;
+import net.minecraft.client.renderer.sodium.gui.SodiumGameOptions;
 import net.minecraft.client.renderer.gl.advanced.arena.staging.MappedStagingBuffer;
 import net.minecraft.client.renderer.gl.advanced.device.RenderDevice;
 import net.minecraft.client.renderer.sodium.gui.options.*;

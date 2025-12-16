@@ -1,6 +1,6 @@
 package net.irisshaders.iris.compat.sodium.mixin;
 
-import net.caffeinemc.mods.sodium.client.gui.SodiumGameOptions;
+import net.minecraft.client.renderer.sodium.gui.SodiumGameOptions;
 import net.minecraft.client.renderer.chunk.advanced.DefaultChunkRenderer;
 import net.irisshaders.iris.shadows.ShadowRenderingState;
 import org.spongepowered.asm.mixin.Mixin;

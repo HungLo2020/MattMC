@@ -1,1 +1,0 @@
-package net.minecraft.client.renderer.chunk.advanced.lists;

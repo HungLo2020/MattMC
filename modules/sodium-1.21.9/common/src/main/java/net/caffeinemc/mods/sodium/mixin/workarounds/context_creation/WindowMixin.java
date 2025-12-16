@@ -10,7 +10,7 @@ import net.minecraft.client.renderer.sodium.compatibility.checks.ModuleScanner;
 import net.minecraft.client.renderer.sodium.compatibility.checks.PostLaunchChecks;
 import net.minecraft.client.renderer.sodium.compatibility.workarounds.nvidia.NvidiaWorkarounds;
 import net.minecraft.client.renderer.sodium.compatibility.environment.GlContextInfo;
-import net.caffeinemc.mods.sodium.client.platform.NativeWindowHandle;
+import net.minecraft.client.renderer.sodium.platform.NativeWindowHandle;
 import net.minecraft.client.renderer.sodium.services.PlatformRuntimeInformation;
 import net.minecraft.Util;
 import org.lwjgl.glfw.GLFW;

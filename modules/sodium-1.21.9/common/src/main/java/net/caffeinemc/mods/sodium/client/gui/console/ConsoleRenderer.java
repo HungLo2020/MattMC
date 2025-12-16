@@ -1,8 +1,8 @@
 package net.caffeinemc.mods.sodium.client.gui.console;
 
-import net.caffeinemc.mods.sodium.client.console.Console;
-import net.caffeinemc.mods.sodium.client.console.message.Message;
-import net.caffeinemc.mods.sodium.client.console.message.MessageLevel;
+import net.minecraft.client.renderer.sodium.console.Console;
+import net.minecraft.client.renderer.sodium.console.message.Message;
+import net.minecraft.client.renderer.sodium.console.message.MessageLevel;
 import net.minecraft.client.renderer.advanced.util.ColorARGB;
 import net.minecraft.client.renderer.advanced.util.ColorU8;
 import net.minecraft.client.Minecraft;

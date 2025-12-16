@@ -1,8 +1,8 @@
 package net.caffeinemc.mods.sodium.client.gui.screen;
 
 import net.minecraft.client.renderer.sodium.SodiumClientMod;
-import net.caffeinemc.mods.sodium.client.console.Console;
-import net.caffeinemc.mods.sodium.client.console.message.MessageLevel;
+import net.minecraft.client.renderer.sodium.console.Console;
+import net.minecraft.client.renderer.sodium.console.message.MessageLevel;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
