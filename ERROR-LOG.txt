@@ -27,26 +27,298 @@ Path for java installation '/usr/lib/jvm/openjdk-21' (Common Linux Locations) do
 
 > Task :runClient
 Using bundled JDK from: /home/matt/Documents/Repos/MattMC/run/jdk-21
-[14:02:13] [main/INFO]: Loading Minecraft 1.21.10 with Fabric Loader 0.18.2
-[14:02:13] [main/INFO]: Mappings not present!
-[14:02:13] [main/INFO]: Skipping dynamic mod discovery, using hardcoded internal mods (Sodium, Iris)
-[14:02:13] [main/WARN]: sodium JAR not found in mods/, not loaded as internal mod
-[14:02:13] [main/INFO]: Registered internal mod: Iris
-[14:02:13] [main/WARN]: Mod resolution failed
-[14:02:13] [main/INFO]: Immediate reason: [HARD_DEP_NO_CANDIDATE iris 1.9.6 {depends sodium @ [0.7.x]}, ROOT_FORCELOAD_SINGLE iris 1.9.6]
-[14:02:13] [main/INFO]: Reason: [HARD_DEP iris 1.9.6 {depends sodium @ [0.7.x]}]
-[14:02:13] [main/INFO]: Fix: add [add:sodium 0.7- ([[0.7-,0.8-)])], remove [], replace []
-[14:02:13] [main/ERROR]: Incompatible mods found!
-net.fabricmc.loader.impl.FormattedException: Some of your mods are incompatible with the game or each other!
-A potential solution has been determined, this may resolve your problem:
-	 - Install sodium, any 0.7.x version.
-More details:
-	 - Mod 'Iris' (iris) 1.9.6 requires any 0.7.x version of sodium, which is missing!
-	at net.fabricmc.loader.impl.FormattedException.ofLocalized(FormattedException.java:51) ~[fabric-loader-0.18.2.jar:0.18.2]
-	at net.fabricmc.loader.impl.FabricLoaderImpl.load(FabricLoaderImpl.java:203) ~[fabric-loader-0.18.2.jar:0.18.2]
-	at net.fabricmc.loader.impl.launch.knot.Knot.init(Knot.java:142) ~[fabric-loader-0.18.2.jar:0.18.2]
-	at net.fabricmc.loader.impl.launch.knot.Knot.launch(Knot.java:66) [fabric-loader-0.18.2.jar:0.18.2]
+[14:08:31] [main/INFO]: Loading Minecraft 1.21.10 with Fabric Loader 0.18.2
+[14:08:31] [main/INFO]: Mappings not present!
+[14:08:32] [main/INFO]: Skipping dynamic mod discovery, using hardcoded internal mods (Sodium, Iris)
+[14:08:32] [main/WARN]: sodium JAR not found in mods/, not loaded as internal mod
+[14:08:32] [main/INFO]: Registered internal mod: Iris
+[14:08:32] [main/INFO]: Loading 5 mods:
+	- fabricloader 0.18.2
+	- iris 1.9.6
+	- java 21
+	- minecraft 1.21.10
+	- mixinextras 0.5.0
+[14:08:32] [main/WARN]: Runtime mod remapping disabled due to no fabric.remapClasspathFile being specified. You may need to update loom.
+[14:08:32] [main/INFO]: SpongePowered MIXIN Subsystem Version=0.8.7 Source=file:/home/matt/Documents/Repos/MattMC/libraries/deps/sponge-mixin-0.16.5+mixin.0.8.7.jar Service=Knot/Fabric Env=CLIENT
+[14:08:32] [main/WARN]: Reference map 'iris.refmap.json' for mixins.iris.json could not be read. If this is a development environment you can ignore this message
+[14:08:32] [main/WARN]: Reference map 'iris-fabric.refmap.json' for mixins.iris.fabric.json could not be read. If this is a development environment you can ignore this message
+[14:08:32] [main/WARN]: Reference map 'iris.refmap.json' for mixins.iris.fantastic.json could not be read. If this is a development environment you can ignore this message
+[14:08:32] [main/WARN]: Reference map 'iris.refmap.json' for mixins.iris.vertexformat.json could not be read. If this is a development environment you can ignore this message
+[14:08:32] [main/WARN]: Reference map 'iris.refmap.json' for mixins.iris.bettermipmaps.json could not be read. If this is a development environment you can ignore this message
+[14:08:32] [main/WARN]: Reference map 'iris.refmap.json' for mixins.iris.compat.sodium.json could not be read. If this is a development environment you can ignore this message
+[14:08:32] [main/WARN]: Reference map 'iris.refmap.json' for mixins.iris.fixes.maxfpscrash.json could not be read. If this is a development environment you can ignore this message
+[14:08:32] [main/ERROR]: mixins.iris.json:MixinChunkBorderRenderer from mod iris: Unsupported mixin, mixins.iris.json:MixinChunkBorderRenderer from mod iris requires the following unsupported language features: [NESTING], these features require compatibility level JAVA_11
+org.spongepowered.asm.mixin.transformer.throwables.InvalidMixinException: Unsupported mixin, mixins.iris.json:MixinChunkBorderRenderer from mod iris requires the following unsupported language features: [NESTING], these features require compatibility level JAVA_11
+	at org.spongepowered.asm.mixin.transformer.MixinInfo$State.validateClassFeatures(MixinInfo.java:365) ~[sponge-mixin-0.16.5+mixin.0.8.7.jar:0.16.5+mixin.0.8.7]
+	at org.spongepowered.asm.mixin.transformer.MixinInfo$State.validate(MixinInfo.java:334) ~[sponge-mixin-0.16.5+mixin.0.8.7.jar:0.16.5+mixin.0.8.7]
+	at org.spongepowered.asm.mixin.transformer.MixinInfo.validate(MixinInfo.java:913) ~[sponge-mixin-0.16.5+mixin.0.8.7.jar:0.16.5+mixin.0.8.7]
+	at org.spongepowered.asm.mixin.transformer.MixinConfig.postInitialise(MixinConfig.java:884) [sponge-mixin-0.16.5+mixin.0.8.7.jar:0.16.5+mixin.0.8.7]
+	at org.spongepowered.asm.mixin.transformer.MixinProcessor.prepareConfigs(MixinProcessor.java:616) [sponge-mixin-0.16.5+mixin.0.8.7.jar:0.16.5+mixin.0.8.7]
+	at org.spongepowered.asm.mixin.transformer.MixinProcessor.select(MixinProcessor.java:510) [sponge-mixin-0.16.5+mixin.0.8.7.jar:0.16.5+mixin.0.8.7]
+	at org.spongepowered.asm.mixin.transformer.MixinProcessor.checkSelect(MixinProcessor.java:486) [sponge-mixin-0.16.5+mixin.0.8.7.jar:0.16.5+mixin.0.8.7]
+	at org.spongepowered.asm.mixin.transformer.MixinProcessor.lockAndSelect(MixinProcessor.java:438) [sponge-mixin-0.16.5+mixin.0.8.7.jar:0.16.5+mixin.0.8.7]
+	at org.spongepowered.asm.mixin.transformer.MixinProcessor.couldTransformClass(MixinProcessor.java:398) [sponge-mixin-0.16.5+mixin.0.8.7.jar:0.16.5+mixin.0.8.7]
+	at org.spongepowered.asm.mixin.transformer.MixinTransformer.couldTransformClass(MixinTransformer.java:265) [sponge-mixin-0.16.5+mixin.0.8.7.jar:0.16.5+mixin.0.8.7]
+	at org.spongepowered.asm.mixin.transformer.MixinTransformer.transformClass(MixinTransformer.java:233) [sponge-mixin-0.16.5+mixin.0.8.7.jar:0.16.5+mixin.0.8.7]
+	at org.spongepowered.asm.mixin.transformer.MixinTransformer.transformClassBytes(MixinTransformer.java:202) [sponge-mixin-0.16.5+mixin.0.8.7.jar:0.16.5+mixin.0.8.7]
+	at net.fabricmc.loader.impl.launch.knot.KnotClassDelegate.getPostMixinClassByteArray(KnotClassDelegate.java:435) [fabric-loader-0.18.2.jar:0.18.2]
+	at net.fabricmc.loader.impl.launch.knot.KnotClassDelegate.tryLoadClass(KnotClassDelegate.java:336) [fabric-loader-0.18.2.jar:0.18.2]
+	at net.fabricmc.loader.impl.launch.knot.KnotClassDelegate.loadClass(KnotClassDelegate.java:231) [fabric-loader-0.18.2.jar:0.18.2]
+	at net.fabricmc.loader.impl.launch.knot.KnotClassLoader.loadClass(KnotClassLoader.java:119) [fabric-loader-0.18.2.jar:0.18.2]
+	at java.base/java.lang.ClassLoader.loadClass(ClassLoader.java:526) [?:?]
+	at net.fabricmc.loader.impl.game.minecraft.MinecraftGameProvider.launch(MinecraftGameProvider.java:529) [fabric-loader-0.18.2.jar:0.18.2]
+	at net.fabricmc.loader.impl.launch.knot.Knot.launch(Knot.java:72) [fabric-loader-0.18.2.jar:0.18.2]
 	at net.fabricmc.loader.impl.launch.knot.KnotClient.main(KnotClient.java:23) [fabric-loader-0.18.2.jar:0.18.2]
+[14:08:32] [main/ERROR]: mixins.iris.json:MixinGlCommandEncoder from mod iris: Unsupported mixin, mixins.iris.json:MixinGlCommandEncoder from mod iris requires the following unsupported language features: [NESTING], these features require compatibility level JAVA_11
+org.spongepowered.asm.mixin.transformer.throwables.InvalidMixinException: Unsupported mixin, mixins.iris.json:MixinGlCommandEncoder from mod iris requires the following unsupported language features: [NESTING], these features require compatibility level JAVA_11
+	at org.spongepowered.asm.mixin.transformer.MixinInfo$State.validateClassFeatures(MixinInfo.java:365) ~[sponge-mixin-0.16.5+mixin.0.8.7.jar:0.16.5+mixin.0.8.7]
+	at org.spongepowered.asm.mixin.transformer.MixinInfo$State.validate(MixinInfo.java:334) ~[sponge-mixin-0.16.5+mixin.0.8.7.jar:0.16.5+mixin.0.8.7]
+	at org.spongepowered.asm.mixin.transformer.MixinInfo.validate(MixinInfo.java:913) ~[sponge-mixin-0.16.5+mixin.0.8.7.jar:0.16.5+mixin.0.8.7]
+	at org.spongepowered.asm.mixin.transformer.MixinConfig.postInitialise(MixinConfig.java:884) [sponge-mixin-0.16.5+mixin.0.8.7.jar:0.16.5+mixin.0.8.7]
+	at org.spongepowered.asm.mixin.transformer.MixinProcessor.prepareConfigs(MixinProcessor.java:616) [sponge-mixin-0.16.5+mixin.0.8.7.jar:0.16.5+mixin.0.8.7]
+	at org.spongepowered.asm.mixin.transformer.MixinProcessor.select(MixinProcessor.java:510) [sponge-mixin-0.16.5+mixin.0.8.7.jar:0.16.5+mixin.0.8.7]
+	at org.spongepowered.asm.mixin.transformer.MixinProcessor.checkSelect(MixinProcessor.java:486) [sponge-mixin-0.16.5+mixin.0.8.7.jar:0.16.5+mixin.0.8.7]
+	at org.spongepowered.asm.mixin.transformer.MixinProcessor.lockAndSelect(MixinProcessor.java:438) [sponge-mixin-0.16.5+mixin.0.8.7.jar:0.16.5+mixin.0.8.7]
+	at org.spongepowered.asm.mixin.transformer.MixinProcessor.couldTransformClass(MixinProcessor.java:398) [sponge-mixin-0.16.5+mixin.0.8.7.jar:0.16.5+mixin.0.8.7]
+	at org.spongepowered.asm.mixin.transformer.MixinTransformer.couldTransformClass(MixinTransformer.java:265) [sponge-mixin-0.16.5+mixin.0.8.7.jar:0.16.5+mixin.0.8.7]
+	at org.spongepowered.asm.mixin.transformer.MixinTransformer.transformClass(MixinTransformer.java:233) [sponge-mixin-0.16.5+mixin.0.8.7.jar:0.16.5+mixin.0.8.7]
+	at org.spongepowered.asm.mixin.transformer.MixinTransformer.transformClassBytes(MixinTransformer.java:202) [sponge-mixin-0.16.5+mixin.0.8.7.jar:0.16.5+mixin.0.8.7]
+	at net.fabricmc.loader.impl.launch.knot.KnotClassDelegate.getPostMixinClassByteArray(KnotClassDelegate.java:435) [fabric-loader-0.18.2.jar:0.18.2]
+	at net.fabricmc.loader.impl.launch.knot.KnotClassDelegate.tryLoadClass(KnotClassDelegate.java:336) [fabric-loader-0.18.2.jar:0.18.2]
+	at net.fabricmc.loader.impl.launch.knot.KnotClassDelegate.loadClass(KnotClassDelegate.java:231) [fabric-loader-0.18.2.jar:0.18.2]
+	at net.fabricmc.loader.impl.launch.knot.KnotClassLoader.loadClass(KnotClassLoader.java:119) [fabric-loader-0.18.2.jar:0.18.2]
+	at java.base/java.lang.ClassLoader.loadClass(ClassLoader.java:526) [?:?]
+	at net.fabricmc.loader.impl.game.minecraft.MinecraftGameProvider.launch(MinecraftGameProvider.java:529) [fabric-loader-0.18.2.jar:0.18.2]
+	at net.fabricmc.loader.impl.launch.knot.Knot.launch(Knot.java:72) [fabric-loader-0.18.2.jar:0.18.2]
+	at net.fabricmc.loader.impl.launch.knot.KnotClient.main(KnotClient.java:23) [fabric-loader-0.18.2.jar:0.18.2]
+[14:08:32] [main/ERROR]: mixins.iris.json:sky.MixinOptions_CloudsOverride from mod iris: Unsupported mixin, mixins.iris.json:sky.MixinOptions_CloudsOverride from mod iris requires the following unsupported language features: [NESTING], these features require compatibility level JAVA_11
+org.spongepowered.asm.mixin.transformer.throwables.InvalidMixinException: Unsupported mixin, mixins.iris.json:sky.MixinOptions_CloudsOverride from mod iris requires the following unsupported language features: [NESTING], these features require compatibility level JAVA_11
+	at org.spongepowered.asm.mixin.transformer.MixinInfo$State.validateClassFeatures(MixinInfo.java:365) ~[sponge-mixin-0.16.5+mixin.0.8.7.jar:0.16.5+mixin.0.8.7]
+	at org.spongepowered.asm.mixin.transformer.MixinInfo$State.validate(MixinInfo.java:334) ~[sponge-mixin-0.16.5+mixin.0.8.7.jar:0.16.5+mixin.0.8.7]
+	at org.spongepowered.asm.mixin.transformer.MixinInfo.validate(MixinInfo.java:913) ~[sponge-mixin-0.16.5+mixin.0.8.7.jar:0.16.5+mixin.0.8.7]
+	at org.spongepowered.asm.mixin.transformer.MixinConfig.postInitialise(MixinConfig.java:884) [sponge-mixin-0.16.5+mixin.0.8.7.jar:0.16.5+mixin.0.8.7]
+	at org.spongepowered.asm.mixin.transformer.MixinProcessor.prepareConfigs(MixinProcessor.java:616) [sponge-mixin-0.16.5+mixin.0.8.7.jar:0.16.5+mixin.0.8.7]
+	at org.spongepowered.asm.mixin.transformer.MixinProcessor.select(MixinProcessor.java:510) [sponge-mixin-0.16.5+mixin.0.8.7.jar:0.16.5+mixin.0.8.7]
+	at org.spongepowered.asm.mixin.transformer.MixinProcessor.checkSelect(MixinProcessor.java:486) [sponge-mixin-0.16.5+mixin.0.8.7.jar:0.16.5+mixin.0.8.7]
+	at org.spongepowered.asm.mixin.transformer.MixinProcessor.lockAndSelect(MixinProcessor.java:438) [sponge-mixin-0.16.5+mixin.0.8.7.jar:0.16.5+mixin.0.8.7]
+	at org.spongepowered.asm.mixin.transformer.MixinProcessor.couldTransformClass(MixinProcessor.java:398) [sponge-mixin-0.16.5+mixin.0.8.7.jar:0.16.5+mixin.0.8.7]
+	at org.spongepowered.asm.mixin.transformer.MixinTransformer.couldTransformClass(MixinTransformer.java:265) [sponge-mixin-0.16.5+mixin.0.8.7.jar:0.16.5+mixin.0.8.7]
+	at org.spongepowered.asm.mixin.transformer.MixinTransformer.transformClass(MixinTransformer.java:233) [sponge-mixin-0.16.5+mixin.0.8.7.jar:0.16.5+mixin.0.8.7]
+	at org.spongepowered.asm.mixin.transformer.MixinTransformer.transformClassBytes(MixinTransformer.java:202) [sponge-mixin-0.16.5+mixin.0.8.7.jar:0.16.5+mixin.0.8.7]
+	at net.fabricmc.loader.impl.launch.knot.KnotClassDelegate.getPostMixinClassByteArray(KnotClassDelegate.java:435) [fabric-loader-0.18.2.jar:0.18.2]
+	at net.fabricmc.loader.impl.launch.knot.KnotClassDelegate.tryLoadClass(KnotClassDelegate.java:336) [fabric-loader-0.18.2.jar:0.18.2]
+	at net.fabricmc.loader.impl.launch.knot.KnotClassDelegate.loadClass(KnotClassDelegate.java:231) [fabric-loader-0.18.2.jar:0.18.2]
+	at net.fabricmc.loader.impl.launch.knot.KnotClassLoader.loadClass(KnotClassLoader.java:119) [fabric-loader-0.18.2.jar:0.18.2]
+	at java.base/java.lang.ClassLoader.loadClass(ClassLoader.java:526) [?:?]
+	at net.fabricmc.loader.impl.game.minecraft.MinecraftGameProvider.launch(MinecraftGameProvider.java:529) [fabric-loader-0.18.2.jar:0.18.2]
+	at net.fabricmc.loader.impl.launch.knot.Knot.launch(Knot.java:72) [fabric-loader-0.18.2.jar:0.18.2]
+	at net.fabricmc.loader.impl.launch.knot.KnotClient.main(KnotClient.java:23) [fabric-loader-0.18.2.jar:0.18.2]
+[14:08:32] [main/INFO]: Initializing MixinExtras via com.llamalad7.mixinextras.service.MixinExtrasServiceImpl(version=0.5.0).
+[14:08:32] [Datafixer Bootstrap/INFO]: 278 Datafixer optimizations took 193 milliseconds
+[14:08:34] [Render thread/INFO]: Setting user: Player256
+[LWJGL] Version: 3.3.3-snapshot
+	 OS: Linux v6.14.0-36-generic
+	JRE: Linux amd64 21.0.5
+	JVM: OpenJDK 64-Bit Server VM v21.0.5+11-LTS by Eclipse Adoptium
+[LWJGL] Loading JNI library: lwjgl
+	Module: org.lwjgl
+	Loaded from org.lwjgl.librarypath: /tmp/lwjgl_matt/3.3.3-snapshot/x64/liblwjgl.so
+[LWJGL] Loading library: glfw
+	Module: org.lwjgl.glfw
+	Loaded from org.lwjgl.librarypath: /tmp/lwjgl_matt/3.3.3-snapshot/x64/libglfw.so
+[14:08:34] [Render thread/WARN]: [Config Load] Minecraft or Options not available, skipping sync
+[14:08:34] [Render thread/INFO]: [Options Load] Starting options load from: /home/matt/Documents/Repos/MattMC/run/options.txt
+[14:08:34] [Render thread/INFO]: [Options Load] Loading shaderPackName from options.txt: raw value = 'ComplementaryHungLoIfied.zip', default = 'null'
+[14:08:34] [Render thread/INFO]: [Options Load] Final shaderPackName value: 'ComplementaryHungLoIfied.zip'
+[14:08:34] [Render thread/INFO]: [Options Load] Loading enableShaders from options.txt: raw value = 'true'
+[14:08:34] [Render thread/INFO]: [Options Load] Parsed enableShaders value: true
+[14:08:34] [Render thread/INFO]: [Mixin] iris$afterOptionsLoaded triggered - calling Iris.syncConfigFromOptions()
+[14:08:34] [Render thread/INFO]: [Iris Sync] syncConfigFromOptions() called with options
+[14:08:34] [Render thread/INFO]: [Iris Sync] Calling irisConfig.initializeFromOptions() to sync from loaded Options
+[14:08:34] [Render thread/INFO]: [Config Load] BEFORE sync - IrisConfig.shaderPackName='null', IrisConfig.enableShaders=true
+[14:08:34] [Render thread/INFO]: [Config Load] options values: shaderPackName='ComplementaryHungLoIfied.zip', enableShaders=true
+[14:08:34] [Render thread/INFO]: [Config Load] AFTER sync - IrisConfig.shaderPackName='ComplementaryHungLoIfied.zip', IrisConfig.enableShaders=true
+[14:08:34] [Render thread/INFO]: [Iris Sync] Sync completed successfully
+[14:08:34] [Render thread/INFO]: [Mixin] iris$afterOptionsLoaded triggered - calling Iris.syncConfigFromOptions()
+[14:08:34] [Render thread/INFO]: [Iris Sync] syncConfigFromOptions() called with options
+[14:08:34] [Render thread/INFO]: [Iris Sync] Calling irisConfig.initializeFromOptions() to sync from loaded Options
+[14:08:34] [Render thread/INFO]: [Config Load] BEFORE sync - IrisConfig.shaderPackName='ComplementaryHungLoIfied.zip', IrisConfig.enableShaders=true
+[14:08:34] [Render thread/INFO]: [Config Load] options values: shaderPackName='ComplementaryHungLoIfied.zip', enableShaders=true
+[14:08:34] [Render thread/INFO]: [Config Load] AFTER sync - IrisConfig.shaderPackName='ComplementaryHungLoIfied.zip', IrisConfig.enableShaders=true
+[14:08:34] [Render thread/INFO]: [Iris Sync] Sync completed successfully
+[14:08:34] [Render thread/INFO]: [Mixin] iris$afterOptionsLoaded triggered - calling Iris.syncConfigFromOptions()
+[14:08:34] [Render thread/INFO]: [Iris Sync] syncConfigFromOptions() called with options
+[14:08:34] [Render thread/INFO]: [Iris Sync] Calling irisConfig.initializeFromOptions() to sync from loaded Options
+[14:08:34] [Render thread/INFO]: [Config Load] BEFORE sync - IrisConfig.shaderPackName='ComplementaryHungLoIfied.zip', IrisConfig.enableShaders=true
+[14:08:34] [Render thread/INFO]: [Config Load] options values: shaderPackName='ComplementaryHungLoIfied.zip', enableShaders=true
+[14:08:34] [Render thread/INFO]: [Config Load] AFTER sync - IrisConfig.shaderPackName='ComplementaryHungLoIfied.zip', IrisConfig.enableShaders=true
+[14:08:34] [Render thread/INFO]: [Iris Sync] Sync completed successfully
+[14:08:34] [Render thread/INFO]: [Mixin] iris$afterOptionsLoaded triggered - calling Iris.syncConfigFromOptions()
+[14:08:34] [Render thread/INFO]: [Iris Sync] syncConfigFromOptions() called with options
+[14:08:34] [Render thread/INFO]: [Iris Sync] Calling irisConfig.initializeFromOptions() to sync from loaded Options
+[14:08:34] [Render thread/INFO]: [Config Load] BEFORE sync - IrisConfig.shaderPackName='ComplementaryHungLoIfied.zip', IrisConfig.enableShaders=true
+[14:08:34] [Render thread/INFO]: [Config Load] options values: shaderPackName='ComplementaryHungLoIfied.zip', enableShaders=true
+[14:08:34] [Render thread/INFO]: [Config Load] AFTER sync - IrisConfig.shaderPackName='ComplementaryHungLoIfied.zip', IrisConfig.enableShaders=true
+[14:08:34] [Render thread/INFO]: [Iris Sync] Sync completed successfully
+[14:08:34] [Render thread/INFO]: [Mixin] iris$afterOptionsLoaded triggered - calling Iris.syncConfigFromOptions()
+[14:08:34] [Render thread/INFO]: [Iris Sync] syncConfigFromOptions() called with options
+[14:08:34] [Render thread/INFO]: [Iris Sync] Calling irisConfig.initializeFromOptions() to sync from loaded Options
+[14:08:34] [Render thread/INFO]: [Config Load] BEFORE sync - IrisConfig.shaderPackName='ComplementaryHungLoIfied.zip', IrisConfig.enableShaders=true
+[14:08:34] [Render thread/INFO]: [Config Load] options values: shaderPackName='ComplementaryHungLoIfied.zip', enableShaders=true
+[14:08:34] [Render thread/INFO]: [Config Load] AFTER sync - IrisConfig.shaderPackName='ComplementaryHungLoIfied.zip', IrisConfig.enableShaders=true
+[14:08:34] [Render thread/INFO]: [Iris Sync] Sync completed successfully
+[14:08:34] [Render thread/INFO]: [Options Save] Saving shaderPackName: value = 'ComplementaryHungLoIfied.zip'
+[14:08:34] [Render thread/INFO]: [Options Save] Saving enableShaders: value = true, json = true
+[14:08:34] [Render thread/INFO]: [Options Save] Completed options save successfully
+[14:08:34] [Render thread/INFO]: [Mixin] iris$afterOptionsLoaded triggered - calling Iris.syncConfigFromOptions()
+[14:08:34] [Render thread/INFO]: [Iris Sync] syncConfigFromOptions() called with options
+[14:08:34] [Render thread/INFO]: [Iris Sync] Calling irisConfig.initializeFromOptions() to sync from loaded Options
+[14:08:34] [Render thread/INFO]: [Config Load] BEFORE sync - IrisConfig.shaderPackName='ComplementaryHungLoIfied.zip', IrisConfig.enableShaders=true
+[14:08:34] [Render thread/INFO]: [Config Load] options values: shaderPackName='ComplementaryHungLoIfied.zip', enableShaders=true
+[14:08:34] [Render thread/INFO]: [Config Load] AFTER sync - IrisConfig.shaderPackName='ComplementaryHungLoIfied.zip', IrisConfig.enableShaders=true
+[14:08:34] [Render thread/INFO]: [Iris Sync] Sync completed successfully
+[14:08:34] [Render thread/INFO]: Backend library: LWJGL version 3.3.3-snapshot
+[14:08:34] [Render thread/INFO]: [Mixin] iris$afterOptionsLoaded triggered - calling Iris.syncConfigFromOptions()
+[14:08:34] [Render thread/INFO]: [Iris Sync] syncConfigFromOptions() called with options
+[14:08:34] [Render thread/INFO]: [Iris Sync] Calling irisConfig.initializeFromOptions() to sync from loaded Options
+[14:08:34] [Render thread/INFO]: [Config Load] BEFORE sync - IrisConfig.shaderPackName='ComplementaryHungLoIfied.zip', IrisConfig.enableShaders=true
+[14:08:34] [Render thread/INFO]: [Config Load] options values: shaderPackName='ComplementaryHungLoIfied.zip', enableShaders=true
+[14:08:34] [Render thread/INFO]: [Config Load] AFTER sync - IrisConfig.shaderPackName='ComplementaryHungLoIfied.zip', IrisConfig.enableShaders=true
+[14:08:34] [Render thread/INFO]: [Iris Sync] Sync completed successfully
+[14:08:34] [Render thread/INFO]: [Mixin] iris$afterOptionsLoaded triggered - calling Iris.syncConfigFromOptions()
+[14:08:34] [Render thread/INFO]: [Iris Sync] syncConfigFromOptions() called with options
+[14:08:34] [Render thread/INFO]: [Iris Sync] Calling irisConfig.initializeFromOptions() to sync from loaded Options
+[14:08:34] [Render thread/INFO]: [Config Load] BEFORE sync - IrisConfig.shaderPackName='ComplementaryHungLoIfied.zip', IrisConfig.enableShaders=true
+[14:08:34] [Render thread/INFO]: [Config Load] options values: shaderPackName='ComplementaryHungLoIfied.zip', enableShaders=true
+[14:08:34] [Render thread/INFO]: [Config Load] AFTER sync - IrisConfig.shaderPackName='ComplementaryHungLoIfied.zip', IrisConfig.enableShaders=true
+[14:08:34] [Render thread/INFO]: [Iris Sync] Sync completed successfully
+[14:08:34] [Render thread/WARN]: Detected unexpected shutdown during last game startup: resetting fullscreen mode
+[LWJGL] Loading library: jemalloc
+	Module: org.lwjgl.jemalloc
+	Loaded from org.lwjgl.librarypath: /tmp/lwjgl_matt/3.3.3-snapshot/x64/libjemalloc.so
+[LWJGL] MemoryUtil allocator: JEmallocAllocator
+[LWJGL] Java 9 check intrinsics enabled
+[LWJGL] Closure Registry: ConcurrentHashMap
+[14:08:35] [Render thread/INFO]: [Mixin] iris$afterOptionsLoaded triggered - calling Iris.syncConfigFromOptions()
+[14:08:35] [Render thread/INFO]: [Iris Sync] syncConfigFromOptions() called with options
+[14:08:35] [Render thread/INFO]: [Iris Sync] Calling irisConfig.initializeFromOptions() to sync from loaded Options
+[14:08:35] [Render thread/INFO]: [Config Load] BEFORE sync - IrisConfig.shaderPackName='ComplementaryHungLoIfied.zip', IrisConfig.enableShaders=true
+[14:08:35] [Render thread/INFO]: [Config Load] options values: shaderPackName='ComplementaryHungLoIfied.zip', enableShaders=true
+[14:08:35] [Render thread/INFO]: [Config Load] AFTER sync - IrisConfig.shaderPackName='ComplementaryHungLoIfied.zip', IrisConfig.enableShaders=true
+[14:08:35] [Render thread/INFO]: [Iris Sync] Sync completed successfully
+[LWJGL] Loading JNI library: lwjgl_stb
+	Module: org.lwjgl.stb
+	Loaded from org.lwjgl.librarypath: /tmp/lwjgl_matt/3.3.3-snapshot/x64/liblwjgl_stb.so
+[14:08:35] [Render thread/INFO]: [Mixin] iris$afterOptionsLoaded triggered - calling Iris.syncConfigFromOptions()
+[14:08:35] [Render thread/INFO]: [Iris Sync] syncConfigFromOptions() called with options
+[14:08:35] [Render thread/INFO]: [Iris Sync] Calling irisConfig.initializeFromOptions() to sync from loaded Options
+[14:08:35] [Render thread/INFO]: [Config Load] BEFORE sync - IrisConfig.shaderPackName='ComplementaryHungLoIfied.zip', IrisConfig.enableShaders=true
+[14:08:35] [Render thread/INFO]: [Config Load] options values: shaderPackName='ComplementaryHungLoIfied.zip', enableShaders=true
+[14:08:35] [Render thread/INFO]: [Config Load] AFTER sync - IrisConfig.shaderPackName='ComplementaryHungLoIfied.zip', IrisConfig.enableShaders=true
+[14:08:35] [Render thread/INFO]: [Iris Sync] Sync completed successfully
+[LWJGL] Loading JNI library: lwjgl_opengl
+	Module: org.lwjgl.opengl
+	Loaded from org.lwjgl.librarypath: /tmp/lwjgl_matt/3.3.3-snapshot/x64/liblwjgl_opengl.so
+[LWJGL] Loading library: libGLX.so.0
+	Module: org.lwjgl.opengl
+	libGLX.so.0 not found in org.lwjgl.librarypath=/tmp/lwjgl_matt/3.3.3-snapshot/x64
+[LWJGL] Java 9 text decoding enabled
+	Loaded from system paths: /lib/x86_64-linux-gnu/libGLX.so.0
+[LWJGL] Java 10 multiplyHigh enabled
+[14:08:35] [ForkJoinPool.commonPool-worker-1/WARN]: [Iris Update Check] This version doesn't have an update index, skipping.
+[14:08:35] [Render thread/INFO]: Debug functionality is disabled.
+[14:08:35] [Render thread/INFO]: ARB_direct_state_access detected, enabling DSA.
+---- Minecraft Crash Report ----
+// Sorry :(
+
+Time: 2025-12-16 14:08:35
+Description: Initializing game
+
+java.lang.ClassCastException: class com.mojang.blaze3d.vertex.VertexFormat cannot be cast to class net.minecraft.client.renderer.advanced.vertex.format.VertexFormatExtensions (com.mojang.blaze3d.vertex.VertexFormat and net.minecraft.client.renderer.advanced.vertex.format.VertexFormatExtensions are in unnamed module of loader 'knot' @4b952a2d)
+	at knot//net.minecraft.client.renderer.vertex.advanced.serializers.VertexSerializerRegistryImpl.getGlobalId(VertexSerializerRegistryImpl.java:137)
+	at knot//net.minecraft.client.renderer.vertex.advanced.serializers.VertexSerializerRegistryImpl.createKey(VertexSerializerRegistryImpl.java:133)
+	at knot//net.minecraft.client.renderer.vertex.advanced.serializers.VertexSerializerRegistryImpl.registerSerializer(VertexSerializerRegistryImpl.java:52)
+	at knot//net.irisshaders.iris.Iris.onRenderSystemInit(Iris.java:141)
+	at knot//com.mojang.blaze3d.systems.RenderSystem.handler$zcc000$iris$onRendererInit(RenderSystem.java:1028)
+	at knot//com.mojang.blaze3d.systems.RenderSystem.initRenderer(RenderSystem.java:222)
+	at knot//net.minecraft.client.Minecraft.<init>(Minecraft.java:479)
+	at knot//net.minecraft.client.main.Main.main(Main.java:243)
+	at net.fabricmc.loader.impl.game.minecraft.MinecraftGameProvider.launch(MinecraftGameProvider.java:536)
+	at net.fabricmc.loader.impl.launch.knot.Knot.launch(Knot.java:72)
+	at net.fabricmc.loader.impl.launch.knot.KnotClient.main(KnotClient.java:23)
+
+
+A detailed walkthrough of the error, its code path and all known details is as follows:
+---------------------------------------------------------------------------------------
+
+-- Head --
+Thread: Render thread
+Stacktrace:
+	at knot//net.minecraft.client.renderer.vertex.advanced.serializers.VertexSerializerRegistryImpl.getGlobalId(VertexSerializerRegistryImpl.java:137)
+	at knot//net.minecraft.client.renderer.vertex.advanced.serializers.VertexSerializerRegistryImpl.createKey(VertexSerializerRegistryImpl.java:133)
+	at knot//net.minecraft.client.renderer.vertex.advanced.serializers.VertexSerializerRegistryImpl.registerSerializer(VertexSerializerRegistryImpl.java:52)
+	at knot//net.irisshaders.iris.Iris.onRenderSystemInit(Iris.java:141)
+	at knot//com.mojang.blaze3d.systems.RenderSystem.handler$zcc000$iris$onRendererInit(RenderSystem.java:1028)
+	at knot//com.mojang.blaze3d.systems.RenderSystem.initRenderer(RenderSystem.java:222)
+	at knot//net.minecraft.client.Minecraft.<init>(Minecraft.java:479)
+
+-- Initialization --
+Details:
+	Modules: 
+Stacktrace:
+	at knot//net.minecraft.client.main.Main.main(Main.java:243)
+	at net.fabricmc.loader.impl.game.minecraft.MinecraftGameProvider.launch(MinecraftGameProvider.java:536)
+	at net.fabricmc.loader.impl.launch.knot.Knot.launch(Knot.java:72)
+	at net.fabricmc.loader.impl.launch.knot.KnotClient.main(KnotClient.java:23)
+
+-- System Details --
+Details:
+	Minecraft Version: 1.21.10
+	Minecraft Version ID: 1.21.10
+	Operating System: Linux (amd64) version 6.14.0-36-generic
+	Java Version: 21.0.5, Eclipse Adoptium
+	Java VM Version: OpenJDK 64-Bit Server VM (mixed mode, sharing), Eclipse Adoptium
+	Memory: 352433880 bytes (336 MiB) / 536870912 bytes (512 MiB) up to 2147483648 bytes (2048 MiB)
+	CPUs: 16
+	Processor Vendor: GenuineIntel
+	Processor Name: 12th Gen Intel(R) Core(TM) i7-12700K
+	Identifier: Intel64 Family 6 Model 151 Stepping 2
+	Microarchitecture: Alder Lake
+	Frequency (GHz): 5.10
+	Number of physical packages: 1
+	Number of physical CPUs: 12
+	Number of logical CPUs: 20
+	Graphics card #0 name: GA102 [GeForce RTX 3080 Ti]
+	Graphics card #0 vendor: NVIDIA Corporation (0x10de)
+	Graphics card #0 VRAM (MiB): 16416.00
+	Graphics card #0 deviceId: 0x2208
+	Graphics card #0 versionInfo: unknown
+	Virtual memory max (MiB): 32300.84
+	Virtual memory used (MiB): 14359.30
+	Swap memory total (MiB): 16384.00
+	Swap memory used (MiB): 4241.97
+	Space in storage for jna.tmpdir (MiB): <path not set>
+	Space in storage for org.lwjgl.system.SharedLibraryExtractPath (MiB): <path not set>
+	Space in storage for io.netty.native.workdir (MiB): <path not set>
+	Space in storage for java.io.tmpdir (MiB): available: 15834.67, total: 15916.84
+	Space in storage for workdir (MiB): available: 292927.09, total: 937500.69
+	JVM Flags: 19 total; -XX:+UseG1GC -XX:+ParallelRefProcEnabled -XX:MaxGCPauseMillis=200 -XX:+UnlockExperimentalVMOptions -XX:+DisableExplicitGC -XX:G1NewSizePercent=30 -XX:G1MaxNewSizePercent=40 -XX:G1HeapRegionSize=8M -XX:G1ReservePercent=20 -XX:G1HeapWastePercent=5 -XX:G1MixedGCCountTarget=4 -XX:InitiatingHeapOccupancyPercent=15 -XX:G1MixedGCLiveThresholdPercent=90 -XX:G1RSetUpdatingPauseTimePercent=5 -XX:SurvivorRatio=32 -XX:+PerfDisableSharedMem -XX:MaxTenuringThreshold=1 -Xms512M -Xmx2G
+	Debug Flags: 0 total; 
+	Launched Version: 1.21.10
+	Backend library: LWJGL version 3.3.3-snapshot
+	Backend API: NVIDIA GeForce RTX 3080 Ti/PCIe/SSE2 GL version 3.3.0 NVIDIA 580.95.05, NVIDIA Corporation
+	Window size: <not initialized>
+	GFLW Platform: x11
+	Render Extensions: GL_ARB_buffer_storage, GL_KHR_debug, GL_ARB_vertex_attrib_binding, GL_ARB_direct_state_access
+	GL debug messages: 
+	Is Modded: Definitely; Client brand changed to 'fabric'
+	Universe: 404
+	Type: Client (map_client.txt)
+	Locale: en_US
+	System encoding: UTF-8
+	File encoding: UTF-8
+	CPU: 20x 12th Gen Intel(R) Core(TM) i7-12700K
+#@!@# Game crashed! Crash report saved to: #@!@# /home/matt/Documents/Repos/MattMC/run/crash-reports/crash-2025-12-16_14.08.35-client.txt
 
 > Task :runClient FAILED
 
@@ -54,7 +326,7 @@ FAILURE: Build failed with an exception.
 
 * What went wrong:
 Execution failed for task ':runClient'.
-> Process 'command '/home/matt/Documents/Repos/MattMC/run/jdk-21/bin/java'' finished with non-zero exit value 1
+> Process 'command '/home/matt/Documents/Repos/MattMC/run/jdk-21/bin/java'' finished with non-zero exit value 255
 
 * Try:
 > Run with --stacktrace option to get the stack trace.
@@ -62,5 +334,5 @@ Execution failed for task ':runClient'.
 > Run with --scan to get full insights.
 > Get more help at https://help.gradle.org.
 
-BUILD FAILED in 24s
+BUILD FAILED in 17s
 12 actionable tasks: 9 executed, 3 from cache
