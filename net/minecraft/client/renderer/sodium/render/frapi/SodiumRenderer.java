@@ -23,8 +23,6 @@ import net.minecraft.client.renderer.sodium.render.frapi.render.AbstractBlockRen
 import net.minecraft.client.renderer.sodium.render.frapi.render.AccessLayerRenderState;
 import net.minecraft.client.renderer.sodium.render.frapi.render.NonTerrainBlockRenderContext;
 import net.minecraft.client.renderer.sodium.render.frapi.render.SimpleBlockRenderContext;
-import net.caffeinemc.mods.sodium.mixin.features.render.frapi.BlockRenderDispatcherAccessor;
-import net.caffeinemc.mods.sodium.mixin.features.render.frapi.ModelBlockRendererAccessor;
 import net.fabricmc.fabric.api.renderer.v1.Renderer;
 import net.fabricmc.fabric.api.renderer.v1.mesh.MutableMesh;
 import net.fabricmc.fabric.api.renderer.v1.mesh.QuadEmitter;
@@ -71,7 +69,7 @@ public class SodiumRenderer implements Renderer {
 
     @Override
     public void render(ModelBlockRenderer modelBlockRenderer, BlockAndTintGetter blockView, BlockStateModel model, BlockState state, BlockPos pos, PoseStack poseStack, BlockVertexConsumerProvider multiBufferSource, boolean cull, long seed, int overlay) {
-        NonTerrainBlockRenderContext.POOL.get().renderModel(blockView, ((ModelBlockRendererAccessor) modelBlockRenderer).getBlockColors(), model, state, pos, poseStack, multiBufferSource, cull, seed, overlay);
+        NonTerrainBlockRenderContext.POOL.get().renderModel(blockView, modelBlockRenderer.getBlockColors(), model, state, pos, poseStack, multiBufferSource, cull, seed, overlay);
     }
 
     @Override
@@ -85,7 +83,7 @@ public class SodiumRenderer implements Renderer {
 
         if (renderShape != RenderShape.INVISIBLE) {
             BlockStateModel model = renderManager.getBlockModel(state);
-            int tint = ((ModelBlockRendererAccessor) renderManager.getModelRenderer()).getBlockColors().getColor(state, null, null, 0);
+            int tint = renderManager.getModelRenderer().getBlockColors().getColor(state, null, null, 0);
             float red = (tint >> 16 & 255) / 255.0F;
             float green = (tint >> 8 & 255) / 255.0F;
             float blue = (tint & 255) / 255.0F;
