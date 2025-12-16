@@ -1,4 +1,4 @@
-package net.minecraft.client.renderer.sodium.client.platform.windows.api.version;
+package net.minecraft.client.renderer.sodium.platform.windows.api.version;
 
 import org.jetbrains.annotations.Nullable;
 import org.lwjgl.system.MemoryUtil;

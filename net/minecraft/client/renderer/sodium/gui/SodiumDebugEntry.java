@@ -1,4 +1,4 @@
-package net.minecraft.client.renderer.sodium.client.gui;
+package net.minecraft.client.renderer.sodium.gui;
 
 import com.google.common.collect.Lists;
 import net.minecraft.client.renderer.sodium.SodiumClientMod;

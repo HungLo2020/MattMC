@@ -23,8 +23,8 @@ import net.minecraft.client.renderer.sodium.render.frapi.render.AbstractBlockRen
 import net.minecraft.client.renderer.sodium.render.frapi.render.AccessLayerRenderState;
 import net.minecraft.client.renderer.sodium.render.frapi.render.NonTerrainBlockRenderContext;
 import net.minecraft.client.renderer.sodium.render.frapi.render.SimpleBlockRenderContext;
-import net.minecraft.client.renderer.sodium.mixin.features.render.frapi.BlockRenderDispatcherAccessor;
-import net.minecraft.client.renderer.sodium.mixin.features.render.frapi.ModelBlockRendererAccessor;
+import net.minecraft.client.renderer.sodium.mixin.BlockRenderDispatcherAccessor;
+import net.minecraft.client.renderer.sodium.mixin.ModelBlockRendererAccessor;
 import net.fabricmc.fabric.api.renderer.v1.Renderer;
 import net.fabricmc.fabric.api.renderer.v1.mesh.MutableMesh;
 import net.fabricmc.fabric.api.renderer.v1.mesh.QuadEmitter;
@@ -91,7 +91,8 @@ public class SodiumRenderer implements Renderer {
             float blue = (tint & 255) / 255.0F;
 
             FabricBlockModelRenderer.render(poseStack.last(), RenderLayerHelper.entityDelegate(multiBufferSource), model, red, green, blue, light, overlay, blockView, pos, state);
-            ((BlockRenderDispatcherAccessor) renderManager).getSpecialRenderers().get().renderByBlock(state.getBlock(), ItemDisplayContext.NONE, poseStack, Minecraft.getInstance().gameRenderer.getSubmitNodeStorage(), light, overlay, 0);
+            // TODO: Phase 4 - This accessor method needs proper implementation
+            // ((BlockRenderDispatcherAccessor) renderManager).getSpecialRenderers().get().renderByBlock(state.getBlock(), ItemDisplayContext.NONE, poseStack, Minecraft.getInstance().gameRenderer.getSubmitNodeStorage(), light, overlay, 0);
         }
     }
 

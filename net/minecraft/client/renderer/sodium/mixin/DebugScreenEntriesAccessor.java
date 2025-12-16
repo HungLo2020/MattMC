@@ -13,9 +13,9 @@ import java.util.HashMap;
  * @see net.minecraft.client.renderer.advanced.AdvancedRenderingConfig
  */
 public class DebugScreenEntriesAccessor {
-    private static final Map<ResourceLocation, DebugScreenOverlay.Entry> entries = new HashMap<>();
+    private static final Map<ResourceLocation, Object> entries = new HashMap<>();
     
-    public static Map<ResourceLocation, DebugScreenOverlay.Entry> getEntries() {
+    public static Map<ResourceLocation, Object> getEntries() {
         return entries;
     }
 }
