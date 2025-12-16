@@ -621,7 +621,7 @@ Steps 7 and 8 were completed together using a systematic 20-step phased approach
 - **Lines of code integrated**: ~150,000 LOC
 - **Build time**: ~2 minutes (zero regression)
 - **Compilation errors**: 0 at each step
-- **Note**: Earlier documentation mentioned 643 files; this has been corrected to 625 based on actual directory verification
+- **Note**: Earlier documentation mentioned 643 files; corrected to 625 based on actual directory verification. The 18-file difference was likely due to counting estimates during planning versus actual post-migration file counts.
 
 **Key Technical Achievements**:
 - Dual rendering paths (vanilla + Sodium) with runtime switching
