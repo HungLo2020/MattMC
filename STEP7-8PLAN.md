@@ -25,7 +25,8 @@ From investigation (commit 8b3bdf19 - reverted):
   - ✅ **Steps 1-12 Complete**: Foundation and core mixin inlining
   - ✅ **Steps 13-14 Complete**: GL and chunk rendering migration with full accessor inlining
   - ✅ **Step 15 Complete**: Vertex handling implementation migrated (7 files)
-  - ⏳ Steps 16-20: Planned for future phases
+  - ✅ **Step 16 Complete**: Supporting infrastructure migrated (203 files)
+  - ⏳ Steps 17-20: Planned for future phases
 - ✅ Build Status: **BUILD SUCCESSFUL** with zero regressions
 - ✅ Verification: See STEPS-13-14-COMPLETION-REPORT.md for comprehensive verification
 
@@ -989,35 +990,80 @@ With mixins inlined as stubs, now migrate actual Sodium implementation code.
 
 ---
 
-#### **Step 16: Migrate Supporting Infrastructure**
+#### **Step 16: Migrate Supporting Infrastructure** ✅ COMPLETE
+
+**Status**: ✅ **COMPLETED** - All 203 supporting infrastructure files migrated to proper Maven directory structure
 
 **Objective**: Move Sodium's utility and support code to Minecraft core.
 
 **Actions**:
-1. Migrate utility packages:
+1. ✅ **DONE**: Migrate utility packages (originally completed in Steps 13-14, directory corrected in Step 16):
    ```
-   sodium.client.util.*           → minecraft.renderer.sodium.util.*
-   sodium.client.model.*          → minecraft.renderer.sodium.model.*
-   sodium.client.services.*       → minecraft.renderer.sodium.services.*
-   sodium.client.world.*          → minecraft.renderer.sodium.world.*
-   sodium.client.gui.console.*    → minecraft.renderer.sodium.gui.console.*
+   sodium.client.util.*           → minecraft.renderer.sodium.util.*          (36 files)
+   sodium.client.model.*          → minecraft.renderer.sodium.model.*         (26 files)
+   sodium.client.services.*       → minecraft.renderer.sodium.services.*      (10 files)
+   sodium.client.world.*          → minecraft.renderer.sodium.world.*         (12 files)
+   sodium.client.gui.console.*    → minecraft.renderer.sodium.console.*       (4 files)
+   sodium.client.gui.*            → minecraft.renderer.sodium.gui.*           (26 files)
+   sodium.client.render.*         → minecraft.renderer.sodium.render.*        (45 files)
+   sodium.client.compatibility.*  → minecraft.renderer.sodium.compatibility.* (14 files)
+   sodium.client.platform.*       → minecraft.renderer.sodium.platform.*      (25 files)
+   sodium.client.data.*           → minecraft.renderer.sodium.data.*          (4 files)
+   SodiumClientMod.java           → minecraft.renderer.sodium.SodiumClientMod.java (1 file)
    ```
 
-2. Copy and update ~182 support files
+2. ✅ **DONE**: Copy and update 203 support files
+   - Files moved from `/net/minecraft/` to `/src/main/java/net/minecraft/`
+   - All package declarations correct (no changes needed)
+   - All imports correct (no changes needed)
 
-3. Update all references
+3. ✅ **VERIFIED**: Update all references
+   - All references already updated in Steps 13-14
+   - No additional updates needed
+
+**Implementation Details**:
+- **Total Files**: 203 implementation files + 1 package-info.java (204 total)
+- **Migration Path**: 
+  - FROM: `/net/minecraft/client/renderer/sodium/` (incorrect location)
+  - TO: `/src/main/java/net/minecraft/client/renderer/sodium/` (proper Maven structure)
+
+**File Breakdown by Subsystem**:
+1. **util/** - 36 files (collections, iterators, color, math, sorting, interval trees, tasks)
+2. **render/** - 45 files (viewport, vertex, texture, frapi, immediate mode)
+3. **gui/** - 26 files (options, controls, bindings, widgets)
+4. **platform/** - 25 files (Windows APIs, Unix APIs, platform helpers)
+5. **model/** - 26 files (color providers, lighting pipeline, quads)
+6. **compatibility/** - 14 files (environment detection, GPU workarounds)
+7. **world/** - 12 files (biome caching, cloned chunks, level slices)
+8. **services/** - 10 files (platform abstraction, service interfaces)
+9. **data/** - 4 files (configuration, fingerprinting)
+10. **console/** - 4 files (debug console)
+11. **SodiumClientMod.java** - 1 file (main entry point)
 
 **Testing**:
-- Build compiles successfully
-- All utilities accessible
-- No missing dependencies
+- ✅ Build compiles successfully (BUILD SUCCESSFUL in 34s)
+- ✅ All utilities accessible
+- ✅ No missing dependencies
+- ✅ compileJava: SUCCESS
+- ✅ compileSodiumJava: SUCCESS
+- ✅ compileIrisJava: SUCCESS
 
 **Completion Criteria**:
-- ✅ ~182 support files migrated
-- ✅ All package declarations updated
-- ✅ All imports updated
+- ✅ 203 support files migrated (exceeded original ~182 estimate)
+- ✅ All package declarations correct (no changes needed)
+- ✅ All imports correct (no changes needed)
 - ✅ Build successful
-- ✅ Zero functional changes
+- ✅ Zero functional changes (pure directory migration)
+- ✅ Comprehensive package-info.java documentation created
+
+**Documentation**:
+- ✅ Created comprehensive main package-info.java
+- ✅ Documented all 9 major subsystems
+- ✅ Listed 64 subdirectories and their purposes
+- ✅ Documented integration with other migrated packages
+- ✅ Documented migration history and source attribution
+
+**Step 16 Complete** - Ready to proceed to Step 17.
 
 ---
 
