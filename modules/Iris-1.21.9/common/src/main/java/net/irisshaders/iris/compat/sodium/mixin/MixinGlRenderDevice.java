@@ -9,7 +9,7 @@ import org.spongepowered.asm.mixin.injection.Redirect;
 
 @Mixin(targets = "net.minecraft.client.renderer.gl.advanced.device.GLRenderDevice$ImmediateDrawCommandList", remap = false)
 public class MixinGlRenderDevice {
-	@Redirect(method = "multiDrawElementsBaseVertex", at = @At(value = "INVOKE", target = "Lnet/caffeinemc/mods/sodium/client/gl/tessellation/GlPrimitiveType;getId()I"))
+	@Redirect(method = "multiDrawElementsBaseVertex", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/renderer/gl/advanced/tessellation/GlPrimitiveType;getId()I"))
 	private int replaceId(GlPrimitiveType instance) {
 		if (ImmediateState.usingTessellation) return GL43C.GL_PATCHES;
 

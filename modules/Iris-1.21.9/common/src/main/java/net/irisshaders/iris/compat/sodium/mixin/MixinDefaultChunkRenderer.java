@@ -17,7 +17,7 @@ public class MixinDefaultChunkRenderer {
 	}
 
 	// TODO IMS: Something about this feels... wrong.
-	@ModifyArg(method = "prepareIndexedTessellation", index = 2, at = @At(value = "INVOKE", target = "Lnet/caffeinemc/mods/sodium/client/render/chunk/DefaultChunkRenderer;createRegionTessellation(Lnet/caffeinemc/mods/sodium/client/gl/device/CommandList;Lnet/caffeinemc/mods/sodium/client/render/chunk/region/RenderRegion$DeviceResources;Z)Lnet/caffeinemc/mods/sodium/client/gl/tessellation/GlTessellation;"), remap = false)
+	@ModifyArg(method = "prepareIndexedTessellation", index = 2, at = @At(value = "INVOKE", target = "Lnet/minecraft/client/renderer/chunk/advanced/DefaultChunkRenderer;createRegionTessellation(Lnet/minecraft/client/renderer/gl/advanced/device/CommandList;Lnet/minecraft/client/renderer/chunk/advanced/region/RenderRegion$DeviceResources;Z)Lnet/minecraft/client/renderer/gl/advanced/tessellation/GlTessellation;"), remap = false)
 	private boolean doNotSortInShadow(boolean useSharedIndexBuffer) {
 		if (ShadowRenderingState.areShadowsCurrentlyBeingRendered()) return false;
 

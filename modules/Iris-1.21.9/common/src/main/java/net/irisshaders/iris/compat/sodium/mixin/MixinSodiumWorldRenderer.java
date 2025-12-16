@@ -40,7 +40,7 @@ public class MixinSodiumWorldRenderer {
 
 	@Redirect(method = "setupTerrain", remap = false,
 		at = @At(value = "INVOKE",
-			target = "Lnet/caffeinemc/mods/sodium/client/render/chunk/RenderSectionManager;needsUpdate()Z", ordinal = 0,
+			target = "Lnet/minecraft/client/renderer/chunk/advanced/RenderSectionManager;needsUpdate()Z", ordinal = 0,
 			remap = false))
 	private boolean iris$forceChunkGraphRebuildInShadowPass(RenderSectionManager instance) {
 		if (ShadowRenderingState.areShadowsCurrentlyBeingRendered()) {
@@ -56,7 +56,7 @@ public class MixinSodiumWorldRenderer {
 
 	@Redirect(method = "setupTerrain", remap = false,
 		at = @At(value = "INVOKE",
-			target = "Lnet/caffeinemc/mods/sodium/client/render/chunk/RenderSectionManager;needsUpdate()Z", ordinal = 1,
+			target = "Lnet/minecraft/client/renderer/chunk/advanced/RenderSectionManager;needsUpdate()Z", ordinal = 1,
 			remap = false))
 	private boolean iris$forceEndGraphRebuild(RenderSectionManager instance) {
 		if (ShadowRenderingState.areShadowsCurrentlyBeingRendered()) {

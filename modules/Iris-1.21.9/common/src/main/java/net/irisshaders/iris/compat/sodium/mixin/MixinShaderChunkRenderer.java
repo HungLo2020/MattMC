@@ -37,7 +37,7 @@ public abstract class MixinShaderChunkRenderer {
 	@Redirect(method = "begin", at = @At(value = "INVOKE", target = "Lcom/mojang/blaze3d/opengl/GlStateManager;_glBindFramebuffer(II)V"))
 	private void bindFramebufferLater(int p_412624_, int p_412635_) {}
 
-	@Redirect(method = "begin", at = @At(value = "INVOKE", target = "Lnet/caffeinemc/mods/sodium/client/render/chunk/ShaderChunkRenderer;compileProgram(Lnet/caffeinemc/mods/sodium/client/render/chunk/shader/ChunkShaderOptions;)Lnet/caffeinemc/mods/sodium/client/gl/shader/GlProgram;"))
+	@Redirect(method = "begin", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/renderer/chunk/advanced/ShaderChunkRenderer;compileProgram(Lnet/minecraft/client/renderer/chunk/advanced/shader/ChunkShaderOptions;)Lnet/minecraft/client/renderer/gl/advanced/shader/GlProgram;"))
 	private GlProgram<ChunkShaderInterface> redirectIrisProgram(ShaderChunkRenderer instance, ChunkShaderOptions options, TerrainRenderPass pass, @Local RenderTarget target) {
 		WorldRenderingPipeline pipeline = Iris.getPipelineManager().getPipelineNullable();
 
