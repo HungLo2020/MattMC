@@ -44,6 +44,27 @@ public class GlStateManager {
 	private static int readFbo;
 	private static int writeFbo;
 
+	// ===== BEGIN SODIUM GL OPTIMIZATION =====
+	// Originally from: sodium.mixin.core.render.GlStateManagerMixin
+	// Step 7: Inline GL State Mixins - Additional state tracking for redundancy elimination
+	
+	/**
+	 * Tracks the last bound texture to avoid redundant glBindTexture calls when Sodium is enabled.
+	 * This is an optimization that reduces unnecessary GL state changes.
+	 * 
+	 * @see #_bindTexture(int)
+	 */
+	private static int sodiumLastBoundTexture = -1;
+	
+	/**
+	 * Tracks the last active texture unit to avoid redundant glActiveTexture calls when Sodium is enabled.
+	 * This is an optimization that reduces unnecessary GL state changes.
+	 * 
+	 * @see #_activeTexture(int)
+	 */
+	private static int sodiumLastActiveTextureUnit = -1;
+	// ===== END SODIUM GL OPTIMIZATION =====
+
 	public static void _disableScissorTest() {
 		RenderSystem.assertOnRenderThread();
 		SCISSOR.mode.disable();

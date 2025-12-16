@@ -28,6 +28,18 @@ public class BufferBuilder implements VertexConsumer {
 	private int elementsToFill;
 	private boolean building = true;
 
+	// ===== BEGIN SODIUM BUFFER OPTIMIZATION =====
+	// Originally from: sodium.mixin.core.render.immediate.consumer.BufferBuilderMixin
+	// Step 8: Inline Buffer Upload Mixins - Buffer upload strategy abstraction
+	
+	/**
+	 * Flag indicating whether to use Sodium's optimized buffer upload strategy.
+	 * When false or when advanced rendering is disabled, vanilla upload is used.
+	 * This will be set to true in Phase 3 when Sodium implementation is migrated.
+	 */
+	private boolean useSodiumUploadStrategy = false;
+	// ===== END SODIUM BUFFER OPTIMIZATION =====
+
 	public BufferBuilder(ByteBufferBuilder byteBufferBuilder, VertexFormat.Mode mode, VertexFormat vertexFormat) {
 		if (!vertexFormat.contains(VertexFormatElement.POSITION)) {
 			throw new IllegalArgumentException("Cannot build mesh with no position element");
@@ -270,4 +282,34 @@ public class BufferBuilder implements VertexConsumer {
 			VertexConsumer.super.addVertex(f, g, h, i, j, k, l, m, n, o, p);
 		}
 	}
+
+	// ===== BEGIN SODIUM BUFFER UPLOAD METHODS =====
+	// Originally from: sodium.mixin.core.render.immediate.consumer.BufferBuilderMixin
+	// Step 8: Inline Buffer Upload Mixins - Upload strategy methods
+	
+	/**
+	 * Prepares this BufferBuilder to use Sodium's optimized buffer upload strategy.
+	 * This method is a placeholder that will be implemented in Phase 3 when Sodium
+	 * implementation code is migrated.
+	 * 
+	 * <p>When advanced rendering is disabled, this method has no effect and vanilla
+	 * upload will be used regardless.
+	 * 
+	 * @param enable whether to enable Sodium upload strategy
+	 */
+	public void setSodiumUploadStrategy(boolean enable) {
+		// Only enable if advanced rendering is active
+		this.useSodiumUploadStrategy = enable && net.minecraft.client.renderer.advanced.AdvancedRenderingConfig.isEnabled();
+	}
+	
+	/**
+	 * Returns whether this BufferBuilder is configured to use Sodium's upload strategy.
+	 * Even if enabled, Sodium upload will only be used if advanced rendering is enabled.
+	 * 
+	 * @return true if Sodium upload strategy is enabled and advanced rendering is active
+	 */
+	public boolean usesSodiumUpload() {
+		return this.useSodiumUploadStrategy && net.minecraft.client.renderer.advanced.AdvancedRenderingConfig.isEnabled();
+	}
+	// ===== END SODIUM BUFFER UPLOAD METHODS =====
 }
