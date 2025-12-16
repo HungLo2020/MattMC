@@ -17,11 +17,13 @@ import java.util.function.Supplier;
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
 import net.minecraft.client.renderer.advanced.AdvancedRenderingConfig;
+import net.minecraft.client.renderer.advanced.vertex.format.VertexFormatExtensions;
+import net.minecraft.client.renderer.advanced.vertex.format.VertexFormatRegistry;
 import org.jetbrains.annotations.Nullable;
 
 @Environment(EnvType.CLIENT)
 @DontObfuscate
-public class VertexFormat {
+public class VertexFormat implements VertexFormatExtensions {
 	public static final int UNKNOWN_ELEMENT = -1;
 	private final List<VertexFormatElement> elements;
 	private final List<String> names;
@@ -44,6 +46,12 @@ public class VertexFormat {
 	 * Set to -1 when not yet calculated.
 	 */
 	private int sodiumCachedStride = -1;
+	
+	/**
+	 * Global ID assigned by VertexFormatRegistry for Sodium's vertex format tracking.
+	 * This allows Sodium to efficiently identify and manage vertex formats.
+	 */
+	private int sodium$globalId;
 	// ===== END SODIUM VERTEX FORMAT INTEGRATION =====
 
 	VertexFormat(List<VertexFormatElement> list, List<String> list2, IntList intList, int i) {
@@ -57,6 +65,9 @@ public class VertexFormat {
 			int k = vertexFormatElement != null ? list.indexOf(vertexFormatElement) : -1;
 			this.offsetsByElement[j] = k != -1 ? intList.getInt(k) : -1;
 		}
+		
+		// Initialize Sodium global ID
+		this.sodium$globalId = VertexFormatRegistry.instance().allocateGlobalId(this);
 	}
 
 	public static VertexFormat.Builder builder() {
@@ -177,6 +188,20 @@ public class VertexFormat {
 		this.immediateDrawIndexBuffer = uploadToBuffer(this.immediateDrawIndexBuffer, byteBuffer, 72, () -> "Immediate index buffer for " + this);
 		return this.immediateDrawIndexBuffer;
 	}
+
+	// ===== BEGIN VERTEX FORMAT EXTENSIONS IMPLEMENTATION =====
+	/**
+	 * Returns the global ID for this vertex format.
+	 * This is part of the VertexFormatExtensions interface required by Sodium's
+	 * vertex serialization system.
+	 * 
+	 * @return the global ID assigned by VertexFormatRegistry
+	 */
+	@Override
+	public int sodium$getGlobalId() {
+		return this.sodium$globalId;
+	}
+	// ===== END VERTEX FORMAT EXTENSIONS IMPLEMENTATION =====
 
 	@Environment(EnvType.CLIENT)
 	@DontObfuscate
