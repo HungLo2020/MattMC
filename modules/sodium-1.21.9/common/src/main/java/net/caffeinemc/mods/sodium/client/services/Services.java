@@ -1,6 +1,6 @@
 package net.caffeinemc.mods.sodium.client.services;
 
-import net.caffeinemc.mods.sodium.client.SodiumClientMod;
+import net.minecraft.client.renderer.sodium.SodiumClientMod;
 
 import java.util.ServiceLoader;
 

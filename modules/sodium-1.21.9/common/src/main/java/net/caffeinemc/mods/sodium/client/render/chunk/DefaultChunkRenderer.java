@@ -1,6 +1,6 @@
 package net.caffeinemc.mods.sodium.client.render.chunk;
 
-import net.caffeinemc.mods.sodium.client.SodiumClientMod;
+import net.minecraft.client.renderer.sodium.SodiumClientMod;
 import net.minecraft.client.renderer.gl.advanced.device.CommandList;
 import net.minecraft.client.renderer.gl.advanced.device.DrawCommandList;
 import net.minecraft.client.renderer.gl.advanced.device.MultiDrawBatch;
@@ -9,7 +9,7 @@ import net.minecraft.client.renderer.gl.advanced.tessellation.GlIndexType;
 import net.minecraft.client.renderer.gl.advanced.tessellation.GlPrimitiveType;
 import net.minecraft.client.renderer.gl.advanced.tessellation.GlTessellation;
 import net.minecraft.client.renderer.gl.advanced.tessellation.TessellationBinding;
-import net.caffeinemc.mods.sodium.client.model.quad.properties.ModelQuadFacing;
+import net.minecraft.client.renderer.sodium.model.quad.properties.ModelQuadFacing;
 import net.minecraft.client.renderer.chunk.advanced.data.SectionRenderDataStorage;
 import net.minecraft.client.renderer.chunk.advanced.data.SectionRenderDataUnsafe;
 import net.minecraft.client.renderer.chunk.advanced.lists.ChunkRenderList;
@@ -18,10 +18,10 @@ import net.minecraft.client.renderer.chunk.advanced.region.RenderRegion;
 import net.minecraft.client.renderer.chunk.advanced.shader.ChunkShaderInterface;
 import net.minecraft.client.renderer.chunk.advanced.terrain.TerrainRenderPass;
 import net.minecraft.client.renderer.chunk.advanced.vertex.format.ChunkVertexType;
-import net.caffeinemc.mods.sodium.client.render.viewport.CameraTransform;
-import net.caffeinemc.mods.sodium.client.util.BitwiseMath;
-import net.caffeinemc.mods.sodium.client.util.FogParameters;
-import net.caffeinemc.mods.sodium.client.util.UInt32;
+import net.minecraft.client.renderer.sodium.render.viewport.CameraTransform;
+import net.minecraft.client.renderer.sodium.util.BitwiseMath;
+import net.minecraft.client.renderer.sodium.util.FogParameters;
+import net.minecraft.client.renderer.sodium.util.UInt32;
 import org.lwjgl.system.MemoryUtil;
 import org.lwjgl.system.Pointer;
 

@@ -1,6 +1,6 @@
-package net.caffeinemc.mods.sodium.client.compatibility.environment.probe;
+package net.minecraft.client.renderer.sodium.compatibility.environment.probe;
 
-import net.caffeinemc.mods.sodium.client.compatibility.environment.OsUtils;
+import net.minecraft.client.renderer.sodium.compatibility.environment.OsUtils;
 import net.caffeinemc.mods.sodium.client.platform.windows.api.d3dkmt.D3DKMT;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;

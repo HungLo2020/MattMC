@@ -2,7 +2,7 @@ package net.caffeinemc.mods.sodium.mixin.features.render.gui.font;
 
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import net.minecraft.client.renderer.advanced.util.ColorARGB;
-import net.caffeinemc.mods.sodium.client.render.vertex.VertexConsumerUtils;
+import net.minecraft.client.renderer.sodium.render.vertex.VertexConsumerUtils;
 import net.minecraft.client.renderer.advanced.vertex.format.common.GlyphVertex;
 import net.minecraft.client.gui.font.glyphs.BakedGlyph;
 import net.minecraft.client.renderer.advanced.util.ColorABGR;

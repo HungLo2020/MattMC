@@ -7,7 +7,7 @@ import net.minecraft.client.renderer.gl.advanced.buffer.GlMutableBuffer;
 import net.minecraft.client.renderer.gl.advanced.device.CommandList;
 import net.minecraft.client.renderer.gl.advanced.tessellation.GlIndexType;
 import net.minecraft.client.renderer.gl.advanced.util.EnumBitField;
-import net.caffeinemc.mods.sodium.client.util.NativeBuffer;
+import net.minecraft.client.renderer.sodium.util.NativeBuffer;
 
 import java.nio.ByteBuffer;
 import java.nio.IntBuffer;

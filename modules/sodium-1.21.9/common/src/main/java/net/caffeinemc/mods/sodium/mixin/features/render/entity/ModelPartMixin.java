@@ -1,6 +1,6 @@
 package net.caffeinemc.mods.sodium.mixin.features.render.entity;
 
-import net.caffeinemc.mods.sodium.client.render.immediate.model.EntityRenderer;
+import net.minecraft.client.renderer.sodium.render.immediate.model.EntityRenderer;
 import net.minecraft.client.renderer.advanced.math.MatrixHelper;
 import net.minecraft.client.model.geom.ModelPart;
 import org.spongepowered.asm.mixin.*;

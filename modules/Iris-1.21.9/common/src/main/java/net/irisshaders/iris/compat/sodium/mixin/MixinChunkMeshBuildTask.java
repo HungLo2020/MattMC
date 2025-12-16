@@ -1,7 +1,7 @@
 package net.irisshaders.iris.compat.sodium.mixin;
 
 import com.llamalad7.mixinextras.sugar.Local;
-import net.caffeinemc.mods.sodium.client.model.quad.properties.ModelQuadFacing;
+import net.minecraft.client.renderer.sodium.model.quad.properties.ModelQuadFacing;
 import net.minecraft.client.renderer.chunk.advanced.compile.ChunkBuildBuffers;
 import net.minecraft.client.renderer.chunk.advanced.compile.ChunkBuildContext;
 import net.minecraft.client.renderer.chunk.advanced.compile.ChunkBuildOutput;
@@ -11,7 +11,7 @@ import net.minecraft.client.renderer.chunk.advanced.compile.pipeline.BlockRender
 import net.minecraft.client.renderer.chunk.advanced.compile.tasks.ChunkBuilderMeshingTask;
 import net.minecraft.client.renderer.chunk.advanced.terrain.material.DefaultMaterials;
 import net.minecraft.client.renderer.chunk.advanced.vertex.format.ChunkVertexEncoder;
-import net.caffeinemc.mods.sodium.client.util.task.CancellationToken;
+import net.minecraft.client.renderer.sodium.util.task.CancellationToken;
 import net.irisshaders.iris.shaderpack.materialmap.WorldRenderingSettings;
 import net.irisshaders.iris.vertices.BlockSensitiveBufferBuilder;
 import net.irisshaders.iris.vertices.sodium.terrain.ChunkVertexExtension;

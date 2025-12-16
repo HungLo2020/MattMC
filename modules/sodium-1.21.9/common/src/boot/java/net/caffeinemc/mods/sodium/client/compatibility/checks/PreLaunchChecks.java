@@ -1,4 +1,4 @@
-package net.caffeinemc.mods.sodium.client.compatibility.checks;
+package net.minecraft.client.renderer.sodium.compatibility.checks;
 
 import net.caffeinemc.mods.sodium.client.platform.PlatformHelper;
 import org.lwjgl.Version;

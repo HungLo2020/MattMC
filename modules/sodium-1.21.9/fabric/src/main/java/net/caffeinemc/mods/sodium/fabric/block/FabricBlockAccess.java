@@ -1,10 +1,10 @@
 package net.caffeinemc.mods.sodium.fabric.block;
 
 import net.minecraft.client.renderer.advanced.util.NormI8;
-import net.caffeinemc.mods.sodium.client.model.quad.ModelQuadView;
-import net.caffeinemc.mods.sodium.client.render.frapi.render.AmbientOcclusionMode;
-import net.caffeinemc.mods.sodium.client.services.PlatformBlockAccess;
-import net.caffeinemc.mods.sodium.client.services.SodiumModelData;
+import net.minecraft.client.renderer.sodium.model.quad.ModelQuadView;
+import net.minecraft.client.renderer.sodium.render.frapi.render.AmbientOcclusionMode;
+import net.minecraft.client.renderer.sodium.services.PlatformBlockAccess;
+import net.minecraft.client.renderer.sodium.services.SodiumModelData;
 import net.fabricmc.fabric.api.client.render.fluid.v1.FluidRenderHandlerRegistry;
 import net.fabricmc.fabric.api.util.TriState;
 import net.minecraft.client.player.LocalPlayer;

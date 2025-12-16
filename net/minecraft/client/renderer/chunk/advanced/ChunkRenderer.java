@@ -3,8 +3,8 @@ package net.minecraft.client.renderer.chunk.advanced;
 import net.minecraft.client.renderer.gl.advanced.device.CommandList;
 import net.minecraft.client.renderer.chunk.advanced.lists.ChunkRenderListIterable;
 import net.minecraft.client.renderer.chunk.advanced.terrain.TerrainRenderPass;
-import net.caffeinemc.mods.sodium.client.render.viewport.CameraTransform;
-import net.caffeinemc.mods.sodium.client.util.FogParameters;
+import net.minecraft.client.renderer.sodium.render.viewport.CameraTransform;
+import net.minecraft.client.renderer.sodium.util.FogParameters;
 
 /**
  * The chunk render backend takes care of managing the graphics resource state of chunk render containers. This includes

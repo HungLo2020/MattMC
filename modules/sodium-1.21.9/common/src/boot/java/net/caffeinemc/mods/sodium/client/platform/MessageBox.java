@@ -1,6 +1,6 @@
 package net.caffeinemc.mods.sodium.client.platform;
 
-import net.caffeinemc.mods.sodium.client.compatibility.environment.OsUtils;
+import net.minecraft.client.renderer.sodium.compatibility.environment.OsUtils;
 import net.caffeinemc.mods.sodium.client.platform.windows.api.Shell32;
 import net.caffeinemc.mods.sodium.client.platform.windows.api.User32;
 import net.caffeinemc.mods.sodium.client.platform.windows.api.msgbox.MsgBoxCallback;

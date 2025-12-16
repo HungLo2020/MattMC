@@ -3,7 +3,7 @@ package net.minecraft.client.renderer.chunk.advanced.translucent_sorting.data;
 import it.unimi.dsi.fastutil.objects.Object2ReferenceMap;
 import net.minecraft.client.renderer.chunk.advanced.translucent_sorting.quad.TQuad;
 import net.minecraft.client.renderer.chunk.advanced.translucent_sorting.trigger.GeometryPlanes;
-import net.caffeinemc.mods.sodium.client.util.sorting.RadixSort;
+import net.minecraft.client.renderer.sodium.util.sorting.RadixSort;
 import net.minecraft.core.SectionPos;
 import org.joml.Vector3dc;
 import org.joml.Vector3fc;

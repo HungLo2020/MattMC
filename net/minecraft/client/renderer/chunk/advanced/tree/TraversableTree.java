@@ -2,7 +2,7 @@ package net.minecraft.client.renderer.chunk.advanced.tree;
 
 import net.minecraft.client.renderer.chunk.advanced.lists.CoordinateSectionVisitor;
 import net.minecraft.client.renderer.chunk.advanced.occlusion.OcclusionCuller;
-import net.caffeinemc.mods.sodium.client.render.viewport.Viewport;
+import net.minecraft.client.renderer.sodium.render.viewport.Viewport;
 import org.joml.FrustumIntersection;
 
 /**

@@ -1,7 +1,7 @@
 package net.minecraft.client.renderer.chunk.advanced.compile;
 
 import it.unimi.dsi.fastutil.objects.Reference2ReferenceOpenHashMap;
-import net.caffeinemc.mods.sodium.client.model.quad.properties.ModelQuadFacing;
+import net.minecraft.client.renderer.sodium.model.quad.properties.ModelQuadFacing;
 import net.minecraft.client.renderer.chunk.advanced.compile.buffers.BakedChunkModelBuilder;
 import net.minecraft.client.renderer.chunk.advanced.compile.buffers.ChunkModelBuilder;
 import net.minecraft.client.renderer.chunk.advanced.data.BuiltSectionInfo;
@@ -13,7 +13,7 @@ import net.minecraft.client.renderer.chunk.advanced.translucent_sorting.bsp_tree
 import net.minecraft.client.renderer.chunk.advanced.translucent_sorting.data.TranslucentData;
 import net.minecraft.client.renderer.chunk.advanced.vertex.builder.ChunkMeshBufferBuilder;
 import net.minecraft.client.renderer.chunk.advanced.vertex.format.ChunkVertexType;
-import net.caffeinemc.mods.sodium.client.util.NativeBuffer;
+import net.minecraft.client.renderer.sodium.util.NativeBuffer;
 
 /**
  * A collection of temporary buffers for each worker thread which will be used to build chunk meshes for given render

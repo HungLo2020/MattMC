@@ -1,8 +1,8 @@
 package net.irisshaders.iris.uniforms;
 
 import com.mojang.blaze3d.systems.RenderSystem;
-import net.caffeinemc.mods.sodium.client.util.FogParameters;
-import net.caffeinemc.mods.sodium.client.util.FogStorage;
+import net.minecraft.client.renderer.sodium.util.FogParameters;
+import net.minecraft.client.renderer.sodium.util.FogStorage;
 import net.irisshaders.iris.gl.state.FogMode;
 import net.irisshaders.iris.gl.uniform.DynamicUniformHolder;
 import net.minecraft.client.Minecraft;

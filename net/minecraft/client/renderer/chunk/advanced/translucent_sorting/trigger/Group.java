@@ -1,6 +1,6 @@
 package net.minecraft.client.renderer.chunk.advanced.translucent_sorting.trigger;
 
-import net.caffeinemc.mods.sodium.client.util.interval_tree.DoubleInterval;
+import net.minecraft.client.renderer.sodium.util.interval_tree.DoubleInterval;
 import org.joml.Vector3fc;
 
 /**

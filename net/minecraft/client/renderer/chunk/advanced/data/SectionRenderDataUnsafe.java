@@ -1,6 +1,6 @@
 package net.minecraft.client.renderer.chunk.advanced.data;
 
-import net.caffeinemc.mods.sodium.client.util.UInt32;
+import net.minecraft.client.renderer.sodium.util.UInt32;
 import org.lwjgl.system.MemoryUtil;
 
 // This code is a terrible hack to get around the fact that we are so incredibly memory bound, and that we

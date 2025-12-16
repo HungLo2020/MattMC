@@ -2,7 +2,7 @@ package net.minecraft.client.renderer.chunk.advanced.compile.executor;
 
 import com.mojang.jtracy.TracyClient;
 import com.mojang.jtracy.Zone;
-import net.caffeinemc.mods.sodium.client.SodiumClientMod;
+import net.minecraft.client.renderer.sodium.SodiumClientMod;
 import net.minecraft.client.renderer.chunk.advanced.compile.BuilderTaskOutput;
 import net.minecraft.client.renderer.chunk.advanced.compile.ChunkBuildContext;
 import net.minecraft.client.renderer.chunk.advanced.compile.tasks.ChunkBuilderTask;

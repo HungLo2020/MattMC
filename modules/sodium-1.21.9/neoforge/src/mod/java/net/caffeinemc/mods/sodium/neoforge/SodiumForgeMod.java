@@ -1,8 +1,8 @@
 package net.caffeinemc.mods.sodium.neoforge;
 
 import net.caffeinemc.mods.sodium.client.gui.SodiumOptionsGUI;
-import net.caffeinemc.mods.sodium.client.render.frapi.SodiumRenderer;
-import net.caffeinemc.mods.sodium.client.util.FlawlessFrames;
+import net.minecraft.client.renderer.sodium.render.frapi.SodiumRenderer;
+import net.minecraft.client.renderer.sodium.util.FlawlessFrames;
 import net.fabricmc.fabric.api.renderer.v1.Renderer;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.IEventBus;

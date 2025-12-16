@@ -2,7 +2,7 @@ package net.caffeinemc.mods.sodium.mixin.features.render.entity.shadows;
 
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import net.minecraft.client.renderer.advanced.util.NormI8;
-import net.caffeinemc.mods.sodium.client.render.vertex.VertexConsumerUtils;
+import net.minecraft.client.renderer.sodium.render.vertex.VertexConsumerUtils;
 import net.minecraft.client.renderer.advanced.vertex.buffer.VertexBufferWriter;
 import net.minecraft.client.renderer.advanced.vertex.format.common.EntityVertex;
 import net.minecraft.client.renderer.*;

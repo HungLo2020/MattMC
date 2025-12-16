@@ -1,7 +1,7 @@
 package net.minecraft.client.renderer.chunk.advanced.tree;
 
 import net.minecraft.client.renderer.chunk.advanced.lists.CoordinateSectionVisitor;
-import net.caffeinemc.mods.sodium.client.render.viewport.Viewport;
+import net.minecraft.client.renderer.sodium.render.viewport.Viewport;
 import net.minecraft.world.level.Level;
 
 public interface TraversableForest extends Forest {

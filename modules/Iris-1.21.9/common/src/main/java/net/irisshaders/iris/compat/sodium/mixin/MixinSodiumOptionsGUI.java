@@ -2,7 +2,7 @@ package net.irisshaders.iris.compat.sodium.mixin;
 
 import com.google.common.collect.ImmutableList;
 import net.caffeinemc.mods.sodium.client.gui.SodiumOptionsGUI;
-import net.caffeinemc.mods.sodium.client.gui.options.OptionPage;
+import net.minecraft.client.renderer.sodium.gui.options.OptionPage;
 import net.irisshaders.iris.gui.screen.ShaderPackScreen;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;

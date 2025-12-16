@@ -1,6 +1,6 @@
 package net.minecraft.client.renderer.chunk.advanced.translucent_sorting.quad;
 
-import net.caffeinemc.mods.sodium.client.model.quad.properties.ModelQuadFacing;
+import net.minecraft.client.renderer.sodium.model.quad.properties.ModelQuadFacing;
 import net.minecraft.client.renderer.chunk.advanced.terrain.material.DefaultMaterials;
 import net.minecraft.client.renderer.chunk.advanced.translucent_sorting.data.TranslucentData;
 import net.minecraft.client.renderer.chunk.advanced.vertex.builder.ChunkMeshBufferBuilder;

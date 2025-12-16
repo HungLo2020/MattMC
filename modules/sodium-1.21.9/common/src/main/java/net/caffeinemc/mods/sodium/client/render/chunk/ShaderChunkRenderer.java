@@ -14,7 +14,7 @@ import net.minecraft.client.renderer.chunk.advanced.shader.*;
 import net.minecraft.client.renderer.chunk.advanced.terrain.TerrainRenderPass;
 import net.minecraft.client.renderer.chunk.advanced.vertex.format.ChunkVertexType;
 import net.minecraft.client.renderer.gl.advanced.shader.*;
-import net.caffeinemc.mods.sodium.client.util.FogParameters;
+import net.minecraft.client.renderer.sodium.util.FogParameters;
 import net.caffeinemc.mods.sodium.mixin.core.GlCommandEncoderAccessor;
 import net.minecraft.resources.ResourceLocation;
 import java.util.Map;

@@ -5,7 +5,7 @@ import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import net.minecraft.client.renderer.chunk.advanced.RenderSection;
 import net.minecraft.client.renderer.chunk.advanced.TaskQueueType;
 import net.minecraft.client.renderer.chunk.advanced.region.RenderRegion;
-import net.caffeinemc.mods.sodium.client.render.viewport.Viewport;
+import net.minecraft.client.renderer.sodium.render.viewport.Viewport;
 
 import java.util.ArrayDeque;
 import java.util.Map;

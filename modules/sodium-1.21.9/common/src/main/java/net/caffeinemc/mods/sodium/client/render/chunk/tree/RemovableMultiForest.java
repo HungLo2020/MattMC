@@ -4,7 +4,7 @@ import it.unimi.dsi.fastutil.longs.Long2ReferenceLinkedOpenHashMap;
 import it.unimi.dsi.fastutil.objects.ReferenceArrayList;
 import net.minecraft.client.renderer.chunk.advanced.RenderSection;
 import net.minecraft.client.renderer.chunk.advanced.lists.CoordinateSectionVisitor;
-import net.caffeinemc.mods.sodium.client.render.viewport.Viewport;
+import net.minecraft.client.renderer.sodium.render.viewport.Viewport;
 import net.minecraft.core.SectionPos;
 
 import java.util.Comparator;

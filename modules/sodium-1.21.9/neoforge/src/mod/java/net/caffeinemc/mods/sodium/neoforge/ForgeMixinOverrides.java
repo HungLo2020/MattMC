@@ -1,6 +1,6 @@
 package net.caffeinemc.mods.sodium.neoforge;
 
-import net.caffeinemc.mods.sodium.client.services.PlatformMixinOverrides;
+import net.minecraft.client.renderer.sodium.services.PlatformMixinOverrides;
 import net.neoforged.fml.loading.FMLLoader;
 import net.neoforged.fml.loading.moddiscovery.ModInfo;
 

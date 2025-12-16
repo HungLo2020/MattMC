@@ -1,7 +1,7 @@
 package net.minecraft.client.renderer.chunk.advanced.data;
 
-import net.caffeinemc.mods.sodium.client.model.quad.properties.ModelQuadFacing;
-import net.caffeinemc.mods.sodium.client.util.NativeBuffer;
+import net.minecraft.client.renderer.sodium.model.quad.properties.ModelQuadFacing;
+import net.minecraft.client.renderer.sodium.util.NativeBuffer;
 
 /**
  * The array of vertex segments is structured as follows:

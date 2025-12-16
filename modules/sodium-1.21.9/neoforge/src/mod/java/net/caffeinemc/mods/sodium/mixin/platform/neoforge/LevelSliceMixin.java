@@ -1,9 +1,9 @@
 package net.caffeinemc.mods.sodium.mixin.platform.neoforge;
 
 
-import net.caffeinemc.mods.sodium.client.services.SodiumModelData;
-import net.caffeinemc.mods.sodium.client.world.LevelSlice;
-import net.caffeinemc.mods.sodium.client.world.SodiumAuxiliaryLightManager;
+import net.minecraft.client.renderer.sodium.services.SodiumModelData;
+import net.minecraft.client.renderer.sodium.world.LevelSlice;
+import net.minecraft.client.renderer.sodium.world.SodiumAuxiliaryLightManager;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.BlockAndTintGetter;

@@ -7,7 +7,7 @@ import net.minecraft.client.renderer.chunk.advanced.vertex.format.ChunkVertexEnc
 import org.joml.Vector3f;
 import org.joml.Vector3fc;
 
-import net.caffeinemc.mods.sodium.client.model.quad.properties.ModelQuadFacing;
+import net.minecraft.client.renderer.sodium.model.quad.properties.ModelQuadFacing;
 import net.minecraft.client.renderer.advanced.util.NormI8;
 
 /**

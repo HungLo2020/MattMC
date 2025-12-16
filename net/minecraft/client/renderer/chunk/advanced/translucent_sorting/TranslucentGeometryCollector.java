@@ -2,8 +2,8 @@ package net.minecraft.client.renderer.chunk.advanced.translucent_sorting;
 
 import it.unimi.dsi.fastutil.objects.ReferenceArrayList;
 import net.minecraft.client.renderer.advanced.util.NormI8;
-import net.caffeinemc.mods.sodium.client.SodiumClientMod;
-import net.caffeinemc.mods.sodium.client.model.quad.properties.ModelQuadFacing;
+import net.minecraft.client.renderer.sodium.SodiumClientMod;
+import net.minecraft.client.renderer.sodium.model.quad.properties.ModelQuadFacing;
 import net.minecraft.client.renderer.chunk.advanced.compile.ChunkBuildOutput;
 import net.minecraft.client.renderer.chunk.advanced.data.BuiltSectionMeshParts;
 import net.minecraft.client.renderer.chunk.advanced.translucent_sorting.bsp_tree.BSPBuildFailureException;

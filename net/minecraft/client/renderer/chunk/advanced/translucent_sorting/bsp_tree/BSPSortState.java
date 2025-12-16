@@ -6,7 +6,7 @@ import java.lang.Math;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.ints.IntConsumer;
 import net.minecraft.client.renderer.chunk.advanced.translucent_sorting.data.TranslucentData;
-import net.caffeinemc.mods.sodium.client.util.NativeBuffer;
+import net.minecraft.client.renderer.sodium.util.NativeBuffer;
 
 /**
  * The sort state is passed around the tree (similar to visitor pattern) and

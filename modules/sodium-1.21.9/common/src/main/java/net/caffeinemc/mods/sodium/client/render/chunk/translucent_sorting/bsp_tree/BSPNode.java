@@ -6,7 +6,7 @@ import org.joml.Vector3fc;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 import net.minecraft.client.renderer.chunk.advanced.translucent_sorting.quad.TQuad;
 import net.minecraft.client.renderer.chunk.advanced.translucent_sorting.data.TopoGraphSorting;
-import net.caffeinemc.mods.sodium.client.util.NativeBuffer;
+import net.minecraft.client.renderer.sodium.util.NativeBuffer;
 import net.minecraft.client.renderer.advanced.util.NormI8;
 import net.minecraft.core.SectionPos;
 

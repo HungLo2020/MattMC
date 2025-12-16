@@ -3,7 +3,7 @@ package net.minecraft.client.renderer.chunk.advanced.region;
 import it.unimi.dsi.fastutil.longs.Long2ReferenceOpenHashMap;
 import it.unimi.dsi.fastutil.objects.Reference2ReferenceMap;
 import it.unimi.dsi.fastutil.objects.Reference2ReferenceOpenHashMap;
-import net.caffeinemc.mods.sodium.client.SodiumClientMod;
+import net.minecraft.client.renderer.sodium.SodiumClientMod;
 import net.minecraft.client.renderer.gl.advanced.arena.PendingUpload;
 import net.minecraft.client.renderer.gl.advanced.arena.staging.FallbackStagingBuffer;
 import net.minecraft.client.renderer.gl.advanced.arena.staging.MappedStagingBuffer;

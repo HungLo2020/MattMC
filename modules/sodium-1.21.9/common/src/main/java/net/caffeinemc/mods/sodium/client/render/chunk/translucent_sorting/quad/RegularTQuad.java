@@ -1,6 +1,6 @@
 package net.minecraft.client.renderer.chunk.advanced.translucent_sorting.quad;
 
-import net.caffeinemc.mods.sodium.client.model.quad.properties.ModelQuadFacing;
+import net.minecraft.client.renderer.sodium.model.quad.properties.ModelQuadFacing;
 import net.minecraft.client.renderer.chunk.advanced.vertex.format.ChunkVertexEncoder;
 
 public class RegularTQuad extends TQuad {

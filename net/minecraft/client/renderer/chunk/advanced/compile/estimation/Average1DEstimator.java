@@ -1,6 +1,6 @@
 package net.minecraft.client.renderer.chunk.advanced.compile.estimation;
 
-import net.caffeinemc.mods.sodium.client.util.MathUtil;
+import net.minecraft.client.renderer.sodium.util.MathUtil;
 
 import java.util.Locale;
 

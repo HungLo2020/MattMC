@@ -1,11 +1,11 @@
 package net.minecraft.client.renderer.chunk.advanced.compile.pipeline;
 
-import net.caffeinemc.mods.sodium.client.model.color.ColorProviderRegistry;
-import net.caffeinemc.mods.sodium.client.model.light.LightPipelineProvider;
-import net.caffeinemc.mods.sodium.client.model.light.data.ArrayLightDataCache;
-import net.caffeinemc.mods.sodium.client.services.FluidRendererFactory;
-import net.caffeinemc.mods.sodium.client.world.LevelSlice;
-import net.caffeinemc.mods.sodium.client.world.cloned.ChunkRenderContext;
+import net.minecraft.client.renderer.sodium.model.color.ColorProviderRegistry;
+import net.minecraft.client.renderer.sodium.model.light.LightPipelineProvider;
+import net.minecraft.client.renderer.sodium.model.light.data.ArrayLightDataCache;
+import net.minecraft.client.renderer.sodium.services.FluidRendererFactory;
+import net.minecraft.client.renderer.sodium.world.LevelSlice;
+import net.minecraft.client.renderer.sodium.world.cloned.ChunkRenderContext;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.renderer.block.BlockModelShaper;

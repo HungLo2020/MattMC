@@ -10,7 +10,7 @@ import net.minecraft.client.renderer.chunk.advanced.RenderSection;
 import net.minecraft.client.renderer.chunk.advanced.compile.ChunkBuildContext;
 import net.minecraft.client.renderer.chunk.advanced.compile.ChunkSortOutput;
 import net.minecraft.client.renderer.chunk.advanced.translucent_sorting.data.DynamicData;
-import net.caffeinemc.mods.sodium.client.util.task.CancellationToken;
+import net.minecraft.client.renderer.sodium.util.task.CancellationToken;
 
 public class ChunkBuilderSortingTask extends ChunkBuilderTask<ChunkSortOutput> {
     private final DynamicSorter sorter;

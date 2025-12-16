@@ -1,4 +1,4 @@
-package net.caffeinemc.mods.sodium.client.compatibility.checks;
+package net.minecraft.client.renderer.sodium.compatibility.checks;
 
 import com.sun.jna.Platform;
 import com.sun.jna.platform.win32.Kernel32Util;

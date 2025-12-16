@@ -1,9 +1,9 @@
 package net.caffeinemc.mods.sodium.service;
 
-import net.caffeinemc.mods.sodium.client.compatibility.checks.PreLaunchChecks;
-import net.caffeinemc.mods.sodium.client.compatibility.environment.probe.GraphicsAdapterProbe;
-import net.caffeinemc.mods.sodium.client.compatibility.workarounds.Workarounds;
-import net.caffeinemc.mods.sodium.client.compatibility.workarounds.nvidia.NvidiaWorkarounds;
+import net.minecraft.client.renderer.sodium.compatibility.checks.PreLaunchChecks;
+import net.minecraft.client.renderer.sodium.compatibility.environment.probe.GraphicsAdapterProbe;
+import net.minecraft.client.renderer.sodium.compatibility.workarounds.Workarounds;
+import net.minecraft.client.renderer.sodium.compatibility.workarounds.nvidia.NvidiaWorkarounds;
 import net.neoforged.neoforgespi.earlywindow.GraphicsBootstrapper;
 
 public class SodiumWorkarounds implements GraphicsBootstrapper {

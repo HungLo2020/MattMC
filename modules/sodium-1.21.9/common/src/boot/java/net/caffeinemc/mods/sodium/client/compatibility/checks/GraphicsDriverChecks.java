@@ -1,10 +1,10 @@
-package net.caffeinemc.mods.sodium.client.compatibility.checks;
+package net.minecraft.client.renderer.sodium.compatibility.checks;
 
-import net.caffeinemc.mods.sodium.client.compatibility.environment.GlContextInfo;
-import net.caffeinemc.mods.sodium.client.compatibility.environment.probe.GraphicsAdapterVendor;
-import net.caffeinemc.mods.sodium.client.compatibility.workarounds.intel.IntelWorkarounds;
-import net.caffeinemc.mods.sodium.client.compatibility.workarounds.nvidia.NvidiaDriverVersion;
-import net.caffeinemc.mods.sodium.client.compatibility.workarounds.nvidia.NvidiaWorkarounds;
+import net.minecraft.client.renderer.sodium.compatibility.environment.GlContextInfo;
+import net.minecraft.client.renderer.sodium.compatibility.environment.probe.GraphicsAdapterVendor;
+import net.minecraft.client.renderer.sodium.compatibility.workarounds.intel.IntelWorkarounds;
+import net.minecraft.client.renderer.sodium.compatibility.workarounds.nvidia.NvidiaDriverVersion;
+import net.minecraft.client.renderer.sodium.compatibility.workarounds.nvidia.NvidiaWorkarounds;
 import net.caffeinemc.mods.sodium.client.platform.NativeWindowHandle;
 import net.caffeinemc.mods.sodium.client.platform.PlatformHelper;
 

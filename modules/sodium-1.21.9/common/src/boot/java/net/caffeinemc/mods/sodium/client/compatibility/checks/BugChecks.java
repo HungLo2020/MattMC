@@ -1,4 +1,4 @@
-package net.caffeinemc.mods.sodium.client.compatibility.checks;
+package net.minecraft.client.renderer.sodium.compatibility.checks;
 
 /**
  * "Checks" are used to determine whether the environment we are running within is actually reasonable. Most often,

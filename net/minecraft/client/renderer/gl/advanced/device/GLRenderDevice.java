@@ -1,6 +1,6 @@
 package net.minecraft.client.renderer.gl.advanced.device;
 
-import net.caffeinemc.mods.sodium.client.compatibility.environment.OsUtils;
+import net.minecraft.client.renderer.sodium.compatibility.environment.OsUtils;
 import net.minecraft.client.renderer.gl.advanced.array.GlVertexArray;
 import net.minecraft.client.renderer.gl.advanced.buffer.*;
 import net.minecraft.client.renderer.gl.advanced.functions.DeviceFunctions;

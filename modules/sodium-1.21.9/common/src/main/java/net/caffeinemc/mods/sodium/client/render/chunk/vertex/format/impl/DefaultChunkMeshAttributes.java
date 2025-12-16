@@ -1,7 +1,7 @@
 package net.minecraft.client.renderer.chunk.advanced.vertex.format.impl;
 
 import net.minecraft.client.renderer.gl.advanced.attribute.GlVertexAttributeFormat;
-import net.caffeinemc.mods.sodium.client.render.vertex.VertexFormatAttribute;
+import net.minecraft.client.renderer.sodium.render.vertex.VertexFormatAttribute;
 
 public class DefaultChunkMeshAttributes {
     public static final VertexFormatAttribute POSITION = new VertexFormatAttribute("POSITION", GlVertexAttributeFormat.UNSIGNED_INT, 2, false, true);

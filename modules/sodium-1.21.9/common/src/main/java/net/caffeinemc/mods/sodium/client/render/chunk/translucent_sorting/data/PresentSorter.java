@@ -1,6 +1,6 @@
 package net.minecraft.client.renderer.chunk.advanced.translucent_sorting.data;
 
-import net.caffeinemc.mods.sodium.client.util.NativeBuffer;
+import net.minecraft.client.renderer.sodium.util.NativeBuffer;
 
 public abstract class PresentSorter implements Sorter {
     private NativeBuffer indexBuffer;

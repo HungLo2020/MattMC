@@ -1,11 +1,11 @@
-package net.caffeinemc.mods.sodium.client.compatibility.workarounds.nvidia;
+package net.minecraft.client.renderer.sodium.compatibility.workarounds.nvidia;
 
-import net.caffeinemc.mods.sodium.client.compatibility.environment.GlContextInfo;
-import net.caffeinemc.mods.sodium.client.compatibility.environment.OsUtils;
-import net.caffeinemc.mods.sodium.client.compatibility.environment.OsUtils.OperatingSystem;
-import net.caffeinemc.mods.sodium.client.compatibility.environment.probe.GraphicsAdapterProbe;
-import net.caffeinemc.mods.sodium.client.compatibility.environment.probe.GraphicsAdapterVendor;
-import net.caffeinemc.mods.sodium.client.compatibility.workarounds.Workarounds;
+import net.minecraft.client.renderer.sodium.compatibility.environment.GlContextInfo;
+import net.minecraft.client.renderer.sodium.compatibility.environment.OsUtils;
+import net.minecraft.client.renderer.sodium.compatibility.environment.OsUtils.OperatingSystem;
+import net.minecraft.client.renderer.sodium.compatibility.environment.probe.GraphicsAdapterProbe;
+import net.minecraft.client.renderer.sodium.compatibility.environment.probe.GraphicsAdapterVendor;
+import net.minecraft.client.renderer.sodium.compatibility.workarounds.Workarounds;
 import net.caffeinemc.mods.sodium.client.platform.unix.Libc;
 import net.caffeinemc.mods.sodium.client.platform.windows.WindowsCommandLine;
 import net.caffeinemc.mods.sodium.client.platform.windows.WindowsFileVersion;

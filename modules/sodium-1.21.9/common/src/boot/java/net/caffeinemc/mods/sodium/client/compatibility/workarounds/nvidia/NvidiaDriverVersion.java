@@ -1,4 +1,4 @@
-package net.caffeinemc.mods.sodium.client.compatibility.workarounds.nvidia;
+package net.minecraft.client.renderer.sodium.compatibility.workarounds.nvidia;
 
 import net.caffeinemc.mods.sodium.client.platform.windows.WindowsFileVersion;
 

@@ -7,14 +7,14 @@ import net.minecraft.client.renderer.gl.advanced.buffer.GlBuffer;
 import net.minecraft.client.renderer.gl.advanced.device.CommandList;
 import net.minecraft.client.renderer.gl.advanced.device.MultiDrawBatch;
 import net.minecraft.client.renderer.gl.advanced.tessellation.GlTessellation;
-import net.caffeinemc.mods.sodium.client.model.quad.properties.ModelQuadFacing;
+import net.minecraft.client.renderer.sodium.model.quad.properties.ModelQuadFacing;
 import net.minecraft.client.renderer.chunk.advanced.RenderSection;
 import net.minecraft.client.renderer.chunk.advanced.data.SectionRenderDataStorage;
 import net.minecraft.client.renderer.chunk.advanced.lists.ChunkRenderList;
 import net.minecraft.client.renderer.chunk.advanced.terrain.DefaultTerrainRenderPasses;
 import net.minecraft.client.renderer.chunk.advanced.terrain.TerrainRenderPass;
 import net.minecraft.client.renderer.chunk.advanced.vertex.format.ChunkMeshFormats;
-import net.caffeinemc.mods.sodium.client.util.MathUtil;
+import net.minecraft.client.renderer.sodium.util.MathUtil;
 import net.minecraft.core.SectionPos;
 import org.apache.commons.lang3.Validate;
 

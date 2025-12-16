@@ -1,7 +1,7 @@
-package net.caffeinemc.mods.sodium.client.compatibility.workarounds.intel;
+package net.minecraft.client.renderer.sodium.compatibility.workarounds.intel;
 
-import net.caffeinemc.mods.sodium.client.compatibility.environment.OsUtils;
-import net.caffeinemc.mods.sodium.client.compatibility.environment.probe.GraphicsAdapterProbe;
+import net.minecraft.client.renderer.sodium.compatibility.environment.OsUtils;
+import net.minecraft.client.renderer.sodium.compatibility.environment.probe.GraphicsAdapterProbe;
 import net.caffeinemc.mods.sodium.client.platform.windows.WindowsFileVersion;
 import net.caffeinemc.mods.sodium.client.platform.windows.api.d3dkmt.D3DKMT;
 import org.jetbrains.annotations.Nullable;

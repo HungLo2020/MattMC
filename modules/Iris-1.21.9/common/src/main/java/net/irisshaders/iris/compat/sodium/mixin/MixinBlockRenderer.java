@@ -7,7 +7,7 @@ import net.minecraft.client.renderer.chunk.advanced.compile.pipeline.BlockRender
 import net.minecraft.client.renderer.chunk.advanced.terrain.TerrainRenderPass;
 import net.minecraft.client.renderer.chunk.advanced.terrain.material.Material;
 import net.minecraft.client.renderer.chunk.advanced.vertex.format.ChunkVertexEncoder;
-import net.caffeinemc.mods.sodium.client.render.frapi.mesh.MutableQuadViewImpl;
+import net.minecraft.client.renderer.sodium.render.frapi.mesh.MutableQuadViewImpl;
 import net.irisshaders.iris.shaderpack.materialmap.WorldRenderingSettings;
 import net.irisshaders.iris.vertices.sodium.terrain.ChunkVertexExtension;
 import net.irisshaders.iris.vertices.sodium.terrain.VertexEncoderInterface;

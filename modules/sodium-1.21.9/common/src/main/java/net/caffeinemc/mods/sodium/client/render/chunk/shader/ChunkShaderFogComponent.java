@@ -5,7 +5,7 @@ import net.minecraft.client.renderer.gl.advanced.shader.uniform.GlUniformFloat;
 import net.minecraft.client.renderer.gl.advanced.shader.uniform.GlUniformFloat2v;
 import net.minecraft.client.renderer.gl.advanced.shader.uniform.GlUniformFloat4v;
 import net.minecraft.client.renderer.gl.advanced.shader.uniform.GlUniformInt;
-import net.caffeinemc.mods.sodium.client.util.FogParameters;
+import net.minecraft.client.renderer.sodium.util.FogParameters;
 
 /**
  * These shader implementations try to remain compatible with the deprecated fixed function pipeline by manually

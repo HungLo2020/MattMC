@@ -1,7 +1,7 @@
 package net.caffeinemc.mods.sodium.mixin.platform.neoforge;
 
-import net.caffeinemc.mods.sodium.client.render.frapi.render.AbstractBlockRenderContext;
-import net.caffeinemc.mods.sodium.client.services.SodiumModelData;
+import net.minecraft.client.renderer.sodium.render.frapi.render.AbstractBlockRenderContext;
+import net.minecraft.client.renderer.sodium.services.SodiumModelData;
 import net.fabricmc.fabric.api.renderer.v1.mesh.QuadEmitter;
 import net.minecraft.client.renderer.RenderType;
 import org.spongepowered.asm.mixin.Mixin;

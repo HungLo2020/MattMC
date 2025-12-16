@@ -7,7 +7,7 @@ import net.minecraft.client.renderer.gl.advanced.device.RenderDevice;
 import net.minecraft.client.renderer.gl.advanced.functions.BufferStorageFunctions;
 import net.minecraft.client.renderer.gl.advanced.sync.GlFence;
 import net.minecraft.client.renderer.gl.advanced.util.EnumBitField;
-import net.caffeinemc.mods.sodium.client.util.MathUtil;
+import net.minecraft.client.renderer.sodium.util.MathUtil;
 import net.minecraft.client.renderer.gl.advanced.buffer.*;
 
 import java.nio.ByteBuffer;

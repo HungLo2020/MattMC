@@ -1,9 +1,9 @@
 package net.caffeinemc.mods.sodium.neoforge.render;
 
-import net.caffeinemc.mods.sodium.client.model.color.ColorProvider;
-import net.caffeinemc.mods.sodium.client.model.color.ColorProviderRegistry;
-import net.caffeinemc.mods.sodium.client.model.light.LightPipelineProvider;
-import net.caffeinemc.mods.sodium.client.model.quad.blender.BlendedColorProvider;
+import net.minecraft.client.renderer.sodium.model.color.ColorProvider;
+import net.minecraft.client.renderer.sodium.model.color.ColorProviderRegistry;
+import net.minecraft.client.renderer.sodium.model.light.LightPipelineProvider;
+import net.minecraft.client.renderer.sodium.model.quad.blender.BlendedColorProvider;
 import net.minecraft.client.renderer.chunk.advanced.compile.ChunkBuildBuffers;
 import net.minecraft.client.renderer.chunk.advanced.compile.buffers.ChunkModelBuilder;
 import net.minecraft.client.renderer.chunk.advanced.compile.pipeline.DefaultFluidRenderer;
@@ -11,8 +11,8 @@ import net.minecraft.client.renderer.chunk.advanced.compile.pipeline.FluidRender
 import net.minecraft.client.renderer.chunk.advanced.terrain.material.DefaultMaterials;
 import net.minecraft.client.renderer.chunk.advanced.terrain.material.Material;
 import net.minecraft.client.renderer.chunk.advanced.translucent_sorting.TranslucentGeometryCollector;
-import net.caffeinemc.mods.sodium.client.services.FluidRendererFactory;
-import net.caffeinemc.mods.sodium.client.world.LevelSlice;
+import net.minecraft.client.renderer.sodium.services.FluidRendererFactory;
+import net.minecraft.client.renderer.sodium.world.LevelSlice;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.material.Fluid;

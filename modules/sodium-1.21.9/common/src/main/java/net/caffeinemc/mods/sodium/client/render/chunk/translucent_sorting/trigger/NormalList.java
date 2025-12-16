@@ -5,12 +5,12 @@ import it.unimi.dsi.fastutil.longs.Long2ReferenceOpenHashMap;
 import it.unimi.dsi.fastutil.objects.Object2ReferenceOpenHashMap;
 import it.unimi.dsi.fastutil.objects.ReferenceArraySet;
 import it.unimi.dsi.fastutil.objects.ReferenceLinkedOpenHashSet;
-import net.caffeinemc.mods.sodium.client.model.quad.properties.ModelQuadFacing;
-import net.caffeinemc.mods.sodium.client.util.MathUtil;
-import net.caffeinemc.mods.sodium.client.util.interval_tree.DoubleInterval;
-import net.caffeinemc.mods.sodium.client.util.interval_tree.Interval;
-import net.caffeinemc.mods.sodium.client.util.interval_tree.Interval.Bounded;
-import net.caffeinemc.mods.sodium.client.util.interval_tree.IntervalTree;
+import net.minecraft.client.renderer.sodium.model.quad.properties.ModelQuadFacing;
+import net.minecraft.client.renderer.sodium.util.MathUtil;
+import net.minecraft.client.renderer.sodium.util.interval_tree.DoubleInterval;
+import net.minecraft.client.renderer.sodium.util.interval_tree.Interval;
+import net.minecraft.client.renderer.sodium.util.interval_tree.Interval.Bounded;
+import net.minecraft.client.renderer.sodium.util.interval_tree.IntervalTree;
 import org.joml.Vector3dc;
 import org.joml.Vector3fc;
 

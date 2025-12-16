@@ -1,7 +1,7 @@
 package net.caffeinemc.mods.sodium.client.platform.windows.api.d3dkmt;
 
-import net.caffeinemc.mods.sodium.client.compatibility.environment.probe.GraphicsAdapterInfo;
-import net.caffeinemc.mods.sodium.client.compatibility.environment.probe.GraphicsAdapterVendor;
+import net.minecraft.client.renderer.sodium.compatibility.environment.probe.GraphicsAdapterInfo;
+import net.minecraft.client.renderer.sodium.compatibility.environment.probe.GraphicsAdapterVendor;
 import net.caffeinemc.mods.sodium.client.platform.windows.WindowsFileVersion;
 import net.caffeinemc.mods.sodium.client.platform.windows.api.Gdi32;
 import net.caffeinemc.mods.sodium.client.platform.windows.api.version.Version;

@@ -1,7 +1,7 @@
 package net.minecraft.client.renderer.chunk.advanced.translucent_sorting.trigger;
 
 import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
-import net.caffeinemc.mods.sodium.client.SodiumClientMod;
+import net.minecraft.client.renderer.sodium.SodiumClientMod;
 import net.minecraft.client.renderer.chunk.advanced.translucent_sorting.SortBehavior;
 import net.minecraft.client.renderer.chunk.advanced.translucent_sorting.SortType;
 import net.minecraft.client.renderer.chunk.advanced.translucent_sorting.data.DynamicData;

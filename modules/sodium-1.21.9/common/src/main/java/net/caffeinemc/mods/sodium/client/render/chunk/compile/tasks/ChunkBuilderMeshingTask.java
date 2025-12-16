@@ -21,10 +21,10 @@ import net.minecraft.client.renderer.chunk.advanced.translucent_sorting.Transluc
 import net.minecraft.client.renderer.chunk.advanced.translucent_sorting.data.DynamicData;
 import net.minecraft.client.renderer.chunk.advanced.translucent_sorting.data.PresentTranslucentData;
 import net.minecraft.client.renderer.chunk.advanced.translucent_sorting.data.TranslucentData;
-import net.caffeinemc.mods.sodium.client.services.PlatformLevelRenderHooks;
-import net.caffeinemc.mods.sodium.client.util.task.CancellationToken;
-import net.caffeinemc.mods.sodium.client.world.LevelSlice;
-import net.caffeinemc.mods.sodium.client.world.cloned.ChunkRenderContext;
+import net.minecraft.client.renderer.sodium.services.PlatformLevelRenderHooks;
+import net.minecraft.client.renderer.sodium.util.task.CancellationToken;
+import net.minecraft.client.renderer.sodium.world.LevelSlice;
+import net.minecraft.client.renderer.sodium.world.cloned.ChunkRenderContext;
 import net.minecraft.CrashReport;
 import net.minecraft.CrashReportCategory;
 import net.minecraft.ReportedException;

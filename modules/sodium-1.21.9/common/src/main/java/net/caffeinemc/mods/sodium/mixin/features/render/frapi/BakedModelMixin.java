@@ -1,8 +1,8 @@
 package net.caffeinemc.mods.sodium.mixin.features.render.frapi;
 
-import net.caffeinemc.mods.sodium.client.render.frapi.render.AbstractBlockRenderContext;
-import net.caffeinemc.mods.sodium.client.render.frapi.render.ItemRenderContext;
-import net.caffeinemc.mods.sodium.client.services.PlatformModelAccess;
+import net.minecraft.client.renderer.sodium.render.frapi.render.AbstractBlockRenderContext;
+import net.minecraft.client.renderer.sodium.render.frapi.render.ItemRenderContext;
+import net.minecraft.client.renderer.sodium.services.PlatformModelAccess;
 import net.fabricmc.fabric.api.renderer.v1.mesh.QuadEmitter;
 import net.fabricmc.fabric.api.renderer.v1.model.FabricBlockModelPart;
 import net.fabricmc.fabric.api.renderer.v1.model.FabricBlockStateModel;

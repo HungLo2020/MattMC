@@ -1,7 +1,7 @@
 package net.minecraft.client.renderer.chunk.advanced.compile.buffers;
 
 import com.mojang.blaze3d.vertex.VertexConsumer;
-import net.caffeinemc.mods.sodium.client.model.quad.properties.ModelQuadFacing;
+import net.minecraft.client.renderer.sodium.model.quad.properties.ModelQuadFacing;
 import net.minecraft.client.renderer.chunk.advanced.data.BuiltSectionInfo;
 import net.minecraft.client.renderer.chunk.advanced.terrain.material.Material;
 import net.minecraft.client.renderer.chunk.advanced.translucent_sorting.TranslucentGeometryCollector;

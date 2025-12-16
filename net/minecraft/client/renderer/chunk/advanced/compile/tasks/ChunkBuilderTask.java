@@ -11,7 +11,7 @@ import net.minecraft.client.renderer.chunk.advanced.RenderSection;
 import net.minecraft.client.renderer.chunk.advanced.compile.BuilderTaskOutput;
 import net.minecraft.client.renderer.chunk.advanced.compile.ChunkBuildContext;
 import net.minecraft.client.renderer.chunk.advanced.translucent_sorting.data.CombinedCameraPos;
-import net.caffeinemc.mods.sodium.client.util.task.CancellationToken;
+import net.minecraft.client.renderer.sodium.util.task.CancellationToken;
 
 /**
  * Build tasks are immutable jobs (with optional prioritization) which contain all the necessary state to perform

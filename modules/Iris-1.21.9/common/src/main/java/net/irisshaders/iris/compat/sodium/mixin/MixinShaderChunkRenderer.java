@@ -11,7 +11,7 @@ import net.minecraft.client.renderer.chunk.advanced.ShaderChunkRenderer;
 import net.minecraft.client.renderer.chunk.advanced.shader.ChunkShaderInterface;
 import net.minecraft.client.renderer.chunk.advanced.shader.ChunkShaderOptions;
 import net.minecraft.client.renderer.chunk.advanced.terrain.TerrainRenderPass;
-import net.caffeinemc.mods.sodium.client.util.FogParameters;
+import net.minecraft.client.renderer.sodium.util.FogParameters;
 import net.irisshaders.iris.Iris;
 import net.irisshaders.iris.gl.blending.BlendModeOverride;
 import net.irisshaders.iris.pipeline.IrisRenderingPipeline;

@@ -3,7 +3,7 @@ package net.minecraft.client.renderer.gl.advanced.attribute;
 import it.unimi.dsi.fastutil.objects.Object2IntArrayMap;
 import it.unimi.dsi.fastutil.objects.Object2IntMap;
 import it.unimi.dsi.fastutil.objects.Object2ObjectArrayMap;
-import net.caffeinemc.mods.sodium.client.render.vertex.VertexFormatAttribute;
+import net.minecraft.client.renderer.sodium.render.vertex.VertexFormatAttribute;
 
 import java.util.EnumMap;
 import java.util.Map;

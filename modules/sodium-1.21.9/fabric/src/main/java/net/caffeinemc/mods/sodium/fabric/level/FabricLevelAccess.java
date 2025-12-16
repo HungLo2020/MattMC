@@ -1,12 +1,12 @@
 package net.caffeinemc.mods.sodium.fabric.level;
 
 import com.mojang.blaze3d.vertex.VertexConsumer;
-import net.caffeinemc.mods.sodium.client.model.color.ColorProviderRegistry;
-import net.caffeinemc.mods.sodium.client.model.light.LightPipelineProvider;
+import net.minecraft.client.renderer.sodium.model.color.ColorProviderRegistry;
+import net.minecraft.client.renderer.sodium.model.light.LightPipelineProvider;
 import net.minecraft.client.renderer.chunk.advanced.compile.pipeline.FluidRenderer;
-import net.caffeinemc.mods.sodium.client.services.PlatformLevelAccess;
-import net.caffeinemc.mods.sodium.client.world.LevelSlice;
-import net.caffeinemc.mods.sodium.client.world.SodiumAuxiliaryLightManager;
+import net.minecraft.client.renderer.sodium.services.PlatformLevelAccess;
+import net.minecraft.client.renderer.sodium.world.LevelSlice;
+import net.minecraft.client.renderer.sodium.world.SodiumAuxiliaryLightManager;
 import net.caffeinemc.mods.sodium.fabric.render.FluidRendererImpl;
 import net.minecraft.client.Camera;
 import net.minecraft.client.renderer.LevelRenderer;

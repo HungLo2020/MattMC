@@ -1,7 +1,7 @@
 package net.minecraft.client.renderer.gl.advanced.shader;
 
 import com.google.common.base.Objects;
-import net.caffeinemc.mods.sodium.client.services.PlatformRuntimeInformation;
+import net.minecraft.client.renderer.sodium.services.PlatformRuntimeInformation;
 import org.apache.commons.io.IOUtils;
 
 import java.io.IOException;
