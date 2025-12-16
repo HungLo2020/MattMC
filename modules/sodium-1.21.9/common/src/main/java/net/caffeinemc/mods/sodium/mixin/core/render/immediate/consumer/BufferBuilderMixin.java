@@ -6,7 +6,7 @@ import com.mojang.blaze3d.vertex.VertexFormat;
 import net.minecraft.client.renderer.advanced.memory.MemoryIntrinsics;
 import net.minecraft.client.renderer.advanced.vertex.buffer.VertexBufferWriter;
 import net.minecraft.client.renderer.advanced.vertex.serializer.VertexSerializerRegistry;
-import net.caffeinemc.mods.sodium.client.render.vertex.buffer.BufferBuilderExtension;
+import net.minecraft.client.renderer.vertex.advanced.buffer.BufferBuilderExtension;
 import org.lwjgl.system.MemoryStack;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;

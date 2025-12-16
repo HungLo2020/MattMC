@@ -2,9 +2,9 @@ package net.caffeinemc.mods.sodium.mixin.features.render.gui.outlines;
 
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
-import net.caffeinemc.mods.sodium.client.render.vertex.VertexConsumerUtils;
+import net.minecraft.client.renderer.vertex.advanced.VertexConsumerUtils;
 import net.minecraft.client.renderer.advanced.vertex.format.common.LineVertex;
-import net.caffeinemc.mods.sodium.client.render.vertex.buffer.BufferBuilderExtension;
+import net.minecraft.client.renderer.vertex.advanced.buffer.BufferBuilderExtension;
 import net.minecraft.client.renderer.LevelRenderer;
 import net.minecraft.client.renderer.advanced.vertex.buffer.VertexBufferWriter;
 import net.minecraft.client.renderer.advanced.util.NormI8;

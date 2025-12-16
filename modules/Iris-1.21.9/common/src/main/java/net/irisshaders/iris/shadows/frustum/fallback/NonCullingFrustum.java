@@ -1,7 +1,7 @@
 package net.irisshaders.iris.shadows.frustum.fallback;
 
-import net.caffeinemc.mods.sodium.client.render.viewport.Viewport;
-import net.caffeinemc.mods.sodium.client.render.viewport.ViewportProvider;
+import net.minecraft.client.renderer.sodium.viewport.Viewport;
+import net.minecraft.client.renderer.sodium.viewport.ViewportProvider;
 import net.minecraft.client.renderer.culling.Frustum;
 import net.minecraft.world.level.levelgen.structure.BoundingBox;
 import net.minecraft.world.phys.AABB;
@@ -9,7 +9,7 @@ import org.joml.FrustumIntersection;
 import org.joml.Matrix4f;
 import org.joml.Vector3d;
 
-public class NonCullingFrustum extends Frustum implements ViewportProvider, net.caffeinemc.mods.sodium.client.render.viewport.frustum.Frustum {
+public class NonCullingFrustum extends Frustum implements ViewportProvider, net.minecraft.client.renderer.sodium.render.viewport.frustum.Frustum {
 	private final Vector3d position = new Vector3d();
 
 	public NonCullingFrustum() {
