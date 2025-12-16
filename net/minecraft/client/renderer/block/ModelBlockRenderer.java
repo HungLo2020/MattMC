@@ -14,6 +14,7 @@ import net.minecraft.Util;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.color.block.BlockColors;
 import net.minecraft.client.renderer.LevelRenderer;
+import net.minecraft.client.renderer.advanced.AdvancedRenderingConfig;
 import net.minecraft.client.renderer.block.model.BakedQuad;
 import net.minecraft.client.renderer.block.model.BlockModelPart;
 import net.minecraft.client.renderer.block.model.BlockStateModel;
@@ -38,7 +39,83 @@ public class ModelBlockRenderer {
 		this.blockColors = blockColors;
 	}
 
+	// ===== BEGIN SODIUM MODEL RENDERING INTEGRATION =====
+	// Originally from: sodium.mixin.core.render.BlockModelRendererMixin
+	// Step 11: Inline Block Model Rendering Mixins
+	
+	/**
+	 * Main entry point for block tessellation with Sodium optimization support.
+	 * Routes to either Sodium's optimized path or vanilla path based on configuration.
+	 * 
+	 * @param blockAndTintGetter The level containing the block
+	 * @param list List of block model parts to tessellate
+	 * @param blockState The block state being rendered
+	 * @param blockPos Position of the block
+	 * @param poseStack Transformation matrix stack
+	 * @param vertexConsumer Consumer for generated vertices
+	 * @param bl Whether to check occlusion
+	 * @param i Overlay UV coordinates
+	 */
 	public void tesselateBlock(
+		BlockAndTintGetter blockAndTintGetter,
+		List<BlockModelPart> list,
+		BlockState blockState,
+		BlockPos blockPos,
+		PoseStack poseStack,
+		VertexConsumer vertexConsumer,
+		boolean bl,
+		int i
+	) {
+		if (AdvancedRenderingConfig.isEnabled()) {
+			tesselateBlockSodium(blockAndTintGetter, list, blockState, blockPos, poseStack, vertexConsumer, bl, i);
+		} else {
+			tesselateBlockVanilla(blockAndTintGetter, list, blockState, blockPos, poseStack, vertexConsumer, bl, i);
+		}
+	}
+	
+	/**
+	 * Sodium's optimized block tessellation path.
+	 * Placeholder for future Sodium implementation (Phase 3).
+	 * Currently delegates to vanilla path until Sodium rendering code is migrated.
+	 * 
+	 * @param blockAndTintGetter The level containing the block
+	 * @param list List of block model parts to tessellate
+	 * @param blockState The block state being rendered
+	 * @param blockPos Position of the block
+	 * @param poseStack Transformation matrix stack
+	 * @param vertexConsumer Consumer for generated vertices
+	 * @param bl Whether to check occlusion
+	 * @param i Overlay UV coordinates
+	 */
+	private void tesselateBlockSodium(
+		BlockAndTintGetter blockAndTintGetter,
+		List<BlockModelPart> list,
+		BlockState blockState,
+		BlockPos blockPos,
+		PoseStack poseStack,
+		VertexConsumer vertexConsumer,
+		boolean bl,
+		int i
+	) {
+		// Placeholder - actual Sodium implementation will be added in Phase 3
+		// For now, delegate to vanilla path to maintain functionality
+		tesselateBlockVanilla(blockAndTintGetter, list, blockState, blockPos, poseStack, vertexConsumer, bl, i);
+	}
+	
+	/**
+	 * Vanilla block tessellation path (original Minecraft implementation).
+	 * This method contains all the original tessellation logic.
+	 * 
+	 * @param blockAndTintGetter The level containing the block
+	 * @param list List of block model parts to tessellate
+	 * @param blockState The block state being rendered
+	 * @param blockPos Position of the block
+	 * @param poseStack Transformation matrix stack
+	 * @param vertexConsumer Consumer for generated vertices
+	 * @param bl Whether to check occlusion
+	 * @param i Overlay UV coordinates
+	 */
+	private void tesselateBlockVanilla(
 		BlockAndTintGetter blockAndTintGetter,
 		List<BlockModelPart> list,
 		BlockState blockState,
@@ -67,6 +144,7 @@ public class ModelBlockRenderer {
 			}
 		}
 	}
+	// ===== END SODIUM MODEL RENDERING INTEGRATION =====
 
 	private static boolean shouldRenderFace(BlockAndTintGetter blockAndTintGetter, BlockState blockState, boolean bl, Direction direction, BlockPos blockPos) {
 		if (!bl) {
