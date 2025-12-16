@@ -108,7 +108,7 @@ import org.joml.Vector4f;
 import org.slf4j.Logger;
 
 @Environment(EnvType.CLIENT)
-public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseable {
+public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseable, net.minecraft.client.renderer.sodium.world.LevelRendererExtension {
 	private static final Logger LOGGER = LogUtils.getLogger();
 	private static final ResourceLocation TRANSPARENCY_POST_CHAIN_ID = ResourceLocation.withDefaultNamespace("transparency");
 	private static final ResourceLocation ENTITY_OUTLINE_POST_CHAIN_ID = ResourceLocation.withDefaultNamespace("entity_outline");
@@ -166,6 +166,11 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 	private net.minecraft.client.renderer.advanced.chunk.ChunkRenderer sodiumChunkRenderer;
 	private net.minecraft.client.renderer.advanced.chunk.ChunkRenderer activeChunkRenderer;
 	// ===== END ADVANCED RENDERING INTEGRATION =====
+	
+	// ===== BEGIN SODIUM INTEGRATION (LevelRendererExtension) =====
+	private net.minecraft.client.renderer.sodium.render.SodiumWorldRenderer sodium$worldRenderer;
+	private net.minecraft.client.renderer.chunk.advanced.ChunkRenderMatrices sodium$matrices;
+	// ===== END SODIUM INTEGRATION =====
 
 	public LevelRenderer(
 		Minecraft minecraft,
@@ -1585,4 +1590,21 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 	public void iris$renderAllFeaturesParticles() {
 		this.featureRenderDispatcher.renderAllFeatures();
 	}
+	
+	// ===== BEGIN SODIUM INTEGRATION (LevelRendererExtension implementation) =====
+	@Override
+	public net.minecraft.client.renderer.sodium.render.SodiumWorldRenderer sodium$getWorldRenderer() {
+		return this.sodium$worldRenderer;
+	}
+	
+	@Override
+	public void sodium$setMatrices(net.minecraft.client.renderer.chunk.advanced.ChunkRenderMatrices matrices) {
+		this.sodium$matrices = matrices;
+	}
+	
+	@Override
+	public net.minecraft.client.renderer.chunk.advanced.ChunkRenderMatrices sodium$getMatrices() {
+		return this.sodium$matrices;
+	}
+	// ===== END SODIUM INTEGRATION =====
 }
