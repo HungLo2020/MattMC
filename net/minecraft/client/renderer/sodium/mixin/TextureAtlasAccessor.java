@@ -12,4 +12,6 @@ import java.util.List;
  */
 public interface TextureAtlasAccessor {
     List<SpriteContents> sodium$getAllSprites();
+    int getWidth();
+    int getHeight();
 }

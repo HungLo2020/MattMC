@@ -8,4 +8,5 @@ package net.minecraft.client.renderer.sodium.mixin;
  */
 public interface NativeImageAccessor {
     long sodium$getPointer();
+    long getPixels();
 }

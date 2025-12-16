@@ -7,7 +7,7 @@ import net.minecraft.client.renderer.sodium.data.fingerprint.HashedFingerprint;
 import net.minecraft.client.renderer.sodium.gui.SodiumDebugEntry;
 import net.minecraft.client.renderer.sodium.gui.SodiumGameOptions;
 import net.minecraft.client.renderer.sodium.services.PlatformRuntimeInformation;
-import net.caffeinemc.mods.sodium.mixin.features.gui.hooks.debug.DebugScreenEntriesAccessor;
+import net.minecraft.client.renderer.sodium.mixin.features.gui.hooks.debug.DebugScreenEntriesAccessor;
 import net.minecraft.client.gui.components.debug.DebugScreenEntries;
 import net.minecraft.resources.ResourceLocation;
 import org.slf4j.Logger;
