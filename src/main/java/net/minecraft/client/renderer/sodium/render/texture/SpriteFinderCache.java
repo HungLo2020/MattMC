@@ -1,4 +1,4 @@
-package net.minecraft.client.renderer.sodium.render.texture;
+package net.caffeinemc.mods.sodium.client.render.texture;
 
 import net.fabricmc.fabric.api.renderer.v1.model.SpriteFinder;
 import net.minecraft.client.Minecraft;

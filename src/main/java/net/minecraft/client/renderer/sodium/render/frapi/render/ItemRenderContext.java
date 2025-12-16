@@ -18,8 +18,6 @@ package net.minecraft.client.renderer.sodium.render.frapi.render;
 
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
-import com.mojang.blaze3d.vertex.VertexMultiConsumer;
-import com.mojang.blaze3d.vertex.SheetedDecalTextureGenerator;
 import com.mojang.math.MatrixUtil;
 import net.minecraft.client.renderer.advanced.texture.SpriteUtil;
 import net.minecraft.client.renderer.advanced.util.ColorMixer;
@@ -29,6 +27,7 @@ import net.minecraft.client.renderer.sodium.render.frapi.mesh.EncodingFormat;
 import net.minecraft.client.renderer.sodium.render.frapi.mesh.MeshViewImpl;
 import net.minecraft.client.renderer.sodium.render.frapi.mesh.MutableQuadViewImpl;
 import net.minecraft.client.renderer.sodium.render.texture.SpriteFinderCache;
+import net.caffeinemc.mods.sodium.mixin.features.render.frapi.ItemRendererAccessor;
 import net.fabricmc.fabric.api.renderer.v1.mesh.MeshView;
 import net.fabricmc.fabric.api.renderer.v1.mesh.QuadEmitter;
 import net.fabricmc.fabric.api.renderer.v1.render.RenderLayerHelper;
@@ -249,15 +248,7 @@ public class ItemRenderContext extends AbstractRenderContext {
                 }
             }
 
-            // Inlined from ItemRenderer.getSpecialFoilBuffer (was private static method)
-            return VertexMultiConsumer.create(
-                new SheetedDecalTextureGenerator(
-                    bufferSource.getBuffer(ItemRenderer.useTransparentGlint(type) ? RenderType.glintTranslucent() : RenderType.glint()), 
-                    specialGlintEntry, 
-                    0.0078125F
-                ),
-                bufferSource.getBuffer(type)
-            );
+            return ItemRendererAccessor.sodium$getSpecialFoilBuffer(bufferSource, type, specialGlintEntry);
         }
 
         return ItemRenderer.getFoilBuffer(bufferSource, type, true, glint != ItemStackRenderState.FoilType.NONE);

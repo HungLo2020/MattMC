@@ -1,4 +1,4 @@
-package net.minecraft.client.renderer.sodium.render.viewport;
+package net.caffeinemc.mods.sodium.client.render.viewport;
 
 import net.minecraft.client.renderer.sodium.render.viewport.frustum.Frustum;
 import net.minecraft.core.BlockPos;
