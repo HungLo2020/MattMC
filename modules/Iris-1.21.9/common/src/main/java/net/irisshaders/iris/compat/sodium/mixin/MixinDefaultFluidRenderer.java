@@ -24,9 +24,9 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 public class MixinDefaultFluidRenderer implements VertexEncoderInterface {
 	@ModifyArg(method = "render", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/renderer/chunk/advanced/compile/" +
 		"pipeline/DefaultFluidRenderer;updateQuad(Lnet/minecraft/client/renderer/sodium/model/quad/ModelQuadViewMutable;" +
-		"Lnet/minecraft/client/renderer/sodium/world/LevelSlice;Lnet/minecraft/core/BlockPos;Lnet/caffeinemc/" +
-		"mods/sodium/client/model/light/LightPipeline;Lnet/minecraft/core/Direction;Lnet/caffeinemc/mods/" +
-		"sodium/client/model/quad/properties/ModelQuadFacing" +
+		"Lnet/minecraft/client/renderer/sodium/world/LevelSlice;Lnet/minecraft/core/BlockPos;Lnet/minecraft/" +
+		"client/renderer/sodium/model/light/LightPipeline;Lnet/minecraft/core/Direction;Lnet/minecraft/client/renderer/" +
+		"sodium/model/quad/properties/ModelQuadFacing" +
 		";FLnet/minecraft/client/renderer/sodium/model/color/ColorProvider;Lnet/minecraft/world/level/material/FluidState;)V", ordinal = 2))
 	private float setBrightness(float br) {
 		return WorldRenderingSettings.INSTANCE.shouldDisableDirectionalShading() ? 1.0f : br;
