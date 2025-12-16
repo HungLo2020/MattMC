@@ -1,6 +1,6 @@
 package net.irisshaders.iris.vertices.sodium.terrain;
 
-import net.caffeinemc.mods.sodium.client.gl.attribute.GlVertexAttributeFormat;
+import net.minecraft.client.renderer.gl.advanced.attribute.GlVertexAttributeFormat;
 import net.caffeinemc.mods.sodium.client.render.vertex.VertexFormatAttribute;
 
 public class IrisChunkMeshAttributes {

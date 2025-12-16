@@ -1,8 +1,8 @@
 package net.caffeinemc.mods.sodium.client.render.chunk;
 
-import net.caffeinemc.mods.sodium.client.gl.device.CommandList;
-import net.caffeinemc.mods.sodium.client.render.chunk.lists.ChunkRenderListIterable;
-import net.caffeinemc.mods.sodium.client.render.chunk.terrain.TerrainRenderPass;
+import net.minecraft.client.renderer.gl.advanced.device.CommandList;
+import net.minecraft.client.renderer.chunk.advanced.lists.ChunkRenderListIterable;
+import net.minecraft.client.renderer.chunk.advanced.terrain.TerrainRenderPass;
 import net.caffeinemc.mods.sodium.client.render.viewport.CameraTransform;
 import net.caffeinemc.mods.sodium.client.util.FogParameters;
 

@@ -2,7 +2,7 @@ package net.irisshaders.iris.vertices.sodium.terrain;
 
 import net.minecraft.client.renderer.advanced.util.ColorABGR;
 import net.minecraft.client.renderer.advanced.util.ColorARGB;
-import net.caffeinemc.mods.sodium.client.render.chunk.vertex.format.ChunkVertexEncoder;
+import net.minecraft.client.renderer.chunk.advanced.vertex.format.ChunkVertexEncoder;
 import net.caffeinemc.mods.sodium.client.render.frapi.helper.ColorHelper;
 import net.irisshaders.iris.shaderpack.materialmap.WorldRenderingSettings;
 import net.irisshaders.iris.vertices.ExtendedDataHelper;
