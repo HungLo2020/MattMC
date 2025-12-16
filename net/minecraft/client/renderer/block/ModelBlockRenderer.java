@@ -39,6 +39,11 @@ public class ModelBlockRenderer {
 		this.blockColors = blockColors;
 	}
 
+	// Accessor for integrated Sodium code (was mixin accessor)
+	public BlockColors getBlockColors() {
+		return this.blockColors;
+	}
+
 	// ===== BEGIN SODIUM MODEL RENDERING INTEGRATION =====
 	// Originally from: sodium.mixin.core.render.BlockModelRendererMixin
 	// Step 11: Inline Block Model Rendering Mixins

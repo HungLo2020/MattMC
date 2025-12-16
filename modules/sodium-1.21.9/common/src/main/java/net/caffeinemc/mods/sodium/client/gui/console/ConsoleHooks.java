@@ -1,6 +1,6 @@
 package net.caffeinemc.mods.sodium.client.gui.console;
 
-import net.caffeinemc.mods.sodium.client.console.Console;
+import net.minecraft.client.renderer.sodium.console.Console;
 import net.minecraft.client.gui.GuiGraphics;
 
 public class ConsoleHooks {

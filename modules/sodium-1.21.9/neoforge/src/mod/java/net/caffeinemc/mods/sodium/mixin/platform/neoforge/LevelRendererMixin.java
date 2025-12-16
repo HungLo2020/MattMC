@@ -1,8 +1,8 @@
 package net.caffeinemc.mods.sodium.mixin.platform.neoforge;
 
 import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
-import net.caffeinemc.mods.sodium.client.render.SodiumWorldRenderer;
-import net.caffeinemc.mods.sodium.client.world.LevelRendererExtension;
+import net.minecraft.client.renderer.sodium.render.SodiumWorldRenderer;
+import net.minecraft.client.renderer.sodium.world.LevelRendererExtension;
 import net.minecraft.client.Camera;
 import net.minecraft.client.renderer.LevelRenderer;
 import net.minecraft.client.renderer.culling.Frustum;

@@ -1,6 +1,6 @@
 package net.caffeinemc.mods.sodium.mixin.platform.neoforge;
 
-import net.caffeinemc.mods.sodium.client.world.SodiumAuxiliaryLightManager;
+import net.minecraft.client.renderer.sodium.world.SodiumAuxiliaryLightManager;
 import net.neoforged.neoforge.common.world.AuxiliaryLightManager;
 import org.spongepowered.asm.mixin.Mixin;
 

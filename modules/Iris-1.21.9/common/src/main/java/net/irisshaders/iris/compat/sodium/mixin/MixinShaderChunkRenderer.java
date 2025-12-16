@@ -6,12 +6,12 @@ import com.mojang.blaze3d.opengl.GlStateManager;
 import com.mojang.blaze3d.opengl.GlTexture;
 import com.mojang.blaze3d.pipeline.RenderTarget;
 import com.mojang.blaze3d.systems.RenderSystem;
-import net.caffeinemc.mods.sodium.client.gl.shader.GlProgram;
-import net.caffeinemc.mods.sodium.client.render.chunk.ShaderChunkRenderer;
-import net.caffeinemc.mods.sodium.client.render.chunk.shader.ChunkShaderInterface;
-import net.caffeinemc.mods.sodium.client.render.chunk.shader.ChunkShaderOptions;
-import net.caffeinemc.mods.sodium.client.render.chunk.terrain.TerrainRenderPass;
-import net.caffeinemc.mods.sodium.client.util.FogParameters;
+import net.minecraft.client.renderer.gl.advanced.shader.GlProgram;
+import net.minecraft.client.renderer.chunk.advanced.ShaderChunkRenderer;
+import net.minecraft.client.renderer.chunk.advanced.shader.ChunkShaderInterface;
+import net.minecraft.client.renderer.chunk.advanced.shader.ChunkShaderOptions;
+import net.minecraft.client.renderer.chunk.advanced.terrain.TerrainRenderPass;
+import net.minecraft.client.renderer.sodium.util.FogParameters;
 import net.irisshaders.iris.Iris;
 import net.irisshaders.iris.gl.blending.BlendModeOverride;
 import net.irisshaders.iris.pipeline.IrisRenderingPipeline;
@@ -37,7 +37,7 @@ public abstract class MixinShaderChunkRenderer {
 	@Redirect(method = "begin", at = @At(value = "INVOKE", target = "Lcom/mojang/blaze3d/opengl/GlStateManager;_glBindFramebuffer(II)V"))
 	private void bindFramebufferLater(int p_412624_, int p_412635_) {}
 
-	@Redirect(method = "begin", at = @At(value = "INVOKE", target = "Lnet/caffeinemc/mods/sodium/client/render/chunk/ShaderChunkRenderer;compileProgram(Lnet/caffeinemc/mods/sodium/client/render/chunk/shader/ChunkShaderOptions;)Lnet/caffeinemc/mods/sodium/client/gl/shader/GlProgram;"))
+	@Redirect(method = "begin", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/renderer/chunk/advanced/ShaderChunkRenderer;compileProgram(Lnet/minecraft/client/renderer/chunk/advanced/shader/ChunkShaderOptions;)Lnet/minecraft/client/renderer/gl/advanced/shader/GlProgram;"))
 	private GlProgram<ChunkShaderInterface> redirectIrisProgram(ShaderChunkRenderer instance, ChunkShaderOptions options, TerrainRenderPass pass, @Local RenderTarget target) {
 		WorldRenderingPipeline pipeline = Iris.getPipelineManager().getPipelineNullable();
 

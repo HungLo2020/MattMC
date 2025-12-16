@@ -10,7 +10,7 @@ import org.jetbrains.annotations.NotNull;
  */
 public interface SpriteUtil {
     SpriteUtil INSTANCE = DependencyInjection.load(SpriteUtil.class,
-            "net.caffeinemc.mods.sodium.client.render.texture.SpriteUtilImpl");
+            "net.minecraft.client.renderer.sodium.render.texture.SpriteUtilImpl");
     
     /**
      * Marks the sprite as "active", meaning that it is visible during this frame and should have the animation

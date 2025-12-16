@@ -1,6 +1,6 @@
 package net.caffeinemc.mods.sodium.mixin.core.render;
 
-import net.caffeinemc.mods.sodium.client.render.texture.SpriteFinderCache;
+import net.minecraft.client.renderer.sodium.render.texture.SpriteFinderCache;
 import net.minecraft.client.renderer.texture.SpriteLoader;
 import net.minecraft.client.renderer.texture.TextureAtlas;
 import net.minecraft.resources.ResourceLocation;

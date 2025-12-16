@@ -1,6 +1,6 @@
 package net.caffeinemc.mods.sodium.mixin.platform.neoforge;
 
-import net.caffeinemc.mods.sodium.client.SodiumClientMod;
+import net.minecraft.client.renderer.sodium.SodiumClientMod;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.main.GameConfig;
 import net.neoforged.fml.ModList;

@@ -1,7 +1,7 @@
 package net.caffeinemc.mods.sodium.neoforge.level;
 
-import net.caffeinemc.mods.sodium.client.services.PlatformLevelAccess;
-import net.caffeinemc.mods.sodium.client.world.SodiumAuxiliaryLightManager;
+import net.minecraft.client.renderer.sodium.services.PlatformLevelAccess;
+import net.minecraft.client.renderer.sodium.world.SodiumAuxiliaryLightManager;
 import net.minecraft.core.SectionPos;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.chunk.LevelChunk;

@@ -1,6 +1,6 @@
 package net.caffeinemc.mods.sodium.mixin.platform.neoforge;
 
-import net.caffeinemc.mods.sodium.client.services.SodiumModelData;
+import net.minecraft.client.renderer.sodium.services.SodiumModelData;
 import net.neoforged.neoforge.model.data.ModelData;
 import org.spongepowered.asm.mixin.Mixin;
 

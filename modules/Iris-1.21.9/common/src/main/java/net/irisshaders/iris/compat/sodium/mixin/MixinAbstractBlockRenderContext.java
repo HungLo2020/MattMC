@@ -1,8 +1,8 @@
 package net.irisshaders.iris.compat.sodium.mixin;
 
 import com.llamalad7.mixinextras.sugar.Local;
-import net.caffeinemc.mods.sodium.client.render.chunk.compile.pipeline.BlockRenderer;
-import net.caffeinemc.mods.sodium.client.render.frapi.render.AbstractBlockRenderContext;
+import net.minecraft.client.renderer.chunk.advanced.compile.pipeline.BlockRenderer;
+import net.minecraft.client.renderer.sodium.render.frapi.render.AbstractBlockRenderContext;
 import net.irisshaders.iris.compat.general.IrisModSupport;
 import net.irisshaders.iris.platform.IrisPlatformHelpers;
 import net.irisshaders.iris.shaderpack.materialmap.WorldRenderingSettings;
@@ -30,7 +30,7 @@ public class MixinAbstractBlockRenderContext {
 	@Shadow
 	protected BlockAndTintGetter level;
 
-	@Inject(method = "bufferDefaultModel", at = @At(value = "INVOKE", target = "Lnet/caffeinemc/mods/sodium/client/services/PlatformModelAccess;getQuads(Lnet/minecraft/world/level/BlockAndTintGetter;Lnet/minecraft/core/BlockPos;Lnet/minecraft/client/renderer/block/model/BlockModelPart;Lnet/minecraft/world/level/block/state/BlockState;Lnet/minecraft/core/Direction;Lnet/minecraft/util/RandomSource;Lnet/minecraft/client/renderer/chunk/ChunkSectionLayer;)Ljava/util/List;"))
+	@Inject(method = "bufferDefaultModel", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/renderer/sodium/services/PlatformModelAccess;getQuads(Lnet/minecraft/world/level/BlockAndTintGetter;Lnet/minecraft/core/BlockPos;Lnet/minecraft/client/renderer/block/model/BlockModelPart;Lnet/minecraft/world/level/block/state/BlockState;Lnet/minecraft/core/Direction;Lnet/minecraft/util/RandomSource;Lnet/minecraft/client/renderer/chunk/ChunkSectionLayer;)Ljava/util/List;"))
 	private void checkDirectionNeo(BlockModelPart part, Predicate<Direction> cullTest, CallbackInfo ci, @Local Direction cullFace) {
 		if ((Object) this instanceof BlockRenderer r && WorldRenderingSettings.INSTANCE.getBlockStateIds() != null && cullFace != null) {
 			BlockState override = IrisModSupport.INSTANCE.getModelPartState(part);

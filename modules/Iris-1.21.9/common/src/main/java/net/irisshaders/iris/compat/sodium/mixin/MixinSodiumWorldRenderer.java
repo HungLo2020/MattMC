@@ -3,9 +3,9 @@ package net.irisshaders.iris.compat.sodium.mixin;
 import com.llamalad7.mixinextras.sugar.ref.LocalBooleanRef;
 import com.mojang.blaze3d.vertex.PoseStack;
 import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
-import net.caffeinemc.mods.sodium.client.render.SodiumWorldRenderer;
-import net.caffeinemc.mods.sodium.client.render.chunk.ChunkRenderMatrices;
-import net.caffeinemc.mods.sodium.client.render.chunk.RenderSectionManager;
+import net.minecraft.client.renderer.sodium.render.SodiumWorldRenderer;
+import net.minecraft.client.renderer.chunk.advanced.ChunkRenderMatrices;
+import net.minecraft.client.renderer.chunk.advanced.RenderSectionManager;
 import net.irisshaders.iris.mixin.LevelRendererAccessor;
 import net.irisshaders.iris.shadows.ShadowRenderer;
 import net.irisshaders.iris.shadows.ShadowRenderingState;
@@ -40,7 +40,7 @@ public class MixinSodiumWorldRenderer {
 
 	@Redirect(method = "setupTerrain", remap = false,
 		at = @At(value = "INVOKE",
-			target = "Lnet/caffeinemc/mods/sodium/client/render/chunk/RenderSectionManager;needsUpdate()Z", ordinal = 0,
+			target = "Lnet/minecraft/client/renderer/chunk/advanced/RenderSectionManager;needsUpdate()Z", ordinal = 0,
 			remap = false))
 	private boolean iris$forceChunkGraphRebuildInShadowPass(RenderSectionManager instance) {
 		if (ShadowRenderingState.areShadowsCurrentlyBeingRendered()) {
@@ -56,7 +56,7 @@ public class MixinSodiumWorldRenderer {
 
 	@Redirect(method = "setupTerrain", remap = false,
 		at = @At(value = "INVOKE",
-			target = "Lnet/caffeinemc/mods/sodium/client/render/chunk/RenderSectionManager;needsUpdate()Z", ordinal = 1,
+			target = "Lnet/minecraft/client/renderer/chunk/advanced/RenderSectionManager;needsUpdate()Z", ordinal = 1,
 			remap = false))
 	private boolean iris$forceEndGraphRebuild(RenderSectionManager instance) {
 		if (ShadowRenderingState.areShadowsCurrentlyBeingRendered()) {

@@ -52,6 +52,13 @@ public class GlCommandEncoder implements CommandEncoder {
 		this.drawFbo = glDevice.directStateAccess().createFrameBufferObject();
 	}
 
+	/**
+	 * Public setter for lastProgram field. Added for Sodium integration.
+	 */
+	public void setLastProgram(@Nullable GlProgram program) {
+		this.lastProgram = program;
+	}
+
 	@Override
 	public RenderPass createRenderPass(Supplier<String> supplier, GpuTextureView gpuTextureView, OptionalInt optionalInt) {
 		return this.createRenderPass(supplier, gpuTextureView, optionalInt, null, OptionalDouble.empty());
@@ -900,7 +907,10 @@ public class GlCommandEncoder implements CommandEncoder {
 		return true;
 	}
 
-	private void applyPipelineState(RenderPipeline renderPipeline) {
+	/**
+	 * Made public for Sodium integration.
+	 */
+	public void applyPipelineState(RenderPipeline renderPipeline) {
 		if (this.lastPipeline != renderPipeline) {
 			this.lastPipeline = renderPipeline;
 			if (renderPipeline.getDepthTestFunction() != DepthTestFunction.NO_DEPTH_TEST) {

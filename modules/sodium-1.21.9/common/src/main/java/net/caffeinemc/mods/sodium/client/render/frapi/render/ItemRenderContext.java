@@ -14,19 +14,19 @@
  * limitations under the License.
  */
 
-package net.caffeinemc.mods.sodium.client.render.frapi.render;
+package net.minecraft.client.renderer.sodium.render.frapi.render;
 
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.mojang.math.MatrixUtil;
 import net.minecraft.client.renderer.advanced.texture.SpriteUtil;
 import net.minecraft.client.renderer.advanced.util.ColorMixer;
-import net.caffeinemc.mods.sodium.client.render.frapi.SodiumRenderer;
-import net.caffeinemc.mods.sodium.client.render.frapi.helper.ColorHelper;
-import net.caffeinemc.mods.sodium.client.render.frapi.mesh.EncodingFormat;
-import net.caffeinemc.mods.sodium.client.render.frapi.mesh.MeshViewImpl;
-import net.caffeinemc.mods.sodium.client.render.frapi.mesh.MutableQuadViewImpl;
-import net.caffeinemc.mods.sodium.client.render.texture.SpriteFinderCache;
+import net.minecraft.client.renderer.sodium.render.frapi.SodiumRenderer;
+import net.minecraft.client.renderer.sodium.render.frapi.helper.ColorHelper;
+import net.minecraft.client.renderer.sodium.render.frapi.mesh.EncodingFormat;
+import net.minecraft.client.renderer.sodium.render.frapi.mesh.MeshViewImpl;
+import net.minecraft.client.renderer.sodium.render.frapi.mesh.MutableQuadViewImpl;
+import net.minecraft.client.renderer.sodium.render.texture.SpriteFinderCache;
 import net.caffeinemc.mods.sodium.mixin.features.render.frapi.ItemRendererAccessor;
 import net.fabricmc.fabric.api.renderer.v1.mesh.MeshView;
 import net.fabricmc.fabric.api.renderer.v1.mesh.QuadEmitter;

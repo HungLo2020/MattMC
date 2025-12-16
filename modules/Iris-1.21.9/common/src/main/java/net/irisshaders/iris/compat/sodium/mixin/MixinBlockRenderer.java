@@ -3,11 +3,11 @@ package net.irisshaders.iris.compat.sodium.mixin;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import com.llamalad7.mixinextras.sugar.Local;
-import net.caffeinemc.mods.sodium.client.render.chunk.compile.pipeline.BlockRenderer;
-import net.caffeinemc.mods.sodium.client.render.chunk.terrain.TerrainRenderPass;
-import net.caffeinemc.mods.sodium.client.render.chunk.terrain.material.Material;
-import net.caffeinemc.mods.sodium.client.render.chunk.vertex.format.ChunkVertexEncoder;
-import net.caffeinemc.mods.sodium.client.render.frapi.mesh.MutableQuadViewImpl;
+import net.minecraft.client.renderer.chunk.advanced.compile.pipeline.BlockRenderer;
+import net.minecraft.client.renderer.chunk.advanced.terrain.TerrainRenderPass;
+import net.minecraft.client.renderer.chunk.advanced.terrain.material.Material;
+import net.minecraft.client.renderer.chunk.advanced.vertex.format.ChunkVertexEncoder;
+import net.minecraft.client.renderer.sodium.render.frapi.mesh.MutableQuadViewImpl;
 import net.irisshaders.iris.shaderpack.materialmap.WorldRenderingSettings;
 import net.irisshaders.iris.vertices.sodium.terrain.ChunkVertexExtension;
 import net.irisshaders.iris.vertices.sodium.terrain.VertexEncoderInterface;
@@ -50,7 +50,7 @@ public class MixinBlockRenderer implements VertexEncoderInterface {
 		hasOverride = false;
 	}
 
-	@WrapOperation(method = "bufferQuad", at = @At(value = "INVOKE", target = "Lnet/caffeinemc/mods/sodium/client/render/chunk/compile/pipeline/BlockRenderer;attemptPassDowngrade(Lnet/minecraft/client/renderer/texture/TextureAtlasSprite;Lnet/caffeinemc/mods/sodium/client/render/chunk/terrain/TerrainRenderPass;)Lnet/caffeinemc/mods/sodium/client/render/chunk/terrain/TerrainRenderPass;"))
+	@WrapOperation(method = "bufferQuad", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/renderer/chunk/advanced/compile/pipeline/BlockRenderer;attemptPassDowngrade(Lnet/minecraft/client/renderer/texture/TextureAtlasSprite;Lnet/minecraft/client/renderer/chunk/advanced/terrain/TerrainRenderPass;)Lnet/minecraft/client/renderer/chunk/advanced/terrain/TerrainRenderPass;"))
 	private TerrainRenderPass iris$skipPassDowngrade(BlockRenderer instance, TextureAtlasSprite textureAtlasSprite, TerrainRenderPass sprite, Operation<TerrainRenderPass> original) {
 		if (hasOverride) return null;
 
@@ -67,7 +67,7 @@ public class MixinBlockRenderer implements VertexEncoderInterface {
 		this.localZ = z;
 	}
 
-	@Inject(method = "bufferQuad", at = @At(value = "FIELD", target = "Lnet/caffeinemc/mods/sodium/client/render/chunk/vertex/format/ChunkVertexEncoder$Vertex;x:F"))
+	@Inject(method = "bufferQuad", at = @At(value = "FIELD", target = "Lnet/minecraft/client/renderer/chunk/advanced/vertex/format/ChunkVertexEncoder$Vertex;x:F"))
 	private void iris$writeVertex(MutableQuadViewImpl quad, float[] brightnesses, Material material, CallbackInfo ci, @Local ChunkVertexEncoder.Vertex vertex) {
 		((ChunkVertexExtension) vertex).iris$setData(lightEmission, isFluid, blockId, localX, localY, localZ);
 	}

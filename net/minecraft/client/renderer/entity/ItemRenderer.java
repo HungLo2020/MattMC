@@ -84,7 +84,10 @@ public class ItemRenderer {
 		}
 	}
 
-	private static boolean useTransparentGlint(RenderType renderType) {
+	/**
+	 * Made public for Sodium integration.
+	 */
+	public static boolean useTransparentGlint(RenderType renderType) {
 		return Minecraft.useShaderTransparency() && renderType == Sheets.translucentItemSheet();
 	}
 

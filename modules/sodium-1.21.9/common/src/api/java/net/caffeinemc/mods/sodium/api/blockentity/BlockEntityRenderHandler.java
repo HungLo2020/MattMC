@@ -11,7 +11,7 @@ import org.jetbrains.annotations.ApiStatus;
 @ApiStatus.AvailableSince("0.6.0")
 public interface BlockEntityRenderHandler {
     BlockEntityRenderHandler INSTANCE = DependencyInjection.load(BlockEntityRenderHandler.class,
-            "net.caffeinemc.mods.sodium.client.render.chunk.BlockEntityRenderHandlerImpl");
+            "net.minecraft.client.renderer.chunk.advanced.BlockEntityRenderHandlerImpl");
 
     static BlockEntityRenderHandler instance() {
         return INSTANCE;

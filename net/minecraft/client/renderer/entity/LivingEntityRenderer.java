@@ -64,7 +64,8 @@ public abstract class LivingEntityRenderer<T extends LivingEntity, S extends Liv
 		return this.model;
 	}
 
-	protected AABB getBoundingBoxForCulling(T livingEntity) {
+	@Override
+	public AABB getBoundingBoxForCulling(T livingEntity) {
 		AABB aABB = super.getBoundingBoxForCulling(livingEntity);
 		if (livingEntity.getItemBySlot(EquipmentSlot.HEAD).is(Items.DRAGON_HEAD)) {
 			float f = 0.5F;

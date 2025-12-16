@@ -16,54 +16,54 @@ Path for java installation '/usr/lib/jvm/openjdk-17' (Common Linux Locations) do
 > Task :fabricLoaderClasses UP-TO-DATE
 > Task :fabricLoaderJar UP-TO-DATE
 > Task :compileJava UP-TO-DATE
-> Task :processResources
-> Task :classes
-> Task :gameJar
+> Task :processResources UP-TO-DATE
+> Task :classes UP-TO-DATE
+> Task :gameJar UP-TO-DATE
 > Task :compileSodiumJava UP-TO-DATE
 > Task :processSodiumResources UP-TO-DATE
 > Task :sodiumClasses UP-TO-DATE
-> Task :compileIrisJava UP-TO-DATE
+> Task :compileIrisJava
 > Task :processIrisResources UP-TO-DATE
-> Task :irisClasses UP-TO-DATE
-> Task :irisJar UP-TO-DATE
+> Task :irisClasses
+> Task :irisJar
 > Task :shaderPackZip
 > Task :sodiumJar UP-TO-DATE
 
 > Task :runClient
 Using bundled JDK from: /home/matt/Documents/Repos/MattMC/run/jdk-21
-[17:30:19] [main/INFO]: Loading Minecraft 1.21.10 with Fabric Loader 0.18.2
-[17:30:19] [main/INFO]: Mappings not present!
-[17:30:19] [main/INFO]: Skipping dynamic mod discovery, using hardcoded internal mods (Sodium, Iris)
-[17:30:19] [main/INFO]: Registered internal mod: Sodium
-[17:30:19] [main/INFO]: Registered internal mod: Iris
-[17:30:19] [main/INFO]: Loading 6 mods:
+[09:01:57] [main/INFO]: Loading Minecraft 1.21.10 with Fabric Loader 0.18.2
+[09:01:57] [main/INFO]: Mappings not present!
+[09:01:57] [main/INFO]: Skipping dynamic mod discovery, using hardcoded internal mods (Sodium, Iris)
+[09:01:57] [main/INFO]: Registered internal mod: Sodium
+[09:01:57] [main/INFO]: Registered internal mod: Iris
+[09:01:57] [main/INFO]: Loading 6 mods:
 	- fabricloader 0.18.2
 	- iris 1.9.6
 	- java 21
 	- minecraft 1.21.10
 	- mixinextras 0.5.0
 	- sodium 0.7.2
-[17:30:19] [main/WARN]: Runtime mod remapping disabled due to no fabric.remapClasspathFile being specified. You may need to update loom.
-[17:30:19] [main/INFO]: SpongePowered MIXIN Subsystem Version=0.8.7 Source=file:/home/matt/Documents/Repos/MattMC/libraries/deps/sponge-mixin-0.16.5+mixin.0.8.7.jar Service=Knot/Fabric Env=CLIENT
-[17:30:19] [main/INFO]: Compatibility level set to JAVA_17
-[17:30:19] [main/WARN]: Reference map 'iris.refmap.json' for mixins.iris.json could not be read. If this is a development environment you can ignore this message
-[17:30:19] [main/WARN]: Reference map 'iris-fabric.refmap.json' for mixins.iris.fabric.json could not be read. If this is a development environment you can ignore this message
-[17:30:19] [main/WARN]: Reference map 'iris.refmap.json' for mixins.iris.fantastic.json could not be read. If this is a development environment you can ignore this message
-[17:30:19] [main/WARN]: Reference map 'iris.refmap.json' for mixins.iris.vertexformat.json could not be read. If this is a development environment you can ignore this message
-[17:30:19] [main/WARN]: Reference map 'iris.refmap.json' for mixins.iris.bettermipmaps.json could not be read. If this is a development environment you can ignore this message
-[17:30:19] [main/WARN]: Reference map 'iris.refmap.json' for mixins.iris.compat.sodium.json could not be read. If this is a development environment you can ignore this message
-[17:30:19] [main/WARN]: Reference map 'iris.refmap.json' for mixins.iris.fixes.maxfpscrash.json could not be read. If this is a development environment you can ignore this message
-[17:30:19] [main/INFO]: Loaded configuration file for Sodium: 42 options available, 1 override(s) found
-[17:30:20] [main/WARN]: Force-disabling mixin 'features.render.world.sky.FogRendererMixin' as rule 'mixin.features.render.world.sky' (added by mods [iris]) disables it and children
-[17:30:20] [main/WARN]: Force-disabling mixin 'features.render.world.sky.ClientLevelMixin' as rule 'mixin.features.render.world.sky' (added by mods [iris]) disables it and children
-[17:30:20] [main/WARN]: Force-disabling mixin 'features.render.world.sky.LevelRendererMixin' as rule 'mixin.features.render.world.sky' (added by mods [iris]) disables it and children
-[17:30:20] [main/INFO]: Searching for graphics cards...
-[17:30:20] [main/INFO]: Found graphics adapter: LinuxPciAdapterInfo[vendor=NVIDIA, name=GA102 [GeForce RTX 3080 Ti], pciVendorId=0x10de, pciDeviceId=0x2208]
-[17:30:20] [main/WARN]: Sodium has applied one or more workarounds to prevent crashes or other issues on your system: [NVIDIA_THREADED_OPTIMIZATIONS_BROKEN]
-[17:30:20] [main/WARN]: This is not necessarily an issue, but it may result in certain features or optimizations being disabled. You can sometimes fix these issues by upgrading your graphics driver.
-[17:30:20] [main/INFO]: Initializing MixinExtras via com.llamalad7.mixinextras.service.MixinExtrasServiceImpl(version=0.5.0).
-[17:30:20] [Datafixer Bootstrap/INFO]: 278 Datafixer optimizations took 220 milliseconds
-[17:30:23] [Render thread/INFO]: Setting user: Player179
+[09:01:57] [main/WARN]: Runtime mod remapping disabled due to no fabric.remapClasspathFile being specified. You may need to update loom.
+[09:01:57] [main/INFO]: SpongePowered MIXIN Subsystem Version=0.8.7 Source=file:/home/matt/Documents/Repos/MattMC/libraries/deps/sponge-mixin-0.16.5+mixin.0.8.7.jar Service=Knot/Fabric Env=CLIENT
+[09:01:57] [main/INFO]: Compatibility level set to JAVA_17
+[09:01:57] [main/WARN]: Reference map 'iris.refmap.json' for mixins.iris.json could not be read. If this is a development environment you can ignore this message
+[09:01:57] [main/WARN]: Reference map 'iris-fabric.refmap.json' for mixins.iris.fabric.json could not be read. If this is a development environment you can ignore this message
+[09:01:57] [main/WARN]: Reference map 'iris.refmap.json' for mixins.iris.fantastic.json could not be read. If this is a development environment you can ignore this message
+[09:01:57] [main/WARN]: Reference map 'iris.refmap.json' for mixins.iris.vertexformat.json could not be read. If this is a development environment you can ignore this message
+[09:01:57] [main/WARN]: Reference map 'iris.refmap.json' for mixins.iris.bettermipmaps.json could not be read. If this is a development environment you can ignore this message
+[09:01:57] [main/WARN]: Reference map 'iris.refmap.json' for mixins.iris.compat.sodium.json could not be read. If this is a development environment you can ignore this message
+[09:01:57] [main/WARN]: Reference map 'iris.refmap.json' for mixins.iris.fixes.maxfpscrash.json could not be read. If this is a development environment you can ignore this message
+[09:01:57] [main/INFO]: Loaded configuration file for Sodium: 42 options available, 1 override(s) found
+[09:01:57] [main/WARN]: Force-disabling mixin 'features.render.world.sky.FogRendererMixin' as rule 'mixin.features.render.world.sky' (added by mods [iris]) disables it and children
+[09:01:57] [main/WARN]: Force-disabling mixin 'features.render.world.sky.ClientLevelMixin' as rule 'mixin.features.render.world.sky' (added by mods [iris]) disables it and children
+[09:01:57] [main/WARN]: Force-disabling mixin 'features.render.world.sky.LevelRendererMixin' as rule 'mixin.features.render.world.sky' (added by mods [iris]) disables it and children
+[09:01:57] [main/INFO]: Searching for graphics cards...
+[09:01:57] [main/INFO]: Found graphics adapter: LinuxPciAdapterInfo[vendor=NVIDIA, name=GA102 [GeForce RTX 3080 Ti], pciVendorId=0x10de, pciDeviceId=0x2208]
+[09:01:57] [main/WARN]: Sodium has applied one or more workarounds to prevent crashes or other issues on your system: [NVIDIA_THREADED_OPTIMIZATIONS_BROKEN]
+[09:01:57] [main/WARN]: This is not necessarily an issue, but it may result in certain features or optimizations being disabled. You can sometimes fix these issues by upgrading your graphics driver.
+[09:01:57] [main/INFO]: Initializing MixinExtras via com.llamalad7.mixinextras.service.MixinExtrasServiceImpl(version=0.5.0).
+[09:01:58] [Datafixer Bootstrap/INFO]: 278 Datafixer optimizations took 213 milliseconds
+[09:02:00] [Render thread/INFO]: Setting user: Player369
 [LWJGL] Version: 3.3.3-snapshot
 	 OS: Linux v6.14.0-36-generic
 	JRE: Linux amd64 21.0.5
@@ -74,89 +74,89 @@ Using bundled JDK from: /home/matt/Documents/Repos/MattMC/run/jdk-21
 [LWJGL] Loading library: glfw
 	Module: org.lwjgl.glfw
 	Loaded from org.lwjgl.librarypath: /tmp/lwjgl_matt/3.3.3-snapshot/x64/libglfw.so
-[17:30:23] [Render thread/WARN]: [Config Load] Minecraft or Options not available, skipping sync
-[17:30:23] [Render thread/INFO]: [Options Load] Starting options load from: /home/matt/Documents/Repos/MattMC/run/options.txt
-[17:30:23] [Render thread/INFO]: [Options Load] Loading shaderPackName from options.txt: raw value = 'ComplementaryHungLoIfied.zip', default = 'null'
-[17:30:23] [Render thread/INFO]: [Options Load] Final shaderPackName value: 'ComplementaryHungLoIfied.zip'
-[17:30:23] [Render thread/INFO]: [Options Load] Loading enableShaders from options.txt: raw value = 'true'
-[17:30:23] [Render thread/INFO]: [Options Load] Parsed enableShaders value: true
-[17:30:23] [Render thread/INFO]: [Mixin] iris$afterOptionsLoaded triggered - calling Iris.syncConfigFromOptions()
-[17:30:23] [Render thread/INFO]: [Iris Sync] syncConfigFromOptions() called with options
-[17:30:23] [Render thread/INFO]: [Iris Sync] Calling irisConfig.initializeFromOptions() to sync from loaded Options
-[17:30:23] [Render thread/INFO]: [Config Load] BEFORE sync - IrisConfig.shaderPackName='null', IrisConfig.enableShaders=true
-[17:30:23] [Render thread/INFO]: [Config Load] options values: shaderPackName='ComplementaryHungLoIfied.zip', enableShaders=true
-[17:30:23] [Render thread/INFO]: [Config Load] AFTER sync - IrisConfig.shaderPackName='ComplementaryHungLoIfied.zip', IrisConfig.enableShaders=true
-[17:30:23] [Render thread/INFO]: [Iris Sync] Sync completed successfully
-[17:30:23] [Render thread/INFO]: [Mixin] iris$afterOptionsLoaded triggered - calling Iris.syncConfigFromOptions()
-[17:30:23] [Render thread/INFO]: [Iris Sync] syncConfigFromOptions() called with options
-[17:30:23] [Render thread/INFO]: [Iris Sync] Calling irisConfig.initializeFromOptions() to sync from loaded Options
-[17:30:23] [Render thread/INFO]: [Config Load] BEFORE sync - IrisConfig.shaderPackName='ComplementaryHungLoIfied.zip', IrisConfig.enableShaders=true
-[17:30:23] [Render thread/INFO]: [Config Load] options values: shaderPackName='ComplementaryHungLoIfied.zip', enableShaders=true
-[17:30:23] [Render thread/INFO]: [Config Load] AFTER sync - IrisConfig.shaderPackName='ComplementaryHungLoIfied.zip', IrisConfig.enableShaders=true
-[17:30:23] [Render thread/INFO]: [Iris Sync] Sync completed successfully
-[17:30:23] [Render thread/INFO]: [Mixin] iris$afterOptionsLoaded triggered - calling Iris.syncConfigFromOptions()
-[17:30:23] [Render thread/INFO]: [Iris Sync] syncConfigFromOptions() called with options
-[17:30:23] [Render thread/INFO]: [Iris Sync] Calling irisConfig.initializeFromOptions() to sync from loaded Options
-[17:30:23] [Render thread/INFO]: [Config Load] BEFORE sync - IrisConfig.shaderPackName='ComplementaryHungLoIfied.zip', IrisConfig.enableShaders=true
-[17:30:23] [Render thread/INFO]: [Config Load] options values: shaderPackName='ComplementaryHungLoIfied.zip', enableShaders=true
-[17:30:23] [Render thread/INFO]: [Config Load] AFTER sync - IrisConfig.shaderPackName='ComplementaryHungLoIfied.zip', IrisConfig.enableShaders=true
-[17:30:23] [Render thread/INFO]: [Iris Sync] Sync completed successfully
-[17:30:23] [Render thread/INFO]: [Mixin] iris$afterOptionsLoaded triggered - calling Iris.syncConfigFromOptions()
-[17:30:23] [Render thread/INFO]: [Iris Sync] syncConfigFromOptions() called with options
-[17:30:23] [Render thread/INFO]: [Iris Sync] Calling irisConfig.initializeFromOptions() to sync from loaded Options
-[17:30:23] [Render thread/INFO]: [Config Load] BEFORE sync - IrisConfig.shaderPackName='ComplementaryHungLoIfied.zip', IrisConfig.enableShaders=true
-[17:30:23] [Render thread/INFO]: [Config Load] options values: shaderPackName='ComplementaryHungLoIfied.zip', enableShaders=true
-[17:30:23] [Render thread/INFO]: [Config Load] AFTER sync - IrisConfig.shaderPackName='ComplementaryHungLoIfied.zip', IrisConfig.enableShaders=true
-[17:30:23] [Render thread/INFO]: [Iris Sync] Sync completed successfully
-[17:30:23] [Render thread/INFO]: [Mixin] iris$afterOptionsLoaded triggered - calling Iris.syncConfigFromOptions()
-[17:30:23] [Render thread/INFO]: [Iris Sync] syncConfigFromOptions() called with options
-[17:30:23] [Render thread/INFO]: [Iris Sync] Calling irisConfig.initializeFromOptions() to sync from loaded Options
-[17:30:23] [Render thread/INFO]: [Config Load] BEFORE sync - IrisConfig.shaderPackName='ComplementaryHungLoIfied.zip', IrisConfig.enableShaders=true
-[17:30:23] [Render thread/INFO]: [Config Load] options values: shaderPackName='ComplementaryHungLoIfied.zip', enableShaders=true
-[17:30:23] [Render thread/INFO]: [Config Load] AFTER sync - IrisConfig.shaderPackName='ComplementaryHungLoIfied.zip', IrisConfig.enableShaders=true
-[17:30:23] [Render thread/INFO]: [Iris Sync] Sync completed successfully
-[17:30:23] [Render thread/INFO]: [Options Save] Saving shaderPackName: value = 'ComplementaryHungLoIfied.zip'
-[17:30:23] [Render thread/INFO]: [Options Save] Saving enableShaders: value = true, json = true
-[17:30:23] [Render thread/INFO]: [Options Save] Completed options save successfully
-[17:30:23] [Render thread/INFO]: [Mixin] iris$afterOptionsLoaded triggered - calling Iris.syncConfigFromOptions()
-[17:30:23] [Render thread/INFO]: [Iris Sync] syncConfigFromOptions() called with options
-[17:30:23] [Render thread/INFO]: [Iris Sync] Calling irisConfig.initializeFromOptions() to sync from loaded Options
-[17:30:23] [Render thread/INFO]: [Config Load] BEFORE sync - IrisConfig.shaderPackName='ComplementaryHungLoIfied.zip', IrisConfig.enableShaders=true
-[17:30:23] [Render thread/INFO]: [Config Load] options values: shaderPackName='ComplementaryHungLoIfied.zip', enableShaders=true
-[17:30:23] [Render thread/INFO]: [Config Load] AFTER sync - IrisConfig.shaderPackName='ComplementaryHungLoIfied.zip', IrisConfig.enableShaders=true
-[17:30:23] [Render thread/INFO]: [Iris Sync] Sync completed successfully
-[17:30:23] [Render thread/INFO]: Backend library: LWJGL version 3.3.3-snapshot
-[17:30:23] [Render thread/INFO]: [Mixin] iris$afterOptionsLoaded triggered - calling Iris.syncConfigFromOptions()
-[17:30:23] [Render thread/INFO]: [Iris Sync] syncConfigFromOptions() called with options
-[17:30:23] [Render thread/INFO]: [Iris Sync] Calling irisConfig.initializeFromOptions() to sync from loaded Options
-[17:30:23] [Render thread/INFO]: [Config Load] BEFORE sync - IrisConfig.shaderPackName='ComplementaryHungLoIfied.zip', IrisConfig.enableShaders=true
-[17:30:23] [Render thread/INFO]: [Config Load] options values: shaderPackName='ComplementaryHungLoIfied.zip', enableShaders=true
-[17:30:23] [Render thread/INFO]: [Config Load] AFTER sync - IrisConfig.shaderPackName='ComplementaryHungLoIfied.zip', IrisConfig.enableShaders=true
-[17:30:23] [Render thread/INFO]: [Iris Sync] Sync completed successfully
+[09:02:00] [Render thread/WARN]: [Config Load] Minecraft or Options not available, skipping sync
+[09:02:00] [Render thread/INFO]: [Options Load] Starting options load from: /home/matt/Documents/Repos/MattMC/run/options.txt
+[09:02:00] [Render thread/INFO]: [Options Load] Loading shaderPackName from options.txt: raw value = 'ComplementaryHungLoIfied.zip', default = 'null'
+[09:02:00] [Render thread/INFO]: [Options Load] Final shaderPackName value: 'ComplementaryHungLoIfied.zip'
+[09:02:00] [Render thread/INFO]: [Options Load] Loading enableShaders from options.txt: raw value = 'true'
+[09:02:00] [Render thread/INFO]: [Options Load] Parsed enableShaders value: true
+[09:02:00] [Render thread/INFO]: [Mixin] iris$afterOptionsLoaded triggered - calling Iris.syncConfigFromOptions()
+[09:02:00] [Render thread/INFO]: [Iris Sync] syncConfigFromOptions() called with options
+[09:02:00] [Render thread/INFO]: [Iris Sync] Calling irisConfig.initializeFromOptions() to sync from loaded Options
+[09:02:00] [Render thread/INFO]: [Config Load] BEFORE sync - IrisConfig.shaderPackName='null', IrisConfig.enableShaders=true
+[09:02:00] [Render thread/INFO]: [Config Load] options values: shaderPackName='ComplementaryHungLoIfied.zip', enableShaders=true
+[09:02:00] [Render thread/INFO]: [Config Load] AFTER sync - IrisConfig.shaderPackName='ComplementaryHungLoIfied.zip', IrisConfig.enableShaders=true
+[09:02:00] [Render thread/INFO]: [Iris Sync] Sync completed successfully
+[09:02:00] [Render thread/INFO]: [Mixin] iris$afterOptionsLoaded triggered - calling Iris.syncConfigFromOptions()
+[09:02:00] [Render thread/INFO]: [Iris Sync] syncConfigFromOptions() called with options
+[09:02:00] [Render thread/INFO]: [Iris Sync] Calling irisConfig.initializeFromOptions() to sync from loaded Options
+[09:02:00] [Render thread/INFO]: [Config Load] BEFORE sync - IrisConfig.shaderPackName='ComplementaryHungLoIfied.zip', IrisConfig.enableShaders=true
+[09:02:00] [Render thread/INFO]: [Config Load] options values: shaderPackName='ComplementaryHungLoIfied.zip', enableShaders=true
+[09:02:00] [Render thread/INFO]: [Config Load] AFTER sync - IrisConfig.shaderPackName='ComplementaryHungLoIfied.zip', IrisConfig.enableShaders=true
+[09:02:00] [Render thread/INFO]: [Iris Sync] Sync completed successfully
+[09:02:00] [Render thread/INFO]: [Mixin] iris$afterOptionsLoaded triggered - calling Iris.syncConfigFromOptions()
+[09:02:00] [Render thread/INFO]: [Iris Sync] syncConfigFromOptions() called with options
+[09:02:00] [Render thread/INFO]: [Iris Sync] Calling irisConfig.initializeFromOptions() to sync from loaded Options
+[09:02:00] [Render thread/INFO]: [Config Load] BEFORE sync - IrisConfig.shaderPackName='ComplementaryHungLoIfied.zip', IrisConfig.enableShaders=true
+[09:02:00] [Render thread/INFO]: [Config Load] options values: shaderPackName='ComplementaryHungLoIfied.zip', enableShaders=true
+[09:02:00] [Render thread/INFO]: [Config Load] AFTER sync - IrisConfig.shaderPackName='ComplementaryHungLoIfied.zip', IrisConfig.enableShaders=true
+[09:02:00] [Render thread/INFO]: [Iris Sync] Sync completed successfully
+[09:02:00] [Render thread/INFO]: [Mixin] iris$afterOptionsLoaded triggered - calling Iris.syncConfigFromOptions()
+[09:02:00] [Render thread/INFO]: [Iris Sync] syncConfigFromOptions() called with options
+[09:02:00] [Render thread/INFO]: [Iris Sync] Calling irisConfig.initializeFromOptions() to sync from loaded Options
+[09:02:00] [Render thread/INFO]: [Config Load] BEFORE sync - IrisConfig.shaderPackName='ComplementaryHungLoIfied.zip', IrisConfig.enableShaders=true
+[09:02:00] [Render thread/INFO]: [Config Load] options values: shaderPackName='ComplementaryHungLoIfied.zip', enableShaders=true
+[09:02:00] [Render thread/INFO]: [Config Load] AFTER sync - IrisConfig.shaderPackName='ComplementaryHungLoIfied.zip', IrisConfig.enableShaders=true
+[09:02:00] [Render thread/INFO]: [Iris Sync] Sync completed successfully
+[09:02:00] [Render thread/INFO]: [Mixin] iris$afterOptionsLoaded triggered - calling Iris.syncConfigFromOptions()
+[09:02:00] [Render thread/INFO]: [Iris Sync] syncConfigFromOptions() called with options
+[09:02:00] [Render thread/INFO]: [Iris Sync] Calling irisConfig.initializeFromOptions() to sync from loaded Options
+[09:02:00] [Render thread/INFO]: [Config Load] BEFORE sync - IrisConfig.shaderPackName='ComplementaryHungLoIfied.zip', IrisConfig.enableShaders=true
+[09:02:00] [Render thread/INFO]: [Config Load] options values: shaderPackName='ComplementaryHungLoIfied.zip', enableShaders=true
+[09:02:00] [Render thread/INFO]: [Config Load] AFTER sync - IrisConfig.shaderPackName='ComplementaryHungLoIfied.zip', IrisConfig.enableShaders=true
+[09:02:00] [Render thread/INFO]: [Iris Sync] Sync completed successfully
+[09:02:00] [Render thread/INFO]: [Options Save] Saving shaderPackName: value = 'ComplementaryHungLoIfied.zip'
+[09:02:00] [Render thread/INFO]: [Options Save] Saving enableShaders: value = true, json = true
+[09:02:00] [Render thread/INFO]: [Options Save] Completed options save successfully
+[09:02:00] [Render thread/INFO]: [Mixin] iris$afterOptionsLoaded triggered - calling Iris.syncConfigFromOptions()
+[09:02:00] [Render thread/INFO]: [Iris Sync] syncConfigFromOptions() called with options
+[09:02:00] [Render thread/INFO]: [Iris Sync] Calling irisConfig.initializeFromOptions() to sync from loaded Options
+[09:02:00] [Render thread/INFO]: [Config Load] BEFORE sync - IrisConfig.shaderPackName='ComplementaryHungLoIfied.zip', IrisConfig.enableShaders=true
+[09:02:00] [Render thread/INFO]: [Config Load] options values: shaderPackName='ComplementaryHungLoIfied.zip', enableShaders=true
+[09:02:00] [Render thread/INFO]: [Config Load] AFTER sync - IrisConfig.shaderPackName='ComplementaryHungLoIfied.zip', IrisConfig.enableShaders=true
+[09:02:00] [Render thread/INFO]: [Iris Sync] Sync completed successfully
+[09:02:00] [Render thread/INFO]: Backend library: LWJGL version 3.3.3-snapshot
+[09:02:00] [Render thread/INFO]: [Mixin] iris$afterOptionsLoaded triggered - calling Iris.syncConfigFromOptions()
+[09:02:00] [Render thread/INFO]: [Iris Sync] syncConfigFromOptions() called with options
+[09:02:00] [Render thread/INFO]: [Iris Sync] Calling irisConfig.initializeFromOptions() to sync from loaded Options
+[09:02:00] [Render thread/INFO]: [Config Load] BEFORE sync - IrisConfig.shaderPackName='ComplementaryHungLoIfied.zip', IrisConfig.enableShaders=true
+[09:02:00] [Render thread/INFO]: [Config Load] options values: shaderPackName='ComplementaryHungLoIfied.zip', enableShaders=true
+[09:02:00] [Render thread/INFO]: [Config Load] AFTER sync - IrisConfig.shaderPackName='ComplementaryHungLoIfied.zip', IrisConfig.enableShaders=true
+[09:02:00] [Render thread/INFO]: [Iris Sync] Sync completed successfully
 [LWJGL] Loading library: jemalloc
 	Module: org.lwjgl.jemalloc
 	Loaded from org.lwjgl.librarypath: /tmp/lwjgl_matt/3.3.3-snapshot/x64/libjemalloc.so
 [LWJGL] MemoryUtil allocator: JEmallocAllocator
 [LWJGL] Java 9 check intrinsics enabled
 [LWJGL] Closure Registry: ConcurrentHashMap
-[17:30:23] [Render thread/INFO]: [Mixin] iris$afterOptionsLoaded triggered - calling Iris.syncConfigFromOptions()
-[17:30:23] [Render thread/INFO]: [Iris Sync] syncConfigFromOptions() called with options
-[17:30:23] [Render thread/INFO]: [Iris Sync] Calling irisConfig.initializeFromOptions() to sync from loaded Options
-[17:30:23] [Render thread/INFO]: [Config Load] BEFORE sync - IrisConfig.shaderPackName='ComplementaryHungLoIfied.zip', IrisConfig.enableShaders=true
-[17:30:23] [Render thread/INFO]: [Config Load] options values: shaderPackName='ComplementaryHungLoIfied.zip', enableShaders=true
-[17:30:23] [Render thread/INFO]: [Config Load] AFTER sync - IrisConfig.shaderPackName='ComplementaryHungLoIfied.zip', IrisConfig.enableShaders=true
-[17:30:23] [Render thread/INFO]: [Iris Sync] Sync completed successfully
-[17:30:23] [Render thread/INFO]: Modifying process environment to apply workarounds for the NVIDIA graphics driver...
+[09:02:00] [Render thread/INFO]: [Mixin] iris$afterOptionsLoaded triggered - calling Iris.syncConfigFromOptions()
+[09:02:00] [Render thread/INFO]: [Iris Sync] syncConfigFromOptions() called with options
+[09:02:00] [Render thread/INFO]: [Iris Sync] Calling irisConfig.initializeFromOptions() to sync from loaded Options
+[09:02:00] [Render thread/INFO]: [Config Load] BEFORE sync - IrisConfig.shaderPackName='ComplementaryHungLoIfied.zip', IrisConfig.enableShaders=true
+[09:02:00] [Render thread/INFO]: [Config Load] options values: shaderPackName='ComplementaryHungLoIfied.zip', enableShaders=true
+[09:02:00] [Render thread/INFO]: [Config Load] AFTER sync - IrisConfig.shaderPackName='ComplementaryHungLoIfied.zip', IrisConfig.enableShaders=true
+[09:02:00] [Render thread/INFO]: [Iris Sync] Sync completed successfully
+[09:02:00] [Render thread/INFO]: Modifying process environment to apply workarounds for the NVIDIA graphics driver...
 [LWJGL] Loading JNI library: lwjgl_stb
 	Module: org.lwjgl.stb
 	Loaded from org.lwjgl.librarypath: /tmp/lwjgl_matt/3.3.3-snapshot/x64/liblwjgl_stb.so
-[17:30:23] [Render thread/INFO]: [Mixin] iris$afterOptionsLoaded triggered - calling Iris.syncConfigFromOptions()
-[17:30:23] [Render thread/INFO]: [Iris Sync] syncConfigFromOptions() called with options
-[17:30:23] [Render thread/INFO]: [Iris Sync] Calling irisConfig.initializeFromOptions() to sync from loaded Options
-[17:30:23] [Render thread/INFO]: [Config Load] BEFORE sync - IrisConfig.shaderPackName='ComplementaryHungLoIfied.zip', IrisConfig.enableShaders=true
-[17:30:23] [Render thread/INFO]: [Config Load] options values: shaderPackName='ComplementaryHungLoIfied.zip', enableShaders=true
-[17:30:23] [Render thread/INFO]: [Config Load] AFTER sync - IrisConfig.shaderPackName='ComplementaryHungLoIfied.zip', IrisConfig.enableShaders=true
-[17:30:23] [Render thread/INFO]: [Iris Sync] Sync completed successfully
+[09:02:00] [Render thread/INFO]: [Mixin] iris$afterOptionsLoaded triggered - calling Iris.syncConfigFromOptions()
+[09:02:00] [Render thread/INFO]: [Iris Sync] syncConfigFromOptions() called with options
+[09:02:00] [Render thread/INFO]: [Iris Sync] Calling irisConfig.initializeFromOptions() to sync from loaded Options
+[09:02:00] [Render thread/INFO]: [Config Load] BEFORE sync - IrisConfig.shaderPackName='ComplementaryHungLoIfied.zip', IrisConfig.enableShaders=true
+[09:02:00] [Render thread/INFO]: [Config Load] options values: shaderPackName='ComplementaryHungLoIfied.zip', enableShaders=true
+[09:02:00] [Render thread/INFO]: [Config Load] AFTER sync - IrisConfig.shaderPackName='ComplementaryHungLoIfied.zip', IrisConfig.enableShaders=true
+[09:02:00] [Render thread/INFO]: [Iris Sync] Sync completed successfully
 [LWJGL] Loading JNI library: lwjgl_opengl
 	Module: org.lwjgl.opengl
 	Loaded from org.lwjgl.librarypath: /tmp/lwjgl_matt/3.3.3-snapshot/x64/liblwjgl_opengl.so
@@ -166,193 +166,165 @@ Using bundled JDK from: /home/matt/Documents/Repos/MattMC/run/jdk-21
 [LWJGL] Java 9 text decoding enabled
 	Loaded from system paths: /lib/x86_64-linux-gnu/libGLX.so.0
 [LWJGL] Java 10 multiplyHigh enabled
-[17:30:23] [ForkJoinPool.commonPool-worker-1/WARN]: [Iris Update Check] This version doesn't have an update index, skipping.
-[17:30:23] [Render thread/INFO]: Debug functionality is disabled.
-[17:30:23] [Render thread/INFO]: ARB_direct_state_access detected, enabling DSA.
-[17:30:23] [Render thread/INFO]: Profile: HIGH (+0 options changed by user)
-[17:30:24] [Render thread/INFO]: Using shaderpack: ComplementaryHungLoIfied.zip
-[17:30:24] [Render thread/INFO]: OpenGL Vendor: NVIDIA Corporation
-[17:30:24] [Render thread/INFO]: OpenGL Renderer: NVIDIA GeForce RTX 3080 Ti/PCIe/SSE2
-[17:30:24] [Render thread/INFO]: OpenGL Version: 3.3.0 NVIDIA 580.95.05
-[17:30:24] [Render thread/INFO]: Modifying OpenGL context to apply workarounds for the NVIDIA graphics driver...
-[17:30:24] [Render thread/INFO]: Using optional rendering extensions: GL_ARB_buffer_storage, GL_KHR_debug, GL_ARB_vertex_attrib_binding, GL_ARB_direct_state_access
-[17:30:24] [Render thread/INFO]: [Mixin] iris$afterOptionsLoaded triggered - calling Iris.syncConfigFromOptions()
-[17:30:24] [Render thread/INFO]: [Iris Sync] syncConfigFromOptions() called with options
-[17:30:24] [Render thread/INFO]: [Iris Sync] Calling irisConfig.initializeFromOptions() to sync from loaded Options
-[17:30:24] [Render thread/INFO]: [Config Load] BEFORE sync - IrisConfig.shaderPackName='ComplementaryHungLoIfied.zip', IrisConfig.enableShaders=true
-[17:30:24] [Render thread/INFO]: [Config Load] options values: shaderPackName='ComplementaryHungLoIfied.zip', enableShaders=true
-[17:30:24] [Render thread/INFO]: [Config Load] AFTER sync - IrisConfig.shaderPackName='ComplementaryHungLoIfied.zip', IrisConfig.enableShaders=true
-[17:30:24] [Render thread/INFO]: [Iris Sync] Sync completed successfully
-[17:30:24] [Render thread/INFO]: [Mixin] iris$afterOptionsLoaded triggered - calling Iris.syncConfigFromOptions()
-[17:30:24] [Render thread/INFO]: [Iris Sync] syncConfigFromOptions() called with options
-[17:30:24] [Render thread/INFO]: [Iris Sync] Calling irisConfig.initializeFromOptions() to sync from loaded Options
-[17:30:24] [Render thread/INFO]: [Config Load] BEFORE sync - IrisConfig.shaderPackName='ComplementaryHungLoIfied.zip', IrisConfig.enableShaders=true
-[17:30:24] [Render thread/INFO]: [Config Load] options values: shaderPackName='ComplementaryHungLoIfied.zip', enableShaders=true
-[17:30:24] [Render thread/INFO]: [Config Load] AFTER sync - IrisConfig.shaderPackName='ComplementaryHungLoIfied.zip', IrisConfig.enableShaders=true
-[17:30:24] [Render thread/INFO]: [Iris Sync] Sync completed successfully
-[17:30:24] [Render thread/INFO]: Loaded 20 skins (0 custom)
-[17:30:24] [Render thread/INFO]: [Mixin] iris$afterOptionsLoaded triggered - calling Iris.syncConfigFromOptions()
-[17:30:24] [Render thread/INFO]: [Iris Sync] syncConfigFromOptions() called with options
-[17:30:24] [Render thread/INFO]: [Iris Sync] Calling irisConfig.initializeFromOptions() to sync from loaded Options
-[17:30:24] [Render thread/INFO]: [Config Load] BEFORE sync - IrisConfig.shaderPackName='ComplementaryHungLoIfied.zip', IrisConfig.enableShaders=true
-[17:30:24] [Render thread/INFO]: [Config Load] options values: shaderPackName='ComplementaryHungLoIfied.zip', enableShaders=true
-[17:30:24] [Render thread/INFO]: [Config Load] AFTER sync - IrisConfig.shaderPackName='ComplementaryHungLoIfied.zip', IrisConfig.enableShaders=true
-[17:30:24] [Render thread/INFO]: [Iris Sync] Sync completed successfully
+[09:02:00] [ForkJoinPool.commonPool-worker-1/WARN]: [Iris Update Check] This version doesn't have an update index, skipping.
+[09:02:01] [Render thread/INFO]: Debug functionality is disabled.
+[09:02:01] [Render thread/INFO]: ARB_direct_state_access detected, enabling DSA.
+[09:02:01] [Render thread/INFO]: Profile: HIGH (+0 options changed by user)
+[09:02:01] [Render thread/INFO]: Using shaderpack: ComplementaryHungLoIfied.zip
+[09:02:01] [Render thread/INFO]: OpenGL Vendor: NVIDIA Corporation
+[09:02:01] [Render thread/INFO]: OpenGL Renderer: NVIDIA GeForce RTX 3080 Ti/PCIe/SSE2
+[09:02:01] [Render thread/INFO]: OpenGL Version: 3.3.0 NVIDIA 580.95.05
+[09:02:01] [Render thread/INFO]: Modifying OpenGL context to apply workarounds for the NVIDIA graphics driver...
+[09:02:01] [Render thread/INFO]: Using optional rendering extensions: GL_ARB_buffer_storage, GL_KHR_debug, GL_ARB_vertex_attrib_binding, GL_ARB_direct_state_access
+[09:02:01] [Render thread/INFO]: [Mixin] iris$afterOptionsLoaded triggered - calling Iris.syncConfigFromOptions()
+[09:02:01] [Render thread/INFO]: [Iris Sync] syncConfigFromOptions() called with options
+[09:02:01] [Render thread/INFO]: [Iris Sync] Calling irisConfig.initializeFromOptions() to sync from loaded Options
+[09:02:01] [Render thread/INFO]: [Config Load] BEFORE sync - IrisConfig.shaderPackName='ComplementaryHungLoIfied.zip', IrisConfig.enableShaders=true
+[09:02:01] [Render thread/INFO]: [Config Load] options values: shaderPackName='ComplementaryHungLoIfied.zip', enableShaders=true
+[09:02:01] [Render thread/INFO]: [Config Load] AFTER sync - IrisConfig.shaderPackName='ComplementaryHungLoIfied.zip', IrisConfig.enableShaders=true
+[09:02:01] [Render thread/INFO]: [Iris Sync] Sync completed successfully
+[09:02:01] [Render thread/INFO]: [Mixin] iris$afterOptionsLoaded triggered - calling Iris.syncConfigFromOptions()
+[09:02:01] [Render thread/INFO]: [Iris Sync] syncConfigFromOptions() called with options
+[09:02:01] [Render thread/INFO]: [Iris Sync] Calling irisConfig.initializeFromOptions() to sync from loaded Options
+[09:02:01] [Render thread/INFO]: [Config Load] BEFORE sync - IrisConfig.shaderPackName='ComplementaryHungLoIfied.zip', IrisConfig.enableShaders=true
+[09:02:01] [Render thread/INFO]: [Config Load] options values: shaderPackName='ComplementaryHungLoIfied.zip', enableShaders=true
+[09:02:01] [Render thread/INFO]: [Config Load] AFTER sync - IrisConfig.shaderPackName='ComplementaryHungLoIfied.zip', IrisConfig.enableShaders=true
+[09:02:01] [Render thread/INFO]: [Iris Sync] Sync completed successfully
+[09:02:01] [Render thread/INFO]: Loaded 20 skins (0 custom)
+[09:02:01] [Render thread/INFO]: [Mixin] iris$afterOptionsLoaded triggered - calling Iris.syncConfigFromOptions()
+[09:02:01] [Render thread/INFO]: [Iris Sync] syncConfigFromOptions() called with options
+[09:02:01] [Render thread/INFO]: [Iris Sync] Calling irisConfig.initializeFromOptions() to sync from loaded Options
+[09:02:01] [Render thread/INFO]: [Config Load] BEFORE sync - IrisConfig.shaderPackName='ComplementaryHungLoIfied.zip', IrisConfig.enableShaders=true
+[09:02:01] [Render thread/INFO]: [Config Load] options values: shaderPackName='ComplementaryHungLoIfied.zip', enableShaders=true
+[09:02:01] [Render thread/INFO]: [Config Load] AFTER sync - IrisConfig.shaderPackName='ComplementaryHungLoIfied.zip', IrisConfig.enableShaders=true
+[09:02:01] [Render thread/INFO]: [Iris Sync] Sync completed successfully
 [LWJGL] Loading library: openal
 	Module: org.lwjgl.openal
 	Loaded from org.lwjgl.librarypath: /tmp/lwjgl_matt/3.3.3-snapshot/x64/libopenal.so
 [LWJGL] [ALC] ALC_SOFT_reopen_device was reported as available but an entry point is missing.
-[17:30:24] [Render thread/INFO]: [Mixin] iris$afterOptionsLoaded triggered - calling Iris.syncConfigFromOptions()
-[17:30:24] [Render thread/INFO]: [Iris Sync] syncConfigFromOptions() called with options
-[17:30:24] [Render thread/INFO]: [Iris Sync] Calling irisConfig.initializeFromOptions() to sync from loaded Options
-[17:30:24] [Render thread/INFO]: [Config Load] BEFORE sync - IrisConfig.shaderPackName='ComplementaryHungLoIfied.zip', IrisConfig.enableShaders=true
-[17:30:24] [Render thread/INFO]: [Config Load] options values: shaderPackName='ComplementaryHungLoIfied.zip', enableShaders=true
-[17:30:24] [Render thread/INFO]: [Config Load] AFTER sync - IrisConfig.shaderPackName='ComplementaryHungLoIfied.zip', IrisConfig.enableShaders=true
-[17:30:24] [Render thread/INFO]: [Iris Sync] Sync completed successfully
-[17:30:24] [Render thread/INFO]: [Mixin] iris$afterOptionsLoaded triggered - calling Iris.syncConfigFromOptions()
-[17:30:24] [Render thread/INFO]: [Iris Sync] syncConfigFromOptions() called with options
-[17:30:24] [Render thread/INFO]: [Iris Sync] Calling irisConfig.initializeFromOptions() to sync from loaded Options
-[17:30:24] [Render thread/INFO]: [Config Load] BEFORE sync - IrisConfig.shaderPackName='ComplementaryHungLoIfied.zip', IrisConfig.enableShaders=true
-[17:30:24] [Render thread/INFO]: [Config Load] options values: shaderPackName='ComplementaryHungLoIfied.zip', enableShaders=true
-[17:30:24] [Render thread/INFO]: [Config Load] AFTER sync - IrisConfig.shaderPackName='ComplementaryHungLoIfied.zip', IrisConfig.enableShaders=true
-[17:30:24] [Render thread/INFO]: [Iris Sync] Sync completed successfully
-[17:30:24] [Render thread/INFO]: Hardware information:
-[17:30:24] [Render thread/INFO]: CPU: 20x 12th Gen Intel(R) Core(TM) i7-12700K
-[17:30:24] [Render thread/INFO]: GPU: NVIDIA GeForce RTX 3080 Ti/PCIe/SSE2 (Supports OpenGL 3.3.0 NVIDIA 580.95.05)
-[17:30:24] [Render thread/INFO]: OS: Linux (6.14.0-36-generic)
+[09:02:01] [Render thread/INFO]: [Mixin] iris$afterOptionsLoaded triggered - calling Iris.syncConfigFromOptions()
+[09:02:01] [Render thread/INFO]: [Iris Sync] syncConfigFromOptions() called with options
+[09:02:01] [Render thread/INFO]: [Iris Sync] Calling irisConfig.initializeFromOptions() to sync from loaded Options
+[09:02:01] [Render thread/INFO]: [Config Load] BEFORE sync - IrisConfig.shaderPackName='ComplementaryHungLoIfied.zip', IrisConfig.enableShaders=true
+[09:02:01] [Render thread/INFO]: [Config Load] options values: shaderPackName='ComplementaryHungLoIfied.zip', enableShaders=true
+[09:02:01] [Render thread/INFO]: [Config Load] AFTER sync - IrisConfig.shaderPackName='ComplementaryHungLoIfied.zip', IrisConfig.enableShaders=true
+[09:02:01] [Render thread/INFO]: [Iris Sync] Sync completed successfully
+[09:02:01] [Render thread/INFO]: [Mixin] iris$afterOptionsLoaded triggered - calling Iris.syncConfigFromOptions()
+[09:02:01] [Render thread/INFO]: [Iris Sync] syncConfigFromOptions() called with options
+[09:02:01] [Render thread/INFO]: [Iris Sync] Calling irisConfig.initializeFromOptions() to sync from loaded Options
+[09:02:01] [Render thread/INFO]: [Config Load] BEFORE sync - IrisConfig.shaderPackName='ComplementaryHungLoIfied.zip', IrisConfig.enableShaders=true
+[09:02:01] [Render thread/INFO]: [Config Load] options values: shaderPackName='ComplementaryHungLoIfied.zip', enableShaders=true
+[09:02:01] [Render thread/INFO]: [Config Load] AFTER sync - IrisConfig.shaderPackName='ComplementaryHungLoIfied.zip', IrisConfig.enableShaders=true
+[09:02:01] [Render thread/INFO]: [Iris Sync] Sync completed successfully
+[09:02:01] [Render thread/INFO]: Hardware information:
+[09:02:01] [Render thread/INFO]: CPU: 20x 12th Gen Intel(R) Core(TM) i7-12700K
+[09:02:01] [Render thread/INFO]: GPU: NVIDIA GeForce RTX 3080 Ti/PCIe/SSE2 (Supports OpenGL 3.3.0 NVIDIA 580.95.05)
+[09:02:01] [Render thread/INFO]: OS: Linux (6.14.0-36-generic)
 [LWJGL] Java 16 memcpy enabled
-[17:30:24] [Render thread/INFO]: [Mixin] iris$afterOptionsLoaded triggered - calling Iris.syncConfigFromOptions()
-[17:30:24] [Render thread/INFO]: [Iris Sync] syncConfigFromOptions() called with options
-[17:30:24] [Render thread/INFO]: [Iris Sync] Calling irisConfig.initializeFromOptions() to sync from loaded Options
-[17:30:24] [Render thread/INFO]: [Config Load] BEFORE sync - IrisConfig.shaderPackName='ComplementaryHungLoIfied.zip', IrisConfig.enableShaders=true
-[17:30:24] [Render thread/INFO]: [Config Load] options values: shaderPackName='ComplementaryHungLoIfied.zip', enableShaders=true
-[17:30:24] [Render thread/INFO]: [Config Load] AFTER sync - IrisConfig.shaderPackName='ComplementaryHungLoIfied.zip', IrisConfig.enableShaders=true
-[17:30:24] [Render thread/INFO]: [Iris Sync] Sync completed successfully
-[17:30:24] [Render thread/INFO]: [Mixin] iris$afterOptionsLoaded triggered - calling Iris.syncConfigFromOptions()
-[17:30:24] [Render thread/INFO]: [Iris Sync] syncConfigFromOptions() called with options
-[17:30:24] [Render thread/INFO]: [Iris Sync] Calling irisConfig.initializeFromOptions() to sync from loaded Options
-[17:30:24] [Render thread/INFO]: [Config Load] BEFORE sync - IrisConfig.shaderPackName='ComplementaryHungLoIfied.zip', IrisConfig.enableShaders=true
-[17:30:24] [Render thread/INFO]: [Config Load] options values: shaderPackName='ComplementaryHungLoIfied.zip', enableShaders=true
-[17:30:24] [Render thread/INFO]: [Config Load] AFTER sync - IrisConfig.shaderPackName='ComplementaryHungLoIfied.zip', IrisConfig.enableShaders=true
-[17:30:24] [Render thread/INFO]: [Iris Sync] Sync completed successfully
-[17:30:24] [Render thread/INFO]: [Mixin] iris$afterOptionsLoaded triggered - calling Iris.syncConfigFromOptions()
-[17:30:24] [Render thread/INFO]: [Iris Sync] syncConfigFromOptions() called with options
-[17:30:24] [Render thread/INFO]: [Iris Sync] Calling irisConfig.initializeFromOptions() to sync from loaded Options
-[17:30:24] [Render thread/INFO]: [Config Load] BEFORE sync - IrisConfig.shaderPackName='ComplementaryHungLoIfied.zip', IrisConfig.enableShaders=true
-[17:30:24] [Render thread/INFO]: [Config Load] options values: shaderPackName='ComplementaryHungLoIfied.zip', enableShaders=true
-[17:30:24] [Render thread/INFO]: [Config Load] AFTER sync - IrisConfig.shaderPackName='ComplementaryHungLoIfied.zip', IrisConfig.enableShaders=true
-[17:30:24] [Render thread/INFO]: [Iris Sync] Sync completed successfully
-[17:30:24] [Render thread/INFO]: [Mixin] iris$afterOptionsLoaded triggered - calling Iris.syncConfigFromOptions()
-[17:30:24] [Render thread/INFO]: [Iris Sync] syncConfigFromOptions() called with options
-[17:30:24] [Render thread/INFO]: [Iris Sync] Calling irisConfig.initializeFromOptions() to sync from loaded Options
-[17:30:24] [Render thread/INFO]: [Config Load] BEFORE sync - IrisConfig.shaderPackName='ComplementaryHungLoIfied.zip', IrisConfig.enableShaders=true
-[17:30:24] [Render thread/INFO]: [Config Load] options values: shaderPackName='ComplementaryHungLoIfied.zip', enableShaders=true
-[17:30:24] [Render thread/INFO]: [Config Load] AFTER sync - IrisConfig.shaderPackName='ComplementaryHungLoIfied.zip', IrisConfig.enableShaders=true
-[17:30:24] [Render thread/INFO]: [Iris Sync] Sync completed successfully
-[17:30:24] [Render thread/INFO]: [Mixin] iris$afterOptionsLoaded triggered - calling Iris.syncConfigFromOptions()
-[17:30:24] [Render thread/INFO]: [Iris Sync] syncConfigFromOptions() called with options
-[17:30:24] [Render thread/INFO]: [Iris Sync] Calling irisConfig.initializeFromOptions() to sync from loaded Options
-[17:30:24] [Render thread/INFO]: [Config Load] BEFORE sync - IrisConfig.shaderPackName='ComplementaryHungLoIfied.zip', IrisConfig.enableShaders=true
-[17:30:24] [Render thread/INFO]: [Config Load] options values: shaderPackName='ComplementaryHungLoIfied.zip', enableShaders=true
-[17:30:24] [Render thread/INFO]: [Config Load] AFTER sync - IrisConfig.shaderPackName='ComplementaryHungLoIfied.zip', IrisConfig.enableShaders=true
-[17:30:24] [Render thread/INFO]: [Iris Sync] Sync completed successfully
-[17:30:24] [Render thread/INFO]: [Mixin] iris$afterOptionsLoaded triggered - calling Iris.syncConfigFromOptions()
-[17:30:24] [Render thread/INFO]: [Iris Sync] syncConfigFromOptions() called with options
-[17:30:24] [Render thread/INFO]: [Iris Sync] Calling irisConfig.initializeFromOptions() to sync from loaded Options
-[17:30:24] [Render thread/INFO]: [Config Load] BEFORE sync - IrisConfig.shaderPackName='ComplementaryHungLoIfied.zip', IrisConfig.enableShaders=true
-[17:30:24] [Render thread/INFO]: [Config Load] options values: shaderPackName='ComplementaryHungLoIfied.zip', enableShaders=true
-[17:30:24] [Render thread/INFO]: [Config Load] AFTER sync - IrisConfig.shaderPackName='ComplementaryHungLoIfied.zip', IrisConfig.enableShaders=true
-[17:30:24] [Render thread/INFO]: [Iris Sync] Sync completed successfully
-[17:30:24] [Render thread/INFO]: Reloading ResourceManager: vanilla
-[17:30:24] [Render thread/INFO]: [Mixin] iris$afterOptionsLoaded triggered - calling Iris.syncConfigFromOptions()
-[17:30:24] [Render thread/INFO]: [Iris Sync] syncConfigFromOptions() called with options
-[17:30:24] [Render thread/INFO]: [Iris Sync] Calling irisConfig.initializeFromOptions() to sync from loaded Options
-[17:30:24] [Render thread/INFO]: [Config Load] BEFORE sync - IrisConfig.shaderPackName='ComplementaryHungLoIfied.zip', IrisConfig.enableShaders=true
-[17:30:24] [Render thread/INFO]: [Config Load] options values: shaderPackName='ComplementaryHungLoIfied.zip', enableShaders=true
-[17:30:24] [Render thread/INFO]: [Config Load] AFTER sync - IrisConfig.shaderPackName='ComplementaryHungLoIfied.zip', IrisConfig.enableShaders=true
-[17:30:24] [Render thread/INFO]: [Iris Sync] Sync completed successfully
-[17:30:24] [Worker-Main-19/INFO]: Found unifont_all_no_pua-16.0.03.hex, loading
-[17:30:24] [Worker-Main-14/INFO]: Found unifont_pua-16.0.03.hex, loading
-[17:30:24] [Worker-Main-8/INFO]: Found unifont_jp_patch-16.0.03.hex, loading
-[17:30:25] [Render thread/INFO]: OpenAL initialized on device HT-S350
-[17:30:25] [Render thread/INFO]: Sound engine started
-[17:30:25] [Render thread/INFO]: Created: 512x256x0 minecraft:textures/atlas/particles.png-atlas
-[17:30:25] [Render thread/INFO]: Created: 128x64x0 minecraft:textures/atlas/decorated_pot.png-atlas
-[17:30:25] [Render thread/INFO]: Created: 2048x1024x0 minecraft:textures/atlas/armor_trims.png-atlas
-[17:30:25] [Render thread/INFO]: Created: 512x256x0 minecraft:textures/atlas/paintings.png-atlas
-[17:30:25] [Render thread/INFO]: Created: 512x512x0 minecraft:textures/atlas/shield_patterns.png-atlas
-[17:30:25] [Render thread/INFO]: Created: 1024x512x4 minecraft:textures/atlas/blocks.png-atlas
-[17:30:25] [Render thread/INFO]: Created: 512x256x0 minecraft:textures/atlas/chest.png-atlas
-[17:30:25] [Render thread/INFO]: Created: 512x512x0 minecraft:textures/atlas/banner_patterns.png-atlas
-[17:30:25] [Render thread/INFO]: Created: 512x256x0 minecraft:textures/atlas/beds.png-atlas
-[17:30:25] [Render thread/INFO]: Created: 1024x512x0 minecraft:textures/atlas/gui.png-atlas
-[17:30:25] [Render thread/INFO]: Created: 64x64x0 minecraft:textures/atlas/map_decorations.png-atlas
-[17:30:25] [Render thread/INFO]: Created: 256x256x0 minecraft:textures/atlas/signs.png-atlas
-[17:30:25] [Render thread/INFO]: Created: 512x256x0 minecraft:textures/atlas/shulker_boxes.png-atlas
-[17:30:25] [Render thread/INFO]: Creating pipeline for dimension minecraft:overworld
-[17:30:27] [Render thread/INFO]: [Options Save] Saving shaderPackName: value = 'ComplementaryHungLoIfied.zip'
-[17:30:27] [Render thread/INFO]: [Options Save] Saving enableShaders: value = true, json = true
-[17:30:27] [Render thread/INFO]: [Options Save] Completed options save successfully
-[17:30:33] [Render thread/INFO]: [Options Save] Saving shaderPackName: value = 'ComplementaryHungLoIfied.zip'
-[17:30:33] [Render thread/INFO]: [Options Save] Saving enableShaders: value = true, json = true
-[17:30:33] [Render thread/INFO]: [Options Save] Completed options save successfully
-[17:30:34] [Render thread/INFO]: [Options Save] Saving shaderPackName: value = 'ComplementaryHungLoIfied.zip'
-[17:30:34] [Render thread/INFO]: [Options Save] Saving enableShaders: value = true, json = true
-[17:30:34] [Render thread/INFO]: [Options Save] Completed options save successfully
-[17:30:35] [Render thread/INFO]: [Options Save] Saving shaderPackName: value = 'ComplementaryHungLoIfied.zip'
-[17:30:35] [Render thread/INFO]: [Options Save] Saving enableShaders: value = true, json = true
-[17:30:35] [Render thread/INFO]: [Options Save] Completed options save successfully
-[17:30:35] [Render thread/INFO]: [Options Save] Saving shaderPackName: value = 'ComplementaryHungLoIfied.zip'
-[17:30:35] [Render thread/INFO]: [Options Save] Saving enableShaders: value = true, json = true
-[17:30:35] [Render thread/INFO]: [Options Save] Completed options save successfully
-[17:30:35] [Render thread/INFO]: [Options Save] Saving shaderPackName: value = 'ComplementaryHungLoIfied.zip'
-[17:30:35] [Render thread/INFO]: [Options Save] Saving enableShaders: value = true, json = true
-[17:30:35] [Render thread/INFO]: [Options Save] Completed options save successfully
-[17:30:36] [Render thread/INFO]: [Options Save] Saving shaderPackName: value = 'ComplementaryHungLoIfied.zip'
-[17:30:36] [Render thread/INFO]: [Options Save] Saving enableShaders: value = true, json = true
-[17:30:36] [Render thread/INFO]: [Options Save] Completed options save successfully
-[17:30:37] [Render thread/INFO]: [Options Save] Saving shaderPackName: value = 'ComplementaryHungLoIfied.zip'
-[17:30:37] [Render thread/INFO]: [Options Save] Saving enableShaders: value = true, json = true
-[17:30:37] [Render thread/INFO]: [Options Save] Completed options save successfully
-[17:30:37] [Render thread/INFO]: [Options Save] Saving shaderPackName: value = 'ComplementaryHungLoIfied.zip'
-[17:30:37] [Render thread/INFO]: [Options Save] Saving enableShaders: value = true, json = true
-[17:30:37] [Render thread/INFO]: [Options Save] Completed options save successfully
-[17:30:38] [Render thread/INFO]: [Options Save] Saving shaderPackName: value = 'ComplementaryHungLoIfied.zip'
-[17:30:38] [Render thread/INFO]: [Options Save] Saving enableShaders: value = true, json = true
-[17:30:38] [Render thread/INFO]: [Options Save] Completed options save successfully
-[17:30:38] [Render thread/INFO]: [Options Save] Saving shaderPackName: value = 'ComplementaryHungLoIfied.zip'
-[17:30:38] [Render thread/INFO]: [Options Save] Saving enableShaders: value = true, json = true
-[17:30:38] [Render thread/INFO]: [Options Save] Completed options save successfully
-[17:30:39] [Render thread/INFO]: [Options Save] Saving shaderPackName: value = 'ComplementaryHungLoIfied.zip'
-[17:30:39] [Render thread/INFO]: [Options Save] Saving enableShaders: value = true, json = true
-[17:30:39] [Render thread/INFO]: [Options Save] Completed options save successfully
-[17:30:41] [Render thread/INFO]: Loaded 1461 recipes
-[17:30:41] [Render thread/INFO]: Loaded 1574 advancements
-[17:30:41] [Server thread/INFO]: Starting integrated minecraft server version 1.21.10
-[17:30:41] [Server thread/INFO]: Generating keypair
-[17:30:41] [Server thread/INFO]: Loading 0 persistent chunks...
-[17:30:41] [Server thread/INFO]: Preparing spawn area: 16%
-[17:30:41] [Server thread/INFO]: Loading 49 chunks for player spawn...
-[17:30:41] [Server thread/INFO]: Preparing spawn area: 59%
-[17:30:41] [Server thread/INFO]: Time elapsed: 565 ms
-[17:30:41] [Server thread/INFO]: Player179[local:E:7077e132] logged in with entity id 69 at (-35.25170924929353, 85.98259141458232, 40.06367367619874)
-[17:30:41] [Server thread/INFO]: Player179 joined the game
-[17:30:41] [Render thread/INFO]: Reloading pipeline on dimension change: minecraft:overworld => minecraft:overworld
-[17:30:41] [Render thread/INFO]: Destroying pipeline minecraft:overworld
-[17:30:42] [Render thread/INFO]: Creating pipeline for dimension minecraft:overworld
-[17:30:42] [Server thread/INFO]: Changing view distance to 12, from 10
-[17:30:42] [Server thread/INFO]: Changing simulation distance to 12, from 0
-[17:30:42] [Render thread/INFO]: Started 10 worker threads
-[17:30:42] [Render thread/ERROR]: Failed to load skin texture data
-java.io.FileNotFoundException: minecraft:entity/player/wide/hunglo
-	at knot/net.minecraft.server.packs.resources.ResourceProvider.lambda$getResourceOrThrow$1(ResourceProvider.java:18) ~[minecraft-1.21.10.jar:?]
-	at java.base/java.util.Optional.orElseThrow(Optional.java:403) ~[?:?]
-	at knot/net.minecraft.server.packs.resources.ResourceProvider.getResourceOrThrow(ResourceProvider.java:18) ~[minecraft-1.21.10.jar:?]
-	at knot/net.minecraft.client.multiplayer.ClientPacketListener.loadSkinTextureData(ClientPacketListener.java:2033) [minecraft-1.21.10.jar:?]
-	at knot/net.minecraft.client.multiplayer.ClientPacketListener.sendPlayerSkin(ClientPacketListener.java:2004) [minecraft-1.21.10.jar:?]
-	at knot/net.minecraft.client.multiplayer.ClientPacketListener.handleLogin(ClientPacketListener.java:540) [minecraft-1.21.10.jar:?]
-	at knot/net.minecraft.network.protocol.game.ClientboundLoginPacket.handle(ClientboundLoginPacket.java:67) [minecraft-1.21.10.jar:?]
-	at knot/net.minecraft.network.protocol.game.ClientboundLoginPacket.handle(ClientboundLoginPacket.java:14) [minecraft-1.21.10.jar:?]
+[09:02:01] [Render thread/INFO]: [Mixin] iris$afterOptionsLoaded triggered - calling Iris.syncConfigFromOptions()
+[09:02:01] [Render thread/INFO]: [Iris Sync] syncConfigFromOptions() called with options
+[09:02:01] [Render thread/INFO]: [Iris Sync] Calling irisConfig.initializeFromOptions() to sync from loaded Options
+[09:02:01] [Render thread/INFO]: [Config Load] BEFORE sync - IrisConfig.shaderPackName='ComplementaryHungLoIfied.zip', IrisConfig.enableShaders=true
+[09:02:01] [Render thread/INFO]: [Config Load] options values: shaderPackName='ComplementaryHungLoIfied.zip', enableShaders=true
+[09:02:01] [Render thread/INFO]: [Config Load] AFTER sync - IrisConfig.shaderPackName='ComplementaryHungLoIfied.zip', IrisConfig.enableShaders=true
+[09:02:01] [Render thread/INFO]: [Iris Sync] Sync completed successfully
+[09:02:01] [Render thread/INFO]: [Mixin] iris$afterOptionsLoaded triggered - calling Iris.syncConfigFromOptions()
+[09:02:01] [Render thread/INFO]: [Iris Sync] syncConfigFromOptions() called with options
+[09:02:01] [Render thread/INFO]: [Iris Sync] Calling irisConfig.initializeFromOptions() to sync from loaded Options
+[09:02:01] [Render thread/INFO]: [Config Load] BEFORE sync - IrisConfig.shaderPackName='ComplementaryHungLoIfied.zip', IrisConfig.enableShaders=true
+[09:02:01] [Render thread/INFO]: [Config Load] options values: shaderPackName='ComplementaryHungLoIfied.zip', enableShaders=true
+[09:02:01] [Render thread/INFO]: [Config Load] AFTER sync - IrisConfig.shaderPackName='ComplementaryHungLoIfied.zip', IrisConfig.enableShaders=true
+[09:02:01] [Render thread/INFO]: [Iris Sync] Sync completed successfully
+[09:02:01] [Render thread/INFO]: [Mixin] iris$afterOptionsLoaded triggered - calling Iris.syncConfigFromOptions()
+[09:02:01] [Render thread/INFO]: [Iris Sync] syncConfigFromOptions() called with options
+[09:02:01] [Render thread/INFO]: [Iris Sync] Calling irisConfig.initializeFromOptions() to sync from loaded Options
+[09:02:01] [Render thread/INFO]: [Config Load] BEFORE sync - IrisConfig.shaderPackName='ComplementaryHungLoIfied.zip', IrisConfig.enableShaders=true
+[09:02:01] [Render thread/INFO]: [Config Load] options values: shaderPackName='ComplementaryHungLoIfied.zip', enableShaders=true
+[09:02:01] [Render thread/INFO]: [Config Load] AFTER sync - IrisConfig.shaderPackName='ComplementaryHungLoIfied.zip', IrisConfig.enableShaders=true
+[09:02:01] [Render thread/INFO]: [Iris Sync] Sync completed successfully
+[09:02:01] [Render thread/INFO]: [Mixin] iris$afterOptionsLoaded triggered - calling Iris.syncConfigFromOptions()
+[09:02:01] [Render thread/INFO]: [Iris Sync] syncConfigFromOptions() called with options
+[09:02:01] [Render thread/INFO]: [Iris Sync] Calling irisConfig.initializeFromOptions() to sync from loaded Options
+[09:02:01] [Render thread/INFO]: [Config Load] BEFORE sync - IrisConfig.shaderPackName='ComplementaryHungLoIfied.zip', IrisConfig.enableShaders=true
+[09:02:01] [Render thread/INFO]: [Config Load] options values: shaderPackName='ComplementaryHungLoIfied.zip', enableShaders=true
+[09:02:01] [Render thread/INFO]: [Config Load] AFTER sync - IrisConfig.shaderPackName='ComplementaryHungLoIfied.zip', IrisConfig.enableShaders=true
+[09:02:01] [Render thread/INFO]: [Iris Sync] Sync completed successfully
+[09:02:01] [Render thread/INFO]: [Mixin] iris$afterOptionsLoaded triggered - calling Iris.syncConfigFromOptions()
+[09:02:01] [Render thread/INFO]: [Iris Sync] syncConfigFromOptions() called with options
+[09:02:01] [Render thread/INFO]: [Iris Sync] Calling irisConfig.initializeFromOptions() to sync from loaded Options
+[09:02:01] [Render thread/INFO]: [Config Load] BEFORE sync - IrisConfig.shaderPackName='ComplementaryHungLoIfied.zip', IrisConfig.enableShaders=true
+[09:02:01] [Render thread/INFO]: [Config Load] options values: shaderPackName='ComplementaryHungLoIfied.zip', enableShaders=true
+[09:02:01] [Render thread/INFO]: [Config Load] AFTER sync - IrisConfig.shaderPackName='ComplementaryHungLoIfied.zip', IrisConfig.enableShaders=true
+[09:02:01] [Render thread/INFO]: [Iris Sync] Sync completed successfully
+[09:02:01] [Render thread/INFO]: Reloading ResourceManager: vanilla
+[09:02:01] [Render thread/INFO]: [Mixin] iris$afterOptionsLoaded triggered - calling Iris.syncConfigFromOptions()
+[09:02:01] [Render thread/INFO]: [Iris Sync] syncConfigFromOptions() called with options
+[09:02:02] [Render thread/INFO]: [Iris Sync] Calling irisConfig.initializeFromOptions() to sync from loaded Options
+[09:02:02] [Render thread/INFO]: [Config Load] BEFORE sync - IrisConfig.shaderPackName='ComplementaryHungLoIfied.zip', IrisConfig.enableShaders=true
+[09:02:02] [Render thread/INFO]: [Config Load] options values: shaderPackName='ComplementaryHungLoIfied.zip', enableShaders=true
+[09:02:02] [Render thread/INFO]: [Config Load] AFTER sync - IrisConfig.shaderPackName='ComplementaryHungLoIfied.zip', IrisConfig.enableShaders=true
+[09:02:02] [Render thread/INFO]: [Iris Sync] Sync completed successfully
+[09:02:02] [Worker-Main-19/INFO]: Found unifont_pua-16.0.03.hex, loading
+[09:02:02] [Worker-Main-17/INFO]: Found unifont_all_no_pua-16.0.03.hex, loading
+[09:02:02] [Worker-Main-11/INFO]: Found unifont_jp_patch-16.0.03.hex, loading
+[09:02:02] [Render thread/INFO]: OpenAL initialized on device HT-S350
+[09:02:02] [Render thread/INFO]: Sound engine started
+[09:02:02] [Render thread/INFO]: Created: 512x256x0 minecraft:textures/atlas/particles.png-atlas
+[09:02:02] [Render thread/INFO]: Created: 128x64x0 minecraft:textures/atlas/decorated_pot.png-atlas
+[09:02:02] [Render thread/INFO]: Created: 2048x1024x0 minecraft:textures/atlas/armor_trims.png-atlas
+[09:02:02] [Render thread/INFO]: Created: 512x256x0 minecraft:textures/atlas/paintings.png-atlas
+[09:02:02] [Render thread/INFO]: Created: 512x512x0 minecraft:textures/atlas/shield_patterns.png-atlas
+[09:02:02] [Render thread/INFO]: Created: 1024x512x4 minecraft:textures/atlas/blocks.png-atlas
+[09:02:02] [Render thread/INFO]: Created: 512x256x0 minecraft:textures/atlas/chest.png-atlas
+[09:02:02] [Render thread/INFO]: Created: 512x512x0 minecraft:textures/atlas/banner_patterns.png-atlas
+[09:02:02] [Render thread/INFO]: Created: 512x256x0 minecraft:textures/atlas/beds.png-atlas
+[09:02:02] [Render thread/INFO]: Created: 1024x512x0 minecraft:textures/atlas/gui.png-atlas
+[09:02:02] [Render thread/INFO]: Created: 64x64x0 minecraft:textures/atlas/map_decorations.png-atlas
+[09:02:02] [Render thread/INFO]: Created: 256x256x0 minecraft:textures/atlas/signs.png-atlas
+[09:02:02] [Render thread/INFO]: Created: 512x256x0 minecraft:textures/atlas/shulker_boxes.png-atlas
+[09:02:02] [Render thread/INFO]: Creating pipeline for dimension minecraft:overworld
+[09:02:03] [Render thread/INFO]: [Options Save] Saving shaderPackName: value = 'ComplementaryHungLoIfied.zip'
+[09:02:03] [Render thread/INFO]: [Options Save] Saving enableShaders: value = true, json = true
+[09:02:03] [Render thread/INFO]: [Options Save] Completed options save successfully
+[09:02:10] [Render thread/INFO]: Loaded 1461 recipes
+[09:02:10] [Render thread/INFO]: Loaded 1574 advancements
+[09:02:10] [Server thread/INFO]: Starting integrated minecraft server version 1.21.10
+[09:02:10] [Server thread/INFO]: Generating keypair
+[09:02:10] [Server thread/INFO]: Loading 0 persistent chunks...
+[09:02:10] [Server thread/INFO]: Loading 49 chunks for player spawn...
+[09:02:10] [Server thread/INFO]: Preparing spawn area: 16%
+[09:02:11] [Server thread/INFO]: Preparing spawn area: 30%
+[09:02:11] [Server thread/INFO]: Time elapsed: 564 ms
+[09:02:11] [Server thread/INFO]: Player369[local:E:b1cc1ec6] logged in with entity id 113 at (-20.190342436140643, 85.68671432518573, 28.09613085534563)
+[09:02:11] [Server thread/INFO]: Player369 joined the game
+[09:02:11] [Render thread/INFO]: Reloading pipeline on dimension change: minecraft:overworld => minecraft:overworld
+[09:02:11] [Render thread/INFO]: Destroying pipeline minecraft:overworld
+[09:02:11] [Render thread/INFO]: Creating pipeline for dimension minecraft:overworld
+[09:02:11] [Server thread/INFO]: Changing view distance to 12, from 10
+[09:02:11] [Server thread/INFO]: Changing simulation distance to 12, from 0
+[09:02:11] [Render thread/ERROR]: Failed to handle packet ClientboundLoginPacket[playerId=113, hardcore=false, levels=[ResourceKey[minecraft:dimension / minecraft:overworld], ResourceKey[minecraft:dimension / minecraft:the_nether], ResourceKey[minecraft:dimension / minecraft:the_end]], maxPlayers=8, chunkRadius=10, simulationDistance=0, reducedDebugInfo=false, showDeathScreen=true, doLimitedCrafting=false, commonPlayerSpawnInfo=CommonPlayerSpawnInfo[dimensionType=Reference{ResourceKey[minecraft:dimension_type / minecraft:overworld]=DimensionType[fixedTime=OptionalLong.empty, hasSkyLight=true, hasCeiling=false, ultraWarm=false, natural=true, coordinateScale=1.0, bedWorks=true, respawnAnchorWorks=false, minY=-64, height=384, logicalHeight=384, infiniburn=TagKey[minecraft:block / minecraft:infiniburn_overworld], effectsLocation=minecraft:overworld, ambientLight=0.0, cloudHeight=Optional[192], monsterSettings=MonsterSettings[piglinSafe=false, hasRaids=true, monsterSpawnLightTest=[0-7], monsterSpawnBlockLightLimit=0]]}, dimension=ResourceKey[minecraft:dimension / minecraft:overworld], seed=-8174093141011421143, gameType=CREATIVE, previousGameType=null, isDebug=false, isFlat=false, lastDeathLocation=Optional.empty, portalCooldown=0, seaLevel=63], enforcesSecureChat=false], disconnecting
+java.lang.RuntimeException: Mixin transformation of net.minecraft.client.renderer.chunk.advanced.compile.pipeline.DefaultFluidRenderer failed
+	at net.fabricmc.loader.impl.launch.knot.KnotClassDelegate.getPostMixinClassByteArray(KnotClassDelegate.java:440) ~[fabric-loader-0.18.2.jar:0.18.2]
+	at net.fabricmc.loader.impl.launch.knot.KnotClassDelegate.tryLoadClass(KnotClassDelegate.java:336) ~[fabric-loader-0.18.2.jar:0.18.2]
+	at net.fabricmc.loader.impl.launch.knot.KnotClassDelegate.loadClass(KnotClassDelegate.java:231) ~[fabric-loader-0.18.2.jar:0.18.2]
+	at net.fabricmc.loader.impl.launch.knot.KnotClassLoader.loadClass(KnotClassLoader.java:119) ~[fabric-loader-0.18.2.jar:0.18.2]
+	at java.base/java.lang.ClassLoader.loadClass(ClassLoader.java:526) ~[?:?]
+	at knot/net.caffeinemc.mods.sodium.fabric.render.FluidRendererImpl.<init>(FluidRendererImpl.java:36) ~[sodium-0.7.2-mc1.21.10.jar:?]
+	at knot/net.caffeinemc.mods.sodium.fabric.render.FluidRendererImpl$FabricFactory.createPlatformFluidRenderer(FluidRendererImpl.java:146) ~[sodium-0.7.2-mc1.21.10.jar:?]
+	at knot/net.minecraft.client.renderer.chunk.advanced.compile.pipeline.BlockRenderCache.<init>(BlockRenderCache.java:31) ~[minecraft-1.21.10.jar:?]
+	at knot/net.minecraft.client.renderer.chunk.advanced.compile.ChunkBuildContext.<init>(ChunkBuildContext.java:14) ~[minecraft-1.21.10.jar:?]
+	at knot/net.minecraft.client.renderer.chunk.advanced.compile.executor.ChunkBuilder.<init>(ChunkBuilder.java:34) ~[minecraft-1.21.10.jar:?]
+	at knot/net.minecraft.client.renderer.chunk.advanced.RenderSectionManager.<init>(RenderSectionManager.java:127) ~[minecraft-1.21.10.jar:?]
+	at knot/net.minecraft.client.renderer.sodium.render.SodiumWorldRenderer.initRenderer(SodiumWorldRenderer.java:311) ~[minecraft-1.21.10.jar:?]
+	at knot/net.minecraft.client.renderer.sodium.render.SodiumWorldRenderer.loadLevel(SodiumWorldRenderer.java:130) ~[minecraft-1.21.10.jar:?]
+	at knot/net.minecraft.client.renderer.sodium.render.SodiumWorldRenderer.setLevel(SodiumWorldRenderer.java:122) ~[minecraft-1.21.10.jar:?]
+	at knot/net.minecraft.client.renderer.LevelRenderer.handler$zhl000$sodium$onWorldChanged(LevelRenderer.java:6259) ~[minecraft-1.21.10.jar:?]
+	at knot/net.minecraft.client.renderer.LevelRenderer.setLevel(LevelRenderer.java:306) ~[minecraft-1.21.10.jar:?]
+	at knot/net.minecraft.client.Minecraft.updateLevelInEngines(Minecraft.java:2161) ~[minecraft-1.21.10.jar:?]
+	at knot/net.minecraft.client.Minecraft.setLevel(Minecraft.java:2024) ~[minecraft-1.21.10.jar:?]
+	at knot/net.minecraft.client.multiplayer.ClientPacketListener.handleLogin(ClientPacketListener.java:509) ~[minecraft-1.21.10.jar:?]
+	at knot/net.minecraft.network.protocol.game.ClientboundLoginPacket.handle(ClientboundLoginPacket.java:67) ~[minecraft-1.21.10.jar:?]
+	at knot/net.minecraft.network.protocol.game.ClientboundLoginPacket.handle(ClientboundLoginPacket.java:14) ~[minecraft-1.21.10.jar:?]
 	at knot/net.minecraft.network.PacketProcessor$ListenerAndPacket.handle(PacketProcessor.java:50) [minecraft-1.21.10.jar:?]
 	at knot/net.minecraft.network.PacketProcessor.processQueuedPackets(PacketProcessor.java:37) [minecraft-1.21.10.jar:?]
 	at knot/net.minecraft.client.Minecraft.runTick(Minecraft.java:1224) [minecraft-1.21.10.jar:?]
@@ -361,149 +333,185 @@ java.io.FileNotFoundException: minecraft:entity/player/wide/hunglo
 	at net.fabricmc.loader.impl.game.minecraft.MinecraftGameProvider.launch(MinecraftGameProvider.java:536) [fabric-loader-0.18.2.jar:0.18.2]
 	at net.fabricmc.loader.impl.launch.knot.Knot.launch(Knot.java:72) [fabric-loader-0.18.2.jar:0.18.2]
 	at net.fabricmc.loader.impl.launch.knot.KnotClient.main(KnotClient.java:23) [fabric-loader-0.18.2.jar:0.18.2]
-[17:30:42] [Render thread/WARN]: Ignoring chat session from Player179 due to missing Services public key
-[17:30:42] [Render thread/INFO]: Loaded 2 advancements
-[17:30:42] [Render thread/WARN]: Error while parsing the block ID map entry for "block.10104":
-[17:30:42] [Render thread/WARN]: - The block minecraft:stone_slab has no property with the name variant, ignoring!
-[17:30:42] [Render thread/WARN]: Error while parsing the block ID map entry for "block.10944":
-[17:30:42] [Render thread/WARN]: - The block minecraft:creaking_heart has no property with the name active, ignoring!
-[17:30:42] [Render thread/WARN]: Error while parsing the block ID map entry for "block.10948":
-[17:30:42] [Render thread/WARN]: - The block minecraft:creaking_heart has no property with the name active, ignoring!
-[17:30:42] [Render thread/INFO]: Stopping worker threads
-[17:30:42] [Render thread/INFO]: Started 10 worker threads
-[17:30:42] [Render thread/INFO]: Resizing Dynamic Transforms UBO, capacity limit of 2 reached during a single frame. New capacity will be 4.
-[17:30:42] [Render thread/INFO]: Resizing Dynamic Transforms UBO, capacity limit of 4 reached during a single frame. New capacity will be 8.
-[17:30:42] [Render thread/INFO]: Resizing Dynamic Transforms UBO, capacity limit of 8 reached during a single frame. New capacity will be 16.
-[17:30:45] [Server thread/INFO]: Saving and pausing game...
-[17:30:45] [Server thread/INFO]: Saving chunks for level 'ServerLevel[New World]'/minecraft:overworld
-[17:30:45] [Server thread/INFO]: Saving chunks for level 'ServerLevel[New World]'/minecraft:the_nether
-[17:30:45] [Server thread/INFO]: Saving chunks for level 'ServerLevel[New World]'/minecraft:the_end
-[17:30:45] [Server thread/INFO]: Player179 lost connection: Disconnected
-[17:30:45] [Server thread/INFO]: Player179 left the game
-[17:30:45] [Server thread/INFO]: Stopping singleplayer server as player logged out
-[17:30:45] [Server thread/INFO]: Stopping server
-[17:30:45] [Server thread/INFO]: Saving players
-[17:30:45] [Server thread/INFO]: Saving worlds
-[17:30:45] [Server thread/INFO]: Saving chunks for level 'ServerLevel[New World]'/minecraft:overworld
-[17:30:45] [Server thread/INFO]: Saving chunks for level 'ServerLevel[New World]'/minecraft:the_nether
-[17:30:45] [Server thread/INFO]: Saving chunks for level 'ServerLevel[New World]'/minecraft:the_end
-[17:30:45] [Server thread/INFO]: ThreadedAnvilChunkStorage (New World): All chunks are saved
-[17:30:45] [Server thread/INFO]: ThreadedAnvilChunkStorage (DIM-1): All chunks are saved
-[17:30:45] [Server thread/INFO]: ThreadedAnvilChunkStorage (DIM1): All chunks are saved
-[17:30:45] [Server thread/INFO]: ThreadedAnvilChunkStorage: All dimensions are saved
-[17:30:45] [Render thread/INFO]: Stopping worker threads
-[17:30:47] [Render thread/INFO]: [Options Save] Saving shaderPackName: value = 'ComplementaryHungLoIfied.zip'
-[17:30:47] [Render thread/INFO]: [Options Save] Saving enableShaders: value = true, json = true
-[17:30:47] [Render thread/INFO]: [Options Save] Completed options save successfully
-[17:30:48] [Render thread/INFO]: [Options Save] Saving shaderPackName: value = 'ComplementaryHungLoIfied.zip'
-[17:30:48] [Render thread/INFO]: [Options Save] Saving enableShaders: value = true, json = true
-[17:30:48] [Render thread/INFO]: [Options Save] Completed options save successfully
-[17:30:50] [Render thread/INFO]: [Options Save] Saving shaderPackName: value = 'ComplementaryHungLoIfied.zip'
-[17:30:50] [Render thread/INFO]: [Options Save] Saving enableShaders: value = true, json = true
-[17:30:50] [Render thread/INFO]: [Options Save] Completed options save successfully
-[17:30:51] [Render thread/INFO]: [Options Save] Saving shaderPackName: value = 'ComplementaryHungLoIfied.zip'
-[17:30:51] [Render thread/INFO]: [Options Save] Saving enableShaders: value = true, json = true
-[17:30:51] [Render thread/INFO]: [Options Save] Completed options save successfully
-[17:30:53] [Render thread/INFO]: Loaded 20 skins (0 custom)
-[17:30:53] [Render thread/INFO]: [Options Save] Saving shaderPackName: value = 'ComplementaryHungLoIfied.zip'
-[17:30:53] [Render thread/INFO]: [Options Save] Saving enableShaders: value = true, json = true
-[17:30:53] [Render thread/INFO]: [Options Save] Completed options save successfully
-[17:30:54] [Render thread/INFO]: [Options Save] Saving shaderPackName: value = 'ComplementaryHungLoIfied.zip'
-[17:30:54] [Render thread/INFO]: [Options Save] Saving enableShaders: value = true, json = true
-[17:30:54] [Render thread/INFO]: [Options Save] Completed options save successfully
-[17:30:55] [Render thread/INFO]: [Options Save] Saving shaderPackName: value = 'ComplementaryHungLoIfied.zip'
-[17:30:55] [Render thread/INFO]: [Options Save] Saving enableShaders: value = true, json = true
-[17:30:55] [Render thread/INFO]: [Options Save] Completed options save successfully
-[17:30:55] [Render thread/INFO]: [Options Save] Saving shaderPackName: value = 'ComplementaryHungLoIfied.zip'
-[17:30:55] [Render thread/INFO]: [Options Save] Saving enableShaders: value = true, json = true
-[17:30:55] [Render thread/INFO]: [Options Save] Completed options save successfully
-[17:30:55] [Render thread/INFO]: [Options Save] Saving shaderPackName: value = 'ComplementaryHungLoIfied.zip'
-[17:30:55] [Render thread/INFO]: [Options Save] Saving enableShaders: value = true, json = true
-[17:30:55] [Render thread/INFO]: [Options Save] Completed options save successfully
-[17:30:56] [Render thread/INFO]: [Options Save] Saving shaderPackName: value = 'ComplementaryHungLoIfied.zip'
-[17:30:56] [Render thread/INFO]: [Options Save] Saving enableShaders: value = true, json = true
-[17:30:56] [Render thread/INFO]: [Options Save] Completed options save successfully
-[17:30:56] [Render thread/INFO]: [Options Save] Saving shaderPackName: value = 'ComplementaryHungLoIfied.zip'
-[17:30:56] [Render thread/INFO]: [Options Save] Saving enableShaders: value = true, json = true
-[17:30:56] [Render thread/INFO]: [Options Save] Completed options save successfully
-[17:30:56] [Render thread/INFO]: [Options Save] Saving shaderPackName: value = 'ComplementaryHungLoIfied.zip'
-[17:30:56] [Render thread/INFO]: [Options Save] Saving enableShaders: value = true, json = true
-[17:30:56] [Render thread/INFO]: [Options Save] Completed options save successfully
-[17:30:57] [Render thread/INFO]: [Options Save] Saving shaderPackName: value = 'ComplementaryHungLoIfied.zip'
-[17:30:57] [Render thread/INFO]: [Options Save] Saving enableShaders: value = true, json = true
-[17:30:57] [Render thread/INFO]: [Options Save] Completed options save successfully
-[17:30:57] [Render thread/INFO]: [Options Save] Saving shaderPackName: value = 'ComplementaryHungLoIfied.zip'
-[17:30:57] [Render thread/INFO]: [Options Save] Saving enableShaders: value = true, json = true
-[17:30:57] [Render thread/INFO]: [Options Save] Completed options save successfully
-[17:30:57] [Render thread/INFO]: [Options Save] Saving shaderPackName: value = 'ComplementaryHungLoIfied.zip'
-[17:30:57] [Render thread/INFO]: [Options Save] Saving enableShaders: value = true, json = true
-[17:30:57] [Render thread/INFO]: [Options Save] Completed options save successfully
-[17:30:58] [Render thread/INFO]: [Options Save] Saving shaderPackName: value = 'ComplementaryHungLoIfied.zip'
-[17:30:58] [Render thread/INFO]: [Options Save] Saving enableShaders: value = true, json = true
-[17:30:58] [Render thread/INFO]: [Options Save] Completed options save successfully
-[17:31:00] [Render thread/INFO]: Loaded 1461 recipes
-[17:31:00] [Render thread/INFO]: Loaded 1574 advancements
-[17:31:00] [Server thread/INFO]: Starting integrated minecraft server version 1.21.10
-[17:31:00] [Server thread/INFO]: Generating keypair
-[17:31:00] [Server thread/INFO]: Loading 0 persistent chunks...
-[17:31:00] [Server thread/INFO]: Loading 49 chunks for player spawn...
-[17:31:00] [Server thread/INFO]: Preparing spawn area: 16%
-[17:31:00] [Server thread/INFO]: Time elapsed: 361 ms
-[17:31:00] [Server thread/INFO]: Player179[local:E:3675c855] logged in with entity id 518 at (-35.25170924929353, 85.98259141458232, 40.06367367619874)
-[17:31:00] [Render thread/INFO]: Reloading pipeline on dimension change: minecraft:overworld => minecraft:overworld
-[17:31:00] [Render thread/INFO]: Destroying pipeline minecraft:overworld
-[17:31:00] [Render thread/INFO]: Creating pipeline for dimension minecraft:overworld
-[17:31:00] [Server thread/INFO]: Player179 joined the game
-[17:31:00] [Server thread/INFO]: Changing view distance to 12, from 10
-[17:31:00] [Server thread/INFO]: Changing simulation distance to 12, from 0
-[17:31:01] [Render thread/INFO]: Started 10 worker threads
-[17:31:01] [Render thread/ERROR]: Failed to load skin texture data
-java.io.FileNotFoundException: minecraft:entity/player/slim/hunglo
-	at knot/net.minecraft.server.packs.resources.ResourceProvider.lambda$getResourceOrThrow$1(ResourceProvider.java:18) ~[minecraft-1.21.10.jar:?]
-	at java.base/java.util.Optional.orElseThrow(Optional.java:403) ~[?:?]
-	at knot/net.minecraft.server.packs.resources.ResourceProvider.getResourceOrThrow(ResourceProvider.java:18) ~[minecraft-1.21.10.jar:?]
-	at knot/net.minecraft.client.multiplayer.ClientPacketListener.loadSkinTextureData(ClientPacketListener.java:2033) [minecraft-1.21.10.jar:?]
-	at knot/net.minecraft.client.multiplayer.ClientPacketListener.sendPlayerSkin(ClientPacketListener.java:2004) [minecraft-1.21.10.jar:?]
-	at knot/net.minecraft.client.multiplayer.ClientPacketListener.handleLogin(ClientPacketListener.java:540) [minecraft-1.21.10.jar:?]
-	at knot/net.minecraft.network.protocol.game.ClientboundLoginPacket.handle(ClientboundLoginPacket.java:67) [minecraft-1.21.10.jar:?]
-	at knot/net.minecraft.network.protocol.game.ClientboundLoginPacket.handle(ClientboundLoginPacket.java:14) [minecraft-1.21.10.jar:?]
-	at knot/net.minecraft.network.PacketProcessor$ListenerAndPacket.handle(PacketProcessor.java:50) [minecraft-1.21.10.jar:?]
-	at knot/net.minecraft.network.PacketProcessor.processQueuedPackets(PacketProcessor.java:37) [minecraft-1.21.10.jar:?]
-	at knot/net.minecraft.client.Minecraft.runTick(Minecraft.java:1224) [minecraft-1.21.10.jar:?]
+Caused by: org.spongepowered.asm.mixin.transformer.throwables.MixinTransformerError: An unexpected critical error was encountered
+	at org.spongepowered.asm.mixin.transformer.MixinProcessor.applyMixins(MixinProcessor.java:381) ~[sponge-mixin-0.16.5+mixin.0.8.7.jar:0.16.5+mixin.0.8.7]
+	at org.spongepowered.asm.mixin.transformer.MixinTransformer.transformClass(MixinTransformer.java:237) ~[sponge-mixin-0.16.5+mixin.0.8.7.jar:0.16.5+mixin.0.8.7]
+	at org.spongepowered.asm.mixin.transformer.MixinTransformer.transformClassBytes(MixinTransformer.java:202) ~[sponge-mixin-0.16.5+mixin.0.8.7.jar:0.16.5+mixin.0.8.7]
+	at net.fabricmc.loader.impl.launch.knot.KnotClassDelegate.getPostMixinClassByteArray(KnotClassDelegate.java:435) ~[fabric-loader-0.18.2.jar:0.18.2]
+	... 28 more
+Caused by: org.spongepowered.asm.mixin.injection.throwables.InjectionError: Critical injection failure: Argument modifier method setBrightness(F)F in mixins.iris.compat.sodium.json:MixinDefaultFluidRenderer from mod iris failed injection check, (0/1) succeeded. Scanned 0 target(s). No refMap loaded.
+	at org.spongepowered.asm.mixin.injection.struct.InjectionInfo.postInject(InjectionInfo.java:531) ~[sponge-mixin-0.16.5+mixin.0.8.7.jar:0.16.5+mixin.0.8.7]
+	at org.spongepowered.asm.mixin.transformer.MixinTargetContext.applyInjections(MixinTargetContext.java:1490) ~[sponge-mixin-0.16.5+mixin.0.8.7.jar:0.16.5+mixin.0.8.7]
+	at org.spongepowered.asm.mixin.transformer.MixinApplicatorStandard.applyInjections(MixinApplicatorStandard.java:752) ~[sponge-mixin-0.16.5+mixin.0.8.7.jar:0.16.5+mixin.0.8.7]
+	at org.spongepowered.asm.mixin.transformer.MixinApplicatorStandard.applyMixin(MixinApplicatorStandard.java:330) ~[sponge-mixin-0.16.5+mixin.0.8.7.jar:0.16.5+mixin.0.8.7]
+	at org.spongepowered.asm.mixin.transformer.MixinApplicatorStandard.apply(MixinApplicatorStandard.java:246) ~[sponge-mixin-0.16.5+mixin.0.8.7.jar:0.16.5+mixin.0.8.7]
+	at org.spongepowered.asm.mixin.transformer.TargetClassContext.apply(TargetClassContext.java:437) ~[sponge-mixin-0.16.5+mixin.0.8.7.jar:0.16.5+mixin.0.8.7]
+	at org.spongepowered.asm.mixin.transformer.TargetClassContext.applyMixins(TargetClassContext.java:418) ~[sponge-mixin-0.16.5+mixin.0.8.7.jar:0.16.5+mixin.0.8.7]
+	at org.spongepowered.asm.mixin.transformer.MixinProcessor.applyMixins(MixinProcessor.java:352) ~[sponge-mixin-0.16.5+mixin.0.8.7.jar:0.16.5+mixin.0.8.7]
+	at org.spongepowered.asm.mixin.transformer.MixinTransformer.transformClass(MixinTransformer.java:237) ~[sponge-mixin-0.16.5+mixin.0.8.7.jar:0.16.5+mixin.0.8.7]
+	at org.spongepowered.asm.mixin.transformer.MixinTransformer.transformClassBytes(MixinTransformer.java:202) ~[sponge-mixin-0.16.5+mixin.0.8.7.jar:0.16.5+mixin.0.8.7]
+	at net.fabricmc.loader.impl.launch.knot.KnotClassDelegate.getPostMixinClassByteArray(KnotClassDelegate.java:435) ~[fabric-loader-0.18.2.jar:0.18.2]
+	... 28 more
+[09:02:11] [Render thread/ERROR]: Unreported exception thrown!
+java.lang.NullPointerException: Cannot invoke "net.minecraft.client.player.LocalPlayer.getInventory()" because "this.minecraft.player" is null
+	at knot/net.minecraft.client.multiplayer.MultiPlayerGameMode.ensureHasSentCarriedItem(MultiPlayerGameMode.java:312) ~[minecraft-1.21.10.jar:?]
+	at knot/net.minecraft.client.multiplayer.MultiPlayerGameMode.tick(MultiPlayerGameMode.java:298) ~[minecraft-1.21.10.jar:?]
+	at knot/net.minecraft.client.Minecraft.tick(Minecraft.java:1702) ~[minecraft-1.21.10.jar:?]
+	at knot/net.minecraft.client.Minecraft.runTick(Minecraft.java:1231) ~[minecraft-1.21.10.jar:?]
 	at knot/net.minecraft.client.Minecraft.run(Minecraft.java:869) [minecraft-1.21.10.jar:?]
 	at knot/net.minecraft.client.main.Main.main(Main.java:258) [minecraft-1.21.10.jar:?]
 	at net.fabricmc.loader.impl.game.minecraft.MinecraftGameProvider.launch(MinecraftGameProvider.java:536) [fabric-loader-0.18.2.jar:0.18.2]
 	at net.fabricmc.loader.impl.launch.knot.Knot.launch(Knot.java:72) [fabric-loader-0.18.2.jar:0.18.2]
 	at net.fabricmc.loader.impl.launch.knot.KnotClient.main(KnotClient.java:23) [fabric-loader-0.18.2.jar:0.18.2]
-[17:31:01] [Render thread/WARN]: Ignoring chat session from Player179 due to missing Services public key
-[17:31:01] [Render thread/INFO]: Loaded 2 advancements
-[17:31:01] [Render thread/WARN]: Error while parsing the block ID map entry for "block.10104":
-[17:31:01] [Render thread/WARN]: - The block minecraft:stone_slab has no property with the name variant, ignoring!
-[17:31:01] [Render thread/WARN]: Error while parsing the block ID map entry for "block.10944":
-[17:31:01] [Render thread/WARN]: - The block minecraft:creaking_heart has no property with the name active, ignoring!
-[17:31:01] [Render thread/WARN]: Error while parsing the block ID map entry for "block.10948":
-[17:31:01] [Render thread/WARN]: - The block minecraft:creaking_heart has no property with the name active, ignoring!
-[17:31:01] [Render thread/INFO]: Stopping worker threads
-[17:31:01] [Render thread/INFO]: Started 10 worker threads
-[17:31:14] [Server thread/INFO]: Saving and pausing game...
-[17:31:14] [Server thread/INFO]: Saving chunks for level 'ServerLevel[New World]'/minecraft:overworld
-[17:31:14] [Server thread/INFO]: Saving chunks for level 'ServerLevel[New World]'/minecraft:the_nether
-[17:31:14] [Server thread/INFO]: Saving chunks for level 'ServerLevel[New World]'/minecraft:the_end
-[17:31:14] [Server thread/INFO]: Player179 lost connection: Disconnected
-[17:31:14] [Server thread/INFO]: Player179 left the game
-[17:31:14] [Server thread/INFO]: Stopping singleplayer server as player logged out
-[17:31:14] [Server thread/INFO]: Stopping server
-[17:31:14] [Server thread/INFO]: Saving players
-[17:31:14] [Server thread/INFO]: Saving worlds
-[17:31:14] [Server thread/INFO]: Saving chunks for level 'ServerLevel[New World]'/minecraft:overworld
-[17:31:14] [Server thread/INFO]: Saving chunks for level 'ServerLevel[New World]'/minecraft:the_nether
-[17:31:14] [Server thread/INFO]: Saving chunks for level 'ServerLevel[New World]'/minecraft:the_end
-[17:31:14] [Server thread/INFO]: ThreadedAnvilChunkStorage (New World): All chunks are saved
-[17:31:14] [Server thread/INFO]: ThreadedAnvilChunkStorage (DIM-1): All chunks are saved
-[17:31:14] [Server thread/INFO]: ThreadedAnvilChunkStorage (DIM1): All chunks are saved
-[17:31:14] [Server thread/INFO]: ThreadedAnvilChunkStorage: All dimensions are saved
-[17:31:14] [Render thread/INFO]: Stopping worker threads
-[17:31:22] [Render thread/INFO]: Stopping!
+[09:02:11] [Server thread/INFO]: Player369 lost connection: Disconnected
+[09:02:11] [Server thread/INFO]: Player369 left the game
+[09:02:11] [Server thread/INFO]: Stopping singleplayer server as player logged out
+[09:02:11] [Server thread/INFO]: Stopping server
+[09:02:11] [Server thread/INFO]: Saving players
+[09:02:11] [Server thread/INFO]: Saving worlds
+[09:02:12] [Server thread/INFO]: Saving chunks for level 'ServerLevel[New World]'/minecraft:overworld
+[09:02:12] [Server thread/INFO]: Saving chunks for level 'ServerLevel[New World]'/minecraft:the_end
+[09:02:12] [Server thread/INFO]: Saving chunks for level 'ServerLevel[New World]'/minecraft:the_nether
+[09:02:12] [Server thread/INFO]: ThreadedAnvilChunkStorage (New World): All chunks are saved
+[09:02:12] [Server thread/INFO]: ThreadedAnvilChunkStorage (DIM1): All chunks are saved
+[09:02:12] [Server thread/INFO]: ThreadedAnvilChunkStorage (DIM-1): All chunks are saved
+[09:02:12] [Server thread/INFO]: ThreadedAnvilChunkStorage: All dimensions are saved
+---- Minecraft Crash Report ----
+// Uh... Did I do that?
 
-BUILD SUCCESSFUL in 1m 17s
+Time: 2025-12-16 09:02:12
+Description: Unexpected error
+
+java.lang.NullPointerException: Cannot invoke "net.minecraft.client.player.LocalPlayer.getInventory()" because "this.minecraft.player" is null
+	at knot//net.minecraft.client.multiplayer.MultiPlayerGameMode.ensureHasSentCarriedItem(MultiPlayerGameMode.java:312)
+	at knot//net.minecraft.client.multiplayer.MultiPlayerGameMode.tick(MultiPlayerGameMode.java:298)
+	at knot//net.minecraft.client.Minecraft.tick(Minecraft.java:1702)
+	at knot//net.minecraft.client.Minecraft.runTick(Minecraft.java:1231)
+	at knot//net.minecraft.client.Minecraft.run(Minecraft.java:869)
+	at knot//net.minecraft.client.main.Main.main(Main.java:258)
+	at net.fabricmc.loader.impl.game.minecraft.MinecraftGameProvider.launch(MinecraftGameProvider.java:536)
+	at net.fabricmc.loader.impl.launch.knot.Knot.launch(Knot.java:72)
+	at net.fabricmc.loader.impl.launch.knot.KnotClient.main(KnotClient.java:23)
+
+
+A detailed walkthrough of the error, its code path and all known details is as follows:
+---------------------------------------------------------------------------------------
+
+-- Head --
+Thread: Render thread
+Stacktrace:
+	at knot//net.minecraft.client.multiplayer.MultiPlayerGameMode.ensureHasSentCarriedItem(MultiPlayerGameMode.java:312)
+	at knot//net.minecraft.client.multiplayer.MultiPlayerGameMode.tick(MultiPlayerGameMode.java:298)
+
+-- Uptime --
+Details:
+	JVM uptime: 15.461s
+	Wall uptime: 12.006s
+	High-res time: 11.808s
+	Client ticks: 164 ticks / 8.200s
+Stacktrace:
+	at knot//net.minecraft.client.Minecraft.fillReport(Minecraft.java:2250)
+	at knot//net.minecraft.client.Minecraft.emergencySaveAndCrash(Minecraft.java:947)
+	at knot//net.minecraft.client.Minecraft.run(Minecraft.java:906)
+	at knot//net.minecraft.client.main.Main.main(Main.java:258)
+	at net.fabricmc.loader.impl.game.minecraft.MinecraftGameProvider.launch(MinecraftGameProvider.java:536)
+	at net.fabricmc.loader.impl.launch.knot.Knot.launch(Knot.java:72)
+	at net.fabricmc.loader.impl.launch.knot.KnotClient.main(KnotClient.java:23)
+
+-- Affected level --
+Details:
+	All players: 0 total; 
+	Chunk stats: 729, 0
+	Level dimension: minecraft:overworld
+	Level spawn location: World: (8,64,8), Section: (at 8,0,8 in 0,4,0; chunk contains blocks 0,-64,0 to 15,319,15), Region: (0,0; contains chunks 0,0 to 31,31, blocks 0,-64,0 to 511,319,511)
+	Level time: 0 game time, 0 day time
+	Server brand: ~~ERROR~~ NullPointerException: Cannot read field "connection" because "this.minecraft.player" is null
+	Server type: Integrated singleplayer server
+	Tracked entity count: 0
+
+-- Last reload --
+Details:
+	Reload number: 1
+	Reload reason: initial
+	Finished: Yes
+	Packs: vanilla
+
+-- System Details --
+Details:
+	Minecraft Version: 1.21.10
+	Minecraft Version ID: 1.21.10
+	Operating System: Linux (amd64) version 6.14.0-36-generic
+	Java Version: 21.0.5, Eclipse Adoptium
+	Java VM Version: OpenJDK 64-Bit Server VM (mixed mode, sharing), Eclipse Adoptium
+	Memory: 181693328 bytes (173 MiB) / 587202560 bytes (560 MiB) up to 2147483648 bytes (2048 MiB)
+	CPUs: 20
+	Processor Vendor: GenuineIntel
+	Processor Name: 12th Gen Intel(R) Core(TM) i7-12700K
+	Identifier: Intel64 Family 6 Model 151 Stepping 2
+	Microarchitecture: Alder Lake
+	Frequency (GHz): 5.10
+	Number of physical packages: 1
+	Number of physical CPUs: 12
+	Number of logical CPUs: 20
+	Graphics card #0 name: GA102 [GeForce RTX 3080 Ti]
+	Graphics card #0 vendor: NVIDIA Corporation (0x10de)
+	Graphics card #0 VRAM (MiB): 16416.00
+	Graphics card #0 deviceId: 0x2208
+	Graphics card #0 versionInfo: unknown
+	Virtual memory max (MiB): 32300.84
+	Virtual memory used (MiB): 16924.86
+	Swap memory total (MiB): 16384.00
+	Swap memory used (MiB): 4245.17
+	Space in storage for jna.tmpdir (MiB): <path not set>
+	Space in storage for org.lwjgl.system.SharedLibraryExtractPath (MiB): <path not set>
+	Space in storage for io.netty.native.workdir (MiB): <path not set>
+	Space in storage for java.io.tmpdir (MiB): available: 15836.88, total: 15916.84
+	Space in storage for workdir (MiB): available: 291499.19, total: 937500.69
+	JVM Flags: 19 total; -XX:+UseG1GC -XX:+ParallelRefProcEnabled -XX:MaxGCPauseMillis=200 -XX:+UnlockExperimentalVMOptions -XX:+DisableExplicitGC -XX:G1NewSizePercent=30 -XX:G1MaxNewSizePercent=40 -XX:G1HeapRegionSize=8M -XX:G1ReservePercent=20 -XX:G1HeapWastePercent=5 -XX:G1MixedGCCountTarget=4 -XX:InitiatingHeapOccupancyPercent=15 -XX:G1MixedGCLiveThresholdPercent=90 -XX:G1RSetUpdatingPauseTimePercent=5 -XX:SurvivorRatio=32 -XX:+PerfDisableSharedMem -XX:MaxTenuringThreshold=1 -Xms512M -Xmx2G
+	Debug Flags: 0 total; 
+	Loaded Shaderpack: ComplementaryHungLoIfied.zip
+		Profile: HIGH (+0 options changed by user)
+	Launched Version: 1.21.10
+	Backend library: LWJGL version 3.3.3-snapshot
+	Backend API: NVIDIA GeForce RTX 3080 Ti/PCIe/SSE2 GL version 3.3.0 NVIDIA 580.95.05, NVIDIA Corporation
+	Window size: 854x480
+	GFLW Platform: x11
+	Render Extensions: GL_ARB_buffer_storage, GL_KHR_debug, GL_ARB_vertex_attrib_binding, GL_ARB_direct_state_access
+	GL debug messages: 
+	Is Modded: Definitely; Client brand changed to 'fabric'; Server brand changed to 'fabric'
+	Universe: 400921fb54442d18
+	Type: Integrated Server (map_client.txt)
+	Graphics mode: fancy
+	Render Distance: 12/12 chunks
+	Resource Packs: vanilla
+	Current Language: en_us
+	Locale: en_US
+	System encoding: UTF-8
+	File encoding: UTF-8
+	CPU: 20x 12th Gen Intel(R) Core(TM) i7-12700K
+	Server Running: false
+	Player Count: 0 / 8; []
+	Active Data Packs: vanilla
+	Available Data Packs: minecart_improvements, redstone_experiments, trade_rebalance, vanilla
+	Enabled Feature Flags: minecraft:vanilla
+	World Generation: Stable
+	World Seed: 2191965471159655822
+	Suppressed Exceptions: ~~NONE~~
+#@!@# Game crashed! Crash report saved to: #@!@# /home/matt/Documents/Repos/MattMC/run/crash-reports/crash-2025-12-16_09.02.12-client.txt
+
+> Task :runClient FAILED
+
+FAILURE: Build failed with an exception.
+
+* What went wrong:
+Execution failed for task ':runClient'.
+> Process 'command '/home/matt/Documents/Repos/MattMC/run/jdk-21/bin/java'' finished with non-zero exit value 255
+
+* Try:
+> Run with --stacktrace option to get the stack trace.
+> Run with --info or --debug option to get more log output.
+> Run with --scan to get full insights.
+> Get more help at https://help.gradle.org.
+
+BUILD FAILED in 18s
 15 actionable tasks: 5 executed, 10 up-to-date

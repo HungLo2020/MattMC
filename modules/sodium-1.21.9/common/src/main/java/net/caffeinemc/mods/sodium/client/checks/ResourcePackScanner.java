@@ -1,7 +1,7 @@
 package net.caffeinemc.mods.sodium.client.checks;
 
-import net.caffeinemc.mods.sodium.client.console.Console;
-import net.caffeinemc.mods.sodium.client.console.message.MessageLevel;
+import net.minecraft.client.renderer.sodium.console.Console;
+import net.minecraft.client.renderer.sodium.console.message.MessageLevel;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.packs.*;
 import net.minecraft.server.packs.resources.ResourceManager;
@@ -73,27 +73,27 @@ public class ResourcePackScanner {
         boolean shown = false;
 
         if (!incompatibleResourcePacks.isEmpty()) {
-            showConsoleMessage("sodium.console.core_shaders_error", true, MessageLevel.SEVERE);
+            showConsoleMessage("sodium.console.core_shaders_error", true, net.minecraft.client.renderer.sodium.console.message.MessageLevel.SEVERE);
 
             for (var entry : incompatibleResourcePacks) {
-                showConsoleMessage(getResourcePackName(entry.resourcePack), false, MessageLevel.SEVERE);
+                showConsoleMessage(getResourcePackName(entry.resourcePack), false, net.minecraft.client.renderer.sodium.console.message.MessageLevel.SEVERE);
             }
 
             shown = true;
         }
 
         if (!likelyIncompatibleResourcePacks.isEmpty()) {
-            showConsoleMessage("sodium.console.core_shaders_warn", true, MessageLevel.WARN);
+            showConsoleMessage("sodium.console.core_shaders_warn", true, net.minecraft.client.renderer.sodium.console.message.MessageLevel.WARN);
 
             for (var entry : likelyIncompatibleResourcePacks) {
-                showConsoleMessage(getResourcePackName(entry.resourcePack), false, MessageLevel.WARN);
+                showConsoleMessage(getResourcePackName(entry.resourcePack), false, net.minecraft.client.renderer.sodium.console.message.MessageLevel.WARN);
             }
 
             shown = true;
         }
 
         if (shown) {
-            showConsoleMessage("sodium.console.core_shaders_info", true, MessageLevel.INFO);
+            showConsoleMessage("sodium.console.core_shaders_info", true, net.minecraft.client.renderer.sodium.console.message.MessageLevel.INFO);
         }
     }
 
@@ -207,7 +207,7 @@ public class ResourcePackScanner {
     }
 
     private static void showConsoleMessage(String message, boolean translatable, MessageLevel messageLevel) {
-        Console.instance().logMessage(messageLevel, message, translatable, 12.5);
+        net.minecraft.client.renderer.sodium.console.Console.instance().logMessage(messageLevel, message, translatable, 12.5);
     }
 
     private record ScannedResourcePack(PackResources resourcePack,

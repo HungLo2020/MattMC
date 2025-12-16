@@ -105,6 +105,20 @@ public class TextureAtlas extends AbstractTexture implements Dumpable, Tickable 
 		}
 	}
 
+	/**
+	 * Returns the width of this texture atlas. Added for Sodium integration.
+	 */
+	public int getWidth() {
+		return this.width;
+	}
+
+	/**
+	 * Returns the height of this texture atlas. Added for Sodium integration.
+	 */
+	public int getHeight() {
+		return this.height;
+	}
+
 	@Override
 	public void dumpContents(ResourceLocation resourceLocation, Path path) throws IOException {
 		String string = resourceLocation.toDebugFileName();
@@ -194,13 +208,5 @@ public class TextureAtlas extends AbstractTexture implements Dumpable, Tickable 
 
 	public int maxSupportedTextureSize() {
 		return this.maxSupportedTextureSize;
-	}
-
-	int getWidth() {
-		return this.width;
-	}
-
-	int getHeight() {
-		return this.height;
 	}
 }

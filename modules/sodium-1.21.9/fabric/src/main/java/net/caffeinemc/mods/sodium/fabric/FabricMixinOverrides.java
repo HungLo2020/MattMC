@@ -1,6 +1,6 @@
 package net.caffeinemc.mods.sodium.fabric;
 
-import net.caffeinemc.mods.sodium.client.services.PlatformMixinOverrides;
+import net.minecraft.client.renderer.sodium.services.PlatformMixinOverrides;
 import net.fabricmc.loader.api.FabricLoader;
 import net.fabricmc.loader.api.ModContainer;
 import net.fabricmc.loader.api.metadata.CustomValue;

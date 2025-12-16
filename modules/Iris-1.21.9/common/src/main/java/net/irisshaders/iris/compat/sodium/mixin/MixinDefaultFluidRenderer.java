@@ -1,14 +1,14 @@
 package net.irisshaders.iris.compat.sodium.mixin;
 
 import com.llamalad7.mixinextras.sugar.Local;
-import net.caffeinemc.mods.sodium.client.model.quad.ModelQuadView;
-import net.caffeinemc.mods.sodium.client.model.quad.properties.ModelQuadFacing;
-import net.caffeinemc.mods.sodium.client.render.chunk.compile.buffers.ChunkModelBuilder;
-import net.caffeinemc.mods.sodium.client.render.chunk.compile.pipeline.DefaultFluidRenderer;
-import net.caffeinemc.mods.sodium.client.render.chunk.terrain.material.Material;
-import net.caffeinemc.mods.sodium.client.render.chunk.translucent_sorting.TranslucentGeometryCollector;
-import net.caffeinemc.mods.sodium.client.render.chunk.vertex.format.ChunkVertexEncoder;
-import net.caffeinemc.mods.sodium.client.render.frapi.mesh.MutableQuadViewImpl;
+import net.minecraft.client.renderer.sodium.model.quad.ModelQuadView;
+import net.minecraft.client.renderer.sodium.model.quad.properties.ModelQuadFacing;
+import net.minecraft.client.renderer.chunk.advanced.compile.buffers.ChunkModelBuilder;
+import net.minecraft.client.renderer.chunk.advanced.compile.pipeline.DefaultFluidRenderer;
+import net.minecraft.client.renderer.chunk.advanced.terrain.material.Material;
+import net.minecraft.client.renderer.chunk.advanced.translucent_sorting.TranslucentGeometryCollector;
+import net.minecraft.client.renderer.chunk.advanced.vertex.format.ChunkVertexEncoder;
+import net.minecraft.client.renderer.sodium.render.frapi.mesh.MutableQuadViewImpl;
 import net.irisshaders.iris.shaderpack.materialmap.WorldRenderingSettings;
 import net.irisshaders.iris.vertices.sodium.terrain.ChunkVertexExtension;
 import net.irisshaders.iris.vertices.sodium.terrain.VertexEncoderInterface;
@@ -22,12 +22,12 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 @Mixin(DefaultFluidRenderer.class)
 public class MixinDefaultFluidRenderer implements VertexEncoderInterface {
-	@ModifyArg(method = "render", at = @At(value = "INVOKE", target = "Lnet/caffeinemc/mods/sodium/client/render/chunk/compile/" +
-		"pipeline/DefaultFluidRenderer;updateQuad(Lnet/caffeinemc/mods/sodium/client/model/quad/ModelQuadViewMutable;" +
-		"Lnet/caffeinemc/mods/sodium/client/world/LevelSlice;Lnet/minecraft/core/BlockPos;Lnet/caffeinemc/" +
-		"mods/sodium/client/model/light/LightPipeline;Lnet/minecraft/core/Direction;Lnet/caffeinemc/mods/" +
-		"sodium/client/model/quad/properties/ModelQuadFacing" +
-		";FLnet/caffeinemc/mods/sodium/client/model/color/ColorProvider;Lnet/minecraft/world/level/material/FluidState;)V", ordinal = 2))
+	@ModifyArg(method = "render", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/renderer/chunk/advanced/compile/" +
+		"pipeline/DefaultFluidRenderer;updateQuad(Lnet/minecraft/client/renderer/sodium/model/quad/ModelQuadViewMutable;" +
+		"Lnet/minecraft/client/renderer/sodium/world/LevelSlice;Lnet/minecraft/core/BlockPos;Lnet/minecraft/" +
+		"client/renderer/sodium/model/light/LightPipeline;Lnet/minecraft/core/Direction;Lnet/minecraft/client/renderer/" +
+		"sodium/model/quad/properties/ModelQuadFacing" +
+		";FLnet/minecraft/client/renderer/sodium/model/color/ColorProvider;Lnet/minecraft/world/level/material/FluidState;)V", ordinal = 2))
 	private float setBrightness(float br) {
 		return WorldRenderingSettings.INSTANCE.shouldDisableDirectionalShading() ? 1.0f : br;
 	}
@@ -54,7 +54,7 @@ public class MixinDefaultFluidRenderer implements VertexEncoderInterface {
 		this.localZ = z;
 	}
 
-	@Inject(method = "writeQuad", at = @At(value = "FIELD", target = "Lnet/caffeinemc/mods/sodium/client/render/chunk/vertex/format/ChunkVertexEncoder$Vertex;x:F"))
+	@Inject(method = "writeQuad", at = @At(value = "FIELD", target = "Lnet/minecraft/client/renderer/chunk/advanced/vertex/format/ChunkVertexEncoder$Vertex;x:F"))
 	private void iris$writeVertex(ChunkModelBuilder builder, TranslucentGeometryCollector collector, Material material, BlockPos offset, ModelQuadView quad, ModelQuadFacing facing, boolean flip, CallbackInfo ci, @Local ChunkVertexEncoder.Vertex vertex) {
 		((ChunkVertexExtension) vertex).iris$setData(lightEmission, isFluid, blockId, localX, localY, localZ);
 	}

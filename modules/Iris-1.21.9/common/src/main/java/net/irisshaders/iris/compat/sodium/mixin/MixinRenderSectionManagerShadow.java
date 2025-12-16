@@ -2,18 +2,18 @@ package net.irisshaders.iris.compat.sodium.mixin;
 
 import com.llamalad7.mixinextras.injector.wrapmethod.WrapMethod;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
-import net.caffeinemc.mods.sodium.client.SodiumClientMod;
-import net.caffeinemc.mods.sodium.client.gl.device.CommandList;
-import net.caffeinemc.mods.sodium.client.render.chunk.RenderSection;
-import net.caffeinemc.mods.sodium.client.render.chunk.RenderSectionManager;
-import net.caffeinemc.mods.sodium.client.render.chunk.TaskQueueType;
-import net.caffeinemc.mods.sodium.client.render.chunk.data.BuiltSectionInfo;
-import net.caffeinemc.mods.sodium.client.render.chunk.lists.SortedRenderLists;
-import net.caffeinemc.mods.sodium.client.render.chunk.lists.TreeSectionCollector;
-import net.caffeinemc.mods.sodium.client.render.chunk.region.RenderRegionManager;
-import net.caffeinemc.mods.sodium.client.render.chunk.translucent_sorting.SortBehavior;
-import net.caffeinemc.mods.sodium.client.render.viewport.Viewport;
-import net.caffeinemc.mods.sodium.client.util.FogParameters;
+import net.minecraft.client.renderer.sodium.SodiumClientMod;
+import net.minecraft.client.renderer.gl.advanced.device.CommandList;
+import net.minecraft.client.renderer.chunk.advanced.RenderSection;
+import net.minecraft.client.renderer.chunk.advanced.RenderSectionManager;
+import net.minecraft.client.renderer.chunk.advanced.TaskQueueType;
+import net.minecraft.client.renderer.chunk.advanced.data.BuiltSectionInfo;
+import net.minecraft.client.renderer.chunk.advanced.lists.SortedRenderLists;
+import net.minecraft.client.renderer.chunk.advanced.lists.TreeSectionCollector;
+import net.minecraft.client.renderer.chunk.advanced.region.RenderRegionManager;
+import net.minecraft.client.renderer.chunk.advanced.translucent_sorting.SortBehavior;
+import net.minecraft.client.renderer.sodium.render.viewport.Viewport;
+import net.minecraft.client.renderer.sodium.util.FogParameters;
 import net.irisshaders.iris.mixinterface.ShadowRenderRegion;
 import net.irisshaders.iris.shadows.ShadowRenderingState;
 import net.minecraft.client.Camera;
@@ -74,7 +74,7 @@ public abstract class MixinRenderSectionManagerShadow {
 		}
 	}
 
-	@Redirect(remap = false, method = "finalizeRenderLists", at = @At(value = "FIELD", target = "Lnet/caffeinemc/mods/sodium/client/render/chunk/RenderSectionManager;renderLists:Lnet/caffeinemc/mods/sodium/client/render/chunk/lists/SortedRenderLists;"))
+	@Redirect(remap = false, method = "finalizeRenderLists", at = @At(value = "FIELD", target = "Lnet/minecraft/client/renderer/chunk/advanced/RenderSectionManager;renderLists:Lnet/minecraft/client/renderer/chunk/advanced/lists/SortedRenderLists;"))
 	private void useShadowRenderList(RenderSectionManager instance, SortedRenderLists value) {
 		if (ShadowRenderingState.areShadowsCurrentlyBeingRendered()) {
 			shadowRenderLists = value;
@@ -116,7 +116,7 @@ public abstract class MixinRenderSectionManagerShadow {
 		this.shadowNeedsRenderListUpdate = true;
 	}
 
-	@Redirect(remap = false, method = "createTerrainRenderList", at = @At(value = "FIELD", target = "Lnet/caffeinemc/mods/sodium/client/render/chunk/RenderSectionManager;taskLists:Ljava/util/Map;"))
+	@Redirect(remap = false, method = "createTerrainRenderList", at = @At(value = "FIELD", target = "Lnet/minecraft/client/renderer/chunk/advanced/RenderSectionManager;taskLists:Ljava/util/Map;"))
 	private void useShadowTaskrList(RenderSectionManager instance, @NotNull Map<TaskQueueType, ArrayDeque<RenderSection>> value) {
 		if (ShadowRenderingState.areShadowsCurrentlyBeingRendered()) {
 			shadowTaskLists = value;
@@ -128,7 +128,7 @@ public abstract class MixinRenderSectionManagerShadow {
 	/**
 	 * Adding a note for myself: This is how the occlusion culling skip for the shadow map is done. Remember this.
 	 */
-	@Redirect(method = "createTerrainRenderList", at = @At(value = "INVOKE", target = "Lnet/caffeinemc/mods/sodium/client/render/chunk/RenderSectionManager;isOutOfGraph(Lnet/minecraft/core/SectionPos;)Z"))
+	@Redirect(method = "createTerrainRenderList", at = @At(value = "INVOKE", target = "Lnet/minecraft/client/renderer/chunk/advanced/RenderSectionManager;isOutOfGraph(Lnet/minecraft/core/SectionPos;)Z"))
 	private boolean iris$setOutOfGraph(RenderSectionManager instance, SectionPos pos) {
 		return ShadowRenderingState.areShadowsCurrentlyBeingRendered() || this.isOutOfGraph(pos);
 	}
@@ -137,7 +137,7 @@ public abstract class MixinRenderSectionManagerShadow {
 		"getRenderLists",
 		"getVisibleChunkCount",
 		"renderLayer"
-	}, at = @At(value = "FIELD", target = "Lnet/caffeinemc/mods/sodium/client/render/chunk/RenderSectionManager;renderLists:Lnet/caffeinemc/mods/sodium/client/render/chunk/lists/SortedRenderLists;"), remap = false)
+	}, at = @At(value = "FIELD", target = "Lnet/minecraft/client/renderer/chunk/advanced/RenderSectionManager;renderLists:Lnet/minecraft/client/renderer/chunk/advanced/lists/SortedRenderLists;"), remap = false)
 	private SortedRenderLists useShadowRenderList2(RenderSectionManager instance) {
 		return ShadowRenderingState.areShadowsCurrentlyBeingRendered() ? shadowRenderLists : renderLists;
 	}
@@ -154,15 +154,15 @@ public abstract class MixinRenderSectionManagerShadow {
 
 	@Redirect(method = {
 		"resetRenderLists",
-		"submitSectionTasks(Lnet/caffeinemc/mods/sodium/client/render/chunk/compile/executor/ChunkJobCollector;Lnet/caffeinemc/mods/sodium/client/render/chunk/compile/estimation/UploadResourceBudget;Lnet/caffeinemc/mods/sodium/client/render/chunk/TaskQueueType;)V"
-	}, at = @At(value = "FIELD", target = "Lnet/caffeinemc/mods/sodium/client/render/chunk/RenderSectionManager;taskLists:Ljava/util/Map;"), remap = false)
+		"submitSectionTasks(Lnet/minecraft/client/renderer/chunk/advanced/compile/executor/ChunkJobCollector;Lnet/minecraft/client/renderer/chunk/advanced/compile/estimation/UploadResourceBudget;Lnet/minecraft/client/renderer/chunk/advanced/TaskQueueType;)V"
+	}, at = @At(value = "FIELD", target = "Lnet/minecraft/client/renderer/chunk/advanced/RenderSectionManager;taskLists:Ljava/util/Map;"), remap = false)
 	private @NotNull Map<TaskQueueType, ArrayDeque<RenderSection>> useShadowTaskList3(RenderSectionManager instance) {
 		return ShadowRenderingState.areShadowsCurrentlyBeingRendered() ? shadowTaskLists : taskLists;
 	}
 
 	@Redirect(method = {
 		"resetRenderLists"
-	}, at = @At(value = "FIELD", target = "Lnet/caffeinemc/mods/sodium/client/render/chunk/RenderSectionManager;renderLists:Lnet/caffeinemc/mods/sodium/client/render/chunk/lists/SortedRenderLists;"), remap = false)
+	}, at = @At(value = "FIELD", target = "Lnet/minecraft/client/renderer/chunk/advanced/RenderSectionManager;renderLists:Lnet/minecraft/client/renderer/chunk/advanced/lists/SortedRenderLists;"), remap = false)
 	private void useShadowRenderList3(RenderSectionManager instance, SortedRenderLists value) {
 		if (ShadowRenderingState.areShadowsCurrentlyBeingRendered()) shadowRenderLists = value;
 		else renderLists = value;

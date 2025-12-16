@@ -35,7 +35,8 @@ public class SnifferRenderer extends AgeableMobRenderer<Sniffer, SnifferRenderSt
 		snifferRenderState.scentingAnimationState.copyFrom(sniffer.scentingAnimationState);
 	}
 
-	protected AABB getBoundingBoxForCulling(Sniffer sniffer) {
+	@Override
+	public AABB getBoundingBoxForCulling(Sniffer sniffer) {
 		return super.getBoundingBoxForCulling(sniffer).inflate(0.6F);
 	}
 }

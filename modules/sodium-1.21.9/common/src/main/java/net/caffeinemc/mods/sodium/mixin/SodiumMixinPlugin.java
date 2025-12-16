@@ -1,7 +1,8 @@
 package net.caffeinemc.mods.sodium.mixin;
 
-import net.caffeinemc.mods.sodium.client.data.config.MixinConfig;
-import net.caffeinemc.mods.sodium.client.services.PlatformRuntimeInformation;
+import net.minecraft.client.renderer.sodium.data.config.MixinConfig;
+import net.minecraft.client.renderer.sodium.data.config.MixinOption;
+import net.minecraft.client.renderer.sodium.services.PlatformRuntimeInformation;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.objectweb.asm.tree.ClassNode;

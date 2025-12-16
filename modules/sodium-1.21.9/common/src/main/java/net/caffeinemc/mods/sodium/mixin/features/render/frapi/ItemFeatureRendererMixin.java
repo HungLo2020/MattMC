@@ -1,9 +1,9 @@
 package net.caffeinemc.mods.sodium.mixin.features.render.frapi;
 
 import com.mojang.blaze3d.vertex.PoseStack;
-import net.caffeinemc.mods.sodium.client.render.frapi.render.ItemRenderContext;
-import net.caffeinemc.mods.sodium.client.render.frapi.render.MeshItemCommand;
-import net.caffeinemc.mods.sodium.client.render.frapi.render.SubmitNodeCollectionExtension;
+import net.minecraft.client.renderer.sodium.render.frapi.render.ItemRenderContext;
+import net.minecraft.client.renderer.sodium.render.frapi.render.MeshItemCommand;
+import net.minecraft.client.renderer.sodium.render.frapi.render.SubmitNodeCollectionExtension;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.OutlineBufferSource;
 import net.minecraft.client.renderer.SubmitNodeCollection;

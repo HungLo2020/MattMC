@@ -7,10 +7,10 @@ import com.mojang.blaze3d.platform.Window;
 import com.mojang.blaze3d.platform.WindowEventHandler;
 import com.mojang.blaze3d.shaders.ShaderType;
 import com.mojang.blaze3d.systems.RenderSystem;
-import net.caffeinemc.mods.sodium.client.compatibility.checks.ModuleScanner;
-import net.caffeinemc.mods.sodium.client.compatibility.checks.PostLaunchChecks;
-import net.caffeinemc.mods.sodium.client.compatibility.environment.GlContextInfo;
-import net.caffeinemc.mods.sodium.client.platform.NativeWindowHandle;
+import net.minecraft.client.renderer.sodium.compatibility.checks.ModuleScanner;
+import net.minecraft.client.renderer.sodium.compatibility.checks.PostLaunchChecks;
+import net.minecraft.client.renderer.sodium.compatibility.environment.GlContextInfo;
+import net.minecraft.client.renderer.sodium.platform.NativeWindowHandle;
 import net.minecraft.Util;
 import net.minecraft.resources.ResourceLocation;
 import org.lwjgl.glfw.GLFWNativeWin32;
@@ -50,10 +50,10 @@ public class RenderSystemMixin {
             wglPrevContext = MemoryUtil.NULL;
         }
 
-        NativeWindowHandle handle = () -> GLFWNativeWin32.glfwGetWin32Window(window);
+        net.minecraft.client.renderer.sodium.platform.NativeWindowHandle handle = () -> GLFWNativeWin32.glfwGetWin32Window(window);
 
-        PostLaunchChecks.onContextInitialized(handle, context);
-        ModuleScanner.checkModules(handle);
+        net.minecraft.client.renderer.sodium.compatibility.checks.PostLaunchChecks.onContextInitialized(handle, context);
+        net.minecraft.client.renderer.sodium.compatibility.checks.ModuleScanner.checkModules(handle);
     }
 
     @Inject(method = "flipFrame", at = @At(value = "RETURN"))
@@ -75,7 +75,7 @@ public class RenderSystemMixin {
 
         // Likely, this indicates a module was injected into the current process. We should check that
         // nothing problematic was just installed.
-        ModuleScanner.checkModules(() -> GLFWNativeWin32.glfwGetWin32Window(window.handle()));
+        net.minecraft.client.renderer.sodium.compatibility.checks.ModuleScanner.checkModules(() -> GLFWNativeWin32.glfwGetWin32Window(window.handle()));
 
         // If we didn't find anything problematic (which would have thrown an exception), then let's just record
         // the new context pointer and carry on.
