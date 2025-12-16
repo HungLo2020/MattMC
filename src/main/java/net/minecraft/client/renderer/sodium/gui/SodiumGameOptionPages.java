@@ -1,4 +1,4 @@
-package net.caffeinemc.mods.sodium.client.gui;
+package net.minecraft.client.renderer.sodium.gui;
 
 import com.google.common.collect.ImmutableList;
 import com.mojang.blaze3d.pipeline.RenderTarget;

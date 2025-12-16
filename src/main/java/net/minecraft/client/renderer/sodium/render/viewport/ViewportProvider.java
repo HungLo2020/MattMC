@@ -1,4 +1,4 @@
-package net.caffeinemc.mods.sodium.client.render.viewport;
+package net.minecraft.client.renderer.sodium.render.viewport;
 
 public interface ViewportProvider {
     Viewport sodium$createViewport();

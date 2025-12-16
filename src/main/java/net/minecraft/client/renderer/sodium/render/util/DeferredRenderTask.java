@@ -1,4 +1,4 @@
-package net.caffeinemc.mods.sodium.client.render.util;
+package net.minecraft.client.renderer.sodium.render.util;
 
 import java.util.concurrent.ConcurrentLinkedDeque;
 

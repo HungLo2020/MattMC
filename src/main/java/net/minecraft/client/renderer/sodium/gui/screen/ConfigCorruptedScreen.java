@@ -1,4 +1,4 @@
-package net.caffeinemc.mods.sodium.client.gui.screen;
+package net.minecraft.client.renderer.sodium.gui.screen;
 
 import net.minecraft.client.renderer.sodium.SodiumClientMod;
 import net.minecraft.client.renderer.sodium.console.Console;

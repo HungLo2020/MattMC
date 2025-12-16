@@ -1,4 +1,4 @@
-package net.caffeinemc.mods.sodium.client.checks;
+package net.minecraft.client.renderer.sodium.checks;
 
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;

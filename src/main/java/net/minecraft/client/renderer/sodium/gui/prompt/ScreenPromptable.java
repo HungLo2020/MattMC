@@ -1,4 +1,4 @@
-package net.caffeinemc.mods.sodium.client.gui.prompt;
+package net.minecraft.client.renderer.sodium.gui.prompt;
 
 import net.minecraft.client.renderer.sodium.util.Dim2i;
 import org.jetbrains.annotations.Nullable;

@@ -1,4 +1,4 @@
-package net.caffeinemc.mods.sodium.client.render.viewport;
+package net.minecraft.client.renderer.sodium.render.viewport;
 
 import net.minecraft.client.renderer.chunk.advanced.region.RenderRegion;
 

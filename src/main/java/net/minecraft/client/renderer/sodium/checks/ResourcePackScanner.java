@@ -1,4 +1,4 @@
-package net.caffeinemc.mods.sodium.client.checks;
+package net.minecraft.client.renderer.sodium.checks;
 
 import net.minecraft.client.renderer.sodium.console.Console;
 import net.minecraft.client.renderer.sodium.console.message.MessageLevel;

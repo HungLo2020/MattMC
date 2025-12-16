@@ -1,4 +1,4 @@
-package net.caffeinemc.mods.sodium.client.gui;
+package net.minecraft.client.renderer.sodium.gui;
 
 import net.minecraft.client.renderer.sodium.SodiumClientMod;
 import net.minecraft.client.renderer.sodium.data.fingerprint.HashedFingerprint;
@@ -9,9 +9,9 @@ import net.minecraft.client.renderer.sodium.gui.options.*;
 import net.minecraft.client.renderer.sodium.gui.options.control.Control;
 import net.minecraft.client.renderer.sodium.gui.options.control.ControlElement;
 import net.minecraft.client.renderer.sodium.gui.options.storage.OptionStorage;
-import net.caffeinemc.mods.sodium.client.gui.prompt.ScreenPrompt;
-import net.caffeinemc.mods.sodium.client.gui.prompt.ScreenPromptable;
-import net.caffeinemc.mods.sodium.client.gui.screen.ConfigCorruptedScreen;
+import net.minecraft.client.renderer.sodium.gui.prompt.ScreenPrompt;
+import net.minecraft.client.renderer.sodium.gui.prompt.ScreenPromptable;
+import net.minecraft.client.renderer.sodium.gui.screen.ConfigCorruptedScreen;
 import net.minecraft.client.renderer.sodium.gui.widgets.FlatButtonWidget;
 import net.minecraft.client.renderer.sodium.services.PlatformRuntimeInformation;
 import net.minecraft.client.renderer.sodium.util.Dim2i;
