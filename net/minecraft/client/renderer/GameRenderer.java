@@ -100,7 +100,7 @@ import org.joml.Vector4f;
 import org.slf4j.Logger;
 
 @Environment(EnvType.CLIENT)
-public class GameRenderer implements Projector, AutoCloseable {
+public class GameRenderer implements Projector, AutoCloseable, net.minecraft.client.renderer.sodium.util.FogStorage {
 	private static final ResourceLocation BLUR_POST_CHAIN_ID = ResourceLocation.withDefaultNamespace("blur");
 	public static final int MAX_BLUR_RADIUS = 10;
 	private static final Logger LOGGER = LogUtils.getLogger();
@@ -131,6 +131,8 @@ public class GameRenderer implements Projector, AutoCloseable {
 	protected PanoramaRenderer panorama;
 	private final CrossFrameResourcePool resourcePool = new CrossFrameResourcePool(3);
 	private final FogRenderer fogRenderer = new FogRenderer();
+	// Sodium FogStorage implementation
+	private net.minecraft.client.renderer.sodium.util.FogParameters sodium$fogParameters = net.minecraft.client.renderer.sodium.util.FogParameters.NONE;
 	private final GuiRenderer guiRenderer;
 	private final GuiRenderState guiRenderState;
 	private final LevelRenderState levelRenderState = new LevelRenderState();
@@ -951,5 +953,11 @@ public class GameRenderer implements Projector, AutoCloseable {
 
 	public synchronized PanoramaRenderer getPanorama() {
 		return this.panorama;
+	}
+
+	// Sodium FogStorage interface implementation
+	@Override
+	public net.minecraft.client.renderer.sodium.util.FogParameters sodium$getFogParameters() {
+		return this.sodium$fogParameters;
 	}
 }
