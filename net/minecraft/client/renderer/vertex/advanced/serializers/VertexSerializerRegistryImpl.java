@@ -1,10 +1,10 @@
-package net.minecraft.client.renderer.sodium.render.vertex.serializers;
+package net.minecraft.client.renderer.vertex.advanced.serializers;
 
 import com.mojang.blaze3d.vertex.VertexFormat;
 import it.unimi.dsi.fastutil.longs.Long2ReferenceMap;
 import it.unimi.dsi.fastutil.longs.Long2ReferenceOpenHashMap;
 import net.minecraft.client.renderer.advanced.vertex.format.VertexFormatExtensions;
-import net.minecraft.client.renderer.sodium.render.vertex.serializers.generated.VertexSerializerFactory;
+import net.minecraft.client.renderer.vertex.advanced.serializers.generated.VertexSerializerFactory;
 import net.minecraft.client.renderer.advanced.vertex.serializer.VertexSerializer;
 import net.minecraft.client.renderer.advanced.vertex.serializer.VertexSerializerRegistry;
 import org.slf4j.Logger;
