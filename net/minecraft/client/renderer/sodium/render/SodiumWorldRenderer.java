@@ -25,7 +25,7 @@ import net.minecraft.client.renderer.sodium.services.PlatformRuntimeInformation;
 import net.minecraft.client.renderer.sodium.util.FogParameters;
 import net.minecraft.client.renderer.sodium.util.NativeBuffer;
 import net.minecraft.client.renderer.sodium.world.LevelRendererExtension;
-import net.minecraft.client.renderer.sodium.mixin.EntityRendererAccessor;
+import net.caffeinemc.mods.sodium.mixin.core.render.world.EntityRendererAccessor;
 import net.minecraft.client.Camera;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;

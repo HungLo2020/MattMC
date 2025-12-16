@@ -12,7 +12,7 @@ import net.minecraft.client.renderer.gl.advanced.shader.uniform.GlUniformMatrix4
 import net.minecraft.client.renderer.chunk.advanced.terrain.TerrainRenderPass;
 import net.minecraft.client.renderer.chunk.advanced.vertex.format.impl.CompactChunkVertex;
 import net.minecraft.client.renderer.sodium.util.FogParameters;
-import net.minecraft.client.renderer.sodium.mixin.TextureAtlasAccessor;
+import net.caffeinemc.mods.sodium.mixin.core.render.texture.TextureAtlasAccessor;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.texture.TextureAtlas;
 import org.joml.Matrix4fc;

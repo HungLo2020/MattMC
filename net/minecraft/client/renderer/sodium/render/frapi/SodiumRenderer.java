@@ -23,8 +23,8 @@ import net.minecraft.client.renderer.sodium.render.frapi.render.AbstractBlockRen
 import net.minecraft.client.renderer.sodium.render.frapi.render.AccessLayerRenderState;
 import net.minecraft.client.renderer.sodium.render.frapi.render.NonTerrainBlockRenderContext;
 import net.minecraft.client.renderer.sodium.render.frapi.render.SimpleBlockRenderContext;
-import net.minecraft.client.renderer.sodium.mixin.BlockRenderDispatcherAccessor;
-import net.minecraft.client.renderer.sodium.mixin.ModelBlockRendererAccessor;
+import net.caffeinemc.mods.sodium.mixin.features.render.frapi.BlockRenderDispatcherAccessor;
+import net.caffeinemc.mods.sodium.mixin.features.render.frapi.ModelBlockRendererAccessor;
 import net.fabricmc.fabric.api.renderer.v1.Renderer;
 import net.fabricmc.fabric.api.renderer.v1.mesh.MutableMesh;
 import net.fabricmc.fabric.api.renderer.v1.mesh.QuadEmitter;

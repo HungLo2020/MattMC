@@ -1,6 +1,6 @@
 package net.minecraft.client.renderer.sodium.util;
 
-import net.minecraft.client.renderer.sodium.mixin.NativeImageAccessor;
+import net.caffeinemc.mods.sodium.mixin.features.textures.NativeImageAccessor;
 import com.mojang.blaze3d.platform.NativeImage;
 
 import java.util.Locale;

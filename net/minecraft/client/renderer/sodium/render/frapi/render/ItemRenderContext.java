@@ -27,7 +27,7 @@ import net.minecraft.client.renderer.sodium.render.frapi.mesh.EncodingFormat;
 import net.minecraft.client.renderer.sodium.render.frapi.mesh.MeshViewImpl;
 import net.minecraft.client.renderer.sodium.render.frapi.mesh.MutableQuadViewImpl;
 import net.minecraft.client.renderer.sodium.render.texture.SpriteFinderCache;
-import net.minecraft.client.renderer.sodium.mixin.ItemRendererAccessor;
+import net.caffeinemc.mods.sodium.mixin.features.render.frapi.ItemRendererAccessor;
 import net.fabricmc.fabric.api.renderer.v1.mesh.MeshView;
 import net.fabricmc.fabric.api.renderer.v1.mesh.QuadEmitter;
 import net.fabricmc.fabric.api.renderer.v1.render.RenderLayerHelper;
