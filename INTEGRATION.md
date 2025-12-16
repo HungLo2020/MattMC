@@ -576,7 +576,27 @@ net.minecraft.client.renderer.advanced/
 
 **Objective**: Move Sodium's implementation code (chunk rendering, meshing, culling) into Minecraft's renderer package.
 
-**Actions**:
+**Current Status**: ⏸️ **DEFERRED** - To be completed together with Step 8
+
+**Rationale for Deferral**:
+After attempting Step 7 migration (commit 8b3bdf19 - reverted in this commit), discovered that:
+1. **Architectural Coupling**: Sodium implementation has deep dependencies on mixin-generated accessor interfaces
+2. **Build Impact**: Migration created 1739 compilation errors due to missing mixin accessors
+3. **Interdependency**: Steps 7 and 8 are architecturally coupled - cannot complete Step 7 without Step 8
+4. **Scope Reality**: Migrating the 3 specified packages required migrating entire Sodium client (~400+ files) due to tight integration
+
+**Investigation Results** (from attempted migration in commit 8b3bdf19):
+- ✅ Successfully migrated 400+ files with correct package structure
+- ✅ Updated all imports and cross-references
+- ❌ Build failed with 1739 errors - all mixin-related
+- ❌ Mixin accessor interfaces are runtime-generated, don't exist as source files
+
+**Decision**: Steps 7 and 8 should be implemented as a single coordinated effort:
+1. First inline critical mixins (Step 8) to create necessary interfaces/methods
+2. Then migrate implementation code (Step 7) to use those inlined methods
+3. This avoids the broken-build state and ensures each commit is buildable
+
+**Original Actions** (deferred):
 1. Migrate chunk rendering implementation:
    - `net.caffeinemc.mods.sodium.client.render.chunk` → `net.minecraft.client.renderer.chunk.advanced`
    - Keep original structure but under new namespace
@@ -587,15 +607,18 @@ net.minecraft.client.renderer.advanced/
 4. Update all import statements
 5. Maintain internal package structure for now (flatten later)
 
-**Why This Step**:
+**Why This Step** (when implemented):
 - Makes Sodium's implementation part of core renderer
 - Enables direct calls instead of going through mod API
 - Simplifies build system (fewer source sets)
 
-**Zero Regression Strategy**:
+**Zero Regression Strategy** (when implemented):
 - Package moves only, preserve all class structure
 - No refactoring of internals in this step
 - Functionality identical after move
+- **Build must remain working at each commit**
+
+**Step 7 Status**: DEFERRED - Will be completed together with Step 8 as integrated migration effort.
 
 ---
 
