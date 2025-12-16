@@ -2,8 +2,8 @@
 > Configure project :
 ✓ Using bundled dependencies from libraries/deps/
   Run './libraries/download-dependencies.sh' to update bundled dependencies
-Path for java installation '/usr/lib/jvm/openjdk-21' (Common Linux Locations) does not contain a java executable
 Path for java installation '/usr/lib/jvm/openjdk-17' (Common Linux Locations) does not contain a java executable
+Path for java installation '/usr/lib/jvm/openjdk-21' (Common Linux Locations) does not contain a java executable
 
 > Task :downloadJdk SKIPPED
 
@@ -17,178 +17,106 @@ Path for java installation '/usr/lib/jvm/openjdk-17' (Common Linux Locations) do
 > Task :fabricLoaderJar UP-TO-DATE
 
 > Task :compileJava
+/home/matt/Documents/Repos/MattMC/net/minecraft/client/renderer/sodium/data/config/MixinConfig.java:5: error: package net.minecraft.client.renderer.sodium.mixin does not exist
+import net.minecraft.client.renderer.sodium.mixin.MixinOption;
+                                                 ^
+/home/matt/Documents/Repos/MattMC/net/minecraft/client/renderer/sodium/data/config/MixinConfig.java:23: error: cannot find symbol
+    private final Map<String, MixinOption> options = new HashMap<>();
+                              ^
+  symbol:   class MixinOption
+  location: class MixinConfig
+/home/matt/Documents/Repos/MattMC/net/minecraft/client/renderer/sodium/data/config/MixinConfig.java:158: error: cannot find symbol
+    public MixinOption getEffectiveOptionForMixin(String mixinClassName) {
+           ^
+  symbol:   class MixinOption
+  location: class MixinConfig
+/home/matt/Documents/Repos/MattMC/net/minecraft/client/renderer/sodium/SodiumClientMod.java:10: error: package net.caffeinemc.mods.sodium.mixin.features.gui.hooks.debug does not exist
+import net.caffeinemc.mods.sodium.mixin.features.gui.hooks.debug.DebugScreenEntriesAccessor;
+                                                                ^
+/home/matt/Documents/Repos/MattMC/net/minecraft/client/renderer/sodium/render/SodiumWorldRenderer.java:28: error: package net.caffeinemc.mods.sodium.mixin.core.render.world does not exist
+import net.caffeinemc.mods.sodium.mixin.core.render.world.EntityRendererAccessor;
+                                                         ^
+/home/matt/Documents/Repos/MattMC/net/minecraft/client/renderer/chunk/advanced/ShaderChunkRenderer.java:18: error: package net.caffeinemc.mods.sodium.mixin.core does not exist
+import net.caffeinemc.mods.sodium.mixin.core.GlCommandEncoderAccessor;
+                                            ^
+/home/matt/Documents/Repos/MattMC/net/minecraft/client/renderer/chunk/advanced/shader/DefaultShaderInterface.java:15: error: package net.caffeinemc.mods.sodium.mixin.core.render.texture does not exist
+import net.caffeinemc.mods.sodium.mixin.core.render.texture.TextureAtlasAccessor;
+                                                           ^
+/home/matt/Documents/Repos/MattMC/net/minecraft/client/renderer/sodium/data/config/MixinConfig.java:100: error: cannot find symbol
+        if (this.options.putIfAbsent(name, new MixinOption(name, enabled, false)) != null) {
+                                               ^
+  symbol:   class MixinOption
+  location: class MixinConfig
+/home/matt/Documents/Repos/MattMC/net/minecraft/client/renderer/sodium/data/config/MixinConfig.java:110: error: cannot find symbol
+            MixinOption option = this.options.get(key);
+            ^
+  symbol:   class MixinOption
+  location: class MixinConfig
+/home/matt/Documents/Repos/MattMC/net/minecraft/client/renderer/sodium/data/config/MixinConfig.java:133: error: cannot find symbol
+        MixinOption option = this.options.get(override.option());
+        ^
+  symbol:   class MixinOption
+  location: class MixinConfig
+/home/matt/Documents/Repos/MattMC/net/minecraft/client/renderer/sodium/data/config/MixinConfig.java:162: error: cannot find symbol
+        MixinOption rule = null;
+        ^
+  symbol:   class MixinOption
+  location: class MixinConfig
+/home/matt/Documents/Repos/MattMC/net/minecraft/client/renderer/sodium/data/config/MixinConfig.java:167: error: cannot find symbol
+            MixinOption candidate = this.options.get(key);
+            ^
+  symbol:   class MixinOption
+  location: class MixinConfig
+/home/matt/Documents/Repos/MattMC/net/minecraft/client/renderer/sodium/data/config/MixinConfig.java:248: error: cannot find symbol
+                .filter(MixinOption::isOverridden)
+                        ^
+  symbol:   variable MixinOption
+  location: class MixinConfig
+/home/matt/Documents/Repos/MattMC/net/minecraft/client/renderer/sodium/SodiumClientMod.java:25: error: cannot find symbol
+        DebugScreenEntriesAccessor.getEntries().put(ResourceLocation.fromNamespaceAndPath("sodium", "sodium"), new SodiumDebugEntry());
+        ^
+  symbol:   variable DebugScreenEntriesAccessor
+  location: class SodiumClientMod
+/home/matt/Documents/Repos/MattMC/net/minecraft/client/renderer/sodium/render/SodiumWorldRenderer.java:442: error: cannot find symbol
+        AABB bb = ((EntityRendererAccessor) renderer).getCullingBox(entity);
+                    ^
+  symbol:   class EntityRendererAccessor
+  location: class SodiumWorldRenderer
+/home/matt/Documents/Repos/MattMC/net/minecraft/client/renderer/sodium/render/frapi/render/ItemRenderContext.java:255: error: useTransparentGlint(RenderType) has private access in ItemRenderer
+                    bufferSource.getBuffer(ItemRenderer.useTransparentGlint(type) ? RenderType.glintTranslucent() : RenderType.glint()), 
+                                                       ^
+/home/matt/Documents/Repos/MattMC/net/minecraft/client/renderer/chunk/advanced/ShaderChunkRenderer.java:92: error: cannot find symbol
+        ((GlCommandEncoderAccessor) RenderSystem.getDevice().createCommandEncoder()).sodium$applyPipelineState(pass.getPipeline());
+          ^
+  symbol:   class GlCommandEncoderAccessor
+  location: class ShaderChunkRenderer
+/home/matt/Documents/Repos/MattMC/net/minecraft/client/renderer/chunk/advanced/ShaderChunkRenderer.java:93: error: cannot find symbol
+        ((GlCommandEncoderAccessor) RenderSystem.getDevice().createCommandEncoder()).sodium$setLastProgram(null);
+          ^
+  symbol:   class GlCommandEncoderAccessor
+  location: class ShaderChunkRenderer
+/home/matt/Documents/Repos/MattMC/net/minecraft/client/renderer/chunk/advanced/shader/DefaultShaderInterface.java:56: error: cannot find symbol
+        var textureAtlas = (TextureAtlasAccessor) Minecraft.getInstance()
+                            ^
+  symbol:   class TextureAtlasAccessor
+  location: class DefaultShaderInterface
 Note: Some input files use or override a deprecated API.
 Note: Recompile with -Xlint:deprecation for details.
-
-> Task :processResources UP-TO-DATE
-> Task :classes
-> Task :gameJar
-
-> Task :compileSodiumJava
-Note: /home/matt/Documents/Repos/MattMC/modules/sodium-1.21.9/common/src/main/java/net/caffeinemc/mods/sodium/mixin/features/render/entity/cull/EntityRendererMixin.java uses unchecked or unsafe operations.
+Note: Some input files use unchecked or unsafe operations.
 Note: Recompile with -Xlint:unchecked for details.
+19 errors
 
-> Task :processSodiumResources UP-TO-DATE
-> Task :sodiumClasses
-> Task :compileIrisJava
-> Task :processIrisResources UP-TO-DATE
-> Task :irisClasses
-> Task :irisJar UP-TO-DATE
-> Task :shaderPackZip
-> Task :sodiumJar UP-TO-DATE
-
-> Task :runClient
-Using bundled JDK from: /home/matt/Documents/Repos/MattMC/run/jdk-21
-[08:20:02] [main/INFO]: Loading Minecraft 1.21.10 with Fabric Loader 0.18.2
-[08:20:02] [main/INFO]: Mappings not present!
-[08:20:02] [main/INFO]: Skipping dynamic mod discovery, using hardcoded internal mods (Sodium, Iris)
-[08:20:02] [main/INFO]: Registered internal mod: Sodium
-[08:20:02] [main/INFO]: Registered internal mod: Iris
-[08:20:02] [main/INFO]: Loading 6 mods:
-	- fabricloader 0.18.2
-	- iris 1.9.6
-	- java 21
-	- minecraft 1.21.10
-	- mixinextras 0.5.0
-	- sodium 0.7.2
-[08:20:02] [main/WARN]: Runtime mod remapping disabled due to no fabric.remapClasspathFile being specified. You may need to update loom.
-[08:20:02] [main/INFO]: SpongePowered MIXIN Subsystem Version=0.8.7 Source=file:/home/matt/Documents/Repos/MattMC/libraries/deps/sponge-mixin-0.16.5+mixin.0.8.7.jar Service=Knot/Fabric Env=CLIENT
-[08:20:02] [main/INFO]: Compatibility level set to JAVA_17
-[08:20:02] [main/WARN]: Reference map 'iris.refmap.json' for mixins.iris.json could not be read. If this is a development environment you can ignore this message
-[08:20:02] [main/WARN]: Reference map 'iris-fabric.refmap.json' for mixins.iris.fabric.json could not be read. If this is a development environment you can ignore this message
-[08:20:02] [main/WARN]: Reference map 'iris.refmap.json' for mixins.iris.fantastic.json could not be read. If this is a development environment you can ignore this message
-[08:20:02] [main/WARN]: Reference map 'iris.refmap.json' for mixins.iris.vertexformat.json could not be read. If this is a development environment you can ignore this message
-[08:20:02] [main/WARN]: Reference map 'iris.refmap.json' for mixins.iris.bettermipmaps.json could not be read. If this is a development environment you can ignore this message
-[08:20:02] [main/WARN]: Reference map 'iris.refmap.json' for mixins.iris.compat.sodium.json could not be read. If this is a development environment you can ignore this message
-[08:20:02] [main/WARN]: Reference map 'iris.refmap.json' for mixins.iris.fixes.maxfpscrash.json could not be read. If this is a development environment you can ignore this message
-[08:20:02] [main/INFO]: Loaded configuration file for Sodium: 42 options available, 1 override(s) found
-[08:20:02] [main/ERROR]: Mixin prepare for mod sodium failed preparing core.GlCommandEncoderAccessor in sodium-common.mixins.json: org.spongepowered.asm.mixin.transformer.throwables.InvalidMixinException The mixin 'net.caffeinemc.mods.sodium.mixin.core.GlCommandEncoderAccessor' is missing an @Mixin annotation
-org.spongepowered.asm.mixin.transformer.throwables.InvalidMixinException: The mixin 'net.caffeinemc.mods.sodium.mixin.core.GlCommandEncoderAccessor' is missing an @Mixin annotation
-	at org.spongepowered.asm.mixin.transformer.MixinInfo.readPriority(MixinInfo.java:1054) ~[sponge-mixin-0.16.5+mixin.0.8.7.jar:0.16.5+mixin.0.8.7]
-	at org.spongepowered.asm.mixin.transformer.MixinInfo.<init>(MixinInfo.java:879) ~[sponge-mixin-0.16.5+mixin.0.8.7.jar:0.16.5+mixin.0.8.7]
-	at org.spongepowered.asm.mixin.transformer.MixinConfig.prepareMixins(MixinConfig.java:933) ~[sponge-mixin-0.16.5+mixin.0.8.7.jar:0.16.5+mixin.0.8.7]
-	at org.spongepowered.asm.mixin.transformer.MixinConfig.prepare(MixinConfig.java:862) ~[sponge-mixin-0.16.5+mixin.0.8.7.jar:0.16.5+mixin.0.8.7]
-	at org.spongepowered.asm.mixin.transformer.MixinProcessor.prepareConfigs(MixinProcessor.java:588) [sponge-mixin-0.16.5+mixin.0.8.7.jar:0.16.5+mixin.0.8.7]
-	at org.spongepowered.asm.mixin.transformer.MixinProcessor.select(MixinProcessor.java:510) [sponge-mixin-0.16.5+mixin.0.8.7.jar:0.16.5+mixin.0.8.7]
-	at org.spongepowered.asm.mixin.transformer.MixinProcessor.checkSelect(MixinProcessor.java:486) [sponge-mixin-0.16.5+mixin.0.8.7.jar:0.16.5+mixin.0.8.7]
-	at org.spongepowered.asm.mixin.transformer.MixinProcessor.lockAndSelect(MixinProcessor.java:438) [sponge-mixin-0.16.5+mixin.0.8.7.jar:0.16.5+mixin.0.8.7]
-	at org.spongepowered.asm.mixin.transformer.MixinProcessor.couldTransformClass(MixinProcessor.java:398) [sponge-mixin-0.16.5+mixin.0.8.7.jar:0.16.5+mixin.0.8.7]
-	at org.spongepowered.asm.mixin.transformer.MixinTransformer.couldTransformClass(MixinTransformer.java:265) [sponge-mixin-0.16.5+mixin.0.8.7.jar:0.16.5+mixin.0.8.7]
-	at org.spongepowered.asm.mixin.transformer.MixinTransformer.transformClass(MixinTransformer.java:233) [sponge-mixin-0.16.5+mixin.0.8.7.jar:0.16.5+mixin.0.8.7]
-	at org.spongepowered.asm.mixin.transformer.MixinTransformer.transformClassBytes(MixinTransformer.java:202) [sponge-mixin-0.16.5+mixin.0.8.7.jar:0.16.5+mixin.0.8.7]
-	at net.fabricmc.loader.impl.launch.knot.KnotClassDelegate.getPostMixinClassByteArray(KnotClassDelegate.java:435) [fabric-loader-0.18.2.jar:0.18.2]
-	at net.fabricmc.loader.impl.launch.knot.KnotClassDelegate.tryLoadClass(KnotClassDelegate.java:336) [fabric-loader-0.18.2.jar:0.18.2]
-	at net.fabricmc.loader.impl.launch.knot.KnotClassDelegate.loadClass(KnotClassDelegate.java:231) [fabric-loader-0.18.2.jar:0.18.2]
-	at net.fabricmc.loader.impl.launch.knot.KnotClassLoader.loadClass(KnotClassLoader.java:119) [fabric-loader-0.18.2.jar:0.18.2]
-	at java.base/java.lang.ClassLoader.loadClass(ClassLoader.java:526) [?:?]
-	at java.base/java.lang.Class.forName0(Native Method) ~[?:?]
-	at java.base/java.lang.Class.forName(Class.java:534) [?:?]
-	at java.base/java.lang.Class.forName(Class.java:513) [?:?]
-	at net.fabricmc.loader.impl.util.DefaultLanguageAdapter.create(DefaultLanguageAdapter.java:50) [fabric-loader-0.18.2.jar:0.18.2]
-	at net.fabricmc.loader.impl.entrypoint.EntrypointStorage$NewEntry.getOrCreate(EntrypointStorage.java:124) [fabric-loader-0.18.2.jar:0.18.2]
-	at net.fabricmc.loader.impl.entrypoint.EntrypointContainerImpl.getEntrypoint(EntrypointContainerImpl.java:53) [fabric-loader-0.18.2.jar:0.18.2]
-	at net.fabricmc.loader.impl.FabricLoaderImpl.invokeEntrypoints(FabricLoaderImpl.java:427) [fabric-loader-0.18.2.jar:0.18.2]
-	at net.fabricmc.loader.impl.launch.knot.Knot.init(Knot.java:156) [fabric-loader-0.18.2.jar:0.18.2]
-	at net.fabricmc.loader.impl.launch.knot.Knot.launch(Knot.java:66) [fabric-loader-0.18.2.jar:0.18.2]
-	at net.fabricmc.loader.impl.launch.knot.KnotClient.main(KnotClient.java:23) [fabric-loader-0.18.2.jar:0.18.2]
-[08:20:02] [main/ERROR]: A mod crashed on startup!
-net.fabricmc.loader.impl.FormattedException: java.lang.RuntimeException: Could not execute entrypoint stage 'preLaunch' due to errors, provided by 'sodium' at 'net.caffeinemc.mods.sodium.fabric.SodiumPreLaunch'!
-	at net.fabricmc.loader.impl.FormattedException.ofLocalized(FormattedException.java:63) ~[fabric-loader-0.18.2.jar:0.18.2]
-	at net.fabricmc.loader.impl.launch.knot.Knot.init(Knot.java:158) ~[fabric-loader-0.18.2.jar:0.18.2]
-	at net.fabricmc.loader.impl.launch.knot.Knot.launch(Knot.java:66) [fabric-loader-0.18.2.jar:0.18.2]
-	at net.fabricmc.loader.impl.launch.knot.KnotClient.main(KnotClient.java:23) [fabric-loader-0.18.2.jar:0.18.2]
-Caused by: java.lang.RuntimeException: Could not execute entrypoint stage 'preLaunch' due to errors, provided by 'sodium' at 'net.caffeinemc.mods.sodium.fabric.SodiumPreLaunch'!
-	at net.fabricmc.loader.impl.FabricLoaderImpl.lambda$invokeEntrypoints$2(FabricLoaderImpl.java:431) ~[fabric-loader-0.18.2.jar:0.18.2]
-	at net.fabricmc.loader.impl.util.ExceptionUtil.gatherExceptions(ExceptionUtil.java:33) ~[fabric-loader-0.18.2.jar:0.18.2]
-	at net.fabricmc.loader.impl.FabricLoaderImpl.invokeEntrypoints(FabricLoaderImpl.java:429) ~[fabric-loader-0.18.2.jar:0.18.2]
-	at net.fabricmc.loader.impl.launch.knot.Knot.init(Knot.java:156) ~[fabric-loader-0.18.2.jar:0.18.2]
-	... 2 more
-Caused by: net.fabricmc.loader.api.EntrypointException: Exception while loading entries for entrypoint 'preLaunch' provided by 'sodium'
-	at net.fabricmc.loader.impl.entrypoint.EntrypointContainerImpl.getEntrypoint(EntrypointContainerImpl.java:56) ~[fabric-loader-0.18.2.jar:0.18.2]
-	at net.fabricmc.loader.impl.FabricLoaderImpl.invokeEntrypoints(FabricLoaderImpl.java:427) ~[fabric-loader-0.18.2.jar:0.18.2]
-	at net.fabricmc.loader.impl.launch.knot.Knot.init(Knot.java:156) ~[fabric-loader-0.18.2.jar:0.18.2]
-	... 2 more
-Caused by: java.lang.RuntimeException: Mixin transformation of net.caffeinemc.mods.sodium.fabric.SodiumPreLaunch failed
-	at net.fabricmc.loader.impl.launch.knot.KnotClassDelegate.getPostMixinClassByteArray(KnotClassDelegate.java:440) ~[fabric-loader-0.18.2.jar:0.18.2]
-	at net.fabricmc.loader.impl.launch.knot.KnotClassDelegate.tryLoadClass(KnotClassDelegate.java:336) ~[fabric-loader-0.18.2.jar:0.18.2]
-	at net.fabricmc.loader.impl.launch.knot.KnotClassDelegate.loadClass(KnotClassDelegate.java:231) ~[fabric-loader-0.18.2.jar:0.18.2]
-	at net.fabricmc.loader.impl.launch.knot.KnotClassLoader.loadClass(KnotClassLoader.java:119) ~[fabric-loader-0.18.2.jar:0.18.2]
-	at java.base/java.lang.ClassLoader.loadClass(ClassLoader.java:526) ~[?:?]
-	at java.base/java.lang.Class.forName0(Native Method) ~[?:?]
-	at java.base/java.lang.Class.forName(Class.java:534) ~[?:?]
-	at java.base/java.lang.Class.forName(Class.java:513) ~[?:?]
-	at net.fabricmc.loader.impl.util.DefaultLanguageAdapter.create(DefaultLanguageAdapter.java:50) ~[fabric-loader-0.18.2.jar:0.18.2]
-	at net.fabricmc.loader.impl.entrypoint.EntrypointStorage$NewEntry.getOrCreate(EntrypointStorage.java:124) ~[fabric-loader-0.18.2.jar:0.18.2]
-	at net.fabricmc.loader.impl.entrypoint.EntrypointContainerImpl.getEntrypoint(EntrypointContainerImpl.java:53) ~[fabric-loader-0.18.2.jar:0.18.2]
-	at net.fabricmc.loader.impl.FabricLoaderImpl.invokeEntrypoints(FabricLoaderImpl.java:427) ~[fabric-loader-0.18.2.jar:0.18.2]
-	at net.fabricmc.loader.impl.launch.knot.Knot.init(Knot.java:156) ~[fabric-loader-0.18.2.jar:0.18.2]
-	... 2 more
-Caused by: org.spongepowered.asm.mixin.throwables.MixinApplyError: Mixin [sodium-common.mixins.json:core.GlCommandEncoderAccessor from mod sodium] from phase [DEFAULT] in config [sodium-common.mixins.json] FAILED during PREPARE
-	at org.spongepowered.asm.mixin.transformer.MixinProcessor.handleMixinError(MixinProcessor.java:686) ~[sponge-mixin-0.16.5+mixin.0.8.7.jar:0.16.5+mixin.0.8.7]
-	at org.spongepowered.asm.mixin.transformer.MixinProcessor.handleMixinPrepareError(MixinProcessor.java:633) ~[sponge-mixin-0.16.5+mixin.0.8.7.jar:0.16.5+mixin.0.8.7]
-	at org.spongepowered.asm.mixin.transformer.MixinProcessor.prepareConfigs(MixinProcessor.java:591) ~[sponge-mixin-0.16.5+mixin.0.8.7.jar:0.16.5+mixin.0.8.7]
-	at org.spongepowered.asm.mixin.transformer.MixinProcessor.select(MixinProcessor.java:510) ~[sponge-mixin-0.16.5+mixin.0.8.7.jar:0.16.5+mixin.0.8.7]
-	at org.spongepowered.asm.mixin.transformer.MixinProcessor.checkSelect(MixinProcessor.java:486) ~[sponge-mixin-0.16.5+mixin.0.8.7.jar:0.16.5+mixin.0.8.7]
-	at org.spongepowered.asm.mixin.transformer.MixinProcessor.lockAndSelect(MixinProcessor.java:438) ~[sponge-mixin-0.16.5+mixin.0.8.7.jar:0.16.5+mixin.0.8.7]
-	at org.spongepowered.asm.mixin.transformer.MixinProcessor.couldTransformClass(MixinProcessor.java:398) ~[sponge-mixin-0.16.5+mixin.0.8.7.jar:0.16.5+mixin.0.8.7]
-	at org.spongepowered.asm.mixin.transformer.MixinTransformer.couldTransformClass(MixinTransformer.java:265) ~[sponge-mixin-0.16.5+mixin.0.8.7.jar:0.16.5+mixin.0.8.7]
-	at org.spongepowered.asm.mixin.transformer.MixinTransformer.transformClass(MixinTransformer.java:233) ~[sponge-mixin-0.16.5+mixin.0.8.7.jar:0.16.5+mixin.0.8.7]
-	at org.spongepowered.asm.mixin.transformer.MixinTransformer.transformClassBytes(MixinTransformer.java:202) ~[sponge-mixin-0.16.5+mixin.0.8.7.jar:0.16.5+mixin.0.8.7]
-	at net.fabricmc.loader.impl.launch.knot.KnotClassDelegate.getPostMixinClassByteArray(KnotClassDelegate.java:435) ~[fabric-loader-0.18.2.jar:0.18.2]
-	at net.fabricmc.loader.impl.launch.knot.KnotClassDelegate.tryLoadClass(KnotClassDelegate.java:336) ~[fabric-loader-0.18.2.jar:0.18.2]
-	at net.fabricmc.loader.impl.launch.knot.KnotClassDelegate.loadClass(KnotClassDelegate.java:231) ~[fabric-loader-0.18.2.jar:0.18.2]
-	at net.fabricmc.loader.impl.launch.knot.KnotClassLoader.loadClass(KnotClassLoader.java:119) ~[fabric-loader-0.18.2.jar:0.18.2]
-	at java.base/java.lang.ClassLoader.loadClass(ClassLoader.java:526) ~[?:?]
-	at java.base/java.lang.Class.forName0(Native Method) ~[?:?]
-	at java.base/java.lang.Class.forName(Class.java:534) ~[?:?]
-	at java.base/java.lang.Class.forName(Class.java:513) ~[?:?]
-	at net.fabricmc.loader.impl.util.DefaultLanguageAdapter.create(DefaultLanguageAdapter.java:50) ~[fabric-loader-0.18.2.jar:0.18.2]
-	at net.fabricmc.loader.impl.entrypoint.EntrypointStorage$NewEntry.getOrCreate(EntrypointStorage.java:124) ~[fabric-loader-0.18.2.jar:0.18.2]
-	at net.fabricmc.loader.impl.entrypoint.EntrypointContainerImpl.getEntrypoint(EntrypointContainerImpl.java:53) ~[fabric-loader-0.18.2.jar:0.18.2]
-	at net.fabricmc.loader.impl.FabricLoaderImpl.invokeEntrypoints(FabricLoaderImpl.java:427) ~[fabric-loader-0.18.2.jar:0.18.2]
-	at net.fabricmc.loader.impl.launch.knot.Knot.init(Knot.java:156) ~[fabric-loader-0.18.2.jar:0.18.2]
-	... 2 more
-Caused by: org.spongepowered.asm.mixin.transformer.throwables.InvalidMixinException: The mixin 'net.caffeinemc.mods.sodium.mixin.core.GlCommandEncoderAccessor' is missing an @Mixin annotation
-	at org.spongepowered.asm.mixin.transformer.MixinInfo.readPriority(MixinInfo.java:1054) ~[sponge-mixin-0.16.5+mixin.0.8.7.jar:0.16.5+mixin.0.8.7]
-	at org.spongepowered.asm.mixin.transformer.MixinInfo.<init>(MixinInfo.java:879) ~[sponge-mixin-0.16.5+mixin.0.8.7.jar:0.16.5+mixin.0.8.7]
-	at org.spongepowered.asm.mixin.transformer.MixinConfig.prepareMixins(MixinConfig.java:933) ~[sponge-mixin-0.16.5+mixin.0.8.7.jar:0.16.5+mixin.0.8.7]
-	at org.spongepowered.asm.mixin.transformer.MixinConfig.prepare(MixinConfig.java:862) ~[sponge-mixin-0.16.5+mixin.0.8.7.jar:0.16.5+mixin.0.8.7]
-	at org.spongepowered.asm.mixin.transformer.MixinProcessor.prepareConfigs(MixinProcessor.java:588) ~[sponge-mixin-0.16.5+mixin.0.8.7.jar:0.16.5+mixin.0.8.7]
-	at org.spongepowered.asm.mixin.transformer.MixinProcessor.select(MixinProcessor.java:510) ~[sponge-mixin-0.16.5+mixin.0.8.7.jar:0.16.5+mixin.0.8.7]
-	at org.spongepowered.asm.mixin.transformer.MixinProcessor.checkSelect(MixinProcessor.java:486) ~[sponge-mixin-0.16.5+mixin.0.8.7.jar:0.16.5+mixin.0.8.7]
-	at org.spongepowered.asm.mixin.transformer.MixinProcessor.lockAndSelect(MixinProcessor.java:438) ~[sponge-mixin-0.16.5+mixin.0.8.7.jar:0.16.5+mixin.0.8.7]
-	at org.spongepowered.asm.mixin.transformer.MixinProcessor.couldTransformClass(MixinProcessor.java:398) ~[sponge-mixin-0.16.5+mixin.0.8.7.jar:0.16.5+mixin.0.8.7]
-	at org.spongepowered.asm.mixin.transformer.MixinTransformer.couldTransformClass(MixinTransformer.java:265) ~[sponge-mixin-0.16.5+mixin.0.8.7.jar:0.16.5+mixin.0.8.7]
-	at org.spongepowered.asm.mixin.transformer.MixinTransformer.transformClass(MixinTransformer.java:233) ~[sponge-mixin-0.16.5+mixin.0.8.7.jar:0.16.5+mixin.0.8.7]
-	at org.spongepowered.asm.mixin.transformer.MixinTransformer.transformClassBytes(MixinTransformer.java:202) ~[sponge-mixin-0.16.5+mixin.0.8.7.jar:0.16.5+mixin.0.8.7]
-	at net.fabricmc.loader.impl.launch.knot.KnotClassDelegate.getPostMixinClassByteArray(KnotClassDelegate.java:435) ~[fabric-loader-0.18.2.jar:0.18.2]
-	at net.fabricmc.loader.impl.launch.knot.KnotClassDelegate.tryLoadClass(KnotClassDelegate.java:336) ~[fabric-loader-0.18.2.jar:0.18.2]
-	at net.fabricmc.loader.impl.launch.knot.KnotClassDelegate.loadClass(KnotClassDelegate.java:231) ~[fabric-loader-0.18.2.jar:0.18.2]
-	at net.fabricmc.loader.impl.launch.knot.KnotClassLoader.loadClass(KnotClassLoader.java:119) ~[fabric-loader-0.18.2.jar:0.18.2]
-	at java.base/java.lang.ClassLoader.loadClass(ClassLoader.java:526) ~[?:?]
-	at java.base/java.lang.Class.forName0(Native Method) ~[?:?]
-	at java.base/java.lang.Class.forName(Class.java:534) ~[?:?]
-	at java.base/java.lang.Class.forName(Class.java:513) ~[?:?]
-	at net.fabricmc.loader.impl.util.DefaultLanguageAdapter.create(DefaultLanguageAdapter.java:50) ~[fabric-loader-0.18.2.jar:0.18.2]
-	at net.fabricmc.loader.impl.entrypoint.EntrypointStorage$NewEntry.getOrCreate(EntrypointStorage.java:124) ~[fabric-loader-0.18.2.jar:0.18.2]
-	at net.fabricmc.loader.impl.entrypoint.EntrypointContainerImpl.getEntrypoint(EntrypointContainerImpl.java:53) ~[fabric-loader-0.18.2.jar:0.18.2]
-	at net.fabricmc.loader.impl.FabricLoaderImpl.invokeEntrypoints(FabricLoaderImpl.java:427) ~[fabric-loader-0.18.2.jar:0.18.2]
-	at net.fabricmc.loader.impl.launch.knot.Knot.init(Knot.java:156) ~[fabric-loader-0.18.2.jar:0.18.2]
-	... 2 more
-
-> Task :runClient FAILED
+> Task :compileJava FAILED
 
 FAILURE: Build failed with an exception.
 
 * What went wrong:
-Execution failed for task ':runClient'.
-> Process 'command '/home/matt/Documents/Repos/MattMC/run/jdk-21/bin/java'' finished with non-zero exit value 1
+Execution failed for task ':compileJava'.
+> Compilation failed; see the compiler error output for details.
 
 * Try:
-> Run with --stacktrace option to get the stack trace.
-> Run with --info or --debug option to get more log output.
+> Run with --info option to get more log output.
 > Run with --scan to get full insights.
-> Get more help at https://help.gradle.org.
 
-BUILD FAILED in 26s
-15 actionable tasks: 7 executed, 8 up-to-date
+BUILD FAILED in 3s
+5 actionable tasks: 2 executed, 3 up-to-date
