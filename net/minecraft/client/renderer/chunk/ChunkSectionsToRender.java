@@ -44,6 +44,11 @@ public record ChunkSectionsToRender(
 			return;
 		}
 		
+		// Guard against null drawsPerLayer (can happen with shadow rendering)
+		if (this.drawsPerLayer == null) {
+			return;
+		}
+		
 		// Vanilla rendering path
 		RenderSystem.AutoStorageIndexBuffer autoStorageIndexBuffer = RenderSystem.getSequentialBuffer(VertexFormat.Mode.QUADS);
 		GpuBuffer gpuBuffer = this.maxIndicesRequired == 0 ? null : autoStorageIndexBuffer.getBuffer(this.maxIndicesRequired);
