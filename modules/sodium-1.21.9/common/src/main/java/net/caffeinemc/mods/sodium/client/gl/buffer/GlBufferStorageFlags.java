@@ -1,6 +1,6 @@
-package net.minecraft.client.renderer.sodium.gl.buffer;
+package net.caffeinemc.mods.sodium.client.gl.buffer;
 
-import net.minecraft.client.renderer.gl.advanced.util.EnumBit;
+import net.caffeinemc.mods.sodium.client.gl.util.EnumBit;
 import org.lwjgl.opengl.GL30C;
 import org.lwjgl.opengl.GL44C;
 

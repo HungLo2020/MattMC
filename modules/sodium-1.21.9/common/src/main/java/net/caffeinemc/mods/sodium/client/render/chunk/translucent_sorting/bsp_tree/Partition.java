@@ -1,4 +1,4 @@
-package net.minecraft.client.renderer.sodium.render.chunk.translucent_sorting.bsp_tree;
+package net.caffeinemc.mods.sodium.client.render.chunk.translucent_sorting.bsp_tree;
 
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 

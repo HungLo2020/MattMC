@@ -1,4 +1,4 @@
-package net.minecraft.client.renderer.sodium.gui.widgets;
+package net.caffeinemc.mods.sodium.client.gui.widgets;
 
 import net.minecraft.client.InputType;
 import net.minecraft.client.Minecraft;

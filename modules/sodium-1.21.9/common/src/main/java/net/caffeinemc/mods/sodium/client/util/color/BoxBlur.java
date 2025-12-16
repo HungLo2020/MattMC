@@ -1,4 +1,4 @@
-package net.minecraft.client.renderer.sodium.util.color;
+package net.caffeinemc.mods.sodium.client.util.color;
 
 import net.minecraft.client.renderer.advanced.util.ColorARGB;
 import net.minecraft.util.Mth;

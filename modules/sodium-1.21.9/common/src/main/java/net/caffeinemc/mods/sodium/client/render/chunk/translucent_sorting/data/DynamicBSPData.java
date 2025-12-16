@@ -1,12 +1,12 @@
-package net.minecraft.client.renderer.sodium.render.chunk.translucent_sorting.data;
+package net.caffeinemc.mods.sodium.client.render.chunk.translucent_sorting.data;
 
-import net.minecraft.client.renderer.chunk.advanced.translucent_sorting.QuadSplittingMode;
-import net.minecraft.client.renderer.chunk.advanced.translucent_sorting.SortType;
-import net.minecraft.client.renderer.chunk.advanced.translucent_sorting.bsp_tree.UpdatedQuadsList;
-import net.minecraft.client.renderer.chunk.advanced.translucent_sorting.quad.TQuad;
-import net.minecraft.client.renderer.chunk.advanced.translucent_sorting.TranslucentGeometryCollector;
-import net.minecraft.client.renderer.chunk.advanced.translucent_sorting.bsp_tree.BSPNode;
-import net.minecraft.client.renderer.chunk.advanced.translucent_sorting.bsp_tree.BSPResult;
+import net.caffeinemc.mods.sodium.client.render.chunk.translucent_sorting.QuadSplittingMode;
+import net.caffeinemc.mods.sodium.client.render.chunk.translucent_sorting.SortType;
+import net.caffeinemc.mods.sodium.client.render.chunk.translucent_sorting.bsp_tree.UpdatedQuadsList;
+import net.caffeinemc.mods.sodium.client.render.chunk.translucent_sorting.quad.TQuad;
+import net.caffeinemc.mods.sodium.client.render.chunk.translucent_sorting.TranslucentGeometryCollector;
+import net.caffeinemc.mods.sodium.client.render.chunk.translucent_sorting.bsp_tree.BSPNode;
+import net.caffeinemc.mods.sodium.client.render.chunk.translucent_sorting.bsp_tree.BSPResult;
 import net.minecraft.core.SectionPos;
 import org.joml.Vector3dc;
 

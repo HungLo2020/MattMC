@@ -1,8 +1,8 @@
-package net.minecraft.client.renderer.sodium.gl.tessellation;
+package net.caffeinemc.mods.sodium.client.gl.tessellation;
 
-import net.minecraft.client.renderer.gl.advanced.attribute.GlVertexAttributeBinding;
-import net.minecraft.client.renderer.gl.advanced.buffer.GlBuffer;
-import net.minecraft.client.renderer.gl.advanced.buffer.GlBufferTarget;
+import net.caffeinemc.mods.sodium.client.gl.attribute.GlVertexAttributeBinding;
+import net.caffeinemc.mods.sodium.client.gl.buffer.GlBuffer;
+import net.caffeinemc.mods.sodium.client.gl.buffer.GlBufferTarget;
 
 public record TessellationBinding(GlBufferTarget target,
                                   GlBuffer buffer,

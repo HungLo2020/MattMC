@@ -1,12 +1,12 @@
-package net.minecraft.client.renderer.sodium.world;
+package net.caffeinemc.mods.sodium.client.world;
 
 import it.unimi.dsi.fastutil.ints.Int2ReferenceMap;
-import net.minecraft.client.renderer.sodium.services.*;
-import net.minecraft.client.renderer.sodium.world.biome.LevelColorCache;
-import net.minecraft.client.renderer.sodium.world.biome.LevelBiomeSlice;
-import net.minecraft.client.renderer.sodium.world.cloned.ChunkRenderContext;
-import net.minecraft.client.renderer.sodium.world.cloned.ClonedChunkSection;
-import net.minecraft.client.renderer.sodium.world.cloned.ClonedChunkSectionCache;
+import net.caffeinemc.mods.sodium.client.services.*;
+import net.caffeinemc.mods.sodium.client.world.biome.LevelColorCache;
+import net.caffeinemc.mods.sodium.client.world.biome.LevelBiomeSlice;
+import net.caffeinemc.mods.sodium.client.world.cloned.ChunkRenderContext;
+import net.caffeinemc.mods.sodium.client.world.cloned.ClonedChunkSection;
+import net.caffeinemc.mods.sodium.client.world.cloned.ClonedChunkSectionCache;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.core.BlockPos;

@@ -1,4 +1,4 @@
-package net.minecraft.client.renderer.sodium.util.sorting;
+package net.caffeinemc.mods.sodium.client.util.sorting;
 
 import it.unimi.dsi.fastutil.ints.IntArrays;
 

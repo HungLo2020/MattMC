@@ -1,4 +1,4 @@
-package net.minecraft.client.renderer.sodium.util;
+package net.caffeinemc.mods.sodium.client.util;
 
 public class BitwiseMath {
     // returns (1) if (a < b), otherwise (0)

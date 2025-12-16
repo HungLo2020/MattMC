@@ -1,4 +1,4 @@
-package net.minecraft.client.renderer.sodium.gl.tessellation;
+package net.caffeinemc.mods.sodium.client.gl.tessellation;
 
 import org.lwjgl.opengl.GL32C;
 

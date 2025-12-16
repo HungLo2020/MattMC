@@ -1,6 +1,6 @@
-package net.minecraft.client.renderer.sodium.gl.functions;
+package net.caffeinemc.mods.sodium.client.gl.functions;
 
-import net.minecraft.client.renderer.gl.advanced.device.RenderDevice;
+import net.caffeinemc.mods.sodium.client.gl.device.RenderDevice;
 
 public class DeviceFunctions {
     private final BufferStorageFunctions bufferStorageFunctions;

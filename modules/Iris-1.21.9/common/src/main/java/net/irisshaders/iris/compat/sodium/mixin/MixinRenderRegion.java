@@ -1,10 +1,10 @@
 package net.irisshaders.iris.compat.sodium.mixin;
 
 import it.unimi.dsi.fastutil.objects.Reference2ReferenceOpenHashMap;
-import net.minecraft.client.renderer.gl.advanced.device.MultiDrawBatch;
-import net.minecraft.client.renderer.chunk.advanced.lists.ChunkRenderList;
-import net.minecraft.client.renderer.chunk.advanced.region.RenderRegion;
-import net.minecraft.client.renderer.chunk.advanced.terrain.TerrainRenderPass;
+import net.caffeinemc.mods.sodium.client.gl.device.MultiDrawBatch;
+import net.caffeinemc.mods.sodium.client.render.chunk.lists.ChunkRenderList;
+import net.caffeinemc.mods.sodium.client.render.chunk.region.RenderRegion;
+import net.caffeinemc.mods.sodium.client.render.chunk.terrain.TerrainRenderPass;
 import net.irisshaders.iris.mixinterface.ShadowRenderRegion;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;

@@ -1,4 +1,4 @@
-package net.minecraft.client.renderer.sodium.util.color;
+package net.caffeinemc.mods.sodium.client.util.color;
 
 import java.util.function.Function;
 import net.minecraft.util.Mth;

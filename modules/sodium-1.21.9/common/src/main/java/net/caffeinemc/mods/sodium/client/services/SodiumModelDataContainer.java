@@ -1,4 +1,4 @@
-package net.minecraft.client.renderer.sodium.services;
+package net.caffeinemc.mods.sodium.client.services;
 
 import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
 import net.minecraft.core.BlockPos;

@@ -24,11 +24,11 @@ SOFTWARE.
 Modified for inclusion in Sodium by douira.
 Copied from https://github.com/lodborg/interval-tree/tree/v1.0.0.
 */
-package net.minecraft.client.renderer.sodium.util.interval_tree;
+package net.caffeinemc.mods.sodium.client.util.interval_tree;
 
 import java.util.*;
 
-import net.minecraft.client.renderer.sodium.util.interval_tree.TreeNode.*;
+import net.caffeinemc.mods.sodium.client.util.interval_tree.TreeNode.*;
 
 /**
  * An implementation of a Centered Interval Tree for efficient search in a set of intervals. See

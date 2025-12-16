@@ -1,4 +1,4 @@
-package net.minecraft.client.renderer.sodium.render.chunk;
+package net.caffeinemc.mods.sodium.client.render.chunk;
 
 import com.mojang.blaze3d.opengl.GlConst;
 import com.mojang.blaze3d.opengl.GlDevice;
@@ -7,14 +7,14 @@ import com.mojang.blaze3d.opengl.GlTexture;
 import com.mojang.blaze3d.pipeline.RenderTarget;
 import com.mojang.blaze3d.systems.RenderSystem;
 import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
-import net.minecraft.client.renderer.gl.advanced.attribute.GlVertexFormat;
-import net.minecraft.client.renderer.gl.advanced.device.CommandList;
-import net.minecraft.client.renderer.gl.advanced.device.RenderDevice;
-import net.minecraft.client.renderer.chunk.advanced.shader.*;
-import net.minecraft.client.renderer.chunk.advanced.terrain.TerrainRenderPass;
-import net.minecraft.client.renderer.chunk.advanced.vertex.format.ChunkVertexType;
-import net.minecraft.client.renderer.gl.advanced.shader.*;
-import net.minecraft.client.renderer.sodium.util.FogParameters;
+import net.caffeinemc.mods.sodium.client.gl.attribute.GlVertexFormat;
+import net.caffeinemc.mods.sodium.client.gl.device.CommandList;
+import net.caffeinemc.mods.sodium.client.gl.device.RenderDevice;
+import net.caffeinemc.mods.sodium.client.render.chunk.shader.*;
+import net.caffeinemc.mods.sodium.client.render.chunk.terrain.TerrainRenderPass;
+import net.caffeinemc.mods.sodium.client.render.chunk.vertex.format.ChunkVertexType;
+import net.caffeinemc.mods.sodium.client.gl.shader.*;
+import net.caffeinemc.mods.sodium.client.util.FogParameters;
 import net.caffeinemc.mods.sodium.mixin.core.GlCommandEncoderAccessor;
 import net.minecraft.resources.ResourceLocation;
 import java.util.Map;

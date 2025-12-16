@@ -1,4 +1,4 @@
-package net.minecraft.client.renderer.sodium.gui.options;
+package net.caffeinemc.mods.sodium.client.gui.options;
 
 import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Component;

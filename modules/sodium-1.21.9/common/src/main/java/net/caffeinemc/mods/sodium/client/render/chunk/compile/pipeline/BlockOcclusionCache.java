@@ -1,9 +1,9 @@
-package net.minecraft.client.renderer.sodium.render.chunk.compile.pipeline;
+package net.caffeinemc.mods.sodium.client.render.chunk.compile.pipeline;
 
 import it.unimi.dsi.fastutil.Hash;
 import it.unimi.dsi.fastutil.objects.Object2IntLinkedOpenCustomHashMap;
-import net.minecraft.client.renderer.sodium.services.PlatformBlockAccess;
-import net.minecraft.client.renderer.sodium.util.DirectionUtil;
+import net.caffeinemc.mods.sodium.client.services.PlatformBlockAccess;
+import net.caffeinemc.mods.sodium.client.util.DirectionUtil;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.world.level.BlockGetter;

@@ -1,4 +1,4 @@
-package net.minecraft.client.renderer.sodium.services;
+package net.caffeinemc.mods.sodium.client.services;
 
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;

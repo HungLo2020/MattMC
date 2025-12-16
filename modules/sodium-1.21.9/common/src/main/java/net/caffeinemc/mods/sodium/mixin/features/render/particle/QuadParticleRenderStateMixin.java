@@ -4,7 +4,7 @@ import com.mojang.blaze3d.vertex.VertexConsumer;
 import net.minecraft.client.renderer.advanced.util.ColorARGB;
 import net.minecraft.client.renderer.advanced.vertex.buffer.VertexBufferWriter;
 import net.minecraft.client.renderer.advanced.vertex.format.common.ParticleVertex;
-import net.minecraft.client.renderer.vertex.advanced.VertexConsumerUtils;
+import net.caffeinemc.mods.sodium.client.render.vertex.VertexConsumerUtils;
 import net.minecraft.client.renderer.state.QuadParticleRenderState;
 import org.joml.Quaternionf;
 import org.joml.Vector3f;

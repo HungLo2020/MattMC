@@ -1,15 +1,15 @@
 package net.irisshaders.iris.compat.sodium.mixin;
 
-import net.minecraft.client.renderer.sodium.gui.SodiumGameOptionPages;
-import net.minecraft.client.renderer.sodium.gui.options.Option;
-import net.minecraft.client.renderer.sodium.gui.options.OptionFlag;
-import net.minecraft.client.renderer.sodium.gui.options.OptionGroup;
-import net.minecraft.client.renderer.sodium.gui.options.OptionImpact;
-import net.minecraft.client.renderer.sodium.gui.options.OptionImpl;
-import net.minecraft.client.renderer.sodium.gui.options.control.ControlValueFormatter;
-import net.minecraft.client.renderer.sodium.gui.options.control.CyclingControl;
-import net.minecraft.client.renderer.sodium.gui.options.control.SliderControl;
-import net.minecraft.client.renderer.sodium.gui.options.storage.MinecraftOptionsStorage;
+import net.caffeinemc.mods.sodium.client.gui.SodiumGameOptionPages;
+import net.caffeinemc.mods.sodium.client.gui.options.Option;
+import net.caffeinemc.mods.sodium.client.gui.options.OptionFlag;
+import net.caffeinemc.mods.sodium.client.gui.options.OptionGroup;
+import net.caffeinemc.mods.sodium.client.gui.options.OptionImpact;
+import net.caffeinemc.mods.sodium.client.gui.options.OptionImpl;
+import net.caffeinemc.mods.sodium.client.gui.options.control.ControlValueFormatter;
+import net.caffeinemc.mods.sodium.client.gui.options.control.CyclingControl;
+import net.caffeinemc.mods.sodium.client.gui.options.control.SliderControl;
+import net.caffeinemc.mods.sodium.client.gui.options.storage.MinecraftOptionsStorage;
 import net.irisshaders.iris.Iris;
 import net.irisshaders.iris.fantastic.SupportedGraphicsMode;
 import net.irisshaders.iris.gui.option.IrisVideoSettings;

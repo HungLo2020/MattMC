@@ -20,10 +20,10 @@ package net.caffeinemc.mods.sodium.mixin.features.render.frapi;
 import java.util.List;
 
 import com.mojang.blaze3d.vertex.PoseStack;
-import net.minecraft.client.renderer.sodium.render.frapi.mesh.MutableMeshImpl;
-import net.minecraft.client.renderer.sodium.render.frapi.render.AccessLayerRenderState;
-import net.minecraft.client.renderer.sodium.render.frapi.render.ItemRenderContext;
-import net.minecraft.client.renderer.sodium.render.frapi.render.OrderedSubmitNodeCollectorExtension;
+import net.caffeinemc.mods.sodium.client.render.frapi.mesh.MutableMeshImpl;
+import net.caffeinemc.mods.sodium.client.render.frapi.render.AccessLayerRenderState;
+import net.caffeinemc.mods.sodium.client.render.frapi.render.ItemRenderContext;
+import net.caffeinemc.mods.sodium.client.render.frapi.render.OrderedSubmitNodeCollectorExtension;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.RenderType;
 import net.minecraft.client.renderer.SubmitNodeCollector;

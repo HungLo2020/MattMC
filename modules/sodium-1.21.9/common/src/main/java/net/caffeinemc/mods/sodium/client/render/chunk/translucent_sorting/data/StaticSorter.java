@@ -1,4 +1,4 @@
-package net.minecraft.client.renderer.sodium.render.chunk.translucent_sorting.data;
+package net.caffeinemc.mods.sodium.client.render.chunk.translucent_sorting.data;
 
 class StaticSorter extends PresentSorter {
     StaticSorter(int quadCount) {

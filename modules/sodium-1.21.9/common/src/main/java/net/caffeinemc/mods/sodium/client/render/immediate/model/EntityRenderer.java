@@ -1,16 +1,16 @@
-package net.minecraft.client.renderer.sodium.render.immediate.model;
+package net.caffeinemc.mods.sodium.client.render.immediate.model;
 
 import com.mojang.blaze3d.vertex.PoseStack;
 import net.minecraft.client.renderer.advanced.math.MatrixHelper;
 import net.minecraft.client.renderer.advanced.vertex.buffer.VertexBufferWriter;
 import net.minecraft.client.renderer.advanced.vertex.format.common.EntityVertex;
-import net.minecraft.client.renderer.sodium.util.Int2;
+import net.caffeinemc.mods.sodium.client.util.Int2;
 import net.minecraft.core.Direction;
 import org.joml.Matrix3f;
 import org.lwjgl.system.MemoryStack;
 import org.lwjgl.system.MemoryUtil;
 
-import static net.minecraft.client.renderer.sodium.render.immediate.model.ModelCuboid.*;
+import static net.caffeinemc.mods.sodium.client.render.immediate.model.ModelCuboid.*;
 
 public class EntityRenderer {
     private static final Matrix3f prevNormalMatrix = new Matrix3f();

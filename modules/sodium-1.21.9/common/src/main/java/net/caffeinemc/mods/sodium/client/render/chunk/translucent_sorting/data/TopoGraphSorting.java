@@ -1,10 +1,10 @@
-package net.minecraft.client.renderer.sodium.render.chunk.translucent_sorting.data;
+package net.caffeinemc.mods.sodium.client.render.chunk.translucent_sorting.data;
 
 import it.unimi.dsi.fastutil.objects.Object2ReferenceMap;
-import net.minecraft.client.renderer.sodium.model.quad.properties.ModelQuadFacing;
-import net.minecraft.client.renderer.chunk.advanced.translucent_sorting.quad.TQuad;
-import net.minecraft.client.renderer.chunk.advanced.translucent_sorting.trigger.NormalList;
-import net.minecraft.client.renderer.sodium.util.collections.BitArray;
+import net.caffeinemc.mods.sodium.client.model.quad.properties.ModelQuadFacing;
+import net.caffeinemc.mods.sodium.client.render.chunk.translucent_sorting.quad.TQuad;
+import net.caffeinemc.mods.sodium.client.render.chunk.translucent_sorting.trigger.NormalList;
+import net.caffeinemc.mods.sodium.client.util.collections.BitArray;
 import org.joml.Vector3fc;
 
 import java.util.function.IntConsumer;

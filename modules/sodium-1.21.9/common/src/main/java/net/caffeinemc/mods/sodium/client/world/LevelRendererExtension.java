@@ -1,7 +1,7 @@
-package net.minecraft.client.renderer.sodium.world;
+package net.caffeinemc.mods.sodium.client.world;
 
-import net.minecraft.client.renderer.sodium.render.SodiumWorldRenderer;
-import net.minecraft.client.renderer.chunk.advanced.ChunkRenderMatrices;
+import net.caffeinemc.mods.sodium.client.render.SodiumWorldRenderer;
+import net.caffeinemc.mods.sodium.client.render.chunk.ChunkRenderMatrices;
 
 public interface LevelRendererExtension {
     SodiumWorldRenderer sodium$getWorldRenderer();

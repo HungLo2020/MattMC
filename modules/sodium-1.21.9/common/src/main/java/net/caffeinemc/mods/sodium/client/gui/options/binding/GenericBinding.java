@@ -1,4 +1,4 @@
-package net.minecraft.client.renderer.sodium.gui.options.binding;
+package net.caffeinemc.mods.sodium.client.gui.options.binding;
 
 import java.util.function.BiConsumer;
 import java.util.function.Function;

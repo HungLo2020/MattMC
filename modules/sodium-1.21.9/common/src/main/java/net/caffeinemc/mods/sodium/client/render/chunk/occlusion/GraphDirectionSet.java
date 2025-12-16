@@ -1,4 +1,4 @@
-package net.minecraft.client.renderer.sodium.render.chunk.occlusion;
+package net.caffeinemc.mods.sodium.client.render.chunk.occlusion;
 
 public class GraphDirectionSet {
     public static final int NONE    = 0;

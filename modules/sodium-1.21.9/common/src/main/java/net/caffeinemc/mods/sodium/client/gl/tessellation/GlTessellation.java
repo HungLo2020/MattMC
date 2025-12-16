@@ -1,6 +1,6 @@
-package net.minecraft.client.renderer.sodium.gl.tessellation;
+package net.caffeinemc.mods.sodium.client.gl.tessellation;
 
-import net.minecraft.client.renderer.gl.advanced.device.CommandList;
+import net.caffeinemc.mods.sodium.client.gl.device.CommandList;
 
 public interface GlTessellation {
     void delete(CommandList commandList);

@@ -12,7 +12,7 @@
 //   See the License for the specific language governing permissions and
 //   limitations under the License.
 
-package net.minecraft.client.renderer.sodium.gl.shader;
+package net.caffeinemc.mods.sodium.client.gl.shader;
 
 import java.nio.ByteBuffer;
 

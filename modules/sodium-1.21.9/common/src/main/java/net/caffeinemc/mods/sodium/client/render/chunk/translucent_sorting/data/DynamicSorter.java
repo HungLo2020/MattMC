@@ -1,4 +1,4 @@
-package net.minecraft.client.renderer.sodium.render.chunk.translucent_sorting.data;
+package net.caffeinemc.mods.sodium.client.render.chunk.translucent_sorting.data;
 
 public abstract class DynamicSorter extends PresentSorter {
     private final int quadCount;

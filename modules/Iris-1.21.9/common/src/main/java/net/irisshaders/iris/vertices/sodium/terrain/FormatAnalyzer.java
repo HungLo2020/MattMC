@@ -2,11 +2,11 @@ package net.irisshaders.iris.vertices.sodium.terrain;
 
 import it.unimi.dsi.fastutil.bytes.Byte2ObjectMap;
 import it.unimi.dsi.fastutil.bytes.Byte2ObjectOpenHashMap;
-import net.minecraft.client.renderer.gl.advanced.attribute.GlVertexFormat;
-import net.minecraft.client.renderer.chunk.advanced.shader.ChunkShaderBindingPoints;
-import net.minecraft.client.renderer.chunk.advanced.vertex.format.ChunkMeshFormats;
-import net.minecraft.client.renderer.chunk.advanced.vertex.format.ChunkVertexType;
-import net.minecraft.client.renderer.chunk.advanced.vertex.format.impl.DefaultChunkMeshAttributes;
+import net.caffeinemc.mods.sodium.client.gl.attribute.GlVertexFormat;
+import net.caffeinemc.mods.sodium.client.render.chunk.shader.ChunkShaderBindingPoints;
+import net.caffeinemc.mods.sodium.client.render.chunk.vertex.format.ChunkMeshFormats;
+import net.caffeinemc.mods.sodium.client.render.chunk.vertex.format.ChunkVertexType;
+import net.caffeinemc.mods.sodium.client.render.chunk.vertex.format.impl.DefaultChunkMeshAttributes;
 
 public class FormatAnalyzer {
 	private static final Byte2ObjectMap<ChunkVertexType> classMap = new Byte2ObjectOpenHashMap<>();

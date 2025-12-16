@@ -14,16 +14,16 @@
  * limitations under the License.
  */
 
-package net.minecraft.client.renderer.sodium.render.frapi.render;
+package net.caffeinemc.mods.sodium.client.render.frapi.render;
 
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import net.minecraft.client.renderer.advanced.texture.SpriteUtil;
 import net.minecraft.client.renderer.advanced.vertex.buffer.VertexBufferWriter;
-import net.minecraft.client.renderer.sodium.render.frapi.helper.ColorHelper;
-import net.minecraft.client.renderer.sodium.render.frapi.mesh.MutableQuadViewImpl;
-import net.minecraft.client.renderer.sodium.render.immediate.model.BakedModelEncoder;
-import net.minecraft.client.renderer.sodium.render.texture.SpriteFinderCache;
+import net.caffeinemc.mods.sodium.client.render.frapi.helper.ColorHelper;
+import net.caffeinemc.mods.sodium.client.render.frapi.mesh.MutableQuadViewImpl;
+import net.caffeinemc.mods.sodium.client.render.immediate.model.BakedModelEncoder;
+import net.caffeinemc.mods.sodium.client.render.texture.SpriteFinderCache;
 import net.fabricmc.fabric.api.renderer.v1.model.FabricBlockStateModel;
 import net.fabricmc.fabric.api.renderer.v1.render.BlockVertexConsumerProvider;
 import net.minecraft.client.renderer.ItemBlockRenderTypes;

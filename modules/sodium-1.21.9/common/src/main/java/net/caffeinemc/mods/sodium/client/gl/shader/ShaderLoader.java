@@ -1,7 +1,7 @@
-package net.minecraft.client.renderer.sodium.gl.shader;
+package net.caffeinemc.mods.sodium.client.gl.shader;
 
 import com.google.common.base.Objects;
-import net.minecraft.client.renderer.sodium.services.PlatformRuntimeInformation;
+import net.caffeinemc.mods.sodium.client.services.PlatformRuntimeInformation;
 import org.apache.commons.io.IOUtils;
 
 import java.io.IOException;

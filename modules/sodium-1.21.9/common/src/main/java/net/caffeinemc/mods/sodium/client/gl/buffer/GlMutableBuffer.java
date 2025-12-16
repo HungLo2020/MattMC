@@ -1,4 +1,4 @@
-package net.minecraft.client.renderer.sodium.gl.buffer;
+package net.caffeinemc.mods.sodium.client.gl.buffer;
 
 /**
  * A mutable buffer type which is supported with OpenGL 1.5+. The buffer's storage can be reallocated at any time

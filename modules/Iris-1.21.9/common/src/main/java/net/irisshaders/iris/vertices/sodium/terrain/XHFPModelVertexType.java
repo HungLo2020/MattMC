@@ -1,8 +1,8 @@
 package net.irisshaders.iris.vertices.sodium.terrain;
 
-import net.minecraft.client.renderer.gl.advanced.attribute.GlVertexFormat;
-import net.minecraft.client.renderer.chunk.advanced.vertex.format.ChunkVertexEncoder;
-import net.minecraft.client.renderer.chunk.advanced.vertex.format.ChunkVertexType;
+import net.caffeinemc.mods.sodium.client.gl.attribute.GlVertexFormat;
+import net.caffeinemc.mods.sodium.client.render.chunk.vertex.format.ChunkVertexEncoder;
+import net.caffeinemc.mods.sodium.client.render.chunk.vertex.format.ChunkVertexType;
 
 /**
  * Like HFPModelVertexType, but extended to support Iris. The extensions aren't particularly efficient right now.

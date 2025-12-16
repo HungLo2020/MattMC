@@ -1,9 +1,9 @@
-package net.minecraft.client.renderer.sodium.gl.functions;
+package net.caffeinemc.mods.sodium.client.gl.functions;
 
-import net.minecraft.client.renderer.gl.advanced.buffer.GlBufferStorageFlags;
-import net.minecraft.client.renderer.gl.advanced.buffer.GlBufferTarget;
-import net.minecraft.client.renderer.gl.advanced.device.RenderDevice;
-import net.minecraft.client.renderer.gl.advanced.util.EnumBitField;
+import net.caffeinemc.mods.sodium.client.gl.buffer.GlBufferStorageFlags;
+import net.caffeinemc.mods.sodium.client.gl.buffer.GlBufferTarget;
+import net.caffeinemc.mods.sodium.client.gl.device.RenderDevice;
+import net.caffeinemc.mods.sodium.client.gl.util.EnumBitField;
 import org.lwjgl.opengl.ARBBufferStorage;
 import org.lwjgl.opengl.GL44C;
 import org.lwjgl.opengl.GLCapabilities;

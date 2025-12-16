@@ -1,4 +1,4 @@
-package net.minecraft.client.renderer.sodium.render.chunk.map;
+package net.caffeinemc.mods.sodium.client.render.chunk.map;
 
 public class ChunkStatus {
     public static final int FLAG_HAS_BLOCK_DATA = 1;

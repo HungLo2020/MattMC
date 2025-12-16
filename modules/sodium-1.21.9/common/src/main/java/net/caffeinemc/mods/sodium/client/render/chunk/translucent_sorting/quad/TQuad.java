@@ -1,13 +1,13 @@
-package net.minecraft.client.renderer.sodium.render.chunk.translucent_sorting.quad;
+package net.caffeinemc.mods.sodium.client.render.chunk.translucent_sorting.quad;
 
 import java.util.Arrays;
 
-import net.minecraft.client.renderer.chunk.advanced.compile.pipeline.DefaultFluidRenderer;
-import net.minecraft.client.renderer.chunk.advanced.vertex.format.ChunkVertexEncoder;
+import net.caffeinemc.mods.sodium.client.render.chunk.compile.pipeline.DefaultFluidRenderer;
+import net.caffeinemc.mods.sodium.client.render.chunk.vertex.format.ChunkVertexEncoder;
 import org.joml.Vector3f;
 import org.joml.Vector3fc;
 
-import net.minecraft.client.renderer.sodium.model.quad.properties.ModelQuadFacing;
+import net.caffeinemc.mods.sodium.client.model.quad.properties.ModelQuadFacing;
 import net.minecraft.client.renderer.advanced.util.NormI8;
 
 /**

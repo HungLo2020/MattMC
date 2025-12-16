@@ -1,9 +1,9 @@
 package net.caffeinemc.mods.sodium.mixin.core.model.quad;
 
-import net.minecraft.client.renderer.sodium.model.quad.BakedQuadView;
-import net.minecraft.client.renderer.sodium.model.quad.properties.ModelQuadFacing;
-import net.minecraft.client.renderer.sodium.model.quad.properties.ModelQuadFlags;
-import net.minecraft.client.renderer.sodium.util.ModelQuadUtil;
+import net.caffeinemc.mods.sodium.client.model.quad.BakedQuadView;
+import net.caffeinemc.mods.sodium.client.model.quad.properties.ModelQuadFacing;
+import net.caffeinemc.mods.sodium.client.model.quad.properties.ModelQuadFlags;
+import net.caffeinemc.mods.sodium.client.util.ModelQuadUtil;
 import net.minecraft.client.renderer.LightTexture;
 import net.minecraft.client.renderer.block.model.BakedQuad;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;

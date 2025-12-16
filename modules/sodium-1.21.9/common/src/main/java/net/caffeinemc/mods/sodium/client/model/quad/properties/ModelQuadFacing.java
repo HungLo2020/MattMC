@@ -1,6 +1,6 @@
-package net.minecraft.client.renderer.sodium.model.quad.properties;
+package net.caffeinemc.mods.sodium.client.model.quad.properties;
 
-import net.minecraft.client.renderer.sodium.util.DirectionUtil;
+import net.caffeinemc.mods.sodium.client.util.DirectionUtil;
 import net.minecraft.client.renderer.advanced.util.NormI8;
 import net.minecraft.core.Direction;
 import net.minecraft.util.Mth;

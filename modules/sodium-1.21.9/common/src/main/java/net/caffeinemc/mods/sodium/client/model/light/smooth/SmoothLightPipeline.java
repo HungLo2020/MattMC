@@ -1,11 +1,11 @@
-package net.minecraft.client.renderer.sodium.model.light.smooth;
+package net.caffeinemc.mods.sodium.client.model.light.smooth;
 
 import net.minecraft.client.renderer.advanced.util.NormI8;
-import net.minecraft.client.renderer.sodium.model.light.LightPipeline;
-import net.minecraft.client.renderer.sodium.model.light.data.LightDataAccess;
-import net.minecraft.client.renderer.sodium.model.light.data.QuadLightData;
-import net.minecraft.client.renderer.sodium.model.quad.ModelQuadView;
-import net.minecraft.client.renderer.sodium.model.quad.properties.ModelQuadFlags;
+import net.caffeinemc.mods.sodium.client.model.light.LightPipeline;
+import net.caffeinemc.mods.sodium.client.model.light.data.LightDataAccess;
+import net.caffeinemc.mods.sodium.client.model.light.data.QuadLightData;
+import net.caffeinemc.mods.sodium.client.model.quad.ModelQuadView;
+import net.caffeinemc.mods.sodium.client.model.quad.properties.ModelQuadFlags;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.util.Mth;

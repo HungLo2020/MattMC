@@ -1,6 +1,6 @@
-package net.minecraft.client.renderer.sodium.render.chunk.compile.executor;
+package net.caffeinemc.mods.sodium.client.render.chunk.compile.executor;
 
-import net.minecraft.client.renderer.chunk.advanced.compile.BuilderTaskOutput;
+import net.caffeinemc.mods.sodium.client.render.chunk.compile.BuilderTaskOutput;
 
 import java.util.ArrayList;
 import java.util.List;

@@ -1,12 +1,12 @@
-package net.minecraft.client.renderer.sodium.render.chunk.compile.executor;
+package net.caffeinemc.mods.sodium.client.render.chunk.compile.executor;
 
 import com.mojang.jtracy.TracyClient;
 import com.mojang.jtracy.Zone;
-import net.minecraft.client.renderer.sodium.SodiumClientMod;
-import net.minecraft.client.renderer.chunk.advanced.compile.BuilderTaskOutput;
-import net.minecraft.client.renderer.chunk.advanced.compile.ChunkBuildContext;
-import net.minecraft.client.renderer.chunk.advanced.compile.tasks.ChunkBuilderTask;
-import net.minecraft.client.renderer.chunk.advanced.vertex.format.ChunkVertexType;
+import net.caffeinemc.mods.sodium.client.SodiumClientMod;
+import net.caffeinemc.mods.sodium.client.render.chunk.compile.BuilderTaskOutput;
+import net.caffeinemc.mods.sodium.client.render.chunk.compile.ChunkBuildContext;
+import net.caffeinemc.mods.sodium.client.render.chunk.compile.tasks.ChunkBuilderTask;
+import net.caffeinemc.mods.sodium.client.render.chunk.vertex.format.ChunkVertexType;
 import net.minecraft.SharedConstants;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.util.Mth;

@@ -1,7 +1,7 @@
-package net.minecraft.client.renderer.sodium.render.chunk.shader;
+package net.caffeinemc.mods.sodium.client.render.chunk.shader;
 
-import net.minecraft.client.renderer.chunk.advanced.terrain.TerrainRenderPass;
-import net.minecraft.client.renderer.sodium.util.FogParameters;
+import net.caffeinemc.mods.sodium.client.render.chunk.terrain.TerrainRenderPass;
+import net.caffeinemc.mods.sodium.client.util.FogParameters;
 import org.joml.Matrix4fc;
 
 public interface ChunkShaderInterface {

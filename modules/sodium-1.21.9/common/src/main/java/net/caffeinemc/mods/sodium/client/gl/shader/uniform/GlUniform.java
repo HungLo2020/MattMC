@@ -1,4 +1,4 @@
-package net.minecraft.client.renderer.sodium.gl.shader.uniform;
+package net.caffeinemc.mods.sodium.client.gl.shader.uniform;
 
 public abstract class GlUniform<T> {
     protected final int index;

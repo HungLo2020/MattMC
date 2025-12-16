@@ -1,20 +1,20 @@
-package net.minecraft.client.renderer.sodium.render.chunk.region;
+package net.caffeinemc.mods.sodium.client.render.chunk.region;
 
 import it.unimi.dsi.fastutil.objects.Reference2ReferenceOpenHashMap;
-import net.minecraft.client.renderer.gl.advanced.arena.GlBufferArena;
-import net.minecraft.client.renderer.gl.advanced.arena.staging.StagingBuffer;
-import net.minecraft.client.renderer.gl.advanced.buffer.GlBuffer;
-import net.minecraft.client.renderer.gl.advanced.device.CommandList;
-import net.minecraft.client.renderer.gl.advanced.device.MultiDrawBatch;
-import net.minecraft.client.renderer.gl.advanced.tessellation.GlTessellation;
-import net.minecraft.client.renderer.sodium.model.quad.properties.ModelQuadFacing;
-import net.minecraft.client.renderer.chunk.advanced.RenderSection;
-import net.minecraft.client.renderer.chunk.advanced.data.SectionRenderDataStorage;
-import net.minecraft.client.renderer.chunk.advanced.lists.ChunkRenderList;
-import net.minecraft.client.renderer.chunk.advanced.terrain.DefaultTerrainRenderPasses;
-import net.minecraft.client.renderer.chunk.advanced.terrain.TerrainRenderPass;
-import net.minecraft.client.renderer.chunk.advanced.vertex.format.ChunkMeshFormats;
-import net.minecraft.client.renderer.sodium.util.MathUtil;
+import net.caffeinemc.mods.sodium.client.gl.arena.GlBufferArena;
+import net.caffeinemc.mods.sodium.client.gl.arena.staging.StagingBuffer;
+import net.caffeinemc.mods.sodium.client.gl.buffer.GlBuffer;
+import net.caffeinemc.mods.sodium.client.gl.device.CommandList;
+import net.caffeinemc.mods.sodium.client.gl.device.MultiDrawBatch;
+import net.caffeinemc.mods.sodium.client.gl.tessellation.GlTessellation;
+import net.caffeinemc.mods.sodium.client.model.quad.properties.ModelQuadFacing;
+import net.caffeinemc.mods.sodium.client.render.chunk.RenderSection;
+import net.caffeinemc.mods.sodium.client.render.chunk.data.SectionRenderDataStorage;
+import net.caffeinemc.mods.sodium.client.render.chunk.lists.ChunkRenderList;
+import net.caffeinemc.mods.sodium.client.render.chunk.terrain.DefaultTerrainRenderPasses;
+import net.caffeinemc.mods.sodium.client.render.chunk.terrain.TerrainRenderPass;
+import net.caffeinemc.mods.sodium.client.render.chunk.vertex.format.ChunkMeshFormats;
+import net.caffeinemc.mods.sodium.client.util.MathUtil;
 import net.minecraft.core.SectionPos;
 import org.apache.commons.lang3.Validate;
 

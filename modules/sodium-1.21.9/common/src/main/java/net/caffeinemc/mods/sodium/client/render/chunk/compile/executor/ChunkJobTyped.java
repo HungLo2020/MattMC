@@ -1,9 +1,9 @@
-package net.minecraft.client.renderer.sodium.render.chunk.compile.executor;
+package net.caffeinemc.mods.sodium.client.render.chunk.compile.executor;
 
-import net.minecraft.client.renderer.chunk.advanced.compile.BuilderTaskOutput;
-import net.minecraft.client.renderer.chunk.advanced.compile.ChunkBuildContext;
-import net.minecraft.client.renderer.chunk.advanced.compile.estimation.JobEffort;
-import net.minecraft.client.renderer.chunk.advanced.compile.tasks.ChunkBuilderTask;
+import net.caffeinemc.mods.sodium.client.render.chunk.compile.BuilderTaskOutput;
+import net.caffeinemc.mods.sodium.client.render.chunk.compile.ChunkBuildContext;
+import net.caffeinemc.mods.sodium.client.render.chunk.compile.estimation.JobEffort;
+import net.caffeinemc.mods.sodium.client.render.chunk.compile.tasks.ChunkBuilderTask;
 
 import java.util.function.Consumer;
 

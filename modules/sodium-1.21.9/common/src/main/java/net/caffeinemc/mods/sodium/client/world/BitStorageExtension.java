@@ -1,4 +1,4 @@
-package net.minecraft.client.renderer.sodium.world;
+package net.caffeinemc.mods.sodium.client.world;
 
 import net.minecraft.world.level.chunk.Palette;
 

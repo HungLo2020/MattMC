@@ -1,8 +1,8 @@
-package net.minecraft.client.renderer.sodium.render.chunk.translucent_sorting.bsp_tree;
+package net.caffeinemc.mods.sodium.client.render.chunk.translucent_sorting.bsp_tree;
 
 import it.unimi.dsi.fastutil.objects.ReferenceArrayList;
-import net.minecraft.client.renderer.chunk.advanced.translucent_sorting.quad.FullTQuad;
-import net.minecraft.client.renderer.chunk.advanced.vertex.builder.ChunkMeshBufferBuilder;
+import net.caffeinemc.mods.sodium.client.render.chunk.translucent_sorting.quad.FullTQuad;
+import net.caffeinemc.mods.sodium.client.render.chunk.vertex.builder.ChunkMeshBufferBuilder;
 
 import java.nio.ByteBuffer;
 

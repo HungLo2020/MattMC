@@ -1,4 +1,4 @@
-package net.minecraft.client.renderer.sodium.world.biome;
+package net.caffeinemc.mods.sodium.client.world.biome;
 
 import net.minecraft.world.level.FoliageColor;
 import net.minecraft.world.level.GrassColor;

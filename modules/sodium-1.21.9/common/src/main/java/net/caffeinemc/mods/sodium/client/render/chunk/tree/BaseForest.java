@@ -1,4 +1,4 @@
-package net.minecraft.client.renderer.sodium.render.chunk.tree;
+package net.caffeinemc.mods.sodium.client.render.chunk.tree;
 
 public abstract class BaseForest<T extends Tree> implements Forest {
     protected final int baseOffsetX, baseOffsetY, baseOffsetZ;

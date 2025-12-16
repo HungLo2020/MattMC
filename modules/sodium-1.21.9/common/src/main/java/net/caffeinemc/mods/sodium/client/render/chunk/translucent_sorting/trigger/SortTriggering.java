@@ -1,12 +1,12 @@
-package net.minecraft.client.renderer.sodium.render.chunk.translucent_sorting.trigger;
+package net.caffeinemc.mods.sodium.client.render.chunk.translucent_sorting.trigger;
 
 import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
-import net.minecraft.client.renderer.sodium.SodiumClientMod;
-import net.minecraft.client.renderer.chunk.advanced.translucent_sorting.SortBehavior;
-import net.minecraft.client.renderer.chunk.advanced.translucent_sorting.SortType;
-import net.minecraft.client.renderer.chunk.advanced.translucent_sorting.data.DynamicData;
-import net.minecraft.client.renderer.chunk.advanced.translucent_sorting.data.DynamicTopoData;
-import net.minecraft.client.renderer.chunk.advanced.translucent_sorting.data.TranslucentData;
+import net.caffeinemc.mods.sodium.client.SodiumClientMod;
+import net.caffeinemc.mods.sodium.client.render.chunk.translucent_sorting.SortBehavior;
+import net.caffeinemc.mods.sodium.client.render.chunk.translucent_sorting.SortType;
+import net.caffeinemc.mods.sodium.client.render.chunk.translucent_sorting.data.DynamicData;
+import net.caffeinemc.mods.sodium.client.render.chunk.translucent_sorting.data.DynamicTopoData;
+import net.caffeinemc.mods.sodium.client.render.chunk.translucent_sorting.data.TranslucentData;
 import net.minecraft.core.SectionPos;
 import org.joml.Vector3dc;
 import org.joml.Vector3fc;

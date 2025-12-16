@@ -1,4 +1,4 @@
-package net.minecraft.client.renderer.sodium.render.chunk.terrain;
+package net.caffeinemc.mods.sodium.client.render.chunk.terrain;
 
 import net.minecraft.client.renderer.RenderType;
 import net.minecraft.client.renderer.chunk.ChunkSectionLayer;

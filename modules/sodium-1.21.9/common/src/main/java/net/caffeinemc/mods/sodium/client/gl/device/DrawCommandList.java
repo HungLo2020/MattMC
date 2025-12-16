@@ -1,6 +1,6 @@
-package net.minecraft.client.renderer.sodium.gl.device;
+package net.caffeinemc.mods.sodium.client.gl.device;
 
-import net.minecraft.client.renderer.gl.advanced.tessellation.GlIndexType;
+import net.caffeinemc.mods.sodium.client.gl.tessellation.GlIndexType;
 
 public interface DrawCommandList extends AutoCloseable {
     void multiDrawElementsBaseVertex(MultiDrawBatch batch, GlIndexType indexType);

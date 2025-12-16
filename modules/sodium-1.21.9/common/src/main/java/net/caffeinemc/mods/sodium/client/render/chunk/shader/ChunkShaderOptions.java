@@ -1,8 +1,8 @@
-package net.minecraft.client.renderer.sodium.render.chunk.shader;
+package net.caffeinemc.mods.sodium.client.render.chunk.shader;
 
-import net.minecraft.client.renderer.gl.advanced.shader.ShaderConstants;
-import net.minecraft.client.renderer.chunk.advanced.terrain.TerrainRenderPass;
-import net.minecraft.client.renderer.chunk.advanced.vertex.format.ChunkVertexType;
+import net.caffeinemc.mods.sodium.client.gl.shader.ShaderConstants;
+import net.caffeinemc.mods.sodium.client.render.chunk.terrain.TerrainRenderPass;
+import net.caffeinemc.mods.sodium.client.render.chunk.vertex.format.ChunkVertexType;
 
 public record ChunkShaderOptions(ChunkFogMode fog, TerrainRenderPass pass, ChunkVertexType vertexType) {
     public ShaderConstants constants() {

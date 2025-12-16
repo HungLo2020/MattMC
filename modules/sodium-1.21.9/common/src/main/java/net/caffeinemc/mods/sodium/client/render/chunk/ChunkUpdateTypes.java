@@ -1,4 +1,4 @@
-package net.minecraft.client.renderer.sodium.render.chunk;
+package net.caffeinemc.mods.sodium.client.render.chunk;
 
 /**
  * Important: Whether the task is scheduled immediately after its creation. Otherwise, they're scheduled through

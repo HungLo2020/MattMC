@@ -1,7 +1,7 @@
-package net.minecraft.client.renderer.sodium.gui.options.control;
+package net.caffeinemc.mods.sodium.client.gui.options.control;
 
 import com.mojang.blaze3d.platform.Monitor;
-import net.minecraft.client.renderer.sodium.compatibility.environment.OsUtils;
+import net.caffeinemc.mods.sodium.client.compatibility.environment.OsUtils;
 import net.minecraft.client.Minecraft;
 import net.minecraft.network.chat.Component;
 

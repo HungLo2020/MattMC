@@ -1,4 +1,4 @@
-package net.minecraft.client.renderer.sodium.model.light.data;
+package net.caffeinemc.mods.sodium.client.model.light.data;
 
 import it.unimi.dsi.fastutil.longs.Long2IntLinkedOpenHashMap;
 import net.minecraft.core.BlockPos;

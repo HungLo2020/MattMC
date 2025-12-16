@@ -1,4 +1,4 @@
-package net.minecraft.client.renderer.sodium.util;
+package net.caffeinemc.mods.sodium.client.util;
 
 import java.util.Arrays;
 import net.minecraft.core.Direction;

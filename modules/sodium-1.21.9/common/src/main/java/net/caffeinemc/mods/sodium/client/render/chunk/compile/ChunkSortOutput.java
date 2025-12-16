@@ -1,8 +1,8 @@
-package net.minecraft.client.renderer.sodium.render.chunk.compile;
+package net.caffeinemc.mods.sodium.client.render.chunk.compile;
 
-import net.minecraft.client.renderer.chunk.advanced.RenderSection;
-import net.minecraft.client.renderer.chunk.advanced.translucent_sorting.data.DynamicTopoData;
-import net.minecraft.client.renderer.chunk.advanced.translucent_sorting.data.Sorter;
+import net.caffeinemc.mods.sodium.client.render.chunk.RenderSection;
+import net.caffeinemc.mods.sodium.client.render.chunk.translucent_sorting.data.DynamicTopoData;
+import net.caffeinemc.mods.sodium.client.render.chunk.translucent_sorting.data.Sorter;
 
 public class ChunkSortOutput extends BuilderTaskOutput {
     private Sorter sorter;

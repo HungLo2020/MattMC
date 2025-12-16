@@ -1,4 +1,4 @@
-package net.minecraft.client.renderer.sodium.render.chunk.compile.estimation;
+package net.caffeinemc.mods.sodium.client.render.chunk.compile.estimation;
 
 public record UploadDuration(long uploadDuration, long size) implements ExpDecayLinear2DEstimator.DataPair<Void> {
     @Override

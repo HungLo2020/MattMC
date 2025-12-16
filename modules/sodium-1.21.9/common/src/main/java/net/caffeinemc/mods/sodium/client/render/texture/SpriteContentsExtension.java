@@ -1,4 +1,4 @@
-package net.minecraft.client.renderer.sodium.render.texture;
+package net.caffeinemc.mods.sodium.client.render.texture;
 
 public interface SpriteContentsExtension {
     void sodium$setActive(boolean value);

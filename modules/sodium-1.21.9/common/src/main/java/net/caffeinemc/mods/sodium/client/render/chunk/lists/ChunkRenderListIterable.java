@@ -1,4 +1,4 @@
-package net.minecraft.client.renderer.sodium.render.chunk.lists;
+package net.caffeinemc.mods.sodium.client.render.chunk.lists;
 
 import java.util.Iterator;
 

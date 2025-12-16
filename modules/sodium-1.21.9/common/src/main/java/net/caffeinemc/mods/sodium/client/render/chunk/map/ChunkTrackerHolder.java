@@ -1,4 +1,4 @@
-package net.minecraft.client.renderer.sodium.render.chunk.map;
+package net.caffeinemc.mods.sodium.client.render.chunk.map;
 
 import net.minecraft.client.multiplayer.ClientLevel;
 

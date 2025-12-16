@@ -1,8 +1,8 @@
-package net.minecraft.client.renderer.sodium.render.frapi.render;
+package net.caffeinemc.mods.sodium.client.render.frapi.render;
 
 import com.mojang.blaze3d.vertex.VertexConsumer;
-import net.minecraft.client.renderer.sodium.render.frapi.mesh.MutableQuadViewImpl;
-import net.minecraft.client.renderer.vertex.advanced.VertexConsumerUtils;
+import net.caffeinemc.mods.sodium.client.render.frapi.mesh.MutableQuadViewImpl;
+import net.caffeinemc.mods.sodium.client.render.vertex.VertexConsumerUtils;
 import net.minecraft.client.renderer.advanced.math.MatrixHelper;
 import net.minecraft.client.renderer.advanced.util.ColorARGB;
 import net.minecraft.client.renderer.advanced.util.NormI8;

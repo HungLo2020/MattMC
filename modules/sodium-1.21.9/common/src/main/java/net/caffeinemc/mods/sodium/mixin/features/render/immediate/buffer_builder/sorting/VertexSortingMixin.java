@@ -2,7 +2,7 @@ package net.caffeinemc.mods.sodium.mixin.features.render.immediate.buffer_builde
 
 import com.llamalad7.mixinextras.injector.ModifyExpressionValue;
 import com.mojang.blaze3d.vertex.VertexSorting;
-import net.minecraft.client.renderer.sodium.util.sorting.VertexSorters;
+import net.caffeinemc.mods.sodium.client.util.sorting.VertexSorters;
 import org.objectweb.asm.Opcodes;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Overwrite;

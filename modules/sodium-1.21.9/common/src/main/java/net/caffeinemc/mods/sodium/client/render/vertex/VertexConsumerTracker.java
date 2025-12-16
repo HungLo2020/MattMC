@@ -1,4 +1,4 @@
-package net.minecraft.client.renderer.sodium.render.vertex;
+package net.caffeinemc.mods.sodium.client.render.vertex;
 
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import it.unimi.dsi.fastutil.objects.ReferenceOpenHashSet;

@@ -1,12 +1,12 @@
-package net.minecraft.client.renderer.sodium.gl.device;
+package net.caffeinemc.mods.sodium.client.gl.device;
 
-import net.minecraft.client.renderer.gl.advanced.array.GlVertexArray;
-import net.minecraft.client.renderer.gl.advanced.buffer.*;
-import net.minecraft.client.renderer.gl.advanced.sync.GlFence;
-import net.minecraft.client.renderer.gl.advanced.tessellation.GlPrimitiveType;
-import net.minecraft.client.renderer.gl.advanced.tessellation.GlTessellation;
-import net.minecraft.client.renderer.gl.advanced.tessellation.TessellationBinding;
-import net.minecraft.client.renderer.gl.advanced.util.EnumBitField;
+import net.caffeinemc.mods.sodium.client.gl.array.GlVertexArray;
+import net.caffeinemc.mods.sodium.client.gl.buffer.*;
+import net.caffeinemc.mods.sodium.client.gl.sync.GlFence;
+import net.caffeinemc.mods.sodium.client.gl.tessellation.GlPrimitiveType;
+import net.caffeinemc.mods.sodium.client.gl.tessellation.GlTessellation;
+import net.caffeinemc.mods.sodium.client.gl.tessellation.TessellationBinding;
+import net.caffeinemc.mods.sodium.client.gl.util.EnumBitField;
 
 import java.nio.ByteBuffer;
 

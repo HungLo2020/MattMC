@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package net.minecraft.client.renderer.sodium.render.frapi.mesh;
+package net.caffeinemc.mods.sodium.client.render.frapi.mesh;
 
 import net.fabricmc.fabric.api.renderer.v1.mesh.Mesh;
 import net.fabricmc.fabric.api.renderer.v1.mesh.MutableMesh;

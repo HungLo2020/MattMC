@@ -1,4 +1,4 @@
-package net.minecraft.client.renderer.sodium.gui.options.storage;
+package net.caffeinemc.mods.sodium.client.gui.options.storage;
 
 public interface OptionStorage<T> {
     T getData();

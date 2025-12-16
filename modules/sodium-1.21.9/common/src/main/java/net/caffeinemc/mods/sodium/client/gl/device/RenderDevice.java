@@ -1,6 +1,6 @@
-package net.minecraft.client.renderer.sodium.gl.device;
+package net.caffeinemc.mods.sodium.client.gl.device;
 
-import net.minecraft.client.renderer.gl.advanced.functions.DeviceFunctions;
+import net.caffeinemc.mods.sodium.client.gl.functions.DeviceFunctions;
 import org.lwjgl.opengl.GLCapabilities;
 
 public interface RenderDevice {

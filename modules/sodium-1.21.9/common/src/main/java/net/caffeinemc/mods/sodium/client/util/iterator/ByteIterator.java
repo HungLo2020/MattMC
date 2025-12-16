@@ -1,4 +1,4 @@
-package net.minecraft.client.renderer.sodium.util.iterator;
+package net.caffeinemc.mods.sodium.client.util.iterator;
 
 public interface ByteIterator {
     boolean hasNext();

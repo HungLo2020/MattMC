@@ -1,7 +1,7 @@
-package net.minecraft.client.renderer.sodium.gl.arena.staging;
+package net.caffeinemc.mods.sodium.client.gl.arena.staging;
 
-import net.minecraft.client.renderer.gl.advanced.buffer.GlBuffer;
-import net.minecraft.client.renderer.gl.advanced.device.CommandList;
+import net.caffeinemc.mods.sodium.client.gl.buffer.GlBuffer;
+import net.caffeinemc.mods.sodium.client.gl.device.CommandList;
 
 import java.nio.ByteBuffer;
 

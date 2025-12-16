@@ -1,8 +1,8 @@
-package net.minecraft.client.renderer.sodium.gl.state;
+package net.caffeinemc.mods.sodium.client.gl.state;
 
-import net.minecraft.client.renderer.gl.advanced.array.GlVertexArray;
-import net.minecraft.client.renderer.gl.advanced.buffer.GlBuffer;
-import net.minecraft.client.renderer.gl.advanced.buffer.GlBufferTarget;
+import net.caffeinemc.mods.sodium.client.gl.array.GlVertexArray;
+import net.caffeinemc.mods.sodium.client.gl.buffer.GlBuffer;
+import net.caffeinemc.mods.sodium.client.gl.buffer.GlBufferTarget;
 
 import java.util.Arrays;
 

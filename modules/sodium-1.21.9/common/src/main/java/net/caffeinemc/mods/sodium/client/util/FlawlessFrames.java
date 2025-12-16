@@ -1,4 +1,4 @@
-package net.minecraft.client.renderer.sodium.util;
+package net.caffeinemc.mods.sodium.client.util;
 
 import java.util.Collections;
 import java.util.Set;

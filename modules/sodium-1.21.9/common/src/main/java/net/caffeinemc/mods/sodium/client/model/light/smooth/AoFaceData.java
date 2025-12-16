@@ -1,11 +1,11 @@
-package net.minecraft.client.renderer.sodium.model.light.smooth;
+package net.caffeinemc.mods.sodium.client.model.light.smooth;
 
-import net.minecraft.client.renderer.sodium.model.light.data.LightDataAccess;
+import net.caffeinemc.mods.sodium.client.model.light.data.LightDataAccess;
 import net.minecraft.client.renderer.LightTexture;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 
-import static net.minecraft.client.renderer.sodium.model.light.data.ArrayLightDataCache.*;
+import static net.caffeinemc.mods.sodium.client.model.light.data.ArrayLightDataCache.*;
 
 class AoFaceData {
     public final int[] lm = new int[4];

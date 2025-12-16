@@ -1,13 +1,13 @@
-package net.minecraft.client.renderer.sodium.render.chunk;
+package net.caffeinemc.mods.sodium.client.render.chunk;
 
-import net.minecraft.client.renderer.chunk.advanced.compile.estimation.MeshResultSize;
-import net.minecraft.client.renderer.chunk.advanced.compile.executor.ChunkJob;
-import net.minecraft.client.renderer.chunk.advanced.data.BuiltSectionInfo;
-import net.minecraft.client.renderer.chunk.advanced.occlusion.GraphDirection;
-import net.minecraft.client.renderer.chunk.advanced.occlusion.GraphDirectionSet;
-import net.minecraft.client.renderer.chunk.advanced.occlusion.VisibilityEncoding;
-import net.minecraft.client.renderer.chunk.advanced.region.RenderRegion;
-import net.minecraft.client.renderer.chunk.advanced.translucent_sorting.data.TranslucentData;
+import net.caffeinemc.mods.sodium.client.render.chunk.compile.estimation.MeshResultSize;
+import net.caffeinemc.mods.sodium.client.render.chunk.compile.executor.ChunkJob;
+import net.caffeinemc.mods.sodium.client.render.chunk.data.BuiltSectionInfo;
+import net.caffeinemc.mods.sodium.client.render.chunk.occlusion.GraphDirection;
+import net.caffeinemc.mods.sodium.client.render.chunk.occlusion.GraphDirectionSet;
+import net.caffeinemc.mods.sodium.client.render.chunk.occlusion.VisibilityEncoding;
+import net.caffeinemc.mods.sodium.client.render.chunk.region.RenderRegion;
+import net.caffeinemc.mods.sodium.client.render.chunk.translucent_sorting.data.TranslucentData;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.SectionPos;

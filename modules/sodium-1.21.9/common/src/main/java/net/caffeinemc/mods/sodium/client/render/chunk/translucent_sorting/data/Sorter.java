@@ -1,4 +1,4 @@
-package net.minecraft.client.renderer.sodium.render.chunk.translucent_sorting.data;
+package net.caffeinemc.mods.sodium.client.render.chunk.translucent_sorting.data;
 
 public interface Sorter extends PresentSortData {
     void writeIndexBuffer(CombinedCameraPos cameraPos, boolean initial);

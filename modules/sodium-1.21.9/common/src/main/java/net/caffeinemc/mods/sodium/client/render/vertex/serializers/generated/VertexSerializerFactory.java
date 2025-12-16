@@ -1,4 +1,4 @@
-package net.minecraft.client.renderer.sodium.render.vertex.serializers.generated;
+package net.caffeinemc.mods.sodium.client.render.vertex.serializers.generated;
 
 import com.mojang.blaze3d.vertex.VertexFormat;
 import com.mojang.blaze3d.vertex.VertexFormatElement;

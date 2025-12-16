@@ -1,6 +1,6 @@
-package net.minecraft.client.renderer.sodium.model.quad;
+package net.caffeinemc.mods.sodium.client.model.quad;
 
-import net.minecraft.client.renderer.sodium.model.quad.properties.ModelQuadFacing;
+import net.caffeinemc.mods.sodium.client.model.quad.properties.ModelQuadFacing;
 
 public interface BakedQuadView extends ModelQuadView {
     ModelQuadFacing getNormalFace();

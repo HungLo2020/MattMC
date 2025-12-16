@@ -1,4 +1,4 @@
-package net.minecraft.client.renderer.sodium.model.quad.properties;
+package net.caffeinemc.mods.sodium.client.model.quad.properties;
 
 import net.fabricmc.fabric.api.renderer.v1.mesh.QuadView;
 

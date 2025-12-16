@@ -1,4 +1,4 @@
-package net.minecraft.client.renderer.sodium.render.chunk.translucent_sorting.trigger;
+package net.caffeinemc.mods.sodium.client.render.chunk.translucent_sorting.trigger;
 
 import org.joml.Vector3dc;
 

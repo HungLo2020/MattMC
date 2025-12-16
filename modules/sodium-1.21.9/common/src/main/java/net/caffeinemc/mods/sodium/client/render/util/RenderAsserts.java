@@ -1,4 +1,4 @@
-package net.minecraft.client.renderer.sodium.render.util;
+package net.caffeinemc.mods.sodium.client.render.util;
 
 import com.mojang.blaze3d.systems.RenderSystem;
 

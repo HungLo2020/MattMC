@@ -1,4 +1,4 @@
-package net.minecraft.client.renderer.sodium.render.chunk.terrain.material.parameters;
+package net.caffeinemc.mods.sodium.client.render.chunk.terrain.material.parameters;
 
 public enum AlphaCutoffParameter {
     ZERO, // 0.0f

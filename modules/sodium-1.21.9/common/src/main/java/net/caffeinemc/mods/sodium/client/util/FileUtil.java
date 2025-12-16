@@ -1,4 +1,4 @@
-package net.minecraft.client.renderer.sodium.util;
+package net.caffeinemc.mods.sodium.client.util;
 
 import java.io.IOException;
 import java.nio.file.Files;

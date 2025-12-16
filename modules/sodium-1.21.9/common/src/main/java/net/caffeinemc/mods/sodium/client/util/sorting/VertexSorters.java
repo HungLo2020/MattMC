@@ -1,8 +1,8 @@
-package net.minecraft.client.renderer.sodium.util.sorting;
+package net.caffeinemc.mods.sodium.client.util.sorting;
 
 import com.mojang.blaze3d.vertex.CompactVectorArray;
 import com.mojang.blaze3d.vertex.VertexSorting;
-import net.minecraft.client.renderer.sodium.util.MathUtil;
+import net.caffeinemc.mods.sodium.client.util.MathUtil;
 import org.apache.commons.lang3.Validate;
 import org.jetbrains.annotations.NotNull;
 import org.joml.Vector3f;

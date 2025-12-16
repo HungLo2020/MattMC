@@ -1,6 +1,6 @@
-package net.minecraft.client.renderer.sodium.services;
+package net.caffeinemc.mods.sodium.client.services;
 
-import net.minecraft.client.renderer.sodium.world.SodiumAuxiliaryLightManager;
+import net.caffeinemc.mods.sodium.client.world.SodiumAuxiliaryLightManager;
 import net.minecraft.core.SectionPos;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.chunk.LevelChunk;

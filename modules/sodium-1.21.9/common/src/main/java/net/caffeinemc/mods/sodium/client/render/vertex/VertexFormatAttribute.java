@@ -1,6 +1,6 @@
-package net.minecraft.client.renderer.sodium.render.vertex;
+package net.caffeinemc.mods.sodium.client.render.vertex;
 
-import net.minecraft.client.renderer.gl.advanced.attribute.GlVertexAttributeFormat;
+import net.caffeinemc.mods.sodium.client.gl.attribute.GlVertexAttributeFormat;
 
 public record VertexFormatAttribute(String name, GlVertexAttributeFormat format, int count, boolean normalized, boolean intType) {
 

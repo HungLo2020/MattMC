@@ -1,7 +1,7 @@
-package net.minecraft.client.renderer.sodium.services;
+package net.caffeinemc.mods.sodium.client.services;
 
-import net.minecraft.client.renderer.sodium.model.quad.ModelQuadView;
-import net.minecraft.client.renderer.sodium.render.frapi.render.AmbientOcclusionMode;
+import net.caffeinemc.mods.sodium.client.model.quad.ModelQuadView;
+import net.caffeinemc.mods.sodium.client.render.frapi.render.AmbientOcclusionMode;
 import net.fabricmc.fabric.api.util.TriState;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.client.renderer.RenderType;

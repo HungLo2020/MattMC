@@ -1,10 +1,10 @@
-package net.minecraft.client.renderer.sodium.render.chunk.compile.buffers;
+package net.caffeinemc.mods.sodium.client.render.chunk.compile.buffers;
 
 import com.mojang.blaze3d.vertex.VertexConsumer;
-import net.minecraft.client.renderer.sodium.model.quad.properties.ModelQuadFacing;
-import net.minecraft.client.renderer.chunk.advanced.terrain.material.Material;
-import net.minecraft.client.renderer.chunk.advanced.translucent_sorting.TranslucentGeometryCollector;
-import net.minecraft.client.renderer.chunk.advanced.vertex.builder.ChunkMeshBufferBuilder;
+import net.caffeinemc.mods.sodium.client.model.quad.properties.ModelQuadFacing;
+import net.caffeinemc.mods.sodium.client.render.chunk.terrain.material.Material;
+import net.caffeinemc.mods.sodium.client.render.chunk.translucent_sorting.TranslucentGeometryCollector;
+import net.caffeinemc.mods.sodium.client.render.chunk.vertex.builder.ChunkMeshBufferBuilder;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
 import org.jetbrains.annotations.NotNull;
 

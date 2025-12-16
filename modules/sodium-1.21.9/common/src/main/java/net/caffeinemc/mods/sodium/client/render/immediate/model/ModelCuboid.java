@@ -1,8 +1,8 @@
-package net.minecraft.client.renderer.sodium.render.immediate.model;
+package net.caffeinemc.mods.sodium.client.render.immediate.model;
 
 import java.util.Set;
 
-import net.minecraft.client.renderer.sodium.util.Int2;
+import net.caffeinemc.mods.sodium.client.util.Int2;
 import net.minecraft.core.Direction;
 import org.apache.commons.lang3.ArrayUtils;
 import org.jetbrains.annotations.NotNull;

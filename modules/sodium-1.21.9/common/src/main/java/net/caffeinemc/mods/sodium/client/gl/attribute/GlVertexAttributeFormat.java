@@ -1,4 +1,4 @@
-package net.minecraft.client.renderer.sodium.gl.attribute;
+package net.caffeinemc.mods.sodium.client.gl.attribute;
 
 import org.lwjgl.opengl.GL33C;
 

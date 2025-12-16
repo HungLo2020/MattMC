@@ -1,4 +1,4 @@
-package net.minecraft.client.renderer.sodium.model.light;
+package net.caffeinemc.mods.sodium.client.model.light;
 
 public enum LightMode {
     SMOOTH,

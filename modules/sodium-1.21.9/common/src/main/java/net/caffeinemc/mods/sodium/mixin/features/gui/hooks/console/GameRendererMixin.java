@@ -2,7 +2,7 @@ package net.caffeinemc.mods.sodium.mixin.features.gui.hooks.console;
 
 
 import com.llamalad7.mixinextras.sugar.Local;
-import net.minecraft.client.renderer.sodium.gui.console.ConsoleHooks;
+import net.caffeinemc.mods.sodium.client.gui.console.ConsoleHooks;
 import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;

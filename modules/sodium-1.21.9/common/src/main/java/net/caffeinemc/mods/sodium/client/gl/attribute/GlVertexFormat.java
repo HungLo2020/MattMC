@@ -1,9 +1,9 @@
-package net.minecraft.client.renderer.sodium.gl.attribute;
+package net.caffeinemc.mods.sodium.client.gl.attribute;
 
 import it.unimi.dsi.fastutil.objects.Object2IntArrayMap;
 import it.unimi.dsi.fastutil.objects.Object2IntMap;
 import it.unimi.dsi.fastutil.objects.Object2ObjectArrayMap;
-import net.minecraft.client.renderer.vertex.advanced.VertexFormatAttribute;
+import net.caffeinemc.mods.sodium.client.render.vertex.VertexFormatAttribute;
 
 import java.util.EnumMap;
 import java.util.Map;

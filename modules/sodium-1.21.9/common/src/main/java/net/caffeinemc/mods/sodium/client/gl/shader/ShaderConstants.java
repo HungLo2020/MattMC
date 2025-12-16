@@ -1,4 +1,4 @@
-package net.minecraft.client.renderer.sodium.gl.shader;
+package net.caffeinemc.mods.sodium.client.gl.shader;
 
 import java.util.*;
 

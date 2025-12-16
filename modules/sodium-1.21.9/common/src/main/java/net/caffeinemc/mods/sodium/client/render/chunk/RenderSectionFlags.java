@@ -1,4 +1,4 @@
-package net.minecraft.client.renderer.sodium.render.chunk;
+package net.caffeinemc.mods.sodium.client.render.chunk;
 
 public class RenderSectionFlags {
     public static final int HAS_BLOCK_GEOMETRY      = 0;

@@ -1,10 +1,10 @@
-package net.minecraft.client.renderer.sodium.render.chunk.lists;
+package net.caffeinemc.mods.sodium.client.render.chunk.lists;
 
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
-import net.minecraft.client.renderer.chunk.advanced.ChunkUpdateTypes;
-import net.minecraft.client.renderer.chunk.advanced.RenderSection;
-import net.minecraft.client.renderer.chunk.advanced.TaskQueueType;
-import net.minecraft.client.renderer.chunk.advanced.region.RenderRegion;
+import net.caffeinemc.mods.sodium.client.render.chunk.ChunkUpdateTypes;
+import net.caffeinemc.mods.sodium.client.render.chunk.RenderSection;
+import net.caffeinemc.mods.sodium.client.render.chunk.TaskQueueType;
+import net.caffeinemc.mods.sodium.client.render.chunk.region.RenderRegion;
 
 import java.util.ArrayDeque;
 import java.util.EnumMap;

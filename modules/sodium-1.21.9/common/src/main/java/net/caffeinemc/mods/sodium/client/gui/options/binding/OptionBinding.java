@@ -1,4 +1,4 @@
-package net.minecraft.client.renderer.sodium.gui.options.binding;
+package net.caffeinemc.mods.sodium.client.gui.options.binding;
 
 public interface OptionBinding<S, T> {
     void setValue(S storage, T value);

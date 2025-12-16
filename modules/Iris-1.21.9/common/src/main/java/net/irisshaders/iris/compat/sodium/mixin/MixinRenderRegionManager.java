@@ -1,9 +1,9 @@
 package net.irisshaders.iris.compat.sodium.mixin;
 
-import net.minecraft.client.renderer.gl.advanced.device.CommandList;
-import net.minecraft.client.renderer.chunk.advanced.compile.BuilderTaskOutput;
-import net.minecraft.client.renderer.chunk.advanced.region.RenderRegion;
-import net.minecraft.client.renderer.chunk.advanced.region.RenderRegionManager;
+import net.caffeinemc.mods.sodium.client.gl.device.CommandList;
+import net.caffeinemc.mods.sodium.client.render.chunk.compile.BuilderTaskOutput;
+import net.caffeinemc.mods.sodium.client.render.chunk.region.RenderRegion;
+import net.caffeinemc.mods.sodium.client.render.chunk.region.RenderRegionManager;
 import net.irisshaders.iris.mixinterface.ShadowRenderRegion;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;

@@ -1,10 +1,10 @@
-package net.minecraft.client.renderer.sodium.gui;
+package net.caffeinemc.mods.sodium.client.gui;
 
 import com.google.common.collect.Lists;
-import net.minecraft.client.renderer.sodium.SodiumClientMod;
-import net.minecraft.client.renderer.sodium.render.SodiumWorldRenderer;
-import net.minecraft.client.renderer.sodium.util.MathUtil;
-import net.minecraft.client.renderer.sodium.util.NativeBuffer;
+import net.caffeinemc.mods.sodium.client.SodiumClientMod;
+import net.caffeinemc.mods.sodium.client.render.SodiumWorldRenderer;
+import net.caffeinemc.mods.sodium.client.util.MathUtil;
+import net.caffeinemc.mods.sodium.client.util.NativeBuffer;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.gui.components.debug.DebugScreenDisplayer;
 import net.minecraft.client.gui.components.debug.DebugScreenEntry;

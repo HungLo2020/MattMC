@@ -1,6 +1,6 @@
-package net.minecraft.client.renderer.sodium.render.chunk.translucent_sorting.bsp_tree;
+package net.caffeinemc.mods.sodium.client.render.chunk.translucent_sorting.bsp_tree;
 
-import net.minecraft.client.renderer.chunk.advanced.translucent_sorting.trigger.GeometryPlanes;
+import net.caffeinemc.mods.sodium.client.render.chunk.translucent_sorting.trigger.GeometryPlanes;
 
 /**
  * The result of a BSP building operation. Building a BSP returns the root node

@@ -1,7 +1,7 @@
-package net.minecraft.client.renderer.sodium.render.chunk.translucent_sorting.data;
+package net.caffeinemc.mods.sodium.client.render.chunk.translucent_sorting.data;
 
-import net.minecraft.client.renderer.chunk.advanced.translucent_sorting.SortType;
-import net.minecraft.client.renderer.chunk.advanced.translucent_sorting.trigger.GeometryPlanes;
+import net.caffeinemc.mods.sodium.client.render.chunk.translucent_sorting.SortType;
+import net.caffeinemc.mods.sodium.client.render.chunk.translucent_sorting.trigger.GeometryPlanes;
 import net.minecraft.core.SectionPos;
 import org.joml.Vector3dc;
 

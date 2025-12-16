@@ -8,7 +8,7 @@
 package net.caffeinemc.mods.sodium.mixin.features.textures.mipmaps;
 
 import net.minecraft.client.renderer.advanced.util.ColorABGR;
-import net.minecraft.client.renderer.sodium.util.color.ColorSRGB;
+import net.caffeinemc.mods.sodium.client.util.color.ColorSRGB;
 import net.minecraft.client.renderer.texture.MipmapGenerator;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Overwrite;

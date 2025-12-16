@@ -1,4 +1,4 @@
-package net.minecraft.client.renderer.sodium.util.collections;
+package net.caffeinemc.mods.sodium.client.util.collections;
 
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;

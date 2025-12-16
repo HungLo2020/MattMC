@@ -1,17 +1,17 @@
-package net.minecraft.client.renderer.sodium.render.chunk.compile.tasks;
+package net.caffeinemc.mods.sodium.client.render.chunk.compile.tasks;
 
-import net.minecraft.client.renderer.chunk.advanced.compile.estimation.JobDurationEstimator;
-import net.minecraft.client.renderer.chunk.advanced.compile.estimation.MeshTaskSizeEstimator;
-import net.minecraft.client.renderer.chunk.advanced.compile.estimation.UploadDurationEstimator;
+import net.caffeinemc.mods.sodium.client.render.chunk.compile.estimation.JobDurationEstimator;
+import net.caffeinemc.mods.sodium.client.render.chunk.compile.estimation.MeshTaskSizeEstimator;
+import net.caffeinemc.mods.sodium.client.render.chunk.compile.estimation.UploadDurationEstimator;
 import org.joml.Vector3dc;
 import org.joml.Vector3f;
 import org.joml.Vector3fc;
 
-import net.minecraft.client.renderer.chunk.advanced.RenderSection;
-import net.minecraft.client.renderer.chunk.advanced.compile.BuilderTaskOutput;
-import net.minecraft.client.renderer.chunk.advanced.compile.ChunkBuildContext;
-import net.minecraft.client.renderer.chunk.advanced.translucent_sorting.data.CombinedCameraPos;
-import net.minecraft.client.renderer.sodium.util.task.CancellationToken;
+import net.caffeinemc.mods.sodium.client.render.chunk.RenderSection;
+import net.caffeinemc.mods.sodium.client.render.chunk.compile.BuilderTaskOutput;
+import net.caffeinemc.mods.sodium.client.render.chunk.compile.ChunkBuildContext;
+import net.caffeinemc.mods.sodium.client.render.chunk.translucent_sorting.data.CombinedCameraPos;
+import net.caffeinemc.mods.sodium.client.util.task.CancellationToken;
 
 /**
  * Build tasks are immutable jobs (with optional prioritization) which contain all the necessary state to perform

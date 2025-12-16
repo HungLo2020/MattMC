@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package net.minecraft.client.renderer.sodium.render.frapi.helper;
+package net.caffeinemc.mods.sodium.client.render.frapi.helper;
 
 import net.minecraft.client.renderer.advanced.util.ColorABGR;
 import net.minecraft.client.renderer.advanced.util.ColorARGB;

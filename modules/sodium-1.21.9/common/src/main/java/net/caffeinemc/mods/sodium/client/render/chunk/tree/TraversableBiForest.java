@@ -1,4 +1,4 @@
-package net.minecraft.client.renderer.sodium.render.chunk.tree;
+package net.caffeinemc.mods.sodium.client.render.chunk.tree;
 
 public class TraversableBiForest extends AbstractTraversableBiForest<TraversableTree> {
     public TraversableBiForest(int baseOffsetX, int baseOffsetY, int baseOffsetZ, float buildDistance) {

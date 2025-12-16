@@ -1,4 +1,4 @@
-package net.minecraft.client.renderer.sodium.model.light.data;
+package net.caffeinemc.mods.sodium.client.model.light.data;
 
 /**
  * Stores the computed light data for a block model quad. The vertex order of each array is defined as that of the

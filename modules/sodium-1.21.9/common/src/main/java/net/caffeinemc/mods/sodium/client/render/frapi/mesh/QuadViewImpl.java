@@ -14,16 +14,16 @@
  * limitations under the License.
  */
 
-package net.minecraft.client.renderer.sodium.render.frapi.mesh;
+package net.caffeinemc.mods.sodium.client.render.frapi.mesh;
 
 
 import net.minecraft.client.renderer.advanced.util.NormI8;
-import net.minecraft.client.renderer.sodium.model.quad.ModelQuadView;
-import net.minecraft.client.renderer.sodium.model.quad.properties.ModelQuadFacing;
-import net.minecraft.client.renderer.sodium.model.quad.properties.ModelQuadFlags;
-import net.minecraft.client.renderer.sodium.render.frapi.helper.ColorHelper;
-import net.minecraft.client.renderer.sodium.render.frapi.helper.GeometryHelper;
-import net.minecraft.client.renderer.sodium.render.frapi.helper.NormalHelper;
+import net.caffeinemc.mods.sodium.client.model.quad.ModelQuadView;
+import net.caffeinemc.mods.sodium.client.model.quad.properties.ModelQuadFacing;
+import net.caffeinemc.mods.sodium.client.model.quad.properties.ModelQuadFlags;
+import net.caffeinemc.mods.sodium.client.render.frapi.helper.ColorHelper;
+import net.caffeinemc.mods.sodium.client.render.frapi.helper.GeometryHelper;
+import net.caffeinemc.mods.sodium.client.render.frapi.helper.NormalHelper;
 import net.fabricmc.fabric.api.renderer.v1.mesh.QuadView;
 import net.fabricmc.fabric.api.renderer.v1.mesh.ShadeMode;
 import net.fabricmc.fabric.api.util.TriState;
@@ -36,7 +36,7 @@ import org.jetbrains.annotations.Nullable;
 import org.joml.Vector2f;
 import org.joml.Vector3f;
 
-import static net.minecraft.client.renderer.sodium.render.frapi.mesh.EncodingFormat.*;
+import static net.caffeinemc.mods.sodium.client.render.frapi.mesh.EncodingFormat.*;
 
 /**
  * Base class for all quads / quad makers. Handles the ugly bits

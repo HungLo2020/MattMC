@@ -1,6 +1,6 @@
-package net.minecraft.client.renderer.sodium.gl.buffer;
+package net.caffeinemc.mods.sodium.client.gl.buffer;
 
-import net.minecraft.client.renderer.gl.advanced.util.EnumBitField;
+import net.caffeinemc.mods.sodium.client.gl.util.EnumBitField;
 
 public class GlImmutableBuffer extends GlBuffer {
     private final EnumBitField<GlBufferStorageFlags> flags;

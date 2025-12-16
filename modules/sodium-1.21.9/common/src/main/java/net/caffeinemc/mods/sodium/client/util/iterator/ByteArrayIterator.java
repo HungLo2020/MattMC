@@ -1,4 +1,4 @@
-package net.minecraft.client.renderer.sodium.util.iterator;
+package net.caffeinemc.mods.sodium.client.util.iterator;
 
 import java.util.NoSuchElementException;
 

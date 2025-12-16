@@ -1,4 +1,4 @@
-package net.minecraft.client.renderer.sodium.render.chunk.translucent_sorting.bsp_tree;
+package net.caffeinemc.mods.sodium.client.render.chunk.translucent_sorting.bsp_tree;
 
 import it.unimi.dsi.fastutil.ints.Int2IntOpenHashMap;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
@@ -7,22 +7,22 @@ import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import it.unimi.dsi.fastutil.longs.LongArrayList;
 import it.unimi.dsi.fastutil.objects.ReferenceArrayList;
 import net.minecraft.client.renderer.advanced.util.ColorMixer;
-import net.minecraft.client.renderer.sodium.model.quad.properties.ModelQuadFacing;
-import net.minecraft.client.renderer.chunk.advanced.translucent_sorting.TranslucentGeometryCollector;
-import net.minecraft.client.renderer.chunk.advanced.translucent_sorting.data.TopoGraphSorting;
-import net.minecraft.client.renderer.chunk.advanced.translucent_sorting.quad.FullTQuad;
-import net.minecraft.client.renderer.chunk.advanced.translucent_sorting.quad.TQuad;
-import net.minecraft.client.renderer.chunk.advanced.vertex.format.ChunkVertexEncoder;
-import net.minecraft.client.renderer.sodium.util.MathUtil;
-import net.minecraft.client.renderer.sodium.util.sorting.RadixSort;
+import net.caffeinemc.mods.sodium.client.model.quad.properties.ModelQuadFacing;
+import net.caffeinemc.mods.sodium.client.render.chunk.translucent_sorting.TranslucentGeometryCollector;
+import net.caffeinemc.mods.sodium.client.render.chunk.translucent_sorting.data.TopoGraphSorting;
+import net.caffeinemc.mods.sodium.client.render.chunk.translucent_sorting.quad.FullTQuad;
+import net.caffeinemc.mods.sodium.client.render.chunk.translucent_sorting.quad.TQuad;
+import net.caffeinemc.mods.sodium.client.render.chunk.vertex.format.ChunkVertexEncoder;
+import net.caffeinemc.mods.sodium.client.util.MathUtil;
+import net.caffeinemc.mods.sodium.client.util.sorting.RadixSort;
 import net.minecraft.util.Mth;
 import org.joml.Vector3fc;
 
 import java.util.Arrays;
 import java.util.Random;
 
-import static net.minecraft.client.renderer.sodium.render.chunk.vertex.format.ChunkVertexEncoder.Vertex.copyVertexTo;
-import static net.minecraft.client.renderer.sodium.render.chunk.vertex.format.ChunkVertexEncoder.Vertex.writeVertex;
+import static net.caffeinemc.mods.sodium.client.render.chunk.vertex.format.ChunkVertexEncoder.Vertex.copyVertexTo;
+import static net.caffeinemc.mods.sodium.client.render.chunk.vertex.format.ChunkVertexEncoder.Vertex.writeVertex;
 
 /**
  * Performs aligned BSP partitioning of many nodes and constructs appropriate

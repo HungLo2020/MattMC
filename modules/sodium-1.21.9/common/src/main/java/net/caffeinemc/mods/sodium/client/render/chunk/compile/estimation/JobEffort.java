@@ -1,4 +1,4 @@
-package net.minecraft.client.renderer.sodium.render.chunk.compile.estimation;
+package net.caffeinemc.mods.sodium.client.render.chunk.compile.estimation;
 
 public record JobEffort(Class<?> category, long duration, long effort) implements ExpDecayLinear2DEstimator.DataPair<Class<?>> {
     public static JobEffort untilNowWithEffort(Class<?> effortType, long start, long effort) {

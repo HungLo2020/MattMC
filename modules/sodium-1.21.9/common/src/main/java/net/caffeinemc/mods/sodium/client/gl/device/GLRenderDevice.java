@@ -1,13 +1,13 @@
-package net.minecraft.client.renderer.sodium.gl.device;
+package net.caffeinemc.mods.sodium.client.gl.device;
 
-import net.minecraft.client.renderer.sodium.compatibility.environment.OsUtils;
-import net.minecraft.client.renderer.gl.advanced.array.GlVertexArray;
-import net.minecraft.client.renderer.gl.advanced.buffer.*;
-import net.minecraft.client.renderer.gl.advanced.functions.DeviceFunctions;
-import net.minecraft.client.renderer.gl.advanced.state.GlStateTracker;
-import net.minecraft.client.renderer.gl.advanced.sync.GlFence;
-import net.minecraft.client.renderer.gl.advanced.tessellation.*;
-import net.minecraft.client.renderer.gl.advanced.util.EnumBitField;
+import net.caffeinemc.mods.sodium.client.compatibility.environment.OsUtils;
+import net.caffeinemc.mods.sodium.client.gl.array.GlVertexArray;
+import net.caffeinemc.mods.sodium.client.gl.buffer.*;
+import net.caffeinemc.mods.sodium.client.gl.functions.DeviceFunctions;
+import net.caffeinemc.mods.sodium.client.gl.state.GlStateTracker;
+import net.caffeinemc.mods.sodium.client.gl.sync.GlFence;
+import net.caffeinemc.mods.sodium.client.gl.tessellation.*;
+import net.caffeinemc.mods.sodium.client.gl.util.EnumBitField;
 import org.lwjgl.opengl.*;
 import java.nio.ByteBuffer;
 

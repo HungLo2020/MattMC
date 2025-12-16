@@ -1,11 +1,11 @@
-package net.minecraft.client.renderer.sodium.render.chunk.translucent_sorting.trigger;
+package net.caffeinemc.mods.sodium.client.render.chunk.translucent_sorting.trigger;
 
 import it.unimi.dsi.fastutil.floats.FloatOpenHashSet;
 import it.unimi.dsi.fastutil.objects.Object2ReferenceMap;
-import net.minecraft.client.renderer.sodium.model.quad.properties.ModelQuadFacing;
-import net.minecraft.client.renderer.sodium.util.MathUtil;
-import net.minecraft.client.renderer.sodium.util.interval_tree.DoubleInterval;
-import net.minecraft.client.renderer.sodium.util.interval_tree.Interval.Bounded;
+import net.caffeinemc.mods.sodium.client.model.quad.properties.ModelQuadFacing;
+import net.caffeinemc.mods.sodium.client.util.MathUtil;
+import net.caffeinemc.mods.sodium.client.util.interval_tree.DoubleInterval;
+import net.caffeinemc.mods.sodium.client.util.interval_tree.Interval.Bounded;
 import net.minecraft.core.SectionPos;
 import org.joml.Vector3fc;
 

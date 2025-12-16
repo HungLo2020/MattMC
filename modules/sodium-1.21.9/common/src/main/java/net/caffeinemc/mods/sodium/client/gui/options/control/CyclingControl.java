@@ -1,8 +1,8 @@
-package net.minecraft.client.renderer.sodium.gui.options.control;
+package net.caffeinemc.mods.sodium.client.gui.options.control;
 
-import net.minecraft.client.renderer.sodium.gui.options.Option;
-import net.minecraft.client.renderer.sodium.gui.options.TextProvider;
-import net.minecraft.client.renderer.sodium.util.Dim2i;
+import net.caffeinemc.mods.sodium.client.gui.options.Option;
+import net.caffeinemc.mods.sodium.client.gui.options.TextProvider;
+import net.caffeinemc.mods.sodium.client.util.Dim2i;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.Screen;

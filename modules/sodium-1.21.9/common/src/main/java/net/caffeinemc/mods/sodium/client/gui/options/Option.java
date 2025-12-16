@@ -1,7 +1,7 @@
-package net.minecraft.client.renderer.sodium.gui.options;
+package net.caffeinemc.mods.sodium.client.gui.options;
 
-import net.minecraft.client.renderer.sodium.gui.options.control.Control;
-import net.minecraft.client.renderer.sodium.gui.options.storage.OptionStorage;
+import net.caffeinemc.mods.sodium.client.gui.options.control.Control;
+import net.caffeinemc.mods.sodium.client.gui.options.storage.OptionStorage;
 import net.minecraft.network.chat.Component;
 import java.util.Collection;
 

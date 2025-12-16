@@ -1,4 +1,4 @@
-package net.minecraft.client.renderer.sodium.render.chunk.vertex.format;
+package net.caffeinemc.mods.sodium.client.render.chunk.vertex.format;
 
 public interface ChunkVertexEncoder {
     long write(long ptr, int materialBits, Vertex[] vertices, int sectionIndex);

@@ -1,4 +1,4 @@
-package net.minecraft.client.renderer.sodium.model.color.interop;
+package net.caffeinemc.mods.sodium.client.model.color.interop;
 
 import it.unimi.dsi.fastutil.objects.Reference2ReferenceMap;
 import it.unimi.dsi.fastutil.objects.ReferenceSet;

@@ -1,4 +1,4 @@
-package net.minecraft.client.renderer.sodium.gl.buffer;
+package net.caffeinemc.mods.sodium.client.gl.buffer;
 
 import org.lwjgl.opengl.GL20C;
 

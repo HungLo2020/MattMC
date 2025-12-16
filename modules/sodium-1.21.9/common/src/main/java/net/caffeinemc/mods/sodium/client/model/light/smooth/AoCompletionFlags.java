@@ -1,4 +1,4 @@
-package net.minecraft.client.renderer.sodium.model.light.smooth;
+package net.caffeinemc.mods.sodium.client.model.light.smooth;
 
 /**
  * Bit flags to indicate which light properties have been computed for a given face.

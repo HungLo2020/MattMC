@@ -1,12 +1,12 @@
-package net.minecraft.client.renderer.sodium.render.chunk.translucent_sorting.trigger;
+package net.caffeinemc.mods.sodium.client.render.chunk.translucent_sorting.trigger;
 
-import net.minecraft.client.renderer.chunk.advanced.translucent_sorting.data.DynamicTopoData;
+import net.caffeinemc.mods.sodium.client.render.chunk.translucent_sorting.data.DynamicTopoData;
 import org.joml.Vector3d;
 import org.joml.Vector3dc;
 
 import it.unimi.dsi.fastutil.doubles.Double2ObjectRBTreeMap;
-import net.minecraft.client.renderer.chunk.advanced.translucent_sorting.data.TranslucentData;
-import net.minecraft.client.renderer.chunk.advanced.translucent_sorting.trigger.SortTriggering.SectionTriggers;
+import net.caffeinemc.mods.sodium.client.render.chunk.translucent_sorting.data.TranslucentData;
+import net.caffeinemc.mods.sodium.client.render.chunk.translucent_sorting.trigger.SortTriggering.SectionTriggers;
 import net.minecraft.core.SectionPos;
 
 /**

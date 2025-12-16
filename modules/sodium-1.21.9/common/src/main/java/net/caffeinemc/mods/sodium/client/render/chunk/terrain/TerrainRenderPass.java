@@ -1,4 +1,4 @@
-package net.minecraft.client.renderer.sodium.render.chunk.terrain;
+package net.caffeinemc.mods.sodium.client.render.chunk.terrain;
 
 import com.mojang.blaze3d.pipeline.RenderPipeline;
 import com.mojang.blaze3d.pipeline.RenderTarget;

@@ -1,6 +1,6 @@
-package net.minecraft.client.renderer.sodium.render.viewport;
+package net.caffeinemc.mods.sodium.client.render.viewport;
 
-import net.minecraft.client.renderer.chunk.advanced.region.RenderRegion;
+import net.caffeinemc.mods.sodium.client.render.chunk.region.RenderRegion;
 
 public class CameraTransform {
     // We want to reduce the precision of the deltas to avoid seams along chunk/region boundaries. This is done by

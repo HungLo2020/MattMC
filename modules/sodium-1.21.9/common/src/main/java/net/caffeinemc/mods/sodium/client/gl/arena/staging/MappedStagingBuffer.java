@@ -1,14 +1,14 @@
-package net.minecraft.client.renderer.sodium.gl.arena.staging;
+package net.caffeinemc.mods.sodium.client.gl.arena.staging;
 
 import it.unimi.dsi.fastutil.PriorityQueue;
 import it.unimi.dsi.fastutil.objects.ObjectArrayFIFOQueue;
-import net.minecraft.client.renderer.gl.advanced.device.CommandList;
-import net.minecraft.client.renderer.gl.advanced.device.RenderDevice;
-import net.minecraft.client.renderer.gl.advanced.functions.BufferStorageFunctions;
-import net.minecraft.client.renderer.gl.advanced.sync.GlFence;
-import net.minecraft.client.renderer.gl.advanced.util.EnumBitField;
-import net.minecraft.client.renderer.sodium.util.MathUtil;
-import net.minecraft.client.renderer.gl.advanced.buffer.*;
+import net.caffeinemc.mods.sodium.client.gl.device.CommandList;
+import net.caffeinemc.mods.sodium.client.gl.device.RenderDevice;
+import net.caffeinemc.mods.sodium.client.gl.functions.BufferStorageFunctions;
+import net.caffeinemc.mods.sodium.client.gl.sync.GlFence;
+import net.caffeinemc.mods.sodium.client.gl.util.EnumBitField;
+import net.caffeinemc.mods.sodium.client.util.MathUtil;
+import net.caffeinemc.mods.sodium.client.gl.buffer.*;
 
 import java.nio.ByteBuffer;
 import java.util.ArrayList;

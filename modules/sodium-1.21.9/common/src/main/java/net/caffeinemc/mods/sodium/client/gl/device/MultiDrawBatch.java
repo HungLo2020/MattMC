@@ -1,4 +1,4 @@
-package net.minecraft.client.renderer.sodium.gl.device;
+package net.caffeinemc.mods.sodium.client.gl.device;
 
 import org.lwjgl.PointerBuffer;
 import org.lwjgl.system.MemoryUtil;

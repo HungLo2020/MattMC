@@ -1,6 +1,6 @@
-package net.minecraft.client.renderer.sodium.gl.buffer;
+package net.caffeinemc.mods.sodium.client.gl.buffer;
 
-import net.minecraft.client.renderer.gl.advanced.GlObject;
+import net.caffeinemc.mods.sodium.client.gl.GlObject;
 import org.lwjgl.opengl.GL20C;
 
 public abstract class GlBuffer extends GlObject {

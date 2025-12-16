@@ -1,4 +1,4 @@
-package net.minecraft.client.renderer.sodium.render.chunk.shader;
+package net.caffeinemc.mods.sodium.client.render.chunk.shader;
 
 public class ChunkShaderBindingPoints {
     public static final int ATTRIBUTE_POSITION = 0;

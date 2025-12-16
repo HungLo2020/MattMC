@@ -1,6 +1,6 @@
-package net.minecraft.client.renderer.sodium.render.chunk.vertex.format;
+package net.caffeinemc.mods.sodium.client.render.chunk.vertex.format;
 
-import net.minecraft.client.renderer.gl.advanced.attribute.GlVertexFormat;
+import net.caffeinemc.mods.sodium.client.gl.attribute.GlVertexFormat;
 
 public interface ChunkVertexType {
     GlVertexFormat getVertexFormat();

@@ -1,6 +1,6 @@
-package net.minecraft.client.renderer.sodium.model.light.data;
+package net.caffeinemc.mods.sodium.client.model.light.data;
 
-import net.minecraft.client.renderer.sodium.services.PlatformBlockAccess;
+import net.caffeinemc.mods.sodium.client.services.PlatformBlockAccess;
 import net.minecraft.client.renderer.LevelRenderer;
 import net.minecraft.client.renderer.LightTexture;
 import net.minecraft.core.BlockPos;

@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package net.minecraft.client.renderer.sodium.render.frapi.helper;
+package net.caffeinemc.mods.sodium.client.render.frapi.helper;
 
 import net.fabricmc.fabric.api.renderer.v1.mesh.QuadView;
 import net.minecraft.core.Direction;

@@ -1,4 +1,4 @@
-package net.minecraft.client.renderer.sodium.render.frapi.render;
+package net.caffeinemc.mods.sodium.client.render.frapi.render;
 
 import com.mojang.blaze3d.vertex.PoseStack;
 import net.fabricmc.fabric.api.renderer.v1.mesh.MeshView;

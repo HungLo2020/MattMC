@@ -1,7 +1,7 @@
 package net.irisshaders.iris.vertices.sodium.terrain;
 
-import net.minecraft.client.renderer.gl.advanced.attribute.GlVertexAttributeFormat;
-import net.minecraft.client.renderer.vertex.advanced.VertexFormatAttribute;
+import net.caffeinemc.mods.sodium.client.gl.attribute.GlVertexAttributeFormat;
+import net.caffeinemc.mods.sodium.client.render.vertex.VertexFormatAttribute;
 
 public class IrisChunkMeshAttributes {
 	public static final VertexFormatAttribute MID_TEX_COORD = new VertexFormatAttribute("midTexCoord", GlVertexAttributeFormat.UNSIGNED_SHORT, 2, false, false);

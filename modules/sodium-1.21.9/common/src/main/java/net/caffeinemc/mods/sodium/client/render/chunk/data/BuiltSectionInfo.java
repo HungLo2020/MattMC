@@ -1,10 +1,10 @@
-package net.minecraft.client.renderer.sodium.render.chunk.data;
+package net.caffeinemc.mods.sodium.client.render.chunk.data;
 
 import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
 import net.minecraft.client.renderer.advanced.texture.SpriteUtil;
-import net.minecraft.client.renderer.chunk.advanced.RenderSectionFlags;
-import net.minecraft.client.renderer.chunk.advanced.occlusion.VisibilityEncoding;
-import net.minecraft.client.renderer.chunk.advanced.terrain.TerrainRenderPass;
+import net.caffeinemc.mods.sodium.client.render.chunk.RenderSectionFlags;
+import net.caffeinemc.mods.sodium.client.render.chunk.occlusion.VisibilityEncoding;
+import net.caffeinemc.mods.sodium.client.render.chunk.terrain.TerrainRenderPass;
 import net.minecraft.client.renderer.chunk.VisibilitySet;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
 import net.minecraft.core.Direction;

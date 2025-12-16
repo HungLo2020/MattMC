@@ -1,12 +1,12 @@
-package net.minecraft.client.renderer.sodium.render.chunk.translucent_sorting.bsp_tree;
+package net.caffeinemc.mods.sodium.client.render.chunk.translucent_sorting.bsp_tree;
 
 import java.nio.IntBuffer;
 import java.lang.Math;
 
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.ints.IntConsumer;
-import net.minecraft.client.renderer.chunk.advanced.translucent_sorting.data.TranslucentData;
-import net.minecraft.client.renderer.sodium.util.NativeBuffer;
+import net.caffeinemc.mods.sodium.client.render.chunk.translucent_sorting.data.TranslucentData;
+import net.caffeinemc.mods.sodium.client.util.NativeBuffer;
 
 /**
  * The sort state is passed around the tree (similar to visitor pattern) and

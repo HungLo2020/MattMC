@@ -1,7 +1,7 @@
-package net.minecraft.client.renderer.sodium.model.light;
+package net.caffeinemc.mods.sodium.client.model.light;
 
-import net.minecraft.client.renderer.sodium.model.light.data.QuadLightData;
-import net.minecraft.client.renderer.sodium.model.quad.ModelQuadView;
+import net.caffeinemc.mods.sodium.client.model.light.data.QuadLightData;
+import net.caffeinemc.mods.sodium.client.model.quad.ModelQuadView;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.world.level.material.FluidState;

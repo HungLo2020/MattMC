@@ -1,4 +1,4 @@
-package net.minecraft.client.renderer.sodium.gl.sync;
+package net.caffeinemc.mods.sodium.client.gl.sync;
 
 import org.lwjgl.opengl.GL32C;
 import org.lwjgl.system.MemoryStack;

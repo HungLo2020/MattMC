@@ -1,4 +1,4 @@
-package net.minecraft.client.renderer.sodium.render.chunk.terrain.material.parameters;
+package net.caffeinemc.mods.sodium.client.render.chunk.terrain.material.parameters;
 
 public class MaterialParameters {
     public static final int OFFSET_USE_MIP = 0;

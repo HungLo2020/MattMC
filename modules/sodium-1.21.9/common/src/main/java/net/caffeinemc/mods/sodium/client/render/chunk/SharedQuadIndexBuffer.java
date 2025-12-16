@@ -1,13 +1,13 @@
-package net.minecraft.client.renderer.sodium.render.chunk;
+package net.caffeinemc.mods.sodium.client.render.chunk;
 
-import net.minecraft.client.renderer.gl.advanced.buffer.GlBuffer;
-import net.minecraft.client.renderer.gl.advanced.buffer.GlBufferMapFlags;
-import net.minecraft.client.renderer.gl.advanced.buffer.GlBufferUsage;
-import net.minecraft.client.renderer.gl.advanced.buffer.GlMutableBuffer;
-import net.minecraft.client.renderer.gl.advanced.device.CommandList;
-import net.minecraft.client.renderer.gl.advanced.tessellation.GlIndexType;
-import net.minecraft.client.renderer.gl.advanced.util.EnumBitField;
-import net.minecraft.client.renderer.sodium.util.NativeBuffer;
+import net.caffeinemc.mods.sodium.client.gl.buffer.GlBuffer;
+import net.caffeinemc.mods.sodium.client.gl.buffer.GlBufferMapFlags;
+import net.caffeinemc.mods.sodium.client.gl.buffer.GlBufferUsage;
+import net.caffeinemc.mods.sodium.client.gl.buffer.GlMutableBuffer;
+import net.caffeinemc.mods.sodium.client.gl.device.CommandList;
+import net.caffeinemc.mods.sodium.client.gl.tessellation.GlIndexType;
+import net.caffeinemc.mods.sodium.client.gl.util.EnumBitField;
+import net.caffeinemc.mods.sodium.client.util.NativeBuffer;
 
 import java.nio.ByteBuffer;
 import java.nio.IntBuffer;

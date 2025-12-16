@@ -14,13 +14,13 @@
  * limitations under the License.
  */
 
-package net.minecraft.client.renderer.sodium.render.frapi.mesh;
+package net.caffeinemc.mods.sodium.client.render.frapi.mesh;
 
 import com.google.common.base.Preconditions;
 import com.mojang.blaze3d.vertex.DefaultVertexFormat;
 import com.mojang.blaze3d.vertex.VertexFormat;
-import net.minecraft.client.renderer.sodium.model.quad.properties.ModelQuadFacing;
-import net.minecraft.client.renderer.sodium.render.frapi.helper.GeometryHelper;
+import net.caffeinemc.mods.sodium.client.model.quad.properties.ModelQuadFacing;
+import net.caffeinemc.mods.sodium.client.render.frapi.helper.GeometryHelper;
 import net.minecraft.client.renderer.chunk.ChunkSectionLayer;
 import net.minecraft.client.renderer.item.ItemStackRenderState;
 import net.minecraft.core.Direction;

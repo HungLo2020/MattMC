@@ -1,4 +1,4 @@
-package net.minecraft.client.renderer.sodium.render.chunk.compile.estimation;
+package net.caffeinemc.mods.sodium.client.render.chunk.compile.estimation;
 
 public class LimitedResourceBudget implements UploadResourceBudget {
     private long duration;

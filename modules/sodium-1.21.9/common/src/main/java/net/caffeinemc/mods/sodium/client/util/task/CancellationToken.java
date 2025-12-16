@@ -1,4 +1,4 @@
-package net.minecraft.client.renderer.sodium.util.task;
+package net.caffeinemc.mods.sodium.client.util.task;
 
 public interface CancellationToken {
     boolean isCancelled();

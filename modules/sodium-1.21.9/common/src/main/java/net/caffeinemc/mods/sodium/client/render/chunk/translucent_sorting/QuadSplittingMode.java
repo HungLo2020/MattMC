@@ -1,6 +1,6 @@
-package net.minecraft.client.renderer.sodium.render.chunk.translucent_sorting;
+package net.caffeinemc.mods.sodium.client.render.chunk.translucent_sorting;
 
-import net.minecraft.client.renderer.sodium.gui.options.TextProvider;
+import net.caffeinemc.mods.sodium.client.gui.options.TextProvider;
 import net.minecraft.network.chat.Component;
 import net.minecraft.util.Mth;
 

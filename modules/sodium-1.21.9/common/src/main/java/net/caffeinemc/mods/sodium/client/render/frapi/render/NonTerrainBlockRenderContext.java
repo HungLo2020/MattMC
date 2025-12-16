@@ -14,19 +14,19 @@
  * limitations under the License.
  */
 
-package net.minecraft.client.renderer.sodium.render.frapi.render;
+package net.caffeinemc.mods.sodium.client.render.frapi.render;
 
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import net.minecraft.client.renderer.advanced.texture.SpriteUtil;
 import net.minecraft.client.renderer.advanced.util.ColorARGB;
 import net.minecraft.client.renderer.advanced.util.ColorMixer;
-import net.minecraft.client.renderer.sodium.model.light.LightMode;
-import net.minecraft.client.renderer.sodium.model.light.LightPipelineProvider;
-import net.minecraft.client.renderer.sodium.model.light.data.SingleBlockLightDataCache;
-import net.minecraft.client.renderer.sodium.render.frapi.mesh.MutableQuadViewImpl;
-import net.minecraft.client.renderer.sodium.render.texture.SpriteFinderCache;
-import net.minecraft.client.renderer.sodium.services.SodiumModelData;
+import net.caffeinemc.mods.sodium.client.model.light.LightMode;
+import net.caffeinemc.mods.sodium.client.model.light.LightPipelineProvider;
+import net.caffeinemc.mods.sodium.client.model.light.data.SingleBlockLightDataCache;
+import net.caffeinemc.mods.sodium.client.render.frapi.mesh.MutableQuadViewImpl;
+import net.caffeinemc.mods.sodium.client.render.texture.SpriteFinderCache;
+import net.caffeinemc.mods.sodium.client.services.SodiumModelData;
 import net.fabricmc.fabric.api.renderer.v1.mesh.ShadeMode;
 import net.fabricmc.fabric.api.renderer.v1.model.FabricBlockStateModel;
 import net.fabricmc.fabric.api.renderer.v1.render.BlockVertexConsumerProvider;

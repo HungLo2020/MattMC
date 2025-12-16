@@ -1,4 +1,4 @@
-package net.minecraft.client.renderer.sodium.render.chunk.compile.pipeline;
+package net.caffeinemc.mods.sodium.client.render.chunk.compile.pipeline;
 
 public interface SpriteContentsExtension {
     boolean sodium$hasTransparentPixels();

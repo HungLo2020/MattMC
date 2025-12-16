@@ -1,8 +1,8 @@
-package net.minecraft.client.renderer.sodium.world.biome;
+package net.caffeinemc.mods.sodium.client.world.biome;
 
-import net.minecraft.client.renderer.sodium.world.BiomeSeedProvider;
-import net.minecraft.client.renderer.sodium.world.LevelSlice;
-import net.minecraft.client.renderer.sodium.world.cloned.ChunkRenderContext;
+import net.caffeinemc.mods.sodium.client.world.BiomeSeedProvider;
+import net.caffeinemc.mods.sodium.client.world.LevelSlice;
+import net.caffeinemc.mods.sodium.client.world.cloned.ChunkRenderContext;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.core.Holder;
 import net.minecraft.core.QuartPos;

@@ -1,10 +1,10 @@
-package net.minecraft.client.renderer.sodium.render.chunk.compile.pipeline;
+package net.caffeinemc.mods.sodium.client.render.chunk.compile.pipeline;
 
-import net.minecraft.client.renderer.sodium.model.color.ColorProviderRegistry;
-import net.minecraft.client.renderer.sodium.model.light.LightPipelineProvider;
-import net.minecraft.client.renderer.chunk.advanced.compile.ChunkBuildBuffers;
-import net.minecraft.client.renderer.chunk.advanced.translucent_sorting.TranslucentGeometryCollector;
-import net.minecraft.client.renderer.sodium.world.LevelSlice;
+import net.caffeinemc.mods.sodium.client.model.color.ColorProviderRegistry;
+import net.caffeinemc.mods.sodium.client.model.light.LightPipelineProvider;
+import net.caffeinemc.mods.sodium.client.render.chunk.compile.ChunkBuildBuffers;
+import net.caffeinemc.mods.sodium.client.render.chunk.translucent_sorting.TranslucentGeometryCollector;
+import net.caffeinemc.mods.sodium.client.world.LevelSlice;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.material.FluidState;

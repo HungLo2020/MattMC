@@ -1,4 +1,4 @@
-package net.minecraft.client.renderer.sodium.render.chunk.compile.estimation;
+package net.caffeinemc.mods.sodium.client.render.chunk.compile.estimation;
 
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 

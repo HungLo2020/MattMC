@@ -1,8 +1,8 @@
 package net.caffeinemc.mods.sodium.mixin.fabric;
 
 import it.unimi.dsi.fastutil.ints.Int2ReferenceMap;
-import net.minecraft.client.renderer.sodium.world.LevelSlice;
-import net.minecraft.client.renderer.sodium.world.biome.LevelBiomeSlice;
+import net.caffeinemc.mods.sodium.client.world.LevelSlice;
+import net.caffeinemc.mods.sodium.client.world.biome.LevelBiomeSlice;
 import net.fabricmc.fabric.api.blockview.v2.FabricBlockView;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Holder;

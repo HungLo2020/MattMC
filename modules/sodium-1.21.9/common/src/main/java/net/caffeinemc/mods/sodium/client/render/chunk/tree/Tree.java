@@ -1,4 +1,4 @@
-package net.minecraft.client.renderer.sodium.render.chunk.tree;
+package net.caffeinemc.mods.sodium.client.render.chunk.tree;
 
 public abstract class Tree {
     public static final int OUT_OF_BOUNDS = -1;

@@ -1,6 +1,6 @@
-package net.minecraft.client.renderer.sodium.render.chunk.lists;
+package net.caffeinemc.mods.sodium.client.render.chunk.lists;
 
-import net.minecraft.client.renderer.chunk.advanced.TaskQueueType;
+import net.caffeinemc.mods.sodium.client.render.chunk.TaskQueueType;
 
 /**
  * The occlusion section collector is passed to the occlusion graph search culler to

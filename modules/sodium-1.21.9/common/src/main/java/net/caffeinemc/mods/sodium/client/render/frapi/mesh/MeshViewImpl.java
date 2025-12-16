@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package net.minecraft.client.renderer.sodium.render.frapi.mesh;
+package net.caffeinemc.mods.sodium.client.render.frapi.mesh;
 
 import java.util.function.Consumer;
 

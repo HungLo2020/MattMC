@@ -14,15 +14,15 @@
  * limitations under the License.
  */
 
-package net.minecraft.client.renderer.sodium.render.frapi;
+package net.caffeinemc.mods.sodium.client.render.frapi;
 
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
-import net.minecraft.client.renderer.sodium.render.frapi.mesh.MutableMeshImpl;
-import net.minecraft.client.renderer.sodium.render.frapi.render.AbstractBlockRenderContext;
-import net.minecraft.client.renderer.sodium.render.frapi.render.AccessLayerRenderState;
-import net.minecraft.client.renderer.sodium.render.frapi.render.NonTerrainBlockRenderContext;
-import net.minecraft.client.renderer.sodium.render.frapi.render.SimpleBlockRenderContext;
+import net.caffeinemc.mods.sodium.client.render.frapi.mesh.MutableMeshImpl;
+import net.caffeinemc.mods.sodium.client.render.frapi.render.AbstractBlockRenderContext;
+import net.caffeinemc.mods.sodium.client.render.frapi.render.AccessLayerRenderState;
+import net.caffeinemc.mods.sodium.client.render.frapi.render.NonTerrainBlockRenderContext;
+import net.caffeinemc.mods.sodium.client.render.frapi.render.SimpleBlockRenderContext;
 import net.caffeinemc.mods.sodium.mixin.features.render.frapi.BlockRenderDispatcherAccessor;
 import net.caffeinemc.mods.sodium.mixin.features.render.frapi.ModelBlockRendererAccessor;
 import net.fabricmc.fabric.api.renderer.v1.Renderer;

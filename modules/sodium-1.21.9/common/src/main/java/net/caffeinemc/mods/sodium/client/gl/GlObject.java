@@ -1,4 +1,4 @@
-package net.minecraft.client.renderer.sodium.gl;
+package net.caffeinemc.mods.sodium.client.gl;
 
 /**
  * An abstract object used to represent objects in OpenGL code safely. This class hides the direct handle to a OpenGL

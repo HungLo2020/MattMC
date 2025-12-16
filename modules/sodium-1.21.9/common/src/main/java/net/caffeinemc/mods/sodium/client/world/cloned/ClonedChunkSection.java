@@ -1,13 +1,13 @@
-package net.minecraft.client.renderer.sodium.world.cloned;
+package net.caffeinemc.mods.sodium.client.world.cloned;
 
 import it.unimi.dsi.fastutil.ints.Int2ReferenceMap;
 import it.unimi.dsi.fastutil.ints.Int2ReferenceMaps;
 import it.unimi.dsi.fastutil.ints.Int2ReferenceOpenHashMap;
-import net.minecraft.client.renderer.sodium.services.*;
-import net.minecraft.client.renderer.sodium.util.iterator.WrappedIterator;
-import net.minecraft.client.renderer.sodium.world.LevelSlice;
-import net.minecraft.client.renderer.sodium.world.PalettedContainerROExtension;
-import net.minecraft.client.renderer.sodium.world.SodiumAuxiliaryLightManager;
+import net.caffeinemc.mods.sodium.client.services.*;
+import net.caffeinemc.mods.sodium.client.util.iterator.WrappedIterator;
+import net.caffeinemc.mods.sodium.client.world.LevelSlice;
+import net.caffeinemc.mods.sodium.client.world.PalettedContainerROExtension;
+import net.caffeinemc.mods.sodium.client.world.SodiumAuxiliaryLightManager;
 import net.minecraft.core.Holder;
 import net.minecraft.core.SectionPos;
 import net.minecraft.world.level.Level;

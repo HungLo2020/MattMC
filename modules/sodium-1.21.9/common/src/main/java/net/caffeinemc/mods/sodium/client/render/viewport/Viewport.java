@@ -1,6 +1,6 @@
-package net.minecraft.client.renderer.sodium.render.viewport;
+package net.caffeinemc.mods.sodium.client.render.viewport;
 
-import net.minecraft.client.renderer.sodium.viewport.frustum.Frustum;
+import net.caffeinemc.mods.sodium.client.render.viewport.frustum.Frustum;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.SectionPos;
 import org.joml.Vector3d;

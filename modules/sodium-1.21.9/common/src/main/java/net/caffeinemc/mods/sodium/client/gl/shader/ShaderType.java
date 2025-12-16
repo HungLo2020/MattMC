@@ -1,4 +1,4 @@
-package net.minecraft.client.renderer.sodium.gl.shader;
+package net.caffeinemc.mods.sodium.client.gl.shader;
 
 import org.lwjgl.opengl.GL20C;
 import org.lwjgl.opengl.GL32C;

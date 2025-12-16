@@ -1,4 +1,4 @@
-package net.minecraft.client.renderer.sodium.render.chunk;
+package net.caffeinemc.mods.sodium.client.render.chunk;
 
 public enum TaskQueueType {
     ZERO_FRAME_DEFER,

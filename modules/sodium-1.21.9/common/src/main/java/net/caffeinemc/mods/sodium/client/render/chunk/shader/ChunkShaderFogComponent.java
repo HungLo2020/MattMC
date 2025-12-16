@@ -1,11 +1,11 @@
-package net.minecraft.client.renderer.sodium.render.chunk.shader;
+package net.caffeinemc.mods.sodium.client.render.chunk.shader;
 
 import com.mojang.blaze3d.systems.RenderSystem;
-import net.minecraft.client.renderer.gl.advanced.shader.uniform.GlUniformFloat;
-import net.minecraft.client.renderer.gl.advanced.shader.uniform.GlUniformFloat2v;
-import net.minecraft.client.renderer.gl.advanced.shader.uniform.GlUniformFloat4v;
-import net.minecraft.client.renderer.gl.advanced.shader.uniform.GlUniformInt;
-import net.minecraft.client.renderer.sodium.util.FogParameters;
+import net.caffeinemc.mods.sodium.client.gl.shader.uniform.GlUniformFloat;
+import net.caffeinemc.mods.sodium.client.gl.shader.uniform.GlUniformFloat2v;
+import net.caffeinemc.mods.sodium.client.gl.shader.uniform.GlUniformFloat4v;
+import net.caffeinemc.mods.sodium.client.gl.shader.uniform.GlUniformInt;
+import net.caffeinemc.mods.sodium.client.util.FogParameters;
 
 /**
  * These shader implementations try to remain compatible with the deprecated fixed function pipeline by manually

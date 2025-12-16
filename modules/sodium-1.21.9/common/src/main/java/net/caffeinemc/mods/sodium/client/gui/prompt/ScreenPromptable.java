@@ -1,6 +1,6 @@
-package net.minecraft.client.renderer.sodium.gui.prompt;
+package net.caffeinemc.mods.sodium.client.gui.prompt;
 
-import net.minecraft.client.renderer.sodium.util.Dim2i;
+import net.caffeinemc.mods.sodium.client.util.Dim2i;
 import org.jetbrains.annotations.Nullable;
 
 public interface ScreenPromptable {

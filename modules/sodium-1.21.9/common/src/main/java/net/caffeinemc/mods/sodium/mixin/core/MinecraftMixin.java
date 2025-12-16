@@ -1,8 +1,8 @@
 package net.caffeinemc.mods.sodium.mixin.core;
 
 import it.unimi.dsi.fastutil.longs.LongArrayFIFOQueue;
-import net.minecraft.client.renderer.sodium.SodiumClientMod;
-import net.minecraft.client.renderer.sodium.checks.ResourcePackScanner;
+import net.caffeinemc.mods.sodium.client.SodiumClientMod;
+import net.caffeinemc.mods.sodium.client.checks.ResourcePackScanner;
 import net.minecraft.client.Minecraft;
 import net.minecraft.server.packs.resources.ReloadableResourceManager;
 import net.minecraft.util.profiling.Profiler;

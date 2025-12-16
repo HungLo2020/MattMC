@@ -1,7 +1,7 @@
-package net.minecraft.client.renderer.sodium.render.chunk.compile.executor;
+package net.caffeinemc.mods.sodium.client.render.chunk.compile.executor;
 
-import net.minecraft.client.renderer.chunk.advanced.compile.ChunkBuildContext;
-import net.minecraft.client.renderer.sodium.util.task.CancellationToken;
+import net.caffeinemc.mods.sodium.client.render.chunk.compile.ChunkBuildContext;
+import net.caffeinemc.mods.sodium.client.util.task.CancellationToken;
 
 public interface ChunkJob extends CancellationToken {
     void execute(ChunkBuildContext context);

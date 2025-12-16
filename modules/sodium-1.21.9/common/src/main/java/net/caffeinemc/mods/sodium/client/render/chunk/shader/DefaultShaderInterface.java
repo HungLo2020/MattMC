@@ -1,17 +1,17 @@
-package net.minecraft.client.renderer.sodium.render.chunk.shader;
+package net.caffeinemc.mods.sodium.client.render.chunk.shader;
 
 import com.mojang.blaze3d.opengl.GlStateManager;
 import com.mojang.blaze3d.opengl.GlTexture;
 import com.mojang.blaze3d.textures.GpuTexture;
 import com.mojang.blaze3d.textures.GpuTextureView;
-import net.minecraft.client.renderer.gl.advanced.device.GLRenderDevice;
-import net.minecraft.client.renderer.gl.advanced.shader.uniform.GlUniformFloat2v;
-import net.minecraft.client.renderer.gl.advanced.shader.uniform.GlUniformFloat3v;
-import net.minecraft.client.renderer.gl.advanced.shader.uniform.GlUniformInt;
-import net.minecraft.client.renderer.gl.advanced.shader.uniform.GlUniformMatrix4f;
-import net.minecraft.client.renderer.chunk.advanced.terrain.TerrainRenderPass;
-import net.minecraft.client.renderer.chunk.advanced.vertex.format.impl.CompactChunkVertex;
-import net.minecraft.client.renderer.sodium.util.FogParameters;
+import net.caffeinemc.mods.sodium.client.gl.device.GLRenderDevice;
+import net.caffeinemc.mods.sodium.client.gl.shader.uniform.GlUniformFloat2v;
+import net.caffeinemc.mods.sodium.client.gl.shader.uniform.GlUniformFloat3v;
+import net.caffeinemc.mods.sodium.client.gl.shader.uniform.GlUniformInt;
+import net.caffeinemc.mods.sodium.client.gl.shader.uniform.GlUniformMatrix4f;
+import net.caffeinemc.mods.sodium.client.render.chunk.terrain.TerrainRenderPass;
+import net.caffeinemc.mods.sodium.client.render.chunk.vertex.format.impl.CompactChunkVertex;
+import net.caffeinemc.mods.sodium.client.util.FogParameters;
 import net.caffeinemc.mods.sodium.mixin.core.render.texture.TextureAtlasAccessor;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.texture.TextureAtlas;

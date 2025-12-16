@@ -1,4 +1,4 @@
-package net.minecraft.client.renderer.sodium.gl.util;
+package net.caffeinemc.mods.sodium.client.gl.util;
 
 import java.util.Arrays;
 import java.util.EnumSet;

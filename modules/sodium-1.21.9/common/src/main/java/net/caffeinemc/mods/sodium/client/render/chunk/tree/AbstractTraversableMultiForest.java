@@ -1,8 +1,8 @@
-package net.minecraft.client.renderer.sodium.render.chunk.tree;
+package net.caffeinemc.mods.sodium.client.render.chunk.tree;
 
 import it.unimi.dsi.fastutil.ints.IntArrays;
-import net.minecraft.client.renderer.chunk.advanced.lists.CoordinateSectionVisitor;
-import net.minecraft.client.renderer.sodium.viewport.Viewport;
+import net.caffeinemc.mods.sodium.client.render.chunk.lists.CoordinateSectionVisitor;
+import net.caffeinemc.mods.sodium.client.render.viewport.Viewport;
 
 public abstract class AbstractTraversableMultiForest<T extends TraversableTree> extends BaseMultiForest<T> implements TraversableForest {
     public AbstractTraversableMultiForest(int baseOffsetX, int baseOffsetY, int baseOffsetZ, float buildDistance) {

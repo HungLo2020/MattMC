@@ -1,14 +1,14 @@
-package net.minecraft.client.renderer.sodium.render.immediate.model;
+package net.caffeinemc.mods.sodium.client.render.immediate.model;
 
 import com.mojang.blaze3d.vertex.PoseStack;
 import net.minecraft.client.renderer.advanced.util.ColorMixer;
-import net.minecraft.client.renderer.sodium.model.quad.ModelQuadView;
+import net.caffeinemc.mods.sodium.client.model.quad.ModelQuadView;
 import net.minecraft.client.renderer.advanced.math.MatrixHelper;
 import net.minecraft.client.renderer.advanced.util.ColorABGR;
 import net.minecraft.client.renderer.advanced.util.ColorU8;
 import net.minecraft.client.renderer.advanced.vertex.buffer.VertexBufferWriter;
 import net.minecraft.client.renderer.advanced.vertex.format.common.EntityVertex;
-import net.minecraft.client.renderer.sodium.services.PlatformRuntimeInformation;
+import net.caffeinemc.mods.sodium.client.services.PlatformRuntimeInformation;
 import org.joml.Matrix3f;
 import org.joml.Matrix4f;
 import org.lwjgl.system.MemoryStack;

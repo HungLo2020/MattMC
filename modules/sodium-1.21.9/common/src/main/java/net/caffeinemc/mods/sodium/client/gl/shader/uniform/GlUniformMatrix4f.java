@@ -1,4 +1,4 @@
-package net.minecraft.client.renderer.sodium.gl.shader.uniform;
+package net.caffeinemc.mods.sodium.client.gl.shader.uniform;
 
 import org.joml.Matrix4fc;
 import org.lwjgl.opengl.GL30C;

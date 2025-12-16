@@ -1,8 +1,8 @@
-package net.minecraft.client.renderer.sodium.render.chunk.lists;
+package net.caffeinemc.mods.sodium.client.render.chunk.lists;
 
 import it.unimi.dsi.fastutil.longs.Long2ReferenceMap;
-import net.minecraft.client.renderer.chunk.advanced.RenderSection;
-import net.minecraft.client.renderer.chunk.advanced.TaskQueueType;
+import net.caffeinemc.mods.sodium.client.render.chunk.RenderSection;
+import net.caffeinemc.mods.sodium.client.render.chunk.TaskQueueType;
 import net.minecraft.core.SectionPos;
 
 /**

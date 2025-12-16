@@ -1,4 +1,4 @@
-package net.minecraft.client.renderer.sodium.render.chunk.translucent_sorting;
+package net.caffeinemc.mods.sodium.client.render.chunk.translucent_sorting;
 
 /**
  * What type of sorting to use for a section. Calculated by a heuristic after

@@ -1,4 +1,4 @@
-package net.minecraft.client.renderer.sodium.render.chunk.compile.executor;
+package net.caffeinemc.mods.sodium.client.render.chunk.compile.executor;
 
 import org.apache.commons.lang3.Validate;
 import org.jetbrains.annotations.Nullable;

@@ -1,6 +1,6 @@
-package net.minecraft.client.renderer.sodium.gl.array;
+package net.caffeinemc.mods.sodium.client.gl.array;
 
-import net.minecraft.client.renderer.gl.advanced.GlObject;
+import net.caffeinemc.mods.sodium.client.gl.GlObject;
 import org.lwjgl.opengl.GL30C;
 
 /**

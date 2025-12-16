@@ -1,4 +1,4 @@
-package net.minecraft.client.renderer.sodium.model.quad.properties;
+package net.caffeinemc.mods.sodium.client.model.quad.properties;
 
 public enum ModelQuadWinding {
     CLOCKWISE(new int[] { 0, 1, 2, 2, 3, 0 }),

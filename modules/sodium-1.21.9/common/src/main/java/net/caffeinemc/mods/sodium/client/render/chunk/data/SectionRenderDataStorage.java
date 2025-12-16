@@ -1,13 +1,13 @@
-package net.minecraft.client.renderer.sodium.render.chunk.data;
+package net.caffeinemc.mods.sodium.client.render.chunk.data;
 
-import net.minecraft.client.renderer.gl.advanced.arena.GlBufferArena;
-import net.minecraft.client.renderer.gl.advanced.arena.GlBufferSegment;
-import net.minecraft.client.renderer.gl.advanced.arena.PendingUpload;
-import net.minecraft.client.renderer.gl.advanced.device.CommandList;
-import net.minecraft.client.renderer.sodium.model.quad.properties.ModelQuadFacing;
-import net.minecraft.client.renderer.chunk.advanced.SharedQuadIndexBuffer;
-import net.minecraft.client.renderer.chunk.advanced.region.RenderRegion;
-import net.minecraft.client.renderer.sodium.util.UInt32;
+import net.caffeinemc.mods.sodium.client.gl.arena.GlBufferArena;
+import net.caffeinemc.mods.sodium.client.gl.arena.GlBufferSegment;
+import net.caffeinemc.mods.sodium.client.gl.arena.PendingUpload;
+import net.caffeinemc.mods.sodium.client.gl.device.CommandList;
+import net.caffeinemc.mods.sodium.client.model.quad.properties.ModelQuadFacing;
+import net.caffeinemc.mods.sodium.client.render.chunk.SharedQuadIndexBuffer;
+import net.caffeinemc.mods.sodium.client.render.chunk.region.RenderRegion;
+import net.caffeinemc.mods.sodium.client.util.UInt32;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 

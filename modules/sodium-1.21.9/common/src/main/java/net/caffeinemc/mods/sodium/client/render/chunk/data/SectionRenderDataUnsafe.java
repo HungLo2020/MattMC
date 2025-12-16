@@ -1,6 +1,6 @@
-package net.minecraft.client.renderer.sodium.render.chunk.data;
+package net.caffeinemc.mods.sodium.client.render.chunk.data;
 
-import net.minecraft.client.renderer.sodium.util.UInt32;
+import net.caffeinemc.mods.sodium.client.util.UInt32;
 import org.lwjgl.system.MemoryUtil;
 
 // This code is a terrible hack to get around the fact that we are so incredibly memory bound, and that we
@@ -27,7 +27,7 @@ import org.lwjgl.system.MemoryUtil;
 public class SectionRenderDataUnsafe {
     /**
      * When the "base element" field is not specified (indicated by setting the MSB to 0), the indices for the geometry set
-     * should be sourced from a monotonic sequence (see {@link net.minecraft.client.renderer.sodium.render.chunk.SharedQuadIndexBuffer}).
+     * should be sourced from a monotonic sequence (see {@link net.caffeinemc.mods.sodium.client.render.chunk.SharedQuadIndexBuffer}).
      *
      * Otherwise, indices should be sourced from the index buffer for the render region using the specified offset.
      */

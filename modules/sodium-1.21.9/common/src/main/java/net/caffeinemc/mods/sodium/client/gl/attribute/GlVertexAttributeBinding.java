@@ -1,4 +1,4 @@
-package net.minecraft.client.renderer.sodium.gl.attribute;
+package net.caffeinemc.mods.sodium.client.gl.attribute;
 
 public class GlVertexAttributeBinding extends GlVertexAttribute {
     private final int index;

@@ -1,8 +1,8 @@
-package net.minecraft.client.renderer.sodium.model.light;
+package net.caffeinemc.mods.sodium.client.model.light;
 
-import net.minecraft.client.renderer.sodium.model.light.data.LightDataAccess;
-import net.minecraft.client.renderer.sodium.model.light.flat.FlatLightPipeline;
-import net.minecraft.client.renderer.sodium.model.light.smooth.SmoothLightPipeline;
+import net.caffeinemc.mods.sodium.client.model.light.data.LightDataAccess;
+import net.caffeinemc.mods.sodium.client.model.light.flat.FlatLightPipeline;
+import net.caffeinemc.mods.sodium.client.model.light.smooth.SmoothLightPipeline;
 
 import java.util.EnumMap;
 

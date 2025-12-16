@@ -1,7 +1,7 @@
-package net.minecraft.client.renderer.sodium.gl.tessellation;
+package net.caffeinemc.mods.sodium.client.gl.tessellation;
 
-import net.minecraft.client.renderer.gl.advanced.array.GlVertexArray;
-import net.minecraft.client.renderer.gl.advanced.device.CommandList;
+import net.caffeinemc.mods.sodium.client.gl.array.GlVertexArray;
+import net.caffeinemc.mods.sodium.client.gl.device.CommandList;
 
 public class GlVertexArrayTessellation extends GlAbstractTessellation {
     private final GlVertexArray array;

@@ -1,4 +1,4 @@
-package net.minecraft.client.renderer.sodium.world.cloned;
+package net.caffeinemc.mods.sodium.client.world.cloned;
 
 import it.unimi.dsi.fastutil.longs.Long2ReferenceLinkedOpenHashMap;
 import org.jetbrains.annotations.NotNull;

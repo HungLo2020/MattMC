@@ -14,14 +14,14 @@
  * limitations under the License.
  */
 
-package net.minecraft.client.renderer.sodium.render.frapi.mesh;
+package net.caffeinemc.mods.sodium.client.render.frapi.mesh;
 
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import net.minecraft.client.renderer.advanced.util.NormI8;
-import net.minecraft.client.renderer.sodium.model.quad.BakedQuadView;
-import net.minecraft.client.renderer.sodium.render.frapi.SodiumRenderer;
-import net.minecraft.client.renderer.sodium.render.frapi.helper.ColorHelper;
-import net.minecraft.client.renderer.sodium.render.frapi.helper.TextureHelper;
+import net.caffeinemc.mods.sodium.client.model.quad.BakedQuadView;
+import net.caffeinemc.mods.sodium.client.render.frapi.SodiumRenderer;
+import net.caffeinemc.mods.sodium.client.render.frapi.helper.ColorHelper;
+import net.caffeinemc.mods.sodium.client.render.frapi.helper.TextureHelper;
 import net.fabricmc.fabric.api.renderer.v1.mesh.QuadEmitter;
 import net.fabricmc.fabric.api.renderer.v1.mesh.QuadTransform;
 import net.fabricmc.fabric.api.renderer.v1.mesh.QuadView;
@@ -38,7 +38,7 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.Objects;
 
-import static net.minecraft.client.renderer.sodium.render.frapi.mesh.EncodingFormat.*;
+import static net.caffeinemc.mods.sodium.client.render.frapi.mesh.EncodingFormat.*;
 
 /**
  * Almost-concrete implementation of a mutable quad. The only missing part is {@link #emitDirectly()},

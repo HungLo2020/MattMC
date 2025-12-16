@@ -1,9 +1,9 @@
-package net.minecraft.client.renderer.sodium.world.biome;
+package net.caffeinemc.mods.sodium.client.world.biome;
 
 import it.unimi.dsi.fastutil.objects.Reference2ReferenceOpenHashMap;
-import net.minecraft.client.renderer.sodium.util.color.BoxBlur;
-import net.minecraft.client.renderer.sodium.util.color.BoxBlur.ColorBuffer;
-import net.minecraft.client.renderer.sodium.world.cloned.ChunkRenderContext;
+import net.caffeinemc.mods.sodium.client.util.color.BoxBlur;
+import net.caffeinemc.mods.sodium.client.util.color.BoxBlur.ColorBuffer;
+import net.caffeinemc.mods.sodium.client.world.cloned.ChunkRenderContext;
 import net.minecraft.util.Mth;
 import net.minecraft.world.level.ColorResolver;
 import net.minecraft.world.level.biome.Biome;

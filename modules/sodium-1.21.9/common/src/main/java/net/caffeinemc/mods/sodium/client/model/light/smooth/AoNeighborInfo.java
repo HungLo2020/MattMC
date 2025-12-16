@@ -1,4 +1,4 @@
-package net.minecraft.client.renderer.sodium.model.light.smooth;
+package net.caffeinemc.mods.sodium.client.model.light.smooth;
 
 import net.minecraft.core.Direction;
 import net.minecraft.util.Mth;

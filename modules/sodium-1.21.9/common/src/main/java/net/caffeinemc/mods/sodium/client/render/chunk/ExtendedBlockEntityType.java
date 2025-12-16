@@ -1,4 +1,4 @@
-package net.minecraft.client.renderer.sodium.render.chunk;
+package net.caffeinemc.mods.sodium.client.render.chunk;
 
 import net.minecraft.client.renderer.advanced.blockentity.BlockEntityRenderPredicate;
 import net.minecraft.core.BlockPos;

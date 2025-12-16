@@ -1,9 +1,9 @@
-package net.minecraft.client.renderer.sodium.data.fingerprint;
+package net.caffeinemc.mods.sodium.client.data.fingerprint;
 
 import com.google.gson.Gson;
 import com.google.gson.annotations.SerializedName;
-import net.minecraft.client.renderer.sodium.services.PlatformRuntimeInformation;
-import net.minecraft.client.renderer.sodium.util.FileUtil;
+import net.caffeinemc.mods.sodium.client.services.PlatformRuntimeInformation;
+import net.caffeinemc.mods.sodium.client.util.FileUtil;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 

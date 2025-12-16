@@ -1,7 +1,7 @@
-package net.minecraft.client.renderer.sodium.render.chunk.compile;
+package net.caffeinemc.mods.sodium.client.render.chunk.compile;
 
-import net.minecraft.client.renderer.chunk.advanced.vertex.format.ChunkVertexType;
-import net.minecraft.client.renderer.chunk.advanced.compile.pipeline.BlockRenderCache;
+import net.caffeinemc.mods.sodium.client.render.chunk.vertex.format.ChunkVertexType;
+import net.caffeinemc.mods.sodium.client.render.chunk.compile.pipeline.BlockRenderCache;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
 

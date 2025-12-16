@@ -1,6 +1,6 @@
-package net.minecraft.client.renderer.sodium.render.chunk.compile.executor;
+package net.caffeinemc.mods.sodium.client.render.chunk.compile.executor;
 
-import net.minecraft.client.renderer.chunk.advanced.compile.estimation.JobEffort;
+import net.caffeinemc.mods.sodium.client.render.chunk.compile.estimation.JobEffort;
 import net.minecraft.ReportedException;
 
 public class ChunkJobResult<OUTPUT> {

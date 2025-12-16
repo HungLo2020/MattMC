@@ -1,7 +1,7 @@
 package net.irisshaders.iris.pipeline.programs;
 
 import com.mojang.blaze3d.opengl.GlStateManager;
-import net.minecraft.client.renderer.gl.advanced.shader.uniform.GlUniform;
+import net.caffeinemc.mods.sodium.client.gl.shader.uniform.GlUniform;
 import net.irisshaders.iris.gl.IrisRenderSystem;
 import org.joml.Matrix3fc;
 import org.lwjgl.opengl.GL30C;

@@ -1,11 +1,11 @@
-package net.minecraft.client.renderer.sodium.model.light.flat;
+package net.caffeinemc.mods.sodium.client.model.light.flat;
 
-import net.minecraft.client.renderer.sodium.model.light.LightPipeline;
-import net.minecraft.client.renderer.sodium.model.light.data.LightDataAccess;
-import net.minecraft.client.renderer.sodium.model.light.data.QuadLightData;
-import net.minecraft.client.renderer.sodium.model.quad.ModelQuadView;
-import net.minecraft.client.renderer.sodium.model.quad.properties.ModelQuadFlags;
-import net.minecraft.client.renderer.sodium.services.PlatformBlockAccess;
+import net.caffeinemc.mods.sodium.client.model.light.LightPipeline;
+import net.caffeinemc.mods.sodium.client.model.light.data.LightDataAccess;
+import net.caffeinemc.mods.sodium.client.model.light.data.QuadLightData;
+import net.caffeinemc.mods.sodium.client.model.quad.ModelQuadView;
+import net.caffeinemc.mods.sodium.client.model.quad.properties.ModelQuadFlags;
+import net.caffeinemc.mods.sodium.client.services.PlatformBlockAccess;
 import net.minecraft.client.renderer.LevelRenderer;
 import net.minecraft.client.renderer.LightTexture;
 import net.minecraft.core.BlockPos;
@@ -16,7 +16,7 @@ import net.minecraft.world.level.material.FluidState;
 
 import java.util.Arrays;
 
-import static net.minecraft.client.renderer.sodium.model.light.data.LightDataAccess.*;
+import static net.caffeinemc.mods.sodium.client.model.light.data.LightDataAccess.*;
 
 /**
  * A light pipeline which implements "classic-style" lighting through simply using the light value of the adjacent

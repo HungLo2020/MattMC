@@ -1,4 +1,4 @@
-package net.minecraft.client.renderer.sodium.gl.shader;
+package net.caffeinemc.mods.sodium.client.gl.shader;
 
 import it.unimi.dsi.fastutil.objects.Object2IntArrayMap;
 import it.unimi.dsi.fastutil.objects.Object2IntMap;

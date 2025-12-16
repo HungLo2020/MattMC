@@ -1,10 +1,10 @@
-package net.minecraft.client.renderer.sodium.model.color;
+package net.caffeinemc.mods.sodium.client.model.color;
 
 import it.unimi.dsi.fastutil.objects.Reference2ReferenceMap;
 import it.unimi.dsi.fastutil.objects.Reference2ReferenceOpenHashMap;
 import it.unimi.dsi.fastutil.objects.ReferenceSet;
-import net.minecraft.client.renderer.sodium.model.color.interop.BlockColorsExtension;
-import net.minecraft.client.renderer.sodium.services.FluidRendererFactory;
+import net.caffeinemc.mods.sodium.client.model.color.interop.BlockColorsExtension;
+import net.caffeinemc.mods.sodium.client.services.FluidRendererFactory;
 import net.minecraft.client.color.block.BlockColors;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;

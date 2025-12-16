@@ -1,4 +1,4 @@
-package net.minecraft.client.renderer.sodium.render.chunk.shader;
+package net.caffeinemc.mods.sodium.client.render.chunk.shader;
 
 import com.google.common.collect.ImmutableList;
 

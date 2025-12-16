@@ -1,4 +1,4 @@
-package net.minecraft.client.renderer.sodium.render.frapi.render;
+package net.caffeinemc.mods.sodium.client.render.frapi.render;
 
 import net.fabricmc.fabric.api.util.TriState;
 
