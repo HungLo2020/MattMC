@@ -7,7 +7,7 @@ import net.minecraft.client.renderer.advanced.internal.DependencyInjection;
 
 public interface VertexFormatRegistry {
     VertexFormatRegistry INSTANCE = DependencyInjection.load(VertexFormatRegistry.class,
-            "net.caffeinemc.mods.sodium.client.render.vertex.VertexFormatRegistryImpl");
+            "net.minecraft.client.renderer.sodium.render.vertex.VertexFormatRegistryImpl");
 
     static VertexFormatRegistry instance() {
         return INSTANCE;
