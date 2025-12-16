@@ -11,7 +11,7 @@ import net.minecraft.client.renderer.culling.Frustum;
  * all operations to the vanilla {@link LevelRenderer}. It serves as the default rendering
  * path when advanced rendering features are disabled.</p>
  * 
- * <p><b>Implementation Note:</b> This is part of STEP7-8PLAN.md Step 2, creating a wrapper
+ * <p><b>Implementation Note:</b> This is part of STEP7-8PLAN.md Steps 2-3, creating a wrapper
  * that maintains backward compatibility with vanilla rendering during Sodium integration.</p>
  * 
  * @since Step 7-8 Integration
@@ -30,15 +30,17 @@ public class VanillaChunkRenderer implements ChunkRenderer {
     
     @Override
     public void renderChunks(Camera camera, Frustum frustum, boolean spectator) {
-        // Delegate to vanilla LevelRenderer
-        // Note: The actual vanilla method will be preserved as renderChunksVanilla() in Step 3
-        // For now, this is a placeholder that will be wired up properly in Step 3
+        // Note: Currently the wrapper method cullTerrain() in LevelRenderer calls
+        // cullTerrainVanilla() directly. This method exists to maintain the abstraction
+        // interface but delegation happens at the LevelRenderer level for now.
+        // In later phases, this will be properly wired when chunk rendering is
+        // extracted from cullTerrain into a dedicated method.
     }
     
     @Override
     public void scheduleChunkRebuild(int x, int y, int z, boolean important) {
         // Delegate to vanilla chunk rebuild mechanism
-        // Will be implemented properly in Step 3 when LevelRenderer integration is complete
+        // Will be implemented properly when chunk rebuilding is extracted in later phases
     }
     
     @Override
