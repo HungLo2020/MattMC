@@ -610,7 +610,7 @@ Steps 7 and 8 were completed together using a systematic 20-step phased approach
 18. Removed Sodium module dependencies completely (229 duplicate files deleted, build.gradle updated)
 
 **Migration Statistics**:
-- **Total files migrated**: 625 Java files
+- **Total files migrated**: 625 Java files (verified by directory count)
 - **Package structure**: 
   - net.minecraft.client.renderer.sodium.* (249 files - infrastructure, non-mixin implementation)
   - net.minecraft.client.renderer.sodium.mixin.* (97 files - mixin transformations)
@@ -621,6 +621,7 @@ Steps 7 and 8 were completed together using a systematic 20-step phased approach
 - **Lines of code integrated**: ~150,000 LOC
 - **Build time**: ~2 minutes (zero regression)
 - **Compilation errors**: 0 at each step
+- **Note**: Earlier documentation mentioned 643 files; this has been corrected to 625 based on actual directory verification
 
 **Key Technical Achievements**:
 - Dual rendering paths (vanilla + Sodium) with runtime switching
@@ -741,13 +742,14 @@ public class VertexFormat implements VertexFormatExtensions {
 ```
 
 **Mixin Disposition**:
-- **4 Extension interfaces**: Inlined directly (VertexFormat, LevelRenderer, ChunkSectionsToRender, GameRenderer)
-- **7 Accessor interfaces**: Inlined during Steps 13-14
-- **8 Core transformation mixins**: Abstraction layers added in Steps 5-12
-- **78 Remaining mixins**: Still in net.minecraft.client.renderer.sodium.mixin/* (97 total - 19 inlined)
-  - These remain as Mixin files but target integrated code
-  - Will be eliminated in future phases through additional abstraction layers
-  - Currently applied at runtime via Fabric Loader's Mixin infrastructure
+- **4 Extension interfaces**: Functionality inlined directly into vanilla classes (VertexFormat, LevelRenderer, ChunkSectionsToRender, GameRenderer)
+- **7 Accessor interfaces**: Functionality inlined during Steps 13-14 (made methods public, added getters)
+- **8 Core transformation types**: Abstraction layers added in Steps 5-12 (dual vanilla/Sodium paths)
+- **All 97 mixin files**: Still exist in net.minecraft.client.renderer.sodium.mixin/*
+  - All 97 mixins target integrated code (not external Sodium module)
+  - Critical functionality from 19 mixins (4+7+8) has been inlined/abstracted in vanilla classes
+  - Remaining mixins still applied at runtime via Fabric Loader's Mixin infrastructure
+  - Future work: Continue progressive elimination through additional abstraction layers
 
 **Why This Approach**:
 - Eliminates runtime mixin overhead for critical paths
@@ -777,8 +779,8 @@ public class VertexFormat implements VertexFormatExtensions {
 
 **Future Work**:
 - Continue mixin elimination through additional abstraction layers
-- Currently 78 mixins remain (of original 97)
-- These will be addressed in future integration steps
+- All 97 mixin files currently remain (functionality from 19 has been inlined/abstracted)
+- Progressive elimination strategy: Add abstraction layers, then remove mixin files
 - All remaining mixins target integrated code (not external Sodium module)
 
 **Step 8 Complete** - Critical mixins inlined, abstraction layers in place. Ready to proceed to Step 9.
