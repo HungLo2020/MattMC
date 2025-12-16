@@ -363,48 +363,58 @@ These steps inline the most critical Sodium mixins, creating the foundation for 
 
 ---
 
-#### **Step 6: Inline Chunk Rendering Mixins - Part 2 (Injection Points)**
+#### **Step 6: Inline Chunk Rendering Mixins - Part 2 (Injection Points)** ✅ COMPLETE
+
+**Status**: ✅ **COMPLETED** - Injection points added, build successful
 
 **Objective**: Add Sodium's injection points to chunk rendering pipeline.
 
 **Actions**:
 1. Analyze `RenderChunkMixin` from Sodium
-2. Add injection points to `net.minecraft.client.renderer.chunk.RenderChunk.java`:
+2. Add injection points to `net.minecraft.client.renderer.chunk.SectionRenderDispatcher.java` (RebuildTask class):
    ```java
-   public CompletableFuture<ChunkBuildResult> compile(...) {
+   public CompletableFuture<SectionTaskResult> doTask(...) {
        // ===== BEGIN SODIUM INTEGRATION =====
-       // Originally from: sodium.mixin.core.render.world.RenderChunkMixin
+       // Originally from: sodium.mixin.core.render.world.RenderSectionMixin
        if (AdvancedRenderingConfig.isEnabled()) {
-           return this.compileSodium(chunkRenderDispatcher, renderRegion, camera);
+           return this.doTaskSodium(sectionBufferBuilderPack);
        }
        // ===== END SODIUM INTEGRATION =====
        
        // Vanilla path preserved
-       return this.compileVanilla(chunkRenderDispatcher, renderRegion, camera);
+       return this.doTaskVanilla(sectionBufferBuilderPack);
    }
    
-   private CompletableFuture<ChunkBuildResult> compileSodium(...) {
+   private CompletableFuture<SectionTaskResult> doTaskSodium(...) {
        // Placeholder - will be implemented when Sodium implementation migrated
        throw new UnsupportedOperationException("Sodium compile not yet implemented");
    }
    
-   private CompletableFuture<ChunkBuildResult> compileVanilla(...) {
+   private CompletableFuture<SectionTaskResult> doTaskVanilla(...) {
        // Moved existing compile logic here
        // ... existing code ...
    }
    ```
 
 **Testing**:
-- Build compiles successfully
-- With flag disabled, vanilla path used
-- No exceptions (flag is disabled)
+- Build compiles successfully ✅
+- With flag disabled, vanilla path used ✅
+- No exceptions (flag is disabled) ✅
 
 **Completion Criteria**:
-- ✅ Injection points added
-- ✅ Vanilla path preserved
-- ✅ Sodium path stubbed
+- ✅ Injection points added to SectionRenderDispatcher.RebuildTask.doTask()
+- ✅ Vanilla path preserved in doTaskVanilla()
+- ✅ Sodium path stubbed in doTaskSodium()
 - ✅ Build successful
-- ✅ Zero functional changes (flag disabled)
+- ✅ Zero functional changes (flag disabled by default)
+
+**Implementation Details**:
+- Modified RebuildTask.doTask() in SectionRenderDispatcher.java (line ~422)
+- Created wrapper method that checks AdvancedRenderingConfig.isEnabled()
+- Renamed original doTask() → doTaskVanilla() preserving all vanilla logic
+- Created doTaskSodium() stub that throws UnsupportedOperationException
+- Added comprehensive JavaDoc to both methods
+- Build verified: BUILD SUCCESSFUL
 
 ---
 
