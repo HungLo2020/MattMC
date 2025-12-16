@@ -72,7 +72,8 @@ public class IllusionerRenderer extends IllagerRenderer<Illusioner, IllusionerRe
 		return true;
 	}
 
-	protected AABB getBoundingBoxForCulling(Illusioner illusioner) {
+	@Override
+	public AABB getBoundingBoxForCulling(Illusioner illusioner) {
 		return super.getBoundingBoxForCulling(illusioner).inflate(3.0, 0.0, 3.0);
 	}
 }

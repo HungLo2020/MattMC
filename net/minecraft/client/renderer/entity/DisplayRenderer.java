@@ -48,7 +48,8 @@ public abstract class DisplayRenderer<T extends Display, S, ST extends DisplayEn
 		this.entityRenderDispatcher = context.getEntityRenderDispatcher();
 	}
 
-	protected AABB getBoundingBoxForCulling(T display) {
+	@Override
+	public AABB getBoundingBoxForCulling(T display) {
 		return display.getBoundingBoxForCulling();
 	}
 

@@ -7,7 +7,6 @@ import net.minecraft.client.renderer.sodium.data.fingerprint.HashedFingerprint;
 import net.minecraft.client.renderer.sodium.gui.SodiumDebugEntry;
 import net.minecraft.client.renderer.sodium.gui.SodiumGameOptions;
 import net.minecraft.client.renderer.sodium.services.PlatformRuntimeInformation;
-import net.caffeinemc.mods.sodium.mixin.features.gui.hooks.debug.DebugScreenEntriesAccessor;
 import net.minecraft.client.gui.components.debug.DebugScreenEntries;
 import net.minecraft.resources.ResourceLocation;
 import org.slf4j.Logger;
@@ -22,7 +21,7 @@ public class SodiumClientMod {
     private static String MOD_VERSION;
 
     public static void onInitialization(String version) {
-        DebugScreenEntriesAccessor.getEntries().put(ResourceLocation.fromNamespaceAndPath("sodium", "sodium"), new SodiumDebugEntry());
+        DebugScreenEntries.getEntries().put(ResourceLocation.fromNamespaceAndPath("sodium", "sodium"), new SodiumDebugEntry());
         MOD_VERSION = version;
 
         CONFIG = loadConfig();

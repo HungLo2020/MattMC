@@ -15,7 +15,7 @@ import net.minecraft.client.renderer.chunk.advanced.terrain.TerrainRenderPass;
 import net.minecraft.client.renderer.chunk.advanced.vertex.format.ChunkVertexType;
 import net.minecraft.client.renderer.gl.advanced.shader.*;
 import net.minecraft.client.renderer.sodium.util.FogParameters;
-import net.caffeinemc.mods.sodium.mixin.core.GlCommandEncoderAccessor;
+import com.mojang.blaze3d.opengl.GlCommandEncoder;
 import net.minecraft.resources.ResourceLocation;
 import java.util.Map;
 
@@ -89,8 +89,8 @@ public abstract class ShaderChunkRenderer implements ChunkRenderer {
 
         GlStateManager._viewport(0, 0, target.getColorTexture().getWidth(0), target.getColorTexture().getHeight(0));
         GlStateManager._glBindFramebuffer(GlConst.GL_FRAMEBUFFER, ((GlTexture) target.getColorTexture()).getFbo(((GlDevice) RenderSystem.getDevice()).directStateAccess(), target.getDepthTexture()));
-        ((GlCommandEncoderAccessor) RenderSystem.getDevice().createCommandEncoder()).sodium$applyPipelineState(pass.getPipeline());
-        ((GlCommandEncoderAccessor) RenderSystem.getDevice().createCommandEncoder()).sodium$setLastProgram(null);
+        ((GlCommandEncoder) RenderSystem.getDevice().createCommandEncoder()).applyPipelineState(pass.getPipeline());
+        ((GlCommandEncoder) RenderSystem.getDevice().createCommandEncoder()).setLastProgram(null);
 
         ChunkShaderOptions options = new ChunkShaderOptions(ChunkFogMode.SMOOTH, pass, this.vertexType);
 

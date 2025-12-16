@@ -55,6 +55,14 @@ public class DebugScreenEntries {
 		return Map.copyOf(ENTRIES_BY_LOCATION);
 	}
 
+	/**
+	 * Returns the mutable map of debug screen entries for registering new entries.
+	 * Added for Sodium integration.
+	 */
+	public static Map<ResourceLocation, DebugScreenEntry> getEntries() {
+		return ENTRIES_BY_LOCATION;
+	}
+
 	@Nullable
 	public static DebugScreenEntry getEntry(ResourceLocation resourceLocation) {
 		return (DebugScreenEntry)ENTRIES_BY_LOCATION.get(resourceLocation);

@@ -25,7 +25,6 @@ import net.minecraft.client.renderer.sodium.services.PlatformRuntimeInformation;
 import net.minecraft.client.renderer.sodium.util.FogParameters;
 import net.minecraft.client.renderer.sodium.util.NativeBuffer;
 import net.minecraft.client.renderer.sodium.world.LevelRendererExtension;
-import net.caffeinemc.mods.sodium.mixin.core.render.world.EntityRendererAccessor;
 import net.minecraft.client.Camera;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
@@ -439,7 +438,7 @@ public class SodiumWorldRenderer {
             return true;
         }
 
-        AABB bb = ((EntityRendererAccessor) renderer).getCullingBox(entity);
+        AABB bb = renderer.getBoundingBoxForCulling(entity);
 
         // bail on very large entities to avoid checking many sections
         double entityVolume = (bb.maxX - bb.minX) * (bb.maxY - bb.minY) * (bb.maxZ - bb.minZ);
