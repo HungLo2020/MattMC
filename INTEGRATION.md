@@ -610,14 +610,14 @@ Steps 7 and 8 were completed together using a systematic 20-step phased approach
 18. Removed Sodium module dependencies completely (229 duplicate files deleted, build.gradle updated)
 
 **Migration Statistics**:
-- **Total files migrated**: 643+ Java files
+- **Total files migrated**: 625 Java files
 - **Package structure**: 
-  - net.minecraft.client.renderer.sodium.* (203 files - infrastructure)
-  - net.minecraft.client.renderer.advanced.* (43 files - API)
-  - net.minecraft.client.renderer.gl.advanced.* (60 files - GL abstraction)
-  - net.minecraft.client.renderer.chunk.advanced.* (165 files - chunk rendering)
-  - net.minecraft.client.renderer.vertex.advanced.* (7 files - vertex handling)
-  - Plus 97 mixin files, 14 platform files, and supporting code
+  - net.minecraft.client.renderer.sodium.* (249 files - infrastructure, non-mixin implementation)
+  - net.minecraft.client.renderer.sodium.mixin.* (97 files - mixin transformations)
+  - net.minecraft.client.renderer.advanced.* (43 files - core API)
+  - net.minecraft.client.renderer.gl.advanced.* (60 files - GL abstraction layer)
+  - net.minecraft.client.renderer.chunk.advanced.* (165 files - chunk rendering implementation)
+  - net.minecraft.client.renderer.vertex.advanced.* (11 files - vertex handling)
 - **Lines of code integrated**: ~150,000 LOC
 - **Build time**: ~2 minutes (zero regression)
 - **Compilation errors**: 0 at each step
