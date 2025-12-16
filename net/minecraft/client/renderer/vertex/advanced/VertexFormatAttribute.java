@@ -1,4 +1,4 @@
-package net.caffeinemc.mods.sodium.client.render.vertex;
+package net.minecraft.client.renderer.vertex.advanced;
 
 import net.minecraft.client.renderer.gl.advanced.attribute.GlVertexAttributeFormat;
 

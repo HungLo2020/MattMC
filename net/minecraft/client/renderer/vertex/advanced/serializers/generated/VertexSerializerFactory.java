@@ -1,4 +1,4 @@
-package net.minecraft.client.renderer.sodium.render.vertex.serializers.generated;
+package net.minecraft.client.renderer.vertex.advanced.serializers.generated;
 
 import com.mojang.blaze3d.vertex.VertexFormat;
 import com.mojang.blaze3d.vertex.VertexFormatElement;
@@ -16,7 +16,7 @@ public class VertexSerializerFactory {
     public static Bytecode generate(VertexFormat srcFormat, VertexFormat dstFormat, String identifier) {
         var memoryCopies = createMemoryTransferList(srcFormat, dstFormat);
 
-        var name = "net/caffeinemc/mods/sodium/client/render/vertex/serializers/generated/VertexSerializer$Impl$" + identifier;
+        var name = "net/minecraft/client/renderer/vertex/advanced/serializers/generated/VertexSerializer$Impl$" + identifier;
 
         ClassWriter classWriter = new ClassWriter(0);
         classWriter.visit(Opcodes.V17, Opcodes.ACC_FINAL | Opcodes.ACC_PUBLIC, name, null,

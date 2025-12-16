@@ -1,4 +1,4 @@
-package net.caffeinemc.mods.sodium.client.render.vertex;
+package net.minecraft.client.renderer.vertex.advanced;
 
 import com.mojang.blaze3d.vertex.VertexFormat;
 import it.unimi.dsi.fastutil.objects.Reference2IntMap;

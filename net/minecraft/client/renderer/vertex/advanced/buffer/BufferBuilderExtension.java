@@ -1,4 +1,4 @@
-package net.minecraft.client.renderer.sodium.render.vertex.buffer;
+package net.minecraft.client.renderer.vertex.advanced.buffer;
 
 import net.minecraft.client.renderer.advanced.vertex.buffer.VertexBufferWriter;
 
