@@ -28,7 +28,7 @@ public class MixinRenderSectionManager {
 
 	@Redirect(method = "getSearchDistance", remap = false,
 		at = @At(value = "FIELD",
-			target = "Lnet/caffeinemc/mods/sodium/client/gui/SodiumGameOptions$PerformanceSettings;useFogOcclusion:Z",
+			target = "Lnet/minecraft/client/renderer/sodium/gui/SodiumGameOptions$PerformanceSettings;useFogOcclusion:Z",
 			remap = false))
 	private boolean iris$disableFogOcclusion(SodiumGameOptions.PerformanceSettings settings) {
 		if (Iris.getCurrentPack().isPresent()) {
