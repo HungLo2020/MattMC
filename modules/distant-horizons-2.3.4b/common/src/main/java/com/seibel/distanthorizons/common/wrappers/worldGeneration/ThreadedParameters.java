@@ -84,7 +84,10 @@ public final class ThreadedParameters
 	private StructureCheck createStructureCheck(GlobalParameters param)
 	{
 		return new StructureCheck(param.chunkScanner, param.registry, param.structures,
-				param.level.dimension(), param.generator, this.level, param.generator.getBiomeSource(), param.worldSeed,
+				param.level.dimension(), param.generator, 
+				this.level.getChunkSource().randomState(), 
+				this.level, 
+				param.generator.getBiomeSource(), param.worldSeed,
 				param.fixerUpper);
 	}
 		

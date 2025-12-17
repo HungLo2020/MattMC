@@ -58,7 +58,8 @@ public class MixinLevelRenderer
 	private void prepareChunkRenders(Matrix4fc projectionMatrix, double d, double e, double f, CallbackInfoReturnable<ChunkSectionsToRender> callback)
         {
 			    // MC combined the model view and projection matricies
-	    ClientApi.RENDER_STATE.mcModelViewMatrix = McObjectConverter.Convert(projectionMatrix);
+			    // Matrix4fc is the immutable interface, create a mutable Matrix4f from it
+	    ClientApi.RENDER_STATE.mcModelViewMatrix = McObjectConverter.Convert(new org.joml.Matrix4f(projectionMatrix));
 	    ClientApi.RENDER_STATE.mcProjectionMatrix = new Mat4f();
 	    ClientApi.RENDER_STATE.mcProjectionMatrix.setIdentity();
 			    
