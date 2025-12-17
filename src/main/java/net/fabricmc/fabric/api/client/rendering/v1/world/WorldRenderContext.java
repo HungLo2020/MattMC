@@ -17,9 +17,12 @@
 package net.fabricmc.fabric.api.client.rendering.v1.world;
 
 import org.jetbrains.annotations.ApiStatus;
+import org.joml.Matrix4f;
 
+import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.RenderBuffers;
+import net.minecraft.world.TickRateManager;
 import com.mojang.blaze3d.vertex.PoseStack;
 
 @ApiStatus.NonExtendable
@@ -41,4 +44,40 @@ public interface WorldRenderContext extends WorldTerrainRenderContext {
 	 * preferably in {@link WorldRenderEvents#END_MAIN} to avoid being overdrawn or cleared.
 	 */
 	MultiBufferSource consumers();
+
+	/**
+	 * @deprecated Use extraction phase instead. This method provides legacy compatibility for mods
+	 * built against Fabric API 0.115.0 (MC 1.21.1). Returns identity matrix in MC 1.21.10+.
+	 */
+	@Deprecated
+	default Matrix4f projectionMatrix() {
+		return new Matrix4f(); // Identity matrix
+	}
+
+	/**
+	 * @deprecated Use extraction phase instead. This method provides legacy compatibility for mods
+	 * built against Fabric API 0.115.0 (MC 1.21.1). Returns identity matrix in MC 1.21.10+.
+	 */
+	@Deprecated
+	default Matrix4f positionMatrix() {
+		return new Matrix4f(); // Identity matrix
+	}
+
+	/**
+	 * @deprecated Use {@link WorldExtractionContext#world()} during extraction phase instead.
+	 * This method provides legacy compatibility for mods built against Fabric API 0.115.0 (MC 1.21.1).
+	 */
+	@Deprecated
+	default ClientLevel world() {
+		return null;
+	}
+
+	/**
+	 * @deprecated Use {@link WorldExtractionContext#tickCounter()} during extraction phase instead.
+	 * This method provides legacy compatibility for mods built against Fabric API 0.115.0 (MC 1.21.1).
+	 */
+	@Deprecated
+	default TickRateManager tickCounter() {
+		return null;
+	}
 }

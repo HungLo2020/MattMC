@@ -97,6 +97,17 @@ public final class WorldRenderEvents {
 	});
 
 	/**
+	 * @deprecated Use {@link #START_MAIN} instead. This event provides legacy compatibility for mods
+	 * built against Fabric API 0.115.0 (MC 1.21.1). Maps to START_MAIN in MC 1.21.10+.
+	 */
+	@Deprecated
+	public static final Event<AfterSetup> AFTER_SETUP = EventFactory.createArrayBacked(AfterSetup.class, callbacks -> context -> {
+		for (final AfterSetup callback : callbacks) {
+			callback.afterSetup(context);
+		}
+	});
+
+	/**
 	 * Called after the {@link net.minecraft.client.renderer.RenderType#solid SOLID}, {@link net.minecraft.client.renderer.RenderType#cutout CUTOUT},
 	 * and {@link net.minecraft.client.renderer.RenderType#cutoutMipped CUTOUT_MIPPED} terrain layers are drawn to the framebuffer,
 	 * before entity and block entities are submitted and drawn to the framebuffer.
@@ -201,6 +212,17 @@ public final class WorldRenderEvents {
 		}
 	});
 
+	/**
+	 * @deprecated Use {@link #END_MAIN} instead. This event provides legacy compatibility for mods
+	 * built against Fabric API 0.115.0 (MC 1.21.1). Maps to END_MAIN in MC 1.21.10+.
+	 */
+	@Deprecated
+	public static final Event<AfterTranslucent> AFTER_TRANSLUCENT = EventFactory.createArrayBacked(AfterTranslucent.class, callbacks -> context -> {
+		for (final AfterTranslucent callback : callbacks) {
+			callback.afterTranslucent(context);
+		}
+	});
+
 	@FunctionalInterface
 	public interface AfterBlockOutlineExtraction {
 		void afterBlockOutlineExtraction(WorldExtractionContext context, @Nullable HitResult result);
@@ -214,6 +236,15 @@ public final class WorldRenderEvents {
 	@FunctionalInterface
 	public interface StartMain {
 		void startMain(WorldTerrainRenderContext context);
+	}
+
+	/**
+	 * @deprecated Use {@link StartMain} instead. Legacy compatibility for Fabric API 0.115.0.
+	 */
+	@Deprecated
+	@FunctionalInterface
+	public interface AfterSetup {
+		void afterSetup(WorldRenderContext context);
 	}
 
 	@FunctionalInterface
@@ -244,5 +275,14 @@ public final class WorldRenderEvents {
 	@FunctionalInterface
 	public interface EndMain {
 		void endMain(WorldRenderContext context);
+	}
+
+	/**
+	 * @deprecated Use {@link EndMain} instead. Legacy compatibility for Fabric API 0.115.0.
+	 */
+	@Deprecated
+	@FunctionalInterface
+	public interface AfterTranslucent {
+		void afterTranslucent(WorldRenderContext context);
 	}
 }
