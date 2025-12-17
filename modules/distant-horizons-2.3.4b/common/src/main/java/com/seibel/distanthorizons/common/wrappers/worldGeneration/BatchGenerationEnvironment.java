@@ -104,7 +104,7 @@ public final class BatchGenerationEnvironment extends AbstractBatchGenerationEnv
 			new ConfigBasedLogger(LogManager.getLogger("LodWorldGen"),
 					() -> Config.Common.Logging.logWorldGenLoadEvent.get());
 	
-	private static final TicketType DH_SERVER_GEN_TICKET = new TicketType(/* timeout, 0 = disabled*/0L, /* persist */ false, TicketType.TicketUse.LOADING);
+	private static final TicketType DH_SERVER_GEN_TICKET = new TicketType(/* timeout, 0 = disabled*/0L, /* flags: LOADING */ TicketType.FLAG_LOADING);
 	
 	private static final IModChecker MOD_CHECKER = SingletonInjector.INSTANCE.get(IModChecker.class);
 	

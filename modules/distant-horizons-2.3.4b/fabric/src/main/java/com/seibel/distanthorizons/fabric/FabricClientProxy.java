@@ -229,7 +229,7 @@ public class FabricClientProxy implements AbstractModInitializer.IEventProxy
 			this.clientApi.renderLods(ClientLevelWrapper.getWrapper(renderContext.world()),
 					modelViewMatrix,
 					projectionMatrix,
-					renderContext.tickCounter().getGameTimeDeltaTicks()
+					renderContext.getGameTimeDeltaTicks()
 					);
 		});
 		
@@ -245,7 +245,7 @@ public class FabricClientProxy implements AbstractModInitializer.IEventProxy
 			this.clientApi.renderFadeOpaque(
 					modelViewMatrix,
 					projectionMatrix,
-					renderContext.tickCounter().getGameTimeDeltaTicks(),
+					renderContext.getGameTimeDeltaTicks(),
 					ClientLevelWrapper.getWrapper(renderContext.world())
 			);
 		});
@@ -268,7 +268,7 @@ public class FabricClientProxy implements AbstractModInitializer.IEventProxy
 			this.clientApi.renderFade(
 					modelViewMatrix,
 					projectionMatrix,
-					renderContext.tickCounter().getGameTimeDeltaTicks(),
+					renderContext.getGameTimeDeltaTicks(),
 					ClientLevelWrapper.getWrapper(renderContext.world())
 			);
 		});

@@ -68,7 +68,7 @@ public class ServerPlayerWrapper implements IServerPlayerWrapper
 	@Override
 	public int getViewDistance() 
 	{
-		return this.getServerPlayer().serverLevel().getServer().getPlayerList().getViewDistance();
+		return ((ServerLevel)this.getServerPlayer().level()).getServer().getPlayerList().getViewDistance();
 	}
 	
 	@Override

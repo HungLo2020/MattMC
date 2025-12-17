@@ -80,4 +80,17 @@ public interface WorldRenderContext extends WorldTerrainRenderContext {
 	default TickRateManager tickCounter() {
 		return null;
 	}
+	
+	/**
+	 * Legacy compatibility method for Fabric API 0.115.0 (MC 1.21.1).
+	 * Returns partial tick delta for rendering interpolation.
+	 * In MC 1.21.10+, this should be obtained from the render context's frame data.
+	 * For now, returns 1.0f as a safe default (full tick).
+	 * 
+	 * @deprecated In MC 1.21.10+, use proper frame-based rendering instead.
+	 */
+	@Deprecated
+	default float getGameTimeDeltaTicks() {
+		return 1.0f; // Default to full tick for compatibility
+	}
 }

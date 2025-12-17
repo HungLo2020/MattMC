@@ -313,13 +313,13 @@ public class MinecraftRenderWrapper implements IMinecraftRenderWrapper
 	@Override
 	public int getTargetFrameBufferViewportWidth()
 	{
-		return this.getRenderTarget().viewWidth;
+		return this.getRenderTarget().width;
 	}
 	
 	@Override
 	public int getTargetFrameBufferViewportHeight()
 	{
-		return this.getRenderTarget().viewHeight;
+		return this.getRenderTarget().height;
 	}
 	
 	@Override
