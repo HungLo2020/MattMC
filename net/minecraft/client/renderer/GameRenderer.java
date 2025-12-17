@@ -149,6 +149,11 @@ public class GameRenderer implements Projector, AutoCloseable, net.minecraft.cli
 	private final GlobalSettingsUniform globalSettingsUniform = new GlobalSettingsUniform();
 	private final PerspectiveProjectionMatrixBuffer levelProjectionMatrixBuffer = new PerspectiveProjectionMatrixBuffer("level");
 	private final CachedPerspectiveProjectionMatrixBuffer hud3dProjectionMatrixBuffer = new CachedPerspectiveProjectionMatrixBuffer("3d hud", 0.05F, 100.0F);
+	
+	// ===== IRIS INTEGRATION STEP 3: Shader Pipeline Fields =====
+	private net.minecraft.client.renderer.shaders.ShaderPipeline activePipeline;
+	private net.minecraft.client.renderer.shaders.ShaderPipeline vanillaPipeline;
+	private net.minecraft.client.renderer.shaders.ShaderPipeline irisPipeline;
 
 	public GameRenderer(Minecraft minecraft, ItemInHandRenderer itemInHandRenderer, RenderBuffers renderBuffers, BlockRenderDispatcher blockRenderDispatcher) {
 		this.minecraft = minecraft;
@@ -185,6 +190,16 @@ public class GameRenderer implements Projector, AutoCloseable, net.minecraft.cli
 		this.screenEffectRenderer = new ScreenEffectRenderer(minecraft, atlasManager, bufferSource);
 		this.cubeMap = this.createCubeMap(minecraft.options.panoramaTheme().get());
 		this.panorama = new PanoramaRenderer(this.cubeMap);
+		
+		// ===== IRIS INTEGRATION STEP 3: Initialize Shader Pipelines =====
+		this.vanillaPipeline = new net.minecraft.client.renderer.shaders.VanillaShaderPipeline(this);
+		this.irisPipeline = new net.minecraft.client.renderer.shaders.IrisShaderPipeline();
+		this.activePipeline = this.vanillaPipeline; // Default to vanilla
+		
+		// Initialize the shader pipeline manager
+		net.minecraft.client.renderer.shaders.ShaderPipelineManager.initialize(this.vanillaPipeline, this.irisPipeline);
+		
+		LOGGER.info("GameRenderer initialized with shader pipeline support - active pipeline: vanilla");
 	}
 
 	private CubeMap createCubeMap(PanoramaTheme theme) {
@@ -216,6 +231,16 @@ public class GameRenderer implements Projector, AutoCloseable, net.minecraft.cli
 	}
 
 	public void close() {
+		// ===== IRIS INTEGRATION STEP 3: Cleanup Shader Pipelines =====
+		if (this.activePipeline != null) {
+			try {
+				this.activePipeline.cleanup();
+			} catch (Exception e) {
+				LOGGER.error("Error cleaning up shader pipeline", e);
+			}
+		}
+		net.minecraft.client.renderer.shaders.ShaderPipelineManager.cleanup();
+		
 		this.globalSettingsUniform.close();
 		this.lightTexture.close();
 		this.overlayTexture.close();
@@ -227,6 +252,40 @@ public class GameRenderer implements Projector, AutoCloseable, net.minecraft.cli
 		this.cubeMap.close();
 		this.fogRenderer.close();
 		this.featureRenderDispatcher.close();
+	}
+	
+	// ===== IRIS INTEGRATION STEP 3: Shader Pipeline Selection =====
+	/**
+	 * Selects the appropriate shader pipeline based on current configuration.
+	 * This is called each frame before rendering to ensure the correct pipeline is active.
+	 */
+	private void selectShaderPipeline() {
+		boolean shouldUseIris = net.minecraft.client.renderer.shaders.ShaderRenderingConfig.isShaderPacksEnabled();
+		net.minecraft.client.renderer.shaders.ShaderPipeline desired = shouldUseIris ? this.irisPipeline : this.vanillaPipeline;
+		
+		if (this.activePipeline != desired) {
+			String oldName = getPipelineName(this.activePipeline);
+			String newName = getPipelineName(desired);
+			LOGGER.info("Switching shader pipeline in GameRenderer: {} -> {}", oldName, newName);
+			
+			this.activePipeline = desired;
+			net.minecraft.client.renderer.shaders.ShaderPipelineManager.selectPipeline();
+		}
+	}
+	
+	/**
+	 * Gets a human-readable name for a pipeline.
+	 */
+	private String getPipelineName(net.minecraft.client.renderer.shaders.ShaderPipeline pipeline) {
+		if (pipeline == null) {
+			return "null";
+		} else if (pipeline instanceof net.minecraft.client.renderer.shaders.VanillaShaderPipeline) {
+			return "vanilla";
+		} else if (pipeline instanceof net.minecraft.client.renderer.shaders.IrisShaderPipeline) {
+			return "iris";
+		} else {
+			return "unknown";
+		}
 	}
 
 	public SubmitNodeStorage getSubmitNodeStorage() {
@@ -572,6 +631,17 @@ public class GameRenderer implements Projector, AutoCloseable, net.minecraft.cli
 	}
 
 	public void render(DeltaTracker deltaTracker, boolean bl) {
+		// ===== IRIS INTEGRATION STEP 3: Select and Begin Frame =====
+		selectShaderPipeline();
+		
+		if (this.activePipeline != null) {
+			try {
+				this.activePipeline.beginFrame();
+			} catch (Exception e) {
+				LOGGER.error("Error in shader pipeline beginFrame()", e);
+			}
+		}
+		
 		if (!this.minecraft.isWindowActive()
 			&& this.minecraft.options.pauseOnLostFocus
 			&& (!this.minecraft.options.touchscreen().get() || !this.minecraft.mouseHandler.isRightPressed())) {
@@ -710,6 +780,15 @@ public class GameRenderer implements Projector, AutoCloseable, net.minecraft.cli
 			this.submitNodeStorage.endFrame();
 			this.featureRenderDispatcher.endFrame();
 			this.resourcePool.endFrame();
+			
+			// ===== IRIS INTEGRATION STEP 3: End Frame =====
+			if (this.activePipeline != null) {
+				try {
+					this.activePipeline.endFrame();
+				} catch (Exception e) {
+					LOGGER.error("Error in shader pipeline endFrame()", e);
+				}
+			}
 		}
 	}
 

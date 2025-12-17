@@ -534,6 +534,24 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 		Vector4f vector4f,
 		boolean bl2
 	) {
+		// ===== IRIS INTEGRATION STEP 4: Shadow Pass Invocation =====
+		if (net.minecraft.client.renderer.shaders.ShaderRenderingConfig.isShadowsEnabled()) {
+			net.minecraft.client.renderer.shaders.ShaderPipeline pipeline = 
+				net.minecraft.client.renderer.shaders.ShaderPipelineManager.getActivePipeline();
+			
+			if (pipeline != null) {
+				try {
+					pipeline.beginShadowPass();
+					prepareShadowPass();
+					renderShadowPass();
+					cleanupShadowPass();
+					pipeline.endShadowPass();
+				} catch (Exception ex) {
+					LOGGER.error("Error during shadow pass rendering", ex);
+				}
+			}
+		}
+		
 		float f = deltaTracker.getGameTimeDeltaPartialTick(false);
 		this.levelRenderState.reset();
 		this.blockEntityRenderDispatcher.prepare(camera);
@@ -679,6 +697,18 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 		ResourceHandle<RenderTarget> resourceHandle3 = this.targets.itemEntity;
 		ResourceHandle<RenderTarget> resourceHandle4 = this.targets.entityOutline;
 		framePass.executes(() -> {
+			// ===== IRIS INTEGRATION STEP 4: Begin Main Pass =====
+			net.minecraft.client.renderer.shaders.ShaderPipeline pipeline = 
+				net.minecraft.client.renderer.shaders.ShaderPipelineManager.getActivePipeline();
+			
+			if (pipeline != null) {
+				try {
+					pipeline.beginMainPass();
+				} catch (Exception ex) {
+					LOGGER.error("Error in shader pipeline beginMainPass()", ex);
+				}
+			}
+			
 			iris$renderMainPassBody();
 			RenderSystem.setShaderFog(gpuBufferSlice);
 			Vec3 vec3 = levelRenderState.cameraRenderState.pos;
@@ -762,6 +792,15 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 
 			bufferSource.endBatch();
 			profilerFiller.pop();
+			
+			// ===== IRIS INTEGRATION STEP 4: End Main Pass =====
+			if (pipeline != null) {
+				try {
+					pipeline.endMainPass();
+				} catch (Exception ex) {
+					LOGGER.error("Error in shader pipeline endMainPass()", ex);
+				}
+			}
 		});
 	}
 
@@ -1607,4 +1646,41 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 		return this.sodium$matrices;
 	}
 	// ===== END SODIUM INTEGRATION =====
+	
+	// ===== IRIS INTEGRATION STEP 4: Shadow Pass Methods =====
+	/**
+	 * Prepares for shadow rendering pass.
+	 * This method is called before rendering shadow maps for shader packs.
+	 * 
+	 * <p>Current implementation is a no-op (vanilla has no shadow rendering).
+	 * This will be implemented in Step 19 when shadow rendering is migrated.</p>
+	 */
+	private void prepareShadowPass() {
+		// No-op: Vanilla rendering doesn't have shadow passes
+		// TODO: Step 19 - Implement shadow frustum setup, shadow matrices
+	}
+	
+	/**
+	 * Renders the shadow pass.
+	 * This method renders the world from the light's perspective for shadow mapping.
+	 * 
+	 * <p>Current implementation is a no-op (vanilla has no shadow rendering).
+	 * This will be implemented in Step 19 when shadow rendering is migrated.</p>
+	 */
+	private void renderShadowPass() {
+		// No-op: Vanilla rendering doesn't have shadow passes
+		// TODO: Step 19 - Render terrain, entities from light perspective
+	}
+	
+	/**
+	 * Cleanup after shadow rendering pass.
+	 * This method is called after shadow rendering is complete.
+	 * 
+	 * <p>Current implementation is a no-op (vanilla has no shadow rendering).
+	 * This will be implemented in Step 19 when shadow rendering is migrated.</p>
+	 */
+	private void cleanupShadowPass() {
+		// No-op: Vanilla rendering doesn't have shadow passes
+		// TODO: Step 19 - Restore main frustum, unbind shadow framebuffers
+	}
 }
