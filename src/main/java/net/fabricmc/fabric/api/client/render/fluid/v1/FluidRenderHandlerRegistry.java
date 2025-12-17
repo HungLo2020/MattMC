@@ -16,174 +16,95 @@
 
 package net.fabricmc.fabric.api.client.render.fluid.v1;
 
-import net.minecraft.client.Minecraft;
-import net.minecraft.client.renderer.BiomeColors;
-import net.minecraft.client.renderer.block.LiquidBlockRenderer;
-import net.minecraft.client.renderer.texture.TextureAtlas;
-import net.minecraft.client.renderer.texture.TextureAtlasSprite;
-import net.minecraft.core.BlockPos;
-import net.minecraft.world.level.BlockAndTintGetter;
+import org.jetbrains.annotations.Nullable;
+
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.HalfTransparentBlock;
 import net.minecraft.world.level.block.LeavesBlock;
 import net.minecraft.world.level.material.Fluid;
-import net.minecraft.world.level.material.FluidState;
-import net.minecraft.world.level.material.Fluids;
-import org.jetbrains.annotations.Nullable;
 
-import java.util.IdentityHashMap;
-import java.util.Map;
+import net.fabricmc.fabric.impl.client.rendering.fluid.FluidRenderHandlerRegistryImpl;
 
 /**
- * Registry for custom fluid render handlers.
+ * Registry for {@link FluidRenderHandler} instances.
+ *
+ * <p>Notably, this supports querying, overriding and wrapping vanilla fluid
+ * rendering.
  */
-public final class FluidRenderHandlerRegistry {
-    public static final FluidRenderHandlerRegistry INSTANCE = new FluidRenderHandlerRegistry();
-    private final Map<Fluid, FluidRenderHandler> handlers = new IdentityHashMap<>();
-    private final Map<Fluid, FluidRenderHandler> modHandlers = new IdentityHashMap<>();
-    private final Map<Block, Boolean> transparencyForOverlay = new IdentityHashMap<>();
-    private volatile boolean initialized = false;
-    
-    private FluidRenderHandlerRegistry() { }
-    
-    /**
-     * Ensures default handlers are registered. Called lazily to avoid class loading issues.
-     */
-    private void ensureInitialized() {
-        if (!initialized) {
-            synchronized (this) {
-                if (!initialized) {
-                    // Register default handlers for vanilla fluids
-                    handlers.put(Fluids.WATER, WaterRenderHandler.INSTANCE);
-                    handlers.put(Fluids.FLOWING_WATER, WaterRenderHandler.INSTANCE);
-                    handlers.put(Fluids.LAVA, LavaRenderHandler.INSTANCE);
-                    handlers.put(Fluids.FLOWING_LAVA, LavaRenderHandler.INSTANCE);
-                    initialized = true;
-                }
-            }
-        }
-    }
-    
-    /**
-     * Gets the singleton instance.
-     */
-    public static FluidRenderHandlerRegistry getInstance() {
-        return INSTANCE;
-    }
-    
-    /**
-     * Registers a render handler for a fluid.
-     */
-    public void register(Fluid fluid, FluidRenderHandler handler) {
-        ensureInitialized();
-        handlers.put(fluid, handler);
-        modHandlers.put(fluid, handler);
-    }
-    
-    /**
-     * Gets the render handler for a fluid.
-     */
-    @Nullable
-    public FluidRenderHandler get(Fluid fluid) {
-        ensureInitialized();
-        return handlers.get(fluid);
-    }
-    
-    /**
-     * Gets the override handler for a fluid if one exists.
-     */
-    @Nullable
-    public FluidRenderHandler getOverride(Fluid fluid) {
-        ensureInitialized();
-        return modHandlers.get(fluid);
-    }
-    
-    /**
-     * Sets the transparency of a block for fluid overlay rendering.
-     */
-    public void setBlockTransparency(Block block, boolean transparent) {
-        ensureInitialized();
-        transparencyForOverlay.put(block, transparent);
-    }
-    
-    /**
-     * Checks if a block is transparent for fluid rendering purposes.
-     */
-    public boolean isBlockTransparent(Block block) {
-        ensureInitialized();
-        Boolean override = transparencyForOverlay.get(block);
-        if (override != null) {
-            return override;
-        }
-        return block instanceof HalfTransparentBlock || block instanceof LeavesBlock;
-    }
-    
-    /**
-     * Called when the fluid renderer reloads textures.
-     */
-    public void onFluidRendererReload(LiquidBlockRenderer renderer, TextureAtlasSprite[] waterSprites, TextureAtlasSprite[] lavaSprites, TextureAtlasSprite waterOverlay) {
-        ensureInitialized();
-        WaterRenderHandler.INSTANCE.updateSprites(waterSprites, waterOverlay);
-        LavaRenderHandler.INSTANCE.updateSprites(lavaSprites);
-        
-        TextureAtlas texture = Minecraft.getInstance()
-                .getAtlasManager()
-                .getAtlasOrThrow(net.minecraft.data.AtlasIds.BLOCKS);
-        
-        for (FluidRenderHandler handler : handlers.values()) {
-            handler.reloadTextures(texture);
-        }
-    }
-    
-    /**
-     * Handler for water rendering.
-     */
-    private static class WaterRenderHandler implements FluidRenderHandler {
-        public static final WaterRenderHandler INSTANCE = new WaterRenderHandler();
-        
-        /**
-         * The water color of the Ocean biome.
-         */
-        private static final int DEFAULT_WATER_COLOR = 0x3f76e4;
-        
-        private final TextureAtlasSprite[] sprites = new TextureAtlasSprite[3];
-        
-        @Override
-        public TextureAtlasSprite[] getFluidSprites(@Nullable BlockAndTintGetter view, @Nullable BlockPos pos, FluidState state) {
-            return sprites;
-        }
-        
-        @Override
-        public int getFluidColor(@Nullable BlockAndTintGetter view, @Nullable BlockPos pos, FluidState state) {
-            if (view != null && pos != null) {
-                return BiomeColors.getAverageWaterColor(view, pos);
-            } else {
-                return DEFAULT_WATER_COLOR;
-            }
-        }
-        
-        public void updateSprites(TextureAtlasSprite[] waterSprites, TextureAtlasSprite waterOverlay) {
-            sprites[0] = waterSprites[0];
-            sprites[1] = waterSprites[1];
-            sprites[2] = waterOverlay;
-        }
-    }
-    
-    /**
-     * Handler for lava rendering.
-     */
-    private static class LavaRenderHandler implements FluidRenderHandler {
-        public static final LavaRenderHandler INSTANCE = new LavaRenderHandler();
-        
-        private TextureAtlasSprite[] sprites;
-        
-        @Override
-        public TextureAtlasSprite[] getFluidSprites(@Nullable BlockAndTintGetter view, @Nullable BlockPos pos, FluidState state) {
-            return sprites;
-        }
-        
-        public void updateSprites(TextureAtlasSprite[] lavaSprites) {
-            sprites = lavaSprites;
-        }
-    }
+public interface FluidRenderHandlerRegistry {
+	FluidRenderHandlerRegistry INSTANCE = new FluidRenderHandlerRegistryImpl();
+
+	/**
+	 * Get a {@link FluidRenderHandler} for a given Fluid. Supports vanilla and
+	 * Fabric fluids.
+	 *
+	 * @param fluid The Fluid.
+	 * @return The FluidRenderHandler.
+	 */
+	@Nullable
+	FluidRenderHandler get(Fluid fluid);
+
+	/**
+	 * Get a {@link FluidRenderHandler} for a given Fluid, if it is not the
+	 * default implementation. Supports vanilla and Fabric fluids.
+	 *
+	 * @param fluid The Fluid.
+	 * @return The FluidRenderHandler.
+	 */
+	@Nullable
+	FluidRenderHandler getOverride(Fluid fluid);
+
+	/**
+	 * Register a {@link FluidRenderHandler} for a given Fluid.
+	 *
+	 * <p>Note that most fluids have a still and a flowing type, and a
+	 * FluidRenderHandler must be registered for each type separately. To easily
+	 * register a render handler for a pair of still and flowing fluids, use
+	 * {@link #register(Fluid, Fluid, FluidRenderHandler)}.
+	 *
+	 * @param fluid The Fluid.
+	 * @param renderer The FluidRenderHandler.
+	 */
+	void register(Fluid fluid, FluidRenderHandler renderer);
+
+	/**
+	 * Register a {@link FluidRenderHandler} for two given Fluids, usually a
+	 * pair of a still and a flowing fluid type that use the same fluid
+	 * renderer.
+	 *
+	 * @param still The still Fluid.
+	 * @param flow The flowing Fluid.
+	 * @param renderer The FluidRenderHandler.
+	 */
+	default void register(Fluid still, Fluid flow, FluidRenderHandler renderer) {
+		register(still, renderer);
+		register(flow, renderer);
+	}
+
+	/**
+	 * Registers whether a block is transparent or not. When a block is
+	 * transparent, the flowing fluid texture to the sides of that block is
+	 * replaced by a special overlay texture. This happens by default with glass
+	 * and leaves, and hence blocks inheriting {@link HalfTransparentBlock} and
+	 * {@link LeavesBlock} are by default transparent. Use this method to
+	 * override the default behavior for a block.
+	 *
+	 * @param block The block to register transparency for.
+	 * @param transparent Whether the block is transparent (e.g. gets the
+	 * overlay textures) or not.
+	 */
+	void setBlockTransparency(Block block, boolean transparent);
+
+	/**
+	 * Looks up whether a block is transparent and gets a fluid overlay texture
+	 * instead of a falling fluid texture. If transparency is registered for a
+	 * block (via {@link #setBlockTransparency}), this method returns that
+	 * registered transparency. Otherwise, this method returns whether the block
+	 * is a subclass of {@link HalfTransparentBlock} or {@link LeavesBlock}.
+	 *
+	 * @param block The block to get transparency for.
+	 * @return Whether the block is transparent (e.g. gets the overlay textures)
+	 * or not.
+	 */
+	boolean isBlockTransparent(Block block);
 }

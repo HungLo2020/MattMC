@@ -41,7 +41,8 @@ public class LiquidBlockRenderer {
 		this.waterOverlay = materialSet.get(ModelBakery.WATER_OVERLAY);
 		
 		// Notify Fabric API's FluidRenderHandlerRegistry of sprite updates
-		net.fabricmc.fabric.api.client.render.fluid.v1.FluidRenderHandlerRegistry.INSTANCE.onFluidRendererReload(
+		((net.fabricmc.fabric.impl.client.rendering.fluid.FluidRenderHandlerRegistryImpl)
+			net.fabricmc.fabric.api.client.render.fluid.v1.FluidRenderHandlerRegistry.INSTANCE).onFluidRendererReload(
 			this, this.waterIcons, this.lavaIcons, this.waterOverlay);
 	}
 
