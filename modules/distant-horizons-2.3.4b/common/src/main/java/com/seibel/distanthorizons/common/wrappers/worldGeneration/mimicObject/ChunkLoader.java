@@ -210,7 +210,7 @@ public class ChunkLoader
 											}
 					else
 					{
-						blockStateContainer = new PalettedContainer<BlockState>(Block.BLOCK_STATE_REGISTRY, Blocks.AIR.defaultBlockState(), Strategy.createForBlockStates(Block.BLOCK_STATE_REGISTRY));
+						blockStateContainer = new PalettedContainer<BlockState>(Blocks.AIR.defaultBlockState(), Strategy.createForBlockStates(Block.BLOCK_STATE_REGISTRY));
 					}
 				
 				
@@ -227,7 +227,7 @@ public class ChunkLoader
 											}
 					else
 					{
-						biomeContainer = new PalettedContainer<Holder<Biome>>(biomes.asHolderIdMap(), 
+						biomeContainer = new PalettedContainer<Holder<Biome>>(
 							biomes.getOrThrow(Biomes.PLAINS),
 								Strategy.createForBiomes(biomes.asHolderIdMap()));
 					}
