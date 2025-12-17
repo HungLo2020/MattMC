@@ -182,7 +182,7 @@ public abstract class LayerLightSectionStorage<M extends DataLayerStorageMap<M>>
 		}
 	}
 
-	protected boolean lightOnInSection(long l) {
+	public boolean lightOnInSection(long l) { // Made accessible by DH access widener
 		long m = SectionPos.getZeroNode(l);
 		return this.columnsWithSources.contains(m);
 	}
