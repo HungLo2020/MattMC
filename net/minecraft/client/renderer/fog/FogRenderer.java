@@ -50,7 +50,7 @@ public class FogRenderer implements AutoCloseable, net.minecraft.client.renderer
 	private final GpuBuffer emptyBuffer;
 	private final MappableRingBuffer regularBuffer;
 	// Sodium FogStorage implementation
-	private net.minecraft.client.renderer.sodium.util.FogParameters fogParameters = net.minecraft.client.renderer.sodium.util.FogParameters.NONE;
+	private net.minecraft.client.renderer.sodium.util.FogParameters parameters = net.minecraft.client.renderer.sodium.util.FogParameters.NONE;
 
 	public FogRenderer() {
 		GpuDevice gpuDevice = RenderSystem.getDevice();
@@ -196,7 +196,7 @@ public class FogRenderer implements AutoCloseable, net.minecraft.client.renderer
 		}
 
 		// Store fog parameters for Sodium FogStorage interface
-		this.fogParameters = new net.minecraft.client.renderer.sodium.util.FogParameters(
+		this.parameters = new net.minecraft.client.renderer.sodium.util.FogParameters(
 			vector4f.x, vector4f.y, vector4f.z, vector4f.w,
 			fogData.environmentalStart,
 			fogData.environmentalEnd,
@@ -224,7 +224,7 @@ public class FogRenderer implements AutoCloseable, net.minecraft.client.renderer
 	// Sodium FogStorage interface implementation
 	@Override
 	public net.minecraft.client.renderer.sodium.util.FogParameters sodium$getFogParameters() {
-		return this.fogParameters;
+		return this.parameters;
 	}
 
 	@Environment(EnvType.CLIENT)
