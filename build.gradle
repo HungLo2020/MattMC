@@ -406,37 +406,10 @@ sourceSets {
         }
     }
     
+    // ===== DISTANT HORIZONS INTEGRATION - DISABLED =====
     // Distant Horizons source set - compiled to a separate mod JAR
-    distantHorizons {
-        java {
-            srcDirs = [
-                // Core subprojects (platform-independent)
-                'modules/distant-horizons-2.3.4b/coreSubProjects/core/src/main/java',
-                'modules/distant-horizons-2.3.4b/coreSubProjects/api/src/main/java',
-                
-                // Common module (multi-loader shared code)
-                'modules/distant-horizons-2.3.4b/common/src/main/java',
-                
-                // Fabric-specific module
-                'modules/distant-horizons-2.3.4b/fabric/src/main/java'
-            ]
-        }
-        resources {
-            srcDirs = [
-                'modules/distant-horizons-2.3.4b/coreSubProjects/core/src/main/resources',
-                'modules/distant-horizons-2.3.4b/coreSubProjects/api/src/main/resources',
-                'modules/distant-horizons-2.3.4b/common/src/main/resources',
-                'modules/distant-horizons-2.3.4b/fabric/src/main/resources'
-            ]
-            
-            // Exclude files from other mod loaders
-            exclude '**/forge/**'
-            exclude '**/neoforge/**'
-            
-            // Exclude access wideners for other versions (already applied to MC source)
-            exclude '**/*.distanthorizons.accesswidener'
-        }
-    }
+    // TO RE-ENABLE: Uncomment the distantHorizons block, configurations, classpaths, and JAR task below
+    
     
     // Main source set - Minecraft and project code (compiled to game JAR)
     main {
@@ -499,10 +472,13 @@ configurations {
     irisCompileOnly.extendsFrom compileOnly
     irisRuntimeOnly.extendsFrom runtimeOnly
     
+    // ===== DISTANT HORIZONS INTEGRATION - DISABLED =====
     // Distant Horizons configurations extend from implementation
-    distantHorizonsImplementation.extendsFrom implementation
-    distantHorizonsCompileOnly.extendsFrom compileOnly
-    distantHorizonsRuntimeOnly.extendsFrom runtimeOnly
+    // TO RE-ENABLE: Uncomment the lines below
+    // distantHorizonsImplementation.extendsFrom implementation
+    // distantHorizonsCompileOnly.extendsFrom compileOnly
+    // distantHorizonsRuntimeOnly.extendsFrom runtimeOnly
+    
 }
 
 // Sodium depends on Fabric Loader and Minecraft
@@ -520,15 +496,18 @@ sourceSets.iris.runtimeClasspath += sourceSets.fabricLoader.output
 sourceSets.iris.runtimeClasspath += sourceSets.main.output
 sourceSets.iris.runtimeClasspath += sourceSets.sodium.output
 
+// ===== DISTANT HORIZONS INTEGRATION - DISABLED =====
 // Distant Horizons depends on Fabric Loader, Minecraft, Sodium, and Iris
-sourceSets.distantHorizons.compileClasspath += sourceSets.fabricLoader.output
-sourceSets.distantHorizons.compileClasspath += sourceSets.main.output
-sourceSets.distantHorizons.compileClasspath += sourceSets.sodium.output
-sourceSets.distantHorizons.compileClasspath += sourceSets.iris.output
-sourceSets.distantHorizons.runtimeClasspath += sourceSets.fabricLoader.output
-sourceSets.distantHorizons.runtimeClasspath += sourceSets.main.output
-sourceSets.distantHorizons.runtimeClasspath += sourceSets.sodium.output
-sourceSets.distantHorizons.runtimeClasspath += sourceSets.iris.output
+// TO RE-ENABLE: Uncomment the lines below
+// sourceSets.distantHorizons.compileClasspath += sourceSets.fabricLoader.output
+// sourceSets.distantHorizons.compileClasspath += sourceSets.main.output
+// sourceSets.distantHorizons.compileClasspath += sourceSets.sodium.output
+// sourceSets.distantHorizons.compileClasspath += sourceSets.iris.output
+// sourceSets.distantHorizons.runtimeClasspath += sourceSets.fabricLoader.output
+// sourceSets.distantHorizons.runtimeClasspath += sourceSets.main.output
+// sourceSets.distantHorizons.runtimeClasspath += sourceSets.sodium.output
+// sourceSets.distantHorizons.runtimeClasspath += sourceSets.iris.output
+
 
 // ============================================================================
 // FABRIC LOADER JAR TASK
@@ -661,11 +640,14 @@ tasks.register('irisJar', Jar) {
 }
 
 // ============================================================================
+// ===== DISTANT HORIZONS INTEGRATION - DISABLED =====
 // DISTANT HORIZONS MOD JAR TASK
 // ============================================================================
 // Create the Distant Horizons mod JAR to be loaded by Fabric Loader
 // ============================================================================
+// TO RE-ENABLE: Uncomment the tasks below
 
+/*
 // Process Distant Horizons resources with version substitution
 tasks.named('processDistantHorizonsResources') {
     filesMatching('fabric.mod.json') {
@@ -695,6 +677,7 @@ tasks.register('distantHorizonsJar', Jar) {
         )
     }
 }
+*/
 
 
 // ============================================================================
@@ -910,7 +893,9 @@ tasks.register('runClient', JavaExec) {
     group = 'minecraft'
     description = 'Runs the Minecraft client with Fabric Loader'
     
-    dependsOn 'fabricLoaderJar', 'gameJar', 'sodiumJar', 'irisJar', 'distantHorizonsJar', 'copyJdkToRun', 'shaderPackZip'
+    // ===== DISTANT HORIZONS INTEGRATION - DISABLED =====
+    // TO RE-ENABLE: Add 'distantHorizonsJar' back to the line below
+    dependsOn 'fabricLoaderJar', 'gameJar', 'sodiumJar', 'irisJar', 'copyJdkToRun', 'shaderPackZip'
     
     // Use the separate JARs so Fabric Loader can detect the game JAR properly
     // The order matters: Fabric Loader JAR first, then Game JAR, then dependencies
@@ -959,7 +944,7 @@ tasks.register('runClient', JavaExec) {
         }
         modsDir.mkdirs()
         
-        // Copy Sodium, Iris, and Distant Horizons mod JARs to mods folder
+        // Copy Sodium and Iris mod JARs to mods folder (DH integration commented out)
         copy {
             from file("${buildDir}/mods")
             into modsDir
