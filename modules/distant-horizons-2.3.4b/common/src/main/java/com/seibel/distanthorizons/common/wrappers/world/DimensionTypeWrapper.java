@@ -72,13 +72,8 @@ public class DimensionTypeWrapper implements IDimensionTypeWrapper
 	public String getName() { return getName(this.dimensionType); }
 	public static String getName(DimensionType dimensionType)
 	{
-		#if MC_VER <= MC_1_16_5
-		// effectsLocation() is marked as client only, so using the backing field directly
-		return dimensionType.effectsLocation.getPath();
-		#else
-		return dimensionType.effectsLocation().getPath();
-		#endif
-	}
+				return dimensionType.effectsLocation().getPath();
+			}
 	
 	@Override
 	public boolean hasCeiling() { return this.dimensionType.hasCeiling(); }

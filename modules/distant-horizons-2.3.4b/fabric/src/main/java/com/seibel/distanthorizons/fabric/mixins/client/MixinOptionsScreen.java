@@ -25,9 +25,7 @@ import com.seibel.distanthorizons.coreapi.ModInfo;
 import com.seibel.distanthorizons.core.config.Config;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
-#if MC_VER < MC_1_19_2
-import net.minecraft.network.chat.TranslatableComponent;
-#endif
+
 import net.minecraft.resources.ResourceLocation;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
@@ -38,18 +36,12 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 import java.util.Objects;
 import java.util.concurrent.atomic.AtomicInteger;
 
-#if MC_VER >= MC_1_20_6
 import net.minecraft.client.gui.layouts.LinearLayout;
 import net.minecraft.client.gui.layouts.HeaderAndFooterLayout;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Shadow;
-#endif
 
-#if MC_VER < MC_1_21_1
-import net.minecraft.client.gui.screens.OptionsScreen;
-#else
 import net.minecraft.client.gui.screens.options.OptionsScreen;
-#endif
 
 
 /**
@@ -64,22 +56,16 @@ public class MixinOptionsScreen extends Screen
 	/** Texture used for the config opening button */
 	@Unique
 	private static final ResourceLocation ICON_TEXTURE =
-		#if MC_VER < MC_1_21_1
-		new ResourceLocation(ModInfo.ID, "textures/gui/button.png");
-		#else
-		ResourceLocation.fromNamespaceAndPath(ModInfo.ID, "textures/gui/button.png");
-		#endif 
+		ResourceLocation.fromNamespaceAndPath(ModInfo.ID, "textures/gui/button.png"); 
 	
 	
 	@Unique
 	private TexturedButtonWidget optionsButton = null;
 	
-	#if MC_VER >= MC_1_20_6
-	@Shadow
+		@Shadow
 	@Final
 	protected HeaderAndFooterLayout layout;
-	#endif
-	
+		
 	
 	
 	//==============//
@@ -93,12 +79,7 @@ public class MixinOptionsScreen extends Screen
 	{
 		if (Config.Client.showDhOptionsButtonInMinecraftUi.get())
 		{
-			#if MC_VER < MC_1_17_1
-			this.addButton(this.getOptionsButton());
-			#elif MC_VER < MC_1_20_6
-			this.addRenderableWidget(this.getOptionsButton());
-			#else
-			
+						
 			// add the button so it's rendered 
 			this.addRenderableWidget(this.getOptionsButton());
 			
@@ -114,8 +95,7 @@ public class MixinOptionsScreen extends Screen
 			layout.wrapped.addChild(this.getOptionsButton(), 1, 2, (settings) -> { settings.paddingLeft(width.get() * -1); });
 			layout.arrangeElements();
 			
-		    #endif
-		}
+		    		}
 	}
 	
 	
@@ -143,11 +123,7 @@ public class MixinOptionsScreen extends Screen
 					// For now it goes to the client option by default
 					(buttonWidget) -> Objects.requireNonNull(this.minecraft).setScreen(GetConfigScreen.getScreen(this)),
 					// Add a title to the button
-	                #if MC_VER < MC_1_19_2
-					new TranslatableComponent(ModInfo.ID + ".title"));
-	                #else
-					Component.translatable(ModInfo.ID + ".title"));
-					#endif
+	                Component.translatable(ModInfo.ID + ".title"));
 		}
 		
 		return this.optionsButton;

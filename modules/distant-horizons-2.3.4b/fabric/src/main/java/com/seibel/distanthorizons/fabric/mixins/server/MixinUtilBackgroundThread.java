@@ -30,11 +30,6 @@ import net.minecraft.Util;
 
 import java.util.concurrent.ExecutorService;
 
-#if MC_VER < MC_1_16_5
-#elif MC_VER < MC_1_21_3
-import java.util.function.Supplier;
-#else
-#endif
 
 /**
  * This is needed for DH's world gen so we can run
@@ -50,50 +45,10 @@ public class MixinUtilBackgroundThread
 	{ return DependencySetupDoneCheck.isDone && DependencySetupDoneCheck.getIsCurrentThreadDistantGeneratorThread.get(); }
 	
 	
-	#if MC_VER < MC_1_21_3
-	@Inject(method = "backgroundExecutor", at = @At("HEAD"), cancellable = true)
-	private static void overrideUtil$backgroundExecutor(CallbackInfoReturnable<ExecutorService> ci)
-	{
-		if (isWorldGenThread())
-		{
-			// run this task on the current DH thread instead of a new MC thread
-			ci.setReturnValue(new RunOnThisThreadExecutorService());
-		}
-	}
-	#else
-	// replaced with TracingExecutor in MC 1.21.3+
-	#endif
+		// replaced with TracingExecutor in MC 1.21.3+
+		
+		// replaced with TracingExecutor in MC 1.21.3+
 	
-	#if MC_VER < MC_1_17_1
-	#elif MC_VER < MC_1_21_3
-	@Inject(method = "wrapThreadWithTaskName(Ljava/lang/String;Ljava/lang/Runnable;)Ljava/lang/Runnable;",
-			at = @At("HEAD"), cancellable = true)
-	private static void overrideUtil$wrapThreadWithTaskName(String string, Runnable r, CallbackInfoReturnable<Runnable> ci)
-	{
-		if (isWorldGenThread())
-		{
-			//ApiShared.LOGGER.info("util wrapThreadWithTaskName(Runnable) triggered");
-			ci.setReturnValue(r);
-		}
-	}
-	#else
-	// replaced with TracingExecutor in MC 1.21.3+
-	#endif
-
-	#if MC_VER < MC_1_18_2
-	#elif MC_VER < MC_1_21_3
-	@Inject(method = "wrapThreadWithTaskName(Ljava/lang/String;Ljava/util/function/Supplier;)Ljava/util/function/Supplier;",
-			at = @At("HEAD"), cancellable = true)
-	private static void overrideUtil$wrapThreadWithTaskNameForSupplier(String string, Supplier<?> r, CallbackInfoReturnable<Supplier<?>> ci)
-	{
-		if (isWorldGenThread())
-		{
-			//ApiShared.LOGGER.info("util wrapThreadWithTaskName(Supplier) triggered");
-			ci.setReturnValue(r);
-		}
-	}
-	#else
-	// replaced with TracingExecutor in MC 1.21.3+
-	#endif
-	
+		// replaced with TracingExecutor in MC 1.21.3+
+		
 }

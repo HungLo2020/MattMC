@@ -33,24 +33,13 @@ import org.apache.logging.log4j.Logger;
 
 import com.seibel.distanthorizons.core.wrapperInterfaces.world.IBiomeWrapper;
 
-#if MC_VER == MC_1_16_5 || MC_VER == MC_1_17_1
-import net.minecraft.core.Registry;
-#elif MC_VER == MC_1_18_2 || MC_VER == MC_1_19_2
-import net.minecraft.core.Holder;
-import net.minecraft.core.Registry;
-import net.minecraft.core.RegistryAccess;
-import net.minecraft.data.BuiltinRegistries;
-#else
 import net.minecraft.core.Holder;
 import net.minecraft.core.registries.Registries;
-#endif
 
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.level.biome.Biome;
 
-#if MC_VER >= MC_1_18_2
 import net.minecraft.world.level.biome.Biomes;
-#endif
 
 
 /** This class wraps the minecraft BlockPos.Mutable (and BlockPos) class */
@@ -60,11 +49,7 @@ public class BiomeWrapper implements IBiomeWrapper
 	private static final Logger LOGGER = LogManager.getLogger();
 	
 	
-	#if MC_VER < MC_1_18_2
-	public static final ConcurrentMap<Biome, BiomeWrapper> WRAPPER_BY_BIOME = new ConcurrentHashMap<>();
-	#else
 	public static final ConcurrentMap<Holder<Biome>, BiomeWrapper> WRAPPER_BY_BIOME = new ConcurrentHashMap<>();
-    #endif
 	
 	public static final ConcurrentHashMap<String, BiomeWrapper> WRAPPER_BY_RESOURCE_LOCATION = new ConcurrentHashMap<>();
 	
@@ -87,11 +72,7 @@ public class BiomeWrapper implements IBiomeWrapper
 	
 	// properties //
 	
-	#if MC_VER < MC_1_18_2
-	public final Biome biome;
-	#else
 	public final Holder<Biome> biome;
-    #endif
 	
 	/** technically final, but since it requires a method call to generate it can't be marked as such */
 	private String serialString;
@@ -103,7 +84,7 @@ public class BiomeWrapper implements IBiomeWrapper
 	// constructors //
 	//==============//
 	
-	static public IBiomeWrapper getBiomeWrapper(#if MC_VER < MC_1_18_2 Biome #else Holder<Biome> #endif biome, ILevelWrapper levelWrapper)
+	static public IBiomeWrapper getBiomeWrapper(Holder<Biome> biome, ILevelWrapper levelWrapper)
 	{
 		if (biome == null)
 		{
@@ -122,7 +103,7 @@ public class BiomeWrapper implements IBiomeWrapper
 			return newWrapper;
 		}
 	}
-	private BiomeWrapper(#if MC_VER < MC_1_18_2 Biome #else Holder<Biome> #endif biome, ILevelWrapper levelWrapper)
+	private BiomeWrapper(Holder<Biome> biome, ILevelWrapper levelWrapper)
 	{
 		this.biome = biome;
 		this.serialString = this.serialize(levelWrapper);
@@ -145,11 +126,7 @@ public class BiomeWrapper implements IBiomeWrapper
 			return EMPTY_BIOME_STRING;
 		}
 		
-        #if MC_VER < MC_1_18_2
-		return biome.toString();
-        #else
-		return this.biome.unwrapKey().orElse(Biomes.THE_VOID).registry().toString();
-        #endif
+        return this.biome.unwrapKey().orElse(Biomes.THE_VOID).registry().toString();
 	}
 	
 	@Override
@@ -216,25 +193,13 @@ public class BiomeWrapper implements IBiomeWrapper
 		net.minecraft.core.RegistryAccess registryAccess = level.registryAccess();
 		
 		ResourceLocation resourceLocation;
-		#if MC_VER == MC_1_16_5 || MC_VER == MC_1_17_1
-		resourceLocation = registryAccess.registryOrThrow(Registry.BIOME_REGISTRY).getKey(this.biome);
-		#elif MC_VER == MC_1_18_2 || MC_VER == MC_1_19_2
-		resourceLocation = registryAccess.registryOrThrow(Registry.BIOME_REGISTRY).getKey(this.biome.value());
-		#elif MC_VER < MC_1_21_3
-		resourceLocation = registryAccess.registryOrThrow(Registries.BIOME).getKey(this.biome.value());
-		#else
-		resourceLocation = registryAccess.lookupOrThrow(Registries.BIOME).getKey(this.biome.value());
-		#endif
-		
+				resourceLocation = registryAccess.lookupOrThrow(Registries.BIOME).getKey(this.biome.value());
+				
 		if (resourceLocation == null)
 		{
 			String biomeName;
-			#if MC_VER == MC_1_16_5 || MC_VER == MC_1_17_1
-			biomeName = this.biome.toString();
-			#else
-			biomeName = this.biome.value().toString();
-			#endif
-			
+						biomeName = this.biome.value().toString();
+						
 			LOGGER.warn("unable to serialize: " + biomeName);
 			// shouldn't normally happen, but just in case
 			this.serialString = "";
@@ -325,11 +290,7 @@ public class BiomeWrapper implements IBiomeWrapper
 		ResourceLocation resourceLocation;
 		try
 		{
-			#if MC_VER < MC_1_21_1
-			resourceLocation = new ResourceLocation(resourceLocationString.substring(0, separatorIndex), resourceLocationString.substring(separatorIndex + 1));
-			#else
 			resourceLocation = ResourceLocation.fromNamespaceAndPath(resourceLocationString.substring(0, separatorIndex), resourceLocationString.substring(separatorIndex + 1));
-			#endif
 		}
 		catch (Exception e)
 		{
@@ -338,19 +299,7 @@ public class BiomeWrapper implements IBiomeWrapper
 		
 		
 		boolean success;
-		#if MC_VER == MC_1_16_5 || MC_VER == MC_1_17_1
-		Biome biome = registryAccess.registryOrThrow(Registry.BIOME_REGISTRY).get(resourceLocation);
-		success = (biome != null);
-		#elif MC_VER == MC_1_18_2 || MC_VER == MC_1_19_2
-		Biome unwrappedBiome = registryAccess.registryOrThrow(Registry.BIOME_REGISTRY).get(resourceLocation);
-		success = (unwrappedBiome != null);
-		Holder<Biome> biome = new Holder.Direct<>(unwrappedBiome);
-		#elif MC_VER < MC_1_21_3
-		Biome unwrappedBiome = registryAccess.registryOrThrow(Registries.BIOME).get(resourceLocation);
-		success = (unwrappedBiome != null);
-		Holder<Biome> biome = new Holder.Direct<>(unwrappedBiome);
-		#else
-		Holder<Biome> biome;
+				Holder<Biome> biome;
 		Optional<Holder.Reference<Biome>> optionalBiomeHolder = registryAccess.lookupOrThrow(Registries.BIOME).get(resourceLocation);
 		if (optionalBiomeHolder.isPresent())
 		{
@@ -363,8 +312,7 @@ public class BiomeWrapper implements IBiomeWrapper
 			success = false;
 			biome = null;
 		}
-		#endif
-		
+				
 		return new BiomeDeserializeResult(success, biome);
 	}
 	
@@ -377,13 +325,9 @@ public class BiomeWrapper implements IBiomeWrapper
 	{
 		public final boolean success;
 		
-		#if MC_VER < MC_1_18_2
-		public final Biome biome;
-		#else
 		public final Holder<Biome> biome;
-    #endif
 		
-		public BiomeDeserializeResult(boolean success, #if MC_VER < MC_1_18_2 Biome #else Holder<Biome> #endif biome)
+		public BiomeDeserializeResult(boolean success, Holder<Biome> biome)
 		{
 			this.success = success;
 			this.biome = biome;

@@ -30,9 +30,7 @@ import net.minecraft.world.level.lighting.LevelLightEngine;
 import net.minecraft.world.level.material.FluidState;
 import org.jetbrains.annotations.Nullable;
 
-#if MC_VER >= MC_1_18_2
 import net.minecraft.core.Holder;
-#endif
 
 public class TintWithoutLevelSmoothOverrider implements BlockAndTintGetter
 {
@@ -62,13 +60,9 @@ public class TintWithoutLevelSmoothOverrider implements BlockAndTintGetter
 	{
 		return colorResolver.getColor(_unwrap(biome.biome), blockPos.getX(), blockPos.getZ());
 	}
-	private Biome _unwrap(#if MC_VER >= MC_1_18_2 Holder<Biome> #else Biome #endif biome)
+	private Biome _unwrap(Holder<Biome> biome)
 	{
-		#if MC_VER >= MC_1_18_2
 		return biome.value();
-		#else
-		return biome;
-		#endif
 	}
 
 //    public int calculateBlockTint(BlockPos blockPos, ColorResolver colorResolver)
@@ -123,22 +117,14 @@ public class TintWithoutLevelSmoothOverrider implements BlockAndTintGetter
 	// post MC 1.17 //
 	//==============//
 	
-	#if MC_VER >= MC_1_17_1
-	
+		
 	@Override
 	public int getHeight()
 	{ throw new UnsupportedOperationException("ERROR: getHeight() called on TintWithoutLevelSmoothOverrider. Object is for tinting only."); }
 	
-	#if MC_VER < MC_1_21_3
-	@Override
-	public int getMinBuildHeight() 
-	{ throw new UnsupportedOperationException("ERROR: getMinBuildHeight() called on TintWithoutLevelSmoothOverrider. Object is for tinting only."); }
-	#else
-	@Override
+		@Override
 	public int getMinY()
 	{ throw new UnsupportedOperationException("ERROR: getMinY() called on TintWithoutLevelSmoothOverrider. Object is for tinting only."); }
-	#endif
-	
-	#endif
-	
+		
+		
 }

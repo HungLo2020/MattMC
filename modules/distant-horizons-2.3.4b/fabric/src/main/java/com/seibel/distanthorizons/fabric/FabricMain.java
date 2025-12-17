@@ -43,11 +43,7 @@ import net.minecraft.server.MinecraftServer;
 import org.apache.logging.log4j.Logger;
 import org.lwjgl.util.tinyfd.TinyFileDialogs;
 
-#if MC_VER >= MC_1_19_2
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
-#else // < 1.19.2
-import net.fabricmc.fabric.api.command.v1.CommandRegistrationCallback;
-#endif
 
 import javax.swing.*;
 import java.awt.*;
@@ -60,11 +56,7 @@ import java.util.function.Consumer;
  */
 public class FabricMain extends AbstractModInitializer implements ClientModInitializer, DedicatedServerModInitializer
 {
-	#if MC_VER >= MC_1_21_1
 	private static final ResourceLocation INITIAL_PHASE = ResourceLocation.fromNamespaceAndPath(ModInfo.RESOURCE_NAMESPACE, ModInfo.DEDICATED_SERVER_INITIAL_PATH);
-	#else
-	private static final ResourceLocation INITIAL_PHASE = new ResourceLocation(ModInfo.RESOURCE_NAMESPACE, ModInfo.DEDICATED_SERVER_INITIAL_PATH);
-	#endif
 	
 	private static final Logger LOGGER = DhLoggerBuilder.getLogger();
 	
@@ -109,17 +101,15 @@ public class FabricMain extends AbstractModInitializer implements ClientModIniti
 		this.tryCreateModCompatAccessor("starlight", IStarlightAccessor.class, StarlightAccessor::new);
 		this.tryCreateModCompatAccessor("optifine", IOptifineAccessor.class, OptifineAccessor::new);
 		this.tryCreateModCompatAccessor("bclib", IBCLibAccessor.class, BCLibAccessor::new);
-		#if MC_VER >= MC_1_19_4
-		// 1.19.4 is the lowest version Iris supports DH
+				// 1.19.4 is the lowest version Iris supports DH
 		this.tryCreateModCompatAccessor("iris", IIrisAccessor.class, IrisAccessor::new);
-		#endif
-	}
+			}
 	
 	@Override
 	protected void subscribeRegisterCommandsEvent(Consumer<CommandDispatcher<CommandSourceStack>> eventHandler)
 	{
 		CommandRegistrationCallback.EVENT.register(
-			(dispatcher, registryAccess #if MC_VER >= MC_1_19_2 , environment #endif ) -> 
+			(dispatcher, registryAccess , environment ) -> 
 			{
 				eventHandler.accept(dispatcher);
 			}
@@ -147,13 +137,11 @@ public class FabricMain extends AbstractModInitializer implements ClientModIniti
 			ModAccessorInjector.INSTANCE.get(IBCLibAccessor.class).setRenderCustomFog(false); // Remove BCLib's fog
 		}
 		
-		#if MC_VER >= MC_1_20_1
-		if (SingletonInjector.INSTANCE.get(IModChecker.class).isModLoaded("sodium"))
+				if (SingletonInjector.INSTANCE.get(IModChecker.class).isModLoaded("sodium"))
 		{
 			ModAccessorInjector.INSTANCE.get(ISodiumAccessor.class).setFogOcclusion(false);
 		}
-		#endif
-		
+				
 		if (ConfigBase.INSTANCE == null)
 		{
 			throw new IllegalStateException("Config was not initialized. Make sure to call LodCommonMain.initConfig() before calling this method.");

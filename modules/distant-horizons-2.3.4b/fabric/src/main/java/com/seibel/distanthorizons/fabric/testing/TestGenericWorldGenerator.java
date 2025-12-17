@@ -86,8 +86,7 @@ public class TestGenericWorldGenerator implements IDhApiWorldGenerator
 	{
 		// this test is only validated for 1.18.2 and up 
 		// (and it is only needed when testing world gen overrides/API chunks, so it isn't normally needed)
-		#if MC_VER >= MC_1_18_2
-		
+				
 		
 		IDhApiBiomeWrapper biome;
 		IDhApiBlockStateWrapper colorBlock;
@@ -181,9 +180,7 @@ public class TestGenericWorldGenerator implements IDhApiWorldGenerator
 		
 		resultConsumer.accept(pooledFullDataSource);
 			
-		#else
-		#endif
-	}
+			}
 	
 	
 	@Override

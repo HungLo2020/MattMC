@@ -39,18 +39,7 @@ public class DummyLightEngine extends LevelLightEngine
 	}
 	
 	
-	#if MC_VER < MC_1_20_1
-	@Override
-	public void onBlockEmissionIncrease(BlockPos blockPos, int i) { }
-	
-	@Override
-	public int runUpdates(int i, boolean bl, boolean bl2) { return 0; }
-	
-	@Override
-	public void enableLightSources(ChunkPos chunkPos, boolean bl) { }
-
-	#else
-	@Override
+		@Override
 	public int runLightUpdates() { return 0; }
 	
 	@Override
@@ -60,10 +49,9 @@ public class DummyLightEngine extends LevelLightEngine
 	public void propagateLightSources(ChunkPos arg) { }
 	
 	public boolean lightOnInSection(SectionPos $$0) { return false; }
-    #endif
-	
+    	
 	@Override
-	public void queueSectionData(LightLayer lightLayer, SectionPos sectionPos, @Nullable DataLayer dataLayer #if MC_VER < MC_1_20_1 , boolean bl #endif ) { }
+	public void queueSectionData(LightLayer lightLayer, SectionPos sectionPos, @Nullable DataLayer dataLayer  ) { }
 	
 	@Override
 	public void checkBlock(BlockPos blockPos) { }
@@ -87,13 +75,11 @@ public class DummyLightEngine extends LevelLightEngine
 	@Override
 	public void retainData(ChunkPos chunkPos, boolean bl) { }
 	
-	#if MC_VER >= MC_1_17_1
-	@Override
+		@Override
 	public int getLightSectionCount() { throw new UnsupportedOperationException("This should never be used!"); }
 	@Override
 	public int getMinLightSection() { throw new UnsupportedOperationException("This should never be used!"); }
 	@Override
 	public int getMaxLightSection() { throw new UnsupportedOperationException("This should never be used!"); }
-    #endif
-	
+    	
 }

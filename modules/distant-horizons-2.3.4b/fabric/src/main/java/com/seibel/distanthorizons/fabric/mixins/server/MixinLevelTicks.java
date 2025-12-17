@@ -1,17 +1,5 @@
 package com.seibel.distanthorizons.fabric.mixins.server;
 
-#if MC_VER < MC_1_21_4
-
-import net.minecraft.world.entity.Entity;
-import org.spongepowered.asm.mixin.Mixin;
-
-@Mixin(Entity.class)
-public class MixinLevelTicks<T>
-{
-	// dummy mixin to make the loader happy
-}
-
-#else
 
 import com.seibel.distanthorizons.common.wrappers.DependencySetupDoneCheck;
 
@@ -45,4 +33,3 @@ public class MixinLevelTicks<T>
 	
 }
 
-#endif

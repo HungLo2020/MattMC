@@ -35,11 +35,7 @@ import net.minecraft.world.level.chunk.ChunkAccess;
 import net.minecraft.world.level.chunk.ProtoChunk;
 import org.apache.logging.log4j.Logger;
 
-#if MC_VER <= MC_1_20_4
-import net.minecraft.world.level.chunk.ChunkStatus;
-#else
 import net.minecraft.world.level.chunk.status.ChunkStatus;
-#endif
 
 
 public final class StepStructureStart
@@ -89,17 +85,9 @@ public final class StepStructureStart
 			}
 		}
 		
-		#if MC_VER < MC_1_19_2
-		if (this.environment.params.worldGenSettings.generateFeatures())
+				if (this.environment.params.worldOptions.generateStructures())
 		{
-		#elif MC_VER < MC_1_19_4
-		if (this.environment.params.worldGenSettings.generateStructures()) 
-		{
-		#else
-		if (this.environment.params.worldOptions.generateStructures())
-		{
-		#endif
-			for (ChunkAccess chunk : chunksToDo)
+					for (ChunkAccess chunk : chunksToDo)
 			{
 				// System.out.println("StepStructureStart: "+chunk.getPos());
 				
@@ -111,25 +99,12 @@ public final class StepStructureStart
 				// and should prevent some concurrency issues
 				STRUCTURE_PLACEMENT_LOCK.lock();
 				
-				#if MC_VER < MC_1_19_2
-				this.environment.params.generator.createStructures(this.environment.params.registry, tParams.structFeat, chunk, this.environment.params.structures,
-						this.environment.params.worldSeed);
-				#elif MC_VER < MC_1_19_4
-				this.environment.params.generator.createStructures(this.environment.params.registry, this.environment.params.randomState, tParams.structFeat, chunk, this.environment.params.structures,
-						this.environment.params.worldSeed);
-				#elif MC_VER <= MC_1_21_3
-				this.environment.params.generator.createStructures(this.environment.params.registry,
-						this.environment.params.level.getChunkSource().getGeneratorState(),
-						tParams.structFeat, chunk, this.environment.params.structures);
-				#else
-				this.environment.params.generator.createStructures(this.environment.params.registry,
+								this.environment.params.generator.createStructures(this.environment.params.registry,
 						this.environment.params.level.getChunkSource().getGeneratorState(),
 						tParams.structFeat, chunk, this.environment.params.structures, 
 						this.environment.params.level.dimension());
-				#endif
-				
-				#if MC_VER >= MC_1_18_2
-				try
+								
+								try
 				{
 					tParams.structCheck.onStructureLoad(chunk.getPos(), chunk.getAllStarts());
 				}
@@ -156,8 +131,7 @@ public final class StepStructureStart
 					}
 				}
 				
-				#endif
-				
+								
 				STRUCTURE_PLACEMENT_LOCK.unlock();
 			}
 		}

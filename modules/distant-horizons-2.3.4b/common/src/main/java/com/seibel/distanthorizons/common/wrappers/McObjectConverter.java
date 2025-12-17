@@ -48,33 +48,20 @@ public class McObjectConverter
 	/** 4x4 float matrix converter */
 	@Deprecated
 	public static Mat4f Convert(
-			#if MC_VER < MC_1_19_4 com.mojang.math.Matrix4f 
-			#elif MC_VER < MC_1_21_6 org.joml.Matrix4f
-			#else org.joml.Matrix4fc 
-			#endif 
-			mcMatrix)
+									mcMatrix)
 	{
 		FloatBuffer buffer = FloatBuffer.allocate(16);
 		storeMatrix(mcMatrix, buffer);
 		Mat4f matrix = new Mat4f(buffer);
-        #if MC_VER < MC_1_19_4
-		matrix.transpose(); // In 1.19.3 and later, we no longer need to transpose it
-        #endif
+        
 		return matrix;
 	}
 	/** Taken from Minecraft's com.mojang.math.Matrix4f class from 1.18.2 */
 	private static void storeMatrix(
-			#if MC_VER < MC_1_19_4 com.mojang.math.Matrix4f 
-			#elif MC_VER < MC_1_21_6 org.joml.Matrix4f 
-			#else org.joml.Matrix4fc 
-			#endif
-			matrix, 
+									matrix, 
 			FloatBuffer buffer)
 	{
-        #if MC_VER < MC_1_19_4
-		matrix.store(buffer);
-        #else
-		// Mojang starts to use joml's Matrix4f libary in 1.19.3 so we copy their store method and use it here if its newer than 1.19.3
+        		// Mojang starts to use joml's Matrix4f libary in 1.19.3 so we copy their store method and use it here if its newer than 1.19.3
 		buffer.put(bufferIndex(0, 0), matrix.m00());
 		buffer.put(bufferIndex(0, 1), matrix.m01());
 		buffer.put(bufferIndex(0, 2), matrix.m02());
@@ -91,8 +78,7 @@ public class McObjectConverter
 		buffer.put(bufferIndex(3, 1), matrix.m31());
 		buffer.put(bufferIndex(3, 2), matrix.m32());
 		buffer.put(bufferIndex(3, 3), matrix.m33());
-        #endif
-	}
+        	}
 	
 	
 	static final Direction[] directions;

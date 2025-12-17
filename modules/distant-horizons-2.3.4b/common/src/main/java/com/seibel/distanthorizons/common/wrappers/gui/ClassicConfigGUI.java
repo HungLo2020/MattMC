@@ -34,12 +34,7 @@ import com.seibel.distanthorizons.coreapi.ModInfo;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
-#if MC_VER < MC_1_20_1
-import com.mojang.blaze3d.vertex.PoseStack;
-import net.minecraft.client.gui.GuiComponent;
-#else
 import net.minecraft.client.gui.GuiGraphics;
-#endif
 import net.minecraft.client.gui.components.AbstractWidget;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.ContainerObjectSelectionList;
@@ -48,9 +43,7 @@ import net.minecraft.client.gui.components.events.GuiEventListener;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 import net.minecraft.client.resources.language.I18n;    // translation
-#if MC_VER >= MC_1_17_1
 import net.minecraft.client.gui.narration.NarratableEntry;
-#endif
 import net.minecraft.resources.ResourceLocation;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -266,11 +259,7 @@ public class ClassicConfigGUI
 						0, 0,
 						// Some textuary stuff
 						0, 
-						#if MC_VER < MC_1_21_1
-						new ResourceLocation(ModInfo.ID, "textures/gui/changelog.png"),
-						#else
 						ResourceLocation.fromNamespaceAndPath(ModInfo.ID, "textures/gui/changelog.png"),
-						#endif
 						20, 20,
 						// Create the button and tell it where to go
 						(buttonWidget) -> {
@@ -301,11 +290,7 @@ public class ClassicConfigGUI
 			
 			this.list = new ConfigListWidget(this.minecraft, this.width * 2, this.height, 32, 32, 25);
 			
-			#if MC_VER < MC_1_20_6 // no background is rendered in MC 1.20.6+
-			if (this.minecraft != null && this.minecraft.level != null)
-				this.list.setRenderBackground(false);
-			#endif
-			
+						
 			this.addWidget(this.list);
 			
 			for (AbstractConfigType info : ConfigBase.INSTANCE.entries)
@@ -407,46 +392,26 @@ public class ClassicConfigGUI
 		}
 		
 		@Override
-        #if MC_VER < MC_1_20_1
-		public void render(PoseStack matrices, int mouseX, int mouseY, float delta)
-        #else
-		public void render(GuiGraphics matrices, int mouseX, int mouseY, float delta)
-		#endif
+        public void render(GuiGraphics matrices, int mouseX, int mouseY, float delta)
 		{
-			#if MC_VER < MC_1_20_2 // 1.20.2 now enables this by default in the `this.list.render` function
-			this.renderBackground(matrices); // Renders background
-			#else
-			super.render(matrices, mouseX, mouseY, delta);
-			#endif
-			this.list.render(matrices, mouseX, mouseY, delta); // Render buttons
+						super.render(matrices, mouseX, mouseY, delta);
+						this.list.render(matrices, mouseX, mouseY, delta); // Render buttons
 			
 			// Render title
 			this.DhDrawCenteredString(matrices, this.font, this.title, this.width / 2, 15, 
-					#if MC_VER < MC_1_21_6 
-					0xFFFFFF // RGB white
-					#else 
-					0xFFFFFFFF // ARGB white
-					#endif);
+					0xFFFFFFFF // ARGB white);
 			
 			if (this.configBase.modID.equals("distanthorizons"))
 			{
 				// Display version
 				this.DhDrawString(matrices, this.font, TextOrLiteral(ModInfo.VERSION), 2, this.height - 10, 
-						#if MC_VER < MC_1_21_6
-						0xAAAAAA // RGB white
-						#else
-						0xFFAAAAAA // ARGB white
-						#endif);
+						0xFFAAAAAA // ARGB white);
 				
 				// If the update is pending, display this message to inform the user that it will apply when the game restarts
 				if (SelfUpdater.deleteOldJarOnJvmShutdown)
 				{
 					this.DhDrawString(matrices, this.font, Translatable(this.configBase.modID + ".updater.waitingForClose"), 4, this.height - 38, 
-						#if MC_VER < MC_1_21_6
-						0xFFFFFF // RGB white
-						#else 
-						0xFFFFFFFF // ARGB white
-						#endif);
+						0xFFFFFFFF // ARGB white);
 				}
 			}
 			
@@ -489,9 +454,7 @@ public class ClassicConfigGUI
 					}
 				}
 			}
-			#if MC_VER < MC_1_20_2
-			super.render(matrices, mouseX, mouseY, delta);
-			#endif
+			
 		}
 		
 	}
@@ -587,11 +550,7 @@ public class ClassicConfigGUI
 		
 		public ConfigListWidget(Minecraft minecraftClient, int canvasWidth, int canvasHeight, int topMargin, int botMargin, int itemSpacing)
 		{
-			#if MC_VER < MC_1_20_4
-			super(minecraftClient, canvasWidth, canvasHeight, topMargin, canvasHeight - botMargin, itemSpacing);
-			#else
 			super(minecraftClient, canvasWidth, canvasHeight - (topMargin + botMargin), topMargin, itemSpacing);
-			#endif
 			this.centerListVertically = false;
 			textRenderer = minecraftClient.font;
 		}
@@ -653,11 +612,7 @@ public class ClassicConfigGUI
 		}
 		
 		@Override
-        #if MC_VER < MC_1_20_1
-		public void render(PoseStack matrices, int index, int y, int x, int entryWidth, int entryHeight, int mouseX, int mouseY, boolean hovered, float tickDelta)
-        #else
-		public void render(GuiGraphics matrices, int index, int y, int x, int entryWidth, int entryHeight, int mouseX, int mouseY, boolean hovered, float tickDelta)
-		#endif
+        public void render(GuiGraphics matrices, int index, int y, int x, int entryWidth, int entryHeight, int mouseX, int mouseY, boolean hovered, float tickDelta)
 		{
 			if (button != null)
 			{
@@ -675,14 +630,8 @@ public class ClassicConfigGUI
 				indexButton.render(matrices, mouseX, mouseY, tickDelta);
 			}
 			if (text != null && (!text.getString().contains("spacer") || button != null))
-                #if MC_VER < MC_1_20_1
-				GuiComponent.drawString(matrices, textRenderer, text, 12, y + 5, 0xFFFFFF);
-				#elif MC_VER < MC_1_21_6
-				matrices.drawString(textRenderer, this.text, 12, y + 5, 0xFFFFFF);
-				#else
-				matrices.drawString(textRenderer, this.text, 12, y + 5, 0xFFFFFFFF);
-				#endif
-		}
+                				matrices.drawString(textRenderer, this.text, 12, y + 5, 0xFFFFFFFF);
+						}
 		
 		@Override
 		public List<? extends GuiEventListener> children()
@@ -692,14 +641,12 @@ public class ClassicConfigGUI
 		
 		// Only for 1.17 and over
 		// Remove in 1.16 and below
-		#if MC_VER >= MC_1_17_1
-		@Override
+				@Override
 		public List<? extends NarratableEntry> narratables()
 		{
 			return children;
 		}
-		#endif
-	}
+			}
 	
 	
 	

@@ -73,20 +73,11 @@ import net.minecraft.world.level.levelgen.NoiseBasedChunkGenerator;
 import net.minecraft.nbt.CompoundTag;
 import org.apache.logging.log4j.LogManager;
 
-#if MC_VER >= MC_1_19_4
 import net.minecraft.core.registries.Registries;
-#else
-import net.minecraft.core.Registry;
-#endif
 
-#if MC_VER <= MC_1_20_4
-import net.minecraft.world.level.chunk.ChunkStatus;
-import org.jetbrains.annotations.Nullable;
-#else
 import net.minecraft.world.level.chunk.status.ChunkStatus;
 
 import javax.annotation.Nullable;
-#endif
 
 /*
 Total:                   3.135214124s
@@ -113,11 +104,7 @@ public final class BatchGenerationEnvironment extends AbstractBatchGenerationEnv
 			new ConfigBasedLogger(LogManager.getLogger("LodWorldGen"),
 					() -> Config.Common.Logging.logWorldGenLoadEvent.get());
 	
-	#if MC_VER < MC_1_21_5
-	private static final TicketType<ChunkPos> DH_SERVER_GEN_TICKET = TicketType.create("dh_server_gen_ticket", Comparator.comparingLong(ChunkPos::toLong));
-	#else
 	private static final TicketType DH_SERVER_GEN_TICKET = new TicketType(/* timeout, 0 = disabled*/0L, /* persist */ false, TicketType.TicketUse.LOADING);
-	#endif
 	
 	private static final IModChecker MOD_CHECKER = SingletonInjector.INSTANCE.get(IModChecker.class);
 	
@@ -605,10 +592,7 @@ public final class BatchGenerationEnvironment extends AbstractBatchGenerationEnv
 		{
 			IOWorker ioWorker = level.getChunkSource().chunkMap.worker;
 			
-			#if MC_VER <= MC_1_18_2
-			return CompletableFuture.completedFuture(ioWorker.load(chunkPos));
-			#else
-			
+						
 			// storage will be null if C2ME is installed
 			if (!this.pullExistingChunkUsingMcAsyncMethod && ioWorker.storage != null)
 			{
@@ -670,8 +654,7 @@ public final class BatchGenerationEnvironment extends AbstractBatchGenerationEnv
 							return null;
 						});
 			}
-			#endif
-		}
+					}
 		catch (Exception e)
 		{
 			LOAD_LOGGER.warn("DistantHorizons: Couldn't load or make chunk [" + chunkPos + "]. Error: [" + e.getMessage() + "].", e);
@@ -725,20 +708,8 @@ public final class BatchGenerationEnvironment extends AbstractBatchGenerationEnv
 	}
 	private static ProtoChunk CreateEmptyChunk(ServerLevel level, ChunkPos chunkPos)
 	{
-		#if MC_VER <= MC_1_16_5
-		return new ProtoChunk(chunkPos, UpgradeData.EMPTY);
-		#elif MC_VER <= MC_1_17_1
-		return new ProtoChunk(chunkPos, UpgradeData.EMPTY, level);
-		#elif MC_VER <= MC_1_19_2
-		return new ProtoChunk(chunkPos, UpgradeData.EMPTY, level, level.registryAccess().registryOrThrow(Registry.BIOME_REGISTRY), null);
-		#elif MC_VER <= MC_1_19_4
-		return new ProtoChunk(chunkPos, UpgradeData.EMPTY, level, level.registryAccess().registryOrThrow(Registries.BIOME), null);
-		#elif MC_VER < MC_1_21_3
-		return new ProtoChunk(chunkPos, UpgradeData.EMPTY, level, level.registryAccess().registryOrThrow(Registries.BIOME), null);
-		#else
-		return new ProtoChunk(chunkPos, UpgradeData.EMPTY, level, level.registryAccess().lookupOrThrow(Registries.BIOME), null);
-		#endif
-	}
+				return new ProtoChunk(chunkPos, UpgradeData.EMPTY, level, level.registryAccess().lookupOrThrow(Registries.BIOME), null);
+			}
 	
 	
 	
@@ -874,19 +845,10 @@ public final class BatchGenerationEnvironment extends AbstractBatchGenerationEnv
 		return CompletableFuture.supplyAsync(() -> 
 		{
 			int chunkLevel;
-			#if MC_VER <= MC_1_19_4
-			// 33 is equivalent to FULL Chunk
-			chunkLevel = generateUpToFeatures ? 33 + ChunkStatus.getDistance(ChunkStatus.FEATURES) : 33;
-			#else
-			// 33 is equivalent to FULL Chunk
+						// 33 is equivalent to FULL Chunk
 			chunkLevel = generateUpToFeatures ? ChunkLevel.byStatus(ChunkStatus.FEATURES) : 33;
-			#endif
-			
-			#if MC_VER < MC_1_21_5
-			level.getChunkSource().distanceManager.addTicket(DH_SERVER_GEN_TICKET, pos, chunkLevel, pos);
-			#else
+						
 			level.getChunkSource().addTicketWithRadius(DH_SERVER_GEN_TICKET, pos, 0);
-			#endif
 			level.getChunkSource().distanceManager.runAllUpdates(level.getChunkSource().chunkMap); // probably not the most optimal to run updates here, but fast enough
 			ChunkHolder holder = level.getChunkSource().chunkMap.getUpdatingChunkIfPresent(pos.toLong());
 			if (holder == null)
@@ -894,17 +856,9 @@ public final class BatchGenerationEnvironment extends AbstractBatchGenerationEnv
 				throw new IllegalStateException("No chunk holder after ticket has been added");
 			}
 			
-			#if MC_VER <= MC_1_20_4
-			return holder.getOrScheduleFuture(ChunkStatus.FEATURES, level.getChunkSource().chunkMap)
-					.thenApply(result -> result.left().orElseThrow(() -> new RuntimeException(result.right().get().toString()))); // can throw if the server is shutting down
-			#elif MC_VER <= MC_1_20_6
-			return holder.getOrScheduleFuture(ChunkStatus.FEATURES, level.getChunkSource().chunkMap)
-					.thenApply(result -> result.orElseThrow(() -> new RuntimeException(result.toString()))); // can throw if the server is shutting down
-			#else
-			return holder.scheduleChunkGenerationTask(ChunkStatus.FEATURES, level.getChunkSource().chunkMap)
+						return holder.scheduleChunkGenerationTask(ChunkStatus.FEATURES, level.getChunkSource().chunkMap)
 					.thenApply(result -> result.orElseThrow(() -> new RuntimeException(result.getError()))); // can throw if the server is shutting down
-			#endif
-			
+						
 		}, level.getChunkSource().chunkMap.mainThreadExecutor).thenCompose(Function.identity());
 	}
 	/** @param chunkWasGeneratedUpToFeatures if false this assumes the chunk was generated to "FULL" status */
@@ -915,25 +869,14 @@ public final class BatchGenerationEnvironment extends AbstractBatchGenerationEnv
 			try
 			{
 				int chunkLevel;
-				#if MC_VER <= MC_1_19_4
-				// 33 is equivalent to FULL Chunk
-				chunkLevel = chunkWasGeneratedUpToFeatures ? 33 + ChunkStatus.getDistance(ChunkStatus.FEATURES) : 33;
-				#else
-				// 33 is equivalent to FULL Chunk
+								// 33 is equivalent to FULL Chunk
 				chunkLevel = chunkWasGeneratedUpToFeatures ? ChunkLevel.byStatus(ChunkStatus.FEATURES) : 33;
-				#endif
-				
-				#if MC_VER < MC_1_21_5
-				level.getChunkSource().distanceManager.removeTicket(DH_SERVER_GEN_TICKET, pos, chunkLevel, pos);
-				#else
+								
 				level.getChunkSource().removeTicketWithRadius(DH_SERVER_GEN_TICKET, pos, 0);
-				#endif
 				
 				// mitigate OOM issues in vanilla chunk system: see https://github.com/pop4959/Chunky/pull/383
 				level.getChunkSource().chunkMap.tick(() -> false);
-				#if MC_VER > MC_1_16_5
 				level.entityManager.tick();
-				#endif
 			}
 			catch (Exception e)
 			{

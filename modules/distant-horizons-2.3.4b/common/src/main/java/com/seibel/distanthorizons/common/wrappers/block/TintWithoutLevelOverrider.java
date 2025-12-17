@@ -35,9 +35,7 @@ import org.apache.logging.log4j.Logger;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-#if MC_VER >= MC_1_18_2
 import net.minecraft.core.Holder;
-#endif
 
 import java.io.IOException;
 import java.util.concurrent.ConcurrentHashMap;
@@ -47,11 +45,7 @@ public class TintWithoutLevelOverrider implements BlockAndTintGetter
 {
 	private static final Logger LOGGER = DhLoggerBuilder.getLogger();
 	
-	#if MC_VER < MC_1_18_2
-	public static final ConcurrentMap<String, Biome> BIOME_BY_RESOURCE_STRING = new ConcurrentHashMap<>();
-	#else
 	public static final ConcurrentMap<String, Holder<Biome>> BIOME_BY_RESOURCE_STRING = new ConcurrentHashMap<>();
-    #endif
 	
 	
 	@NotNull
@@ -87,13 +81,9 @@ public class TintWithoutLevelOverrider implements BlockAndTintGetter
 		
 		return colorResolver.getColor(unwrap(getClientBiome(biomeString)), blockPos.getX(), blockPos.getZ());
 	}
-	private static Biome unwrap(#if MC_VER >= MC_1_18_2 Holder<Biome> #else Biome #endif biome)
+	private static Biome unwrap(Holder<Biome> biome)
 	{
-		#if MC_VER >= MC_1_18_2
 		return biome.value();
-		#else
-		return biome;
-		#endif
 	}
 	
 	/**
@@ -130,7 +120,7 @@ public class TintWithoutLevelOverrider implements BlockAndTintGetter
 	 * whenever the biome information is needed, ensuring it always retrieves the most current {@code Biome}
 	 * instance associated with the holder at that time.</p>
 	 */
-	private static #if MC_VER < MC_1_18_2 Biome #else Holder<Biome> #endif getClientBiome(String biomeResourceString)
+	private static Holder<Biome> getClientBiome(String biomeResourceString)
 	{
 		// cache the client biomes so we don't have to re-parse the resource location every time
 		return BIOME_BY_RESOURCE_STRING.compute(biomeResourceString, 
@@ -218,22 +208,14 @@ public class TintWithoutLevelOverrider implements BlockAndTintGetter
 	// post MC 1.17 //
 	//==============//
 	
-	#if MC_VER >= MC_1_17_1
-	
+		
 	@Override
 	public int getHeight()
 	{ throw new UnsupportedOperationException("ERROR: getHeight() called on TintWithoutLevelOverrider. Object is for tinting only."); }
 	
-	#if MC_VER < MC_1_21_3
-	@Override
-	public int getMinBuildHeight() 
-	{ throw new UnsupportedOperationException("ERROR: getMinBuildHeight() called on TintWithoutLevelOverrider. Object is for tinting only."); }
-	#else
-	@Override
+		@Override
 	public int getMinY()
 	{ throw new UnsupportedOperationException("ERROR: getMinY() called on TintWithoutLevelOverrider. Object is for tinting only."); }
-	#endif
-	
-	#endif
-	
+		
+		
 }

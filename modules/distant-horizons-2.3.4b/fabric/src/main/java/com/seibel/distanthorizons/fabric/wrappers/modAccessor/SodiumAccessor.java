@@ -28,18 +28,7 @@ import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftRen
 import com.seibel.distanthorizons.core.wrapperInterfaces.modAccessor.ISodiumAccessor;
 
 
-#if MC_VER < MC_1_20_1
-import me.jellysquid.mods.sodium.client.render.SodiumWorldRenderer;
-#endif
-#if MC_VER < MC_1_17_1
-import net.minecraft.nbt.CompoundTag;
-import net.minecraft.network.protocol.Packet;
-import net.minecraft.world.entity.Entity;
-import net.minecraft.world.entity.EntityType;
-import net.minecraft.world.level.LevelAccessor;
-import net.minecraft.world.phys.AABB;
-#else 
-#endif
+
 
 public class SodiumAccessor implements ISodiumAccessor
 {
@@ -50,11 +39,9 @@ public class SodiumAccessor implements ISodiumAccessor
 	 */
 	public static final boolean isSodiumV5OrLess;
 	
-	#if MC_VER >= MC_1_20_1
-	private static MethodHandle setFogOcclusionMethod;
+		private static MethodHandle setFogOcclusionMethod;
 	private static Object sodiumPerformanceOptions;
-	#endif
-	
+		
 	static {
 		isSodiumV5OrLess = !classPresent("net.caffeinemc.mods.sodium.client.render.SodiumWorldRenderer");
 	}
@@ -78,8 +65,7 @@ public class SodiumAccessor implements ISodiumAccessor
 	@Override
 	public void setFogOcclusion(boolean occlusionEnabled)
 	{
-		#if MC_VER >= MC_1_20_1
-		try
+				try
 		{
 			if (sodiumPerformanceOptions == null)
 			{
@@ -122,8 +108,7 @@ public class SodiumAccessor implements ISodiumAccessor
 		{
 			throw new RuntimeException(e);
 		}
-		#endif
-	}
+			}
 
 	
 	

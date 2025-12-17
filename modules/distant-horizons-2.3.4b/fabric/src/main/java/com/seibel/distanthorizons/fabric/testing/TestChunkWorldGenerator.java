@@ -65,8 +65,7 @@ public class TestChunkWorldGenerator extends AbstractDhApiChunkWorldGenerator
 	{
 		// this test is only validated for 1.18.2 and up 
 		// (and it is only needed when testing world gen overrides/API chunks, so it isn't normally needed)
-		#if MC_VER >= MC_1_18_2
-		ChunkAccess chunk = this.level.getChunk(chunkPosX, chunkPosZ);
+				ChunkAccess chunk = this.level.getChunk(chunkPosX, chunkPosZ);
 		
 		
 		int minBuildHeight = this.levelWrapper.getMinHeight();
@@ -93,10 +92,7 @@ public class TestChunkWorldGenerator extends AbstractDhApiChunkWorldGenerator
 			}
 		}
 		return apiChunk;
-		#else
-		return null;
-		#endif
-	}
+			}
 	
 	@Override
 	public void preGeneratorTaskStart() { /* do nothing */ }

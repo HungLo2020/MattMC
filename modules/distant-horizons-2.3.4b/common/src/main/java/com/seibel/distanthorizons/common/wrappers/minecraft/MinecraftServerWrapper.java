@@ -36,11 +36,7 @@ public class MinecraftServerWrapper implements IMinecraftSharedWrapper
 			throw new IllegalStateException("Trying to get Installation Direction before Dedicated server completed initialization!");
 		}
 		
-		#if MC_VER < MC_1_21_1
-		return this.dedicatedServer.getServerDirectory();
-		#else
 		return this.dedicatedServer.getServerDirectory().toFile();
-		#endif
 	}
 	
 	@Override

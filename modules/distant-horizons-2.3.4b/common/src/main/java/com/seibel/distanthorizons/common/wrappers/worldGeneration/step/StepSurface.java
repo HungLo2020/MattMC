@@ -30,11 +30,7 @@ import net.minecraft.server.level.WorldGenRegion;
 import net.minecraft.world.level.chunk.ChunkAccess;
 import net.minecraft.world.level.chunk.ProtoChunk;
 
-#if MC_VER <= MC_1_20_4
-import net.minecraft.world.level.chunk.ChunkStatus;
-#else
 import net.minecraft.world.level.chunk.status.ChunkStatus;
-#endif
 
 
 public final class StepSurface
@@ -73,14 +69,8 @@ public final class StepSurface
 		for (ChunkAccess chunk : chunksToDo)
 		{
 			// System.out.println("StepSurface: "+chunk.getPos());
-			#if MC_VER < MC_1_18_2
-			environment.params.generator.buildSurfaceAndBedrock(worldGenRegion, chunk);
-			#elif MC_VER < MC_1_19_2
-			environment.params.generator.buildSurface(worldGenRegion, tParams.structFeat.forWorldGenRegion(worldGenRegion), chunk);
-			#else
-			environment.params.generator.buildSurface(worldGenRegion, tParams.structFeat.forWorldGenRegion(worldGenRegion), environment.params.randomState, chunk);
-			#endif
-		}
+						environment.params.generator.buildSurface(worldGenRegion, tParams.structFeat.forWorldGenRegion(worldGenRegion), environment.params.randomState, chunk);
+					}
 	}
 	
 }
