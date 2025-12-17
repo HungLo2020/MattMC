@@ -51,6 +51,8 @@ import net.minecraft.client.gui.screens.TitleScreen;
 
 import com.seibel.distanthorizons.common.CommonPacketPayload;
 import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
+import net.minecraft.network.FriendlyByteBuf;
+import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 
 
 import java.util.HashSet;
@@ -290,8 +292,10 @@ public class FabricClientProxy implements AbstractModInitializer.IEventProxy
 		// networking event //
 		//==================//
 		
-				PayloadTypeRegistry.playS2C().register(CommonPacketPayload.TYPE, new CommonPacketPayload.Codec());
-		ClientPlayNetworking.registerGlobalReceiver(CommonPacketPayload.TYPE, (payload, context) ->
+		CustomPacketPayload.TypeAndCodec<FriendlyByteBuf, CommonPacketPayload> typeAndCodec = 
+			new CustomPacketPayload.TypeAndCodec<>(CommonPacketPayload.TYPE, new CommonPacketPayload.Codec());
+		PayloadTypeRegistry.playS2C().register(typeAndCodec, new CommonPacketPayload.Codec());
+		ClientPlayNetworking.registerGlobalReceiver(typeAndCodec, (payload, context) ->
 		{
 			if (payload.message() == null)
 			{

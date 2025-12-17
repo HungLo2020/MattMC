@@ -32,6 +32,8 @@ import org.apache.logging.log4j.Logger;
 
 import com.seibel.distanthorizons.common.CommonPacketPayload;
 import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
+import net.minecraft.network.FriendlyByteBuf;
+import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 
 import java.util.function.Supplier;
 
@@ -174,13 +176,15 @@ public class FabricServerProxy implements AbstractModInitializer.IEventProxy
 			}
 		});
 		
-				PayloadTypeRegistry.playC2S().register(CommonPacketPayload.TYPE, new CommonPacketPayload.Codec());
+		CustomPacketPayload.TypeAndCodec<FriendlyByteBuf, CommonPacketPayload> typeAndCodec = 
+			new CustomPacketPayload.TypeAndCodec<>(CommonPacketPayload.TYPE, new CommonPacketPayload.Codec());
+		PayloadTypeRegistry.playC2S().register(typeAndCodec, new CommonPacketPayload.Codec());
 		if (this.isDedicatedServer)
 		{
-			PayloadTypeRegistry.playS2C().register(CommonPacketPayload.TYPE, new CommonPacketPayload.Codec());
+			PayloadTypeRegistry.playS2C().register(typeAndCodec, new CommonPacketPayload.Codec());
 		}
 		
-		ServerPlayNetworking.registerGlobalReceiver(CommonPacketPayload.TYPE, (payload, context) ->
+		ServerPlayNetworking.registerGlobalReceiver(typeAndCodec, (payload, context) ->
 		{
 			if (payload.message() == null)
 			{
