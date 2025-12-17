@@ -49,16 +49,16 @@ repositories {
     // Always include Maven Central (for most dependencies)
     mavenCentral()
     
-    // Only add remote repositories if bundled dependencies are NOT available
+    // Fabric Maven repository (always included for Fabric API modules)
+    maven {
+        name = 'Fabric'
+        url = 'https://maven.fabricmc.net/'
+    }
+    
+    // Only add other remote repositories if bundled dependencies are NOT available
     if (!useBundledDeps) {
         println "⚠ Bundled dependencies not found. Using remote repositories."
         println "  Run './libraries/download-dependencies.sh' to download dependencies for offline builds."
-        
-        // Fabric Maven repository (for Fabric Loader dependencies)
-        maven {
-            name = 'Fabric'
-            url = 'https://maven.fabricmc.net/'
-        }
         
         // Minecraft libraries (primary source for Mojang dependencies)
         maven { 
@@ -315,10 +315,13 @@ dependencies {
     // XZ for Java - Compression for LOD file storage
     implementation 'org.tukaani:xz:1.9'
     
-    // Fabric API modules (required by DH's Fabric integration)
-    // Note: These are stub implementations in src/main/java/net/fabricmc/fabric/api/
-    // The actual implementations are loaded at runtime by Fabric Loader
-    // DH requires these specific modules for lifecycle events, resource loading, and networking
+    // SQLite JDBC - Database backend for LOD storage
+    implementation 'org.xerial:sqlite-jdbc:3.45.1.0'
+    
+    // Fabric API - Required by DH's Fabric integration
+    // Using local stub implementations in src/main/java/net/fabricmc/fabric/api/
+    // The actual implementations are loaded at runtime by Fabric Loader when available
+    // DH requires lifecycle events, resource loading, and networking classes
     
     // ===== TESTING DEPENDENCIES =====
     // Testing dependencies - only available in test scope, excluded from production builds
