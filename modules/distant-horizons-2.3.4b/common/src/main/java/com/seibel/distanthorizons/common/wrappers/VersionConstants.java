@@ -43,8 +43,7 @@ public class VersionConstants implements IVersionConstants
 		// it can't load client classes when running as a dedicated server,
 		// which was how we were dynamically accessing the MC version string
 		
-					ERROR MC version constant missing
-				
+		return "1.21.10";
 	}
 	
 }

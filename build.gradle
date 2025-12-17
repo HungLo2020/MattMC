@@ -304,6 +304,22 @@ dependencies {
     // GLSL Transformer - GLSL shader transformation library
     implementation 'io.github.douira:glsl-transformer:3.0.0-pre3'
     
+    // ===== DISTANT HORIZONS DEPENDENCIES =====
+    // Night Config - TOML configuration file handling
+    implementation 'com.electronwill.night-config:core:3.6.7'
+    implementation 'com.electronwill.night-config:toml:3.6.7'
+    
+    // JSON Simple - JSON parsing
+    implementation 'com.googlecode.json-simple:json-simple:1.1.1'
+    
+    // XZ for Java - Compression for LOD file storage
+    implementation 'org.tukaani:xz:1.9'
+    
+    // Fabric API modules (required by DH's Fabric integration)
+    // Note: These are stub implementations in src/main/java/net/fabricmc/fabric/api/
+    // The actual implementations are loaded at runtime by Fabric Loader
+    // DH requires these specific modules for lifecycle events, resource loading, and networking
+    
     // ===== TESTING DEPENDENCIES =====
     // Testing dependencies - only available in test scope, excluded from production builds
     
@@ -390,6 +406,38 @@ sourceSets {
         }
     }
     
+    // Distant Horizons source set - compiled to a separate mod JAR
+    distantHorizons {
+        java {
+            srcDirs = [
+                // Core subprojects (platform-independent)
+                'modules/distant-horizons-2.3.4b/coreSubProjects/core/src/main/java',
+                'modules/distant-horizons-2.3.4b/coreSubProjects/api/src/main/java',
+                
+                // Common module (multi-loader shared code)
+                'modules/distant-horizons-2.3.4b/common/src/main/java',
+                
+                // Fabric-specific module
+                'modules/distant-horizons-2.3.4b/fabric/src/main/java'
+            ]
+        }
+        resources {
+            srcDirs = [
+                'modules/distant-horizons-2.3.4b/coreSubProjects/core/src/main/resources',
+                'modules/distant-horizons-2.3.4b/coreSubProjects/api/src/main/resources',
+                'modules/distant-horizons-2.3.4b/common/src/main/resources',
+                'modules/distant-horizons-2.3.4b/fabric/src/main/resources'
+            ]
+            
+            // Exclude files from other mod loaders
+            exclude '**/forge/**'
+            exclude '**/neoforge/**'
+            
+            // Exclude access wideners for other versions (already applied to MC source)
+            exclude '**/*.distanthorizons.accesswidener'
+        }
+    }
+    
     // Main source set - Minecraft and project code (compiled to game JAR)
     main {
         java {
@@ -450,6 +498,11 @@ configurations {
     irisImplementation.extendsFrom implementation
     irisCompileOnly.extendsFrom compileOnly
     irisRuntimeOnly.extendsFrom runtimeOnly
+    
+    // Distant Horizons configurations extend from implementation
+    distantHorizonsImplementation.extendsFrom implementation
+    distantHorizonsCompileOnly.extendsFrom compileOnly
+    distantHorizonsRuntimeOnly.extendsFrom runtimeOnly
 }
 
 // Sodium depends on Fabric Loader and Minecraft
@@ -466,6 +519,16 @@ sourceSets.iris.compileClasspath += sourceSets.sodium.output
 sourceSets.iris.runtimeClasspath += sourceSets.fabricLoader.output
 sourceSets.iris.runtimeClasspath += sourceSets.main.output
 sourceSets.iris.runtimeClasspath += sourceSets.sodium.output
+
+// Distant Horizons depends on Fabric Loader, Minecraft, Sodium, and Iris
+sourceSets.distantHorizons.compileClasspath += sourceSets.fabricLoader.output
+sourceSets.distantHorizons.compileClasspath += sourceSets.main.output
+sourceSets.distantHorizons.compileClasspath += sourceSets.sodium.output
+sourceSets.distantHorizons.compileClasspath += sourceSets.iris.output
+sourceSets.distantHorizons.runtimeClasspath += sourceSets.fabricLoader.output
+sourceSets.distantHorizons.runtimeClasspath += sourceSets.main.output
+sourceSets.distantHorizons.runtimeClasspath += sourceSets.sodium.output
+sourceSets.distantHorizons.runtimeClasspath += sourceSets.iris.output
 
 // ============================================================================
 // FABRIC LOADER JAR TASK
@@ -596,6 +659,43 @@ tasks.register('irisJar', Jar) {
         )
     }
 }
+
+// ============================================================================
+// DISTANT HORIZONS MOD JAR TASK
+// ============================================================================
+// Create the Distant Horizons mod JAR to be loaded by Fabric Loader
+// ============================================================================
+
+// Process Distant Horizons resources with version substitution
+tasks.named('processDistantHorizonsResources') {
+    filesMatching('fabric.mod.json') {
+        expand 'version': '2.3.4-b'
+    }
+}
+
+tasks.register('distantHorizonsJar', Jar) {
+    group = 'build'
+    description = 'Assembles the Distant Horizons mod JAR'
+    
+    dependsOn 'compileDistantHorizonsJava', 'processDistantHorizonsResources'
+    
+    archiveBaseName = 'distanthorizons'
+    archiveVersion = '2.3.4-b'
+    archiveClassifier = 'mc1.21.10'
+    
+    from sourceSets.distantHorizons.output
+    
+    destinationDirectory = file("${buildDir}/mods")
+    
+    manifest {
+        attributes(
+            'Implementation-Title': 'Distant Horizons',
+            'Implementation-Version': '2.3.4-b',
+            'Implementation-Vendor': 'jeseibel'
+        )
+    }
+}
+
 
 // ============================================================================
 // SHADER PACK ZIP TASK
@@ -810,7 +910,7 @@ tasks.register('runClient', JavaExec) {
     group = 'minecraft'
     description = 'Runs the Minecraft client with Fabric Loader'
     
-    dependsOn 'fabricLoaderJar', 'gameJar', 'sodiumJar', 'irisJar', 'copyJdkToRun', 'shaderPackZip'
+    dependsOn 'fabricLoaderJar', 'gameJar', 'sodiumJar', 'irisJar', 'distantHorizonsJar', 'copyJdkToRun', 'shaderPackZip'
     
     // Use the separate JARs so Fabric Loader can detect the game JAR properly
     // The order matters: Fabric Loader JAR first, then Game JAR, then dependencies
@@ -859,7 +959,7 @@ tasks.register('runClient', JavaExec) {
         }
         modsDir.mkdirs()
         
-        // Copy Sodium and Iris mod JARs to mods folder
+        // Copy Sodium, Iris, and Distant Horizons mod JARs to mods folder
         copy {
             from file("${buildDir}/mods")
             into modsDir

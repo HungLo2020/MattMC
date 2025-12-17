@@ -399,19 +399,19 @@ public class ClassicConfigGUI
 			
 			// Render title
 			this.DhDrawCenteredString(matrices, this.font, this.title, this.width / 2, 15, 
-					0xFFFFFFFF // ARGB white);
+					0xFFFFFFFF); // ARGB white
 			
 			if (this.configBase.modID.equals("distanthorizons"))
 			{
 				// Display version
 				this.DhDrawString(matrices, this.font, TextOrLiteral(ModInfo.VERSION), 2, this.height - 10, 
-						0xFFAAAAAA // ARGB white);
+						0xFFAAAAAA); // ARGB white
 				
 				// If the update is pending, display this message to inform the user that it will apply when the game restarts
 				if (SelfUpdater.deleteOldJarOnJvmShutdown)
 				{
 					this.DhDrawString(matrices, this.font, Translatable(this.configBase.modID + ".updater.waitingForClose"), 4, this.height - 38, 
-						0xFFFFFFFF // ARGB white);
+						0xFFFFFFFF); // ARGB white
 				}
 			}
 			
