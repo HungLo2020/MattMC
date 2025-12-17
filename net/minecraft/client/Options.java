@@ -806,6 +806,30 @@ public class Options {
 	);
 	
 	/**
+	 * Whether shader packs should be loaded and used (Iris integration - Step 1).
+	 * Default: false (vanilla rendering)
+	 */
+	private final OptionInstance<Boolean> enableShaderPacks = OptionInstance.createBoolean(
+		"options.iris.enableShaderPacks", false, boolean_ -> {}
+	);
+	
+	/**
+	 * Whether shadow rendering is enabled (Iris integration - Step 1).
+	 * Default: false (no shadow passes)
+	 */
+	private final OptionInstance<Boolean> enableShadows = OptionInstance.createBoolean(
+		"options.iris.enableShadows", false, boolean_ -> {}
+	);
+	
+	/**
+	 * Whether post-processing effects are enabled (Iris integration - Step 1).
+	 * Default: false (no post-processing)
+	 */
+	private final OptionInstance<Boolean> enablePostProcessing = OptionInstance.createBoolean(
+		"options.iris.enablePostProcessing", false, boolean_ -> {}
+	);
+	
+	/**
 	 * Number of chunk builder threads (Sodium integration).
 	 * 0 means automatic based on CPU cores.
 	 */
@@ -1299,6 +1323,18 @@ public class Options {
 		return this.enableShaders;
 	}
 	
+	public OptionInstance<Boolean> enableShaderPacks() {
+		return this.enableShaderPacks;
+	}
+	
+	public OptionInstance<Boolean> enableShadows() {
+		return this.enableShadows;
+	}
+	
+	public OptionInstance<Boolean> enablePostProcessing() {
+		return this.enablePostProcessing;
+	}
+	
 	public OptionInstance<Integer> chunkBuilderThreads() {
 		return this.chunkBuilderThreads;
 	}
@@ -1476,6 +1512,9 @@ public class Options {
 		// Advanced Rendering Options (Step 5: Sodium/Iris Integration)
 		this.shaderPackName = fieldAccess.process("shaderPackName", this.shaderPackName);
 		fieldAccess.process("enableShaders", this.enableShaders);
+		fieldAccess.process("enableShaderPacks", this.enableShaderPacks);
+		fieldAccess.process("enableShadows", this.enableShadows);
+		fieldAccess.process("enablePostProcessing", this.enablePostProcessing);
 		fieldAccess.process("chunkBuilderThreads", this.chunkBuilderThreads);
 		fieldAccess.process("animateOnlyVisibleTextures", this.animateOnlyVisibleTextures);
 		fieldAccess.process("useEntityCulling", this.useEntityCulling);
