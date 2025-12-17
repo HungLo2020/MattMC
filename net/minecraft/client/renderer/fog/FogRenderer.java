@@ -35,7 +35,7 @@ import org.joml.Vector4f;
 import org.lwjgl.system.MemoryStack;
 
 @Environment(EnvType.CLIENT)
-public class FogRenderer implements AutoCloseable, net.minecraft.client.renderer.sodium.util.FogStorage {
+public class FogRenderer implements AutoCloseable {
 	public static final int FOG_UBO_SIZE = new Std140SizeCalculator().putVec4().putFloat().putFloat().putFloat().putFloat().putFloat().putFloat().get();
 	private static final List<FogEnvironment> FOG_ENVIRONMENTS = Lists.<FogEnvironment>newArrayList(
 		new LavaFogEnvironment(),
@@ -49,8 +49,6 @@ public class FogRenderer implements AutoCloseable, net.minecraft.client.renderer
 	private static boolean fogEnabled = true;
 	private final GpuBuffer emptyBuffer;
 	private final MappableRingBuffer regularBuffer;
-	// Sodium FogStorage implementation
-	private net.minecraft.client.renderer.sodium.util.FogParameters parameters = net.minecraft.client.renderer.sodium.util.FogParameters.NONE;
 
 	public FogRenderer() {
 		GpuDevice gpuDevice = RenderSystem.getDevice();
@@ -195,15 +193,6 @@ public class FogRenderer implements AutoCloseable, net.minecraft.client.renderer
 			);
 		}
 
-		// Store fog parameters for Sodium FogStorage interface
-		this.parameters = new net.minecraft.client.renderer.sodium.util.FogParameters(
-			vector4f.x, vector4f.y, vector4f.z, vector4f.w,
-			fogData.environmentalStart,
-			fogData.environmentalEnd,
-			fogData.renderDistanceStart,
-			fogData.renderDistanceEnd
-		);
-
 		return vector4f;
 	}
 
@@ -219,12 +208,6 @@ public class FogRenderer implements AutoCloseable, net.minecraft.client.renderer
 	private void updateBuffer(ByteBuffer byteBuffer, int i, Vector4f vector4f, float f, float g, float h, float j, float k, float l) {
 		byteBuffer.position(i);
 		Std140Builder.intoBuffer(byteBuffer).putVec4(vector4f).putFloat(f).putFloat(g).putFloat(h).putFloat(j).putFloat(k).putFloat(l);
-	}
-
-	// Sodium FogStorage interface implementation
-	@Override
-	public net.minecraft.client.renderer.sodium.util.FogParameters sodium$getFogParameters() {
-		return this.parameters;
 	}
 
 	@Environment(EnvType.CLIENT)
