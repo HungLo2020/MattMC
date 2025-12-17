@@ -2,8 +2,6 @@ package com.seibel.distanthorizons.common.wrappers.gui;
 
 import com.seibel.distanthorizons.coreapi.ModInfo;
 import com.seibel.distanthorizons.core.config.ConfigBase;
-import com.seibel.distanthorizons.core.config.gui.ConfigScreen;
-import com.seibel.distanthorizons.core.config.gui.JavaScreenHandlerScreen;
 import com.seibel.distanthorizons.core.config.gui.OpenGLConfigScreen;
 import net.minecraft.client.gui.screens.Screen;
 
@@ -15,8 +13,8 @@ public class GetConfigScreen
 	{
 		Classic,
 		@Deprecated
-		OpenGL, // This was just an attempt, it didn't work out, and we are going to change to javafx soon (as soon as that works)
-		JavaFX;
+		OpenGL // This was just an attempt, it didn't work out, and we are going to change to javafx soon (as soon as that works)
+		// JavaFX option removed - requires JAWT dependency which has been removed
 	}
 	
 	public static Screen getScreen(Screen parent)
@@ -32,9 +30,7 @@ public class GetConfigScreen
 			case OpenGL:
 				MinecraftScreen.getScreen(parent, new OpenGLConfigScreen(), ModInfo.ID + ".title");
 				return null;
-//            case JavaFX -> MinecraftScreen.getScreen(parent, new JavaScreenHandlerScreen(new JavaScreenHandlerScreen.ExampleScreen()), ModInfo.ID + ".title");
-			case JavaFX:
-				return MinecraftScreen.getScreen(parent, new JavaScreenHandlerScreen(new ConfigScreen()), ModInfo.ID + ".title");
+			// JavaFX case removed - JavaScreenHandlerScreen has been removed due to JAWT dependency elimination
 			default:
 				throw new IllegalArgumentException("No config screen implementation defined for ["+useScreen+"].");
 		}

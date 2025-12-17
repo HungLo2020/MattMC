@@ -27,9 +27,6 @@
         ],
         "server": [
             "com.seibel.distanthorizons.fabric.FabricMain"
-        ],
-        "modmenu": [
-            "com.seibel.distanthorizons.fabric.wrappers.config.ModMenuIntegration"
         ]
     },
     
