@@ -131,8 +131,6 @@ public class GameRenderer implements Projector, AutoCloseable, net.minecraft.cli
 	protected PanoramaRenderer panorama;
 	private final CrossFrameResourcePool resourcePool = new CrossFrameResourcePool(3);
 	private final FogRenderer fogRenderer = new FogRenderer();
-	// Sodium FogStorage implementation
-	private net.minecraft.client.renderer.sodium.util.FogParameters sodium$fogParameters = net.minecraft.client.renderer.sodium.util.FogParameters.NONE;
 	private final GuiRenderer guiRenderer;
 	private final GuiRenderState guiRenderState;
 	private final LevelRenderState levelRenderState = new LevelRenderState();
@@ -1034,9 +1032,9 @@ public class GameRenderer implements Projector, AutoCloseable, net.minecraft.cli
 		return this.panorama;
 	}
 
-	// Sodium FogStorage interface implementation
+	// Sodium FogStorage interface implementation - delegates to fogRenderer
 	@Override
 	public net.minecraft.client.renderer.sodium.util.FogParameters sodium$getFogParameters() {
-		return this.sodium$fogParameters;
+		return ((net.minecraft.client.renderer.sodium.util.FogStorage) this.fogRenderer).sodium$getFogParameters();
 	}
 }
