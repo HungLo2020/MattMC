@@ -310,7 +310,7 @@ public class FabricClientProxy implements AbstractModInitializer.IEventProxy
 		// Check all keys we need
 		for (int keyCode = GLFW.GLFW_KEY_A; keyCode <= GLFW.GLFW_KEY_Z; keyCode++)
 		{
-			if (InputConstants.isKeyDown(Minecraft.getInstance().getWindow().getWindow(), keyCode))
+			if (InputConstants.isKeyDown(Minecraft.getInstance().getWindow(), keyCode))
 			{
 				currentKeyDown.add(keyCode);
 			}
@@ -318,7 +318,7 @@ public class FabricClientProxy implements AbstractModInitializer.IEventProxy
 		
 		for (int keyCode : KEY_TO_CHECK_FOR)
 		{
-			if (InputConstants.isKeyDown(Minecraft.getInstance().getWindow().getWindow(), keyCode))
+			if (InputConstants.isKeyDown(Minecraft.getInstance().getWindow(), keyCode))
 			{
 				currentKeyDown.add(keyCode);
 			}

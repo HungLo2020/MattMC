@@ -308,12 +308,16 @@ dependencies {
     // Night Config - TOML configuration file handling
     implementation 'com.electronwill.night-config:core:3.6.7'
     implementation 'com.electronwill.night-config:toml:3.6.7'
+    implementation 'com.electronwill.night-config:json:3.6.7'
     
     // JSON Simple - JSON parsing
     implementation 'com.googlecode.json-simple:json-simple:1.1.1'
     
     // XZ for Java - Compression for LOD file storage
     implementation 'org.tukaani:xz:1.9'
+    
+    // SQLite JDBC - Database for LOD data storage
+    implementation 'org.xerial:sqlite-jdbc:3.47.2.0'
     
     // Fabric API modules (required by DH's Fabric integration)
     // Note: These are stub implementations in src/main/java/net/fabricmc/fabric/api/
