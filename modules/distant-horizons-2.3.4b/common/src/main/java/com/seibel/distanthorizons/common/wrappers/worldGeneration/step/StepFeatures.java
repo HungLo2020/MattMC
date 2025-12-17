@@ -31,11 +31,7 @@ import net.minecraft.world.level.chunk.ProtoChunk;
 import net.minecraft.world.level.levelgen.Heightmap;
 import org.apache.logging.log4j.Logger;
 
-#if MC_VER <= MC_1_20_4
-import net.minecraft.world.level.chunk.ChunkStatus;
-#else
 import net.minecraft.world.level.chunk.status.ChunkStatus;
-#endif
 
 
 public final class StepFeatures
@@ -72,11 +68,7 @@ public final class StepFeatures
 			
 			try
 			{
-				#if MC_VER < MC_1_18_2
-				worldGenRegion.setOverrideCenter(chunk.getPos());
-				environment.params.generator.applyBiomeDecoration(worldGenRegion, tParams.structFeat);
-				#else
-				if (worldGenRegion.hasChunk(chunkWrapper.getChunkPos().getX(), chunkWrapper.getChunkPos().getZ()))
+								if (worldGenRegion.hasChunk(chunkWrapper.getChunkPos().getX(), chunkWrapper.getChunkPos().getZ()))
 				{
 					this.environment.params.generator.applyBiomeDecoration(worldGenRegion, chunk, tParams.structFeat.forWorldGenRegion(worldGenRegion));
 				}
@@ -84,8 +76,7 @@ public final class StepFeatures
 				{
 					LOGGER.warn("Unable to generate features for chunk at pos ["+chunkWrapper.getChunkPos()+"], world gen region doesn't contain the chunk.");
 				}
-				#endif
-				
+								
 				Heightmap.primeHeightmaps(chunk, STATUS.heightmapsAfter());
 			}
 			catch (Exception e)

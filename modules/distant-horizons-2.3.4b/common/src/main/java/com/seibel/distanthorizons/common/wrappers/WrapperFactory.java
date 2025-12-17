@@ -40,9 +40,7 @@ import com.seibel.distanthorizons.core.wrapperInterfaces.world.IBiomeWrapper;
 import com.seibel.distanthorizons.core.wrapperInterfaces.world.ILevelWrapper;
 import com.seibel.distanthorizons.core.wrapperInterfaces.worldGeneration.AbstractBatchGenerationEnvironmentWrapper;
 import net.minecraft.client.multiplayer.ClientLevel;
-#if MC_VER > MC_1_17_1
 import net.minecraft.core.Holder;
-#endif
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.LevelReader;
@@ -229,31 +227,15 @@ public class WrapperFactory implements IWrapperFactory
 		
 		
 		
-		#if MC_VER < MC_1_20_4
-		if (objectArray.length != 1)
-		{
-			throw new ClassCastException(createBiomeWrapperErrorMessage(objectArray));
-		}
-		#endif
-		
-		#if MC_VER < MC_1_18_2
-		if (!(objectArray[0] instanceof Biome))
-		{
-			throw new ClassCastException(createBiomeWrapperErrorMessage(objectArray));
-		}
-		
-		Biome biome = (Biome) objectArray[0];
-		return BiomeWrapper.getBiomeWrapper(biome, coreLevelWrapper);
-		#else
-		if (!(objectArray[0] instanceof Holder) || !(((Holder<?>) objectArray[0]).value() instanceof Biome))
+				
+				if (!(objectArray[0] instanceof Holder) || !(((Holder<?>) objectArray[0]).value() instanceof Biome))
 		{
 			throw new ClassCastException(createBiomeWrapperErrorMessage(objectArray));
 		}
 		
 		Holder<Biome> biomeHolder = (Holder<Biome>) objectArray[0];
 		return BiomeWrapper.getBiomeWrapper(biomeHolder, coreLevelWrapper);
-		#endif
-	}
+			}
 	/**
 	 * Note: when this is updated for different MC versions,
 	 * make sure you also update the documentation in {@link IDhApiWrapperFactory#getBiomeWrapper}.
@@ -262,11 +244,7 @@ public class WrapperFactory implements IWrapperFactory
 	{
 		String[] expectedClassNames;
 		
-		#if MC_VER < MC_1_18_2
-		expectedClassNames = new String[] { Biome.class.getName() };
-		#else
 		expectedClassNames = new String[] { Holder.class.getName()+"<"+Biome.class.getName()+">" };
-		#endif
 		
 		return createWrapperErrorMessage("Biome wrapper", expectedClassNames, objectArray);
 	}
@@ -304,12 +282,8 @@ public class WrapperFactory implements IWrapperFactory
 	{
 		String[] expectedClassNames;
 		
-		#if MC_VER == MC_1_16_5 || MC_VER == MC_1_17_1
-		expectedClassNames = new String[] { Biome.class.getName() };
-		#else
-		expectedClassNames = new String[] { Holder.class.getName()+"<"+Biome.class.getName()+">" };
-		#endif
-		
+				expectedClassNames = new String[] { Holder.class.getName()+"<"+Biome.class.getName()+">" };
+				
 		return createWrapperErrorMessage("BlockState wrapper", expectedClassNames, objectArray);
 	}
 	

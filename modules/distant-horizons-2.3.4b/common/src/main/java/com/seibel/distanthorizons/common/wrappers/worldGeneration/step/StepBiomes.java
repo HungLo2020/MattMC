@@ -30,15 +30,9 @@ import net.minecraft.server.level.WorldGenRegion;
 import net.minecraft.world.level.chunk.ChunkAccess;
 import net.minecraft.world.level.chunk.ProtoChunk;
 
-#if MC_VER >= MC_1_18_2
 import net.minecraft.world.level.levelgen.blending.Blender;
-#endif
 
-#if MC_VER <= MC_1_20_4
-import net.minecraft.world.level.chunk.ChunkStatus;
-#else
 import net.minecraft.world.level.chunk.status.ChunkStatus;
-#endif
 
 public final class StepBiomes
 {
@@ -75,45 +69,14 @@ public final class StepBiomes
 		
 		for (ChunkAccess chunk : chunksToDo)
 		{
-			#if MC_VER < MC_1_18_2
-			this.environment.params.generator.createBiomes(this.environment.params.biomes, chunk);
-			#elif MC_VER < MC_1_19_2
-			chunk = this.environment.confirmFutureWasRunSynchronously(
-						this.environment.params.generator.createBiomes(
-							this.environment.params.biomes, 
-							Runnable::run, 
-							Blender.of(worldGenRegion),
-							tParams.structFeat.forWorldGenRegion(worldGenRegion), 
-							chunk)
-					);
-			#elif MC_VER < MC_1_19_4
-			chunk = this.environment.confirmFutureWasRunSynchronously(
-						this.environment.params.generator.createBiomes(
-							this.environment.params.biomes, 
-							Runnable::run, 
-							this.environment.params.randomState, Blender.of(worldGenRegion),
-							tParams.structFeat.forWorldGenRegion(worldGenRegion), 
-							chunk)
-					);
-			#elif MC_VER < MC_1_21_1
-			chunk = this.environment.confirmFutureWasRunSynchronously(
-						this.environment.params.generator.createBiomes(
-							Runnable::run, 
-							this.environment.params.randomState, 
-							Blender.of(worldGenRegion),
-							tParams.structFeat.forWorldGenRegion(worldGenRegion), 
-							chunk)
-					);
-			#else
-			chunk = this.environment.confirmFutureWasRunSynchronously(
+						chunk = this.environment.confirmFutureWasRunSynchronously(
 						this.environment.params.generator.createBiomes(
 							this.environment.params.randomState, 
 							Blender.of(worldGenRegion),
 							tParams.structFeat.forWorldGenRegion(worldGenRegion), 
 							chunk)
 					);
-			#endif
-		}
+					}
 	}
 	
 }

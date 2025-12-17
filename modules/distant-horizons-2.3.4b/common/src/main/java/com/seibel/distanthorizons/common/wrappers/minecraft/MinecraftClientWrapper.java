@@ -50,19 +50,14 @@ import net.minecraft.client.multiplayer.ServerData;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
-#if MC_VER < MC_1_19_2
-import net.minecraft.network.chat.TextComponent;
-#endif
+
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.util.profiling.ProfilerFiller;
 import net.minecraft.world.level.ChunkPos;
 import org.apache.logging.log4j.Logger;
 import org.jetbrains.annotations.Nullable;
 
-#if MC_VER < MC_1_21_3
-#else
 import net.minecraft.util.profiling.Profiler;
-#endif
 
 /**
  * A singleton that wraps the Minecraft object.
@@ -233,11 +228,7 @@ public class MinecraftClientWrapper implements IMinecraftClientWrapper, IMinecra
 			return new DhChunkPos(0, 0);
 		}
 		
-        #if MC_VER < MC_1_17_1
-        ChunkPos playerPos = new ChunkPos(player.blockPosition());
-        #else
-		ChunkPos playerPos = player.chunkPosition();
-        #endif
+        ChunkPos playerPos = player.chunkPosition();
 		return new DhChunkPos(playerPos.x, playerPos.z);
 	}
 	
@@ -262,11 +253,7 @@ public class MinecraftClientWrapper implements IMinecraftClientWrapper, IMinecra
 	public IProfilerWrapper getProfiler()
 	{
 		ProfilerFiller profiler;
-		#if MC_VER < MC_1_21_3
-		profiler = MINECRAFT.getProfiler();
-		#else
 		profiler = Profiler.get();
-		#endif
 		
 		if (this.profilerWrapper == null)
 		{
@@ -306,11 +293,7 @@ public class MinecraftClientWrapper implements IMinecraftClientWrapper, IMinecra
 			return;
 		}
 		
-        #if MC_VER < MC_1_19_2
-		player.sendMessage(new TextComponent(string), getPlayer().getUUID());
-        #else
-		player.displayClientMessage(net.minecraft.network.chat.Component.translatable(string), /*isOverlay*/false);
-        #endif
+        player.displayClientMessage(net.minecraft.network.chat.Component.translatable(string), /*isOverlay*/false);
 	}
 	
 	@Override
@@ -322,11 +305,7 @@ public class MinecraftClientWrapper implements IMinecraftClientWrapper, IMinecra
 			return;
 		}
 		
-        #if MC_VER < MC_1_19_2
-		player.displayClientMessage(new TextComponent(string), /*isOverlay*/true);
-        #else
-		player.displayClientMessage(net.minecraft.network.chat.Component.translatable(string), /*isOverlay*/true);
-        #endif
+        player.displayClientMessage(net.minecraft.network.chat.Component.translatable(string), /*isOverlay*/true);
 	}
 	
 	/**
@@ -342,11 +321,7 @@ public class MinecraftClientWrapper implements IMinecraftClientWrapper, IMinecra
 	{
 		LOGGER.error(ModInfo.READABLE_NAME + " had the following error: [" + errorMessage + "]. Crashing Minecraft...", exception);
 		CrashReport report = new CrashReport(errorMessage, exception);
-		#if MC_VER < MC_1_20_4
-		Minecraft.crash(report);
-		#else
 		Minecraft.getInstance().delayCrash(report);
-		#endif
 	}
 	
 	@Override

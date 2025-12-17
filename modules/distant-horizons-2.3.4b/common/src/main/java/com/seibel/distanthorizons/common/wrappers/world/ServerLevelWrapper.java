@@ -46,16 +46,9 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.level.chunk.ChunkAccess;
 import net.minecraft.world.level.chunk.ChunkSource;
 
-#if MC_VER <= MC_1_20_4
-import net.minecraft.world.level.chunk.ChunkStatus;
-#else
 import net.minecraft.world.level.chunk.status.ChunkStatus;
-#endif
 
-#if MC_VER < MC_1_21_3
-#else
 import java.nio.file.Path;
-#endif
 
 import org.apache.logging.log4j.Logger;
 
@@ -106,11 +99,7 @@ public class ServerLevelWrapper implements IServerLevelWrapper
 	@Override
 	public File getMcSaveFolder() 
 	{ 
-		#if MC_VER < MC_1_21_3
-		return this.level.getChunkSource().getDataStorage().dataFolder;
-		#else
 		return this.level.getChunkSource().getDataStorage().dataFolder.toFile();
-		#endif
 	}
 	
 	@Override
@@ -118,12 +107,8 @@ public class ServerLevelWrapper implements IServerLevelWrapper
 	{
 		// Need specifically overworld since it's the only dimension that is stored in a server root folder
 		
-		#if MC_VER >= MC_1_21_3
-		return this.level.getServer().getLevel(Level.OVERWORLD).getChunkSource().getDataStorage().dataFolder.getParent().getFileName().toString();
-		#else // <= 1.21.3
-		return this.level.getServer().getLevel(Level.OVERWORLD).getChunkSource().getDataStorage().dataFolder.getParentFile().getName();
-		#endif
-	}
+				return this.level.getServer().getLevel(Level.OVERWORLD).getChunkSource().getDataStorage().dataFolder.getParent().getFileName().toString();
+			}
 	
 	@Override
 	public DimensionTypeWrapper getDimensionType() { return DimensionTypeWrapper.getDimensionTypeWrapper(this.level.dimensionType()); }
@@ -154,14 +139,8 @@ public class ServerLevelWrapper implements IServerLevelWrapper
 	@Override
 	public int getMinHeight()
 	{
-        #if MC_VER < MC_1_17_1
-        return 0;
-        #elif MC_VER < MC_1_21_3
-		return this.level.getMinBuildHeight();
-        #else
-		return this.level.getMinY();
-        #endif
-	}
+        		return this.level.getMinY();
+        	}
 	
 	@Override
 	public IChunkWrapper tryGetChunk(DhChunkPos pos)

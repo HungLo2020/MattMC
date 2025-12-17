@@ -1,6 +1,5 @@
 package com.seibel.distanthorizons.common.wrappers.worldGeneration.mimicObject;
 
-#if MC_VER >= MC_1_21_1
 
 import net.minecraft.server.level.GenerationChunkHolder;
 import net.minecraft.world.level.ChunkPos;
@@ -17,12 +16,8 @@ public class DhGenerationChunkHolder extends GenerationChunkHolder
 	@Override 
 	public int getQueueLevel() { return 0; }
 	
-	#if MC_VER < MC_1_21_3
-	#else
-	@Override
+		@Override
 	protected void addSaveDependency(CompletableFuture<?> completableFuture) { }
-	#endif
-	
+		
 }
 
-#endif

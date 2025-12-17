@@ -31,13 +31,7 @@ import org.spongepowered.asm.mixin.Mixin;
 @Deprecated // TODO: Not sure if this is needed anymore
 public class MixinServerLevel
 {
-//    #if MC_VER < MC_1_17_1
-//    @Inject(method = "save", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/level/ServerChunkCache;save(Z)V", shift = At.Shift.AFTER))
-//    private void saveWorldEvent(ProgressListener progressListener, boolean bl, boolean bl2, CallbackInfo ci) {
-//        Main.client_proxy.worldSaveEvent();
-//    }
-//    #else
-//    @Inject(method = "save", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/level/entity/PersistentEntitySectionManager;saveAll()V", shift = At.Shift.AFTER))
+//    //    @Inject(method = "save", at = @At(value = "INVOKE", target = "Lnet/minecraft/world/level/entity/PersistentEntitySectionManager;saveAll()V", shift = At.Shift.AFTER))
 //    private void saveWorldEvent_sA(ProgressListener progressListener, boolean bl, boolean bl2, CallbackInfo ci) {
 //        Main.client_proxy.worldSaveEvent();
 //    }
@@ -45,5 +39,4 @@ public class MixinServerLevel
 //    private void saveWorldEvent_aS(ProgressListener progressListener, boolean bl, boolean bl2, CallbackInfo ci) {
 //        Main.client_proxy.worldSaveEvent();
 //    }
-//    #endif
-}
+//    }

@@ -39,17 +39,9 @@ import java.util.WeakHashMap;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
 
-#if MC_VER <= MC_1_20_4
-import net.minecraft.world.level.chunk.ChunkStatus;
-#else
 import net.minecraft.world.level.chunk.status.ChunkStatus;
-#endif
 
-#if MC_VER < MC_1_21_3
-import net.minecraft.world.phys.Vec3;
-#else
 import com.seibel.distanthorizons.core.util.ColorUtil;
-#endif
 
 public class ClientLevelWrapper implements IClientLevelWrapper
 {
@@ -260,14 +252,8 @@ public class ClientLevelWrapper implements IClientLevelWrapper
 	@Override
 	public int getMinHeight()
 	{
-        #if MC_VER < MC_1_17_1
-        return 0;
-		#elif MC_VER < MC_1_21_3
-		return this.level.getMinBuildHeight();
-        #else
-		return this.level.getMinY();
-        #endif
-	}
+        		return this.level.getMinY();
+        	}
 	
 	@Override
 	public IChunkWrapper tryGetChunk(DhChunkPos pos)
@@ -345,14 +331,9 @@ public class ClientLevelWrapper implements IClientLevelWrapper
 	@Override
 	public Color getCloudColor(float tickDelta)
 	{
-		#if MC_VER < MC_1_21_3
-		Vec3 colorVec3 = this.level.getCloudColor(tickDelta);
-		return new Color((float)colorVec3.x, (float)colorVec3.y, (float)colorVec3.z);
-		#else
-		int argbColor = this.level.getCloudColor(tickDelta);
+				int argbColor = this.level.getCloudColor(tickDelta);
 		return ColorUtil.toColorObjARGB(argbColor);
-		#endif
-	}
+			}
 	
 	
 	

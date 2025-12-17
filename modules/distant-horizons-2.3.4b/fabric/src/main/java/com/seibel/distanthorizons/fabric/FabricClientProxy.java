@@ -49,16 +49,10 @@ import net.fabricmc.fabric.api.event.player.UseBlockCallback;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.TitleScreen;
 
-#if MC_VER >= MC_1_20_6
 import com.seibel.distanthorizons.common.CommonPacketPayload;
 import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
-#else
-import com.seibel.distanthorizons.core.network.messages.AbstractNetworkMessage;
-#endif
 
-#if MC_VER < MC_1_19_4
-import java.nio.FloatBuffer;
-#endif
+
 import java.util.HashSet;
 import java.util.concurrent.AbstractExecutorService;
 import java.util.concurrent.ThreadPoolExecutor;
@@ -222,11 +216,7 @@ public class FabricClientProxy implements AbstractModInitializer.IEventProxy
 			Mat4f projectionMatrix = McObjectConverter.Convert(renderContext.projectionMatrix());
 			
 			Mat4f modelViewMatrix;
-			#if MC_VER < MC_1_20_6
-			modelViewMatrix = McObjectConverter.Convert(renderContext.matrixStack().last().pose());
-			#else
 			modelViewMatrix = McObjectConverter.Convert(renderContext.positionMatrix());
-			#endif
 			
 			
 			//LOGGER.info("\n\n" +
@@ -239,11 +229,7 @@ public class FabricClientProxy implements AbstractModInitializer.IEventProxy
 			this.clientApi.renderLods(ClientLevelWrapper.getWrapper(renderContext.world()),
 					modelViewMatrix,
 					projectionMatrix,
-					#if MC_VER < MC_1_21_1
-					renderContext.tickDelta()
-					#else
 					renderContext.tickCounter().getGameTimeDeltaTicks()
-					#endif
 					);
 		});
 		
@@ -254,20 +240,12 @@ public class FabricClientProxy implements AbstractModInitializer.IEventProxy
 			Mat4f projectionMatrix = McObjectConverter.Convert(renderContext.projectionMatrix());
 			
 			Mat4f modelViewMatrix;
-			#if MC_VER < MC_1_20_6
-			modelViewMatrix = McObjectConverter.Convert(renderContext.matrixStack().last().pose());
-			#else
 			modelViewMatrix = McObjectConverter.Convert(renderContext.positionMatrix());
-			#endif
 			
 			this.clientApi.renderFadeOpaque(
 					modelViewMatrix,
 					projectionMatrix,
-					#if MC_VER < MC_1_21_1
-					renderContext.tickDelta(),
-					#else
 					renderContext.tickCounter().getGameTimeDeltaTicks(),
-					#endif
 					ClientLevelWrapper.getWrapper(renderContext.world())
 			);
 		});
@@ -278,31 +256,19 @@ public class FabricClientProxy implements AbstractModInitializer.IEventProxy
 			Mat4f projectionMatrix = McObjectConverter.Convert(renderContext.projectionMatrix());
 			
 			Mat4f modelViewMatrix;
-			#if MC_VER < MC_1_20_6
-			modelViewMatrix = McObjectConverter.Convert(renderContext.matrixStack().last().pose());
-			#else
 			modelViewMatrix = McObjectConverter.Convert(renderContext.positionMatrix());
-			#endif
 			
 			
-			#if MC_VER < MC_1_21_6
-			// rendered in MixinLevelRenderer
-			#else
-			ClientApi.INSTANCE.renderDeferredLodsForShaders(ClientLevelWrapper.getWrapper(renderContext.world()),
+						ClientApi.INSTANCE.renderDeferredLodsForShaders(ClientLevelWrapper.getWrapper(renderContext.world()),
 					ClientApi.RENDER_STATE.mcModelViewMatrix,
 					ClientApi.RENDER_STATE.mcProjectionMatrix,
 					ClientApi.RENDER_STATE.frameTime
 			);
-			#endif
-			
+						
 			this.clientApi.renderFade(
 					modelViewMatrix,
 					projectionMatrix,
-					#if MC_VER < MC_1_21_1
-					renderContext.tickDelta(),
-					#else
 					renderContext.tickCounter().getGameTimeDeltaTicks(),
-					#endif
 					ClientLevelWrapper.getWrapper(renderContext.world())
 			);
 		});
@@ -324,8 +290,7 @@ public class FabricClientProxy implements AbstractModInitializer.IEventProxy
 		// networking event //
 		//==================//
 		
-		#if MC_VER >= MC_1_20_6
-		PayloadTypeRegistry.playS2C().register(CommonPacketPayload.TYPE, new CommonPacketPayload.Codec());
+				PayloadTypeRegistry.playS2C().register(CommonPacketPayload.TYPE, new CommonPacketPayload.Codec());
 		ClientPlayNetworking.registerGlobalReceiver(CommonPacketPayload.TYPE, (payload, context) ->
 		{
 			if (payload.message() == null)
@@ -334,17 +299,7 @@ public class FabricClientProxy implements AbstractModInitializer.IEventProxy
 			}
 			ClientApi.INSTANCE.pluginMessageReceived(payload.message());
 		});
-		#else
-		ClientPlayNetworking.registerGlobalReceiver(AbstractPluginPacketSender.WRAPPER_PACKET_RESOURCE, (client, handler, buffer, packetSender) ->
-		{
-			AbstractNetworkMessage message = PACKET_SENDER.decodeMessage(buffer);
-			if (message != null)
-			{
-				ClientApi.INSTANCE.pluginMessageReceived(message);
 			}
-		});
-		#endif
-	}
 	
 	public void onKeyInput()
 	{

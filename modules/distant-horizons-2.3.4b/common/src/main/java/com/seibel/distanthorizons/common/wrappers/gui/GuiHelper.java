@@ -5,10 +5,6 @@ import net.minecraft.client.gui.components.Button;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.MutableComponent;
 
-#if MC_VER < MC_1_19_2
-import net.minecraft.network.chat.TextComponent;
-import net.minecraft.network.chat.TranslatableComponent;
-#endif
 
 public class GuiHelper
 {
@@ -17,56 +13,32 @@ public class GuiHelper
 	 */
 	public static Button MakeBtn(Component base, int posX, int posZ, int width, int height, Button.OnPress action)
 	{
-        #if MC_VER < MC_1_19_4
-		return new Button(posX, posZ, width, height, base, action);
-        #else
-		return Button.builder(base, action).bounds(posX, posZ, width, height).build();
-        #endif
+        return Button.builder(base, action).bounds(posX, posZ, width, height).build();
 	}
 	
 	public static MutableComponent TextOrLiteral(String text)
 	{
-        #if MC_VER < MC_1_19_2
-		return new TextComponent(text);
-        #else
-		return Component.literal(text);
-        #endif
+        return Component.literal(text);
 	}
 	
 	public static MutableComponent TextOrTranslatable(String text)
 	{
-        #if MC_VER < MC_1_19_2
-		return new TextComponent(text);
-        #else
-		return Component.translatable(text);
-        #endif
+        return Component.translatable(text);
 	}
 	
 	public static MutableComponent Translatable(String text, Object... args)
 	{
-        #if MC_VER < MC_1_19_2
-		return new TranslatableComponent(text, args);
-        #else
-		return Component.translatable(text, args);
-        #endif
+        return Component.translatable(text, args);
 	}
 	
 	public static void SetX(AbstractWidget w, int x)
 	{
-        #if MC_VER < MC_1_19_4
-		w.x = x;
-        #else
-		w.setX(x);
-        #endif
+        w.setX(x);
 	}
 	
 	public static void SetY(AbstractWidget w, int y)
 	{
-        #if MC_VER < MC_1_19_4
-		w.y = y;
-        #else
-		w.setY(y);
-        #endif
+        w.setY(y);
 	}
 	
 }

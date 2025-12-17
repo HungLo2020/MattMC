@@ -21,19 +21,6 @@ package com.seibel.distanthorizons.fabric.mixins.server;
 
 import org.spongepowered.asm.mixin.Mixin;
 
-#if MC_VER < MC_1_21_3
-/**
- * {@link MixinUtilBackgroundThread} was used for versions before 1.21.3
- * This is just a dummy class/mixin to make the compiler happy.
- *
- * @see MixinUtilBackgroundThread
- */
-@Mixin(net.minecraft.Util.class) // TODO we should allow version specific mixins so we don't have to create dummy mixins that exist for all MC versions
-public class MixinTracingExecutor
-{
-	
-}
-#else
 
 import com.seibel.distanthorizons.common.wrappers.DependencySetupDoneCheck;
 import com.seibel.distanthorizons.core.util.objects.RunOnThisThreadExecutorService;
@@ -72,4 +59,3 @@ public class MixinTracingExecutor
 	}	
 	
 }
-#endif

@@ -17,9 +17,7 @@ import java.nio.file.Path;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.locks.ReentrantLock;
 
-#if MC_VER >= MC_1_20_6
 import net.minecraft.world.level.chunk.storage.RegionStorageInfo;
-#endif
 
 /** 
  * Shouldn't be used when the C2ME mod is present,
@@ -84,31 +82,13 @@ public class RegionFileStorageExternalCache implements AutoCloseable
 			{
 				this.getRegionFileLock.lock();
 				
-				#if MC_VER == MC_1_16_5 || MC_VER == MC_1_17_1
-				rFile = this.storage.getRegionFile(pos);
-				
-				// keeping the region cache size low helps prevent concurrency issues
-				if (this.storage.regionCache.size() > 150) // max 256
-				{
-					RegionFile removedFile = this.storage.regionCache.removeLast();
-					if (removedFile != null)
-					{
-						removedFile.close();
-					}
-				}
-				#else
-				rFile = this.storage.regionCache.getOrDefault(posLong, null);	
-				#endif
-				
+								rFile = this.storage.regionCache.getOrDefault(posLong, null);	
+								
 				break;
 			}
 			catch (ArrayIndexOutOfBoundsException e)
 			{
-				#if MC_VER == MC_1_16_5 || MC_VER == MC_1_17_1
-				// the file just wasn't cached
-				break;
-				#else
-				// potential concurrency issue, wait a second and try to get the file again
+								// potential concurrency issue, wait a second and try to get the file again
 				try
 				{
 					Thread.sleep(250);
@@ -116,8 +96,7 @@ public class RegionFileStorageExternalCache implements AutoCloseable
 				catch (InterruptedException ignored)
 				{
 				}
-				#endif
-			}
+							}
 			catch (NullPointerException e)
 			{
 				// Can sometimes happen when other mods modify the region cache system (IE C2ME)
@@ -159,26 +138,16 @@ public class RegionFileStorageExternalCache implements AutoCloseable
 		
 		// Otherwise, check if file exist, and if so, add it to the cache
 		Path storageFolderPath;
-		#if MC_VER == MC_1_16_5 || MC_VER == MC_1_17_1
-		storageFolderPath = this.storage.folder.toPath();
-		#else
-		storageFolderPath = this.storage.folder;
-		#endif
-		
+				storageFolderPath = this.storage.folder;
+				
 		if (!Files.exists(storageFolderPath))
 		{
 			return null;
 		}
 		
 		Path regionFilePath = storageFolderPath.resolve("r." + pos.getRegionX() + "." + pos.getRegionZ() + ".mca");
-		#if MC_VER == MC_1_16_5 || MC_VER == MC_1_17_1
-		rFile = new RegionFile(regionFilePath.toFile(), storageFolderPath.toFile(), false);
-		#elif MC_VER <= MC_1_20_4
-		rFile = new RegionFile(regionFilePath, storageFolderPath, false);
-		#else
-		rFile = new RegionFile(new RegionStorageInfo("level", null, "level type"), regionFilePath, storageFolderPath, false);
-		#endif
-		
+				rFile = new RegionFile(new RegionStorageInfo("level", null, "level type"), regionFilePath, storageFolderPath, false);
+				
 		this.regionFileCache.add(new RegionFileCache(ChunkPos.asLong(pos.getRegionX(), pos.getRegionZ()), rFile));
 		while (this.regionFileCache.size() > MAX_CACHE_SIZE)
 		{

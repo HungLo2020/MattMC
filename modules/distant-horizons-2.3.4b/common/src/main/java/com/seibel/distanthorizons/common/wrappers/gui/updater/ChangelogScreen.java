@@ -16,16 +16,9 @@ import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 import org.apache.logging.log4j.Logger;
 
-#if MC_VER >= MC_1_17_1
 import net.minecraft.client.gui.narration.NarratableEntry;
-#endif
 
-#if MC_VER < MC_1_20_1
-import net.minecraft.client.gui.GuiComponent;
-import com.mojang.blaze3d.vertex.PoseStack;
-#else
 import net.minecraft.client.gui.GuiGraphics;
-#endif
 
 
 import static com.seibel.distanthorizons.common.wrappers.gui.GuiHelper.*;
@@ -167,41 +160,23 @@ public class ChangelogScreen extends DhScreen
 	}
 	
 	@Override
-    #if MC_VER < MC_1_20_1
-	public void render(PoseStack matrices, int mouseX, int mouseY, float delta)
-    #else
-	public void render(GuiGraphics matrices, int mouseX, int mouseY, float delta)
-    #endif
+    public void render(GuiGraphics matrices, int mouseX, int mouseY, float delta)
 	{
-		#if MC_VER < MC_1_20_2
-		this.renderBackground(matrices); // Render background
-		#else
 		this.renderBackground(matrices, mouseX, mouseY, delta); // Render background
-		#endif
 		if (!this.usable)
 		{
 			return;
 		}
 		
 		int maxScroll;
-		#if MC_VER <= MC_1_21_3
-		maxScroll = this.changelogArea.getMaxScroll();
-		#else
 		maxScroll = this.changelogArea.maxScrollAmount();
-		#endif
 		
 		// Set the scroll position to the mouse height relative to the screen
 		// This is a bit of a hack as we cannot scroll on this area
 		double scrollAmount = ((double) mouseY) / ((double) this.height) * 1.1 * maxScroll;
 		
-	    #if MC_VER == MC_1_16_5 || MC_VER == MC_1_17_1
-		this.changelogArea.setScrollAmount(scrollAmount);
-		#elif MC_VER <= MC_1_21_3
-		this.changelogArea.scrollAmount = scrollAmount;
-		#else
-		this.changelogArea.setScrollAmount(scrollAmount);
-		#endif
-		
+	    		this.changelogArea.setScrollAmount(scrollAmount);
+				
 		
 		// render order matters, otherwise on 1.20.6+ the blurred background will render on top of the text
 		super.render(matrices, mouseX, mouseY, delta); // Render the buttons
@@ -221,11 +196,7 @@ public class ChangelogScreen extends DhScreen
 		
 		public TextArea(Minecraft minecraftClient, int canvasWidth, int canvasHeight, int topMargin, int botMargin, int itemSpacing)
 		{
-			#if MC_VER < MC_1_20_4
-			super(minecraftClient, canvasWidth, canvasHeight, topMargin, canvasHeight - botMargin, itemSpacing);
-			#else
 			super(minecraftClient, canvasWidth, canvasHeight - (topMargin + botMargin), topMargin, itemSpacing);
-			#endif
 			this.centerListVertically = false;
 			this.textRenderer = minecraftClient.font;
 		}
@@ -259,32 +230,22 @@ public class ChangelogScreen extends DhScreen
 			return new ButtonEntry(text);
 		}
 		
-		#if MC_VER < MC_1_20_1
-		@Override
-		public void render(PoseStack matrices, int index, int y, int x, int entryWidth, int entryHeight, int mouseX, int mouseY, boolean hovered, float tickDelta)
-		{
-			GuiComponent.drawString(matrices, textRenderer, text, 12, y + 5, 0xFFFFFF);
-		}
-		#else
-		@Override
+				@Override
 		public void render(GuiGraphics matrices, int index, int y, int x, int entryWidth, int entryHeight, int mouseX, int mouseY, boolean hovered, float tickDelta)
 		{
 			matrices.drawString(textRenderer, this.text, 12, y + 5, 0xFFFFFF);
 		}
-        #endif
-		
+        		
 		@Override
 		public List<? extends GuiEventListener> children()
 		{
 			return this.children;
 		}
-		#if MC_VER >= MC_1_17_1
-		@Override
+				@Override
 		public List<? extends NarratableEntry> narratables()
 		{
 			return this.children;
 		}
-		#endif
-	}
+			}
 	
 }

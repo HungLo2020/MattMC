@@ -65,11 +65,7 @@ public class TintGetterOverrideSmooth implements BlockAndTintGetter
 	
 	private Biome _getBiome(BlockPos pos)
 	{
-		#if MC_VER >= MC_1_18_2
 		return this.parent.getBiome(pos).value();
-		#else
-		return parent.getBiome(pos);
-		#endif
 	}
 	
 	public int calculateBlockTint(BlockPos blockPos, ColorResolver colorResolver)
@@ -126,12 +122,7 @@ public class TintGetterOverrideSmooth implements BlockAndTintGetter
 	@Override
 	public int getLightEmission(BlockPos blockPos) { return this.parent.getLightEmission(blockPos); }
 	
-	#if MC_VER < MC_1_21_3
-	@Override
-	public int getMaxLightLevel() { return this.parent.getMaxLightLevel(); }
-	#else
-	#endif
-	
+			
 	@Override
 	public Stream<BlockState> getBlockStates(AABB aABB) { return this.parent.getBlockStates(aABB); }
 	
@@ -151,16 +142,10 @@ public class TintGetterOverrideSmooth implements BlockAndTintGetter
 	@Override
 	public double getBlockFloorHeight(BlockPos blockPos) { return this.parent.getBlockFloorHeight(blockPos); }
 	
-	#if MC_VER < MC_1_21_3
-	@Override
-	public int getMaxBuildHeight() { return this.parent.getMaxBuildHeight(); }
-	#else
-	@Override
+		@Override
 	public int getMaxY() { return this.parent.getMaxY(); }
-	#endif
-	
-	#if MC_VER >= MC_1_17_1
-	@Override
+		
+		@Override
 	public <T extends BlockEntity> Optional<T> getBlockEntity(BlockPos blockPos, BlockEntityType<T> blockEntityType) { return this.parent.getBlockEntity(blockPos, blockEntityType); }
 	
 	@Override
@@ -169,33 +154,18 @@ public class TintGetterOverrideSmooth implements BlockAndTintGetter
 	@Override
 	public int getHeight() { return this.parent.getHeight(); }
 	
-	#if MC_VER < MC_1_21_3
-	@Override
-	public int getMinBuildHeight() { return this.parent.getMinBuildHeight(); }
-	#else
-	@Override
+		@Override
 	public int getMinY() { return this.parent.getMinY(); }
-	#endif
-	
+		
 	@Override
 	public int getSectionsCount() { return this.parent.getSectionsCount(); }
 	
-	#if MC_VER < MC_1_21_3
-	@Override
-	public int getMinSection() { return this.parent.getMinSection(); }
-	#else
-	@Override
+		@Override
 	public int getMinSectionY() { return BlockAndTintGetter.super.getMinSectionY(); }	
-	#endif
-	
-	#if MC_VER < MC_1_21_3
-	@Override
-	public int getMaxSection() { return this.parent.getMaxSection(); }
-	#else
-	@Override
+		
+		@Override
 	public int getMaxSectionY() { return this.parent.getMaxSectionY(); }
-	#endif
-	
+		
 	@Override
 	public boolean isOutsideBuildHeight(BlockPos blockPos) { return this.parent.isOutsideBuildHeight(blockPos); }
 	
@@ -210,5 +180,4 @@ public class TintGetterOverrideSmooth implements BlockAndTintGetter
 	
 	@Override
 	public int getSectionYFromSectionIndex(int i) { return this.parent.getSectionYFromSectionIndex(i); }
-    #endif
-}
+    }

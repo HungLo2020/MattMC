@@ -70,7 +70,7 @@ public class PregenCommand extends AbstractCommand
 		
 		CompletableFuture<Void> future = this.pregenManager.startPregen(
 				ServerLevelWrapper.getWrapper(level),
-				new DhBlockPos2D(#if MC_VER >= MC_1_19_2 origin.x(), origin.z() #else origin.x, origin.z #endif),
+				new DhBlockPos2D(origin.x(), origin.z()),
 				chunkRadius
 		);
 		

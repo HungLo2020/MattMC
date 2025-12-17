@@ -52,39 +52,12 @@ public class LightMapWrapper implements ILightMapWrapper
 	
 	public void uploadLightmap(NativeImage image)
 	{
-		#if MC_VER < MC_1_21_5
-		int currentTexture = GLMC.getActiveTexture();
-		if (this.textureId == 0)
-		{
-			this.createLightmap(image);
-		}
-		else
-		{
-			GLMC.glBindTexture(this.textureId);
-		}
-		image.upload(0, 0, 0, false);
-		
-		// getActiveTexture() may return textures that aren't valid and attempting to bind them will
-		// throw a GL error in MC 1.21.1
-		if (GL32.glIsTexture(currentTexture))
-		{
-			GLMC.glBindTexture(currentTexture);
-		}
-		#else 
-		throw new UnsupportedOperationException("setLightmapId should be used for MC versions after 1.21.5"); // TODO that MC version number is wrong, when did we actually start using setLightmapId()?
-		#endif
-	}
+				throw new UnsupportedOperationException("setLightmapId should be used for MC versions after 1.21.5"); // TODO that MC version number is wrong, when did we actually start using setLightmapId()?
+			}
 	private void createLightmap(NativeImage image)
 	{
-		#if MC_VER < MC_1_21_5
-		this.textureId = GLMC.glGenTextures();
-		GLMC.glBindTexture(this.textureId);
-		GL32.glTexImage2D(GL32.GL_TEXTURE_2D, 0, image.format().glFormat(), image.getWidth(), image.getHeight(),
-				0, image.format().glFormat(), GL32.GL_UNSIGNED_BYTE, (ByteBuffer) null);
-		#else
-		throw new UnsupportedOperationException("setLightmapId should be used for MC versions after 1.21.5"); // TODO that MC version number is wrong, when did we actually start using setLightmapId()?
-		#endif
-	}
+				throw new UnsupportedOperationException("setLightmapId should be used for MC versions after 1.21.5"); // TODO that MC version number is wrong, when did we actually start using setLightmapId()?
+			}
 	
 	public void setLightmapId(int minecraftLightmapTetxureId)
 	{

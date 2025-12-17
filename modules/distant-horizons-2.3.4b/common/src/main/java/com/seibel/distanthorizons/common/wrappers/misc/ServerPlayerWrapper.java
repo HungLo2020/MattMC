@@ -52,14 +52,8 @@ public class ServerPlayerWrapper implements IServerPlayerWrapper
 		ServerLevel level = ((IMixinServerPlayer) this.getServerPlayer()).distantHorizons$getDimensionChangeDestination();
 		if (level == null)
 		{
-			#if MC_VER < MC_1_20_1
-			level = this.getServerPlayer().getLevel();
-			#elif MC_VER < MC_1_21_6
-			level = this.getServerPlayer().serverLevel();
-			#else
-			level = this.getServerPlayer().level();
-			#endif
-		}
+						level = this.getServerPlayer().level();
+					}
 		
 		return ServerLevelWrapper.getWrapper(level);
 	}
@@ -74,22 +68,14 @@ public class ServerPlayerWrapper implements IServerPlayerWrapper
 	@Override
 	public int getViewDistance() 
 	{
-		#if MC_VER < MC_1_21_6
-		return this.getServerPlayer().server.getPlayerList().getViewDistance();
-		#else
 		return this.getServerPlayer().getServer().getPlayerList().getViewDistance();
-		#endif
 	}
 	
 	@Override
 	public SocketAddress getRemoteAddress()
 	{
-		#if MC_VER >= MC_1_19_4
-		return this.getServerPlayer().connection.getRemoteAddress();
-		#else // < 1.19.4
-		return this.getServerPlayer().connection.connection.getRemoteAddress();
-		#endif
-	}
+				return this.getServerPlayer().connection.getRemoteAddress();
+			}
 	
 	
 	

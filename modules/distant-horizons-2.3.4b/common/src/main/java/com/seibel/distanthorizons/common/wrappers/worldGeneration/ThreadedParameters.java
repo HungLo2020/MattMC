@@ -25,9 +25,7 @@ import com.seibel.distanthorizons.common.wrappers.worldGeneration.mimicObject.Wo
 
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.WorldGenLevel;
-#if MC_VER >= MC_1_18_2
 import net.minecraft.world.level.levelgen.structure.StructureCheck;
-#endif
 
 public final class ThreadedParameters
 {
@@ -35,9 +33,7 @@ public final class ThreadedParameters
 	
 	final ServerLevel level;
 	public WorldGenStructFeatManager structFeat = null;
-	#if MC_VER >= MC_1_18_2
 	public StructureCheck structCheck;
-	#endif
 	boolean isValid = true;
 	public final PerfCalculator perf = new PerfCalculator();
 	
@@ -63,16 +59,10 @@ public final class ThreadedParameters
 		previousGlobalParameters = param;
 		
 		this.level = param.level;
-		#if MC_VER < MC_1_18_2
-		this.structFeat = new WorldGenStructFeatManager(param.worldGenSettings, level);
-		#elif MC_VER < MC_1_19_2
-		this.structCheck = this.createStructureCheck(param);
-		#else
-		this.structCheck = new StructureCheck(param.chunkScanner, param.registry, param.structures,
+				this.structCheck = new StructureCheck(param.chunkScanner, param.registry, param.structures,
 				param.level.dimension(), param.generator, param.randomState, level, param.generator.getBiomeSource(), param.worldSeed,
 				param.fixerUpper);
-		#endif
-	}
+			}
 	
 	
 	
@@ -80,16 +70,11 @@ public final class ThreadedParameters
 	
 	public void makeStructFeat(WorldGenLevel genLevel, GlobalParameters param)
 	{
-		#if MC_VER < MC_1_19_4
-		structFeat = new WorldGenStructFeatManager(param.worldGenSettings, genLevel #if MC_VER >= MC_1_18_2 , structCheck #endif );
-		#else
 		structFeat = new WorldGenStructFeatManager(param.worldOptions, genLevel, structCheck);
-		#endif
 	}
 	
 	
-	#if MC_VER >= MC_1_18_2 && MC_VER < MC_1_19_2
-	public void recreateStructureCheck()
+		public void recreateStructureCheck()
 	{
 		if (previousGlobalParameters != null)
 		{
@@ -102,8 +87,5 @@ public final class ThreadedParameters
 				param.level.dimension(), param.generator, this.level, param.generator.getBiomeSource(), param.worldSeed,
 				param.fixerUpper);
 	}
-	#else
-	public void recreateStructureCheck() { /* do nothing */ }	
-	#endif
-	
+		
 }
