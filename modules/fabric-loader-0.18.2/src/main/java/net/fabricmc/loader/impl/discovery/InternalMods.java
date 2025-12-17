@@ -53,12 +53,9 @@ public final class InternalMods {
 	public static List<ModCandidateImpl> getAll(VersionOverrides versionOverrides, DependencyOverrides depOverrides) {
 		List<ModCandidateImpl> internalMods = new ArrayList<>();
 		
-		// Add Sodium as internal mod
-		ModCandidateImpl sodium = createModCandidate("sodium", versionOverrides, depOverrides);
-		if (sodium != null) {
-			internalMods.add(sodium);
-			Log.info(LogCategory.DISCOVERY, "Registered internal mod: Sodium");
-		}
+		// NOTE: Sodium is now fully integrated into the base game, no longer loaded as a JAR mod
+		// Keeping this comment as a reminder of the integration status
+		Log.info(LogCategory.DISCOVERY, "Sodium is integrated - not loading as separate mod");
 		
 		// Add Iris as internal mod
 		ModCandidateImpl iris = createModCandidate("iris", versionOverrides, depOverrides);
