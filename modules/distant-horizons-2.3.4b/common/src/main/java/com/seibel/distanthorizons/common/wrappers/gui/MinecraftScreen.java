@@ -34,7 +34,7 @@ public class MinecraftScreen
 		protected ConfigScreenRenderer(Screen parent, AbstractScreen screen, String translationName)
 		{
 			super(translate(translationName));
-			screen.minecraftWindow = Minecraft.getInstance().getWindow().getWindow();
+			screen.minecraftWindow = Minecraft.getInstance().getWindow().handle();
 			this.parent = parent;
 			this.screen = screen;
 		}

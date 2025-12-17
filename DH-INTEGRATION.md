@@ -6,29 +6,29 @@
 Integrate Distant Horizons (DH) mod source code directly into the MattMC unified build system, enabling compilation and execution alongside Minecraft, Fabric Loader, Sodium, and Iris within a single Gradle project. When `./gradlew runClient` is executed, all components including DH should compile from source and run together seamlessly.
 
 ### Current Status
-- ✅ **Core subproject integrated**: DH's core and API subprojects extracted to `modules/distant-horizons-2.3.4b/coreSubProjects/`
+- ✅ **DH source extracted**: All DH 2.3.4b source code present in `modules/distant-horizons-2.3.4b/` (679 Java files)
 - ✅ **Access wideners applied**: All 29 access widener directives from DH applied to vanilla Minecraft source (20 files modified)
 - ✅ **Preprocessor directives removed**: All 427 Manifold preprocessor directives removed from 75 files (Fabric and Common modules) for MC 1.21.10
-- ✅ **Build integration**: DH source set added to build.gradle with all 4 source directories
-- ✅ **Dependencies**: DH-specific dependencies added (Night Config, JSON Simple, XZ)
-- ✅ **JAR tasks**: distantHorizonsJar task created and wired into runClient
-- ❌ **Compilation**: 124 compilation errors identified (Phase 2 work)
-- ❌ **Platform abstractions**: Fabric API stubs need to be created
-- ❌ **API compatibility**: MC 1.21.10 API changes need to be addressed
+- ✅ **Dependencies added**: DH-specific dependencies added to build.gradle (Night Config, JSON Simple, XZ)
+- ✅ **Fabric API stubs implemented**: All 22 required Fabric API stub classes created and verified against real API
+- ⚠️ **Build integration DISABLED**: DH source set, configurations, and JAR tasks present in build.gradle but commented out
+- ❌ **Compilation not tested**: Integration is disabled, no recent compilation attempts
+- ❌ **Runtime integration**: Not yet tested (integration disabled)
 
 ### Recommended Approach
 **Phased Integration Strategy** - Incrementally add DH to the build system, addressing compilation issues one layer at a time:
 
-1. **Phase 1**: Build system setup (source sets, dependencies, JAR tasks) - ✅ **COMPLETED**
-2. **Phase 2**: Resolve compilation errors (Fabric API, MC API compatibility, parameter names)
+1. **Phase 1**: Build system setup (source sets, dependencies, JAR tasks) - ⚠️ **PREPARED BUT DISABLED**
+2. **Phase 2**: Enable build integration and resolve compilation errors
 3. **Phase 3**: Runtime integration (mixin configs, mod metadata)
 4. **Phase 4**: Testing and validation
 
-**Estimated Complexity**: HIGH - 24-40 hours of remaining development time
-- ✅ **Phase 1 Completed**: Source sets and dependency configuration (4-8 hours)
-- ✅ **Preprocessor directives**: Removed from all files (8-12 hours)
-- Medium (40%): Basic compilation and dependency resolution (12-24 hours)
-- Hard (40%): Platform abstractions and runtime integration (12-16 hours)
+**Estimated Complexity**: HIGH - 16-32 hours of remaining development time
+- ✅ **Preparatory Work Completed**: All source extracted, access wideners applied, preprocessor directives removed, Fabric API stubs created (12-20 hours invested)
+- ⚠️ **Phase 1 Status**: Build configuration exists but is commented out (needs uncommenting)
+- Medium (50%): Enable integration, resolve compilation errors (8-16 hours)
+- Medium (30%): Runtime integration and testing (4-8 hours)
+- Low (20%): Final validation and documentation (4-8 hours)
 
 ---
 
@@ -105,6 +105,34 @@ The fundamental challenge is bridging these architectural differences:
 ---
 
 ## Current Integration Status
+
+### Why is DH Integration Disabled?
+
+The build.gradle file contains all necessary DH integration code, but it's currently commented out with "DISTANT HORIZONS INTEGRATION - DISABLED" markers. This appears to be a deliberate choice, possibly due to:
+
+1. **Compilation errors**: Previous integration attempts may have encountered errors
+2. **Build time concerns**: Compiling 679 additional Java files increases build time
+3. **Stability**: Keeping the integration disabled until all issues are resolved
+4. **Development workflow**: Allowing work on main codebase without DH complications
+
+### Current Integration State
+
+**What's Ready**:
+- ✅ All DH source code extracted (679 Java files in `modules/distant-horizons-2.3.4b/`)
+- ✅ Access wideners applied to Minecraft source (29 directives, 20 files)
+- ✅ Preprocessor directives removed (427 blocks from 75 files)
+- ✅ Dependencies added (Night Config, JSON Simple, XZ)
+- ✅ Fabric API stubs implemented (22 classes)
+- ✅ Build configuration written (source sets, tasks, dependencies)
+
+**What's Disabled**:
+- ⚠️ DH source set (commented out in build.gradle)
+- ⚠️ Configuration extensions (commented out)
+- ⚠️ Classpath dependencies (commented out)
+- ⚠️ JAR build tasks (commented out)
+- ⚠️ Runtime integration (not wired into runClient)
+
+**Next Step**: Enable integration by uncommenting the disabled sections and test compilation.
 
 ### Completed Work
 
@@ -251,12 +279,27 @@ All conditionals were evaluated for MC 1.21.10:
 - ✅ JSON Simple 1.1.1 - JSON parsing
 - ✅ XZ for Java 1.9 - Compression for LOD storage
 
-**Configuration inheritance**:
-- ✅ distantHorizonsImplementation extends from implementation
-- ✅ distantHorizonsCompileOnly extends from compileOnly
-- ✅ distantHorizonsRuntimeOnly extends from runtimeOnly
+**Fabric API Stubs** (✅ Complete):
+- ✅ All 22 required Fabric API stub classes implemented in `src/main/java/net/fabricmc/fabric/api/`
+- ✅ Verified against real Fabric API source in `frnsrc/fabric-1.21.10/`
+- ✅ Verified against actual DH usage patterns in DH source code
+- ✅ Legacy API compatibility added for deprecated patterns (1.21.1 → 1.21.10 compatibility)
 
-**Status**: All DH-specific dependencies added. Libraries resolve correctly at compile time.
+**Implemented stub modules**:
+- fabric-api-base (Event system)
+- fabric-events-interaction-v0 (Player interaction events)
+- fabric-lifecycle-events-v1 (Client/server lifecycle and tick events)
+- fabric-command-api-v2 (Command registration)
+- fabric-entity-events-v1 (Entity events)
+- fabric-rendering-v1 (Client world rendering events + legacy support)
+- fabric-networking-api-v1 (Client/server networking)
+
+**Configuration inheritance**:
+- ⚠️ distantHorizonsImplementation extends from implementation (COMMENTED OUT)
+- ⚠️ distantHorizonsCompileOnly extends from compileOnly (COMMENTED OUT)
+- ⚠️ distantHorizonsRuntimeOnly extends from runtimeOnly (COMMENTED OUT)
+
+**Status**: All DH-specific dependencies added and Fabric API stubs created. Configuration inheritance ready but disabled.
 
 #### 6. Preprocessor Cleanup (✅ Complete - Phase 1)
 
@@ -270,29 +313,40 @@ All conditionals were evaluated for MC 1.21.10:
 
 ### Pending Work
 
-#### 1. Compilation Error Resolution (❌ Phase 2 - In Progress)
+#### 1. Enable Build Integration (❌ Phase 1 - Not Started)
 
-**Identified issues** (124 compilation errors):
-- **Fabric API missing** (25+ errors): ClientTickEvents, WorldRenderEvents, PayloadTypeRegistry, ClientPlayNetworking
-  - Need to create stub implementations or include actual Fabric API modules
-- **Minecraft API changes** (50+ errors): PalettedContainer.Strategy, ChunkStatus, StructureCheck constructor
-  - DH code needs updates for MC 1.21.10 API compatibility
-- **Missing classes/methods** (30+ errors): Window.getWindow(), ChunkType enum
-  - API changes or removal in MC 1.21.10
-- **Type inference issues** (15+ errors): lookupOrThrow generic type compatibility
-  - Need explicit type parameters
+**Current state**: All build configuration exists in build.gradle but is commented out with "DISTANT HORIZONS INTEGRATION - DISABLED" markers.
 
-**Estimated effort**: 12-24 hours
+**Required actions**:
+1. Uncomment the `distantHorizons` source set definition (around line 410)
+2. Uncomment configuration extensions (lines 478-480)
+3. Uncomment classpath dependencies (lines 502-509)
+4. Uncomment JAR task and resource processing (lines 650-679)
+5. Add `distantHorizonsJar` to runClient dependencies (line 898)
 
-#### 2. Platform Code Resolution (❌ Phase 2)
+**Estimated effort**: 30 minutes to 1 hour
+
+#### 2. Compilation Error Resolution (❌ Phase 2 - Unknown)
+
+**Status**: Integration is currently disabled, so compilation errors are unknown.
+
+**Expected issues** (based on previous integration attempts documented):
+- **Fabric API compatibility**: Stubs may need adjustments for actual DH usage patterns
+- **Minecraft API changes**: DH code may need updates for MC 1.21.10 API compatibility
+- **Parameter name mismatches**: Parchment vs Mojmap parameter naming differences
+- **Type inference issues**: Generic type compatibility issues
+
+**Estimated effort**: 8-16 hours (once integration is enabled)
+
+#### 3. Platform Code Resolution (❌ Phase 2)
 
 **Issues**:
-- Fabric API stub implementations needed
-- Missing Fabric-specific platform implementations (if any remain)
+- Verify all Fabric-specific implementations exist
+- Check for any remaining Architectury platform abstractions
 
-**Estimated effort**: 4-8 hours
+**Estimated effort**: 2-4 hours
 
-#### 3. Runtime Integration (❌ Phase 3)
+#### 4. Runtime Integration (❌ Phase 3)
 
 **Issues**:
 - Mixin configuration validation
@@ -302,7 +356,7 @@ All conditionals were evaluated for MC 1.21.10:
 
 **Estimated effort**: 4-8 hours
 
-#### 4. Testing and Validation (❌ Phase 4)
+#### 5. Testing and Validation (❌ Phase 4)
 
 **Issues**:
 - Functional testing of LOD rendering
@@ -310,20 +364,37 @@ All conditionals were evaluated for MC 1.21.10:
 - Compatibility testing with Sodium/Iris
 - Multiplayer testing
 
-**Estimated effort**: 8-12 hours
+**Estimated effort**: 4-8 hours
 
 ---
 
-## Phase 1: Build System Setup (✅ COMPLETED)
+## Phase 1: Build System Setup (⚠️ PREPARED BUT DISABLED)
 
-**Status**: Phase 1 implementation complete as of commit `9ddc175`. All build system components configured and tested.
+**Status**: All Phase 1 code exists in build.gradle but is commented out. Integration was prepared and then disabled for unknown reasons.
 
-**Completion Summary**:
-- ✅ Source set added with 4 directories (core, api, common, fabric)
+**Current State Summary**:
+- ✅ Source set definition exists (commented out, line ~410)
+- ✅ Configuration extensions exist (commented out, lines ~478-480)
+- ✅ Classpath dependencies exist (commented out, lines ~502-509)
+- ✅ JAR task exists (commented out, lines ~650-679)
+- ✅ Dependencies added (Night Config, JSON Simple, XZ) - active in build.gradle
+- ✅ Fabric API stubs implemented in `src/main/java/net/fabricmc/fabric/api/`
+
+**To Enable Integration**:
+1. Find all "DISTANT HORIZONS INTEGRATION - DISABLED" markers in build.gradle
+2. Uncomment the following sections:
+   - Lines ~410-412: distantHorizons source set
+   - Lines ~478-480: Configuration extensions
+   - Lines ~502-509: Classpath dependencies
+   - Lines ~650-679: processDistantHorizonsResources and distantHorizonsJar tasks
+   - Line ~898: Add 'distantHorizonsJar' to runClient dependencies
+
+**Completion Summary (if enabled)**:
+- ✅ Source set would include 4 directories (core, api, common, fabric) - 679 Java files
 - ✅ Dependencies configured (Night Config, JSON Simple, XZ)
-- ✅ Build tasks created (distantHorizonsJar)
-- ✅ Runtime integration (wired into runClient)
-- ✅ Initial compilation test performed (124 errors identified for Phase 2)
+- ✅ Build tasks ready (distantHorizonsJar)
+- ✅ Runtime integration ready (can wire into runClient)
+- ❌ Compilation not yet tested (integration disabled)
 
 ### Implementation Details
 
@@ -670,32 +741,28 @@ dependsOn 'fabricLoaderJar', 'gameJar', 'sodiumJar', 'irisJar', 'copyDistantHori
 - Ensures DH is compiled and copied before running the client
 - DH JAR will be loaded by Fabric Loader from `run/mods/` directory
 
-### Step 1.7: Testing Phase 1 (✅ Complete)
+### Step 1.7: Testing Phase 1 (⚠️ INTEGRATION DISABLED)
 
-**Command executed**:
+**Current state**: Build integration exists but is commented out. No recent compilation tests.
+
+**To test** (after uncommenting integration):
 ```bash
 ./gradlew compileDistantHorizonsJava --info
 ```
 
-**Actual outcome**:
-- ✅ **Build system configured successfully**
-- ✅ **Source files found and parsed** (~679 Java files)
-- ✅ **Dependencies resolved** (Night Config, JSON Simple, XZ)
-- ❌ **124 compilation errors identified** - as expected!
+**Expected outcome** (based on previous work documented):
+- ✅ **Build system should configure successfully**
+- ✅ **Source files should be found and parsed** (~679 Java files)
+- ✅ **Dependencies should resolve** (Night Config, JSON Simple, XZ)
+- ❓ **Compilation errors**: Unknown until integration is enabled
 
-**Error categories identified**:
-1. **Fabric API missing** (25+ errors): ClientTickEvents, WorldRenderEvents, PayloadTypeRegistry, ClientPlayNetworking
-2. **Minecraft API changes** (50+ errors): PalettedContainer.Strategy, ChunkStatus, StructureCheck constructor changes
-3. **Missing classes/methods** (30+ errors): Window.getWindow(), ChunkType enum removed or relocated
-4. **Type inference issues** (15+ errors): lookupOrThrow generic type compatibility
+**Potential error categories** (from previous attempts):
+1. **Fabric API compatibility**: Stub implementations may need adjustments
+2. **Minecraft API changes**: DH code may need updates for MC 1.21.10 API
+3. **Parameter name mismatches**: Parchment vs Mojmap naming differences
+4. **Type inference issues**: Generic type compatibility
 
-**Preprocessor fixes applied**:
-- ✅ Fixed `VersionConstants.java` - Added MC version "1.21.10"
-- ✅ Fixed `MixinServerLevel.java` - Corrected missing closing brace
-- ✅ Fixed `McObjectConverter.java` - Added `org.joml.Matrix4f` parameter types
-- ✅ Fixed `ClassicConfigGUI.java` - Corrected comment syntax (3 locations)
-
-**Phase 1 Status**: ✅ **COMPLETE** - All build system setup tasks finished. Ready for Phase 2.
+**Phase 1 Status**: ⚠️ **PREPARED BUT DISABLED** - All build system setup exists but needs to be enabled. Ready to proceed to compilation testing once uncommented.
 
 ---
 
@@ -1592,27 +1659,283 @@ jar tf build/mods/distanthorizons-2.3.4-b-mc1.21.10.jar | grep -E "json|mixins"
 
 ## Conclusion
 
-Integrating Distant Horizons into MattMC is a **complex, multi-phase project** requiring:
+Integrating Distant Horizons into MattMC is a **well-prepared but incomplete project** with substantial groundwork already laid:
 
-- **32-48 hours** of remaining development time (✅ preprocessor removal completed, saving 8-12 hours)
-- Deep understanding of Fabric, Gradle, and Minecraft modding
-- Systematic debugging and problem-solving
-- Acceptance of architectural limitations
+**Work Completed** (estimated 12-20 hours invested):
+- ✅ All DH source code extracted and organized (679 Java files)
+- ✅ Access wideners applied (29 directives, 20 files modified)
+- ✅ Preprocessor directives removed (427 blocks from 75 files)
+- ✅ Dependencies configured (Night Config, JSON Simple, XZ)
+- ✅ Fabric API stubs created (22 classes, verified against real API)
+- ✅ Build integration code written (ready to enable)
 
-The integration is **technically feasible** but requires careful execution of all four phases. With preprocessor directives already removed, the biggest remaining challenges are parameter name mismatches (Parchment) and platform-specific code (Architectury).
+**Remaining Work** (estimated 16-32 hours):
+- ⚠️ **Enable integration** (30 min - 1 hour): Uncomment disabled build configuration
+- ❌ **Resolve compilation errors** (8-16 hours): Fix API compatibility, parameter names, type issues
+- ❌ **Runtime integration** (4-8 hours): Test mixins, mod metadata, entrypoints
+- ❌ **Validation** (4-8 hours): Functional testing, performance, compatibility
+
+**Current Blocker**: Integration is disabled in build.gradle. All preparation is complete, but the build system integration needs to be enabled before compilation can be tested.
+
+**Integration Feasibility**: **HIGH** - With ~60% of the work already completed (preparatory phase), the remaining work is primarily:
+1. Enabling the existing build configuration (trivial)
+2. Fixing compilation errors (moderate complexity)
+3. Testing and validation (standard testing work)
+
+**Architectural Considerations**:
+- No mixin refmaps (development mode required)
+- Single version support (MC 1.21.10 only)
+- Manual access wideners (no automation)
+- Source-level integration (higher maintenance burden)
 
 **Success depends on**:
-1. ✅ Preprocessor directive removal - COMPLETED
-2. Following the phased approach outlined in this document
-3. Systematic debugging and error tracking
-4. Willingness to make manual source code modifications
-5. Acceptance of limitations (no refmaps, development mode required, single version support)
-
-**Progress so far**:
-- ✅ Core subproject integrated
-- ✅ Access wideners applied
-- ✅ Preprocessor directives removed (75 files, ~427 blocks)
+1. ✅ Source extraction and organization - COMPLETE
+2. ✅ Access widener application - COMPLETE
+3. ✅ Preprocessor directive removal - COMPLETE
+4. ✅ Fabric API stub creation - COMPLETE
+5. ⚠️ Enabling build integration - READY TO PROCEED
+6. ❌ Systematic debugging of compilation errors - NOT STARTED
+7. ❌ Runtime testing and validation - NOT STARTED
 
 **Once complete**, you'll have a fully integrated, source-level build of Distant Horizons that compiles and runs alongside Minecraft, Fabric Loader, Sodium, and Iris in a single unified project.
 
-**Good luck with the integration!**
+**Recommended Next Steps**: See the "Next Steps for DH Integration" section at the end of this document.
+
+---
+
+## Next Steps for DH Integration
+
+Based on the current state of the project, here are the recommended first steps to start integrating DH:
+
+### Step 1: Enable Build Integration (30 minutes - 1 hour)
+
+**Objective**: Uncomment all DH integration code in build.gradle to enable the build system.
+
+**Actions**:
+1. Open `build.gradle` in your editor
+2. Search for "DISTANT HORIZONS INTEGRATION - DISABLED" (5 occurrences)
+3. Uncomment the following sections:
+
+   **a) Source Set Definition** (around line 410):
+   - Remove the comment markers from the `distantHorizons` source set block
+   - This defines the 4 source directories (core, api, common, fabric)
+
+   **b) Configuration Extensions** (around lines 478-480):
+   - Uncomment the 3 configuration extension lines
+   - This makes DH inherit base project dependencies
+
+   **c) Classpath Dependencies** (around lines 502-509):
+   - Uncomment the 8 classpath configuration lines
+   - This makes Minecraft, Fabric Loader, Sodium, and Iris available to DH
+
+   **d) JAR Task** (around lines 650-679):
+   - Uncomment the entire multi-line comment block (lines 650-680)
+   - This enables the processDistantHorizonsResources and distantHorizonsJar tasks
+
+   **e) RunClient Dependency** (around line 898):
+   - Add `'distantHorizonsJar',` to the dependsOn list
+   - Change: `dependsOn 'fabricLoaderJar', 'gameJar', 'sodiumJar', 'irisJar', 'copyJdkToRun', 'shaderPackZip'`
+   - To: `dependsOn 'fabricLoaderJar', 'gameJar', 'sodiumJar', 'irisJar', 'distantHorizonsJar', 'copyJdkToRun', 'shaderPackZip'`
+
+4. Save the file
+
+**Verification**:
+```bash
+# Verify Gradle can parse the build file
+./gradlew tasks --all | grep distantHorizons
+```
+
+Expected output should show distantHorizons-related tasks.
+
+### Step 2: Test Compilation (1-2 hours)
+
+**Objective**: Attempt to compile DH and identify all compilation errors.
+
+**Actions**:
+```bash
+# Clean previous builds
+./gradlew clean
+
+# Attempt to compile DH source
+./gradlew compileDistantHorizonsJava 2>&1 | tee dh-compile-errors.txt
+```
+
+**Expected result**: Compilation will likely fail with errors. This is normal and expected.
+
+**Analysis**:
+1. Review `dh-compile-errors.txt`
+2. Categorize errors by type:
+   - Fabric API missing methods/classes
+   - Minecraft API changes
+   - Parameter name mismatches
+   - Type inference issues
+   - Missing dependencies
+
+3. Count errors in each category:
+```bash
+# Count total errors
+grep "error:" dh-compile-errors.txt | wc -l
+
+# Find most common error patterns
+grep "error:" dh-compile-errors.txt | sed 's/.*error: //' | sort | uniq -c | sort -rn | head -20
+```
+
+### Step 3: Create Compilation Error Report (1-2 hours)
+
+**Objective**: Document all compilation errors systematically for resolution planning.
+
+**Actions**:
+1. Create a new file `DH-COMPILATION-ERRORS.md`
+2. Document each unique error type with:
+   - Error message
+   - Affected files
+   - Likely cause
+   - Proposed solution
+3. Prioritize errors by frequency and severity
+
+**Template**:
+```markdown
+# DH Compilation Errors Report
+
+## Summary
+- Total errors: XXX
+- Affected files: XXX
+- Error categories: XXX
+
+## Error Categories
+
+### Category 1: Fabric API Missing Methods (XX errors)
+**Example error**: ...
+**Affected files**: ...
+**Cause**: ...
+**Solution**: ...
+
+### Category 2: Minecraft API Changes (XX errors)
+...
+```
+
+### Step 4: Fix High-Priority Compilation Errors (4-8 hours)
+
+**Objective**: Resolve the most common and blocking compilation errors.
+
+**Priority Order**:
+1. **Fabric API stubs**: Adjust stub implementations if methods are missing
+2. **Minecraft API changes**: Update DH code for MC 1.21.10 API changes
+3. **Simple fixes**: Missing imports, obvious typos, simple refactoring
+4. **Complex issues**: Parameter names, type inference (may require extensive changes)
+
+**Approach**:
+- Fix errors in batches by category
+- Test compilation after each batch
+- Document changes made for future reference
+
+### Step 5: Achieve Clean Compilation (4-8 hours)
+
+**Objective**: Get DH to compile without errors.
+
+**Success Criteria**:
+```bash
+./gradlew compileDistantHorizonsJava
+# BUILD SUCCESSFUL
+```
+
+**Verification**:
+```bash
+# Check that classes were generated
+find build/classes/java/distantHorizons -name "*.class" | wc -l
+# Should show ~679+ class files
+```
+
+### Step 6: Test JAR Creation (30 minutes)
+
+**Objective**: Verify the DH JAR can be built.
+
+**Actions**:
+```bash
+./gradlew distantHorizonsJar
+
+# Verify JAR was created
+ls -lh build/mods/distanthorizons-*.jar
+
+# Check JAR contents
+jar tf build/mods/distanthorizons-*.jar | grep -E "fabric.mod.json|mixins.json"
+```
+
+**Success Criteria**:
+- JAR file created in `build/mods/`
+- Contains fabric.mod.json
+- Contains mixin configuration files
+- Contains compiled class files
+
+### Step 7: Test Runtime Loading (1-2 hours)
+
+**Objective**: Verify Fabric Loader can load the DH mod.
+
+**Actions**:
+```bash
+./gradlew runClient
+```
+
+**What to check in logs**:
+1. **Mod discovery**:
+   ```
+   [Fabric Loader] Loading mod distanthorizons 2.3.4-b
+   ```
+
+2. **Mixin application**:
+   ```
+   [Mixin] Mixing DistantHorizons.fabric.mixins.json into minecraft
+   ```
+
+3. **No critical errors**: Look for stack traces or error messages from DH
+
+**Common issues and fixes**:
+- **Mod not loaded**: Check fabric.mod.json syntax and location in JAR
+- **Mixin failures**: Verify access wideners are correct
+- **Missing resources**: Check resource directories in source set
+- **ClassNotFoundException**: Verify dependencies in runtime classpath
+
+### Step 8: Initial Functional Testing (2-4 hours)
+
+**Objective**: Verify basic DH functionality.
+
+**Test Cases**:
+1. **Game launches**: Minecraft starts without crashes
+2. **Mod appears**: DH shows in mod list (F3 or Mod Menu)
+3. **Config created**: Check for config file in `run/config/`
+4. **LOD generation**: Create/load a world, check if LOD chunks generate
+5. **Rendering**: Verify distant chunks render (may need to enable in config)
+6. **Keybinds**: Test DH keybinds (F8 for debug menu)
+
+**Documentation**:
+- Take screenshots of working features
+- Note any issues or missing functionality
+- Document performance impact (FPS with/without DH)
+
+---
+
+## Summary of Next Steps
+
+**Immediate Actions** (Next 2-4 hours):
+1. ✅ Enable build integration by uncommenting code in build.gradle
+2. ✅ Test compilation and capture error output
+3. ✅ Analyze and categorize compilation errors
+
+**Short-term Goals** (Next 8-16 hours):
+4. ✅ Create compilation error report
+5. ✅ Fix high-priority compilation errors
+6. ✅ Achieve clean compilation
+
+**Medium-term Goals** (Next 4-8 hours):
+7. ✅ Test JAR creation
+8. ✅ Test runtime loading
+9. ✅ Initial functional testing
+
+**Expected Timeline**: 2-4 days of focused work to reach a functional DH integration.
+
+**Risk Mitigation**:
+- Start with small, incremental changes
+- Test frequently to catch issues early
+- Document all changes for future reference
+- Keep the integration disabled (commented out) until fully working
+- Consider creating a separate git branch for DH integration work

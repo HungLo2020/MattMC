@@ -612,8 +612,13 @@ public class ClassicConfigGUI
 		}
 		
 		@Override
-        public void render(GuiGraphics matrices, int index, int y, int x, int entryWidth, int entryHeight, int mouseX, int mouseY, boolean hovered, float tickDelta)
+        public void renderContent(GuiGraphics matrices, int x, int y, boolean hovered, float tickDelta)
 		{
+			// Note: mouseX and mouseY are not provided in MC 1.21.10 Entry.renderContent()
+			// Widgets handle their own mouse tracking internally, so we pass 0, 0
+			int mouseX = 0;
+			int mouseY = 0;
+			
 			if (button != null)
 			{
 				SetY(button, y);

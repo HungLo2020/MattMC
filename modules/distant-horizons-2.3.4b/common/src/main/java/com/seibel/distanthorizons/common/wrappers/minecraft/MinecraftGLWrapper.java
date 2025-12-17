@@ -20,6 +20,7 @@
 package com.seibel.distanthorizons.common.wrappers.minecraft;
 
 
+import com.mojang.blaze3d.opengl.GlStateManager;
 import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
 import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftGLWrapper;
 

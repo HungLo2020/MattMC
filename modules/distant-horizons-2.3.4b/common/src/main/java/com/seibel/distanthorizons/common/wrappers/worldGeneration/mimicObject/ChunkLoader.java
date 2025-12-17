@@ -50,6 +50,9 @@ import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.chunk.*;
+import net.minecraft.world.level.chunk.Strategy;
+import net.minecraft.world.level.chunk.status.ChunkStatus;
+import net.minecraft.world.level.chunk.status.ChunkType;
 
 
 import net.minecraft.world.level.levelgen.Heightmap;
@@ -70,7 +73,7 @@ public class ChunkLoader
 	private static final AtomicBoolean ZERO_CHUNK_POS_ERROR_LOGGED_REF = new AtomicBoolean(false);
 	
 	
-	private static final Codec<PalettedContainer<BlockState>> BLOCK_STATE_CODEC = PalettedContainer.codec(Block.BLOCK_STATE_REGISTRY, BlockState.CODEC, PalettedContainer.Strategy.SECTION_STATES, Blocks.AIR.defaultBlockState());
+	private static final Codec<PalettedContainer<BlockState>> BLOCK_STATE_CODEC = PalettedContainer.codecRW(BlockState.CODEC, Strategy.createForBlockStates(Block.BLOCK_STATE_REGISTRY), Blocks.AIR.defaultBlockState());
 	private static final String TAG_UPGRADE_DATA = "UpgradeData";
 	private static final String BLOCK_TICKS_TAG_18 = "block_ticks";
 	private static final String FLUID_TICKS_TAG_18 = "fluid_ticks";
@@ -166,7 +169,7 @@ public class ChunkLoader
 	{
 						Registry<Biome> biomes = level.registryAccess().lookupOrThrow(Registries.BIOME);
 								Codec<PalettedContainer<Holder<Biome>>> biomeCodec = PalettedContainer.codecRW(
-				biomes.asHolderIdMap(), biomes.holderByNameCodec(), PalettedContainer.Strategy.SECTION_BIOMES, biomes.getOrThrow(Biomes.PLAINS));
+				biomes.holderByNameCodec(), Strategy.createForBiomes(biomes.asHolderIdMap()), biomes.getOrThrow(Biomes.PLAINS));
 							
 		int sectionYIndex = level.getSectionsCount();
 		LevelChunkSection[] chunkSections = new LevelChunkSection[sectionYIndex];
@@ -208,7 +211,7 @@ public class ChunkLoader
 											}
 					else
 					{
-						blockStateContainer = new PalettedContainer<BlockState>(Block.BLOCK_STATE_REGISTRY, Blocks.AIR.defaultBlockState(), PalettedContainer.Strategy.SECTION_STATES);
+						blockStateContainer = new PalettedContainer<BlockState>(Blocks.AIR.defaultBlockState(), Strategy.createForBlockStates(Block.BLOCK_STATE_REGISTRY));
 					}
 				
 				
@@ -225,9 +228,9 @@ public class ChunkLoader
 											}
 					else
 					{
-						biomeContainer = new PalettedContainer<Holder<Biome>>(biomes.asHolderIdMap(), 
+						biomeContainer = new PalettedContainer<Holder<Biome>>(
 							biomes.getOrThrow(Biomes.PLAINS),
-								PalettedContainer.Strategy.SECTION_BIOMES);
+								Strategy.createForBiomes(biomes.asHolderIdMap()));
 					}
 				
 										

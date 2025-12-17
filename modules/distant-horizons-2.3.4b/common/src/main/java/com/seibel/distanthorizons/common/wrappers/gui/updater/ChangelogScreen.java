@@ -231,7 +231,7 @@ public class ChangelogScreen extends DhScreen
 		}
 		
 				@Override
-		public void render(GuiGraphics matrices, int index, int y, int x, int entryWidth, int entryHeight, int mouseX, int mouseY, boolean hovered, float tickDelta)
+		public void renderContent(GuiGraphics matrices, int x, int y, boolean hovered, float tickDelta)
 		{
 			matrices.drawString(textRenderer, this.text, 12, y + 5, 0xFFFFFF);
 		}

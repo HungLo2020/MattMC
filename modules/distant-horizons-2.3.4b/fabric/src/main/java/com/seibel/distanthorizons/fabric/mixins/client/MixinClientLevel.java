@@ -46,7 +46,7 @@ public class MixinClientLevel
 		ClientLevel clientLevel = (ClientLevel) (Object) this;
 		LevelChunk chunk = clientLevel.getChunkSource().getChunk(x, z, false);
 		
-		if (chunk != null && !chunk.isClientLightReady())
+		if (chunk != null && !chunk.isLightCorrect())
 		{
 			SharedApi.INSTANCE.chunkLoadEvent(
 					new ChunkWrapper(chunk, ClientLevelWrapper.getWrapper(clientLevel)), 
