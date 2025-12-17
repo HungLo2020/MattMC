@@ -19,7 +19,6 @@
     "license": "LGPL-3",
     "icon": "assets/distanthorizons/icon.png",
     
-    "accessWidener": "distanthorizons.accesswidener",
     
     "environment": "*",
     "entrypoints": {
