@@ -7,7 +7,7 @@ import net.minecraft.Util;
 
 @Environment(EnvType.CLIENT)
 public class LinearLayout implements Layout {
-	private final GridLayout wrapped;
+	public final GridLayout wrapped; // Made accessible by DH access widener
 	private final LinearLayout.Orientation orientation;
 	private int nextChildIndex = 0;
 

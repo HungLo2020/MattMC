@@ -13,7 +13,7 @@ public class BiomeManager {
 	private static final int ZOOM = 4;
 	private static final int ZOOM_MASK = 3;
 	private final BiomeManager.NoiseBiomeSource noiseBiomeSource;
-	private final long biomeZoomSeed;
+	public final long biomeZoomSeed; // Made accessible by DH access widener
 
 	public BiomeManager(BiomeManager.NoiseBiomeSource noiseBiomeSource, long l) {
 		this.noiseBiomeSource = noiseBiomeSource;

@@ -87,7 +87,7 @@ public class LevelChunk extends ChunkAccess implements DebugValueSource {
 		}
 	};
 	private final Map<BlockPos, LevelChunk.RebindableTickingBlockEntityWrapper> tickersInLevel = Maps.<BlockPos, LevelChunk.RebindableTickingBlockEntityWrapper>newHashMap();
-	private boolean loaded;
+	public boolean loaded; // Made accessible by DH access widener
 	final Level level;
 	@Nullable
 	private Supplier<FullChunkStatus> fullStatus;

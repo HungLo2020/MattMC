@@ -17,7 +17,7 @@ import org.slf4j.Logger;
 public class ThreadingDetector {
 	private static final Logger LOGGER = LogUtils.getLogger();
 	private final String name;
-	private final Semaphore lock = new Semaphore(1);
+	public Semaphore lock = new Semaphore(1); // Made accessible and mutable by DH access widener
 	private final Lock stackTraceLock = new ReentrantLock();
 	@Nullable
 	private volatile Thread threadThatFailedToAcquire;

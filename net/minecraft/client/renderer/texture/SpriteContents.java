@@ -38,10 +38,10 @@ public class SpriteContents implements Stitcher.Entry, AutoCloseable {
 	final ResourceLocation name;
 	final int width;
 	final int height;
-	private final NativeImage originalImage;
+	public final NativeImage originalImage; // Made accessible by DH access widener
 	NativeImage[] byMipLevel;
 	@Nullable
-	private final SpriteContents.AnimatedTexture animatedTexture;
+	public final SpriteContents.AnimatedTexture animatedTexture; // Made accessible by DH access widener
 	private final List<WithValue<?>> additionalMetadata;
 
 	public SpriteContents(ResourceLocation resourceLocation, FrameSize frameSize, NativeImage nativeImage) {
@@ -223,11 +223,11 @@ public class SpriteContents implements Stitcher.Entry, AutoCloseable {
 			this.interpolateFrames = bl;
 		}
 
-		int getFrameX(int i) {
+		public int getFrameX(int i) { // Made accessible by DH access widener
 			return i % this.frameRowSize;
 		}
 
-		int getFrameY(int i) {
+		public int getFrameY(int i) { // Made accessible by DH access widener
 			return i / this.frameRowSize;
 		}
 

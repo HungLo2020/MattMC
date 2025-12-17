@@ -130,7 +130,7 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 	@Nullable
 	private ClientLevel level;
 	private final SectionOcclusionGraph sectionOcclusionGraph = new SectionOcclusionGraph();
-	private final ObjectArrayList<SectionRenderDispatcher.RenderSection> visibleSections = new ObjectArrayList<>(10000);
+	public final ObjectArrayList<SectionRenderDispatcher.RenderSection> visibleSections = new ObjectArrayList<>(10000); // Made accessible by DH access widener
 	private final ObjectArrayList<SectionRenderDispatcher.RenderSection> nearbyVisibleSections = new ObjectArrayList<>(50);
 	@Nullable
 	private ViewArea viewArea;

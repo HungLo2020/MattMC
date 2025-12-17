@@ -24,7 +24,7 @@ public abstract class LightEngine<M extends DataLayerStorageMap<M>, S extends La
 	private static final int MIN_QUEUE_SIZE = 512;
 	protected static final Direction[] PROPAGATION_DIRECTIONS = Direction.values();
 	protected final LightChunkGetter chunkSource;
-	protected final S storage;
+	public final S storage; // Made accessible by DH access widener
 	private final LongOpenHashSet blockNodesToCheck = new LongOpenHashSet(512, 0.5F);
 	private final LongArrayFIFOQueue decreaseQueue = new LongArrayFIFOQueue();
 	private final LongArrayFIFOQueue increaseQueue = new LongArrayFIFOQueue();
