@@ -55,12 +55,6 @@
     "sodium:options": {
       "mixin.features.render.world.sky": false
     },
-    "mc-publish": {
-      "loaders": [
-        "fabric",
-        "quilt"
-      ]
-    },
     "loom:injected_interfaces": {
       "net/minecraft/class_276": ["net/irisshaders/iris/mixinterface/RenderTargetInterface"],
       "com/mojang/blaze3d/textures/GpuTexture": ["net/irisshaders/iris/mixinterface/GpuTextureInterface"],
