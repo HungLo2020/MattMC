@@ -335,7 +335,7 @@ public boolean shouldFilterMessageTo(ServerPlayer serverPlayer) {
 public record ClientInformation(
     String language,
     int viewDistance,
-    ChatVisiblity chatVisibility,
+    ChatVisibility chatVisibility,
     boolean chatColors,
     int modelCustomisation,
     HumanoidArm mainHand,
