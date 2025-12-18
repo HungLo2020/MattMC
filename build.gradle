@@ -711,14 +711,32 @@ tasks.register('distantHorizonsJar', Jar) {
     
     from sourceSets.distantHorizons.output
     
+    // Explicitly include language files to ensure they're in the JAR
+    from('modules/distant-horizons-2.3.4b/coreSubProjects/core/src/main/resources') {
+        include 'assets/distanthorizons/lang/**'
+    }
+    
+    // Ensure proper handling of duplicate files
+    duplicatesStrategy = DuplicatesStrategy.WARN
+    
     destinationDirectory = file("${buildDir}/mods")
     
     manifest {
         attributes(
             'Implementation-Title': 'Distant Horizons',
             'Implementation-Version': '2.3.4-b',
-            'Implementation-Vendor': 'jeseibel'
+            'Implementation-Vendor': 'jeseibel',
+            'Fabric-Loom-Mixin-Remap-Type': 'static'
         )
+    }
+    
+    // Explicitly verify lang files are included
+    doFirst {
+        def langFile = file('modules/distant-horizons-2.3.4b/coreSubProjects/core/src/main/resources/assets/distanthorizons/lang/en_us.json')
+        if (!langFile.exists()) {
+            throw new GradleException("Language file not found: ${langFile}")
+        }
+        logger.lifecycle("DH: Language file verified at ${langFile}")
     }
 }
 
