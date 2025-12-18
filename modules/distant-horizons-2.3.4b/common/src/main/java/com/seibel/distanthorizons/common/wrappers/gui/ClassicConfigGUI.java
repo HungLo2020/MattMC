@@ -612,30 +612,29 @@ public class ClassicConfigGUI
 		}
 		
 		@Override
-        public void renderContent(GuiGraphics matrices, int x, int y, boolean hovered, float tickDelta)
+        public void renderContent(GuiGraphics matrices, int mouseX, int mouseY, boolean hovered, float tickDelta)
 		{
-			// Note: mouseX and mouseY are not provided in MC 1.21.10 Entry.renderContent()
-			// Widgets handle their own mouse tracking internally, so we pass 0, 0
-			int mouseX = 0;
-			int mouseY = 0;
+			// In MC 1.21.10+, renderContent receives mouseX and mouseY as parameters
+			// The actual rendering Y position comes from this.getContentY()
+			int renderY = this.getContentY();
 			
 			if (button != null)
 			{
-				SetY(button, y);
+				SetY(button, renderY);
 				button.render(matrices, mouseX, mouseY, tickDelta);
 			}
 			if (resetButton != null)
 			{
-				SetY(resetButton, y);
+				SetY(resetButton, renderY);
 				resetButton.render(matrices, mouseX, mouseY, tickDelta);
 			}
 			if (indexButton != null)
 			{
-				SetY(indexButton, y);
+				SetY(indexButton, renderY);
 				indexButton.render(matrices, mouseX, mouseY, tickDelta);
 			}
 			if (text != null && (!text.getString().contains("spacer") || button != null))
-                				matrices.drawString(textRenderer, this.text, 12, y + 5, 0xFFFFFFFF);
+                				matrices.drawString(textRenderer, this.text, 12, renderY + 5, 0xFFFFFFFF);
 						}
 		
 		@Override
