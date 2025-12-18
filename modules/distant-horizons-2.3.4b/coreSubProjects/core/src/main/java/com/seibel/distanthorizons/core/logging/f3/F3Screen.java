@@ -79,6 +79,8 @@ public class F3Screen
 	 */
 	public static void addStringToDisplay(List<String> messageList)
 	{
+		LOGGER.info("[DH-DEBUG] ========== F3Screen.addStringToDisplay called ==========");
+		
 		// multi thread pools
 		PriorityTaskPicker.Executor worldGenPool = ThreadPoolUtil.getWorldGenExecutor();
 		PriorityTaskPicker.Executor fileHandlerPool = ThreadPoolUtil.getFileHandlerExecutor();
@@ -92,11 +94,15 @@ public class F3Screen
 		ThreadPoolExecutor migrationPool = ThreadPoolUtil.getFullDataMigrationExecutor();
 		
 		AbstractDhWorld world = SharedApi.getAbstractDhWorld();
+		LOGGER.info("[DH-DEBUG] SharedApi.getAbstractDhWorld() returned: " + world);
+		
 		// Return early if DH world isn't initialized yet (can happen when F3 is opened before world loads)
 		if (world == null)
 		{
+			LOGGER.warn("[DH-DEBUG] World is NULL - returning early from F3 display");
 			return;
 		}
+		LOGGER.info("[DH-DEBUG] World exists - getting loaded levels");
 		Iterable<? extends IDhLevel> levelIterator = world.getAllLoadedLevels();
 		
 		
