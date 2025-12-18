@@ -151,11 +151,25 @@ public class ClientApi
 	 */
 	public synchronized void onClientOnlyConnected()
 	{
+		LOGGER.info("[DH-DEBUG] ========== onClientOnlyConnected START ==========");
+		
 		// only continue if the client is connected to a different server
 		boolean connectedToServer = MC_CLIENT.clientConnectedToDedicatedServer();
 		boolean connectedToReplay = MC_CLIENT.connectedToReplay();
+		
+		LOGGER.info("[DH-DEBUG] Connection status: connectedToServer=" + connectedToServer + ", connectedToReplay=" + connectedToReplay);
+		LOGGER.info("[DH-DEBUG] Current world before creation: " + SharedApi.getAbstractDhWorld());
+		LOGGER.info("[DH-DEBUG] Waiting client levels count: " + this.waitingClientLevels.size());
+		
+		// FIXED FOR MC 1.21.10: Also create world for singleplayer/LAN mode
+		// In singleplayer mode, both connectedToServer and connectedToReplay are false,
+		// but we still need to create a DhClientWorld for LOD rendering to work
+		LOGGER.info("onClientOnlyConnected called: connectedToServer=" + connectedToServer + ", connectedToReplay=" + connectedToReplay);
+		
 		if (connectedToServer || connectedToReplay)
 		{
+			LOGGER.info("[DH-DEBUG] Taking dedicated server/replay path");
+			
 			if (connectedToServer)
 			{
 				LOGGER.info("Client on ClientOnly mode connecting.");
@@ -177,8 +191,13 @@ public class ClientApi
 			
 			// firing after clientLevelLoadEvent
 			// TODO if level has prepped to load it should fire level load event
+			LOGGER.info("[DH-DEBUG] Creating DhClientWorld for dedicated server/replay...");
 			DhClientWorld world = new DhClientWorld();
+			LOGGER.info("[DH-DEBUG] DhClientWorld created: " + world);
+			
+			LOGGER.info("[DH-DEBUG] Setting DH world in SharedApi...");
 			SharedApi.setDhWorld(world);
+			LOGGER.info("[DH-DEBUG] SharedApi.getAbstractDhWorld() now returns: " + SharedApi.getAbstractDhWorld());
 			
 			this.pluginChannelApi.onJoinServer(world.networkState.getSession());
 			world.networkState.sendConfigMessage();
@@ -186,10 +205,39 @@ public class ClientApi
 			LOGGER.info("Loading [" + this.waitingClientLevels.size() + "] waiting client level wrappers.");
 			for (IClientLevelWrapper level : this.waitingClientLevels)
 			{
+				LOGGER.info("[DH-DEBUG] Loading waiting level: " + level);
 				this.clientLevelLoadEvent(level);
 			}
 			
 			this.waitingClientLevels.clear();
+			LOGGER.info("[DH-DEBUG] ========== onClientOnlyConnected END (server/replay path) ==========");
+		}
+		else
+		{
+			// Singleplayer/LAN mode - still need to create DH world
+			LOGGER.info("[DH-DEBUG] Taking singleplayer/LAN path");
+			LOGGER.info("Client on singleplayer/LAN mode connecting - creating DH world.");
+			
+			LOGGER.info("[DH-DEBUG] Creating DhClientWorld for singleplayer/LAN...");
+			DhClientWorld world = new DhClientWorld();
+			LOGGER.info("[DH-DEBUG] DhClientWorld created: " + world);
+			
+			LOGGER.info("[DH-DEBUG] Setting DH world in SharedApi...");
+			SharedApi.setDhWorld(world);
+			LOGGER.info("[DH-DEBUG] SharedApi.getAbstractDhWorld() now returns: " + SharedApi.getAbstractDhWorld());
+			
+			this.pluginChannelApi.onJoinServer(world.networkState.getSession());
+			world.networkState.sendConfigMessage();
+			
+			LOGGER.info("Loading [" + this.waitingClientLevels.size() + "] waiting client level wrappers.");
+			for (IClientLevelWrapper level : this.waitingClientLevels)
+			{
+				LOGGER.info("[DH-DEBUG] Loading waiting level: " + level);
+				this.clientLevelLoadEvent(level);
+			}
+			
+			this.waitingClientLevels.clear();
+			LOGGER.info("[DH-DEBUG] ========== onClientOnlyConnected END (singleplayer/LAN path) ==========");
 		}
 	}
 	
@@ -257,11 +305,18 @@ public class ClientApi
 	
 	public void clientLevelLoadEvent(IClientLevelWrapper levelWrapper)
 	{
+		LOGGER.info("[DH-DEBUG] ========== clientLevelLoadEvent START ==========");
+		LOGGER.info("[DH-DEBUG] Level wrapper: " + levelWrapper);
+		LOGGER.info("[DH-DEBUG] Level identifier: " + levelWrapper.getDhIdentifier());
+		
 		// wait a moment before loading the level to give the server a chance to handle the client's login request
 		if (MC_CLIENT.clientConnectedToDedicatedServer())
 		{
+			LOGGER.info("[DH-DEBUG] Connected to dedicated server - checking first level load timer");
+			
 			if (this.firstLevelLoadTimer == null)
 			{
+				LOGGER.info("[DH-DEBUG] First level load - scheduling delayed load");
 				this.firstLevelLoadTimer = TimerUtil.CreateTimer("FirstLevelLoadTimer");
 				this.firstLevelLoadTimer.schedule(new TimerTask()
 				{
@@ -270,6 +325,7 @@ public class ClientApi
 				}, FIRST_LEVEL_LOAD_DELAY_IN_MS);
 				return;
 			}
+			LOGGER.info("[DH-DEBUG] Timer exists - canceling and continuing with load");
 			this.firstLevelLoadTimer.cancel();
 		}
 		
@@ -279,8 +335,12 @@ public class ClientApi
 			LOGGER.info("Loading client level [" + levelWrapper + "]-[" + levelWrapper.getDhIdentifier() + "].");
 			
 			AbstractDhWorld world = SharedApi.getAbstractDhWorld();
+			LOGGER.info("[DH-DEBUG] Current DH world from SharedApi: " + world);
+			
 			if (world != null)
 			{
+				LOGGER.info("[DH-DEBUG] World exists - checking if level loading allowed");
+				
 				if (!this.pluginChannelApi.allowLevelLoading(levelWrapper))
 				{
 					LOGGER.info("Levels in this connection are managed by the server, skipping auto-load.");
@@ -290,21 +350,27 @@ public class ClientApi
 					return;
 				}
 				
-				
+				LOGGER.info("[DH-DEBUG] Loading/getting level in world");
 				world.getOrLoadLevel(levelWrapper);
+				LOGGER.info("[DH-DEBUG] Level loaded successfully");
+				
 				ApiEventInjector.INSTANCE.fireAllEvents(DhApiLevelLoadEvent.class, new DhApiLevelLoadEvent.EventParam(levelWrapper));
 				
 				this.loadWaitingChunksForLevel(levelWrapper);
+				LOGGER.info("[DH-DEBUG] ========== clientLevelLoadEvent END (success) ==========");
 			}
 			else
 			{
+				LOGGER.warn("[DH-DEBUG] World is NULL - adding level to waiting queue");
 				this.waitingClientLevels.add(levelWrapper);
+				LOGGER.info("[DH-DEBUG] ========== clientLevelLoadEvent END (queued) ==========");
 			}
 		}
 		catch (Exception e)
 		{
 			// handle errors here to prevent blowing up a mixin or API up stream
 			LOGGER.error("Unexpected error in ClientApi.clientLevelLoadEvent(), error: "+e.getMessage(), e);
+			LOGGER.error("[DH-DEBUG] ========== clientLevelLoadEvent END (exception) ==========");
 		}
 	}
 	private void loadWaitingChunksForLevel(IClientLevelWrapper level)
