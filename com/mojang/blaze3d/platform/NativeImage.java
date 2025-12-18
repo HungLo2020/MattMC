@@ -47,7 +47,13 @@ public final class NativeImage implements AutoCloseable {
 	private final int width;
 	private final int height;
 	private final boolean useStbFree;
-	private long pixels;
+	/**
+	 * Native memory pointer to the pixel data.
+	 * 
+	 * @apiNote Made public for Iris direct pixel buffer access for performance.
+	 * Originally widened by: iris.accesswidener
+	 */
+	public long pixels;
 	private final long size;
 
 	public NativeImage(int i, int j, boolean bl) {
