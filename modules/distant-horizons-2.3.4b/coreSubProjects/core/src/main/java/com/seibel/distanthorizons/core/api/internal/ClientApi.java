@@ -154,6 +154,12 @@ public class ClientApi
 		// only continue if the client is connected to a different server
 		boolean connectedToServer = MC_CLIENT.clientConnectedToDedicatedServer();
 		boolean connectedToReplay = MC_CLIENT.connectedToReplay();
+		
+		// FIXED FOR MC 1.21.10: Also create world for singleplayer/LAN mode
+		// In singleplayer mode, both connectedToServer and connectedToReplay are false,
+		// but we still need to create a DhClientWorld for LOD rendering to work
+		LOGGER.info("onClientOnlyConnected called: connectedToServer=" + connectedToServer + ", connectedToReplay=" + connectedToReplay);
+		
 		if (connectedToServer || connectedToReplay)
 		{
 			if (connectedToServer)
@@ -177,6 +183,25 @@ public class ClientApi
 			
 			// firing after clientLevelLoadEvent
 			// TODO if level has prepped to load it should fire level load event
+			DhClientWorld world = new DhClientWorld();
+			SharedApi.setDhWorld(world);
+			
+			this.pluginChannelApi.onJoinServer(world.networkState.getSession());
+			world.networkState.sendConfigMessage();
+			
+			LOGGER.info("Loading [" + this.waitingClientLevels.size() + "] waiting client level wrappers.");
+			for (IClientLevelWrapper level : this.waitingClientLevels)
+			{
+				this.clientLevelLoadEvent(level);
+			}
+			
+			this.waitingClientLevels.clear();
+		}
+		else
+		{
+			// Singleplayer/LAN mode - still need to create DH world
+			LOGGER.info("Client on singleplayer/LAN mode connecting - creating DH world.");
+			
 			DhClientWorld world = new DhClientWorld();
 			SharedApi.setDhWorld(world);
 			

@@ -1298,3 +1298,83 @@ All required resources are present in the JAR.
 The duplicate `dependencies` block initially added (lines 526-539) was removed as it was redundant and used incorrect versions.
 
 **Final Status**: All dependencies properly configured and available at runtime.
+
+---
+
+## Issue #7: DH World Not Created in Singleplayer/LAN Mode
+
+### Problem
+`SharedApi.currentWorld` remained `null` even after DH initialized successfully, causing F3 debug display to show nothing and LOD rendering to fail.
+
+### Root Cause
+In `ClientApi.onClientOnlyConnected()` (lines 152-194), DH world creation was conditional:
+
+```java
+boolean connectedToServer = MC_CLIENT.clientConnectedToDedicatedServer();
+boolean connectedToReplay = MC_CLIENT.connectedToReplay();
+if (connectedToServer || connectedToReplay)
+{
+    // Create DhClientWorld...
+}
+```
+
+In singleplayer/LAN mode:
+- `connectedToServer` = false
+- `connectedToReplay` = false  
+- World never created
+
+### Solution
+Added else branch to create `DhClientWorld` for singleplayer/LAN mode (lines 196-214):
+
+```java
+else
+{
+    // Singleplayer/LAN mode - still need to create DH world
+    LOGGER.info("Client on singleplayer/LAN mode connecting - creating DH world.");
+    
+    DhClientWorld world = new DhClientWorld();
+    SharedApi.setDhWorld(world);
+    
+    this.pluginChannelApi.onJoinServer(world.networkState.getSession());
+    world.networkState.sendConfigMessage();
+    
+    LOGGER.info("Loading [" + this.waitingClientLevels.size() + "] waiting client level wrappers.");
+    for (IClientLevelWrapper level : this.waitingClientLevels)
+    {
+        this.clientLevelLoadEvent(level);
+    }
+    
+    this.waitingClientLevels.clear();
+}
+```
+
+Also added debug logging to track connection mode.
+
+### Behavior Verification
+
+**Expected Behavior:**
+1. DH creates `DhClientWorld` in all modes (dedicated server, replay, singleplayer, LAN)
+2. `SharedApi.getAbstractDhWorld()` returns valid world object
+3. LOD chunks are generated and rendered
+4. F3 debug display shows DH statistics
+
+**Identical to Original:**
+The world creation logic is identical whether in dedicated server or singleplayer mode - same `DhClientWorld` constructor, same initialization sequence, same level loading.
+
+**Why This Fix is Correct:**
+- DH supports singleplayer mode (documented in user guides, config files reference it)
+- `MixinClientPacketListener.enableChunkLight` injection processes chunks in all modes
+- The world creation code doesn't depend on server connection status
+- All DH's world management code handles singleplayer (file paths, database storage, etc.)
+
+### Files Changed
+- `modules/distant-horizons-2.3.4b/coreSubProjects/core/src/main/java/com/seibel/distanthorizons/core/api/internal/ClientApi.java`
+
+### Testing
+After this fix, singleplayer worlds should:
+- ✅ Create DH world on join
+- ✅ Process chunk loads via `enableChunkLight` mixin
+- ✅ Generate LOD data  
+- ✅ Display F3 statistics
+- ✅ Render LOD chunks beyond render distance
+
