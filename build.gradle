@@ -962,8 +962,8 @@ tasks.register('runClient', JavaExec) {
     def gameJarFile = file("${buildDir}/libs/minecraft-${version}.jar")
     def dhJarFile = file("${buildDir}/mods/distanthorizons-2.3.4-b-mc1.21.10.jar")
     
-    // Add DH JAR to classpath so Fabric can load its resources in development mode
-    classpath = files(fabricLoaderJarFile, gameJarFile, dhJarFile) + 
+    // DH is loaded via fabric.addMods system property, not classpath
+    classpath = files(fabricLoaderJarFile, gameJarFile) + 
                 configurations.runtimeClasspath
     
     // Use Fabric Loader's KnotClient as the entry point
@@ -975,8 +975,8 @@ tasks.register('runClient', JavaExec) {
         '-Dfabric.development=true',
         // Tell Fabric Loader where the game JAR is
         "-Dfabric.gameJarPath.client=${gameJarFile.absolutePath}",
-        // Tell Fabric to treat DH as a development mod so resources load properly
-        "-Dfabric.skipMcProvider=false"
+        // Add DH JAR as an additional mod to ensure resources are loaded properly
+        "-Dfabric.addMods=${dhJarFile.absolutePath}"
     ]
     
     // Required client arguments - these get passed through Knot to Minecraft
@@ -1010,13 +1010,12 @@ tasks.register('runClient', JavaExec) {
         }
         modsDir.mkdirs()
         
-        // Copy Sodium and Iris mod JARs to mods folder
-        // DH is on classpath for proper resource loading, so exclude it from mods folder
+        // Copy Sodium, Iris, and DH mod JARs to mods folder
+        // DH is also specified via fabric.addMods to ensure proper resource loading
         copy {
             from file("${buildDir}/mods")
             into modsDir
             include '*.jar'
-            exclude 'distanthorizons*.jar'  // DH loaded via classpath for dev mode
         }
         
         // Copy assets from src/main/resources/assets to run/assets for dev environment
