@@ -1,0 +1,388 @@
+/*
+ *    This file is part of the Distant Horizons mod
+ *    licensed under the GNU LGPL v3 License.
+ *
+ *    Copyright (C) 2020 James Seibel
+ *
+ *    This program is free software: you can redistribute it and/or modify
+ *    it under the terms of the GNU Lesser General Public License as published by
+ *    the Free Software Foundation, version 3.
+ *
+ *    This program is distributed in the hope that it will be useful,
+ *    but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *    GNU Lesser General Public License for more details.
+ *
+ *    You should have received a copy of the GNU Lesser General Public License
+ *    along with this program.  If not, see <https://www.gnu.org/licenses/>.
+ */
+
+package com.seibel.distanthorizons.core.level;
+
+import com.google.common.cache.CacheBuilder;
+import com.seibel.distanthorizons.core.config.Config;
+import com.seibel.distanthorizons.core.dataObjects.fullData.sources.FullDataSourceV2;
+import com.seibel.distanthorizons.core.dependencyInjection.SingletonInjector;
+import com.seibel.distanthorizons.core.file.fullDatafile.V2.FullDataSourceProviderV2;
+import com.seibel.distanthorizons.core.file.fullDatafile.RemoteFullDataSourceProvider;
+import com.seibel.distanthorizons.core.file.structure.ISaveStructure;
+import com.seibel.distanthorizons.core.generation.RemoteWorldRetrievalQueue;
+import com.seibel.distanthorizons.core.logging.DhLogger;
+import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
+import com.seibel.distanthorizons.core.multiplayer.client.ClientNetworkState;
+import com.seibel.distanthorizons.core.multiplayer.client.SyncOnLoadRequestQueue;
+import com.seibel.distanthorizons.core.network.event.ScopedNetworkEventSource;
+import com.seibel.distanthorizons.core.network.messages.fullData.FullDataPartialUpdateMessage;
+import com.seibel.distanthorizons.core.pos.DhChunkPos;
+import com.seibel.distanthorizons.core.render.RenderBufferHandler;
+import com.seibel.distanthorizons.core.render.renderer.generic.GenericObjectRenderer;
+import com.seibel.distanthorizons.core.pos.blockPos.DhBlockPos2D;
+import com.seibel.distanthorizons.core.render.renderer.DebugRenderer;
+import com.seibel.distanthorizons.core.sql.dto.FullDataSourceV2DTO;
+import com.seibel.distanthorizons.core.util.threading.ThreadPoolUtil;
+import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftClientWrapper;
+import com.seibel.distanthorizons.core.wrapperInterfaces.world.IClientLevelWrapper;
+import com.seibel.distanthorizons.core.wrapperInterfaces.world.ILevelWrapper;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
+
+import javax.annotation.CheckForNull;
+import java.awt.*;
+import java.io.File;
+import java.io.IOException;
+import java.sql.SQLException;
+import java.util.*;
+import java.util.List;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Executor;
+import java.util.concurrent.TimeUnit;
+
+/** The level used when connected to a server */
+public class DhClientLevel extends AbstractDhLevel implements IDhClientLevel
+{
+	private static final DhLogger LOGGER = new DhLoggerBuilder().build();
+	private static final DhLogger NETWORK_LOGGER = new DhLoggerBuilder()
+			.fileLevelConfig(Config.Common.Logging.logNetworkEventToFile)
+			.build();
+	
+	private static final IMinecraftClientWrapper MC_CLIENT = SingletonInjector.INSTANCE.get(IMinecraftClientWrapper.class);
+	
+	public final ClientLevelModule clientside;
+	public final IClientLevelWrapper levelWrapper;
+	public final ISaveStructure saveStructure;
+	public final RemoteFullDataSourceProvider remoteDataSourceProvider;
+	
+	@CheckForNull
+	private final ClientNetworkState networkState;
+	@Nullable
+	private final ScopedNetworkEventSource networkEventSource;
+	
+	/** used when connected to a DH supported server so we don't process the same chunks multiple times */
+	private final Set<DhChunkPos> loadedOnceChunks = Collections.newSetFromMap(
+			CacheBuilder.newBuilder()
+					.expireAfterWrite(10, TimeUnit.MINUTES)
+					.<DhChunkPos, Boolean>build()
+					.asMap()
+	);
+	
+	public final LodRequestModule lodRequestModule;
+	
+	@Nullable
+	private final SyncOnLoadRequestQueue syncOnLoadRequestQueue;
+	
+	
+	
+	//=============//
+	// constructor //
+	//=============//
+	
+	public DhClientLevel(
+		ISaveStructure saveStructure, 
+		IClientLevelWrapper clientLevelWrapper, 
+		@Nullable ClientNetworkState networkState
+		) throws SQLException, IOException
+	{ this(saveStructure, clientLevelWrapper, null, networkState); }
+	public DhClientLevel(
+		ISaveStructure saveStructure, 
+		IClientLevelWrapper clientLevelWrapper, 
+		@Nullable File fullDataSaveDirOverride, 
+		@Nullable ClientNetworkState networkState
+		) throws SQLException, IOException
+	{
+		File saveFolder = saveStructure.getSaveFolder(clientLevelWrapper);
+		File pre23Folder = saveStructure.getPre23SaveFolder(clientLevelWrapper);
+		
+		if (pre23Folder.exists())
+		{
+			if (!pre23Folder.renameTo(saveFolder))
+			{
+				throw new RuntimeException("Could not move old save data folder: " + pre23Folder.getAbsolutePath() + " to " + saveFolder.getAbsolutePath());
+			}
+		}
+		else if (saveStructure.getSaveFolder(clientLevelWrapper).mkdirs())
+		{
+			LOGGER.warn("unable to create data folder.");
+		}
+		
+		this.levelWrapper = clientLevelWrapper;
+		this.levelWrapper.setDhLevel(this);
+		this.saveStructure = saveStructure;
+		
+		this.networkState = networkState;
+		if (this.networkState != null)
+		{
+			this.networkEventSource = new ScopedNetworkEventSource(this.networkState.getSession());
+			this.syncOnLoadRequestQueue = new SyncOnLoadRequestQueue(this, this.networkState);
+			this.registerNetworkHandlers();
+		}
+		else
+		{
+			this.networkEventSource = null;
+			this.syncOnLoadRequestQueue = null;
+		}
+		
+		this.remoteDataSourceProvider = new RemoteFullDataSourceProvider(this, saveStructure, fullDataSaveDirOverride, this.syncOnLoadRequestQueue);
+		this.lodRequestModule = new LodRequestModule(this,this, this.remoteDataSourceProvider, () -> new LodRequestState(this, networkState));
+		
+		this.clientside = new ClientLevelModule(this);
+		
+		this.createAndSetSupportingRepos(this.remoteDataSourceProvider.repo.databaseFile);
+		this.runRepoReliantSetup();
+		
+		this.clientside.startRenderer();
+		LOGGER.info("Started DHLevel for " + this.levelWrapper + " with saves at " + this.saveStructure);
+	}
+	private void registerNetworkHandlers()
+	{
+		assert this.networkEventSource != null;
+		assert this.networkState != null;
+		
+		this.networkEventSource.registerHandler(FullDataPartialUpdateMessage.class, message ->
+		{
+			if (MC_CLIENT.connectedToReplay())
+			{
+				return;
+			}
+			
+			
+			try (FullDataSourceV2DTO dataSourceDto = this.networkState.fullDataPayloadReceiver.decodeDataSource(message.payload))
+			{
+				boolean isSameLevel = message.isSameLevelAs(this.levelWrapper);
+				NETWORK_LOGGER.debug("Buffer ["+message.payload.dtoBufferId+"] isSameLevel: ["+isSameLevel+"]");
+				if (!isSameLevel)
+				{
+					return;
+				}
+				
+				
+				Executor executor = ThreadPoolUtil.getFileHandlerExecutor();
+				if (executor != null)
+				{
+					executor.execute(() ->
+					{
+						try
+						{
+							// TODO this has a lock which can cause stuttering/lag issues
+							this.updateBeaconBeamsForSectionPos(dataSourceDto.pos, message.payload.beaconBeams);
+						}
+						catch (Exception e)
+						{
+							LOGGER.error("Unexpected erorr while updating full data source, error: ["+e.getMessage()+"].", e);
+						}
+					});
+				}
+				
+				
+				FullDataSourceV2 fullDataSource = dataSourceDto.createDataSource(this.levelWrapper, null);
+				this.updateDataSourcesAsync(fullDataSource)
+						.whenComplete((result, e) -> fullDataSource.close());
+			}
+			catch (Exception e)
+			{
+				LOGGER.error("Error while updating full data source", e);
+			}
+		});
+	}
+	
+	
+	
+	//==============//
+	// tick methods //
+	//==============//
+	
+	@Override
+	public void clientTick()
+	{
+		try
+		{
+			this.clientside.clientTick();
+			
+			if (this.syncOnLoadRequestQueue != null)
+			{
+				this.syncOnLoadRequestQueue.tick(new DhBlockPos2D(MC_CLIENT.getPlayerBlockPos()));
+			}
+		}
+		catch (Exception e)
+		{
+			LOGGER.error("Unexpected clientTick Exception: "+e.getMessage(), e);
+		}
+	}
+	
+	@Override
+	public boolean shouldDoWorldGen()
+	{
+		ClientNetworkState networkState = this.networkState;
+		
+		boolean isClientUsable = false, isAllowedDimension = false;
+		if (networkState != null)
+		{
+			isClientUsable = networkState.isReady();
+			isAllowedDimension = MC_CLIENT.getWrappedClientLevel() == this.levelWrapper;
+		}
+		
+		return isClientUsable
+				&& networkState.sessionConfig.isDistantGenerationEnabled()
+				&& isAllowedDimension
+				&& this.clientside.isRendering();
+	}
+	
+	@Override
+	@Nullable
+	public DhBlockPos2D getTargetPosForGeneration() { return new DhBlockPos2D(MC_CLIENT.getPlayerBlockPos()); }
+	
+	
+	
+	//===========//
+	// world gen //
+	//===========//
+	
+	@Override
+	public void onWorldGenTaskComplete(long pos)
+	{
+		DebugRenderer.makeParticle(
+				new DebugRenderer.BoxParticle(
+						new DebugRenderer.Box(pos, 128f, 156f, 0.09f, Color.red.darker()),
+						0.2, 32f
+				)
+		);
+		
+		this.clientside.reloadPos(pos);
+	}
+	
+	
+	
+	//=========//
+	// getters //
+	//=========//
+	
+	@Override
+	public IClientLevelWrapper getClientLevelWrapper() { return this.levelWrapper; }
+	
+	@Override
+	public void clearRenderCache() { this.clientside.clearRenderCache(); }
+	
+	@Override
+	@NotNull
+	public ILevelWrapper getLevelWrapper() { return this.levelWrapper; }
+	
+	@Override
+	public CompletableFuture<Void> updateDataSourcesAsync(FullDataSourceV2 data) { return this.clientside.updateDataSourcesAsync(data); }
+	
+	@Override
+	public FullDataSourceProviderV2 getFullDataProvider() { return this.remoteDataSourceProvider; }
+	
+	@Override
+	public ISaveStructure getSaveStructure() { return this.saveStructure; }
+	
+	@Override
+	public GenericObjectRenderer getGenericRenderer() { return this.clientside.genericRenderer; }
+	@Override
+	public RenderBufferHandler getRenderBufferHandler()
+	{
+		ClientLevelModule.ClientRenderState renderState = this.clientside.ClientRenderStateRef.get();
+		return (renderState != null) ? renderState.renderBufferHandler : null;
+	}
+	
+	public boolean shouldProcessChunkUpdate(DhChunkPos chunkPos)
+	{
+		if (this.networkState == null || !this.networkState.isReady())
+		{
+			return true;
+		}
+		
+		return !this.networkState.sessionConfig.isRealTimeUpdatesEnabled() || this.loadedOnceChunks.add(chunkPos);
+	}
+	
+	
+	
+	//===========//
+	// debugging //
+	//===========//
+	
+	@Override
+	public void addDebugMenuStringsToList(List<String> messageList)
+	{
+		String dimName = this.levelWrapper.getDhIdentifier();
+		boolean rendering = this.clientside.isRendering();
+		messageList.add("["+dimName+"] rendering: "+(rendering ? "yes" : "no"));
+		
+		
+		this.remoteDataSourceProvider.addDebugMenuStringsToList(messageList);
+		
+		
+		// world gen
+		this.lodRequestModule.addDebugMenuStringsToList(messageList);
+		if (this.syncOnLoadRequestQueue != null)
+		{
+			assert this.networkState != null;
+			if (this.networkState.sessionConfig.getSynchronizeOnLoad())
+			{
+				this.syncOnLoadRequestQueue.addDebugMenuStringsToList(messageList);
+			}
+		}
+	}
+	
+	
+	
+	//================//
+	// base overrides //
+	//================//
+	
+	@Override
+	public String toString() { return "DhClientLevel{" + this.getClientLevelWrapper().getDhIdentifier() + "}"; }
+	
+	@Override
+	public void close()
+	{
+		if (this.lodRequestModule != null)
+		{
+			this.lodRequestModule.close();
+		}
+		
+		if (this.networkEventSource != null)
+		{
+			this.networkEventSource.close();
+		}
+		
+		this.levelWrapper.setDhLevel(null);
+		this.clientside.close();
+		super.close();
+		this.remoteDataSourceProvider.close();
+		LOGGER.info("Closed [" + DhClientLevel.class.getSimpleName() + "] for [" + this.levelWrapper + "]");
+	}
+	
+	
+	
+	//================//
+	// helper classes //
+	//================//
+	
+	private static class LodRequestState extends LodRequestModule.AbstractLodRequestState
+	{
+		LodRequestState(DhClientLevel level, ClientNetworkState networkState)
+		{
+			this.retrievalQueue = new RemoteWorldRetrievalQueue(networkState, level);
+		}
+	}
+	
+}
