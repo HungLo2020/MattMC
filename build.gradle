@@ -944,8 +944,7 @@ tasks.register('runClient', JavaExec) {
     def gameJarFile = file("${buildDir}/libs/minecraft-${version}.jar")
     
     classpath = files(fabricLoaderJarFile, gameJarFile) + 
-                configurations.runtimeClasspath +
-                sourceSets.distantHorizons.runtimeClasspath
+                configurations.runtimeClasspath
     
     // Use Fabric Loader's KnotClient as the entry point
     mainClass = 'net.fabricmc.loader.impl.launch.knot.KnotClient'
