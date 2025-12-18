@@ -70,7 +70,6 @@
     "sodium-fabric.mixins.json"
   ],
   "depends" : {
-    "fabricloader" : ">=0.16.0"
   },
   "breaks" : {
     "embeddium": "*",
