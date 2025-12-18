@@ -1,5 +1,24 @@
 # Distant Horizons Migration Plan
 
+## ⚠️ CRITICAL FINDING - BUILD CURRENTLY BROKEN ⚠️
+
+**IMMEDIATE ISSUE IDENTIFIED**: The existing integrated Distant Horizons code in `modules/distant-horizons-2.3.4b/` contains **unprocessed preprocessing directives** (`#if MC_VER`, `#else`, `#endif`). The build system is currently **BROKEN** with ~300 compilation errors.
+
+### Root Cause
+- The source code has Manifold preprocessing directives that aren't being processed
+- Java compiler encounters raw `#if` directives and fails
+- This affects ~123 files across the codebase
+
+### Immediate Options
+1. **Option A (Recommended)**: Configure Manifold preprocessor in MattMC's build system
+2. **Option B**: Find preprocessed version of DH 2.3.4b for MC 1.21.10  
+3. **Option C**: Manually resolve all preprocessing directives (time-consuming)
+
+### Decision
+We will implement **Option A** - add Manifold preprocessor support to enable proper compilation.
+
+---
+
 ## Executive Summary
 
 This document outlines the strategy for updating the integrated Distant Horizons mod in MattMC from version **2.3.4-b** (Minecraft 1.21.10) to version **2.4.3-b-dev** (Minecraft 1.21.11).

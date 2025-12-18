@@ -1,6 +1,7 @@
 plugins {
     id 'java'
     id 'application'
+    id 'systems.manifold.manifold-gradle-plugin' version '0.0.2-alpha'
 }
 
 group = 'net.minecraft'
@@ -27,6 +28,9 @@ def sodiumDir = 'modules/sodium-1.21.9'
 // Iris version (update this when upgrading Iris source)
 def irisVersion = '1.9.6'
 def irisDir = 'modules/Iris-1.21.9'
+
+// Manifold version for preprocessing
+def manifoldVersion = '2025.1.27'
 
 java {
     // Keep toolchain configuration for compilation
@@ -319,6 +323,10 @@ dependencies {
     // SQLite JDBC - Database for LOD data storage
     implementation 'org.xerial:sqlite-jdbc:3.47.2.0'
     
+    // Manifold Preprocessor - for handling MC version-specific code
+    // This is needed to process #if MC_VER preprocessing directives in Distant Horizons code
+    annotationProcessor "systems.manifold:manifold-preprocessor:${manifoldVersion}"
+    
     // Fabric API modules (required by DH's Fabric integration)
     // Note: These are stub implementations in src/main/java/net/fabricmc/fabric/api/
     // The actual implementations are loaded at runtime by Fabric Loader
@@ -540,6 +548,44 @@ sourceSets.distantHorizons.runtimeClasspath += sourceSets.fabricLoader.output
 sourceSets.distantHorizons.runtimeClasspath += sourceSets.main.output
 sourceSets.distantHorizons.runtimeClasspath += sourceSets.sodium.output
 sourceSets.distantHorizons.runtimeClasspath += sourceSets.iris.output
+
+// ============================================================================
+// MANIFOLD PREPROCESSOR CONFIGURATION FOR DISTANT HORIZONS
+// ============================================================================
+// Configure Manifold preprocessor to handle version-specific code in DH
+// ============================================================================
+
+manifold {
+    manifoldVersion = manifoldVersion
+}
+
+// Add Manifold annotation processor ONLY to Distant Horizons compilation
+// This processes #if MC_VER directives for version-specific code
+tasks.named('compileDistantHorizonsJava') {
+    options.compilerArgs = options.compilerArgs.findAll { !it.startsWith('-Xplugin:Manifold') }
+    options.compilerArgs += [
+        '-Xplugin:Manifold',
+        '-DMCVER=MC_1_21_10'  // Define MC version for preprocessing
+    ]
+}
+
+// Make sure other source sets don't use Manifold
+tasks.named('compileFabricLoaderJava') {
+    options.compilerArgs = options.compilerArgs.findAll { !it.startsWith('-Xplugin:Manifold') }
+}
+tasks.named('compileJava') {
+    options.compilerArgs = options.compilerArgs.findAll { !it.startsWith('-Xplugin:Manifold') }
+}
+tasks.named('compileSodiumJava') {
+    options.compilerArgs = options.compilerArgs.findAll { !it.startsWith('-Xplugin:Manifold') }
+}
+tasks.named('compileIrisJava') {
+    options.compilerArgs = options.compilerArgs.findAll { !it.startsWith('-Xplugin:Manifold') }
+}
+
+configurations {
+    distantHorizonsAnnotationProcessor.extendsFrom annotationProcessor
+}
 
 
 // ============================================================================
