@@ -529,7 +529,13 @@ public class GlStateManager {
 	@Environment(EnvType.CLIENT)
 	public static class BooleanState {
 		private final int state;
-		private boolean enabled;
+		/**
+		 * The enabled state.
+		 * 
+		 * @apiNote Made public for Iris shader pipeline state management.
+		 * Originally widened by: iris.accesswidener
+		 */
+		public boolean enabled;
 
 		public BooleanState(int i) {
 			this.state = i;
