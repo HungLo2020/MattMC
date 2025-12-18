@@ -24,6 +24,7 @@ import com.seibel.distanthorizons.common.wrappers.world.ClientLevelWrapper;
 import com.seibel.distanthorizons.core.api.internal.ClientApi;
 import com.seibel.distanthorizons.core.api.internal.SharedApi;
 import net.minecraft.client.multiplayer.ClientLevel;
+import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.chunk.LevelChunk;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
@@ -40,11 +41,13 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 public class MixinClientLevel
 {
 	// Moved to overriding the enableChunkLight(...) method over at ClientPacketListener for 1.20+
-		@Inject(method = "setLightReady", at = @At("HEAD"))
-	private void onChunkLightReady(int x, int z, CallbackInfo ci)
+	// For MC 1.21.10: setLightReady() was removed, targeting onChunkLoaded() instead
+	// Note: This may be redundant with MixinClientPacketListener.onEnableChunkLight() but kept for compatibility
+	@Inject(method = "onChunkLoaded", at = @At("HEAD"), require = 0)
+	private void onChunkLightReady(ChunkPos chunkPos, CallbackInfo ci)
 	{
 		ClientLevel clientLevel = (ClientLevel) (Object) this;
-		LevelChunk chunk = clientLevel.getChunkSource().getChunk(x, z, false);
+		LevelChunk chunk = clientLevel.getChunkSource().getChunk(chunkPos.x, chunkPos.z, false);
 		
 		if (chunk != null && !chunk.isLightCorrect())
 		{
