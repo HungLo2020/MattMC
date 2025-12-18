@@ -1281,3 +1281,20 @@ All required resources are present in the JAR.
 - **Expected Behavior**: ✅ DH should create world and function fully
 
 **Distant Horizons now has all required dependencies and resources for full functionality with MattMC for MC 1.21.10.**
+
+## Issue #6 Update: Dependencies Already Present
+
+**Correction**: After further investigation, all required DH runtime dependencies were ALREADY properly configured in the main `dependencies` block (build.gradle lines 307-320):
+
+- ✅ `nightconfig-core` v3.6.7
+- ✅ `nightconfig-toml` v3.6.7  
+- ✅ `nightconfig-json` v3.6.7
+- ✅ `lz4-java` v1.8.0 (line 182)
+- ✅ `xz` v1.9
+- ✅ `sqlite-jdbc` v3.47.2.0
+
+**Actual Fix Required**: Only needed to ensure these dependencies are available at runtime by updating the `runClient` classpath to include `sourceSets.distantHorizons.runtimeClasspath` (build.gradle line 970).
+
+The duplicate `dependencies` block initially added (lines 526-539) was removed as it was redundant and used incorrect versions.
+
+**Final Status**: All dependencies properly configured and available at runtime.

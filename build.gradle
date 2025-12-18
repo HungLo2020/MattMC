@@ -516,28 +516,6 @@ configurations {
     
 }
 
-// ============================================================================
-// DISTANT HORIZONS DEPENDENCIES
-// ============================================================================
-// DH requires these dependencies at runtime for config, compression, and database
-// These are normally "shaded" (bundled) in DH's JAR, but we need to provide them
-// ============================================================================
-
-dependencies {
-    // NightConfig - Config system (TOML and JSON support)
-    distantHorizonsImplementation 'com.electronwill.night-config:toml:3.6.6'
-    distantHorizonsImplementation 'com.electronwill.night-config:json:3.6.6'
-    
-    // LZ4 - Fast compression for chunk data
-    distantHorizonsImplementation 'org.lz4:lz4-java:1.8.0'
-    
-    // XZ - LZMA compression for chunk data
-    distantHorizonsImplementation 'org.tukaani:xz:1.9'
-    
-    // SQLite - Database for LOD storage
-    distantHorizonsImplementation 'org.xerial:sqlite-jdbc:3.47.2.0'
-}
-
 // Sodium depends on Fabric Loader and Minecraft
 // Fabric API stub interfaces are in src/main/java/net/fabricmc/fabric/api/
 sourceSets.sodium.compileClasspath += sourceSets.fabricLoader.output
