@@ -92,6 +92,11 @@ public class F3Screen
 		ThreadPoolExecutor migrationPool = ThreadPoolUtil.getFullDataMigrationExecutor();
 		
 		AbstractDhWorld world = SharedApi.getAbstractDhWorld();
+		// Return early if DH world isn't initialized yet (can happen when F3 is opened before world loads)
+		if (world == null)
+		{
+			return;
+		}
 		Iterable<? extends IDhLevel> levelIterator = world.getAllLoadedLevels();
 		
 		
