@@ -711,14 +711,32 @@ tasks.register('distantHorizonsJar', Jar) {
     
     from sourceSets.distantHorizons.output
     
+    // Explicitly include language files to ensure they're in the JAR
+    from('modules/distant-horizons-2.3.4b/coreSubProjects/core/src/main/resources') {
+        include 'assets/distanthorizons/lang/**'
+    }
+    
+    // Ensure proper handling of duplicate files
+    duplicatesStrategy = DuplicatesStrategy.WARN
+    
     destinationDirectory = file("${buildDir}/mods")
     
     manifest {
         attributes(
             'Implementation-Title': 'Distant Horizons',
             'Implementation-Version': '2.3.4-b',
-            'Implementation-Vendor': 'jeseibel'
+            'Implementation-Vendor': 'jeseibel',
+            'Fabric-Loom-Mixin-Remap-Type': 'static'
         )
+    }
+    
+    // Explicitly verify lang files are included
+    doFirst {
+        def langFile = file('modules/distant-horizons-2.3.4b/coreSubProjects/core/src/main/resources/assets/distanthorizons/lang/en_us.json')
+        if (!langFile.exists()) {
+            throw new GradleException("Language file not found: ${langFile}")
+        }
+        logger.lifecycle("DH: Language file verified at ${langFile}")
     }
 }
 
@@ -942,8 +960,10 @@ tasks.register('runClient', JavaExec) {
     // The order matters: Fabric Loader JAR first, then Game JAR, then dependencies
     def fabricLoaderJarFile = file("${buildDir}/libs/fabric-loader-${fabricLoaderVersion}.jar")
     def gameJarFile = file("${buildDir}/libs/minecraft-${version}.jar")
+    def dhJarFile = file("${buildDir}/mods/distanthorizons-2.3.4-b-mc1.21.10.jar")
     
-    classpath = files(fabricLoaderJarFile, gameJarFile) + 
+    // Add DH JAR to classpath so Fabric can load its resources in development mode
+    classpath = files(fabricLoaderJarFile, gameJarFile, dhJarFile) + 
                 configurations.runtimeClasspath
     
     // Use Fabric Loader's KnotClient as the entry point
@@ -954,7 +974,9 @@ tasks.register('runClient', JavaExec) {
         // Fabric Loader options
         '-Dfabric.development=true',
         // Tell Fabric Loader where the game JAR is
-        "-Dfabric.gameJarPath.client=${gameJarFile.absolutePath}"
+        "-Dfabric.gameJarPath.client=${gameJarFile.absolutePath}",
+        // Tell Fabric to treat DH as a development mod so resources load properly
+        "-Dfabric.skipMcProvider=false"
     ]
     
     // Required client arguments - these get passed through Knot to Minecraft
@@ -974,6 +996,9 @@ tasks.register('runClient', JavaExec) {
         if (!gameJarFile.exists()) {
             throw new GradleException("Game JAR not found: ${gameJarFile}")
         }
+        if (!dhJarFile.exists()) {
+            throw new GradleException("DH JAR not found: ${dhJarFile}. Run 'gradlew distantHorizonsJar' first.")
+        }
         
         workingDir.mkdirs()
         file('run/assets').mkdirs()
@@ -985,11 +1010,13 @@ tasks.register('runClient', JavaExec) {
         }
         modsDir.mkdirs()
         
-        // Copy Sodium and Iris mod JARs to mods folder (DH integration commented out)
+        // Copy Sodium and Iris mod JARs to mods folder
+        // DH is on classpath for proper resource loading, so exclude it from mods folder
         copy {
             from file("${buildDir}/mods")
             into modsDir
             include '*.jar'
+            exclude 'distanthorizons*.jar'  // DH loaded via classpath for dev mode
         }
         
         // Copy assets from src/main/resources/assets to run/assets for dev environment
@@ -1000,6 +1027,9 @@ tasks.register('runClient', JavaExec) {
                 into file('run/assets')
             }
         }
+        
+        // DH is now on classpath so Fabric should load its resources automatically
+        // No need to extract assets manually
         
         // Create shaderpacks directory and copy shader pack zip
         def shaderpacksDir = file('run/shaderpacks')
