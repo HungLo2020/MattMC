@@ -45,6 +45,19 @@ public void renderContent(GuiGraphics matrices, int mouseX, int mouseY, boolean 
 ### 3. Gradle Configuration
 **Fix:** Updated `mcVer` in DH's `gradle.properties` from `1.21.8` to `1.21.10`
 
+### 4. Missing Translation Files in Main Project Resources
+**Root Cause:** When DH code is compiled directly into the game JAR (rather than loaded as a separate mod), Minecraft's resource loading system requires language files to be in the main project's resources directory.
+
+**Issue:** Language files existed in `modules/distant-horizons-2.3.4b/coreSubProjects/core/src/main/resources/assets/distanthorizons/lang/` but were not accessible at runtime because they weren't in the main project's resources.
+
+**Fix:** Copied `en_us.json` to `src/main/resources/assets/distanthorizons/lang/en_us.json` so translations are available when the game loads.
+
+**Impact:** All DH GUI text now displays correctly:
+- Button labels: "Done", "Cancel", "Reset"
+- Boolean values: "True", "False"
+- Config titles and tooltips
+- Enum value translations
+
 ## API Changes in MC 1.21.6+
 
 ### Entry Rendering Method
@@ -112,8 +125,10 @@ This maps to:
 
 The translation system uses:
 1. `Component.translatable(key)` to create translatable components
-2. Language files in `coreSubProjects/core/src/main/resources/assets/distanthorizons/lang/en_us.json`
+2. Language files that must be in the main project's resources for direct integration
 3. `I18n.exists(key)` to check if a translation exists before using it
+
+**Important**: When DH is compiled directly into the game JAR, language files must be in `src/main/resources/assets/distanthorizons/lang/` rather than only in the modules directory. This ensures Minecraft's resource loader can find and load the translations at runtime.
 
 All of these APIs work correctly in MC 1.21.10.
 
@@ -127,6 +142,10 @@ All of these APIs work correctly in MC 1.21.10.
 
 3. `/modules/distant-horizons-2.3.4b/gradle.properties`
    - Updated `mcVer` from 1.21.8 to 1.21.10
+
+4. `/src/main/resources/assets/distanthorizons/lang/en_us.json` (NEW)
+   - Copied DH language file to main project resources
+   - Required for translations to work when DH is compiled into game JAR
 
 ## Testing Recommendations
 
