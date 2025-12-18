@@ -1,0 +1,13 @@
+{
+  "schemaVersion": 1,
+  "id": "fabric-lifecycle-events-v1",
+  "version": "1.0.0",
+  "name": "Fabric Lifecycle Events (v1) - Stub",
+  "description": "Stub implementation for Fabric Lifecycle Events v1 API",
+  "license": "Apache-2.0",
+  "environment": "*",
+  "entrypoints": {},
+  "depends": {
+    "fabricloader": ">=0.4.0"
+  }
+}

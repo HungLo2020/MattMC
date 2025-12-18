@@ -20,6 +20,9 @@ def lwjglNatives = System.getProperty('os.name').toLowerCase().contains('mac')
 def fabricLoaderVersion = '0.18.2'
 def fabricLoaderDir = "modules/fabric-loader-${fabricLoaderVersion}"
 
+// Fabric API version for MC 1.21.10 (required for mod resource loading)
+def fabricApiVersion = '0.129.0+1.21.10'
+
 // Sodium version (update this when upgrading Sodium source)
 def sodiumVersion = '0.7.2'
 def sodiumDir = 'modules/sodium-1.21.9'
