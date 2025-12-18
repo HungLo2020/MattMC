@@ -3,45 +3,7 @@
   "id" : "sodium",
   "version" : "${version}",
   "name" : "Sodium",
-  "description" : "Sodium is a powerful rendering engine for Minecraft which greatly improves frame rates and micro-stutter, while fixing many graphical issues",
-  "authors" : [
-    {
-      "name" : "JellySquid (jellysquid3)",
-      "contact" : {
-        "email" : "jellysquid@pm.me",
-        "homepage" : "https://jellysquid.me"
-      }
-    }
-  ],
-  "contributors" : [
-    "IMS212",
-    "bytzo",
-    "PepperCode1",
-    "FlashyReese",
-    "altrisi",
-    "Grayray75",
-    "Madis0",
-    "Johni0702",
-    "comp500",
-    "coderbot16",
-    "Moulberry",
-    "MCRcortex",
-    "Altirix",
-    "embeddedt",
-    "pajicadvance",
-    "Kroppeb",
-    "douira",
-    "burgerindividual",
-    "TwistedZero",
-    "Leo40Git",
-    "haykam821",
-    "muzikbike"
-  ],
-  "contact" : {
-    "homepage" : "https://github.com/CaffeineMC/sodium",
-    "sources" : "https://github.com/CaffeineMC/sodium",
-    "issues" : "https://github.com/CaffeineMC/sodium/issues"
-  },
+  "description" : "Advanced rendering engine integrated into MattMC for improved performance",
   "license" : "Polyform-Shield-1.0.0",
   "icon" : "sodium-icon.png",
   "environment" : "client",
@@ -59,8 +21,5 @@
   "mixins" : [
     "sodium-common.mixins.json",
     "sodium-fabric.mixins.json"
-  ],
-  "provides" : [
-    "indium"
   ]
 }
