@@ -17,10 +17,12 @@ import java.util.function.Supplier;
 import net.minecraft.api.EnvType;
 import net.minecraft.api.Environment;
 import org.jetbrains.annotations.Nullable;
+import net.caffeinemc.mods.sodium.api.vertex.format.VertexFormatExtensions;
+import net.caffeinemc.mods.sodium.api.vertex.format.VertexFormatRegistry;
 
 @Environment(EnvType.CLIENT)
 @DontObfuscate
-public class VertexFormat {
+public class VertexFormat implements VertexFormatExtensions {
 	public static final int UNKNOWN_ELEMENT = -1;
 	private final List<VertexFormatElement> elements;
 	private final List<String> names;
@@ -31,6 +33,8 @@ public class VertexFormat {
 	private GpuBuffer immediateDrawVertexBuffer;
 	@Nullable
 	private GpuBuffer immediateDrawIndexBuffer;
+	// Sodium: Global ID for vertex format tracking
+	private int sodium$globalId;
 
 	VertexFormat(List<VertexFormatElement> list, List<String> list2, IntList intList, int i) {
 		this.elements = list;
@@ -43,6 +47,9 @@ public class VertexFormat {
 			int k = vertexFormatElement != null ? list.indexOf(vertexFormatElement) : -1;
 			this.offsetsByElement[j] = k != -1 ? intList.getInt(k) : -1;
 		}
+		
+		// Sodium: Allocate global ID after initialization
+		this.sodium$globalId = VertexFormatRegistry.instance().allocateGlobalId(this);
 	}
 
 	public static VertexFormat.Builder builder() {
@@ -137,6 +144,12 @@ public class VertexFormat {
 	public GpuBuffer uploadImmediateIndexBuffer(ByteBuffer byteBuffer) {
 		this.immediateDrawIndexBuffer = uploadToBuffer(this.immediateDrawIndexBuffer, byteBuffer, 72, () -> "Immediate index buffer for " + this);
 		return this.immediateDrawIndexBuffer;
+	}
+
+	// Sodium: Implementation of VertexFormatExtensions
+	@Override
+	public int sodium$getGlobalId() {
+		return this.sodium$globalId;
 	}
 
 	@Environment(EnvType.CLIENT)

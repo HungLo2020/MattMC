@@ -17,8 +17,11 @@ import net.minecraft.world.level.block.piston.PistonMovingBlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
+import net.caffeinemc.mods.sodium.api.blockentity.BlockEntityRenderPredicate;
+import net.caffeinemc.mods.sodium.client.render.chunk.ExtendedBlockEntityType;
+import org.apache.commons.lang3.ArrayUtils;
 
-public class BlockEntityType<T extends BlockEntity> {
+public class BlockEntityType<T extends BlockEntity> implements ExtendedBlockEntityType<T> {
 	private static final Logger LOGGER = LogUtils.getLogger();
 	public static final BlockEntityType<FurnaceBlockEntity> FURNACE = register("furnace", FurnaceBlockEntity::new, Blocks.FURNACE);
 	public static final BlockEntityType<ChestBlockEntity> CHEST = register(
@@ -270,6 +273,8 @@ public class BlockEntityType<T extends BlockEntity> {
 	private final BlockEntityType.BlockEntitySupplier<? extends T> factory;
 	private final Set<Block> validBlocks;
 	private final Holder.Reference<BlockEntityType<?>> builtInRegistryHolder = BuiltInRegistries.BLOCK_ENTITY_TYPE.createIntrusiveHolder(this);
+	// Sodium: Render predicates for block entities
+	private BlockEntityRenderPredicate<T>[] sodium$renderPredicates = new BlockEntityRenderPredicate[0];
 
 	@Nullable
 	public static ResourceLocation getKey(BlockEntityType<?> blockEntityType) {
@@ -313,6 +318,29 @@ public class BlockEntityType<T extends BlockEntity> {
 
 	public boolean onlyOpCanSetNbt() {
 		return OP_ONLY_CUSTOM_DATA.contains(this);
+	}
+
+	// Sodium: Implementation of ExtendedBlockEntityType
+	@Override
+	public BlockEntityRenderPredicate<T>[] sodium$getRenderPredicates() {
+		return sodium$renderPredicates;
+	}
+
+	@Override
+	public void sodium$addRenderPredicate(BlockEntityRenderPredicate<T> predicate) {
+		sodium$renderPredicates = ArrayUtils.add(sodium$renderPredicates, predicate);
+	}
+
+	@Override
+	public boolean sodium$removeRenderPredicate(BlockEntityRenderPredicate<T> predicate) {
+		int index = ArrayUtils.indexOf(sodium$renderPredicates, predicate);
+
+		if (index == ArrayUtils.INDEX_NOT_FOUND) {
+			return false;
+		}
+
+		sodium$renderPredicates = ArrayUtils.remove(sodium$renderPredicates, index);
+		return true;
 	}
 
 	@FunctionalInterface

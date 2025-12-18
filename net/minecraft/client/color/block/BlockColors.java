@@ -24,14 +24,21 @@ import net.minecraft.world.level.block.state.properties.DoubleBlockHalf;
 import net.minecraft.world.level.block.state.properties.Property;
 import net.minecraft.world.level.material.MapColor;
 import org.jetbrains.annotations.Nullable;
+import net.caffeinemc.mods.sodium.client.model.color.interop.BlockColorsExtension;
+import it.unimi.dsi.fastutil.objects.*;
+import net.caffeinemc.mods.sodium.client.SodiumClientMod;
 
 @Environment(EnvType.CLIENT)
-public class BlockColors {
+public class BlockColors implements BlockColorsExtension {
 	private static final int DEFAULT = -1;
 	public static final int LILY_PAD_IN_WORLD = -14647248;
 	public static final int LILY_PAD_DEFAULT = -9321636;
 	private final IdMapper<BlockColor> blockColors = new IdMapper(32);
 	private final Map<Block, Set<Property<?>>> coloringStates = Maps.<Block, Set<Property<?>>>newHashMap();
+	// Sodium: Keep a copy of blocks to color mapping for per-vertex coloring optimization
+	private final Reference2ReferenceMap<Block, BlockColor> blocksToColor = new Reference2ReferenceOpenHashMap<>();
+	// Sodium: Track blocks that have had their color providers overridden
+	private final ReferenceSet<Block> overridenBlocks = new ReferenceOpenHashSet<>();
 
 	public static BlockColors createDefault() {
 		BlockColors blockColors = new BlockColors();
@@ -126,6 +133,14 @@ public class BlockColors {
 	public void register(BlockColor blockColor, Block... blocks) {
 		for (Block block : blocks) {
 			this.blockColors.addMapping(blockColor, BuiltInRegistries.BLOCK.getId(block));
+			
+			// Sodium: Track color provider registrations
+			// There will be one provider already registered for vanilla blocks, if we are replacing it,
+			// it means a mod is using custom logic, and we need to disable per-vertex coloring
+			if (this.blocksToColor.put(block, blockColor) != null) {
+				this.overridenBlocks.add(block);
+				SodiumClientMod.logger().info("Block {} had its color provider replaced with {} and will not use per-vertex coloring", BuiltInRegistries.BLOCK.getKey(block), blockColor.toString());
+			}
 		}
 	}
 
@@ -141,5 +156,16 @@ public class BlockColors {
 
 	public Set<Property<?>> getColoringProperties(Block block) {
 		return (Set<Property<?>>)this.coloringStates.getOrDefault(block, ImmutableSet.of());
+	}
+
+	// Sodium: Implementation of BlockColorsExtension
+	@Override
+	public Reference2ReferenceMap<Block, BlockColor> sodium$getProviders() {
+		return Reference2ReferenceMaps.unmodifiable(this.blocksToColor);
+	}
+
+	@Override
+	public ReferenceSet<Block> sodium$getOverridenVanillaBlocks() {
+		return ReferenceSets.unmodifiable(this.overridenBlocks);
 	}
 }
