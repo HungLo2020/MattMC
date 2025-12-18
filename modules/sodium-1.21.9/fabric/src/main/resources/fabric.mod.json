@@ -69,8 +69,6 @@
     "sodium-common.mixins.json",
     "sodium-fabric.mixins.json"
   ],
-  "depends" : {
-  },
   "breaks" : {
     "embeddium": "*",
     "optifabric" : "*",
