@@ -1,7 +1,7 @@
 package net.caffeinemc.mods.sodium.client.render.chunk.translucent_sorting;
 
 import it.unimi.dsi.fastutil.objects.ReferenceArrayList;
-import net.caffeinemc.mods.sodium.api.util.NormI8;
+import net.sodium.api.util.NormI8;
 import net.caffeinemc.mods.sodium.client.SodiumClientMod;
 import net.caffeinemc.mods.sodium.client.model.quad.properties.ModelQuadFacing;
 import net.caffeinemc.mods.sodium.client.render.chunk.compile.ChunkBuildOutput;

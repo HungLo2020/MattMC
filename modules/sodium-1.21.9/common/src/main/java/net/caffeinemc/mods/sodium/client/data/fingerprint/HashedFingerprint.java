@@ -3,7 +3,7 @@ package net.caffeinemc.mods.sodium.client.data.fingerprint;
 import com.google.gson.Gson;
 import com.google.gson.annotations.SerializedName;
 import net.caffeinemc.mods.sodium.client.services.PlatformRuntimeInformation;
-import net.minecraft.client.renderer.sodium.util.FileUtil;
+import net.sodium.api.util.FileUtil;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
