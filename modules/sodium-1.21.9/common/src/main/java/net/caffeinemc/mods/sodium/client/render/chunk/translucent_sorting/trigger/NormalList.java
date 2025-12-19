@@ -6,7 +6,7 @@ import it.unimi.dsi.fastutil.objects.Object2ReferenceOpenHashMap;
 import it.unimi.dsi.fastutil.objects.ReferenceArraySet;
 import it.unimi.dsi.fastutil.objects.ReferenceLinkedOpenHashSet;
 import net.caffeinemc.mods.sodium.client.model.quad.properties.ModelQuadFacing;
-import net.caffeinemc.mods.sodium.client.util.MathUtil;
+import net.minecraft.client.renderer.sodium.util.MathUtil;
 import net.caffeinemc.mods.sodium.client.util.interval_tree.DoubleInterval;
 import net.caffeinemc.mods.sodium.client.util.interval_tree.Interval;
 import net.caffeinemc.mods.sodium.client.util.interval_tree.Interval.Bounded;

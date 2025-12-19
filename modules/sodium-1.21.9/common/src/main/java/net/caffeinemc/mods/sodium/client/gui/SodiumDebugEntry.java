@@ -3,7 +3,7 @@ package net.caffeinemc.mods.sodium.client.gui;
 import com.google.common.collect.Lists;
 import net.caffeinemc.mods.sodium.client.SodiumClientMod;
 import net.caffeinemc.mods.sodium.client.render.SodiumWorldRenderer;
-import net.caffeinemc.mods.sodium.client.util.MathUtil;
+import net.minecraft.client.renderer.sodium.util.MathUtil;
 import net.caffeinemc.mods.sodium.client.util.NativeBuffer;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.gui.components.debug.DebugScreenDisplayer;

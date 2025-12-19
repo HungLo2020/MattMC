@@ -5,7 +5,7 @@ import net.caffeinemc.mods.sodium.client.model.quad.ModelQuadView;
 import net.caffeinemc.mods.sodium.client.render.frapi.render.AmbientOcclusionMode;
 import net.caffeinemc.mods.sodium.client.services.PlatformBlockAccess;
 import net.caffeinemc.mods.sodium.client.services.SodiumModelData;
-import net.caffeinemc.mods.sodium.client.util.DirectionUtil;
+import net.minecraft.client.renderer.sodium.util.DirectionUtil;
 import net.fabricmc.fabric.api.util.TriState;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.client.renderer.RenderType;

@@ -7,7 +7,7 @@ import net.caffeinemc.mods.sodium.client.gui.options.TextProvider;
 import net.caffeinemc.mods.sodium.client.render.chunk.DeferMode;
 import net.caffeinemc.mods.sodium.client.render.chunk.translucent_sorting.QuadSplittingMode;
 import net.caffeinemc.mods.sodium.client.services.PlatformRuntimeInformation;
-import net.caffeinemc.mods.sodium.client.util.FileUtil;
+import net.minecraft.client.renderer.sodium.util.FileUtil;
 import net.minecraft.client.GraphicsStatus;
 import net.minecraft.network.chat.Component;
 import org.jetbrains.annotations.NotNull;

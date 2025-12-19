@@ -1,4 +1,4 @@
-package net.caffeinemc.mods.sodium.client.util;
+package net.minecraft.client.renderer.sodium.util;
 
 
 import org.joml.Vector3dc;
