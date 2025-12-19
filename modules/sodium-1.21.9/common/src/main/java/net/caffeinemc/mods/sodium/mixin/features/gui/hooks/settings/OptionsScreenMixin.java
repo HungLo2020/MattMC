@@ -1,20 +1,35 @@
 package net.caffeinemc.mods.sodium.mixin.features.gui.hooks.settings;
 
+import net.caffeinemc.mods.sodium.client.gui.SodiumOptionsGUI;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.screens.options.OptionsScreen;
 import net.minecraft.network.chat.Component;
 import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.injection.At;
+import org.spongepowered.asm.mixin.injection.ModifyArg;
 
-// MattMC: This mixin is disabled because it targets a lambda method with intermediary/Yarn names
-// that don't exist in MattMC's official mapping. The Video Settings button will open vanilla
-// VideoSettingsScreen instead of Sodium's options GUI.
-// To fix: Either access Sodium settings from the game menu or implement a proper hook.
+import java.util.function.Supplier;
+
 @Mixin(OptionsScreen.class)
 public class OptionsScreenMixin extends Screen {
     protected OptionsScreenMixin(Component title) {
         super(title);
     }
     
-    // Original mixin targeted lambda$init$2 which doesn't exist in MattMC
-    // The Sodium options can still be accessed via the game menu or mod menu integration
+    /**
+     * Redirects the Video Settings button to open Sodium's options GUI instead of vanilla video settings.
+     * Uses ModifyArg to intercept the supplier argument when creating the button with the VIDEO component.
+     */
+    @ModifyArg(
+        method = "init",
+        at = @At(
+            value = "INVOKE",
+            target = "Lnet/minecraft/client/gui/screens/options/OptionsScreen;openScreenButton(Lnet/minecraft/network/chat/Component;Ljava/util/function/Supplier;)Lnet/minecraft/client/gui/components/Button;",
+            ordinal = 2  // Third call to openScreenButton is for VIDEO (after SKIN_CUSTOMIZATION and SOUNDS)
+        ),
+        index = 1  // Modify the second parameter (the Supplier)
+    )
+    private Supplier<Screen> useSodiumOptionsScreen(Supplier<Screen> original) {
+        return () -> SodiumOptionsGUI.createScreen(this);
+    }
 }
