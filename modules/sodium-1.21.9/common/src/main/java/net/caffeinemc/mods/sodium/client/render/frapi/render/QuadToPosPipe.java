@@ -18,7 +18,7 @@ package net.caffeinemc.mods.sodium.client.render.frapi.render;
 
 import java.util.function.Consumer;
 
-import net.caffeinemc.mods.sodium.api.math.MatrixHelper;
+import net.sodium.api.math.MatrixHelper;
 import org.joml.Matrix4fc;
 import org.joml.Vector3f;
 import org.joml.Vector3fc;

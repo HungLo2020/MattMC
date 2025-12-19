@@ -2,7 +2,7 @@
 package net.caffeinemc.mods.sodium.client.util.color;
 
 
-import net.caffeinemc.mods.sodium.api.util.ColorABGR;
+import net.sodium.api.util.ColorABGR;
 
 /**
  * This is a port of the fast-srgb8 library from thomcc on <a href="https://github.com/thomcc/fast-srgb8">GitHub</a>.

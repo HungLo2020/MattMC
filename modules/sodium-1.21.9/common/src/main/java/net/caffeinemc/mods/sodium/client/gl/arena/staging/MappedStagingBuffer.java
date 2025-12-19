@@ -7,7 +7,7 @@ import net.caffeinemc.mods.sodium.client.gl.device.RenderDevice;
 import net.caffeinemc.mods.sodium.client.gl.functions.BufferStorageFunctions;
 import net.caffeinemc.mods.sodium.client.gl.sync.GlFence;
 import net.caffeinemc.mods.sodium.client.gl.util.EnumBitField;
-import net.caffeinemc.mods.sodium.client.util.MathUtil;
+import net.sodium.api.util.MathUtil;
 import net.caffeinemc.mods.sodium.client.gl.buffer.*;
 
 import java.nio.ByteBuffer;
