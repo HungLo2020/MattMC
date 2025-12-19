@@ -1,6 +1,6 @@
 package net.irisshaders.iris.mixin.texture.pbr;
 
-import net.caffeinemc.mods.sodium.api.texture.SpriteUtil;
+import net.sodium.api.texture.SpriteUtil;
 import net.irisshaders.iris.pbr.texture.PBRSpriteHolder;
 import net.irisshaders.iris.pbr.texture.SpriteContentsExtension;
 import net.minecraft.client.renderer.texture.SpriteContents;

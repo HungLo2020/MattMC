@@ -3,7 +3,7 @@ package net.caffeinemc.mods.sodium.client.render.vertex;
 import com.mojang.blaze3d.vertex.VertexFormat;
 import it.unimi.dsi.fastutil.objects.Reference2IntMap;
 import it.unimi.dsi.fastutil.objects.Reference2IntOpenHashMap;
-import net.caffeinemc.mods.sodium.api.vertex.format.VertexFormatRegistry;
+import net.sodium.api.vertex.format.VertexFormatRegistry;
 
 import java.util.concurrent.locks.StampedLock;
 

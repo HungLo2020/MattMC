@@ -1,6 +1,6 @@
 package net.caffeinemc.mods.sodium.client.model.light.smooth;
 
-import net.caffeinemc.mods.sodium.api.util.NormI8;
+import net.sodium.api.util.NormI8;
 import net.caffeinemc.mods.sodium.client.model.light.LightPipeline;
 import net.caffeinemc.mods.sodium.client.model.light.data.LightDataAccess;
 import net.caffeinemc.mods.sodium.client.model.light.data.QuadLightData;

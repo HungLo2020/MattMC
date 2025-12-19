@@ -1,6 +1,6 @@
 package net.caffeinemc.mods.sodium.client.gl.device;
 
-import net.caffeinemc.mods.sodium.client.compatibility.environment.OsUtils;
+import net.sodium.client.compatibility.environment.OsUtils;
 import net.caffeinemc.mods.sodium.client.gl.array.GlVertexArray;
 import net.caffeinemc.mods.sodium.client.gl.buffer.*;
 import net.caffeinemc.mods.sodium.client.gl.functions.DeviceFunctions;

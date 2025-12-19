@@ -1,6 +1,6 @@
 package net.caffeinemc.mods.sodium.client.util.color;
 
-import net.caffeinemc.mods.sodium.api.util.ColorARGB;
+import net.sodium.api.util.ColorARGB;
 import net.minecraft.util.Mth;
 
 public class BoxBlur {
