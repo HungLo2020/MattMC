@@ -1,16 +1,13 @@
 package net.caffeinemc.mods.sodium.mixin.workarounds.context_creation;
 
 import com.mojang.blaze3d.TracyFrameCapture;
-import com.mojang.blaze3d.platform.DisplayData;
-import com.mojang.blaze3d.platform.ScreenManager;
 import com.mojang.blaze3d.platform.Window;
-import com.mojang.blaze3d.platform.WindowEventHandler;
 import com.mojang.blaze3d.shaders.ShaderType;
 import com.mojang.blaze3d.systems.RenderSystem;
-import net.caffeinemc.mods.sodium.client.compatibility.checks.ModuleScanner;
-import net.caffeinemc.mods.sodium.client.compatibility.checks.PostLaunchChecks;
-import net.caffeinemc.mods.sodium.client.compatibility.environment.GlContextInfo;
-import net.caffeinemc.mods.sodium.client.platform.NativeWindowHandle;
+import net.sodium.client.compatibility.checks.ModuleScanner;
+import net.sodium.client.compatibility.checks.PostLaunchChecks;
+import net.sodium.client.compatibility.environment.GlContextInfo;
+import net.sodium.client.platform.NativeWindowHandle;
 import net.minecraft.Util;
 import net.minecraft.resources.ResourceLocation;
 import org.lwjgl.glfw.GLFWNativeWin32;

@@ -3,7 +3,7 @@ package net.caffeinemc.mods.sodium.client.render.chunk.compile.pipeline;
 import net.sodium.api.util.ColorABGR;
 import net.sodium.api.util.ColorARGB;
 import net.sodium.api.util.ColorMixer;
-import net.caffeinemc.mods.sodium.client.compatibility.workarounds.Workarounds;
+import net.sodium.client.compatibility.workarounds.Workarounds;
 import net.caffeinemc.mods.sodium.client.model.color.ColorProvider;
 import net.caffeinemc.mods.sodium.client.model.color.ColorProviderRegistry;
 import net.caffeinemc.mods.sodium.client.model.light.LightMode;
