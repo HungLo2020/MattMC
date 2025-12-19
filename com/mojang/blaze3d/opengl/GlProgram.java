@@ -24,7 +24,13 @@ public class GlProgram implements AutoCloseable {
 	private static final Logger LOGGER = LogUtils.getLogger();
 	public static Set<String> BUILT_IN_UNIFORMS = Sets.<String>newHashSet("Projection", "Lighting", "Fog", "Globals");
 	public static GlProgram INVALID_PROGRAM = new GlProgram(-1, "invalid");
-	private final Map<String, Uniform> uniformsByName = new HashMap();
+	/**
+	 * Map of uniform names to uniform objects.
+	 * 
+	 * @apiNote Made public for Iris shader pipeline uniform management.
+	 * Originally widened by: iris.accesswidener
+	 */
+	public final Map<String, Uniform> uniformsByName = new HashMap();
 	private final int programId;
 	private final String debugLabel;
 

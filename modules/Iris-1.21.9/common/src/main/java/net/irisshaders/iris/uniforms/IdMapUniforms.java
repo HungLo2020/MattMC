@@ -1,7 +1,7 @@
 package net.irisshaders.iris.uniforms;
 
 import it.unimi.dsi.fastutil.objects.Object2IntFunction;
-import net.irisshaders.iris.api.v0.item.IrisItemLightProvider;
+import net.iris.api.v0.item.IrisItemLightProvider;
 import net.irisshaders.iris.gl.uniform.UniformHolder;
 import net.irisshaders.iris.gl.uniform.UniformUpdateFrequency;
 import net.irisshaders.iris.shaderpack.IdMap;

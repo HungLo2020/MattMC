@@ -1,7 +1,7 @@
 package net.caffeinemc.mods.sodium.client.checks;
 
-import net.caffeinemc.mods.sodium.client.console.Console;
-import net.caffeinemc.mods.sodium.client.console.message.MessageLevel;
+import net.sodium.client.console.Console;
+import net.sodium.client.console.message.MessageLevel;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.packs.*;
 import net.minecraft.server.packs.resources.ResourceManager;

@@ -1,16 +1,6 @@
 package frnsrc.`sodium-1`.`21`.`9-stable`
 
+// This Sodium module is integrated into MattMC's build system.
+// See the main MattMC build.gradle for actual build configuration.
 rootProject.name = "sodium"
 
-pluginManagement {
-    repositories {
-        mavenLocal()
-        maven { url = uri("https://maven.fabricmc.net/") }
-        maven { url = uri("https://maven.neoforged.net/releases/") }
-        gradlePluginPortal()
-    }
-}
-
-include("common")
-include("fabric")
-include("neoforge")

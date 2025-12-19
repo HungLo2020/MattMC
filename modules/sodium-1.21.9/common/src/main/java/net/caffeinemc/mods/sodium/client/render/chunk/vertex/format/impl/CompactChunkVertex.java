@@ -1,6 +1,6 @@
 package net.caffeinemc.mods.sodium.client.render.chunk.vertex.format.impl;
 
-import net.caffeinemc.mods.sodium.api.util.ColorARGB;
+import net.sodium.api.util.ColorARGB;
 import net.caffeinemc.mods.sodium.client.gl.attribute.GlVertexFormat;
 import net.caffeinemc.mods.sodium.client.render.chunk.shader.ChunkShaderBindingPoints;
 import net.caffeinemc.mods.sodium.client.render.chunk.vertex.format.ChunkVertexEncoder;
