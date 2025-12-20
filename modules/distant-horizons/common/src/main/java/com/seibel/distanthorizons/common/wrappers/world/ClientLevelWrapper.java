@@ -333,7 +333,7 @@ public class ClientLevelWrapper implements IClientLevelWrapper
 	@Override
 	public Color getCloudColor(float tickDelta)
 	{
-		int argbColor = this.level.environmentAttributes().getValue(EnvironmentAttributes.CLOUD_COLOR, BlockPos.ZERO);
+		int argbColor = this.level.getCloudColor(tickDelta);
 		return new Color(ColorUtil.getRed(argbColor), ColorUtil.getGreen(argbColor), ColorUtil.getBlue(argbColor), 255 /* ignore alpha since DH clouds don't render correctly with transparency */);
 	}
 	

@@ -112,7 +112,7 @@ public class FrameLayout extends AbstractLayout {
 	}
 
 	@Environment(EnvType.CLIENT)
-	static class ChildContainer extends AbstractLayout.AbstractChildWrapper {
+	public static class ChildContainer extends AbstractLayout.AbstractChildWrapper {
 		protected ChildContainer(LayoutElement layoutElement, LayoutSettings layoutSettings) {
 			super(layoutElement, layoutSettings);
 		}
