@@ -314,9 +314,8 @@ dependencies {
     // ===== DISTANT HORIZONS DEPENDENCIES =====
     // Additional dependencies required for Distant Horizons core
     if (enableDistantHorizons) {
-        // LWJGL JAWT for embedded GUI frames
+        // LWJGL JAWT for embedded GUI frames (no natives needed - pure Java bridge)
         implementation 'org.lwjgl:lwjgl-jawt:3.3.3'
-        runtimeOnly "org.lwjgl:lwjgl-jawt::${lwjglNatives}"
         
         // Compression libraries
         implementation 'com.github.luben:zstd-jni:1.5.7-6'
