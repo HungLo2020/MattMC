@@ -586,7 +586,7 @@ public class BlockStateWrapper implements IBlockStateWrapper
 			
 			try
 			{
-				resourceLocation = Identifier.fromNamespaceAndPath(resourceStateString.substring(0, separatorIndex), resourceStateString.substring(separatorIndex + 1));
+				resourceLocation = ResourceLocation.fromNamespaceAndPath(resourceStateString.substring(0, separatorIndex), resourceStateString.substring(separatorIndex + 1));
 			}
 			catch (Exception e)
 			{

@@ -460,7 +460,7 @@ public class GameRenderer implements Projector, AutoCloseable {
 		this.fovModifier = Mth.clamp(this.fovModifier, 0.1F, 1.5F);
 	}
 
-	private float getFov(Camera camera, float f, boolean bl) {
+	public float getFov(Camera camera, float f, boolean bl) {
 		if (this.panoramicMode) {
 			return 90.0F;
 		} else {

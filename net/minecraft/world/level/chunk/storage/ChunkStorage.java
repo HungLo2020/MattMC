@@ -24,7 +24,7 @@ import org.jetbrains.annotations.Nullable;
 
 public class ChunkStorage implements AutoCloseable {
 	public static final int LAST_MONOLYTH_STRUCTURE_DATA_VERSION = 1493;
-	private final IOWorker worker;
+	public final IOWorker worker;
 	protected final DataFixer fixerUpper;
 	@Nullable
 	private volatile LegacyStructureDataHandler legacyStructureHandler;

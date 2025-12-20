@@ -293,7 +293,7 @@ public class BiomeWrapper implements IBiomeWrapper
 		ResourceLocation resourceLocation;
 		try
 		{
-			resourceLocation = Identifier.fromNamespaceAndPath(resourceLocationString.substring(0, separatorIndex), resourceLocationString.substring(separatorIndex + 1));
+			resourceLocation = ResourceLocation.fromNamespaceAndPath(resourceLocationString.substring(0, separatorIndex), resourceLocationString.substring(separatorIndex + 1));
 		}
 		catch (Exception e)
 		{
