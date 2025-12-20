@@ -111,7 +111,7 @@ public class FabricMain extends AbstractModInitializer implements ClientModIniti
 	protected void subscribeRegisterCommandsEvent(Consumer<CommandDispatcher<CommandSourceStack>> eventHandler)
 	{
 		CommandRegistrationCallback.EVENT.register(
-			(dispatcher, registryAccess >= MC_1_19_2 , environment ) -> 
+			(dispatcher, registryAccess, environment) -> 
 			{
 				eventHandler.accept(dispatcher);
 			}

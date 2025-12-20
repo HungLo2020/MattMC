@@ -311,6 +311,26 @@ dependencies {
     // GLSL Transformer - GLSL shader transformation library
     implementation 'io.github.douira:glsl-transformer:3.0.0-pre3'
     
+    // ===== DISTANT HORIZONS DEPENDENCIES =====
+    // Additional dependencies required for Distant Horizons core
+    if (enableDistantHorizons) {
+        // LWJGL JAWT for embedded GUI frames
+        implementation 'org.lwjgl:lwjgl-jawt:3.3.3'
+        runtimeOnly "org.lwjgl:lwjgl-jawt::${lwjglNatives}"
+        
+        // Compression libraries
+        implementation 'com.github.luben:zstd-jni:1.5.7-6'
+        implementation 'org.lz4:lz4-java:1.8.0'
+        implementation 'org.tukaani:xz:1.9'
+        
+        // Database
+        implementation 'org.xerial:sqlite-jdbc:3.47.2.0'
+        
+        // Configuration
+        implementation 'com.electronwill.night-config:toml:3.6.6'
+        implementation 'com.electronwill.night-config:json:3.6.6'
+    }
+    
     // ===== TESTING DEPENDENCIES =====
     // Testing dependencies - only available in test scope, excluded from production builds
     
@@ -443,12 +463,16 @@ if (enableDistantHorizons) {
         distantHorizons {
             java {
                 srcDirs = [
+                    "${distantHorizonsDir}/coreSubProjects/core/src/main/java",
+                    "${distantHorizonsDir}/coreSubProjects/api/src/main/java",
                     "${distantHorizonsDir}/common/src/main/java",
                     "${distantHorizonsDir}/fabric/src/main/java"
                 ]
             }
             resources {
                 srcDirs = [
+                    "${distantHorizonsDir}/coreSubProjects/core/src/main/resources",
+                    "${distantHorizonsDir}/coreSubProjects/api/src/main/resources",
                     "${distantHorizonsDir}/common/src/main/resources",
                     "${distantHorizonsDir}/fabric/src/main/resources"
                 ]

@@ -48,7 +48,7 @@ import net.minecraft.world.level.chunk.status.ChunkStatus;
 
 
 
-public class WorldGenStructFeatManager extends < MC_1_19_2 StructureFeatureManager
+public class WorldGenStructFeatManager extends StructureManager
 {
 	final WorldGenLevel genLevel;
 	

@@ -51,7 +51,7 @@ public class DummyLightEngine extends LevelLightEngine
 	public boolean lightOnInSection(SectionPos $$0) { return false; }
 	
 	@Override
-	public void queueSectionData(LightLayer lightLayer, SectionPos sectionPos, @Nullable DataLayer dataLayer < MC_1_20_1 , boolean bl ) { }
+	public void queueSectionData(LightLayer lightLayer, SectionPos sectionPos, @Nullable DataLayer dataLayer) { }
 	
 	@Override
 	public void checkBlock(BlockPos blockPos) { }

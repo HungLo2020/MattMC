@@ -139,7 +139,7 @@ public class ChunkCompoundTagParser
 		// get misc properties //
 		//=====================//
 		
-		int sectionYCount = < MC_1_17_1 16;
+		int sectionYCount = mcWorldGenLevel.getSectionsCount();
 		LevelChunkSection[] chunkSections = new LevelChunkSection[sectionYCount];
 		boolean hasBlocks = readAndPopulateSections(mcWorldGenLevel, chunkPos, tagLevel, chunkSections);
 		if (!hasBlocks)
@@ -223,7 +223,7 @@ public class ChunkCompoundTagParser
 		LevelAccessor level, ChunkPos chunkPos, CompoundTag chunkData,
 		LevelChunkSection[] chunkSections)
 	{
-		int sectionYCount = < MC_1_17_1 16;
+		int sectionYCount = level.getSectionsCount();
 		
 		ListTag tagSections = CompoundTagUtil.getListTag(chunkData, "Sections", 10);
 		// try lower-case "sections" if capital "Sections" is missing
@@ -334,7 +334,7 @@ public class ChunkCompoundTagParser
 	{
 		return level.registryAccess().lookupOrThrow(Registries.BIOME);
 	}
-	private static 
+	private static Codec<PalettedContainer<Holder<Biome>>>
 		getBiomeCodec(LevelAccessor level, Registry<Biome> biomeRegistry)
 	{
 		return PalettedContainer.codecRW(

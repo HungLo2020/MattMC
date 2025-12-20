@@ -85,7 +85,7 @@ public class BiomeWrapper implements IBiomeWrapper
 	// constructors //
 	//==============//
 	
-	public static BiomeWrapper getBiomeWrapper(< MC_1_18_2 Biome biome, ILevelWrapper levelWrapper)
+	public static BiomeWrapper getBiomeWrapper(Holder<Biome> biome, ILevelWrapper levelWrapper)
 	{
 		if (biome == null)
 		{
@@ -105,7 +105,7 @@ public class BiomeWrapper implements IBiomeWrapper
 			return newWrapper;
 		}
 	}
-	private BiomeWrapper(< MC_1_18_2 Biome biome, ILevelWrapper levelWrapper)
+	private BiomeWrapper(Holder<Biome> biome, ILevelWrapper levelWrapper)
 	{
 		this.biome = biome;
 		this.serialString = this.serialize(levelWrapper);
@@ -330,7 +330,7 @@ public class BiomeWrapper implements IBiomeWrapper
 		
 		public final Holder<Biome> biome;
 		
-		public BiomeDeserializeResult(boolean success, < MC_1_18_2 Biome biome)
+		public BiomeDeserializeResult(boolean success, Holder<Biome> biome)
 		{
 			this.success = success;
 			this.biome = biome;

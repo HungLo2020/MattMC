@@ -259,7 +259,7 @@ public abstract class AbstractDhTintGetter implements BlockAndTintGetter
 	 * whenever the biome information is needed, ensuring it always retrieves the most current {@code Biome}
 	 * instance associated with the holder at that time.</p>
 	 */
-	private static < MC_1_18_2 Biome getClientBiome(String biomeResourceString)
+	private static Holder<Biome> getClientBiome(String biomeResourceString)
 	{
 		Holder<Biome> biome; 
 		

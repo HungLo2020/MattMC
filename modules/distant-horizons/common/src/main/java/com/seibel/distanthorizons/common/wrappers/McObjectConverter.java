@@ -48,6 +48,7 @@ public class McObjectConverter
 	/** 4x4 float matrix converter */
 	@Deprecated
 	public static Mat4f Convert(
+			org.joml.Matrix4fc 
 			mcMatrix)
 	{
 		FloatBuffer buffer = FloatBuffer.allocate(16);
@@ -57,6 +58,7 @@ public class McObjectConverter
 	}
 	/** Taken from Minecraft's com.mojang.math.Matrix4f class from 1.18.2 */
 	private static void storeMatrix(
+			org.joml.Matrix4fc 
 			matrix, 
 			FloatBuffer buffer)
 	{

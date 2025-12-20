@@ -51,7 +51,7 @@ public class LightGetterAdaptor implements LightChunkGetter
 	}
 	
 	@Override
-	public < MC_1_20_1 BlockGetter getChunkForLighting(int chunkX, int chunkZ)
+	public LightChunk getChunkForLighting(int chunkX, int chunkZ)
 	{
 		if (genRegion == null)
 			throw new IllegalStateException("World Gen region has not been set!");
