@@ -16,10 +16,10 @@
 
 package net.fabricmc.fabric.api.event.lifecycle.v1;
 
-import net.minecraft.resource.LifecycledResourceManager;
+import net.minecraft.server.packs.resources.ResourceManager;
 import net.minecraft.server.MinecraftServer;
-import net.minecraft.server.PlayerManager;
-import net.minecraft.server.network.ServerPlayerEntity;
+import net.minecraft.server.players.PlayerList;
+import net.minecraft.server.level.ServerPlayer;
 
 import net.fabricmc.fabric.api.event.Event;
 import net.fabricmc.fabric.api.event.EventFactory;
