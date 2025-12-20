@@ -14,124 +14,493 @@ Path for java installation '/usr/lib/jvm/openjdk-17' (Common Linux Locations) do
 > Task :compileFabricLoaderJava FROM-CACHE
 > Task :processFabricLoaderResources UP-TO-DATE
 > Task :fabricLoaderClasses UP-TO-DATE
-> Task :fabricLoaderJar UP-TO-DATE
 > Task :compileJava FROM-CACHE
 > Task :processResources UP-TO-DATE
 > Task :classes UP-TO-DATE
-> Task :gameJar UP-TO-DATE
-> Task :compileSodiumJava UP-TO-DATE
-> Task :processSodiumResources UP-TO-DATE
-> Task :sodiumClasses UP-TO-DATE
-> Task :compileIrisJava UP-TO-DATE
-> Task :processIrisResources UP-TO-DATE
-> Task :irisClasses UP-TO-DATE
-> Task :irisJar UP-TO-DATE
-> Task :shaderPackZip
-> Task :sodiumJar UP-TO-DATE
 
-> Task :runClient
-Using bundled JDK from: /home/matt/Documents/Repos/MattMC/run/jdk-21
-[10:45:59] [main/INFO]: Loading Minecraft 1.21.10 with Fabric Loader 0.18.2
-[10:45:59] [main/INFO]: Mappings not present!
-[10:45:59] [main/INFO]: Loading 6 mods:
-	- fabricloader 0.18.2
-	- iris 1.9.6
-	- java 21
-	- minecraft 1.21.10
-	- mixinextras 0.5.0
-	- sodium 0.7.2
-[10:45:59] [main/WARN]: Runtime mod remapping disabled due to no fabric.remapClasspathFile being specified. You may need to update loom.
-[10:45:59] [main/INFO]: SpongePowered MIXIN Subsystem Version=0.8.7 Source=file:/home/matt/Documents/Repos/MattMC/libraries/deps/sponge-mixin-0.16.5+mixin.0.8.7.jar Service=Knot/Fabric Env=CLIENT
-[10:45:59] [main/INFO]: Compatibility level set to JAVA_17
-[10:45:59] [main/INFO]: Loaded configuration file for Sodium: 42 options available, 1 override(s) found
-[10:45:59] [main/WARN]: Reference map 'iris.refmap.json' for mixins.iris.json could not be read. If this is a development environment you can ignore this message
-[10:45:59] [main/WARN]: Reference map 'iris-fabric.refmap.json' for mixins.iris.fabric.json could not be read. If this is a development environment you can ignore this message
-[10:45:59] [main/WARN]: Reference map 'iris.refmap.json' for mixins.iris.fantastic.json could not be read. If this is a development environment you can ignore this message
-[10:45:59] [main/WARN]: Reference map 'iris.refmap.json' for mixins.iris.vertexformat.json could not be read. If this is a development environment you can ignore this message
-[10:45:59] [main/WARN]: Reference map 'iris.refmap.json' for mixins.iris.bettermipmaps.json could not be read. If this is a development environment you can ignore this message
-[10:45:59] [main/WARN]: Reference map 'iris.refmap.json' for mixins.iris.compat.sodium.json could not be read. If this is a development environment you can ignore this message
-[10:45:59] [main/WARN]: Reference map 'iris.refmap.json' for mixins.iris.fixes.maxfpscrash.json could not be read. If this is a development environment you can ignore this message
-[10:45:59] [main/WARN]: Force-disabling mixin 'features.render.world.sky.FogRendererMixin' as rule 'mixin.features.render.world.sky' (added by mods [iris]) disables it and children
-[10:45:59] [main/WARN]: Force-disabling mixin 'features.render.world.sky.ClientLevelMixin' as rule 'mixin.features.render.world.sky' (added by mods [iris]) disables it and children
-[10:45:59] [main/WARN]: Force-disabling mixin 'features.render.world.sky.LevelRendererMixin' as rule 'mixin.features.render.world.sky' (added by mods [iris]) disables it and children
-[10:45:59] [main/INFO]: Searching for graphics cards...
-[10:45:59] [main/INFO]: Found graphics adapter: LinuxPciAdapterInfo[vendor=NVIDIA, name=GA102 [GeForce RTX 3080 Ti], pciVendorId=0x10de, pciDeviceId=0x2208]
-[10:45:59] [main/WARN]: Sodium has applied one or more workarounds to prevent crashes or other issues on your system: [NVIDIA_THREADED_OPTIMIZATIONS_BROKEN]
-[10:45:59] [main/WARN]: This is not necessarily an issue, but it may result in certain features or optimizations being disabled. You can sometimes fix these issues by upgrading your graphics driver.
-[10:45:59] [main/INFO]: Initializing MixinExtras via com.llamalad7.mixinextras.service.MixinExtrasServiceImpl(version=0.5.0).
-[10:45:59] [Datafixer Bootstrap/INFO]: 278 Datafixer optimizations took 222 milliseconds
-[10:46:02] [Render thread/INFO]: Setting user: Player334
-[LWJGL] Version: 3.3.3-snapshot
-	 OS: Linux v6.14.0-36-generic
-	JRE: Linux amd64 21.0.5
-	JVM: OpenJDK 64-Bit Server VM v21.0.5+11-LTS by Eclipse Adoptium
-[LWJGL] Loading JNI library: lwjgl
-	Module: org.lwjgl
-	Loaded from org.lwjgl.librarypath: /tmp/lwjgl_matt/3.3.3-snapshot/x64/liblwjgl.so
-[LWJGL] Loading library: glfw
-	Module: org.lwjgl.glfw
-	Loaded from org.lwjgl.librarypath: /tmp/lwjgl_matt/3.3.3-snapshot/x64/libglfw.so
-[10:46:02] [Render thread/INFO]: Backend library: LWJGL version 3.3.3-snapshot
-[LWJGL] Loading library: jemalloc
-	Module: org.lwjgl.jemalloc
-	Loaded from org.lwjgl.librarypath: /tmp/lwjgl_matt/3.3.3-snapshot/x64/libjemalloc.so
-[LWJGL] MemoryUtil allocator: JEmallocAllocator
-[LWJGL] Java 9 check intrinsics enabled
-[LWJGL] Closure Registry: ConcurrentHashMap
-[10:46:02] [Render thread/INFO]: Modifying process environment to apply workarounds for the NVIDIA graphics driver...
-[LWJGL] Loading JNI library: lwjgl_stb
-	Module: org.lwjgl.stb
-	Loaded from org.lwjgl.librarypath: /tmp/lwjgl_matt/3.3.3-snapshot/x64/liblwjgl_stb.so
-[LWJGL] Loading JNI library: lwjgl_opengl
-	Module: org.lwjgl.opengl
-	Loaded from org.lwjgl.librarypath: /tmp/lwjgl_matt/3.3.3-snapshot/x64/liblwjgl_opengl.so
-[LWJGL] Loading library: libGLX.so.0
-	Module: org.lwjgl.opengl
-	libGLX.so.0 not found in org.lwjgl.librarypath=/tmp/lwjgl_matt/3.3.3-snapshot/x64
-[LWJGL] Java 9 text decoding enabled
-	Loaded from system paths: /lib/x86_64-linux-gnu/libGLX.so.0
-[LWJGL] Java 10 multiplyHigh enabled
-[10:46:02] [ForkJoinPool.commonPool-worker-1/WARN]: [Iris Update Check] This version doesn't have an update index, skipping.
-[10:46:02] [Render thread/INFO]: OpenGL Vendor: NVIDIA Corporation
-[10:46:02] [Render thread/INFO]: OpenGL Renderer: NVIDIA GeForce RTX 3080 Ti/PCIe/SSE2
-[10:46:02] [Render thread/INFO]: OpenGL Version: 3.3.0 NVIDIA 580.95.05
-[10:46:02] [Render thread/INFO]: Modifying OpenGL context to apply workarounds for the NVIDIA graphics driver...
-[10:46:02] [Render thread/INFO]: Debug functionality is disabled.
-[10:46:02] [Render thread/INFO]: ARB_direct_state_access detected, enabling DSA.
-[10:46:02] [Render thread/INFO]: Profile: HIGH (+0 options changed by user)
-[10:46:03] [Render thread/INFO]: Using shaderpack: ComplementaryHungLoIfied.zip
-[10:46:03] [Render thread/INFO]: Using optional rendering extensions: GL_ARB_buffer_storage, GL_KHR_debug, GL_ARB_vertex_attrib_binding, GL_ARB_direct_state_access
-[10:46:03] [Render thread/INFO]: Loaded 20 skins (0 custom)
-[LWJGL] Loading library: openal
-	Module: org.lwjgl.openal
-	Loaded from org.lwjgl.librarypath: /tmp/lwjgl_matt/3.3.3-snapshot/x64/libopenal.so
-[LWJGL] [ALC] ALC_SOFT_reopen_device was reported as available but an entry point is missing.
-[10:46:03] [Render thread/INFO]: Hardware information:
-[10:46:03] [Render thread/INFO]: CPU: 20x 12th Gen Intel(R) Core(TM) i7-12700K
-[10:46:03] [Render thread/INFO]: GPU: NVIDIA GeForce RTX 3080 Ti/PCIe/SSE2 (Supports OpenGL 3.3.0 NVIDIA 580.95.05)
-[10:46:03] [Render thread/INFO]: OS: Linux (6.14.0-36-generic)
-[LWJGL] Java 16 memcpy enabled
-[10:46:03] [Render thread/INFO]: Reloading ResourceManager: vanilla
-[10:46:03] [Worker-Main-17/INFO]: Found unifont_all_no_pua-16.0.03.hex, loading
-[10:46:03] [Worker-Main-19/INFO]: Found unifont_pua-16.0.03.hex, loading
-[10:46:03] [Worker-Main-19/INFO]: Found unifont_jp_patch-16.0.03.hex, loading
-[10:46:04] [Render thread/INFO]: OpenAL initialized on device HT-S350
-[10:46:04] [Render thread/INFO]: Sound engine started
-[10:46:04] [Render thread/INFO]: Created: 512x256x0 minecraft:textures/atlas/particles.png-atlas
-[10:46:04] [Render thread/INFO]: Created: 128x64x0 minecraft:textures/atlas/decorated_pot.png-atlas
-[10:46:04] [Render thread/INFO]: Created: 2048x1024x0 minecraft:textures/atlas/armor_trims.png-atlas
-[10:46:04] [Render thread/INFO]: Created: 512x256x0 minecraft:textures/atlas/paintings.png-atlas
-[10:46:04] [Render thread/INFO]: Created: 512x512x0 minecraft:textures/atlas/shield_patterns.png-atlas
-[10:46:04] [Render thread/INFO]: Created: 1024x512x4 minecraft:textures/atlas/blocks.png-atlas
-[10:46:04] [Render thread/INFO]: Created: 512x256x0 minecraft:textures/atlas/chest.png-atlas
-[10:46:04] [Render thread/INFO]: Created: 512x512x0 minecraft:textures/atlas/banner_patterns.png-atlas
-[10:46:04] [Render thread/INFO]: Created: 512x256x0 minecraft:textures/atlas/beds.png-atlas
-[10:46:04] [Render thread/INFO]: Created: 1024x512x0 minecraft:textures/atlas/gui.png-atlas
-[10:46:04] [Render thread/INFO]: Created: 64x64x0 minecraft:textures/atlas/map_decorations.png-atlas
-[10:46:04] [Render thread/INFO]: Created: 256x256x0 minecraft:textures/atlas/signs.png-atlas
-[10:46:04] [Render thread/INFO]: Created: 512x256x0 minecraft:textures/atlas/shulker_boxes.png-atlas
-[10:46:04] [Render thread/INFO]: Creating pipeline for dimension minecraft:overworld
-[10:46:09] [Render thread/INFO]: Stopping!
+> Task :compileDistantHorizonsJava FAILED
+/home/matt/Documents/Repos/MattMC/modules/distant-horizons/fabric/src/main/java/net/fabricmc/fabric/api/networking/v1/PacketByteBufs.java:29: error: class FriendlyByteBufs is public, should be declared in a file named FriendlyByteBufs.java
+public final class FriendlyByteBufs {
+             ^
+/home/matt/Documents/Repos/MattMC/modules/distant-horizons/fabric/src/main/java/com/seibel/distanthorizons/fabric/FabricPluginPacketSender.java:10: error: cannot find symbol
+import net.fabricmc.fabric.api.networking.v1.PacketByteBufs;
+                                            ^
+  symbol:   class PacketByteBufs
+  location: package net.fabricmc.fabric.api.networking.v1
+/home/matt/Documents/Repos/MattMC/modules/distant-horizons/fabric/src/main/java/net/fabricmc/fabric/api/networking/v1/PayloadTypeRegistry.java:21: error: cannot find symbol
+import net.minecraft.network.PacketByteBuf;
+                            ^
+  symbol:   class PacketByteBuf
+  location: package net.minecraft.network
+/home/matt/Documents/Repos/MattMC/modules/distant-horizons/fabric/src/main/java/net/fabricmc/fabric/api/networking/v1/PayloadTypeRegistry.java:22: error: cannot find symbol
+import net.minecraft.network.RegistryByteBuf;
+                            ^
+  symbol:   class RegistryByteBuf
+  location: package net.minecraft.network
+/home/matt/Documents/Repos/MattMC/modules/distant-horizons/fabric/src/main/java/net/fabricmc/fabric/api/networking/v1/PayloadTypeRegistry.java:23: error: cannot find symbol
+import net.minecraft.network.codec.PacketCodec;
+                                  ^
+  symbol:   class PacketCodec
+  location: package net.minecraft.network.codec
+/home/matt/Documents/Repos/MattMC/modules/distant-horizons/fabric/src/main/java/net/fabricmc/fabric/api/networking/v1/PayloadTypeRegistry.java:24: error: package net.minecraft.network.packet does not exist
+import net.minecraft.network.packet.CustomPayload;
+                                   ^
+/home/matt/Documents/Repos/MattMC/modules/distant-horizons/fabric/src/main/java/net/fabricmc/fabric/api/networking/v1/PayloadTypeRegistry.java:26: error: package net.fabricmc.fabric.impl.networking does not exist
+import net.fabricmc.fabric.impl.networking.PayloadTypeRegistryImpl;
+                                          ^
+/home/matt/Documents/Repos/MattMC/modules/distant-horizons/fabric/src/main/java/net/fabricmc/fabric/api/networking/v1/PayloadTypeRegistry.java:32: error: cannot find symbol
+public interface PayloadTypeRegistry<B extends PacketByteBuf> {
+                                               ^
+  symbol: class PacketByteBuf
+/home/matt/Documents/Repos/MattMC/modules/distant-horizons/fabric/src/main/java/net/fabricmc/fabric/api/networking/v1/PayloadTypeRegistry.java:44: error: cannot find symbol
+	<T extends CustomPayload> CustomPayload.Type<? super B, T> register(CustomPayload.Id<T> id, PacketCodec<? super B, T> codec);
+	           ^
+  symbol:   class CustomPayload
+  location: interface PayloadTypeRegistry<B>
+  where B is a type-variable:
+    B declared in interface PayloadTypeRegistry
+/home/matt/Documents/Repos/MattMC/modules/distant-horizons/fabric/src/main/java/net/fabricmc/fabric/api/networking/v1/PayloadTypeRegistry.java:44: error: package CustomPayload does not exist
+	<T extends CustomPayload> CustomPayload.Type<? super B, T> register(CustomPayload.Id<T> id, PacketCodec<? super B, T> codec);
+	                                                                                 ^
+/home/matt/Documents/Repos/MattMC/modules/distant-horizons/fabric/src/main/java/net/fabricmc/fabric/api/networking/v1/PayloadTypeRegistry.java:44: error: cannot find symbol
+	<T extends CustomPayload> CustomPayload.Type<? super B, T> register(CustomPayload.Id<T> id, PacketCodec<? super B, T> codec);
+	                                                                                            ^
+  symbol:   class PacketCodec
+  location: interface PayloadTypeRegistry<B>
+  where B is a type-variable:
+    B declared in interface PayloadTypeRegistry
+/home/matt/Documents/Repos/MattMC/modules/distant-horizons/fabric/src/main/java/net/fabricmc/fabric/api/networking/v1/PayloadTypeRegistry.java:44: error: package CustomPayload does not exist
+	<T extends CustomPayload> CustomPayload.Type<? super B, T> register(CustomPayload.Id<T> id, PacketCodec<? super B, T> codec);
+	                                       ^
+/home/matt/Documents/Repos/MattMC/modules/distant-horizons/fabric/src/main/java/net/fabricmc/fabric/api/networking/v1/PayloadTypeRegistry.java:61: error: cannot find symbol
+	<T extends CustomPayload> CustomPayload.Type<? super B, T> registerLarge(CustomPayload.Id<T> id, PacketCodec<? super B, T> codec, int maxPacketSize);
+	           ^
+  symbol:   class CustomPayload
+  location: interface PayloadTypeRegistry<B>
+  where B is a type-variable:
+    B declared in interface PayloadTypeRegistry
+/home/matt/Documents/Repos/MattMC/modules/distant-horizons/fabric/src/main/java/net/fabricmc/fabric/api/networking/v1/PayloadTypeRegistry.java:61: error: package CustomPayload does not exist
+	<T extends CustomPayload> CustomPayload.Type<? super B, T> registerLarge(CustomPayload.Id<T> id, PacketCodec<? super B, T> codec, int maxPacketSize);
+	                                                                                      ^
+/home/matt/Documents/Repos/MattMC/modules/distant-horizons/fabric/src/main/java/net/fabricmc/fabric/api/networking/v1/PayloadTypeRegistry.java:61: error: cannot find symbol
+	<T extends CustomPayload> CustomPayload.Type<? super B, T> registerLarge(CustomPayload.Id<T> id, PacketCodec<? super B, T> codec, int maxPacketSize);
+	                                                                                                 ^
+  symbol:   class PacketCodec
+  location: interface PayloadTypeRegistry<B>
+  where B is a type-variable:
+    B declared in interface PayloadTypeRegistry
+/home/matt/Documents/Repos/MattMC/modules/distant-horizons/fabric/src/main/java/net/fabricmc/fabric/api/networking/v1/PayloadTypeRegistry.java:61: error: package CustomPayload does not exist
+	<T extends CustomPayload> CustomPayload.Type<? super B, T> registerLarge(CustomPayload.Id<T> id, PacketCodec<? super B, T> codec, int maxPacketSize);
+	                                       ^
+/home/matt/Documents/Repos/MattMC/modules/distant-horizons/fabric/src/main/java/net/fabricmc/fabric/api/networking/v1/PayloadTypeRegistry.java:66: error: cannot find symbol
+	static PayloadTypeRegistry<PacketByteBuf> configurationC2S() {
+	                           ^
+  symbol:   class PacketByteBuf
+  location: interface PayloadTypeRegistry<B>
+  where B is a type-variable:
+    B declared in interface PayloadTypeRegistry
+/home/matt/Documents/Repos/MattMC/modules/distant-horizons/fabric/src/main/java/net/fabricmc/fabric/api/networking/v1/PayloadTypeRegistry.java:73: error: cannot find symbol
+	static PayloadTypeRegistry<PacketByteBuf> configurationS2C() {
+	                           ^
+  symbol:   class PacketByteBuf
+  location: interface PayloadTypeRegistry<B>
+  where B is a type-variable:
+    B declared in interface PayloadTypeRegistry
+/home/matt/Documents/Repos/MattMC/modules/distant-horizons/fabric/src/main/java/net/fabricmc/fabric/api/networking/v1/PayloadTypeRegistry.java:80: error: cannot find symbol
+	static PayloadTypeRegistry<RegistryByteBuf> playC2S() {
+	                           ^
+  symbol:   class RegistryByteBuf
+  location: interface PayloadTypeRegistry<B>
+  where B is a type-variable:
+    B declared in interface PayloadTypeRegistry
+/home/matt/Documents/Repos/MattMC/modules/distant-horizons/fabric/src/main/java/net/fabricmc/fabric/api/networking/v1/PayloadTypeRegistry.java:87: error: cannot find symbol
+	static PayloadTypeRegistry<RegistryByteBuf> playS2C() {
+	                           ^
+  symbol:   class RegistryByteBuf
+  location: interface PayloadTypeRegistry<B>
+  where B is a type-variable:
+    B declared in interface PayloadTypeRegistry
+/home/matt/Documents/Repos/MattMC/modules/distant-horizons/fabric/src/main/java/net/fabricmc/fabric/api/networking/v1/ServerPlayConnectionEvents.java:19: error: package net.minecraft.network.packet does not exist
+import net.minecraft.network.packet.CustomPayload;
+                                   ^
+/home/matt/Documents/Repos/MattMC/modules/distant-horizons/fabric/src/main/java/net/fabricmc/fabric/api/networking/v1/ServerPlayConnectionEvents.java:21: error: cannot find symbol
+import net.minecraft.server.network.ServerPlayNetworkHandler;
+                                   ^
+  symbol:   class ServerPlayNetworkHandler
+  location: package net.minecraft.server.network
+/home/matt/Documents/Repos/MattMC/modules/distant-horizons/fabric/src/main/java/net/fabricmc/fabric/api/networking/v1/ServerPlayConnectionEvents.java:78: error: cannot find symbol
+		void onPlayDisconnect(ServerPlayNetworkHandler handler, MinecraftServer server);
+		                      ^
+  symbol:   class ServerPlayNetworkHandler
+  location: interface Disconnect
+/home/matt/Documents/Repos/MattMC/modules/distant-horizons/fabric/src/main/java/net/fabricmc/fabric/api/networking/v1/ServerPlayConnectionEvents.java:73: error: cannot find symbol
+		void onPlayReady(ServerPlayNetworkHandler handler, PacketSender sender, MinecraftServer server);
+		                 ^
+  symbol:   class ServerPlayNetworkHandler
+  location: interface Join
+/home/matt/Documents/Repos/MattMC/modules/distant-horizons/fabric/src/main/java/net/fabricmc/fabric/api/networking/v1/ServerPlayConnectionEvents.java:73: error: cannot find symbol
+		void onPlayReady(ServerPlayNetworkHandler handler, PacketSender sender, MinecraftServer server);
+		                                                   ^
+  symbol:   class PacketSender
+  location: interface Join
+/home/matt/Documents/Repos/MattMC/modules/distant-horizons/fabric/src/main/java/net/fabricmc/fabric/api/networking/v1/ServerPlayConnectionEvents.java:68: error: cannot find symbol
+		void onPlayInit(ServerPlayNetworkHandler handler, MinecraftServer server);
+		                ^
+  symbol:   class ServerPlayNetworkHandler
+  location: interface Init
+/home/matt/Documents/Repos/MattMC/modules/distant-horizons/fabric/src/main/java/net/fabricmc/fabric/api/networking/v1/ServerPlayNetworking.java:25: error: package net.minecraft.network.listener does not exist
+import net.minecraft.network.listener.ClientCommonPacketListener;
+                                     ^
+/home/matt/Documents/Repos/MattMC/modules/distant-horizons/fabric/src/main/java/net/fabricmc/fabric/api/networking/v1/ServerPlayNetworking.java:26: error: package net.minecraft.network.packet does not exist
+import net.minecraft.network.packet.CustomPayload;
+                                   ^
+/home/matt/Documents/Repos/MattMC/modules/distant-horizons/fabric/src/main/java/net/fabricmc/fabric/api/networking/v1/ServerPlayNetworking.java:27: error: package net.minecraft.network.packet does not exist
+import net.minecraft.network.packet.Packet;
+                                   ^
+/home/matt/Documents/Repos/MattMC/modules/distant-horizons/fabric/src/main/java/net/fabricmc/fabric/api/networking/v1/ServerPlayNetworking.java:29: error: cannot find symbol
+import net.minecraft.server.network.ServerPlayNetworkHandler;
+                                   ^
+  symbol:   class ServerPlayNetworkHandler
+  location: package net.minecraft.server.network
+/home/matt/Documents/Repos/MattMC/modules/distant-horizons/fabric/src/main/java/net/fabricmc/fabric/api/networking/v1/ServerPlayNetworking.java:30: error: cannot find symbol
+import net.minecraft.server.network.ServerPlayerEntity;
+                                   ^
+  symbol:   class ServerPlayerEntity
+  location: package net.minecraft.server.network
+/home/matt/Documents/Repos/MattMC/modules/distant-horizons/fabric/src/main/java/net/fabricmc/fabric/api/networking/v1/ServerPlayNetworking.java:31: error: cannot find symbol
+import net.minecraft.util.Identifier;
+                         ^
+  symbol:   class Identifier
+  location: package net.minecraft.util
+/home/matt/Documents/Repos/MattMC/modules/distant-horizons/fabric/src/main/java/net/fabricmc/fabric/api/networking/v1/ServerPlayNetworking.java:33: error: package net.fabricmc.fabric.impl.networking.server does not exist
+import net.fabricmc.fabric.impl.networking.server.ServerNetworkingImpl;
+                                                 ^
+/home/matt/Documents/Repos/MattMC/modules/distant-horizons/fabric/src/main/java/net/fabricmc/fabric/api/networking/v1/ServerPlayNetworking.java:77: error: cannot find symbol
+	public static <T extends CustomPayload> boolean registerGlobalReceiver(CustomPayload.Id<T> type, PlayPayloadHandler<T> handler) {
+	                         ^
+  symbol:   class CustomPayload
+  location: class ServerPlayNetworking
+/home/matt/Documents/Repos/MattMC/modules/distant-horizons/fabric/src/main/java/net/fabricmc/fabric/api/networking/v1/ServerPlayNetworking.java:77: error: package CustomPayload does not exist
+	public static <T extends CustomPayload> boolean registerGlobalReceiver(CustomPayload.Id<T> type, PlayPayloadHandler<T> handler) {
+	                                                                                    ^
+/home/matt/Documents/Repos/MattMC/modules/distant-horizons/fabric/src/main/java/net/fabricmc/fabric/api/networking/v1/ServerPlayNetworking.java:326: error: cannot find symbol
+	public interface PlayPayloadHandler<T extends CustomPayload> {
+	                                              ^
+  symbol:   class CustomPayload
+  location: class ServerPlayNetworking
+/home/matt/Documents/Repos/MattMC/modules/distant-horizons/fabric/src/main/java/net/fabricmc/fabric/api/networking/v1/ServerPlayNetworking.java:94: error: cannot find symbol
+	public static ServerPlayNetworking.PlayPayloadHandler<?> unregisterGlobalReceiver(Identifier id) {
+	                                                                                  ^
+  symbol:   class Identifier
+  location: class ServerPlayNetworking
+/home/matt/Documents/Repos/MattMC/modules/distant-horizons/fabric/src/main/java/net/fabricmc/fabric/api/networking/v1/ServerPlayNetworking.java:104: error: cannot find symbol
+	public static Set<Identifier> getGlobalReceivers() {
+	                  ^
+  symbol:   class Identifier
+  location: class ServerPlayNetworking
+/home/matt/Documents/Repos/MattMC/modules/distant-horizons/fabric/src/main/java/net/fabricmc/fabric/api/networking/v1/ServerPlayNetworking.java:126: error: cannot find symbol
+	public static <T extends CustomPayload> boolean registerReceiver(ServerPlayNetworkHandler networkHandler, CustomPayload.Id<T> type, PlayPayloadHandler<T> handler) {
+	                         ^
+  symbol:   class CustomPayload
+  location: class ServerPlayNetworking
+/home/matt/Documents/Repos/MattMC/modules/distant-horizons/fabric/src/main/java/net/fabricmc/fabric/api/networking/v1/ServerPlayNetworking.java:126: error: cannot find symbol
+	public static <T extends CustomPayload> boolean registerReceiver(ServerPlayNetworkHandler networkHandler, CustomPayload.Id<T> type, PlayPayloadHandler<T> handler) {
+	                                                                 ^
+  symbol:   class ServerPlayNetworkHandler
+  location: class ServerPlayNetworking
+/home/matt/Documents/Repos/MattMC/modules/distant-horizons/fabric/src/main/java/net/fabricmc/fabric/api/networking/v1/ServerPlayNetworking.java:126: error: package CustomPayload does not exist
+	public static <T extends CustomPayload> boolean registerReceiver(ServerPlayNetworkHandler networkHandler, CustomPayload.Id<T> type, PlayPayloadHandler<T> handler) {
+	                                                                                                                       ^
+/home/matt/Documents/Repos/MattMC/modules/distant-horizons/fabric/src/main/java/net/fabricmc/fabric/api/networking/v1/ServerPlayNetworking.java:140: error: cannot find symbol
+	public static ServerPlayNetworking.PlayPayloadHandler<?> unregisterReceiver(ServerPlayNetworkHandler networkHandler, Identifier id) {
+	                                                                            ^
+  symbol:   class ServerPlayNetworkHandler
+  location: class ServerPlayNetworking
+/home/matt/Documents/Repos/MattMC/modules/distant-horizons/fabric/src/main/java/net/fabricmc/fabric/api/networking/v1/ServerPlayNetworking.java:140: error: cannot find symbol
+	public static ServerPlayNetworking.PlayPayloadHandler<?> unregisterReceiver(ServerPlayNetworkHandler networkHandler, Identifier id) {
+	                                                                                                                     ^
+  symbol:   class Identifier
+  location: class ServerPlayNetworking
+/home/matt/Documents/Repos/MattMC/modules/distant-horizons/fabric/src/main/java/net/fabricmc/fabric/api/networking/v1/ServerPlayNetworking.java:150: error: cannot find symbol
+	public static Set<Identifier> getReceived(ServerPlayerEntity player) {
+	                                          ^
+  symbol:   class ServerPlayerEntity
+  location: class ServerPlayNetworking
+/home/matt/Documents/Repos/MattMC/modules/distant-horizons/fabric/src/main/java/net/fabricmc/fabric/api/networking/v1/ServerPlayNetworking.java:150: error: cannot find symbol
+	public static Set<Identifier> getReceived(ServerPlayerEntity player) {
+	                  ^
+  symbol:   class Identifier
+  location: class ServerPlayNetworking
+/home/matt/Documents/Repos/MattMC/modules/distant-horizons/fabric/src/main/java/net/fabricmc/fabric/api/networking/v1/ServerPlayNetworking.java:162: error: cannot find symbol
+	public static Set<Identifier> getReceived(ServerPlayNetworkHandler handler) {
+	                                          ^
+  symbol:   class ServerPlayNetworkHandler
+  location: class ServerPlayNetworking
+/home/matt/Documents/Repos/MattMC/modules/distant-horizons/fabric/src/main/java/net/fabricmc/fabric/api/networking/v1/ServerPlayNetworking.java:162: error: cannot find symbol
+	public static Set<Identifier> getReceived(ServerPlayNetworkHandler handler) {
+	                  ^
+  symbol:   class Identifier
+  location: class ServerPlayNetworking
+/home/matt/Documents/Repos/MattMC/modules/distant-horizons/fabric/src/main/java/net/fabricmc/fabric/api/networking/v1/ServerPlayNetworking.java:174: error: cannot find symbol
+	public static Set<Identifier> getSendable(ServerPlayerEntity player) {
+	                                          ^
+  symbol:   class ServerPlayerEntity
+  location: class ServerPlayNetworking
+/home/matt/Documents/Repos/MattMC/modules/distant-horizons/fabric/src/main/java/net/fabricmc/fabric/api/networking/v1/ServerPlayNetworking.java:174: error: cannot find symbol
+	public static Set<Identifier> getSendable(ServerPlayerEntity player) {
+	                  ^
+  symbol:   class Identifier
+  location: class ServerPlayNetworking
+/home/matt/Documents/Repos/MattMC/modules/distant-horizons/fabric/src/main/java/net/fabricmc/fabric/api/networking/v1/ServerPlayNetworking.java:186: error: cannot find symbol
+	public static Set<Identifier> getSendable(ServerPlayNetworkHandler handler) {
+	                                          ^
+  symbol:   class ServerPlayNetworkHandler
+  location: class ServerPlayNetworking
+/home/matt/Documents/Repos/MattMC/modules/distant-horizons/fabric/src/main/java/net/fabricmc/fabric/api/networking/v1/ServerPlayNetworking.java:186: error: cannot find symbol
+	public static Set<Identifier> getSendable(ServerPlayNetworkHandler handler) {
+	                  ^
+  symbol:   class Identifier
+  location: class ServerPlayNetworking
+/home/matt/Documents/Repos/MattMC/modules/distant-horizons/fabric/src/main/java/net/fabricmc/fabric/api/networking/v1/ServerPlayNetworking.java:199: error: cannot find symbol
+	public static boolean canSend(ServerPlayerEntity player, Identifier channelName) {
+	                              ^
+  symbol:   class ServerPlayerEntity
+  location: class ServerPlayNetworking
+/home/matt/Documents/Repos/MattMC/modules/distant-horizons/fabric/src/main/java/net/fabricmc/fabric/api/networking/v1/ServerPlayNetworking.java:199: error: cannot find symbol
+	public static boolean canSend(ServerPlayerEntity player, Identifier channelName) {
+	                                                         ^
+  symbol:   class Identifier
+  location: class ServerPlayNetworking
+/home/matt/Documents/Repos/MattMC/modules/distant-horizons/fabric/src/main/java/net/fabricmc/fabric/api/networking/v1/ServerPlayNetworking.java:212: error: cannot find symbol
+	public static boolean canSend(ServerPlayerEntity player, CustomPayload.Id<?> type) {
+	                              ^
+  symbol:   class ServerPlayerEntity
+  location: class ServerPlayNetworking
+/home/matt/Documents/Repos/MattMC/modules/distant-horizons/fabric/src/main/java/net/fabricmc/fabric/api/networking/v1/ServerPlayNetworking.java:212: error: package CustomPayload does not exist
+	public static boolean canSend(ServerPlayerEntity player, CustomPayload.Id<?> type) {
+	                                                                      ^
+/home/matt/Documents/Repos/MattMC/modules/distant-horizons/fabric/src/main/java/net/fabricmc/fabric/api/networking/v1/ServerPlayNetworking.java:225: error: cannot find symbol
+	public static boolean canSend(ServerPlayNetworkHandler handler, Identifier channelName) {
+	                              ^
+  symbol:   class ServerPlayNetworkHandler
+  location: class ServerPlayNetworking
+/home/matt/Documents/Repos/MattMC/modules/distant-horizons/fabric/src/main/java/net/fabricmc/fabric/api/networking/v1/ServerPlayNetworking.java:225: error: cannot find symbol
+	public static boolean canSend(ServerPlayNetworkHandler handler, Identifier channelName) {
+	                                                                ^
+  symbol:   class Identifier
+  location: class ServerPlayNetworking
+/home/matt/Documents/Repos/MattMC/modules/distant-horizons/fabric/src/main/java/net/fabricmc/fabric/api/networking/v1/ServerPlayNetworking.java:239: error: cannot find symbol
+	public static boolean canSend(ServerPlayNetworkHandler handler, CustomPayload.Id<?> type) {
+	                              ^
+  symbol:   class ServerPlayNetworkHandler
+  location: class ServerPlayNetworking
+/home/matt/Documents/Repos/MattMC/modules/distant-horizons/fabric/src/main/java/net/fabricmc/fabric/api/networking/v1/ServerPlayNetworking.java:239: error: package CustomPayload does not exist
+	public static boolean canSend(ServerPlayNetworkHandler handler, CustomPayload.Id<?> type) {
+	                                                                             ^
+/home/matt/Documents/Repos/MattMC/modules/distant-horizons/fabric/src/main/java/net/fabricmc/fabric/api/networking/v1/ServerPlayNetworking.java:252: error: cannot find symbol
+	public static <T extends CustomPayload> Packet<ClientCommonPacketListener> createS2CPacket(T packet) {
+	                         ^
+  symbol:   class CustomPayload
+  location: class ServerPlayNetworking
+/home/matt/Documents/Repos/MattMC/modules/distant-horizons/fabric/src/main/java/net/fabricmc/fabric/api/networking/v1/ServerPlayNetworking.java:252: error: cannot find symbol
+	public static <T extends CustomPayload> Packet<ClientCommonPacketListener> createS2CPacket(T packet) {
+	                                        ^
+  symbol:   class Packet
+  location: class ServerPlayNetworking
+/home/matt/Documents/Repos/MattMC/modules/distant-horizons/fabric/src/main/java/net/fabricmc/fabric/api/networking/v1/ServerPlayNetworking.java:252: error: cannot find symbol
+	public static <T extends CustomPayload> Packet<ClientCommonPacketListener> createS2CPacket(T packet) {
+	                                               ^
+  symbol:   class ClientCommonPacketListener
+  location: class ServerPlayNetworking
+/home/matt/Documents/Repos/MattMC/modules/distant-horizons/fabric/src/main/java/net/fabricmc/fabric/api/networking/v1/ServerPlayNetworking.java:262: error: cannot find symbol
+	public static PacketSender getSender(ServerPlayerEntity player) {
+	                                     ^
+  symbol:   class ServerPlayerEntity
+  location: class ServerPlayNetworking
+/home/matt/Documents/Repos/MattMC/modules/distant-horizons/fabric/src/main/java/net/fabricmc/fabric/api/networking/v1/ServerPlayNetworking.java:262: error: cannot find symbol
+	public static PacketSender getSender(ServerPlayerEntity player) {
+	              ^
+  symbol:   class PacketSender
+  location: class ServerPlayNetworking
+/home/matt/Documents/Repos/MattMC/modules/distant-horizons/fabric/src/main/java/net/fabricmc/fabric/api/networking/v1/ServerPlayNetworking.java:274: error: cannot find symbol
+	public static PacketSender getSender(ServerPlayNetworkHandler handler) {
+	                                     ^
+  symbol:   class ServerPlayNetworkHandler
+  location: class ServerPlayNetworking
+/home/matt/Documents/Repos/MattMC/modules/distant-horizons/fabric/src/main/java/net/fabricmc/fabric/api/networking/v1/ServerPlayNetworking.java:274: error: cannot find symbol
+	public static PacketSender getSender(ServerPlayNetworkHandler handler) {
+	              ^
+  symbol:   class PacketSender
+  location: class ServerPlayNetworking
+/home/matt/Documents/Repos/MattMC/modules/distant-horizons/fabric/src/main/java/net/fabricmc/fabric/api/networking/v1/ServerPlayNetworking.java:288: error: cannot find symbol
+	public static void send(ServerPlayerEntity player, CustomPayload payload) {
+	                        ^
+  symbol:   class ServerPlayerEntity
+  location: class ServerPlayNetworking
+/home/matt/Documents/Repos/MattMC/modules/distant-horizons/fabric/src/main/java/net/fabricmc/fabric/api/networking/v1/ServerPlayNetworking.java:288: error: cannot find symbol
+	public static void send(ServerPlayerEntity player, CustomPayload payload) {
+	                                                   ^
+  symbol:   class CustomPayload
+  location: class ServerPlayNetworking
+/home/matt/Documents/Repos/MattMC/modules/distant-horizons/fabric/src/main/java/net/fabricmc/fabric/api/networking/v1/ServerPlayNetworking.java:301: error: cannot find symbol
+	public static void reconfigure(ServerPlayerEntity player) {
+	                               ^
+  symbol:   class ServerPlayerEntity
+  location: class ServerPlayNetworking
+/home/matt/Documents/Repos/MattMC/modules/distant-horizons/fabric/src/main/java/net/fabricmc/fabric/api/networking/v1/ServerPlayNetworking.java:312: error: cannot find symbol
+	public static void reconfigure(ServerPlayNetworkHandler handler) {
+	                               ^
+  symbol:   class ServerPlayNetworkHandler
+  location: class ServerPlayNetworking
+/home/matt/Documents/Repos/MattMC/modules/distant-horizons/fabric/src/main/java/net/fabricmc/fabric/api/networking/v1/ServerPlayNetworking.java:358: error: cannot find symbol
+		ServerPlayerEntity player();
+		^
+  symbol:   class ServerPlayerEntity
+  location: interface Context
+/home/matt/Documents/Repos/MattMC/modules/distant-horizons/fabric/src/main/java/net/fabricmc/fabric/api/networking/v1/ServerPlayNetworking.java:363: error: cannot find symbol
+		PacketSender responseSender();
+		^
+  symbol:   class PacketSender
+  location: interface Context
+/home/matt/Documents/Repos/MattMC/modules/distant-horizons/fabric/src/main/java/net/fabricmc/fabric/api/client/networking/v1/ClientPlayNetworking.java:25: error: cannot find symbol
+import net.minecraft.client.MinecraftClient;
+                           ^
+  symbol:   class MinecraftClient
+  location: package net.minecraft.client
+/home/matt/Documents/Repos/MattMC/modules/distant-horizons/fabric/src/main/java/net/fabricmc/fabric/api/client/networking/v1/ClientPlayNetworking.java:26: error: package net.minecraft.client.network does not exist
+import net.minecraft.client.network.ClientPlayerEntity;
+                                   ^
+/home/matt/Documents/Repos/MattMC/modules/distant-horizons/fabric/src/main/java/net/fabricmc/fabric/api/client/networking/v1/ClientPlayNetworking.java:27: error: package net.minecraft.network.listener does not exist
+import net.minecraft.network.listener.ServerCommonPacketListener;
+                                     ^
+/home/matt/Documents/Repos/MattMC/modules/distant-horizons/fabric/src/main/java/net/fabricmc/fabric/api/client/networking/v1/ClientPlayNetworking.java:28: error: package net.minecraft.network.packet does not exist
+import net.minecraft.network.packet.CustomPayload;
+                                   ^
+/home/matt/Documents/Repos/MattMC/modules/distant-horizons/fabric/src/main/java/net/fabricmc/fabric/api/client/networking/v1/ClientPlayNetworking.java:29: error: package net.minecraft.network.packet does not exist
+import net.minecraft.network.packet.Packet;
+                                   ^
+/home/matt/Documents/Repos/MattMC/modules/distant-horizons/fabric/src/main/java/net/fabricmc/fabric/api/client/networking/v1/ClientPlayNetworking.java:30: error: cannot find symbol
+import net.minecraft.util.Identifier;
+                         ^
+  symbol:   class Identifier
+  location: package net.minecraft.util
+/home/matt/Documents/Repos/MattMC/modules/distant-horizons/fabric/src/main/java/net/fabricmc/fabric/api/client/networking/v1/ClientPlayNetworking.java:32: error: cannot find symbol
+import net.fabricmc.fabric.api.networking.v1.PacketSender;
+                                            ^
+  symbol:   class PacketSender
+  location: package net.fabricmc.fabric.api.networking.v1
+/home/matt/Documents/Repos/MattMC/modules/distant-horizons/fabric/src/main/java/net/fabricmc/fabric/api/client/networking/v1/ClientPlayNetworking.java:35: error: package net.fabricmc.fabric.impl.networking.client does not exist
+import net.fabricmc.fabric.impl.networking.client.ClientNetworkingImpl;
+                                                 ^
+/home/matt/Documents/Repos/MattMC/modules/distant-horizons/fabric/src/main/java/net/fabricmc/fabric/api/client/networking/v1/ClientPlayNetworking.java:36: error: package net.fabricmc.fabric.impl.networking.client does not exist
+import net.fabricmc.fabric.impl.networking.client.ClientPlayNetworkAddon;
+                                                 ^
+/home/matt/Documents/Repos/MattMC/modules/distant-horizons/fabric/src/main/java/net/fabricmc/fabric/api/client/networking/v1/ClientPlayNetworking.java:71: error: cannot find symbol
+	public static <T extends CustomPayload> boolean registerGlobalReceiver(CustomPayload.Id<T> type, PlayPayloadHandler<T> handler) {
+	                         ^
+  symbol:   class CustomPayload
+  location: class ClientPlayNetworking
+/home/matt/Documents/Repos/MattMC/modules/distant-horizons/fabric/src/main/java/net/fabricmc/fabric/api/client/networking/v1/ClientPlayNetworking.java:71: error: package CustomPayload does not exist
+	public static <T extends CustomPayload> boolean registerGlobalReceiver(CustomPayload.Id<T> type, PlayPayloadHandler<T> handler) {
+	                                                                                    ^
+/home/matt/Documents/Repos/MattMC/modules/distant-horizons/fabric/src/main/java/net/fabricmc/fabric/api/client/networking/v1/ClientPlayNetworking.java:262: error: cannot find symbol
+	public interface PlayPayloadHandler<T extends CustomPayload> {
+	                                              ^
+  symbol:   class CustomPayload
+  location: class ClientPlayNetworking
+/home/matt/Documents/Repos/MattMC/modules/distant-horizons/fabric/src/main/java/net/fabricmc/fabric/api/client/networking/v1/ClientPlayNetworking.java:88: error: cannot find symbol
+	public static ClientPlayNetworking.PlayPayloadHandler<?> unregisterGlobalReceiver(Identifier id) {
+	                                                                                  ^
+  symbol:   class Identifier
+  location: class ClientPlayNetworking
+/home/matt/Documents/Repos/MattMC/modules/distant-horizons/fabric/src/main/java/net/fabricmc/fabric/api/client/networking/v1/ClientPlayNetworking.java:98: error: cannot find symbol
+	public static Set<Identifier> getGlobalReceivers() {
+	                  ^
+  symbol:   class Identifier
+  location: class ClientPlayNetworking
+/home/matt/Documents/Repos/MattMC/modules/distant-horizons/fabric/src/main/java/net/fabricmc/fabric/api/client/networking/v1/ClientPlayNetworking.java:118: error: cannot find symbol
+	public static <T extends CustomPayload> boolean registerReceiver(CustomPayload.Id<T> type, PlayPayloadHandler<T> handler) {
+	                         ^
+  symbol:   class CustomPayload
+  location: class ClientPlayNetworking
+/home/matt/Documents/Repos/MattMC/modules/distant-horizons/fabric/src/main/java/net/fabricmc/fabric/api/client/networking/v1/ClientPlayNetworking.java:118: error: package CustomPayload does not exist
+	public static <T extends CustomPayload> boolean registerReceiver(CustomPayload.Id<T> type, PlayPayloadHandler<T> handler) {
+	                                                                              ^
+/home/matt/Documents/Repos/MattMC/modules/distant-horizons/fabric/src/main/java/net/fabricmc/fabric/api/client/networking/v1/ClientPlayNetworking.java:139: error: cannot find symbol
+	public static ClientPlayNetworking.PlayPayloadHandler<?> unregisterReceiver(Identifier id) {
+	                                                                            ^
+  symbol:   class Identifier
+  location: class ClientPlayNetworking
+/home/matt/Documents/Repos/MattMC/modules/distant-horizons/fabric/src/main/java/net/fabricmc/fabric/api/client/networking/v1/ClientPlayNetworking.java:155: error: cannot find symbol
+	public static Set<Identifier> getReceived() throws IllegalStateException {
+	                  ^
+  symbol:   class Identifier
+  location: class ClientPlayNetworking
+/home/matt/Documents/Repos/MattMC/modules/distant-horizons/fabric/src/main/java/net/fabricmc/fabric/api/client/networking/v1/ClientPlayNetworking.java:171: error: cannot find symbol
+	public static Set<Identifier> getSendable() throws IllegalStateException {
+	                  ^
+  symbol:   class Identifier
+  location: class ClientPlayNetworking
+/home/matt/Documents/Repos/MattMC/modules/distant-horizons/fabric/src/main/java/net/fabricmc/fabric/api/client/networking/v1/ClientPlayNetworking.java:188: error: cannot find symbol
+	public static boolean canSend(Identifier channelName) throws IllegalArgumentException {
+	                              ^
+  symbol:   class Identifier
+  location: class ClientPlayNetworking
+/home/matt/Documents/Repos/MattMC/modules/distant-horizons/fabric/src/main/java/net/fabricmc/fabric/api/client/networking/v1/ClientPlayNetworking.java:204: error: package CustomPayload does not exist
+	public static boolean canSend(CustomPayload.Id<?> type) {
+	                                           ^
+/home/matt/Documents/Repos/MattMC/modules/distant-horizons/fabric/src/main/java/net/fabricmc/fabric/api/client/networking/v1/ClientPlayNetworking.java:214: error: cannot find symbol
+	public static <T extends CustomPayload> Packet<ServerCommonPacketListener> createC2SPacket(T packet) {
+	                         ^
+  symbol:   class CustomPayload
+  location: class ClientPlayNetworking
+/home/matt/Documents/Repos/MattMC/modules/distant-horizons/fabric/src/main/java/net/fabricmc/fabric/api/client/networking/v1/ClientPlayNetworking.java:214: error: cannot find symbol
+	public static <T extends CustomPayload> Packet<ServerCommonPacketListener> createC2SPacket(T packet) {
+	                                        ^
+  symbol:   class Packet
+  location: class ClientPlayNetworking
+/home/matt/Documents/Repos/MattMC/modules/distant-horizons/fabric/src/main/java/net/fabricmc/fabric/api/client/networking/v1/ClientPlayNetworking.java:214: error: cannot find symbol
+	public static <T extends CustomPayload> Packet<ServerCommonPacketListener> createC2SPacket(T packet) {
+	                                               ^
+  symbol:   class ServerCommonPacketListener
+  location: class ClientPlayNetworking
+/home/matt/Documents/Repos/MattMC/modules/distant-horizons/fabric/src/main/java/net/fabricmc/fabric/api/client/networking/v1/ClientPlayNetworking.java:224: error: cannot find symbol
+	public static PacketSender getSender() throws IllegalStateException {
+	              ^
+  symbol:   class PacketSender
+  location: class ClientPlayNetworking
+/home/matt/Documents/Repos/MattMC/modules/distant-horizons/fabric/src/main/java/net/fabricmc/fabric/api/client/networking/v1/ClientPlayNetworking.java:241: error: cannot find symbol
+	public static void send(CustomPayload payload) {
+	                        ^
+  symbol:   class CustomPayload
+  location: class ClientPlayNetworking
+/home/matt/Documents/Repos/MattMC/modules/distant-horizons/fabric/src/main/java/net/fabricmc/fabric/api/client/networking/v1/ClientPlayNetworking.java:289: error: cannot find symbol
+		MinecraftClient client();
+		^
+  symbol:   class MinecraftClient
+  location: interface Context
+/home/matt/Documents/Repos/MattMC/modules/distant-horizons/fabric/src/main/java/net/fabricmc/fabric/api/client/networking/v1/ClientPlayNetworking.java:294: error: cannot find symbol
+		ClientPlayerEntity player();
+		^
+  symbol:   class ClientPlayerEntity
+  location: interface Context
+Note: Some input files use or override a deprecated API.
+Note: Recompile with -Xlint:deprecation for details.
+Note: Some input files use unchecked or unsafe operations.
+Note: Recompile with -Xlint:unchecked for details.
+Note: Some messages have been simplified; recompile with -Xdiags:verbose to get full output
+100 errors
+only showing the first 100 errors, of 192 total; use -Xmaxerrs if you would like to see more
 
-BUILD SUCCESSFUL in 13s
-15 actionable tasks: 3 executed, 2 from cache, 10 up-to-date
+FAILURE: Build failed with an exception.
+
+* What went wrong:
+Execution failed for task ':compileDistantHorizonsJava'.
+> Compilation failed; see the compiler error output for details.
+
+* Try:
+> Run with --info option to get more log output.
+> Run with --scan to get full insights.
+
+BUILD FAILED in 2s
+6 actionable tasks: 2 executed, 2 from cache, 2 up-to-date
