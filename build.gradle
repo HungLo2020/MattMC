@@ -528,6 +528,12 @@ sourceSets.iris.runtimeClasspath += sourceSets.fabricLoader.output
 sourceSets.iris.runtimeClasspath += sourceSets.main.output
 sourceSets.iris.runtimeClasspath += sourceSets.sodium.output
 
+// Add Distant Horizons to Iris classpath when enabled (for DH compatibility classes)
+if (enableDistantHorizons) {
+    sourceSets.iris.compileClasspath += sourceSets.distantHorizons.output
+    sourceSets.iris.runtimeClasspath += sourceSets.distantHorizons.output
+}
+
 // Conditionally add Distant Horizons dependencies if enabled
 if (enableDistantHorizons) {
     // Distant Horizons depends on Fabric Loader and Minecraft
@@ -650,6 +656,11 @@ tasks.register('irisJar', Jar) {
     description = 'Assembles the Iris mod JAR'
     
     dependsOn 'compileIrisJava', 'processIrisResources'
+    
+    // Ensure Distant Horizons compiles before Iris when enabled (for DH compatibility classes)
+    if (enableDistantHorizons) {
+        dependsOn 'compileDistantHorizonsJava'
+    }
     
     archiveBaseName = 'iris'
     archiveVersion = irisVersion
@@ -1479,3 +1490,10 @@ clientFatJar {
 
 // The clientDist task already uses only runtimeClasspath and main source set,
 // but we verify this is maintained for future modifications
+
+// Ensure Distant Horizons compiles before Iris when DH is enabled
+if (enableDistantHorizons) {
+    tasks.named('compileIrisJava') {
+        dependsOn 'compileDistantHorizonsJava'
+    }
+}
