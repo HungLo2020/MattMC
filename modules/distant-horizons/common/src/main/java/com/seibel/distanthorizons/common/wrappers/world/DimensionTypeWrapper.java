@@ -66,7 +66,7 @@ public class DimensionTypeWrapper implements IDimensionTypeWrapper
 	}
 	private static String determineName(DimensionType dimensionType)
 	{
-		throw new UnsupportedOperationException("As of MC 1.21.11 the dimension type no longer stores it's name and must be determined from the level.");
+		return dimensionType.effectsLocation().getPath();
 	}
 	
 	public static void clearMap() { DIMENSION_WRAPPER_BY_NAME.clear(); }
