@@ -1,19 +1,19 @@
 {
     "schemaVersion": 1,
     "id": "distanthorizons",
-    "version": "${version}",
+    "version": "2.4.4-b-dev",
 
     "provides": [ "lod" ],
     
     
-    "name": "${mod_name}",
-    "description": "${description}",
-    "authors": $authors,
+    "name": "Distant Horizons",
+    "description": "Adds LODs (Levels Of Detail) to Minecraft",
+    "authors": ["James Seibel"],
     
     "contact": {
-        "homepage": "${homepage}",
-        "sources": "${source}",
-        "issues": "${issues}"
+        "homepage": "https://gitlab.com/jeseibel/distant-horizons",
+        "sources": "https://gitlab.com/jeseibel/distant-horizons",
+        "issues": "https://gitlab.com/jeseibel/distant-horizons/-/issues"
     },
     
     "license": "LGPL-3",
@@ -35,21 +35,26 @@
     
     "depends": {
         "fabricloader": "*",
-        "minecraft": $compatible_minecraft_versions,
-        "java": ">=${java_version}"
+        "minecraft": ">=1.21.10",
+        "java": ">=21"
     },
     
     "custom": {
         "modmenu": {
             "links": {
-                "modmenu.discord": "${discord}"
+                "modmenu.discord": "https://discord.gg/SEKhUEpk"
             }
+        },
+        "distant_horizons": {
+            "git_branch": "Manifest",
+            "git_commit": "unknown",
+            "build_source": "Gradle"
         }
     },
     
     "suggests": {
     },
     
-    "breaks": $fabric_incompatibility_list,
-    "recommends": $fabric_recommend_list
+    "breaks": {},
+    "recommends": {}
 }

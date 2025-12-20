@@ -12,6 +12,10 @@ import java.util.List;
 @Mixin(DebugScreenOverlay.class)
 public class MixinDebugScreenOverlay
 {
-	// handled by DhDebugScreenEntry for MC versions after 1.21.10
-	
+	@Inject(method = "getSystemInformation", at = @At("RETURN"))
+	private void addCustomF3(CallbackInfoReturnable<List<String>> cir)
+	{
+		List<String> messages = cir.getReturnValue();
+		F3Screen.addStringToDisplay(messages);
+	}
 }
