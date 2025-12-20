@@ -32,11 +32,7 @@ import com.seibel.distanthorizons.core.util.gridList.ArrayGridList;
 import net.minecraft.world.level.chunk.ChunkAccess;
 import com.seibel.distanthorizons.core.logging.DhLogger;
 
-#if MC_VER <= MC_1_20_4
-import net.minecraft.world.level.chunk.ChunkStatus;
-#else
 import net.minecraft.world.level.chunk.status.ChunkStatus;
-#endif
 
 
 public final class StepStructureStart extends AbstractWorldGenStep
@@ -73,13 +69,7 @@ public final class StepStructureStart extends AbstractWorldGenStep
 		
 		// TODO should be put in wrapped environment so we can skip some other world gen steps
 		//  SURFACE wouldn't need structure generation either
-		#if MC_VER < MC_1_19_2
-		if (!this.environment.globalParams.worldGenSettings.generateFeatures())
-		#elif MC_VER < MC_1_19_4
-		if (!this.environment.globalParams.worldGenSettings.generateStructures()) 
-		#else
 		if (!this.environment.globalParams.worldOptions.generateStructures())
-		#endif
 		{
 			return;
 		}
@@ -94,24 +84,11 @@ public final class StepStructureStart extends AbstractWorldGenStep
 			// and should prevent some concurrency issues
 			STRUCTURE_PLACEMENT_LOCK.lock();
 			
-			#if MC_VER < MC_1_19_2
-			this.environment.globalParams.generator.createStructures(this.environment.globalParams.registry, tParams.structFeatManager, chunk, this.environment.globalParams.structures,
-					this.environment.globalParams.worldSeed);
-			#elif MC_VER < MC_1_19_4
-			this.environment.globalParams.generator.createStructures(this.environment.globalParams.registry, this.environment.globalParams.randomState, tParams.structFeatManager, chunk, this.environment.globalParams.structures,
-					this.environment.globalParams.worldSeed);
-			#elif MC_VER <= MC_1_21_3
-			this.environment.globalParams.generator.createStructures(this.environment.globalParams.registry,
-					this.environment.globalParams.mcServerLevel.getChunkSource().getGeneratorState(),
-					tParams.structFeatManager, chunk, this.environment.globalParams.structures);
-			#else
 			this.environment.globalParams.generator.createStructures(this.environment.globalParams.registry,
 					this.environment.globalParams.mcServerLevel.getChunkSource().getGeneratorState(),
 					tParams.structFeatManager, chunk, this.environment.globalParams.structures, 
 					this.environment.globalParams.mcServerLevel.dimension());
-			#endif
 			
-			#if MC_VER >= MC_1_18_2
 			try
 			{
 				tParams.structCheck.onStructureLoad(chunk.getPos(), chunk.getAllStarts());
@@ -137,7 +114,6 @@ public final class StepStructureStart extends AbstractWorldGenStep
 				}
 			}
 			
-			#endif
 			
 			STRUCTURE_PLACEMENT_LOCK.unlock();
 		}

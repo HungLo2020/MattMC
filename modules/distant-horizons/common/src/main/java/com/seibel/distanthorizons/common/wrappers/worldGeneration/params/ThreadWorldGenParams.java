@@ -24,9 +24,7 @@ import com.seibel.distanthorizons.common.wrappers.worldGeneration.mimicObject.Wo
 
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.WorldGenLevel;
-#if MC_VER >= MC_1_18_2
 import net.minecraft.world.level.levelgen.structure.StructureCheck;
-#endif
 
 public final class ThreadWorldGenParams
 {
@@ -36,9 +34,7 @@ public final class ThreadWorldGenParams
 	final ServerLevel level;
 	public WorldGenStructFeatManager structFeatManager = null;
 	
-	#if MC_VER >= MC_1_18_2
 	public StructureCheck structCheck;
-	#endif
 	
 	boolean isValid = true;
 	
@@ -72,15 +68,9 @@ public final class ThreadWorldGenParams
 		
 		this.level = param.mcServerLevel;
 		
-		#if MC_VER < MC_1_18_2
-		this.structFeatManager = new WorldGenStructFeatManager(param.worldGenSettings, this.level);
-		#elif MC_VER < MC_1_19_2
-		this.structCheck = this.createStructureCheck(param);
-		#else
 		this.structCheck = new StructureCheck(param.chunkScanner, param.registry, param.structures,
 				param.mcServerLevel.dimension(), param.generator, param.randomState, this.level, param.generator.getBiomeSource(), param.worldSeed,
 				param.dataFixer);
-		#endif
 	}
 	
 	
@@ -91,33 +81,10 @@ public final class ThreadWorldGenParams
 	
 	public void makeStructFeatManager(WorldGenLevel genLevel, GlobalWorldGenParams param)
 	{
-		#if MC_VER < MC_1_18_2
-		this.structFeatManager = new WorldGenStructFeatManager(param.worldGenSettings, genLevel);
-		#elif MC_VER < MC_1_19_4
-		this.structFeatManager = new WorldGenStructFeatManager(param.worldGenSettings, genLevel, this.structCheck);
-		#else
 		this.structFeatManager = new WorldGenStructFeatManager(param.worldOptions, genLevel, this.structCheck);
-		#endif
 	}
 	
-	#if MC_VER < MC_1_18_2
-	#elif MC_VER < MC_1_19_2
-	public void recreateStructureCheck()
-	{
-		if (previousGlobalWorldGenParams != null)
-		{
-			this.structCheck = this.createStructureCheck(previousGlobalWorldGenParams);
-		}
-	}
-	private StructureCheck createStructureCheck(GlobalWorldGenParams param)
-	{
-		return new StructureCheck(param.chunkScanner, param.registry, param.structures,
-				param.mcServerLevel.dimension(), param.generator, this.level, param.generator.getBiomeSource(), param.worldSeed,
-				param.dataFixer);
-	}
-	#else
 	public void recreateStructureCheck() { /* do nothing */ }	
-	#endif
 	
 	
 	

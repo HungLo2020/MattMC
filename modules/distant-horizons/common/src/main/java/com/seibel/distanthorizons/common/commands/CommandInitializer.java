@@ -8,21 +8,12 @@ import org.jetbrains.annotations.Nullable;
 import static com.seibel.distanthorizons.core.network.messages.MessageRegistry.DEBUG_CODEC_CRASH_MESSAGE;
 import static net.minecraft.commands.Commands.literal;
 
-#if MC_VER <= MC_1_21_10
-#else
-import net.minecraft.server.permissions.PermissionCheck;
-import net.minecraft.server.permissions.Permissions;
-#endif
 
 public class CommandInitializer
 {
 	private boolean serverReady = false;
 	
-	#if MC_VER <= MC_1_21_10
 	private static final int REQUIRED_PERMISSION_LEVEL = 4;
-	#else
-	private static final PermissionCheck COMMAND_PERMISSION_CHECK = new PermissionCheck.Require(Permissions.COMMANDS_OWNER);
-	#endif
 	
 	
 	/**
@@ -62,11 +53,7 @@ public class CommandInitializer
 		LiteralArgumentBuilder<CommandSourceStack> builder = literal("dh")
 				.requires((source) ->
 				{
-					#if MC_VER <= MC_1_21_10
 					return source.hasPermission(REQUIRED_PERMISSION_LEVEL);
-					#else
-					return COMMAND_PERMISSION_CHECK.check(source.permissions());
-					#endif
 				});
 		
 		builder.then(new ConfigCommand().buildCommand());

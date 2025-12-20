@@ -43,17 +43,8 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.level.chunk.ChunkAccess;
 import net.minecraft.world.level.chunk.ChunkSource;
 
-#if MC_VER <= MC_1_20_4
-import net.minecraft.world.level.chunk.ChunkStatus;
-#else
 import net.minecraft.world.level.chunk.status.ChunkStatus;
-#endif
 
-#if MC_VER <= MC_1_21_10
-#else
-import net.minecraft.world.level.ChunkPos;
-import net.minecraft.server.level.ChunkHolder;
-#endif
 
 import com.seibel.distanthorizons.core.logging.DhLogger;
 import org.jetbrains.annotations.Nullable;
@@ -114,11 +105,7 @@ public class ServerLevelWrapper implements IServerLevelWrapper
 	@Override
 	public File getMcSaveFolder() 
 	{ 
-		#if MC_VER < MC_1_21_3
-		return this.level.getChunkSource().getDataStorage().dataFolder;
-		#else
 		return this.level.getChunkSource().getDataStorage().dataFolder.toFile();
-		#endif
 	}
 	
 	@Override
@@ -163,11 +150,7 @@ public class ServerLevelWrapper implements IServerLevelWrapper
 		{
 			// We use the overworld since it's the only dimension that is stored in the server root folder
 			
-			#if MC_VER >= MC_1_21_3
 			return this.level.getServer().getLevel(Level.OVERWORLD).getChunkSource().getDataStorage().dataFolder.getParent().getFileName().toString();
-			#else // <= 1.21.3
-			return this.level.getServer().getLevel(Level.OVERWORLD).getChunkSource().getDataStorage().dataFolder.getParentFile().getName();
-			#endif
 		}
 		catch (Exception e)
 		{
@@ -180,21 +163,13 @@ public class ServerLevelWrapper implements IServerLevelWrapper
 	@Override
 	public DimensionTypeWrapper getDimensionType() 
 	{
-		#if MC_VER <= MC_1_21_10
 		return DimensionTypeWrapper.getDimensionTypeWrapper(this.level.dimensionType());
-		#else
-		return DimensionTypeWrapper.getDimensionTypeWrapper(this.level.dimensionType(), this.getDimensionName());
-		#endif
 	}
 	
 	@Override
 	public String getDimensionName()
 	{
-		#if MC_VER <= MC_1_21_10
 		return this.level.dimension().location().toString();
-		#else
-		return this.level.dimension().identifier().toString();
-		#endif
 	}
 	
 	@Override
@@ -220,19 +195,12 @@ public class ServerLevelWrapper implements IServerLevelWrapper
 	@Override
 	public int getMinHeight()
 	{
-        #if MC_VER < MC_1_17_1
-        return 0;
-        #elif MC_VER < MC_1_21_3
-		return this.level.getMinBuildHeight();
-        #else
 		return this.level.getMinY();
-        #endif
 	}
 	
 	@Override
 	public IChunkWrapper tryGetChunk(DhChunkPos pos)
 	{
-		#if MC_VER < MC_1_21_11
 		if (!this.level.hasChunk(pos.getX(), pos.getZ()))
 		{
 			return null;
@@ -245,24 +213,6 @@ public class ServerLevelWrapper implements IServerLevelWrapper
 		}
 		
 		return new ChunkWrapper(chunk, this);
-		#else
-		
-		// directly hitting the chunkMap is required otherwise MC will run this on the main server thread,
-		// causing lag
-		ChunkHolder chunkHolder = this.level.getChunkSource().chunkMap.getVisibleChunkIfPresent(new ChunkPos(pos.getX(), pos.getZ()).toLong());
-		if (chunkHolder == null)
-		{
-			return null;
-		}
-		
-		ChunkAccess chunk = chunkHolder.getChunkIfPresent(ChunkStatus.FULL);
-		if (chunk == null)
-		{
-			return null;
-		}
-		
-		return new ChunkWrapper(chunk, this);
-		#endif
 	}
 	
 	@Override

@@ -41,35 +41,15 @@ import com.seibel.distanthorizons.core.logging.DhLogger;
 
 import java.util.*;
 
-#if MC_VER >= MC_1_17_1
 import net.minecraft.core.QuartPos;
-#endif
 
-#if MC_VER == MC_1_16_5
+
+
+
+
 import net.minecraft.world.level.chunk.LevelChunkSection;
-#endif
 
-#if MC_VER == MC_1_17_1
-import net.minecraft.world.level.chunk.LevelChunkSection;
-#endif
-
-#if MC_VER == MC_1_18_2
-import net.minecraft.world.level.chunk.LevelChunkSection;
-#endif
-
-#if MC_VER == MC_1_19_2 || MC_VER == MC_1_19_4
-import net.minecraft.world.level.chunk.LevelChunkSection;
-#endif
-
-#if MC_VER >= MC_1_20_1
-import net.minecraft.world.level.chunk.LevelChunkSection;
-#endif
-
-#if MC_VER <= MC_1_20_4
-import net.minecraft.world.level.chunk.ChunkStatus;
-#else
 import net.minecraft.world.level.chunk.status.ChunkStatus;
-#endif
 
 
 public class ChunkWrapper implements IChunkWrapper
@@ -133,36 +113,22 @@ public class ChunkWrapper implements IChunkWrapper
 	public int getHeight() { return getHeight(this.chunk); }
 	public static int getHeight(ChunkAccess chunk)
 	{
-		#if MC_VER < MC_1_17_1
-		return 255;
-		#else
 		return chunk.getHeight();
-		#endif
 	}
 	
 	@Override
 	public int getInclusiveMinBuildHeight() { return getInclusiveMinBuildHeight(this.chunk); }
 	public static int getInclusiveMinBuildHeight(ChunkAccess chunk)
 	{
-		#if MC_VER < MC_1_17_1
-		return 0;
-		#elif MC_VER < MC_1_21_3
-		return chunk.getMinBuildHeight();
-		#else
 		return chunk.getMinY();
-		#endif
 	}
 	
 	@Override
 	public int getExclusiveMaxBuildHeight() { return getExclusiveMaxBuildHeight(this.chunk); }
 	public static int getExclusiveMaxBuildHeight(ChunkAccess chunk) 
 	{
-		#if MC_VER < MC_1_21_3
-		return chunk.getMaxBuildHeight();
-		#else
 		// +1 since Minecraft made the max value inclusive
 		return chunk.getMaxY() + 1;
-		#endif
 	}
 	
 	@Override
@@ -232,13 +198,7 @@ public class ChunkWrapper implements IChunkWrapper
 	}
 	private static boolean isChunkSectionEmpty(LevelChunkSection section)
 	{
-		#if MC_VER == MC_1_16_5
-		return section.isEmpty();
-		#elif MC_VER == MC_1_17_1
-		return section.isEmpty();
-		#else
 		return section.hasOnlyAir();
-		#endif
 	}
 	private int getChunkSectionMinHeight(int index) { return (index * 16) + this.getInclusiveMinBuildHeight(); }
 	
@@ -334,24 +294,10 @@ public class ChunkWrapper implements IChunkWrapper
 	@Override
 	public IBiomeWrapper getBiome(int relX, int relY, int relZ)
 	{
-		#if MC_VER < MC_1_17_1
-		return BiomeWrapper.getBiomeWrapper(this.chunk.getBiomes().getNoiseBiome(
-				relX >> 2, relY >> 2, relZ >> 2),
-				this.wrappedLevel);
-		#elif MC_VER < MC_1_18_2
-		return BiomeWrapper.getBiomeWrapper(this.chunk.getBiomes().getNoiseBiome(
-				QuartPos.fromBlock(relX), QuartPos.fromBlock(relY), QuartPos.fromBlock(relZ)),
-				this.wrappedLevel);
-		#elif MC_VER < MC_1_18_2
-		return BiomeWrapper.getBiomeWrapper(this.chunk.getNoiseBiome(
-				QuartPos.fromBlock(relX), QuartPos.fromBlock(relY), QuartPos.fromBlock(relZ)),
-				this.wrappedLevel);
-		#else 
 		//Now returns a Holder<Biome> instead of Biome
 		return BiomeWrapper.getBiomeWrapper(this.chunk.getNoiseBiome(
 				QuartPos.fromBlock(relX), QuartPos.fromBlock(relY), QuartPos.fromBlock(relZ)),
 				this.wrappedLevel);
-		#endif
 	}
 	
 	@Override
@@ -409,11 +355,7 @@ public class ChunkWrapper implements IChunkWrapper
 			{
 	            // TODO implement section cloning for older MC versions, only 1.21.4 MC (and maybe other semi recent versions) have a clean way to handle this
 	            // TODO we probably want a wrapper object instead
-				#if MC_VER < MC_1_21_4
-				this.levelChunkSections[i] = section;
-				#else
 				this.levelChunkSections[i] = section.copy();
-				#endif
 			}
 		}
 	}
@@ -481,22 +423,14 @@ public class ChunkWrapper implements IChunkWrapper
 	{
 		if (chunk instanceof ProtoChunk)
 		{
-			#if MC_VER < MC_1_21_1
-			((ProtoChunk) chunk).setStatus(status);
-			#else
 			((ProtoChunk) chunk).setPersistedStatus(status);
-			#endif
 		}
 	}
 	
 	public ChunkStatus getStatus() { return getStatus(this.getChunk()); }
 	public static ChunkStatus getStatus(ChunkAccess chunk)
 	{
-		#if MC_VER < MC_1_21_1 
-		return chunk.getStatus();
-		#else
 		return chunk.getPersistedStatus(); 
-		#endif
 	}
 	
 	@Override
@@ -590,12 +524,6 @@ public class ChunkWrapper implements IChunkWrapper
 			this.blockLightPosList = new ArrayList<>();
 			
 			
-			#if MC_VER < MC_1_20_1
-			this.chunk.getLights().forEach((blockPos) ->
-			{
-				this.blockLightPosList.add(new DhBlockPos(blockPos.getX(), blockPos.getY(), blockPos.getZ()));
-			});
-			#else
 			this.chunk.findBlockLightSources((blockPos, blockState) ->
 			{
 				DhBlockPos pos = new DhBlockPos(blockPos.getX(), blockPos.getY(), blockPos.getZ());
@@ -606,7 +534,6 @@ public class ChunkWrapper implements IChunkWrapper
 				
 				this.blockLightPosList.add(pos);
 			});
-			#endif
 		}
 		
 		return this.blockLightPosList;

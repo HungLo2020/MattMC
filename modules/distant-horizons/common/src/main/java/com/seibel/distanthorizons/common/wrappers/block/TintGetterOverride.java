@@ -91,11 +91,6 @@ public class TintGetterOverride extends AbstractDhTintGetter
 	@Override
 	public int getLightEmission(BlockPos blockPos) { return this.parent.getLightEmission(blockPos); }
 	
-	#if MC_VER < MC_1_21_3
-	@Override
-	public int getMaxLightLevel() { return this.parent.getMaxLightLevel(); }
-	#else
-	#endif
 	
 	@Override
 	public Stream<BlockState> getBlockStates(AABB aABB) { return this.parent.getBlockStates(aABB); }
@@ -116,15 +111,9 @@ public class TintGetterOverride extends AbstractDhTintGetter
 	@Override
 	public double getBlockFloorHeight(BlockPos blockPos) { return this.parent.getBlockFloorHeight(blockPos); }
 	
-	#if MC_VER < MC_1_21_3
-	@Override
-	public int getMaxBuildHeight() { return this.parent.getMaxBuildHeight(); }
-	#else
 	@Override
 	public int getMaxY() { return this.parent.getMaxY(); }
-	#endif
 	
-	#if MC_VER >= MC_1_17_1
 	@Override
 	public <T extends BlockEntity> Optional<T> getBlockEntity(BlockPos blockPos, BlockEntityType<T> blockEntityType) { return this.parent.getBlockEntity(blockPos, blockEntityType); }
 	
@@ -134,32 +123,17 @@ public class TintGetterOverride extends AbstractDhTintGetter
 	@Override
 	public int getHeight() { return this.parent.getHeight(); }
 	
-	#if MC_VER < MC_1_21_3
-	@Override
-	public int getMinBuildHeight() { return this.parent.getMinBuildHeight(); }
-	#else
 	@Override
 	public int getMinY() { return this.parent.getMinY(); }
-	#endif
 	
 	@Override
 	public int getSectionsCount() { return this.parent.getSectionsCount(); }
 	
-	#if MC_VER < MC_1_21_3
-	@Override
-	public int getMinSection() { return this.parent.getMinSection(); }
-	#else
 	@Override
 	public int getMinSectionY() { return super.getMinSectionY(); }	
-	#endif
 	
-	#if MC_VER < MC_1_21_3
-	@Override
-	public int getMaxSection() { return this.parent.getMaxSection(); }
-	#else
 	@Override
 	public int getMaxSectionY() { return this.parent.getMaxSectionY(); }
-	#endif
 	
 	@Override
 	public boolean isOutsideBuildHeight(BlockPos blockPos) { return this.parent.isOutsideBuildHeight(blockPos); }
@@ -175,7 +149,6 @@ public class TintGetterOverride extends AbstractDhTintGetter
 	
 	@Override
 	public int getSectionYFromSectionIndex(int i) { return this.parent.getSectionYFromSectionIndex(i); }
-    #endif
 	
 	
 	

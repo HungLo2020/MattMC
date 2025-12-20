@@ -34,11 +34,7 @@ import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.FlowerBlock;
 import net.minecraft.world.level.block.LeavesBlock;
 import net.minecraft.world.level.block.RotatedPillarBlock;
-#if MC_VER >= MC_1_19_2
 import net.minecraft.util.RandomSource;
-#else
-import java.util.Random;
-#endif
 import net.minecraft.world.level.block.state.BlockState;
 import com.seibel.distanthorizons.core.logging.DhLogger;
 import org.jetbrains.annotations.Nullable;
@@ -48,10 +44,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.concurrent.locks.ReentrantLock;
 
-#if MC_VER < MC_1_21_5
-#else
 import net.minecraft.client.renderer.block.model.BlockModelPart;
-#endif
 
 /**
  * This stores and calculates the colors
@@ -85,12 +78,8 @@ public class ClientBlockStateColorCache
 	
 	
 	
-	#if MC_VER < MC_1_19_2
-	private static final Random RANDOM = new Random(0);
-	#else
 	/** Note: this object isn't thread safe and must be put in a lock */
 	private static final RandomSource RANDOM = RandomSource.create();
-	#endif
 	
 	private final IClientLevelWrapper clientLevelWrapper;
 	private final BlockState blockState;
@@ -231,25 +220,11 @@ public class ClientBlockStateColorCache
 					BakedQuad firstQuad = quads.get(0);
 					
 					this.needPostTinting = firstQuad.isTinted();
-					#if MC_VER <= MC_1_21_4
-					this.tintIndex = firstQuad.getTintIndex();
-					#else
 					this.tintIndex = firstQuad.tintIndex();
-					#endif
 					
-					#if MC_VER < MC_1_17_1
-					this.baseColor = calculateColorFromTexture(
-                        firstQuad.sprite,
-						EColorMode.getColorMode(this.blockState.getBlock()));
-					#elif MC_VER < MC_1_21_5
-					this.baseColor = calculateColorFromTexture(
-                        firstQuad.getSprite(),
-						EColorMode.getColorMode(this.blockState.getBlock()));
-					#else
 					this.baseColor = calculateColorFromTexture(
 						firstQuad.sprite(),
 						EColorMode.getColorMode(this.blockState.getBlock()));
-					#endif
 				}
 				else
 				{
@@ -283,10 +258,6 @@ public class ClientBlockStateColorCache
 	{
 		List<BakedQuad> quads = null;
 		
-		#if MC_VER < MC_1_21_5
-		quads = Minecraft.getInstance().getModelManager().getBlockModelShaper().
-				getBlockModel(this.blockState).getQuads(this.blockState, direction, RANDOM);
-		#else
 		List<BlockModelPart> blockModelPartList = Minecraft.getInstance().getModelManager().getBlockModelShaper().
 				getBlockModel(this.blockState).collectParts(RANDOM);
 		
@@ -299,7 +270,6 @@ public class ClientBlockStateColorCache
 				quads.addAll(blockModelPartList.get(i).getQuads(direction));
 			}
 		}
-		#endif
 		
 		return quads;
 	}
@@ -397,19 +367,11 @@ public class ClientBlockStateColorCache
 	}
 	private static int getTextureWidth(TextureAtlasSprite texture)
 	{
-        #if MC_VER < MC_1_19_4
-		return texture.getWidth();
-        #else
 		return texture.contents().width();
-        #endif
 	}
 	private static int getTextureHeight(TextureAtlasSprite texture)
 	{
-        #if MC_VER < MC_1_19_4
-		return texture.getHeight();
-        #else
 		return texture.contents().height();
-        #endif
 	}
 	/**
 	 * This method was suggested by IMS from the Iris/Sodium team. 

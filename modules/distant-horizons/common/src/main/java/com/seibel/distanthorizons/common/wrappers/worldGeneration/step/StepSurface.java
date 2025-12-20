@@ -29,11 +29,7 @@ import com.seibel.distanthorizons.common.wrappers.worldGeneration.mimicObject.Dh
 import com.seibel.distanthorizons.core.util.gridList.ArrayGridList;
 import net.minecraft.world.level.chunk.ChunkAccess;
 
-#if MC_VER <= MC_1_20_4
-import net.minecraft.world.level.chunk.ChunkStatus;
-#else
 import net.minecraft.world.level.chunk.status.ChunkStatus;
-#endif
 
 
 public final class StepSurface extends AbstractWorldGenStep
@@ -69,13 +65,7 @@ public final class StepSurface extends AbstractWorldGenStep
 		{
 			ChunkAccess chunk = chunkWrapper.getChunk();
 			
-			#if MC_VER < MC_1_18_2
-			this.environment.globalParams.generator.buildSurfaceAndBedrock(worldGenRegion, chunk);
-			#elif MC_VER < MC_1_19_2
-			this.environment.globalParams.generator.buildSurface(worldGenRegion, tParams.structFeatManager.forWorldGenRegion(worldGenRegion), chunk);
-			#else
 			this.environment.globalParams.generator.buildSurface(worldGenRegion, tParams.structFeatManager.forWorldGenRegion(worldGenRegion), this.environment.globalParams.randomState, chunk);
-			#endif
 		}
 	}
 	

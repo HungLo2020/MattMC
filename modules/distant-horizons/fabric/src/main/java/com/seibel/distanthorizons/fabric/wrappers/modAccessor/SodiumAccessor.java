@@ -29,18 +29,6 @@ import com.seibel.distanthorizons.core.wrapperInterfaces.modAccessor.ISodiumAcce
 import net.minecraft.client.Minecraft;
 
 
-#if MC_VER < MC_1_20_1
-import me.jellysquid.mods.sodium.client.render.SodiumWorldRenderer;
-#endif
-#if MC_VER < MC_1_17_1
-import net.minecraft.nbt.CompoundTag;
-import net.minecraft.network.protocol.Packet;
-import net.minecraft.world.entity.Entity;
-import net.minecraft.world.entity.EntityType;
-import net.minecraft.world.level.LevelAccessor;
-import net.minecraft.world.phys.AABB;
-#else 
-#endif
 
 public class SodiumAccessor implements ISodiumAccessor
 {
@@ -51,12 +39,6 @@ public class SodiumAccessor implements ISodiumAccessor
 	 */
 	public static final boolean isSodiumV5OrLess;
 	
-	#if MC_VER <= MC_1_19_4
-	#elif MC_VER <= MC_1_21_10
-	private static MethodHandle setFogOcclusionMethod;
-	private static Object sodiumPerformanceOptions;
-	#else
-	#endif
 	
 	static {
 		isSodiumV5OrLess = !classPresent("net.caffeinemc.mods.sodium.client.render.SodiumWorldRenderer");
@@ -81,54 +63,7 @@ public class SodiumAccessor implements ISodiumAccessor
 	@Override
 	public void setFogOcclusion(boolean occlusionEnabled)
 	{
-		#if MC_VER <= MC_1_19_4
-		#elif MC_VER <= MC_1_21_10
-		try
-		{
-			if (sodiumPerformanceOptions == null)
-			{
-				if (isSodiumV5OrLess)
-				{
-					// sodium 0.5
-					
-					Class<?> optionsClass = Class.forName("me.jellysquid.mods.sodium.client.gui.SodiumGameOptions");
-					Object basicOptions = MethodHandles.lookup().findStatic(
-							Class.forName("me.jellysquid.mods.sodium.client.SodiumClientMod"), 
-							"options", MethodType.methodType(optionsClass)).invoke();
-					sodiumPerformanceOptions = optionsClass.getDeclaredField("performance").get(basicOptions);
-					setFogOcclusionMethod = MethodHandles.lookup()
-							.findSetter(Class.forName(
-											"me.jellysquid.mods.sodium.client.gui.SodiumGameOptions$PerformanceSettings"),
-									"useFogOcclusion", boolean.class);
-					
-					// alternate option if referencing Sodium 0.5 directly
-					//me.jellysquid.mods.sodium.client.SodiumClientMod.options().performance.useFogOcclusion = b;
-				} 
-				else
-				{
-					// sodium 0.6
-					
-					Class<?> optionsClass = Class.forName("net.caffeinemc.mods.sodium.client.gui.SodiumGameOptions");
-					Object basicOptions = MethodHandles.lookup().findStatic(
-							Class.forName("net.caffeinemc.mods.sodium.client.SodiumClientMod"),
-							"options", MethodType.methodType(optionsClass)).invoke();
-					sodiumPerformanceOptions = optionsClass.getDeclaredField("performance").get(basicOptions);
-					setFogOcclusionMethod = MethodHandles.lookup()
-							.findSetter(Class.forName(
-											"net.caffeinemc.mods.sodium.client.gui.SodiumGameOptions$PerformanceSettings"),
-									"useFogOcclusion", boolean.class);
-				}
-			}
-			
-			setFogOcclusionMethod.invoke(sodiumPerformanceOptions, occlusionEnabled);
-		}
-		catch (Throwable e)
-		{
-			throw new RuntimeException(e);
-		}
-		#else
 		// in newer versions of Sodium this doesn't appear to be an issue so it can probably just be ignored
-		#endif
 	}
 
 	

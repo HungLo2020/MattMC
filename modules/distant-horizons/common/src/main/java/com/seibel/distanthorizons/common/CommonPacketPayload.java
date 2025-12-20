@@ -1,6 +1,5 @@
 package com.seibel.distanthorizons.common;
 
-#if MC_VER >= MC_1_20_6
 
 import com.seibel.distanthorizons.core.dependencyInjection.SingletonInjector;
 import com.seibel.distanthorizons.core.network.messages.AbstractNetworkMessage;
@@ -36,4 +35,3 @@ public record CommonPacketPayload(@Nullable AbstractNetworkMessage message) impl
 	
 }
 
-#endif

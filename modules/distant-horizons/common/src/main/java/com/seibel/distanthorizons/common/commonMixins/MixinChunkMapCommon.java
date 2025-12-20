@@ -39,29 +39,16 @@ public class MixinChunkMapCommon
 		
 		// MC has a tendency to try saving incomplete or corrupted chunks (which show up as empty or black chunks)
 		// this logic should prevent that from happening
-		#if MC_VER == MC_1_16_5 || MC_VER == MC_1_17_1
-		if (chunk.isUnsaved() || chunk.getUpgradeData() != null || !chunk.isLightCorrect())
-		{
-			return;
-		}
-		#else
 		if (chunk.isUnsaved() || chunk.isUpgrading() || !chunk.isLightCorrect())
 		{
 			return;
 		}
-		#endif
 		
 		
 		
 		// biome validation //
 		
 		// some chunks may be missing their biomes, which cause issues when attempting to save them
-		#if MC_VER == MC_1_16_5 || MC_VER == MC_1_17_1
-		if (chunk.getBiomes() == null)
-		{
-			return;
-		}
-		#else
 		try
 		{
 			// this will throw an exception if the biomes aren't set up
@@ -71,7 +58,6 @@ public class MixinChunkMapCommon
 		{
 			return;
 		}
-		#endif
 		
 		
 		

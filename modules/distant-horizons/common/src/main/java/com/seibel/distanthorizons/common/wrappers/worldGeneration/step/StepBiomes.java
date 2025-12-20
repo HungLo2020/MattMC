@@ -29,15 +29,9 @@ import com.seibel.distanthorizons.common.wrappers.worldGeneration.mimicObject.Dh
 import com.seibel.distanthorizons.core.util.gridList.ArrayGridList;
 import net.minecraft.world.level.chunk.ChunkAccess;
 
-#if MC_VER >= MC_1_18_2
 import net.minecraft.world.level.levelgen.blending.Blender;
-#endif
 
-#if MC_VER <= MC_1_20_4
-import net.minecraft.world.level.chunk.ChunkStatus;
-#else
 import net.minecraft.world.level.chunk.status.ChunkStatus;
-#endif
 
 public final class StepBiomes extends AbstractWorldGenStep
 {
@@ -73,36 +67,6 @@ public final class StepBiomes extends AbstractWorldGenStep
 			ChunkAccess chunk = chunkWrapper.getChunk();
 			
 			
-			#if MC_VER < MC_1_18_2
-			this.environment.globalParams.generator.createBiomes(this.environment.globalParams.biomes, chunk);
-			#elif MC_VER < MC_1_19_2
-			chunk = this.environment.confirmFutureWasRunSynchronously(
-						this.environment.globalParams.generator.createBiomes(
-							this.environment.globalParams.biomes, 
-							Runnable::run, 
-							Blender.of(worldGenRegion),
-							tParams.structFeatManager.forWorldGenRegion(worldGenRegion), 
-							chunk)
-					);
-			#elif MC_VER < MC_1_19_4
-			chunk = this.environment.confirmFutureWasRunSynchronously(
-						this.environment.globalParams.generator.createBiomes(
-							this.environment.globalParams.biomes, 
-							Runnable::run, 
-							this.environment.globalParams.randomState, Blender.of(worldGenRegion),
-							tParams.structFeatManager.forWorldGenRegion(worldGenRegion), 
-							chunk)
-					);
-			#elif MC_VER < MC_1_21_1
-			chunk = this.environment.confirmFutureWasRunSynchronously(
-						this.environment.globalParams.generator.createBiomes(
-							Runnable::run, 
-							this.environment.globalParams.randomState, 
-							Blender.of(worldGenRegion),
-							tParams.structFeatManager.forWorldGenRegion(worldGenRegion), 
-							chunk)
-					);
-			#else
 			chunk = this.environment.confirmFutureWasRunSynchronously(
 						this.environment.globalParams.generator.createBiomes(
 							this.environment.globalParams.randomState, 
@@ -110,7 +74,6 @@ public final class StepBiomes extends AbstractWorldGenStep
 							tParams.structFeatManager.forWorldGenRegion(worldGenRegion), 
 							chunk)
 					);
-			#endif
 		}
 	}
 	

@@ -15,11 +15,7 @@ import io.netty.buffer.ByteBufUtil;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.server.level.ServerPlayer;
 
-#if MC_VER <= MC_1_21_10
 import net.minecraft.resources.ResourceLocation;
-#else
-import net.minecraft.resources.Identifier;
-#endif
 
 import java.io.IOException;
 import java.util.Objects;
@@ -30,13 +26,7 @@ public abstract class AbstractPluginPacketSender implements IPluginPacketSender
 			.fileLevelConfig(Config.Common.Logging.logNetworkEventToFile)
 			.build();
 	
-	#if MC_VER <= MC_1_20_6
-	public static final ResourceLocation WRAPPER_PACKET_RESOURCE = new ResourceLocation(ModInfo.RESOURCE_NAMESPACE, ModInfo.WRAPPER_PACKET_PATH);
-	#elif  MC_VER <= MC_1_21_10
-	public static final ResourceLocation WRAPPER_PACKET_RESOURCE = ResourceLocation.fromNamespaceAndPath(ModInfo.RESOURCE_NAMESPACE, ModInfo.WRAPPER_PACKET_PATH);
-	#else
 	public static final Identifier WRAPPER_PACKET_RESOURCE = Identifier.fromNamespaceAndPath(ModInfo.RESOURCE_NAMESPACE, ModInfo.WRAPPER_PACKET_PATH);
-	#endif
 	
 	// "Forge byte" is an unused packet ID. We have our own system which works with all mod loaders,
 	// so we're just accounting for it by reading the protocol version as a byte instead of a short in Forge, to keep cross-loader compatibility

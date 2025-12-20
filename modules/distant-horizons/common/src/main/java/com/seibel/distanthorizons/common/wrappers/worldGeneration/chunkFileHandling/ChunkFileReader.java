@@ -28,27 +28,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionException;
 import java.util.concurrent.atomic.AtomicReference;
 
-#if MC_VER <= MC_1_17_1
-import net.minecraft.world.level.chunk.ChunkStatus;
-#elif MC_VER <= MC_1_19_2
-import net.minecraft.world.level.chunk.ChunkStatus;
-import net.minecraft.core.Registry;
-#elif MC_VER <= MC_1_19_4
-import net.minecraft.core.registries.Registries;
-import net.minecraft.world.level.chunk.ChunkStatus;
-#elif MC_VER <= MC_1_20_6
-import net.minecraft.core.registries.Registries;
-#elif MC_VER <= MC_1_21_3
-import net.minecraft.core.registries.Registries;
-import net.minecraft.world.level.chunk.status.ChunkStatus;
-#elif MC_VER <= MC_1_21_8
-import net.minecraft.core.registries.Registries;
-import net.minecraft.world.level.chunk.status.ChunkStatus;
-#elif MC_VER <= MC_1_21_9
 import net.minecraft.world.level.chunk.PalettedContainerFactory;
-#else
-import net.minecraft.world.level.chunk.PalettedContainerFactory;
-#endif
 
 public class ChunkFileReader implements AutoCloseable
 {
@@ -173,9 +153,6 @@ public class ChunkFileReader implements AutoCloseable
 		{
 			IOWorker ioWorker = level.getChunkSource().chunkMap.worker;
 			
-			#if MC_VER <= MC_1_18_2
-			return CompletableFuture.completedFuture(ioWorker.load(chunkPos));
-			#else
 			
 			// storage will be null if C2ME is installed
 			if (!this.pullExistingChunkUsingMcAsyncMethod 
@@ -244,7 +221,6 @@ public class ChunkFileReader implements AutoCloseable
 						return null;
 					});
 			}
-			#endif
 		}
 		catch (ClosedByInterruptException ignore)
 		{
@@ -297,21 +273,7 @@ public class ChunkFileReader implements AutoCloseable
 	}
 	public static ProtoChunk CreateProtoChunk(ServerLevel level, ChunkPos chunkPos)
 	{
-		#if MC_VER <= MC_1_16_5
-		return new ProtoChunk(chunkPos, UpgradeData.EMPTY);
-		#elif MC_VER <= MC_1_17_1
-		return new ProtoChunk(chunkPos, UpgradeData.EMPTY, level);
-		#elif MC_VER <= MC_1_19_2
-		return new ProtoChunk(chunkPos, UpgradeData.EMPTY, level, level.registryAccess().registryOrThrow(Registry.BIOME_REGISTRY), null);
-		#elif MC_VER <= MC_1_19_4
-		return new ProtoChunk(chunkPos, UpgradeData.EMPTY, level, level.registryAccess().registryOrThrow(Registries.BIOME), null);
-		#elif MC_VER < MC_1_21_3
-		return new ProtoChunk(chunkPos, UpgradeData.EMPTY, level, level.registryAccess().registryOrThrow(Registries.BIOME), null);
-		#elif MC_VER < MC_1_21_9
-		return new ProtoChunk(chunkPos, UpgradeData.EMPTY, level, level.registryAccess().lookupOrThrow(Registries.BIOME), null);
-		#else
 		return new ProtoChunk(chunkPos, UpgradeData.EMPTY, level, PalettedContainerFactory.create(level.registryAccess()), null);
-		#endif
 	}
 	
 	
