@@ -172,7 +172,7 @@ public class ClassicConfigGUI
 						0, 0,
 						// Some texture stuff
 						0, 
-						Identifier.fromNamespaceAndPath(ModInfo.ID, "textures/gui/changelog.png"),
+						ResourceLocation.fromNamespaceAndPath(ModInfo.ID, "textures/gui/changelog.png"),
 						20, 20,
 						// Create the button and tell it where to go
 						(buttonWidget) -> {

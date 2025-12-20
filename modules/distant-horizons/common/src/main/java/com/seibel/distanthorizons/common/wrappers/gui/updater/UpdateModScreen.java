@@ -87,7 +87,7 @@ public class UpdateModScreen extends DhScreen
 					0, 0,
 					// Some textuary stuff
 					0, 
-					Identifier.fromNamespaceAndPath(ModInfo.ID, "logo.png"),
+					ResourceLocation.fromNamespaceAndPath(ModInfo.ID, "logo.png"),
 					195, 65,
 					// Create the button and tell it where to go
 					// For now it goes to the client option by default
@@ -114,7 +114,7 @@ public class UpdateModScreen extends DhScreen
 					0, 0,
 					// Some textuary stuff
 					0, 
-					Identifier.fromNamespaceAndPath(ModInfo.ID, "textures/gui/changelog.png"),
+					ResourceLocation.fromNamespaceAndPath(ModInfo.ID, "textures/gui/changelog.png"),
 					20, 20,
 					// Create the button and tell it where to go
 					(buttonWidget) -> Objects.requireNonNull(this.minecraft).setScreen(new ChangelogScreen(this, this.newVersionID)),

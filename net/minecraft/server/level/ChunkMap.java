@@ -453,7 +453,7 @@ public class ChunkMap extends ChunkStorage implements ChunkHolder.PlayerProvider
 		}
 	}
 
-	protected void tick(BooleanSupplier booleanSupplier) {
+	public void tick(BooleanSupplier booleanSupplier) {
 		ProfilerFiller profilerFiller = Profiler.get();
 		profilerFiller.push("poi");
 		this.poiManager.tick(booleanSupplier);

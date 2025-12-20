@@ -154,6 +154,7 @@ public class MinecraftRenderWrapper implements IMinecraftRenderWrapper
 		Vector4f colorValues = mcFogRenderer.setupFog(
 			MC.gameRenderer.getMainCamera(),
 			MC.options.getEffectiveRenderDistance(),
+			false, // bl parameter
 			MC.deltaTracker,
 			MC.gameRenderer.getDarkenWorldAmount(MC.deltaTracker.getGameTimeDeltaPartialTick(true)),
 			MC.level);
@@ -170,11 +171,9 @@ public class MinecraftRenderWrapper implements IMinecraftRenderWrapper
 	{
 		if (MC.level.dimensionType().hasSkyLight())
 		{
-			float frameTime;
-			frameTime = 0f; // unused
-			
-			int argbColor = MC.level.environmentAttributes().getValue(EnvironmentAttributes.SKY_COLOR, BlockPos.ZERO);
-			return new Color(ColorUtil.getRed(argbColor), ColorUtil.getGreen(argbColor), ColorUtil.getBlue(argbColor), 255 /* ignore alpha since DH clouds don't render correctly with transparency */);
+			float frameTime = MC.deltaTracker.getGameTimeDeltaPartialTick(true);
+			Vec3 skyColorVec = Vec3.fromRGB24(MC.level.getSkyColor(MC.gameRenderer.getMainCamera().getPosition(), frameTime));
+			return new Color((float)skyColorVec.x, (float)skyColorVec.y, (float)skyColorVec.z, 1.0f /* ignore alpha since DH clouds don't render correctly with transparency */);
 		}
 		else
 		{

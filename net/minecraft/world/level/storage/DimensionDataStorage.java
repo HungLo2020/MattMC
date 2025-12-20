@@ -43,7 +43,7 @@ public class DimensionDataStorage implements AutoCloseable {
 	private final Map<SavedDataType<?>, Optional<SavedData>> cache = new HashMap();
 	private final DataFixer fixerUpper;
 	private final HolderLookup.Provider registries;
-	private final Path dataFolder;
+	public final Path dataFolder;
 	private CompletableFuture<?> pendingWriteFuture = CompletableFuture.completedFuture(null);
 
 	public DimensionDataStorage(SavedData.Context context, Path path, DataFixer dataFixer, HolderLookup.Provider provider) {

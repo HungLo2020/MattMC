@@ -95,7 +95,7 @@ public class MixinFogRenderer
 	private static boolean cancelFog()
 	{
 		Camera camera = Minecraft.getInstance().gameRenderer.getMainCamera();
-		Entity entity = camera.entity();	
+		Entity entity = camera.getEntity();	
 		
 		
 		boolean cameraNotInFluid = cameraNotInFluid(camera);

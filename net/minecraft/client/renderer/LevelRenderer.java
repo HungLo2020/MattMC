@@ -128,7 +128,7 @@ public class LevelRenderer implements ResourceManagerReloadListener, AutoCloseab
 	public final DebugRenderer debugRenderer = new DebugRenderer();
 	public final GameTestBlockHighlightRenderer gameTestBlockHighlightRenderer = new GameTestBlockHighlightRenderer();
 	@Nullable
-	private ClientLevel level;
+	public ClientLevel level;
 	private final SectionOcclusionGraph sectionOcclusionGraph = new SectionOcclusionGraph();
 	private final ObjectArrayList<SectionRenderDispatcher.RenderSection> visibleSections = new ObjectArrayList<>(10000);
 	private final ObjectArrayList<SectionRenderDispatcher.RenderSection> nearbyVisibleSections = new ObjectArrayList<>(50);
