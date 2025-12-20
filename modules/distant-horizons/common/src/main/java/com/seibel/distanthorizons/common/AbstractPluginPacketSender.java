@@ -26,7 +26,7 @@ public abstract class AbstractPluginPacketSender implements IPluginPacketSender
 			.fileLevelConfig(Config.Common.Logging.logNetworkEventToFile)
 			.build();
 	
-	public static final Identifier WRAPPER_PACKET_RESOURCE = Identifier.fromNamespaceAndPath(ModInfo.RESOURCE_NAMESPACE, ModInfo.WRAPPER_PACKET_PATH);
+	public static final ResourceLocation WRAPPER_PACKET_RESOURCE = ResourceLocation.fromNamespaceAndPath(ModInfo.RESOURCE_NAMESPACE, ModInfo.WRAPPER_PACKET_PATH);
 	
 	// "Forge byte" is an unused packet ID. We have our own system which works with all mod loaders,
 	// so we're just accounting for it by reading the protocol version as a byte instead of a short in Forge, to keep cross-loader compatibility

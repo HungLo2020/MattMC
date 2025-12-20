@@ -17,7 +17,7 @@
 package net.fabricmc.fabric.api.event.lifecycle.v1;
 
 import net.minecraft.server.level.ChunkHolder;
-// ChunkLevelType removed in Mojang mappings
+import net.minecraft.server.level.FullChunkStatus;
 import net.minecraft.server.level.ServerChunkCache;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.chunk.status.ChunkStatus;
@@ -71,19 +71,19 @@ public final class ServerChunkEvents {
 	});
 
 	/**
-	 * Called when a chunk's actual ticking behavior is about to align with its updated {@link ChunkLevelType}.
+	 * Called when a chunk's actual ticking behavior is about to align with its updated {@link FullChunkStatus}.
 	 *
 	 * <p>When this event is being called:
 	 * <ul>
-	 * <li>The chunk's {@link WorldChunk#getLevelType()} has already changed.</li>
+	 * <li>The chunk's {@link LevelChunk#getLevelType()} has already changed.</li>
 	 * <li>Entities within the chunk are not guaranteed to be accessible.</li>
 	 * <li>The chunk's corresponding level type future in {@link ChunkHolder} is not guaranteed to be done.</li>
-	 * <li>When transitioning from {@link ChunkLevelType#INACCESSIBLE} to {@link ChunkLevelType#FULL}, calling {@link ServerChunkCache#getChunkFutureSyncOnMainThread(int, int, ChunkStatus, boolean)} to fetch the current chunk at {@link ChunkStatus#FULL} status results in undefined behavior.</li>
+	 * <li>When transitioning from {@link FullChunkStatus#INACCESSIBLE} to {@link FullChunkStatus#FULL}, calling {@link ServerChunkCache#getChunkFutureSyncOnMainThread(int, int, ChunkStatus, boolean)} to fetch the current chunk at {@link ChunkStatus#FULL} status results in undefined behavior.</li>
 	 * </ul>
 	 */
 	public static final Event<LevelTypeChange> CHUNK_LEVEL_TYPE_CHANGE = EventFactory.createArrayBacked(LevelTypeChange.class, (world, chunk, oldLevelType, newLevelType) -> { }, callbacks -> (serverWorld, chunk, oldLevelType, newLevelType) -> {
 		for (LevelTypeChange callback : callbacks) {
-			callback.onChunkLevelTypeChange(serverWorld, chunk, oldLevelType, newLevelType);
+			callback.onFullChunkStatusChange(serverWorld, chunk, oldLevelType, newLevelType);
 		}
 	});
 
@@ -104,6 +104,6 @@ public final class ServerChunkEvents {
 
 	@FunctionalInterface
 	public interface LevelTypeChange {
-		void onChunkLevelTypeChange(ServerLevel world, LevelChunk chunk, ChunkLevelType oldLevelType, ChunkLevelType newLevelType);
+		void onFullChunkStatusChange(ServerLevel world, LevelChunk chunk, FullChunkStatus oldLevelType, FullChunkStatus newLevelType);
 	}
 }

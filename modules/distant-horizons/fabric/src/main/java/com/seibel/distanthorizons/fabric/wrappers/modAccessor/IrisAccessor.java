@@ -22,13 +22,12 @@ package com.seibel.distanthorizons.fabric.wrappers.modAccessor;
 
 import com.seibel.distanthorizons.core.wrapperInterfaces.modAccessor.IIrisAccessor;
 
-import net.irisshaders.iris.Iris;
-import net.irisshaders.iris.api.v0.IrisApi;
+import net.iris.api.v0.IrisApi;
 
 public class IrisAccessor implements IIrisAccessor
 {
 	@Override
-	public String getModName() { return Iris.MODID; }
+	public String getModName() { return "iris"; }
 	
 	@Override
 	public boolean isShaderPackInUse() { return IrisApi.getInstance().isShaderPackInUse(); }

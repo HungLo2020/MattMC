@@ -41,7 +41,6 @@ import net.minecraft.server.MinecraftServer;
 import com.seibel.distanthorizons.core.logging.DhLogger;
 
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
-import net.fabricmc.fabric.api.command.v1.CommandRegistrationCallback;
 
 import net.minecraft.resources.ResourceLocation;
 
@@ -54,7 +53,7 @@ import java.util.function.Consumer;
  */
 public class FabricMain extends AbstractModInitializer implements ClientModInitializer, DedicatedServerModInitializer
 {
-	private static final Identifier INITIAL_PHASE = Identifier.fromNamespaceAndPath(ModInfo.RESOURCE_NAMESPACE, ModInfo.DEDICATED_SERVER_INITIAL_PATH);
+	private static final ResourceLocation INITIAL_PHASE = ResourceLocation.fromNamespaceAndPath(ModInfo.RESOURCE_NAMESPACE, ModInfo.DEDICATED_SERVER_INITIAL_PATH);
 	
 	private static final DhLogger LOGGER = new DhLoggerBuilder().build();
 	

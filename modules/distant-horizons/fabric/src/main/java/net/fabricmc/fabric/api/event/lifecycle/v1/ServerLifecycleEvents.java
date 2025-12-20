@@ -157,12 +157,12 @@ public final class ServerLifecycleEvents {
 		 * @param player Player to which the data is being sent.
 		 * @param joined True if the player is joining the server, false if the server finished a successful resource reload.
 		 */
-		void onSyncDataPackContents(ServerPlayerEntity player, boolean joined);
+		void onSyncDataPackContents(ServerPlayer player, boolean joined);
 	}
 
 	@FunctionalInterface
 	public interface StartDataPackReload {
-		void startDataPackReload(MinecraftServer server, LifecycledResourceManager resourceManager);
+		void startDataPackReload(MinecraftServer server, ResourceManager resourceManager);
 	}
 
 	@FunctionalInterface
@@ -176,7 +176,7 @@ public final class ServerLifecycleEvents {
 		 * @param resourceManager the resource manager
 		 * @param success if the reload was successful
 		 */
-		void endDataPackReload(MinecraftServer server, LifecycledResourceManager resourceManager, boolean success);
+		void endDataPackReload(MinecraftServer server, ResourceManager resourceManager, boolean success);
 	}
 
 	@FunctionalInterface

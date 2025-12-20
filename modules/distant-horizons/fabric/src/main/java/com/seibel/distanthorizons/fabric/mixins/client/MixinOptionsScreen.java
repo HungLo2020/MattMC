@@ -54,7 +54,7 @@ public class MixinOptionsScreen extends Screen
 {
 	/** Texture used for the config opening button */
 	@Unique
-	private static final Identifier ICON_TEXTURE = Identifier.fromNamespaceAndPath(ModInfo.ID, "textures/gui/button.png");
+	private static final ResourceLocation ICON_TEXTURE = ResourceLocation.fromNamespaceAndPath(ModInfo.ID, "textures/gui/button.png");
 	
 	
 	@Unique
