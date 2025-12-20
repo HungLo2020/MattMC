@@ -26,8 +26,8 @@ import net.minecraft.network.FriendlyByteBuf;
 /**
  * Helper methods for working with and creating {@link FriendlyByteBuf}s.
  */
-public final class FriendlyByteBufs {
-	private static final FriendlyByteBuf EMPTY_PACKET_BYTE_BUF = new FriendlyByteBuf(Unpooled.EMPTY_BUFFER);
+public final class PacketByteBufs {
+	private static final FriendlyByteBuf EMPTY_BUF = new FriendlyByteBuf(Unpooled.EMPTY_BUFFER);
 
 	/**
 	 * Returns an empty instance of packet byte buf.
@@ -35,7 +35,7 @@ public final class FriendlyByteBufs {
 	 * @return an empty buf
 	 */
 	public static FriendlyByteBuf empty() {
-		return EMPTY_PACKET_BYTE_BUF;
+		return EMPTY_BUF;
 	}
 
 	/**
@@ -201,6 +201,6 @@ public final class FriendlyByteBufs {
 		return new FriendlyByteBuf(buf.retainedDuplicate());
 	}
 
-	private FriendlyByteBufs() {
+	private PacketByteBufs() {
 	}
 }
