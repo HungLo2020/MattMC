@@ -220,7 +220,7 @@ public abstract class AbstractDhTintGetter implements BlockAndTintGetter
 		return unwrapBiome(getClientBiome(biomeString));
 	}
 	
-	protected static Biome unwrapBiome(>= MC_1_18_2 Holder<Biome> biome)
+	protected static Biome unwrapBiome(Holder<Biome> biome)
 	{
 		return biome.value();
 	}
