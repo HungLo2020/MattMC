@@ -407,6 +407,10 @@ sourceSets {
                 "${irisDir}/common/src/api/java",
                 "${irisDir}/fabric/src/main/java"
             ]
+            // Exclude DH compatibility classes when Distant Horizons is disabled
+            if (!enableDistantHorizons) {
+                exclude '**/compat/dh/**'
+            }
         }
         resources {
             srcDirs = [
