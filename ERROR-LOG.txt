@@ -35,9 +35,9 @@ Path for java installation '/usr/lib/jvm/openjdk-17' (Common Linux Locations) do
 
 > Task :runClient
 Using bundled JDK from: /home/matt/Documents/Repos/MattMC/run/jdk-21
-[14:50:22] [main/INFO]: Loading Minecraft 1.21.10 with Fabric Loader 0.18.2
-[14:50:22] [main/INFO]: Mappings not present!
-[14:50:22] [main/INFO]: Loading 7 mods:
+[15:17:36] [main/INFO]: Loading Minecraft 1.21.10 with Fabric Loader 0.18.2
+[15:17:36] [main/INFO]: Mappings not present!
+[15:17:36] [main/INFO]: Loading 7 mods:
 	- distanthorizons 2.4.4-b-dev
 	- fabricloader 0.18.2
 	- iris 1.9.6
@@ -45,51 +45,51 @@ Using bundled JDK from: /home/matt/Documents/Repos/MattMC/run/jdk-21
 	- minecraft 1.21.10
 	- mixinextras 0.5.0
 	- sodium 0.7.2
-[14:50:22] [main/WARN]: Runtime mod remapping disabled due to no fabric.remapClasspathFile being specified. You may need to update loom.
-[14:50:22] [main/INFO]: SpongePowered MIXIN Subsystem Version=0.8.7 Source=file:/home/matt/Documents/Repos/MattMC/libraries/deps/sponge-mixin-0.16.5+mixin.0.8.7.jar Service=Knot/Fabric Env=CLIENT
-[14:50:22] [main/INFO]: Compatibility level set to JAVA_17
-[14:50:22] [main/INFO]: Loaded configuration file for Sodium: 42 options available, 1 override(s) found
-[14:50:22] [main/WARN]: Reference map 'iris.refmap.json' for mixins.iris.json could not be read. If this is a development environment you can ignore this message
-[14:50:22] [main/WARN]: Reference map 'iris-fabric.refmap.json' for mixins.iris.fabric.json could not be read. If this is a development environment you can ignore this message
-[14:50:22] [main/WARN]: Reference map 'iris.refmap.json' for mixins.iris.fantastic.json could not be read. If this is a development environment you can ignore this message
-[14:50:22] [main/WARN]: Reference map 'iris.refmap.json' for mixins.iris.vertexformat.json could not be read. If this is a development environment you can ignore this message
-[14:50:22] [main/WARN]: Reference map 'iris.refmap.json' for mixins.iris.bettermipmaps.json could not be read. If this is a development environment you can ignore this message
-[14:50:22] [main/WARN]: Reference map 'iris.refmap.json' for mixins.iris.compat.sodium.json could not be read. If this is a development environment you can ignore this message
-[14:50:22] [main/WARN]: Reference map 'iris.refmap.json' for mixins.iris.fixes.maxfpscrash.json could not be read. If this is a development environment you can ignore this message
-[14:50:22] [main/WARN]: Force-disabling mixin 'features.render.world.sky.FogRendererMixin' as rule 'mixin.features.render.world.sky' (added by mods [iris]) disables it and children
-[14:50:22] [main/WARN]: Force-disabling mixin 'features.render.world.sky.ClientLevelMixin' as rule 'mixin.features.render.world.sky' (added by mods [iris]) disables it and children
-[14:50:22] [main/WARN]: Force-disabling mixin 'features.render.world.sky.LevelRendererMixin' as rule 'mixin.features.render.world.sky' (added by mods [iris]) disables it and children
-[14:50:22] [main/INFO]: Searching for graphics cards...
-[14:50:22] [main/INFO]: Found graphics adapter: LinuxPciAdapterInfo[vendor=NVIDIA, name=GA102 [GeForce RTX 3080 Ti], pciVendorId=0x10de, pciDeviceId=0x2208]
-[14:50:22] [main/WARN]: Sodium has applied one or more workarounds to prevent crashes or other issues on your system: [NVIDIA_THREADED_OPTIMIZATIONS_BROKEN]
-[14:50:22] [main/WARN]: This is not necessarily an issue, but it may result in certain features or optimizations being disabled. You can sometimes fix these issues by upgrading your graphics driver.
-[14:50:22] [main/INFO]: Initializing MixinExtras via com.llamalad7.mixinextras.service.MixinExtrasServiceImpl(version=0.5.0).
-[14:50:23] [Datafixer Bootstrap/INFO]: 278 Datafixer optimizations took 202 milliseconds
-[14:50:25] [Render thread/INFO]: Setting user: Player690
-[14:50:25] [Render thread/INFO]: Initializing Distant Horizons client, firing DhApiBeforeDhInitEvent...
-[14:50:25] [Render thread/INFO]: Running library validation...
-[14:50:25] [Render thread/INFO]: Garbage collectors: [G1 Young Generation, G1 Concurrent GC, G1 Old Generation]
-[14:50:25] [Render thread/WARN]: Distant Horizons: G1 Garbage collector detected. 
+[15:17:36] [main/WARN]: Runtime mod remapping disabled due to no fabric.remapClasspathFile being specified. You may need to update loom.
+[15:17:36] [main/INFO]: SpongePowered MIXIN Subsystem Version=0.8.7 Source=file:/home/matt/Documents/Repos/MattMC/libraries/deps/sponge-mixin-0.16.5+mixin.0.8.7.jar Service=Knot/Fabric Env=CLIENT
+[15:17:36] [main/INFO]: Compatibility level set to JAVA_17
+[15:17:36] [main/INFO]: Loaded configuration file for Sodium: 42 options available, 1 override(s) found
+[15:17:36] [main/WARN]: Reference map 'iris.refmap.json' for mixins.iris.json could not be read. If this is a development environment you can ignore this message
+[15:17:36] [main/WARN]: Reference map 'iris-fabric.refmap.json' for mixins.iris.fabric.json could not be read. If this is a development environment you can ignore this message
+[15:17:36] [main/WARN]: Reference map 'iris.refmap.json' for mixins.iris.fantastic.json could not be read. If this is a development environment you can ignore this message
+[15:17:36] [main/WARN]: Reference map 'iris.refmap.json' for mixins.iris.vertexformat.json could not be read. If this is a development environment you can ignore this message
+[15:17:36] [main/WARN]: Reference map 'iris.refmap.json' for mixins.iris.bettermipmaps.json could not be read. If this is a development environment you can ignore this message
+[15:17:36] [main/WARN]: Reference map 'iris.refmap.json' for mixins.iris.compat.sodium.json could not be read. If this is a development environment you can ignore this message
+[15:17:36] [main/WARN]: Reference map 'iris.refmap.json' for mixins.iris.fixes.maxfpscrash.json could not be read. If this is a development environment you can ignore this message
+[15:17:36] [main/WARN]: Force-disabling mixin 'features.render.world.sky.FogRendererMixin' as rule 'mixin.features.render.world.sky' (added by mods [iris]) disables it and children
+[15:17:36] [main/WARN]: Force-disabling mixin 'features.render.world.sky.ClientLevelMixin' as rule 'mixin.features.render.world.sky' (added by mods [iris]) disables it and children
+[15:17:36] [main/WARN]: Force-disabling mixin 'features.render.world.sky.LevelRendererMixin' as rule 'mixin.features.render.world.sky' (added by mods [iris]) disables it and children
+[15:17:36] [main/INFO]: Searching for graphics cards...
+[15:17:36] [main/INFO]: Found graphics adapter: LinuxPciAdapterInfo[vendor=NVIDIA, name=GA102 [GeForce RTX 3080 Ti], pciVendorId=0x10de, pciDeviceId=0x2208]
+[15:17:36] [main/WARN]: Sodium has applied one or more workarounds to prevent crashes or other issues on your system: [NVIDIA_THREADED_OPTIMIZATIONS_BROKEN]
+[15:17:36] [main/WARN]: This is not necessarily an issue, but it may result in certain features or optimizations being disabled. You can sometimes fix these issues by upgrading your graphics driver.
+[15:17:37] [main/INFO]: Initializing MixinExtras via com.llamalad7.mixinextras.service.MixinExtrasServiceImpl(version=0.5.0).
+[15:17:37] [Datafixer Bootstrap/INFO]: 278 Datafixer optimizations took 182 milliseconds
+[15:17:39] [Render thread/INFO]: Setting user: Player988
+[15:17:39] [Render thread/INFO]: Initializing Distant Horizons client, firing DhApiBeforeDhInitEvent...
+[15:17:39] [Render thread/INFO]: Running library validation...
+[15:17:39] [Render thread/INFO]: Garbage collectors: [G1 Young Generation, G1 Concurrent GC, G1 Old Generation]
+[15:17:39] [Render thread/WARN]: Distant Horizons: G1 Garbage collector detected. 
 This garbage collector can cause FPS stuttering. 
 It's recommended to use a concurrent garbage collector 
 like ZGC (Java 21+) or Shenandoah (Java 8 through 17) for a smoother experience. 
 
-[14:50:25] [Render thread/INFO]: Distant Horizons, Version: 2.4.4-b-dev
-[14:50:25] [Render thread/INFO]: DH Branch: ${info_git_commit}
-[14:50:25] [Render thread/INFO]: DH Commit: ${info_git_branch}
-[14:50:25] [Render thread/INFO]: DH Jar Build Source: ${info_build_source}
-[14:50:25] [Render thread/INFO]: Registering Fabric Client Events
-[14:50:25] [Render thread/INFO]: Registering Fabric Server Events
-[14:50:25] [Render thread/INFO]: Registered mod compatibility accessor for: [Sodium-Fabric].
-[14:50:25] [Render thread/INFO]: Skipping mod compatibility accessor for: [starlight]
-[14:50:25] [Render thread/INFO]: Skipping mod compatibility accessor for: [optifine]
-[14:50:25] [Render thread/INFO]: Skipping mod compatibility accessor for: [bclib]
-[14:50:25] [Render thread/INFO]: Skipping mod compatibility accessor for: [c2me]
-[14:50:25] [Render thread/INFO]: Registered mod compatibility accessor for: [iris].
-[14:50:25] [Render thread/INFO]: Initialising config for [DistantHorizons]
-[14:50:25] [Render thread/INFO]: [DistantHorizons] Config initialised
-[14:50:25] [Render thread/INFO]: Applying config to loggers
-[14:50:25] [Render thread/INFO]: Distant Horizons client Initialized.
+[15:17:39] [Render thread/INFO]: Distant Horizons, Version: 2.4.4-b-dev
+[15:17:39] [Render thread/INFO]: DH Branch: ${info_git_commit}
+[15:17:39] [Render thread/INFO]: DH Commit: ${info_git_branch}
+[15:17:39] [Render thread/INFO]: DH Jar Build Source: ${info_build_source}
+[15:17:39] [Render thread/INFO]: Registering Fabric Client Events
+[15:17:39] [Render thread/INFO]: Registering Fabric Server Events
+[15:17:40] [Render thread/INFO]: Registered mod compatibility accessor for: [Sodium-Fabric].
+[15:17:40] [Render thread/INFO]: Skipping mod compatibility accessor for: [starlight]
+[15:17:40] [Render thread/INFO]: Skipping mod compatibility accessor for: [optifine]
+[15:17:40] [Render thread/INFO]: Skipping mod compatibility accessor for: [bclib]
+[15:17:40] [Render thread/INFO]: Skipping mod compatibility accessor for: [c2me]
+[15:17:40] [Render thread/INFO]: Registered mod compatibility accessor for: [iris].
+[15:17:40] [Render thread/INFO]: Initialising config for [DistantHorizons]
+[15:17:40] [Render thread/INFO]: [DistantHorizons] Config initialised
+[15:17:40] [Render thread/INFO]: Applying config to loggers
+[15:17:40] [Render thread/INFO]: Distant Horizons client Initialized.
 [LWJGL] Version: 3.3.3-snapshot
 	 OS: Linux v6.14.0-36-generic
 	JRE: Linux amd64 21.0.5
@@ -100,15 +100,15 @@ like ZGC (Java 21+) or Shenandoah (Java 8 through 17) for a smoother experience.
 [LWJGL] Loading library: glfw
 	Module: org.lwjgl.glfw
 	Loaded from org.lwjgl.librarypath: /tmp/lwjgl_matt/3.3.3-snapshot/x64/libglfw.so
-[14:50:25] [Render thread/INFO]: Queuing DH event binding...
-[14:50:25] [Render thread/INFO]: Backend library: LWJGL version 3.3.3-snapshot
+[15:17:40] [Render thread/INFO]: Queuing DH event binding...
+[15:17:40] [Render thread/INFO]: Backend library: LWJGL version 3.3.3-snapshot
 [LWJGL] Loading library: jemalloc
 	Module: org.lwjgl.jemalloc
 	Loaded from org.lwjgl.librarypath: /tmp/lwjgl_matt/3.3.3-snapshot/x64/libjemalloc.so
 [LWJGL] MemoryUtil allocator: JEmallocAllocator
 [LWJGL] Java 9 check intrinsics enabled
 [LWJGL] Closure Registry: ConcurrentHashMap
-[14:50:25] [Render thread/INFO]: Modifying process environment to apply workarounds for the NVIDIA graphics driver...
+[15:17:40] [Render thread/INFO]: Modifying process environment to apply workarounds for the NVIDIA graphics driver...
 [LWJGL] Loading JNI library: lwjgl_stb
 	Module: org.lwjgl.stb
 	Loaded from org.lwjgl.librarypath: /tmp/lwjgl_matt/3.3.3-snapshot/x64/liblwjgl_stb.so
@@ -121,65 +121,65 @@ like ZGC (Java 21+) or Shenandoah (Java 8 through 17) for a smoother experience.
 [LWJGL] Java 9 text decoding enabled
 	Loaded from system paths: /lib/x86_64-linux-gnu/libGLX.so.0
 [LWJGL] Java 10 multiplyHigh enabled
-[14:50:26] [ForkJoinPool.commonPool-worker-1/WARN]: [Iris Update Check] This version doesn't have an update index, skipping.
-[14:50:26] [Render thread/INFO]: OpenGL Vendor: NVIDIA Corporation
-[14:50:26] [Render thread/INFO]: OpenGL Renderer: NVIDIA GeForce RTX 3080 Ti/PCIe/SSE2
-[14:50:26] [Render thread/INFO]: OpenGL Version: 3.3.0 NVIDIA 580.95.05
-[14:50:26] [Render thread/INFO]: Modifying OpenGL context to apply workarounds for the NVIDIA graphics driver...
-[14:50:26] [Render thread/INFO]: Debug functionality is disabled.
-[14:50:26] [Render thread/INFO]: ARB_direct_state_access detected, enabling DSA.
-[14:50:26] [Render thread/INFO]: Using optional rendering extensions: GL_ARB_buffer_storage, GL_KHR_debug, GL_ARB_vertex_attrib_binding, GL_ARB_direct_state_access
-[14:50:26] [Render thread/INFO]: Loaded 20 skins (0 custom)
+[15:17:40] [ForkJoinPool.commonPool-worker-1/WARN]: [Iris Update Check] This version doesn't have an update index, skipping.
+[15:17:40] [Render thread/INFO]: OpenGL Vendor: NVIDIA Corporation
+[15:17:40] [Render thread/INFO]: OpenGL Renderer: NVIDIA GeForce RTX 3080 Ti/PCIe/SSE2
+[15:17:40] [Render thread/INFO]: OpenGL Version: 3.3.0 NVIDIA 580.95.05
+[15:17:40] [Render thread/INFO]: Modifying OpenGL context to apply workarounds for the NVIDIA graphics driver...
+[15:17:40] [Render thread/INFO]: Debug functionality is disabled.
+[15:17:40] [Render thread/INFO]: ARB_direct_state_access detected, enabling DSA.
+[15:17:40] [Render thread/INFO]: Using optional rendering extensions: GL_ARB_buffer_storage, GL_KHR_debug, GL_ARB_vertex_attrib_binding, GL_ARB_direct_state_access
+[15:17:40] [Render thread/INFO]: Loaded 20 skins (0 custom)
 [LWJGL] Loading library: openal
 	Module: org.lwjgl.openal
 	Loaded from org.lwjgl.librarypath: /tmp/lwjgl_matt/3.3.3-snapshot/x64/libopenal.so
 [LWJGL] [ALC] ALC_SOFT_reopen_device was reported as available but an entry point is missing.
-[14:50:26] [Render thread/INFO]: Hardware information:
-[14:50:26] [Render thread/INFO]: CPU: 20x 12th Gen Intel(R) Core(TM) i7-12700K
-[14:50:26] [Render thread/INFO]: GPU: NVIDIA GeForce RTX 3080 Ti/PCIe/SSE2 (Supports OpenGL 3.3.0 NVIDIA 580.95.05)
-[14:50:26] [Render thread/INFO]: OS: Linux (6.14.0-36-generic)
+[15:17:41] [Render thread/INFO]: Hardware information:
+[15:17:41] [Render thread/INFO]: CPU: 20x 12th Gen Intel(R) Core(TM) i7-12700K
+[15:17:41] [Render thread/INFO]: GPU: NVIDIA GeForce RTX 3080 Ti/PCIe/SSE2 (Supports OpenGL 3.3.0 NVIDIA 580.95.05)
+[15:17:41] [Render thread/INFO]: OS: Linux (6.14.0-36-generic)
 [LWJGL] Java 16 memcpy enabled
-[14:50:26] [Render thread/INFO]: Reloading ResourceManager: vanilla
-[14:50:26] [Worker-Main-8/INFO]: Found unifont_pua-16.0.03.hex, loading
-[14:50:26] [Worker-Main-19/INFO]: Found unifont_all_no_pua-16.0.03.hex, loading
-[14:50:27] [Worker-Main-16/INFO]: Found unifont_jp_patch-16.0.03.hex, loading
-[14:50:27] [Render thread/INFO]: OpenAL initialized on device HT-S350
-[14:50:27] [Render thread/INFO]: Sound engine started
-[14:50:27] [Render thread/INFO]: Created: 512x256x0 minecraft:textures/atlas/particles.png-atlas
-[14:50:27] [Render thread/INFO]: Created: 128x64x0 minecraft:textures/atlas/decorated_pot.png-atlas
-[14:50:27] [Render thread/INFO]: Created: 2048x1024x0 minecraft:textures/atlas/armor_trims.png-atlas
-[14:50:27] [Render thread/INFO]: Created: 512x256x0 minecraft:textures/atlas/paintings.png-atlas
-[14:50:27] [Render thread/INFO]: Created: 512x512x0 minecraft:textures/atlas/shield_patterns.png-atlas
-[14:50:27] [Render thread/INFO]: Created: 1024x512x4 minecraft:textures/atlas/blocks.png-atlas
-[14:50:27] [Render thread/INFO]: Created: 512x256x0 minecraft:textures/atlas/chest.png-atlas
-[14:50:27] [Render thread/INFO]: Created: 512x512x0 minecraft:textures/atlas/banner_patterns.png-atlas
-[14:50:27] [Render thread/INFO]: Created: 512x256x0 minecraft:textures/atlas/beds.png-atlas
-[14:50:27] [Render thread/INFO]: Created: 1024x512x0 minecraft:textures/atlas/gui.png-atlas
-[14:50:27] [Render thread/INFO]: Created: 64x64x0 minecraft:textures/atlas/map_decorations.png-atlas
-[14:50:27] [Render thread/INFO]: Created: 256x256x0 minecraft:textures/atlas/signs.png-atlas
-[14:50:27] [Render thread/INFO]: Created: 512x256x0 minecraft:textures/atlas/shulker_boxes.png-atlas
-[14:50:27] [Render thread/INFO]: Checking for Distant Horizons update
-[14:50:28] [Render thread/WARN]: Latest pipeline was found for branch [main], but we are on branch [${info_git_commit}].
-[14:50:28] [Render thread/INFO]: Creating pipeline for dimension minecraft:overworld
-[14:50:32] [Render thread/INFO]: Loaded 1461 recipes
-[14:50:32] [Render thread/INFO]: Loaded 1574 advancements
-[14:50:32] [Server thread/INFO]: Starting integrated minecraft server version 1.21.10
-[14:50:32] [Server thread/INFO]: Generating keypair
-[14:50:32] [Server thread/INFO]: Loading 0 persistent chunks...
-[14:50:33] [Server thread/INFO]: Loading 49 chunks for player spawn...
-[14:50:33] [Server thread/INFO]: Preparing spawn area: 16%
-[14:50:33] [Server thread/INFO]: Preparing spawn area: 100%
-[14:50:33] [Server thread/INFO]: Time elapsed: 512 ms
-[14:50:33] [Server thread/INFO]: Player690[local:E:1dcd13a3] logged in with entity id 91 at (96.30081318882031, 127.59348476373154, -16.339301250279796)
-[14:50:33] [Server thread/INFO]: Player690 joined the game
-[14:50:33] [Render thread/INFO]: Reloading pipeline on dimension change: minecraft:overworld => minecraft:overworld
-[14:50:33] [Render thread/INFO]: Destroying pipeline minecraft:overworld
-[14:50:33] [Render thread/INFO]: Creating pipeline for dimension minecraft:overworld
-[14:50:33] [Render thread/INFO]: Loading client level [Wrapped{ClientLevel@1mb0tn69ikpga@minecraft:overworld}]-[1mb0tn69ikpga@minecraft:overworld].
-[14:50:33] [Server thread/INFO]: Changing view distance to 12, from 10
-[14:50:33] [Server thread/INFO]: Changing simulation distance to 12, from 0
-[14:50:33] [Render thread/INFO]: Started 10 worker threads
-[14:50:33] [Render thread/ERROR]: Failed to load skin texture data
+[15:17:41] [Render thread/INFO]: Reloading ResourceManager: vanilla
+[15:17:41] [Worker-Main-17/INFO]: Found unifont_pua-16.0.03.hex, loading
+[15:17:41] [Worker-Main-19/INFO]: Found unifont_all_no_pua-16.0.03.hex, loading
+[15:17:41] [Worker-Main-6/INFO]: Found unifont_jp_patch-16.0.03.hex, loading
+[15:17:41] [Render thread/INFO]: OpenAL initialized on device HT-S350
+[15:17:41] [Render thread/INFO]: Sound engine started
+[15:17:41] [Render thread/INFO]: Created: 512x256x0 minecraft:textures/atlas/particles.png-atlas
+[15:17:41] [Render thread/INFO]: Created: 128x64x0 minecraft:textures/atlas/decorated_pot.png-atlas
+[15:17:41] [Render thread/INFO]: Created: 2048x1024x0 minecraft:textures/atlas/armor_trims.png-atlas
+[15:17:41] [Render thread/INFO]: Created: 512x256x0 minecraft:textures/atlas/paintings.png-atlas
+[15:17:41] [Render thread/INFO]: Created: 512x512x0 minecraft:textures/atlas/shield_patterns.png-atlas
+[15:17:41] [Render thread/INFO]: Created: 1024x512x4 minecraft:textures/atlas/blocks.png-atlas
+[15:17:41] [Render thread/INFO]: Created: 512x256x0 minecraft:textures/atlas/chest.png-atlas
+[15:17:41] [Render thread/INFO]: Created: 512x512x0 minecraft:textures/atlas/banner_patterns.png-atlas
+[15:17:41] [Render thread/INFO]: Created: 512x256x0 minecraft:textures/atlas/beds.png-atlas
+[15:17:41] [Render thread/INFO]: Created: 1024x512x0 minecraft:textures/atlas/gui.png-atlas
+[15:17:41] [Render thread/INFO]: Created: 64x64x0 minecraft:textures/atlas/map_decorations.png-atlas
+[15:17:41] [Render thread/INFO]: Created: 256x256x0 minecraft:textures/atlas/signs.png-atlas
+[15:17:41] [Render thread/INFO]: Created: 512x256x0 minecraft:textures/atlas/shulker_boxes.png-atlas
+[15:17:41] [Render thread/INFO]: Checking for Distant Horizons update
+[15:17:42] [Render thread/WARN]: Latest pipeline was found for branch [main], but we are on branch [${info_git_commit}].
+[15:17:42] [Render thread/INFO]: Creating pipeline for dimension minecraft:overworld
+[15:18:00] [Render thread/INFO]: Loaded 1461 recipes
+[15:18:00] [Render thread/INFO]: Loaded 1574 advancements
+[15:18:00] [Server thread/INFO]: Starting integrated minecraft server version 1.21.10
+[15:18:00] [Server thread/INFO]: Generating keypair
+[15:18:01] [Server thread/INFO]: Loading 0 persistent chunks...
+[15:18:01] [Server thread/INFO]: Loading 49 chunks for player spawn...
+[15:18:01] [Server thread/INFO]: Preparing spawn area: 16%
+[15:18:01] [Server thread/INFO]: Preparing spawn area: 64%
+[15:18:01] [Server thread/INFO]: Time elapsed: 561 ms
+[15:18:01] [Server thread/INFO]: Player988[local:E:23901aa7] logged in with entity id 65 at (78.00406357092272, 127.59348476373154, -20.035495178286062)
+[15:18:01] [Server thread/INFO]: Player988 joined the game
+[15:18:01] [Render thread/INFO]: Reloading pipeline on dimension change: minecraft:overworld => minecraft:overworld
+[15:18:01] [Render thread/INFO]: Destroying pipeline minecraft:overworld
+[15:18:01] [Render thread/INFO]: Creating pipeline for dimension minecraft:overworld
+[15:18:01] [Render thread/INFO]: Loading client level [Wrapped{ClientLevel@1mb0tn69ikpga@minecraft:overworld}]-[1mb0tn69ikpga@minecraft:overworld].
+[15:18:01] [Render thread/INFO]: Started 10 worker threads
+[15:18:01] [Server thread/INFO]: Changing view distance to 12, from 10
+[15:18:01] [Server thread/INFO]: Changing simulation distance to 12, from 0
+[15:18:01] [Render thread/ERROR]: Failed to load skin texture data
 java.io.FileNotFoundException: minecraft:entity/player/wide/steve
 	at knot/net.minecraft.server.packs.resources.ResourceProvider.lambda$getResourceOrThrow$1(ResourceProvider.java:18) ~[minecraft-1.21.10.jar:?]
 	at java.base/java.util.Optional.orElseThrow(Optional.java:403) ~[?:?]
@@ -197,13 +197,13 @@ java.io.FileNotFoundException: minecraft:entity/player/wide/steve
 	at net.fabricmc.loader.impl.game.minecraft.MinecraftGameProvider.launch(MinecraftGameProvider.java:536) [fabric-loader-0.18.2.jar:0.18.2]
 	at net.fabricmc.loader.impl.launch.knot.Knot.launch(Knot.java:72) [fabric-loader-0.18.2.jar:0.18.2]
 	at net.fabricmc.loader.impl.launch.knot.KnotClient.main(KnotClient.java:23) [fabric-loader-0.18.2.jar:0.18.2]
-[14:50:33] [Render thread/INFO]: Loading client level [Wrapped{ClientLevel@1mb0tn69ikpga@minecraft:overworld}]-[1mb0tn69ikpga@minecraft:overworld].
-[14:50:33] [Render thread/WARN]: Ignoring chat session from Player690 due to missing Services public key
-[14:50:33] [Render thread/INFO]: Loaded 2 advancements
-[14:50:33] [Render thread/INFO]: Resizing Dynamic Transforms UBO, capacity limit of 2 reached during a single frame. New capacity will be 4.
-[14:50:33] [Render thread/INFO]: Creating GLProxy... If this is the last message you see there must have been an OpenGL error.
-[14:50:33] [Render thread/INFO]: Lod Render OpenGL version [3.3.0 NVIDIA 580.95.05].
-[14:50:33] [Render thread/INFO]: minecraftGlCapabilities:
+[15:18:01] [Render thread/INFO]: Loading client level [Wrapped{ClientLevel@1mb0tn69ikpga@minecraft:overworld}]-[1mb0tn69ikpga@minecraft:overworld].
+[15:18:01] [Render thread/WARN]: Ignoring chat session from Player988 due to missing Services public key
+[15:18:01] [Render thread/INFO]: Loaded 2 advancements
+[15:18:01] [Render thread/INFO]: Resizing Dynamic Transforms UBO, capacity limit of 2 reached during a single frame. New capacity will be 4.
+[15:18:01] [Render thread/INFO]: Creating GLProxy... If this is the last message you see there must have been an OpenGL error.
+[15:18:01] [Render thread/INFO]: Lod Render OpenGL version [3.3.0 NVIDIA 580.95.05].
+[15:18:01] [Render thread/INFO]: minecraftGlCapabilities:
 Your OpenGL support:
 openGL version 3.2+: [true] <- REQUIRED
 Vertex Attribute Buffer Binding: [true] <- optional improvement
@@ -211,31 +211,31 @@ Buffer Storage: [true] <- optional improvement
 
 [LWJGL] [GL] Using KHR_debug for error logging.
 [LWJGL] [GL] Warning: A non-debug context may not produce any debug output.
-[14:50:33] [Render thread/INFO]: GPU Vendor [NVIDIA CORPORATION] with OS [Linux], Preferred upload method is [BUFFER_STORAGE].
-[14:50:33] [Render thread/INFO]: GLProxy creation successful. OpenGL smiles upon you this day.
-[14:50:33] [Render thread/INFO]: [System] [CHAT] §2Distant Horizons: nightly/unstable build, version: [2.4.4-b-dev].§r\nIssues may occur with this version.\nHere be dragons!\n
-[14:50:33] [Render thread/INFO]: Resizing Dynamic Transforms UBO, capacity limit of 4 reached during a single frame. New capacity will be 8.
-[14:50:37] [Render thread/INFO]: [System] [CHAT] §6Distant Horizons: Low memory detected.§r \nStuttering or low FPS may occur. \nPlease increase Minecraft's available memory to 4 GB or more. \nThis warning can be disabled in DH's config under Advanced -> Logging. \n
-[14:50:38] [Server thread/INFO]: Saving and pausing game...
-[14:50:38] [Server thread/INFO]: Saving chunks for level 'ServerLevel[New World]'/minecraft:overworld
-[14:50:38] [Server thread/INFO]: Saving chunks for level 'ServerLevel[New World]'/minecraft:the_nether
-[14:50:38] [Server thread/INFO]: Saving chunks for level 'ServerLevel[New World]'/minecraft:the_end
-[14:50:39] [Server thread/INFO]: Player690 lost connection: Disconnected
-[14:50:39] [Server thread/INFO]: Player690 left the game
-[14:50:39] [Server thread/INFO]: Stopping singleplayer server as player logged out
-[14:50:39] [Server thread/INFO]: Stopping server
-[14:50:39] [Server thread/INFO]: Saving players
-[14:50:39] [Server thread/INFO]: Saving worlds
-[14:50:39] [Server thread/INFO]: Saving chunks for level 'ServerLevel[New World]'/minecraft:overworld
-[14:50:39] [Server thread/INFO]: Saving chunks for level 'ServerLevel[New World]'/minecraft:the_nether
-[14:50:39] [Server thread/INFO]: Saving chunks for level 'ServerLevel[New World]'/minecraft:the_end
-[14:50:39] [Server thread/INFO]: ThreadedAnvilChunkStorage (New World): All chunks are saved
-[14:50:39] [Server thread/INFO]: ThreadedAnvilChunkStorage (DIM-1): All chunks are saved
-[14:50:39] [Server thread/INFO]: ThreadedAnvilChunkStorage (DIM1): All chunks are saved
-[14:50:39] [Server thread/INFO]: ThreadedAnvilChunkStorage: All dimensions are saved
-[14:50:39] [Render thread/INFO]: Unloading client level [ClientLevelWrapper]-[1mb0tn69ikpga@minecraft:overworld].
-[14:50:39] [Render thread/INFO]: Stopping worker threads
-[14:50:39] [Render thread/INFO]: Stopping!
+[15:18:01] [Render thread/INFO]: GPU Vendor [NVIDIA CORPORATION] with OS [Linux], Preferred upload method is [BUFFER_STORAGE].
+[15:18:01] [Render thread/INFO]: GLProxy creation successful. OpenGL smiles upon you this day.
+[15:18:01] [Render thread/INFO]: [System] [CHAT] §2Distant Horizons: nightly/unstable build, version: [2.4.4-b-dev].§r\nIssues may occur with this version.\nHere be dragons!\n
+[15:18:02] [Render thread/INFO]: Resizing Dynamic Transforms UBO, capacity limit of 4 reached during a single frame. New capacity will be 8.
+[15:18:05] [Render thread/INFO]: [System] [CHAT] §6Distant Horizons: Low memory detected.§r \nStuttering or low FPS may occur. \nPlease increase Minecraft's available memory to 4 GB or more. \nThis warning can be disabled in DH's config under Advanced -> Logging. \n
+[15:18:07] [Server thread/INFO]: Saving and pausing game...
+[15:18:07] [Server thread/INFO]: Saving chunks for level 'ServerLevel[New World]'/minecraft:overworld
+[15:18:07] [Server thread/INFO]: Saving chunks for level 'ServerLevel[New World]'/minecraft:the_end
+[15:18:07] [Server thread/INFO]: Saving chunks for level 'ServerLevel[New World]'/minecraft:the_nether
+[15:18:07] [Server thread/INFO]: Player988 lost connection: Disconnected
+[15:18:07] [Server thread/INFO]: Player988 left the game
+[15:18:07] [Server thread/INFO]: Stopping singleplayer server as player logged out
+[15:18:07] [Server thread/INFO]: Stopping server
+[15:18:07] [Server thread/INFO]: Saving players
+[15:18:07] [Server thread/INFO]: Saving worlds
+[15:18:07] [Server thread/INFO]: Saving chunks for level 'ServerLevel[New World]'/minecraft:overworld
+[15:18:07] [Server thread/INFO]: Saving chunks for level 'ServerLevel[New World]'/minecraft:the_end
+[15:18:07] [Server thread/INFO]: Saving chunks for level 'ServerLevel[New World]'/minecraft:the_nether
+[15:18:07] [Server thread/INFO]: ThreadedAnvilChunkStorage (New World): All chunks are saved
+[15:18:07] [Server thread/INFO]: ThreadedAnvilChunkStorage (DIM1): All chunks are saved
+[15:18:07] [Server thread/INFO]: ThreadedAnvilChunkStorage (DIM-1): All chunks are saved
+[15:18:07] [Server thread/INFO]: ThreadedAnvilChunkStorage: All dimensions are saved
+[15:18:07] [Render thread/INFO]: Unloading client level [ClientLevelWrapper]-[1mb0tn69ikpga@minecraft:overworld].
+[15:18:07] [Render thread/INFO]: Stopping worker threads
+[15:18:08] [Render thread/INFO]: Stopping!
 
-BUILD SUCCESSFUL in 20s
+BUILD SUCCESSFUL in 34s
 18 actionable tasks: 3 executed, 15 up-to-date
