@@ -29,15 +29,9 @@ import com.seibel.distanthorizons.common.wrappers.worldGeneration.mimicObject.Dh
 import com.seibel.distanthorizons.core.util.gridList.ArrayGridList;
 import net.minecraft.world.level.chunk.ChunkAccess;
 
-#if MC_VER >= MC_1_18_2
 import net.minecraft.world.level.levelgen.blending.Blender;
-#endif
 
-#if MC_VER <= MC_1_20_4
-import net.minecraft.world.level.chunk.ChunkStatus;
-#else
 import net.minecraft.world.level.chunk.status.ChunkStatus;
-#endif
 
 public final class StepNoise extends AbstractWorldGenStep
 {
@@ -72,37 +66,12 @@ public final class StepNoise extends AbstractWorldGenStep
 		{
 			ChunkAccess chunk = chunkWrapper.getChunk();
 			
-			#if MC_VER < MC_1_17_1
-			this.environment.globalParams.generator.fillFromNoise(worldGenRegion, tParams.structFeatManager, chunk);
-			#elif MC_VER < MC_1_18_2
-			chunk = this.environment.confirmFutureWasRunSynchronously(
-						this.environment.globalParams.generator.fillFromNoise(
-							Runnable::run,
-							tParams.structFeatManager.forWorldGenRegion(worldGenRegion), 
-							chunk));
-			#elif MC_VER < MC_1_19_2
-			chunk = this.environment.confirmFutureWasRunSynchronously(
-						this.environment.globalParams.generator.fillFromNoise(
-							Runnable::run, 
-							Blender.of(worldGenRegion),
-							tParams.structFeatManager.forWorldGenRegion(worldGenRegion), 
-							chunk));
-			#elif MC_VER < MC_1_21_1
-			chunk = this.environment.confirmFutureWasRunSynchronously(
-						this.environment.globalParams.generator.fillFromNoise(
-							Runnable::run, 
-							Blender.of(worldGenRegion), 
-							this.environment.globalParams.randomState,
-							tParams.structFeatManager.forWorldGenRegion(worldGenRegion), 
-							chunk));
-			#else
 			chunk = this.environment.confirmFutureWasRunSynchronously(
 						this.environment.globalParams.generator.fillFromNoise(
 							Blender.of(worldGenRegion), 
 							this.environment.globalParams.randomState,
 							tParams.structFeatManager.forWorldGenRegion(worldGenRegion), 
 							chunk));
-			#endif
 		}
 	}
 	

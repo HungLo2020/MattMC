@@ -47,22 +47,12 @@ import net.fabricmc.fabric.api.event.player.UseBlockCallback;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.TitleScreen;
 
-#if MC_VER >= MC_1_20_6
 import com.seibel.distanthorizons.common.CommonPacketPayload;
 import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
-#else
-import com.seibel.distanthorizons.core.network.messages.AbstractNetworkMessage;
-#endif
 
-#if MC_VER < MC_1_19_4
-import java.nio.FloatBuffer;
-#endif
 import java.util.HashSet;
 import java.util.concurrent.AbstractExecutorService;
 
-#if MC_VER < MC_1_21_9
-import net.fabricmc.fabric.api.client.rendering.v1.WorldRenderEvents;
-#endif
 
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.world.InteractionResult;
@@ -216,82 +206,6 @@ public class FabricClientProxy implements AbstractModInitializer.IEventProxy
 		//==============//
 
 		
-		#if MC_VER < MC_1_21_9
-		WorldRenderEvents.AFTER_SETUP.register((renderContext) ->
-		{
-			ClientApi.RENDER_STATE.mcProjectionMatrix = McObjectConverter.Convert(renderContext.projectionMatrix());
-			
-			#if MC_VER < MC_1_20_6
-			ClientApi.RENDER_STATE.mcModelViewMatrix = McObjectConverter.Convert(renderContext.matrixStack().last().pose());
-			#else
-			ClientApi.RENDER_STATE.mcModelViewMatrix = McObjectConverter.Convert(renderContext.positionMatrix());
-			#endif
-			
-			#if MC_VER < MC_1_21_1
-			ClientApi.RENDER_STATE.frameTime = renderContext.tickDelta();
-			#else
-			ClientApi.RENDER_STATE.frameTime = renderContext.tickCounter().getGameTimeDeltaTicks();
-			#endif
-			
-			ClientApi.RENDER_STATE.clientLevelWrapper = ClientLevelWrapper.getWrapperIfDifferent(ClientApi.RENDER_STATE.clientLevelWrapper, renderContext.world());
-			
-			
-			this.clientApi.renderLods();
-		});
-		
-		
-		WorldRenderEvents.AFTER_ENTITIES.register((renderContext) ->
-		{
-			ClientApi.RENDER_STATE.mcProjectionMatrix = McObjectConverter.Convert(renderContext.projectionMatrix());
-			
-			#if MC_VER < MC_1_20_6
-			ClientApi.RENDER_STATE.mcModelViewMatrix = McObjectConverter.Convert(renderContext.matrixStack().last().pose());
-			#else
-			ClientApi.RENDER_STATE.mcModelViewMatrix = McObjectConverter.Convert(renderContext.positionMatrix());
-			#endif
-			
-			#if MC_VER < MC_1_21_1
-			ClientApi.RENDER_STATE.frameTime = renderContext.tickDelta();
-			#else
-			ClientApi.RENDER_STATE.frameTime = renderContext.tickCounter().getGameTimeDeltaTicks();
-			#endif
-			
-			ClientApi.RENDER_STATE.clientLevelWrapper = ClientLevelWrapper.getWrapperIfDifferent(ClientApi.RENDER_STATE.clientLevelWrapper, renderContext.world());
-			
-			
-			this.clientApi.renderFadeOpaque();
-		});
-		
-		WorldRenderEvents.AFTER_TRANSLUCENT.register((renderContext) ->
-		{
-			ClientApi.RENDER_STATE.mcProjectionMatrix = McObjectConverter.Convert(renderContext.projectionMatrix());
-			
-			#if MC_VER < MC_1_20_6
-			ClientApi.RENDER_STATE.mcModelViewMatrix = McObjectConverter.Convert(renderContext.matrixStack().last().pose());
-			#else
-			ClientApi.RENDER_STATE.mcModelViewMatrix = McObjectConverter.Convert(renderContext.positionMatrix());
-			#endif
-			
-			#if MC_VER < MC_1_21_1
-			ClientApi.RENDER_STATE.frameTime = renderContext.tickDelta();
-			#else
-			ClientApi.RENDER_STATE.frameTime = renderContext.tickCounter().getGameTimeDeltaTicks();
-			#endif
-			
-			ClientApi.RENDER_STATE.clientLevelWrapper = ClientLevelWrapper.getWrapperIfDifferent(ClientApi.RENDER_STATE.clientLevelWrapper, renderContext.world());
-			
-			
-			
-			
-			#if MC_VER < MC_1_21_6
-			// rendered in MixinLevelRenderer
-			#else
-			ClientApi.INSTANCE.renderDeferredLodsForShaders();
-			#endif
-			
-			this.clientApi.renderFadeTransparent();
-		});
-		#endif
 		
 		
 		// Debug keyboard event
@@ -310,7 +224,6 @@ public class FabricClientProxy implements AbstractModInitializer.IEventProxy
 		// networking event //
 		//==================//
 		
-		#if MC_VER >= MC_1_20_6
 		PayloadTypeRegistry.playS2C().register(CommonPacketPayload.TYPE, new CommonPacketPayload.Codec());
 		ClientPlayNetworking.registerGlobalReceiver(CommonPacketPayload.TYPE, (payload, context) ->
 		{
@@ -320,16 +233,6 @@ public class FabricClientProxy implements AbstractModInitializer.IEventProxy
 			}
 			ClientApi.INSTANCE.pluginMessageReceived(payload.message());
 		});
-		#else
-		ClientPlayNetworking.registerGlobalReceiver(AbstractPluginPacketSender.WRAPPER_PACKET_RESOURCE, (client, handler, buffer, packetSender) ->
-		{
-			AbstractNetworkMessage message = PACKET_SENDER.decodeMessage(buffer);
-			if (message != null)
-			{
-				ClientApi.INSTANCE.pluginMessageReceived(message);
-			}
-		});
-		#endif
 	}
 	
 	public void onKeyInput()

@@ -192,7 +192,7 @@ public class ServerLevel extends Level implements ServerEntityGetter, WorldGenLe
 	private final ServerLevelData serverLevelData;
 	final EntityTickList entityTickList = new EntityTickList();
 	private final ServerWaypointManager waypointManager;
-	private final PersistentEntitySectionManager<Entity> entityManager;
+	public final PersistentEntitySectionManager<Entity> entityManager;
 	private final GameEventDispatcher gameEventDispatcher;
 	public boolean noSave;
 	private final SleepStatus sleepStatus;

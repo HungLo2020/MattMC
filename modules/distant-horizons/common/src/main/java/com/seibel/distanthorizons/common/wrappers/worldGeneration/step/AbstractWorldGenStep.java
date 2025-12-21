@@ -10,11 +10,7 @@ import net.minecraft.world.level.chunk.ProtoChunk;
 import java.util.ArrayList;
 import java.util.List;
 
-#if MC_VER <= MC_1_20_4
-import net.minecraft.world.level.chunk.ChunkStatus;
-#else
 import net.minecraft.world.level.chunk.status.ChunkStatus;
-#endif
 
 public abstract class AbstractWorldGenStep
 {

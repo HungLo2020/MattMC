@@ -13,17 +13,9 @@ import com.seibel.distanthorizons.core.logging.DhLogger;
 
 import net.minecraft.client.gui.screens.Screen;
 
-#if MC_VER >= MC_1_20_1
 import net.minecraft.client.gui.GuiGraphics;
-#else
-import com.mojang.blaze3d.vertex.PoseStack;
-#endif
 
-#if MC_VER <= MC_1_21_10
 import net.minecraft.resources.ResourceLocation;
-#else
-import net.minecraft.resources.Identifier;
-#endif
 
 import static com.seibel.distanthorizons.common.wrappers.gui.GuiHelper.*;
 
@@ -95,13 +87,7 @@ public class UpdateModScreen extends DhScreen
 					0, 0,
 					// Some textuary stuff
 					0, 
-					#if MC_VER <= MC_1_20_6
-					new ResourceLocation(ModInfo.ID, "logo.png"),
-					#elif MC_VER <= MC_1_21_10
 					ResourceLocation.fromNamespaceAndPath(ModInfo.ID, "logo.png"),
-					#else
-					Identifier.fromNamespaceAndPath(ModInfo.ID, "logo.png"),
-					#endif
 					195, 65,
 					// Create the button and tell it where to go
 					// For now it goes to the client option by default
@@ -128,13 +114,7 @@ public class UpdateModScreen extends DhScreen
 					0, 0,
 					// Some textuary stuff
 					0, 
-					#if MC_VER < MC_1_21_1
-					new ResourceLocation(ModInfo.ID, "textures/gui/changelog.png"),
-					#elif MC_VER <= MC_1_21_10
 					ResourceLocation.fromNamespaceAndPath(ModInfo.ID, "textures/gui/changelog.png"),
-					#else
-					Identifier.fromNamespaceAndPath(ModInfo.ID, "textures/gui/changelog.png"),
-					#endif
 					20, 20,
 					// Create the button and tell it where to go
 					(buttonWidget) -> Objects.requireNonNull(this.minecraft).setScreen(new ChangelogScreen(this, this.newVersionID)),
@@ -172,19 +152,9 @@ public class UpdateModScreen extends DhScreen
 	}
 	
 	@Override
-    #if MC_VER < MC_1_20_1
-	public void render(PoseStack matrices, int mouseX, int mouseY, float delta)
-    #else
 	public void render(GuiGraphics matrices, int mouseX, int mouseY, float delta)
-    #endif
 	{
-		#if MC_VER < MC_1_20_2
-		this.renderBackground(matrices); // Render background
-		#elif MC_VER < MC_1_21_6
-		this.renderBackground(matrices, mouseX, mouseY, delta); // Render background
-		#else
 		// background blur is already being rendered, rendering again causes the game to crash
-		#endif
 		
 		// TODO: add the tooltips for the buttons
 		super.render(matrices, mouseX, mouseY, delta); // Render the buttons
@@ -194,20 +164,12 @@ public class UpdateModScreen extends DhScreen
 		this.DhDrawCenteredString(matrices, this.font, 
 				Translatable(ModInfo.ID + ".updater.text1"), 
 				this.width / 2, this.height / 2 - 35,
-				#if MC_VER < MC_1_21_6
-				0xFFFFFF // RGB
-				#else
 				0xFFFFFFFF // ARGB
-				#endif
 		);
 		this.DhDrawCenteredString(matrices, this.font, 
 				Translatable(ModInfo.ID + ".updater.text2", this.currentVer, this.nextVer), 
 				this.width / 2, this.height / 2 - 20, 
-				#if MC_VER < MC_1_21_6
-				0x52FD52 // RGB
-				#else
 				0xFF52FD52 // ARGB
-				#endif
 		);
 	}
 	

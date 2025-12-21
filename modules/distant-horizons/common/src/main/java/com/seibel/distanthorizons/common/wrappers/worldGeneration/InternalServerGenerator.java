@@ -24,11 +24,7 @@ import net.minecraft.server.level.TicketType;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.chunk.ChunkAccess;
 
-#if MC_VER <= MC_1_20_4
-import net.minecraft.world.level.chunk.ChunkStatus;
-#else
 import net.minecraft.world.level.chunk.status.ChunkStatus;
-#endif
 
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
@@ -58,13 +54,7 @@ public class InternalServerGenerator
 	 */
 	private static final int MS_TO_IGNORE_CHUNK_AFTER_COMPLETION = 5_000;
 	
-	#if MC_VER < MC_1_21_5
-	private static final TicketType<ChunkPos> DH_SERVER_GEN_TICKET = TicketType.create("dh_server_gen_ticket", Comparator.comparingLong(ChunkPos::toLong));
-	#elif MC_VER < MC_1_21_9
-	private static final TicketType DH_SERVER_GEN_TICKET = new TicketType(/* timeout, 0 = disabled*/0L, /* persist */ false, TicketType.TicketUse.LOADING);
-	#else
 	private static final TicketType DH_SERVER_GEN_TICKET = new TicketType(/* timeout, 0 = disabled*/0L, /* flags */TicketType.FLAG_LOADING);
-	#endif
 	
 	private static boolean c2meMissingWarningLogged = false;
 	
@@ -235,12 +225,7 @@ public class InternalServerGenerator
 			// ignore chunk update events for this position
 			SharedApi.CHUNK_UPDATE_QUEUE_MANAGER.addPosToIgnore(new DhChunkPos(chunkPos.x, chunkPos.z));
 			
-			#if MC_VER < MC_1_21_5
-			int chunkLevel = 33; // 33 is equivalent to FULL Chunk
-			level.getChunkSource().distanceManager.addTicket(DH_SERVER_GEN_TICKET, chunkPos, chunkLevel, chunkPos);
-			#else
 			level.getChunkSource().addTicketWithRadius(DH_SERVER_GEN_TICKET, chunkPos, 0);
-			#endif
 			
 			// probably not the most optimal to run updates here, but fast enough
 			level.getChunkSource().distanceManager.runAllUpdates(level.getChunkSource().chunkMap);
@@ -251,16 +236,8 @@ public class InternalServerGenerator
 				throw new IllegalStateException("No chunk chunkHolder for pos ["+chunkPos+"] after ticket has been added.");
 			}
 			
-			#if MC_VER <= MC_1_20_4
-			return chunkHolder.getOrScheduleFuture(ChunkStatus.FEATURES, level.getChunkSource().chunkMap)
-					.thenApply(result -> result.left().orElseThrow(() -> new RuntimeException(result.right().get().toString()))); // can throw if the server is shutting down
-			#elif MC_VER <= MC_1_20_6
-			return chunkHolder.getOrScheduleFuture(ChunkStatus.FEATURES, level.getChunkSource().chunkMap)
-					.thenApply(result -> result.orElseThrow(() -> new RuntimeException(result.toString()))); // can throw if the server is shutting down
-			#else
 			return chunkHolder.scheduleChunkGenerationTask(ChunkStatus.FEATURES, level.getChunkSource().chunkMap)
 					.thenApply(result -> result.orElseThrow(() -> new RuntimeException(result.getError()))); // can throw if the server is shutting down
-			#endif
 			
 		}, this.params.mcServerLevel.getChunkSource().chunkMap.mainThreadExecutor)
 		.thenCompose(Function.identity());
@@ -275,18 +252,11 @@ public class InternalServerGenerator
 		{
 			try
 			{
-				#if MC_VER < MC_1_21_5
-				int chunkLevel = 33; // 33 is equivalent to FULL Chunk
-				level.getChunkSource().distanceManager.removeTicket(DH_SERVER_GEN_TICKET, chunkPos, chunkLevel, chunkPos);
-				#else
 				level.getChunkSource().removeTicketWithRadius(DH_SERVER_GEN_TICKET, chunkPos, 0);
-				#endif
 				
 				level.getChunkSource().chunkMap.tick(() -> false);
 				
-				#if MC_VER > MC_1_16_5
 				level.entityManager.tick();
-				#endif
 				
 				
 				// give MC a few seconds to save the chunk before

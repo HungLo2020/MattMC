@@ -52,13 +52,7 @@ public class ServerPlayerWrapper implements IServerPlayerWrapper
 		ServerLevel level = ((IMixinServerPlayer) this.getServerPlayer()).distantHorizons$getDimensionChangeDestination();
 		if (level == null)
 		{
-			#if MC_VER < MC_1_20_1
-			level = this.getServerPlayer().getLevel();
-			#elif MC_VER < MC_1_21_6
-			level = this.getServerPlayer().serverLevel();
-			#else
 			level = this.getServerPlayer().level();
-			#endif
 		}
 		
 		return ServerLevelWrapper.getWrapper(level);

@@ -30,32 +30,15 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.biome.Biome;
 import net.minecraft.world.level.biome.BiomeManager;
 import net.minecraft.world.level.chunk.ChunkGenerator;
-#if MC_VER >= MC_1_18_2
 import net.minecraft.world.level.chunk.storage.ChunkScanAccess;
-#endif
 
-#if MC_VER < MC_1_19_2
-import net.minecraft.world.level.levelgen.structure.templatesystem.StructureManager;
-#elif MC_VER < MC_1_19_2
-import net.minecraft.world.level.levelgen.structure.templatesystem.StructureManager;
-#else
 import net.minecraft.world.level.levelgen.RandomState;
 import net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplateManager;
-#endif
 import net.minecraft.world.level.storage.WorldData;
 
-#if MC_VER < MC_1_19_4
-#elif MC_VER < MC_1_21_3
 import net.minecraft.core.registries.Registries;
-#else
-import net.minecraft.core.registries.Registries;
-#endif
 
-#if MC_VER < MC_1_19_4
-import net.minecraft.world.level.levelgen.WorldGenSettings;
-#else
 import net.minecraft.world.level.levelgen.WorldOptions;
-#endif
 
 /**
  * Handles parameters that are relevant for the entire MC world.
@@ -72,23 +55,13 @@ public final class GlobalWorldGenParams
 	public final long worldSeed;
 	public final DataFixer dataFixer;
 	
-	#if MC_VER < MC_1_19_2
-	public final StructureManager structures;
-	#else
 	public final StructureTemplateManager structures;
 	public final RandomState randomState;
-	#endif
 	
-	#if MC_VER < MC_1_19_4
-	public final WorldGenSettings worldGenSettings;
-	#else
 	public final WorldOptions worldOptions;
-	#endif
 	
-	#if MC_VER >= MC_1_18_2
 	public final BiomeManager biomeManager;
 	public final ChunkScanAccess chunkScanner;
-	#endif
 	
 	
 	
@@ -105,32 +78,18 @@ public final class GlobalWorldGenParams
 		WorldData worldData = server.getWorldData();
 		this.registry = server.registryAccess();
 		
-		#if MC_VER < MC_1_19_4
-		this.worldGenSettings = worldData.worldGenSettings();
-		this.biomes = registry.registryOrThrow(Registry.BIOME_REGISTRY);
-		this.worldSeed = worldGenSettings.seed();
-		#elif MC_VER < MC_1_21_3
-		this.worldOptions = worldData.worldGenOptions();
-		this.biomes = registry.registryOrThrow(Registries.BIOME);
-		this.worldSeed = worldOptions.seed();
-		#else
 		this.worldOptions = worldData.worldGenOptions();
 		this.biomes = this.registry.lookupOrThrow(Registries.BIOME);
 		this.worldSeed = this.worldOptions.seed();
-		#endif
 		
-		#if MC_VER >= MC_1_18_2
 		this.biomeManager = new BiomeManager(this.mcServerLevel, BiomeManager.obfuscateSeed(this.worldSeed));
 		this.chunkScanner = this.mcServerLevel.getChunkSource().chunkScanner();
-		#endif
 		
 		this.structures = server.getStructureManager();
 		this.generator = this.mcServerLevel.getChunkSource().getGenerator();
 		this.dataFixer = server.getFixerUpper();
 		
-		#if MC_VER >= MC_1_19_2
 		this.randomState = this.mcServerLevel.getChunkSource().randomState();
-		#endif
 	}
 	
 	

@@ -43,9 +43,7 @@ import net.minecraft.util.Mth;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.ColorResolver;
-#if MC_VER >= MC_1_17_1
 import net.minecraft.world.level.LevelHeightAccessor;
-#endif
 import net.minecraft.world.level.LightLayer;
 import net.minecraft.world.level.biome.Biome;
 import net.minecraft.world.level.block.Blocks;
@@ -56,24 +54,16 @@ import net.minecraft.world.level.chunk.ImposterProtoChunk;
 import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.level.lighting.LevelLightEngine;
 
-#if MC_VER <= MC_1_20_4
-import net.minecraft.world.level.chunk.ChunkStatus;
-#else
 import net.minecraft.world.level.chunk.status.*;
-#endif
 
-#if MC_VER >= MC_1_21_1
 import net.minecraft.util.StaticCache2D;
 import com.google.common.collect.ImmutableList;
 import net.minecraft.server.level.GenerationChunkHolder;
-#endif
 
-#if MC_VER >= MC_1_18_2
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.material.Fluid;
 import net.minecraft.world.ticks.BlackholeTickAccess;
 import net.minecraft.world.ticks.LevelTickAccess;
-#endif
 
 
 public class DhLitWorldGenRegion extends WorldGenRegion
@@ -99,29 +89,6 @@ public class DhLitWorldGenRegion extends WorldGenRegion
 	 */
 	private final ReentrantLock getChunkLock = new ReentrantLock();
 	
-	#if MC_VER < MC_1_18_2
-	private ChunkPos overrideCenterPos = null;
-	
-	public void setOverrideCenter(ChunkPos pos) { overrideCenterPos = pos; }
-	#if MC_VER < MC_1_17_1
-	@Override
-	public int getCenterX() 
-	{
-		return overrideCenterPos==null ? super.getCenterX() : overrideCenterPos.x;
-	}
-	@Override
-	public int getCenterZ() 
-	{
-		return overrideCenterPos==null ? super.getCenterX() : overrideCenterPos.z;
-	}
-	#else
-	@Override
-	public ChunkPos getCenter()
-	{
-		return overrideCenterPos == null ? super.getCenter() : overrideCenterPos;
-	}
-	#endif
-	#endif
 	
 	
 	
@@ -132,11 +99,6 @@ public class DhLitWorldGenRegion extends WorldGenRegion
 			List<ChunkAccess> chunkList, ChunkStatus chunkStatus, int writeRadius,
 			BatchGenerationEnvironment.IEmptyChunkRetrievalFunc generator)
 	{
-		#if MC_VER == MC_1_16_5
-		super(serverLevel, chunkList);
-		#elif MC_VER < MC_1_21_1
-		super(serverLevel, chunkList, chunkStatus, writeRadius);
-		#else
 		super(serverLevel, 
 				StaticCache2D.create(
 					centerChunkX, centerChunkZ,
@@ -147,7 +109,6 @@ public class DhLitWorldGenRegion extends WorldGenRegion
 						new ChunkDependencies(ImmutableList.copyOf(ChunkStatus.getStatusList()).reverse()),
 						writeRadius, (WorldGenContext var1, ChunkStep var2, StaticCache2D<GenerationChunkHolder> var3, ChunkAccess var4) -> null),
 				centerChunk);
-		#endif
 		
 		this.firstPos = chunkList.get(0).getPos();
 		this.serverLevel = serverLevel;
@@ -160,7 +121,6 @@ public class DhLitWorldGenRegion extends WorldGenRegion
 	
 	
 	
-	#if MC_VER >= MC_1_17_1
 	// Bypass BCLib mixin overrides.
 	@Override
 	public boolean ensureCanWrite(BlockPos blockPos)
@@ -175,32 +135,23 @@ public class DhLitWorldGenRegion extends WorldGenRegion
 		{
 			return false;
 		}
-		#if MC_VER >= MC_1_18_2
 		if (center.isUpgrading())
 		{
 			LevelHeightAccessor levelHeightAccessor = center.getHeightAccessorForGeneration();
 			
 			int minY;
 			int maxY;
-			#if MC_VER < MC_1_21_3
-			minY = levelHeightAccessor.getMinBuildHeight();
-			maxY = levelHeightAccessor.getMaxBuildHeight();
-			#else
 			minY = levelHeightAccessor.getMinY();
 			maxY = levelHeightAccessor.getMaxY();
-			#endif
 			
 			if (blockPos.getY() < minY || blockPos.getY() >= maxY)
 			{
 				return false;
 			}
 		}
-		#endif
 		return true;
 	}
-	#endif
 	
-	#if MC_VER >= MC_1_18_2
 	@Override
 	@NotNull
 	public LevelTickAccess<Block> getBlockTicks()
@@ -214,7 +165,6 @@ public class DhLitWorldGenRegion extends WorldGenRegion
 	@Override
 	@NotNull
 	public LevelTickAccess<Fluid> getFluidTicks() { return BlackholeTickAccess.emptyLevelList(); }
-	#endif
 	
 	// TODO Check this
 //	@Override
@@ -233,11 +183,7 @@ public class DhLitWorldGenRegion extends WorldGenRegion
 			return true;
 		}
 		
-		#if MC_VER < MC_1_21_5
-		chunkAccess.setBlockState(blockPos, blockState, /*isBlockMoving*/false);
-		#else
 		chunkAccess.setBlockState(blockPos, blockState, /*flags*/0);
-		#endif
 		
 		// This is for post ticking for water on gen and stuff like that. Not enabled
 		// for now.
@@ -265,17 +211,11 @@ public class DhLitWorldGenRegion extends WorldGenRegion
 		BlockState blockState = this.getBlockState(blockPos);
 		
 		// This is a bypass for the spawner block since MC complains about not having it
-		#if MC_VER >= MC_1_17_1
 		if (blockState.getBlock() instanceof SpawnerBlock)
 		{
 			return ((EntityBlock) blockState.getBlock()).newBlockEntity(blockPos, blockState);
 		}
 		else return null;
-		#else
-		if (blockState.getBlock() instanceof SpawnerBlock) {
-			return ((EntityBlock) blockState.getBlock()).newBlockEntity(this);
-		} else return null;
-		#endif
 	}
 	
 	/**
@@ -352,7 +292,7 @@ public class DhLitWorldGenRegion extends WorldGenRegion
 		ChunkAccess chunk = this.getChunkAccess(chunkX, chunkZ, chunkStatus, returnNonNull);
 		if (chunk instanceof LevelChunk)
 		{
-			chunk = new ImposterProtoChunk((LevelChunk) chunk #if MC_VER >= MC_1_18_2 ,/* allow writes */ false #endif );
+			chunk = new ImposterProtoChunk((LevelChunk) chunk, /* allow writes */ false );
 		}
 		return chunk;
 	}
@@ -442,20 +382,12 @@ public class DhLitWorldGenRegion extends WorldGenRegion
 	
 	private Biome _getBiome(BlockPos pos)
 	{
-		#if MC_VER >= MC_1_18_2
 		return this.getBiome(pos).value();
-		#else
-		return this.getBiome(pos);
-		#endif
 	}
 	
 	public int calculateBlockTint(BlockPos blockPos, ColorResolver colorResolver)
 	{
-		#if MC_VER < MC_1_19_2
-		int i = (Minecraft.getInstance()).options.biomeBlendRadius;
-		#else
 		int i = (Minecraft.getInstance()).options.biomeBlendRadius().get();
-		#endif
 		if (i == 0)
 			return colorResolver.getColor((Biome) _getBiome(blockPos), blockPos.getX(), blockPos.getZ());
 		int j = (i * 2 + 1) * (i * 2 + 1);

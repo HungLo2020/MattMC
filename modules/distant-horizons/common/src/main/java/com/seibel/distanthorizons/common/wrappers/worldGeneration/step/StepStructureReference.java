@@ -29,11 +29,7 @@ import com.seibel.distanthorizons.common.wrappers.worldGeneration.mimicObject.Dh
 import com.seibel.distanthorizons.core.util.gridList.ArrayGridList;
 import net.minecraft.world.level.chunk.ChunkAccess;
 
-#if MC_VER <= MC_1_20_4
-import net.minecraft.world.level.chunk.ChunkStatus;
-#else
 import net.minecraft.world.level.chunk.status.ChunkStatus;
-#endif
 
 
 public final class StepStructureReference extends AbstractWorldGenStep

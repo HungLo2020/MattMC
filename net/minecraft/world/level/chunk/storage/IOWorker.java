@@ -30,7 +30,7 @@ public class IOWorker implements ChunkScanAccess, AutoCloseable {
 	private static final Logger LOGGER = LogUtils.getLogger();
 	private final AtomicBoolean shutdownRequested = new AtomicBoolean();
 	private final PriorityConsecutiveExecutor consecutiveExecutor;
-	private final RegionFileStorage storage;
+	public final RegionFileStorage storage;
 	private final SequencedMap<ChunkPos, IOWorker.PendingStore> pendingWrites = new LinkedHashMap();
 	private final Long2ObjectLinkedOpenHashMap<CompletableFuture<BitSet>> regionCacheForBlender = new Long2ObjectLinkedOpenHashMap<>();
 	private static final int REGION_CACHE_SIZE = 1024;

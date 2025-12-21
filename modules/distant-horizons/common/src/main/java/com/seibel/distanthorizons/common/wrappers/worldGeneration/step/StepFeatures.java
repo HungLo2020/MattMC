@@ -30,11 +30,7 @@ import net.minecraft.world.level.chunk.ChunkAccess;
 import net.minecraft.world.level.levelgen.Heightmap;
 import com.seibel.distanthorizons.core.logging.DhLogger;
 
-#if MC_VER <= MC_1_20_4
-import net.minecraft.world.level.chunk.ChunkStatus;
-#else
 import net.minecraft.world.level.chunk.status.ChunkStatus;
-#endif
 
 import java.util.ArrayList;
 import java.util.ConcurrentModificationException;
@@ -78,10 +74,6 @@ public final class StepFeatures extends AbstractWorldGenStep
 			
 			try
 			{
-				#if MC_VER < MC_1_18_2
-				worldGenRegion.setOverrideCenter(chunk.getPos());
-				environment.globalParams.generator.applyBiomeDecoration(worldGenRegion, tParams.structFeatManager);
-				#else
 				if (worldGenRegion.hasChunk(chunkWrapper.getChunkPos().getX(), chunkWrapper.getChunkPos().getZ()))
 				{
 					this.environment.globalParams.generator.applyBiomeDecoration(worldGenRegion, chunk, tParams.structFeatManager.forWorldGenRegion(worldGenRegion));
@@ -90,7 +82,6 @@ public final class StepFeatures extends AbstractWorldGenStep
 				{
 					LOGGER.warn("Unable to generate features for chunk at pos ["+chunkWrapper.getChunkPos()+"], world gen region doesn't contain the chunk.");
 				}
-				#endif
 				
 				Heightmap.primeHeightmaps(chunk, STATUS.heightmapsAfter());
 			}

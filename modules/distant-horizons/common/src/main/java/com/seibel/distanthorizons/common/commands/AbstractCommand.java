@@ -6,14 +6,9 @@ import com.seibel.distanthorizons.common.wrappers.misc.ServerPlayerWrapper;
 import com.seibel.distanthorizons.core.wrapperInterfaces.misc.IServerPlayerWrapper;
 import net.minecraft.commands.CommandSourceStack;
 
-#if MC_VER >= MC_1_19_2
 import net.minecraft.network.chat.Component;
 
 import java.util.Objects;
-#else // < 1.19.2
-import net.minecraft.network.chat.TranslatableComponent;
-import com.mojang.brigadier.exceptions.CommandSyntaxException;
-#endif
 
 /**
  * Abstract class providing common functionality for DH's commands.
@@ -32,13 +27,7 @@ public abstract class AbstractCommand
 	 */
 	protected int sendSuccessResponse(CommandContext<CommandSourceStack> commandContext, String text, boolean notifyAdmins)
 	{
-		#if MC_VER >= MC_1_20_1
 		commandContext.getSource().sendSuccess(() -> Component.literal(text), notifyAdmins);
-		#elif MC_VER >= MC_1_19_2
-		commandContext.getSource().sendSuccess(Component.literal(text), notifyAdmins);
-		#else
-		commandContext.getSource().sendSuccess(new TranslatableComponent(text), notifyAdmins);
-		#endif
 		return 1;
 	}
 	
@@ -51,13 +40,7 @@ public abstract class AbstractCommand
 	 */
 	protected int sendFailureResponse(CommandContext<CommandSourceStack> commandContext, String text)
 	{
-		#if MC_VER >= MC_1_20_1
 		commandContext.getSource().sendFailure(Component.literal(text));
-		#elif MC_VER >= MC_1_19_2
-		commandContext.getSource().sendFailure(Component.literal(text));
-		#else
-		commandContext.getSource().sendFailure(new TranslatableComponent(text));
-		#endif
 		return 1;
 	}
 	
@@ -67,13 +50,9 @@ public abstract class AbstractCommand
 	 * @param commandContext The command context to get the server player from.
 	 * @return The server player wrapper for the player who sent the command.
 	 */
-	protected IServerPlayerWrapper getSourcePlayer(CommandContext<CommandSourceStack> commandContext) #if MC_VER < MC_1_19_2 throws CommandSyntaxException #endif
+	protected IServerPlayerWrapper getSourcePlayer(CommandContext<CommandSourceStack> commandContext)
 	{
-		#if MC_VER >= MC_1_19_2
 		return ServerPlayerWrapper.getWrapper(Objects.requireNonNull(commandContext.getSource().getPlayer()));
-		#else
-		return ServerPlayerWrapper.getWrapper(commandContext.getSource().getPlayerOrException());
-		#endif
 	}
 	
 	/**
@@ -84,19 +63,7 @@ public abstract class AbstractCommand
 	 */
 	protected boolean isPlayerSource(CommandSourceStack source)
 	{
-		#if MC_VER >= MC_1_19_2
 		return source.isPlayer();
-		#else
-		try
-		{
-			source.getPlayerOrException();
-			return true;
-		}
-		catch (CommandSyntaxException e)
-		{
-			return false;
-		}
-		#endif
 	}
 	
 }

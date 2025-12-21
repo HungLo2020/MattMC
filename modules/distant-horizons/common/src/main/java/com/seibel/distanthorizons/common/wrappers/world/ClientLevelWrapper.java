@@ -39,22 +39,10 @@ import java.util.WeakHashMap;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Function;
 
-#if MC_VER <= MC_1_20_4
-import net.minecraft.world.level.chunk.ChunkStatus;
-#else
 import net.minecraft.world.level.chunk.status.ChunkStatus;
-#endif
 
-#if MC_VER < MC_1_21_3
-import net.minecraft.world.phys.Vec3;
-#else
 import com.seibel.distanthorizons.core.util.ColorUtil;
-#endif
 
-#if MC_VER <= MC_1_21_10
-#else
-import net.minecraft.world.attribute.EnvironmentAttributes;
-#endif
 
 
 public class ClientLevelWrapper implements IClientLevelWrapper
@@ -246,21 +234,13 @@ public class ClientLevelWrapper implements IClientLevelWrapper
 	@Override
 	public IDimensionTypeWrapper getDimensionType()
 	{
-		#if MC_VER <= MC_1_21_10
 		return DimensionTypeWrapper.getDimensionTypeWrapper(this.level.dimensionType());
-		#else
-		return DimensionTypeWrapper.getDimensionTypeWrapper(this.level.dimensionType(), this.getDimensionName());
-		#endif
 	}
 	
 	@Override
 	public String getDimensionName()
 	{
-		#if MC_VER <= MC_1_21_10
 		return this.level.dimension().location().toString();
-		#else
-		return this.level.dimension().identifier().toString();
-		#endif
 	}
 	
 	@Override
@@ -286,13 +266,7 @@ public class ClientLevelWrapper implements IClientLevelWrapper
 	@Override
 	public int getMinHeight()
 	{
-        #if MC_VER < MC_1_17_1
-        return 0;
-		#elif MC_VER < MC_1_21_3
-		return this.level.getMinBuildHeight();
-        #else
 		return this.level.getMinY();
-        #endif
 	}
 	
 	@Override
@@ -359,16 +333,8 @@ public class ClientLevelWrapper implements IClientLevelWrapper
 	@Override
 	public Color getCloudColor(float tickDelta)
 	{
-		#if MC_VER < MC_1_21_3
-		Vec3 colorVec3 = this.level.getCloudColor(tickDelta);
-		return new Color((float)colorVec3.x, (float)colorVec3.y, (float)colorVec3.z);
-		#elif MC_VER <= MC_1_21_10
 		int argbColor = this.level.getCloudColor(tickDelta);
-		return ColorUtil.toColorObjARGB(argbColor);
-		#else
-		int argbColor = this.level.environmentAttributes().getValue(EnvironmentAttributes.CLOUD_COLOR, BlockPos.ZERO);
 		return new Color(ColorUtil.getRed(argbColor), ColorUtil.getGreen(argbColor), ColorUtil.getBlue(argbColor), 255 /* ignore alpha since DH clouds don't render correctly with transparency */);
-		#endif
 	}
 	
 	

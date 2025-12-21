@@ -39,32 +39,16 @@ public class DimensionTypeWrapper implements IDimensionTypeWrapper
 	// Constructor //
 	//=============//
 	
-	#if MC_VER <= MC_1_21_10
 	public DimensionTypeWrapper(DimensionType dimensionType)
-	#else
-	public DimensionTypeWrapper(DimensionType dimensionType, String name)
-	#endif
 	{
 		this.dimensionType = dimensionType; 
 		
-		#if MC_VER <= MC_1_21_10
 		this.name = determineName(dimensionType);
-		#else
-		this.name = name;
-		#endif
 	}
 	
-	#if MC_VER <= MC_1_21_10
 	public static DimensionTypeWrapper getDimensionTypeWrapper(DimensionType dimensionType)
-	#else
-	public static DimensionTypeWrapper getDimensionTypeWrapper(DimensionType dimensionType, String name)
-	#endif
 	{
-		#if MC_VER <= MC_1_21_10
 		String dimName = determineName(dimensionType);
-		#else
-		String dimName = name;
-		#endif
 		
 		// check if the dimension has already been wrapped
 		if (DIMENSION_WRAPPER_BY_NAME.containsKey(dimName) 
@@ -75,25 +59,14 @@ public class DimensionTypeWrapper implements IDimensionTypeWrapper
 		
 		
 		// create the missing wrapper
-		#if MC_VER <= MC_1_21_10
 		DimensionTypeWrapper dimensionTypeWrapper = new DimensionTypeWrapper(dimensionType);
-		#else
-		DimensionTypeWrapper dimensionTypeWrapper = new DimensionTypeWrapper(dimensionType, dimName);
-		#endif
 		
 		DIMENSION_WRAPPER_BY_NAME.put(dimName, dimensionTypeWrapper);
 		return dimensionTypeWrapper;
 	}
 	private static String determineName(DimensionType dimensionType)
 	{
-		#if MC_VER <= MC_1_16_5
-		// effectsLocation() is marked as client only, so using the backing field directly
-		return dimensionType.effectsLocation.getPath();
-		#elif MC_VER <= MC_1_21_10
 		return dimensionType.effectsLocation().getPath();
-		#else
-		throw new UnsupportedOperationException("As of MC 1.21.11 the dimension type no longer stores it's name and must be determined from the level.");
-		#endif
 	}
 	
 	public static void clearMap() { DIMENSION_WRAPPER_BY_NAME.clear(); }

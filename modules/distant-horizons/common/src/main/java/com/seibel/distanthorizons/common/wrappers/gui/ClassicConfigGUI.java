@@ -42,22 +42,11 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 
-#if MC_VER < MC_1_20_1
-import com.mojang.blaze3d.vertex.PoseStack;
-import net.minecraft.client.gui.GuiComponent;
-#else
 import net.minecraft.client.gui.GuiGraphics;
-#endif
 
-#if MC_VER >= MC_1_17_1
 import net.minecraft.client.gui.narration.NarratableEntry;
-#endif
 
-#if MC_VER <= MC_1_21_10
 import net.minecraft.resources.ResourceLocation;
-#else
-import net.minecraft.resources.Identifier;
-#endif
 
 import static com.seibel.distanthorizons.common.wrappers.gui.GuiHelper.*;
 import static com.seibel.distanthorizons.common.wrappers.gui.GuiHelper.Translatable;
@@ -183,13 +172,7 @@ public class ClassicConfigGUI
 						0, 0,
 						// Some texture stuff
 						0, 
-						#if MC_VER < MC_1_21_1
-						new ResourceLocation(ModInfo.ID, "textures/gui/changelog.png"),
-						#elif MC_VER <= MC_1_21_10
 						ResourceLocation.fromNamespaceAndPath(ModInfo.ID, "textures/gui/changelog.png"),
-						#else
-						Identifier.fromNamespaceAndPath(ModInfo.ID, "textures/gui/changelog.png"),
-						#endif
 						20, 20,
 						// Create the button and tell it where to go
 						(buttonWidget) -> {
@@ -232,12 +215,6 @@ public class ClassicConfigGUI
 			
 			this.configListWidget = new ConfigListWidget(this.minecraft, this.width * 2, this.height, 32, 32, 25);
 			
-			#if MC_VER < MC_1_20_6 // no background is rendered in MC 1.20.6+
-			if (this.minecraft != null && this.minecraft.level != null)
-			{
-				this.configListWidget.setRenderBackground(false);
-			}
-			#endif
 			
 			this.addWidget(this.configListWidget);
 			
@@ -667,17 +644,9 @@ public class ClassicConfigGUI
 		//===========//
 		
 		@Override
-        #if MC_VER < MC_1_20_1
-		public void render(PoseStack matrices, int mouseX, int mouseY, float delta)
-        #else
 		public void render(GuiGraphics matrices, int mouseX, int mouseY, float delta)
-		#endif
 		{
-			#if MC_VER < MC_1_20_2 // 1.20.2 now enables this by default in the `this.list.render` function
-			this.renderBackground(matrices); // Renders background
-			#else
 			super.render(matrices, mouseX, mouseY, delta);
-			#endif
 			
 			this.configListWidget.render(matrices, mouseX, mouseY, delta); // Render buttons
 			
@@ -685,45 +654,26 @@ public class ClassicConfigGUI
 			// Render config title
 			this.DhDrawCenteredString(matrices, this.font, this.title, 
 					this.width / 2, 15, 
-					#if MC_VER < MC_1_21_6 
-					0xFFFFFF // RGB white
-					#else 
-					0xFFFFFFFF // ARGB white
-					#endif);
+					0xFFFFFFFF); // ARGB white
 			
 			
 			// render DH version
 			this.DhDrawString(matrices, this.font, TextOrLiteral(ModInfo.VERSION), 2, this.height - 10, 
-					#if MC_VER < MC_1_21_6
-					0xAAAAAA // RGB white
-					#else
-					0xFFAAAAAA // ARGB white
-					#endif);
+					0xFFAAAAAA); // ARGB white
 			
 			// If the update is pending, display this message to inform the user that it will apply when the game restarts
 			if (SelfUpdater.deleteOldJarOnJvmShutdown)
 			{
 				this.DhDrawString(matrices, this.font, Translatable(ModInfo.ID + ".updater.waitingForClose"), 4, this.height - 42, 
-						#if MC_VER < MC_1_21_6
-						0xFFFFFF // RGB white
-						#else
-						0xFFFFFFFF // ARGB white
-						#endif);
+						0xFFFFFFFF); // ARGB white
 			}
 			
 			
 			this.renderTooltip(matrices, mouseX, mouseY, delta);
 			
-			#if MC_VER < MC_1_20_2
-			super.render(matrices, mouseX, mouseY, delta);
-			#endif
 		}
 		
-		#if MC_VER < MC_1_20_1
-		private void renderTooltip(PoseStack matrices, int mouseX, int mouseY, float delta)
-        #else
 		private void renderTooltip(GuiGraphics matrices, int mouseX, int mouseY, float delta)
-		#endif
 		{
 			AbstractWidget hoveredWidget = this.configListWidget.getHoveredButton(mouseX, mouseY);
 			if (hoveredWidget == null)
@@ -804,11 +754,7 @@ public class ClassicConfigGUI
 		
 		public ConfigListWidget(Minecraft minecraftClient, int canvasWidth, int canvasHeight, int topMargin, int botMargin, int itemSpacing)
 		{
-			#if MC_VER < MC_1_20_4
-			super(minecraftClient, canvasWidth, canvasHeight, topMargin, canvasHeight - botMargin, itemSpacing);
-			#else
 			super(minecraftClient, canvasWidth, canvasHeight - (topMargin + botMargin), topMargin, itemSpacing);
-			#endif
 			
 			this.centerListVertically = false;
 			this.textRenderer = minecraftClient.font;
@@ -828,13 +774,8 @@ public class ClassicConfigGUI
 				if (button != null 
 					&& button.visible)
 				{
-					#if MC_VER < MC_1_19_4
-					double minX = button.x;
-					double minY = button.y;
-					#else
 					double minX = button.getX();
 					double minY = button.getY();
-					#endif
 					
 					double maxX = minX + button.getWidth();
 					double maxY = minY + button.getHeight();
@@ -920,20 +861,11 @@ public class ClassicConfigGUI
 		
 		
 		@Override
-        #if MC_VER < MC_1_20_1
-		public void render(PoseStack matrices, int index, int y, int x, int entryWidth, int entryHeight, int mouseX, int mouseY, boolean hovered, float tickDelta)
-        #elif MC_VER < MC_1_21_9
-		public void render(GuiGraphics matrices, int index, int y, int x, int entryWidth, int entryHeight, int mouseX, int mouseY, boolean hovered, float tickDelta)
-		#else
 		public void renderContent(GuiGraphics matrices, int mouseX, int mouseY, boolean hovered, float tickDelta)
-		#endif
 		{
 			try
 			{
-				#if MC_VER < MC_1_21_9
-				#else
 				int y = this.getY(); /// TODO why is the Y value being set during render?
-				#endif
 				
 				if (this.button != null)
 				{
@@ -989,22 +921,10 @@ public class ClassicConfigGUI
 					}
 				
 				
-                #if MC_VER < MC_1_20_1
-				GuiComponent.drawString(matrices, textRenderer, 
-					this.text, 
-					textXPos, y + 5, 
-					0xFFFFFF);
-				#elif MC_VER < MC_1_21_6
-					matrices.drawString(textRenderer,
-							this.text,
-							textXPos, y + 5,
-							0xFFFFFF);
-				#else
 				matrices.drawString(textRenderer, 
 						this.text,
 						textXPos, y + 5, 
 						0xFFFFFFFF);
-				#endif
 				}
 			}
 			catch (Exception e)
@@ -1018,11 +938,9 @@ public class ClassicConfigGUI
 		public @NotNull List<? extends GuiEventListener> children()
 		{ return this.children; }
 		
-		#if MC_VER >= MC_1_17_1
 		@Override
 		public @NotNull List<? extends NarratableEntry> narratables()
 		{ return this.children; }
-		#endif
 		
 		
 		

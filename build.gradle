@@ -311,6 +311,25 @@ dependencies {
     // GLSL Transformer - GLSL shader transformation library
     implementation 'io.github.douira:glsl-transformer:3.0.0-pre3'
     
+    // ===== DISTANT HORIZONS DEPENDENCIES =====
+    // Additional dependencies required for Distant Horizons core
+    if (enableDistantHorizons) {
+        // LWJGL JAWT for embedded GUI frames (no natives needed - pure Java bridge)
+        implementation 'org.lwjgl:lwjgl-jawt:3.3.3'
+        
+        // Compression libraries
+        implementation 'com.github.luben:zstd-jni:1.5.7-6'
+        implementation 'org.lz4:lz4-java:1.8.0'
+        implementation 'org.tukaani:xz:1.9'
+        
+        // Database
+        implementation 'org.xerial:sqlite-jdbc:3.47.2.0'
+        
+        // Configuration
+        implementation 'com.electronwill.night-config:toml:3.6.6'
+        implementation 'com.electronwill.night-config:json:3.6.6'
+    }
+    
     // ===== TESTING DEPENDENCIES =====
     // Testing dependencies - only available in test scope, excluded from production builds
     
@@ -388,6 +407,16 @@ sourceSets {
                 "${irisDir}/common/src/api/java",
                 "${irisDir}/fabric/src/main/java"
             ]
+            // Exclude DH implementation classes when Distant Horizons is disabled
+            // Keep DHCompat.java as it has fallback logic for when DH isn't present
+            if (!enableDistantHorizons) {
+                exclude '**/compat/dh/DHCompatInternal.java'
+                exclude '**/compat/dh/LodRendererEvents.java'
+                exclude '**/compat/dh/IrisLodRenderProgram.java'
+                exclude '**/compat/dh/IrisGenericRenderProgram.java'
+                exclude '**/compat/dh/DhFrameBufferWrapper.java'
+                exclude '**/compat/dh/DHMixinConfigPlugin.java'
+            }
         }
         resources {
             srcDirs = [
@@ -443,12 +472,16 @@ if (enableDistantHorizons) {
         distantHorizons {
             java {
                 srcDirs = [
+                    "${distantHorizonsDir}/coreSubProjects/core/src/main/java",
+                    "${distantHorizonsDir}/coreSubProjects/api/src/main/java",
                     "${distantHorizonsDir}/common/src/main/java",
                     "${distantHorizonsDir}/fabric/src/main/java"
                 ]
             }
             resources {
                 srcDirs = [
+                    "${distantHorizonsDir}/coreSubProjects/core/src/main/resources",
+                    "${distantHorizonsDir}/coreSubProjects/api/src/main/resources",
                     "${distantHorizonsDir}/common/src/main/resources",
                     "${distantHorizonsDir}/fabric/src/main/resources"
                 ]
@@ -504,6 +537,12 @@ sourceSets.iris.compileClasspath += sourceSets.sodium.output
 sourceSets.iris.runtimeClasspath += sourceSets.fabricLoader.output
 sourceSets.iris.runtimeClasspath += sourceSets.main.output
 sourceSets.iris.runtimeClasspath += sourceSets.sodium.output
+
+// Add Distant Horizons to Iris classpath when enabled (for DH compatibility classes)
+if (enableDistantHorizons) {
+    sourceSets.iris.compileClasspath += sourceSets.distantHorizons.output
+    sourceSets.iris.runtimeClasspath += sourceSets.distantHorizons.output
+}
 
 // Conditionally add Distant Horizons dependencies if enabled
 if (enableDistantHorizons) {
@@ -627,6 +666,11 @@ tasks.register('irisJar', Jar) {
     description = 'Assembles the Iris mod JAR'
     
     dependsOn 'compileIrisJava', 'processIrisResources'
+    
+    // Ensure Distant Horizons compiles before Iris when enabled (for DH compatibility classes)
+    if (enableDistantHorizons) {
+        dependsOn 'compileDistantHorizonsJava'
+    }
     
     archiveBaseName = 'iris'
     archiveVersion = irisVersion
@@ -1456,3 +1500,10 @@ clientFatJar {
 
 // The clientDist task already uses only runtimeClasspath and main source set,
 // but we verify this is maintained for future modifications
+
+// Ensure Distant Horizons compiles before Iris when DH is enabled
+if (enableDistantHorizons) {
+    tasks.named('compileIrisJava') {
+        dependsOn 'compileDistantHorizonsJava'
+    }
+}

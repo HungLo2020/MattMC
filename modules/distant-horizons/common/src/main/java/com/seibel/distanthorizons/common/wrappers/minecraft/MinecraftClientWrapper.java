@@ -46,14 +46,8 @@ import net.minecraft.world.level.ChunkPos;
 
 import org.jetbrains.annotations.Nullable;
 
-#if MC_VER < MC_1_19_2
-import net.minecraft.network.chat.TextComponent;
-#endif
 
-#if MC_VER < MC_1_21_3
-#else
 import net.minecraft.util.profiling.Profiler;
-#endif
 
 /**
  * A singleton that wraps the Minecraft object.
@@ -157,11 +151,7 @@ public class MinecraftClientWrapper implements IMinecraftClientWrapper, IMinecra
 			return new DhChunkPos(0, 0);
 		}
 		
-        #if MC_VER < MC_1_17_1
-        ChunkPos playerPos = new ChunkPos(player.blockPosition());
-        #else
 		ChunkPos playerPos = player.chunkPosition();
-        #endif
 		return new DhChunkPos(playerPos.x, playerPos.z);
 	}
 	
@@ -203,17 +193,11 @@ public class MinecraftClientWrapper implements IMinecraftClientWrapper, IMinecra
 			return;
 		}
 		
-        #if MC_VER < MC_1_19_2
-		player.sendMessage(new TextComponent(string), getPlayer().getUUID());
-        #elif MC_VER < MC_1_21_9
-		player.displayClientMessage(net.minecraft.network.chat.Component.translatable(string), /*isOverlay*/false);
-		#else
 		
 		GLProxy.queueRunningOnRenderThread(() -> 
 		{
 			player.displayClientMessage(net.minecraft.network.chat.Component.translatable(string), /*isOverlay*/false);
 		});
-        #endif
 	}
 	
 	@Override
@@ -225,11 +209,7 @@ public class MinecraftClientWrapper implements IMinecraftClientWrapper, IMinecra
 			return;
 		}
 		
-        #if MC_VER < MC_1_19_2
-		player.displayClientMessage(new TextComponent(string), /*isOverlay*/true);
-        #else
 		player.displayClientMessage(net.minecraft.network.chat.Component.translatable(string), /*isOverlay*/true);
-        #endif
 	}
 	
 	
@@ -240,20 +220,12 @@ public class MinecraftClientWrapper implements IMinecraftClientWrapper, IMinecra
 	
 	public void disableVanillaClouds()
 	{
-		#if MC_VER <= MC_1_18_2
-		MINECRAFT.options.renderClouds = CloudStatus.OFF;
-		#else
 		MINECRAFT.options.cloudStatus().set(CloudStatus.OFF);
-		#endif
 	}
 	
 	public void disableVanillaChunkFadeIn()
 	{
-		#if MC_VER <= MC_1_21_10
 		// chunk fade in was added MC 1.21.11
-		#else
-		MINECRAFT.options.chunkSectionFadeInTime().set(0.0);
-		#endif
 	}
 	
 	
@@ -266,11 +238,7 @@ public class MinecraftClientWrapper implements IMinecraftClientWrapper, IMinecra
 	public IProfilerWrapper getProfiler()
 	{
 		ProfilerFiller profiler;
-		#if MC_VER < MC_1_21_3
-		profiler = MINECRAFT.getProfiler();
-		#else
 		profiler = Profiler.get();
-		#endif
 		
 		if (this.profilerWrapper == null)
 		{
@@ -289,11 +257,7 @@ public class MinecraftClientWrapper implements IMinecraftClientWrapper, IMinecra
 	{
 		LOGGER.fatal(ModInfo.READABLE_NAME + " had the following error: [" + errorMessage + "]. Crashing Minecraft...", exception);
 		CrashReport report = new CrashReport(errorMessage, exception);
-		#if MC_VER < MC_1_20_4
-		Minecraft.crash(report);
-		#else
 		MINECRAFT.delayCrash(report);
-		#endif
 	}
 	
 	

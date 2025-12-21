@@ -86,11 +86,7 @@ public abstract class AbstractModInitializer
 		
 		LOGGER.info(ModInfo.READABLE_NAME + " client Initialized.");
 		
-		#if MC_VER < MC_1_21_9
-		// debug screen rendering handled via a mixin
-		#else
 		DhDebugScreenEntry.register();
-		#endif
 		
 		this.subscribeClientStartedEvent(this::postInit);
 	}

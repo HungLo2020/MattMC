@@ -44,29 +44,13 @@ import java.util.concurrent.ConcurrentHashMap;
 
 import org.jetbrains.annotations.Nullable;
 
-#if MC_VER == MC_1_16_5 || MC_VER == MC_1_17_1
-import net.minecraft.core.Registry;
-import net.minecraft.core.BlockPos;
-import net.minecraft.world.level.EmptyBlockGetter;
-#elif MC_VER == MC_1_18_2 || MC_VER == MC_1_19_2
-import net.minecraft.client.Minecraft;
-import net.minecraft.world.level.Level;
-import net.minecraft.core.BlockPos;
-import net.minecraft.core.Registry;
-import net.minecraft.world.level.EmptyBlockGetter;
-#else
 import net.minecraft.world.level.Level;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.world.level.EmptyBlockGetter;
 import net.minecraft.core.Holder;
-#endif
 
-#if MC_VER <= MC_1_21_10
 import net.minecraft.resources.ResourceLocation;
-#else
-import net.minecraft.resources.Identifier;
-#endif
 
 public class BlockStateWrapper implements IBlockStateWrapper
 {
@@ -92,11 +76,7 @@ public class BlockStateWrapper implements IBlockStateWrapper
 	public static HashSet<IBlockStateWrapper> rendererIgnoredCaveBlocks = null;
 	
 	/** keep track of broken blocks so we don't log every time */
-	#if MC_VER <= MC_1_21_10
 	private static final HashSet<ResourceLocation> BROKEN_RESOURCE_LOCATIONS = new HashSet<>();
-	#else
-	private static final HashSet<Identifier> BROKEN_RESOURCE_LOCATIONS = new HashSet<>();
-	#endif
 	
 	
 	
@@ -200,11 +180,7 @@ public class BlockStateWrapper implements IBlockStateWrapper
 			if (block instanceof BeaconBeamBlock)
 			{
 				int colorInt;
-				#if MC_VER <= MC_1_19_4
-				colorInt = ((BeaconBeamBlock) block).getColor().getMaterialColor().col;
-				#else 
 				colorInt = ((BeaconBeamBlock) block).getColor().getMapColor().col;
-				#endif
 				
 				beaconTintColor = ColorUtil.toColorObjRGB(colorInt);
 			}
@@ -248,11 +224,7 @@ public class BlockStateWrapper implements IBlockStateWrapper
 		int mcColor = 0;
 		if (this.blockState != null)
 		{
-			#if MC_VER < MC_1_20_1
-			mcColor = this.blockState.getMaterial().getColor().col;
-	        #else
 			mcColor = this.blockState.getMapColor(EmptyBlockGetter.INSTANCE, BlockPos.ZERO).col;
-            #endif
 			this.mapColor = ColorUtil.toColorObjRGB(mcColor);
 		}
 		else
@@ -445,11 +417,7 @@ public class BlockStateWrapper implements IBlockStateWrapper
 		boolean propagatesSkyLightDown = true;
 		if (this.blockState != null)
 		{
-			#if MC_VER < MC_1_21_3
-			propagatesSkyLightDown = this.blockState.propagatesSkylightDown(EmptyBlockGetter.INSTANCE, BlockPos.ZERO);
-			#else
 			propagatesSkyLightDown = this.blockState.propagatesSkylightDown();
-			#endif
 		}
 		
 		return propagatesSkyLightDown;
@@ -501,11 +469,7 @@ public class BlockStateWrapper implements IBlockStateWrapper
 			return false;
 		}
 		
-        #if MC_VER < MC_1_20_1
-		return this.blockState.getMaterial().isSolid();
-        #else
 		return !this.blockState.getCollisionShape(EmptyBlockGetter.INSTANCE, BlockPos.ZERO).isEmpty();
-        #endif
 	}
 	
 	@Override
@@ -516,11 +480,7 @@ public class BlockStateWrapper implements IBlockStateWrapper
 			return false;
 		}
 		
-        #if MC_VER < MC_1_20_1
-		return this.blockState.getMaterial().isLiquid() || !this.blockState.getFluidState().isEmpty();
-        #else
 		return !this.blockState.getFluidState().isEmpty();
-        #endif
 	}
 	
 	@Override
@@ -559,26 +519,12 @@ public class BlockStateWrapper implements IBlockStateWrapper
 		
 		
 		// older versions of MC have a static registry
-		#if MC_VER > MC_1_17_1
 		Level level = (Level)levelWrapper.getWrappedMcObject();
 		net.minecraft.core.RegistryAccess registryAccess = level.registryAccess();
-		#endif
 		
-		#if MC_VER < MC_1_21_11
 		ResourceLocation resourceLocation;
-		#else
-		Identifier resourceLocation;
-		#endif
 		
-		#if MC_VER == MC_1_16_5 || MC_VER == MC_1_17_1
-		resourceLocation = Registry.BLOCK.getKey(this.blockState.getBlock());
-		#elif MC_VER == MC_1_18_2 || MC_VER == MC_1_19_2
-		resourceLocation = registryAccess.registryOrThrow(Registry.BLOCK_REGISTRY).getKey(this.blockState.getBlock());
-		#elif MC_VER < MC_1_21_3
-		resourceLocation = registryAccess.registryOrThrow(Registries.BLOCK).getKey(this.blockState.getBlock());
-		#else
 		resourceLocation = registryAccess.lookupOrThrow(Registries.BLOCK).getKey(this.blockState.getBlock());
-		#endif
 		
 		
 		
@@ -636,21 +582,11 @@ public class BlockStateWrapper implements IBlockStateWrapper
 				throw new IOException("Unable to parse Resource Location out of string: [" + resourceStateString + "].");
 			}
 			
-			#if MC_VER < MC_1_21_11
 			ResourceLocation resourceLocation;
-			#else
-			Identifier resourceLocation;
-			#endif
 			
 			try
 			{
-				#if MC_VER < MC_1_21_1
-				resourceLocation = new ResourceLocation(resourceStateString.substring(0, separatorIndex), resourceStateString.substring(separatorIndex + 1));
-				#elif MC_VER <= MC_1_21_10
 				resourceLocation = ResourceLocation.fromNamespaceAndPath(resourceStateString.substring(0, separatorIndex), resourceStateString.substring(separatorIndex + 1));
-				#else
-				resourceLocation = Identifier.fromNamespaceAndPath(resourceStateString.substring(0, separatorIndex), resourceStateString.substring(separatorIndex + 1));
-				#endif
 			}
 			catch (Exception e)
 			{
@@ -663,25 +599,13 @@ public class BlockStateWrapper implements IBlockStateWrapper
 			try
 			{
 				
-				#if MC_VER > MC_1_17_1
 				LodUtil.assertTrue(levelWrapper != null && levelWrapper.getWrappedMcObject() != null);
 				Level level = (Level)levelWrapper.getWrappedMcObject();
-				#endif
 				
 				Block block;
-				#if MC_VER == MC_1_16_5 || MC_VER == MC_1_17_1
-				block = Registry.BLOCK.get(resourceLocation);
-				#elif MC_VER == MC_1_18_2 || MC_VER == MC_1_19_2
-				net.minecraft.core.RegistryAccess registryAccess = level.registryAccess();
-				block = registryAccess.registryOrThrow(Registry.BLOCK_REGISTRY).get(resourceLocation);
-				#elif MC_VER < MC_1_21_3
-				net.minecraft.core.RegistryAccess registryAccess = level.registryAccess();
-				block = registryAccess.registryOrThrow(Registries.BLOCK).get(resourceLocation);
-				#else
 				net.minecraft.core.RegistryAccess registryAccess = level.registryAccess();
 				Optional<Holder.Reference<Block>> optionalBlockHolder = registryAccess.lookupOrThrow(Registries.BLOCK).get(resourceLocation);
 				block = optionalBlockHolder.isPresent() ? optionalBlockHolder.get().value() : null;
-				#endif
 				
 				
 				if (block == null)
@@ -810,21 +734,15 @@ public class BlockStateWrapper implements IBlockStateWrapper
 		}
 		else if (this.blockState.getSoundType() == SoundType.WOOD
 				|| serialString.contains("root")
-				#if MC_VER >= MC_1_19_4
 				|| this.blockState.getSoundType() == SoundType.CHERRY_WOOD
-				#endif
 				) 
 		{
 			return EDhApiBlockMaterial.WOOD;
 		}
 		else if (this.blockState.getSoundType() == SoundType.METAL
-				#if MC_VER >= MC_1_19_2
 				|| this.blockState.getSoundType() == SoundType.COPPER
-				#endif
-				#if MC_VER >= MC_1_20_4
 				|| this.blockState.getSoundType() == SoundType.COPPER_BULB
 				|| this.blockState.getSoundType() == SoundType.COPPER_GRATE
-				#endif
 				) 
 		{
 			return EDhApiBlockMaterial.METAL;
@@ -843,7 +761,6 @@ public class BlockStateWrapper implements IBlockStateWrapper
 		{
 			return EDhApiBlockMaterial.DIRT;
 		}
-		#if MC_VER >= MC_1_17_1
 		else if (this.blockState.getSoundType() == SoundType.DEEPSLATE
 				|| this.blockState.getSoundType() == SoundType.DEEPSLATE_BRICKS
 				|| this.blockState.getSoundType() == SoundType.DEEPSLATE_TILES 
@@ -852,7 +769,6 @@ public class BlockStateWrapper implements IBlockStateWrapper
 		{
 			return EDhApiBlockMaterial.DEEPSLATE;
 		} 
-		#endif
 		else if (this.serialString.contains("snow"))
 		{
 			return EDhApiBlockMaterial.SNOW;

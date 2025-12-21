@@ -19,22 +19,15 @@
 
 package com.seibel.distanthorizons.fabric.wrappers.modAccessor;
 
-#if MC_VER >= MC_1_19_4
 
 import com.seibel.distanthorizons.core.wrapperInterfaces.modAccessor.IIrisAccessor;
 
-#if MC_VER <= MC_1_20_4
-import net.coderbot.iris.Iris;
-import net.irisshaders.iris.api.v0.IrisApi;
-#else
-import net.irisshaders.iris.Iris;
-import net.irisshaders.iris.api.v0.IrisApi;
-#endif
+import net.iris.api.v0.IrisApi;
 
 public class IrisAccessor implements IIrisAccessor
 {
 	@Override
-	public String getModName() { return Iris.MODID; }
+	public String getModName() { return "iris"; }
 	
 	@Override
 	public boolean isShaderPackInUse() { return IrisApi.getInstance().isShaderPackInUse(); }
@@ -44,4 +37,3 @@ public class IrisAccessor implements IIrisAccessor
 	
 }
 
-#endif

@@ -12,7 +12,7 @@ import net.minecraft.network.chat.Component;
 public class HeaderAndFooterLayout implements Layout {
 	public static final int DEFAULT_HEADER_AND_FOOTER_HEIGHT = 33;
 	private static final int CONTENT_MARGIN_TOP = 30;
-	private final FrameLayout headerFrame = new FrameLayout();
+	public final FrameLayout headerFrame = new FrameLayout();
 	private final FrameLayout footerFrame = new FrameLayout();
 	private final FrameLayout contentsFrame = new FrameLayout();
 	private final Screen screen;

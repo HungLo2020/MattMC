@@ -32,12 +32,8 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import com.seibel.distanthorizons.core.logging.DhLogger;
 
-#if MC_VER >= MC_1_20_6
 import com.seibel.distanthorizons.common.CommonPacketPayload;
 import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
-#else
-import com.seibel.distanthorizons.core.network.messages.AbstractNetworkMessage;
-#endif
 
 /**
  * This handles all events sent to the server,
@@ -153,14 +149,14 @@ public class FabricServerProxy implements AbstractModInitializer.IEventProxy
 		{
 			if (this.isValidTime())
 			{
-				ServerApi.INSTANCE.serverPlayerJoinEvent(this.getServerPlayerWrapper(handler.player));
+				ServerApi.INSTANCE.serverPlayerJoinEvent(this.getServerPlayerWrapper(handler));
 			}
 		});
 		ServerPlayConnectionEvents.DISCONNECT.register((handler, server) ->
 		{
 			if (this.isValidTime())
 			{
-				ServerApi.INSTANCE.serverPlayerDisconnectEvent(this.getServerPlayerWrapper(handler.player));
+				ServerApi.INSTANCE.serverPlayerDisconnectEvent(this.getServerPlayerWrapper(handler));
 			}
 		});
 		ServerEntityWorldChangeEvents.AFTER_PLAYER_CHANGE_WORLD.register((player, originLevel, destinationLevel) ->
@@ -175,7 +171,6 @@ public class FabricServerProxy implements AbstractModInitializer.IEventProxy
 			}
 		});
 		
-		#if MC_VER >= MC_1_20_6
 		PayloadTypeRegistry.playC2S().register(CommonPacketPayload.TYPE, new CommonPacketPayload.Codec());
 		if (this.isDedicatedServer)
 		{
@@ -190,16 +185,6 @@ public class FabricServerProxy implements AbstractModInitializer.IEventProxy
 			}
 			ServerApi.INSTANCE.pluginMessageReceived(ServerPlayerWrapper.getWrapper(context.player()), payload.message());
 		});
-		#else
-		ServerPlayNetworking.registerGlobalReceiver(AbstractPluginPacketSender.WRAPPER_PACKET_RESOURCE, (server, serverPlayer, handler, buffer, packetSender) ->
-		{
-			AbstractNetworkMessage message = PACKET_SENDER.decodeMessage(buffer);
-			if (message != null)
-			{
-				ServerApi.INSTANCE.pluginMessageReceived(ServerPlayerWrapper.getWrapper(serverPlayer), message);
-			}
-		});
-		#endif
 	}
 	
 }

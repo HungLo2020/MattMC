@@ -40,17 +40,9 @@ import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.server.MinecraftServer;
 import com.seibel.distanthorizons.core.logging.DhLogger;
 
-#if MC_VER >= MC_1_19_2
 import net.fabricmc.fabric.api.command.v2.CommandRegistrationCallback;
-#else // < 1.19.2
-import net.fabricmc.fabric.api.command.v1.CommandRegistrationCallback;
-#endif
 
-#if MC_VER <= MC_1_21_10
 import net.minecraft.resources.ResourceLocation;
-#else
-import net.minecraft.resources.Identifier;
-#endif
 
 import java.util.function.Consumer;
 
@@ -61,13 +53,7 @@ import java.util.function.Consumer;
  */
 public class FabricMain extends AbstractModInitializer implements ClientModInitializer, DedicatedServerModInitializer
 {
-	#if MC_VER <= MC_1_20_6
-	private static final ResourceLocation INITIAL_PHASE = new ResourceLocation(ModInfo.RESOURCE_NAMESPACE, ModInfo.DEDICATED_SERVER_INITIAL_PATH);
-	#elif MC_VER <= MC_1_21_10
 	private static final ResourceLocation INITIAL_PHASE = ResourceLocation.fromNamespaceAndPath(ModInfo.RESOURCE_NAMESPACE, ModInfo.DEDICATED_SERVER_INITIAL_PATH);
-	#else
-	private static final Identifier INITIAL_PHASE = Identifier.fromNamespaceAndPath(ModInfo.RESOURCE_NAMESPACE, ModInfo.DEDICATED_SERVER_INITIAL_PATH);
-	#endif
 	
 	private static final DhLogger LOGGER = new DhLoggerBuilder().build();
 	
@@ -116,17 +102,15 @@ public class FabricMain extends AbstractModInitializer implements ClientModIniti
 		this.tryCreateModCompatAccessor("optifine", IOptifineAccessor.class, OptifineAccessor::new);
 		this.tryCreateModCompatAccessor("bclib", IBCLibAccessor.class, BCLibAccessor::new);
 		this.tryCreateModCompatAccessor("c2me", IC2meAccessor.class, C2meAccessor::new);
-		#if MC_VER >= MC_1_19_4
 		// 1.19.4 is the lowest version Iris supports DH
 		this.tryCreateModCompatAccessor("iris", IIrisAccessor.class, IrisAccessor::new);
-		#endif
 	}
 	
 	@Override
 	protected void subscribeRegisterCommandsEvent(Consumer<CommandDispatcher<CommandSourceStack>> eventHandler)
 	{
 		CommandRegistrationCallback.EVENT.register(
-			(dispatcher, registryAccess #if MC_VER >= MC_1_19_2 , environment #endif ) -> 
+			(dispatcher, registryAccess, environment) -> 
 			{
 				eventHandler.accept(dispatcher);
 			}
@@ -154,12 +138,10 @@ public class FabricMain extends AbstractModInitializer implements ClientModIniti
 			ModAccessorInjector.INSTANCE.get(IBCLibAccessor.class).setRenderCustomFog(false); // Remove BCLib's fog
 		}
 		
-		#if MC_VER >= MC_1_20_1
 		if (SingletonInjector.INSTANCE.get(IModChecker.class).isModLoaded("sodium"))
 		{
 			ModAccessorInjector.INSTANCE.get(ISodiumAccessor.class).setFogOcclusion(false);
 		}
-		#endif
 	}
 	
 }

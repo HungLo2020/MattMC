@@ -25,19 +25,11 @@ import com.seibel.distanthorizons.core.wrapperInterfaces.modAccessor.IStarlightA
 import net.minecraft.world.level.BlockGetter;
 import net.minecraft.world.level.chunk.LightChunkGetter;
 
-#if MC_VER >= MC_1_17_1
 import net.minecraft.world.level.LevelHeightAccessor;
-#endif
 
-#if MC_VER >= MC_1_20_1
 import net.minecraft.world.level.chunk.LightChunk;
-#endif
 
-#if MC_VER <= MC_1_20_4
-import net.minecraft.world.level.chunk.ChunkStatus;
-#else
 import net.minecraft.world.level.chunk.status.ChunkStatus;
-#endif
 
 
 
@@ -59,7 +51,7 @@ public class LightGetterAdaptor implements LightChunkGetter
 	}
 	
 	@Override
-	public #if MC_VER < MC_1_20_1 BlockGetter #else LightChunk #endif getChunkForLighting(int chunkX, int chunkZ)
+	public LightChunk getChunkForLighting(int chunkX, int chunkZ)
 	{
 		if (genRegion == null)
 			throw new IllegalStateException("World Gen region has not been set!");
@@ -73,10 +65,8 @@ public class LightGetterAdaptor implements LightChunkGetter
 		return shouldReturnNull ? null : (genRegion != null ? genRegion : heightGetter);
 	}
 	
-	#if MC_VER >= MC_1_17_1
 	public LevelHeightAccessor getLevelHeightAccessor()
 	{
 		return heightGetter;
 	}
-	#endif
 }

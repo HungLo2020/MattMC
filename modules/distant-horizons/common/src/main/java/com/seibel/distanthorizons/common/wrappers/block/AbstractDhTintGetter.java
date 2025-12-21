@@ -26,20 +26,14 @@ import com.seibel.distanthorizons.core.logging.DhLogger;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-#if MC_VER >= MC_1_18_2
 import net.minecraft.core.Holder;
-#endif
 
 
 public abstract class AbstractDhTintGetter implements BlockAndTintGetter
 {
 	private static final DhLogger LOGGER = new DhLoggerBuilder().build();
 	
-	#if MC_VER < MC_1_18_2
-	private static final ConcurrentHashMap<String, Biome> BIOME_BY_RESOURCE_STRING = new ConcurrentHashMap<>();
-	#else
 	private static final ConcurrentHashMap<String, Holder<Biome>> BIOME_BY_RESOURCE_STRING = new ConcurrentHashMap<>();
-    #endif
 	
 	private static final ConcurrentHashMap<BlockBiomeWrapperPair, Integer> COLOR_BY_BLOCK_BIOME_PAIR = new ConcurrentHashMap<>();
 	/** returned if the color cache is incomplete */
@@ -226,13 +220,9 @@ public abstract class AbstractDhTintGetter implements BlockAndTintGetter
 		return unwrapBiome(getClientBiome(biomeString));
 	}
 	
-	protected static Biome unwrapBiome(#if MC_VER >= MC_1_18_2 Holder<Biome> #else Biome #endif biome)
+	protected static Biome unwrapBiome(Holder<Biome> biome)
 	{
-		#if MC_VER >= MC_1_18_2
 		return biome.value();
-		#else
-		return biome;
-		#endif
 	}
 	
 	/**
@@ -269,13 +259,9 @@ public abstract class AbstractDhTintGetter implements BlockAndTintGetter
 	 * whenever the biome information is needed, ensuring it always retrieves the most current {@code Biome}
 	 * instance associated with the holder at that time.</p>
 	 */
-	private static #if MC_VER < MC_1_18_2 Biome #else Holder<Biome> #endif getClientBiome(String biomeResourceString)
+	private static Holder<Biome> getClientBiome(String biomeResourceString)
 	{
-		#if MC_VER < MC_1_18_2 
-		Biome biome;
-		#else 
 		Holder<Biome> biome; 
-		#endif
 		
 		// calling get instead of compute is slightly faster for already
 		// computed values
