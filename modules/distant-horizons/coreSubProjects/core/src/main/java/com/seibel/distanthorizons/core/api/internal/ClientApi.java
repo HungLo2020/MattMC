@@ -346,7 +346,15 @@ public class ClientApi
 	//===============//
 	
 	/** Should be called before {@link ClientApi#renderDeferredLodsForShaders} */
-	public void renderLods() { this.renderLodLayer(false); }
+	public void renderLods() { 
+		LOGGER.info("=== ClientApi.renderLods() CALLED ===");
+		try {
+			this.renderLodLayer(false);
+			LOGGER.info("=== ClientApi.renderLods() FINISHED ===");
+		} catch (Exception e) {
+			LOGGER.error("=== ClientApi.renderLods() EXCEPTION: " + e.getMessage() + " ===", e);
+		}
+	}
 	
 	/** 
 	 * Only necessary when Shaders are in use.
@@ -356,15 +364,35 @@ public class ClientApi
 	
 	private void renderLodLayer(boolean renderingDeferredLayer)
 	{
+		LOGGER.info("=== renderLodLayer() STARTED, renderingDeferredLayer=" + renderingDeferredLayer + " ===");
+		
 		//=========//
 		// logging //
 		//=========//
 		
 		this.sendQueuedChatMessages();
+		LOGGER.info("renderLodLayer: Sent queued chat messages");
 		
 		IProfilerWrapper profiler = MC_CLIENT.getProfiler();
-		profiler.pop(); // get out of "terrain"
-		profiler.push("DH-RenderLevel");
+		LOGGER.info("renderLodLayer: Got profiler: " + profiler);
+		
+		try {
+			LOGGER.info("renderLodLayer: About to profiler.pop() from terrain");
+			profiler.pop(); // get out of "terrain"
+			LOGGER.info("renderLodLayer: Successfully popped from terrain");
+		} catch (Exception e) {
+			LOGGER.error("renderLodLayer: EXCEPTION during profiler.pop(): " + e.getMessage(), e);
+			return;
+		}
+		
+		try {
+			LOGGER.info("renderLodLayer: About to profiler.push(DH-RenderLevel)");
+			profiler.push("DH-RenderLevel");
+			LOGGER.info("renderLodLayer: Successfully pushed DH-RenderLevel");
+		} catch (Exception e) {
+			LOGGER.error("renderLodLayer: EXCEPTION during profiler.push(): " + e.getMessage(), e);
+			return;
+		}
 		
 		
 		
