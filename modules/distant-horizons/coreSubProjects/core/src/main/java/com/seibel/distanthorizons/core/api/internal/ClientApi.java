@@ -400,25 +400,36 @@ public class ClientApi
 		// render thread tasks //
 		//=====================//
 		
+		LOGGER.info("renderLodLayer: Starting render thread tasks section, renderingDeferredLayer=" + renderingDeferredLayer);
+		
 		// only run these tasks once per frame
 		if (!renderingDeferredLayer)
 		{
+			LOGGER.info("renderLodLayer: Pushing 'DH render thread tasks' profiler");
 			profiler.push("DH render thread tasks");
 			
 			try
 			{
+				LOGGER.info("renderLodLayer: Getting GLProxy instance");
 				// make sure the GLProxy is created for future use
 				GLProxy.getInstance();
 				
+				LOGGER.info("renderLodLayer: Running render thread tasks");
 				// these tasks always need to be called, regardless of whether the renderer is enabled or not to prevent memory leaks
 				GLProxy.runRenderThreadTasks();
+				LOGGER.info("renderLodLayer: Render thread tasks completed");
 			}
 			catch (Exception e)
 			{
 				LOGGER.error("Unexpected issue running render thread tasks, error: [" + e.getMessage() + "].", e);
 			}
 			
+			LOGGER.info("renderLodLayer: Popping 'DH render thread tasks' profiler");
 			profiler.pop();
+		}
+		else
+		{
+			LOGGER.info("renderLodLayer: Skipping render thread tasks (deferred layer)");
 		}
 		
 		
@@ -426,6 +437,8 @@ public class ClientApi
 		//=================//
 		// parameter setup //
 		//=================//
+		
+		LOGGER.info("renderLodLayer: Setting up render parameters");
 		
 		EDhApiRenderPass renderPass;
 		if (DhApiRenderProxy.INSTANCE.getDeferTransparentRendering())
@@ -444,10 +457,17 @@ public class ClientApi
 			renderPass = EDhApiRenderPass.OPAQUE_AND_TRANSPARENT;
 		}
 		
+		LOGGER.info("renderLodLayer: Render pass = " + renderPass);
+		
 		// A global render state variable is used since MC has split up their
 		// render prep and actual rendering into different threads/methods
 		// this is annoying since it's possible to start a render with only
 		// partially complete info, but there isn't a better option at the moment
+		LOGGER.info("renderLodLayer: Creating RenderParams with frameTime=" + RENDER_STATE.frameTime + 
+					", mcProjectionMatrix=" + RENDER_STATE.mcProjectionMatrix + 
+					", mcModelViewMatrix=" + RENDER_STATE.mcModelViewMatrix + 
+					", clientLevelWrapper=" + RENDER_STATE.clientLevelWrapper);
+		
 		RenderParams renderParams =
 			new RenderParams(
 				renderPass,
@@ -456,21 +476,26 @@ public class ClientApi
 				RENDER_STATE.clientLevelWrapper
 			);
 		
+		LOGGER.info("renderLodLayer: RenderParams created successfully");
+		
 		
 		
 		//============//
 		// validation //
 		//============//
 		
+		LOGGER.info("renderLodLayer: Validating render parameters");
 		// TODO write this message to the F3 menu so people can see when a different mod screws with the lightmap
 		String validationMessage = renderParams.getValidationErrorMessage();
 		if (validationMessage != null)
 		{
+			LOGGER.error("renderLodLayer: VALIDATION FAILED: " + validationMessage);
 			this.lastRenderParamValidationMessage = validationMessage;
 			return;
 		}
 		else
 		{
+			LOGGER.info("renderLodLayer: Validation passed");
 			this.lastRenderParamValidationMessage = null;
 		}
 		
