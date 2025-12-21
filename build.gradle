@@ -402,17 +402,11 @@ sourceSets {
     // Iris source set - compiled to a separate mod JAR
     iris {
         java {
-            // Conditionally add headers directory based on enableDistantHorizons
-            def irisSrcDirs = [
+            srcDirs = [
                 "${irisDir}/common/src/main/java",
                 "${irisDir}/common/src/api/java",
                 "${irisDir}/fabric/src/main/java"
             ]
-            if (enableDistantHorizons) {
-                irisSrcDirs.add("${irisDir}/common/src/headers/java")
-            }
-            srcDirs = irisSrcDirs
-            
             // Exclude DH implementation classes when Distant Horizons is disabled
             // Keep DHCompat.java as it has fallback logic for when DH isn't present
             if (!enableDistantHorizons) {
