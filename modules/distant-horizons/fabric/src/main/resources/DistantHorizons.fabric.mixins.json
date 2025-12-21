@@ -2,6 +2,7 @@
   "required": true,
   "minVersion": "0.8",
   "package": "com.seibel.distanthorizons.fabric.mixins",
+  "priority": 1100,
   "mixins": [
     "server.MixinChunkGenerator",
     "server.MixinChunkMap",
