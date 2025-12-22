@@ -101,10 +101,11 @@ public class FabricServerProxy implements AbstractModInitializer.IEventProxy
 		
 		
 		// ServerWorldLoadEvent
-		//TODO: Check if both of these use the correct timed events. (i.e. is it 'ed' or 'ing' one?)
-		ServerLifecycleEvents.SERVER_STARTING.register((server) ->
+		// Use SERVER_STARTED instead of SERVER_STARTING because SERVER_STARTING may fire before
+		// registerEvents() is called for integrated servers (singleplayer mode)
+		ServerLifecycleEvents.SERVER_STARTED.register((server) ->
 		{
-			System.out.println("!!!!! SERVER_STARTING event fired! isDedicatedServer=" + this.isDedicatedServer + ", isValidTime()=" + this.isValidTime());
+			System.out.println("!!!!! SERVER_STARTED event fired! isDedicatedServer=" + this.isDedicatedServer + ", isValidTime()=" + this.isValidTime());
 			if (this.isValidTime())
 			{
 				ServerApi.INSTANCE.serverLoadEvent(this.isDedicatedServer);
