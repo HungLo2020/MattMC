@@ -114,8 +114,10 @@ public abstract class AbstractModInitializer
 		this.commandInitializer = new CommandInitializer();
 		this.subscribeRegisterCommandsEvent(dispatcher -> { this.commandInitializer.initCommands(dispatcher); });
 		
+		System.out.println("!!!!! AbstractModInitializer: About to call subscribeServerStartingEvent()");
 		this.subscribeServerStartingEvent(server -> 
 		{
+			System.out.println("!!!!! AbstractModInitializer: SERVER_STARTING event handler called!");
 			MinecraftServerWrapper.INSTANCE.dedicatedServer = (DedicatedServer)server;
 			
 			this.initConfig();

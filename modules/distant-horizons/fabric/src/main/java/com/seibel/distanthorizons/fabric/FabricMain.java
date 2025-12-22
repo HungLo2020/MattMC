@@ -124,8 +124,12 @@ public class FabricMain extends AbstractModInitializer implements ClientModIniti
 	@Override
 	protected void subscribeServerStartingEvent(Consumer<MinecraftServer> eventHandler)
 	{
+		System.out.println("!!!!! FabricMain.subscribeServerStartingEvent() CALLED - registering SERVER_STARTING with INITIAL_PHASE");
 		ServerLifecycleEvents.SERVER_STARTING.addPhaseOrdering(INITIAL_PHASE, Event.DEFAULT_PHASE);
-		ServerLifecycleEvents.SERVER_STARTING.register(INITIAL_PHASE, eventHandler::accept);
+		ServerLifecycleEvents.SERVER_STARTING.register(INITIAL_PHASE, (server) -> {
+			System.out.println("!!!!! SERVER_STARTING event fired (INITIAL_PHASE)!");
+			eventHandler.accept(server);
+		});
 	}
 	
 	@Override
