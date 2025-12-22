@@ -60,8 +60,8 @@ public abstract class MixinChunkHolderChunkEvents {
 	@Inject(method = "updateFutures", at = @At("TAIL"))
 	private void onUpdateFutures(ChunkMap chunkMap, Executor executor, CallbackInfo ci) {
 		// Check if chunk transitioned to FULL status
-		FullChunkStatus oldStatus = net.minecraft.server.level.ChunkLevel.fullStatus(this.oldTicketLevel);
-		FullChunkStatus newStatus = net.minecraft.server.level.ChunkLevel.fullStatus(this.ticketLevel);
+		FullChunkStatus oldStatus = ChunkLevel.fullStatus(this.oldTicketLevel);
+		FullChunkStatus newStatus = ChunkLevel.fullStatus(this.ticketLevel);
 		
 		boolean wasFullChunk = oldStatus.isOrAfter(FullChunkStatus.FULL);
 		boolean isFullChunk = newStatus.isOrAfter(FullChunkStatus.FULL);
