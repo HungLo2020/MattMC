@@ -19,6 +19,7 @@ import com.seibel.distanthorizons.core.wrapperInterfaces.world.ILevelWrapper;
 import com.seibel.distanthorizons.fabric.testing.TestChunkInputReplacerEvent;
 import com.seibel.distanthorizons.fabric.testing.TestWorldGenBindingEvent;
 import net.fabricmc.fabric.api.entity.event.v1.ServerEntityWorldChangeEvents;
+import net.fabricmc.fabric.api.event.Event;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerChunkEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerTickEvents;
@@ -101,14 +102,19 @@ public class FabricServerProxy implements AbstractModInitializer.IEventProxy
 		
 		
 		// ServerWorldLoadEvent
-		// Use SERVER_STARTED instead of SERVER_STARTING because SERVER_STARTING may fire before
-		// registerEvents() is called for integrated servers (singleplayer mode)
-		ServerLifecycleEvents.SERVER_STARTED.register((server) ->
+		// Use SERVER_STARTING with phase ordering to ensure event fires for integrated servers.
+		// Register AFTER FabricMain's INITIAL_PHASE so server wrapper is initialized first.
+		ServerLifecycleEvents.SERVER_STARTING.register(Event.DEFAULT_PHASE, (server) ->
 		{
-			System.out.println("!!!!! SERVER_STARTED event fired! isDedicatedServer=" + this.isDedicatedServer + ", isValidTime()=" + this.isValidTime());
+			System.out.println("!!!!! SERVER_STARTING event fired (DEFAULT_PHASE)! isDedicatedServer=" + this.isDedicatedServer + ", isValidTime()=" + this.isValidTime());
 			if (this.isValidTime())
 			{
+				System.out.println("!!!!! About to call ServerApi.INSTANCE.serverLoadEvent()");
 				ServerApi.INSTANCE.serverLoadEvent(this.isDedicatedServer);
+			}
+			else
+			{
+				System.out.println("!!!!! isValidTime() returned false, skipping serverLoadEvent()");
 			}
 		});
 		// ServerWorldUnloadEvent
