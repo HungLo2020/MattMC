@@ -74,7 +74,9 @@ public class FabricServerProxy implements AbstractModInitializer.IEventProxy
 		}
 		
 		//FIXME: This may cause init issue...
-		return !(Minecraft.getInstance().screen instanceof TitleScreen);
+		// Always return true for integrated servers - the TitleScreen check was preventing
+		// server-side initialization in singleplayer, causing "No DH Client World Loaded" errors
+		return true; // Was: !(Minecraft.getInstance().screen instanceof TitleScreen);
 	}
 	
 	private IClientLevelWrapper getClientLevelWrapper(ClientLevel level) { return ClientLevelWrapper.getWrapper(level); }
