@@ -154,18 +154,12 @@ public class FabricMain extends AbstractModInitializer implements ClientModIniti
 	{
 		System.out.println("!!!!! FabricMain.onInitializeClient() CALLED");
 		super.onInitializeClient();
-		
-		// CRITICAL FIX: DedicatedServerModInitializer.onInitializeServer() only runs on dedicated servers!
-		// For integrated servers (singleplayer), we need to manually call server initialization here.
-		// This ensures server-side DH initialization happens for both dedicated AND integrated servers.
-		System.out.println("!!!!! FabricMain: Manually calling onInitializeServer() for integrated server support");
-		super.onInitializeServer();
 	}
 	
 	@Override
 	public void onInitializeServer()
 	{
-		System.out.println("!!!!! FabricMain.onInitializeServer() CALLED (dedicated server only)");
+		System.out.println("!!!!! FabricMain.onInitializeServer() CALLED");
 		super.onInitializeServer();
 	}
 	
