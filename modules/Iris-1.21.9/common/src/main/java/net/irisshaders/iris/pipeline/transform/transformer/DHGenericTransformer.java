@@ -28,6 +28,9 @@ public class DHGenericTransformer {
 		root.rename("dhProjection", "iris_ProjectionMatrix");
 		root.rename("dhProjectionInverse", "iris_ProjectionMatrixInverse");
 		
+		// Note: dhDepthTex, dhDepthTex0, and dhDepthTex1 are dynamically added samplers
+		// They are registered in IrisSamplers.addRenderTargetSamplers() and don't need renaming
+		
 		root.rename("gl_ProjectionMatrix", "iris_ProjectionMatrix");
 
 		if (parameters.type.glShaderType == ShaderType.VERTEX) {
@@ -67,6 +70,13 @@ public class DHGenericTransformer {
 
 		tree.parseAndInjectNode(t, ASTInjectionPoint.BEFORE_DECLARATIONS,
 			"uniform mat4 iris_ProjectionMatrixInverse;");
+
+		// Add DH depth texture uniforms for shader compatibility
+		// These are dynamically bound by IrisSamplers.addRenderTargetSamplers()
+		tree.parseAndInjectNodes(t, ASTInjectionPoint.BEFORE_DECLARATIONS,
+			"uniform sampler2D dhDepthTex;",
+			"uniform sampler2D dhDepthTex0;",
+			"uniform sampler2D dhDepthTex1;");
 
 		Iris.logger.warn("Type is " + parameters.type);
 
