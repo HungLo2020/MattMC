@@ -44,9 +44,6 @@ public abstract class MixinChunkHolderChunkEvents {
 	@Shadow
 	public abstract LevelChunk getChunkToSend();
 	
-	@Shadow
-	public abstract ChunkAccess getLatestChunk();
-	
 	@Unique
 	private boolean fabric_wasFullChunk = false;
 	
