@@ -89,25 +89,44 @@ public class MixinLevelRenderer
 	@Inject(at = @At("HEAD"), method = "prepareChunkRenders")
 	private void prepareChunkRenders(Matrix4fc modelViewMatrix, double d, double e, double f, CallbackInfoReturnable<ChunkSectionsToRender> callback)
 	{
-		LOGGER.debug("[DH-RENDER-MIXIN] prepareChunkRenders() called");
-		LOGGER.debug("[DH-RENDER-MIXIN] Thread: " + Thread.currentThread().getName() + " (ID: " + Thread.currentThread().getId() + ")");
-		LOGGER.debug("[DH-RENDER-MIXIN] Setting render state matrices and level wrapper");
+		LOGGER.info("[DH-RENDER-MIXIN] ========== prepareChunkRenders() CALLED ==========");
+		LOGGER.info("[DH-RENDER-MIXIN] Thread: " + Thread.currentThread().getName() + " (ID: " + Thread.currentThread().getId() + ")");
+		LOGGER.info("[DH-RENDER-MIXIN] Level: " + this.level);
+		LOGGER.info("[DH-RENDER-MIXIN] Setting render state matrices and level wrapper");
 		
 		ClientApi.RENDER_STATE.mcModelViewMatrix = McObjectConverter.Convert(modelViewMatrix);
 		ClientApi.RENDER_STATE.clientLevelWrapper = ClientLevelWrapper.getWrapperIfDifferent(ClientApi.RENDER_STATE.clientLevelWrapper, this.level);
 		
-		LOGGER.debug("[DH-RENDER-MIXIN] clientLevelWrapper: " + ClientApi.RENDER_STATE.clientLevelWrapper);
+		LOGGER.info("[DH-RENDER-MIXIN] clientLevelWrapper: " + ClientApi.RENDER_STATE.clientLevelWrapper);
+		LOGGER.info("[DH-RENDER-MIXIN] ClientApi.INSTANCE: " + ClientApi.INSTANCE);
 		
 		// only crash during development
 		if (ModInfo.IS_DEV_BUILD)
 		{
-			ClientApi.RENDER_STATE.canRenderOrThrow();
+			LOGGER.info("[DH-RENDER-MIXIN] Development build - checking canRenderOrThrow()");
+			try
+			{
+				ClientApi.RENDER_STATE.canRenderOrThrow();
+				LOGGER.info("[DH-RENDER-MIXIN] canRenderOrThrow() passed");
+			}
+			catch (Exception ex)
+			{
+				LOGGER.error("[DH-RENDER-MIXIN] canRenderOrThrow() failed: " + ex.getMessage(), ex);
+				throw ex;
+			}
 		}
 		
-		LOGGER.debug("[DH-RENDER-MIXIN] Calling ClientApi.INSTANCE.renderLods()");
-		ClientApi.INSTANCE.renderLods();
-		LOGGER.debug("[DH-RENDER-MIXIN] ClientApi.INSTANCE.renderLods() completed");
-		
+		LOGGER.info("[DH-RENDER-MIXIN] Calling ClientApi.INSTANCE.renderLods()");
+		try
+		{
+			ClientApi.INSTANCE.renderLods();
+			LOGGER.info("[DH-RENDER-MIXIN] ClientApi.INSTANCE.renderLods() completed successfully");
+		}
+		catch (Exception ex)
+		{
+			LOGGER.error("[DH-RENDER-MIXIN] renderLods() failed: " + ex.getMessage(), ex);
+		}
+		LOGGER.info("[DH-RENDER-MIXIN] ========== prepareChunkRenders() COMPLETE ==========");
 	}
 	
 	

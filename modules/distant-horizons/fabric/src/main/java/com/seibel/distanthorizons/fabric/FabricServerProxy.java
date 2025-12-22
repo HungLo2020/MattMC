@@ -4,6 +4,7 @@ import com.seibel.distanthorizons.api.DhApi;
 import com.seibel.distanthorizons.api.methods.events.abstractEvents.DhApiChunkProcessingEvent;
 import com.seibel.distanthorizons.api.methods.events.DhApiEventRegister;
 import com.seibel.distanthorizons.api.methods.events.abstractEvents.DhApiLevelLoadEvent;
+import com.seibel.distanthorizons.api.objects.DhApiResult;
 import com.seibel.distanthorizons.common.AbstractModInitializer;
 import com.seibel.distanthorizons.common.wrappers.chunk.ChunkWrapper;
 import com.seibel.distanthorizons.common.wrappers.misc.ServerPlayerWrapper;
@@ -100,10 +101,25 @@ public class FabricServerProxy implements AbstractModInitializer.IEventProxy
 		
 		/* Register the mod needed event callbacks */
 		
-		// can be enabled to test overrides/events without having to build a separate API project 
+		// NOTE: TestWorldGenBindingEvent is for testing only and should NOT be enabled in production
+		// It creates flat colored planes instead of proper terrain generation
 		if (false)
 		{
-			DhApiEventRegister.on(DhApiLevelLoadEvent.class, new TestWorldGenBindingEvent());
+			// can be enabled to test overrides/events without having to build a separate API project 
+			LOGGER.info("[DH-EVENTS] Registering DhApiLevelLoadEvent handler (TestWorldGenBindingEvent)...");
+			DhApiResult<Void> worldGenResult = DhApiEventRegister.on(DhApiLevelLoadEvent.class, new TestWorldGenBindingEvent());
+			if (worldGenResult.success)
+			{
+				LOGGER.info("[DH-EVENTS] TestWorldGenBindingEvent registered successfully");
+			}
+			else
+			{
+				LOGGER.error("[DH-EVENTS] Failed to register TestWorldGenBindingEvent: " + worldGenResult.message);
+			}
+		}
+		
+		if (false)
+		{
 			DhApi.events.bind(DhApiChunkProcessingEvent.class, new TestChunkInputReplacerEvent());
 		}
 		
