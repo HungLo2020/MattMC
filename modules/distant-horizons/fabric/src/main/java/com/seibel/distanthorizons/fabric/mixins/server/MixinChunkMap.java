@@ -22,7 +22,7 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 import java.util.function.BooleanSupplier;
 
 @Mixin(ChunkMap.class)
-public class MixinChunkMap
+public abstract class MixinChunkMap
 {
 	@Unique
 	private static final Logger LOGGER = LoggerFactory.getLogger("DH-ChunkEvents");
