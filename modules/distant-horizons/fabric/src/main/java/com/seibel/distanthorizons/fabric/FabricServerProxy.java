@@ -101,9 +101,19 @@ public class FabricServerProxy implements AbstractModInitializer.IEventProxy
 		/* Register the mod needed event callbacks */
 		
 		// can be enabled to test overrides/events without having to build a separate API project 
+		LOGGER.info("[DH-EVENTS] Registering DhApiLevelLoadEvent handler (TestWorldGenBindingEvent)...");
+		DhApiResult<Void> worldGenResult = DhApiEventRegister.on(DhApiLevelLoadEvent.class, new TestWorldGenBindingEvent());
+		if (worldGenResult.success)
+		{
+			LOGGER.info("[DH-EVENTS] TestWorldGenBindingEvent registered successfully");
+		}
+		else
+		{
+			LOGGER.error("[DH-EVENTS] Failed to register TestWorldGenBindingEvent: " + worldGenResult.message);
+		}
+		
 		if (false)
 		{
-			DhApiEventRegister.on(DhApiLevelLoadEvent.class, new TestWorldGenBindingEvent());
 			DhApi.events.bind(DhApiChunkProcessingEvent.class, new TestChunkInputReplacerEvent());
 		}
 		
