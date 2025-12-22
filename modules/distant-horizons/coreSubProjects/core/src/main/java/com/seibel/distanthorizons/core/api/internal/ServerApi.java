@@ -59,8 +59,13 @@ public class ServerApi
 	
 	public void serverLoadEvent(boolean isDedicatedEnvironment)
 	{
+		System.out.println("!!!!! ServerApi.serverLoadEvent() CALLED !!!!!");
+		System.out.println("!!!!! isDedicatedEnvironment: " + isDedicatedEnvironment);
 		LOGGER.debug("Server World loading with (dedicated?:" + isDedicatedEnvironment + ")");
-		SharedApi.setDhWorld(isDedicatedEnvironment ? new DhServerWorld() : new DhClientServerWorld());
+		AbstractDhWorld world = isDedicatedEnvironment ? new DhServerWorld() : new DhClientServerWorld();
+		System.out.println("!!!!! Created world: " + world + " (type: " + world.getClass().getSimpleName() + ")");
+		SharedApi.setDhWorld(world);
+		System.out.println("!!!!! SharedApi.setDhWorld() called, SharedApi.getAbstractDhWorld(): " + SharedApi.getAbstractDhWorld());
 	}
 	
 	public void serverUnloadEvent()

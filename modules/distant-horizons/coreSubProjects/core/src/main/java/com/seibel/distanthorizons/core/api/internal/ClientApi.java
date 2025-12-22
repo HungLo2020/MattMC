@@ -356,6 +356,10 @@ public class ClientApi
 	
 	private void renderLodLayer(boolean renderingDeferredLayer)
 	{
+		System.out.println("!!!!! renderLodLayer() CALLED, renderingDeferredLayer=" + renderingDeferredLayer);
+		System.out.println("!!!!! SharedApi.getAbstractDhWorld(): " + SharedApi.getAbstractDhWorld());
+		System.out.println("!!!!! SharedApi.tryGetDhClientWorld(): " + SharedApi.tryGetDhClientWorld());
+		
 		//=========//
 		// logging //
 		//=========//
@@ -434,15 +438,20 @@ public class ClientApi
 		// validation //
 		//============//
 		
+		System.out.println("!!!!! About to validate renderParams");
+		System.out.println("!!!!! renderParams.dhClientWorld: " + ((renderParams == null) ? "renderParams is null!" : "checking..."));
 		// TODO write this message to the F3 menu so people can see when a different mod screws with the lightmap
 		String validationMessage = renderParams.getValidationErrorMessage();
+		System.out.println("!!!!! Validation message: " + validationMessage);
 		if (validationMessage != null)
 		{
+			System.out.println("!!!!! VALIDATION FAILED! Returning early.");
 			this.lastRenderParamValidationMessage = validationMessage;
 			return;
 		}
 		else
 		{
+			System.out.println("!!!!! Validation passed!");
 			this.lastRenderParamValidationMessage = null;
 		}
 		
