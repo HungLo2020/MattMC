@@ -72,7 +72,7 @@ public abstract class MixinMinecraftServerLifecycle {
 	/**
 	 * Invoke SERVER_STOPPING event when the server begins shutdown.
 	 */
-	@Inject(method = "shutdown", at = @At("HEAD"))
+	@Inject(method = "stopServer", at = @At("HEAD"))
 	private void onServerStopping(CallbackInfo ci) {
 		MinecraftServer server = (MinecraftServer) (Object) this;
 		LOGGER.info("[DH-MIXIN-LIFECYCLE] ========== MIXIN: onServerStopping CALLED ==========");
@@ -83,7 +83,7 @@ public abstract class MixinMinecraftServerLifecycle {
 	/**
 	 * Invoke SERVER_STOPPED event after the server has stopped.
 	 */
-	@Inject(method = "shutdown", at = @At("TAIL"))
+	@Inject(method = "stopServer", at = @At("TAIL"))
 	private void onServerStopped(CallbackInfo ci) {
 		MinecraftServer server = (MinecraftServer) (Object) this;
 		LOGGER.info("[DH-MIXIN-LIFECYCLE] ========== MIXIN: onServerStopped CALLED ==========");
