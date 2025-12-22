@@ -87,6 +87,7 @@ public class FabricServerProxy implements AbstractModInitializer.IEventProxy
 	@Override
 	public void registerEvents()
 	{
+		System.out.println("!!!!! FabricServerProxy.registerEvents() CALLED, isDedicatedServer=" + this.isDedicatedServer);
 		LOGGER.info("Registering Fabric Server Events");
 		
 		/* Register the mod needed event callbacks */
@@ -103,6 +104,7 @@ public class FabricServerProxy implements AbstractModInitializer.IEventProxy
 		//TODO: Check if both of these use the correct timed events. (i.e. is it 'ed' or 'ing' one?)
 		ServerLifecycleEvents.SERVER_STARTING.register((server) ->
 		{
+			System.out.println("!!!!! SERVER_STARTING event fired! isDedicatedServer=" + this.isDedicatedServer + ", isValidTime()=" + this.isValidTime());
 			if (this.isValidTime())
 			{
 				ServerApi.INSTANCE.serverLoadEvent(this.isDedicatedServer);
