@@ -185,7 +185,7 @@ public class FabricServerProxy implements AbstractModInitializer.IEventProxy
 		LOGGER.info("[DH-EVENTS] Registering ServerPlayConnectionEvents.JOIN event...");
 		ServerPlayConnectionEvents.JOIN.register((handler, sender, server) ->
 		{
-			LOGGER.info("[DH-EVENT-CALLBACK] Player joined: " + handler.player.getName());
+			LOGGER.info("[DH-EVENT-CALLBACK] Player joined: " + handler.getName());
 			if (this.isValidTime())
 			{
 				ServerApi.INSTANCE.serverPlayerJoinEvent(this.getServerPlayerWrapper(handler));
@@ -195,7 +195,7 @@ public class FabricServerProxy implements AbstractModInitializer.IEventProxy
 		LOGGER.info("[DH-EVENTS] Registering ServerPlayConnectionEvents.DISCONNECT event...");
 		ServerPlayConnectionEvents.DISCONNECT.register((handler, server) ->
 		{
-			LOGGER.info("[DH-EVENT-CALLBACK] Player disconnected: " + handler.player.getName());
+			LOGGER.info("[DH-EVENT-CALLBACK] Player disconnected: " + handler.getName());
 			if (this.isValidTime())
 			{
 				ServerApi.INSTANCE.serverPlayerDisconnectEvent(this.getServerPlayerWrapper(handler));
