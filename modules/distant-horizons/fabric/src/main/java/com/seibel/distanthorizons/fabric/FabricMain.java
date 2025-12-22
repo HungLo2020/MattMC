@@ -126,12 +126,10 @@ public class FabricMain extends AbstractModInitializer implements ClientModIniti
 	{
 		LOGGER.info("[DH-EVENT-SUB] Subscribing to SERVER_STARTING event...");
 		LOGGER.info("[DH-EVENT-SUB] Thread: " + Thread.currentThread().getName() + " (ID: " + Thread.currentThread().getId() + ")");
-		LOGGER.info("[DH-EVENT-SUB] Adding phase ordering: INITIAL_PHASE -> DEFAULT_PHASE");
 		
-		ServerLifecycleEvents.SERVER_STARTING.addPhaseOrdering(INITIAL_PHASE, Event.DEFAULT_PHASE);
-		
-		LOGGER.info("[DH-EVENT-SUB] Registering SERVER_STARTING event handler at INITIAL_PHASE");
-		ServerLifecycleEvents.SERVER_STARTING.register(INITIAL_PHASE, (server) -> {
+		// Try registering without phase ordering to see if that's the issue
+		LOGGER.info("[DH-EVENT-SUB] Registering SERVER_STARTING event handler at DEFAULT phase");
+		ServerLifecycleEvents.SERVER_STARTING.register((server) -> {
 			LOGGER.info("[DH-EVENT-FIRE] ========== SERVER_STARTING EVENT FIRED ==========");
 			LOGGER.info("[DH-EVENT-FIRE] Server: " + server);
 			LOGGER.info("[DH-EVENT-FIRE] Is Dedicated: " + server.isDedicatedServer());

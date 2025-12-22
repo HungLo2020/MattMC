@@ -68,21 +68,21 @@ public class FabricServerProxy implements AbstractModInitializer.IEventProxy
 	// TODO rename
 	private boolean isValidTime()
 	{
-		LOGGER.debug("[DH-VALIDATION] isValidTime() called");
-		LOGGER.debug("[DH-VALIDATION] isDedicatedServer: " + this.isDedicatedServer);
+		LOGGER.info("[DH-VALIDATION] isValidTime() called");
+		LOGGER.info("[DH-VALIDATION] isDedicatedServer: " + this.isDedicatedServer);
 		
 		if (this.isDedicatedServer)
 		{
-			LOGGER.debug("[DH-VALIDATION] Dedicated server - returning true");
+			LOGGER.info("[DH-VALIDATION] Dedicated server - returning true");
 			return true;
 		}
 		
 		boolean isOnTitleScreen = Minecraft.getInstance().screen instanceof TitleScreen;
-		LOGGER.debug("[DH-VALIDATION] Is on title screen: " + isOnTitleScreen);
+		LOGGER.info("[DH-VALIDATION] Is on title screen: " + isOnTitleScreen);
 		
 		//FIXME: This may cause init issue...
 		boolean result = !isOnTitleScreen;
-		LOGGER.debug("[DH-VALIDATION] isValidTime() returning: " + result);
+		LOGGER.info("[DH-VALIDATION] isValidTime() returning: " + result);
 		return result;
 	}
 	
