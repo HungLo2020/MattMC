@@ -1,6 +1,7 @@
 package com.seibel.distanthorizons.fabric.mixins.server;
 
-import com.llamalad7.mixinextras.sugar.Local;
+import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
+import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import com.seibel.distanthorizons.core.logging.DhLogger;
 import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
@@ -38,9 +39,9 @@ public abstract class MixinMinecraftServerLifecycle {
 	
 	/**
 	 * Invoke SERVER_STARTING event when the server starts running.
-	 * Injects at the head of runServer() method.
+	 * Injects before setupServer() is called in runServer() method.
 	 */
-	@Inject(method = "runServer", at = @At("HEAD"))
+	@Inject(method = "runServer", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/MinecraftServer;setupServer()Z"))
 	private void onServerStarting(CallbackInfo ci) {
 		MinecraftServer server = (MinecraftServer) (Object) this;
 		LOGGER.info("[DH-MIXIN-LIFECYCLE] ========== MIXIN: onServerStarting CALLED ==========");
@@ -54,9 +55,9 @@ public abstract class MixinMinecraftServerLifecycle {
 	
 	/**
 	 * Invoke SERVER_STARTED event after the server has completed setup.
-	 * Injects after the server starts ticking.
+	 * Injects before createMetadata() is called in runServer() method.
 	 */
-	@Inject(method = "runServer", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/MinecraftServer;tickServer(Ljava/util/function/BooleanSupplier;)V", ordinal = 0))
+	@Inject(method = "runServer", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/MinecraftServer;createMetadata()Lnet/minecraft/server/ServerMetadata;", ordinal = 0))
 	private void onServerStarted(CallbackInfo ci) {
 		MinecraftServer server = (MinecraftServer) (Object) this;
 		LOGGER.info("[DH-MIXIN-LIFECYCLE] ========== MIXIN: onServerStarted CALLED ==========");
@@ -71,57 +72,38 @@ public abstract class MixinMinecraftServerLifecycle {
 	/**
 	 * Invoke SERVER_STOPPING event when the server begins shutdown.
 	 */
-	@Inject(method = "stopServer", at = @At("HEAD"))
+	@Inject(method = "shutdown", at = @At("HEAD"))
 	private void onServerStopping(CallbackInfo ci) {
 		MinecraftServer server = (MinecraftServer) (Object) this;
+		LOGGER.info("[DH-MIXIN-LIFECYCLE] ========== MIXIN: onServerStopping CALLED ==========");
 		ServerLifecycleEvents.SERVER_STOPPING.invoker().onServerStopping(server);
+		LOGGER.info("[DH-MIXIN-LIFECYCLE] SERVER_STOPPING event invoked successfully");
 	}
 	
 	/**
 	 * Invoke SERVER_STOPPED event after the server has stopped.
 	 */
-	@Inject(method = "stopServer", at = @At("TAIL"))
+	@Inject(method = "shutdown", at = @At("TAIL"))
 	private void onServerStopped(CallbackInfo ci) {
 		MinecraftServer server = (MinecraftServer) (Object) this;
+		LOGGER.info("[DH-MIXIN-LIFECYCLE] ========== MIXIN: onServerStopped CALLED ==========");
 		ServerLifecycleEvents.SERVER_STOPPED.invoker().onServerStopped(server);
+		LOGGER.info("[DH-MIXIN-LIFECYCLE] SERVER_STOPPED event invoked successfully");
 	}
 	
 	/**
-	 * Invoke ServerWorldEvents.LOAD when a world is loaded (overworld).
-	 * Injects after the overworld is added to the levels map.
+	 * Invoke ServerWorldEvents.LOAD when a world is loaded.
+	 * Uses WrapOperation to intercept Map.put() calls when worlds are added.
 	 */
-	@Inject(method = "createLevels", at = @At(value = "INVOKE", target = "Ljava/util/Map;put(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;", ordinal = 0, shift = At.Shift.AFTER))
-	private void onOverworldLoad(CallbackInfo ci) {
+	@WrapOperation(method = "createLevels", at = @At(value = "INVOKE", target = "Ljava/util/Map;put(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;"))
+	private <K, V> V onWorldLoad(Map<K, V> levels, K registryKey, V serverLevel, Operation<V> original) {
+		final V result = original.call(levels, registryKey, serverLevel);
 		MinecraftServer server = (MinecraftServer) (Object) this;
-		LOGGER.info("[DH-MIXIN-LIFECYCLE] ========== MIXIN: onOverworldLoad CALLED ==========");
-		LOGGER.info("[DH-MIXIN-LIFECYCLE] Thread: " + Thread.currentThread().getName() + " (ID: " + Thread.currentThread().getId() + ")");
-		ServerLevel overworld = server.getLevel(Level.OVERWORLD);
-		if (overworld != null) {
-			LOGGER.info("[DH-MIXIN-LIFECYCLE] Overworld level found: " + overworld);
-			LOGGER.info("[DH-MIXIN-LIFECYCLE] About to invoke ServerWorldEvents.LOAD for overworld...");
-			ServerWorldEvents.LOAD.invoker().onWorldLoad(server, overworld);
-			LOGGER.info("[DH-MIXIN-LIFECYCLE] ServerWorldEvents.LOAD invoked successfully for overworld");
-		} else {
-			LOGGER.warn("[DH-MIXIN-LIFECYCLE] Overworld level is NULL - cannot fire LOAD event");
-		}
-	}
-	
-	/**
-	 * Invoke ServerWorldEvents.LOAD when a world is loaded (nether/end/custom dimensions).
-	 * Injects after each dimension is added to the levels map.
-	 */
-	@Inject(method = "createLevels", at = @At(value = "INVOKE", target = "Ljava/util/Map;put(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;", ordinal = 1, shift = At.Shift.AFTER))
-	private void onDimensionLoad(CallbackInfo ci, @Local(ordinal = 1) ServerLevel serverLevel2) {
-		MinecraftServer server = (MinecraftServer) (Object) this;
-		LOGGER.info("[DH-MIXIN-LIFECYCLE] ========== MIXIN: onDimensionLoad CALLED ==========");
-		LOGGER.info("[DH-MIXIN-LIFECYCLE] Thread: " + Thread.currentThread().getName() + " (ID: " + Thread.currentThread().getId() + ")");
-		if (serverLevel2 != null) {
-			LOGGER.info("[DH-MIXIN-LIFECYCLE] Dimension level found: " + serverLevel2);
-			LOGGER.info("[DH-MIXIN-LIFECYCLE] About to invoke ServerWorldEvents.LOAD for dimension...");
-			ServerWorldEvents.LOAD.invoker().onWorldLoad(server, serverLevel2);
-			LOGGER.info("[DH-MIXIN-LIFECYCLE] ServerWorldEvents.LOAD invoked successfully for dimension");
-		} else {
-			LOGGER.warn("[DH-MIXIN-LIFECYCLE] Dimension level is NULL - cannot fire LOAD event");
-		}
+		LOGGER.info("[DH-MIXIN-LIFECYCLE] ========== MIXIN: onWorldLoad CALLED ==========");
+		LOGGER.info("[DH-MIXIN-LIFECYCLE] World being loaded: " + serverLevel);
+		LOGGER.info("[DH-MIXIN-LIFECYCLE] About to invoke ServerWorldEvents.LOAD...");
+		ServerWorldEvents.LOAD.invoker().onWorldLoad(server, (ServerLevel) serverLevel);
+		LOGGER.info("[DH-MIXIN-LIFECYCLE] ServerWorldEvents.LOAD invoked successfully");
+		return result;
 	}
 }
