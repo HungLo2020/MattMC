@@ -19,16 +19,23 @@ public class FabricMixinPlugin implements IMixinConfigPlugin
 	@Override
 	public boolean shouldApplyMixin(String targetClassName, String mixinClassName)
 	{
+		System.out.println("!!!!! FabricMixinPlugin.shouldApplyMixin called !!!!!");
+		System.out.println("!!!!! targetClassName: " + targetClassName);
+		System.out.println("!!!!! mixinClassName: " + mixinClassName);
+		
 		if (mixinClassName.contains(".mods."))
 		{ // If the mixin wants to go into a mod then we check if that mod is loaded or not
-			return FabricLoader.getInstance().isModLoaded(
+			boolean shouldLoad = FabricLoader.getInstance().isModLoaded(
 					mixinClassName
 							// What these 2 regex's do is get the mod name that we are checking out of the mixinClassName
 							// Eg. "com.seibel.distanthorizons.mixins.mods.sodium.MixinSodiumChunkRenderer" turns into "sodium"
 							.replaceAll("^.*mods.", "") // Replaces everything before the mods
 							.replaceAll("\\..*$", "") // Replaces everything after the mod name
 			);
+			System.out.println("!!!!! Mod mixin, shouldLoad: " + shouldLoad);
+			return shouldLoad;
 		}
+		System.out.println("!!!!! Regular mixin, returning true");
 		return true;
 	}
 	
@@ -36,7 +43,10 @@ public class FabricMixinPlugin implements IMixinConfigPlugin
 	@Override
 	public void onLoad(String mixinPackage)
 	{
-		
+		System.out.println("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
+		System.out.println("!!!!! FabricMixinPlugin.onLoad called !!!!!");
+		System.out.println("!!!!! mixinPackage: " + mixinPackage);
+		System.out.println("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
 	}
 	
 	@Override
