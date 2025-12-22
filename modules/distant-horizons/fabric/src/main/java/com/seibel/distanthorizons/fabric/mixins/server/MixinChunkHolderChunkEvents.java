@@ -2,6 +2,7 @@ package com.seibel.distanthorizons.fabric.mixins.server;
 
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerChunkEvents;
 import net.minecraft.server.level.ChunkHolder;
+import net.minecraft.server.level.ChunkLevel;
 import net.minecraft.server.level.ChunkMap;
 import net.minecraft.server.level.FullChunkStatus;
 import net.minecraft.server.level.ServerLevel;
@@ -53,51 +54,52 @@ public abstract class MixinChunkHolderChunkEvents {
 	private boolean fabric_loadEventFired = false;
 	
 	/**
-	 * Fire CHUNK_LOAD and CHUNK_GENERATE events when chunks are promoted.
-	 * We inject into promoteChunk which is called when a chunk reaches FULL status from generation or loading.
+	 * Fire CHUNK_LOAD and CHUNK_GENERATE events when chunks are promoted to FULL status.
+	 * We inject at the end of updateFutures() after the chunk has been promoted.
 	 */
-	@Inject(method = "promoteChunk", at = @At("RETURN"))
-	private void onPromoteChunk(ChunkMap chunkMap, Executor executor, CallbackInfoReturnable<CompletableFuture<ChunkAccess>> cir) {
-		// Only fire events once per chunk
-		if (fabric_loadEventFired) {
-			return;
-		}
+	@Inject(method = "updateFutures", at = @At("TAIL"))
+	private void onUpdateFutures(ChunkMap chunkMap, Executor executor, CallbackInfo ci) {
+		// Check if chunk transitioned to FULL status
+		FullChunkStatus oldStatus = net.minecraft.server.level.ChunkLevel.fullStatus(this.oldTicketLevel);
+		FullChunkStatus newStatus = net.minecraft.server.level.ChunkLevel.fullStatus(this.ticketLevel);
 		
-		// Get the chunk that was just promoted
-		ChunkAccess chunk = this.getLatestChunk();
+		boolean wasFullChunk = oldStatus.isOrAfter(FullChunkStatus.FULL);
+		boolean isFullChunk = newStatus.isOrAfter(FullChunkStatus.FULL);
 		
-		if (chunk instanceof LevelChunk levelChunk) {
-			// Use the accessor to get the level from ChunkMap
-			ServerLevel level = ((ChunkMapAccessor) chunkMap).distanthorizons$getLevel();
+		// Chunk was promoted to FULL status
+		if (!wasFullChunk && isFullChunk && !fabric_loadEventFired) {
+			LevelChunk levelChunk = this.getChunkToSend();
 			
-			LOGGER.info("[DH-CHUNK-LOAD] Firing CHUNK_LOAD event for chunk at {}", levelChunk.getPos());
-			
-			try {
-				ServerChunkEvents.CHUNK_LOAD.invoker().onChunkLoad(level, levelChunk);
+			if (levelChunk != null) {
+				// Use the accessor to get the level from ChunkMap
+				ServerLevel level = ((ChunkMapAccessor) chunkMap).distanthorizons$getLevel();
 				
-				// For newly generated chunks (not loaded from disk), also fire CHUNK_GENERATE
-				// In Minecraft, chunks loaded from disk are already LevelChunks, newly generated ones are ProtoChunks first
-				if (!fabric_wasFullChunk) {
-					LOGGER.info("[DH-CHUNK-GENERATE] Firing CHUNK_GENERATE event for chunk at {}", levelChunk.getPos());
-					ServerChunkEvents.CHUNK_GENERATE.invoker().onChunkGenerate(level, levelChunk);
+				LOGGER.info("[DH-CHUNK-LOAD] Firing CHUNK_LOAD event for chunk at {}", levelChunk.getPos());
+				
+				try {
+					ServerChunkEvents.CHUNK_LOAD.invoker().onChunkLoad(level, levelChunk);
+					
+					// For newly generated chunks (not loaded from disk), also fire CHUNK_GENERATE
+					// Track if this chunk was previously at FULL status to distinguish new generation from loading
+					if (!fabric_wasFullChunk) {
+						LOGGER.info("[DH-CHUNK-GENERATE] Firing CHUNK_GENERATE event for chunk at {}", levelChunk.getPos());
+						ServerChunkEvents.CHUNK_GENERATE.invoker().onChunkGenerate(level, levelChunk);
+					}
+					
+					fabric_loadEventFired = true;
+				} catch (Exception e) {
+					LOGGER.error("[DH-CHUNK-LOAD] Error invoking chunk events for {}: {}", levelChunk.getPos(), e.getMessage(), e);
 				}
-				
-				fabric_loadEventFired = true;
-				fabric_wasFullChunk = true;
-			} catch (Exception e) {
-				LOGGER.error("[DH-CHUNK-LOAD] Error invoking chunk events for {}: {}", levelChunk.getPos(), e.getMessage(), e);
 			}
+			
+			fabric_wasFullChunk = true;
 		}
-	}
-	
-	/**
-	 * Track when chunks are demoted to reset our tracking flags.
-	 */
-	@Inject(method = "demoteChunk", at = @At("HEAD"))
-	private void onDemoteChunk(ChunkMap chunkMap, FullChunkStatus fullChunkStatus, CallbackInfo ci) {
-		// Reset flags when chunk is unloaded
-		fabric_loadEventFired = false;
-		fabric_wasFullChunk = false;
-		LOGGER.info("[DH-CHUNK-UPDATE] Chunk demoted, resetting tracking flags");
+		
+		// Chunk was demoted from FULL status - reset flags
+		if (wasFullChunk && !isFullChunk) {
+			fabric_loadEventFired = false;
+			fabric_wasFullChunk = false;
+			LOGGER.info("[DH-CHUNK-UPDATE] Chunk demoted from FULL, resetting tracking flags");
+		}
 	}
 }
