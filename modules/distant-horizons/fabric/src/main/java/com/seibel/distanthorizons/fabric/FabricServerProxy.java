@@ -103,6 +103,10 @@ public class FabricServerProxy implements AbstractModInitializer.IEventProxy
 		
 		// ServerWorldLoadEvent
 		// Use SERVER_STARTING with phase ordering to ensure event fires for integrated servers.
+		// Set up phase ordering first (normally done in FabricMain.subscribeServerStartingEvent,
+		// but that's only called from onInitializeServer which doesn't run for integrated servers)
+		ServerLifecycleEvents.SERVER_STARTING.addPhaseOrdering(FabricMain.INITIAL_PHASE, Event.DEFAULT_PHASE);
+		
 		// Register AFTER FabricMain's INITIAL_PHASE so server wrapper is initialized first.
 		ServerLifecycleEvents.SERVER_STARTING.register(Event.DEFAULT_PHASE, (server) ->
 		{
