@@ -73,7 +73,15 @@ public abstract class MixinPlayerManager
 		{
 			// Create a simple PacketSender implementation
 			PacketSender sender = new PacketSender() {
-				// Minimal implementation - we don't use packet sending in DH's event handlers
+				@Override
+				public void sendPacket(net.minecraft.network.protocol.common.custom.CustomPacketPayload payload) {
+					// Minimal implementation - DH doesn't use packet sending in event handlers
+				}
+				
+				@Override
+				public void sendPacket(net.minecraft.resources.ResourceLocation channel, net.minecraft.network.FriendlyByteBuf buf) {
+					// Minimal implementation - DH doesn't use packet sending in event handlers
+				}
 			};
 			
 			// Fire the JOIN event
