@@ -19,6 +19,52 @@ public class DHGenericTransformer {
 		Root root, Parameters parameters) {
 		CommonTransformer.transform(t, tree, root, parameters, false);
 
+		// CRITICAL: Inject ALL uniforms BEFORE any rename operations
+		// Renames pollute the identifier index, causing conditional checks to fail incorrectly
+		// By injecting first, we can accurately detect pre-existing uniform declarations
+		
+		// Inject matrix uniforms with conditional checks to avoid duplicates
+		if (!root.identifierIndex.has("iris_NormalMatrix")) {
+			tree.parseAndInjectNode(t, ASTInjectionPoint.BEFORE_DECLARATIONS,
+				"uniform mat3 iris_NormalMatrix;");
+		}
+		
+		if (!root.identifierIndex.has("iris_ModelViewMatrix")) {
+			tree.parseAndInjectNode(t, ASTInjectionPoint.BEFORE_DECLARATIONS,
+				"uniform mat4 iris_ModelViewMatrix;");
+		}
+		
+		if (!root.identifierIndex.has("iris_ModelViewMatrixInverse")) {
+			tree.parseAndInjectNode(t, ASTInjectionPoint.BEFORE_DECLARATIONS,
+				"uniform mat4 iris_ModelViewMatrixInverse;");
+		}
+		
+		if (!root.identifierIndex.has("iris_ProjectionMatrix")) {
+			tree.parseAndInjectNode(t, ASTInjectionPoint.BEFORE_DECLARATIONS,
+				"uniform mat4 iris_ProjectionMatrix;");
+		}
+		
+		if (!root.identifierIndex.has("iris_ProjectionMatrixInverse")) {
+			tree.parseAndInjectNode(t, ASTInjectionPoint.BEFORE_DECLARATIONS,
+				"uniform mat4 iris_ProjectionMatrixInverse;");
+		}
+		
+		// Add DH depth texture uniforms for shader compatibility
+		// These are dynamically bound by IrisSamplers.addRenderTargetSamplers()
+		if (!root.identifierIndex.has("dhDepthTex")) {
+			tree.parseAndInjectNode(t, ASTInjectionPoint.BEFORE_DECLARATIONS,
+				"uniform sampler2D dhDepthTex;");
+		}
+		
+		if (!root.identifierIndex.has("dhDepthTex0")) {
+			tree.parseAndInjectNode(t, ASTInjectionPoint.BEFORE_DECLARATIONS,
+				"uniform sampler2D dhDepthTex0;");
+		}
+		
+		if (!root.identifierIndex.has("dhDepthTex1")) {
+			tree.parseAndInjectNode(t, ASTInjectionPoint.BEFORE_DECLARATIONS,
+				"uniform sampler2D dhDepthTex1;");
+		}
 
 		root.replaceExpressionMatches(t, CommonTransformer.glTextureMatrix0, "mat4(1.0)");
 		root.replaceExpressionMatches(t, CommonTransformer.glTextureMatrix1, "mat4(1.0)");
@@ -27,9 +73,6 @@ public class DHGenericTransformer {
 		// Some shaderpacks designed for Distant Horizons use dhProjection/dhProjectionInverse
 		root.rename("dhProjection", "iris_ProjectionMatrix");
 		root.rename("dhProjectionInverse", "iris_ProjectionMatrixInverse");
-		
-		// Note: dhDepthTex, dhDepthTex0, and dhDepthTex1 are dynamically added samplers
-		// They are registered in IrisSamplers.addRenderTargetSamplers() and don't need renaming
 		
 		root.rename("gl_ProjectionMatrix", "iris_ProjectionMatrix");
 
@@ -62,35 +105,6 @@ public class DHGenericTransformer {
 		// computed on the CPU-side of things
 		root.replaceReferenceExpressions(t, "gl_NormalMatrix",
 			"iris_NormalMatrix");
-		// Inject matrix uniforms BEFORE renaming to avoid identifier index conflicts
-		// After renaming gl_ModelViewMatrix → iris_ModelViewMatrix, the identifier index
-		// will think iris_ModelViewMatrix exists, but it's just a renamed reference, not a declaration
-		tree.parseAndInjectNode(t, ASTInjectionPoint.BEFORE_DECLARATIONS,
-			"uniform mat3 iris_NormalMatrix;");
-
-		tree.parseAndInjectNode(t, ASTInjectionPoint.BEFORE_DECLARATIONS,
-			"uniform mat4 iris_ModelViewMatrix;");
-
-		tree.parseAndInjectNode(t, ASTInjectionPoint.BEFORE_DECLARATIONS,
-			"uniform mat4 iris_ModelViewMatrixInverse;");
-
-		tree.parseAndInjectNode(t, ASTInjectionPoint.BEFORE_DECLARATIONS,
-			"uniform mat4 iris_ProjectionMatrix;");
-
-		tree.parseAndInjectNode(t, ASTInjectionPoint.BEFORE_DECLARATIONS,
-			"uniform mat4 iris_ProjectionMatrixInverse;");
-
-		// Add DH depth texture uniforms for shader compatibility
-		// These are dynamically bound by IrisSamplers.addRenderTargetSamplers()
-		// Inject unconditionally to ensure they're available (GLSL allows duplicate uniforms with same type)
-		tree.parseAndInjectNode(t, ASTInjectionPoint.BEFORE_DECLARATIONS,
-			"uniform sampler2D dhDepthTex;");
-		
-		tree.parseAndInjectNode(t, ASTInjectionPoint.BEFORE_DECLARATIONS,
-			"uniform sampler2D dhDepthTex0;");
-		
-		tree.parseAndInjectNode(t, ASTInjectionPoint.BEFORE_DECLARATIONS,
-			"uniform sampler2D dhDepthTex1;");
 
 		Iris.logger.warn("Type is " + parameters.type);
 
