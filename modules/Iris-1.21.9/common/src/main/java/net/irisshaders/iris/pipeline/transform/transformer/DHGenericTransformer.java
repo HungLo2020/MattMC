@@ -62,21 +62,39 @@ public class DHGenericTransformer {
 		// computed on the CPU-side of things
 		root.replaceReferenceExpressions(t, "gl_NormalMatrix",
 			"iris_NormalMatrix");
+		// Inject matrix uniforms BEFORE renaming to avoid identifier index conflicts
+		// After renaming gl_ModelViewMatrix → iris_ModelViewMatrix, the identifier index
+		// will think iris_ModelViewMatrix exists, but it's just a renamed reference, not a declaration
 		tree.parseAndInjectNode(t, ASTInjectionPoint.BEFORE_DECLARATIONS,
 			"uniform mat3 iris_NormalMatrix;");
 
 		tree.parseAndInjectNode(t, ASTInjectionPoint.BEFORE_DECLARATIONS,
+			"uniform mat4 iris_ModelViewMatrix;");
+
+		tree.parseAndInjectNode(t, ASTInjectionPoint.BEFORE_DECLARATIONS,
 			"uniform mat4 iris_ModelViewMatrixInverse;");
+
+		tree.parseAndInjectNode(t, ASTInjectionPoint.BEFORE_DECLARATIONS,
+			"uniform mat4 iris_ProjectionMatrix;");
 
 		tree.parseAndInjectNode(t, ASTInjectionPoint.BEFORE_DECLARATIONS,
 			"uniform mat4 iris_ProjectionMatrixInverse;");
 
 		// Add DH depth texture uniforms for shader compatibility
 		// These are dynamically bound by IrisSamplers.addRenderTargetSamplers()
-		tree.parseAndInjectNodes(t, ASTInjectionPoint.BEFORE_DECLARATIONS,
-			"uniform sampler2D dhDepthTex;",
-			"uniform sampler2D dhDepthTex0;",
-			"uniform sampler2D dhDepthTex1;");
+		// Only inject if they don't already exist (some DH shaders may declare them)
+		if (!root.identifierIndex.has("dhDepthTex")) {
+			tree.parseAndInjectNode(t, ASTInjectionPoint.BEFORE_DECLARATIONS,
+				"uniform sampler2D dhDepthTex;");
+		}
+		if (!root.identifierIndex.has("dhDepthTex0")) {
+			tree.parseAndInjectNode(t, ASTInjectionPoint.BEFORE_DECLARATIONS,
+				"uniform sampler2D dhDepthTex0;");
+		}
+		if (!root.identifierIndex.has("dhDepthTex1")) {
+			tree.parseAndInjectNode(t, ASTInjectionPoint.BEFORE_DECLARATIONS,
+				"uniform sampler2D dhDepthTex1;");
+		}
 
 		Iris.logger.warn("Type is " + parameters.type);
 
@@ -93,15 +111,6 @@ public class DHGenericTransformer {
 				tree.parseAndInjectNodes(t, ASTInjectionPoint.BEFORE_FUNCTIONS,
 					"vec4 ftransform() { return gl_ModelViewProjectionMatrix * gl_Vertex; }");
 			}
-			// Only inject uniforms if they don't already exist (some DH shaders may declare them)
-			if (!root.identifierIndex.has("iris_ProjectionMatrix")) {
-				tree.parseAndInjectNode(t, ASTInjectionPoint.BEFORE_DECLARATIONS,
-					"uniform mat4 iris_ProjectionMatrix;");
-			}
-			if (!root.identifierIndex.has("iris_ModelViewMatrix")) {
-				tree.parseAndInjectNode(t, ASTInjectionPoint.BEFORE_DECLARATIONS,
-					"uniform mat4 iris_ModelViewMatrix;");
-			}
 			tree.parseAndInjectNode(t, ASTInjectionPoint.BEFORE_DECLARATIONS,
 				// _draw_translation replaced with Chunks[_draw_id].offset.xyz
 				"vec4 getVertexPosition() { return vec4(_vert_position, 1.0); }");
@@ -111,16 +120,6 @@ public class DHGenericTransformer {
 			// inject in reverse order if performed piece-wise but in correct order if
 			// performed as an array of injections)
 			injectVertInit(t, tree, root, parameters);
-		} else {
-			// Only inject uniforms if they don't already exist (some DH shaders may declare them)
-			if (!root.identifierIndex.has("iris_ModelViewMatrix")) {
-				tree.parseAndInjectNode(t, ASTInjectionPoint.BEFORE_DECLARATIONS,
-					"uniform mat4 iris_ModelViewMatrix;");
-			}
-			if (!root.identifierIndex.has("iris_ProjectionMatrix")) {
-				tree.parseAndInjectNode(t, ASTInjectionPoint.BEFORE_DECLARATIONS,
-					"uniform mat4 iris_ProjectionMatrix;");
-			}
 		}
 
 		root.replaceReferenceExpressions(t, "gl_ModelViewProjectionMatrix",
