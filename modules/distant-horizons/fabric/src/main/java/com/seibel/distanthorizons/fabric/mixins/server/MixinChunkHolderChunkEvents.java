@@ -51,19 +51,19 @@ public abstract class MixinChunkHolderChunkEvents {
 	private boolean fabric_loadEventFired = false;
 	
 	/**
-	 * Fire CHUNK_LOAD and CHUNK_GENERATE events when chunks are promoted to FULL status.
-	 * We inject right after the fullChunkFuture is scheduled for promotion (line 282 in updateFutures).
+	 * Fire CHUNK_LOAD and CHUNK_GENERATE events when chunks become accessible.
+	 * We inject at TAIL to detect ticket level transitions without calling ChunkLevel methods.
+	 * 
+	 * A chunk becomes accessible when its ticket level is <= 33 (FULL status threshold).
 	 */
-	@Inject(
-		method = "updateFutures",
-		at = @At(
-			value = "INVOKE",
-			target = "Lnet/minecraft/server/level/ChunkHolder;scheduleFullChunkPromotion(Lnet/minecraft/server/level/ChunkMap;Ljava/util/concurrent/CompletableFuture;Ljava/util/concurrent/Executor;Lnet/minecraft/server/level/FullChunkStatus;)V",
-			ordinal = 0
-		)
-	)
-	private void onChunkPromotedToFull(ChunkMap chunkMap, Executor executor, CallbackInfo ci) {
-		if (!fabric_loadEventFired) {
+	@Inject(method = "updateFutures", at = @At("TAIL"))
+	private void onUpdateFutures(ChunkMap chunkMap, Executor executor, CallbackInfo ci) {
+		// Check if chunk became accessible (ticket level <= 33 means FULL or better)
+		boolean wasAccessible = this.oldTicketLevel <= 33;
+		boolean isAccessible = this.ticketLevel <= 33;
+		
+		// Chunk transitioned to accessible (FULL or better status)
+		if (!wasAccessible && isAccessible && !fabric_loadEventFired) {
 			LevelChunk levelChunk = this.getChunkToSend();
 			
 			if (levelChunk != null) {
@@ -76,7 +76,7 @@ public abstract class MixinChunkHolderChunkEvents {
 					ServerChunkEvents.CHUNK_LOAD.invoker().onChunkLoad(level, levelChunk);
 					
 					// For newly generated chunks (not loaded from disk), also fire CHUNK_GENERATE
-					// Track if this chunk was previously at FULL status to distinguish new generation from loading
+					// Track if this chunk was previously accessible to distinguish new generation from loading
 					if (!fabric_wasFullChunk) {
 						LOGGER.info("[DH-CHUNK-GENERATE] Firing CHUNK_GENERATE event for chunk at {}", levelChunk.getPos());
 						ServerChunkEvents.CHUNK_GENERATE.invoker().onChunkGenerate(level, levelChunk);
@@ -89,22 +89,11 @@ public abstract class MixinChunkHolderChunkEvents {
 				}
 			}
 		}
-	}
-	
-	/**
-	 * Reset tracking flags when chunk is demoted from FULL status.
-	 */
-	@Inject(
-		method = "updateFutures",
-		at = @At(
-			value = "INVOKE",
-			target = "Ljava/util/concurrent/CompletableFuture;complete(Ljava/lang/Object;)Z",
-			ordinal = 0
-		)
-	)
-	private void onChunkDemotedFromFull(ChunkMap chunkMap, Executor executor, CallbackInfo ci) {
-		fabric_loadEventFired = false;
-		fabric_wasFullChunk = false;
-		LOGGER.info("[DH-CHUNK-UPDATE] Chunk demoted from FULL, resetting tracking flags");
+		
+		// Chunk transitioned to inaccessible - reset tracking flags
+		if (wasAccessible && !isAccessible) {
+			fabric_loadEventFired = false;
+			fabric_wasFullChunk = false;
+		}
 	}
 }
