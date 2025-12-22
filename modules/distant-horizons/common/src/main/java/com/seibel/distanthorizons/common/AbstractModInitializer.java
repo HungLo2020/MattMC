@@ -99,6 +99,28 @@ public abstract class AbstractModInitializer
 		LOGGER.info("[DH-INIT] Subscribing to client started event...");
 		this.subscribeClientStartedEvent(this::postInit);
 		
+		// For integrated servers, we need to subscribe to SERVER_STARTING event
+		LOGGER.info("[DH-INIT] Subscribing to server starting event for integrated server...");
+		this.subscribeServerStartingEvent(server -> 
+		{
+			LOGGER.info("[DH-EVENT] ========== SERVER_STARTING CALLBACK (Integrated Server) ==========");
+			LOGGER.info("[DH-EVENT] Server: " + server);
+			LOGGER.info("[DH-EVENT] Is Dedicated: " + server.isDedicatedServer());
+			LOGGER.info("[DH-EVENT] Thread: " + Thread.currentThread().getName() + " (ID: " + Thread.currentThread().getId() + ")");
+			
+			// For integrated servers, we don't set the dedicated server field
+			// Just initialize what's needed for integrated server operation
+			if (!server.isDedicatedServer())
+			{
+				LOGGER.info("[DH-EVENT] Integrated server detected - initializing for singleplayer");
+				this.commandInitializer = new CommandInitializer();
+				this.commandInitializer.onServerReady();
+			}
+			
+			LOGGER.info("[DH-EVENT] ========== SERVER_STARTING CALLBACK COMPLETE ==========");
+		});
+		LOGGER.info("[DH-INIT] Server starting event subscription added for integrated server");
+		
 		LOGGER.info("[DH-INIT] ========== CLIENT INITIALIZATION COMPLETE ==========");
 	}
 	
