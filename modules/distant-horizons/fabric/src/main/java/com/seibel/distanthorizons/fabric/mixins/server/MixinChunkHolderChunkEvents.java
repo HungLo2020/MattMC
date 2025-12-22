@@ -54,9 +54,15 @@ public abstract class MixinChunkHolderChunkEvents {
 		boolean wasAccessible = oldStatus.isOrAfter(FullChunkStatus.FULL);
 		boolean isAccessible = newStatus.isOrAfter(FullChunkStatus.FULL);
 		
+		// Diagnostic logging
+		LOGGER.info("[DH-CHUNK-UPDATE] updateFutures called - oldLevel: {}, newLevel: {}, oldStatus: {}, newStatus: {}, wasAccessible: {}, isAccessible: {}",
+			this.oldTicketLevel, this.ticketLevel, oldStatus, newStatus, wasAccessible, isAccessible);
+		
 		// Fire CHUNK_LOAD when chunk becomes accessible (wasn't accessible before, but is now)
 		if (!wasAccessible && isAccessible) {
 			LevelChunk chunk = this.getChunkToSend();
+			LOGGER.info("[DH-CHUNK-UPDATE] Chunk transitioning to FULL - getChunkToSend() returned: {}", chunk != null ? chunk.getPos() : "null");
+			
 			if (chunk != null) {
 				// Use the accessor to get the level from ChunkMap
 				ServerLevel level = ((ChunkMapAccessor) chunkMap).distanthorizons$getLevel();
@@ -80,6 +86,7 @@ public abstract class MixinChunkHolderChunkEvents {
 			}
 		} else if (wasAccessible && !isAccessible) {
 			// Chunk is being unloaded
+			LOGGER.info("[DH-CHUNK-UPDATE] Chunk transitioning away from FULL - resetting fabric_wasFullChunk");
 			fabric_wasFullChunk = false;
 		}
 	}
