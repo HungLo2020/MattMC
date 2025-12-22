@@ -89,8 +89,14 @@ public class MixinLevelRenderer
 	@Inject(at = @At("HEAD"), method = "prepareChunkRenders")
 	private void prepareChunkRenders(Matrix4fc modelViewMatrix, double d, double e, double f, CallbackInfoReturnable<ChunkSectionsToRender> callback)
 	{
+		LOGGER.debug("[DH-RENDER-MIXIN] prepareChunkRenders() called");
+		LOGGER.debug("[DH-RENDER-MIXIN] Thread: " + Thread.currentThread().getName() + " (ID: " + Thread.currentThread().getId() + ")");
+		LOGGER.debug("[DH-RENDER-MIXIN] Setting render state matrices and level wrapper");
+		
 		ClientApi.RENDER_STATE.mcModelViewMatrix = McObjectConverter.Convert(modelViewMatrix);
 		ClientApi.RENDER_STATE.clientLevelWrapper = ClientLevelWrapper.getWrapperIfDifferent(ClientApi.RENDER_STATE.clientLevelWrapper, this.level);
+		
+		LOGGER.debug("[DH-RENDER-MIXIN] clientLevelWrapper: " + ClientApi.RENDER_STATE.clientLevelWrapper);
 		
 		// only crash during development
 		if (ModInfo.IS_DEV_BUILD)
@@ -98,7 +104,9 @@ public class MixinLevelRenderer
 			ClientApi.RENDER_STATE.canRenderOrThrow();
 		}
 		
+		LOGGER.debug("[DH-RENDER-MIXIN] Calling ClientApi.INSTANCE.renderLods()");
 		ClientApi.INSTANCE.renderLods();
+		LOGGER.debug("[DH-RENDER-MIXIN] ClientApi.INSTANCE.renderLods() completed");
 		
 	}
 	

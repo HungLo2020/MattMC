@@ -9,7 +9,8 @@
     "server.MixinServerPlayer",
     "server.MixinTracingExecutor",
     "server.MixinUtilBackgroundThread", 
-    "server.MixinLevelTicks"
+    "server.MixinLevelTicks",
+    "server.MixinMinecraftServerLifecycle"
   ],
   "client": [
     "client.MixinClientLevel",
