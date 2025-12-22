@@ -98,21 +98,41 @@ public class LodRequestModule implements Closeable
 		}
 		catch (InterruptedException ignore) { }
 	}
+	private static boolean hasLoggedInitialTick = false;
+	
 	private void tick()
 	{
 		boolean shouldDoWorldGen = this.onWorldGenCompleteListener.shouldDoWorldGen();
+		boolean isReadOnly = DhApiWorldProxy.INSTANCE.getReadOnly();
 		// if the world is read only don't generate anything
-		shouldDoWorldGen &= !DhApiWorldProxy.INSTANCE.getReadOnly();
+		shouldDoWorldGen &= !isReadOnly;
 		
 		boolean isWorldGenRunning = this.isWorldGenRunning();
+		
+		// Log the first few ticks to diagnose startup
+		if (!hasLoggedInitialTick)
+		{
+			LOGGER.info("[DH-LOD-REQUEST-TICK] ========== LodRequestModule tick() CALLED ==========");
+			LOGGER.info("[DH-LOD-REQUEST-TICK] shouldDoWorldGen (from listener): " + this.onWorldGenCompleteListener.shouldDoWorldGen());
+			LOGGER.info("[DH-LOD-REQUEST-TICK] isReadOnly: " + isReadOnly);
+			LOGGER.info("[DH-LOD-REQUEST-TICK] shouldDoWorldGen (final): " + shouldDoWorldGen);
+			LOGGER.info("[DH-LOD-REQUEST-TICK] isWorldGenRunning: " + isWorldGenRunning);
+			LOGGER.info("[DH-LOD-REQUEST-TICK] Thread: " + Thread.currentThread().getName());
+			hasLoggedInitialTick = true;
+		}
+		
 		if (shouldDoWorldGen && !isWorldGenRunning)
 		{
 			// start world gen
+			LOGGER.info("[DH-LOD-REQUEST-START] ========== STARTING WORLD GEN ==========");
+			LOGGER.info("[DH-LOD-REQUEST-START] Calling worldGenStateSupplier.get() to create LodRequestState");
 			this.startWorldGen(this.dataSourceProvider, this.worldGenStateSupplier.get());
+			LOGGER.info("[DH-LOD-REQUEST-START] World gen started successfully");
 		}
 		else if (!shouldDoWorldGen && isWorldGenRunning)
 		{
 			// stop world gen
+			LOGGER.info("[DH-LOD-REQUEST-STOP] Stopping world gen - shouldDoWorldGen: " + shouldDoWorldGen);
 			this.stopWorldGen(this.dataSourceProvider);
 		}
 		

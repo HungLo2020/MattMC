@@ -6,6 +6,7 @@
     "server.MixinChunkGenerator",
     "server.MixinChunkMap",
     "server.MixinEntity",
+    "server.MixinPlayerManager",
     "server.MixinServerPlayer",
     "server.MixinTracingExecutor",
     "server.MixinUtilBackgroundThread", 
