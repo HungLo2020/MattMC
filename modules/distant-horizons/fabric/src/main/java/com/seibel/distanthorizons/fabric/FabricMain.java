@@ -148,4 +148,19 @@ public class FabricMain extends AbstractModInitializer implements ClientModIniti
 		}
 	}
 	
+	// Fabric API entry points
+	@Override
+	public void onInitializeClient()
+	{
+		System.out.println("!!!!! FabricMain.onInitializeClient() CALLED");
+		super.onInitializeClient();
+	}
+	
+	@Override
+	public void onInitializeServer()
+	{
+		System.out.println("!!!!! FabricMain.onInitializeServer() CALLED");
+		super.onInitializeServer();
+	}
+	
 }
