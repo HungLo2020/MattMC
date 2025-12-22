@@ -11,7 +11,8 @@
     "server.MixinUtilBackgroundThread", 
     "server.MixinLevelTicks",
     "server.MixinMinecraftServerLifecycle",
-    "server.MixinChunkHolderChunkEvents"
+    "server.MixinChunkHolderChunkEvents",
+    "server.ChunkMapAccessor"
   ],
   "client": [
     "client.MixinClientLevel",

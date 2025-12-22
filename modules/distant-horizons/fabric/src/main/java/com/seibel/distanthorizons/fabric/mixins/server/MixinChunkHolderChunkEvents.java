@@ -8,7 +8,6 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.chunk.LevelChunk;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.Unique;
@@ -23,14 +22,13 @@ import java.util.concurrent.Executor;
  * This is needed because the standard Fabric API mixins are not included in this build.
  * 
  * Based on Fabric API's ChunkHolderMixin and ChunkGeneratingMixin.
+ * 
+ * Note: ChunkHolder doesn't have a ServerLevel field, so we use ChunkMapAccessor
+ * to access the level from the ChunkMap parameter passed to updateFutures().
  */
 @Mixin(ChunkHolder.class)
 public abstract class MixinChunkHolderChunkEvents {
 	private static final Logger LOGGER = LoggerFactory.getLogger("DH-ChunkEvents");
-	
-	@Shadow
-	@Final
-	private ServerLevel level;
 	
 	@Shadow
 	private int oldTicketLevel;
@@ -60,16 +58,19 @@ public abstract class MixinChunkHolderChunkEvents {
 		if (!wasAccessible && isAccessible) {
 			LevelChunk chunk = this.getChunkToSend();
 			if (chunk != null) {
+				// Use the accessor to get the level from ChunkMap
+				ServerLevel level = ((ChunkMapAccessor) chunkMap).distanthorizons$getLevel();
+				
 				LOGGER.info("[DH-CHUNK-LOAD] Chunk load event: {} (ticket level {} -> {})", chunk.getPos(), oldTicketLevel, ticketLevel);
 				
 				try {
-					ServerChunkEvents.CHUNK_LOAD.invoker().onChunkLoad(this.level, chunk);
+					ServerChunkEvents.CHUNK_LOAD.invoker().onChunkLoad(level, chunk);
 					
 					// Fire CHUNK_GENERATE if this is a newly generated chunk (not loaded from disk)
 					// We detect this by checking if the chunk was previously unloaded
 					if (!fabric_wasFullChunk) {
 						LOGGER.info("[DH-CHUNK-GENERATE] Chunk generate event: {}", chunk.getPos());
-						ServerChunkEvents.CHUNK_GENERATE.invoker().onChunkGenerate(this.level, chunk);
+						ServerChunkEvents.CHUNK_GENERATE.invoker().onChunkGenerate(level, chunk);
 					}
 				} catch (Exception e) {
 					LOGGER.error("[DH-CHUNK-LOAD] Error invoking chunk load event for {}: {}", chunk.getPos(), e.getMessage(), e);
