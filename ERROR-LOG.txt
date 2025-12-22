@@ -35,9 +35,9 @@ Path for java installation '/usr/lib/jvm/openjdk-17' (Common Linux Locations) do
 
 > Task :runClient
 Using bundled JDK from: /home/matt/Documents/Repos/MattMC/run/jdk-21
-[10:50:40] [main/INFO]: Loading Minecraft 1.21.10 with Fabric Loader 0.18.2
-[10:50:40] [main/INFO]: Mappings not present!
-[10:50:40] [main/INFO]: Loading 7 mods:
+[11:11:08] [main/INFO]: Loading Minecraft 1.21.10 with Fabric Loader 0.18.2
+[11:11:08] [main/INFO]: Mappings not present!
+[11:11:08] [main/INFO]: Loading 7 mods:
 	- distanthorizons 2.4.4-b-dev
 	- fabricloader 0.18.2
 	- iris 1.9.6
@@ -45,26 +45,26 @@ Using bundled JDK from: /home/matt/Documents/Repos/MattMC/run/jdk-21
 	- minecraft 1.21.10
 	- mixinextras 0.5.0
 	- sodium 0.7.2
-[10:50:40] [main/WARN]: Runtime mod remapping disabled due to no fabric.remapClasspathFile being specified. You may need to update loom.
-[10:50:40] [main/INFO]: SpongePowered MIXIN Subsystem Version=0.8.7 Source=file:/home/matt/Documents/Repos/MattMC/libraries/deps/sponge-mixin-0.16.5+mixin.0.8.7.jar Service=Knot/Fabric Env=CLIENT
-[10:50:40] [main/INFO]: Compatibility level set to JAVA_17
-[10:50:40] [main/INFO]: Loaded configuration file for Sodium: 42 options available, 1 override(s) found
-[10:50:40] [main/WARN]: Reference map 'iris.refmap.json' for mixins.iris.json could not be read. If this is a development environment you can ignore this message
-[10:50:40] [main/WARN]: Reference map 'iris-fabric.refmap.json' for mixins.iris.fabric.json could not be read. If this is a development environment you can ignore this message
-[10:50:40] [main/WARN]: Reference map 'iris.refmap.json' for mixins.iris.fantastic.json could not be read. If this is a development environment you can ignore this message
-[10:50:40] [main/WARN]: Reference map 'iris.refmap.json' for mixins.iris.vertexformat.json could not be read. If this is a development environment you can ignore this message
-[10:50:40] [main/WARN]: Reference map 'iris.refmap.json' for mixins.iris.bettermipmaps.json could not be read. If this is a development environment you can ignore this message
-[10:50:40] [main/WARN]: Reference map 'iris.refmap.json' for mixins.iris.compat.sodium.json could not be read. If this is a development environment you can ignore this message
-[10:50:40] [main/WARN]: Reference map 'iris.refmap.json' for mixins.iris.fixes.maxfpscrash.json could not be read. If this is a development environment you can ignore this message
-[10:50:40] [main/WARN]: Force-disabling mixin 'features.render.world.sky.FogRendererMixin' as rule 'mixin.features.render.world.sky' (added by mods [iris]) disables it and children
-[10:50:40] [main/WARN]: Force-disabling mixin 'features.render.world.sky.ClientLevelMixin' as rule 'mixin.features.render.world.sky' (added by mods [iris]) disables it and children
-[10:50:40] [main/WARN]: Force-disabling mixin 'features.render.world.sky.LevelRendererMixin' as rule 'mixin.features.render.world.sky' (added by mods [iris]) disables it and children
-[10:50:40] [main/INFO]: Searching for graphics cards...
-[10:50:40] [main/INFO]: Found graphics adapter: LinuxPciAdapterInfo[vendor=NVIDIA, name=GA102 [GeForce RTX 3080 Ti], pciVendorId=0x10de, pciDeviceId=0x2208]
-[10:50:40] [main/WARN]: Sodium has applied one or more workarounds to prevent crashes or other issues on your system: [NVIDIA_THREADED_OPTIMIZATIONS_BROKEN]
-[10:50:40] [main/WARN]: This is not necessarily an issue, but it may result in certain features or optimizations being disabled. You can sometimes fix these issues by upgrading your graphics driver.
-[10:50:41] [main/INFO]: Initializing MixinExtras via com.llamalad7.mixinextras.service.MixinExtrasServiceImpl(version=0.5.0).
-[10:50:41] [Datafixer Bootstrap/INFO]: 278 Datafixer optimizations took 199 milliseconds
+[11:11:08] [main/WARN]: Runtime mod remapping disabled due to no fabric.remapClasspathFile being specified. You may need to update loom.
+[11:11:08] [main/INFO]: SpongePowered MIXIN Subsystem Version=0.8.7 Source=file:/home/matt/Documents/Repos/MattMC/libraries/deps/sponge-mixin-0.16.5+mixin.0.8.7.jar Service=Knot/Fabric Env=CLIENT
+[11:11:08] [main/INFO]: Compatibility level set to JAVA_17
+[11:11:08] [main/WARN]: Reference map 'iris.refmap.json' for mixins.iris.json could not be read. If this is a development environment you can ignore this message
+[11:11:08] [main/WARN]: Reference map 'iris-fabric.refmap.json' for mixins.iris.fabric.json could not be read. If this is a development environment you can ignore this message
+[11:11:08] [main/WARN]: Reference map 'iris.refmap.json' for mixins.iris.fantastic.json could not be read. If this is a development environment you can ignore this message
+[11:11:08] [main/WARN]: Reference map 'iris.refmap.json' for mixins.iris.vertexformat.json could not be read. If this is a development environment you can ignore this message
+[11:11:08] [main/WARN]: Reference map 'iris.refmap.json' for mixins.iris.bettermipmaps.json could not be read. If this is a development environment you can ignore this message
+[11:11:08] [main/WARN]: Reference map 'iris.refmap.json' for mixins.iris.compat.sodium.json could not be read. If this is a development environment you can ignore this message
+[11:11:08] [main/WARN]: Reference map 'iris.refmap.json' for mixins.iris.fixes.maxfpscrash.json could not be read. If this is a development environment you can ignore this message
+[11:11:08] [main/INFO]: Loaded configuration file for Sodium: 42 options available, 1 override(s) found
+[11:11:08] [main/WARN]: Force-disabling mixin 'features.render.world.sky.FogRendererMixin' as rule 'mixin.features.render.world.sky' (added by mods [iris]) disables it and children
+[11:11:08] [main/WARN]: Force-disabling mixin 'features.render.world.sky.ClientLevelMixin' as rule 'mixin.features.render.world.sky' (added by mods [iris]) disables it and children
+[11:11:08] [main/WARN]: Force-disabling mixin 'features.render.world.sky.LevelRendererMixin' as rule 'mixin.features.render.world.sky' (added by mods [iris]) disables it and children
+[11:11:08] [main/INFO]: Searching for graphics cards...
+[11:11:08] [main/INFO]: Found graphics adapter: LinuxPciAdapterInfo[vendor=NVIDIA, name=GA102 [GeForce RTX 3080 Ti], pciVendorId=0x10de, pciDeviceId=0x2208]
+[11:11:08] [main/WARN]: Sodium has applied one or more workarounds to prevent crashes or other issues on your system: [NVIDIA_THREADED_OPTIMIZATIONS_BROKEN]
+[11:11:08] [main/WARN]: This is not necessarily an issue, but it may result in certain features or optimizations being disabled. You can sometimes fix these issues by upgrading your graphics driver.
+[11:11:08] [main/INFO]: Initializing MixinExtras via com.llamalad7.mixinextras.service.MixinExtrasServiceImpl(version=0.5.0).
+[11:11:08] [Datafixer Bootstrap/INFO]: 278 Datafixer optimizations took 170 milliseconds
 [LWJGL] Version: 3.3.3-snapshot
 	 OS: Linux v6.14.0-36-generic
 	JRE: Linux amd64 21.0.5
@@ -75,7 +75,7 @@ Using bundled JDK from: /home/matt/Documents/Repos/MattMC/run/jdk-21
 [LWJGL] Loading library: glfw
 	Module: org.lwjgl.glfw
 	Loaded from org.lwjgl.librarypath: /tmp/lwjgl_matt/3.3.3-snapshot/x64/libglfw.so
-[10:50:43] [main/WARN]: Failed to get system info for Render Extensions
+[11:11:11] [main/WARN]: Failed to get system info for Render Extensions
 java.lang.IllegalStateException: Can't getDevice() before it was initialized
 	at knot/com.mojang.blaze3d.systems.RenderSystem.getDevice(RenderSystem.java:354) ~[minecraft-1.21.10.jar:?]
 	at knot/net.minecraft.client.Minecraft.lambda$fillSystemReport$42(Minecraft.java:2298) ~[minecraft-1.21.10.jar:?]
@@ -87,9 +87,9 @@ java.lang.IllegalStateException: Can't getDevice() before it was initialized
 	at net.fabricmc.loader.impl.launch.knot.Knot.launch(Knot.java:72) [fabric-loader-0.18.2.jar:0.18.2]
 	at net.fabricmc.loader.impl.launch.knot.KnotClient.main(KnotClient.java:23) [fabric-loader-0.18.2.jar:0.18.2]
 ---- Minecraft Crash Report ----
-// Hey, that tickles! Hehehe!
+// You should try our sister game, Minceraft!
 
-Time: 2025-12-22 10:50:44
+Time: 2025-12-22 11:11:11
 Description: Bootstrap
 
 java.lang.BootstrapMethodError: java.lang.RuntimeException: Mixin transformation of net.minecraft.server.MinecraftServer failed
@@ -125,7 +125,7 @@ Caused by: org.spongepowered.asm.mixin.transformer.throwables.MixinTransformerEr
 	at org.spongepowered.asm.mixin.transformer.MixinTransformer.transformClassBytes(MixinTransformer.java:202)
 	at net.fabricmc.loader.impl.launch.knot.KnotClassDelegate.getPostMixinClassByteArray(KnotClassDelegate.java:435)
 	... 23 more
-Caused by: org.spongepowered.asm.mixin.injection.throwables.InjectionError: Critical injection failure: Callback method onServerStarting(Lorg/spongepowered/asm/mixin/injection/callback/CallbackInfo;)V in DistantHorizons.fabric.mixins.json:server.MixinMinecraftServerLifecycle from mod distanthorizons failed injection check, (0/1) succeeded. Scanned 0 target(s). No refMap loaded.
+Caused by: org.spongepowered.asm.mixin.injection.throwables.InjectionError: Critical injection failure: Callback method onServerStarted(Lorg/spongepowered/asm/mixin/injection/callback/CallbackInfo;)V in DistantHorizons.fabric.mixins.json:server.MixinMinecraftServerLifecycle from mod distanthorizons failed injection check, (0/1) succeeded. Scanned 0 target(s). No refMap loaded.
 	at org.spongepowered.asm.mixin.injection.struct.InjectionInfo.postInject(InjectionInfo.java:531)
 	at org.spongepowered.asm.mixin.transformer.MixinTargetContext.applyInjections(MixinTargetContext.java:1490)
 	at org.spongepowered.asm.mixin.transformer.MixinApplicatorStandard.applyInjections(MixinApplicatorStandard.java:752)
@@ -175,7 +175,7 @@ Details:
 	Operating System: Linux (amd64) version 6.14.0-36-generic
 	Java Version: 21.0.5, Eclipse Adoptium
 	Java VM Version: OpenJDK 64-Bit Server VM (mixed mode, sharing), Eclipse Adoptium
-	Memory: 340226752 bytes (324 MiB) / 536870912 bytes (512 MiB) up to 2147483648 bytes (2048 MiB)
+	Memory: 347883696 bytes (331 MiB) / 536870912 bytes (512 MiB) up to 2147483648 bytes (2048 MiB)
 	CPUs: 20
 	Processor Vendor: GenuineIntel
 	Processor Name: 12th Gen Intel(R) Core(TM) i7-12700K
@@ -191,14 +191,14 @@ Details:
 	Graphics card #0 deviceId: 0x2208
 	Graphics card #0 versionInfo: unknown
 	Virtual memory max (MiB): 32300.84
-	Virtual memory used (MiB): 18380.67
+	Virtual memory used (MiB): 18155.67
 	Swap memory total (MiB): 16384.00
-	Swap memory used (MiB): 4372.26
+	Swap memory used (MiB): 4371.83
 	Space in storage for jna.tmpdir (MiB): <path not set>
 	Space in storage for org.lwjgl.system.SharedLibraryExtractPath (MiB): <path not set>
 	Space in storage for io.netty.native.workdir (MiB): <path not set>
-	Space in storage for java.io.tmpdir (MiB): available: 15814.39, total: 15916.84
-	Space in storage for workdir (MiB): available: 292317.25, total: 937500.69
+	Space in storage for java.io.tmpdir (MiB): available: 15812.78, total: 15916.84
+	Space in storage for workdir (MiB): available: 292396.56, total: 937500.69
 	JVM Flags: 19 total; -XX:+UseG1GC -XX:+ParallelRefProcEnabled -XX:MaxGCPauseMillis=200 -XX:+UnlockExperimentalVMOptions -XX:+DisableExplicitGC -XX:G1NewSizePercent=30 -XX:G1MaxNewSizePercent=40 -XX:G1HeapRegionSize=8M -XX:G1ReservePercent=20 -XX:G1HeapWastePercent=5 -XX:G1MixedGCCountTarget=4 -XX:InitiatingHeapOccupancyPercent=15 -XX:G1MixedGCLiveThresholdPercent=90 -XX:G1RSetUpdatingPauseTimePercent=5 -XX:SurvivorRatio=32 -XX:+PerfDisableSharedMem -XX:MaxTenuringThreshold=1 -Xms512M -Xmx2G
 	Debug Flags: 0 total; 
 	Launched Version: 1.21.10
@@ -215,7 +215,7 @@ Details:
 	System encoding: UTF-8
 	File encoding: UTF-8
 	CPU: 20x 12th Gen Intel(R) Core(TM) i7-12700K
-#@!@# Game crashed! Crash report saved to: #@!@# /home/matt/Documents/Repos/MattMC/run/crash-reports/crash-2025-12-22_10.50.44-client.txt
+#@!@# Game crashed! Crash report saved to: #@!@# /home/matt/Documents/Repos/MattMC/run/crash-reports/crash-2025-12-22_11.11.11-client.txt
 
 > Task :runClient FAILED
 
