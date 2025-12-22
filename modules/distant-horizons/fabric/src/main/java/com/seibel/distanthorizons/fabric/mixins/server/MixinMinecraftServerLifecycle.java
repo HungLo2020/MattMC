@@ -39,9 +39,9 @@ public abstract class MixinMinecraftServerLifecycle {
 	
 	/**
 	 * Invoke SERVER_STARTING event when the server starts running.
-	 * Injects before setupServer() is called in runServer() method.
+	 * Injects before initServer() is called in runServer() method.
 	 */
-	@Inject(method = "runServer", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/MinecraftServer;setupServer()Z"))
+	@Inject(method = "runServer", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/MinecraftServer;initServer()Z"))
 	private void onServerStarting(CallbackInfo ci) {
 		MinecraftServer server = (MinecraftServer) (Object) this;
 		LOGGER.info("[DH-MIXIN-LIFECYCLE] ========== MIXIN: onServerStarting CALLED ==========");
@@ -55,9 +55,9 @@ public abstract class MixinMinecraftServerLifecycle {
 	
 	/**
 	 * Invoke SERVER_STARTED event after the server has completed setup.
-	 * Injects before createMetadata() is called in runServer() method.
+	 * Injects after buildServerStatus() is called in runServer() method.
 	 */
-	@Inject(method = "runServer", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/MinecraftServer;createMetadata()Lnet/minecraft/server/ServerMetadata;", ordinal = 0))
+	@Inject(method = "runServer", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/MinecraftServer;buildServerStatus()Lnet/minecraft/server/ServerStatus;", shift = At.Shift.AFTER))
 	private void onServerStarted(CallbackInfo ci) {
 		MinecraftServer server = (MinecraftServer) (Object) this;
 		LOGGER.info("[DH-MIXIN-LIFECYCLE] ========== MIXIN: onServerStarted CALLED ==========");
