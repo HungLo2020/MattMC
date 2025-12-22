@@ -815,8 +815,8 @@ def serverJvmArgs = [
 
 // Common JVM arguments for client tasks
 def clientJvmArgs = [
-    '-Xmx2G',
-    '-Xms512M',
+    '-Xmx8G',
+    '-Xms4G',
     '-XX:+UseG1GC',
     '-XX:+ParallelRefProcEnabled',
     '-XX:MaxGCPauseMillis=200',
