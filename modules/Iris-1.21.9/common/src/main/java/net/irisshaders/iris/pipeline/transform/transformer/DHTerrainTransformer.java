@@ -82,19 +82,15 @@ public class DHTerrainTransformer {
 
 		// Add DH depth texture uniforms for shader compatibility
 		// These are dynamically bound by IrisSamplers.addRenderTargetSamplers()
-		// Only inject if they don't already exist (some DH shaders may declare them)
-		if (!root.identifierIndex.has("dhDepthTex")) {
-			tree.parseAndInjectNode(t, ASTInjectionPoint.BEFORE_DECLARATIONS,
-				"uniform sampler2D dhDepthTex;");
-		}
-		if (!root.identifierIndex.has("dhDepthTex0")) {
-			tree.parseAndInjectNode(t, ASTInjectionPoint.BEFORE_DECLARATIONS,
-				"uniform sampler2D dhDepthTex0;");
-		}
-		if (!root.identifierIndex.has("dhDepthTex1")) {
-			tree.parseAndInjectNode(t, ASTInjectionPoint.BEFORE_DECLARATIONS,
-				"uniform sampler2D dhDepthTex1;");
-		}
+		// Inject unconditionally to ensure they're available (GLSL allows duplicate uniforms with same type)
+		tree.parseAndInjectNode(t, ASTInjectionPoint.BEFORE_DECLARATIONS,
+			"uniform sampler2D dhDepthTex;");
+		
+		tree.parseAndInjectNode(t, ASTInjectionPoint.BEFORE_DECLARATIONS,
+			"uniform sampler2D dhDepthTex0;");
+		
+		tree.parseAndInjectNode(t, ASTInjectionPoint.BEFORE_DECLARATIONS,
+			"uniform sampler2D dhDepthTex1;");
 
 		Iris.logger.warn("Type is " + parameters.type);
 
