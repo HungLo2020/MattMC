@@ -59,8 +59,32 @@ public class ServerApi
 	
 	public void serverLoadEvent(boolean isDedicatedEnvironment)
 	{
-		LOGGER.debug("Server World loading with (dedicated?:" + isDedicatedEnvironment + ")");
-		SharedApi.setDhWorld(isDedicatedEnvironment ? new DhServerWorld() : new DhClientServerWorld());
+		LOGGER.info("[DH-WORLD] ========== SERVER LOAD EVENT ==========");
+		LOGGER.info("[DH-WORLD] isDedicatedEnvironment: " + isDedicatedEnvironment);
+		LOGGER.info("[DH-WORLD] Thread: " + Thread.currentThread().getName() + " (ID: " + Thread.currentThread().threadId() + ")");
+		LOGGER.info("[DH-WORLD] Current world before: " + SharedApi.getAbstractDhWorld());
+		
+		AbstractDhWorld newWorld;
+		if (isDedicatedEnvironment)
+		{
+			LOGGER.info("[DH-WORLD] Creating DhServerWorld (dedicated server)");
+			newWorld = new DhServerWorld();
+		}
+		else
+		{
+			LOGGER.info("[DH-WORLD] Creating DhClientServerWorld (integrated server)");
+			newWorld = new DhClientServerWorld();
+		}
+		
+		LOGGER.info("[DH-WORLD] Created world: " + newWorld);
+		LOGGER.info("[DH-WORLD] World class: " + newWorld.getClass().getName());
+		LOGGER.info("[DH-WORLD] Calling SharedApi.setDhWorld()");
+		
+		SharedApi.setDhWorld(newWorld);
+		
+		LOGGER.info("[DH-WORLD] Current world after: " + SharedApi.getAbstractDhWorld());
+		LOGGER.info("[DH-WORLD] tryGetDhClientWorld: " + SharedApi.tryGetDhClientWorld());
+		LOGGER.info("[DH-WORLD] ========== SERVER LOAD EVENT COMPLETE ==========");
 	}
 	
 	public void serverUnloadEvent()
@@ -84,13 +108,25 @@ public class ServerApi
 	
 	public void serverLevelLoadEvent(IServerLevelWrapper level)
 	{
-		LOGGER.debug("Server Level " + level + " loading");
+		LOGGER.info("[DH-LEVEL] ========== SERVER LEVEL LOAD EVENT ==========");
+		LOGGER.info("[DH-LEVEL] Level: " + level);
+		LOGGER.info("[DH-LEVEL] Level identifier: " + level.getDhIdentifier());
+		LOGGER.info("[DH-LEVEL] Thread: " + Thread.currentThread().getName() + " (ID: " + Thread.currentThread().threadId() + ")");
 		
 		AbstractDhWorld serverWorld = SharedApi.getAbstractDhWorld();
+		LOGGER.info("[DH-LEVEL] Current DH world: " + serverWorld);
+		
 		if (serverWorld != null)
 		{
+			LOGGER.info("[DH-LEVEL] Loading level into DH world...");
 			serverWorld.getOrLoadLevel(level);
+			LOGGER.info("[DH-LEVEL] Level loaded, firing DhApiLevelLoadEvent");
 			ApiEventInjector.INSTANCE.fireAllEvents(DhApiLevelLoadEvent.class, new DhApiLevelLoadEvent.EventParam(level));
+			LOGGER.info("[DH-LEVEL] ========== SERVER LEVEL LOAD EVENT COMPLETE ==========");
+		}
+		else
+		{
+			LOGGER.warn("[DH-LEVEL] Cannot load level - DH world is null!");
 		}
 	}
 	public void serverLevelUnloadEvent(IServerLevelWrapper level)

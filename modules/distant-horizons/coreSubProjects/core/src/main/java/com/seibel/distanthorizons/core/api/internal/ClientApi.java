@@ -141,9 +141,16 @@ public class ClientApi
 	 */
 	public synchronized void onClientOnlyConnected()
 	{
+		LOGGER.info("[DH-CLIENT-CONNECT] ========== CLIENT ONLY CONNECTED ==========");
+		LOGGER.info("[DH-CLIENT-CONNECT] Thread: " + Thread.currentThread().getName() + " (ID: " + Thread.currentThread().threadId() + ")");
+		
 		// only continue if the client is connected to a different server
 		boolean connectedToServer = MC_CLIENT.clientConnectedToDedicatedServer();
 		boolean connectedToReplay = MC_CLIENT.connectedToReplay();
+		
+		LOGGER.info("[DH-CLIENT-CONNECT] Connected to dedicated server: " + connectedToServer);
+		LOGGER.info("[DH-CLIENT-CONNECT] Connected to replay: " + connectedToReplay);
+		
 		if (connectedToServer || connectedToReplay)
 		{
 			if (connectedToServer)
@@ -167,19 +174,28 @@ public class ClientApi
 			
 			// firing after clientLevelLoadEvent
 			// TODO if level has prepped to load it should fire level load event
+			LOGGER.info("[DH-CLIENT-CONNECT] Creating DhClientWorld (client-only mode)");
 			DhClientWorld world = new DhClientWorld();
+			LOGGER.info("[DH-CLIENT-CONNECT] Created DhClientWorld: " + world);
+			LOGGER.info("[DH-CLIENT-CONNECT] Calling SharedApi.setDhWorld()");
 			SharedApi.setDhWorld(world);
 			
 			this.pluginChannelApi.onJoinServer(world.networkState.getSession());
 			world.networkState.sendConfigMessage();
 			
-			LOGGER.info("Loading [" + this.waitingClientLevels.size() + "] waiting client level wrappers.");
+			LOGGER.info("[DH-CLIENT-CONNECT] Loading [" + this.waitingClientLevels.size() + "] waiting client level wrappers.");
 			for (IClientLevelWrapper level : this.waitingClientLevels)
 			{
 				this.clientLevelLoadEvent(level);
 			}
 			
 			this.waitingClientLevels.clear();
+			LOGGER.info("[DH-CLIENT-CONNECT] ========== CLIENT ONLY CONNECTED COMPLETE ==========");
+		}
+		else
+		{
+			LOGGER.info("[DH-CLIENT-CONNECT] Not connected to dedicated server or replay - skipping DhClientWorld creation");
+			LOGGER.info("[DH-CLIENT-CONNECT] This is expected for integrated/singleplayer - world should be created by ServerApi");
 		}
 	}
 	
@@ -247,11 +263,17 @@ public class ClientApi
 	
 	public void clientLevelLoadEvent(IClientLevelWrapper levelWrapper)
 	{
+		LOGGER.info("[DH-CLIENT-LEVEL] ========== CLIENT LEVEL LOAD EVENT ==========");
+		LOGGER.info("[DH-CLIENT-LEVEL] Level: " + levelWrapper);
+		LOGGER.info("[DH-CLIENT-LEVEL] Level identifier: " + levelWrapper.getDhIdentifier());
+		LOGGER.info("[DH-CLIENT-LEVEL] Thread: " + Thread.currentThread().getName() + " (ID: " + Thread.currentThread().threadId() + ")");
+		
 		// wait a moment before loading the level to give the server a chance to handle the client's login request
 		if (MC_CLIENT.clientConnectedToDedicatedServer())
 		{
 			if (this.firstLevelLoadTimer == null)
 			{
+				LOGGER.info("[DH-CLIENT-LEVEL] Dedicated server detected - delaying level load by " + FIRST_LEVEL_LOAD_DELAY_IN_MS + "ms");
 				this.firstLevelLoadTimer = TimerUtil.CreateTimer("FirstLevelLoadTimer");
 				this.firstLevelLoadTimer.schedule(new TimerTask()
 				{
@@ -261,19 +283,22 @@ public class ClientApi
 				return;
 			}
 			this.firstLevelLoadTimer.cancel();
+			LOGGER.info("[DH-CLIENT-LEVEL] Level load delay completed");
 		}
 		
 		
 		try
 		{
-			LOGGER.info("Loading client level [" + levelWrapper + "]-[" + levelWrapper.getDhIdentifier() + "].");
+			LOGGER.info("[DH-CLIENT-LEVEL] Loading client level [" + levelWrapper + "]-[" + levelWrapper.getDhIdentifier() + "].");
 			
 			AbstractDhWorld world = SharedApi.getAbstractDhWorld();
+			LOGGER.info("[DH-CLIENT-LEVEL] Current DH world: " + world);
+			
 			if (world != null)
 			{
 				if (!this.pluginChannelApi.allowLevelLoading(levelWrapper))
 				{
-					LOGGER.info("Levels in this connection are managed by the server, skipping auto-load.");
+					LOGGER.info("[DH-CLIENT-LEVEL] Levels in this connection are managed by the server, skipping auto-load.");
 					
 					// Instead of attempting to load themselves, send the config and wait for a server provided level key.
 					((DhClientWorld) world).networkState.sendConfigMessage();
@@ -281,13 +306,18 @@ public class ClientApi
 				}
 				
 				
+				LOGGER.info("[DH-CLIENT-LEVEL] Loading level into DH world...");
 				world.getOrLoadLevel(levelWrapper);
+				LOGGER.info("[DH-CLIENT-LEVEL] Level loaded, firing DhApiLevelLoadEvent");
 				ApiEventInjector.INSTANCE.fireAllEvents(DhApiLevelLoadEvent.class, new DhApiLevelLoadEvent.EventParam(levelWrapper));
 				
+				LOGGER.info("[DH-CLIENT-LEVEL] Loading waiting chunks for level...");
 				this.loadWaitingChunksForLevel(levelWrapper);
+				LOGGER.info("[DH-CLIENT-LEVEL] ========== CLIENT LEVEL LOAD EVENT COMPLETE ==========");
 			}
 			else
 			{
+				LOGGER.warn("[DH-CLIENT-LEVEL] DH world is null - adding to waiting levels");
 				this.waitingClientLevels.add(levelWrapper);
 			}
 		}
@@ -346,7 +376,12 @@ public class ClientApi
 	//===============//
 	
 	/** Should be called before {@link ClientApi#renderDeferredLodsForShaders} */
-	public void renderLods() { this.renderLodLayer(false); }
+	public void renderLods() 
+	{ 
+		LOGGER.debug("[DH-RENDER] renderLods() called");
+		this.renderLodLayer(false); 
+		LOGGER.debug("[DH-RENDER] renderLods() completed");
+	}
 	
 	/** 
 	 * Only necessary when Shaders are in use.
@@ -356,6 +391,10 @@ public class ClientApi
 	
 	private void renderLodLayer(boolean renderingDeferredLayer)
 	{
+		LOGGER.debug("[DH-RENDER-LAYER] ========== RENDER LOD LAYER START ==========");
+		LOGGER.debug("[DH-RENDER-LAYER] renderingDeferredLayer: " + renderingDeferredLayer);
+		LOGGER.debug("[DH-RENDER-LAYER] Thread: " + Thread.currentThread().getName() + " (ID: " + Thread.currentThread().threadId() + ")");
+		
 		//=========//
 		// logging //
 		//=========//
@@ -399,6 +438,8 @@ public class ClientApi
 		// parameter setup //
 		//=================//
 		
+		LOGGER.debug("[DH-RENDER-LAYER] Setting up render parameters...");
+		
 		EDhApiRenderPass renderPass;
 		if (DhApiRenderProxy.INSTANCE.getDeferTransparentRendering())
 		{
@@ -416,6 +457,9 @@ public class ClientApi
 			renderPass = EDhApiRenderPass.OPAQUE_AND_TRANSPARENT;
 		}
 		
+		LOGGER.debug("[DH-RENDER-LAYER] Render pass: " + renderPass);
+		LOGGER.debug("[DH-RENDER-LAYER] clientLevelWrapper: " + RENDER_STATE.clientLevelWrapper);
+		
 		// A global render state variable is used since MC has split up their
 		// render prep and actual rendering into different threads/methods
 		// this is annoying since it's possible to start a render with only
@@ -428,16 +472,29 @@ public class ClientApi
 				RENDER_STATE.clientLevelWrapper
 			);
 		
+		LOGGER.debug("[DH-RENDER-LAYER] RenderParams created");
+		
 		
 		
 		//============//
 		// validation //
 		//============//
 		
+		LOGGER.debug("[DH-RENDER-LAYER] Validating render parameters...");
+		
 		// TODO write this message to the F3 menu so people can see when a different mod screws with the lightmap
 		String validationMessage = renderParams.getValidationErrorMessage();
 		if (validationMessage != null)
 		{
+			LOGGER.warn("[DH-RENDER-VALIDATION] ========== VALIDATION FAILED ==========");
+			LOGGER.warn("[DH-RENDER-VALIDATION] Reason: " + validationMessage);
+			LOGGER.warn("[DH-RENDER-VALIDATION] Current DH world: " + SharedApi.getAbstractDhWorld());
+			LOGGER.warn("[DH-RENDER-VALIDATION] tryGetDhClientWorld: " + SharedApi.tryGetDhClientWorld());
+			LOGGER.warn("[DH-RENDER-VALIDATION] dhClientWorld from params: " + renderParams.dhClientWorld);
+			LOGGER.warn("[DH-RENDER-VALIDATION] dhClientLevel from params: " + renderParams.dhClientLevel);
+			LOGGER.warn("[DH-RENDER-VALIDATION] clientLevelWrapper from params: " + renderParams.clientLevelWrapper);
+			LOGGER.warn("[DH-RENDER-VALIDATION] ========================================");
+			
 			this.lastRenderParamValidationMessage = validationMessage;
 			return;
 		}
@@ -445,6 +502,8 @@ public class ClientApi
 		{
 			this.lastRenderParamValidationMessage = null;
 		}
+		
+		LOGGER.debug("[DH-RENDER-LAYER] Validation passed!");
 		
 		if (this.rendererDisabledBecauseOfExceptions)
 		{
@@ -465,6 +524,8 @@ public class ClientApi
 		// rendering //
 		//===========//
 		
+		LOGGER.debug("[DH-RENDER-LAYER] Starting rendering...");
+		
 		try
 		{
 			// render pass //
@@ -476,7 +537,9 @@ public class ClientApi
 					boolean renderingCancelledForThisFrame = ApiEventInjector.INSTANCE.fireAllEvents(DhApiBeforeRenderEvent.class, renderParams);
 					if (!renderingCancelledForThisFrame)
 					{
+						LOGGER.debug("[DH-RENDER-LAYER] Calling LodRenderer.INSTANCE.render()");
 						LodRenderer.INSTANCE.render(renderParams, profiler);
+						LOGGER.debug("[DH-RENDER-LAYER] LodRenderer.INSTANCE.render() completed");
 					}
 					
 					if (!DhApi.Delayed.renderProxy.getDeferTransparentRendering())
@@ -521,6 +584,8 @@ public class ClientApi
 		
 		profiler.pop(); // end LOD
 		profiler.push("terrain"); // go back into "terrain"
+		
+		LOGGER.debug("[DH-RENDER-LAYER] ========== RENDER LOD LAYER COMPLETE ==========");
 	}
 	
 	

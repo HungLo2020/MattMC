@@ -101,23 +101,41 @@ public class SharedApi
 	
 	public static void setDhWorld(AbstractDhWorld newWorld)
 	{
+		LOGGER.info("[DH-WORLD-SET] ========== SETTING DH WORLD ==========");
+		LOGGER.info("[DH-WORLD-SET] Thread: " + Thread.currentThread().getName() + " (ID: " + Thread.currentThread().threadId() + ")");
+		LOGGER.info("[DH-WORLD-SET] Old world: " + currentWorld);
+		LOGGER.info("[DH-WORLD-SET] New world: " + newWorld);
+		
+		if (newWorld != null)
+		{
+			LOGGER.info("[DH-WORLD-SET] New world class: " + newWorld.getClass().getName());
+			LOGGER.info("[DH-WORLD-SET] New world environment: " + newWorld.environment);
+			LOGGER.info("[DH-WORLD-SET] Is IDhClientWorld: " + (newWorld instanceof IDhClientWorld));
+		}
+		
 		AbstractDhWorld oldWorld = currentWorld;
 		if (oldWorld != null)
 		{
+			LOGGER.info("[DH-WORLD-SET] Closing old world: " + oldWorld);
 			oldWorld.close();
 		}
+		
 		currentWorld = newWorld;
+		LOGGER.info("[DH-WORLD-SET] currentWorld field updated");
 		
 		// starting and stopping the DataRenderTransformer is necessary to prevent attempting to
 		// access the MC level at inappropriate times, which can cause exceptions
 		if (currentWorld != null)
 		{
+			LOGGER.info("[DH-WORLD-SET] Setting up thread pools...");
 			ThreadPoolUtil.setupThreadPools();
 			
+			LOGGER.info("[DH-WORLD-SET] Firing DhApiWorldLoadEvent...");
 			ApiEventInjector.INSTANCE.fireAllEvents(DhApiWorldLoadEvent.class, new DhApiWorldLoadEvent.EventParam());
 		}
 		else
 		{
+			LOGGER.info("[DH-WORLD-SET] Shutting down thread pools...");
 			ThreadPoolUtil.shutdownThreadPools();
 			DebugRenderer.clearRenderables();
 			
@@ -134,11 +152,16 @@ public class SharedApi
 			// recommend that the garbage collector cleans up any objects from the old world and thread pools
 			System.gc();
 			
+			LOGGER.info("[DH-WORLD-SET] Firing DhApiWorldUnloadEvent...");
 			ApiEventInjector.INSTANCE.fireAllEvents(DhApiWorldUnloadEvent.class, new DhApiWorldUnloadEvent.EventParam());
 			
 			// fired after the unload event so API users can't change the read-only for any new worlds
 			DhApiWorldProxy.INSTANCE.setReadOnly(false, false);
 		}
+		
+		LOGGER.info("[DH-WORLD-SET] Final currentWorld: " + currentWorld);
+		LOGGER.info("[DH-WORLD-SET] Final tryGetDhClientWorld: " + tryGetDhClientWorld());
+		LOGGER.info("[DH-WORLD-SET] ========== DH WORLD SET COMPLETE ==========");
 	}
 	
 	@Nullable
@@ -146,7 +169,13 @@ public class SharedApi
 	
 	/** returns null if the {@link SharedApi#currentWorld} isn't a {@link DhClientWorld} or {@link DhClientServerWorld} */
 	@Nullable
-	public static IDhClientWorld tryGetDhClientWorld() { return (currentWorld instanceof IDhClientWorld) ? (IDhClientWorld) currentWorld : null; }
+	public static IDhClientWorld tryGetDhClientWorld() 
+	{ 
+		boolean isClientWorld = (currentWorld instanceof IDhClientWorld);
+		LOGGER.debug("[DH-WORLD-GET] tryGetDhClientWorld() - currentWorld: " + currentWorld + 
+			", is IDhClientWorld: " + isClientWorld);
+		return isClientWorld ? (IDhClientWorld) currentWorld : null; 
+	}
 	
 	/** returns null if the {@link SharedApi#currentWorld} isn't a {@link DhServerWorld} or {@link DhClientServerWorld} */
 	@Nullable

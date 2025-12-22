@@ -66,6 +66,9 @@ public abstract class AbstractModInitializer
 	
 	public void onInitializeClient()
 	{
+		LOGGER.info("[DH-INIT] ========== CLIENT INITIALIZATION START ==========");
+		LOGGER.info("[DH-INIT] Thread: " + Thread.currentThread().getName() + " (ID: " + Thread.currentThread().threadId() + ")");
+		
 		DependencySetup.createClientBindings();
 		this.createInitialClientBindings();
 		
@@ -75,8 +78,13 @@ public abstract class AbstractModInitializer
 		this.startup();
 		this.logBuildInfo();
 		
+		LOGGER.info("[DH-INIT] Creating client proxy and registering events...");
 		this.createClientProxy().registerEvents();
+		LOGGER.info("[DH-INIT] Client proxy events registered");
+		
+		LOGGER.info("[DH-INIT] Creating server proxy (integrated=true) and registering events...");
 		this.createServerProxy(false).registerEvents();
+		LOGGER.info("[DH-INIT] Server proxy (integrated) events registered");
 		
 		this.initializeModCompat();
 		
@@ -88,11 +96,17 @@ public abstract class AbstractModInitializer
 		
 		DhDebugScreenEntry.register();
 		
+		LOGGER.info("[DH-INIT] Subscribing to client started event...");
 		this.subscribeClientStartedEvent(this::postInit);
+		
+		LOGGER.info("[DH-INIT] ========== CLIENT INITIALIZATION COMPLETE ==========");
 	}
 	
 	public void onInitializeServer()
 	{
+		LOGGER.info("[DH-INIT] ========== DEDICATED SERVER INITIALIZATION START ==========");
+		LOGGER.info("[DH-INIT] Thread: " + Thread.currentThread().getName() + " (ID: " + Thread.currentThread().threadId() + ")");
+		
 		DependencySetup.createServerBindings();
 		
 		LOGGER.info("Initializing " + ModInfo.READABLE_NAME + " server, firing DhApiBeforeDhInitEvent event...");
@@ -106,7 +120,9 @@ public abstract class AbstractModInitializer
 		// noinspection ResultOfMethodCallIgnored
 		ThreadPresetConfigEventHandler.INSTANCE.toString();
 		
+		LOGGER.info("[DH-INIT] Creating server proxy (dedicated=true) and registering events...");
 		this.createServerProxy(true).registerEvents();
+		LOGGER.info("[DH-INIT] Server proxy (dedicated) events registered");
 		
 		this.initializeModCompat();
 		
@@ -114,8 +130,12 @@ public abstract class AbstractModInitializer
 		this.commandInitializer = new CommandInitializer();
 		this.subscribeRegisterCommandsEvent(dispatcher -> { this.commandInitializer.initCommands(dispatcher); });
 		
+		LOGGER.info("[DH-INIT] Subscribing to server starting event...");
 		this.subscribeServerStartingEvent(server -> 
 		{
+			LOGGER.info("[DH-EVENT] SERVER_STARTING callback triggered!");
+			LOGGER.info("[DH-EVENT] Thread: " + Thread.currentThread().getName() + " (ID: " + Thread.currentThread().threadId() + ")");
+			
 			MinecraftServerWrapper.INSTANCE.dedicatedServer = (DedicatedServer)server;
 			
 			this.initConfig();
@@ -126,6 +146,8 @@ public abstract class AbstractModInitializer
 			
 			LOGGER.info(ModInfo.READABLE_NAME + " server Initialized at " + server.getServerDirectory());
 		});
+		
+		LOGGER.info("[DH-INIT] ========== DEDICATED SERVER INITIALIZATION COMPLETE ==========");
 	}
 	
 	
