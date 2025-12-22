@@ -127,36 +127,43 @@ public class FabricMain extends AbstractModInitializer implements ClientModIniti
 		LOGGER.info("[DH-EVENT-SUB] Subscribing to server lifecycle events...");
 		LOGGER.info("[DH-EVENT-SUB] Thread: " + Thread.currentThread().getName() + " (ID: " + Thread.currentThread().getId() + ")");
 		
-		// Try both SERVER_STARTING and SERVER_STARTED for integrated servers
-		// SERVER_STARTING doesn't seem to fire for integrated servers in this Fabric version
-		LOGGER.info("[DH-EVENT-SUB] Registering SERVER_STARTING event handler at DEFAULT phase");
+		// Try ALL server lifecycle events to see which ones fire for integrated servers
+		LOGGER.info("[DH-EVENT-SUB] Registering SERVER_STARTING event handler");
 		ServerLifecycleEvents.SERVER_STARTING.register((server) -> {
 			LOGGER.info("[DH-EVENT-FIRE] ========== SERVER_STARTING EVENT FIRED ==========");
 			LOGGER.info("[DH-EVENT-FIRE] Server: " + server);
 			LOGGER.info("[DH-EVENT-FIRE] Is Dedicated: " + server.isDedicatedServer());
 			LOGGER.info("[DH-EVENT-FIRE] Thread: " + Thread.currentThread().getName() + " (ID: " + Thread.currentThread().getId() + ")");
-			
 			eventHandler.accept(server);
-			
 			LOGGER.info("[DH-EVENT-FIRE] SERVER_STARTING event handler completed");
 		});
 		
-		// Also try SERVER_STARTED as fallback for integrated servers
-		LOGGER.info("[DH-EVENT-SUB] Registering SERVER_STARTED event handler as fallback");
+		LOGGER.info("[DH-EVENT-SUB] Registering SERVER_STARTED event handler");
 		ServerLifecycleEvents.SERVER_STARTED.register((server) -> {
 			LOGGER.info("[DH-EVENT-FIRE] ========== SERVER_STARTED EVENT FIRED ==========");
 			LOGGER.info("[DH-EVENT-FIRE] Server: " + server);
 			LOGGER.info("[DH-EVENT-FIRE] Is Dedicated: " + server.isDedicatedServer());
 			LOGGER.info("[DH-EVENT-FIRE] Thread: " + Thread.currentThread().getName() + " (ID: " + Thread.currentThread().getId() + ")");
-			
-			// Only call handler if it's an integrated server and SERVER_STARTING didn't fire
 			if (!server.isDedicatedServer())
 			{
 				LOGGER.info("[DH-EVENT-FIRE] Integrated server detected in SERVER_STARTED - calling handler");
 				eventHandler.accept(server);
 			}
-			
 			LOGGER.info("[DH-EVENT-FIRE] SERVER_STARTED event handler completed");
+		});
+		
+		LOGGER.info("[DH-EVENT-SUB] Registering SERVER_STOPPING event handler");
+		ServerLifecycleEvents.SERVER_STOPPING.register((server) -> {
+			LOGGER.info("[DH-EVENT-FIRE] ========== SERVER_STOPPING EVENT FIRED ==========");
+			LOGGER.info("[DH-EVENT-FIRE] Server: " + server);
+			LOGGER.info("[DH-EVENT-FIRE] Is Dedicated: " + server.isDedicatedServer());
+		});
+		
+		LOGGER.info("[DH-EVENT-SUB] Registering SERVER_STOPPED event handler");
+		ServerLifecycleEvents.SERVER_STOPPED.register((server) -> {
+			LOGGER.info("[DH-EVENT-FIRE] ========== SERVER_STOPPED EVENT FIRED ==========");
+			LOGGER.info("[DH-EVENT-FIRE] Server: " + server);
+			LOGGER.info("[DH-EVENT-FIRE] Is Dedicated: " + server.isDedicatedServer());
 		});
 		
 		LOGGER.info("[DH-EVENT-SUB] Server lifecycle event subscriptions complete");
