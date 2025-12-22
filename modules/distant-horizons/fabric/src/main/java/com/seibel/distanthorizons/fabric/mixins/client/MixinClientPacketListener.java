@@ -29,8 +29,19 @@ public class MixinClientPacketListener
 	@Inject(method = "handleLogin", at = @At("RETURN"))
 	void onHandleLoginEnd(CallbackInfo ci) 
 	{ 
+		System.out.println("========================================");
+		System.out.println("DH MixinClientPacketListener.onHandleLoginEnd() CALLED!");
+		System.out.println("About to call ClientApi.INSTANCE.onClientOnlyConnected()");
+		System.out.println("========================================");
 		ClientApi.INSTANCE.onClientOnlyConnected(); 
+		System.out.println("========================================");
+		System.out.println("DH MixinClientPacketListener: onClientOnlyConnected() finished");
+		System.out.println("About to call clientLevelLoadEvent()");
+		System.out.println("========================================");
 		ClientApi.INSTANCE.clientLevelLoadEvent(ClientLevelWrapper.getWrapper(this.level, true));
+		System.out.println("========================================");
+		System.out.println("DH MixinClientPacketListener.onHandleLoginEnd() FINISHED!");
+		System.out.println("========================================");
 	}
 	
 	@Inject(method = "close", at = @At("HEAD"))
