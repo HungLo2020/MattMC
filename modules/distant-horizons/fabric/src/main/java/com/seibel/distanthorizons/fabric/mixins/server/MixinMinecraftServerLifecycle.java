@@ -28,6 +28,11 @@ public abstract class MixinMinecraftServerLifecycle {
 	@Unique
 	private static final DhLogger LOGGER = new DhLoggerBuilder().build();
 	
+	static {
+		LOGGER.info("[DH-MIXIN-LIFECYCLE] ########## MixinMinecraftServerLifecycle CLASS LOADED ##########");
+		LOGGER.info("[DH-MIXIN-LIFECYCLE] This mixin will invoke Fabric server lifecycle events");
+	}
+	
 	@Shadow
 	public abstract ServerLevel getLevel(ResourceKey<Level> resourceKey);
 	
