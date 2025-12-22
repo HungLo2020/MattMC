@@ -55,19 +55,18 @@ public abstract class MixinChunkHolderChunkEvents {
 	
 	/**
 	 * Fire CHUNK_LOAD and CHUNK_GENERATE events when chunks are promoted to FULL status.
-	 * We inject at the end of updateFutures() after the chunk has been promoted.
+	 * We inject right after the fullChunkFuture is scheduled for promotion (line 282 in updateFutures).
 	 */
-	@Inject(method = "updateFutures", at = @At("TAIL"))
-	private void onUpdateFutures(ChunkMap chunkMap, Executor executor, CallbackInfo ci) {
-		// Check if chunk transitioned to FULL status
-		FullChunkStatus oldStatus = ChunkLevel.fullStatus(this.oldTicketLevel);
-		FullChunkStatus newStatus = ChunkLevel.fullStatus(this.ticketLevel);
-		
-		boolean wasFullChunk = oldStatus.isOrAfter(FullChunkStatus.FULL);
-		boolean isFullChunk = newStatus.isOrAfter(FullChunkStatus.FULL);
-		
-		// Chunk was promoted to FULL status
-		if (!wasFullChunk && isFullChunk && !fabric_loadEventFired) {
+	@Inject(
+		method = "updateFutures",
+		at = @At(
+			value = "INVOKE",
+			target = "Lnet/minecraft/server/level/ChunkHolder;scheduleFullChunkPromotion(Lnet/minecraft/server/level/ChunkMap;Ljava/util/concurrent/CompletableFuture;Ljava/util/concurrent/Executor;Lnet/minecraft/server/level/FullChunkStatus;)V",
+			ordinal = 0
+		)
+	)
+	private void onChunkPromotedToFull(ChunkMap chunkMap, Executor executor, CallbackInfo ci) {
+		if (!fabric_loadEventFired) {
 			LevelChunk levelChunk = this.getChunkToSend();
 			
 			if (levelChunk != null) {
@@ -87,19 +86,28 @@ public abstract class MixinChunkHolderChunkEvents {
 					}
 					
 					fabric_loadEventFired = true;
+					fabric_wasFullChunk = true;
 				} catch (Exception e) {
 					LOGGER.error("[DH-CHUNK-LOAD] Error invoking chunk events for {}: {}", levelChunk.getPos(), e.getMessage(), e);
 				}
 			}
-			
-			fabric_wasFullChunk = true;
 		}
-		
-		// Chunk was demoted from FULL status - reset flags
-		if (wasFullChunk && !isFullChunk) {
-			fabric_loadEventFired = false;
-			fabric_wasFullChunk = false;
-			LOGGER.info("[DH-CHUNK-UPDATE] Chunk demoted from FULL, resetting tracking flags");
-		}
+	}
+	
+	/**
+	 * Reset tracking flags when chunk is demoted from FULL status.
+	 */
+	@Inject(
+		method = "updateFutures",
+		at = @At(
+			value = "INVOKE",
+			target = "Ljava/util/concurrent/CompletableFuture;complete(Ljava/lang/Object;)Z",
+			ordinal = 0
+		)
+	)
+	private void onChunkDemotedFromFull(ChunkMap chunkMap, Executor executor, CallbackInfo ci) {
+		fabric_loadEventFired = false;
+		fabric_wasFullChunk = false;
+		LOGGER.info("[DH-CHUNK-UPDATE] Chunk demoted from FULL, resetting tracking flags");
 	}
 }
