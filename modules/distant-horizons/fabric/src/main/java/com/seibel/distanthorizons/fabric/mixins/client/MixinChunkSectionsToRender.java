@@ -22,10 +22,13 @@ package com.seibel.distanthorizons.fabric.mixins.client;
 	
 import com.seibel.distanthorizons.common.wrappers.world.ClientLevelWrapper;
 import com.seibel.distanthorizons.core.api.internal.ClientApi;
+import com.seibel.distanthorizons.core.logging.DhLogger;
+import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.chunk.ChunkSectionLayerGroup;
 import net.minecraft.client.renderer.chunk.ChunkSectionsToRender;
 import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
@@ -34,6 +37,8 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 @Mixin(ChunkSectionsToRender.class)
 public class MixinChunkSectionsToRender
 {
+	@Unique
+	private static final DhLogger LOGGER = new DhLoggerBuilder().build();
 	
 	
 	// needs to fire at HEAD with a lower than normal order (less than 1000)
@@ -41,18 +46,47 @@ public class MixinChunkSectionsToRender
 	@Inject(at = @At("HEAD"), method = "renderGroup", order = 800)
 	private void renderDeferredLayer(ChunkSectionLayerGroup chunkSectionLayerGroup, CallbackInfo ci)
 	{
+		LOGGER.info("[DH-RENDER-LAYER] ========== RENDER GROUP CALLED ==========");
+		LOGGER.info("[DH-RENDER-LAYER] Layer: " + chunkSectionLayerGroup);
+		LOGGER.info("[DH-RENDER-LAYER] Thread: " + Thread.currentThread().getName());
+		
 		ClientApi.RENDER_STATE.clientLevelWrapper = ClientLevelWrapper.getWrapperIfDifferent(ClientApi.RENDER_STATE.clientLevelWrapper, Minecraft.getInstance().levelRenderer.level);
 		
+		LOGGER.info("[DH-RENDER-LAYER] clientLevelWrapper: " + ClientApi.RENDER_STATE.clientLevelWrapper);
 		
 		if (chunkSectionLayerGroup == ChunkSectionLayerGroup.TRANSLUCENT)
 		{
-			ClientApi.INSTANCE.renderFadeTransparent();
-			ClientApi.INSTANCE.renderDeferredLodsForShaders();
+			LOGGER.info("[DH-RENDER-LAYER] TRANSLUCENT layer - rendering fade transparent and deferred LODs");
+			try
+			{
+				ClientApi.INSTANCE.renderFadeTransparent();
+				LOGGER.info("[DH-RENDER-LAYER] renderFadeTransparent() completed");
+				ClientApi.INSTANCE.renderDeferredLodsForShaders();
+				LOGGER.info("[DH-RENDER-LAYER] renderDeferredLodsForShaders() completed");
+			}
+			catch (Exception e)
+			{
+				LOGGER.error("[DH-RENDER-LAYER] Error rendering translucent: " + e.getMessage(), e);
+			}
 		}
 		else if (chunkSectionLayerGroup == ChunkSectionLayerGroup.TRIPWIRE)
 		{
-			ClientApi.INSTANCE.renderFadeOpaque();
+			LOGGER.info("[DH-RENDER-LAYER] TRIPWIRE layer - rendering fade opaque");
+			try
+			{
+				ClientApi.INSTANCE.renderFadeOpaque();
+				LOGGER.info("[DH-RENDER-LAYER] renderFadeOpaque() completed");
+			}
+			catch (Exception e)
+			{
+				LOGGER.error("[DH-RENDER-LAYER] Error rendering tripwire: " + e.getMessage(), e);
+			}
 		}
+		else
+		{
+			LOGGER.info("[DH-RENDER-LAYER] Other layer (" + chunkSectionLayerGroup + ") - no LOD rendering");
+		}
+		LOGGER.info("[DH-RENDER-LAYER] ========== RENDER GROUP COMPLETE ==========");
 	}
 	
 	
