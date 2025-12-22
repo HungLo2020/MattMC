@@ -61,7 +61,7 @@ public class ServerApi
 	{
 		LOGGER.info("[DH-WORLD] ========== SERVER LOAD EVENT ==========");
 		LOGGER.info("[DH-WORLD] isDedicatedEnvironment: " + isDedicatedEnvironment);
-		LOGGER.info("[DH-WORLD] Thread: " + Thread.currentThread().getName() + " (ID: " + Thread.currentThread().threadId() + ")");
+		LOGGER.info("[DH-WORLD] Thread: " + Thread.currentThread().getName() + " (ID: " + Thread.currentThread().getId() + ")");
 		LOGGER.info("[DH-WORLD] Current world before: " + SharedApi.getAbstractDhWorld());
 		
 		AbstractDhWorld newWorld;
@@ -111,7 +111,7 @@ public class ServerApi
 		LOGGER.info("[DH-LEVEL] ========== SERVER LEVEL LOAD EVENT ==========");
 		LOGGER.info("[DH-LEVEL] Level: " + level);
 		LOGGER.info("[DH-LEVEL] Level identifier: " + level.getDhIdentifier());
-		LOGGER.info("[DH-LEVEL] Thread: " + Thread.currentThread().getName() + " (ID: " + Thread.currentThread().threadId() + ")");
+		LOGGER.info("[DH-LEVEL] Thread: " + Thread.currentThread().getName() + " (ID: " + Thread.currentThread().getId() + ")");
 		
 		AbstractDhWorld serverWorld = SharedApi.getAbstractDhWorld();
 		LOGGER.info("[DH-LEVEL] Current DH world: " + serverWorld);

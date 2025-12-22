@@ -67,7 +67,7 @@ public abstract class AbstractModInitializer
 	public void onInitializeClient()
 	{
 		LOGGER.info("[DH-INIT] ========== CLIENT INITIALIZATION START ==========");
-		LOGGER.info("[DH-INIT] Thread: " + Thread.currentThread().getName() + " (ID: " + Thread.currentThread().threadId() + ")");
+		LOGGER.info("[DH-INIT] Thread: " + Thread.currentThread().getName() + " (ID: " + Thread.currentThread().getId() + ")");
 		
 		DependencySetup.createClientBindings();
 		this.createInitialClientBindings();
@@ -105,7 +105,7 @@ public abstract class AbstractModInitializer
 	public void onInitializeServer()
 	{
 		LOGGER.info("[DH-INIT] ========== DEDICATED SERVER INITIALIZATION START ==========");
-		LOGGER.info("[DH-INIT] Thread: " + Thread.currentThread().getName() + " (ID: " + Thread.currentThread().threadId() + ")");
+		LOGGER.info("[DH-INIT] Thread: " + Thread.currentThread().getName() + " (ID: " + Thread.currentThread().getId() + ")");
 		
 		DependencySetup.createServerBindings();
 		
@@ -134,7 +134,7 @@ public abstract class AbstractModInitializer
 		this.subscribeServerStartingEvent(server -> 
 		{
 			LOGGER.info("[DH-EVENT] SERVER_STARTING callback triggered!");
-			LOGGER.info("[DH-EVENT] Thread: " + Thread.currentThread().getName() + " (ID: " + Thread.currentThread().threadId() + ")");
+			LOGGER.info("[DH-EVENT] Thread: " + Thread.currentThread().getName() + " (ID: " + Thread.currentThread().getId() + ")");
 			
 			MinecraftServerWrapper.INSTANCE.dedicatedServer = (DedicatedServer)server;
 			

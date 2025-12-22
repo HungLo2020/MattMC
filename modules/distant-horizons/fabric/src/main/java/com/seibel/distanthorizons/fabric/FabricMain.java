@@ -125,7 +125,7 @@ public class FabricMain extends AbstractModInitializer implements ClientModIniti
 	protected void subscribeServerStartingEvent(Consumer<MinecraftServer> eventHandler)
 	{
 		LOGGER.info("[DH-EVENT-SUB] Subscribing to SERVER_STARTING event...");
-		LOGGER.info("[DH-EVENT-SUB] Thread: " + Thread.currentThread().getName() + " (ID: " + Thread.currentThread().threadId() + ")");
+		LOGGER.info("[DH-EVENT-SUB] Thread: " + Thread.currentThread().getName() + " (ID: " + Thread.currentThread().getId() + ")");
 		LOGGER.info("[DH-EVENT-SUB] Adding phase ordering: INITIAL_PHASE -> DEFAULT_PHASE");
 		
 		ServerLifecycleEvents.SERVER_STARTING.addPhaseOrdering(INITIAL_PHASE, Event.DEFAULT_PHASE);
@@ -135,7 +135,7 @@ public class FabricMain extends AbstractModInitializer implements ClientModIniti
 			LOGGER.info("[DH-EVENT-FIRE] ========== SERVER_STARTING EVENT FIRED ==========");
 			LOGGER.info("[DH-EVENT-FIRE] Server: " + server);
 			LOGGER.info("[DH-EVENT-FIRE] Is Dedicated: " + server.isDedicatedServer());
-			LOGGER.info("[DH-EVENT-FIRE] Thread: " + Thread.currentThread().getName() + " (ID: " + Thread.currentThread().threadId() + ")");
+			LOGGER.info("[DH-EVENT-FIRE] Thread: " + Thread.currentThread().getName() + " (ID: " + Thread.currentThread().getId() + ")");
 			
 			eventHandler.accept(server);
 			

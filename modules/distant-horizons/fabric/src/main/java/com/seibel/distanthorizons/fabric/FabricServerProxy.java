@@ -96,7 +96,7 @@ public class FabricServerProxy implements AbstractModInitializer.IEventProxy
 	{
 		LOGGER.info("[DH-EVENTS] ========== REGISTERING FABRIC SERVER EVENTS ==========");
 		LOGGER.info("[DH-EVENTS] isDedicatedServer: " + this.isDedicatedServer);
-		LOGGER.info("[DH-EVENTS] Thread: " + Thread.currentThread().getName() + " (ID: " + Thread.currentThread().threadId() + ")");
+		LOGGER.info("[DH-EVENTS] Thread: " + Thread.currentThread().getName() + " (ID: " + Thread.currentThread().getId() + ")");
 		
 		/* Register the mod needed event callbacks */
 		
@@ -116,7 +116,7 @@ public class FabricServerProxy implements AbstractModInitializer.IEventProxy
 			LOGGER.info("[DH-EVENT-CALLBACK] ========== SERVER_STARTING CALLBACK TRIGGERED ==========");
 			LOGGER.info("[DH-EVENT-CALLBACK] Server: " + server);
 			LOGGER.info("[DH-EVENT-CALLBACK] Is Dedicated: " + server.isDedicatedServer());
-			LOGGER.info("[DH-EVENT-CALLBACK] Thread: " + Thread.currentThread().getName() + " (ID: " + Thread.currentThread().threadId() + ")");
+			LOGGER.info("[DH-EVENT-CALLBACK] Thread: " + Thread.currentThread().getName() + " (ID: " + Thread.currentThread().getId() + ")");
 			
 			boolean isValid = this.isValidTime();
 			LOGGER.info("[DH-EVENT-CALLBACK] isValidTime: " + isValid);

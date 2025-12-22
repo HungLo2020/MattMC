@@ -90,7 +90,7 @@ public class MixinLevelRenderer
 	private void prepareChunkRenders(Matrix4fc modelViewMatrix, double d, double e, double f, CallbackInfoReturnable<ChunkSectionsToRender> callback)
 	{
 		LOGGER.debug("[DH-RENDER-MIXIN] prepareChunkRenders() called");
-		LOGGER.debug("[DH-RENDER-MIXIN] Thread: " + Thread.currentThread().getName() + " (ID: " + Thread.currentThread().threadId() + ")");
+		LOGGER.debug("[DH-RENDER-MIXIN] Thread: " + Thread.currentThread().getName() + " (ID: " + Thread.currentThread().getId() + ")");
 		LOGGER.debug("[DH-RENDER-MIXIN] Setting render state matrices and level wrapper");
 		
 		ClientApi.RENDER_STATE.mcModelViewMatrix = McObjectConverter.Convert(modelViewMatrix);

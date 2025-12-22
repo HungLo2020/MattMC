@@ -102,7 +102,7 @@ public class SharedApi
 	public static void setDhWorld(AbstractDhWorld newWorld)
 	{
 		LOGGER.info("[DH-WORLD-SET] ========== SETTING DH WORLD ==========");
-		LOGGER.info("[DH-WORLD-SET] Thread: " + Thread.currentThread().getName() + " (ID: " + Thread.currentThread().threadId() + ")");
+		LOGGER.info("[DH-WORLD-SET] Thread: " + Thread.currentThread().getName() + " (ID: " + Thread.currentThread().getId() + ")");
 		LOGGER.info("[DH-WORLD-SET] Old world: " + currentWorld);
 		LOGGER.info("[DH-WORLD-SET] New world: " + newWorld);
 		

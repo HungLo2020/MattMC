@@ -142,7 +142,7 @@ public class ClientApi
 	public synchronized void onClientOnlyConnected()
 	{
 		LOGGER.info("[DH-CLIENT-CONNECT] ========== CLIENT ONLY CONNECTED ==========");
-		LOGGER.info("[DH-CLIENT-CONNECT] Thread: " + Thread.currentThread().getName() + " (ID: " + Thread.currentThread().threadId() + ")");
+		LOGGER.info("[DH-CLIENT-CONNECT] Thread: " + Thread.currentThread().getName() + " (ID: " + Thread.currentThread().getId() + ")");
 		
 		// only continue if the client is connected to a different server
 		boolean connectedToServer = MC_CLIENT.clientConnectedToDedicatedServer();
@@ -266,7 +266,7 @@ public class ClientApi
 		LOGGER.info("[DH-CLIENT-LEVEL] ========== CLIENT LEVEL LOAD EVENT ==========");
 		LOGGER.info("[DH-CLIENT-LEVEL] Level: " + levelWrapper);
 		LOGGER.info("[DH-CLIENT-LEVEL] Level identifier: " + levelWrapper.getDhIdentifier());
-		LOGGER.info("[DH-CLIENT-LEVEL] Thread: " + Thread.currentThread().getName() + " (ID: " + Thread.currentThread().threadId() + ")");
+		LOGGER.info("[DH-CLIENT-LEVEL] Thread: " + Thread.currentThread().getName() + " (ID: " + Thread.currentThread().getId() + ")");
 		
 		// wait a moment before loading the level to give the server a chance to handle the client's login request
 		if (MC_CLIENT.clientConnectedToDedicatedServer())
@@ -393,7 +393,7 @@ public class ClientApi
 	{
 		LOGGER.debug("[DH-RENDER-LAYER] ========== RENDER LOD LAYER START ==========");
 		LOGGER.debug("[DH-RENDER-LAYER] renderingDeferredLayer: " + renderingDeferredLayer);
-		LOGGER.debug("[DH-RENDER-LAYER] Thread: " + Thread.currentThread().getName() + " (ID: " + Thread.currentThread().threadId() + ")");
+		LOGGER.debug("[DH-RENDER-LAYER] Thread: " + Thread.currentThread().getName() + " (ID: " + Thread.currentThread().getId() + ")");
 		
 		//=========//
 		// logging //
