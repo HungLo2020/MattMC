@@ -22,6 +22,12 @@ public class DHTerrainTransformer {
 
 		root.replaceExpressionMatches(t, CommonTransformer.glTextureMatrix0, "mat4(1.0)");
 		root.replaceExpressionMatches(t, CommonTransformer.glTextureMatrix1, "mat4(1.0)");
+		
+		// Rename DH-specific uniform names to iris_ prefixed versions for shader compatibility
+		// Some shaderpacks designed for Distant Horizons use dhProjection/dhProjectionInverse
+		root.rename("dhProjection", "iris_ProjectionMatrix");
+		root.rename("dhProjectionInverse", "iris_ProjectionMatrixInverse");
+		
 		root.rename("gl_ProjectionMatrix", "iris_ProjectionMatrix");
 
 		if (parameters.type.glShaderType == ShaderType.VERTEX) {
@@ -61,12 +67,6 @@ public class DHTerrainTransformer {
 
 		tree.parseAndInjectNode(t, ASTInjectionPoint.BEFORE_DECLARATIONS,
 			"uniform mat4 iris_ProjectionMatrixInverse;");
-
-		// Add DH-specific uniform aliases for shader compatibility
-		// Some shaderpacks expect dhProjection and dhProjectionInverse instead of iris_ prefixed versions
-		tree.parseAndInjectNodes(t, ASTInjectionPoint.BEFORE_DECLARATIONS,
-			"#define dhProjection iris_ProjectionMatrix",
-			"#define dhProjectionInverse iris_ProjectionMatrixInverse");
 
 		Iris.logger.warn("Type is " + parameters.type);
 
