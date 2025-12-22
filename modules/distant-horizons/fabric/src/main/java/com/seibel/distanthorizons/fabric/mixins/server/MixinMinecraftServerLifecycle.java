@@ -57,7 +57,7 @@ public abstract class MixinMinecraftServerLifecycle {
 	 * Invoke SERVER_STARTED event after the server has completed setup.
 	 * Injects after buildServerStatus() is called in runServer() method.
 	 */
-	@Inject(method = "runServer", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/MinecraftServer;buildServerStatus()Lnet/minecraft/server/ServerStatus;", shift = At.Shift.AFTER))
+	@Inject(method = "runServer", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/MinecraftServer;buildServerStatus()Lnet/minecraft/network/protocol/status/ServerStatus;", shift = At.Shift.AFTER))
 	private void onServerStarted(CallbackInfo ci) {
 		MinecraftServer server = (MinecraftServer) (Object) this;
 		LOGGER.info("[DH-MIXIN-LIFECYCLE] ========== MIXIN: onServerStarted CALLED ==========");
