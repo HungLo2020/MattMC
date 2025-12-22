@@ -141,17 +141,12 @@ public class ClientApi
 	 */
 	public synchronized void onClientOnlyConnected()
 	{
-		// only continue if the client is connected to a different server OR in singleplayer
+		// only continue if the client is connected to a different server
 		boolean connectedToServer = MC_CLIENT.clientConnectedToDedicatedServer();
 		boolean connectedToReplay = MC_CLIENT.connectedToReplay();
-		boolean hasSingleplayer = MC_CLIENT.hasSinglePlayerServer();
-		if (connectedToServer || connectedToReplay || hasSingleplayer)
+		if (connectedToServer || connectedToReplay)
 		{
-			if (hasSingleplayer)
-			{
-				LOGGER.info("Client in Singleplayer mode connecting.");
-			}
-			else if (connectedToServer)
+			if (connectedToServer)
 			{
 				LOGGER.info("Client on ClientOnly mode connecting.");
 			}
@@ -351,15 +346,7 @@ public class ClientApi
 	//===============//
 	
 	/** Should be called before {@link ClientApi#renderDeferredLodsForShaders} */
-	public void renderLods() { 
-		LOGGER.info("=== ClientApi.renderLods() CALLED ===");
-		try {
-			this.renderLodLayer(false);
-			LOGGER.info("=== ClientApi.renderLods() FINISHED ===");
-		} catch (Exception e) {
-			LOGGER.error("=== ClientApi.renderLods() EXCEPTION: " + e.getMessage() + " ===", e);
-		}
-	}
+	public void renderLods() { this.renderLodLayer(false); }
 	
 	/** 
 	 * Only necessary when Shaders are in use.
@@ -369,35 +356,15 @@ public class ClientApi
 	
 	private void renderLodLayer(boolean renderingDeferredLayer)
 	{
-		LOGGER.info("=== renderLodLayer() STARTED, renderingDeferredLayer=" + renderingDeferredLayer + " ===");
-		
 		//=========//
 		// logging //
 		//=========//
 		
 		this.sendQueuedChatMessages();
-		LOGGER.info("renderLodLayer: Sent queued chat messages");
 		
 		IProfilerWrapper profiler = MC_CLIENT.getProfiler();
-		LOGGER.info("renderLodLayer: Got profiler: " + profiler);
-		
-		try {
-			LOGGER.info("renderLodLayer: About to profiler.pop() from terrain");
-			profiler.pop(); // get out of "terrain"
-			LOGGER.info("renderLodLayer: Successfully popped from terrain");
-		} catch (Exception e) {
-			LOGGER.error("renderLodLayer: EXCEPTION during profiler.pop(): " + e.getMessage(), e);
-			return;
-		}
-		
-		try {
-			LOGGER.info("renderLodLayer: About to profiler.push(DH-RenderLevel)");
-			profiler.push("DH-RenderLevel");
-			LOGGER.info("renderLodLayer: Successfully pushed DH-RenderLevel");
-		} catch (Exception e) {
-			LOGGER.error("renderLodLayer: EXCEPTION during profiler.push(): " + e.getMessage(), e);
-			return;
-		}
+		profiler.pop(); // get out of "terrain"
+		profiler.push("DH-RenderLevel");
 		
 		
 		
@@ -405,36 +372,25 @@ public class ClientApi
 		// render thread tasks //
 		//=====================//
 		
-		LOGGER.info("renderLodLayer: Starting render thread tasks section, renderingDeferredLayer=" + renderingDeferredLayer);
-		
 		// only run these tasks once per frame
 		if (!renderingDeferredLayer)
 		{
-			LOGGER.info("renderLodLayer: Pushing 'DH render thread tasks' profiler");
 			profiler.push("DH render thread tasks");
 			
 			try
 			{
-				LOGGER.info("renderLodLayer: Getting GLProxy instance");
 				// make sure the GLProxy is created for future use
 				GLProxy.getInstance();
 				
-				LOGGER.info("renderLodLayer: Running render thread tasks");
 				// these tasks always need to be called, regardless of whether the renderer is enabled or not to prevent memory leaks
 				GLProxy.runRenderThreadTasks();
-				LOGGER.info("renderLodLayer: Render thread tasks completed");
 			}
 			catch (Exception e)
 			{
 				LOGGER.error("Unexpected issue running render thread tasks, error: [" + e.getMessage() + "].", e);
 			}
 			
-			LOGGER.info("renderLodLayer: Popping 'DH render thread tasks' profiler");
 			profiler.pop();
-		}
-		else
-		{
-			LOGGER.info("renderLodLayer: Skipping render thread tasks (deferred layer)");
 		}
 		
 		
@@ -442,8 +398,6 @@ public class ClientApi
 		//=================//
 		// parameter setup //
 		//=================//
-		
-		LOGGER.info("renderLodLayer: Setting up render parameters");
 		
 		EDhApiRenderPass renderPass;
 		if (DhApiRenderProxy.INSTANCE.getDeferTransparentRendering())
@@ -462,17 +416,10 @@ public class ClientApi
 			renderPass = EDhApiRenderPass.OPAQUE_AND_TRANSPARENT;
 		}
 		
-		LOGGER.info("renderLodLayer: Render pass = " + renderPass);
-		
 		// A global render state variable is used since MC has split up their
 		// render prep and actual rendering into different threads/methods
 		// this is annoying since it's possible to start a render with only
 		// partially complete info, but there isn't a better option at the moment
-		LOGGER.info("renderLodLayer: Creating RenderParams with frameTime=" + RENDER_STATE.frameTime + 
-					", mcProjectionMatrix=" + RENDER_STATE.mcProjectionMatrix + 
-					", mcModelViewMatrix=" + RENDER_STATE.mcModelViewMatrix + 
-					", clientLevelWrapper=" + RENDER_STATE.clientLevelWrapper);
-		
 		RenderParams renderParams =
 			new RenderParams(
 				renderPass,
@@ -481,26 +428,21 @@ public class ClientApi
 				RENDER_STATE.clientLevelWrapper
 			);
 		
-		LOGGER.info("renderLodLayer: RenderParams created successfully");
-		
 		
 		
 		//============//
 		// validation //
 		//============//
 		
-		LOGGER.info("renderLodLayer: Validating render parameters");
 		// TODO write this message to the F3 menu so people can see when a different mod screws with the lightmap
 		String validationMessage = renderParams.getValidationErrorMessage();
 		if (validationMessage != null)
 		{
-			LOGGER.error("renderLodLayer: VALIDATION FAILED: " + validationMessage);
 			this.lastRenderParamValidationMessage = validationMessage;
 			return;
 		}
 		else
 		{
-			LOGGER.info("renderLodLayer: Validation passed");
 			this.lastRenderParamValidationMessage = null;
 		}
 		

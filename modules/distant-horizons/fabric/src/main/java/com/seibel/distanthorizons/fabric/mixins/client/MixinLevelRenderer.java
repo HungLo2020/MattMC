@@ -63,12 +63,6 @@ public class MixinLevelRenderer
 	@Unique
 	private static final DhLogger LOGGER = new DhLoggerBuilder().build();
 	
-	static {
-		System.out.println("========================================");
-		System.out.println("DH MixinLevelRenderer CLASS LOADED!");
-		System.out.println("========================================");
-	}
-	
 	
 	@Inject(at = @At("HEAD"), method = "renderLevel")
 	private void renderLevel(
@@ -77,21 +71,13 @@ public class MixinLevelRenderer
 			Matrix4f positionMatrix, Matrix4f projectionMatrix, Matrix4f idkMatrix, GpuBufferSlice gpuBufferSlice,
 			Vector4f skyColor, boolean thinFog, CallbackInfo callback)
     {
-	    LOGGER.info("=== DH MixinLevelRenderer.renderLevel CALLED ===");
-	    LOGGER.info("DH Mixin renderLevel: this.level = " + this.level);
-	    
 	    ClientApi.RENDER_STATE.mcModelViewMatrix = McObjectConverter.Convert(positionMatrix);
 	    ClientApi.RENDER_STATE.mcProjectionMatrix = McObjectConverter.Convert(projectionMatrix);
 	    
 		// TODO move this into a common place
 	    ClientApi.RENDER_STATE.frameTime = Minecraft.getInstance().deltaTracker.getRealtimeDeltaTicks();
 	    
-	    LOGGER.info("DH Mixin renderLevel: About to call ClientLevelWrapper.getWrapperIfDifferent");
-	    LOGGER.info("DH Mixin renderLevel: Current clientLevelWrapper = " + ClientApi.RENDER_STATE.clientLevelWrapper);
 	    ClientApi.RENDER_STATE.clientLevelWrapper = ClientLevelWrapper.getWrapperIfDifferent(ClientApi.RENDER_STATE.clientLevelWrapper, this.level);
-	    LOGGER.info("DH Mixin renderLevel: After getWrapperIfDifferent, clientLevelWrapper = " + ClientApi.RENDER_STATE.clientLevelWrapper);
-	    
-	    LOGGER.info("DH MixinLevelRenderer.renderLevel finished setting render state");
 	    
 		// handled here and in MixinChunkSectionsToRender
     }
@@ -101,32 +87,17 @@ public class MixinLevelRenderer
 	@Inject(at = @At("HEAD"), method = "prepareChunkRenders")
 	private void prepareChunkRenders(Matrix4fc modelViewMatrix, double d, double e, double f, CallbackInfoReturnable<ChunkSectionsToRender> callback)
 	{
-		LOGGER.info("=== DH MixinLevelRenderer.prepareChunkRenders CALLED ===");
-		LOGGER.info("DH Mixin: this.level = " + this.level);
-		LOGGER.info("DH Mixin: Setting model view matrix");
-		
 		ClientApi.RENDER_STATE.mcModelViewMatrix = McObjectConverter.Convert(modelViewMatrix);
 		
-		LOGGER.info("DH Mixin: About to call ClientLevelWrapper.getWrapperIfDifferent");
-		LOGGER.info("DH Mixin: Current clientLevelWrapper = " + ClientApi.RENDER_STATE.clientLevelWrapper);
 		ClientApi.RENDER_STATE.clientLevelWrapper = ClientLevelWrapper.getWrapperIfDifferent(ClientApi.RENDER_STATE.clientLevelWrapper, this.level);
-		LOGGER.info("DH Mixin: After getWrapperIfDifferent, clientLevelWrapper = " + ClientApi.RENDER_STATE.clientLevelWrapper);
 		
-		LOGGER.info("DH Mixin: About to check if dev build");
 		// only crash during development
 		if (ModInfo.IS_DEV_BUILD)
 		{
-			LOGGER.info("DH Mixin: IS_DEV_BUILD = true, checking render state");
 			ClientApi.RENDER_STATE.canRenderOrThrow();
 		}
-		else
-		{
-			LOGGER.info("DH Mixin: IS_DEV_BUILD = false");
-		}
 		
-		LOGGER.info("DH Mixin: About to call ClientApi.INSTANCE.renderLods()");
 		ClientApi.INSTANCE.renderLods();
-		LOGGER.info("DH Mixin: Finished calling renderLods()");
 		
 	}
 	

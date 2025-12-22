@@ -23,47 +23,14 @@ import java.util.concurrent.AbstractExecutorService;
 @Mixin(ClientPacketListener.class)
 public class MixinClientPacketListener
 {
-	static {
-		System.out.println("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
-		System.out.println("DH MixinClientPacketListener CLASS LOADED!");
-		System.out.println("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!");
-	}
-	
 	@Shadow
 	private ClientLevel level;
-	
-	@Inject(method = "handleLogin", at = @At("HEAD"))
-	void onHandleLoginStart(CallbackInfo ci) 
-	{ 
-		System.out.println("========================================");
-		System.out.println("DH MixinClientPacketListener.onHandleLoginStart() CALLED AT HEAD!");
-		System.out.println("========================================");
-	}
 	
 	@Inject(method = "handleLogin", at = @At("RETURN"))
 	void onHandleLoginEnd(CallbackInfo ci) 
 	{ 
-		System.out.println("========================================");
-		System.out.println("DH MixinClientPacketListener.onHandleLoginEnd() CALLED AT RETURN!");
-		System.out.println("About to call ClientApi.INSTANCE.onClientOnlyConnected()");
-		System.out.println("========================================");
 		ClientApi.INSTANCE.onClientOnlyConnected(); 
-		System.out.println("========================================");
-		System.out.println("DH MixinClientPacketListener: onClientOnlyConnected() finished");
-		System.out.println("About to call clientLevelLoadEvent()");
-		System.out.println("========================================");
 		ClientApi.INSTANCE.clientLevelLoadEvent(ClientLevelWrapper.getWrapper(this.level, true));
-		System.out.println("========================================");
-		System.out.println("DH MixinClientPacketListener.onHandleLoginEnd() FINISHED!");
-		System.out.println("========================================");
-	}
-	
-	@Inject(method = "handleLogin", at = @At("TAIL"))
-	void onHandleLoginTail(CallbackInfo ci) 
-	{ 
-		System.out.println("========================================");
-		System.out.println("DH MixinClientPacketListener.onHandleLoginTail() CALLED AT TAIL!");
-		System.out.println("========================================");
 	}
 	
 	@Inject(method = "close", at = @At("HEAD"))
