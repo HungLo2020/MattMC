@@ -141,11 +141,15 @@ public class ClientApi
 	 */
 	public synchronized void onClientOnlyConnected()
 	{
+		System.out.println("!!!!! onClientOnlyConnected() STARTED");
 		// only continue if the client is connected to a different server
 		boolean connectedToServer = MC_CLIENT.clientConnectedToDedicatedServer();
 		boolean connectedToReplay = MC_CLIENT.connectedToReplay();
+		System.out.println("!!!!! connectedToServer: " + connectedToServer);
+		System.out.println("!!!!! connectedToReplay: " + connectedToReplay);
 		if (connectedToServer || connectedToReplay)
 		{
+			System.out.println("!!!!! Creating DhClientWorld...");
 			if (connectedToServer)
 			{
 				LOGGER.info("Client on ClientOnly mode connecting.");
@@ -168,7 +172,9 @@ public class ClientApi
 			// firing after clientLevelLoadEvent
 			// TODO if level has prepped to load it should fire level load event
 			DhClientWorld world = new DhClientWorld();
+			System.out.println("!!!!! DhClientWorld created: " + world);
 			SharedApi.setDhWorld(world);
+			System.out.println("!!!!! SharedApi.setDhWorld() called");
 			
 			this.pluginChannelApi.onJoinServer(world.networkState.getSession());
 			world.networkState.sendConfigMessage();
@@ -181,6 +187,11 @@ public class ClientApi
 			
 			this.waitingClientLevels.clear();
 		}
+		else
+		{
+			System.out.println("!!!!! NOT connected to server or replay - DhClientWorld NOT created!");
+		}
+		System.out.println("!!!!! onClientOnlyConnected() FINISHED");
 	}
 	
 	/** Synchronized to prevent a rare issue where multiple disconnect events are triggered on top of each other. */
