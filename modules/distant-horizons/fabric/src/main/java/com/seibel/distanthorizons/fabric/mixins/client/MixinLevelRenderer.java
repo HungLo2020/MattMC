@@ -109,10 +109,10 @@ public class MixinLevelRenderer
 				ClientApi.RENDER_STATE.canRenderOrThrow();
 				LOGGER.info("[DH-RENDER-MIXIN] canRenderOrThrow() passed");
 			}
-			catch (Exception e)
+			catch (Exception ex)
 			{
-				LOGGER.error("[DH-RENDER-MIXIN] canRenderOrThrow() failed: " + e.getMessage(), e);
-				throw e;
+				LOGGER.error("[DH-RENDER-MIXIN] canRenderOrThrow() failed: " + ex.getMessage(), ex);
+				throw ex;
 			}
 		}
 		
@@ -122,9 +122,9 @@ public class MixinLevelRenderer
 			ClientApi.INSTANCE.renderLods();
 			LOGGER.info("[DH-RENDER-MIXIN] ClientApi.INSTANCE.renderLods() completed successfully");
 		}
-		catch (Exception e)
+		catch (Exception ex)
 		{
-			LOGGER.error("[DH-RENDER-MIXIN] renderLods() failed: " + e.getMessage(), e);
+			LOGGER.error("[DH-RENDER-MIXIN] renderLods() failed: " + ex.getMessage(), ex);
 		}
 		LOGGER.info("[DH-RENDER-MIXIN] ========== prepareChunkRenders() COMPLETE ==========");
 	}
