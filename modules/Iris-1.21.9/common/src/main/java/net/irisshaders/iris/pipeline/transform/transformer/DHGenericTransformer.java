@@ -93,9 +93,16 @@ public class DHGenericTransformer {
 				tree.parseAndInjectNodes(t, ASTInjectionPoint.BEFORE_FUNCTIONS,
 					"vec4 ftransform() { return gl_ModelViewProjectionMatrix * gl_Vertex; }");
 			}
-			tree.parseAndInjectNodes(t, ASTInjectionPoint.BEFORE_DECLARATIONS,
-				"uniform mat4 iris_ProjectionMatrix;",
-				"uniform mat4 iris_ModelViewMatrix;",
+			// Only inject uniforms if they don't already exist (some DH shaders may declare them)
+			if (!root.identifierIndex.has("iris_ProjectionMatrix")) {
+				tree.parseAndInjectNode(t, ASTInjectionPoint.BEFORE_DECLARATIONS,
+					"uniform mat4 iris_ProjectionMatrix;");
+			}
+			if (!root.identifierIndex.has("iris_ModelViewMatrix")) {
+				tree.parseAndInjectNode(t, ASTInjectionPoint.BEFORE_DECLARATIONS,
+					"uniform mat4 iris_ModelViewMatrix;");
+			}
+			tree.parseAndInjectNode(t, ASTInjectionPoint.BEFORE_DECLARATIONS,
 				// _draw_translation replaced with Chunks[_draw_id].offset.xyz
 				"vec4 getVertexPosition() { return vec4(_vert_position, 1.0); }");
 			root.replaceReferenceExpressions(t, "gl_Vertex", "getVertexPosition()");
@@ -105,9 +112,15 @@ public class DHGenericTransformer {
 			// performed as an array of injections)
 			injectVertInit(t, tree, root, parameters);
 		} else {
-			tree.parseAndInjectNodes(t, ASTInjectionPoint.BEFORE_DECLARATIONS,
-				"uniform mat4 iris_ModelViewMatrix;",
-				"uniform mat4 iris_ProjectionMatrix;");
+			// Only inject uniforms if they don't already exist (some DH shaders may declare them)
+			if (!root.identifierIndex.has("iris_ModelViewMatrix")) {
+				tree.parseAndInjectNode(t, ASTInjectionPoint.BEFORE_DECLARATIONS,
+					"uniform mat4 iris_ModelViewMatrix;");
+			}
+			if (!root.identifierIndex.has("iris_ProjectionMatrix")) {
+				tree.parseAndInjectNode(t, ASTInjectionPoint.BEFORE_DECLARATIONS,
+					"uniform mat4 iris_ProjectionMatrix;");
+			}
 		}
 
 		root.replaceReferenceExpressions(t, "gl_ModelViewProjectionMatrix",
