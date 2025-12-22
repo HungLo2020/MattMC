@@ -172,14 +172,29 @@ public class FabricServerProxy implements AbstractModInitializer.IEventProxy
 		LOGGER.info("[DH-EVENTS] Registering ServerChunkEvents.CHUNK_LOAD event...");
 		ServerChunkEvents.CHUNK_LOAD.register((server, chunk) ->
 		{
+			LOGGER.info("[DH-EVENT-CALLBACK] CHUNK_LOAD EVENT TRIGGERED for chunk at {}", chunk.getPos());
 			ILevelWrapper level = this.getServerLevelWrapper((ServerLevel) chunk.getLevel());
 			if (this.isValidTime())
 			{
+				LOGGER.info("[DH-EVENT-CALLBACK] Calling ServerApi.serverChunkLoadEvent for chunk at {}", chunk.getPos());
 				ServerApi.INSTANCE.serverChunkLoadEvent(
 						new ChunkWrapper(chunk, level),
 						level);
 			}
+			else
+			{
+				LOGGER.info("[DH-EVENT-CALLBACK] isValidTime() returned false, skipping serverChunkLoadEvent");
+			}
 		});
+		
+		// ServerChunkGenerateEvent
+		LOGGER.info("[DH-EVENTS] Registering ServerChunkEvents.CHUNK_GENERATE event...");
+		ServerChunkEvents.CHUNK_GENERATE.register((server, chunk) ->
+		{
+			LOGGER.info("[DH-EVENT-CALLBACK] CHUNK_GENERATE EVENT TRIGGERED for chunk at {}", chunk.getPos());
+			// Chunk generation can trigger LOD distant generation
+		});
+		
 		// ServerChunkSaveEvent - Done in MixinChunkMap
 		
 		LOGGER.info("[DH-EVENTS] Registering ServerPlayConnectionEvents.JOIN event...");
