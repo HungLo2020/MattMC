@@ -62,6 +62,12 @@ public class DHGenericTransformer {
 		tree.parseAndInjectNode(t, ASTInjectionPoint.BEFORE_DECLARATIONS,
 			"uniform mat4 iris_ProjectionMatrixInverse;");
 
+		// Add DH-specific uniform aliases for shader compatibility
+		// Some shaderpacks expect dhProjection and dhProjectionInverse instead of iris_ prefixed versions
+		tree.parseAndInjectNodes(t, ASTInjectionPoint.BEFORE_DECLARATIONS,
+			"#define dhProjection iris_ProjectionMatrix",
+			"#define dhProjectionInverse iris_ProjectionMatrixInverse");
+
 		Iris.logger.warn("Type is " + parameters.type);
 
 		// TODO: All of the transformed variants of the input matrices, preferably
