@@ -62,22 +62,48 @@ public class DHGenericTransformer {
 		tree.parseAndInjectNode(t, ASTInjectionPoint.BEFORE_DECLARATIONS,
 			"uniform mat4 iris_ProjectionMatrixInverse;");
 
-		// Add DH-specific uniforms for shader pack compatibility
-		Iris.logger.info("[DH-SHADER-TRANSFORM] Injecting DH-specific uniforms for shader: " + parameters.type);
-		tree.parseAndInjectNode(t, ASTInjectionPoint.BEFORE_DECLARATIONS,
-			"uniform mat4 dhProjection;");
+		// Add DH-specific uniforms for shader pack compatibility (only if not already declared)
+		Iris.logger.info("[DH-SHADER-TRANSFORM] Checking and injecting DH-specific uniforms for shader: " + parameters.type);
+		
+		if (!root.identifierIndex.has("dhProjection")) {
+			tree.parseAndInjectNode(t, ASTInjectionPoint.BEFORE_DECLARATIONS,
+				"uniform mat4 dhProjection;");
+			Iris.logger.info("[DH-SHADER-TRANSFORM] Injected dhProjection");
+		} else {
+			Iris.logger.info("[DH-SHADER-TRANSFORM] dhProjection already declared, skipping");
+		}
 
-		tree.parseAndInjectNode(t, ASTInjectionPoint.BEFORE_DECLARATIONS,
-			"uniform mat4 dhProjectionInverse;");
+		if (!root.identifierIndex.has("dhProjectionInverse")) {
+			tree.parseAndInjectNode(t, ASTInjectionPoint.BEFORE_DECLARATIONS,
+				"uniform mat4 dhProjectionInverse;");
+			Iris.logger.info("[DH-SHADER-TRANSFORM] Injected dhProjectionInverse");
+		} else {
+			Iris.logger.info("[DH-SHADER-TRANSFORM] dhProjectionInverse already declared, skipping");
+		}
 
-		tree.parseAndInjectNode(t, ASTInjectionPoint.BEFORE_DECLARATIONS,
-			"uniform sampler2D dhDepthTex;");
+		if (!root.identifierIndex.has("dhDepthTex")) {
+			tree.parseAndInjectNode(t, ASTInjectionPoint.BEFORE_DECLARATIONS,
+				"uniform sampler2D dhDepthTex;");
+			Iris.logger.info("[DH-SHADER-TRANSFORM] Injected dhDepthTex");
+		} else {
+			Iris.logger.info("[DH-SHADER-TRANSFORM] dhDepthTex already declared, skipping");
+		}
 
-		tree.parseAndInjectNode(t, ASTInjectionPoint.BEFORE_DECLARATIONS,
-			"uniform sampler2D dhDepthTex1;");
+		if (!root.identifierIndex.has("dhDepthTex1")) {
+			tree.parseAndInjectNode(t, ASTInjectionPoint.BEFORE_DECLARATIONS,
+				"uniform sampler2D dhDepthTex1;");
+			Iris.logger.info("[DH-SHADER-TRANSFORM] Injected dhDepthTex1");
+		} else {
+			Iris.logger.info("[DH-SHADER-TRANSFORM] dhDepthTex1 already declared, skipping");
+		}
 
-		tree.parseAndInjectNode(t, ASTInjectionPoint.BEFORE_DECLARATIONS,
-			"uniform int dhRenderDistance;");
+		if (!root.identifierIndex.has("dhRenderDistance")) {
+			tree.parseAndInjectNode(t, ASTInjectionPoint.BEFORE_DECLARATIONS,
+				"uniform int dhRenderDistance;");
+			Iris.logger.info("[DH-SHADER-TRANSFORM] Injected dhRenderDistance");
+		} else {
+			Iris.logger.info("[DH-SHADER-TRANSFORM] dhRenderDistance already declared, skipping");
+		}
 
 		Iris.logger.warn("Type is " + parameters.type);
 
