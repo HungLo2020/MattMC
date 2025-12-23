@@ -308,6 +308,7 @@ public class TransformPatcher {
 		Object2ObjectMap<Tri<String, TextureType, TextureStage>, String> textureMap) {
 		// Prepend #define DISTANT_HORIZONS to enable shader pack's DH-specific uniforms
 		String dhDefine = "#define DISTANT_HORIZONS\n";
+		System.out.println("[DH-SHADER-PREPROCESSING] Prepending DISTANT_HORIZONS define to shader: " + name);
 		vertex = dhDefine + vertex;
 		fragment = dhDefine + fragment;
 		if (tessControl != null) tessControl = dhDefine + tessControl;
@@ -324,6 +325,7 @@ public class TransformPatcher {
 		Object2ObjectMap<Tri<String, TextureType, TextureStage>, String> textureMap) {
 		// Prepend #define DISTANT_HORIZONS to enable shader pack's DH-specific uniforms
 		String dhDefine = "#define DISTANT_HORIZONS\n";
+		System.out.println("[DH-SHADER-PREPROCESSING] Prepending DISTANT_HORIZONS define to shader: " + name);
 		vertex = dhDefine + vertex;
 		fragment = dhDefine + fragment;
 		if (tessControl != null) tessControl = dhDefine + tessControl;
