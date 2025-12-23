@@ -68,13 +68,13 @@ public class MixinOptionsScreen extends Screen
 	/** Texture used for the config opening button */
 	#if MC_VER <= MC_1_20_6
 	@Unique
-	private static final ResourceLocation ICON_TEXTURE = new ResourceLocation(ModInfo.ID, "textures/gui/button.png");
+	private static final ResourceLocation ICON_TEXTURE = new ResourceLocation("minecraft", "textures/gui/distanthorizons_button.png");
 	#elif MC_VER <= MC_1_21_10
 	@Unique
-	private static final ResourceLocation ICON_TEXTURE = ResourceLocation.fromNamespaceAndPath(ModInfo.ID, "textures/gui/button.png");
+	private static final ResourceLocation ICON_TEXTURE = ResourceLocation.fromNamespaceAndPath("minecraft", "textures/gui/distanthorizons_button.png");
 	#else
 	@Unique
-	private static final Identifier ICON_TEXTURE = Identifier.fromNamespaceAndPath(ModInfo.ID, "textures/gui/button.png");
+	private static final Identifier ICON_TEXTURE = Identifier.fromNamespaceAndPath("minecraft", "textures/gui/distanthorizons_button.png");
 	#endif
 	
 	
