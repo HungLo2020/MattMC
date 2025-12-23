@@ -1,14 +1,11 @@
 package net.caffeinemc.mods.sodium.fabric.model;
 
 import it.unimi.dsi.fastutil.longs.Long2ObjectMaps;
-import net.caffeinemc.mods.sodium.client.render.frapi.render.AbstractBlockRenderContext;
-import net.caffeinemc.mods.sodium.client.services.PlatformModelAccess;
-import net.caffeinemc.mods.sodium.client.services.SodiumModelData;
-import net.caffeinemc.mods.sodium.client.services.SodiumModelDataContainer;
-import net.caffeinemc.mods.sodium.client.world.LevelSlice;
+import net.sodium.client.render.frapi.render.AbstractBlockRenderContext;
+import net.sodium.client.services.PlatformModelAccess;
+import net.sodium.client.services.SodiumModelData;
+import net.sodium.client.services.SodiumModelDataContainer;
 import net.fabricmc.fabric.api.renderer.v1.mesh.QuadEmitter;
-import net.minecraft.client.renderer.ItemBlockRenderTypes;
-import net.minecraft.client.renderer.RenderType;
 import net.minecraft.client.renderer.block.model.BakedQuad;
 import net.minecraft.client.renderer.block.model.BlockModelPart;
 import net.minecraft.client.renderer.block.model.BlockStateModel;
@@ -21,7 +18,6 @@ import net.minecraft.world.level.BlockAndTintGetter;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.state.BlockState;
 
-import java.util.Collections;
 import java.util.List;
 
 public class FabricModelAccess implements PlatformModelAccess {

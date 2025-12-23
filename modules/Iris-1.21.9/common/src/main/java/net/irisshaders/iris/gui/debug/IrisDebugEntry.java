@@ -1,10 +1,9 @@
 package net.irisshaders.iris.gui.debug;
 
-import net.caffeinemc.mods.sodium.client.render.SodiumWorldRenderer;
+import net.sodium.client.render.SodiumWorldRenderer;
 import net.irisshaders.iris.Iris;
 import net.irisshaders.iris.gui.option.IrisVideoSettings;
 import net.irisshaders.iris.shadows.ShadowRenderer;
-import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.components.debug.DebugScreenDisplayer;
 import net.minecraft.client.gui.components.debug.DebugScreenEntry;
 import net.minecraft.resources.ResourceLocation;

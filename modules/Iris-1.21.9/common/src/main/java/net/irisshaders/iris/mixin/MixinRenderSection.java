@@ -1,6 +1,6 @@
 package net.irisshaders.iris.mixin;
 
-import net.caffeinemc.mods.sodium.client.render.chunk.RenderSection;
+import net.sodium.client.render.chunk.RenderSection;
 import net.irisshaders.iris.shadows.ShadowRenderingState;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;

@@ -1,6 +1,6 @@
 package net.irisshaders.iris.compat.sodium.mixin;
 
-import net.caffeinemc.mods.sodium.client.gui.SodiumGameOptions;
+import net.sodium.client.gui.SodiumGameOptions;
 import net.irisshaders.iris.Iris;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;

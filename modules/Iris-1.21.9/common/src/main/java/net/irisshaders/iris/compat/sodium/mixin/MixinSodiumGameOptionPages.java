@@ -1,15 +1,15 @@
 package net.irisshaders.iris.compat.sodium.mixin;
 
-import net.caffeinemc.mods.sodium.client.gui.SodiumGameOptionPages;
-import net.caffeinemc.mods.sodium.client.gui.options.Option;
-import net.caffeinemc.mods.sodium.client.gui.options.OptionFlag;
-import net.caffeinemc.mods.sodium.client.gui.options.OptionGroup;
-import net.caffeinemc.mods.sodium.client.gui.options.OptionImpact;
-import net.caffeinemc.mods.sodium.client.gui.options.OptionImpl;
-import net.caffeinemc.mods.sodium.client.gui.options.control.ControlValueFormatter;
-import net.caffeinemc.mods.sodium.client.gui.options.control.CyclingControl;
-import net.caffeinemc.mods.sodium.client.gui.options.control.SliderControl;
-import net.caffeinemc.mods.sodium.client.gui.options.storage.MinecraftOptionsStorage;
+import net.sodium.client.gui.SodiumGameOptionPages;
+import net.sodium.client.gui.options.Option;
+import net.sodium.client.gui.options.OptionFlag;
+import net.sodium.client.gui.options.OptionGroup;
+import net.sodium.client.gui.options.OptionImpact;
+import net.sodium.client.gui.options.OptionImpl;
+import net.sodium.client.gui.options.control.ControlValueFormatter;
+import net.sodium.client.gui.options.control.CyclingControl;
+import net.sodium.client.gui.options.control.SliderControl;
+import net.sodium.client.gui.options.storage.MinecraftOptionsStorage;
 import net.irisshaders.iris.Iris;
 import net.irisshaders.iris.fantastic.SupportedGraphicsMode;
 import net.irisshaders.iris.gui.option.IrisVideoSettings;
@@ -42,7 +42,7 @@ public class MixinSodiumGameOptionPages {
 			to = @At(value = "CONSTANT", args = "stringValue=options.simulationDistance")
 		),
 		at = @At(value = "INVOKE", remap = false,
-			target = "net/caffeinemc/mods/sodium/client/gui/options/OptionGroup$Builder.add (" +
+			target = "net/sodium/client/gui/options/OptionGroup$Builder.add (" +
 				"Lnet/caffeinemc/mods/sodium/client/gui/options/Option;" +
 				")Lnet/caffeinemc/mods/sodium/client/gui/options/OptionGroup$Builder;"),
 		allow = 1)
@@ -60,7 +60,7 @@ public class MixinSodiumGameOptionPages {
 			to = @At(value = "CONSTANT", args = "stringValue=options.renderClouds")
 		),
 		at = @At(value = "INVOKE", remap = false,
-			target = "net/caffeinemc/mods/sodium/client/gui/options/OptionGroup$Builder.add (" +
+			target = "net/sodium/client/gui/options/OptionGroup$Builder.add (" +
 				"Lnet/caffeinemc/mods/sodium/client/gui/options/Option;" +
 				")Lnet/caffeinemc/mods/sodium/client/gui/options/OptionGroup$Builder;"),
 		allow = 1)
@@ -78,7 +78,7 @@ public class MixinSodiumGameOptionPages {
 			to = @At(value = "CONSTANT", args = "stringValue=options.renderClouds")
 		),
 		at = @At(value = "INVOKE", remap = false,
-			target = "net/caffeinemc/mods/sodium/client/gui/options/OptionGroup$Builder.add (" +
+			target = "net/sodium/client/gui/options/OptionGroup$Builder.add (" +
 				"Lnet/caffeinemc/mods/sodium/client/gui/options/Option;" +
 				")Lnet/caffeinemc/mods/sodium/client/gui/options/OptionGroup$Builder;"),
 		allow = 1)

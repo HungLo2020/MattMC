@@ -1,6 +1,6 @@
 package net.irisshaders.iris.compat.sodium.mixin;
 
-import net.caffeinemc.mods.sodium.client.render.chunk.vertex.format.ChunkVertexEncoder;
+import net.sodium.client.render.chunk.vertex.format.ChunkVertexEncoder;
 import net.irisshaders.iris.vertices.sodium.terrain.ChunkVertexExtension;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;

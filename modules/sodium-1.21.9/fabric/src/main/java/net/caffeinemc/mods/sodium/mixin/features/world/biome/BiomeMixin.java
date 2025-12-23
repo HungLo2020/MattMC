@@ -1,6 +1,6 @@
 package net.caffeinemc.mods.sodium.mixin.features.world.biome;
 
-import net.caffeinemc.mods.sodium.client.world.biome.BiomeColorMaps;
+import net.sodium.client.world.biome.BiomeColorMaps;
 import net.minecraft.util.Mth;
 import net.minecraft.world.level.biome.Biome;
 import net.minecraft.world.level.biome.BiomeSpecialEffects;
