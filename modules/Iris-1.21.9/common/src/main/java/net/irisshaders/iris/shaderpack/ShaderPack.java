@@ -292,14 +292,19 @@ public class ShaderPack {
 			// extension in order to represent the path as its program name
 			String programString = pathString.substring(pathString.indexOf("/") == 0 ? 1 : 0, pathString.lastIndexOf("."));
 
+			// DEBUG: Log ALL shader loads to trace the flow
+			Iris.logger.info("[SHADER-SOURCE-PROVIDER] Loading shader: " + programString + " from path: " + pathString);
+
 			// Return an empty program source if the program is disabled by the current profile
 			if (disabledPrograms.contains(programString)) {
+				Iris.logger.info("[SHADER-SOURCE-PROVIDER] Shader " + programString + " is disabled");
 				return null;
 			}
 
 			ImmutableList<String> lines = includeProcessor.getIncludedFile(path);
 
 			if (lines == null) {
+				Iris.logger.info("[SHADER-SOURCE-PROVIDER] No lines found for shader: " + programString);
 				return null;
 			}
 
