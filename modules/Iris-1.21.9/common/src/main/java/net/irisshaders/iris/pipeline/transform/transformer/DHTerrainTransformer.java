@@ -62,31 +62,6 @@ public class DHTerrainTransformer {
 		tree.parseAndInjectNode(t, ASTInjectionPoint.BEFORE_DECLARATIONS,
 			"uniform mat4 iris_ProjectionMatrixInverse;");
 
-		// Add DH-specific uniforms for shader pack compatibility
-		// These MUST be injected unconditionally because shader packs declare them inside #ifdef DISTANT_HORIZONS
-		// which won't be defined, so identifierIndex may incorrectly detect them as "already declared"
-		Iris.logger.info("[DH-SHADER-TRANSFORM] Injecting DH-specific uniforms for shader: " + parameters.type);
-		
-		tree.parseAndInjectNode(t, ASTInjectionPoint.BEFORE_DECLARATIONS,
-			"uniform mat4 dhProjection;");
-		Iris.logger.info("[DH-SHADER-TRANSFORM] Injected dhProjection");
-
-		tree.parseAndInjectNode(t, ASTInjectionPoint.BEFORE_DECLARATIONS,
-			"uniform mat4 dhProjectionInverse;");
-		Iris.logger.info("[DH-SHADER-TRANSFORM] Injected dhProjectionInverse");
-
-		tree.parseAndInjectNode(t, ASTInjectionPoint.BEFORE_DECLARATIONS,
-			"uniform sampler2D dhDepthTex;");
-		Iris.logger.info("[DH-SHADER-TRANSFORM] Injected dhDepthTex");
-
-		tree.parseAndInjectNode(t, ASTInjectionPoint.BEFORE_DECLARATIONS,
-			"uniform sampler2D dhDepthTex1;");
-		Iris.logger.info("[DH-SHADER-TRANSFORM] Injected dhDepthTex1");
-
-		tree.parseAndInjectNode(t, ASTInjectionPoint.BEFORE_DECLARATIONS,
-			"uniform int dhRenderDistance;");
-		Iris.logger.info("[DH-SHADER-TRANSFORM] Injected dhRenderDistance");
-
 		Iris.logger.warn("Type is " + parameters.type);
 
 		// TODO: All of the transformed variants of the input matrices, preferably
