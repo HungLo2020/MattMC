@@ -324,8 +324,9 @@ public class ShaderPack {
 			String source = builder.toString();
 			
 			// Add DISTANT_HORIZONS define for DH shaders
+			// Program names come in forms like "world0/dh_terrain", so check if it contains "/dh_"
 			Iterable<StringPair> currentEnvironmentDefines = finalEnvironmentDefines1;
-			if (programString.startsWith("dh_")) {
+			if (programString.contains("/dh_") || programString.startsWith("dh_")) {
 				List<StringPair> dhDefines = new ArrayList<>();
 				finalEnvironmentDefines1.forEach(dhDefines::add);
 				dhDefines.add(new StringPair("DISTANT_HORIZONS", ""));
