@@ -48,6 +48,9 @@ import net.minecraft.network.chat.MutableComponent;
 import org.apache.commons.lang3.SystemUtils;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.ArrayList;
+import java.util.List;
+
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
@@ -314,7 +317,18 @@ public class ShaderPack {
 			// directly. This removes one obstacle to accurate reporting of line numbers for errors,
 			// though there exist many more (such as relocating all #extension directives and similar things)
 			String source = builder.toString();
-			source = JcppProcessor.glslPreprocessSource(source, finalEnvironmentDefines1);
+			
+			// Add DISTANT_HORIZONS define for DH shaders
+			Iterable<StringPair> currentEnvironmentDefines = finalEnvironmentDefines1;
+			if (programString.startsWith("dh_")) {
+				List<StringPair> dhDefines = new ArrayList<>();
+				finalEnvironmentDefines1.forEach(dhDefines::add);
+				dhDefines.add(new StringPair("DISTANT_HORIZONS", ""));
+				currentEnvironmentDefines = dhDefines;
+				Iris.logger.info("[DH-SHADER-PREPROCESSING] Adding DISTANT_HORIZONS define for shader: " + programString);
+			}
+			
+			source = JcppProcessor.glslPreprocessSource(source, currentEnvironmentDefines);
 
 			return source;
 		};
