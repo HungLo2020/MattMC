@@ -62,6 +62,14 @@ public class DHTerrainTransformer {
 		tree.parseAndInjectNode(t, ASTInjectionPoint.BEFORE_DECLARATIONS,
 			"uniform mat4 iris_ProjectionMatrixInverse;");
 
+		// Add DH-specific projection matrix uniforms for shader pack compatibility
+		Iris.logger.info("[DH-SHADER-TRANSFORM] Injecting dhProjection and dhProjectionInverse uniforms for shader: " + parameters.type);
+		tree.parseAndInjectNode(t, ASTInjectionPoint.BEFORE_DECLARATIONS,
+			"uniform mat4 dhProjection;");
+
+		tree.parseAndInjectNode(t, ASTInjectionPoint.BEFORE_DECLARATIONS,
+			"uniform mat4 dhProjectionInverse;");
+
 		Iris.logger.warn("Type is " + parameters.type);
 
 		// TODO: All of the transformed variants of the input matrices, preferably

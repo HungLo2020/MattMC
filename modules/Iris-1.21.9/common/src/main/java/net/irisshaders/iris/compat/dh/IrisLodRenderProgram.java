@@ -24,6 +24,7 @@ import net.irisshaders.iris.shaderpack.programs.ProgramSource;
 import net.irisshaders.iris.uniforms.CommonUniforms;
 import net.irisshaders.iris.uniforms.builtin.BuiltinReplacementUniforms;
 import net.irisshaders.iris.uniforms.custom.CustomUniforms;
+import net.irisshaders.iris.Iris;
 import net.minecraft.client.Minecraft;
 import org.joml.Matrix3f;
 import org.joml.Matrix4f;
@@ -48,6 +49,9 @@ public class IrisLodRenderProgram {
 	public final int projectionUniform;
 	public final int projectionInverseUniform;
 	public final int normalMatrix3fUniform;
+	// DH-specific projection uniforms
+	public final int dhProjectionUniform;
+	public final int dhProjectionInverseUniform;
 	// Fog/Clip Uniforms
 	public final int clipDistanceUniform;
 	private final int id;
@@ -131,6 +135,17 @@ public class IrisLodRenderProgram {
 		modelViewUniform = tryGetUniformLocation2("iris_ModelViewMatrix");
 		modelViewInverseUniform = tryGetUniformLocation2("iris_ModelViewMatrixInverse");
 		normalMatrix3fUniform = tryGetUniformLocation2("iris_NormalMatrix");
+
+		// DH-specific projection uniforms
+		dhProjectionUniform = tryGetUniformLocation2("dhProjection");
+		dhProjectionInverseUniform = tryGetUniformLocation2("dhProjectionInverse");
+
+		// Log DH uniform locations for debugging
+		Iris.logger.info("[DH-SHADER-UNIFORMS] Program: " + name);
+		Iris.logger.info("[DH-SHADER-UNIFORMS] dhProjection uniform location: " + dhProjectionUniform);
+		Iris.logger.info("[DH-SHADER-UNIFORMS] dhProjectionInverse uniform location: " + dhProjectionInverseUniform);
+		Iris.logger.info("[DH-SHADER-UNIFORMS] iris_ProjectionMatrix uniform location: " + projectionUniform);
+		Iris.logger.info("[DH-SHADER-UNIFORMS] iris_ProjectionMatrixInverse uniform location: " + projectionInverseUniform);
 
 		// Fog/Clip Uniforms
 		clipDistanceUniform = tryGetUniformLocation2("clipDistance");
@@ -228,6 +243,10 @@ public class IrisLodRenderProgram {
 		setUniform(projectionUniform, projection);
 		setUniform(projectionInverseUniform, projection.invert(new Matrix4f()));
 		setUniform(normalMatrix3fUniform, new Matrix4f(modelView).invert().transpose3x3(new Matrix3f()));
+
+		// Set DH-specific projection uniforms (these are the same as the iris ones)
+		setUniform(dhProjectionUniform, projection);
+		setUniform(dhProjectionInverseUniform, projection.invert(new Matrix4f()));
 
 		setUniform(mircoOffsetUniform, 0.01f); // 0.01 block offset
 

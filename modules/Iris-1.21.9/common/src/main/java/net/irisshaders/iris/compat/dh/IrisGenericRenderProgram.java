@@ -54,6 +54,9 @@ public class IrisGenericRenderProgram implements IDhApiGenericObjectShaderProgra
 	public final int projectionUniform;
 	public final int projectionInverseUniform;
 	public final int normalMatrix3fUniform;
+	// DH-specific projection uniforms
+	public final int dhProjectionUniform;
+	public final int dhProjectionInverseUniform;
 	// Fog/Clip Uniforms
 	private final int id;
 	private final ProgramUniforms uniforms;
@@ -145,6 +148,17 @@ public class IrisGenericRenderProgram implements IDhApiGenericObjectShaderProgra
 		modelViewUniform = tryGetUniformLocation2("iris_ModelViewMatrix");
 		modelViewInverseUniform = tryGetUniformLocation2("iris_ModelViewMatrixInverse");
 		normalMatrix3fUniform = tryGetUniformLocation2("iris_NormalMatrix");
+
+		// DH-specific projection uniforms
+		dhProjectionUniform = tryGetUniformLocation2("dhProjection");
+		dhProjectionInverseUniform = tryGetUniformLocation2("dhProjectionInverse");
+
+		// Log DH uniform locations for debugging
+		Iris.logger.info("[DH-SHADER-UNIFORMS-GENERIC] Program: " + name);
+		Iris.logger.info("[DH-SHADER-UNIFORMS-GENERIC] dhProjection uniform location: " + dhProjectionUniform);
+		Iris.logger.info("[DH-SHADER-UNIFORMS-GENERIC] dhProjectionInverse uniform location: " + dhProjectionInverseUniform);
+		Iris.logger.info("[DH-SHADER-UNIFORMS-GENERIC] iris_ProjectionMatrix uniform location: " + projectionUniform);
+		Iris.logger.info("[DH-SHADER-UNIFORMS-GENERIC] iris_ProjectionMatrixInverse uniform location: " + projectionInverseUniform);
 
 		this.instancedShaderOffsetChunkUniform = this.tryGetUniformLocation2("uOffsetChunk");
 		this.instancedShaderOffsetSubChunkUniform = this.tryGetUniformLocation2("uOffsetSubChunk");
@@ -240,6 +254,11 @@ public class IrisGenericRenderProgram implements IDhApiGenericObjectShaderProgra
 		setUniform(projectionUniform, toJOML(renderParam.dhProjectionMatrix));
 		setUniform(projectionInverseUniform, toJOML(renderParam.dhModelViewMatrix).invert());
 		setUniform(normalMatrix3fUniform, toJOML(renderParam.dhModelViewMatrix).invert().transpose3x3(new Matrix3f()));
+		
+		// Set DH-specific projection uniforms (these are the same as the iris ones)
+		setUniform(dhProjectionUniform, toJOML(renderParam.dhProjectionMatrix));
+		setUniform(dhProjectionInverseUniform, toJOML(renderParam.dhProjectionMatrix).invert());
+		
 		Minecraft.getInstance().gameRenderer.lightTexture().turnOnLightLayer();
 		IrisRenderSystem.bindTextureToUnit(TextureType.TEXTURE_2D.getGlType(), IrisSamplers.LIGHTMAP_TEXTURE_UNIT, RenderSystem.getShaderTexture(2).texture().iris$getGlId());
 		this.setUniform(this.instancedShaderProjectionModelViewMatrixUniform, toJOML(renderParam.dhProjectionMatrix).mul(toJOML(renderParam.dhModelViewMatrix)));
