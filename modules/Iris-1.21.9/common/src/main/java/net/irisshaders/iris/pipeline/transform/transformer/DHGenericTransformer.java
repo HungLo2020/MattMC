@@ -19,61 +19,9 @@ public class DHGenericTransformer {
 		Root root, Parameters parameters) {
 		CommonTransformer.transform(t, tree, root, parameters, false);
 
-		// CRITICAL: Inject ALL uniforms BEFORE any rename operations
-		// Renames pollute the identifier index, causing conditional checks to fail incorrectly
-		// By injecting first, we can accurately detect pre-existing uniform declarations
-		
-		// Inject matrix uniforms with conditional checks to avoid duplicates
-		if (!root.identifierIndex.has("iris_NormalMatrix")) {
-			tree.parseAndInjectNode(t, ASTInjectionPoint.BEFORE_DECLARATIONS,
-				"uniform mat3 iris_NormalMatrix;");
-		}
-		
-		if (!root.identifierIndex.has("iris_ModelViewMatrix")) {
-			tree.parseAndInjectNode(t, ASTInjectionPoint.BEFORE_DECLARATIONS,
-				"uniform mat4 iris_ModelViewMatrix;");
-		}
-		
-		if (!root.identifierIndex.has("iris_ModelViewMatrixInverse")) {
-			tree.parseAndInjectNode(t, ASTInjectionPoint.BEFORE_DECLARATIONS,
-				"uniform mat4 iris_ModelViewMatrixInverse;");
-		}
-		
-		if (!root.identifierIndex.has("iris_ProjectionMatrix")) {
-			tree.parseAndInjectNode(t, ASTInjectionPoint.BEFORE_DECLARATIONS,
-				"uniform mat4 iris_ProjectionMatrix;");
-		}
-		
-		if (!root.identifierIndex.has("iris_ProjectionMatrixInverse")) {
-			tree.parseAndInjectNode(t, ASTInjectionPoint.BEFORE_DECLARATIONS,
-				"uniform mat4 iris_ProjectionMatrixInverse;");
-		}
-		
-		// Add DH depth texture uniforms for shader compatibility
-		// These are dynamically bound by IrisSamplers.addRenderTargetSamplers()
-		if (!root.identifierIndex.has("dhDepthTex")) {
-			tree.parseAndInjectNode(t, ASTInjectionPoint.BEFORE_DECLARATIONS,
-				"uniform sampler2D dhDepthTex;");
-		}
-		
-		if (!root.identifierIndex.has("dhDepthTex0")) {
-			tree.parseAndInjectNode(t, ASTInjectionPoint.BEFORE_DECLARATIONS,
-				"uniform sampler2D dhDepthTex0;");
-		}
-		
-		if (!root.identifierIndex.has("dhDepthTex1")) {
-			tree.parseAndInjectNode(t, ASTInjectionPoint.BEFORE_DECLARATIONS,
-				"uniform sampler2D dhDepthTex1;");
-		}
 
 		root.replaceExpressionMatches(t, CommonTransformer.glTextureMatrix0, "mat4(1.0)");
 		root.replaceExpressionMatches(t, CommonTransformer.glTextureMatrix1, "mat4(1.0)");
-		
-		// Rename DH-specific uniform names to iris_ prefixed versions for shader compatibility
-		// Some shaderpacks designed for Distant Horizons use dhProjection/dhProjectionInverse
-		root.rename("dhProjection", "iris_ProjectionMatrix");
-		root.rename("dhProjectionInverse", "iris_ProjectionMatrixInverse");
-		
 		root.rename("gl_ProjectionMatrix", "iris_ProjectionMatrix");
 
 		if (parameters.type.glShaderType == ShaderType.VERTEX) {
@@ -105,6 +53,14 @@ public class DHGenericTransformer {
 		// computed on the CPU-side of things
 		root.replaceReferenceExpressions(t, "gl_NormalMatrix",
 			"iris_NormalMatrix");
+		tree.parseAndInjectNode(t, ASTInjectionPoint.BEFORE_DECLARATIONS,
+			"uniform mat3 iris_NormalMatrix;");
+
+		tree.parseAndInjectNode(t, ASTInjectionPoint.BEFORE_DECLARATIONS,
+			"uniform mat4 iris_ModelViewMatrixInverse;");
+
+		tree.parseAndInjectNode(t, ASTInjectionPoint.BEFORE_DECLARATIONS,
+			"uniform mat4 iris_ProjectionMatrixInverse;");
 
 		Iris.logger.warn("Type is " + parameters.type);
 
@@ -121,7 +77,9 @@ public class DHGenericTransformer {
 				tree.parseAndInjectNodes(t, ASTInjectionPoint.BEFORE_FUNCTIONS,
 					"vec4 ftransform() { return gl_ModelViewProjectionMatrix * gl_Vertex; }");
 			}
-			tree.parseAndInjectNode(t, ASTInjectionPoint.BEFORE_DECLARATIONS,
+			tree.parseAndInjectNodes(t, ASTInjectionPoint.BEFORE_DECLARATIONS,
+				"uniform mat4 iris_ProjectionMatrix;",
+				"uniform mat4 iris_ModelViewMatrix;",
 				// _draw_translation replaced with Chunks[_draw_id].offset.xyz
 				"vec4 getVertexPosition() { return vec4(_vert_position, 1.0); }");
 			root.replaceReferenceExpressions(t, "gl_Vertex", "getVertexPosition()");
@@ -130,6 +88,10 @@ public class DHGenericTransformer {
 			// inject in reverse order if performed piece-wise but in correct order if
 			// performed as an array of injections)
 			injectVertInit(t, tree, root, parameters);
+		} else {
+			tree.parseAndInjectNodes(t, ASTInjectionPoint.BEFORE_DECLARATIONS,
+				"uniform mat4 iris_ModelViewMatrix;",
+				"uniform mat4 iris_ProjectionMatrix;");
 		}
 
 		root.replaceReferenceExpressions(t, "gl_ModelViewProjectionMatrix",
