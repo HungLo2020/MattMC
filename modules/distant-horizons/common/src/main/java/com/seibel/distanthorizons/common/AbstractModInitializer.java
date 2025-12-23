@@ -122,6 +122,20 @@ public abstract class AbstractModInitializer
 		LOGGER.info("[DH-INIT] Server starting event subscription added for integrated server");
 		
 		LOGGER.info("[DH-INIT] ========== CLIENT INITIALIZATION COMPLETE ==========");
+		
+		// WORKAROUND: Manually fire DhApiAfterDhInitEvent since postInit() isn't being called
+		// The SERVER_STARTING callback lambda doesn't execute properly, so we manually trigger
+		// the event here to ensure Iris event handlers get bound
+		new Thread(() -> {
+			try {
+				Thread.sleep(100); // Wait 100ms for everything to settle
+				LOGGER.info("[DH-EVENT-MANUAL] Manually firing DhApiAfterDhInitEvent to ensure Iris event handlers are bound");
+				ApiEventInjector.INSTANCE.fireAllEvents(DhApiAfterDhInitEvent.class, null);
+				LOGGER.info("[DH-EVENT-MANUAL] DhApiAfterDhInitEvent manually fired successfully");
+			} catch (Exception e) {
+				LOGGER.error("[DH-EVENT-MANUAL] Failed to manually fire DhApiAfterDhInitEvent", e);
+			}
+		}, "DH-Manual-Event-Trigger").start();
 	}
 	
 	public void onInitializeServer()
