@@ -30,8 +30,8 @@ public abstract class MixinMinecraftServerLifecycle {
 	private static final DhLogger LOGGER = new DhLoggerBuilder().build();
 	
 	static {
-		LOGGER.info("[DH-MIXIN-LIFECYCLE] ########## MixinMinecraftServerLifecycle CLASS LOADED ##########");
-		LOGGER.info("[DH-MIXIN-LIFECYCLE] This mixin will invoke Fabric server lifecycle events");
+		//LOGGER.info("[DH-MIXIN-LIFECYCLE] ########## MixinMinecraftServerLifecycle CLASS LOADED ##########");
+		//LOGGER.info("[DH-MIXIN-LIFECYCLE] This mixin will invoke Fabric server lifecycle events");
 	}
 	
 	@Shadow
@@ -44,13 +44,13 @@ public abstract class MixinMinecraftServerLifecycle {
 	@Inject(method = "runServer", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/MinecraftServer;initServer()Z"))
 	private void onServerStarting(CallbackInfo ci) {
 		MinecraftServer server = (MinecraftServer) (Object) this;
-		LOGGER.info("[DH-MIXIN-LIFECYCLE] ========== MIXIN: onServerStarting CALLED ==========");
-		LOGGER.info("[DH-MIXIN-LIFECYCLE] Server: " + server);
-		LOGGER.info("[DH-MIXIN-LIFECYCLE] Is Dedicated: " + server.isDedicatedServer());
-		LOGGER.info("[DH-MIXIN-LIFECYCLE] Thread: " + Thread.currentThread().getName() + " (ID: " + Thread.currentThread().getId() + ")");
-		LOGGER.info("[DH-MIXIN-LIFECYCLE] About to invoke SERVER_STARTING event...");
+		//LOGGER.info("[DH-MIXIN-LIFECYCLE] ========== MIXIN: onServerStarting CALLED ==========");
+		//LOGGER.info("[DH-MIXIN-LIFECYCLE] Server: " + server);
+		//LOGGER.info("[DH-MIXIN-LIFECYCLE] Is Dedicated: " + server.isDedicatedServer());
+		//LOGGER.info("[DH-MIXIN-LIFECYCLE] Thread: " + Thread.currentThread().getName() + " (ID: " + Thread.currentThread().getId() + ")");
+		//LOGGER.info("[DH-MIXIN-LIFECYCLE] About to invoke SERVER_STARTING event...");
 		ServerLifecycleEvents.SERVER_STARTING.invoker().onServerStarting(server);
-		LOGGER.info("[DH-MIXIN-LIFECYCLE] SERVER_STARTING event invoked successfully");
+		//LOGGER.info("[DH-MIXIN-LIFECYCLE] SERVER_STARTING event invoked successfully");
 	}
 	
 	/**
@@ -60,13 +60,13 @@ public abstract class MixinMinecraftServerLifecycle {
 	@Inject(method = "runServer", at = @At(value = "INVOKE", target = "Lnet/minecraft/server/MinecraftServer;buildServerStatus()Lnet/minecraft/network/protocol/status/ServerStatus;", shift = At.Shift.AFTER))
 	private void onServerStarted(CallbackInfo ci) {
 		MinecraftServer server = (MinecraftServer) (Object) this;
-		LOGGER.info("[DH-MIXIN-LIFECYCLE] ========== MIXIN: onServerStarted CALLED ==========");
-		LOGGER.info("[DH-MIXIN-LIFECYCLE] Server: " + server);
-		LOGGER.info("[DH-MIXIN-LIFECYCLE] Is Dedicated: " + server.isDedicatedServer());
-		LOGGER.info("[DH-MIXIN-LIFECYCLE] Thread: " + Thread.currentThread().getName() + " (ID: " + Thread.currentThread().getId() + ")");
-		LOGGER.info("[DH-MIXIN-LIFECYCLE] About to invoke SERVER_STARTED event...");
+		//LOGGER.info("[DH-MIXIN-LIFECYCLE] ========== MIXIN: onServerStarted CALLED ==========");
+		//LOGGER.info("[DH-MIXIN-LIFECYCLE] Server: " + server);
+		//LOGGER.info("[DH-MIXIN-LIFECYCLE] Is Dedicated: " + server.isDedicatedServer());
+		//LOGGER.info("[DH-MIXIN-LIFECYCLE] Thread: " + Thread.currentThread().getName() + " (ID: " + Thread.currentThread().getId() + ")");
+		//LOGGER.info("[DH-MIXIN-LIFECYCLE] About to invoke SERVER_STARTED event...");
 		ServerLifecycleEvents.SERVER_STARTED.invoker().onServerStarted(server);
-		LOGGER.info("[DH-MIXIN-LIFECYCLE] SERVER_STARTED event invoked successfully");
+		//LOGGER.info("[DH-MIXIN-LIFECYCLE] SERVER_STARTED event invoked successfully");
 	}
 	
 	/**
@@ -75,9 +75,9 @@ public abstract class MixinMinecraftServerLifecycle {
 	@Inject(method = "stopServer", at = @At("HEAD"))
 	private void onServerStopping(CallbackInfo ci) {
 		MinecraftServer server = (MinecraftServer) (Object) this;
-		LOGGER.info("[DH-MIXIN-LIFECYCLE] ========== MIXIN: onServerStopping CALLED ==========");
+		//LOGGER.info("[DH-MIXIN-LIFECYCLE] ========== MIXIN: onServerStopping CALLED ==========");
 		ServerLifecycleEvents.SERVER_STOPPING.invoker().onServerStopping(server);
-		LOGGER.info("[DH-MIXIN-LIFECYCLE] SERVER_STOPPING event invoked successfully");
+		//LOGGER.info("[DH-MIXIN-LIFECYCLE] SERVER_STOPPING event invoked successfully");
 	}
 	
 	/**
@@ -86,9 +86,9 @@ public abstract class MixinMinecraftServerLifecycle {
 	@Inject(method = "stopServer", at = @At("TAIL"))
 	private void onServerStopped(CallbackInfo ci) {
 		MinecraftServer server = (MinecraftServer) (Object) this;
-		LOGGER.info("[DH-MIXIN-LIFECYCLE] ========== MIXIN: onServerStopped CALLED ==========");
+		//LOGGER.info("[DH-MIXIN-LIFECYCLE] ========== MIXIN: onServerStopped CALLED ==========");
 		ServerLifecycleEvents.SERVER_STOPPED.invoker().onServerStopped(server);
-		LOGGER.info("[DH-MIXIN-LIFECYCLE] SERVER_STOPPED event invoked successfully");
+		//LOGGER.info("[DH-MIXIN-LIFECYCLE] SERVER_STOPPED event invoked successfully");
 	}
 	
 	/**
@@ -99,11 +99,11 @@ public abstract class MixinMinecraftServerLifecycle {
 	private <K, V> V onWorldLoad(Map<K, V> levels, K registryKey, V serverLevel, Operation<V> original) {
 		final V result = original.call(levels, registryKey, serverLevel);
 		MinecraftServer server = (MinecraftServer) (Object) this;
-		LOGGER.info("[DH-MIXIN-LIFECYCLE] ========== MIXIN: onWorldLoad CALLED ==========");
-		LOGGER.info("[DH-MIXIN-LIFECYCLE] World being loaded: " + serverLevel);
-		LOGGER.info("[DH-MIXIN-LIFECYCLE] About to invoke ServerWorldEvents.LOAD...");
+		//LOGGER.info("[DH-MIXIN-LIFECYCLE] ========== MIXIN: onWorldLoad CALLED ==========");
+		//LOGGER.info("[DH-MIXIN-LIFECYCLE] World being loaded: " + serverLevel);
+		//LOGGER.info("[DH-MIXIN-LIFECYCLE] About to invoke ServerWorldEvents.LOAD...");
 		ServerWorldEvents.LOAD.invoker().onWorldLoad(server, (ServerLevel) serverLevel);
-		LOGGER.info("[DH-MIXIN-LIFECYCLE] ServerWorldEvents.LOAD invoked successfully");
+		//LOGGER.info("[DH-MIXIN-LIFECYCLE] ServerWorldEvents.LOAD invoked successfully");
 		return result;
 	}
 }

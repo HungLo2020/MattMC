@@ -69,21 +69,21 @@ public class FabricServerProxy implements AbstractModInitializer.IEventProxy
 	// TODO rename
 	private boolean isValidTime()
 	{
-		LOGGER.info("[DH-VALIDATION] isValidTime() called");
-		LOGGER.info("[DH-VALIDATION] isDedicatedServer: " + this.isDedicatedServer);
+		//LOGGER.info("[DH-VALIDATION] isValidTime() called");
+		//LOGGER.info("[DH-VALIDATION] isDedicatedServer: " + this.isDedicatedServer);
 		
 		if (this.isDedicatedServer)
 		{
-			LOGGER.info("[DH-VALIDATION] Dedicated server - returning true");
+			//LOGGER.info("[DH-VALIDATION] Dedicated server - returning true");
 			return true;
 		}
 		
 		boolean isOnTitleScreen = Minecraft.getInstance().screen instanceof TitleScreen;
-		LOGGER.info("[DH-VALIDATION] Is on title screen: " + isOnTitleScreen);
+		//LOGGER.info("[DH-VALIDATION] Is on title screen: " + isOnTitleScreen);
 		
 		//FIXME: This may cause init issue...
 		boolean result = !isOnTitleScreen;
-		LOGGER.info("[DH-VALIDATION] isValidTime() returning: " + result);
+		//LOGGER.info("[DH-VALIDATION] isValidTime() returning: " + result);
 		return result;
 	}
 	
@@ -129,23 +129,23 @@ public class FabricServerProxy implements AbstractModInitializer.IEventProxy
 		LOGGER.info("[DH-EVENTS] Registering SERVER_STARTING event...");
 		ServerLifecycleEvents.SERVER_STARTING.register((server) ->
 		{
-			LOGGER.info("[DH-EVENT-CALLBACK] ========== SERVER_STARTING CALLBACK TRIGGERED ==========");
-			LOGGER.info("[DH-EVENT-CALLBACK] Server: " + server);
-			LOGGER.info("[DH-EVENT-CALLBACK] Is Dedicated: " + server.isDedicatedServer());
-			LOGGER.info("[DH-EVENT-CALLBACK] Thread: " + Thread.currentThread().getName() + " (ID: " + Thread.currentThread().getId() + ")");
+			//LOGGER.info("[DH-EVENT-CALLBACK] ========== SERVER_STARTING CALLBACK TRIGGERED ==========");
+			//LOGGER.info("[DH-EVENT-CALLBACK] Server: " + server);
+			//LOGGER.info("[DH-EVENT-CALLBACK] Is Dedicated: " + server.isDedicatedServer());
+			//LOGGER.info("[DH-EVENT-CALLBACK] Thread: " + Thread.currentThread().getName() + " (ID: " + Thread.currentThread().getId() + ")");
 			
 			boolean isValid = this.isValidTime();
-			LOGGER.info("[DH-EVENT-CALLBACK] isValidTime: " + isValid);
+			//LOGGER.info("[DH-EVENT-CALLBACK] isValidTime: " + isValid);
 			
 			if (isValid)
 			{
-				LOGGER.info("[DH-EVENT-CALLBACK] Calling ServerApi.serverLoadEvent(isDedicated=" + this.isDedicatedServer + ")");
+				//LOGGER.info("[DH-EVENT-CALLBACK] Calling ServerApi.serverLoadEvent(isDedicated=" + this.isDedicatedServer + ")");
 				ServerApi.INSTANCE.serverLoadEvent(this.isDedicatedServer);
-				LOGGER.info("[DH-EVENT-CALLBACK] ServerApi.serverLoadEvent completed");
+				//LOGGER.info("[DH-EVENT-CALLBACK] ServerApi.serverLoadEvent completed");
 			}
 			else
 			{
-				LOGGER.warn("[DH-EVENT-CALLBACK] Skipped ServerApi.serverLoadEvent - isValidTime returned false");
+				//LOGGER.warn("[DH-EVENT-CALLBACK] Skipped ServerApi.serverLoadEvent - isValidTime returned false");
 			}
 		});
 		
@@ -153,10 +153,10 @@ public class FabricServerProxy implements AbstractModInitializer.IEventProxy
 		LOGGER.info("[DH-EVENTS] Registering SERVER_STOPPED event...");
 		ServerLifecycleEvents.SERVER_STOPPED.register((server) ->
 		{
-			LOGGER.info("[DH-EVENT-CALLBACK] SERVER_STOPPED callback triggered");
+			//LOGGER.info("[DH-EVENT-CALLBACK] SERVER_STOPPED callback triggered");
 			if (this.isValidTime())
 			{
-				LOGGER.info("[DH-EVENT-CALLBACK] Calling ServerApi.serverUnloadEvent()");
+				//LOGGER.info("[DH-EVENT-CALLBACK] Calling ServerApi.serverUnloadEvent()");
 				ServerApi.INSTANCE.serverUnloadEvent();
 			}
 		});
@@ -165,10 +165,10 @@ public class FabricServerProxy implements AbstractModInitializer.IEventProxy
 		LOGGER.info("[DH-EVENTS] Registering ServerWorldEvents.LOAD event...");
 		ServerWorldEvents.LOAD.register((server, level) ->
 		{
-			LOGGER.info("[DH-EVENT-CALLBACK] ServerWorldEvents.LOAD callback triggered for level: " + level);
+			//LOGGER.info("[DH-EVENT-CALLBACK] ServerWorldEvents.LOAD callback triggered for level: " + level);
 			if (this.isValidTime())
 			{
-				LOGGER.info("[DH-EVENT-CALLBACK] Calling ServerApi.serverLevelLoadEvent()");
+				//LOGGER.info("[DH-EVENT-CALLBACK] Calling ServerApi.serverLevelLoadEvent()");
 				ServerApi.INSTANCE.serverLevelLoadEvent(this.getServerLevelWrapper(level));
 			}
 		});
@@ -177,7 +177,7 @@ public class FabricServerProxy implements AbstractModInitializer.IEventProxy
 		LOGGER.info("[DH-EVENTS] Registering ServerWorldEvents.UNLOAD event...");
 		ServerWorldEvents.UNLOAD.register((server, level) ->
 		{
-			LOGGER.info("[DH-EVENT-CALLBACK] ServerWorldEvents.UNLOAD callback triggered for level: " + level);
+			//LOGGER.info("[DH-EVENT-CALLBACK] ServerWorldEvents.UNLOAD callback triggered for level: " + level);
 			if (this.isValidTime())
 			{
 				ServerApi.INSTANCE.serverLevelUnloadEvent(this.getServerLevelWrapper(level));
@@ -201,7 +201,7 @@ public class FabricServerProxy implements AbstractModInitializer.IEventProxy
 		LOGGER.info("[DH-EVENTS] Registering ServerPlayConnectionEvents.JOIN event...");
 		ServerPlayConnectionEvents.JOIN.register((handler, sender, server) ->
 		{
-			LOGGER.info("[DH-EVENT-CALLBACK] Player joined: " + handler.getName());
+			//LOGGER.info("[DH-EVENT-CALLBACK] Player joined: " + handler.getName());
 			if (this.isValidTime())
 			{
 				ServerApi.INSTANCE.serverPlayerJoinEvent(this.getServerPlayerWrapper(handler));
@@ -211,7 +211,7 @@ public class FabricServerProxy implements AbstractModInitializer.IEventProxy
 		LOGGER.info("[DH-EVENTS] Registering ServerPlayConnectionEvents.DISCONNECT event...");
 		ServerPlayConnectionEvents.DISCONNECT.register((handler, server) ->
 		{
-			LOGGER.info("[DH-EVENT-CALLBACK] Player disconnected: " + handler.getName());
+			//LOGGER.info("[DH-EVENT-CALLBACK] Player disconnected: " + handler.getName());
 			if (this.isValidTime())
 			{
 				ServerApi.INSTANCE.serverPlayerDisconnectEvent(this.getServerPlayerWrapper(handler));

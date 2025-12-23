@@ -46,23 +46,23 @@ public class MixinChunkSectionsToRender
 	@Inject(at = @At("HEAD"), method = "renderGroup", order = 800)
 	private void renderDeferredLayer(ChunkSectionLayerGroup chunkSectionLayerGroup, CallbackInfo ci)
 	{
-		LOGGER.info("[DH-RENDER-LAYER] ========== RENDER GROUP CALLED ==========");
-		LOGGER.info("[DH-RENDER-LAYER] Layer: " + chunkSectionLayerGroup);
-		LOGGER.info("[DH-RENDER-LAYER] Thread: " + Thread.currentThread().getName());
+		//LOGGER.info("[DH-RENDER-LAYER] ========== RENDER GROUP CALLED ==========");
+		//LOGGER.info("[DH-RENDER-LAYER] Layer: " + chunkSectionLayerGroup);
+		//LOGGER.info("[DH-RENDER-LAYER] Thread: " + Thread.currentThread().getName());
 		
 		ClientApi.RENDER_STATE.clientLevelWrapper = ClientLevelWrapper.getWrapperIfDifferent(ClientApi.RENDER_STATE.clientLevelWrapper, Minecraft.getInstance().levelRenderer.level);
 		
-		LOGGER.info("[DH-RENDER-LAYER] clientLevelWrapper: " + ClientApi.RENDER_STATE.clientLevelWrapper);
+		//LOGGER.info("[DH-RENDER-LAYER] clientLevelWrapper: " + ClientApi.RENDER_STATE.clientLevelWrapper);
 		
 		if (chunkSectionLayerGroup == ChunkSectionLayerGroup.TRANSLUCENT)
 		{
-			LOGGER.info("[DH-RENDER-LAYER] TRANSLUCENT layer - rendering fade transparent and deferred LODs");
+			//LOGGER.info("[DH-RENDER-LAYER] TRANSLUCENT layer - rendering fade transparent and deferred LODs");
 			try
 			{
 				ClientApi.INSTANCE.renderFadeTransparent();
-				LOGGER.info("[DH-RENDER-LAYER] renderFadeTransparent() completed");
+				//LOGGER.info("[DH-RENDER-LAYER] renderFadeTransparent() completed");
 				ClientApi.INSTANCE.renderDeferredLodsForShaders();
-				LOGGER.info("[DH-RENDER-LAYER] renderDeferredLodsForShaders() completed");
+				//LOGGER.info("[DH-RENDER-LAYER] renderDeferredLodsForShaders() completed");
 			}
 			catch (Exception e)
 			{
@@ -71,11 +71,11 @@ public class MixinChunkSectionsToRender
 		}
 		else if (chunkSectionLayerGroup == ChunkSectionLayerGroup.TRIPWIRE)
 		{
-			LOGGER.info("[DH-RENDER-LAYER] TRIPWIRE layer - rendering fade opaque");
+			//LOGGER.info("[DH-RENDER-LAYER] TRIPWIRE layer - rendering fade opaque");
 			try
 			{
 				ClientApi.INSTANCE.renderFadeOpaque();
-				LOGGER.info("[DH-RENDER-LAYER] renderFadeOpaque() completed");
+				//LOGGER.info("[DH-RENDER-LAYER] renderFadeOpaque() completed");
 			}
 			catch (Exception e)
 			{
@@ -84,9 +84,9 @@ public class MixinChunkSectionsToRender
 		}
 		else
 		{
-			LOGGER.info("[DH-RENDER-LAYER] Other layer (" + chunkSectionLayerGroup + ") - no LOD rendering");
+			//LOGGER.info("[DH-RENDER-LAYER] Other layer (" + chunkSectionLayerGroup + ") - no LOD rendering");
 		}
-		LOGGER.info("[DH-RENDER-LAYER] ========== RENDER GROUP COMPLETE ==========");
+		//LOGGER.info("[DH-RENDER-LAYER] ========== RENDER GROUP COMPLETE ==========");
 	}
 	
 	

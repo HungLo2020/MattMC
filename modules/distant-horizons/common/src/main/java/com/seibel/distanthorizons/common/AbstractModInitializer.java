@@ -66,8 +66,8 @@ public abstract class AbstractModInitializer
 	
 	public void onInitializeClient()
 	{
-		LOGGER.info("[DH-INIT] ========== CLIENT INITIALIZATION START ==========");
-		LOGGER.info("[DH-INIT] Thread: " + Thread.currentThread().getName() + " (ID: " + Thread.currentThread().getId() + ")");
+		//LOGGER.info("[DH-INIT] ========== CLIENT INITIALIZATION START ==========");
+		//LOGGER.info("[DH-INIT] Thread: " + Thread.currentThread().getName() + " (ID: " + Thread.currentThread().getId() + ")");
 		
 		DependencySetup.createClientBindings();
 		this.createInitialClientBindings();
@@ -78,13 +78,13 @@ public abstract class AbstractModInitializer
 		this.startup();
 		this.logBuildInfo();
 		
-		LOGGER.info("[DH-INIT] Creating client proxy and registering events...");
+		//LOGGER.info("[DH-INIT] Creating client proxy and registering events...");
 		this.createClientProxy().registerEvents();
-		LOGGER.info("[DH-INIT] Client proxy events registered");
+		//LOGGER.info("[DH-INIT] Client proxy events registered");
 		
-		LOGGER.info("[DH-INIT] Creating server proxy (integrated=true) and registering events...");
+		//LOGGER.info("[DH-INIT] Creating server proxy (integrated=true) and registering events...");
 		this.createServerProxy(false).registerEvents();
-		LOGGER.info("[DH-INIT] Server proxy (integrated) events registered");
+		//LOGGER.info("[DH-INIT] Server proxy (integrated) events registered");
 		
 		this.initializeModCompat();
 		
@@ -96,32 +96,32 @@ public abstract class AbstractModInitializer
 		
 		DhDebugScreenEntry.register();
 		
-		LOGGER.info("[DH-INIT] Subscribing to client started event...");
+		//LOGGER.info("[DH-INIT] Subscribing to client started event...");
 		this.subscribeClientStartedEvent(this::postInit);
 		
 		// For integrated servers, we need to subscribe to SERVER_STARTING event
-		LOGGER.info("[DH-INIT] Subscribing to server starting event for integrated server...");
+		//LOGGER.info("[DH-INIT] Subscribing to server starting event for integrated server...");
 		this.subscribeServerStartingEvent(server -> 
 		{
-			LOGGER.info("[DH-EVENT] ========== SERVER_STARTING CALLBACK (Integrated Server) ==========");
-			LOGGER.info("[DH-EVENT] Server: " + server);
-			LOGGER.info("[DH-EVENT] Is Dedicated: " + server.isDedicatedServer());
-			LOGGER.info("[DH-EVENT] Thread: " + Thread.currentThread().getName() + " (ID: " + Thread.currentThread().getId() + ")");
+			//LOGGER.info("[DH-EVENT] ========== SERVER_STARTING CALLBACK (Integrated Server) ==========");
+			//LOGGER.info("[DH-EVENT] Server: " + server);
+			//LOGGER.info("[DH-EVENT] Is Dedicated: " + server.isDedicatedServer());
+			//LOGGER.info("[DH-EVENT] Thread: " + Thread.currentThread().getName() + " (ID: " + Thread.currentThread().getId() + ")");
 			
 			// For integrated servers, we don't set the dedicated server field
 			// Just initialize what's needed for integrated server operation
 			if (!server.isDedicatedServer())
 			{
-				LOGGER.info("[DH-EVENT] Integrated server detected - initializing for singleplayer");
+				//LOGGER.info("[DH-EVENT] Integrated server detected - initializing for singleplayer");
 				this.commandInitializer = new CommandInitializer();
 				this.commandInitializer.onServerReady();
 			}
 			
-			LOGGER.info("[DH-EVENT] ========== SERVER_STARTING CALLBACK COMPLETE ==========");
+			//LOGGER.info("[DH-EVENT] ========== SERVER_STARTING CALLBACK COMPLETE ==========");
 		});
-		LOGGER.info("[DH-INIT] Server starting event subscription added for integrated server");
+		//LOGGER.info("[DH-INIT] Server starting event subscription added for integrated server");
 		
-		LOGGER.info("[DH-INIT] ========== CLIENT INITIALIZATION COMPLETE ==========");
+		//LOGGER.info("[DH-INIT] ========== CLIENT INITIALIZATION COMPLETE ==========");
 		
 		// WORKAROUND: Manually fire DhApiAfterDhInitEvent since postInit() isn't being called
 		// The SERVER_STARTING callback lambda doesn't execute properly, so we manually trigger
@@ -129,9 +129,9 @@ public abstract class AbstractModInitializer
 		new Thread(() -> {
 			try {
 				Thread.sleep(100); // Wait 100ms for everything to settle
-				LOGGER.info("[DH-EVENT-MANUAL] Manually firing DhApiAfterDhInitEvent to ensure Iris event handlers are bound");
+				//LOGGER.info("[DH-EVENT-MANUAL] Manually firing DhApiAfterDhInitEvent to ensure Iris event handlers are bound");
 				ApiEventInjector.INSTANCE.fireAllEvents(DhApiAfterDhInitEvent.class, null);
-				LOGGER.info("[DH-EVENT-MANUAL] DhApiAfterDhInitEvent manually fired successfully");
+				//LOGGER.info("[DH-EVENT-MANUAL] DhApiAfterDhInitEvent manually fired successfully");
 			} catch (Exception e) {
 				LOGGER.error("[DH-EVENT-MANUAL] Failed to manually fire DhApiAfterDhInitEvent", e);
 			}
@@ -140,8 +140,8 @@ public abstract class AbstractModInitializer
 	
 	public void onInitializeServer()
 	{
-		LOGGER.info("[DH-INIT] ========== DEDICATED SERVER INITIALIZATION START ==========");
-		LOGGER.info("[DH-INIT] Thread: " + Thread.currentThread().getName() + " (ID: " + Thread.currentThread().getId() + ")");
+		//LOGGER.info("[DH-INIT] ========== DEDICATED SERVER INITIALIZATION START ==========");
+		//LOGGER.info("[DH-INIT] Thread: " + Thread.currentThread().getName() + " (ID: " + Thread.currentThread().getId() + ")");
 		
 		DependencySetup.createServerBindings();
 		
@@ -156,9 +156,9 @@ public abstract class AbstractModInitializer
 		// noinspection ResultOfMethodCallIgnored
 		ThreadPresetConfigEventHandler.INSTANCE.toString();
 		
-		LOGGER.info("[DH-INIT] Creating server proxy (dedicated=true) and registering events...");
+		//LOGGER.info("[DH-INIT] Creating server proxy (dedicated=true) and registering events...");
 		this.createServerProxy(true).registerEvents();
-		LOGGER.info("[DH-INIT] Server proxy (dedicated) events registered");
+		//LOGGER.info("[DH-INIT] Server proxy (dedicated) events registered");
 		
 		this.initializeModCompat();
 		

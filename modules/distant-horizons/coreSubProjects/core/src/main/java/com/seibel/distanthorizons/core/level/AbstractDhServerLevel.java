@@ -107,11 +107,11 @@ public abstract class AbstractDhServerLevel extends AbstractDhLevel implements I
 		// Log once if worldgen is disabled
 		if (!result && !hasLoggedShouldDoWorldGen)
 		{
-			LOGGER.info("[DH-SHOULD-DO-WORLDGEN] ========== shouldDoWorldGen() RETURNING FALSE ==========");
-			LOGGER.info("[DH-SHOULD-DO-WORLDGEN] Config enabled: " + configEnabled);
-			LOGGER.info("[DH-SHOULD-DO-WORLDGEN] Has players in queue: " + hasPlayers);
-			LOGGER.info("[DH-SHOULD-DO-WORLDGEN] Player queue size: " + this.worldGenPlayerCenteringQueue.size());
-			LOGGER.info("[DH-SHOULD-DO-WORLDGEN] Thread: " + Thread.currentThread().getName());
+			//LOGGER.info("[DH-SHOULD-DO-WORLDGEN] ========== shouldDoWorldGen() RETURNING FALSE ==========");
+			//LOGGER.info("[DH-SHOULD-DO-WORLDGEN] Config enabled: " + configEnabled);
+			//LOGGER.info("[DH-SHOULD-DO-WORLDGEN] Has players in queue: " + hasPlayers);
+			//LOGGER.info("[DH-SHOULD-DO-WORLDGEN] Player queue size: " + this.worldGenPlayerCenteringQueue.size());
+			//LOGGER.info("[DH-SHOULD-DO-WORLDGEN] Thread: " + Thread.currentThread().getName());
 			hasLoggedShouldDoWorldGen = true;
 		}
 		
