@@ -108,14 +108,21 @@ public class WorldGenerationQueue implements IFullDataSourceRetrievalQueue, IDeb
 	
 	public WorldGenerationQueue(IDhApiWorldGenerator generator, IDhServerLevel level)
 	{
-		LOGGER.info("Creating world gen queue");
+		//LOGGER.info("[DH-WORLDGEN-QUEUE-INIT] ========== Creating WorldGenerationQueue ==========");
+		//LOGGER.info("[DH-WORLDGEN-QUEUE-INIT] Generator: " + generator);
+		//LOGGER.info("[DH-WORLDGEN-QUEUE-INIT] Generator class: " + generator.getClass().getName());
+		//LOGGER.info("[DH-WORLDGEN-QUEUE-INIT] Level: " + level.getLevelWrapper());
+		//LOGGER.info("[DH-WORLDGEN-QUEUE-INIT] Thread: " + Thread.currentThread().getName());
+		
 		this.generator = generator;
 		this.level = level;
 		this.lowestDataDetail = generator.getLargestDataDetailLevel();
 		this.highestDataDetail = generator.getSmallestDataDetailLevel();
 		
+		//LOGGER.info("[DH-WORLDGEN-QUEUE-INIT] Detail levels - Lowest (largest): " + this.lowestDataDetail + ", Highest (smallest): " + this.highestDataDetail);
+		
 		DebugRenderer.register(this, Config.Client.Advanced.Debugging.DebugWireframe.showWorldGenQueue);
-		LOGGER.info("Created world gen queue");
+		//LOGGER.info("[DH-WORLDGEN-QUEUE-INIT] ========== WorldGenerationQueue CREATED ==========");
 	}
 	
 	
@@ -128,9 +135,16 @@ public class WorldGenerationQueue implements IFullDataSourceRetrievalQueue, IDeb
 	@Override
 	public CompletableFuture<WorldGenResult> submitRetrievalTask(long pos, byte requiredDataDetail, IWorldGenTaskTracker tracker)
 	{
+		//LOGGER.info("[DH-WORLDGEN-QUEUE-SUBMIT] ========== submitRetrievalTask() CALLED ==========");
+		//LOGGER.info("[DH-WORLDGEN-QUEUE-SUBMIT] Position: " + pos);
+		//LOGGER.info("[DH-WORLDGEN-QUEUE-SUBMIT] Required detail: " + requiredDataDetail);
+		//LOGGER.info("[DH-WORLDGEN-QUEUE-SUBMIT] Tracker: " + tracker);
+		//LOGGER.info("[DH-WORLDGEN-QUEUE-SUBMIT] Thread: " + Thread.currentThread().getName());
+		
 		// the generator is shutting down, don't add new tasks
 		if (this.generatorClosingFuture != null)
 		{
+			//LOGGER.warn("[DH-WORLDGEN-QUEUE-SUBMIT] Generator is shutting down, rejecting task");
 			return CompletableFuture.completedFuture(WorldGenResult.CreateFail());
 		}
 		
@@ -138,10 +152,12 @@ public class WorldGenerationQueue implements IFullDataSourceRetrievalQueue, IDeb
 		// make sure the generator can provide the requested position
 		if (requiredDataDetail < this.highestDataDetail)
 		{
+			//LOGGER.error("[DH-WORLDGEN-QUEUE-SUBMIT] Required detail " + requiredDataDetail + " < highest detail " + this.highestDataDetail);
 			throw new UnsupportedOperationException("Current generator does not meet requiredDataDetail level");
 		}
 		if (requiredDataDetail > this.lowestDataDetail)
 		{
+			//LOGGER.info("[DH-WORLDGEN-QUEUE-SUBMIT] Clamping required detail from " + requiredDataDetail + " to lowest " + this.lowestDataDetail);
 			requiredDataDetail = this.lowestDataDetail;
 		}
 		
@@ -151,6 +167,8 @@ public class WorldGenerationQueue implements IFullDataSourceRetrievalQueue, IDeb
 		
 		CompletableFuture<WorldGenResult> future = new CompletableFuture<>();
 		this.waitingTasks.put(pos, new WorldGenTask(pos, requiredDataDetail, tracker, future));
+		//LOGGER.info("[DH-WORLDGEN-QUEUE-SUBMIT] Task added to waiting queue. Total waiting tasks: " + this.waitingTasks.size());
+		//LOGGER.info("[DH-WORLDGEN-QUEUE-SUBMIT] ========== submitRetrievalTask() COMPLETE ==========");
 		return future;
 	}
 	
@@ -176,11 +194,17 @@ public class WorldGenerationQueue implements IFullDataSourceRetrievalQueue, IDeb
 	@Override
 	public void startAndSetTargetPos(DhBlockPos2D targetPos)
 	{
+		//LOGGER.info("[DH-WORLDGEN-QUEUE-START] ========== startAndSetTargetPos() CALLED ==========");
+		//LOGGER.info("[DH-WORLDGEN-QUEUE-START] Target position: " + targetPos);
+		//LOGGER.info("[DH-WORLDGEN-QUEUE-START] Previous target: " + this.generationTargetPos);
+		//LOGGER.info("[DH-WORLDGEN-QUEUE-START] Thread: " + Thread.currentThread().getName());
+		
 		// update the target pos
 		this.generationTargetPos = targetPos;
 		
 		// needs to be called at least once to start the queue
 		this.tryQueueNewWorldGenRequestsAsync();
+		//LOGGER.info("[DH-WORLDGEN-QUEUE-START] ========== startAndSetTargetPos() COMPLETE ==========");
 	}
 	private synchronized void tryQueueNewWorldGenRequestsAsync()
 	{

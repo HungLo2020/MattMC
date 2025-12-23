@@ -52,12 +52,17 @@ public class DHCompatInternal {
 	public DHCompatInternal(IrisRenderingPipeline pipeline, boolean dhShadowEnabled) {
 		this.pipeline = pipeline;
 
+		//Iris.logger.info("[DH-COMPAT-INIT] ========== DHCompatInternal CONSTRUCTOR CALLED ==========");
+		//Iris.logger.info("[DH-COMPAT-INIT] pipeline: " + (pipeline != null ? "present" : "null"));
+		//Iris.logger.info("[DH-COMPAT-INIT] dhShadowEnabled: " + dhShadowEnabled);
+
 		if (pipeline == null || !DhApi.Delayed.configs.graphics().renderingEnabled().getValue()) {
+			//Iris.logger.info("[DH-COMPAT-INIT] Pipeline null or DH rendering disabled - exiting constructor");
 			return;
 		}
 
 		if (pipeline.getDHTerrainShader().isEmpty() && pipeline.getDHWaterShader().isEmpty()) {
-			Iris.logger.warn("No DH shader found in this pack.");
+			Iris.logger.warn("[DH-COMPAT-INIT] No DH shader found in this pack.");
 			incompatible = true;
 			return;
 		}
@@ -100,6 +105,12 @@ public class DHCompatInternal {
 		}
 
 		shouldOverride = true;
+		//Iris.logger.info("[DH-COMPAT-INIT] shouldOverride set to: " + shouldOverride);
+		//Iris.logger.info("[DH-COMPAT-INIT] solidProgram: " + (solidProgram != null ? "initialized" : "null"));
+		//Iris.logger.info("[DH-COMPAT-INIT] translucentProgram: " + (translucentProgram != null ? "initialized" : "null"));
+		//Iris.logger.info("[DH-COMPAT-INIT] shadowProgram: " + (shadowProgram != null ? "initialized" : "null"));
+		//Iris.logger.info("[DH-COMPAT-INIT] genericShader: " + (genericShader != null ? "initialized" : "null"));
+		//Iris.logger.info("[DH-COMPAT-INIT] ========== DHCompatInternal CONSTRUCTOR COMPLETE ==========");
 	}
 
 	public static int getDhBlockRenderDistance() {

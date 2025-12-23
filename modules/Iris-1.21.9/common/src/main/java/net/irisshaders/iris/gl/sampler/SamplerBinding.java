@@ -30,7 +30,13 @@ public class SamplerBinding {
 	}
 
 	private void updateSampler() {
+		int textureId = texture.getAsInt();
+		// Skip binding if texture ID is invalid (-1 or 0)
+		// This prevents GL_INVALID_OPERATION errors when DH textures aren't ready yet
+		if (textureId <= 0) {
+			return;
+		}
 		IrisRenderSystem.bindSamplerToUnit(textureUnit, sampler);
-		IrisRenderSystem.bindTextureToUnit(textureType.getGlType(), textureUnit, texture.getAsInt());
+		IrisRenderSystem.bindTextureToUnit(textureType.getGlType(), textureUnit, textureId);
 	}
 }

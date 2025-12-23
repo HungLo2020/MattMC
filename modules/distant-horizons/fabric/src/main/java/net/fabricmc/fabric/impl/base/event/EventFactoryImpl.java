@@ -87,8 +87,13 @@ public final class EventFactoryImpl {
 			}
 
 			synchronized (lock) {
+				// Add logging for debugging
+				System.out.println("[DH-EVENT-STUB] Registering listener to event: " + type.getSimpleName());
+				System.out.println("[DH-EVENT-STUB] Current listener count: " + listeners.size());
 				listeners.add(listener);
 				updateInvoker();
+				System.out.println("[DH-EVENT-STUB] New listener count: " + listeners.size());
+				System.out.println("[DH-EVENT-STUB] Invoker updated: " + (invoker != null));
 			}
 		}
 

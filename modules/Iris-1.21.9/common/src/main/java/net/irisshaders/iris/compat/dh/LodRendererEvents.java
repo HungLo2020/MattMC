@@ -215,19 +215,30 @@ public class LodRendererEvents {
 			@Override
 			public void beforeRender(DhApiEventParam<EventParam> input) {
 				DHCompatInternal instance = getInstance();
+				//Iris.logger.info("[DH-RENDER-SHADER] ========== beforeBufferRenderEvent CALLED ==========");
+				//Iris.logger.info("[DH-RENDER-SHADER] shouldOverride: " + instance.shouldOverride);
+				//Iris.logger.info("[DH-RENDER-SHADER] isShadowRender: " + ShadowRenderingState.areShadowsCurrentlyBeingRendered());
+				//Iris.logger.info("[DH-RENDER-SHADER] atTranslucent: " + atTranslucent);
+				
 				if (instance.shouldOverride) {
 					DhApiVec3f modelPos = input.value.modelPos;
 					if (ShadowRenderingState.areShadowsCurrentlyBeingRendered()) {
+						//Iris.logger.info("[DH-RENDER-SHADER] Binding SHADOW shader");
 						instance.getShadowShader().bind();
 						instance.getShadowShader().setModelPos(modelPos);
 					} else if (atTranslucent) {
+						//Iris.logger.info("[DH-RENDER-SHADER] Binding TRANSLUCENT shader");
 						instance.getTranslucentShader().bind();
 						instance.getTranslucentShader().setModelPos(modelPos);
 					} else {
+						//Iris.logger.info("[DH-RENDER-SHADER] Binding SOLID shader");
 						instance.getSolidShader().bind();
 						instance.getSolidShader().setModelPos(modelPos);
 					}
+				} else {
+					//Iris.logger.info("[DH-RENDER-SHADER] shouldOverride is FALSE - not binding any shader");
 				}
+				//Iris.logger.info("[DH-RENDER-SHADER] ========== beforeBufferRenderEvent COMPLETE ==========");
 			}
 		};
 
@@ -239,6 +250,10 @@ public class LodRendererEvents {
 			@Override
 			public void beforeSetup(DhApiEventParam<DhApiRenderParam> event) {
 				DHCompatInternal instance = getInstance();
+				
+				//Iris.logger.info("[DH-RENDER-FB] ========== setupBeforeRenderFrameBufferBinding CALLED ==========");
+				//Iris.logger.info("[DH-RENDER-FB] shouldOverride: " + instance.shouldOverride);
+				//Iris.logger.info("[DH-RENDER-FB] isShadowRender: " + ShadowRenderingState.areShadowsCurrentlyBeingRendered());
 
 				OverrideInjector.INSTANCE.unbind(IDhApiShadowCullingFrustum.class, (IDhApiOverrideable) ShadowRenderer.FRUSTUM);
 				OverrideInjector.INSTANCE.unbind(IDhApiFramebuffer.class, instance.getShadowFBWrapper());
@@ -247,16 +262,22 @@ public class LodRendererEvents {
 
 				if (instance.shouldOverride) {
 					if (instance.getGenericShader() != null) {
+						//Iris.logger.info("[DH-RENDER-FB] Binding GENERIC shader program");
 						OverrideInjector.INSTANCE.bind(IDhApiGenericObjectShaderProgram.class, instance.getGenericShader());
 					}
 
 					if (ShadowRenderingState.areShadowsCurrentlyBeingRendered() && instance.shouldOverrideShadow) {
+						//Iris.logger.info("[DH-RENDER-FB] Binding SHADOW framebuffer and frustum");
 						OverrideInjector.INSTANCE.bind(IDhApiFramebuffer.class, instance.getShadowFBWrapper());
 						OverrideInjector.INSTANCE.bind(IDhApiShadowCullingFrustum.class, (IDhApiOverrideable) ShadowRenderer.FRUSTUM);
 					} else {
+						//Iris.logger.info("[DH-RENDER-FB] Binding SOLID framebuffer");
 						OverrideInjector.INSTANCE.bind(IDhApiFramebuffer.class, instance.getSolidFBWrapper());
 					}
+				} else {
+					//Iris.logger.info("[DH-RENDER-FB] shouldOverride is FALSE - not binding any framebuffers");
 				}
+				//Iris.logger.info("[DH-RENDER-FB] ========== setupBeforeRenderFrameBufferBinding COMPLETE ==========");
 			}
 		};
 		DhApi.events.bind(DhApiBeforeRenderSetupEvent.class, beforeRenderPassEvent);

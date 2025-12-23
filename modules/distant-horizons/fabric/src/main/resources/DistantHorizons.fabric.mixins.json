@@ -6,10 +6,12 @@
     "server.MixinChunkGenerator",
     "server.MixinChunkMap",
     "server.MixinEntity",
+    "server.MixinPlayerManager",
     "server.MixinServerPlayer",
     "server.MixinTracingExecutor",
     "server.MixinUtilBackgroundThread", 
-    "server.MixinLevelTicks"
+    "server.MixinLevelTicks",
+    "server.MixinMinecraftServerLifecycle"
   ],
   "client": [
     "client.MixinClientLevel",

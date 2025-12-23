@@ -70,6 +70,12 @@ public class TestGenericWorldGenerator implements IDhApiWorldGenerator
 			EDhApiDistantGeneratorMode generatorMode, ExecutorService worldGeneratorThreadPool,
 			Consumer<IDhApiFullDataSource> resultConsumer)
 	{
+		//LOGGER.info("[DH-WORLDGEN-TASK] ========== generateLod() CALLED ==========");
+		//LOGGER.info("[DH-WORLDGEN-TASK] Position: (" + posX + ", " + posZ + ")");
+		//LOGGER.info("[DH-WORLDGEN-TASK] Detail Level: " + detailLevel);
+		//LOGGER.info("[DH-WORLDGEN-TASK] Generator Mode: " + generatorMode);
+		//LOGGER.info("[DH-WORLDGEN-TASK] Thread: " + Thread.currentThread().getName());
+		
 		return CompletableFuture.runAsync(() -> 
 			this.generateInternal(
 				chunkPosMinX, chunkPosMinZ,
@@ -84,6 +90,11 @@ public class TestGenericWorldGenerator implements IDhApiWorldGenerator
 		EDhApiDistantGeneratorMode generatorMode,
 		Consumer<IDhApiFullDataSource> resultConsumer)
 	{
+		//LOGGER.info("[DH-WORLDGEN-GENERATE] ========== generateInternal() START ==========");
+		//LOGGER.info("[DH-WORLDGEN-GENERATE] Position: (" + posX + ", " + posZ + ")");
+		//LOGGER.info("[DH-WORLDGEN-GENERATE] Detail Level: " + detailLevel);
+		//LOGGER.info("[DH-WORLDGEN-GENERATE] Thread: " + Thread.currentThread().getName());
+		
 		// this test is only validated for 1.18.2 and up 
 		// (and it is only needed when testing world gen overrides/API chunks, so it isn't normally needed)
 		
@@ -145,16 +156,19 @@ public class TestGenericWorldGenerator implements IDhApiWorldGenerator
 			}
 			
 			colorBlock = DhApi.Delayed.wrapperFactory.getDefaultBlockStateWrapper(blockResourceLocation, this.levelWrapper);
+			//LOGGER.info("[DH-WORLDGEN-GENERATE] Using color block: " + blockResourceLocation + ", height: " + maxHeight);
 			
 		}
 		catch (IOException e)
 		{
-			LOGGER.error("Failed to get biome/block: "+ e.getMessage(), e);
+			//LOGGER.error("[DH-WORLDGEN-GENERATE] Failed to get biome/block: "+ e.getMessage(), e);
 			return;
 		}
 		
 		ArrayList<DhApiTerrainDataPoint> dataPoints = new ArrayList<>();
 		int width = pooledFullDataSource.getWidthInDataColumns();
+		//LOGGER.info("[DH-WORLDGEN-GENERATE] Generating " + width + "x" + width + " data columns");
+		
 		for (int x = 0; x < width; x++)
 		{
 			for (int z = 0; z < width; z++)
@@ -178,7 +192,9 @@ public class TestGenericWorldGenerator implements IDhApiWorldGenerator
 			}
 		}
 		
+		//LOGGER.info("[DH-WORLDGEN-GENERATE] Calling resultConsumer.accept()");
 		resultConsumer.accept(pooledFullDataSource);
+		//LOGGER.info("[DH-WORLDGEN-GENERATE] ========== generateInternal() COMPLETE ==========");
 			
 	}
 	

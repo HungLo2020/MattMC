@@ -34,9 +34,16 @@ public final class ServerLifecycleEvents {
 	 * <p>This occurs before the {@link PlayerManager player manager} and any worlds are loaded.
 	 */
 	public static final Event<ServerStarting> SERVER_STARTING = EventFactory.createArrayBacked(ServerStarting.class, callbacks -> server -> {
-		for (ServerStarting callback : callbacks) {
+		//System.out.println("[DH-EVENT-INVOKER] ========== SERVER_STARTING INVOKER CALLED ==========");
+		//System.out.println("[DH-EVENT-INVOKER] Number of callbacks: " + callbacks.length);
+		//System.out.println("[DH-EVENT-INVOKER] Server: " + server);
+		for (int i = 0; i < callbacks.length; i++) {
+			//System.out.println("[DH-EVENT-INVOKER] Invoking callback " + (i+1) + "/" + callbacks.length);
+			ServerStarting callback = callbacks[i];
 			callback.onServerStarting(server);
+			//System.out.println("[DH-EVENT-INVOKER] Callback " + (i+1) + " completed");
 		}
+		//System.out.println("[DH-EVENT-INVOKER] ========== SERVER_STARTING INVOKER COMPLETE ==========");
 	});
 
 	/**
@@ -45,9 +52,16 @@ public final class ServerLifecycleEvents {
 	 * <p>At this stage, all worlds are live.
 	 */
 	public static final Event<ServerStarted> SERVER_STARTED = EventFactory.createArrayBacked(ServerStarted.class, (callbacks) -> (server) -> {
-		for (ServerStarted callback : callbacks) {
+		//System.out.println("[DH-EVENT-INVOKER] ========== SERVER_STARTED INVOKER CALLED ==========");
+		//System.out.println("[DH-EVENT-INVOKER] Number of callbacks: " + callbacks.length);
+		//System.out.println("[DH-EVENT-INVOKER] Server: " + server);
+		for (int i = 0; i < callbacks.length; i++) {
+			//System.out.println("[DH-EVENT-INVOKER] Invoking callback " + (i+1) + "/" + callbacks.length);
+			ServerStarted callback = callbacks[i];
 			callback.onServerStarted(server);
+			//System.out.println("[DH-EVENT-INVOKER] Callback " + (i+1) + " completed");
 		}
+		//System.out.println("[DH-EVENT-INVOKER] ========== SERVER_STARTED INVOKER COMPLETE ==========");
 	});
 
 	/**

@@ -99,7 +99,26 @@ public abstract class AbstractDhServerLevel extends AbstractDhLevel implements I
 	
 	@Override
 	public boolean shouldDoWorldGen()
-	{ return Config.Common.WorldGenerator.enableDistantGeneration.get() && !this.worldGenPlayerCenteringQueue.isEmpty(); }
+	{ 
+		boolean configEnabled = Config.Common.WorldGenerator.enableDistantGeneration.get();
+		boolean hasPlayers = !this.worldGenPlayerCenteringQueue.isEmpty();
+		boolean result = configEnabled && hasPlayers;
+		
+		// Log once if worldgen is disabled
+		if (!result && !hasLoggedShouldDoWorldGen)
+		{
+			//LOGGER.info("[DH-SHOULD-DO-WORLDGEN] ========== shouldDoWorldGen() RETURNING FALSE ==========");
+			//LOGGER.info("[DH-SHOULD-DO-WORLDGEN] Config enabled: " + configEnabled);
+			//LOGGER.info("[DH-SHOULD-DO-WORLDGEN] Has players in queue: " + hasPlayers);
+			//LOGGER.info("[DH-SHOULD-DO-WORLDGEN] Player queue size: " + this.worldGenPlayerCenteringQueue.size());
+			//LOGGER.info("[DH-SHOULD-DO-WORLDGEN] Thread: " + Thread.currentThread().getName());
+			hasLoggedShouldDoWorldGen = true;
+		}
+		
+		return result;
+	}
+	
+	private static boolean hasLoggedShouldDoWorldGen = false;
 	
 	@Override
 	@Nullable
