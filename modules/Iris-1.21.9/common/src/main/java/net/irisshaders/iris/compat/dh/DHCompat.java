@@ -151,20 +151,26 @@ public class DHCompat {
 	}
 
 	public int getDepthTex() {
-		if (compatInternalInstance == null) return 0;
+		if (compatInternalInstance == null) return -1;
 
 		try {
-			return (int) getDepthTex.invoke(compatInternalInstance);
+			int texId = (int) getDepthTex.invoke(compatInternalInstance);
+			// Return -1 for invalid texture IDs to prevent GL_INVALID_OPERATION errors
+			// The sampler binding code should check for -1 and skip binding
+			return (texId <= 0) ? -1 : texId;
 		} catch (Throwable e) {
 			throw new RuntimeException(e);
 		}
 	}
 
 	public int getDepthTexNoTranslucent() {
-		if (compatInternalInstance == null) return 0;
+		if (compatInternalInstance == null) return -1;
 
 		try {
-			return (int) getDepthTexNoTranslucent.invoke(compatInternalInstance);
+			int texId = (int) getDepthTexNoTranslucent.invoke(compatInternalInstance);
+			// Return -1 for invalid texture IDs to prevent GL_INVALID_OPERATION errors
+			// The sampler binding code should check for -1 and skip binding
+			return (texId <= 0) ? -1 : texId;
 		} catch (Throwable e) {
 			throw new RuntimeException(e);
 		}
