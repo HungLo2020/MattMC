@@ -49,7 +49,7 @@ public class CloudRenderHandler
 	private static final DhLogger LOGGER = new DhLoggerBuilder().build();
 	private static final IMinecraftRenderWrapper MC_RENDER = SingletonInjector.INSTANCE.get(IMinecraftRenderWrapper.class);
 	
-	private static final String CLOUD_RESOURCE_TEXTURE_PATH = "assets/distanthorizons/textures/clouds.png";
+	private static final String CLOUD_RESOURCE_TEXTURE_PATH = "assets/minecraft/textures/environment/distanthorizons_clouds.png";
 	
 	private static final boolean DEBUG_BORDER_COLORS = false;
 	
