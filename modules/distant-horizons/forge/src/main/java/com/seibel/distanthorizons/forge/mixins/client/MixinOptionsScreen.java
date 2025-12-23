@@ -47,7 +47,7 @@ import java.util.Objects;
 public class MixinOptionsScreen extends Screen
 {
 	// Get the texture for the button
-	private static final ResourceLocation ICON_TEXTURE = new ResourceLocation(ModInfo.ID, "textures/gui/button.png");
+	private static final ResourceLocation ICON_TEXTURE = new ResourceLocation("minecraft", "textures/gui/distanthorizons_button.png");
 	protected MixinOptionsScreen(Component title)
 	{
 		super(title);

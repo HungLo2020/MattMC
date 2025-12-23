@@ -57,7 +57,7 @@ public class BaseJFrame extends JFrame
 		setTitle(SingletonInjector.INSTANCE.get(ILangWrapper.class).getLang("lod.title"));
 		try
 		{
-			setIconImage(ImageIO.read(JarUtils.accessFile("assets/distanthorizons/icon.png")));
+			setIconImage(ImageIO.read(JarUtils.accessFile("assets/minecraft/textures/gui/distanthorizons_icon.png")));
 		}
 		catch (Exception e)
 		{
@@ -85,7 +85,7 @@ public class BaseJFrame extends JFrame
 		// Creates a list with all the options in it
 		List<String> langsToChoose = new ArrayList<>();
 		try (
-				final InputStreamReader isr = new InputStreamReader(JarUtils.accessFile("assets/distanthorizons/lang"), StandardCharsets.UTF_8);
+				final InputStreamReader isr = new InputStreamReader(JarUtils.accessFile("assets/minecraft/lang"), StandardCharsets.UTF_8);
 				final BufferedReader br = new BufferedReader(isr)
 		)
 		{
@@ -122,11 +122,11 @@ public class BaseJFrame extends JFrame
 		try
 		{
 			lightMode = new JButton(new ImageIcon(
-					new FlatSVGIcon(JarUtils.accessFile("assets/distanthorizons/textures/jar/themeLight.svg")).getImage() // Get the image
+					new FlatSVGIcon(JarUtils.accessFile("assets/minecraft/textures/gui/jar/themeLight.svg")).getImage() // Get the image
 							.getScaledInstance(themeButtonSize, themeButtonSize, Image.SCALE_DEFAULT) // Scale it to the correct size
 			));
 			darkMode = new JButton(new ImageIcon(
-					new FlatSVGIcon(JarUtils.accessFile("assets/distanthorizons/textures/jar/themeDark.svg")).getImage() // Get the image
+					new FlatSVGIcon(JarUtils.accessFile("assets/minecraft/textures/gui/jar/themeDark.svg")).getImage() // Get the image
 							.getScaledInstance(themeButtonSize, themeButtonSize, Image.SCALE_DEFAULT) // Scale it to the correct size
 			));
 		}
@@ -164,7 +164,7 @@ public class BaseJFrame extends JFrame
 				super.paintComponent(g);
 				try
 				{
-					BufferedImage image = ImageIO.read(JarUtils.accessFile("assets/distanthorizons/logo.png"));
+					BufferedImage image = ImageIO.read(JarUtils.accessFile("assets/minecraft/textures/gui/distanthorizons_logo.png"));
 					int logoWidth = (int) ((double) logoHeight * ((double) image.getWidth() / (double) image.getHeight())); // Calculate the aspect ratio and set the height correctly to not stretch it
 					g.drawImage(image, (getWidth() / 2) - (logoWidth / 2), 0, logoWidth, logoHeight, this); // Resize image and draw it
 				}

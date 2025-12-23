@@ -57,7 +57,7 @@ public class BaseJFrame extends JFrame
 		setTitle(SingletonInjector.INSTANCE.get(ILangWrapper.class).getLang("lod.title"));
 		try
 		{
-			setIconImage(ImageIO.read(JarUtils.accessFile("assets/distanthorizons/icon.png")));
+			setIconImage(ImageIO.read(JarUtils.accessFile("assets/minecraft/textures/gui/distanthorizons_icon.png")));
 		}
 		catch (Exception e)
 		{
