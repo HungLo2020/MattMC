@@ -391,9 +391,9 @@ public class ClientApi
 	
 	private void renderLodLayer(boolean renderingDeferredLayer)
 	{
-		LOGGER.debug("[DH-RENDER-LAYER] ========== RENDER LOD LAYER START ==========");
-		LOGGER.debug("[DH-RENDER-LAYER] renderingDeferredLayer: " + renderingDeferredLayer);
-		LOGGER.debug("[DH-RENDER-LAYER] Thread: " + Thread.currentThread().getName() + " (ID: " + Thread.currentThread().getId() + ")");
+		//LOGGER.debug("[DH-RENDER-LAYER] ========== RENDER LOD LAYER START ==========");
+		//LOGGER.debug("[DH-RENDER-LAYER] renderingDeferredLayer: " + renderingDeferredLayer);
+		//LOGGER.debug("[DH-RENDER-LAYER] Thread: " + Thread.currentThread().getName() + " (ID: " + Thread.currentThread().getId() + ")");
 		
 		//=========//
 		// logging //
@@ -438,7 +438,7 @@ public class ClientApi
 		// parameter setup //
 		//=================//
 		
-		LOGGER.debug("[DH-RENDER-LAYER] Setting up render parameters...");
+		//LOGGER.debug("[DH-RENDER-LAYER] Setting up render parameters...");
 		
 		EDhApiRenderPass renderPass;
 		if (DhApiRenderProxy.INSTANCE.getDeferTransparentRendering())
@@ -457,8 +457,8 @@ public class ClientApi
 			renderPass = EDhApiRenderPass.OPAQUE_AND_TRANSPARENT;
 		}
 		
-		LOGGER.debug("[DH-RENDER-LAYER] Render pass: " + renderPass);
-		LOGGER.debug("[DH-RENDER-LAYER] clientLevelWrapper: " + RENDER_STATE.clientLevelWrapper);
+		//LOGGER.debug("[DH-RENDER-LAYER] Render pass: " + renderPass);
+		//LOGGER.debug("[DH-RENDER-LAYER] clientLevelWrapper: " + RENDER_STATE.clientLevelWrapper);
 		
 		// A global render state variable is used since MC has split up their
 		// render prep and actual rendering into different threads/methods
@@ -472,7 +472,7 @@ public class ClientApi
 				RENDER_STATE.clientLevelWrapper
 			);
 		
-		LOGGER.debug("[DH-RENDER-LAYER] RenderParams created");
+		//LOGGER.debug("[DH-RENDER-LAYER] RenderParams created");
 		
 		
 		
@@ -480,7 +480,7 @@ public class ClientApi
 		// validation //
 		//============//
 		
-		LOGGER.debug("[DH-RENDER-LAYER] Validating render parameters...");
+		//LOGGER.debug("[DH-RENDER-LAYER] Validating render parameters...");
 		
 		// TODO write this message to the F3 menu so people can see when a different mod screws with the lightmap
 		String validationMessage = renderParams.getValidationErrorMessage();
@@ -503,7 +503,7 @@ public class ClientApi
 			this.lastRenderParamValidationMessage = null;
 		}
 		
-		LOGGER.debug("[DH-RENDER-LAYER] Validation passed!");
+		//LOGGER.debug("[DH-RENDER-LAYER] Validation passed!");
 		
 		if (this.rendererDisabledBecauseOfExceptions)
 		{
@@ -524,7 +524,7 @@ public class ClientApi
 		// rendering //
 		//===========//
 		
-		LOGGER.debug("[DH-RENDER-LAYER] Starting rendering...");
+		//LOGGER.debug("[DH-RENDER-LAYER] Starting rendering...");
 		
 		try
 		{
@@ -537,9 +537,9 @@ public class ClientApi
 					boolean renderingCancelledForThisFrame = ApiEventInjector.INSTANCE.fireAllEvents(DhApiBeforeRenderEvent.class, renderParams);
 					if (!renderingCancelledForThisFrame)
 					{
-						LOGGER.debug("[DH-RENDER-LAYER] Calling LodRenderer.INSTANCE.render()");
+						//LOGGER.debug("[DH-RENDER-LAYER] Calling LodRenderer.INSTANCE.render()");
 						LodRenderer.INSTANCE.render(renderParams, profiler);
-						LOGGER.debug("[DH-RENDER-LAYER] LodRenderer.INSTANCE.render() completed");
+						//LOGGER.debug("[DH-RENDER-LAYER] LodRenderer.INSTANCE.render() completed");
 					}
 					
 					if (!DhApi.Delayed.renderProxy.getDeferTransparentRendering())
@@ -585,7 +585,7 @@ public class ClientApi
 		profiler.pop(); // end LOD
 		profiler.push("terrain"); // go back into "terrain"
 		
-		LOGGER.debug("[DH-RENDER-LAYER] ========== RENDER LOD LAYER COMPLETE ==========");
+		//LOGGER.debug("[DH-RENDER-LAYER] ========== RENDER LOD LAYER COMPLETE ==========");
 	}
 	
 	
