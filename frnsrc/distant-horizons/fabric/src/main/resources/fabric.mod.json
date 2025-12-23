@@ -17,7 +17,7 @@
     },
     
     "license": "LGPL-3",
-    "icon": "assets/distanthorizons/icon.png",
+    "icon": "assets/minecraft/textures/gui/distanthorizons_icon.png",
     
     "accessWidener": "distanthorizons.accesswidener",
     
