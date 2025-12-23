@@ -124,7 +124,7 @@ public class ChunkMap extends ChunkStorage implements ChunkHolder.PlayerProvider
 	private final List<ChunkGenerationTask> pendingGenerationTasks = new ArrayList();
 	final ServerLevel level;
 	private final ThreadedLevelLightEngine lightEngine;
-	private final BlockableEventLoop<Runnable> mainThreadExecutor;
+	public final BlockableEventLoop<Runnable> mainThreadExecutor;
 	private final RandomState randomState;
 	private final ChunkGeneratorStructureState chunkGeneratorState;
 	private final Supplier<DimensionDataStorage> overworldDataStorage;
@@ -453,7 +453,7 @@ public class ChunkMap extends ChunkStorage implements ChunkHolder.PlayerProvider
 		}
 	}
 
-	protected void tick(BooleanSupplier booleanSupplier) {
+	public void tick(BooleanSupplier booleanSupplier) {
 		ProfilerFiller profilerFiller = Profiler.get();
 		profilerFiller.push("poi");
 		this.poiManager.tick(booleanSupplier);

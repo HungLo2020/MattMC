@@ -28,6 +28,13 @@ def sodiumDir = 'modules/sodium-1.21.9'
 def irisVersion = '1.9.6'
 def irisDir = 'modules/Iris-1.21.9'
 
+// Distant Horizons toggle (controlled by gradle.properties)
+def enableDistantHorizons = project.findProperty('distanthorizons') == 'true'
+
+// Distant Horizons version (update this when upgrading Distant Horizons source)
+def distantHorizonsVersion = '2.4.4-b-dev'
+def distantHorizonsDir = 'modules/distant-horizons'
+
 java {
     // Keep toolchain configuration for compilation
     // But we'll override at runtime for JavaExec tasks
@@ -304,6 +311,25 @@ dependencies {
     // GLSL Transformer - GLSL shader transformation library
     implementation 'io.github.douira:glsl-transformer:3.0.0-pre3'
     
+    // ===== DISTANT HORIZONS DEPENDENCIES =====
+    // Additional dependencies required for Distant Horizons core
+    if (enableDistantHorizons) {
+        // LWJGL JAWT for embedded GUI frames (no natives needed - pure Java bridge)
+        implementation 'org.lwjgl:lwjgl-jawt:3.3.3'
+        
+        // Compression libraries
+        implementation 'com.github.luben:zstd-jni:1.5.7-6'
+        implementation 'org.lz4:lz4-java:1.8.0'
+        implementation 'org.tukaani:xz:1.9'
+        
+        // Database
+        implementation 'org.xerial:sqlite-jdbc:3.47.2.0'
+        
+        // Configuration
+        implementation 'com.electronwill.night-config:toml:3.6.6'
+        implementation 'com.electronwill.night-config:json:3.6.6'
+    }
+    
     // ===== TESTING DEPENDENCIES =====
     // Testing dependencies - only available in test scope, excluded from production builds
     
@@ -381,6 +407,16 @@ sourceSets {
                 "${irisDir}/common/src/api/java",
                 "${irisDir}/fabric/src/main/java"
             ]
+            // Exclude DH implementation classes when Distant Horizons is disabled
+            // Keep DHCompat.java as it has fallback logic for when DH isn't present
+            if (!enableDistantHorizons) {
+                exclude '**/compat/dh/DHCompatInternal.java'
+                exclude '**/compat/dh/LodRendererEvents.java'
+                exclude '**/compat/dh/IrisLodRenderProgram.java'
+                exclude '**/compat/dh/IrisGenericRenderProgram.java'
+                exclude '**/compat/dh/DhFrameBufferWrapper.java'
+                exclude '**/compat/dh/DHMixinConfigPlugin.java'
+            }
         }
         resources {
             srcDirs = [
@@ -429,6 +465,31 @@ sourceSets {
     }
 }
 
+// Conditionally add Distant Horizons source set if enabled
+if (enableDistantHorizons) {
+    sourceSets {
+        // Distant Horizons source set - compiled to a separate mod JAR
+        distantHorizons {
+            java {
+                srcDirs = [
+                    "${distantHorizonsDir}/coreSubProjects/core/src/main/java",
+                    "${distantHorizonsDir}/coreSubProjects/api/src/main/java",
+                    "${distantHorizonsDir}/common/src/main/java",
+                    "${distantHorizonsDir}/fabric/src/main/java"
+                ]
+            }
+            resources {
+                srcDirs = [
+                    "${distantHorizonsDir}/coreSubProjects/core/src/main/resources",
+                    "${distantHorizonsDir}/coreSubProjects/api/src/main/resources",
+                    "${distantHorizonsDir}/common/src/main/resources",
+                    "${distantHorizonsDir}/fabric/src/main/resources"
+                ]
+            }
+        }
+    }
+}
+
 // ============================================================================
 // FABRIC LOADER DEPENDENCIES
 // ============================================================================
@@ -452,6 +513,16 @@ configurations {
     irisRuntimeOnly.extendsFrom runtimeOnly
 }
 
+// Conditionally add Distant Horizons configurations if enabled
+if (enableDistantHorizons) {
+    configurations {
+        // Distant Horizons configurations extend from implementation + fabricLoader
+        distantHorizonsImplementation.extendsFrom implementation
+        distantHorizonsCompileOnly.extendsFrom compileOnly
+        distantHorizonsRuntimeOnly.extendsFrom runtimeOnly
+    }
+}
+
 // Sodium depends on Fabric Loader and Minecraft
 // Fabric API stub interfaces are in src/main/java/net/fabricmc/fabric/api/
 sourceSets.sodium.compileClasspath += sourceSets.fabricLoader.output
@@ -466,6 +537,21 @@ sourceSets.iris.compileClasspath += sourceSets.sodium.output
 sourceSets.iris.runtimeClasspath += sourceSets.fabricLoader.output
 sourceSets.iris.runtimeClasspath += sourceSets.main.output
 sourceSets.iris.runtimeClasspath += sourceSets.sodium.output
+
+// Add Distant Horizons to Iris classpath when enabled (for DH compatibility classes)
+if (enableDistantHorizons) {
+    sourceSets.iris.compileClasspath += sourceSets.distantHorizons.output
+    sourceSets.iris.runtimeClasspath += sourceSets.distantHorizons.output
+}
+
+// Conditionally add Distant Horizons dependencies if enabled
+if (enableDistantHorizons) {
+    // Distant Horizons depends on Fabric Loader and Minecraft
+    sourceSets.distantHorizons.compileClasspath += sourceSets.fabricLoader.output
+    sourceSets.distantHorizons.compileClasspath += sourceSets.main.output
+    sourceSets.distantHorizons.runtimeClasspath += sourceSets.fabricLoader.output
+    sourceSets.distantHorizons.runtimeClasspath += sourceSets.main.output
+}
 
 // ============================================================================
 // FABRIC LOADER JAR TASK
@@ -581,6 +667,11 @@ tasks.register('irisJar', Jar) {
     
     dependsOn 'compileIrisJava', 'processIrisResources'
     
+    // Ensure Distant Horizons compiles before Iris when enabled (for DH compatibility classes)
+    if (enableDistantHorizons) {
+        dependsOn 'compileDistantHorizonsJava'
+    }
+    
     archiveBaseName = 'iris'
     archiveVersion = irisVersion
     archiveClassifier = 'mc1.21.10'
@@ -594,6 +685,57 @@ tasks.register('irisJar', Jar) {
             'Implementation-Title': 'Iris',
             'Implementation-Version': irisVersion
         )
+    }
+}
+
+// ============================================================================
+// DISTANT HORIZONS MOD JAR TASK
+// ============================================================================
+// Create the Distant Horizons mod JAR to be loaded by Fabric Loader
+// Only enabled if distanthorizons property is set to true in gradle.properties
+// ============================================================================
+
+if (enableDistantHorizons) {
+    // Process Distant Horizons resources with version substitution
+    tasks.named('processDistantHorizonsResources') {
+        filesMatching('fabric.mod.json') {
+            expand(
+                'version': distantHorizonsVersion,
+                'mod_name': 'Distant Horizons',
+                'description': 'This mod generates and renders simplified terrain beyond the normal view distance at a low performance cost.',
+                'authors': '["James Seibel", "Leonardo Amato", "Cola", "coolGi", "Ran", "Leetom", "pshsh"]',
+                'homepage': 'https://modrinth.com/mod/distanthorizons',
+                'source': 'https://gitlab.com/jeseibel/distant-horizons',
+                'issues': 'https://gitlab.com/jeseibel/distant-horizons/-/issues',
+                'discord': 'https://discord.gg/xAB8G4cENx',
+                'compatible_minecraft_versions': '["1.21.10"]',
+                'java_version': '21',
+                'fabric_incompatibility_list': '{}',
+                'fabric_recommend_list': '{}'
+            )
+        }
+    }
+
+    tasks.register('distantHorizonsJar', Jar) {
+        group = 'build'
+        description = 'Assembles the Distant Horizons mod JAR'
+        
+        dependsOn 'compileDistantHorizonsJava', 'processDistantHorizonsResources'
+        
+        archiveBaseName = 'distanthorizons'
+        archiveVersion = distantHorizonsVersion
+        archiveClassifier = 'mc1.21.10'
+        
+        from sourceSets.distantHorizons.output
+        
+        destinationDirectory = file("${buildDir}/mods")
+        
+        manifest {
+            attributes(
+                'Implementation-Title': 'Distant Horizons',
+                'Implementation-Version': distantHorizonsVersion
+            )
+        }
     }
 }
 
@@ -673,8 +815,8 @@ def serverJvmArgs = [
 
 // Common JVM arguments for client tasks
 def clientJvmArgs = [
-    '-Xmx2G',
-    '-Xms512M',
+    '-Xmx8G',
+    '-Xms4G',
     '-XX:+UseG1GC',
     '-XX:+ParallelRefProcEnabled',
     '-XX:MaxGCPauseMillis=200',
@@ -810,7 +952,12 @@ tasks.register('runClient', JavaExec) {
     group = 'minecraft'
     description = 'Runs the Minecraft client with Fabric Loader'
     
-    dependsOn 'fabricLoaderJar', 'gameJar', 'sodiumJar', 'irisJar', 'copyJdkToRun', 'shaderPackZip'
+    // Conditionally add distantHorizonsJar to dependencies based on property
+    def dependencies = ['fabricLoaderJar', 'gameJar', 'sodiumJar', 'irisJar', 'copyJdkToRun', 'shaderPackZip']
+    if (enableDistantHorizons) {
+        dependencies.add(4, 'distantHorizonsJar') // Add after irisJar
+    }
+    dependsOn dependencies
     
     // Use the separate JARs so Fabric Loader can detect the game JAR properly
     // The order matters: Fabric Loader JAR first, then Game JAR, then dependencies
@@ -1090,7 +1237,12 @@ tasks.register('clientDist') {
     group = 'distribution'
     description = 'Creates a runnable client distribution'
     
-    dependsOn 'jar', 'classes', 'downloadJdk', 'shaderPackZip', 'fabricLoaderJar', 'gameJar', 'sodiumJar', 'irisJar'
+    // Conditionally add distantHorizonsJar to dependencies based on property
+    def dependencies = ['jar', 'classes', 'downloadJdk', 'shaderPackZip', 'fabricLoaderJar', 'gameJar', 'sodiumJar', 'irisJar']
+    if (enableDistantHorizons) {
+        dependencies.add('distantHorizonsJar')
+    }
+    dependsOn dependencies
     
     def distDir = "${buildDir}/client-dist/MattMC"
     
@@ -1348,3 +1500,10 @@ clientFatJar {
 
 // The clientDist task already uses only runtimeClasspath and main source set,
 // but we verify this is maintained for future modifications
+
+// Ensure Distant Horizons compiles before Iris when DH is enabled
+if (enableDistantHorizons) {
+    tasks.named('compileIrisJava') {
+        dependsOn 'compileDistantHorizonsJava'
+    }
+}

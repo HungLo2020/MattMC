@@ -48,6 +48,9 @@ import net.minecraft.network.chat.MutableComponent;
 import org.apache.commons.lang3.SystemUtils;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.ArrayList;
+import java.util.List;
+
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
@@ -289,14 +292,19 @@ public class ShaderPack {
 			// extension in order to represent the path as its program name
 			String programString = pathString.substring(pathString.indexOf("/") == 0 ? 1 : 0, pathString.lastIndexOf("."));
 
+			// DEBUG: Log ALL shader loads to trace the flow
+			//Iris.logger.info("[SHADER-SOURCE-PROVIDER] Loading shader: " + programString + " from path: " + pathString);
+
 			// Return an empty program source if the program is disabled by the current profile
 			if (disabledPrograms.contains(programString)) {
+				//Iris.logger.info("[SHADER-SOURCE-PROVIDER] Shader " + programString + " is disabled");
 				return null;
 			}
 
 			ImmutableList<String> lines = includeProcessor.getIncludedFile(path);
 
 			if (lines == null) {
+				//Iris.logger.info("[SHADER-SOURCE-PROVIDER] No lines found for shader: " + programString);
 				return null;
 			}
 
@@ -314,7 +322,19 @@ public class ShaderPack {
 			// directly. This removes one obstacle to accurate reporting of line numbers for errors,
 			// though there exist many more (such as relocating all #extension directives and similar things)
 			String source = builder.toString();
-			source = JcppProcessor.glslPreprocessSource(source, finalEnvironmentDefines1);
+			
+			// Add DISTANT_HORIZONS define for DH shaders
+			// Program names come in forms like "world0/dh_terrain", so check if it contains "/dh_"
+			Iterable<StringPair> currentEnvironmentDefines = finalEnvironmentDefines1;
+			if (programString.contains("/dh_") || programString.startsWith("dh_")) {
+				List<StringPair> dhDefines = new ArrayList<>();
+				finalEnvironmentDefines1.forEach(dhDefines::add);
+				dhDefines.add(new StringPair("DISTANT_HORIZONS", ""));
+				currentEnvironmentDefines = dhDefines;
+				//Iris.logger.info("[DH-SHADER-PREPROCESSING] Adding DISTANT_HORIZONS define for shader: " + programString);
+			}
+			
+			source = JcppProcessor.glslPreprocessSource(source, currentEnvironmentDefines);
 
 			return source;
 		};
