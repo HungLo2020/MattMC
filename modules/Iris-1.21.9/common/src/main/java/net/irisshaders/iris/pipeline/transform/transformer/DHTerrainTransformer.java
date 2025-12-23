@@ -53,14 +53,11 @@ public class DHTerrainTransformer {
 		// computed on the CPU-side of things
 		root.replaceReferenceExpressions(t, "gl_NormalMatrix",
 			"iris_NormalMatrix");
-		tree.parseAndInjectNode(t, ASTInjectionPoint.BEFORE_DECLARATIONS,
-			"uniform mat3 iris_NormalMatrix;");
+		addIfNotExists(root, t, tree, "iris_NormalMatrix", Type.F32MAT3, StorageQualifier.StorageType.UNIFORM);
 
-		tree.parseAndInjectNode(t, ASTInjectionPoint.BEFORE_DECLARATIONS,
-			"uniform mat4 iris_ModelViewMatrixInverse;");
+		addIfNotExists(root, t, tree, "iris_ModelViewMatrixInverse", Type.F32MAT4, StorageQualifier.StorageType.UNIFORM);
 
-		tree.parseAndInjectNode(t, ASTInjectionPoint.BEFORE_DECLARATIONS,
-			"uniform mat4 iris_ProjectionMatrixInverse;");
+		addIfNotExists(root, t, tree, "iris_ProjectionMatrixInverse", Type.F32MAT4, StorageQualifier.StorageType.UNIFORM);
 
 		Iris.logger.warn("Type is " + parameters.type);
 
@@ -77,9 +74,9 @@ public class DHTerrainTransformer {
 				tree.parseAndInjectNodes(t, ASTInjectionPoint.BEFORE_FUNCTIONS,
 					"vec4 ftransform() { return gl_ModelViewProjectionMatrix * gl_Vertex; }");
 			}
-			tree.parseAndInjectNodes(t, ASTInjectionPoint.BEFORE_DECLARATIONS,
-				"uniform mat4 iris_ProjectionMatrix;",
-				"uniform mat4 iris_ModelViewMatrix;",
+			addIfNotExists(root, t, tree, "iris_ProjectionMatrix", Type.F32MAT4, StorageQualifier.StorageType.UNIFORM);
+			addIfNotExists(root, t, tree, "iris_ModelViewMatrix", Type.F32MAT4, StorageQualifier.StorageType.UNIFORM);
+			tree.parseAndInjectNode(t, ASTInjectionPoint.BEFORE_DECLARATIONS,
 				// _draw_translation replaced with Chunks[_draw_id].offset.xyz
 				"vec4 getVertexPosition() { return vec4(modelOffset + _vert_position, 1.0); }");
 			root.replaceReferenceExpressions(t, "gl_Vertex", "getVertexPosition()");
@@ -89,9 +86,8 @@ public class DHTerrainTransformer {
 			// performed as an array of injections)
 			injectVertInit(t, tree, root, parameters);
 		} else {
-			tree.parseAndInjectNodes(t, ASTInjectionPoint.BEFORE_DECLARATIONS,
-				"uniform mat4 iris_ModelViewMatrix;",
-				"uniform mat4 iris_ProjectionMatrix;");
+			addIfNotExists(root, t, tree, "iris_ModelViewMatrix", Type.F32MAT4, StorageQualifier.StorageType.UNIFORM);
+			addIfNotExists(root, t, tree, "iris_ProjectionMatrix", Type.F32MAT4, StorageQualifier.StorageType.UNIFORM);
 		}
 
 		root.replaceReferenceExpressions(t, "gl_ModelViewProjectionMatrix",
