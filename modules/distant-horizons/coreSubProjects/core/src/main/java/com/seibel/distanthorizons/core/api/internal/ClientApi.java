@@ -263,17 +263,17 @@ public class ClientApi
 	
 	public void clientLevelLoadEvent(IClientLevelWrapper levelWrapper)
 	{
-		LOGGER.info("[DH-CLIENT-LEVEL] ========== CLIENT LEVEL LOAD EVENT ==========");
-		LOGGER.info("[DH-CLIENT-LEVEL] Level: " + levelWrapper);
-		LOGGER.info("[DH-CLIENT-LEVEL] Level identifier: " + levelWrapper.getDhIdentifier());
-		LOGGER.info("[DH-CLIENT-LEVEL] Thread: " + Thread.currentThread().getName() + " (ID: " + Thread.currentThread().getId() + ")");
+		//LOGGER.info("[DH-CLIENT-LEVEL] ========== CLIENT LEVEL LOAD EVENT ==========");
+		//LOGGER.info("[DH-CLIENT-LEVEL] Level: " + levelWrapper);
+		//LOGGER.info("[DH-CLIENT-LEVEL] Level identifier: " + levelWrapper.getDhIdentifier());
+		//LOGGER.info("[DH-CLIENT-LEVEL] Thread: " + Thread.currentThread().getName() + " (ID: " + Thread.currentThread().getId() + ")");
 		
 		// wait a moment before loading the level to give the server a chance to handle the client's login request
 		if (MC_CLIENT.clientConnectedToDedicatedServer())
 		{
 			if (this.firstLevelLoadTimer == null)
 			{
-				LOGGER.info("[DH-CLIENT-LEVEL] Dedicated server detected - delaying level load by " + FIRST_LEVEL_LOAD_DELAY_IN_MS + "ms");
+				//LOGGER.info("[DH-CLIENT-LEVEL] Dedicated server detected - delaying level load by " + FIRST_LEVEL_LOAD_DELAY_IN_MS + "ms");
 				this.firstLevelLoadTimer = TimerUtil.CreateTimer("FirstLevelLoadTimer");
 				this.firstLevelLoadTimer.schedule(new TimerTask()
 				{
@@ -283,22 +283,22 @@ public class ClientApi
 				return;
 			}
 			this.firstLevelLoadTimer.cancel();
-			LOGGER.info("[DH-CLIENT-LEVEL] Level load delay completed");
+			//LOGGER.info("[DH-CLIENT-LEVEL] Level load delay completed");
 		}
 		
 		
 		try
 		{
-			LOGGER.info("[DH-CLIENT-LEVEL] Loading client level [" + levelWrapper + "]-[" + levelWrapper.getDhIdentifier() + "].");
+			//LOGGER.info("[DH-CLIENT-LEVEL] Loading client level [" + levelWrapper + "]-[" + levelWrapper.getDhIdentifier() + "].");
 			
 			AbstractDhWorld world = SharedApi.getAbstractDhWorld();
-			LOGGER.info("[DH-CLIENT-LEVEL] Current DH world: " + world);
+			//LOGGER.info("[DH-CLIENT-LEVEL] Current DH world: " + world);
 			
 			if (world != null)
 			{
 				if (!this.pluginChannelApi.allowLevelLoading(levelWrapper))
 				{
-					LOGGER.info("[DH-CLIENT-LEVEL] Levels in this connection are managed by the server, skipping auto-load.");
+					//LOGGER.info("[DH-CLIENT-LEVEL] Levels in this connection are managed by the server, skipping auto-load.");
 					
 					// Instead of attempting to load themselves, send the config and wait for a server provided level key.
 					((DhClientWorld) world).networkState.sendConfigMessage();
@@ -306,14 +306,14 @@ public class ClientApi
 				}
 				
 				
-				LOGGER.info("[DH-CLIENT-LEVEL] Loading level into DH world...");
+				//LOGGER.info("[DH-CLIENT-LEVEL] Loading level into DH world...");
 				world.getOrLoadLevel(levelWrapper);
-				LOGGER.info("[DH-CLIENT-LEVEL] Level loaded, firing DhApiLevelLoadEvent");
+				//LOGGER.info("[DH-CLIENT-LEVEL] Level loaded, firing DhApiLevelLoadEvent");
 				ApiEventInjector.INSTANCE.fireAllEvents(DhApiLevelLoadEvent.class, new DhApiLevelLoadEvent.EventParam(levelWrapper));
 				
-				LOGGER.info("[DH-CLIENT-LEVEL] Loading waiting chunks for level...");
+				//LOGGER.info("[DH-CLIENT-LEVEL] Loading waiting chunks for level...");
 				this.loadWaitingChunksForLevel(levelWrapper);
-				LOGGER.info("[DH-CLIENT-LEVEL] ========== CLIENT LEVEL LOAD EVENT COMPLETE ==========");
+				//LOGGER.info("[DH-CLIENT-LEVEL] ========== CLIENT LEVEL LOAD EVENT COMPLETE ==========");
 			}
 			else
 			{
