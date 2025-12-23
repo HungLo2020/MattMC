@@ -252,7 +252,7 @@ public class IrisGenericRenderProgram implements IDhApiGenericObjectShaderProgra
 		setUniform(modelViewUniform, toJOML(renderParam.dhModelViewMatrix));
 		setUniform(modelViewInverseUniform, toJOML(renderParam.dhModelViewMatrix).invert());
 		setUniform(projectionUniform, toJOML(renderParam.dhProjectionMatrix));
-		setUniform(projectionInverseUniform, toJOML(renderParam.dhModelViewMatrix).invert());
+		setUniform(projectionInverseUniform, toJOML(renderParam.dhProjectionMatrix).invert());
 		setUniform(normalMatrix3fUniform, toJOML(renderParam.dhModelViewMatrix).invert().transpose3x3(new Matrix3f()));
 		
 		// Set DH-specific projection uniforms (these are the same as the iris ones)
