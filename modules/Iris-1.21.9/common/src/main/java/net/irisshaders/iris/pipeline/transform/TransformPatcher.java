@@ -306,6 +306,14 @@ public class TransformPatcher {
 	public static Map<PatchShaderType, String> patchDHTerrain(
 		String name, String vertex, String tessControl, String tessEval, String geometry, String fragment,
 		Object2ObjectMap<Tri<String, TextureType, TextureStage>, String> textureMap) {
+		// Prepend #define DISTANT_HORIZONS to enable shader pack's DH-specific uniforms
+		String dhDefine = "#define DISTANT_HORIZONS\n";
+		vertex = dhDefine + vertex;
+		fragment = dhDefine + fragment;
+		if (tessControl != null) tessControl = dhDefine + tessControl;
+		if (tessEval != null) tessEval = dhDefine + tessEval;
+		if (geometry != null) geometry = dhDefine + geometry;
+		
 		return transform(name, vertex, geometry, tessControl, tessEval, fragment,
 			new DHParameters(Patch.DH_TERRAIN, textureMap));
 	}
@@ -314,6 +322,14 @@ public class TransformPatcher {
 	public static Map<PatchShaderType, String> patchDHGeneric(
 		String name, String vertex, String tessControl, String tessEval, String geometry, String fragment,
 		Object2ObjectMap<Tri<String, TextureType, TextureStage>, String> textureMap) {
+		// Prepend #define DISTANT_HORIZONS to enable shader pack's DH-specific uniforms
+		String dhDefine = "#define DISTANT_HORIZONS\n";
+		vertex = dhDefine + vertex;
+		fragment = dhDefine + fragment;
+		if (tessControl != null) tessControl = dhDefine + tessControl;
+		if (tessEval != null) tessEval = dhDefine + tessEval;
+		if (geometry != null) geometry = dhDefine + geometry;
+		
 		return transform(name, vertex, geometry, tessControl, tessEval, fragment,
 			new DHParameters(Patch.DH_GENERIC, textureMap));
 
