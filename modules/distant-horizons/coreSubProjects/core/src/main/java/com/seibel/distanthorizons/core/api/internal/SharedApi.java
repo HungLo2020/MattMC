@@ -173,7 +173,7 @@ public class SharedApi
 	{ 
 		boolean isClientWorld = (currentWorld instanceof IDhClientWorld);
 		//LOGGER.debug("[DH-WORLD-GET] tryGetDhClientWorld() - currentWorld: " + currentWorld + 
-			", is IDhClientWorld: " + isClientWorld);
+		//	", is IDhClientWorld: " + isClientWorld);
 		return isClientWorld ? (IDhClientWorld) currentWorld : null; 
 	}
 	
