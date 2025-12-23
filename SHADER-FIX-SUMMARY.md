@@ -2,19 +2,24 @@
 
 ## Problem Description
 
-When enabling shaders with Distant Horizons, the game would fail to load shaders with the following error:
+When enabling shaders with Distant Horizons, the game would fail to load shaders with errors about undefined DH-specific uniforms:
 
+**Initial error:**
 ```
-[16:41:05] [Render thread/WARN]: Shader compilation log for dh_terrain.fsh: 0(366) : error C1503: undefined variable "dhProjection"
-0(367) : error C1503: undefined variable "dhProjectionInverse"
-[16:41:05] [Render thread/ERROR]: Failed to create shader rendering pipeline, disabling shaders!
+error C1503: undefined variable "dhProjection"
+error C1503: undefined variable "dhProjectionInverse"
+```
+
+**After initial fix:**
+```
+error C1503: undefined variable "dhDepthTex1"
 ```
 
 ## Root Cause Analysis
 
 The issue occurred because:
 
-1. **Shader Pack Expectations**: The Complementary shader pack (and likely other DH-compatible shaders) expects `dhProjection` and `dhProjectionInverse` uniforms to be available in DH terrain shaders. These are defined in the shader pack's `lib/uniforms.glsl`:
+1. **Shader Pack Expectations**: The Complementary shader pack (and likely other DH-compatible shaders) expects several DH-specific uniforms to be available. These are defined in the shader pack's `lib/uniforms.glsl`:
 
 ```glsl
 #ifdef DISTANT_HORIZONS
@@ -28,26 +33,35 @@ The issue occurred because:
 #endif
 ```
 
-2. **Iris Implementation**: Iris was only injecting `iris_ProjectionMatrix` and `iris_ProjectionMatrixInverse` uniforms during shader transformation, but not the DH-specific `dhProjection` and `dhProjectionInverse` uniforms that shader packs expect.
+2. **Iris Implementation**: Iris was only injecting `iris_ProjectionMatrix` and `iris_ProjectionMatrixInverse` uniforms during shader transformation, but not the DH-specific uniforms (`dhProjection`, `dhProjectionInverse`, `dhDepthTex`, `dhDepthTex1`, `dhRenderDistance`) that shader packs expect.
 
 3. **Compilation from Source**: This issue manifested specifically in this project because all mods (including Iris) are compiled completely from source, which differs from using pre-compiled mod jars where this issue might have been already addressed or worked around.
 
 ## Solution Implemented
 
-The fix involved adding support for DH-specific projection uniforms at multiple levels:
+The fix involved adding support for all DH-specific uniforms at multiple levels:
 
 ### 1. Shader Transformation Layer (DHTerrainTransformer.java & DHGenericTransformer.java)
 
-Added injection of `dhProjection` and `dhProjectionInverse` uniform declarations:
+Added injection of all DH-specific uniform declarations:
 
 ```java
-// Add DH-specific projection matrix uniforms for shader pack compatibility
-Iris.logger.info("[DH-SHADER-TRANSFORM] Injecting dhProjection and dhProjectionInverse uniforms for shader: " + parameters.type);
+// Add DH-specific uniforms for shader pack compatibility
+Iris.logger.info("[DH-SHADER-TRANSFORM] Injecting DH-specific uniforms for shader: " + parameters.type);
 tree.parseAndInjectNode(t, ASTInjectionPoint.BEFORE_DECLARATIONS,
     "uniform mat4 dhProjection;");
 
 tree.parseAndInjectNode(t, ASTInjectionPoint.BEFORE_DECLARATIONS,
     "uniform mat4 dhProjectionInverse;");
+
+tree.parseAndInjectNode(t, ASTInjectionPoint.BEFORE_DECLARATIONS,
+    "uniform sampler2D dhDepthTex;");
+
+tree.parseAndInjectNode(t, ASTInjectionPoint.BEFORE_DECLARATIONS,
+    "uniform sampler2D dhDepthTex1;");
+
+tree.parseAndInjectNode(t, ASTInjectionPoint.BEFORE_DECLARATIONS,
+    "uniform int dhRenderDistance;");
 ```
 
 ### 2. LOD Render Program (IrisLodRenderProgram.java)
@@ -73,11 +87,15 @@ setUniform(dhProjectionUniform, projection);
 setUniform(dhProjectionInverseUniform, projection.invert(new Matrix4f()));
 ```
 
-### 3. Generic Render Program (IrisGenericRenderProgram.java)
+### 4. Sampler and Uniform Values
 
-Applied the same changes as IrisLodRenderProgram for consistency and to support both rendering paths.
+**Note**: The depth texture samplers (`dhDepthTex`, `dhDepthTex1`) and render distance uniform (`dhRenderDistance`) are already being bound/set by Iris:
+- `dhDepthTex` and `dhDepthTex1` are bound in `IrisSamplers.addRenderTargetSamplers()` 
+- `dhRenderDistance` is set in `CommonUniforms.java`
 
-### 4. Debug Logging
+The issue was only that shader transformers weren't injecting the uniform declarations, causing compilation failures.
+
+### 5. Debug Logging
 
 Added comprehensive logging to help diagnose issues:
 
@@ -87,14 +105,20 @@ Added comprehensive logging to help diagnose issues:
 
 ## Expected Behavior After Fix
 
-1. **Shader Compilation**: DH terrain shaders will compile successfully because `dhProjection` and `dhProjectionInverse` uniforms are now declared.
+1. **Shader Compilation**: DH terrain and water shaders will compile successfully because all required DH-specific uniforms are now declared:
+   - `dhProjection` and `dhProjectionInverse` (matrices)
+   - `dhDepthTex` and `dhDepthTex1` (samplers)
+   - `dhRenderDistance` (integer)
 
-2. **Uniform Values**: These uniforms will be populated with the same values as `iris_ProjectionMatrix` and `iris_ProjectionMatrixInverse`, ensuring correct rendering.
+2. **Uniform Values**: 
+   - Projection uniforms will be populated with the same values as `iris_ProjectionMatrix` and `iris_ProjectionMatrixInverse`
+   - Depth texture samplers will be bound to the appropriate DH depth buffers
+   - Render distance will be set to the DH chunk render distance
 
 3. **Logging Output**: You should see log messages like:
 ```
-[DH-SHADER-TRANSFORM] Injecting dhProjection and dhProjectionInverse uniforms for shader: VERTEX
-[DH-SHADER-TRANSFORM] Injecting dhProjection and dhProjectionInverse uniforms for shader: FRAGMENT
+[DH-SHADER-TRANSFORM] Injecting DH-specific uniforms for shader: VERTEX
+[DH-SHADER-TRANSFORM] Injecting DH-specific uniforms for shader: FRAGMENT
 [DH-SHADER-UNIFORMS] Program: dh_terrain
 [DH-SHADER-UNIFORMS] dhProjection uniform location: <non-negative number>
 [DH-SHADER-UNIFORMS] dhProjectionInverse uniform location: <non-negative number>
@@ -126,11 +150,11 @@ Added comprehensive logging to help diagnose issues:
 ## Files Modified
 
 1. `modules/Iris-1.21.9/common/src/main/java/net/irisshaders/iris/pipeline/transform/transformer/DHTerrainTransformer.java`
-   - Added dhProjection/dhProjectionInverse uniform declarations
+   - Added all DH-specific uniform declarations: `dhProjection`, `dhProjectionInverse`, `dhDepthTex`, `dhDepthTex1`, `dhRenderDistance`
    - Added logging for debugging
 
 2. `modules/Iris-1.21.9/common/src/main/java/net/irisshaders/iris/pipeline/transform/transformer/DHGenericTransformer.java`
-   - Added dhProjection/dhProjectionInverse uniform declarations
+   - Added all DH-specific uniform declarations: `dhProjection`, `dhProjectionInverse`, `dhDepthTex`, `dhDepthTex1`, `dhRenderDistance`
    - Added logging for debugging
 
 3. `modules/Iris-1.21.9/common/src/main/java/net/irisshaders/iris/compat/dh/IrisLodRenderProgram.java`
@@ -143,6 +167,7 @@ Added comprehensive logging to help diagnose issues:
    - Added dhProjectionUniform and dhProjectionInverseUniform fields
    - Added uniform location lookups
    - Added uniform value setting in bind()
+   - Fixed pre-existing bug: projectionInverseUniform now uses dhProjectionMatrix instead of dhModelViewMatrix
    - Added logging for debugging
 
 ## Build Verification
