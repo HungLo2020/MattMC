@@ -47,6 +47,11 @@ public class BlockRenderDispatcherMixin {
         FabricBlockModelRenderer.render(entry, layer -> vertexConsumers.getBuffer(RenderLayerHelper.getEntityBlockLayer(layer)), model, red, green, blue, light, overlay, EmptyBlockAndTintGetter.INSTANCE, BlockPos.ZERO, state);
     }
 
+    // Note: The renderProxyNeo method targets a NeoForge-specific method signature that doesn't exist in Fabric 1.21.10
+    // The actual renderSingleBlock method signature is: (BlockState, PoseStack, MultiBufferSource, int, int)
+    // This redirect group is marked as "min = 1, max = 1" which means one of the two redirects in the group must match
+    // Since renderProxy already matches and handles the redirect, this NeoForge-specific one can be safely commented out
+    /*
     @Group(name = "sodium$proxy", min = 1, max = 1)
     @Dynamic
     @Redirect(method = "renderSingleBlock(Lnet/minecraft/world/level/block/state/BlockState;Lcom/mojang/blaze3d/vertex/PoseStack;Lnet/minecraft/client/renderer/MultiBufferSource;IILnet/minecraft/world/level/BlockAndTintGetter;Lnet/minecraft/core/BlockPos;)V", require = 0, at = @At(value = "INVOKE", target = "Lnet/minecraft/client/renderer/block/ModelBlockRenderer;renderModel(Lcom/mojang/blaze3d/vertex/PoseStack$Pose;Lnet/minecraft/client/renderer/MultiBufferSource;Lnet/minecraft/client/renderer/block/model/BlockStateModel;FFFIILnet/minecraft/world/level/BlockAndTintGetter;Lnet/minecraft/core/BlockPos;Lnet/minecraft/world/level/block/state/BlockState;)V"))
@@ -63,4 +68,5 @@ public class BlockRenderDispatcherMixin {
                                 BlockState state) {
         FabricBlockModelRenderer.render(entry, layer -> bufferSource.getBuffer(RenderLayerHelper.getEntityBlockLayer(layer)), model, red, green, blue, light, overlay, level, pos, state);
     }
+    */
 }
