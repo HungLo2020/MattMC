@@ -64,10 +64,10 @@ public abstract class MixinPlayerManager
 	)
 	private void onPlayerJoin(Connection connection, ServerPlayer player, CommonListenerCookie arg, CallbackInfo ci)
 	{
-		LOGGER.info("[DH-PLAYER-JOIN-MIXIN] ========== Player joining server ==========");
-		LOGGER.info("[DH-PLAYER-JOIN-MIXIN] Player: " + player.getName().getString());
-		LOGGER.info("[DH-PLAYER-JOIN-MIXIN] Thread: " + Thread.currentThread().getName());
-		LOGGER.info("[DH-PLAYER-JOIN-MIXIN] Firing ServerPlayConnectionEvents.JOIN event...");
+		//LOGGER.info("[DH-PLAYER-JOIN-MIXIN] ========== Player joining server ==========");
+		//LOGGER.info("[DH-PLAYER-JOIN-MIXIN] Player: " + player.getName().getString());
+		//LOGGER.info("[DH-PLAYER-JOIN-MIXIN] Thread: " + Thread.currentThread().getName());
+		//LOGGER.info("[DH-PLAYER-JOIN-MIXIN] Firing ServerPlayConnectionEvents.JOIN event...");
 		
 		try
 		{
@@ -86,11 +86,11 @@ public abstract class MixinPlayerManager
 			
 			// Fire the JOIN event
 			ServerPlayConnectionEvents.JOIN.invoker().onPlayReady(player, sender, this.server);
-			LOGGER.info("[DH-PLAYER-JOIN-MIXIN] ServerPlayConnectionEvents.JOIN event fired successfully");
+			//LOGGER.info("[DH-PLAYER-JOIN-MIXIN] ServerPlayConnectionEvents.JOIN event fired successfully");
 		}
 		catch (Exception e)
 		{
-			LOGGER.error("[DH-PLAYER-JOIN-MIXIN] ERROR firing JOIN event", e);
+			//LOGGER.error("[DH-PLAYER-JOIN-MIXIN] ERROR firing JOIN event", e);
 		}
 	}
 }

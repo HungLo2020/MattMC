@@ -112,22 +112,22 @@ public class LodRequestModule implements Closeable
 		// Log the first few ticks to diagnose startup
 		if (!hasLoggedInitialTick)
 		{
-			LOGGER.info("[DH-LOD-REQUEST-TICK] ========== LodRequestModule tick() CALLED ==========");
-			LOGGER.info("[DH-LOD-REQUEST-TICK] shouldDoWorldGen (from listener): " + this.onWorldGenCompleteListener.shouldDoWorldGen());
-			LOGGER.info("[DH-LOD-REQUEST-TICK] isReadOnly: " + isReadOnly);
-			LOGGER.info("[DH-LOD-REQUEST-TICK] shouldDoWorldGen (final): " + shouldDoWorldGen);
-			LOGGER.info("[DH-LOD-REQUEST-TICK] isWorldGenRunning: " + isWorldGenRunning);
-			LOGGER.info("[DH-LOD-REQUEST-TICK] Thread: " + Thread.currentThread().getName());
+			//LOGGER.info("[DH-LOD-REQUEST-TICK] ========== LodRequestModule tick() CALLED ==========");
+			//LOGGER.info("[DH-LOD-REQUEST-TICK] shouldDoWorldGen (from listener): " + this.onWorldGenCompleteListener.shouldDoWorldGen());
+			//LOGGER.info("[DH-LOD-REQUEST-TICK] isReadOnly: " + isReadOnly);
+			//LOGGER.info("[DH-LOD-REQUEST-TICK] shouldDoWorldGen (final): " + shouldDoWorldGen);
+			//LOGGER.info("[DH-LOD-REQUEST-TICK] isWorldGenRunning: " + isWorldGenRunning);
+			//LOGGER.info("[DH-LOD-REQUEST-TICK] Thread: " + Thread.currentThread().getName());
 			hasLoggedInitialTick = true;
 		}
 		
 		if (shouldDoWorldGen && !isWorldGenRunning)
 		{
 			// start world gen
-			LOGGER.info("[DH-LOD-REQUEST-START] ========== STARTING WORLD GEN ==========");
-			LOGGER.info("[DH-LOD-REQUEST-START] Calling worldGenStateSupplier.get() to create LodRequestState");
+			//LOGGER.info("[DH-LOD-REQUEST-START] ========== STARTING WORLD GEN ==========");
+			//LOGGER.info("[DH-LOD-REQUEST-START] Calling worldGenStateSupplier.get() to create LodRequestState");
 			this.startWorldGen(this.dataSourceProvider, this.worldGenStateSupplier.get());
-			LOGGER.info("[DH-LOD-REQUEST-START] World gen started successfully");
+			//LOGGER.info("[DH-LOD-REQUEST-START] World gen started successfully");
 		}
 		else if (!shouldDoWorldGen && isWorldGenRunning)
 		{
