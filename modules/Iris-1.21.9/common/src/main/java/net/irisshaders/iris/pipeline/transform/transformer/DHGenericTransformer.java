@@ -62,13 +62,22 @@ public class DHGenericTransformer {
 		tree.parseAndInjectNode(t, ASTInjectionPoint.BEFORE_DECLARATIONS,
 			"uniform mat4 iris_ProjectionMatrixInverse;");
 
-		// Add DH-specific projection matrix uniforms for shader pack compatibility
-		Iris.logger.info("[DH-SHADER-TRANSFORM] Injecting dhProjection and dhProjectionInverse uniforms for shader: " + parameters.type);
+		// Add DH-specific uniforms for shader pack compatibility
+		Iris.logger.info("[DH-SHADER-TRANSFORM] Injecting DH-specific uniforms for shader: " + parameters.type);
 		tree.parseAndInjectNode(t, ASTInjectionPoint.BEFORE_DECLARATIONS,
 			"uniform mat4 dhProjection;");
 
 		tree.parseAndInjectNode(t, ASTInjectionPoint.BEFORE_DECLARATIONS,
 			"uniform mat4 dhProjectionInverse;");
+
+		tree.parseAndInjectNode(t, ASTInjectionPoint.BEFORE_DECLARATIONS,
+			"uniform sampler2D dhDepthTex;");
+
+		tree.parseAndInjectNode(t, ASTInjectionPoint.BEFORE_DECLARATIONS,
+			"uniform sampler2D dhDepthTex1;");
+
+		tree.parseAndInjectNode(t, ASTInjectionPoint.BEFORE_DECLARATIONS,
+			"uniform int dhRenderDistance;");
 
 		Iris.logger.warn("Type is " + parameters.type);
 
