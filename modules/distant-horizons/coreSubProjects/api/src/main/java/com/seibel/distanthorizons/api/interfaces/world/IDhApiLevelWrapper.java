@@ -19,8 +19,8 @@
 
 package com.seibel.distanthorizons.api.interfaces.world;
 
-import net.distant_horizons.api.interfaces.IDhApiUnsafeWrapper;
-import net.distant_horizons.api.enums.worldGeneration.EDhApiLevelType;
+import com.seibel.distanthorizons.api.interfaces.IDhApiUnsafeWrapper;
+import com.seibel.distanthorizons.api.enums.worldGeneration.EDhApiLevelType;
 import com.seibel.distanthorizons.api.interfaces.render.IDhApiCustomRenderRegister;
 
 import java.io.File;

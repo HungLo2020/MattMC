@@ -1,8 +1,8 @@
 package com.seibel.distanthorizons.fabric.mixins.client;
 
 import com.seibel.distanthorizons.api.enums.config.EDhApiUpdateBranch;
-import net.distant_horizons.common.wrappers.gui.updater.UpdateModScreen;
-import net.distant_horizons.common.wrappers.world.ClientLevelWrapper;
+import com.seibel.distanthorizons.common.wrappers.gui.updater.UpdateModScreen;
+import com.seibel.distanthorizons.common.wrappers.world.ClientLevelWrapper;
 import com.seibel.distanthorizons.core.api.internal.ClientApi;
 import com.seibel.distanthorizons.core.config.Config;
 import com.seibel.distanthorizons.core.dependencyInjection.SingletonInjector;

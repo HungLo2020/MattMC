@@ -2,9 +2,9 @@ package net.irisshaders.iris.gl.texture;
 
 import com.mojang.blaze3d.opengl.GlStateManager;
 import com.mojang.blaze3d.systems.RenderSystem;
-import net.iris.gl.IrisRenderSystem;
-import net.iris.gl.framebuffer.GlFramebuffer;
-import net.iris.mixin.GlStateManagerAccessor;
+import net.irisshaders.iris.gl.IrisRenderSystem;
+import net.irisshaders.iris.gl.framebuffer.GlFramebuffer;
+import net.irisshaders.iris.mixin.GlStateManagerAccessor;
 import org.lwjgl.opengl.GL;
 import org.lwjgl.opengl.GL20C;
 import org.lwjgl.opengl.GL30C;

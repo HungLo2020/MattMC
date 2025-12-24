@@ -1,7 +1,7 @@
 package net.caffeinemc.mods.sodium.client.gl.tessellation;
 
-import net.sodium.client.gl.array.GlVertexArray;
-import net.sodium.client.gl.device.CommandList;
+import net.caffeinemc.mods.sodium.client.gl.array.GlVertexArray;
+import net.caffeinemc.mods.sodium.client.gl.device.CommandList;
 
 public class GlVertexArrayTessellation extends GlAbstractTessellation {
     private final GlVertexArray array;

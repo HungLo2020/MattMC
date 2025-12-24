@@ -3,8 +3,8 @@ package net.irisshaders.iris.pipeline.transform.transformer;
 import io.github.douira.glsl_transformer.ast.node.TranslationUnit;
 import io.github.douira.glsl_transformer.ast.query.Root;
 import io.github.douira.glsl_transformer.ast.transform.ASTParser;
-import net.iris.pipeline.transform.PatchShaderType;
-import net.iris.pipeline.transform.parameter.Parameters;
+import net.irisshaders.iris.pipeline.transform.PatchShaderType;
+import net.irisshaders.iris.pipeline.transform.parameter.Parameters;
 
 public class CompositeCoreTransformer {
 	public static void transform(

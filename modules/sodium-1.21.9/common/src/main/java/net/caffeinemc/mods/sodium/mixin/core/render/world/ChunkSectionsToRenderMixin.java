@@ -1,9 +1,9 @@
 package net.caffeinemc.mods.sodium.mixin.core.render.world;
 
-import net.sodium.client.gl.device.RenderDevice;
-import net.sodium.client.render.SodiumWorldRenderer;
-import net.sodium.client.render.chunk.ChunkRenderMatrices;
-import net.sodium.client.util.SodiumChunkSection;
+import net.caffeinemc.mods.sodium.client.gl.device.RenderDevice;
+import net.caffeinemc.mods.sodium.client.render.SodiumWorldRenderer;
+import net.caffeinemc.mods.sodium.client.render.chunk.ChunkRenderMatrices;
+import net.caffeinemc.mods.sodium.client.util.SodiumChunkSection;
 import net.minecraft.client.renderer.chunk.ChunkSectionLayerGroup;
 import net.minecraft.client.renderer.chunk.ChunkSectionsToRender;
 import org.spongepowered.asm.mixin.Mixin;

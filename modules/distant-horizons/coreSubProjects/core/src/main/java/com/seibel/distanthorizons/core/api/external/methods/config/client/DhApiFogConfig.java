@@ -19,9 +19,9 @@
 
 package com.seibel.distanthorizons.core.api.external.methods.config.client;
 
-import net.distant_horizons.api.enums.rendering.EDhApiFogColorMode;
-import net.distant_horizons.api.enums.rendering.EDhApiFogDrawMode;
-import net.distant_horizons.api.interfaces.config.IDhApiConfigValue;
+import com.seibel.distanthorizons.api.enums.rendering.EDhApiFogColorMode;
+import com.seibel.distanthorizons.api.enums.rendering.EDhApiFogDrawMode;
+import com.seibel.distanthorizons.api.interfaces.config.IDhApiConfigValue;
 import com.seibel.distanthorizons.api.interfaces.config.client.IDhApiFarFogConfig;
 import com.seibel.distanthorizons.api.interfaces.config.client.IDhApiFogConfig;
 import com.seibel.distanthorizons.api.interfaces.config.client.IDhApiHeightFogConfig;

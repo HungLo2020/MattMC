@@ -1,20 +1,20 @@
 package net.irisshaders.iris.gui.element.widget;
 
-import net.iris.Iris;
-import net.iris.gui.GuiUtil;
-import net.iris.gui.NavigationController;
-import net.iris.gui.element.ShaderPackOptionList;
-import net.iris.gui.element.screen.ElementWidgetScreenData;
-import net.iris.gui.screen.ShaderPackScreen;
-import net.iris.shaderpack.option.menu.OptionMenuBooleanOptionElement;
-import net.iris.shaderpack.option.menu.OptionMenuContainer;
-import net.iris.shaderpack.option.menu.OptionMenuElement;
-import net.iris.shaderpack.option.menu.OptionMenuElementScreen;
-import net.iris.shaderpack.option.menu.OptionMenuLinkElement;
-import net.iris.shaderpack.option.menu.OptionMenuMainElementScreen;
-import net.iris.shaderpack.option.menu.OptionMenuProfileElement;
-import net.iris.shaderpack.option.menu.OptionMenuStringOptionElement;
-import net.iris.shaderpack.option.menu.OptionMenuSubElementScreen;
+import net.irisshaders.iris.Iris;
+import net.irisshaders.iris.gui.GuiUtil;
+import net.irisshaders.iris.gui.NavigationController;
+import net.irisshaders.iris.gui.element.ShaderPackOptionList;
+import net.irisshaders.iris.gui.element.screen.ElementWidgetScreenData;
+import net.irisshaders.iris.gui.screen.ShaderPackScreen;
+import net.irisshaders.iris.shaderpack.option.menu.OptionMenuBooleanOptionElement;
+import net.irisshaders.iris.shaderpack.option.menu.OptionMenuContainer;
+import net.irisshaders.iris.shaderpack.option.menu.OptionMenuElement;
+import net.irisshaders.iris.shaderpack.option.menu.OptionMenuElementScreen;
+import net.irisshaders.iris.shaderpack.option.menu.OptionMenuLinkElement;
+import net.irisshaders.iris.shaderpack.option.menu.OptionMenuMainElementScreen;
+import net.irisshaders.iris.shaderpack.option.menu.OptionMenuProfileElement;
+import net.irisshaders.iris.shaderpack.option.menu.OptionMenuStringOptionElement;
+import net.irisshaders.iris.shaderpack.option.menu.OptionMenuSubElementScreen;
 import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Component;
 

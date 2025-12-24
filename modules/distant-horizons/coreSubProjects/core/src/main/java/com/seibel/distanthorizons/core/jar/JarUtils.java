@@ -19,8 +19,6 @@
 
 package com.seibel.distanthorizons.core.jar;
 
-
-import net.distant_horizons.core.jar.EPlatform;
 import com.seibel.distanthorizons.core.dependencyInjection.SingletonInjector;
 import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
 import com.seibel.distanthorizons.core.wrapperInterfaces.modAccessor.IModChecker;

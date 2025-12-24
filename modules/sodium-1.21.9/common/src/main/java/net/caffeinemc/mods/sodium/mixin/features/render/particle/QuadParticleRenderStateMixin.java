@@ -4,7 +4,7 @@ import com.mojang.blaze3d.vertex.VertexConsumer;
 import net.sodium.api.util.ColorARGB;
 import net.sodium.api.vertex.buffer.VertexBufferWriter;
 import net.sodium.api.vertex.format.common.ParticleVertex;
-import net.sodium.client.render.vertex.VertexConsumerUtils;
+import net.caffeinemc.mods.sodium.client.render.vertex.VertexConsumerUtils;
 import net.minecraft.client.renderer.state.QuadParticleRenderState;
 import org.joml.Quaternionf;
 import org.joml.Vector3f;

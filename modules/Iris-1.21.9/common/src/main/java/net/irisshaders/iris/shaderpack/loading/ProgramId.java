@@ -2,8 +2,8 @@ package net.irisshaders.iris.shaderpack.loading;
 
 import net.iris.api.v0.IrisProgram;
 import net.iris.gl.blending.BlendMode;
-import net.iris.gl.blending.BlendModeFunction;
-import net.iris.gl.blending.BlendModeOverride;
+import net.irisshaders.iris.gl.blending.BlendModeFunction;
+import net.irisshaders.iris.gl.blending.BlendModeOverride;
 
 import java.util.Objects;
 import java.util.Optional;

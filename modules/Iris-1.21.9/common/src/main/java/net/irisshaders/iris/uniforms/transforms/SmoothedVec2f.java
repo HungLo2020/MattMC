@@ -1,6 +1,6 @@
 package net.irisshaders.iris.uniforms.transforms;
 
-import net.iris.uniforms.FrameUpdateNotifier;
+import net.irisshaders.iris.uniforms.FrameUpdateNotifier;
 import org.joml.Vector2f;
 import org.joml.Vector2i;
 

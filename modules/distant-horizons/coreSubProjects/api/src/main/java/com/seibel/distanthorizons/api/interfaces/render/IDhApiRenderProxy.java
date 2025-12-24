@@ -19,7 +19,7 @@
 
 package com.seibel.distanthorizons.api.interfaces.render;
 
-import net.distant_horizons.api.objects.DhApiResult;
+import com.seibel.distanthorizons.api.objects.DhApiResult;
 
 
 /**

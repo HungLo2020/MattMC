@@ -29,11 +29,11 @@ import com.seibel.distanthorizons.core.jar.installer.ModrinthGetter;
 import com.seibel.distanthorizons.core.jar.installer.WebDownloader;
 import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
 import com.seibel.distanthorizons.core.logging.f3.F3Screen;
-import net.distant_horizons.core.util.NativeDialogUtil;
+import com.seibel.distanthorizons.core.util.NativeDialogUtil;
 import com.seibel.distanthorizons.core.wrapperInterfaces.IVersionConstants;
 import com.seibel.distanthorizons.coreapi.ModInfo;
-import net.distant_horizons.coreapi.util.StringUtil;
-import net.distant_horizons.coreapi.util.jar.DeleteOnUnlock;
+import com.seibel.distanthorizons.coreapi.util.StringUtil;
+import com.seibel.distanthorizons.coreapi.util.jar.DeleteOnUnlock;
 import com.seibel.distanthorizons.core.logging.DhLogger;
 
 import javax.swing.*;

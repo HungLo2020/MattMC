@@ -1,10 +1,10 @@
 package net.caffeinemc.mods.sodium.client.render.chunk;
 
-import net.sodium.client.gl.device.CommandList;
-import net.sodium.client.render.chunk.lists.ChunkRenderListIterable;
-import net.sodium.client.render.chunk.terrain.TerrainRenderPass;
-import net.sodium.client.render.viewport.CameraTransform;
-import net.sodium.client.util.FogParameters;
+import net.caffeinemc.mods.sodium.client.gl.device.CommandList;
+import net.caffeinemc.mods.sodium.client.render.chunk.lists.ChunkRenderListIterable;
+import net.caffeinemc.mods.sodium.client.render.chunk.terrain.TerrainRenderPass;
+import net.caffeinemc.mods.sodium.client.render.viewport.CameraTransform;
+import net.caffeinemc.mods.sodium.client.util.FogParameters;
 
 /**
  * The chunk render backend takes care of managing the graphics resource state of chunk render containers. This includes

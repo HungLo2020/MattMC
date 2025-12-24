@@ -19,7 +19,7 @@
 
 package com.seibel.distanthorizons.api.objects.data;
 
-import net.distant_horizons.api.enums.EDhApiDetailLevel;
+import com.seibel.distanthorizons.api.enums.EDhApiDetailLevel;
 import com.seibel.distanthorizons.api.interfaces.block.IDhApiBiomeWrapper;
 import com.seibel.distanthorizons.api.interfaces.block.IDhApiBlockStateWrapper;
 

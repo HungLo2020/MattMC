@@ -19,8 +19,8 @@
 
 package com.seibel.distanthorizons.fabric.mixins.client;
 
-import net.distant_horizons.common.wrappers.gui.GetConfigScreen;
-import net.distant_horizons.common.wrappers.gui.TexturedButtonWidget;
+import com.seibel.distanthorizons.common.wrappers.gui.GetConfigScreen;
+import com.seibel.distanthorizons.common.wrappers.gui.TexturedButtonWidget;
 import com.seibel.distanthorizons.coreapi.ModInfo;
 import com.seibel.distanthorizons.core.config.Config;
 import net.minecraft.client.gui.screens.Screen;

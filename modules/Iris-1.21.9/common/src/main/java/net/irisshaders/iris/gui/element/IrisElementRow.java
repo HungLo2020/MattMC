@@ -1,7 +1,7 @@
 package net.irisshaders.iris.gui.element;
 
 import com.google.common.collect.ImmutableList;
-import net.iris.gui.GuiUtil;
+import net.irisshaders.iris.gui.GuiUtil;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.ComponentPath;
 import net.minecraft.client.gui.Font;

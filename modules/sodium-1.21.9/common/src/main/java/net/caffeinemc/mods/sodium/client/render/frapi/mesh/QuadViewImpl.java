@@ -18,12 +18,12 @@ package net.caffeinemc.mods.sodium.client.render.frapi.mesh;
 
 
 import net.sodium.api.util.NormI8;
-import net.sodium.client.model.quad.ModelQuadView;
-import net.sodium.client.model.quad.properties.ModelQuadFacing;
-import net.sodium.client.model.quad.properties.ModelQuadFlags;
-import net.sodium.client.render.frapi.helper.ColorHelper;
-import net.sodium.client.render.frapi.helper.GeometryHelper;
-import net.sodium.client.render.frapi.helper.NormalHelper;
+import net.caffeinemc.mods.sodium.client.model.quad.ModelQuadView;
+import net.caffeinemc.mods.sodium.client.model.quad.properties.ModelQuadFacing;
+import net.caffeinemc.mods.sodium.client.model.quad.properties.ModelQuadFlags;
+import net.caffeinemc.mods.sodium.client.render.frapi.helper.ColorHelper;
+import net.caffeinemc.mods.sodium.client.render.frapi.helper.GeometryHelper;
+import net.caffeinemc.mods.sodium.client.render.frapi.helper.NormalHelper;
 import net.fabricmc.fabric.api.renderer.v1.mesh.QuadView;
 import net.fabricmc.fabric.api.renderer.v1.mesh.ShadeMode;
 import net.fabricmc.fabric.api.util.TriState;

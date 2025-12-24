@@ -19,8 +19,8 @@
 
 package com.seibel.distanthorizons.fabric.mixins.client;
 
-import net.distant_horizons.common.wrappers.chunk.ChunkWrapper;
-import net.distant_horizons.common.wrappers.world.ClientLevelWrapper;
+import com.seibel.distanthorizons.common.wrappers.chunk.ChunkWrapper;
+import com.seibel.distanthorizons.common.wrappers.world.ClientLevelWrapper;
 import com.seibel.distanthorizons.core.api.internal.ClientApi;
 import com.seibel.distanthorizons.core.api.internal.SharedApi;
 import net.minecraft.client.multiplayer.ClientLevel;

@@ -1,8 +1,8 @@
 package kroppeb.stareval.function;
 
 import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
-import net.iris.stareval.expression.Expression;
-import net.iris.stareval.expression.VariableExpression;
+import kroppeb.stareval.expression.Expression;
+import kroppeb.stareval.expression.VariableExpression;
 
 import java.util.Map;
 

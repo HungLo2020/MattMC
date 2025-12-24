@@ -2,8 +2,8 @@ package net.irisshaders.iris.mixin;
 
 import com.mojang.blaze3d.opengl.GlStateManager;
 import com.mojang.blaze3d.systems.RenderSystem;
-import net.iris.gl.blending.DepthColorStorage;
-import net.iris.vertices.ImmediateState;
+import net.irisshaders.iris.gl.blending.DepthColorStorage;
+import net.irisshaders.iris.vertices.ImmediateState;
 import org.lwjgl.opengl.GL11;
 import org.lwjgl.opengl.GL43C;
 import org.spongepowered.asm.mixin.Mixin;

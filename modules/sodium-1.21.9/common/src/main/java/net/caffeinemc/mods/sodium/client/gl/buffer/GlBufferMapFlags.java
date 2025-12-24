@@ -1,6 +1,6 @@
 package net.caffeinemc.mods.sodium.client.gl.buffer;
 
-import net.sodium.client.gl.util.EnumBit;
+import net.caffeinemc.mods.sodium.client.gl.util.EnumBit;
 import org.lwjgl.opengl.GL30C;
 import org.lwjgl.opengl.GL33C;
 import org.lwjgl.opengl.GL44C;

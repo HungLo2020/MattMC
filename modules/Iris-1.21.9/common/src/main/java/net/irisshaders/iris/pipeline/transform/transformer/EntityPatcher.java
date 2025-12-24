@@ -13,8 +13,8 @@ import io.github.douira.glsl_transformer.ast.transform.ASTInjectionPoint;
 import io.github.douira.glsl_transformer.ast.transform.ASTParser;
 import io.github.douira.glsl_transformer.parser.ParseShape;
 import io.github.douira.glsl_transformer.util.Type;
-import net.iris.gl.shader.ShaderType;
-import net.iris.pipeline.transform.parameter.VanillaParameters;
+import net.irisshaders.iris.gl.shader.ShaderType;
+import net.irisshaders.iris.pipeline.transform.parameter.VanillaParameters;
 
 public class EntityPatcher {
 	private static final AutoHintedMatcher<ExternalDeclaration> uniformVec4EntityColor = new AutoHintedMatcher<>(

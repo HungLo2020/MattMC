@@ -19,7 +19,7 @@
 
 package com.seibel.distanthorizons.coreapi.DependencyInjection;
 
-import net.distant_horizons.coreapi.interfaces.dependencyInjection.IBindable;
+import com.seibel.distanthorizons.coreapi.interfaces.dependencyInjection.IBindable;
 import com.seibel.distanthorizons.coreapi.interfaces.dependencyInjection.IDependencyInjector;
 
 import java.util.ArrayList;

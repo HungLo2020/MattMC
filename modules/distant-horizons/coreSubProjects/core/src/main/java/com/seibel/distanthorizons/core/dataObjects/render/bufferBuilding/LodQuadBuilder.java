@@ -19,24 +19,22 @@
 
 package com.seibel.distanthorizons.core.dataObjects.render.bufferBuilding;
 
-
-import net.distant_horizons.core.dataObjects.render.bufferBuilding.BufferMergeDirectionEnum;
 import java.nio.ByteBuffer;
 import java.util.*;
 
-import net.distant_horizons.api.enums.config.EDhApiGrassSideRendering;
-import net.distant_horizons.api.enums.rendering.EDhApiBlockMaterial;
-import net.distant_horizons.api.enums.rendering.EDhApiDebugRendering;
+import com.seibel.distanthorizons.api.enums.config.EDhApiGrassSideRendering;
+import com.seibel.distanthorizons.api.enums.rendering.EDhApiBlockMaterial;
+import com.seibel.distanthorizons.api.enums.rendering.EDhApiDebugRendering;
 import com.seibel.distanthorizons.core.config.Config;
 import com.seibel.distanthorizons.core.dependencyInjection.SingletonInjector;
 import com.seibel.distanthorizons.core.enums.EDhDirection;
 import com.seibel.distanthorizons.core.logging.DhLogger;
 import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
-import net.distant_horizons.core.util.ColorUtil;
+import com.seibel.distanthorizons.core.util.ColorUtil;
 import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftClientWrapper;
 import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftRenderWrapper;
 import com.seibel.distanthorizons.core.wrapperInterfaces.world.IClientLevelWrapper;
-import net.distant_horizons.coreapi.util.MathUtil;
+import com.seibel.distanthorizons.coreapi.util.MathUtil;
 import org.lwjgl.system.MemoryUtil;
 
 /**

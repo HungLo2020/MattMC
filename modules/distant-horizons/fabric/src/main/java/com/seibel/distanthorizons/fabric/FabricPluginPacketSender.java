@@ -1,12 +1,12 @@
 package com.seibel.distanthorizons.fabric;
 
-import net.distant_horizons.common.AbstractPluginPacketSender;
+import com.seibel.distanthorizons.common.AbstractPluginPacketSender;
 import com.seibel.distanthorizons.core.network.messages.AbstractNetworkMessage;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.minecraft.server.level.ServerPlayer;
 
-import net.distant_horizons.common.CommonPacketPayload;
+import com.seibel.distanthorizons.common.CommonPacketPayload;
 import net.fabricmc.fabric.api.networking.v1.PacketByteBufs;
 import net.minecraft.network.FriendlyByteBuf;
 

@@ -20,7 +20,7 @@
 package com.seibel.distanthorizons.core.pos.blockPos;
 
 import com.seibel.distanthorizons.core.pos.Pos2D;
-import net.distant_horizons.coreapi.util.MathUtil;
+import com.seibel.distanthorizons.coreapi.util.MathUtil;
 
 /** immutable */
 public class DhBlockPos2D

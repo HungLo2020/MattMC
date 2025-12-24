@@ -1,7 +1,7 @@
 package net.caffeinemc.mods.sodium.client.render.chunk.compile;
 
-import net.sodium.client.render.chunk.RenderSection;
-import net.sodium.client.render.chunk.compile.estimation.MeshResultSize;
+import net.caffeinemc.mods.sodium.client.render.chunk.RenderSection;
+import net.caffeinemc.mods.sodium.client.render.chunk.compile.estimation.MeshResultSize;
 
 public abstract class BuilderTaskOutput {
     public final RenderSection render;

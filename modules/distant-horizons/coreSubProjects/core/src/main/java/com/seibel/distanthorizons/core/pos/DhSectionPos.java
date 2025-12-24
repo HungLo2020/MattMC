@@ -24,7 +24,7 @@ import com.seibel.distanthorizons.core.enums.EDhDirection;
 import com.seibel.distanthorizons.core.pos.blockPos.DhBlockPos;
 import com.seibel.distanthorizons.core.pos.blockPos.DhBlockPos2D;
 import com.seibel.distanthorizons.core.util.LodUtil;
-import net.distant_horizons.coreapi.util.BitShiftUtil;
+import com.seibel.distanthorizons.coreapi.util.BitShiftUtil;
 
 import java.util.function.LongConsumer;
 

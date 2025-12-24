@@ -19,8 +19,6 @@
 
 package com.seibel.distanthorizons.core.generation.tasks;
 
-
-import net.distant_horizons.core.generation.tasks.WorldGenResult;
 import com.seibel.distanthorizons.core.file.fullDatafile.GeneratedFullDataSourceProvider;
 
 import java.util.concurrent.CompletableFuture;

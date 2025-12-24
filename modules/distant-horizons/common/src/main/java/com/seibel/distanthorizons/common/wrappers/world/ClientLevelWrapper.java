@@ -1,6 +1,6 @@
 package com.seibel.distanthorizons.common.wrappers.world;
 
-import net.distant_horizons.api.enums.worldGeneration.EDhApiLevelType;
+import com.seibel.distanthorizons.api.enums.worldGeneration.EDhApiLevelType;
 import com.seibel.distanthorizons.api.interfaces.render.IDhApiCustomRenderRegister;
 import com.seibel.distanthorizons.common.wrappers.block.BiomeWrapper;
 import com.seibel.distanthorizons.common.wrappers.block.BlockStateWrapper;
@@ -41,7 +41,7 @@ import java.util.function.Function;
 
 import net.minecraft.world.level.chunk.status.ChunkStatus;
 
-import net.distant_horizons.core.util.ColorUtil;
+import com.seibel.distanthorizons.core.util.ColorUtil;
 
 
 

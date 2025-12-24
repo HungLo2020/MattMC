@@ -19,7 +19,7 @@
 
 package com.seibel.distanthorizons.core.pos;
 
-import net.distant_horizons.coreapi.util.BitShiftUtil;
+import com.seibel.distanthorizons.coreapi.util.BitShiftUtil;
 
 /**
  * Often used to measure LOD widths

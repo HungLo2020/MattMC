@@ -1,8 +1,8 @@
 package com.seibel.distanthorizons.fabric.testing;
 
 import com.seibel.distanthorizons.api.DhApi;
-import net.distant_horizons.api.enums.EDhApiDetailLevel;
-import net.distant_horizons.api.enums.worldGeneration.EDhApiDistantGeneratorMode;
+import com.seibel.distanthorizons.api.enums.EDhApiDetailLevel;
+import com.seibel.distanthorizons.api.enums.worldGeneration.EDhApiDistantGeneratorMode;
 import com.seibel.distanthorizons.api.enums.worldGeneration.EDhApiWorldGeneratorReturnType;
 import com.seibel.distanthorizons.api.interfaces.block.IDhApiBiomeWrapper;
 import com.seibel.distanthorizons.api.interfaces.block.IDhApiBlockStateWrapper;
@@ -10,7 +10,7 @@ import com.seibel.distanthorizons.api.interfaces.override.worldGenerator.IDhApiW
 import com.seibel.distanthorizons.api.interfaces.world.IDhApiLevelWrapper;
 import com.seibel.distanthorizons.api.objects.data.DhApiTerrainDataPoint;
 import com.seibel.distanthorizons.api.objects.data.IDhApiFullDataSource;
-import net.distant_horizons.common.wrappers.world.ServerLevelWrapper;
+import com.seibel.distanthorizons.common.wrappers.world.ServerLevelWrapper;
 import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
 import net.minecraft.server.level.ServerLevel;
 import com.seibel.distanthorizons.core.logging.DhLogger;

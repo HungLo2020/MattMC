@@ -1,7 +1,7 @@
 package net.irisshaders.iris.mixin.shadows;
 
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
-import net.iris.shadows.CullingDataCache;
+import net.irisshaders.iris.shadows.CullingDataCache;
 import net.minecraft.client.renderer.LevelRenderer;
 import net.minecraft.client.renderer.chunk.SectionRenderDispatcher;
 import org.spongepowered.asm.mixin.Final;

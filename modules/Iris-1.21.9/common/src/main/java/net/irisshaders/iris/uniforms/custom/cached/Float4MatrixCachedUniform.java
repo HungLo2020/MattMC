@@ -1,9 +1,9 @@
 package net.irisshaders.iris.uniforms.custom.cached;
 
 import com.mojang.blaze3d.systems.RenderSystem;
-import net.iris.gl.IrisRenderSystem;
-import net.iris.gl.uniform.UniformUpdateFrequency;
-import net.iris.parsing.MatrixType;
+import net.irisshaders.iris.gl.IrisRenderSystem;
+import net.irisshaders.iris.gl.uniform.UniformUpdateFrequency;
+import net.irisshaders.iris.parsing.MatrixType;
 import org.joml.Matrix4f;
 import org.joml.Matrix4fc;
 import org.lwjgl.opengl.GL21;

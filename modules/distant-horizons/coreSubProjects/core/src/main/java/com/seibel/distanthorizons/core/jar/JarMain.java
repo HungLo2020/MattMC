@@ -19,16 +19,14 @@
 package com.seibel.distanthorizons.core.jar;
 
 
-
-import net.distant_horizons.core.jar.EPlatform;
 import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
 import com.seibel.distanthorizons.core.pos.DhSectionPos;
 import com.seibel.distanthorizons.core.sql.dto.FullDataSourceV2DTO;
 import com.seibel.distanthorizons.core.sql.repo.FullDataSourceV2Repo;
-import net.distant_horizons.core.util.NativeDialogUtil;
+import com.seibel.distanthorizons.core.util.NativeDialogUtil;
 import com.seibel.distanthorizons.coreapi.ModInfo;
 import com.seibel.distanthorizons.core.jar.gui.BaseJFrame;
-import net.distant_horizons.core.jar.gui.cusomJObject.JBox;
+import com.seibel.distanthorizons.core.jar.gui.cusomJObject.JBox;
 import com.seibel.distanthorizons.core.jar.installer.ModrinthGetter;
 import com.seibel.distanthorizons.core.jar.installer.WebDownloader;
 import org.apache.logging.log4j.LogManager;

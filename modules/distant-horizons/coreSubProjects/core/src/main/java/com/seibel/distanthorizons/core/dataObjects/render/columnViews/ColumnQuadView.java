@@ -19,8 +19,6 @@
 
 package com.seibel.distanthorizons.core.dataObjects.render.columnViews;
 
-
-import net.distant_horizons.core.dataObjects.render.columnViews.IColumnDataView;
 import it.unimi.dsi.fastutil.longs.LongArrayList;
 
 public class ColumnQuadView implements IColumnDataView

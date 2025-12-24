@@ -11,15 +11,15 @@ import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.regex.Pattern;
 
-import net.distant_horizons.api.enums.config.DisallowSelectingViaConfigGui;
+import com.seibel.distanthorizons.api.enums.config.DisallowSelectingViaConfigGui;
 import com.seibel.distanthorizons.common.wrappers.gui.config.ConfigGuiInfo;
 import com.seibel.distanthorizons.core.config.Config;
 import com.seibel.distanthorizons.core.config.ConfigHandler;
 import com.seibel.distanthorizons.core.config.types.*;
 import com.seibel.distanthorizons.common.wrappers.gui.updater.ChangelogScreen;
 
-import net.distant_horizons.core.config.types.enums.EConfigCommentTextPosition;
-import net.distant_horizons.core.config.types.enums.EConfigValidity;
+import com.seibel.distanthorizons.core.config.types.enums.EConfigCommentTextPosition;
+import com.seibel.distanthorizons.core.config.types.enums.EConfigValidity;
 import com.seibel.distanthorizons.core.dependencyInjection.SingletonInjector;
 import com.seibel.distanthorizons.core.jar.updater.SelfUpdater;
 import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
@@ -49,7 +49,7 @@ import net.minecraft.client.gui.narration.NarratableEntry;
 import net.minecraft.resources.ResourceLocation;
 
 import static com.seibel.distanthorizons.common.wrappers.gui.GuiHelper.*;
-import static net.distant_horizons.common.wrappers.gui.GuiHelper.Translatable;
+import static com.seibel.distanthorizons.common.wrappers.gui.GuiHelper.Translatable;
 
 
 /*

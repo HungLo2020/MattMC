@@ -1,11 +1,11 @@
 package net.irisshaders.iris.targets;
 
 import com.mojang.blaze3d.opengl.GlStateManager;
-import net.iris.gl.GLDebug;
-import net.iris.gl.IrisRenderSystem;
-import net.iris.gl.texture.InternalTextureFormat;
-import net.iris.gl.texture.PixelFormat;
-import net.iris.gl.texture.PixelType;
+import net.irisshaders.iris.gl.GLDebug;
+import net.irisshaders.iris.gl.IrisRenderSystem;
+import net.irisshaders.iris.gl.texture.InternalTextureFormat;
+import net.irisshaders.iris.gl.texture.PixelFormat;
+import net.irisshaders.iris.gl.texture.PixelType;
 import org.joml.Vector2i;
 import org.lwjgl.opengl.GL11C;
 import org.lwjgl.opengl.GL13C;

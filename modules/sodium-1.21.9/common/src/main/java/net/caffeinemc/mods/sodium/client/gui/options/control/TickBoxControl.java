@@ -1,7 +1,7 @@
 package net.caffeinemc.mods.sodium.client.gui.options.control;
 
-import net.sodium.client.gui.options.Option;
-import net.sodium.client.util.Dim2i;
+import net.caffeinemc.mods.sodium.client.gui.options.Option;
+import net.caffeinemc.mods.sodium.client.util.Dim2i;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.input.KeyEvent;
 import net.minecraft.client.input.MouseButtonEvent;

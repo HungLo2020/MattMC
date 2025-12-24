@@ -19,8 +19,8 @@
 
 package com.seibel.distanthorizons.core.wrapperInterfaces.worldGeneration;
 
-import net.distant_horizons.api.enums.worldGeneration.EDhApiDistantGeneratorMode;
-import net.distant_horizons.api.enums.worldGeneration.EDhApiWorldGenerationStep;
+import com.seibel.distanthorizons.api.enums.worldGeneration.EDhApiDistantGeneratorMode;
+import com.seibel.distanthorizons.api.enums.worldGeneration.EDhApiWorldGenerationStep;
 import com.seibel.distanthorizons.core.wrapperInterfaces.chunk.IChunkWrapper;
 
 import java.util.concurrent.CompletableFuture;

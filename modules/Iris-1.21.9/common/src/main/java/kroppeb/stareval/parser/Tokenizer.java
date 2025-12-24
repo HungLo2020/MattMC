@@ -1,6 +1,6 @@
 package kroppeb.stareval.parser;
 
-import net.iris.stareval.element.ExpressionElement;
+import kroppeb.stareval.element.ExpressionElement;
 import net.iris.stareval.exception.ParseException;
 import net.iris.stareval.exception.UnexpectedCharacterException;
 import net.iris.stareval.exception.UnexpectedEndingException;

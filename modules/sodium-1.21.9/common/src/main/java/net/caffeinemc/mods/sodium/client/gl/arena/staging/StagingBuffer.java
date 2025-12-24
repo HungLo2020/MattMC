@@ -1,7 +1,7 @@
 package net.caffeinemc.mods.sodium.client.gl.arena.staging;
 
-import net.sodium.client.gl.buffer.GlBuffer;
-import net.sodium.client.gl.device.CommandList;
+import net.caffeinemc.mods.sodium.client.gl.buffer.GlBuffer;
+import net.caffeinemc.mods.sodium.client.gl.device.CommandList;
 
 import java.nio.ByteBuffer;
 

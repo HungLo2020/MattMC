@@ -1,9 +1,9 @@
 package net.irisshaders.iris.shaderpack.texture;
 
-import net.iris.Iris;
-import net.iris.gl.texture.InternalTextureFormat;
-import net.iris.gl.texture.PixelFormat;
-import net.iris.gl.texture.PixelType;
+import net.irisshaders.iris.Iris;
+import net.irisshaders.iris.gl.texture.InternalTextureFormat;
+import net.irisshaders.iris.gl.texture.PixelFormat;
+import net.irisshaders.iris.gl.texture.PixelType;
 
 public abstract class CustomTextureData {
 	private CustomTextureData() {

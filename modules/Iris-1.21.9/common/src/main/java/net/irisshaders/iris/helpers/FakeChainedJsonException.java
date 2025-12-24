@@ -1,6 +1,6 @@
 package net.irisshaders.iris.helpers;
 
-import net.iris.gl.shader.ShaderCompileException;
+import net.irisshaders.iris.gl.shader.ShaderCompileException;
 import net.minecraft.server.ChainedJsonException;
 
 public class FakeChainedJsonException extends ChainedJsonException {

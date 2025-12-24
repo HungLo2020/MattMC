@@ -5,7 +5,7 @@ import com.seibel.distanthorizons.core.dependencyInjection.SingletonInjector;
 import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
 import com.seibel.distanthorizons.core.wrapperInterfaces.IVersionConstants;
 import com.seibel.distanthorizons.coreapi.ModInfo;
-import net.distant_horizons.core.jar.installer.MarkdownFormatter;
+import com.seibel.distanthorizons.core.jar.installer.MarkdownFormatter;
 import com.seibel.distanthorizons.core.jar.installer.ModrinthGetter;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;

@@ -19,8 +19,8 @@
 
 package com.seibel.distanthorizons.core.config.api.converters;
 
-import net.distant_horizons.api.enums.rendering.EDhApiRendererMode;
-import net.distant_horizons.coreapi.interfaces.config.IConverter;
+import com.seibel.distanthorizons.api.enums.rendering.EDhApiRendererMode;
+import com.seibel.distanthorizons.coreapi.interfaces.config.IConverter;
 
 /**
  * Used for simplifying the fake chunk rendering on/off setting.

@@ -1,6 +1,6 @@
 package net.caffeinemc.mods.sodium.mixin.features.options.overlays;
 
-import net.sodium.client.SodiumClientMod;
+import net.caffeinemc.mods.sodium.client.SodiumClientMod;
 import net.minecraft.client.gui.Gui;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;

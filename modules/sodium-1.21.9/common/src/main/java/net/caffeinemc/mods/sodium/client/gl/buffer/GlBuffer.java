@@ -1,6 +1,6 @@
 package net.caffeinemc.mods.sodium.client.gl.buffer;
 
-import net.sodium.client.gl.GlObject;
+import net.caffeinemc.mods.sodium.client.gl.GlObject;
 import org.lwjgl.opengl.GL20C;
 
 public abstract class GlBuffer extends GlObject {

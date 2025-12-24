@@ -1,19 +1,19 @@
 package net.caffeinemc.mods.sodium.client.render.chunk.compile;
 
 import it.unimi.dsi.fastutil.objects.Reference2ReferenceOpenHashMap;
-import net.sodium.client.model.quad.properties.ModelQuadFacing;
-import net.sodium.client.render.chunk.compile.buffers.BakedChunkModelBuilder;
-import net.sodium.client.render.chunk.compile.buffers.ChunkModelBuilder;
-import net.sodium.client.render.chunk.data.BuiltSectionInfo;
-import net.sodium.client.render.chunk.data.BuiltSectionMeshParts;
-import net.sodium.client.render.chunk.terrain.DefaultTerrainRenderPasses;
-import net.sodium.client.render.chunk.terrain.TerrainRenderPass;
-import net.sodium.client.render.chunk.terrain.material.Material;
-import net.sodium.client.render.chunk.translucent_sorting.bsp_tree.UpdatedQuadsList;
-import net.sodium.client.render.chunk.translucent_sorting.data.TranslucentData;
-import net.sodium.client.render.chunk.vertex.builder.ChunkMeshBufferBuilder;
-import net.sodium.client.render.chunk.vertex.format.ChunkVertexType;
-import net.sodium.client.util.NativeBuffer;
+import net.caffeinemc.mods.sodium.client.model.quad.properties.ModelQuadFacing;
+import net.caffeinemc.mods.sodium.client.render.chunk.compile.buffers.BakedChunkModelBuilder;
+import net.caffeinemc.mods.sodium.client.render.chunk.compile.buffers.ChunkModelBuilder;
+import net.caffeinemc.mods.sodium.client.render.chunk.data.BuiltSectionInfo;
+import net.caffeinemc.mods.sodium.client.render.chunk.data.BuiltSectionMeshParts;
+import net.caffeinemc.mods.sodium.client.render.chunk.terrain.DefaultTerrainRenderPasses;
+import net.caffeinemc.mods.sodium.client.render.chunk.terrain.TerrainRenderPass;
+import net.caffeinemc.mods.sodium.client.render.chunk.terrain.material.Material;
+import net.caffeinemc.mods.sodium.client.render.chunk.translucent_sorting.bsp_tree.UpdatedQuadsList;
+import net.caffeinemc.mods.sodium.client.render.chunk.translucent_sorting.data.TranslucentData;
+import net.caffeinemc.mods.sodium.client.render.chunk.vertex.builder.ChunkMeshBufferBuilder;
+import net.caffeinemc.mods.sodium.client.render.chunk.vertex.format.ChunkVertexType;
+import net.caffeinemc.mods.sodium.client.util.NativeBuffer;
 
 /**
  * A collection of temporary buffers for each worker thread which will be used to build chunk meshes for given render

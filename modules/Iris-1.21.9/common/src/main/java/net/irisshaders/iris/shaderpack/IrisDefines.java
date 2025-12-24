@@ -1,10 +1,10 @@
 package net.irisshaders.iris.shaderpack;
 
 import com.google.common.collect.ImmutableList;
-import net.iris.gl.shader.StandardMacros;
-import net.iris.helpers.StringPair;
-import net.iris.parsing.BiomeCategories;
-import net.iris.uniforms.BiomeUniforms;
+import net.irisshaders.iris.gl.shader.StandardMacros;
+import net.irisshaders.iris.helpers.StringPair;
+import net.irisshaders.iris.parsing.BiomeCategories;
+import net.irisshaders.iris.uniforms.BiomeUniforms;
 
 import java.util.ArrayList;
 import java.util.List;

@@ -19,9 +19,9 @@
 
 package com.seibel.distanthorizons.core.logging;
 
-import net.distant_horizons.api.enums.config.EDhApiLoggerLevel;
+import com.seibel.distanthorizons.api.enums.config.EDhApiLoggerLevel;
 import com.seibel.distanthorizons.core.config.Config;
-import net.distant_horizons.core.config.listeners.IConfigListener;
+import com.seibel.distanthorizons.core.config.listeners.IConfigListener;
 import com.seibel.distanthorizons.core.config.types.ConfigEntry;
 import com.seibel.distanthorizons.core.dependencyInjection.SingletonInjector;
 import com.seibel.distanthorizons.core.util.ThreadUtil;

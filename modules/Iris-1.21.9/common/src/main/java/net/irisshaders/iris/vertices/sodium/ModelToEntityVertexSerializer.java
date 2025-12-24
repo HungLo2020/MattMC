@@ -4,9 +4,9 @@ import net.sodium.api.memory.MemoryIntrinsics;
 import net.sodium.api.util.NormI8;
 import net.sodium.api.vertex.format.common.EntityVertex;
 import net.sodium.api.vertex.serializer.VertexSerializer;
-import net.iris.uniforms.CapturedRenderingState;
-import net.iris.vertices.IrisVertexFormats;
-import net.iris.vertices.NormalHelper;
+import net.irisshaders.iris.uniforms.CapturedRenderingState;
+import net.irisshaders.iris.vertices.IrisVertexFormats;
+import net.irisshaders.iris.vertices.NormalHelper;
 import org.lwjgl.system.MemoryUtil;
 
 public class ModelToEntityVertexSerializer implements VertexSerializer {

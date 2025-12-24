@@ -1,6 +1,6 @@
 package kroppeb.stareval.element.token;
 
-import net.iris.stareval.element.ExpressionElement;
+import kroppeb.stareval.element.ExpressionElement;
 
 public class NumberToken extends Token implements ExpressionElement {
 	private final String number;

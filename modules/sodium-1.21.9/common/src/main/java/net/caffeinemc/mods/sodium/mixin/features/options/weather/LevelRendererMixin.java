@@ -1,6 +1,6 @@
 package net.caffeinemc.mods.sodium.mixin.features.options.weather;
 
-import net.sodium.client.SodiumClientMod;
+import net.caffeinemc.mods.sodium.client.SodiumClientMod;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.LevelRenderer;
 import net.minecraft.client.renderer.WeatherEffectRenderer;

@@ -5,12 +5,12 @@ import it.unimi.dsi.fastutil.longs.Long2ReferenceOpenHashMap;
 import it.unimi.dsi.fastutil.objects.Object2ReferenceOpenHashMap;
 import it.unimi.dsi.fastutil.objects.ReferenceArraySet;
 import it.unimi.dsi.fastutil.objects.ReferenceLinkedOpenHashSet;
-import net.sodium.client.model.quad.properties.ModelQuadFacing;
+import net.caffeinemc.mods.sodium.client.model.quad.properties.ModelQuadFacing;
 import net.sodium.api.util.MathUtil;
-import net.sodium.client.util.interval_tree.DoubleInterval;
-import net.sodium.client.util.interval_tree.Interval;
-import net.sodium.client.util.interval_tree.Interval.Bounded;
-import net.sodium.client.util.interval_tree.IntervalTree;
+import net.caffeinemc.mods.sodium.client.util.interval_tree.DoubleInterval;
+import net.caffeinemc.mods.sodium.client.util.interval_tree.Interval;
+import net.caffeinemc.mods.sodium.client.util.interval_tree.Interval.Bounded;
+import net.caffeinemc.mods.sodium.client.util.interval_tree.IntervalTree;
 import org.joml.Vector3fc;
 
 import java.util.Collection;

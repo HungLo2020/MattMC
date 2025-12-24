@@ -1,6 +1,6 @@
 package net.irisshaders.iris.vertices.sodium;
 
-import net.iris.vertices.views.QuadView;
+import net.irisshaders.iris.vertices.views.QuadView;
 import org.lwjgl.system.MemoryUtil;
 
 public class QuadViewEntity implements QuadView {

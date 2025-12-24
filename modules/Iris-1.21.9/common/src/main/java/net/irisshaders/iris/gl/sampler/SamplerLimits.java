@@ -1,7 +1,7 @@
 package net.irisshaders.iris.gl.sampler;
 
 import com.mojang.blaze3d.opengl.GlStateManager;
-import net.iris.gl.IrisRenderSystem;
+import net.irisshaders.iris.gl.IrisRenderSystem;
 import org.lwjgl.opengl.GL20C;
 import org.lwjgl.opengl.GL45C;
 

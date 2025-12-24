@@ -1,10 +1,10 @@
 package net.irisshaders.iris.compat.sodium.mixin;
 
-import net.sodium.client.gui.SodiumGameOptions;
-import net.sodium.client.render.chunk.RenderSectionManager;
-import net.sodium.client.render.chunk.vertex.format.ChunkVertexType;
-import net.iris.Iris;
-import net.iris.shaderpack.materialmap.WorldRenderingSettings;
+import net.caffeinemc.mods.sodium.client.gui.SodiumGameOptions;
+import net.caffeinemc.mods.sodium.client.render.chunk.RenderSectionManager;
+import net.caffeinemc.mods.sodium.client.render.chunk.vertex.format.ChunkVertexType;
+import net.irisshaders.iris.Iris;
+import net.irisshaders.iris.shaderpack.materialmap.WorldRenderingSettings;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.ModifyArg;

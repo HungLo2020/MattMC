@@ -2,10 +2,10 @@ package net.irisshaders.iris.mixin.entity_render_context;
 
 import com.llamalad7.mixinextras.sugar.Local;
 import com.mojang.blaze3d.vertex.PoseStack;
-import net.iris.helpers.EntityState;
-import net.iris.shaderpack.materialmap.NamespacedId;
-import net.iris.shaderpack.materialmap.WorldRenderingSettings;
-import net.iris.uniforms.CapturedRenderingState;
+import net.irisshaders.iris.helpers.EntityState;
+import net.irisshaders.iris.shaderpack.materialmap.NamespacedId;
+import net.irisshaders.iris.shaderpack.materialmap.WorldRenderingSettings;
+import net.irisshaders.iris.uniforms.CapturedRenderingState;
 import net.minecraft.client.model.HumanoidModel;
 import net.minecraft.client.model.Model;
 import net.minecraft.client.renderer.MultiBufferSource;

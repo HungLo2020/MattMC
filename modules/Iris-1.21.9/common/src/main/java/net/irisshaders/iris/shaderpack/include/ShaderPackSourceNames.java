@@ -1,8 +1,8 @@
 package net.irisshaders.iris.shaderpack.include;
 
 import com.google.common.collect.ImmutableList;
-import net.iris.shaderpack.loading.ProgramArrayId;
-import net.iris.shaderpack.loading.ProgramId;
+import net.irisshaders.iris.shaderpack.loading.ProgramArrayId;
+import net.irisshaders.iris.shaderpack.loading.ProgramId;
 
 import java.io.IOException;
 import java.nio.file.Files;

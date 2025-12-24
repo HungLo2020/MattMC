@@ -1,11 +1,11 @@
 package net.caffeinemc.mods.sodium.client.model.light.flat;
 
-import net.sodium.client.model.light.LightPipeline;
-import net.sodium.client.model.light.data.LightDataAccess;
-import net.sodium.client.model.light.data.QuadLightData;
-import net.sodium.client.model.quad.ModelQuadView;
-import net.sodium.client.model.quad.properties.ModelQuadFlags;
-import net.sodium.client.services.PlatformBlockAccess;
+import net.caffeinemc.mods.sodium.client.model.light.LightPipeline;
+import net.caffeinemc.mods.sodium.client.model.light.data.LightDataAccess;
+import net.caffeinemc.mods.sodium.client.model.light.data.QuadLightData;
+import net.caffeinemc.mods.sodium.client.model.quad.ModelQuadView;
+import net.caffeinemc.mods.sodium.client.model.quad.properties.ModelQuadFlags;
+import net.caffeinemc.mods.sodium.client.services.PlatformBlockAccess;
 import net.minecraft.client.renderer.LevelRenderer;
 import net.minecraft.client.renderer.LightTexture;
 import net.minecraft.core.BlockPos;

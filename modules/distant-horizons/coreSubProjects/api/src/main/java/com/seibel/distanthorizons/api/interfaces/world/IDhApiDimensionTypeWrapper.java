@@ -19,7 +19,7 @@
 
 package com.seibel.distanthorizons.api.interfaces.world;
 
-import net.distant_horizons.api.interfaces.IDhApiUnsafeWrapper;
+import com.seibel.distanthorizons.api.interfaces.IDhApiUnsafeWrapper;
 
 /**
  * @author James Seibel

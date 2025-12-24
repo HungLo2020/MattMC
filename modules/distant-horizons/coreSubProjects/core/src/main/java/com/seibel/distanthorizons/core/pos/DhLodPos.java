@@ -21,7 +21,7 @@ package com.seibel.distanthorizons.core.pos;
 
 import com.seibel.distanthorizons.core.dataObjects.fullData.sources.FullDataSourceV2;
 import com.seibel.distanthorizons.core.pos.blockPos.DhBlockPos2D;
-import net.distant_horizons.coreapi.util.BitShiftUtil;
+import com.seibel.distanthorizons.coreapi.util.BitShiftUtil;
 import com.seibel.distanthorizons.core.util.LodUtil;
 import org.jetbrains.annotations.NotNull;
 

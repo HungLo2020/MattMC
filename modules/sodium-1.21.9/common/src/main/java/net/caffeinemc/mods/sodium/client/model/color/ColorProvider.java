@@ -1,7 +1,7 @@
 package net.caffeinemc.mods.sodium.client.model.color;
 
-import net.sodium.client.model.quad.ModelQuadView;
-import net.sodium.client.world.LevelSlice;
+import net.caffeinemc.mods.sodium.client.model.quad.ModelQuadView;
+import net.caffeinemc.mods.sodium.client.world.LevelSlice;
 import net.minecraft.core.BlockPos;
 
 public interface ColorProvider<T> {

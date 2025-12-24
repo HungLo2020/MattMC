@@ -1,7 +1,7 @@
 package net.caffeinemc.mods.sodium.client.gui.widgets;
 
 import com.mojang.blaze3d.platform.cursor.CursorTypes;
-import net.sodium.client.util.Dim2i;
+import net.caffeinemc.mods.sodium.client.util.Dim2i;
 import net.minecraft.client.gui.ComponentPath;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Renderable;

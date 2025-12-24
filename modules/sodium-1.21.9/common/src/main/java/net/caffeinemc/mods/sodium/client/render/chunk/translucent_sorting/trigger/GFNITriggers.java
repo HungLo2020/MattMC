@@ -2,9 +2,9 @@ package net.caffeinemc.mods.sodium.client.render.chunk.translucent_sorting.trigg
 
 import it.unimi.dsi.fastutil.objects.Object2ReferenceMap;
 import it.unimi.dsi.fastutil.objects.Object2ReferenceOpenHashMap;
-import net.sodium.client.render.chunk.translucent_sorting.data.DynamicData;
-import net.sodium.client.render.chunk.translucent_sorting.data.TranslucentData;
-import net.sodium.client.render.chunk.translucent_sorting.trigger.SortTriggering.SectionTriggers;
+import net.caffeinemc.mods.sodium.client.render.chunk.translucent_sorting.data.DynamicData;
+import net.caffeinemc.mods.sodium.client.render.chunk.translucent_sorting.data.TranslucentData;
+import net.caffeinemc.mods.sodium.client.render.chunk.translucent_sorting.trigger.SortTriggering.SectionTriggers;
 import net.minecraft.core.SectionPos;
 import org.joml.Vector3fc;
 

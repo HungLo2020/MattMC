@@ -6,10 +6,10 @@ import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.ints.IntList;
-import net.iris.Iris;
+import net.irisshaders.iris.Iris;
 import net.iris.gl.IrisLimits;
-import net.iris.gl.texture.InternalTextureFormat;
-import net.iris.shaderpack.parsing.DirectiveHolder;
+import net.irisshaders.iris.gl.texture.InternalTextureFormat;
+import net.irisshaders.iris.shaderpack.parsing.DirectiveHolder;
 import org.joml.Vector4f;
 
 import java.util.Collections;

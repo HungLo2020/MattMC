@@ -1,6 +1,6 @@
 package kroppeb.stareval.element.tree;
 
-import net.iris.stareval.element.ExpressionElement;
+import kroppeb.stareval.element.ExpressionElement;
 import net.iris.stareval.parser.UnaryOp;
 
 public record UnaryExpressionElement(UnaryOp op, ExpressionElement inner) implements ExpressionElement {

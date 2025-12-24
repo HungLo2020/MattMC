@@ -1,6 +1,6 @@
 package net.caffeinemc.mods.sodium.client.services;
 
-import net.sodium.client.SodiumClientMod;
+import net.caffeinemc.mods.sodium.client.SodiumClientMod;
 
 import java.util.ServiceLoader;
 

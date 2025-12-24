@@ -19,8 +19,6 @@
 
 package com.seibel.distanthorizons.core.jar;
 
-
-import net.distant_horizons.core.jar.EPlatform;
 import java.io.*;
 import java.util.regex.Pattern;
 

@@ -1,8 +1,8 @@
 package net.irisshaders.iris.gl.sampler;
 
-import net.iris.gl.IrisRenderSystem;
-import net.iris.gl.state.ValueUpdateNotifier;
-import net.iris.gl.texture.TextureType;
+import net.irisshaders.iris.gl.IrisRenderSystem;
+import net.irisshaders.iris.gl.state.ValueUpdateNotifier;
+import net.irisshaders.iris.gl.texture.TextureType;
 
 import java.util.function.IntSupplier;
 

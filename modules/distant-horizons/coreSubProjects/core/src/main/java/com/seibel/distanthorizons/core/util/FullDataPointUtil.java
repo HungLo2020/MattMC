@@ -2,7 +2,7 @@ package com.seibel.distanthorizons.core.util;
 
 import com.seibel.distanthorizons.core.dataObjects.fullData.sources.FullDataSourceV1;
 import com.seibel.distanthorizons.core.dataObjects.fullData.sources.FullDataSourceV2;
-import net.distant_horizons.core.util.objects.DataCorruptedException;
+import com.seibel.distanthorizons.core.util.objects.DataCorruptedException;
 import com.seibel.distanthorizons.coreapi.ModInfo;
 import org.jetbrains.annotations.Contract;
 

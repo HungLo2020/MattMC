@@ -1,6 +1,6 @@
 package net.caffeinemc.mods.sodium.client.gl.arena;
 
-import net.sodium.client.util.NativeBuffer;
+import net.caffeinemc.mods.sodium.client.util.NativeBuffer;
 
 public class PendingUpload {
     private final NativeBuffer data;

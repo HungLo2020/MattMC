@@ -2,7 +2,7 @@ package net.irisshaders.iris.gl.program;
 
 import com.mojang.blaze3d.opengl.GlStateManager;
 import net.iris.gl.GlResource;
-import net.iris.gl.IrisRenderSystem;
+import net.irisshaders.iris.gl.IrisRenderSystem;
 import org.lwjgl.opengl.GL43C;
 
 public final class Program extends GlResource {

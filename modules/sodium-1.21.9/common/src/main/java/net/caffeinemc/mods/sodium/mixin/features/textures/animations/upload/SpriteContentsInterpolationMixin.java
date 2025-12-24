@@ -1,8 +1,8 @@
 package net.caffeinemc.mods.sodium.mixin.features.textures.animations.upload;
 
 import com.mojang.blaze3d.textures.GpuTexture;
-import net.sodium.client.util.NativeImageHelper;
-import net.sodium.mixin.features.textures.SpriteContentsInvoker;
+import net.caffeinemc.mods.sodium.client.util.NativeImageHelper;
+import net.caffeinemc.mods.sodium.mixin.features.textures.SpriteContentsInvoker;
 import net.sodium.api.util.ColorMixer;
 import net.minecraft.client.renderer.texture.SpriteContents;
 import org.lwjgl.system.MemoryUtil;

@@ -1,7 +1,7 @@
 package net.caffeinemc.mods.sodium.client.render.chunk.shader;
 
-import net.sodium.client.gl.shader.uniform.GlUniform;
-import net.sodium.client.gl.shader.uniform.GlUniformBlock;
+import net.caffeinemc.mods.sodium.client.gl.shader.uniform.GlUniform;
+import net.caffeinemc.mods.sodium.client.gl.shader.uniform.GlUniformBlock;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 

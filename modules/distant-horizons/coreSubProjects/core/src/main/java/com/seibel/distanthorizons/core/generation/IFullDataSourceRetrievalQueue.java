@@ -20,11 +20,11 @@
 package com.seibel.distanthorizons.core.generation;
 
 import com.seibel.distanthorizons.core.generation.tasks.IWorldGenTaskTracker;
-import net.distant_horizons.core.generation.tasks.WorldGenResult;
+import com.seibel.distanthorizons.core.generation.tasks.WorldGenResult;
 import com.seibel.distanthorizons.core.pos.blockPos.DhBlockPos2D;
 import com.seibel.distanthorizons.core.pos.DhSectionPos;
 import com.seibel.distanthorizons.core.render.LodQuadTree;
-import net.distant_horizons.core.util.objects.RollingAverage;
+import com.seibel.distanthorizons.core.util.objects.RollingAverage;
 import org.jetbrains.annotations.Nullable;
 
 import java.io.Closeable;

@@ -3,11 +3,11 @@ package net.irisshaders.iris.shaderpack.properties;
 import com.google.common.collect.ImmutableList;
 import it.unimi.dsi.fastutil.ints.Int2ObjectArrayMap;
 import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
-import net.iris.Iris;
-import net.iris.gl.texture.InternalTextureFormat;
-import net.iris.helpers.OptionalBoolean;
-import net.iris.shaderpack.parsing.DirectiveHolder;
-import net.iris.shadows.ShadowMatrices;
+import net.irisshaders.iris.Iris;
+import net.irisshaders.iris.gl.texture.InternalTextureFormat;
+import net.irisshaders.iris.helpers.OptionalBoolean;
+import net.irisshaders.iris.shaderpack.parsing.DirectiveHolder;
+import net.irisshaders.iris.shadows.ShadowMatrices;
 import org.joml.Vector4f;
 
 import java.util.Optional;

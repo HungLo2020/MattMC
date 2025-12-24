@@ -1,7 +1,7 @@
 package net.caffeinemc.mods.sodium.client.render.chunk.lists;
 
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
-import net.sodium.client.util.iterator.ReversibleObjectArrayIterator;
+import net.caffeinemc.mods.sodium.client.util.iterator.ReversibleObjectArrayIterator;
 
 /**
  * Stores one render list of sections per region, sorted by the order in which

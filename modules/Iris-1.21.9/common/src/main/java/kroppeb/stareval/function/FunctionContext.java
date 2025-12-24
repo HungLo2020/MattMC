@@ -1,6 +1,6 @@
 package kroppeb.stareval.function;
 
-import net.iris.stareval.expression.Expression;
+import kroppeb.stareval.expression.Expression;
 
 public interface FunctionContext {
 	Expression getVariable(String name);

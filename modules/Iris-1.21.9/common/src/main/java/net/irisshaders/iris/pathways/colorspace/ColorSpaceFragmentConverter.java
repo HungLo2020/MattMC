@@ -7,15 +7,15 @@ import com.mojang.blaze3d.opengl.GlTexture;
 import com.mojang.blaze3d.systems.RenderPass;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.VertexFormat;
-import net.iris.gl.IrisRenderSystem;
-import net.iris.gl.framebuffer.GlFramebuffer;
-import net.iris.gl.program.Program;
-import net.iris.gl.program.ProgramBuilder;
-import net.iris.gl.uniform.UniformUpdateFrequency;
-import net.iris.helpers.StringPair;
-import net.iris.mixinterface.CustomPass;
-import net.iris.pathways.FullScreenQuadRenderer;
-import net.iris.shaderpack.preprocessor.JcppProcessor;
+import net.irisshaders.iris.gl.IrisRenderSystem;
+import net.irisshaders.iris.gl.framebuffer.GlFramebuffer;
+import net.irisshaders.iris.gl.program.Program;
+import net.irisshaders.iris.gl.program.ProgramBuilder;
+import net.irisshaders.iris.gl.uniform.UniformUpdateFrequency;
+import net.irisshaders.iris.helpers.StringPair;
+import net.irisshaders.iris.mixinterface.CustomPass;
+import net.irisshaders.iris.pathways.FullScreenQuadRenderer;
+import net.irisshaders.iris.shaderpack.preprocessor.JcppProcessor;
 import net.minecraft.client.Minecraft;
 import org.apache.commons.io.IOUtils;
 import org.joml.Matrix4f;
@@ -29,7 +29,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.OptionalInt;
 
-import static net.iris.pipeline.CompositeRenderer.COMPOSITE_PIPELINE;
+import static net.irisshaders.iris.pipeline.CompositeRenderer.COMPOSITE_PIPELINE;
 
 public class ColorSpaceFragmentConverter implements ColorSpaceConverter {
 	private static final CustomPass EMPTY = new CustomPass() {

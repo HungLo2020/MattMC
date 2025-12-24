@@ -4,11 +4,11 @@ import com.mojang.blaze3d.vertex.VertexConsumer;
 import net.sodium.api.util.ColorABGR;
 import net.sodium.api.util.ColorARGB;
 import net.sodium.api.util.NormI8;
-import net.sodium.client.model.quad.properties.ModelQuadFacing;
-import net.sodium.client.render.chunk.terrain.material.Material;
-import net.sodium.client.render.chunk.translucent_sorting.TranslucentGeometryCollector;
-import net.sodium.client.render.chunk.vertex.format.ChunkVertexEncoder;
-import net.sodium.client.render.texture.SpriteFinderCache;
+import net.caffeinemc.mods.sodium.client.model.quad.properties.ModelQuadFacing;
+import net.caffeinemc.mods.sodium.client.render.chunk.terrain.material.Material;
+import net.caffeinemc.mods.sodium.client.render.chunk.translucent_sorting.TranslucentGeometryCollector;
+import net.caffeinemc.mods.sodium.client.render.chunk.vertex.format.ChunkVertexEncoder;
+import net.caffeinemc.mods.sodium.client.render.texture.SpriteFinderCache;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
 import org.jetbrains.annotations.NotNull;
 

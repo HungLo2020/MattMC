@@ -1,6 +1,6 @@
 package net.irisshaders.iris.gui.element.widget;
 
-import net.iris.shaderpack.option.menu.OptionMenuElement;
+import net.irisshaders.iris.shaderpack.option.menu.OptionMenuElement;
 import net.minecraft.network.chat.Component;
 
 import java.util.Optional;

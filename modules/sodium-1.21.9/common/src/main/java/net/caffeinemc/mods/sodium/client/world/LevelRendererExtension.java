@@ -1,7 +1,7 @@
 package net.caffeinemc.mods.sodium.client.world;
 
-import net.sodium.client.render.SodiumWorldRenderer;
-import net.sodium.client.render.chunk.ChunkRenderMatrices;
+import net.caffeinemc.mods.sodium.client.render.SodiumWorldRenderer;
+import net.caffeinemc.mods.sodium.client.render.chunk.ChunkRenderMatrices;
 
 public interface LevelRendererExtension {
     SodiumWorldRenderer sodium$getWorldRenderer();

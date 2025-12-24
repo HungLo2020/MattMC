@@ -19,8 +19,6 @@
 
 package com.seibel.distanthorizons.core.dataObjects.render.bufferBuilding;
 
-
-import net.distant_horizons.core.dataObjects.render.bufferBuilding.BufferMergeDirectionEnum;
 import com.seibel.distanthorizons.core.config.Config;
 import com.seibel.distanthorizons.core.enums.EDhDirection;
 import com.seibel.distanthorizons.core.util.LodUtil;

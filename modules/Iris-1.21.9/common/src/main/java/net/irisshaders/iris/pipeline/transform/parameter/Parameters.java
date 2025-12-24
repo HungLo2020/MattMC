@@ -2,12 +2,12 @@ package net.irisshaders.iris.pipeline.transform.parameter;
 
 import io.github.douira.glsl_transformer.ast.transform.JobParameters;
 import it.unimi.dsi.fastutil.objects.Object2ObjectMap;
-import net.iris.gl.blending.AlphaTest;
-import net.iris.gl.texture.TextureType;
-import net.iris.helpers.Tri;
-import net.iris.pipeline.transform.Patch;
-import net.iris.pipeline.transform.PatchShaderType;
-import net.iris.shaderpack.texture.TextureStage;
+import net.irisshaders.iris.gl.blending.AlphaTest;
+import net.irisshaders.iris.gl.texture.TextureType;
+import net.irisshaders.iris.helpers.Tri;
+import net.irisshaders.iris.pipeline.transform.Patch;
+import net.irisshaders.iris.pipeline.transform.PatchShaderType;
+import net.irisshaders.iris.shaderpack.texture.TextureStage;
 
 public abstract class Parameters implements JobParameters {
 	public final Patch patch;

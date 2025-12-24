@@ -1,10 +1,10 @@
 package net.caffeinemc.mods.sodium.client.gl.arena;
 
-import net.sodium.client.gl.arena.staging.StagingBuffer;
-import net.sodium.client.gl.buffer.GlBuffer;
-import net.sodium.client.gl.buffer.GlBufferUsage;
-import net.sodium.client.gl.buffer.GlMutableBuffer;
-import net.sodium.client.gl.device.CommandList;
+import net.caffeinemc.mods.sodium.client.gl.arena.staging.StagingBuffer;
+import net.caffeinemc.mods.sodium.client.gl.buffer.GlBuffer;
+import net.caffeinemc.mods.sodium.client.gl.buffer.GlBufferUsage;
+import net.caffeinemc.mods.sodium.client.gl.buffer.GlMutableBuffer;
+import net.caffeinemc.mods.sodium.client.gl.device.CommandList;
 
 import java.nio.ByteBuffer;
 import java.util.ArrayList;

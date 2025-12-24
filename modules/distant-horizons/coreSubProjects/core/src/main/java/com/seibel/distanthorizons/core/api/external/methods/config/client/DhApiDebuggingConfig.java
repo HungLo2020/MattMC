@@ -19,11 +19,11 @@
 
 package com.seibel.distanthorizons.core.api.external.methods.config.client;
 
-import net.distant_horizons.api.interfaces.config.IDhApiConfigValue;
+import com.seibel.distanthorizons.api.interfaces.config.IDhApiConfigValue;
 import com.seibel.distanthorizons.api.interfaces.config.client.IDhApiDebuggingConfig;
 import com.seibel.distanthorizons.core.config.api.DhApiConfigValue;
 import com.seibel.distanthorizons.core.config.Config;
-import net.distant_horizons.api.enums.rendering.EDhApiDebugRendering;
+import com.seibel.distanthorizons.api.enums.rendering.EDhApiDebugRendering;
 
 public class DhApiDebuggingConfig implements IDhApiDebuggingConfig
 {

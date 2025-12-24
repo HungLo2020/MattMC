@@ -1,6 +1,6 @@
 package net.caffeinemc.mods.sodium.client.gl.arena;
 
-import net.sodium.client.util.UInt32;
+import net.caffeinemc.mods.sodium.client.util.UInt32;
 
 class PendingBufferCopyCommand {
     private final int readOffset; /* Uint32 */

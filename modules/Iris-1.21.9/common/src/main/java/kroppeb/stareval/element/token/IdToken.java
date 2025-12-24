@@ -1,6 +1,6 @@
 package kroppeb.stareval.element.token;
 
-import net.iris.stareval.element.AccessibleExpressionElement;
+import kroppeb.stareval.element.AccessibleExpressionElement;
 
 public class IdToken extends Token implements AccessibleExpressionElement {
 	private final String id;

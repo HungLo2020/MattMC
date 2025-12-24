@@ -21,7 +21,7 @@ package com.seibel.distanthorizons.core.config.eventHandlers;
 
 import com.seibel.distanthorizons.core.config.Config;
 import com.seibel.distanthorizons.core.config.ConfigHandler;
-import net.distant_horizons.core.config.listeners.IConfigListener;
+import com.seibel.distanthorizons.core.config.listeners.IConfigListener;
 
 /** 
  * handles enabling/disabling config validation when the

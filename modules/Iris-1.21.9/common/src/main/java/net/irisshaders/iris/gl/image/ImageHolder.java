@@ -1,6 +1,6 @@
 package net.irisshaders.iris.gl.image;
 
-import net.iris.gl.texture.InternalTextureFormat;
+import net.irisshaders.iris.gl.texture.InternalTextureFormat;
 
 import java.util.function.IntSupplier;
 

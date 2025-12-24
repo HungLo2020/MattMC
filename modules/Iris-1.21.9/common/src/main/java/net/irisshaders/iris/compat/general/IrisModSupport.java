@@ -1,7 +1,7 @@
 package net.irisshaders.iris.compat.general;
 
 import it.unimi.dsi.fastutil.objects.Object2ObjectArrayMap;
-import net.iris.Iris;
+import net.irisshaders.iris.Iris;
 import net.minecraft.client.renderer.block.model.BlockModelPart;
 import net.minecraft.client.renderer.block.model.BlockStateModel;
 import net.minecraft.world.level.block.state.BlockState;

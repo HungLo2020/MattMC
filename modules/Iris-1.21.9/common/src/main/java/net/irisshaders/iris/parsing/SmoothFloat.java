@@ -1,6 +1,6 @@
 package net.irisshaders.iris.parsing;
 
-import net.iris.uniforms.SystemTimeUniforms;
+import net.irisshaders.iris.uniforms.SystemTimeUniforms;
 
 /**
  * An implementation of basic exponential smoothing that converts a sequence of unsmoothed values into a sequence of

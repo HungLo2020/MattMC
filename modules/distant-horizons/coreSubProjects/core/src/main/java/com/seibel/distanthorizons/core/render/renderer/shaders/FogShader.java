@@ -19,9 +19,9 @@
 
 package com.seibel.distanthorizons.core.render.renderer.shaders;
 
-import net.distant_horizons.api.enums.rendering.EDhApiFogColorMode;
-import net.distant_horizons.api.enums.rendering.EDhApiHeightFogDirection;
-import net.distant_horizons.api.enums.rendering.EDhApiHeightFogMixMode;
+import com.seibel.distanthorizons.api.enums.rendering.EDhApiFogColorMode;
+import com.seibel.distanthorizons.api.enums.rendering.EDhApiHeightFogDirection;
+import com.seibel.distanthorizons.api.enums.rendering.EDhApiHeightFogMixMode;
 import com.seibel.distanthorizons.core.config.Config;
 import com.seibel.distanthorizons.core.dependencyInjection.SingletonInjector;
 import com.seibel.distanthorizons.core.render.glObject.shader.ShaderProgram;

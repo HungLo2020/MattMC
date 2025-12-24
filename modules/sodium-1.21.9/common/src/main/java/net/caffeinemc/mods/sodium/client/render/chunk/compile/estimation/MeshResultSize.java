@@ -1,6 +1,6 @@
 package net.caffeinemc.mods.sodium.client.render.chunk.compile.estimation;
 
-import net.sodium.client.render.chunk.RenderSection;
+import net.caffeinemc.mods.sodium.client.render.chunk.RenderSection;
 
 public record MeshResultSize(SectionCategory category, long resultSize) implements Average1DEstimator.Value<MeshResultSize.SectionCategory> {
     public static long NO_DATA = -1;

@@ -2,10 +2,10 @@ package net.caffeinemc.mods.sodium.client.render.chunk.translucent_sorting.trigg
 
 import it.unimi.dsi.fastutil.floats.FloatOpenHashSet;
 import it.unimi.dsi.fastutil.objects.Object2ReferenceMap;
-import net.sodium.client.model.quad.properties.ModelQuadFacing;
+import net.caffeinemc.mods.sodium.client.model.quad.properties.ModelQuadFacing;
 import net.sodium.api.util.MathUtil;
-import net.sodium.client.util.interval_tree.DoubleInterval;
-import net.sodium.client.util.interval_tree.Interval.Bounded;
+import net.caffeinemc.mods.sodium.client.util.interval_tree.DoubleInterval;
+import net.caffeinemc.mods.sodium.client.util.interval_tree.Interval.Bounded;
 import net.minecraft.core.SectionPos;
 import org.joml.Vector3fc;
 

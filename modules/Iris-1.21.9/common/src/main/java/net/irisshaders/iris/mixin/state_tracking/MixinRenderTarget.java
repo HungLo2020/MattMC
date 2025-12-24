@@ -1,7 +1,7 @@
 package net.irisshaders.iris.mixin.state_tracking;
 
 import com.mojang.blaze3d.pipeline.RenderTarget;
-import net.iris.Iris;
+import net.irisshaders.iris.Iris;
 import net.minecraft.client.Minecraft;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;

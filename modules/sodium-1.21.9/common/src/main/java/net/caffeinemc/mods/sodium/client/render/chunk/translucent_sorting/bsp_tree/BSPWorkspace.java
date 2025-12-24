@@ -2,9 +2,9 @@ package net.caffeinemc.mods.sodium.client.render.chunk.translucent_sorting.bsp_t
 
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
-import net.sodium.client.render.chunk.translucent_sorting.QuadSplittingMode;
-import net.sodium.client.render.chunk.translucent_sorting.quad.FullTQuad;
-import net.sodium.client.render.chunk.translucent_sorting.quad.TQuad;
+import net.caffeinemc.mods.sodium.client.render.chunk.translucent_sorting.QuadSplittingMode;
+import net.caffeinemc.mods.sodium.client.render.chunk.translucent_sorting.quad.FullTQuad;
+import net.caffeinemc.mods.sodium.client.render.chunk.translucent_sorting.quad.TQuad;
 import net.minecraft.core.SectionPos;
 import org.joml.Vector3fc;
 

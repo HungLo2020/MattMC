@@ -5,12 +5,12 @@ import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.ints.IntList;
-import net.iris.helpers.OptionalBoolean;
-import net.iris.shaderpack.include.AbsolutePackPath;
-import net.iris.shaderpack.option.values.OptionValues;
-import net.iris.shaderpack.parsing.ParsedString;
-import net.iris.shaderpack.properties.PackShadowDirectives;
-import net.iris.shaderpack.transform.line.LineTransform;
+import net.irisshaders.iris.helpers.OptionalBoolean;
+import net.irisshaders.iris.shaderpack.include.AbsolutePackPath;
+import net.irisshaders.iris.shaderpack.option.values.OptionValues;
+import net.irisshaders.iris.shaderpack.parsing.ParsedString;
+import net.irisshaders.iris.shaderpack.properties.PackShadowDirectives;
+import net.irisshaders.iris.shaderpack.transform.line.LineTransform;
 
 import java.util.HashMap;
 import java.util.Map;

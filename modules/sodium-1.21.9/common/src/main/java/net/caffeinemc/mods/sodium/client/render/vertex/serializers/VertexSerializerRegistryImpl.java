@@ -4,7 +4,7 @@ import com.mojang.blaze3d.vertex.VertexFormat;
 import it.unimi.dsi.fastutil.longs.Long2ReferenceMap;
 import it.unimi.dsi.fastutil.longs.Long2ReferenceOpenHashMap;
 import net.sodium.api.vertex.format.VertexFormatExtensions;
-import net.sodium.client.render.vertex.serializers.generated.VertexSerializerFactory;
+import net.caffeinemc.mods.sodium.client.render.vertex.serializers.generated.VertexSerializerFactory;
 import net.sodium.api.vertex.serializer.VertexSerializer;
 import net.sodium.api.vertex.serializer.VertexSerializerRegistry;
 import org.slf4j.Logger;

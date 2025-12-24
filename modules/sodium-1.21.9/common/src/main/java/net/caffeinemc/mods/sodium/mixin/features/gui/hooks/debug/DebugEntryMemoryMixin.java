@@ -1,7 +1,7 @@
 package net.caffeinemc.mods.sodium.mixin.features.gui.hooks.debug;
 
 import net.sodium.api.util.MathUtil;
-import net.sodium.client.util.NativeBuffer;
+import net.caffeinemc.mods.sodium.client.util.NativeBuffer;
 import net.minecraft.client.gui.components.debug.DebugEntryMemory;
 import net.minecraft.client.gui.components.debug.DebugScreenDisplayer;
 import net.minecraft.resources.ResourceLocation;

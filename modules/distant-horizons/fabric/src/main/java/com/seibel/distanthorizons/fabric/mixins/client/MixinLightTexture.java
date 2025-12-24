@@ -19,7 +19,7 @@
 
 package com.seibel.distanthorizons.fabric.mixins.client;
 
-import net.distant_horizons.common.wrappers.minecraft.MinecraftRenderWrapper;
+import com.seibel.distanthorizons.common.wrappers.minecraft.MinecraftRenderWrapper;
 import com.seibel.distanthorizons.core.dependencyInjection.SingletonInjector;
 import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftClientWrapper;
 import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftRenderWrapper;
