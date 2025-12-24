@@ -1,6 +1,6 @@
 package net.caffeinemc.mods.sodium.client.gl.functions;
 
-import net.caffeinemc.mods.sodium.client.gl.device.RenderDevice;
+import net.sodium.client.gl.device.RenderDevice;
 
 public class DeviceFunctions {
     private final BufferStorageFunctions bufferStorageFunctions;

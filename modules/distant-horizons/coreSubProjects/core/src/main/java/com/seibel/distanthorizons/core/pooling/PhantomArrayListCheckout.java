@@ -1,7 +1,7 @@
 package com.seibel.distanthorizons.core.pooling;
 
-import com.seibel.distanthorizons.core.util.ListUtil;
-import com.seibel.distanthorizons.coreapi.util.StringUtil;
+import net.distant_horizons.core.util.ListUtil;
+import net.distant_horizons.coreapi.util.StringUtil;
 import it.unimi.dsi.fastutil.bytes.ByteArrayList;
 import it.unimi.dsi.fastutil.longs.LongArrayList;
 import it.unimi.dsi.fastutil.shorts.ShortArrayList;

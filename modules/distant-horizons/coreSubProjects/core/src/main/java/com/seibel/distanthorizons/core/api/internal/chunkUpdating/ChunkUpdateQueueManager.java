@@ -1,12 +1,12 @@
 package com.seibel.distanthorizons.core.api.internal.chunkUpdating;
 
-import com.seibel.distanthorizons.core.api.internal.ClientApi;
-import com.seibel.distanthorizons.core.api.internal.SharedApi;
-import com.seibel.distanthorizons.core.config.Config;
-import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
-import com.seibel.distanthorizons.core.pos.DhChunkPos;
-import com.seibel.distanthorizons.core.world.EWorldEnvironment;
-import com.seibel.distanthorizons.core.logging.DhLogger;
+import net.distant_horizons.core.api.internal.ClientApi;
+import net.distant_horizons.core.api.internal.SharedApi;
+import net.distant_horizons.core.config.Config;
+import net.distant_horizons.core.logging.DhLoggerBuilder;
+import net.distant_horizons.core.pos.DhChunkPos;
+import net.distant_horizons.core.world.EWorldEnvironment;
+import net.distant_horizons.core.logging.DhLogger;
 
 import java.util.Collections;
 import java.util.Set;

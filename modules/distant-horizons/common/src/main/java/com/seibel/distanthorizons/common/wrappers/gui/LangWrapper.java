@@ -1,6 +1,6 @@
 package com.seibel.distanthorizons.common.wrappers.gui;
 
-import com.seibel.distanthorizons.core.wrapperInterfaces.config.ILangWrapper;
+import net.distant_horizons.core.wrapperInterfaces.config.ILangWrapper;
 import net.minecraft.client.resources.language.I18n;
 
 public class LangWrapper implements ILangWrapper

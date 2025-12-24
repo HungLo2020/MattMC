@@ -1,6 +1,6 @@
 package net.irisshaders.iris.gl.texture;
 
-import net.irisshaders.iris.gl.IrisRenderSystem;
+import net.iris.gl.IrisRenderSystem;
 import org.lwjgl.opengl.GL30C;
 
 import java.nio.ByteBuffer;

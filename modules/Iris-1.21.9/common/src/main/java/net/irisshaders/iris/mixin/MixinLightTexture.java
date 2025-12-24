@@ -1,6 +1,6 @@
 package net.irisshaders.iris.mixin;
 
-import net.irisshaders.iris.uniforms.CapturedRenderingState;
+import net.iris.uniforms.CapturedRenderingState;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.LightTexture;
 import net.minecraft.world.entity.LivingEntity;

@@ -19,8 +19,8 @@
 
 package com.seibel.distanthorizons.common.wrappers.block;
 
-import com.seibel.distanthorizons.core.dataObjects.fullData.sources.FullDataSourceV2;
-import com.seibel.distanthorizons.core.wrapperInterfaces.world.IClientLevelWrapper;
+import net.distant_horizons.core.dataObjects.fullData.sources.FullDataSourceV2;
+import net.distant_horizons.core.wrapperInterfaces.world.IClientLevelWrapper;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.world.level.*;

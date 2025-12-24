@@ -2,7 +2,7 @@ package net.caffeinemc.mods.sodium.client.data.fingerprint;
 
 import com.google.gson.Gson;
 import com.google.gson.annotations.SerializedName;
-import net.caffeinemc.mods.sodium.client.services.PlatformRuntimeInformation;
+import net.sodium.client.services.PlatformRuntimeInformation;
 import net.sodium.api.util.FileUtil;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;

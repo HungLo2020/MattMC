@@ -20,13 +20,13 @@
 package com.seibel.distanthorizons.core.util.objects.dataStreams;
 
 import com.github.luben.zstd.Zstd;
-import com.seibel.distanthorizons.api.enums.config.EDhApiDataCompressionMode;
-import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
+import net.distant_horizons.api.enums.config.EDhApiDataCompressionMode;
+import net.distant_horizons.core.logging.DhLoggerBuilder;
 import it.unimi.dsi.fastutil.bytes.ByteArrayList;
 import net.jpountz.lz4.LZ4Factory;
 import net.jpountz.lz4.LZ4FrameOutputStream;
 import net.jpountz.xxhash.XXHashFactory;
-import com.seibel.distanthorizons.core.logging.DhLogger;
+import net.distant_horizons.core.logging.DhLogger;
 import org.tukaani.xz.*;
 
 import java.io.*;

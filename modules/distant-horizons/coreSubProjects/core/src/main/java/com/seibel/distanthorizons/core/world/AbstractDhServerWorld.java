@@ -1,13 +1,13 @@
 package com.seibel.distanthorizons.core.world;
 
-import com.seibel.distanthorizons.core.file.structure.LocalSaveStructure;
-import com.seibel.distanthorizons.core.level.AbstractDhServerLevel;
-import com.seibel.distanthorizons.core.level.IDhLevel;
-import com.seibel.distanthorizons.core.multiplayer.server.ServerPlayerState;
-import com.seibel.distanthorizons.core.multiplayer.server.ServerPlayerStateManager;
-import com.seibel.distanthorizons.core.wrapperInterfaces.misc.IServerPlayerWrapper;
-import com.seibel.distanthorizons.core.wrapperInterfaces.world.ILevelWrapper;
-import com.seibel.distanthorizons.core.wrapperInterfaces.world.IServerLevelWrapper;
+import net.distant_horizons.core.file.structure.LocalSaveStructure;
+import net.distant_horizons.core.level.AbstractDhServerLevel;
+import net.distant_horizons.core.level.IDhLevel;
+import net.distant_horizons.core.multiplayer.server.ServerPlayerState;
+import net.distant_horizons.core.multiplayer.server.ServerPlayerStateManager;
+import net.distant_horizons.core.wrapperInterfaces.misc.IServerPlayerWrapper;
+import net.distant_horizons.core.wrapperInterfaces.world.ILevelWrapper;
+import net.distant_horizons.core.wrapperInterfaces.world.IServerLevelWrapper;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.ArrayList;

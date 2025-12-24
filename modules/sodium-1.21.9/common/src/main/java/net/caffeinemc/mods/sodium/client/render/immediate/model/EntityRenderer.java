@@ -4,7 +4,7 @@ import com.mojang.blaze3d.vertex.PoseStack;
 import net.sodium.api.math.MatrixHelper;
 import net.sodium.api.vertex.buffer.VertexBufferWriter;
 import net.sodium.api.vertex.format.common.EntityVertex;
-import net.caffeinemc.mods.sodium.client.util.Int2;
+import net.sodium.client.util.Int2;
 import net.minecraft.core.Direction;
 import org.joml.Matrix3f;
 import org.lwjgl.system.MemoryStack;

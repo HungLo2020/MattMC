@@ -19,7 +19,7 @@
 
 package com.seibel.distanthorizons.api.interfaces.block;
 
-import com.seibel.distanthorizons.api.interfaces.IDhApiUnsafeWrapper;
+import net.distant_horizons.api.interfaces.IDhApiUnsafeWrapper;
 
 /**
  * A Minecraft version independent way of handling Biomes.

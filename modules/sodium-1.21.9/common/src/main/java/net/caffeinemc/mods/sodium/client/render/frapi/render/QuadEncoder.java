@@ -1,8 +1,8 @@
 package net.caffeinemc.mods.sodium.client.render.frapi.render;
 
 import com.mojang.blaze3d.vertex.VertexConsumer;
-import net.caffeinemc.mods.sodium.client.render.frapi.mesh.MutableQuadViewImpl;
-import net.caffeinemc.mods.sodium.client.render.vertex.VertexConsumerUtils;
+import net.sodium.client.render.frapi.mesh.MutableQuadViewImpl;
+import net.sodium.client.render.vertex.VertexConsumerUtils;
 import net.sodium.api.math.MatrixHelper;
 import net.sodium.api.util.ColorARGB;
 import net.sodium.api.util.NormI8;

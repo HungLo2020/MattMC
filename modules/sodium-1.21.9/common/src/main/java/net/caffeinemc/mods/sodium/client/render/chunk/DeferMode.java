@@ -1,6 +1,6 @@
 package net.caffeinemc.mods.sodium.client.render.chunk;
 
-import net.caffeinemc.mods.sodium.client.gui.options.TextProvider;
+import net.sodium.client.gui.options.TextProvider;
 import net.minecraft.network.chat.Component;
 
 public enum DeferMode implements TextProvider {

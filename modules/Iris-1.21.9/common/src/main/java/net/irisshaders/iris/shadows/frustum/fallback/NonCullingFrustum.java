@@ -1,7 +1,7 @@
 package net.irisshaders.iris.shadows.frustum.fallback;
 
-import net.caffeinemc.mods.sodium.client.render.viewport.Viewport;
-import net.caffeinemc.mods.sodium.client.render.viewport.ViewportProvider;
+import net.sodium.client.render.viewport.Viewport;
+import net.sodium.client.render.viewport.ViewportProvider;
 import net.minecraft.client.renderer.culling.Frustum;
 import net.minecraft.world.level.levelgen.structure.BoundingBox;
 import net.minecraft.world.phys.AABB;

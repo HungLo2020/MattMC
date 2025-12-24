@@ -1,7 +1,7 @@
 package net.irisshaders.iris.mixin;
 
 import com.llamalad7.mixinextras.sugar.Local;
-import net.irisshaders.iris.Iris;
+import net.iris.Iris;
 import net.minecraft.client.renderer.EndFlashState;
 import net.minecraft.util.Mth;
 import net.minecraft.util.RandomSource;

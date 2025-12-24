@@ -1,7 +1,7 @@
 package net.irisshaders.iris.gl.uniform;
 
-import net.irisshaders.iris.gl.IrisRenderSystem;
-import net.irisshaders.iris.gl.state.ValueUpdateNotifier;
+import net.iris.gl.IrisRenderSystem;
+import net.iris.gl.state.ValueUpdateNotifier;
 
 public class FloatUniform extends Uniform {
 	private final FloatSupplier value;

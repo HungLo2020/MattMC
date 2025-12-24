@@ -20,7 +20,7 @@
 package com.seibel.distanthorizons.fabric.wrappers.modAccessor;
 
 
-import com.seibel.distanthorizons.core.wrapperInterfaces.modAccessor.IIrisAccessor;
+import net.distant_horizons.core.wrapperInterfaces.modAccessor.IIrisAccessor;
 
 import net.iris.api.v0.IrisApi;
 

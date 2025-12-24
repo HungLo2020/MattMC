@@ -19,20 +19,20 @@
 
 package com.seibel.distanthorizons.core.level;
 
-import com.seibel.distanthorizons.core.config.Config;
-import com.seibel.distanthorizons.core.dataObjects.fullData.sources.FullDataSourceV2;
-import com.seibel.distanthorizons.core.dependencyInjection.SingletonInjector;
-import com.seibel.distanthorizons.core.file.fullDatafile.IDataSourceUpdateListenerFunc;
-import com.seibel.distanthorizons.core.file.fullDatafile.V2.FullDataSourceProviderV2;
-import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
-import com.seibel.distanthorizons.core.pos.blockPos.DhBlockPos2D;
-import com.seibel.distanthorizons.core.render.LodQuadTree;
-import com.seibel.distanthorizons.core.render.RenderBufferHandler;
-import com.seibel.distanthorizons.core.render.renderer.generic.GenericObjectRenderer;
-import com.seibel.distanthorizons.core.util.LodUtil;
-import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftClientWrapper;
-import com.seibel.distanthorizons.core.wrapperInterfaces.world.IClientLevelWrapper;
-import com.seibel.distanthorizons.core.logging.DhLogger;
+import net.distant_horizons.core.config.Config;
+import net.distant_horizons.core.dataObjects.fullData.sources.FullDataSourceV2;
+import net.distant_horizons.core.dependencyInjection.SingletonInjector;
+import net.distant_horizons.core.file.fullDatafile.IDataSourceUpdateListenerFunc;
+import net.distant_horizons.core.file.fullDatafile.V2.FullDataSourceProviderV2;
+import net.distant_horizons.core.logging.DhLoggerBuilder;
+import net.distant_horizons.core.pos.blockPos.DhBlockPos2D;
+import net.distant_horizons.core.render.LodQuadTree;
+import net.distant_horizons.core.render.RenderBufferHandler;
+import net.distant_horizons.core.render.renderer.generic.GenericObjectRenderer;
+import net.distant_horizons.core.util.LodUtil;
+import net.distant_horizons.core.wrapperInterfaces.minecraft.IMinecraftClientWrapper;
+import net.distant_horizons.core.wrapperInterfaces.world.IClientLevelWrapper;
+import net.distant_horizons.core.logging.DhLogger;
 
 import javax.annotation.WillNotClose;
 import java.io.Closeable;

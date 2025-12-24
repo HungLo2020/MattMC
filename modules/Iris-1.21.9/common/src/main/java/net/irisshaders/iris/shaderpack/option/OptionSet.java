@@ -1,7 +1,7 @@
 package net.irisshaders.iris.shaderpack.option;
 
 import com.google.common.collect.ImmutableMap;
-import net.irisshaders.iris.Iris;
+import net.iris.Iris;
 
 import java.util.HashMap;
 import java.util.Map;

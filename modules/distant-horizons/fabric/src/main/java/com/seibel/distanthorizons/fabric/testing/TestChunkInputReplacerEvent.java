@@ -1,11 +1,11 @@
 package com.seibel.distanthorizons.fabric.testing;
 
-import com.seibel.distanthorizons.api.DhApi;
-import com.seibel.distanthorizons.api.interfaces.block.IDhApiBlockStateWrapper;
-import com.seibel.distanthorizons.api.methods.events.abstractEvents.DhApiChunkProcessingEvent;
-import com.seibel.distanthorizons.api.methods.events.sharedParameterObjects.DhApiEventParam;
-import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
-import com.seibel.distanthorizons.core.logging.DhLogger;
+import net.distant_horizons.api.DhApi;
+import net.distant_horizons.api.interfaces.block.IDhApiBlockStateWrapper;
+import net.distant_horizons.api.methods.events.abstractEvents.DhApiChunkProcessingEvent;
+import net.distant_horizons.api.methods.events.sharedParameterObjects.DhApiEventParam;
+import net.distant_horizons.core.logging.DhLoggerBuilder;
+import net.distant_horizons.core.logging.DhLogger;
 
 import java.io.IOException;
 

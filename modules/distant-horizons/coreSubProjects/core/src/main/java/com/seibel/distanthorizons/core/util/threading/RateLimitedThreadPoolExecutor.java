@@ -19,10 +19,10 @@
 
 package com.seibel.distanthorizons.core.util.threading;
 
-import com.seibel.distanthorizons.core.config.Config;
-import com.seibel.distanthorizons.core.config.types.ConfigEntry;
-import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
-import com.seibel.distanthorizons.core.logging.DhLogger;
+import net.distant_horizons.core.config.Config;
+import net.distant_horizons.core.config.types.ConfigEntry;
+import net.distant_horizons.core.logging.DhLoggerBuilder;
+import net.distant_horizons.core.logging.DhLogger;
 
 import java.util.concurrent.*;
 import java.util.function.Supplier;

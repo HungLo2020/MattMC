@@ -19,12 +19,12 @@
 
 package com.seibel.distanthorizons.api.interfaces.data;
 
-import com.seibel.distanthorizons.api.enums.EDhApiDetailLevel;
-import com.seibel.distanthorizons.api.interfaces.override.worldGenerator.IDhApiWorldGenerator;
-import com.seibel.distanthorizons.api.interfaces.world.IDhApiLevelWrapper;
-import com.seibel.distanthorizons.api.objects.DhApiResult;
-import com.seibel.distanthorizons.api.objects.data.DhApiRaycastResult;
-import com.seibel.distanthorizons.api.objects.data.DhApiTerrainDataPoint;
+import net.distant_horizons.api.enums.EDhApiDetailLevel;
+import net.distant_horizons.api.interfaces.override.worldGenerator.IDhApiWorldGenerator;
+import net.distant_horizons.api.interfaces.world.IDhApiLevelWrapper;
+import net.distant_horizons.api.objects.DhApiResult;
+import net.distant_horizons.api.objects.data.DhApiRaycastResult;
+import net.distant_horizons.api.objects.data.DhApiTerrainDataPoint;
 
 /**
  * Used to interface with Distant Horizons' terrain data.

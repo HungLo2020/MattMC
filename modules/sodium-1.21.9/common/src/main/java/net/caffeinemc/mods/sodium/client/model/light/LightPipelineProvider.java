@@ -1,8 +1,8 @@
 package net.caffeinemc.mods.sodium.client.model.light;
 
-import net.caffeinemc.mods.sodium.client.model.light.data.LightDataAccess;
-import net.caffeinemc.mods.sodium.client.model.light.flat.FlatLightPipeline;
-import net.caffeinemc.mods.sodium.client.model.light.smooth.SmoothLightPipeline;
+import net.sodium.client.model.light.data.LightDataAccess;
+import net.sodium.client.model.light.flat.FlatLightPipeline;
+import net.sodium.client.model.light.smooth.SmoothLightPipeline;
 
 import java.util.EnumMap;
 

@@ -1,19 +1,19 @@
 package net.irisshaders.iris.apiimpl;
 
 import com.mojang.blaze3d.pipeline.RenderPipeline;
-import net.irisshaders.iris.Iris;
+import net.iris.Iris;
 import net.iris.api.v0.IrisApi;
 import net.iris.api.v0.IrisApiConfig;
 import net.iris.api.v0.IrisProgram;
 import net.iris.api.v0.IrisTextVertexSink;
-import net.irisshaders.iris.gui.screen.ShaderPackScreen;
-import net.irisshaders.iris.pipeline.IrisPipelines;
-import net.irisshaders.iris.pipeline.VanillaRenderingPipeline;
-import net.irisshaders.iris.pipeline.WorldRenderingPipeline;
-import net.irisshaders.iris.pipeline.programs.ShaderKey;
-import net.irisshaders.iris.shaderpack.loading.ProgramId;
-import net.irisshaders.iris.shadows.ShadowRenderingState;
-import net.irisshaders.iris.vertices.IrisTextVertexSinkImpl;
+import net.iris.gui.screen.ShaderPackScreen;
+import net.iris.pipeline.IrisPipelines;
+import net.iris.pipeline.VanillaRenderingPipeline;
+import net.iris.pipeline.WorldRenderingPipeline;
+import net.iris.pipeline.programs.ShaderKey;
+import net.iris.shaderpack.loading.ProgramId;
+import net.iris.shadows.ShadowRenderingState;
+import net.iris.vertices.IrisTextVertexSinkImpl;
 import net.minecraft.client.gui.screens.Screen;
 
 import java.nio.ByteBuffer;

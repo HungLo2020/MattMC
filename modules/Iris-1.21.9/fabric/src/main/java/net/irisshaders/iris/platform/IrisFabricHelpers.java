@@ -6,7 +6,7 @@ import net.fabricmc.loader.api.FabricLoader;
 import net.fabricmc.loader.api.ModContainer;
 import net.fabricmc.loader.api.SemanticVersion;
 import net.fabricmc.loader.api.VersionParsingException;
-import net.irisshaders.iris.gl.texture.DepthBufferFormat;
+import net.iris.gl.texture.DepthBufferFormat;
 import net.minecraft.client.KeyMapping;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;

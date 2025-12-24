@@ -19,9 +19,9 @@
 
 package com.seibel.distanthorizons.api.methods.events.sharedParameterObjects;
 
-import com.seibel.distanthorizons.api.enums.rendering.EDhApiRenderPass;
-import com.seibel.distanthorizons.api.methods.events.interfaces.IDhApiEventParam;
-import com.seibel.distanthorizons.api.objects.math.DhApiMat4f;
+import net.distant_horizons.api.enums.rendering.EDhApiRenderPass;
+import net.distant_horizons.api.methods.events.interfaces.IDhApiEventParam;
+import net.distant_horizons.api.objects.math.DhApiMat4f;
 
 /**
  * Contains information relevant to when Distant Horizons (re)creates

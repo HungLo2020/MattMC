@@ -19,9 +19,9 @@
 
 package com.seibel.distanthorizons.core.jar;
 
-import com.seibel.distanthorizons.core.dependencyInjection.SingletonInjector;
-import com.seibel.distanthorizons.core.jar.wrapperInterfaces.config.LangWrapper;
-import com.seibel.distanthorizons.core.wrapperInterfaces.config.ILangWrapper;
+import net.distant_horizons.core.dependencyInjection.SingletonInjector;
+import net.distant_horizons.core.jar.wrapperInterfaces.config.LangWrapper;
+import net.distant_horizons.core.wrapperInterfaces.config.ILangWrapper;
 
 public class JarDependencySetup
 {

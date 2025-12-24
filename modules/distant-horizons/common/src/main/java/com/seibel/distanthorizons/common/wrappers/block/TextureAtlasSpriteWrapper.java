@@ -21,7 +21,7 @@ package com.seibel.distanthorizons.common.wrappers.block;
 
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
 
-import com.seibel.distanthorizons.core.util.ColorUtil;
+import net.distant_horizons.core.util.ColorUtil;
 import net.minecraft.client.renderer.texture.SpriteContents;
 
 /**

@@ -1,16 +1,16 @@
 package net.irisshaders.iris.uniforms;
 
 import com.mojang.blaze3d.systems.RenderSystem;
-import net.caffeinemc.mods.sodium.client.util.FogStorage;
-import net.irisshaders.iris.gl.state.FogMode;
-import net.irisshaders.iris.gl.state.StateUpdateNotifiers;
-import net.irisshaders.iris.gl.uniform.DynamicUniformHolder;
-import net.irisshaders.iris.gl.uniform.UniformUpdateFrequency;
+import net.sodium.client.util.FogStorage;
+import net.iris.gl.state.FogMode;
+import net.iris.gl.state.StateUpdateNotifiers;
+import net.iris.gl.uniform.DynamicUniformHolder;
+import net.iris.gl.uniform.UniformUpdateFrequency;
 import net.minecraft.client.Minecraft;
 import org.joml.Vector3f;
 import org.lwjgl.opengl.GL11;
 
-import static net.irisshaders.iris.gl.uniform.UniformUpdateFrequency.PER_FRAME;
+import static net.iris.gl.uniform.UniformUpdateFrequency.PER_FRAME;
 
 public class FogUniforms {
 	private FogUniforms() {

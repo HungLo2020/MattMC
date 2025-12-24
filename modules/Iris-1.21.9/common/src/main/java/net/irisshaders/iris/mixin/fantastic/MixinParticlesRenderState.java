@@ -1,6 +1,6 @@
 package net.irisshaders.iris.mixin.fantastic;
 
-import net.irisshaders.iris.mixinterface.ParticleRenderStateExtension;
+import net.iris.mixinterface.ParticleRenderStateExtension;
 import net.minecraft.client.particle.ItemPickupParticleGroup;
 import net.minecraft.client.renderer.SubmitNodeStorage;
 import net.minecraft.client.renderer.state.CameraRenderState;

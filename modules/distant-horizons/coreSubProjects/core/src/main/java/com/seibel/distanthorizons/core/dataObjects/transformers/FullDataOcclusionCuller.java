@@ -1,8 +1,8 @@
 package com.seibel.distanthorizons.core.dataObjects.transformers;
 
-import com.seibel.distanthorizons.core.dataObjects.fullData.sources.FullDataSourceV2;
-import com.seibel.distanthorizons.core.util.FullDataPointUtil;
-import com.seibel.distanthorizons.core.util.LodUtil;
+import net.distant_horizons.core.dataObjects.fullData.sources.FullDataSourceV2;
+import net.distant_horizons.core.util.FullDataPointUtil;
+import net.distant_horizons.core.util.LodUtil;
 import it.unimi.dsi.fastutil.longs.LongArrayList;
 import org.jetbrains.annotations.NotNull;
 

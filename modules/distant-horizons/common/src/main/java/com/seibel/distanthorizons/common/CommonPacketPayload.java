@@ -1,9 +1,9 @@
 package com.seibel.distanthorizons.common;
 
 
-import com.seibel.distanthorizons.core.dependencyInjection.SingletonInjector;
-import com.seibel.distanthorizons.core.network.messages.AbstractNetworkMessage;
-import com.seibel.distanthorizons.core.wrapperInterfaces.misc.IPluginPacketSender;
+import net.distant_horizons.core.dependencyInjection.SingletonInjector;
+import net.distant_horizons.core.network.messages.AbstractNetworkMessage;
+import net.distant_horizons.core.wrapperInterfaces.misc.IPluginPacketSender;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;

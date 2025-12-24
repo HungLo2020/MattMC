@@ -19,7 +19,7 @@
 
 package com.seibel.distanthorizons.api.objects.math;
 
-import com.seibel.distanthorizons.api.interfaces.util.IDhApiCopyable;
+import net.distant_horizons.api.interfaces.util.IDhApiCopyable;
 
 /**
  * Often used to store block positions or any other

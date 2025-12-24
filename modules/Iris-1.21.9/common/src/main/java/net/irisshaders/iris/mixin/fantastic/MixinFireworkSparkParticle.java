@@ -1,6 +1,6 @@
 package net.irisshaders.iris.mixin.fantastic;
 
-import net.irisshaders.iris.Iris;
+import net.iris.Iris;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.particle.ParticleRenderType;
 import net.minecraft.client.particle.SimpleAnimatedParticle;

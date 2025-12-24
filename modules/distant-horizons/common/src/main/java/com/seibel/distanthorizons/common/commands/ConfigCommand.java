@@ -3,9 +3,9 @@ package com.seibel.distanthorizons.common.commands;
 import com.mojang.brigadier.arguments.*;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.mojang.brigadier.context.CommandContext;
-import com.seibel.distanthorizons.core.config.ConfigHandler;
-import com.seibel.distanthorizons.core.config.types.AbstractConfigBase;
-import com.seibel.distanthorizons.core.config.types.ConfigEntry;
+import net.distant_horizons.core.config.ConfigHandler;
+import net.distant_horizons.core.config.types.AbstractConfigBase;
+import net.distant_horizons.core.config.types.ConfigEntry;
 import net.minecraft.commands.CommandSourceStack;
 
 import java.util.Arrays;

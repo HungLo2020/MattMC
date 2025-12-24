@@ -19,10 +19,10 @@
 
 package com.seibel.distanthorizons.core.render.renderer;
 
-import com.seibel.distanthorizons.api.enums.config.EDhApiGpuUploadMethod;
-import com.seibel.distanthorizons.core.render.glObject.buffer.GLVertexBuffer;
-import com.seibel.distanthorizons.core.render.glObject.vertexAttribute.AbstractVertexAttribute;
-import com.seibel.distanthorizons.core.render.glObject.vertexAttribute.VertexPointer;
+import net.distant_horizons.api.enums.config.EDhApiGpuUploadMethod;
+import net.distant_horizons.core.render.glObject.buffer.GLVertexBuffer;
+import net.distant_horizons.core.render.glObject.vertexAttribute.AbstractVertexAttribute;
+import net.distant_horizons.core.render.glObject.vertexAttribute.VertexPointer;
 import org.lwjgl.opengl.GL32;
 import org.lwjgl.system.MemoryUtil;
 

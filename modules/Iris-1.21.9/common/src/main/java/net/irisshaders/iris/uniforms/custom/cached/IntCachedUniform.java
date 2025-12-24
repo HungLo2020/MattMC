@@ -2,8 +2,8 @@ package net.irisshaders.iris.uniforms.custom.cached;
 
 import com.mojang.blaze3d.opengl.GlStateManager;
 import net.iris.stareval.function.FunctionReturn;
-import kroppeb.stareval.function.Type;
-import net.irisshaders.iris.gl.uniform.UniformUpdateFrequency;
+import net.iris.stareval.function.Type;
+import net.iris.gl.uniform.UniformUpdateFrequency;
 
 import java.util.function.IntSupplier;
 

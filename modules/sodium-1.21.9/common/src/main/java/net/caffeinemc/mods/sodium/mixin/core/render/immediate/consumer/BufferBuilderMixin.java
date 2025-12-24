@@ -6,7 +6,7 @@ import com.mojang.blaze3d.vertex.VertexFormat;
 import net.sodium.api.memory.MemoryIntrinsics;
 import net.sodium.api.vertex.buffer.VertexBufferWriter;
 import net.sodium.api.vertex.serializer.VertexSerializerRegistry;
-import net.caffeinemc.mods.sodium.client.render.vertex.buffer.BufferBuilderExtension;
+import net.sodium.client.render.vertex.buffer.BufferBuilderExtension;
 import org.lwjgl.system.MemoryStack;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;

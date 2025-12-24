@@ -1,9 +1,9 @@
 package com.seibel.distanthorizons.common.wrappers.worldGeneration.step;
 
-import com.seibel.distanthorizons.common.wrappers.chunk.ChunkWrapper;
-import com.seibel.distanthorizons.common.wrappers.worldGeneration.params.ThreadWorldGenParams;
-import com.seibel.distanthorizons.common.wrappers.worldGeneration.mimicObject.DhLitWorldGenRegion;
-import com.seibel.distanthorizons.core.util.gridList.ArrayGridList;
+import net.distant_horizons.common.wrappers.chunk.ChunkWrapper;
+import net.distant_horizons.common.wrappers.worldGeneration.params.ThreadWorldGenParams;
+import net.distant_horizons.common.wrappers.worldGeneration.mimicObject.DhLitWorldGenRegion;
+import net.distant_horizons.core.util.gridList.ArrayGridList;
 import net.minecraft.world.level.chunk.ChunkAccess;
 import net.minecraft.world.level.chunk.ProtoChunk;
 

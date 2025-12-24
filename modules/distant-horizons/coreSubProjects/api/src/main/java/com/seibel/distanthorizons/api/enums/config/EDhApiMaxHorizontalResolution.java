@@ -22,7 +22,7 @@ package com.seibel.distanthorizons.api.enums.config;
 import java.util.ArrayList;
 import java.util.Collections;
 
-import com.seibel.distanthorizons.coreapi.util.MathUtil;
+import net.distant_horizons.coreapi.util.MathUtil;
 
 /**
  * BLOCK <Br>

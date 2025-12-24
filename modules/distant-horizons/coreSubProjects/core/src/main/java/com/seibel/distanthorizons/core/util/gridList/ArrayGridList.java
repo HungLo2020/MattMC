@@ -19,7 +19,7 @@
 
 package com.seibel.distanthorizons.core.util.gridList;
 
-import com.seibel.distanthorizons.core.pos.Pos2D;
+import net.distant_horizons.core.pos.Pos2D;
 
 import java.util.ArrayList;
 import java.util.function.BiConsumer;

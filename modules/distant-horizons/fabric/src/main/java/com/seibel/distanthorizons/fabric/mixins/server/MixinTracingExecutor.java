@@ -19,11 +19,11 @@
 
 package com.seibel.distanthorizons.fabric.mixins.server;
 
-import com.seibel.distanthorizons.common.wrappers.worldGeneration.BatchGenerationEnvironment;
+import net.distant_horizons.common.wrappers.worldGeneration.BatchGenerationEnvironment;
 import org.spongepowered.asm.mixin.Mixin;
 
 
-import com.seibel.distanthorizons.core.util.objects.RunOnThisThreadExecutorService;
+import net.distant_horizons.core.util.objects.RunOnThisThreadExecutorService;
 import net.minecraft.TracingExecutor;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;

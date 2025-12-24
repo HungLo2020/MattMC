@@ -23,7 +23,7 @@ import java.nio.ByteBuffer;
 
 import org.lwjgl.opengl.GL32;
 
-import com.seibel.distanthorizons.api.enums.config.EDhApiGpuUploadMethod;
+import net.distant_horizons.api.enums.config.EDhApiGpuUploadMethod;
 
 /**
  * This is a container for a OpenGL

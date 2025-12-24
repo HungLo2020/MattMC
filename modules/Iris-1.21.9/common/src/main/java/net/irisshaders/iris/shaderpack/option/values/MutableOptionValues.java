@@ -1,8 +1,8 @@
 package net.irisshaders.iris.shaderpack.option.values;
 
 import com.google.common.collect.ImmutableMap;
-import net.irisshaders.iris.helpers.OptionalBoolean;
-import net.irisshaders.iris.shaderpack.option.OptionSet;
+import net.iris.helpers.OptionalBoolean;
+import net.iris.shaderpack.option.OptionSet;
 
 import java.util.HashMap;
 import java.util.Map;

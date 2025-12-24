@@ -5,9 +5,9 @@ import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
-import net.irisshaders.iris.Iris;
-import net.irisshaders.iris.gui.option.IrisVideoSettings;
-import net.irisshaders.iris.pathways.colorspace.ColorSpace;
+import net.iris.Iris;
+import net.iris.gui.option.IrisVideoSettings;
+import net.iris.pathways.colorspace.ColorSpace;
 import net.minecraft.resources.ResourceLocation;
 
 import java.io.IOException;

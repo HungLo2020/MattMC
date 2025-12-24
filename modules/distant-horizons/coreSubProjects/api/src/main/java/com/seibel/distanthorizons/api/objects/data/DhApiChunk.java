@@ -19,8 +19,8 @@
 
 package com.seibel.distanthorizons.api.objects.data;
 
-import com.seibel.distanthorizons.api.interfaces.factories.IDhApiWrapperFactory;
-import com.seibel.distanthorizons.api.interfaces.override.worldGenerator.IDhApiWorldGenerator;
+import net.distant_horizons.api.interfaces.factories.IDhApiWrapperFactory;
+import net.distant_horizons.api.interfaces.override.worldGenerator.IDhApiWorldGenerator;
 import org.apache.logging.log4j.LogManager;
 
 import java.util.ArrayList;

@@ -19,7 +19,7 @@
 
 package com.seibel.distanthorizons.core.wrapperInterfaces.minecraft;
 
-import com.seibel.distanthorizons.coreapi.interfaces.dependencyInjection.IBindable;
+import net.distant_horizons.coreapi.interfaces.dependencyInjection.IBindable;
 
 /**
  * @author James Seibel

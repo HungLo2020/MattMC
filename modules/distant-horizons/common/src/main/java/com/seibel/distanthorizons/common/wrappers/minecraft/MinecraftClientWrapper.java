@@ -21,18 +21,18 @@ package com.seibel.distanthorizons.common.wrappers.minecraft;
 
 import java.io.File;
 
-import com.seibel.distanthorizons.common.wrappers.world.ClientLevelWrapper;
-import com.seibel.distanthorizons.core.file.structure.ClientOnlySaveStructure;
-import com.seibel.distanthorizons.core.render.glObject.GLProxy;
-import com.seibel.distanthorizons.core.wrapperInterfaces.world.IClientLevelWrapper;
-import com.seibel.distanthorizons.coreapi.ModInfo;
-import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
-import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftClientWrapper;
-import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftSharedWrapper;
-import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IProfilerWrapper;
-import com.seibel.distanthorizons.core.pos.blockPos.DhBlockPos;
-import com.seibel.distanthorizons.core.pos.DhChunkPos;
-import com.seibel.distanthorizons.core.logging.DhLogger;
+import net.distant_horizons.common.wrappers.world.ClientLevelWrapper;
+import net.distant_horizons.core.file.structure.ClientOnlySaveStructure;
+import net.distant_horizons.core.render.glObject.GLProxy;
+import net.distant_horizons.core.wrapperInterfaces.world.IClientLevelWrapper;
+import net.distant_horizons.coreapi.ModInfo;
+import net.distant_horizons.core.logging.DhLoggerBuilder;
+import net.distant_horizons.core.wrapperInterfaces.minecraft.IMinecraftClientWrapper;
+import net.distant_horizons.core.wrapperInterfaces.minecraft.IMinecraftSharedWrapper;
+import net.distant_horizons.core.wrapperInterfaces.minecraft.IProfilerWrapper;
+import net.distant_horizons.core.pos.blockPos.DhBlockPos;
+import net.distant_horizons.core.pos.DhChunkPos;
+import net.distant_horizons.core.logging.DhLogger;
 
 import net.minecraft.CrashReport;
 import net.minecraft.client.CloudStatus;

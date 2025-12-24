@@ -19,10 +19,10 @@
 
 package com.seibel.distanthorizons.core.sql;
 
-import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
-import com.seibel.distanthorizons.core.sql.dto.IBaseDTO;
-import com.seibel.distanthorizons.core.sql.repo.AbstractDhRepo;
-import com.seibel.distanthorizons.core.logging.DhLogger;
+import net.distant_horizons.core.logging.DhLoggerBuilder;
+import net.distant_horizons.core.sql.dto.IBaseDTO;
+import net.distant_horizons.core.sql.repo.AbstractDhRepo;
+import net.distant_horizons.core.logging.DhLogger;
 
 import java.io.IOException;
 import java.io.InputStream;

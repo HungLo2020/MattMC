@@ -19,7 +19,7 @@
 
 package com.seibel.distanthorizons.core.pos;
 
-import com.seibel.distanthorizons.coreapi.util.MathUtil;
+import net.distant_horizons.coreapi.util.MathUtil;
 
 import java.util.Objects;
 

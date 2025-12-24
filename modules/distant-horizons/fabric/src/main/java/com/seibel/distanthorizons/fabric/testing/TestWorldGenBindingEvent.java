@@ -1,12 +1,12 @@
 package com.seibel.distanthorizons.fabric.testing;
 
-import com.seibel.distanthorizons.api.DhApi;
-import com.seibel.distanthorizons.api.interfaces.override.worldGenerator.IDhApiWorldGenerator;
-import com.seibel.distanthorizons.api.methods.events.abstractEvents.DhApiLevelLoadEvent;
-import com.seibel.distanthorizons.api.methods.events.sharedParameterObjects.DhApiEventParam;
-import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
+import net.distant_horizons.api.DhApi;
+import net.distant_horizons.api.interfaces.override.worldGenerator.IDhApiWorldGenerator;
+import net.distant_horizons.api.methods.events.abstractEvents.DhApiLevelLoadEvent;
+import net.distant_horizons.api.methods.events.sharedParameterObjects.DhApiEventParam;
+import net.distant_horizons.core.logging.DhLoggerBuilder;
 import net.minecraft.server.level.ServerLevel;
-import com.seibel.distanthorizons.core.logging.DhLogger;
+import net.distant_horizons.core.logging.DhLogger;
 
 // TODO add to API example once Builderb0y has given the all-clear
 public class TestWorldGenBindingEvent extends DhApiLevelLoadEvent

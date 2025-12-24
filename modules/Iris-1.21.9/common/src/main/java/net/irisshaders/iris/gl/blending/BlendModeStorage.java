@@ -2,9 +2,9 @@ package net.irisshaders.iris.gl.blending;
 
 import com.mojang.blaze3d.opengl.GlStateManager;
 import net.iris.gl.blending.BlendMode;
-import net.irisshaders.iris.gl.IrisRenderSystem;
-import net.irisshaders.iris.mixin.GlStateManagerAccessor;
-import net.irisshaders.iris.mixin.statelisteners.BooleanStateAccessor;
+import net.iris.gl.IrisRenderSystem;
+import net.iris.mixin.GlStateManagerAccessor;
+import net.iris.mixin.statelisteners.BooleanStateAccessor;
 
 public class BlendModeStorage {
 	private static boolean originalBlendEnable;

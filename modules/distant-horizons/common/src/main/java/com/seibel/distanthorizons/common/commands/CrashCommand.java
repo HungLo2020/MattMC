@@ -1,9 +1,9 @@
 package com.seibel.distanthorizons.common.commands;
 
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
-import com.seibel.distanthorizons.core.api.internal.SharedApi;
-import com.seibel.distanthorizons.core.multiplayer.server.ServerPlayerState;
-import com.seibel.distanthorizons.core.network.messages.base.CodecCrashMessage;
+import net.distant_horizons.core.api.internal.SharedApi;
+import net.distant_horizons.core.multiplayer.server.ServerPlayerState;
+import net.distant_horizons.core.network.messages.base.CodecCrashMessage;
 import net.minecraft.commands.CommandSourceStack;
 
 import static net.minecraft.commands.Commands.literal;

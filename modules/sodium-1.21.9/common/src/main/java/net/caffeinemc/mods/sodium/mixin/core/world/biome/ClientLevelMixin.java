@@ -1,6 +1,6 @@
 package net.caffeinemc.mods.sodium.mixin.core.world.biome;
 
-import net.caffeinemc.mods.sodium.client.world.BiomeSeedProvider;
+import net.sodium.client.world.BiomeSeedProvider;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.multiplayer.ClientPacketListener;
 import net.minecraft.client.renderer.LevelRenderer;

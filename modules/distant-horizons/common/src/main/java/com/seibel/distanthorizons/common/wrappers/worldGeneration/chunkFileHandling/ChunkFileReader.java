@@ -1,16 +1,16 @@
 package com.seibel.distanthorizons.common.wrappers.worldGeneration.chunkFileHandling;
 
-import com.seibel.distanthorizons.common.wrappers.chunk.ChunkWrapper;
-import com.seibel.distanthorizons.common.wrappers.worldGeneration.params.GlobalWorldGenParams;
-import com.seibel.distanthorizons.common.wrappers.worldGeneration.mimicObject.RegionFileStorageExternalCache;
-import com.seibel.distanthorizons.core.config.Config;
-import com.seibel.distanthorizons.core.dependencyInjection.SingletonInjector;
-import com.seibel.distanthorizons.core.logging.DhLogger;
-import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
-import com.seibel.distanthorizons.core.pos.DhChunkPos;
-import com.seibel.distanthorizons.core.util.ExceptionUtil;
-import com.seibel.distanthorizons.core.wrapperInterfaces.chunk.ChunkLightStorage;
-import com.seibel.distanthorizons.core.wrapperInterfaces.modAccessor.IModChecker;
+import net.distant_horizons.common.wrappers.chunk.ChunkWrapper;
+import net.distant_horizons.common.wrappers.worldGeneration.params.GlobalWorldGenParams;
+import net.distant_horizons.common.wrappers.worldGeneration.mimicObject.RegionFileStorageExternalCache;
+import net.distant_horizons.core.config.Config;
+import net.distant_horizons.core.dependencyInjection.SingletonInjector;
+import net.distant_horizons.core.logging.DhLogger;
+import net.distant_horizons.core.logging.DhLoggerBuilder;
+import net.distant_horizons.core.pos.DhChunkPos;
+import net.distant_horizons.core.util.ExceptionUtil;
+import net.distant_horizons.core.wrapperInterfaces.chunk.ChunkLightStorage;
+import net.distant_horizons.core.wrapperInterfaces.modAccessor.IModChecker;
 
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.server.level.ServerLevel;

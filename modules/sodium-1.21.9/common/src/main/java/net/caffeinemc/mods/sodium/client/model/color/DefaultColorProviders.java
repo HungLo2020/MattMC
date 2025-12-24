@@ -1,8 +1,8 @@
 package net.caffeinemc.mods.sodium.client.model.color;
 
-import net.caffeinemc.mods.sodium.client.model.quad.ModelQuadView;
-import net.caffeinemc.mods.sodium.client.model.quad.blender.BlendedColorProvider;
-import net.caffeinemc.mods.sodium.client.world.LevelSlice;
+import net.sodium.client.model.quad.ModelQuadView;
+import net.sodium.client.model.quad.blender.BlendedColorProvider;
+import net.sodium.client.world.LevelSlice;
 import net.minecraft.client.color.block.BlockColor;
 import net.minecraft.client.renderer.BiomeColors;
 import net.minecraft.core.BlockPos;

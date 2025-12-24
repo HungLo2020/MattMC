@@ -1,7 +1,7 @@
 package net.caffeinemc.mods.sodium.client.gui;
 
-import net.caffeinemc.mods.sodium.client.SodiumClientMod;
-import net.caffeinemc.mods.sodium.client.render.SodiumWorldRenderer;
+import net.sodium.client.SodiumClientMod;
+import net.sodium.client.render.SodiumWorldRenderer;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.gui.components.debug.DebugScreenDisplayer;
 import net.minecraft.client.gui.components.debug.DebugScreenEntry;

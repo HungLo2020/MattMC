@@ -1,19 +1,19 @@
 package com.seibel.distanthorizons.fabric.testing;
 
-import com.seibel.distanthorizons.api.DhApi;
-import com.seibel.distanthorizons.api.enums.EDhApiDetailLevel;
-import com.seibel.distanthorizons.api.enums.worldGeneration.EDhApiDistantGeneratorMode;
-import com.seibel.distanthorizons.api.enums.worldGeneration.EDhApiWorldGeneratorReturnType;
-import com.seibel.distanthorizons.api.interfaces.block.IDhApiBiomeWrapper;
-import com.seibel.distanthorizons.api.interfaces.block.IDhApiBlockStateWrapper;
-import com.seibel.distanthorizons.api.interfaces.override.worldGenerator.IDhApiWorldGenerator;
-import com.seibel.distanthorizons.api.interfaces.world.IDhApiLevelWrapper;
-import com.seibel.distanthorizons.api.objects.data.DhApiTerrainDataPoint;
-import com.seibel.distanthorizons.api.objects.data.IDhApiFullDataSource;
-import com.seibel.distanthorizons.common.wrappers.world.ServerLevelWrapper;
-import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
+import net.distant_horizons.api.DhApi;
+import net.distant_horizons.api.enums.EDhApiDetailLevel;
+import net.distant_horizons.api.enums.worldGeneration.EDhApiDistantGeneratorMode;
+import net.distant_horizons.api.enums.worldGeneration.EDhApiWorldGeneratorReturnType;
+import net.distant_horizons.api.interfaces.block.IDhApiBiomeWrapper;
+import net.distant_horizons.api.interfaces.block.IDhApiBlockStateWrapper;
+import net.distant_horizons.api.interfaces.override.worldGenerator.IDhApiWorldGenerator;
+import net.distant_horizons.api.interfaces.world.IDhApiLevelWrapper;
+import net.distant_horizons.api.objects.data.DhApiTerrainDataPoint;
+import net.distant_horizons.api.objects.data.IDhApiFullDataSource;
+import net.distant_horizons.common.wrappers.world.ServerLevelWrapper;
+import net.distant_horizons.core.logging.DhLoggerBuilder;
 import net.minecraft.server.level.ServerLevel;
-import com.seibel.distanthorizons.core.logging.DhLogger;
+import net.distant_horizons.core.logging.DhLogger;
 
 import java.io.IOException;
 import java.util.ArrayList;

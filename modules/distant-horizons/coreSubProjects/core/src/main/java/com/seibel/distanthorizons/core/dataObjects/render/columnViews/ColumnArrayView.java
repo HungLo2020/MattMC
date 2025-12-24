@@ -20,8 +20,8 @@
 package com.seibel.distanthorizons.core.dataObjects.render.columnViews;
 
 
-import com.seibel.distanthorizons.core.dataObjects.render.ColumnRenderSource;
-import com.seibel.distanthorizons.core.util.RenderDataPointUtil;
+import net.distant_horizons.core.dataObjects.render.ColumnRenderSource;
+import net.distant_horizons.core.util.RenderDataPointUtil;
 import it.unimi.dsi.fastutil.longs.LongArrayList;
 
 import java.util.Arrays;

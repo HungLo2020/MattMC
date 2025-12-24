@@ -19,7 +19,7 @@
 
 package com.seibel.distanthorizons.api.objects.data;
 
-import com.seibel.distanthorizons.api.objects.math.DhApiVec3i;
+import net.distant_horizons.api.objects.math.DhApiVec3i;
 
 /**
  * Holds a single datapoint of terrain data

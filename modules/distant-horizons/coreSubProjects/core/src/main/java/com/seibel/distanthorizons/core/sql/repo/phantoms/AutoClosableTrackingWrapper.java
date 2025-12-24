@@ -1,6 +1,6 @@
 package com.seibel.distanthorizons.core.sql.repo.phantoms;
 
-import com.seibel.distanthorizons.coreapi.ModInfo;
+import net.distant_horizons.coreapi.ModInfo;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 

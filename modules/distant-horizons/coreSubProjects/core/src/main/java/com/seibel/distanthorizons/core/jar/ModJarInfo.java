@@ -22,9 +22,9 @@ package com.seibel.distanthorizons.core.jar;
 import com.electronwill.nightconfig.core.Config;
 import com.electronwill.nightconfig.core.io.ParsingMode;
 import com.electronwill.nightconfig.json.JsonFormat;
-import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
+import net.distant_horizons.core.logging.DhLoggerBuilder;
 import org.apache.logging.log4j.LogManager;
-import com.seibel.distanthorizons.core.logging.DhLogger;
+import net.distant_horizons.core.logging.DhLogger;
 
 /**
  * Get info on the git for the mod <br>

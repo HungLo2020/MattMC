@@ -1,8 +1,8 @@
 package net.irisshaders.iris.compat.sodium.mixin;
 
-import net.caffeinemc.mods.sodium.client.gui.SodiumGameOptions;
-import net.caffeinemc.mods.sodium.client.render.chunk.DefaultChunkRenderer;
-import net.irisshaders.iris.shadows.ShadowRenderingState;
+import net.sodium.client.gui.SodiumGameOptions;
+import net.sodium.client.render.chunk.DefaultChunkRenderer;
+import net.iris.shadows.ShadowRenderingState;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.ModifyArg;

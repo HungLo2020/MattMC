@@ -1,17 +1,17 @@
 package com.seibel.distanthorizons.core.api.internal;
 
-import com.seibel.distanthorizons.core.config.Config;
-import com.seibel.distanthorizons.core.dependencyInjection.SingletonInjector;
-import com.seibel.distanthorizons.core.level.IKeyedClientLevelManager;
-import com.seibel.distanthorizons.core.level.IServerKeyedClientLevel;
-import com.seibel.distanthorizons.core.logging.DhLogger;
-import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
-import com.seibel.distanthorizons.core.network.event.internal.CloseInternalEvent;
-import com.seibel.distanthorizons.core.network.messages.base.LevelInitMessage;
-import com.seibel.distanthorizons.core.network.session.NetworkSession;
-import com.seibel.distanthorizons.core.render.glObject.GLProxy;
-import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftClientWrapper;
-import com.seibel.distanthorizons.core.wrapperInterfaces.world.IClientLevelWrapper;
+import net.distant_horizons.core.config.Config;
+import net.distant_horizons.core.dependencyInjection.SingletonInjector;
+import net.distant_horizons.core.level.IKeyedClientLevelManager;
+import net.distant_horizons.core.level.IServerKeyedClientLevel;
+import net.distant_horizons.core.logging.DhLogger;
+import net.distant_horizons.core.logging.DhLoggerBuilder;
+import net.distant_horizons.core.network.event.internal.CloseInternalEvent;
+import net.distant_horizons.core.network.messages.base.LevelInitMessage;
+import net.distant_horizons.core.network.session.NetworkSession;
+import net.distant_horizons.core.render.glObject.GLProxy;
+import net.distant_horizons.core.wrapperInterfaces.minecraft.IMinecraftClientWrapper;
+import net.distant_horizons.core.wrapperInterfaces.world.IClientLevelWrapper;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 

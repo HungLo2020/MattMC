@@ -19,18 +19,18 @@
 
 package com.seibel.distanthorizons.core.dataObjects.render.bufferBuilding;
 
-import com.seibel.distanthorizons.core.config.Config;
-import com.seibel.distanthorizons.core.dependencyInjection.SingletonInjector;
-import com.seibel.distanthorizons.core.enums.EDhDirection;
-import com.seibel.distanthorizons.core.level.IDhClientLevel;
-import com.seibel.distanthorizons.core.pooling.PhantomArrayListCheckout;
-import com.seibel.distanthorizons.core.util.ColorUtil;
-import com.seibel.distanthorizons.core.util.LodUtil;
-import com.seibel.distanthorizons.core.util.RenderDataPointUtil;
-import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftClientWrapper;
-import com.seibel.distanthorizons.core.dataObjects.render.columnViews.ColumnArrayView;
-import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftRenderWrapper;
-import com.seibel.distanthorizons.coreapi.util.MathUtil;
+import net.distant_horizons.core.config.Config;
+import net.distant_horizons.core.dependencyInjection.SingletonInjector;
+import net.distant_horizons.core.enums.EDhDirection;
+import net.distant_horizons.core.level.IDhClientLevel;
+import net.distant_horizons.core.pooling.PhantomArrayListCheckout;
+import net.distant_horizons.core.util.ColorUtil;
+import net.distant_horizons.core.util.LodUtil;
+import net.distant_horizons.core.util.RenderDataPointUtil;
+import net.distant_horizons.core.wrapperInterfaces.minecraft.IMinecraftClientWrapper;
+import net.distant_horizons.core.dataObjects.render.columnViews.ColumnArrayView;
+import net.distant_horizons.core.wrapperInterfaces.minecraft.IMinecraftRenderWrapper;
+import net.distant_horizons.coreapi.util.MathUtil;
 import it.unimi.dsi.fastutil.longs.LongArrayList;
 import org.jetbrains.annotations.NotNull;
 

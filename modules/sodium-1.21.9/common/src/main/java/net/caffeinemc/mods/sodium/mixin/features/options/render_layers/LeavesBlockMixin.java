@@ -1,6 +1,6 @@
 package net.caffeinemc.mods.sodium.mixin.features.options.render_layers;
 
-import net.caffeinemc.mods.sodium.client.SodiumClientMod;
+import net.sodium.client.SodiumClientMod;
 import net.minecraft.client.Minecraft;
 import net.minecraft.core.Direction;
 import net.minecraft.world.level.block.Block;

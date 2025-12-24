@@ -1,9 +1,9 @@
 package net.caffeinemc.mods.sodium.client.render.chunk.translucent_sorting.data;
 
-import net.caffeinemc.mods.sodium.client.render.chunk.translucent_sorting.SortType;
-import net.caffeinemc.mods.sodium.client.render.chunk.translucent_sorting.quad.TQuad;
+import net.sodium.client.render.chunk.translucent_sorting.SortType;
+import net.sodium.client.render.chunk.translucent_sorting.quad.TQuad;
 import net.sodium.api.util.MathUtil;
-import net.caffeinemc.mods.sodium.client.util.sorting.RadixSort;
+import net.sodium.client.util.sorting.RadixSort;
 import net.minecraft.core.SectionPos;
 
 /**

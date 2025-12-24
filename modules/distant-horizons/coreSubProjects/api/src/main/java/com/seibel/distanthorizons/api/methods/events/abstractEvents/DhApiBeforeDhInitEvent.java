@@ -19,8 +19,8 @@
 
 package com.seibel.distanthorizons.api.methods.events.abstractEvents;
 
-import com.seibel.distanthorizons.api.methods.events.interfaces.IDhApiEvent;
-import com.seibel.distanthorizons.api.methods.events.sharedParameterObjects.DhApiEventParam;
+import net.distant_horizons.api.methods.events.interfaces.IDhApiEvent;
+import net.distant_horizons.api.methods.events.sharedParameterObjects.DhApiEventParam;
 
 /**
  * Fired before Distant Horizons starts running its mod loader setup. <br>

@@ -19,24 +19,24 @@
 
 package com.seibel.distanthorizons.fabric;
 
-import com.seibel.distanthorizons.common.AbstractModInitializer;
-import com.seibel.distanthorizons.common.AbstractPluginPacketSender;
-import com.seibel.distanthorizons.common.wrappers.McObjectConverter;
-import com.seibel.distanthorizons.common.wrappers.world.ClientLevelWrapper;
-import com.seibel.distanthorizons.core.api.internal.ClientApi;
-import com.seibel.distanthorizons.common.wrappers.chunk.ChunkWrapper;
+import net.distant_horizons.common.AbstractModInitializer;
+import net.distant_horizons.common.AbstractPluginPacketSender;
+import net.distant_horizons.common.wrappers.McObjectConverter;
+import net.distant_horizons.common.wrappers.world.ClientLevelWrapper;
+import net.distant_horizons.core.api.internal.ClientApi;
+import net.distant_horizons.common.wrappers.chunk.ChunkWrapper;
 
-import com.seibel.distanthorizons.core.api.internal.SharedApi;
-import com.seibel.distanthorizons.core.dependencyInjection.ModAccessorInjector;
-import com.seibel.distanthorizons.core.dependencyInjection.SingletonInjector;
-import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
-import com.seibel.distanthorizons.core.util.math.Mat4f;
-import com.seibel.distanthorizons.core.util.threading.ThreadPoolUtil;
-import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftClientWrapper;
-import com.seibel.distanthorizons.core.wrapperInterfaces.misc.IPluginPacketSender;
-import com.seibel.distanthorizons.core.wrapperInterfaces.modAccessor.ISodiumAccessor;
-import com.seibel.distanthorizons.core.wrapperInterfaces.world.IClientLevelWrapper;
-import com.seibel.distanthorizons.fabric.wrappers.modAccessor.SodiumAccessor;
+import net.distant_horizons.core.api.internal.SharedApi;
+import net.distant_horizons.core.dependencyInjection.ModAccessorInjector;
+import net.distant_horizons.core.dependencyInjection.SingletonInjector;
+import net.distant_horizons.core.logging.DhLoggerBuilder;
+import net.distant_horizons.core.util.math.Mat4f;
+import net.distant_horizons.core.util.threading.ThreadPoolUtil;
+import net.distant_horizons.core.wrapperInterfaces.minecraft.IMinecraftClientWrapper;
+import net.distant_horizons.core.wrapperInterfaces.misc.IPluginPacketSender;
+import net.distant_horizons.core.wrapperInterfaces.modAccessor.ISodiumAccessor;
+import net.distant_horizons.core.wrapperInterfaces.world.IClientLevelWrapper;
+import net.distant_horizons.fabric.wrappers.modAccessor.SodiumAccessor;
 import net.fabricmc.api.EnvType;
 import net.fabricmc.api.Environment;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientChunkEvents;
@@ -47,7 +47,7 @@ import net.fabricmc.fabric.api.event.player.UseBlockCallback;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.TitleScreen;
 
-import com.seibel.distanthorizons.common.CommonPacketPayload;
+import net.distant_horizons.common.CommonPacketPayload;
 import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
 
 import java.util.HashSet;
@@ -58,7 +58,7 @@ import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.level.chunk.ChunkAccess;
 import net.minecraft.world.phys.HitResult;
-import com.seibel.distanthorizons.core.logging.DhLogger;
+import net.distant_horizons.core.logging.DhLogger;
 import org.lwjgl.glfw.GLFW;
 
 /**

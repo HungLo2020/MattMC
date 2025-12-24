@@ -20,21 +20,21 @@
 package com.seibel.distanthorizons.core;
 
 import com.github.luben.zstd.ZstdOutputStream;
-import com.seibel.distanthorizons.core.config.Config;
-import com.seibel.distanthorizons.core.dependencyInjection.SingletonInjector;
-import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
-import com.seibel.distanthorizons.core.render.renderer.generic.GenericRenderObjectFactory;
-import com.seibel.distanthorizons.core.sql.DatabaseUpdater;
-import com.seibel.distanthorizons.core.wrapperInterfaces.IWrapperFactory;
-import com.seibel.distanthorizons.core.world.DhApiWorldProxy;
-import com.seibel.distanthorizons.core.api.external.methods.config.DhApiConfig;
-import com.seibel.distanthorizons.core.api.external.methods.data.DhApiTerrainDataRepo;
-import com.seibel.distanthorizons.api.DhApi;
-import com.seibel.distanthorizons.core.render.DhApiRenderProxy;
-import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftClientWrapper;
-import com.seibel.distanthorizons.coreapi.util.StringUtil;
+import net.distant_horizons.core.config.Config;
+import net.distant_horizons.core.dependencyInjection.SingletonInjector;
+import net.distant_horizons.core.logging.DhLoggerBuilder;
+import net.distant_horizons.core.render.renderer.generic.GenericRenderObjectFactory;
+import net.distant_horizons.core.sql.DatabaseUpdater;
+import net.distant_horizons.core.wrapperInterfaces.IWrapperFactory;
+import net.distant_horizons.core.world.DhApiWorldProxy;
+import net.distant_horizons.core.api.external.methods.config.DhApiConfig;
+import net.distant_horizons.core.api.external.methods.data.DhApiTerrainDataRepo;
+import net.distant_horizons.api.DhApi;
+import net.distant_horizons.core.render.DhApiRenderProxy;
+import net.distant_horizons.core.wrapperInterfaces.minecraft.IMinecraftClientWrapper;
+import net.distant_horizons.coreapi.util.StringUtil;
 import net.jpountz.lz4.LZ4FrameOutputStream;
-import com.seibel.distanthorizons.core.logging.DhLogger;
+import net.distant_horizons.core.logging.DhLogger;
 import org.sqlite.SQLiteJDBCLoader;
 import org.tukaani.xz.XZOutputStream;
 

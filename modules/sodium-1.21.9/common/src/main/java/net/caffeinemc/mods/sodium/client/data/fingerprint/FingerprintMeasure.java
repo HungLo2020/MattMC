@@ -1,6 +1,6 @@
 package net.caffeinemc.mods.sodium.client.data.fingerprint;
 
-import net.caffeinemc.mods.sodium.client.services.PlatformRuntimeInformation;
+import net.sodium.client.services.PlatformRuntimeInformation;
 import net.minecraft.client.Minecraft;
 import org.apache.commons.codec.binary.Hex;
 import org.jetbrains.annotations.NotNull;

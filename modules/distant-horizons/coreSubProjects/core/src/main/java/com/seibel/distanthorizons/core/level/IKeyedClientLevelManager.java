@@ -19,8 +19,8 @@
 
 package com.seibel.distanthorizons.core.level;
 
-import com.seibel.distanthorizons.core.wrapperInterfaces.world.IClientLevelWrapper;
-import com.seibel.distanthorizons.coreapi.interfaces.dependencyInjection.IBindable;
+import net.distant_horizons.core.wrapperInterfaces.world.IClientLevelWrapper;
+import net.distant_horizons.coreapi.interfaces.dependencyInjection.IBindable;
 
 /**
  * Handles level overrides initiated by servers that

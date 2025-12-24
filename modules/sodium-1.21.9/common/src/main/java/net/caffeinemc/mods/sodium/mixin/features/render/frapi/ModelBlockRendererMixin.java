@@ -18,8 +18,8 @@ package net.caffeinemc.mods.sodium.mixin.features.render.frapi;
 
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
-import net.caffeinemc.mods.sodium.client.render.frapi.render.NonTerrainBlockRenderContext;
-import net.caffeinemc.mods.sodium.client.render.frapi.render.SimpleBlockRenderContext;
+import net.sodium.client.render.frapi.render.NonTerrainBlockRenderContext;
+import net.sodium.client.render.frapi.render.SimpleBlockRenderContext;
 import net.fabricmc.fabric.api.renderer.v1.model.FabricBlockStateModel;
 import net.minecraft.client.color.block.BlockColors;
 import net.minecraft.client.renderer.block.ModelBlockRenderer;

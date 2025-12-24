@@ -19,7 +19,7 @@
 
 package com.seibel.distanthorizons.core.config.gui;
 
-import com.seibel.distanthorizons.core.jar.EPlatform;
+import net.distant_horizons.core.jar.EPlatform;
 import org.jetbrains.annotations.NotNull;
 import org.lwjgl.system.jawt.JAWT;
 import org.lwjgl.system.macosx.*;

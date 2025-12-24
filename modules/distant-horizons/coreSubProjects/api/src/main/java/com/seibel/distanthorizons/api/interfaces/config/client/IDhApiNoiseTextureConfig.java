@@ -19,8 +19,8 @@
 
 package com.seibel.distanthorizons.api.interfaces.config.client;
 
-import com.seibel.distanthorizons.api.interfaces.config.IDhApiConfigGroup;
-import com.seibel.distanthorizons.api.interfaces.config.IDhApiConfigValue;
+import net.distant_horizons.api.interfaces.config.IDhApiConfigGroup;
+import net.distant_horizons.api.interfaces.config.IDhApiConfigValue;
 
 /**
  * Distant Horizons' noise texture configuration. <br><br>

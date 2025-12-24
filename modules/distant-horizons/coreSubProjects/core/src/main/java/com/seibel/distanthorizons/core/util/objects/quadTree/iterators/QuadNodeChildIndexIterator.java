@@ -19,8 +19,8 @@
 
 package com.seibel.distanthorizons.core.util.objects.quadTree.iterators;
 
-import com.seibel.distanthorizons.core.pos.DhSectionPos;
-import com.seibel.distanthorizons.core.util.objects.quadTree.QuadNode;
+import net.distant_horizons.core.pos.DhSectionPos;
+import net.distant_horizons.core.util.objects.quadTree.QuadNode;
 
 import java.util.*;
 import java.util.function.Consumer;

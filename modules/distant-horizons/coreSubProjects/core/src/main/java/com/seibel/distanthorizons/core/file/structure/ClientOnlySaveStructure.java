@@ -20,19 +20,19 @@
 package com.seibel.distanthorizons.core.file.structure;
 
 import com.google.common.net.PercentEscaper;
-import com.seibel.distanthorizons.api.interfaces.override.levelHandling.IDhApiSaveStructure;
-import com.seibel.distanthorizons.core.dependencyInjection.SingletonInjector;
-import com.seibel.distanthorizons.core.config.Config;
-import com.seibel.distanthorizons.api.enums.config.EDhApiServerFolderNameMode;
-import com.seibel.distanthorizons.core.level.IServerKeyedClientLevel;
-import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
-import com.seibel.distanthorizons.core.util.objects.ParsedIp;
-import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftClientWrapper;
-import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftSharedWrapper;
-import com.seibel.distanthorizons.core.wrapperInterfaces.world.ILevelWrapper;
-import com.seibel.distanthorizons.coreapi.DependencyInjection.OverrideInjector;
-import com.seibel.distanthorizons.coreapi.util.StringUtil;
-import com.seibel.distanthorizons.core.logging.DhLogger;
+import net.distant_horizons.api.interfaces.override.levelHandling.IDhApiSaveStructure;
+import net.distant_horizons.core.dependencyInjection.SingletonInjector;
+import net.distant_horizons.core.config.Config;
+import net.distant_horizons.api.enums.config.EDhApiServerFolderNameMode;
+import net.distant_horizons.core.level.IServerKeyedClientLevel;
+import net.distant_horizons.core.logging.DhLoggerBuilder;
+import net.distant_horizons.core.util.objects.ParsedIp;
+import net.distant_horizons.core.wrapperInterfaces.minecraft.IMinecraftClientWrapper;
+import net.distant_horizons.core.wrapperInterfaces.minecraft.IMinecraftSharedWrapper;
+import net.distant_horizons.core.wrapperInterfaces.world.ILevelWrapper;
+import net.distant_horizons.coreapi.DependencyInjection.OverrideInjector;
+import net.distant_horizons.coreapi.util.StringUtil;
+import net.distant_horizons.core.logging.DhLogger;
 
 import java.io.File;
 import java.util.*;

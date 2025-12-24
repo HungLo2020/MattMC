@@ -19,8 +19,8 @@
 
 package com.seibel.distanthorizons.core.dependencyInjection;
 
-import com.seibel.distanthorizons.coreapi.DependencyInjection.DependencyInjector;
-import com.seibel.distanthorizons.coreapi.interfaces.dependencyInjection.IBindable;
+import net.distant_horizons.coreapi.DependencyInjection.DependencyInjector;
+import net.distant_horizons.coreapi.interfaces.dependencyInjection.IBindable;
 
 /**
  * This class takes care of dependency injection

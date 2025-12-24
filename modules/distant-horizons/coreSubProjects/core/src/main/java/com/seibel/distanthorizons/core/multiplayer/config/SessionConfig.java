@@ -1,10 +1,10 @@
 package com.seibel.distanthorizons.core.multiplayer.config;
 
 import com.google.common.base.MoreObjects;
-import com.seibel.distanthorizons.core.config.Config;
-import com.seibel.distanthorizons.core.config.listeners.ConfigChangeListener;
-import com.seibel.distanthorizons.core.config.types.ConfigEntry;
-import com.seibel.distanthorizons.core.network.INetworkObject;
+import net.distant_horizons.core.config.Config;
+import net.distant_horizons.core.config.listeners.ConfigChangeListener;
+import net.distant_horizons.core.config.types.ConfigEntry;
+import net.distant_horizons.core.network.INetworkObject;
 import io.netty.buffer.ByteBuf;
 
 import java.io.Closeable;

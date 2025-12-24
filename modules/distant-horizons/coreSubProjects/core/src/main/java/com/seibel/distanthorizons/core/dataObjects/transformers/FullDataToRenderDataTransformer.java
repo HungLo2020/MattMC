@@ -19,27 +19,27 @@
 
 package com.seibel.distanthorizons.core.dataObjects.transformers;
 
-import com.seibel.distanthorizons.api.enums.config.EDhApiBlocksToAvoid;
-import com.seibel.distanthorizons.core.config.Config;
-import com.seibel.distanthorizons.core.dataObjects.fullData.FullDataPointIdMap;
-import com.seibel.distanthorizons.core.dataObjects.fullData.sources.FullDataSourceV2;
-import com.seibel.distanthorizons.core.dataObjects.render.ColumnRenderSource;
-import com.seibel.distanthorizons.core.dataObjects.render.columnViews.ColumnArrayView;
-import com.seibel.distanthorizons.core.dependencyInjection.SingletonInjector;
-import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
-import com.seibel.distanthorizons.core.pooling.PhantomArrayListCheckout;
-import com.seibel.distanthorizons.core.pooling.PhantomArrayListPool;
-import com.seibel.distanthorizons.core.pos.DhSectionPos;
-import com.seibel.distanthorizons.core.pos.blockPos.DhBlockPosMutable;
+import net.distant_horizons.api.enums.config.EDhApiBlocksToAvoid;
+import net.distant_horizons.core.config.Config;
+import net.distant_horizons.core.dataObjects.fullData.FullDataPointIdMap;
+import net.distant_horizons.core.dataObjects.fullData.sources.FullDataSourceV2;
+import net.distant_horizons.core.dataObjects.render.ColumnRenderSource;
+import net.distant_horizons.core.dataObjects.render.columnViews.ColumnArrayView;
+import net.distant_horizons.core.dependencyInjection.SingletonInjector;
+import net.distant_horizons.core.logging.DhLoggerBuilder;
+import net.distant_horizons.core.pooling.PhantomArrayListCheckout;
+import net.distant_horizons.core.pooling.PhantomArrayListPool;
+import net.distant_horizons.core.pos.DhSectionPos;
+import net.distant_horizons.core.pos.blockPos.DhBlockPosMutable;
 import com.seibel.distanthorizons.core.util.*;
-import com.seibel.distanthorizons.core.wrapperInterfaces.IWrapperFactory;
-import com.seibel.distanthorizons.core.wrapperInterfaces.block.IBlockStateWrapper;
-import com.seibel.distanthorizons.core.wrapperInterfaces.world.IBiomeWrapper;
-import com.seibel.distanthorizons.core.wrapperInterfaces.world.IClientLevelWrapper;
-import com.seibel.distanthorizons.coreapi.util.BitShiftUtil;
+import net.distant_horizons.core.wrapperInterfaces.IWrapperFactory;
+import net.distant_horizons.core.wrapperInterfaces.block.IBlockStateWrapper;
+import net.distant_horizons.core.wrapperInterfaces.world.IBiomeWrapper;
+import net.distant_horizons.core.wrapperInterfaces.world.IClientLevelWrapper;
+import net.distant_horizons.coreapi.util.BitShiftUtil;
 import it.unimi.dsi.fastutil.longs.LongArrayList;
 import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
-import com.seibel.distanthorizons.core.logging.DhLogger;
+import net.distant_horizons.core.logging.DhLogger;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.HashSet;

@@ -1,8 +1,8 @@
 package net.irisshaders.iris.mixin;
 
-import net.irisshaders.iris.Iris;
-import net.irisshaders.iris.shaderpack.LanguageMap;
-import net.irisshaders.iris.shaderpack.ShaderPack;
+import net.iris.Iris;
+import net.iris.shaderpack.LanguageMap;
+import net.iris.shaderpack.ShaderPack;
 import net.minecraft.client.resources.language.ClientLanguage;
 import net.minecraft.locale.Language;
 import net.minecraft.server.packs.resources.Resource;

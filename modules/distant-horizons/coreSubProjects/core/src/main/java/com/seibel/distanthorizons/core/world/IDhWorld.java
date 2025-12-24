@@ -19,8 +19,8 @@
 
 package com.seibel.distanthorizons.core.world;
 
-import com.seibel.distanthorizons.core.level.IDhLevel;
-import com.seibel.distanthorizons.core.wrapperInterfaces.world.ILevelWrapper;
+import net.distant_horizons.core.level.IDhLevel;
+import net.distant_horizons.core.wrapperInterfaces.world.ILevelWrapper;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 

@@ -1,7 +1,7 @@
 package net.caffeinemc.mods.sodium.mixin.features.render.world.sky;
 
 import com.llamalad7.mixinextras.sugar.Local;
-import net.caffeinemc.mods.sodium.client.util.color.FastCubicSampler;
+import net.sodium.client.util.color.FastCubicSampler;
 import net.minecraft.client.Camera;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.renderer.fog.FogRenderer;

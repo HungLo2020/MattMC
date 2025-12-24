@@ -19,12 +19,12 @@
 
 package com.seibel.distanthorizons.api.methods.events.abstractEvents;
 
-import com.seibel.distanthorizons.api.interfaces.render.IDhApiRenderableBoxGroup;
-import com.seibel.distanthorizons.api.interfaces.world.IDhApiLevelWrapper;
-import com.seibel.distanthorizons.api.methods.events.interfaces.IDhApiCancelableEvent;
-import com.seibel.distanthorizons.api.methods.events.interfaces.IDhApiEventParam;
-import com.seibel.distanthorizons.api.methods.events.sharedParameterObjects.DhApiCancelableEventParam;
-import com.seibel.distanthorizons.api.methods.events.sharedParameterObjects.DhApiRenderParam;
+import net.distant_horizons.api.interfaces.render.IDhApiRenderableBoxGroup;
+import net.distant_horizons.api.interfaces.world.IDhApiLevelWrapper;
+import net.distant_horizons.api.methods.events.interfaces.IDhApiCancelableEvent;
+import net.distant_horizons.api.methods.events.interfaces.IDhApiEventParam;
+import net.distant_horizons.api.methods.events.sharedParameterObjects.DhApiCancelableEventParam;
+import net.distant_horizons.api.methods.events.sharedParameterObjects.DhApiRenderParam;
 
 /**
  * Called before Distant Horizons starts rendering a generic object. <br>

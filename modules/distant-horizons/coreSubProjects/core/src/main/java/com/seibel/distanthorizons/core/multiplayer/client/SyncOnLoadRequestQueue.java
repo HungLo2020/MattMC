@@ -1,10 +1,10 @@
 package com.seibel.distanthorizons.core.multiplayer.client;
 
-import com.seibel.distanthorizons.core.config.Config;
-import com.seibel.distanthorizons.core.generation.RemoteWorldRetrievalQueue;
-import com.seibel.distanthorizons.core.level.DhClientLevel;
-import com.seibel.distanthorizons.core.pos.DhSectionPos;
-import com.seibel.distanthorizons.core.pos.blockPos.DhBlockPos2D;
+import net.distant_horizons.core.config.Config;
+import net.distant_horizons.core.generation.RemoteWorldRetrievalQueue;
+import net.distant_horizons.core.level.DhClientLevel;
+import net.distant_horizons.core.pos.DhSectionPos;
+import net.distant_horizons.core.pos.blockPos.DhBlockPos2D;
 
 import java.util.concurrent.CompletableFuture;
 

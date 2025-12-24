@@ -22,10 +22,10 @@ package com.seibel.distanthorizons.core.jar.wrapperInterfaces.config;
 import com.electronwill.nightconfig.core.Config;
 import com.electronwill.nightconfig.core.io.ParsingMode;
 import com.electronwill.nightconfig.json.JsonFormat;
-import com.seibel.distanthorizons.core.jar.JarUtils;
-import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
-import com.seibel.distanthorizons.core.wrapperInterfaces.config.ILangWrapper;
-import com.seibel.distanthorizons.core.logging.DhLogger;
+import net.distant_horizons.core.jar.JarUtils;
+import net.distant_horizons.core.logging.DhLoggerBuilder;
+import net.distant_horizons.core.wrapperInterfaces.config.ILangWrapper;
+import net.distant_horizons.core.logging.DhLogger;
 
 import java.util.Locale;
 

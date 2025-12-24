@@ -20,17 +20,17 @@
 package com.seibel.distanthorizons.core.network.event;
 
 import com.google.common.cache.CacheBuilder;
-import com.seibel.distanthorizons.core.config.Config;
-import com.seibel.distanthorizons.core.logging.DhLogger;
-import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
-import com.seibel.distanthorizons.core.network.event.internal.AbstractInternalEvent;
-import com.seibel.distanthorizons.core.network.messages.AbstractNetworkMessage;
-import com.seibel.distanthorizons.core.network.messages.AbstractTrackableMessage;
-import com.seibel.distanthorizons.core.network.messages.MessageRegistry;
-import com.seibel.distanthorizons.core.network.session.SessionClosedException;
-import com.seibel.distanthorizons.core.network.messages.requests.CancelMessage;
-import com.seibel.distanthorizons.core.network.messages.requests.ExceptionMessage;
-import com.seibel.distanthorizons.coreapi.ModInfo;
+import net.distant_horizons.core.config.Config;
+import net.distant_horizons.core.logging.DhLogger;
+import net.distant_horizons.core.logging.DhLoggerBuilder;
+import net.distant_horizons.core.network.event.internal.AbstractInternalEvent;
+import net.distant_horizons.core.network.messages.AbstractNetworkMessage;
+import net.distant_horizons.core.network.messages.AbstractTrackableMessage;
+import net.distant_horizons.core.network.messages.MessageRegistry;
+import net.distant_horizons.core.network.session.SessionClosedException;
+import net.distant_horizons.core.network.messages.requests.CancelMessage;
+import net.distant_horizons.core.network.messages.requests.ExceptionMessage;
+import net.distant_horizons.coreapi.ModInfo;
 
 import java.io.InvalidClassException;
 import java.util.Collections;

@@ -19,14 +19,14 @@
 
 package com.seibel.distanthorizons.core.config;
 
-import com.seibel.distanthorizons.core.config.file.ConfigFileHandler;
+import net.distant_horizons.core.config.file.ConfigFileHandler;
 import com.seibel.distanthorizons.core.config.types.*;
-import com.seibel.distanthorizons.core.dependencyInjection.SingletonInjector;
-import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
-import com.seibel.distanthorizons.core.wrapperInterfaces.config.ILangWrapper;
-import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftSharedWrapper;
-import com.seibel.distanthorizons.coreapi.ModInfo;
-import com.seibel.distanthorizons.core.logging.DhLogger;
+import net.distant_horizons.core.dependencyInjection.SingletonInjector;
+import net.distant_horizons.core.logging.DhLoggerBuilder;
+import net.distant_horizons.core.wrapperInterfaces.config.ILangWrapper;
+import net.distant_horizons.core.wrapperInterfaces.minecraft.IMinecraftSharedWrapper;
+import net.distant_horizons.coreapi.ModInfo;
+import net.distant_horizons.core.logging.DhLogger;
 
 import java.lang.reflect.Field;
 import java.nio.file.Path;

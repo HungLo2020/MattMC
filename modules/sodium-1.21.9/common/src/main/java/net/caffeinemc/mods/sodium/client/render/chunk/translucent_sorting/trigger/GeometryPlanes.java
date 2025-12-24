@@ -7,8 +7,8 @@ import org.joml.Vector3f;
 import org.joml.Vector3fc;
 
 import it.unimi.dsi.fastutil.objects.Object2ReferenceOpenHashMap;
-import net.caffeinemc.mods.sodium.client.model.quad.properties.ModelQuadFacing;
-import net.caffeinemc.mods.sodium.client.render.chunk.translucent_sorting.quad.TQuad;
+import net.sodium.client.model.quad.properties.ModelQuadFacing;
+import net.sodium.client.render.chunk.translucent_sorting.quad.TQuad;
 import net.minecraft.core.SectionPos;
 
 /**

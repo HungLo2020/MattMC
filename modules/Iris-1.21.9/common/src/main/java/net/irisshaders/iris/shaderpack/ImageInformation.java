@@ -1,9 +1,9 @@
 package net.irisshaders.iris.shaderpack;
 
-import net.irisshaders.iris.gl.texture.InternalTextureFormat;
-import net.irisshaders.iris.gl.texture.PixelFormat;
-import net.irisshaders.iris.gl.texture.PixelType;
-import net.irisshaders.iris.gl.texture.TextureType;
+import net.iris.gl.texture.InternalTextureFormat;
+import net.iris.gl.texture.PixelFormat;
+import net.iris.gl.texture.PixelType;
+import net.iris.gl.texture.TextureType;
 
 public record ImageInformation(String name, String samplerName, TextureType target, PixelFormat format,
 							   InternalTextureFormat internalTextureFormat,

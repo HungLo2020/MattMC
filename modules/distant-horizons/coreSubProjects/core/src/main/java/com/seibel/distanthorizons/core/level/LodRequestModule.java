@@ -19,21 +19,21 @@
 
 package com.seibel.distanthorizons.core.level;
 
-import com.seibel.distanthorizons.api.enums.worldGeneration.EDhApiDistantGeneratorProgressDisplayLocation;
-import com.seibel.distanthorizons.core.api.internal.ClientApi;
-import com.seibel.distanthorizons.core.config.Config;
-import com.seibel.distanthorizons.core.file.fullDatafile.GeneratedFullDataSourceProvider;
-import com.seibel.distanthorizons.core.generation.IFullDataSourceRetrievalQueue;
-import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
-import com.seibel.distanthorizons.core.logging.f3.F3Screen;
-import com.seibel.distanthorizons.core.pos.blockPos.DhBlockPos2D;
-import com.seibel.distanthorizons.core.util.FormatUtil;
-import com.seibel.distanthorizons.core.util.ThreadUtil;
-import com.seibel.distanthorizons.core.util.objects.RollingAverage;
-import com.seibel.distanthorizons.core.util.threading.PriorityTaskPicker;
-import com.seibel.distanthorizons.core.util.threading.ThreadPoolUtil;
-import com.seibel.distanthorizons.core.world.DhApiWorldProxy;
-import com.seibel.distanthorizons.core.logging.DhLogger;
+import net.distant_horizons.api.enums.worldGeneration.EDhApiDistantGeneratorProgressDisplayLocation;
+import net.distant_horizons.core.api.internal.ClientApi;
+import net.distant_horizons.core.config.Config;
+import net.distant_horizons.core.file.fullDatafile.GeneratedFullDataSourceProvider;
+import net.distant_horizons.core.generation.IFullDataSourceRetrievalQueue;
+import net.distant_horizons.core.logging.DhLoggerBuilder;
+import net.distant_horizons.core.logging.f3.F3Screen;
+import net.distant_horizons.core.pos.blockPos.DhBlockPos2D;
+import net.distant_horizons.core.util.FormatUtil;
+import net.distant_horizons.core.util.ThreadUtil;
+import net.distant_horizons.core.util.objects.RollingAverage;
+import net.distant_horizons.core.util.threading.PriorityTaskPicker;
+import net.distant_horizons.core.util.threading.ThreadPoolUtil;
+import net.distant_horizons.core.world.DhApiWorldProxy;
+import net.distant_horizons.core.logging.DhLogger;
 
 import java.io.Closeable;
 import java.time.Duration;

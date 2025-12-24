@@ -19,11 +19,11 @@
 
 package com.seibel.distanthorizons.core.sql.dto;
 
-import com.seibel.distanthorizons.api.enums.config.EDhApiDataCompressionMode;
-import com.seibel.distanthorizons.api.enums.worldGeneration.EDhApiWorldGenerationStep;
-import com.seibel.distanthorizons.core.dataObjects.fullData.sources.FullDataSourceV1;
-import com.seibel.distanthorizons.core.pos.DhSectionPos;
-import com.seibel.distanthorizons.core.util.objects.dataStreams.DhDataInputStream;
+import net.distant_horizons.api.enums.config.EDhApiDataCompressionMode;
+import net.distant_horizons.api.enums.worldGeneration.EDhApiWorldGenerationStep;
+import net.distant_horizons.core.dataObjects.fullData.sources.FullDataSourceV1;
+import net.distant_horizons.core.pos.DhSectionPos;
+import net.distant_horizons.core.util.objects.dataStreams.DhDataInputStream;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;

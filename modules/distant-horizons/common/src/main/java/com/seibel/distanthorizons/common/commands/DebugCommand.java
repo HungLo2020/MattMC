@@ -1,7 +1,7 @@
 package com.seibel.distanthorizons.common.commands;
 
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
-import com.seibel.distanthorizons.core.logging.f3.F3Screen;
+import net.distant_horizons.core.logging.f3.F3Screen;
 import net.minecraft.commands.CommandSourceStack;
 
 import java.util.ArrayList;

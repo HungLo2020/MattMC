@@ -1,10 +1,10 @@
 package net.irisshaders.iris.mixin;
 
-import net.irisshaders.iris.Iris;
-import net.irisshaders.iris.platform.IrisPlatformHelpers;
-import net.irisshaders.iris.shaderpack.texture.CustomTextureData;
-import net.irisshaders.iris.shaderpack.texture.TextureFilteringData;
-import net.irisshaders.iris.targets.backed.NativeImageBackedCustomTexture;
+import net.iris.Iris;
+import net.iris.platform.IrisPlatformHelpers;
+import net.iris.shaderpack.texture.CustomTextureData;
+import net.iris.shaderpack.texture.TextureFilteringData;
+import net.iris.targets.backed.NativeImageBackedCustomTexture;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.main.GameConfig;
 import net.minecraft.resources.ResourceLocation;

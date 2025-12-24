@@ -1,7 +1,7 @@
 package net.caffeinemc.mods.sodium.client.gl.tessellation;
 
-import net.caffeinemc.mods.sodium.client.gl.attribute.GlVertexAttributeBinding;
-import net.caffeinemc.mods.sodium.client.gl.device.CommandList;
+import net.sodium.client.gl.attribute.GlVertexAttributeBinding;
+import net.sodium.client.gl.device.CommandList;
 import org.lwjgl.opengl.GL20C;
 import org.lwjgl.opengl.GL30C;
 

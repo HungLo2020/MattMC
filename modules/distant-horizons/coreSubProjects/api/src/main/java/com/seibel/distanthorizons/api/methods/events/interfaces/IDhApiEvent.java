@@ -19,8 +19,8 @@
 
 package com.seibel.distanthorizons.api.methods.events.interfaces;
 
-import com.seibel.distanthorizons.api.methods.events.sharedParameterObjects.DhApiEventParam;
-import com.seibel.distanthorizons.coreapi.interfaces.dependencyInjection.IBindable;
+import net.distant_horizons.api.methods.events.sharedParameterObjects.DhApiEventParam;
+import net.distant_horizons.coreapi.interfaces.dependencyInjection.IBindable;
 
 /**
  * The interface used by all DH Api events.

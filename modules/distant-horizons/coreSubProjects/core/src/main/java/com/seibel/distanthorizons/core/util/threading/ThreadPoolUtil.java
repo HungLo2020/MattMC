@@ -19,7 +19,7 @@
 
 package com.seibel.distanthorizons.core.util.threading;
 
-import com.seibel.distanthorizons.core.util.ThreadUtil;
+import net.distant_horizons.core.util.ThreadUtil;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 

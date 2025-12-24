@@ -1,7 +1,7 @@
 package net.irisshaders.iris.uniforms;
 
-import net.irisshaders.iris.gl.uniform.UniformHolder;
-import net.irisshaders.iris.gl.uniform.UniformUpdateFrequency;
+import net.iris.gl.uniform.UniformHolder;
+import net.iris.gl.uniform.UniformUpdateFrequency;
 
 import java.util.OptionalLong;
 import java.util.function.IntSupplier;

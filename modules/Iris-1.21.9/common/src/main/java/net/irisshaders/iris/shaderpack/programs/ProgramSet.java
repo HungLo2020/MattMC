@@ -1,18 +1,18 @@
 package net.irisshaders.iris.shaderpack.programs;
 
-import net.irisshaders.iris.Iris;
-import net.irisshaders.iris.features.FeatureFlags;
-import net.irisshaders.iris.gl.blending.BlendModeOverride;
-import net.irisshaders.iris.shaderpack.ShaderPack;
-import net.irisshaders.iris.shaderpack.include.AbsolutePackPath;
-import net.irisshaders.iris.shaderpack.loading.ProgramArrayId;
-import net.irisshaders.iris.shaderpack.loading.ProgramId;
-import net.irisshaders.iris.shaderpack.parsing.ComputeDirectiveParser;
-import net.irisshaders.iris.shaderpack.parsing.ConstDirectiveParser;
-import net.irisshaders.iris.shaderpack.parsing.DispatchingDirectiveHolder;
-import net.irisshaders.iris.shaderpack.properties.PackDirectives;
-import net.irisshaders.iris.shaderpack.properties.PackRenderTargetDirectives;
-import net.irisshaders.iris.shaderpack.properties.ShaderProperties;
+import net.iris.Iris;
+import net.iris.features.FeatureFlags;
+import net.iris.gl.blending.BlendModeOverride;
+import net.iris.shaderpack.ShaderPack;
+import net.iris.shaderpack.include.AbsolutePackPath;
+import net.iris.shaderpack.loading.ProgramArrayId;
+import net.iris.shaderpack.loading.ProgramId;
+import net.iris.shaderpack.parsing.ComputeDirectiveParser;
+import net.iris.shaderpack.parsing.ConstDirectiveParser;
+import net.iris.shaderpack.parsing.DispatchingDirectiveHolder;
+import net.iris.shaderpack.properties.PackDirectives;
+import net.iris.shaderpack.properties.PackRenderTargetDirectives;
+import net.iris.shaderpack.properties.ShaderProperties;
 
 import java.util.ArrayList;
 import java.util.Arrays;

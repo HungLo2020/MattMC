@@ -1,6 +1,6 @@
 package com.seibel.distanthorizons.api.methods.events.interfaces;
 
-import com.seibel.distanthorizons.api.interfaces.util.IDhApiCopyable;
+import net.distant_horizons.api.interfaces.util.IDhApiCopyable;
 
 /**
  * @author James Seibel

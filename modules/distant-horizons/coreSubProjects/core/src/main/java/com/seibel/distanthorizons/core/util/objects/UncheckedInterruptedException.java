@@ -19,7 +19,7 @@
 
 package com.seibel.distanthorizons.core.util.objects;
 
-import com.seibel.distanthorizons.core.util.ExceptionUtil;
+import net.distant_horizons.core.util.ExceptionUtil;
 
 import java.util.concurrent.CompletionException;
 

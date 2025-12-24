@@ -1,6 +1,6 @@
 package com.seibel.distanthorizons.core.util;
 
-import com.seibel.distanthorizons.core.util.objects.UncheckedInterruptedException;
+import net.distant_horizons.core.util.objects.UncheckedInterruptedException;
 
 import java.nio.channels.ClosedByInterruptException;
 import java.util.concurrent.CancellationException;

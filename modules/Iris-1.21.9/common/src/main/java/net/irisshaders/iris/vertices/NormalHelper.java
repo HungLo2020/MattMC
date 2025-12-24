@@ -16,8 +16,8 @@ package net.irisshaders.iris.vertices;
  * limitations under the License.
  */
 
-import net.irisshaders.iris.vertices.views.QuadView;
-import net.irisshaders.iris.vertices.views.TriView;
+import net.iris.vertices.views.QuadView;
+import net.iris.vertices.views.TriView;
 import net.minecraft.util.Mth;
 import org.jetbrains.annotations.NotNull;
 import org.joml.Vector2f;

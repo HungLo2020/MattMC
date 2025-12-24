@@ -1,9 +1,9 @@
 package net.irisshaders.iris.compat.dh.mixin;
 
-import com.seibel.distanthorizons.api.interfaces.override.rendering.IDhApiShadowCullingFrustum;
-import com.seibel.distanthorizons.api.objects.math.DhApiMat4f;
-import net.irisshaders.iris.shadows.frustum.BoxCuller;
-import net.irisshaders.iris.shadows.frustum.fallback.BoxCullingFrustum;
+import net.distant_horizons.api.interfaces.override.rendering.IDhApiShadowCullingFrustum;
+import net.distant_horizons.api.objects.math.DhApiMat4f;
+import net.iris.shadows.frustum.BoxCuller;
+import net.iris.shadows.frustum.fallback.BoxCullingFrustum;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;

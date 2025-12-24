@@ -1,12 +1,12 @@
 package com.seibel.distanthorizons.api.interfaces.render;
 
-import com.seibel.distanthorizons.api.enums.config.EDhApiLodShading;
-import com.seibel.distanthorizons.api.methods.events.sharedParameterObjects.DhApiRenderParam;
-import com.seibel.distanthorizons.api.objects.math.DhApiVec3d;
-import com.seibel.distanthorizons.api.objects.math.DhApiVec3f;
-import com.seibel.distanthorizons.api.objects.math.DhApiVec3i;
-import com.seibel.distanthorizons.api.objects.render.DhApiRenderableBox;
-import com.seibel.distanthorizons.api.objects.render.DhApiRenderableBoxGroupShading;
+import net.distant_horizons.api.enums.config.EDhApiLodShading;
+import net.distant_horizons.api.methods.events.sharedParameterObjects.DhApiRenderParam;
+import net.distant_horizons.api.objects.math.DhApiVec3d;
+import net.distant_horizons.api.objects.math.DhApiVec3f;
+import net.distant_horizons.api.objects.math.DhApiVec3i;
+import net.distant_horizons.api.objects.render.DhApiRenderableBox;
+import net.distant_horizons.api.objects.render.DhApiRenderableBoxGroupShading;
 
 import java.util.List;
 import java.util.function.Consumer;

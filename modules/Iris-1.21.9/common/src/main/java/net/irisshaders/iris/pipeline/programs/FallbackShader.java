@@ -6,12 +6,12 @@ import com.mojang.blaze3d.pipeline.RenderPipeline;
 import com.mojang.blaze3d.shaders.UniformType;
 import com.mojang.blaze3d.vertex.VertexFormat;
 import net.iris.compat.SkipList;
-import net.irisshaders.iris.gl.blending.BlendModeOverride;
-import net.irisshaders.iris.gl.blending.DepthColorStorage;
-import net.irisshaders.iris.gl.framebuffer.GlFramebuffer;
-import net.irisshaders.iris.mixinterface.ShaderInstanceInterface;
-import net.irisshaders.iris.pipeline.IrisRenderingPipeline;
-import net.irisshaders.iris.uniforms.CapturedRenderingState;
+import net.iris.gl.blending.BlendModeOverride;
+import net.iris.gl.blending.DepthColorStorage;
+import net.iris.gl.framebuffer.GlFramebuffer;
+import net.iris.mixinterface.ShaderInstanceInterface;
+import net.iris.pipeline.IrisRenderingPipeline;
+import net.iris.uniforms.CapturedRenderingState;
 import org.lwjgl.opengl.GL31C;
 import org.lwjgl.opengl.GL46C;
 

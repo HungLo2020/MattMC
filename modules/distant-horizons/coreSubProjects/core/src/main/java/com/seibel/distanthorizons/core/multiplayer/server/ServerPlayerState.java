@@ -1,21 +1,21 @@
 package com.seibel.distanthorizons.core.multiplayer.server;
 
-import com.seibel.distanthorizons.core.config.Config;
-import com.seibel.distanthorizons.core.config.listeners.ConfigChangeListener;
-import com.seibel.distanthorizons.core.level.AbstractDhServerLevel;
-import com.seibel.distanthorizons.core.multiplayer.config.SessionConfig;
-import com.seibel.distanthorizons.core.multiplayer.fullData.FullDataPayloadSender;
-import com.seibel.distanthorizons.core.multiplayer.fullData.SharedBandwidthLimit;
-import com.seibel.distanthorizons.core.network.event.internal.IncompatibleMessageInternalEvent;
-import com.seibel.distanthorizons.core.network.messages.base.CloseReasonMessage;
-import com.seibel.distanthorizons.core.network.messages.base.LevelInitMessage;
-import com.seibel.distanthorizons.core.network.messages.base.SessionConfigMessage;
-import com.seibel.distanthorizons.core.network.event.internal.CloseInternalEvent;
-import com.seibel.distanthorizons.core.network.exceptions.RateLimitedException;
-import com.seibel.distanthorizons.core.network.messages.fullData.FullDataSourceRequestMessage;
-import com.seibel.distanthorizons.core.network.session.NetworkSession;
-import com.seibel.distanthorizons.core.util.ratelimiting.SupplierBasedRateAndConcurrencyLimiter;
-import com.seibel.distanthorizons.core.wrapperInterfaces.misc.IServerPlayerWrapper;
+import net.distant_horizons.core.config.Config;
+import net.distant_horizons.core.config.listeners.ConfigChangeListener;
+import net.distant_horizons.core.level.AbstractDhServerLevel;
+import net.distant_horizons.core.multiplayer.config.SessionConfig;
+import net.distant_horizons.core.multiplayer.fullData.FullDataPayloadSender;
+import net.distant_horizons.core.multiplayer.fullData.SharedBandwidthLimit;
+import net.distant_horizons.core.network.event.internal.IncompatibleMessageInternalEvent;
+import net.distant_horizons.core.network.messages.base.CloseReasonMessage;
+import net.distant_horizons.core.network.messages.base.LevelInitMessage;
+import net.distant_horizons.core.network.messages.base.SessionConfigMessage;
+import net.distant_horizons.core.network.event.internal.CloseInternalEvent;
+import net.distant_horizons.core.network.exceptions.RateLimitedException;
+import net.distant_horizons.core.network.messages.fullData.FullDataSourceRequestMessage;
+import net.distant_horizons.core.network.session.NetworkSession;
+import net.distant_horizons.core.util.ratelimiting.SupplierBasedRateAndConcurrencyLimiter;
+import net.distant_horizons.core.wrapperInterfaces.misc.IServerPlayerWrapper;
 import org.jetbrains.annotations.NotNull;
 
 import java.io.Closeable;

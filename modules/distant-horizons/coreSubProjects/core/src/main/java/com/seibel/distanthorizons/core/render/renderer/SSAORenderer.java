@@ -19,13 +19,13 @@
 
 package com.seibel.distanthorizons.core.render.renderer;
 
-import com.seibel.distanthorizons.core.dependencyInjection.SingletonInjector;
-import com.seibel.distanthorizons.core.render.glObject.GLState;
-import com.seibel.distanthorizons.core.render.renderer.shaders.SSAOApplyShader;
-import com.seibel.distanthorizons.core.render.renderer.shaders.SSAOShader;
-import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftGLWrapper;
-import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftRenderWrapper;
-import com.seibel.distanthorizons.core.util.math.Mat4f;
+import net.distant_horizons.core.dependencyInjection.SingletonInjector;
+import net.distant_horizons.core.render.glObject.GLState;
+import net.distant_horizons.core.render.renderer.shaders.SSAOApplyShader;
+import net.distant_horizons.core.render.renderer.shaders.SSAOShader;
+import net.distant_horizons.core.wrapperInterfaces.minecraft.IMinecraftGLWrapper;
+import net.distant_horizons.core.wrapperInterfaces.minecraft.IMinecraftRenderWrapper;
+import net.distant_horizons.core.util.math.Mat4f;
 import org.lwjgl.opengl.GL32;
 import org.lwjgl.opengl.GL43C;
 

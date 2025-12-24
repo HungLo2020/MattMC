@@ -1,6 +1,6 @@
 package net.irisshaders.iris.mixin;
 
-import net.irisshaders.iris.Iris;
+import net.iris.Iris;
 import net.iris.NeoLambdas;
 import net.minecraft.client.Camera;
 import net.minecraft.client.Minecraft;

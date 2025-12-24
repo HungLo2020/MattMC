@@ -20,11 +20,11 @@
 package com.seibel.distanthorizons.core.network.messages.requests;
 
 import com.google.common.base.MoreObjects;
-import com.seibel.distanthorizons.core.network.exceptions.RateLimitedException;
-import com.seibel.distanthorizons.core.network.exceptions.RequestOutOfRangeException;
-import com.seibel.distanthorizons.core.network.exceptions.RequestRejectedException;
-import com.seibel.distanthorizons.core.network.exceptions.SectionRequiresSplittingException;
-import com.seibel.distanthorizons.core.network.messages.AbstractTrackableMessage;
+import net.distant_horizons.core.network.exceptions.RateLimitedException;
+import net.distant_horizons.core.network.exceptions.RequestOutOfRangeException;
+import net.distant_horizons.core.network.exceptions.RequestRejectedException;
+import net.distant_horizons.core.network.exceptions.SectionRequiresSplittingException;
+import net.distant_horizons.core.network.messages.AbstractTrackableMessage;
 import io.netty.buffer.ByteBuf;
 
 import java.util.ArrayList;

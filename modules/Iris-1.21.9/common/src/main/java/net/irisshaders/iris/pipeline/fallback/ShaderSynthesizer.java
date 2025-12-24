@@ -1,9 +1,9 @@
 package net.irisshaders.iris.pipeline.fallback;
 
-import net.irisshaders.iris.gl.blending.AlphaTest;
-import net.irisshaders.iris.gl.blending.AlphaTests;
-import net.irisshaders.iris.gl.state.FogMode;
-import net.irisshaders.iris.gl.state.ShaderAttributeInputs;
+import net.iris.gl.blending.AlphaTest;
+import net.iris.gl.blending.AlphaTests;
+import net.iris.gl.state.FogMode;
+import net.iris.gl.state.ShaderAttributeInputs;
 
 public class ShaderSynthesizer {
 	public static String vsh(boolean hasChunkOffset, ShaderAttributeInputs inputs, FogMode fogMode,

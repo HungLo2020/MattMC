@@ -1,6 +1,6 @@
 package net.caffeinemc.mods.sodium.client.render.chunk.tree;
 
-import net.caffeinemc.mods.sodium.client.render.chunk.RenderSection;
+import net.sodium.client.render.chunk.RenderSection;
 
 public interface Forest {
     void add(int x, int y, int z);

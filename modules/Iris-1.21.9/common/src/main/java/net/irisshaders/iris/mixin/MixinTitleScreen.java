@@ -1,6 +1,6 @@
 package net.irisshaders.iris.mixin;
 
-import net.irisshaders.iris.Iris;
+import net.iris.Iris;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.screens.TitleScreen;
 import net.minecraft.network.chat.Component;

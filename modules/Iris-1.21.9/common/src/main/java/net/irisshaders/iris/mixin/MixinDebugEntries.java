@@ -1,7 +1,7 @@
 package net.irisshaders.iris.mixin;
 
-import net.irisshaders.iris.gui.debug.IrisDebugEntry;
-import net.irisshaders.iris.gui.debug.IrisTrueDebugEntry;
+import net.iris.gui.debug.IrisDebugEntry;
+import net.iris.gui.debug.IrisTrueDebugEntry;
 import net.minecraft.client.gui.components.debug.DebugScreenEntries;
 import net.minecraft.client.gui.components.debug.DebugScreenEntry;
 import net.minecraft.resources.ResourceLocation;

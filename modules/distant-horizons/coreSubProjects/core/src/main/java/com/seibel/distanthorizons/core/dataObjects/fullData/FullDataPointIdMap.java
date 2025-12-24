@@ -19,17 +19,17 @@
 
 package com.seibel.distanthorizons.core.dataObjects.fullData;
 
-import com.seibel.distanthorizons.core.dataObjects.BlockBiomeWrapperPair;
-import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
-import com.seibel.distanthorizons.core.pos.DhSectionPos;
-import com.seibel.distanthorizons.core.util.LodUtil;
-import com.seibel.distanthorizons.core.util.objects.DataCorruptedException;
-import com.seibel.distanthorizons.core.util.objects.dataStreams.DhDataInputStream;
-import com.seibel.distanthorizons.core.util.objects.dataStreams.DhDataOutputStream;
-import com.seibel.distanthorizons.core.wrapperInterfaces.block.IBlockStateWrapper;
-import com.seibel.distanthorizons.core.wrapperInterfaces.world.IBiomeWrapper;
-import com.seibel.distanthorizons.core.wrapperInterfaces.world.ILevelWrapper;
-import com.seibel.distanthorizons.core.logging.DhLogger;
+import net.distant_horizons.core.dataObjects.BlockBiomeWrapperPair;
+import net.distant_horizons.core.logging.DhLoggerBuilder;
+import net.distant_horizons.core.pos.DhSectionPos;
+import net.distant_horizons.core.util.LodUtil;
+import net.distant_horizons.core.util.objects.DataCorruptedException;
+import net.distant_horizons.core.util.objects.dataStreams.DhDataInputStream;
+import net.distant_horizons.core.util.objects.dataStreams.DhDataOutputStream;
+import net.distant_horizons.core.wrapperInterfaces.block.IBlockStateWrapper;
+import net.distant_horizons.core.wrapperInterfaces.world.IBiomeWrapper;
+import net.distant_horizons.core.wrapperInterfaces.world.ILevelWrapper;
+import net.distant_horizons.core.logging.DhLogger;
 
 import java.io.*;
 import java.util.*;

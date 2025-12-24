@@ -1,8 +1,8 @@
 package com.seibel.distanthorizons.core.render.glObject.texture;
 
-import com.seibel.distanthorizons.api.interfaces.override.rendering.IDhApiFramebuffer;
-import com.seibel.distanthorizons.core.dependencyInjection.SingletonInjector;
-import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftGLWrapper;
+import net.distant_horizons.api.interfaces.override.rendering.IDhApiFramebuffer;
+import net.distant_horizons.core.dependencyInjection.SingletonInjector;
+import net.distant_horizons.core.wrapperInterfaces.minecraft.IMinecraftGLWrapper;
 import it.unimi.dsi.fastutil.ints.Int2IntArrayMap;
 import it.unimi.dsi.fastutil.ints.Int2IntMap;
 import org.lwjgl.opengl.GL32;

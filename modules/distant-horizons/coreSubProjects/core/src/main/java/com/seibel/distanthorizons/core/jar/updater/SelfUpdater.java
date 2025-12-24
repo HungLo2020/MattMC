@@ -19,22 +19,22 @@
 
 package com.seibel.distanthorizons.core.jar.updater;
 
-import com.seibel.distanthorizons.api.enums.config.EDhApiUpdateBranch;
-import com.seibel.distanthorizons.core.config.Config;
-import com.seibel.distanthorizons.core.dependencyInjection.SingletonInjector;
-import com.seibel.distanthorizons.core.jar.JarUtils;
-import com.seibel.distanthorizons.core.jar.ModJarInfo;
-import com.seibel.distanthorizons.core.jar.installer.GitlabGetter;
-import com.seibel.distanthorizons.core.jar.installer.ModrinthGetter;
-import com.seibel.distanthorizons.core.jar.installer.WebDownloader;
-import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
-import com.seibel.distanthorizons.core.logging.f3.F3Screen;
-import com.seibel.distanthorizons.core.util.NativeDialogUtil;
-import com.seibel.distanthorizons.core.wrapperInterfaces.IVersionConstants;
-import com.seibel.distanthorizons.coreapi.ModInfo;
-import com.seibel.distanthorizons.coreapi.util.StringUtil;
-import com.seibel.distanthorizons.coreapi.util.jar.DeleteOnUnlock;
-import com.seibel.distanthorizons.core.logging.DhLogger;
+import net.distant_horizons.api.enums.config.EDhApiUpdateBranch;
+import net.distant_horizons.core.config.Config;
+import net.distant_horizons.core.dependencyInjection.SingletonInjector;
+import net.distant_horizons.core.jar.JarUtils;
+import net.distant_horizons.core.jar.ModJarInfo;
+import net.distant_horizons.core.jar.installer.GitlabGetter;
+import net.distant_horizons.core.jar.installer.ModrinthGetter;
+import net.distant_horizons.core.jar.installer.WebDownloader;
+import net.distant_horizons.core.logging.DhLoggerBuilder;
+import net.distant_horizons.core.logging.f3.F3Screen;
+import net.distant_horizons.core.util.NativeDialogUtil;
+import net.distant_horizons.core.wrapperInterfaces.IVersionConstants;
+import net.distant_horizons.coreapi.ModInfo;
+import net.distant_horizons.coreapi.util.StringUtil;
+import net.distant_horizons.coreapi.util.jar.DeleteOnUnlock;
+import net.distant_horizons.core.logging.DhLogger;
 
 import javax.swing.*;
 import java.awt.*;

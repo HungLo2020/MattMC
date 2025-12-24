@@ -1,8 +1,8 @@
 package com.seibel.distanthorizons.core.wrapperInterfaces.misc;
 
-import com.seibel.distanthorizons.api.interfaces.IDhApiUnsafeWrapper;
-import com.seibel.distanthorizons.core.wrapperInterfaces.block.IBlockStateWrapper;
-import com.seibel.distanthorizons.core.wrapperInterfaces.chunk.IChunkWrapper;
+import net.distant_horizons.api.interfaces.IDhApiUnsafeWrapper;
+import net.distant_horizons.core.wrapperInterfaces.block.IBlockStateWrapper;
+import net.distant_horizons.core.wrapperInterfaces.chunk.IChunkWrapper;
 
 /**
  * Currently this wrapper is just used to prevent 

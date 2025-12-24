@@ -1,8 +1,8 @@
 package com.seibel.distanthorizons.core.sql.dto.util;
 
-import com.seibel.distanthorizons.core.sql.dto.FullDataSourceV2DTO;
-import com.seibel.distanthorizons.core.util.objects.dataStreams.DhDataInputStream;
-import com.seibel.distanthorizons.core.util.objects.dataStreams.DhDataOutputStream;
+import net.distant_horizons.core.sql.dto.FullDataSourceV2DTO;
+import net.distant_horizons.core.util.objects.dataStreams.DhDataInputStream;
+import net.distant_horizons.core.util.objects.dataStreams.DhDataOutputStream;
 
 import java.io.IOException;
 

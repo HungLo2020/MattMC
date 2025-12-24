@@ -1,9 +1,9 @@
 package net.irisshaders.iris.gui.element;
 
 import com.mojang.blaze3d.systems.RenderSystem;
-import net.irisshaders.iris.Iris;
-import net.irisshaders.iris.gui.GuiUtil;
-import net.irisshaders.iris.gui.screen.ShaderPackScreen;
+import net.iris.Iris;
+import net.iris.gui.GuiUtil;
+import net.iris.gui.screen.ShaderPackScreen;
 import net.minecraft.ChatFormatting;
 import net.minecraft.Util;
 import net.minecraft.client.Minecraft;

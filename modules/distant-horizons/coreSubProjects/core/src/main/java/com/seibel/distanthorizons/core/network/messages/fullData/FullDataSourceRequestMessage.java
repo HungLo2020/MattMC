@@ -20,9 +20,9 @@
 package com.seibel.distanthorizons.core.network.messages.fullData;
 
 import com.google.common.base.MoreObjects;
-import com.seibel.distanthorizons.core.network.messages.ILevelRelatedMessage;
-import com.seibel.distanthorizons.core.network.messages.AbstractTrackableMessage;
-import com.seibel.distanthorizons.core.wrapperInterfaces.world.ILevelWrapper;
+import net.distant_horizons.core.network.messages.ILevelRelatedMessage;
+import net.distant_horizons.core.network.messages.AbstractTrackableMessage;
+import net.distant_horizons.core.wrapperInterfaces.world.ILevelWrapper;
 import io.netty.buffer.ByteBuf;
 
 import javax.annotation.Nullable;

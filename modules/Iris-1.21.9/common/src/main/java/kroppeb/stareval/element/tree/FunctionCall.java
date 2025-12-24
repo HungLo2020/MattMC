@@ -1,6 +1,6 @@
 package kroppeb.stareval.element.tree;
 
-import kroppeb.stareval.element.ExpressionElement;
+import net.iris.stareval.element.ExpressionElement;
 
 import java.util.List;
 
