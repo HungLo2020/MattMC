@@ -19,8 +19,8 @@
 
 package com.seibel.distanthorizons.coreapi.DependencyInjection;
 
-import net.distant_horizons.api.interfaces.override.IDhApiOverrideable;
-import net.distant_horizons.coreapi.interfaces.dependencyInjection.IOverrideInjector;
+import com.seibel.distanthorizons.api.interfaces.override.IDhApiOverrideable;
+import com.seibel.distanthorizons.coreapi.interfaces.dependencyInjection.IOverrideInjector;
 import net.distant_horizons.coreapi.util.StringUtil;
 
 import java.util.HashMap;

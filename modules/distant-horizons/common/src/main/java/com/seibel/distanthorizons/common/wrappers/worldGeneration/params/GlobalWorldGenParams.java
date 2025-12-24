@@ -20,8 +20,8 @@
 package com.seibel.distanthorizons.common.wrappers.worldGeneration.params;
 
 import com.mojang.datafixers.DataFixer;
-import net.distant_horizons.common.wrappers.world.ServerLevelWrapper;
-import net.distant_horizons.core.level.IDhServerLevel;
+import com.seibel.distanthorizons.common.wrappers.world.ServerLevelWrapper;
+import com.seibel.distanthorizons.core.level.IDhServerLevel;
 
 import net.minecraft.core.Registry;
 import net.minecraft.core.RegistryAccess;

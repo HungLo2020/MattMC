@@ -19,7 +19,7 @@
 
 package com.seibel.distanthorizons.common.wrappers;
 
-import net.distant_horizons.core.wrapperInterfaces.IVersionConstants;
+import com.seibel.distanthorizons.core.wrapperInterfaces.IVersionConstants;
 
 /**
  * @author James Seibel

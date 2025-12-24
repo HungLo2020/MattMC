@@ -26,26 +26,26 @@ import java.util.concurrent.ConcurrentHashMap;
 import com.mojang.blaze3d.pipeline.RenderTarget;
 import com.mojang.blaze3d.platform.NativeImage;
 import net.distant_horizons.api.enums.config.EDhApiLodShading;
-import net.distant_horizons.common.wrappers.McObjectConverter;
-import net.distant_horizons.common.wrappers.misc.LightMapWrapper;
-import net.distant_horizons.core.config.Config;
-import net.distant_horizons.core.dependencyInjection.ModAccessorInjector;
+import com.seibel.distanthorizons.common.wrappers.McObjectConverter;
+import com.seibel.distanthorizons.common.wrappers.misc.LightMapWrapper;
+import com.seibel.distanthorizons.core.config.Config;
+import com.seibel.distanthorizons.core.dependencyInjection.ModAccessorInjector;
 
-import net.distant_horizons.core.enums.EDhDirection;
-import net.distant_horizons.core.logging.DhLoggerBuilder;
+import com.seibel.distanthorizons.core.enums.EDhDirection;
+import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
 import net.distant_horizons.core.util.ColorUtil;
-import net.distant_horizons.core.wrapperInterfaces.misc.ILightMapWrapper;
+import com.seibel.distanthorizons.core.wrapperInterfaces.misc.ILightMapWrapper;
 
 import net.minecraft.client.renderer.fog.FogRenderer;
 
 
-import net.distant_horizons.core.wrapperInterfaces.modAccessor.AbstractOptifineAccessor;
-import net.distant_horizons.core.wrapperInterfaces.world.IClientLevelWrapper;
-import net.distant_horizons.core.wrapperInterfaces.world.IDimensionTypeWrapper;
-import net.distant_horizons.core.wrapperInterfaces.world.ILevelWrapper;
-import net.distant_horizons.core.util.math.Vec3d;
-import net.distant_horizons.core.util.math.Vec3f;
-import net.distant_horizons.core.wrapperInterfaces.minecraft.IMinecraftRenderWrapper;
+import com.seibel.distanthorizons.core.wrapperInterfaces.modAccessor.AbstractOptifineAccessor;
+import com.seibel.distanthorizons.core.wrapperInterfaces.world.IClientLevelWrapper;
+import com.seibel.distanthorizons.core.wrapperInterfaces.world.IDimensionTypeWrapper;
+import com.seibel.distanthorizons.core.wrapperInterfaces.world.ILevelWrapper;
+import com.seibel.distanthorizons.core.util.math.Vec3d;
+import com.seibel.distanthorizons.core.util.math.Vec3f;
+import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftRenderWrapper;
 
 import net.minecraft.client.Camera;
 import net.minecraft.client.Minecraft;
@@ -54,7 +54,7 @@ import net.minecraft.core.Direction;
 import net.minecraft.world.effect.MobEffects;
 
 import net.minecraft.world.phys.Vec3;
-import net.distant_horizons.core.logging.DhLogger;
+import com.seibel.distanthorizons.core.logging.DhLogger;
 import org.jetbrains.annotations.NotNull;
 import org.joml.Vector4f;
 

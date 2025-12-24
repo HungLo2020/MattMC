@@ -19,7 +19,7 @@
 
 package com.seibel.distanthorizons.core.level;
 
-import net.distant_horizons.core.wrapperInterfaces.world.IClientLevelWrapper;
+import com.seibel.distanthorizons.core.wrapperInterfaces.world.IClientLevelWrapper;
 import org.jetbrains.annotations.Nullable;
 
 /**

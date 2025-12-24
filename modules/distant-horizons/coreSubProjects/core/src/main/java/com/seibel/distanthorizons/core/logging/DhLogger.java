@@ -20,13 +20,13 @@
 package com.seibel.distanthorizons.core.logging;
 
 import net.distant_horizons.api.enums.config.EDhApiLoggerLevel;
-import net.distant_horizons.core.config.Config;
+import com.seibel.distanthorizons.core.config.Config;
 import net.distant_horizons.core.config.listeners.IConfigListener;
-import net.distant_horizons.core.config.types.ConfigEntry;
-import net.distant_horizons.core.dependencyInjection.SingletonInjector;
-import net.distant_horizons.core.util.ThreadUtil;
-import net.distant_horizons.core.wrapperInterfaces.minecraft.IMinecraftClientWrapper;
-import net.distant_horizons.coreapi.ModInfo;
+import com.seibel.distanthorizons.core.config.types.ConfigEntry;
+import com.seibel.distanthorizons.core.dependencyInjection.SingletonInjector;
+import com.seibel.distanthorizons.core.util.ThreadUtil;
+import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftClientWrapper;
+import com.seibel.distanthorizons.coreapi.ModInfo;
 import org.apache.logging.log4j.Level;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;

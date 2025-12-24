@@ -1,9 +1,9 @@
 package com.seibel.distanthorizons.fabric.mixins.client;
 
 import net.distant_horizons.common.wrappers.world.ClientLevelWrapper;
-import net.distant_horizons.core.api.internal.ClientApi;
-import net.distant_horizons.core.api.internal.SharedApi;
-import net.distant_horizons.core.util.threading.ThreadPoolUtil;
+import com.seibel.distanthorizons.core.api.internal.ClientApi;
+import com.seibel.distanthorizons.core.api.internal.SharedApi;
+import com.seibel.distanthorizons.core.util.threading.ThreadPoolUtil;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.multiplayer.ClientPacketListener;
 import net.minecraft.world.level.chunk.ChunkAccess;
@@ -14,7 +14,7 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-import net.distant_horizons.core.wrapperInterfaces.world.IClientLevelWrapper;
+import com.seibel.distanthorizons.core.wrapperInterfaces.world.IClientLevelWrapper;
 import net.minecraft.world.level.chunk.LevelChunk;
 import net.distant_horizons.common.wrappers.chunk.ChunkWrapper;
 

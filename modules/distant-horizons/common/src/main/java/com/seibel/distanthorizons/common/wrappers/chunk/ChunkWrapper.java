@@ -18,26 +18,26 @@
  */
 package com.seibel.distanthorizons.common.wrappers.chunk;
 
-import net.distant_horizons.common.wrappers.block.BiomeWrapper;
-import net.distant_horizons.common.wrappers.block.BlockStateWrapper;
-import net.distant_horizons.common.wrappers.misc.MutableBlockPosWrapper;
-import net.distant_horizons.core.logging.DhLoggerBuilder;
-import net.distant_horizons.core.pos.blockPos.DhBlockPos;
-import net.distant_horizons.core.pos.DhChunkPos;
-import net.distant_horizons.core.util.LodUtil;
-import net.distant_horizons.core.wrapperInterfaces.block.IBlockStateWrapper;
-import net.distant_horizons.core.wrapperInterfaces.chunk.ChunkLightStorage;
-import net.distant_horizons.core.wrapperInterfaces.chunk.IChunkWrapper;
-import net.distant_horizons.core.wrapperInterfaces.misc.IMutableBlockPosWrapper;
-import net.distant_horizons.core.wrapperInterfaces.world.IBiomeWrapper;
+import com.seibel.distanthorizons.common.wrappers.block.BiomeWrapper;
+import com.seibel.distanthorizons.common.wrappers.block.BlockStateWrapper;
+import com.seibel.distanthorizons.common.wrappers.misc.MutableBlockPosWrapper;
+import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
+import com.seibel.distanthorizons.core.pos.blockPos.DhBlockPos;
+import com.seibel.distanthorizons.core.pos.DhChunkPos;
+import com.seibel.distanthorizons.core.util.LodUtil;
+import com.seibel.distanthorizons.core.wrapperInterfaces.block.IBlockStateWrapper;
+import com.seibel.distanthorizons.core.wrapperInterfaces.chunk.ChunkLightStorage;
+import com.seibel.distanthorizons.core.wrapperInterfaces.chunk.IChunkWrapper;
+import com.seibel.distanthorizons.core.wrapperInterfaces.misc.IMutableBlockPosWrapper;
+import com.seibel.distanthorizons.core.wrapperInterfaces.world.IBiomeWrapper;
 
-import net.distant_horizons.core.wrapperInterfaces.world.ILevelWrapper;
+import com.seibel.distanthorizons.core.wrapperInterfaces.world.ILevelWrapper;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.chunk.ChunkAccess;
 import net.minecraft.world.level.chunk.ProtoChunk;
 import net.minecraft.world.level.levelgen.Heightmap;
 
-import net.distant_horizons.core.logging.DhLogger;
+import com.seibel.distanthorizons.core.logging.DhLogger;
 
 import java.util.*;
 

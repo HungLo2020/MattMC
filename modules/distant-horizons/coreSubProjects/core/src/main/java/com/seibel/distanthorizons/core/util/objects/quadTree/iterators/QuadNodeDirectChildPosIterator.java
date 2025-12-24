@@ -19,8 +19,8 @@
 
 package com.seibel.distanthorizons.core.util.objects.quadTree.iterators;
 
-import net.distant_horizons.core.pos.DhSectionPos;
-import net.distant_horizons.core.util.objects.quadTree.QuadNode;
+import com.seibel.distanthorizons.core.pos.DhSectionPos;
+import com.seibel.distanthorizons.core.util.objects.quadTree.QuadNode;
 import it.unimi.dsi.fastutil.longs.LongIterator;
 
 import java.util.NoSuchElementException;

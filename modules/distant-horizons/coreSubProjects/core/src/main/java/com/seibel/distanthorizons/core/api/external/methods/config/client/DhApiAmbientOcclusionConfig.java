@@ -20,9 +20,9 @@
 package com.seibel.distanthorizons.core.api.external.methods.config.client;
 
 import net.distant_horizons.api.interfaces.config.IDhApiConfigValue;
-import net.distant_horizons.api.interfaces.config.client.IDhApiAmbientOcclusionConfig;
-import net.distant_horizons.core.config.api.DhApiConfigValue;
-import net.distant_horizons.core.config.Config;
+import com.seibel.distanthorizons.api.interfaces.config.client.IDhApiAmbientOcclusionConfig;
+import com.seibel.distanthorizons.core.config.api.DhApiConfigValue;
+import com.seibel.distanthorizons.core.config.Config;
 
 public class DhApiAmbientOcclusionConfig implements IDhApiAmbientOcclusionConfig
 {

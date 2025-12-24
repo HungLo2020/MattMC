@@ -23,9 +23,9 @@ import java.lang.invoke.MethodHandle;
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.MethodType;
 
-import net.distant_horizons.core.dependencyInjection.SingletonInjector;
-import net.distant_horizons.core.wrapperInterfaces.minecraft.IMinecraftRenderWrapper;
-import net.distant_horizons.core.wrapperInterfaces.modAccessor.ISodiumAccessor;
+import com.seibel.distanthorizons.core.dependencyInjection.SingletonInjector;
+import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftRenderWrapper;
+import com.seibel.distanthorizons.core.wrapperInterfaces.modAccessor.ISodiumAccessor;
 import net.minecraft.client.Minecraft;
 
 

@@ -19,7 +19,7 @@
 
 package com.seibel.distanthorizons.api.methods.events.interfaces;
 
-import net.distant_horizons.api.methods.events.sharedParameterObjects.DhApiEventParam;
+import com.seibel.distanthorizons.api.methods.events.sharedParameterObjects.DhApiEventParam;
 import net.distant_horizons.coreapi.interfaces.dependencyInjection.IBindable;
 
 /**

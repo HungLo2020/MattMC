@@ -20,11 +20,11 @@
 package com.seibel.distanthorizons.core.network.messages.fullData;
 
 import com.google.common.base.MoreObjects;
-import net.distant_horizons.core.multiplayer.fullData.FullDataPayload;
+import com.seibel.distanthorizons.core.multiplayer.fullData.FullDataPayload;
 import net.distant_horizons.core.network.INetworkObject;
-import net.distant_horizons.core.network.messages.ILevelRelatedMessage;
-import net.distant_horizons.core.network.messages.AbstractNetworkMessage;
-import net.distant_horizons.core.wrapperInterfaces.world.IServerLevelWrapper;
+import com.seibel.distanthorizons.core.network.messages.ILevelRelatedMessage;
+import com.seibel.distanthorizons.core.network.messages.AbstractNetworkMessage;
+import com.seibel.distanthorizons.core.wrapperInterfaces.world.IServerLevelWrapper;
 import io.netty.buffer.ByteBuf;
 
 public class FullDataPartialUpdateMessage extends AbstractNetworkMessage implements ILevelRelatedMessage

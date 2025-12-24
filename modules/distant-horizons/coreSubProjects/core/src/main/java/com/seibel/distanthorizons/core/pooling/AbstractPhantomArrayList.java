@@ -1,8 +1,8 @@
 package com.seibel.distanthorizons.core.pooling;
 
-import net.distant_horizons.core.logging.DhLoggerBuilder;
+import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
 import org.apache.logging.log4j.LogManager;
-import net.distant_horizons.core.logging.DhLogger;
+import com.seibel.distanthorizons.core.logging.DhLogger;
 
 import java.lang.ref.PhantomReference;
 

@@ -20,8 +20,8 @@
 package com.seibel.distanthorizons.api.methods.events.sharedParameterObjects;
 
 import net.distant_horizons.api.enums.rendering.EDhApiRenderPass;
-import net.distant_horizons.api.methods.events.interfaces.IDhApiEventParam;
-import net.distant_horizons.api.objects.math.DhApiMat4f;
+import com.seibel.distanthorizons.api.methods.events.interfaces.IDhApiEventParam;
+import com.seibel.distanthorizons.api.objects.math.DhApiMat4f;
 
 /**
  * Contains information relevant to Distant Horizons and Minecraft rendering.

@@ -19,11 +19,11 @@
 
 package com.seibel.distanthorizons.core.dependencyInjection;
 
-import net.distant_horizons.coreapi.DependencyInjection.DependencyInjector;
+import com.seibel.distanthorizons.coreapi.DependencyInjection.DependencyInjector;
 import net.distant_horizons.coreapi.interfaces.dependencyInjection.IBindable;
-import net.distant_horizons.core.logging.DhLoggerBuilder;
-import net.distant_horizons.core.wrapperInterfaces.modAccessor.IModAccessor;
-import net.distant_horizons.core.logging.DhLogger;
+import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
+import com.seibel.distanthorizons.core.wrapperInterfaces.modAccessor.IModAccessor;
+import com.seibel.distanthorizons.core.logging.DhLogger;
 
 import java.lang.invoke.MethodHandles;
 

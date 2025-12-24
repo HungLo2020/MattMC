@@ -22,14 +22,14 @@ package com.seibel.distanthorizons.core.wrapperInterfaces.minecraft;
 import java.util.ArrayList;
 import java.util.UUID;
 
-import net.distant_horizons.core.enums.EDhDirection;
-import net.distant_horizons.core.pos.blockPos.DhBlockPos;
-import net.distant_horizons.core.pos.DhChunkPos;
-import net.distant_horizons.core.render.glObject.GLProxy;
-import net.distant_horizons.core.wrapperInterfaces.world.IClientLevelWrapper;
-import net.distant_horizons.coreapi.ModInfo;
+import com.seibel.distanthorizons.core.enums.EDhDirection;
+import com.seibel.distanthorizons.core.pos.blockPos.DhBlockPos;
+import com.seibel.distanthorizons.core.pos.DhChunkPos;
+import com.seibel.distanthorizons.core.render.glObject.GLProxy;
+import com.seibel.distanthorizons.core.wrapperInterfaces.world.IClientLevelWrapper;
+import com.seibel.distanthorizons.coreapi.ModInfo;
 import net.distant_horizons.coreapi.interfaces.dependencyInjection.IBindable;
-import net.distant_horizons.core.wrapperInterfaces.world.ILevelWrapper;
+import com.seibel.distanthorizons.core.wrapperInterfaces.world.ILevelWrapper;
 import org.apache.logging.log4j.Level;
 
 public interface IMinecraftClientWrapper extends IBindable

@@ -19,9 +19,9 @@
 
 package com.seibel.distanthorizons.core.sql.dto;
 
-import net.distant_horizons.core.dataObjects.fullData.sources.FullDataSourceV2;
+import com.seibel.distanthorizons.core.dataObjects.fullData.sources.FullDataSourceV2;
 import net.distant_horizons.core.network.INetworkObject;
-import net.distant_horizons.core.pos.blockPos.DhBlockPos;
+import com.seibel.distanthorizons.core.pos.blockPos.DhBlockPos;
 import io.netty.buffer.ByteBuf;
 
 import java.awt.*;

@@ -19,7 +19,7 @@
 
 package com.seibel.distanthorizons.core.dependencyInjection;
 
-import net.distant_horizons.coreapi.DependencyInjection.DependencyInjector;
+import com.seibel.distanthorizons.coreapi.DependencyInjection.DependencyInjector;
 import net.distant_horizons.coreapi.interfaces.dependencyInjection.IBindable;
 
 /**

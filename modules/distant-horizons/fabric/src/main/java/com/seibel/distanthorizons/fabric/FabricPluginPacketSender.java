@@ -1,7 +1,7 @@
 package com.seibel.distanthorizons.fabric;
 
 import net.distant_horizons.common.AbstractPluginPacketSender;
-import net.distant_horizons.core.network.messages.AbstractNetworkMessage;
+import com.seibel.distanthorizons.core.network.messages.AbstractNetworkMessage;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.minecraft.server.level.ServerPlayer;

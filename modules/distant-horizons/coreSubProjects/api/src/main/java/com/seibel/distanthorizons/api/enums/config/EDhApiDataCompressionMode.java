@@ -19,6 +19,8 @@
 
 package com.seibel.distanthorizons.api.enums.config;
 
+
+import net.distant_horizons.api.enums.config.DisallowSelectingViaConfigGui;
 /**
  * UNCOMPRESSED <br>
  * LZ4 <br>

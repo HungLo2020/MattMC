@@ -23,9 +23,9 @@ import java.lang.ref.WeakReference;
 import java.util.LinkedList;
 import java.util.concurrent.ThreadFactory;
 
-import net.distant_horizons.core.logging.DhLoggerBuilder;
-import net.distant_horizons.core.util.ThreadUtil;
-import net.distant_horizons.core.logging.DhLogger;
+import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
+import com.seibel.distanthorizons.core.util.ThreadUtil;
+import com.seibel.distanthorizons.core.logging.DhLogger;
 import org.jetbrains.annotations.NotNull;
 
 /**

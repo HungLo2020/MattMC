@@ -19,10 +19,10 @@
 
 package com.seibel.distanthorizons.api.interfaces.factories;
 
-import net.distant_horizons.api.interfaces.block.IDhApiBiomeWrapper;
-import net.distant_horizons.api.interfaces.block.IDhApiBlockStateWrapper;
-import net.distant_horizons.api.interfaces.world.IDhApiLevelWrapper;
-import net.distant_horizons.api.DhApi;
+import com.seibel.distanthorizons.api.interfaces.block.IDhApiBiomeWrapper;
+import com.seibel.distanthorizons.api.interfaces.block.IDhApiBlockStateWrapper;
+import com.seibel.distanthorizons.api.interfaces.world.IDhApiLevelWrapper;
+import com.seibel.distanthorizons.api.DhApi;
 
 import java.io.IOException;
 

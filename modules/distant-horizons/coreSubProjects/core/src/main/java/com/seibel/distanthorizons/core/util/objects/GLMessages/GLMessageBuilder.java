@@ -19,8 +19,8 @@
 
 package com.seibel.distanthorizons.core.util.objects.GLMessages;
 
-import net.distant_horizons.core.logging.DhLoggerBuilder;
-import net.distant_horizons.core.logging.DhLogger;
+import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
+import com.seibel.distanthorizons.core.logging.DhLogger;
 
 import java.util.function.Consumer;
 import java.util.function.Function;

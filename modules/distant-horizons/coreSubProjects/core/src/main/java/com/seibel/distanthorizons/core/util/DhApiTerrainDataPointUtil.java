@@ -1,10 +1,10 @@
 package com.seibel.distanthorizons.core.util;
 
-import net.distant_horizons.api.interfaces.world.IDhApiLevelWrapper;
-import net.distant_horizons.api.objects.data.DhApiTerrainDataPoint;
-import net.distant_horizons.core.dataObjects.fullData.FullDataPointIdMap;
-import net.distant_horizons.core.wrapperInterfaces.block.IBlockStateWrapper;
-import net.distant_horizons.core.wrapperInterfaces.world.IBiomeWrapper;
+import com.seibel.distanthorizons.api.interfaces.world.IDhApiLevelWrapper;
+import com.seibel.distanthorizons.api.objects.data.DhApiTerrainDataPoint;
+import com.seibel.distanthorizons.core.dataObjects.fullData.FullDataPointIdMap;
+import com.seibel.distanthorizons.core.wrapperInterfaces.block.IBlockStateWrapper;
+import com.seibel.distanthorizons.core.wrapperInterfaces.world.IBiomeWrapper;
 
 /**
  * Used to give additional features to {@link DhApiTerrainDataPoint}

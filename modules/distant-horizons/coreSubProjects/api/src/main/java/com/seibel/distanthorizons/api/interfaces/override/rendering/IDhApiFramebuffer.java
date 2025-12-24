@@ -19,7 +19,7 @@
 
 package com.seibel.distanthorizons.api.interfaces.override.rendering;
 
-import net.distant_horizons.api.interfaces.override.IDhApiOverrideable;
+import com.seibel.distanthorizons.api.interfaces.override.IDhApiOverrideable;
 
 /**
  * @author James Seibel

@@ -20,15 +20,15 @@
 package com.seibel.distanthorizons.core.render.renderer;
 
 import net.distant_horizons.api.enums.config.EDhApiGpuUploadMethod;
-import net.distant_horizons.core.dependencyInjection.SingletonInjector;
-import net.distant_horizons.core.logging.DhLogger;
-import net.distant_horizons.core.logging.DhLoggerBuilder;
-import net.distant_horizons.core.render.glObject.buffer.GLVertexBuffer;
-import net.distant_horizons.core.render.glObject.shader.ShaderProgram;
-import net.distant_horizons.core.render.glObject.vertexAttribute.AbstractVertexAttribute;
-import net.distant_horizons.core.render.glObject.vertexAttribute.VertexPointer;
-import net.distant_horizons.core.wrapperInterfaces.minecraft.IMinecraftGLWrapper;
-import net.distant_horizons.core.wrapperInterfaces.minecraft.IMinecraftRenderWrapper;
+import com.seibel.distanthorizons.core.dependencyInjection.SingletonInjector;
+import com.seibel.distanthorizons.core.logging.DhLogger;
+import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
+import com.seibel.distanthorizons.core.render.glObject.buffer.GLVertexBuffer;
+import com.seibel.distanthorizons.core.render.glObject.shader.ShaderProgram;
+import com.seibel.distanthorizons.core.render.glObject.vertexAttribute.AbstractVertexAttribute;
+import com.seibel.distanthorizons.core.render.glObject.vertexAttribute.VertexPointer;
+import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftGLWrapper;
+import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftRenderWrapper;
 
 import org.lwjgl.opengl.GL32;
 

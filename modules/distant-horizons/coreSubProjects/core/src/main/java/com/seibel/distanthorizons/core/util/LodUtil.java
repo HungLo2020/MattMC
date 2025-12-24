@@ -22,11 +22,11 @@ package com.seibel.distanthorizons.core.util;
 import java.util.Arrays;
 import java.util.List;
 
-import net.distant_horizons.core.logging.DhLoggerBuilder;
-import net.distant_horizons.core.render.vertexFormat.DefaultLodVertexFormats;
-import net.distant_horizons.core.render.vertexFormat.LodVertexFormat;
-import net.distant_horizons.core.wrapperInterfaces.block.IBlockStateWrapper;
-import net.distant_horizons.core.logging.DhLogger;
+import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
+import com.seibel.distanthorizons.core.render.vertexFormat.DefaultLodVertexFormats;
+import com.seibel.distanthorizons.core.render.vertexFormat.LodVertexFormat;
+import com.seibel.distanthorizons.core.wrapperInterfaces.block.IBlockStateWrapper;
+import com.seibel.distanthorizons.core.logging.DhLogger;
 
 /**
  * This class holds methods and constants that may be used in multiple places.

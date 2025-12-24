@@ -21,11 +21,11 @@ package com.seibel.distanthorizons.core.logging;
 
 import net.distant_horizons.api.enums.config.EDhApiLoggerLevel;
 import net.distant_horizons.core.config.listeners.IConfigListener;
-import net.distant_horizons.core.config.types.AbstractConfigBase;
-import net.distant_horizons.core.config.types.ConfigEntry;
-import net.distant_horizons.coreapi.ModInfo;
+import com.seibel.distanthorizons.core.config.types.AbstractConfigBase;
+import com.seibel.distanthorizons.core.config.types.ConfigEntry;
+import com.seibel.distanthorizons.coreapi.ModInfo;
 import org.apache.logging.log4j.LogManager;
-import net.distant_horizons.core.logging.DhLogger;
+import com.seibel.distanthorizons.core.logging.DhLogger;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;

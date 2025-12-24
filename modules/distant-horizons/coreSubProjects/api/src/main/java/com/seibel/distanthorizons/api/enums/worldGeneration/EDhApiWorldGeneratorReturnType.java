@@ -19,8 +19,10 @@
 
 package com.seibel.distanthorizons.api.enums.worldGeneration;
 
-import net.distant_horizons.api.interfaces.override.worldGenerator.IDhApiWorldGenerator;
-import net.distant_horizons.api.objects.data.IDhApiFullDataSource;
+
+import net.distant_horizons.api.enums.worldGeneration.EDhApiDistantGeneratorMode;
+import com.seibel.distanthorizons.api.interfaces.override.worldGenerator.IDhApiWorldGenerator;
+import com.seibel.distanthorizons.api.objects.data.IDhApiFullDataSource;
 
 import java.util.concurrent.ExecutorService;
 import java.util.function.Consumer;

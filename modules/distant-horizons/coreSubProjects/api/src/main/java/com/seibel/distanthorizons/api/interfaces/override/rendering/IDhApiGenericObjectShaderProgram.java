@@ -19,12 +19,12 @@
 
 package com.seibel.distanthorizons.api.interfaces.override.rendering;
 
-import net.distant_horizons.api.interfaces.override.IDhApiOverrideable;
-import net.distant_horizons.api.interfaces.render.IDhApiRenderableBoxGroup;
-import net.distant_horizons.api.methods.events.sharedParameterObjects.DhApiRenderParam;
+import com.seibel.distanthorizons.api.interfaces.override.IDhApiOverrideable;
+import com.seibel.distanthorizons.api.interfaces.render.IDhApiRenderableBoxGroup;
+import com.seibel.distanthorizons.api.methods.events.sharedParameterObjects.DhApiRenderParam;
 import net.distant_horizons.api.objects.math.DhApiVec3d;
-import net.distant_horizons.api.objects.render.DhApiRenderableBox;
-import net.distant_horizons.api.objects.render.DhApiRenderableBoxGroupShading;
+import com.seibel.distanthorizons.api.objects.render.DhApiRenderableBox;
+import com.seibel.distanthorizons.api.objects.render.DhApiRenderableBoxGroupShading;
 
 /**
  * @see IDhApiShaderProgram

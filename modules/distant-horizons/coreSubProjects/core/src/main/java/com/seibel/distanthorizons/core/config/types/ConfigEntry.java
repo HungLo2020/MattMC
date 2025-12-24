@@ -20,10 +20,10 @@
 package com.seibel.distanthorizons.core.config.types;
 
 
-import net.distant_horizons.core.config.ConfigHandler;
+import com.seibel.distanthorizons.core.config.ConfigHandler;
 import net.distant_horizons.core.util.NumberUtil;
-import net.distant_horizons.core.config.file.ConfigFileHandler;
-import net.distant_horizons.core.config.listeners.ConfigChangeListener;
+import com.seibel.distanthorizons.core.config.file.ConfigFileHandler;
+import com.seibel.distanthorizons.core.config.listeners.ConfigChangeListener;
 import net.distant_horizons.core.config.listeners.IConfigListener;
 import net.distant_horizons.core.config.types.enums.EConfigEntryAppearance;
 import net.distant_horizons.core.config.types.enums.EConfigValidity;

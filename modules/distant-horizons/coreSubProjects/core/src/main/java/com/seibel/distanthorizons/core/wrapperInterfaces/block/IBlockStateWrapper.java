@@ -19,8 +19,8 @@
 
 package com.seibel.distanthorizons.core.wrapperInterfaces.block;
 
-import net.distant_horizons.api.interfaces.block.IDhApiBlockStateWrapper;
-import net.distant_horizons.core.util.LodUtil;
+import com.seibel.distanthorizons.api.interfaces.block.IDhApiBlockStateWrapper;
+import com.seibel.distanthorizons.core.util.LodUtil;
 
 import java.awt.*;
 

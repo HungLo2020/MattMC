@@ -1,7 +1,7 @@
 package com.seibel.distanthorizons.core.network.messages;
 
-import net.distant_horizons.core.wrapperInterfaces.world.ILevelWrapper;
-import net.distant_horizons.core.wrapperInterfaces.world.IServerLevelWrapper;
+import com.seibel.distanthorizons.core.wrapperInterfaces.world.ILevelWrapper;
+import com.seibel.distanthorizons.core.wrapperInterfaces.world.IServerLevelWrapper;
 
 /** Implemented by messages that handle level data */
 public interface ILevelRelatedMessage

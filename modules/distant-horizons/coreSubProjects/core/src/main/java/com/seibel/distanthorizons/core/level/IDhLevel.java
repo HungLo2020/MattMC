@@ -19,19 +19,19 @@
 
 package com.seibel.distanthorizons.core.level;
 
-import net.distant_horizons.core.api.internal.ClientApi;
-import net.distant_horizons.core.api.internal.ServerApi;
-import net.distant_horizons.core.dataObjects.fullData.sources.FullDataSourceV2;
-import net.distant_horizons.core.file.fullDatafile.V2.FullDataSourceProviderV2;
-import net.distant_horizons.core.file.fullDatafile.GeneratedFullDataSourceProvider;
-import net.distant_horizons.core.file.structure.ISaveStructure;
-import net.distant_horizons.core.pos.DhChunkPos;
-import net.distant_horizons.core.render.RenderBufferHandler;
-import net.distant_horizons.core.render.renderer.generic.GenericObjectRenderer;
-import net.distant_horizons.core.sql.dto.BeaconBeamDTO;
-import net.distant_horizons.core.sql.repo.BeaconBeamRepo;
-import net.distant_horizons.core.wrapperInterfaces.chunk.IChunkWrapper;
-import net.distant_horizons.core.wrapperInterfaces.world.ILevelWrapper;
+import com.seibel.distanthorizons.core.api.internal.ClientApi;
+import com.seibel.distanthorizons.core.api.internal.ServerApi;
+import com.seibel.distanthorizons.core.dataObjects.fullData.sources.FullDataSourceV2;
+import com.seibel.distanthorizons.core.file.fullDatafile.V2.FullDataSourceProviderV2;
+import com.seibel.distanthorizons.core.file.fullDatafile.GeneratedFullDataSourceProvider;
+import com.seibel.distanthorizons.core.file.structure.ISaveStructure;
+import com.seibel.distanthorizons.core.pos.DhChunkPos;
+import com.seibel.distanthorizons.core.render.RenderBufferHandler;
+import com.seibel.distanthorizons.core.render.renderer.generic.GenericObjectRenderer;
+import com.seibel.distanthorizons.core.sql.dto.BeaconBeamDTO;
+import com.seibel.distanthorizons.core.sql.repo.BeaconBeamRepo;
+import com.seibel.distanthorizons.core.wrapperInterfaces.chunk.IChunkWrapper;
+import com.seibel.distanthorizons.core.wrapperInterfaces.world.ILevelWrapper;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 

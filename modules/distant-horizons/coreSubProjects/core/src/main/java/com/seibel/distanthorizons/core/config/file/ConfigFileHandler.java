@@ -20,16 +20,16 @@
 package com.seibel.distanthorizons.core.config.file;
 
 import com.electronwill.nightconfig.core.file.CommentedFileConfig;
-import net.distant_horizons.core.config.ConfigHandler;
-import net.distant_horizons.core.dependencyInjection.SingletonInjector;
-import net.distant_horizons.core.config.types.AbstractConfigBase;
-import net.distant_horizons.core.config.types.ConfigEntry;
+import com.seibel.distanthorizons.core.config.ConfigHandler;
+import com.seibel.distanthorizons.core.dependencyInjection.SingletonInjector;
+import com.seibel.distanthorizons.core.config.types.AbstractConfigBase;
+import com.seibel.distanthorizons.core.config.types.ConfigEntry;
 import net.distant_horizons.core.jar.EPlatform;
-import net.distant_horizons.core.logging.DhLoggerBuilder;
-import net.distant_horizons.core.wrapperInterfaces.minecraft.IMinecraftClientWrapper;
-import net.distant_horizons.coreapi.ModInfo;
+import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
+import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftClientWrapper;
+import com.seibel.distanthorizons.coreapi.ModInfo;
 import org.apache.logging.log4j.LogManager;
-import net.distant_horizons.core.logging.DhLogger;
+import com.seibel.distanthorizons.core.logging.DhLogger;
 
 import java.io.File;
 import java.io.IOException;

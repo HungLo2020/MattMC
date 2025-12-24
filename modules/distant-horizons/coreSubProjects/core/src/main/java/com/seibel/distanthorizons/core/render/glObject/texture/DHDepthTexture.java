@@ -1,7 +1,7 @@
 package com.seibel.distanthorizons.core.render.glObject.texture;
 
-import net.distant_horizons.core.dependencyInjection.SingletonInjector;
-import net.distant_horizons.core.wrapperInterfaces.minecraft.IMinecraftGLWrapper;
+import com.seibel.distanthorizons.core.dependencyInjection.SingletonInjector;
+import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftGLWrapper;
 import org.lwjgl.opengl.GL11C;
 import org.lwjgl.opengl.GL13C;
 import org.lwjgl.opengl.GL43C;

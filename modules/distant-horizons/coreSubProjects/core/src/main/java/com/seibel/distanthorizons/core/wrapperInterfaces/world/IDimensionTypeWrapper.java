@@ -19,7 +19,7 @@
 
 package com.seibel.distanthorizons.core.wrapperInterfaces.world;
 
-import net.distant_horizons.api.interfaces.world.IDhApiDimensionTypeWrapper;
+import com.seibel.distanthorizons.api.interfaces.world.IDhApiDimensionTypeWrapper;
 import net.distant_horizons.coreapi.interfaces.dependencyInjection.IBindable;
 
 public interface IDimensionTypeWrapper extends IDhApiDimensionTypeWrapper, IBindable

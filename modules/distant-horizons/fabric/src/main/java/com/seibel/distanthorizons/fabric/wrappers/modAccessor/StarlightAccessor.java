@@ -19,7 +19,7 @@
 
 package com.seibel.distanthorizons.fabric.wrappers.modAccessor;
 
-import net.distant_horizons.core.wrapperInterfaces.modAccessor.IStarlightAccessor;
+import com.seibel.distanthorizons.core.wrapperInterfaces.modAccessor.IStarlightAccessor;
 
 
 public class StarlightAccessor implements IStarlightAccessor

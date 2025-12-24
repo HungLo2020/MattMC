@@ -1,8 +1,8 @@
 package com.seibel.distanthorizons.core.multiplayer.server;
 
-import net.distant_horizons.core.multiplayer.fullData.SharedBandwidthLimit;
-import net.distant_horizons.core.network.messages.AbstractNetworkMessage;
-import net.distant_horizons.core.wrapperInterfaces.misc.IServerPlayerWrapper;
+import com.seibel.distanthorizons.core.multiplayer.fullData.SharedBandwidthLimit;
+import com.seibel.distanthorizons.core.network.messages.AbstractNetworkMessage;
+import com.seibel.distanthorizons.core.wrapperInterfaces.misc.IServerPlayerWrapper;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.Collection;

@@ -1,10 +1,10 @@
 package com.seibel.distanthorizons.core.util.threading;
 
-import net.distant_horizons.core.config.Config;
+import com.seibel.distanthorizons.core.config.Config;
 import net.distant_horizons.core.config.listeners.IConfigListener;
-import net.distant_horizons.core.logging.DhLoggerBuilder;
+import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
 import net.distant_horizons.core.util.objects.RollingAverage;
-import net.distant_horizons.core.logging.DhLogger;
+import com.seibel.distanthorizons.core.logging.DhLogger;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.*;

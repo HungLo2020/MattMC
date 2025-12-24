@@ -19,7 +19,7 @@
 
 package com.seibel.distanthorizons.fabric.wrappers.modAccessor;
 
-import net.distant_horizons.core.wrapperInterfaces.modAccessor.IC2meAccessor;
+import com.seibel.distanthorizons.core.wrapperInterfaces.modAccessor.IC2meAccessor;
 
 public class C2meAccessor implements IC2meAccessor
 {

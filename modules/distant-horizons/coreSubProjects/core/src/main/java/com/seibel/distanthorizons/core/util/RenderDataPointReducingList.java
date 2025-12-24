@@ -20,11 +20,11 @@
 package com.seibel.distanthorizons.core.util;
 
 import com.google.common.annotations.VisibleForTesting;
-import net.distant_horizons.core.dataObjects.render.columnViews.ColumnArrayView;
+import com.seibel.distanthorizons.core.dataObjects.render.columnViews.ColumnArrayView;
 import net.distant_horizons.core.dataObjects.render.columnViews.IColumnDataView;
-import net.distant_horizons.core.pooling.AbstractPhantomArrayList;
-import net.distant_horizons.core.pooling.PhantomArrayListPool;
-import net.distant_horizons.core.util.LodUtil.AssertFailureException;
+import com.seibel.distanthorizons.core.pooling.AbstractPhantomArrayList;
+import com.seibel.distanthorizons.core.pooling.PhantomArrayListPool;
+import com.seibel.distanthorizons.core.util.LodUtil.AssertFailureException;
 import it.unimi.dsi.fastutil.longs.LongArrayList;
 import it.unimi.dsi.fastutil.shorts.ShortArrayList;
 import it.unimi.dsi.fastutil.shorts.ShortArrays;

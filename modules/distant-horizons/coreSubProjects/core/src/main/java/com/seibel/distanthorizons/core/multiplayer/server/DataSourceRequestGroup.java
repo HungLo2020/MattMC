@@ -1,7 +1,7 @@
 package com.seibel.distanthorizons.core.multiplayer.server;
 
-import net.distant_horizons.core.dataObjects.fullData.sources.FullDataSourceV2;
-import net.distant_horizons.core.network.messages.fullData.FullDataSourceRequestMessage;
+import com.seibel.distanthorizons.core.dataObjects.fullData.sources.FullDataSourceV2;
+import com.seibel.distanthorizons.core.network.messages.fullData.FullDataSourceRequestMessage;
 
 import javax.annotation.CheckForNull;
 import java.util.Collection;

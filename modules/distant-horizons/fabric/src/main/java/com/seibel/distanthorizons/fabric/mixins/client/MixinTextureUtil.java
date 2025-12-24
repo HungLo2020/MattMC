@@ -1,7 +1,7 @@
 package com.seibel.distanthorizons.fabric.mixins.client;
 
 import com.mojang.blaze3d.platform.TextureUtil;
-import net.distant_horizons.core.config.Config;
+import com.seibel.distanthorizons.core.config.Config;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Redirect;

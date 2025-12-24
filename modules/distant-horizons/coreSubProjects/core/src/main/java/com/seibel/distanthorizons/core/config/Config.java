@@ -19,7 +19,27 @@
 
 package com.seibel.distanthorizons.core.config;
 
-import net.distant_horizons.api.DhApi;
+
+import net.distant_horizons.core.config.types.enums.EConfigCommentTextPosition;
+import net.distant_horizons.core.config.types.enums.EConfigEntryAppearance;
+import net.distant_horizons.api.enums.config.EDhApiBlocksToAvoid;
+import net.distant_horizons.api.enums.rendering.EDhApiDebugRendering;
+import net.distant_horizons.api.enums.rendering.EDhApiFogColorMode;
+import net.distant_horizons.api.enums.rendering.EDhApiFogFalloff;
+import net.distant_horizons.api.enums.config.EDhApiGLErrorHandlingMode;
+import net.distant_horizons.api.enums.config.EDhApiGpuUploadMethod;
+import net.distant_horizons.api.enums.config.EDhApiGrassSideRendering;
+import net.distant_horizons.api.enums.rendering.EDhApiHeightFogDirection;
+import net.distant_horizons.api.enums.rendering.EDhApiHeightFogMixMode;
+import net.distant_horizons.api.enums.config.EDhApiHorizontalQuality;
+import net.distant_horizons.api.enums.config.EDhApiLodShading;
+import net.distant_horizons.api.enums.config.EDhApiLoggerLevel;
+import net.distant_horizons.api.enums.config.EDhApiMcRenderingFadeMode;
+import net.distant_horizons.api.enums.rendering.EDhApiRendererMode;
+import net.distant_horizons.api.enums.config.EDhApiServerFolderNameMode;
+import net.distant_horizons.api.enums.rendering.EDhApiTransparency;
+import net.distant_horizons.api.enums.config.EDhApiWorldCompressionMode;
+import com.seibel.distanthorizons.api.DhApi;
 import com.seibel.distanthorizons.api.enums.config.*;
 import com.seibel.distanthorizons.api.enums.config.quickOptions.*;
 import com.seibel.distanthorizons.api.enums.rendering.*;
@@ -27,17 +47,17 @@ import net.distant_horizons.api.enums.worldGeneration.EDhApiDistantGeneratorMode
 import net.distant_horizons.api.enums.worldGeneration.EDhApiDistantGeneratorProgressDisplayLocation;
 import com.seibel.distanthorizons.core.config.eventHandlers.*;
 import com.seibel.distanthorizons.core.config.eventHandlers.presets.*;
-import net.distant_horizons.core.config.listeners.ConfigChangeListener;
+import com.seibel.distanthorizons.core.config.listeners.ConfigChangeListener;
 import com.seibel.distanthorizons.core.config.types.*;
 import com.seibel.distanthorizons.core.config.types.enums.*;
-import net.distant_horizons.core.dependencyInjection.SingletonInjector;
-import net.distant_horizons.core.logging.DhLoggerBuilder;
-import net.distant_horizons.core.pos.DhSectionPos;
+import com.seibel.distanthorizons.core.dependencyInjection.SingletonInjector;
+import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
+import com.seibel.distanthorizons.core.pos.DhSectionPos;
 import net.distant_horizons.core.util.NativeDialogUtil;
-import net.distant_horizons.core.wrapperInterfaces.IWrapperFactory;
-import net.distant_horizons.core.wrapperInterfaces.minecraft.IMinecraftSharedWrapper;
-import net.distant_horizons.coreapi.ModInfo;
-import net.distant_horizons.core.logging.DhLogger;
+import com.seibel.distanthorizons.core.wrapperInterfaces.IWrapperFactory;
+import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftSharedWrapper;
+import com.seibel.distanthorizons.coreapi.ModInfo;
+import com.seibel.distanthorizons.core.logging.DhLogger;
 
 import java.io.File;
 import java.util.*;

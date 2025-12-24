@@ -20,11 +20,11 @@
 package com.seibel.distanthorizons.common.wrappers.misc;
 
 import com.mojang.blaze3d.platform.NativeImage;
-import net.distant_horizons.core.dependencyInjection.SingletonInjector;
-import net.distant_horizons.core.logging.DhLoggerBuilder;
-import net.distant_horizons.core.wrapperInterfaces.minecraft.IMinecraftGLWrapper;
-import net.distant_horizons.core.wrapperInterfaces.misc.ILightMapWrapper;
-import net.distant_horizons.core.logging.DhLogger;
+import com.seibel.distanthorizons.core.dependencyInjection.SingletonInjector;
+import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
+import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftGLWrapper;
+import com.seibel.distanthorizons.core.wrapperInterfaces.misc.ILightMapWrapper;
+import com.seibel.distanthorizons.core.logging.DhLogger;
 import org.lwjgl.opengl.GL32;
 
 import java.nio.ByteBuffer;

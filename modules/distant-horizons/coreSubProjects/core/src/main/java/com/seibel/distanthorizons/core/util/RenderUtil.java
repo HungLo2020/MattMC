@@ -19,13 +19,13 @@
 
 package com.seibel.distanthorizons.core.util;
 
-import net.distant_horizons.core.config.Config;
-import net.distant_horizons.core.dependencyInjection.SingletonInjector;
-import net.distant_horizons.core.wrapperInterfaces.minecraft.IMinecraftClientWrapper;
-import net.distant_horizons.core.wrapperInterfaces.minecraft.IMinecraftRenderWrapper;
-import net.distant_horizons.core.wrapperInterfaces.world.IClientLevelWrapper;
+import com.seibel.distanthorizons.core.config.Config;
+import com.seibel.distanthorizons.core.dependencyInjection.SingletonInjector;
+import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftClientWrapper;
+import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftRenderWrapper;
+import com.seibel.distanthorizons.core.wrapperInterfaces.world.IClientLevelWrapper;
 import net.distant_horizons.coreapi.util.MathUtil;
-import net.distant_horizons.core.util.math.Mat4f;
+import com.seibel.distanthorizons.core.util.math.Mat4f;
 
 /**
  * This holds miscellaneous helper code

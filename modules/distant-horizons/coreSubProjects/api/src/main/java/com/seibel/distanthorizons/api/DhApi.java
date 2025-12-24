@@ -19,22 +19,22 @@
 
 package com.seibel.distanthorizons.api;
 
-import net.distant_horizons.api.interfaces.events.IDhApiEventInjector;
-import net.distant_horizons.api.interfaces.factories.IDhApiWrapperFactory;
-import net.distant_horizons.api.interfaces.override.IDhApiOverrideable;
-import net.distant_horizons.api.interfaces.override.worldGenerator.IDhApiWorldGeneratorOverrideRegister;
-import net.distant_horizons.api.interfaces.render.IDhApiCustomRenderObjectFactory;
-import net.distant_horizons.api.interfaces.render.IDhApiRenderProxy;
-import net.distant_horizons.api.interfaces.world.IDhApiLevelWrapper;
-import net.distant_horizons.api.methods.events.abstractEvents.DhApiAfterDhInitEvent;
-import net.distant_horizons.api.methods.override.DhApiWorldGeneratorOverrideRegister;
-import net.distant_horizons.coreapi.ModInfo;
-import net.distant_horizons.api.interfaces.config.IDhApiConfig;
-import net.distant_horizons.api.interfaces.world.IDhApiWorldProxy;
-import net.distant_horizons.coreapi.DependencyInjection.ApiEventInjector;
-import net.distant_horizons.coreapi.DependencyInjection.OverrideInjector;
-import net.distant_horizons.api.interfaces.data.IDhApiTerrainDataRepo;
-import net.distant_horizons.coreapi.interfaces.dependencyInjection.IOverrideInjector;
+import com.seibel.distanthorizons.api.interfaces.events.IDhApiEventInjector;
+import com.seibel.distanthorizons.api.interfaces.factories.IDhApiWrapperFactory;
+import com.seibel.distanthorizons.api.interfaces.override.IDhApiOverrideable;
+import com.seibel.distanthorizons.api.interfaces.override.worldGenerator.IDhApiWorldGeneratorOverrideRegister;
+import com.seibel.distanthorizons.api.interfaces.render.IDhApiCustomRenderObjectFactory;
+import com.seibel.distanthorizons.api.interfaces.render.IDhApiRenderProxy;
+import com.seibel.distanthorizons.api.interfaces.world.IDhApiLevelWrapper;
+import com.seibel.distanthorizons.api.methods.events.abstractEvents.DhApiAfterDhInitEvent;
+import com.seibel.distanthorizons.api.methods.override.DhApiWorldGeneratorOverrideRegister;
+import com.seibel.distanthorizons.coreapi.ModInfo;
+import com.seibel.distanthorizons.api.interfaces.config.IDhApiConfig;
+import com.seibel.distanthorizons.api.interfaces.world.IDhApiWorldProxy;
+import com.seibel.distanthorizons.coreapi.DependencyInjection.ApiEventInjector;
+import com.seibel.distanthorizons.coreapi.DependencyInjection.OverrideInjector;
+import com.seibel.distanthorizons.api.interfaces.data.IDhApiTerrainDataRepo;
+import com.seibel.distanthorizons.coreapi.interfaces.dependencyInjection.IOverrideInjector;
 
 /**
  * This is the masthead of the API, almost everything you could want to do

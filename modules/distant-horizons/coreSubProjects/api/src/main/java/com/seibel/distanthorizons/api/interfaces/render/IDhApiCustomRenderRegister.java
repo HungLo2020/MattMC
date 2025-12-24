@@ -1,8 +1,8 @@
 package com.seibel.distanthorizons.api.interfaces.render;
 
-import net.distant_horizons.api.DhApi;
-import net.distant_horizons.api.interfaces.world.IDhApiLevelWrapper;
-import net.distant_horizons.api.interfaces.world.IDhApiWorldProxy;
+import com.seibel.distanthorizons.api.DhApi;
+import com.seibel.distanthorizons.api.interfaces.world.IDhApiLevelWrapper;
+import com.seibel.distanthorizons.api.interfaces.world.IDhApiWorldProxy;
 
 /**
  * Handles adding and removing

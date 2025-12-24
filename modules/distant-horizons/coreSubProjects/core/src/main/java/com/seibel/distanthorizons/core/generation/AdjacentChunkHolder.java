@@ -1,7 +1,7 @@
 package com.seibel.distanthorizons.core.generation;
 
-import net.distant_horizons.core.pos.DhChunkPos;
-import net.distant_horizons.core.wrapperInterfaces.chunk.IChunkWrapper;
+import com.seibel.distanthorizons.core.pos.DhChunkPos;
+import com.seibel.distanthorizons.core.wrapperInterfaces.chunk.IChunkWrapper;
 import net.distant_horizons.coreapi.util.BitShiftUtil;
 import org.jetbrains.annotations.NotNull;
 

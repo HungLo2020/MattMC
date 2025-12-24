@@ -19,18 +19,18 @@
 
 package com.seibel.distanthorizons.core.wrapperInterfaces.chunk;
 
-import net.distant_horizons.core.generation.AdjacentChunkHolder;
-import net.distant_horizons.core.pos.blockPos.DhBlockPos;
-import net.distant_horizons.core.pos.blockPos.DhBlockPos2D;
-import net.distant_horizons.core.pos.blockPos.DhBlockPosMutable;
-import net.distant_horizons.core.pos.DhChunkPos;
-import net.distant_horizons.core.sql.dto.BeaconBeamDTO;
-import net.distant_horizons.core.wrapperInterfaces.block.IBlockStateWrapper;
-import net.distant_horizons.core.wrapperInterfaces.misc.IMutableBlockPosWrapper;
-import net.distant_horizons.coreapi.ModInfo;
+import com.seibel.distanthorizons.core.generation.AdjacentChunkHolder;
+import com.seibel.distanthorizons.core.pos.blockPos.DhBlockPos;
+import com.seibel.distanthorizons.core.pos.blockPos.DhBlockPos2D;
+import com.seibel.distanthorizons.core.pos.blockPos.DhBlockPosMutable;
+import com.seibel.distanthorizons.core.pos.DhChunkPos;
+import com.seibel.distanthorizons.core.sql.dto.BeaconBeamDTO;
+import com.seibel.distanthorizons.core.wrapperInterfaces.block.IBlockStateWrapper;
+import com.seibel.distanthorizons.core.wrapperInterfaces.misc.IMutableBlockPosWrapper;
+import com.seibel.distanthorizons.coreapi.ModInfo;
 import net.distant_horizons.coreapi.interfaces.dependencyInjection.IBindable;
-import net.distant_horizons.core.util.LodUtil;
-import net.distant_horizons.core.wrapperInterfaces.world.IBiomeWrapper;
+import com.seibel.distanthorizons.core.util.LodUtil;
+import com.seibel.distanthorizons.core.wrapperInterfaces.world.IBiomeWrapper;
 import org.jetbrains.annotations.Nullable;
 
 import java.awt.*;

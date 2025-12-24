@@ -20,10 +20,10 @@
 package com.seibel.distanthorizons.core.wrapperInterfaces.modAccessor;
 
 import net.distant_horizons.api.enums.rendering.EDhApiFogDrawMode;
-import net.distant_horizons.core.dependencyInjection.SingletonInjector;
-import net.distant_horizons.core.logging.DhLoggerBuilder;
-import net.distant_horizons.core.wrapperInterfaces.minecraft.IMinecraftClientWrapper;
-import net.distant_horizons.core.logging.DhLogger;
+import com.seibel.distanthorizons.core.dependencyInjection.SingletonInjector;
+import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
+import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftClientWrapper;
+import com.seibel.distanthorizons.core.logging.DhLogger;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;

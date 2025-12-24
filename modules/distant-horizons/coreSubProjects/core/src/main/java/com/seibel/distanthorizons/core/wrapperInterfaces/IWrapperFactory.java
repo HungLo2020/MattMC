@@ -19,13 +19,13 @@
 
 package com.seibel.distanthorizons.core.wrapperInterfaces;
 
-import net.distant_horizons.api.interfaces.factories.IDhApiWrapperFactory;
-import net.distant_horizons.core.level.IDhLevel;
-import net.distant_horizons.core.wrapperInterfaces.block.IBlockStateWrapper;
-import net.distant_horizons.core.wrapperInterfaces.chunk.IChunkWrapper;
-import net.distant_horizons.core.wrapperInterfaces.world.IBiomeWrapper;
-import net.distant_horizons.core.wrapperInterfaces.world.ILevelWrapper;
-import net.distant_horizons.core.wrapperInterfaces.worldGeneration.IBatchGeneratorEnvironmentWrapper;
+import com.seibel.distanthorizons.api.interfaces.factories.IDhApiWrapperFactory;
+import com.seibel.distanthorizons.core.level.IDhLevel;
+import com.seibel.distanthorizons.core.wrapperInterfaces.block.IBlockStateWrapper;
+import com.seibel.distanthorizons.core.wrapperInterfaces.chunk.IChunkWrapper;
+import com.seibel.distanthorizons.core.wrapperInterfaces.world.IBiomeWrapper;
+import com.seibel.distanthorizons.core.wrapperInterfaces.world.ILevelWrapper;
+import com.seibel.distanthorizons.core.wrapperInterfaces.worldGeneration.IBatchGeneratorEnvironmentWrapper;
 import net.distant_horizons.coreapi.interfaces.dependencyInjection.IBindable;
 
 import java.io.IOException;

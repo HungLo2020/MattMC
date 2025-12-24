@@ -19,7 +19,7 @@
 
 package com.seibel.distanthorizons.core.config.listeners;
 
-import net.distant_horizons.core.config.types.ConfigEntry;
+import com.seibel.distanthorizons.core.config.types.ConfigEntry;
 
 import java.io.Closeable;
 import java.util.function.Consumer;

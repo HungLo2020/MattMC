@@ -19,10 +19,10 @@
 
 package com.seibel.distanthorizons.coreapi.DependencyInjection;
 
-import net.distant_horizons.api.interfaces.override.worldGenerator.IDhApiWorldGenerator;
+import com.seibel.distanthorizons.api.interfaces.override.worldGenerator.IDhApiWorldGenerator;
 import net.distant_horizons.coreapi.interfaces.dependencyInjection.IBindable;
 import net.distant_horizons.coreapi.util.StringUtil;
-import net.distant_horizons.api.interfaces.world.IDhApiLevelWrapper;
+import com.seibel.distanthorizons.api.interfaces.world.IDhApiLevelWrapper;
 
 import java.util.HashMap;
 

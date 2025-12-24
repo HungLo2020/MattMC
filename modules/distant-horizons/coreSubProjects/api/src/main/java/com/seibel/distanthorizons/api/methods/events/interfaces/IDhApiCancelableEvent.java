@@ -19,8 +19,8 @@
 
 package com.seibel.distanthorizons.api.methods.events.interfaces;
 
-import net.distant_horizons.api.methods.events.sharedParameterObjects.DhApiCancelableEventParam;
-import net.distant_horizons.api.methods.events.sharedParameterObjects.DhApiEventParam;
+import com.seibel.distanthorizons.api.methods.events.sharedParameterObjects.DhApiCancelableEventParam;
+import com.seibel.distanthorizons.api.methods.events.sharedParameterObjects.DhApiEventParam;
 
 /**
  * If a {@link IDhApiEvent} implements this interface than the event

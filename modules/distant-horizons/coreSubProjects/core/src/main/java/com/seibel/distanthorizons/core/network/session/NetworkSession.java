@@ -1,17 +1,17 @@
 package com.seibel.distanthorizons.core.network.session;
 
-import net.distant_horizons.core.config.Config;
-import net.distant_horizons.core.dependencyInjection.SingletonInjector;
-import net.distant_horizons.core.logging.DhLogger;
-import net.distant_horizons.core.logging.DhLoggerBuilder;
-import net.distant_horizons.core.network.event.AbstractNetworkEventSource;
-import net.distant_horizons.core.network.event.internal.CloseInternalEvent;
-import net.distant_horizons.core.network.event.internal.ProtocolErrorInternalEvent;
-import net.distant_horizons.core.network.messages.AbstractNetworkMessage;
-import net.distant_horizons.core.network.messages.AbstractTrackableMessage;
-import net.distant_horizons.core.network.messages.base.CloseReasonMessage;
-import net.distant_horizons.core.wrapperInterfaces.misc.IPluginPacketSender;
-import net.distant_horizons.core.wrapperInterfaces.misc.IServerPlayerWrapper;
+import com.seibel.distanthorizons.core.config.Config;
+import com.seibel.distanthorizons.core.dependencyInjection.SingletonInjector;
+import com.seibel.distanthorizons.core.logging.DhLogger;
+import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
+import com.seibel.distanthorizons.core.network.event.AbstractNetworkEventSource;
+import com.seibel.distanthorizons.core.network.event.internal.CloseInternalEvent;
+import com.seibel.distanthorizons.core.network.event.internal.ProtocolErrorInternalEvent;
+import com.seibel.distanthorizons.core.network.messages.AbstractNetworkMessage;
+import com.seibel.distanthorizons.core.network.messages.AbstractTrackableMessage;
+import com.seibel.distanthorizons.core.network.messages.base.CloseReasonMessage;
+import com.seibel.distanthorizons.core.wrapperInterfaces.misc.IPluginPacketSender;
+import com.seibel.distanthorizons.core.wrapperInterfaces.misc.IServerPlayerWrapper;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.concurrent.CompletableFuture;

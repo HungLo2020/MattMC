@@ -20,9 +20,9 @@
 package com.seibel.distanthorizons.core.network.messages.fullData;
 
 import com.google.common.base.MoreObjects;
-import net.distant_horizons.core.multiplayer.fullData.FullDataPayload;
+import com.seibel.distanthorizons.core.multiplayer.fullData.FullDataPayload;
 import net.distant_horizons.core.network.INetworkObject;
-import net.distant_horizons.core.network.messages.AbstractTrackableMessage;
+import com.seibel.distanthorizons.core.network.messages.AbstractTrackableMessage;
 import io.netty.buffer.ByteBuf;
 import org.jetbrains.annotations.Nullable;
 

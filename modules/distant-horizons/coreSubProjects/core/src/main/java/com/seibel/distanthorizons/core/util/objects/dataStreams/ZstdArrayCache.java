@@ -1,9 +1,9 @@
 package com.seibel.distanthorizons.core.util.objects.dataStreams;
 
 //import com.github.luben.zstd.BufferPool;
-import net.distant_horizons.core.logging.DhLoggerBuilder;
+import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
 import it.unimi.dsi.fastutil.ints.Int2ReferenceArrayMap;
-import net.distant_horizons.core.logging.DhLogger;
+import com.seibel.distanthorizons.core.logging.DhLogger;
 
 import java.nio.ByteBuffer;
 import java.util.ArrayList;

@@ -4,10 +4,10 @@ package com.seibel.distanthorizons.fabric.mixins.mods.sodium;
 
 // Sodium 0.5
 import com.mojang.blaze3d.vertex.PoseStack;
-import net.distant_horizons.core.api.internal.ClientApi;
-import net.distant_horizons.core.dependencyInjection.ModAccessorInjector;
-import net.distant_horizons.core.wrapperInterfaces.modAccessor.ISodiumAccessor;
-import net.distant_horizons.fabric.wrappers.modAccessor.SodiumAccessor;
+import com.seibel.distanthorizons.core.api.internal.ClientApi;
+import com.seibel.distanthorizons.core.dependencyInjection.ModAccessorInjector;
+import com.seibel.distanthorizons.core.wrapperInterfaces.modAccessor.ISodiumAccessor;
+import com.seibel.distanthorizons.fabric.wrappers.modAccessor.SodiumAccessor;
 import me.jellysquid.mods.sodium.client.gl.device.CommandList;
 import me.jellysquid.mods.sodium.client.render.SodiumWorldRenderer;
 import me.jellysquid.mods.sodium.client.render.chunk.ChunkRenderMatrices;
@@ -55,10 +55,10 @@ public class MixinSodiumRenderer
 }
 
 // Sodium 0.3 to 0.4
-import net.distant_horizons.core.api.internal.ClientApi;
-import net.distant_horizons.core.dependencyInjection.ModAccessorInjector;
-import net.distant_horizons.core.wrapperInterfaces.modAccessor.ISodiumAccessor;
-import net.distant_horizons.fabric.wrappers.modAccessor.SodiumAccessor;
+import com.seibel.distanthorizons.core.api.internal.ClientApi;
+import com.seibel.distanthorizons.core.dependencyInjection.ModAccessorInjector;
+import com.seibel.distanthorizons.core.wrapperInterfaces.modAccessor.ISodiumAccessor;
+import com.seibel.distanthorizons.fabric.wrappers.modAccessor.SodiumAccessor;
 import me.jellysquid.mods.sodium.client.gl.device.CommandList;
 import me.jellysquid.mods.sodium.client.render.SodiumWorldRenderer;
 import me.jellysquid.mods.sodium.client.render.chunk.ChunkCameraContext;

@@ -19,10 +19,10 @@
 
 package com.seibel.distanthorizons.api.methods.events.abstractEvents;
 
-import net.distant_horizons.api.methods.events.interfaces.IDhApiEvent;
-import net.distant_horizons.api.methods.events.interfaces.IDhApiEventParam;
-import net.distant_horizons.api.methods.events.sharedParameterObjects.DhApiEventParam;
-import net.distant_horizons.api.methods.events.sharedParameterObjects.DhApiTextureCreatedParam;
+import com.seibel.distanthorizons.api.methods.events.interfaces.IDhApiEvent;
+import com.seibel.distanthorizons.api.methods.events.interfaces.IDhApiEventParam;
+import com.seibel.distanthorizons.api.methods.events.sharedParameterObjects.DhApiEventParam;
+import com.seibel.distanthorizons.api.methods.events.sharedParameterObjects.DhApiTextureCreatedParam;
 
 /**
  * Called before Distant Horizons (re)creates 

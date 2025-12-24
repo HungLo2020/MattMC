@@ -19,7 +19,7 @@
 
 package com.seibel.distanthorizons.api.methods.events.sharedParameterObjects;
 
-import net.distant_horizons.api.methods.events.interfaces.IDhApiEvent;
+import com.seibel.distanthorizons.api.methods.events.interfaces.IDhApiEvent;
 
 /** 
  * Wraps the event parameter to allow for additional control over the event 

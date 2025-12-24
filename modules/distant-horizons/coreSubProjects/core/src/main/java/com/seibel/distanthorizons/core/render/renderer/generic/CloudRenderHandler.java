@@ -20,21 +20,21 @@
 package com.seibel.distanthorizons.core.render.renderer.generic;
 
 import net.distant_horizons.api.enums.rendering.EDhApiBlockMaterial;
-import net.distant_horizons.api.interfaces.render.IDhApiRenderableBoxGroup;
-import net.distant_horizons.api.methods.events.sharedParameterObjects.DhApiRenderParam;
+import com.seibel.distanthorizons.api.interfaces.render.IDhApiRenderableBoxGroup;
+import com.seibel.distanthorizons.api.methods.events.sharedParameterObjects.DhApiRenderParam;
 import net.distant_horizons.api.objects.math.DhApiVec3d;
-import net.distant_horizons.api.objects.render.DhApiRenderableBox;
-import net.distant_horizons.api.objects.render.DhApiRenderableBoxGroupShading;
-import net.distant_horizons.core.config.Config;
-import net.distant_horizons.core.dependencyInjection.SingletonInjector;
-import net.distant_horizons.core.level.IDhClientLevel;
-import net.distant_horizons.core.logging.DhLoggerBuilder;
-import net.distant_horizons.core.util.LodUtil;
-import net.distant_horizons.core.util.math.Vec3d;
-import net.distant_horizons.core.util.math.Vec3f;
-import net.distant_horizons.core.wrapperInterfaces.minecraft.IMinecraftRenderWrapper;
-import net.distant_horizons.coreapi.ModInfo;
-import net.distant_horizons.core.logging.DhLogger;
+import com.seibel.distanthorizons.api.objects.render.DhApiRenderableBox;
+import com.seibel.distanthorizons.api.objects.render.DhApiRenderableBoxGroupShading;
+import com.seibel.distanthorizons.core.config.Config;
+import com.seibel.distanthorizons.core.dependencyInjection.SingletonInjector;
+import com.seibel.distanthorizons.core.level.IDhClientLevel;
+import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
+import com.seibel.distanthorizons.core.util.LodUtil;
+import com.seibel.distanthorizons.core.util.math.Vec3d;
+import com.seibel.distanthorizons.core.util.math.Vec3f;
+import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftRenderWrapper;
+import com.seibel.distanthorizons.coreapi.ModInfo;
+import com.seibel.distanthorizons.core.logging.DhLogger;
 
 import javax.imageio.ImageIO;
 import java.awt.*;

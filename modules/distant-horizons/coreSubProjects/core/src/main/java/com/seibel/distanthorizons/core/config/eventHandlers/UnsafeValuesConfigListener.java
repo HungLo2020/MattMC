@@ -19,8 +19,8 @@
 
 package com.seibel.distanthorizons.core.config.eventHandlers;
 
-import net.distant_horizons.core.config.Config;
-import net.distant_horizons.core.config.ConfigHandler;
+import com.seibel.distanthorizons.core.config.Config;
+import com.seibel.distanthorizons.core.config.ConfigHandler;
 import net.distant_horizons.core.config.listeners.IConfigListener;
 
 /** 

@@ -19,14 +19,14 @@
 
 package com.seibel.distanthorizons.core.file.structure;
 
-import net.distant_horizons.api.interfaces.override.levelHandling.IDhApiSaveStructure;
-import net.distant_horizons.core.logging.DhLoggerBuilder;
+import com.seibel.distanthorizons.api.interfaces.override.levelHandling.IDhApiSaveStructure;
+import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
 import net.distant_horizons.core.world.EWorldEnvironment;
-import net.distant_horizons.core.wrapperInterfaces.world.ILevelWrapper;
-import net.distant_horizons.core.wrapperInterfaces.world.IServerLevelWrapper;
-import net.distant_horizons.coreapi.DependencyInjection.OverrideInjector;
+import com.seibel.distanthorizons.core.wrapperInterfaces.world.ILevelWrapper;
+import com.seibel.distanthorizons.core.wrapperInterfaces.world.IServerLevelWrapper;
+import com.seibel.distanthorizons.coreapi.DependencyInjection.OverrideInjector;
 import net.distant_horizons.coreapi.util.StringUtil;
-import net.distant_horizons.core.logging.DhLogger;
+import com.seibel.distanthorizons.core.logging.DhLogger;
 
 import java.io.File;
 import java.util.concurrent.ConcurrentHashMap;
