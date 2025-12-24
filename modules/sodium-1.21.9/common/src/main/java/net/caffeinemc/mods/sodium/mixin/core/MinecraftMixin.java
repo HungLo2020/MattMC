@@ -73,14 +73,6 @@ public class MinecraftMixin {
     }
 
     /**
-     * Check for problematic core shader resource packs after the initial game launch.
-     */
-    @Inject(method = "buildInitialScreens", at = @At("TAIL"))
-    private void postInit(CallbackInfoReturnable<Runnable> cir) {
-        ResourcePackScanner.checkIfCoreShaderLoaded(this.resourceManager);
-    }
-
-    /**
      * Check for problematic core shader resource packs after every resource reload.
      */
     @Inject(method = "reloadResourcePacks()Ljava/util/concurrent/CompletableFuture;", at = @At("TAIL"))

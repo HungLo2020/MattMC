@@ -10,6 +10,8 @@ import net.minecraft.client.auth.UserApiService.UserFlag;
 import net.minecraft.client.auth.UserApiService.UserProperties;
 import net.minecraft.client.auth.ProfileResult.ProfileActionType;
 import net.minecraft.client.auth.ProfileResult;
+import net.minecraft.hooks.GameHooks;
+import net.minecraft.hooks.HookRegistry;
 
 import com.mojang.blaze3d.TracyFrameCapture;
 import com.mojang.blaze3d.pipeline.MainTarget;
@@ -721,6 +723,11 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 		for (Function<Runnable, Screen> function : Lists.reverse(list)) {
 			Screen screen = (Screen)function.apply(runnable);
 			runnable = () -> this.setScreen(screen);
+		}
+
+		// HOOK: Call registered game initialization hooks
+		for (GameHooks hook : HookRegistry.getGameHooks()) {
+			hook.onGameInitialized(this);
 		}
 
 		return runnable;
