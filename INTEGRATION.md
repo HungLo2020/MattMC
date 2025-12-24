@@ -5,9 +5,14 @@
 This document provides an **EXTREMELY COMPREHENSIVE** plan for integrating the mods currently compiled separately (Fabric Loader, Sodium, Iris, and Distant Horizons) directly into the main Minecraft 1.21.10 game JAR. The goal is to simplify the build system and have all features in a single JAR while maintaining all functionality.
 
 **Current Architecture**: Mods are compiled into separate JARs and loaded at runtime via Fabric Loader  
-**Target Architecture**: All mod code integrated directly into the main game JAR with mixin-based transformations and initialization at game startup
+**Target Architecture**: All mod code absorbed into Minecraft's package structure, with mixin transformations applied directly to source code
 
-**Critical Design Decision**: Mixins (code injection mechanisms that modify Minecraft's behavior at runtime) will NOT be manually inlined into Minecraft source code. Instead, the mixin system (SpongePowered Mixin) will be preserved to apply bytecode transformations at runtime. This avoids circular dependency issues where mixin code references mod classes that depend on Minecraft.
+**Critical Design Decision**: To achieve true integration without creating compilation dependency issues, all mod code must be **moved into Minecraft's package hierarchy** (e.g., `net.minecraft.client.renderer.sodium.*` instead of `net.caffeinemc.mods.sodium.*`). This is the ONLY way to avoid the circular dependency problem where Minecraft would need to depend on mods that already depend on Minecraft.
+
+**Why Full Absorption is Necessary**:
+- ❌ Minecraft CANNOT depend on mod packages at compile time (creates circular dependency)
+- ✅ Solution: Move mod packages INTO Minecraft's package structure
+- ✅ Result: Everything becomes part of Minecraft core, no external mod dependencies
 
 **Access Widener Status**: The 53 access widener modifications from Distant Horizons have already been applied directly to the Minecraft source code, so no additional access widening is needed during integration.
 
@@ -260,58 +265,114 @@ Fabric Loader (182 files) ← Independent, provides APIs
 - SpongePowered Mixin library transforms bytecode on-the-fly
 - Classes are modified before being loaded by the JVM
 
-**Integration Solution**:
-- **Keep the mixin system**: SpongePowered Mixin library remains as a dependency
-- **Preserve mixin classes**: Mixins stay in their original mod packages (e.g., `net.caffeinemc.mods.sodium.mixin`)
-- **Initialize mixin system directly**: Replace Fabric Loader's mixin initialization with direct initialization
-- **Register mixin configurations**: Load mixin JSON files from integrated resources
-- **No manual source modification**: Minecraft source code remains unchanged
+**Integration Solution - Full Code Absorption**:
 
-**Why Not Inline Mixins**:
-The original plan suggested manually applying mixins by inlining code into Minecraft classes. This approach is not viable due to technical constraints:
+The only way to truly integrate mods without creating compilation dependencies is to **move all mod code into Minecraft's package structure**. This eliminates the mod/Minecraft separation entirely.
 
-1. **Circular Dependency Problem**:
-   - Mixin code references classes from their respective mods (Sodium, Iris, DH)
-   - These mod classes depend on Minecraft at compile-time
-   - Inlining would require: Minecraft → Mods → Minecraft (impossible circular dependency)
+**Why Minecraft Cannot Depend on Mod Packages**:
+```
+Current (Separate Mods):
+- Sodium depends on Minecraft ✅
+- Iris depends on Minecraft ✅  
+- DH depends on Minecraft ✅
 
-2. **Example of the Problem**:
-   ```java
-   // In Sodium mixin (net.caffeinemc.mods.sodium.mixin.core.render.world.LevelRendererMixin)
-   @Inject(method = "renderLevel", at = @At("HEAD"))
-   private void onRenderLevel(CallbackInfo ci) {
-       SodiumClientMod.onRenderStart();  // References Sodium class!
-   }
-   ```
-   - If inlined into `LevelRenderer.java` (Minecraft class), it would reference `SodiumClientMod`
-   - But `SodiumClientMod` depends on Minecraft classes
-   - Creates circular dependency: Minecraft → Sodium → Minecraft
+If we try to keep mod packages:
+- Minecraft would need to import net.caffeinemc.* ❌
+- But net.caffeinemc.* already imports net.minecraft.* ❌
+- This creates: Minecraft ↔ Mods (bidirectional dependency - impossible!)
+```
 
-3. **Maintenance Burden**:
-   - 256+ mixins would need manual tracking and application
-   - Every Minecraft update would require reapplying all modifications
-   - High risk of errors and merge conflicts
+**The Solution - Absorb Mods into Minecraft**:
+```
+After Integration:
+- No more separate mod packages
+- Sodium code moves to: net.minecraft.client.renderer.sodium.*
+- Iris code moves to: net.minecraft.client.renderer.shaders.iris.*
+- DH code moves to: net.minecraft.client.renderer.lod.*
+- Everything is now part of Minecraft's codebase
+- No external dependencies!
+```
 
-**Integration Approach**:
-1. Keep mixins as separate classes in mod packages
-2. Preserve SpongePowered Mixin library
-3. Initialize mixin system early in JVM startup
-4. Register all mixin configurations from integrated mods
-5. Let mixin system handle bytecode transformation at class load time
+**Mixin Integration Process**:
 
-**Example Mixin Configuration** (Sodium):
-```json
-{
-  "package": "net.caffeinemc.mods.sodium.mixin",
-  "plugin": "net.caffeinemc.mods.sodium.mixin.SodiumMixinPlugin",
-  "mixins": [
-    "core.MinecraftMixin",
-    "core.render.world.LevelRendererMixin",
-    "features.render.entity.CubeMixin"
-    // ... 100+ more
-  ]
+**Step 1: Relocate Mod Classes**
+```
+Before:
+  net/caffeinemc/mods/sodium/client/SodiumClientMod.java
+  
+After:
+  net/minecraft/client/renderer/sodium/SodiumRenderer.java
+```
+
+**Step 2: Update Package Declarations**
+```java
+// Before (in mod package):
+package net.caffeinemc.mods.sodium.client;
+import net.minecraft.client.renderer.LevelRenderer;
+
+// After (in Minecraft package):
+package net.minecraft.client.renderer.sodium;
+import net.minecraft.client.renderer.LevelRenderer;  // Same package tree now!
+```
+
+**Step 3: Apply Mixin Transformations**
+```java
+// Original Mixin:
+@Mixin(LevelRenderer.class)
+public class LevelRendererMixin {
+    @Inject(method = "renderLevel", at = @At("HEAD"))
+    private void onRenderLevel(CallbackInfo ci) {
+        SodiumClientMod.onRenderStart();  // References mod class
+    }
+}
+
+// After Integration:
+// In net/minecraft/client/renderer/LevelRenderer.java
+import net.minecraft.client.renderer.sodium.SodiumRenderer;  // Now same package tree!
+
+public void renderLevel(...) {
+    // INTEGRATED: Sodium render start
+    SodiumRenderer.onRenderStart();  // ✅ Both classes in net.minecraft.*
+    
+    // Original Minecraft code...
 }
 ```
+
+**Why This Works**:
+- ✅ Everything is in `net.minecraft.*` packages
+- ✅ No external mod dependencies
+- ✅ No compilation dependency issues
+- ✅ True integration - mods become part of Minecraft
+- ✅ Single cohesive codebase
+
+**Integration Approach by Mixin Type**:
+
+1. **@Inject**: Add method call at injection point
+2. **@Accessor**: Add public getter/setter methods
+3. **@Overwrite**: Replace method body entirely
+4. **@ModifyVariable**: Inline the modification logic
+5. **@Redirect**: Inline the redirection logic
+6. **Interface @Mixin**: Make target class implement interface directly
+
+**Example Package Reorganization**:
+```
+Before Integration:
+  modules/sodium/src/.../net/caffeinemc/mods/sodium/
+  modules/iris/src/.../net/irisshaders/iris/
+  modules/distant-horizons/src/.../com/seibel/distanthorizons/
+
+After Integration:
+  src/main/java/net/minecraft/client/renderer/sodium/
+  src/main/java/net/minecraft/client/renderer/shaders/iris/
+  src/main/java/net/minecraft/client/renderer/lod/
+```
+
+**Benefits of Full Absorption**:
+- ✅ No mod packages = no dependency issues
+- ✅ Everything compiles together as one project
+- ✅ True integration, not just bundling
+- ✅ Simplified maintenance
+- ✅ Single JAR with all features built-in
 
 ### 4.2 Access Widener Challenges
 
@@ -458,40 +519,98 @@ Distant Horizons:
 
 ### 5.2 Integration Approach
 
-**RECOMMENDED: Modified Static Integration with Runtime Mixins**
+**RECOMMENDED: Full Absorption Integration**
 
-This approach integrates all mod sources into the main source tree while preserving the mixin system for runtime bytecode transformation.
+This approach truly integrates mods by moving their functionality into the Minecraft source tree, eliminating the mod/Minecraft separation entirely.
 
-**Key Characteristics**:
-- Copy all mod source code into main source tree
-- Keep mod code in original package structures (no circular dependencies)
-- Preserve SpongePowered Mixin library for runtime transformations
-- Mixins remain as separate classes (not inlined into Minecraft)
-- Create initialization hooks in Minecraft startup
-- Remove Fabric Loader's mod loading (Knot launcher)
-- Produce single JAR containing all code
+**Key Principle**: Minecraft CANNOT depend on mod packages at compile time. Therefore, we must move/copy mod functionality INTO Minecraft's package structure.
 
-**Why This Approach**:
-1. **Avoids Circular Dependencies**: Mod code stays in mod packages, can freely reference Minecraft classes
-2. **Preserves Mixin Functionality**: Mixins work as designed (runtime bytecode transformation)
-3. **Maintains Separation**: Mod code remains organized for future updates
-4. **Achieves Single JAR**: All code in one JAR, no external mod files needed
-5. **Simpler Than Manual Integration**: No need to manually modify 256+ Minecraft classes
+**Integration Strategy**:
 
-**Alternative Approaches (NOT Recommended)**:
+**Phase 1: Move Core Mod Logic into Minecraft Package**
+- Identify which mod classes provide core functionality (not just mixin glue)
+- Move these classes into appropriate Minecraft packages
+- Example: Move `SodiumClientMod` → `net.minecraft.client.renderer.sodium.SodiumRenderer`
+- Example: Move Iris shader classes → `net.minecraft.client.renderer.shaders.iris.*`
+- Example: Move DH LOD system → `net.minecraft.client.renderer.lod.*`
 
-**Option B: Pure Manual Integration**
-- Manually inline all mixin transformations into Minecraft source
-- **PROBLEM**: Creates circular dependencies (Minecraft → Mods → Minecraft)
-- **PROBLEM**: Extremely difficult to maintain (256+ mixins to track)
-- **PROBLEM**: Mixin code references mod classes that don't exist in Minecraft
-- Status: **REJECTED** - Not feasible due to circular dependency issues
+**Phase 2: Apply Mixin Transformations Directly**
+- For each mixin, inline the transformation into the target Minecraft class
+- Since mod classes are now IN Minecraft packages, no dependency issues
+- Example:
 
-**Option C: Multi-JAR Bundle**
-- Keep current architecture but bundle JARs together
-- **PROBLEM**: Doesn't achieve single JAR goal
-- **PROBLEM**: Still requires runtime mod loading
-- Status: **REJECTED** - Doesn't meet project objectives
+```java
+// Original Mixin (in mod):
+@Mixin(LevelRenderer.class)
+public class LevelRendererMixin {
+    @Inject(method = "renderLevel", at = @At("HEAD"))
+    private void onRenderLevel(CallbackInfo ci) {
+        SodiumClientMod.onRenderStart();  // References mod class
+    }
+}
+
+// After Integration (Minecraft class):
+// net/minecraft/client/renderer/LevelRenderer.java
+public void renderLevel(...) {
+    // INTEGRATED: Sodium render start (moved from SodiumClientMod)
+    net.minecraft.client.renderer.sodium.SodiumRenderer.onRenderStart();
+    
+    // Original Minecraft code...
+}
+```
+
+**Why This Works**:
+- ✅ No mod packages exist anymore - everything is Minecraft
+- ✅ No compilation dependencies on external mods
+- ✅ True integration - functionality is now part of Minecraft
+- ✅ Single JAR with all features built-in
+
+**The Key Difference**:
+- ❌ DON'T: Make Minecraft import `net.caffeinemc.mods.sodium.*`
+- ✅ DO: Move Sodium classes to `net.minecraft.client.renderer.sodium.*`
+- Result: Everything is in Minecraft's package tree
+
+**Package Reorganization**:
+
+```
+src/main/java/
+├── net/minecraft/
+│   ├── client/
+│   │   ├── renderer/
+│   │   │   ├── sodium/              # Sodium rendering (MOVED from mod)
+│   │   │   │   ├── SodiumRenderer.java
+│   │   │   │   ├── chunk/
+│   │   │   │   └── gl/
+│   │   │   ├── shaders/
+│   │   │   │   ├── iris/            # Iris shaders (MOVED from mod)
+│   │   │   │   │   ├── IrisShaderManager.java
+│   │   │   │   │   └── pipeline/
+│   │   │   ├── lod/                 # DH LOD system (MOVED from mod)
+│   │   │   │   ├── LodRenderer.java
+│   │   │   │   └── storage/
+│   │   │   └── LevelRenderer.java   # MODIFIED with integrated code
+│   │   └── Minecraft.java           # MODIFIED for initialization
+│   └── server/
+└── com/mojang/                       # Mojang libraries (unchanged)
+```
+
+**What Gets Integrated**:
+1. **Mods' core functionality**: Moved into Minecraft package structure
+2. **Mixin transformations**: Applied directly to Minecraft source
+3. **Resources**: Merged into Minecraft resources
+4. **Dependencies**: Added to Minecraft's dependencies
+
+**What Gets Removed**:
+1. ❌ Mod packages (net.caffeinemc.*, net.irisshaders.*, com.seibel.*)
+2. ❌ Mixin JSON configs (no longer needed)
+3. ❌ SpongePowered Mixin library (no runtime transformation)
+4. ❌ Fabric Loader (no mod loading)
+
+**This is TRUE Integration**:
+- All functionality becomes part of Minecraft core
+- No separate "mod" concept exists
+- Single codebase, single package hierarchy
+- Like the features were built into Minecraft from the start
 
 ### 5.3 Package Structure After Integration
 
@@ -521,58 +640,192 @@ src/main/java/
     └── fabric/
 ```
 
-### 5.4 Mixin Application Strategy
+### 5.4 Mixin Integration Strategy
 
-**CRITICAL DESIGN DECISION**: Mixins will **NOT** be inlined into Minecraft source code. They will remain as separate mixin classes in their respective mod packages.
+**GOAL**: Fully integrate mod functionality into Minecraft by moving mod code into Minecraft's package structure and applying mixin transformations directly.
 
-**Why Not Inline Mixins?**:
-- Mixin classes contain code that references mod-specific classes, variables, and methods
-- These mod classes depend on Minecraft at compile-time
-- Inlining would create a circular dependency: Minecraft → Mods → Minecraft
-- Mixin system is designed to inject behavior without modifying the target class source
+**Core Principle**: Since Minecraft cannot depend on mod packages at compile time, we must move ALL mod functionality INTO Minecraft's package hierarchy.
 
-**Integration Approach**:
+**Step-by-Step Integration Process**:
 
-**Phase 1: Preserve Mixin Infrastructure**
-- Keep SpongePowered Mixin library as a runtime dependency
-- Integrate mixin classes in their original mod packages (not in Minecraft packages)
-- Preserve mixin JSON configuration files in mod resources
-- Ensure mixin system initializes during game startup (not via Fabric Loader)
+**Phase 1: Analyze and Categorize Mod Code**
 
-**Phase 2: Initialize Mixin System**
-- Initialize SpongePowered Mixin engine early in Minecraft startup
-- Register all mixin configurations from integrated mods
-- Apply mixins at class load time (same as current behavior)
-- No manual source code modification to Minecraft classes needed
+For each mod, categorize classes into:
 
-**Phase 3: Verification**
-- Test that all mixins are discovered and applied correctly
-- Verify mod functionality works as expected
-- Monitor for mixin conflicts or initialization order issues
-- Create automated tests for critical mixin transformations
+1. **Core Functionality Classes**: Classes that implement actual features
+   - Sodium: Rendering engine, chunk builders, GL utilities
+   - Iris: Shader manager, pipeline, uniform handling
+   - DH: LOD generator, storage, rendering
 
-**Mixin Structure After Integration**:
+2. **Mixin Classes**: Classes that inject into Minecraft
+   - These will be eliminated - their logic moves into target classes
 
-Mixin classes stay in mod packages:
+3. **API/Interface Classes**: Public APIs exposed by mods
+   - Will move into Minecraft packages
+
+4. **Utility Classes**: Helpers, data structures, algorithms
+   - Will move into appropriate Minecraft util packages
+
+**Phase 2: Relocate Mod Classes into Minecraft Packages**
+
+Move mod classes into Minecraft's package structure:
+
+```
+Sodium Classes:
+  FROM: net.caffeinemc.mods.sodium.client.render.*
+  TO:   net.minecraft.client.renderer.sodium.*
+
+  FROM: net.caffeinemc.mods.sodium.client.gl.*
+  TO:   net.minecraft.client.renderer.gl.sodium.*
+
+Iris Classes:
+  FROM: net.irisshaders.iris.pipeline.*
+  TO:   net.minecraft.client.renderer.shaders.iris.*
+
+  FROM: net.irisshaders.iris.gl.*
+  TO:   net.minecraft.client.renderer.gl.iris.*
+
+Distant Horizons Classes:
+  FROM: com.seibel.distanthorizons.core.render.*
+  TO:   net.minecraft.client.renderer.lod.*
+
+  FROM: com.seibel.distanthorizons.core.world.*
+  TO:   net.minecraft.world.level.lod.*
+```
+
+**Phase 3: Update Package Declarations and Imports**
+
+After moving files:
+1. Change package declarations to new Minecraft packages
+2. Update all imports to reflect new locations
+3. Resolve any naming conflicts
+4. Test compilation
+
+**Phase 4: Apply Mixin Transformations**
+
+For each mixin, manually integrate its logic into the target Minecraft class:
+
+**Example 1: Simple Injection**
 ```java
-// In net/caffeinemc/mods/sodium/mixin/core/render/world/LevelRendererMixin.java
+// Original Mixin:
 @Mixin(LevelRenderer.class)
 public class LevelRendererMixin {
     @Inject(method = "renderLevel", at = @At("HEAD"))
     private void onRenderLevel(CallbackInfo ci) {
-        SodiumClientMod.onRenderStart();  // References Sodium class - OK!
+        SodiumClientMod.onRenderStart();
+    }
+}
+
+// Integrated (after moving SodiumClientMod → SodiumRenderer):
+// In net/minecraft/client/renderer/LevelRenderer.java
+import net.minecraft.client.renderer.sodium.SodiumRenderer;  // Now in Minecraft package!
+
+public void renderLevel(...) {
+    // INTEGRATED: Sodium render start hook
+    SodiumRenderer.onRenderStart();
+    
+    // Original Minecraft code continues...
+}
+```
+
+**Example 2: Field Accessor**
+```java
+// Original Mixin Accessor:
+@Mixin(LevelRenderer.class)
+public interface LevelRendererAccessor {
+    @Accessor("destructionProgress")
+    Map<Integer, BlockDestructionProgress> getDestructionProgress();
+}
+
+// Integrated: Just add public getter
+// In net/minecraft/client/renderer/LevelRenderer.java
+public Map<Integer, BlockDestructionProgress> getDestructionProgress() {
+    return this.destructionProgress;
+}
+```
+
+**Example 3: Method Overwrite**
+```java
+// Original Mixin:
+@Mixin(LevelRenderer.class)
+public class LevelRendererMixin {
+    @Overwrite
+    public void renderChunks(...) {
+        // Sodium's completely different implementation
+        SodiumChunkRenderer.render(...);
+    }
+}
+
+// Integrated: Replace method body
+// In net/minecraft/client/renderer/LevelRenderer.java
+import net.minecraft.client.renderer.sodium.SodiumChunkRenderer;
+
+public void renderChunks(...) {
+    // INTEGRATED: Using Sodium's chunk rendering
+    // (Original method body replaced)
+    SodiumChunkRenderer.render(...);
+}
+```
+
+**Example 4: Interface Implementation**
+```java
+// Original Mixin:
+@Mixin(LevelRenderer.class)
+public abstract class LevelRendererMixin implements SodiumWorldRenderer {
+    // Implements interface methods
+}
+
+// Integrated: Make class implement interface directly
+// In net/minecraft/client/renderer/LevelRenderer.java
+import net.minecraft.client.renderer.sodium.SodiumWorldRenderer;
+
+public class LevelRenderer implements AutoCloseable, SodiumWorldRenderer {
+    // Implement required methods
+    @Override
+    public ChunkRenderManager getChunkRenderManager() {
+        return this.sodiumChunkRenderManager;
     }
 }
 ```
 
-Minecraft source remains unmodified:
+**Phase 5: Initialize Integrated Systems**
+
+Add initialization in Minecraft startup:
+
 ```java
-// In net/minecraft/client/renderer/LevelRenderer.java
-public void renderLevel(...) {
-    // Original method - mixin injects at runtime via bytecode transformation
-    // No source code changes needed!
+// In net/minecraft/client/Minecraft.java
+public Minecraft(GameConfig gameConfig) {
+    // Early in constructor, after basic setup
+    
+    // INTEGRATED: Initialize Sodium rendering system
+    net.minecraft.client.renderer.sodium.SodiumRenderer.initialize();
+    
+    // INTEGRATED: Initialize Iris shader system  
+    net.minecraft.client.renderer.shaders.iris.IrisShaderManager.initialize();
+    
+    // INTEGRATED: Initialize DH LOD system
+    net.minecraft.client.renderer.lod.LodRenderer.initialize();
+    
+    // Rest of Minecraft initialization...
 }
 ```
+
+**Phase 6: Remove Mixin Infrastructure**
+
+Once all mixins are integrated:
+1. Delete all mixin classes
+2. Delete mixin JSON configurations
+3. Remove SpongePowered Mixin dependency
+4. Remove Fabric Loader dependency
+5. Test extensively
+
+**Phase 7: Documentation**
+
+Create `INTEGRATION_CHANGES.md` documenting:
+- Which Minecraft classes were modified
+- What functionality was added
+- Which original mod classes were moved where
+- Rationale for each major change
 
 ### 5.5 Access Widener Application Strategy
 
@@ -666,69 +919,132 @@ public class ModIntegration {
 
 ### Phase 1: Fabric Loader Integration (Week 2-3)
 
-**Objective**: Integrate Fabric Loader source and establish mixin infrastructure without runtime mod loading
+**Objective**: Remove Fabric Loader's mod loading infrastructure, as it will not be needed once mods are fully absorbed into Minecraft
 
-**Sub-Phase 1.1: Source Integration**
-1. Copy Fabric Loader sources to main source tree
-2. Update build.gradle: Remove fabricLoader source set
-3. Resolve any compilation errors
-4. Test compilation
+**Sub-Phase 1.1: Analyze Fabric Loader Dependencies**
+1. Identify which Fabric Loader components are essential:
+   - Fabric API stubs (used by mods)
+   - Any utility classes used by mods
+2. Identify which components can be removed:
+   - Knot launcher (mod loading system)
+   - Mixin initialization system (will be removed entirely)
+   - Mod discovery and JAR loading
+3. Document findings
 
-**Sub-Phase 1.2: Mixin System Setup**
-1. Keep SpongePowered Mixin library as dependency
-2. Create `ModIntegration.initializeMixins()` for mixin engine setup
-3. Remove Fabric Loader's Knot launcher entry point
-4. Initialize mixin system before Minecraft class loading
-5. Test: Mixin system initializes without Fabric Loader launcher
+**Sub-Phase 1.2: Preserve Essential Fabric APIs**
+1. Keep Fabric API stubs that mods use (already in main source at `net/fabricmc/fabric/api/`)
+2. Ensure these APIs will still work when mods are absorbed into Minecraft
+3. May need to adapt some APIs to work without Fabric Loader
 
-**Sub-Phase 1.3: Remove Runtime Mod Loading**
-1. Remove mod discovery code (JAR scanning in run/mods/)
-2. Remove dynamic mod loading infrastructure
-3. Preserve essential Fabric APIs used by mods
-4. Create stub implementations where needed
+**Sub-Phase 1.3: Remove Fabric Loader Infrastructure**
+1. Remove Knot launcher entry point
+2. Remove mod discovery code
+3. Remove runtime mod loading system
+4. Keep minimal Fabric API support if needed by integrated code
 
-**Sub-Phase 1.4: Testing and Validation**
+**Sub-Phase 1.4: Update Main Entry Point**
+1. Ensure Minecraft starts directly (not via Fabric Loader)
+2. Update build.gradle to use Minecraft's main class
+3. Remove fabricLoader source set from build
+4. Test: Minecraft launches without Fabric Loader
+
+**Sub-Phase 1.5: Testing and Validation**
 1. Build and verify compilation succeeds
 2. Test: Minecraft starts without Fabric Loader launcher
-3. Test: No runtime mod loading occurs
-4. Verify: Game launches to main menu
-5. **CRITICAL: Game must run and work properly with no regressions**
+3. Test: Game launches to main menu
+4. Verify: No Fabric Loader initialization occurs
+5. **CRITICAL: Game must run and work properly (vanilla functionality)**
 
 **Success Criteria**:
-- Minecraft compiles with Fabric Loader source integrated
-- Game starts without Knot launcher
-- Mixin infrastructure ready for mod integration
-- No runtime mod loading occurs
-- **Game runs normally, reaches main menu, and can load a world**
+- Fabric Loader's mod loading removed
+- Game starts directly without Knot launcher
+- Essential Fabric APIs preserved for mod integration
+- Minecraft runs normally in vanilla mode
+- **Game reaches main menu and can load a world**
+
+**Note**: At this phase, no mods are integrated yet - this just removes the mod loading infrastructure in preparation for direct code absorption.
 
 ---
 
-### Phase 2: Sodium Integration (Week 4-6)
+### Phase 2: Sodium Integration (Week 4-8)
 
-**Objective**: Integrate Sodium rendering optimizations directly into Minecraft
+**Objective**: Integrate Sodium rendering optimizations by moving code into Minecraft's package structure and applying mixin transformations directly
 
-**Sub-Phase 2.1: Source Integration**
-1. Copy Sodium sources to main source tree (`net/caffeinemc/mods/sodium/`)
-2. Copy Sodium resources (shaders, icons, configuration files)
-3. Copy Sodium mixin JSON configurations to resources
-4. Resolve compilation errors
+**Sub-Phase 2.1: Relocate Sodium Source Code**
+1. Move Sodium source files from `modules/sodium/.../net/caffeinemc/mods/sodium/` to `src/main/java/net/minecraft/client/renderer/sodium/`
+2. Update package declarations in all moved files
+3. Update imports throughout moved code
+4. Copy Sodium resources (shaders, icons, configuration files) to main resources
 5. Test compilation
 
-**Sub-Phase 2.2: Mixin Registration**
-1. Register Sodium mixin configurations with mixin system
-2. Verify mixin JSON files are discovered correctly
-3. Test: Sodium mixins are loaded and applied at runtime
-4. Monitor for mixin conflicts or load order issues
+**Sub-Phase 2.2: Analyze Sodium Mixins**
+1. Catalog all Sodium mixins (106+ from sodium-common.mixins.json and sodium-fabric.mixins.json)
+2. For each mixin, document:
+   - Target Minecraft class and method
+   - Injection type (@Inject, @Overwrite, @Accessor, etc.)
+   - What functionality it adds/modifies
+   - Dependencies on Sodium classes
+3. Prioritize mixins by importance (core rendering vs optional features)
 
-**Sub-Phase 2.3: Initialize Sodium**
-1. Add Sodium initialization to `ModIntegration.initializeClient()`
-2. Call `SodiumPreLaunch.onPreLaunch()` in pre-launch phase
-3. Call `SodiumFabricMod.onInitializeClient()` in main initialization
-4. Test: Sodium initialization completes without errors
+**Sub-Phase 2.3: Apply Mixin Transformations to Minecraft Source**
+1. For simple @Inject mixins: Add method calls at injection points
+   ```java
+   // In net/minecraft/client/renderer/LevelRenderer.java
+   import net.minecraft.client.renderer.sodium.SodiumRenderer;
+   
+   public void renderLevel(...) {
+       SodiumRenderer.beforeRenderLevel(this, ...);  // Added
+       // Original code...
+   }
+   ```
 
-**Sub-Phase 2.4: Testing and Validation**
+2. For @Accessor mixins: Add public getters/setters
+   ```java
+   // In net/minecraft/client/renderer/LevelRenderer.java
+   public ChunkRenderList getChunkRenderList() {  // Added
+       return this.chunkRenderList;
+   }
+   ```
+
+3. For @Overwrite mixins: Replace method bodies
+   ```java
+   // In net/minecraft/client/renderer/LevelRenderer.java
+   public void setupRender(...) {
+       // INTEGRATED: Using Sodium's implementation
+       net.minecraft.client.renderer.sodium.SodiumChunkRenderer.setup(this, ...);
+   }
+   ```
+
+4. For interface @Mixin: Make class implement interface
+   ```java
+   // In net/minecraft/client/renderer/LevelRenderer.java
+   public class LevelRenderer implements AutoCloseable, SodiumWorldRenderer {
+       // Implement SodiumWorldRenderer methods
+   }
+   ```
+
+**Sub-Phase 2.4: Remove Mixin Infrastructure**
+1. Delete Sodium mixin classes (no longer needed)
+2. Delete mixin JSON configurations
+3. Update build.gradle to remove Sodium source set
+4. Test compilation
+
+**Sub-Phase 2.5: Initialize Sodium**
+1. Add Sodium initialization to Minecraft startup
+   ```java
+   // In net/minecraft/client/Minecraft.java
+   public Minecraft(GameConfig gameConfig) {
+       // INTEGRATED: Initialize Sodium
+       net.minecraft.client.renderer.sodium.SodiumRenderer.initialize();
+       // ...
+   }
+   ```
+2. Ensure Sodium GUI integrates with video settings
+3. Test initialization order
+
+**Sub-Phase 2.6: Testing and Validation**
 1. Build and verify compilation succeeds
-2. Test: Sodium GUI appears in video settings
+2. Test: Sodium options appear in video settings
 3. Test: Rendering optimizations are active
 4. Functional tests: Chunk rendering, culling, memory efficiency
 5. Performance tests: FPS benchmarks, memory usage, chunk loading speed
@@ -737,10 +1053,12 @@ public class ModIntegration {
 8. Compare performance to baseline (should be equal or better)
 
 **Success Criteria**:
+- Sodium code fully integrated into `net.minecraft.client.renderer.sodium.*`
+- All 106+ mixin transformations applied to Minecraft source
+- No remaining Sodium mod packages
 - Sodium features fully functional
 - Rendering performance matches or exceeds modded version
 - No rendering artifacts or crashes
-- Sodium options GUI accessible and working
 - **Game runs normally with all Sodium optimizations active**
 
 ---
