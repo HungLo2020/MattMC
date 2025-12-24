@@ -5,7 +5,13 @@
 This document provides an **EXTREMELY COMPREHENSIVE** plan for integrating the mods currently compiled separately (Fabric Loader, Sodium, Iris, and Distant Horizons) directly into the main Minecraft 1.21.10 game JAR. The goal is to simplify the build system and have all features in a single JAR while maintaining all functionality.
 
 **Current Architecture**: Mods are compiled into separate JARs and loaded at runtime via Fabric Loader  
-**Target Architecture**: All mod code integrated directly into the main game JAR with initialization at game startup
+**Target Architecture**: All mod code integrated directly into the main game JAR with mixin-based transformations and initialization at game startup
+
+**Critical Design Decision**: Mixins will NOT be manually inlined into Minecraft source code. Instead, the mixin system (SpongePowered Mixin) will be preserved to apply bytecode transformations at runtime. This avoids circular dependency issues where mixin code references mod classes that depend on Minecraft.
+
+**Access Widener Status**: The 53 access widener modifications from Distant Horizons have already been applied directly to the Minecraft source code, so no additional access widening is needed during integration.
+
+**Testing Requirement**: After each integration phase, the game must be tested to ensure it runs and works properly with no regressions before proceeding to the next phase.
 
 ---
 
@@ -254,11 +260,44 @@ Fabric Loader (182 files) ← Independent, provides APIs
 - SpongePowered Mixin library transforms bytecode on-the-fly
 - Classes are modified before being loaded by the JVM
 
-**Integration Challenges**:
-1. **Static Mixins**: Can potentially be applied at compile-time or via manual source code integration
-2. **Dynamic Mixins**: Some mixins use conditions or plugins (e.g., `SodiumMixinPlugin`, `IrisMixinPlugin`)
-3. **Mixin Conflicts**: Multiple mods may mixin to the same class (need careful ordering)
-4. **Interface Injections**: Some mixins inject interfaces into Minecraft classes
+**Integration Solution**:
+- **Keep the mixin system**: SpongePowered Mixin library remains as a dependency
+- **Preserve mixin classes**: Mixins stay in their original mod packages (e.g., `net.caffeinemc.mods.sodium.mixin`)
+- **Initialize mixin system directly**: Replace Fabric Loader's mixin initialization with direct initialization
+- **Register mixin configurations**: Load mixin JSON files from integrated resources
+- **No manual source modification**: Minecraft source code remains unchanged
+
+**Why Not Inline Mixins**:
+The original plan suggested manually applying mixins by inlining code into Minecraft classes. This approach is fundamentally flawed because:
+
+1. **Circular Dependency Problem**:
+   - Mixin code references classes from their respective mods (Sodium, Iris, DH)
+   - These mod classes depend on Minecraft at compile-time
+   - Inlining would require: Minecraft → Mods → Minecraft (impossible circular dependency)
+
+2. **Example of the Problem**:
+   ```java
+   // In Sodium mixin (net.caffeinemc.mods.sodium.mixin.core.render.world.LevelRendererMixin)
+   @Inject(method = "renderLevel", at = @At("HEAD"))
+   private void onRenderLevel(CallbackInfo ci) {
+       SodiumClientMod.onRenderStart();  // References Sodium class!
+   }
+   ```
+   - If inlined into `LevelRenderer.java` (Minecraft class), it would reference `SodiumClientMod`
+   - But `SodiumClientMod` depends on Minecraft classes
+   - Creates circular dependency: Minecraft → Sodium → Minecraft
+
+3. **Maintenance Burden**:
+   - 256+ mixins would need manual tracking and application
+   - Every Minecraft update would require reapplying all modifications
+   - High risk of errors and merge conflicts
+
+**Integration Approach**:
+1. Keep mixins as separate classes in mod packages
+2. Preserve SpongePowered Mixin library
+3. Initialize mixin system early in JVM startup
+4. Register all mixin configurations from integrated mods
+5. Let mixin system handle bytecode transformation at class load time
 
 **Example Mixin Configuration** (Sodium):
 ```json
@@ -276,23 +315,35 @@ Fabric Loader (182 files) ← Independent, provides APIs
 
 ### 4.2 Access Widener Challenges
 
-**Challenge**: Distant Horizons requires 53 access modifications to Minecraft classes
+**STATUS**: Access widener modifications have already been applied to Minecraft source code.
 
-**Current System**:
+**What Was Done**:
+- The 53 access widener entries from Distant Horizons have been manually applied
+- Private/protected members changed to public/accessible as needed
+- Changes are permanent in the Minecraft source files
+
+**Original Challenge** (now resolved):
 - Access wideners defined in `.accesswidener` files
-- Fabric Loader widens access at class load time
-- Changes private/protected members to public/accessible
+- Fabric Loader would widen access at class load time
+- Need to change private/protected members to public/accessible
 
-**Integration Challenges**:
-1. **Manual Access Widening**: Need to modify Minecraft source directly (change `private` → `public`)
-2. **Maintenance Burden**: Changes must be tracked and reapplied on Minecraft updates
-3. **Potential Conflicts**: Multiple mods may widen same members
+**Integration Impact**:
+- No access widener processing needed during integration
+- Distant Horizons code can directly access previously-private Minecraft members
+- Access widener files can be removed from resources (no longer needed)
 
-**Example Access Widener**:
+**Example of Applied Access Widener**:
+```java
+// Before (original Minecraft):
+private Path dataFolder;
+
+// After (widened for Distant Horizons):
+public Path dataFolder;  // ACCESS WIDENED for DistantHorizons
 ```
-accessible field net/minecraft/world/level/storage/DimensionDataStorage dataFolder Ljava/nio/file/Path;
-accessible method net/minecraft/client/renderer/GameRenderer getFov (Lnet/minecraft/client/Camera;FZ)F
-```
+
+**Maintenance Note**:
+- When updating Minecraft versions, access widener changes must be reapplied
+- Maintain documentation of all widened members for future reference
 
 ### 4.3 Fabric API Challenges
 
@@ -407,25 +458,40 @@ Distant Horizons:
 
 ### 5.2 Integration Approach
 
-**Option A: Static Integration (RECOMMENDED)**
-- Copy mod source into main source tree
-- Manually apply mixins as source code changes
+**RECOMMENDED: Modified Static Integration with Runtime Mixins**
+
+This approach integrates all mod sources into the main source tree while preserving the mixin system for runtime bytecode transformation.
+
+**Key Characteristics**:
+- Copy all mod source code into main source tree
+- Keep mod code in original package structures (no circular dependencies)
+- Preserve SpongePowered Mixin library for runtime transformations
+- Mixins remain as separate classes (not inlined into Minecraft)
 - Create initialization hooks in Minecraft startup
-- Remove Fabric Loader runtime dependency
+- Remove Fabric Loader's mod loading (Knot launcher)
+- Produce single JAR containing all code
 
-**Option B: Hybrid Integration**
-- Keep Fabric Loader for mixin system
-- Integrate mod sources into main JAR
-- Use embedded Fabric Loader at runtime
-- Simpler but keeps Fabric dependency
+**Why This Approach**:
+1. **Avoids Circular Dependencies**: Mod code stays in mod packages, can freely reference Minecraft classes
+2. **Preserves Mixin Functionality**: Mixins work as designed (runtime bytecode transformation)
+3. **Maintains Separation**: Mod code remains organized for future updates
+4. **Achieves Single JAR**: All code in one JAR, no external mod files needed
+5. **Simpler Than Manual Integration**: No need to manually modify 256+ Minecraft classes
 
-**Option C: Pure Compilation**
-- Integrate sources into single source set
-- Keep separate JAR tasks
-- Bundle all JARs into single distribution
-- Minimal change but doesn't meet goal of single JAR
+**Alternative Approaches (NOT Recommended)**:
 
-**Recommendation**: **Option A (Static Integration)** for maximum simplification and single JAR goal
+**Option B: Pure Manual Integration**
+- Manually inline all mixin transformations into Minecraft source
+- **PROBLEM**: Creates circular dependencies (Minecraft → Mods → Minecraft)
+- **PROBLEM**: Extremely difficult to maintain (256+ mixins to track)
+- **PROBLEM**: Mixin code references mod classes that don't exist in Minecraft
+- Status: **REJECTED** - Not feasible due to circular dependency issues
+
+**Option C: Multi-JAR Bundle**
+- Keep current architecture but bundle JARs together
+- **PROBLEM**: Doesn't achieve single JAR goal
+- **PROBLEM**: Still requires runtime mod loading
+- Status: **REJECTED** - Doesn't meet project objectives
 
 ### 5.3 Package Structure After Integration
 
@@ -457,62 +523,76 @@ src/main/java/
 
 ### 5.4 Mixin Application Strategy
 
-**Three-Phase Approach**:
+**CRITICAL DESIGN DECISION**: Mixins will **NOT** be inlined into Minecraft source code. They will remain as separate mixin classes in their respective mod packages.
 
-**Phase 1: Mixin Analysis**
-- Parse all mixin JSON configurations
-- Identify all target classes and methods
-- Map all @Inject, @Redirect, @ModifyVariable, @Overwrite annotations
-- Document all interface injections
+**Why Not Inline Mixins?**:
+- Mixin classes contain code that references mod-specific classes, variables, and methods
+- These mod classes depend on Minecraft at compile-time
+- Inlining would create a circular dependency: Minecraft → Mods → Minecraft
+- Mixin system is designed to inject behavior without modifying the target class source
 
-**Phase 2: Manual Application**
-- For each mixin, manually apply the transformation to Minecraft source
-- Create backup of original methods (commented out or in separate files)
-- Add integration points for mod functionality
-- Test each mixin application individually
+**Integration Approach**:
+
+**Phase 1: Preserve Mixin Infrastructure**
+- Keep SpongePowered Mixin library as a runtime dependency
+- Integrate mixin classes in their original mod packages (not in Minecraft packages)
+- Preserve mixin JSON configuration files in mod resources
+- Ensure mixin system initializes during game startup (not via Fabric Loader)
+
+**Phase 2: Initialize Mixin System**
+- Initialize SpongePowered Mixin engine early in Minecraft startup
+- Register all mixin configurations from integrated mods
+- Apply mixins at class load time (same as current behavior)
+- No manual source code modification to Minecraft classes needed
 
 **Phase 3: Verification**
-- Run diff between original and modified Minecraft classes
-- Document all changes for future Minecraft version updates
-- Create automated tests for mixin functionality
+- Test that all mixins are discovered and applied correctly
+- Verify mod functionality works as expected
+- Monitor for mixin conflicts or initialization order issues
+- Create automated tests for critical mixin transformations
 
-**Example Mixin Transformation**:
+**Mixin Structure After Integration**:
 
-Original Mixin (Sodium):
+Mixin classes stay in mod packages:
 ```java
+// In net/caffeinemc/mods/sodium/mixin/core/render/world/LevelRendererMixin.java
 @Mixin(LevelRenderer.class)
 public class LevelRendererMixin {
     @Inject(method = "renderLevel", at = @At("HEAD"))
     private void onRenderLevel(CallbackInfo ci) {
-        SodiumClientMod.onRenderStart();
+        SodiumClientMod.onRenderStart();  // References Sodium class - OK!
     }
 }
 ```
 
-Integrated Code:
+Minecraft source remains unmodified:
 ```java
 // In net/minecraft/client/renderer/LevelRenderer.java
 public void renderLevel(...) {
-    // SODIUM INTEGRATION: Call Sodium render start
-    net.caffeinemc.mods.sodium.client.SodiumClientMod.onRenderStart();
-    
-    // Original method body continues...
+    // Original method - mixin injects at runtime via bytecode transformation
+    // No source code changes needed!
 }
 ```
 
 ### 5.5 Access Widener Application Strategy
 
-**Automated Approach**:
-1. Parse all `.accesswidener` files
-2. Generate list of Minecraft classes to modify
-3. Use AST manipulation (JavaParser or similar) to change visibility modifiers
-4. Document all modifications for version updates
+**STATUS**: Access widener changes have already been applied directly to the Minecraft source code.
 
-**Manual Approach** (if automation fails):
-1. Systematically go through each access widener entry
-2. Locate the field/method/class in Minecraft source
-3. Change `private` → `protected` or `public` as specified
-4. Mark with comment: `// ACCESS WIDENED for DistantHorizons`
+**What Was Done**:
+- The 53 access widener entries from Distant Horizons have been manually applied
+- Visibility modifiers changed from `private` to `public` or `protected` as needed
+- Changes are permanent in the Minecraft source files
+
+**Integration Impact**:
+- No additional access widener processing needed during integration
+- Distant Horizons code can directly access previously-private Minecraft members
+- Access widener files (`.accesswidener`) can be removed from resources
+- No runtime access widening required
+
+**Future Maintenance**:
+- When updating Minecraft versions, access changes must be reapplied
+- Document all access-widened members for tracking
+- Consider maintaining a list of modified access levels for version updates
 
 ### 5.6 Initialization Strategy
 
@@ -523,6 +603,12 @@ package net.minecraft.integration;
 
 public class ModIntegration {
     private static boolean initialized = false;
+    
+    public static void initializeMixins() {
+        // Initialize SpongePowered Mixin engine
+        // Register all mixin configurations from integrated mods
+        // This replaces Fabric Loader's mixin initialization
+    }
     
     public static void initializeClient() {
         if (initialized) return;
@@ -549,6 +635,7 @@ public class ModIntegration {
 ```
 
 **Call Points**:
+- Mixins: Before Minecraft class loading begins (JVM startup)
 - Client: `net.minecraft.client.Minecraft.<init>()` (early in constructor)
 - Server: `net.minecraft.server.Main.main()` (before server start)
 
@@ -558,29 +645,28 @@ public class ModIntegration {
 ### Phase 0: Preparation and Baseline (Week 1)
 
 **Objectives**:
-- Create comprehensive backup of current working state
 - Document current functionality for regression testing
-- Set up integration branch
 - Create testing framework
+- Establish baseline performance metrics
 
 **Tasks**:
 1. ✓ Create `INTEGRATION.md` (this document)
-2. Create integration branch: `git checkout -b integration/all-mods`
-3. Tag current state: `git tag baseline-before-integration`
-4. Document all current features and test cases
-5. Create automated test suite for existing functionality
-6. Set up build comparison tools (JAR diff, class comparison)
+2. Document all current features and test cases
+3. Create automated test suite for existing functionality
+4. Establish baseline performance benchmarks (FPS, memory, startup time)
+5. Document current working state for comparison
 
 **Success Criteria**:
 - All documentation complete
 - Baseline tests pass 100%
-- Build produces identical JARs to current state
+- Performance benchmarks recorded
+- **Game runs and works properly with current multi-JAR architecture**
 
 ---
 
 ### Phase 1: Fabric Loader Integration (Week 2-3)
 
-**Objective**: Integrate Fabric Loader source and remove runtime mod loading
+**Objective**: Integrate Fabric Loader source and establish mixin infrastructure without runtime mod loading
 
 **Sub-Phase 1.1: Source Integration**
 1. Copy Fabric Loader sources to main source tree
@@ -588,22 +674,32 @@ public class ModIntegration {
 3. Resolve any compilation errors
 4. Test compilation
 
-**Sub-Phase 1.2: Remove Knot Launcher**
-1. Identify Knot launcher entry point code
-2. Extract essential initialization logic
-3. Create `ModIntegration.initializeClient()` in Minecraft client startup
-4. Remove mod discovery and JAR loading code
-5. Test: Minecraft should start without Fabric Loader launcher
+**Sub-Phase 1.2: Mixin System Setup**
+1. Keep SpongePowered Mixin library as dependency
+2. Create `ModIntegration.initializeMixins()` for mixin engine setup
+3. Remove Fabric Loader's Knot launcher entry point
+4. Initialize mixin system before Minecraft class loading
+5. Test: Mixin system initializes without Fabric Loader launcher
 
-**Sub-Phase 1.3: Preserve Essential Fabric APIs**
-1. Audit which Fabric Loader APIs are used by mods
-2. Create stub implementations or direct replacements
-3. Test: Mods can compile against new API stubs
+**Sub-Phase 1.3: Remove Runtime Mod Loading**
+1. Remove mod discovery code (JAR scanning in run/mods/)
+2. Remove dynamic mod loading infrastructure
+3. Preserve essential Fabric APIs used by mods
+4. Create stub implementations where needed
+
+**Sub-Phase 1.4: Testing and Validation**
+1. Build and verify compilation succeeds
+2. Test: Minecraft starts without Fabric Loader launcher
+3. Test: No runtime mod loading occurs
+4. Verify: Game launches to main menu
+5. **CRITICAL: Game must run and work properly with no regressions**
 
 **Success Criteria**:
 - Minecraft compiles with Fabric Loader source integrated
 - Game starts without Knot launcher
+- Mixin infrastructure ready for mod integration
 - No runtime mod loading occurs
+- **Game runs normally, reaches main menu, and can load a world**
 
 ---
 
@@ -612,31 +708,40 @@ public class ModIntegration {
 **Objective**: Integrate Sodium rendering optimizations directly into Minecraft
 
 **Sub-Phase 2.1: Source Integration**
-1. Copy Sodium sources to main source tree
-2. Copy Sodium resources
-3. Resolve compilation errors
-4. Test compilation
+1. Copy Sodium sources to main source tree (`net/caffeinemc/mods/sodium/`)
+2. Copy Sodium resources (shaders, icons, configuration files)
+3. Copy Sodium mixin JSON configurations to resources
+4. Resolve compilation errors
+5. Test compilation
 
-**Sub-Phase 2.2: Mixin Analysis and Application**
-1. Parse `sodium-common.mixins.json` (106+ mixins)
-2. Categorize mixins by criticality
-3. Create mixin application order
-4. Apply mixins systematically
-5. Test after each major mixin category
+**Sub-Phase 2.2: Mixin Registration**
+1. Register Sodium mixin configurations with mixin system
+2. Verify mixin JSON files are discovered correctly
+3. Test: Sodium mixins are loaded and applied at runtime
+4. Monitor for mixin conflicts or load order issues
 
 **Sub-Phase 2.3: Initialize Sodium**
-1. Identify Sodium initialization code
-2. Call from `ModIntegration.initializeClient()`
-3. Test: Sodium GUI should appear in video settings
+1. Add Sodium initialization to `ModIntegration.initializeClient()`
+2. Call `SodiumPreLaunch.onPreLaunch()` in pre-launch phase
+3. Call `SodiumFabricMod.onInitializeClient()` in main initialization
+4. Test: Sodium initialization completes without errors
 
-**Sub-Phase 2.4: Testing**
-1. Functional tests: Rendering, GUI, options
-2. Performance tests: FPS, memory, chunk loading
+**Sub-Phase 2.4: Testing and Validation**
+1. Build and verify compilation succeeds
+2. Test: Sodium GUI appears in video settings
+3. Test: Rendering optimizations are active
+4. Functional tests: Chunk rendering, culling, memory efficiency
+5. Performance tests: FPS benchmarks, memory usage, chunk loading speed
+6. Visual tests: No rendering artifacts, correct colors, proper lighting
+7. **CRITICAL: Game must run and work properly with no regressions**
+8. Compare performance to baseline (should be equal or better)
 
 **Success Criteria**:
 - Sodium features fully functional
-- Rendering performance matches modded version
+- Rendering performance matches or exceeds modded version
 - No rendering artifacts or crashes
+- Sodium options GUI accessible and working
+- **Game runs normally with all Sodium optimizations active**
 
 ---
 
@@ -644,36 +749,47 @@ public class ModIntegration {
 
 **Objective**: Integrate LOD rendering for extended view distances
 
-**Sub-Phase 3.1: Access Widener Application**
-1. Parse `1_21_10.distanthorizons.accesswidener` (53 entries)
-2. Apply access changes (automated or manual)
-3. Test compilation
+**Sub-Phase 3.1: Verify Access Wideners**
+1. Confirm that all 53 access widener modifications are already applied to Minecraft source
+2. Verify Distant Horizons can access previously-private members
+3. No additional access widener processing needed
 
 **Sub-Phase 3.2: Source Integration**
-1. Copy Distant Horizons sources
-2. Copy resources (SQL scripts, configuration)
-3. Resolve compilation errors
-4. Test compilation
+1. Copy Distant Horizons sources to main source tree (`com/seibel/distanthorizons/`)
+2. Copy resources (SQL scripts, configuration files, icons)
+3. Copy DH mixin JSON configurations to resources
+4. Resolve compilation errors
+5. Test compilation
 
-**Sub-Phase 3.3: Mixin Application**
-1. Parse DH mixin configurations
-2. Apply mixins to Minecraft classes
-3. Test mixin integration
+**Sub-Phase 3.3: Mixin Registration**
+1. Register DH mixin configurations with mixin system
+2. Verify mixin discovery and loading
+3. Test: DH mixins are applied at runtime
+4. Monitor for conflicts with existing mixins
 
 **Sub-Phase 3.4: Initialize Distant Horizons**
-1. Add DH initialization to ModIntegration
-2. Test: LOD rendering should activate
+1. Add DH initialization to `ModIntegration.initializeClient()`
+2. Add DH server initialization to `ModIntegration.initializeServer()`
+3. Test: DH initializes without errors
 
-**Sub-Phase 3.5: Testing**
-1. LOD generation, rendering, persistence
-2. Multi-threading stability
-3. Performance
+**Sub-Phase 3.5: Testing and Validation**
+1. Build and verify compilation succeeds
+2. Test: LOD chunks generate correctly
+3. Test: LOD rendering displays properly
+4. Test: Data persistence (SQLite database)
+5. Test: Multi-threading stability
+6. Performance tests: FPS with LODs, memory usage, generation speed
+7. Functional tests: Extended view distances, LOD quality settings
+8. **CRITICAL: Game must run and work properly with no regressions**
+9. Test both single-player and server scenarios
 
 **Success Criteria**:
-- LOD chunks generate and render
-- Extended view distance works
-- Data saves and loads correctly
-- Performance acceptable
+- LOD chunks generate and render correctly
+- Extended view distance works as expected
+- Data saves and loads correctly between sessions
+- Performance acceptable with LODs enabled
+- No crashes or threading issues
+- **Game runs normally with Distant Horizons active**
 
 ---
 
@@ -682,42 +798,56 @@ public class ModIntegration {
 **Objective**: Integrate shader pack support with Sodium and DH compatibility
 
 **Sub-Phase 4.1: Source Integration**
-1. Copy Iris sources
-2. Copy resources
-3. Resolve compilation errors
-4. Test compilation
+1. Copy Iris sources to main source tree (`net/irisshaders/iris/`)
+2. Copy resources (shader templates, icons, configuration files)
+3. Copy all 10 Iris mixin JSON configurations to resources
+4. Resolve compilation errors
+5. Test compilation
 
-**Sub-Phase 4.2: Mixin Application**
-1. Parse 10 Iris mixin configurations (150+ mixins)
-2. Categorize mixins
-3. Apply mixins carefully (may conflict with Sodium)
-4. Test each mixin category
+**Sub-Phase 4.2: Mixin Registration**
+1. Register all Iris mixin configurations with mixin system
+2. Pay special attention to Sodium compatibility mixins
+3. Pay special attention to DH compatibility mixins
+4. Verify mixin discovery and loading
+5. Test: Iris mixins are applied at runtime
+6. Monitor for conflicts (especially with Sodium mixins)
 
 **Sub-Phase 4.3: Sodium Integration**
-1. Verify Sodium API usage
-2. Test Iris + Sodium together
+1. Verify Sodium API usage is compatible
+2. Test Iris + Sodium interaction
+3. Verify Sodium rendering pipeline modifications work correctly
+4. Test: Sodium options still accessible with Iris active
 
 **Sub-Phase 4.4: Distant Horizons Integration**
 1. Enable DH compatibility layer
-2. Test Iris + DH together
+2. Test Iris + DH shader integration
+3. Verify LOD rendering works with shaders
 
 **Sub-Phase 4.5: Initialize Iris**
-1. Add Iris initialization to ModIntegration
-2. Test: Shader packs should be loadable
+1. Add Iris initialization to `ModIntegration.initializeClient()`
+2. Ensure proper initialization order (after Sodium, before/with DH)
+3. Test: Iris initializes without errors
 
-**Sub-Phase 4.6: Testing**
-1. Shader pack loading
-2. Various shader packs
-3. Sodium + Iris rendering
-4. DH + Iris rendering
-5. Performance with shaders
+**Sub-Phase 4.6: Testing and Validation**
+1. Build and verify compilation succeeds
+2. Test: Shader packs can be loaded from shaderpacks folder
+3. Test: Multiple different shader packs (BSL, Complementary, Sildurs, etc.)
+4. Test: Sodium + Iris rendering together
+5. Test: DH + Iris rendering together (LOD shaders)
+6. Performance tests: FPS with shaders, memory usage, shader compilation time
+7. Functional tests: All shader features (shadows, reflections, bloom, etc.)
+8. Visual tests: Proper rendering, no artifacts, correct colors
+9. **CRITICAL: Game must run and work properly with no regressions**
+10. Test shader pack switching and reloading
 
 **Success Criteria**:
 - Shader packs load and render correctly
-- No conflicts with Sodium
-- DH shaders work
-- Performance acceptable
-- All shader features functional
+- No conflicts with Sodium optimizations
+- DH shader integration works
+- Performance acceptable with shaders enabled
+- All shader features functional (shadows, bloom, etc.)
+- Shader pack switching works smoothly
+- **Game runs normally with all three mods (Sodium + Iris + DH) working together**
 
 ---
 
@@ -726,18 +856,29 @@ public class ModIntegration {
 **Objective**: Simplify build system to single source set and single JAR
 
 **Tasks**:
-1. Remove all custom source sets
-2. Remove separate JAR tasks
-3. Simplify run tasks
-4. Update classpath
-5. Clean up dependencies
-6. Update distribution tasks
+1. Remove all custom source sets from build.gradle
+2. Remove separate JAR tasks for mods
+3. Simplify run tasks (no more mod loading from run/mods/)
+4. Update classpath configuration
+5. Clean up dependencies (ensure all mod dependencies included)
+6. Update distribution tasks to produce single JAR
+7. Test build process end-to-end
+
+**Testing and Validation**:
+1. Verify build completes successfully
+2. Verify single JAR is produced with all integrated code
+3. Test: JAR can be run standalone
+4. Test: Game launches from the single JAR
+5. Test: All features work from single JAR (no mods in run/mods/)
+6. **CRITICAL: Game must run and work properly with no regressions**
+7. Verify JAR size is reasonable (not bloated)
 
 **Success Criteria**:
-- Build produces single JAR
-- JAR contains all integrated code
+- Build produces single JAR containing all integrated code
+- JAR is runnable without external mod files
 - Run tasks work without mod loading
-- Distributions work correctly
+- Distribution tasks work correctly
+- **Game runs normally from single JAR with all features intact**
 
 ---
 
@@ -746,16 +887,30 @@ public class ModIntegration {
 **Objective**: Merge all mod resources into main resources
 
 **Tasks**:
-1. Merge mod assets
-2. Merge mod data files
-3. Remove mod metadata
-4. Update resource references
-5. Test resource loading
+1. Merge mod assets (textures, icons, shaders)
+2. Merge mod data files (configurations, SQL scripts)
+3. Consolidate mixin JSON configurations
+4. Remove mod-specific metadata files (fabric.mod.json if not needed)
+5. Update resource references in code if needed
+6. Resolve any resource path conflicts
+7. Test resource loading
+
+**Testing and Validation**:
+1. Verify all resources are accessible
+2. Test: Sodium GUI icons display correctly
+3. Test: Iris shader files load properly
+4. Test: DH configuration files are found
+5. Test: No missing resource errors in logs
+6. Visual tests: All UI elements render correctly
+7. **CRITICAL: Game must run and work properly with no regressions**
+8. Test resource loading from JAR (not from file system)
 
 **Success Criteria**:
-- All mod resources accessible
-- No missing assets
-- Resource loading works correctly
+- All mod resources merged into main resources
+- No missing assets or resources
+- Resource loading works correctly from single JAR
+- No resource path conflicts
+- **Game runs normally with all resources loading correctly**
 
 ---
 
@@ -764,17 +919,31 @@ public class ModIntegration {
 **Objective**: Clean up integration code and optimize
 
 **Tasks**:
-1. Remove Fabric Loader dependency (if possible)
-2. Remove module directories
+1. Evaluate if Fabric Loader dependency can be further reduced
+2. Remove or archive module directories (keep as reference if needed)
 3. Code organization and documentation
-4. Performance optimization
-5. Code quality improvements
+4. Add code comments explaining integration points
+5. Performance optimization opportunities
+6. Code quality improvements
+7. Remove dead code or unused imports
+
+**Testing and Validation**:
+1. Verify compilation after cleanup
+2. Run full regression test suite
+3. Performance benchmarks: Compare to baseline and previous phases
+4. Memory profiling: Ensure no memory leaks from integration
+5. Startup time: Should be faster than multi-JAR version
+6. Test all major features comprehensively
+7. **CRITICAL: Game must run and work properly with no regressions**
+8. Verify no functionality lost during cleanup
 
 **Success Criteria**:
-- Clean codebase
-- No module directories
-- Performance equal or better
-- Code quality high
+- Clean, well-organized codebase
+- Module directories archived or removed
+- Performance equal to or better than baseline
+- Code quality high and maintainable
+- Documentation updated
+- **Game runs normally with optimizations applied**
 
 ---
 
@@ -783,17 +952,71 @@ public class ModIntegration {
 **Objective**: Comprehensive testing and documentation
 
 **Tasks**:
-1. Functional testing (all features)
-2. Performance testing (benchmarks)
-3. Compatibility testing (platforms, configurations)
-4. Documentation updates
-5. Create integration report
+1. Functional testing (all features across all mods)
+2. Performance testing (comprehensive benchmarks)
+3. Compatibility testing (different platforms, configurations)
+4. Documentation updates (README, build instructions, etc.)
+5. Create integration report and lessons learned
+6. Update maintenance documentation
+
+**Comprehensive Testing Checklist**:
+1. **Baseline Comparison**:
+   - All baseline tests must pass
+   - Performance must match or exceed baseline
+   - No regressions from original multi-JAR system
+
+2. **Feature Testing**:
+   - Sodium: All rendering optimizations, GUI options
+   - Iris: Shader pack loading, all shader features
+   - Distant Horizons: LOD generation, rendering, persistence
+   - Cross-mod: Sodium+Iris, Iris+DH, all three together
+
+3. **Platform Testing**:
+   - Windows (x64)
+   - Linux (x64, ARM64)
+   - macOS (Intel, Apple Silicon)
+
+4. **Performance Testing**:
+   - FPS benchmarks (vanilla areas, complex scenes)
+   - Memory usage (normal, extended view distances)
+   - Startup time (should be faster than multi-JAR)
+   - Shader compilation time
+   - LOD generation speed
+
+5. **Stability Testing**:
+   - Extended play sessions (no memory leaks)
+   - World loading/unloading cycles
+   - Shader pack switching
+   - Settings changes
+   - Multiplayer connections (if applicable)
+
+6. **User Acceptance Testing**:
+   - New player experience (first launch)
+   - World creation and loading
+   - Shader pack installation and usage
+   - Extended view distance configuration
+   - Low-end hardware testing
+   - High-end hardware testing
+
+**Documentation Updates**:
+1. Update README.md with integration status
+2. Document build process for single JAR
+3. Create INTEGRATION_REPORT.md with:
+   - What was integrated
+   - How it was integrated
+   - Known issues or limitations
+   - Performance comparisons
+   - Maintenance notes for future updates
+4. Update development documentation
 
 **Success Criteria**:
-- All tests pass
-- Performance acceptable
-- Documentation complete
-- Ready for release
+- **ALL tests pass without regressions**
+- Performance meets or exceeds baseline
+- All platforms tested and working
+- Documentation complete and accurate
+- Integration report provides clear guidance for maintenance
+- **Game runs flawlessly with all integrated features**
+- Ready for production release
 
 ---
 
@@ -835,49 +1058,57 @@ public class ModIntegration {
 
 ## 8. Rollback and Contingency Plans
 
-### 8.1 Git Strategy
+### 8.1 Version Control Strategy
 
-**Branch Structure**:
-```
-main
-  ↓
-integration/all-mods
-  ↓
-  ├─ integration/phase-1-fabric-loader
-  ├─ integration/phase-2-sodium
-  ├─ integration/phase-3-distant-horizons
-  └─ integration/phase-4-iris
-```
+**Branch Management**:
+- Work can be done on feature branches for each phase
+- Main branch remains stable
+- Integration work merged only after thorough testing
 
-**Tags**:
-- `baseline-before-integration`
-- `phase-1-complete`
-- `phase-2-complete`
-- `phase-3-complete`
-- `phase-4-complete`
-- `integration-complete`
+**Recommendations**:
+- Commit frequently during each phase
+- Tag successful phase completions for reference
+- Keep detailed commit messages explaining changes
 
 ### 8.2 Contingency Plans
 
-**If Mixin Integration Fails**:
-- Keep Fabric Loader's mixin system at runtime
-- Integrate sources but use runtime mixins
-- Still achieves single JAR (embed mixin library)
+**If Mixin System Integration Fails**:
+- Mixin system is essential - integration not viable without it
+- The SpongePowered Mixin library must remain as a dependency
+- If mixin initialization proves problematic, may need to keep minimal Fabric Loader infrastructure
+- Fallback: Keep Fabric Loader's mixin initialization but remove mod loading
 
 **If Performance Degrades**:
 - Profile to identify bottleneck
-- Optimize initialization
-- Optimize threading
+- Optimize initialization order
+- Optimize mixin registration
+- Investigate threading issues
+- Compare mixin application efficiency
 
 **If Dependency Conflicts Occur**:
-- Use shading to isolate libraries
-- Fork/modify dependencies
-- Document modifications
+- Use shading to isolate conflicting libraries
+- Fork and modify dependencies if necessary
+- Document all modifications for maintenance
+- Consider alternative versions of conflicting libraries
+
+**If Cross-Mod Compatibility Issues Arise**:
+- Review initialization order
+- Check for mixin conflicts (multiple mixins targeting same class)
+- Verify API compatibility between mods
+- May need to adjust mixin priority or ordering
 
 **If Integration Proves Infeasible**:
+- Document why integration is not viable
 - Fallback to current multi-JAR system
-- Optimize build process
-- Document why integration not viable
+- Optimize current build process instead
+- Consider partial integration (some mods only)
+
+**Testing Failure Response**:
+- Do not proceed to next phase if testing fails
+- Identify root cause of failures
+- Fix issues before continuing
+- Re-run all tests after fixes
+- Document what went wrong and how it was resolved
 
 ---
 
@@ -932,35 +1163,37 @@ integration/all-mods
 ### Current State
 - **4 Mods**: Fabric Loader, Sodium, Iris, Distant Horizons
 - **Total Files**: 1,996 Java files in modules
-- **Mixins**: 256+ mixin classes
-- **Access Wideners**: 53 modifications
+- **Mixins**: 256+ mixin classes (will be preserved, not inlined)
+- **Access Wideners**: 53 modifications (already applied to Minecraft source)
 - **Current JAR Output**: 5 separate JARs
 
 ### Target State
 - **Single JAR**: All code in one JAR
-- **No Runtime Mod Loading**: Direct integration
+- **Preserved Mixin System**: SpongePowered Mixin library for runtime transformations
+- **No Runtime Mod Loading**: Direct integration via ModIntegration class
 - **Simplified Build**: Single source set
 - **All Features Intact**: 100% functionality preserved
 
 ### Integration Complexity
 - **Estimated Timeline**: 18 weeks (optimistic) to 30+ weeks (realistic)
 - **Major Challenges**:
-  1. 256+ mixins to manually apply
-  2. 53 access widener modifications
+  1. Mixin system integration (preserving runtime transformation)
+  2. Proper initialization order for all mods
   3. Complex inter-mod dependencies
   4. Maintaining performance parity
+  5. Testing after each phase to ensure no regressions
 - **Major Benefits**:
   1. Single JAR simplicity
-  2. Faster startup
+  2. Faster startup (no mod discovery/loading)
   3. Better performance potential
   4. Simplified distribution
 
 ### Key Decision Points
-- **Integration Approach**: Static integration (Option A) recommended
-- **Mixin Strategy**: Manual application with documentation
-- **Access Wideners**: Automated parsing + manual application
-- **Testing**: Comprehensive at each phase
-- **Rollback**: Git branches and tags for each phase
+- **Integration Approach**: Modified Static Integration with Runtime Mixins (recommended)
+- **Mixin Strategy**: Preserve mixin system, do NOT inline into Minecraft source
+- **Access Wideners**: Already applied to Minecraft source, no additional processing needed
+- **Testing**: Comprehensive validation after each phase, game must run and work properly
+- **Phase 0**: Skip backup/branching instructions, focus on baseline testing
 
 ---
 
@@ -1051,77 +1284,123 @@ From Distant Horizons:
 ## Appendix D: Integration Checklist
 
 ### Pre-Integration
-- [ ] Backup current codebase
-- [ ] Tag baseline
-- [ ] Create integration branch
-- [ ] Document features
-- [ ] Create test suite
-- [ ] Verify build works
+- [ ] Document current features and test cases
+- [ ] Create baseline test suite
+- [ ] Record baseline performance metrics
+- [ ] Verify current build works correctly
+- [ ] Understand mixin system architecture
+- [ ] Verify access wideners already applied
 
 ### Phase 1: Fabric Loader
-- [ ] Copy sources
-- [ ] Remove source set
-- [ ] Create ModIntegration class
-- [ ] Remove Knot launcher
-- [ ] Test startup
-- [ ] Tag phase complete
+- [ ] Copy Fabric Loader sources to main source tree
+- [ ] Remove fabricLoader source set from build.gradle
+- [ ] Preserve SpongePowered Mixin library dependency
+- [ ] Create ModIntegration class with initializeMixins()
+- [ ] Remove Knot launcher and mod loading code
+- [ ] Test: Mixin system initializes correctly
+- [ ] Test: Minecraft starts without Fabric Loader launcher
+- [ ] **CRITICAL: Game runs and works properly**
+- [ ] Tag/commit phase completion
 
 ### Phase 2: Sodium
-- [ ] Copy sources/resources
-- [ ] Apply 106+ mixins
-- [ ] Initialize Sodium
-- [ ] Test rendering
-- [ ] Test GUI
-- [ ] Tag phase complete
+- [ ] Copy Sodium sources to `net/caffeinemc/mods/sodium/`
+- [ ] Copy Sodium resources and mixin configurations
+- [ ] Register Sodium mixin JSONs with mixin system
+- [ ] Initialize Sodium via ModIntegration
+- [ ] Test: Sodium mixins apply correctly
+- [ ] Test: Sodium GUI appears in video settings
+- [ ] Test: Rendering optimizations active
+- [ ] Performance tests pass
+- [ ] **CRITICAL: Game runs and works properly with Sodium**
+- [ ] Tag/commit phase completion
 
 ### Phase 3: Distant Horizons
-- [ ] Apply 53 access wideners
-- [ ] Copy sources/resources
-- [ ] Apply mixins
-- [ ] Initialize DH
-- [ ] Test LOD rendering
-- [ ] Tag phase complete
+- [ ] Verify 53 access wideners already applied
+- [ ] Copy DH sources to `com/seibel/distanthorizons/`
+- [ ] Copy DH resources and mixin configurations
+- [ ] Register DH mixin JSONs with mixin system
+- [ ] Initialize DH via ModIntegration
+- [ ] Test: DH mixins apply correctly
+- [ ] Test: LOD rendering works
+- [ ] Test: Data persistence (SQLite)
+- [ ] Performance tests pass
+- [ ] **CRITICAL: Game runs and works properly with DH**
+- [ ] Tag/commit phase completion
 
 ### Phase 4: Iris
-- [ ] Copy sources/resources
-- [ ] Apply 150+ mixins
-- [ ] Verify Sodium integration
-- [ ] Test shader loading
-- [ ] Test DH integration
-- [ ] Tag phase complete
+- [ ] Copy Iris sources to `net/irisshaders/iris/`
+- [ ] Copy Iris resources and all 10 mixin configurations
+- [ ] Register Iris mixin JSONs with mixin system
+- [ ] Initialize Iris via ModIntegration
+- [ ] Test: Iris mixins apply correctly
+- [ ] Test: Shader packs load correctly
+- [ ] Test: Sodium + Iris compatibility
+- [ ] Test: DH + Iris compatibility
+- [ ] Performance tests with shaders pass
+- [ ] **CRITICAL: Game runs and works properly with all mods**
+- [ ] Tag/commit phase completion
 
 ### Phase 5-8: Finalization
-- [ ] Simplify build system
-- [ ] Consolidate resources
-- [ ] Code cleanup
-- [ ] Final testing
-- [ ] Update documentation
+- [ ] Simplify build system to single source set
+- [ ] Consolidate all resources
+- [ ] Remove module directories
+- [ ] Code cleanup and optimization
+- [ ] Comprehensive testing (all features)
+- [ ] Platform compatibility testing
+- [ ] Performance benchmarking
+- [ ] Documentation updates
+- [ ] Integration report complete
+- [ ] **CRITICAL: Final build runs flawlessly**
 - [ ] Tag integration complete
 
 ---
 
 ## Conclusion
 
-This comprehensive plan provides a detailed roadmap for integrating all mods into the main Minecraft JAR. The integration is complex with 256+ mixins, 53 access widener modifications, and complex dependencies, but is achievable through careful incremental execution over 18-30 weeks.
+This comprehensive plan provides a detailed roadmap for integrating all mods into the main Minecraft JAR. The integration preserves the mixin system for runtime bytecode transformation while achieving a single JAR output.
 
-**Key Success Factors**:
-1. Incremental approach with testing at each phase
-2. Comprehensive documentation of all changes
-3. Git branches/tags for rollback capability
-4. Performance monitoring throughout
-5. Thorough testing after each phase
+**Revised Integration Complexity**:
+- **Estimated Timeline**: 18-30 weeks
+- **Key Approach Changes**:
+  1. Mixins are NOT inlined - they remain as separate classes to avoid circular dependencies
+  2. SpongePowered Mixin library is preserved for runtime transformations
+  3. Access wideners are already applied to Minecraft source - no additional work needed
+  4. Testing is mandatory after each phase before proceeding
+
+**Critical Success Factors**:
+1. **Preserve Mixin Architecture**: Keep mixin system for bytecode transformation
+2. **Avoid Circular Dependencies**: Keep mod code in mod packages, not in Minecraft
+3. **Incremental Testing**: Game must run and work properly after each phase
+4. **Comprehensive Documentation**: Document all integration points for maintenance
+5. **Performance Monitoring**: Ensure no performance regressions throughout
+
+**Key Technical Decisions**:
+1. **Mixin System**: Preserved, not inlined (avoids circular dependency issues)
+2. **Access Wideners**: Already applied to Minecraft source code
+3. **Build System**: Simplified to single source set producing single JAR
+4. **Testing**: Mandatory validation after each integration phase
+5. **Initialization**: Central ModIntegration class coordinates mod startup
 
 **Next Steps**:
-1. Review this plan
-2. Begin Phase 0 (preparation and baseline)
-3. Proceed incrementally through phases
-4. Document everything for maintenance
+1. Review this revised plan
+2. Begin Phase 0 (baseline testing and documentation)
+3. Proceed incrementally through phases, testing thoroughly after each
+4. Do not proceed to next phase if testing reveals regressions
+5. Document all issues and resolutions for future reference
+
+**Important Notes**:
+- This is a complex integration requiring careful execution
+- Testing is not optional - it's critical to success
+- Circular dependency avoidance is fundamental to the design
+- Performance must match or exceed current multi-JAR system
+- All 256+ mixins must work correctly for full functionality
 
 ---
 
-**Document Version**: 1.0  
+**Document Version**: 2.0  
 **Created**: 2025-12-24  
-**Status**: Complete - Ready for Implementation
+**Revised**: 2025-12-24  
+**Status**: Updated - Ready for Implementation with Corrected Approach
 
 ---
 
