@@ -137,21 +137,28 @@ MattMC/
 ├── gradlew / gradlew.bat # Gradle wrapper scripts
 ├── gradle/               # Gradle wrapper files
 ├── libraries/            # Bundled JDK and launch scripts
-├── com/                  # Mojang source files (blaze3d, realmsclient, etc.)
-├── net/minecraft/        # Main Minecraft source code (thousands of files)
-│   ├── client/           # Client-specific code
-│   │   ├── main/Main.java # Client entry point
-│   │   ├── renderer/     # Rendering engine
-│   │   └── gui/          # User interface
-│   ├── server/           # Server-specific code
-│   │   ├── Main.java     # Server entry point
-│   │   └── dedicated/    # Dedicated server implementation
-│   ├── world/            # World generation, entities, blocks
-│   ├── network/          # Networking and protocol implementation
-│   ├── commands/         # Command system
-│   └── ...               # Game logic, AI, physics, etc.
-├── src/main/resources/   # Resource files
-│   └── version.json      # Version information
+├── src/                  # Source code (standard Maven/Gradle structure)
+│   └── main/
+│       ├── java/         # All Java source files
+│       │   ├── com/mojang/        # Mojang libraries (blaze3d, math, logging)
+│       │   └── net/
+│       │       ├── minecraft/     # Minecraft source code (thousands of files)
+│       │       │   ├── client/    # Client-specific code
+│       │       │   │   ├── main/Main.java  # Client entry point
+│       │       │   │   ├── renderer/       # Rendering engine
+│       │       │   │   └── gui/            # User interface
+│       │       │   ├── server/    # Server-specific code
+│       │       │   │   ├── Main.java       # Server entry point
+│       │       │   │   └── dedicated/      # Dedicated server implementation
+│       │       │   ├── world/     # World generation, entities, blocks
+│       │       │   ├── network/   # Networking and protocol implementation
+│       │       │   ├── commands/  # Command system
+│       │       │   └── ...        # Game logic, AI, physics, etc.
+│       │       ├── fabricmc/      # Fabric API stubs
+│       │       ├── iris/          # Iris API
+│       │       └── sodium/        # Sodium API
+│       └── resources/    # Resource files
+│           └── version.json       # Version information
 └── run/                  # Runtime directory (created on first run)
     ├── jdk-21/           # Bundled JDK (optional)
     ├── assets/           # Game assets
@@ -190,7 +197,11 @@ The `gradle.properties` file configures Gradle for optimal build speeds:
 
 ### Modifying Source Code
 
-The entire Minecraft codebase is available in the `net/minecraft/` and `com/` directories. You can:
+The entire Minecraft codebase is available in the `src/main/java/` directory using standard Maven/Gradle structure:
+- `src/main/java/net/minecraft/` - Main Minecraft source code
+- `src/main/java/com/mojang/` - Mojang libraries (blaze3d, math, logging)
+
+You can:
 
 1. **Modify Game Mechanics**: Edit entity behavior, world generation, etc.
 2. **Add Features**: Implement new blocks, items, or game modes
