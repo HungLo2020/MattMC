@@ -7,7 +7,7 @@ This document provides an **EXTREMELY COMPREHENSIVE** plan for integrating the m
 **Current Architecture**: Mods are compiled into separate JARs and loaded at runtime via Fabric Loader  
 **Target Architecture**: All mod code integrated directly into the main game JAR with mixin-based transformations and initialization at game startup
 
-**Critical Design Decision**: Mixins will NOT be manually inlined into Minecraft source code. Instead, the mixin system (SpongePowered Mixin) will be preserved to apply bytecode transformations at runtime. This avoids circular dependency issues where mixin code references mod classes that depend on Minecraft.
+**Critical Design Decision**: Mixins (code injection mechanisms that modify Minecraft's behavior at runtime) will NOT be manually inlined into Minecraft source code. Instead, the mixin system (SpongePowered Mixin) will be preserved to apply bytecode transformations at runtime. This avoids circular dependency issues where mixin code references mod classes that depend on Minecraft.
 
 **Access Widener Status**: The 53 access widener modifications from Distant Horizons have already been applied directly to the Minecraft source code, so no additional access widening is needed during integration.
 
@@ -268,7 +268,7 @@ Fabric Loader (182 files) ← Independent, provides APIs
 - **No manual source modification**: Minecraft source code remains unchanged
 
 **Why Not Inline Mixins**:
-The original plan suggested manually applying mixins by inlining code into Minecraft classes. This approach is fundamentally flawed because:
+The original plan suggested manually applying mixins by inlining code into Minecraft classes. This approach is not viable due to technical constraints:
 
 1. **Circular Dependency Problem**:
    - Mixin code references classes from their respective mods (Sodium, Iris, DH)
