@@ -3,19 +3,16 @@ package net.irisshaders.iris.platform;
 import com.mojang.blaze3d.textures.TextureFormat;
 import net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper;
 import net.fabricmc.loader.api.FabricLoader;
-import net.fabricmc.loader.api.ModContainer;
 import net.fabricmc.loader.api.SemanticVersion;
 import net.fabricmc.loader.api.VersionParsingException;
-import net.irisshaders.iris.gl.texture.DepthBufferFormat;
+import net.iris.gl.texture.DepthBufferFormat;
 import net.minecraft.client.KeyMapping;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.world.level.BlockAndTintGetter;
 import net.minecraft.world.level.block.state.BlockState;
-import org.lwjgl.system.Configuration;
 
 import java.nio.file.Path;
-import java.text.ParseException;
 
 public class IrisFabricHelpers implements IrisPlatformHelpers {
 	static {

@@ -1,4 +1,4 @@
-package net.irisshaders.iris.gl.uniform;
+package net.iris.gl.uniform;
 
 public enum UniformUpdateFrequency {
 	ONCE,

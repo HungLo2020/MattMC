@@ -16,7 +16,7 @@ import net.irisshaders.iris.gl.program.ProgramUniforms;
 import net.irisshaders.iris.gl.texture.DepthCopyStrategy;
 import net.irisshaders.iris.gl.texture.InternalTextureFormat;
 import net.irisshaders.iris.gl.texture.PixelType;
-import net.irisshaders.iris.gl.uniform.UniformUpdateFrequency;
+import net.iris.gl.uniform.UniformUpdateFrequency;
 import net.irisshaders.iris.mixinterface.CustomPass;
 import net.irisshaders.iris.pipeline.CompositeRenderer;
 import net.irisshaders.iris.uniforms.SystemTimeUniforms;

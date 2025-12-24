@@ -1,6 +1,6 @@
 package net.irisshaders.iris.gui.debug;
 
-import net.irisshaders.iris.gl.shader.ShaderCompileException;
+import net.iris.gl.shader.ShaderCompileException;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.AbstractTextAreaWidget;

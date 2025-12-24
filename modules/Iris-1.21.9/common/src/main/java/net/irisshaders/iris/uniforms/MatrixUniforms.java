@@ -11,7 +11,7 @@ import org.joml.Matrix4fc;
 
 import java.util.function.Supplier;
 
-import static net.irisshaders.iris.gl.uniform.UniformUpdateFrequency.PER_FRAME;
+import static net.iris.gl.uniform.UniformUpdateFrequency.PER_FRAME;
 
 public final class MatrixUniforms {
 	private MatrixUniforms() {

@@ -13,7 +13,7 @@ import org.joml.Vector4f;
 
 import java.util.Objects;
 
-import static net.irisshaders.iris.gl.uniform.UniformUpdateFrequency.PER_FRAME;
+import static net.iris.gl.uniform.UniformUpdateFrequency.PER_FRAME;
 
 /**
  * @see <a href="https://github.com/IrisShaders/ShaderDoc/blob/master/uniforms.md#celestial-bodies">Uniforms: Celestial bodies</a>

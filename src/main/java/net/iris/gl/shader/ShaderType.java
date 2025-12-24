@@ -1,6 +1,6 @@
 // This file is based on code from Sodium by JellySquid, licensed under the LGPLv3 license.
 
-package net.irisshaders.iris.gl.shader;
+package net.iris.gl.shader;
 
 import org.lwjgl.opengl.GL20;
 import org.lwjgl.opengl.GL32C;

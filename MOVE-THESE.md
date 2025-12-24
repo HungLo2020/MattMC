@@ -1,22 +1,4 @@
 
-modules/Iris-1.21.9/common/src/main/java/net/irisshaders/iris/gl/blending/AlphaTestFunction.java
-modules/Iris-1.21.9/common/src/main/java/net/irisshaders/iris/gl/blending/BlendMode.java
-modules/Iris-1.21.9/common/src/main/java/net/irisshaders/iris/gl/blending/ColorMask.java
-modules/Iris-1.21.9/common/src/main/java/net/irisshaders/iris/gl/buffer/BuiltShaderStorageInfo.java
-modules/Iris-1.21.9/common/src/main/java/net/irisshaders/iris/gl/buffer/ShaderStorageInfo.java
-modules/Iris-1.21.9/common/src/main/java/net/irisshaders/iris/gl/framebuffer/ViewportData.java
-modules/Iris-1.21.9/common/src/main/java/net/irisshaders/iris/gl/program/GlUniform1iCall.java
-modules/Iris-1.21.9/common/src/main/java/net/irisshaders/iris/gl/shader/ShaderCompileException.java
-modules/Iris-1.21.9/common/src/main/java/net/irisshaders/iris/gl/shader/ShaderType.java
-modules/Iris-1.21.9/common/src/main/java/net/irisshaders/iris/gl/shader/ShaderWorkarounds.java
-modules/Iris-1.21.9/common/src/main/java/net/irisshaders/iris/gl/state/FogMode.java
-modules/Iris-1.21.9/common/src/main/java/net/irisshaders/iris/gl/state/ValueUpdateNotifier.java
-modules/Iris-1.21.9/common/src/main/java/net/irisshaders/iris/gl/texture/DepthBufferFormat.java
-modules/Iris-1.21.9/common/src/main/java/net/irisshaders/iris/gl/texture/ShaderDataType.java
-modules/Iris-1.21.9/common/src/main/java/net/irisshaders/iris/gl/texture/TextureScaleOverride.java
-modules/Iris-1.21.9/common/src/main/java/net/irisshaders/iris/gl/uniform/FloatSupplier.java
-modules/Iris-1.21.9/common/src/main/java/net/irisshaders/iris/gl/uniform/UniformType.java
-modules/Iris-1.21.9/common/src/main/java/net/irisshaders/iris/gl/uniform/UniformUpdateFrequency.java
 modules/Iris-1.21.9/common/src/main/java/net/irisshaders/iris/gui/FileDialogUtil.java
 modules/Iris-1.21.9/common/src/main/java/net/irisshaders/iris/gui/screen/HudHideable.java
 modules/Iris-1.21.9/common/src/main/java/net/irisshaders/iris/helpers/OptionalBoolean.java

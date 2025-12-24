@@ -5,7 +5,7 @@ import kroppeb.stareval.expression.VariableExpression;
 import kroppeb.stareval.function.FunctionContext;
 import net.iris.stareval.function.FunctionReturn;
 import kroppeb.stareval.function.Type;
-import net.irisshaders.iris.gl.uniform.UniformUpdateFrequency;
+import net.iris.gl.uniform.UniformUpdateFrequency;
 import net.irisshaders.iris.parsing.VectorType;
 import org.joml.Vector2f;
 import org.joml.Vector3f;

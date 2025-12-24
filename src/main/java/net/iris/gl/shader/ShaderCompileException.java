@@ -1,4 +1,4 @@
-package net.irisshaders.iris.gl.shader;
+package net.iris.gl.shader;
 
 public class ShaderCompileException extends RuntimeException {
 	private final String filename;

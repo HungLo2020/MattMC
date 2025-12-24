@@ -1,4 +1,4 @@
-package net.irisshaders.iris.gl.texture;
+package net.iris.gl.texture;
 
 import org.jetbrains.annotations.Nullable;
 import org.lwjgl.opengl.GL30C;

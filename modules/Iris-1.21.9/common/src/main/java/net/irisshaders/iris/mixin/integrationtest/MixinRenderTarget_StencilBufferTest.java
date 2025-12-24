@@ -2,14 +2,13 @@ package net.irisshaders.iris.mixin.integrationtest;
 
 
 import com.mojang.blaze3d.pipeline.RenderTarget;
-import net.irisshaders.iris.gl.texture.DepthBufferFormat;
+import net.iris.gl.texture.DepthBufferFormat;
 import net.irisshaders.iris.platform.IrisPlatformHelpers;
 import org.lwjgl.opengl.GL30;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.ModifyArgs;
-import org.spongepowered.asm.mixin.injection.Slice;
 import org.spongepowered.asm.mixin.injection.invoke.arg.Args;
 
 /**

@@ -7,8 +7,8 @@ import org.joml.Vector3d;
 import org.joml.Vector3f;
 import org.joml.Vector3i;
 
-import static net.irisshaders.iris.gl.uniform.UniformUpdateFrequency.ONCE;
-import static net.irisshaders.iris.gl.uniform.UniformUpdateFrequency.PER_FRAME;
+import static net.iris.gl.uniform.UniformUpdateFrequency.ONCE;
+import static net.iris.gl.uniform.UniformUpdateFrequency.PER_FRAME;
 
 /**
  * @see <a href="https://github.com/IrisShaders/ShaderDoc/blob/master/uniforms.md#camera">Uniforms: Camera</a>

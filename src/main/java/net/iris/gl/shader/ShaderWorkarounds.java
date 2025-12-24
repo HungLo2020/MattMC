@@ -12,7 +12,7 @@
 //   See the License for the specific language governing permissions and
 //   limitations under the License.
 
-package net.irisshaders.iris.gl.shader;
+package net.iris.gl.shader;
 
 import org.lwjgl.PointerBuffer;
 import org.lwjgl.opengl.GL20C;

@@ -3,7 +3,7 @@ package net.irisshaders.iris.uniforms;
 import com.mojang.blaze3d.opengl.GlStateManager;
 import com.mojang.blaze3d.systems.RenderSystem;
 import net.irisshaders.iris.compat.dh.DHCompat;
-import net.irisshaders.iris.gl.state.FogMode;
+import net.iris.gl.state.FogMode;
 import net.irisshaders.iris.gl.state.StateUpdateNotifiers;
 import net.irisshaders.iris.gl.uniform.DynamicUniformHolder;
 import net.irisshaders.iris.gl.uniform.UniformHolder;
@@ -41,9 +41,9 @@ import org.joml.Vector3d;
 import org.joml.Vector4f;
 import org.joml.Vector4i;
 
-import static net.irisshaders.iris.gl.uniform.UniformUpdateFrequency.ONCE;
-import static net.irisshaders.iris.gl.uniform.UniformUpdateFrequency.PER_FRAME;
-import static net.irisshaders.iris.gl.uniform.UniformUpdateFrequency.PER_TICK;
+import static net.iris.gl.uniform.UniformUpdateFrequency.ONCE;
+import static net.iris.gl.uniform.UniformUpdateFrequency.PER_FRAME;
+import static net.iris.gl.uniform.UniformUpdateFrequency.PER_TICK;
 
 public final class CommonUniforms {
 	private static final Minecraft client = Minecraft.getInstance();

@@ -7,7 +7,7 @@ import net.irisshaders.iris.Iris;
 import net.irisshaders.iris.gl.blending.AlphaTest;
 import net.iris.gl.blending.AlphaTestFunction;
 import net.irisshaders.iris.gl.blending.AlphaTests;
-import net.irisshaders.iris.gl.state.FogMode;
+import net.iris.gl.state.FogMode;
 import net.irisshaders.iris.shaderpack.loading.ProgramId;
 import net.irisshaders.iris.vertices.IrisVertexFormats;
 

@@ -1,4 +1,4 @@
-package net.irisshaders.iris.gl.texture;
+package net.iris.gl.texture;
 
 public enum ShaderDataType {
 	FLOAT,

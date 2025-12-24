@@ -8,7 +8,7 @@ import net.minecraft.client.multiplayer.ClientLevel;
 
 import java.util.Objects;
 
-import static net.irisshaders.iris.gl.uniform.UniformUpdateFrequency.PER_TICK;
+import static net.iris.gl.uniform.UniformUpdateFrequency.PER_TICK;
 
 public final class WorldTimeUniforms {
 	private WorldTimeUniforms() {

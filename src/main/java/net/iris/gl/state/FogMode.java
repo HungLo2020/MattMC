@@ -1,4 +1,4 @@
-package net.irisshaders.iris.gl.state;
+package net.iris.gl.state;
 
 public enum FogMode {
 	/**

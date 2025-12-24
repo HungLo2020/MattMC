@@ -2,7 +2,7 @@ package net.irisshaders.iris.uniforms;
 
 import it.unimi.dsi.fastutil.objects.Object2IntMap;
 import it.unimi.dsi.fastutil.objects.Object2IntOpenHashMap;
-import net.irisshaders.iris.gl.uniform.FloatSupplier;
+import net.iris.gl.uniform.FloatSupplier;
 import net.irisshaders.iris.gl.uniform.UniformHolder;
 import net.irisshaders.iris.mixinterface.ExtendedBiome;
 import net.irisshaders.iris.parsing.BiomeCategories;
@@ -16,7 +16,7 @@ import net.minecraft.world.level.biome.Biome;
 import java.util.function.IntSupplier;
 import java.util.function.ToIntFunction;
 
-import static net.irisshaders.iris.gl.uniform.UniformUpdateFrequency.PER_TICK;
+import static net.iris.gl.uniform.UniformUpdateFrequency.PER_TICK;
 
 public class BiomeUniforms {
 	private static final Object2IntMap<ResourceKey<Biome>> biomeMap = new Object2IntOpenHashMap<>();

@@ -1,7 +1,7 @@
 package net.irisshaders.iris.uniforms;
 
 import net.irisshaders.iris.gl.uniform.UniformHolder;
-import net.irisshaders.iris.gl.uniform.UniformUpdateFrequency;
+import net.iris.gl.uniform.UniformUpdateFrequency;
 import net.irisshaders.iris.gui.option.IrisVideoSettings;
 import net.irisshaders.iris.helpers.JomlConversions;
 import net.irisshaders.iris.mixin.GameRendererAccessor;
@@ -25,7 +25,7 @@ import org.joml.Vector4f;
 import java.util.Objects;
 import java.util.stream.StreamSupport;
 
-import static net.irisshaders.iris.gl.uniform.UniformUpdateFrequency.PER_FRAME;
+import static net.iris.gl.uniform.UniformUpdateFrequency.PER_FRAME;
 
 public class IrisExclusiveUniforms {
 	private static final Vector3d ZERO = new Vector3d(0);

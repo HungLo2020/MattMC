@@ -3,8 +3,8 @@ package net.irisshaders.iris.uniforms.custom.cached;
 import net.iris.stareval.function.FunctionReturn;
 import kroppeb.stareval.function.Type;
 import net.irisshaders.iris.gl.IrisRenderSystem;
-import net.irisshaders.iris.gl.uniform.FloatSupplier;
-import net.irisshaders.iris.gl.uniform.UniformUpdateFrequency;
+import net.iris.gl.uniform.FloatSupplier;
+import net.iris.gl.uniform.UniformUpdateFrequency;
 
 public class FloatCachedUniform extends CachedUniform {
 

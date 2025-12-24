@@ -7,7 +7,7 @@ import it.unimi.dsi.fastutil.booleans.BooleanConsumer;
 import net.irisshaders.iris.gl.blending.AlphaTest;
 import net.irisshaders.iris.gl.blending.BlendModeOverride;
 import net.irisshaders.iris.gl.blending.BufferBlendInformation;
-import net.irisshaders.iris.gl.framebuffer.ViewportData;
+import net.iris.gl.framebuffer.ViewportData;
 import net.irisshaders.iris.shaderpack.parsing.CommentDirective;
 import net.irisshaders.iris.shaderpack.parsing.CommentDirectiveParser;
 import net.irisshaders.iris.shaderpack.parsing.ConstDirectiveParser;
