@@ -1,8 +1,8 @@
 package net.caffeinemc.mods.sodium.client.render.chunk.compile;
 
-import net.caffeinemc.mods.sodium.client.render.chunk.RenderSection;
-import net.caffeinemc.mods.sodium.client.render.chunk.translucent_sorting.data.DynamicTopoData;
-import net.caffeinemc.mods.sodium.client.render.chunk.translucent_sorting.data.Sorter;
+import net.sodium.client.render.chunk.RenderSection;
+import net.sodium.client.render.chunk.translucent_sorting.data.DynamicTopoData;
+import net.sodium.client.render.chunk.translucent_sorting.data.Sorter;
 
 public class ChunkSortOutput extends BuilderTaskOutput {
     private Sorter sorter;

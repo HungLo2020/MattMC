@@ -1,6 +1,6 @@
 package com.seibel.distanthorizons.core.multiplayer.client;
 
-import com.seibel.distanthorizons.core.network.messages.fullData.FullDataSplitMessage;
+import net.distant_horizons.core.network.messages.fullData.FullDataSplitMessage;
 
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.BooleanSupplier;

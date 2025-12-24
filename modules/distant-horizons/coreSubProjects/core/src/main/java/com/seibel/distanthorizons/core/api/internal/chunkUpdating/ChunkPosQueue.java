@@ -1,7 +1,7 @@
 package com.seibel.distanthorizons.core.api.internal.chunkUpdating;
 
-import com.seibel.distanthorizons.core.api.internal.SharedApi;
-import com.seibel.distanthorizons.core.pos.DhChunkPos;
+import net.distant_horizons.core.api.internal.SharedApi;
+import net.distant_horizons.core.pos.DhChunkPos;
 
 import java.util.Comparator;
 import java.util.concurrent.ConcurrentHashMap;

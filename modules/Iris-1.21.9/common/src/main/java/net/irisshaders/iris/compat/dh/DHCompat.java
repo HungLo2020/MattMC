@@ -1,10 +1,10 @@
 package net.irisshaders.iris.compat.dh;
 
-import net.irisshaders.iris.Iris;
+import net.iris.Iris;
 import net.iris.gl.shader.ShaderCompileException;
-import net.irisshaders.iris.pipeline.IrisRenderingPipeline;
-import net.irisshaders.iris.platform.IrisPlatformHelpers;
-import net.irisshaders.iris.uniforms.CapturedRenderingState;
+import net.iris.pipeline.IrisRenderingPipeline;
+import net.iris.platform.IrisPlatformHelpers;
+import net.iris.uniforms.CapturedRenderingState;
 import net.minecraft.client.Minecraft;
 import org.joml.Matrix4f;
 

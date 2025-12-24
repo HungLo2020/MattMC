@@ -19,18 +19,18 @@
 
 package com.seibel.distanthorizons.core.api.internal;
 
-import com.seibel.distanthorizons.api.methods.events.abstractEvents.DhApiLevelLoadEvent;
-import com.seibel.distanthorizons.api.methods.events.abstractEvents.DhApiLevelUnloadEvent;
-import com.seibel.distanthorizons.core.network.messages.AbstractNetworkMessage;
-import com.seibel.distanthorizons.core.network.messages.MessageRegistry;
+import net.distant_horizons.api.methods.events.abstractEvents.DhApiLevelLoadEvent;
+import net.distant_horizons.api.methods.events.abstractEvents.DhApiLevelUnloadEvent;
+import net.distant_horizons.core.network.messages.AbstractNetworkMessage;
+import net.distant_horizons.core.network.messages.MessageRegistry;
 import com.seibel.distanthorizons.core.world.*;
-import com.seibel.distanthorizons.core.wrapperInterfaces.misc.IServerPlayerWrapper;
-import com.seibel.distanthorizons.coreapi.DependencyInjection.ApiEventInjector;
-import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
-import com.seibel.distanthorizons.core.wrapperInterfaces.chunk.IChunkWrapper;
-import com.seibel.distanthorizons.core.wrapperInterfaces.world.ILevelWrapper;
-import com.seibel.distanthorizons.core.wrapperInterfaces.world.IServerLevelWrapper;
-import com.seibel.distanthorizons.core.logging.DhLogger;
+import net.distant_horizons.core.wrapperInterfaces.misc.IServerPlayerWrapper;
+import net.distant_horizons.coreapi.DependencyInjection.ApiEventInjector;
+import net.distant_horizons.core.logging.DhLoggerBuilder;
+import net.distant_horizons.core.wrapperInterfaces.chunk.IChunkWrapper;
+import net.distant_horizons.core.wrapperInterfaces.world.ILevelWrapper;
+import net.distant_horizons.core.wrapperInterfaces.world.IServerLevelWrapper;
+import net.distant_horizons.core.logging.DhLogger;
 import org.jetbrains.annotations.NotNull;
 
 /**

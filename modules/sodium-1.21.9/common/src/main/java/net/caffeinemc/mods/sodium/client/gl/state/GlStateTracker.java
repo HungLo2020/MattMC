@@ -1,8 +1,8 @@
 package net.caffeinemc.mods.sodium.client.gl.state;
 
-import net.caffeinemc.mods.sodium.client.gl.array.GlVertexArray;
-import net.caffeinemc.mods.sodium.client.gl.buffer.GlBuffer;
-import net.caffeinemc.mods.sodium.client.gl.buffer.GlBufferTarget;
+import net.sodium.client.gl.array.GlVertexArray;
+import net.sodium.client.gl.buffer.GlBuffer;
+import net.sodium.client.gl.buffer.GlBufferTarget;
 
 import java.util.Arrays;
 

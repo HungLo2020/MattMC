@@ -1,7 +1,7 @@
 package net.irisshaders.iris.uniforms;
 
-import net.irisshaders.iris.gl.uniform.UniformHolder;
-import net.irisshaders.iris.helpers.JomlConversions;
+import net.iris.gl.uniform.UniformHolder;
+import net.iris.helpers.JomlConversions;
 import net.minecraft.client.Minecraft;
 import org.joml.Vector3d;
 import org.joml.Vector3f;

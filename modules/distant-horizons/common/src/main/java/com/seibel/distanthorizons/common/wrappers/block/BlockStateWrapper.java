@@ -19,22 +19,22 @@
 
 package com.seibel.distanthorizons.common.wrappers.block;
 
-import com.seibel.distanthorizons.api.enums.rendering.EDhApiBlockMaterial;
-import com.seibel.distanthorizons.core.config.Config;
-import com.seibel.distanthorizons.core.config.types.ConfigEntry;
-import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
-import com.seibel.distanthorizons.core.util.ColorUtil;
-import com.seibel.distanthorizons.core.util.LodUtil;
-import com.seibel.distanthorizons.core.wrapperInterfaces.block.IBlockStateWrapper;
+import net.distant_horizons.api.enums.rendering.EDhApiBlockMaterial;
+import net.distant_horizons.core.config.Config;
+import net.distant_horizons.core.config.types.ConfigEntry;
+import net.distant_horizons.core.logging.DhLoggerBuilder;
+import net.distant_horizons.core.util.ColorUtil;
+import net.distant_horizons.core.util.LodUtil;
+import net.distant_horizons.core.wrapperInterfaces.block.IBlockStateWrapper;
 
-import com.seibel.distanthorizons.core.wrapperInterfaces.world.ILevelWrapper;
+import net.distant_horizons.core.wrapperInterfaces.world.ILevelWrapper;
 import net.minecraft.tags.BlockTags;
 import net.minecraft.world.level.block.BeaconBeamBlock;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.SoundType;
 import net.minecraft.world.level.block.state.BlockState;
-import com.seibel.distanthorizons.core.logging.DhLogger;
+import net.distant_horizons.core.logging.DhLogger;
 
 import java.awt.*;
 import java.io.IOException;

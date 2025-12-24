@@ -19,8 +19,8 @@
 
 package com.seibel.distanthorizons.core.config.types;
 
-import com.seibel.distanthorizons.core.config.gui.IConfigGuiInfo;
-import com.seibel.distanthorizons.core.config.types.enums.EConfigEntryAppearance;
+import net.distant_horizons.core.config.gui.IConfigGuiInfo;
+import net.distant_horizons.core.config.types.enums.EConfigEntryAppearance;
 
 /**
  * The class all config options should extend

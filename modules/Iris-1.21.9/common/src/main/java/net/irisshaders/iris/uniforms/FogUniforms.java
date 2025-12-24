@@ -1,9 +1,9 @@
 package net.irisshaders.iris.uniforms;
 
-import net.caffeinemc.mods.sodium.client.util.FogStorage;
+import net.sodium.client.util.FogStorage;
 import net.iris.gl.state.FogMode;
-import net.irisshaders.iris.gl.state.StateUpdateNotifiers;
-import net.irisshaders.iris.gl.uniform.DynamicUniformHolder;
+import net.iris.gl.state.StateUpdateNotifiers;
+import net.iris.gl.uniform.DynamicUniformHolder;
 import net.iris.gl.uniform.UniformUpdateFrequency;
 import net.minecraft.client.Minecraft;
 import org.joml.Vector3f;

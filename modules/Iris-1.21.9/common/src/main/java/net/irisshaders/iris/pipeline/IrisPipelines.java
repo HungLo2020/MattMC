@@ -4,17 +4,17 @@ import com.mojang.blaze3d.pipeline.RenderPipeline;
 import com.mojang.datafixers.types.Func;
 import it.unimi.dsi.fastutil.Function;
 import it.unimi.dsi.fastutil.objects.Object2ObjectArrayMap;
-import net.irisshaders.iris.Iris;
-import net.irisshaders.iris.pathways.HandRenderer;
-import net.irisshaders.iris.pipeline.programs.ShaderKey;
-import net.irisshaders.iris.shaderpack.loading.ProgramId;
-import net.irisshaders.iris.shadows.ShadowRenderingState;
+import net.iris.Iris;
+import net.iris.pathways.HandRenderer;
+import net.iris.pipeline.programs.ShaderKey;
+import net.iris.shaderpack.loading.ProgramId;
+import net.iris.shadows.ShadowRenderingState;
 import net.minecraft.client.renderer.RenderPipelines;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.Map;
 
-import static net.irisshaders.iris.pipeline.programs.ShaderOverrides.isBlockEntities;
+import static net.iris.pipeline.programs.ShaderOverrides.isBlockEntities;
 
 public class IrisPipelines {
 	private static final Map<RenderPipeline, Function<IrisRenderingPipeline, ShaderKey>> coreShaderMap = new Object2ObjectArrayMap<>();

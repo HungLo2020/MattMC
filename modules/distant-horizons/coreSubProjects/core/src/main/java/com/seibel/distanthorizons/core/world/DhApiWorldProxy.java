@@ -19,17 +19,17 @@
 
 package com.seibel.distanthorizons.core.world;
 
-import com.seibel.distanthorizons.api.interfaces.world.IDhApiDimensionTypeWrapper;
-import com.seibel.distanthorizons.api.interfaces.world.IDhApiLevelWrapper;
-import com.seibel.distanthorizons.api.interfaces.world.IDhApiWorldProxy;
-import com.seibel.distanthorizons.core.api.internal.SharedApi;
-import com.seibel.distanthorizons.core.dependencyInjection.SingletonInjector;
-import com.seibel.distanthorizons.core.level.IDhLevel;
-import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
-import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftClientWrapper;
-import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftSharedWrapper;
-import com.seibel.distanthorizons.core.wrapperInterfaces.world.ILevelWrapper;
-import com.seibel.distanthorizons.core.logging.DhLogger;
+import net.distant_horizons.api.interfaces.world.IDhApiDimensionTypeWrapper;
+import net.distant_horizons.api.interfaces.world.IDhApiLevelWrapper;
+import net.distant_horizons.api.interfaces.world.IDhApiWorldProxy;
+import net.distant_horizons.core.api.internal.SharedApi;
+import net.distant_horizons.core.dependencyInjection.SingletonInjector;
+import net.distant_horizons.core.level.IDhLevel;
+import net.distant_horizons.core.logging.DhLoggerBuilder;
+import net.distant_horizons.core.wrapperInterfaces.minecraft.IMinecraftClientWrapper;
+import net.distant_horizons.core.wrapperInterfaces.minecraft.IMinecraftSharedWrapper;
+import net.distant_horizons.core.wrapperInterfaces.world.ILevelWrapper;
+import net.distant_horizons.core.logging.DhLogger;
 
 import java.util.ArrayList;
 

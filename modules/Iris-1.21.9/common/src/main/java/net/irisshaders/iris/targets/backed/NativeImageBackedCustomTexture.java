@@ -2,10 +2,10 @@ package net.irisshaders.iris.targets.backed;
 
 import com.mojang.blaze3d.platform.NativeImage;
 import com.mojang.blaze3d.systems.RenderSystem;
-import net.irisshaders.iris.gl.IrisRenderSystem;
-import net.irisshaders.iris.gl.texture.TextureAccess;
-import net.irisshaders.iris.gl.texture.TextureType;
-import net.irisshaders.iris.shaderpack.texture.CustomTextureData;
+import net.iris.gl.IrisRenderSystem;
+import net.iris.gl.texture.TextureAccess;
+import net.iris.gl.texture.TextureType;
+import net.iris.shaderpack.texture.CustomTextureData;
 import net.minecraft.client.renderer.texture.DynamicTexture;
 import org.lwjgl.opengl.GL11C;
 import org.lwjgl.opengl.GL13C;

@@ -1,15 +1,15 @@
 package com.seibel.distanthorizons.common.wrappers.gui.updater;
 
-import com.seibel.distanthorizons.api.enums.config.EDhApiUpdateBranch;
-import com.seibel.distanthorizons.common.wrappers.gui.DhScreen;
-import com.seibel.distanthorizons.common.wrappers.gui.TexturedButtonWidget;
-import com.seibel.distanthorizons.core.jar.ModJarInfo;
-import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
-import com.seibel.distanthorizons.coreapi.ModInfo;
-import com.seibel.distanthorizons.core.config.Config;
-import com.seibel.distanthorizons.core.jar.installer.ModrinthGetter;
-import com.seibel.distanthorizons.core.jar.updater.SelfUpdater;
-import com.seibel.distanthorizons.core.logging.DhLogger;
+import net.distant_horizons.api.enums.config.EDhApiUpdateBranch;
+import net.distant_horizons.common.wrappers.gui.DhScreen;
+import net.distant_horizons.common.wrappers.gui.TexturedButtonWidget;
+import net.distant_horizons.core.jar.ModJarInfo;
+import net.distant_horizons.core.logging.DhLoggerBuilder;
+import net.distant_horizons.coreapi.ModInfo;
+import net.distant_horizons.core.config.Config;
+import net.distant_horizons.core.jar.installer.ModrinthGetter;
+import net.distant_horizons.core.jar.updater.SelfUpdater;
+import net.distant_horizons.core.logging.DhLogger;
 
 import net.minecraft.client.gui.screens.Screen;
 

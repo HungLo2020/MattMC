@@ -1,6 +1,6 @@
 package com.seibel.distanthorizons.fabric.wrappers.modAccessor;
 
-import com.seibel.distanthorizons.core.wrapperInterfaces.modAccessor.IBCLibAccessor;
+import net.distant_horizons.core.wrapperInterfaces.modAccessor.IBCLibAccessor;
 
 public class BCLibAccessor implements IBCLibAccessor
 {

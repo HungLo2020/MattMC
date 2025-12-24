@@ -1,7 +1,7 @@
 package net.irisshaders.iris.mixin;
 
-import net.irisshaders.iris.Iris;
-import net.irisshaders.iris.pipeline.WorldRenderingPhase;
+import net.iris.Iris;
+import net.iris.pipeline.WorldRenderingPhase;
 import net.minecraft.client.Camera;
 import net.minecraft.client.particle.ParticleEngine;
 import net.minecraft.client.renderer.LightTexture;

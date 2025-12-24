@@ -2,11 +2,11 @@ package net.caffeinemc.mods.sodium.client.gl.arena.staging;
 
 import it.unimi.dsi.fastutil.PriorityQueue;
 import it.unimi.dsi.fastutil.objects.ObjectArrayFIFOQueue;
-import net.caffeinemc.mods.sodium.client.gl.device.CommandList;
-import net.caffeinemc.mods.sodium.client.gl.device.RenderDevice;
-import net.caffeinemc.mods.sodium.client.gl.functions.BufferStorageFunctions;
-import net.caffeinemc.mods.sodium.client.gl.sync.GlFence;
-import net.caffeinemc.mods.sodium.client.gl.util.EnumBitField;
+import net.sodium.client.gl.device.CommandList;
+import net.sodium.client.gl.device.RenderDevice;
+import net.sodium.client.gl.functions.BufferStorageFunctions;
+import net.sodium.client.gl.sync.GlFence;
+import net.sodium.client.gl.util.EnumBitField;
 import net.sodium.api.util.MathUtil;
 import net.caffeinemc.mods.sodium.client.gl.buffer.*;
 

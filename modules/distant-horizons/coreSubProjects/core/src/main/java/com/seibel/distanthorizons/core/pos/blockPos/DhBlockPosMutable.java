@@ -19,7 +19,7 @@
 
 package com.seibel.distanthorizons.core.pos.blockPos;
 
-import com.seibel.distanthorizons.core.enums.EDhDirection;
+import net.distant_horizons.core.enums.EDhDirection;
 
 public class DhBlockPosMutable extends DhBlockPos
 {

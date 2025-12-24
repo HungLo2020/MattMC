@@ -1,13 +1,13 @@
 package com.seibel.distanthorizons.common.wrappers.worldGeneration.mimicObject;
 
-import com.seibel.distanthorizons.common.wrappers.worldGeneration.chunkFileHandling.ChunkFileReader;
-import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
+import net.distant_horizons.common.wrappers.worldGeneration.chunkFileHandling.ChunkFileReader;
+import net.distant_horizons.core.logging.DhLoggerBuilder;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.NbtIo;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.chunk.storage.RegionFile;
 import net.minecraft.world.level.chunk.storage.RegionFileStorage;
-import com.seibel.distanthorizons.core.logging.DhLogger;
+import net.distant_horizons.core.logging.DhLogger;
 
 import org.jetbrains.annotations.Nullable;
 import java.io.DataInputStream;

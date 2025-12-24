@@ -19,7 +19,7 @@
 
 package com.seibel.distanthorizons.core.dataObjects.transformers;
 
-import com.seibel.distanthorizons.api.enums.worldGeneration.EDhApiDistantGeneratorMode;
+import net.distant_horizons.api.enums.worldGeneration.EDhApiDistantGeneratorMode;
 
 /**
  * This is used to easily configure how LodChunks are generated.

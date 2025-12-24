@@ -1,6 +1,6 @@
 package net.irisshaders.iris.shaderpack.materialmap;
 
-import net.irisshaders.iris.Iris;
+import net.iris.Iris;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.Collections;

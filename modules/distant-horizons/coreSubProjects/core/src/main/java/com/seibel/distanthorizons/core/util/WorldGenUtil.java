@@ -1,9 +1,9 @@
 package com.seibel.distanthorizons.core.util;
 
-import com.seibel.distanthorizons.core.config.Config;
-import com.seibel.distanthorizons.core.pos.DhChunkPos;
-import com.seibel.distanthorizons.core.pos.DhSectionPos;
-import com.seibel.distanthorizons.core.pos.blockPos.DhBlockPos;
+import net.distant_horizons.core.config.Config;
+import net.distant_horizons.core.pos.DhChunkPos;
+import net.distant_horizons.core.pos.DhSectionPos;
+import net.distant_horizons.core.pos.blockPos.DhBlockPos;
 
 public class WorldGenUtil
 {

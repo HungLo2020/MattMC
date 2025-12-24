@@ -1,6 +1,6 @@
 package net.irisshaders.iris.vertices;
 
-import net.irisshaders.iris.vertices.views.QuadView;
+import net.iris.vertices.views.QuadView;
 import org.lwjgl.system.MemoryUtil;
 
 public class BufferBuilderPolygonView implements QuadView {

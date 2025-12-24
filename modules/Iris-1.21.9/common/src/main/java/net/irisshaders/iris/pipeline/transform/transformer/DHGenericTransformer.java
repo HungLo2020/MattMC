@@ -6,11 +6,11 @@ import io.github.douira.glsl_transformer.ast.query.Root;
 import io.github.douira.glsl_transformer.ast.transform.ASTInjectionPoint;
 import io.github.douira.glsl_transformer.ast.transform.ASTParser;
 import io.github.douira.glsl_transformer.util.Type;
-import net.irisshaders.iris.Iris;
+import net.iris.Iris;
 import net.iris.gl.shader.ShaderType;
-import net.irisshaders.iris.pipeline.transform.parameter.Parameters;
+import net.iris.pipeline.transform.parameter.Parameters;
 
-import static net.irisshaders.iris.pipeline.transform.transformer.CommonTransformer.addIfNotExists;
+import static net.iris.pipeline.transform.transformer.CommonTransformer.addIfNotExists;
 
 public class DHGenericTransformer {
 	public static void transform(

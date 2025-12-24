@@ -3,9 +3,9 @@ package net.irisshaders.iris.gl.buffer;
 import com.mojang.blaze3d.opengl.GlStateManager;
 import it.unimi.dsi.fastutil.ints.Int2ObjectArrayMap;
 import net.iris.gl.buffer.BuiltShaderStorageInfo;
-import net.irisshaders.iris.Iris;
-import net.irisshaders.iris.gl.IrisRenderSystem;
-import net.irisshaders.iris.gl.sampler.SamplerLimits;
+import net.iris.Iris;
+import net.iris.gl.IrisRenderSystem;
+import net.iris.gl.sampler.SamplerLimits;
 import org.lwjgl.opengl.GL43C;
 
 import java.util.ArrayList;

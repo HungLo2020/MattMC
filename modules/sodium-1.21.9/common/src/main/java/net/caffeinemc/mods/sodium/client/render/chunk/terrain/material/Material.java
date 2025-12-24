@@ -1,8 +1,8 @@
 package net.caffeinemc.mods.sodium.client.render.chunk.terrain.material;
 
-import net.caffeinemc.mods.sodium.client.render.chunk.terrain.TerrainRenderPass;
-import net.caffeinemc.mods.sodium.client.render.chunk.terrain.material.parameters.AlphaCutoffParameter;
-import net.caffeinemc.mods.sodium.client.render.chunk.terrain.material.parameters.MaterialParameters;
+import net.sodium.client.render.chunk.terrain.TerrainRenderPass;
+import net.sodium.client.render.chunk.terrain.material.parameters.AlphaCutoffParameter;
+import net.sodium.client.render.chunk.terrain.material.parameters.MaterialParameters;
 
 public class Material {
     public final TerrainRenderPass pass;

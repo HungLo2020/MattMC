@@ -1,9 +1,9 @@
 package net.irisshaders.iris.uniforms.custom.cached;
 
 import net.iris.stareval.function.FunctionReturn;
-import net.irisshaders.iris.gl.IrisRenderSystem;
+import net.iris.gl.IrisRenderSystem;
 import net.iris.gl.uniform.UniformUpdateFrequency;
-import net.irisshaders.iris.parsing.VectorType;
+import net.iris.parsing.VectorType;
 import org.joml.Vector2i;
 
 import java.util.function.Supplier;

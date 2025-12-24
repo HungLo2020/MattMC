@@ -1,6 +1,6 @@
 package net.caffeinemc.mods.sodium.client.gui.options.storage;
 
-import net.caffeinemc.mods.sodium.client.SodiumClientMod;
+import net.sodium.client.SodiumClientMod;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.Options;
 

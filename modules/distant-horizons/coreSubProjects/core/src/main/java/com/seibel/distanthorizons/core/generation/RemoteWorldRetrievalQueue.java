@@ -1,19 +1,19 @@
 package com.seibel.distanthorizons.core.generation;
 
-import com.seibel.distanthorizons.core.config.Config;
-import com.seibel.distanthorizons.core.generation.tasks.IWorldGenTaskTracker;
-import com.seibel.distanthorizons.core.generation.tasks.WorldGenResult;
-import com.seibel.distanthorizons.core.level.DhClientLevel;
-import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
-import com.seibel.distanthorizons.core.multiplayer.client.AbstractFullDataNetworkRequestQueue;
-import com.seibel.distanthorizons.core.multiplayer.client.ClientNetworkState;
-import com.seibel.distanthorizons.core.pos.DhSectionPos;
-import com.seibel.distanthorizons.core.pos.blockPos.DhBlockPos2D;
-import com.seibel.distanthorizons.core.render.renderer.IDebugRenderable;
-import com.seibel.distanthorizons.core.util.LodUtil;
-import com.seibel.distanthorizons.core.util.WorldGenUtil;
-import com.seibel.distanthorizons.core.util.objects.RollingAverage;
-import com.seibel.distanthorizons.core.logging.DhLogger;
+import net.distant_horizons.core.config.Config;
+import net.distant_horizons.core.generation.tasks.IWorldGenTaskTracker;
+import net.distant_horizons.core.generation.tasks.WorldGenResult;
+import net.distant_horizons.core.level.DhClientLevel;
+import net.distant_horizons.core.logging.DhLoggerBuilder;
+import net.distant_horizons.core.multiplayer.client.AbstractFullDataNetworkRequestQueue;
+import net.distant_horizons.core.multiplayer.client.ClientNetworkState;
+import net.distant_horizons.core.pos.DhSectionPos;
+import net.distant_horizons.core.pos.blockPos.DhBlockPos2D;
+import net.distant_horizons.core.render.renderer.IDebugRenderable;
+import net.distant_horizons.core.util.LodUtil;
+import net.distant_horizons.core.util.WorldGenUtil;
+import net.distant_horizons.core.util.objects.RollingAverage;
+import net.distant_horizons.core.logging.DhLogger;
 
 import java.util.ArrayList;
 import java.util.List;

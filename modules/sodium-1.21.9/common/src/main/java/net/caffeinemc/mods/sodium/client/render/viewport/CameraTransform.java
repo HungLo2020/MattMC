@@ -1,6 +1,6 @@
 package net.caffeinemc.mods.sodium.client.render.viewport;
 
-import net.caffeinemc.mods.sodium.client.render.chunk.region.RenderRegion;
+import net.sodium.client.render.chunk.region.RenderRegion;
 
 public class CameraTransform {
     // We want to reduce the precision of the deltas to avoid seams along chunk/region boundaries. This is done by

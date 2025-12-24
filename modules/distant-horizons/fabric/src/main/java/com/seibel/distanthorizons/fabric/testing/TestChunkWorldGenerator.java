@@ -1,15 +1,15 @@
 package com.seibel.distanthorizons.fabric.testing;
 
-import com.seibel.distanthorizons.api.DhApi;
-import com.seibel.distanthorizons.api.enums.worldGeneration.EDhApiDistantGeneratorMode;
-import com.seibel.distanthorizons.api.enums.worldGeneration.EDhApiWorldGeneratorReturnType;
-import com.seibel.distanthorizons.api.interfaces.block.IDhApiBiomeWrapper;
-import com.seibel.distanthorizons.api.interfaces.block.IDhApiBlockStateWrapper;
-import com.seibel.distanthorizons.api.interfaces.override.worldGenerator.AbstractDhApiChunkWorldGenerator;
-import com.seibel.distanthorizons.api.interfaces.world.IDhApiLevelWrapper;
-import com.seibel.distanthorizons.api.objects.data.DhApiChunk;
-import com.seibel.distanthorizons.api.objects.data.DhApiTerrainDataPoint;
-import com.seibel.distanthorizons.common.wrappers.world.ServerLevelWrapper;
+import net.distant_horizons.api.DhApi;
+import net.distant_horizons.api.enums.worldGeneration.EDhApiDistantGeneratorMode;
+import net.distant_horizons.api.enums.worldGeneration.EDhApiWorldGeneratorReturnType;
+import net.distant_horizons.api.interfaces.block.IDhApiBiomeWrapper;
+import net.distant_horizons.api.interfaces.block.IDhApiBlockStateWrapper;
+import net.distant_horizons.api.interfaces.override.worldGenerator.AbstractDhApiChunkWorldGenerator;
+import net.distant_horizons.api.interfaces.world.IDhApiLevelWrapper;
+import net.distant_horizons.api.objects.data.DhApiChunk;
+import net.distant_horizons.api.objects.data.DhApiTerrainDataPoint;
+import net.distant_horizons.common.wrappers.world.ServerLevelWrapper;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.chunk.ChunkAccess;

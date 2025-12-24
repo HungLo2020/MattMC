@@ -2,7 +2,7 @@ package net.irisshaders.iris.mixin;
 
 import com.mojang.blaze3d.pipeline.RenderPipeline;
 import com.mojang.blaze3d.pipeline.RenderTarget;
-import net.irisshaders.iris.mixinterface.RenderTypeInterface;
+import net.iris.mixinterface.RenderTypeInterface;
 import net.minecraft.client.renderer.RenderType;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;

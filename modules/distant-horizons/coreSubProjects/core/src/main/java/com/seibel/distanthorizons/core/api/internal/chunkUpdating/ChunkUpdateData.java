@@ -1,7 +1,7 @@
 package com.seibel.distanthorizons.core.api.internal.chunkUpdating;
 
-import com.seibel.distanthorizons.core.level.IDhLevel;
-import com.seibel.distanthorizons.core.wrapperInterfaces.chunk.IChunkWrapper;
+import net.distant_horizons.core.level.IDhLevel;
+import net.distant_horizons.core.wrapperInterfaces.chunk.IChunkWrapper;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;

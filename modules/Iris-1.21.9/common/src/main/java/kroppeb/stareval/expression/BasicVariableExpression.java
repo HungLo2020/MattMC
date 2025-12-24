@@ -1,8 +1,8 @@
 package kroppeb.stareval.expression;
 
-import kroppeb.stareval.function.FunctionContext;
+import net.iris.stareval.function.FunctionContext;
 import net.iris.stareval.function.FunctionReturn;
-import kroppeb.stareval.function.Type;
+import net.iris.stareval.function.Type;
 
 public class BasicVariableExpression implements VariableExpression {
 	final private String name;

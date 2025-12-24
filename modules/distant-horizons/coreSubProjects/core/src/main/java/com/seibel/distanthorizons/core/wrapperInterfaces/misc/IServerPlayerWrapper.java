@@ -19,9 +19,9 @@
 
 package com.seibel.distanthorizons.core.wrapperInterfaces.misc;
 
-import com.seibel.distanthorizons.api.interfaces.IDhApiUnsafeWrapper;
-import com.seibel.distanthorizons.core.wrapperInterfaces.world.IServerLevelWrapper;
-import com.seibel.distanthorizons.core.util.math.Vec3d;
+import net.distant_horizons.api.interfaces.IDhApiUnsafeWrapper;
+import net.distant_horizons.core.wrapperInterfaces.world.IServerLevelWrapper;
+import net.distant_horizons.core.util.math.Vec3d;
 
 import java.net.SocketAddress;
 

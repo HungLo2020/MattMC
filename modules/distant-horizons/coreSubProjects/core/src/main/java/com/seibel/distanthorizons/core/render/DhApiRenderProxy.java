@@ -19,16 +19,16 @@
 
 package com.seibel.distanthorizons.core.render;
 
-import com.seibel.distanthorizons.api.interfaces.render.IDhApiRenderProxy;
-import com.seibel.distanthorizons.api.objects.DhApiResult;
-import com.seibel.distanthorizons.core.api.internal.SharedApi;
-import com.seibel.distanthorizons.core.dependencyInjection.SingletonInjector;
-import com.seibel.distanthorizons.core.level.IDhClientLevel;
-import com.seibel.distanthorizons.core.level.IDhLevel;
-import com.seibel.distanthorizons.core.render.renderer.LodRenderer;
-import com.seibel.distanthorizons.core.util.RenderUtil;
-import com.seibel.distanthorizons.core.world.AbstractDhWorld;
-import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftRenderWrapper;
+import net.distant_horizons.api.interfaces.render.IDhApiRenderProxy;
+import net.distant_horizons.api.objects.DhApiResult;
+import net.distant_horizons.core.api.internal.SharedApi;
+import net.distant_horizons.core.dependencyInjection.SingletonInjector;
+import net.distant_horizons.core.level.IDhClientLevel;
+import net.distant_horizons.core.level.IDhLevel;
+import net.distant_horizons.core.render.renderer.LodRenderer;
+import net.distant_horizons.core.util.RenderUtil;
+import net.distant_horizons.core.world.AbstractDhWorld;
+import net.distant_horizons.core.wrapperInterfaces.minecraft.IMinecraftRenderWrapper;
 import org.lwjgl.opengl.GL32;
 
 /**

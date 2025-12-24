@@ -20,8 +20,8 @@
 package com.seibel.distanthorizons.core.jar.installer;
 
 import com.electronwill.nightconfig.core.Config;
-import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
-import com.seibel.distanthorizons.core.logging.DhLogger;
+import net.distant_horizons.core.logging.DhLoggerBuilder;
+import net.distant_horizons.core.logging.DhLogger;
 import org.jetbrains.annotations.Nullable;
 
 import java.net.URL;

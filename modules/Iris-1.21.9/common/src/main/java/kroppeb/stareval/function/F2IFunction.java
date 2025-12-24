@@ -1,6 +1,6 @@
 package kroppeb.stareval.function;
 
-import kroppeb.stareval.expression.Expression;
+import net.iris.stareval.expression.Expression;
 import net.iris.stareval.function.FunctionReturn;
 
 @FunctionalInterface

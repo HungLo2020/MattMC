@@ -1,9 +1,9 @@
 package net.irisshaders.iris.uniforms;
 
 import com.mojang.math.Axis;
-import net.irisshaders.iris.Iris;
-import net.irisshaders.iris.gl.uniform.UniformHolder;
-import net.irisshaders.iris.pipeline.WorldRenderingPipeline;
+import net.iris.Iris;
+import net.iris.gl.uniform.UniformHolder;
+import net.iris.pipeline.WorldRenderingPipeline;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.renderer.EndFlashState;

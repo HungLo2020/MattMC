@@ -19,7 +19,7 @@
 
 package com.seibel.distanthorizons.fabric.wrappers.modAccessor;
 
-import com.seibel.distanthorizons.core.wrapperInterfaces.modAccessor.IModChecker;
+import net.distant_horizons.core.wrapperInterfaces.modAccessor.IModChecker;
 import net.fabricmc.loader.api.FabricLoader;
 
 import java.io.File;

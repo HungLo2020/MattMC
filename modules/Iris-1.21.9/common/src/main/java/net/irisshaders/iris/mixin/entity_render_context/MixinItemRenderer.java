@@ -1,6 +1,6 @@
 package net.irisshaders.iris.mixin.entity_render_context;
 
-import net.irisshaders.iris.mixinterface.ItemContextState;
+import net.iris.mixinterface.ItemContextState;
 import net.minecraft.client.renderer.item.ItemModelResolver;
 import net.minecraft.client.renderer.item.ItemStackRenderState;
 import net.minecraft.core.component.DataComponents;

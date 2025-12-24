@@ -11,9 +11,9 @@ import io.github.douira.glsl_transformer.ast.transform.ASTInjectionPoint;
 import io.github.douira.glsl_transformer.ast.transform.ASTParser;
 import io.github.douira.glsl_transformer.util.Type;
 import net.iris.gl.shader.ShaderType;
-import net.irisshaders.iris.pipeline.transform.parameter.SodiumParameters;
+import net.iris.pipeline.transform.parameter.SodiumParameters;
 
-import static net.irisshaders.iris.pipeline.transform.transformer.CommonTransformer.addIfNotExists;
+import static net.iris.pipeline.transform.transformer.CommonTransformer.addIfNotExists;
 
 public class SodiumTransformer {
 	public static void transform(

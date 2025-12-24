@@ -19,9 +19,9 @@
 
 package com.seibel.distanthorizons.api.methods.events.abstractEvents;
 
-import com.seibel.distanthorizons.api.methods.events.interfaces.IDhApiEvent;
-import com.seibel.distanthorizons.api.methods.events.sharedParameterObjects.DhApiEventParam;
-import com.seibel.distanthorizons.api.methods.events.sharedParameterObjects.DhApiRenderParam;
+import net.distant_horizons.api.methods.events.interfaces.IDhApiEvent;
+import net.distant_horizons.api.methods.events.sharedParameterObjects.DhApiEventParam;
+import net.distant_horizons.api.methods.events.sharedParameterObjects.DhApiRenderParam;
 
 /**
  * Fired after Distant Horizons finishes rendering a frame. <br>

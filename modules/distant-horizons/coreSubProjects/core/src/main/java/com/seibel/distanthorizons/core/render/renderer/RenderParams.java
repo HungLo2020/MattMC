@@ -1,23 +1,23 @@
 package com.seibel.distanthorizons.core.render.renderer;
 
-import com.seibel.distanthorizons.api.enums.rendering.EDhApiRenderPass;
-import com.seibel.distanthorizons.api.methods.events.sharedParameterObjects.DhApiRenderParam;
-import com.seibel.distanthorizons.core.api.internal.SharedApi;
-import com.seibel.distanthorizons.core.dependencyInjection.SingletonInjector;
-import com.seibel.distanthorizons.core.level.IDhClientLevel;
-import com.seibel.distanthorizons.core.logging.DhLogger;
-import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
-import com.seibel.distanthorizons.core.render.RenderBufferHandler;
-import com.seibel.distanthorizons.core.render.renderer.generic.GenericObjectRenderer;
-import com.seibel.distanthorizons.core.util.RenderUtil;
-import com.seibel.distanthorizons.core.util.math.Mat4f;
-import com.seibel.distanthorizons.core.util.math.Vec3d;
-import com.seibel.distanthorizons.core.world.IDhClientWorld;
-import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftClientWrapper;
-import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftRenderWrapper;
-import com.seibel.distanthorizons.core.wrapperInterfaces.misc.ILightMapWrapper;
-import com.seibel.distanthorizons.core.wrapperInterfaces.modAccessor.AbstractOptifineAccessor;
-import com.seibel.distanthorizons.core.wrapperInterfaces.world.IClientLevelWrapper;
+import net.distant_horizons.api.enums.rendering.EDhApiRenderPass;
+import net.distant_horizons.api.methods.events.sharedParameterObjects.DhApiRenderParam;
+import net.distant_horizons.core.api.internal.SharedApi;
+import net.distant_horizons.core.dependencyInjection.SingletonInjector;
+import net.distant_horizons.core.level.IDhClientLevel;
+import net.distant_horizons.core.logging.DhLogger;
+import net.distant_horizons.core.logging.DhLoggerBuilder;
+import net.distant_horizons.core.render.RenderBufferHandler;
+import net.distant_horizons.core.render.renderer.generic.GenericObjectRenderer;
+import net.distant_horizons.core.util.RenderUtil;
+import net.distant_horizons.core.util.math.Mat4f;
+import net.distant_horizons.core.util.math.Vec3d;
+import net.distant_horizons.core.world.IDhClientWorld;
+import net.distant_horizons.core.wrapperInterfaces.minecraft.IMinecraftClientWrapper;
+import net.distant_horizons.core.wrapperInterfaces.minecraft.IMinecraftRenderWrapper;
+import net.distant_horizons.core.wrapperInterfaces.misc.ILightMapWrapper;
+import net.distant_horizons.core.wrapperInterfaces.modAccessor.AbstractOptifineAccessor;
+import net.distant_horizons.core.wrapperInterfaces.world.IClientLevelWrapper;
 
 /**
  * An extension of {@link DhApiRenderParam}

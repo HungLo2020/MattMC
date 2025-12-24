@@ -19,19 +19,19 @@
 
 package com.seibel.distanthorizons.core.render.renderer;
 
-import com.seibel.distanthorizons.core.dependencyInjection.SingletonInjector;
-import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
-import com.seibel.distanthorizons.core.render.glObject.GLState;
-import com.seibel.distanthorizons.core.render.renderer.shaders.DhFadeShader;
-import com.seibel.distanthorizons.core.render.renderer.shaders.FadeApplyShader;
-import com.seibel.distanthorizons.core.render.renderer.shaders.VanillaFadeShader;
-import com.seibel.distanthorizons.core.util.math.Mat4f;
-import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftClientWrapper;
-import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftGLWrapper;
-import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftRenderWrapper;
-import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IProfilerWrapper;
-import com.seibel.distanthorizons.core.wrapperInterfaces.world.IClientLevelWrapper;
-import com.seibel.distanthorizons.core.logging.DhLogger;
+import net.distant_horizons.core.dependencyInjection.SingletonInjector;
+import net.distant_horizons.core.logging.DhLoggerBuilder;
+import net.distant_horizons.core.render.glObject.GLState;
+import net.distant_horizons.core.render.renderer.shaders.DhFadeShader;
+import net.distant_horizons.core.render.renderer.shaders.FadeApplyShader;
+import net.distant_horizons.core.render.renderer.shaders.VanillaFadeShader;
+import net.distant_horizons.core.util.math.Mat4f;
+import net.distant_horizons.core.wrapperInterfaces.minecraft.IMinecraftClientWrapper;
+import net.distant_horizons.core.wrapperInterfaces.minecraft.IMinecraftGLWrapper;
+import net.distant_horizons.core.wrapperInterfaces.minecraft.IMinecraftRenderWrapper;
+import net.distant_horizons.core.wrapperInterfaces.minecraft.IProfilerWrapper;
+import net.distant_horizons.core.wrapperInterfaces.world.IClientLevelWrapper;
+import net.distant_horizons.core.logging.DhLogger;
 import org.lwjgl.opengl.GL32;
 
 import java.nio.ByteBuffer;

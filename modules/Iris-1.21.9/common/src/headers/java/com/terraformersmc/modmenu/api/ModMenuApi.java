@@ -24,7 +24,7 @@
 
 package com.terraformersmc.modmenu.api;
 
-import com.terraformersmc.modmenu.util.ModMenuApiMarker;
+import net.modmenu.util.ModMenuApiMarker;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 

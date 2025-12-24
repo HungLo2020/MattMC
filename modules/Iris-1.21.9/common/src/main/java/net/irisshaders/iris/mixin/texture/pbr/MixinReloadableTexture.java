@@ -1,7 +1,7 @@
 package net.irisshaders.iris.mixin.texture.pbr;
 
 import com.mojang.blaze3d.platform.NativeImage;
-import net.irisshaders.iris.pbr.TextureTracker;
+import net.iris.pbr.TextureTracker;
 import net.minecraft.client.renderer.texture.AbstractTexture;
 import net.minecraft.client.renderer.texture.ReloadableTexture;
 import net.minecraft.resources.ResourceLocation;

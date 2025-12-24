@@ -1,11 +1,11 @@
 package net.irisshaders.iris.uniforms;
 
-import net.irisshaders.iris.gl.uniform.UniformHolder;
+import net.iris.gl.uniform.UniformHolder;
 import net.iris.gl.uniform.UniformUpdateFrequency;
-import net.irisshaders.iris.gui.option.IrisVideoSettings;
-import net.irisshaders.iris.helpers.JomlConversions;
-import net.irisshaders.iris.mixin.GameRendererAccessor;
-import net.irisshaders.iris.shaderpack.materialmap.WorldRenderingSettings;
+import net.iris.gui.option.IrisVideoSettings;
+import net.iris.helpers.JomlConversions;
+import net.iris.mixin.GameRendererAccessor;
+import net.iris.shaderpack.materialmap.WorldRenderingSettings;
 import net.minecraft.client.Camera;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;

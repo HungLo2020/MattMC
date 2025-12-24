@@ -19,9 +19,9 @@
 
 package com.seibel.distanthorizons.common.util;
 
-import com.seibel.distanthorizons.common.wrappers.world.ClientLevelWrapper;
-import com.seibel.distanthorizons.common.wrappers.world.ServerLevelWrapper;
-import com.seibel.distanthorizons.core.wrapperInterfaces.world.ILevelWrapper;
+import net.distant_horizons.common.wrappers.world.ClientLevelWrapper;
+import net.distant_horizons.common.wrappers.world.ServerLevelWrapper;
+import net.distant_horizons.core.wrapperInterfaces.world.ILevelWrapper;
 import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.LevelAccessor;

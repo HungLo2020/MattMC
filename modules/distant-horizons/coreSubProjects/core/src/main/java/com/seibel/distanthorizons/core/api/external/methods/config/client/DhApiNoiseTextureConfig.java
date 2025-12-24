@@ -19,10 +19,10 @@
 
 package com.seibel.distanthorizons.core.api.external.methods.config.client;
 
-import com.seibel.distanthorizons.api.interfaces.config.IDhApiConfigValue;
-import com.seibel.distanthorizons.api.interfaces.config.client.IDhApiNoiseTextureConfig;
-import com.seibel.distanthorizons.core.config.api.DhApiConfigValue;
-import com.seibel.distanthorizons.core.config.Config;
+import net.distant_horizons.api.interfaces.config.IDhApiConfigValue;
+import net.distant_horizons.api.interfaces.config.client.IDhApiNoiseTextureConfig;
+import net.distant_horizons.core.config.api.DhApiConfigValue;
+import net.distant_horizons.core.config.Config;
 
 public class DhApiNoiseTextureConfig implements IDhApiNoiseTextureConfig
 {

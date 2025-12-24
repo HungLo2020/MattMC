@@ -1,8 +1,8 @@
 package com.seibel.distanthorizons.api.objects.render;
 
 
-import com.seibel.distanthorizons.api.interfaces.render.IDhApiRenderableBoxGroup;
-import com.seibel.distanthorizons.api.objects.math.DhApiVec3f;
+import net.distant_horizons.api.interfaces.render.IDhApiRenderableBoxGroup;
+import net.distant_horizons.api.objects.math.DhApiVec3f;
 
 import java.awt.*;
 

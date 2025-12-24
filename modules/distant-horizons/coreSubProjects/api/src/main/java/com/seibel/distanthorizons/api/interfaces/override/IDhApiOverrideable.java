@@ -19,8 +19,8 @@
 
 package com.seibel.distanthorizons.api.interfaces.override;
 
-import com.seibel.distanthorizons.coreapi.interfaces.dependencyInjection.IBindable;
-import com.seibel.distanthorizons.coreapi.interfaces.dependencyInjection.IOverrideInjector;
+import net.distant_horizons.coreapi.interfaces.dependencyInjection.IBindable;
+import net.distant_horizons.coreapi.interfaces.dependencyInjection.IOverrideInjector;
 
 /**
  * Implemented by all DhApi objects that can be overridden.

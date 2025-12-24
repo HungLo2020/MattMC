@@ -1,6 +1,6 @@
 package kroppeb.stareval.element.tree;
 
-import kroppeb.stareval.element.AccessibleExpressionElement;
+import net.iris.stareval.element.AccessibleExpressionElement;
 
 public record AccessExpressionElement(AccessibleExpressionElement base,
 									  String index) implements AccessibleExpressionElement {

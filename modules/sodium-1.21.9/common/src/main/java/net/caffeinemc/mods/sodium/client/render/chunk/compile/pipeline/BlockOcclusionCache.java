@@ -2,7 +2,7 @@ package net.caffeinemc.mods.sodium.client.render.chunk.compile.pipeline;
 
 import it.unimi.dsi.fastutil.Hash;
 import it.unimi.dsi.fastutil.objects.Object2IntLinkedOpenCustomHashMap;
-import net.caffeinemc.mods.sodium.client.services.PlatformBlockAccess;
+import net.sodium.client.services.PlatformBlockAccess;
 import net.sodium.api.util.DirectionUtil;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;

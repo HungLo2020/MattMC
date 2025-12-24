@@ -19,14 +19,14 @@
 
 package com.seibel.distanthorizons.core.level;
 
-import com.seibel.distanthorizons.api.interfaces.override.worldGenerator.IDhApiWorldGenerator;
-import com.seibel.distanthorizons.core.file.fullDatafile.GeneratedFullDataSourceProvider;
-import com.seibel.distanthorizons.core.file.structure.ISaveStructure;
-import com.seibel.distanthorizons.core.generation.BatchGenerator;
-import com.seibel.distanthorizons.core.generation.WorldGenerationQueue;
-import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
-import com.seibel.distanthorizons.coreapi.DependencyInjection.WorldGeneratorInjector;
-import com.seibel.distanthorizons.core.logging.DhLogger;
+import net.distant_horizons.api.interfaces.override.worldGenerator.IDhApiWorldGenerator;
+import net.distant_horizons.core.file.fullDatafile.GeneratedFullDataSourceProvider;
+import net.distant_horizons.core.file.structure.ISaveStructure;
+import net.distant_horizons.core.generation.BatchGenerator;
+import net.distant_horizons.core.generation.WorldGenerationQueue;
+import net.distant_horizons.core.logging.DhLoggerBuilder;
+import net.distant_horizons.coreapi.DependencyInjection.WorldGeneratorInjector;
+import net.distant_horizons.core.logging.DhLogger;
 
 import java.io.IOException;
 import java.sql.SQLException;

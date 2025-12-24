@@ -1,9 +1,9 @@
 package net.irisshaders.iris.layer;
 
-import net.irisshaders.iris.Iris;
-import net.irisshaders.iris.gl.state.StateUpdateNotifiers;
-import net.irisshaders.iris.pipeline.WorldRenderingPhase;
-import net.irisshaders.iris.pipeline.WorldRenderingPipeline;
+import net.iris.Iris;
+import net.iris.gl.state.StateUpdateNotifiers;
+import net.iris.pipeline.WorldRenderingPhase;
+import net.iris.pipeline.WorldRenderingPipeline;
 
 public class GbufferPrograms {
 	private static boolean entities;

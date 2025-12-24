@@ -1,6 +1,6 @@
 package net.caffeinemc.mods.sodium.client.render.chunk.translucent_sorting.bsp_tree;
 
-import net.caffeinemc.mods.sodium.client.render.chunk.translucent_sorting.trigger.GeometryPlanes;
+import net.sodium.client.render.chunk.translucent_sorting.trigger.GeometryPlanes;
 
 /**
  * The result of a BSP building operation. Building a BSP returns the root node

@@ -1,8 +1,8 @@
 package net.caffeinemc.mods.sodium.mixin.core.model.colors;
 
 import it.unimi.dsi.fastutil.objects.*;
-import net.caffeinemc.mods.sodium.client.SodiumClientMod;
-import net.caffeinemc.mods.sodium.client.model.color.interop.BlockColorsExtension;
+import net.sodium.client.SodiumClientMod;
+import net.sodium.client.model.color.interop.BlockColorsExtension;
 import net.minecraft.client.color.block.BlockColor;
 import net.minecraft.client.color.block.BlockColors;
 import net.minecraft.core.registries.BuiltInRegistries;

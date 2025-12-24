@@ -19,18 +19,18 @@
 
 package com.seibel.distanthorizons.core.config.eventHandlers.presets;
 
-import com.seibel.distanthorizons.api.enums.config.EDhApiHorizontalQuality;
-import com.seibel.distanthorizons.api.enums.config.EDhApiMaxHorizontalResolution;
-import com.seibel.distanthorizons.api.enums.config.EDhApiMcRenderingFadeMode;
-import com.seibel.distanthorizons.api.enums.config.EDhApiVerticalQuality;
-import com.seibel.distanthorizons.api.enums.config.quickOptions.EDhApiQualityPreset;
-import com.seibel.distanthorizons.api.enums.rendering.EDhApiTransparency;
-import com.seibel.distanthorizons.core.config.Config;
-import com.seibel.distanthorizons.core.config.ConfigPresetOptions;
-import com.seibel.distanthorizons.core.config.listeners.ConfigChangeListener;
-import com.seibel.distanthorizons.core.config.types.AbstractConfigBase;
-import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
-import com.seibel.distanthorizons.core.logging.DhLogger;
+import net.distant_horizons.api.enums.config.EDhApiHorizontalQuality;
+import net.distant_horizons.api.enums.config.EDhApiMaxHorizontalResolution;
+import net.distant_horizons.api.enums.config.EDhApiMcRenderingFadeMode;
+import net.distant_horizons.api.enums.config.EDhApiVerticalQuality;
+import net.distant_horizons.api.enums.config.quickOptions.EDhApiQualityPreset;
+import net.distant_horizons.api.enums.rendering.EDhApiTransparency;
+import net.distant_horizons.core.config.Config;
+import net.distant_horizons.core.config.ConfigPresetOptions;
+import net.distant_horizons.core.config.listeners.ConfigChangeListener;
+import net.distant_horizons.core.config.types.AbstractConfigBase;
+import net.distant_horizons.core.logging.DhLoggerBuilder;
+import net.distant_horizons.core.logging.DhLogger;
 
 import java.util.*;
 

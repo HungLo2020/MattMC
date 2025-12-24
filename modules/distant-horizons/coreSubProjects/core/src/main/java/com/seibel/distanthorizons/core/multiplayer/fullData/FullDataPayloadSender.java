@@ -1,8 +1,8 @@
 package com.seibel.distanthorizons.core.multiplayer.fullData;
 
-import com.seibel.distanthorizons.core.network.messages.fullData.FullDataSplitMessage;
-import com.seibel.distanthorizons.core.network.session.NetworkSession;
-import com.seibel.distanthorizons.core.util.TimerUtil;
+import net.distant_horizons.core.network.messages.fullData.FullDataSplitMessage;
+import net.distant_horizons.core.network.session.NetworkSession;
+import net.distant_horizons.core.util.TimerUtil;
 import io.netty.buffer.ByteBuf;
 
 import java.util.Timer;

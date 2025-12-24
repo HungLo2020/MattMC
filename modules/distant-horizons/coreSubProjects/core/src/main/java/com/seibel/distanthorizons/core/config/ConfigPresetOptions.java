@@ -19,7 +19,7 @@
 
 package com.seibel.distanthorizons.core.config;
 
-import com.seibel.distanthorizons.core.config.types.ConfigEntry;
+import net.distant_horizons.core.config.types.ConfigEntry;
 
 import java.util.HashMap;
 import java.util.HashSet;

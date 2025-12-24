@@ -1,8 +1,8 @@
 package net.irisshaders.iris.mixin.entity_render_context;
 
-import net.irisshaders.iris.shaderpack.materialmap.NamespacedId;
-import net.irisshaders.iris.shaderpack.materialmap.WorldRenderingSettings;
-import net.irisshaders.iris.uniforms.CapturedRenderingState;
+import net.iris.shaderpack.materialmap.NamespacedId;
+import net.iris.shaderpack.materialmap.WorldRenderingSettings;
+import net.iris.uniforms.CapturedRenderingState;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.SubmitNodeCollection;
 import net.minecraft.client.renderer.SubmitNodeStorage;

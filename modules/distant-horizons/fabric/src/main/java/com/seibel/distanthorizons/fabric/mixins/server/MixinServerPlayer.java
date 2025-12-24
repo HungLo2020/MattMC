@@ -19,7 +19,7 @@
 
 package com.seibel.distanthorizons.fabric.mixins.server;
 
-import com.seibel.distanthorizons.common.wrappers.misc.IMixinServerPlayer;
+import net.distant_horizons.common.wrappers.misc.IMixinServerPlayer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.Entity;

@@ -1,7 +1,7 @@
 package net.irisshaders.iris.shaderpack.parsing;
 
-import net.irisshaders.iris.Iris;
-import net.irisshaders.iris.shaderpack.option.values.OptionValues;
+import net.iris.Iris;
+import net.iris.shaderpack.option.values.OptionValues;
 
 import java.util.EmptyStackException;
 import java.util.Stack;

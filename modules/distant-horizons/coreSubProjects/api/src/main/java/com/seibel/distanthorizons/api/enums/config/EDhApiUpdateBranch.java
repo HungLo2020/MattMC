@@ -1,6 +1,6 @@
 package com.seibel.distanthorizons.api.enums.config;
 
-import com.seibel.distanthorizons.coreapi.ModInfo;
+import net.distant_horizons.coreapi.ModInfo;
 
 /**
  * AUTO, <br>

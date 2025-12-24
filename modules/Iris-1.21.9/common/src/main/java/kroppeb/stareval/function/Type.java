@@ -1,11 +1,11 @@
 package kroppeb.stareval.function;
 
-import kroppeb.stareval.expression.ConstantExpression;
-import kroppeb.stareval.function.TypedFunction.Parameter;
+import net.iris.stareval.expression.ConstantExpression;
+import net.iris.stareval.function.TypedFunction.Parameter;
 import net.iris.stareval.function.FunctionReturn;
 import net.iris.gl.uniform.UniformType;
-import net.irisshaders.iris.parsing.MatrixType;
-import net.irisshaders.iris.parsing.VectorType;
+import net.iris.parsing.MatrixType;
+import net.iris.parsing.VectorType;
 
 public abstract class Type {
 	public static final Boolean Boolean = new Boolean();

@@ -19,14 +19,14 @@
 
 package com.seibel.distanthorizons.core.world;
 
-import com.seibel.distanthorizons.core.api.internal.ClientApi;
-import com.seibel.distanthorizons.core.file.structure.ClientOnlySaveStructure;
-import com.seibel.distanthorizons.core.level.DhClientLevel;
-import com.seibel.distanthorizons.core.level.IDhLevel;
-import com.seibel.distanthorizons.core.multiplayer.client.ClientNetworkState;
-import com.seibel.distanthorizons.core.util.TimerUtil;
-import com.seibel.distanthorizons.core.wrapperInterfaces.world.IClientLevelWrapper;
-import com.seibel.distanthorizons.core.wrapperInterfaces.world.ILevelWrapper;
+import net.distant_horizons.core.api.internal.ClientApi;
+import net.distant_horizons.core.file.structure.ClientOnlySaveStructure;
+import net.distant_horizons.core.level.DhClientLevel;
+import net.distant_horizons.core.level.IDhLevel;
+import net.distant_horizons.core.multiplayer.client.ClientNetworkState;
+import net.distant_horizons.core.util.TimerUtil;
+import net.distant_horizons.core.wrapperInterfaces.world.IClientLevelWrapper;
+import net.distant_horizons.core.wrapperInterfaces.world.ILevelWrapper;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.ArrayList;

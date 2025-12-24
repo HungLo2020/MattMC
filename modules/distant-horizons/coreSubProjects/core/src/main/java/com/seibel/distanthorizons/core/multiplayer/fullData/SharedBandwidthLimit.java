@@ -1,6 +1,6 @@
 package com.seibel.distanthorizons.core.multiplayer.fullData;
 
-import com.seibel.distanthorizons.core.config.Config;
+import net.distant_horizons.core.config.Config;
 
 import java.util.Collections;
 import java.util.Set;

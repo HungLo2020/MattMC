@@ -5,7 +5,7 @@ import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import net.minecraft.commands.CommandSourceStack;
 import org.jetbrains.annotations.Nullable;
 
-import static com.seibel.distanthorizons.core.network.messages.MessageRegistry.DEBUG_CODEC_CRASH_MESSAGE;
+import static net.distant_horizons.core.network.messages.MessageRegistry.DEBUG_CODEC_CRASH_MESSAGE;
 import static net.minecraft.commands.Commands.literal;
 
 

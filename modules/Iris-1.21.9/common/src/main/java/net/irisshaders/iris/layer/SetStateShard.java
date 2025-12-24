@@ -1,8 +1,8 @@
 package net.irisshaders.iris.layer;
 
-import net.irisshaders.iris.Iris;
-import net.irisshaders.iris.pipeline.WorldRenderingPhase;
-import net.irisshaders.iris.pipeline.WorldRenderingPipeline;
+import net.iris.Iris;
+import net.iris.pipeline.WorldRenderingPhase;
+import net.iris.pipeline.WorldRenderingPipeline;
 import net.minecraft.client.renderer.RenderStateShard;
 
 public class SetStateShard extends RenderStateShard {

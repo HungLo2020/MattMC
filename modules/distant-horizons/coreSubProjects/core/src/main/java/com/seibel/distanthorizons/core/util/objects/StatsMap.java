@@ -19,7 +19,7 @@
 
 package com.seibel.distanthorizons.core.util.objects;
 
-import com.seibel.distanthorizons.core.util.math.UnitBytes;
+import net.distant_horizons.core.util.math.UnitBytes;
 
 import java.util.TreeMap;
 

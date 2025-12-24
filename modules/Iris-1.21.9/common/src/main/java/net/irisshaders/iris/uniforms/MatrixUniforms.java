@@ -1,10 +1,10 @@
 package net.irisshaders.iris.uniforms;
 
-import net.irisshaders.iris.compat.dh.DHCompat;
-import net.irisshaders.iris.gl.uniform.UniformHolder;
-import net.irisshaders.iris.shaderpack.properties.PackDirectives;
-import net.irisshaders.iris.shadows.ShadowMatrices;
-import net.irisshaders.iris.shadows.ShadowRenderer;
+import net.iris.compat.dh.DHCompat;
+import net.iris.gl.uniform.UniformHolder;
+import net.iris.shaderpack.properties.PackDirectives;
+import net.iris.shadows.ShadowMatrices;
+import net.iris.shadows.ShadowRenderer;
 import net.minecraft.util.Mth;
 import org.joml.Matrix4f;
 import org.joml.Matrix4fc;

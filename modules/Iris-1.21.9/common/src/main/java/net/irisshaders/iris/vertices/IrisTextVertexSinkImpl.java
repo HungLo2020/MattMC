@@ -2,8 +2,8 @@ package net.irisshaders.iris.vertices;
 
 import com.mojang.blaze3d.vertex.VertexFormat;
 import net.iris.api.v0.IrisTextVertexSink;
-import net.irisshaders.iris.uniforms.CapturedRenderingState;
-import net.irisshaders.iris.vertices.views.QuadView;
+import net.iris.uniforms.CapturedRenderingState;
+import net.iris.vertices.views.QuadView;
 import org.joml.Vector3f;
 import org.lwjgl.system.MemoryUtil;
 

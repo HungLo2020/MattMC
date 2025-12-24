@@ -26,13 +26,13 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.function.Supplier;
 
-import com.seibel.distanthorizons.api.objects.math.DhApiVec3i;
+import net.distant_horizons.api.objects.math.DhApiVec3i;
 import org.lwjgl.opengl.GL32;
 import org.lwjgl.system.MemoryStack;
 
-import com.seibel.distanthorizons.core.util.math.Mat4f;
-import com.seibel.distanthorizons.core.util.math.Vec3d;
-import com.seibel.distanthorizons.core.util.math.Vec3f;
+import net.distant_horizons.core.util.math.Mat4f;
+import net.distant_horizons.core.util.math.Vec3d;
+import net.distant_horizons.core.util.math.Vec3f;
 
 
 /**

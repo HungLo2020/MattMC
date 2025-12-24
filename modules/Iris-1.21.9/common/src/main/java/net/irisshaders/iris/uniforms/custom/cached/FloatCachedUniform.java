@@ -1,8 +1,8 @@
 package net.irisshaders.iris.uniforms.custom.cached;
 
 import net.iris.stareval.function.FunctionReturn;
-import kroppeb.stareval.function.Type;
-import net.irisshaders.iris.gl.IrisRenderSystem;
+import net.iris.stareval.function.Type;
+import net.iris.gl.IrisRenderSystem;
 import net.iris.gl.uniform.FloatSupplier;
 import net.iris.gl.uniform.UniformUpdateFrequency;
 

@@ -1,6 +1,6 @@
 package net.irisshaders.iris.helpers;
 
-import net.irisshaders.iris.uniforms.CapturedRenderingState;
+import net.iris.uniforms.CapturedRenderingState;
 
 public class EntityState {
 	private static int backupValue;

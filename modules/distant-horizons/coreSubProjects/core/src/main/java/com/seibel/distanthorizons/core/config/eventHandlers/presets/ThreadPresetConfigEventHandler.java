@@ -19,15 +19,15 @@
 
 package com.seibel.distanthorizons.core.config.eventHandlers.presets;
 
-import com.seibel.distanthorizons.api.enums.config.quickOptions.EDhApiThreadPreset;
-import com.seibel.distanthorizons.core.config.listeners.ConfigChangeListener;
-import com.seibel.distanthorizons.core.config.Config;
-import com.seibel.distanthorizons.core.config.ConfigPresetOptions;
-import com.seibel.distanthorizons.core.config.types.AbstractConfigBase;
-import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
-import com.seibel.distanthorizons.coreapi.util.MathUtil;
+import net.distant_horizons.api.enums.config.quickOptions.EDhApiThreadPreset;
+import net.distant_horizons.core.config.listeners.ConfigChangeListener;
+import net.distant_horizons.core.config.Config;
+import net.distant_horizons.core.config.ConfigPresetOptions;
+import net.distant_horizons.core.config.types.AbstractConfigBase;
+import net.distant_horizons.core.logging.DhLoggerBuilder;
+import net.distant_horizons.coreapi.util.MathUtil;
 import org.apache.logging.log4j.LogManager;
-import com.seibel.distanthorizons.core.logging.DhLogger;
+import net.distant_horizons.core.logging.DhLogger;
 
 import java.util.Arrays;
 import java.util.HashMap;

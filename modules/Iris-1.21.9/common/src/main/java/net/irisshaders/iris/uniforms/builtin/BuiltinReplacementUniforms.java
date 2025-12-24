@@ -1,6 +1,6 @@
 package net.irisshaders.iris.uniforms.builtin;
 
-import net.irisshaders.iris.gl.uniform.UniformHolder;
+import net.iris.gl.uniform.UniformHolder;
 import net.iris.gl.uniform.UniformUpdateFrequency;
 import org.joml.Matrix4f;
 

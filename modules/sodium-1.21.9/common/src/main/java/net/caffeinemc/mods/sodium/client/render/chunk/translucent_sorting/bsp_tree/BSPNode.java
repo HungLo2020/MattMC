@@ -1,12 +1,12 @@
 package net.caffeinemc.mods.sodium.client.render.chunk.translucent_sorting.bsp_tree;
 
-import net.caffeinemc.mods.sodium.client.render.chunk.translucent_sorting.QuadSplittingMode;
+import net.sodium.client.render.chunk.translucent_sorting.QuadSplittingMode;
 import org.joml.Vector3fc;
 
 import it.unimi.dsi.fastutil.ints.IntArrayList;
-import net.caffeinemc.mods.sodium.client.render.chunk.translucent_sorting.quad.TQuad;
-import net.caffeinemc.mods.sodium.client.render.chunk.translucent_sorting.data.TopoGraphSorting;
-import net.caffeinemc.mods.sodium.client.util.NativeBuffer;
+import net.sodium.client.render.chunk.translucent_sorting.quad.TQuad;
+import net.sodium.client.render.chunk.translucent_sorting.data.TopoGraphSorting;
+import net.sodium.client.util.NativeBuffer;
 import net.sodium.api.util.NormI8;
 import net.minecraft.core.SectionPos;
 

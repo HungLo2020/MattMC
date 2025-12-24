@@ -19,10 +19,10 @@
 
 package com.seibel.distanthorizons.core.pos;
 
-import com.seibel.distanthorizons.core.pos.blockPos.DhBlockPos;
-import com.seibel.distanthorizons.core.pos.blockPos.DhBlockPos2D;
-import com.seibel.distanthorizons.core.util.LodUtil;
-import com.seibel.distanthorizons.core.util.math.Vec3d;
+import net.distant_horizons.core.pos.blockPos.DhBlockPos;
+import net.distant_horizons.core.pos.blockPos.DhBlockPos2D;
+import net.distant_horizons.core.util.LodUtil;
+import net.distant_horizons.core.util.math.Vec3d;
 
 /**
  * immutable <br><br>

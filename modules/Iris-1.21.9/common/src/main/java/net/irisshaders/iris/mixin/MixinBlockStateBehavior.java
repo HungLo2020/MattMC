@@ -1,6 +1,6 @@
 package net.irisshaders.iris.mixin;
 
-import net.irisshaders.iris.shaderpack.materialmap.WorldRenderingSettings;
+import net.iris.shaderpack.materialmap.WorldRenderingSettings;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.BlockGetter;
 import net.minecraft.world.level.block.Block;

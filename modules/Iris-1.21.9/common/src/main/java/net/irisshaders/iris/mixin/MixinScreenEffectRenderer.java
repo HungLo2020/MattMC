@@ -1,8 +1,8 @@
 package net.irisshaders.iris.mixin;
 
 import com.mojang.blaze3d.vertex.PoseStack;
-import net.irisshaders.iris.Iris;
-import net.irisshaders.iris.pipeline.WorldRenderingPipeline;
+import net.iris.Iris;
+import net.iris.pipeline.WorldRenderingPipeline;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.ScreenEffectRenderer;

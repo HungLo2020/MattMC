@@ -1,6 +1,6 @@
 package net.caffeinemc.mods.sodium.client.render.chunk.compile.executor;
 
-import net.caffeinemc.mods.sodium.client.render.chunk.compile.BuilderTaskOutput;
+import net.sodium.client.render.chunk.compile.BuilderTaskOutput;
 
 import java.util.ArrayList;
 import java.util.List;

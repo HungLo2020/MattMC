@@ -2,9 +2,9 @@ package net.irisshaders.iris.mixin.texture.pbr;
 
 import com.mojang.blaze3d.opengl.GlTexture;
 import com.mojang.blaze3d.textures.FilterMode;
-import net.irisshaders.iris.pbr.TextureTracker;
-import net.irisshaders.iris.pbr.texture.PBRAtlasHolder;
-import net.irisshaders.iris.pbr.texture.TextureAtlasExtension;
+import net.iris.pbr.TextureTracker;
+import net.iris.pbr.texture.PBRAtlasHolder;
+import net.iris.pbr.texture.TextureAtlasExtension;
 import net.minecraft.client.renderer.texture.AbstractTexture;
 import net.minecraft.client.renderer.texture.SpriteLoader;
 import net.minecraft.client.renderer.texture.TextureAtlas;

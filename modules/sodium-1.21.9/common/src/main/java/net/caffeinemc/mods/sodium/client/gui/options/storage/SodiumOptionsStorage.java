@@ -1,7 +1,7 @@
 package net.caffeinemc.mods.sodium.client.gui.options.storage;
 
-import net.caffeinemc.mods.sodium.client.SodiumClientMod;
-import net.caffeinemc.mods.sodium.client.gui.SodiumGameOptions;
+import net.sodium.client.SodiumClientMod;
+import net.sodium.client.gui.SodiumGameOptions;
 
 import java.io.IOException;
 

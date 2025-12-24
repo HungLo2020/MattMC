@@ -1,7 +1,7 @@
 package net.irisshaders.iris.shaderpack.programs;
 
-import net.irisshaders.iris.shaderpack.properties.IndirectPointer;
-import net.irisshaders.iris.shaderpack.properties.ShaderProperties;
+import net.iris.shaderpack.properties.IndirectPointer;
+import net.iris.shaderpack.properties.ShaderProperties;
 import org.joml.Vector2f;
 import org.joml.Vector3i;
 

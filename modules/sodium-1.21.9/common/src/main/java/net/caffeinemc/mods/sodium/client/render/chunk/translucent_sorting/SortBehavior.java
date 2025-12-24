@@ -1,6 +1,6 @@
 package net.caffeinemc.mods.sodium.client.render.chunk.translucent_sorting;
 
-import net.caffeinemc.mods.sodium.client.render.chunk.DeferMode;
+import net.sodium.client.render.chunk.DeferMode;
 
 public enum SortBehavior {
     OFF("OFF", SortMode.NONE),

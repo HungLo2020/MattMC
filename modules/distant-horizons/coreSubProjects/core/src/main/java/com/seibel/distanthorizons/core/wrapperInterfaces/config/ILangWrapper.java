@@ -19,7 +19,7 @@
 
 package com.seibel.distanthorizons.core.wrapperInterfaces.config;
 
-import com.seibel.distanthorizons.coreapi.interfaces.dependencyInjection.IBindable;
+import net.distant_horizons.coreapi.interfaces.dependencyInjection.IBindable;
 
 public interface ILangWrapper extends IBindable
 {

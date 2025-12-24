@@ -1,7 +1,7 @@
 package net.irisshaders.iris.gl.image;
 
-import net.irisshaders.iris.gl.IrisRenderSystem;
-import net.irisshaders.iris.gl.framebuffer.GlFramebuffer;
+import net.iris.gl.IrisRenderSystem;
+import net.iris.gl.framebuffer.GlFramebuffer;
 import org.lwjgl.opengl.GL30C;
 
 public abstract class ImageClearPass {

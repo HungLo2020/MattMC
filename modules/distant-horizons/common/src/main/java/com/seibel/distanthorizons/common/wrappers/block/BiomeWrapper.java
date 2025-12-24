@@ -26,12 +26,12 @@ import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
-import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
-import com.seibel.distanthorizons.core.wrapperInterfaces.world.ILevelWrapper;
+import net.distant_horizons.core.logging.DhLoggerBuilder;
+import net.distant_horizons.core.wrapperInterfaces.world.ILevelWrapper;
 import net.minecraft.world.level.Level;
-import com.seibel.distanthorizons.core.logging.DhLogger;
+import net.distant_horizons.core.logging.DhLogger;
 
-import com.seibel.distanthorizons.core.wrapperInterfaces.world.IBiomeWrapper;
+import net.distant_horizons.core.wrapperInterfaces.world.IBiomeWrapper;
 
 import net.minecraft.core.Holder;
 import net.minecraft.core.registries.Registries;

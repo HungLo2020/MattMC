@@ -19,14 +19,14 @@
 
 package com.seibel.distanthorizons.coreapi.DependencyInjection;
 
-import com.seibel.distanthorizons.api.interfaces.events.IDhApiEventInjector;
-import com.seibel.distanthorizons.api.methods.events.interfaces.IDhApiCancelableEvent;
-import com.seibel.distanthorizons.api.methods.events.interfaces.IDhApiEvent;
-import com.seibel.distanthorizons.api.methods.events.interfaces.IDhApiEventParam;
-import com.seibel.distanthorizons.api.methods.events.interfaces.IDhApiOneTimeEvent;
-import com.seibel.distanthorizons.api.methods.events.sharedParameterObjects.DhApiCancelableEventParam;
-import com.seibel.distanthorizons.api.methods.events.sharedParameterObjects.DhApiEventParam;
-import com.seibel.distanthorizons.coreapi.interfaces.dependencyInjection.IBindable;
+import net.distant_horizons.api.interfaces.events.IDhApiEventInjector;
+import net.distant_horizons.api.methods.events.interfaces.IDhApiCancelableEvent;
+import net.distant_horizons.api.methods.events.interfaces.IDhApiEvent;
+import net.distant_horizons.api.methods.events.interfaces.IDhApiEventParam;
+import net.distant_horizons.api.methods.events.interfaces.IDhApiOneTimeEvent;
+import net.distant_horizons.api.methods.events.sharedParameterObjects.DhApiCancelableEventParam;
+import net.distant_horizons.api.methods.events.sharedParameterObjects.DhApiEventParam;
+import net.distant_horizons.coreapi.interfaces.dependencyInjection.IBindable;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 

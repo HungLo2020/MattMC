@@ -19,19 +19,19 @@
 
 package com.seibel.distanthorizons.core.generation;
 
-import com.seibel.distanthorizons.api.enums.worldGeneration.EDhApiWorldGenerationStep;
-import com.seibel.distanthorizons.api.interfaces.override.worldGenerator.IDhApiWorldGenerator;
-import com.seibel.distanthorizons.core.dependencyInjection.SingletonInjector;
-import com.seibel.distanthorizons.core.level.IDhLevel;
-import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
-import com.seibel.distanthorizons.core.util.ExceptionUtil;
-import com.seibel.distanthorizons.core.wrapperInterfaces.chunk.IChunkWrapper;
-import com.seibel.distanthorizons.core.wrapperInterfaces.worldGeneration.IBatchGeneratorEnvironmentWrapper;
-import com.seibel.distanthorizons.coreapi.interfaces.dependencyInjection.IOverrideInjector;
-import com.seibel.distanthorizons.api.enums.worldGeneration.EDhApiDistantGeneratorMode;
-import com.seibel.distanthorizons.core.util.LodUtil;
-import com.seibel.distanthorizons.core.wrapperInterfaces.IWrapperFactory;
-import com.seibel.distanthorizons.core.logging.DhLogger;
+import net.distant_horizons.api.enums.worldGeneration.EDhApiWorldGenerationStep;
+import net.distant_horizons.api.interfaces.override.worldGenerator.IDhApiWorldGenerator;
+import net.distant_horizons.core.dependencyInjection.SingletonInjector;
+import net.distant_horizons.core.level.IDhLevel;
+import net.distant_horizons.core.logging.DhLoggerBuilder;
+import net.distant_horizons.core.util.ExceptionUtil;
+import net.distant_horizons.core.wrapperInterfaces.chunk.IChunkWrapper;
+import net.distant_horizons.core.wrapperInterfaces.worldGeneration.IBatchGeneratorEnvironmentWrapper;
+import net.distant_horizons.coreapi.interfaces.dependencyInjection.IOverrideInjector;
+import net.distant_horizons.api.enums.worldGeneration.EDhApiDistantGeneratorMode;
+import net.distant_horizons.core.util.LodUtil;
+import net.distant_horizons.core.wrapperInterfaces.IWrapperFactory;
+import net.distant_horizons.core.logging.DhLogger;
 
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;

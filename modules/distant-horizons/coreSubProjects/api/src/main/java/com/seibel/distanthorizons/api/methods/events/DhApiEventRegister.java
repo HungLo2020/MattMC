@@ -19,9 +19,9 @@
 
 package com.seibel.distanthorizons.api.methods.events;
 
-import com.seibel.distanthorizons.api.objects.DhApiResult;
-import com.seibel.distanthorizons.api.methods.events.interfaces.IDhApiEvent;
-import com.seibel.distanthorizons.coreapi.DependencyInjection.ApiEventInjector;
+import net.distant_horizons.api.objects.DhApiResult;
+import net.distant_horizons.api.methods.events.interfaces.IDhApiEvent;
+import net.distant_horizons.coreapi.DependencyInjection.ApiEventInjector;
 
 /**
  * Handles adding/removing event handlers.

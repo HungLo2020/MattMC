@@ -2,17 +2,17 @@ package net.irisshaders.iris.gl.program;
 
 import com.google.common.collect.ImmutableSet;
 import com.mojang.blaze3d.systems.RenderSystem;
-import net.irisshaders.iris.gl.IrisRenderSystem;
-import net.irisshaders.iris.gl.image.ImageHolder;
-import net.irisshaders.iris.gl.sampler.GlSampler;
-import net.irisshaders.iris.gl.sampler.SamplerHolder;
-import net.irisshaders.iris.gl.shader.GlShader;
-import net.irisshaders.iris.gl.shader.ProgramCreator;
+import net.iris.gl.IrisRenderSystem;
+import net.iris.gl.image.ImageHolder;
+import net.iris.gl.sampler.GlSampler;
+import net.iris.gl.sampler.SamplerHolder;
+import net.iris.gl.shader.GlShader;
+import net.iris.gl.shader.ProgramCreator;
 import net.iris.gl.shader.ShaderCompileException;
 import net.iris.gl.shader.ShaderType;
 import net.iris.gl.state.ValueUpdateNotifier;
-import net.irisshaders.iris.gl.texture.InternalTextureFormat;
-import net.irisshaders.iris.gl.texture.TextureType;
+import net.iris.gl.texture.InternalTextureFormat;
+import net.iris.gl.texture.TextureType;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.function.IntSupplier;

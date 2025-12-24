@@ -19,13 +19,13 @@
 
 package com.seibel.distanthorizons.common.wrappers.block;
 
-import com.seibel.distanthorizons.common.wrappers.McObjectConverter;
-import com.seibel.distanthorizons.core.dataObjects.fullData.sources.FullDataSourceV2;
-import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
-import com.seibel.distanthorizons.core.pos.blockPos.DhBlockPos;
-import com.seibel.distanthorizons.core.pos.blockPos.DhBlockPosMutable;
-import com.seibel.distanthorizons.core.util.ColorUtil;
-import com.seibel.distanthorizons.core.wrapperInterfaces.world.IClientLevelWrapper;
+import net.distant_horizons.common.wrappers.McObjectConverter;
+import net.distant_horizons.core.dataObjects.fullData.sources.FullDataSourceV2;
+import net.distant_horizons.core.logging.DhLoggerBuilder;
+import net.distant_horizons.core.pos.blockPos.DhBlockPos;
+import net.distant_horizons.core.pos.blockPos.DhBlockPosMutable;
+import net.distant_horizons.core.util.ColorUtil;
+import net.distant_horizons.core.wrapperInterfaces.world.IClientLevelWrapper;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.block.model.BakedQuad;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
@@ -36,7 +36,7 @@ import net.minecraft.world.level.block.LeavesBlock;
 import net.minecraft.world.level.block.RotatedPillarBlock;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.block.state.BlockState;
-import com.seibel.distanthorizons.core.logging.DhLogger;
+import net.distant_horizons.core.logging.DhLogger;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;

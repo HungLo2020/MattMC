@@ -19,9 +19,9 @@
 
 package com.seibel.distanthorizons.core.config.eventHandlers;
 
-import com.seibel.distanthorizons.api.enums.rendering.EDhApiRendererMode;
-import com.seibel.distanthorizons.core.config.listeners.ConfigChangeListener;
-import com.seibel.distanthorizons.core.config.Config;
+import net.distant_horizons.api.enums.rendering.EDhApiRendererMode;
+import net.distant_horizons.core.config.listeners.ConfigChangeListener;
+import net.distant_horizons.core.config.Config;
 
 public class QuickRenderToggleConfigEventHandler
 {

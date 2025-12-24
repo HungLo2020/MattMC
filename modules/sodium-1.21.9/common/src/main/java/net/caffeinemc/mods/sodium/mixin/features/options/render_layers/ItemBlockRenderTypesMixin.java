@@ -1,6 +1,6 @@
 package net.caffeinemc.mods.sodium.mixin.features.options.render_layers;
 
-import net.caffeinemc.mods.sodium.client.SodiumClientMod;
+import net.sodium.client.SodiumClientMod;
 import net.minecraft.client.GraphicsStatus;
 import net.minecraft.client.renderer.ItemBlockRenderTypes;
 import org.spongepowered.asm.mixin.Mixin;

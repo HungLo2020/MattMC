@@ -19,12 +19,12 @@
 
 package com.seibel.distanthorizons.core.level;
 
-import com.seibel.distanthorizons.core.file.structure.ISaveStructure;
-import com.seibel.distanthorizons.core.multiplayer.server.ServerPlayerStateManager;
-import com.seibel.distanthorizons.core.pos.blockPos.DhBlockPos2D;
-import com.seibel.distanthorizons.core.render.RenderBufferHandler;
-import com.seibel.distanthorizons.core.render.renderer.generic.GenericObjectRenderer;
-import com.seibel.distanthorizons.core.wrapperInterfaces.world.IServerLevelWrapper;
+import net.distant_horizons.core.file.structure.ISaveStructure;
+import net.distant_horizons.core.multiplayer.server.ServerPlayerStateManager;
+import net.distant_horizons.core.pos.blockPos.DhBlockPos2D;
+import net.distant_horizons.core.render.RenderBufferHandler;
+import net.distant_horizons.core.render.renderer.generic.GenericObjectRenderer;
+import net.distant_horizons.core.wrapperInterfaces.world.IServerLevelWrapper;
 import org.jetbrains.annotations.Nullable;
 
 import java.io.IOException;

@@ -1,8 +1,8 @@
 package net.irisshaders.iris.mixin;
 
 import com.mojang.blaze3d.vertex.PoseStack;
-import net.irisshaders.iris.Iris;
-import net.irisshaders.iris.pathways.HandRenderer;
+import net.iris.Iris;
+import net.iris.pathways.HandRenderer;
 import net.minecraft.client.player.AbstractClientPlayer;
 import net.minecraft.client.renderer.ItemInHandRenderer;
 import net.minecraft.client.renderer.MultiBufferSource;

@@ -21,10 +21,10 @@ package com.seibel.distanthorizons.common.wrappers;
 
 import java.nio.FloatBuffer;
 
-import com.seibel.distanthorizons.core.enums.EDhDirection;
-import com.seibel.distanthorizons.core.pos.blockPos.DhBlockPos;
-import com.seibel.distanthorizons.core.pos.DhChunkPos;
-import com.seibel.distanthorizons.core.util.math.Mat4f;
+import net.distant_horizons.core.enums.EDhDirection;
+import net.distant_horizons.core.pos.blockPos.DhBlockPos;
+import net.distant_horizons.core.pos.DhChunkPos;
+import net.distant_horizons.core.util.math.Mat4f;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;

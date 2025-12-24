@@ -2,7 +2,7 @@ package net.irisshaders.iris.vertices;
 
 import com.mojang.blaze3d.vertex.VertexFormat;
 import com.mojang.blaze3d.vertex.VertexFormatElement;
-import net.irisshaders.iris.Iris;
+import net.iris.Iris;
 
 public class IrisVertexFormats {
 	public static final VertexFormatElement ENTITY_ELEMENT;

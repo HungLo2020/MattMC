@@ -1,6 +1,6 @@
 package com.seibel.distanthorizons.common.wrappers.misc;
 
-import com.seibel.distanthorizons.core.wrapperInterfaces.misc.IMutableBlockPosWrapper;
+import net.distant_horizons.core.wrapperInterfaces.misc.IMutableBlockPosWrapper;
 import net.minecraft.core.BlockPos;
 
 public class MutableBlockPosWrapper implements IMutableBlockPosWrapper

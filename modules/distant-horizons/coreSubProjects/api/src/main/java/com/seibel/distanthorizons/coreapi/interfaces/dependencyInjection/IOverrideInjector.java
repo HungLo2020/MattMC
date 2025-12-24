@@ -20,7 +20,7 @@
 package com.seibel.distanthorizons.coreapi.interfaces.dependencyInjection;
 
 
-import com.seibel.distanthorizons.api.interfaces.override.IDhApiOverrideable;
+import net.distant_horizons.api.interfaces.override.IDhApiOverrideable;
 
 public interface IOverrideInjector<BindableType extends IBindable>
 {

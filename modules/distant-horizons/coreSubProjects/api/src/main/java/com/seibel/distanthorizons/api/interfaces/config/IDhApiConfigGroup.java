@@ -19,7 +19,7 @@
 
 package com.seibel.distanthorizons.api.interfaces.config;
 
-import com.seibel.distanthorizons.coreapi.interfaces.dependencyInjection.IBindable;
+import net.distant_horizons.coreapi.interfaces.dependencyInjection.IBindable;
 
 /**
  * This interface is just used to organize API config groups so

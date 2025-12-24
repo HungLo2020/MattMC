@@ -1,7 +1,7 @@
 package net.irisshaders.iris.gui;
 
-import net.irisshaders.iris.gui.element.ShaderPackOptionList;
-import net.irisshaders.iris.shaderpack.option.menu.OptionMenuContainer;
+import net.iris.gui.element.ShaderPackOptionList;
+import net.iris.shaderpack.option.menu.OptionMenuContainer;
 
 import java.util.ArrayDeque;
 import java.util.Deque;

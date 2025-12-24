@@ -1,12 +1,12 @@
 package com.seibel.distanthorizons.core.dataObjects;
 
-import com.seibel.distanthorizons.core.dataObjects.fullData.FullDataPointIdMap;
-import com.seibel.distanthorizons.core.dependencyInjection.SingletonInjector;
-import com.seibel.distanthorizons.core.util.objects.DataCorruptedException;
-import com.seibel.distanthorizons.core.wrapperInterfaces.IWrapperFactory;
-import com.seibel.distanthorizons.core.wrapperInterfaces.block.IBlockStateWrapper;
-import com.seibel.distanthorizons.core.wrapperInterfaces.world.IBiomeWrapper;
-import com.seibel.distanthorizons.core.wrapperInterfaces.world.ILevelWrapper;
+import net.distant_horizons.core.dataObjects.fullData.FullDataPointIdMap;
+import net.distant_horizons.core.dependencyInjection.SingletonInjector;
+import net.distant_horizons.core.util.objects.DataCorruptedException;
+import net.distant_horizons.core.wrapperInterfaces.IWrapperFactory;
+import net.distant_horizons.core.wrapperInterfaces.block.IBlockStateWrapper;
+import net.distant_horizons.core.wrapperInterfaces.world.IBiomeWrapper;
+import net.distant_horizons.core.wrapperInterfaces.world.ILevelWrapper;
 
 import java.util.concurrent.ConcurrentHashMap;
 

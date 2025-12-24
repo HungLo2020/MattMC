@@ -20,9 +20,9 @@
 package com.seibel.distanthorizons.core.network.messages.base;
 
 import com.google.common.base.MoreObjects;
-import com.seibel.distanthorizons.core.multiplayer.config.SessionConfig;
-import com.seibel.distanthorizons.core.network.INetworkObject;
-import com.seibel.distanthorizons.core.network.messages.AbstractNetworkMessage;
+import net.distant_horizons.core.multiplayer.config.SessionConfig;
+import net.distant_horizons.core.network.INetworkObject;
+import net.distant_horizons.core.network.messages.AbstractNetworkMessage;
 import io.netty.buffer.ByteBuf;
 
 /** used for full DH support */

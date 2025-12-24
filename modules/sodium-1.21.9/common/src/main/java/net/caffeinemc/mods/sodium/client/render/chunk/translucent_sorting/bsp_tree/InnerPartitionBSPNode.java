@@ -7,22 +7,22 @@ import it.unimi.dsi.fastutil.ints.IntOpenHashSet;
 import it.unimi.dsi.fastutil.longs.LongArrayList;
 import it.unimi.dsi.fastutil.objects.ReferenceArrayList;
 import net.sodium.api.util.ColorMixer;
-import net.caffeinemc.mods.sodium.client.model.quad.properties.ModelQuadFacing;
-import net.caffeinemc.mods.sodium.client.render.chunk.translucent_sorting.TranslucentGeometryCollector;
-import net.caffeinemc.mods.sodium.client.render.chunk.translucent_sorting.data.TopoGraphSorting;
-import net.caffeinemc.mods.sodium.client.render.chunk.translucent_sorting.quad.FullTQuad;
-import net.caffeinemc.mods.sodium.client.render.chunk.translucent_sorting.quad.TQuad;
-import net.caffeinemc.mods.sodium.client.render.chunk.vertex.format.ChunkVertexEncoder;
+import net.sodium.client.model.quad.properties.ModelQuadFacing;
+import net.sodium.client.render.chunk.translucent_sorting.TranslucentGeometryCollector;
+import net.sodium.client.render.chunk.translucent_sorting.data.TopoGraphSorting;
+import net.sodium.client.render.chunk.translucent_sorting.quad.FullTQuad;
+import net.sodium.client.render.chunk.translucent_sorting.quad.TQuad;
+import net.sodium.client.render.chunk.vertex.format.ChunkVertexEncoder;
 import net.sodium.api.util.MathUtil;
-import net.caffeinemc.mods.sodium.client.util.sorting.RadixSort;
+import net.sodium.client.util.sorting.RadixSort;
 import net.minecraft.util.Mth;
 import org.joml.Vector3fc;
 
 import java.util.Arrays;
 import java.util.Random;
 
-import static net.caffeinemc.mods.sodium.client.render.chunk.vertex.format.ChunkVertexEncoder.Vertex.copyVertexTo;
-import static net.caffeinemc.mods.sodium.client.render.chunk.vertex.format.ChunkVertexEncoder.Vertex.writeVertex;
+import static net.sodium.client.render.chunk.vertex.format.ChunkVertexEncoder.Vertex.copyVertexTo;
+import static net.sodium.client.render.chunk.vertex.format.ChunkVertexEncoder.Vertex.writeVertex;
 
 /**
  * Performs aligned BSP partitioning of many nodes and constructs appropriate

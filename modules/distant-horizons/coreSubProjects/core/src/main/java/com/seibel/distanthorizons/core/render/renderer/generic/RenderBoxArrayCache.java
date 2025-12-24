@@ -2,8 +2,8 @@ package com.seibel.distanthorizons.core.render.renderer.generic;
 
 import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.RemovalNotification;
-import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
-import com.seibel.distanthorizons.core.logging.DhLogger;
+import net.distant_horizons.core.logging.DhLoggerBuilder;
+import net.distant_horizons.core.logging.DhLogger;
 
 import java.util.concurrent.ConcurrentMap;
 

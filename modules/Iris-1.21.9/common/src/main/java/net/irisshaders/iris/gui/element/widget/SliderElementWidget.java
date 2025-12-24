@@ -1,7 +1,7 @@
 package net.irisshaders.iris.gui.element.widget;
 
-import net.irisshaders.iris.gui.GuiUtil;
-import net.irisshaders.iris.shaderpack.option.menu.OptionMenuStringOptionElement;
+import net.iris.gui.GuiUtil;
+import net.iris.shaderpack.option.menu.OptionMenuStringOptionElement;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;

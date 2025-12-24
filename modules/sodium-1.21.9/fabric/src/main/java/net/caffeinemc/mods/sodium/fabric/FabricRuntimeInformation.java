@@ -1,6 +1,6 @@
 package net.caffeinemc.mods.sodium.fabric;
 
-import net.caffeinemc.mods.sodium.client.services.PlatformRuntimeInformation;
+import net.sodium.client.services.PlatformRuntimeInformation;
 import net.fabricmc.loader.api.FabricLoader;
 
 import java.nio.file.Path;

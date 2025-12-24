@@ -19,11 +19,11 @@
 
 package com.seibel.distanthorizons.core.api.external.methods.config;
 
-import com.seibel.distanthorizons.api.interfaces.config.IDhApiConfig;
-import com.seibel.distanthorizons.api.interfaces.config.both.IDhApiWorldGenerationConfig;
+import net.distant_horizons.api.interfaces.config.IDhApiConfig;
+import net.distant_horizons.api.interfaces.config.both.IDhApiWorldGenerationConfig;
 import com.seibel.distanthorizons.api.interfaces.config.client.*;
 import com.seibel.distanthorizons.core.api.external.methods.config.client.*;
-import com.seibel.distanthorizons.core.api.external.methods.config.common.DhApiWorldGenerationConfig;
+import net.distant_horizons.core.api.external.methods.config.common.DhApiWorldGenerationConfig;
 
 public class DhApiConfig implements IDhApiConfig
 {

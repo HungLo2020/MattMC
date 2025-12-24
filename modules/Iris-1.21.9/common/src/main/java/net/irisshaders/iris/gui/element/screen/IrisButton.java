@@ -2,7 +2,7 @@ package net.irisshaders.iris.gui.element.screen;
 
 import com.mojang.blaze3d.opengl.GlStateManager;
 import net.iris.gl.uniform.FloatSupplier;
-import net.irisshaders.iris.gui.GuiUtil;
+import net.iris.gui.GuiUtil;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;

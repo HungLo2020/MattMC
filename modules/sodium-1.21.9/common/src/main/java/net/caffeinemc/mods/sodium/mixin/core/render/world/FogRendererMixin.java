@@ -1,8 +1,8 @@
 package net.caffeinemc.mods.sodium.mixin.core.render.world;
 
 import com.llamalad7.mixinextras.sugar.Local;
-import net.caffeinemc.mods.sodium.client.util.FogParameters;
-import net.caffeinemc.mods.sodium.client.util.FogStorage;
+import net.sodium.client.util.FogParameters;
+import net.sodium.client.util.FogStorage;
 import net.minecraft.client.Camera;
 import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.multiplayer.ClientLevel;

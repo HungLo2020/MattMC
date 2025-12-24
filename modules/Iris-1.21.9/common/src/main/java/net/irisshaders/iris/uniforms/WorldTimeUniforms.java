@@ -1,8 +1,8 @@
 package net.irisshaders.iris.uniforms;
 
-import net.irisshaders.iris.Iris;
-import net.irisshaders.iris.gl.uniform.UniformHolder;
-import net.irisshaders.iris.shaderpack.DimensionId;
+import net.iris.Iris;
+import net.iris.gl.uniform.UniformHolder;
+import net.iris.shaderpack.DimensionId;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
 

@@ -1,7 +1,7 @@
 package net.irisshaders.iris.compat.sodium.mixin;
 
-import net.caffeinemc.mods.sodium.client.gl.tessellation.GlPrimitiveType;
-import net.irisshaders.iris.vertices.ImmediateState;
+import net.sodium.client.gl.tessellation.GlPrimitiveType;
+import net.iris.vertices.ImmediateState;
 import org.lwjgl.opengl.GL43C;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;

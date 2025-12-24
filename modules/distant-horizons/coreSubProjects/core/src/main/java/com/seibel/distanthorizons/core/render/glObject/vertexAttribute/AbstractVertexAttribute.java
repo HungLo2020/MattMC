@@ -19,7 +19,7 @@
 
 package com.seibel.distanthorizons.core.render.glObject.vertexAttribute;
 
-import com.seibel.distanthorizons.core.render.glObject.GLProxy;
+import net.distant_horizons.core.render.glObject.GLProxy;
 import org.lwjgl.opengl.GL32;
 
 /**

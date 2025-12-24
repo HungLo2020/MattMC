@@ -1,7 +1,7 @@
 package net.irisshaders.iris.mixin.statelisteners;
 
 import com.mojang.blaze3d.opengl.GlStateManager;
-import net.irisshaders.iris.gl.state.StateUpdateNotifiers;
+import net.iris.gl.state.StateUpdateNotifiers;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;

@@ -19,7 +19,7 @@
 
 package com.seibel.distanthorizons.core.config.types;
 
-import com.seibel.distanthorizons.core.config.types.enums.EConfigEntryAppearance;
+import net.distant_horizons.core.config.types.enums.EConfigEntryAppearance;
 
 /**
  * Adds a category to the config

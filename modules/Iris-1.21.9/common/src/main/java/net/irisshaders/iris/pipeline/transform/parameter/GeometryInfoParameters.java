@@ -1,10 +1,10 @@
 package net.irisshaders.iris.pipeline.transform.parameter;
 
 import it.unimi.dsi.fastutil.objects.Object2ObjectMap;
-import net.irisshaders.iris.gl.texture.TextureType;
+import net.iris.gl.texture.TextureType;
 import net.iris.helpers.Tri;
-import net.irisshaders.iris.pipeline.transform.Patch;
-import net.irisshaders.iris.shaderpack.texture.TextureStage;
+import net.iris.pipeline.transform.Patch;
+import net.iris.shaderpack.texture.TextureStage;
 
 public abstract class GeometryInfoParameters extends Parameters {
 	public final boolean hasGeometry;

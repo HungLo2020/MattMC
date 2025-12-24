@@ -20,13 +20,13 @@
 package com.seibel.distanthorizons.core.api.external.methods.config.client;
 
 import com.seibel.distanthorizons.api.enums.config.*;
-import com.seibel.distanthorizons.api.enums.rendering.EDhApiTransparency;
-import com.seibel.distanthorizons.api.interfaces.config.IDhApiConfigValue;
+import net.distant_horizons.api.enums.rendering.EDhApiTransparency;
+import net.distant_horizons.api.interfaces.config.IDhApiConfigValue;
 import com.seibel.distanthorizons.api.interfaces.config.client.*;
-import com.seibel.distanthorizons.core.config.api.DhApiConfigValue;
-import com.seibel.distanthorizons.api.enums.rendering.EDhApiRendererMode;
-import com.seibel.distanthorizons.core.config.Config;
-import com.seibel.distanthorizons.core.config.api.converters.RenderModeEnabledConverter;
+import net.distant_horizons.core.config.api.DhApiConfigValue;
+import net.distant_horizons.api.enums.rendering.EDhApiRendererMode;
+import net.distant_horizons.core.config.Config;
+import net.distant_horizons.core.config.api.converters.RenderModeEnabledConverter;
 
 public class DhApiGraphicsConfig implements IDhApiGraphicsConfig
 {

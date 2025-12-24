@@ -21,9 +21,9 @@ package com.seibel.distanthorizons.core.jar.installer;
 
 import com.electronwill.nightconfig.core.Config;
 import com.electronwill.nightconfig.json.JsonFormat;
-import com.seibel.distanthorizons.core.jar.updater.SelfUpdater;
-import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
-import com.seibel.distanthorizons.core.logging.DhLogger;
+import net.distant_horizons.core.jar.updater.SelfUpdater;
+import net.distant_horizons.core.logging.DhLoggerBuilder;
+import net.distant_horizons.core.logging.DhLogger;
 
 import java.net.URL;
 import java.util.*;

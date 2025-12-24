@@ -1,9 +1,9 @@
 package net.irisshaders.iris.shaderpack.option.menu;
 
-import net.irisshaders.iris.shaderpack.option.MergedBooleanOption;
-import net.irisshaders.iris.shaderpack.option.MergedStringOption;
-import net.irisshaders.iris.shaderpack.option.ShaderPackOptions;
-import net.irisshaders.iris.shaderpack.properties.ShaderProperties;
+import net.iris.shaderpack.option.MergedBooleanOption;
+import net.iris.shaderpack.option.MergedStringOption;
+import net.iris.shaderpack.option.ShaderPackOptions;
+import net.iris.shaderpack.properties.ShaderProperties;
 
 import java.util.Map;
 

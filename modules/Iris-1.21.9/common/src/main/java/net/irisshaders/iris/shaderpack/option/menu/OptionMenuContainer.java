@@ -1,10 +1,10 @@
 package net.irisshaders.iris.shaderpack.option.menu;
 
 import com.google.common.collect.Lists;
-import net.irisshaders.iris.Iris;
-import net.irisshaders.iris.shaderpack.option.ProfileSet;
-import net.irisshaders.iris.shaderpack.option.ShaderPackOptions;
-import net.irisshaders.iris.shaderpack.properties.ShaderProperties;
+import net.iris.Iris;
+import net.iris.shaderpack.option.ProfileSet;
+import net.iris.shaderpack.option.ShaderPackOptions;
+import net.iris.shaderpack.properties.ShaderProperties;
 
 import java.util.ArrayList;
 import java.util.Collections;

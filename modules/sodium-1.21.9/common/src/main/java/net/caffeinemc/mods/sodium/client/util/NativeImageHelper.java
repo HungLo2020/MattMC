@@ -1,6 +1,6 @@
 package net.caffeinemc.mods.sodium.client.util;
 
-import net.caffeinemc.mods.sodium.mixin.features.textures.NativeImageAccessor;
+import net.sodium.mixin.features.textures.NativeImageAccessor;
 import com.mojang.blaze3d.platform.NativeImage;
 
 import java.util.Locale;

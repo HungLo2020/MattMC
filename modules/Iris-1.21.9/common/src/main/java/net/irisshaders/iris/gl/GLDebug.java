@@ -5,8 +5,8 @@
 
 package net.irisshaders.iris.gl;
 
-import net.irisshaders.iris.Iris;
-import net.irisshaders.iris.platform.IrisPlatformHelpers;
+import net.iris.Iris;
+import net.iris.platform.IrisPlatformHelpers;
 import org.lwjgl.opengl.AMDDebugOutput;
 import org.lwjgl.opengl.ARBDebugOutput;
 import org.lwjgl.opengl.GL;

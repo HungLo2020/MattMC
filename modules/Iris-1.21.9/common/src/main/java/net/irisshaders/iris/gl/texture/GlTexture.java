@@ -2,8 +2,8 @@ package net.irisshaders.iris.gl.texture;
 
 import com.mojang.blaze3d.opengl.GlStateManager;
 import net.iris.gl.GlResource;
-import net.irisshaders.iris.gl.IrisRenderSystem;
-import net.irisshaders.iris.shaderpack.texture.TextureFilteringData;
+import net.iris.gl.IrisRenderSystem;
+import net.iris.shaderpack.texture.TextureFilteringData;
 import org.lwjgl.opengl.GL11C;
 import org.lwjgl.opengl.GL13C;
 import org.lwjgl.opengl.GL20C;

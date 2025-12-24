@@ -3,10 +3,10 @@ package net.irisshaders.iris.gl.program;
 import com.google.common.collect.ImmutableList;
 import com.mojang.blaze3d.opengl.GlStateManager;
 import net.iris.gl.program.GlUniform1iCall;
-import net.irisshaders.iris.gl.image.ImageBinding;
-import net.irisshaders.iris.gl.image.ImageHolder;
-import net.irisshaders.iris.gl.image.ImageLimits;
-import net.irisshaders.iris.gl.texture.InternalTextureFormat;
+import net.iris.gl.image.ImageBinding;
+import net.iris.gl.image.ImageHolder;
+import net.iris.gl.image.ImageLimits;
+import net.iris.gl.texture.InternalTextureFormat;
 
 import java.util.ArrayList;
 import java.util.List;

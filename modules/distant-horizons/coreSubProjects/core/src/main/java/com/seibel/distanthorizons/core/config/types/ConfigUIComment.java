@@ -19,11 +19,11 @@
 
 package com.seibel.distanthorizons.core.config.types;
 
-import com.seibel.distanthorizons.core.config.Config;
-import com.seibel.distanthorizons.core.config.types.enums.EConfigCommentTextPosition;
-import com.seibel.distanthorizons.core.config.types.enums.EConfigEntryAppearance;
-import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
-import com.seibel.distanthorizons.core.logging.DhLogger;
+import net.distant_horizons.core.config.Config;
+import net.distant_horizons.core.config.types.enums.EConfigCommentTextPosition;
+import net.distant_horizons.core.config.types.enums.EConfigEntryAppearance;
+import net.distant_horizons.core.logging.DhLoggerBuilder;
+import net.distant_horizons.core.logging.DhLogger;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 

@@ -1,7 +1,7 @@
 package net.irisshaders.iris.gl.sampler;
 
 import net.iris.gl.GlResource;
-import net.irisshaders.iris.gl.IrisRenderSystem;
+import net.iris.gl.IrisRenderSystem;
 import org.lwjgl.opengl.GL11C;
 import org.lwjgl.opengl.GL13C;
 import org.lwjgl.opengl.GL20C;

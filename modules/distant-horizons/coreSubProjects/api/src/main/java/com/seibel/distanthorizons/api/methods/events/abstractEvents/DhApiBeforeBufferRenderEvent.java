@@ -19,11 +19,11 @@
 
 package com.seibel.distanthorizons.api.methods.events.abstractEvents;
 
-import com.seibel.distanthorizons.api.methods.events.interfaces.IDhApiEvent;
-import com.seibel.distanthorizons.api.methods.events.interfaces.IDhApiEventParam;
-import com.seibel.distanthorizons.api.methods.events.sharedParameterObjects.DhApiEventParam;
-import com.seibel.distanthorizons.api.methods.events.sharedParameterObjects.DhApiRenderParam;
-import com.seibel.distanthorizons.api.objects.math.DhApiVec3f;
+import net.distant_horizons.api.methods.events.interfaces.IDhApiEvent;
+import net.distant_horizons.api.methods.events.interfaces.IDhApiEventParam;
+import net.distant_horizons.api.methods.events.sharedParameterObjects.DhApiEventParam;
+import net.distant_horizons.api.methods.events.sharedParameterObjects.DhApiRenderParam;
+import net.distant_horizons.api.objects.math.DhApiVec3f;
 
 /**
  * Called before Distant Horizons starts rendering a buffer. <br>

@@ -1,6 +1,6 @@
 package net.irisshaders.iris.uniforms;
 
-import net.irisshaders.iris.gl.uniform.UniformHolder;
+import net.iris.gl.uniform.UniformHolder;
 import net.minecraft.client.Minecraft;
 
 import static net.iris.gl.uniform.UniformUpdateFrequency.PER_FRAME;

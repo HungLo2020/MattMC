@@ -1,6 +1,6 @@
 package kroppeb.stareval.expression;
 
-import kroppeb.stareval.function.Type;
+import net.iris.stareval.function.Type;
 
 import java.util.Collection;
 

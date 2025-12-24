@@ -19,7 +19,7 @@
 
 package com.seibel.distanthorizons.core.enums;
 
-import com.seibel.distanthorizons.core.util.math.Vec3i;
+import net.distant_horizons.core.util.math.Vec3i;
 
 /**
  * Up <Br>

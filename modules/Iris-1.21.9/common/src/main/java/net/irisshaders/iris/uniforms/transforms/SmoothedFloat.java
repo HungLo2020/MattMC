@@ -1,8 +1,8 @@
 package net.irisshaders.iris.uniforms.transforms;
 
 import net.iris.gl.uniform.FloatSupplier;
-import net.irisshaders.iris.uniforms.FrameUpdateNotifier;
-import net.irisshaders.iris.uniforms.SystemTimeUniforms;
+import net.iris.uniforms.FrameUpdateNotifier;
+import net.iris.uniforms.SystemTimeUniforms;
 
 /**
  * An implementation of basic exponential smoothing that converts a sequence of unsmoothed values into a sequence of

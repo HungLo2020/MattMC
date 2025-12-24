@@ -19,14 +19,14 @@
 
 package com.seibel.distanthorizons.core.util;
 
-import com.seibel.distanthorizons.api.enums.rendering.EDhApiBlockMaterial;
-import com.seibel.distanthorizons.core.level.AbstractDhLevel;
-import com.seibel.distanthorizons.core.dataObjects.render.columnViews.ColumnArrayView;
-import com.seibel.distanthorizons.core.dataObjects.render.columnViews.IColumnDataView;
-import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
-import com.seibel.distanthorizons.core.wrapperInterfaces.world.ILevelWrapper;
-import com.seibel.distanthorizons.coreapi.ModInfo;
-import com.seibel.distanthorizons.core.logging.DhLogger;
+import net.distant_horizons.api.enums.rendering.EDhApiBlockMaterial;
+import net.distant_horizons.core.level.AbstractDhLevel;
+import net.distant_horizons.core.dataObjects.render.columnViews.ColumnArrayView;
+import net.distant_horizons.core.dataObjects.render.columnViews.IColumnDataView;
+import net.distant_horizons.core.logging.DhLoggerBuilder;
+import net.distant_horizons.core.wrapperInterfaces.world.ILevelWrapper;
+import net.distant_horizons.coreapi.ModInfo;
+import net.distant_horizons.core.logging.DhLogger;
 
 
 /**
