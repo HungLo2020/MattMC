@@ -7,8 +7,6 @@ import com.mojang.blaze3d.vertex.DefaultVertexFormat;
 import com.mojang.blaze3d.vertex.MeshData;
 import com.mojang.blaze3d.vertex.Tesselator;
 import com.mojang.blaze3d.vertex.VertexFormat;
-import net.irisshaders.iris.gl.IrisRenderSystem;
-import net.irisshaders.iris.helpers.VertexBufferHelper;
 
 /**
  * Renders a full-screen textured quad to the screen. Used in composite / deferred rendering.

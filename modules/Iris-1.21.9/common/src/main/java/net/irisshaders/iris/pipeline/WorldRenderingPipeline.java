@@ -5,7 +5,7 @@ import it.unimi.dsi.fastutil.objects.Object2ObjectMap;
 import net.irisshaders.iris.compat.dh.DHCompat;
 import net.irisshaders.iris.features.FeatureFlags;
 import net.irisshaders.iris.gl.texture.TextureType;
-import net.irisshaders.iris.helpers.Tri;
+import net.iris.helpers.Tri;
 import net.irisshaders.iris.mixin.LevelRendererAccessor;
 import net.irisshaders.iris.pipeline.programs.SodiumPrograms;
 import net.irisshaders.iris.shaderpack.properties.CloudSetting;
@@ -16,7 +16,6 @@ import net.minecraft.client.Camera;
 import net.minecraft.client.gui.components.debug.DebugScreenDisplayer;
 import net.minecraft.client.renderer.state.CameraRenderState;
 
-import java.util.List;
 import java.util.OptionalInt;
 
 public interface WorldRenderingPipeline {

@@ -2,10 +2,9 @@ package net.irisshaders.iris.mixin.gui;
 
 import com.llamalad7.mixinextras.injector.wrapmethod.WrapMethod;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
-import com.mojang.blaze3d.systems.RenderSystem;
 import net.irisshaders.iris.Iris;
 import net.irisshaders.iris.gl.GLDebug;
-import net.irisshaders.iris.gui.screen.HudHideable;
+import net.iris.gui.screen.HudHideable;
 import net.irisshaders.iris.pipeline.WorldRenderingPipeline;
 import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.Minecraft;

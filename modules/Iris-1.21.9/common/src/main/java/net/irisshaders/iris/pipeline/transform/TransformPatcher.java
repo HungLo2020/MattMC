@@ -21,7 +21,7 @@ import net.irisshaders.iris.gl.blending.AlphaTest;
 import net.iris.gl.shader.ShaderCompileException;
 import net.irisshaders.iris.gl.state.ShaderAttributeInputs;
 import net.irisshaders.iris.gl.texture.TextureType;
-import net.irisshaders.iris.helpers.Tri;
+import net.iris.helpers.Tri;
 import net.irisshaders.iris.pipeline.transform.parameter.ComputeParameters;
 import net.irisshaders.iris.pipeline.transform.parameter.DHParameters;
 import net.irisshaders.iris.pipeline.transform.parameter.Parameters;

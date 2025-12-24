@@ -1,4 +1,4 @@
-package net.irisshaders.iris.helpers;
+package net.iris.helpers;
 
 /**
  * An absurdly simple class for storing pairs of strings because Java lacks pair / tuple types.

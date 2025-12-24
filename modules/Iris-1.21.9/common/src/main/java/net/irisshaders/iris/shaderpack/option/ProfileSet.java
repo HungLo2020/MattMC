@@ -1,7 +1,7 @@
 package net.irisshaders.iris.shaderpack.option;
 
 import net.irisshaders.iris.Iris;
-import net.irisshaders.iris.IrisLogging;
+import net.iris.IrisLogging;
 import net.irisshaders.iris.shaderpack.option.values.OptionValues;
 import org.jetbrains.annotations.Nullable;
 

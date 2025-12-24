@@ -1,4 +1,4 @@
-package net.irisshaders.iris.gui;
+package net.iris.gui;
 
 import org.jetbrains.annotations.Nullable;
 import org.lwjgl.PointerBuffer;

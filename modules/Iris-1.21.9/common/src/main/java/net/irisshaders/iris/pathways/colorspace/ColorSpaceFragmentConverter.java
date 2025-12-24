@@ -12,7 +12,7 @@ import net.irisshaders.iris.gl.framebuffer.GlFramebuffer;
 import net.irisshaders.iris.gl.program.Program;
 import net.irisshaders.iris.gl.program.ProgramBuilder;
 import net.iris.gl.uniform.UniformUpdateFrequency;
-import net.irisshaders.iris.helpers.StringPair;
+import net.iris.helpers.StringPair;
 import net.irisshaders.iris.mixinterface.CustomPass;
 import net.irisshaders.iris.pathways.FullScreenQuadRenderer;
 import net.irisshaders.iris.shaderpack.preprocessor.JcppProcessor;

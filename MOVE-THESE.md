@@ -1,10 +1,4 @@
 
-modules/Iris-1.21.9/common/src/main/java/net/irisshaders/iris/gui/FileDialogUtil.java
-modules/Iris-1.21.9/common/src/main/java/net/irisshaders/iris/gui/screen/HudHideable.java
-modules/Iris-1.21.9/common/src/main/java/net/irisshaders/iris/helpers/OptionalBoolean.java
-modules/Iris-1.21.9/common/src/main/java/net/irisshaders/iris/helpers/StringPair.java
-modules/Iris-1.21.9/common/src/main/java/net/irisshaders/iris/helpers/Tri.java
-modules/Iris-1.21.9/common/src/main/java/net/irisshaders/iris/helpers/VertexBufferHelper.java
 modules/Iris-1.21.9/common/src/main/java/net/irisshaders/iris/mixin/IrisMixinPlugin.java
 modules/Iris-1.21.9/common/src/main/java/net/irisshaders/iris/mixin/texunits/MixinGlStateManager.java
 modules/Iris-1.21.9/common/src/main/java/net/irisshaders/iris/mixinterface/AbstractTextureExtended.java

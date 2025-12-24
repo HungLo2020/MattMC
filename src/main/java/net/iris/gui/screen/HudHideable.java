@@ -1,4 +1,4 @@
-package net.irisshaders.iris.gui.screen;
+package net.iris.gui.screen;
 
 /**
  * Screens implementing this will hide the player hand and HUD

@@ -1,4 +1,4 @@
-package net.irisshaders.iris.helpers;
+package net.iris.helpers;
 
 import java.util.function.BooleanSupplier;
 
