@@ -596,16 +596,29 @@ tasks.register('fabricLoaderJar', Jar) {
 
 tasks.register('gameJar', Jar) {
     group = 'build'
-    description = 'Assembles the Minecraft game JAR'
+    description = 'Assembles the Minecraft game JAR with integrated modules'
     
-    dependsOn 'classes'
+    // Ensure all module classes are compiled before creating game JAR
+    dependsOn 'classes', 'compileSodiumJava', 'compileIrisJava'
+    if (enableDistantHorizons) {
+        dependsOn 'compileDistantHorizonsJava'
+    }
     
     archiveBaseName = 'minecraft'
     archiveVersion = version
     
+    // Include main Minecraft code plus all integrated modules
     from sourceSets.main.output
+    from sourceSets.sodium.output
+    from sourceSets.iris.output
+    if (enableDistantHorizons) {
+        from sourceSets.distantHorizons.output
+    }
     
     destinationDirectory = file("${buildDir}/libs")
+    
+    // Exclude duplicate META-INF/services - merge them instead
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
 }
 
 // Ensure fabricLoaderJar depends on compilation
@@ -933,13 +946,15 @@ tasks.register('runClient', JavaExec) {
     group = 'minecraft'
     description = 'Runs the Minecraft client with Fabric Loader and integrated modules'
     
-    // Use the integrated JAR with all modules included
-    dependsOn 'jar', 'copyJdkToRun', 'shaderPackZip'
+    // Use separate Fabric Loader and Game JARs (with integrated mods in game JAR)
+    dependsOn 'fabricLoaderJar', 'gameJar', 'copyJdkToRun', 'shaderPackZip'
     
-    // Use the main JAR which now contains all modules
-    def mainJarFile = file("${buildDir}/libs/${project.name}-${version}.jar")
+    // Use the separate JARs so Fabric Loader can detect the game JAR properly
+    // The order matters: Fabric Loader JAR first, then Game JAR, then dependencies
+    def fabricLoaderJarFile = file("${buildDir}/libs/fabric-loader-${fabricLoaderVersion}.jar")
+    def gameJarFile = file("${buildDir}/libs/minecraft-${version}.jar")
     
-    classpath = files(mainJarFile) + configurations.runtimeClasspath
+    classpath = files(fabricLoaderJarFile, gameJarFile) + configurations.runtimeClasspath
     
     // Use Fabric Loader's KnotClient as the entry point
     mainClass = 'net.fabricmc.loader.impl.launch.knot.KnotClient'
@@ -948,8 +963,8 @@ tasks.register('runClient', JavaExec) {
     jvmArgs = clientJvmArgs + [
         // Fabric Loader options
         '-Dfabric.development=true',
-        // Tell Fabric Loader where the game JAR is (same as main JAR now)
-        "-Dfabric.gameJarPath.client=${mainJarFile.absolutePath}"
+        // Tell Fabric Loader where the game JAR is
+        "-Dfabric.gameJarPath.client=${gameJarFile.absolutePath}"
     ]
     
     // Required client arguments - these get passed through Knot to Minecraft
@@ -962,16 +977,19 @@ tasks.register('runClient', JavaExec) {
     ]
     
     doFirst {
-        // Verify JAR exists
-        if (!mainJarFile.exists()) {
-            throw new GradleException("Main JAR not found: ${mainJarFile}")
+        // Verify JARs exist
+        if (!fabricLoaderJarFile.exists()) {
+            throw new GradleException("Fabric Loader JAR not found: ${fabricLoaderJarFile}")
+        }
+        if (!gameJarFile.exists()) {
+            throw new GradleException("Game JAR not found: ${gameJarFile}")
         }
         
         workingDir.mkdirs()
         file('run/assets').mkdirs()
         file('run/resourcepacks').mkdirs()
         
-        // Create empty mods folder (all mods are now integrated into main JAR)
+        // Create empty mods folder (all mods are now integrated into game JAR)
         def modsDir = file('run/mods')
         if (modsDir.exists()) {
             modsDir.deleteDir()
@@ -1202,8 +1220,8 @@ tasks.register('clientDist') {
     group = 'distribution'
     description = 'Creates a runnable client distribution'
     
-    // Use integrated JAR with all modules
-    dependsOn 'jar', 'classes', 'downloadJdk', 'shaderPackZip'
+    // Use separate Fabric Loader and Game JARs (with integrated mods)
+    dependsOn 'fabricLoaderJar', 'gameJar', 'classes', 'downloadJdk', 'shaderPackZip'
     
     def distDir = "${buildDir}/client-dist/MattMC"
     
@@ -1218,12 +1236,19 @@ tasks.register('clientDist') {
         file("${distDir}/run/shaderpacks").mkdirs()
         file("${distDir}/run/mods").mkdirs()
         
-        // Copy main JAR (with all modules integrated) to lib directory
+        // Copy Fabric Loader JAR to lib directory
         copy {
-            from file("${buildDir}/libs/${project.name}-${version}.jar")
+            from file("${buildDir}/libs/fabric-loader-${fabricLoaderVersion}.jar")
             into "${distDir}/lib"
         }
-        println "Copied integrated JAR to ${distDir}/lib"
+        println "Copied Fabric Loader JAR to ${distDir}/lib"
+        
+        // Copy Game JAR (with integrated modules) to lib directory
+        copy {
+            from file("${buildDir}/libs/minecraft-${version}.jar")
+            into "${distDir}/lib"
+        }
+        println "Copied Game JAR (with integrated modules) to ${distDir}/lib"
         
         // Copy all dependency JARs
         copy {
@@ -1268,13 +1293,14 @@ tasks.register('clientDist') {
         }
         println "Copied shader pack to ${distDir}/run/shaderpacks"
         
-        // No need to copy mod JARs - all modules are now integrated into main JAR
+        // No need to copy mod JARs - all modules are now integrated into game JAR
         
         // Build classpath string for launch scripts
-        // Main JAR first, then dependencies
-        def mainJarName = "${project.name}-${version}.jar"
-        def classpathLinux = "lib/${mainJarName}:lib/" + configurations.runtimeClasspath.files.collect { it.name }.join(':lib/')
-        def classpathWindows = "lib\\${mainJarName};lib\\" + configurations.runtimeClasspath.files.collect { it.name }.join(';lib\\')
+        // Fabric Loader JAR first, then Game JAR, then dependencies (same order as runClient)
+        def fabricLoaderJarName = "fabric-loader-${fabricLoaderVersion}.jar"
+        def gameJarName = "minecraft-${version}.jar"
+        def classpathLinux = "lib/${fabricLoaderJarName}:lib/${gameJarName}:lib/" + configurations.runtimeClasspath.files.collect { it.name }.join(':lib/')
+        def classpathWindows = "lib\\${fabricLoaderJarName};lib\\${gameJarName};lib\\" + configurations.runtimeClasspath.files.collect { it.name }.join(';lib\\')
         
         // Asset index - this should match the index file in assets/indexes/<assetIndex>.json
         def assetIndex = '27'
