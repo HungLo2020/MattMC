@@ -1,4 +1,4 @@
-package kroppeb.stareval.exception;
+package net.iris.stareval.exception;
 
 public class UnexpectedEndingException extends ParseException {
 	public UnexpectedEndingException() {

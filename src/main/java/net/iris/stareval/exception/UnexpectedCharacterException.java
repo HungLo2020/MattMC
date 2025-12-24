@@ -1,4 +1,4 @@
-package kroppeb.stareval.exception;
+package net.iris.stareval.exception;
 
 public class UnexpectedCharacterException extends ParseException {
 	public UnexpectedCharacterException(char expected, char actual, int index) {

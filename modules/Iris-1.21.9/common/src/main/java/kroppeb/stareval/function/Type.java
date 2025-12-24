@@ -2,6 +2,7 @@ package kroppeb.stareval.function;
 
 import kroppeb.stareval.expression.ConstantExpression;
 import kroppeb.stareval.function.TypedFunction.Parameter;
+import net.iris.stareval.function.FunctionReturn;
 import net.irisshaders.iris.gl.uniform.UniformType;
 import net.irisshaders.iris.parsing.MatrixType;
 import net.irisshaders.iris.parsing.VectorType;

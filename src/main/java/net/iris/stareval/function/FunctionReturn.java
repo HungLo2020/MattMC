@@ -1,4 +1,4 @@
-package kroppeb.stareval.function;
+package net.iris.stareval.function;
 
 public class FunctionReturn {
 	public boolean booleanReturn;

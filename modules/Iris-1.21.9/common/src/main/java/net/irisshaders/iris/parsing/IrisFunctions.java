@@ -12,7 +12,7 @@ import kroppeb.stareval.function.FFF2BFunction;
 import kroppeb.stareval.function.FFF2FFunction;
 import kroppeb.stareval.function.FunctionContext;
 import kroppeb.stareval.function.FunctionResolver;
-import kroppeb.stareval.function.FunctionReturn;
+import net.iris.stareval.function.FunctionReturn;
 import kroppeb.stareval.function.I2IFunction;
 import kroppeb.stareval.function.II2BFunction;
 import kroppeb.stareval.function.II2IFunction;

@@ -1,4 +1,4 @@
-package net.irisshaders.iris.fantastic;
+package net.iris.fantastic;
 
 public enum ParticleRenderingPhase {
 	EVERYTHING,

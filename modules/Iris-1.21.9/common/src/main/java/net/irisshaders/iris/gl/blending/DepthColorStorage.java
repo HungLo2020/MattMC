@@ -1,6 +1,7 @@
 package net.irisshaders.iris.gl.blending;
 
 import com.mojang.blaze3d.opengl.GlStateManager;
+import net.iris.gl.blending.ColorMask;
 import net.irisshaders.iris.mixin.GlStateManagerAccessor;
 
 public class DepthColorStorage {

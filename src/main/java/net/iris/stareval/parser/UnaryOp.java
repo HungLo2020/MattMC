@@ -1,4 +1,4 @@
-package kroppeb.stareval.parser;
+package net.iris.stareval.parser;
 
 public record UnaryOp(String name) {
 

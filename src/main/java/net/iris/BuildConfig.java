@@ -1,4 +1,4 @@
-package net.irisshaders.iris;
+package net.iris;
 
 // Generated for MattMC Iris integration
 public class BuildConfig {

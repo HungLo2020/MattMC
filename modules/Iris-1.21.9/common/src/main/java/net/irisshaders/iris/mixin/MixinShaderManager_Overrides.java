@@ -4,46 +4,21 @@ import com.mojang.blaze3d.opengl.GlDevice;
 import com.mojang.blaze3d.opengl.GlProgram;
 import com.mojang.blaze3d.opengl.GlRenderPipeline;
 import com.mojang.blaze3d.pipeline.RenderPipeline;
-import it.unimi.dsi.fastutil.Function;
-import it.unimi.dsi.fastutil.objects.Object2ObjectArrayMap;
 import net.irisshaders.iris.Iris;
-import net.irisshaders.iris.mixinterface.ShaderInstanceInterface;
-import net.irisshaders.iris.pathways.HandRenderer;
 import net.irisshaders.iris.pipeline.CompositeRenderer;
 import net.irisshaders.iris.pipeline.IrisPipelines;
 import net.irisshaders.iris.pipeline.IrisRenderingPipeline;
-import net.irisshaders.iris.pipeline.WorldRenderingPhase;
 import net.irisshaders.iris.pipeline.WorldRenderingPipeline;
-import net.irisshaders.iris.pipeline.programs.ShaderAccess;
 import net.irisshaders.iris.pipeline.programs.ShaderKey;
-import net.irisshaders.iris.pipeline.programs.ShaderOverrides;
-import net.irisshaders.iris.platform.IrisPlatformHelpers;
-import net.irisshaders.iris.shadows.ShadowRenderingState;
 import net.irisshaders.iris.vertices.ImmediateState;
-import net.minecraft.client.gui.screens.Screen;
-import net.minecraft.client.renderer.RenderPipelines;
-import net.minecraft.client.renderer.ShaderManager;
-import net.minecraft.resources.ResourceLocation;
-import org.jetbrains.annotations.Nullable;
 import org.spongepowered.asm.mixin.Mixin;
-import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
-import java.lang.invoke.MethodHandle;
-import java.lang.invoke.MethodHandles;
-import java.lang.invoke.MethodType;
 import java.util.HashSet;
-import java.util.Map;
-import java.util.Optional;
 import java.util.Set;
-
-import static net.irisshaders.iris.compat.SkipList.ALWAYS;
-import static net.irisshaders.iris.compat.SkipList.NONE;
-import static net.irisshaders.iris.compat.SkipList.shouldSkipList;
-import static net.irisshaders.iris.pipeline.programs.ShaderOverrides.isBlockEntities;
 
 @Mixin(GlDevice.class)
 public abstract class MixinShaderManager_Overrides {

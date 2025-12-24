@@ -1,7 +1,7 @@
 package kroppeb.stareval.element.tree;
 
 import kroppeb.stareval.element.ExpressionElement;
-import kroppeb.stareval.parser.UnaryOp;
+import net.iris.stareval.parser.UnaryOp;
 
 public record UnaryExpressionElement(UnaryOp op, ExpressionElement inner) implements ExpressionElement {
 

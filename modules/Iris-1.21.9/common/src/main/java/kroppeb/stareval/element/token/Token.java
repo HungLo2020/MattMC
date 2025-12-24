@@ -1,6 +1,6 @@
 package kroppeb.stareval.element.token;
 
-import kroppeb.stareval.element.Element;
+import net.iris.stareval.element.Element;
 
 public abstract class Token implements Element {
 	@Override

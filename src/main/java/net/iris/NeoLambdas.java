@@ -1,4 +1,4 @@
-package net.irisshaders.iris;
+package net.iris;
 
 public class NeoLambdas {
     // MattMC uses official Mojang mappings - target the named wrapper methods we add to LevelRenderer

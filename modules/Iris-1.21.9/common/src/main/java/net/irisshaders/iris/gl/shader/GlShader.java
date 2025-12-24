@@ -4,7 +4,7 @@ package net.irisshaders.iris.gl.shader;
 
 import com.mojang.blaze3d.opengl.GlStateManager;
 import net.irisshaders.iris.gl.GLDebug;
-import net.irisshaders.iris.gl.GlResource;
+import net.iris.gl.GlResource;
 import net.irisshaders.iris.gl.IrisRenderSystem;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;

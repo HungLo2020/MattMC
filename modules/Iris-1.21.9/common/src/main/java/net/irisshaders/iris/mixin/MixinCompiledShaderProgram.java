@@ -19,15 +19,14 @@ import org.slf4j.Logger;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
-import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.Redirect;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 import java.lang.invoke.MethodHandle;
 
-import static net.irisshaders.iris.compat.SkipList.ALWAYS;
-import static net.irisshaders.iris.compat.SkipList.NONE;
-import static net.irisshaders.iris.compat.SkipList.shouldSkipList;
+import static net.iris.compat.SkipList.ALWAYS;
+import static net.iris.compat.SkipList.NONE;
+import static net.iris.compat.SkipList.shouldSkipList;
 
 @Mixin(GlProgram.class)
 public abstract class MixinCompiledShaderProgram implements ShaderInstanceInterface {

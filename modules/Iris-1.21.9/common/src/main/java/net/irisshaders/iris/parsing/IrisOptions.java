@@ -1,8 +1,8 @@
 package net.irisshaders.iris.parsing;
 
-import kroppeb.stareval.parser.BinaryOp;
+import net.iris.stareval.parser.BinaryOp;
 import kroppeb.stareval.parser.ParserOptions;
-import kroppeb.stareval.parser.UnaryOp;
+import net.iris.stareval.parser.UnaryOp;
 
 public class IrisOptions {
 	public static final ParserOptions options;

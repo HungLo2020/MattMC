@@ -1,4 +1,4 @@
-package net.irisshaders.iris.gl;
+package net.iris.gl;
 
 public interface BooleanStateExtended {
 	void setUnknownState();

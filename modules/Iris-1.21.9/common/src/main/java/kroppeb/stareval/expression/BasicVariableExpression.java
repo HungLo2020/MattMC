@@ -1,7 +1,7 @@
 package kroppeb.stareval.expression;
 
 import kroppeb.stareval.function.FunctionContext;
-import kroppeb.stareval.function.FunctionReturn;
+import net.iris.stareval.function.FunctionReturn;
 import kroppeb.stareval.function.Type;
 
 public class BasicVariableExpression implements VariableExpression {

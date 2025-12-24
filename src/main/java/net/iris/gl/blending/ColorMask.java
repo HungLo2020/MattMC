@@ -1,4 +1,4 @@
-package net.irisshaders.iris.gl.blending;
+package net.iris.gl.blending;
 
 public class ColorMask {
 	private final boolean red;

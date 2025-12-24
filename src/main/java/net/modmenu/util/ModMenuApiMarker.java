@@ -22,7 +22,7 @@
  * SOFTWARE.
  */
 
-package com.terraformersmc.modmenu.util;
+package net.modmenu.util;
 
 public interface ModMenuApiMarker {
 }

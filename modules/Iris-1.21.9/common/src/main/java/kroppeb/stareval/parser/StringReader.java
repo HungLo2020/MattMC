@@ -1,6 +1,6 @@
 package kroppeb.stareval.parser;
 
-import kroppeb.stareval.exception.UnexpectedCharacterException;
+import net.iris.stareval.exception.UnexpectedCharacterException;
 
 /**
  * A class to facilitate the reading of strings.

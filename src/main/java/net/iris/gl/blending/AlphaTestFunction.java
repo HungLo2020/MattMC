@@ -1,4 +1,4 @@
-package net.irisshaders.iris.gl.blending;
+package net.iris.gl.blending;
 
 import org.lwjgl.opengl.GL11;
 

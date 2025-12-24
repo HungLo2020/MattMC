@@ -1,4 +1,4 @@
-package kroppeb.stareval.exception;
+package net.iris.stareval.exception;
 
 public abstract class ParseException extends Exception {
 	public ParseException() {

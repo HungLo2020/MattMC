@@ -1,6 +1,7 @@
 package net.irisshaders.iris.gl.blending;
 
 import com.mojang.blaze3d.opengl.GlStateManager;
+import net.iris.gl.blending.BlendMode;
 import net.irisshaders.iris.gl.IrisRenderSystem;
 import net.irisshaders.iris.mixin.GlStateManagerAccessor;
 import net.irisshaders.iris.mixin.statelisteners.BooleanStateAccessor;

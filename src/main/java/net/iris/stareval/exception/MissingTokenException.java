@@ -1,4 +1,4 @@
-package kroppeb.stareval.exception;
+package net.iris.stareval.exception;
 
 public class MissingTokenException extends ParseException {
 	public MissingTokenException(String message, int index) {

@@ -1,7 +1,7 @@
 package kroppeb.stareval.element.tree;
 
 import kroppeb.stareval.element.ExpressionElement;
-import kroppeb.stareval.parser.BinaryOp;
+import net.iris.stareval.parser.BinaryOp;
 
 public record BinaryExpressionElement(BinaryOp op, ExpressionElement left,
 									  ExpressionElement right) implements ExpressionElement {

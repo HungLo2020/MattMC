@@ -5,10 +5,8 @@ import com.mojang.blaze3d.opengl.GlTexture;
 import com.mojang.blaze3d.textures.GpuTexture;
 import it.unimi.dsi.fastutil.ints.Int2IntArrayMap;
 import it.unimi.dsi.fastutil.ints.Int2IntMap;
-import net.irisshaders.iris.gl.GlResource;
+import net.iris.gl.GlResource;
 import net.irisshaders.iris.gl.IrisRenderSystem;
-import net.irisshaders.iris.gl.texture.DepthBufferFormat;
-import net.irisshaders.iris.pbr.TextureInfoCache;
 import org.lwjgl.opengl.GL30C;
 
 public class GlFramebuffer extends GlResource {

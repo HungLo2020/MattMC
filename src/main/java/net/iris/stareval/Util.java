@@ -1,4 +1,4 @@
-package kroppeb.stareval;
+package net.iris.stareval;
 
 import java.util.function.Consumer;
 

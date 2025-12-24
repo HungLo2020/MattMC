@@ -1,5 +1,7 @@
 package net.irisshaders.iris.gl.blending;
 
+import net.iris.gl.blending.BlendMode;
+
 public class BufferBlendOverride {
 	private final int drawBuffer;
 	private final BlendMode blendMode;

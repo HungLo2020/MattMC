@@ -1,4 +1,4 @@
-package kroppeb.stareval.exception;
+package net.iris.stareval.exception;
 
 public class UnexpectedTokenException extends ParseException {
 	public UnexpectedTokenException(String message, int index) {
