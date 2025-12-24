@@ -2,7 +2,7 @@ package net.caffeinemc.mods.sodium.client.gui.prompt;
 
 import net.caffeinemc.mods.sodium.client.gui.widgets.AbstractWidget;
 import net.caffeinemc.mods.sodium.client.gui.widgets.FlatButtonWidget;
-import net.sodium.client.util.Dim2i;
+import net.caffeinemc.mods.sodium.client.util.Dim2i;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Renderable;

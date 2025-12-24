@@ -4,7 +4,7 @@ import io.github.douira.glsl_transformer.ast.node.TranslationUnit;
 import io.github.douira.glsl_transformer.ast.query.Root;
 import io.github.douira.glsl_transformer.ast.transform.ASTInjectionPoint;
 import io.github.douira.glsl_transformer.ast.transform.ASTParser;
-import net.sodium.client.gl.shader.ShaderType;
+import net.caffeinemc.mods.sodium.client.gl.shader.ShaderType;
 import net.irisshaders.iris.pipeline.transform.PatchShaderType;
 import net.irisshaders.iris.pipeline.transform.parameter.VanillaParameters;
 

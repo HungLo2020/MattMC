@@ -11,22 +11,22 @@ import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.regex.Pattern;
 
-import net.distant_horizons.api.enums.config.DisallowSelectingViaConfigGui;
+import com.seibel.distanthorizons.api.enums.config.DisallowSelectingViaConfigGui;
 import com.seibel.distanthorizons.common.wrappers.gui.config.ConfigGuiInfo;
 import com.seibel.distanthorizons.core.config.Config;
 import com.seibel.distanthorizons.core.config.ConfigHandler;
 import com.seibel.distanthorizons.core.config.types.*;
 import com.seibel.distanthorizons.common.wrappers.gui.updater.ChangelogScreen;
 
-import net.distant_horizons.core.config.types.enums.EConfigCommentTextPosition;
-import net.distant_horizons.core.config.types.enums.EConfigValidity;
+import com.seibel.distanthorizons.core.config.types.enums.EConfigCommentTextPosition;
+import com.seibel.distanthorizons.core.config.types.enums.EConfigValidity;
 import com.seibel.distanthorizons.core.dependencyInjection.SingletonInjector;
 import com.seibel.distanthorizons.core.jar.updater.SelfUpdater;
 import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
 import com.seibel.distanthorizons.core.util.AnnotationUtil;
 import com.seibel.distanthorizons.core.wrapperInterfaces.config.IConfigGui;
 import com.seibel.distanthorizons.core.wrapperInterfaces.config.ILangWrapper;
-import net.distant_horizons.coreapi.ModInfo;
+import com.seibel.distanthorizons.coreapi.ModInfo;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;

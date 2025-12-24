@@ -3,9 +3,9 @@ package net.caffeinemc.mods.sodium.mixin.features.render.immediate.buffer_builde
 import com.mojang.blaze3d.vertex.BufferBuilder;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
-import net.sodium.api.texture.SpriteUtil;
-import net.sodium.api.util.ColorABGR;
-import net.sodium.api.vertex.buffer.VertexBufferWriter;
+import net.caffeinemc.mods.sodium.api.texture.SpriteUtil;
+import net.caffeinemc.mods.sodium.api.util.ColorABGR;
+import net.caffeinemc.mods.sodium.api.vertex.buffer.VertexBufferWriter;
 import net.caffeinemc.mods.sodium.client.model.quad.ModelQuadView;
 import net.caffeinemc.mods.sodium.client.render.immediate.model.BakedModelEncoder;
 import net.minecraft.client.renderer.block.model.BakedQuad;

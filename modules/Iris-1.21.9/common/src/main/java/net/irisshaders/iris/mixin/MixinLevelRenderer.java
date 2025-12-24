@@ -9,7 +9,7 @@ import com.mojang.blaze3d.framegraph.FramePass;
 import com.mojang.blaze3d.resource.GraphicsResourceAllocator;
 import com.mojang.blaze3d.systems.RenderSystem;
 import net.irisshaders.iris.Iris;
-import net.iris.NeoLambdas;
+import net.irisshaders.iris.NeoLambdas;
 import net.irisshaders.iris.compat.dh.DHCompat;
 import net.irisshaders.iris.gl.IrisRenderSystem;
 import net.irisshaders.iris.layer.IsOutlineRenderStateShard;

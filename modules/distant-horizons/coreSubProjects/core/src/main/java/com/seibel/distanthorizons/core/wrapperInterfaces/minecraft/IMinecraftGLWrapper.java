@@ -19,7 +19,7 @@
 
 package com.seibel.distanthorizons.core.wrapperInterfaces.minecraft;
 
-import net.distant_horizons.coreapi.interfaces.dependencyInjection.IBindable;
+import com.seibel.distanthorizons.coreapi.interfaces.dependencyInjection.IBindable;
 import org.lwjgl.opengl.GL32;
 
 import java.util.ArrayList;

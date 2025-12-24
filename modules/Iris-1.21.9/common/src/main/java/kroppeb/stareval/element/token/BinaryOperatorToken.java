@@ -1,6 +1,6 @@
 package kroppeb.stareval.element.token;
 
-import net.iris.stareval.parser.BinaryOp;
+import kroppeb.stareval.parser.BinaryOp;
 
 public class BinaryOperatorToken extends Token {
 	public final BinaryOp op;

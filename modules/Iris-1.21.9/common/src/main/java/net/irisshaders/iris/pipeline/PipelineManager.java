@@ -2,7 +2,7 @@ package net.irisshaders.iris.pipeline;
 
 import com.mojang.blaze3d.opengl.GlStateManager;
 import net.irisshaders.iris.Iris;
-import net.iris.shaderpack.materialmap.NamespacedId;
+import net.irisshaders.iris.shaderpack.materialmap.NamespacedId;
 import net.irisshaders.iris.shaderpack.materialmap.WorldRenderingSettings;
 import net.irisshaders.iris.uniforms.SystemTimeUniforms;
 import net.minecraft.client.Minecraft;

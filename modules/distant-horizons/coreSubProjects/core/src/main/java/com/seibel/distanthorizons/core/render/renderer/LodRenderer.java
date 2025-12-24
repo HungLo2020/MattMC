@@ -41,7 +41,7 @@ import com.seibel.distanthorizons.core.render.renderer.generic.GenericObjectRend
 import com.seibel.distanthorizons.core.render.renderer.shaders.*;
 import com.seibel.distanthorizons.core.util.math.Mat4f;
 import com.seibel.distanthorizons.core.util.math.Vec3d;
-import net.distant_horizons.core.util.objects.SortedArraySet;
+import com.seibel.distanthorizons.core.util.objects.SortedArraySet;
 import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftClientWrapper;
 import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftGLWrapper;
 import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftRenderWrapper;

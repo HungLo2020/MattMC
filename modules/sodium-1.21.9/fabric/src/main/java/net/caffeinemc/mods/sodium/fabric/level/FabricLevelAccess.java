@@ -6,7 +6,7 @@ import net.caffeinemc.mods.sodium.client.model.light.LightPipelineProvider;
 import net.caffeinemc.mods.sodium.client.render.chunk.compile.pipeline.FluidRenderer;
 import net.caffeinemc.mods.sodium.client.services.PlatformLevelAccess;
 import net.caffeinemc.mods.sodium.client.world.LevelSlice;
-import net.sodium.client.world.SodiumAuxiliaryLightManager;
+import net.caffeinemc.mods.sodium.client.world.SodiumAuxiliaryLightManager;
 import net.caffeinemc.mods.sodium.fabric.render.FluidRendererImpl;
 import net.minecraft.client.Camera;
 import net.minecraft.client.renderer.LevelRenderer;

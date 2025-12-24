@@ -19,7 +19,7 @@
 
 package com.seibel.distanthorizons.api.interfaces.config.client;
 
-import net.distant_horizons.api.interfaces.config.IDhApiConfigValue;
+import com.seibel.distanthorizons.api.interfaces.config.IDhApiConfigValue;
 import com.seibel.distanthorizons.api.interfaces.config.IDhApiConfigGroup;
 
 /**

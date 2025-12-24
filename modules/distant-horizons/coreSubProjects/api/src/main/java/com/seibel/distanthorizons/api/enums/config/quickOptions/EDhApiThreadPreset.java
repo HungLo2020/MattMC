@@ -19,7 +19,7 @@
 
 package com.seibel.distanthorizons.api.enums.config.quickOptions;
 
-import net.distant_horizons.api.enums.config.DisallowSelectingViaConfigGui;
+import com.seibel.distanthorizons.api.enums.config.DisallowSelectingViaConfigGui;
 
 /**
  * CUSTOM, <br><br>

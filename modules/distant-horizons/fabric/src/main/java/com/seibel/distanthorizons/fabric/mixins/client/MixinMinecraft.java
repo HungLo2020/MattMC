@@ -11,7 +11,7 @@ import com.seibel.distanthorizons.core.jar.installer.ModrinthGetter;
 import com.seibel.distanthorizons.core.jar.updater.SelfUpdater;
 import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
 import com.seibel.distanthorizons.core.wrapperInterfaces.IVersionConstants;
-import net.distant_horizons.coreapi.ModInfo;
+import com.seibel.distanthorizons.coreapi.ModInfo;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.TitleScreen;

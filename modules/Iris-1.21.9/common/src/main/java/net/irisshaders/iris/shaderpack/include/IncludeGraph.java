@@ -3,7 +3,7 @@ package net.irisshaders.iris.shaderpack.include;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import net.irisshaders.iris.Iris;
-import net.iris.shaderpack.error.RusticError;
+import net.irisshaders.iris.shaderpack.error.RusticError;
 import net.irisshaders.iris.shaderpack.transform.line.LineTransform;
 
 import java.io.IOException;

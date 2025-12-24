@@ -1,6 +1,6 @@
 package com.seibel.distanthorizons.common.wrappers.gui.config;
 
-import net.distant_horizons.core.config.gui.IConfigGuiInfo;
+import com.seibel.distanthorizons.core.config.gui.IConfigGuiInfo;
 import com.seibel.distanthorizons.core.config.types.AbstractConfigBase;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;

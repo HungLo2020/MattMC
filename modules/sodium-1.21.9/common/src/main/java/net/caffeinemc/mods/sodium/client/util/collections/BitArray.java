@@ -1,6 +1,6 @@
 package net.caffeinemc.mods.sodium.client.util.collections;
 
-import net.sodium.api.util.MathUtil;
+import net.caffeinemc.mods.sodium.api.util.MathUtil;
 
 import java.util.Arrays;
 

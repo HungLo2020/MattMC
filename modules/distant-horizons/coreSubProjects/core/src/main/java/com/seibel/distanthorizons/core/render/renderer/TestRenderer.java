@@ -19,7 +19,7 @@
 
 package com.seibel.distanthorizons.core.render.renderer;
 
-import net.distant_horizons.api.enums.config.EDhApiGpuUploadMethod;
+import com.seibel.distanthorizons.api.enums.config.EDhApiGpuUploadMethod;
 import com.seibel.distanthorizons.core.dependencyInjection.SingletonInjector;
 import com.seibel.distanthorizons.core.logging.DhLogger;
 import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;

@@ -1,11 +1,11 @@
 package kroppeb.stareval.parser;
 
 import kroppeb.stareval.element.ExpressionElement;
-import net.iris.stareval.exception.ParseException;
-import net.iris.stareval.exception.UnexpectedCharacterException;
-import net.iris.stareval.exception.UnexpectedEndingException;
-import net.iris.stareval.parser.BinaryOp;
-import net.iris.stareval.parser.UnaryOp;
+import kroppeb.stareval.exception.ParseException;
+import kroppeb.stareval.exception.UnexpectedCharacterException;
+import kroppeb.stareval.exception.UnexpectedEndingException;
+import kroppeb.stareval.parser.BinaryOp;
+import kroppeb.stareval.parser.UnaryOp;
 
 class Tokenizer {
 	private Tokenizer() {

@@ -22,7 +22,7 @@ package com.seibel.distanthorizons.core.jar;
 import com.seibel.distanthorizons.core.dependencyInjection.SingletonInjector;
 import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
 import com.seibel.distanthorizons.core.wrapperInterfaces.modAccessor.IModChecker;
-import net.distant_horizons.coreapi.ModInfo;
+import com.seibel.distanthorizons.coreapi.ModInfo;
 import org.apache.logging.log4j.LogManager;
 import com.seibel.distanthorizons.core.logging.DhLogger;
 import org.jetbrains.annotations.Nullable;

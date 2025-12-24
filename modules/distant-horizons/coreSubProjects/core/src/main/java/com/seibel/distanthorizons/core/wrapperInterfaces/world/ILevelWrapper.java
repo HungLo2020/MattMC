@@ -26,7 +26,7 @@ import com.seibel.distanthorizons.api.interfaces.world.IDhApiLevelWrapper;
 import com.seibel.distanthorizons.core.level.IDhLevel;
 import com.seibel.distanthorizons.core.pos.DhChunkPos;
 import com.seibel.distanthorizons.core.wrapperInterfaces.chunk.IChunkWrapper;
-import net.distant_horizons.coreapi.interfaces.dependencyInjection.IBindable;
+import com.seibel.distanthorizons.coreapi.interfaces.dependencyInjection.IBindable;
 import org.jetbrains.annotations.Nullable;
 
 /**

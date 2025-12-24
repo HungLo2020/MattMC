@@ -21,7 +21,7 @@ package com.seibel.distanthorizons.core.config.eventHandlers;
 
 import com.seibel.distanthorizons.api.DhApi;
 import com.seibel.distanthorizons.api.interfaces.render.IDhApiRenderProxy;
-import net.distant_horizons.core.config.listeners.IConfigListener;
+import com.seibel.distanthorizons.core.config.listeners.IConfigListener;
 import com.seibel.distanthorizons.core.util.TimerUtil;
 
 import java.util.Timer;

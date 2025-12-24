@@ -7,7 +7,7 @@
  */
 package net.caffeinemc.mods.sodium.mixin.features.textures.mipmaps;
 
-import net.sodium.api.util.ColorABGR;
+import net.caffeinemc.mods.sodium.api.util.ColorABGR;
 import net.caffeinemc.mods.sodium.client.util.color.ColorSRGB;
 import net.minecraft.client.renderer.texture.MipmapGenerator;
 import org.spongepowered.asm.mixin.Mixin;

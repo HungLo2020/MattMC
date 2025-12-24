@@ -19,10 +19,10 @@
 
 package com.seibel.distanthorizons.core.render.renderer.generic;
 
-import net.distant_horizons.api.enums.rendering.EDhApiBlockMaterial;
+import com.seibel.distanthorizons.api.enums.rendering.EDhApiBlockMaterial;
 import com.seibel.distanthorizons.api.interfaces.render.IDhApiRenderableBoxGroup;
 import com.seibel.distanthorizons.api.methods.events.sharedParameterObjects.DhApiRenderParam;
-import net.distant_horizons.api.objects.math.DhApiVec3d;
+import com.seibel.distanthorizons.api.objects.math.DhApiVec3d;
 import com.seibel.distanthorizons.api.objects.render.DhApiRenderableBox;
 import com.seibel.distanthorizons.api.objects.render.DhApiRenderableBoxGroupShading;
 import com.seibel.distanthorizons.core.config.Config;
@@ -33,7 +33,7 @@ import com.seibel.distanthorizons.core.util.LodUtil;
 import com.seibel.distanthorizons.core.util.math.Vec3d;
 import com.seibel.distanthorizons.core.util.math.Vec3f;
 import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftRenderWrapper;
-import net.distant_horizons.coreapi.ModInfo;
+import com.seibel.distanthorizons.coreapi.ModInfo;
 import com.seibel.distanthorizons.core.logging.DhLogger;
 
 import javax.imageio.ImageIO;

@@ -9,14 +9,14 @@ public class SpriteUtil {
     @Deprecated(forRemoval = true)
     public static void markSpriteActive(@Nullable TextureAtlasSprite sprite) {
         if (sprite != null) {
-            net.sodium.api.texture.SpriteUtil.INSTANCE.markSpriteActive(sprite);
+            net.caffeinemc.mods.sodium.api.texture.SpriteUtil.INSTANCE.markSpriteActive(sprite);
         }
     }
 
     @Deprecated(forRemoval = true)
     public static boolean hasAnimation(@Nullable TextureAtlasSprite sprite) {
         if (sprite != null) {
-            return net.sodium.api.texture.SpriteUtil.INSTANCE.hasAnimation(sprite);
+            return net.caffeinemc.mods.sodium.api.texture.SpriteUtil.INSTANCE.hasAnimation(sprite);
         }
 
         return false;

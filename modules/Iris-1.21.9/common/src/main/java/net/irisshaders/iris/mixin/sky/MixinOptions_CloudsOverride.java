@@ -1,7 +1,7 @@
 package net.irisshaders.iris.mixin.sky;
 
 import net.irisshaders.iris.Iris;
-import net.iris.shaderpack.properties.CloudSetting;
+import net.irisshaders.iris.shaderpack.properties.CloudSetting;
 import net.minecraft.client.CloudStatus;
 import net.minecraft.client.OptionInstance;
 import net.minecraft.client.Options;

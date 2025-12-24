@@ -20,7 +20,7 @@
 package com.seibel.distanthorizons.core.sql;
 
 import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
-import net.distant_horizons.core.sql.dto.IBaseDTO;
+import com.seibel.distanthorizons.core.sql.dto.IBaseDTO;
 import com.seibel.distanthorizons.core.sql.repo.AbstractDhRepo;
 import com.seibel.distanthorizons.core.logging.DhLogger;
 

@@ -1,7 +1,7 @@
 package net.caffeinemc.mods.sodium.client.render.chunk.tree;
 
 import it.unimi.dsi.fastutil.ints.IntArrays;
-import net.sodium.client.render.chunk.lists.CoordinateSectionVisitor;
+import net.caffeinemc.mods.sodium.client.render.chunk.lists.CoordinateSectionVisitor;
 import net.caffeinemc.mods.sodium.client.render.viewport.Viewport;
 
 public abstract class AbstractTraversableMultiForest<T extends TraversableTree> extends BaseMultiForest<T> implements TraversableForest {

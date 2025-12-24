@@ -11,7 +11,7 @@ import net.caffeinemc.mods.sodium.client.gl.shader.uniform.GlUniformInt;
 import net.caffeinemc.mods.sodium.client.gl.shader.uniform.GlUniformMatrix4f;
 import net.caffeinemc.mods.sodium.client.render.chunk.terrain.TerrainRenderPass;
 import net.caffeinemc.mods.sodium.client.render.chunk.vertex.format.impl.CompactChunkVertex;
-import net.sodium.client.util.FogParameters;
+import net.caffeinemc.mods.sodium.client.util.FogParameters;
 import net.caffeinemc.mods.sodium.mixin.core.render.texture.TextureAtlasAccessor;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.texture.TextureAtlas;

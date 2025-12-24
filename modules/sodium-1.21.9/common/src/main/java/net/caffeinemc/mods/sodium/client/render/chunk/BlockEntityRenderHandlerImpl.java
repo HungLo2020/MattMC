@@ -1,7 +1,7 @@
 package net.caffeinemc.mods.sodium.client.render.chunk;
 
-import net.sodium.api.blockentity.BlockEntityRenderHandler;
-import net.sodium.api.blockentity.BlockEntityRenderPredicate;
+import net.caffeinemc.mods.sodium.api.blockentity.BlockEntityRenderHandler;
+import net.caffeinemc.mods.sodium.api.blockentity.BlockEntityRenderPredicate;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.entity.BlockEntityType;
 

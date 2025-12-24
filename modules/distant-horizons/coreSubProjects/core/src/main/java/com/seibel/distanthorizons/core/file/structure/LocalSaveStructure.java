@@ -21,11 +21,11 @@ package com.seibel.distanthorizons.core.file.structure;
 
 import com.seibel.distanthorizons.api.interfaces.override.levelHandling.IDhApiSaveStructure;
 import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
-import net.distant_horizons.core.world.EWorldEnvironment;
+import com.seibel.distanthorizons.core.world.EWorldEnvironment;
 import com.seibel.distanthorizons.core.wrapperInterfaces.world.ILevelWrapper;
 import com.seibel.distanthorizons.core.wrapperInterfaces.world.IServerLevelWrapper;
 import com.seibel.distanthorizons.coreapi.DependencyInjection.OverrideInjector;
-import net.distant_horizons.coreapi.util.StringUtil;
+import com.seibel.distanthorizons.coreapi.util.StringUtil;
 import com.seibel.distanthorizons.core.logging.DhLogger;
 
 import java.io.File;

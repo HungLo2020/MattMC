@@ -1,7 +1,7 @@
 package net.irisshaders.iris.shaderpack.option;
 
 import com.google.common.collect.ImmutableMap;
-import net.iris.shaderpack.include.AbsolutePackPath;
+import net.irisshaders.iris.shaderpack.include.AbsolutePackPath;
 import net.irisshaders.iris.shaderpack.include.IncludeGraph;
 import net.irisshaders.iris.shaderpack.option.values.MutableOptionValues;
 import net.irisshaders.iris.shaderpack.option.values.OptionValues;

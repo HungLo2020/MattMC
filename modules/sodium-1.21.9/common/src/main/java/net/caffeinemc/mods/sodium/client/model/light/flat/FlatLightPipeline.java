@@ -2,7 +2,7 @@ package net.caffeinemc.mods.sodium.client.model.light.flat;
 
 import net.caffeinemc.mods.sodium.client.model.light.LightPipeline;
 import net.caffeinemc.mods.sodium.client.model.light.data.LightDataAccess;
-import net.sodium.client.model.light.data.QuadLightData;
+import net.caffeinemc.mods.sodium.client.model.light.data.QuadLightData;
 import net.caffeinemc.mods.sodium.client.model.quad.ModelQuadView;
 import net.caffeinemc.mods.sodium.client.model.quad.properties.ModelQuadFlags;
 import net.caffeinemc.mods.sodium.client.services.PlatformBlockAccess;

@@ -1,6 +1,6 @@
 package com.seibel.distanthorizons.core.render.renderer;
 
-import net.distant_horizons.api.enums.rendering.EDhApiRenderPass;
+import com.seibel.distanthorizons.api.enums.rendering.EDhApiRenderPass;
 import com.seibel.distanthorizons.api.methods.events.sharedParameterObjects.DhApiRenderParam;
 import com.seibel.distanthorizons.core.api.internal.SharedApi;
 import com.seibel.distanthorizons.core.dependencyInjection.SingletonInjector;

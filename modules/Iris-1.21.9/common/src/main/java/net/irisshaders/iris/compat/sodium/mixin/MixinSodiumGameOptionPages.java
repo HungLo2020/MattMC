@@ -2,7 +2,7 @@ package net.irisshaders.iris.compat.sodium.mixin;
 
 import net.caffeinemc.mods.sodium.client.gui.SodiumGameOptionPages;
 import net.caffeinemc.mods.sodium.client.gui.options.Option;
-import net.sodium.client.gui.options.OptionFlag;
+import net.caffeinemc.mods.sodium.client.gui.options.OptionFlag;
 import net.caffeinemc.mods.sodium.client.gui.options.OptionGroup;
 import net.caffeinemc.mods.sodium.client.gui.options.OptionImpact;
 import net.caffeinemc.mods.sodium.client.gui.options.OptionImpl;
@@ -13,7 +13,7 @@ import net.caffeinemc.mods.sodium.client.gui.options.storage.MinecraftOptionsSto
 import net.irisshaders.iris.Iris;
 import net.irisshaders.iris.fantastic.SupportedGraphicsMode;
 import net.irisshaders.iris.gui.option.IrisVideoSettings;
-import net.iris.pathways.colorspace.ColorSpace;
+import net.irisshaders.iris.pathways.colorspace.ColorSpace;
 import net.minecraft.client.Options;
 import net.minecraft.network.chat.Component;
 import org.spongepowered.asm.mixin.Final;

@@ -25,10 +25,10 @@ import com.seibel.distanthorizons.core.render.glObject.shader.ShaderProgram;
 import com.seibel.distanthorizons.core.render.renderer.LodRenderer;
 import com.seibel.distanthorizons.core.render.renderer.SSAORenderer;
 import com.seibel.distanthorizons.core.render.renderer.ScreenQuad;
-import net.distant_horizons.core.util.NumberUtil;
+import com.seibel.distanthorizons.core.util.NumberUtil;
 import com.seibel.distanthorizons.core.util.math.Mat4f;
 import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftGLWrapper;
-import net.sodium.api.util.MathUtil;
+import com.seibel.distanthorizons.coreapi.util.MathUtil;
 import org.lwjgl.opengl.GL32;
 
 /**

@@ -7,7 +7,7 @@ import it.unimi.dsi.fastutil.ints.IntArrayList;
 import net.caffeinemc.mods.sodium.client.render.chunk.translucent_sorting.quad.TQuad;
 import net.caffeinemc.mods.sodium.client.render.chunk.translucent_sorting.data.TopoGraphSorting;
 import net.caffeinemc.mods.sodium.client.util.NativeBuffer;
-import net.sodium.api.util.NormI8;
+import net.caffeinemc.mods.sodium.api.util.NormI8;
 import net.minecraft.core.SectionPos;
 
 /**

@@ -1,6 +1,6 @@
 package net.irisshaders.iris.parsing;
 
-import net.iris.stareval.function.FunctionReturn;
+import kroppeb.stareval.function.FunctionReturn;
 import kroppeb.stareval.function.Type;
 import org.joml.Vector2f;
 import org.joml.Vector2i;

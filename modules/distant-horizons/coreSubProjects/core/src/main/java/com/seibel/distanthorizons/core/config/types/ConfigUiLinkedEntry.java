@@ -19,7 +19,7 @@
 
 package com.seibel.distanthorizons.core.config.types;
 
-import net.distant_horizons.core.config.types.enums.EConfigEntryAppearance;
+import com.seibel.distanthorizons.core.config.types.enums.EConfigEntryAppearance;
 
 /**
  * Creates a UI element that copies everything from another element.

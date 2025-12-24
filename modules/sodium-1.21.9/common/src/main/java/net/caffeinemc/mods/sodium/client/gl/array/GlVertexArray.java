@@ -1,6 +1,6 @@
 package net.caffeinemc.mods.sodium.client.gl.array;
 
-import net.sodium.client.gl.GlObject;
+import net.caffeinemc.mods.sodium.client.gl.GlObject;
 import org.lwjgl.opengl.GL30C;
 
 /**

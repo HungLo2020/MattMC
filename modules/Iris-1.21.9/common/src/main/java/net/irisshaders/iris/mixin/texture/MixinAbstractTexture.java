@@ -2,7 +2,7 @@ package net.irisshaders.iris.mixin.texture;
 
 import com.mojang.blaze3d.textures.GpuTexture;
 import net.irisshaders.iris.Iris;
-import net.iris.mixinterface.AbstractTextureExtended;
+import net.irisshaders.iris.mixinterface.AbstractTextureExtended;
 import net.irisshaders.iris.pbr.TextureTracker;
 import net.minecraft.client.renderer.texture.AbstractTexture;
 import net.minecraft.client.renderer.texture.ReloadableTexture;

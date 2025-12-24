@@ -2,7 +2,7 @@ package net.caffeinemc.mods.sodium.mixin.features.render.immediate.matrix_stack;
 
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
-import net.sodium.api.math.MatrixHelper;
+import net.caffeinemc.mods.sodium.api.math.MatrixHelper;
 import org.joml.Math;
 import org.joml.Matrix3f;
 import org.joml.Matrix4f;

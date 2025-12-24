@@ -19,8 +19,8 @@
 
 package com.seibel.distanthorizons.api.interfaces.config.client;
 
-import net.distant_horizons.api.interfaces.config.IDhApiConfigValue;
-import net.distant_horizons.api.enums.config.EDhApiServerFolderNameMode;
+import com.seibel.distanthorizons.api.interfaces.config.IDhApiConfigValue;
+import com.seibel.distanthorizons.api.enums.config.EDhApiServerFolderNameMode;
 import com.seibel.distanthorizons.api.interfaces.config.IDhApiConfigGroup;
 
 /**

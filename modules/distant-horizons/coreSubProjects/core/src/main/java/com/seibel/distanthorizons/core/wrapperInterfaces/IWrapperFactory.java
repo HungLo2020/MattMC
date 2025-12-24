@@ -26,7 +26,7 @@ import com.seibel.distanthorizons.core.wrapperInterfaces.chunk.IChunkWrapper;
 import com.seibel.distanthorizons.core.wrapperInterfaces.world.IBiomeWrapper;
 import com.seibel.distanthorizons.core.wrapperInterfaces.world.ILevelWrapper;
 import com.seibel.distanthorizons.core.wrapperInterfaces.worldGeneration.IBatchGeneratorEnvironmentWrapper;
-import net.distant_horizons.coreapi.interfaces.dependencyInjection.IBindable;
+import com.seibel.distanthorizons.coreapi.interfaces.dependencyInjection.IBindable;
 
 import java.io.IOException;
 import java.util.HashSet;

@@ -20,7 +20,7 @@
 package com.seibel.distanthorizons.core.sql.dto;
 
 import com.seibel.distanthorizons.core.dataObjects.fullData.sources.FullDataSourceV2;
-import net.distant_horizons.core.network.INetworkObject;
+import com.seibel.distanthorizons.core.network.INetworkObject;
 import com.seibel.distanthorizons.core.pos.blockPos.DhBlockPos;
 import io.netty.buffer.ByteBuf;
 

@@ -4,7 +4,7 @@ import com.google.common.cache.CacheBuilder;
 import com.seibel.distanthorizons.core.config.Config;
 import com.seibel.distanthorizons.core.logging.DhLogger;
 import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
-import net.distant_horizons.core.network.INetworkObject;
+import com.seibel.distanthorizons.core.network.INetworkObject;
 import com.seibel.distanthorizons.core.network.messages.fullData.FullDataSplitMessage;
 import com.seibel.distanthorizons.core.sql.dto.FullDataSourceV2DTO;
 import com.seibel.distanthorizons.core.util.LodUtil;

@@ -20,7 +20,7 @@
 package com.seibel.distanthorizons.fabric.mixins.server;
 
 import com.seibel.distanthorizons.common.wrappers.worldGeneration.BatchGenerationEnvironment;
-import net.distant_horizons.core.util.objects.RunOnThisThreadExecutorService;
+import com.seibel.distanthorizons.core.util.objects.RunOnThisThreadExecutorService;
 import org.spongepowered.asm.mixin.Mixin;
 
 import net.minecraft.Util;

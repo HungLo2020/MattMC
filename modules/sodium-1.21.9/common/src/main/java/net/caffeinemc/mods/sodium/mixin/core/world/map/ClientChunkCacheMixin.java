@@ -1,6 +1,6 @@
 package net.caffeinemc.mods.sodium.mixin.core.world.map;
 
-import net.sodium.client.render.chunk.map.ChunkStatus;
+import net.caffeinemc.mods.sodium.client.render.chunk.map.ChunkStatus;
 import net.caffeinemc.mods.sodium.client.render.chunk.map.ChunkTrackerHolder;
 import net.minecraft.client.multiplayer.ClientChunkCache;
 import net.minecraft.client.multiplayer.ClientLevel;

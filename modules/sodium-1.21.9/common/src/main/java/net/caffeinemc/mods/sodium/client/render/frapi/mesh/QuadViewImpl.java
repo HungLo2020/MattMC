@@ -17,7 +17,7 @@
 package net.caffeinemc.mods.sodium.client.render.frapi.mesh;
 
 
-import net.sodium.api.util.NormI8;
+import net.caffeinemc.mods.sodium.api.util.NormI8;
 import net.caffeinemc.mods.sodium.client.model.quad.ModelQuadView;
 import net.caffeinemc.mods.sodium.client.model.quad.properties.ModelQuadFacing;
 import net.caffeinemc.mods.sodium.client.model.quad.properties.ModelQuadFlags;

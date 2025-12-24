@@ -1,7 +1,7 @@
 package net.caffeinemc.mods.sodium.client.render.chunk.vertex.builder;
 
 import net.caffeinemc.mods.sodium.client.render.chunk.terrain.material.Material;
-import net.sodium.client.render.chunk.vertex.format.ChunkVertexEncoder;
+import net.caffeinemc.mods.sodium.client.render.chunk.vertex.format.ChunkVertexEncoder;
 import net.caffeinemc.mods.sodium.client.render.chunk.vertex.format.ChunkVertexType;
 import org.lwjgl.system.MemoryUtil;
 

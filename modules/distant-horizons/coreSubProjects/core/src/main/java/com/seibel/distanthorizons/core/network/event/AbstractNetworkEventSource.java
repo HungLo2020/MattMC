@@ -27,10 +27,10 @@ import com.seibel.distanthorizons.core.network.event.internal.AbstractInternalEv
 import com.seibel.distanthorizons.core.network.messages.AbstractNetworkMessage;
 import com.seibel.distanthorizons.core.network.messages.AbstractTrackableMessage;
 import com.seibel.distanthorizons.core.network.messages.MessageRegistry;
-import net.distant_horizons.core.network.session.SessionClosedException;
+import com.seibel.distanthorizons.core.network.session.SessionClosedException;
 import com.seibel.distanthorizons.core.network.messages.requests.CancelMessage;
 import com.seibel.distanthorizons.core.network.messages.requests.ExceptionMessage;
-import net.distant_horizons.coreapi.ModInfo;
+import com.seibel.distanthorizons.coreapi.ModInfo;
 
 import java.io.InvalidClassException;
 import java.util.Collections;

@@ -1,6 +1,6 @@
 package net.caffeinemc.mods.sodium.client.render.chunk.tree;
 
-import net.sodium.client.render.chunk.lists.CoordinateSectionVisitor;
+import net.caffeinemc.mods.sodium.client.render.chunk.lists.CoordinateSectionVisitor;
 import net.caffeinemc.mods.sodium.client.render.viewport.Viewport;
 
 public abstract class AbstractTraversableBiForest<T extends TraversableTree> extends BaseBiForest<T> implements TraversableForest {

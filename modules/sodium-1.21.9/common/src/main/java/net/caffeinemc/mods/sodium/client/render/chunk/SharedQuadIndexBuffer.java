@@ -2,10 +2,10 @@ package net.caffeinemc.mods.sodium.client.render.chunk;
 
 import net.caffeinemc.mods.sodium.client.gl.buffer.GlBuffer;
 import net.caffeinemc.mods.sodium.client.gl.buffer.GlBufferMapFlags;
-import net.sodium.client.gl.buffer.GlBufferUsage;
+import net.caffeinemc.mods.sodium.client.gl.buffer.GlBufferUsage;
 import net.caffeinemc.mods.sodium.client.gl.buffer.GlMutableBuffer;
 import net.caffeinemc.mods.sodium.client.gl.device.CommandList;
-import net.sodium.client.gl.tessellation.GlIndexType;
+import net.caffeinemc.mods.sodium.client.gl.tessellation.GlIndexType;
 import net.caffeinemc.mods.sodium.client.gl.util.EnumBitField;
 import net.caffeinemc.mods.sodium.client.util.NativeBuffer;
 

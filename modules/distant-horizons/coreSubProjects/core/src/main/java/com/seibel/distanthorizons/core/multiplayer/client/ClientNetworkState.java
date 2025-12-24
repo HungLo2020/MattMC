@@ -17,7 +17,7 @@ import com.seibel.distanthorizons.core.network.messages.fullData.FullDataSplitMe
 import com.seibel.distanthorizons.core.network.messages.fullData.FullDataPartialUpdateMessage;
 import com.seibel.distanthorizons.core.network.session.NetworkSession;
 import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftClientWrapper;
-import net.distant_horizons.coreapi.ModInfo;
+import com.seibel.distanthorizons.coreapi.ModInfo;
 import org.jetbrains.annotations.Nullable;
 
 import java.io.Closeable;

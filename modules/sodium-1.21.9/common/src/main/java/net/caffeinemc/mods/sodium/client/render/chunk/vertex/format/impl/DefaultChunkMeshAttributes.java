@@ -1,6 +1,6 @@
 package net.caffeinemc.mods.sodium.client.render.chunk.vertex.format.impl;
 
-import net.sodium.client.gl.attribute.GlVertexAttributeFormat;
+import net.caffeinemc.mods.sodium.client.gl.attribute.GlVertexAttributeFormat;
 import net.caffeinemc.mods.sodium.client.render.vertex.VertexFormatAttribute;
 
 public class DefaultChunkMeshAttributes {

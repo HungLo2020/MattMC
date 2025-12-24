@@ -1,6 +1,6 @@
 package net.irisshaders.iris.shaderpack.option;
 
-import net.iris.shaderpack.include.AbsolutePackPath;
+import net.irisshaders.iris.shaderpack.include.AbsolutePackPath;
 
 /**
  * Encapsulates a single location of an option.

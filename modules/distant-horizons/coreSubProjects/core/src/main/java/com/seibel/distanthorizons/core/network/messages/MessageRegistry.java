@@ -31,7 +31,7 @@ import com.seibel.distanthorizons.core.network.messages.requests.ExceptionMessag
 import com.seibel.distanthorizons.core.network.messages.fullData.FullDataPartialUpdateMessage;
 import com.seibel.distanthorizons.core.network.messages.fullData.FullDataSourceRequestMessage;
 import com.seibel.distanthorizons.core.network.messages.fullData.FullDataSourceResponseMessage;
-import net.distant_horizons.coreapi.ModInfo;
+import com.seibel.distanthorizons.coreapi.ModInfo;
 
 import java.util.HashMap;
 import java.util.Map;

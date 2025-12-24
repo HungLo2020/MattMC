@@ -1,7 +1,7 @@
 package net.irisshaders.iris.mixin.entity_render_context;
 
 import com.mojang.blaze3d.vertex.PoseStack;
-import net.iris.shaderpack.materialmap.NamespacedId;
+import net.irisshaders.iris.shaderpack.materialmap.NamespacedId;
 import net.irisshaders.iris.shaderpack.materialmap.WorldRenderingSettings;
 import net.irisshaders.iris.uniforms.CapturedRenderingState;
 import net.minecraft.client.model.ElytraModel;

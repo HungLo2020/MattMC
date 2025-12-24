@@ -2,7 +2,7 @@ package net.irisshaders.iris.gl.image;
 
 import com.mojang.blaze3d.opengl.GlStateManager;
 import net.irisshaders.iris.gl.GLDebug;
-import net.iris.gl.GlResource;
+import net.irisshaders.iris.gl.GlResource;
 import net.irisshaders.iris.gl.IrisRenderSystem;
 import net.irisshaders.iris.gl.texture.InternalTextureFormat;
 import net.irisshaders.iris.gl.texture.PixelFormat;

@@ -22,11 +22,11 @@ package com.seibel.distanthorizons.core.sql.repo;
 import com.seibel.distanthorizons.core.logging.DhLogger;
 import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
 import com.seibel.distanthorizons.core.sql.DatabaseUpdater;
-import net.distant_horizons.core.sql.DbConnectionClosedException;
-import net.distant_horizons.core.sql.dto.IBaseDTO;
+import com.seibel.distanthorizons.core.sql.DbConnectionClosedException;
+import com.seibel.distanthorizons.core.sql.dto.IBaseDTO;
 import com.seibel.distanthorizons.core.sql.repo.phantoms.AutoClosableTrackingWrapper;
-import net.distant_horizons.core.util.KeyedLockContainer;
-import net.distant_horizons.coreapi.ModInfo;
+import com.seibel.distanthorizons.core.util.KeyedLockContainer;
+import com.seibel.distanthorizons.coreapi.ModInfo;
 import com.seibel.distanthorizons.core.logging.DhLogger;
 import org.jetbrains.annotations.Nullable;
 

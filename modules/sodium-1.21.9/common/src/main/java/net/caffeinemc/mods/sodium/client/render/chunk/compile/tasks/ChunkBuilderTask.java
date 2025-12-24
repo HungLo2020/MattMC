@@ -10,8 +10,8 @@ import org.joml.Vector3fc;
 import net.caffeinemc.mods.sodium.client.render.chunk.RenderSection;
 import net.caffeinemc.mods.sodium.client.render.chunk.compile.BuilderTaskOutput;
 import net.caffeinemc.mods.sodium.client.render.chunk.compile.ChunkBuildContext;
-import net.sodium.client.render.chunk.translucent_sorting.data.CombinedCameraPos;
-import net.sodium.client.util.task.CancellationToken;
+import net.caffeinemc.mods.sodium.client.render.chunk.translucent_sorting.data.CombinedCameraPos;
+import net.caffeinemc.mods.sodium.client.util.task.CancellationToken;
 
 /**
  * Build tasks are immutable jobs (with optional prioritization) which contain all the necessary state to perform

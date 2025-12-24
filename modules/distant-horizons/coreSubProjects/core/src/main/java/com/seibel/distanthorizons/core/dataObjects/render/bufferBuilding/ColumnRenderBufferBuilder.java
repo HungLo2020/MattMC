@@ -19,8 +19,8 @@
 
 package com.seibel.distanthorizons.core.dataObjects.render.bufferBuilding;
 
-import net.distant_horizons.api.enums.rendering.EDhApiBlockMaterial;
-import net.distant_horizons.api.enums.rendering.EDhApiDebugRendering;
+import com.seibel.distanthorizons.api.enums.rendering.EDhApiBlockMaterial;
+import com.seibel.distanthorizons.api.enums.rendering.EDhApiDebugRendering;
 import com.seibel.distanthorizons.core.enums.EDhDirection;
 import com.seibel.distanthorizons.core.config.Config;
 import com.seibel.distanthorizons.core.dataObjects.render.ColumnRenderSource;
@@ -32,7 +32,7 @@ import com.seibel.distanthorizons.core.pooling.PhantomArrayListPool;
 import com.seibel.distanthorizons.core.pos.blockPos.DhBlockPos;
 import com.seibel.distanthorizons.core.pos.DhSectionPos;
 import com.seibel.distanthorizons.core.render.glObject.GLProxy;
-import net.distant_horizons.core.util.ColorUtil;
+import com.seibel.distanthorizons.core.util.ColorUtil;
 import com.seibel.distanthorizons.core.util.LodUtil;
 import com.seibel.distanthorizons.core.util.RenderDataPointUtil;
 import com.seibel.distanthorizons.core.dataObjects.render.columnViews.ColumnArrayView;

@@ -3,7 +3,7 @@ package net.irisshaders.iris.gui.element;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.Iterables;
 import net.irisshaders.iris.Iris;
-import net.iris.gui.FileDialogUtil;
+import net.irisshaders.iris.gui.FileDialogUtil;
 import net.irisshaders.iris.gui.GuiUtil;
 import net.irisshaders.iris.gui.NavigationController;
 import net.irisshaders.iris.gui.element.widget.AbstractElementWidget;

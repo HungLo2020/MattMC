@@ -1,6 +1,6 @@
 package net.caffeinemc.mods.sodium.client.model.quad;
 
-import net.sodium.api.util.ModelQuadUtil;
+import net.caffeinemc.mods.sodium.api.util.ModelQuadUtil;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
 import net.minecraft.core.Direction;
 

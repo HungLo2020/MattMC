@@ -1,7 +1,7 @@
 package kroppeb.stareval.function;
 
 import kroppeb.stareval.expression.Expression;
-import net.iris.stareval.function.FunctionReturn;
+import kroppeb.stareval.function.FunctionReturn;
 
 @FunctionalInterface
 public interface II2IFunction extends TypedFunction {

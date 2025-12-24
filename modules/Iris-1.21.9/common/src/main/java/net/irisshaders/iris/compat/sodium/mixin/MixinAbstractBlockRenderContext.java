@@ -6,7 +6,7 @@ import net.caffeinemc.mods.sodium.client.render.frapi.render.AbstractBlockRender
 import net.irisshaders.iris.compat.general.IrisModSupport;
 import net.irisshaders.iris.platform.IrisPlatformHelpers;
 import net.irisshaders.iris.shaderpack.materialmap.WorldRenderingSettings;
-import net.iris.vertices.BlockSensitiveBufferBuilder;
+import net.irisshaders.iris.vertices.BlockSensitiveBufferBuilder;
 import net.minecraft.client.renderer.block.model.BlockModelPart;
 import net.minecraft.client.renderer.block.model.BlockStateModel;
 import net.minecraft.core.BlockPos;

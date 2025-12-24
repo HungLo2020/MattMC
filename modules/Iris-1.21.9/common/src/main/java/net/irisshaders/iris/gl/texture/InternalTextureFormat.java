@@ -1,7 +1,7 @@
 package net.irisshaders.iris.gl.texture;
 
-import net.iris.gl.GlVersion;
-import net.iris.gl.texture.ShaderDataType;
+import net.irisshaders.iris.gl.GlVersion;
+import net.irisshaders.iris.gl.texture.ShaderDataType;
 import org.lwjgl.opengl.GL11C;
 import org.lwjgl.opengl.GL30C;
 import org.lwjgl.opengl.GL31C;

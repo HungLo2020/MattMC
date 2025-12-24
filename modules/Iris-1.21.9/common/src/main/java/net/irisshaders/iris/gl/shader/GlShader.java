@@ -3,11 +3,11 @@
 package net.irisshaders.iris.gl.shader;
 
 import com.mojang.blaze3d.opengl.GlStateManager;
-import net.iris.gl.shader.ShaderCompileException;
-import net.sodium.client.gl.shader.ShaderType;
-import net.sodium.client.gl.shader.ShaderWorkarounds;
+import net.irisshaders.iris.gl.shader.ShaderCompileException;
+import net.caffeinemc.mods.sodium.client.gl.shader.ShaderType;
+import net.caffeinemc.mods.sodium.client.gl.shader.ShaderWorkarounds;
 import net.irisshaders.iris.gl.GLDebug;
-import net.iris.gl.GlResource;
+import net.irisshaders.iris.gl.GlResource;
 import net.irisshaders.iris.gl.IrisRenderSystem;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;

@@ -9,7 +9,7 @@ import com.mojang.blaze3d.textures.GpuTexture;
 import com.mojang.blaze3d.textures.TextureFormat;
 import net.irisshaders.iris.gl.IrisRenderSystem;
 import net.irisshaders.iris.gl.framebuffer.GlFramebuffer;
-import net.iris.gl.texture.DepthBufferFormat;
+import net.irisshaders.iris.gl.texture.DepthBufferFormat;
 import net.irisshaders.iris.gl.texture.DepthCopyStrategy;
 import net.irisshaders.iris.platform.IrisPlatformHelpers;
 import net.irisshaders.iris.shaderpack.properties.PackDirectives;

@@ -2,7 +2,7 @@ package net.caffeinemc.mods.sodium.client.render.immediate.model;
 
 import java.util.Set;
 
-import net.sodium.client.util.Int2;
+import net.caffeinemc.mods.sodium.client.util.Int2;
 import net.minecraft.core.Direction;
 import org.apache.commons.lang3.ArrayUtils;
 import org.jetbrains.annotations.NotNull;

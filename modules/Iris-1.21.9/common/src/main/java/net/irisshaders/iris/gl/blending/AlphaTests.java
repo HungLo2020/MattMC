@@ -1,6 +1,6 @@
 package net.irisshaders.iris.gl.blending;
 
-import net.iris.gl.blending.AlphaTestFunction;
+import net.irisshaders.iris.gl.blending.AlphaTestFunction;
 
 public class AlphaTests {
 	public static final AlphaTest OFF = AlphaTest.ALWAYS;

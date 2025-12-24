@@ -6,7 +6,7 @@ import com.mojang.blaze3d.systems.RenderSystem;
 import net.irisshaders.iris.Iris;
 import net.irisshaders.iris.compat.dh.DHCompat;
 import net.irisshaders.iris.gl.IrisRenderSystem;
-import net.iris.helpers.StringPair;
+import net.irisshaders.iris.helpers.StringPair;
 import net.irisshaders.iris.pathways.HandRenderer;
 import net.irisshaders.iris.pbr.format.TextureFormat;
 import net.irisshaders.iris.pbr.format.TextureFormatLoader;

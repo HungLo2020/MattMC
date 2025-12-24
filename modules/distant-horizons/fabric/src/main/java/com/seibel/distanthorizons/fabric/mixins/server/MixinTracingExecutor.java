@@ -23,7 +23,7 @@ import com.seibel.distanthorizons.common.wrappers.worldGeneration.BatchGeneratio
 import org.spongepowered.asm.mixin.Mixin;
 
 
-import net.distant_horizons.core.util.objects.RunOnThisThreadExecutorService;
+import com.seibel.distanthorizons.core.util.objects.RunOnThisThreadExecutorService;
 import net.minecraft.TracingExecutor;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;

@@ -1,6 +1,6 @@
 package net.irisshaders.iris.gl.state;
 
-import net.iris.gl.state.ValueUpdateNotifier;
+import net.irisshaders.iris.gl.state.ValueUpdateNotifier;
 
 /**
  * Holds some standard update notifiers for various elements of GL state. Currently, this class has a few listeners for

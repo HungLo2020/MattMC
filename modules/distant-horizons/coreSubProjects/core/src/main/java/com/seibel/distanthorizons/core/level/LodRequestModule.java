@@ -19,7 +19,7 @@
 
 package com.seibel.distanthorizons.core.level;
 
-import net.distant_horizons.api.enums.worldGeneration.EDhApiDistantGeneratorProgressDisplayLocation;
+import com.seibel.distanthorizons.api.enums.worldGeneration.EDhApiDistantGeneratorProgressDisplayLocation;
 import com.seibel.distanthorizons.core.api.internal.ClientApi;
 import com.seibel.distanthorizons.core.config.Config;
 import com.seibel.distanthorizons.core.file.fullDatafile.GeneratedFullDataSourceProvider;
@@ -27,9 +27,9 @@ import com.seibel.distanthorizons.core.generation.IFullDataSourceRetrievalQueue;
 import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
 import com.seibel.distanthorizons.core.logging.f3.F3Screen;
 import com.seibel.distanthorizons.core.pos.blockPos.DhBlockPos2D;
-import net.distant_horizons.core.util.FormatUtil;
+import com.seibel.distanthorizons.core.util.FormatUtil;
 import com.seibel.distanthorizons.core.util.ThreadUtil;
-import net.distant_horizons.core.util.objects.RollingAverage;
+import com.seibel.distanthorizons.core.util.objects.RollingAverage;
 import com.seibel.distanthorizons.core.util.threading.PriorityTaskPicker;
 import com.seibel.distanthorizons.core.util.threading.ThreadPoolUtil;
 import com.seibel.distanthorizons.core.world.DhApiWorldProxy;

@@ -5,7 +5,7 @@ import net.caffeinemc.mods.sodium.client.gl.arena.GlBufferArena;
 import net.caffeinemc.mods.sodium.client.gl.arena.staging.StagingBuffer;
 import net.caffeinemc.mods.sodium.client.gl.buffer.GlBuffer;
 import net.caffeinemc.mods.sodium.client.gl.device.CommandList;
-import net.sodium.client.gl.device.MultiDrawBatch;
+import net.caffeinemc.mods.sodium.client.gl.device.MultiDrawBatch;
 import net.caffeinemc.mods.sodium.client.gl.tessellation.GlTessellation;
 import net.caffeinemc.mods.sodium.client.model.quad.properties.ModelQuadFacing;
 import net.caffeinemc.mods.sodium.client.render.chunk.RenderSection;
@@ -14,7 +14,7 @@ import net.caffeinemc.mods.sodium.client.render.chunk.lists.ChunkRenderList;
 import net.caffeinemc.mods.sodium.client.render.chunk.terrain.DefaultTerrainRenderPasses;
 import net.caffeinemc.mods.sodium.client.render.chunk.terrain.TerrainRenderPass;
 import net.caffeinemc.mods.sodium.client.render.chunk.vertex.format.ChunkMeshFormats;
-import net.sodium.api.util.MathUtil;
+import net.caffeinemc.mods.sodium.api.util.MathUtil;
 import net.minecraft.core.SectionPos;
 import org.apache.commons.lang3.Validate;
 

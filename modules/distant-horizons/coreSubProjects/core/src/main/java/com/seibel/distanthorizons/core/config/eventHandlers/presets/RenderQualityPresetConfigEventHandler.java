@@ -19,12 +19,12 @@
 
 package com.seibel.distanthorizons.core.config.eventHandlers.presets;
 
-import net.distant_horizons.api.enums.config.EDhApiHorizontalQuality;
+import com.seibel.distanthorizons.api.enums.config.EDhApiHorizontalQuality;
 import com.seibel.distanthorizons.api.enums.config.EDhApiMaxHorizontalResolution;
-import net.distant_horizons.api.enums.config.EDhApiMcRenderingFadeMode;
+import com.seibel.distanthorizons.api.enums.config.EDhApiMcRenderingFadeMode;
 import com.seibel.distanthorizons.api.enums.config.EDhApiVerticalQuality;
 import com.seibel.distanthorizons.api.enums.config.quickOptions.EDhApiQualityPreset;
-import net.distant_horizons.api.enums.rendering.EDhApiTransparency;
+import com.seibel.distanthorizons.api.enums.rendering.EDhApiTransparency;
 import com.seibel.distanthorizons.core.config.Config;
 import com.seibel.distanthorizons.core.config.ConfigPresetOptions;
 import com.seibel.distanthorizons.core.config.listeners.ConfigChangeListener;

@@ -17,7 +17,7 @@
 package net.caffeinemc.mods.sodium.client.render.frapi.mesh;
 
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
-import net.sodium.api.util.NormI8;
+import net.caffeinemc.mods.sodium.api.util.NormI8;
 import net.caffeinemc.mods.sodium.client.model.quad.BakedQuadView;
 import net.caffeinemc.mods.sodium.client.render.frapi.helper.ColorHelper;
 import net.caffeinemc.mods.sodium.client.render.frapi.helper.TextureHelper;

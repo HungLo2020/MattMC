@@ -22,18 +22,45 @@ package com.seibel.distanthorizons.fabric.wrappers.modAccessor;
 
 import com.seibel.distanthorizons.core.wrapperInterfaces.modAccessor.IIrisAccessor;
 
-import net.iris.api.v0.IrisApi;
-
 public class IrisAccessor implements IIrisAccessor
 {
+	private static final String IRIS_API_CLASS = "net.irisshaders.iris.api.v0.IrisApi";
+	private Object irisApiInstance;
+	
+	public IrisAccessor() {
+		try {
+			Class<?> irisApiClass = Class.forName(IRIS_API_CLASS);
+			java.lang.reflect.Method getInstanceMethod = irisApiClass.getMethod("getInstance");
+			irisApiInstance = getInstanceMethod.invoke(null);
+		} catch (Exception e) {
+			irisApiInstance = null;
+		}
+	}
+	
 	@Override
 	public String getModName() { return "iris"; }
 	
 	@Override
-	public boolean isShaderPackInUse() { return IrisApi.getInstance().isShaderPackInUse(); }
+	public boolean isShaderPackInUse() {
+		if (irisApiInstance == null) return false;
+		try {
+			java.lang.reflect.Method method = irisApiInstance.getClass().getMethod("isShaderPackInUse");
+			return (Boolean) method.invoke(irisApiInstance);
+		} catch (Exception e) {
+			return false;
+		}
+	}
 	
 	@Override
-	public boolean isRenderingShadowPass() { return IrisApi.getInstance().isRenderingShadowPass(); }
+	public boolean isRenderingShadowPass() {
+		if (irisApiInstance == null) return false;
+		try {
+			java.lang.reflect.Method method = irisApiInstance.getClass().getMethod("isRenderingShadowPass");
+			return (Boolean) method.invoke(irisApiInstance);
+		} catch (Exception e) {
+			return false;
+		}
+	}
 	
 }
 

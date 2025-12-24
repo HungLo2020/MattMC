@@ -5,7 +5,7 @@ import com.mojang.blaze3d.opengl.GlStateManager;
 import com.mojang.blaze3d.pipeline.RenderPipeline;
 import com.mojang.blaze3d.shaders.UniformType;
 import com.mojang.blaze3d.vertex.VertexFormat;
-import net.iris.compat.SkipList;
+import net.irisshaders.iris.compat.SkipList;
 import net.irisshaders.iris.gl.blending.BlendModeOverride;
 import net.irisshaders.iris.gl.blending.DepthColorStorage;
 import net.irisshaders.iris.gl.framebuffer.GlFramebuffer;

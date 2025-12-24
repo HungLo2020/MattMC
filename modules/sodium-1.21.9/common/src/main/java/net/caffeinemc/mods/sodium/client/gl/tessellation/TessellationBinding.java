@@ -2,7 +2,7 @@ package net.caffeinemc.mods.sodium.client.gl.tessellation;
 
 import net.caffeinemc.mods.sodium.client.gl.attribute.GlVertexAttributeBinding;
 import net.caffeinemc.mods.sodium.client.gl.buffer.GlBuffer;
-import net.sodium.client.gl.buffer.GlBufferTarget;
+import net.caffeinemc.mods.sodium.client.gl.buffer.GlBufferTarget;
 
 public record TessellationBinding(GlBufferTarget target,
                                   GlBuffer buffer,

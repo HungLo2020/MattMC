@@ -1,9 +1,9 @@
 package net.caffeinemc.mods.sodium.mixin.features.render.particle;
 
 import com.mojang.blaze3d.vertex.VertexConsumer;
-import net.sodium.api.util.ColorARGB;
-import net.sodium.api.vertex.buffer.VertexBufferWriter;
-import net.sodium.api.vertex.format.common.ParticleVertex;
+import net.caffeinemc.mods.sodium.api.util.ColorARGB;
+import net.caffeinemc.mods.sodium.api.vertex.buffer.VertexBufferWriter;
+import net.caffeinemc.mods.sodium.api.vertex.format.common.ParticleVertex;
 import net.caffeinemc.mods.sodium.client.render.vertex.VertexConsumerUtils;
 import net.minecraft.client.renderer.state.QuadParticleRenderState;
 import org.joml.Quaternionf;

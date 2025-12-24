@@ -1,6 +1,6 @@
 package net.irisshaders.iris.layer;
 
-import net.iris.shaderpack.materialmap.NamespacedId;
+import net.irisshaders.iris.shaderpack.materialmap.NamespacedId;
 import net.irisshaders.iris.shaderpack.materialmap.WorldRenderingSettings;
 import net.irisshaders.iris.uniforms.CapturedRenderingState;
 import net.minecraft.client.renderer.RenderStateShard;

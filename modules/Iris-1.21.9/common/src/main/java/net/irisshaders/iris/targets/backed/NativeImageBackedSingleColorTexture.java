@@ -1,7 +1,7 @@
 package net.irisshaders.iris.targets.backed;
 
 import com.mojang.blaze3d.platform.NativeImage;
-import net.sodium.api.util.ColorARGB;
+import net.caffeinemc.mods.sodium.api.util.ColorARGB;
 import net.minecraft.client.renderer.texture.DynamicTexture;
 
 public class NativeImageBackedSingleColorTexture extends DynamicTexture {

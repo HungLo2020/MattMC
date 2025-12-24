@@ -1,7 +1,7 @@
 package net.irisshaders.iris.mixin;
 
-import net.iris.mixinterface.BiomeAmbienceInterface;
-import net.iris.mixinterface.LocalPlayerInterface;
+import net.irisshaders.iris.mixinterface.BiomeAmbienceInterface;
+import net.irisshaders.iris.mixinterface.LocalPlayerInterface;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.client.resources.sounds.AmbientSoundHandler;
 import net.minecraft.client.resources.sounds.BiomeAmbientSoundsHandler;

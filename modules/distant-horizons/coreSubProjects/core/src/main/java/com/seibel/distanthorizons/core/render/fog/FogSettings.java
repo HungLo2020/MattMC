@@ -19,7 +19,7 @@
 
 package com.seibel.distanthorizons.core.render.fog;
 
-import net.distant_horizons.api.enums.rendering.EDhApiFogFalloff;
+import com.seibel.distanthorizons.api.enums.rendering.EDhApiFogFalloff;
 
 import java.util.Objects;
 

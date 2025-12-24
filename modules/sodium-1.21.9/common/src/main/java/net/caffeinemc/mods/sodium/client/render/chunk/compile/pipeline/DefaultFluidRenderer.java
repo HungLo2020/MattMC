@@ -1,13 +1,13 @@
 package net.caffeinemc.mods.sodium.client.render.chunk.compile.pipeline;
 
 
-import net.sodium.api.util.ColorARGB;
-import net.sodium.api.util.NormI8;
+import net.caffeinemc.mods.sodium.api.util.ColorARGB;
+import net.caffeinemc.mods.sodium.api.util.NormI8;
 import net.caffeinemc.mods.sodium.client.model.color.ColorProvider;
-import net.sodium.client.model.light.LightMode;
+import net.caffeinemc.mods.sodium.client.model.light.LightMode;
 import net.caffeinemc.mods.sodium.client.model.light.LightPipeline;
 import net.caffeinemc.mods.sodium.client.model.light.LightPipelineProvider;
-import net.sodium.client.model.light.data.QuadLightData;
+import net.caffeinemc.mods.sodium.client.model.light.data.QuadLightData;
 import net.caffeinemc.mods.sodium.client.model.quad.ModelQuad;
 import net.caffeinemc.mods.sodium.client.model.quad.ModelQuadView;
 import net.caffeinemc.mods.sodium.client.model.quad.ModelQuadViewMutable;
@@ -16,9 +16,9 @@ import net.caffeinemc.mods.sodium.client.model.quad.properties.ModelQuadFlags;
 import net.caffeinemc.mods.sodium.client.render.chunk.compile.buffers.ChunkModelBuilder;
 import net.caffeinemc.mods.sodium.client.render.chunk.terrain.material.Material;
 import net.caffeinemc.mods.sodium.client.render.chunk.translucent_sorting.TranslucentGeometryCollector;
-import net.sodium.client.render.chunk.vertex.format.ChunkVertexEncoder;
+import net.caffeinemc.mods.sodium.client.render.chunk.vertex.format.ChunkVertexEncoder;
 import net.caffeinemc.mods.sodium.client.services.PlatformBlockAccess;
-import net.sodium.api.util.DirectionUtil;
+import net.caffeinemc.mods.sodium.api.util.DirectionUtil;
 import net.caffeinemc.mods.sodium.client.world.LevelSlice;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;

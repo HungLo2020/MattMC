@@ -19,7 +19,7 @@
 
 package com.seibel.distanthorizons.core.wrapperInterfaces.modAccessor;
 
-import net.distant_horizons.coreapi.interfaces.dependencyInjection.IBindable;
+import com.seibel.distanthorizons.coreapi.interfaces.dependencyInjection.IBindable;
 
 /**
  * @author Leetom

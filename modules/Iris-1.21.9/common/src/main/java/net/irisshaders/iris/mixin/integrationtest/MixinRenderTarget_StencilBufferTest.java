@@ -2,7 +2,7 @@ package net.irisshaders.iris.mixin.integrationtest;
 
 
 import com.mojang.blaze3d.pipeline.RenderTarget;
-import net.iris.gl.texture.DepthBufferFormat;
+import net.irisshaders.iris.gl.texture.DepthBufferFormat;
 import net.irisshaders.iris.platform.IrisPlatformHelpers;
 import org.lwjgl.opengl.GL30;
 import org.spongepowered.asm.mixin.Mixin;

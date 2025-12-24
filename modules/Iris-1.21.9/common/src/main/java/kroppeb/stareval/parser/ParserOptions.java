@@ -2,8 +2,8 @@ package kroppeb.stareval.parser;
 
 import it.unimi.dsi.fastutil.chars.Char2ObjectMap;
 import it.unimi.dsi.fastutil.chars.Char2ObjectOpenHashMap;
-import net.iris.stareval.parser.BinaryOp;
-import net.iris.stareval.parser.UnaryOp;
+import kroppeb.stareval.parser.BinaryOp;
+import kroppeb.stareval.parser.UnaryOp;
 
 public final class ParserOptions {
 	private final Char2ObjectMap<? extends OpResolver<? extends UnaryOp>> unaryOpResolvers;

@@ -1,7 +1,7 @@
 package net.caffeinemc.mods.sodium.client.gl.functions;
 
 import net.caffeinemc.mods.sodium.client.gl.buffer.GlBufferStorageFlags;
-import net.sodium.client.gl.buffer.GlBufferTarget;
+import net.caffeinemc.mods.sodium.client.gl.buffer.GlBufferTarget;
 import net.caffeinemc.mods.sodium.client.gl.device.RenderDevice;
 import net.caffeinemc.mods.sodium.client.gl.util.EnumBitField;
 import org.lwjgl.opengl.ARBBufferStorage;

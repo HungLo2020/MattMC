@@ -1,13 +1,13 @@
 package net.caffeinemc.mods.sodium.client.render.immediate.model;
 
 import com.mojang.blaze3d.vertex.PoseStack;
-import net.sodium.api.util.ColorMixer;
+import net.caffeinemc.mods.sodium.api.util.ColorMixer;
 import net.caffeinemc.mods.sodium.client.model.quad.ModelQuadView;
-import net.sodium.api.math.MatrixHelper;
-import net.sodium.api.util.ColorABGR;
-import net.sodium.api.util.ColorU8;
-import net.sodium.api.vertex.buffer.VertexBufferWriter;
-import net.sodium.api.vertex.format.common.EntityVertex;
+import net.caffeinemc.mods.sodium.api.math.MatrixHelper;
+import net.caffeinemc.mods.sodium.api.util.ColorABGR;
+import net.caffeinemc.mods.sodium.api.util.ColorU8;
+import net.caffeinemc.mods.sodium.api.vertex.buffer.VertexBufferWriter;
+import net.caffeinemc.mods.sodium.api.vertex.format.common.EntityVertex;
 import net.caffeinemc.mods.sodium.client.services.PlatformRuntimeInformation;
 import org.joml.Matrix3f;
 import org.joml.Matrix4f;

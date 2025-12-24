@@ -1,6 +1,6 @@
 package net.irisshaders.iris.gl.blending;
 
-import net.iris.gl.blending.AlphaTestFunction;
+import net.irisshaders.iris.gl.blending.AlphaTestFunction;
 
 public record AlphaTest(AlphaTestFunction function, float reference) {
 	public static final AlphaTest ALWAYS = new AlphaTest(AlphaTestFunction.ALWAYS, 0.0f);

@@ -2,7 +2,7 @@ package net.caffeinemc.mods.sodium.mixin.features.textures.scan;
 
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
-import net.sodium.client.render.chunk.compile.pipeline.TextureAtlasSpriteExtension;
+import net.caffeinemc.mods.sodium.client.render.chunk.compile.pipeline.TextureAtlasSpriteExtension;
 import net.minecraft.client.renderer.texture.SpriteContents;
 import net.minecraft.client.renderer.texture.SpriteTicker;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;

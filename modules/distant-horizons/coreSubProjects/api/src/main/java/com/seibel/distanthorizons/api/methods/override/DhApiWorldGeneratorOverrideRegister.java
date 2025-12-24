@@ -22,7 +22,7 @@ package com.seibel.distanthorizons.api.methods.override;
 import com.seibel.distanthorizons.api.interfaces.override.worldGenerator.IDhApiWorldGenerator;
 import com.seibel.distanthorizons.api.interfaces.override.worldGenerator.IDhApiWorldGeneratorOverrideRegister;
 import com.seibel.distanthorizons.api.interfaces.world.IDhApiLevelWrapper;
-import net.distant_horizons.api.objects.DhApiResult;
+import com.seibel.distanthorizons.api.objects.DhApiResult;
 import com.seibel.distanthorizons.coreapi.DependencyInjection.WorldGeneratorInjector;
 
 /**

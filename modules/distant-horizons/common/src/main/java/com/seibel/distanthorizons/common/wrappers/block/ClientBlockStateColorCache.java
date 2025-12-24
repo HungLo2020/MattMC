@@ -24,7 +24,7 @@ import com.seibel.distanthorizons.core.dataObjects.fullData.sources.FullDataSour
 import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
 import com.seibel.distanthorizons.core.pos.blockPos.DhBlockPos;
 import com.seibel.distanthorizons.core.pos.blockPos.DhBlockPosMutable;
-import net.distant_horizons.core.util.ColorUtil;
+import com.seibel.distanthorizons.core.util.ColorUtil;
 import com.seibel.distanthorizons.core.wrapperInterfaces.world.IClientLevelWrapper;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.block.model.BakedQuad;

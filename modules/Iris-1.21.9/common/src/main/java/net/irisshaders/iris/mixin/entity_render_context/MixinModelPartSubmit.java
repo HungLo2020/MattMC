@@ -1,8 +1,8 @@
 package net.irisshaders.iris.mixin.entity_render_context;
 
-import net.iris.mixinterface.ModelStorage;
+import net.irisshaders.iris.mixinterface.ModelStorage;
 import net.irisshaders.iris.uniforms.CapturedRenderingState;
-import net.iris.vertices.ImmediateState;
+import net.irisshaders.iris.vertices.ImmediateState;
 import net.minecraft.client.renderer.SubmitNodeStorage;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;

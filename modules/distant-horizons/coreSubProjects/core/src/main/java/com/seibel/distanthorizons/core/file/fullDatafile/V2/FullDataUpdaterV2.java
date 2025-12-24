@@ -3,7 +3,7 @@ package com.seibel.distanthorizons.core.file.fullDatafile.V2;
 import com.seibel.distanthorizons.api.enums.config.EDhApiDataCompressionMode;
 import com.seibel.distanthorizons.core.config.Config;
 import com.seibel.distanthorizons.core.dataObjects.fullData.sources.FullDataSourceV2;
-import net.distant_horizons.core.file.fullDatafile.IDataSourceUpdateListenerFunc;
+import com.seibel.distanthorizons.core.file.fullDatafile.IDataSourceUpdateListenerFunc;
 import com.seibel.distanthorizons.core.logging.DhLogger;
 import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
 import com.seibel.distanthorizons.core.pos.DhSectionPos;

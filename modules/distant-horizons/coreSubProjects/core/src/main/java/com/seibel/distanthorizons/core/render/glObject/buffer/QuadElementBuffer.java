@@ -19,10 +19,10 @@
 
 package com.seibel.distanthorizons.core.render.glObject.buffer;
 
-import net.distant_horizons.api.enums.config.EDhApiGpuUploadMethod;
+import com.seibel.distanthorizons.api.enums.config.EDhApiGpuUploadMethod;
 import com.seibel.distanthorizons.core.logging.DhLogger;
 import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
-import net.distant_horizons.core.render.glObject.GLEnums;
+import com.seibel.distanthorizons.core.render.glObject.GLEnums;
 import com.seibel.distanthorizons.core.render.glObject.GLProxy;
 import com.seibel.distanthorizons.core.logging.DhLogger;
 import org.lwjgl.opengl.GL32;

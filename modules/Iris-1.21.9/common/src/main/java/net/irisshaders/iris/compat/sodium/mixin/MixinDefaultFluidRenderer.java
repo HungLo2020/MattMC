@@ -7,11 +7,11 @@ import net.caffeinemc.mods.sodium.client.render.chunk.compile.buffers.ChunkModel
 import net.caffeinemc.mods.sodium.client.render.chunk.compile.pipeline.DefaultFluidRenderer;
 import net.caffeinemc.mods.sodium.client.render.chunk.terrain.material.Material;
 import net.caffeinemc.mods.sodium.client.render.chunk.translucent_sorting.TranslucentGeometryCollector;
-import net.sodium.client.render.chunk.vertex.format.ChunkVertexEncoder;
+import net.caffeinemc.mods.sodium.client.render.chunk.vertex.format.ChunkVertexEncoder;
 import net.caffeinemc.mods.sodium.client.render.frapi.mesh.MutableQuadViewImpl;
 import net.irisshaders.iris.shaderpack.materialmap.WorldRenderingSettings;
-import net.iris.vertices.sodium.terrain.ChunkVertexExtension;
-import net.iris.vertices.sodium.terrain.VertexEncoderInterface;
+import net.irisshaders.iris.vertices.sodium.terrain.ChunkVertexExtension;
+import net.irisshaders.iris.vertices.sodium.terrain.VertexEncoderInterface;
 import net.minecraft.core.BlockPos;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;

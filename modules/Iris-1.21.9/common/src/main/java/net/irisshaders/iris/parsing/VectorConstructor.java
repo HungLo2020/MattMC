@@ -1,10 +1,10 @@
 package net.irisshaders.iris.parsing;
 
-import net.iris.stareval.Util;
+import kroppeb.stareval.Util;
 import kroppeb.stareval.expression.Expression;
 import kroppeb.stareval.function.AbstractTypedFunction;
 import kroppeb.stareval.function.FunctionContext;
-import net.iris.stareval.function.FunctionReturn;
+import kroppeb.stareval.function.FunctionReturn;
 import kroppeb.stareval.function.Type;
 
 import java.util.Arrays;

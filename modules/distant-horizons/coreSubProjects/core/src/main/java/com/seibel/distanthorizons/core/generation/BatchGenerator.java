@@ -19,7 +19,7 @@
 
 package com.seibel.distanthorizons.core.generation;
 
-import net.distant_horizons.api.enums.worldGeneration.EDhApiWorldGenerationStep;
+import com.seibel.distanthorizons.api.enums.worldGeneration.EDhApiWorldGenerationStep;
 import com.seibel.distanthorizons.api.interfaces.override.worldGenerator.IDhApiWorldGenerator;
 import com.seibel.distanthorizons.core.dependencyInjection.SingletonInjector;
 import com.seibel.distanthorizons.core.level.IDhLevel;
@@ -28,7 +28,7 @@ import com.seibel.distanthorizons.core.util.ExceptionUtil;
 import com.seibel.distanthorizons.core.wrapperInterfaces.chunk.IChunkWrapper;
 import com.seibel.distanthorizons.core.wrapperInterfaces.worldGeneration.IBatchGeneratorEnvironmentWrapper;
 import com.seibel.distanthorizons.coreapi.interfaces.dependencyInjection.IOverrideInjector;
-import net.distant_horizons.api.enums.worldGeneration.EDhApiDistantGeneratorMode;
+import com.seibel.distanthorizons.api.enums.worldGeneration.EDhApiDistantGeneratorMode;
 import com.seibel.distanthorizons.core.util.LodUtil;
 import com.seibel.distanthorizons.core.wrapperInterfaces.IWrapperFactory;
 import com.seibel.distanthorizons.core.logging.DhLogger;

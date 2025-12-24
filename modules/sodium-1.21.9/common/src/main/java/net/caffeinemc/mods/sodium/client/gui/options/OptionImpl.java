@@ -1,9 +1,9 @@
 package net.caffeinemc.mods.sodium.client.gui.options;
 
 import net.caffeinemc.mods.sodium.client.gui.options.binding.GenericBinding;
-import net.sodium.client.gui.options.binding.OptionBinding;
+import net.caffeinemc.mods.sodium.client.gui.options.binding.OptionBinding;
 import net.caffeinemc.mods.sodium.client.gui.options.control.Control;
-import net.sodium.client.gui.options.storage.OptionStorage;
+import net.caffeinemc.mods.sodium.client.gui.options.storage.OptionStorage;
 import net.minecraft.network.chat.Component;
 import org.apache.commons.lang3.Validate;
 

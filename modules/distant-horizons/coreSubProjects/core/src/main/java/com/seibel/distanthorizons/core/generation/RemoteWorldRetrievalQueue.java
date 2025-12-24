@@ -2,7 +2,7 @@ package com.seibel.distanthorizons.core.generation;
 
 import com.seibel.distanthorizons.core.config.Config;
 import com.seibel.distanthorizons.core.generation.tasks.IWorldGenTaskTracker;
-import net.distant_horizons.core.generation.tasks.WorldGenResult;
+import com.seibel.distanthorizons.core.generation.tasks.WorldGenResult;
 import com.seibel.distanthorizons.core.level.DhClientLevel;
 import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
 import com.seibel.distanthorizons.core.multiplayer.client.AbstractFullDataNetworkRequestQueue;
@@ -12,7 +12,7 @@ import com.seibel.distanthorizons.core.pos.blockPos.DhBlockPos2D;
 import com.seibel.distanthorizons.core.render.renderer.IDebugRenderable;
 import com.seibel.distanthorizons.core.util.LodUtil;
 import com.seibel.distanthorizons.core.util.WorldGenUtil;
-import net.distant_horizons.core.util.objects.RollingAverage;
+import com.seibel.distanthorizons.core.util.objects.RollingAverage;
 import com.seibel.distanthorizons.core.logging.DhLogger;
 
 import java.util.ArrayList;

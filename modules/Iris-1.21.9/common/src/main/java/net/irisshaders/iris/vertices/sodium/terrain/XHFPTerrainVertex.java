@@ -1,11 +1,11 @@
 package net.irisshaders.iris.vertices.sodium.terrain;
 
-import net.sodium.api.util.ColorABGR;
-import net.sodium.api.util.ColorARGB;
-import net.sodium.client.render.chunk.vertex.format.ChunkVertexEncoder;
+import net.caffeinemc.mods.sodium.api.util.ColorABGR;
+import net.caffeinemc.mods.sodium.api.util.ColorARGB;
+import net.caffeinemc.mods.sodium.client.render.chunk.vertex.format.ChunkVertexEncoder;
 import net.irisshaders.iris.shaderpack.materialmap.WorldRenderingSettings;
-import net.iris.vertices.ExtendedDataHelper;
-import net.sodium.api.util.NormI8;
+import net.irisshaders.iris.vertices.ExtendedDataHelper;
+import net.caffeinemc.mods.sodium.api.util.NormI8;
 import net.irisshaders.iris.vertices.NormalHelper;
 import net.minecraft.util.Mth;
 import org.joml.Vector2f;

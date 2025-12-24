@@ -1,6 +1,6 @@
 package com.seibel.distanthorizons.core.api.external.methods.data;
 
-import net.distant_horizons.api.interfaces.data.IDhApiTerrainDataCache;
+import com.seibel.distanthorizons.api.interfaces.data.IDhApiTerrainDataCache;
 import com.seibel.distanthorizons.core.dataObjects.fullData.sources.FullDataSourceV2;
 import com.seibel.distanthorizons.core.logging.DhLogger;
 import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;

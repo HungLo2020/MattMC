@@ -1,8 +1,8 @@
 package net.caffeinemc.mods.sodium.client.render.chunk.data;
 
 import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
-import net.sodium.api.texture.SpriteUtil;
-import net.sodium.client.render.chunk.RenderSectionFlags;
+import net.caffeinemc.mods.sodium.api.texture.SpriteUtil;
+import net.caffeinemc.mods.sodium.client.render.chunk.RenderSectionFlags;
 import net.caffeinemc.mods.sodium.client.render.chunk.occlusion.VisibilityEncoding;
 import net.caffeinemc.mods.sodium.client.render.chunk.terrain.TerrainRenderPass;
 import net.minecraft.client.renderer.chunk.VisibilitySet;

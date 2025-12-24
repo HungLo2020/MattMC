@@ -1,7 +1,7 @@
 package net.irisshaders.iris.uniforms;
 
 import net.irisshaders.iris.gl.uniform.UniformHolder;
-import net.iris.gl.uniform.UniformUpdateFrequency;
+import net.irisshaders.iris.gl.uniform.UniformUpdateFrequency;
 import net.irisshaders.iris.gui.option.IrisVideoSettings;
 import net.irisshaders.iris.helpers.JomlConversions;
 import net.irisshaders.iris.mixin.GameRendererAccessor;

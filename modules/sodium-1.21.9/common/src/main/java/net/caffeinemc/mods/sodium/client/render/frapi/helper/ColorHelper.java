@@ -16,8 +16,8 @@
 
 package net.caffeinemc.mods.sodium.client.render.frapi.helper;
 
-import net.sodium.api.util.ColorABGR;
-import net.sodium.api.util.ColorARGB;
+import net.caffeinemc.mods.sodium.api.util.ColorABGR;
+import net.caffeinemc.mods.sodium.api.util.ColorARGB;
 
 /**
  * Static routines of general utility for renderer implementations.

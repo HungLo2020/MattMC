@@ -3,7 +3,7 @@ package kroppeb.stareval.element.token;
 import kroppeb.stareval.element.ExpressionElement;
 import kroppeb.stareval.element.PriorityOperatorElement;
 import kroppeb.stareval.element.tree.UnaryExpressionElement;
-import net.iris.stareval.parser.UnaryOp;
+import kroppeb.stareval.parser.UnaryOp;
 
 public class UnaryOperatorToken extends Token implements PriorityOperatorElement {
 	private final UnaryOp op;

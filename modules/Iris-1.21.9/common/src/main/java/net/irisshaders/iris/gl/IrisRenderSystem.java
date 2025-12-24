@@ -6,7 +6,7 @@ import com.mojang.blaze3d.opengl.GlStateManager;
 import com.mojang.blaze3d.systems.RenderSystem;
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.ints.IntList;
-import net.iris.gl.BooleanStateExtended;
+import net.irisshaders.iris.gl.BooleanStateExtended;
 import net.irisshaders.iris.Iris;
 import net.irisshaders.iris.gl.sampler.SamplerLimits;
 import net.irisshaders.iris.gl.texture.TextureType;

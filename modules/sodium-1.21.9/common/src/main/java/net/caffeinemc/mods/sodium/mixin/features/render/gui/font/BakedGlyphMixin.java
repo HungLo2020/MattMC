@@ -1,10 +1,10 @@
 package net.caffeinemc.mods.sodium.mixin.features.render.gui.font;
 
 import com.mojang.blaze3d.vertex.VertexConsumer;
-import net.sodium.api.util.ColorARGB;
+import net.caffeinemc.mods.sodium.api.util.ColorARGB;
 import net.caffeinemc.mods.sodium.client.render.vertex.VertexConsumerUtils;
-import net.sodium.api.vertex.format.common.GlyphVertex;
-import net.sodium.api.math.MatrixHelper;
+import net.caffeinemc.mods.sodium.api.vertex.format.common.GlyphVertex;
+import net.caffeinemc.mods.sodium.api.math.MatrixHelper;
 import net.minecraft.client.gui.font.glyphs.BakedSheetGlyph;
 import org.joml.Matrix4f;
 import org.lwjgl.system.MemoryStack;

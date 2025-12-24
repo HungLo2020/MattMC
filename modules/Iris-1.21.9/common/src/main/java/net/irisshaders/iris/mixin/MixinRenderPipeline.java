@@ -6,7 +6,7 @@ import com.mojang.blaze3d.platform.DepthTestFunction;
 import com.mojang.blaze3d.vertex.DefaultVertexFormat;
 import com.mojang.blaze3d.vertex.VertexFormat;
 import net.irisshaders.iris.Iris;
-import net.iris.vertices.ImmediateState;
+import net.irisshaders.iris.vertices.ImmediateState;
 import net.irisshaders.iris.vertices.IrisVertexFormats;
 import net.minecraft.client.renderer.ShaderDefines;
 import net.minecraft.resources.ResourceLocation;

@@ -2,7 +2,7 @@ package net.caffeinemc.mods.sodium.fabric;
 
 import net.caffeinemc.mods.sodium.client.SodiumClientMod;
 import net.caffeinemc.mods.sodium.client.render.frapi.SodiumRenderer;
-import net.sodium.client.util.FlawlessFrames;
+import net.caffeinemc.mods.sodium.client.util.FlawlessFrames;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.renderer.v1.Renderer;
 import net.fabricmc.loader.api.FabricLoader;

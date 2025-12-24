@@ -22,7 +22,7 @@ package com.seibel.distanthorizons.core.render.renderer.generic;
 import com.seibel.distanthorizons.api.interfaces.render.IDhApiCustomRenderObjectFactory;
 import com.seibel.distanthorizons.api.interfaces.render.IDhApiCustomRenderRegister;
 import com.seibel.distanthorizons.api.interfaces.render.IDhApiRenderableBoxGroup;
-import net.distant_horizons.api.objects.math.DhApiVec3d;
+import com.seibel.distanthorizons.api.objects.math.DhApiVec3d;
 import com.seibel.distanthorizons.api.objects.math.DhApiVec3f;
 import com.seibel.distanthorizons.api.objects.render.DhApiRenderableBox;
 import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;

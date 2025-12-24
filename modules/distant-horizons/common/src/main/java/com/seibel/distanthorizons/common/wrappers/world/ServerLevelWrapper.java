@@ -25,7 +25,7 @@ import java.util.Collections;
 import java.util.Map;
 import java.util.WeakHashMap;
 
-import net.distant_horizons.api.enums.worldGeneration.EDhApiLevelType;
+import com.seibel.distanthorizons.api.enums.worldGeneration.EDhApiLevelType;
 import com.seibel.distanthorizons.api.interfaces.render.IDhApiCustomRenderRegister;
 import com.seibel.distanthorizons.common.wrappers.chunk.ChunkWrapper;
 import com.seibel.distanthorizons.core.api.internal.SharedApi;
@@ -34,7 +34,7 @@ import com.seibel.distanthorizons.core.level.IDhLevel;
 import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
 import com.seibel.distanthorizons.core.network.messages.base.LevelInitMessage;
 import com.seibel.distanthorizons.core.pos.DhChunkPos;
-import net.distant_horizons.core.world.EWorldEnvironment;
+import com.seibel.distanthorizons.core.world.EWorldEnvironment;
 import com.seibel.distanthorizons.core.wrapperInterfaces.chunk.IChunkWrapper;
 
 import com.seibel.distanthorizons.core.wrapperInterfaces.world.IServerLevelWrapper;

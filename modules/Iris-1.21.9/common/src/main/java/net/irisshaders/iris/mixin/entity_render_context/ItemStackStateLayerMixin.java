@@ -4,7 +4,7 @@ import com.llamalad7.mixinextras.sugar.Share;
 import com.llamalad7.mixinextras.sugar.ref.LocalIntRef;
 import com.mojang.blaze3d.vertex.PoseStack;
 import net.irisshaders.iris.mixinterface.ItemContextState;
-import net.iris.shaderpack.materialmap.NamespacedId;
+import net.irisshaders.iris.shaderpack.materialmap.NamespacedId;
 import net.irisshaders.iris.shaderpack.materialmap.WorldRenderingSettings;
 import net.irisshaders.iris.uniforms.CapturedRenderingState;
 import net.minecraft.client.renderer.MultiBufferSource;

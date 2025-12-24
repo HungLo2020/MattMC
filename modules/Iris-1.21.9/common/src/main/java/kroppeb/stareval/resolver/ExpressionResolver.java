@@ -14,7 +14,7 @@ import kroppeb.stareval.expression.Expression;
 import kroppeb.stareval.expression.VariableExpression;
 import kroppeb.stareval.function.FunctionContext;
 import kroppeb.stareval.function.FunctionResolver;
-import net.iris.stareval.function.FunctionReturn;
+import kroppeb.stareval.function.FunctionReturn;
 import kroppeb.stareval.function.Type;
 import kroppeb.stareval.function.TypedFunction;
 import kroppeb.stareval.function.TypedFunction.Parameter;

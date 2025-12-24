@@ -6,8 +6,8 @@ import net.caffeinemc.mods.sodium.client.render.chunk.lists.RenderSectionVisitor
 import net.caffeinemc.mods.sodium.client.render.viewport.CameraTransform;
 import net.caffeinemc.mods.sodium.client.render.viewport.Viewport;
 import net.caffeinemc.mods.sodium.client.util.collections.DoubleBufferedQueue;
-import net.sodium.client.util.collections.ReadQueue;
-import net.sodium.client.util.collections.WriteQueue;
+import net.caffeinemc.mods.sodium.client.util.collections.ReadQueue;
+import net.caffeinemc.mods.sodium.client.util.collections.WriteQueue;
 import net.minecraft.core.SectionPos;
 import net.minecraft.util.Mth;
 import net.minecraft.world.level.Level;

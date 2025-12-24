@@ -1,7 +1,7 @@
 package kroppeb.stareval.parser;
 
 import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
-import net.iris.stareval.exception.ParseException;
+import kroppeb.stareval.exception.ParseException;
 
 import java.util.Map;
 

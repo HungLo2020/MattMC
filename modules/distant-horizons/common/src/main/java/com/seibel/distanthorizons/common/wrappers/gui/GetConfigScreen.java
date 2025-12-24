@@ -2,7 +2,7 @@ package com.seibel.distanthorizons.common.wrappers.gui;
 
 import com.seibel.distanthorizons.core.config.ConfigHandler;
 import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
-import net.distant_horizons.coreapi.ModInfo;
+import com.seibel.distanthorizons.coreapi.ModInfo;
 import com.seibel.distanthorizons.core.config.gui.JavaScreenHandlerScreen;
 import net.minecraft.client.gui.screens.Screen;
 import com.seibel.distanthorizons.core.logging.DhLogger;

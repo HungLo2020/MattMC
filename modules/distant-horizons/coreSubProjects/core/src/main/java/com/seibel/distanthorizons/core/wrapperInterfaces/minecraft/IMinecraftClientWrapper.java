@@ -27,8 +27,8 @@ import com.seibel.distanthorizons.core.pos.blockPos.DhBlockPos;
 import com.seibel.distanthorizons.core.pos.DhChunkPos;
 import com.seibel.distanthorizons.core.render.glObject.GLProxy;
 import com.seibel.distanthorizons.core.wrapperInterfaces.world.IClientLevelWrapper;
-import net.distant_horizons.coreapi.ModInfo;
-import net.distant_horizons.coreapi.interfaces.dependencyInjection.IBindable;
+import com.seibel.distanthorizons.coreapi.ModInfo;
+import com.seibel.distanthorizons.coreapi.interfaces.dependencyInjection.IBindable;
 import com.seibel.distanthorizons.core.wrapperInterfaces.world.ILevelWrapper;
 import org.apache.logging.log4j.Level;
 

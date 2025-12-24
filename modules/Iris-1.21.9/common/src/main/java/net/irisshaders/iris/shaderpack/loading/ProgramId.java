@@ -1,7 +1,7 @@
 package net.irisshaders.iris.shaderpack.loading;
 
-import net.iris.pipeline.programs.IrisProgram;
-import net.iris.gl.blending.BlendMode;
+import net.irisshaders.iris.pipeline.programs.IrisProgram;
+import net.irisshaders.iris.gl.blending.BlendMode;
 import net.irisshaders.iris.gl.blending.BlendModeFunction;
 import net.irisshaders.iris.gl.blending.BlendModeOverride;
 

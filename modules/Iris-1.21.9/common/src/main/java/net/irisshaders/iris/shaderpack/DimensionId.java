@@ -1,6 +1,6 @@
 package net.irisshaders.iris.shaderpack;
 
-import net.iris.shaderpack.materialmap.NamespacedId;
+import net.irisshaders.iris.shaderpack.materialmap.NamespacedId;
 
 public class DimensionId {
 	public static final NamespacedId OVERWORLD = new NamespacedId("minecraft", "overworld");

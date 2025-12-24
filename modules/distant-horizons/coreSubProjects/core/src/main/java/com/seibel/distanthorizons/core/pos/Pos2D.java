@@ -19,7 +19,7 @@
 
 package com.seibel.distanthorizons.core.pos;
 
-import net.sodium.api.util.MathUtil;
+import com.seibel.distanthorizons.coreapi.util.MathUtil;
 
 import java.util.Objects;
 

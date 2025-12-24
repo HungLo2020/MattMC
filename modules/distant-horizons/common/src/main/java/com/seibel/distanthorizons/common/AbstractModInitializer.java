@@ -20,7 +20,7 @@ import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
 import com.seibel.distanthorizons.core.wrapperInterfaces.modAccessor.IModAccessor;
 import com.seibel.distanthorizons.core.wrapperInterfaces.modAccessor.IModChecker;
 import com.seibel.distanthorizons.coreapi.DependencyInjection.ApiEventInjector;
-import net.distant_horizons.coreapi.ModInfo;
+import com.seibel.distanthorizons.coreapi.ModInfo;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.dedicated.DedicatedServer;

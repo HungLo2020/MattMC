@@ -3,7 +3,7 @@ package net.caffeinemc.mods.sodium.client.render.chunk.translucent_sorting.trigg
 import it.unimi.dsi.fastutil.objects.ObjectOpenHashSet;
 import net.caffeinemc.mods.sodium.client.SodiumClientMod;
 import net.caffeinemc.mods.sodium.client.render.chunk.translucent_sorting.SortBehavior;
-import net.sodium.client.render.chunk.translucent_sorting.SortType;
+import net.caffeinemc.mods.sodium.client.render.chunk.translucent_sorting.SortType;
 import net.caffeinemc.mods.sodium.client.render.chunk.translucent_sorting.data.DynamicData;
 import net.caffeinemc.mods.sodium.client.render.chunk.translucent_sorting.data.DynamicTopoData;
 import net.caffeinemc.mods.sodium.client.render.chunk.translucent_sorting.data.TranslucentData;

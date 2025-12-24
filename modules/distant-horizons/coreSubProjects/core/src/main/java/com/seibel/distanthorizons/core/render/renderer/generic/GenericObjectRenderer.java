@@ -19,20 +19,20 @@
 
 package com.seibel.distanthorizons.core.render.renderer.generic;
 
-import net.distant_horizons.api.enums.config.EDhApiGpuUploadMethod;
-import net.distant_horizons.api.enums.rendering.EDhApiBlockMaterial;
+import com.seibel.distanthorizons.api.enums.config.EDhApiGpuUploadMethod;
+import com.seibel.distanthorizons.api.enums.rendering.EDhApiBlockMaterial;
 import com.seibel.distanthorizons.api.interfaces.override.rendering.IDhApiGenericObjectShaderProgram;
 import com.seibel.distanthorizons.api.interfaces.render.IDhApiRenderableBoxGroup;
 import com.seibel.distanthorizons.api.interfaces.render.IDhApiCustomRenderRegister;
 import com.seibel.distanthorizons.api.methods.events.abstractEvents.*;
 import com.seibel.distanthorizons.api.methods.events.sharedParameterObjects.DhApiRenderParam;
-import net.distant_horizons.api.objects.math.DhApiVec3d;
+import com.seibel.distanthorizons.api.objects.math.DhApiVec3d;
 import com.seibel.distanthorizons.api.objects.render.DhApiRenderableBox;
 import com.seibel.distanthorizons.api.objects.render.DhApiRenderableBoxGroupShading;
 import com.seibel.distanthorizons.core.config.Config;
 import com.seibel.distanthorizons.core.dependencyInjection.ModAccessorInjector;
 import com.seibel.distanthorizons.core.dependencyInjection.SingletonInjector;
-import net.distant_horizons.core.jar.EPlatform;
+import com.seibel.distanthorizons.core.jar.EPlatform;
 import com.seibel.distanthorizons.core.logging.DhLogger;
 import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
 import com.seibel.distanthorizons.core.logging.f3.F3Screen;
@@ -47,7 +47,7 @@ import com.seibel.distanthorizons.core.util.math.Vec3d;
 import com.seibel.distanthorizons.core.wrapperInterfaces.modAccessor.ISodiumAccessor;
 import com.seibel.distanthorizons.coreapi.DependencyInjection.ApiEventInjector;
 import com.seibel.distanthorizons.coreapi.DependencyInjection.OverrideInjector;
-import net.distant_horizons.coreapi.ModInfo;
+import com.seibel.distanthorizons.coreapi.ModInfo;
 import org.apache.logging.log4j.LogManager;
 import com.seibel.distanthorizons.core.logging.DhLogger;
 import org.lwjgl.opengl.ARBInstancedArrays;

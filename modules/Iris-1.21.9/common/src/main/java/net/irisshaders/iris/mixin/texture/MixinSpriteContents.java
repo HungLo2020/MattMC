@@ -2,7 +2,7 @@ package net.irisshaders.iris.mixin.texture;
 
 import com.mojang.blaze3d.platform.NativeImage;
 import net.irisshaders.iris.Iris;
-import net.sodium.client.render.chunk.compile.pipeline.SpriteContentsExtension;
+import net.caffeinemc.mods.sodium.client.render.chunk.compile.pipeline.SpriteContentsExtension;
 import net.irisshaders.iris.pbr.mipmap.CustomMipmapGenerator;
 import net.minecraft.client.renderer.texture.MipmapGenerator;
 import net.minecraft.client.renderer.texture.SpriteContents;

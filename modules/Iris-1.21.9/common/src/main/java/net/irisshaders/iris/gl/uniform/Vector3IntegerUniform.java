@@ -1,7 +1,7 @@
 package net.irisshaders.iris.gl.uniform;
 
 import net.irisshaders.iris.gl.IrisRenderSystem;
-import net.iris.gl.state.ValueUpdateNotifier;
+import net.irisshaders.iris.gl.state.ValueUpdateNotifier;
 import org.joml.Vector3i;
 
 import java.util.function.Supplier;

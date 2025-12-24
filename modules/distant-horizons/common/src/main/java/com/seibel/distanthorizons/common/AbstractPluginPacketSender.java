@@ -10,7 +10,7 @@ import com.seibel.distanthorizons.core.network.messages.AbstractNetworkMessage;
 import com.seibel.distanthorizons.core.network.messages.base.CloseReasonMessage;
 import com.seibel.distanthorizons.core.wrapperInterfaces.misc.IPluginPacketSender;
 import com.seibel.distanthorizons.core.wrapperInterfaces.misc.IServerPlayerWrapper;
-import net.distant_horizons.coreapi.ModInfo;
+import com.seibel.distanthorizons.coreapi.ModInfo;
 import io.netty.buffer.ByteBufUtil;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.server.level.ServerPlayer;

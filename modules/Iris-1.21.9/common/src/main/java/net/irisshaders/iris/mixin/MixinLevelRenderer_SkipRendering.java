@@ -5,7 +5,7 @@ import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import com.llamalad7.mixinextras.injector.wrapoperation.WrapOperation;
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
 import net.irisshaders.iris.Iris;
-import net.iris.NeoLambdas;
+import net.irisshaders.iris.NeoLambdas;
 import net.irisshaders.iris.pipeline.IrisRenderingPipeline;
 import net.minecraft.client.Camera;
 import net.minecraft.client.multiplayer.ClientLevel;

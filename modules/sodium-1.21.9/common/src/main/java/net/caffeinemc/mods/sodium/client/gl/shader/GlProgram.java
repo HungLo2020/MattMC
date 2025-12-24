@@ -1,8 +1,8 @@
 package net.caffeinemc.mods.sodium.client.gl.shader;
 
 import com.mojang.blaze3d.opengl.GlStateManager;
-import net.sodium.client.gl.GlObject;
-import net.sodium.client.gl.shader.uniform.GlUniform;
+import net.caffeinemc.mods.sodium.client.gl.GlObject;
+import net.caffeinemc.mods.sodium.client.gl.shader.uniform.GlUniform;
 import net.caffeinemc.mods.sodium.client.gl.shader.uniform.GlUniformBlock;
 import net.caffeinemc.mods.sodium.client.render.chunk.shader.ShaderBindingContext;
 import net.minecraft.resources.ResourceLocation;

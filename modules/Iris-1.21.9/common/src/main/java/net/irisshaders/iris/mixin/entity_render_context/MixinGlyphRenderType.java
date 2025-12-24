@@ -4,7 +4,7 @@ import com.llamalad7.mixinextras.injector.wrapmethod.WrapMethod;
 import com.llamalad7.mixinextras.injector.wrapoperation.Operation;
 import net.irisshaders.iris.layer.BlockEntityRenderStateShard;
 import net.irisshaders.iris.layer.OuterWrappedRenderType;
-import net.iris.vertices.ImmediateState;
+import net.irisshaders.iris.vertices.ImmediateState;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.font.GlyphRenderTypes;
 import net.minecraft.client.renderer.RenderType;

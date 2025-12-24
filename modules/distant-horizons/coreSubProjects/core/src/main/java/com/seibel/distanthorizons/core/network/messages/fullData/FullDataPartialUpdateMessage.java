@@ -21,7 +21,7 @@ package com.seibel.distanthorizons.core.network.messages.fullData;
 
 import com.google.common.base.MoreObjects;
 import com.seibel.distanthorizons.core.multiplayer.fullData.FullDataPayload;
-import net.distant_horizons.core.network.INetworkObject;
+import com.seibel.distanthorizons.core.network.INetworkObject;
 import com.seibel.distanthorizons.core.network.messages.ILevelRelatedMessage;
 import com.seibel.distanthorizons.core.network.messages.AbstractNetworkMessage;
 import com.seibel.distanthorizons.core.wrapperInterfaces.world.IServerLevelWrapper;

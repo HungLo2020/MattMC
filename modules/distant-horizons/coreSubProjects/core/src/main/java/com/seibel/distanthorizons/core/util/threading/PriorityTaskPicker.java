@@ -1,9 +1,9 @@
 package com.seibel.distanthorizons.core.util.threading;
 
 import com.seibel.distanthorizons.core.config.Config;
-import net.distant_horizons.core.config.listeners.IConfigListener;
+import com.seibel.distanthorizons.core.config.listeners.IConfigListener;
 import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
-import net.distant_horizons.core.util.objects.RollingAverage;
+import com.seibel.distanthorizons.core.util.objects.RollingAverage;
 import com.seibel.distanthorizons.core.logging.DhLogger;
 import org.jetbrains.annotations.NotNull;
 

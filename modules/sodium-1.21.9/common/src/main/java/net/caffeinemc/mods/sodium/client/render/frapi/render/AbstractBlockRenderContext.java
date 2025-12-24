@@ -1,10 +1,10 @@
 package net.caffeinemc.mods.sodium.client.render.frapi.render;
 
 import it.unimi.dsi.fastutil.objects.ObjectArrayList;
-import net.sodium.client.model.light.LightMode;
+import net.caffeinemc.mods.sodium.client.model.light.LightMode;
 import net.caffeinemc.mods.sodium.client.model.light.LightPipeline;
 import net.caffeinemc.mods.sodium.client.model.light.LightPipelineProvider;
-import net.sodium.client.model.light.data.QuadLightData;
+import net.caffeinemc.mods.sodium.client.model.light.data.QuadLightData;
 import net.caffeinemc.mods.sodium.client.render.chunk.compile.pipeline.BlockOcclusionCache;
 import net.caffeinemc.mods.sodium.client.render.frapi.SodiumRenderer;
 import net.caffeinemc.mods.sodium.client.render.frapi.helper.ColorHelper;

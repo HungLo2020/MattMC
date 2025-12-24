@@ -1,7 +1,7 @@
 package net.irisshaders.iris.gui.option;
 
 import net.irisshaders.iris.Iris;
-import net.iris.pathways.colorspace.ColorSpace;
+import net.irisshaders.iris.pathways.colorspace.ColorSpace;
 import net.irisshaders.iris.pipeline.WorldRenderingPipeline;
 import net.minecraft.client.OptionInstance;
 import net.minecraft.client.gui.components.Tooltip;

@@ -12,7 +12,7 @@ import net.caffeinemc.mods.sodium.client.render.SodiumWorldRenderer;
 import net.caffeinemc.mods.sodium.client.render.chunk.ChunkRenderMatrices;
 import net.caffeinemc.mods.sodium.client.render.viewport.ViewportProvider;
 import net.caffeinemc.mods.sodium.client.services.PlatformLevelRenderHooks;
-import net.sodium.client.util.FlawlessFrames;
+import net.caffeinemc.mods.sodium.client.util.FlawlessFrames;
 import net.caffeinemc.mods.sodium.client.util.FogStorage;
 import net.caffeinemc.mods.sodium.client.util.SodiumChunkSection;
 import net.caffeinemc.mods.sodium.client.world.LevelRendererExtension;

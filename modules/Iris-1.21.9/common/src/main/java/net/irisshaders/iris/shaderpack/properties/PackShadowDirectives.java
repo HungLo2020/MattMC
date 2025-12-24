@@ -5,8 +5,8 @@ import it.unimi.dsi.fastutil.ints.Int2ObjectArrayMap;
 import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
 import net.irisshaders.iris.Iris;
 import net.irisshaders.iris.gl.texture.InternalTextureFormat;
-import net.iris.helpers.OptionalBoolean;
-import net.iris.shaderpack.parsing.DirectiveHolder;
+import net.irisshaders.iris.helpers.OptionalBoolean;
+import net.irisshaders.iris.shaderpack.parsing.DirectiveHolder;
 import net.irisshaders.iris.shadows.ShadowMatrices;
 import org.joml.Vector4f;
 

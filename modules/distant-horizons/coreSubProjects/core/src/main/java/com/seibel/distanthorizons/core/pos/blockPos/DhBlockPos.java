@@ -20,7 +20,7 @@
 package com.seibel.distanthorizons.core.pos.blockPos;
 
 import com.seibel.distanthorizons.core.enums.EDhDirection;
-import net.distant_horizons.core.network.INetworkObject;
+import com.seibel.distanthorizons.core.network.INetworkObject;
 import com.seibel.distanthorizons.core.util.LodUtil;
 
 import io.netty.buffer.ByteBuf;

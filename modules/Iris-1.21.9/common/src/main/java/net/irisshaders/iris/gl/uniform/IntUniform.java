@@ -1,7 +1,7 @@
 package net.irisshaders.iris.gl.uniform;
 
 import com.mojang.blaze3d.opengl.GlStateManager;
-import net.iris.gl.state.ValueUpdateNotifier;
+import net.irisshaders.iris.gl.state.ValueUpdateNotifier;
 
 import java.util.function.IntSupplier;
 

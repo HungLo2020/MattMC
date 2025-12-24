@@ -1,7 +1,7 @@
 package net.irisshaders.iris.uniforms;
 
 import net.irisshaders.iris.gl.uniform.UniformHolder;
-import net.iris.gl.uniform.UniformUpdateFrequency;
+import net.irisshaders.iris.gl.uniform.UniformUpdateFrequency;
 import net.irisshaders.iris.uniforms.transforms.SmoothedFloat;
 import net.minecraft.client.Minecraft;
 import net.minecraft.core.BlockPos;

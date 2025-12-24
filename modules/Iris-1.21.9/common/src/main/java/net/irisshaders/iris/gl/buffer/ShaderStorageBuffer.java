@@ -1,7 +1,7 @@
 package net.irisshaders.iris.gl.buffer;
 
 import com.mojang.blaze3d.opengl.GlStateManager;
-import net.iris.gl.buffer.BuiltShaderStorageInfo;
+import net.irisshaders.iris.gl.buffer.BuiltShaderStorageInfo;
 import net.irisshaders.iris.gl.GLDebug;
 import net.irisshaders.iris.gl.IrisRenderSystem;
 import org.lwjgl.opengl.GL43C;

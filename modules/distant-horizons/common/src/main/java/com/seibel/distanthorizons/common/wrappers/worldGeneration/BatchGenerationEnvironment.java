@@ -22,8 +22,8 @@ package com.seibel.distanthorizons.common.wrappers.worldGeneration;
 
 import com.google.common.collect.ImmutableMap;
 import com.seibel.distanthorizons.api.DhApi;
-import net.distant_horizons.api.enums.worldGeneration.EDhApiDistantGeneratorMode;
-import net.distant_horizons.api.enums.worldGeneration.EDhApiWorldGenerationStep;
+import com.seibel.distanthorizons.api.enums.worldGeneration.EDhApiDistantGeneratorMode;
+import com.seibel.distanthorizons.api.enums.worldGeneration.EDhApiWorldGenerationStep;
 import com.seibel.distanthorizons.common.wrappers.world.ServerLevelWrapper;
 import com.seibel.distanthorizons.common.wrappers.worldGeneration.chunkFileHandling.ChunkFileReader;
 import com.seibel.distanthorizons.common.wrappers.worldGeneration.mimicObject.*;
@@ -50,7 +50,7 @@ import java.util.*;
 import java.util.concurrent.*;
 import java.util.function.Consumer;
 
-import net.distant_horizons.coreapi.ModInfo;
+import com.seibel.distanthorizons.coreapi.ModInfo;
 import org.jetbrains.annotations.NotNull;
 
 import com.seibel.distanthorizons.common.wrappers.worldGeneration.step.StepBiomes;

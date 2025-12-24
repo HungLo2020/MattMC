@@ -6,7 +6,7 @@ import com.mojang.blaze3d.pipeline.RenderTarget;
 import com.mojang.blaze3d.systems.GpuDevice;
 import com.mojang.blaze3d.systems.RenderPass;
 import com.mojang.blaze3d.systems.RenderSystem;
-import net.iris.fantastic.ParticleRenderingPhase;
+import net.irisshaders.iris.fantastic.ParticleRenderingPhase;
 import net.irisshaders.iris.fantastic.PhasedParticleEngine;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.LevelRenderer;

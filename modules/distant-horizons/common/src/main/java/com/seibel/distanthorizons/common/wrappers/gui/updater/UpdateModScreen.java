@@ -5,7 +5,7 @@ import com.seibel.distanthorizons.common.wrappers.gui.DhScreen;
 import com.seibel.distanthorizons.common.wrappers.gui.TexturedButtonWidget;
 import com.seibel.distanthorizons.core.jar.ModJarInfo;
 import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
-import net.distant_horizons.coreapi.ModInfo;
+import com.seibel.distanthorizons.coreapi.ModInfo;
 import com.seibel.distanthorizons.core.config.Config;
 import com.seibel.distanthorizons.core.jar.installer.ModrinthGetter;
 import com.seibel.distanthorizons.core.jar.updater.SelfUpdater;

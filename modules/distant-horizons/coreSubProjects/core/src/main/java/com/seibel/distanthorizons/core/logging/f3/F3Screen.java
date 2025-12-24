@@ -34,8 +34,8 @@ import com.seibel.distanthorizons.core.util.threading.PriorityTaskPicker;
 import com.seibel.distanthorizons.core.util.threading.ThreadPoolUtil;
 import com.seibel.distanthorizons.core.world.AbstractDhWorld;
 import com.seibel.distanthorizons.core.wrapperInterfaces.minecraft.IMinecraftClientWrapper;
-import net.distant_horizons.coreapi.ModInfo;
-import net.distant_horizons.coreapi.util.StringUtil;
+import com.seibel.distanthorizons.coreapi.ModInfo;
+import com.seibel.distanthorizons.coreapi.util.StringUtil;
 import org.apache.logging.log4j.LogManager;
 import com.seibel.distanthorizons.core.logging.DhLogger;
 

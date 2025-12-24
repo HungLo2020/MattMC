@@ -24,7 +24,7 @@ import com.seibel.distanthorizons.core.api.internal.SharedApi;
 import com.seibel.distanthorizons.core.network.messages.requests.ExceptionMessage;
 import com.seibel.distanthorizons.core.network.session.NetworkSession;
 import com.seibel.distanthorizons.core.util.LodUtil;
-import net.distant_horizons.core.world.EWorldEnvironment;
+import com.seibel.distanthorizons.core.world.EWorldEnvironment;
 import io.netty.buffer.ByteBuf;
 
 import java.util.concurrent.atomic.AtomicInteger;

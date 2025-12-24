@@ -2,7 +2,7 @@ package net.caffeinemc.mods.sodium.client.gui.options.control;
 
 import net.caffeinemc.mods.sodium.client.gui.options.Option;
 import net.caffeinemc.mods.sodium.client.gui.options.TextProvider;
-import net.sodium.client.util.Dim2i;
+import net.caffeinemc.mods.sodium.client.util.Dim2i;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.Screen;

@@ -1,7 +1,7 @@
 package net.irisshaders.iris.mixin;
 
 import com.mojang.blaze3d.opengl.GlRenderPass;
-import net.iris.mixinterface.CustomPass;
+import net.irisshaders.iris.mixinterface.CustomPass;
 import net.irisshaders.iris.mixinterface.RenderPassInterface;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;

@@ -1,6 +1,6 @@
 package kroppeb.stareval.element.tree.partial;
 
-import net.iris.stareval.element.Element;
+import kroppeb.stareval.element.Element;
 
 public abstract class PartialExpression implements Element {
 	@Override

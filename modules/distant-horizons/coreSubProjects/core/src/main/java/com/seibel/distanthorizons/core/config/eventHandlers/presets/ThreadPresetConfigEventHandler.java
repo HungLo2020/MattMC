@@ -25,7 +25,7 @@ import com.seibel.distanthorizons.core.config.Config;
 import com.seibel.distanthorizons.core.config.ConfigPresetOptions;
 import com.seibel.distanthorizons.core.config.types.AbstractConfigBase;
 import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
-import net.sodium.api.util.MathUtil;
+import com.seibel.distanthorizons.coreapi.util.MathUtil;
 import org.apache.logging.log4j.LogManager;
 import com.seibel.distanthorizons.core.logging.DhLogger;
 

@@ -10,7 +10,7 @@ import net.caffeinemc.mods.sodium.client.render.chunk.RenderSection;
 import net.caffeinemc.mods.sodium.client.render.chunk.compile.ChunkBuildContext;
 import net.caffeinemc.mods.sodium.client.render.chunk.compile.ChunkSortOutput;
 import net.caffeinemc.mods.sodium.client.render.chunk.translucent_sorting.data.DynamicData;
-import net.sodium.client.util.task.CancellationToken;
+import net.caffeinemc.mods.sodium.client.util.task.CancellationToken;
 
 public class ChunkBuilderSortingTask extends ChunkBuilderTask<ChunkSortOutput> {
     private final DynamicSorter sorter;

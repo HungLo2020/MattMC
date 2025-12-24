@@ -1,6 +1,6 @@
 package net.caffeinemc.mods.sodium.mixin.features.textures.animations.tracking;
 
-import net.sodium.api.texture.SpriteUtil;
+import net.caffeinemc.mods.sodium.api.texture.SpriteUtil;
 import net.minecraft.client.renderer.texture.TextureAtlas;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
 import org.spongepowered.asm.mixin.Mixin;

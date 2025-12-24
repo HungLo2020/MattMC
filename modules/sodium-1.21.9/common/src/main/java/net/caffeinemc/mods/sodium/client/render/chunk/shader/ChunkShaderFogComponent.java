@@ -5,7 +5,7 @@ import net.caffeinemc.mods.sodium.client.gl.shader.uniform.GlUniformFloat;
 import net.caffeinemc.mods.sodium.client.gl.shader.uniform.GlUniformFloat2v;
 import net.caffeinemc.mods.sodium.client.gl.shader.uniform.GlUniformFloat4v;
 import net.caffeinemc.mods.sodium.client.gl.shader.uniform.GlUniformInt;
-import net.sodium.client.util.FogParameters;
+import net.caffeinemc.mods.sodium.client.util.FogParameters;
 
 /**
  * These shader implementations try to remain compatible with the deprecated fixed function pipeline by manually

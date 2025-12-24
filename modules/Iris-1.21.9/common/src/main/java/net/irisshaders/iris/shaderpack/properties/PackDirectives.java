@@ -6,11 +6,11 @@ import it.unimi.dsi.fastutil.objects.Object2BooleanMaps;
 import it.unimi.dsi.fastutil.objects.Object2ObjectMap;
 import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
 import net.irisshaders.iris.Iris;
-import net.iris.gl.texture.TextureScaleOverride;
+import net.irisshaders.iris.gl.texture.TextureScaleOverride;
 import net.irisshaders.iris.gl.texture.TextureType;
-import net.iris.helpers.Tri;
-import net.iris.shaderpack.parsing.DirectiveHolder;
-import net.iris.shaderpack.texture.TextureStage;
+import net.irisshaders.iris.helpers.Tri;
+import net.irisshaders.iris.shaderpack.parsing.DirectiveHolder;
+import net.irisshaders.iris.shaderpack.texture.TextureStage;
 import org.joml.Vector2i;
 
 import java.util.Set;

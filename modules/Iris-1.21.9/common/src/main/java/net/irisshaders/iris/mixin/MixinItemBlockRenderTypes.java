@@ -1,7 +1,7 @@
 package net.irisshaders.iris.mixin;
 
 import net.irisshaders.iris.shaderpack.materialmap.BlockMaterialMapping;
-import net.iris.shaderpack.materialmap.BlockRenderType;
+import net.irisshaders.iris.shaderpack.materialmap.BlockRenderType;
 import net.irisshaders.iris.shaderpack.materialmap.WorldRenderingSettings;
 import net.minecraft.client.renderer.ItemBlockRenderTypes;
 import net.minecraft.client.renderer.RenderType;

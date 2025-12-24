@@ -2,7 +2,7 @@ package net.caffeinemc.mods.sodium.client.render.chunk.lists;
 
 import it.unimi.dsi.fastutil.longs.Long2ReferenceMap;
 import net.caffeinemc.mods.sodium.client.render.chunk.RenderSection;
-import net.sodium.client.render.chunk.TaskQueueType;
+import net.caffeinemc.mods.sodium.client.render.chunk.TaskQueueType;
 import net.minecraft.core.SectionPos;
 
 /**

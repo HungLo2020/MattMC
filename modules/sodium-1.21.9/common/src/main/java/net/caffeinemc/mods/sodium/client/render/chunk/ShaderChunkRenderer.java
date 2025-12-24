@@ -14,7 +14,7 @@ import net.caffeinemc.mods.sodium.client.render.chunk.shader.*;
 import net.caffeinemc.mods.sodium.client.render.chunk.terrain.TerrainRenderPass;
 import net.caffeinemc.mods.sodium.client.render.chunk.vertex.format.ChunkVertexType;
 import net.caffeinemc.mods.sodium.client.gl.shader.*;
-import net.sodium.client.util.FogParameters;
+import net.caffeinemc.mods.sodium.client.util.FogParameters;
 import net.caffeinemc.mods.sodium.mixin.core.GlCommandEncoderAccessor;
 import net.minecraft.resources.ResourceLocation;
 import java.util.Map;

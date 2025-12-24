@@ -1,19 +1,19 @@
 package net.caffeinemc.mods.sodium.client.render.chunk.translucent_sorting;
 
 import it.unimi.dsi.fastutil.objects.ReferenceArrayList;
-import net.sodium.api.util.NormI8;
+import net.caffeinemc.mods.sodium.api.util.NormI8;
 import net.caffeinemc.mods.sodium.client.SodiumClientMod;
 import net.caffeinemc.mods.sodium.client.model.quad.properties.ModelQuadFacing;
 import net.caffeinemc.mods.sodium.client.render.chunk.compile.ChunkBuildOutput;
 import net.caffeinemc.mods.sodium.client.render.chunk.data.BuiltSectionMeshParts;
-import net.sodium.client.render.chunk.translucent_sorting.bsp_tree.BSPBuildFailureException;
+import net.caffeinemc.mods.sodium.client.render.chunk.translucent_sorting.bsp_tree.BSPBuildFailureException;
 import net.caffeinemc.mods.sodium.client.render.chunk.translucent_sorting.data.*;
 import net.caffeinemc.mods.sodium.client.render.chunk.translucent_sorting.quad.FullTQuad;
 import net.caffeinemc.mods.sodium.client.render.chunk.translucent_sorting.quad.RegularTQuad;
 import net.caffeinemc.mods.sodium.client.render.chunk.translucent_sorting.quad.TQuad;
 import net.caffeinemc.mods.sodium.client.render.chunk.translucent_sorting.trigger.GeometryPlanes;
 import net.caffeinemc.mods.sodium.client.render.chunk.translucent_sorting.trigger.SortTriggering;
-import net.sodium.client.render.chunk.vertex.format.ChunkVertexEncoder;
+import net.caffeinemc.mods.sodium.client.render.chunk.vertex.format.ChunkVertexEncoder;
 import net.minecraft.core.SectionPos;
 import net.minecraft.util.Mth;
 

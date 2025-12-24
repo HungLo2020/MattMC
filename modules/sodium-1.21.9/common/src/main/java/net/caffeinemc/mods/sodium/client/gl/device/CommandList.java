@@ -2,8 +2,8 @@ package net.caffeinemc.mods.sodium.client.gl.device;
 
 import net.caffeinemc.mods.sodium.client.gl.array.GlVertexArray;
 import net.caffeinemc.mods.sodium.client.gl.buffer.*;
-import net.sodium.client.gl.sync.GlFence;
-import net.sodium.client.gl.tessellation.GlPrimitiveType;
+import net.caffeinemc.mods.sodium.client.gl.sync.GlFence;
+import net.caffeinemc.mods.sodium.client.gl.tessellation.GlPrimitiveType;
 import net.caffeinemc.mods.sodium.client.gl.tessellation.GlTessellation;
 import net.caffeinemc.mods.sodium.client.gl.tessellation.TessellationBinding;
 import net.caffeinemc.mods.sodium.client.gl.util.EnumBitField;

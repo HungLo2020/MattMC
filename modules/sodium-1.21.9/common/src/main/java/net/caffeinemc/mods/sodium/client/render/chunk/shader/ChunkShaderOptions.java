@@ -1,6 +1,6 @@
 package net.caffeinemc.mods.sodium.client.render.chunk.shader;
 
-import net.sodium.client.gl.shader.ShaderConstants;
+import net.caffeinemc.mods.sodium.client.gl.shader.ShaderConstants;
 import net.caffeinemc.mods.sodium.client.render.chunk.terrain.TerrainRenderPass;
 import net.caffeinemc.mods.sodium.client.render.chunk.vertex.format.ChunkVertexType;
 

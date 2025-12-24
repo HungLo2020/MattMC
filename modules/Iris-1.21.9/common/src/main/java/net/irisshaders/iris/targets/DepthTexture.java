@@ -2,9 +2,9 @@ package net.irisshaders.iris.targets;
 
 import com.mojang.blaze3d.opengl.GlStateManager;
 import net.irisshaders.iris.gl.GLDebug;
-import net.iris.gl.GlResource;
+import net.irisshaders.iris.gl.GlResource;
 import net.irisshaders.iris.gl.IrisRenderSystem;
-import net.iris.gl.texture.DepthBufferFormat;
+import net.irisshaders.iris.gl.texture.DepthBufferFormat;
 import org.lwjgl.opengl.GL11C;
 import org.lwjgl.opengl.GL13C;
 import org.lwjgl.opengl.GL43C;

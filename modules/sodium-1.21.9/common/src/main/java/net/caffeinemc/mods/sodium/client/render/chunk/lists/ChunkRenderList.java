@@ -1,11 +1,11 @@
 package net.caffeinemc.mods.sodium.client.render.chunk.lists;
 
-import net.sodium.client.render.chunk.LocalSectionIndex;
+import net.caffeinemc.mods.sodium.client.render.chunk.LocalSectionIndex;
 import net.caffeinemc.mods.sodium.client.render.chunk.RenderSection;
-import net.sodium.client.render.chunk.RenderSectionFlags;
+import net.caffeinemc.mods.sodium.client.render.chunk.RenderSectionFlags;
 import net.caffeinemc.mods.sodium.client.render.chunk.region.RenderRegion;
 import net.caffeinemc.mods.sodium.client.util.iterator.ByteArrayIterator;
-import net.sodium.client.util.iterator.ByteIterator;
+import net.caffeinemc.mods.sodium.client.util.iterator.ByteIterator;
 import net.caffeinemc.mods.sodium.client.util.iterator.ReversibleByteArrayIterator;
 import net.minecraft.core.SectionPos;
 import net.minecraft.util.Mth;

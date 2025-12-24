@@ -1,6 +1,6 @@
 package net.caffeinemc.mods.sodium.client.model.light;
 
-import net.sodium.client.model.light.data.QuadLightData;
+import net.caffeinemc.mods.sodium.client.model.light.data.QuadLightData;
 import net.caffeinemc.mods.sodium.client.model.quad.ModelQuadView;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;

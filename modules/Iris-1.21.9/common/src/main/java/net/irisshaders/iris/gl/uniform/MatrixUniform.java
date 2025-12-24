@@ -1,6 +1,6 @@
 package net.irisshaders.iris.gl.uniform;
 
-import net.iris.gl.state.ValueUpdateNotifier;
+import net.irisshaders.iris.gl.state.ValueUpdateNotifier;
 import org.joml.Matrix4f;
 import org.joml.Matrix4fc;
 import org.lwjgl.BufferUtils;

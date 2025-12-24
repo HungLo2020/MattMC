@@ -1,6 +1,6 @@
 package com.seibel.distanthorizons.core.multiplayer.server;
 
-import net.distant_horizons.api.enums.worldGeneration.EDhApiDistantGeneratorMode;
+import com.seibel.distanthorizons.api.enums.worldGeneration.EDhApiDistantGeneratorMode;
 import com.seibel.distanthorizons.core.config.Config;
 import com.seibel.distanthorizons.core.dataObjects.fullData.sources.FullDataSourceV2;
 import com.seibel.distanthorizons.core.file.fullDatafile.GeneratedFullDataSourceProvider;
@@ -8,8 +8,8 @@ import com.seibel.distanthorizons.core.level.AbstractDhServerLevel;
 import com.seibel.distanthorizons.core.logging.DhLogger;
 import com.seibel.distanthorizons.core.logging.DhLoggerBuilder;
 import com.seibel.distanthorizons.core.multiplayer.fullData.FullDataPayload;
-import net.distant_horizons.core.network.exceptions.RequestRejectedException;
-import net.distant_horizons.core.network.exceptions.SectionRequiresSplittingException;
+import com.seibel.distanthorizons.core.network.exceptions.RequestRejectedException;
+import com.seibel.distanthorizons.core.network.exceptions.SectionRequiresSplittingException;
 import com.seibel.distanthorizons.core.network.messages.fullData.FullDataSourceRequestMessage;
 import com.seibel.distanthorizons.core.network.messages.fullData.FullDataSourceResponseMessage;
 import com.seibel.distanthorizons.core.pos.DhSectionPos;

@@ -19,7 +19,7 @@ import net.irisshaders.iris.pipeline.WorldRenderingPhase;
 import net.irisshaders.iris.shaderpack.programs.ProgramSource;
 import net.irisshaders.iris.shaderpack.properties.PackDirectives;
 import net.irisshaders.iris.shaderpack.properties.PackShadowDirectives;
-import net.iris.shaderpack.properties.ShadowCullState;
+import net.irisshaders.iris.shaderpack.properties.ShadowCullState;
 import net.irisshaders.iris.shadows.frustum.BoxCuller;
 import net.irisshaders.iris.shadows.frustum.CullEverythingFrustum;
 import net.irisshaders.iris.shadows.frustum.FrustumHolder;

@@ -1,7 +1,7 @@
 package kroppeb.stareval.expression;
 
 import kroppeb.stareval.function.FunctionContext;
-import net.iris.stareval.function.FunctionReturn;
+import kroppeb.stareval.function.FunctionReturn;
 import kroppeb.stareval.function.TypedFunction;
 
 import java.util.Collection;

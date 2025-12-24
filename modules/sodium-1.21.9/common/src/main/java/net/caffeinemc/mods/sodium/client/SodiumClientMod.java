@@ -1,7 +1,7 @@
 package net.caffeinemc.mods.sodium.client;
 
-import net.sodium.client.console.Console;
-import net.sodium.client.console.message.MessageLevel;
+import net.caffeinemc.mods.sodium.client.console.Console;
+import net.caffeinemc.mods.sodium.client.console.message.MessageLevel;
 import net.caffeinemc.mods.sodium.client.data.fingerprint.FingerprintMeasure;
 import net.caffeinemc.mods.sodium.client.data.fingerprint.HashedFingerprint;
 import net.caffeinemc.mods.sodium.client.gui.SodiumDebugEntry;

@@ -1,9 +1,9 @@
 package net.caffeinemc.mods.sodium.client.model.light.smooth;
 
-import net.sodium.api.util.NormI8;
+import net.caffeinemc.mods.sodium.api.util.NormI8;
 import net.caffeinemc.mods.sodium.client.model.light.LightPipeline;
 import net.caffeinemc.mods.sodium.client.model.light.data.LightDataAccess;
-import net.sodium.client.model.light.data.QuadLightData;
+import net.caffeinemc.mods.sodium.client.model.light.data.QuadLightData;
 import net.caffeinemc.mods.sodium.client.model.quad.ModelQuadView;
 import net.caffeinemc.mods.sodium.client.model.quad.properties.ModelQuadFlags;
 import net.minecraft.core.BlockPos;

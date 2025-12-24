@@ -1,7 +1,7 @@
 package kroppeb.stareval.parser;
 
 import kroppeb.stareval.element.AccessibleExpressionElement;
-import net.iris.stareval.element.Element;
+import kroppeb.stareval.element.Element;
 import kroppeb.stareval.element.ExpressionElement;
 import kroppeb.stareval.element.PriorityOperatorElement;
 import kroppeb.stareval.element.token.BinaryOperatorToken;
@@ -14,11 +14,11 @@ import kroppeb.stareval.element.tree.FunctionCall;
 import kroppeb.stareval.element.tree.UnaryExpressionElement;
 import kroppeb.stareval.element.tree.partial.PartialBinaryExpression;
 import kroppeb.stareval.element.tree.partial.UnfinishedArgsExpression;
-import net.iris.stareval.exception.MissingTokenException;
-import net.iris.stareval.exception.ParseException;
-import net.iris.stareval.exception.UnexpectedTokenException;
-import net.iris.stareval.parser.BinaryOp;
-import net.iris.stareval.parser.UnaryOp;
+import kroppeb.stareval.exception.MissingTokenException;
+import kroppeb.stareval.exception.ParseException;
+import kroppeb.stareval.exception.UnexpectedTokenException;
+import kroppeb.stareval.parser.BinaryOp;
+import kroppeb.stareval.parser.UnaryOp;
 
 import java.util.ArrayList;
 import java.util.List;

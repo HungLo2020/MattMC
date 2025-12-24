@@ -1,9 +1,9 @@
 package net.irisshaders.iris.gui.screen;
 
 import com.mojang.blaze3d.platform.InputConstants;
-import net.iris.gui.screen.HudHideable;
+import net.irisshaders.iris.gui.screen.HudHideable;
 import net.irisshaders.iris.Iris;
-import net.iris.api.v0.IrisApi;
+import net.irisshaders.iris.api.v0.IrisApi;
 import net.irisshaders.iris.gui.GuiUtil;
 import net.irisshaders.iris.gui.NavigationController;
 import net.irisshaders.iris.gui.OldImageButton;
@@ -14,7 +14,7 @@ import net.irisshaders.iris.gui.element.widget.AbstractElementWidget;
 import net.irisshaders.iris.gui.element.widget.CommentedElementWidget;
 import net.irisshaders.iris.platform.IrisPlatformHelpers;
 import net.irisshaders.iris.shaderpack.ShaderPack;
-import net.iris.uniforms.FrameUpdateNotifier;
+import net.irisshaders.iris.uniforms.FrameUpdateNotifier;
 import net.irisshaders.iris.uniforms.transforms.SmoothedFloat;
 import net.minecraft.ChatFormatting;
 import net.minecraft.Util;

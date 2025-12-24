@@ -16,13 +16,13 @@ import net.caffeinemc.mods.sodium.client.render.chunk.terrain.DefaultTerrainRend
 import net.caffeinemc.mods.sodium.client.render.chunk.terrain.TerrainRenderPass;
 import net.caffeinemc.mods.sodium.client.render.chunk.terrain.material.DefaultMaterials;
 import net.caffeinemc.mods.sodium.client.render.chunk.translucent_sorting.SortBehavior;
-import net.sodium.client.render.chunk.translucent_sorting.SortType;
+import net.caffeinemc.mods.sodium.client.render.chunk.translucent_sorting.SortType;
 import net.caffeinemc.mods.sodium.client.render.chunk.translucent_sorting.TranslucentGeometryCollector;
 import net.caffeinemc.mods.sodium.client.render.chunk.translucent_sorting.data.DynamicData;
 import net.caffeinemc.mods.sodium.client.render.chunk.translucent_sorting.data.PresentTranslucentData;
 import net.caffeinemc.mods.sodium.client.render.chunk.translucent_sorting.data.TranslucentData;
 import net.caffeinemc.mods.sodium.client.services.PlatformLevelRenderHooks;
-import net.sodium.client.util.task.CancellationToken;
+import net.caffeinemc.mods.sodium.client.util.task.CancellationToken;
 import net.caffeinemc.mods.sodium.client.world.LevelSlice;
 import net.caffeinemc.mods.sodium.client.world.cloned.ChunkRenderContext;
 import net.minecraft.CrashReport;

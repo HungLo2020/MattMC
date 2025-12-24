@@ -11,7 +11,7 @@ import net.caffeinemc.mods.sodium.client.render.chunk.ShaderChunkRenderer;
 import net.caffeinemc.mods.sodium.client.render.chunk.shader.ChunkShaderInterface;
 import net.caffeinemc.mods.sodium.client.render.chunk.shader.ChunkShaderOptions;
 import net.caffeinemc.mods.sodium.client.render.chunk.terrain.TerrainRenderPass;
-import net.sodium.client.util.FogParameters;
+import net.caffeinemc.mods.sodium.client.util.FogParameters;
 import net.irisshaders.iris.Iris;
 import net.irisshaders.iris.gl.blending.BlendModeOverride;
 import net.irisshaders.iris.pipeline.IrisRenderingPipeline;

@@ -39,7 +39,7 @@ import com.seibel.distanthorizons.core.util.ThreadUtil;
 import com.seibel.distanthorizons.core.util.objects.quadTree.QuadNode;
 import com.seibel.distanthorizons.core.util.objects.quadTree.QuadTree;
 import com.seibel.distanthorizons.core.util.threading.ThreadPoolUtil;
-import net.sodium.api.util.MathUtil;
+import com.seibel.distanthorizons.coreapi.util.MathUtil;
 import it.unimi.dsi.fastutil.longs.LongIterator;
 import org.jetbrains.annotations.Nullable;
 

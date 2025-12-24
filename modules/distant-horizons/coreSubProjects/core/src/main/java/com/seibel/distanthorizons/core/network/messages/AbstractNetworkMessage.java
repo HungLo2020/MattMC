@@ -1,7 +1,7 @@
 package com.seibel.distanthorizons.core.network.messages;
 
 import com.google.common.base.MoreObjects;
-import net.distant_horizons.core.network.INetworkObject;
+import com.seibel.distanthorizons.core.network.INetworkObject;
 import com.seibel.distanthorizons.core.network.session.NetworkSession;
 import com.seibel.distanthorizons.core.wrapperInterfaces.misc.IServerPlayerWrapper;
 

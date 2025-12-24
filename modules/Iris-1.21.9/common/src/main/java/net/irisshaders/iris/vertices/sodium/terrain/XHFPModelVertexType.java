@@ -1,7 +1,7 @@
 package net.irisshaders.iris.vertices.sodium.terrain;
 
 import net.caffeinemc.mods.sodium.client.gl.attribute.GlVertexFormat;
-import net.sodium.client.render.chunk.vertex.format.ChunkVertexEncoder;
+import net.caffeinemc.mods.sodium.client.render.chunk.vertex.format.ChunkVertexEncoder;
 import net.caffeinemc.mods.sodium.client.render.chunk.vertex.format.ChunkVertexType;
 
 /**

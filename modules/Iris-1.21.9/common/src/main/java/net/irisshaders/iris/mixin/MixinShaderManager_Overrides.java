@@ -10,7 +10,7 @@ import net.irisshaders.iris.pipeline.IrisPipelines;
 import net.irisshaders.iris.pipeline.IrisRenderingPipeline;
 import net.irisshaders.iris.pipeline.WorldRenderingPipeline;
 import net.irisshaders.iris.pipeline.programs.ShaderKey;
-import net.iris.vertices.ImmediateState;
+import net.irisshaders.iris.vertices.ImmediateState;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;

@@ -28,7 +28,7 @@ import com.seibel.distanthorizons.api.interfaces.render.IDhApiRenderProxy;
 import com.seibel.distanthorizons.api.interfaces.world.IDhApiLevelWrapper;
 import com.seibel.distanthorizons.api.methods.events.abstractEvents.DhApiAfterDhInitEvent;
 import com.seibel.distanthorizons.api.methods.override.DhApiWorldGeneratorOverrideRegister;
-import net.distant_horizons.coreapi.ModInfo;
+import com.seibel.distanthorizons.coreapi.ModInfo;
 import com.seibel.distanthorizons.api.interfaces.config.IDhApiConfig;
 import com.seibel.distanthorizons.api.interfaces.world.IDhApiWorldProxy;
 import com.seibel.distanthorizons.coreapi.DependencyInjection.ApiEventInjector;

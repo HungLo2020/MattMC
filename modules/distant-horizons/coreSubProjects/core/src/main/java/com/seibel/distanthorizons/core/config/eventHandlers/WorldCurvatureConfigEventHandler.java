@@ -20,7 +20,7 @@
 package com.seibel.distanthorizons.core.config.eventHandlers;
 
 import com.seibel.distanthorizons.core.config.Config;
-import net.distant_horizons.core.config.listeners.IConfigListener;
+import com.seibel.distanthorizons.core.config.listeners.IConfigListener;
 
 import java.util.Timer;
 import java.util.TimerTask;

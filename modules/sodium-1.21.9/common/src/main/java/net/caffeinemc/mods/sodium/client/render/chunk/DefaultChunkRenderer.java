@@ -3,10 +3,10 @@ package net.caffeinemc.mods.sodium.client.render.chunk;
 import net.caffeinemc.mods.sodium.client.SodiumClientMod;
 import net.caffeinemc.mods.sodium.client.gl.device.CommandList;
 import net.caffeinemc.mods.sodium.client.gl.device.DrawCommandList;
-import net.sodium.client.gl.device.MultiDrawBatch;
+import net.caffeinemc.mods.sodium.client.gl.device.MultiDrawBatch;
 import net.caffeinemc.mods.sodium.client.gl.device.RenderDevice;
-import net.sodium.client.gl.tessellation.GlIndexType;
-import net.sodium.client.gl.tessellation.GlPrimitiveType;
+import net.caffeinemc.mods.sodium.client.gl.tessellation.GlIndexType;
+import net.caffeinemc.mods.sodium.client.gl.tessellation.GlPrimitiveType;
 import net.caffeinemc.mods.sodium.client.gl.tessellation.GlTessellation;
 import net.caffeinemc.mods.sodium.client.gl.tessellation.TessellationBinding;
 import net.caffeinemc.mods.sodium.client.model.quad.properties.ModelQuadFacing;
@@ -19,9 +19,9 @@ import net.caffeinemc.mods.sodium.client.render.chunk.shader.ChunkShaderInterfac
 import net.caffeinemc.mods.sodium.client.render.chunk.terrain.TerrainRenderPass;
 import net.caffeinemc.mods.sodium.client.render.chunk.vertex.format.ChunkVertexType;
 import net.caffeinemc.mods.sodium.client.render.viewport.CameraTransform;
-import net.sodium.client.util.BitwiseMath;
-import net.sodium.client.util.FogParameters;
-import net.sodium.client.util.UInt32;
+import net.caffeinemc.mods.sodium.client.util.BitwiseMath;
+import net.caffeinemc.mods.sodium.client.util.FogParameters;
+import net.caffeinemc.mods.sodium.client.util.UInt32;
 import org.lwjgl.system.MemoryUtil;
 import org.lwjgl.system.Pointer;
 

@@ -3,7 +3,7 @@ package net.irisshaders.iris;
 import com.google.gson.Gson;
 import com.google.gson.JsonParser;
 import com.google.gson.JsonSyntaxException;
-import net.iris.BuildConfig;
+import net.irisshaders.iris.BuildConfig;
 import net.irisshaders.iris.config.IrisConfig;
 import net.irisshaders.iris.gl.shader.StandardMacros;
 import net.irisshaders.iris.platform.IrisPlatformHelpers;

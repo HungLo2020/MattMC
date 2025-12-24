@@ -3,7 +3,7 @@ package net.caffeinemc.mods.sodium.client.model.quad.blender;
 import net.caffeinemc.mods.sodium.client.model.quad.ModelQuadView;
 import net.caffeinemc.mods.sodium.client.model.color.ColorProvider;
 import net.caffeinemc.mods.sodium.client.world.LevelSlice;
-import net.sodium.api.util.ColorMixer;
+import net.caffeinemc.mods.sodium.api.util.ColorMixer;
 import net.minecraft.core.BlockPos;
 import net.minecraft.util.Mth;
 

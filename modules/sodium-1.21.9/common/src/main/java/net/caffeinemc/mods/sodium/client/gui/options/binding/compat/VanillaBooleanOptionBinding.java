@@ -1,6 +1,6 @@
 package net.caffeinemc.mods.sodium.client.gui.options.binding.compat;
 
-import net.sodium.client.gui.options.binding.OptionBinding;
+import net.caffeinemc.mods.sodium.client.gui.options.binding.OptionBinding;
 import net.minecraft.client.OptionInstance;
 import net.minecraft.client.Options;
 

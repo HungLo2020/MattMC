@@ -7,7 +7,7 @@ import io.github.douira.glsl_transformer.ast.transform.ASTInjectionPoint;
 import io.github.douira.glsl_transformer.ast.transform.ASTParser;
 import io.github.douira.glsl_transformer.util.Type;
 import net.irisshaders.iris.Iris;
-import net.sodium.client.gl.shader.ShaderType;
+import net.caffeinemc.mods.sodium.client.gl.shader.ShaderType;
 import net.irisshaders.iris.pipeline.transform.parameter.Parameters;
 
 import static net.irisshaders.iris.pipeline.transform.transformer.CommonTransformer.addIfNotExists;

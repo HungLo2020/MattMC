@@ -18,10 +18,10 @@ package net.caffeinemc.mods.sodium.client.render.frapi.render;
 
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
-import net.sodium.api.texture.SpriteUtil;
-import net.sodium.api.util.ColorARGB;
-import net.sodium.api.util.ColorMixer;
-import net.sodium.client.model.light.LightMode;
+import net.caffeinemc.mods.sodium.api.texture.SpriteUtil;
+import net.caffeinemc.mods.sodium.api.util.ColorARGB;
+import net.caffeinemc.mods.sodium.api.util.ColorMixer;
+import net.caffeinemc.mods.sodium.client.model.light.LightMode;
 import net.caffeinemc.mods.sodium.client.model.light.LightPipelineProvider;
 import net.caffeinemc.mods.sodium.client.model.light.data.SingleBlockLightDataCache;
 import net.caffeinemc.mods.sodium.client.render.frapi.mesh.MutableQuadViewImpl;

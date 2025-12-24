@@ -1,12 +1,12 @@
 package net.caffeinemc.mods.sodium.client.render.chunk.compile.pipeline;
 
-import net.sodium.api.util.ColorABGR;
-import net.sodium.api.util.ColorARGB;
-import net.sodium.api.util.ColorMixer;
-import net.sodium.client.compatibility.workarounds.Workarounds;
+import net.caffeinemc.mods.sodium.api.util.ColorABGR;
+import net.caffeinemc.mods.sodium.api.util.ColorARGB;
+import net.caffeinemc.mods.sodium.api.util.ColorMixer;
+import net.caffeinemc.mods.sodium.client.compatibility.workarounds.Workarounds;
 import net.caffeinemc.mods.sodium.client.model.color.ColorProvider;
 import net.caffeinemc.mods.sodium.client.model.color.ColorProviderRegistry;
-import net.sodium.client.model.light.LightMode;
+import net.caffeinemc.mods.sodium.client.model.light.LightMode;
 import net.caffeinemc.mods.sodium.client.model.light.LightPipelineProvider;
 import net.caffeinemc.mods.sodium.client.model.quad.properties.ModelQuadFacing;
 import net.caffeinemc.mods.sodium.client.model.quad.properties.ModelQuadOrientation;
@@ -16,11 +16,11 @@ import net.caffeinemc.mods.sodium.client.render.chunk.terrain.DefaultTerrainRend
 import net.caffeinemc.mods.sodium.client.render.chunk.terrain.TerrainRenderPass;
 import net.caffeinemc.mods.sodium.client.render.chunk.terrain.material.DefaultMaterials;
 import net.caffeinemc.mods.sodium.client.render.chunk.terrain.material.Material;
-import net.sodium.client.render.chunk.terrain.material.parameters.AlphaCutoffParameter;
+import net.caffeinemc.mods.sodium.client.render.chunk.terrain.material.parameters.AlphaCutoffParameter;
 import net.caffeinemc.mods.sodium.client.render.chunk.terrain.material.parameters.MaterialParameters;
 import net.caffeinemc.mods.sodium.client.render.chunk.translucent_sorting.TranslucentGeometryCollector;
 import net.caffeinemc.mods.sodium.client.render.chunk.vertex.builder.ChunkMeshBufferBuilder;
-import net.sodium.client.render.chunk.vertex.format.ChunkVertexEncoder;
+import net.caffeinemc.mods.sodium.client.render.chunk.vertex.format.ChunkVertexEncoder;
 import net.caffeinemc.mods.sodium.client.render.frapi.mesh.MutableQuadViewImpl;
 import net.caffeinemc.mods.sodium.client.render.frapi.render.AbstractBlockRenderContext;
 import net.caffeinemc.mods.sodium.client.render.texture.SpriteFinderCache;

@@ -10,12 +10,12 @@ import net.caffeinemc.mods.sodium.client.render.chunk.compile.pipeline.BlockRend
 import net.caffeinemc.mods.sodium.client.render.chunk.compile.pipeline.BlockRenderer;
 import net.caffeinemc.mods.sodium.client.render.chunk.compile.tasks.ChunkBuilderMeshingTask;
 import net.caffeinemc.mods.sodium.client.render.chunk.terrain.material.DefaultMaterials;
-import net.sodium.client.render.chunk.vertex.format.ChunkVertexEncoder;
-import net.sodium.client.util.task.CancellationToken;
+import net.caffeinemc.mods.sodium.client.render.chunk.vertex.format.ChunkVertexEncoder;
+import net.caffeinemc.mods.sodium.client.util.task.CancellationToken;
 import net.irisshaders.iris.shaderpack.materialmap.WorldRenderingSettings;
-import net.iris.vertices.BlockSensitiveBufferBuilder;
-import net.iris.vertices.sodium.terrain.ChunkVertexExtension;
-import net.iris.vertices.sodium.terrain.VertexEncoderInterface;
+import net.irisshaders.iris.vertices.BlockSensitiveBufferBuilder;
+import net.irisshaders.iris.vertices.sodium.terrain.ChunkVertexExtension;
+import net.irisshaders.iris.vertices.sodium.terrain.VertexEncoderInterface;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.block.LightBlock;
 import net.minecraft.world.level.block.state.BlockState;

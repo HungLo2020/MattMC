@@ -2,7 +2,7 @@ package com.seibel.distanthorizons.common.wrappers.gui;
 
 import com.mojang.blaze3d.platform.Window;
 import com.mojang.blaze3d.vertex.PoseStack;
-import net.distant_horizons.core.config.gui.AbstractScreen;
+import com.seibel.distanthorizons.core.config.gui.AbstractScreen;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.ContainerObjectSelectionList;

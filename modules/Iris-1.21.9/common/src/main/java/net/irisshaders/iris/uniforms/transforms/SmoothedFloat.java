@@ -1,7 +1,7 @@
 package net.irisshaders.iris.uniforms.transforms;
 
-import net.iris.gl.uniform.FloatSupplier;
-import net.iris.uniforms.FrameUpdateNotifier;
+import net.irisshaders.iris.gl.uniform.FloatSupplier;
+import net.irisshaders.iris.uniforms.FrameUpdateNotifier;
 import net.irisshaders.iris.uniforms.SystemTimeUniforms;
 
 /**

@@ -19,8 +19,8 @@
 
 package com.seibel.distanthorizons.api.interfaces.config.client;
 
-import net.distant_horizons.api.enums.rendering.EDhApiDebugRendering;
-import net.distant_horizons.api.interfaces.config.IDhApiConfigValue;
+import com.seibel.distanthorizons.api.enums.rendering.EDhApiDebugRendering;
+import com.seibel.distanthorizons.api.interfaces.config.IDhApiConfigValue;
 import com.seibel.distanthorizons.api.interfaces.config.IDhApiConfigGroup;
 
 /**

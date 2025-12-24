@@ -19,7 +19,7 @@
 
 package com.seibel.distanthorizons.api.methods.events.abstractEvents;
 
-import net.distant_horizons.api.enums.rendering.EDhApiRenderPass;
+import com.seibel.distanthorizons.api.enums.rendering.EDhApiRenderPass;
 import com.seibel.distanthorizons.api.methods.events.interfaces.IDhApiEvent;
 import com.seibel.distanthorizons.api.methods.events.sharedParameterObjects.DhApiEventParam;
 import com.seibel.distanthorizons.api.methods.events.sharedParameterObjects.DhApiRenderParam;
