@@ -2687,7 +2687,7 @@ public class Minecraft extends ReentrantBlockableEventLoop<Runnable> implements 
 	}
 
 	public boolean isTextFilteringEnabled() {
-		return this.userProperties().flag(UserFlag.PROFANITY_FILTER_ENABLED);
+		return false;
 	}
 
 	public void prepareForMultiplayer() {

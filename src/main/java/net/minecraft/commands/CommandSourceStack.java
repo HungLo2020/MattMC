@@ -454,8 +454,7 @@ public class CommandSourceStack implements ExecutionCommandSource<CommandSourceS
 	}
 
 	public boolean shouldFilterMessageTo(ServerPlayer serverPlayer) {
-		ServerPlayer serverPlayer2 = this.getPlayer();
-		return serverPlayer == serverPlayer2 ? false : serverPlayer2 != null && serverPlayer2.isTextFilteringEnabled() || serverPlayer.isTextFilteringEnabled();
+		return false;
 	}
 
 	public void sendChatMessage(OutgoingChatMessage outgoingChatMessage, boolean bl, ChatType.Bound bound) {

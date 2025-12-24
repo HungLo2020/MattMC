@@ -105,8 +105,6 @@ public class DedicatedServerProperties extends Settings<DedicatedServerPropertie
 	public final Settings<DedicatedServerProperties>.MutableValue<Integer> entityBroadcastRangePercentage = this.getMutable(
 		"entity-broadcast-range-percentage", stringx -> Mth.clamp(Integer.parseInt(stringx), 10, 1000), 100
 	);
-	public final String textFilteringConfig = this.get("text-filtering-config", "");
-	public final int textFilteringVersion = this.get("text-filtering-version", 0);
 	public final Optional<MinecraftServer.ServerResourcePackInfo> serverResourcePackInfo;
 	public final DataPackConfig initialDataPackConfiguration;
 	public final Settings<DedicatedServerProperties>.MutableValue<Integer> playerIdleTimeout = this.getMutable("player-idle-timeout", 0);

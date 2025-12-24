@@ -49,7 +49,6 @@ import net.minecraft.server.jsonrpc.security.SecurityConfig;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.server.level.progress.LoggingLevelLoadListener;
-import net.minecraft.server.network.ServerTextFilter;
 import net.minecraft.server.network.TextFilter;
 import net.minecraft.server.packs.repository.PackRepository;
 import net.minecraft.server.players.NameAndId;
@@ -89,8 +88,6 @@ public class DedicatedServer extends MinecraftServer implements ServerInterface 
 	@Nullable
 	private MinecraftServerGui gui;
 	@Nullable
-	private final ServerTextFilter serverTextFilter;
-	@Nullable
 	private RemoteSampleLogger tickTimeLogger;
 	private boolean isTickTimeLoggingEnabled;
 	private final ServerLinks serverLinks;
@@ -111,7 +108,6 @@ public class DedicatedServer extends MinecraftServer implements ServerInterface 
 		super(thread, levelStorageAccess, packRepository, worldStem, Proxy.NO_PROXY, dataFixer, services, LoggingLevelLoadListener.forDedicatedServer());
 		this.settings = dedicatedServerSettings;
 		this.rconConsoleSource = new RconConsoleSource(this);
-		this.serverTextFilter = ServerTextFilter.createFromConfig(dedicatedServerSettings.getProperties());
 		this.serverLinks = createServerLinks(dedicatedServerSettings);
 		if (dedicatedServerSettings.getProperties().codeOfConduct) {
 			this.codeOfConductTexts = readCodeOfConducts();
@@ -444,10 +440,6 @@ public class DedicatedServer extends MinecraftServer implements ServerInterface 
 
 	@Override
 	public void onServerExit() {
-		if (this.serverTextFilter != null) {
-			this.serverTextFilter.close();
-		}
-
 		if (this.gui != null) {
 			this.gui.close();
 		}
@@ -788,7 +780,7 @@ public class DedicatedServer extends MinecraftServer implements ServerInterface 
 
 	@Override
 	public TextFilter createTextFilterForPlayer(ServerPlayer serverPlayer) {
-		return this.serverTextFilter != null ? this.serverTextFilter.createContext(serverPlayer.getGameProfile()) : TextFilter.DUMMY;
+		return TextFilter.DUMMY;
 	}
 
 	@Nullable

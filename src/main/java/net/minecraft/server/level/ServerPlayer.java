@@ -1997,11 +1997,11 @@ public class ServerPlayer extends Player {
 
 	@Override
 	public boolean isTextFilteringEnabled() {
-		return this.textFilteringEnabled;
+		return false;
 	}
 
 	public boolean shouldFilterMessageTo(ServerPlayer serverPlayer) {
-		return serverPlayer == this ? false : this.textFilteringEnabled || serverPlayer.textFilteringEnabled;
+		return false;
 	}
 
 	@Override
