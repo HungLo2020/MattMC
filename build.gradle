@@ -596,29 +596,16 @@ tasks.register('fabricLoaderJar', Jar) {
 
 tasks.register('gameJar', Jar) {
     group = 'build'
-    description = 'Assembles the Minecraft game JAR with integrated modules'
+    description = 'Assembles the Minecraft game JAR'
     
-    // Ensure all module classes are compiled before creating game JAR
-    dependsOn 'classes', 'compileSodiumJava', 'compileIrisJava'
-    if (enableDistantHorizons) {
-        dependsOn 'compileDistantHorizonsJava'
-    }
+    dependsOn 'classes'
     
     archiveBaseName = 'minecraft'
     archiveVersion = version
     
-    // Include main Minecraft code plus all integrated modules
     from sourceSets.main.output
-    from sourceSets.sodium.output
-    from sourceSets.iris.output
-    if (enableDistantHorizons) {
-        from sourceSets.distantHorizons.output
-    }
     
     destinationDirectory = file("${buildDir}/libs")
-    
-    // Exclude duplicate META-INF/services - merge them instead
-    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
 }
 
 // Ensure fabricLoaderJar depends on compilation
@@ -782,19 +769,8 @@ tasks.register('shaderPackZip', Zip) {
 // ============================================================================
 
 jar {
-    // Ensure all module classes are compiled before creating JAR
-    dependsOn 'compileFabricLoaderJava', 'compileSodiumJava', 'compileIrisJava'
-    if (enableDistantHorizons) {
-        dependsOn 'compileDistantHorizonsJava'
-    }
-    
-    // Include all module source sets in the main JAR for tight integration
+    // Include both source sets in the main JAR for distribution
     from sourceSets.fabricLoader.output
-    from sourceSets.sodium.output
-    from sourceSets.iris.output
-    if (enableDistantHorizons) {
-        from sourceSets.distantHorizons.output
-    }
     from sourceSets.main.output
     
     manifest {
@@ -944,17 +920,22 @@ tasks.register('runServerGui', JavaExec) {
 // Task to run the Minecraft client through Fabric Loader (Knot)
 tasks.register('runClient', JavaExec) {
     group = 'minecraft'
-    description = 'Runs the Minecraft client with Fabric Loader and integrated modules'
+    description = 'Runs the Minecraft client with Fabric Loader'
     
-    // Use separate Fabric Loader and Game JARs (with integrated mods in game JAR)
-    dependsOn 'fabricLoaderJar', 'gameJar', 'copyJdkToRun', 'shaderPackZip'
+    // Conditionally add distantHorizonsJar to dependencies based on property
+    def dependencies = ['fabricLoaderJar', 'gameJar', 'sodiumJar', 'irisJar', 'copyJdkToRun', 'shaderPackZip']
+    if (enableDistantHorizons) {
+        dependencies.add(4, 'distantHorizonsJar') // Add after irisJar
+    }
+    dependsOn dependencies
     
     // Use the separate JARs so Fabric Loader can detect the game JAR properly
     // The order matters: Fabric Loader JAR first, then Game JAR, then dependencies
     def fabricLoaderJarFile = file("${buildDir}/libs/fabric-loader-${fabricLoaderVersion}.jar")
     def gameJarFile = file("${buildDir}/libs/minecraft-${version}.jar")
     
-    classpath = files(fabricLoaderJarFile, gameJarFile) + configurations.runtimeClasspath
+    classpath = files(fabricLoaderJarFile, gameJarFile) + 
+                configurations.runtimeClasspath
     
     // Use Fabric Loader's KnotClient as the entry point
     mainClass = 'net.fabricmc.loader.impl.launch.knot.KnotClient'
@@ -988,13 +969,19 @@ tasks.register('runClient', JavaExec) {
         workingDir.mkdirs()
         file('run/assets').mkdirs()
         file('run/resourcepacks').mkdirs()
-        
-        // Create empty mods folder (all mods are now integrated into game JAR)
+        // Clear and recreate mods folder to remove stale/old mod JARs
         def modsDir = file('run/mods')
         if (modsDir.exists()) {
             modsDir.deleteDir()
         }
         modsDir.mkdirs()
+        
+        // Copy Sodium and Iris mod JARs to mods folder
+        copy {
+            from file("${buildDir}/mods")
+            into modsDir
+            include '*.jar'
+        }
         
         // Copy assets from src/main/resources/assets to run/assets for dev environment
         def resourcesAssetsDir = file('src/main/resources/assets')
@@ -1220,8 +1207,12 @@ tasks.register('clientDist') {
     group = 'distribution'
     description = 'Creates a runnable client distribution'
     
-    // Use separate Fabric Loader and Game JARs (with integrated mods)
-    dependsOn 'fabricLoaderJar', 'gameJar', 'classes', 'downloadJdk', 'shaderPackZip'
+    // Conditionally add distantHorizonsJar to dependencies based on property
+    def dependencies = ['jar', 'classes', 'downloadJdk', 'shaderPackZip', 'fabricLoaderJar', 'gameJar', 'sodiumJar', 'irisJar']
+    if (enableDistantHorizons) {
+        dependencies.add('distantHorizonsJar')
+    }
+    dependsOn dependencies
     
     def distDir = "${buildDir}/client-dist/MattMC"
     
@@ -1243,12 +1234,12 @@ tasks.register('clientDist') {
         }
         println "Copied Fabric Loader JAR to ${distDir}/lib"
         
-        // Copy Game JAR (with integrated modules) to lib directory
+        // Copy Game JAR to lib directory
         copy {
             from file("${buildDir}/libs/minecraft-${version}.jar")
             into "${distDir}/lib"
         }
-        println "Copied Game JAR (with integrated modules) to ${distDir}/lib"
+        println "Copied Game JAR to ${distDir}/lib"
         
         // Copy all dependency JARs
         copy {
@@ -1293,7 +1284,13 @@ tasks.register('clientDist') {
         }
         println "Copied shader pack to ${distDir}/run/shaderpacks"
         
-        // No need to copy mod JARs - all modules are now integrated into game JAR
+        // Copy mod JARs (Sodium, Iris) to run/mods directory
+        copy {
+            from file("${buildDir}/mods")
+            into "${distDir}/run/mods"
+            include '*.jar'
+        }
+        println "Copied mod JARs to ${distDir}/run/mods"
         
         // Build classpath string for launch scripts
         // Fabric Loader JAR first, then Game JAR, then dependencies (same order as runClient)
