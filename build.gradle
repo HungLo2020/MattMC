@@ -429,21 +429,10 @@ sourceSets {
     // Main source set - Minecraft and project code (compiled to game JAR)
     main {
         java {
-            srcDir '.'
+            srcDir 'src/main/java'
             
-            // Global excludes
-            exclude 'gradle/**'
-            exclude 'build/**'
-            exclude '.git/**'
-            exclude '.idea/**'
             // Exclude bundled Mojang sources that shadow Maven dependencies
             exclude 'com/mojang/authlib/**'
-            // Exclude test sources from main source set
-            exclude 'src/test/**'
-            // Exclude frnsrc directory entirely (reference-only code)
-            exclude 'frnsrc/**'
-            // Exclude modules directory (compiled separately)
-            exclude 'modules/**'
         }
         resources {
             srcDirs = [
